@@ -7,6 +7,21 @@ using namespace godot;
 
 namespace BlastBullets2D {
 
+// Pushes bullet i's cached transform everywhere at once: the physics shape,
+// the drawn instance (enabled bullets only: a disabled slot keeps the zero
+// transform that hides it), the attachment (carried by attachment_delta;
+// stick-relative ones recompute) and a fresh interpolation history. So a
+// paused factory never shows a stale pose.
+void BulletVolley2D::present_bullet_transform(int bullet_index, const Vector2 &attachment_delta) {
+	const Transform2D &transf = all_cached_instance_transforms[bullet_index];
+	sync_shape_transform_from_instance(bullet_index, transf);
+	if (all_bullets_enabled_set.contains(bullet_index)) {
+		multi->set_instance_transform_2d(bullet_index, to_local_for_multimesh(transf));
+	}
+	carry_attachment_with_transform(bullet_index, transf, attachment_delta);
+	update_bullet_previous_transform_for_interpolation(bullet_index);
+}
+
 void BulletVolley2D::set_inherited_velocity_offset(const Vector2 &new_offset) {
 	if (!new_offset.is_finite()) {
 		UtilityFunctions::push_error("set_inherited_velocity_offset: offset must be finite, keeping the old value.");
@@ -421,6 +436,26 @@ Vector2 BulletVolley2D::get_bullet_direction(int bullet_index) const {
 	return all_cached_direction[bullet_index];
 }
 
+// True, after one warning naming the owner, when a direction curve (shared
+// or this bullet's own) steers bullet i: a direct direction write would be
+// overwritten on the next tick, so the setters refuse it.
+bool BulletVolley2D::direction_curve_owns_direction(int bullet_index) {
+	const char *owner = nullptr;
+	if (shared_bullet_curves_data.is_valid() && (shared_bullet_curves_data->x_direction_curve.is_valid() || shared_bullet_curves_data->y_direction_curve.is_valid())) {
+		owner = "shared";
+	} else {
+		const BulletCurvesData2D *own = find_bullet_curves_data_ptr(bullet_index);
+		if (own != nullptr && (own->x_direction_curve.is_valid() || own->y_direction_curve.is_valid())) {
+			owner = "individual";
+		}
+	}
+	if (owner == nullptr) {
+		return false;
+	}
+	UtilityFunctions::push_warning(String("You are trying to set bullet direction directly while having a direction curve assigned to the ") + owner + " curves data. The curve will override any direct direction changes. Set the curve to null first if you want to set direction directly.");
+	return true;
+}
+
 void BulletVolley2D::set_bullet_direction(int bullet_index, const Vector2 &new_direction) {
 	if (!validate_bullet_index(bullet_index, "set_bullet_direction")) {
 		return;
@@ -436,15 +471,7 @@ void BulletVolley2D::set_bullet_direction(int bullet_index, const Vector2 &new_d
 		return;
 	}
 
-	if (shared_bullet_curves_data.is_valid() && (shared_bullet_curves_data->x_direction_curve.is_valid() || shared_bullet_curves_data->y_direction_curve.is_valid())) {
-		UtilityFunctions::push_warning("You are trying to set bullet direction directly while having a direction curve assigned to the shared curves data. The curve will override any direct speed data changes. Set the curve to null first if you want to set speed data directly.");
-		return;
-	}
-
-	BulletCurvesData2D *curves_data = find_bullet_curves_data_ptr(bullet_index);
-
-	if (curves_data != nullptr && (curves_data->x_direction_curve.is_valid() || curves_data->y_direction_curve.is_valid())) {
-		UtilityFunctions::push_warning("You are trying to set bullet direction directly while having a direction curve assigned to the individual curves data. The curve will override any direct speed data changes. Set the curve to null first if you want to set speed data directly.");
+	if (direction_curve_owns_direction(bullet_index)) {
 		return;
 	}
 
@@ -493,25 +520,11 @@ void BulletVolley2D::set_bullet_texture_rotation_radians(int bullet_index, real_
 		return;
 	}
 
-	auto &curr_transf = all_cached_instance_transforms[bullet_index];
-	// Absolute visual rotation: the volley-wide texture offset is part of
-	// the instance basis (spawn path bakes it in), so writing absolute
-	// would double-count it in adjust_direction_based_on_rotation (which
-	// strips exactly one offset). Compose like the towards_position setter.
-	curr_transf.set_rotation(new_rotation_radians + cache_texture_rotation_radians);
-	sync_shape_transform_from_instance(bullet_index, curr_transf);
-
-	// Instantly apply the updated transform so paused factories don't render stale visuals.
-	if (all_bullets_enabled_set.contains(bullet_index)) {
-		multi->set_instance_transform_2d(bullet_index, to_local_for_multimesh(curr_transf));
-	}
-
-	// Stick-relative attachments follow the rotation like set_bullet_transform
-	// does: without this they sit at the old angle until the next tick (and
-	// forever while paused).
-	carry_attachment_with_transform(bullet_index, curr_transf, Vector2(0, 0));
-
-	update_bullet_previous_transform_for_interpolation(bullet_index);
+	// The volley-wide texture offset is part of the instance basis (the
+	// spawn path bakes it in): compose it, or adjust_direction_based_on_
+	// rotation (which strips exactly one offset) would double-count it.
+	all_cached_instance_transforms[bullet_index].set_rotation(new_rotation_radians + cache_texture_rotation_radians);
+	present_bullet_transform(bullet_index, Vector2(0, 0));
 }
 
 TypedArray<real_t> BulletVolley2D::all_bullets_get_texture_rotation_radians(int bullet_index_start, int bullet_index_end_inclusive) const {
@@ -545,18 +558,8 @@ void BulletVolley2D::set_bullet_texture_rotation_degrees(int bullet_index, real_
 		return;
 	}
 
-	auto &curr_transf = all_cached_instance_transforms[bullet_index];
-	curr_transf.set_rotation(Math::deg_to_rad(new_rotation_degrees) + cache_texture_rotation_radians);
-	sync_shape_transform_from_instance(bullet_index, curr_transf);
-
-	// Instantly apply the updated transform so paused factories don't render stale visuals.
-	if (all_bullets_enabled_set.contains(bullet_index)) {
-		multi->set_instance_transform_2d(bullet_index, to_local_for_multimesh(curr_transf));
-	}
-
-	carry_attachment_with_transform(bullet_index, curr_transf, Vector2(0, 0));
-
-	update_bullet_previous_transform_for_interpolation(bullet_index);
+	all_cached_instance_transforms[bullet_index].set_rotation(Math::deg_to_rad(new_rotation_degrees) + cache_texture_rotation_radians);
+	present_bullet_transform(bullet_index, Vector2(0, 0));
 }
 
 TypedArray<real_t> BulletVolley2D::all_bullets_get_texture_rotation_degrees(int bullet_index_start, int bullet_index_end_inclusive) const {
@@ -631,26 +634,8 @@ void BulletVolley2D::set_bullet_transform(int bullet_index, const Transform2D &n
 	curr_bullet_transf = new_transform;
 	curr_bullet_origin = new_transform.get_origin();
 
-	sync_shape_transform_from_instance(bullet_index, curr_bullet_transf);
-
-	// Instantly apply the updated transforms
-	if (all_bullets_enabled_set.contains(bullet_index)) {
-		multi->set_instance_transform_2d(bullet_index, to_local_for_multimesh(curr_bullet_transf));
-	}
-
-	// Carry the attachment along so it doesn't stay behind at the old position.
-	// Stick-relative attachments recompute from the new transform (same as the next
-	// tick would); non-stick ones translate by the jump delta (they never heal otherwise).
-	if (bullet_factory != nullptr && bullet_index >= 0 && bullet_index < (int)attachments.size() && attachments[bullet_index] != nullptr) {
-		if (attachment_stick_relative_to_bullet[bullet_index]) {
-			attachment_transforms[bullet_index] = calculate_attachment_global_transf(bullet_index, curr_bullet_transf);
-		} else {
-			attachment_transforms[bullet_index] = attachment_transforms[bullet_index].translated(origin_delta);
-		}
-		if (!bullet_factory->use_physics_interpolation) {
-			attachments[bullet_index]->set_global_transform(attachment_transforms[bullet_index]);
-		}
-	}
+	// The attachment shifts by the jump (stick-relative ones recompute).
+	present_bullet_transform(bullet_index, origin_delta);
 
 	// Update direction if requested. A direction curve owns the direction, so
 	// skip just this part (the transform itself is still applied above).
@@ -673,8 +658,6 @@ void BulletVolley2D::set_bullet_transform(int bullet_index, const Transform2D &n
 			}
 		}
 	}
-
-	update_bullet_previous_transform_for_interpolation(bullet_index);
 }
 
 TypedArray<Transform2D> BulletVolley2D::all_bullets_get_transforms(int bullet_index_start, int bullet_index_end_inclusive) const {
@@ -694,15 +677,7 @@ void BulletVolley2D::set_bullet_direction_towards_position(int bullet_index, con
 		return;
 	}
 
-	if (shared_bullet_curves_data.is_valid() && (shared_bullet_curves_data->x_direction_curve.is_valid() || shared_bullet_curves_data->y_direction_curve.is_valid())) {
-		UtilityFunctions::push_warning("You are trying to set bullet direction directly while having a direction curve assigned to the shared curves data. The curve will override any direct direction changes. Set the curve to null first if you want to set direction directly.");
-		return;
-	}
-
-	BulletCurvesData2D *towards_curves_data = find_bullet_curves_data_ptr(bullet_index);
-
-	if (towards_curves_data != nullptr && (towards_curves_data->x_direction_curve.is_valid() || towards_curves_data->y_direction_curve.is_valid())) {
-		UtilityFunctions::push_warning("You are trying to set bullet direction directly while having a direction curve assigned to the individual curves data. The curve will override any direct direction changes. Set the curve to null first if you want to set direction directly.");
+	if (direction_curve_owns_direction(bullet_index)) {
 		return;
 	}
 
@@ -737,15 +712,7 @@ void BulletVolley2D::set_bullet_direction_towards_node2d(int bullet_index, const
 		UtilityFunctions::push_error("set_bullet_direction_towards_node2d: target position must be finite.");
 		return;
 	}
-	if (shared_bullet_curves_data.is_valid() && (shared_bullet_curves_data->x_direction_curve.is_valid() || shared_bullet_curves_data->y_direction_curve.is_valid())) {
-		UtilityFunctions::push_warning("You are trying to set bullet direction directly while having a direction curve assigned to the shared curves data. The curve will override any direct direction changes. Set the curve to null first if you want to set direction directly.");
-		return;
-	}
-
-	BulletCurvesData2D *towards_node_curves_data = find_bullet_curves_data_ptr(bullet_index);
-
-	if (towards_node_curves_data != nullptr && (towards_node_curves_data->x_direction_curve.is_valid() || towards_node_curves_data->y_direction_curve.is_valid())) {
-		UtilityFunctions::push_warning("You are trying to set bullet direction directly while having a direction curve assigned to the individual curves data. The curve will override any direct direction changes. Set the curve to null first if you want to set direction directly.");
+	if (direction_curve_owns_direction(bullet_index)) {
 		return;
 	}
 	if (bullet_index < 0 || bullet_index >= (int)all_cached_direction.size() || bullet_index >= (int)all_cached_velocity.size() || bullet_index >= (int)all_cached_speed.size() || bullet_index >= (int)all_cached_instance_origin.size()) {
@@ -805,18 +772,7 @@ void BulletVolley2D::set_bullet_texture_rotation_towards_position(int bullet_ind
 	Vector2 scale = transf.get_scale();
 	transf.set_rotation_and_scale(angle + cache_texture_rotation_radians, scale);
 	transf.set_origin(pos);
-	sync_shape_transform_from_instance(bullet_index, transf);
-
-	// Only write the multimesh slot for ENABLED bullets: a disabled slot holds the
-	// zero transform that hides it, and writing a real transform here would
-	// resurrect the visual for a frame (or permanently on a paused factory).
-	if (all_bullets_enabled_set.contains(bullet_index)) {
-		multi->set_instance_transform_2d(bullet_index, to_local_for_multimesh(transf));
-	}
-
-	carry_attachment_with_transform(bullet_index, transf, Vector2(0, 0));
-
-	update_bullet_previous_transform_for_interpolation(bullet_index);
+	present_bullet_transform(bullet_index, Vector2(0, 0));
 }
 
 void BulletVolley2D::all_bullets_set_texture_rotation_towards_position(const Vector2 &target_position, int bullet_index_start, int bullet_index_end_inclusive) {

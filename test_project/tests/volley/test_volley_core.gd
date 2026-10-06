@@ -98,3 +98,31 @@ func test_texture_rotation_round_trip_with_offset() -> void:
 	w.set_bullet_texture_rotation_degrees(0, 30.0)
 	assert_almost_eq(w.get_bullet_texture_rotation_degrees(0), 30.0, 0.01, "degrees round-trip")
 	assert_almost_eq(angle_difference(w.get_bullet_transform(0).get_rotation(), deg_to_rad(30.0) + 0.7), 0.0, 0.001, "instance still carries the offset")
+
+
+## A direction curve owns the heading: every direction setter refuses the
+## write with ONE warning in direction wording (it once said "speed data").
+func test_direction_setters_under_a_direction_curve_refuse_with_direction_wording() -> void:
+	var target := Node2D.new()
+	target.position = Vector2(0, 300)
+	add(target)
+	for owner in ["shared", "individual"]:
+		var curves := BulletCurvesData2D.new()
+		curves.x_direction_curve = H.make_flat_curve(0.5)
+		var d := H.make_volley_data(2, 100.0, 30.0)
+		if owner == "shared":
+			d.shared_bullet_curves_data = curves
+		else:
+			d.all_bullet_curves_data = [curves, curves]
+		var v: BulletVolley2D = factory.spawn_volley(d)
+		var before: Vector2 = v.get_bullet_direction(0)
+		var text := "You are trying to set bullet direction directly while having a direction curve assigned to the %s curves data. The curve will override any direct direction changes. Set the curve to null first if you want to set direction directly." % owner
+		v.set_bullet_direction(0, Vector2(0, -1))
+		expect_warning_sequence([text])
+		v.set_bullet_direction_towards_position(0, Vector2(-400, 0))
+		expect_warning_sequence([text])
+		v.set_bullet_direction_towards_node2d(0, target)
+		expect_warning_sequence([text])
+		assert_eq(v.get_bullet_direction(0), before, "%s curve: the direction was left to the curve" % owner)
+		v.clear_all_bullets()
+		await idle(1)

@@ -113,6 +113,25 @@ func expect_error_sequence(texts: Array, msg := "") -> void:
 	assert_true(ok, "%sexpected errors %s, got %s" % [(msg + ": ") if msg != "" else "", str(texts), str(seen)])
 
 
+## Same contract as expect_error_sequence, for push_warning: exactly
+## `texts.size()` NEW warnings, in order, each containing its entry.
+func expect_warning_sequence(texts: Array, msg := "") -> void:
+	var seen: Array[String] = []
+	var warns: Array = []
+	for err in get_errors():
+		if not err.handled and err.is_push_warning():
+			err.handled = true
+			warns.append(err)
+			seen.append(str(err.code))
+	var ok: bool = warns.size() == texts.size()
+	if ok:
+		for i in texts.size():
+			if not warns[i].contains_text(str(texts[i])):
+				ok = false
+				break
+	assert_true(ok, "%sexpected warnings %s, got %s" % [(msg + ": ") if msg != "" else "", str(texts), str(seen)])
+
+
 ## Asserts that NO unhandled error was recorded since the last expect_* call
 ## (a mid-test checkpoint: strict mode only checks at the very end).
 func expect_no_errors(msg := "") -> void:

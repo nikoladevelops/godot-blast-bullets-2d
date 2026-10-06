@@ -1098,6 +1098,8 @@ public:
 	// the texture-rotation setters, and the teleport paths so paused
 	// factories never leave attachments behind.
 	_ALWAYS_INLINE_ void carry_attachment_with_transform(int bullet_index, const Transform2D &new_transform, const Vector2 &origin_delta);
+	void present_bullet_transform(int bullet_index, const Vector2 &attachment_delta);
+	bool direction_curve_owns_direction(int bullet_index);
 
 	//////////////////// CURVES RELATED
 	inline void populate_shared_curves_related_data(const Ref<BulletCurvesData2D> &new_curves_data);
