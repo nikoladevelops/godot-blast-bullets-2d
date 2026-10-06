@@ -1,0 +1,154 @@
+{
+  "timestamp": "2026-10-06T17-47-37Z",
+  "commit": "46e2f26",
+  "dirty": false,
+  "repeat": 5,
+  "machine": {
+    "cpu": "AMD Ryzen 7 8840HS w/ Radeon 780M Graphics",
+    "cores": 16,
+    "os": "Linux-7.2.9-1-cachyos-x86_64-with-glibc2.44",
+    "python": "3.14.7"
+  },
+  "scenarios": {
+    "pool_churn": {
+      "active_bullets_mean": 9000.0,
+      "collision_records": 0,
+      "description": "one 300-bullet volley per frame, 0.5 s life (warm-pool spawn + expiry)",
+      "engine_ms": {
+        "max": 1.441,
+        "mean": 0.73404,
+        "p50": 0.721,
+        "p95": 0.817,
+        "p99": 0.84
+      },
+      "expired_bullets": 90000,
+      "extra": {},
+      "factory_tick_ms": {
+        "max": 0.707,
+        "mean": 0.28496,
+        "p50": 0.277,
+        "p95": 0.321,
+        "p99": 0.359
+      },
+      "frame_ms": {
+        "max": 1.576,
+        "mean": 0.817293333333333,
+        "p50": 0.802,
+        "p95": 0.923,
+        "p99": 0.984
+      },
+      "measure_frames": 300,
+      "memory_static_growth_mb": 0.0395088195800781,
+      "memory_static_peak_mb": 33.6197261810303,
+      "nodes_end": 38.0,
+      "objects_end": 4059.0,
+      "objects_growth": 0,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 329,
+      "pool_misses": 31,
+      "spawned_bullets": 90000,
+      "step_ms": {
+        "max": 0.179,
+        "mean": 0.0832533333333333,
+        "p50": 0.078,
+        "p95": 0.111,
+        "p99": 0.161
+      },
+      "warmup_frames": 60
+    },
+    "spawner_aimed_regen_2k": {
+      "active_bullets_mean": 36000.0,
+      "collision_records": 0,
+      "description": "2000-bullet aimed spawner regenerating its pattern every frame (uncacheable source)",
+      "engine_ms": {
+        "max": 4.357,
+        "mean": 2.618475,
+        "p50": 2.556,
+        "p95": 2.924,
+        "p99": 4.223
+      },
+      "expired_bullets": 400000,
+      "extra": {},
+      "factory_tick_ms": {
+        "max": 3.002,
+        "mean": 1.33239,
+        "p50": 1.314,
+        "p95": 1.463,
+        "p99": 2.008
+      },
+      "frame_ms": {
+        "max": 4.844,
+        "mean": 3.064845,
+        "p50": 2.997,
+        "p95": 3.413,
+        "p99": 4.655
+      },
+      "measure_frames": 200,
+      "memory_static_growth_mb": 0.0561447143554688,
+      "memory_static_peak_mb": 41.661584854126,
+      "nodes_end": 28.0,
+      "objects_end": 1594.0,
+      "objects_growth": 0,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 221,
+      "pool_misses": 19,
+      "spawned_bullets": 400000,
+      "step_ms": {
+        "max": 0.756,
+        "mean": 0.453775,
+        "p50": 0.439,
+        "p95": 0.518,
+        "p99": 0.598
+      },
+      "warmup_frames": 40
+    },
+    "spawner_warm_shot_5k": {
+      "active_bullets_mean": 90000.0,
+      "collision_records": 0,
+      "description": "5000-bullet heart spawner, shoot_once every frame, warm pool",
+      "engine_ms": {
+        "max": 16.069,
+        "mean": 11.63123,
+        "p50": 11.48,
+        "p95": 14.004,
+        "p99": 15.777
+      },
+      "expired_bullets": 1000000,
+      "extra": {},
+      "factory_tick_ms": {
+        "max": 5.549,
+        "mean": 3.488355,
+        "p50": 3.403,
+        "p95": 3.814,
+        "p99": 5.334
+      },
+      "frame_ms": {
+        "max": 17.697,
+        "mean": 13.320875,
+        "p50": 13.142,
+        "p95": 16.203,
+        "p99": 17.433
+      },
+      "measure_frames": 200,
+      "memory_static_growth_mb": 1.04824066162109,
+      "memory_static_peak_mb": 158.692316055298,
+      "nodes_end": 27.0,
+      "objects_end": 1593.0,
+      "objects_growth": 0,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 221,
+      "pool_misses": 19,
+      "spawned_bullets": 1000000,
+      "step_ms": {
+        "max": 3.416,
+        "mean": 1.728445,
+        "p50": 1.679,
+        "p95": 1.751,
+        "p99": 2.708
+      },
+      "warmup_frames": 40
+    }
+  },
+  "godot": "4.7.2-stable (arch_linux)",
+  "debug_build": true
+}
