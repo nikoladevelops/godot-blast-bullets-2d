@@ -2,7 +2,8 @@
 
 #include "godot_cpp/classes/node2d.hpp"
 #include "godot_cpp/variant/vector2.hpp"
-#include <deque>
+#include <utility>
+#include <vector>
 
 namespace BlastBullets2D {
 using namespace godot;
@@ -37,6 +38,59 @@ struct HomingTarget {
 			type(GlobalPositionTarget), global_position_target(pos) {}
 	HomingTarget(Node2D *node, uint64_t id) :
 			type(Node2DTarget), node2d_target_data(node, id) {}
+};
+
+// Double-ended queue that allocates NOTHING while empty: every bullet owns
+// one, and std::deque allocates its map and a first node on construction
+// (two mallocs and ~0.5 KB per bullet on every cold spawn, homing or not).
+// A ring over a vector that doubles when full; slots are value types.
+template <typename T>
+class RingDeque2D {
+public:
+	bool empty() const noexcept { return count == 0; }
+	int size() const noexcept { return count; }
+	T &front() { return buf[head]; }
+	const T &front() const { return buf[head]; }
+	T &back() { return buf[wrap(head + count - 1)]; }
+	void emplace_back(const T &value) {
+		grow_if_full();
+		buf[wrap(head + count)] = value;
+		++count;
+	}
+	void emplace_front(const T &value) {
+		grow_if_full();
+		head = wrap(head + capacity() - 1);
+		buf[head] = value;
+		++count;
+	}
+	void pop_front() {
+		buf[head] = T();
+		head = wrap(head + 1);
+		--count;
+	}
+	void pop_back() {
+		buf[wrap(head + count - 1)] = T();
+		--count;
+	}
+
+private:
+	std::vector<T> buf;
+	int head = 0;
+	int count = 0;
+
+	int capacity() const { return (int)buf.size(); }
+	int wrap(int index) const { return index % capacity(); }
+	void grow_if_full() {
+		if (count < capacity()) {
+			return;
+		}
+		std::vector<T> grown(capacity() == 0 ? 4 : capacity() * 2);
+		for (int k = 0; k < count; ++k) {
+			grown[k] = std::move(buf[wrap(head + k)]);
+		}
+		buf.swap(grown);
+		head = 0;
+	}
 };
 
 class HomingTargetDeque {
@@ -348,7 +402,7 @@ private:
 		return nullptr;
 	}
 
-	std::deque<HomingTarget> homing_targets;
+	RingDeque2D<HomingTarget> homing_targets;
 	mutable Vector2 cached_front_target_global_position{ 0, 0 };
 };
 } //namespace BlastBullets2D
