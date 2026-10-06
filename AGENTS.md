@@ -1,283 +1,364 @@
-# AGENTS.md — BlastBullets2D agentic workflow
+# AGENTS.md — BlastBullets2D: how to work on this codebase
 
-Godot 4 GDExtension (C++ via godot-cpp) + GUT headless suites. Stability and
-performance are Priority 1; every behavior change must be verified by an
-executed test. Read §0 first, then the section you need before touching
-`src/` or tests. Every fact below was verified by running it; if you find
-one that is wrong, fix this file in the same change.
+Godot 4 GDExtension (C++ via godot-cpp) + headless GUT test suites. Stability
+and performance come first; every behavior change is proven by an executed
+test, every refactor by an unchanged behavior snapshot. Every fact below was
+verified by running it; if one turns out wrong, fix this file in the same
+change.
 
-## 0. Quick start + decision table (read this even if you read nothing else)
+**If you read nothing else, read §0, §1 and §2.** Use the table of contents
+for the rest: the sections are written to be looked up, not read once.
+
+| § | Topic | § | Topic |
+|---|---|---|---|
+| 0 | Golden rules | 10 | Pattern module (BulletPatterns2D, spawner patterns) |
+| 1 | Commands | 11 | Volley (BulletVolley2D) architecture |
+| 2 | The work loop (do it like this) | 12 | Factory, spawner, signals, pooling |
+| 3 | Decision table | 13 | Pattern bake cache |
+| 4 | Playbooks | 14 | Contracts and pitfalls catalog |
+| 5 | Commits | 15 | Benchmarks and performance lessons |
+| 6 | Never edit | 16 | Inspector groups and serialization |
+| 7 | Test harness | 17 | Documentation generation |
+| 8 | Writing tests | 18 | tools/ catalog |
+| 9 | Searching and reading | 19 | Final report template |
+
+## 0. Golden rules
+
+1. **Never guess.** Read the code (`rg -n`), probe the engine, run the test.
+   Cite `file:line` for every claim you make.
+2. **Failing test first.** A bug fix starts with a test that fails for the
+   right reason; a fix you never saw red is not proven.
+3. **Never weaken a test** to make it pass. Fix the code, or ask the user
+   (with engine-code references) when the contract itself is in question.
+4. **A refactor changes nothing observable.** Prove it with
+   `tools/api_snapshot.py diff` (IDENTICAL) before you commit.
+5. **Hot paths are sacred** (§15): no per-bullet allocation, no per-bullet
+   engine boundary crossing, benchmark before AND after.
+6. **Build only with `tools/compile_debug_build.py`**; check its exit code
+   before you test (a failed build leaves the old library).
+7. **Small steps:** one concern per change, build + test + snapshot after
+   each, commit each green step (§5).
+8. **Error and warning texts are public API.** Keep them byte-identical
+   unless the change is the point (then pin the new text in a test).
+9. **Ask the user** before changing a contract (public behavior, wording,
+   defaults); fix plain bugs without asking but list them in the report.
+10. **Finish green:** full suite + `--self-test` + format check + snapshot
+    diff + benchmark gate, then report with Big-O and a ratings table (§19).
+
+## 1. Commands
 
 ```sh
-GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py   # build (never raw scons, never edit SConstruct)
-python3 tools/run_tests.py                                       # ~136 files / ~876 tests, ~10 s, leak-checked
-python3 tools/run_tests.py --self-test                           # the harness itself still catches failures/leaks
-python3 tools/run_benchmarks.py --scenario <name>                # perf evidence (§15)
+GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py   # build (exit 1 = failed; never raw scons, never edit SConstruct)
+python3 tools/run_tests.py                                       # 139 files / 885 tests, ~10 s, leak-checked
+python3 tools/run_tests.py --suite <substring> --full            # one area, every failure message unclipped
+python3 tools/run_tests.py --self-test                           # proves the harness still catches failures/leaks
+python3 tools/api_snapshot.py save <label>                       # behavior snapshot (~10 s, §7.4)
+python3 tools/api_snapshot.py diff <label_a> <label_b>           # must print IDENTICAL for a refactor
+python3 tools/format_code.py [--check] [files or dirs]           # clang-format (repo .clang-format)
+python3 tools/run_benchmarks.py [--scenario <name>] [--gate]     # performance (§15)
+GODOTPP_NONINTERACTIVE=1 python3 tools/generate_xml_docs.py      # regenerate doc_classes (§17)
 ```
+
+## 2. The work loop (this is how the expert works)
+
+Follow these steps in order for EVERY change. Expected output is shown so you
+know what "done" looks like.
+
+1. **Understand before touching.** Find the code: `rg -n "name" src/`.
+   Read the whole function and its callers (`Read` with offset/limit for big
+   files: never assume what a function does from its name). Find the tests
+   that pin it: `rg -n "name" test_project/tests`. Note the error texts.
+2. **Probe what you are unsure about** (engine behavior, current output):
+   write `test_project/tests/spawner/test_zz_probe.gd` (extends BlastTest,
+   print values through a failing `assert_eq(str(values), "", "PROBE")`),
+   run it with `python3 tools/run_tests.py --suite test_zz_probe --full
+   --no-lint` (lint R6 refuses an unlisted suite), read the FAIL line
+   (`["<your values>"] expected to equal [""]: PROBE`), then DELETE the file
+   and its `.uid`.
+3. **Take a snapshot** when you will change C++: build, then
+   `python3 tools/api_snapshot.py save before`.
+4. **Bug fix: write the test first.** Add it to the suite of that area (or a
+   new suite: §8.4), run it, and confirm it FAILS for the reason you
+   expect (the assert message, not a script error).
+5. **Change the code** in the smallest steps you can. After each step:
+   ```sh
+   GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py   # must print "Compilation finished successfully"
+   python3 tools/run_tests.py --suite <area>                        # "ALL n TEST FILES PASSED (... no leaks)"
+   python3 tools/api_snapshot.py save after && python3 tools/api_snapshot.py diff before after
+   ```
+   A pure refactor must print `IDENTICAL`. A bug fix shows ONLY the entries
+   you meant to change: read each one; anything else is a regression.
+6. **Format** what you touched: `python3 tools/format_code.py src/<dir>`.
+7. **Hot path touched?** Benchmark before and after (§15) on the same
+   machine and build; differences under ~5% p50 are noise.
+8. **Full verification:** `python3 tools/run_tests.py`,
+   `python3 tools/run_tests.py --self-test`, `python3 tools/format_code.py --check`.
+9. **Public API or docs changed?** Update `doc_classes/` (§17) and list new
+   suites in `test_project/tests/README.md` (the lint fails otherwise).
+10. **Commit** the green step (§5), then continue with the next step.
+
+Habits that matter:
+- Before changing any message text, `rg` the tests for SEVERAL fragments
+  of it (prefix and suffix): `expect_errors_containing` pins substrings, so
+  searching one part misses the pin. Run the FULL suite before every commit,
+  not only the area suite (a reworded curves error once passed its area
+  suite and broke `volley/test_volley_api_coverage.gd`).
+- Scripted multi-file edits: assert every `old` text occurs exactly as many
+  times as you expect BEFORE writing (`str.replace("", x)` inserts x between
+  every character: an empty match once exploded `pattern_generate2d.cpp`). Re-read the diff (`git diff --stat`, `git diff`) after.
+- Mechanical rewrites (regex over many functions) are fine when the
+  compiler and the snapshot check them; fix the few compile errors by hand.
+- When a benchmark regresses, diagnose before reverting: the cause is often
+  a per-bullet store/allocation or a mutable context the compiler must
+  reload (§15.3).
+- Keep the user's hand-edited files out of your commits
+  (`test_project/benchmark_scene/benchmark.tscn`).
+
+## 3. Decision table
 
 | Situation | Do this | Never do this |
 |---|---|---|
-| A test fails after your change | Read the FULL failure text; reproduce with `--suite <file>`; fix the code | Edit the assertion to match new behavior without asking the user (§16.3) |
-| Unexpected `push_error` fails a test | Find the emitter with `rg -n "<text>" src/`; decide if the call is wrong (fix the test input) or the code is wrong (fix code) | `swallow_errors()` (lint rejects it outside the fuzz allowlist) |
-| `CRASH` / missing JUnit report | Stale or broken `.so`: rebuild, rerun; check the log for `SCRIPT ERROR` / `class_db.cpp` | Assume it passed |
-| `LEAK` verdict | Something survives the test: `add()`/autofree nodes, free RIDs, disconnect | Add `--no-leaks` and call it green |
-| New property invisible in inspector | ADD_PROPERTY before its bind, wrong subgroup prefix, or `_validate_property` gate (§9) | Hide the visibility test failure |
-| Need to know if your test is real | Mutation-check it (§6): break the code on purpose, watch the test fail, restore | Trust a test you never saw fail |
-| Perf change | Benchmark before AND after on the same machine/build (§15) | Claim a speedup from one run or a different build type |
-| Runner prints only part of a failure | Re-run with `--full` (every failing parameter, unclipped) | Guess from the first line |
-| Runner says "src/ is newer than the compiled extension" | Rebuild (§0c step 2); comment-only edits count too | `--allow-stale` |
-| Unsure about engine behavior | Probe it: write `test_project/tests/spawner/test_zz_probe.gd` (extends BlastTest, put the values in a failing `assert_eq(..., "", "PROBE")`), run `godot --headless --fixed-fps 60 --path test_project -s addons/gut/gut_cmdln.gd -gconfig= -gtest=res://tests/spawner/test_zz_probe.gd -gexit -gdisable_colors`, read the message, then DELETE the file and its `.uid` | Guess from memory of Godot docs; leave the probe behind |
-| A pattern draws fewer bullets or two bullets on one spot | Extend `spawner/test_spawner_pattern_counts.gd` first, then fix the generator (§6b) | Accept "it looks fine" |
-| A handler needs reset / free_* / populate_* / a shape change | Call the `*_deferred` twin (`reset_deferred`, `set_collision_shape_runtime_deferred`, ...) (§12b) | `call_deferred` from physics: it still runs inside the physics frame and is rejected |
-| Adding a pattern knob | Field in `PatternKnobs2D` + one `PATTERN_KNOB` row in `pattern_knob_table2d.inc` (§6b) | Hand-written accessor, declaration and bind |
-| Refactoring pattern or accessor code | Hash every generator's output and dump the spawner surface (properties, methods, setter outcomes) before and after; both must be identical | Trust the suite alone for a pure refactor |
-| "Homing bullets sometimes miss" | Check inherited momentum vs bullet speed (`inherit_movement_velocity`) and turn radius speed / `homing_smoothing` vs the hitbox | Assume a pattern bug |
+| A test fails after your change | Read the FULL failure (`--full`); reproduce with `--suite <file>`; fix the code | Edit the assertion to match new behavior without asking (§0.3) |
+| Unexpected `push_error` fails a test | Find the emitter: `rg -n "<text>" src/`; decide whether the call (test input) or the code is wrong | `swallow_errors()` (lint rejects it outside the fuzz allowlist) |
+| `CRASH` / missing JUnit report | Stale or broken `.so`: rebuild, rerun; read the log for `SCRIPT ERROR` / `class_db.cpp` | Assume it passed |
+| Runner says "src/ changed after the last successful build" | The last build FAILED (or never ran): fix the compile error, rebuild | `--allow-stale` |
+| `LEAK` verdict | Something survives the test: `add()`/autofree nodes, free RIDs, disconnect | `--no-leaks` and call it green |
+| Snapshot diff shows entries you did not intend | It is a behavior change: find which step caused it (re-snapshot per step) | Commit and hope |
+| Snapshot diff is IDENTICAL but a test failed | Tests are stricter in places (signals, timing): the test wins | Ignore the test |
+| New property invisible in the inspector | ADD_PROPERTY before its bind, wrong subgroup prefix, or `_validate_property` gate (§16) | Hide the visibility test failure |
+| Need to know if your test is real | Mutation-check it (§8.3): break the code, watch it fail, restore | Trust a test you never saw fail |
+| Perf change | Benchmark before AND after on the same build (§15) | Claim a speedup from one run |
+| Unsure about engine behavior | Probe it (§2.2) | Guess from memory of Godot docs |
+| A pattern draws fewer bullets or stacks two | Extend `spawner/test_spawner_pattern_counts.gd`, then fix the generator (§10) | "It looks fine" |
+| Adding a pattern knob | Field in `PatternKnobs2D` + one `PATTERN_KNOB` row (§10.3) | Hand-written accessor, declaration and bind |
+| Adding a generator argument | One row in `pattern_signatures2d.inc` + the Params struct field (§10.2) | Editing the header, the wrapper and the bind by hand |
+| A handler needs reset / free_* / populate_* / a shape change | Call the `*_deferred` twin (§12.3) | `call_deferred` from physics (still inside the physics frame) |
+| "Homing bullets sometimes miss" | Check inherited momentum vs speed (`inherit_movement_velocity`), turn rate (`homing_smoothing`) vs hitbox | Assume a pattern bug |
+| A warning must be pinned | `expect_warning_sequence([...])` | `expect_error_sequence` (it ignores warnings) |
 
-## 0b. Commits (user rule — overrides any tool or harness default)
+## 4. Playbooks
 
-- NEVER add `Co-Authored-By` lines, and never mention Claude, Anthropic,
-  or any AI model/assistant anywhere in a commit (title, body, trailer).
+### 4.1 Fix a bug
+1. Reproduce: smallest script or test that shows it (§2.2 probe).
+2. Find the cause in code; cite `file:line`. Look for siblings: the same
+   mistake is often copied (e.g. velocity composed without the fall speed
+   appeared in 8 setters).
+3. Red test in the area's suite (assert the documented behavior, exact
+   texts). Run: it fails for the right reason.
+4. Minimal fix; rebuild; the test passes; the full suite passes.
+5. Snapshot diff: only the intended entries changed.
+6. Commit: `Fix <thing>` + one line of why.
+
+### 4.2 Pure refactor (behavior must not change)
+1. `save before` on the current build.
+2. Change one thing (e.g. extract a helper); keep every expression, cast and
+   operation order: float results must stay bit-identical (`a/2.0f` and
+   `a*0.5f` are equal; `0.0` vs `-0.0` after `x*0` is NOT; `Vector2(r(), r())`
+   has unspecified evaluation order; `Transform2D(rot, pos)` + `set_scale`
+   differs from the 4-argument constructor).
+3. Build, `save after`, `diff before after` → `IDENTICAL`; run the area's
+   suites; benchmark if the hot path moved.
+4. The snapshot only covers what it exercises: if your refactor touches a
+   path it does not reach (check by breaking it on purpose), add a snapshot
+   section first and re-baseline at the OLD code: `git checkout <old> -- src/`,
+   build, `save base`, `git checkout HEAD -- src/`, build.
+
+### 4.3 Add or change a volley feature / property
+Read §11 first. Then the checklist in §8.5. Per-bullet state lives in
+parallel arrays sized per volley; if your array must reset on a new life,
+add it where the others of its feature reset (bounce arrays: ONE list in
+`visit_bounce_ledger`; rotation arrays: `visit_rotation_trio`). Per-bullet
+work in the tick goes into the matching stage of `move_bullets` (§11.2).
+
+### 4.4 Patterns: add a knob, a generator argument or a shape
+See §10. A new knob = one table row; a new generator argument = one
+signature row + a Params field (append at the END: positional GDScript calls
+must keep working); a new shape = registry row + Params struct + signature
+entry + `generate_<shape>2d` + dispatch + track case.
+
+### 4.5 Performance change
+`run_benchmarks.py --scenario <x>` before, change, rebuild, after; repeat a
+surprising result. A/B against an old commit: §15.2. Never update the
+baseline unless the change is accepted (say so in the commit).
+
+### 4.6 Documentation
+Bound API change → §17. Description text only → edit `doc_classes/*.xml`
+directly (BBCode, escape `<` `>`), rebuild, regenerate: the diff must be
+empty apart from escaping.
+
+### 4.7 Formatting
+`python3 tools/format_code.py <files or dirs>` after editing C++.
+`--check` must pass before you finish. X-macro tables (`*.inc`) are not
+formatted (rows are aligned by hand). Formatting-only commits go into
+`.git-blame-ignore-revs` (`git config blame.ignoreRevsFile .git-blame-ignore-revs`).
+
+## 5. Commits (user rule — overrides any tool or harness default)
+
+- NEVER add `Co-Authored-By` lines, and never mention Claude, Anthropic, or
+  any AI model/assistant anywhere in a commit (title, body, trailer).
 - Title: imperative, short and descriptive, at most 50 characters
   (`Fix flower bullet count`, `Add spawner cadence tests`).
-- Body: optional, at most 3 short lines saying what changed and why.
-  No essays, no test counts, no file lists.
-- Commit only when the user asks (or the approved plan says so); push only
-  when the user asks. Never force-push without explicit approval.
-- Stage files explicitly. Never stage unrelated user changes (e.g. a scene
-  the user edited by hand, like `test_project/benchmark_scene/benchmark.tscn`).
+- Body: optional, at most 3 short lines saying what changed and why. No
+  essays, no test counts, no file lists.
+- Commit only when the user asks (or the approved plan says so); one commit
+  per green step. Push only when asked; never force-push without approval.
+- Stage files explicitly; never stage unrelated user changes (e.g. the
+  hand-edited `test_project/benchmark_scene/benchmark.tscn`). New test files
+  come with their `.uid` (run a headless `--import` if it is missing).
 
 ```sh
 git add <the files you changed>
 git commit -m "Fix flower bullet count" -m "FAN splits the amount over petals."
 ```
 
-## 0c. Change recipe (do these steps in order, every time)
-
-1. Read the code you will touch (`rg -n` the method name; files in §12).
-2. Write or extend the test FIRST; build and run it; watch it FAIL for the
-   right reason:
-   ```sh
-   GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py
-   python3 tools/run_tests.py --suite <your_test_file_name> --full
-   ```
-3. Fix the code. Rebuild. Run the same suite until it passes.
-4. Run everything, then the harness self-check:
-   ```sh
-   python3 tools/run_tests.py
-   python3 tools/run_tests.py --self-test
-   ```
-5. Hot path touched (tick, spawn, pattern generation, preview)? Benchmark
-   (§15) and compare with `test_project/benchmarks/log/LATEST.md`.
-6. Public API changed? Update `doc_classes/` (§10) and add the new suite to
-   `test_project/tests/README.md` (the lint fails otherwise).
-7. Commit only if asked, following §0b.
-
-## 0d. Glossary
-
-- **volley**: one spawn call = one `BulletVolley2D` (one MultiMesh + one physics
-  area holding N bullets). Its spawn data is one `BulletVolleyData2D`.
-- **marker / generator**: the Node2D a pattern is built around
-  (`transforms_generator`, else the spawner itself).
-- **pattern source**: which generator builds the per-bullet transforms
-  (`pattern_source`, 33 ids, serialized).
-- **bake**: the spawner's cached raw pattern (§13), re-posed per shot.
-- **chain**: a burst (N shots apart) or a telegraph (warning, then shot).
-- **leg**: one traversal of a movement Path2D.
-- **pool**: parked volleys reused by `VolleyPoolKey2D` (bullet count + collision shape).
-
-## 0e. Never edit
+## 6. Never edit
 
 - `SConstruct` (use `tools/*.py` / `setup.py`).
 - `test_project/addons/gut/` (vendored GUT).
 - Personal paths in `tools/config.json`.
-- Scenes the user edits by hand (e.g. `test_project/benchmark_scene/*.tscn`)
-  unless asked.
-- Generated `doc_classes/*.xml` structure (only description text; §10).
+- Scenes the user edits by hand (`test_project/benchmark_scene/*.tscn`).
+- The structure of generated `doc_classes/*.xml` (description text only; §17).
 
-## 1. Running tests (only supported path)
+## 7. Test harness
+
+### 7.1 Running tests (only supported path)
 
 ```sh
 python3 tools/run_tests.py                  # every suite, leak-checked
 python3 tools/run_tests.py --suite volley    # substring/glob filter (repeatable)
 python3 tools/run_tests.py --changed-only    # files plausibly affected by uncommitted changes
-python3 tools/run_tests.py --fail-fast       # stop scheduling after first red file
+python3 tools/run_tests.py --fail-fast       # stop scheduling after the first red file
 python3 tools/run_tests.py --list            # discover without running
 python3 tools/run_tests.py --self-test       # canaries must report FAIL + LEAK + strict mismatch
-python3 tools/run_tests.py --no-leaks        # faster, NOT green (skips leak gate)
+python3 tools/run_tests.py --no-leaks        # faster, NOT green (skips the leak gate)
 python3 tools/run_tests.py --report          # + test_project/test_results/summary.json (slowest first)
-python3 tools/run_tests.py --full            # print every failure message unclipped (all failing parameters)
-python3 tools/run_tests.py --realtime        # real-time pacing (default is simulated time, see below)
-python3 tools/lint_tests.py                  # static test lint (the runner runs it first; exit 3 = lint failed)
+python3 tools/run_tests.py --full            # every failure message unclipped (all failing parameters)
+python3 tools/run_tests.py --realtime        # real-time pacing (default: simulated time)
+python3 tools/lint_tests.py                  # static test lint (run first by the runner; exit 3 = failed)
 ```
 
-- Time is SIMULATED: the runner passes `--fixed-fps 60`, so every frame
-  advances exactly 1/60 s and runs as fast as the CPU allows. Frame-counted
-  tests behave identically to real time; the full suite runs in ~8 s.
-- A file is green only when ALL hold: process exits 0, GUT JUnit shows
-  0 failures (missing report = CRASH, never PASS — catches a stale `.so`),
-  `--verbose` exit report has no leaks, no `SCRIPT ERROR`, and no
-  `godot-cpp/src/core/class_db.cpp` error (a dropped property/method).
-- Never run test files directly with `--script`; the runner does the
-  class-cache refresh, per-file processes, JUnit + leak verdicts.
+- Time is SIMULATED (`--fixed-fps 60`): every frame advances exactly 1/60 s
+  as fast as the CPU allows. Frame-counted tests behave like real time.
+- A file is green only when ALL hold: exit 0, GUT JUnit with 0 failures
+  (missing report = CRASH, never PASS), no leaks in the `--verbose` exit
+  report, no `SCRIPT ERROR`, no `godot-cpp/src/core/class_db.cpp` error.
+- Stale-build guard: every SUCCESSFUL build writes
+  `test_project/addons/blastbullets2d/bin/.build_stamp`; tests and snapshots
+  refuse to run while any `src/` file is newer than it. A failed build keeps
+  the refusal (before the stamp, objects compiled before the error made a
+  failed build look fresh and tests ran against the previous library).
+- Never run test files with `--script`; the runner does the class-cache
+  refresh, per-file processes, JUnit and leak verdicts.
 - Lint rules (`tools/lint_tests.py`): R1 no `extends SceneTree`; R2 every
   suite `extends BlastTest`; R3 no GUT `wait_*_frames`; R4 `swallow_errors()`
   only in `volley/test_volley_crash_proof.gd`; R5 `at_least=true` expects
   need a `# lint: at-least <reason>` comment; R6 every suite listed in
   `test_project/tests/README.md`; R7 no stray `print(` (only `print("BENCH`).
 
-## 2. Leak detection
+### 7.2 Leak detection
 
-- Runner passes `--verbose` to headless Godot and fails files matching:
-  `ObjectDB instances leaked`, `Leaked instance:`, `RID ... leaked`,
-  `resources still in use`, `Orphan StringName`.
-- `BlastTest.after_each` asserts `debug_assert_no_dangling()` + zero new
-  orphans after EVERY test — a leak fails at the test, not at exit.
-- Deliberate leakers / failers live in `test_project/tests_meta/` and run
-  ONLY via `--self-test` (they must be reported, never green).
-- `integration/test_steady_state_memory.gd` pins the live Object count
-  across repeated warm shots (retention leaks the exit report never sees).
+- The runner fails files matching `ObjectDB instances leaked`,
+  `Leaked instance:`, `RID ... leaked`, `resources still in use`,
+  `Orphan StringName`.
+- `BlastTest.after_each` asserts `debug_assert_no_dangling()` and zero new
+  orphans after EVERY test: a leak fails at the test, not at exit.
+- Deliberate leakers/failers live in `test_project/tests_meta/` and run only
+  via `--self-test` (they must be reported, never green).
+- `integration/test_steady_state_memory.gd` pins the live Object count over
+  repeated warm shots (retention leaks the exit report never sees).
 
-## 3. Searching (use `rg`, not `grep`)
+### 7.3 Harness facts
 
-```sh
-rg --files test_project/tests -g 'test_*.gd'    # suite inventory (-g globs the BASENAME)
-python3 tools/run_tests.py --list               # same inventory, as the runner sees it
-rg -n "push_error|emit_signal" src/bullet_volley/  # fail-loud sites (pin exact text in tests)
-rg -n "^func test_" test_project/tests/volley/test_volley_bounce.gd
-rg -n 'BulletSpawner2D::shoot_once' src/        # where a method lives (files are split, §12)
-```
+- From an idle point `await idle(k)` runs exactly k factory ticks;
+  `await physics(n)` resumes INSIDE frame n before the factory ticked
+  (n-1 ticks). `factory.debug_advance_time(delta)` runs one tick with any
+  delta (zero included) from an idle point; with `--fixed-fps`,
+  `Engine.time_scale` does not change the delta.
+- The runner prints only the first failing assert per test and GUT clips
+  array diffs: join problems into one string to see them all.
+- A `Packed*Array` read from an Array is a copy (write it back).
+- `push_warning` lands in `get_errors()` (`err.is_push_warning()`); pin it
+  with `expect_warning_sequence`.
+- `obj.set("misspelled", v)` silently does nothing: assert `k in obj` and
+  read the value back when a test sets properties by name.
 
-## 4. GUT framework reference (what's available, what's used)
+### 7.4 The behavior snapshot (`tools/api_snapshot.py`)
 
-- **Discovery**: `.gutconfig.json` points at `res://tests/`; file must be
-  named `test_*.gd` and extend `BlastTest`. Each file runs in its OWN Godot
-  process (no cross-file state); tests inside a file run sequentially.
-- **Lifecycle**: `before_all` / `before_each` / `after_each` / `after_all`.
-  `BlastTest.before_all` turns the spawner cache verifier ON (§13);
-  `before_each` builds a fresh `factory` (+2 idle frames); `after_each`
-  idles, asserts a dangling-free factory, `reset()`s, and asserts zero new
-  orphans. Override `before_each` with `await super()` first.
-- **Asserts**: `assert_eq/ne`, `assert_almost_eq/ne`, `assert_gt/gte/lt/lte`,
-  `assert_true/false`, `assert_between`, `assert_has`, `assert_has_method`,
-  `assert_null/not_null`, `assert_freed/not_freed`, `assert_no_new_orphans`,
-  `assert_property*`, `assert_string_contains`, `assert_connected`,
-  `assert_has_signal`, `assert_is/typeof`, `assert_eq_deep`. Prefer the
-  TYPED assert matching the comparison (failure output shows got/expected).
-- **Signals**: `watch_signals(obj)`, `assert_signal_emitted`,
-  `assert_signal_not_emitted`, `assert_signal_emit_count(obj, name, n)`,
-  `assert_signal_emitted_with_parameters`, `get_signal_emit_count`,
-  `get_signal_parameters`. Use COUNTS for exactly-once contracts
-  (`shooting_started/stopped`, movement signals, `property_list_changed`).
-- **Parameters**: `func test_x(i: int = use_parameters([...]))` runs once
-  per value with full before/after_each isolation (33-source sweeps, the
-  12x4 easing parity). This GUT version groups executions under one
-  `<parameterized>` JUnit case — isolation is real, per-value reporting is not.
-- **Doubles** (`double`/`spy`/`stub`, `assert_called*`): available, UNUSED
-  so far. Reach for them when a handler must be observed without side effects.
-- **Strict errors**: any `push_error`/engine error not claimed by an
-  `expect_*` fails the test (`get_errors()` + `err.handled`).
+Runs `test_project/snapshot/api_snapshot.tscn` headless and stores what the
+plugin does as short hashes plus the exact error/warning texts each call
+produced (JSON in `test_project/test_results/snapshots/`, gitignored).
+Sections:
+- `surface`: ClassDB surface of every plugin class (methods, argument names
+  and types, default values with their Variant type, properties with
+  hints/usage in order, signals, enum constants).
+- `patterns`: every static BulletPatterns2D method over defaults, amounts
+  (-1, 0, 1, 2, 7, 24, 10001), markers, one-argument perturbations and seeded
+  combinations.
+- `generate`: `BulletPatterns2D.generate` for every shape and every knob.
+- `layouts`: 48 multi-ring + 8 fill-inside seeded outline combinations per
+  outline shape.
+- `spawner`: every pattern source x every inspector-visible knob (spawn
+  transforms + preview dots/track/rings) and every preset.
+- `setters`: hostile setter probes (NaN, INF, negatives, huge) for spawner,
+  volley and data resources.
+- `traces`: deterministic volley flights (`debug_advance_time`) for every
+  motion feature.
+- `volley_api`: every bound BulletVolley2D method x 3 argument sets on a
+  plain and a featured volley: return value, errors, full per-bullet state
+  before and after a tick.
 
-## 5. Test doctrine (`test_project/tests/common/blast_test.gd`)
+Unseeded randomness is detected (each call runs twice) and recorded by size
+only. `save` refuses a stale build. `diff a b` exits 1 on any difference and
+prints the first entries per section (`--limit N`).
 
-- Builders: `quick_volley()`, `make_spawner()` (shooting + homing OFF before it
-  enters the tree), `make_preview_spawner()`, `H` (`blast_test_helpers.gd`:
-  `make_volley_data`, `make_still_data`, `make_speed`, `make_rotation`,
-  `make_effect_layer`, `make_flat_curve`, ...), `make_wall/make_area/
-  make_probe_scene/add` (autofreed).
-- Frames: `await idle(n)` (idle frame — structural factory calls
-  `reset/free_*/populate_*` allowed) vs `await physics(n)` (INSIDE the
-  physics step — structural calls rejected; call `idle()` first). NEVER
-  GUT's `wait_*_frames` (resumes after n+1 frames, skews every count).
-- Pin errors RIGHT AFTER the hostile call:
-  `expect_error_sequence(["exact text", ...])` (exact count + order +
-  wording; preferred), `expect_error(text)`, `expect_errors_containing(text, N)`
-  (EXACTLY N), `expect_no_errors()` (mid-test checkpoint). End-of-test lumps
-  hide bugs: strict pinning once exposed two bounce tests that silently ran
-  with a setter-rejected value (`bounce_cooldown_sec = 5.0` is outside [0, 1]).
+## 8. Writing tests
+
+### 8.1 Doctrine (`test_project/tests/common/blast_test.gd`)
+
+- Builders: `quick_volley()`, `make_spawner()` (shooting + homing OFF
+  before it enters the tree), `make_preview_spawner()`, `H`
+  (`blast_test_helpers.gd`: `make_volley_data`, `make_still_data`,
+  `make_speed`, `make_rotation`, `make_effect_layer`, `make_flat_curve`,
+  ...), `make_wall/make_area/make_probe_scene/add` (autofreed).
+- Frames: `await idle(n)` (idle frame: structural factory calls allowed) vs
+  `await physics(n)` (INSIDE the physics step: structural calls rejected;
+  call `idle()` first). NEVER GUT's `wait_*_frames` (resumes after n+1
+  frames, skews every count).
+- Pin errors RIGHT AFTER the hostile call: `expect_error_sequence(["exact
+  text", ...])` (exact count + order + wording; preferred),
+  `expect_error(text)`, `expect_errors_containing(text, N)` (EXACTLY N),
+  `expect_no_errors()` (mid-test checkpoint), `expect_warning_sequence`
+  (same contract for warnings). End-of-test lumps hide bugs.
 - `Array(...)`-wrap engine arrays before `assert_eq` against literals.
-- Headless rendering: the dummy RenderingServer stores multimesh buffers
-  but `get_instance_transform_2d()` returns identity — decode
-  `multimesh.buffer` instead (`volley/test_volley_render_buffers.gd`).
+- Headless rendering: the dummy RenderingServer stores multimesh buffers but
+  `get_instance_transform_2d()` returns identity — decode `multimesh.buffer`
+  (`volley/test_volley_render_buffers.gd`).
 
-## 6. Writing good tests (checklist)
+### 8.2 Checklist for a good test
 
-- Name: `test_<behavior>_<expectation>` (`test_paused_steady_overlap_registers_once_on_resume`).
-- One behavior per test; shared builders over local setup; no magic
-  numbers without a comment (frame budgets, tolerances, layer values).
-- Failing-first: write the test, watch it fail for the RIGHT reason
-  (assert vs unexpected-error), then fix, then keep it.
-- **Mutation check** (how to prove a test is real when the fix already
-  exists): copy the source file to the scratchpad, disable the fix (e.g.
-  `if (false && ...)`, comment out a `notify_property_list_changed()`),
-  rebuild, run the suite — it must FAIL on exactly the tests you expect —
-  then restore the copy and rebuild. Used for the cache invalidation sweep,
-  render buffers and inspector gating.
-- Determinism: never wall-clock sleeps; frame counts with margins (prefer
-  early-break loops `for i in N: await physics(); if cond: break`);
-  `seed()` any randomness you assert on.
-- Each `push_error` gets an `expect_*` with the EXACT engine wording (copy
-  from a failing run, verify it fires where you think).
-- New API surface: `has_method` bind check + happy path + reject-and-keep
-  + OOB + pool-reuse neutrality (spawn → pool → respawn, no state leaks).
+- Name: `test_<behavior>_<expectation>`.
+- One behavior per test; shared builders over local setup; no magic numbers
+  without a comment (frame budgets, tolerances, layer values).
+- Determinism: no wall-clock sleeps; frame counts with margins (early-break
+  loops `for i in N: await physics(); if cond: break`); `seed()` any
+  randomness you assert on.
+- Each `push_error`/`push_warning` gets an expect with the EXACT text.
+- New API surface: `has_method` bind check + happy path + reject-and-keep +
+  OOB + pool-reuse neutrality (spawn → pool → respawn, no state leaks).
 - Prefer GENERIC tests that walk `get_property_list()` / `get_method_list()`
-  so future additions are covered automatically (range contract sweep,
-  bake invalidation sweep, subgroup-prefix lock, visibility sweep).
+  / `ClassDB.class_get_method_list()` so future additions are covered
+  automatically (range contract sweep, bake invalidation sweep, subgroup
+  lock, visibility sweep, every-generator wording sweep).
+- Invariants beat examples: "the next tick moves the bullet by exactly
+  (reported velocity + g dt) dt" catches every composition bug at once.
 
-## 6b. How to add or fix a pattern (BulletSpawner2D)
+### 8.3 Mutation check (prove a test is real)
 
-Everything lives in `src/patterns/` (class `BulletPatterns2D`, static):
-generator in `patterns_<family>.cpp` (`helper_generate_transforms_<shape>`;
-families `shapes`, `curves`, `polygons`, `edges`, `polyline`), layout engine
-in `pattern_layout2d.cpp`, formulas shared by a generator and its track in
-`patterns_internal.hpp` (`rain_*2d`, `cross_*2d`), samplers in
-`pattern_preview_tracks2d.cpp` (`helper_sample_outline_<shape>`), bindings
-in `bullet_patterns2d_bindings.cpp`. The knobs are `PatternKnobs2D`
-(`pattern_knobs2d.hpp`, inherited by the spawner, field = serialized name);
-the per-source stages over them: `pattern_dispatch2d.cpp` (`generate_raw`),
-`pattern_track_dispatch2d.cpp` (`build_preview_track` into a
-`PatternTrackSink2D`), `pattern_gating2d.cpp` (`is_knob_relevant`),
-`pattern_presets2d.cpp`; ids, names, knob prefixes and capabilities are ONE
-registry table (`pattern_registry2d.cpp`, `BulletPatterns2D.get_shapes()`).
-The module never touches the tree: the spawner resolves children / aimed
-target / Path2D curve into `PatternInputs2D` (`bullet_spawner2d_patterns.cpp`,
-`generate_raw_pattern`). Generators: each `helper_generate_transforms_<shape>`
-binding wraps a native static core `BulletPatterns2D::generate_<shape>2d(amount,
-marker, const <Shape>Params2D &)` returning `PatternSlots2D` (std::vector);
-params structs live in `pattern_params2d.hpp` (defaults = the GDScript
-defaults; loops carry `OutlineLayout2D` / `CornerLayout2D`), and the dispatch
-fills them by field name. Knob accessors: ONE table,
-`pattern_knob_table2d.inc` (row order = inspector and .tscn order), expanded
-by X-macros into the spawner getters/setters (validation rules from
-`pattern_knob_checks2d.hpp`, message "BulletSpawner2D: <knob> <text>, keeping
-the old value."), their declarations and their binds. New knob = field in
-`PatternKnobs2D` + one `PATTERN_KNOB` row; only `PATTERN_PROPERTY` rows (node
-paths, arrays, enum-typed Path2D knobs, spawner settings) keep hand-written
-accessors in `bullet_spawner2d_pattern_properties.cpp`. New shape = registry
-row (next free id) + knobs + table rows + a params struct + a generate and a
-track case; gating follows its prefix. `BulletPatterns2D.generate(shape,
-amount, marker, params)` (`pattern_generate2d.cpp`) writes knobs by name
-through the same table and checks, so it matches a spawner for every source
-(pinned by `patterns/test_patterns_generate.gd`).
+Copy the source file to a scratch location, break the fix on purpose (old
+wording back, `if (false && ...)`), rebuild, run the suite: it must FAIL on
+exactly the tests you expect. Restore the copy, rebuild, run again (green).
 
-Invariants every generator must keep (pinned by
-`spawner/test_spawner_pattern_counts.gd`, `test_spawner_pattern_bake.gd`,
-`test_spawner_preview_coincidence.gd`, `test_spawner_preview_track_coincidence.gd`,
-`patterns/test_patterns_gating.gd`):
-1. Exactly `helper_bullets_amount` transforms (On Outline, Layers, Fill
-   Inside; gaps redistribute, overflow shrinks spacing).
-2. No two bullets closer than 0.5 px (no hidden duplicates). Closed curves:
-   sweep the curve exactly once (watch retraces: odd roses, shared-factor
-   Lissajous, multi-revolution spirographs) and use
-   `resample_loop_even_distinct` for self-crossing curves.
-3. Pure function of its inputs (the bake cache relies on it; random
-   patterns take a seed).
-4. The preview track (`helper_sample_outline_*`) draws the same curve the
-   bullets sit on, for EVERY source (dots within 1.5 px x pattern_scale).
-   Put any formula both sides need in `patterns_internal.hpp`: the rain
-   and cross tracks once drifted 48 px / 22 px from their own bullets.
-5. Every bad input fails loud once with exact wording.
-
-Spawner test template (copy, rename, list in `tests/README.md`):
+### 8.4 New suite template (copy, rename, list in `tests/README.md`)
 
 ```gdscript
 extends BlastTest
@@ -300,323 +381,417 @@ func test_<behavior>_<expectation>() -> void:
 	assert_signal_emit_count(sp, "volley_fired", 1, "exactly once")
 ```
 
-## 7. Integration tests, scenes & feature mixing
-
-- Harness pattern: `make_spawner(data, source, n)` + `make_wall(pos)` /
-  `make_area` on known layers + `watch_signals` on factory/spawner/volley.
-  `make_wall` defaults to layer value 4 (matches `H.make_*_data` masks);
-  the bounce suite uses its own convention (bounce wall 8, plain 16).
-- A spawner added to the tree auto-fires by default: use `make_spawner()`
-  or `set_shooting_enabled(false)` BEFORE `add()`.
-- Scene tests: author a `.tscn` under `test_project/tests/scenes/` like an
-  editor scene, `load().instantiate()` it in a suite
-  (`integration/test_scene_moving_turret.gd`). This also locks
-  serialization: property names + enum ids must survive load.
-- Physics tests need REAL frames: spawn → `await physics(k)` with
-  early-break; assert counts, signals AND finiteness.
-- Re-entrancy: `integration/test_reentrant_frees.gd` frees things inside
-  every signal handler. Godot REFUSES `free()` on an object that is
-  currently emitting; handlers must `queue_free()` the emitter.
-- Feature crosses: combine 2–4 systems (homing+wobble+gravity+curves,
-  movement+spin+homing); assert each system's signature survives + full
-  finiteness + pool-reuse neutrality. Pairwise beats exhaustive.
-- Preview tests: `make_preview_spawner`, `await idle(6)` for rebuilds,
-  `debug_check_layer_coincidence(tol)`, `debug_get_preview_stats()`
-  (spin/move must keep `rebuilds`/`*_draws` flat).
-- Spawner-owned vs factory-owned routing: connect BOTH signal sets, assert
-  the silent side stayed silent.
-
-## 8. New-feature checklist (do all of these)
+### 8.5 New-feature checklist (do all of these)
 
 1. Bind check (`has_method`) + happy-path test.
 2. Setter reject-and-keep: NaN/Inf/OOB/negative/inverted, old value kept,
    exact error text pinned.
-3. Inspector: right group/subgroup (§9), per-mode visibility, gating
+3. Inspector: right group/subgroup (§16), per-mode visibility, gating
    setters call `notify_property_list_changed()`, hint strings byte-exact,
    serialized enums locked.
-4. If it affects pattern geometry: the setter calls `on_pattern_changed()`
-   (§13) — the bake sweep fails otherwise.
+4. Pattern geometry? The setter calls `on_pattern_changed()` (§13).
 5. Pool-reuse neutrality + no-dangling (automatic via `after_each`, but add
    explicit state assertions).
-6. Signals: emission counts incl. negative cases (stays silent); liveness
-   check after every emit (§12).
-7. `doc_classes/<Class>.xml` (§10), `tests/README.md` entry (lint R6).
+6. Signals: emission counts incl. negative cases; liveness check after
+   every emit (§12.4).
+7. `doc_classes/<Class>.xml` (§17), `tests/README.md` entry (lint R6).
 8. Hot path touched? Benchmark before/after (§15).
 
-## 9. Inspector groups & serialization locks
+### 8.6 GUT reference
 
-- Spawner groups, in order (locked by `test_volley_bounce.gd`): Setup,
-  Bullet Patterns, Shooting, Spin, Homing, Orbiting, Preview, Movement,
-  Performance. Spawn data (`BulletVolleyData2D`, one inspector category):
-  Bullets, Appearance, Movement Speed, Bullet Rotation (shared + per-bullet
-  + tile + stop flag together), Wobble, Gravity, Bounce and Ricochet,
-  Movement Pattern Paths, Homing, Collision, Attachments, Sprite Effects,
-  Rendering and Material. No duplicate group titles and no ungrouped
-  property (`volley/test_volley_data_inspector.gd`).
-- Bullet Patterns: `pattern_source` + `helper_bullets_amount`, then a
-  `Transform` subgroup (scales, muzzle offset + space, skip indices), one
-  `ADD_SUBGROUP("Ring", "helper_ring_")` per shape (prefix stripped in the
-  inspector), `Outline Layers` last. The inspector EJECTS a property whose
-  name lacks the subgroup prefix; `test_every_prefixed_subgroup_member_carries_the_prefix`
-  catches it. Mind overlapping prefixes (`helper_star_polygon_` vs
-  `helper_star_`, `helper_counter_spiral_` vs `helper_spiral_`).
-- ADD_PROPERTY BEFORE its bind_method is SILENTLY dropped by ClassDB (the
-  runner flags the `class_db.cpp` error). Moving a property = moving its
-  whole bind+ADD_PROPERTY paragraph (for pattern knobs: moving its table
-  row; the expansion binds before it adds the property).
-- A setter whose field `_validate_property` reads MUST call
-  `notify_property_list_changed()` (pinned per switch).
-- Gating: helper_* per pattern mode; homing/orbiting/movement/preview knobs
-  hide while their master switch is off; spin speed only in Continuous,
-  amplitude/frequency only in Oscillate; burst_*/telegraph_sec only when on.
-- Enum ids are serialized into `.tscn`: renumbering silently repoints saved
-  scenes. `pattern_source` ids and pool-key shape ids
-  (`Circle:3,Rectangle:4,Capsule:5`) are locked — extend the lock for any
-  new serialized enum. Saved property ORDER follows the bind order, so an
-  inspector reorg reorders `.tscn` lines (harmless, expected in diffs).
+- Discovery: `.gutconfig.json` points at `res://tests/`; files named
+  `test_*.gd`, extending `BlastTest`. Each file runs in its OWN Godot process.
+- Lifecycle: `before_all` / `before_each` / `after_each` / `after_all`.
+  `BlastTest.before_all` turns the spawner cache verifier ON (§13);
+  `before_each` builds a fresh `factory`; override with `await super()` first.
+- Asserts: `assert_eq/ne`, `assert_almost_eq/ne`, `assert_gt/gte/lt/lte`,
+  `assert_true/false`, `assert_between`, `assert_has`, `assert_has_method`,
+  `assert_null/not_null`, `assert_freed/not_freed`, `assert_no_new_orphans`,
+  `assert_string_contains`, `assert_connected`, `assert_has_signal`,
+  `assert_is/typeof`, `assert_eq_deep`. Prefer the typed assert matching the
+  comparison (failure output shows got/expected).
+- Signals: `watch_signals(obj)`, `assert_signal_emit_count(obj, name, n)`,
+  `assert_signal_emitted_with_parameters`, `get_signal_emit_count`,
+  `get_signal_parameters`. Use COUNTS for exactly-once contracts.
+- Parameters: `func test_x(i: int = use_parameters([...]))` runs once per
+  value with full before/after_each isolation; this GUT version reports them
+  under one `<parameterized>` case.
+- Doubles (`double`/`spy`/`stub`): available, unused so far.
+- Strict errors: any `push_error`/engine error not claimed by an `expect_*`
+  fails the test.
 
-## 10. Documentation generation (verified behavior)
+### 8.7 Integration tests, scenes and feature mixing
 
-- Order: close the editor → rebuild (`compile_debug_build.py`) →
-  `GODOTPP_NONINTERACTIVE=1 python3 tools/generate_xml_docs.py` → review
-  `git diff doc_classes/` → fill every empty `<description>` → rebuild
-  (docs compile into the binary) → regenerate once more: the diff must be
-  empty apart from escaping (`>` becomes `&gt;`).
-- The doctool KEEPS existing descriptions of members that still exist,
-  ADDS new members with empty text, DROPS removed ones and re-sorts
-  alphabetically (never hand-reorder). Write literal `<`/`>` as
-  `&lt;`/`&gt;` or the XML breaks.
-- BBCode: `[Class]`, `[method C.m]`, `[member C.p]`, `[signal C.s]`,
-  `[param x]`, `[constant C]`, `[enum C.E]`, `[code]`, `[codeblock]`, `[b]`, `[i]`.
+- Harness pattern: `make_spawner(data, source, n)` + `make_wall(pos)` /
+  `make_area` on known layers + `watch_signals` on factory/spawner/volley.
+  `make_wall` defaults to layer value 4 (matches `H.make_*_data` masks); the
+  bounce suite uses its own convention (bounce wall 8, plain 16).
+- A spawner added to the tree auto-fires: use `make_spawner()` or
+  `set_shooting_enabled(false)` BEFORE `add()`.
+- Scene tests: author a `.tscn` under `test_project/tests/scenes/` and
+  `load().instantiate()` it (`integration/test_scene_moving_turret.gd`); this
+  also locks serialization (property names + enum ids survive load).
+- Physics tests need REAL frames: spawn → `await physics(k)` with
+  early-break; assert counts, signals AND finiteness.
+- Re-entrancy: `integration/test_reentrant_frees.gd` frees things inside
+  every signal handler. Godot REFUSES `free()` on an object that is
+  emitting; handlers must `queue_free()` the emitter.
+- Feature crosses: combine 2–4 systems; assert each system's signature, full
+  finiteness and pool-reuse neutrality. Pairwise beats exhaustive.
+- Preview tests: `make_preview_spawner`, `await idle(6)` for rebuilds,
+  `debug_check_layer_coincidence(tol)`, `debug_get_preview_stats()`
+  (spin/move keep `rebuilds`/`*_draws` flat).
+- Spawner-owned vs factory-owned routing: connect BOTH signal sets and
+  assert the silent side stayed silent.
 
-## 11. `tools/` + `setup.py` catalog
+## 9. Searching and reading
 
-- `setup.py`: interactive menu (Godot paths/versions, project folder,
-  rename, icons, docs, debug/release builds, profiles, LTO, export zip,
-  tutorials). First stop for a new machine.
-- Build: `compile_debug_build.py` / `compile_release_build.py` /
-  `clean_build.py` / `select_build_profile.py` / `edit_build_profile.py` /
-  `change_lto_mode.py` / `toggle_editor_target.py` /
-  `toggle_debug_symbols.py` / `toggle_reloadable.py` (hot reload). New
-  `.cpp` files under `src/` are picked up automatically (recursive glob).
-- Config: `select_godot_path.py`, `select_godot_project.py`,
-  `change_godot_target_version.py`, `update_godot_cpp.py`,
-  `config_manager.py` + `config.json` (machine state — don't commit
-  personal paths), `paths.py` (canonical locations).
-- Plugin: `renaming.py`, `update_icons.py`, `export_plugin.py` (asset-store
-  zip), `generate_xml_docs.py`, `gdextension_file_helper.py`,
-  `apple_helpers.py`, `git_helpers.py`, `scons_helpers.py` +
-  `scons_build_helpers.py`, `tutorials.py`.
-- Tests/perf: `run_tests.py`, `lint_tests.py`, `run_benchmarks.py`.
+```sh
+rg --files test_project/tests -g 'test_*.gd'      # suite inventory (-g globs the BASENAME)
+rg -n "push_error|emit_signal" src/bullet_volley/   # fail-loud sites (pin exact text in tests)
+rg -n "^func test_" test_project/tests/volley/test_volley_bounce.gd
+rg -n 'BulletSpawner2D::shoot_once' src/           # where a method lives (files are split, §11/§12)
+rg -n "PATTERN_ARGS_ring" src/patterns/            # a generator's signature row
+```
 
-## 12. Architecture map (read before debugging)
+- Big files: read the region you need (`Read` with offset/limit); never edit
+  a file you have not read.
+- Includes are root-relative (`"data/..."`). New `.cpp` files under `src/`
+  are picked up automatically (recursive glob).
+
+## 10. Pattern module (`src/patterns/`, class `BulletPatterns2D`)
+
+### 10.1 File map
+
+| File | Holds |
+|---|---|
+| `patterns_shapes.cpp` | direct-placement generators: grid, fan, spiral, line, aimed, rain, scatter, star polygon, multi/counter spiral (one `arm_spirals2d` core + `spiral_facing2d`), cross, wave, waterfall, lattice, corridor |
+| `patterns_curves.cpp` | loop generators: ring, flower, ellipse, star, heart, rose, lissajous, circle (`dense_curve_loop2d` = dense sweep → even resample → fill outline) |
+| `patterns_polygons.cpp` | rectangle, polygon, triangle, trapezoid, diamond; corner builders, `build_symmetric_polygon_loop`, `layout_polygon_corners2d`, `stack_at_marker2d` |
+| `patterns_edges.cpp`, `patterns_polyline.cpp` | edge from points / image edges; polyline (and the spawner Path2D layout) |
+| `pattern_layout2d.cpp` | the outline layout engine `layout_outline_slots` (On Outline / Layers / Fill Inside), resamplers, generator head checks (`pattern_check_amount`, `pattern_check_marker`, `pattern_check_corner_layout`, `danmaku_validate_head`), layer helpers |
+| `pattern_preview_tracks2d.cpp` | `helper_sample_outline_*`: the curve each pattern's bullets sit on |
+| `pattern_signatures2d.inc` | ONE row per argument of every `helper_generate_transforms_*` (§10.2) |
+| `bullet_patterns2d_bindings.cpp` | the generated wrappers + every bind (one line each) |
+| `bullet_patterns2d.hpp`, `pattern_params2d.hpp` | class + enums; the `<Shape>Params2D` structs (defaults = GDScript defaults) |
+| `pattern_knobs2d.hpp`, `pattern_knob_table2d.inc`, `pattern_knob_checks2d.hpp` | spawner knobs, the knob table (§10.3), its value checks + shared array validators |
+| `pattern_dispatch2d.cpp`, `pattern_track_dispatch2d.cpp` | per source: knobs → Params → `generate_<shape>2d`; knobs → preview track |
+| `pattern_gating2d.cpp`, `pattern_presets2d.cpp`, `pattern_registry2d.cpp` | inspector gating, presets, ONE registry table (ids, names, prefixes, capabilities; `get_shapes()`) |
+| `pattern_generate2d.cpp` | `BulletPatterns2D.generate(shape, amount, marker, params)` (writes knobs by name through the same table and checks) |
+| `pattern_bake_cache2d.*`, `pattern_pose2d.*` | the spawner bake cache (§13) |
+| `pattern_debug2d.cpp` | outline debug inspectors used by tests |
+| `patterns_internal.hpp`, `pattern_curves2d.hpp` | shared declarations and formulas used by a generator AND its track |
+
+The module never touches the scene tree: the spawner resolves children /
+aimed target / Path2D curve into `PatternInputs2D`
+(`bullet_spawner2d_patterns.cpp`, `generate_raw_pattern`).
+
+### 10.2 Generators and the signature table
+
+Every generator is a native core `generate_<shape>2d(amount, marker, const
+<Shape>Params2D &p)` returning `PatternSlots2D` (std::vector, no Variant per
+bullet). Inside, inputs read as `p.<field>`; the function names itself once
+and rejects input in a fixed order (`patterns_shapes.cpp`, grid):
+```cpp
+const char *caller = "helper_generate_transforms_grid";
+PATTERN_REQUIRE(pattern_check_amount(caller, transforms_amount));       // "<caller>: transforms_amount must be between 0 and 10000."
+PATTERN_REJECT_IF(!Math::is_finite(p.jitter) || p.jitter < 0.0, "jitter must be a finite number >= 0."); // pushes "<caller>: <tail>", returns {}
+PATTERN_REQUIRE(pattern_check_marker(caller, marker_transform, false)); // finite marker (true = also invertible)
+```
+Shortcuts: `danmaku_validate_head(caller, amount, marker)` = amount + finite
+invertible marker; `pattern_check_corner_layout(caller, p.corner,
+p.outline.layer_layout)` = the six polygon corner checks in pinned order.
+Check ORDER is part of the contract (only the first failing check reports).
+
+`pattern_signatures2d.inc` describes the GDScript wrapper of each generator:
+```
+#define PATTERN_ARGS_heart(REQ, OPT) \
+	OPT(real_t, size, 150.0, size) \
+	OPT(real_t, base_rotation, 0.0, base_rotation) \
+	OPT(bool, face_outward, true, face_outward) \
+	OPT(real_t, facing_offset_degrees, 0.0, facing_offset_degrees) \
+	PATTERN_OUTLINE_HEAD(REQ, OPT) \
+	OPT(int, layer_layout, 1, outline.layer_layout)
+PATTERN_GENERATOR(heart, HeartParams2D)
+```
+`REQ(type, name, field)` / `OPT(type, name, default_literal, field)`; field
+is the Params path (`outline.`/`corner.` for the shared layout structs).
+The table expands into the header declarations (with C++ defaults), the
+wrapper bodies and the binds (D_METHOD names + DEFVALs). Rules: exact C++
+types (enum types feed the doc's `enum=`, real_t vs double is visible);
+defaults are LITERALS (never `Params{}.x`: real_t is float, so 0.3 would
+become 0.30000001 in the bound default); new arguments go at the END of an
+entry (positional calls); the Params struct default must match the row.
+
+### 10.3 Spawner knobs (`pattern_knob_table2d.inc`)
+
+ONE row per spawner "Bullet Patterns" property in inspector (and `.tscn`)
+order, expanded into the spawner getters/setters (validation via
+`pattern_knob_checks2d.hpp`, message "BulletSpawner2D: <knob> <text>,
+keeping the old value."), their declarations and binds, and the by-name
+writer of `generate()`. New knob = field in `PatternKnobs2D` + one
+`PATTERN_KNOB` row. `PATTERN_PROPERTY` rows (node paths, arrays, enum-typed
+Path2D knobs, spawner settings) keep hand-written accessors in
+`bullet_spawner2d_pattern_properties.cpp`. The dispatch copies knobs into
+Params; the shared layouts come from `outline_layout()` / `corner_layout()`.
+
+New shape = registry row (next free id) + knobs + table rows + Params
+struct + signature entry + `generate_<shape>2d` + a dispatch and a track
+case; gating follows its prefix.
+
+### 10.4 Invariants every generator keeps
+
+Pinned by `spawner/test_spawner_pattern_counts.gd`,
+`test_spawner_pattern_bake.gd`, `test_spawner_preview_coincidence.gd`,
+`test_spawner_preview_track_coincidence.gd`, `patterns/test_patterns_gating.gd`,
+`factory/test_factory_helper_edges.gd`:
+1. Exactly `helper_bullets_amount` transforms (On Outline, Layers, Fill
+   Inside; gaps redistribute, overflow shrinks spacing).
+2. No two bullets closer than 0.5 px. Closed curves sweep exactly once
+   (watch retraces: odd roses, shared-factor Lissajous, multi-revolution
+   spirographs); self-crossing curves use `resample_loop_even_distinct`.
+3. Pure function of its inputs (the bake cache relies on it; random
+   patterns take a seed; seed 0 = the global RNG).
+4. The preview track draws the curve the bullets sit on, for EVERY source
+   (dots within 1.5 px x pattern_scale). Formulas both sides need live in
+   `patterns_internal.hpp` / `pattern_curves2d.hpp`.
+5. Every bad input fails loud once with exact wording; amount errors read
+   "<fn>: transforms_amount must be between 0 and 10000." for every shape
+   generator (polyline keeps its pinned "must be in 0..10000.").
+
+Not merged on purpose: the six arc-length resamplers (precision and
+threshold differences change bits).
+
+## 11. Volley (`src/bullet_volley/`, class `BulletVolley2D`)
+
+One volley = one spawn call = N bullets in one MultiMesh + one physics area.
+Per-bullet state is struct-of-arrays (`all_cached_*`, `all_bounce_*`, ...).
+
+### 11.1 File map
+
+```
+bullet_volley2d.hpp            the class: fields grouped per feature + declarations
+bullet_volley2d_internal.hpp   inline helpers shared by several volley TUs
+bullet_volley2d.cpp            lifecycle: spawn, enable_volley (pool reuse), begin/release life, enable/disable/clear bullet
+bullet_volley2d_tick.cpp       tick() + move_bullets (THE per-bullet loop) and its stages (hot path)
+bullet_volley2d_render.cpp     physics interpolation pass
+bullet_volley2d_setup.cpp      MultiMesh/buffer setup (one set_buffer per spawn)
+bullet_volley2d_collision.cpp  area + ONE shared shape, intake, dedup, paused-overlap park/replay, drain
+bullet_volley2d_{bounce,homing,orbit,motion,curves,wobble,gravity,lifetime,timers,attachments,
+                 effects,animation,teleport,debug,bindings}.cpp   one feature each
+homing_target_deque.hpp        per-bullet/shared target queue (RingDeque2D: allocates nothing while empty)
+```
+
+### 11.2 The tick (`bullet_volley2d_tick.cpp`)
+
+`tick()`: drain collisions (impact pose) → `move_bullets` → homing reached
+events → animation finished → lifetime. `move_bullets` computes a
+`const MoveTick2D t` once (hoisted flags, shared curve samples, pattern
+length, lock snapshot, `core_limit` = the size every always-sized array
+covers) and reuses ONE `BulletStep2D b` scratch for all bullets
+(`b.begin(i, ...)` resets only what each bullet must start from). Per
+bullet, in order:
+`step_homing` (own deque wins, shared is the fallback) →
+`step_direction_curves` → `step_wobble` → `step_rotation` (+ adjust
+direction, bounce visual) → velocity refresh → `step_pattern_and_forces`
+(pattern, wind, gravity) → `step_orbit` → `step_place` (transform, shape,
+attachment, trail, reached test) → `step_speed` (next tick's speed).
+All stages are `_ALWAYS_INLINE_` in this TU: keep per-bullet code in ONE
+translation unit; a `_ALWAYS_INLINE_` helper called from another file links
+but fails at extension LOAD time (CRASH) — move its definition to
+`bullet_volley2d_internal.hpp`.
+
+### 11.3 Shared helpers (use them; do not re-implement)
+
+| Helper | Use |
+|---|---|
+| `for_range` / `collect_range<Arr>` | every `all_bullets_*` method: one range validation, then per bullet |
+| `validate_bullet_index(i, fn)` | per-bullet entry check (loud); guarantees `0 <= i < amount_bullets` |
+| `reject_pooled_handle(fn)` | a pooled volley is a stale handle: refuse writes (frozen bullets accept them) |
+| `refresh_cached_velocity(i)` | the documented composition: direction x speed + inherited + fall speed |
+| `present_bullet_transform(i, delta)` | push a changed cached transform to shape, MultiMesh, attachment, interpolation |
+| `teleport_bullet_to(i, origin, delta)` | the shared teleport body |
+| `visit_bounce_ledger(f)` / `visit_rotation_trio(f)` | the ONE list of those per-bullet arrays |
+| `homing_drop_own_targets(i)` / `homing_resync_count(i)` | per-bullet homing counter bookkeeping |
+| `bullet_homing_push` / `shared_homing_push` | counted pushes (a rejected push is never counted) |
+| `orbit_keep_lock_across_replace_for_bullet` | single routing point for a front change |
+| `direction_curve_owns_direction(i)` | direction setters refuse (one warning) while a direction curve steers |
+| `sample_volley_curve(curve, use_unit, fallback)` | a curve at the volley clock |
+| `apply_direction_axis2d` | one direction-curve channel (x or y) |
+| `write_multimesh_transform2d` | the 8-float MultiMesh layout |
+| `area_ready_or_error(fn)` | area accessors on a never-spawned volley |
+
+### 11.4 Life states and pooling
+
+ACTIVE → last bullet out → POOLED (auto pooling on: `release_life` drops
+attachments, homing, orbit, timers, records, the volley's own connections,
+owner, user Resources, groups, metadata; the handle is stale and
+`enable_bullet` refuses it) or PARKED (auto pooling off: frozen, still owned,
+wakeable). `begin_life` is the single new-life path (one generation bump =
+`get_life_id`). `disable_bullet` FREEZES (state kept; `reset_state` /
+`bullet_reset_state` clear ledgers); active-only timers hold while parked.
+
+### 11.5 Per-bullet data model
+
+Entry `i` drives bullet `i`; per-bullet (valid) > shared (valid) > default;
+explicit all-zero = intent; tile checkboxes wrap short arrays. Curves:
+clear FREEZES the last sample (pinned).
+
+## 12. Factory, spawner, signals, pooling
+
+### 12.1 Map
 
 ```
 src/
-  register_types.cpp                      class registration (ClassDB)
-  bullet_volley/                          BulletVolley2D: one volley = N bullets, one MultiMesh, one physics area
-    bullet_volley2d.hpp                   the class: fields grouped per feature + declarations (+ file map)
-    bullet_volley2d_internal.hpp          inline helpers shared by several volley TUs (volley .cpp files only)
-    bullet_volley2d.cpp                   lifecycle: spawn, enable_volley (pool reuse), enable/disable/clear bullet, teardown
-    bullet_volley2d_tick.cpp              move_bullets: THE per-bullet loop + its inline helpers (hot path)
-    bullet_volley2d_render.cpp            physics interpolation pass
-    bullet_volley2d_setup.cpp             MultiMesh/buffer setup
-    bullet_volley2d_collision.cpp         area + ONE shared shape, intake, dedup, paused-overlap park/replay, drain, counts
-    bullet_volley2d_{bounce,homing,orbit,motion,curves,wobble,gravity,lifetime,timers,attachments,effects,
-                     animation,teleport,debug,bindings}.cpp   one feature each
-    homing_target_deque.hpp, bullet_movement_pattern_data2d.hpp   volley-only data structures
-  factory/                                BulletFactory2D
-    bullet_factory2d.cpp                  lifecycle, containers/debugger, interpolation, tick/render sweeps, teleport
-    bullet_factory2d_spawn.cpp            request validation, spawn_volley(+_span), pool pre-population
-    bullet_factory2d_structural.cpp       reset/free_*/clear_*, *_deferred queue, volley bookkeeping (vec/set/pool sync)
-    bullet_factory2d_effects.cpp          factory-owned one-shot effect bakes
-    bullet_factory2d_stats.cpp            frame stats, monitors, debugger knobs, debug_*
-    bullet_factory2d_bindings.cpp         _bind_methods
-    bullet_factory2d_internal.hpp, factory_operation_guard2d.hpp
-  patterns/                               BulletPatterns2D + the pattern stages (file map in section 6b)
-  bullet_spawner/bullet_spawner2d.cpp     wiring, shooting cadence, spin, bursts/telegraph, pattern lists, lifecycle, shoot_once
-  bullet_spawner/bullet_spawner2d_pattern_properties.cpp  Bullet Patterns accessors + apply_pattern_preset (table in patterns/)
-  bullet_spawner/bullet_spawner2d_patterns.cpp   scene inputs -> PatternKnobs2D::generate_raw, bake cache use, span collect
-  bullet_spawner/bullet_spawner2d_homing.cpp     homing/orbiting, target resolution, live-volley steering
-  bullet_spawner/bullet_spawner2d_preview.cpp    preview snapshot/rebuild, pose, dirty checks, debug_* geometry
-  bullet_spawner/bullet_spawner2d_preview_layer.cpp  PatternPreviewLayer2D (draw_multimesh canvas layer)
+  register_types.cpp                      class registration
+  factory/bullet_factory2d.cpp            lifecycle, containers/debugger, interpolation, tick/render sweeps
+  factory/bullet_factory2d_spawn.cpp      request validation, spawn_volley(+_span), pool pre-population
+  factory/bullet_factory2d_structural.cpp reset/free_*/clear_*, *_deferred queue, bookkeeping
+  factory/bullet_factory2d_effects.cpp    factory-owned one-shot effects
+  factory/bullet_factory2d_stats.cpp      frame stats, monitors, debugger knobs, debug_*
+  factory/bullet_factory2d_bindings.cpp   _bind_methods
+  bullet_spawner/bullet_spawner2d.cpp     wiring, cadence, spin, bursts/telegraph, pattern lists, shoot_once
+  bullet_spawner/bullet_spawner2d_pattern_properties.cpp  hand-written pattern accessors + presets
+  bullet_spawner/bullet_spawner2d_patterns.cpp   scene inputs -> generate_raw, bake cache use
+  bullet_spawner/bullet_spawner2d_homing.cpp     homing/orbiting, target resolution, live steering
+  bullet_spawner/bullet_spawner2d_preview.cpp    preview snapshot/rebuild, pose, debug_* geometry
+  bullet_spawner/bullet_spawner2d_preview_layer.cpp  PatternPreviewLayer2D (draw_multimesh)
   bullet_spawner/bullet_spawner2d_movement.cpp   Path2D movement
   bullet_spawner/bullet_spawner2d_bindings.cpp   _bind_methods (groups/subgroups) + _validate_property
-  bullet_spawner/bullet_spawner2d_internal.hpp   statics shared by >1 spawner TU (limits aliased from patterns/)
   data/        inspector Resources: BulletVolleyData2D, BulletSpeed/Rotation/Curves/Wobble/EffectLayerData2D
   pooling/     VolleyPool (parked volleys per key), VolleyPoolKey2D
   attachments/ BulletAttachment2D + its object pool
   debugger/    BulletVolleyDebugger2D (collision-shape overlay)
-  core/        header-only utilities: warn_once2d, cached_string_names2d, easing2d (Tween port),
-               dynamic_sparse_set, collision_shape_helper2d, reentrancy_guard2d
+  core/        header-only: warn_once2d, cached_string_names2d, easing2d (Tween port), dynamic_sparse_set,
+               collision_shape_helper2d, reentrancy_guard2d, transform_math2d
 ```
 
-- Same class across the split files (pure moves). Put new code in the file
-  of its concern; keep per-bullet loops inside ONE translation unit (no
-  cross-TU call per bullet). Volley helpers marked `_ALWAYS_INLINE_` are
-  defined in the .cpp that uses them or in `bullet_volley2d_internal.hpp`:
-  calling one from another file links fine but fails at extension LOAD time
-  (undefined symbol: the runner reports CRASH) - move the definition to the
-  internal header instead. Includes are root-relative (`"data/..."`).
-- Threading: everything runs on the main thread (physics callbacks
-  included); no locks exist and none are needed. Do not add threads.
-- **Spawn flow**: `BulletFactory2D.spawn_volley` → `spawn_volley_internal`
-  → pool pop by `VolleyPoolKey2D` (bullet count + shape) or fresh alloc →
-  `enable_volley` (validates EVERYTHING before mutating; a refused
-  enable changes nothing) → `set_up_bullet_instances` (one `set_buffer`
-  upload). The spawner calls the C++ span path
-  (`spawn_volley_span`, no Variant boxing).
-- **Pooling**: one bucket per key; pop prefers newest non-ticked volley;
-  same-key spawns from handlers reuse mid-sweep. Structural ops
-  (`reset/free_*/populate_*`) are idle-frame only: inside a physics frame
-  they are REJECTED loudly. Their `*_deferred` twins queue through
-  `queue_structural_call` and are safe from anywhere.
-  `free_active_bullets()` DESTROYS (next spawn is cold); clear/expiry return
-  drained volleys to the pool (or park them with auto pooling off).
-- **Tick order** (`BulletVolley2D::tick`): drain collisions (impact pose)
-  → `move_bullets` → homing reached events → animation finished →
-  lifetime. EVERY signal fires live inside it with the bullet alive; the
-  plugin decides the kill AFTER the handler from the post-handler state
-  (heal = veto; handler disabled it = no extra effects). Liveness after
-  each emit: `tick_may_continue(id)`. Only `shoot_once_deferred`, the
-  structural `*_deferred` queue, the debugger restore and preview rebuilds
-  still use `call_deferred` (a call deferred from physics runs inside the
-  physics frame: pinned in `integration/test_engine_facts.gd`).
-- **Factory sweep**: the snapshot is (instance id, pointer) pairs, never
-  slots: a handler `free()` swap-removes `all_volleys`. `volley_free_epoch`
-  skips the ObjectDB lookup unless something was freed; `sweep_tick_stamp`
-  / `sweep_timer_stamp` give one tick and one timer pass per volley per
-  step; `begin_life` stamps them, so a life begun mid-sweep starts next step.
-- **Life states**: ACTIVE → last bullet out → POOLED (auto pooling on:
-  `release_life` drops attachments, homing, orbit, timers, records, the
-  volley's own connections, owner, user Resources, groups, metadata; the
-  handle is stale and `enable_bullet` refuses it) or PARKED (auto pooling
-  off: frozen, still owned, wakeable). `begin_life` is the single new-life
-  path (one generation bump = `get_life_id`). `disable_bullet` FREEZES (state
-  kept; `reset_state` / `bullet_reset_state` clear ledgers); active-only
-  timers hold while parked.
-- **Collision pipeline**: area callbacks (ADDED) → object-level dedup
-  window (O(1) hash; `collision_dedup_by_object = false` for shape-level)
-  → records with queue-time epochs/velocity/pose → per-tick drain →
-  counting → signals → bounce. Paused factory: ADDED events are PARKED per
-  volley (cap 4096, deduped, cancelled by REMOVED) and replayed once on
-  resume; overlaps counted before the pause are never recounted.
-- **Liveness doctrine (C++)**: never carry a raw `Object*` across user
-  code or `call_deferred` (godot-cpp converts Variant args BEFORE your
-  body's id check runs). Capture `get_instance_id()` BEFORE the emit and
-  compare `ObjectDB::get_instance(id) == expected_ptr` afterwards
-  (`slot_still_holds_attachment_id`, `revalidate_configured_volley`,
-  movement's `alive()` lambda). Stop touching `this` when it fails.
-- **Spawner loop**: `_process` runs iff `needs_process()` (shooting, spin,
-  retarget, preview, movement, burst/telegraph/pattern list pending).
-  Runtime order: movement → spin → preview → shooting/bursts, so shots and
-  the gizmo use this frame's pose. `shooting_*` signals track auto-shooting
-  transitions only. Auto-fire errors are latched (one report per
-  misconfiguration until a config setter re-arms it; manual calls always
-  report); `get_setup_warnings()` mirrors the editor warning icon.
-- **Per-bullet model**: entry `i` drives bullet `i`; per-bullet (valid) >
-  shared (valid) > default; explicit all-zero = intent. Curves: clear
-  FREEZES the last sample (pinned).
-- **Preview**: geometry snapshotted UNSPUN in holder space; spin/move are
-  the layer NODE transform (`set_preview_pose`: Hb^-1 R Hb, + muzzle
-  offset), so spinning or rigidly moving costs 0 rebuilds / 0 redraws.
-  Dots/rings/arrow heads are one `draw_multimesh` each. Full fidelity at
-  any count (no LOD).
-- **Movement**: the spawner node travels a Path2D at runtime only;
-  `advance_movement` (bounded 64-leg catch-up) → `apply_movement_pose`
-  (`Curve2D::sample_baked_with_rotation`). Easing = `Easing2D::ease`
-  (parity-tested vs `Tween.interpolate_value`) or a progress Curve.
+### 12.2 Flows
 
-## 12b. Signal timing (live, in-tick)
+- Spawn: `BulletFactory2D.spawn_volley` → `spawn_volley_internal` → pool pop
+  by `VolleyPoolKey2D` (bullet count + shape) or fresh alloc →
+  `enable_volley` (validates EVERYTHING before mutating; a refused enable
+  changes nothing) → `set_up_bullet_instances` (one `set_buffer`). The
+  spawner uses the span path (`spawn_volley_span`, no Variant boxing).
+- Factory sweep: the snapshot is (instance id, pointer) pairs, never slots
+  (a handler `free()` swap-removes `all_volleys`); `volley_free_epoch` skips
+  the ObjectDB lookup unless something was freed; `sweep_tick_stamp` /
+  `sweep_timer_stamp` give one tick and one timer pass per volley per step.
+- Spawner loop: `_process` runs iff `needs_process()`. Order: movement →
+  spin → preview → shooting/bursts. `shooting_*` signals track auto-fire
+  transitions only; auto-fire errors are latched (one report per
+  misconfiguration until a config setter re-arms it).
+- Preview: geometry snapshotted UNSPUN in holder space; spin/move are the
+  layer NODE transform, so spinning/moving costs 0 rebuilds / 0 redraws.
+- Movement: the spawner travels a Path2D at runtime (`advance_movement`,
+  bounded 64-leg catch-up; `Easing2D::ease` parity-tested vs Tween).
 
-- Every bullet signal fires synchronously inside `BulletVolley2D::tick`
-  (order in §12): `area_entered` / `body_entered` / `bounce_*` (drain,
-  impact pose), `bullet_homing_target_reached` (after the move),
-  `sprite_animation_finished`, `life_time_over` (lifetime pass). The
-  bullet is ALIVE in the handler: custom data, transforms, velocity, hit
-  and bounce counts and the attachment are readable as they are.
+### 12.3 Structural calls and threading
+
+- Everything runs on the main thread (physics callbacks included); no locks.
+  Do not add threads.
+- Structural ops (`reset/free_*/populate_*`, shape changes) are idle-frame
+  only: inside a physics frame they are REJECTED loudly. Their `*_deferred`
+  twins queue through `queue_structural_call` and are safe from anywhere.
+  `free_active_bullets()` DESTROYS; clear/expiry return drained volleys to
+  the pool (or park them with auto pooling off).
+
+### 12.4 Signals (live, in-tick) and liveness
+
+- Every bullet signal fires synchronously inside `BulletVolley2D::tick`:
+  `area_entered` / `body_entered` / `bounce_*` (drain, impact pose),
+  `bullet_homing_target_reached` (after the move),
+  `sprite_animation_finished`, `life_time_over` (lifetime pass). The bullet
+  is ALIVE in the handler (custom data, transforms, velocity, counts,
+  attachment readable).
 - The plugin decides afterwards from the post-handler state: a hit kills
-  only if the count is still at max (a heal vetoes it), a lifetime expiry
-  kills only bullets whose life was not extended (`set_life_time_left`,
-  infinite lifetime), a homing auto-pop pops only if the front is still
-  the reached target. A handler that disabled the bullet itself gets no
-  extra effects; freed targets are skipped; a pause from a handler stops
-  the rest of the sweep.
-- Handlers may spawn and edit bullets freely. Structural calls are
-  rejected inside the tick: use the `*_deferred` twins (idle queue,
-  `queue_structural_call`). Remaining `call_deferred` uses: only
-  `shoot_once_deferred`, the structural queue itself, the debugger restore
-  and preview rebuilds.
+  only if the count is still at max (a heal vetoes it); expiry kills only
+  bullets whose life was not extended; a homing auto-pop pops only if the
+  front is still the reached target; a handler that disabled the bullet
+  gets no extra effects; freed targets are skipped; a pause stops the sweep.
+- Handlers may spawn and edit bullets freely; structural calls need the
+  `*_deferred` twins. Remaining `call_deferred` uses: `shoot_once_deferred`,
+  the structural queue itself, the debugger restore, preview rebuilds (a
+  call deferred from physics still runs inside the physics frame: pinned in
+  `integration/test_engine_facts.gd`).
 - Routing: a spawner volley emits on its spawner, a factory volley on the
-  factory, never both. Connections live on the emitter: a freed spawner
-  takes them along (`orphaned_volleys` decides what its bullets do; an
-  unhandled hit warns once with the reason; `emit_collision_signals =
-  false` says "intentionally silent").
+  factory, never both. A freed spawner takes its connections along
+  (`orphaned_volleys` decides what its bullets do).
+- C++ liveness: never carry a raw `Object*` across user code or
+  `call_deferred` (godot-cpp converts Variant args before your id check
+  runs). Capture `get_instance_id()` before the emit and compare
+  `ObjectDB::get_instance(id) == expected_ptr` after (`tick_may_continue`,
+  `revalidate_configured_volley`, the movement `alive()` lambda). Stop
+  touching `this` when it fails.
 - Pinned by `volley/test_volley_hit_contract`, `test_volley_lifetime_contract`,
   `test_volley_signal_timing`, `test_volley_bounce_signals`,
-  `spawner/test_spawner_orphan_policy` and `integration/test_engine_facts`.
+  `test_volley_homing_mixed_deques`, `spawner/test_spawner_orphan_policy`.
+
+### 12.5 Collision pipeline
+
+Area callbacks (ADDED) → object-level dedup window (O(1) hash;
+`collision_dedup_by_object = false` for shape-level) → records with
+queue-time epochs/velocity/pose → per-tick drain → counting → signals →
+bounce. Paused factory: ADDED events are PARKED per volley (cap 4096,
+deduped, cancelled by REMOVED) and replayed once on resume.
 
 ## 13. Pattern bake cache (spawner)
 
-- `resolve_raw_pattern` (cache in `patterns/pattern_bake_cache2d.cpp`,
-  posing in `patterns/pattern_pose2d.cpp`) generates raw transforms (pre spin/scale/skip) once
+- `resolve_raw_pattern` generates raw transforms (pre spin/scale/skip) once
   per `pattern_version` and re-poses them per shot (one 2x3 multiply per
-  bullet). The motion class is MEASURED with probe markers
-  (`classify_pattern_motion`): RIGID (follows any rigid generator move),
-  TRANSLATION (same basis only, e.g. world-direction rain), NONE.
-  CHILDREN/AIMED/CORRIDOR/CUSTOM/PATH2D read outside state (registry flag
-  `reads_external_state`) → always regenerate; unseeded random re-rolls →
-  fails the probe → regenerate.
+  bullet). The motion class is MEASURED with probe markers: RIGID,
+  TRANSLATION (same basis only, e.g. world-direction rain), NONE. Sources
+  with `reads_external_state` (CHILDREN/AIMED/CORRIDOR/CUSTOM/PATH2D) and
+  unseeded random always regenerate.
 - Every geometry setter calls `on_pattern_changed()` (version bump +
-  preview rebuild). NEVER call bare `rebuild_preview()` from a setter that
-  changes geometry. Presets write members raw, then call it once.
-- Proof: tests run with `debug_set_pattern_cache_verify(true)` (every
-  cached result regenerated and compared; mismatch = error = red test), and
-  `test_spawner_pattern_bake` perturbs EVERY pattern property for
-  invalidation, and every shape knob under its OWN shape (the generic
-  sweep alone missed a Heart setter; mutation-tested). `pattern_cache_mode = Off` exists for
-  debugging; moving/spinning spawners never need it.
+  preview rebuild). Presets write members raw, then call it once.
+- Proof: tests run with `debug_set_pattern_cache_verify(true)` (every cached
+  result regenerated and compared; mismatch = error = red test);
+  `test_spawner_pattern_bake` perturbs EVERY pattern property, and every
+  shape knob under its OWN shape. `pattern_cache_mode = Off` exists for
+  debugging.
 
-## 14. Contracts & pitfalls catalog (pinned by tests — do not "fix" back)
+## 14. Contracts and pitfalls catalog (pinned by tests — do not "fix" back)
 
-- Ranges: `all_bullets_*(start, end)` — (0, -1) = whole volley, end -1 =
-  through the last bullet; out-of-range or inverted ranges push
-  `Invalid index range in <fn> ...` once and apply NOTHING
-  (`volley/test_volley_range_contract.gd`, discovered via `get_method_list`).
+- Ranges: `all_bullets_*(start, end)`: (0, -1) = whole volley, end -1 =
+  through the last bullet; out-of-range/inverted ranges push `Invalid index
+  range in <fn> ...` once and apply NOTHING (`volley/test_volley_range_contract.gd`).
 - `spawn_pattern_list` entries: unknown keys fail loud with a did-you-mean;
   valid keys still apply.
-- Pause/resume replays overlaps that began during the pause, exactly once
-  (`volley/test_volley_pause_overlaps.gd`).
+- Pause/resume replays overlaps that began during the pause, exactly once.
 - Same-owner full-drain wake keeps linear ballistics; foreign wakes are
-  neutralized (see `enable_bullet` docs).
-- `spawn_position_offset_space`: Global (default, historical) vs Local
-  (turns with the spawner); the preview draws it where bullets spawn.
-- Spawner contracts (v4.1), each pinned by the named suite:
+  neutralized.
+- `spawn_position_offset_space`: Global (default) vs Local; the preview
+  draws it where bullets spawn.
 
 | Behavior | Suite |
 |---|---|
 | Every helper draws exactly `helper_bullets_amount` bullets at distinct spots; flower FAN splits the amount over petals | `test_spawner_pattern_counts` |
+| Every shape generator reports amount and NaN-marker errors in one wording | `test_factory_helper_edges` |
 | Presets are clean (pattern knobs + spin reset; Transform subgroup and node wiring kept) | `test_spawner_presets` |
-| Pattern-list entries are temporary overrides (everything restored); `pattern_list_finished` in both modes | `test_spawner_pattern_lists` |
-| Auto bursts clamp to `volleys_remaining`, cancel when auto-fire turns off (`burst_finished` still fires); mirror starts plain | `test_spawner_burst_telegraph` |
-| Controls called before the tree survive `_ready`; a spent `fire_n_volleys` budget clears itself; `shooting_*` signals are auto-fire only | `test_spawner_cadence` |
-| Every failed shot emits `volley_skipped(reason)` (`no_factory`, `no_spawn_data`, `no_transforms`, `over_budget`, `outside_fire_arc`, `factory_refused`, `dropped`) | `test_spawner_cadence` |
-| Reparenting keeps assigned nodes, tracked volleys, chains and lists; NodePaths are rewritten on re-entry | `test_spawner_tree_reentry` |
-| Setters reject NaN/Inf/out-of-range with "keeping the old value"; no setter depends on another field (load order) | `test_spawner_setter_contract` |
-| Fire arc follows spin and the volley chases the targets the arc approved | `test_spawner_homing_propagation` |
-| One-time warnings use `WarnOnce2D` codes 101+ (spawner) and stay quiet in the preview | `test_spawner_setter_contract` |
-| Homing sources never pick the spawner, its markers, factory nodes, dying nodes or non-Node2Ds; an empty resolution fires a plain volley and warns once per homing configuration | `test_spawner_homing_detection` |
-| Homing queues cap at 256 without errors; freed targets are trimmed; retarget skips dead/pooled/foreign/old-factory volleys and disabled bullets | `test_spawner_homing_queues` |
-| Public surface after the volley refactor: one `spawn_volley`, no `BulletType`, factory and spawner share signal names/payloads, exact stats keys, one container + one debugger | `test_factory_api_surface` |
-| A pooled volley reused for plain data matches a cold volley field by field, pose and flight (every feature reset) | `test_volley_pool_reuse_all_features` |
-| A one-bullet volley behaves like bullet 0 of any volley (per-bullet curves beat shared) | `test_volley_single_bullet` |
-| Every spawn-data and volley property sits in a group; names and group titles unique | `test_volley_data_inspector` |
-| Hits/bounces/lifetime/homing fire live with the bullet alive; the kill is decided after the handler (veto, self-disable, freed target, pause) | `test_volley_hit_contract`, `test_volley_lifetime_contract`, `test_volley_signal_timing`, `test_volley_bounce_signals` |
-| disable_bullet freezes (state kept), opt-in reset, -1 keeps the hit count, parked vs pooled, pooled wake refused | `test_volley_freeze_contract` |
-| Every clock restarts per life, holds while parked/paused, one tick per step across mid-sweep frees, finite under hitches | `test_volley_clock_audit` |
+| Pattern-list entries are temporary overrides; `pattern_list_finished` in both modes | `test_spawner_pattern_lists` |
+| Auto bursts clamp to `volleys_remaining`, cancel when auto-fire turns off | `test_spawner_burst_telegraph` |
+| Controls before the tree survive `_ready`; `shooting_*` signals are auto-fire only | `test_spawner_cadence` |
+| Every failed shot emits `volley_skipped(reason)` | `test_spawner_cadence` |
+| Reparenting keeps assigned nodes, tracked volleys, chains and lists | `test_spawner_tree_reentry` |
+| Setters reject NaN/Inf/out-of-range with "keeping the old value"; no setter depends on another field | `test_spawner_setter_contract` |
+| Fire arc follows spin; the volley chases the targets the arc approved | `test_spawner_homing_propagation` |
+| Homing sources never pick the spawner, its markers, factory nodes, dying nodes or non-Node2Ds | `test_spawner_homing_detection` |
+| Homing queues cap at 256; freed targets trimmed; retarget skips dead/pooled/foreign volleys | `test_spawner_homing_queues` |
+| A bullet steering by its own targets owns its reach even while the shared deque has targets | `test_volley_homing_mixed_deques` |
+| Every orbiting bullet circles its own front target; a zero-delta tick moves nothing | `test_volley_orbit_own_center` |
+| `get_bullet_velocity` = direction x speed + inherited + fall speed, in the tick AND right after every setter; `bullet_set_velocity` sets the exact total | `test_volley_velocity_composition` |
+| Direction setters under a direction curve refuse with one direction-worded warning | `test_volley_core` |
+| Public surface: one `spawn_volley`, no `BulletType`, shared signal names/payloads, exact stats keys | `test_factory_api_surface` |
+| A pooled volley reused for plain data matches a cold volley field by field | `test_volley_pool_reuse_all_features` |
+| A one-bullet volley behaves like bullet 0 of any volley | `test_volley_single_bullet` |
+| Every spawn-data and volley property sits in a group; names and titles unique | `test_volley_data_inspector` |
+| Hits/bounces/lifetime/homing fire live; the kill is decided after the handler | `test_volley_hit_contract`, `test_volley_lifetime_contract`, `test_volley_signal_timing`, `test_volley_bounce_signals` |
+| disable_bullet freezes; opt-in reset; parked vs pooled; pooled wake refused | `test_volley_freeze_contract` |
+| Every clock restarts per life, holds while parked/paused, finite under hitches | `test_volley_clock_audit` |
 | Custom data per bullet and shared, readable in every callback, never leaks through the pool | `test_volley_custom_data_contract` |
-| orphaned_volleys policies; unhandled hits warn once with the reason | `test_spawner_orphan_policy` |
-| Every setter round-trips or rejects loudly and keeps the old value; NaN/INF rejected everywhere | `integration/test_accessor_contract` |
+| orphaned_volleys policies; unhandled hits warn once | `test_spawner_orphan_policy` |
+| Every setter round-trips or rejects loudly and keeps the old value | `integration/test_accessor_contract` |
 | Homing aims through inherited spawner momentum | `test_volley_homing_drift` |
 | reset_finished fires after the reset; handlers can respawn | `test_factory_reset_finished` |
 
@@ -624,25 +799,18 @@ src/
   entries; empty arrays; short vs oversized arrays; OOB indices (-1/99);
   inverted ranges; zero amounts/sizes/speeds; singular transforms; freed
   factory/generator/target/path mid-flight; pool reuse across lives;
-  pause/resume with overlaps in flight; 10k cap (10000 ok, 10001
-  rejected); maxed queues/timers (64); same-frame expiry+respawn; deferred
-  calls from collision handlers; teleport-into-wall; coincident
-  aim/target; zero-radius orbit; negative speeds under curves.
-- Harness facts: from an idle point `await idle(k)` runs exactly k
-  factory ticks, `await physics(n)` resumes INSIDE frame n before the
-  factory ticked (n-1 ticks); with `--fixed-fps`, `Engine.time_scale`
-  does not change the delta (use `factory.debug_advance_time(delta)`);
-  the runner prints only the first failing assert per test and GUT clips
-  array diffs (join problems into one string to see them all); a
-  `Packed*Array` read from an Array is a copy (write it back);
-  `push_warning` lands in `get_errors()` (`err.is_push_warning()`).
-- Godot facts that bit us: GDExtension virtuals (`_get_configuration_warnings`)
-  are not script-callable (expose a public twin); Godot imports `.csv` files
-  inside the project as translations (keep logs under a `.gdignore` folder);
-  a warning printed per spawn retains objects (use `WarnOnce2D`);
-  `--quit-after` guards headless scripts against hangs.
+  pause/resume with overlaps in flight; 10k cap (10000 ok, 10001 rejected);
+  maxed queues/timers (64); same-frame expiry+respawn; deferred calls from
+  collision handlers; zero-delta ticks; mixed shared + per-bullet features.
+- Godot facts that bit us: GDExtension virtuals
+  (`_get_configuration_warnings`) are not script-callable (expose a public
+  twin); Godot imports `.csv` files inside the project as translations (keep
+  logs under a `.gdignore` folder); a warning printed per spawn retains
+  objects (use `WarnOnce2D`); `--quit-after` guards headless scripts.
 
-## 15. Benchmarks & profiling (measure before AND after any perf change)
+## 15. Benchmarks and performance lessons
+
+### 15.1 Running
 
 ```sh
 python3 tools/run_benchmarks.py                     # 18 headless scenarios x5 (median)
@@ -651,53 +819,127 @@ python3 tools/run_benchmarks.py --gate              # exit 1 on regression vs lo
 python3 tools/run_benchmarks.py --update-baseline   # ONLY for an accepted change; say so in the commit
 ```
 
-- Read `test_project/benchmarks/log/LATEST.md` (this run vs baseline).
-  Regression = p50 > +10% AND > +0.05 ms, or p95 > +20% AND > +0.3 ms
-  (p99/max are reported, not gated: they are bimodal on a desktop).
-  `log/history.csv` = append-only trend, `log/results/*.json` = raw runs.
-  Compare only same machine + same build type.
-- A/B a change: run the scenarios on your build, `git stash push -u -- src/`,
-  rebuild, run again, `git stash pop`, rebuild. A/B against an OLD commit:
-  `git worktree add --detach <dir> <commit>`, copy `godot-cpp/` (with its
-  `bin/`) into it and point that worktree's `tools/config.json`
-  `godotProjectFolder` at ITS `test_project` (the path is absolute: left
-  as is, the old build installs over the main project's `.so`). Differences under ~5% p50
-  are noise on this machine.
-- Scenarios: `test_project/benchmarks/scenarios/*.gd` (extend
-  `BlastBenchmark`: `setup()`, `step(frame)`, `extra`). Columns: frame =
-  step (scenario's own plugin calls) + engine (physics + factory tick +
-  render); tick = factory physics tick only.
-- In-engine: `BulletFactory2D.get_frame_stats()`, `get_active_bullet_count()`,
-  and the `BlastBullets2D/*` custom monitors (editor Debugger → Monitors,
-  `register_performance_monitors`). Editor Profiler for script cost,
-  Visual Profiler for GPU.
-- Facts (debug build, Ryzen 7 8840HS): 10k bullets in flight
-  ≈ 0.27 ms factory tick (`volley_10k_flight`). Cold spawn was O(N²) (8k: 1.5 s) because every
-  per-bullet `shape_set_data` re-updated all shapes of the area; one
-  shared shape per volley made it O(N) (8k: 11 ms, 1k: 0.66 ms).
-  Spawner preview spin/move: 0 rebuilds, p99 ~50 ms → 3–5 ms.
-  Live signals: `lifetime_signal_10k` adds ~0.25 ms per 10k-bullet expiry
-  wave over `mass_expiry_10k` with an empty handler (index arrays + veto
-  checks); the rest of its p99 is the handler's own GDScript.
-  Inlining `move_bullets` into the factory loop cost 20-25% on
-  `trails_fx_2k` (it lives in its own TU now); a `Ref<>` returned by value
-  per bullet costs a reference()/unreference() engine call pair (trail and
-  effect shards hand out raw `MultiMesh *`, ~9% p50 / ~18% p95 on trails).
+- Read `test_project/benchmarks/log/LATEST.md`. Regression = p50 > +10% AND
+  > +0.05 ms, or p95 > +20% AND > +0.3 ms (p99/max reported, not gated).
+  `log/history.csv` = trend, `log/results/*.json` = raw runs. Compare only
+  same machine + same build type. Differences under ~5% p50 are noise.
+- Columns: frame = step (the scenario's plugin calls) + engine (physics +
+  factory tick + render); tick = factory physics tick only.
+- In-engine: `BulletFactory2D.get_frame_stats()`, the `BlastBullets2D/*`
+  monitors (`register_performance_monitors`), the editor profilers.
 
-## 16. Rules (non-negotiable)
+### 15.2 A/B
 
-1. Failing-first: reproduce with a test that fails (or mutation-check an
-   existing fix), then fix, then keep it.
-2. Evidence before synthesis: read the code, cite `file:line`; never
-   assert behavior you haven't executed. Re-read code before documenting it.
-3. Never weaken a test to fit the code — fix the code, or bring the
-   contract question to the user with engine-code references.
-4. Tick code is sacred: no per-bullet extension-boundary crossings (hoist
-   sin/cos, inverses, StringNames via `CachedStringNames2D`), O(1)
-   amortized per bullet, no per-bullet allocation per tick (reuse scratch,
-   `reserve()`), batched buffer uploads. New per-tick work needs a
-   benchmark delta.
-5. Don't modify SConstruct; build only through `tools/*.py` / `setup.py`.
-   Test only inside `test_project/` (no temp projects).
-6. Full suite green (leaks on) + `--self-test` before finishing. End
-   reports with Big-O + a ratings table.
+On your build run the scenarios, `git stash push -u -- src/`, rebuild, run
+again, `git stash pop`, rebuild. Against an OLD commit:
+`git worktree add --detach <dir> <commit>`, copy `godot-cpp/` (with `bin/`)
+into it and point that worktree's `tools/config.json` `godotProjectFolder`
+at ITS `test_project` (left as is, the old build installs over the main
+project's `.so`). For quick numeric comparisons load two
+`log/results/*.json` files and compare `scenarios[name].factory_tick_ms.p50`.
+
+### 15.3 Lessons (measured on Ryzen 7 8840HS, debug build)
+
+- 10k bullets in flight ≈ 0.26 ms factory tick (`volley_10k_flight`).
+- Tick code rules: no per-bullet engine-boundary crossings (hoist sin/cos,
+  inverses, StringNames via `CachedStringNames2D`), O(1) amortized per
+  bullet, no per-bullet allocation (reuse scratch, `reserve()`), batched
+  buffer uploads.
+- Per-bullet stores are expensive at 10k: a per-bullet scratch struct that
+  zero-initialized three Vector2 made `trails_fx_2k` +13% and
+  `volley_10k_flight` +7%. Create scratch once per tick, reset only what each
+  bullet needs; make the per-tick context a `const` object (a mutable one
+  is reloaded after every external call). The staged loop then measured
+  level or faster than the monolithic one (tick p50: `trails_fx_2k` −1%,
+  `volley_10k_flight` −6%).
+- Write-only per-bullet arrays cost a store per bullet per tick: delete
+  them (the shape-origin cache was one).
+- `std::deque` allocates on construction: two mallocs per bullet per cold
+  spawn even with homing unused; `RingDeque2D` allocates nothing while empty.
+- Duplicate seeding: a blank pre-seed that ran the full per-bullet speed
+  setup before the real one cost ~5% of a cold spawn.
+- Cold spawn was O(N²) (8k: 1.5 s) when every per-bullet `shape_set_data`
+  re-updated all shapes; one shared shape per volley made it O(N) (8k: ~10 ms).
+- Inlining `move_bullets` into the factory loop cost 20–25% on
+  `trails_fx_2k`: it stays a separate call in its own TU.
+- A `Ref<>` returned by value per bullet costs a reference()/unreference()
+  pair (trail and effect shards hand out raw `MultiMesh *`).
+- Pattern layout: the pattern refactor (one `marker.affine_inverse()` per
+  call instead of per point, shared layout lambdas) cut
+  `spawner_warm_shot_5k` p50 ~23% and `spawner_aimed_regen_2k` ~13%.
+- Spawner preview spin/move: 0 rebuilds, p99 ~50 ms → 3–5 ms.
+- Live signals: `lifetime_signal_10k` adds ~0.25 ms per 10k-bullet expiry
+  wave over `mass_expiry_10k` with an empty handler.
+
+## 16. Inspector groups and serialization locks
+
+- Spawner groups, in order (locked by `test_volley_bounce.gd`): Setup,
+  Bullet Patterns, Shooting, Spin, Homing, Orbiting, Preview, Movement,
+  Performance. Spawn data (`BulletVolleyData2D`): Bullets, Appearance,
+  Movement Speed, Bullet Rotation, Wobble, Gravity, Bounce and Ricochet,
+  Movement Pattern Paths, Homing, Collision, Attachments, Sprite Effects,
+  Rendering and Material. No duplicate titles, no ungrouped property
+  (`volley/test_volley_data_inspector.gd`).
+- Bullet Patterns: `pattern_source` + `helper_bullets_amount`, then a
+  `Transform` subgroup, one `ADD_SUBGROUP("Ring", "helper_ring_")` per shape
+  (prefix stripped in the inspector), `Outline Layers` last. The inspector
+  EJECTS a property whose name lacks the subgroup prefix
+  (`test_every_prefixed_subgroup_member_carries_the_prefix`). Mind
+  overlapping prefixes (`helper_star_polygon_` vs `helper_star_`).
+- ADD_PROPERTY BEFORE its bind_method is SILENTLY dropped by ClassDB (the
+  runner flags the `class_db.cpp` error). Moving a property = moving its
+  bind + ADD_PROPERTY paragraph (pattern knobs: move the table row).
+- A setter whose field `_validate_property` reads MUST call
+  `notify_property_list_changed()`.
+- Gating: helper_* per pattern mode; homing/orbiting/movement/preview knobs
+  hide while their switch is off; spin speed only in Continuous;
+  amplitude/frequency only in Oscillate; burst_*/telegraph_sec only when on.
+- Enum ids are serialized: renumbering silently repoints saved scenes.
+  `pattern_source` ids and pool-key shape ids (`Circle:3,Rectangle:4,Capsule:5`)
+  are locked. Saved property ORDER follows the bind order (an inspector
+  reorg reorders `.tscn` lines: harmless, expected in diffs).
+
+## 17. Documentation generation
+
+- Order: close the editor → build → `GODOTPP_NONINTERACTIVE=1 python3
+  tools/generate_xml_docs.py` → review `git diff doc_classes/` → fill every
+  empty `<description>` → build (docs compile into the binary) → regenerate:
+  the diff must be empty apart from escaping (`>` becomes `&gt;`).
+- The doctool KEEPS descriptions of existing members, ADDS new members with
+  empty text, DROPS removed ones and re-sorts alphabetically. Write `<`/`>`
+  as `&lt;`/`&gt;`.
+- A regeneration with zero diff proves the bound API matches the docs (use
+  it after big refactors).
+- BBCode: `[Class]`, `[method C.m]`, `[member C.p]`, `[signal C.s]`,
+  `[param x]`, `[constant C]`, `[enum C.E]`, `[code]`, `[codeblock]`, `[b]`, `[i]`.
+
+## 18. tools/ catalog
+
+- `setup.py`: interactive menu (Godot paths/versions, project folder,
+  rename, icons, docs, builds, profiles, LTO, export zip, tutorials).
+- Build: `compile_debug_build.py` / `compile_release_build.py` (both write
+  the build stamp on success) / `clean_build.py` / `select_build_profile.py`
+  / `edit_build_profile.py` / `change_lto_mode.py` / `toggle_editor_target.py`
+  / `toggle_debug_symbols.py` / `toggle_reloadable.py`.
+- Verification: `run_tests.py`, `lint_tests.py`, `api_snapshot.py` (§7.4),
+  `format_code.py`, `run_benchmarks.py`.
+- Config: `select_godot_path.py`, `select_godot_project.py`,
+  `change_godot_target_version.py`, `update_godot_cpp.py`,
+  `config_manager.py` + `config.json` (machine state), `paths.py`.
+- Plugin: `renaming.py`, `update_icons.py`, `export_plugin.py`,
+  `generate_xml_docs.py`, `gdextension_file_helper.py`, `apple_helpers.py`,
+  `git_helpers.py`, `scons_helpers.py` + `scons_build_helpers.py`,
+  `tutorials.py`.
+
+## 19. Final report template
+
+End every task with:
+1. What changed (per area), with the commits.
+2. Bugs found and fixed, each with the test that pins it.
+3. Verification: suite (`ALL n TEST FILES PASSED`), `--self-test`, format
+   check, snapshot diff (IDENTICAL or the listed intended deltas), benchmark
+   gate + the notable deltas.
+4. Big-O of the touched paths (per tick, per spawn, per call).
+5. A ratings table (stability, performance, code clarity, test coverage,
+   docs) with one line of justification each.
+6. Open questions for the user (contract changes you did NOT make).
