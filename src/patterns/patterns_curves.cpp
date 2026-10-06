@@ -208,6 +208,37 @@ void lissajous_sweep2d(double fx, double fy, double phase, double &r_t0, double 
 	}
 }
 
+// An arc-even loop resampled from a dense ideal sweep (marker-local, then
+// shifted to the marker origin), plus the dense sweep as the Fill/Layers
+// outline. distinct = resample_loop_even_distinct (self-crossing curves).
+struct DenseLoop2D {
+	PackedVector2Array points;
+	PackedVector2Array normals;
+	PackedFloat32Array overrides;
+	PackedVector2Array fill_outline;
+};
+
+static DenseLoop2D dense_curve_loop2d(const PackedVector2Array &dense_pts, const PackedVector2Array &dense_nrms, const PackedFloat32Array &dense_ovr, int count, bool closed, bool distinct, const Vector2 &origin, int outline_placement) {
+	PackedVector2Array even_local;
+	PackedVector2Array even_nrms;
+	PackedFloat32Array even_ovr;
+	if (distinct) {
+		resample_loop_even_distinct(dense_pts, dense_nrms, dense_ovr, count, closed, even_local, even_nrms, even_ovr);
+	} else {
+		resample_loop_even(dense_pts, dense_nrms, dense_ovr, count, closed, even_local, even_nrms, even_ovr);
+	}
+	DenseLoop2D loop;
+	loop.fill_outline = fill_outline_from(outline_placement, dense_pts, origin);
+	for (int i = 0; i < even_local.size(); ++i) {
+		loop.points.push_back(origin + even_local[i]);
+		loop.normals.push_back(even_nrms[i]);
+		if (i < even_ovr.size()) {
+			loop.overrides.push_back(even_ovr[i]);
+		}
+	}
+	return loop;
+}
+
 PatternSlots2D BulletPatterns2D::generate_ring2d(int transforms_amount, Transform2D marker_transform, const RingParams2D &p) {
 	const char *caller = "helper_generate_transforms_ring";
 
@@ -350,16 +381,11 @@ PatternSlots2D BulletPatterns2D::generate_flower2d(int transforms_amount, Transf
 			const Vector2 radial = Vector2(Math::cos(theta), Math::sin(theta));
 			dense_nrms.push_back((radial.length_squared() > 1e-12) ? radial : Vector2(1, 0));
 		}
-		PackedVector2Array even_local;
-		PackedVector2Array even_nrms;
-		PackedFloat32Array even_ovr;
-		resample_loop_even_distinct(dense_pts, dense_nrms, PackedFloat32Array(), transforms_amount, true, even_local, even_nrms, even_ovr);
-		fill_outline = fill_outline_from(p.outline.outline_placement, dense_pts, origin);
+		const DenseLoop2D loop = dense_curve_loop2d(dense_pts, dense_nrms, PackedFloat32Array(), transforms_amount, true, true, origin, p.outline.outline_placement);
+		loop_points = loop.points;
+		loop_normals = loop.normals;
+		fill_outline = loop.fill_outline;
 		fill_normals = fill_outline.is_empty() ? PackedVector2Array() : dense_nrms;
-		for (int i = 0; i < even_local.size(); ++i) {
-			loop_points.push_back(origin + even_local[i]);
-			loop_normals.push_back(even_nrms[i]);
-		}
 	} else if (p.flower_type == FLOWER_PHYLLOTAXIS) {
 		if (p.outline.outline_placement == OUTLINE_FILL_INSIDE) {
 			for (int q = 0; q < 128; ++q) {
@@ -403,16 +429,11 @@ PatternSlots2D BulletPatterns2D::generate_flower2d(int transforms_amount, Transf
 			dense_pts.push_back(local);
 			dense_nrms.push_back((local.length_squared() > 1e-12) ? local.normalized() : Vector2(1, 0));
 		}
-		PackedVector2Array even_local;
-		PackedVector2Array even_nrms;
-		PackedFloat32Array even_ovr;
-		resample_loop_even_distinct(dense_pts, dense_nrms, PackedFloat32Array(), transforms_amount, true, even_local, even_nrms, even_ovr);
-		fill_outline = fill_outline_from(p.outline.outline_placement, dense_pts, origin);
+		const DenseLoop2D loop = dense_curve_loop2d(dense_pts, dense_nrms, PackedFloat32Array(), transforms_amount, true, true, origin, p.outline.outline_placement);
+		loop_points = loop.points;
+		loop_normals = loop.normals;
+		fill_outline = loop.fill_outline;
 		fill_normals = fill_outline.is_empty() ? PackedVector2Array() : dense_nrms;
-		for (int i = 0; i < even_local.size(); ++i) {
-			loop_points.push_back(origin + even_local[i]);
-			loop_normals.push_back(even_nrms[i]);
-		}
 	} else {
 		// Simplified Gielis superformula with a = b = 1, n2 = n3 = fullness:
 		// r = (|cos(mt/4)|^f + |sin(mt/4)|^f)^(-1/f). m = super_lobes.
@@ -428,16 +449,11 @@ PatternSlots2D BulletPatterns2D::generate_flower2d(int transforms_amount, Transf
 			const Vector2 radial = Vector2(Math::cos(ang), Math::sin(ang));
 			dense_nrms.push_back((radial.length_squared() > 1e-12) ? radial : Vector2(1, 0));
 		}
-		PackedVector2Array even_local;
-		PackedVector2Array even_nrms;
-		PackedFloat32Array even_ovr;
-		resample_loop_even_distinct(dense_pts, dense_nrms, PackedFloat32Array(), transforms_amount, true, even_local, even_nrms, even_ovr);
-		fill_outline = fill_outline_from(p.outline.outline_placement, dense_pts, origin);
+		const DenseLoop2D loop = dense_curve_loop2d(dense_pts, dense_nrms, PackedFloat32Array(), transforms_amount, true, true, origin, p.outline.outline_placement);
+		loop_points = loop.points;
+		loop_normals = loop.normals;
+		fill_outline = loop.fill_outline;
 		fill_normals = fill_outline.is_empty() ? PackedVector2Array() : dense_nrms;
-		for (int i = 0; i < even_local.size(); ++i) {
-			loop_points.push_back(origin + even_local[i]);
-			loop_normals.push_back(even_nrms[i]);
-		}
 	}
 	// The flower always lays its layers out on one shared loop.
 	OutlineLayout2D flower_outline = p.outline;
@@ -592,20 +608,8 @@ PatternSlots2D BulletPatterns2D::generate_heart2d(int transforms_amount, Transfo
 		const real_t radial = (local.length_squared() > 0.0) ? local.angle() : p.base_rotation;
 		dense_ovr.push_back((p.face_outward ? radial : radial + Math::PI) + facing_offset);
 	}
-	PackedVector2Array loop_points;
-	PackedVector2Array loop_normals;
-	PackedFloat32Array facing_override;
-	PackedVector2Array even_local;
-	PackedVector2Array even_nrms;
-	PackedFloat32Array even_ovr;
-	resample_loop_even(dense_pts, dense_nrms, dense_ovr, transforms_amount, true, even_local, even_nrms, even_ovr);
-	const PackedVector2Array fill_outline = fill_outline_from(p.outline.outline_placement, dense_pts, origin);
-	for (int i = 0; i < even_local.size(); ++i) {
-		loop_points.push_back(origin + even_local[i]);
-		loop_normals.push_back(even_nrms[i]);
-		facing_override.push_back(even_ovr[i]);
-	}
-	return layout_outline_slots(caller, marker_transform, loop_points, loop_normals, false, 0.0, p.face_outward, p.facing_offset_degrees, facing_override, p.outline, CornerLayout2D::smooth(), PackedVector2Array(), true, true, fill_outline, dense_nrms, dense_ovr);
+	const DenseLoop2D loop = dense_curve_loop2d(dense_pts, dense_nrms, dense_ovr, transforms_amount, true, false, origin, p.outline.outline_placement);
+	return layout_outline_slots(caller, marker_transform, loop.points, loop.normals, false, 0.0, p.face_outward, p.facing_offset_degrees, loop.overrides, p.outline, CornerLayout2D::smooth(), PackedVector2Array(), true, true, loop.fill_outline, dense_nrms, dense_ovr);
 }
 
 PatternSlots2D BulletPatterns2D::generate_rose2d(int transforms_amount, Transform2D marker_transform, const RoseParams2D &p) {
@@ -634,18 +638,8 @@ PatternSlots2D BulletPatterns2D::generate_rose2d(int transforms_amount, Transfor
 		const real_t shape_angle = (cos_k >= 0.0) ? theta : theta + Math::PI;
 		dense_nrms.push_back(Vector2(Math::cos(shape_angle), Math::sin(shape_angle)));
 	}
-	PackedVector2Array loop_points;
-	PackedVector2Array loop_normals;
-	PackedVector2Array even_local;
-	PackedVector2Array even_nrms;
-	PackedFloat32Array even_ovr;
-	resample_loop_even_distinct(dense_pts, dense_nrms, PackedFloat32Array(), transforms_amount, true, even_local, even_nrms, even_ovr);
-	const PackedVector2Array fill_outline = fill_outline_from(p.outline.outline_placement, dense_pts, origin);
-	for (int i = 0; i < even_local.size(); ++i) {
-		loop_points.push_back(origin + even_local[i]);
-		loop_normals.push_back(even_nrms[i]);
-	}
-	return layout_outline_slots(caller, marker_transform, loop_points, loop_normals, false, 0.0, p.face_outward, p.facing_offset_degrees, PackedFloat32Array(), p.outline, CornerLayout2D::smooth(), PackedVector2Array(), true, true, fill_outline, dense_nrms);
+	const DenseLoop2D loop = dense_curve_loop2d(dense_pts, dense_nrms, PackedFloat32Array(), transforms_amount, true, true, origin, p.outline.outline_placement);
+	return layout_outline_slots(caller, marker_transform, loop.points, loop.normals, false, 0.0, p.face_outward, p.facing_offset_degrees, PackedFloat32Array(), p.outline, CornerLayout2D::smooth(), PackedVector2Array(), true, true, loop.fill_outline, dense_nrms);
 }
 
 PatternSlots2D BulletPatterns2D::generate_lissajous2d(int transforms_amount, Transform2D marker_transform, const LissajousParams2D &p) {
@@ -678,18 +672,8 @@ PatternSlots2D BulletPatterns2D::generate_lissajous2d(int transforms_amount, Tra
 		dense_pts.push_back(offset);
 		dense_nrms.push_back((offset.length_squared() > 0.0) ? offset.normalized() : Vector2(Math::cos(marker_rot), Math::sin(marker_rot)));
 	}
-	PackedVector2Array loop_points;
-	PackedVector2Array loop_normals;
-	PackedVector2Array even_local;
-	PackedVector2Array even_nrms;
-	PackedFloat32Array even_ovr;
-	resample_loop_even_distinct(dense_pts, dense_nrms, PackedFloat32Array(), transforms_amount, !open_run, even_local, even_nrms, even_ovr);
-	const PackedVector2Array fill_outline = fill_outline_from(p.outline.outline_placement, dense_pts, origin);
-	for (int i = 0; i < even_local.size(); ++i) {
-		loop_points.push_back(origin + even_local[i]);
-		loop_normals.push_back(even_nrms[i]);
-	}
-	return layout_outline_slots(caller, marker_transform, loop_points, loop_normals, false, 0.0, p.face_outward, p.facing_offset_degrees, PackedFloat32Array(), p.outline, CornerLayout2D::smooth(), PackedVector2Array(), !open_run, true, fill_outline, dense_nrms);
+	const DenseLoop2D loop = dense_curve_loop2d(dense_pts, dense_nrms, PackedFloat32Array(), transforms_amount, !open_run, true, origin, p.outline.outline_placement);
+	return layout_outline_slots(caller, marker_transform, loop.points, loop.normals, false, 0.0, p.face_outward, p.facing_offset_degrees, PackedFloat32Array(), p.outline, CornerLayout2D::smooth(), PackedVector2Array(), !open_run, true, loop.fill_outline, dense_nrms);
 }
 
 PatternSlots2D BulletPatterns2D::generate_circle2d(int transforms_amount, Transform2D marker_transform, const CircleParams2D &p) {
