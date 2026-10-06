@@ -68,6 +68,7 @@ func _ready() -> void:
 		"spawner": _snap_spawner,
 		"setters": _snap_setters,
 		"traces": _snap_traces,
+		"volley_api": _snap_volley_api,
 	}
 	for name in sections:
 		if only != "" and not (name in only.split(",")):
@@ -718,6 +719,202 @@ func _snap_traces(section: String) -> void:
 	_trace(section, factory, "reuse_life1", homing.duplicate(), func(v: BulletVolley2D) -> void:
 		v.all_bullets_push_back_homing_target(target_a), 30)
 	_trace(section, factory, "reuse_life2", H.make_volley_data(6, 220.0))
+	factory.reset()
+	factory.queue_free()
+	await get_tree().process_frame
+
+
+# ---- 7. Every bound volley method x three argument sets ---------------------
+
+## Everything a volley exposes per bullet (no instance ids: those vary).
+func _volley_full_state(v: BulletVolley2D) -> Array:
+	var rows := []
+	for i in v.get_amount_bullets():
+		rows.append([v.get_bullet_transform(i), v.debug_get_bullet_info(i), v.debug_get_orbiting_info(i),
+				v.debug_get_bounce_info(i), v.debug_get_wobble_info(i), v.debug_get_curves_info(i)])
+	rows.append(v.debug_get_clocks())
+	return rows
+
+
+## Objects become their class name (instance ids differ per run).
+func _plain(x: Variant) -> Variant:
+	if x is Object:
+		return (x as Object).get_class() if is_instance_valid(x) else "<freed>"
+	if x is Array:
+		var a := []
+		for e in x:
+			a.append(_plain(e))
+		return a
+	if x is Dictionary:
+		var d := {}
+		for k in x:
+			d[k] = _plain(x[k])
+		return d
+	return x
+
+
+var _api_calls: Array = []
+var _api_target: Node2D
+var _api_path: Path2D
+var _api_scene: PackedScene
+
+
+func _api_object(cls: String, variant: int) -> Variant:
+	if variant == 2:
+		return null
+	match cls:
+		"BulletSpeedData2D":
+			return H.make_speed(250.0 if variant == 0 else 40.0, 900.0, 50.0)
+		"BulletRotationData2D":
+			return H.make_rotation(2.0 if variant == 0 else -1.0, 8.0, 1.0)
+		"BulletCurvesData2D":
+			var c := BulletCurvesData2D.new()
+			c.movement_speed_curve = _curve([Vector2(0, 100), Vector2(1, 300)])
+			if variant == 0:
+				c.x_direction_curve = _curve([Vector2(0, 0.0), Vector2(1, 1.0)])
+			return c
+		"BulletWobbleData2D":
+			var w := BulletWobbleData2D.new()
+			w.enabled = true
+			w.mode = variant
+			w.amplitude = 25.0
+			w.frequency_hz = 2.0
+			return w
+		"Curve2D":
+			return _api_path.curve
+		"PackedScene":
+			return _api_scene
+		"Shape2D", "CircleShape2D":
+			return H.make_circle_shape(5.0 + variant)
+		"SpriteFrames":
+			return H.make_sprite_frames()
+		"Node2D", "Node", "Object", "CanvasItem":
+			return _api_target
+		"Resource":
+			return H.make_speed(1.0, 2.0, 3.0)
+	return null
+
+
+func _api_arg(a: Dictionary, variant: int) -> Variant:
+	var t := int(a.get("type", TYPE_NIL))
+	var cn := String(a.get("class_name", ""))
+	var n := String(a.get("name", ""))
+	match t:
+		TYPE_INT:
+			if n == "bullet_index":
+				return [1, 3, 99][variant]
+			if n.ends_with("_start") or n == "start_index":
+				return [0, 1, 3][variant]
+			if n.ends_with("_end_inclusive") or n == "end_index_inclusive":
+				return [-1, 2, 1][variant]
+			if cn.contains("."):
+				var parts := cn.split(".")
+				var vals := []
+				for c in ClassDB.class_get_enum_constants(parts[0], parts[1], true):
+					vals.append(ClassDB.class_get_integer_constant(parts[0], c))
+				return [vals[mini(1, vals.size() - 1)], vals[0], 99][variant]
+			return [1, 3, -5][variant]
+		TYPE_FLOAT:
+			return [37.5, 0.25, NAN][variant]
+		TYPE_BOOL:
+			return [true, false, true][variant]
+		TYPE_VECTOR2:
+			return [Vector2(120, -40), Vector2(0, 1), Vector2(NAN, 0)][variant]
+		TYPE_TRANSFORM2D:
+			return [Transform2D(0.3, Vector2(50, 20)), Transform2D(), Transform2D(0.0, Vector2(INF, 0))][variant]
+		TYPE_COLOR:
+			return [Color(0.5, 0.2, 0.9), Color(1, 1, 1, 0.5), Color(NAN, 0, 0)][variant]
+		TYPE_STRING, TYPE_STRING_NAME:
+			return ["default", "", "missing"][variant]
+		TYPE_NODE_PATH:
+			return [get_path_to(_api_path), NodePath(), NodePath("nope")][variant]
+		TYPE_DICTIONARY:
+			return [{}, {"k": 1}, {}][variant]
+		TYPE_CALLABLE:
+			return [func(...args) -> void: _api_calls.append(["cb", args.size()]), Callable(), Callable()][variant]
+		TYPE_PACKED_INT32_ARRAY:
+			return [PackedInt32Array([0, 2]), PackedInt32Array(), PackedInt32Array([99, -1])][variant]
+		TYPE_PACKED_FLOAT32_ARRAY:
+			return [PackedFloat32Array([1.0, 1.5]), PackedFloat32Array(), PackedFloat32Array([NAN])][variant]
+		TYPE_PACKED_VECTOR2_ARRAY:
+			return [PackedVector2Array([Vector2(0, 0), Vector2(50, 10)]), PackedVector2Array(), PackedVector2Array([Vector2(NAN, 0)])][variant]
+		TYPE_OBJECT:
+			return _api_object(cn, variant)
+		TYPE_NIL: # Variant arguments (node2d_or_global_position, custom data...)
+			if n.contains("position") or n.contains("node2d") or n.contains("target"):
+				return [_api_target, Vector2(200, 100), "bad"][variant]
+			return [H.make_speed(1.0, 2.0, 3.0), 1.5, null][variant]
+		TYPE_ARRAY:
+			var hs := String(a.get("hint_string", ""))
+			if hs != "" and ClassDB.class_exists(hs):
+				return [[_api_object(hs, 0), _api_object(hs, 1)], [], [null]][variant]
+			if n.contains("homing") or n.contains("node2d"):
+				return [[_api_target, Vector2(200, 100)], [], [null, 5]][variant]
+			if hs == "Transform2D" or n.contains("transform"):
+				return [[Transform2D(0.0, Vector2(10, 0))], [], [null]][variant]
+			if hs == "Vector2":
+				return [[Vector2(0, 300), Vector2(40, 0)], [], [Vector2(NAN, 0)]][variant]
+			return [[1.0, true], [], [null]][variant]
+	return null
+
+
+func _api_rich(v: BulletVolley2D) -> void:
+	v.all_bullets_set_gravity(Vector2(0, 120))
+	v.bullet_homing_push_back_node2d_target(0, _api_target)
+	v.shared_homing_deque_push_back_global_position_target(Vector2(-200, 50))
+	v.bullet_enable_orbiting(1, 40.0, BulletVolley2D.OrbitRight, BulletVolley2D.FaceTarget)
+	v.all_bullets_set_wobble_data(_api_object("BulletWobbleData2D", 0))
+
+
+func _snap_volley_api(section: String) -> void:
+	var factory := BulletFactory2D.new()
+	add_child(factory)
+	_api_target = Node2D.new()
+	_api_target.position = Vector2(300, 140)
+	add_child(_api_target)
+	_api_path = Path2D.new()
+	_api_path.curve = Curve2D.new()
+	for pt in [Vector2(0, 0), Vector2(40, 30), Vector2(80, -30), Vector2(120, 0)]:
+		_api_path.curve.add_point(pt)
+	add_child(_api_path)
+	var probe: Node = load("res://tests/scenes/attachment_probe.gd").new()
+	_api_scene = PackedScene.new()
+	_api_scene.pack(probe)
+	probe.free()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	cap.take()
+	var methods := ClassDB.class_get_method_list(&"BulletVolley2D", true)
+	methods.sort_custom(func(a, b): return String(a["name"]) < String(b["name"]))
+	for m in methods:
+		var name := String(m["name"])
+		if name.begins_with("_"):
+			continue
+		for base in ["plain", "rich"]:
+			for variant in 3:
+				seed(4242)
+				_api_calls.clear()
+				var v: BulletVolley2D = factory.spawn_volley(H.make_volley_data(4, 150.0, 30.0))
+				if base == "rich":
+					_api_rich(v)
+				factory.debug_advance_time(TRACE_STEP)
+				cap.take()
+				var args := []
+				for a in m.get("args", []):
+					args.append(_api_arg(a, variant))
+				var ret: Variant = v.callv(name, args)
+				var errs := cap.take()
+				var after := []
+				if is_instance_valid(v):
+					after.append(_volley_full_state(v))
+					factory.debug_advance_time(TRACE_STEP)
+					if is_instance_valid(v):
+						after.append(_volley_full_state(v))
+				_rec(section, "%s#%s%d" % [name, base, variant], [_plain(ret), after, _api_calls.duplicate()], errs)
+				if is_instance_valid(v) and not v.is_queued_for_deletion():
+					v.clear_all_bullets()
+				cap.take()
+		await get_tree().process_frame
 	factory.reset()
 	factory.queue_free()
 	await get_tree().process_frame
