@@ -423,17 +423,25 @@ void BulletVolley2D::set_all_physics_shapes_enabled_for_area(bool enable) {
 	}
 }
 
-int BulletVolley2D::get_collision_layer() const {
+// The area accessors need a volley spawned through BulletFactory2D (a bare
+// new() volley has no physics area): fail loud naming the caller.
+bool BulletVolley2D::area_ready_or_error(const char *function_name) const {
 	if (physics_server == nullptr || !area.is_valid()) {
-		UtilityFunctions::push_error("get_collision_layer: multimesh was never spawned through BulletFactory2D.");
+		UtilityFunctions::push_error(String(function_name) + ": multimesh was never spawned through BulletFactory2D.");
+		return false;
+	}
+	return true;
+}
+
+int BulletVolley2D::get_collision_layer() const {
+	if (!area_ready_or_error("get_collision_layer")) {
 		return 0;
 	}
 	return physics_server->area_get_collision_layer(area);
 }
 
 void BulletVolley2D::set_collision_layer(int new_collision_layer) {
-	if (physics_server == nullptr || !area.is_valid()) {
-		UtilityFunctions::push_error("set_collision_layer: multimesh was never spawned through BulletFactory2D.");
+	if (!area_ready_or_error("set_collision_layer")) {
 		return;
 	}
 	physics_server->area_set_collision_layer(area, new_collision_layer);
@@ -441,24 +449,21 @@ void BulletVolley2D::set_collision_layer(int new_collision_layer) {
 
 void BulletVolley2D::set_collision_layer_from_array(const TypedArray<int> &numbers) {
 	int bitmask = BulletVolleyData2D::calculate_bitmask(numbers);
-	if (physics_server == nullptr || !area.is_valid()) {
-		UtilityFunctions::push_error("set_collision_layer_from_array: multimesh was never spawned through BulletFactory2D.");
+	if (!area_ready_or_error("set_collision_layer_from_array")) {
 		return;
 	}
 	physics_server->area_set_collision_layer(area, bitmask);
 }
 
 int BulletVolley2D::get_collision_mask() const {
-	if (physics_server == nullptr || !area.is_valid()) {
-		UtilityFunctions::push_error("get_collision_mask: multimesh was never spawned through BulletFactory2D.");
+	if (!area_ready_or_error("get_collision_mask")) {
 		return 0;
 	}
 	return physics_server->area_get_collision_mask(area);
 }
 
 void BulletVolley2D::set_collision_mask(int new_collision_mask) {
-	if (physics_server == nullptr || !area.is_valid()) {
-		UtilityFunctions::push_error("set_collision_mask: multimesh was never spawned through BulletFactory2D.");
+	if (!area_ready_or_error("set_collision_mask")) {
 		return;
 	}
 	physics_server->area_set_collision_mask(area, new_collision_mask);
@@ -466,8 +471,7 @@ void BulletVolley2D::set_collision_mask(int new_collision_mask) {
 
 void BulletVolley2D::set_collision_mask_from_array(const TypedArray<int> &numbers) {
 	int bitmask = BulletVolleyData2D::calculate_bitmask(numbers);
-	if (physics_server == nullptr || !area.is_valid()) {
-		UtilityFunctions::push_error("set_collision_mask_from_array: multimesh was never spawned through BulletFactory2D.");
+	if (!area_ready_or_error("set_collision_mask_from_array")) {
 		return;
 	}
 	physics_server->area_set_collision_mask(area, bitmask);
@@ -478,8 +482,7 @@ bool BulletVolley2D::get_monitorable() const {
 }
 
 void BulletVolley2D::set_monitorable(bool value) {
-	if (physics_server == nullptr || !area.is_valid()) {
-		UtilityFunctions::push_error("set_monitorable: multimesh was never spawned through BulletFactory2D.");
+	if (!area_ready_or_error("set_monitorable")) {
 		return;
 	}
 	monitorable = value;

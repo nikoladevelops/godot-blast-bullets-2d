@@ -321,13 +321,7 @@ void BulletVolley2D::apply_shared_movement_pattern_from_data(const BulletVolleyD
 	// Null/empty removes the feature: clear the shared slot so a previously
 	// set pattern (or curves, via populate_shared below) cannot linger.
 	// Distances reset so re-adding the feature later starts every bullet at 0.
-	if (volley_data.shared_movement_pattern_path.is_empty()) {
-		shared_movement_pattern_curve.unref();
-		shared_movement_pattern_face_movement_direction = false;
-		shared_movement_pattern_repeat = true;
-		shared_movement_pattern_distances.assign(amount_bullets, 0.0);
-		return;
-	}
+	// An empty path resolves to null silently; a bad one fails loud once.
 	Ref<Curve2D> curve = resolve_movement_pattern_curve(bullet_factory, volley_data.shared_movement_pattern_path, "shared_movement_pattern_path");
 	if (curve.is_null()) {
 		shared_movement_pattern_curve.unref();

@@ -456,6 +456,7 @@ public:
 
 	int get_collision_mask() const;
 	void set_collision_mask(int new_collision_mask);
+	bool area_ready_or_error(const char *function_name) const;
 	void set_collision_mask_from_array(const TypedArray<int> &numbers);
 
 	bool get_monitorable() const;

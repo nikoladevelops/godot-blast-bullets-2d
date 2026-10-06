@@ -108,9 +108,8 @@ void BulletVolley2D::apply_wobble_from_data(const BulletVolleyData2D &volley_dat
 				all_bullet_wobble_data[i] = res;
 				continue;
 			}
-		} else if (entry < 0 && wobble_size == 0) {
-			// empty array: fall through to shared below
 		}
+		// No live entry (empty array, null, disabled): the shared fallback.
 		if (shared_bullet_wobble_data.is_valid()) {
 			all_bullet_wobble[i] = make_wobble_seed(shared_bullet_wobble_data, i);
 		}
@@ -126,27 +125,20 @@ void BulletVolley2D::bullet_set_wobble_data(int bullet_index, const Ref<BulletWo
 		UtilityFunctions::push_error("bullet_set_wobble_data: wobble storage is not set up for this multimesh.");
 		return;
 	}
-	if (wobble_data.is_null()) {
-		// Clear back to the shared fallback (or inactive when unset).
+	// Back to the shared fallback (or inactive when unset).
+	auto clear_to_shared = [&]() {
 		all_bullet_wobble_data[bullet_index].unref();
-		if (shared_bullet_wobble_data.is_valid()) {
-			all_bullet_wobble[bullet_index] = make_wobble_seed(shared_bullet_wobble_data, bullet_index);
-		} else {
-			all_bullet_wobble[bullet_index] = WobbleSeed();
-		}
+		all_bullet_wobble[bullet_index] = shared_bullet_wobble_data.is_valid() ? make_wobble_seed(shared_bullet_wobble_data, bullet_index) : WobbleSeed();
 		refresh_wobble_feature_flag();
+	};
+	if (wobble_data.is_null()) {
+		clear_to_shared();
 		return;
 	}
 	WobbleSeed seed = make_wobble_seed(wobble_data, bullet_index);
 	if (!seed.active) {
 		UtilityFunctions::push_error("bullet_set_wobble_data: wobble data is disabled or invalid, slot cleared to the shared fallback.");
-		all_bullet_wobble_data[bullet_index].unref();
-		if (shared_bullet_wobble_data.is_valid()) {
-			all_bullet_wobble[bullet_index] = make_wobble_seed(shared_bullet_wobble_data, bullet_index);
-		} else {
-			all_bullet_wobble[bullet_index] = WobbleSeed();
-		}
-		refresh_wobble_feature_flag();
+		clear_to_shared();
 		return;
 	}
 	all_bullet_wobble[bullet_index] = seed;
