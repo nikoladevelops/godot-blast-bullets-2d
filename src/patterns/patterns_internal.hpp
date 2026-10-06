@@ -7,10 +7,7 @@
 
 #include "core/transform_math2d.hpp"
 #include "core/warn_once2d.hpp"
-#include "data/bullet_effect_layer_data2d.hpp"
-#include "godot_cpp/classes/global_constants.hpp"
 #include "godot_cpp/classes/image.hpp"
-#include "godot_cpp/classes/image_texture.hpp"
 #include "godot_cpp/classes/random_number_generator.hpp"
 #include "godot_cpp/core/class_db.hpp"
 #include "godot_cpp/core/math.hpp"
@@ -18,20 +15,11 @@
 #include "godot_cpp/core/object.hpp"
 #include "godot_cpp/variant/dictionary.hpp"
 #include "godot_cpp/variant/vector2.hpp"
-#include "godot_cpp/variant/vector3.hpp"
 #include "patterns/bullet_patterns2d.hpp"
 #include "patterns/pattern_params2d.hpp"
 #include "patterns/pattern_slots2d.hpp"
 #include <algorithm>
 #include <cstdint>
-#include <godot_cpp/classes/atlas_texture.hpp>
-#include <godot_cpp/classes/engine.hpp>
-#include <godot_cpp/classes/performance.hpp>
-#include <godot_cpp/classes/physics_server2d.hpp>
-#include <godot_cpp/classes/project_settings.hpp>
-#include <godot_cpp/classes/scene_tree.hpp>
-#include <godot_cpp/classes/time.hpp>
-#include <godot_cpp/classes/world2d.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
 namespace BlastBullets2D {
@@ -104,16 +92,16 @@ inline constexpr int HELPER_MAX_TRANSFORMS = 10000;
 // (1e30 spacing on an 8k volley) overflow slot math to Inf/NaN, which would
 // poison the whole volley downstream. Slots that blew out land at the clamped
 // edge, valid slots pass through untouched. Warns once when it fires.
-void danmaku_clamp_slots_finite(const char *caller_name, PatternSlots2D &slots); // bullet_factory2d_patterns_layout.cpp
+void danmaku_clamp_slots_finite(const char *caller_name, PatternSlots2D &slots); // pattern_layout2d.cpp
 
-double outline_point_seg_dist(const Vector2 &p, const Vector2 &a, const Vector2 &b); // bullet_factory2d_patterns_layout.cpp
+double outline_point_seg_dist(const Vector2 &p, const Vector2 &a, const Vector2 &b); // pattern_layout2d.cpp
 
 // Angular-sorted silhouette of a slot cloud around its average: recovers a
 // clean simple polygon for star-shaped outlines (star/flower/rose loops),
 // approximates one for self-intersecting weaves. Consecutive near-dupes
 // (repeated star vertices, closed-curve seams) collapse. False when no
 // usable interior exists.
-bool outline_build_boundary(const PackedVector2Array &points, PackedVector2Array &r_boundary, Vector2 &r_center); // bullet_factory2d_patterns_layout.cpp
+bool outline_build_boundary(const PackedVector2Array &points, PackedVector2Array &r_boundary, Vector2 &r_center); // pattern_layout2d.cpp
 
 // Even arc-length resample of a slot-space polyline into m points (plus
 // interpolated parallel normals/override facings). Closed loops wrap around
@@ -121,15 +109,15 @@ bool outline_build_boundary(const PackedVector2Array &points, PackedVector2Array
 // gap next to bullet 0); open polylines pin both endpoints. Override angles
 // interpolate along the shortest arc. Degenerate input yields copies of the
 // first point so callers always get exactly m outputs.
-void resample_loop_even(const PackedVector2Array &pts, const PackedVector2Array &nrms, const PackedFloat32Array &ovr, int m, bool closed, PackedVector2Array &r_pts, PackedVector2Array &r_nrms, PackedFloat32Array &r_ovr, double phase = 0.0); // bullet_factory2d_patterns_layout.cpp
+void resample_loop_even(const PackedVector2Array &pts, const PackedVector2Array &nrms, const PackedFloat32Array &ovr, int m, bool closed, PackedVector2Array &r_pts, PackedVector2Array &r_nrms, PackedFloat32Array &r_ovr, double phase = 0.0); // pattern_layout2d.cpp
 
 // `avoid_radius` > 0 also keeps every slot that far from `avoid_point`
 // (layer rings scale about it: a slot there would stack on every ring).
-void resample_loop_even_distinct(const PackedVector2Array &pts, const PackedVector2Array &nrms, const PackedFloat32Array &ovr, int m, bool closed, PackedVector2Array &r_pts, PackedVector2Array &r_nrms, PackedFloat32Array &r_ovr, const Vector2 &avoid_point = Vector2(), real_t avoid_radius = 0.0); // bullet_factory2d_patterns_layout.cpp
+void resample_loop_even_distinct(const PackedVector2Array &pts, const PackedVector2Array &nrms, const PackedFloat32Array &ovr, int m, bool closed, PackedVector2Array &r_pts, PackedVector2Array &r_nrms, PackedFloat32Array &r_ovr, const Vector2 &avoid_point = Vector2(), real_t avoid_radius = 0.0); // pattern_layout2d.cpp
 
 // Dense outline for Fill Inside / Layers: marker-relative sweep points
 // shifted by `origin`, or nothing for On Outline (unused there).
-PackedVector2Array fill_outline_from(int outline_placement, const PackedVector2Array &local_pts, const Vector2 &origin); // bullet_factory2d_patterns_layout.cpp
+PackedVector2Array fill_outline_from(int outline_placement, const PackedVector2Array &local_pts, const Vector2 &origin); // pattern_layout2d.cpp
 
 PatternSlots2D layout_outline_slots(
 		const char *caller_name,
@@ -155,7 +143,7 @@ PatternSlots2D layout_outline_slots(
 		// curve at any bullet count. Empty = slot loop only.
 		const PackedVector2Array &dense_outline = PackedVector2Array(),
 		const PackedVector2Array &dense_normals = PackedVector2Array(),
-		const PackedFloat32Array &dense_overrides = PackedFloat32Array()); // bullet_factory2d_patterns_layout.cpp
+		const PackedFloat32Array &dense_overrides = PackedFloat32Array()); // pattern_layout2d.cpp
 
 // Generator heads (pattern_layout2d.cpp), each fails loud once with
 // "<caller>: ..." and returns false. danmaku_validate_head = amount, then the
@@ -202,7 +190,7 @@ inline int spirograph_dense_samples(int revolutions) {
 	return Math::clamp(720 * revolutions, 720, 4096);
 }
 
-int spirograph_revolutions(double k, int max_m = 64); // bullet_factory2d_patterns_curves.cpp
+int spirograph_revolutions(double k, int max_m = 64); // patterns_curves.cpp
 
 // FAN flower: how many of `amount` bullets petal `petal` holds. Even split
 // with the remainder spread symmetrically around the bloom (never all on
@@ -219,12 +207,12 @@ inline int flower_fan_petal_count(int petal, int petals, int amount) {
 // round robin; grouping (stride >= arms) gives each arm runs of
 // g = stride / arms + 1 consecutive slots. Always one-to-one: no two slots
 // share an (arm, step) pair, so no bullet hides under another.
-void spiral_arm_step(int i, int arms, int stride, int &r_arm, int &r_step); // bullet_factory2d_patterns_shapes.cpp
+void spiral_arm_step(int i, int arms, int stride, int &r_arm, int &r_step); // patterns_shapes.cpp
 
 // Outward edge normal for the directed edge a -> b, oriented against ref
 // (a corner-averaged normal): falls back to a zero vector when degenerate,
 // letting callers substitute their own fallback.
-Vector2 oriented_edge_normal(const Vector2 &a, const Vector2 &b, const Vector2 &ref); // bullet_factory2d_patterns_polygons.cpp
+Vector2 oriented_edge_normal(const Vector2 &a, const Vector2 &b, const Vector2 &ref); // patterns_polygons.cpp
 
 // True when the directed edge a -> b runs more along X than Y (horizontal-ish
 // in shape-local space). Used by corner priority: HORIZONTAL lets the
@@ -240,7 +228,7 @@ inline bool edge_is_horizontal(const Vector2 &a, const Vector2 &b) {
 // outward edge normals. Points along the corner's angle bisector (triangle
 // apexes face UP, star tips read radial). Falls back to the averaged corner
 // normal when the edges oppose (straight continuation) or degenerate.
-Vector2 miter_normal(const PackedVector2Array &corners, int c, const Vector2 &ref); // bullet_factory2d_patterns_polygons.cpp
+Vector2 miter_normal(const PackedVector2Array &corners, int c, const Vector2 &ref); // patterns_polygons.cpp
 
 // Shared corner-anchored polygon loop builder: every corner carries a slot
 // and interiors spread per edge via apportion_polygon_slots, each slot riding
@@ -258,14 +246,14 @@ bool build_symmetric_polygon_loop(const PackedVector2Array &corners, const Packe
 // their preview samplers (single source of truth: the track can never drift
 // from the volley). All windings come out rectangle-positive (outward edge
 // normals); rotation spins the finished corners.
-PackedVector2Array build_triangle_corners(int triangle_type, real_t size_a, real_t size_b, real_t rotation); // bullet_factory2d_patterns_polygons.cpp
+PackedVector2Array build_triangle_corners(int triangle_type, real_t size_a, real_t size_b, real_t rotation); // patterns_polygons.cpp
 
-PackedVector2Array build_trapezoid_corners(real_t base_top, real_t base_bottom, real_t height, real_t rotation); // bullet_factory2d_patterns_polygons.cpp
+PackedVector2Array build_trapezoid_corners(real_t base_top, real_t base_bottom, real_t height, real_t rotation); // patterns_polygons.cpp
 
-PackedVector2Array build_diamond_corners(real_t diagonal_x, real_t diagonal_y, real_t rotation); // bullet_factory2d_patterns_polygons.cpp
+PackedVector2Array build_diamond_corners(real_t diagonal_x, real_t diagonal_y, real_t rotation); // patterns_polygons.cpp
 
 // Quiet worker shared by the bound normal computer and the edge sampler:
 // fills r_normals, returns false (no error spam) when unusable.
-bool compute_edge_normals_quiet(const PackedVector2Array &edge_points, bool closed, bool flip, PackedVector2Array &r_normals); // bullet_factory2d_patterns_edges.cpp
+bool compute_edge_normals_quiet(const PackedVector2Array &edge_points, bool closed, bool flip, PackedVector2Array &r_normals); // patterns_edges.cpp
 
 } // namespace BlastBullets2D

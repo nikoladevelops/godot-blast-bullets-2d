@@ -39,48 +39,6 @@ void danmaku_clamp_slots_finite(const char *caller_name, PatternSlots2D &slots) 
 	}
 }
 
-// Outline layout engine shared by the closed-loop shape generators below.
-// points/normals are parallel arrays in SLOT order (slot i = points[i]):
-// slot-space origins plus geometric OUTWARD unit vectors (before any
-// face_outward flip). points_are_local selects marker.xform for origins;
-// rot_add carries a generator rotation quirk (0, or marker rot for the
-// xform builders). facing_override (empty, or per-slot) replaces composed
-// facing (ring random rotation). Default args reproduce each generator's
-// legacy output exactly; non-default args remap:
-//   reverse mirrors the slot order (winding flip), slot_offset rotates which
-//     slot becomes bullet 0 (normalized mod count, negatives wrap).
-//   facing selector rotates every default facing (0 / +90 / -90 deg).
-//   FILL_INSIDE swaps the loop for a row-major grid masked to the loop
-//     interior (even-odd rule on the angular-sorted silhouette, capped at
-//     slot_count, may return fewer on small shapes); facings go radial from
-//     the silhouette center. LAYERS keeps the slot count and spreads it over
-//     concentric rings (layer 0 sits exactly on the outline; extras step
-//     per layer_side, dealt per layer_fill).
-// Crash-safe: every index is bounds-checked, non-finite inputs fall back to
-// the marker origin instead of poisoning the volley, degenerate loops yield
-// an empty (loud, when misused) array instead of garbage.
-static bool outline_point_in_poly(const PackedVector2Array &poly, const Vector2 &p) {
-	const int n = poly.size();
-	if (n < 3 || !p.is_finite()) {
-		return false;
-	}
-	bool inside = false;
-	for (int i = 0, j = n - 1; i < n; j = i++) {
-		const Vector2 a = poly[i];
-		const Vector2 b = poly[j];
-		if (!a.is_finite() || !b.is_finite()) {
-			continue;
-		}
-		if ((a.y > p.y) != (b.y > p.y)) {
-			const double x_int = (double)b.x + ((double)p.y - (double)b.y) / ((double)a.y - (double)b.y) * ((double)a.x - (double)b.x);
-			if (Math::is_finite(x_int) && (double)p.x < x_int) {
-				inside = !inside;
-			}
-		}
-	}
-	return inside;
-}
-
 double outline_point_seg_dist(const Vector2 &p, const Vector2 &a, const Vector2 &b) {
 	const Vector2 ab = b - a;
 	const double len_sq = (double)ab.length_squared();
@@ -429,8 +387,9 @@ static bool fill_build_boundary(const PackedVector2Array &points, const PackedVe
 	return r_center.is_finite();
 }
 
-// Row-major interior grid at `spacing` (even-odd rule, same crossing test
-// as outline_point_in_poly): counts cells and optionally collects them.
+// Row-major interior grid at `spacing` (even-odd rule: a cell is inside
+// when an odd number of boundary crossings lie to its right): counts cells
+// and optionally collects them.
 // stop_after > 0 ends the count early once reached (the spacing search only
 // needs "enough"). Guarded against runaway grids.
 static int fill_scan_cells(const PackedVector2Array &poly, double spacing, bool stagger, double margin, std::vector<Vector2> *r_cells, int stop_after) {
@@ -544,6 +503,55 @@ PackedVector2Array fill_outline_from(int outline_placement, const PackedVector2A
 	return out;
 }
 
+// One outline layer ring in slot space: points, outward normals and
+// (optional) per-slot facing overrides, in winding order.
+struct LayerRing2D {
+	PackedVector2Array pts;
+	PackedVector2Array nrms;
+	PackedFloat32Array ovr;
+};
+
+// Rotates parallel ring arrays so slot `start` comes first (ovr is rotated
+// only when it holds one entry per point).
+static void rotate_ring_slots(PackedVector2Array &pts, PackedVector2Array &nrms, PackedFloat32Array &ovr, int start) {
+	if (start == 0 || pts.size() <= 1) {
+		return;
+	}
+	PackedVector2Array rp;
+	PackedVector2Array rn;
+	PackedFloat32Array ro;
+	const bool has_ovr = ovr.size() == pts.size();
+	for (int k = 0; k < (int)pts.size(); ++k) {
+		rp.push_back(pts[(k + start) % (int)pts.size()]);
+		rn.push_back(nrms[(k + start) % (int)nrms.size()]);
+		if (has_ovr) {
+			ro.push_back(ovr[(k + start) % (int)ovr.size()]);
+		}
+	}
+	pts = rp;
+	nrms = rn;
+	ovr = ro;
+}
+
+// Outline layout engine shared by the closed-loop shape generators.
+// points/normals are parallel arrays in SLOT order (slot i = points[i]):
+// slot-space origins plus geometric OUTWARD unit vectors (before any
+// face_outward flip). points_are_local selects marker.xform for origins;
+// rot_add carries a generator rotation quirk (0, or marker rot for the
+// xform builders). facing_override (empty, or per-slot) replaces composed
+// facing (ring random rotation). Default args reproduce each generator's
+// legacy output exactly; non-default args remap:
+//   reverse mirrors the slot order (winding flip), slot_offset rotates which
+//     slot becomes bullet 0 (normalized mod count, negatives wrap).
+//   facing selector rotates every default facing (0 / +90 / -90 deg).
+//   FILL_INSIDE swaps the loop for a row-major grid masked to the loop
+//     interior (even-odd rule), exactly slot_count cells picked evenly;
+//     facings go radial from the interior center. LAYERS keeps the slot
+//     count and spreads it over concentric rings (layer 0 sits exactly on
+//     the outline; extras step per layer_side, dealt per layer_fill).
+// Crash-safe: every index is bounds-checked, non-finite inputs fall back to
+// the marker origin instead of poisoning the volley, degenerate loops yield
+// an empty (loud, when misused) array instead of garbage.
 PatternSlots2D layout_outline_slots(const char *caller_name, const Transform2D &marker_transform, const PackedVector2Array &points, const PackedVector2Array &normals, bool points_are_local, real_t rot_add, bool face_outward, real_t facing_offset_degrees, const PackedFloat32Array &facing_override, const OutlineLayout2D &outline, const CornerLayout2D &corner, const PackedVector2Array &polygon_corners, bool loop_closed, bool allow_resample, const PackedVector2Array &dense_outline, const PackedVector2Array &dense_normals, const PackedFloat32Array &dense_overrides) {
 	// Unpacked once under the names the layout below was written with.
 	const int outline_placement = outline.outline_placement;
@@ -581,11 +589,11 @@ PatternSlots2D layout_outline_slots(const char *caller_name, const Transform2D &
 	// by construction (every loop generator builds centered shapes), so
 	// layers scale about Vector2(0, 0) — the marker origin — on both the
 	// volley and the preview side, exactly, at any bullet density.
+	const Transform2D to_slot = points_are_local ? Transform2D() : marker_transform.affine_inverse();
 	PackedVector2Array slot_points;
 	slot_points.resize(n);
 	for (int i = 0; i < n; ++i) {
-		const Vector2 gp = points[i];
-		slot_points[i] = points_are_local ? gp : marker_transform.affine_inverse().xform(gp);
+		slot_points[i] = points_are_local ? points[i] : to_slot.xform(points[i]);
 	}
 	// Loop centroid in slot space: every extra layer rescales the slot loop
 	// about this point, so each ring is the same figure at a different size
@@ -732,18 +740,105 @@ PatternSlots2D layout_outline_slots(const char *caller_name, const Transform2D &
 			idx = rotated;
 		}
 	}
-	auto compose_facing = [&](int j) -> real_t {
-		if (use_override) {
-			const real_t o = (j >= 0 && j < facing_override.size()) ? facing_override[j] : 0.0f;
-			return Math::is_finite((double)o) ? o + selector : rot_add + selector;
-		}
-		const Vector2 nrm = (j >= 0 && j < normals.size()) ? normals[j] : Vector2(1, 0);
+	// Facing from an outward normal (or a radial direction): the generator
+	// rotation, flipped for face_outward = false, plus the outline_facing
+	// selector and the offset; rot_add when that is not finite.
+	auto facing_from_normal = [&](const Vector2 &nrm) -> real_t {
 		const double na = (nrm.is_finite() && nrm.length_squared() > 1e-12) ? nrm.angle() : 0.0;
 		real_t rot = rot_add + (real_t)na + (face_outward ? 0.0f : Math::PI) + selector + facing_offset;
 		if (!Math::is_finite((double)rot)) {
 			rot = rot_add;
 		}
 		return rot;
+	};
+	// A per-slot facing override (legacy byte-exact facings) + the selector.
+	auto facing_from_override = [&](real_t o) -> real_t {
+		return Math::is_finite((double)o) ? o + selector : rot_add + selector;
+	};
+	auto compose_facing = [&](int j) -> real_t {
+		if (use_override) {
+			return facing_from_override((j >= 0 && j < facing_override.size()) ? facing_override[j] : 0.0f);
+		}
+		return facing_from_normal((j >= 0 && j < normals.size()) ? normals[j] : Vector2(1, 0));
+	};
+	// Slot space -> global (global builders stored origin-relative slots that
+	// compose back onto the marker; local ones xform in place_origin), the
+	// marker scale, and the marker itself when anything is not finite.
+	auto emit_slot = [&](real_t rot, Vector2 local) {
+		if (!points_are_local && local.is_finite()) {
+			const Vector2 back = marker_transform.xform(local);
+			local = back.is_finite() ? back : marker_transform.get_origin();
+		}
+		Transform2D slot(rot, place_origin(local));
+		slot.set_scale(marker_scale);
+		if (!slot.is_finite()) {
+			slot = Transform2D(rot_add, marker_transform.get_origin());
+			slot.set_scale(marker_scale);
+		}
+		out.push_back(slot);
+	};
+	// Which slot of a ring becomes its first bullet: the slot offset plus, on
+	// outer rings, the layer twist (stacked rings interleave instead of
+	// spoking). Wrapped into [0, size): C++ % keeps the dividend's sign, so a
+	// negative twist would otherwise index before the buffer.
+	auto ring_start = [&](int L, int ring_size) -> int {
+		if (ring_size <= 1) {
+			return 0;
+		}
+		int off = outline_slot_offset % ring_size;
+		if (off < 0) {
+			off += ring_size;
+		}
+		int start = off;
+		if (L > 0 && layer_twist != 0) {
+			const int64_t size64 = (int64_t)ring_size;
+			const int64_t tw = ((int64_t)L * (int64_t)layer_twist) % size64;
+			start = (int)(((int64_t)start + tw) % size64 + size64) % ring_size;
+		}
+		return start;
+	};
+	// Scales ring L about the slot-space origin (the marker origin); false
+	// when an outer ring collapses below 5% (it is skipped).
+	auto scale_ring = [&](int L, PackedVector2Array &lp) -> bool {
+		if (L == 0) {
+			return true;
+		}
+		const double layer_s = BulletPatterns2D::helper_layer_scale_factor(L, layer_scale, layer_side, layer_scale_curve, layer_custom_scales);
+		if (!Math::is_finite(layer_s) || layer_s < 0.05) {
+			return false;
+		}
+		for (int k = 0; k < lp.size(); ++k) {
+			const Vector2 s = lp[k] * (real_t)layer_s;
+			lp[k] = s.is_finite() ? s : lp[k];
+		}
+		return true;
+	};
+	// Emits the dealt bullets in bullet order (drops omitted): the k-th member
+	// of a layer takes the k-th slot of its ring in winding order.
+	auto emit_layer_rings = [&](const LayerRing2D *rings, const LayerDeal &deal) {
+		const bool has_ovr = !facing_override.is_empty() && facing_override.size() == n;
+		int layer_cursor[64] = { 0 };
+		for (int i = 0; i < n; ++i) {
+			if (deal.dropped[i]) {
+				continue;
+			}
+			const int bl = deal.layer_of[i];
+			if (bl < 0 || bl >= 64 || bl >= layer_count) {
+				continue;
+			}
+			const LayerRing2D &ring = rings[bl];
+			const int k = layer_cursor[bl]++;
+			if (k < 0 || k >= ring.pts.size()) {
+				continue;
+			}
+			real_t rot;
+			if (has_ovr && k < ring.ovr.size()) {
+				rot = facing_from_override(ring.ovr[k]);
+			} else {
+				rot = facing_from_normal((k < ring.nrms.size()) ? ring.nrms[k] : Vector2(1, 0));
+			}
+			emit_slot(rot, ring.pts[k]);
+		}
 	};
 	if (outline_placement == BulletPatterns2D::OUTLINE_FILL_INSIDE) {
 		// The interior comes from a boundary that does not depend on the
@@ -768,13 +863,7 @@ PatternSlots2D layout_outline_slots(const char *caller_name, const Transform2D &
 		const int take = MIN(n, count);
 		for (int k = 0; k < take; ++k) {
 			const Vector2 cell = cells[(size_t)((((int64_t)2 * k + 1) * count) / ((int64_t)2 * take))];
-			const Vector2 radial = cell - center;
-			const double ra = (radial.is_finite() && radial.length_squared() > 1e-12) ? radial.angle() : 0.0;
-			real_t rot = rot_add + (real_t)ra + (face_outward ? 0.0f : Math::PI) + selector + facing_offset;
-			if (!Math::is_finite((double)rot)) {
-				rot = rot_add;
-			}
-			Transform2D slot(rot, place_origin(cell));
+			Transform2D slot(facing_from_normal(cell - center), place_origin(cell));
 			slot.set_scale(marker_scale);
 			if (slot.is_finite()) {
 				out.push_back(slot);
@@ -792,7 +881,7 @@ PatternSlots2D layout_outline_slots(const char *caller_name, const Transform2D &
 		PackedVector2Array corner_slot;
 		for (int c = 0; c < polygon_corners.size(); ++c) {
 			const Vector2 gp = polygon_corners[c];
-			const Vector2 sp = points_are_local ? gp : marker_transform.affine_inverse().xform(gp);
+			const Vector2 sp = points_are_local ? gp : to_slot.xform(gp);
 			if (sp.is_finite()) {
 				corner_slot.push_back(sp);
 			}
@@ -812,15 +901,9 @@ PatternSlots2D layout_outline_slots(const char *caller_name, const Transform2D &
 		// (shared with the smooth sibling branch below).
 		LayerDeal deal;
 		deal_layer_membership(n, layer_count, layer_fill, layer_start_offset, layer_max_dots, deal);
-		PackedInt32Array &bullet_layer_of = deal.layer_of;
 		int (&layer_keep)[64] = deal.keep;
-		PackedByteArray &dropped = deal.dropped;
 		// Build one symmetric loop per non-empty layer.
-		struct LayerLoop {
-			PackedVector2Array pts;
-			PackedVector2Array nrms;
-		};
-		LayerLoop layers[64];
+		LayerRing2D layers[64];
 		for (int L = 0; L < layer_count && L < 64; ++L) {
 			if (layer_keep[L] <= 0) {
 				continue;
@@ -845,84 +928,15 @@ PatternSlots2D layout_outline_slots(const char *caller_name, const Transform2D &
 			if (!build_symmetric_polygon_loop(use_corners, use_normals, layer_keep[L], corner, lp, ln)) {
 				continue;
 			}
-			// Per-layer offset/twist: rotate each ring so stacked rings
-			// interleave instead of spoking. Layer 0 keeps the canonical
-			// offset only.
-			int rot = 0;
-			if (lp.size() > 1) {
-				int off = outline_slot_offset % (int)lp.size();
-				if (off < 0) {
-					off += (int)lp.size();
-				}
-				rot = off;
-				if (L > 0 && layer_twist != 0) {
-					const int64_t ring_size = (int64_t)lp.size();
-					const int64_t tw = ((int64_t)L * (int64_t)layer_twist) % ring_size;
-					// Normalize into [0, ring_size): C++ % keeps the
-					// dividend's sign, so a negative twist would index
-					// before the buffer (hard crash). Same wrap rule as
-					// the shared-loop branch below.
-					rot = (int)(((int64_t)rot + tw) % ring_size + ring_size) % (int)ring_size;
-				}
-			}
-			if (rot != 0 && lp.size() > 1) {
-				PackedVector2Array rp;
-				PackedVector2Array rn;
-				for (int k = 0; k < (int)lp.size(); ++k) {
-					rp.push_back(lp[(k + rot) % (int)lp.size()]);
-					rn.push_back(ln[(k + rot) % (int)ln.size()]);
-				}
-				lp = rp;
-				ln = rn;
-			}
-			// Scale about the slot-space origin (the marker origin).
-			const double layer_s = (L == 0) ? 1.0 : BulletPatterns2D::helper_layer_scale_factor(L, layer_scale, layer_side, layer_scale_curve, layer_custom_scales);
-			if (L > 0 && (!Math::is_finite(layer_s) || layer_s < 0.05)) {
+			PackedFloat32Array no_ovr;
+			rotate_ring_slots(lp, ln, no_ovr, ring_start(L, (int)lp.size()));
+			if (!scale_ring(L, lp)) {
 				continue;
-			}
-			if (L > 0) {
-				for (int k = 0; k < lp.size(); ++k) {
-					const Vector2 s = lp[k] * (real_t)layer_s;
-					lp[k] = s.is_finite() ? s : lp[k];
-				}
 			}
 			layers[L].pts = lp;
 			layers[L].nrms = ln;
 		}
-		// Emit in bullet index order (drops omitted), k-th member of a layer
-		// takes the k-th loop slot in winding order.
-		int layer_cursor[64] = { 0 };
-		for (int i = 0; i < n; ++i) {
-			if (dropped[i]) {
-				continue;
-			}
-			const int bl = bullet_layer_of[i];
-			if (bl < 0 || bl >= 64 || bl >= layer_count) {
-				continue;
-			}
-			const int k = layer_cursor[bl]++;
-			if (k < 0 || k >= layers[bl].pts.size() || k >= layers[bl].nrms.size()) {
-				continue;
-			}
-			Vector2 local = layers[bl].pts[k];
-			const Vector2 snrm = layers[bl].nrms[k];
-			const double na = (snrm.is_finite() && snrm.length_squared() > 1e-12) ? snrm.angle() : 0.0;
-			real_t rot = rot_add + (real_t)na + (face_outward ? 0.0f : Math::PI) + selector + facing_offset;
-			if (!Math::is_finite((double)rot)) {
-				rot = rot_add;
-			}
-			if (!points_are_local && local.is_finite()) {
-				const Vector2 back = marker_transform.xform(local);
-				local = back.is_finite() ? back : marker_transform.get_origin();
-			}
-			Transform2D slot(rot, place_origin(local));
-			slot.set_scale(marker_scale);
-			if (!slot.is_finite()) {
-				slot = Transform2D(rot_add, marker_transform.get_origin());
-				slot.set_scale(marker_scale);
-			}
-			out.push_back(slot);
-		}
+		emit_layer_rings(layers, deal);
 		return out;
 	}
 	// Even-per-layer layout for smooth loops (no corners): each ring resamples
@@ -943,15 +957,8 @@ PatternSlots2D layout_outline_slots(const char *caller_name, const Transform2D &
 		}
 		LayerDeal deal;
 		deal_layer_membership(n, layer_count, layer_fill, layer_start_offset, layer_max_dots, deal);
-		PackedInt32Array &bullet_layer_of = deal.layer_of;
 		int (&layer_keep)[64] = deal.keep;
-		PackedByteArray &dropped = deal.dropped;
-		struct SmoothRing {
-			PackedVector2Array pts;
-			PackedVector2Array nrms;
-			PackedFloat32Array ovr;
-		};
-		SmoothRing rings[64];
+		LayerRing2D rings[64];
 		// Resample source: the dense ideal curve when the caller gave one
 		// (rings land exactly on the drawn curve), else the slot loop.
 		PackedVector2Array src_pts = slot_points;
@@ -961,7 +968,6 @@ PatternSlots2D layout_outline_slots(const char *caller_name, const Transform2D &
 				(facing_override.is_empty() || dense_overrides.size() == dense_outline.size());
 		if (dense_ok) {
 			src_pts.resize(dense_outline.size());
-			const Transform2D to_slot = marker_transform.affine_inverse();
 			for (int q = 0; q < dense_outline.size(); ++q) {
 				src_pts[q] = points_are_local ? dense_outline[q] : to_slot.xform(dense_outline[q]);
 			}
@@ -996,92 +1002,15 @@ PatternSlots2D layout_outline_slots(const char *caller_name, const Transform2D &
 				ln = rn;
 				lo = ro;
 			}
-			int rot = 0;
-			if (lp.size() > 1) {
-				int off = outline_slot_offset % (int)lp.size();
-				if (off < 0) {
-					off += (int)lp.size();
-				}
-				rot = off;
-				if (L > 0 && layer_twist != 0) {
-					const int64_t ring_size = (int64_t)lp.size();
-					const int64_t tw = ((int64_t)L * (int64_t)layer_twist) % ring_size;
-					// Normalize into [0, ring_size): C++ % keeps the
-					// dividend's sign, so a negative twist would index
-					// before the buffer (hard crash). Same wrap rule as
-					// the shared-loop branch below.
-					rot = (int)(((int64_t)rot + tw) % ring_size + ring_size) % (int)ring_size;
-				}
-			}
-			if (rot != 0 && lp.size() > 1) {
-				PackedVector2Array rp;
-				PackedVector2Array rn;
-				PackedFloat32Array ro;
-				const bool has_ovr = lo.size() == lp.size();
-				for (int k = 0; k < (int)lp.size(); ++k) {
-					rp.push_back(lp[(k + rot) % (int)lp.size()]);
-					rn.push_back(ln[(k + rot) % (int)ln.size()]);
-					if (has_ovr) {
-						ro.push_back(lo[(k + rot) % (int)lo.size()]);
-					}
-				}
-				lp = rp;
-				ln = rn;
-				lo = ro;
-			}
-			const double layer_s = (L == 0) ? 1.0 : BulletPatterns2D::helper_layer_scale_factor(L, layer_scale, layer_side, layer_scale_curve, layer_custom_scales);
-			if (L > 0 && (!Math::is_finite(layer_s) || layer_s < 0.05)) {
+			rotate_ring_slots(lp, ln, lo, ring_start(L, (int)lp.size()));
+			if (!scale_ring(L, lp)) {
 				continue;
-			}
-			if (L > 0) {
-				for (int k = 0; k < lp.size(); ++k) {
-					const Vector2 s = lp[k] * (real_t)layer_s;
-					lp[k] = s.is_finite() ? s : lp[k];
-				}
 			}
 			rings[L].pts = lp;
 			rings[L].nrms = ln;
 			rings[L].ovr = lo;
 		}
-		int layer_cursor[64] = { 0 };
-		const bool has_ovr = !facing_override.is_empty() && facing_override.size() == n;
-		for (int i = 0; i < n; ++i) {
-			if (dropped[i]) {
-				continue;
-			}
-			const int bl = bullet_layer_of[i];
-			if (bl < 0 || bl >= 64 || bl >= layer_count) {
-				continue;
-			}
-			const int k = layer_cursor[bl]++;
-			if (k < 0 || k >= rings[bl].pts.size()) {
-				continue;
-			}
-			Vector2 local = rings[bl].pts[k];
-			real_t rot;
-			if (has_ovr && k < rings[bl].ovr.size()) {
-				const real_t o = rings[bl].ovr[k];
-				rot = Math::is_finite((double)o) ? o + selector : rot_add + selector;
-			} else {
-				const Vector2 snrm = (k < rings[bl].nrms.size()) ? rings[bl].nrms[k] : Vector2(1, 0);
-				const double na = (snrm.is_finite() && snrm.length_squared() > 1e-12) ? snrm.angle() : 0.0;
-				rot = rot_add + (real_t)na + (face_outward ? 0.0f : Math::PI) + selector + facing_offset;
-				if (!Math::is_finite((double)rot)) {
-					rot = rot_add;
-				}
-			}
-			if (!points_are_local && local.is_finite()) {
-				const Vector2 back = marker_transform.xform(local);
-				local = back.is_finite() ? back : marker_transform.get_origin();
-			}
-			Transform2D slot(rot, place_origin(local));
-			slot.set_scale(marker_scale);
-			if (!slot.is_finite()) {
-				slot = Transform2D(rot_add, marker_transform.get_origin());
-				slot.set_scale(marker_scale);
-			}
-			out.push_back(slot);
-		}
+		emit_layer_rings(rings, deal);
 		return out;
 	}
 	// Per-layer bullet counters for the max_dots density cap. Layer 0 is
@@ -1140,20 +1069,7 @@ PatternSlots2D layout_outline_slots(const char *caller_name, const Transform2D &
 				}
 			}
 		}
-		// Slot-space -> global: local builders xform through place_origin;
-		// global builders stored origin-relative slots that must be composed
-		// back onto the marker (place_origin passes those through untouched).
-		if (!points_are_local && local.is_finite()) {
-			const Vector2 back = marker_transform.xform(local);
-			local = back.is_finite() ? back : marker_transform.get_origin();
-		}
-		Transform2D slot(compose_facing(j), place_origin(local));
-		slot.set_scale(marker_scale);
-		if (!slot.is_finite()) {
-			slot = Transform2D(rot_add, marker_transform.get_origin());
-			slot.set_scale(marker_scale);
-		}
-		out.push_back(slot);
+		emit_slot(compose_facing(j), local);
 	}
 	return out;
 }

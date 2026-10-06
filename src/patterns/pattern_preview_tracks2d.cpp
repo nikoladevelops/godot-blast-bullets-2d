@@ -34,7 +34,6 @@ static Dictionary outline_track_result(const PackedVector2Array &points, bool cl
 // t): the arc endpoint frac = +0.5 maps to the next petal's t, so exact
 // endpoints are only reachable through the override.
 static bool flower_curve_point(int flower_type, int petals, real_t radius, real_t petal_spread, real_t petal_sharpness, double inner_radius_scale, double spiro_roller, double spiro_pen, double super_lobes, double super_fullness, real_t base_rotation, double t, Vector2 &r_offset, int petal_override = -1, double frac_override = 2.0) {
-	(void)petal_spread;
 	const double clamped_inner = Math::clamp(inner_radius_scale, 0.0, 0.999);
 	if (flower_type == BulletPatterns2D::FLOWER_FAN) {
 		// Trace the fan's petal arcs so the preview matches the generator's
@@ -181,7 +180,6 @@ Dictionary BulletPatterns2D::helper_sample_outline_flower(int flower_type, int p
 		}
 		return outline_track_result(pts, true);
 	}
-	int prev_petal = -1;
 	for (int i = 0; i < n; ++i) {
 		const double t = Math::TAU * (double)revolutions * (double)i / (double)n;
 		Vector2 off;
