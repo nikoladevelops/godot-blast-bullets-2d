@@ -64,6 +64,7 @@ func _ready() -> void:
 		"surface": _snap_surface,
 		"patterns": _snap_patterns,
 		"generate": _snap_generate,
+		"layouts": _snap_layouts,
 		"spawner": _snap_spawner,
 		"setters": _snap_setters,
 		"traces": _snap_traces,
@@ -339,6 +340,60 @@ func _snap_generate(section: String) -> void:
 	seed(12345)
 	_rec(section, "bad_shape", BulletPatterns2D.generate(99, 7, markers[0], {}))
 	_rec(section, "bad_key", BulletPatterns2D.generate(0, 7, markers[0], {"radiuss": 1.0}))
+
+
+# ---- 3b. Outline layouts: seeded knob combinations per loop shape ------------
+
+## Layers (multi-ring, both layouts, every fill/side, twist, reverse, offset,
+## caps, custom scales) and Fill Inside combinations for every outline shape:
+## the one-knob sweeps never combine them.
+func _snap_layouts(section: String) -> void:
+	for shape in BulletPatterns2D.get_shapes():
+		if not shape["outline"]:
+			continue
+		var id: int = shape["id"]
+		var rng := RandomNumberGenerator.new()
+		rng.seed = 7919 + id
+		for k in 48:
+			var params := {
+				"outline_placement": 1,
+				"outline_layer_count": [2, 3, 5][rng.randi_range(0, 2)],
+				"outline_layer_layout": rng.randi_range(0, 1),
+				"outline_layer_fill": rng.randi_range(0, 3),
+				"outline_layer_side": rng.randi_range(0, 2),
+				"outline_layer_scale": [0.2, 0.35, 0.6][rng.randi_range(0, 2)],
+				"outline_layer_scale_curve": rng.randi_range(0, 1),
+				"outline_layer_twist": [0, 1, -3][rng.randi_range(0, 2)],
+				"outline_layer_max_dots": [0, 0, 3][rng.randi_range(0, 2)],
+				"outline_layer_start_offset": [0, 0, 1][rng.randi_range(0, 2)],
+				"outline_reverse": rng.randi_range(0, 1) == 1,
+				"outline_slot_offset": [0, 2, -5][rng.randi_range(0, 2)],
+				"outline_facing": rng.randi_range(0, 2),
+			}
+			if k % 6 == 5:
+				params["outline_layer_scales"] = PackedFloat32Array([1.0, 1.5, 2.2, 0.6])
+			if shape["corners"]:
+				params["outline_distribution"] = rng.randi_range(0, 1)
+				params["outline_corner_mode"] = rng.randi_range(0, 1)
+				params["outline_corner_priority"] = rng.randi_range(0, 2)
+				params["outline_corner_facing"] = rng.randi_range(0, 2)
+				params["outline_edge_margin"] = [0.0, 6.0][rng.randi_range(0, 1)]
+			var amount: int = [7, 12, 24, 31][rng.randi_range(0, 3)]
+			var m: Transform2D = markers[k % 2]
+			_rec(section, "%d#layers%d" % [id, k],
+					_stable(func() -> Variant: return BulletPatterns2D.generate(id, amount, m, params)))
+		for k in 8:
+			var params := {
+				"outline_placement": 2,
+				"outline_fill_spacing": [12.0, 24.0, 40.0][rng.randi_range(0, 2)],
+				"outline_fill_stagger": rng.randi_range(0, 1) == 1,
+				"outline_fill_margin": [0.0, 4.0][rng.randi_range(0, 1)],
+				"outline_facing": rng.randi_range(0, 2),
+			}
+			var amount: int = [9, 20][k % 2]
+			var m: Transform2D = markers[k % 2]
+			_rec(section, "%d#fill%d" % [id, k],
+					_stable(func() -> Variant: return BulletPatterns2D.generate(id, amount, m, params)))
 
 
 # ---- 4. Spawner: every source x every visible knob ---------------------------
