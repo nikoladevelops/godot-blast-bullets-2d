@@ -368,7 +368,7 @@ void BulletVolley2D::_notification(int p_what) {
 			fx_clear_trail_layers();
 
 			if (physics_server && area.is_valid()) {
-				// Disable the area's shapes (ALL OF THEM no matter their bullets_enabled_status).
+				// Disable every shape of the area (enabled or not).
 				// Bounds-checked: never let a desynced attachments vector take down PREDELETE.
 				// When the factory itself is tearing down, only run the script callback and
 				// drop the slot: re-pooling into (or queue_freeing from) a dying factory is
@@ -846,8 +846,8 @@ bool BulletVolley2D::clear_bullet(int bullet_index) {
 		return false;
 	}
 	// Pose captured before the disable below (disable never moves the
-	// bullet, but the last-bullet disable funnels into disable_volley
-	// which pools the instance; the DESTROY path fires the same way).
+	// bullet, but the last-bullet disable releases the life and pools the
+	// instance; the DESTROY path fires the same way).
 	Transform2D fx_clear_transf;
 	const bool fx_have_pose = bullet_index >= 0 && bullet_index < (int)all_cached_instance_transforms.size();
 	if (fx_have_pose) {

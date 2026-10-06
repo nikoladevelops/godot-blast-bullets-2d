@@ -325,8 +325,6 @@ void BulletVolley2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("all_bullets_get_velocity", "bullet_index_start", "bullet_index_end_inclusive"), &BulletVolley2D::all_bullets_get_velocity, DEFVAL(0), DEFVAL(-1));
 
 	// SHARED MOVEMENT PATTERN RUNTIME API (spawn-data equivalent, editable live).
-
-	// SHARED MOVEMENT PATTERN RUNTIME API (spawn-data equivalent, editable live).
 	ADD_GROUP("Movement Pattern Paths", "");
 	ClassDB::bind_method(D_METHOD("get_shared_movement_pattern_curve"), &BulletVolley2D::get_shared_movement_pattern_curve);
 	ClassDB::bind_method(D_METHOD("set_shared_movement_pattern_curve", "new_curve"), &BulletVolley2D::set_shared_movement_pattern_curve);

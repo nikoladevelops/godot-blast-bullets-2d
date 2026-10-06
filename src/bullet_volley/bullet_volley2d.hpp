@@ -166,13 +166,13 @@ public:
 	// is never observable as factory-owned. 0 = factory-owned (default).
 	void spawn(const BulletVolleyData2D &spawn_data, VolleyPool *pool, BulletFactory2D *factory, Node *bullets_container, const Vector2 &new_inherited_velocity_offset, int new_sparse_set_id, bool spawn_in_pool, uint64_t spawner_id = 0);
 
+	// Resource id of the data being applied (spawn/enable): keys the
+	// once-per-resource configuration warnings (WarnOnce2D).
+	uint64_t warn_data_id = 0;
 	// Native transform source for the NEXT spawn()/enable_volley(): when
 	// set, the volley reads its bullet transforms from this span instead of
 	// unboxing data.transforms (a Variant per bullet). The factory sets it
 	// around the call; set_up_bullet_instances consumes and clears it.
-	// Resource id of the data being applied (spawn/enable): keys the
-	// once-per-resource configuration warnings (WarnOnce2D).
-	uint64_t warn_data_id = 0;
 	const Transform2D *spawn_transforms_ptr = nullptr;
 	int spawn_transforms_count = 0;
 	_ALWAYS_INLINE_ int spawn_transform_count(const BulletVolleyData2D &data) const {
@@ -191,7 +191,7 @@ public:
 	// physics callback; factory free/reset methods already call it for you at a safe time.
 	void force_delete();
 
-	/// METHODS RESPONSIBLE FOR VARIOUS BULLET FEATURES
+	// METHODS RESPONSIBLE FOR VARIOUS BULLET FEATURES
 
 	// Caches hold GLOBAL-space transforms, but MultiMesh instance slots are LOCAL
 	// to this MultiMeshInstance2D (rendered global = node_global * instance).
@@ -233,14 +233,11 @@ public:
 
 	// Use this method when you want to use physics interpolation - smooth rendering of textures despite physics ticks per second
 	void interpolate_bullet_visuals();
-
 	_ALWAYS_INLINE_ void batch_flush_instance_transforms();
-
 	void update_all_previous_transforms_for_interpolation();
 
 	// Updates interpolation data for physics
 	_ALWAYS_INLINE_ void update_bullet_previous_transform_for_interpolation(int bullet_index);
-
 	_ALWAYS_INLINE_ Transform2D get_interpolated_transform(const Transform2D &curr_transf, const Transform2D &prev_transf, double fraction);
 
 	// Advances the volley clock (curves, fade) and the lifetime countdown;
@@ -262,10 +259,7 @@ public:
 	// Hot path: plain countdown + index + one set_texture. No SpriteFrames calls here.
 	// Texture swaps are interpolation-exempt (interpolation only lerps transforms).
 	void advance_sprite_animation(double delta);
-	///
-
 	TypedArray<bool> get_all_bullets_status();
-
 	bool is_bullet_status_enabled(int bullet_index);
 
 	_ALWAYS_INLINE_ Ref<Resource> get_shared_bullets_custom_data() const {
@@ -281,7 +275,6 @@ public:
 	// null, never as the shared value, so the two can never be confused.
 	Ref<Resource> bullet_get_custom_data(int bullet_index) const;
 	void bullet_set_custom_data(int bullet_index, const Ref<Resource> &new_custom_data);
-
 	TypedArray<Resource> all_bullets_get_custom_data(int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 	void all_bullets_set_custom_data(const Ref<Resource> &new_custom_data, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 
@@ -329,7 +322,6 @@ public:
 
 	Ref<BulletSpeedData2D> get_bullet_speed_data(int bullet_index) const;
 	void set_bullet_speed_data(int bullet_index, const Ref<BulletSpeedData2D> &new_bullet_speed_data);
-
 	TypedArray<BulletSpeedData2D> all_bullets_get_speed_data(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) const;
 	void all_bullets_set_speed_data(const Ref<BulletSpeedData2D> &new_bullet_speed_data, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 
@@ -337,13 +329,10 @@ public:
 
 	Vector2 get_bullet_direction(int bullet_index) const;
 	void set_bullet_direction(int bullet_index, const Vector2 &new_direction);
-
 	TypedArray<Vector2> all_bullets_get_direction(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) const;
 	void all_bullets_set_direction(const Vector2 &new_direction, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
-
 	void set_bullet_direction_towards_position(int bullet_index, const Vector2 &target_position);
 	void all_bullets_set_direction_towards_position(const Vector2 &target_position, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
-
 	void set_bullet_direction_towards_node2d(int bullet_index, const Node2D *target_node);
 	void all_bullets_set_direction_towards_node2d(const Node2D *target_node, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 
@@ -351,13 +340,10 @@ public:
 
 	real_t get_bullet_texture_rotation_radians(int bullet_index) const;
 	void set_bullet_texture_rotation_radians(int bullet_index, real_t new_rotation_radians);
-
 	TypedArray<real_t> all_bullets_get_texture_rotation_radians(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) const;
 	void all_bullets_set_texture_rotation_radians(real_t new_rotation_radians, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
-
 	void set_bullet_texture_rotation_towards_position(int bullet_index, const Vector2 &target_position);
 	void all_bullets_set_texture_rotation_towards_position(const Vector2 &target_position, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
-
 	void set_bullet_texture_rotation_towards_node2d(int bullet_index, const Node2D *target_node);
 	void all_bullets_set_texture_rotation_towards_node2d(const Node2D *target_node, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 
@@ -365,7 +351,6 @@ public:
 
 	real_t get_bullet_texture_rotation_degrees(int bullet_index) const;
 	void set_bullet_texture_rotation_degrees(int bullet_index, real_t new_rotation_degrees);
-
 	TypedArray<real_t> all_bullets_get_texture_rotation_degrees(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) const;
 	void all_bullets_set_texture_rotation_degrees(real_t new_rotation_degrees, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 
@@ -387,10 +372,8 @@ public:
 	// delta after this value is computed, so this stays the stable gameplay
 	// read (splitting bullets, speed checks) rather than the rendered delta.
 	Vector2 get_bullet_velocity(int bullet_index) const;
-
 	TypedArray<Transform2D> all_bullets_get_transforms(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) const;
 	void all_bullets_set_transforms(const Transform2D &new_transform, bool set_direction_based_on_transform = false, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
-
 	real_t get_curves_elapsed_time() const;
 	void set_curves_elapsed_time(real_t new_time);
 
@@ -438,25 +421,19 @@ public:
 	}
 
 	Ref<Curve2D> get_bullet_movement_pattern_curve(int bullet_index) const;
-
 	void set_bullet_movement_pattern_from_path(int bullet_index, Path2D *path_holding_pattern, bool face_movement_direction = false, bool repeat_pattern = true);
 	void all_bullets_set_movement_pattern_from_path(Path2D *path_holding_pattern, bool face_movement_direction = false, bool repeat_pattern = true, int start_index = 0, int end_index_inclusive = -1);
-
 	void set_bullet_movement_pattern_from_curve(int bullet_index, const Ref<Curve2D> &curve_pattern, bool face_movement_direction = false, bool repeat_pattern = true);
 	void all_bullets_set_movement_pattern_from_curve(const Ref<Curve2D> &curve_pattern, bool face_movement_direction = false, bool repeat_pattern = true, int start_index = 0, int end_index_inclusive = -1);
-
 	void remove_bullet_movement_pattern(int bullet_index);
 	void all_bullets_remove_movement_pattern(int start_index = 0, int end_index_inclusive = -1);
-
 	int get_collision_layer() const;
 	void set_collision_layer(int new_collision_layer);
 	void set_collision_layer_from_array(const TypedArray<int> &numbers);
-
 	int get_collision_mask() const;
 	void set_collision_mask(int new_collision_mask);
 	bool area_ready_or_error(const char *function_name) const;
 	void set_collision_mask_from_array(const TypedArray<int> &numbers);
-
 	bool get_monitorable() const;
 	void set_monitorable(bool value);
 
@@ -469,9 +446,7 @@ public:
 	PoolKey get_pool_key() const { return PoolKey{ amount_bullets, cached_effective_shape_type }; }
 
 	void _notification(int p_what);
-
 	bool is_auto_pooling_enabled = true;
-
 	bool is_attachments_auto_pooling_enabled = true;
 
 	// Set by the pool itself - tells us at a glance whether this volley is sitting in a bucket right now.
@@ -482,7 +457,6 @@ public:
 
 	// Which bullets are still alive (fast add/remove/lookup while the tick runs)
 	DynamicSparseSet all_bullets_enabled_set;
-
 	BulletFactory2D *bullet_factory = nullptr;
 	// Optional spawner owner (ObjectID, 0 = none), mirroring owner_volley_id
 	// on attachments. When a live BulletSpawner2D is tagged, collision and
@@ -508,9 +482,7 @@ public:
 	// Shared debugger can also read the zero transform to hide disabled shapes.
 	// (Exposed as static so it's reachable without an instance.)
 
-	///
-
-	/// ROTATION RELATED
+	// ROTATION RELATED
 
 	std::vector<real_t> all_rotation_speed;
 	std::vector<real_t> all_max_rotation_speed;
@@ -552,9 +524,7 @@ public:
 	// If set to true, it will stop the rotation when the max rotation speed is reached
 	bool stop_rotation_when_max_reached = false;
 
-	///
-
-	/// BULLET ATTACHMENT RELATED
+	// BULLET ATTACHMENT RELATED
 
 	// Per-slot attachment assignment epoch: bumped on EVERY ownership change
 	// (attach, detach, disable, free, reclaim, reuse-blank). The deferred
@@ -564,9 +534,7 @@ public:
 	// generation (classic ABA), and pointer+id then match a stale request.
 	// Sized to amount_bullets at spawn; reset on reuse.
 	std::vector<uint64_t> attachment_assignment_epochs;
-
 	_ALWAYS_INLINE_ void bump_attachment_epoch(int bullet_index);
-
 	_ALWAYS_INLINE_ uint64_t attachment_epoch_for(int bullet_index) const;
 
 	// Object-level collision dedup (default ON): one logical hit per
@@ -591,11 +559,8 @@ public:
 	// silently merges two unrelated pairs (a real hit gets dropped); at
 	// 64 bits that probability is ~5e-12.
 	static uint64_t collision_dedup_key(int bullet_index, int64_t instance_id);
-
 	_ALWAYS_INLINE_ bool collision_already_queued(int bullet_index, int64_t entered_instance_id);
-
 	_ALWAYS_INLINE_ void mark_collision_queued(int bullet_index, int64_t entered_instance_id);
-
 	void clear_collision_dedup_keys();
 
 	// Bound so both dedup modes are reachable and testable. Default true (one
@@ -650,7 +615,6 @@ public:
 	// so pooled reuse (A with params -> B without) would leak A's visuals.
 	// finalize_set_up() resets every previously applied key on the empty path.
 	std::vector<String> applied_instance_shader_keys;
-
 	void clear_applied_instance_shader_overrides();
 
 	// Stores each bullet's attachment pooling id
@@ -688,9 +652,7 @@ public:
 	// resumes it with on_bullet_enable.
 	std::vector<uint8_t> attachment_suspended;
 
-	///
-
-	/// SPRITE EFFECT (FX LAYER) RELATED
+	// SPRITE EFFECT (FX LAYER) RELATED
 
 	// One baked trail layer: per-frame shard nodes (children of the volley,
 	// so pooling hides them, freeing is automatic, and relative z tracks the
@@ -807,7 +769,6 @@ public:
 	void fx_fire_oneshot(int trigger, int bullet_index, const Transform2D &at);
 	// Fires ON_SPAWN layers for every bullet (spawn/enable activation).
 	void fx_fire_spawn_layers();
-
 	bool has_trail_effects() const;
 	// Layer-index guard shared by the per-bullet toggles (single error for
 	// range calls instead of one per bullet).
@@ -826,9 +787,8 @@ public:
 	// Local-space trail instance transform for tests (zero Transform2D when
 	// the bullet has no visible trail instance on that layer).
 	Transform2D debug_get_trail_transform(int layer_index, int bullet_index) const;
-	///
 
-	/// OTHER
+	// OTHER
 
 	// Provides inertia to the bullets by adding an additional velocity offset to their movement every physics frame
 	Vector2 inherited_velocity_offset = Vector2(0, 0);
@@ -875,7 +835,7 @@ public:
 	// If a ShaderMaterial was provided and it has instance shader parameters, then they should get cached here
 	Dictionary instance_shader_parameters;
 
-	/// TEXTURE / ANIMATION RELATED
+	// TEXTURE / ANIMATION RELATED
 
 	// Baked SpriteFrames animation. Rebuilt at spawn/enable/play only; the per-tick
 	// advance_sprite_animation() touches just these vectors + set_texture.
@@ -896,26 +856,18 @@ public:
 
 	// This is the texture size of the bullets
 	Vector2 texture_size = Vector2(0, 0);
-
 	real_t cache_texture_rotation_radians = 0.0;
-
 	Vector2 cache_collision_shape_offset = Vector2(0, 0);
 
-
-	///
-
-	/// BULLET SPEED RELATED
+	// BULLET SPEED RELATED
 
 	std::vector<real_t> all_cached_speed;
 	std::vector<real_t> all_cached_max_speed;
 	std::vector<real_t> all_cached_acceleration;
-
 	Ref<BulletCurvesData2D> shared_bullet_curves_data = nullptr;
 	std::vector<Ref<BulletCurvesData2D>> all_bullet_curves_data;
 
-	///
-
-	/// CACHED CALCULATIONS FOR IMPROVED PERFORMANCE
+	// CACHED CALCULATIONS FOR IMPROVED PERFORMANCE
 
 	// Holds all multimesh instance transforms. I am doing this so I don't have to call multi->get_instance_transform_2d() every frame
 	std::vector<Transform2D> all_cached_instance_transforms;
@@ -932,13 +884,9 @@ public:
 	// Holds all cached directions of the bullets
 	std::vector<Vector2> all_cached_direction;
 
-	///
-
-	/// BULLET MOVEMENT PATTERN RELATED
+	// BULLET MOVEMENT PATTERN RELATED
 
 	std::vector<BulletMovementPatternData2D> all_movement_pattern_data;
-
-	///
 
 	// PHYSICS INTERPOLATION RELATED
 
@@ -950,7 +898,7 @@ public:
 
 	//
 
-	/// COLLISION RELATED
+	// COLLISION RELATED
 
 	enum CollisionType : uint8_t {
 		AREA = 0,
@@ -963,9 +911,7 @@ public:
 	// amount_bullets at spawn; the homing epochs stay separate
 	// (they guard deferred homing work, this guards the collision drain).
 	std::vector<uint64_t> bullet_collision_epochs;
-
 	_ALWAYS_INLINE_ uint64_t collision_epoch_for_bullet(int bullet_index) const;
-
 	_ALWAYS_INLINE_ void bump_collision_epoch_for_bullet(int bullet_index);
 
 	struct BulletCollisionData2D {
@@ -999,7 +945,6 @@ public:
 		// reuse clears the record vector, so lifetimes can never mix.
 		Vector2 queue_target_position = Vector2(0, 0);
 		bool queue_target_position_valid = false;
-
 		BulletCollisionData2D() = default;
 
 		BulletCollisionData2D(int new_bullet_index, int64_t new_collided_instance_id, CollisionType new_collision_type) :
@@ -1024,7 +969,6 @@ public:
 
 	// Saves whether the bullets can detect bodies or not
 	bool monitorable = false;
-
 	Ref<Shape2D> cached_collision_shape;
 
 	// Typed cache resolved once at spawn/enable via casting. Physics + debugger branch on this, no per-bullet cast.
@@ -1040,7 +984,7 @@ public:
 
 	//
 
-	/// HELPER METHODS
+	// HELPER METHODS
 
 	// Note: If you wish to debug these functions with the debugger, remove the _ALWAYS_INLINE_ temporarily
 
@@ -1099,9 +1043,8 @@ public:
 	void present_bullet_transform(int bullet_index, const Vector2 &attachment_delta);
 	bool direction_curve_owns_direction(int bullet_index);
 
-	//////////////////// CURVES RELATED
+	// CURVES RELATED
 	inline void populate_shared_curves_related_data(const Ref<BulletCurvesData2D> &new_curves_data);
-
 	_ALWAYS_INLINE_ void populate_individual_bullet_curves_related_data(int bullet_index, const Ref<BulletCurvesData2D> &new_curves_data);
 
 	// Applies the x direction curve offset to the provided direction vector and normalizes it.
@@ -1119,13 +1062,9 @@ public:
 	// speed/direction caches with no recovery, so fail each sample to 0.
 	_ALWAYS_INLINE_ real_t sample_volley_curve(const Ref<Curve> &curve, bool use_unit, real_t fallback) const;
 	_ALWAYS_INLINE_ real_t get_bullet_curves_movement_speed(const BulletCurvesData2D *curves_data) const;
-
 	_ALWAYS_INLINE_ real_t get_bullet_curves_rotation_speed(const BulletCurvesData2D *curves_data) const;
-
 	_ALWAYS_INLINE_ real_t get_bullet_curves_x_direction_offset(const BulletCurvesData2D *curves_data) const;
-
 	_ALWAYS_INLINE_ real_t get_bullet_curves_y_direction_offset(const BulletCurvesData2D *curves_data) const;
-
 	_ALWAYS_INLINE_ void apply_direction_curve_texture_rotation_if_needed(Vector2 &curr_bullet_direction, Transform2D &curr_bullet_transf, double delta, const BulletCurvesData2D *curves_data) const;
 
 	// Calculates the input x value for curves based on whether unit curve is used or not (basically whether to treat the input as percentages or raw elapsed time)
@@ -1133,13 +1072,9 @@ public:
 
 	// Borrows raw pointer - valid until next reassignment (no refcount inc). Keep scope transient.
 	_ALWAYS_INLINE_ BulletCurvesData2D *find_bullet_curves_data_ptr(int bullet_index) const;
-
 	Ref<BulletCurvesData2D> bullet_get_curves_data(int bullet_index) const;
-
 	void bullet_set_curves_data(int bullet_index, const Ref<BulletCurvesData2D> &curves_data);
-
 	void all_bullets_set_curves_data(const Ref<BulletCurvesData2D> &curves_data, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
-
 	TypedArray<BulletCurvesData2D> all_bullets_get_curves_data(int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 
 	// Clear one bullet's per-bullet curves back to the shared fallback (or
@@ -1171,14 +1106,12 @@ public:
 
 	// Custom rotation function (I am doing this for performance reasons since Godot's rotated_local returns a brand new Transform2D, but I want to modify a reference without making copies)
 	_ALWAYS_INLINE_ void rotate_transform_locally(Transform2D &transform, real_t angle) const;
-
 	BulletAttachment2D *bullet_get_attachment(int bullet_index);
 
 	// Owner tracking: detaching an attachment always
 	// clears both fields together, which is what makes its later PREDELETE a
 	// no-op for the slot it left behind.
 	static void clear_attachment_owner_fields(BulletAttachment2D *attachment);
-
 
 	// Pooled-attachment check: pooling is keyed by a
 	// 32-bit scene hash that can theoretically collide across two different
@@ -1190,18 +1123,14 @@ public:
 	// and documented: the sweep just pushed these exact instances, so the
 	// bucket top is ours unless a re-entrant handler stole it.
 	static bool is_popped_attachment_from_scene(BulletAttachment2D *candidate, const Ref<PackedScene> &expected_scene, uint32_t expected_pooling_id);
-
 	BulletAttachment2D *bullet_set_attachment_to_null(int bullet_index);
 
 	// Called by BulletAttachment2D's PREDELETE when an ACTIVE attachment is freed
 	// manually: drops the slot only if it still holds this exact pointer. Safe to
 	// call on any state (bounds- and identity-checked).
 	void _do_drop_attachment_slot_if_matches(int bullet_index, BulletAttachment2D *attachment);
-
 	TypedArray<BulletAttachment2D> all_bullets_get_attachments(int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
-
 	TypedArray<BulletAttachment2D> all_bullets_set_attachment_to_null(int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
-
 	void all_bullets_set_attachment(const Ref<PackedScene> &attachment_scene, const Vector2 &bullet_attachment_offset, bool stick_relative_to_bullet = true, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 
 	// Guard-free core of bullet_set_attachment. Used by the public wrapper
@@ -1213,7 +1142,6 @@ public:
 	// wiped by the trailing blank (reset path) or pooled as a live slot
 	// (disable path). Defer with call_deferred instead.
 	_ALWAYS_INLINE_ bool attach_bullet_attachment_internal(int bullet_index, const Ref<PackedScene> &attachment_scene, const Vector2 &bullet_attachment_offset, bool stick_relative_to_bullet);
-
 	void bullet_set_attachment(int bullet_index, const Ref<PackedScene> &attachment_scene, const Vector2 &bullet_attachment_offset, bool stick_relative_to_bullet = true);
 
 	// Applies the spawn data's shared attachment to every bullet. Called from
@@ -1221,9 +1149,7 @@ public:
 	// Stops after the first failure so a bad scene prints one error instead of
 	// one per bullet.
 	_ALWAYS_INLINE_ void apply_shared_bullet_attachment_from_data(const BulletVolleyData2D &data);
-
 	void bullet_free_attachment(int bullet_index);
-
 	void bullet_disable_attachment(int bullet_index);
 
 	// Deferred attachment disable carrying the spawn generation, the slot's
@@ -1370,7 +1296,7 @@ public:
 	// paused the factory mid-drain).
 	void park_collision_record(const BulletCollisionData2D &record);
 
-	/// COLLISION DETECTION METHODS
+	// COLLISION DETECTION METHODS
 
 	// Queue-time target velocity for the bounce math (see the record
 	// above): same read as the drain path (RigidBody2D linear_velocity,
@@ -1401,14 +1327,12 @@ public:
 	};
 	std::vector<PausedOverlap2D> paused_overlaps;
 	static constexpr size_t kMaxPausedOverlaps = 4096;
-
 	_ALWAYS_INLINE_ void park_paused_overlap(PhysicsServer2D::AreaBodyStatus status, int64_t target_id, int bullet_index, CollisionType type);
 
 	// Called by the factory when processing resumes: queue every parked
 	// overlap whose bullet is still the same live bullet, through the normal
 	// dedup + record path. Returns the number of records queued.
 	int replay_paused_overlaps();
-
 	void area_entered_func(PhysicsServer2D::AreaBodyStatus status, RID entered_rid, int64_t entered_instance_id, int entered_shape_index, int bullet_shape_index);
 	void body_entered_func(PhysicsServer2D::AreaBodyStatus status, RID entered_rid, int64_t entered_instance_id, int entered_shape_index, int bullet_shape_index);
 
@@ -1420,7 +1344,8 @@ public:
 	// would null-deref.
 	_ALWAYS_INLINE_ void move_bullet_attachment(const Vector2 &translate_by, int bullet_index);
 
-	// Calculates the global transform of the bullet attachment. Note that this function relies on bullet_attachment_local_transform being set already
+	// Global transform of the bullet's attachment (relies on its
+	// attachment_local_transforms entry being set already).
 	_ALWAYS_INLINE_ Transform2D calculate_attachment_global_transf(int bullet_index, const Transform2D &original_data_transf);
 
 	bool get_is_life_time_infinite() const { return is_life_time_infinite; }
@@ -1437,9 +1362,7 @@ public:
 	// (exactly one hit remaining). Storing the threshold itself would kill on
 	// the next hit, unlike an equivalent wake.
 	void set_bullet_collision_count(int bullet_index, int value);
-
 	TypedArray<int> get_bullets_current_collision_count() const;
-
 	bool set_bullets_current_collision_count(const TypedArray<int> &arr, bool tile_short_arrays = false);
 
 	// Void wrapper for the editor property (property setters must return void).
@@ -1449,7 +1372,6 @@ public:
 		(void)set_bullets_current_collision_count(arr);
 	}
 
-	///
 protected:
 	// Internal setup helpers (spawn/enable seed shared spawn data through
 	// set_rotation_data). Not bound to scripts.
@@ -1484,22 +1406,16 @@ protected:
 
 	// Sets up the area correctly with collision related data
 	void set_up_area(const int collision_layer, const int collision_mask, bool new_monitorable, const RID &physics_space);
-
 	void generate_physics_shapes_for_area(int amount);
 	// Pushes the cached shape data into volley_shape once (no-op when it
 	// already matches) and marks it applied.
 	void apply_volley_shape_data();
 	// Detaches every shape from the area and frees volley_shape.
 	void release_volley_shape();
-
 	void set_all_physics_shapes_enabled_for_area(bool enable);
-
 	void generate_multimesh();
-
 	void set_up_multimesh(int new_instance_count, const Ref<Mesh> &new_mesh, Vector2 new_texture_size);
-
 	void set_up_bullet_instances(const BulletVolleyData2D &data);
-
 	void set_up_life_time_timer(double new_max_life_time, double new_current_life_time);
 
 	// Bakes frames + per-frame seconds from SpriteFrames (fps-relative durations) and
@@ -1528,10 +1444,8 @@ protected:
 			const Color &new_self_modulate,
 			const Dictionary &new_instance_shader_parameters);
 
-	///
-
 public:
-	/// COLLISION-SHAPE DEBUGGER ACCESSORS (read by BulletVolleyDebugger2D once per volley per tick)
+	// COLLISION-SHAPE DEBUGGER ACCESSORS (read by BulletVolleyDebugger2D once per volley per tick)
 
 	PhysicsServer2D::ShapeType get_collision_shape_type_for_debugging() const {
 		return cached_effective_shape_type;
@@ -1632,7 +1546,6 @@ public:
 		Vector2 locked_center{ 0, 0 };
 		HomingType locked_target_type = NotHoming;
 		uint64_t locked_target_identity = 0;
-
 		OrbitingData() = default;
 
 		OrbitingData(real_t new_radius, OrbitingDirection new_direction, OrbitingTextureRotation new_texture_rotation) :
@@ -1670,7 +1583,6 @@ protected:
 
 	// For each bullet whether the orbiting is enabled or not
 	std::vector<uint8_t> all_orbiting_status;
-
 	int active_orbiting_count = 0;
 	// Reused per-tick scratch: the orbit-lock snapshot used to keep read to avoid per-tick std::vector
 	// assignment churn in move_bullets.
@@ -2002,7 +1914,7 @@ public:
 	// target is a different identity than the one the bullet locked onto.
 	_ALWAYS_INLINE_ bool orbit_should_unlock_for_front_change(OrbitingData &orbiting_data, const HomingTargetDeque &deque);
 
-	///////////////// ORBITING DATA METHODS
+	// ORBITING DATA METHODS
 
 	// Frozen (disabled) bullets and parked volleys accept homing/orbit
 	// configuration: it applies on the wake (freeze contract). Only a POOLED
@@ -2011,28 +1923,17 @@ public:
 	_ALWAYS_INLINE_ bool reject_pooled_handle(const char *function_name) const;
 	// Warns once and returns true when the (validated) bullet's orbit is off.
 	bool orbit_disabled_warn(int bullet_index, const char *action) const;
-
 	void bullet_enable_orbiting(int bullet_index, real_t orbiting_radius, OrbitingDirection orbiting_direction, OrbitingTextureRotation orbiting_texture_rotation, OrbitingFollowMode orbiting_follow_mode = FollowTarget, real_t orbiting_follow_deadzone = 0.0f, OrbitingLockPolicy orbiting_lock_policy = RelockAlways, bool orbiting_rigid_follow = true);
-
 	void bullet_disable_orbiting(int bullet_index);
-
 	void bullet_set_orbiting_radius(int bullet_index, real_t new_radius);
-
 	real_t bullet_get_orbiting_radius(int bullet_index);
-
 	bool bullet_is_orbiting_enabled(int bullet_index);
-
 	void bullet_set_orbiting_texture_rotation(int bullet_index, OrbitingTextureRotation new_texture_rotation);
-
 	OrbitingTextureRotation bullet_get_orbiting_texture_rotation(int bullet_index);
-
 	void bullet_set_orbiting_direction(int bullet_index, OrbitingDirection new_direction);
-
 	OrbitingDirection bullet_get_orbiting_direction(int bullet_index);
 
-	/////////////////
-
-	///////////////// ORBITING DATA HELPERS
+	// ORBITING DATA HELPERS
 
 	// Re-lock every locked bullet onto a fresh deque without the fly-to-rim
 	// flicker: same front identity = keep angle + center, new identity =
@@ -2048,7 +1949,6 @@ public:
 
 	// Same, scoped to one per-bullet deque's owner.
 	_ALWAYS_INLINE_ void orbit_unlock_on_empty_deque_for_bullet(int bullet_index);
-
 	void all_bullets_enable_orbiting(real_t orbiting_radius, OrbitingDirection orbiting_direction, OrbitingTextureRotation orbiting_texture_rotation, int bullet_index_start = 0, int bullet_index_end_inclusive = -1, OrbitingFollowMode orbiting_follow_mode = FollowTarget, real_t orbiting_follow_deadzone = 0.0f, OrbitingLockPolicy orbiting_lock_policy = RelockAlways, bool orbiting_rigid_follow = true);
 
 	// Concentric-ring enable: bullet (start + k) orbits at radius_start + radius_step * k.
@@ -2058,9 +1958,7 @@ public:
 	// direction (re-setting it would re-roll mid-flight); the rest applies.
 	// Invalid enums are still rejected per bullet by the individual setters.
 	void all_bullets_enable_orbiting_linear(real_t radius_start, real_t radius_step, OrbitingDirection orbiting_direction = OrbitRight, OrbitingTextureRotation orbiting_texture_rotation = FaceTarget, int bullet_index_start = 0, int bullet_index_end_inclusive = -1, OrbitingFollowMode orbiting_follow_mode = FollowTarget, real_t orbiting_follow_deadzone = 0.0f, OrbitingLockPolicy orbiting_lock_policy = RelockAlways, bool orbiting_rigid_follow = true);
-
 	bool bullet_is_orbiting_locked(int bullet_index);
-
 	Vector2 bullet_get_orbiting_center(int bullet_index);
 
 	// Locked angle in radians: the ring slot the bullet holds (or is flying to).
@@ -2071,17 +1969,11 @@ public:
 	// teleported target. Rejected (no unlock) when orbiting is off or the
 	// bullet never locked.
 	void bullet_set_orbiting_center(int bullet_index, const Vector2 &new_center);
-
 	void bullet_set_orbiting_follow_mode(int bullet_index, OrbitingFollowMode new_follow_mode);
-
 	OrbitingFollowMode bullet_get_orbiting_follow_mode(int bullet_index);
-
 	void bullet_set_orbiting_follow_deadzone(int bullet_index, real_t new_deadzone);
-
 	real_t bullet_get_orbiting_follow_deadzone(int bullet_index);
-
 	void bullet_set_orbiting_lock_policy(int bullet_index, OrbitingLockPolicy new_lock_policy);
-
 	OrbitingLockPolicy bullet_get_orbiting_lock_policy(int bullet_index);
 
 	// When on, locked OrbitLeft/OrbitRight bullets translate 1:1 with the
@@ -2090,11 +1982,8 @@ public:
 	// off, locked bullets chase the ring clamped to speed * delta, so slow
 	// bullets trail behind fast targets. Never drops the lock.
 	void bullet_set_orbiting_rigid_follow(int bullet_index, bool new_rigid_follow);
-
 	bool bullet_get_orbiting_rigid_follow(int bullet_index);
-
 	void all_bullets_set_orbiting_rigid_follow(bool new_rigid_follow, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
-
 	PackedFloat32Array all_bullets_get_orbiting_radius(int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 
 	// Bulk center reads (same per-bullet warnings as bullet_get_orbiting_center).
@@ -2111,37 +2000,23 @@ public:
 
 	// Bulk homing-queue depths. Example: var n = bullets.all_bullets_get_homing_targets_amount().
 	PackedInt32Array all_bullets_get_homing_targets_amount(int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
-
 	TypedArray<bool> all_bullets_is_orbiting_enabled(int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
-
 	void all_bullets_disable_orbiting(int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
-
 	void all_bullets_set_orbiting_radius(real_t new_radius, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
-
 	void all_bullets_set_orbiting_direction(OrbitingDirection new_direction, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
-
 	void all_bullets_set_orbiting_texture_rotation(OrbitingTextureRotation new_rotation, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
-
 	void all_bullets_set_orbiting_follow_mode(OrbitingFollowMode new_follow_mode, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
-
 	void all_bullets_set_orbiting_follow_deadzone(real_t new_deadzone, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
-
 	void all_bullets_set_orbiting_lock_policy(OrbitingLockPolicy new_lock_policy, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
-
 	void all_bullets_set_orbiting_center(const Vector2 &new_center, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
-
 	TypedArray<bool> all_bullets_is_orbiting_locked(int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 
-	////////////////
-
-	///////////// PER BULLET HOMING DEQUE POP METHODS
+	// PER BULLET HOMING DEQUE POP METHODS
 
 	Variant bullet_homing_pop_front_target(int bullet_index);
-
 	Variant bullet_homing_pop_back_target(int bullet_index);
-	/////////////////////
 
-	//////////////// PER BULLET HOMING DEQUE PUSH METHODS
+	// PER BULLET HOMING DEQUE PUSH METHODS
 
 	// The six per-bullet pushes: validate, refuse a pooled handle, count the
 	// target only when the deque stored it, re-arm the reached flag when a
@@ -2149,31 +2024,22 @@ public:
 	template <typename Push>
 	bool bullet_homing_push(int bullet_index, const char *function_name, bool front, Push &&push);
 	bool bullet_homing_push_front_mouse_position_target(int bullet_index);
-
 	bool bullet_homing_push_front_node2d_target(int bullet_index, Node2D *new_homing_target);
-
 	bool bullet_homing_push_front_global_position_target(int bullet_index, const Vector2 &global_position);
-
 	bool bullet_homing_push_back_mouse_position_target(int bullet_index);
-
 	bool bullet_homing_push_back_node2d_target(int bullet_index, Node2D *new_homing_target);
-
 	bool bullet_homing_push_back_global_position_target(int bullet_index, const Vector2 &global_position);
 
 	// Single-bullet Variant push (Node2D or Vector2), mirroring the
 	// all_bullets_*_homing_target type branch. Returns false with an error on
 	// invalid index or target type, pushing nothing.
 	bool bullet_homing_push_back_homing_target(int bullet_index, const Variant &node2d_or_global_position);
-
 	bool bullet_homing_push_front_homing_target(int bullet_index, const Variant &node2d_or_global_position);
-	/////////////////////////////
 
-	///  PER BULLET HOMING DEQUE HELPERS
+	// PER BULLET HOMING DEQUE HELPERS
 
 	void bullet_clear_homing_targets(int bullet_index);
-
 	Array all_bullets_pop_front_target(int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
-
 	Array all_bullets_pop_back_target(int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 
 	// Bulk push paths skip disabled slots silently: the per-bullet push
@@ -2185,7 +2051,6 @@ public:
 	}
 
 	void all_bullets_push_back_mouse_position_target(int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
-
 	void all_bullets_push_front_mouse_position_target(int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 
 	// Bulk push paths skip disabled slots silently (see the helper above the
@@ -2193,14 +2058,11 @@ public:
 	// pass over a partially-disabled volley must not spam one error per
 	// bullet per interval.
 	void all_bullets_push_back_homing_target(const Variant &node2d_or_global_position, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
-
 	void all_bullets_push_front_homing_target(const Variant &node2d_or_global_position, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
-
 	void all_bullets_push_back_homing_targets_array(const Array &node2ds_or_global_positions_array, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
-
 	void all_bullets_push_front_homing_targets_array(const Array &node2ds_or_global_positions_array, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 
-	// Per-bullet variant of the shared replace above: instead of clear (which
+	// Per-bullet variant of the shared replace: instead of clear (which
 	// unlocks) + push, clear the raw deque inline and re-pin surviving locks
 	// onto the fresh front. Returns false when the slot is disabled or the
 	// target invalid (nothing touched): bulk callers skip disabled slots
@@ -2222,31 +2084,19 @@ public:
 	// deque unlocks there, while RelockAlways still re-locks on a real
 	// front swap.
 	_ALWAYS_INLINE_ void orbit_keep_lock_across_replace_for_bullet_front_only(int bullet_index, HomingTargetDeque &deque, bool front_changed = true);
-
 	void all_bullets_replace_homing_targets_with_new_target(const Variant &node2d_or_global_position, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
-
 	void all_bullets_replace_homing_targets_with_new_target_array(const Array &node2ds_or_global_positions_array, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
-
 	void all_bullets_replace_homing_targets_with_mouse(int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
-
 	void all_bullets_assign_homing_targets_array(const Array &node2ds_or_global_positions_array, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
-
 	void all_bullets_clear_homing_targets(int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
-
 	int bullet_homing_check_targets_amount(int bullet_index) const;
-
 	bool bullet_check_has_homing_targets(int bullet_index) const;
-
 	HomingType bullet_homing_check_current_target_type(int bullet_index) const;
-
 	Variant bullet_get_current_homing_target(int bullet_index) const;
-
-	//////////////////////////////
 
 	// SHARED BULLET HOMING DEQUE POP METHODS
 
 	Variant shared_homing_deque_pop_front_target();
-
 	Variant shared_homing_deque_pop_back_target();
 
 	// SHARED BULLET HOMING DEQUE PUSH METHODS
@@ -2256,27 +2106,17 @@ public:
 	// A pooled volley refuses (reject_pooled_handle).
 	template <typename Push>
 	void shared_homing_push(const char *function_name, bool front, Push &&push);
-
 	void shared_homing_deque_push_front_mouse_position_target();
-
 	void shared_homing_deque_push_front_node2d_target(Node2D *new_homing_target);
-
 	void shared_homing_deque_push_front_global_position_target(const Vector2 &global_position);
-
 	void shared_homing_deque_push_back_mouse_position_target();
-
 	void shared_homing_deque_push_back_node2d_target(Node2D *new_homing_target);
-
 	void shared_homing_deque_push_back_global_position_target(const Vector2 &global_position);
 
-	////////////////////////////////////
-
-	/// SHARED BULLET HOMING DEQUE HELPER METHODS
+	// SHARED BULLET HOMING DEQUE HELPER METHODS
 
 	void shared_homing_deque_push_back_homing_targets_array(const Array &node2ds_or_global_positions_array);
-
 	void shared_homing_deque_push_front_homing_targets_array(const Array &node2ds_or_global_positions_array);
-
 	void shared_homing_deque_clear_homing_targets();
 
 	// Replace = clear + push, but locks must survive the intermediate empty
@@ -2284,7 +2124,6 @@ public:
 	// input keeps the old queue AND the old lock), then re-pin surviving
 	// locks onto the fresh front instead of dropping them.
 	void shared_homing_deque_replace_homing_targets_with_new_target(const Variant &node2d_or_global_position);
-
 	void shared_homing_deque_replace_homing_targets_with_new_target_array(const Array &node2ds_or_global_positions_array);
 
 	_ALWAYS_INLINE_ int shared_homing_deque_check_homing_targets_amount() const {
@@ -2302,8 +2141,6 @@ public:
 	_ALWAYS_INLINE_ Variant shared_homing_deque_get_current_homing_target() const {
 		return shared_homing_deque.get_current_homing_target();
 	}
-
-	/////////////////////////
 
 	// Teleport bookkeeping for locked orbits: re-aim the ring slot from the
 	// bullet's new offset around the current ring center, so the next tick
@@ -2323,7 +2160,6 @@ public:
 	// Shifts a bullet's position by a certain amount. Same locked-ring
 	// re-aim as teleport_bullet (see above).
 	void teleport_shift_bullet(int bullet_index, const Vector2 &shift_amount);
-
 	void teleport_shift_all_bullets(const Vector2 &shift_amount, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 
 	// Sets a bullet's velocity directly (wind, knockback, split inheritance).
@@ -2332,9 +2168,7 @@ public:
 	// this velocity. max_speed is raised when below the new speed so the next
 	// tick doesn't snap it back down. Non-finite input is rejected.
 	void bullet_set_velocity(int bullet_index, const Vector2 &new_velocity);
-
 	void all_bullets_set_velocity(const Vector2 &new_velocity, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
-
 	TypedArray<Vector2> all_bullets_get_velocity(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) const;
 
 	// Property getters and setters
@@ -2419,7 +2253,8 @@ public:
 	bool wants_queued_target_motion() const { return bounce_enabled(); }
 	int try_handle_bounce(CollisionType collision_type, int bullet_index, int64_t entered_instance_id, Vector2 queued_target_velocity, bool queued_velocity_valid, Vector2 queued_target_position, bool queue_position_valid);
 
-	// Virtual methods
+	// Seeds the speed/direction/velocity SoA from a per-bullet array (shared
+	// fills the gaps afterwards; tile wraps short arrays).
 	void set_up_movement_data(const TypedArray<BulletSpeedData2D> &new_speed_data, bool tile_short_arrays = false);
 	// Per-bullet rotation PRESENCE. set_rotation_data seeds the rotation SoA
 	// from a user array, and the seed knows something the values cannot
@@ -2435,11 +2270,9 @@ public:
 	// slot it writes so a later set_shared_bullet_speed_data cannot undo it.
 	void mark_per_bullet_speed_presence(int bullet_index, bool present);
 	// Motion-feature lifecycle (speed SoA, rotation fallback, wobble,
-	// gravity/drag, movement patterns, homing/orbit, bounce):
-	// seed on a fresh spawn (the volley is not in the tree yet), reseed on a
-	// pool reuse (false = refused, the caller rolls back), neutralize without
-	// reseeding (drop_stale_work = a new life: scrub connections and
-	// invalidate deferred work), and the tail of a full deactivation.
+	// gravity/drag, movement patterns, homing/orbit, bounce): seeded from the
+	// spawn data on every life (begin_life), and the tail of a full
+	// deactivation.
 	void seed_motion_features(const BulletVolleyData2D &data);
 	void on_volley_deactivated();
 
@@ -2683,7 +2516,6 @@ protected:
 
 	// Updates the homing timer and checks if interval is reached
 	_ALWAYS_INLINE_ bool update_homing_timer(double delta);
-
 	static void _bind_methods();
 };
 } // namespace BlastBullets2D

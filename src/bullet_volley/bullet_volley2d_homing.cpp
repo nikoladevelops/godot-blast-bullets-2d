@@ -688,8 +688,8 @@ void BulletVolley2D::clear_homing_state_for_teardown() {
 	shared_homing_deque.clear_homing_targets(cached_mouse_global_position);
 	reset_shared_homing_reached_state();
 	// A pooled instance must not carry runtime homing/orbit setup into the
-	// next owner. Mirrors custom_additional_enable_logic so an enable_bullet()
-	// wake (which skips that path) starts from the same blank state.
+	// next owner. Mirrors the seed in begin_life, so an enable_bullet() wake
+	// (which skips that path) starts from the same blank state.
 	all_bullet_homing_smoothing.assign(all_bullet_homing_smoothing.size(), 0.0);
 	use_per_bullet_homing_smoothing = false;
 	// Value-reset the whole orbit payload, not just the lock: a stale

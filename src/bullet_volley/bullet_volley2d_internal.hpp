@@ -477,7 +477,6 @@ _ALWAYS_INLINE_ void BulletVolley2D::populate_shared_curves_related_data(const R
 	}
 
 	shared_bullet_curves_data = new_curves_data;
-
 	const bool is_movement_curve_valid = shared_bullet_curves_data->movement_speed_curve.is_valid();
 	const bool is_rotation_curve_valid = shared_bullet_curves_data->rotation_speed_curve.is_valid();
 	const bool is_x_direction_curve_valid = shared_bullet_curves_data->x_direction_curve.is_valid();
@@ -666,9 +665,7 @@ _ALWAYS_INLINE_ bool BulletVolley2D::attach_bullet_attachment_internal(int bulle
 	auto &pool = bullet_factory->bullet_attachments_pool;
 	const uint32_t pooling_key = BulletAttachmentObjectPool2D::make_pooling_key_for_scene(attachment_scene);
 	const bool key_recognized = pool.is_key_recognized(pooling_key);
-
 	bullet_disable_attachment(bullet_index);
-
 	BulletAttachment2D *attachment_instance = pool.pop(pooling_key);
 	bool created_brand_new_instance = false;
 
@@ -717,13 +714,10 @@ _ALWAYS_INLINE_ bool BulletVolley2D::attach_bullet_attachment_internal(int bulle
 	}
 
 	attachment_offsets[bullet_index] = bullet_attachment_offset;
-
 	auto &local_transf = attachment_local_transforms[bullet_index];
-
 	local_transf = Transform2D();
 	local_transf.set_origin(bullet_attachment_offset);
 	local_transf.set_rotation(0.0);
-
 	auto &global_transf = attachment_transforms[bullet_index];
 	// The live pose: teleports/shifts/ticks since spawn count (a paused
 	// factory never heals a stale attachment pose).
@@ -732,7 +726,6 @@ _ALWAYS_INLINE_ bool BulletVolley2D::attach_bullet_attachment_internal(int bulle
 		live_pose = all_cached_instance_transforms[bullet_index];
 	}
 	global_transf = calculate_attachment_global_transf(bullet_index, live_pose);
-
 	attachment_instance->set_transform(Transform2D());
 	attachment_instance->set_global_transform(global_transf);
 

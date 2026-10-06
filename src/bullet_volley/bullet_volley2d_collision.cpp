@@ -752,7 +752,7 @@ void BulletVolley2D::handle_bullet_collision(const BulletCollisionData2D &record
 	}
 
 	// Count the hit BEFORE the signal: handlers read the hit that just landed
-	// (get_bullet_collision_count, and get_bullet_hits_remaining == 0 means
+	// (get_bullet_collision_count == get_bullet_max_collision_count means
 	// this hit is lethal unless the handler intervenes).
 	++bullets_current_collision_count[bullet_index];
 
