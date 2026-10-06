@@ -81,154 +81,52 @@ Variant BulletVolley2D::bullet_homing_pop_back_target(int bullet_index) {
 }
 
 bool BulletVolley2D::bullet_homing_push_front_mouse_position_target(int bullet_index) {
-	if (!validate_bullet_index(bullet_index, "bullet_homing_push_front_mouse_position_target")) {
-		return false;
-	}
-	if (orbit_reject_disabled_bullet(bullet_index, "bullet_homing_push_front_mouse_position_target")) {
-		return false;
-	}
-
-	// Always refresh on push: keying freshness off the GLOBAL mouse-target counter
-	// made a fresh target inherit this node's stale cache whenever any OTHER
-	// multimesh held mouse targets.
-	cached_mouse_global_position = get_global_mouse_position();
-
-	auto &queue = all_bullet_homing_targets[bullet_index];
-
-	// Only count the target if the deque actually stored it (rejected
-	// pushes - full deque - must not desync the counters into
-	// phantom-homing an empty deque forever).
-	if (!queue.push_front_mouse_position_target(cached_mouse_global_position)) {
-		return false;
-	}
-
-	++all_homing_count[bullet_index];
-	++active_homing_count;
-
-	// A re-exposed front target re-arms like the shared deque does: the
-	// per-bullet reached flag below is per-target, so without this a
-	// popped-then-repushed target never fires again.
-	queue.reset_front_reached_flag();
-
-	return true;
+	return bullet_homing_push(bullet_index, "bullet_homing_push_front_mouse_position_target", true, [&](HomingTargetDeque &queue) {
+		// Always refresh on push: keying freshness off the GLOBAL mouse
+		// counter made a fresh target inherit this node's stale cache
+		// whenever any OTHER volley held mouse targets.
+		cached_mouse_global_position = get_global_mouse_position();
+		return queue.push_front_mouse_position_target(cached_mouse_global_position);
+	});
 }
 
 bool BulletVolley2D::bullet_homing_push_front_node2d_target(int bullet_index, Node2D *new_homing_target) {
-	if (!validate_bullet_index(bullet_index, "bullet_homing_push_front_node2d_target")) {
-		return false;
-	}
-	if (orbit_reject_disabled_bullet(bullet_index, "bullet_homing_push_front_node2d_target")) {
-		return false;
-	}
-
-	if (new_homing_target == nullptr) {
-		UtilityFunctions::push_error("bullet_homing_push_front_node2d_target: target is null, nothing pushed.");
-		return false;
-	}
-
-	auto &queue = all_bullet_homing_targets[bullet_index];
-
-	if (!queue.push_front_node2d_target(new_homing_target)) {
-		return false;
-	}
-
-	++all_homing_count[bullet_index];
-	++active_homing_count;
-	queue.reset_front_reached_flag();
-	return true;
+	return bullet_homing_push(bullet_index, "bullet_homing_push_front_node2d_target", true, [&](HomingTargetDeque &queue) {
+		if (new_homing_target == nullptr) {
+			UtilityFunctions::push_error("bullet_homing_push_front_node2d_target: target is null, nothing pushed.");
+			return false;
+		}
+		return queue.push_front_node2d_target(new_homing_target);
+	});
 }
 
 bool BulletVolley2D::bullet_homing_push_front_global_position_target(int bullet_index, const Vector2 &global_position) {
-	if (!validate_bullet_index(bullet_index, "bullet_homing_push_front_global_position_target")) {
-		return false;
-	}
-	if (orbit_reject_disabled_bullet(bullet_index, "bullet_homing_push_front_global_position_target")) {
-		return false;
-	}
-
-	auto &queue = all_bullet_homing_targets[bullet_index];
-
-	// Only count the target if the deque actually stored it (a non-finite position
-	// is rejected inside the deque; counting it would desync the counters and leave
-	// this bullet phantom-homing an empty deque forever).
-	if (!queue.push_front_global_position_target(global_position)) {
-		return false;
-	}
-
-	++all_homing_count[bullet_index];
-	++active_homing_count;
-	queue.reset_front_reached_flag();
-	return true;
+	return bullet_homing_push(bullet_index, "bullet_homing_push_front_global_position_target", true, [&](HomingTargetDeque &queue) {
+		return queue.push_front_global_position_target(global_position); // rejects non-finite positions
+	});
 }
 
 bool BulletVolley2D::bullet_homing_push_back_mouse_position_target(int bullet_index) {
-	if (!validate_bullet_index(bullet_index, "bullet_homing_push_back_mouse_position_target")) {
-		return false;
-	}
-	if (orbit_reject_disabled_bullet(bullet_index, "bullet_homing_push_back_mouse_position_target")) {
-		return false;
-	}
-
-	// Always refresh on push (see push_front variant for the rationale).
-	cached_mouse_global_position = get_global_mouse_position();
-
-	auto &queue = all_bullet_homing_targets[bullet_index];
-
-	// Only count the target if the deque actually stored it (see front variant).
-	if (!queue.push_back_mouse_position_target(cached_mouse_global_position)) {
-		return false;
-	}
-
-	++all_homing_count[bullet_index];
-	++active_homing_count;
-
-	return true;
+	return bullet_homing_push(bullet_index, "bullet_homing_push_back_mouse_position_target", false, [&](HomingTargetDeque &queue) {
+		cached_mouse_global_position = get_global_mouse_position(); // see the front variant
+		return queue.push_back_mouse_position_target(cached_mouse_global_position);
+	});
 }
 
 bool BulletVolley2D::bullet_homing_push_back_node2d_target(int bullet_index, Node2D *new_homing_target) {
-	if (!validate_bullet_index(bullet_index, "bullet_homing_push_back_node2d_target")) {
-		return false;
-	}
-	if (orbit_reject_disabled_bullet(bullet_index, "bullet_homing_push_back_node2d_target")) {
-		return false;
-	}
-
-	if (new_homing_target == nullptr) {
-		UtilityFunctions::push_error("bullet_homing_push_back_node2d_target: target is null, nothing pushed.");
-		return false;
-	}
-
-	auto &queue = all_bullet_homing_targets[bullet_index];
-
-	if (!queue.push_back_node2d_target(new_homing_target)) {
-		return false;
-	}
-
-	++all_homing_count[bullet_index];
-	++active_homing_count;
-
-	return true;
+	return bullet_homing_push(bullet_index, "bullet_homing_push_back_node2d_target", false, [&](HomingTargetDeque &queue) {
+		if (new_homing_target == nullptr) {
+			UtilityFunctions::push_error("bullet_homing_push_back_node2d_target: target is null, nothing pushed.");
+			return false;
+		}
+		return queue.push_back_node2d_target(new_homing_target);
+	});
 }
 
 bool BulletVolley2D::bullet_homing_push_back_global_position_target(int bullet_index, const Vector2 &global_position) {
-	if (!validate_bullet_index(bullet_index, "bullet_homing_push_back_global_position_target")) {
-		return false;
-	}
-	if (orbit_reject_disabled_bullet(bullet_index, "bullet_homing_push_back_global_position_target")) {
-		return false;
-	}
-
-	auto &queue = all_bullet_homing_targets[bullet_index];
-
-	// Only count the target if the deque actually stored it (see push_front variant).
-	if (!queue.push_back_global_position_target(global_position)) {
-		return false;
-	}
-
-	++all_homing_count[bullet_index];
-	++active_homing_count;
-
-	return true;
+	return bullet_homing_push(bullet_index, "bullet_homing_push_back_global_position_target", false, [&](HomingTargetDeque &queue) {
+		return queue.push_back_global_position_target(global_position);
+	});
 }
 
 bool BulletVolley2D::bullet_homing_push_back_homing_target(int bullet_index, const Variant &node2d_or_global_position) {
@@ -561,79 +459,31 @@ Variant BulletVolley2D::shared_homing_deque_pop_back_target() {
 	return popped;
 }
 
-_ALWAYS_INLINE_ bool BulletVolley2D::orbit_reject_fully_disabled_volley(const char *function_name) const {
-	// A parked volley (every bullet frozen) accepts shared targets for its
-	// wake; a pooled one is a stale handle.
-	if (is_pooled_in_pool) {
-		UtilityFunctions::push_error(String(function_name) + ": this volley is in the pool (its last bullet died), so this handle is stale. Spawn a new volley instead.");
-		return true;
-	}
-	return false;
-}
-
 void BulletVolley2D::shared_homing_deque_push_front_mouse_position_target() {
 	// Always refresh on push (see bullet_homing_push_front_mouse_position_target).
 	cached_mouse_global_position = get_global_mouse_position();
-
-	if (orbit_reject_fully_disabled_volley("shared_homing_deque_push_front_mouse_position_target")) {
-		return;
-	}
-	if (shared_homing_deque.push_front_mouse_position_target(cached_mouse_global_position)) {
-		reset_shared_homing_reached_state();
-	}
+	shared_homing_push("shared_homing_deque_push_front_mouse_position_target", true, [&](HomingTargetDeque &deque) { return deque.push_front_mouse_position_target(cached_mouse_global_position); });
 }
 
 void BulletVolley2D::shared_homing_deque_push_front_node2d_target(Node2D *new_homing_target) {
-	if (orbit_reject_fully_disabled_volley("shared_homing_deque_push_front_node2d_target")) {
-		return;
-	}
-	const int before = shared_homing_deque.get_homing_targets_amount();
-	shared_homing_deque.push_front_node2d_target(new_homing_target);
-	if (shared_homing_deque.get_homing_targets_amount() != before) {
-		reset_shared_homing_reached_state();
-	}
+	shared_homing_push("shared_homing_deque_push_front_node2d_target", true, [&](HomingTargetDeque &deque) { return deque.push_front_node2d_target(new_homing_target); });
 }
 
 void BulletVolley2D::shared_homing_deque_push_front_global_position_target(const Vector2 &global_position) {
-	if (orbit_reject_fully_disabled_volley("shared_homing_deque_push_front_global_position_target")) {
-		return;
-	}
-	if (shared_homing_deque.push_front_global_position_target(global_position)) {
-		reset_shared_homing_reached_state();
-	}
+	shared_homing_push("shared_homing_deque_push_front_global_position_target", true, [&](HomingTargetDeque &deque) { return deque.push_front_global_position_target(global_position); });
 }
 
 void BulletVolley2D::shared_homing_deque_push_back_mouse_position_target() {
-	// Always refresh on push (see bullet_homing_push_front_mouse_position_target).
 	cached_mouse_global_position = get_global_mouse_position();
-
-	if (orbit_reject_fully_disabled_volley("shared_homing_deque_push_back_mouse_position_target")) {
-		return;
-	}
-	const bool was_empty = shared_homing_deque.empty();
-	if (shared_homing_deque.push_back_mouse_position_target(cached_mouse_global_position) && was_empty) {
-		reset_shared_homing_reached_state();
-	}
+	shared_homing_push("shared_homing_deque_push_back_mouse_position_target", false, [&](HomingTargetDeque &deque) { return deque.push_back_mouse_position_target(cached_mouse_global_position); });
 }
 
 void BulletVolley2D::shared_homing_deque_push_back_node2d_target(Node2D *new_homing_target) {
-	if (orbit_reject_fully_disabled_volley("shared_homing_deque_push_back_node2d_target")) {
-		return;
-	}
-	const bool was_empty = shared_homing_deque.empty();
-	if (shared_homing_deque.push_back_node2d_target(new_homing_target) && was_empty && !shared_homing_deque.empty()) {
-		reset_shared_homing_reached_state();
-	}
+	shared_homing_push("shared_homing_deque_push_back_node2d_target", false, [&](HomingTargetDeque &deque) { return deque.push_back_node2d_target(new_homing_target); });
 }
 
 void BulletVolley2D::shared_homing_deque_push_back_global_position_target(const Vector2 &global_position) {
-	if (orbit_reject_fully_disabled_volley("shared_homing_deque_push_back_global_position_target")) {
-		return;
-	}
-	const bool was_empty = shared_homing_deque.empty();
-	if (shared_homing_deque.push_back_global_position_target(global_position) && was_empty) {
-		reset_shared_homing_reached_state();
-	}
+	shared_homing_push("shared_homing_deque_push_back_global_position_target", false, [&](HomingTargetDeque &deque) { return deque.push_back_global_position_target(global_position); });
 }
 
 void BulletVolley2D::shared_homing_deque_push_back_homing_targets_array(const Array &node2ds_or_global_positions_array) {

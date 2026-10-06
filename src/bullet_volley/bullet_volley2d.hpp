@@ -2025,12 +2025,11 @@ public:
 
 	///////////////// ORBITING DATA METHODS
 
-	// Disabled bullets own no homing/orbit state (disable_bullet clears it
-	// and the tick never moves them): pushing targets or arming orbit there
-	// inflates the homing/orbiting counters for slots that never drain.
-	// Retarget passes skip disabled slots; direct script calls get a loud
-	// error here instead of a silent counter leak.
-	_ALWAYS_INLINE_ bool orbit_reject_disabled_bullet(int bullet_index, const char *function_name) const;
+	// Frozen (disabled) bullets and parked volleys accept homing/orbit
+	// configuration: it applies on the wake (freeze contract). Only a POOLED
+	// volley refuses, loudly: its last bullet died, so this handle is stale
+	// and a write would configure the next owner's bullets.
+	_ALWAYS_INLINE_ bool reject_pooled_handle(const char *function_name) const;
 	// Warns once and returns true when the (validated) bullet's orbit is off.
 	bool orbit_disabled_warn(int bullet_index, const char *action) const;
 
@@ -2165,6 +2164,11 @@ public:
 
 	//////////////// PER BULLET HOMING DEQUE PUSH METHODS
 
+	// The six per-bullet pushes: validate, refuse a pooled handle, count the
+	// target only when the deque stored it, re-arm the reached flag when a
+	// front push exposed a new front.
+	template <typename Push>
+	bool bullet_homing_push(int bullet_index, const char *function_name, bool front, Push &&push);
 	bool bullet_homing_push_front_mouse_position_target(int bullet_index);
 
 	bool bullet_homing_push_front_node2d_target(int bullet_index, Node2D *new_homing_target);
@@ -2240,7 +2244,6 @@ public:
 	// front swap.
 	_ALWAYS_INLINE_ void orbit_keep_lock_across_replace_for_bullet_front_only(int bullet_index, HomingTargetDeque &deque, bool front_changed = true);
 
-
 	void all_bullets_replace_homing_targets_with_new_target(const Variant &node2d_or_global_position, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 
 	void all_bullets_replace_homing_targets_with_new_target_array(const Array &node2ds_or_global_positions_array, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
@@ -2271,11 +2274,9 @@ public:
 	// Push-front always swaps the front target, so every bullet is re-armed for
 	// it. Push-back only re-arms when the deque was empty (that push creates
 	// the front); otherwise the front is unchanged and fired flags must stay.
-	// A push onto a volley with zero enabled bullets is rejected: the tick
-	// never moves disabled slots, so queuing there only inflates the shared
-	// state (and the global mouse counter) with targets that never drain.
-
-	_ALWAYS_INLINE_ bool orbit_reject_fully_disabled_volley(const char *function_name) const;
+	// A pooled volley refuses (reject_pooled_handle).
+	template <typename Push>
+	void shared_homing_push(const char *function_name, bool front, Push &&push);
 
 	void shared_homing_deque_push_front_mouse_position_target();
 

@@ -881,18 +881,44 @@ _ALWAYS_INLINE_ bool BulletVolley2D::orbit_should_unlock_for_front_change(Orbiti
 	}
 }
 
-_ALWAYS_INLINE_ bool BulletVolley2D::orbit_reject_disabled_bullet(int bullet_index, const char *function_name) const {
-	if (bullet_index < 0 || bullet_index >= amount_bullets) {
-		return false;
-	}
-	// Frozen (disabled) bullets accept configuration: it applies on the wake
-	// (freeze contract). Only a POOLED volley refuses: it was released, so a
-	// write through this handle would configure the next owner's bullets.
+_ALWAYS_INLINE_ bool BulletVolley2D::reject_pooled_handle(const char *function_name) const {
 	if (is_pooled_in_pool) {
 		UtilityFunctions::push_error(String(function_name) + ": this volley is in the pool (its last bullet died), so this handle is stale. Spawn a new volley instead.");
 		return true;
 	}
 	return false;
+}
+
+template <typename Push>
+bool BulletVolley2D::bullet_homing_push(int bullet_index, const char *function_name, bool front, Push &&push) {
+	if (!validate_bullet_index(bullet_index, function_name) || reject_pooled_handle(function_name)) {
+		return false;
+	}
+	HomingTargetDeque &queue = all_bullet_homing_targets[bullet_index];
+	// A rejected push (full deque, bad target) must never be counted: the
+	// bullet would phantom-home an empty deque forever.
+	if (!push(queue)) {
+		return false;
+	}
+	++all_homing_count[bullet_index];
+	++active_homing_count;
+	if (front) {
+		// A re-exposed front re-arms its per-target reached flag (a popped
+		// then re-pushed target fires again).
+		queue.reset_front_reached_flag();
+	}
+	return true;
+}
+
+template <typename Push>
+void BulletVolley2D::shared_homing_push(const char *function_name, bool front, Push &&push) {
+	if (reject_pooled_handle(function_name)) {
+		return;
+	}
+	const bool was_empty = shared_homing_deque.empty();
+	if (push(shared_homing_deque) && (front || was_empty)) {
+		reset_shared_homing_reached_state();
+	}
 }
 
 _ALWAYS_INLINE_ void BulletVolley2D::orbit_keep_lock_across_replace(HomingTargetDeque &deque) {
@@ -937,7 +963,6 @@ _ALWAYS_INLINE_ void BulletVolley2D::orbit_keep_lock_across_replace_for_bullet_f
 		o.is_locked_orbiting = false;
 	}
 }
-
 
 // Drops bullet i's own homing targets and their share of the volley-wide
 // counter (the deque clear also keeps the global mouse counter honest).

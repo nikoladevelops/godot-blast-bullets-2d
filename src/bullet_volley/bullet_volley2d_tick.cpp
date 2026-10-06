@@ -791,7 +791,6 @@ _ALWAYS_INLINE_ void BulletVolley2D::step_speed(const MoveTick2D &t, BulletStep2
 	}
 }
 
-
 // ---- Per-bullet helpers called from move_bullets (inline, this file only) ----
 
 _ALWAYS_INLINE_ void BulletVolley2D::batch_flush_instance_transforms() {

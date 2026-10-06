@@ -21,7 +21,7 @@ void BulletVolley2D::bullet_enable_orbiting(int bullet_index, real_t orbiting_ra
 	if (!validate_bullet_index(bullet_index, "bullet_enable_orbiting")) {
 		return;
 	}
-	if (orbit_reject_disabled_bullet(bullet_index, "bullet_enable_orbiting")) {
+	if (reject_pooled_handle("bullet_enable_orbiting")) {
 		return;
 	}
 
