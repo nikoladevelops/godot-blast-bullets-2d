@@ -115,6 +115,8 @@ static inline T *validate_cached_node(const Node *self, const NodePath &p_path, 
 static constexpr const char *PREVIEW_META_KEY = "blastbullets_pattern_preview";
 
 static constexpr const char *PREVIEW_HOLDER_NAME = "~BlastBulletsPatternPreview";
+// The graze ring preview layer (internal child of the spawner).
+static constexpr const char *GRAZE_PREVIEW_NAME = "~BlastBulletsGrazePreview";
 
 // Shared limits (single definition so validation, generation and preview
 // agree; the inspector hint strings in _bind_methods mirror these).

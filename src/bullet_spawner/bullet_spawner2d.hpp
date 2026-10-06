@@ -9,6 +9,7 @@
 #include "patterns/pattern_registry2d.hpp"
 #include <vector>
 
+#include "data/bullet_graze_zone2d.hpp"
 #include "data/bullet_volley_data2d.hpp"
 #include "godot_cpp/classes/array_mesh.hpp"
 #include "godot_cpp/classes/curve.hpp"
@@ -134,6 +135,41 @@ public:
 	float ring_width = 1.5f;
 	void set_rings_data(float p_radius, const Color &p_color, float p_width);
 
+	void _draw() override;
+
+protected:
+	static void _bind_methods();
+};
+
+// Graze ring preview of one spawner: every ring of every graze zone drawn
+// as a circle around each resolved target. Top-level (draws in canvas
+// coordinates, so target global positions are used as they are and a
+// moving spawner never redraws), owner-less and internal (never saved,
+// never a pattern marker). Same snapshot contract as PatternPreviewLayer2D:
+// the spawner stores plain values, _draw() repaints them forever, and a
+// redraw happens only when the snapshot really changed.
+struct GrazePreviewCircle2D {
+	Vector2 center;
+	real_t radius = 0.0;
+	Color color;
+	int zone_index = 0;
+	int ring_index = 0;
+	uint64_t target_id = 0;
+	bool operator==(const GrazePreviewCircle2D &o) const {
+		return center == o.center && radius == o.radius && color == o.color && zone_index == o.zone_index && ring_index == o.ring_index && target_id == o.target_id;
+	}
+};
+
+class GrazePreviewLayer2D : public Node2D {
+	GDCLASS(GrazePreviewLayer2D, Node2D)
+
+public:
+	std::vector<GrazePreviewCircle2D> circles;
+	float line_width = 1.5f;
+	// Instrumentation for tests: how many times _draw() ran.
+	int debug_draw_count = 0;
+	// Stores a new snapshot and queues ONE redraw when it differs.
+	void set_circles(const std::vector<GrazePreviewCircle2D> &p_circles, float p_line_width);
 	void _draw() override;
 
 protected:
@@ -702,6 +738,48 @@ public:
 	void set_orbiting_lock_policy(BulletVolley2D::OrbitingLockPolicy value);
 	bool get_orbiting_rigid_follow() const;
 	void set_orbiting_rigid_follow(bool value);
+
+	// GRAZE (EASY API, bullet_spawner2d_graze.cpp)
+	//
+	// Every fired volley is armed with graze_zones (BulletGrazeZone2D: a
+	// target group and up to 4 rings around each target). A bullet passing
+	// within a ring of a zone target fires bullet_grazed, and
+	// bullet_graze_exited when it leaves that zone alive: on this spawner
+	// while it lives, then on the BulletFactory2D, which receives every
+	// graze (also for bullets whose spawner was already freed, whatever
+	// orphaned_volleys says, as long as the bullets fly). A volley keeps
+	// its zones: edits made INSIDE a zone resource reach bullets in flight,
+	// while graze_enabled / graze_zones changes apply to the next shots.
+	bool graze_enabled = false;
+	// Up to BulletVolley2D::MAX_GRAZE_ZONES zones; null entries are kept
+	// (the inspector adds them) and skipped.
+	TypedArray<BulletGrazeZone2D> graze_zones;
+	// Ring preview: each ring of each zone drawn around every resolved
+	// target, in the zone's preview_color (editor by default; at runtime
+	// only when graze_preview_during_runtime is on).
+	bool graze_show_preview = true;
+	bool graze_preview_during_runtime = false;
+	double graze_preview_line_width = 1.5;
+
+	bool get_graze_enabled() const;
+	void set_graze_enabled(bool value);
+	TypedArray<BulletGrazeZone2D> get_graze_zones() const;
+	void set_graze_zones(const Array &value);
+	bool get_graze_show_preview() const;
+	void set_graze_show_preview(bool value);
+	bool get_graze_preview_during_runtime() const;
+	void set_graze_preview_during_runtime(bool value);
+	double get_graze_preview_line_width() const;
+	void set_graze_preview_line_width(double value);
+	// The targets the runtime would test for zone `zone_index` right now
+	// (the shared filter, the first BulletGrazeZone2D::MAX_TARGETS in tree
+	// order; this spawner itself never counts).
+	Array resolve_graze_targets(int zone_index) const;
+	// The rings exactly as the preview draws them:
+	// [{center, radius, color, zone_index, ring_index, target_id}].
+	Array debug_get_graze_preview_circles() const;
+	// {active, visible, circles, draws}: ring preview instrumentation.
+	Dictionary debug_get_graze_preview_stats() const;
 
 	// BURST / TELEGRAPH / TARGETING / PERF accessors (members above).
 	bool get_burst_enabled() const;
@@ -1523,6 +1601,28 @@ private:
 	// Orbiting without homing warns once per configuration (re-armed by
 	// on_config_changed()).
 	bool orbit_without_homing_warned = false;
+	// Arms a freshly fired volley with graze_zones (shoot_once, before the
+	// homing signals). Runs no user code.
+	void apply_volley_graze(BulletVolley2D *volley);
+	// graze_zones mutated in place (append past 4 zones, non-zone entries):
+	// warned once per assignment, the usable entries still arm.
+	bool graze_zones_misuse_warned = false;
+	// Zone resources' `changed` -> ring preview refresh.
+	void connect_graze_zones(bool connect);
+	void _on_graze_zone_changed();
+	// Ring preview: allowed + toggled on (editor: graze_show_preview;
+	// runtime: also graze_preview_during_runtime) + graze on.
+	bool graze_preview_active() const;
+	// Rebuilds the ring snapshot from the live targets and pushes it to the
+	// layer (one redraw only when it changed); hides the layer when the
+	// preview is off. Never dereferences a stored target: ids only.
+	void refresh_graze_preview();
+	// The layer under this spawner (cached pointer validated by id, healed
+	// by name), created on demand.
+	GrazePreviewLayer2D *resolve_graze_preview_layer(bool create);
+	GrazePreviewLayer2D *graze_preview_layer = nullptr;
+	uint64_t graze_preview_layer_id = 0;
+	std::vector<GrazePreviewCircle2D> graze_preview_scratch;
 	// Candidate count of the last round-robin resolution (to advance the
 	// cursor by what a reused resolution actually took).
 	mutable int homing_round_robin_last_count = 0;

@@ -84,6 +84,22 @@ func test_factory_and_spawner_declare_the_same_volley_signals() -> void:
 		assert_false(factory.has_signal(gone), gone + " is gone")
 
 
+func test_factory_and_spawner_declare_the_same_graze_signals() -> void:
+	var spawner := make_spawner()
+	var expected := {
+		"bullet_grazed": [["target", "Node2D"], ["volley", "BulletVolley2D"], ["bullet_index", ""], ["zone", "BulletGrazeZone2D"], ["ring_index", ""]],
+		"bullet_graze_exited": [["target", "Node2D"], ["volley", "BulletVolley2D"], ["bullet_index", ""], ["zone", "BulletGrazeZone2D"], ["deepest_ring_index", ""]],
+	}
+	for owner in [factory, spawner]:
+		for name in expected:
+			var s := _signal(owner, name)
+			assert_false(s.is_empty(), "%s declares %s" % [owner.get_class(), name])
+			var got: Array = []
+			for a in s.get("args", []):
+				got.append([str(a["name"]), str(a["class_name"])])
+			assert_eq(got, expected[name], "%s.%s payload" % [owner.get_class(), name])
+
+
 func test_stats_dictionaries_have_exact_keys() -> void:
 	var hit_keys: Array = factory.debug_get_pool_hit_stats().keys()
 	hit_keys.sort()

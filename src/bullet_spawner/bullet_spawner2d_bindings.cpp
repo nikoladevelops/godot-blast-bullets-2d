@@ -61,6 +61,18 @@ void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
 		}
 		return;
 	}
+	// Graze: everything but the master switch hides while graze is off; the
+	// line width also needs a preview toggle.
+	if (property_name.begins_with("graze_")) {
+		bool show = property_name == "graze_enabled" || graze_enabled;
+		if (show && property_name == "graze_preview_line_width") {
+			show = graze_show_preview || graze_preview_during_runtime;
+		}
+		if (!show) {
+			p_property.usage &= ~PROPERTY_USAGE_EDITOR;
+		}
+		return;
+	}
 	// Tidy inspector: hide the preview tuning knobs while both preview
 	// switches are off. The toggles + spin props stay always visible.
 	if (property_name.begins_with("preview_") && property_name != "show_pattern_preview") {
@@ -144,7 +156,7 @@ void BulletSpawner2D::_bind_methods() {
 	// Inspector layout: Setup (wiring) -> Bullet Patterns (source, amount,
 	// Transform subgroup, one subgroup per shape with its helper_<shape>_
 	// prefix stripped, Outline Layers last) -> Shooting -> Spin -> Homing ->
-	// Orbiting -> Preview -> Movement -> Performance. Property NAMES never
+	// Orbiting -> Graze -> Preview -> Movement -> Performance. Property NAMES never
 	// change here (they are serialized into .tscn); only the order and the
 	// headers do. ADD_PROPERTY must follow its bind_method calls, otherwise
 	// ClassDB silently drops the property (the test runner flags that).
@@ -603,6 +615,42 @@ void BulletSpawner2D::_bind_methods() {
 	BIND_ENUM_CONSTANT(HOMING_SELECT_DISTRIBUTE);
 	BIND_ENUM_CONSTANT(HOMING_RETARGET_OFF);
 	BIND_ENUM_CONSTANT(HOMING_RETARGET_ON_INTERVAL);
+
+	// Graze (bullet_spawner2d_graze.cpp). The signals bubble: they fire here
+	// first (while this spawner lives), then on the BulletFactory2D, which
+	// receives every graze. Same payloads on both. Live inside the factory
+	// tick, right after the move: the bullet is alive in the handler.
+	ADD_SIGNAL(MethodInfo("bullet_grazed",
+			PropertyInfo(Variant::OBJECT, "target", PROPERTY_HINT_RESOURCE_TYPE, "Node2D"),
+			PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
+			PropertyInfo(Variant::INT, "bullet_index"),
+			PropertyInfo(Variant::OBJECT, "zone", PROPERTY_HINT_RESOURCE_TYPE, "BulletGrazeZone2D"),
+			PropertyInfo(Variant::INT, "ring_index")));
+	ADD_SIGNAL(MethodInfo("bullet_graze_exited",
+			PropertyInfo(Variant::OBJECT, "target", PROPERTY_HINT_RESOURCE_TYPE, "Node2D"),
+			PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
+			PropertyInfo(Variant::INT, "bullet_index"),
+			PropertyInfo(Variant::OBJECT, "zone", PROPERTY_HINT_RESOURCE_TYPE, "BulletGrazeZone2D"),
+			PropertyInfo(Variant::INT, "deepest_ring_index")));
+	ClassDB::bind_method(D_METHOD("get_graze_enabled"), &BulletSpawner2D::get_graze_enabled);
+	ClassDB::bind_method(D_METHOD("set_graze_enabled", "value"), &BulletSpawner2D::set_graze_enabled);
+	ClassDB::bind_method(D_METHOD("get_graze_zones"), &BulletSpawner2D::get_graze_zones);
+	ClassDB::bind_method(D_METHOD("set_graze_zones", "value"), &BulletSpawner2D::set_graze_zones);
+	ClassDB::bind_method(D_METHOD("get_graze_show_preview"), &BulletSpawner2D::get_graze_show_preview);
+	ClassDB::bind_method(D_METHOD("set_graze_show_preview", "value"), &BulletSpawner2D::set_graze_show_preview);
+	ClassDB::bind_method(D_METHOD("get_graze_preview_during_runtime"), &BulletSpawner2D::get_graze_preview_during_runtime);
+	ClassDB::bind_method(D_METHOD("set_graze_preview_during_runtime", "value"), &BulletSpawner2D::set_graze_preview_during_runtime);
+	ClassDB::bind_method(D_METHOD("get_graze_preview_line_width"), &BulletSpawner2D::get_graze_preview_line_width);
+	ClassDB::bind_method(D_METHOD("set_graze_preview_line_width", "value"), &BulletSpawner2D::set_graze_preview_line_width);
+	ClassDB::bind_method(D_METHOD("resolve_graze_targets", "zone_index"), &BulletSpawner2D::resolve_graze_targets);
+	ClassDB::bind_method(D_METHOD("debug_get_graze_preview_circles"), &BulletSpawner2D::debug_get_graze_preview_circles);
+	ClassDB::bind_method(D_METHOD("debug_get_graze_preview_stats"), &BulletSpawner2D::debug_get_graze_preview_stats);
+	ADD_GROUP("Graze", "");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "graze_enabled"), "set_graze_enabled", "get_graze_enabled");
+	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "graze_zones", PROPERTY_HINT_ARRAY_TYPE, "BulletGrazeZone2D"), "set_graze_zones", "get_graze_zones");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "graze_show_preview"), "set_graze_show_preview", "get_graze_show_preview");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "graze_preview_during_runtime"), "set_graze_preview_during_runtime", "get_graze_preview_during_runtime");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "graze_preview_line_width", PROPERTY_HINT_RANGE, "0.5,16,0.5,or_greater"), "set_graze_preview_line_width", "get_graze_preview_line_width");
 
 	ClassDB::bind_method(D_METHOD("get_show_pattern_preview"), &BulletSpawner2D::get_show_pattern_preview);
 	ClassDB::bind_method(D_METHOD("set_show_pattern_preview", "value"), &BulletSpawner2D::set_show_pattern_preview);

@@ -1251,11 +1251,7 @@ void BulletSpawner2D::update_preview_process_state() {
 	// Runtime: never touched here - shooting/spinning own _process, and the
 	// runtime preview piggy-backs that loop via preview_sources_dirty().
 	if (Engine::get_singleton()->is_editor_hint() && is_inside_tree()) {
-		if (show_pattern_preview) {
-			set_process(true);
-		} else {
-			set_process(false);
-		}
+		set_process(show_pattern_preview || graze_preview_active());
 	}
 }
 

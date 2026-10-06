@@ -26,7 +26,7 @@ func before_each() -> void:
 	probes.append(["BulletVolley2D", v])
 	probes.append(["BulletFactory2D", factory])
 	probes.append(["BulletSpawner2D", make_spawner(H.make_volley_data(2))])
-	for cls in ["BulletVolleyData2D", "BulletSpeedData2D", "BulletRotationData2D", "BulletCurvesData2D", "BulletWobbleData2D", "BulletEffectLayerData2D", "VolleyPoolKey2D"]:
+	for cls in ["BulletVolleyData2D", "BulletSpeedData2D", "BulletRotationData2D", "BulletCurvesData2D", "BulletWobbleData2D", "BulletEffectLayerData2D", "BulletGrazeZone2D", "VolleyPoolKey2D"]:
 		probes.append([cls, ClassDB.instantiate(cls)])
 	var att: BulletAttachment2D = BulletAttachment2D.new()
 	add(att)

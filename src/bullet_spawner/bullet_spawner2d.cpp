@@ -595,7 +595,7 @@ int BulletSpawner2D::volleys_remaining() const {
 // "auto-shooting stopped" sleep paths in _process/shoot_once all use it, so a
 // new subsystem (e.g. movement) is added in exactly one place.
 bool BulletSpawner2D::needs_process_besides_shooting() const {
-	return spin_enabled || homing_retarget_active() || preview_active() || burst_shots_left > 0 || telegraph_pending || pattern_list_active || movement_active();
+	return spin_enabled || homing_retarget_active() || preview_active() || graze_preview_active() || burst_shots_left > 0 || telegraph_pending || pattern_list_active || movement_active();
 }
 
 bool BulletSpawner2D::needs_process() const {
@@ -660,6 +660,24 @@ PackedStringArray BulletSpawner2D::_get_configuration_warnings() const {
 	}
 	if (orbiting_enabled && !homing_enabled) {
 		out.push_back("orbiting_enabled needs homing_enabled (orbiting locks onto a homing target).");
+	}
+	if (graze_enabled) {
+		bool any_zone = false;
+		for (int i = 0; i < graze_zones.size(); ++i) {
+			const Variant entry = graze_zones[i];
+			const BulletGrazeZone2D *zone = entry.get_type() == Variant::OBJECT ? Object::cast_to<BulletGrazeZone2D>((Object *)entry) : nullptr;
+			if (zone == nullptr) {
+				out.push_back("graze_zones[" + String::num_int64(i) + "] is empty.");
+				continue;
+			}
+			any_zone = true;
+			if (zone->target_group.is_empty()) {
+				out.push_back("graze_zones[" + String::num_int64(i) + "] has an empty target_group: it never finds a target.");
+			}
+		}
+		if (!any_zone) {
+			out.push_back("Graze is enabled but graze_zones is empty: no bullet of this spawner can be grazed.");
+		}
 	}
 	return out;
 }
@@ -813,6 +831,9 @@ bool BulletSpawner2D::shoot_once() {
 	if (spawn_position_offset != Vector2(0, 0)) {
 		bullets->teleport_shift_all_bullets(resolve_spawn_offset_global());
 	}
+	// Graze zones arm before the homing signals (no user code runs here),
+	// so every handler from here on sees an armed volley.
+	apply_volley_graze(bullets);
 	apply_volley_homing_and_orbiting(bullets, arc_resolved ? &arc_targets : nullptr);
 	// Re-validate: handlers of homing_targets_resolved/volley_homing_configured
 	// ran above and may have freed this volley or handed it to another owner.
@@ -887,6 +908,7 @@ void BulletSpawner2D::_ready() {
 		// move of a spawner would pay a notification.)
 		update_preview_process_state();
 		rebuild_preview();
+		refresh_graze_preview();
 		return;
 	}
 	// Runtime: the preview holder is owner-less and thus never saved, but a
@@ -912,6 +934,18 @@ void BulletSpawner2D::_ready() {
 		}
 	} else {
 		rebuild_preview();
+	}
+	// Same for the graze ring layer (internal child of this spawner).
+	if (!graze_preview_active()) {
+		Node *stray_rings = get_node_or_null(NodePath(GRAZE_PREVIEW_NAME));
+		if (stray_rings != nullptr) {
+			remove_child(stray_rings);
+			memdelete(stray_rings);
+		}
+		graze_preview_layer = nullptr;
+		graze_preview_layer_id = 0;
+	} else {
+		refresh_graze_preview();
 	}
 	// Controls called before the tree (pause, fire_n_volleys, ...) are kept:
 	// only the timer arms here.
@@ -973,6 +1007,8 @@ void BulletSpawner2D::_notification(int p_what) {
 		preview_holder = nullptr;
 		preview_dots_layer = nullptr;
 		preview_arrows_layer = nullptr;
+		graze_preview_layer = nullptr;
+		graze_preview_layer_id = 0;
 		tracked_base = nullptr;
 		tracked_base_id = 0;
 		tracked_has_base_global = false;
@@ -1035,6 +1071,9 @@ void BulletSpawner2D::_process(double delta) {
 		if (preview_active() && preview_sources_dirty()) {
 			rebuild_preview();
 		}
+		if (graze_preview_active() || graze_preview_layer != nullptr) {
+			refresh_graze_preview();
+		}
 		return;
 	}
 	const bool delta_ok = Math::is_finite(delta) && delta > 0.0;
@@ -1059,6 +1098,10 @@ void BulletSpawner2D::_process(double delta) {
 	// Crash-safe: preview_sources_dirty() never dereferences a stale node.
 	if (preview_active() && preview_sources_dirty()) {
 		rebuild_preview();
+	}
+	// Ring preview: targets move every frame; one redraw only on change.
+	if (graze_preview_active()) {
+		refresh_graze_preview();
 	}
 	if (!delta_ok) {
 		return;

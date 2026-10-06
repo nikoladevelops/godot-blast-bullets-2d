@@ -973,7 +973,8 @@ func test_t20_inspector_groups_stay_coherent() -> void:
 	assert_true(groups_found.has("Bullet Patterns"), "spawner Bullet Patterns group present")
 	assert_true(not groups_found.has("Transform Generation"), "old Transform Generation name gone")
 	assert_true(not groups_found.has("Burst and Telegraph"), "Burst group merged away")
-	assert_eq(spawner_group_order.slice(0, 9), ["Setup", "Bullet Patterns", "Shooting", "Spin", "Homing", "Orbiting", "Preview", "Movement", "Performance"], "spawner group order")
+	assert_true(groups_found.has("Graze"), "spawner Graze group present")
+	assert_eq(spawner_group_order.slice(0, 10), ["Setup", "Bullet Patterns", "Shooting", "Spin", "Homing", "Orbiting", "Graze", "Preview", "Movement", "Performance"], "spawner group order")
 	spawner20.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_GRID
 	await idle(1)
 	var ring_visible_grid := false
@@ -1025,6 +1026,8 @@ func test_t20_inspector_groups_stay_coherent() -> void:
 	assert_true(prop_group.get("telegraph_enabled", "") == "Shooting", "telegraph merged into Shooting")
 	assert_true(prop_group.get("telegraph_sec", "") == "Shooting", "telegraph seconds merged into Shooting")
 	assert_true(prop_group.get("orbiting_enabled", "") == "Orbiting", "orbiting master grouped")
+	for gname in ["graze_enabled", "graze_zones", "graze_show_preview", "graze_preview_during_runtime", "graze_preview_line_width"]:
+		assert_true(prop_group.get(gname, "") == "Graze", gname + " grouped under Graze")
 	assert_true(prop_group.get("show_pattern_preview", "") == "Preview", "preview master grouped")
 	var stray_homing := []
 	for pname in prop_group.keys():

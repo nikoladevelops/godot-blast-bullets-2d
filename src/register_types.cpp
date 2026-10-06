@@ -83,6 +83,7 @@ void initialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
 	// Bullet Spawner
 	GDREGISTER_CLASS(BulletSpawner2D)
 	GDREGISTER_CLASS(PatternPreviewLayer2D)
+	GDREGISTER_CLASS(GrazePreviewLayer2D)
 
 	CachedStringNames2D::create();
 	WarnOnce2D::create();
