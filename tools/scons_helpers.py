@@ -37,6 +37,19 @@ def clear_screen() -> None:
     cmd = "cls" if os.name == "nt" else "clear"
     subprocess.run([cmd], check=False)
 
+# Written only after a SUCCESSFUL build. tools/run_tests.py and
+# tools/api_snapshot.py refuse to run while any source is newer than it, so a
+# failed build can never be tested against the previous library (the objects
+# that did compile before the error would otherwise look up to date).
+BUILD_STAMP = os.path.join(str(PROJECT_ROOT), "test_project", "addons", "blastbullets2d", "bin", ".build_stamp")
+
+
+def write_build_stamp(target: str) -> None:
+    os.makedirs(os.path.dirname(BUILD_STAMP), exist_ok=True)
+    with open(BUILD_STAMP, "w", encoding="utf-8") as handle:
+        handle.write(target + "\n")
+
+
 def run_scons_build(target: BuildTarget) -> None:
     """
     Executes SCons build targeting a specific build profile (template_debug or template_release)
@@ -112,6 +125,7 @@ def run_scons_build(target: BuildTarget) -> None:
 
         if process.returncode == 0:
             succeeded = True
+            write_build_stamp(target)
             print("\n" + "=" * 50)
             print(f"Compilation finished successfully ({mode_label} Build).")
             print(f"Target API: Godot {godot_version} | LTO: {lto_mode} | Debug Symbols: {debug_symbols}")

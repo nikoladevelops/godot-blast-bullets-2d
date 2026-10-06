@@ -162,10 +162,20 @@ def newest_mtime(root, exts):
     return newest
 
 
+BUILD_STAMP = os.path.join(ADDON_BIN_DIR, ".build_stamp")
+
+
 def stale_binary_reason():
     built = newest_mtime(ADDON_BIN_DIR, (".so", ".dll", ".dylib"))
     if built == 0.0:
         return "no compiled extension found in test_project/addons/blastbullets2d/bin"
+    # The build tools stamp every SUCCESSFUL build: a source newer than the
+    # stamp means the last build failed (or never ran) after that edit.
+    if os.path.exists(BUILD_STAMP):
+        source = newest_mtime(os.path.join(REPO_ROOT, "src"), (".cpp", ".hpp", ".h", ".inc"))
+        if source > os.path.getmtime(BUILD_STAMP):
+            return "src/ changed after the last successful build (rebuild: GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py; a failed build keeps this error)"
+        return None
     # SCons recompiles objects (.os) after any source edit but skips the link
     # when the object bytes are unchanged (comment-only edits): the newest
     # object therefore also proves the build ran after the edit.
