@@ -173,49 +173,15 @@ static bool bounce_precise_normal_from_target(Object *hit_target, const Vector2 
 
 void BulletVolley2D::ensure_bounce_vectors() {
 	if (!bounce_enabled()) {
-		all_bounce_count.clear();
-		all_bounce_cooldown.clear();
-		all_bounce_last_tick.clear();
-		all_bounce_last_target.clear();
-		all_bounce_last_time.clear();
-		all_bounce_last_normal.clear();
-		all_bounce_last_target_velocity.clear();
-		bounce_visual_pending.clear();
-		bounce_visual_target.clear();
-		all_bounce_speed_multiplier.clear();
+		bounce_ledger_clear();
 		bounce_speed_scaled = false;
 		return;
 	}
-	if ((int)all_bounce_count.size() != amount_bullets) {
-		all_bounce_count.assign(amount_bullets, 0);
-	}
-	if ((int)all_bounce_cooldown.size() != amount_bullets) {
-		all_bounce_cooldown.assign(amount_bullets, 0.0);
-	}
-	if ((int)all_bounce_last_tick.size() != amount_bullets) {
-		all_bounce_last_tick.assign(amount_bullets, 0);
-	}
-	if ((int)all_bounce_last_target.size() != amount_bullets) {
-		all_bounce_last_target.assign(amount_bullets, 0);
-	}
-	if ((int)all_bounce_last_time.size() != amount_bullets) {
-		all_bounce_last_time.assign(amount_bullets, 0.0);
-	}
-	if ((int)all_bounce_last_normal.size() != amount_bullets) {
-		all_bounce_last_normal.assign(amount_bullets, Vector2(0, 0));
-	}
-	if ((int)all_bounce_last_target_velocity.size() != amount_bullets) {
-		all_bounce_last_target_velocity.assign(amount_bullets, Vector2(0, 0));
-	}
-	if ((int)bounce_visual_pending.size() != amount_bullets) {
-		bounce_visual_pending.assign(amount_bullets, 0);
-	}
-	if ((int)bounce_visual_target.size() != amount_bullets) {
-		bounce_visual_target.assign(amount_bullets, Vector2(1, 0));
-	}
-	if ((int)all_bounce_speed_multiplier.size() != amount_bullets) {
-		all_bounce_speed_multiplier.assign(amount_bullets, 1.0);
-	}
+	visit_bounce_ledger([&](auto &v, auto empty) {
+		if ((int)v.size() != amount_bullets) {
+			v.assign(amount_bullets, empty);
+		}
+	});
 }
 
 void BulletVolley2D::set_bounce_mask(int value) {
@@ -322,27 +288,9 @@ void BulletVolley2D::apply_bounce_from_data(const BulletVolleyData2D &volley_dat
 	// armed; clear() drops the vectors when disarmed so plain volleys
 	// carry no bounce state at all.
 	if (bounce_enabled()) {
-		all_bounce_count.assign(amount_bullets, 0);
-		all_bounce_cooldown.assign(amount_bullets, 0.0);
-		all_bounce_last_tick.assign(amount_bullets, 0);
-		all_bounce_last_target.assign(amount_bullets, 0);
-		all_bounce_last_time.assign(amount_bullets, 0.0);
-		all_bounce_last_normal.assign(amount_bullets, Vector2(0, 0));
-		all_bounce_last_target_velocity.assign(amount_bullets, Vector2(0, 0));
-		bounce_visual_pending.assign(amount_bullets, 0);
-		bounce_visual_target.assign(amount_bullets, Vector2(1, 0));
-		all_bounce_speed_multiplier.assign(amount_bullets, 1.0);
+		bounce_ledger_assign();
 	} else {
-		all_bounce_count.clear();
-		all_bounce_cooldown.clear();
-		all_bounce_last_tick.clear();
-		all_bounce_last_target.clear();
-		all_bounce_last_time.clear();
-		all_bounce_last_normal.clear();
-		all_bounce_last_target_velocity.clear();
-		bounce_visual_pending.clear();
-		bounce_visual_target.clear();
-		all_bounce_speed_multiplier.clear();
+		bounce_ledger_clear();
 	}
 	bounce_speed_scaled = false;
 	bounce_mask_warning_issued = false;

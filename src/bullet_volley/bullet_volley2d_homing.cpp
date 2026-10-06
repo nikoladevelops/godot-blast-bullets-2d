@@ -57,14 +57,7 @@ Variant BulletVolley2D::bullet_homing_pop_front_target(int bullet_index) {
 	// Resync hardening: the tick trim path and direct deque edits can
 	// leave the counter above the live deque size (phantom-homing an
 	// empty deque). Clamp down so counters always reflect reality.
-	const int live = queue.get_homing_targets_amount();
-	if (all_homing_count[bullet_index] > live) {
-		active_homing_count -= (all_homing_count[bullet_index] - live);
-		if (active_homing_count < 0) {
-			active_homing_count = 0;
-		}
-		all_homing_count[bullet_index] = live;
-	}
+	homing_resync_count(bullet_index);
 	orbit_route_front_change_for_bullet(bullet_index, queue);
 	return popped;
 }
@@ -85,14 +78,7 @@ Variant BulletVolley2D::bullet_homing_pop_back_target(int bullet_index) {
 
 	Variant popped = queue.pop_back_target(cached_mouse_global_position);
 	// Same resync as the front-pop above.
-	const int live = queue.get_homing_targets_amount();
-	if (all_homing_count[bullet_index] > live) {
-		active_homing_count -= (all_homing_count[bullet_index] - live);
-		if (active_homing_count < 0) {
-			active_homing_count = 0;
-		}
-		all_homing_count[bullet_index] = live;
-	}
+	homing_resync_count(bullet_index);
 	// Back-pop leaves the front target untouched: only an emptied deque
 	// unlocks here, the lock itself is never disturbed by a tail edit.
 	if (bullet_index >= 0 && bullet_index < (int)all_orbiting_data.size() && bullet_index < (int)all_orbiting_status.size() && all_orbiting_status[bullet_index]) {
@@ -284,15 +270,7 @@ void BulletVolley2D::bullet_clear_homing_targets(int bullet_index) {
 	}
 
 	auto &queue = all_bullet_homing_targets[bullet_index];
-
-	auto &count = all_homing_count[bullet_index];
-	active_homing_count -= count;
-	if (active_homing_count < 0) {
-		active_homing_count = 0;
-	}
-	count = 0;
-
-	queue.clear_homing_targets(cached_mouse_global_position);
+	homing_drop_own_targets(bullet_index);
 	orbit_unlock_on_empty_deque_for_bullet(bullet_index);
 }
 
@@ -422,13 +400,7 @@ bool BulletVolley2D::bullet_replace_homing_targets_with_new_target(int bullet_in
 		return false;
 	}
 	auto &queue = all_bullet_homing_targets[bullet_index];
-	auto &count = all_homing_count[bullet_index];
-	active_homing_count -= count;
-	if (active_homing_count < 0) {
-		active_homing_count = 0;
-	}
-	count = 0;
-	queue.clear_homing_targets(cached_mouse_global_position);
+	homing_drop_own_targets(bullet_index);
 	bullet_homing_push_back_homing_target(bullet_index, node2d_or_global_position);
 	orbit_keep_lock_across_replace_for_bullet(bullet_index, queue);
 	return true;
@@ -475,13 +447,7 @@ void BulletVolley2D::all_bullets_replace_homing_targets_with_new_target_array(co
 			continue;
 		}
 		auto &queue = all_bullet_homing_targets[i];
-		auto &count = all_homing_count[i];
-		active_homing_count -= count;
-		if (active_homing_count < 0) {
-			active_homing_count = 0;
-		}
-		count = 0;
-		queue.clear_homing_targets(cached_mouse_global_position);
+		homing_drop_own_targets(i);
 	}
 	all_bullets_push_back_homing_targets_array(node2ds_or_global_positions_array, bullet_index_start, bullet_index_end_inclusive);
 	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
@@ -500,13 +466,7 @@ void BulletVolley2D::all_bullets_replace_homing_targets_with_mouse(int bullet_in
 			continue;
 		}
 		auto &queue = all_bullet_homing_targets[i];
-		auto &count = all_homing_count[i];
-		active_homing_count -= count;
-		if (active_homing_count < 0) {
-			active_homing_count = 0;
-		}
-		count = 0;
-		queue.clear_homing_targets(cached_mouse_global_position);
+		homing_drop_own_targets(i);
 		if (all_bullet_homing_targets[i].push_back_mouse_position_target(cached_mouse_global_position)) {
 			++all_homing_count[i];
 			++active_homing_count;
@@ -935,14 +895,7 @@ void BulletVolley2D::clear_homing_state_for_teardown() {
 	bounce_randomness_deg = 0.0;
 	bounce_cooldown_sec = 0.05;
 	bounce_debounce_sec = 0.15;
-	all_bounce_count.clear();
-	all_bounce_cooldown.clear();
-	all_bounce_last_tick.clear();
-	all_bounce_last_target.clear();
-	all_bounce_last_time.clear();
-	bounce_visual_pending.clear();
-	bounce_visual_target.clear();
-	all_bounce_speed_multiplier.clear();
+	bounce_ledger_clear();
 	bounce_speed_scaled = false;
 	bounce_mask_warning_issued = false;
 }

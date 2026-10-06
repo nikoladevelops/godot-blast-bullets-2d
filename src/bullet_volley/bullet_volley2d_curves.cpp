@@ -79,9 +79,7 @@ _ALWAYS_INLINE_ void BulletVolley2D::populate_individual_bullet_curves_related_d
 	// Size this even when there's no rotation curve yet - someone can add one later and the tick reads it every frame.
 	// All three rotation vectors must match (see populate_shared above).
 	if ((int)all_rotation_speed.size() != amount_bullets) {
-		all_rotation_speed.assign(amount_bullets, 0.0);
-		all_max_rotation_speed.assign(amount_bullets, 0.0);
-		all_rotation_acceleration.assign(amount_bullets, 0.0);
+		visit_rotation_trio([&](std::vector<real_t> &v) { v.assign(amount_bullets, 0.0); });
 	}
 
 	if (is_rotation_curve_valid) {

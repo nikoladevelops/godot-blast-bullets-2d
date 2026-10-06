@@ -279,9 +279,7 @@ void BulletVolley2D::move_bullets(double delta) {
 		// rotation trio. Enforce the invariant once per tick so the rotation
 		// stage can never index out of bounds (resize keeps existing speeds).
 		if ((int)all_rotation_speed.size() != amount_bullets || (int)all_max_rotation_speed.size() != amount_bullets || (int)all_rotation_acceleration.size() != amount_bullets) {
-			all_rotation_speed.resize(amount_bullets, 0.0);
-			all_max_rotation_speed.resize(amount_bullets, 0.0);
-			all_rotation_acceleration.resize(amount_bullets, 0.0);
+			visit_rotation_trio([&](std::vector<real_t> &v) { v.resize(amount_bullets, 0.0); });
 		}
 		// Same invariant for the shared-deque reached states.
 		if ((int)all_shared_homing_reached.size() != amount_bullets) {
@@ -373,15 +371,7 @@ _ALWAYS_INLINE_ void BulletVolley2D::step_homing(const MoveTick2D &t, BulletStep
 		if (active_homing_count < 0) {
 			active_homing_count = 0;
 		}
-		// A counter that ran ahead of the real queue is pulled back (no ghost targets).
-		const int live_after_trim = own.get_homing_targets_amount();
-		if (count > live_after_trim) {
-			active_homing_count -= (count - live_after_trim);
-			if (active_homing_count < 0) {
-				active_homing_count = 0;
-			}
-			count = live_after_trim;
-		}
+		homing_resync_count(i);
 		// Trimming exposed a new front target: like a pop, orbit rings re-lock.
 		if (trimmed_count > 0) {
 			orbit_route_front_change_for_bullet(i, own);

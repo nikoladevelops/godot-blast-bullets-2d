@@ -516,6 +516,13 @@ public:
 	std::vector<real_t> all_rotation_speed;
 	std::vector<real_t> all_max_rotation_speed;
 	std::vector<real_t> all_rotation_acceleration;
+	// The three rotation arrays always travel together (sized, cleared).
+	template <typename F>
+	void visit_rotation_trio(F &&f) {
+		f(all_rotation_speed);
+		f(all_max_rotation_speed);
+		f(all_rotation_acceleration);
+	}
 
 	// If set to false it will also rotate the collision shapes
 	bool rotate_only_textures = false;
@@ -1906,6 +1913,28 @@ protected:
 	// Volley-level bounce switch. True exactly when bounce_mask != 0; the
 	// tick gates cooldown/visual work behind it.
 	bool bounce_enabled() const { return bounce_mask != 0; }
+	// The per-bullet bounce ledger, listed ONCE: f(vector, its empty-slot
+	// value) for each array (sized while bouncing is armed, dropped while
+	// disarmed, reset per slot by bullet_reset_state).
+	template <typename F>
+	void visit_bounce_ledger(F &&f) {
+		f(all_bounce_count, 0);
+		f(all_bounce_cooldown, 0.0);
+		f(all_bounce_last_tick, 0);
+		f(all_bounce_last_target, 0);
+		f(all_bounce_last_time, 0.0);
+		f(all_bounce_last_normal, Vector2(0, 0));
+		f(all_bounce_last_target_velocity, Vector2(0, 0));
+		f(bounce_visual_pending, 0);
+		f(bounce_visual_target, Vector2(1, 0));
+		f(all_bounce_speed_multiplier, 1.0);
+	}
+	void bounce_ledger_clear() {
+		visit_bounce_ledger([](auto &v, auto) { v.clear(); });
+	}
+	void bounce_ledger_assign() {
+		visit_bounce_ledger([&](auto &v, auto empty) { v.assign(amount_bullets, empty); });
+	}
 	// Sizes (or clears) the bounce ledger to match amount_bullets. Sized only
 	// while bouncing is armed; cleared when disarmed so disabled features
 	// cost nothing per tick. Every reader bounds-checks, so the empty state
@@ -2595,6 +2624,9 @@ protected:
 	// without movement, so the bullet holds its pose. A zero heading
 	// (unseeded ballistics) also holds: steering it would snap to angle 0.
 	_ALWAYS_INLINE_ void update_homing(HomingTargetDeque &homing_deque, int bullet_index, double delta, Vector2 &bullet_pos, Vector2 &target_pos);
+	// Own-target bookkeeping (index already validated).
+	_ALWAYS_INLINE_ void homing_drop_own_targets(int bullet_index);
+	_ALWAYS_INLINE_ void homing_resync_count(int bullet_index);
 
 	// Rotates bullet to face target with smoothing (boundary-agnostic version).
 	// require_homing_flag: the homing feature only rotates the texture when the user

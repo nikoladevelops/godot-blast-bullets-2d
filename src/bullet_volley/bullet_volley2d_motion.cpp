@@ -179,9 +179,7 @@ void BulletVolley2D::set_rotation_data(const TypedArray<BulletRotationData2D> &r
 	// With the tile checkbox, short arrays wrap (i % size).
 	if (amount_rotation_data == 0) {
 		is_rotation_data_active = false;
-		all_rotation_speed.clear();
-		all_max_rotation_speed.clear();
-		all_rotation_acceleration.clear();
+		visit_rotation_trio([](std::vector<real_t> &v) { v.clear(); });
 		// Rotation is off entirely, so no slot is seeded: a later
 		// set_shared_bullet_rotation_data full-seeds every slot instead.
 		reset_per_bullet_rotation_presence();
@@ -213,9 +211,7 @@ void BulletVolley2D::set_rotation_data(const TypedArray<BulletRotationData2D> &r
 	rotate_only_textures = new_rotate_only_textures;
 
 	// Clear existing data (avoids freeing the actual memory, instead only the .amount_bullets is changed which allows me to push brand new elements as if the vector is empty/ overwrite existing but not accessible ones)
-	all_rotation_speed.clear();
-	all_max_rotation_speed.clear();
-	all_rotation_acceleration.clear();
+	visit_rotation_trio([](std::vector<real_t> &v) { v.clear(); });
 	// Fresh seed: every slot below is re-derived from its own entry, so the
 	// presence bit resets to all-zero and the shared fallback may fill the gaps
 	// again.
@@ -286,9 +282,7 @@ void BulletVolley2D::set_bullet_rotation_data(int bullet_index, const Ref<Bullet
 	// here so a live write wakes rotation instead of silently no-op'ing.
 	// amount_bullets is fixed for the volley's life, so resize is exact.
 	if (all_rotation_speed.empty() || all_max_rotation_speed.empty() || all_rotation_acceleration.empty()) {
-		all_rotation_speed.assign(amount_bullets, 0.0);
-		all_max_rotation_speed.assign(amount_bullets, 0.0);
-		all_rotation_acceleration.assign(amount_bullets, 0.0);
+		visit_rotation_trio([&](std::vector<real_t> &v) { v.assign(amount_bullets, 0.0); });
 	}
 
 	if (bullet_index < 0 || bullet_index >= (int)all_rotation_speed.size() || bullet_index >= (int)all_max_rotation_speed.size() || bullet_index >= (int)all_rotation_acceleration.size()) {
@@ -327,9 +321,7 @@ void BulletVolley2D::all_bullets_set_rotation_data(const Ref<BulletRotationData2
 
 void BulletVolley2D::clear_bullet_rotation_data() {
 	is_rotation_data_active = false;
-	all_rotation_speed.clear();
-	all_max_rotation_speed.clear();
-	all_rotation_acceleration.clear();
+	visit_rotation_trio([](std::vector<real_t> &v) { v.clear(); });
 	// Presence must go with the values: without this, the volley keeps stale
 	// per-bullet bits and a later shared fallback skips slots that are now
 	// genuine gaps (rotation cleared means "no seed", not "authored zero").
@@ -995,9 +987,7 @@ void BulletVolley2D::apply_shared_rotation_fallback(const Ref<BulletRotationData
 	// rotation so the tick spins every slot, not just slot 0.
 	if (!is_rotation_data_active) {
 		if ((int)all_rotation_speed.size() != amount_bullets) {
-			all_rotation_speed.assign(amount_bullets, 0.0);
-			all_max_rotation_speed.assign(amount_bullets, 0.0);
-			all_rotation_acceleration.assign(amount_bullets, 0.0);
+			visit_rotation_trio([&](std::vector<real_t> &v) { v.assign(amount_bullets, 0.0); });
 		}
 		has_per_bullet_rotation_data.assign(amount_bullets, 1);
 		for (int i = 0; i < amount_bullets; ++i) {

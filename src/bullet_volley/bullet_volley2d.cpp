@@ -798,36 +798,11 @@ void BulletVolley2D::reset_bullet_runtime_state(int bullet_index) {
 	if (bullet_index < (int)bullets_current_collision_count.size()) {
 		bullets_current_collision_count[bullet_index] = 0;
 	}
-	if (bullet_index < (int)all_bounce_count.size()) {
-		all_bounce_count[bullet_index] = 0;
-	}
-	if (bullet_index < (int)all_bounce_cooldown.size()) {
-		all_bounce_cooldown[bullet_index] = 0.0;
-	}
-	if (bullet_index < (int)all_bounce_last_tick.size()) {
-		all_bounce_last_tick[bullet_index] = 0;
-	}
-	if (bullet_index < (int)all_bounce_last_target.size()) {
-		all_bounce_last_target[bullet_index] = 0;
-	}
-	if (bullet_index < (int)all_bounce_last_time.size()) {
-		all_bounce_last_time[bullet_index] = 0.0;
-	}
-	if (bullet_index < (int)all_bounce_last_normal.size()) {
-		all_bounce_last_normal[bullet_index] = Vector2(0, 0);
-	}
-	if (bullet_index < (int)all_bounce_last_target_velocity.size()) {
-		all_bounce_last_target_velocity[bullet_index] = Vector2(0, 0);
-	}
-	if (bullet_index < (int)bounce_visual_pending.size()) {
-		bounce_visual_pending[bullet_index] = 0;
-	}
-	if (bullet_index < (int)bounce_visual_target.size()) {
-		bounce_visual_target[bullet_index] = Vector2(1, 0);
-	}
-	if (bullet_index < (int)all_bounce_speed_multiplier.size()) {
-		all_bounce_speed_multiplier[bullet_index] = 1.0;
-	}
+	visit_bounce_ledger([&](auto &v, auto empty) {
+		if (bullet_index < (int)v.size()) {
+			v[bullet_index] = empty;
+		}
+	});
 	if (bullet_index < (int)all_gravity_velocity.size()) {
 		all_gravity_velocity[bullet_index] = Vector2(0, 0);
 	}
@@ -843,15 +818,8 @@ void BulletVolley2D::reset_bullet_runtime_state(int bullet_index) {
 	if (bullet_index < (int)shared_movement_pattern_distances.size()) {
 		shared_movement_pattern_distances[bullet_index] = 0.0;
 	}
-	if (bullet_index < (int)all_bullet_homing_targets.size()) {
-		all_bullet_homing_targets[bullet_index].clear_homing_targets(cached_mouse_global_position);
-	}
-	if (bullet_index < (int)all_homing_count.size()) {
-		active_homing_count -= all_homing_count[bullet_index];
-		if (active_homing_count < 0) {
-			active_homing_count = 0;
-		}
-		all_homing_count[bullet_index] = 0;
+	if (bullet_index < (int)all_bullet_homing_targets.size() && bullet_index < (int)all_homing_count.size()) {
+		homing_drop_own_targets(bullet_index);
 	}
 	if (bullet_index < (int)all_shared_homing_reached.size()) {
 		all_shared_homing_reached[bullet_index] = SharedHomingReachedState();

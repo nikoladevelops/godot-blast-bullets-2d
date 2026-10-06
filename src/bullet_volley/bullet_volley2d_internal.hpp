@@ -472,9 +472,7 @@ _ALWAYS_INLINE_ void BulletVolley2D::populate_shared_curves_related_data(const R
 	// indexes max/accel beside speed, and a curves-seeded resize of speed
 	// alone would leave them short -> OOB read on the next shared write.
 	if ((int)all_rotation_speed.size() != amount_bullets) {
-		all_rotation_speed.assign(amount_bullets, 0.0);
-		all_max_rotation_speed.assign(amount_bullets, 0.0);
-		all_rotation_acceleration.assign(amount_bullets, 0.0);
+		visit_rotation_trio([&](std::vector<real_t> &v) { v.assign(amount_bullets, 0.0); });
 	}
 
 	for (int i = 0; i < amount_bullets; ++i) {
@@ -959,6 +957,30 @@ _ALWAYS_INLINE_ void BulletVolley2D::orbit_keep_lock_across_replace_for_bullet_f
 
 _ALWAYS_INLINE_ void BulletVolley2D::orbit_route_front_change_for_bullet(int bullet_index, HomingTargetDeque &deque) {
 	orbit_keep_lock_across_replace_for_bullet(bullet_index, deque);
+}
+
+// Drops bullet i's own homing targets and their share of the volley-wide
+// counter (the deque clear also keeps the global mouse counter honest).
+_ALWAYS_INLINE_ void BulletVolley2D::homing_drop_own_targets(int bullet_index) {
+	active_homing_count -= all_homing_count[bullet_index];
+	if (active_homing_count < 0) {
+		active_homing_count = 0;
+	}
+	all_homing_count[bullet_index] = 0;
+	all_bullet_homing_targets[bullet_index].clear_homing_targets(cached_mouse_global_position);
+}
+
+// Pulls bullet i's counter down to its live queue size, so a counter that
+// ran ahead of the deque (trims, direct deque edits) never homes on ghosts.
+_ALWAYS_INLINE_ void BulletVolley2D::homing_resync_count(int bullet_index) {
+	const int live = all_bullet_homing_targets[bullet_index].get_homing_targets_amount();
+	if (all_homing_count[bullet_index] > live) {
+		active_homing_count -= (all_homing_count[bullet_index] - live);
+		if (active_homing_count < 0) {
+			active_homing_count = 0;
+		}
+		all_homing_count[bullet_index] = live;
+	}
 }
 
 _ALWAYS_INLINE_ void BulletVolley2D::rotate_to_target(int bullet_index, const Vector2 &diff, real_t max_turn, bool require_homing_flag) {
