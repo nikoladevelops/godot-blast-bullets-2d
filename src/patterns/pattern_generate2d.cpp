@@ -122,23 +122,11 @@ static KnobWrite2D write_special_knob(PatternKnobs2D &k, const String &name, con
 			return KNOB_REJECTED;
 		}
 		const Array arr = v;
-		if (arr.size() > kPatternMaxBullets) {
-			pattern_knob_reject2d("helper_custom_transforms", "must hold <= 10000 entries", kGenerateOwner);
+		if (const char *problem = pattern_custom_transforms_problem2d(arr, kPatternMaxBullets)) {
+			pattern_knob_reject2d("helper_custom_transforms", problem, kGenerateOwner);
 			return KNOB_REJECTED;
 		}
-		TypedArray<Transform2D> out;
-		for (int i = 0; i < arr.size(); ++i) {
-			if (arr[i].get_type() != Variant::TRANSFORM2D) {
-				pattern_knob_reject2d("helper_custom_transforms", "must hold only Transform2D entries", kGenerateOwner);
-				return KNOB_REJECTED;
-			}
-			if (!((Transform2D)arr[i]).is_finite()) {
-				pattern_knob_reject2d("helper_custom_transforms", "must hold finite transforms", kGenerateOwner);
-				return KNOB_REJECTED;
-			}
-			out.push_back(arr[i]);
-		}
-		k.helper_custom_transforms = out;
+		k.helper_custom_transforms = TypedArray<Transform2D>(arr);
 		return KNOB_WRITTEN;
 	}
 	if (name == "helper_outline_layer_scales") {
@@ -147,16 +135,9 @@ static KnobWrite2D write_special_knob(PatternKnobs2D &k, const String &name, con
 			return KNOB_REJECTED;
 		}
 		const PackedFloat32Array scales = v;
-		if (scales.size() > kPatternMaxOutlineLayers) {
-			pattern_knob_reject2d("helper_outline_layer_scales", "holds at most 64 entries", kGenerateOwner);
+		if (const char *problem = pattern_layer_scales_problem2d(scales, kPatternMaxOutlineLayers)) {
+			pattern_knob_reject2d("helper_outline_layer_scales", problem, kGenerateOwner);
 			return KNOB_REJECTED;
-		}
-		for (int i = 0; i < scales.size(); ++i) {
-			const double s = (double)scales[i];
-			if (!Math::is_finite(s) || s < 0.05 || s > 64.0) {
-				pattern_knob_reject2d("helper_outline_layer_scales", "entries must be finite in [0.05, 64]", kGenerateOwner);
-				return KNOB_REJECTED;
-			}
 		}
 		k.helper_outline_layer_scales = scales;
 		return KNOB_WRITTEN;

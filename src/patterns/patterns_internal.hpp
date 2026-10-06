@@ -16,6 +16,7 @@
 #include "godot_cpp/variant/dictionary.hpp"
 #include "godot_cpp/variant/vector2.hpp"
 #include "patterns/bullet_patterns2d.hpp"
+#include "patterns/pattern_inputs2d.hpp"
 #include "patterns/pattern_params2d.hpp"
 #include "patterns/pattern_slots2d.hpp"
 #include <algorithm>
@@ -83,10 +84,9 @@ static inline int cross_arm_bullets2d(int amount, int arm_count, int arm) {
 // Cap for every helper_generate_transforms_* call: each one allocates O(n)
 // slots, so an unbounded count (a typo'd 1000000, let alone INT_MAX) would
 // freeze or OOM the game. Batch huge volleys into several calls instead.
-// Matches BulletSpawner2D::kMaxBulletsPerVolley (10000): the spawner fans
-// helper_bullets_amount straight into these generators, and its own cap test
-// collects a 10000-volley. A lower static cap here would break that contract.
-inline constexpr int HELPER_MAX_TRANSFORMS = 10000;
+// The same cap as the spawner's helper_bullets_amount (kPatternMaxBullets):
+// the spawner fans its amount straight into these generators.
+inline constexpr int HELPER_MAX_TRANSFORMS = kPatternMaxBullets;
 
 // Clamp finished slot arrays into a sane world box: huge-but-finite inputs
 // (1e30 spacing on an 8k volley) overflow slot math to Inf/NaN, which would

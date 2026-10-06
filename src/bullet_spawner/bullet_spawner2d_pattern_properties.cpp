@@ -122,23 +122,9 @@ void BulletSpawner2D::set_helper_custom_transforms(const TypedArray<Transform2D>
 	on_config_changed();
 	// One shoot fires this array into transforms + buffers + physics: the
 	// same freeze/OOM rationale as helper_bullets_amount caps it at 10000.
-	if (value.size() > kMaxBulletsPerVolley) {
-		UtilityFunctions::push_error("BulletSpawner2D: helper_custom_transforms must hold <= 10000 entries, keeping the old value.");
+	if (const char *problem = pattern_custom_transforms_problem2d(value, kMaxBulletsPerVolley)) {
+		pattern_knob_reject2d("helper_custom_transforms", problem);
 		return;
-	}
-	for (int i = 0; i < value.size(); ++i) {
-		// Type first, conversion second: inspector array edits can hand
-		// transient nulls/wrong types across, and a blind Variant cast is
-		// what wedged the editor. Finite check rides on the typed value.
-		const Variant element = value[i];
-		if (element.get_type() != Variant::TRANSFORM2D) {
-			UtilityFunctions::push_error("BulletSpawner2D: helper_custom_transforms must hold only Transform2D entries, keeping the old value.");
-			return;
-		}
-		if (!((Transform2D)element).is_finite()) {
-			UtilityFunctions::push_error("BulletSpawner2D: helper_custom_transforms must hold finite transforms, keeping the old value.");
-			return;
-		}
 	}
 	helper_custom_transforms = value;
 	on_pattern_changed();
@@ -147,16 +133,9 @@ void BulletSpawner2D::set_helper_custom_transforms(const TypedArray<Transform2D>
 PackedFloat32Array BulletSpawner2D::get_helper_outline_layer_scales() const { return helper_outline_layer_scales; }
 
 void BulletSpawner2D::set_helper_outline_layer_scales(const PackedFloat32Array &value) {
-	if (value.size() > kMaxOutlineLayers) {
-		UtilityFunctions::push_error("BulletSpawner2D: helper_outline_layer_scales holds at most 64 entries, keeping the old value.");
+	if (const char *problem = pattern_layer_scales_problem2d(value, kMaxOutlineLayers)) {
+		pattern_knob_reject2d("helper_outline_layer_scales", problem);
 		return;
-	}
-	for (int i = 0; i < value.size(); ++i) {
-		const double s = (double)value[i];
-		if (!Math::is_finite(s) || s < 0.05 || s > 64.0) {
-			UtilityFunctions::push_error("BulletSpawner2D: helper_outline_layer_scales entries must be finite in [0.05, 64], keeping the old value.");
-			return;
-		}
 	}
 	helper_outline_layer_scales = value;
 	on_pattern_changed();
