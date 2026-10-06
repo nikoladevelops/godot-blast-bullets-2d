@@ -921,9 +921,6 @@ public:
 	// Holds all multimesh instance transform origin vectors. I am doing this so I don't have to call .get_origin() every frame
 	std::vector<Vector2> all_cached_instance_origin;
 
-	// Holds all collision shape transform origin vectors. I am doing this so I don't have to call .get_origin() every frame
-	std::vector<Vector2> all_cached_shape_origin;
-
 	// Holds all calculated velocities for the bullets. I am doing this to avoid unnecessary calculations. If I know the direction -> calculate the velocity. Update the values only when the velocity changes, otherwise it's just unnecessary to always do Vector2(cos, sin) every frame..
 	std::vector<Vector2> all_cached_velocity;
 
@@ -1946,6 +1943,21 @@ public:
 	// and inlining the whole per-bullet loop into BulletFactory2D::tick_volleys
 	// measured 20-25% slower on trails_fx_2k (register pressure in the loop).
 	void move_bullets(double delta);
+	// move_bullets runs these stages per active bullet, in this order, all
+	// inlined into its loop (bullet_volley2d_tick.cpp): MoveTick2D holds the
+	// values hoisted out of the loop, BulletStep2D one bullet's scratch.
+	struct MoveTick2D;
+	struct BulletStep2D;
+	_ALWAYS_INLINE_ void step_homing(const MoveTick2D &t, BulletStep2D &b);
+	_ALWAYS_INLINE_ void step_direction_curves(const MoveTick2D &t, BulletStep2D &b);
+	_ALWAYS_INLINE_ void step_wobble(const MoveTick2D &t, BulletStep2D &b);
+	_ALWAYS_INLINE_ void step_rotation(const MoveTick2D &t, BulletStep2D &b);
+	_ALWAYS_INLINE_ void step_pattern_and_forces(const MoveTick2D &t, BulletStep2D &b);
+	_ALWAYS_INLINE_ void step_orbit(const MoveTick2D &t, BulletStep2D &b);
+	_ALWAYS_INLINE_ void step_place(const MoveTick2D &t, BulletStep2D &b);
+	_ALWAYS_INLINE_ void step_speed(const MoveTick2D &t, BulletStep2D &b);
+	// velocity = direction x speed + inherited offset + fall speed.
+	_ALWAYS_INLINE_ void refresh_cached_velocity(int bullet_index);
 
 	// Fingerprint of the current front target, so the ring knows when the target actually changed.
 	// bullet locked onto last. Node2D = instance id, Vector2 = bit hash of

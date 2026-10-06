@@ -55,13 +55,11 @@ void BulletVolley2D::set_up_bullet_instances(const BulletVolleyData2D &data) {
 		all_cached_instance_transforms.clear();
 		all_cached_instance_origin.clear();
 		all_cached_shape_transforms.clear();
-		all_cached_shape_origin.clear();
 	} else {
 		// First spawn: reserve everything up front for the fixed bullet count.
 		all_cached_instance_transforms.reserve(amount_bullets);
 		all_cached_instance_origin.reserve(amount_bullets);
 		all_cached_shape_transforms.reserve(amount_bullets);
-		all_cached_shape_origin.reserve(amount_bullets);
 	}
 
 	cache_texture_rotation_radians = data.texture_rotation_radians;
@@ -117,7 +115,6 @@ void BulletVolley2D::set_up_bullet_instances(const BulletVolleyData2D &data) {
 		all_cached_instance_origin.emplace_back(texture_transf.get_origin());
 
 		all_cached_shape_transforms.emplace_back(shape_transf);
-		all_cached_shape_origin.emplace_back(shape_transf.get_origin());
 	}
 	if (batch_ok) {
 		multi->set_buffer(batch_buffer);

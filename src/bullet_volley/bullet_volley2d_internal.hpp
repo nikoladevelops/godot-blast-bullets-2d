@@ -420,8 +420,7 @@ _ALWAYS_INLINE_ void BulletVolley2D::cache_collision_shape_typed(const Ref<Shape
 
 _ALWAYS_INLINE_ void BulletVolley2D::sync_shape_transform_from_instance(int bullet_index, const Transform2D &instance_transf) {
 	auto &shape_transf = all_cached_shape_transforms[bullet_index];
-	auto &shape_origin = all_cached_shape_origin[bullet_index];
-	auto &instance_origin = all_cached_instance_origin[bullet_index];
+	const Vector2 &instance_origin = all_cached_instance_origin[bullet_index];
 	if (!rotate_only_textures) {
 		shape_transf = instance_transf;
 		if (cache_texture_rotation_radians != 0.0) {
@@ -432,8 +431,7 @@ _ALWAYS_INLINE_ void BulletVolley2D::sync_shape_transform_from_instance(int bull
 	if (cache_collision_shape_offset != Vector2(0, 0)) {
 		rotated_offset = cache_collision_shape_offset.rotated(shape_transf.get_rotation());
 	}
-	shape_origin = instance_origin + rotated_offset;
-	shape_transf.set_origin(shape_origin);
+	shape_transf.set_origin(instance_origin + rotated_offset);
 	if (physics_server) {
 		physics_server->area_set_shape_transform(area, bullet_index, shape_transf);
 	}
@@ -510,54 +508,31 @@ _ALWAYS_INLINE_ void BulletVolley2D::populate_shared_curves_related_data(const R
 	}
 }
 
-_ALWAYS_INLINE_ void BulletVolley2D::apply_x_direction_curve(Vector2 &direction_vector, const BulletCurvesData2D *curves_data) const {
-	const bool is_x_direction_curve_valid = curves_data != nullptr && curves_data->get_x_direction_curve().is_valid();
-
-	if (!is_x_direction_curve_valid) {
-		return;
-	}
-
-	const real_t x_dir_offset = get_bullet_curves_x_direction_offset(curves_data);
-	const real_t x_direction_curve_strength = curves_data->x_direction_curve_strength;
-	auto x_curve_mode = curves_data->x_direction_curve_mode;
-
-	const Vector2 before = direction_vector;
-	if (x_curve_mode == DirectionCurveMode::Additive) {
-		direction_vector.x += x_dir_offset * x_direction_curve_strength;
+// One direction-curve channel on axis 0 (x) or 1 (y): Additive adds
+// offset * strength to that component, Override replaces it. A near-zero
+// result keeps the incoming heading (no stall, no snap to angle 0).
+static _ALWAYS_INLINE_ void apply_direction_axis2d(Vector2 &direction, int axis, DirectionCurveMode mode, real_t offset, real_t strength) {
+	const Vector2 before = direction;
+	if (mode == DirectionCurveMode::Additive) {
+		direction[axis] += offset * strength;
 	} else {
-		direction_vector.x = x_dir_offset * x_direction_curve_strength;
+		direction[axis] = offset * strength;
 	}
+	direction = direction.length_squared() < 0.00000001 ? before : direction.normalized();
+}
 
-	if (direction_vector.length_squared() < 0.00000001) {
-		direction_vector = before;
+_ALWAYS_INLINE_ void BulletVolley2D::apply_x_direction_curve(Vector2 &direction_vector, const BulletCurvesData2D *curves_data) const {
+	if (curves_data == nullptr || !curves_data->get_x_direction_curve().is_valid()) {
 		return;
 	}
-	direction_vector = direction_vector.normalized();
+	apply_direction_axis2d(direction_vector, 0, curves_data->x_direction_curve_mode, get_bullet_curves_x_direction_offset(curves_data), curves_data->x_direction_curve_strength);
 }
 
 _ALWAYS_INLINE_ void BulletVolley2D::apply_y_direction_curve(Vector2 &direction_vector, const BulletCurvesData2D *curves_data) const {
-	const bool is_y_direction_curve_valid = curves_data != nullptr && curves_data->get_y_direction_curve().is_valid();
-
-	if (!is_y_direction_curve_valid) {
+	if (curves_data == nullptr || !curves_data->get_y_direction_curve().is_valid()) {
 		return;
 	}
-
-	const real_t y_dir_offset = get_bullet_curves_y_direction_offset(curves_data);
-	const real_t y_direction_curve_strength = curves_data->y_direction_curve_strength;
-	auto y_curve_mode = curves_data->y_direction_curve_mode;
-
-	const Vector2 before = direction_vector;
-	if (y_curve_mode == DirectionCurveMode::Additive) {
-		direction_vector.y += y_dir_offset * y_direction_curve_strength;
-	} else {
-		direction_vector.y = y_dir_offset * y_direction_curve_strength;
-	}
-
-	if (direction_vector.length_squared() < 0.00000001) {
-		direction_vector = before;
-		return;
-	}
-	direction_vector = direction_vector.normalized();
+	apply_direction_axis2d(direction_vector, 1, curves_data->y_direction_curve_mode, get_bullet_curves_y_direction_offset(curves_data), curves_data->y_direction_curve_strength);
 }
 
 _ALWAYS_INLINE_ real_t BulletVolley2D::get_bullet_curves_movement_speed(const BulletCurvesData2D *curves_data) const {
