@@ -1639,7 +1639,7 @@
 			<return type="bool" />
 			<param index="0" name="zones" type="Array" />
 			<description>
-				Arms this volley with up to [constant MAX_GRAZE_ZONES] [BulletGrazeZone2D] zones (null entries are skipped but keep their index) and resets every bullet's graze state. Use it for volleys spawned straight from [BulletFactory2D]; spawner volleys are armed by [member BulletSpawner2D.graze_zones]. Returns false and changes nothing for more than 4 entries or a non-zone entry; refused on a pooled handle.
+				Arms this volley with up to [constant MAX_GRAZE_ZONES] [BulletGrazeZone2D] zones (null entries are skipped but keep their index) and resets every bullet's graze state. Use it for volleys spawned straight from [BulletFactory2D]; spawner volleys are armed by [member BulletSpawner2D.graze_zones]. The targets come from each zone's [member BulletGrazeZone2D.target_group], or from the arming spawner's [member BulletSpawner2D.graze_target_source] for its volleys (re-arming keeps that; a new life forgets it). Returns false and changes nothing for more than 4 entries or a non-zone entry; refused on a pooled handle.
 			</description>
 		</method>
 		<method name="has_bullet_movement_pattern" qualifiers="const">

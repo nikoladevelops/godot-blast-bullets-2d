@@ -73,6 +73,12 @@
 				Static test hook: the easing value movement uses at [param t] for a [enum Tween.TransitionType] and [enum Tween.EaseType]. Matches [method Tween.interpolate_value] for every transition and ease (pinned by tests).
 			</description>
 		</method>
+		<method name="debug_get_graze_detector_stats" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Graze target finder instrumentation: scans (target scans run by this spawner's own lists), lists (target lists it keeps), shares_factory_lists (true while the settings are the defaults: [member graze_target_source] Zone Groups, no [member graze_filter_group], [member graze_update_interval] 0; its volleys then share the factory's one scan per group per tick, counted in [method BulletFactory2D.debug_get_graze_stats]).
+			</description>
+		</method>
 		<method name="debug_get_graze_preview_circles" qualifiers="const">
 			<return type="Array" />
 			<description>
@@ -324,6 +330,12 @@
 				Freezes volley creation keeping all counters: burst, telegraph, pattern-list and timer chains hold where they are and resume on [method resume_shooting]. Spin, retargeting and preview are unaffected. Manual [method shoot_once] still fires. Emits [signal shooting_stopped] on the active-to-idle transition (inside the tree only; a pause made before the tree is kept through _ready).
 			</description>
 		</method>
+		<method name="refresh_graze_targets">
+			<return type="int" />
+			<description>
+				Scans for graze targets now, whatever [member graze_update_interval] says: every bullet this spawner fired (still flying, orphaned or not) tests the nodes found from its next tick on. Call it right after spawning enemies when the interval is long. Returns how many distinct targets the spawner's zones have now (this spawner never counts). Pushes an error and returns 0 outside the scene tree. Homing's counterpart is [method retarget_live_volleys].
+			</description>
+		</method>
 		<method name="reset_shooting">
 			<return type="void" />
 			<description>
@@ -340,7 +352,7 @@
 			<return type="Array" />
 			<param index="0" name="zone_index" type="int" />
 			<description>
-				The [Node2D] targets the runtime would test for [member graze_zones] entry [param zone_index] right now: the first 4 live members of its target group in tree order, this spawner excluded. Empty for an empty slot or a disabled zone; an out-of-range index pushes an error.
+				The [Node2D] targets the runtime would test for [member graze_zones] entry [param zone_index] right now, as [member graze_target_source] finds them (between scans: the nodes the last scan found): the first [constant BulletGrazeZone2D.MAX_TARGETS] in tree order, this spawner excluded. Empty for an empty slot or a disabled zone; an out-of-range index pushes an error.
 			</description>
 		</method>
 		<method name="resolve_homing_targets" qualifiers="const">
@@ -360,7 +372,7 @@
 		<method name="retarget_live_volleys">
 			<return type="int" />
 			<description>
-				Re-resolves targets and replaces the queues of every still-active volley owned by this spawner (expired or pooled volleys are skipped), and re-applies steering and orbiting tuning so runtime changes reach flying volleys. Random and round-robin selections resolve per volley. Volleys with no resolvable targets are skipped quietly and keep their old queues. Volleys whose bullets are all disabled are skipped too: the tick never moves disabled slots, so pushing targets there would only inflate counters. Returns how many volleys were retargeted. Also runs automatically when [member homing_retarget_mode] is On Interval. Only the newest volley is touched when [member homing_retarget_previous_volleys] is off. Locked orbit rings survive the replace per the lock policy ([member orbiting_lock_policy]) instead of always re-locking.
+				Homing's refresh (the counterpart of [method refresh_graze_targets]): call it after spawning enemies so flying volleys chase them too, whatever [member homing_retarget_mode] says. Re-resolves targets and replaces the queues of every still-active volley owned by this spawner (expired or pooled volleys are skipped), and re-applies steering and orbiting tuning so runtime changes reach flying volleys. Random and round-robin selections resolve per volley. Volleys with no resolvable targets are skipped quietly and keep their old queues. Volleys whose bullets are all disabled are skipped too: the tick never moves disabled slots, so pushing targets there would only inflate counters. Returns how many volleys were retargeted. Also runs automatically when [member homing_retarget_mode] is On Interval. Only the newest volley is touched when [member homing_retarget_previous_volleys] is off. Locked orbit rings survive the replace per the lock policy ([member orbiting_lock_policy]) instead of always re-locking.
 			</description>
 		</method>
 		<method name="set_bullet_factory">
@@ -448,8 +460,26 @@
 		<member name="burst_interval_sec" type="float" setter="set_burst_interval_sec" getter="get_burst_interval_sec" default="0.15">
 			Seconds between burst shots. Must be finite and above zero.
 		</member>
+		<member name="graze_children_parent_path" type="NodePath" setter="set_graze_children_parent_path" getter="get_graze_children_parent_path" default="NodePath(&quot;&quot;)">
+			Node Children source: the node whose [Node2D] children are the graze targets (e.g. an "Enemies" container). Resolved from this spawner; never this spawner itself, a [BulletFactory2D] or anything inside one. After the spawner is freed its volleys keep using the node this path pointed to.
+		</member>
+		<member name="graze_children_recursive" type="bool" setter="set_graze_children_recursive" getter="get_graze_children_recursive" default="false">
+			Node Children source: also every [Node2D] below the children (depth-first, tree order), walking through plain [Node]s.
+		</member>
 		<member name="graze_enabled" type="bool" setter="set_graze_enabled" getter="get_graze_enabled" default="false">
 			Master switch: every volley this spawner fires is armed with [member graze_zones]. Changes apply to the next shots; volleys already flying keep their zones.
+		</member>
+		<member name="graze_filter_group" type="StringName" setter="set_graze_filter_group" getter="get_graze_filter_group" default="&amp;&quot;&quot;">
+			Allow-list for every [member graze_target_source]: only nodes also in this group are graze targets. Empty = everything the source finds.
+		</member>
+		<member name="graze_node_name" type="String" setter="set_graze_node_name" getter="get_graze_node_name" default="&quot;Player&quot;">
+			Node Name source: the current scene is scanned for [Node2D]s named like this, compared per [member graze_node_name_match_mode] and [member graze_node_name_case_sensitive] (the same matching as [member homing_node_name]). Never this spawner or its markers, nothing inside a [BulletFactory2D]. A scan walks the scene: with a big scene, give [member graze_update_interval] a few tenths of a second.
+		</member>
+		<member name="graze_node_name_case_sensitive" type="bool" setter="set_graze_node_name_case_sensitive" getter="get_graze_node_name_case_sensitive" default="false">
+			Node Name source: compare names with their case (off: "enemy" also matches "Enemy").
+		</member>
+		<member name="graze_node_name_match_mode" type="int" setter="set_graze_node_name_match_mode" getter="get_graze_node_name_match_mode" enum="BulletSpawner2D.HomingNodeNameMatch" default="1">
+			Node Name source: how [member graze_node_name] is compared (Exact, Contains, Starts With, Ends With; homing's values).
 		</member>
 		<member name="graze_preview_during_runtime" type="bool" setter="set_graze_preview_during_runtime" getter="get_graze_preview_during_runtime" default="false">
 			Also draw this spawner's graze rings while the game runs (debugging aid). Requires [member graze_show_preview]. Zones flagged [member BulletGrazeZone2D.preview_during_runtime] are drawn by the factory instead (once, whatever this setting), never twice.
@@ -459,6 +489,16 @@
 		</member>
 		<member name="graze_show_preview" type="bool" setter="set_graze_show_preview" getter="get_graze_show_preview" default="true">
 			Draw every ring of every zone around each resolved target in the zone's [member BulletGrazeZone2D.preview_color]: in the editor, and at runtime only with [member graze_preview_during_runtime]. The rings follow moving targets without rebuilding anything else.
+		</member>
+		<member name="graze_target_path" type="NodePath" setter="set_graze_target_path" getter="get_graze_target_path" default="NodePath(&quot;&quot;)">
+			Node Path source: the [Node2D] that grazes this spawner's bullets (a path to another type is rejected). After the spawner is freed its volleys keep the node this path pointed to.
+		</member>
+		<member name="graze_target_source" type="int" setter="set_graze_target_source" getter="get_graze_target_source" enum="BulletSpawner2D.GrazeTargetSource" default="0">
+			Who can graze this spawner's bullets. Zone Groups (default): each zone's [member BulletGrazeZone2D.target_group]. The other sources find the nodes for every zone at once: Node Path ([member graze_target_path]), Node Name ([member graze_node_name]) or Node Children ([member graze_children_parent_path]); each zone then rings those nodes and its own group is not used. All sources honor [member graze_filter_group], keep the first [constant BulletGrazeZone2D.MAX_TARGETS] in tree order and never find this spawner.
+			The settings are shared with every volley this spawner fired: changing them (or calling [method refresh_graze_targets]) reaches bullets in flight on their next tick, and an open graze visit then moves to the nearest target the bullet is still inside (or ends silently). Orphaned volleys keep the settings after the spawner is freed. Pooled volleys forget them.
+		</member>
+		<member name="graze_update_interval" type="float" setter="set_graze_update_interval" getter="get_graze_update_interval" default="0.0">
+			Seconds of factory time between target scans; 0 scans every physics tick, so a node that joins (an enemy spawned later) is tested on the next tick. Between scans the targets' positions are still read every tick and a freed or dying target stops counting at once; a newcomer waits for the next scan or [method refresh_graze_targets]. Raise it for costly scans (Node Name over a big scene, many spawners with their own settings); spawners left at the defaults share one scan per group per tick with every factory volley.
 		</member>
 		<member name="graze_zones" type="BulletGrazeZone2D[]" setter="set_graze_zones" getter="get_graze_zones" default="[]">
 			Up to 4 [BulletGrazeZone2D] zones armed on every fired volley; null entries are kept and skipped. A shared [code].tres[/code] works across spawners. Assign the whole array: one changed in place still arms its first 4 zones but warns once.
@@ -1698,6 +1738,18 @@
 		</constant>
 		<constant name="HOMING_RETARGET_ON_INTERVAL" value="1" enum="HomingRetargetMode">
 			Flying volleys are re-aimed every [member homing_retarget_interval_sec].
+		</constant>
+		<constant name="GRAZE_SOURCE_ZONE_GROUPS" value="0" enum="GrazeTargetSource">
+			Each zone's [member BulletGrazeZone2D.target_group] (the default).
+		</constant>
+		<constant name="GRAZE_SOURCE_NODE_PATH" value="1" enum="GrazeTargetSource">
+			The [Node2D] at [member graze_target_path].
+		</constant>
+		<constant name="GRAZE_SOURCE_NODE_NAME" value="2" enum="GrazeTargetSource">
+			[Node2D]s of the current scene named like [member graze_node_name].
+		</constant>
+		<constant name="GRAZE_SOURCE_NODE_CHILDREN" value="3" enum="GrazeTargetSource">
+			[Node2D] children of [member graze_children_parent_path] (the whole subtree with [member graze_children_recursive]).
 		</constant>
 		<constant name="MOVEMENT_SPACE_ATTACH" value="0" enum="MovementSpace">
 			The spawner sits on the path (like [PathFollow2D]).

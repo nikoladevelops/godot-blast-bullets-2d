@@ -134,14 +134,14 @@
 		<method name="debug_get_graze_stats" qualifiers="const">
 			<return type="Dictionary" />
 			<description>
-				Graze counters: refreshes (target cache refreshes), events_total (graze events dispatched by every volley), cached_groups (groups currently in the target cache).
+				Graze counters: refreshes (zone-group scans by the factory's target lists, at most one per group per physics step), events_total (graze events dispatched by every volley), cached_groups (zone groups with a target list), live_detectors (graze target finders alive: the factory's plus one per spawner with its own settings, kept while its bullets fly).
 			</description>
 		</method>
 		<method name="debug_get_graze_targets">
 			<return type="Array" />
 			<param index="0" name="group" type="StringName" />
 			<description>
-				The graze targets of [param group] exactly as the next volley tick of this physics step tests them: an Array of {id, position} (the first 4 live [Node2D] members in tree order, in this factory's World2D).
+				The graze targets of [param group] exactly as the next volley tick of this physics step tests them: an Array of {id, position} (the first [constant BulletGrazeZone2D.MAX_TARGETS] live [Node2D] members in tree order, in this factory's World2D).
 			</description>
 		</method>
 		<method name="debug_get_live_volley_ids">
@@ -187,6 +187,13 @@
 			<param index="0" name="enabled" type="bool" />
 			<description>
 				Debug/test helper: when enabled, every one-shot effect the factory fires is recorded for [method debug_get_effect_log]. Off by default; turning it off clears the log. The log keeps the newest 4096 entries.
+			</description>
+		</method>
+		<method name="debug_set_graze_slab_min_targets">
+			<return type="int" />
+			<param index="0" name="value" type="int" />
+			<description>
+				Test/profiling hook: zones with more live targets than [param value] (default 8) test each bullet only against the targets near its motion in x instead of every target (same results, far cheaper with many targets). 0 = always, 64 = never. Process-wide. Returns the previous value; a value outside 0..64 pushes an error and changes nothing.
 			</description>
 		</method>
 		<method name="debug_validate_spawn_data" qualifiers="static">
