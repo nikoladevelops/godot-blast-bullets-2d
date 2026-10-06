@@ -21,6 +21,7 @@ for the rest: the sections are written to be looked up, not read once.
 | 7 | Test harness | 17 | Documentation generation |
 | 8 | Writing tests | 18 | tools/ catalog |
 | 9 | Searching and reading | 19 | Final report template |
+|  |  | 20 | Graze (zones, tick stage, routing, preview) |
 
 ## 0. Golden rules
 
@@ -43,15 +44,17 @@ for the rest: the sections are written to be looked up, not read once.
 9. **Ask the user** before changing a contract (public behavior, wording,
    defaults); fix plain bugs without asking but list them in the report.
 10. **Finish green:** full suite + `--self-test` + format check + snapshot
-    diff + benchmark gate, then report with Big-O and a ratings table (§19).
+    diff + benchmark gate (+ `run_editor_smoke.py` when editor/preview code
+    changed), then report with Big-O and a ratings table (§19).
 
 ## 1. Commands
 
 ```sh
 GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py   # build (exit 1 = failed; never raw scons, never edit SConstruct)
-python3 tools/run_tests.py                                       # 139 files / 885 tests, ~10 s, leak-checked
+python3 tools/run_tests.py                                       # 149 files / 988 tests, ~10 s, leak-checked
 python3 tools/run_tests.py --suite <substring> --full            # one area, every failure message unclipped
 python3 tools/run_tests.py --self-test                           # proves the harness still catches failures/leaks
+python3 tools/run_editor_smoke.py                                # headless EDITOR run of tests/editor_smoke/ (editor-only paths)
 python3 tools/api_snapshot.py save <label>                       # behavior snapshot (~10 s, §7.4)
 python3 tools/api_snapshot.py diff <label_a> <label_b>           # must print IDENTICAL for a refactor
 python3 tools/format_code.py [--check] [files or dirs]           # clang-format (repo .clang-format)
@@ -316,7 +319,10 @@ prints the first entries per section (`--limit N`).
 ### 8.1 Doctrine (`test_project/tests/common/blast_test.gd`)
 
 - Builders: `quick_volley()`, `make_spawner()` (shooting + homing OFF
-  before it enters the tree), `make_preview_spawner()`, `H`
+  before it enters the tree), `make_preview_spawner()`, graze:
+  `make_graze_target(pos, group)`, `graze_volley(transforms, speed)`,
+  `step_factory(n, delta)`, `H.make_graze_zone(radii, group)`,
+  `H.record_graze(emitter)` + `H.graze_kinds(log)`, `H`
   (`blast_test_helpers.gd`: `make_volley_data`, `make_still_data`,
   `make_speed`, `make_rotation`, `make_effect_layer`, `make_flat_curve`,
   ...), `make_wall/make_area/make_probe_scene/add` (autofreed).
@@ -579,13 +585,15 @@ bullet_volley2d_setup.cpp      MultiMesh/buffer setup (one set_buffer per spawn)
 bullet_volley2d_collision.cpp  area + ONE shared shape, intake, dedup, paused-overlap park/replay, drain
 bullet_volley2d_{bounce,homing,orbit,motion,curves,wobble,gravity,lifetime,timers,attachments,
                  effects,animation,teleport,debug,bindings}.cpp   one feature each
+bullet_volley2d_graze.cpp      graze arming, per-tick zone snapshot (prepare_graze_tick), live dispatch (§20)
 homing_target_deque.hpp        per-bullet/shared target queue (RingDeque2D: allocates nothing while empty)
 ```
 
 ### 11.2 The tick (`bullet_volley2d_tick.cpp`)
 
-`tick()`: drain collisions (impact pose) → `move_bullets` → homing reached
-events → animation finished → lifetime. `move_bullets` computes a
+`tick()`: drain collisions (impact pose) → `prepare_graze_tick` (armed
+volleys) → `move_bullets` → homing reached events → graze events →
+animation finished → lifetime. `move_bullets` computes a
 `const MoveTick2D t` once (hoisted flags, shared curve samples, pattern
 length, lock snapshot, `core_limit` = the size every always-sized array
 covers) and reuses ONE `BulletStep2D b` scratch for all bullets
@@ -595,7 +603,8 @@ bullet, in order:
 `step_direction_curves` → `step_wobble` → `step_rotation` (+ adjust
 direction, bounce visual) → velocity refresh → `step_pattern_and_forces`
 (pattern, wind, gravity) → `step_orbit` → `step_place` (transform, shape,
-attachment, trail, reached test) → `step_speed` (next tick's speed).
+attachment, trail, reached test) → `step_graze` (only while a zone has a
+live target; §20) → `step_speed` (next tick's speed).
 All stages are `_ALWAYS_INLINE_` in this TU: keep per-bullet code in ONE
 translation unit; a `_ALWAYS_INLINE_` helper called from another file links
 but fails at extension LOAD time (CRASH) — move its definition to
@@ -649,6 +658,7 @@ src/
   factory/bullet_factory2d_structural.cpp reset/free_*/clear_*, *_deferred queue, bookkeeping
   factory/bullet_factory2d_effects.cpp    factory-owned one-shot effects
   factory/bullet_factory2d_stats.cpp      frame stats, monitors, debugger knobs, debug_*
+  factory/bullet_factory2d_graze.cpp      graze target cache (ids + positions, one refresh per sweep per group)
   factory/bullet_factory2d_bindings.cpp   _bind_methods
   bullet_spawner/bullet_spawner2d.cpp     wiring, cadence, spin, bursts/telegraph, pattern lists, shoot_once
   bullet_spawner/bullet_spawner2d_pattern_properties.cpp  hand-written pattern accessors + presets
@@ -657,13 +667,14 @@ src/
   bullet_spawner/bullet_spawner2d_preview.cpp    preview snapshot/rebuild, pose, debug_* geometry
   bullet_spawner/bullet_spawner2d_preview_layer.cpp  PatternPreviewLayer2D (draw_multimesh)
   bullet_spawner/bullet_spawner2d_movement.cpp   Path2D movement
+  bullet_spawner/bullet_spawner2d_graze.cpp      Graze group: arming at shot, resolve_graze_targets, ring preview (GrazePreviewLayer2D)
   bullet_spawner/bullet_spawner2d_bindings.cpp   _bind_methods (groups/subgroups) + _validate_property
-  data/        inspector Resources: BulletVolleyData2D, BulletSpeed/Rotation/Curves/Wobble/EffectLayerData2D
+  data/        inspector Resources: BulletVolleyData2D, BulletSpeed/Rotation/Curves/Wobble/EffectLayerData2D, BulletGrazeZone2D
   pooling/     VolleyPool (parked volleys per key), VolleyPoolKey2D
   attachments/ BulletAttachment2D + its object pool
   debugger/    BulletVolleyDebugger2D (collision-shape overlay)
   core/        header-only: warn_once2d, cached_string_names2d, easing2d (Tween port), dynamic_sparse_set,
-               collision_shape_helper2d, reentrancy_guard2d, transform_math2d
+               collision_shape_helper2d, reentrancy_guard2d, transform_math2d, graze_targets2d (THE graze target filter)
 ```
 
 ### 12.2 Flows
@@ -715,7 +726,9 @@ src/
   call deferred from physics still runs inside the physics frame: pinned in
   `integration/test_engine_facts.gd`).
 - Routing: a spawner volley emits on its spawner, a factory volley on the
-  factory, never both. A freed spawner takes its connections along
+  factory, never both. The ONE exception is graze (§20): `bullet_grazed` /
+  `bullet_graze_exited` bubble to the owner spawner (while alive) and then
+  ALWAYS to the factory (graze changes nothing and must outlive enemies). A freed spawner takes its connections along
   (`orphaned_volleys` decides what its bullets do).
 - C++ liveness: never carry a raw `Object*` across user code or
   `call_deferred` (godot-cpp converts Variant args before your id check
@@ -794,6 +807,11 @@ deduped, cancelled by REMOVED) and replayed once on resume.
 | Every setter round-trips or rejects loudly and keeps the old value | `integration/test_accessor_contract` |
 | Homing aims through inherited spawner momentum | `test_volley_homing_drift` |
 | reset_finished fires after the reset; handlers can respawn | `test_factory_reset_finished` |
+| Graze: one graze per ring per bullet life (Once), outer ring first, swept test, inclusive effective radius (bullet size counted) | `test_volley_graze_core` |
+| Graze visits: one exit per visit that grazed, naming its target; killed/frozen bullets never exit; a vanished target ends or moves its visits silently | `test_volley_graze_exit` |
+| Graze handlers are live; events of disabled/woken bullets, freed targets, replaced zones are dropped; a pause finishes the batch | `test_volley_graze_handlers` |
+| Spawner volleys are armed before any shot signal; graze bubbles spawner -> factory; orphans keep grazing on the factory | `test_spawner_graze`, `test_spawner_graze_orphans` |
+| The ring preview draws exactly the runtime targets; never saved, never a marker or homing candidate | `test_spawner_graze_preview`, `run_editor_smoke.py` |
 
 - Edge cases to test everywhere: NaN/Inf scalars and vectors; null array
   entries; empty arrays; short vs oversized arrays; OOB indices (-1/99);
@@ -813,7 +831,7 @@ deduped, cancelled by REMOVED) and replayed once on resume.
 ### 15.1 Running
 
 ```sh
-python3 tools/run_benchmarks.py                     # 18 headless scenarios x5 (median)
+python3 tools/run_benchmarks.py                     # 20 headless scenarios x5 (median)
 python3 tools/run_benchmarks.py --scenario spawner_ # substring filter (repeatable)
 python3 tools/run_benchmarks.py --gate              # exit 1 on regression vs log/baseline.json
 python3 tools/run_benchmarks.py --update-baseline   # ONLY for an accepted change; say so in the commit
@@ -870,12 +888,19 @@ project's `.so`). For quick numeric comparisons load two
 - Spawner preview spin/move: 0 rebuilds, p99 ~50 ms → 3–5 ms.
 - Live signals: `lifetime_signal_10k` adds ~0.25 ms per 10k-bullet expiry
   wave over `mass_expiry_10k` with an empty handler.
+- godot-cpp `Vector2::dot()`, `length_squared()` and `is_finite()` are NOT
+  inline (a PLT call each): the graze stage tripled its cost through three
+  `.dot()` calls per bullet. Hot paths use component math (`a.x * b.x + ...`).
+  Check with `objdump -dr -C src/bullet_volley/bullet_volley2d_tick.os`.
+- Graze armed: `graze_10k_flight` ≈ +10% tick over `volley_10k_flight`
+  (fast path inline in the loop, slow path `_NO_INLINE_`); a separate
+  post-move pass measured slower. Graze off costs nothing (hoisted flag).
 
 ## 16. Inspector groups and serialization locks
 
 - Spawner groups, in order (locked by `test_volley_bounce.gd`): Setup,
-  Bullet Patterns, Shooting, Spin, Homing, Orbiting, Preview, Movement,
-  Performance. Spawn data (`BulletVolleyData2D`): Bullets, Appearance,
+  Bullet Patterns, Shooting, Spin, Homing, Orbiting, Graze, Preview,
+  Movement, Performance. Spawn data (`BulletVolleyData2D`): Bullets, Appearance,
   Movement Speed, Bullet Rotation, Wobble, Gravity, Bounce and Ricochet,
   Movement Pattern Paths, Homing, Collision, Attachments, Sprite Effects,
   Rendering and Material. No duplicate titles, no ungrouped property
@@ -922,7 +947,8 @@ project's `.so`). For quick numeric comparisons load two
   / `edit_build_profile.py` / `change_lto_mode.py` / `toggle_editor_target.py`
   / `toggle_debug_symbols.py` / `toggle_reloadable.py`.
 - Verification: `run_tests.py`, `lint_tests.py`, `api_snapshot.py` (§7.4),
-  `format_code.py`, `run_benchmarks.py`.
+  `format_code.py`, `run_benchmarks.py`, `run_editor_smoke.py` (headless
+  editor + @tool probes in `test_project/tests/editor_smoke/`).
 - Config: `select_godot_path.py`, `select_godot_project.py`,
   `change_godot_target_version.py`, `update_godot_cpp.py`,
   `config_manager.py` + `config.json` (machine state), `paths.py`.
@@ -943,3 +969,62 @@ End every task with:
 5. A ratings table (stability, performance, code clarity, test coverage,
    docs) with one line of justification each.
 6. Open questions for the user (contract changes you did NOT make).
+
+## 20. Graze (`BulletGrazeZone2D`, volley stage, spawner group)
+
+A bullet grazes ring k of a zone when its motion during one tick (segment
+start -> end, swept: fast bullets never skip a ring) comes within ring k's
+effective radius (`ring_<k+1>_radius` + bullet bounding radius when
+`count_bullet_size`) of a zone target. Detection is math in the tick, never
+physics (no layer/mask setup, deterministic under `debug_advance_time`).
+
+### 20.1 Pieces
+
+| Piece | Where | Notes |
+|---|---|---|
+| Zone config | `data/bullet_graze_zone2d.*` | group, 1..4 rings (fixed `ring_N_radius`: inspector-safe), `regraze` (Once 0 / After Exit 1, serialized), `count_bullet_size`, `preview_color`; every accepted change emits `changed` |
+| Target filter | `core/graze_targets2d.hpp` | live Node2D group members in tree, not queued, finite, same World2D, first 4 in tree order; shared by the runtime cache AND the preview |
+| Target cache | `factory/bullet_factory2d_graze.cpp` | ids + positions per group, refreshed lazily once per sweep; idle groups dropped; warn 24 past 4 targets |
+| Arming + dispatch | `bullet_volley/bullet_volley2d_graze.cpp` | `graze_set_zones` (Refs, nulls keep their index), `prepare_graze_tick` (stable target slots, rings sorted by radius), `dispatch_graze_events` |
+| Per-bullet stage | `bullet_volley2d_tick.cpp` | `step_graze` (fast path inline, component math) + `graze_visit` (`_NO_INLINE_` slow path) |
+| Spawner | `bullet_spawner/bullet_spawner2d_graze.cpp` | Graze group, arming in `shoot_once` before the homing signals, `resolve_graze_targets`, ring preview (`GrazePreviewLayer2D`: top-level, internal, owner-less, tagged) |
+
+### 20.2 Contract (pinned by the `*graze*` suites)
+
+- Signals `bullet_grazed(target, volley, bullet_index, zone, ring_index)` and
+  `bullet_graze_exited(target, volley, bullet_index, zone, deepest_ring_index)`,
+  same payload on spawner and factory, live after the move (tick order §11.2).
+  Bubbling: owner spawner first (while alive), then the factory ALWAYS.
+- Rings touched in one tick fire largest radius first (equal radii by index).
+  Once: each ring once per bullet life (per zone, shared by its targets).
+  After Exit: leaving the zone re-arms its rings.
+- A visit = inside the outermost ring of any zone target. It belongs to one
+  target (anchor slot = target of its latest new graze). Exit fires once per
+  visit that grazed, naming that target. Killed/cleared/expired/frozen
+  bullets never exit; a wake starts a fresh visit; a vanished anchor moves
+  the visit to another target the bullet is still inside, else ends it
+  silently; a zone losing every target ends its visits silently.
+- Dispatch drops events whose bullet epoch moved, whose zones generation
+  changed, or whose target is freed/queued; stops when the volley is freed
+  or queued; a pause lets the batch finish; an early tick return keeps the
+  queue for the next tick; `release_life` clears it.
+- The owner spawner never grazes its own bullets. Volleys hold zone Refs and
+  read them every tick (live edits reach bullets in flight); `release_life`
+  unrefs them (weakref-tested).
+
+### 20.3 State and limits
+
+`graze_state`: one `uint16_t` per bullet per zone slot (`uint16_t`, not
+`uint8_t`: char stores alias everything and would force reloads in the
+loop). Bits 0-3 rings grazed, 4 inside, 5-6 deepest ring of the visit,
+7 visit fired, 8-9 anchor target slot. Limits: 4 zones, 4 rings, 4 targets
+per zone (`BulletGrazeZone2D::MAX_RINGS/MAX_TARGETS`,
+`BulletVolley2D::MAX_GRAZE_ZONES`).
+
+### 20.4 Adding a zone option
+
+Field + validated setter (emit_changed, "BulletGrazeZone2D: <prop> ...,
+keeping the old value.") + bind in `bullet_graze_zone2d.cpp`; read it in
+`prepare_graze_tick` into `GrazeTickZone2D` (never read the Resource per
+bullet); cover it in `test_volley_graze_core` (mutation-checked); the data
+setter sweep picks the setter up automatically; regenerate docs (§17).
