@@ -11,6 +11,7 @@
 
 #include "bullet_volley/bullet_volley2d.hpp"
 #include "core/easing2d.hpp"
+#include "core/node_scan2d.hpp"
 #include "godot_cpp/classes/capsule_shape2d.hpp"
 #include "godot_cpp/classes/circle_shape2d.hpp"
 #include "godot_cpp/classes/curve2d.hpp"
@@ -108,12 +109,9 @@ static inline T *validate_cached_node(const Node *self, const NodePath &p_path, 
 	return resolved;
 }
 
-// Metadata tag + node name for the editor-only pattern preview holder.
-// The children-mode collection skips anything carrying the tag, so the
-// preview can never become a spawn marker. The tilde sorts it last and marks
+// Node name for the editor-only pattern preview holder (tagged with
+// PREVIEW_META_KEY, core/node_scan2d.hpp). The tilde sorts it last and marks
 // it as internal. The holder is owner-less: never saved, never exported.
-static constexpr const char *PREVIEW_META_KEY = "blastbullets_pattern_preview";
-
 static constexpr const char *PREVIEW_HOLDER_NAME = "~BlastBulletsPatternPreview";
 // The graze ring preview layer (internal child of the spawner).
 static constexpr const char *GRAZE_PREVIEW_NAME = "~BlastBulletsGrazePreview";

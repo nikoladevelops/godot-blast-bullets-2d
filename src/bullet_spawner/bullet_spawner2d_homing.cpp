@@ -575,8 +575,10 @@ void BulletSpawner2D::collect_homing_candidates_by_name(Node *p_node, Array &r_c
 void BulletSpawner2D::collect_homing_candidates_from_children(Node *p_parent, bool recursive, Array &r_candidates) const {
 	// Shared children scan: never the spawner itself (a parent pointing at
 	// our own node would make the volley chase its emitter), never the
-	// preview holder.
-	scan_node2d_children(p_parent, recursive, this, homing_filter_group, PREVIEW_META_KEY, homing_scan_stack,
+	// preview holder, never a bullet factory or the bullets inside it.
+	scan_node2d_children(
+			p_parent, recursive, this, homing_filter_group, PREVIEW_META_KEY, homing_scan_stack,
+			[](Node *node) { return Object::cast_to<BulletFactory2D>(node) != nullptr; },
 			[&r_candidates](Node2D *node) { r_candidates.push_back(node); });
 }
 

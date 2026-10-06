@@ -1,7 +1,8 @@
 extends BlastTest
 ## Homing target detection, one section per homing_target_source: what each
 ## source finds, what it must never pick (the spawner itself, its markers,
-## nodes under the factory, nodes already queued for deletion, non-Node2Ds),
+## a bullet factory or nodes under it, nodes already queued for deletion,
+## non-Node2Ds),
 ## and how failures are reported: a shot that finds nothing still fires as a
 ## plain volley, emits homing_targets_resolved([]), and warns ONCE per homing
 ## configuration (changing a homing target setting re-arms the warning; a
@@ -255,3 +256,19 @@ func test_children_of_the_spawners_own_parent_exclude_the_spawner() -> void:
 	sp.set_homing_max_targets(10)
 	sp.set_homing_target_selection(BulletSpawner2D.HOMING_SELECT_FIRST)
 	assert_eq(sp.resolve_homing_targets(true, false), [foe], "the spawner never chases itself")
+
+
+func test_children_never_pick_a_bullet_factory_or_its_nodes() -> void:
+	var sp := _spawner(BulletSpawner2D.HOMING_SOURCE_NODE_CHILDREN)
+	var in_factory := Node2D.new() # the factory's containers hold every bullet node
+	factory.add_child(in_factory)
+	var foe := _node("zzSiblingFoe", Vector2(200, 0))
+	sp.set_homing_children_parent_path(sp.get_path_to(factory.get_parent()))
+	sp.set_homing_children_recursive(true)
+	sp.set_homing_max_targets(10000)
+	sp.set_homing_target_selection(BulletSpawner2D.HOMING_SELECT_FIRST)
+	var found := sp.resolve_homing_targets(true, false)
+	assert_false(found.has(factory), "never the factory itself")
+	assert_false(found.has(in_factory), "nor anything inside it")
+	assert_true(found.has(foe), "its siblings count")
+	in_factory.free()

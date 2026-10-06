@@ -12,6 +12,12 @@ using namespace godot;
 // Node scans shared by the spawner's target sources (homing and graze):
 // one walk, one set of exclusions, so both features find the same nodes.
 
+// Metadata tag of the spawner's preview nodes (pattern preview holder,
+// graze ring layer). Children-mode pattern markers and every target scan
+// skip anything carrying it, so a preview never becomes a spawn marker or
+// a target.
+static constexpr const char *PREVIEW_META_KEY = "blastbullets_pattern_preview";
+
 // How a node name is compared with a pattern. The ids are
 // BulletSpawner2D::HomingNodeNameMatch's (serialized by
 // homing_node_name_match_mode and graze_node_name_match_mode).
@@ -81,10 +87,11 @@ inline void scan_node2ds_by_name(Node *root, const String &name_pattern, int mod
 // (and their descendants when `recursive`), depth-first pre-order, except
 // `exclude` (the scanning spawner: a parent pointing at it would make it its
 // own target), nodes queued for deletion or tagged with `preview_meta`, and
-// nodes outside filter_group (when not empty). Same explicit stack as the
-// name scan.
-template <typename VisitFn>
-inline void scan_node2d_children(Node *parent, bool recursive, const Node *exclude, const StringName &filter_group, const char *preview_meta, Array &stack, VisitFn visit) {
+// nodes outside filter_group (when not empty). A node skip(node) refuses
+// (bullet factories) is neither reported nor descended into. Same explicit
+// stack as the name scan.
+template <typename SkipFn, typename VisitFn>
+inline void scan_node2d_children(Node *parent, bool recursive, const Node *exclude, const StringName &filter_group, const char *preview_meta, Array &stack, SkipFn skip, VisitFn visit) {
 	if (parent == nullptr) {
 		return;
 	}
@@ -94,7 +101,7 @@ inline void scan_node2d_children(Node *parent, bool recursive, const Node *exclu
 	}
 	while (!stack.is_empty()) {
 		Node *child = Object::cast_to<Node>(stack.pop_back());
-		if (child == nullptr) {
+		if (child == nullptr || skip(child)) {
 			continue;
 		}
 		Node2D *as_2d = Object::cast_to<Node2D>(child);
