@@ -2328,7 +2328,8 @@ public:
 	// non-orbiting bullets are untouched. The shift delta is unused for the
 	// angle itself (the new absolute offset decides it) but keeps the
 	// signature symmetric with the teleport paths.
-	_ALWAYS_INLINE_ void orbit_reflect_teleport(int bullet_index, const Vector2 &p_shift_delta);
+	_ALWAYS_INLINE_ void orbit_reflect_teleport(int bullet_index);
+	void teleport_bullet_to(int bullet_index, const Vector2 &new_origin, const Vector2 &delta);
 
 	// Teleports a bullet to a new global position. A locked orbit re-aims
 	// its ring slot from the new offset (same angle convention as the lock
