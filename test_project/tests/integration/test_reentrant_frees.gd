@@ -103,6 +103,32 @@ func test_free_attachment_inside_life_time_over() -> void:
 
 
 
+func test_free_attachment_and_target_inside_graze_handlers() -> void:
+	# Graze handlers run live after the move: a handler that free()s the
+	# bullet's attachment and then the target must leave no dangling slot,
+	# and the rest of the batch (exit, other bullets) must skip the dead
+	# target instead of touching it.
+	var target := make_graze_target(Vector2(150, 20))
+	var v: BulletVolley2D = factory.spawn_volley(_attached_data())
+	v.all_bullets_set_attachment(make_probe_scene(), Vector2.ZERO, true)
+	v.graze_set_zones([H.make_graze_zone([30.0])])
+	var events: Array = []
+	factory.bullet_grazed.connect(func(t: Node2D, volley: BulletVolley2D, idx: int, _z: BulletGrazeZone2D, _r: int) -> void:
+		events.append(idx)
+		_free_attachment_of(volley, idx)
+		if is_instance_valid(t):
+			t.free())
+	factory.bullet_graze_exited.connect(func(_t: Node2D, _v: BulletVolley2D, idx: int, _z: BulletGrazeZone2D, _r: int) -> void:
+		events.append(-1 - idx))
+	for i in 40:
+		await physics()
+	assert_eq(events, [0], "one graze; the target freed in its handler reports nothing more")
+	assert_eq(freed_count, 1, "the grazing bullet's attachment was freed inside the handler")
+	assert_null(v.bullet_get_attachment(0), "slot dropped (no dangling pointer)")
+	assert_false(is_instance_valid(target), "target freed")
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "factory consistent after the graze-handler frees")
+
+
 var seen_attached: Array = []
 
 

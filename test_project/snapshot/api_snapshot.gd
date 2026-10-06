@@ -559,7 +559,7 @@ func _probe_setters(section: String, label: String, obj: Object) -> void:
 
 func _snap_setters(section: String) -> void:
 	for cls in [&"BulletVolleyData2D", &"BulletSpeedData2D", &"BulletRotationData2D", &"BulletCurvesData2D",
-			&"BulletWobbleData2D", &"BulletEffectLayerData2D"]:
+			&"BulletWobbleData2D", &"BulletEffectLayerData2D", &"BulletGrazeZone2D"]:
 		_probe_setters(section, cls, ClassDB.instantiate(cls))
 	var sp := BulletSpawner2D.new()
 	sp.set_shooting_enabled(false)
@@ -603,6 +603,49 @@ func _trace(section: String, factory: BulletFactory2D, label: String, data: Bull
 			_rec(section, "%s#t%d" % [label, step + 1], _volley_state(v))
 	v.clear_all_bullets()
 	cap.take()
+
+
+## A flight with graze zones armed: every graze event (kind, target name,
+## bullet, zone index, ring) and each bullet's grazed rings per zone.
+func _graze_trace(section: String, factory: BulletFactory2D, label: String, data: BulletVolleyData2D,
+		zones: Array, setup: Callable = Callable(), steps: int = 120) -> void:
+	seed(4242)
+	var log: Array = []
+	var on_enter := func(t: Node2D, _v: BulletVolley2D, i: int, z: BulletGrazeZone2D, r: int) -> void:
+		log.append(["enter", str(t.name), i, zones.find(z), r])
+	var on_exit := func(t: Node2D, _v: BulletVolley2D, i: int, z: BulletGrazeZone2D, r: int) -> void:
+		log.append(["exit", str(t.name), i, zones.find(z), r])
+	factory.bullet_grazed.connect(on_enter)
+	factory.bullet_graze_exited.connect(on_exit)
+	var v: BulletVolley2D = factory.spawn_volley(data)
+	if setup.is_valid():
+		setup.call(v)
+	v.graze_set_zones(zones)
+	for step in steps:
+		factory.debug_advance_time(TRACE_STEP)
+	_rec(section, label + "#events", log)
+	var rings := []
+	for i in v.get_amount_bullets():
+		var row := []
+		for z in zones.size():
+			row.append(v.get_bullet_grazed_rings(i, z))
+		rings.append(row)
+	_rec(section, label + "#rings", rings)
+	factory.bullet_grazed.disconnect(on_enter)
+	factory.bullet_graze_exited.disconnect(on_exit)
+	v.clear_all_bullets()
+	cap.take()
+
+
+func _graze_zone(group: StringName, radii: Array, regraze: int, bullet_size: bool) -> BulletGrazeZone2D:
+	var z := BulletGrazeZone2D.new()
+	z.target_group = group
+	z.ring_count = radii.size()
+	for i in radii.size():
+		z.set_ring_radius(i, radii[i])
+	z.regraze = regraze
+	z.count_bullet_size = bullet_size
+	return z
 
 
 func _curve(points: Array) -> Curve:
@@ -719,6 +762,19 @@ func _snap_traces(section: String) -> void:
 	_trace(section, factory, "reuse_life1", homing.duplicate(), func(v: BulletVolley2D) -> void:
 		v.all_bullets_push_back_homing_target(target_a), 30)
 	_trace(section, factory, "reuse_life2", H.make_volley_data(6, 220.0))
+
+	# Graze: a homing volley weaving through target_a's rings (Once) while
+	# a wide After Exit zone over target_b re-grazes, and a fast line.
+	target_a.name = "SnapGrazeA"
+	target_b.name = "SnapGrazeB"
+	target_a.add_to_group(&"snap_graze_a")
+	target_b.add_to_group(&"snap_graze_b")
+	_graze_trace(section, factory, "graze_homing", homing.duplicate(),
+			[_graze_zone(&"snap_graze_a", [80.0, 30.0, 10.0], BulletGrazeZone2D.REGRAZE_ONCE, true),
+			_graze_zone(&"snap_graze_b", [420.0], BulletGrazeZone2D.REGRAZE_AFTER_EXIT, false)],
+			func(v: BulletVolley2D) -> void: v.all_bullets_push_back_homing_target(target_a))
+	_graze_trace(section, factory, "graze_line", H.make_volley_data(6, 2400.0),
+			[_graze_zone(&"snap_graze_a", [205.0, 201.0], BulletGrazeZone2D.REGRAZE_ONCE, false)])
 	factory.reset()
 	factory.queue_free()
 	await get_tree().process_frame

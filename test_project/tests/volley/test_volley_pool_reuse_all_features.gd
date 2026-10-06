@@ -2,8 +2,8 @@ extends BlastTest
 ## A volley that lived with EVERY feature switched on, expired into the pool
 ## and was reused for plain bullets must be indistinguishable from a volley
 ## that was never used: homing queues, orbit, bounce, wobble, gravity,
-## curves, movement patterns, trails, timers, attachments, custom data, tint
-## and spin are all reset, and the reused bullets sit and fly exactly where a
+## curves, movement patterns, trails, timers, attachments, custom data, tint,
+## spin and graze are all reset, and the reused bullets sit and fly exactly where a
 ## cold volley's bullets do. Guards the single reset path of the merged
 ## volley class (reset_transient_volley_state + reset_motion_feature_state).
 
@@ -63,7 +63,14 @@ func _volley_state(v: BulletVolley2D) -> Dictionary:
 		"trail_bakes": fx.get("trail_bake_count"),
 		"shared_custom_data": v.get_shared_bullets_custom_data(),
 		"shared_pattern": v.has_shared_movement_pattern(),
+		"graze": _graze_state(v),
 	}
+
+
+func _graze_state(v: BulletVolley2D) -> Dictionary:
+	var g: Dictionary = v.debug_get_graze_info()
+	g.erase("generation") # bumped per arming/release: instance history, not state
+	return g
 
 
 func _bullet_state(v: BulletVolley2D, i: int) -> Dictionary:
@@ -92,6 +99,9 @@ func test_reused_volley_matches_a_cold_volley() -> void:
 	v.set_shared_movement_pattern_curve(_pattern_curve())
 	v.attach_time_based_function(1.0, _on_timer, true)
 	v.bullet_set_custom_data(2, Resource.new())
+	make_graze_target(Vector2(0, 0))
+	v.graze_set_zones([H.make_graze_zone([400.0])])
+	factory.bullet_grazed.connect(func(_t: Node2D, _v: BulletVolley2D, _i: int, _z: BulletGrazeZone2D, _r: int) -> void: pass)
 	expect_no_errors("every feature switches on cleanly")
 	for i in 120: # early break; the lifetime is 15 ticks
 		await physics()
@@ -99,6 +109,7 @@ func test_reused_volley_matches_a_cold_volley() -> void:
 			break
 	await idle(2) # the lifetime hold flushes on the idle frame
 	assert_true(bool(v.debug_get_volley_info().get("is_pooled", false)), "expired into the pool")
+	assert_gt(int(factory.debug_get_graze_stats()["events_total"]), 0, "the loaded life really grazed")
 
 	var hits_before := int(factory.debug_get_pool_hit_stats()["hits"])
 	var reused: BulletVolley2D = factory.spawn_volley(_plain())

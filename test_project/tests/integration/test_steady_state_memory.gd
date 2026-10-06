@@ -31,6 +31,20 @@ func test_spawner_shots_retain_nothing() -> void:
 	assert_eq(grown, 0, "200 warm spawner shots: zero retained objects")
 
 
+func test_graze_shots_retain_nothing() -> void:
+	# Every shot grazes (a target sits on the muzzle) and a handler listens:
+	# events, zone references and per-bullet state must all recycle.
+	make_graze_target(Vector2(5, 0))
+	var sp := make_spawner(H.make_volley_data(4, 250.0, 0.05), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 8)
+	sp.graze_zones = [H.make_graze_zone([400.0, 200.0])] # the ring pattern spawns ~100 px out
+	sp.graze_enabled = true
+	var grazes := [0]
+	factory.bullet_grazed.connect(func(_t: Node2D, _v: BulletVolley2D, _i: int, _z: BulletGrazeZone2D, _r: int) -> void: grazes[0] += 1)
+	var grown: int = await _steady(func(): sp.shoot_once())
+	assert_gt(grazes[0], 1000, "the shots really grazed (%d events)" % grazes[0])
+	assert_eq(grown, 0, "200 warm grazing shots: zero retained objects")
+
+
 func test_script_spawns_with_short_arrays_retain_nothing() -> void:
 	var d := H.make_volley_data(3, 250.0, 0.05) # 3 speed entries...
 	var arr: Array = []
