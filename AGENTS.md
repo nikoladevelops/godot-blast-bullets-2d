@@ -822,7 +822,11 @@ deduped, cancelled by REMOVED) and replayed once on resume.
   collision handlers; zero-delta ticks; mixed shared + per-bullet features.
 - Godot facts that bit us: GDExtension virtuals
   (`_get_configuration_warnings`) are not script-callable (expose a public
-  twin); Godot imports `.csv` files inside the project as translations (keep
+  twin); NEVER open the real test_project in an editor with a scene argument
+  (headless or not): the editor saves `open_scenes`/`current_scene` in
+  `.godot/editor/editor_layout.cfg` and the developer's next launch reopens
+  that scene, so a @tool script in it runs in their editor (an editor-smoke
+  probe once quit the developer's editor 3 s after every launch); Godot imports `.csv` files inside the project as translations (keep
   logs under a `.gdignore` folder); a warning printed per spawn retains
   objects (use `WarnOnce2D`); `--quit-after` guards headless scripts.
 
@@ -948,7 +952,8 @@ project's `.so`). For quick numeric comparisons load two
   / `toggle_debug_symbols.py` / `toggle_reloadable.py`.
 - Verification: `run_tests.py`, `lint_tests.py`, `api_snapshot.py` (§7.4),
   `format_code.py`, `run_benchmarks.py`, `run_editor_smoke.py` (headless
-  editor + @tool probes in `test_project/tests/editor_smoke/`).
+  editor + @tool probes in `test_project/tests/editor_smoke/`, run on a
+  throwaway COPY of the project; probes act only with `--blast-editor-smoke`).
 - Config: `select_godot_path.py`, `select_godot_project.py`,
   `change_godot_target_version.py`, `update_godot_cpp.py`,
   `config_manager.py` + `config.json` (machine state), `paths.py`.

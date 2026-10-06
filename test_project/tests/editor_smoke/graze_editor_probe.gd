@@ -6,6 +6,12 @@ extends Node
 ## drop, no crash), a replacement added (rings return), a zone edited, the
 ## spawner reparented, graze switched off (layer hidden). Prints one
 ## "SMOKE OK" line, or "SMOKE FAIL: <step>" lines, then quits the editor.
+##
+## INERT unless the editor was started by the smoke runner (user argument
+## --blast-editor-smoke): opened in anyone's editor (a restored tab, a scene
+## thumbnail, a curious click) it touches nothing and never quits.
+
+const RUNNER_FLAG := "--blast-editor-smoke"
 
 var frame := 0
 var failures: Array = []
@@ -14,7 +20,8 @@ var enemy: BulletSpawner2D
 
 
 func _process(_delta: float) -> void:
-	if not Engine.is_editor_hint():
+	if not Engine.is_editor_hint() or not OS.get_cmdline_user_args().has(RUNNER_FLAG):
+		set_process(false)
 		return
 	frame += 1
 	if frame == 1:
