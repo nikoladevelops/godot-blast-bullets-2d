@@ -2004,8 +2004,6 @@ public:
 	// deque; otherwise it reports the shared broadcast deque.
 	_ALWAYS_INLINE_ bool orbit_live_deque_for_bullet(int bullet_index, const HomingTargetDeque *&r_deque) const;
 
-	_ALWAYS_INLINE_ HomingType orbit_target_type(const HomingTargetDeque &deque) const;
-
 	// Locked-ring center for this tick. FollowTarget tracks the target.
 	// FollowDeadzone pins locked_center until the target walks farther than
 	// follow_deadzone from it, then re-pins. Anchored ignores the target

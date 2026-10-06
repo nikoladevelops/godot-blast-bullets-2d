@@ -4,9 +4,8 @@
 #include "godot_cpp/variant/vector2.hpp"
 #include <deque>
 
-using namespace godot;
-
 namespace BlastBullets2D {
+using namespace godot;
 
 // The supported homing types
 enum HomingType {
@@ -65,14 +64,6 @@ public:
 
 	const HomingTarget &front() const {
 		return homing_targets.front();
-	}
-
-	HomingTarget &back() {
-		return homing_targets.back();
-	}
-
-	const HomingTarget &back() const {
-		return homing_targets.back();
 	}
 
 	bool empty() const noexcept {
@@ -201,28 +192,10 @@ public:
 			}
 		}
 
-		switch (target.type) {
-			case GlobalPositionTarget: {
-				return target.global_position_target;
-			}
-			case Node2DTarget: {
-				auto &target_data = target.node2d_target_data;
-
-				if (!is_homing_target_valid(target_data.target, target_data.cached_valid_instance_id)) {
-					return nullptr;
-				}
-
-				return target_data.target;
-			}
-			case NotHoming: {
-				return nullptr;
-			}
-			case MousePositionTarget:
-				--mouse_homing_targets_amount;
-
-				return cached_pos;
+		if (target.type == MousePositionTarget) {
+			--mouse_homing_targets_amount;
 		}
-		return nullptr;
+		return target_as_variant(target, cached_pos);
 	}
 
 	_ALWAYS_INLINE_ Variant pop_back_target(const Vector2 &cached_mouse_global_position) {
@@ -233,143 +206,62 @@ public:
 		HomingTarget target = homing_targets.back();
 		homing_targets.pop_back();
 
-		switch (target.type) {
-			case GlobalPositionTarget: {
-				return target.global_position_target;
-			}
-			case Node2DTarget: {
-				auto &target_data = target.node2d_target_data;
-
-				if (!is_homing_target_valid(target_data.target, target_data.cached_valid_instance_id)) {
-					return nullptr;
-				}
-
-				return target_data.target;
-			}
-			case NotHoming: {
-				return nullptr;
-			}
-			case MousePositionTarget:
-				--mouse_homing_targets_amount;
-
-				// No per-target position exists yet, so return the last cached mouse
-				// position. Good enough for one frame until the cache refreshes.
-				return cached_mouse_global_position;
+		if (target.type == MousePositionTarget) {
+			--mouse_homing_targets_amount;
 		}
-		return nullptr;
+		// A mouse target has no position of its own: the last cached mouse
+		// position (good for one frame until the cache refreshes).
+		return target_as_variant(target, cached_mouse_global_position);
 	}
 
 	//////////////////////////////////////////////
 
 	//// PUSH METHODS
-	// Returns false when the push was rejected (deque full), so callers that
-	// track homing counters don't count a target that was never stored.
+	// Each returns false (nothing stored) when the push is rejected: a null
+	// node, a non-finite position or a full deque. Callers that track
+	// counters never count a target that was never stored.
 	_ALWAYS_INLINE_ bool push_front_mouse_position_target(const Vector2 &cached_mouse_global_position) {
-		if (!has_room_for_push()) {
-			return false;
-		}
 		HomingTarget target;
 		target.type = HomingType::MousePositionTarget;
-
-		++mouse_homing_targets_amount;
-
-		cached_front_target_global_position = cached_mouse_global_position;
-
-		homing_targets.emplace_front(target);
-		return true;
+		return store(target, true, cached_mouse_global_position);
 	}
 
-	// Returns false when the push was rejected (null target or deque full).
 	_ALWAYS_INLINE_ bool push_front_node2d_target(Node2D *new_homing_target) {
 		if (!new_homing_target) {
 			UtilityFunctions::push_error("push_front_node2d_target: target is null");
 			return false;
 		}
-		if (!has_room_for_push()) {
-			return false;
-		}
-		homing_targets.emplace_front(new_homing_target, new_homing_target->get_instance_id());
-
-		cached_front_target_global_position = new_homing_target->get_global_position();
-		return true;
+		return store(HomingTarget(new_homing_target, new_homing_target->get_instance_id()), true, new_homing_target->get_global_position());
 	}
 
-	// Returns false when the push was rejected (non-finite position or deque
-	// full), so callers that track homing counters don't count a target that
-	// was never stored.
 	_ALWAYS_INLINE_ bool push_front_global_position_target(const Vector2 &global_position) {
 		if (!global_position.is_finite()) {
 			UtilityFunctions::push_error("push_front_global_position_target: position must be finite, nothing pushed.");
 			return false;
 		}
-		if (!has_room_for_push()) {
-			return false;
-		}
-		homing_targets.emplace_front(global_position);
-
-		cached_front_target_global_position = global_position;
-		return true;
+		return store(HomingTarget(global_position), true, global_position);
 	}
 
-	// Returns false when the push was rejected (deque full). See front variant.
 	_ALWAYS_INLINE_ bool push_back_mouse_position_target(const Vector2 &cached_mouse_global_position) {
-		if (!has_room_for_push()) {
-			return false;
-		}
 		HomingTarget target;
 		target.type = HomingType::MousePositionTarget;
-
-		bool is_queue_empty = homing_targets.empty();
-
-		++mouse_homing_targets_amount;
-
-		homing_targets.emplace_back(target);
-
-		if (is_queue_empty) {
-			cached_front_target_global_position = cached_mouse_global_position;
-		}
-		return true;
+		return store(target, false, cached_mouse_global_position);
 	}
 
-	// Returns false when the push was rejected (null target or deque full).
 	_ALWAYS_INLINE_ bool push_back_node2d_target(Node2D *new_homing_target) {
 		if (!new_homing_target) {
 			UtilityFunctions::push_error("push_back_node2d_target: target is null");
 			return false;
 		}
-		if (!has_room_for_push()) {
-			return false;
-		}
-		bool is_queue_empty = homing_targets.empty();
-
-		homing_targets.emplace_back(new_homing_target, new_homing_target->get_instance_id());
-
-		// Update the cached global position since it will be used - target is at the front of the queue
-		if (is_queue_empty) {
-			cached_front_target_global_position = new_homing_target->get_global_position();
-		}
-		return true;
+		return store(HomingTarget(new_homing_target, new_homing_target->get_instance_id()), false, new_homing_target->get_global_position());
 	}
 
-	// Returns false when the push was rejected (non-finite position or deque
-	// full). See push_front variant.
 	_ALWAYS_INLINE_ bool push_back_global_position_target(const Vector2 &global_position) {
 		if (!global_position.is_finite()) {
 			UtilityFunctions::push_error("push_back_global_position_target: position must be finite, nothing pushed.");
 			return false;
 		}
-		if (!has_room_for_push()) {
-			return false;
-		}
-		bool is_queue_empty = homing_targets.empty();
-
-		homing_targets.emplace_back(global_position);
-
-		// Update the cached global position since it will be used - target is at the front of the queue
-		if (is_queue_empty) {
-			cached_front_target_global_position = global_position;
-		}
-		return true;
+		return store(HomingTarget(global_position), false, global_position);
 	}
 
 	///////////////////////////////////////
@@ -397,28 +289,7 @@ public:
 			return nullptr;
 		}
 
-		const HomingTarget &target = homing_targets.front();
-
-		switch (target.type) {
-			case GlobalPositionTarget: {
-				return target.global_position_target;
-			}
-			case Node2DTarget: {
-				auto &target_data = target.node2d_target_data;
-
-				if (!is_homing_target_valid(target_data.target, target_data.cached_valid_instance_id)) {
-					return nullptr;
-				}
-
-				return target_data.target;
-			}
-			case NotHoming: {
-				return nullptr;
-			}
-			case MousePositionTarget:
-				return cached_front_target_global_position;
-		}
-		return nullptr;
+		return target_as_variant(homing_targets.front(), cached_front_target_global_position);
 	}
 	// Re-arms the front target's reached flag (per-bullet reached semantics
 	// live on the target itself, unlike the shared deque's per-bullet
@@ -437,6 +308,46 @@ public:
 	static inline int mouse_homing_targets_amount = 0;
 
 private:
+	// Stores a validated target at the front or the back; the cached front
+	// position follows whenever the target became the front.
+	_ALWAYS_INLINE_ bool store(const HomingTarget &target, bool at_front, const Vector2 &position) {
+		if (!has_room_for_push()) {
+			return false;
+		}
+		if (target.type == MousePositionTarget) {
+			++mouse_homing_targets_amount;
+		}
+		const bool becomes_front = at_front || homing_targets.empty();
+		if (at_front) {
+			homing_targets.emplace_front(target);
+		} else {
+			homing_targets.emplace_back(target);
+		}
+		if (becomes_front) {
+			cached_front_target_global_position = position;
+		}
+		return true;
+	}
+
+	// A target as GDScript sees it: the Node2D (null once freed), its
+	// position, or `mouse_position` for a mouse target.
+	_ALWAYS_INLINE_ Variant target_as_variant(const HomingTarget &target, const Vector2 &mouse_position) const {
+		switch (target.type) {
+			case GlobalPositionTarget:
+				return target.global_position_target;
+			case Node2DTarget:
+				if (!is_homing_target_valid(target.node2d_target_data.target, target.node2d_target_data.cached_valid_instance_id)) {
+					return nullptr;
+				}
+				return target.node2d_target_data.target;
+			case MousePositionTarget:
+				return mouse_position;
+			case NotHoming:
+				break;
+		}
+		return nullptr;
+	}
+
 	std::deque<HomingTarget> homing_targets;
 	mutable Vector2 cached_front_target_global_position{ 0, 0 };
 };

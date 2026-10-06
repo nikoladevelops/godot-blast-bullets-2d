@@ -970,7 +970,7 @@ _ALWAYS_INLINE_ bool BulletVolley2D::advance_movement_pattern(const Ref<Curve2D>
 _ALWAYS_INLINE_ void BulletVolley2D::orbit_stamp_lock(OrbitingData &orbiting_data, const Vector2 &center, const HomingTargetDeque &deque) {
 	orbiting_data.is_locked_orbiting = true;
 	orbiting_data.locked_center = center;
-	orbiting_data.locked_target_type = orbit_target_type(deque);
+	orbiting_data.locked_target_type = deque.get_current_target_type();
 	orbiting_data.locked_target_identity = orbit_target_identity(deque);
 }
 

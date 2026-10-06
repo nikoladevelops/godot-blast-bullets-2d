@@ -834,13 +834,6 @@ _ALWAYS_INLINE_ bool BulletVolley2D::orbit_live_deque_for_bullet(int bullet_inde
 	return false;
 }
 
-_ALWAYS_INLINE_ HomingType BulletVolley2D::orbit_target_type(const HomingTargetDeque &deque) const {
-	if (deque.empty()) {
-		return NotHoming;
-	}
-	return deque.front().type;
-}
-
 _ALWAYS_INLINE_ Vector2 BulletVolley2D::orbit_effective_center(OrbitingData &orbiting_data, const Vector2 &live_target_pos) {
 	switch (orbiting_data.follow_mode) {
 		case Anchored:
@@ -957,7 +950,7 @@ _ALWAYS_INLINE_ void BulletVolley2D::orbit_keep_lock_across_replace_for_bullet_f
 	}
 	if (!orbit_should_unlock_for_front_change(o, deque)) {
 		o.locked_center = deque.get_cached_front_target_global_position();
-		o.locked_target_type = orbit_target_type(deque);
+		o.locked_target_type = deque.get_current_target_type();
 		o.locked_target_identity = orbit_target_identity(deque);
 	} else {
 		o.is_locked_orbiting = false;
