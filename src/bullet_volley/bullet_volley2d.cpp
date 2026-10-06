@@ -879,10 +879,9 @@ BulletVolley2D::~BulletVolley2D() {
 
 void BulletVolley2D::seed_motion_features(const BulletVolleyData2D &data) {
 	const BulletVolleyData2D *volley_data = &data;
-	// Size movement/homing/orbit SoA up front: the tick path indexes them
-	// unconditionally, so even a wrong-type early-return must leave them sized.
-	// Gravity vectors/velocities sized here too (same invariant as movement).
-	set_up_movement_data(TypedArray<BulletSpeedData2D>());
+	// Reset every motion feature to its blank state first (the apply_* calls
+	// below then seed from the data); the speed/direction/velocity arrays are
+	// sized and fully written by set_up_movement_data below.
 	adjust_direction_based_on_rotation = false;
 	homing_update_timer = 0.0;
 	all_bullet_wobble.assign(amount_bullets, WobbleSeed());
