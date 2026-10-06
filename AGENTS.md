@@ -51,7 +51,7 @@ for the rest: the sections are written to be looked up, not read once.
 
 ```sh
 GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py   # build (exit 1 = failed; never raw scons, never edit SConstruct)
-python3 tools/run_tests.py                                       # 152 files / 1032 tests, ~10 s, leak-checked
+python3 tools/run_tests.py                                       # 152 files / 1036 tests, ~10 s, leak-checked
 python3 tools/run_tests.py --suite <substring> --full            # one area, every failure message unclipped
 python3 tools/run_tests.py --self-test                           # proves the harness still catches failures/leaks
 python3 tools/run_editor_smoke.py                                # headless EDITOR run of tests/editor_smoke/ (editor-only paths)
@@ -792,7 +792,8 @@ deduped, cancelled by REMOVED) and replayed once on resume.
 | Setters reject NaN/Inf/out-of-range with "keeping the old value"; no setter depends on another field | `test_spawner_setter_contract` |
 | Fire arc follows spin; the volley chases the targets the arc approved | `test_spawner_homing_propagation` |
 | Homing sources never pick the spawner, its markers, a factory or its nodes, dying nodes or non-Node2Ds | `test_spawner_homing_detection` |
-| Homing queues cap at 256; freed targets trimmed; retarget skips dead/pooled/foreign volleys | `test_spawner_homing_queues` |
+| Homing queues have no cap (300 targets queue, shared and per bullet); freed targets trimmed; retarget skips dead/pooled/foreign volleys | `test_spawner_homing_queues` |
+| No hidden caps: every live homing volley stays tracked and retargets; `homing_max_targets` has no upper bound; no default homing/graze group or name (empty settings are named in warnings) | `test_spawner_tracker_cap`, `test_spawner_homing_selection`, `test_spawner_homing_detection` |
 | A bullet steering by its own targets owns its reach even while the shared deque has targets | `test_volley_homing_mixed_deques` |
 | Every orbiting bullet circles its own front target; a zero-delta tick moves nothing | `test_volley_orbit_own_center` |
 | `get_bullet_velocity` = direction x speed + inherited + fall speed, in the tick AND right after every setter; `bullet_set_velocity` sets the exact total | `test_volley_velocity_composition` |
@@ -814,8 +815,8 @@ deduped, cancelled by REMOVED) and replayed once on resume.
 | Graze handlers are live; events of disabled/woken bullets, freed targets, replaced zones are dropped; a pause finishes the batch | `test_volley_graze_handlers` |
 | Spawner volleys are armed before any shot signal; graze bubbles spawner -> factory; orphans keep grazing on the factory | `test_spawner_graze`, `test_spawner_graze_orphans` |
 | The ring preview draws exactly the runtime targets; never saved, never a marker or homing candidate | `test_spawner_graze_preview`, `run_editor_smoke.py` |
-| Up to 64 graze targets per zone (a member joining after the shot counts next tick); a target keeps its slot while others come and go | `test_volley_graze_targets` |
-| Graze target sources (zone groups, path, name, children), filter, update interval, refresh; edits reach flying bullets; orphans keep the settings; homing's refresh is `retarget_live_volleys()` | `test_spawner_graze_detection` |
+| No graze target cap (300+ targets, a member joining after the shot counts next tick); a target keeps its slot while others come and go | `test_volley_graze_targets` |
+| Graze target sources (node group, path, name, children: the spawner decides who grazes, zones only how), filter, update interval, refresh; edits reach flying bullets; orphans keep the settings; homing's refresh is `retarget_live_volleys()` | `test_spawner_graze_detection` |
 | Past 8 targets the slab finds exactly what testing every target finds (same events, same ties) | `test_volley_graze_slab` |
 
 - Edge cases to test everywhere: NaN/Inf scalars and vectors; null array
@@ -823,7 +824,7 @@ deduped, cancelled by REMOVED) and replayed once on resume.
   inverted ranges; zero amounts/sizes/speeds; singular transforms; freed
   factory/generator/target/path mid-flight; pool reuse across lives;
   pause/resume with overlaps in flight; 10k cap (10000 ok, 10001 rejected);
-  maxed queues/timers (64); same-frame expiry+respawn; deferred calls from
+  maxed timers (64); huge target/queue counts; same-frame expiry+respawn; deferred calls from
   collision handlers; zero-delta ticks; mixed shared + per-bullet features.
 - Godot facts that bit us: GDExtension virtuals
   (`_get_configuration_warnings`) are not script-callable (expose a public
@@ -911,12 +912,14 @@ project's `.so`). For quick numeric comparisons load two
   post-move pass measured slower. Graze off costs nothing (hoisted flag).
 - Many graze targets: testing every target is ~1.6 ns per bullet-target pair
   (`graze_64_targets`, 10k bullets x 64 targets: 1.32 ms tick). Past 8 live
-  targets the zone's targets are kept sorted by x (once per sweep, in the
-  shared list) and each bullet binary-searches the slab within reach of its
-  motion: 0.39 ms. Reading few targets through a pointer (plus a slab flag)
-  cost `graze_10k_flight` +3% (one more load and branch per bullet per
-  zone): up to 8 unsorted targets sit inline in `GrazeTickZone2D`, so the
-  1-target case is level with the old fixed-array layout.
+  targets the list keeps a test view sorted by x (once per sweep, shared by
+  every volley) and each bullet binary-searches the slab within reach of
+  its motion: ~0.36 ms. Reading few targets through a pointer cost
+  `graze_10k_flight` +3% (one more load and branch per bullet): up to 8
+  unsorted targets are copied inline into `GrazeTickTargets2D`. Volleys
+  read larger lists IN PLACE (no per-volley copy, no per-volley liveness
+  pass: the user-code epoch re-validates the shared list instead), and the
+  swept distance is measured once per bullet for every zone.
 
 ## 16. Inspector groups and serialization locks
 
@@ -1003,15 +1006,21 @@ physics (no layer/mask setup, deterministic under `debug_advance_time`).
 
 ### 20.1 Pieces
 
+WHO grazes is decided in ONE place, never in the zone: the spawner's Graze
+group (`graze_target_source` + knobs) for spawner volleys, the group passed
+to `graze_set_zones(zones, target_group)` for factory volleys. A zone only
+says HOW (rings, regraze, bullet size, previews). Every zone of a volley
+rings the same targets.
+
 | Piece | Where | Notes |
 |---|---|---|
-| Zone config | `data/bullet_graze_zone2d.*` | group, 1..4 rings (fixed `ring_N_radius`: inspector-safe), `regraze` (Once 0 / After Exit 1, serialized), `count_bullet_size`, `preview_color`; every accepted change emits `changed` |
-| Target filter | `core/graze_targets2d.hpp` | `graze_target_usable2d`: Node2D in tree, not queued, finite, same World2D; `collect_graze_targets2d`: group members (+ filter group), first 64 in tree order; shared by every source AND the previews |
-| Target lists | `factory/graze_detector2d.*` | `GrazeDetector2D`: the factory owns one (zone groups, every tick); a spawner owns another (`std::shared_ptr`, shared with every volley it armed) and delegates to the factory's while at the defaults. `GrazeTargetList2D`: stable slots + per-slot change serials, membership rescanned per `update_interval` (factory `graze_clock`), positions once per sweep, `by_x` past 8 targets; warn 24 (group) / 105 (name) / 106 (children) past 64 |
-| Arming + dispatch | `bullet_volley/bullet_volley2d_graze.cpp` | `graze_set_zones` (Refs, nulls keep their index), `graze_set_detector` (spawner), `prepare_graze_tick` (per-volley live copy of each list, vanished slots from serials/uids, rings sorted by radius), `dispatch_graze_events` |
-| Per-bullet stage | `bullet_volley2d_tick.cpp` | `step_graze` (fast path inline, component math; up to 8 targets read inline from the tick zone, more from the volley's buffers with a slab binary search when x-sorted) + `graze_visit` (`_NO_INLINE_` slow path) |
-| Spawner | `bullet_spawner/bullet_spawner2d_graze.cpp` | Graze group: `graze_target_source` + knobs (homing's name matching via `core/node_scan2d.hpp`), `graze_update_interval`, `refresh_graze_targets`, arming in `shoot_once` before the homing signals, `resolve_graze_targets`, ring preview (`GrazePreviewLayer2D`: top-level, internal, owner-less, tagged) |
-| Runtime preview | `factory/bullet_factory2d_graze.cpp`, `debugger/graze_preview_layer2d.*` | zones flagged `preview_during_runtime` drawn by the FACTORY, once per (zone, detector), from active volleys + `GRAZE_SPAWNER_GROUP` spawners; asleep (no `_process`) until a spawner/volley wakes it, sleeps again when nothing flagged is left; `update_process_state()` is the one `_process` switch; the spawner's own layer skips flagged zones at runtime |
+| Zone config | `data/bullet_graze_zone2d.*` | 1..4 rings (fixed `ring_N_radius`: inspector-safe), `regraze` (Once 0 / After Exit 1, serialized), `count_bullet_size`, `preview_color`, `preview_during_runtime`; every accepted change emits `changed`. No targeting property |
+| Target filter | `core/graze_targets2d.hpp` | `graze_target_usable2d`: Node2D in tree, not queued, finite, same World2D; `collect_graze_targets2d`: group members (+ filter group), tree order, no cap; shared by every source AND the previews |
+| Target lists | `factory/graze_detector2d.*` | `GrazeDetector2D`: the factory owns one (a list per group, every tick) for factory volleys; each spawner owns one (`std::shared_ptr`, shared with every volley it armed) and hands out the factory's list while it is Node Group + no filter + interval 0. `GrazeTargetList2D`: growable, stable slots (`slot_of` hash, free-slot reuse, per-slot change serials), membership rescanned per `update_interval` (factory `graze_clock`), positions once per sweep, re-validated within a sweep when the factory's user-code epoch moved, x-sorted test view past 8 targets |
+| Arming + dispatch | `bullet_volley/bullet_volley2d_graze.cpp` | `graze_set_zones(zones, group)` (factory volleys; empty group refused), `graze_arm_from_spawner` (C++), `graze_target_list()`, `prepare_graze_tick` (reads the list in place; copies only <= 8 targets inline or a view without its owner spawner), `dispatch_graze_events` |
+| Per-bullet stage | `bullet_volley2d_tick.cpp` | `step_graze`: the swept distance to the targets once per bullet (inline loop, or a binary-searched x slab), then each active zone's outer radius; `graze_visit` (`_NO_INLINE_` slow path) per zone |
+| Spawner | `bullet_spawner/bullet_spawner2d_graze.cpp` | Graze group: `graze_target_source` (Node Group / Node Path / Node Name / Node Children, serialized 0..3) + `graze_node_group` and the other knobs (homing's name matching via `core/node_scan2d.hpp`), `graze_update_interval`, `refresh_graze_targets`, `resolve_graze_targets()`, arming in `shoot_once` before the homing signals, ring preview (`GrazePreviewLayer2D`: top-level, internal, owner-less, tagged) |
+| Runtime preview | `factory/bullet_factory2d_graze.cpp`, `debugger/graze_preview_layer2d.*` | zones flagged `preview_during_runtime` drawn by the FACTORY, once per (zone, target list), from active volleys + `GRAZE_SPAWNER_GROUP` spawners; asleep (no `_process`) until a spawner/volley wakes it, sleeps again when nothing flagged is left; `update_process_state()` is the one `_process` switch; the spawner's own layer skips flagged zones at runtime |
 
 ### 20.2 Contract (pinned by the `*graze*` suites)
 
@@ -1030,21 +1039,25 @@ physics (no layer/mask setup, deterministic under `debug_advance_time`).
   silently; a zone losing every target ends its visits silently. A target
   keeps its slot while others come and go; a new list (source switch, new
   group) re-anchors every open visit the same way.
-- Targets: Zone Groups (default; each zone's `target_group`), Node Path,
-  Node Name, Node Children (spawner `graze_target_source`), all filtered by
-  `graze_filter_group`, first 64 in tree order, never the spawner, never a
-  factory or its nodes. Membership rescans every `graze_update_interval`
+- Targets: Node Group (default; `graze_node_group`, EMPTY by default: the
+  developer names it), Node Path, Node Name, Node Children, all filtered by
+  `graze_filter_group`, NO cap, tree order (ties), never the spawner, never
+  a factory or its nodes. Membership rescans every `graze_update_interval`
   (0 = every tick: a joining target counts next tick); between scans
   positions stay live and a freed/queued target drops at once.
   `refresh_graze_targets()` rescans now. Spawner settings are shared with
   its volleys (edits reach bullets in flight; orphans keep them and the
   nodes the paths last resolved); `release_life` drops them.
+- Inside a sweep, a target freed or queued by ANY live handler of an
+  earlier volley is never tested by a later one (its Once ring is never
+  spent): `BulletFactory2D::note_user_code()` bumps the user-code epoch
+  right before every live emit / timer callback in the tick and the lists
+  re-validate when it moved. A NEW emit or callback site in the tick MUST
+  call `note_user_code()` (`test_volley_graze_handlers` pins two sites).
 - Dispatch drops events whose bullet epoch moved, whose zones generation
   changed, or whose target is freed/queued; stops when the volley is freed
   or queued; a pause lets the batch finish; an early tick return keeps the
-  queue for the next tick; `release_life` clears it. Each volley re-checks
-  every list target per tick (a target freed by an earlier volley's handler
-  in the same sweep is never tested, its Once ring never spent).
+  queue for the next tick; `release_life` clears it.
 - The owner spawner never grazes its own bullets. Volleys hold zone Refs and
   read them every tick (live edits reach bullets in flight); `release_life`
   unrefs them (weakref-tested).
@@ -1054,17 +1067,20 @@ physics (no layer/mask setup, deterministic under `debug_advance_time`).
 `graze_state`: one `uint16_t` per bullet per zone slot (`uint16_t`, not
 `uint8_t`: char stores alias everything and would force reloads in the
 loop). Bits 0-3 rings grazed, 4 inside, 5-6 deepest ring of the visit,
-7 visit fired, 8-13 anchor target slot (0..63). Limits: 4 zones, 4 rings,
-64 targets per zone (`BulletGrazeZone2D::MAX_RINGS/MAX_TARGETS`,
-`BulletVolley2D::MAX_GRAZE_ZONES`). Per-bullet cost grows with the LIVE
+7 visit fired; `graze_anchor` (`uint32_t`, same indexing) is the visit's
+target slot. Targets: no cap. Structural limits: 4 zones per volley, 4
+rings per zone (`BulletVolley2D::MAX_GRAZE_ZONES`,
+`BulletGrazeZone2D::MAX_RINGS`). Per-bullet cost grows with the LIVE
 targets only; past `GrazeTargetList2D::slab_min_targets` (8) a bullet tests
 only the x-slab around its motion (`debug_set_graze_slab_min_targets`
 forces either path; `test_volley_graze_slab` proves them equal).
 
 ### 20.4 Adding a zone option
 
-Field + validated setter (emit_changed, "BulletGrazeZone2D: <prop> ...,
-keeping the old value.") + bind in `bullet_graze_zone2d.cpp`; read it in
+A zone option is about HOW a graze is measured (who grazes belongs to the
+spawner's Graze group: §20.5). Field + validated setter (emit_changed,
+"BulletGrazeZone2D: <prop> ..., keeping the old value.") + bind in
+`bullet_graze_zone2d.cpp`; read it in
 `prepare_graze_tick` into `GrazeTickZone2D` (never read the Resource per
 bullet); cover it in `test_volley_graze_core` (mutation-checked); the data
 setter sweep picks the setter up automatically; regenerate docs (§17).

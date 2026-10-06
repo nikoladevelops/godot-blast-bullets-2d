@@ -4,7 +4,7 @@
 		Graze configuration: which nodes can graze bullets, and the rings around them.
 	</brief_description>
 	<description>
-		A graze zone names the nodes bullets can graze (every live [Node2D] in [member target_group], the first [constant MAX_TARGETS] in tree order; a spawner can find them by path, name or children instead with [member BulletSpawner2D.graze_target_source]) and up to [constant MAX_RINGS] concentric rings around each of them. A bullet grazes ring k when its motion during one physics tick comes within ring_&lt;k+1&gt;_radius of a target's global position (plus its own collision bounding radius when [member count_bullet_size] is on). The test is swept, so fast bullets never skip a ring.
+		A graze zone says HOW a graze is measured: up to [constant MAX_RINGS] concentric rings around each graze target. WHO the targets are is not part of the zone: the spawner that fires it decides ([member BulletSpawner2D.graze_target_source]: a group, a path, a name or a parent's children), or the group passed to [method BulletVolley2D.graze_set_zones]. So one zone resource works for any target, and every zone of a volley rings the same targets. A bullet grazes ring k when its motion during one physics tick comes within ring_&lt;k+1&gt;_radius of a target's global position (plus its own collision bounding radius when [member count_bullet_size] is on). The test is swept, so fast bullets never skip a ring.
 		Arm zones on a [BulletSpawner2D] with [member BulletSpawner2D.graze_zones] (every fired volley carries them) or on any volley with [method BulletVolley2D.graze_set_zones]. A graze fires [signal BulletSpawner2D.bullet_grazed] on the owner spawner while it lives, then [signal BulletFactory2D.bullet_grazed], which receives every graze in the game, including bullets of spawners that were already freed. One shared [code].tres[/code] dropped into every enemy spawner is the whole setup; connect the factory signal once to count graze for score.
 		Volleys keep a reference to their zones and read them every tick: a script that edits a zone (a power-up widening a ring, [member enabled] turned off) changes every bullet already in flight. Every accepted change emits [signal Resource.changed]; rejected values push an error and keep the old value.
 	</description>
@@ -64,16 +64,10 @@
 		<member name="ring_count" type="int" setter="set_ring_count" getter="get_ring_count" default="1">
 			How many rings are active, 1 to 4. Rings beyond it hide in the inspector but keep their stored radius.
 		</member>
-		<member name="target_group" type="StringName" setter="set_target_group" getter="get_target_group" default="&amp;&quot;player&quot;">
-			Group whose live [Node2D] members can graze bullets: the first [constant MAX_TARGETS] in tree order (more push one warning). A member that joins later (a respawned player, an enemy spawned after the shot) is picked up on the next tick ([member BulletSpawner2D.graze_update_interval] can space the scans out), a spawner never grazes its own bullets, and targets in another World2D are ignored. Empty finds nothing. Not used for spawners whose [member BulletSpawner2D.graze_target_source] is not Zone Groups.
-		</member>
 	</members>
 	<constants>
 		<constant name="MAX_RINGS" value="4">
 			Rings per zone.
-		</constant>
-		<constant name="MAX_TARGETS" value="64">
-			Targets tested per zone (the first ones in tree order). The cost per bullet grows with the targets that are live, never with this cap; past 8 targets each bullet only tests the targets near its motion.
 		</constant>
 		<constant name="REGRAZE_ONCE" value="0" enum="Regraze">
 			Each ring of the zone grazes at most once per bullet life.
