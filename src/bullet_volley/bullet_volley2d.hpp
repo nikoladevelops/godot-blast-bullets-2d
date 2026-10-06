@@ -2471,16 +2471,22 @@ public:
 	static constexpr uint16_t GRAZE_ANCHOR_MASK = 0x3F00; // target slot the visit belongs to (0..63)
 	// One zone as this tick tests it (rebuilt by prepare_graze_tick).
 	struct GrazeTickZone2D {
-		// Live targets, compact: centers[k] belongs to stable slot slots[k]
-		// (both point into graze_tick_centers / graze_tick_slots).
+		static constexpr int INLINE_TARGETS = 8;
+		// Live targets, compact: centers[k] belongs to stable slot slots[k].
+		// Up to INLINE_TARGETS unsorted ones sit right here (inline_count >
+		// 0: the per-bullet loop reads them without a pointer chase); more
+		// live in graze_tick_centers / graze_tick_slots.
 		int target_count = 0;
+		int inline_count = 0;
+		Vector2 inline_centers[INLINE_TARGETS];
+		uint8_t inline_slots[INLINE_TARGETS] = {};
 		const Vector2 *centers = nullptr;
 		const uint8_t *slots = nullptr;
-		// Many targets (GrazeTargetList2D::slab_min_targets): centers are
-		// sorted by x, order[k] is target k's tree-order index (ties), and
-		// a bullet only tests the targets within slab_reach of its motion
-		// in x (the outermost effective radius, plus a rounding margin).
-		bool slab = false;
+		// The other targets: sorted by x when the list keeps by_x (more
+		// than GrazeTargetList2D::slab_min_targets), order[k] is target k's
+		// tree-order index (ties), and a bullet only tests the targets
+		// within slab_reach of its motion in x (the outermost effective
+		// radius plus a rounding margin; infinite when unsorted).
 		real_t slab_reach = 0.0;
 		const uint8_t *order = nullptr;
 		// Stable slot -> target id (0 = free): the target list's table, so a

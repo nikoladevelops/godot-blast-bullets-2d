@@ -1,10 +1,11 @@
 extends BlastTest
 ## Many-target graze zones: past 8 live targets a bullet is tested only
 ## against the targets near its motion in x (the slab, sorted by x once per
-## tick). Seeded scenes (fast bullets in every direction, resting bullets,
-## targets weaving across each other, rings entered, left and re-grazed)
-## produce exactly the same grazes and exits with the slab forced on as
-## with every target tested; equal distances still go to the first target
+## tick); up to 8 sit inline and are all tested. Seeded scenes (fast bullets
+## in every direction, resting bullets, targets weaving across each other,
+## rings entered, left and re-grazed) produce exactly the same grazes and
+## exits with the slab forced on as with every target tested, for few
+## (inline) and many targets; equal distances still go to the first target
 ## in tree order; the threshold knob rejects bad values.
 
 const GROUP := &"graze_slab"
@@ -15,16 +16,16 @@ func after_each() -> void:
 	await super()
 
 
-## One seeded scene: 16 targets weaving around the origin, 48 bullets
-## (fast in every direction, slow, resting), two-ring After Exit zone,
-## 40 ticks. Returns every event as [kind, target index, bullet, ring].
-func _scene(scene_seed: int, slab_min: int) -> Array:
+## One seeded scene: `target_count` targets weaving around the origin, 48
+## bullets (fast in every direction, slow, resting), two-ring After Exit
+## zone, 40 ticks. Returns every event as [kind, target index, bullet, ring].
+func _scene(scene_seed: int, slab_min: int, target_count: int = 16) -> Array:
 	factory.debug_set_graze_slab_min_targets(slab_min)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = scene_seed
 	var targets: Array = []
 	var homes: Array = []
-	for i in 16:
+	for i in target_count:
 		var home := Vector2(rng.randf_range(-300, 300), rng.randf_range(-300, 300))
 		targets.append(make_graze_target(home, GROUP))
 		homes.append(home)
@@ -57,28 +58,38 @@ func _scene(scene_seed: int, slab_min: int) -> Array:
 
 
 func test_the_slab_finds_exactly_what_testing_every_target_finds() -> void:
-	for scene_seed in [11, 23, 47]:
-		var every := _scene(scene_seed, 64)
-		var slab := _scene(scene_seed, 0)
-		assert_gt(every.size(), 20, "seed %d: a busy scene" % scene_seed)
-		var exits := every.filter(func(e: Array) -> bool: return e[0] == "exit")
-		assert_gt(exits.size(), 0, "seed %d: visits end too" % scene_seed)
-		assert_eq(slab, every, "seed %d: the same events in the same order" % scene_seed)
+	# 16 targets: every one tested from the volley's buffers vs the slab;
+	# 6 targets: every one tested inline vs the slab.
+	for target_count in [16, 6]:
+		for scene_seed in [11, 23, 47]:
+			var every := _scene(scene_seed, 64, target_count)
+			var slab := _scene(scene_seed, 0, target_count)
+			var what := "%d targets, seed %d" % [target_count, scene_seed]
+			assert_gt(every.size(), 10, what + ": a busy scene")
+			var exits := every.filter(func(e: Array) -> bool: return e[0] == "exit")
+			assert_gt(exits.size(), 0, what + ": visits end too")
+			assert_eq(slab, every, what + ": the same events in the same order")
 
 
 func test_equal_distances_go_to_the_first_target_in_tree_order() -> void:
-	factory.debug_set_graze_slab_min_targets(0)
-	var right := make_graze_target(Vector2(10, 0), GROUP) # first in tree order
-	var left := make_graze_target(Vector2(-10, 0), GROUP) # first in x order
-	for i in 8: # far fillers
-		make_graze_target(Vector2(1000 + 100 * i, 0), GROUP)
-	var v := graze_volley(H.transforms_at([Vector2.ZERO]), 0.0)
-	v.graze_set_zones([H.make_graze_zone([20.0], GROUP)])
-	var log := H.record_graze(factory)
-	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "one graze")
-	assert_eq(log[0][1], right, "the tie goes to the first in tree order, not the first in x")
-	assert_ne(log[0][1], left, "not the left one")
+	for slab_min in [64, 0]: # inline (every target), then the x-sorted slab
+		factory.debug_set_graze_slab_min_targets(slab_min)
+		var group := StringName("graze_tie_%d" % slab_min)
+		var right := make_graze_target(Vector2(10, 0), group) # first in tree order
+		var left := make_graze_target(Vector2(-10, 0), group) # first in x order
+		var v := graze_volley(H.transforms_at([Vector2.ZERO]), 0.0)
+		v.graze_set_zones([H.make_graze_zone([20.0], group)])
+		var log := H.record_graze(factory)
+		step_factory()
+		assert_eq(H.graze_kinds(log), ["enter:0:0"], "slab_min %d: one graze" % slab_min)
+		assert_eq(log[0][1], right, "slab_min %d: the tie goes to the first in tree order" % slab_min)
+		right.position = Vector2(300, 0)
+		left.position = Vector2(-300, 0)
+		step_factory()
+		assert_eq(H.graze_kinds(log), ["enter:0:0", "exit:0:0"], "slab_min %d: one exit" % slab_min)
+		assert_eq(log[1][1], right, "slab_min %d: naming the same target" % slab_min)
+		assert_ne(log[1][1], left, "slab_min %d: not the other" % slab_min)
+		v.graze_clear()
 
 
 func test_the_threshold_knob_rejects_bad_values() -> void:

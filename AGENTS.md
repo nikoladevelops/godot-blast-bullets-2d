@@ -913,7 +913,10 @@ project's `.so`). For quick numeric comparisons load two
   (`graze_64_targets`, 10k bullets x 64 targets: 1.32 ms tick). Past 8 live
   targets the zone's targets are kept sorted by x (once per sweep, in the
   shared list) and each bullet binary-searches the slab within reach of its
-  motion: 0.39 ms, and the 1-target case is level.
+  motion: 0.39 ms. Reading few targets through a pointer (plus a slab flag)
+  cost `graze_10k_flight` +3% (one more load and branch per bullet per
+  zone): up to 8 unsorted targets sit inline in `GrazeTickZone2D`, so the
+  1-target case is level with the old fixed-array layout.
 
 ## 16. Inspector groups and serialization locks
 
@@ -1006,7 +1009,7 @@ physics (no layer/mask setup, deterministic under `debug_advance_time`).
 | Target filter | `core/graze_targets2d.hpp` | `graze_target_usable2d`: Node2D in tree, not queued, finite, same World2D; `collect_graze_targets2d`: group members (+ filter group), first 64 in tree order; shared by every source AND the previews |
 | Target lists | `factory/graze_detector2d.*` | `GrazeDetector2D`: the factory owns one (zone groups, every tick); a spawner owns another (`std::shared_ptr`, shared with every volley it armed) and delegates to the factory's while at the defaults. `GrazeTargetList2D`: stable slots + per-slot change serials, membership rescanned per `update_interval` (factory `graze_clock`), positions once per sweep, `by_x` past 8 targets; warn 24 (group) / 105 (name) / 106 (children) past 64 |
 | Arming + dispatch | `bullet_volley/bullet_volley2d_graze.cpp` | `graze_set_zones` (Refs, nulls keep their index), `graze_set_detector` (spawner), `prepare_graze_tick` (per-volley live copy of each list, vanished slots from serials/uids, rings sorted by radius), `dispatch_graze_events` |
-| Per-bullet stage | `bullet_volley2d_tick.cpp` | `step_graze` (fast path inline, component math; slab binary search when the zone is x-sorted) + `graze_visit` (`_NO_INLINE_` slow path) |
+| Per-bullet stage | `bullet_volley2d_tick.cpp` | `step_graze` (fast path inline, component math; up to 8 targets read inline from the tick zone, more from the volley's buffers with a slab binary search when x-sorted) + `graze_visit` (`_NO_INLINE_` slow path) |
 | Spawner | `bullet_spawner/bullet_spawner2d_graze.cpp` | Graze group: `graze_target_source` + knobs (homing's name matching via `core/node_scan2d.hpp`), `graze_update_interval`, `refresh_graze_targets`, arming in `shoot_once` before the homing signals, `resolve_graze_targets`, ring preview (`GrazePreviewLayer2D`: top-level, internal, owner-less, tagged) |
 | Runtime preview | `factory/bullet_factory2d_graze.cpp`, `debugger/graze_preview_layer2d.*` | zones flagged `preview_during_runtime` drawn by the FACTORY, once per (zone, detector), from active volleys + `GRAZE_SPAWNER_GROUP` spawners; asleep (no `_process`) until a spawner/volley wakes it, sleeps again when nothing flagged is left; `update_process_state()` is the one `_process` switch; the spawner's own layer skips flagged zones at runtime |
 

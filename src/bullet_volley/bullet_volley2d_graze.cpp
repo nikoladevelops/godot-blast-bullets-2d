@@ -194,8 +194,8 @@ void BulletVolley2D::prepare_graze_tick() {
 		const BulletGrazeZone2D *zone = graze_zones[z].ptr();
 		const GrazeTargetList2D *list = lists[z];
 		tz.target_count = 0;
+		tz.inline_count = 0;
 		tz.vanished_slots = 0;
-		tz.slab = false;
 		tz.order = nullptr;
 		if (list == nullptr) {
 			tz.seen_list_uid = 0;
@@ -216,12 +216,14 @@ void BulletVolley2D::prepare_graze_tick() {
 			tz.seen_list_uid = list->uid;
 			tz.seen_list_serial = list->serial;
 			tz.slot_ids = list->slot_ids;
-			Vector2 *centers = graze_tick_centers.data() + offset;
-			uint8_t *slots = graze_tick_slots.data() + offset;
-			uint8_t *orders = graze_tick_order.data() + offset;
-			// Many targets: copied in x order (the list keeps it), each
-			// with its tree-order index so ties still go to the first.
+			// Few targets stay inline; many are copied to the volley's
+			// buffers in x order (the list keeps it), each with its
+			// tree-order index so ties still go to the first.
 			const bool slab = list->by_x_valid;
+			const bool inline_targets = !slab && list->count <= GrazeTickZone2D::INLINE_TARGETS;
+			Vector2 *centers = inline_targets ? tz.inline_centers : graze_tick_centers.data() + offset;
+			uint8_t *slots = inline_targets ? tz.inline_slots : graze_tick_slots.data() + offset;
+			uint8_t *orders = graze_tick_order.data() + offset;
 			for (int n = 0; n < list->count; ++n) {
 				const int k = slab ? (int)list->by_x[n] : n;
 				const GrazeTarget2D &target = list->targets[k];
@@ -244,9 +246,11 @@ void BulletVolley2D::prepare_graze_tick() {
 			}
 			tz.centers = centers;
 			tz.slots = slots;
-			tz.slab = slab;
-			tz.order = slab ? orders : nullptr;
-			offset += tz.target_count;
+			tz.inline_count = inline_targets ? tz.target_count : 0;
+			tz.order = inline_targets ? nullptr : orders;
+			if (!inline_targets) {
+				offset += tz.target_count;
+			}
 		}
 		if (zone != nullptr && tz.target_count > 0) {
 			// Rings by radius, largest first (insertion sort: equal radii
@@ -272,7 +276,7 @@ void BulletVolley2D::prepare_graze_tick() {
 			tz.regraze_after_exit = zone->regraze == BulletGrazeZone2D::REGRAZE_AFTER_EXIT;
 			// A target farther than this in x can never reach the outermost
 			// ring; the margin keeps every boundary case on the exact test.
-			tz.slab_reach = tz.slab ? Math::sqrt(tz.ring_r2[0]) * (real_t)1.001 + (real_t)0.001 : (real_t)0.0;
+			tz.slab_reach = list != nullptr && list->by_x_valid ? Math::sqrt(tz.ring_r2[0]) * (real_t)1.001 + (real_t)0.001 : (real_t)Math::INF;
 		}
 		const uint8_t bit = (uint8_t)(1u << z);
 		if (tz.target_count > 0) {
