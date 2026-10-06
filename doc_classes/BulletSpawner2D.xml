@@ -452,7 +452,7 @@
 			Master switch: every volley this spawner fires is armed with [member graze_zones]. Changes apply to the next shots; volleys already flying keep their zones.
 		</member>
 		<member name="graze_preview_during_runtime" type="bool" setter="set_graze_preview_during_runtime" getter="get_graze_preview_during_runtime" default="false">
-			Also draw the graze rings while the game runs (debugging aid). Requires [member graze_show_preview].
+			Also draw this spawner's graze rings while the game runs (debugging aid). Requires [member graze_show_preview]. Zones flagged [member BulletGrazeZone2D.preview_during_runtime] are drawn by the factory instead (once, whatever this setting), never twice.
 		</member>
 		<member name="graze_preview_line_width" type="float" setter="set_graze_preview_line_width" getter="get_graze_preview_line_width" default="1.5">
 			Line width of the graze preview rings, in pixels. Must be finite and above zero.

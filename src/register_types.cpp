@@ -20,6 +20,7 @@
 
 // Debugger
 #include "debugger/bullet_volley_debugger2d.hpp"
+#include "debugger/graze_preview_layer2d.hpp"
 
 // Spawn data classes
 #include "data/bullet_volley_data2d.hpp"

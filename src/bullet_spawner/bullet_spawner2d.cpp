@@ -79,6 +79,7 @@ void BulletSpawner2D::set_bullet_factory(BulletFactory2D *factory) {
 	bullet_factory_id = factory != nullptr ? factory->get_instance_id() : 0;
 	if (factory == nullptr)
 		bullet_factory = nullptr;
+	update_graze_runtime_preview_hookup();
 }
 
 NodePath BulletSpawner2D::get_transforms_generator_path() const {
@@ -935,7 +936,9 @@ void BulletSpawner2D::_ready() {
 	} else {
 		rebuild_preview();
 	}
-	// Same for the graze ring layer (internal child of this spawner).
+	// Graze runtime preview hookup (group + factory wake), then the same
+	// stray cleanup for the spawner's own ring layer.
+	update_graze_runtime_preview_hookup();
 	if (!graze_preview_active()) {
 		Node *stray_rings = get_node_or_null(NodePath(GRAZE_PREVIEW_NAME));
 		if (stray_rings != nullptr) {

@@ -164,6 +164,11 @@ void BulletVolley2D::prepare_graze_tick() {
 		GrazeTarget2D live[BulletGrazeZone2D::MAX_TARGETS];
 		int live_count = 0;
 		const BulletGrazeZone2D *zone = graze_zones[z].ptr();
+		if (zone != nullptr && zone->enabled && zone->preview_during_runtime) {
+			// Keeps the factory's runtime ring preview drawing this zone
+			// (cheap: a flag check once awake).
+			bullet_factory->wake_graze_runtime_preview();
+		}
 		if (zone != nullptr && zone->enabled && !zone->target_group.is_empty()) {
 			GrazeTarget2D found[BulletGrazeZone2D::MAX_TARGETS];
 			const int count = bullet_factory->graze_targets_for(zone->target_group, found);

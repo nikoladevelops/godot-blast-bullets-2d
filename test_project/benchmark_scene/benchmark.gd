@@ -55,3 +55,7 @@ func _on_bullet_spawner_2d_area_entered(_hit_target_area: Object, _volley: Bulle
 func _on_bullet_spawner_2d_body_entered(_hit_target_body: Object, _volley: BulletVolley2D, _bullet_index: int) -> void:
 	if log_spawner_hits:
 		print("Spawner hit a body!")
+
+
+func _on_bullet_spawner_2d_bullet_grazed(target: Node2D, volley: BulletVolley2D, bullet_index: int, zone: BulletGrazeZone2D, ring_index: int) -> void:
+	print("Bullet volley" + str(volley) + " at index " + str(bullet_index) + " grazed " + str(ring_index))

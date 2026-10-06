@@ -2,6 +2,7 @@
 
 #include "bullet_spawner/volley_tracker2d.hpp"
 #include "bullet_volley/bullet_volley2d.hpp"
+#include "debugger/graze_preview_layer2d.hpp"
 #include "factory/bullet_factory2d.hpp"
 #include "patterns/bullet_patterns2d.hpp"
 #include "patterns/pattern_bake_cache2d.hpp"
@@ -135,41 +136,6 @@ public:
 	float ring_width = 1.5f;
 	void set_rings_data(float p_radius, const Color &p_color, float p_width);
 
-	void _draw() override;
-
-protected:
-	static void _bind_methods();
-};
-
-// Graze ring preview of one spawner: every ring of every graze zone drawn
-// as a circle around each resolved target. Top-level (draws in canvas
-// coordinates, so target global positions are used as they are and a
-// moving spawner never redraws), owner-less and internal (never saved,
-// never a pattern marker). Same snapshot contract as PatternPreviewLayer2D:
-// the spawner stores plain values, _draw() repaints them forever, and a
-// redraw happens only when the snapshot really changed.
-struct GrazePreviewCircle2D {
-	Vector2 center;
-	real_t radius = 0.0;
-	Color color;
-	int zone_index = 0;
-	int ring_index = 0;
-	uint64_t target_id = 0;
-	bool operator==(const GrazePreviewCircle2D &o) const {
-		return center == o.center && radius == o.radius && color == o.color && zone_index == o.zone_index && ring_index == o.ring_index && target_id == o.target_id;
-	}
-};
-
-class GrazePreviewLayer2D : public Node2D {
-	GDCLASS(GrazePreviewLayer2D, Node2D)
-
-public:
-	std::vector<GrazePreviewCircle2D> circles;
-	float line_width = 1.5f;
-	// Instrumentation for tests: how many times _draw() ran.
-	int debug_draw_count = 0;
-	// Stores a new snapshot and queues ONE redraw when it differs.
-	void set_circles(const std::vector<GrazePreviewCircle2D> &p_circles, float p_line_width);
 	void _draw() override;
 
 protected:
@@ -1610,6 +1576,10 @@ private:
 	// Zone resources' `changed` -> ring preview refresh.
 	void connect_graze_zones(bool connect);
 	void _on_graze_zone_changed();
+	// Runtime only: graze spawners join GRAZE_SPAWNER_GROUP (the factory's
+	// runtime preview scans it) and wake their factory's runtime preview
+	// whenever a held zone is flagged preview_during_runtime.
+	void update_graze_runtime_preview_hookup();
 	// Ring preview: allowed + toggled on (editor: graze_show_preview;
 	// runtime: also graze_preview_during_runtime) + graze on.
 	bool graze_preview_active() const;

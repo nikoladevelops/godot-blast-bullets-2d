@@ -172,10 +172,13 @@ void BulletFactory2D::_ready() {
 	volley_debugger->set_draw_inactive_shapes(debugger_draw_inactive_cached_before_ready);
 
 	use_physics_interpolation = use_physics_interpolation_cached_before_ready;
-	set_process(is_factory_processing_bullets && use_physics_interpolation);
+	update_process_state();
 
 	is_ready = true;
 	register_monitors();
+	// Spawners readied before this factory could not wake its graze runtime
+	// preview: one look now (it sleeps again when nothing is flagged).
+	wake_graze_runtime_preview();
 
 	// Interpolation mismatch warning: warn when the factory flag disagrees with the project setting.
 	// Bullets look steppy on >60Hz displays when project interpolation is off
@@ -237,7 +240,7 @@ bool BulletFactory2D::ensure_factory_initialized() {
 		volley_debugger->set_draw_inactive_shapes(debugger_draw_inactive_cached_before_ready);
 	}
 	use_physics_interpolation = use_physics_interpolation_cached_before_ready;
-	set_process(is_factory_processing_bullets && use_physics_interpolation);
+	update_process_state();
 	is_ready = true;
 	if (!ready_missing_super_warned) {
 		ready_missing_super_warned = true;
@@ -341,9 +344,15 @@ void BulletFactory2D::set_is_factory_processing_bullets(bool is_processing_enabl
 	}
 
 	set_physics_process(is_processing_enabled);
-	// _process only drives the interpolation pass: idle it otherwise
-	// instead of paying an empty virtual call every rendered frame.
-	set_process(is_processing_enabled && use_physics_interpolation);
+	update_process_state();
+}
+
+void BulletFactory2D::update_process_state() {
+	// _process drives the interpolation pass (only while bullets process
+	// and interpolation is on) and the graze runtime preview (only while
+	// awake): idle otherwise instead of paying an empty virtual call every
+	// rendered frame.
+	set_process((is_factory_processing_bullets && use_physics_interpolation) || graze_runtime_preview_awake);
 }
 
 void BulletFactory2D::_physics_process(double delta) {
@@ -393,18 +402,20 @@ void BulletFactory2D::_physics_process(double delta) {
 }
 
 void BulletFactory2D::_process(double delta) {
-	if (!use_physics_interpolation) {
-		return;
+	if (is_factory_processing_bullets && use_physics_interpolation) {
+		// Same guard as _physics_process: reset/free_* during the render
+		// sweep would mutate the vec under iteration. The interpolation pass
+		// only reads, but its inputs (vec, sparse set) are shared with the
+		// writers.
+		const uint64_t stats_t0 = Time::get_singleton()->get_ticks_usec();
+		is_iterating_bullets = true;
+		interpolate_volleys();
+		is_iterating_bullets = false;
+		stats_last_render_usec = Time::get_singleton()->get_ticks_usec() - stats_t0;
 	}
-
-	// Same guard as _physics_process: reset/free_* during the render sweep
-	// would mutate the vec under iteration. The interpolation pass only
-	// reads, but its inputs (vec, sparse set) are shared with the writers.
-	const uint64_t stats_t0 = Time::get_singleton()->get_ticks_usec();
-	is_iterating_bullets = true;
-	interpolate_volleys();
-	is_iterating_bullets = false;
-	stats_last_render_usec = Time::get_singleton()->get_ticks_usec() - stats_t0;
+	if (graze_runtime_preview_awake) {
+		refresh_graze_runtime_preview();
+	}
 }
 
 RID BulletFactory2D::get_physics_space() const {

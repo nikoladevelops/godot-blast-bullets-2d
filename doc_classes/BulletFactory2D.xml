@@ -125,6 +125,12 @@
 				Lifecycle snapshot: is_ready, is_busy, is_iterating, is_tearing_down, processing, volleys_total, volleys_pooled, attachments_pooled.
 			</description>
 		</method>
+		<method name="debug_get_graze_runtime_preview" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				The graze runtime preview ([member BulletGrazeZone2D.preview_during_runtime]) exactly as drawn: awake (it sleeps while no flagged zone is in use), visible, zones (flagged zones drawn), draws, and circles, an Array of {center, radius, color, zone_index, ring_index, target_id}.
+			</description>
+		</method>
 		<method name="debug_get_graze_stats" qualifiers="const">
 			<return type="Dictionary" />
 			<description>

@@ -993,6 +993,7 @@ physics (no layer/mask setup, deterministic under `debug_advance_time`).
 | Arming + dispatch | `bullet_volley/bullet_volley2d_graze.cpp` | `graze_set_zones` (Refs, nulls keep their index), `prepare_graze_tick` (stable target slots, rings sorted by radius), `dispatch_graze_events` |
 | Per-bullet stage | `bullet_volley2d_tick.cpp` | `step_graze` (fast path inline, component math) + `graze_visit` (`_NO_INLINE_` slow path) |
 | Spawner | `bullet_spawner/bullet_spawner2d_graze.cpp` | Graze group, arming in `shoot_once` before the homing signals, `resolve_graze_targets`, ring preview (`GrazePreviewLayer2D`: top-level, internal, owner-less, tagged) |
+| Runtime preview | `factory/bullet_factory2d_graze.cpp`, `debugger/graze_preview_layer2d.*` | zones flagged `preview_during_runtime` drawn by the FACTORY, once each, from active volleys + `GRAZE_SPAWNER_GROUP` spawners; asleep (no `_process`) until a spawner/volley wakes it, sleeps again when nothing flagged is left; `update_process_state()` is the one `_process` switch; the spawner's own layer skips flagged zones at runtime |
 
 ### 20.2 Contract (pinned by the `*graze*` suites)
 

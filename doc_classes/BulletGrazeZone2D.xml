@@ -41,7 +41,10 @@
 			When off, the zone tests nothing and bullets inside it end their visit silently. Applies to bullets in flight on the next tick.
 		</member>
 		<member name="preview_color" type="Color" setter="set_preview_color" getter="get_preview_color" default="Color(0.2, 0.9, 0.8, 0.8)">
-			Color of this zone's rings in the spawner's graze preview. The innermost ring uses it as is; each larger ring is drawn fainter.
+			Color of this zone's rings in the spawner's graze preview and in the runtime preview ([member preview_during_runtime]). The innermost ring uses it as is; each larger ring is drawn fainter.
+		</member>
+		<member name="preview_during_runtime" type="bool" setter="set_preview_during_runtime" getter="get_preview_during_runtime" default="false">
+			Debug view: while the game runs, [BulletFactory2D] draws this zone's rings around its targets in [member preview_color], once however many spawners share the zone, so ring sizes can be tuned live (edit the zone from a script or the remote inspector and the rings, and every bullet in flight, follow on the next frame). The zone is drawn while a running [BulletSpawner2D] with graze on holds it, or while any active volley is armed with it (bullets of a freed spawner, volleys armed with [method BulletVolley2D.graze_set_zones]). Off by default; it costs nothing while no zone has it on. The editor preview is [member BulletSpawner2D.graze_show_preview].
 		</member>
 		<member name="regraze" type="int" setter="set_regraze" getter="get_regraze" enum="BulletGrazeZone2D.Regraze" default="0">
 			When a bullet may graze a ring of this zone again. [constant REGRAZE_ONCE]: each ring grazes at most once per bullet life. [constant REGRAZE_AFTER_EXIT]: a bullet that left the zone (the outermost ring of every target) grazes every ring again on its next visit.

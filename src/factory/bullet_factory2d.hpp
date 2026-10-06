@@ -20,6 +20,7 @@
 #include "core/graze_targets2d.hpp"
 #include "data/bullet_effect_layer_data2d.hpp"
 #include "data/bullet_volley_data2d.hpp"
+#include "debugger/graze_preview_layer2d.hpp"
 #include "godot_cpp/core/math.hpp"
 #include "godot_cpp/variant/dictionary.hpp"
 #include "godot_cpp/variant/packed_float32_array.hpp"
@@ -490,6 +491,20 @@ public:
 	// Bumped by volleys per emitted graze event (never per bullet).
 	uint64_t stats_graze_events_total = 0;
 
+	// ---- Graze runtime preview (bullet_factory2d_graze.cpp) ----
+	// Zones flagged BulletGrazeZone2D.preview_during_runtime are drawn here
+	// while the game runs, ONCE each however many spawners share them:
+	// those armed on this factory's active volleys (also volleys of freed
+	// spawners and factory-only volleys) and those held by running graze
+	// spawners that use this factory (GRAZE_SPAWNER_GROUP). Asleep (no
+	// per-frame work) until a spawner or a volley holding a flagged zone
+	// wakes it; it falls asleep again once nothing flagged is left. Keeps
+	// drawing while the factory is paused (inspect a frozen frame).
+	void wake_graze_runtime_preview();
+	// {awake, visible, zones, circles: [{center, radius, color, zone_index,
+	// ring_index, target_id}]} exactly as drawn.
+	Dictionary debug_get_graze_runtime_preview() const;
+
 	//
 
 	void handle_manual_volley_deletion(BulletVolley2D &bullet_multi);
@@ -596,6 +611,20 @@ private:
 	std::vector<VolleyIterationEntry> timer_iteration_scratch;
 	std::vector<GrazeGroupCache2D> graze_groups;
 	uint64_t stats_graze_refreshes = 0;
+	bool graze_runtime_preview_awake = false;
+	GrazePreviewLayer2D *graze_runtime_layer = nullptr;
+	uint64_t graze_runtime_layer_id = 0;
+	int graze_runtime_zone_count = 0;
+	std::vector<GrazePreviewCircle2D> graze_runtime_scratch;
+	std::vector<const BulletGrazeZone2D *> graze_runtime_zones_scratch;
+	static constexpr float kGrazeRuntimePreviewWidth = 2.0f;
+	// Collects the flagged zones in use and redraws (or hides and sleeps).
+	void refresh_graze_runtime_preview();
+	// The layer (internal child), validated by id and healed by name.
+	GrazePreviewLayer2D *resolve_graze_runtime_layer(bool create);
+	// _process runs for the interpolation pass (processing + interpolation)
+	// or the graze runtime preview: the ONE place that decides.
+	void update_process_state();
 	// Advanced once per factory physics step (tick + timers + effects).
 	uint64_t sweep_counter = 0;
 	// Bumped whenever a volley is destroyed (manual free, tracking removal).

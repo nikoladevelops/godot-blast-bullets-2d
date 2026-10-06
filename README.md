@@ -352,6 +352,8 @@ func _on_bullet_graze_exited(target: Node2D, volley: BulletVolley2D, bullet_inde
 
 Each ring grazes once per bullet by default (`regraze = Once`); `After Exit` re-grazes every time a bullet comes back. Edit the zone at runtime (a power-up widening `ring_1_radius`) and every bullet in flight follows it.
 
+To tune ring sizes while the game runs, tick `preview_during_runtime` on the zone: the factory draws its rings around your player (once, however many spawners share the zone), and edits made from a script or the remote inspector show on the next frame. It is off by default and costs nothing while off.
+
 #### Accessing advanced features
 
 ```

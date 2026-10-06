@@ -20,6 +20,7 @@ void BulletSpawner2D::set_graze_enabled(bool value) {
 	notify_property_list_changed();
 	refresh_graze_preview();
 	refresh_process_state();
+	update_graze_runtime_preview_hookup();
 }
 
 TypedArray<BulletGrazeZone2D> BulletSpawner2D::get_graze_zones() const {
@@ -51,6 +52,7 @@ void BulletSpawner2D::set_graze_zones(const Array &value) {
 	connect_graze_zones(true);
 	on_config_changed();
 	refresh_graze_preview();
+	update_graze_runtime_preview_hookup();
 }
 
 bool BulletSpawner2D::get_graze_show_preview() const {
@@ -108,6 +110,34 @@ void BulletSpawner2D::connect_graze_zones(bool connect) {
 void BulletSpawner2D::_on_graze_zone_changed() {
 	on_config_changed();
 	refresh_graze_preview();
+	update_graze_runtime_preview_hookup();
+}
+
+void BulletSpawner2D::update_graze_runtime_preview_hookup() {
+	if (Engine::get_singleton()->is_editor_hint()) {
+		return;
+	}
+	const StringName group(GRAZE_SPAWNER_GROUP);
+	if (graze_enabled != is_in_group(group)) {
+		if (graze_enabled) {
+			add_to_group(group, false); // never saved with the scene
+		} else {
+			remove_from_group(group);
+		}
+	}
+	if (!graze_enabled || !is_inside_tree()) {
+		return;
+	}
+	for (int i = 0; i < graze_zones.size() && i < BulletVolley2D::MAX_GRAZE_ZONES; ++i) {
+		const Variant entry = graze_zones[i];
+		const BulletGrazeZone2D *zone = entry.get_type() == Variant::OBJECT ? Object::cast_to<BulletGrazeZone2D>((Object *)entry) : nullptr;
+		if (zone != nullptr && zone->enabled && zone->preview_during_runtime) {
+			if (BulletFactory2D *factory = get_bullet_factory()) {
+				factory->wake_graze_runtime_preview();
+			}
+			return;
+		}
+	}
 }
 
 void BulletSpawner2D::apply_volley_graze(BulletVolley2D *volley) {
@@ -225,37 +255,19 @@ void BulletSpawner2D::refresh_graze_preview() {
 	}
 	BulletFactory2D *factory = get_bullet_factory();
 	const Ref<World2D> world = factory != nullptr && factory->is_inside_tree() ? factory->get_world_2d() : get_world_2d();
+	const bool runtime = !Engine::get_singleton()->is_editor_hint();
 	for (int z = 0; z < graze_zones.size() && z < BulletVolley2D::MAX_GRAZE_ZONES; ++z) {
 		const Variant entry = graze_zones[z];
 		const BulletGrazeZone2D *zone = entry.get_type() == Variant::OBJECT ? Object::cast_to<BulletGrazeZone2D>((Object *)entry) : nullptr;
 		if (zone == nullptr || !zone->enabled) {
 			continue;
 		}
-		GrazeTarget2D targets[BulletGrazeZone2D::MAX_TARGETS];
-		int count = 0;
-		collect_graze_targets2d(get_tree(), zone->target_group, world.ptr(), get_instance_id(), targets, count);
-		const int rings = CLAMP(zone->ring_count, 1, BulletGrazeZone2D::MAX_RINGS);
-		for (int r = 0; r < rings; ++r) {
-			// Inner rings opaque, each larger one fainter (0.7 per step).
-			int rank = 0;
-			for (int o = 0; o < rings; ++o) {
-				if (zone->ring_radii[o] < zone->ring_radii[r] || (zone->ring_radii[o] == zone->ring_radii[r] && o < r)) {
-					++rank;
-				}
-			}
-			Color color = zone->preview_color;
-			color.a *= (float)Math::pow(0.7, (double)rank);
-			for (int k = 0; k < count; ++k) {
-				GrazePreviewCircle2D circle;
-				circle.center = targets[k].position;
-				circle.radius = zone->ring_radii[r];
-				circle.color = color;
-				circle.zone_index = z;
-				circle.ring_index = r;
-				circle.target_id = targets[k].id;
-				graze_preview_scratch.push_back(circle);
-			}
+		// At runtime the factory draws zones flagged preview_during_runtime
+		// (once, however many spawners share them): never twice.
+		if (runtime && zone->preview_during_runtime && factory != nullptr) {
+			continue;
 		}
+		append_graze_zone_circles2d(get_tree(), *zone, z, world.ptr(), get_instance_id(), graze_preview_scratch);
 	}
 	layer->set_circles(graze_preview_scratch, (float)graze_preview_line_width);
 }

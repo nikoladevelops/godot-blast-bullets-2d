@@ -111,6 +111,15 @@ void BulletGrazeZone2D::set_preview_color(const Color &value) {
 	emit_changed();
 }
 
+bool BulletGrazeZone2D::get_preview_during_runtime() const { return preview_during_runtime; }
+void BulletGrazeZone2D::set_preview_during_runtime(bool value) {
+	if (preview_during_runtime == value) {
+		return;
+	}
+	preview_during_runtime = value;
+	emit_changed();
+}
+
 void BulletGrazeZone2D::_validate_property(PropertyInfo &p_property) const {
 	const String name = p_property.name;
 	if (!name.begins_with("ring_") || !name.ends_with("_radius")) {
@@ -156,6 +165,10 @@ void BulletGrazeZone2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_preview_color"), &BulletGrazeZone2D::get_preview_color);
 	ClassDB::bind_method(D_METHOD("set_preview_color", "value"), &BulletGrazeZone2D::set_preview_color);
 	ADD_PROPERTY(PropertyInfo(Variant::COLOR, "preview_color"), "set_preview_color", "get_preview_color");
+
+	ClassDB::bind_method(D_METHOD("get_preview_during_runtime"), &BulletGrazeZone2D::get_preview_during_runtime);
+	ClassDB::bind_method(D_METHOD("set_preview_during_runtime", "value"), &BulletGrazeZone2D::set_preview_during_runtime);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "preview_during_runtime"), "set_preview_during_runtime", "get_preview_during_runtime");
 
 	ClassDB::bind_method(D_METHOD("get_ring_radius", "index"), &BulletGrazeZone2D::get_ring_radius);
 	ClassDB::bind_method(D_METHOD("set_ring_radius", "index", "value"), &BulletGrazeZone2D::set_ring_radius);
