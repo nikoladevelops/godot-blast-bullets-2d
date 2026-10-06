@@ -1,9 +1,9 @@
 # BlastBullets2D benchmark: latest run
 
-- run: `2026-10-05T10-36-56Z` commit `72ed46e`
+- run: `2026-10-06T05-30-29Z` commit `cedbd11`
 - machine: AMD Ryzen 7 8840HS w/ Radeon 780M Graphics (16 threads), Linux-7.2.9-1-cachyos-x86_64-with-glibc2.44
 - godot: 4.7.2-stable (arch_linux), debug build: True, repeats: 5 (median)
-- baseline: `5ed265d` (2026-10-02T16-53-28Z)
+- baseline: `cedbd11` (2026-10-06T05-29-10Z)
 
 Times are milliseconds of CPU per frame (simulated time, `--fixed-fps 60`).
 `frame` = step + engine; `step` = the scenario's own plugin calls (spawns...);
@@ -11,28 +11,28 @@ Times are milliseconds of CPU per frame (simulated time, `--fixed-fps 60`).
 
 | scenario | frame p50 | frame p95 | frame p99 | frame max | step max | engine max | tick p50 | tick p99 | bullets | mem peak MB | objects +/- | vs baseline |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| attachments_500 | 0.046 | 0.052 | 0.127 | 0.364 | 0.239 | 0.127 | 0.027 | 0.078 | 453 | 32.9 | +0 | frame p50 +0%, tick p50 +8% |
-| bounce_box_2k | 0.116 | 0.125 | 0.133 | 0.233 | 0.001 | 0.233 | 0.055 | 0.063 | 2000 | 29.7 | +0 | frame p50 -7%, tick p50 +0% |
-| cold_spawn_scaling | 0.004 | 0.004 | 0.004 | 0.004 | 0.001 | 0.004 | 0.000 | 0.000 | 0 | 51.2 | +0 | frame p50 +0%, tick p50 +0% |
-| collision_storm | 0.682 | 1.276 | 1.524 | 2.737 | 0.160 | 2.600 | 0.144 | 0.306 | 1400 | 30.5 | +0 | frame p50 -8%, tick p50 -20% |
-| factory_warm_spawn_5k | 12.516 | 15.001 | 15.485 | 15.853 | 3.324 | 14.412 | 3.134 | 5.062 | 90000 | 69.7 | +0 | frame p50 -28%, tick p50 -27% |
-| hit_handlers_2k | 1.415 | 2.088 | 2.851 | 3.546 | 0.881 | 3.308 | 0.315 | 0.592 | 1870 | 36.5 | +318 | new |
-| homing_2k_moving_targets | 0.169 | 0.179 | 0.197 | 1.028 | 0.010 | 1.027 | 0.104 | 0.119 | 2000 | 29.7 | +0 | frame p50 +1%, tick p50 +7% |
-| kitchen_sink | 0.472 | 0.622 | 0.941 | 2.152 | 0.004 | 2.151 | 0.279 | 0.332 | 7488 | 33.1 | +171 | frame p50 -5%, tick p50 +1% |
-| lifetime_signal_10k | 0.581 | 0.763 | 4.783 | 5.439 | 3.177 | 2.389 | 0.268 | 2.124 | 7375 | 38.8 | +0 | new |
-| mass_expiry_10k | 0.589 | 0.766 | 4.574 | 5.220 | 2.930 | 2.491 | 0.275 | 0.755 | 7375 | 38.8 | +0 | frame p50 -1%, tick p50 +3% |
-| pool_churn | 0.783 | 0.840 | 0.897 | 2.573 | 0.812 | 2.457 | 0.275 | 0.325 | 9000 | 33.9 | +0 | frame p50 -13%, tick p50 -12% |
-| spawner_aimed_regen_2k | 2.764 | 2.943 | 4.684 | 4.761 | 1.907 | 4.223 | 1.179 | 2.980 | 36000 | 43.4 | +0 | new |
-| spawner_moving_preview_1500 | 0.567 | 1.299 | 2.628 | 3.284 | 0.004 | 3.284 | 0.324 | 0.457 | 11550 | 34.9 | +15 | frame p50 -56%, tick p50 +2% |
-| spawner_path_move_1500 | 0.853 | 1.645 | 3.204 | 3.699 | 0.002 | 3.698 | 0.484 | 0.647 | 17780 | 37.7 | +15 | new |
-| spawner_spin_preview_1500 | 0.581 | 1.519 | 4.652 | 9.027 | 0.002 | 9.026 | 0.321 | 0.477 | 11550 | 39.8 | +15 | frame p50 -40%, tick p50 +1% |
-| spawner_warm_shot_5k | 13.572 | 16.050 | 17.188 | 17.959 | 3.666 | 16.035 | 3.409 | 5.416 | 90000 | 163.5 | +0 | new |
-| trails_fx_2k | 0.353 | 0.611 | 3.605 | 3.841 | 3.245 | 1.638 | 0.285 | 0.554 | 1967 | 30.9 | +0 | frame p50 -13%, tick p50 -15% |
-| volley_10k_flight | 0.556 | 0.588 | 0.623 | 2.253 | 0.002 | 2.253 | 0.271 | 0.298 | 10000 | 32.8 | +0 | frame p50 -1%, tick p50 +1% |
+| attachments_500 | 0.044 | 0.052 | 0.127 | 0.329 | 0.206 | 0.127 | 0.025 | 0.078 | 453 | 32.9 | +0 | frame p50 -2%, tick p50 -4% |
+| bounce_box_2k | 0.116 | 0.122 | 0.127 | 0.133 | 0.001 | 0.132 | 0.053 | 0.058 | 2000 | 29.7 | +0 | frame p50 +3%, tick p50 +2% |
+| cold_spawn_scaling | 0.004 | 0.005 | 0.007 | 0.007 | 0.001 | 0.007 | 0.000 | 0.000 | 0 | 51.3 | +0 | frame p50 +0%, tick p50 +0% |
+| collision_storm | 0.662 | 1.261 | 1.306 | 2.345 | 0.147 | 2.290 | 0.142 | 0.305 | 1400 | 30.5 | +0 | frame p50 -3%, tick p50 -1% |
+| factory_warm_spawn_5k | 11.978 | 13.332 | 15.161 | 16.047 | 2.798 | 14.748 | 3.010 | 3.837 | 90000 | 64.9 | +0 | frame p50 -9%, tick p50 -5% |
+| hit_handlers_2k | 1.333 | 2.025 | 2.513 | 3.274 | 0.451 | 3.133 | 0.276 | 0.573 | 1870 | 35.6 | +318 | frame p50 +2%, tick p50 -7% |
+| homing_2k_moving_targets | 0.169 | 0.176 | 0.180 | 0.218 | 0.006 | 0.217 | 0.103 | 0.111 | 2000 | 29.7 | +0 | frame p50 +2%, tick p50 +1% |
+| kitchen_sink | 0.470 | 0.587 | 0.679 | 1.764 | 0.004 | 1.763 | 0.272 | 0.316 | 7488 | 32.7 | +171 | frame p50 -1%, tick p50 -1% |
+| lifetime_signal_10k | 0.575 | 0.758 | 4.325 | 5.096 | 2.722 | 2.471 | 0.257 | 2.114 | 7375 | 38.3 | +0 | frame p50 -1%, tick p50 -2% |
+| mass_expiry_10k | 0.578 | 0.756 | 4.080 | 4.608 | 2.293 | 2.498 | 0.260 | 0.707 | 7375 | 38.3 | +0 | frame p50 -1%, tick p50 -0% |
+| pool_churn | 0.761 | 0.819 | 0.869 | 2.720 | 0.101 | 2.636 | 0.263 | 0.299 | 9000 | 33.4 | +0 | frame p50 -0%, tick p50 -2% |
+| spawner_aimed_regen_2k | 2.590 | 2.793 | 4.464 | 4.683 | 2.066 | 4.197 | 1.126 | 1.304 | 36000 | 41.4 | +0 | frame p50 -1%, tick p50 -1% |
+| spawner_moving_preview_1500 | 0.551 | 1.173 | 2.215 | 2.823 | 0.002 | 2.823 | 0.307 | 0.423 | 11550 | 34.2 | +15 | frame p50 -5%, tick p50 -5% |
+| spawner_path_move_1500 | 0.838 | 1.542 | 2.830 | 3.200 | 0.001 | 3.199 | 0.468 | 0.597 | 17780 | 36.7 | +15 | frame p50 -6%, tick p50 -5% |
+| spawner_spin_preview_1500 | 0.575 | 1.413 | 4.050 | 8.255 | 0.001 | 8.255 | 0.310 | 0.455 | 11550 | 39.1 | +15 | frame p50 -1%, tick p50 -1% |
+| spawner_warm_shot_5k | 12.334 | 14.101 | 16.532 | 17.163 | 3.454 | 15.343 | 3.232 | 5.024 | 90000 | 158.5 | +0 | frame p50 -3%, tick p50 -2% |
+| trails_fx_2k | 0.347 | 0.599 | 3.474 | 3.636 | 3.016 | 0.647 | 0.279 | 0.538 | 1967 | 30.9 | +0 | frame p50 +2%, tick p50 +2% |
+| volley_10k_flight | 0.546 | 0.565 | 0.576 | 0.582 | 0.001 | 0.582 | 0.258 | 0.269 | 10000 | 32.3 | +0 | frame p50 -0%, tick p50 -0% |
 
 ## Scenario extras
 
-- **cold_spawn_scaling**: cold_1000_ms=0.600, cold_2000_ms=1.385, cold_4000_ms=3.601, cold_8000_ms=10.683, scaling_8k_over_1k=17.388
+- **cold_spawn_scaling**: cold_1000_ms=0.523, cold_2000_ms=1.192, cold_4000_ms=3.245, cold_8000_ms=9.345, scaling_8k_over_1k=17.821
 - **collision_storm**: records_per_frame=200.000
 - **hit_handlers_2k**: handler_calls=38157, healed=4769
 - **lifetime_signal_10k**: bullets_listed=30000, handler_calls=30
