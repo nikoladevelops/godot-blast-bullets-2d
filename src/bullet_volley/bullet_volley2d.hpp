@@ -1117,6 +1117,7 @@ public:
 
 	// A NaN baked into a Curve resource would otherwise flow straight into
 	// speed/direction caches with no recovery, so fail each sample to 0.
+	_ALWAYS_INLINE_ real_t sample_volley_curve(const Ref<Curve> &curve, bool use_unit, real_t fallback) const;
 	_ALWAYS_INLINE_ real_t get_bullet_curves_movement_speed(const BulletCurvesData2D *curves_data) const;
 
 	_ALWAYS_INLINE_ real_t get_bullet_curves_rotation_speed(const BulletCurvesData2D *curves_data) const;
@@ -2222,6 +2223,11 @@ public:
 	// parity) — wake the bullet first, then replace.
 	bool bullet_replace_homing_targets_with_new_target(int bullet_index, const Variant &node2d_or_global_position);
 
+	// Single routing point for every per-bullet front change that is not an
+	// explicit clear (pops, replaces, trims, the auto-pop flush). Empty
+	// deque = policy-aware unlock (StayLocked rides out the gap); non-empty
+	// deque = keep or unlock per lock policy, so RelockAlways never holds a
+	// stale lock and StayLocked/RelockOnTargetChange never flicker.
 	_ALWAYS_INLINE_ void orbit_keep_lock_across_replace_for_bullet(int bullet_index, HomingTargetDeque &deque);
 
 	// Front-change core: shared by pops (any position) and replaces.
@@ -2231,13 +2237,6 @@ public:
 	// front swap.
 	_ALWAYS_INLINE_ void orbit_keep_lock_across_replace_for_bullet_front_only(int bullet_index, HomingTargetDeque &deque, bool front_changed = true);
 
-	// Single routing point for every per-bullet front change that is not an
-	// explicit clear: manual pops (front/back) and the deferred auto-pop
-	// flush funnel here. Empty deque = policy-aware unlock (StayLocked rides
-	// out the gap); non-empty deque = keep or unlock per lock policy, so
-	// RelockAlways never holds a stale lock on a new target and
-	// StayLocked/RelockOnTargetChange never flicker on the same target.
-	_ALWAYS_INLINE_ void orbit_route_front_change_for_bullet(int bullet_index, HomingTargetDeque &deque);
 
 	void all_bullets_replace_homing_targets_with_new_target(const Variant &node2d_or_global_position, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 

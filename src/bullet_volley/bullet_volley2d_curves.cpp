@@ -101,7 +101,7 @@ _ALWAYS_INLINE_ void BulletVolley2D::populate_individual_bullet_curves_related_d
 	}
 
 	if (is_movement_curve_valid || is_x_direction_curve_valid || is_y_direction_curve_valid) {
-		all_cached_velocity[bullet_index] = all_cached_direction[bullet_index] * all_cached_speed[bullet_index] + inherited_velocity_offset;
+		refresh_cached_velocity(bullet_index);
 	}
 }
 

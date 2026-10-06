@@ -36,9 +36,7 @@ real_t BulletVolley2D::gravity_strength_scale_for_bullet(const BulletCurvesData2
 	} else {
 		return 1.0;
 	}
-	const bool use_unit = src->gravity_use_unit_curve && !is_life_time_infinite;
-	const real_t sampled = src->gravity_strength_curve->sample_baked(curve_get_input_value(use_unit));
-	return Math::is_finite(sampled) ? sampled : 1.0;
+	return sample_volley_curve(src->gravity_strength_curve, src->gravity_use_unit_curve, 1.0);
 }
 
 void BulletVolley2D::set_gravity(const Vector2 &value) {

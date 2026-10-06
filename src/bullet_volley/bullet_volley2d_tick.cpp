@@ -374,7 +374,7 @@ _ALWAYS_INLINE_ void BulletVolley2D::step_homing(const MoveTick2D &t, BulletStep
 		homing_resync_count(i);
 		// Trimming exposed a new front target: like a pop, orbit rings re-lock.
 		if (trimmed_count > 0) {
-			orbit_route_front_change_for_bullet(i, own);
+			orbit_keep_lock_across_replace_for_bullet(i, own);
 		}
 		if (count > 0 && !own.empty()) {
 			// Moving targets refresh on the interval.
@@ -788,16 +788,9 @@ _ALWAYS_INLINE_ void BulletVolley2D::step_speed(const MoveTick2D &t, BulletStep2
 		const real_t keep = Math::max((real_t)0.0, (real_t)1.0 - linear_drag * (real_t)delta);
 		all_cached_speed[i] *= keep;
 		refresh_cached_velocity(i);
-	} else if (gravity_active) {
-		// Any gravity (shared or per-bullet) keeps its fall speed in the
-		// reported velocity; the plain accel path above omits it.
-		refresh_cached_velocity(i);
 	}
 }
 
-_ALWAYS_INLINE_ void BulletVolley2D::refresh_cached_velocity(int bullet_index) {
-	all_cached_velocity[bullet_index] = all_cached_direction[bullet_index] * all_cached_speed[bullet_index] + inherited_velocity_offset + ((bullet_index < (int)all_gravity_velocity.size()) ? all_gravity_velocity[bullet_index] : Vector2(0, 0));
-}
 
 // ---- Per-bullet helpers called from move_bullets (inline, this file only) ----
 
@@ -824,14 +817,7 @@ _ALWAYS_INLINE_ void BulletVolley2D::batch_flush_instance_transforms() {
 		if (all_bullets_enabled_set.contains(i)) {
 			t = multimesh_inv * all_cached_instance_transforms[i];
 		}
-		w[i * 8 + 0] = t.columns[0][0];
-		w[i * 8 + 1] = t.columns[1][0];
-		w[i * 8 + 2] = 0;
-		w[i * 8 + 3] = t.columns[2][0];
-		w[i * 8 + 4] = t.columns[0][1];
-		w[i * 8 + 5] = t.columns[1][1];
-		w[i * 8 + 6] = 0;
-		w[i * 8 + 7] = t.columns[2][1];
+		write_multimesh_transform2d(w + i * 8, t);
 	}
 
 	multi->set_buffer(batch_buffer);
@@ -869,14 +855,14 @@ _ALWAYS_INLINE_ void BulletVolley2D::bullet_accelerate_speed(int bullet_index, d
 	}
 	curr_bullet_speed = new_speed;
 
-	all_cached_velocity[bullet_index] = all_cached_direction[bullet_index] * curr_bullet_speed + inherited_velocity_offset;
+	refresh_cached_velocity(bullet_index);
 }
 
 _ALWAYS_INLINE_ void BulletVolley2D::bullet_accelerate_speed_using_curve(int bullet_index, double delta, const BulletCurvesData2D *curves_data) {
 	real_t &curr_bullet_speed = all_cached_speed[bullet_index];
 	curr_bullet_speed = get_bullet_curves_movement_speed(curves_data);
 
-	all_cached_velocity[bullet_index] = all_cached_direction[bullet_index] * curr_bullet_speed + inherited_velocity_offset;
+	refresh_cached_velocity(bullet_index);
 }
 
 _ALWAYS_INLINE_ void BulletVolley2D::bullet_accelerate_rotation_speed(int bullet_index, double delta) {

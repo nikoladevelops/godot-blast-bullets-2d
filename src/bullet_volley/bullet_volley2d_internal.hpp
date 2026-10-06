@@ -48,6 +48,25 @@
 namespace BlastBullets2D {
 using namespace godot;
 
+// The documented velocity composition: direction x speed + inherited
+// offset + the integrated fall speed (zero while gravity never acted).
+_ALWAYS_INLINE_ void BulletVolley2D::refresh_cached_velocity(int bullet_index) {
+	all_cached_velocity[bullet_index] = all_cached_direction[bullet_index] * all_cached_speed[bullet_index] + inherited_velocity_offset + ((bullet_index < (int)all_gravity_velocity.size()) ? all_gravity_velocity[bullet_index] : Vector2(0, 0));
+}
+
+// One MultiMesh 2D instance in the buffer layout set_buffer expects:
+// row-major 2x4 (x.x, y.x, 0, origin.x, x.y, y.y, 0, origin.y).
+static _ALWAYS_INLINE_ void write_multimesh_transform2d(float *out, const Transform2D &t) {
+	out[0] = t.columns[0][0];
+	out[1] = t.columns[1][0];
+	out[2] = 0;
+	out[3] = t.columns[2][0];
+	out[4] = t.columns[0][1];
+	out[5] = t.columns[1][1];
+	out[6] = 0;
+	out[7] = t.columns[2][1];
+}
+
 _ALWAYS_INLINE_ Transform2D BulletVolley2D::to_local_for_multimesh(const Transform2D &global_transf) const {
 	if (node_inverse_scope_active) {
 		return node_inverse_scope_valid ? node_inverse_scope * global_transf : global_transf;
@@ -501,7 +520,7 @@ _ALWAYS_INLINE_ void BulletVolley2D::populate_shared_curves_related_data(const R
 		}
 
 		if (is_movement_curve_valid || is_x_direction_curve_valid || is_y_direction_curve_valid) {
-			all_cached_velocity[i] = all_cached_direction[i] * all_cached_speed[i] + inherited_velocity_offset;
+			refresh_cached_velocity(i);
 		}
 	}
 }
@@ -533,40 +552,28 @@ _ALWAYS_INLINE_ void BulletVolley2D::apply_y_direction_curve(Vector2 &direction_
 	apply_direction_axis2d(direction_vector, 1, curves_data->y_direction_curve_mode, get_bullet_curves_y_direction_offset(curves_data), curves_data->y_direction_curve_strength);
 }
 
+// A curve sampled at the volley clock: life progress (0..1) when use_unit
+// and the lifetime is finite, else elapsed seconds; fallback when the
+// sample is not finite.
+_ALWAYS_INLINE_ real_t BulletVolley2D::sample_volley_curve(const Ref<Curve> &curve, bool use_unit, real_t fallback) const {
+	const real_t sampled = curve->sample_baked(curve_get_input_value(use_unit && !is_life_time_infinite));
+	return Math::is_finite(sampled) ? sampled : fallback;
+}
+
 _ALWAYS_INLINE_ real_t BulletVolley2D::get_bullet_curves_movement_speed(const BulletCurvesData2D *curves_data) const {
-	const bool use_unit_curve = curves_data->movement_use_unit_curve && !is_life_time_infinite;
-
-	real_t input_x = curve_get_input_value(use_unit_curve);
-
-	const real_t sampled = curves_data->movement_speed_curve->sample_baked(input_x);
-	return Math::is_finite(sampled) ? sampled : 0.0;
+	return sample_volley_curve(curves_data->movement_speed_curve, curves_data->movement_use_unit_curve, 0.0);
 }
 
 _ALWAYS_INLINE_ real_t BulletVolley2D::get_bullet_curves_rotation_speed(const BulletCurvesData2D *curves_data) const {
-	const bool use_unit_curve = curves_data->rotation_use_unit_curve && !is_life_time_infinite;
-
-	real_t input_x = curve_get_input_value(use_unit_curve);
-
-	const real_t sampled = curves_data->rotation_speed_curve->sample_baked(input_x);
-	return Math::is_finite(sampled) ? sampled : 0.0;
+	return sample_volley_curve(curves_data->rotation_speed_curve, curves_data->rotation_use_unit_curve, 0.0);
 }
 
 _ALWAYS_INLINE_ real_t BulletVolley2D::get_bullet_curves_x_direction_offset(const BulletCurvesData2D *curves_data) const {
-	const bool use_unit_curve = curves_data->x_direction_use_unit_curve && !is_life_time_infinite;
-
-	real_t input_x = curve_get_input_value(use_unit_curve);
-
-	const real_t sampled = curves_data->x_direction_curve->sample_baked(input_x);
-	return Math::is_finite(sampled) ? sampled : 0.0;
+	return sample_volley_curve(curves_data->x_direction_curve, curves_data->x_direction_use_unit_curve, 0.0);
 }
 
 _ALWAYS_INLINE_ real_t BulletVolley2D::get_bullet_curves_y_direction_offset(const BulletCurvesData2D *curves_data) const {
-	const bool use_unit_curve = curves_data->y_direction_use_unit_curve && !is_life_time_infinite;
-
-	real_t input_x = curve_get_input_value(use_unit_curve);
-
-	const real_t sampled = curves_data->y_direction_curve->sample_baked(input_x);
-	return Math::is_finite(sampled) ? sampled : 0.0;
+	return sample_volley_curve(curves_data->y_direction_curve, curves_data->y_direction_use_unit_curve, 0.0);
 }
 
 _ALWAYS_INLINE_ real_t BulletVolley2D::curve_get_input_value(bool use_unit_curve) const {
@@ -889,32 +896,8 @@ _ALWAYS_INLINE_ bool BulletVolley2D::orbit_reject_disabled_bullet(int bullet_ind
 }
 
 _ALWAYS_INLINE_ void BulletVolley2D::orbit_keep_lock_across_replace(HomingTargetDeque &deque) {
-	for (size_t k = 0; k < all_orbiting_data.size(); ++k) {
-		if (k >= all_orbiting_status.size() || all_orbiting_status[k] == 0) {
-			continue;
-		}
-		OrbitingData &o = all_orbiting_data[k];
-		if (!o.is_locked_orbiting) {
-			continue;
-		}
-		if (deque.empty()) {
-			if (o.lock_policy == StayLocked) {
-				continue;
-			}
-			o.is_locked_orbiting = false;
-			continue;
-		}
-		if (o.lock_policy == RelockAlways) {
-			o.is_locked_orbiting = false;
-			continue;
-		}
-		if (!orbit_should_unlock_for_front_change(o, deque)) {
-			o.locked_center = deque.get_cached_front_target_global_position();
-			o.locked_target_type = orbit_target_type(deque);
-			o.locked_target_identity = orbit_target_identity(deque);
-		} else {
-			o.is_locked_orbiting = false;
-		}
+	for (int k = 0; k < (int)all_orbiting_data.size(); ++k) {
+		orbit_keep_lock_across_replace_for_bullet(k, deque);
 	}
 }
 
@@ -955,9 +938,6 @@ _ALWAYS_INLINE_ void BulletVolley2D::orbit_keep_lock_across_replace_for_bullet_f
 	}
 }
 
-_ALWAYS_INLINE_ void BulletVolley2D::orbit_route_front_change_for_bullet(int bullet_index, HomingTargetDeque &deque) {
-	orbit_keep_lock_across_replace_for_bullet(bullet_index, deque);
-}
 
 // Drops bullet i's own homing targets and their share of the volley-wide
 // counter (the deque clear also keeps the global mouse counter honest).

@@ -17,7 +17,7 @@ void BulletVolley2D::set_inherited_velocity_offset(const Vector2 &new_offset) {
 	// direction changes, so without this the getter stays stale until
 	// the next steer (forever while paused or fully disabled).
 	for (size_t k = 0; k < all_cached_velocity.size() && k < all_cached_direction.size() && k < all_cached_speed.size(); ++k) {
-		all_cached_velocity[k] = all_cached_direction[k] * all_cached_speed[k] + inherited_velocity_offset;
+		refresh_cached_velocity((int)k);
 	}
 }
 
@@ -73,7 +73,10 @@ void BulletVolley2D::bullet_set_velocity(int bullet_index, const Vector2 &new_ve
 		return;
 	}
 
-	const Vector2 without_offset = new_velocity - inherited_velocity_offset;
+	// The exact TOTAL velocity: the current fall speed stays the gravity
+	// integrator's, direction x speed takes the rest.
+	const Vector2 fall = bullet_index >= 0 && bullet_index < (int)all_gravity_velocity.size() ? all_gravity_velocity[bullet_index] : Vector2(0, 0);
+	const Vector2 without_offset = new_velocity - inherited_velocity_offset - fall;
 	const real_t new_speed = without_offset.length();
 
 	if (bullet_index < 0 || bullet_index >= (int)all_cached_direction.size() || bullet_index >= (int)all_cached_speed.size() || bullet_index >= (int)all_cached_max_speed.size() || bullet_index >= (int)all_cached_velocity.size()) {
@@ -87,7 +90,7 @@ void BulletVolley2D::bullet_set_velocity(int bullet_index, const Vector2 &new_ve
 	if (all_cached_max_speed[bullet_index] < new_speed) {
 		all_cached_max_speed[bullet_index] = new_speed;
 	}
-	all_cached_velocity[bullet_index] = all_cached_direction[bullet_index] * new_speed + inherited_velocity_offset;
+	refresh_cached_velocity(bullet_index);
 }
 
 void BulletVolley2D::all_bullets_set_velocity(const Vector2 &new_velocity, int bullet_index_start, int bullet_index_end_inclusive) {
@@ -379,7 +382,7 @@ void BulletVolley2D::set_bullet_speed_data(int bullet_index, const Ref<BulletSpe
 	all_cached_speed[bullet_index] = new_bullet_speed_data->speed;
 	all_cached_max_speed[bullet_index] = new_bullet_speed_data->max_speed;
 	all_cached_acceleration[bullet_index] = new_bullet_speed_data->acceleration;
-	all_cached_velocity[bullet_index] = all_cached_direction[bullet_index] * new_bullet_speed_data->speed + inherited_velocity_offset;
+	refresh_cached_velocity(bullet_index);
 	// A direct per-bullet write is as authoritative as a seeded entry: the
 	// shared fallback must never overwrite it, including an all-zero "freeze".
 	mark_per_bullet_speed_presence(bullet_index, true);
@@ -449,7 +452,7 @@ void BulletVolley2D::set_bullet_direction(int bullet_index, const Vector2 &new_d
 		return;
 	}
 	all_cached_direction[bullet_index] = new_direction.normalized();
-	all_cached_velocity[bullet_index] = all_cached_direction[bullet_index] * all_cached_speed[bullet_index] + inherited_velocity_offset;
+	refresh_cached_velocity(bullet_index);
 }
 
 TypedArray<Vector2> BulletVolley2D::all_bullets_get_direction(int bullet_index_start, int bullet_index_end_inclusive) const {
@@ -666,7 +669,7 @@ void BulletVolley2D::set_bullet_transform(int bullet_index, const Transform2D &n
 			Vector2 new_direction = Vector2(1, 0).rotated(curr_bullet_transf.get_rotation() - cache_texture_rotation_radians);
 			if (bullet_index >= 0 && bullet_index < (int)all_cached_direction.size() && bullet_index < (int)all_cached_velocity.size() && bullet_index < (int)all_cached_speed.size()) {
 				all_cached_direction[bullet_index] = new_direction.normalized();
-				all_cached_velocity[bullet_index] = all_cached_direction[bullet_index] * all_cached_speed[bullet_index] + inherited_velocity_offset;
+				refresh_cached_velocity(bullet_index);
 			}
 		}
 	}
@@ -712,7 +715,7 @@ void BulletVolley2D::set_bullet_direction_towards_position(int bullet_index, con
 		return;
 	}
 	all_cached_direction[bullet_index] = to_target.normalized();
-	all_cached_velocity[bullet_index] = all_cached_direction[bullet_index] * all_cached_speed[bullet_index] + inherited_velocity_offset;
+	refresh_cached_velocity(bullet_index);
 }
 
 void BulletVolley2D::all_bullets_set_direction_towards_position(const Vector2 &target_position, int bullet_index_start, int bullet_index_end_inclusive) {
@@ -754,7 +757,7 @@ void BulletVolley2D::set_bullet_direction_towards_node2d(int bullet_index, const
 		return;
 	}
 	all_cached_direction[bullet_index] = to_node.normalized();
-	all_cached_velocity[bullet_index] = all_cached_direction[bullet_index] * all_cached_speed[bullet_index] + inherited_velocity_offset;
+	refresh_cached_velocity(bullet_index);
 }
 
 void BulletVolley2D::all_bullets_set_direction_towards_node2d(const Node2D *target_node, int bullet_index_start, int bullet_index_end_inclusive) {

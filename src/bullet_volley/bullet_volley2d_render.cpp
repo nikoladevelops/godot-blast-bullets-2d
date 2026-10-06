@@ -42,14 +42,7 @@ void BulletVolley2D::interpolate_bullet_visuals() {
 		} else {
 			t = zero_transform;
 		}
-		w[i * 8 + 0] = t.columns[0][0];
-		w[i * 8 + 1] = t.columns[1][0];
-		w[i * 8 + 2] = 0;
-		w[i * 8 + 3] = t.columns[2][0];
-		w[i * 8 + 4] = t.columns[0][1];
-		w[i * 8 + 5] = t.columns[1][1];
-		w[i * 8 + 6] = 0;
-		w[i * 8 + 7] = t.columns[2][1];
+		write_multimesh_transform2d(w + i * 8, t);
 	}
 	multi->set_buffer(batch_buffer);
 	const auto &active_bullet_indexes = all_bullets_enabled_set.get_active_indexes();

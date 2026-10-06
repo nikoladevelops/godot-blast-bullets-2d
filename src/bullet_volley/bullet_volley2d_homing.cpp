@@ -9,15 +9,8 @@ using namespace godot;
 namespace BlastBullets2D {
 
 _ALWAYS_INLINE_ void BulletVolley2D::orbit_unlock_on_empty_deque() {
-	for (size_t k = 0; k < all_orbiting_data.size(); ++k) {
-		if (k >= all_orbiting_status.size() || all_orbiting_status[k] == 0) {
-			continue;
-		}
-		OrbitingData &o = all_orbiting_data[k];
-		if (!o.is_locked_orbiting || o.lock_policy == StayLocked) {
-			continue;
-		}
-		o.is_locked_orbiting = false;
+	for (int k = 0; k < (int)all_orbiting_data.size(); ++k) {
+		orbit_unlock_on_empty_deque_for_bullet(k);
 	}
 }
 
@@ -58,7 +51,7 @@ Variant BulletVolley2D::bullet_homing_pop_front_target(int bullet_index) {
 	// leave the counter above the live deque size (phantom-homing an
 	// empty deque). Clamp down so counters always reflect reality.
 	homing_resync_count(bullet_index);
-	orbit_route_front_change_for_bullet(bullet_index, queue);
+	orbit_keep_lock_across_replace_for_bullet(bullet_index, queue);
 	return popped;
 }
 

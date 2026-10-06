@@ -64,3 +64,45 @@ func test_reported_velocity_matches_the_next_tick_displacement(case_index: int =
 		if expected.distance_to(moved) > 0.05:
 			problems.append("%s bullet %d: reported %s (+g dt = %s), moved %s (fall %.2f)" % [case_name, b, reported, expected, moved, v.debug_get_gravity_info(b)["fall_speed"]])
 	assert_eq(", ".join(problems), "", "reported velocity includes the fall speed")
+
+
+## Setters that change direction or speed report the same composition right
+## away (not only after the next tick), and bullet_set_velocity sets the
+## EXACT total velocity: the next tick moves the bullet by (set + g dt) dt.
+const SETTERS := ["set_bullet_direction", "towards_position", "towards_node2d", "set_bullet_speed_data", "bullet_set_velocity"]
+
+
+func test_setters_keep_the_fall_speed_in_the_reported_velocity(setter_index: int = use_parameters(range(SETTERS.size()))) -> void:
+	var setter: String = SETTERS[setter_index]
+	var d := H.make_volley_data(1, 200.0, 30.0)
+	d.gravity = Vector2(0, 400)
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	var target := Node2D.new()
+	target.position = Vector2(-300, -300)
+	add(target)
+	await idle(1)
+	for i in 20:
+		factory.debug_advance_time(DT)
+	var fall: Vector2 = v.get_bullet_velocity(0) - v.get_bullet_direction(0) * 200.0
+	assert_gt(fall.length(), 100.0, "the bullet is falling")
+	match setter:
+		"set_bullet_direction":
+			v.set_bullet_direction(0, Vector2(-1, 0))
+		"towards_position":
+			v.set_bullet_direction_towards_position(0, Vector2(-500, 0))
+		"towards_node2d":
+			v.set_bullet_direction_towards_node2d(0, target)
+		"set_bullet_speed_data":
+			v.set_bullet_speed_data(0, H.make_speed(120.0, 3000.0, 0.0))
+		"bullet_set_velocity":
+			v.bullet_set_velocity(0, Vector2(150, -60))
+	var reported: Vector2 = v.get_bullet_velocity(0)
+	if setter == "bullet_set_velocity":
+		assert_almost_eq(reported, Vector2(150, -60), Vector2(0.01, 0.01), "the exact velocity that was set")
+	else:
+		var own: Vector2 = v.get_bullet_direction(0) * v.debug_get_bullet_info(0)["speed"]
+		assert_almost_eq(reported, own + fall, Vector2(0.05, 0.05), "%s: direction x speed + the current fall speed" % setter)
+	var p0: Vector2 = v.get_bullet_global_transform(0).origin
+	factory.debug_advance_time(DT)
+	var moved: Vector2 = (v.get_bullet_global_transform(0).origin - p0) / DT
+	assert_almost_eq(moved, reported + Vector2(0, 400) * DT, Vector2(0.05, 0.05), "%s: the next tick flies the reported velocity (+ g dt)" % setter)

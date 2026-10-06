@@ -98,16 +98,7 @@ void BulletVolley2D::set_up_bullet_instances(const BulletVolleyData2D &data) {
 
 		cache_texture_transforms[i] = texture_transf;
 		if (batch_ok) {
-			const Transform2D local = to_local_for_multimesh(texture_transf);
-			float *o = batch_w + i * 8;
-			o[0] = local.columns[0][0];
-			o[1] = local.columns[1][0];
-			o[2] = 0;
-			o[3] = local.columns[2][0];
-			o[4] = local.columns[0][1];
-			o[5] = local.columns[1][1];
-			o[6] = 0;
-			o[7] = local.columns[2][1];
+			write_multimesh_transform2d(batch_w + i * 8, to_local_for_multimesh(texture_transf));
 		}
 
 		// Cache bullet transforms and origin vectors
