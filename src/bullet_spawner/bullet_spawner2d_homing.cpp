@@ -3,6 +3,7 @@
 // retargeting and the per-volley steering/orbit configuration.
 
 #include "bullet_spawner/bullet_spawner2d_internal.hpp"
+#include "core/node_scan2d.hpp"
 
 using namespace godot;
 
@@ -560,104 +561,23 @@ void BulletSpawner2D::update_homing_process_state(bool reset_countdown) {
 }
 
 void BulletSpawner2D::collect_homing_candidates_by_name(Node *p_node, Array &r_candidates) const {
-	if (p_node == nullptr) {
-		return;
-	}
-	// Explicit stack instead of recursion: scene trees can be arbitrarily
-	// deep and this runs per volley plus per retarget pass. Children are
-	// pushed in reverse so they pop in tree order (FIRST selection stays
-	// deterministic).
-	homing_scan_stack.clear();
-	Array &stack = homing_scan_stack;
-	stack.push_back(p_node);
-	// Pattern folded once per scan, not once per visited node.
-	const String pattern = homing_node_name_case_sensitive ? homing_node_name : homing_node_name.to_lower();
-	while (!stack.is_empty()) {
-		Node *node = Object::cast_to<Node>(stack.pop_back());
-		if (node == nullptr) {
-			continue;
-		}
-		// Never descend into a bullet factory: its containers hold every
-		// volley, attachment and effect shard (thousands of nodes in a busy
-		// scene), none of which is a homing target, and walking them made
-		// every name scan scale with the live bullet count.
-		if (Object::cast_to<BulletFactory2D>(node) != nullptr) {
-			continue;
-		}
-		// Never this spawner or anything under it (its pattern markers).
-		if (node == this) {
-			continue;
-		}
-		Node2D *as_2d = Object::cast_to<Node2D>(node);
-		// Never chase ourselves or our own markers: the spawner (and any Node2D
-		// markers under it) would otherwise match a broad pattern like "Node2D".
-		// Never the preview holder either: it is visualization only (same
-		// exclusion as the children spawn markers in the collect path).
-		if (as_2d != nullptr && !as_2d->is_queued_for_deletion() && !as_2d->has_meta(PREVIEW_META_KEY)) {
-			String node_name = String(as_2d->get_name());
-			if (!homing_node_name_case_sensitive) {
-				node_name = node_name.to_lower();
-			}
-			bool match = false;
-			switch (homing_node_name_match_mode) {
-				case HOMING_NAME_MATCH_CONTAINS:
-					match = node_name.contains(pattern);
-					break;
-				case HOMING_NAME_MATCH_STARTS_WITH:
-					match = node_name.begins_with(pattern);
-					break;
-				case HOMING_NAME_MATCH_ENDS_WITH:
-					match = node_name.ends_with(pattern);
-					break;
-				case HOMING_NAME_MATCH_EXACT:
-				default:
-					match = node_name == pattern;
-					break;
-			}
-			if (match && (homing_filter_group.is_empty() || as_2d->is_in_group(homing_filter_group))) {
-				r_candidates.push_back(as_2d);
-			}
-		}
-		for (int i = node->get_child_count() - 1; i >= 0; --i) {
-			stack.push_back(node->get_child(i));
-		}
-	}
+	// Shared node-name scan (core/node_scan2d.hpp): never a bullet factory's
+	// subtree (its containers hold every volley, attachment and effect
+	// shard: thousands of nodes, none a target), never this spawner or its
+	// markers (a broad pattern like "Node2D" would match them), never the
+	// preview holder (visualization only).
+	scan_node2ds_by_name(
+			p_node, homing_node_name, homing_node_name_match_mode, homing_node_name_case_sensitive, homing_filter_group, PREVIEW_META_KEY, homing_scan_stack,
+			[this](Node *node) { return node == this || Object::cast_to<BulletFactory2D>(node) != nullptr; },
+			[&r_candidates](Node2D *node) { r_candidates.push_back(node); });
 }
 
 void BulletSpawner2D::collect_homing_candidates_from_children(Node *p_parent, bool recursive, Array &r_candidates) const {
-	if (p_parent == nullptr) {
-		return;
-	}
-	// Explicit stack instead of recursion (same reason as
-	// collect_homing_candidates_by_name): trees can be arbitrarily deep and
-	// this runs per volley plus per retarget pass. Reverse-push keeps
-	// depth-first pre-order identical to the old recursive walk.
-	homing_scan_stack.clear();
-	Array &stack = homing_scan_stack;
-	for (int i = p_parent->get_child_count() - 1; i >= 0; --i) {
-		stack.push_back(p_parent->get_child(i));
-	}
-	while (!stack.is_empty()) {
-		Node *child = Object::cast_to<Node>(stack.pop_back());
-		if (child == nullptr) {
-			continue;
-		}
-		Node2D *as_2d = Object::cast_to<Node2D>(child);
-		// Never the spawner itself (a parent pointing at our own node would
-		// otherwise make the volley chase its emitter).
-		// Same preview-holder exclusion as the name scan above: the gizmo
-		// must never become a homing target.
-		if (as_2d != nullptr && as_2d != this && !as_2d->is_queued_for_deletion() && !as_2d->has_meta(PREVIEW_META_KEY)) {
-			if (homing_filter_group.is_empty() || as_2d->is_in_group(homing_filter_group)) {
-				r_candidates.push_back(as_2d);
-			}
-		}
-		if (recursive) {
-			for (int i = child->get_child_count() - 1; i >= 0; --i) {
-				stack.push_back(child->get_child(i));
-			}
-		}
-	}
+	// Shared children scan: never the spawner itself (a parent pointing at
+	// our own node would make the volley chase its emitter), never the
+	// preview holder.
+	scan_node2d_children(p_parent, recursive, this, homing_filter_group, PREVIEW_META_KEY, homing_scan_stack,
+			[&r_candidates](Node2D *node) { r_candidates.push_back(node); });
 }
 
 void BulletSpawner2D::warn_empty_homing_targets_once(const String &message, bool quiet) const {
