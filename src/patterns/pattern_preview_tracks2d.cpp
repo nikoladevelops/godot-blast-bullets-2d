@@ -19,10 +19,18 @@ static int outline_sweep_count(double perimeter) {
 	return Math::clamp((int)(perimeter / 8.0), 32, 256);
 }
 
+// Track result {points, closed} (+ "local" for the row/arm strips: true
+// when the points are marker-local and must be posed by the caller).
 static Dictionary outline_track_result(const PackedVector2Array &points, bool closed) {
 	Dictionary result;
 	result["points"] = points;
 	result["closed"] = closed;
+	return result;
+}
+
+static Dictionary outline_track_result(const PackedVector2Array &points, bool closed, bool local) {
+	Dictionary result = outline_track_result(points, closed);
+	result["local"] = local;
 	return result;
 }
 
@@ -236,11 +244,7 @@ Dictionary BulletPatterns2D::helper_sample_outline_lissajous(real_t size_x, real
 Dictionary BulletPatterns2D::helper_sample_outline_heart(real_t size, real_t base_rotation) {
 	if (!Math::is_finite(size) || size <= 0.0 || !Math::is_finite(base_rotation)) {
 		UtilityFunctions::push_error("helper_sample_outline_heart: size must be finite and > 0, base_rotation finite.");
-		Dictionary empty;
-		empty["points"] = PackedVector2Array();
-		empty["closed"] = false;
-		empty["local"] = false;
-		return empty;
+		return outline_track_result(PackedVector2Array(), false, false);
 	}
 	// The generator's heart curve and scale.
 	const real_t scale = size / 32.0;
@@ -250,21 +254,13 @@ Dictionary BulletPatterns2D::helper_sample_outline_heart(real_t size, real_t bas
 		const real_t tt = Math::TAU * (real_t)i / (real_t)n;
 		pts.push_back(heart_point2d(tt, scale).rotated(base_rotation));
 	}
-	Dictionary result;
-	result["points"] = pts;
-	result["closed"] = true;
-	result["local"] = false;
-	return result;
+	return outline_track_result(pts, true, false);
 }
 
 Dictionary BulletPatterns2D::helper_sample_outline_spiral(int transforms_amount, real_t start_radius, real_t radius_step, real_t angle_step, real_t base_rotation_abs) {
 	if (transforms_amount < 0 || !Math::is_finite(start_radius) || !Math::is_finite(radius_step) || !Math::is_finite(angle_step) || !Math::is_finite(base_rotation_abs)) {
 		UtilityFunctions::push_error("helper_sample_outline_spiral: bad args.");
-		Dictionary empty;
-		empty["points"] = PackedVector2Array();
-		empty["closed"] = false;
-		empty["local"] = false;
-		return empty;
+		return outline_track_result(PackedVector2Array(), false, false);
 	}
 	PackedVector2Array pts;
 	for (int i = 0; i < transforms_amount; ++i) {
@@ -275,57 +271,33 @@ Dictionary BulletPatterns2D::helper_sample_outline_spiral(int transforms_amount,
 			pts.push_back(p);
 		}
 	}
-	Dictionary result;
-	result["points"] = pts;
-	result["closed"] = false;
-	result["local"] = false;
-	return result;
+	return outline_track_result(pts, false, false);
 }
 
 Dictionary BulletPatterns2D::helper_sample_outline_multispiral(int transforms_amount, int arms, real_t start_radius, real_t radius_step, real_t angle_step, real_t base_rotation_abs, int arm_index_stride) {
 	if (transforms_amount < 0 || arms < 1 || !Math::is_finite(start_radius) || !Math::is_finite(radius_step) || !Math::is_finite(angle_step) || !Math::is_finite(base_rotation_abs) || arm_index_stride < 1) {
 		UtilityFunctions::push_error("helper_sample_outline_multispiral: bad args.");
-		Dictionary empty;
-		empty["points"] = PackedVector2Array();
-		empty["closed"] = false;
-		empty["local"] = false;
-		return empty;
+		return outline_track_result(PackedVector2Array(), false, false);
 	}
 	PackedVector2Array pts;
 	outline_emit_spiral_arms(pts, transforms_amount, arms, start_radius, radius_step, angle_step, base_rotation_abs, arm_index_stride, false);
-	Dictionary result;
-	result["points"] = pts;
-	result["closed"] = false;
-	result["local"] = false;
-	return result;
+	return outline_track_result(pts, false, false);
 }
 
 Dictionary BulletPatterns2D::helper_sample_outline_counter_spiral(int transforms_amount, int arms, real_t start_radius, real_t radius_step, real_t angle_step, real_t base_rotation_abs, int arm_index_stride, bool mirror_alternate_arms) {
 	if (transforms_amount < 0 || arms < 2 || !Math::is_finite(start_radius) || !Math::is_finite(radius_step) || !Math::is_finite(angle_step) || !Math::is_finite(base_rotation_abs) || arm_index_stride < 1) {
 		UtilityFunctions::push_error("helper_sample_outline_counter_spiral: bad args.");
-		Dictionary empty;
-		empty["points"] = PackedVector2Array();
-		empty["closed"] = false;
-		empty["local"] = false;
-		return empty;
+		return outline_track_result(PackedVector2Array(), false, false);
 	}
 	PackedVector2Array pts;
 	outline_emit_spiral_arms(pts, transforms_amount, arms, start_radius, radius_step, angle_step, base_rotation_abs, arm_index_stride, mirror_alternate_arms);
-	Dictionary result;
-	result["points"] = pts;
-	result["closed"] = false;
-	result["local"] = false;
-	return result;
+	return outline_track_result(pts, false, false);
 }
 
 Dictionary BulletPatterns2D::helper_sample_outline_grid(int transforms_amount, int rows_per_column, int alignment, real_t column_offset, real_t row_offset, real_t base_rotation_abs, bool rotate_with_marker) {
 	if (transforms_amount < 0 || rows_per_column < 1 || alignment < 0 || alignment > 8 || !Math::is_finite(column_offset) || !Math::is_finite(row_offset) || !Math::is_finite(base_rotation_abs)) {
 		UtilityFunctions::push_error("helper_sample_outline_grid: bad args.");
-		Dictionary empty;
-		empty["points"] = PackedVector2Array();
-		empty["closed"] = false;
-		empty["local"] = false;
-		return empty;
+		return outline_track_result(PackedVector2Array(), false, false);
 	}
 	// Mirrors helper_generate_transforms_grid column/row math (ideal grid:
 	// no jitter, no random rotation). Row strips, INF-separated.
@@ -369,21 +341,13 @@ Dictionary BulletPatterns2D::helper_sample_outline_grid(int transforms_amount, i
 		}
 		outline_emit_inf(pts);
 	}
-	Dictionary result;
-	result["points"] = pts;
-	result["closed"] = false;
-	result["local"] = !rotate_with_marker;
-	return result;
+	return outline_track_result(pts, false, !rotate_with_marker);
 }
 
 Dictionary BulletPatterns2D::helper_sample_outline_lattice(int transforms_amount, int columns, int rows, real_t spacing_x, real_t spacing_y, bool stagger_rows) {
 	if (transforms_amount < 0 || columns < 1 || rows < 1 || !Math::is_finite(spacing_x) || !Math::is_finite(spacing_y)) {
 		UtilityFunctions::push_error("helper_sample_outline_lattice: bad args.");
-		Dictionary empty;
-		empty["points"] = PackedVector2Array();
-		empty["closed"] = false;
-		empty["local"] = false;
-		return empty;
+		return outline_track_result(PackedVector2Array(), false, false);
 	}
 	// Mirrors helper_generate_transforms_lattice row math, including the
 	// overflow rows past capacity.
@@ -400,21 +364,13 @@ Dictionary BulletPatterns2D::helper_sample_outline_lattice(int transforms_amount
 		}
 		outline_emit_inf(pts);
 	}
-	Dictionary result;
-	result["points"] = pts;
-	result["closed"] = false;
-	result["local"] = false;
-	return result;
+	return outline_track_result(pts, false, false);
 }
 
 Dictionary BulletPatterns2D::helper_sample_outline_waterfall(int transforms_amount, int columns, real_t column_spacing, int rows, real_t row_spacing, real_t stagger, const Vector2 &rain_direction) {
 	if (transforms_amount < 0 || columns < 1 || rows < 1 || !Math::is_finite(column_spacing) || !Math::is_finite(row_spacing) || !Math::is_finite(stagger) || !rain_direction.is_finite() || rain_direction.length_squared() <= 0.0) {
 		UtilityFunctions::push_error("helper_sample_outline_waterfall: bad args.");
-		Dictionary empty;
-		empty["points"] = PackedVector2Array();
-		empty["closed"] = false;
-		empty["local"] = false;
-		return empty;
+		return outline_track_result(PackedVector2Array(), false, false);
 	}
 	// Mirrors helper_generate_transforms_waterfall row math, including the
 	// overflow rows past capacity.
@@ -434,21 +390,13 @@ Dictionary BulletPatterns2D::helper_sample_outline_waterfall(int transforms_amou
 		}
 		outline_emit_inf(pts);
 	}
-	Dictionary result;
-	result["points"] = pts;
-	result["closed"] = false;
-	result["local"] = false;
-	return result;
+	return outline_track_result(pts, false, false);
 }
 
 Dictionary BulletPatterns2D::helper_sample_outline_rain(int transforms_amount, real_t band_width, const Vector2 &rain_direction, real_t drop_spacing) {
 	if (transforms_amount < 0 || !Math::is_finite(band_width) || band_width < 0.0 || !rain_direction.is_finite() || rain_direction.length_squared() <= 0.0 || !Math::is_finite(drop_spacing)) {
 		UtilityFunctions::push_error("helper_sample_outline_rain: bad args.");
-		Dictionary empty;
-		empty["points"] = PackedVector2Array();
-		empty["closed"] = false;
-		empty["local"] = false;
-		return empty;
+		return outline_track_result(PackedVector2Array(), false, false);
 	}
 	// Mirrors helper_generate_transforms_rain row grouping.
 	const Vector2 axis = rain_direction.normalized();
@@ -472,21 +420,13 @@ Dictionary BulletPatterns2D::helper_sample_outline_rain(int transforms_amount, r
 		}
 		outline_emit_inf(pts);
 	}
-	Dictionary result;
-	result["points"] = pts;
-	result["closed"] = false;
-	result["local"] = false;
-	return result;
+	return outline_track_result(pts, false, false);
 }
 
 Dictionary BulletPatterns2D::helper_sample_outline_wave(real_t width, real_t amplitude, real_t waves, const Vector2 &direction) {
 	if (!Math::is_finite(width) || width < 0.0 || !Math::is_finite(amplitude) || amplitude < 0.0 || !Math::is_finite(waves) || !direction.is_finite() || direction.length_squared() <= 0.0) {
 		UtilityFunctions::push_error("helper_sample_outline_wave: bad args.");
-		Dictionary empty;
-		empty["points"] = PackedVector2Array();
-		empty["closed"] = false;
-		empty["local"] = false;
-		return empty;
+		return outline_track_result(PackedVector2Array(), false, false);
 	}
 	// Mirrors helper_generate_transforms_wave center line at fixed density.
 	const Vector2 axis = direction.normalized();
@@ -497,11 +437,7 @@ Dictionary BulletPatterns2D::helper_sample_outline_wave(real_t width, real_t amp
 		const real_t frac = (real_t)i / (real_t)(n - 1) - 0.5;
 		pts.push_back(axis * (frac * width) + across * (amplitude * Math::sin(frac * waves * Math::TAU)));
 	}
-	Dictionary result;
-	result["points"] = pts;
-	result["closed"] = false;
-	result["local"] = false;
-	return result;
+	return outline_track_result(pts, false, false);
 }
 
 Dictionary BulletPatterns2D::helper_sample_outline_circle(real_t radius) {
