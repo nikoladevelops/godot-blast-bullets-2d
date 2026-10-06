@@ -210,6 +210,9 @@ void BulletVolley2D::prepare_graze_tick() {
 					tz.slot_ids[s] = live[k].id;
 				}
 			}
+			if (slot < 0) {
+				continue; // unreachable: at most MAX_TARGETS live targets, as many slots
+			}
 			tz.centers[tz.target_count] = live[k].position;
 			tz.slots[tz.target_count] = (uint8_t)slot;
 			++tz.target_count;
