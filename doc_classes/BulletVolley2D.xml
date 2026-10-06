@@ -803,7 +803,7 @@
 			<return type="BulletCurvesData2D" />
 			<param index="0" name="bullet_index" type="int" />
 			<description>
-				Gets the curves data of a specific bullet. Returns a [BulletCurvesData2D], which can be null if the bullet doesn't have curves data assigned.
+				Gets the curves data of a specific bullet. Returns a [BulletCurvesData2D], or null (with an error, since reading an empty slot is usually a mistake) when the bullet has no individual curves data: check [member shared_bullet_curves_data] for the shared one.
 				Curves data is a [BulletCurvesData2D] resource that can contain multiple curves used to control different aspects of the bullet's behavior over time, such as movement speed, rotation speed, direction adjustment, etc...
 				Note: If you want to set or get the curves data of multiple bullets at once, use [method all_bullets_set_curves_data] or [method all_bullets_get_curves_data].
 			</description>
