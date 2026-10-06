@@ -1141,11 +1141,14 @@ _ALWAYS_INLINE_ void BulletVolley2D::update_homing(HomingTargetDeque &homing_deq
 	if (bullet_index < 0 || bullet_index >= (int)all_cached_instance_origin.size() || bullet_index >= (int)all_cached_direction.size() || bullet_index >= (int)all_cached_instance_transforms.size()) {
 		return;
 	}
+	// The steering deque's front is this bullet's homing (and orbit) target
+	// on EVERY tick: the orbit section and the reached test read target_pos
+	// right after this call, so a zero-delta tick must not leave it holding
+	// the previous bullet's target.
+	target_pos = homing_deque.get_cached_front_target_global_position();
 	if (!Math::is_finite(delta) || delta <= 0.0) {
 		return;
 	}
-	// Get the front target's cached position
-	target_pos = homing_deque.get_cached_front_target_global_position();
 	if (!target_pos.is_finite()) {
 		return;
 	}
