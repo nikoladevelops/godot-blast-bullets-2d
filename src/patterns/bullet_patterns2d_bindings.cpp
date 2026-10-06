@@ -35,10 +35,8 @@ void BulletPatterns2D::_bind_methods() {
 #define PATTERN_NAME_OPT(TYPE, NAME, DEFAULT, FIELD) , #NAME
 #define PATTERN_DEFVAL_REQ(TYPE, NAME, FIELD)
 #define PATTERN_DEFVAL_OPT(TYPE, NAME, DEFAULT, FIELD) , DEFVAL(DEFAULT)
-#define PATTERN_GENERATOR(SHAPE, PARAMS)                                                                                                                      \
-	ClassDB::bind_static_method("BulletPatterns2D",                                                                                                           \
-			D_METHOD("helper_generate_transforms_" #SHAPE, "transforms_amount", "marker_transform" PATTERN_ARGS_##SHAPE(PATTERN_NAME_REQ, PATTERN_NAME_OPT)), \
-			&BulletPatterns2D::helper_generate_transforms_##SHAPE PATTERN_ARGS_##SHAPE(PATTERN_DEFVAL_REQ, PATTERN_DEFVAL_OPT));
+#define PATTERN_GENERATOR(SHAPE, PARAMS) \
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_generate_transforms_" #SHAPE, "transforms_amount", "marker_transform" PATTERN_ARGS_##SHAPE(PATTERN_NAME_REQ, PATTERN_NAME_OPT)), &BulletPatterns2D::helper_generate_transforms_##SHAPE PATTERN_ARGS_##SHAPE(PATTERN_DEFVAL_REQ, PATTERN_DEFVAL_OPT));
 #include "patterns/pattern_signatures2d.inc"
 #undef PATTERN_GENERATOR
 #undef PATTERN_NAME_REQ
@@ -57,392 +55,67 @@ void BulletPatterns2D::_bind_methods() {
 	BIND_ENUM_CONSTANT(POLYLINE_FACING_NORMAL_P90);
 	BIND_ENUM_CONSTANT(POLYLINE_FACING_NORMAL_M90);
 
-	ClassDB::bind_static_method("BulletPatterns2D",
-			D_METHOD("helper_apply_skip_indices",
-					"transforms",
-					"skip_indices"),
-			&BulletPatterns2D::helper_apply_skip_indices);
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_apply_skip_indices", "transforms", "skip_indices"), &BulletPatterns2D::helper_apply_skip_indices);
 
-	ClassDB::bind_static_method("BulletPatterns2D",
-			D_METHOD("helper_layer_scale_factor",
-					"layer_index",
-					"scale_step",
-					"side",
-					"scale_curve",
-					"custom_scales"),
-			&BulletPatterns2D::helper_layer_scale_factor,
-			DEFVAL(0.2),
-			DEFVAL(0),
-			DEFVAL(0),
-			DEFVAL(PackedFloat32Array()));
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_layer_scale_factor", "layer_index", "scale_step", "side", "scale_curve", "custom_scales"), &BulletPatterns2D::helper_layer_scale_factor, DEFVAL(0.2), DEFVAL(0), DEFVAL(0), DEFVAL(PackedFloat32Array()));
 
-	ClassDB::bind_static_method("BulletPatterns2D",
-			D_METHOD("helper_bullet_layer_index",
-					"bullet_index",
-					"slot_count",
-					"layer_count",
-					"layer_fill",
-					"layer_start_offset"),
-			&BulletPatterns2D::helper_bullet_layer_index,
-			DEFVAL(0),
-			DEFVAL(0),
-			DEFVAL(1),
-			DEFVAL(0),
-			DEFVAL(0));
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_bullet_layer_index", "bullet_index", "slot_count", "layer_count", "layer_fill", "layer_start_offset"), &BulletPatterns2D::helper_bullet_layer_index, DEFVAL(0), DEFVAL(0), DEFVAL(1), DEFVAL(0), DEFVAL(0));
 
-	ClassDB::bind_static_method("BulletPatterns2D",
-			D_METHOD("helper_sample_outline_rose",
-					"petals",
-					"radius",
-					"lobe_sharpness",
-					"base_rotation"),
-			&BulletPatterns2D::helper_sample_outline_rose,
-			DEFVAL(6),
-			DEFVAL(150.0),
-			DEFVAL(1.0),
-			DEFVAL(0.0));
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_rose", "petals", "radius", "lobe_sharpness", "base_rotation"), &BulletPatterns2D::helper_sample_outline_rose, DEFVAL(6), DEFVAL(150.0), DEFVAL(1.0), DEFVAL(0.0));
 
-	ClassDB::bind_static_method("BulletPatterns2D",
-			D_METHOD("helper_sample_outline_flower",
-					"flower_type",
-					"petals",
-					"radius",
-					"petal_spread",
-					"petal_sharpness",
-					"inner_radius_scale",
-					"spiro_roller",
-					"spiro_pen",
-					"super_lobes",
-					"super_fullness",
-					"base_rotation",
-					"transforms_amount"),
-			&BulletPatterns2D::helper_sample_outline_flower,
-			DEFVAL(0),
-			DEFVAL(6),
-			DEFVAL(150.0),
-			DEFVAL(0.5),
-			DEFVAL(1.0),
-			DEFVAL(0.0),
-			DEFVAL(45.0),
-			DEFVAL(80.0),
-			DEFVAL(6.0),
-			DEFVAL(1.0),
-			DEFVAL(0.0),
-			DEFVAL(-1));
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_flower", "flower_type", "petals", "radius", "petal_spread", "petal_sharpness", "inner_radius_scale", "spiro_roller", "spiro_pen", "super_lobes", "super_fullness", "base_rotation", "transforms_amount"), &BulletPatterns2D::helper_sample_outline_flower, DEFVAL(0), DEFVAL(6), DEFVAL(150.0), DEFVAL(0.5), DEFVAL(1.0), DEFVAL(0.0), DEFVAL(45.0), DEFVAL(80.0), DEFVAL(6.0), DEFVAL(1.0), DEFVAL(0.0), DEFVAL(-1));
 
-	ClassDB::bind_static_method("BulletPatterns2D",
-			D_METHOD("helper_sample_outline_lissajous",
-					"size_x",
-					"size_y",
-					"freq_x",
-					"freq_y",
-					"phase"),
-			&BulletPatterns2D::helper_sample_outline_lissajous,
-			DEFVAL(200.0),
-			DEFVAL(120.0),
-			DEFVAL(3.0),
-			DEFVAL(2.0),
-			DEFVAL(0.0));
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_lissajous", "size_x", "size_y", "freq_x", "freq_y", "phase"), &BulletPatterns2D::helper_sample_outline_lissajous, DEFVAL(200.0), DEFVAL(120.0), DEFVAL(3.0), DEFVAL(2.0), DEFVAL(0.0));
 
-	ClassDB::bind_static_method("BulletPatterns2D",
-			D_METHOD("helper_sample_outline_circle",
-					"radius"),
-			&BulletPatterns2D::helper_sample_outline_circle,
-			DEFVAL(150.0));
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_circle", "radius"), &BulletPatterns2D::helper_sample_outline_circle, DEFVAL(150.0));
 
-	ClassDB::bind_static_method("BulletPatterns2D",
-			D_METHOD("helper_sample_outline_rectangle",
-					"size"),
-			&BulletPatterns2D::helper_sample_outline_rectangle,
-			DEFVAL(Vector2(300.0, 200.0)));
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_rectangle", "size"), &BulletPatterns2D::helper_sample_outline_rectangle, DEFVAL(Vector2(300.0, 200.0)));
 
-	ClassDB::bind_static_method("BulletPatterns2D",
-			D_METHOD("helper_sample_outline_triangle",
-					"triangle_type",
-					"size_a",
-					"size_b",
-					"rotation"),
-			&BulletPatterns2D::helper_sample_outline_triangle,
-			DEFVAL(0),
-			DEFVAL(150.0),
-			DEFVAL(150.0),
-			DEFVAL(0.0));
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_triangle", "triangle_type", "size_a", "size_b", "rotation"), &BulletPatterns2D::helper_sample_outline_triangle, DEFVAL(0), DEFVAL(150.0), DEFVAL(150.0), DEFVAL(0.0));
 
-	ClassDB::bind_static_method("BulletPatterns2D",
-			D_METHOD("helper_sample_outline_trapezoid",
-					"base_top",
-					"base_bottom",
-					"height",
-					"rotation"),
-			&BulletPatterns2D::helper_sample_outline_trapezoid,
-			DEFVAL(200.0),
-			DEFVAL(300.0),
-			DEFVAL(200.0),
-			DEFVAL(0.0));
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_trapezoid", "base_top", "base_bottom", "height", "rotation"), &BulletPatterns2D::helper_sample_outline_trapezoid, DEFVAL(200.0), DEFVAL(300.0), DEFVAL(200.0), DEFVAL(0.0));
 
-	ClassDB::bind_static_method("BulletPatterns2D",
-			D_METHOD("helper_sample_outline_diamond",
-					"diagonal_x",
-					"diagonal_y",
-					"rotation"),
-			&BulletPatterns2D::helper_sample_outline_diamond,
-			DEFVAL(200.0),
-			DEFVAL(300.0),
-			DEFVAL(0.0));
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_diamond", "diagonal_x", "diagonal_y", "rotation"), &BulletPatterns2D::helper_sample_outline_diamond, DEFVAL(200.0), DEFVAL(300.0), DEFVAL(0.0));
 
-	ClassDB::bind_static_method("BulletPatterns2D",
-			D_METHOD("helper_sample_outline_polygon",
-					"vertices",
-					"radius",
-					"base_rotation"),
-			&BulletPatterns2D::helper_sample_outline_polygon,
-			DEFVAL(6),
-			DEFVAL(150.0),
-			DEFVAL(0.0));
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_polygon", "vertices", "radius", "base_rotation"), &BulletPatterns2D::helper_sample_outline_polygon, DEFVAL(6), DEFVAL(150.0), DEFVAL(0.0));
 
-	ClassDB::bind_static_method("BulletPatterns2D",
-			D_METHOD("helper_sample_outline_ellipse",
-					"radius_x",
-					"radius_y",
-					"ellipse_rotation",
-					"start_angle",
-					"arc",
-					"mode"),
-			&BulletPatterns2D::helper_sample_outline_ellipse,
-			DEFVAL(150.0),
-			DEFVAL(100.0),
-			DEFVAL(0.0),
-			DEFVAL(0.0),
-			DEFVAL(Math::TAU),
-			DEFVAL(0));
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_ellipse", "radius_x", "radius_y", "ellipse_rotation", "start_angle", "arc", "mode"), &BulletPatterns2D::helper_sample_outline_ellipse, DEFVAL(150.0), DEFVAL(100.0), DEFVAL(0.0), DEFVAL(0.0), DEFVAL(Math::TAU), DEFVAL(0));
 
-	ClassDB::bind_static_method("BulletPatterns2D",
-			D_METHOD("helper_sample_outline_ring",
-					"radius",
-					"arc",
-					"y_scale",
-					"start_angle_abs"),
-			&BulletPatterns2D::helper_sample_outline_ring,
-			DEFVAL(150.0),
-			DEFVAL(Math::TAU),
-			DEFVAL(1.0),
-			DEFVAL(0.0));
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_ring", "radius", "arc", "y_scale", "start_angle_abs"), &BulletPatterns2D::helper_sample_outline_ring, DEFVAL(150.0), DEFVAL(Math::TAU), DEFVAL(1.0), DEFVAL(0.0));
 
-	ClassDB::bind_static_method("BulletPatterns2D",
-			D_METHOD("helper_sample_outline_star",
-					"points",
-					"outer_radius",
-					"inner_radius",
-					"base_rotation"),
-			&BulletPatterns2D::helper_sample_outline_star,
-			DEFVAL(5),
-			DEFVAL(150.0),
-			DEFVAL(65.0),
-			DEFVAL(0.0));
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_star", "points", "outer_radius", "inner_radius", "base_rotation"), &BulletPatterns2D::helper_sample_outline_star, DEFVAL(5), DEFVAL(150.0), DEFVAL(65.0), DEFVAL(0.0));
 
-	ClassDB::bind_static_method("BulletPatterns2D",
-			D_METHOD("helper_sample_outline_grid",
-					"transforms_amount",
-					"rows_per_column",
-					"alignment",
-					"column_offset",
-					"row_offset",
-					"base_rotation_abs",
-					"rotate_with_marker"),
-			&BulletPatterns2D::helper_sample_outline_grid,
-			DEFVAL(0),
-			DEFVAL(10),
-			DEFVAL(3),
-			DEFVAL(150.0),
-			DEFVAL(150.0),
-			DEFVAL(0.0),
-			DEFVAL(true));
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_grid", "transforms_amount", "rows_per_column", "alignment", "column_offset", "row_offset", "base_rotation_abs", "rotate_with_marker"), &BulletPatterns2D::helper_sample_outline_grid, DEFVAL(0), DEFVAL(10), DEFVAL(3), DEFVAL(150.0), DEFVAL(150.0), DEFVAL(0.0), DEFVAL(true));
 
-	ClassDB::bind_static_method("BulletPatterns2D",
-			D_METHOD("helper_sample_outline_lattice",
-					"transforms_amount",
-					"columns",
-					"rows",
-					"spacing_x",
-					"spacing_y",
-					"stagger_rows"),
-			&BulletPatterns2D::helper_sample_outline_lattice,
-			DEFVAL(0),
-			DEFVAL(4),
-			DEFVAL(4),
-			DEFVAL(64.0),
-			DEFVAL(64.0),
-			DEFVAL(true));
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_lattice", "transforms_amount", "columns", "rows", "spacing_x", "spacing_y", "stagger_rows"), &BulletPatterns2D::helper_sample_outline_lattice, DEFVAL(0), DEFVAL(4), DEFVAL(4), DEFVAL(64.0), DEFVAL(64.0), DEFVAL(true));
 
-	ClassDB::bind_static_method("BulletPatterns2D",
-			D_METHOD("helper_sample_outline_waterfall",
-					"transforms_amount",
-					"columns",
-					"column_spacing",
-					"rows",
-					"row_spacing",
-					"stagger",
-					"rain_direction"),
-			&BulletPatterns2D::helper_sample_outline_waterfall,
-			DEFVAL(0),
-			DEFVAL(4),
-			DEFVAL(64.0),
-			DEFVAL(4),
-			DEFVAL(64.0),
-			DEFVAL(0.0),
-			DEFVAL(Vector2(0, 1)));
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_waterfall", "transforms_amount", "columns", "column_spacing", "rows", "row_spacing", "stagger", "rain_direction"), &BulletPatterns2D::helper_sample_outline_waterfall, DEFVAL(0), DEFVAL(4), DEFVAL(64.0), DEFVAL(4), DEFVAL(64.0), DEFVAL(0.0), DEFVAL(Vector2(0, 1)));
 
-	ClassDB::bind_static_method("BulletPatterns2D",
-			D_METHOD("helper_sample_outline_rain",
-					"transforms_amount",
-					"band_width",
-					"rain_direction",
-					"drop_spacing"),
-			&BulletPatterns2D::helper_sample_outline_rain,
-			DEFVAL(0),
-			DEFVAL(600.0),
-			DEFVAL(Vector2(0, 1)),
-			DEFVAL(48.0));
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_rain", "transforms_amount", "band_width", "rain_direction", "drop_spacing"), &BulletPatterns2D::helper_sample_outline_rain, DEFVAL(0), DEFVAL(600.0), DEFVAL(Vector2(0, 1)), DEFVAL(48.0));
 
-	ClassDB::bind_static_method("BulletPatterns2D",
-			D_METHOD("helper_sample_outline_wave",
-					"width",
-					"amplitude",
-					"waves",
-					"direction"),
-			&BulletPatterns2D::helper_sample_outline_wave,
-			DEFVAL(300.0),
-			DEFVAL(50.0),
-			DEFVAL(2.0),
-			DEFVAL(Vector2(1, 0)));
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_wave", "width", "amplitude", "waves", "direction"), &BulletPatterns2D::helper_sample_outline_wave, DEFVAL(300.0), DEFVAL(50.0), DEFVAL(2.0), DEFVAL(Vector2(1, 0)));
 
-	ClassDB::bind_static_method("BulletPatterns2D",
-			D_METHOD("helper_sample_outline_heart",
-					"size",
-					"base_rotation"),
-			&BulletPatterns2D::helper_sample_outline_heart,
-			DEFVAL(100.0),
-			DEFVAL(0.0));
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_heart", "size", "base_rotation"), &BulletPatterns2D::helper_sample_outline_heart, DEFVAL(100.0), DEFVAL(0.0));
 
-	ClassDB::bind_static_method("BulletPatterns2D",
-			D_METHOD("helper_sample_outline_spiral",
-					"transforms_amount",
-					"start_radius",
-					"radius_step",
-					"angle_step",
-					"base_rotation_abs"),
-			&BulletPatterns2D::helper_sample_outline_spiral,
-			DEFVAL(0),
-			DEFVAL(50.0),
-			DEFVAL(15.0),
-			DEFVAL(0.6),
-			DEFVAL(0.0));
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_spiral", "transforms_amount", "start_radius", "radius_step", "angle_step", "base_rotation_abs"), &BulletPatterns2D::helper_sample_outline_spiral, DEFVAL(0), DEFVAL(50.0), DEFVAL(15.0), DEFVAL(0.6), DEFVAL(0.0));
 
-	ClassDB::bind_static_method("BulletPatterns2D",
-			D_METHOD("helper_sample_outline_multispiral",
-					"transforms_amount",
-					"arms",
-					"start_radius",
-					"radius_step",
-					"angle_step",
-					"base_rotation_abs",
-					"arm_index_stride"),
-			&BulletPatterns2D::helper_sample_outline_multispiral,
-			DEFVAL(0),
-			DEFVAL(3),
-			DEFVAL(50.0),
-			DEFVAL(15.0),
-			DEFVAL(0.6),
-			DEFVAL(0.0),
-			DEFVAL(1));
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_multispiral", "transforms_amount", "arms", "start_radius", "radius_step", "angle_step", "base_rotation_abs", "arm_index_stride"), &BulletPatterns2D::helper_sample_outline_multispiral, DEFVAL(0), DEFVAL(3), DEFVAL(50.0), DEFVAL(15.0), DEFVAL(0.6), DEFVAL(0.0), DEFVAL(1));
 
-	ClassDB::bind_static_method("BulletPatterns2D",
-			D_METHOD("helper_sample_outline_counter_spiral",
-					"transforms_amount",
-					"arms",
-					"start_radius",
-					"radius_step",
-					"angle_step",
-					"base_rotation_abs",
-					"arm_index_stride",
-					"mirror_alternate_arms"),
-			&BulletPatterns2D::helper_sample_outline_counter_spiral,
-			DEFVAL(0),
-			DEFVAL(4),
-			DEFVAL(50.0),
-			DEFVAL(15.0),
-			DEFVAL(0.6),
-			DEFVAL(0.0),
-			DEFVAL(1),
-			DEFVAL(true));
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_counter_spiral", "transforms_amount", "arms", "start_radius", "radius_step", "angle_step", "base_rotation_abs", "arm_index_stride", "mirror_alternate_arms"), &BulletPatterns2D::helper_sample_outline_counter_spiral, DEFVAL(0), DEFVAL(4), DEFVAL(50.0), DEFVAL(15.0), DEFVAL(0.6), DEFVAL(0.0), DEFVAL(1), DEFVAL(true));
 
-	ClassDB::bind_static_method("BulletPatterns2D",
-			D_METHOD("helper_apply_side_spread",
-					"transforms",
-					"side_mode",
-					"spread",
-					"spread_exponent",
-					"seed"),
-			&BulletPatterns2D::helper_apply_side_spread,
-			DEFVAL(0),
-			DEFVAL(0.0),
-			DEFVAL(2.0),
-			DEFVAL(0));
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_apply_side_spread", "transforms", "side_mode", "spread", "spread_exponent", "seed"), &BulletPatterns2D::helper_apply_side_spread, DEFVAL(0), DEFVAL(0.0), DEFVAL(2.0), DEFVAL(0));
 
-	ClassDB::bind_static_method("BulletPatterns2D",
-			D_METHOD("helper_compute_edge_normals",
-					"edge_points",
-					"closed",
-					"flip"),
-			&BulletPatterns2D::helper_compute_edge_normals,
-			DEFVAL(false),
-			DEFVAL(false));
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_compute_edge_normals", "edge_points", "closed", "flip"), &BulletPatterns2D::helper_compute_edge_normals, DEFVAL(false), DEFVAL(false));
 
 	// Outline debug inspectors: mathematical conformance framework for every
 	// closed shape (dot positions, gaps, corner ownership, facing deviations,
 	// settings echo). Pure math, no scene tree needed.
-	ClassDB::bind_static_method("BulletPatterns2D",
-			D_METHOD("debug_describe_outline",
-					"shape",
-					"count",
-					"params"),
-			&BulletPatterns2D::debug_describe_outline,
-			DEFVAL(Dictionary()));
-	ClassDB::bind_static_method("BulletPatterns2D",
-			D_METHOD("debug_volley_gaps",
-					"volley"),
-			&BulletPatterns2D::debug_volley_gaps);
-	ClassDB::bind_static_method("BulletPatterns2D",
-			D_METHOD("debug_verify_volley",
-					"volley",
-					"shape",
-					"marker",
-					"count",
-					"params",
-					"tolerance_px",
-					"tolerance_rad"),
-			&BulletPatterns2D::debug_verify_volley,
-			DEFVAL(Dictionary()),
-			DEFVAL(1.0),
-			DEFVAL(0.02));
-	ClassDB::bind_static_method("BulletPatterns2D",
-			D_METHOD("debug_outline_quotas",
-					"shape",
-					"count",
-					"params"),
-			&BulletPatterns2D::debug_outline_quotas,
-			DEFVAL(Dictionary()));
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("debug_describe_outline", "shape", "count", "params"), &BulletPatterns2D::debug_describe_outline, DEFVAL(Dictionary()));
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("debug_volley_gaps", "volley"), &BulletPatterns2D::debug_volley_gaps);
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("debug_verify_volley", "volley", "shape", "marker", "count", "params", "tolerance_px", "tolerance_rad"), &BulletPatterns2D::debug_verify_volley, DEFVAL(Dictionary()), DEFVAL(1.0), DEFVAL(0.02));
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("debug_outline_quotas", "shape", "count", "params"), &BulletPatterns2D::debug_outline_quotas, DEFVAL(Dictionary()));
 
-	ClassDB::bind_static_method("BulletPatterns2D",
-			D_METHOD("helper_extract_edge_from_image",
-					"image",
-					"threshold",
-					"step",
-					"quiet"),
-			&BulletPatterns2D::helper_extract_edge_from_image,
-			DEFVAL(0.5),
-			DEFVAL(4),
-			DEFVAL(false));
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_extract_edge_from_image", "image", "threshold", "step", "quiet"), &BulletPatterns2D::helper_extract_edge_from_image, DEFVAL(0.5), DEFVAL(4), DEFVAL(false));
 
 	// Need this in order to expose the enum constants to Godot Engine
 	BIND_ENUM_CONSTANT(SPIRAL_FACING_TANGENT);
