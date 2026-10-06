@@ -36,14 +36,7 @@ _ALWAYS_INLINE_ void BulletVolley2D::orbit_unlock_on_empty_deque_for_bullet(int 
 }
 
 PackedInt32Array BulletVolley2D::all_bullets_get_homing_targets_amount(int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_homing_targets_amount");
-
-	PackedInt32Array arr;
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		arr.push_back(bullet_homing_check_targets_amount(i));
-	}
-
-	return arr;
+	return collect_range<PackedInt32Array>(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_homing_targets_amount", [&](int i) { return bullet_homing_check_targets_amount(i); });
 }
 
 Variant BulletVolley2D::bullet_homing_pop_front_target(int bullet_index) {
@@ -415,7 +408,7 @@ bool BulletVolley2D::bullet_replace_homing_targets_with_new_target(int bullet_in
 	if (!validate_bullet_index(bullet_index, "bullet_replace_homing_targets_with_new_target")) {
 		return false;
 	}
-	if (bullet_index < 0 || bullet_index >= amount_bullets || !all_bullets_enabled_set.contains(bullet_index)) {
+	if (bullet_index >= amount_bullets || !all_bullets_enabled_set.contains(bullet_index)) {
 		return false;
 	}
 	Node2D *node = Object::cast_to<Node2D>(node2d_or_global_position);
@@ -557,10 +550,7 @@ void BulletVolley2D::all_bullets_assign_homing_targets_array(const Array &node2d
 }
 
 void BulletVolley2D::all_bullets_clear_homing_targets(int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_clear_homing_targets");
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		bullet_clear_homing_targets(i);
-	}
+	for_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_clear_homing_targets", [&](int i) { bullet_clear_homing_targets(i); });
 }
 
 int BulletVolley2D::bullet_homing_check_targets_amount(int bullet_index) const {
@@ -859,12 +849,7 @@ void BulletVolley2D::all_bullets_set_homing_smoothing(real_t value, int bullet_i
 }
 
 TypedArray<real_t> BulletVolley2D::all_bullets_get_homing_smoothing(int bullet_index_start, int bullet_index_end_inclusive) const {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_homing_smoothing");
-	TypedArray<real_t> arr;
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		arr.push_back(bullet_get_homing_smoothing(i));
-	}
-	return arr;
+	return collect_range<TypedArray<real_t>>(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_homing_smoothing", [&](int i) { return bullet_get_homing_smoothing(i); });
 }
 
 void BulletVolley2D::set_homing_delay_sec(real_t value) {

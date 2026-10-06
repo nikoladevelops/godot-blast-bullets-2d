@@ -568,7 +568,7 @@ int BulletVolley2D::get_bullet_collision_count(int bullet_index) const {
 	if (!validate_bullet_index(bullet_index, "get_bullet_collision_count")) {
 		return 0;
 	}
-	if (bullet_index < 0 || bullet_index >= (int)bullets_current_collision_count.size()) {
+	if (bullet_index >= (int)bullets_current_collision_count.size()) {
 		return 0;
 	}
 	return bullets_current_collision_count[bullet_index];
@@ -578,7 +578,7 @@ void BulletVolley2D::set_bullet_collision_count(int bullet_index, int value) {
 	if (!validate_bullet_index(bullet_index, "set_bullet_collision_count")) {
 		return;
 	}
-	if (bullet_index < 0 || bullet_index >= (int)bullets_current_collision_count.size()) {
+	if (bullet_index >= (int)bullets_current_collision_count.size()) {
 		UtilityFunctions::push_error("set_bullet_collision_count: collision data not initialized for this multimesh.");
 		return;
 	}

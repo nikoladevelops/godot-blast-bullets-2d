@@ -117,11 +117,7 @@ TypedArray<BulletAttachment2D> BulletVolley2D::all_bullets_set_attachment_to_nul
 }
 
 void BulletVolley2D::all_bullets_set_attachment(const Ref<PackedScene> &attachment_scene, const Vector2 &bullet_attachment_offset, bool stick_relative_to_bullet, int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_attachment");
-
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		bullet_set_attachment(i, attachment_scene, bullet_attachment_offset, stick_relative_to_bullet);
-	}
+	for_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_attachment", [&](int i) { bullet_set_attachment(i, attachment_scene, bullet_attachment_offset, stick_relative_to_bullet); });
 }
 
 void BulletVolley2D::bullet_set_attachment(int bullet_index, const Ref<PackedScene> &attachment_scene, const Vector2 &bullet_attachment_offset, bool stick_relative_to_bullet) {

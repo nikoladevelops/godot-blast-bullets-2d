@@ -104,7 +104,7 @@ Vector2 BulletVolley2D::debug_get_previous_origin(int bullet_index) const {
 	if (!validate_bullet_index(bullet_index, "debug_get_previous_origin")) {
 		return Vector2(0, 0);
 	}
-	if (bullet_index < 0 || bullet_index >= (int)all_previous_instance_transf.size()) {
+	if (bullet_index >= (int)all_previous_instance_transf.size()) {
 		return Vector2(0, 0);
 	}
 	return all_previous_instance_transf[bullet_index].get_origin();

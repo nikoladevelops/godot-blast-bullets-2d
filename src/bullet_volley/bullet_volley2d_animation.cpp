@@ -117,7 +117,7 @@ Ref<Resource> BulletVolley2D::bullet_get_custom_data(int bullet_index) const {
 	if (!validate_bullet_index(bullet_index, "bullet_get_custom_data")) {
 		return Ref<Resource>();
 	}
-	if (bullet_index >= 0 && bullet_index < (int)all_bullets_custom_data.size() && all_bullets_custom_data[bullet_index].is_valid()) {
+	if (bullet_index < (int)all_bullets_custom_data.size() && all_bullets_custom_data[bullet_index].is_valid()) {
 		return all_bullets_custom_data[bullet_index];
 	}
 	return Ref<Resource>();
@@ -127,26 +127,18 @@ void BulletVolley2D::bullet_set_custom_data(int bullet_index, const Ref<Resource
 	if (!validate_bullet_index(bullet_index, "bullet_set_custom_data")) {
 		return;
 	}
-	if (bullet_index < 0 || bullet_index >= (int)all_bullets_custom_data.size()) {
+	if (bullet_index >= (int)all_bullets_custom_data.size()) {
 		return;
 	}
 	all_bullets_custom_data[bullet_index] = new_custom_data;
 }
 
 TypedArray<Resource> BulletVolley2D::all_bullets_get_custom_data(int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_custom_data");
-	TypedArray<Resource> arr;
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		arr.push_back(bullet_get_custom_data(i));
-	}
-	return arr;
+	return collect_range<TypedArray<Resource>>(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_custom_data", [&](int i) { return bullet_get_custom_data(i); });
 }
 
 void BulletVolley2D::all_bullets_set_custom_data(const Ref<Resource> &new_custom_data, int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_custom_data");
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		bullet_set_custom_data(i, new_custom_data);
-	}
+	for_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_custom_data", [&](int i) { bullet_set_custom_data(i, new_custom_data); });
 }
 
 void BulletVolley2D::clear_applied_instance_shader_overrides() {

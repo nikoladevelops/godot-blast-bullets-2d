@@ -1061,6 +1061,21 @@ public:
 	// rewrote every bullet.) On rejection the range is left empty
 	// (start > end) so callers' loops do nothing and getters return [].
 	_ALWAYS_INLINE_ bool ensure_indexes_match_amount_bullets_range(int &bullet_index_start, int &bullet_index_end_inclusive, const char *function_name) const;
+	// The all_bullets_* skeletons: validate the range once (as above), then
+	// run fn(i) per bullet / collect fn(i) per bullet into an Arr.
+	template <typename F>
+	void for_range(int bullet_index_start, int bullet_index_end_inclusive, const char *function_name, F &&fn) const {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, function_name);
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			fn(i);
+		}
+	}
+	template <typename Arr, typename F>
+	Arr collect_range(int bullet_index_start, int bullet_index_end_inclusive, const char *function_name, F &&fn) const {
+		Arr arr;
+		for_range(bullet_index_start, bullet_index_end_inclusive, function_name, [&](int i) { arr.push_back(fn(i)); });
+		return arr;
+	}
 
 	// Resolve Ref<Shape2D> once via casting into typed cache. Single error per spawn/enable, then quiet.
 	// Null/unsupported/invalid => circle r16 (consistent default, cheapest physics).
@@ -1971,6 +1986,8 @@ public:
 	// Retarget passes skip disabled slots; direct script calls get a loud
 	// error here instead of a silent counter leak.
 	_ALWAYS_INLINE_ bool orbit_reject_disabled_bullet(int bullet_index, const char *function_name) const;
+	// Warns once and returns true when the (validated) bullet's orbit is off.
+	bool orbit_disabled_warn(int bullet_index, const char *action) const;
 
 	void bullet_enable_orbiting(int bullet_index, real_t orbiting_radius, OrbitingDirection orbiting_direction, OrbitingTextureRotation orbiting_texture_rotation, OrbitingFollowMode orbiting_follow_mode = FollowTarget, real_t orbiting_follow_deadzone = 0.0f, OrbitingLockPolicy orbiting_lock_policy = RelockAlways, bool orbiting_rigid_follow = true);
 

@@ -78,7 +78,7 @@ Vector2 BulletVolley2D::bullet_get_gravity(int bullet_index) const {
 	if (!validate_bullet_index(bullet_index, "bullet_get_gravity")) {
 		return Vector2(0, 0);
 	}
-	if (bullet_index < 0 || bullet_index >= (int)all_gravity.size()) {
+	if (bullet_index >= (int)all_gravity.size()) {
 		return Vector2(0, 0);
 	}
 	return all_gravity[bullet_index];
@@ -118,12 +118,7 @@ void BulletVolley2D::all_bullets_set_gravity(const Vector2 &value, int bullet_in
 }
 
 TypedArray<Vector2> BulletVolley2D::all_bullets_get_gravity(int bullet_index_start, int bullet_index_end_inclusive) const {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_gravity");
-	TypedArray<Vector2> arr;
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		arr.push_back(bullet_get_gravity(i));
-	}
-	return arr;
+	return collect_range<TypedArray<Vector2>>(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_gravity", [&](int i) { return bullet_get_gravity(i); });
 }
 
 void BulletVolley2D::set_gravity_delay_sec(double value) {
@@ -146,19 +141,14 @@ real_t BulletVolley2D::bullet_get_fall_speed(int bullet_index) const {
 	if (!validate_bullet_index(bullet_index, "bullet_get_fall_speed")) {
 		return 0.0;
 	}
-	if (bullet_index < 0 || bullet_index >= (int)all_gravity_velocity.size()) {
+	if (bullet_index >= (int)all_gravity_velocity.size()) {
 		return 0.0;
 	}
 	return all_gravity_velocity[bullet_index].length();
 }
 
 TypedArray<real_t> BulletVolley2D::all_bullets_get_fall_speed(int bullet_index_start, int bullet_index_end_inclusive) const {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_fall_speed");
-	TypedArray<real_t> arr;
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		arr.push_back(bullet_get_fall_speed(i));
-	}
-	return arr;
+	return collect_range<TypedArray<real_t>>(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_fall_speed", [&](int i) { return bullet_get_fall_speed(i); });
 }
 
 void BulletVolley2D::set_linear_drag(real_t value) {

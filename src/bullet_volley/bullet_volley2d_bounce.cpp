@@ -294,19 +294,14 @@ int BulletVolley2D::bullet_get_bounce_count(int bullet_index) const {
 	if (!validate_bullet_index(bullet_index, "bullet_get_bounce_count")) {
 		return 0;
 	}
-	if (bullet_index < 0 || bullet_index >= (int)all_bounce_count.size()) {
+	if (bullet_index >= (int)all_bounce_count.size()) {
 		return 0;
 	}
 	return all_bounce_count[bullet_index];
 }
 
 TypedArray<int> BulletVolley2D::all_bullets_get_bounce_count(int bullet_index_start, int bullet_index_end_inclusive) const {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_bounce_count");
-	TypedArray<int> arr;
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		arr.push_back(bullet_get_bounce_count(i));
-	}
-	return arr;
+	return collect_range<TypedArray<int>>(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_bounce_count", [&](int i) { return bullet_get_bounce_count(i); });
 }
 
 void BulletVolley2D::apply_bounce_from_data(const BulletVolleyData2D &volley_data, int data_collision_mask) {

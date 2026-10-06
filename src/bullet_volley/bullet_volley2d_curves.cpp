@@ -136,11 +136,7 @@ void BulletVolley2D::bullet_set_curves_data(int bullet_index, const Ref<BulletCu
 }
 
 void BulletVolley2D::all_bullets_set_curves_data(const Ref<BulletCurvesData2D> &curves_data, int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_curves_data");
-
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		bullet_set_curves_data(i, curves_data);
-	}
+	for_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_curves_data", [&](int i) { bullet_set_curves_data(i, curves_data); });
 }
 
 TypedArray<BulletCurvesData2D> BulletVolley2D::all_bullets_get_curves_data(int bullet_index_start, int bullet_index_end_inclusive) {
@@ -156,11 +152,7 @@ TypedArray<BulletCurvesData2D> BulletVolley2D::all_bullets_get_curves_data(int b
 }
 
 void BulletVolley2D::all_bullets_clear_curves_data(int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_clear_curves_data");
-
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		bullet_set_curves_data(i, Ref<BulletCurvesData2D>());
-	}
+	for_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_clear_curves_data", [&](int i) { bullet_set_curves_data(i, Ref<BulletCurvesData2D>()); });
 }
 
 void BulletVolley2D::set_shared_movement_pattern_curve(const Ref<Curve2D> &new_curve) {
@@ -259,11 +251,7 @@ void BulletVolley2D::remove_bullet_movement_pattern(int bullet_index) {
 }
 
 void BulletVolley2D::all_bullets_remove_movement_pattern(int start_index, int end_index_inclusive) {
-	ensure_indexes_match_amount_bullets_range(start_index, end_index_inclusive, "all_bullets_remove_movement_pattern");
-
-	for (int i = start_index; i <= end_index_inclusive; ++i) {
-		remove_bullet_movement_pattern(i);
-	}
+	for_range(start_index, end_index_inclusive, "all_bullets_remove_movement_pattern", [&](int i) { remove_bullet_movement_pattern(i); });
 }
 
 void BulletVolley2D::apply_per_bullet_curves_from_data(const BulletVolleyData2D &volley_data) {

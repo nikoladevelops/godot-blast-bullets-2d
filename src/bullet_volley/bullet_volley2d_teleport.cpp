@@ -157,11 +157,7 @@ void BulletVolley2D::teleport_shift_bullet(int bullet_index, const Vector2 &shif
 }
 
 void BulletVolley2D::teleport_shift_all_bullets(const Vector2 &shift_amount, int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "teleport_shift_all_bullets");
-
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		teleport_shift_bullet(i, shift_amount);
-	}
+	for_range(bullet_index_start, bullet_index_end_inclusive, "teleport_shift_all_bullets", [&](int i) { teleport_shift_bullet(i, shift_amount); });
 }
 
 } // namespace BlastBullets2D

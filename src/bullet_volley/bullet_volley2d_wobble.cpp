@@ -56,7 +56,7 @@ real_t BulletVolley2D::bullet_get_wobble_amplitude(int bullet_index) const {
 	if (!validate_bullet_index(bullet_index, "bullet_get_wobble_amplitude")) {
 		return 0.0;
 	}
-	if (bullet_index < 0 || bullet_index >= (int)all_bullet_wobble.size()) {
+	if (bullet_index >= (int)all_bullet_wobble.size()) {
 		return 0.0;
 	}
 	const WobbleSeed &w = all_bullet_wobble[bullet_index];
@@ -67,7 +67,7 @@ bool BulletVolley2D::bullet_get_wobble_face_movement_direction(int bullet_index)
 	if (!validate_bullet_index(bullet_index, "bullet_get_wobble_face_movement_direction")) {
 		return false;
 	}
-	if (bullet_index < 0 || bullet_index >= (int)all_bullet_wobble.size()) {
+	if (bullet_index >= (int)all_bullet_wobble.size()) {
 		return false;
 	}
 	return all_bullet_wobble[bullet_index].active && all_bullet_wobble[bullet_index].face_movement_direction;
@@ -77,7 +77,7 @@ real_t BulletVolley2D::bullet_get_wobble_face_rotation_speed(int bullet_index) c
 	if (!validate_bullet_index(bullet_index, "bullet_get_wobble_face_rotation_speed")) {
 		return 0.0;
 	}
-	if (bullet_index < 0 || bullet_index >= (int)all_bullet_wobble.size()) {
+	if (bullet_index >= (int)all_bullet_wobble.size()) {
 		return 0.0;
 	}
 	const WobbleSeed &w = all_bullet_wobble[bullet_index];
@@ -155,29 +155,21 @@ void BulletVolley2D::bullet_set_wobble_data(int bullet_index, const Ref<BulletWo
 }
 
 void BulletVolley2D::all_bullets_set_wobble_data(const Ref<BulletWobbleData2D> &wobble_data, int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_wobble_data");
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		bullet_set_wobble_data(i, wobble_data);
-	}
+	for_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_wobble_data", [&](int i) { bullet_set_wobble_data(i, wobble_data); });
 }
 
 Ref<BulletWobbleData2D> BulletVolley2D::bullet_get_wobble_data(int bullet_index) const {
 	if (!validate_bullet_index(bullet_index, "bullet_get_wobble_data")) {
 		return Ref<BulletWobbleData2D>();
 	}
-	if (bullet_index < 0 || bullet_index >= (int)all_bullet_wobble_data.size()) {
+	if (bullet_index >= (int)all_bullet_wobble_data.size()) {
 		return Ref<BulletWobbleData2D>();
 	}
 	return all_bullet_wobble_data[bullet_index];
 }
 
 TypedArray<BulletWobbleData2D> BulletVolley2D::all_bullets_get_wobble_data(int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_wobble_data");
-	TypedArray<BulletWobbleData2D> arr;
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		arr.push_back(bullet_get_wobble_data(i));
-	}
-	return arr;
+	return collect_range<TypedArray<BulletWobbleData2D>>(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_wobble_data", [&](int i) { return bullet_get_wobble_data(i); });
 }
 
 void BulletVolley2D::set_shared_bullet_wobble_data(const Ref<BulletWobbleData2D> &new_wobble_data) {

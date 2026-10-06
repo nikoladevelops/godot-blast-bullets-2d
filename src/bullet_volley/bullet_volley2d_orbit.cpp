@@ -7,6 +7,16 @@ using namespace godot;
 
 namespace BlastBullets2D {
 
+// True (after one "Bullet index N has orbiting disabled. Cannot <action>."
+// warning) when the bullet's orbit is off. Call after validate_bullet_index.
+bool BulletVolley2D::orbit_disabled_warn(int bullet_index, const char *action) const {
+	if (all_orbiting_status[bullet_index] != 0) {
+		return false;
+	}
+	UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " has orbiting disabled. Cannot " + action + ".");
+	return true;
+}
+
 void BulletVolley2D::bullet_enable_orbiting(int bullet_index, real_t orbiting_radius, OrbitingDirection orbiting_direction, OrbitingTextureRotation orbiting_texture_rotation, OrbitingFollowMode orbiting_follow_mode, real_t orbiting_follow_deadzone, OrbitingLockPolicy orbiting_lock_policy, bool orbiting_rigid_follow) {
 	if (!validate_bullet_index(bullet_index, "bullet_enable_orbiting")) {
 		return;
@@ -103,10 +113,7 @@ void BulletVolley2D::bullet_set_orbiting_radius(int bullet_index, real_t new_rad
 		new_radius = 0.01;
 	}
 
-	auto &orbiting_status = all_orbiting_status[bullet_index];
-
-	if (orbiting_status == 0) {
-		UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " has orbiting disabled. Cannot set orbiting radius.");
+	if (orbit_disabled_warn(bullet_index, "set orbiting radius")) {
 		return;
 	}
 
@@ -133,10 +140,7 @@ real_t BulletVolley2D::bullet_get_orbiting_radius(int bullet_index) {
 		return 0.0;
 	}
 
-	auto &orbiting_status = all_orbiting_status[bullet_index];
-
-	if (orbiting_status == 0) {
-		UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " has orbiting disabled. Cannot get orbiting radius.");
+	if (orbit_disabled_warn(bullet_index, "get orbiting radius")) {
 		return 0.0;
 	}
 
@@ -157,10 +161,7 @@ void BulletVolley2D::bullet_set_orbiting_texture_rotation(int bullet_index, Orbi
 		return;
 	}
 
-	auto &orbiting_status = all_orbiting_status[bullet_index];
-
-	if (orbiting_status == 0) {
-		UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " has orbiting disabled. Cannot set orbiting texture rotation.");
+	if (orbit_disabled_warn(bullet_index, "set orbiting texture rotation")) {
 		return;
 	}
 
@@ -177,10 +178,7 @@ BulletVolley2D::OrbitingTextureRotation BulletVolley2D::bullet_get_orbiting_text
 		return FaceTarget;
 	}
 
-	auto &orbiting_status = all_orbiting_status[bullet_index];
-
-	if (orbiting_status == 0) {
-		UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " has orbiting disabled. Cannot get orbiting texture rotation.");
+	if (orbit_disabled_warn(bullet_index, "get orbiting texture rotation")) {
 		return FaceTarget;
 	}
 
@@ -193,10 +191,7 @@ void BulletVolley2D::bullet_set_orbiting_direction(int bullet_index, OrbitingDir
 		return;
 	}
 
-	auto &orbiting_status = all_orbiting_status[bullet_index];
-
-	if (orbiting_status == 0) {
-		UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " has orbiting disabled. Cannot set orbiting direction.");
+	if (orbit_disabled_warn(bullet_index, "set orbiting direction")) {
 		return;
 	}
 
@@ -227,10 +222,7 @@ BulletVolley2D::OrbitingDirection BulletVolley2D::bullet_get_orbiting_direction(
 		return DontMove;
 	}
 
-	auto &orbiting_status = all_orbiting_status[bullet_index];
-
-	if (orbiting_status == 0) {
-		UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " has orbiting disabled. Cannot get orbiting direction.");
+	if (orbit_disabled_warn(bullet_index, "get orbiting direction")) {
 		return DontMove;
 	}
 
@@ -239,11 +231,7 @@ BulletVolley2D::OrbitingDirection BulletVolley2D::bullet_get_orbiting_direction(
 }
 
 void BulletVolley2D::all_bullets_enable_orbiting(real_t orbiting_radius, OrbitingDirection orbiting_direction, OrbitingTextureRotation orbiting_texture_rotation, int bullet_index_start, int bullet_index_end_inclusive, OrbitingFollowMode orbiting_follow_mode, real_t orbiting_follow_deadzone, OrbitingLockPolicy orbiting_lock_policy, bool orbiting_rigid_follow) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_enable_orbiting");
-
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		bullet_enable_orbiting(i, orbiting_radius, orbiting_direction, orbiting_texture_rotation, orbiting_follow_mode, orbiting_follow_deadzone, orbiting_lock_policy, orbiting_rigid_follow);
-	}
+	for_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_enable_orbiting", [&](int i) { bullet_enable_orbiting(i, orbiting_radius, orbiting_direction, orbiting_texture_rotation, orbiting_follow_mode, orbiting_follow_deadzone, orbiting_lock_policy, orbiting_rigid_follow); });
 }
 
 void BulletVolley2D::all_bullets_enable_orbiting_linear(real_t radius_start, real_t radius_step, OrbitingDirection orbiting_direction, OrbitingTextureRotation orbiting_texture_rotation, int bullet_index_start, int bullet_index_end_inclusive, OrbitingFollowMode orbiting_follow_mode, real_t orbiting_follow_deadzone, OrbitingLockPolicy orbiting_lock_policy, bool orbiting_rigid_follow) {
@@ -281,8 +269,7 @@ Vector2 BulletVolley2D::bullet_get_orbiting_center(int bullet_index) {
 	if (!validate_bullet_index(bullet_index, "bullet_get_orbiting_center")) {
 		return Vector2(0, 0);
 	}
-	if (all_orbiting_status[bullet_index] == 0) {
-		UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " has orbiting disabled. Cannot get orbiting center.");
+	if (orbit_disabled_warn(bullet_index, "get orbiting center")) {
 		return Vector2(0, 0);
 	}
 	auto &orbiting_data = all_orbiting_data[bullet_index];
@@ -300,8 +287,7 @@ real_t BulletVolley2D::bullet_get_orbiting_angle(int bullet_index) {
 	if (!validate_bullet_index(bullet_index, "bullet_get_orbiting_angle")) {
 		return 0.0;
 	}
-	if (all_orbiting_status[bullet_index] == 0) {
-		UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " has orbiting disabled. Cannot get orbiting angle.");
+	if (orbit_disabled_warn(bullet_index, "get orbiting angle")) {
 		return 0.0;
 	}
 	return all_orbiting_data[bullet_index].angle;
@@ -315,8 +301,7 @@ void BulletVolley2D::bullet_set_orbiting_center(int bullet_index, const Vector2 
 		UtilityFunctions::push_error("bullet_set_orbiting_center: new_center must be finite (NaN/Inf is rejected).");
 		return;
 	}
-	if (all_orbiting_status[bullet_index] == 0) {
-		UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " has orbiting disabled. Cannot set orbiting center.");
+	if (orbit_disabled_warn(bullet_index, "set orbiting center")) {
 		return;
 	}
 	auto &orbiting_data = all_orbiting_data[bullet_index];
@@ -335,8 +320,7 @@ void BulletVolley2D::bullet_set_orbiting_follow_mode(int bullet_index, OrbitingF
 		UtilityFunctions::push_error("Invalid orbiting follow mode " + String::num_int64(new_follow_mode) + ". Use FollowTarget, FollowDeadzone or Anchored.");
 		return;
 	}
-	if (all_orbiting_status[bullet_index] == 0) {
-		UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " has orbiting disabled. Cannot set orbiting follow mode.");
+	if (orbit_disabled_warn(bullet_index, "set orbiting follow mode")) {
 		return;
 	}
 	all_orbiting_data[bullet_index].follow_mode = new_follow_mode;
@@ -346,8 +330,7 @@ BulletVolley2D::OrbitingFollowMode BulletVolley2D::bullet_get_orbiting_follow_mo
 	if (!validate_bullet_index(bullet_index, "bullet_get_orbiting_follow_mode")) {
 		return FollowTarget;
 	}
-	if (all_orbiting_status[bullet_index] == 0) {
-		UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " has orbiting disabled. Cannot get orbiting follow mode.");
+	if (orbit_disabled_warn(bullet_index, "get orbiting follow mode")) {
 		return FollowTarget;
 	}
 	return all_orbiting_data[bullet_index].follow_mode;
@@ -361,8 +344,7 @@ void BulletVolley2D::bullet_set_orbiting_follow_deadzone(int bullet_index, real_
 		UtilityFunctions::push_error("Orbiting follow deadzone must be finite and >= 0, got " + String::num(new_deadzone) + ".");
 		return;
 	}
-	if (all_orbiting_status[bullet_index] == 0) {
-		UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " has orbiting disabled. Cannot set orbiting follow deadzone.");
+	if (orbit_disabled_warn(bullet_index, "set orbiting follow deadzone")) {
 		return;
 	}
 	all_orbiting_data[bullet_index].follow_deadzone = new_deadzone;
@@ -372,8 +354,7 @@ real_t BulletVolley2D::bullet_get_orbiting_follow_deadzone(int bullet_index) {
 	if (!validate_bullet_index(bullet_index, "bullet_get_orbiting_follow_deadzone")) {
 		return 0.0;
 	}
-	if (all_orbiting_status[bullet_index] == 0) {
-		UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " has orbiting disabled. Cannot get orbiting follow deadzone.");
+	if (orbit_disabled_warn(bullet_index, "get orbiting follow deadzone")) {
 		return 0.0;
 	}
 	return all_orbiting_data[bullet_index].follow_deadzone;
@@ -387,8 +368,7 @@ void BulletVolley2D::bullet_set_orbiting_lock_policy(int bullet_index, OrbitingL
 		UtilityFunctions::push_error("Invalid orbiting lock policy " + String::num_int64(new_lock_policy) + ". Use RelockAlways, StayLocked or RelockOnTargetChange.");
 		return;
 	}
-	if (all_orbiting_status[bullet_index] == 0) {
-		UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " has orbiting disabled. Cannot set orbiting lock policy.");
+	if (orbit_disabled_warn(bullet_index, "set orbiting lock policy")) {
 		return;
 	}
 	all_orbiting_data[bullet_index].lock_policy = new_lock_policy;
@@ -398,8 +378,7 @@ BulletVolley2D::OrbitingLockPolicy BulletVolley2D::bullet_get_orbiting_lock_poli
 	if (!validate_bullet_index(bullet_index, "bullet_get_orbiting_lock_policy")) {
 		return RelockAlways;
 	}
-	if (all_orbiting_status[bullet_index] == 0) {
-		UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " has orbiting disabled. Cannot get orbiting lock policy.");
+	if (orbit_disabled_warn(bullet_index, "get orbiting lock policy")) {
 		return RelockAlways;
 	}
 	return all_orbiting_data[bullet_index].lock_policy;
@@ -409,8 +388,7 @@ void BulletVolley2D::bullet_set_orbiting_rigid_follow(int bullet_index, bool new
 	if (!validate_bullet_index(bullet_index, "bullet_set_orbiting_rigid_follow")) {
 		return;
 	}
-	if (all_orbiting_status[bullet_index] == 0) {
-		UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " has orbiting disabled. Cannot set orbiting rigid follow.");
+	if (orbit_disabled_warn(bullet_index, "set orbiting rigid follow")) {
 		return;
 	}
 	all_orbiting_data[bullet_index].rigid_follow = new_rigid_follow;
@@ -420,138 +398,66 @@ bool BulletVolley2D::bullet_get_orbiting_rigid_follow(int bullet_index) {
 	if (!validate_bullet_index(bullet_index, "bullet_get_orbiting_rigid_follow")) {
 		return true;
 	}
-	if (all_orbiting_status[bullet_index] == 0) {
-		UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " has orbiting disabled. Cannot get orbiting rigid follow.");
+	if (orbit_disabled_warn(bullet_index, "get orbiting rigid follow")) {
 		return true;
 	}
 	return all_orbiting_data[bullet_index].rigid_follow;
 }
 
 void BulletVolley2D::all_bullets_set_orbiting_rigid_follow(bool new_rigid_follow, int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_orbiting_rigid_follow");
-
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		bullet_set_orbiting_rigid_follow(i, new_rigid_follow);
-	}
+	for_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_orbiting_rigid_follow", [&](int i) { bullet_set_orbiting_rigid_follow(i, new_rigid_follow); });
 }
 
 PackedFloat32Array BulletVolley2D::all_bullets_get_orbiting_radius(int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_orbiting_radius");
-
-	PackedFloat32Array arr;
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		arr.push_back(bullet_get_orbiting_radius(i));
-	}
-
-	return arr;
+	return collect_range<PackedFloat32Array>(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_orbiting_radius", [&](int i) { return bullet_get_orbiting_radius(i); });
 }
 
 PackedVector2Array BulletVolley2D::all_bullets_get_orbiting_center(int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_orbiting_center");
-
-	PackedVector2Array arr;
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		arr.push_back(bullet_get_orbiting_center(i));
-	}
-
-	return arr;
+	return collect_range<PackedVector2Array>(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_orbiting_center", [&](int i) { return bullet_get_orbiting_center(i); });
 }
 
 PackedFloat32Array BulletVolley2D::all_bullets_get_orbiting_angle(int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_orbiting_angle");
-
-	PackedFloat32Array arr;
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		arr.push_back(bullet_get_orbiting_angle(i));
-	}
-
-	return arr;
+	return collect_range<PackedFloat32Array>(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_orbiting_angle", [&](int i) { return bullet_get_orbiting_angle(i); });
 }
 
 TypedArray<bool> BulletVolley2D::all_bullets_is_orbiting_enabled(int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_is_orbiting_enabled");
-
-	TypedArray<bool> arr;
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		arr.push_back(bullet_is_orbiting_enabled(i));
-	}
-
-	return arr;
+	return collect_range<TypedArray<bool>>(bullet_index_start, bullet_index_end_inclusive, "all_bullets_is_orbiting_enabled", [&](int i) { return bullet_is_orbiting_enabled(i); });
 }
 
 void BulletVolley2D::all_bullets_disable_orbiting(int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_disable_orbiting");
-
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		bullet_disable_orbiting(i);
-	}
+	for_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_disable_orbiting", [&](int i) { bullet_disable_orbiting(i); });
 }
 
 void BulletVolley2D::all_bullets_set_orbiting_radius(real_t new_radius, int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_orbiting_radius");
-
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		bullet_set_orbiting_radius(i, new_radius);
-	}
+	for_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_orbiting_radius", [&](int i) { bullet_set_orbiting_radius(i, new_radius); });
 }
 
 void BulletVolley2D::all_bullets_set_orbiting_direction(OrbitingDirection new_direction, int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_orbiting_direction");
-
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		bullet_set_orbiting_direction(i, new_direction);
-	}
+	for_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_orbiting_direction", [&](int i) { bullet_set_orbiting_direction(i, new_direction); });
 }
 
 void BulletVolley2D::all_bullets_set_orbiting_texture_rotation(OrbitingTextureRotation new_rotation, int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_orbiting_texture_rotation");
-
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		bullet_set_orbiting_texture_rotation(i, new_rotation);
-	}
+	for_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_orbiting_texture_rotation", [&](int i) { bullet_set_orbiting_texture_rotation(i, new_rotation); });
 }
 
 void BulletVolley2D::all_bullets_set_orbiting_follow_mode(OrbitingFollowMode new_follow_mode, int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_orbiting_follow_mode");
-
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		bullet_set_orbiting_follow_mode(i, new_follow_mode);
-	}
+	for_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_orbiting_follow_mode", [&](int i) { bullet_set_orbiting_follow_mode(i, new_follow_mode); });
 }
 
 void BulletVolley2D::all_bullets_set_orbiting_follow_deadzone(real_t new_deadzone, int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_orbiting_follow_deadzone");
-
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		bullet_set_orbiting_follow_deadzone(i, new_deadzone);
-	}
+	for_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_orbiting_follow_deadzone", [&](int i) { bullet_set_orbiting_follow_deadzone(i, new_deadzone); });
 }
 
 void BulletVolley2D::all_bullets_set_orbiting_lock_policy(OrbitingLockPolicy new_lock_policy, int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_orbiting_lock_policy");
-
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		bullet_set_orbiting_lock_policy(i, new_lock_policy);
-	}
+	for_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_orbiting_lock_policy", [&](int i) { bullet_set_orbiting_lock_policy(i, new_lock_policy); });
 }
 
 void BulletVolley2D::all_bullets_set_orbiting_center(const Vector2 &new_center, int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_orbiting_center");
-
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		bullet_set_orbiting_center(i, new_center);
-	}
+	for_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_orbiting_center", [&](int i) { bullet_set_orbiting_center(i, new_center); });
 }
 
 TypedArray<bool> BulletVolley2D::all_bullets_is_orbiting_locked(int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_is_orbiting_locked");
-
-	TypedArray<bool> arr;
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		arr.push_back(bullet_is_orbiting_locked(i));
-	}
-
-	return arr;
+	return collect_range<TypedArray<bool>>(bullet_index_start, bullet_index_end_inclusive, "all_bullets_is_orbiting_locked", [&](int i) { return bullet_is_orbiting_locked(i); });
 }
 
 } // namespace BlastBullets2D

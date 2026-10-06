@@ -25,7 +25,7 @@ real_t BulletVolley2D::bullet_get_rotation_speed(int bullet_index) const {
 	if (!validate_bullet_index(bullet_index, "bullet_get_rotation_speed")) {
 		return 0.0;
 	}
-	if (bullet_index < 0 || bullet_index >= (int)all_rotation_speed.size()) {
+	if (bullet_index >= (int)all_rotation_speed.size()) {
 		return 0.0;
 	}
 	return all_rotation_speed[bullet_index];
@@ -91,11 +91,7 @@ void BulletVolley2D::bullet_set_velocity(int bullet_index, const Vector2 &new_ve
 }
 
 void BulletVolley2D::all_bullets_set_velocity(const Vector2 &new_velocity, int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_velocity");
-
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		bullet_set_velocity(i, new_velocity);
-	}
+	for_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_velocity", [&](int i) { bullet_set_velocity(i, new_velocity); });
 }
 
 TypedArray<Vector2> BulletVolley2D::all_bullets_get_velocity(int bullet_index_start, int bullet_index_end_inclusive) const {
@@ -313,14 +309,7 @@ void BulletVolley2D::set_bullet_rotation_data(int bullet_index, const Ref<Bullet
 }
 
 TypedArray<BulletRotationData2D> BulletVolley2D::all_bullets_get_rotation_data(int bullet_index_start, int bullet_index_end_inclusive) const {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_rotation_data");
-
-	TypedArray<BulletRotationData2D> arr;
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		arr.push_back(get_bullet_rotation_data(i));
-	}
-
-	return arr;
+	return collect_range<TypedArray<BulletRotationData2D>>(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_rotation_data", [&](int i) { return get_bullet_rotation_data(i); });
 }
 
 void BulletVolley2D::all_bullets_set_rotation_data(const Ref<BulletRotationData2D> &new_bullet_rotation_data, int bullet_index_start, int bullet_index_end_inclusive) {
@@ -405,14 +394,7 @@ void BulletVolley2D::set_bullet_speed_data(int bullet_index, const Ref<BulletSpe
 }
 
 TypedArray<BulletSpeedData2D> BulletVolley2D::all_bullets_get_speed_data(int bullet_index_start, int bullet_index_end_inclusive) const {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_speed_data");
-
-	TypedArray<BulletSpeedData2D> arr;
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		arr.push_back(get_bullet_speed_data(i));
-	}
-
-	return arr;
+	return collect_range<TypedArray<BulletSpeedData2D>>(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_speed_data", [&](int i) { return get_bullet_speed_data(i); });
 }
 
 void BulletVolley2D::all_bullets_set_speed_data(const Ref<BulletSpeedData2D> &new_bullet_speed_data, int bullet_index_start, int bullet_index_end_inclusive) {
@@ -479,29 +461,18 @@ void BulletVolley2D::set_bullet_direction(int bullet_index, const Vector2 &new_d
 }
 
 TypedArray<Vector2> BulletVolley2D::all_bullets_get_direction(int bullet_index_start, int bullet_index_end_inclusive) const {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_direction");
-
-	TypedArray<Vector2> arr;
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		arr.push_back(get_bullet_direction(i));
-	}
-
-	return arr;
+	return collect_range<TypedArray<Vector2>>(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_direction", [&](int i) { return get_bullet_direction(i); });
 }
 
 void BulletVolley2D::all_bullets_set_direction(const Vector2 &new_direction, int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_direction");
-
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		set_bullet_direction(i, new_direction);
-	}
+	for_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_direction", [&](int i) { set_bullet_direction(i, new_direction); });
 }
 
 real_t BulletVolley2D::get_bullet_texture_rotation_radians(int bullet_index) const {
 	if (!validate_bullet_index(bullet_index, "get_bullet_texture_rotation_radians")) {
 		return 0.0;
 	}
-	if (bullet_index < 0 || bullet_index >= (int)all_cached_instance_transforms.size()) {
+	if (bullet_index >= (int)all_cached_instance_transforms.size()) {
 		return 0.0;
 	}
 
@@ -549,29 +520,18 @@ void BulletVolley2D::set_bullet_texture_rotation_radians(int bullet_index, real_
 }
 
 TypedArray<real_t> BulletVolley2D::all_bullets_get_texture_rotation_radians(int bullet_index_start, int bullet_index_end_inclusive) const {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_texture_rotation_radians");
-
-	TypedArray<real_t> arr;
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		arr.push_back(get_bullet_texture_rotation_radians(i));
-	}
-
-	return arr;
+	return collect_range<TypedArray<real_t>>(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_texture_rotation_radians", [&](int i) { return get_bullet_texture_rotation_radians(i); });
 }
 
 void BulletVolley2D::all_bullets_set_texture_rotation_radians(real_t new_rotation_radians, int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_texture_rotation_radians");
-
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		set_bullet_texture_rotation_radians(i, new_rotation_radians);
-	}
+	for_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_texture_rotation_radians", [&](int i) { set_bullet_texture_rotation_radians(i, new_rotation_radians); });
 }
 
 real_t BulletVolley2D::get_bullet_texture_rotation_degrees(int bullet_index) const {
 	if (!validate_bullet_index(bullet_index, "get_bullet_texture_rotation_degrees")) {
 		return 0.0;
 	}
-	if (bullet_index < 0 || bullet_index >= (int)all_cached_instance_transforms.size()) {
+	if (bullet_index >= (int)all_cached_instance_transforms.size()) {
 		return 0.0;
 	}
 
@@ -605,29 +565,18 @@ void BulletVolley2D::set_bullet_texture_rotation_degrees(int bullet_index, real_
 }
 
 TypedArray<real_t> BulletVolley2D::all_bullets_get_texture_rotation_degrees(int bullet_index_start, int bullet_index_end_inclusive) const {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_texture_rotation_degrees");
-
-	TypedArray<real_t> arr;
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		arr.push_back(get_bullet_texture_rotation_degrees(i));
-	}
-
-	return arr;
+	return collect_range<TypedArray<real_t>>(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_texture_rotation_degrees", [&](int i) { return get_bullet_texture_rotation_degrees(i); });
 }
 
 void BulletVolley2D::all_bullets_set_texture_rotation_degrees(real_t new_rotation_degrees, int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_texture_rotation_degrees");
-
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		set_bullet_texture_rotation_degrees(i, new_rotation_degrees);
-	}
+	for_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_texture_rotation_degrees", [&](int i) { set_bullet_texture_rotation_degrees(i, new_rotation_degrees); });
 }
 
 Transform2D BulletVolley2D::get_bullet_transform(int bullet_index) const {
 	if (!validate_bullet_index(bullet_index, "get_bullet_transform")) {
 		return Transform2D();
 	}
-	if (bullet_index < 0 || bullet_index >= (int)all_cached_instance_transforms.size()) {
+	if (bullet_index >= (int)all_cached_instance_transforms.size()) {
 		return Transform2D();
 	}
 
@@ -640,7 +589,7 @@ Transform2D BulletVolley2D::get_bullet_global_transform(int bullet_index) const 
 	if (!validate_bullet_index(bullet_index, "get_bullet_global_transform")) {
 		return Transform2D();
 	}
-	if (bullet_index < 0 || bullet_index >= (int)all_cached_instance_transforms.size()) {
+	if (bullet_index >= (int)all_cached_instance_transforms.size()) {
 		return Transform2D();
 	}
 
@@ -734,22 +683,11 @@ void BulletVolley2D::set_bullet_transform(int bullet_index, const Transform2D &n
 }
 
 TypedArray<Transform2D> BulletVolley2D::all_bullets_get_transforms(int bullet_index_start, int bullet_index_end_inclusive) const {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_transforms");
-
-	TypedArray<Transform2D> arr;
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		arr.push_back(get_bullet_transform(i));
-	}
-
-	return arr;
+	return collect_range<TypedArray<Transform2D>>(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_transforms", [&](int i) { return get_bullet_transform(i); });
 }
 
 void BulletVolley2D::all_bullets_set_transforms(const Transform2D &new_transform, bool set_direction_based_on_transform, int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_transforms");
-
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		set_bullet_transform(i, new_transform, set_direction_based_on_transform);
-	}
+	for_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_transforms", [&](int i) { set_bullet_transform(i, new_transform, set_direction_based_on_transform); });
 }
 
 void BulletVolley2D::set_bullet_direction_towards_position(int bullet_index, const Vector2 &target_position) {
@@ -786,11 +724,7 @@ void BulletVolley2D::set_bullet_direction_towards_position(int bullet_index, con
 }
 
 void BulletVolley2D::all_bullets_set_direction_towards_position(const Vector2 &target_position, int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_direction_towards_position");
-
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		set_bullet_direction_towards_position(i, target_position);
-	}
+	for_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_direction_towards_position", [&](int i) { set_bullet_direction_towards_position(i, target_position); });
 }
 
 void BulletVolley2D::set_bullet_direction_towards_node2d(int bullet_index, const Node2D *target_node) {
@@ -891,11 +825,7 @@ void BulletVolley2D::set_bullet_texture_rotation_towards_position(int bullet_ind
 }
 
 void BulletVolley2D::all_bullets_set_texture_rotation_towards_position(const Vector2 &target_position, int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_texture_rotation_towards_position");
-
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		set_bullet_texture_rotation_towards_position(i, target_position);
-	}
+	for_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_texture_rotation_towards_position", [&](int i) { set_bullet_texture_rotation_towards_position(i, target_position); });
 }
 
 void BulletVolley2D::set_bullet_texture_rotation_towards_node2d(int bullet_index, const Node2D *target_node) {

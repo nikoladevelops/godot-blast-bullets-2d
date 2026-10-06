@@ -785,10 +785,7 @@ void BulletVolley2D::bullet_reset_state(int bullet_index) {
 }
 
 void BulletVolley2D::all_bullets_reset_state(int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_reset_state");
-	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-		reset_bullet_runtime_state(i);
-	}
+	for_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_reset_state", [&](int i) { reset_bullet_runtime_state(i); });
 }
 
 void BulletVolley2D::reset_bullet_runtime_state(int bullet_index) {
