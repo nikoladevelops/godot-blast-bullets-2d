@@ -111,7 +111,7 @@ Ref<BulletCurvesData2D> BulletVolley2D::bullet_get_curves_data(int bullet_index)
 	}
 
 	if (bullet_index >= (int)all_bullet_curves_data.size() || all_bullet_curves_data[bullet_index].is_null()) {
-		UtilityFunctions::push_error("bullet_get_curves_data: This bullet has no individual curves data, did you mean to access shared_bullet_curves_data?");
+		UtilityFunctions::push_error("Invalid bullet_index at bullet_get_curves_data(). This bullet has no individual curves data, did you mean to access shared_bullet_curves_data?");
 		return Ref<BulletCurvesData2D>();
 	}
 
