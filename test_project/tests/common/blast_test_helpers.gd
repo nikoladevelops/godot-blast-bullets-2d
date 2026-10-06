@@ -102,3 +102,36 @@ static func make_flat_curve(value: float) -> Curve:
 	c.add_point(Vector2(0, value))
 	c.add_point(Vector2(1, value))
 	return c
+
+## Graze zone over `group` with one ring per radius (bullet size off unless
+## asked, so distances in tests are center to center).
+static func make_graze_zone(radii: Array = [24.0], group: StringName = &"graze_targets", count_bullet_size := false) -> BulletGrazeZone2D:
+	var z := BulletGrazeZone2D.new()
+	z.target_group = group
+	z.ring_count = radii.size()
+	for i in radii.size():
+		z.set_ring_radius(i, radii[i])
+	z.count_bullet_size = count_bullet_size
+	return z
+
+## Records every graze event `emitter` (a factory or a spawner) emits as
+## [kind, target, volley, bullet_index, zone, ring], kind "enter" / "exit".
+static func record_graze(emitter: Object) -> Array:
+	var log: Array = []
+	emitter.connect("bullet_grazed", func(t: Node2D, v: BulletVolley2D, i: int, z: BulletGrazeZone2D, r: int) -> void: log.append(["enter", t, v, i, z, r]))
+	emitter.connect("bullet_graze_exited", func(t: Node2D, v: BulletVolley2D, i: int, z: BulletGrazeZone2D, r: int) -> void: log.append(["exit", t, v, i, z, r]))
+	return log
+
+## "kind:bullet:ring" per recorded graze event (compact asserts).
+static func graze_kinds(log: Array) -> Array:
+	var out: Array = []
+	for e in log:
+		out.append("%s:%d:%d" % [e[0], e[3], e[5]])
+	return out
+
+## One transform per point, facing +X.
+static func transforms_at(points: Array) -> Array:
+	var out: Array = []
+	for p in points:
+		out.append(Transform2D(0.0, p))
+	return out

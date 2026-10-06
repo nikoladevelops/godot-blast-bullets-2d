@@ -598,14 +598,6 @@ void BulletVolley2D::set_bullet_collision_count(int bullet_index, int value) {
 	}
 }
 
-static String describe_emitter2d(Object *emitter) {
-	Node *node = Object::cast_to<Node>(emitter);
-	if (node == nullptr) {
-		return emitter->get_class();
-	}
-	return node->get_class() + " '" + (node->is_inside_tree() ? String(node->get_path()) : String(node->get_name())) + "'";
-}
-
 Object *BulletVolley2D::resolve_hit_emitter_checked() {
 	Object *emitter = resolve_signal_emitter();
 	if (drain_handlers_checked) {

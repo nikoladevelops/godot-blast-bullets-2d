@@ -17,6 +17,7 @@
 #include "attachments/bullet_attachment_object_pool2d.hpp"
 #include "core/collision_shape_helper2d.hpp"
 #include "core/dynamic_sparse_set.hpp"
+#include "core/graze_targets2d.hpp"
 #include "data/bullet_effect_layer_data2d.hpp"
 #include "data/bullet_volley_data2d.hpp"
 #include "godot_cpp/core/math.hpp"
@@ -459,6 +460,36 @@ public:
 	// the orphan warnings; hand_to_factory makes them factory-owned.
 	void apply_orphan_policy(uint64_t owner_spawner_id, int policy, const String &spawner_path);
 
+	// ---- Graze target cache (bullet_factory2d_graze.cpp) ----
+	// The graze targets of one group as of one factory sweep: ids and
+	// positions only (user code runs between the volleys of a sweep, so a
+	// stored pointer could dangle; volleys re-resolve every id). Refreshed
+	// lazily, at most once per physics step per group, and only for the
+	// groups an armed volley asks for. A spawner's death does not matter:
+	// orphaned volleys keep asking the factory.
+	struct GrazeGroupCache2D {
+		StringName group;
+		uint64_t sweep = 0;
+		uint64_t last_used_sweep = 0;
+		bool refreshed = false;
+		int count = 0;
+		GrazeTarget2D targets[BulletGrazeZone2D::MAX_TARGETS];
+	};
+	// Groups nobody asked about for this many sweeps are dropped (bounded
+	// memory when games churn through group names).
+	static constexpr uint64_t kGrazeGroupIdleSweeps = 600;
+	// Copies the targets of `group` for the current sweep into r_targets
+	// (BulletGrazeZone2D::MAX_TARGETS slots) and returns how many.
+	int graze_targets_for(const StringName &group, GrazeTarget2D *r_targets);
+	void clear_graze_cache();
+	// [{id, position}] exactly as the next volley tick of this sweep would
+	// test them (refreshes a stale entry first).
+	Array debug_get_graze_targets(const StringName &group);
+	// {refreshes, events_total, cached_groups}.
+	Dictionary debug_get_graze_stats() const;
+	// Bumped by volleys per emitted graze event (never per bullet).
+	uint64_t stats_graze_events_total = 0;
+
 	//
 
 	void handle_manual_volley_deletion(BulletVolley2D &bullet_multi);
@@ -563,6 +594,8 @@ private:
 	};
 	std::vector<VolleyIterationEntry> iteration_scratch;
 	std::vector<VolleyIterationEntry> timer_iteration_scratch;
+	std::vector<GrazeGroupCache2D> graze_groups;
+	uint64_t stats_graze_refreshes = 0;
 	// Advanced once per factory physics step (tick + timers + effects).
 	uint64_t sweep_counter = 0;
 	// Bumped whenever a volley is destroyed (manual free, tracking removal).

@@ -12,6 +12,7 @@
 #include "core/warn_once2d.hpp"
 #include "data/bullet_curves_data2d.hpp"
 #include "data/bullet_effect_layer_data2d.hpp"
+#include "data/bullet_graze_zone2d.hpp"
 #include "data/bullet_rotation_data2d.hpp"
 #include "data/bullet_speed_data2d.hpp"
 #include "data/bullet_volley_data2d.hpp"
@@ -90,6 +91,7 @@ class VolleyPool;
 //   bullet_volley2d_effects.cpp     sprite effect layers + trails
 //   bullet_volley2d_animation.cpp   sprite animation, fade/tint, custom data
 //   bullet_volley2d_teleport.cpp    teleporting
+//   bullet_volley2d_graze.cpp       graze zones: arming, per-tick targets, event dispatch
 //   bullet_volley2d_debug.cpp       debug_* introspection
 //   bullet_volley2d_bindings.cpp    Godot bindings (methods, properties, signals)
 //   bullet_volley2d_internal.hpp    inline helpers shared by several of the files above
@@ -2425,6 +2427,104 @@ public:
 	// clear helpers the enable path uses, so the global mouse-target counter can't leak
 	// when a multimesh dies holding mouse targets.
 	void clear_homing_state_for_teardown();
+
+	// GRAZE (bullet_volley2d_graze.cpp; the per-bullet stage step_graze is
+	// in bullet_volley2d_tick.cpp). A bullet grazes ring k of a zone when
+	// its motion during one tick comes within that ring's effective radius
+	// of a zone target (see BulletGrazeZone2D). Events are collected by the
+	// move loop and emitted live right after it: bullet_grazed /
+	// bullet_graze_exited on the owner spawner (while it lives), then on
+	// the factory (always).
+	static constexpr int MAX_GRAZE_ZONES = 4;
+	// Arms this volley with up to MAX_GRAZE_ZONES zones (null entries are
+	// skipped but keep their index) and resets every bullet's graze state.
+	// Refused on a pooled handle; nothing changes on an error.
+	bool graze_set_zones(const Array &zones);
+	// Disarms (zones released, pending events dropped).
+	void graze_clear();
+	// The armed zones, nulls in place.
+	Array get_graze_zones() const;
+	bool is_graze_armed() const;
+	// Bit k set = ring k of that zone was already grazed by this bullet
+	// (the Once policy keeps it for the bullet's life).
+	int get_bullet_grazed_rings(int bullet_index, int zone_index) const;
+	// Inside the zone's outermost ring at the end of its last evaluated tick.
+	bool is_bullet_inside_graze(int bullet_index, int zone_index) const;
+	// Clears one bullet's graze state in every zone (it can graze again).
+	void bullet_reset_graze(int bullet_index);
+	// {armed, zone_slots, state_bytes, active_this_tick, pending_events,
+	// dispatched_events, bullet_radius, generation}.
+	Dictionary debug_get_graze_info() const;
+
+	// Per bullet per zone state (graze_state). uint16_t on purpose: stores
+	// through a char type may alias anything, which would make the compiler
+	// reload the tick's hoisted data after every state write.
+	static constexpr uint16_t GRAZE_RINGS_MASK = 0x000F; // ring k already grazed
+	static constexpr uint16_t GRAZE_INSIDE = 0x0010; // inside the outermost ring after the last tick
+	static constexpr int GRAZE_DEEPEST_SHIFT = 5;
+	static constexpr uint16_t GRAZE_DEEPEST_MASK = 0x0060; // deepest ring index touched this visit
+	static constexpr uint16_t GRAZE_VISIT_FIRED = 0x0080; // this visit fired a bullet_grazed
+	static constexpr int GRAZE_ANCHOR_SHIFT = 8;
+	static constexpr uint16_t GRAZE_ANCHOR_MASK = 0x0300; // target slot the visit belongs to
+	// One zone as this tick tests it (rebuilt by prepare_graze_tick).
+	struct GrazeTickZone2D {
+		// Live targets, compact: centers[k] belongs to stable slot slots[k].
+		int target_count = 0;
+		Vector2 centers[BulletGrazeZone2D::MAX_TARGETS];
+		uint8_t slots[BulletGrazeZone2D::MAX_TARGETS] = {};
+		// Stable slot -> target id (0 = free), kept across ticks so a visit
+		// can name the target it belongs to; vanished_slots flags the slots
+		// whose target disappeared THIS tick (their visits end or move on).
+		uint64_t slot_ids[BulletGrazeZone2D::MAX_TARGETS] = {};
+		uint8_t vanished_slots = 0;
+		int ring_count = 0;
+		// Effective radius squared per ring, sorted by radius DESCENDING
+		// (equal radii keep ring order); ring_index maps a sorted slot to
+		// its ring, ring_slot a ring to its sorted slot.
+		real_t ring_r2[BulletGrazeZone2D::MAX_RINGS] = {};
+		uint8_t ring_index[BulletGrazeZone2D::MAX_RINGS] = {};
+		uint8_t ring_slot[BulletGrazeZone2D::MAX_RINGS] = {};
+		bool regraze_after_exit = false;
+	};
+	// Collected by step_graze, emitted by dispatch_graze_events. The bullet
+	// epoch and the zones generation end events whose bullet or zones
+	// changed under an earlier handler.
+	struct GrazeEvent2D {
+		int bullet_index = -1;
+		uint64_t epoch = 0;
+		uint64_t target_id = 0;
+		uint32_t generation = 0;
+		uint8_t zone = 0;
+		uint8_t ring = 0;
+		bool exit = false;
+	};
+	Ref<BulletGrazeZone2D> graze_zones[MAX_GRAZE_ZONES];
+	// Highest armed zone index + 1 (0 = disarmed): the graze_state stride.
+	int graze_zone_slots = 0;
+	// Bumped by every arm/clear/release: stale events are dropped.
+	uint32_t graze_generation = 0;
+	// Largest bullet basis scale at arming time (bullet size scaling).
+	real_t graze_bullet_scale = 1.0;
+	std::vector<uint16_t> graze_state;
+	GrazeTickZone2D graze_tick_zones[MAX_GRAZE_ZONES];
+	bool graze_tick_active = false;
+	// Zones that had live targets last tick (bit per zone): losing them
+	// ends that zone's open visits silently, once.
+	uint8_t graze_zones_with_targets = 0;
+	std::vector<GrazeEvent2D> graze_events;
+	std::vector<GrazeEvent2D> graze_dispatch_scratch;
+	uint64_t graze_events_dispatched = 0;
+	// Tick hooks (tick(): prepare before the move, dispatch after the
+	// homing events). dispatch returns false when the volley was freed.
+	void prepare_graze_tick();
+	bool dispatch_graze_events();
+	_ALWAYS_INLINE_ void step_graze(const MoveTick2D &t, int bullet_index, const Vector2 &p1, const Vector2 &v);
+	void graze_visit(int zone_index, int bullet_index, const Vector2 &p1, real_t swept_d2, int swept_target);
+	// A wake starts a fresh visit (no exit for a visit the freeze ended).
+	void graze_end_visits_of_bullet(int bullet_index);
+	void graze_end_visits_of_zone(int zone_index);
+	// Pool time / new life: zones released, state and events cleared.
+	void graze_release();
 
 protected:
 	// Updates homing behavior for a bullet. Zero-delta ticks steer nothing:

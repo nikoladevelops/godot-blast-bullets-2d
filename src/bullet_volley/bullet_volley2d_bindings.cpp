@@ -612,6 +612,18 @@ void BulletVolley2D::_bind_methods() {
 	// signals.
 	ADD_SIGNAL(MethodInfo("sprite_animation_finished",
 			PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D")));
+
+	// Graze (bullet_volley2d_graze.cpp). The signals live on the owner
+	// spawner and on the factory, not here.
+	ClassDB::bind_method(D_METHOD("graze_set_zones", "zones"), &BulletVolley2D::graze_set_zones);
+	ClassDB::bind_method(D_METHOD("graze_clear"), &BulletVolley2D::graze_clear);
+	ClassDB::bind_method(D_METHOD("get_graze_zones"), &BulletVolley2D::get_graze_zones);
+	ClassDB::bind_method(D_METHOD("is_graze_armed"), &BulletVolley2D::is_graze_armed);
+	ClassDB::bind_method(D_METHOD("get_bullet_grazed_rings", "bullet_index", "zone_index"), &BulletVolley2D::get_bullet_grazed_rings);
+	ClassDB::bind_method(D_METHOD("is_bullet_inside_graze", "bullet_index", "zone_index"), &BulletVolley2D::is_bullet_inside_graze);
+	ClassDB::bind_method(D_METHOD("bullet_reset_graze", "bullet_index"), &BulletVolley2D::bullet_reset_graze);
+	ClassDB::bind_method(D_METHOD("debug_get_graze_info"), &BulletVolley2D::debug_get_graze_info);
+	BIND_CONSTANT(MAX_GRAZE_ZONES);
 }
 
 } // namespace BlastBullets2D

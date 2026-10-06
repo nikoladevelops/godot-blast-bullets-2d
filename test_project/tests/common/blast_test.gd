@@ -243,3 +243,29 @@ func make_probe_scene() -> PackedScene:
 ## Adds a node under the test, freed automatically after it.
 func add(node: Node) -> Node:
 	return add_child_autofree(node)
+
+
+## Node2D graze target at global `pos`, member of `group` (freed after the test).
+func make_graze_target(pos: Vector2, group: StringName = &"graze_targets") -> Node2D:
+	var n := Node2D.new()
+	n.position = pos
+	add(n)
+	n.add_to_group(group)
+	return n
+
+
+## Factory-owned volley, one bullet per transform moving +X at `speed`
+## (speed cap lifted), circle r4 hitbox unless `shape` is given, 60 s life.
+func graze_volley(transforms: Array, speed: float, shape: Shape2D = null) -> BulletVolley2D:
+	var d := H.make_volley_data(transforms.size(), speed, 60.0)
+	d.transforms = transforms
+	for sp in d.all_bullet_speed_data:
+		(sp as BulletSpeedData2D).max_speed = 100000.0
+	d.collision_shape = shape if shape != null else H.make_circle_shape(4.0)
+	return factory.spawn_volley(d)
+
+
+## n factory ticks of `delta` (factory.debug_advance_time), each asserted.
+func step_factory(n: int = 1, delta: float = 1.0 / 60.0) -> void:
+	for i in n:
+		assert_true(factory.debug_advance_time(delta), "factory tick %d advanced" % i)

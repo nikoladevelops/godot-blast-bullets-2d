@@ -184,6 +184,7 @@ void BulletVolley2D::release_life() {
 	homing_reached_events.clear();
 	shared_pop_requested = false;
 	anim_finished_event_pending = false;
+	graze_release(); // user resources (zones) and queued events
 	// Volley-level listeners belong to the life that connected them.
 	disconnect_sprite_animation_connections();
 	for (const Dictionary &connection : get_signal_connection_list(CachedStringNames2D::get().bullet_homing_target_reached)) {
@@ -604,6 +605,9 @@ void BulletVolley2D::enable_bullet(int bullet_index, int collision_amount, bool 
 	// A wake is a new slot life: records queued before the disable must not
 	// fire now (same-overlap double count).
 	bump_collision_epoch_for_bullet(bullet_index);
+	// The freeze ended any graze visit: a fresh one starts (no exit fires
+	// for a visit that ended frozen).
+	graze_end_visits_of_bullet(bullet_index);
 
 	multi->set_instance_transform_2d(bullet_index, to_local_for_multimesh(all_cached_instance_transforms[bullet_index])); // Start rendering the instance
 	write_trail_instances(bullet_index); // Wake resumes the trail with the bullet
@@ -797,6 +801,12 @@ void BulletVolley2D::reset_bullet_runtime_state(int bullet_index) {
 	// (curves, wobble/gravity seeds, custom data) and the attachment stay.
 	if (bullet_index < (int)bullets_current_collision_count.size()) {
 		bullets_current_collision_count[bullet_index] = 0;
+	}
+	for (int z = 0; z < graze_zone_slots; ++z) {
+		const size_t at = (size_t)bullet_index * graze_zone_slots + z;
+		if (at < graze_state.size()) {
+			graze_state[at] = 0;
+		}
 	}
 	visit_bounce_ledger([&](auto &v, auto empty) {
 		if (bullet_index < (int)v.size()) {

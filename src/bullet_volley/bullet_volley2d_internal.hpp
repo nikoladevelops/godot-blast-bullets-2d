@@ -54,6 +54,16 @@ _ALWAYS_INLINE_ void BulletVolley2D::refresh_cached_velocity(int bullet_index) {
 	all_cached_velocity[bullet_index] = all_cached_direction[bullet_index] * all_cached_speed[bullet_index] + inherited_velocity_offset + ((bullet_index < (int)all_gravity_velocity.size()) ? all_gravity_velocity[bullet_index] : Vector2(0, 0));
 }
 
+// "<Class> '<path>'" for an emitter node: names the spawner or factory in
+// the unhandled-signal warnings.
+static inline String describe_emitter2d(Object *emitter) {
+	Node *node = Object::cast_to<Node>(emitter);
+	if (node == nullptr) {
+		return emitter->get_class();
+	}
+	return node->get_class() + " '" + (node->is_inside_tree() ? String(node->get_path()) : String(node->get_name())) + "'";
+}
+
 // One MultiMesh 2D instance in the buffer layout set_buffer expects:
 // row-major 2x4 (x.x, y.x, 0, origin.x, x.y, y.y, 0, origin.y).
 static _ALWAYS_INLINE_ void write_multimesh_transform2d(float *out, const Transform2D &t) {

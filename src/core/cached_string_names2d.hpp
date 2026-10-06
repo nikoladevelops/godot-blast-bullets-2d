@@ -27,6 +27,8 @@ struct CachedStringNames2D {
 	const StringName sprite_animation_finished = StringName("sprite_animation_finished");
 	const StringName bullet_homing_target_reached = StringName("bullet_homing_target_reached");
 	const StringName volley_bullet_homing_target_reached = StringName("volley_bullet_homing_target_reached");
+	const StringName bullet_grazed = StringName("bullet_grazed");
+	const StringName bullet_graze_exited = StringName("bullet_graze_exited");
 
 	static inline CachedStringNames2D *singleton = nullptr;
 

@@ -40,11 +40,24 @@ void BulletVolley2D::tick(double delta) {
 	if (!tick_may_continue(self_id) || !is_active) {
 		return;
 	}
-	// 2. Integration (no user code runs inside; homing reaches are queued).
+	// 1b. Graze: this tick's targets and rings (no user code).
+	if (graze_zone_slots > 0) {
+		prepare_graze_tick();
+	}
+	// 2. Integration (no user code runs inside; homing reaches and grazes
+	// are queued).
 	move_bullets(delta);
 	// 3. Homing reached events (live) + auto-pops.
 	if (!homing_reached_events.empty() || shared_pop_requested) {
 		if (!dispatch_homing_events() || !tick_may_continue(self_id) || !is_active) {
+			return;
+		}
+	}
+	// 3b. Graze events (live). A pause from a handler lets the batch finish
+	// (the motion already happened); events an early return above left
+	// queued are dispatched first on the next tick.
+	if (!graze_events.empty()) {
+		if (!dispatch_graze_events() || !tick_may_continue(self_id) || !is_active) {
 			return;
 		}
 	}
@@ -97,6 +110,10 @@ struct BulletVolley2D::MoveTick2D {
 	real_t strip_cos = 1.0;
 	real_t strip_sin = 0.0;
 	bool has_shape_offset = false;
+	// Graze: some zone has a live target this tick (prepare_graze_tick).
+	bool graze = false;
+	int graze_zone_slots = 0;
+	const GrazeTickZone2D *graze_zones = nullptr;
 };
 
 // One bullet's scratch while the stages run. Created once per tick and
@@ -296,6 +313,9 @@ void BulletVolley2D::move_bullets(double delta) {
 		t.strip_cos = t.strip_texture_rotation ? (real_t)Math::cos(-cache_texture_rotation_radians) : (real_t)1.0;
 		t.strip_sin = t.strip_texture_rotation ? (real_t)Math::sin(-cache_texture_rotation_radians) : (real_t)0.0;
 		t.has_shape_offset = cache_collision_shape_offset != Vector2(0, 0);
+		t.graze = graze_tick_active && graze_zone_slots > 0 && graze_state.size() == (size_t)amount_bullets * (size_t)graze_zone_slots;
+		t.graze_zone_slots = graze_zone_slots;
+		t.graze_zones = graze_tick_zones;
 		return t;
 	}();
 
@@ -341,6 +361,9 @@ void BulletVolley2D::move_bullets(double delta) {
 			step_pattern_and_forces(t, b);
 			step_orbit(t, b);
 			step_place(t, b);
+			if (t.graze) {
+				step_graze(t, i, all_cached_instance_origin[i], b.velocity_delta);
+			}
 			step_speed(t, b);
 		}
 	} // tick_inverse_scope
@@ -758,6 +781,159 @@ _ALWAYS_INLINE_ void BulletVolley2D::step_place(const MoveTick2D &t, BulletStep2
 	if (b.steering_deque != nullptr && !b.steering_deque->empty() && b.target_pos.is_finite()) {
 		try_to_emit_bullet_homing_target_reached_signal(*b.steering_deque, b.steering_deque == &shared_homing_deque, i, origin, b.target_pos, Vector2(0, 0));
 	}
+}
+
+// 8b. GRAZE. The bullet's motion this tick is the segment p1 - v -> p1;
+// for every zone, its closest approach to the zone's targets (swept, so a
+// fast bullet cannot skip a thin ring) decides which rings it touched, and
+// its end point whether it is still inside the outermost ring. Inline here
+// is only the distance test every bullet pays; a bullet inside or touching
+// a zone continues in graze_visit (out of line: keeps the loop small).
+_ALWAYS_INLINE_ void BulletVolley2D::step_graze(const MoveTick2D &t, int bullet_index, const Vector2 &p1, const Vector2 &v) {
+	// Plain component math on purpose: godot-cpp's Vector2::dot() is not
+	// inline (a call per use), which tripled this stage's cost.
+	const real_t vx = v.x;
+	const real_t vy = v.y;
+	const real_t vv = vx * vx + vy * vy;
+	// Distances are compared scaled by |v|^2 (no division per bullet); a
+	// bullet that did not move compares them as they are.
+	const real_t scale = vv > (real_t)0.0 ? vv : (real_t)1.0;
+	const uint16_t *row = graze_state.data() + (size_t)bullet_index * (size_t)t.graze_zone_slots;
+	for (int z = 0; z < t.graze_zone_slots; ++z) {
+		const GrazeTickZone2D &zone = t.graze_zones[z];
+		if (zone.target_count == 0) {
+			continue;
+		}
+		real_t swept_scaled = (real_t)Math::INF;
+		int swept_target = 0;
+		for (int k = 0; k < zone.target_count; ++k) {
+			// q0 = start - center: the start pose relative to the target.
+			const real_t q0x = p1.x - zone.centers[k].x - vx;
+			const real_t q0y = p1.y - zone.centers[k].y - vy;
+			// Closest approach over the segment q0 -> q0 + v, branch-free:
+			// the projection of -q0 on v clamped to [0, |v|^2] picks the
+			// start, an interior point or the end; times |v|^2 that
+			// distance is |q0|^2 |v|^2 - c (2 a - c).
+			const real_t along = -(q0x * vx + q0y * vy);
+			const real_t along_c = MIN(MAX(along, (real_t)0.0), vv);
+			const real_t d2_scaled = (q0x * q0x + q0y * q0y) * scale - along_c * ((real_t)2.0 * along - along_c);
+			if (d2_scaled < swept_scaled) {
+				swept_scaled = d2_scaled;
+				swept_target = k;
+			}
+		}
+		// Far bullets (nearly all of them) leave here, writing nothing. A
+		// non-finite pose compares false and leaves here too.
+		if ((row[z] & GRAZE_INSIDE) == 0 && !(swept_scaled <= zone.ring_r2[0] * scale)) {
+			continue;
+		}
+		graze_visit(z, bullet_index, p1, swept_scaled / scale, swept_target);
+	}
+}
+
+// The rest of step_graze for a bullet inside or touching zone z: rings,
+// visit bookkeeping, events. A visit belongs to one target (its anchor
+// slot): the target of its latest new graze.
+_NO_INLINE_ void BulletVolley2D::graze_visit(int z, int bullet_index, const Vector2 &p1, real_t swept_d2, int swept_target) {
+	const GrazeTickZone2D &zone = graze_tick_zones[z];
+	uint16_t *row = graze_state.data() + (size_t)bullet_index * (size_t)graze_zone_slots;
+	real_t end = (real_t)Math::INF;
+	int end_target = 0;
+	for (int k = 0; k < zone.target_count; ++k) {
+		const real_t dx = p1.x - zone.centers[k].x;
+		const real_t dy = p1.y - zone.centers[k].y;
+		const real_t end_d2 = dx * dx + dy * dy;
+		if (end_d2 < end) {
+			end = end_d2;
+			end_target = k;
+		}
+	}
+	if (!Math::is_finite(end)) {
+		return;
+	}
+	// The swept minimum never exceeds the end point (rounding aside).
+	const real_t swept = MIN(swept_d2, end);
+	uint16_t st = row[z];
+	bool was_inside = (st & GRAZE_INSIDE) != 0;
+	if (was_inside && zone.vanished_slots != 0) {
+		const int anchor = (st & GRAZE_ANCHOR_MASK) >> GRAZE_ANCHOR_SHIFT;
+		if ((zone.vanished_slots & (1u << anchor)) != 0) {
+			if (end <= zone.ring_r2[0]) {
+				// Still inside another target: the visit moves on to it.
+				st = (uint16_t)((st & ~GRAZE_ANCHOR_MASK) | (zone.slots[end_target] << GRAZE_ANCHOR_SHIFT));
+			} else {
+				// Its target is gone: the visit ends silently.
+				st &= (uint16_t)~(GRAZE_INSIDE | GRAZE_DEEPEST_MASK | GRAZE_VISIT_FIRED | GRAZE_ANCHOR_MASK);
+				if (zone.regraze_after_exit) {
+					st &= (uint16_t)~GRAZE_RINGS_MASK;
+				}
+				was_inside = false;
+			}
+		}
+	}
+	// Not inside (or the visit just ended silently) and nothing touched.
+	if (!(swept <= zone.ring_r2[0]) && !was_inside) {
+		row[z] = st;
+		return;
+	}
+	// Rings are sorted largest first: the touched ones are a prefix.
+	int touched = 0;
+	while (touched < zone.ring_count && swept <= zone.ring_r2[touched]) {
+		++touched;
+	}
+	if (touched > 0) {
+		const int deepest_slot = touched - 1;
+		if (!was_inside) {
+			// A new visit starts, anchored to the target it touched.
+			st &= (uint16_t)~(GRAZE_DEEPEST_MASK | GRAZE_VISIT_FIRED | GRAZE_ANCHOR_MASK);
+			st |= (uint16_t)((zone.ring_index[deepest_slot] << GRAZE_DEEPEST_SHIFT) | (zone.slots[swept_target] << GRAZE_ANCHOR_SHIFT));
+		} else {
+			// A ring dropped mid-visit (ring_count lowered) never wins.
+			const int current = (st & GRAZE_DEEPEST_MASK) >> GRAZE_DEEPEST_SHIFT;
+			const int current_slot = current < zone.ring_count ? (int)zone.ring_slot[current] : -1;
+			if (deepest_slot > current_slot) {
+				st = (uint16_t)((st & ~GRAZE_DEEPEST_MASK) | (zone.ring_index[deepest_slot] << GRAZE_DEEPEST_SHIFT));
+			}
+		}
+		for (int s = 0; s < touched; ++s) {
+			const uint16_t bit = (uint16_t)(1u << zone.ring_index[s]);
+			if ((st & bit) != 0) {
+				continue;
+			}
+			st = (uint16_t)((st & ~GRAZE_ANCHOR_MASK) | bit | GRAZE_VISIT_FIRED | (zone.slots[swept_target] << GRAZE_ANCHOR_SHIFT));
+			GrazeEvent2D ev;
+			ev.bullet_index = bullet_index;
+			ev.epoch = collision_epoch_for_bullet(bullet_index);
+			ev.target_id = zone.slot_ids[zone.slots[swept_target]];
+			ev.generation = graze_generation;
+			ev.zone = (uint8_t)z;
+			ev.ring = zone.ring_index[s];
+			graze_events.push_back(ev);
+		}
+	}
+	if (end <= zone.ring_r2[0]) {
+		st |= GRAZE_INSIDE;
+	} else if (was_inside || touched > 0) {
+		// The visit ends with the bullet alive and outside: the exit
+		// names the target the visit belongs to.
+		if ((st & GRAZE_VISIT_FIRED) != 0) {
+			const int anchor = (st & GRAZE_ANCHOR_MASK) >> GRAZE_ANCHOR_SHIFT;
+			GrazeEvent2D ev;
+			ev.bullet_index = bullet_index;
+			ev.epoch = collision_epoch_for_bullet(bullet_index);
+			ev.target_id = zone.slot_ids[anchor] != 0 ? zone.slot_ids[anchor] : zone.slot_ids[zone.slots[end_target]];
+			ev.generation = graze_generation;
+			ev.zone = (uint8_t)z;
+			ev.ring = (uint8_t)((st & GRAZE_DEEPEST_MASK) >> GRAZE_DEEPEST_SHIFT);
+			ev.exit = true;
+			graze_events.push_back(ev);
+		}
+		st &= (uint16_t)~(GRAZE_INSIDE | GRAZE_DEEPEST_MASK | GRAZE_VISIT_FIRED | GRAZE_ANCHOR_MASK);
+		if (zone.regraze_after_exit) {
+			st &= (uint16_t)~GRAZE_RINGS_MASK;
+		}
+	}
+	row[z] = st;
 }
 
 // 9. SPEED for the next tick. Own speed curve > shared curve > plain
