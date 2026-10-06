@@ -111,7 +111,7 @@ func test_free_attachment_and_target_inside_graze_handlers() -> void:
 	var target := make_graze_target(Vector2(150, 20))
 	var v: BulletVolley2D = factory.spawn_volley(_attached_data())
 	v.all_bullets_set_attachment(make_probe_scene(), Vector2.ZERO, true)
-	v.graze_set_zones([H.make_graze_zone([30.0])])
+	v.graze_set_zones([H.make_graze_zone([30.0])], &"graze_targets")
 	var events: Array = []
 	factory.bullet_grazed.connect(func(t: Node2D, volley: BulletVolley2D, idx: int, _z: BulletGrazeZone2D, _r: int) -> void:
 		events.append(idx)

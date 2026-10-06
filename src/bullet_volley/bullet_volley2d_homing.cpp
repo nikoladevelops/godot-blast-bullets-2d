@@ -763,6 +763,7 @@ bool BulletVolley2D::dispatch_homing_events() {
 		if (ev.target_instance_id != 0) {
 			target = Object::cast_to<Node2D>(ObjectDB::get_instance(ObjectID(ev.target_instance_id)));
 		}
+		note_user_code();
 		emit_signal(reached_signal, this, ev.bullet_index, target, ev.target_position);
 		if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
 			return false;
@@ -772,6 +773,7 @@ bool BulletVolley2D::dispatch_homing_events() {
 		if (owner_spawner_id != 0) {
 			Object *owner = ObjectDB::get_instance(ObjectID(owner_spawner_id));
 			if (owner != nullptr) {
+				note_user_code();
 				owner->emit_signal(forward_signal, this, ev.bullet_index, target, ev.target_position);
 				if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
 					return false;

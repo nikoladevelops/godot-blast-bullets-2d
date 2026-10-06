@@ -22,6 +22,7 @@ func _spawner(policy: int) -> BulletSpawner2D:
 	sp.orphaned_volleys = policy
 	sp.graze_zones = [H.make_graze_zone([20.0])]
 	sp.graze_enabled = true
+	sp.graze_node_group = &"graze_targets"
 	add_child(sp)
 	sp.set_bullet_factory(factory)
 	return sp

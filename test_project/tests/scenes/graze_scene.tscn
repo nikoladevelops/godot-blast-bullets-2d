@@ -31,7 +31,6 @@ collision_mask = 4
 bullet_max_collision_count = 1
 
 [sub_resource type="BulletGrazeZone2D" id="Zone_player"]
-target_group = &"player"
 ring_count = 2
 ring_1_radius = 48.0
 ring_2_radius = 24.0
@@ -59,6 +58,7 @@ spawn_data = SubResource("Data_enemy")
 pattern_source = 1
 shooting_enabled = false
 graze_enabled = true
+graze_node_group = &"player"
 graze_zones = Array[BulletGrazeZone2D]([SubResource("Zone_player")])
 graze_show_preview = false
 graze_preview_line_width = 3.0

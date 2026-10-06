@@ -2437,14 +2437,21 @@ public:
 	// the factory (always).
 	static constexpr int MAX_GRAZE_ZONES = 4;
 	// Arms this volley with up to MAX_GRAZE_ZONES zones (null entries are
-	// skipped but keep their index) and resets every bullet's graze state.
-	// Refused on a pooled handle; nothing changes on an error.
-	bool graze_set_zones(const Array &zones);
+	// skipped but keep their index) whose targets are the live Node2D
+	// members of `target_group`, and resets every bullet's graze state.
+	// Refused on a pooled handle or an empty group; nothing changes on an
+	// error. Spawner volleys are armed by their spawner instead
+	// (graze_arm_from_spawner: its Graze group finds the targets).
+	bool graze_set_zones(const Array &zones, const StringName &target_group);
+	// C++ only: zones (already validated by the spawner's setter) found by
+	// the spawner's detector, shared with every volley it armed.
+	bool graze_arm_from_spawner(const Array &zones, const std::shared_ptr<GrazeDetector2D> &detector);
+	// The target list this volley tests this sweep (its spawner's detector,
+	// or graze_target_group through the factory's); nullptr when there is
+	// none.
+	GrazeTargetList2D *graze_target_list();
 	// Disarms (zones released, pending events dropped).
 	void graze_clear();
-	// The detector that finds this volley's graze targets (the spawner arms
-	// its own; null = the factory's, by zone group).
-	void graze_set_detector(const std::shared_ptr<GrazeDetector2D> &detector);
 	// The armed zones, nulls in place.
 	Array get_graze_zones() const;
 	bool is_graze_armed() const;
@@ -2456,7 +2463,8 @@ public:
 	// Clears one bullet's graze state in every zone (it can graze again).
 	void bullet_reset_graze(int bullet_index);
 	// {armed, zone_slots, state_bytes, active_this_tick, pending_events,
-	// dispatched_events, bullet_radius, generation}.
+	// dispatched_events, bullet_radius, generation, target_group,
+	// spawner_targets, targets}.
 	Dictionary debug_get_graze_info() const;
 
 	// Per bullet per zone state (graze_state). uint16_t on purpose: stores
@@ -2467,40 +2475,54 @@ public:
 	static constexpr int GRAZE_DEEPEST_SHIFT = 5;
 	static constexpr uint16_t GRAZE_DEEPEST_MASK = 0x0060; // deepest ring index touched this visit
 	static constexpr uint16_t GRAZE_VISIT_FIRED = 0x0080; // this visit fired a bullet_grazed
-	static constexpr int GRAZE_ANCHOR_SHIFT = 8;
-	static constexpr uint16_t GRAZE_ANCHOR_MASK = 0x3F00; // target slot the visit belongs to (0..63)
-	// One zone as this tick tests it (rebuilt by prepare_graze_tick).
-	struct GrazeTickZone2D {
+	// This tick's graze targets, shared by every zone of the volley
+	// (rebuilt by prepare_graze_tick from the volley's target list). No cap
+	// on how many.
+	struct GrazeTickTargets2D {
 		static constexpr int INLINE_TARGETS = 8;
 		// Live targets, compact: centers[k] belongs to stable slot slots[k].
-		// Up to INLINE_TARGETS unsorted ones sit right here (inline_count >
-		// 0: the per-bullet loop reads them without a pointer chase); more
-		// live in graze_tick_centers / graze_tick_slots.
-		int target_count = 0;
+		// Up to INLINE_TARGETS unsorted ones are copied right here
+		// (inline_count > 0: the per-bullet loop reads them without a
+		// pointer chase); more are read from the list's test view (or this
+		// volley's filtered copy of it).
+		int count = 0;
 		int inline_count = 0;
 		Vector2 inline_centers[INLINE_TARGETS];
-		uint8_t inline_slots[INLINE_TARGETS] = {};
+		uint32_t inline_slots[INLINE_TARGETS] = {};
 		const Vector2 *centers = nullptr;
-		const uint8_t *slots = nullptr;
-		// The other targets: sorted by x when the list keeps by_x (more
-		// than GrazeTargetList2D::slab_min_targets), order[k] is target k's
-		// tree-order index (ties), and a bullet only tests the targets
-		// within slab_reach of its motion in x (the outermost effective
-		// radius plus a rounding margin; infinite when unsorted).
+		const uint32_t *slots = nullptr;
+		// The view's order: sorted by x when `sorted` (more than
+		// GrazeTargetList2D::slab_min_targets), order[k] is target k's
+		// tree-order index (ties), and a bullet only tests the targets within
+		// slab_reach of its motion in x (the largest outermost effective
+		// radius of the active zones plus a rounding margin; infinite when
+		// unsorted).
+		bool sorted = false;
 		real_t slab_reach = 0.0;
-		const uint8_t *order = nullptr;
-		// Stable slot -> target id (0 = free): the target list's table, so a
-		// visit can name the target it belongs to. Valid during this tick's
-		// move only (no user code runs in between).
+		const uint32_t *order = nullptr;
+		// The list's stable slots (valid during this tick's move only: no
+		// user code runs in between): slot -> target id, and the serial of
+		// each slot's last change.
 		const uint64_t *slot_ids = nullptr;
-		// Slots whose target disappeared or changed since this volley's
-		// last tick (their visits end or move on).
-		uint64_t vanished_slots = 0;
-		// The target list this volley read last tick (graze_detector2d.hpp):
-		// another uid means every slot changed, another serial means the
-		// slots changed since then.
+		const uint64_t *slot_changed = nullptr;
+		uint32_t slot_count = 0;
+		// A visit's anchor slot changed since this volley's last tick when
+		// the list was switched (another source or group) or its
+		// slot_changed is past prev_serial.
+		bool switched = false;
+		uint64_t prev_serial = 0;
+		// The target list this volley read last tick (graze_detector2d.hpp).
 		uint64_t seen_list_uid = 0;
 		uint64_t seen_list_serial = 0;
+		_FORCE_INLINE_ bool anchor_changed(uint32_t slot) const {
+			return switched || slot >= slot_count || slot_changed[slot] > prev_serial;
+		}
+	};
+	// One zone's rings as this tick tests them (rebuilt by
+	// prepare_graze_tick). Inactive: no zone in the slot, zone disabled, or
+	// no target this tick.
+	struct GrazeTickZone2D {
+		bool active = false;
 		int ring_count = 0;
 		// Effective radius squared per ring, sorted by radius DESCENDING
 		// (equal radii keep ring order); ring_index maps a sorted slot to
@@ -2509,6 +2531,9 @@ public:
 		uint8_t ring_index[BulletGrazeZone2D::MAX_RINGS] = {};
 		uint8_t ring_slot[BulletGrazeZone2D::MAX_RINGS] = {};
 		bool regraze_after_exit = false;
+		// Outermost effective radius plus a rounding margin: no target
+		// farther than this in x can touch the zone.
+		real_t reach = 0.0;
 	};
 	// Collected by step_graze, emitted by dispatch_graze_events. The bullet
 	// epoch and the zones generation end events whose bullet or zones
@@ -2525,20 +2550,26 @@ public:
 	Ref<BulletGrazeZone2D> graze_zones[MAX_GRAZE_ZONES];
 	// Highest armed zone index + 1 (0 = disarmed): the graze_state stride.
 	int graze_zone_slots = 0;
-	// Who finds the targets: the arming spawner's detector, or null for the
-	// factory's (zone groups). Kept for the volley's life (orphans keep
-	// their spawner's), dropped with the life.
+	// Who grazes: the arming spawner's detector (its Graze group settings;
+	// orphans keep it), or for factory volleys graze_target_group through
+	// the factory's detector. Dropped when disarmed or with the life.
 	std::shared_ptr<GrazeDetector2D> graze_detector;
-	// This tick's live targets of every zone, back to back (capacity kept
-	// across ticks and pool reuse).
+	StringName graze_target_group;
+	// This volley's filtered copy of a list's view (only when its owner
+	// spawner is itself one of the targets; capacity kept across ticks and
+	// pool reuse).
 	std::vector<Vector2> graze_tick_centers;
-	std::vector<uint8_t> graze_tick_slots;
-	std::vector<uint8_t> graze_tick_order;
+	std::vector<uint32_t> graze_tick_slots;
+	std::vector<uint32_t> graze_tick_order;
+	// Per bullet per zone: the stable slot of the target a visit belongs to
+	// (its latest new graze), beside graze_state (same indexing).
+	std::vector<uint32_t> graze_anchor;
 	// Bumped by every arm/clear/release: stale events are dropped.
 	uint32_t graze_generation = 0;
 	// Largest bullet basis scale at arming time (bullet size scaling).
 	real_t graze_bullet_scale = 1.0;
 	std::vector<uint16_t> graze_state;
+	GrazeTickTargets2D graze_tick_targets;
 	GrazeTickZone2D graze_tick_zones[MAX_GRAZE_ZONES];
 	bool graze_tick_active = false;
 	// Zones that had live targets last tick (bit per zone): losing them
@@ -2547,6 +2578,14 @@ public:
 	std::vector<GrazeEvent2D> graze_events;
 	std::vector<GrazeEvent2D> graze_dispatch_scratch;
 	uint64_t graze_events_dispatched = 0;
+	// Right before handing control to user code inside the tick (every live
+	// signal and timer callback): graze target lists re-validate (a target
+	// a handler freed is never tested by a later volley of the sweep).
+	_FORCE_INLINE_ void note_user_code() const {
+		if (bullet_factory != nullptr) {
+			bullet_factory->note_user_code();
+		}
+	}
 	// Tick hooks (tick(): prepare before the move, dispatch after the
 	// homing events). dispatch returns false when the volley was freed.
 	void prepare_graze_tick();
@@ -2556,8 +2595,12 @@ public:
 	// A wake starts a fresh visit (no exit for a visit the freeze ended).
 	void graze_end_visits_of_bullet(int bullet_index);
 	void graze_end_visits_of_zone(int zone_index);
-	// Pool time / new life: zones released, state and events cleared.
+	// Pool time / new life / re-arming: zones and targets released, state
+	// and events cleared.
 	void graze_release();
+	// Validates graze_set_zones input into r_armed (pushes the error).
+	static bool graze_collect_zones(const Array &zones, Ref<BulletGrazeZone2D> *r_armed, int &r_slots);
+	void graze_arm(const Ref<BulletGrazeZone2D> *armed, int slots, const std::shared_ptr<GrazeDetector2D> &detector, const StringName &target_group);
 
 protected:
 	// Updates homing behavior for a bullet. Zero-delta ticks steer nothing:

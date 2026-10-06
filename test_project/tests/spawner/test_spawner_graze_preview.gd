@@ -17,6 +17,7 @@ func _preview_spawner(zones: Array) -> BulletSpawner2D:
 	var sp := make_spawner(H.make_volley_data(1, 0.0, 60.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
 	sp.graze_zones = zones
 	sp.graze_enabled = true
+	sp.graze_node_group = &"graze_targets"
 	sp.graze_preview_during_runtime = true
 	return sp
 
@@ -31,10 +32,9 @@ func _circles(sp: BulletSpawner2D) -> Array:
 func test_every_ring_of_every_zone_around_every_target() -> void:
 	make_graze_target(Vector2(100, 0))
 	make_graze_target(Vector2(200, 0))
-	make_graze_target(Vector2(0, 300), &"graze_b")
 	var a := H.make_graze_zone([10.0, 30.0])
 	a.preview_color = Color(1, 0, 0, 1)
-	var b := H.make_graze_zone([5.0], &"graze_b")
+	var b := H.make_graze_zone([5.0])
 	var off := H.make_graze_zone([50.0])
 	off.enabled = false
 	var sp := _preview_spawner([a, null, b, off])
@@ -42,8 +42,8 @@ func test_every_ring_of_every_zone_around_every_target() -> void:
 	assert_eq(_circles(sp), [
 		[Vector2(100, 0), 10.0, 0, 0], [Vector2(200, 0), 10.0, 0, 0],
 		[Vector2(100, 0), 30.0, 0, 1], [Vector2(200, 0), 30.0, 0, 1],
-		[Vector2(0, 300), 5.0, 2, 0],
-	], "zone by zone, ring by ring, target by target; disabled zones and empty slots draw nothing")
+		[Vector2(100, 0), 5.0, 2, 0], [Vector2(200, 0), 5.0, 2, 0],
+	], "zone by zone, ring by ring, target by target (every zone rings the same targets); disabled zones and empty slots draw nothing")
 	var colors: Array = []
 	for c in sp.debug_get_graze_preview_circles():
 		colors.append(c["color"])
@@ -51,7 +51,7 @@ func test_every_ring_of_every_zone_around_every_target() -> void:
 	assert_true((colors[2] as Color).is_equal_approx(Color(1, 0, 0, 0.7)), "each larger ring fainter")
 	var stats: Dictionary = sp.debug_get_graze_preview_stats()
 	assert_true(stats["active"] and stats["visible"], "active and visible")
-	assert_eq(stats["circles"], 5, "five circles")
+	assert_eq(stats["circles"], 6, "six circles")
 
 
 func test_preview_targets_are_the_runtime_targets() -> void:
@@ -66,7 +66,7 @@ func test_preview_targets_are_the_runtime_targets() -> void:
 	for c in sp.debug_get_graze_preview_circles():
 		ids.append(c["target_id"])
 	var runtime: Array = []
-	for t in sp.resolve_graze_targets(0):
+	for t in sp.resolve_graze_targets():
 		runtime.append((t as Node).get_instance_id())
 	assert_eq(ids, [a.get_instance_id(), b.get_instance_id()], "live targets only, the spawner excluded")
 	assert_eq(ids, runtime, "exactly what the runtime tests")
@@ -172,6 +172,7 @@ func test_a_stray_layer_is_dropped_at_ready_unless_the_runtime_preview_is_on() -
 		sp.set_homing_enabled(false)
 		sp.graze_zones = [H.make_graze_zone([10.0])]
 		sp.graze_enabled = true
+		sp.graze_node_group = &"graze_targets"
 		sp.graze_preview_during_runtime = runtime_preview
 		var stray := GrazePreviewLayer2D.new()
 		stray.name = LAYER

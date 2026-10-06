@@ -608,7 +608,7 @@ func _trace(section: String, factory: BulletFactory2D, label: String, data: Bull
 ## A flight with graze zones armed: every graze event (kind, target name,
 ## bullet, zone index, ring) and each bullet's grazed rings per zone.
 func _graze_trace(section: String, factory: BulletFactory2D, label: String, data: BulletVolleyData2D,
-		zones: Array, setup: Callable = Callable(), steps: int = 120) -> void:
+		zones: Array, group: StringName, setup: Callable = Callable(), steps: int = 120) -> void:
 	seed(4242)
 	var log: Array = []
 	var on_enter := func(t: Node2D, _v: BulletVolley2D, i: int, z: BulletGrazeZone2D, r: int) -> void:
@@ -620,7 +620,7 @@ func _graze_trace(section: String, factory: BulletFactory2D, label: String, data
 	var v: BulletVolley2D = factory.spawn_volley(data)
 	if setup.is_valid():
 		setup.call(v)
-	v.graze_set_zones(zones)
+	v.graze_set_zones(zones, group)
 	for step in steps:
 		factory.debug_advance_time(TRACE_STEP)
 	_rec(section, label + "#events", log)
@@ -637,9 +637,8 @@ func _graze_trace(section: String, factory: BulletFactory2D, label: String, data
 	cap.take()
 
 
-func _graze_zone(group: StringName, radii: Array, regraze: int, bullet_size: bool) -> BulletGrazeZone2D:
+func _graze_zone(radii: Array, regraze: int, bullet_size: bool) -> BulletGrazeZone2D:
 	var z := BulletGrazeZone2D.new()
-	z.target_group = group
 	z.ring_count = radii.size()
 	for i in radii.size():
 		z.set_ring_radius(i, radii[i])
@@ -763,18 +762,19 @@ func _snap_traces(section: String) -> void:
 		v.all_bullets_push_back_homing_target(target_a), 30)
 	_trace(section, factory, "reuse_life2", H.make_volley_data(6, 220.0))
 
-	# Graze: a homing volley weaving through target_a's rings (Once) while
-	# a wide After Exit zone over target_b re-grazes, and a fast line.
+	# Graze: a homing volley weaving through the rings of both targets: a
+	# tight Once zone and a wide After Exit zone over the same targets, and
+	# a fast line.
 	target_a.name = "SnapGrazeA"
 	target_b.name = "SnapGrazeB"
-	target_a.add_to_group(&"snap_graze_a")
-	target_b.add_to_group(&"snap_graze_b")
+	target_a.add_to_group(&"snap_graze")
+	target_b.add_to_group(&"snap_graze")
 	_graze_trace(section, factory, "graze_homing", homing.duplicate(),
-			[_graze_zone(&"snap_graze_a", [80.0, 30.0, 10.0], BulletGrazeZone2D.REGRAZE_ONCE, true),
-			_graze_zone(&"snap_graze_b", [420.0], BulletGrazeZone2D.REGRAZE_AFTER_EXIT, false)],
+			[_graze_zone([80.0, 30.0, 10.0], BulletGrazeZone2D.REGRAZE_ONCE, true),
+			_graze_zone([420.0], BulletGrazeZone2D.REGRAZE_AFTER_EXIT, false)], &"snap_graze",
 			func(v: BulletVolley2D) -> void: v.all_bullets_push_back_homing_target(target_a))
 	_graze_trace(section, factory, "graze_line", H.make_volley_data(6, 2400.0),
-			[_graze_zone(&"snap_graze_a", [205.0, 201.0], BulletGrazeZone2D.REGRAZE_ONCE, false)])
+			[_graze_zone([205.0, 201.0], BulletGrazeZone2D.REGRAZE_ONCE, false)], &"snap_graze")
 	# Many targets (the slab path past 8): a fast line through a field of 20.
 	var field: Array = []
 	for i in 20:
@@ -785,7 +785,7 @@ func _snap_traces(section: String) -> void:
 		add_child(t)
 		field.append(t)
 	_graze_trace(section, factory, "graze_field", H.make_volley_data(6, 2400.0),
-			[_graze_zone(&"snap_graze_field", [24.0, 12.0], BulletGrazeZone2D.REGRAZE_AFTER_EXIT, true)])
+			[_graze_zone([24.0, 12.0], BulletGrazeZone2D.REGRAZE_AFTER_EXIT, true)], &"snap_graze_field")
 	for t in field:
 		(t as Node).free()
 	factory.reset()

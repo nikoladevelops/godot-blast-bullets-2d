@@ -725,6 +725,7 @@ int BulletVolley2D::try_handle_bounce(CollisionType collision_type, int bullet_i
 	Object *emitter = emit_collision_signals ? resolve_hit_emitter_checked() : nullptr;
 	const uint64_t self_id = get_instance_id();
 	if (emitter != nullptr) {
+		note_user_code();
 		if (collision_type == CollisionType::AREA) {
 			emitter->emit_signal(CachedStringNames2D::get().bounce_area_entered, hit_target, this, bullet_index);
 		} else {

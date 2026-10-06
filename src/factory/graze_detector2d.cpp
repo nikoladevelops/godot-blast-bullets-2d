@@ -1,14 +1,16 @@
 // GrazeDetector2D: graze target lists with stable slots, rescanned on the
 // detector's update interval (factory time), positions refreshed once per
-// factory sweep. See graze_detector2d.hpp.
+// factory sweep, re-validated when user code ran inside the sweep. See
+// graze_detector2d.hpp.
 
 #include "factory/graze_detector2d.hpp"
 
-#include "core/warn_once2d.hpp"
 #include "factory/bullet_factory2d.hpp"
 
 #include <godot_cpp/classes/scene_tree.hpp>
 #include <godot_cpp/classes/window.hpp>
+
+#include <algorithm>
 
 using namespace godot;
 
@@ -28,9 +30,9 @@ GrazeDetector2D::~GrazeDetector2D() {
 }
 
 void GrazeDetector2D::set_config(const Config &p_config) {
-	if (p_config.source != config.source) {
-		// Group lists and the single list do not map onto each other:
-		// volleys meet new list uids and treat every slot as changed.
+	if (p_config.source != config.source || p_config.node_group != config.node_group) {
+		// Other targets altogether: volleys meet new list uids and treat
+		// every slot as changed.
 		lists.clear();
 	}
 	if (p_config.target_path != config.target_path) {
@@ -54,14 +56,11 @@ void GrazeDetector2D::clear_lists() {
 }
 
 bool GrazeDetector2D::shares_factory_lists() const {
-	return config.source == SOURCE_ZONE_GROUPS && config.filter_group.is_empty() && config.update_interval == 0.0;
+	return config.source == SOURCE_NODE_GROUP && config.filter_group.is_empty() && config.update_interval == 0.0;
 }
 
-GrazeTargetList2D *GrazeDetector2D::list_for(const BulletGrazeZone2D &zone, BulletFactory2D &factory) {
-	if (!zone.enabled) {
-		return nullptr;
-	}
-	return list_for_group(zone.target_group, factory);
+GrazeTargetList2D *GrazeDetector2D::list(BulletFactory2D &factory) {
+	return list_for_group(config.node_group, factory);
 }
 
 GrazeTargetList2D *GrazeDetector2D::list_for_group(const StringName &group, BulletFactory2D &factory) {
@@ -72,7 +71,7 @@ GrazeTargetList2D *GrazeDetector2D::list_for_group(const StringName &group, Bull
 	if (this != &shared && shares_factory_lists()) {
 		return shared.list_for_group(group, factory);
 	}
-	const bool by_group = config.source == SOURCE_ZONE_GROUPS;
+	const bool by_group = config.source == SOURCE_NODE_GROUP;
 	if (by_group && group.is_empty()) {
 		return nullptr;
 	}
@@ -105,28 +104,24 @@ GrazeTargetList2D *GrazeDetector2D::list_for_group(const StringName &group, Bull
 	return list;
 }
 
-int GrazeDetector2D::collect_now(const BulletGrazeZone2D &zone, SceneTree *tree, const World2D *world, GrazeTarget2D *r_targets, int &r_count) {
-	r_count = 0;
-	if (!zone.enabled) {
-		return 0;
-	}
-	return scan(zone.target_group, tree, world, r_targets, r_count);
+void GrazeDetector2D::collect_now(SceneTree *tree, const World2D *world, std::vector<GrazeTarget2D> &r_targets) {
+	r_targets.clear();
+	scan(config.node_group, tree, world, r_targets);
 }
 
-int GrazeDetector2D::scan(const StringName &group, SceneTree *tree, const World2D *world, GrazeTarget2D *r_targets, int &r_count) {
-	r_count = 0;
+void GrazeDetector2D::scan(const StringName &group, SceneTree *tree, const World2D *world, std::vector<GrazeTarget2D> &r_targets) {
 	if (tree == nullptr) {
-		return 0;
+		return;
 	}
 	++scans;
 	Node *spawner = spawner_id != 0 ? Object::cast_to<Node>(ObjectDB::get_instance(ObjectID(spawner_id))) : nullptr;
 	// Paths resolve from the spawner while it is in the tree; out of it (or
 	// freed) the nodes they pointed to last keep serving its volleys.
 	const bool resolve_paths = spawner != nullptr && spawner->is_inside_tree();
-	int total = 0;
 	auto add = [&](Node2D *node) {
-		graze_add_target2d(node, world, r_targets, r_count, total);
+		graze_add_target2d(node, world, r_targets);
 	};
+	auto skip_factories = [](Node *node) { return Object::cast_to<BulletFactory2D>(node) != nullptr; };
 	switch (config.source) {
 		case SOURCE_NODE_PATH: {
 			Node *node = nullptr;
@@ -150,10 +145,7 @@ int GrazeDetector2D::scan(const StringName &group, SceneTree *tree, const World2
 			} else if (children_parent_id != 0) {
 				parent = Object::cast_to<Node>(ObjectDB::get_instance(ObjectID(children_parent_id)));
 			}
-			scan_node2d_children(
-					parent, config.children_recursive, spawner, config.filter_group, PREVIEW_META_KEY, scan_stack,
-					[](Node *node) { return Object::cast_to<BulletFactory2D>(node) != nullptr; },
-					add);
+			scan_node2d_children(parent, config.children_recursive, spawner, config.filter_group, PREVIEW_META_KEY, scan_stack, skip_factories, add);
 			break;
 		}
 		case SOURCE_NODE_NAME: {
@@ -172,170 +164,181 @@ int GrazeDetector2D::scan(const StringName &group, SceneTree *tree, const World2
 					add);
 			break;
 		}
-		case SOURCE_ZONE_GROUPS:
+		case SOURCE_NODE_GROUP:
 		default:
-			total = collect_graze_targets2d(tree, group, config.filter_group, world, spawner_id, r_targets, r_count);
+			collect_graze_targets2d(tree, group, config.filter_group, world, spawner_id, r_targets);
 			break;
 	}
-	return total;
 }
 
 void GrazeDetector2D::update(GrazeTargetList2D &list, BulletFactory2D &factory) {
 	const uint64_t sweep = factory.get_sweep_counter();
 	const uint64_t factory_id = factory.get_instance_id();
-	if (!list.scan_due && list.fresh_sweep == sweep && list.fresh_factory_id == factory_id) {
+	const uint64_t epoch = factory.get_user_code_epoch();
+	const bool fresh = list.fresh_sweep == sweep && list.fresh_factory_id == factory_id;
+	std::vector<GrazeTarget2D> &live = live_scratch;
+	live.clear();
+	if (fresh && !list.scan_due) {
+		if (list.validated_epoch == epoch) {
+			return;
+		}
+		// User code ran since this sweep's update (an earlier volley's
+		// handler): a target it freed or queued for deletion drops out now,
+		// so later volleys of the sweep never test it. Positions stay this
+		// sweep's.
+		list.validated_epoch = epoch;
+		for (const GrazeTarget2D &target : list.targets) {
+			const Node2D *node = Object::cast_to<Node2D>(ObjectDB::get_instance(ObjectID(target.id)));
+			if (node != nullptr && !node->is_queued_for_deletion()) {
+				live.push_back(target);
+			}
+		}
+		if (live.size() != list.targets.size()) {
+			apply(list, live);
+		}
 		return;
 	}
 	const Ref<World2D> world = factory.get_world_2d();
 	const double now = factory.get_graze_clock();
-	GrazeTarget2D live[GrazeTargetList2D::CAP];
-	int live_count = 0;
 	if (list.scan_due || list.fresh_factory_id != factory_id || now >= list.next_scan_time) {
 		list.scan_due = false;
 		list.next_scan_time = now + config.update_interval;
-		const int total = scan(list.group, factory.get_tree(), world.ptr(), live, live_count);
-		warn_overflow(list, total, factory_id);
-		list.member_count = live_count;
-		for (int k = 0; k < live_count; ++k) {
+		scan(list.group, factory.get_tree(), world.ptr(), live);
+		list.members.resize(live.size());
+		for (size_t k = 0; k < live.size(); ++k) {
 			list.members[k] = live[k].id;
 		}
 	} else {
 		// Between rescans: what the last scan found, positions read now.
-		int kept = 0;
-		for (int k = 0; k < list.member_count; ++k) {
+		size_t kept = 0;
+		for (size_t k = 0; k < list.members.size(); ++k) {
 			const uint64_t id = list.members[k];
 			Node2D *node = Object::cast_to<Node2D>(ObjectDB::get_instance(ObjectID(id)));
 			if (node == nullptr || node->is_queued_for_deletion()) {
 				continue; // gone for good: the next rescan may find others
 			}
 			list.members[kept++] = id;
-			Vector2 position;
-			if (graze_target_usable2d(node, world.ptr(), position)) {
-				live[live_count].id = id;
-				live[live_count].position = position;
-				++live_count;
+			GrazeTarget2D target;
+			if (graze_target_usable2d(node, world.ptr(), target.position)) {
+				target.id = id;
+				live.push_back(target);
 			}
 		}
-		list.member_count = kept;
+		list.members.resize(kept);
 	}
-	const bool same_targets = live_count == list.count && [&]() {
-		for (int k = 0; k < live_count; ++k) {
-			if (list.targets[k].id != live[k].id) {
-				return false;
-			}
-		}
-		return true;
-	}();
-	assign_slots(list, live, live_count);
-	sort_by_x(list, same_targets);
+	apply(list, live);
 	list.fresh_sweep = sweep;
 	list.fresh_factory_id = factory_id;
+	list.validated_epoch = epoch;
 }
 
-void GrazeDetector2D::sort_by_x(GrazeTargetList2D &list, bool same_targets) {
-	if (list.count <= GrazeTargetList2D::slab_min_targets) {
-		list.by_x_valid = false;
-		return;
-	}
-	if (!same_targets || !list.by_x_valid) {
-		for (int k = 0; k < list.count; ++k) {
-			list.by_x[k] = (uint8_t)k;
-		}
-	}
-	// Insertion sort: targets move little between ticks, so the last
-	// order is nearly sorted (linear in the common case).
-	for (int i = 1; i < list.count; ++i) {
-		const uint8_t index = list.by_x[i];
-		const real_t x = list.targets[index].position.x;
-		int at = i;
-		while (at > 0) {
-			const uint8_t before = list.by_x[at - 1];
-			const real_t bx = list.targets[before].position.x;
-			if (bx < x || (bx == x && before < index)) {
-				break;
-			}
-			list.by_x[at] = before;
-			--at;
-		}
-		list.by_x[at] = index;
-	}
-	list.by_x_valid = true;
-}
-
-void GrazeDetector2D::warn_overflow(const GrazeTargetList2D &list, int total, uint64_t factory_id) const {
-	if (total <= GrazeTargetList2D::CAP) {
-		return;
-	}
-	const uint64_t owner = spawner_id != 0 ? spawner_id : factory_id;
-	const String tail = " graze targets; only the first " + String::num_int64(GrazeTargetList2D::CAP) + " in tree order are tested.";
-	switch (config.source) {
-		case SOURCE_NODE_NAME:
-			WarnOnce2D::warn(owner, 105u, (int64_t)config.node_name.hash(), 0, "BulletSpawner2D: graze_node_name '" + config.node_name + "' matches " + String::num_int64(total) + tail);
-			break;
-		case SOURCE_NODE_CHILDREN:
-			WarnOnce2D::warn(owner, 106u, 0, 0, "BulletSpawner2D: graze_children_parent_path holds " + String::num_int64(total) + tail);
-			break;
-		default:
-			WarnOnce2D::warn(owner, 24u, (int64_t)String(list.group).hash(), 0, "BulletGrazeZone2D: group '" + String(list.group) + "' holds " + String::num_int64(total) + tail);
-			break;
-	}
-}
-
-void GrazeDetector2D::assign_slots(GrazeTargetList2D &list, const GrazeTarget2D *live, int live_count) {
+void GrazeDetector2D::apply(GrazeTargetList2D &list, const std::vector<GrazeTarget2D> &live) {
 	// Same targets in the same order as last time (the common case): only
 	// the positions moved.
-	bool same = live_count == list.count;
-	for (int k = 0; same && k < live_count; ++k) {
+	bool same = live.size() == list.targets.size();
+	for (size_t k = 0; same && k < live.size(); ++k) {
 		same = list.targets[k].id == live[k].id;
 	}
 	if (same) {
-		for (int k = 0; k < live_count; ++k) {
+		for (size_t k = 0; k < live.size(); ++k) {
 			list.targets[k].position = live[k].position;
+		}
+		build_view(list, true);
+		return;
+	}
+	// A remaining target keeps its slot, a new one takes a free slot (or a
+	// new one), a target that is no longer there frees its slot.
+	std::vector<uint32_t> &changed = changed_scratch;
+	changed.clear();
+	++list.stamp;
+	list.slots.resize(live.size());
+	for (size_t k = 0; k < live.size(); ++k) {
+		const uint64_t id = live[k].id;
+		uint32_t slot;
+		const auto found = list.slot_of.find(id);
+		if (found != list.slot_of.end()) {
+			slot = found->second;
+		} else {
+			if (!list.free_slots.empty()) {
+				slot = list.free_slots.back();
+				list.free_slots.pop_back();
+			} else {
+				slot = (uint32_t)list.slot_ids.size();
+				list.slot_ids.push_back(0);
+				list.slot_changed.push_back(0);
+				list.slot_stamp.push_back(0);
+			}
+			list.slot_ids[slot] = id;
+			list.slot_of[id] = slot;
+			changed.push_back(slot);
+		}
+		list.slot_stamp[slot] = list.stamp;
+		list.slots[k] = slot;
+	}
+	for (uint32_t s = 0; s < (uint32_t)list.slot_ids.size(); ++s) {
+		if (list.slot_ids[s] != 0 && list.slot_stamp[s] != list.stamp) {
+			list.slot_of.erase(list.slot_ids[s]);
+			list.slot_ids[s] = 0;
+			list.free_slots.push_back(s);
+			changed.push_back(s);
+		}
+	}
+	list.targets = live;
+	if (!changed.empty()) {
+		++list.serial;
+		for (const uint32_t s : changed) {
+			list.slot_changed[s] = list.serial;
+		}
+	}
+	build_view(list, false);
+}
+
+void GrazeDetector2D::build_view(GrazeTargetList2D &list, bool same_targets) {
+	const size_t n = list.targets.size();
+	list.view_centers.resize(n);
+	list.view_slots.resize(n);
+	list.view_order.resize(n);
+	if ((int)n <= GrazeTargetList2D::slab_min_targets) {
+		list.by_x_valid = false;
+		for (size_t k = 0; k < n; ++k) {
+			list.view_centers[k] = list.targets[k].position;
+			list.view_slots[k] = list.slots[k];
+			list.view_order[k] = (uint32_t)k;
 		}
 		return;
 	}
-	uint64_t changed = 0;
-	// A target that is no longer there frees its slot...
-	for (int s = 0; s < GrazeTargetList2D::CAP; ++s) {
-		if (list.slot_ids[s] == 0) {
-			continue;
+	// Sorted by x, equal x by tree index (ties stay with tree order).
+	const GrazeTarget2D *targets = list.targets.data();
+	auto before = [targets](uint32_t a, uint32_t b) {
+		const real_t ax = targets[a].position.x;
+		const real_t bx = targets[b].position.x;
+		return ax < bx || (ax == bx && a < b);
+	};
+	if (!same_targets || !list.by_x_valid || list.by_x.size() != n) {
+		list.by_x.resize(n);
+		for (size_t k = 0; k < n; ++k) {
+			list.by_x[k] = (uint32_t)k;
 		}
-		bool kept = false;
-		for (int k = 0; k < live_count && !kept; ++k) {
-			kept = live[k].id == list.slot_ids[s];
-		}
-		if (!kept) {
-			list.slot_ids[s] = 0;
-			changed |= 1ull << s;
+		std::sort(list.by_x.begin(), list.by_x.end(), before);
+	} else {
+		// Same targets, moved a little since last tick: the last order is
+		// nearly sorted, so insertion sort is about linear.
+		for (size_t i = 1; i < n; ++i) {
+			const uint32_t index = list.by_x[i];
+			size_t at = i;
+			while (at > 0 && before(index, list.by_x[at - 1])) {
+				list.by_x[at] = list.by_x[at - 1];
+				--at;
+			}
+			list.by_x[at] = index;
 		}
 	}
-	// ...a remaining one keeps its slot, a new one takes the lowest free.
-	for (int k = 0; k < live_count; ++k) {
-		int slot = -1;
-		for (int s = 0; s < GrazeTargetList2D::CAP && slot < 0; ++s) {
-			if (list.slot_ids[s] == live[k].id) {
-				slot = s;
-			}
-		}
-		for (int s = 0; s < GrazeTargetList2D::CAP && slot < 0; ++s) {
-			if (list.slot_ids[s] == 0) {
-				slot = s;
-				list.slot_ids[s] = live[k].id;
-				changed |= 1ull << s;
-			}
-		}
-		// Always found: at most CAP live targets, as many slots.
-		list.targets[k] = live[k];
-		list.slots[k] = (uint8_t)slot;
-	}
-	list.count = live_count;
-	if (changed != 0) {
-		++list.serial;
-		for (int s = 0; s < GrazeTargetList2D::CAP; ++s) {
-			if ((changed & (1ull << s)) != 0) {
-				list.slot_changed[s] = list.serial;
-			}
-		}
+	list.by_x_valid = true;
+	for (size_t i = 0; i < n; ++i) {
+		const uint32_t k = list.by_x[i];
+		list.view_centers[i] = list.targets[k].position;
+		list.view_slots[i] = list.slots[k];
+		list.view_order[i] = k;
 	}
 }
 

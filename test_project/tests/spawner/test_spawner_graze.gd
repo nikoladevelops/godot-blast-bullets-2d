@@ -6,8 +6,8 @@ extends BlastTest
 ## each (factory volleys never touch a spawner), a spawner never grazes
 ## its own bullets, zones edited or removed after a shot keep the flying
 ## volley's arming, presets and adoption keep graze settings, setup warnings
-## name empty or groupless zones, and an array mutated in place still arms
-## its usable zones with one warning.
+## name empty zones and an empty node group (no default group), and an
+## array mutated in place still arms its usable zones with one warning.
 
 
 func _spawner(zones: Array, speed: float = 0.0) -> BulletSpawner2D:
@@ -16,6 +16,7 @@ func _spawner(zones: Array, speed: float = 0.0) -> BulletSpawner2D:
 	var sp := make_spawner(d, BulletSpawner2D.PATTERN_FROM_SELF, 1)
 	sp.graze_zones = zones
 	sp.graze_enabled = true
+	sp.graze_node_group = &"graze_targets"
 	return sp
 
 
@@ -46,6 +47,7 @@ func test_graze_knobs_gate_in_the_inspector() -> void:
 	for k in knobs:
 		assert_false(is_editor_visible(sp, StringName(k)), k + " hides while graze is off")
 	sp.graze_enabled = true
+	sp.graze_node_group = &"graze_targets"
 	for k in knobs:
 		assert_true(is_editor_visible(sp, StringName(k)), k + " shows with graze on")
 	sp.graze_show_preview = false
@@ -99,6 +101,7 @@ func test_nothing_arms_while_graze_is_off_or_has_no_zone() -> void:
 	sp.graze_enabled = false
 	assert_false(_shoot(sp).is_graze_armed(), "graze off")
 	sp.graze_enabled = true
+	sp.graze_node_group = &"graze_targets"
 	sp.graze_zones = []
 	assert_false(_shoot(sp).is_graze_armed(), "no zones")
 	sp.graze_zones = [null, null]
@@ -132,7 +135,7 @@ func test_factory_volleys_never_fire_spawner_signals() -> void:
 	var spawner_log := H.record_graze(sp)
 	var factory_log := H.record_graze(factory)
 	var v := graze_volley(H.transforms_at([Vector2.ZERO]), 0.0)
-	v.graze_set_zones([H.make_graze_zone([20.0])])
+	v.graze_set_zones([H.make_graze_zone([20.0])], &"graze_targets")
 	step_factory(2)
 	assert_eq(spawner_log, [], "the spawner stays silent for a factory volley")
 	assert_eq(factory_log.size(), 1, "the factory reports it")
@@ -146,13 +149,29 @@ func test_a_spawner_never_grazes_its_own_bullets() -> void:
 	other.add_to_group(&"graze_targets")
 	other.graze_zones = [H.make_graze_zone([20.0])]
 	other.graze_enabled = true
+	other.graze_node_group = &"graze_targets"
 	var log := H.record_graze(factory)
 	_shoot(sp)
 	_shoot(other)
 	step_factory(2)
 	assert_eq(log.size(), 2, "each spawner's bullet grazed the OTHER spawner only")
 	assert_eq([log[0][1], log[1][1]], [other, sp], "never its own")
-	assert_eq(sp.resolve_graze_targets(0), [other], "resolve skips the spawner itself")
+	assert_eq(sp.resolve_graze_targets(), [other], "resolve skips the spawner itself")
+
+
+func test_a_spawner_among_many_targets_never_grazes_its_own_bullets() -> void:
+	# Past 8 targets the volley reads the list's x-sorted view; the owner is
+	# filtered out of a copy of it.
+	var sp := _spawner([H.make_graze_zone([20.0])])
+	sp.add_to_group(&"graze_targets") # at the bullet's spawn point
+	for i in 9:
+		make_graze_target(Vector2(1000 + 100 * i, 0))
+	var near := make_graze_target(Vector2(15, 0))
+	var log := H.record_graze(factory)
+	_shoot(sp)
+	step_factory(2)
+	assert_eq(H.graze_kinds(log), ["enter:0:0"], "one graze")
+	assert_eq(log[0][1], near, "by the nearest OTHER target, never the spawner at distance 0")
 
 
 func test_bursts_and_pattern_lists_arm_every_volley() -> void:
@@ -231,17 +250,16 @@ func test_adoption_keeps_the_arming_and_moves_the_signals() -> void:
 	assert_eq(H.graze_kinds(log_b), ["enter:0:0"], "the adopter does")
 
 
-func test_setup_warnings_name_empty_and_groupless_zones() -> void:
+func test_setup_warnings_name_empty_zones_and_an_empty_group() -> void:
 	var sp := make_spawner()
 	assert_eq(_graze_warnings(sp), [], "graze off: nothing")
 	sp.graze_enabled = true
-	assert_eq(_graze_warnings(sp), ["Graze is enabled but graze_zones is empty: no bullet of this spawner can be grazed."], "no zones")
-	var groupless := H.make_graze_zone()
-	groupless.target_group = &""
-	sp.graze_zones = [null, groupless]
-	assert_eq(_graze_warnings(sp), ["graze_zones[0] is empty.", "graze_zones[1] has an empty target_group: it never finds a target."], "each bad slot named")
+	assert_eq(_graze_warnings(sp), ["Graze is enabled but graze_zones is empty: no bullet of this spawner can be grazed.", "graze_target_source is Node Group but graze_node_group is empty: no graze target is found."], "no zones, no group (no default group: the developer names it)")
+	sp.graze_node_group = &"graze_targets"
+	sp.graze_zones = [null, H.make_graze_zone()]
+	assert_eq(_graze_warnings(sp), ["graze_zones[0] is empty."], "each empty slot named")
 	sp.graze_zones = [H.make_graze_zone()]
-	assert_eq(_graze_warnings(sp), [], "a usable zone")
+	assert_eq(_graze_warnings(sp), [], "a usable zone and group")
 
 
 func _graze_warnings(sp: BulletSpawner2D) -> Array:
@@ -258,10 +276,11 @@ func test_resolve_graze_targets_follows_the_runtime_filter() -> void:
 	var dying := make_graze_target(Vector2(3, 0))
 	dying.queue_free()
 	var sp := _spawner([H.make_graze_zone(), null])
-	assert_eq(sp.resolve_graze_targets(0), [a, b], "live Node2D members in tree order")
-	assert_eq(sp.resolve_graze_targets(1), [], "an empty slot resolves nothing")
-	sp.resolve_graze_targets(2)
-	expect_error_sequence(["BulletSpawner2D.resolve_graze_targets: zone_index 2 is out of range."])
+	assert_eq(sp.resolve_graze_targets(), [a, b], "live Node2D members in tree order (every zone rings them)")
+	b.free()
+	assert_eq(sp.resolve_graze_targets(), [a], "a node freed since the last tick is left out")
+	sp.graze_node_group = &""
+	assert_eq(sp.resolve_graze_targets(), [], "no group, no target")
 
 
 func test_an_array_mutated_in_place_still_arms_its_usable_zones_and_warns_once() -> void:
@@ -270,7 +289,7 @@ func test_an_array_mutated_in_place_still_arms_its_usable_zones_and_warns_once()
 	var sp := _spawner([z])
 	var zones: Array = sp.graze_zones
 	for i in 4:
-		zones.append(H.make_graze_zone([5.0], &"graze_nobody"))
+		zones.append(H.make_graze_zone([5.0])) # too small to reach the target
 	var log := H.record_graze(factory)
 	var v := _shoot(sp)
 	_shoot(sp)

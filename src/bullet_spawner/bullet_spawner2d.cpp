@@ -683,14 +683,13 @@ PackedStringArray BulletSpawner2D::_get_configuration_warnings() const {
 				continue;
 			}
 			any_zone = true;
-			if (graze_target_source == GRAZE_SOURCE_ZONE_GROUPS && zone->target_group.is_empty()) {
-				out.push_back("graze_zones[" + String::num_int64(i) + "] has an empty target_group: it never finds a target.");
-			}
 		}
 		if (!any_zone) {
 			out.push_back("Graze is enabled but graze_zones is empty: no bullet of this spawner can be grazed.");
 		}
-		if (graze_target_source == GRAZE_SOURCE_NODE_PATH && graze_target_path.is_empty()) {
+		if (graze_target_source == GRAZE_SOURCE_NODE_GROUP && graze_node_group.is_empty()) {
+			out.push_back("graze_target_source is Node Group but graze_node_group is empty: no graze target is found.");
+		} else if (graze_target_source == GRAZE_SOURCE_NODE_PATH && graze_target_path.is_empty()) {
 			out.push_back("graze_target_source is Node Path but graze_target_path is empty: no graze target is found.");
 		} else if (graze_target_source == GRAZE_SOURCE_NODE_NAME && graze_node_name.is_empty()) {
 			out.push_back("graze_target_source is Node Name but graze_node_name is empty: no graze target is found.");

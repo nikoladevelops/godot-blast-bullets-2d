@@ -100,6 +100,7 @@ void BulletVolley2D::expire_live_bullets() {
 		// gone, teardown) only skips the notification.
 		Object *emitter = resolve_lifetime_emitter_checked();
 		if (emitter != nullptr) {
+			note_user_code();
 			emitter->emit_signal(CachedStringNames2D::get().life_time_over, this, bullet_indexes);
 		}
 		if (ObjectDB::get_instance(ObjectID(self_id)) != this || is_queued_for_deletion()) {

@@ -38,6 +38,7 @@ func test_graze_shots_retain_nothing() -> void:
 	var sp := make_spawner(H.make_volley_data(4, 250.0, 0.05), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 8)
 	sp.graze_zones = [H.make_graze_zone([400.0, 200.0])] # the ring pattern spawns ~100 px out
 	sp.graze_enabled = true
+	sp.graze_node_group = &"graze_targets"
 	var grazes := [0]
 	factory.bullet_grazed.connect(func(_t: Node2D, _v: BulletVolley2D, _i: int, _z: BulletGrazeZone2D, _r: int) -> void: grazes[0] += 1)
 	var grown: int = await _steady(func(): sp.shoot_once())

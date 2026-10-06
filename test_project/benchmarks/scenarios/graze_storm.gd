@@ -17,7 +17,6 @@ func setup() -> void:
 	add_child(player)
 	player.add_to_group(&"bench_storm_player")
 	_zone = BulletGrazeZone2D.new()
-	_zone.target_group = &"bench_storm_player"
 	_zone.ring_count = 2
 	_zone.ring_1_radius = 64.0
 	_zone.ring_2_radius = 32.0
@@ -31,5 +30,5 @@ func _on_graze(_t: Node2D, _v: BulletVolley2D, _i: int, _z: BulletGrazeZone2D, _
 func step(frame: int) -> void:
 	if frame % 15 == 0:
 		var v: BulletVolley2D = factory.spawn_volley(_data)
-		v.graze_set_zones([_zone])
+		v.graze_set_zones([_zone], &"bench_storm_player")
 	extra["events"] = _events

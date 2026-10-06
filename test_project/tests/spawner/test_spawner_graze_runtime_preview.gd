@@ -19,11 +19,12 @@ func _graze_spawner(zones: Array, at: Vector2 = Vector2.ZERO) -> BulletSpawner2D
 	sp.position = at
 	sp.graze_zones = zones
 	sp.graze_enabled = true
+	sp.graze_node_group = &"graze_targets"
 	return sp
 
 
-func _flagged(radii: Array = [20.0, 40.0], group: StringName = &"graze_targets") -> BulletGrazeZone2D:
-	var z := H.make_graze_zone(radii, group)
+func _flagged(radii: Array = [20.0, 40.0]) -> BulletGrazeZone2D:
+	var z := H.make_graze_zone(radii)
 	z.preview_during_runtime = true
 	return z
 
@@ -137,6 +138,7 @@ func test_disabled_zones_and_graze_off_draw_nothing() -> void:
 	assert_eq(_drawn(), [], "a spawner with graze off does not hold the zone")
 	assert_false(sp.is_in_group("_blast_bullets_graze_spawners"), "it left the internal group")
 	sp.graze_enabled = true
+	sp.graze_node_group = &"graze_targets"
 	await idle(2)
 	assert_eq(_drawn().size(), 1, "graze back on: drawn again")
 
@@ -156,7 +158,7 @@ func test_volleys_keep_a_zone_drawn_without_any_spawner() -> void:
 	assert_eq(_drawn(), [], "no bullet and no spawner holds it: hidden")
 	assert_false(factory.debug_get_graze_runtime_preview()["awake"], "asleep")
 	var v := graze_volley(H.transforms_at([Vector2.ZERO]), 0.0)
-	v.graze_set_zones([z])
+	v.graze_set_zones([z], &"graze_targets")
 	await idle(3)
 	assert_eq(_drawn().size(), 1, "a factory-only volley armed with it draws it too")
 
@@ -180,6 +182,7 @@ func test_a_spawner_ready_before_its_factory_is_drawn() -> void:
 	sp.set_homing_enabled(false)
 	sp.graze_zones = [_flagged([30.0])]
 	sp.graze_enabled = true
+	sp.graze_node_group = &"graze_targets"
 	sp.set_bullet_factory(late)
 	add(sp) # its wake finds no ready factory
 	add(late) # the factory looks once when it becomes ready

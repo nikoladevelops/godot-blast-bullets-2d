@@ -3,18 +3,17 @@ extends BlastTest
 ## through the factory's per-sweep cache): only live Node2D members of the
 ## group count; members that are not Node2D, queued for deletion, outside
 ## the tree, at a non-finite position or in another World2D are skipped;
-## an empty group is a dormant zone (no warning); up to 64 targets graze
-## (a member that joins the group after the shot, even the fifth, is picked
-## up on the next tick); more than 64 keeps the first 64 in tree order and
-## warns once; a target keeps its slot while others come and go (no
-## spurious exits), every slot up to 63 names its target on exit; volleys
+## an empty group is a dormant zone (no warning); there is no target cap (a
+## member that joins the group after the shot, even the 300th, is picked up
+## on the next tick, every slot names its target on exit); a target keeps
+## its slot while others come and go (no spurious exits); volleys
 ## over one group share one scan per tick; a respawned target is picked up
 ## on the next tick while Once bits stay per zone.
 
 
 func _resting_bullet_in_zone(radius: float = 20.0) -> BulletVolley2D:
 	var v := graze_volley(H.transforms_at([Vector2.ZERO]), 0.0)
-	v.graze_set_zones([H.make_graze_zone([radius])])
+	v.graze_set_zones([H.make_graze_zone([radius])], &"graze_targets")
 	return v
 
 
@@ -107,17 +106,17 @@ func test_a_fifth_member_joining_after_the_shot_is_grazed_next_tick() -> void:
 	assert_eq(log[0][1], late, "named")
 
 
-func test_every_one_of_64_targets_grazes_and_names_itself_on_exit() -> void:
+func test_every_one_of_300_targets_grazes_and_names_itself_on_exit() -> void:
 	var targets: Array = []
 	var points: Array = []
-	for i in 64: # one target per bullet, 100 px apart (rings never overlap)
+	for i in 300: # one target per bullet, 100 px apart (rings never overlap)
 		targets.append(make_graze_target(Vector2(100 * i + 10, 0)))
 		points.append(Vector2(100 * i, 0))
 	var v := graze_volley(H.transforms_at(points), 0.0)
-	v.graze_set_zones([H.make_graze_zone([20.0])])
+	v.graze_set_zones([H.make_graze_zone([20.0])], &"graze_targets")
 	var log := H.record_graze(factory)
 	step_factory()
-	assert_eq(log.size(), 64, "64 grazes")
+	assert_eq(log.size(), 300, "300 grazes")
 	var named := true
 	for e in log:
 		named = named and e[0] == "enter" and e[1] == targets[e[3]]
@@ -126,27 +125,23 @@ func test_every_one_of_64_targets_grazes_and_names_itself_on_exit() -> void:
 	for t in targets:
 		(t as Node2D).position.y = 500.0
 	step_factory()
-	assert_eq(log.size(), 64, "64 exits")
+	assert_eq(log.size(), 300, "300 exits")
 	var exits_named := true
 	for e in log:
 		exits_named = exits_named and e[0] == "exit" and e[1] == targets[e[3]]
-	assert_true(exits_named, "every exit names its own target, slots past 3 included")
+	assert_true(exits_named, "every exit names its own target, slots past 255 included")
 
 
-func test_more_than_64_targets_keeps_the_first_64_and_warns_once() -> void:
-	for i in 64:
+func test_there_is_no_target_cap() -> void:
+	for i in 299: # far away, ahead of it in tree order
 		make_graze_target(Vector2(500 + 50 * i, 0))
 	var last := make_graze_target(Vector2(10, 0))
 	var log := H.record_graze(factory)
 	_resting_bullet_in_zone()
 	step_factory(3)
-	expect_warning_sequence(["BulletGrazeZone2D: group 'graze_targets' holds 65 graze targets; only the first 64 in tree order are tested."])
-	assert_eq(log, [], "the 65th target (last in tree order) is not tested")
-	var ids: Array = []
-	for t in factory.debug_get_graze_targets(&"graze_targets"):
-		ids.append(t["id"])
-	assert_eq(ids.size(), 64, "64 targets")
-	assert_false(ids.has(last.get_instance_id()), "not the 65th")
+	assert_eq(H.graze_kinds(log), ["enter:0:0"], "the 300th target (last in tree order) grazes")
+	assert_eq(log[0][1], last, "named")
+	assert_eq(factory.debug_get_graze_targets(&"graze_targets").size(), 300, "every target counts")
 
 
 func test_a_target_keeps_its_slot_while_others_come_and_go() -> void:
@@ -156,7 +151,7 @@ func test_a_target_keeps_its_slot_while_others_come_and_go() -> void:
 	var first := make_graze_target(Vector2(-500, 0)) # slot 0
 	var held := make_graze_target(Vector2(10, 0)) # slot 1
 	var v := graze_volley(H.transforms_at([Vector2.ZERO]), 0.0)
-	v.graze_set_zones([H.make_graze_zone([20.0])])
+	v.graze_set_zones([H.make_graze_zone([20.0])], &"graze_targets")
 	var log := H.record_graze(factory)
 	step_factory()
 	assert_eq(H.graze_kinds(log), ["enter:0:0"], "the visit belongs to the held target")
@@ -178,7 +173,7 @@ func test_a_target_keeps_its_slot_while_others_come_and_go() -> void:
 func test_volleys_over_one_group_share_one_scan_per_tick() -> void:
 	make_graze_target(Vector2(10, 0))
 	for i in 3:
-		graze_volley(H.transforms_at([Vector2(0, 100 * i)]), 0.0).graze_set_zones([H.make_graze_zone([20.0])])
+		graze_volley(H.transforms_at([Vector2(0, 100 * i)]), 0.0).graze_set_zones([H.make_graze_zone([20.0])], &"graze_targets")
 	step_factory()
 	var before: int = factory.debug_get_graze_stats()["refreshes"]
 	step_factory(4)
@@ -188,7 +183,7 @@ func test_volleys_over_one_group_share_one_scan_per_tick() -> void:
 func test_a_respawned_target_is_picked_up_next_tick() -> void:
 	var old := make_graze_target(Vector2(10, 0))
 	var v := graze_volley(H.transforms_at([Vector2.ZERO, Vector2(300, 0)]), 0.0)
-	v.graze_set_zones([H.make_graze_zone([20.0])])
+	v.graze_set_zones([H.make_graze_zone([20.0])], &"graze_targets")
 	var log := H.record_graze(factory)
 	step_factory()
 	assert_eq(H.graze_kinds(log), ["enter:0:0"], "bullet 0 grazed the first target")

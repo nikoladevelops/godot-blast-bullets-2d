@@ -40,9 +40,9 @@ func _scene(scene_seed: int, slab_min: int, target_count: int = 16) -> Array:
 		sp.speed = [0.0, 300.0, 1800.0, 4200.0][i % 4] # resting, slow, fast, faster than a ring per tick
 	d.collision_shape = H.make_circle_shape(4.0)
 	var v: BulletVolley2D = factory.spawn_volley(d)
-	var zone := H.make_graze_zone([14.0, 36.0], GROUP)
+	var zone := H.make_graze_zone([14.0, 36.0])
 	zone.regraze = BulletGrazeZone2D.REGRAZE_AFTER_EXIT
-	v.graze_set_zones([zone])
+	v.graze_set_zones([zone], GROUP)
 	var log := H.record_graze(factory)
 	for tick in 40:
 		for i in targets.size():
@@ -78,7 +78,7 @@ func test_equal_distances_go_to_the_first_target_in_tree_order() -> void:
 		var right := make_graze_target(Vector2(10, 0), group) # first in tree order
 		var left := make_graze_target(Vector2(-10, 0), group) # first in x order
 		var v := graze_volley(H.transforms_at([Vector2.ZERO]), 0.0)
-		v.graze_set_zones([H.make_graze_zone([20.0], group)])
+		v.graze_set_zones([H.make_graze_zone([20.0])], group)
 		var log := H.record_graze(factory)
 		step_factory()
 		assert_eq(H.graze_kinds(log), ["enter:0:0"], "slab_min %d: one graze" % slab_min)
@@ -96,8 +96,5 @@ func test_the_threshold_knob_rejects_bad_values() -> void:
 	assert_true(factory.has_method("debug_set_graze_slab_min_targets"), "bound")
 	assert_eq(factory.debug_set_graze_slab_min_targets(3), 8, "returns the previous value (default 8)")
 	assert_eq(factory.debug_set_graze_slab_min_targets(-1), 3, "a bad value changes nothing")
-	assert_eq(factory.debug_set_graze_slab_min_targets(65), 3, "a bad value changes nothing")
-	expect_error_sequence([
-		"BulletFactory2D::debug_set_graze_slab_min_targets: value must be between 0 and 64, nothing changed.",
-		"BulletFactory2D::debug_set_graze_slab_min_targets: value must be between 0 and 64, nothing changed.",
-	])
+	expect_error_sequence(["BulletFactory2D::debug_set_graze_slab_min_targets: value must be >= 0, nothing changed."])
+	assert_eq(factory.debug_set_graze_slab_min_targets(1000000), 3, "any size is fine (here: never)")

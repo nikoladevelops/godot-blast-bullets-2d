@@ -101,6 +101,7 @@ void BulletVolley2D::run_custom_timers(double delta) {
 		if (!callback.is_valid()) {
 			continue;
 		}
+		note_user_code();
 		callback.call();
 		if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
 			return; // the callback freed this volley

@@ -18,7 +18,7 @@ void BulletFactory2D::clear_graze_cache() {
 Array BulletFactory2D::debug_get_graze_targets(const StringName &group) {
 	Array out;
 	const GrazeTargetList2D *list = graze_default_detector.list_for_group(group, *this);
-	for (int i = 0; list != nullptr && i < list->count; ++i) {
+	for (int i = 0; list != nullptr && i < list->count(); ++i) {
 		Dictionary d;
 		d["id"] = (int64_t)list->targets[i].id;
 		d["position"] = list->targets[i].position;
@@ -38,8 +38,8 @@ Dictionary BulletFactory2D::debug_get_graze_stats() const {
 
 int BulletFactory2D::debug_set_graze_slab_min_targets(int value) {
 	const int previous = GrazeTargetList2D::slab_min_targets;
-	if (value < 0 || value > BulletGrazeZone2D::MAX_TARGETS) {
-		UtilityFunctions::push_error("BulletFactory2D::debug_set_graze_slab_min_targets: value must be between 0 and 64, nothing changed.");
+	if (value < 0) {
+		UtilityFunctions::push_error("BulletFactory2D::debug_set_graze_slab_min_targets: value must be >= 0, nothing changed.");
 		return previous;
 	}
 	GrazeTargetList2D::slab_min_targets = value;
@@ -90,22 +90,18 @@ GrazePreviewLayer2D *BulletFactory2D::resolve_graze_runtime_layer(bool create) {
 
 void BulletFactory2D::refresh_graze_runtime_preview() {
 	graze_runtime_zones_scratch.clear();
-	// One entry per (zone, detector): a zone shared by spawners that find
-	// targets the same way draws once; spawners with their own target
-	// settings draw around their own targets.
-	auto add_zone = [&](const BulletGrazeZone2D *zone, GrazeDetector2D *detector) {
-		if (zone == nullptr || !zone->enabled || !zone->preview_during_runtime || detector == nullptr) {
+	// One entry per (zone, target list): a zone shared by spawners that
+	// find the same targets draws once; others draw around their own.
+	auto add_zone = [&](const BulletGrazeZone2D *zone, const GrazeTargetList2D *list) {
+		if (zone == nullptr || !zone->enabled || !zone->preview_during_runtime) {
 			return;
 		}
-		if (detector->shares_factory_lists()) {
-			detector = &graze_default_detector;
-		}
 		for (const GrazeRuntimeZone2D &known : graze_runtime_zones_scratch) {
-			if (known.zone == zone && known.detector == detector) {
+			if (known.zone == zone && known.list == list) {
 				return;
 			}
 		}
-		graze_runtime_zones_scratch.push_back(GrazeRuntimeZone2D{ zone, detector });
+		graze_runtime_zones_scratch.push_back(GrazeRuntimeZone2D{ zone, list });
 	};
 	SceneTree *tree = is_inside_tree() ? get_tree() : nullptr;
 	if (is_ready && !is_tearing_down && tree != nullptr) {
@@ -114,13 +110,13 @@ void BulletFactory2D::refresh_graze_runtime_preview() {
 			if (index < 0 || index >= (int)all_volleys.size()) {
 				continue;
 			}
-			const BulletVolley2D *volley = all_volleys[index];
-			if (volley == nullptr || !volley->is_active) {
+			BulletVolley2D *volley = all_volleys[index];
+			if (volley == nullptr || !volley->is_active || volley->graze_zone_slots == 0) {
 				continue;
 			}
-			GrazeDetector2D *detector = volley->graze_detector != nullptr ? volley->graze_detector.get() : &graze_default_detector;
+			const GrazeTargetList2D *list = volley->graze_target_list();
 			for (int z = 0; z < volley->graze_zone_slots; ++z) {
-				add_zone(volley->graze_zones[z].ptr(), detector);
+				add_zone(volley->graze_zones[z].ptr(), list);
 			}
 		}
 		// Zones held by running graze spawners of this factory (steady
@@ -132,9 +128,10 @@ void BulletFactory2D::refresh_graze_runtime_preview() {
 			if (spawner == nullptr || !spawner->graze_enabled || spawner->bullet_factory_id != self_id || spawner->is_queued_for_deletion()) {
 				continue;
 			}
+			const GrazeTargetList2D *list = spawner->graze_detector_ref().list(*this);
 			for (int z = 0; z < spawner->graze_zones.size() && z < BulletVolley2D::MAX_GRAZE_ZONES; ++z) {
 				const Variant entry = spawner->graze_zones[z];
-				add_zone(entry.get_type() == Variant::OBJECT ? Object::cast_to<BulletGrazeZone2D>((Object *)entry) : nullptr, &spawner->graze_detector_ref());
+				add_zone(entry.get_type() == Variant::OBJECT ? Object::cast_to<BulletGrazeZone2D>((Object *)entry) : nullptr, list);
 			}
 		}
 	}
@@ -154,9 +151,8 @@ void BulletFactory2D::refresh_graze_runtime_preview() {
 	}
 	for (size_t i = 0; i < graze_runtime_zones_scratch.size(); ++i) {
 		const GrazeRuntimeZone2D &entry = graze_runtime_zones_scratch[i];
-		const GrazeTargetList2D *list = entry.detector->list_for(*entry.zone, *this);
-		if (list != nullptr) {
-			append_graze_zone_circles2d(*entry.zone, (int)i, list->targets, list->count, graze_runtime_scratch);
+		if (entry.list != nullptr) {
+			append_graze_zone_circles2d(*entry.zone, (int)i, entry.list->targets.data(), entry.list->count(), graze_runtime_scratch);
 		}
 	}
 	GrazePreviewLayer2D *layer = resolve_graze_runtime_layer(true);

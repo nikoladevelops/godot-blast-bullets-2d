@@ -1,6 +1,7 @@
 extends BlastTest
-## BulletSpawner2D graze target sources: graze_target_source (Zone Groups,
-## Node Path, Node Name, Node Children) with homing's name matching,
+## BulletSpawner2D graze target sources, the ONE place that decides who
+## grazes (zones only say how): graze_target_source (Node Group, Node Path,
+## Node Name, Node Children) with homing's name matching,
 ## graze_filter_group, graze_update_interval and refresh_graze_targets().
 ## Defaults and serialized ids are locked, setters reject and keep with
 ## exact texts, each source shows only its own knobs and names its empty
@@ -10,12 +11,12 @@ extends BlastTest
 ## nodes), the filter applies to all of them, the interval holds membership
 ## between scans while positions stay live, a refresh rescans at once, edits
 ## reach bullets in flight, orphaned volleys keep their spawner's settings,
-## both ring previews draw the source's targets, more than 64 matches warn
-## once, default spawners share the factory's one scan per tick, detectors
+## both ring previews draw the source's targets, hundreds of matches all
+## count (no cap), default spawners share the factory's one scan per tick, detectors
 ## live exactly as long as their spawner or its bullets and never leak
 ## through the pool. Homing's refresh is retarget_live_volleys().
 
-const ZONE_GROUPS := BulletSpawner2D.GRAZE_SOURCE_ZONE_GROUPS
+const NODE_GROUP := BulletSpawner2D.GRAZE_SOURCE_NODE_GROUP
 const NODE_PATH := BulletSpawner2D.GRAZE_SOURCE_NODE_PATH
 const NODE_NAME := BulletSpawner2D.GRAZE_SOURCE_NODE_NAME
 const NODE_CHILDREN := BulletSpawner2D.GRAZE_SOURCE_NODE_CHILDREN
@@ -23,12 +24,13 @@ const NODE_CHILDREN := BulletSpawner2D.GRAZE_SOURCE_NODE_CHILDREN
 
 ## A spawner at the origin firing one resting bullet (circle r4), graze on
 ## with `zones` (default: one 20 px ring over the default test group).
-func _spawner(zones: Array = [], source: int = ZONE_GROUPS) -> BulletSpawner2D:
+func _spawner(zones: Array = [], source: int = NODE_GROUP) -> BulletSpawner2D:
 	var d := H.make_volley_data(1, 0.0, 60.0)
 	d.collision_shape = H.make_circle_shape(4.0)
 	var sp := make_spawner(d, BulletSpawner2D.PATTERN_FROM_SELF, 1)
 	sp.graze_zones = zones if not zones.is_empty() else [H.make_graze_zone([20.0])]
 	sp.graze_enabled = true
+	sp.graze_node_group = &"graze_targets"
 	sp.graze_target_source = source
 	return sp
 
@@ -45,6 +47,7 @@ func _loose_spawner(source: int) -> BulletSpawner2D:
 	sp.helper_bullets_amount = 1
 	sp.graze_zones = [H.make_graze_zone([20.0])]
 	sp.graze_enabled = true
+	sp.graze_node_group = &"graze_targets"
 	sp.graze_target_source = source
 	add_child(sp)
 	sp.set_bullet_factory(factory)
@@ -88,13 +91,14 @@ func _graze_warnings(sp: BulletSpawner2D) -> Array:
 
 func test_api_is_bound_with_documented_defaults() -> void:
 	var sp := make_spawner()
-	for m in ["get_graze_target_source", "set_graze_target_source", "get_graze_filter_group", "set_graze_filter_group", "get_graze_target_path", "set_graze_target_path", "get_graze_node_name", "set_graze_node_name", "get_graze_node_name_match_mode", "set_graze_node_name_match_mode", "get_graze_node_name_case_sensitive", "set_graze_node_name_case_sensitive", "get_graze_children_parent_path", "set_graze_children_parent_path", "get_graze_children_recursive", "set_graze_children_recursive", "get_graze_update_interval", "set_graze_update_interval", "refresh_graze_targets", "debug_get_graze_detector_stats"]:
+	for m in ["get_graze_target_source", "set_graze_target_source", "get_graze_node_group", "set_graze_node_group", "get_graze_filter_group", "set_graze_filter_group", "get_graze_target_path", "set_graze_target_path", "get_graze_node_name", "set_graze_node_name", "get_graze_node_name_match_mode", "set_graze_node_name_match_mode", "get_graze_node_name_case_sensitive", "set_graze_node_name_case_sensitive", "get_graze_children_parent_path", "set_graze_children_parent_path", "get_graze_children_recursive", "set_graze_children_recursive", "get_graze_update_interval", "set_graze_update_interval", "refresh_graze_targets", "debug_get_graze_detector_stats"]:
 		assert_true(sp.has_method(m), "BulletSpawner2D.%s is bound" % m)
-	assert_eq([ZONE_GROUPS, NODE_PATH, NODE_NAME, NODE_CHILDREN], [0, 1, 2, 3], "serialized source ids")
-	assert_eq(sp.graze_target_source, ZONE_GROUPS, "zone groups by default (each zone's target_group)")
+	assert_eq([NODE_GROUP, NODE_PATH, NODE_NAME, NODE_CHILDREN], [0, 1, 2, 3], "serialized source ids")
+	assert_eq(sp.graze_target_source, NODE_GROUP, "a node group by default")
+	assert_eq(sp.graze_node_group, &"", "no default group: the developer names it")
 	assert_eq(sp.graze_filter_group, &"", "no filter")
 	assert_eq(sp.graze_target_path, NodePath(""), "no path")
-	assert_eq(sp.graze_node_name, "Player", "name")
+	assert_eq(sp.graze_node_name, "", "no default name")
 	assert_eq(sp.graze_node_name_match_mode, BulletSpawner2D.HOMING_NAME_MATCH_CONTAINS, "contains, like homing")
 	assert_false(sp.graze_node_name_case_sensitive, "case-insensitive")
 	assert_eq(sp.graze_children_parent_path, NodePath(""), "no parent")
@@ -139,7 +143,7 @@ func test_each_source_shows_only_its_own_knobs() -> void:
 	var sp := make_spawner()
 	var always := ["graze_target_source", "graze_filter_group", "graze_update_interval"]
 	var own := {
-		ZONE_GROUPS: [],
+		NODE_GROUP: ["graze_node_group"],
 		NODE_PATH: ["graze_target_path"],
 		NODE_NAME: ["graze_node_name", "graze_node_name_match_mode", "graze_node_name_case_sensitive"],
 		NODE_CHILDREN: ["graze_children_parent_path", "graze_children_recursive"],
@@ -150,6 +154,7 @@ func test_each_source_shows_only_its_own_knobs() -> void:
 	for k in always + specific:
 		assert_false(is_editor_visible(sp, StringName(k)), k + " hides while graze is off")
 	sp.graze_enabled = true
+	sp.graze_node_group = &"graze_targets"
 	watch_signals(sp)
 	for source in own:
 		sp.graze_target_source = source
@@ -161,12 +166,11 @@ func test_each_source_shows_only_its_own_knobs() -> void:
 
 
 func test_setup_warnings_name_an_empty_source_setting() -> void:
-	var groupless := H.make_graze_zone()
-	groupless.target_group = &""
-	var sp := _spawner([groupless])
-	assert_eq(_graze_warnings(sp), ["graze_zones[0] has an empty target_group: it never finds a target."], "zone groups need a group")
+	var sp := _spawner()
+	sp.graze_node_group = &""
+	assert_eq(_graze_warnings(sp), ["graze_target_source is Node Group but graze_node_group is empty: no graze target is found."], "empty group")
 	sp.graze_target_source = NODE_PATH
-	assert_eq(_graze_warnings(sp), ["graze_target_source is Node Path but graze_target_path is empty: no graze target is found."], "the zone's group no longer matters")
+	assert_eq(_graze_warnings(sp), ["graze_target_source is Node Path but graze_target_path is empty: no graze target is found."], "empty path")
 	sp.graze_target_source = NODE_NAME
 	sp.graze_node_name = ""
 	assert_eq(_graze_warnings(sp), ["graze_target_source is Node Name but graze_node_name is empty: no graze target is found."], "empty name")
@@ -179,7 +183,8 @@ func test_setup_warnings_name_an_empty_source_setting() -> void:
 func test_enemies_spawned_after_the_spawner_are_grazed() -> void:
 	# The reported case: graze over an enemy group, the enemies spawned after
 	# the shot, more of them than the old cap of four.
-	var sp := _spawner([H.make_graze_zone([20.0], &"enemies")])
+	var sp := _spawner([H.make_graze_zone([20.0])])
+	sp.graze_node_group = &"enemies"
 	var log := H.record_graze(sp)
 	_shoot(sp)
 	step_factory()
@@ -189,7 +194,7 @@ func test_enemies_spawned_after_the_spawner_are_grazed() -> void:
 	step_factory()
 	assert_eq(H.graze_kinds(log), ["enter:0:0"], "the sixth enemy, spawned after the shot, grazes on the next tick")
 	assert_eq(log[0][1], sixth, "named")
-	assert_eq(sp.resolve_graze_targets(0).size(), 6, "all six are targets")
+	assert_eq(sp.resolve_graze_targets().size(), 6, "all six are targets")
 
 
 func test_node_name_source_matches_per_mode_and_case() -> void:
@@ -212,7 +217,7 @@ func test_node_name_source_matches_per_mode_and_case() -> void:
 		sp.graze_node_name_match_mode = c[0]
 		sp.graze_node_name_case_sensitive = c[1]
 		var got: Array = []
-		for n in sp.resolve_graze_targets(0):
+		for n in sp.resolve_graze_targets():
 			got.append(String((n as Node).name))
 		assert_eq(got, c[2], "mode %d, case sensitive %s (tree order)" % [c[0], c[1]])
 
@@ -229,7 +234,7 @@ func test_node_name_scan_skips_the_spawner_its_markers_factories_dying_and_plain
 	var dying := _node("TargetDying", Vector2(5, 0))
 	dying.queue_free()
 	var real := _node("TargetReal", Vector2(10, 0))
-	assert_eq(sp.resolve_graze_targets(0), [real], "only the live Node2D outside the spawner and the factory")
+	assert_eq(sp.resolve_graze_targets(), [real], "only the live Node2D outside the spawner and the factory")
 	var log := H.record_graze(sp)
 	_shoot(sp)
 	step_factory()
@@ -248,10 +253,10 @@ func test_node_path_source_grazes_the_node_at_the_path() -> void:
 	assert_eq(H.graze_kinds(log), ["enter:0:0"], "one graze")
 	assert_eq(log[0][1], target, "the node at the path, not the zone group's member")
 	sp.graze_target_path = NodePath("")
-	assert_eq(sp.resolve_graze_targets(0), [], "an empty path finds nothing")
+	assert_eq(sp.resolve_graze_targets(), [], "an empty path finds nothing")
 	sp.graze_target_path = sp.get_path_to(target)
 	target.free()
-	assert_eq(sp.resolve_graze_targets(0), [], "a freed node is no target")
+	assert_eq(sp.resolve_graze_targets(), [], "a freed node is no target")
 
 
 func test_node_children_source_direct_or_recursive() -> void:
@@ -265,9 +270,9 @@ func test_node_children_source_direct_or_recursive() -> void:
 	var d := _node("D", Vector2(0, 300), a)
 	var sp := _spawner([], NODE_CHILDREN)
 	sp.graze_children_parent_path = sp.get_path_to(squad)
-	assert_eq(sp.resolve_graze_targets(0), [a, b], "direct Node2D children")
+	assert_eq(sp.resolve_graze_targets(), [a, b], "direct Node2D children")
 	sp.graze_children_recursive = true
-	assert_eq(sp.resolve_graze_targets(0), [a, d, b, c], "the whole subtree, depth-first in tree order")
+	assert_eq(sp.resolve_graze_targets(), [a, d, b, c], "the whole subtree, depth-first in tree order")
 	squad.position = Vector2(-10, 0) # A sits 10 px from the bullet
 	var log := H.record_graze(sp)
 	_shoot(sp)
@@ -279,18 +284,18 @@ func test_node_children_source_direct_or_recursive() -> void:
 func test_a_spawner_never_finds_itself() -> void:
 	var sp := _spawner([], NODE_NAME)
 	sp.name = "PlayerTurret"
-	assert_eq(sp.resolve_graze_targets(0), [], "name: never itself (Contains 'Player')")
+	assert_eq(sp.resolve_graze_targets(), [], "name: never itself (Contains 'Player')")
 	sp.graze_target_source = NODE_PATH
 	sp.graze_target_path = NodePath(".")
-	assert_eq(sp.resolve_graze_targets(0), [], "path: never itself")
+	assert_eq(sp.resolve_graze_targets(), [], "path: never itself")
 	sp.graze_target_source = NODE_CHILDREN
 	sp.graze_children_parent_path = NodePath("..")
-	assert_false(sp.resolve_graze_targets(0).has(sp), "children: never itself")
-	sp.graze_target_source = ZONE_GROUPS
+	assert_false(sp.resolve_graze_targets().has(sp), "children: never itself")
+	sp.graze_target_source = NODE_GROUP
 	sp.add_to_group(&"graze_targets")
-	assert_eq(sp.resolve_graze_targets(0), [], "group: never itself")
+	assert_eq(sp.resolve_graze_targets(), [], "group: never itself")
 	sp.graze_filter_group = &"graze_targets" # own lists now
-	assert_eq(sp.resolve_graze_targets(0), [], "filtered group: never itself")
+	assert_eq(sp.resolve_graze_targets(), [], "filtered group: never itself")
 
 
 func test_the_filter_group_applies_to_every_source() -> void:
@@ -302,18 +307,18 @@ func test_the_filter_group_applies_to_every_source() -> void:
 	var sp := _spawner()
 	sp.graze_filter_group = &"allowed"
 	assert_false(sp.debug_get_graze_detector_stats()["shares_factory_lists"], "a filter needs own lists")
-	assert_eq(sp.resolve_graze_targets(0), [kept], "zone groups")
+	assert_eq(sp.resolve_graze_targets(), [kept], "zone groups")
 	sp.graze_target_source = NODE_NAME
 	sp.graze_node_name = "Filter"
-	assert_eq(sp.resolve_graze_targets(0), [kept], "node name")
+	assert_eq(sp.resolve_graze_targets(), [kept], "node name")
 	sp.graze_target_source = NODE_CHILDREN
 	sp.graze_children_parent_path = NodePath("..")
-	assert_eq(sp.resolve_graze_targets(0), [kept], "node children")
+	assert_eq(sp.resolve_graze_targets(), [kept], "node children")
 	sp.graze_target_source = NODE_PATH
 	sp.graze_target_path = sp.get_path_to(dropped)
-	assert_eq(sp.resolve_graze_targets(0), [], "node path: a node outside the filter is no target")
+	assert_eq(sp.resolve_graze_targets(), [], "node path: a node outside the filter is no target")
 	sp.graze_target_path = sp.get_path_to(kept)
-	assert_eq(sp.resolve_graze_targets(0), [kept], "node path")
+	assert_eq(sp.resolve_graze_targets(), [kept], "node path")
 
 
 func test_update_interval_holds_membership_between_scans() -> void:
@@ -327,17 +332,17 @@ func test_update_interval_holds_membership_between_scans() -> void:
 	var scans: int = sp.debug_get_graze_detector_stats()["scans"]
 	var late := _node("MoverLate", Vector2(-500, 100))
 	step_factory(20) # 1/3 s: no rescan yet
-	assert_eq(sp.resolve_graze_targets(0), [far], "a newcomer waits for the next scan")
+	assert_eq(sp.resolve_graze_targets(), [far], "a newcomer waits for the next scan")
 	far.position = Vector2(-10, 0)
 	step_factory()
 	assert_eq(H.graze_kinds(log), ["enter:0:0"], "a found target moving onto the bullet grazes at once: positions are live")
 	assert_eq(sp.debug_get_graze_detector_stats()["scans"], scans, "no scan in between")
 	step_factory(15) # past 0.5 s since the first scan
 	assert_eq(sp.debug_get_graze_detector_stats()["scans"], scans + 1, "one rescan per interval")
-	assert_eq(sp.resolve_graze_targets(0), [far, late], "the rescan found the newcomer")
+	assert_eq(sp.resolve_graze_targets(), [far, late], "the rescan found the newcomer")
 	far.free()
 	step_factory()
-	assert_eq(sp.resolve_graze_targets(0), [late], "a freed target stops counting at once")
+	assert_eq(sp.resolve_graze_targets(), [late], "a freed target stops counting at once")
 	assert_eq(H.graze_kinds(log), ["enter:0:0"], "its visit ended silently")
 	assert_false(v.is_bullet_inside_graze(0, 0), "no visit left")
 
@@ -358,13 +363,15 @@ func test_refresh_graze_targets_rescans_at_once() -> void:
 	assert_eq(log[0][1], late, "named")
 
 
-func test_refresh_counts_distinct_targets_and_refuses_outside_the_tree() -> void:
+func test_refresh_counts_targets_and_refuses_outside_the_tree() -> void:
 	var a := make_graze_target(Vector2(100, 0))
-	var b := make_graze_target(Vector2(200, 0), &"graze_other")
-	var sp := _spawner([H.make_graze_zone([20.0]), H.make_graze_zone([20.0]), H.make_graze_zone([20.0], &"graze_other")])
-	assert_eq(sp.refresh_graze_targets(), 2, "two zones over one group and a third zone: two distinct targets")
-	assert_eq(_ids(sp.resolve_graze_targets(2)), _ids([b]), "the third zone's own group")
-	assert_eq(_ids(sp.resolve_graze_targets(0)), _ids([a]), "the first zone's")
+	var b := make_graze_target(Vector2(200, 0))
+	make_graze_target(Vector2(300, 0), &"graze_other")
+	var sp := _spawner([H.make_graze_zone([20.0]), H.make_graze_zone([40.0]), H.make_graze_zone([60.0])])
+	assert_eq(sp.refresh_graze_targets(), 2, "three zones ring the same two targets")
+	assert_eq(_ids(sp.resolve_graze_targets()), _ids([a, b]), "in tree order")
+	sp.graze_node_group = &"graze_other"
+	assert_eq(sp.refresh_graze_targets(), 1, "another group, another target set")
 	var loose := BulletSpawner2D.new()
 	assert_eq(loose.refresh_graze_targets(), 0, "nothing outside the tree")
 	expect_error_sequence(["BulletSpawner2D.refresh_graze_targets: spawner is outside the scene tree, nothing refreshed."])
@@ -383,7 +390,7 @@ func test_setting_edits_reach_bullets_in_flight() -> void:
 	step_factory()
 	assert_eq(H.graze_kinds(log), ["enter:0:0"], "the flying bullet follows the new name")
 	assert_true(v.is_bullet_inside_graze(0, 0), "inside")
-	sp.graze_target_source = ZONE_GROUPS # Beta is in no zone group
+	sp.graze_target_source = NODE_GROUP # Beta is in no zone group
 	step_factory()
 	assert_eq(H.graze_kinds(log), ["enter:0:0"], "switching the source away ends the visit silently")
 	assert_false(v.is_bullet_inside_graze(0, 0), "no visit left")
@@ -417,7 +424,7 @@ func test_the_children_source_never_finds_a_bullet_factory() -> void:
 	sp.graze_children_recursive = true
 	var inside := _node("InsideFactory", Vector2(5, 0), factory)
 	var sibling := _node("Sibling", Vector2(10, 0))
-	var found := sp.resolve_graze_targets(0)
+	var found := sp.resolve_graze_targets()
 	assert_false(found.has(factory), "not the factory")
 	assert_false(found.has(inside), "nor anything inside it")
 	assert_true(found.has(sibling), "its siblings count")
@@ -458,7 +465,7 @@ func test_the_ring_preview_draws_the_source_targets() -> void:
 	for c in sp.debug_get_graze_preview_circles():
 		ids.append(c["target_id"])
 	assert_eq(ids, _ids([shown]), "rings around the named node only")
-	assert_eq(_ids(sp.resolve_graze_targets(0)), ids, "exactly what the runtime tests")
+	assert_eq(_ids(sp.resolve_graze_targets()), ids, "exactly what the runtime tests")
 
 
 func test_the_factory_preview_draws_each_spawners_targets() -> void:
@@ -482,21 +489,24 @@ func test_the_factory_preview_draws_each_spawners_targets() -> void:
 	assert_eq(info["zones"], 2, "once per (zone, target source)")
 
 
-func test_more_than_64_matches_keep_the_first_64_and_warn_once() -> void:
-	for i in 65:
+func test_hundreds_of_matches_all_count() -> void:
+	for i in 300:
 		_node("Swarm%d" % i, Vector2(1000 + i, 0))
 	var sp := _spawner([], NODE_NAME)
 	sp.graze_node_name = "Swarm"
-	assert_eq(sp.resolve_graze_targets(0).size(), 64, "the first 64")
-	sp.resolve_graze_targets(0)
-	expect_warning_sequence(["BulletSpawner2D: graze_node_name 'Swarm' matches 65 graze targets; only the first 64 in tree order are tested."])
+	assert_eq(sp.resolve_graze_targets().size(), 300, "every named node, no cap")
 	var squad := _node("BigSquad", Vector2(-1000, 0))
-	for i in 65:
+	for i in 300:
 		_node("Member%d" % i, Vector2(i, 0), squad)
 	sp.graze_target_source = NODE_CHILDREN
 	sp.graze_children_parent_path = sp.get_path_to(squad)
-	assert_eq(sp.resolve_graze_targets(0).size(), 64, "the first 64 children")
-	expect_warning_sequence(["BulletSpawner2D: graze_children_parent_path holds 65 graze targets; only the first 64 in tree order are tested."])
+	assert_eq(sp.resolve_graze_targets().size(), 300, "every child, no cap")
+	var last := _node("Member300", Vector2(1010, 0), squad) # the 301st, last in tree order, 10 px from the bullet
+	var log := H.record_graze(sp)
+	_shoot(sp)
+	step_factory()
+	assert_eq(H.graze_kinds(log), ["enter:0:0"], "one graze")
+	assert_eq(log[0][1], last, "by the 301st child")
 
 
 func test_spawners_at_the_defaults_share_the_factorys_scan() -> void:
@@ -540,7 +550,7 @@ func test_a_pooled_spawner_volley_reused_by_the_factory_finds_zone_groups() -> v
 	v.disable_bullet(0)
 	var reused := graze_volley(H.transforms_at([Vector2.ZERO]), 0.0)
 	assert_eq(reused, v, "the pool handed it back")
-	reused.graze_set_zones([H.make_graze_zone([20.0])])
+	reused.graze_set_zones([H.make_graze_zone([20.0])], &"graze_targets")
 	log.clear()
 	step_factory()
 	assert_eq(H.graze_kinds(log), ["enter:0:0"], "one graze")

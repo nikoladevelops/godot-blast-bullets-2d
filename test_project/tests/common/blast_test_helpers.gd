@@ -103,11 +103,10 @@ static func make_flat_curve(value: float) -> Curve:
 	c.add_point(Vector2(1, value))
 	return c
 
-## Graze zone over `group` with one ring per radius (bullet size off unless
+## Graze zone with one ring per radius (bullet size off unless
 ## asked, so distances in tests are center to center).
-static func make_graze_zone(radii: Array = [24.0], group: StringName = &"graze_targets", count_bullet_size := false) -> BulletGrazeZone2D:
+static func make_graze_zone(radii: Array = [24.0], count_bullet_size := false) -> BulletGrazeZone2D:
 	var z := BulletGrazeZone2D.new()
-	z.target_group = group
 	z.ring_count = radii.size()
 	for i in radii.size():
 		z.set_ring_radius(i, radii[i])

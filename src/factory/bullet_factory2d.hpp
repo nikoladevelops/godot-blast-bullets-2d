@@ -475,6 +475,13 @@ public:
 	bool graze_lists_usable() const { return is_ready && !is_tearing_down && is_inside_tree(); }
 	// Factory time for graze rescans: the sum of every physics step's delta.
 	double get_graze_clock() const { return graze_clock; }
+	// Bumped right before the plugin hands control to user code inside a
+	// sweep (every live signal / timer callback): graze target lists
+	// re-validate when it moved, so a target an earlier handler freed is
+	// never tested by a later volley of the same sweep. Every new emit or
+	// callback site inside the tick MUST call note_user_code().
+	uint64_t get_user_code_epoch() const { return user_code_epoch; }
+	void note_user_code() { ++user_code_epoch; }
 	void clear_graze_cache();
 	// [{id, position}] exactly as the next volley tick of this sweep would
 	// test them (refreshes a stale entry first).
@@ -482,7 +489,8 @@ public:
 	// {refreshes, events_total, cached_groups, live_detectors}.
 	Dictionary debug_get_graze_stats() const;
 	// Zones with more live targets than this test each bullet against the
-	// targets near it in x only (default 8; 0 = always, 64 = never).
+	// targets near it in x only (default 8; 0 = always, a huge value =
+	// never).
 	// Process-wide, for tests and profiling. Returns the previous value.
 	int debug_set_graze_slab_min_targets(int value);
 	// Bumped by volleys per emitted graze event (never per bullet).
@@ -608,15 +616,16 @@ private:
 	std::vector<VolleyIterationEntry> timer_iteration_scratch;
 	GrazeDetector2D graze_default_detector{ 0 };
 	double graze_clock = 0.0;
+	uint64_t user_code_epoch = 0;
 	bool graze_runtime_preview_awake = false;
 	GrazePreviewLayer2D *graze_runtime_layer = nullptr;
 	uint64_t graze_runtime_layer_id = 0;
 	int graze_runtime_zone_count = 0;
 	std::vector<GrazePreviewCircle2D> graze_runtime_scratch;
-	// The zone and the detector whose lists it is drawn around.
+	// The zone and the target list it is drawn around.
 	struct GrazeRuntimeZone2D {
 		const BulletGrazeZone2D *zone = nullptr;
-		GrazeDetector2D *detector = nullptr;
+		const GrazeTargetList2D *list = nullptr;
 	};
 	std::vector<GrazeRuntimeZone2D> graze_runtime_zones_scratch;
 	static constexpr float kGrazeRuntimePreviewWidth = 2.0f;

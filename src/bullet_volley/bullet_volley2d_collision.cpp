@@ -763,6 +763,7 @@ void BulletVolley2D::handle_bullet_collision(const BulletCollisionData2D &record
 	Object *emitter = emit_collision_signals ? resolve_hit_emitter_checked() : nullptr;
 	if (emitter != nullptr) {
 		const StringName &signal_name = record.collision_type == CollisionType::AREA ? CachedStringNames2D::get().area_entered : CachedStringNames2D::get().body_entered;
+		note_user_code();
 		emitter->emit_signal(signal_name, hit_target, this, bullet_index);
 	}
 

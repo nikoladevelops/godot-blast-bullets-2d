@@ -96,12 +96,21 @@ BulletSpawner2D::GrazeTargetSource BulletSpawner2D::get_graze_target_source() co
 }
 
 void BulletSpawner2D::set_graze_target_source(GrazeTargetSource value) {
-	if (value < GRAZE_SOURCE_ZONE_GROUPS || value > GRAZE_SOURCE_NODE_CHILDREN) {
+	if (value < GRAZE_SOURCE_NODE_GROUP || value > GRAZE_SOURCE_NODE_CHILDREN) {
 		UtilityFunctions::push_error("BulletSpawner2D: invalid graze_target_source, keeping the old value.");
 		return;
 	}
 	graze_target_source = value;
 	notify_property_list_changed();
+	apply_graze_detector_config();
+}
+
+StringName BulletSpawner2D::get_graze_node_group() const {
+	return graze_node_group;
+}
+
+void BulletSpawner2D::set_graze_node_group(const StringName &value) {
+	graze_node_group = value;
 	apply_graze_detector_config();
 }
 
@@ -203,6 +212,7 @@ GrazeDetector2D &BulletSpawner2D::graze_detector_ref() const {
 GrazeDetector2D::Config BulletSpawner2D::graze_detector_config() const {
 	GrazeDetector2D::Config config;
 	config.source = (int)graze_target_source;
+	config.node_group = graze_node_group;
 	config.filter_group = graze_filter_group;
 	config.target_path = graze_target_path;
 	config.node_name = graze_node_name;
@@ -220,9 +230,9 @@ void BulletSpawner2D::apply_graze_detector_config() {
 	refresh_graze_preview();
 }
 
-void BulletSpawner2D::collect_graze_zone_targets(const BulletGrazeZone2D &zone, GrazeTarget2D *r_targets, int &r_count) const {
-	r_count = 0;
-	if (!zone.enabled || !is_inside_tree()) {
+void BulletSpawner2D::collect_graze_targets(std::vector<GrazeTarget2D> &r_targets) const {
+	r_targets.clear();
+	if (!is_inside_tree()) {
 		return;
 	}
 	GrazeDetector2D &detector = graze_detector_ref();
@@ -230,11 +240,14 @@ void BulletSpawner2D::collect_graze_zone_targets(const BulletGrazeZone2D &zone, 
 	BulletFactory2D *factory = get_bullet_factory();
 	if (factory != nullptr && factory->graze_lists_usable() && !Engine::get_singleton()->is_editor_hint()) {
 		// What the volleys test this sweep (shared lists may hold this
-		// spawner; its own volleys skip it, so does this view).
-		const GrazeTargetList2D *list = detector.list_for(zone, *factory);
-		for (int k = 0; list != nullptr && k < list->count; ++k) {
-			if (list->targets[k].id != self_id) {
-				r_targets[r_count++] = list->targets[k];
+		// spawner; its own volleys skip it, so does this view). A target
+		// freed since the sweep (idle-time user code) is left out too.
+		const GrazeTargetList2D *list = detector.list(*factory);
+		for (int k = 0; list != nullptr && k < list->count(); ++k) {
+			const GrazeTarget2D &target = list->targets[k];
+			const Node2D *node = Object::cast_to<Node2D>(ObjectDB::get_instance(ObjectID(target.id)));
+			if (target.id != self_id && node != nullptr && !node->is_queued_for_deletion()) {
+				r_targets.push_back(target);
 			}
 		}
 		return;
@@ -242,7 +255,7 @@ void BulletSpawner2D::collect_graze_zone_targets(const BulletGrazeZone2D &zone, 
 	// No running factory (editor, factory not ready): a fresh scan in the
 	// same space as the runtime, the factory's world when there is one.
 	const Ref<World2D> world = factory != nullptr && factory->is_inside_tree() ? factory->get_world_2d() : get_world_2d();
-	detector.collect_now(zone, get_tree(), world.ptr(), r_targets, r_count);
+	detector.collect_now(get_tree(), world.ptr(), r_targets);
 }
 
 int BulletSpawner2D::refresh_graze_targets() {
@@ -259,29 +272,10 @@ int BulletSpawner2D::refresh_graze_targets() {
 		factory->get_graze_default_detector().mark_due();
 	}
 	// Rescan through the same path the runtime and the preview read.
-	uint64_t seen[BulletVolley2D::MAX_GRAZE_ZONES * BulletGrazeZone2D::MAX_TARGETS];
-	int distinct = 0;
-	for (int z = 0; z < graze_zones.size() && z < BulletVolley2D::MAX_GRAZE_ZONES; ++z) {
-		const Variant entry = graze_zones[z];
-		const BulletGrazeZone2D *zone = entry.get_type() == Variant::OBJECT ? Object::cast_to<BulletGrazeZone2D>((Object *)entry) : nullptr;
-		if (zone == nullptr) {
-			continue;
-		}
-		GrazeTarget2D targets[BulletGrazeZone2D::MAX_TARGETS];
-		int count = 0;
-		collect_graze_zone_targets(*zone, targets, count);
-		for (int k = 0; k < count; ++k) {
-			bool known = false;
-			for (int i = 0; i < distinct && !known; ++i) {
-				known = seen[i] == targets[k].id;
-			}
-			if (!known) {
-				seen[distinct++] = targets[k].id;
-			}
-		}
-	}
+	collect_graze_targets(graze_targets_scratch);
+	const int found = (int)graze_targets_scratch.size();
 	refresh_graze_preview();
-	return distinct;
+	return found;
 }
 
 void BulletSpawner2D::connect_graze_zones(bool connect) {
@@ -357,28 +351,18 @@ void BulletSpawner2D::apply_volley_graze(BulletVolley2D *volley) {
 		graze_zones_misuse_warned = true;
 		UtilityFunctions::push_warning("BulletSpawner2D: graze_zones was changed in place and holds more than 4 zones or entries that are not BulletGrazeZone2D; only the first 4 zones are used. Assign the whole array instead (graze_zones = [...]).");
 	}
-	if (any && volley->graze_set_zones(zones)) {
+	if (any) {
 		// Shared: setting edits and refresh_graze_targets() reach it in flight.
 		graze_detector_ref();
-		volley->graze_set_detector(graze_detector);
+		volley->graze_arm_from_spawner(zones, graze_detector);
 	}
 }
 
-Array BulletSpawner2D::resolve_graze_targets(int zone_index) const {
+Array BulletSpawner2D::resolve_graze_targets() const {
 	Array out;
-	if (zone_index < 0 || zone_index >= graze_zones.size()) {
-		UtilityFunctions::push_error("BulletSpawner2D.resolve_graze_targets: zone_index " + String::num_int64(zone_index) + " is out of range.");
-		return out;
-	}
-	const Ref<BulletGrazeZone2D> zone = graze_zones[zone_index];
-	if (zone.is_null()) {
-		return out;
-	}
-	GrazeTarget2D targets[BulletGrazeZone2D::MAX_TARGETS];
-	int count = 0;
-	collect_graze_zone_targets(**zone, targets, count);
-	for (int i = 0; i < count; ++i) {
-		out.push_back(ObjectDB::get_instance(ObjectID(targets[i].id)));
+	collect_graze_targets(graze_targets_scratch);
+	for (const GrazeTarget2D &target : graze_targets_scratch) {
+		out.push_back(ObjectDB::get_instance(ObjectID(target.id)));
 	}
 	return out;
 }
@@ -448,6 +432,8 @@ void BulletSpawner2D::refresh_graze_preview() {
 	}
 	BulletFactory2D *factory = get_bullet_factory();
 	const bool runtime = !Engine::get_singleton()->is_editor_hint();
+	// Every zone rings the same targets: resolved once.
+	collect_graze_targets(graze_targets_scratch);
 	for (int z = 0; z < graze_zones.size() && z < BulletVolley2D::MAX_GRAZE_ZONES; ++z) {
 		const Variant entry = graze_zones[z];
 		const BulletGrazeZone2D *zone = entry.get_type() == Variant::OBJECT ? Object::cast_to<BulletGrazeZone2D>((Object *)entry) : nullptr;
@@ -459,10 +445,7 @@ void BulletSpawner2D::refresh_graze_preview() {
 		if (runtime && zone->preview_during_runtime && factory != nullptr) {
 			continue;
 		}
-		GrazeTarget2D targets[BulletGrazeZone2D::MAX_TARGETS];
-		int count = 0;
-		collect_graze_zone_targets(*zone, targets, count);
-		append_graze_zone_circles2d(*zone, z, targets, count, graze_preview_scratch);
+		append_graze_zone_circles2d(*zone, z, graze_targets_scratch.data(), (int)graze_targets_scratch.size(), graze_preview_scratch);
 	}
 	layer->set_circles(graze_preview_scratch, (float)graze_preview_line_width);
 }

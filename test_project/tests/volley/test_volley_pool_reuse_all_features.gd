@@ -100,7 +100,7 @@ func test_reused_volley_matches_a_cold_volley() -> void:
 	v.attach_time_based_function(1.0, _on_timer, true)
 	v.bullet_set_custom_data(2, Resource.new())
 	make_graze_target(Vector2(0, 0))
-	v.graze_set_zones([H.make_graze_zone([400.0])])
+	v.graze_set_zones([H.make_graze_zone([400.0])], &"graze_targets")
 	factory.bullet_grazed.connect(func(_t: Node2D, _v: BulletVolley2D, _i: int, _z: BulletGrazeZone2D, _r: int) -> void: pass)
 	expect_no_errors("every feature switches on cleanly")
 	for i in 120: # early break; the lifetime is 15 ticks

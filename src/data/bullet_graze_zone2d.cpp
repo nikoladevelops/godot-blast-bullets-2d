@@ -15,15 +15,6 @@ void BulletGrazeZone2D::set_enabled(bool value) {
 	emit_changed();
 }
 
-StringName BulletGrazeZone2D::get_target_group() const { return target_group; }
-void BulletGrazeZone2D::set_target_group(const StringName &value) {
-	if (target_group == value) {
-		return;
-	}
-	target_group = value;
-	emit_changed();
-}
-
 int BulletGrazeZone2D::get_ring_count() const { return ring_count; }
 void BulletGrazeZone2D::set_ring_count(int value) {
 	if (value < 1 || value > MAX_RINGS) {
@@ -136,10 +127,6 @@ void BulletGrazeZone2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_enabled", "value"), &BulletGrazeZone2D::set_enabled);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "enabled"), "set_enabled", "get_enabled");
 
-	ClassDB::bind_method(D_METHOD("get_target_group"), &BulletGrazeZone2D::get_target_group);
-	ClassDB::bind_method(D_METHOD("set_target_group", "value"), &BulletGrazeZone2D::set_target_group);
-	ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "target_group"), "set_target_group", "get_target_group");
-
 	ClassDB::bind_method(D_METHOD("get_ring_count"), &BulletGrazeZone2D::get_ring_count);
 	ClassDB::bind_method(D_METHOD("set_ring_count", "value"), &BulletGrazeZone2D::set_ring_count);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "ring_count", PROPERTY_HINT_RANGE, "1,4,1"), "set_ring_count", "get_ring_count");
@@ -175,7 +162,6 @@ void BulletGrazeZone2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_active_ring_radii"), &BulletGrazeZone2D::get_active_ring_radii);
 
 	BIND_CONSTANT(MAX_RINGS);
-	BIND_CONSTANT(MAX_TARGETS);
 	BIND_ENUM_CONSTANT(REGRAZE_ONCE);
 	BIND_ENUM_CONSTANT(REGRAZE_AFTER_EXIT);
 }

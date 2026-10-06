@@ -9,13 +9,14 @@
 namespace BlastBullets2D {
 using namespace godot;
 
-// Graze zone: which nodes can graze bullets (every live Node2D of
-// target_group, the first MAX_TARGETS in tree order; a spawner may find
-// them another way: BulletSpawner2D.graze_target_source) and the
-// concentric rings around each of them. A bullet grazes ring k when its motion during
-// one tick comes within ring_<k+1>_radius (plus its own bounding radius when
-// count_bullet_size is on) of a target's global position. Rings are
-// independent circles: their order here does not matter.
+// Graze zone: HOW a graze is measured, the concentric rings around each
+// graze target. WHO the targets are is not part of the zone: the spawner
+// that arms it decides (BulletSpawner2D.graze_target_source), or the
+// group passed to BulletVolley2D.graze_set_zones. A bullet grazes ring k
+// when its motion during one tick comes within ring_<k+1>_radius (plus its
+// own bounding radius when count_bullet_size is on) of a target's global
+// position. Rings are independent circles: their order here does not
+// matter.
 //
 // Armed on volleys by BulletSpawner2D.graze_zones (or
 // BulletVolley2D.graze_set_zones): the volley keeps a reference and reads
@@ -28,11 +29,6 @@ class BulletGrazeZone2D : public Resource {
 
 public:
 	static constexpr int MAX_RINGS = 4;
-	// Live targets tested per zone (first in tree order; more warn once).
-	// The per-bullet cost grows with the targets that are live, never with
-	// this cap. A visit's target slot must fit the 6 anchor bits of the
-	// volley's graze state (BulletVolley2D::GRAZE_ANCHOR_MASK).
-	static constexpr int MAX_TARGETS = 64;
 
 	// SERIALIZED ids: never renumber.
 	enum Regraze {
@@ -44,7 +40,6 @@ public:
 	};
 
 	bool enabled = true;
-	StringName target_group = StringName("player");
 	int ring_count = 1;
 	real_t ring_radii[MAX_RINGS] = { 24.0, 40.0, 56.0, 72.0 };
 	bool count_bullet_size = true;
@@ -57,9 +52,6 @@ public:
 
 	bool get_enabled() const;
 	void set_enabled(bool value);
-
-	StringName get_target_group() const;
-	void set_target_group(const StringName &value);
 
 	int get_ring_count() const;
 	void set_ring_count(int value);

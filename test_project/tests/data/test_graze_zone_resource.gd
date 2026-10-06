@@ -1,5 +1,7 @@
 extends BlastTest
-## BulletGrazeZone2D, the graze configuration resource: documented defaults,
+## BulletGrazeZone2D, the graze configuration resource (how a graze is
+## measured; who grazes is never part of it): documented defaults, no target
+## group or other targeting property,
 ## ring knobs beyond ring_count hide in the inspector (still stored), every
 ## accepted change emits `changed` exactly once (rejected and same-value sets
 ## emit nothing), index accessors reject out-of-range indexes with exact
@@ -12,7 +14,7 @@ const TRES_PATH := "user://graze_zone_round_trip.tres"
 func test_defaults_match_the_documented_values() -> void:
 	var z := BulletGrazeZone2D.new()
 	assert_true(z.enabled, "enabled by default")
-	assert_eq(z.target_group, &"player", "target group")
+	assert_false("target_group" in z, "who grazes is the spawner's (or the arming call's) business")
 	assert_eq(z.ring_count, 1, "one ring")
 	assert_eq([z.ring_1_radius, z.ring_2_radius, z.ring_3_radius, z.ring_4_radius], [24.0, 40.0, 56.0, 72.0], "ring radii")
 	assert_true(z.count_bullet_size, "bullet size counts")
@@ -20,7 +22,7 @@ func test_defaults_match_the_documented_values() -> void:
 	assert_true(z.preview_color.is_equal_approx(Color(0.2, 0.9, 0.8, 0.8)), "preview color")
 	assert_false(z.preview_during_runtime, "no runtime preview by default")
 	assert_eq(BulletGrazeZone2D.MAX_RINGS, 4, "ring cap")
-	assert_eq(BulletGrazeZone2D.MAX_TARGETS, 64, "target cap")
+	assert_false(ClassDB.class_has_integer_constant("BulletGrazeZone2D", "MAX_TARGETS"), "no target cap")
 
 
 func test_ring_properties_hide_beyond_ring_count() -> void:
@@ -45,7 +47,7 @@ func test_ring_properties_hide_beyond_ring_count() -> void:
 func test_every_accepted_set_emits_changed_once() -> void:
 	var z := BulletGrazeZone2D.new()
 	watch_signals(z)
-	var sets := [["enabled", false], ["target_group", &"enemies"], ["ring_count", 3], ["ring_1_radius", 10.0],
+	var sets := [["enabled", false], ["ring_count", 3], ["ring_1_radius", 10.0],
 		["ring_2_radius", 20.0], ["ring_3_radius", 30.0], ["ring_4_radius", 40.0], ["count_bullet_size", false],
 		["regraze", BulletGrazeZone2D.REGRAZE_AFTER_EXIT], ["preview_color", Color.RED], ["preview_during_runtime", true]]
 	var expected := 0
@@ -123,7 +125,6 @@ func test_regraze_ids_are_locked() -> void:
 func test_zone_survives_a_tres_round_trip() -> void:
 	var z := BulletGrazeZone2D.new()
 	z.enabled = false
-	z.target_group = &"heroes"
 	z.ring_count = 4
 	z.ring_1_radius = 11.0
 	z.ring_2_radius = 22.0
@@ -139,5 +140,5 @@ func test_zone_survives_a_tres_round_trip() -> void:
 	assert_not_null(back, "loads back as a BulletGrazeZone2D")
 	if back == null:
 		return
-	for prop in ["enabled", "target_group", "ring_count", "ring_1_radius", "ring_2_radius", "ring_3_radius", "ring_4_radius", "count_bullet_size", "regraze", "preview_color", "preview_during_runtime"]:
+	for prop in ["enabled", "ring_count", "ring_1_radius", "ring_2_radius", "ring_3_radius", "ring_4_radius", "count_bullet_size", "regraze", "preview_color", "preview_during_runtime"]:
 		assert_eq(back.get(prop), z.get(prop), prop + " survives")

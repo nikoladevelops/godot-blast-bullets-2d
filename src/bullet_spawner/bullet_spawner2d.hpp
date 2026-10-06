@@ -719,29 +719,31 @@ public:
 	// its zones: edits made INSIDE a zone resource reach bullets in flight,
 	// while graze_enabled / graze_zones changes apply to the next shots.
 	//
-	// Who the targets are: graze_target_source and the settings below
-	// (the same choices as homing's). They are shared with every volley
-	// this spawner fired, so edits and refresh_graze_targets() reach
+	// WHO grazes is decided here and only here (the zones say how):
+	// graze_target_source and the settings below (the same choices as
+	// homing's), the same targets for every zone. They are shared with every
+	// volley this spawner fired, so edits and refresh_graze_targets() reach
 	// bullets in flight; orphaned volleys keep the settings and the nodes
-	// the paths last pointed to.
+	// the paths last pointed to. No cap on how many targets.
 	bool graze_enabled = false;
 	// Up to BulletVolley2D::MAX_GRAZE_ZONES zones; null entries are kept
 	// (the inspector adds them) and skipped.
 	TypedArray<BulletGrazeZone2D> graze_zones;
 	// SERIALIZED ids (GrazeDetector2D::Source): never renumber.
 	enum GrazeTargetSource {
-		GRAZE_SOURCE_ZONE_GROUPS = 0, // each zone's target_group (default)
+		GRAZE_SOURCE_NODE_GROUP = 0, // Node2D members of graze_node_group (default)
 		GRAZE_SOURCE_NODE_PATH = 1, // the Node2D at graze_target_path
 		GRAZE_SOURCE_NODE_NAME = 2, // Node2Ds named like graze_node_name (scene scan)
 		GRAZE_SOURCE_NODE_CHILDREN = 3 // Node2D children of graze_children_parent_path
 	};
-	GrazeTargetSource graze_target_source = GRAZE_SOURCE_ZONE_GROUPS;
+	GrazeTargetSource graze_target_source = GRAZE_SOURCE_NODE_GROUP;
+	StringName graze_node_group;
 	// Allow-list for every source: only nodes in this group count.
 	StringName graze_filter_group;
 	NodePath graze_target_path;
 	// Scanned from the current scene (never inside a bullet factory or this
 	// spawner), compared per graze_node_name_match_mode (homing's values).
-	String graze_node_name = "Player";
+	String graze_node_name;
 	HomingNodeNameMatch graze_node_name_match_mode = HOMING_NAME_MATCH_CONTAINS;
 	bool graze_node_name_case_sensitive = false;
 	NodePath graze_children_parent_path;
@@ -770,6 +772,8 @@ public:
 	void set_graze_preview_line_width(double value);
 	GrazeTargetSource get_graze_target_source() const;
 	void set_graze_target_source(GrazeTargetSource value);
+	StringName get_graze_node_group() const;
+	void set_graze_node_group(const StringName &value);
 	StringName get_graze_filter_group() const;
 	void set_graze_filter_group(const StringName &value);
 	NodePath get_graze_target_path() const;
@@ -788,16 +792,15 @@ public:
 	void set_graze_update_interval(double value);
 	// Scans for graze targets now (whatever graze_update_interval says):
 	// the bullets this spawner fired test the nodes found from their next
-	// tick on. Returns how many distinct targets its zones have now.
+	// tick on. Returns how many targets it has now.
 	int refresh_graze_targets();
 	// The graze target finder this spawner shares with every volley it
 	// armed (created on first use). C++ only: the factory's runtime ring
 	// preview draws around its lists.
 	GrazeDetector2D &graze_detector_ref() const;
-	// The targets the runtime would test for zone `zone_index` right now
-	// (graze_target_source, the first BulletGrazeZone2D::MAX_TARGETS in
-	// tree order; this spawner itself never counts).
-	Array resolve_graze_targets(int zone_index) const;
+	// The targets the runtime tests right now (graze_target_source, every
+	// zone rings them, in tree order; this spawner itself never counts).
+	Array resolve_graze_targets() const;
 	// The rings exactly as the preview draws them:
 	// [{center, radius, color, zone_index, ring_index, target_id}].
 	Array debug_get_graze_preview_circles() const;
@@ -1635,9 +1638,10 @@ private:
 	// Pushes them into the detector (rescans due), then the config
 	// warnings and the ring preview follow.
 	void apply_graze_detector_config();
-	// The targets of one zone as the runtime tests them (the factory's
-	// lists while it runs, a fresh scan otherwise), this spawner excluded.
-	void collect_graze_zone_targets(const BulletGrazeZone2D &zone, GrazeTarget2D *r_targets, int &r_count) const;
+	// The targets as the runtime tests them (the detector's list while the
+	// factory runs, a fresh scan otherwise), this spawner excluded.
+	void collect_graze_targets(std::vector<GrazeTarget2D> &r_targets) const;
+	mutable std::vector<GrazeTarget2D> graze_targets_scratch;
 	// Arms a freshly fired volley with graze_zones (shoot_once, before the
 	// homing signals). Runs no user code.
 	void apply_volley_graze(BulletVolley2D *volley);
