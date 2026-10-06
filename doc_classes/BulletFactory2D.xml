@@ -125,6 +125,19 @@
 				Lifecycle snapshot: is_ready, is_busy, is_iterating, is_tearing_down, processing, volleys_total, volleys_pooled, attachments_pooled.
 			</description>
 		</method>
+		<method name="debug_get_graze_stats" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Graze counters: refreshes (target cache refreshes), events_total (graze events dispatched by every volley), cached_groups (groups currently in the target cache).
+			</description>
+		</method>
+		<method name="debug_get_graze_targets">
+			<return type="Array" />
+			<param index="0" name="group" type="StringName" />
+			<description>
+				The graze targets of [param group] exactly as the next volley tick of this physics step tests them: an Array of {id, position} (the first 4 live [Node2D] members in tree order, in this factory's World2D).
+			</description>
+		</method>
 		<method name="debug_get_live_volley_ids">
 			<return type="PackedInt64Array" />
 			<param index="0" name="owner_spawner_id" type="int" />
@@ -462,6 +475,26 @@
 			<param index="2" name="bullet_index" type="int" />
 			<description>
 				Emitted live when a bullet bounces off a body; same contract as [signal bounce_area_entered].
+			</description>
+		</signal>
+		<signal name="bullet_graze_exited">
+			<param index="0" name="target" type="Node2D" />
+			<param index="1" name="volley" type="BulletVolley2D" />
+			<param index="2" name="bullet_index" type="int" />
+			<param index="3" name="zone" type="BulletGrazeZone2D" />
+			<param index="4" name="deepest_ring_index" type="int" />
+			<description>
+				Emitted live when a bullet that grazed a zone leaves it alive (outside the outermost ring of every target of the zone). [param deepest_ring_index] is the smallest-radius ring touched during that visit and [param target] the target the visit belonged to. A bullet killed, cleared, expired or frozen inside never exits. Every exit reaches the factory (right after the owner spawner's own signal).
+			</description>
+		</signal>
+		<signal name="bullet_grazed">
+			<param index="0" name="target" type="Node2D" />
+			<param index="1" name="volley" type="BulletVolley2D" />
+			<param index="2" name="bullet_index" type="int" />
+			<param index="3" name="zone" type="BulletGrazeZone2D" />
+			<param index="4" name="ring_index" type="int" />
+			<description>
+				Emitted live, inside the physics tick right after the bullets moved, when a bullet comes within ring [param ring_index] of [param zone] around [param target] (see [BulletGrazeZone2D]). The bullet is alive in the handler: transforms, velocity and custom data are readable and writable through [param volley]. Several rings entered in one tick fire from the largest radius to the smallest. Every graze in the game reaches the factory whoever owns the volley (the owner [BulletSpawner2D] emits first while it lives), including bullets of spawners already freed: connect here once to count graze for score. Structural calls need their [code]_deferred[/code] twins inside the handler.
 			</description>
 		</signal>
 		<signal name="life_time_over">

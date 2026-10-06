@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="GrazePreviewLayer2D" inherits="Node2D" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		Internal graze ring preview layer owned by [BulletSpawner2D]. Not for direct use.
+	</brief_description>
+	<description>
+		Internal helper behind the [BulletSpawner2D] graze preview (the "~BlastBulletsGrazePreview" child). It draws every ring of every graze zone around each resolved target and repaints itself on every engine redraw. It is top-level (canvas coordinates), internal and owner-less: never saved to scenes, never listed by [method Node.get_children], never a pattern marker. At runtime it only exists when [member BulletSpawner2D.graze_preview_during_runtime] is on. Tune it through the spawner's Graze properties.
+	</description>
+	<tutorials>
+	</tutorials>
+</class>

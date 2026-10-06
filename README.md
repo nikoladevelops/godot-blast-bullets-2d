@@ -56,6 +56,8 @@ The main advantages to using this custom built plugin:
 
 - **Orbiting Bullets** - Each bullet can begin orbiting a homing target at a custom radius while also moving in a circle around it. Imagine a swarm of bullets orbiting your mouse as you move it, while the radius increases or decreases then some of them go and orbit another target, this is the type of behavior you can implement on the go.
 
+- **Graze (Near Misses)** - Bullets that pass close to the player report it: up to 4 rings per graze zone ("near", "close", "razor"...), swept so fast bullets never skip a ring, once per bullet or again on every visit, with an exit signal when the bullet leaves alive. Configure it once as a `BulletGrazeZone2D` resource, drop it into every enemy spawner, and connect `BulletFactory2D.bullet_grazed` once to count graze for score, even for bullets of enemies that already died. The editor draws the rings around your player.
+
 - **Bouncing Bullets (Ricochet)** - Pick bounce layers and bullets reflect off those targets automatically with configurable strength (elastic, damped, dead-stop, super-elastic), optional hit consumption, bounce budgets, radial or shape-accurate normals, instant or smooth visual turn, scatter randomness and overlap cooldown. Full signals (`bounce_area_entered` / `bounce_body_entered`, on the factory or on the spawner that fired the volley) included.
 
 - **Path2D Movement Patterns** - Draw a Path2D in your scene and suddenly the bullets possess that movement behavior
@@ -226,6 +228,7 @@ func spawn_bullets()->void:
 - **Movement along a Path2D** - `movement_enabled` makes the spawner itself travel a `Path2D` at runtime: timed by duration or speed, eased with any Tween transition/ease (or your own progress `Curve`), Once / Loop / Ping Pong, forward or reverse, attached to the path or replayed from the start position, optional face-the-path rotation, start delay, endpoint pauses, and bullets that inherit the spawner's velocity. Control it from code with `movement_play()` / `movement_pause()` / `movement_stop()` / `movement_seek()` / `movement_reverse()` and the `movement_*` signals.
 - **Pattern bake cache** - patterns are generated once and re-posed per shot whenever they provably follow the spawner, and rebaked automatically when any pattern property changes (`pattern_cache_mode`, group Performance). Moving or spinning spawners stay cheap with thousands of bullets.
 - **Setup help** - the editor shows a warning icon for missing wiring (no factory, no spawn data, Aimed without a target, movement without a path, ...); `get_setup_warnings()` returns the same list at runtime, and a misconfigured auto-firing spawner reports its error once instead of every interval.
+- **Graze, configured per spawner** - `graze_enabled` + `graze_zones` (up to 4 `BulletGrazeZone2D` resources: a target group such as `player` and up to 4 ring radii) arm every fired volley. `bullet_grazed(target, volley, bullet_index, zone, ring_index)` and `bullet_graze_exited(...)` fire live on the spawner while it lives, then on the factory, which hears every graze in the game. `graze_show_preview` draws the rings around each target in the editor (`graze_preview_during_runtime` for play).
 - **Homing and orbiting, configured per spawner** - `homing_enabled` with shared or per-bullet queues, six target sources (node group, mouse, global position, node path, node name, children), steering (`homing_smoothing`, `homing_update_interval`, `homing_delay_sec`, `homing_duration_sec`, `homing_lose_range_px`), interval retargeting of flying volleys, and `orbiting_enabled` rings with radius/direction/follow/lock controls. Every volley is tracked for `retarget_live_volleys()`, `clear_live_volleys_homing()`, and `volley_*` signals; `max_live_bullets` pauses firing while too many of this spawner's bullets are alive.
 
 Full property and method reference for all of the above lives in the editor docs (`BulletSpawner2D`, `BulletFactory2D`).
@@ -330,6 +333,24 @@ func _on_life_time_over(_volley: BulletVolley2D, _bullet_indexes: Array[int]) ->
 	pass
 ```
 
+
+#### Graze (near misses)<br>
+Make one `BulletGrazeZone2D` resource (`target_group = &"player"`, `ring_count`, `ring_1_radius`...), put your player in that group, then turn on `graze_enabled` and add the zone to `graze_zones` on every enemy spawner (or call `volley.graze_set_zones([zone])` on volleys spawned straight from the factory). Connect the factory once:
+
+```
+# Every graze in the game, whoever fired the bullet (even an enemy that already died).
+func _on_bullet_grazed(target: Node2D, volley: BulletVolley2D, bullet_index: int, zone: BulletGrazeZone2D, ring_index: int) -> void:
+	score += 10 if ring_index == 0 else 50 # ring 1 is the tight one in this zone
+	# The bullet is alive here: read or change it through the volley.
+	var hit_pos := volley.get_bullet_global_transform(bullet_index).origin
+	spawn_graze_spark(hit_pos)
+
+# Optional: the bullet left the zone alive (deepest_ring_index = closest ring it reached).
+func _on_bullet_graze_exited(target: Node2D, volley: BulletVolley2D, bullet_index: int, zone: BulletGrazeZone2D, deepest_ring_index: int) -> void:
+	pass
+```
+
+Each ring grazes once per bullet by default (`regraze = Once`); `After Exit` re-grazes every time a bullet comes back. Edit the zone at runtime (a power-up widening `ring_1_radius`) and every bullet in flight follows it.
 
 #### Accessing advanced features
 

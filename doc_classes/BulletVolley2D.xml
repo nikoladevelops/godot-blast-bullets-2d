@@ -1066,6 +1066,13 @@
 				Replaces the specified bullet's per-bullet homing queue with a single new target (Node2D or Vector2) while preserving the orbit lock under StayLocked and RelockOnTargetChange (same front target keeps angle and center). Returns true when replaced; false when the slot is disabled or the target is invalid (nothing changed).
 			</description>
 		</method>
+		<method name="bullet_reset_graze">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Clears bullet [param bullet_index]'s graze state in every zone: it may graze every ring again and an open visit ends silently. [method bullet_reset_state] does this too.
+			</description>
+		</method>
 		<method name="bullet_reset_state">
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
@@ -1331,6 +1338,12 @@
 				Gravity introspection: vector, fall_speed, window_active, curve_scale. Never mutates.
 			</description>
 		</method>
+		<method name="debug_get_graze_info" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Graze introspection: armed, zone_slots, state_bytes, active_this_tick (some zone had a live target), pending_events (queued for the next dispatch), dispatched_events, bullet_radius (added when a zone counts bullet size), generation.
+			</description>
+		</method>
 		<method name="debug_get_life_state" qualifiers="const">
 			<return type="String" />
 			<description>
@@ -1481,6 +1494,14 @@
 				Get a specific bullet's transform in global space (the caches already hold global-space transforms). Use this when you need world coordinates, for example to spawn child bullets exactly where a bullet died. [method get_bullet_transform] returns the same transform instead.
 			</description>
 		</method>
+		<method name="get_bullet_grazed_rings" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="zone_index" type="int" />
+			<description>
+				Bitmask of the rings of zone [param zone_index] that bullet [param bullet_index] already grazed (bit k = ring k). With [constant BulletGrazeZone2D.REGRAZE_ONCE] the bits stay for the bullet's life.
+			</description>
+		</method>
 		<method name="get_bullet_movement_pattern_curve" qualifiers="const">
 			<return type="Curve2D" />
 			<param index="0" name="bullet_index" type="int" />
@@ -1554,6 +1575,12 @@
 				Base tint the fade tick multiplies. Snapshotted from spawn data on every spawn/enable; change it here at runtime (not through the CanvasItem setter, which the next fade tick would overwrite while any fade is configured).
 			</description>
 		</method>
+		<method name="get_graze_zones" qualifiers="const">
+			<return type="Array" />
+			<description>
+				The zones armed on this volley, with null in empty slots (the index is the zone index used by the readouts).
+			</description>
+		</method>
 		<method name="get_is_wobble_enabled" qualifiers="const">
 			<return type="bool" />
 			<description>
@@ -1602,6 +1629,19 @@
 				Cached SpriteFrames source of the playing animation. The bake is a snapshot: later edits to the resource need a replay via [method play_sprite_animation] or [method play_sprite_animation_name]. Playing on a pooled (inactive) instance applies immediately but is discarded by the next pool-reuse bake.
 			</description>
 		</method>
+		<method name="graze_clear">
+			<return type="void" />
+			<description>
+				Disarms graze on this volley: zones released, per-bullet state and queued events dropped. Refused on a pooled handle.
+			</description>
+		</method>
+		<method name="graze_set_zones">
+			<return type="bool" />
+			<param index="0" name="zones" type="Array" />
+			<description>
+				Arms this volley with up to [constant MAX_GRAZE_ZONES] [BulletGrazeZone2D] zones (null entries are skipped but keep their index) and resets every bullet's graze state. Use it for volleys spawned straight from [BulletFactory2D]; spawner volleys are armed by [member BulletSpawner2D.graze_zones]. Returns false and changes nothing for more than 4 entries or a non-zone entry; refused on a pooled handle.
+			</description>
+		</method>
 		<method name="has_bullet_movement_pattern" qualifiers="const">
 			<return type="bool" />
 			<param index="0" name="bullet_index" type="int" />
@@ -1647,11 +1687,25 @@
 				Whether any trail layer is currently baked on this volley.
 			</description>
 		</method>
+		<method name="is_bullet_inside_graze" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="zone_index" type="int" />
+			<description>
+				Whether bullet [param bullet_index] was inside zone [param zone_index]'s outermost ring at the end of its last evaluated tick.
+			</description>
+		</method>
 		<method name="is_bullet_status_enabled">
 			<return type="bool" />
 			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Check the status of a specific bullet - whether it is enabled (active and visible on screen) or disabled (inactive and invisible)
+			</description>
+		</method>
+		<method name="is_graze_armed" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Whether at least one graze zone is armed on this volley.
 			</description>
 		</method>
 		<method name="is_parked" qualifiers="const">
@@ -2402,6 +2456,9 @@
 		</constant>
 		<constant name="RelockOnTargetChange" value="2" enum="OrbitingLockPolicy">
 			Orbiting lock policy, the lock drops only when the front target is a different target than the one the bullet locked onto. The same moving Node2D never breaks the ring, but switching enemies re-acquires it.
+		</constant>
+		<constant name="MAX_GRAZE_ZONES" value="4">
+			Graze zones per volley (and per spawner).
 		</constant>
 	</constants>
 </class>

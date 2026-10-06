@@ -73,6 +73,18 @@
 				Static test hook: the easing value movement uses at [param t] for a [enum Tween.TransitionType] and [enum Tween.EaseType]. Matches [method Tween.interpolate_value] for every transition and ease (pinned by tests).
 			</description>
 		</method>
+		<method name="debug_get_graze_preview_circles" qualifiers="const">
+			<return type="Array" />
+			<description>
+				The graze preview's rings exactly as drawn: an Array of {center, radius, color, zone_index, ring_index, target_id}. Empty while the preview is off.
+			</description>
+		</method>
+		<method name="debug_get_graze_preview_stats" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Graze preview instrumentation: active, visible, circles, draws (how many times the layer redrew).
+			</description>
+		</method>
 		<method name="debug_get_layer_rings" qualifiers="const">
 			<return type="Array" />
 			<description>
@@ -324,6 +336,13 @@
 				Resets the spin angle to zero.
 			</description>
 		</method>
+		<method name="resolve_graze_targets" qualifiers="const">
+			<return type="Array" />
+			<param index="0" name="zone_index" type="int" />
+			<description>
+				The [Node2D] targets the runtime would test for [member graze_zones] entry [param zone_index] right now: the first 4 live members of its target group in tree order, this spawner excluded. Empty for an empty slot or a disabled zone; an out-of-range index pushes an error.
+			</description>
+		</method>
 		<method name="resolve_homing_targets" qualifiers="const">
 			<return type="Array" />
 			<param index="0" name="quiet" type="bool" default="false" />
@@ -428,6 +447,21 @@
 		</member>
 		<member name="burst_interval_sec" type="float" setter="set_burst_interval_sec" getter="get_burst_interval_sec" default="0.15">
 			Seconds between burst shots. Must be finite and above zero.
+		</member>
+		<member name="graze_enabled" type="bool" setter="set_graze_enabled" getter="get_graze_enabled" default="false">
+			Master switch: every volley this spawner fires is armed with [member graze_zones]. Changes apply to the next shots; volleys already flying keep their zones.
+		</member>
+		<member name="graze_preview_during_runtime" type="bool" setter="set_graze_preview_during_runtime" getter="get_graze_preview_during_runtime" default="false">
+			Also draw the graze rings while the game runs (debugging aid). Requires [member graze_show_preview].
+		</member>
+		<member name="graze_preview_line_width" type="float" setter="set_graze_preview_line_width" getter="get_graze_preview_line_width" default="1.5">
+			Line width of the graze preview rings, in pixels. Must be finite and above zero.
+		</member>
+		<member name="graze_show_preview" type="bool" setter="set_graze_show_preview" getter="get_graze_show_preview" default="true">
+			Draw every ring of every zone around each resolved target in the zone's [member BulletGrazeZone2D.preview_color]: in the editor, and at runtime only with [member graze_preview_during_runtime]. The rings follow moving targets without rebuilding anything else.
+		</member>
+		<member name="graze_zones" type="BulletGrazeZone2D[]" setter="set_graze_zones" getter="get_graze_zones" default="[]">
+			Up to 4 [BulletGrazeZone2D] zones armed on every fired volley; null entries are kept and skipped. A shared [code].tres[/code] works across spawners. Assign the whole array: one changed in place still arms its first 4 zones but warns once.
 		</member>
 		<member name="helper_aimed_centered" type="bool" setter="set_helper_aimed_centered" getter="get_helper_aimed_centered" default="true">
 			Center the cone on the target. Off starts it to one side.
@@ -1462,6 +1496,26 @@
 			<param index="2" name="bullet_index" type="int" />
 			<description>
 				Fired when one of this spawner's bullets bounces off a body. A consumed bounce fires both this and [signal body_entered].
+			</description>
+		</signal>
+		<signal name="bullet_graze_exited">
+			<param index="0" name="target" type="Node2D" />
+			<param index="1" name="volley" type="BulletVolley2D" />
+			<param index="2" name="bullet_index" type="int" />
+			<param index="3" name="zone" type="BulletGrazeZone2D" />
+			<param index="4" name="deepest_ring_index" type="int" />
+			<description>
+				Fired when one of this spawner's bullets leaves a graze zone alive after grazing it. Same payload and contract as [signal BulletFactory2D.bullet_graze_exited], which fires right after this one.
+			</description>
+		</signal>
+		<signal name="bullet_grazed">
+			<param index="0" name="target" type="Node2D" />
+			<param index="1" name="volley" type="BulletVolley2D" />
+			<param index="2" name="bullet_index" type="int" />
+			<param index="3" name="zone" type="BulletGrazeZone2D" />
+			<param index="4" name="ring_index" type="int" />
+			<description>
+				Fired live when one of this spawner's bullets grazes a ring of a zone (see [BulletGrazeZone2D]). Same payload and contract as [signal BulletFactory2D.bullet_grazed], which fires right after this one for the same graze: count graze on one of the two. Once this spawner is freed its flying bullets keep grazing and only the factory signal fires.
 			</description>
 		</signal>
 		<signal name="burst_finished">

@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="BulletGrazeZone2D" inherits="Resource" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		Graze configuration: which nodes can graze bullets, and the rings around them.
+	</brief_description>
+	<description>
+		A graze zone names the nodes bullets can graze (every live [Node2D] in [member target_group], the first [constant MAX_TARGETS] in tree order) and up to [constant MAX_RINGS] concentric rings around each of them. A bullet grazes ring k when its motion during one physics tick comes within ring_&lt;k+1&gt;_radius of a target's global position (plus its own collision bounding radius when [member count_bullet_size] is on). The test is swept, so fast bullets never skip a ring.
+		Arm zones on a [BulletSpawner2D] with [member BulletSpawner2D.graze_zones] (every fired volley carries them) or on any volley with [method BulletVolley2D.graze_set_zones]. A graze fires [signal BulletSpawner2D.bullet_grazed] on the owner spawner while it lives, then [signal BulletFactory2D.bullet_grazed], which receives every graze in the game, including bullets of spawners that were already freed. One shared [code].tres[/code] dropped into every enemy spawner is the whole setup; connect the factory signal once to count graze for score.
+		Volleys keep a reference to their zones and read them every tick: a script that edits a zone (a power-up widening a ring, [member enabled] turned off) changes every bullet already in flight. Every accepted change emits [signal Resource.changed]; rejected values push an error and keep the old value.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="get_active_ring_radii" qualifiers="const">
+			<return type="PackedFloat32Array" />
+			<description>
+				The radii of the active rings: the first [member ring_count] of [member ring_1_radius] to [member ring_4_radius].
+			</description>
+		</method>
+		<method name="get_ring_radius" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="index" type="int" />
+			<description>
+				Radius of ring [param index] (0 = [member ring_1_radius]), valid for 0 to 3 whatever [member ring_count] is. An out-of-range index pushes an error and returns 0.
+			</description>
+		</method>
+		<method name="set_ring_radius">
+			<return type="void" />
+			<param index="0" name="index" type="int" />
+			<param index="1" name="value" type="float" />
+			<description>
+				Sets the radius of ring [param index] (0 = [member ring_1_radius]) with the same validation as the property. An out-of-range index is refused with an error.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="count_bullet_size" type="bool" setter="set_count_bullet_size" getter="get_count_bullet_size" default="true">
+			When on, a bullet's collision bounding radius (circle radius, half the shorter rectangle side, half the capsule height, times the bullet's scale) is added to every ring, so big bullets graze earlier. Off measures center to center.
+		</member>
+		<member name="enabled" type="bool" setter="set_enabled" getter="get_enabled" default="true">
+			When off, the zone tests nothing and bullets inside it end their visit silently. Applies to bullets in flight on the next tick.
+		</member>
+		<member name="preview_color" type="Color" setter="set_preview_color" getter="get_preview_color" default="Color(0.2, 0.9, 0.8, 0.8)">
+			Color of this zone's rings in the spawner's graze preview. The innermost ring uses it as is; each larger ring is drawn fainter.
+		</member>
+		<member name="regraze" type="int" setter="set_regraze" getter="get_regraze" enum="BulletGrazeZone2D.Regraze" default="0">
+			When a bullet may graze a ring of this zone again. [constant REGRAZE_ONCE]: each ring grazes at most once per bullet life. [constant REGRAZE_AFTER_EXIT]: a bullet that left the zone (the outermost ring of every target) grazes every ring again on its next visit.
+		</member>
+		<member name="ring_1_radius" type="float" setter="set_ring_1_radius" getter="get_ring_1_radius" default="24.0">
+			Radius of ring 0 in pixels (always active). Rings are independent circles, so their order does not matter; when one tick enters several, the larger radius reports first. Must be finite and above zero.
+		</member>
+		<member name="ring_2_radius" type="float" setter="set_ring_2_radius" getter="get_ring_2_radius" default="40.0">
+			Radius of ring 1 in pixels, active when [member ring_count] is 2 or more. Same rules as [member ring_1_radius].
+		</member>
+		<member name="ring_3_radius" type="float" setter="set_ring_3_radius" getter="get_ring_3_radius" default="56.0">
+			Radius of ring 2 in pixels, active when [member ring_count] is 3 or more. Same rules as [member ring_1_radius].
+		</member>
+		<member name="ring_4_radius" type="float" setter="set_ring_4_radius" getter="get_ring_4_radius" default="72.0">
+			Radius of ring 3 in pixels, active when [member ring_count] is 4. Same rules as [member ring_1_radius].
+		</member>
+		<member name="ring_count" type="int" setter="set_ring_count" getter="get_ring_count" default="1">
+			How many rings are active, 1 to 4. Rings beyond it hide in the inspector but keep their stored radius.
+		</member>
+		<member name="target_group" type="StringName" setter="set_target_group" getter="get_target_group" default="&amp;&quot;player&quot;">
+			Group whose live [Node2D] members can graze bullets: the first [constant MAX_TARGETS] in tree order (more push one warning). A respawned player is picked up on the next tick, a spawner never grazes its own bullets, and targets in another World2D are ignored. Empty finds nothing.
+		</member>
+	</members>
+	<constants>
+		<constant name="MAX_RINGS" value="4">
+			Rings per zone.
+		</constant>
+		<constant name="MAX_TARGETS" value="4">
+			Targets tested per zone (the first ones in tree order).
+		</constant>
+		<constant name="REGRAZE_ONCE" value="0" enum="Regraze">
+			Each ring of the zone grazes at most once per bullet life.
+		</constant>
+		<constant name="REGRAZE_AFTER_EXIT" value="1" enum="Regraze">
+			Leaving the zone re-arms every ring of the zone for that bullet.
+		</constant>
+	</constants>
+</class>
