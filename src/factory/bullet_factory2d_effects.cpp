@@ -361,6 +361,8 @@ int BulletFactory2D::fx_fire_into_bake(FXOneShotBake &bake, const Transform2D &a
 	}
 	slot.fixed = t;
 	slot.birth = fx_clock;
+	slot.birth_sweep = sweep_counter;
+	slot.birth_needs_rebase = (fx_aged_sweep != sweep_counter);
 	slot.duration = bake.total;
 	slot.start_age = (layer->random_start_frame && bake.total > 0.0) ? (double)UtilityFunctions::randf_range(0.0f, (float)bake.total) : 0.0;
 	slot.active = true;
@@ -412,6 +414,8 @@ void BulletFactory2D::age_fx_effects(double delta) {
 		return;
 	}
 	fx_clock += delta;
+	fx_last_delta = delta;
+	fx_aged_sweep = sweep_counter;
 	// Index loops with per-access size (same pattern as the timer loops):
 	// user code never runs here, but manual-hatch registration can append
 	// bakes from any GDScript context, so never hold a reference across it.
@@ -434,6 +438,13 @@ void BulletFactory2D::age_fx_bake(FXOneShotBake &bake) {
 		FXOneShotSlot &slot = bake.slots[s];
 		if (!slot.active) {
 			continue;
+		}
+		if (slot.birth_sweep == sweep_counter) {
+			if (slot.birth_needs_rebase) {
+				slot.birth += fx_last_delta;
+				slot.birth_needs_rebase = false;
+			}
+			continue; // born this sweep: shows frame zero, ages next sweep
 		}
 		const double age = slot.start_age + (fx_clock - slot.birth);
 		if (!Math::is_finite(age) || age >= slot.duration) {

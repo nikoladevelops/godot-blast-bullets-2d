@@ -184,6 +184,15 @@ public:
 		bool active = false;
 		Transform2D fixed;
 		double birth = 0.0;
+		// Sweep the slot fired in: the sweep's delta covers time BEFORE the
+		// birth, so the birth sweep must not age the newborn (it already shows
+		// frame zero). Fires on the tick path (before this sweep's aging ran)
+		// additionally rebase birth forward by the sweep's delta at the next
+		// aging: without it the clock still advances under the newborn and the
+		// effect dies one sweep early. Fires after this sweep's aging (timers,
+		// idle code) need no rebase: the next delta is fully post-birth.
+		uint64_t birth_sweep = 0;
+		bool birth_needs_rebase = false;
 		double duration = 0.0;
 		double start_age = 0.0;
 		int last_shard = -1;
@@ -253,6 +262,10 @@ public:
 	// coexist instead of rebaking each other away.
 	std::vector<FXOneShotBake> fx_manual_bakes;
 	double fx_clock = 0.0;
+	// Sweep of the last age_fx_effects run, and the delta it advanced with:
+	// newborn slots fired before this sweep's aging rebase their birth by it.
+	uint64_t fx_aged_sweep = 0;
+	double fx_last_delta = 0.0;
 	// Reusable per-tick scratch for the shard-occupancy pass in age_fx_bake:
 	// allocating it fresh per bake per tick was heap churn on every physics
 	// frame. Sized per use via assign (no preservation needed).
