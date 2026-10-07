@@ -503,6 +503,10 @@ Array SoundMixer2D::debug_voices() const {
 			d["volume_db"] = voice.player->get_volume_db();
 			d["pitch_scale"] = voice.player->get_pitch_scale();
 			d["bus"] = voice.player->get_bus();
+			d["max_distance"] = voice.player->get_max_distance();
+			d["attenuation"] = voice.player->get_attenuation();
+			d["panning_strength"] = voice.player->get_panning_strength();
+			d["area_mask"] = voice.player->get_area_mask();
 		}
 		out.push_back(d);
 	}
