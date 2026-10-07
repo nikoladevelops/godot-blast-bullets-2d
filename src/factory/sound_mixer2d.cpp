@@ -17,6 +17,7 @@
 #include <godot_cpp/variant/utility_functions.hpp>
 
 #include <algorithm>
+#include <cmath>
 
 using namespace godot;
 namespace BlastBullets2D {
@@ -275,7 +276,7 @@ double SoundMixer2D::sound_effective_max_distance(BulletFactory2D &factory, cons
 	return sound->max_distance / zoom;
 }
 
-bool SoundMixer2D::offer(BulletFactory2D &factory, const Ref<BulletSoundData2D> &sound, const Vector2 &event_pos, float volume_offset_db, const SoundListenerSpec2D &listener) {
+bool SoundMixer2D::offer(BulletFactory2D &factory, const Ref<BulletSoundData2D> &sound, const Vector2 &event_pos, float volume_offset_db, const SoundListenerSpec2D &listener, int volley_amount) {
 	if (paused || sound.is_null() || !sound->enabled) {
 		if (paused) {
 			++dropped_total;
@@ -298,6 +299,12 @@ bool SoundMixer2D::offer(BulletFactory2D &factory, const Ref<BulletSoundData2D> 
 			return false;
 		}
 	}
+	// Amount gates compose with everything by AND, first: a volley outside
+	// the size window never takes a candidate slot.
+	if ((sound->min_volley_amount > 0 && volley_amount < sound->min_volley_amount) || (sound->max_volley_amount > 0 && volley_amount > sound->max_volley_amount)) {
+		++dropped_total;
+		return false;
+	}
 	const size_t cap = sound->min_interval_sec > 0.0 ? 1 : (size_t)Math::max(1, sound->max_voices);
 	Channel &channel = channel_for(sound->get_instance_id(), cap);
 	// Offer-time distance over the current list: evicts the farthest while the
@@ -319,6 +326,7 @@ bool SoundMixer2D::offer(BulletFactory2D &factory, const Ref<BulletSoundData2D> 
 	candidate.volume_offset_db = volume_offset_db;
 	candidate.listener = listener;
 	candidate.order = offer_order++;
+	candidate.volley_amount = volley_amount;
 	candidate.dist = dist;
 	if (channel.candidates.size() < channel.cap) {
 		channel.candidates.push_back(candidate);
@@ -474,6 +482,7 @@ void SoundMixer2D::flush(BulletFactory2D &factory) {
 			Vector2 event_pos;
 			float volume_offset_db = 0.0f;
 			double dist = 0.0;
+			int volley_amount = 1;
 			Vector2 listener_pos;
 			uint64_t node_id = 0;
 			bool is_point = false;
@@ -498,6 +507,7 @@ void SoundMixer2D::flush(BulletFactory2D &factory) {
 			winner.event_pos = candidate.event_pos;
 			winner.volume_offset_db = candidate.volume_offset_db;
 			winner.dist = dist;
+			winner.volley_amount = candidate.volley_amount;
 			winner.listener_pos = anchor;
 			winner.node_id = found ? node_id : 0;
 			winner.is_point = is_point && found;
@@ -572,7 +582,13 @@ void SoundMixer2D::flush(BulletFactory2D &factory) {
 				++dropped_total;
 				continue;
 			}
-			const float volume = SoundMixer2D::apply_playback_mix(player, sound, picked, winner.volume_offset_db, &warned_buses);
+			// Volley-size gain, added with the trim and the randoms (bounded:
+			// log10 gives +4 dB at 100 bullets, +8 dB at 10k, for k = 2).
+			float amount_gain = 0.0f;
+			if (Math::is_finite((double)sound->amount_gain_db) && sound->amount_gain_db > 0.0) {
+				amount_gain = (float)((double)sound->amount_gain_db * std::log10((double)MAX(1, winner.volley_amount)));
+			}
+			const float volume = SoundMixer2D::apply_playback_mix(player, sound, picked, winner.volume_offset_db + amount_gain, &warned_buses);
 			player->set_global_position(at);
 			player->play();
 			Voice &voice = voices[slot];

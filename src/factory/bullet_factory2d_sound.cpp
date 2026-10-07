@@ -8,11 +8,11 @@ using namespace godot;
 
 namespace BlastBullets2D {
 
-bool BulletFactory2D::sound_offer(const Ref<BulletSoundData2D> &sound, const Vector2 &event_pos, float volume_offset_db, const SoundListenerSpec2D &listener) {
+bool BulletFactory2D::sound_offer(const Ref<BulletSoundData2D> &sound, const Vector2 &event_pos, float volume_offset_db, const SoundListenerSpec2D &listener, int volley_amount) {
 	if (is_tearing_down) {
 		return false;
 	}
-	return sound_mixer.offer(*this, sound, event_pos, volume_offset_db, listener);
+	return sound_mixer.offer(*this, sound, event_pos, volume_offset_db, listener, volley_amount);
 }
 
 bool BulletFactory2D::play_sound(const Ref<BulletSoundData2D> &sound, const Vector2 &global_position, const StringName &listener_group) {

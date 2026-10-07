@@ -359,6 +359,45 @@ void BulletSoundData2D::set_max_duration_sec(double value) {
 	emit_changed();
 }
 
+int BulletSoundData2D::get_min_volley_amount() const { return min_volley_amount; }
+void BulletSoundData2D::set_min_volley_amount(int value) {
+	if (value < 0) {
+		UtilityFunctions::push_error("BulletSoundData2D: min_volley_amount must be >= 0, keeping the old value.");
+		return;
+	}
+	if (min_volley_amount == value) {
+		return;
+	}
+	min_volley_amount = value;
+	emit_changed();
+}
+
+int BulletSoundData2D::get_max_volley_amount() const { return max_volley_amount; }
+void BulletSoundData2D::set_max_volley_amount(int value) {
+	if (value < 0) {
+		UtilityFunctions::push_error("BulletSoundData2D: max_volley_amount must be >= 0, keeping the old value.");
+		return;
+	}
+	if (max_volley_amount == value) {
+		return;
+	}
+	max_volley_amount = value;
+	emit_changed();
+}
+
+double BulletSoundData2D::get_amount_gain_db() const { return amount_gain_db; }
+void BulletSoundData2D::set_amount_gain_db(double value) {
+	if (!Math::is_finite(value) || value < 0.0) {
+		UtilityFunctions::push_error("BulletSoundData2D: amount_gain_db must be finite and >= 0, keeping the old value.");
+		return;
+	}
+	if (amount_gain_db == value) {
+		return;
+	}
+	amount_gain_db = value;
+	emit_changed();
+}
+
 void BulletSoundData2D::preview() {
 	if (Engine::get_singleton() == nullptr || !Engine::get_singleton()->is_editor_hint()) {
 		UtilityFunctions::push_error("BulletSoundData2D.preview: editor only, nothing plays.");
@@ -522,6 +561,18 @@ void BulletSoundData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_max_duration_sec"), &BulletSoundData2D::get_max_duration_sec);
 	ClassDB::bind_method(D_METHOD("set_max_duration_sec", "value"), &BulletSoundData2D::set_max_duration_sec);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "max_duration_sec", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater,suffix:s"), "set_max_duration_sec", "get_max_duration_sec");
+
+	ClassDB::bind_method(D_METHOD("get_min_volley_amount"), &BulletSoundData2D::get_min_volley_amount);
+	ClassDB::bind_method(D_METHOD("set_min_volley_amount", "value"), &BulletSoundData2D::set_min_volley_amount);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "min_volley_amount", PROPERTY_HINT_RANGE, "0,10000,1,or_greater"), "set_min_volley_amount", "get_min_volley_amount");
+
+	ClassDB::bind_method(D_METHOD("get_max_volley_amount"), &BulletSoundData2D::get_max_volley_amount);
+	ClassDB::bind_method(D_METHOD("set_max_volley_amount", "value"), &BulletSoundData2D::set_max_volley_amount);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "max_volley_amount", PROPERTY_HINT_RANGE, "0,10000,1,or_greater"), "set_max_volley_amount", "get_max_volley_amount");
+
+	ClassDB::bind_method(D_METHOD("get_amount_gain_db"), &BulletSoundData2D::get_amount_gain_db);
+	ClassDB::bind_method(D_METHOD("set_amount_gain_db", "value"), &BulletSoundData2D::set_amount_gain_db);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "amount_gain_db", PROPERTY_HINT_RANGE, "0,24,0.01,or_greater,suffix:dB"), "set_amount_gain_db", "get_amount_gain_db");
 
 	ClassDB::bind_method(D_METHOD("preview"), &BulletSoundData2D::preview);
 	ClassDB::bind_method(D_METHOD("preview_at", "global_position", "volume_offset_db", "use_position"), &BulletSoundData2D::preview_at);

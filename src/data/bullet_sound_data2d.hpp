@@ -146,6 +146,14 @@ public:
 	int priority = 0;
 	// Stops a voice after this long (looping streams). 0 = whole stream.
 	double max_duration_sec = 0.0;
+	// Offers only from volleys with at least this many bullets (0 = off).
+	int min_volley_amount = 0;
+	// Offers only from volleys with at most this many bullets (0 = no cap).
+	int max_volley_amount = 0;
+	// Loudness added per volley size: k * log10(max(1, amount)), so k = 2
+	// adds +4 dB at 100 bullets and +8 dB at 10k. 0 = off. Manual hatches
+	// count as a single bullet.
+	double amount_gain_db = 0.0;
 
 	bool get_enabled() const;
 	void set_enabled(bool value);
@@ -227,6 +235,15 @@ public:
 
 	double get_max_duration_sec() const;
 	void set_max_duration_sec(double value);
+
+	int get_min_volley_amount() const;
+	void set_min_volley_amount(int value);
+
+	int get_max_volley_amount() const;
+	void set_max_volley_amount(int value);
+
+	double get_amount_gain_db() const;
+	void set_amount_gain_db(double value);
 
 	// Editor mix preview: plays the picked stream with this entry's mix
 	// applied (volume, one pitch roll, bus, centered), so pitch/volume edits

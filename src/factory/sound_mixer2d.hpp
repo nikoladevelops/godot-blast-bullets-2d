@@ -50,9 +50,11 @@ public:
 	int max_voices_total = 32;
 
 	// One event offer. False = dropped (paused, editor, disabled, streamless,
-	// chance). True = queued for this sweep's flush (or the next sweep's when
-	// offered outside a sweep).
-	bool offer(BulletFactory2D &factory, const Ref<BulletSoundData2D> &sound, const Vector2 &event_pos, float volume_offset_db, const SoundListenerSpec2D &listener);
+	// chance, amount gate). True = queued for this sweep's flush (or the next
+	// sweep's when offered outside a sweep). volley_amount is the firing
+	// volley's size (1 for manual hatches): the amount gates read it first,
+	// amount_gain_db is added to the played volume.
+	bool offer(BulletFactory2D &factory, const Ref<BulletSoundData2D> &sound, const Vector2 &event_pos, float volume_offset_db, const SoundListenerSpec2D &listener, int volley_amount = 1);
 	// End of sweep: release finished voices, enforce durations, follow node
 	// listeners, pick winners per channel, play them. Returns on one branch
 	// when nothing is pending and no voice is busy.
@@ -86,6 +88,9 @@ private:
 		float volume_offset_db = 0.0f;
 		SoundListenerSpec2D listener;
 		uint64_t order = 0;
+		// Firing volley's size (1 for manual hatches): the amount gates and
+		// the gain read it at flush.
+		int volley_amount = 1;
 		// Offer-time distance to the resolved listener: evicts the farthest
 		// while the per-sweep slots fill, so winners are nearest.
 		double dist = 0.0;

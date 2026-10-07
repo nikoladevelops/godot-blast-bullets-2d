@@ -515,7 +515,9 @@ public:
 	// Channels are shared per sound resource across the whole factory.
 	// Volley/spawner entry point (C++ only: the listener spec has no Variant
 	// form): false = dropped (paused, editor, disabled, streamless, chance).
-	bool sound_offer(const Ref<BulletSoundData2D> &sound, const Vector2 &event_pos, float volume_offset_db, const SoundListenerSpec2D &listener);
+	// volley_amount carries the firing volley's size for the amount gates
+	// (manual hatches count as one).
+	bool sound_offer(const Ref<BulletSoundData2D> &sound, const Vector2 &event_pos, float volume_offset_db, const SoundListenerSpec2D &listener, int volley_amount = 1);
 	// User hatch: plays `sound` at the end of the next sweep (Godot listener,
 	// or the nearest member of `listener_group`). False = refused (null,
 	// disabled, outside the tree, paused, editor).

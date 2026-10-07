@@ -904,7 +904,7 @@ bool BulletSpawner2D::shoot_once() {
 	emit_signal("volley_fired", bullets, volleys_fired);
 	// The shot succeeded (no drop path follows): spawner-only entries fire
 	// at the spawner's global position.
-	fire_spawner_sound(BulletSoundData2D::SOUND_ON_SHOT);
+	fire_spawner_sound(BulletSoundData2D::SOUND_ON_SHOT, bullets->get_amount_bullets());
 	// One-shot budget counts every fired volley (auto or manual) without
 	// touching max_volleys. Spent budget pauses via the standard path, so
 	// transitions stay consistent; placed after volley_fired so the last

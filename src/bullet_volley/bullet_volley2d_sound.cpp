@@ -112,7 +112,7 @@ void BulletVolley2D::sound_fire(int trigger, int bullet_index, const Vector2 &ev
 		if (entry->get_ring_index() >= 0 && entry->get_ring_index() != ring) {
 			continue;
 		}
-		bullet_factory->sound_offer(entry, event_pos, sound_volume_offset_db, spec);
+		bullet_factory->sound_offer(entry, event_pos, sound_volume_offset_db, spec, amount_bullets);
 	}
 }
 
@@ -143,7 +143,7 @@ void BulletVolley2D::sound_fire_flight() {
 			if (entry.is_null() || !entry->enabled || entry->get_trigger() != BulletSoundData2D::SOUND_ON_FLIGHT) {
 				continue;
 			}
-			bullet_factory->sound_offer(entry, at, sound_volume_offset_db, spec);
+			bullet_factory->sound_offer(entry, at, sound_volume_offset_db, spec, amount_bullets);
 		}
 	}
 }

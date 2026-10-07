@@ -10,6 +10,14 @@ func after_all() -> void:
 	await super()
 
 
+func _logged_count(sound_id: int) -> int:
+	var n := 0
+	for e in factory.debug_get_sound_log():
+		if int((e as Dictionary).get("sound", 0)) == sound_id:
+			n += 1
+	return n
+
+
 func test_spatial_knobs_applied_per_play() -> void:
 	godot_listener_at(Vector2.ZERO)
 	var s := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
@@ -105,3 +113,75 @@ func test_one_resource_shares_one_budget_across_spawners() -> void:
 	assert_true(b.shoot_once(), "second spawner fires")
 	await physics(2)
 	assert_eq(int(factory.debug_get_sound_stats()["plays_total"]), 1, "one shared interval: one play")
+
+
+func test_amount_gain_exact_db() -> void:
+	godot_listener_at(Vector2.ZERO)
+	factory.debug_set_sound_log_enabled(true)
+	var s := H.make_sound(BulletSoundData2D.SOUND_ON_FLIGHT)
+	s.min_interval_sec = 0.0
+	s.max_voices = 1
+	s.amount_gain_db = 2.0
+	s.volume_db = -10.0
+	var sid: int = s.get_instance_id()
+	var v := quick_volley(100)
+	assert_true(v.sound_set_effects([s]), "entry armed")
+	await physics(2)
+	assert_true(_logged_count(sid) >= 1, "100-bullet flight logs")
+	assert_eq(busy_voices().size(), 1, "voice busy")
+	assert_almost_eq(float((busy_voices()[0] as Dictionary)["volume_db"]), -6.0, 0.05, "100 bullets at k=2 gives base+4")
+
+
+func test_min_gate_silences_small_volleys() -> void:
+	godot_listener_at(Vector2.ZERO)
+	factory.debug_set_sound_log_enabled(true)
+	var s := H.make_sound(BulletSoundData2D.SOUND_ON_FLIGHT)
+	s.min_interval_sec = 0.0
+	s.min_volley_amount = 10
+	var small := quick_volley(4)
+	assert_true(small.sound_set_effects([s]), "entry armed")
+	await physics(2)
+	assert_eq(int(factory.debug_get_sound_stats()["plays_total"]), 0, "4-bullet volley below min 10 stays silent")
+
+
+func test_max_gate_silences_huge_volleys() -> void:
+	godot_listener_at(Vector2.ZERO)
+	factory.debug_set_sound_log_enabled(true)
+	var s := H.make_sound(BulletSoundData2D.SOUND_ON_FLIGHT)
+	s.min_interval_sec = 0.0
+	s.max_volley_amount = 10
+	var huge := quick_volley(100)
+	assert_true(huge.sound_set_effects([s]), "entry armed")
+	var before: int = int(factory.debug_get_sound_stats()["plays_total"])
+	await physics(2)
+	assert_eq(int(factory.debug_get_sound_stats()["plays_total"]), before, "100-bullet volley past max 10 stays silent")
+
+
+func test_manual_hatch_counts_as_one() -> void:
+	godot_listener_at(Vector2.ZERO)
+	factory.debug_set_sound_log_enabled(true)
+	var s := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+	s.min_interval_sec = 0.0
+	s.min_volley_amount = 2
+	var sid: int = s.get_instance_id()
+	factory.play_sound(s, Vector2.ZERO)
+	await physics(2)
+	assert_eq(_logged_count(sid), 0, "manual hatch counts as one: below min 2 stays silent")
+
+
+func test_amount_setters_reject_and_keep() -> void:
+	var s := BulletSoundData2D.new()
+	assert_eq(s.min_volley_amount, 0, "min off by default")
+	assert_eq(s.max_volley_amount, 0, "max off by default")
+	assert_eq(s.amount_gain_db, 0.0, "gain off by default")
+	s.set_min_volley_amount(-1)
+	expect_error_sequence(["BulletSoundData2D: min_volley_amount must be >= 0, keeping the old value."])
+	assert_eq(s.min_volley_amount, 0, "kept")
+	s.set_max_volley_amount(-1)
+	expect_error_sequence(["BulletSoundData2D: max_volley_amount must be >= 0, keeping the old value."])
+	assert_eq(s.max_volley_amount, 0, "kept")
+	s.set_amount_gain_db(-1.0)
+	expect_error_sequence(["BulletSoundData2D: amount_gain_db must be finite and >= 0, keeping the old value."])
+	assert_eq(s.amount_gain_db, 0.0, "kept")
+	s.set_amount_gain_db(NAN)
+	expect_error_sequence(["BulletSoundData2D: amount_gain_db must be finite and >= 0, keeping the old value."])

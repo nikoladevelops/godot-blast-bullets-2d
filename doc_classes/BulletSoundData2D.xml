@@ -35,6 +35,9 @@
 		</method>
 	</methods>
 	<members>
+		<member name="amount_gain_db" type="float" setter="set_amount_gain_db" getter="get_amount_gain_db" default="0.0">
+			Loudness added per volley size: k times log10 of the bullet count, so k = 2 adds +4 dB at 100 bullets and +8 dB at 10k. Added with the trim and the randoms. 0 disables it. Manual hatches count as a single bullet.
+		</member>
 		<member name="area_mask" type="int" setter="set_area_mask" getter="get_area_mask" default="1">
 			Physics layers whose [Area2D] audio bus overrides apply to this sound. Hidden while [member positional] is off. Reverb-zone example: an [Area2D] with an audio bus override (a reverb bus) on layer 2 plus [code]area_mask = 2[/code] makes cave shots echo while arena shots stay dry.
 		</member>
@@ -62,8 +65,14 @@
 		<member name="max_voices" type="int" setter="set_max_voices" getter="get_max_voices" default="4">
 			Simultaneous voices of this sound across the whole factory. Past this, [member when_limit_reached] decides.
 		</member>
+		<member name="max_volley_amount" type="int" setter="set_max_volley_amount" getter="get_max_volley_amount" default="0">
+			Offers only from volleys with at most this many bullets. 0 means no cap. Gates compose with the interval, distance, camera and chance checks by AND.
+		</member>
 		<member name="min_interval_sec" type="float" setter="set_min_interval_sec" getter="get_min_interval_sec" default="0.05">
 			At most one play per interval across the whole factory; the nearest event wins each sweep. 0 plays up to [member max_voices] per sweep instead.
+		</member>
+		<member name="min_volley_amount" type="int" setter="set_min_volley_amount" getter="get_min_volley_amount" default="0">
+			Offers only from volleys with at least this many bullets. 0 disables the gate. Gates compose with the interval, distance, camera and chance checks by AND.
 		</member>
 		<member name="panning_strength" type="float" setter="set_panning_strength" getter="get_panning_strength" default="1.0">
 			Stereo spread (Godot's own panning math). Hidden while [member positional] is off.

@@ -1785,8 +1785,9 @@ private:
 	bool sound_effects_misuse_warned = false;
 	// Fires the spawner-only entries (On Shot after a successful shot, On
 	// Telegraph with volley_telegraphed) at the spawner's global position.
-	// Runs no user code.
-	void fire_spawner_sound(int trigger);
+	// volley_amount is the fired volley's size for the amount gates (1 when
+	// unknown, e.g. telegraphs). Runs no user code.
+	void fire_spawner_sound(int trigger, int volley_amount = 1);
 	// Zone resources' `changed` -> ring preview refresh.
 	void connect_graze_zones(bool connect);
 	void _on_graze_zone_changed();
