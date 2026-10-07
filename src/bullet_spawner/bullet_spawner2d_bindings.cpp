@@ -87,6 +87,29 @@ void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
 		}
 		return;
 	}
+	// Sound: everything but the master switch hides while sound is off; each
+	// listener source shows only its own knobs (Godot Listener needs none).
+	if (property_name.begins_with("sound_")) {
+		bool show = property_name == "sound_enabled" || sound_enabled;
+		if (show && property_name == "sound_listener_node_group") {
+			show = sound_listener_source == SOUND_LISTENER_NODE_GROUP;
+		} else if (show && property_name == "sound_listener_path") {
+			show = sound_listener_source == SOUND_LISTENER_NODE_PATH;
+		} else if (show && property_name.begins_with("sound_listener_node_name")) {
+			show = sound_listener_source == SOUND_LISTENER_NODE_NAME;
+		} else if (show && property_name.begins_with("sound_listener_children_")) {
+			show = sound_listener_source == SOUND_LISTENER_NODE_CHILDREN;
+		} else if (show && property_name == "sound_listener_global_positions") {
+			show = sound_listener_source == SOUND_LISTENER_GLOBAL_POSITIONS;
+		} else if (show && (property_name == "sound_listener_filter_group" || property_name == "sound_listener_update_interval")) {
+			// Godot Listener and points have no group and need no interval.
+			show = sound_listener_source != SOUND_LISTENER_GODOT_LISTENER && sound_listener_source != SOUND_LISTENER_MOUSE && sound_listener_source != SOUND_LISTENER_GLOBAL_POSITIONS;
+		}
+		if (!show) {
+			p_property.usage &= ~PROPERTY_USAGE_EDITOR;
+		}
+		return;
+	}
 	// Tidy inspector: hide the preview tuning knobs while both preview
 	// switches are off. The toggles + spin props stay always visible.
 	if (property_name.begins_with("preview_") && property_name != "show_pattern_preview") {
@@ -635,6 +658,13 @@ void BulletSpawner2D::_bind_methods() {
 	BIND_ENUM_CONSTANT(GRAZE_SOURCE_NODE_CHILDREN);
 	BIND_ENUM_CONSTANT(GRAZE_SOURCE_MOUSE);
 	BIND_ENUM_CONSTANT(GRAZE_SOURCE_GLOBAL_POSITIONS);
+	BIND_ENUM_CONSTANT(SOUND_LISTENER_GODOT_LISTENER);
+	BIND_ENUM_CONSTANT(SOUND_LISTENER_NODE_GROUP);
+	BIND_ENUM_CONSTANT(SOUND_LISTENER_NODE_PATH);
+	BIND_ENUM_CONSTANT(SOUND_LISTENER_NODE_NAME);
+	BIND_ENUM_CONSTANT(SOUND_LISTENER_NODE_CHILDREN);
+	BIND_ENUM_CONSTANT(SOUND_LISTENER_MOUSE);
+	BIND_ENUM_CONSTANT(SOUND_LISTENER_GLOBAL_POSITIONS);
 
 	// Graze (bullet_spawner2d_graze.cpp). The signals bubble: they fire here
 	// first (while this spawner lives), then on the BulletFactory2D, which
@@ -689,6 +719,41 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("debug_get_graze_preview_circles"), &BulletSpawner2D::debug_get_graze_preview_circles);
 	ClassDB::bind_method(D_METHOD("debug_get_graze_preview_stats"), &BulletSpawner2D::debug_get_graze_preview_stats);
 	ClassDB::bind_method(D_METHOD("debug_get_graze_detector_stats"), &BulletSpawner2D::debug_get_graze_detector_stats);
+
+	// Sound (bullet_spawner2d_sound.cpp). Every fired volley carries
+	// sound_effects; spawner-only entries (On Shot, On Telegraph) offer
+	// directly from the spawner at its global position.
+	ClassDB::bind_method(D_METHOD("get_sound_enabled"), &BulletSpawner2D::get_sound_enabled);
+	ClassDB::bind_method(D_METHOD("set_sound_enabled", "value"), &BulletSpawner2D::set_sound_enabled);
+	ClassDB::bind_method(D_METHOD("get_sound_effects"), &BulletSpawner2D::get_sound_effects);
+	ClassDB::bind_method(D_METHOD("set_sound_effects", "value"), &BulletSpawner2D::set_sound_effects);
+	ClassDB::bind_method(D_METHOD("get_sound_volume_db"), &BulletSpawner2D::get_sound_volume_db);
+	ClassDB::bind_method(D_METHOD("set_sound_volume_db", "value"), &BulletSpawner2D::set_sound_volume_db);
+	ClassDB::bind_method(D_METHOD("get_sound_listener_source"), &BulletSpawner2D::get_sound_listener_source);
+	ClassDB::bind_method(D_METHOD("set_sound_listener_source", "value"), &BulletSpawner2D::set_sound_listener_source);
+	ClassDB::bind_method(D_METHOD("get_sound_listener_node_group"), &BulletSpawner2D::get_sound_listener_node_group);
+	ClassDB::bind_method(D_METHOD("set_sound_listener_node_group", "value"), &BulletSpawner2D::set_sound_listener_node_group);
+	ClassDB::bind_method(D_METHOD("get_sound_listener_filter_group"), &BulletSpawner2D::get_sound_listener_filter_group);
+	ClassDB::bind_method(D_METHOD("set_sound_listener_filter_group", "value"), &BulletSpawner2D::set_sound_listener_filter_group);
+	ClassDB::bind_method(D_METHOD("get_sound_listener_path"), &BulletSpawner2D::get_sound_listener_path);
+	ClassDB::bind_method(D_METHOD("set_sound_listener_path", "path"), &BulletSpawner2D::set_sound_listener_path);
+	ClassDB::bind_method(D_METHOD("get_sound_listener_node_name"), &BulletSpawner2D::get_sound_listener_node_name);
+	ClassDB::bind_method(D_METHOD("set_sound_listener_node_name", "value"), &BulletSpawner2D::set_sound_listener_node_name);
+	ClassDB::bind_method(D_METHOD("get_sound_listener_node_name_match_mode"), &BulletSpawner2D::get_sound_listener_node_name_match_mode);
+	ClassDB::bind_method(D_METHOD("set_sound_listener_node_name_match_mode", "value"), &BulletSpawner2D::set_sound_listener_node_name_match_mode);
+	ClassDB::bind_method(D_METHOD("get_sound_listener_node_name_case_sensitive"), &BulletSpawner2D::get_sound_listener_node_name_case_sensitive);
+	ClassDB::bind_method(D_METHOD("set_sound_listener_node_name_case_sensitive", "value"), &BulletSpawner2D::set_sound_listener_node_name_case_sensitive);
+	ClassDB::bind_method(D_METHOD("get_sound_listener_children_parent_path"), &BulletSpawner2D::get_sound_listener_children_parent_path);
+	ClassDB::bind_method(D_METHOD("set_sound_listener_children_parent_path", "path"), &BulletSpawner2D::set_sound_listener_children_parent_path);
+	ClassDB::bind_method(D_METHOD("get_sound_listener_children_recursive"), &BulletSpawner2D::get_sound_listener_children_recursive);
+	ClassDB::bind_method(D_METHOD("set_sound_listener_children_recursive", "value"), &BulletSpawner2D::set_sound_listener_children_recursive);
+	ClassDB::bind_method(D_METHOD("get_sound_listener_global_positions"), &BulletSpawner2D::get_sound_listener_global_positions);
+	ClassDB::bind_method(D_METHOD("set_sound_listener_global_positions", "value"), &BulletSpawner2D::set_sound_listener_global_positions);
+	ClassDB::bind_method(D_METHOD("get_sound_listener_update_interval"), &BulletSpawner2D::get_sound_listener_update_interval);
+	ClassDB::bind_method(D_METHOD("set_sound_listener_update_interval", "value"), &BulletSpawner2D::set_sound_listener_update_interval);
+	ClassDB::bind_method(D_METHOD("refresh_sound_listeners"), &BulletSpawner2D::refresh_sound_listeners);
+	ClassDB::bind_method(D_METHOD("resolve_sound_listeners"), &BulletSpawner2D::resolve_sound_listeners);
+	ClassDB::bind_method(D_METHOD("debug_get_sound_detector_stats"), &BulletSpawner2D::debug_get_sound_detector_stats);
 	ADD_GROUP("Graze", "");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "graze_enabled"), "set_graze_enabled", "get_graze_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "graze_zones", PROPERTY_HINT_ARRAY_TYPE, "BulletGrazeZone2D"), "set_graze_zones", "get_graze_zones");
@@ -709,6 +774,22 @@ void BulletSpawner2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_show_pattern_preview"), &BulletSpawner2D::get_show_pattern_preview);
 	ClassDB::bind_method(D_METHOD("set_show_pattern_preview", "value"), &BulletSpawner2D::set_show_pattern_preview);
+	ADD_GROUP("Sound", "");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "sound_enabled"), "set_sound_enabled", "get_sound_enabled");
+	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "sound_effects", PROPERTY_HINT_ARRAY_TYPE, "BulletSoundData2D"), "set_sound_effects", "get_sound_effects");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "sound_volume_db", PROPERTY_HINT_RANGE, "-80,24,0.1,suffix:dB"), "set_sound_volume_db", "get_sound_volume_db");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "sound_listener_source", PROPERTY_HINT_ENUM, "Godot Listener,Node Group,Node Path,Node Name,Node Children,Mouse,Global Positions"), "set_sound_listener_source", "get_sound_listener_source");
+	ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "sound_listener_node_group"), "set_sound_listener_node_group", "get_sound_listener_node_group");
+	ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "sound_listener_filter_group"), "set_sound_listener_filter_group", "get_sound_listener_filter_group");
+	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "sound_listener_path", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "Node2D"), "set_sound_listener_path", "get_sound_listener_path");
+	ADD_PROPERTY(PropertyInfo(Variant::STRING, "sound_listener_node_name"), "set_sound_listener_node_name", "get_sound_listener_node_name");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "sound_listener_node_name_match_mode", PROPERTY_HINT_ENUM, "Exact,Contains,Starts With,Ends With"), "set_sound_listener_node_name_match_mode", "get_sound_listener_node_name_match_mode");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "sound_listener_node_name_case_sensitive"), "set_sound_listener_node_name_case_sensitive", "get_sound_listener_node_name_case_sensitive");
+	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "sound_listener_children_parent_path", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "Node2D"), "set_sound_listener_children_parent_path", "get_sound_listener_children_parent_path");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "sound_listener_children_recursive"), "set_sound_listener_children_recursive", "get_sound_listener_children_recursive");
+	ADD_PROPERTY(PropertyInfo(Variant::PACKED_VECTOR2_ARRAY, "sound_listener_global_positions"), "set_sound_listener_global_positions", "get_sound_listener_global_positions");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "sound_listener_update_interval", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater,suffix:s"), "set_sound_listener_update_interval", "get_sound_listener_update_interval");
+
 	ADD_GROUP("Preview", "");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "show_pattern_preview"), "set_show_pattern_preview", "get_show_pattern_preview");
 

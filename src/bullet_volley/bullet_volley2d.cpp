@@ -185,6 +185,7 @@ void BulletVolley2D::release_life() {
 	shared_pop_requested = false;
 	anim_finished_event_pending = false;
 	graze_release(); // user resources (zones) and queued events
+	sound_release(); // user resources (sounds) and the listener ref
 	graze_detector.reset(); // the arming spawner's target settings
 	// Volley-level listeners belong to the life that connected them.
 	disconnect_sprite_animation_connections();

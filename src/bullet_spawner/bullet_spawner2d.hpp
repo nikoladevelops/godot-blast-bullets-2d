@@ -8,9 +8,11 @@
 #include "patterns/pattern_bake_cache2d.hpp"
 #include "patterns/pattern_knobs2d.hpp"
 #include "patterns/pattern_registry2d.hpp"
+#include <memory>
 #include <vector>
 
 #include "data/bullet_graze_zone2d.hpp"
+#include "data/bullet_sound_data2d.hpp"
 #include "data/bullet_volley_data2d.hpp"
 #include "godot_cpp/classes/array_mesh.hpp"
 #include "godot_cpp/classes/curve.hpp"
@@ -816,6 +818,105 @@ public:
 	// {scans, lists, shares_factory_lists}: this spawner's graze detector
 	// (scans run by its own lists; shared lists count on the factory).
 	Dictionary debug_get_graze_detector_stats() const;
+
+	// SOUND (bullet_spawner2d_sound.cpp)
+	//
+	// Every fired volley is armed with sound_effects (BulletSoundData2D: one
+	// entry per trigger), each playing its stream when its trigger fires,
+	// subject to its own limits (shared per resource across the factory).
+	// A volley keeps its entries: edits made INSIDE a sound resource reach
+	// bullets in flight, while sound_enabled / sound_effects changes apply
+	// to the next shots.
+	//
+	// WHO the sounds are measured from is decided here and only here (the
+	// entries say how): sound_listener_source and the settings below (the
+	// same choices as graze and homing, plus Godot's own 2D listener). They
+	// are shared with every volley this spawner fired, so edits and
+	// refresh_sound_listeners() reach bullets in flight; orphaned volleys
+	// keep the settings and the nodes the paths last pointed to. Sounds
+	// whose listener source finds nobody fall back to Godot's listener.
+	// No cap on how many listeners.
+	bool sound_enabled = false;
+	// Stacked entries; null entries are kept (the inspector adds them) and
+	// skipped.
+	Array sound_effects;
+	// Added to every entry's volume_db (a per-spawner mix trim).
+	double sound_volume_db = 0.0;
+	// SERIALIZED ids: never renumber. Like GrazeDetector2D::Source with a
+	// Godot-listener default in front (never cast between the two enums).
+	enum SoundListenerSource {
+		SOUND_LISTENER_GODOT_LISTENER = 0, // Godot's current AudioListener2D / camera
+		SOUND_LISTENER_NODE_GROUP = 1, // Node2D members of sound_listener_node_group
+		SOUND_LISTENER_NODE_PATH = 2, // the Node2D at sound_listener_path
+		SOUND_LISTENER_NODE_NAME = 3, // Node2Ds named like sound_listener_node_name (scene scan)
+		SOUND_LISTENER_NODE_CHILDREN = 4, // Node2D children of sound_listener_children_parent_path
+		SOUND_LISTENER_MOUSE = 5, // the cursor, in the bullets' canvas coordinates
+		SOUND_LISTENER_GLOBAL_POSITIONS = 6 // every entry of sound_listener_global_positions
+	};
+	SoundListenerSource sound_listener_source = SOUND_LISTENER_GODOT_LISTENER;
+	StringName sound_listener_node_group;
+	// Allow-list for every node source: only nodes in this group count.
+	StringName sound_listener_filter_group;
+	NodePath sound_listener_path;
+	// Scanned from the current scene (never inside a bullet factory or this
+	// spawner), compared per sound_listener_node_name_match_mode (homing's
+	// values).
+	String sound_listener_node_name;
+	HomingNodeNameMatch sound_listener_node_name_match_mode = HOMING_NAME_MATCH_CONTAINS;
+	bool sound_listener_node_name_case_sensitive = false;
+	NodePath sound_listener_children_parent_path;
+	bool sound_listener_children_recursive = false;
+	// Global Positions source: one listener per entry (finite only), read
+	// every sweep (edits reach bullets in flight). No cap.
+	PackedVector2Array sound_listener_global_positions;
+	// Seconds between listener scans (factory time); 0 = every physics tick.
+	// Positions are read every sweep either way; a listener freed or queued
+	// for deletion stops counting at once, a new one waits for the next
+	// scan (or refresh_sound_listeners()).
+	double sound_listener_update_interval = 0.0;
+
+	bool get_sound_enabled() const;
+	void set_sound_enabled(bool value);
+	Array get_sound_effects() const;
+	void set_sound_effects(const Array &value);
+	double get_sound_volume_db() const;
+	void set_sound_volume_db(double value);
+	SoundListenerSource get_sound_listener_source() const;
+	void set_sound_listener_source(SoundListenerSource value);
+	StringName get_sound_listener_node_group() const;
+	void set_sound_listener_node_group(const StringName &value);
+	StringName get_sound_listener_filter_group() const;
+	void set_sound_listener_filter_group(const StringName &value);
+	NodePath get_sound_listener_path() const;
+	void set_sound_listener_path(const NodePath &p_path);
+	String get_sound_listener_node_name() const;
+	void set_sound_listener_node_name(const String &value);
+	HomingNodeNameMatch get_sound_listener_node_name_match_mode() const;
+	void set_sound_listener_node_name_match_mode(HomingNodeNameMatch value);
+	bool get_sound_listener_node_name_case_sensitive() const;
+	void set_sound_listener_node_name_case_sensitive(bool value);
+	NodePath get_sound_listener_children_parent_path() const;
+	void set_sound_listener_children_parent_path(const NodePath &p_path);
+	bool get_sound_listener_children_recursive() const;
+	void set_sound_listener_children_recursive(bool value);
+	PackedVector2Array get_sound_listener_global_positions() const;
+	void set_sound_listener_global_positions(const PackedVector2Array &value);
+	double get_sound_listener_update_interval() const;
+	void set_sound_listener_update_interval(double value);
+	// Scans for listeners now (whatever sound_listener_update_interval
+	// says): the bullets this spawner fired measure from the nodes found
+	// from their next tick on. Returns how many listeners it has now.
+	int refresh_sound_listeners();
+	// The listener finder this spawner shares with every volley it armed
+	// (created on first use). C++ only.
+	std::shared_ptr<GrazeDetector2D> sound_detector_ref() const;
+	// The listeners the runtime measures from right now
+	// (sound_listener_source, in tree order; this spawner itself never
+	// counts). Node2D entries, Vector2 for point sources, empty for Godot's
+	// listener.
+	Array resolve_sound_listeners() const;
+	// {scans, lists, shares_factory_lists}: this spawner's sound detector.
+	Dictionary debug_get_sound_detector_stats() const;
 
 	// BURST / TELEGRAPH / TARGETING / PERF accessors (members above).
 	bool get_burst_enabled() const;
@@ -1658,6 +1759,30 @@ private:
 	// graze_zones mutated in place (append past 4 zones, non-zone entries):
 	// warned once per assignment, the usable entries still arm.
 	bool graze_zones_misuse_warned = false;
+	// The sound listener finder shared with every volley this spawner armed
+	// (created on first use).
+	mutable std::shared_ptr<GrazeDetector2D> sound_detector;
+	// The sound_* listener settings as a detector configuration (Godot
+	// Listener maps to no detector scan: the mixer measures from Godot).
+	GrazeDetector2D::Config sound_detector_config() const;
+	// Pushes them into the detector (rescans due), then the config warnings
+	// follow.
+	void apply_sound_detector_config();
+	// The listeners as the runtime measures from them (the detector's list
+	// while the factory runs, a fresh scan otherwise), this spawner
+	// excluded.
+	void collect_sound_listeners(std::vector<GrazeTarget2D> &r_targets) const;
+	mutable std::vector<GrazeTarget2D> sound_listeners_scratch;
+	// Arms a freshly fired volley with sound_effects (shoot_once, beside the
+	// graze arming). Runs no user code.
+	void apply_volley_sound(BulletVolley2D *volley);
+	// sound_effects mutated in place (non-sound entries): warned once per
+	// assignment, the usable entries still arm.
+	bool sound_effects_misuse_warned = false;
+	// Fires the spawner-only entries (On Shot after a successful shot, On
+	// Telegraph with volley_telegraphed) at the spawner's global position.
+	// Runs no user code.
+	void fire_spawner_sound(int trigger);
 	// Zone resources' `changed` -> ring preview refresh.
 	void connect_graze_zones(bool connect);
 	void _on_graze_zone_changed();
@@ -1711,6 +1836,7 @@ VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingNodeNameMatch);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingTargetSelection);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingRetargetMode);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::GrazeTargetSource);
+VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::SoundListenerSource);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::PatternCacheMode);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::MovementSpace);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::MovementLoopMode);

@@ -698,6 +698,32 @@ PackedStringArray BulletSpawner2D::_get_configuration_warnings() const {
 			out.push_back("graze_target_source is Global Positions but graze_global_positions is empty: no graze target is found.");
 		}
 	}
+	if (sound_enabled) {
+		bool any_sound = false;
+		for (int i = 0; i < sound_effects.size(); ++i) {
+			const Variant entry = sound_effects[i];
+			const BulletSoundData2D *sound = entry.get_type() == Variant::OBJECT ? Object::cast_to<BulletSoundData2D>((Object *)entry) : nullptr;
+			if (sound == nullptr) {
+				out.push_back("sound_effects[" + String::num_int64(i) + "] is empty.");
+				continue;
+			}
+			any_sound = true;
+		}
+		if (!any_sound) {
+			out.push_back("Sound is enabled but sound_effects is empty: no bullet of this spawner plays sounds.");
+		}
+		if (sound_listener_source == SOUND_LISTENER_NODE_GROUP && sound_listener_node_group.is_empty()) {
+			out.push_back("sound_listener_source is Node Group but sound_listener_node_group is empty: sounds measure from Godot's listener.");
+		} else if (sound_listener_source == SOUND_LISTENER_NODE_PATH && sound_listener_path.is_empty()) {
+			out.push_back("sound_listener_source is Node Path but sound_listener_path is empty: sounds measure from Godot's listener.");
+		} else if (sound_listener_source == SOUND_LISTENER_NODE_NAME && sound_listener_node_name.is_empty()) {
+			out.push_back("sound_listener_source is Node Name but sound_listener_node_name is empty: sounds measure from Godot's listener.");
+		} else if (sound_listener_source == SOUND_LISTENER_NODE_CHILDREN && sound_listener_children_parent_path.is_empty()) {
+			out.push_back("sound_listener_source is Node Children but sound_listener_children_parent_path is empty: sounds measure from Godot's listener.");
+		} else if (sound_listener_source == SOUND_LISTENER_GLOBAL_POSITIONS && sound_listener_global_positions.is_empty()) {
+			out.push_back("sound_listener_source is Global Positions but sound_listener_global_positions is empty: sounds measure from Godot's listener.");
+		}
+	}
 	return out;
 }
 
@@ -853,6 +879,7 @@ bool BulletSpawner2D::shoot_once() {
 	// Graze zones arm before the homing signals (no user code runs here),
 	// so every handler from here on sees an armed volley.
 	apply_volley_graze(bullets);
+	apply_volley_sound(bullets);
 	apply_volley_homing_and_orbiting(bullets, arc_resolved ? &arc_targets : nullptr);
 	// Re-validate: handlers of homing_targets_resolved/volley_homing_configured
 	// ran above and may have freed this volley or handed it to another owner.

@@ -14,6 +14,7 @@
 #include "data/bullet_effect_layer_data2d.hpp"
 #include "data/bullet_graze_zone2d.hpp"
 #include "data/bullet_rotation_data2d.hpp"
+#include "data/bullet_sound_data2d.hpp"
 #include "data/bullet_speed_data2d.hpp"
 #include "data/bullet_volley_data2d.hpp"
 #include "data/bullet_wobble_data2d.hpp"
@@ -2555,6 +2556,15 @@ public:
 	// the factory's detector. Dropped when disarmed or with the life.
 	std::shared_ptr<GrazeDetector2D> graze_detector;
 	StringName graze_target_group;
+	// Armed sound entries (nulls kept in place, skipped at fire). The mask
+	// has one bit per SoundTrigger with at least one enabled entry; WHO
+	// listens is the arming spawner's detector (orphans keep it) or, for
+	// factory volleys, sound_listener_group through the factory's detector.
+	std::vector<Ref<BulletSoundData2D>> sound_effects;
+	uint32_t sound_trigger_mask = 0;
+	std::shared_ptr<GrazeDetector2D> sound_detector;
+	StringName sound_listener_group;
+	float sound_volume_offset_db = 0.0f;
 	// This volley's filtered copy of a list's view (only when its owner
 	// spawner is itself one of the targets; capacity kept across ticks and
 	// pool reuse).
@@ -2601,6 +2611,29 @@ public:
 	// Validates graze_set_zones input into r_armed (pushes the error).
 	static bool graze_collect_zones(const Array &zones, Ref<BulletGrazeZone2D> *r_armed, int &r_slots);
 	void graze_arm(const Ref<BulletGrazeZone2D> *armed, int slots, const std::shared_ptr<GrazeDetector2D> &detector, const StringName &target_group);
+
+	// SOUND (bullet_volley2d_sound.cpp; fired through SoundMixer2D at the
+	// trigger sites). Armed entries play their stream when their trigger
+	// fires, subject to each entry's own limits (shared per resource across
+	// the factory). The trigger sites test sound_trigger_mask first: an
+	// unarmed volley pays one bit test per event, never a call.
+	// Factory volleys arm by name (sound_set_effects: empty group = Godot's
+	// listener, else the nearest member of that group); spawner volleys are
+	// armed by their spawner (sound_arm_from_spawner: its Sound group finds
+	// the listeners, shared like graze). On Shot / On Telegraph entries are
+	// spawner-only: a factory volley never fires them.
+	bool sound_set_effects(const Array &effects, const StringName &listener_group = StringName());
+	// C++ only: entries (already validated by the spawner's setter) found by
+	// the spawner's listener detector, shared with every volley it armed,
+	// plus the spawner's volume offset added to every entry.
+	bool sound_arm_from_spawner(const Array &effects, const std::shared_ptr<GrazeDetector2D> &detector, float volume_offset_db);
+	// The armed entries, nulls in place.
+	Array sound_get_effects() const;
+	StringName sound_get_listener_group() const;
+	bool is_sound_armed() const { return sound_trigger_mask != 0; }
+	// Pool time / new life: entries, mask, listener and offset dropped (a
+	// reused volley never plays a previous life's sound).
+	void sound_release();
 
 protected:
 	// Updates homing behavior for a bullet. Zero-delta ticks steer nothing:

@@ -139,6 +139,12 @@
 				Seconds until the next interval retarget pass. Deterministically staggered per spawner so N spawners never group-scan on the same tick.
 			</description>
 		</method>
+		<method name="debug_get_sound_detector_stats" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Listener detector counters: {scans, lists, shares_factory_lists}.
+			</description>
+		</method>
 		<method name="debug_set_pattern_cache_verify" qualifiers="static">
 			<return type="void" />
 			<param index="0" name="enabled" type="bool" />
@@ -336,6 +342,12 @@
 				Scans for graze targets now, whatever [member graze_update_interval] says: every bullet this spawner fired (still flying, orphaned or not) tests the nodes found from its next tick on. Call it right after spawning enemies when the interval is long. Returns how many targets it has now (every zone rings the same ones; this spawner never counts). Pushes an error and returns 0 outside the scene tree. Homing's counterpart is [method retarget_live_volleys].
 			</description>
 		</method>
+		<method name="refresh_sound_listeners">
+			<return type="int" />
+			<description>
+				Scans for listeners now (whatever sound_listener_update_interval says): the bullets this spawner fired measure from the nodes found from their next tick on. Returns how many listeners it has now.
+			</description>
+		</method>
 		<method name="reset_shooting">
 			<return type="void" />
 			<description>
@@ -360,6 +372,12 @@
 			<param index="1" name="advance_round_robin" type="bool" default="true" />
 			<description>
 				Resolves the current homing targets without touching any volley: group members, name matches (case-insensitive unless [member homing_node_name_case_sensitive]), children of the parent path, the node at [member homing_target_path], or the [member homing_global_position] snapshot. The Mouse source returns an empty array (the cursor is pushed live, not resolved). Entries are Node2D or Vector2. Unless quiet is true, an empty result warns once per homing configuration (shots share the same warning). With advance_round_robin off, the round-robin pick is resolved without consuming the cursor (retarget passes use this so flying volleys keep stable targets).
+			</description>
+		</method>
+		<method name="resolve_sound_listeners" qualifiers="const">
+			<return type="Array" />
+			<description>
+				The listeners the runtime measures from right now (Node2D entries, Vector2 for point sources, empty for Godot's listener).
 			</description>
 		</method>
 		<method name="resume_shooting">
@@ -1473,6 +1491,48 @@
 		<member name="show_preview_during_runtime" type="bool" setter="set_show_preview_during_runtime" getter="get_show_preview_during_runtime" default="false">
 			Also shows the preview while the game runs. Off by default.
 		</member>
+		<member name="sound_effects" type="Array" setter="set_sound_effects" getter="get_sound_effects" default="[]">
+			Stacked [BulletSoundData2D] entries (nulls allowed, skipped). Each entry plays its stream when its trigger fires, subject to its own limits. On Shot and On Telegraph entries offer from the spawner itself; the rest fire from the volley.
+		</member>
+		<member name="sound_enabled" type="bool" setter="set_sound_enabled" getter="get_sound_enabled" default="false">
+			Master switch: every volley this spawner fires is armed with [member sound_effects]. Changes apply to the next shots; volleys already flying keep their entries.
+		</member>
+		<member name="sound_listener_children_parent_path" type="NodePath" setter="set_sound_listener_children_parent_path" getter="get_sound_listener_children_parent_path" default="NodePath(&quot;&quot;)">
+			Node Children source: Node2D children of this parent.
+		</member>
+		<member name="sound_listener_children_recursive" type="bool" setter="set_sound_listener_children_recursive" getter="get_sound_listener_children_recursive" default="false">
+			Node Children source: scan the whole subtree, not just direct children.
+		</member>
+		<member name="sound_listener_filter_group" type="StringName" setter="set_sound_listener_filter_group" getter="get_sound_listener_filter_group" default="&amp;&quot;&quot;">
+			Allow-list for every node source: only nodes in this group count (empty counts everything found).
+		</member>
+		<member name="sound_listener_global_positions" type="PackedVector2Array" setter="set_sound_listener_global_positions" getter="get_sound_listener_global_positions" default="PackedVector2Array()">
+			Global Positions source: one listener per entry (finite only), read every sweep. Points never follow.
+		</member>
+		<member name="sound_listener_node_group" type="StringName" setter="set_sound_listener_node_group" getter="get_sound_listener_node_group" default="&amp;&quot;&quot;">
+			Node Group source: Node2D members of this group (empty by default: the developer names it).
+		</member>
+		<member name="sound_listener_node_name" type="String" setter="set_sound_listener_node_name" getter="get_sound_listener_node_name" default="&quot;&quot;">
+			Node Name source: Node2Ds named like this (scene scan, never inside a factory or this spawner).
+		</member>
+		<member name="sound_listener_node_name_case_sensitive" type="bool" setter="set_sound_listener_node_name_case_sensitive" getter="get_sound_listener_node_name_case_sensitive" default="false">
+			Node Name source: match case-sensitively.
+		</member>
+		<member name="sound_listener_node_name_match_mode" type="int" setter="set_sound_listener_node_name_match_mode" getter="get_sound_listener_node_name_match_mode" enum="BulletSpawner2D.HomingNodeNameMatch" default="1">
+			How sound_listener_node_name matches (homing's values): Exact, Contains, Starts With, Ends With.
+		</member>
+		<member name="sound_listener_path" type="NodePath" setter="set_sound_listener_path" getter="get_sound_listener_path" default="NodePath(&quot;&quot;)">
+			Node Path source: the Node2D at this path.
+		</member>
+		<member name="sound_listener_source" type="int" setter="set_sound_listener_source" getter="get_sound_listener_source" enum="BulletSpawner2D.SoundListenerSource" default="0">
+			Who the sounds are measured from: Godot's own 2D listener, or listeners picked like graze/homing targets. Shared with every volley this spawner fired, so edits reach bullets in flight; orphaned volleys keep the settings. A source that finds nobody falls back to Godot's listener.
+		</member>
+		<member name="sound_listener_update_interval" type="float" setter="set_sound_listener_update_interval" getter="get_sound_listener_update_interval" default="0.0">
+			Seconds between listener scans (factory time); 0 scans every physics tick. Positions stay live between scans.
+		</member>
+		<member name="sound_volume_db" type="float" setter="set_sound_volume_db" getter="get_sound_volume_db" default="0.0">
+			Mix trim added to every entry's volume on top of its own volume_db (plus each play's random offset).
+		</member>
 		<member name="spawn_data" type="BulletVolleyData2D" setter="set_spawn_data" getter="get_spawn_data">
 			Bullet data for each volley. Duplicated once per resource (the spawner keeps the copy until the resource changes or is replaced), so sharing one resource is safe. Assigning the same resource again keeps the copy.
 		</member>
@@ -1761,6 +1821,20 @@
 		</constant>
 		<constant name="GRAZE_SOURCE_GLOBAL_POSITIONS" value="5" enum="GrazeTargetSource">
 			Every entry of [member graze_global_positions], read every tick. The signals carry a null [code]target[/code].
+		</constant>
+		<constant name="SOUND_LISTENER_GODOT_LISTENER" value="0" enum="SoundListenerSource">
+		</constant>
+		<constant name="SOUND_LISTENER_NODE_GROUP" value="1" enum="SoundListenerSource">
+		</constant>
+		<constant name="SOUND_LISTENER_NODE_PATH" value="2" enum="SoundListenerSource">
+		</constant>
+		<constant name="SOUND_LISTENER_NODE_NAME" value="3" enum="SoundListenerSource">
+		</constant>
+		<constant name="SOUND_LISTENER_NODE_CHILDREN" value="4" enum="SoundListenerSource">
+		</constant>
+		<constant name="SOUND_LISTENER_MOUSE" value="5" enum="SoundListenerSource">
+		</constant>
+		<constant name="SOUND_LISTENER_GLOBAL_POSITIONS" value="6" enum="SoundListenerSource">
 		</constant>
 		<constant name="MOVEMENT_SPACE_ATTACH" value="0" enum="MovementSpace">
 			The spawner sits on the path (like [PathFollow2D]).

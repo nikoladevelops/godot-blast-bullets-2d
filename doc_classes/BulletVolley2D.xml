@@ -1727,6 +1727,12 @@
 				Whether rotation data is currently driving the volley (any seeded rotation array, shared or per-bullet).
 			</description>
 		</method>
+		<method name="is_sound_armed" qualifiers="const">
+			<return type="bool" />
+			<description>
+				True when at least one enabled entry is armed (the trigger mask is set).
+			</description>
+		</method>
 		<method name="is_sprite_animation_finished" qualifiers="const">
 			<return type="bool" />
 			<description>
@@ -2168,6 +2174,26 @@
 				Clears then pushes an array of homing targets to the back of the shared deque.
 
 				If you want to clear then push an array of targets to a specific bullet's per-bullet deque, use [method all_bullets_replace_homing_targets_with_new_target_array] instead.
+			</description>
+		</method>
+		<method name="sound_get_effects" qualifiers="const">
+			<return type="Array" />
+			<description>
+				The armed sound entries, nulls in place.
+			</description>
+		</method>
+		<method name="sound_get_listener_group" qualifiers="const">
+			<return type="StringName" />
+			<description>
+				The listener group this factory volley was armed with (empty means Godot's listener).
+			</description>
+		</method>
+		<method name="sound_set_effects">
+			<return type="bool" />
+			<param index="0" name="effects" type="Array" />
+			<param index="1" name="listener_group" type="StringName" default="&amp;&quot;&quot;" />
+			<description>
+				Arms a factory volley with sound entries (empty listener_group means Godot's listener, else the nearest member of that group). On Shot and On Telegraph entries never fire on a factory volley: they are spawner-only. Refused on a pooled handle.
 			</description>
 		</method>
 		<method name="stop_sprite_animation">
