@@ -39,6 +39,13 @@ public:
 		SOUND_LIMIT_REPLACE_OLDEST = 0,
 		SOUND_LIMIT_SKIP_NEW = 1
 	};
+	// SERIALIZED ids (BulletSoundData2D.stream_mode): never renumber.
+	enum StreamMode {
+		STREAM_RANDOM = 0,
+		STREAM_WEIGHTED = 1,
+		STREAM_SEQUENCE = 2,
+		STREAM_SHUFFLE = 3
+	};
 
 	// Master switch: lets users toggle a sound without removing it.
 	bool enabled = true;
@@ -50,6 +57,21 @@ public:
 	// weighted, no repeats), AudioStreamPlaylist (sequences),
 	// AudioStreamSynchronized (layers).
 	Ref<AudioStream> stream;
+
+	// Stacked alternative streams: when non-empty, each play picks one per
+	// stream_mode instead of stream (nulls skipped). Five hit variations
+	// without building an AudioStreamRandomizer; stream stays the fallback
+	// when the list is empty (or all null).
+	Array streams;
+	// How streams is picked (see StreamMode). Weighted reads
+	// stream_weights; Sequence round-robins and Shuffle deals every entry
+	// once per cycle (both cursors live in the shared channel, like the
+	// limits: every spawner using this resource shares the order).
+	int stream_mode = STREAM_RANDOM;
+	// Per-entry weight for Weighted mode, parallel to streams (all-zero,
+	// empty or size-mismatched = uniform). Swapping the array mid-fight
+	// works: the next play re-reads it.
+	PackedFloat32Array stream_weights;
 
 	// Base loudness in dB (the spawner's sound_volume_db is added on top,
 	// plus the random offset below when set).
@@ -103,6 +125,15 @@ public:
 
 	Ref<AudioStream> get_stream() const;
 	void set_stream(const Ref<AudioStream> &new_stream);
+
+	Array get_streams() const;
+	void set_streams(const Array &value);
+
+	int get_stream_mode() const;
+	void set_stream_mode(int value);
+
+	PackedFloat32Array get_stream_weights() const;
+	void set_stream_weights(const PackedFloat32Array &value);
 
 	double get_volume_db() const;
 	void set_volume_db(double value);
@@ -163,3 +194,4 @@ protected:
 
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSoundData2D::SoundTrigger);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSoundData2D::SoundLimitMode);
+VARIANT_ENUM_CAST(BlastBullets2D::BulletSoundData2D::StreamMode);

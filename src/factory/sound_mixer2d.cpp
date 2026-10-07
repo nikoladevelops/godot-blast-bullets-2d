@@ -24,6 +24,82 @@ static double sound_dist2(const Vector2 &a, const Vector2 &b) {
 	return dx * dx + dy * dy;
 }
 
+// Any playable audio: stream set, or at least one non-null list entry.
+static bool sound_has_audio(const BulletSoundData2D *sound) {
+	if (sound->stream.is_valid()) {
+		return true;
+	}
+	for (int i = 0; i < sound->streams.size(); ++i) {
+		const Variant entry = sound->streams[i];
+		if (entry.get_type() == Variant::OBJECT && Object::cast_to<AudioStream>((Object *)entry) != nullptr) {
+			return true;
+		}
+	}
+	return false;
+}
+
+Ref<AudioStream> SoundMixer2D::pick_stream(BulletSoundData2D *sound, Channel &channel) {
+	std::vector<Ref<AudioStream>> usable;
+	usable.reserve((size_t)sound->streams.size() + 1);
+	for (int i = 0; i < sound->streams.size(); ++i) {
+		const Variant entry = sound->streams[i];
+		AudioStream *s = entry.get_type() == Variant::OBJECT ? Object::cast_to<AudioStream>((Object *)entry) : nullptr;
+		if (s != nullptr) {
+			usable.push_back(Ref<AudioStream>(s));
+		}
+	}
+	if (usable.empty()) {
+		return sound->stream;
+	}
+	const size_t n = usable.size();
+	const int mode = sound->stream_mode;
+	if (mode == BulletSoundData2D::STREAM_SEQUENCE) {
+		const size_t idx = channel.seq_cursor % n;
+		channel.seq_cursor = idx + 1;
+		return usable[idx];
+	}
+	if (mode == BulletSoundData2D::STREAM_SHUFFLE) {
+		if (channel.shuffle_bag.empty() || channel.shuffle_n != n) {
+			channel.shuffle_bag.clear();
+			for (size_t i = 0; i < n; ++i) {
+				channel.shuffle_bag.push_back(i);
+			}
+			for (size_t i = n; i > 1; --i) {
+				const size_t j = (size_t)UtilityFunctions::randi() % i;
+				std::swap(channel.shuffle_bag[i - 1], channel.shuffle_bag[j]);
+			}
+			channel.shuffle_n = n;
+		}
+		const size_t idx = channel.shuffle_bag.back();
+		channel.shuffle_bag.pop_back();
+		return usable[idx];
+	}
+	if (mode == BulletSoundData2D::STREAM_WEIGHTED && sound->stream_weights.size() == sound->streams.size()) {
+		double total = 0.0;
+		for (int i = 0; i < sound->streams.size(); ++i) {
+			const Variant entry = sound->streams[i];
+			if (entry.get_type() == Variant::OBJECT && Object::cast_to<AudioStream>((Object *)entry) != nullptr && sound->stream_weights[i] > 0.0f) {
+				total += (double)sound->stream_weights[i];
+			}
+		}
+		if (total > 0.0) {
+			double roll = UtilityFunctions::randf() * total;
+			for (int i = 0; i < sound->streams.size(); ++i) {
+				const Variant entry = sound->streams[i];
+				AudioStream *s = entry.get_type() == Variant::OBJECT ? Object::cast_to<AudioStream>((Object *)entry) : nullptr;
+				if (s == nullptr || sound->stream_weights[i] <= 0.0f) {
+					continue;
+				}
+				roll -= (double)sound->stream_weights[i];
+				if (roll <= 0.0) {
+					return Ref<AudioStream>(s);
+				}
+			}
+			return usable.back();
+		}
+	}
+	return usable[(size_t)UtilityFunctions::randi() % n];
+}
 // AudioStreamRandomizer pitch math: pitch_scale * exp(lerp(log(1/r),
 // log(r), randf)). Rolled only when r > 1 (no RNG burn otherwise).
 static float sound_roll_pitch(double range) {
@@ -115,7 +191,7 @@ bool SoundMixer2D::offer(BulletFactory2D &factory, const Ref<BulletSoundData2D> 
 	if (Engine::get_singleton()->is_editor_hint()) {
 		return false;
 	}
-	if (sound->stream.is_null()) {
+	if (!sound_has_audio(sound.ptr())) {
 		if (WarnOnce2D::first(sound->get_instance_id(), SOUND_WARN_EMPTY_STREAM)) {
 			UtilityFunctions::push_warning("BulletSoundData2D: stream is empty, the sound plays nothing.");
 		}
@@ -289,7 +365,7 @@ void SoundMixer2D::flush(BulletFactory2D &factory) {
 			channel.candidates.clear();
 			continue;
 		}
-		if (!sound->enabled || sound->stream.is_null()) {
+		if (!sound->enabled || !sound_has_audio(sound)) {
 			channel.candidates.clear();
 			continue;
 		}
@@ -409,7 +485,12 @@ void SoundMixer2D::flush(BulletFactory2D &factory) {
 				volume += (float)UtilityFunctions::randf_range(-(double)sound->random_volume_offset_db, (double)sound->random_volume_offset_db);
 			}
 			const float pitch = (float)sound->pitch_scale * sound_roll_pitch(sound->random_pitch);
-			player->set_stream(sound->stream);
+			const Ref<AudioStream> picked = pick_stream(sound, channel);
+			if (picked.is_null()) {
+				++dropped_total;
+				continue;
+			}
+			player->set_stream(picked);
 			player->set_volume_db(volume);
 			player->set_pitch_scale(pitch);
 			player->set_bus(bus);
@@ -503,6 +584,8 @@ Array SoundMixer2D::debug_voices() const {
 			d["volume_db"] = voice.player->get_volume_db();
 			d["pitch_scale"] = voice.player->get_pitch_scale();
 			d["bus"] = voice.player->get_bus();
+			const Ref<AudioStream> played = voice.player->get_stream();
+			d["stream"] = played.is_valid() ? (int64_t)played->get_instance_id() : (int64_t)0;
 			d["max_distance"] = voice.player->get_max_distance();
 			d["attenuation"] = voice.player->get_attenuation();
 			d["panning_strength"] = voice.player->get_panning_strength();

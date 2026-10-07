@@ -1,0 +1,111 @@
+extends BlastTest
+## Built-in stream lists: each play picks per stream_mode (nulls skipped,
+## stream the fallback), pick cursors shared per resource like the limits.
+
+
+func after_all() -> void:
+	# Same headless-audio drain as the other sound suites.
+	OS.delay_msec(500)
+	await super()
+
+
+func _list_sound(mode: int, streams: Array, weights := PackedFloat32Array()) -> BulletSoundData2D:
+	var s := BulletSoundData2D.new()
+	s.stream = H.make_sound_stream()
+	s.streams = streams
+	s.stream_mode = mode
+	s.stream_weights = weights
+	s.min_interval_sec = 0.0
+	s.max_voices = 1
+	return s
+
+
+func _played_stream_id() -> int:
+	assert_eq(busy_voices().size(), 1, "one voice busy")
+	return int((busy_voices()[0] as Dictionary).get("stream", 0))
+
+
+func _play_each_sweep(s: BulletSoundData2D, n: int) -> Array:
+	var ids: Array = []
+	for i in n:
+		assert_true(factory.play_sound(s, Vector2.ZERO), "offer %d accepted" % i)
+		await physics(2)
+		ids.append(_played_stream_id())
+	return ids
+
+
+func test_setters_reject_and_keep() -> void:
+	var s := BulletSoundData2D.new()
+	for m in ["set_streams", "get_streams", "set_stream_mode", "get_stream_mode", "set_stream_weights", "get_stream_weights"]:
+		assert_has_method(s, m, "bound " + m)
+	s.set_streams(["nope"] as Array)
+	expect_error_sequence(["BulletSoundData2D: streams entries must be AudioStream or null, keeping the old value."])
+	assert_true((s.streams as Array).is_empty(), "streams kept")
+	s.set_stream_mode(4)
+	expect_error_sequence(["BulletSoundData2D: stream_mode must be 0 (Random), 1 (Weighted), 2 (Sequence) or 3 (Shuffle), keeping the old value."])
+	assert_eq(s.stream_mode, BulletSoundData2D.STREAM_RANDOM, "mode kept")
+	s.set_stream_weights(PackedFloat32Array([-1.0]))
+	expect_error_sequence(["BulletSoundData2D: stream_weights must hold finite numbers >= 0 only, keeping the old value."])
+	assert_true(s.stream_weights.is_empty(), "weights kept")
+	s.set_stream_weights(PackedFloat32Array([NAN]))
+	expect_error_sequence(["BulletSoundData2D: stream_weights must hold finite numbers >= 0 only, keeping the old value."])
+
+
+func test_empty_list_falls_back_to_stream() -> void:
+	godot_listener_at(Vector2.ZERO)
+	var s := BulletSoundData2D.new()
+	s.stream = H.make_sound_stream()
+	s.min_interval_sec = 0.0
+	assert_true(factory.play_sound(s, Vector2.ZERO), "offer accepted")
+	await physics(2)
+	assert_eq(_played_stream_id(), s.stream.get_instance_id(), "fallback stream plays")
+
+
+func test_all_null_list_warns_and_plays_nothing() -> void:
+	godot_listener_at(Vector2.ZERO)
+	var s := BulletSoundData2D.new()
+	s.streams = [null, null]
+	s.min_interval_sec = 0.0
+	assert_false(factory.play_sound(s, Vector2.ZERO), "nothing to play")
+	expect_warning_sequence(["BulletSoundData2D: stream is empty, the sound plays nothing."])
+	await physics(2)
+	assert_eq(busy_voices().size(), 0, "no voice taken")
+
+
+func test_sequence_plays_exact_order() -> void:
+	godot_listener_at(Vector2.ZERO)
+	var trio := [H.make_sound_stream(0.2), H.make_sound_stream(0.21), H.make_sound_stream(0.22)]
+	var s := _list_sound(BulletSoundData2D.STREAM_SEQUENCE, trio)
+	var ids := await _play_each_sweep(s, 6)
+	var want: Array = []
+	for k in 6:
+		want.append((trio[k % 3] as AudioStreamWAV).get_instance_id())
+	assert_eq(ids, want, "round-robin order shared across sweeps")
+
+
+func test_shuffle_deals_every_entry_per_cycle() -> void:
+	godot_listener_at(Vector2.ZERO)
+	var quad := [H.make_sound_stream(0.2), H.make_sound_stream(0.21), H.make_sound_stream(0.22), H.make_sound_stream(0.23)]
+	var s := _list_sound(BulletSoundData2D.STREAM_SHUFFLE, quad)
+	for cycle in 2:
+		var ids := await _play_each_sweep(s, 4)
+		ids.sort()
+		var want: Array = []
+		for q in quad:
+			want.append((q as AudioStreamWAV).get_instance_id())
+		want.sort()
+		assert_eq(ids, want, "cycle %d deals every entry once" % cycle)
+
+
+func test_weighted_favors_heavier_entries() -> void:
+	godot_listener_at(Vector2.ZERO)
+	seed(1234)
+	var pair := [H.make_sound_stream(0.2), H.make_sound_stream(0.21)]
+	var s := _list_sound(BulletSoundData2D.STREAM_WEIGHTED, pair, PackedFloat32Array([3.0, 1.0]))
+	var ids := await _play_each_sweep(s, 200)
+	var heavy := 0
+	for id in ids:
+		if id == (pair[0] as AudioStreamWAV).get_instance_id():
+			heavy += 1
+	assert_gte(heavy, 110, "heavy entry wins well above half")
+	assert_lte(heavy, 170, "light entry still plays")

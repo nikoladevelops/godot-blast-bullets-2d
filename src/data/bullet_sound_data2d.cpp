@@ -38,6 +38,53 @@ void BulletSoundData2D::set_stream(const Ref<AudioStream> &new_stream) {
 	emit_changed();
 }
 
+Array BulletSoundData2D::get_streams() const { return streams; }
+void BulletSoundData2D::set_streams(const Array &value) {
+	for (int i = 0; i < value.size(); ++i) {
+		const Variant &entry = value[i];
+		if (entry.get_type() == Variant::NIL) {
+			continue;
+		}
+		if (Object::cast_to<AudioStream>(entry.get_type() == Variant::OBJECT ? (Object *)entry : nullptr) == nullptr) {
+			UtilityFunctions::push_error("BulletSoundData2D: streams entries must be AudioStream or null, keeping the old value.");
+			return;
+		}
+	}
+	if (streams == value) {
+		return;
+	}
+	streams = value;
+	emit_changed();
+}
+
+int BulletSoundData2D::get_stream_mode() const { return stream_mode; }
+void BulletSoundData2D::set_stream_mode(int value) {
+	if (value < STREAM_RANDOM || value > STREAM_SHUFFLE) {
+		UtilityFunctions::push_error("BulletSoundData2D: stream_mode must be 0 (Random), 1 (Weighted), 2 (Sequence) or 3 (Shuffle), keeping the old value.");
+		return;
+	}
+	if (stream_mode == value) {
+		return;
+	}
+	stream_mode = value;
+	emit_changed();
+}
+
+PackedFloat32Array BulletSoundData2D::get_stream_weights() const { return stream_weights; }
+void BulletSoundData2D::set_stream_weights(const PackedFloat32Array &value) {
+	for (int i = 0; i < value.size(); ++i) {
+		if (!Math::is_finite(value[i]) || value[i] < 0.0f) {
+			UtilityFunctions::push_error("BulletSoundData2D: stream_weights must hold finite numbers >= 0 only, keeping the old value.");
+			return;
+		}
+	}
+	if (stream_weights == value) {
+		return;
+	}
+	stream_weights = value;
+	emit_changed();
+}
+
 double BulletSoundData2D::get_volume_db() const { return volume_db; }
 void BulletSoundData2D::set_volume_db(double value) {
 	if (!Math::is_finite(value)) {
@@ -284,6 +331,18 @@ void BulletSoundData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_stream", "stream"), &BulletSoundData2D::set_stream);
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "stream", PROPERTY_HINT_RESOURCE_TYPE, "AudioStream"), "set_stream", "get_stream");
 
+	ClassDB::bind_method(D_METHOD("get_streams"), &BulletSoundData2D::get_streams);
+	ClassDB::bind_method(D_METHOD("set_streams", "streams"), &BulletSoundData2D::set_streams);
+	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "streams", PROPERTY_HINT_ARRAY_TYPE, "AudioStream"), "set_streams", "get_streams");
+
+	ClassDB::bind_method(D_METHOD("get_stream_mode"), &BulletSoundData2D::get_stream_mode);
+	ClassDB::bind_method(D_METHOD("set_stream_mode", "value"), &BulletSoundData2D::set_stream_mode);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "stream_mode", PROPERTY_HINT_ENUM, "Random,Weighted,Sequence,Shuffle"), "set_stream_mode", "get_stream_mode");
+
+	ClassDB::bind_method(D_METHOD("get_stream_weights"), &BulletSoundData2D::get_stream_weights);
+	ClassDB::bind_method(D_METHOD("set_stream_weights", "weights"), &BulletSoundData2D::set_stream_weights);
+	ADD_PROPERTY(PropertyInfo(Variant::PACKED_FLOAT32_ARRAY, "stream_weights"), "set_stream_weights", "get_stream_weights");
+
 	ADD_GROUP("Volume and Pitch", "");
 
 	ClassDB::bind_method(D_METHOD("get_volume_db"), &BulletSoundData2D::get_volume_db);
@@ -366,5 +425,9 @@ void BulletSoundData2D::_bind_methods() {
 	BIND_ENUM_CONSTANT(SOUND_ON_TELEGRAPH);
 	BIND_ENUM_CONSTANT(SOUND_LIMIT_REPLACE_OLDEST);
 	BIND_ENUM_CONSTANT(SOUND_LIMIT_SKIP_NEW);
+	BIND_ENUM_CONSTANT(STREAM_RANDOM);
+	BIND_ENUM_CONSTANT(STREAM_WEIGHTED);
+	BIND_ENUM_CONSTANT(STREAM_SEQUENCE);
+	BIND_ENUM_CONSTANT(STREAM_SHUFFLE);
 }
 } //namespace BlastBullets2D

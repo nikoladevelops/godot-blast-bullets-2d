@@ -87,6 +87,11 @@ private:
 		// max_voices. Reserved once: offers never allocate after warmup.
 		std::vector<Candidate> candidates;
 		size_t cap = 1;
+		// Stream-list pick state (Sequence cursor, Shuffle bag): per
+		// resource, shared like the limits.
+		size_t seq_cursor = 0;
+		std::vector<size_t> shuffle_bag;
+		size_t shuffle_n = 0;
 	};
 	struct Voice {
 		AudioStreamPlayer2D *player = nullptr;
@@ -106,6 +111,10 @@ private:
 	};
 
 	Channel &channel_for(uint64_t sound_id, size_t cap);
+	// The stream this play uses: streams picked per stream_mode (nulls
+	// skipped, stream the fallback), or null when there is nothing to play.
+	// Round-robin and shuffle state live in the channel (shared).
+	Ref<AudioStream> pick_stream(BulletSoundData2D *sound, Channel &channel);
 	// Nearest target of the candidate's spec (fresh list read): returns false
 	// when a node source finds nobody (caller falls back to Godot's listener).
 	bool resolve_listener(BulletFactory2D &factory, const SoundListenerSpec2D &spec, const Vector2 &event_pos, Vector2 &r_listener_pos, uint64_t &r_node_id, bool &r_is_point) const;
