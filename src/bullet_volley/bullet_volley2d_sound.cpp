@@ -116,4 +116,36 @@ void BulletVolley2D::sound_fire(int trigger, int bullet_index, const Vector2 &ev
 	}
 }
 
+void BulletVolley2D::sound_fire_flight() {
+	if (!(sound_trigger_mask & (1u << BulletSoundData2D::SOUND_ON_FLIGHT))) {
+		return;
+	}
+	if (bullet_factory == nullptr || sound_effects.empty()) {
+		return;
+	}
+	SoundListenerSpec2D spec;
+	if (sound_detector != nullptr) {
+		spec.kind = SoundListenerSpec2D::DETECTOR;
+		spec.detector = sound_detector;
+	} else if (!sound_listener_group.is_empty()) {
+		spec.kind = SoundListenerSpec2D::NODE_GROUP;
+		spec.group = sound_listener_group;
+	}
+	for (int i : all_bullets_enabled_set.get_active_indexes()) {
+		if (i < 0 || i >= amount_bullets) {
+			continue;
+		}
+		const Vector2 at = all_cached_instance_origin[i];
+		if (!at.is_finite()) {
+			continue;
+		}
+		for (const Ref<BulletSoundData2D> &entry : sound_effects) {
+			if (entry.is_null() || !entry->enabled || entry->get_trigger() != BulletSoundData2D::SOUND_ON_FLIGHT) {
+				continue;
+			}
+			bullet_factory->sound_offer(entry, at, sound_volume_offset_db, spec);
+		}
+	}
+}
+
 } // namespace BlastBullets2D

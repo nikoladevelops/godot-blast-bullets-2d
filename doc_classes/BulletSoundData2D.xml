@@ -139,6 +139,9 @@
 		<constant name="SOUND_ON_TELEGRAPH" value="9" enum="SoundTrigger">
 			Plays when volley_telegraphed fires. Spawner-only.
 		</constant>
+		<constant name="SOUND_ON_FLIGHT" value="10" enum="SoundTrigger">
+			Offers every sweep per live bullet at its current pose, through the same channels (interval, voices, steal all apply). Built for short positional blips, not sustained loops: voices sit where they start and never track bullets.
+		</constant>
 		<constant name="SOUND_LIMIT_REPLACE_OLDEST" value="0" enum="SoundLimitMode">
 			Past max_voices, stop this sound's oldest voice and reuse it.
 		</constant>

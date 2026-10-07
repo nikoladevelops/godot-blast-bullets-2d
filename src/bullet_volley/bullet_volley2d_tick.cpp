@@ -47,6 +47,11 @@ void BulletVolley2D::tick(double delta) {
 	// 2. Integration (no user code runs inside; homing reaches and grazes
 	// are queued).
 	move_bullets(delta);
+	// 2b. Flight sounds: one offer per live bullet at its current pose, only
+	// when armed (one mask bit, otherwise zero per-bullet cost).
+	if (sound_trigger_mask & (1u << BulletSoundData2D::SOUND_ON_FLIGHT)) {
+		sound_fire_flight();
+	}
 	// 3. Homing reached events (live) + auto-pops.
 	if (!homing_reached_events.empty() || shared_pop_requested) {
 		if (!dispatch_homing_events() || !tick_may_continue(self_id) || !is_active) {

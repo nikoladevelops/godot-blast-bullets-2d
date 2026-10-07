@@ -33,7 +33,8 @@ public:
 		SOUND_ON_HOMING_TARGET_REACHED = 6,
 		SOUND_ON_GRAZE = 7,
 		SOUND_ON_GRAZE_EXIT = 8,
-		SOUND_ON_TELEGRAPH = 9
+		SOUND_ON_TELEGRAPH = 9,
+		SOUND_ON_FLIGHT = 10
 	};
 	// SERIALIZED ids (BulletSoundData2D.when_limit_reached): never renumber.
 	enum SoundLimitMode {

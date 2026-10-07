@@ -2641,6 +2641,10 @@ public:
 	// Graze dispatches pass their ring (entries with ring_index >= 0 only
 	// match it); every other site passes -1 (ring entries never match).
 	void sound_fire(int trigger, int bullet_index, const Vector2 &event_pos, int ring = -1);
+	// Flight pass (called once per tick after the move when the flight mask
+	// bit is set): one offer per live bullet at its current pose. Frozen and
+	// pooled bullets never offer.
+	void sound_fire_flight();
 
 protected:
 	// Updates homing behavior for a bullet. Zero-delta ticks steer nothing:

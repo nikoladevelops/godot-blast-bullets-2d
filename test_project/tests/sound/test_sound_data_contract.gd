@@ -28,6 +28,7 @@ func test_bind_and_defaults() -> void:
 	assert_eq(s.priority, 0, "priority defaults 0")
 	assert_eq(s.max_duration_sec, 0.0, "max duration defaults 0")
 	assert_eq(BulletSoundData2D.SOUND_ON_TELEGRAPH, 9, "telegraph id serialized")
+	assert_eq(BulletSoundData2D.SOUND_ON_FLIGHT, 10, "flight id appended")
 	assert_eq(BulletSoundData2D.SOUND_LIMIT_SKIP_NEW, 1, "skip-new id serialized")
 
 
@@ -35,13 +36,13 @@ func test_trigger_rejects_and_keeps() -> void:
 	var s := BulletSoundData2D.new()
 	s.trigger = BulletSoundData2D.SOUND_ON_GRAZE
 	s.set_trigger(-1)
-	expect_error_sequence(["BulletSoundData2D: trigger must be 0 (On Shot), 1 (On Hit), 2 (On Destroy), 3 (On Bounce), 4 (On Lifetime Over), 5 (On Clear), 6 (On Homing Target Reached), 7 (On Graze), 8 (On Graze Exit) or 9 (On Telegraph), keeping the old value."])
+	expect_error_sequence(["BulletSoundData2D: trigger must be 0 (On Shot), 1 (On Hit), 2 (On Destroy), 3 (On Bounce), 4 (On Lifetime Over), 5 (On Clear), 6 (On Homing Target Reached), 7 (On Graze), 8 (On Graze Exit), 9 (On Telegraph) or 10 (On Flight), keeping the old value."])
 	assert_eq(s.trigger, BulletSoundData2D.SOUND_ON_GRAZE, "old trigger kept")
-	s.set_trigger(10)
-	expect_error_sequence(["BulletSoundData2D: trigger must be 0 (On Shot), 1 (On Hit), 2 (On Destroy), 3 (On Bounce), 4 (On Lifetime Over), 5 (On Clear), 6 (On Homing Target Reached), 7 (On Graze), 8 (On Graze Exit) or 9 (On Telegraph), keeping the old value."])
+	s.set_trigger(11)
+	expect_error_sequence(["BulletSoundData2D: trigger must be 0 (On Shot), 1 (On Hit), 2 (On Destroy), 3 (On Bounce), 4 (On Lifetime Over), 5 (On Clear), 6 (On Homing Target Reached), 7 (On Graze), 8 (On Graze Exit), 9 (On Telegraph) or 10 (On Flight), keeping the old value."])
 	assert_eq(s.trigger, BulletSoundData2D.SOUND_ON_GRAZE, "old trigger kept")
-	s.set_trigger(BulletSoundData2D.SOUND_ON_HIT)
-	assert_eq(s.trigger, BulletSoundData2D.SOUND_ON_HIT, "valid trigger applies")
+	s.set_trigger(BulletSoundData2D.SOUND_ON_FLIGHT)
+	assert_eq(s.trigger, BulletSoundData2D.SOUND_ON_FLIGHT, "flight trigger applies")
 
 
 func test_float_setters_reject_and_keep() -> void:
