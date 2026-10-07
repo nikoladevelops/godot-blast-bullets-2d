@@ -53,6 +53,12 @@ public:
 		STREAM_SEQUENCE = 2,
 		STREAM_SHUFFLE = 3
 	};
+	// SERIALIZED ids (BulletSoundData2D.audibility_mode): never renumber.
+	enum AudibilityMode {
+		SOUND_AUDIBILITY_DISTANCE = 0,
+		SOUND_AUDIBILITY_CAMERA = 1,
+		SOUND_AUDIBILITY_DISTANCE_AND_CAMERA = 2
+	};
 
 	// Master switch: lets users toggle a sound without removing it.
 	bool enabled = true;
@@ -115,6 +121,15 @@ public:
 	double panning_strength = 1.0;
 	// Area2D audio bus overrides listen on these physics layers.
 	int area_mask = 1;
+	// Which audibility rule drops events (see AudibilityMode): distance only
+	// (today's max_distance), camera view only, or both.
+	int audibility_mode = SOUND_AUDIBILITY_DISTANCE;
+	// The camera view rect grows by this many pixels on every side before an
+	// event counts as outside.
+	double camera_margin_px = 200.0;
+	// When true, the effective max_distance is divided by the camera's
+	// minimum zoom (zoomed in hears less, pulled back hears more).
+	bool zoom_scales_distance = false;
 
 	// At most one play per interval across the whole factory (shared with
 	// every spawner using this resource); the nearest event wins each sweep.
@@ -186,6 +201,15 @@ public:
 	int get_area_mask() const;
 	void set_area_mask(int value);
 
+	int get_audibility_mode() const;
+	void set_audibility_mode(int value);
+
+	double get_camera_margin_px() const;
+	void set_camera_margin_px(double value);
+
+	bool get_zoom_scales_distance() const;
+	void set_zoom_scales_distance(bool value);
+
 	double get_min_interval_sec() const;
 	void set_min_interval_sec(double value);
 
@@ -231,3 +255,4 @@ VARIANT_ENUM_CAST(BlastBullets2D::BulletSoundData2D::SoundTrigger);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSoundData2D::SoundLimitMode);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSoundData2D::StealMode);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSoundData2D::StreamMode);
+VARIANT_ENUM_CAST(BlastBullets2D::BulletSoundData2D::AudibilityMode);

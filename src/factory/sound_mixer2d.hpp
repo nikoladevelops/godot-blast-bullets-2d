@@ -124,6 +124,13 @@ private:
 	};
 
 	Channel &channel_for(uint64_t sound_id, size_t cap);
+	// Camera view test for one event: false when the event is outside the
+	// camera's view rect (grown by the entry's margin). No camera, or a
+	// Distance-only entry, never culls.
+	static bool sound_in_camera_view(BulletFactory2D &factory, const BulletSoundData2D *sound, const Vector2 &event_pos);
+	// Effective max_distance for one entry: divided by the camera's minimum
+	// zoom when zoom_scales_distance is set (no camera means zoom 1).
+	static double sound_effective_max_distance(BulletFactory2D &factory, const BulletSoundData2D *sound);
 	// The stream this play uses: streams picked per stream_mode (nulls
 	// skipped, stream the fallback), or null when there is nothing to play.
 	// Round-robin and shuffle state live in the channel (shared).

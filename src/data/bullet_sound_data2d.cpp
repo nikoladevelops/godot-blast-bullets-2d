@@ -246,6 +246,41 @@ void BulletSoundData2D::set_area_mask(int value) {
 	emit_changed();
 }
 
+int BulletSoundData2D::get_audibility_mode() const { return audibility_mode; }
+void BulletSoundData2D::set_audibility_mode(int value) {
+	if (value < SOUND_AUDIBILITY_DISTANCE || value > SOUND_AUDIBILITY_DISTANCE_AND_CAMERA) {
+		UtilityFunctions::push_error("BulletSoundData2D: audibility_mode must be 0 (Distance), 1 (Camera) or 2 (Distance and Camera), keeping the old value.");
+		return;
+	}
+	if (audibility_mode == value) {
+		return;
+	}
+	audibility_mode = value;
+	emit_changed();
+}
+
+double BulletSoundData2D::get_camera_margin_px() const { return camera_margin_px; }
+void BulletSoundData2D::set_camera_margin_px(double value) {
+	if (!Math::is_finite(value) || value < 0.0) {
+		UtilityFunctions::push_error("BulletSoundData2D: camera_margin_px must be finite and >= 0, keeping the old value.");
+		return;
+	}
+	if (camera_margin_px == value) {
+		return;
+	}
+	camera_margin_px = value;
+	emit_changed();
+}
+
+bool BulletSoundData2D::get_zoom_scales_distance() const { return zoom_scales_distance; }
+void BulletSoundData2D::set_zoom_scales_distance(bool value) {
+	if (zoom_scales_distance == value) {
+		return;
+	}
+	zoom_scales_distance = value;
+	emit_changed();
+}
+
 double BulletSoundData2D::get_min_interval_sec() const { return min_interval_sec; }
 void BulletSoundData2D::set_min_interval_sec(double value) {
 	if (!Math::is_finite(value) || value < 0.0) {
@@ -450,6 +485,18 @@ void BulletSoundData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_area_mask", "value"), &BulletSoundData2D::set_area_mask);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "area_mask", PROPERTY_HINT_LAYERS_2D_PHYSICS), "set_area_mask", "get_area_mask");
 
+	ClassDB::bind_method(D_METHOD("get_audibility_mode"), &BulletSoundData2D::get_audibility_mode);
+	ClassDB::bind_method(D_METHOD("set_audibility_mode", "value"), &BulletSoundData2D::set_audibility_mode);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "audibility_mode", PROPERTY_HINT_ENUM, "Distance,Camera,Distance and Camera"), "set_audibility_mode", "get_audibility_mode");
+
+	ClassDB::bind_method(D_METHOD("get_camera_margin_px"), &BulletSoundData2D::get_camera_margin_px);
+	ClassDB::bind_method(D_METHOD("set_camera_margin_px", "value"), &BulletSoundData2D::set_camera_margin_px);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "camera_margin_px", PROPERTY_HINT_RANGE, "0,4096,1,or_greater,suffix:px"), "set_camera_margin_px", "get_camera_margin_px");
+
+	ClassDB::bind_method(D_METHOD("get_zoom_scales_distance"), &BulletSoundData2D::get_zoom_scales_distance);
+	ClassDB::bind_method(D_METHOD("set_zoom_scales_distance", "value"), &BulletSoundData2D::set_zoom_scales_distance);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "zoom_scales_distance"), "set_zoom_scales_distance", "get_zoom_scales_distance");
+
 	ADD_GROUP("Limits", "");
 
 	ClassDB::bind_method(D_METHOD("get_min_interval_sec"), &BulletSoundData2D::get_min_interval_sec);
@@ -499,5 +546,8 @@ void BulletSoundData2D::_bind_methods() {
 	BIND_ENUM_CONSTANT(STREAM_WEIGHTED);
 	BIND_ENUM_CONSTANT(STREAM_SEQUENCE);
 	BIND_ENUM_CONSTANT(STREAM_SHUFFLE);
+	BIND_ENUM_CONSTANT(SOUND_AUDIBILITY_DISTANCE);
+	BIND_ENUM_CONSTANT(SOUND_AUDIBILITY_CAMERA);
+	BIND_ENUM_CONSTANT(SOUND_AUDIBILITY_DISTANCE_AND_CAMERA);
 }
 } //namespace BlastBullets2D

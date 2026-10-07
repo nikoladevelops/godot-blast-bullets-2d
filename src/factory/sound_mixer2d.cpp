@@ -5,10 +5,12 @@
 #include "factory/bullet_factory2d.hpp"
 
 #include <godot_cpp/classes/audio_stream_wav.hpp>
+#include <godot_cpp/classes/camera2d.hpp>
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/node2d.hpp>
 #include <godot_cpp/classes/scene_tree.hpp>
 #include <godot_cpp/classes/scene_tree_timer.hpp>
+#include <godot_cpp/classes/viewport.hpp>
 #include <godot_cpp/classes/window.hpp>
 #include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/core/object.hpp>
@@ -232,6 +234,47 @@ bool SoundMixer2D::resolve_listener(BulletFactory2D &factory, const SoundListene
 	return true;
 }
 
+bool SoundMixer2D::sound_in_camera_view(BulletFactory2D &factory, const BulletSoundData2D *sound, const Vector2 &event_pos) {
+	if (sound->audibility_mode != BulletSoundData2D::SOUND_AUDIBILITY_CAMERA && sound->audibility_mode != BulletSoundData2D::SOUND_AUDIBILITY_DISTANCE_AND_CAMERA) {
+		return true;
+	}
+	Viewport *vp = factory.get_viewport();
+	if (vp == nullptr) {
+		return true;
+	}
+	Camera2D *camera = vp->get_camera_2d();
+	if (camera == nullptr) {
+		return true;
+	}
+	const Vector2 zoom = camera->get_zoom();
+	const double zx = Math::is_finite((double)zoom.x) && zoom.x > 0.0 ? (double)zoom.x : 1.0;
+	const double zy = Math::is_finite((double)zoom.y) && zoom.y > 0.0 ? (double)zoom.y : 1.0;
+	const Vector2 half = vp->get_visible_rect().size * Vector2(0.5f / (float)zx, 0.5f / (float)zy);
+	const double margin = Math::is_finite(sound->camera_margin_px) && sound->camera_margin_px > 0.0 ? sound->camera_margin_px : 0.0;
+	const Vector2 center = camera->get_screen_center_position();
+	const Vector2 grown = half + Vector2((float)margin, (float)margin);
+	return Math::abs((double)event_pos.x - (double)center.x) <= (double)grown.x && Math::abs((double)event_pos.y - (double)center.y) <= (double)grown.y;
+}
+
+double SoundMixer2D::sound_effective_max_distance(BulletFactory2D &factory, const BulletSoundData2D *sound) {
+	if (!sound->zoom_scales_distance) {
+		return sound->max_distance;
+	}
+	double zoom = 1.0;
+	if (Viewport *vp = factory.get_viewport(); vp != nullptr) {
+		if (Camera2D *camera = vp->get_camera_2d(); camera != nullptr) {
+			const Vector2 z = camera->get_zoom();
+			if (Math::is_finite((double)z.x) && Math::is_finite((double)z.y) && z.x > 0.0 && z.y > 0.0) {
+				zoom = MIN((double)z.x, (double)z.y);
+			}
+		}
+	}
+	if (!(zoom > 0.0) || !Math::is_finite(zoom)) {
+		return sound->max_distance;
+	}
+	return sound->max_distance / zoom;
+}
+
 bool SoundMixer2D::offer(BulletFactory2D &factory, const Ref<BulletSoundData2D> &sound, const Vector2 &event_pos, float volume_offset_db, const SoundListenerSpec2D &listener) {
 	if (paused || sound.is_null() || !sound->enabled) {
 		if (paused) {
@@ -265,7 +308,8 @@ bool SoundMixer2D::offer(BulletFactory2D &factory, const Ref<BulletSoundData2D> 
 	const bool found = resolve_listener(factory, listener, event_pos, listener_pos, node_id, is_point);
 	const Vector2 anchor = found ? listener_pos : godot_listener_pos(factory);
 	const double dist = Math::sqrt(sound_dist2(event_pos, anchor));
-	const bool audible = !sound->positional || !(dist > sound->max_distance);
+	const double max_dist = sound_effective_max_distance(factory, sound.ptr());
+	const bool audible = (!sound->positional || !(dist > max_dist)) && sound_in_camera_view(factory, sound.ptr(), event_pos);
 	if (!audible) {
 		++dropped_total;
 		return false;
@@ -445,7 +489,8 @@ void SoundMixer2D::flush(BulletFactory2D &factory) {
 			const bool found = resolve_listener(factory, candidate.listener, candidate.event_pos, listener_pos, node_id, is_point);
 			const Vector2 anchor = found ? listener_pos : godot_listener_pos(factory);
 			const double dist = Math::sqrt(sound_dist2(candidate.event_pos, anchor));
-			if (sound->positional && dist > sound->max_distance) {
+			const double max_dist = sound_effective_max_distance(factory, sound);
+			if ((sound->positional && dist > max_dist) || !sound_in_camera_view(factory, sound, candidate.event_pos)) {
 				++dropped_total;
 				continue;
 			}

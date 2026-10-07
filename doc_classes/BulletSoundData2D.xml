@@ -41,8 +41,14 @@
 		<member name="attenuation" type="float" setter="set_attenuation" getter="get_attenuation" default="1.0">
 			Distance falloff curve exponent (Godot's own volume math). Hidden while [member positional] is off.
 		</member>
+		<member name="audibility_mode" type="int" setter="set_audibility_mode" getter="get_audibility_mode" default="0">
+			Which audibility rule drops events: Distance (only [member max_distance]), Camera (only the camera view), or both. Distance is the default: existing scenes behave as before.
+		</member>
 		<member name="bus" type="StringName" setter="set_bus" getter="get_bus" default="&amp;&quot;Master&quot;">
 			Mixer bus this sound plays on. Unknown names play on Master with one warning per name.
+		</member>
+		<member name="camera_margin_px" type="float" setter="set_camera_margin_px" getter="get_camera_margin_px" default="200.0">
+			The camera view rect grows by this many pixels on every side before an event counts as outside. Rescues near-outside events from the cull.
 		</member>
 		<member name="enabled" type="bool" setter="set_enabled" getter="get_enabled" default="true">
 			Master switch: toggle a sound without removing it. Disabled entries play nothing.
@@ -107,6 +113,9 @@
 		<member name="when_limit_reached" type="int" setter="set_when_limit_reached" getter="get_when_limit_reached" default="0">
 			What happens past [member max_voices]: stop this sound's oldest voice and reuse it, or drop the new event.
 		</member>
+		<member name="zoom_scales_distance" type="bool" setter="set_zoom_scales_distance" getter="get_zoom_scales_distance" default="false">
+			When true, the effective [member max_distance] is divided by the camera's minimum zoom: zoomed in hears less, pulled back hears more. No camera means zoom 1.
+		</member>
 	</members>
 	<constants>
 		<constant name="SOUND_ON_SHOT" value="0" enum="SoundTrigger">
@@ -165,6 +174,15 @@
 		</constant>
 		<constant name="STREAM_SHUFFLE" value="3" enum="StreamMode">
 			Deal every entry of [member streams] once per cycle, in shuffled order.
+		</constant>
+		<constant name="SOUND_AUDIBILITY_DISTANCE" value="0" enum="AudibilityMode">
+			Only [member max_distance] drops events (the default).
+		</constant>
+		<constant name="SOUND_AUDIBILITY_CAMERA" value="1" enum="AudibilityMode">
+			Only the camera view drops events (no camera means no culling).
+		</constant>
+		<constant name="SOUND_AUDIBILITY_DISTANCE_AND_CAMERA" value="2" enum="AudibilityMode">
+			Both rules drop events.
 		</constant>
 	</constants>
 </class>
