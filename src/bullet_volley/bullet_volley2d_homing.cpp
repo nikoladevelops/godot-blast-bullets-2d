@@ -763,6 +763,9 @@ bool BulletVolley2D::dispatch_homing_events() {
 		if (ev.target_instance_id != 0) {
 			target = Object::cast_to<Node2D>(ObjectDB::get_instance(ObjectID(ev.target_instance_id)));
 		}
+		// The reach is delivered (drop checks above passed): the sound
+		// offers whether or not anything is connected.
+		sound_fire(BulletSoundData2D::SOUND_ON_HOMING_TARGET_REACHED, ev.bullet_index, ev.target_position);
 		note_user_code();
 		emit_signal(reached_signal, this, ev.bullet_index, target, ev.target_position);
 		if (ObjectDB::get_instance(ObjectID(self_id)) != this) {

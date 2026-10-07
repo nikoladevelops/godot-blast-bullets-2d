@@ -902,6 +902,9 @@ bool BulletSpawner2D::shoot_once() {
 	// (non-nested) shots are unaffected. All pre-emit failure paths above
 	// return while the guard is either unset or already cleared.
 	emit_signal("volley_fired", bullets, volleys_fired);
+	// The shot succeeded (no drop path follows): spawner-only entries fire
+	// at the spawner's global position.
+	fire_spawner_sound(BulletSoundData2D::SOUND_ON_SHOT);
 	// One-shot budget counts every fired volley (auto or manual) without
 	// touching max_volleys. Spent budget pauses via the standard path, so
 	// transitions stay consistent; placed after volley_fired so the last
@@ -1328,6 +1331,7 @@ void BulletSpawner2D::begin_telegraph(bool auto_started) {
 	telegraph_from_auto = auto_started;
 	telegraph_time_left = telegraph_sec;
 	emit_signal("volley_telegraphed", aim);
+	fire_spawner_sound(BulletSoundData2D::SOUND_ON_TELEGRAPH);
 	set_process(true);
 }
 

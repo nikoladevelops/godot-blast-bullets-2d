@@ -709,6 +709,7 @@ int BulletVolley2D::try_handle_bounce(CollisionType collision_type, int bullet_i
 	}
 	// Bounce sparks own this record (a consumed bounce falls through to the
 	// counter below, but must not double-fire the hit spark there).
+	sound_fire(BulletSoundData2D::SOUND_ON_BOUNCE, bullet_index, all_cached_instance_transforms[bullet_index].get_origin());
 	fx_fire_oneshot(EFFECT_ON_BOUNCE, bullet_index, all_cached_instance_transforms[bullet_index]);
 	// Arm the same-target debounce: further records against THIS object
 	// inside the window never re-bounce (see the check above).

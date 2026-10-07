@@ -2634,6 +2634,11 @@ public:
 	// Pool time / new life: entries, mask, listener and offset dropped (a
 	// reused volley never plays a previous life's sound).
 	void sound_release();
+	// Offers every armed entry with this trigger to the factory mixer (inline
+	// mask test first: unarmed triggers never reach the mixer). Lethal and
+	// clear paths call this BEFORE disable_bullet: the last bullet's disable
+	// releases the life (and drops these entries) synchronously.
+	void sound_fire(int trigger, int bullet_index, const Vector2 &event_pos);
 
 protected:
 	// Updates homing behavior for a bullet. Zero-delta ticks steer nothing:

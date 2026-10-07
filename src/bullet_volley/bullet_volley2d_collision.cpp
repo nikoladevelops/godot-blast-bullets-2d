@@ -779,6 +779,10 @@ void BulletVolley2D::handle_bullet_collision(const BulletCollisionData2D &record
 	// raised max vetoes the kill; max 0 is infinite.
 	const bool lethal = bullet_max_collision_count > 0 && bullets_current_collision_count[bullet_index] >= bullet_max_collision_count;
 	if (lethal) {
+		// Destroy sound only (never the hit sound too): the killing blow
+		// gets one report, at the impact pose, BEFORE the disable below
+		// (the last bullet's disable releases the life synchronously).
+		sound_fire(BulletSoundData2D::SOUND_ON_DESTROY, bullet_index, impact_transf.get_origin());
 		// Destroy explosion only (never the hit spark too): the killing blow
 		// gets one visual, at the impact pose. The attachment goes back to
 		// the pool with the bullet (the handler already saw it).
@@ -787,6 +791,7 @@ void BulletVolley2D::handle_bullet_collision(const BulletCollisionData2D &record
 	} else if (bounce_decision != 2) {
 		// Hit sparks for counted, survived hits (a consumed bounce already
 		// fired its bounce spark, so it stays silent here).
+		sound_fire(BulletSoundData2D::SOUND_ON_HIT, bullet_index, impact_transf.get_origin());
 		fx_fire_oneshot(EFFECT_ON_HIT, bullet_index, impact_transf);
 	}
 }

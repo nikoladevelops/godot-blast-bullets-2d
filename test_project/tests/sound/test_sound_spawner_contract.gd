@@ -4,6 +4,13 @@ extends BlastTest
 ## their nodes, arming reaches every fired volley, orphans keep the settings.
 
 
+func after_all() -> void:
+	# Shots in this suite play real (looped) voices: same headless-audio
+	# drain as the other sound suites (resets already stopped every voice).
+	OS.delay_msec(500)
+	await super()
+
+
 func _shot_volley(sp: BulletSpawner2D) -> BulletVolley2D:
 	watch_signals(sp)
 	var before: int = get_signal_emit_count(sp, "volley_fired")

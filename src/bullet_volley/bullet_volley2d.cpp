@@ -742,6 +742,16 @@ int BulletVolley2D::disable_bullets_bulk(const std::vector<int> &indexes, int fx
 			}
 			const bool fx_have_pose = fx_trigger >= 0 && i < (int)all_cached_instance_transforms.size();
 			const Transform2D fx_pose = fx_have_pose ? all_cached_instance_transforms[i] : Transform2D();
+			if (fx_have_pose) {
+				// The matching sound trigger, BEFORE the disable below (a
+				// clear of the last bullet releases the life synchronously;
+				// the drain check runs after this loop, but the pose and
+				// the entries are read while both are intact).
+				const int sound_trigger = fx_trigger == EFFECT_ON_CLEAR ? BulletSoundData2D::SOUND_ON_CLEAR : (fx_trigger == EFFECT_ON_LIFETIME_OVER ? BulletSoundData2D::SOUND_ON_LIFETIME_OVER : -1);
+				if (sound_trigger >= 0) {
+					sound_fire(sound_trigger, i, fx_pose.get_origin());
+				}
+			}
 			all_bullets_enabled_set.disable_data(i);
 			--active_bullets_counter;
 			if (active_bullets_counter < 0) {
@@ -864,6 +874,7 @@ bool BulletVolley2D::clear_bullet(int bullet_index) {
 	const bool fx_have_pose = bullet_index >= 0 && bullet_index < (int)all_cached_instance_transforms.size();
 	if (fx_have_pose) {
 		fx_clear_transf = all_cached_instance_transforms[bullet_index];
+		sound_fire(BulletSoundData2D::SOUND_ON_CLEAR, bullet_index, fx_clear_transf.get_origin());
 	}
 	disable_bullet(bullet_index, true);
 	if (fx_have_pose) {

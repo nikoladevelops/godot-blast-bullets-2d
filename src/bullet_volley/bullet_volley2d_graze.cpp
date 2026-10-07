@@ -340,6 +340,11 @@ bool BulletVolley2D::dispatch_graze_events() {
 			continue;
 		}
 		const Ref<BulletGrazeZone2D> zone = graze_zones[ev.zone];
+		// The graze is delivered (drop checks above passed): the sound
+		// offers whether or not anything is connected.
+		if (ev.bullet_index >= 0 && ev.bullet_index < (int)all_cached_instance_transforms.size()) {
+			sound_fire(ev.exit ? BulletSoundData2D::SOUND_ON_GRAZE_EXIT : BulletSoundData2D::SOUND_ON_GRAZE, ev.bullet_index, all_cached_instance_transforms[ev.bullet_index].get_origin());
+		}
 		const StringName &signal_name = ev.exit ? names.bullet_graze_exited : names.bullet_grazed;
 		bool handled = false;
 		// Bubbling: the owner spawner first (while it lives), then the
