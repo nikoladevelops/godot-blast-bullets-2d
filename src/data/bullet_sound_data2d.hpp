@@ -39,6 +39,11 @@ public:
 		SOUND_LIMIT_REPLACE_OLDEST = 0,
 		SOUND_LIMIT_SKIP_NEW = 1
 	};
+	// SERIALIZED ids (BulletSoundData2D.steal_mode): never renumber.
+	enum StealMode {
+		STEAL_OLDEST = 0,
+		STEAL_QUIETEST = 1
+	};
 	// SERIALIZED ids (BulletSoundData2D.stream_mode): never renumber.
 	enum StreamMode {
 		STREAM_RANDOM = 0,
@@ -117,6 +122,9 @@ public:
 	int max_voices = 4;
 	// What happens past max_voices (see SoundLimitMode).
 	int when_limit_reached = SOUND_LIMIT_REPLACE_OLDEST;
+	// Which voice Replace Oldest stops (see StealMode): the oldest, or the
+	// quietest (lowest played volume, ties go to the oldest).
+	int steal_mode = STEAL_OLDEST;
 	// Voice-stealing rank for the factory-wide pool (-16..16).
 	int priority = 0;
 	// Stops a voice after this long (looping streams). 0 = whole stream.
@@ -185,6 +193,9 @@ public:
 	int get_when_limit_reached() const;
 	void set_when_limit_reached(int value);
 
+	int get_steal_mode() const;
+	void set_steal_mode(int value);
+
 	int get_priority() const;
 	void set_priority(int value);
 
@@ -202,4 +213,5 @@ protected:
 
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSoundData2D::SoundTrigger);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSoundData2D::SoundLimitMode);
+VARIANT_ENUM_CAST(BlastBullets2D::BulletSoundData2D::StealMode);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSoundData2D::StreamMode);

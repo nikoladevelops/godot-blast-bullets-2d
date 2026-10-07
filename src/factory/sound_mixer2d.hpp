@@ -100,6 +100,9 @@ private:
 		int priority = 0;
 		double start_clock = 0.0;
 		double max_duration = 0.0;
+		// Effective played volume (volume + trim + random): Quietest steal
+		// ranks by it (ties go to the oldest).
+		float last_volume = 0.0f;
 		// Follow state for node listeners: the event P is fixed, L is tracked
 		// by id and the voice sits at G + (P - L) every sweep. A dead L
 		// freezes the voice where it is. Point listeners never follow.

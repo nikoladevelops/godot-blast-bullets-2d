@@ -290,6 +290,19 @@ void BulletSoundData2D::set_priority(int value) {
 	emit_changed();
 }
 
+int BulletSoundData2D::get_steal_mode() const { return steal_mode; }
+void BulletSoundData2D::set_steal_mode(int value) {
+	if (value != STEAL_OLDEST && value != STEAL_QUIETEST) {
+		UtilityFunctions::push_error("BulletSoundData2D: steal_mode must be 0 (Oldest) or 1 (Quietest), keeping the old value.");
+		return;
+	}
+	if (steal_mode == value) {
+		return;
+	}
+	steal_mode = value;
+	emit_changed();
+}
+
 double BulletSoundData2D::get_max_duration_sec() const { return max_duration_sec; }
 void BulletSoundData2D::set_max_duration_sec(double value) {
 	if (!Math::is_finite(value) || value < 0.0) {
@@ -422,6 +435,10 @@ void BulletSoundData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_when_limit_reached", "value"), &BulletSoundData2D::set_when_limit_reached);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "when_limit_reached", PROPERTY_HINT_ENUM, "Replace Oldest,Skip New"), "set_when_limit_reached", "get_when_limit_reached");
 
+	ClassDB::bind_method(D_METHOD("get_steal_mode"), &BulletSoundData2D::get_steal_mode);
+	ClassDB::bind_method(D_METHOD("set_steal_mode", "value"), &BulletSoundData2D::set_steal_mode);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "steal_mode", PROPERTY_HINT_ENUM, "Oldest,Quietest"), "set_steal_mode", "get_steal_mode");
+
 	ClassDB::bind_method(D_METHOD("get_priority"), &BulletSoundData2D::get_priority);
 	ClassDB::bind_method(D_METHOD("set_priority", "value"), &BulletSoundData2D::set_priority);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "priority", PROPERTY_HINT_RANGE, "-16,16,1,or_greater,or_less"), "set_priority", "get_priority");
@@ -442,6 +459,8 @@ void BulletSoundData2D::_bind_methods() {
 	BIND_ENUM_CONSTANT(SOUND_ON_TELEGRAPH);
 	BIND_ENUM_CONSTANT(SOUND_LIMIT_REPLACE_OLDEST);
 	BIND_ENUM_CONSTANT(SOUND_LIMIT_SKIP_NEW);
+	BIND_ENUM_CONSTANT(STEAL_OLDEST);
+	BIND_ENUM_CONSTANT(STEAL_QUIETEST);
 	BIND_ENUM_CONSTANT(STREAM_RANDOM);
 	BIND_ENUM_CONSTANT(STREAM_WEIGHTED);
 	BIND_ENUM_CONSTANT(STREAM_SEQUENCE);

@@ -218,3 +218,44 @@ func _collect_interpolated(n: Node, out: Array) -> void:
 		if c is CanvasItem and (c as CanvasItem).is_physics_interpolated_and_enabled():
 			out.append(str(n.get_path_to(c)))
 		_collect_interpolated(c, out)
+
+
+func test_steal_mode_setter_rejects_and_keeps() -> void:
+	var s := BulletSoundData2D.new()
+	assert_has_method(s, "set_steal_mode", "bound set_steal_mode")
+	assert_has_method(s, "get_steal_mode", "bound get_steal_mode")
+	assert_eq(s.steal_mode, BulletSoundData2D.STEAL_OLDEST, "oldest by default")
+	s.set_steal_mode(2)
+	expect_error_sequence(["BulletSoundData2D: steal_mode must be 0 (Oldest) or 1 (Quietest), keeping the old value."])
+	assert_eq(s.steal_mode, BulletSoundData2D.STEAL_OLDEST, "kept")
+
+
+func _busy_volumes() -> Array:
+	var out: Array = []
+	for e in busy_voices():
+		out.append(float((e as Dictionary)["volume_db"]))
+	out.sort()
+	return out
+
+
+func test_quietest_steal_takes_the_quietest_voice() -> void:
+	godot_listener_at(Vector2.ZERO)
+	for mode in [BulletSoundData2D.STEAL_QUIETEST, BulletSoundData2D.STEAL_OLDEST]:
+		var s := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT, 2)
+		s.steal_mode = mode
+		s.volume_db = -2.0
+		assert_true(factory.play_sound(s, Vector2.ZERO), "loud plays")
+		await physics(2)
+		s.volume_db = -20.0
+		assert_true(factory.play_sound(s, Vector2(10, 0)), "quiet plays")
+		await physics(2)
+		assert_eq(busy_voices().size(), 2, "two voices busy")
+		s.volume_db = -10.0
+		assert_true(factory.play_sound(s, Vector2(20, 0)), "third offered")
+		await physics(2)
+		if mode == BulletSoundData2D.STEAL_QUIETEST:
+			assert_eq(_busy_volumes(), [-10.0, -2.0], "quietest stolen")
+		else:
+			assert_eq(_busy_volumes(), [-20.0, -10.0], "oldest stolen")
+		factory.stop_sounds()
+		await idle(1)

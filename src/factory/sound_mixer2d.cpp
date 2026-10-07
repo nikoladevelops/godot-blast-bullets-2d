@@ -439,8 +439,16 @@ void SoundMixer2D::flush(BulletFactory2D &factory) {
 					++dropped_total;
 					continue;
 				}
-				voices[oldest_same].player->stop();
-				release_voice(voices[oldest_same]);
+				size_t victim = oldest_same;
+				if (sound->steal_mode == BulletSoundData2D::STEAL_QUIETEST) {
+					for (size_t i = 0; i < voices.size(); ++i) {
+						if (voices[i].busy && voices[i].sound_id == channel.sound_id && voices[i].last_volume < voices[victim].last_volume) {
+							victim = i;
+						}
+					}
+				}
+				voices[victim].player->stop();
+				release_voice(voices[victim]);
 			}
 			AudioStreamPlayer2D *player = alloc_voice(factory, sound->priority);
 			if (player == nullptr) {
@@ -512,6 +520,7 @@ void SoundMixer2D::flush(BulletFactory2D &factory) {
 			voice.sound_id = channel.sound_id;
 			voice.priority = sound->priority;
 			voice.start_clock = clock;
+			voice.last_volume = volume;
 			voice.max_duration = Math::is_finite(sound->max_duration_sec) && sound->max_duration_sec > 0.0 ? sound->max_duration_sec : 0.0;
 			voice.event_pos = winner.event_pos;
 			voice.listener_node_id = winner.node_id;
