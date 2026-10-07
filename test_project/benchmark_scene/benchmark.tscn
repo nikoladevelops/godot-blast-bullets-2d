@@ -120,7 +120,11 @@ ring_count = 3
 ring_1_radius = 30.5
 ring_2_radius = 65.0
 ring_3_radius = 120.0
-preview_during_runtime = true
+count_bullet_size = false
+
+[sub_resource type="Curve" id="Curve_r5nj6"]
+_data = [Vector2(0.13763441, 0.34210527), 0.0, 0.0, 0, 0, Vector2(0.7225807, 0.66315794), 0.0, 0.0, 0, 0]
+point_count = 2
 
 [sub_resource type="Gradient" id="Gradient_rfik0"]
 colors = PackedColorArray(0.215686, 0.215686, 0.215686, 1, 0.215686, 0.215686, 0.215686, 1)
@@ -158,6 +162,7 @@ script = ExtResource("1_cfubd")
 bullet_factory_path = NodePath("../BulletFactory2D")
 transforms_generator = NodePath(".")
 spawn_data = SubResource("BulletVolleyData2D_nkrfg")
+pattern_source = 30
 helper_bullets_amount = 555
 helper_ring_y_scale = 3.0
 helper_fan_spread = 3.0
@@ -184,6 +189,11 @@ orbiting_radius_start = 350.0
 orbiting_lock_policy = 1
 graze_enabled = true
 graze_zones = Array[BulletGrazeZone2D]([SubResource("BulletGrazeZone2D_c5op3")])
+graze_node_group = &"enemy"
+graze_target_path = NodePath("../Player")
+graze_node_name_match_mode = 2
+graze_children_parent_path = NodePath("../EnemySpawnersContainer/EnemyShipSpawner")
+graze_preview_during_runtime = true
 show_preview_during_runtime = true
 preview_draw_collision_rings = true
 preview_collision_ring_color = Color(0.60784316, 0.14117648, 0.57254905, 1)
@@ -191,6 +201,7 @@ movement_enabled = true
 movement_path = NodePath("../Paths/Path2D")
 movement_loop_mode = 2
 movement_transition = 2
+movement_progress_curve = SubResource("Curve_r5nj6")
 movement_rotate_with_path = true
 movement_cubic_sampling = true
 position = Vector2(-390, -28)

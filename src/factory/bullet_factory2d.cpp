@@ -176,9 +176,6 @@ void BulletFactory2D::_ready() {
 
 	is_ready = true;
 	register_monitors();
-	// Spawners readied before this factory could not wake its graze runtime
-	// preview: one look now (it sleeps again when nothing is flagged).
-	wake_graze_runtime_preview();
 
 	// Interpolation mismatch warning: warn when the factory flag disagrees with the project setting.
 	// Bullets look steppy on >60Hz displays when project interpolation is off
@@ -349,10 +346,9 @@ void BulletFactory2D::set_is_factory_processing_bullets(bool is_processing_enabl
 
 void BulletFactory2D::update_process_state() {
 	// _process drives the interpolation pass (only while bullets process
-	// and interpolation is on) and the graze runtime preview (only while
-	// awake): idle otherwise instead of paying an empty virtual call every
-	// rendered frame.
-	set_process((is_factory_processing_bullets && use_physics_interpolation) || graze_runtime_preview_awake);
+	// and interpolation is on): idle otherwise instead of paying an empty
+	// virtual call every rendered frame.
+	set_process(is_factory_processing_bullets && use_physics_interpolation);
 }
 
 void BulletFactory2D::_physics_process(double delta) {
@@ -413,9 +409,6 @@ void BulletFactory2D::_process(double delta) {
 		interpolate_volleys();
 		is_iterating_bullets = false;
 		stats_last_render_usec = Time::get_singleton()->get_ticks_usec() - stats_t0;
-	}
-	if (graze_runtime_preview_awake) {
-		refresh_graze_runtime_preview();
 	}
 }
 

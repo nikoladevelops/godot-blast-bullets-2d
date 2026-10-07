@@ -49,14 +49,8 @@ func _process(_delta: float) -> void:
 			_expect(2, Vector2(100, 0), "a replacement target gets rings")
 			var zone := enemy.graze_zones[0] as BulletGrazeZone2D
 			zone.ring_count = 1
-			# A runtime-only switch: the editor keeps drawing through the
-			# spawner and the (never ready) factory draws nothing.
-			zone.preview_during_runtime = true
 		120:
-			_expect(1, Vector2(100, 0), "a zone edit redraws (runtime preview flag ignored in the editor)")
-			var factory := root.get_node("BulletFactory2D")
-			if factory.get_node_or_null("~BlastBulletsGrazeRuntimePreview") != null or factory.debug_get_graze_runtime_preview()["awake"]:
-				_fail("the factory runtime preview woke inside the editor")
+			_expect(1, Vector2(100, 0), "a zone edit redraws")
 			var holder := Node2D.new()
 			holder.name = "Holder"
 			root.add_child(holder)

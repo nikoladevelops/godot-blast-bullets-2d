@@ -1651,10 +1651,6 @@ private:
 	// Zone resources' `changed` -> ring preview refresh.
 	void connect_graze_zones(bool connect);
 	void _on_graze_zone_changed();
-	// Runtime only: graze spawners join GRAZE_SPAWNER_GROUP (the factory's
-	// runtime preview scans it) and wake their factory's runtime preview
-	// whenever a held zone is flagged preview_during_runtime.
-	void update_graze_runtime_preview_hookup();
 	// Ring preview: allowed + toggled on (editor: graze_show_preview;
 	// runtime: also graze_preview_during_runtime) + graze on.
 	bool graze_preview_active() const;

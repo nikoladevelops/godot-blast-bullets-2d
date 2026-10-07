@@ -30,10 +30,9 @@ struct GrazePreviewCircle2D {
 };
 
 // Graze ring preview layer: every ring of the zones it is given, drawn as a
-// circle around each resolved target. Used by BulletSpawner2D (its editor /
-// runtime preview) and by BulletFactory2D (zones with
-// BulletGrazeZone2D.preview_during_runtime, drawn once however many
-// spawners share them). Top-level (canvas coordinates: target global
+// circle around each resolved target. Used by BulletSpawner2D (its editor
+// preview, and at runtime with graze_preview_during_runtime). Top-level
+// (canvas coordinates: target global
 // positions draw as they are, a moving owner never redraws), owner-less and
 // internal (never saved, never a pattern marker). Same snapshot contract as
 // PatternPreviewLayer2D: the owner stores plain values, _draw() repaints

@@ -203,14 +203,6 @@ void BulletVolley2D::prepare_graze_tick() {
 	// Bullet size: the shape's bounding radius (read every tick: a runtime
 	// shape change counts at once) times the scale measured at arming.
 	const real_t bullet_radius = graze_shape_bound_radius2d(cached_effective_shape_type, cached_circle_radius, cached_rect_size, cached_capsule_height) * graze_bullet_scale;
-	for (int z = 0; z < graze_zone_slots; ++z) {
-		const BulletGrazeZone2D *zone = graze_zones[z].ptr();
-		if (zone != nullptr && zone->enabled && zone->preview_during_runtime) {
-			// Keeps the factory's runtime ring preview drawing this zone
-			// (cheap: a flag check once awake).
-			bullet_factory->wake_graze_runtime_preview();
-		}
-	}
 	// The targets: one list for every zone, updated at most once per sweep
 	// and shared by every volley of its detector. Read in place; copied only
 	// when few (inline) or when this volley's owner spawner is one of them.

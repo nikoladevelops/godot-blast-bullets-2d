@@ -89,7 +89,7 @@ rotation = -1.5708
 [node name="ShootTimer" type="Timer" parent="." unique_id=2123705527]
 one_shot = true
 
-[node name="BulletAnimatedSprite" type="AnimatedSprite2D" parent="." unique_id=1682853447]
+[node name="BulletAnimatedSprite" type="AnimatedSprite2D" parent="." unique_id=1682853447 groups=["enemy"]]
 visible = false
 sprite_frames = ExtResource("8_5vb7x")
 

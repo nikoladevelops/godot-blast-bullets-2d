@@ -11,7 +11,7 @@ extends BlastTest
 ## nodes), the filter applies to all of them, the interval holds membership
 ## between scans while positions stay live, a refresh rescans at once, edits
 ## reach bullets in flight, orphaned volleys keep their spawner's settings,
-## both ring previews draw the source's targets, hundreds of matches all
+## the ring preview draws the source's targets, hundreds of matches all
 ## count (no cap), default spawners share the factory's one scan per tick, detectors
 ## live exactly as long as their spawner or its bullets and never leak
 ## through the pool. Homing's refresh is retarget_live_volleys().
@@ -466,27 +466,6 @@ func test_the_ring_preview_draws_the_source_targets() -> void:
 		ids.append(c["target_id"])
 	assert_eq(ids, _ids([shown]), "rings around the named node only")
 	assert_eq(_ids(sp.resolve_graze_targets()), ids, "exactly what the runtime tests")
-
-
-func test_the_factory_preview_draws_each_spawners_targets() -> void:
-	var zone := H.make_graze_zone([20.0])
-	zone.preview_during_runtime = true
-	var a := _spawner([zone], NODE_NAME)
-	a.graze_node_name = "RingA"
-	var b := _spawner([zone], NODE_NAME)
-	b.graze_node_name = "RingB"
-	var ta := _node("RingA", Vector2(100, 0))
-	var tb := _node("RingB", Vector2(-100, 0))
-	await idle(2)
-	var info: Dictionary = factory.debug_get_graze_runtime_preview()
-	var ids: Array = []
-	for c in info["circles"]:
-		ids.append(c["target_id"])
-	ids.sort()
-	var expected := _ids([ta, tb])
-	expected.sort()
-	assert_eq(ids, expected, "one zone, drawn around each spawner's own targets")
-	assert_eq(info["zones"], 2, "once per (zone, target source)")
 
 
 func test_hundreds_of_matches_all_count() -> void:

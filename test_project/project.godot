@@ -35,6 +35,7 @@ enabled=PackedStringArray("res://addons/gut/plugin.cfg")
 [global_group]
 
 player=""
+enemy=""
 
 [input]
 

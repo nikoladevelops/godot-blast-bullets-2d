@@ -16,12 +16,6 @@
 namespace BlastBullets2D {
 using namespace godot;
 
-// Internal (non-persistent) group of every running BulletSpawner2D with
-// graze on: BulletFactory2D scans it for zones flagged
-// preview_during_runtime. The tree keeps it exact (leaving the tree or being
-// freed removes a spawner); never a user-facing group.
-static constexpr const char *GRAZE_SPAWNER_GROUP = "_blast_bullets_graze_spawners";
-
 // One graze target as the runtime keeps it: an instance id and the global
 // position read when the snapshot was taken. Never a pointer: user code runs
 // between the snapshot and its use (handlers of earlier volleys in the same

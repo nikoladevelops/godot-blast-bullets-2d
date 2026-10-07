@@ -484,7 +484,7 @@
 			Node Name source: how [member graze_node_name] is compared (Exact, Contains, Starts With, Ends With; homing's values).
 		</member>
 		<member name="graze_preview_during_runtime" type="bool" setter="set_graze_preview_during_runtime" getter="get_graze_preview_during_runtime" default="false">
-			Also draw this spawner's graze rings while the game runs (debugging aid). Requires [member graze_show_preview]. Zones flagged [member BulletGrazeZone2D.preview_during_runtime] are drawn by the factory instead (once, whatever this setting), never twice.
+			Also draw this spawner's graze rings while the game runs (debugging aid): edit a zone from a script or the remote inspector and the rings, and every bullet in flight, follow at once. Requires [member graze_show_preview]. This is the only runtime graze preview; every spawner with it on draws its own rings, so turn it on for one spawner to tune a zone that several share.
 		</member>
 		<member name="graze_preview_line_width" type="float" setter="set_graze_preview_line_width" getter="get_graze_preview_line_width" default="1.5">
 			Line width of the graze preview rings, in pixels. Must be finite and above zero.

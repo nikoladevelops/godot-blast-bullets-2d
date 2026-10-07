@@ -45,10 +45,6 @@ public:
 	bool count_bullet_size = true;
 	Regraze regraze = REGRAZE_ONCE;
 	Color preview_color = Color(0.2, 0.9, 0.8, 0.8);
-	// Debug view: while the game runs, the factory draws this zone's rings
-	// around its targets (once, however many spawners share the zone), so
-	// sizes can be tuned live. Off by default.
-	bool preview_during_runtime = false;
 
 	bool get_enabled() const;
 	void set_enabled(bool value);
@@ -80,9 +76,6 @@ public:
 
 	Color get_preview_color() const;
 	void set_preview_color(const Color &value);
-
-	bool get_preview_during_runtime() const;
-	void set_preview_during_runtime(bool value);
 
 	// Rings beyond ring_count hide in the inspector (still stored).
 	void _validate_property(PropertyInfo &p_property) const;

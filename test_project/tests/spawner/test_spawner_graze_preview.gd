@@ -2,7 +2,9 @@ extends BlastTest
 ## Graze ring preview (runtime path: graze_preview_during_runtime; the
 ## editor path runs the same refresh): every ring of every enabled zone is
 ## drawn around every resolved target (the runtime's own filter, the spawner
-## excluded) in the zone's color with outer rings fainter; targets moving
+## excluded) in the zone's color with outer rings fainter; it is the only
+## runtime ring preview (zones carry no switch, the factory never draws
+## rings nor wakes its _process for graze); targets moving
 ## redraw the rings without a pattern rebuild and a still scene never
 ## redraws; freed targets drop out; zone edits redraw at once; the toggles
 ## hide the layer; the layer is top-level, internal, owner-less and tagged,
@@ -52,6 +54,19 @@ func test_every_ring_of_every_zone_around_every_target() -> void:
 	var stats: Dictionary = sp.debug_get_graze_preview_stats()
 	assert_true(stats["active"] and stats["visible"], "active and visible")
 	assert_eq(stats["circles"], 6, "six circles")
+
+
+func test_the_spawner_preview_is_the_only_runtime_preview() -> void:
+	make_graze_target(Vector2(100, 0))
+	var z := H.make_graze_zone([30.0])
+	var sp := _preview_spawner([z])
+	assert_true(sp.shoot_once(), "fires: a volley armed with the zone is in flight")
+	await idle(3)
+	assert_eq(_circles(sp), [[Vector2(100, 0), 30.0, 0, 0]], "the spawner draws its zone")
+	assert_false("preview_during_runtime" in z, "a zone carries no runtime preview switch")
+	assert_false(factory.has_method("debug_get_graze_runtime_preview"), "no factory-drawn ring preview")
+	assert_null(factory.get_node_or_null("~BlastBulletsGrazeRuntimePreview"), "the factory never builds a ring layer")
+	assert_false(factory.is_processing(), "graze never wakes the factory's _process (interpolation is off here)")
 
 
 func test_preview_targets_are_the_runtime_targets() -> void:
