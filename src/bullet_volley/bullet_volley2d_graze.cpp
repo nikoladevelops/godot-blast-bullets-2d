@@ -332,9 +332,11 @@ bool BulletVolley2D::dispatch_graze_events() {
 			continue;
 		}
 		// A target freed (or queued for deletion) since the move is no
-		// longer something to report.
-		Node2D *target = Object::cast_to<Node2D>(ObjectDB::get_instance(ObjectID(ev.target_id)));
-		if (target == nullptr || target->is_queued_for_deletion()) {
+		// longer something to report. A point (Mouse, Global Positions) is
+		// no node: the signals carry a null target and it never dies.
+		const bool point = graze_is_point_target2d(ev.target_id);
+		Node2D *target = point ? nullptr : Object::cast_to<Node2D>(ObjectDB::get_instance(ObjectID(ev.target_id)));
+		if (!point && (target == nullptr || target->is_queued_for_deletion())) {
 			continue;
 		}
 		const Ref<BulletGrazeZone2D> zone = graze_zones[ev.zone];
@@ -356,9 +358,11 @@ bool BulletVolley2D::dispatch_graze_events() {
 			}
 			// The handler may have freed the target: the factory's
 			// handler gets a live one or nothing.
-			target = Object::cast_to<Node2D>(ObjectDB::get_instance(ObjectID(ev.target_id)));
-			if (target == nullptr || target->is_queued_for_deletion()) {
-				continue;
+			if (!point) {
+				target = Object::cast_to<Node2D>(ObjectDB::get_instance(ObjectID(ev.target_id)));
+				if (target == nullptr || target->is_queued_for_deletion()) {
+					continue;
+				}
 			}
 		}
 		if (bullet_factory != nullptr && bullet_factory->has_connections(signal_name)) {

@@ -75,7 +75,7 @@ inline void append_graze_zone_circles2d(const BulletGrazeZone2D &zone, int zone_
 			circle.color = color;
 			circle.zone_index = zone_index;
 			circle.ring_index = r;
-			circle.target_id = targets[k].id;
+			circle.target_id = graze_is_point_target2d(targets[k].id) ? 0 : targets[k].id; // a point is no node
 			r_circles.push_back(circle);
 		}
 	}

@@ -94,7 +94,7 @@ BulletSpawner2D::GrazeTargetSource BulletSpawner2D::get_graze_target_source() co
 }
 
 void BulletSpawner2D::set_graze_target_source(GrazeTargetSource value) {
-	if (value < GRAZE_SOURCE_NODE_GROUP || value > GRAZE_SOURCE_NODE_CHILDREN) {
+	if (value < GRAZE_SOURCE_NODE_GROUP || value > GRAZE_SOURCE_GLOBAL_POSITIONS) {
 		UtilityFunctions::push_error("BulletSpawner2D: invalid graze_target_source, keeping the old value.");
 		return;
 	}
@@ -182,6 +182,21 @@ void BulletSpawner2D::set_graze_children_recursive(bool value) {
 	apply_graze_detector_config();
 }
 
+PackedVector2Array BulletSpawner2D::get_graze_global_positions() const {
+	return graze_global_positions;
+}
+
+void BulletSpawner2D::set_graze_global_positions(const PackedVector2Array &value) {
+	for (int i = 0; i < value.size(); ++i) {
+		if (!value[i].is_finite()) {
+			UtilityFunctions::push_error("BulletSpawner2D: graze_global_positions must hold finite positions only, keeping the old value.");
+			return;
+		}
+	}
+	graze_global_positions = value;
+	apply_graze_detector_config();
+}
+
 double BulletSpawner2D::get_graze_update_interval() const {
 	return graze_update_interval;
 }
@@ -218,6 +233,7 @@ GrazeDetector2D::Config BulletSpawner2D::graze_detector_config() const {
 	config.node_name_case_sensitive = graze_node_name_case_sensitive;
 	config.children_parent_path = graze_children_parent_path;
 	config.children_recursive = graze_children_recursive;
+	config.global_positions = graze_global_positions;
 	config.update_interval = graze_update_interval;
 	return config;
 }
@@ -243,6 +259,10 @@ void BulletSpawner2D::collect_graze_targets(std::vector<GrazeTarget2D> &r_target
 		const GrazeTargetList2D *list = detector.list(*factory);
 		for (int k = 0; list != nullptr && k < list->count(); ++k) {
 			const GrazeTarget2D &target = list->targets[k];
+			if (graze_is_point_target2d(target.id)) {
+				r_targets.push_back(target);
+				continue;
+			}
 			const Node2D *node = Object::cast_to<Node2D>(ObjectDB::get_instance(ObjectID(target.id)));
 			if (target.id != self_id && node != nullptr && !node->is_queued_for_deletion()) {
 				r_targets.push_back(target);
@@ -251,9 +271,13 @@ void BulletSpawner2D::collect_graze_targets(std::vector<GrazeTarget2D> &r_target
 		return;
 	}
 	// No running factory (editor, factory not ready): a fresh scan in the
-	// same space as the runtime, the factory's world when there is one.
-	const Ref<World2D> world = factory != nullptr && factory->is_inside_tree() ? factory->get_world_2d() : get_world_2d();
-	detector.collect_now(get_tree(), world.ptr(), r_targets);
+	// same space as the runtime, the factory's world when there is one. The
+	// cursor only at runtime (in the editor it sits over the editor's UI).
+	const bool editor = Engine::get_singleton()->is_editor_hint();
+	const bool factory_in_tree = factory != nullptr && factory->is_inside_tree();
+	const Ref<World2D> world = factory_in_tree ? factory->get_world_2d() : get_world_2d();
+	const CanvasItem *mouse_space = editor ? nullptr : (factory_in_tree ? (const CanvasItem *)factory : (const CanvasItem *)this);
+	detector.collect_now(get_tree(), world.ptr(), mouse_space, r_targets);
 }
 
 int BulletSpawner2D::refresh_graze_targets() {
@@ -332,7 +356,8 @@ Array BulletSpawner2D::resolve_graze_targets() const {
 	Array out;
 	collect_graze_targets(graze_targets_scratch);
 	for (const GrazeTarget2D &target : graze_targets_scratch) {
-		out.push_back(ObjectDB::get_instance(ObjectID(target.id)));
+		// Points (Mouse, Global Positions) are no nodes: their position.
+		out.push_back(graze_is_point_target2d(target.id) ? Variant(target.position) : Variant(ObjectDB::get_instance(ObjectID(target.id))));
 	}
 	return out;
 }

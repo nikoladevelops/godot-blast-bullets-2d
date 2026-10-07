@@ -351,7 +351,7 @@
 		<method name="resolve_graze_targets" qualifiers="const">
 			<return type="Array" />
 			<description>
-				The [Node2D] targets the runtime tests right now, as [member graze_target_source] finds them (between scans: the nodes the last scan found), in tree order, this spawner excluded. Every zone of [member graze_zones] rings the same targets. No cap.
+				The [Node2D] targets the runtime tests right now, as [member graze_target_source] finds them (between scans: the nodes the last scan found), in tree order, this spawner excluded. The point sources give their positions instead: the cursor ([Vector2], one entry) or every entry of [member graze_global_positions] in order. Every zone of [member graze_zones] rings the same targets. No cap.
 			</description>
 		</method>
 		<method name="resolve_homing_targets" qualifiers="const">
@@ -460,7 +460,7 @@
 			Seconds between burst shots. Must be finite and above zero.
 		</member>
 		<member name="graze_children_parent_path" type="NodePath" setter="set_graze_children_parent_path" getter="get_graze_children_parent_path" default="NodePath(&quot;&quot;)">
-			Node Children source: the node whose [Node2D] children are the graze targets (e.g. an "Enemies" container). Resolved from this spawner; never this spawner itself, a [BulletFactory2D] or anything inside one. After the spawner is freed its volleys keep using the node this path pointed to.
+			Node Children source: the node whose [Node2D] children are the graze targets (e.g. an "Enemies" container). Resolved from this spawner; never this spawner or anything under it (a parent inside this spawner finds nothing), a [BulletFactory2D] or anything inside one. After the spawner is freed its volleys keep using the node this path pointed to.
 		</member>
 		<member name="graze_children_recursive" type="bool" setter="set_graze_children_recursive" getter="get_graze_children_recursive" default="false">
 			Node Children source: also every [Node2D] below the children (depth-first, tree order), walking through plain [Node]s.
@@ -469,7 +469,10 @@
 			Master switch: every volley this spawner fires is armed with [member graze_zones]. Changes apply to the next shots; volleys already flying keep their zones.
 		</member>
 		<member name="graze_filter_group" type="StringName" setter="set_graze_filter_group" getter="get_graze_filter_group" default="&amp;&quot;&quot;">
-			Allow-list for every [member graze_target_source]: only nodes also in this group are graze targets. Empty = everything the source finds.
+			Allow-list for every node [member graze_target_source]: only nodes also in this group are graze targets. Empty = everything the source finds. The point sources (Mouse, Global Positions) have no nodes and ignore it.
+		</member>
+		<member name="graze_global_positions" type="PackedVector2Array" setter="set_graze_global_positions" getter="get_graze_global_positions" default="PackedVector2Array()">
+			Global Positions source: every entry is a graze target at that global position (no cap; the editor warns while the list is empty). A list holding a NaN or infinite position is rejected and the old value kept. The points are read every tick: assign a new list (e.g. each frame from a script that tracks players without nodes) and bullets in flight test it on their next tick. A visit belongs to its point's index, so a point that moves keeps its visit; the signals carry a null [code]target[/code] for points.
 		</member>
 		<member name="graze_node_group" type="StringName" setter="set_graze_node_group" getter="get_graze_node_group" default="&amp;&quot;&quot;">
 			Node Group source: the group whose [Node2D] members graze this spawner's bullets (e.g. your player's group). Empty by default: name it, or nothing grazes (the editor warns). Members that join later (respawns, enemies spawned after the shot) count from the next scan.
@@ -493,14 +496,14 @@
 			Draw every ring of every zone around each resolved target in the zone's [member BulletGrazeZone2D.preview_color]: in the editor, and at runtime only with [member graze_preview_during_runtime]. The rings follow moving targets without rebuilding anything else.
 		</member>
 		<member name="graze_target_path" type="NodePath" setter="set_graze_target_path" getter="get_graze_target_path" default="NodePath(&quot;&quot;)">
-			Node Path source: the [Node2D] that grazes this spawner's bullets (a path to another type is rejected). After the spawner is freed its volleys keep the node this path pointed to.
+			Node Path source: the [Node2D] that grazes this spawner's bullets (a path to another type is rejected). It may be a child of this spawner, never the spawner itself. After the spawner is freed its volleys keep the node this path pointed to.
 		</member>
 		<member name="graze_target_source" type="int" setter="set_graze_target_source" getter="get_graze_target_source" enum="BulletSpawner2D.GrazeTargetSource" default="0">
-			Who can graze this spawner's bullets: the one place that decides it (a [BulletGrazeZone2D] only says how a graze is measured, so one zone resource works for any target). Node Group (default): the members of [member graze_node_group]. Node Path ([member graze_target_path]), Node Name ([member graze_node_name]) or Node Children ([member graze_children_parent_path]). Every zone rings the same targets. All sources honor [member graze_filter_group], count every node they find (no cap; past 8 targets each bullet only tests the ones near its motion) and never find this spawner.
+			Who can graze this spawner's bullets: the one place that decides it (a [BulletGrazeZone2D] only says how a graze is measured, so one zone resource works for any target). Node Group (default): the members of [member graze_node_group]. Node Path ([member graze_target_path]), Node Name ([member graze_node_name]) or Node Children ([member graze_children_parent_path]). Mouse (the cursor) and Global Positions ([member graze_global_positions]) are points, not nodes: [signal bullet_grazed] and [signal bullet_graze_exited] carry a null [code]target[/code] for them, and they ignore [member graze_filter_group] and [member graze_update_interval] (read every tick). Every zone rings the same targets. Every source counts all it finds (no cap; past 8 targets each bullet only tests the ones near its motion). The node sources honor [member graze_filter_group] and only keep [Node2D]s inside the tree, not queued for deletion, at a finite position and in the bullets' world, never a [BulletFactory2D] or anything inside one, never this spawner itself; the scans (Node Name, Node Children) never find anything under this spawner either, while Node Group members and Node Path may be its children.
 			The settings are shared with every volley this spawner fired: changing them (or calling [method refresh_graze_targets]) reaches bullets in flight on their next tick, and an open graze visit then moves to the nearest target the bullet is still inside (or ends silently). Orphaned volleys keep the settings after the spawner is freed. Pooled volleys forget them.
 		</member>
 		<member name="graze_update_interval" type="float" setter="set_graze_update_interval" getter="get_graze_update_interval" default="0.0">
-			Seconds of factory time between target scans; 0 scans every physics tick, so a node that joins (an enemy spawned later) is tested on the next tick. Between scans the targets' positions are still read every tick and a freed or dying target stops counting at once; a newcomer waits for the next scan or [method refresh_graze_targets]. Raise it for costly scans (Node Name over a big scene, many spawners with their own settings); spawners left at the defaults share one scan per group per tick with every factory volley.
+			Seconds of factory time between target scans; 0 scans every physics tick, so a node that joins (an enemy spawned later) is tested on the next tick. Between scans the targets' positions are still read every tick and a freed or dying target stops counting at once; a newcomer waits for the next scan or [method refresh_graze_targets]. Raise it for costly scans (Node Name over a big scene, many spawners with their own settings); spawners left at the defaults share one scan per group per tick with every factory volley. The point sources (Mouse, Global Positions) are read every tick whatever this says.
 		</member>
 		<member name="graze_zones" type="BulletGrazeZone2D[]" setter="set_graze_zones" getter="get_graze_zones" default="[]">
 			Up to 4 [BulletGrazeZone2D] zones armed on every fired volley; null entries are kept and skipped. A shared [code].tres[/code] works across spawners. Assign the whole array: one changed in place still arms its first 4 zones but warns once.
@@ -1193,7 +1196,7 @@
 			Advances the homing queue when a target is reached: per bullet in Per Bullet mode, once for the shared queue in Shared mode.
 		</member>
 		<member name="homing_children_parent_path" type="NodePath" setter="set_homing_children_parent_path" getter="get_homing_children_parent_path" default="NodePath(&quot;&quot;)">
-			Parent whose Node2D children are chased for the Node Children source (the whole subtree with [member homing_children_recursive], walking through non-Node2D nodes). Required: an empty or invalid path fires plain volleys and warns once. The spawner itself is never chased.
+			Parent whose Node2D children are chased for the Node Children source (the whole subtree with [member homing_children_recursive], walking through non-Node2D nodes). Required: an empty or invalid path fires plain volleys and warns once. Nothing under this spawner (and the spawner itself) is ever chased, nor anything inside a [BulletFactory2D].
 		</member>
 		<member name="homing_children_recursive" type="bool" setter="set_homing_children_recursive" getter="get_homing_children_recursive" default="false">
 			Includes grandchildren and deeper descendants for the Node Children source.
@@ -1223,7 +1226,7 @@
 			Volley steering pauses while the bullet is farther than this from its target. 0 is unlimited. Must be finite and 0 or more.
 		</member>
 		<member name="homing_max_detection_range" type="float" setter="set_homing_max_detection_range" getter="get_homing_max_detection_range" default="0.0">
-			Detection radius around the effective generator (the volley's muzzle: [member transforms_generator_path] when set, else the spawner) for the node group, node name, and node children sources. Nearest selection measures from the same point. 0 is unlimited.
+			Detection radius around the effective generator (the volley's muzzle: [member transforms_generator_path] when set, else the spawner) for the node group, node name, and node children sources (never Node Path, which names one node). Nearest selection measures from the same point. 0 is unlimited.
 		</member>
 		<member name="homing_max_targets" type="int" setter="set_homing_max_targets" getter="get_homing_max_targets" default="1">
 			How many targets enter the queue. 1 is classic single-target homing. Only the node group, node name, and node children sources use it. Must be 1 or more; there is no upper cap (homing queues hold as many targets as you give them).
@@ -1232,7 +1235,7 @@
 			0 shares one target queue across the whole volley, 1 gives every bullet its own queue (same targets each).
 		</member>
 		<member name="homing_node_group" type="StringName" setter="set_homing_node_group" getter="get_homing_node_group" default="&amp;&quot;&quot;">
-			Polled group for the Node Group source (empty by default: name it, or volleys fly without homing and the editor warns). Only Node2D members can be chased; other members, the spawner itself and nodes queued for deletion are skipped.
+			Polled group for the Node Group source (empty by default: name it, or volleys fly without homing and the editor warns). Only Node2D members can be chased; other members, the spawner itself, nodes queued for deletion and anything the shared filter refuses (see [member homing_target_source]) are skipped. The spawner's own children may be members.
 		</member>
 		<member name="homing_node_name" type="String" setter="set_homing_node_name" getter="get_homing_node_name" default="&quot;&quot;">
 			Name pattern chased for the Node Name source (empty by default: name it). The whole scene is scanned, so dynamically spawned enemies are found with no group setup. The spawner itself and its child markers never match, and [BulletFactory2D] subtrees (volleys, attachments, effects) are never scanned. Prefer the Node Group source in large scenes: the scan visits every node once per volley.
@@ -1274,13 +1277,13 @@
 			Lets homing steer the bullet facing. Turn off only when a movement pattern, rotation data, or orbiting texture mode already owns the facing, otherwise homing steers nothing.
 		</member>
 		<member name="homing_target_path" type="NodePath" setter="set_homing_target_path" getter="get_homing_target_path" default="NodePath(&quot;&quot;)">
-			Node chased per volley for the Node Path source. Must point at a live Node2D in the tree: a freed, removed or dying target means the volley flies without homing (warned once). Inside the tree, a path to a non-Node2D is rejected and the old value kept; an unresolved path is accepted (the node may be added later).
+			Node chased per volley for the Node Path source. Must point at a live Node2D in the tree: a freed, removed or dying target (or one the shared filter refuses, see [member homing_target_source]) means the volley flies without homing (warned once). It may be this spawner itself ([code].[/code]: bullets fly back to it) or one of its children. Inside the tree, a path to a non-Node2D is rejected and the old value kept; an unresolved path is accepted (the node may be added later).
 		</member>
 		<member name="homing_target_selection" type="int" setter="set_homing_target_selection" getter="get_homing_target_selection" enum="BulletSpawner2D.HomingTargetSelection" default="0">
 			Which detected nodes become targets: nearest to the spawner, random, tree order, round robin across volleys, or dealt across bullets (Per Bullet mode only).
 		</member>
 		<member name="homing_target_source" type="int" setter="set_homing_target_source" getter="get_homing_target_source" enum="BulletSpawner2D.HomingTargetSource" default="0">
-			Where volley targets come from: a node group, the mouse cursor, a global position snapshot, a node path, a node name, or a node's children. Each source shows its own settings, like the pattern_source helper patterns do. Sources never pick the spawner itself, its pattern markers, nodes under a [BulletFactory2D], nodes already queued for deletion, or non-Node2D nodes. When a shot finds no target it still fires as a plain volley, and a warning explaining why prints once per homing configuration (changing any homing target setting re-arms it).
+			Where volley targets come from: a node group, the mouse cursor, a global position snapshot, a node path, a node name, or a node's children. Each source shows its own settings, like the pattern_source helper patterns do. The node sources share one filter with graze: only [Node2D]s inside the tree, not queued for deletion, at a finite position and in the bullets' world, never a [BulletFactory2D] or anything inside one. The scans (Node Name, Node Children) never find this spawner or anything under it; Node Group members may be its children but never the spawner itself; Node Path may name the spawner itself (bullets fly back to it, or orbit it with [member orbiting_enabled]) or its children. When a shot finds no target it still fires as a plain volley, and a warning explaining why prints once per homing configuration (changing any homing target setting re-arms it).
 		</member>
 		<member name="homing_update_interval" type="float" setter="set_homing_update_interval" getter="get_homing_update_interval" default="0.0">
 			Seconds between target position refreshes. 0 refreshes every tick.
@@ -1547,7 +1550,7 @@
 			<param index="3" name="zone" type="BulletGrazeZone2D" />
 			<param index="4" name="deepest_ring_index" type="int" />
 			<description>
-				Fired when one of this spawner's bullets leaves a graze zone alive after grazing it. Same payload and contract as [signal BulletFactory2D.bullet_graze_exited], which fires right after this one.
+				Fired when one of this spawner's bullets leaves a graze zone alive after grazing it. [param target] is null for the point sources. Same payload and contract as [signal BulletFactory2D.bullet_graze_exited], which fires right after this one.
 			</description>
 		</signal>
 		<signal name="bullet_grazed">
@@ -1557,7 +1560,7 @@
 			<param index="3" name="zone" type="BulletGrazeZone2D" />
 			<param index="4" name="ring_index" type="int" />
 			<description>
-				Fired live when one of this spawner's bullets grazes a ring of a zone (see [BulletGrazeZone2D]). Same payload and contract as [signal BulletFactory2D.bullet_grazed], which fires right after this one for the same graze: count graze on one of the two. Once this spawner is freed its flying bullets keep grazing and only the factory signal fires.
+				Fired live when one of this spawner's bullets grazes a ring of a zone (see [BulletGrazeZone2D]). [param target] is null for the point sources (Mouse, Global Positions). Same payload and contract as [signal BulletFactory2D.bullet_grazed], which fires right after this one for the same graze: count graze on one of the two. Once this spawner is freed its flying bullets keep grazing and only the factory signal fires.
 			</description>
 		</signal>
 		<signal name="burst_finished">
@@ -1742,6 +1745,7 @@
 			Flying volleys are re-aimed every [member homing_retarget_interval_sec].
 		</constant>
 		<constant name="GRAZE_SOURCE_NODE_GROUP" value="0" enum="GrazeTargetSource">
+			[Node2D] members of [member graze_node_group] (the default).
 		</constant>
 		<constant name="GRAZE_SOURCE_NODE_PATH" value="1" enum="GrazeTargetSource">
 			The [Node2D] at [member graze_target_path].
@@ -1751,6 +1755,12 @@
 		</constant>
 		<constant name="GRAZE_SOURCE_NODE_CHILDREN" value="3" enum="GrazeTargetSource">
 			[Node2D] children of [member graze_children_parent_path] (the whole subtree with [member graze_children_recursive]).
+		</constant>
+		<constant name="GRAZE_SOURCE_MOUSE" value="4" enum="GrazeTargetSource">
+			The mouse cursor, in the bullets' canvas coordinates (through the camera), read every tick. Runtime only: in the editor nothing is drawn. The signals carry a null [code]target[/code].
+		</constant>
+		<constant name="GRAZE_SOURCE_GLOBAL_POSITIONS" value="5" enum="GrazeTargetSource">
+			Every entry of [member graze_global_positions], read every tick. The signals carry a null [code]target[/code].
 		</constant>
 		<constant name="MOVEMENT_SPACE_ATTACH" value="0" enum="MovementSpace">
 			The spawner sits on the path (like [PathFollow2D]).

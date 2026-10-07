@@ -615,7 +615,7 @@ void BulletVolley2D::_bind_methods() {
 
 	// Graze (bullet_volley2d_graze.cpp). The signals live on the owner
 	// spawner and on the factory, not here.
-	ClassDB::bind_method(D_METHOD("graze_set_zones", "zones"), &BulletVolley2D::graze_set_zones);
+	ClassDB::bind_method(D_METHOD("graze_set_zones", "zones", "target_group"), &BulletVolley2D::graze_set_zones);
 	ClassDB::bind_method(D_METHOD("graze_clear"), &BulletVolley2D::graze_clear);
 	ClassDB::bind_method(D_METHOD("get_graze_zones"), &BulletVolley2D::get_graze_zones);
 	ClassDB::bind_method(D_METHOD("is_graze_armed"), &BulletVolley2D::is_graze_armed);

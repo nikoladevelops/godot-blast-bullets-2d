@@ -20,6 +20,8 @@ const NODE_GROUP := BulletSpawner2D.GRAZE_SOURCE_NODE_GROUP
 const NODE_PATH := BulletSpawner2D.GRAZE_SOURCE_NODE_PATH
 const NODE_NAME := BulletSpawner2D.GRAZE_SOURCE_NODE_NAME
 const NODE_CHILDREN := BulletSpawner2D.GRAZE_SOURCE_NODE_CHILDREN
+const MOUSE := BulletSpawner2D.GRAZE_SOURCE_MOUSE
+const GLOBAL_POSITIONS := BulletSpawner2D.GRAZE_SOURCE_GLOBAL_POSITIONS
 
 
 ## A spawner at the origin firing one resting bullet (circle r4), graze on
@@ -91,9 +93,9 @@ func _graze_warnings(sp: BulletSpawner2D) -> Array:
 
 func test_api_is_bound_with_documented_defaults() -> void:
 	var sp := make_spawner()
-	for m in ["get_graze_target_source", "set_graze_target_source", "get_graze_node_group", "set_graze_node_group", "get_graze_filter_group", "set_graze_filter_group", "get_graze_target_path", "set_graze_target_path", "get_graze_node_name", "set_graze_node_name", "get_graze_node_name_match_mode", "set_graze_node_name_match_mode", "get_graze_node_name_case_sensitive", "set_graze_node_name_case_sensitive", "get_graze_children_parent_path", "set_graze_children_parent_path", "get_graze_children_recursive", "set_graze_children_recursive", "get_graze_update_interval", "set_graze_update_interval", "refresh_graze_targets", "debug_get_graze_detector_stats"]:
+	for m in ["get_graze_target_source", "set_graze_target_source", "get_graze_node_group", "set_graze_node_group", "get_graze_filter_group", "set_graze_filter_group", "get_graze_target_path", "set_graze_target_path", "get_graze_node_name", "set_graze_node_name", "get_graze_node_name_match_mode", "set_graze_node_name_match_mode", "get_graze_node_name_case_sensitive", "set_graze_node_name_case_sensitive", "get_graze_children_parent_path", "set_graze_children_parent_path", "get_graze_children_recursive", "set_graze_children_recursive", "get_graze_global_positions", "set_graze_global_positions", "get_graze_update_interval", "set_graze_update_interval", "refresh_graze_targets", "debug_get_graze_detector_stats"]:
 		assert_true(sp.has_method(m), "BulletSpawner2D.%s is bound" % m)
-	assert_eq([NODE_GROUP, NODE_PATH, NODE_NAME, NODE_CHILDREN], [0, 1, 2, 3], "serialized source ids")
+	assert_eq([NODE_GROUP, NODE_PATH, NODE_NAME, NODE_CHILDREN, MOUSE, GLOBAL_POSITIONS], [0, 1, 2, 3, 4, 5], "serialized source ids")
 	assert_eq(sp.graze_target_source, NODE_GROUP, "a node group by default")
 	assert_eq(sp.graze_node_group, &"", "no default group: the developer names it")
 	assert_eq(sp.graze_filter_group, &"", "no filter")
@@ -103,6 +105,7 @@ func test_api_is_bound_with_documented_defaults() -> void:
 	assert_false(sp.graze_node_name_case_sensitive, "case-insensitive")
 	assert_eq(sp.graze_children_parent_path, NodePath(""), "no parent")
 	assert_false(sp.graze_children_recursive, "direct children")
+	assert_eq(sp.graze_global_positions, PackedVector2Array(), "no positions")
 	assert_eq(sp.graze_update_interval, 0.0, "scans every tick")
 	assert_true(sp.debug_get_graze_detector_stats()["shares_factory_lists"], "defaults share the factory's lists")
 
@@ -113,7 +116,7 @@ func test_setters_reject_and_keep() -> void:
 	add(plain)
 	sp.graze_target_source = NODE_NAME
 	sp.set("graze_target_source", -1)
-	sp.set("graze_target_source", 4)
+	sp.set("graze_target_source", 6)
 	sp.graze_node_name_match_mode = BulletSpawner2D.HOMING_NAME_MATCH_EXACT
 	sp.set("graze_node_name_match_mode", -1)
 	sp.set("graze_node_name_match_mode", 4)
@@ -141,28 +144,33 @@ func test_setters_reject_and_keep() -> void:
 
 func test_each_source_shows_only_its_own_knobs() -> void:
 	var sp := make_spawner()
-	var always := ["graze_target_source", "graze_filter_group", "graze_update_interval"]
+	# The filter group and the scan interval are about nodes: the point
+	# sources (Mouse, Global Positions) hide them.
+	var node_only := ["graze_filter_group", "graze_update_interval"]
 	var own := {
-		NODE_GROUP: ["graze_node_group"],
-		NODE_PATH: ["graze_target_path"],
-		NODE_NAME: ["graze_node_name", "graze_node_name_match_mode", "graze_node_name_case_sensitive"],
-		NODE_CHILDREN: ["graze_children_parent_path", "graze_children_recursive"],
+		NODE_GROUP: ["graze_node_group"] + node_only,
+		NODE_PATH: ["graze_target_path"] + node_only,
+		NODE_NAME: ["graze_node_name", "graze_node_name_match_mode", "graze_node_name_case_sensitive"] + node_only,
+		NODE_CHILDREN: ["graze_children_parent_path", "graze_children_recursive"] + node_only,
+		MOUSE: [],
+		GLOBAL_POSITIONS: ["graze_global_positions"],
 	}
-	var specific: Array = []
+	var specific: Array = node_only.duplicate()
 	for source in own:
-		specific.append_array(own[source])
-	for k in always + specific:
+		for k in own[source]:
+			if not specific.has(k):
+				specific.append(k)
+	for k in ["graze_target_source"] + specific:
 		assert_false(is_editor_visible(sp, StringName(k)), k + " hides while graze is off")
 	sp.graze_enabled = true
 	sp.graze_node_group = &"graze_targets"
 	watch_signals(sp)
 	for source in own:
 		sp.graze_target_source = source
-		for k in always:
-			assert_true(is_editor_visible(sp, StringName(k)), "%s shows under source %d" % [k, source])
+		assert_true(is_editor_visible(sp, &"graze_target_source"), "the source shows under source %d" % source)
 		for k in specific:
 			assert_eq(is_editor_visible(sp, StringName(k)), (own[source] as Array).has(k), "%s under source %d" % [k, source])
-	assert_signal_emit_count(sp, "property_list_changed", 4, "every source change refreshes the inspector")
+	assert_signal_emit_count(sp, "property_list_changed", 6, "every source change refreshes the inspector")
 
 
 func test_setup_warnings_name_an_empty_source_setting() -> void:

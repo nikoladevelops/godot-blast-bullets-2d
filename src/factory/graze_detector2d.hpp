@@ -3,8 +3,10 @@
 #include "core/graze_targets2d.hpp"
 #include "core/node_scan2d.hpp"
 
+#include <godot_cpp/classes/canvas_item.hpp>
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/node_path.hpp>
+#include <godot_cpp/variant/packed_vector2_array.hpp>
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/string_name.hpp>
 
@@ -98,6 +100,8 @@ public:
 		SOURCE_NODE_PATH = 1, // the Node2D at target_path
 		SOURCE_NODE_NAME = 2, // Node2Ds named like node_name (scene scan)
 		SOURCE_NODE_CHILDREN = 3, // Node2D children of children_parent_path
+		SOURCE_MOUSE = 4, // the cursor (point target)
+		SOURCE_GLOBAL_POSITIONS = 5, // every entry of global_positions (point targets)
 	};
 	struct Config {
 		int source = SOURCE_NODE_GROUP;
@@ -110,8 +114,12 @@ public:
 		bool node_name_case_sensitive = false;
 		NodePath children_parent_path;
 		bool children_recursive = false;
+		PackedVector2Array global_positions;
 		double update_interval = 0.0;
 	};
+	// Mouse and Global Positions: no nodes, no group, no filter; read every
+	// sweep whatever update_interval says.
+	bool uses_points() const { return config.source == SOURCE_MOUSE || config.source == SOURCE_GLOBAL_POSITIONS; }
 	// Lists nobody asked about for this many sweeps are dropped (bounded
 	// memory when games churn through group names).
 	static constexpr uint64_t kIdleSweeps = 600;
@@ -146,8 +154,9 @@ public:
 	// factory volleys); other sources ignore `group`.
 	GrazeTargetList2D *list_for_group(const StringName &group, BulletFactory2D &factory);
 	// A fresh scan (no lists, no clock): the editor ring preview and
-	// scripts without a running factory.
-	void collect_now(SceneTree *tree, const World2D *world, std::vector<GrazeTarget2D> &r_targets);
+	// scripts without a running factory. `mouse_space` reads the cursor
+	// (nullptr: no cursor, e.g. in the editor).
+	void collect_now(SceneTree *tree, const World2D *world, const CanvasItem *mouse_space, std::vector<GrazeTarget2D> &r_targets);
 
 	int get_list_count() const { return (int)lists.size(); }
 	// Debug counters: scans run by this detector, detectors alive.
@@ -166,7 +175,9 @@ private:
 	std::vector<uint32_t> changed_scratch;
 	static uint64_t next_list_uid;
 
-	void scan(const StringName &group, SceneTree *tree, const World2D *world, std::vector<GrazeTarget2D> &r_targets);
+	// `mouse_space`: the canvas item whose get_global_mouse_position() is
+	// the cursor in the bullets' coordinates (the factory at runtime).
+	void scan(const StringName &group, SceneTree *tree, const World2D *world, const CanvasItem *mouse_space, std::vector<GrazeTarget2D> &r_targets);
 	void update(GrazeTargetList2D &list, BulletFactory2D &factory);
 	// Makes `live` the list's targets: stable slots, change serials, view.
 	void apply(GrazeTargetList2D &list, const std::vector<GrazeTarget2D> &live);

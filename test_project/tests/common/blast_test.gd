@@ -265,6 +265,26 @@ func graze_volley(transforms: Array, speed: float, shape: Shape2D = null) -> Bul
 	return factory.spawn_volley(d)
 
 
+## Moves the mouse so factory.get_global_mouse_position() reads `pos`
+## (headless: through mouse motion events). The window's stretch transform
+## is measured from two samples, never assumed.
+func mouse_to(pos: Vector2) -> void:
+	_mouse_event(Vector2.ZERO)
+	var origin := factory.get_global_mouse_position()
+	_mouse_event(Vector2(100, 100))
+	var per_pixel := (factory.get_global_mouse_position() - origin) / 100.0
+	_mouse_event((pos - origin) / per_pixel)
+	assert_almost_eq(factory.get_global_mouse_position(), pos, Vector2(0.01, 0.01), "the mouse sits at %s" % pos)
+
+
+func _mouse_event(screen_pos: Vector2) -> void:
+	var ev := InputEventMouseMotion.new()
+	ev.position = screen_pos
+	ev.global_position = screen_pos
+	Input.parse_input_event(ev)
+	Input.flush_buffered_events()
+
+
 ## n factory ticks of `delta` (factory.debug_advance_time), each asserted.
 func step_factory(n: int = 1, delta: float = 1.0 / 60.0) -> void:
 	for i in n:

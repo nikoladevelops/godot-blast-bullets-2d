@@ -155,3 +155,21 @@ func test_non_finite_values_are_rejected_by_every_float_and_vector_setter() -> v
 					problems.append("%s.%s(%s) rejected but changed %s -> %s" % [cls, setter, bad, r["old"], r["now"]])
 	assert_gt(checked, 300, "the sweep reached the float/vector setters (%d calls)" % checked)
 	assert_eq(problems, [], "NaN and +/-INF never reach a stored value")
+
+
+func test_every_bound_method_names_every_argument() -> void:
+	# An argument bound without a name shows as "_unnamed_argN" in the docs
+	# and the editor's autocompletion. Every plugin class, found by API type.
+	var unnamed: Array = []
+	var classes := 0
+	for cls in ClassDB.get_class_list():
+		if ClassDB.class_get_api_type(cls) != ClassDB.API_EXTENSION:
+			continue
+		classes += 1
+		for m in ClassDB.class_get_method_list(cls, true):
+			for a in m["args"]:
+				var arg_name := str(a["name"])
+				if arg_name.is_empty() or arg_name.begins_with("_unnamed_arg"):
+					unnamed.append("%s.%s(%s)" % [cls, m["name"], arg_name])
+	assert_gte(classes, 16, "every plugin class checked")
+	assert_eq(unnamed, [], "every argument has a name")

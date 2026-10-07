@@ -558,26 +558,50 @@ void BulletSpawner2D::update_homing_process_state(bool reset_countdown) {
 	}
 }
 
+const World2D *BulletSpawner2D::homing_target_world() const {
+	// Volleys fly in their factory's world: a node of another world (a
+	// SubViewport) has coordinates they can never reach.
+	BulletFactory2D *factory = get_bullet_factory();
+	const Ref<World2D> world = factory != nullptr && factory->is_inside_tree() ? factory->get_world_2d() : get_world_2d();
+	return world.ptr();
+}
+
 void BulletSpawner2D::collect_homing_candidates_by_name(Node *p_node, Array &r_candidates) const {
 	// Shared node-name scan (core/node_scan2d.hpp): never a bullet factory's
 	// subtree (its containers hold every volley, attachment and effect
 	// shard: thousands of nodes, none a target), never this spawner or its
-	// markers (a broad pattern like "Node2D" would match them), never the
-	// preview holder (visualization only).
+	// markers (a broad pattern like "Node2D" would match them); the visitor
+	// applies THE target filter (preview layers, other worlds...).
+	const World2D *world = homing_target_world();
 	scan_node2ds_by_name(
-			p_node, homing_node_name, homing_node_name_match_mode, homing_node_name_case_sensitive, homing_filter_group, PREVIEW_META_KEY, homing_scan_stack,
+			p_node, homing_node_name, homing_node_name_match_mode, homing_node_name_case_sensitive, homing_filter_group, homing_scan_stack,
 			[this](Node *node) { return node == this || Object::cast_to<BulletFactory2D>(node) != nullptr; },
-			[&r_candidates](Node2D *node) { r_candidates.push_back(node); });
+			[&r_candidates, world](Node2D *node) {
+				Vector2 position;
+				if (target_node_usable2d(node, world, position)) {
+					r_candidates.push_back(node);
+				}
+			});
 }
 
 void BulletSpawner2D::collect_homing_candidates_from_children(Node *p_parent, bool recursive, Array &r_candidates) const {
-	// Shared children scan: never the spawner itself (a parent pointing at
-	// our own node would make the volley chase its emitter), never the
-	// preview holder, never a bullet factory or the bullets inside it.
+	// Shared children scan: never this spawner or anything under it (a
+	// parent pointing at our own node would make the volley chase its
+	// emitter or its markers), never a bullet factory or the bullets inside
+	// it; the visitor applies THE target filter.
+	if (p_parent == nullptr || p_parent == this || is_ancestor_of(p_parent) || node_in_bullet_factory2d(p_parent)) {
+		return;
+	}
+	const World2D *world = homing_target_world();
 	scan_node2d_children(
-			p_parent, recursive, this, homing_filter_group, PREVIEW_META_KEY, homing_scan_stack,
-			[](Node *node) { return Object::cast_to<BulletFactory2D>(node) != nullptr; },
-			[&r_candidates](Node2D *node) { r_candidates.push_back(node); });
+			p_parent, recursive, homing_filter_group, homing_scan_stack,
+			[this](Node *node) { return node == this || Object::cast_to<BulletFactory2D>(node) != nullptr; },
+			[&r_candidates, world](Node2D *node) {
+				Vector2 position;
+				if (target_node_usable2d(node, world, position)) {
+					r_candidates.push_back(node);
+				}
+			});
 }
 
 void BulletSpawner2D::warn_empty_homing_targets_once(const String &message, bool quiet) const {
@@ -616,10 +640,13 @@ Array BulletSpawner2D::resolve_homing_targets(bool quiet, bool advance_round_rob
 		return targets;
 	}
 	if (homing_target_source == HOMING_SOURCE_NODE_PATH) {
+		// Explicit: the path may name this spawner (bullets fly back to or
+		// orbit it) or its children. THE target filter still applies: a node
+		// queued for deletion dies at the end of this frame, a factory node or
+		// another world's node is nothing a volley can chase.
 		Node2D *target = Object::cast_to<Node2D>(get_node_or_null(homing_target_path));
-		// A node queued for deletion dies at the end of this frame: chasing
-		// it would only hand the volley a dead target.
-		if (target == nullptr || target->is_queued_for_deletion()) {
+		Vector2 target_position;
+		if (target == nullptr || !target_node_usable2d(target, homing_target_world(), target_position)) {
 			warn_empty_homing_targets_once("BulletSpawner2D::resolve_homing_targets: homing_target_path does not point at a live Node2D, volley flies without homing.", quiet);
 			return targets;
 		}
@@ -685,20 +712,24 @@ Array BulletSpawner2D::resolve_homing_targets(bool quiet, bool advance_round_rob
 					return targets;
 				}
 				TypedArray<Node> members = tree->get_nodes_in_group(homing_node_group);
+				const World2D *world = homing_target_world();
 				for (int i = 0; i < members.size(); ++i) {
 					Node2D *candidate = Object::cast_to<Node2D>(members[i]);
 					if (candidate == nullptr) {
 						continue; // group may hold anything: only Node2Ds can be chased
 					}
-					// Never chase ourselves (an enemy turret in the enemies group)
-					// or a node that dies at the end of this frame.
-					if (candidate == this || candidate->is_queued_for_deletion()) {
+					// Never chase ourselves (an enemy turret in the enemies group);
+					// our own children may be members (explicit).
+					if (candidate == this) {
 						continue;
 					}
 					if (!homing_filter_group.is_empty() && !candidate->is_in_group(homing_filter_group)) {
 						continue;
 					}
-					candidates.push_back(candidate);
+					Vector2 position;
+					if (target_node_usable2d(candidate, world, position)) {
+						candidates.push_back(candidate);
+					}
 				}
 			}
 		}

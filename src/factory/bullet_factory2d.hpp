@@ -519,6 +519,11 @@ public:
 	}
 
 	void _notification(int p_what);
+	// Every BulletFactory2D inside a SceneTree (ENTER_TREE / EXIT_TREE). The
+	// target sources' "never a factory or anything inside one" rule
+	// (node_in_bullet_factory2d) asks these instead of walking each
+	// candidate's ancestors.
+	static std::vector<BulletFactory2D *> factories_in_tree;
 
 	// True while bullet state must not be structurally mutated: the factory is
 	// actively iterating flight vectors (physics sweep, disable sweeps holding

@@ -4,6 +4,8 @@ extends BlastTest
 ##   - FLOAT: NaN and +Inf are rejected with exactly one error that says the
 ##     old value is kept, and the value is unchanged;
 ##   - VECTOR2: a NaN vector is rejected the same way;
+##   - PACKED_VECTOR2_ARRAY: a list with a NaN or Inf entry is rejected the
+##     same way;
 ##   - INT with an enum hint: an id outside the hint is rejected the same way.
 ## Properties that legitimately accept any value are listed with a reason.
 
@@ -93,6 +95,24 @@ func test_vector_properties_reject_nan() -> void:
 			bad.append(problem)
 	assert_gt(probed, 8, "the sweep really covers the vector surface")
 	_assert_none(bad, "vector setters reject NaN and keep the old value")
+
+
+func test_point_list_properties_reject_non_finite_entries() -> void:
+	var sp := make_spawner()
+	var bad: Array = []
+	var probed := 0
+	for p in _editor_props(sp):
+		var prop := str(p.name)
+		if int(p.type) != TYPE_PACKED_VECTOR2_ARRAY or ANY_VALUE_OK.has(prop):
+			continue
+		probed += 1
+		sp.set(prop, PackedVector2Array([Vector2(1, 2)])) # an old value worth keeping
+		for v in [PackedVector2Array([Vector2(3, 4), Vector2(NAN, 0)]), PackedVector2Array([Vector2(0, INF)])]:
+			var problem := _probe(sp, prop, v)
+			if problem != "":
+				bad.append(problem)
+	assert_gte(probed, 1, "the sweep covers every point list (graze_global_positions)")
+	_assert_none(bad, "point lists reject non-finite entries and keep the old value")
 
 
 func test_color_properties_reject_nan() -> void:

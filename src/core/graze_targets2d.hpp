@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/node_scan2d.hpp"
 #include "data/bullet_graze_zone2d.hpp"
 
 #include <godot_cpp/classes/node2d.hpp>
@@ -25,30 +26,25 @@ struct GrazeTarget2D {
 	Vector2 position;
 };
 
-// THE graze target filter, shared by every graze target source (the
-// factory's zone-group lists, the spawner's name/path/children sources)
-// and the ring previews, so a preview draws exactly what the runtime
-// tests. A usable target is inside the tree, not queued for deletion,
-// lives in `world` (when given: coordinates of different worlds never mix)
-// and has a finite global position (returned in r_position).
-inline bool graze_target_usable2d(Node2D *node, const World2D *world, Vector2 &r_position) {
-	if (node == nullptr || !node->is_inside_tree() || node->is_queued_for_deletion()) {
-		return false;
-	}
-	if (world != nullptr) {
-		const Ref<World2D> node_world = node->get_world_2d();
-		if (node_world.ptr() != world) {
-			return false;
-		}
-	}
-	r_position = node->get_global_position();
-	return r_position.is_finite();
+// Point targets (the Mouse and Global Positions sources) are no nodes:
+// their id is this bit plus the point's index (the cursor is index 0), so a
+// point keeps its slot by index and a visit stays with it while it moves.
+// Never an instance id of a graze target: Godot sets bit 63 only for
+// RefCounted objects, and a target node is a Node2D. Consumers never look a
+// point id up in ObjectDB; the signals carry a null target for it.
+static constexpr uint64_t GRAZE_POINT_TARGET_BIT = (uint64_t)1 << 63;
+
+inline bool graze_is_point_target2d(uint64_t id) {
+	return (id & GRAZE_POINT_TARGET_BIT) != 0;
 }
 
-// Appends `node` to r_targets when it is a usable target (above).
+// Appends `node` to r_targets when it passes THE target filter
+// (target_node_usable2d, core/node_scan2d.hpp), shared by every graze and
+// homing source and the ring previews, so a preview draws exactly what the
+// runtime tests.
 inline bool graze_add_target2d(Node2D *node, const World2D *world, std::vector<GrazeTarget2D> &r_targets) {
 	Vector2 position;
-	if (!graze_target_usable2d(node, world, position)) {
+	if (!target_node_usable2d(node, world, position)) {
 		return false;
 	}
 	GrazeTarget2D target;

@@ -76,6 +76,11 @@ void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
 			show = graze_target_source == GRAZE_SOURCE_NODE_NAME;
 		} else if (show && property_name.begins_with("graze_children_")) {
 			show = graze_target_source == GRAZE_SOURCE_NODE_CHILDREN;
+		} else if (show && property_name == "graze_global_positions") {
+			show = graze_target_source == GRAZE_SOURCE_GLOBAL_POSITIONS;
+		} else if (show && (property_name == "graze_filter_group" || property_name == "graze_update_interval")) {
+			// Points have no group and are read every tick.
+			show = graze_target_source != GRAZE_SOURCE_MOUSE && graze_target_source != GRAZE_SOURCE_GLOBAL_POSITIONS;
 		}
 		if (!show) {
 			p_property.usage &= ~PROPERTY_USAGE_EDITOR;
@@ -628,6 +633,8 @@ void BulletSpawner2D::_bind_methods() {
 	BIND_ENUM_CONSTANT(GRAZE_SOURCE_NODE_PATH);
 	BIND_ENUM_CONSTANT(GRAZE_SOURCE_NODE_NAME);
 	BIND_ENUM_CONSTANT(GRAZE_SOURCE_NODE_CHILDREN);
+	BIND_ENUM_CONSTANT(GRAZE_SOURCE_MOUSE);
+	BIND_ENUM_CONSTANT(GRAZE_SOURCE_GLOBAL_POSITIONS);
 
 	// Graze (bullet_spawner2d_graze.cpp). The signals bubble: they fire here
 	// first (while this spawner lives), then on the BulletFactory2D, which
@@ -673,6 +680,8 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_graze_children_parent_path", "path"), &BulletSpawner2D::set_graze_children_parent_path);
 	ClassDB::bind_method(D_METHOD("get_graze_children_recursive"), &BulletSpawner2D::get_graze_children_recursive);
 	ClassDB::bind_method(D_METHOD("set_graze_children_recursive", "value"), &BulletSpawner2D::set_graze_children_recursive);
+	ClassDB::bind_method(D_METHOD("get_graze_global_positions"), &BulletSpawner2D::get_graze_global_positions);
+	ClassDB::bind_method(D_METHOD("set_graze_global_positions", "value"), &BulletSpawner2D::set_graze_global_positions);
 	ClassDB::bind_method(D_METHOD("get_graze_update_interval"), &BulletSpawner2D::get_graze_update_interval);
 	ClassDB::bind_method(D_METHOD("set_graze_update_interval", "value"), &BulletSpawner2D::set_graze_update_interval);
 	ClassDB::bind_method(D_METHOD("refresh_graze_targets"), &BulletSpawner2D::refresh_graze_targets);
@@ -683,7 +692,7 @@ void BulletSpawner2D::_bind_methods() {
 	ADD_GROUP("Graze", "");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "graze_enabled"), "set_graze_enabled", "get_graze_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "graze_zones", PROPERTY_HINT_ARRAY_TYPE, "BulletGrazeZone2D"), "set_graze_zones", "get_graze_zones");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "graze_target_source", PROPERTY_HINT_ENUM, "Node Group,Node Path,Node Name,Node Children"), "set_graze_target_source", "get_graze_target_source");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "graze_target_source", PROPERTY_HINT_ENUM, "Node Group,Node Path,Node Name,Node Children,Mouse,Global Positions"), "set_graze_target_source", "get_graze_target_source");
 	ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "graze_node_group"), "set_graze_node_group", "get_graze_node_group");
 	ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "graze_filter_group"), "set_graze_filter_group", "get_graze_filter_group");
 	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "graze_target_path", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "Node2D"), "set_graze_target_path", "get_graze_target_path");
@@ -692,6 +701,7 @@ void BulletSpawner2D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "graze_node_name_case_sensitive"), "set_graze_node_name_case_sensitive", "get_graze_node_name_case_sensitive");
 	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "graze_children_parent_path"), "set_graze_children_parent_path", "get_graze_children_parent_path");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "graze_children_recursive"), "set_graze_children_recursive", "get_graze_children_recursive");
+	ADD_PROPERTY(PropertyInfo(Variant::PACKED_VECTOR2_ARRAY, "graze_global_positions"), "set_graze_global_positions", "get_graze_global_positions");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "graze_update_interval", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater,suffix:s"), "set_graze_update_interval", "get_graze_update_interval");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "graze_show_preview"), "set_graze_show_preview", "get_graze_show_preview");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "graze_preview_during_runtime"), "set_graze_preview_during_runtime", "get_graze_preview_during_runtime");

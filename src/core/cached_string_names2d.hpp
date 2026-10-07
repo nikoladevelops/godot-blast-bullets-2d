@@ -29,6 +29,8 @@ struct CachedStringNames2D {
 	const StringName volley_bullet_homing_target_reached = StringName("volley_bullet_homing_target_reached");
 	const StringName bullet_grazed = StringName("bullet_grazed");
 	const StringName bullet_graze_exited = StringName("bullet_graze_exited");
+	// node_scan2d.hpp PREVIEW_META_KEY: checked per target candidate.
+	const StringName preview_meta = StringName("blastbullets_pattern_preview");
 
 	static inline CachedStringNames2D *singleton = nullptr;
 

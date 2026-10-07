@@ -734,7 +734,9 @@ public:
 		GRAZE_SOURCE_NODE_GROUP = 0, // Node2D members of graze_node_group (default)
 		GRAZE_SOURCE_NODE_PATH = 1, // the Node2D at graze_target_path
 		GRAZE_SOURCE_NODE_NAME = 2, // Node2Ds named like graze_node_name (scene scan)
-		GRAZE_SOURCE_NODE_CHILDREN = 3 // Node2D children of graze_children_parent_path
+		GRAZE_SOURCE_NODE_CHILDREN = 3, // Node2D children of graze_children_parent_path
+		GRAZE_SOURCE_MOUSE = 4, // the cursor, in the bullets' canvas coordinates
+		GRAZE_SOURCE_GLOBAL_POSITIONS = 5 // every entry of graze_global_positions
 	};
 	GrazeTargetSource graze_target_source = GRAZE_SOURCE_NODE_GROUP;
 	StringName graze_node_group;
@@ -748,6 +750,9 @@ public:
 	bool graze_node_name_case_sensitive = false;
 	NodePath graze_children_parent_path;
 	bool graze_children_recursive = false;
+	// Global Positions source: one graze target per entry (finite only),
+	// read every tick (edits reach bullets in flight). No cap.
+	PackedVector2Array graze_global_positions;
 	// Seconds between target scans (factory time); 0 = every physics tick.
 	// Positions are read every tick either way; a target freed or queued
 	// for deletion stops counting at once, a new one waits for the next
@@ -788,6 +793,8 @@ public:
 	void set_graze_children_parent_path(const NodePath &p_path);
 	bool get_graze_children_recursive() const;
 	void set_graze_children_recursive(bool value);
+	PackedVector2Array get_graze_global_positions() const;
+	void set_graze_global_positions(const PackedVector2Array &value);
 	double get_graze_update_interval() const;
 	void set_graze_update_interval(double value);
 	// Scans for graze targets now (whatever graze_update_interval says):
@@ -1587,14 +1594,17 @@ private:
 	// Remembers a fresh volley for retargeting (deduped: pooled instances
 	// reuse ids) and prunes dead/foreign entries via the tracker.
 	void track_live_volley(BulletVolley2D *bullets);
-	// Recursive scene scan for the node-name source: collects live
-	// Node2Ds under p_node whose name matches homing_node_name per
+	// The World2D homing targets must live in: the factory's (where the
+	// volleys fly), else this spawner's.
+	const World2D *homing_target_world() const;
+	// Scene scan for the node-name source: collects usable Node2Ds under
+	// p_node whose name matches homing_node_name per
 	// homing_node_name_match_mode and homing_node_name_case_sensitive,
-	// honoring homing_filter_group.
+	// honoring homing_filter_group. Never this spawner or anything under it.
 	void collect_homing_candidates_by_name(Node *p_node, Array &r_candidates) const;
-	// Children scan for the node-children source: collects Node2D
+	// Children scan for the node-children source: collects usable Node2D
 	// children of p_parent (whole subtree when recursive), honoring
-	// homing_filter_group. Never collects this spawner itself.
+	// homing_filter_group. Never this spawner or anything under it.
 	void collect_homing_candidates_from_children(Node *p_parent, bool recursive, Array &r_candidates) const;
 	// Warn-once latch helper for empty resolutions (const: flips the
 	// mutable latch). Quiet passes never warn. The latch re-arms only

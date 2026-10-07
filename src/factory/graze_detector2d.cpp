@@ -104,16 +104,39 @@ GrazeTargetList2D *GrazeDetector2D::list_for_group(const StringName &group, Bull
 	return list;
 }
 
-void GrazeDetector2D::collect_now(SceneTree *tree, const World2D *world, std::vector<GrazeTarget2D> &r_targets) {
+void GrazeDetector2D::collect_now(SceneTree *tree, const World2D *world, const CanvasItem *mouse_space, std::vector<GrazeTarget2D> &r_targets) {
 	r_targets.clear();
-	scan(config.node_group, tree, world, r_targets);
+	scan(config.node_group, tree, world, mouse_space, r_targets);
 }
 
-void GrazeDetector2D::scan(const StringName &group, SceneTree *tree, const World2D *world, std::vector<GrazeTarget2D> &r_targets) {
+void GrazeDetector2D::scan(const StringName &group, SceneTree *tree, const World2D *world, const CanvasItem *mouse_space, std::vector<GrazeTarget2D> &r_targets) {
 	if (tree == nullptr) {
 		return;
 	}
 	++scans;
+	if (config.source == SOURCE_MOUSE) {
+		if (mouse_space != nullptr && mouse_space->is_inside_tree()) {
+			GrazeTarget2D cursor;
+			cursor.id = GRAZE_POINT_TARGET_BIT;
+			cursor.position = mouse_space->get_global_mouse_position();
+			if (cursor.position.is_finite()) {
+				r_targets.push_back(cursor);
+			}
+		}
+		return;
+	}
+	if (config.source == SOURCE_GLOBAL_POSITIONS) {
+		// Finite by the spawner's setter.
+		const int count = config.global_positions.size();
+		r_targets.reserve(r_targets.size() + (size_t)count);
+		for (int i = 0; i < count; ++i) {
+			GrazeTarget2D point;
+			point.id = GRAZE_POINT_TARGET_BIT | (uint64_t)i;
+			point.position = config.global_positions[i];
+			r_targets.push_back(point);
+		}
+		return;
+	}
 	Node *spawner = spawner_id != 0 ? Object::cast_to<Node>(ObjectDB::get_instance(ObjectID(spawner_id))) : nullptr;
 	// Paths resolve from the spawner while it is in the tree; out of it (or
 	// freed) the nodes they pointed to last keep serving its volleys.
@@ -121,7 +144,9 @@ void GrazeDetector2D::scan(const StringName &group, SceneTree *tree, const World
 	auto add = [&](Node2D *node) {
 		graze_add_target2d(node, world, r_targets);
 	};
-	auto skip_factories = [](Node *node) { return Object::cast_to<BulletFactory2D>(node) != nullptr; };
+	// The scans never visit nor enter the spawner (its markers, its preview
+	// layers) or a bullet factory (thousands of bullet nodes, none a target).
+	auto skip_scan = [spawner](Node *node) { return node == spawner || Object::cast_to<BulletFactory2D>(node) != nullptr; };
 	switch (config.source) {
 		case SOURCE_NODE_PATH: {
 			Node *node = nullptr;
@@ -131,6 +156,8 @@ void GrazeDetector2D::scan(const StringName &group, SceneTree *tree, const World
 			} else if (path_target_id != 0) {
 				node = Object::cast_to<Node>(ObjectDB::get_instance(ObjectID(path_target_id)));
 			}
+			// Explicit: the spawner's own children may graze, never the
+			// spawner itself (it never grazes its own bullets).
 			Node2D *target = Object::cast_to<Node2D>(node);
 			if (target != nullptr && target != spawner && (config.filter_group.is_empty() || target->is_in_group(config.filter_group))) {
 				add(target);
@@ -145,7 +172,12 @@ void GrazeDetector2D::scan(const StringName &group, SceneTree *tree, const World
 			} else if (children_parent_id != 0) {
 				parent = Object::cast_to<Node>(ObjectDB::get_instance(ObjectID(children_parent_id)));
 			}
-			scan_node2d_children(parent, config.children_recursive, spawner, config.filter_group, PREVIEW_META_KEY, scan_stack, skip_factories, add);
+			// A parent inside the spawner or a bullet factory has nothing a
+			// scan may find.
+			if (parent == nullptr || parent == spawner || (spawner != nullptr && spawner->is_ancestor_of(parent)) || node_in_bullet_factory2d(parent)) {
+				break;
+			}
+			scan_node2d_children(parent, config.children_recursive, config.filter_group, scan_stack, skip_scan, add);
 			break;
 		}
 		case SOURCE_NODE_NAME: {
@@ -158,10 +190,7 @@ void GrazeDetector2D::scan(const StringName &group, SceneTree *tree, const World
 			if (root == nullptr) {
 				root = tree->get_root();
 			}
-			scan_node2ds_by_name(
-					root, config.node_name, config.node_name_match, config.node_name_case_sensitive, config.filter_group, PREVIEW_META_KEY, scan_stack,
-					[spawner](Node *node) { return node == spawner || Object::cast_to<BulletFactory2D>(node) != nullptr; },
-					add);
+			scan_node2ds_by_name(root, config.node_name, config.node_name_match, config.node_name_case_sensitive, config.filter_group, scan_stack, skip_scan, add);
 			break;
 		}
 		case SOURCE_NODE_GROUP:
@@ -188,6 +217,10 @@ void GrazeDetector2D::update(GrazeTargetList2D &list, BulletFactory2D &factory) 
 		// sweep's.
 		list.validated_epoch = epoch;
 		for (const GrazeTarget2D &target : list.targets) {
+			if (graze_is_point_target2d(target.id)) {
+				live.push_back(target); // points never die (an edit marks the list due)
+				continue;
+			}
 			const Node2D *node = Object::cast_to<Node2D>(ObjectDB::get_instance(ObjectID(target.id)));
 			if (node != nullptr && !node->is_queued_for_deletion()) {
 				live.push_back(target);
@@ -200,10 +233,11 @@ void GrazeDetector2D::update(GrazeTargetList2D &list, BulletFactory2D &factory) 
 	}
 	const Ref<World2D> world = factory.get_world_2d();
 	const double now = factory.get_graze_clock();
-	if (list.scan_due || list.fresh_factory_id != factory_id || now >= list.next_scan_time) {
+	// Points are read every sweep (the cursor moves, an array edit is live).
+	if (uses_points() || list.scan_due || list.fresh_factory_id != factory_id || now >= list.next_scan_time) {
 		list.scan_due = false;
 		list.next_scan_time = now + config.update_interval;
-		scan(list.group, factory.get_tree(), world.ptr(), live);
+		scan(list.group, factory.get_tree(), world.ptr(), &factory, live);
 		list.members.resize(live.size());
 		for (size_t k = 0; k < live.size(); ++k) {
 			list.members[k] = live[k].id;
@@ -219,7 +253,7 @@ void GrazeDetector2D::update(GrazeTargetList2D &list, BulletFactory2D &factory) 
 			}
 			list.members[kept++] = id;
 			GrazeTarget2D target;
-			if (graze_target_usable2d(node, world.ptr(), target.position)) {
+			if (target_node_present2d(node, world.ptr(), target.position)) {
 				target.id = id;
 				live.push_back(target);
 			}

@@ -694,6 +694,8 @@ PackedStringArray BulletSpawner2D::_get_configuration_warnings() const {
 			out.push_back("graze_target_source is Node Name but graze_node_name is empty: no graze target is found.");
 		} else if (graze_target_source == GRAZE_SOURCE_NODE_CHILDREN && graze_children_parent_path.is_empty()) {
 			out.push_back("graze_target_source is Node Children but graze_children_parent_path is empty: no graze target is found.");
+		} else if (graze_target_source == GRAZE_SOURCE_GLOBAL_POSITIONS && graze_global_positions.is_empty()) {
+			out.push_back("graze_target_source is Global Positions but graze_global_positions is empty: no graze target is found.");
 		}
 	}
 	return out;

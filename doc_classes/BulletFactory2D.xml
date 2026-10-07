@@ -491,7 +491,7 @@
 			<param index="3" name="zone" type="BulletGrazeZone2D" />
 			<param index="4" name="deepest_ring_index" type="int" />
 			<description>
-				Emitted live when a bullet that grazed a zone leaves it alive (outside the outermost ring of every target of the zone). [param deepest_ring_index] is the smallest-radius ring touched during that visit and [param target] the target the visit belonged to. A bullet killed, cleared, expired or frozen inside never exits. Every exit reaches the factory (right after the owner spawner's own signal).
+				Emitted live when a bullet that grazed a zone leaves it alive (outside the outermost ring of every target of the zone). [param deepest_ring_index] is the smallest-radius ring touched during that visit and [param target] the target the visit belonged to (null for a point target: [constant BulletSpawner2D.GRAZE_SOURCE_MOUSE], [constant BulletSpawner2D.GRAZE_SOURCE_GLOBAL_POSITIONS]). A bullet killed, cleared, expired or frozen inside never exits. Every exit reaches the factory (right after the owner spawner's own signal).
 			</description>
 		</signal>
 		<signal name="bullet_grazed">
@@ -501,7 +501,7 @@
 			<param index="3" name="zone" type="BulletGrazeZone2D" />
 			<param index="4" name="ring_index" type="int" />
 			<description>
-				Emitted live, inside the physics tick right after the bullets moved, when a bullet comes within ring [param ring_index] of [param zone] around [param target] (see [BulletGrazeZone2D]). The bullet is alive in the handler: transforms, velocity and custom data are readable and writable through [param volley]. Several rings entered in one tick fire from the largest radius to the smallest. Every graze in the game reaches the factory whoever owns the volley (the owner [BulletSpawner2D] emits first while it lives), including bullets of spawners already freed: connect here once to count graze for score. Structural calls need their [code]_deferred[/code] twins inside the handler.
+				Emitted live, inside the physics tick right after the bullets moved, when a bullet comes within ring [param ring_index] of [param zone] around [param target] (see [BulletGrazeZone2D]). [param target] is null when the target is a point (a spawner's Mouse or Global Positions source). The bullet is alive in the handler: transforms, velocity and custom data are readable and writable through [param volley]. Several rings entered in one tick fire from the largest radius to the smallest. Every graze in the game reaches the factory whoever owns the volley (the owner [BulletSpawner2D] emits first while it lives), including bullets of spawners already freed: connect here once to count graze for score. Structural calls need their [code]_deferred[/code] twins inside the handler.
 			</description>
 		</signal>
 		<signal name="life_time_over">

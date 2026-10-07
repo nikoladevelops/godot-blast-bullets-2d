@@ -116,8 +116,24 @@ FactoryOperationGuard::~FactoryOperationGuard() {
 	factory->is_factory_busy = saved_busy;
 }
 
+std::vector<BulletFactory2D *> BulletFactory2D::factories_in_tree;
+
+bool node_in_bullet_factory2d(Node *node) {
+	for (BulletFactory2D *factory : BulletFactory2D::factories_in_tree) {
+		if (factory == node || factory->is_ancestor_of(node)) {
+			return true;
+		}
+	}
+	return false;
+}
+
 void BulletFactory2D::_notification(int p_what) {
+	if (p_what == NOTIFICATION_ENTER_TREE) {
+		factories_in_tree.push_back(this);
+		return;
+	}
 	if (p_what == NOTIFICATION_EXIT_TREE) {
+		factories_in_tree.erase(std::remove(factories_in_tree.begin(), factories_in_tree.end(), this), factories_in_tree.end());
 		unregister_monitors();
 		return;
 	}
