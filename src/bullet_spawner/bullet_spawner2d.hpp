@@ -915,6 +915,10 @@ public:
 	// counts). Node2D entries, Vector2 for point sources, empty for Godot's
 	// listener.
 	Array resolve_sound_listeners() const;
+	// Plays one Sound group entry with this spawner's mix applied (editor
+	// tool: listen without running the game; allowed at runtime too).
+	// Wrong index errors, null/streamless entries warn, nothing crashes.
+	void preview_sound_effect(int index);
 	// {scans, lists, shares_factory_lists}: this spawner's sound detector.
 	Dictionary debug_get_sound_detector_stats() const;
 

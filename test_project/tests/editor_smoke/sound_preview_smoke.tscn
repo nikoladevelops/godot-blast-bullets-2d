@@ -1,0 +1,38 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://tests/editor_smoke/sound_preview_probe.gd" id="1_probe"]
+
+[sub_resource type="BulletSpeedData2D" id="Speed_shared"]
+speed = 300.0
+max_speed = 3000.0
+
+[sub_resource type="CircleShape2D" id="Shape_bullet"]
+radius = 4.0
+
+[sub_resource type="BulletVolleyData2D" id="Data_enemy"]
+shared_bullet_speed_data = SubResource("Speed_shared")
+max_life_time = 4.0
+collision_shape = SubResource("Shape_bullet")
+collision_layer = 2
+collision_mask = 4
+bullet_max_collision_count = 1
+
+[sub_resource type="BulletSoundData2D" id="Sound_preview"]
+trigger = 0
+volume_db = -6.0
+pitch_scale = 1.5
+
+[node name="SoundPreviewSmoke" type="Node2D"]
+
+[node name="BulletFactory2D" type="BulletFactory2D" parent="."]
+
+[node name="Enemy" type="BulletSpawner2D" parent="."]
+bullet_factory_path = NodePath("../BulletFactory2D")
+spawn_data = SubResource("Data_enemy")
+pattern_source = 1
+shooting_enabled = false
+sound_enabled = true
+sound_effects = Array[BulletSoundData2D]([SubResource("Sound_preview")])
+
+[node name="Probe" type="Node" parent="."]
+script = ExtResource("1_probe")

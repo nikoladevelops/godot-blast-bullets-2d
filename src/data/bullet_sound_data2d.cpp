@@ -1,7 +1,15 @@
 #include "data/bullet_sound_data2d.hpp"
 
+#include "factory/sound_mixer2d.hpp"
+
 #include <godot_cpp/classes/audio_server.hpp>
+#include <godot_cpp/classes/audio_stream_player2d.hpp>
+#include <godot_cpp/classes/engine.hpp>
+#include <godot_cpp/classes/scene_tree.hpp>
+#include <godot_cpp/classes/scene_tree_timer.hpp>
+#include <godot_cpp/classes/window.hpp>
 #include <godot_cpp/core/class_db.hpp>
+#include <godot_cpp/core/object.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
 using namespace godot;
@@ -316,6 +324,27 @@ void BulletSoundData2D::set_max_duration_sec(double value) {
 	emit_changed();
 }
 
+void BulletSoundData2D::preview() {
+	if (Engine::get_singleton() == nullptr || !Engine::get_singleton()->is_editor_hint()) {
+		UtilityFunctions::push_error("BulletSoundData2D.preview: editor only, nothing plays.");
+		return;
+	}
+	preview_at(Vector2(), 0.0f, false);
+}
+
+void BulletSoundData2D::preview_at(const Vector2 &global_position, float volume_offset_db, bool use_position) {
+	SoundMixer2D::preview_play(this, global_position, volume_offset_db, use_position);
+}
+
+AudioStreamPlayer2D *BulletSoundData2D::debug_get_preview_player() const {
+	SceneTree *tree = SceneTree::get_singleton();
+	if (tree == nullptr || tree->get_root() == nullptr) {
+		return nullptr;
+	}
+	Node *node = tree->get_root()->get_node_or_null(NodePath("BlastSoundPreview_" + String::num_uint64(get_instance_id())));
+	return Object::cast_to<AudioStreamPlayer2D>(node);
+}
+
 void BulletSoundData2D::_validate_property(PropertyInfo &p_property) const {
 	const String name = p_property.name;
 	if (name == "max_distance" || name == "attenuation" || name == "panning_strength" || name == "area_mask") {
@@ -446,6 +475,10 @@ void BulletSoundData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_max_duration_sec"), &BulletSoundData2D::get_max_duration_sec);
 	ClassDB::bind_method(D_METHOD("set_max_duration_sec", "value"), &BulletSoundData2D::set_max_duration_sec);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "max_duration_sec", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater,suffix:s"), "set_max_duration_sec", "get_max_duration_sec");
+
+	ClassDB::bind_method(D_METHOD("preview"), &BulletSoundData2D::preview);
+	ClassDB::bind_method(D_METHOD("preview_at", "global_position", "volume_offset_db", "use_position"), &BulletSoundData2D::preview_at);
+	ClassDB::bind_method(D_METHOD("debug_get_preview_player"), &BulletSoundData2D::debug_get_preview_player);
 
 	BIND_ENUM_CONSTANT(SOUND_ON_SHOT);
 	BIND_ENUM_CONSTANT(SOUND_ON_HIT);

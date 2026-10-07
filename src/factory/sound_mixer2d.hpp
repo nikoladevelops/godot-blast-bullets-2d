@@ -69,6 +69,16 @@ public:
 	void clear_log() { sound_log.clear(); }
 	Array debug_voices() const;
 	Dictionary debug_stats() const;
+	// Applies one play's mix to a player (stream, volume + offset + random,
+	// pitch * random, bus with Master fallback, spatial or centered
+	// constants). Shared by the sweep flush and the editor preview. Returns
+	// the applied volume (Quietest steal ranks by it).
+	static float apply_playback_mix(AudioStreamPlayer2D *player, const BulletSoundData2D *sound, const Ref<AudioStream> &picked, float volume_offset_db, std::vector<String> *warned_buses, bool force_centered = false);
+	// Editor preview: plays the entry's picked stream with its mix through a
+	// transient player under the tree root (never the edited scene). A second
+	// call stops the first, one-shots free themselves on finished, looping
+	// entries are stopped after 10 s. Allowed at runtime too (harmless).
+	static void preview_play(BulletSoundData2D *sound, const Vector2 &global_position, float volume_offset_db, bool use_position);
 
 private:
 	struct Candidate {
@@ -117,7 +127,7 @@ private:
 	// The stream this play uses: streams picked per stream_mode (nulls
 	// skipped, stream the fallback), or null when there is nothing to play.
 	// Round-robin and shuffle state live in the channel (shared).
-	Ref<AudioStream> pick_stream(BulletSoundData2D *sound, Channel &channel);
+	static Ref<AudioStream> pick_stream(const BulletSoundData2D *sound, Channel &channel);
 	// Nearest target of the candidate's spec (fresh list read): returns false
 	// when a node source finds nobody (caller falls back to Godot's listener).
 	bool resolve_listener(BulletFactory2D &factory, const SoundListenerSpec2D &spec, const Vector2 &event_pos, Vector2 &r_listener_pos, uint64_t &r_node_id, bool &r_is_point) const;

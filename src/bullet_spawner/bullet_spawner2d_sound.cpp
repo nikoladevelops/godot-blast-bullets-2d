@@ -340,4 +340,19 @@ Dictionary BulletSpawner2D::debug_get_sound_detector_stats() const {
 	return d;
 }
 
+void BulletSpawner2D::preview_sound_effect(int index) {
+	if (index < 0 || index >= sound_effects.size()) {
+		UtilityFunctions::push_error("BulletSpawner2D.preview_sound_effect: index " + String::num_int64(index) + " out of range (sound_effects holds " + String::num_int64(sound_effects.size()) + "), nothing plays.");
+		return;
+	}
+	const Variant entry = sound_effects[index];
+	BulletSoundData2D *sound = entry.get_type() == Variant::OBJECT ? Object::cast_to<BulletSoundData2D>((Object *)entry) : nullptr;
+	if (sound == nullptr) {
+		UtilityFunctions::push_warning("BulletSpawner2D.preview_sound_effect: entry " + String::num_int64(index) + " is null, nothing plays.");
+		return;
+	}
+	// Disabled/streamless entries take the entry's usual warning path.
+	sound->preview_at(get_global_position(), (float)sound_volume_db, true);
+}
+
 } // namespace BlastBullets2D

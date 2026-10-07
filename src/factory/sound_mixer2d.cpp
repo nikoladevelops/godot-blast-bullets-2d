@@ -4,8 +4,13 @@
 #include "core/warn_once2d.hpp"
 #include "factory/bullet_factory2d.hpp"
 
+#include <godot_cpp/classes/audio_stream_wav.hpp>
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/node2d.hpp>
+#include <godot_cpp/classes/scene_tree.hpp>
+#include <godot_cpp/classes/scene_tree_timer.hpp>
+#include <godot_cpp/classes/window.hpp>
+#include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/core/object.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
@@ -38,7 +43,7 @@ static bool sound_has_audio(const BulletSoundData2D *sound) {
 	return false;
 }
 
-Ref<AudioStream> SoundMixer2D::pick_stream(BulletSoundData2D *sound, Channel &channel) {
+Ref<AudioStream> SoundMixer2D::pick_stream(const BulletSoundData2D *sound, Channel &channel) {
 	std::vector<Ref<AudioStream>> usable;
 	usable.reserve((size_t)sound->streams.size() + 1);
 	for (int i = 0; i < sound->streams.size(); ++i) {
@@ -108,6 +113,52 @@ static float sound_roll_pitch(double range) {
 	}
 	const double u = UtilityFunctions::randf();
 	return (float)Math::exp(Math::log(range) * (2.0 * u - 1.0));
+}
+
+float SoundMixer2D::apply_playback_mix(AudioStreamPlayer2D *player, const BulletSoundData2D *sound, const Ref<AudioStream> &picked, float volume_offset_db, std::vector<String> *warned_buses, bool force_centered) {
+	// Bus: unknown names play on Master (one warning per name).
+	String bus = sound->bus;
+	AudioServer *server = AudioServer::get_singleton();
+	if (server == nullptr || server->get_bus_index(bus) < 0) {
+		bool warned = true;
+		if (warned_buses != nullptr) {
+			warned = false;
+			for (size_t bi = 0; bi < warned_buses->size(); ++bi) {
+				if ((*warned_buses)[bi] == bus) {
+					warned = true;
+					break;
+				}
+			}
+			if (!warned) {
+				warned_buses->push_back(bus);
+			}
+		}
+		if (!warned) {
+			UtilityFunctions::push_warning("BulletSoundData2D: bus \"" + bus + "\" does not exist, playing on Master.");
+		}
+		bus = "Master";
+	}
+	float volume = (float)sound->volume_db + volume_offset_db;
+	if (Math::is_finite((double)sound->random_volume_offset_db) && sound->random_volume_offset_db > 0.0) {
+		volume += (float)UtilityFunctions::randf_range(-(double)sound->random_volume_offset_db, (double)sound->random_volume_offset_db);
+	}
+	const float pitch = (float)sound->pitch_scale * sound_roll_pitch(sound->random_pitch);
+	player->set_stream(picked);
+	player->set_volume_db(volume);
+	player->set_pitch_scale(pitch);
+	player->set_bus(bus);
+	if (sound->positional && !force_centered) {
+		player->set_max_distance((float)sound->max_distance);
+		player->set_attenuation((float)sound->attenuation);
+		player->set_panning_strength((float)sound->panning_strength);
+		player->set_area_mask((int)sound->area_mask);
+	} else {
+		player->set_max_distance(1e30f);
+		player->set_attenuation(0.0f);
+		player->set_panning_strength(0.0f);
+		player->set_area_mask(0);
+	}
+	return volume;
 }
 
 Vector2 SoundMixer2D::godot_listener_pos(BulletFactory2D &factory) {
@@ -353,7 +404,6 @@ void SoundMixer2D::flush(BulletFactory2D &factory) {
 	if (!any_pending) {
 		return;
 	}
-	AudioServer *server = AudioServer::get_singleton();
 	for (auto &entry : channels) {
 		Channel &channel = entry.second;
 		if (channel.candidates.empty()) {
@@ -462,22 +512,6 @@ void SoundMixer2D::flush(BulletFactory2D &factory) {
 					break;
 				}
 			}
-			// Bus: unknown names play on Master (one warning per name).
-			String bus = sound->bus;
-			if (server == nullptr || server->get_bus_index(bus) < 0) {
-				bool warned = false;
-				for (size_t bi = 0; bi < warned_buses.size(); ++bi) {
-					if (warned_buses[bi] == bus) {
-						warned = true;
-						break;
-					}
-				}
-				if (!warned) {
-					warned_buses.push_back(bus);
-					UtilityFunctions::push_warning("BulletSoundData2D: bus \"" + bus + "\" does not exist, playing on Master.");
-				}
-				bus = "Master";
-			}
 			// Placement: Godot listener -> the event position (Godot does
 			// falloff/panning); a node listener L of event P -> G + (P - L)
 			// so the engine measures from L; point listeners are fixed.
@@ -488,31 +522,12 @@ void SoundMixer2D::flush(BulletFactory2D &factory) {
 			} else if (!sound->positional) {
 				at = godot_pos;
 			}
-			float volume = (float)sound->volume_db + winner.volume_offset_db;
-			if (Math::is_finite((double)sound->random_volume_offset_db) && sound->random_volume_offset_db > 0.0) {
-				volume += (float)UtilityFunctions::randf_range(-(double)sound->random_volume_offset_db, (double)sound->random_volume_offset_db);
-			}
-			const float pitch = (float)sound->pitch_scale * sound_roll_pitch(sound->random_pitch);
 			const Ref<AudioStream> picked = pick_stream(sound, channel);
 			if (picked.is_null()) {
 				++dropped_total;
 				continue;
 			}
-			player->set_stream(picked);
-			player->set_volume_db(volume);
-			player->set_pitch_scale(pitch);
-			player->set_bus(bus);
-			if (sound->positional) {
-				player->set_max_distance((float)sound->max_distance);
-				player->set_attenuation((float)sound->attenuation);
-				player->set_panning_strength((float)sound->panning_strength);
-				player->set_area_mask((int)sound->area_mask);
-			} else {
-				player->set_max_distance(1e30f);
-				player->set_attenuation(0.0f);
-				player->set_panning_strength(0.0f);
-				player->set_area_mask(0);
-			}
+			const float volume = SoundMixer2D::apply_playback_mix(player, sound, picked, winner.volume_offset_db, &warned_buses);
 			player->set_global_position(at);
 			player->play();
 			Voice &voice = voices[slot];
@@ -539,6 +554,74 @@ void SoundMixer2D::flush(BulletFactory2D &factory) {
 				e["frame"] = (int64_t)Engine::get_singleton()->get_physics_frames();
 				sound_log.push_back(e);
 			}
+		}
+	}
+}
+
+// One transient player per entry id under the tree root (never the edited
+// scene, so nothing is saved). Stops itself when the stream ends.
+static String sound_preview_node_name(uint64_t entry_id) {
+	return "BlastSoundPreview_" + String::num_uint64(entry_id);
+}
+
+void SoundMixer2D::preview_play(BulletSoundData2D *sound, const Vector2 &global_position, float volume_offset_db, bool use_position) {
+	if (sound == nullptr) {
+		return;
+	}
+	SceneTree *tree = SceneTree::get_singleton();
+	if (tree == nullptr) {
+		return;
+	}
+	Window *root = tree->get_root();
+	if (root == nullptr) {
+		return;
+	}
+	if (!sound->enabled) {
+		UtilityFunctions::push_warning("BulletSoundData2D: the sound is disabled, nothing plays.");
+		return;
+	}
+	if (!sound_has_audio(sound)) {
+		if (WarnOnce2D::first(sound->get_instance_id(), SOUND_WARN_EMPTY_STREAM)) {
+			UtilityFunctions::push_warning("BulletSoundData2D: stream is empty, the sound plays nothing.");
+		}
+		return;
+	}
+	// Sequence/shuffle cursors need a channel; preview shares the pick, not
+	// the limits (it always plays the picked stream).
+	Channel channel;
+	const Ref<AudioStream> picked = pick_stream(sound, channel);
+	if (picked.is_null()) {
+		if (WarnOnce2D::first(sound->get_instance_id(), SOUND_WARN_EMPTY_STREAM)) {
+			UtilityFunctions::push_warning("BulletSoundData2D: stream is empty, the sound plays nothing.");
+		}
+		return;
+	}
+	const String name = sound_preview_node_name(sound->get_instance_id());
+	if (Node *old = root->get_node_or_null(NodePath(name)); old != nullptr) {
+		// A second call stops the first synchronously: stop, detach and free
+		// now (a queue_free would linger until frame end and force the new
+		// player onto a suffixed name the lookup would miss). The player is
+		// childless and only ever carries its own finished connection.
+		if (AudioStreamPlayer2D *old_player = Object::cast_to<AudioStreamPlayer2D>(old); old_player != nullptr) {
+			old_player->stop();
+		}
+		root->remove_child(old);
+		memdelete(old);
+	}
+	AudioStreamPlayer2D *player = memnew(AudioStreamPlayer2D);
+	player->set_name(name);
+	player->set_max_polyphony(1);
+	player->set_physics_interpolation_mode(Node::PHYSICS_INTERPOLATION_MODE_OFF);
+	apply_playback_mix(player, sound, picked, volume_offset_db, nullptr, !use_position);
+	player->set_global_position(global_position);
+	root->add_child(player);
+	player->play();
+	player->connect("finished", Callable(player, "queue_free"), Object::CONNECT_ONE_SHOT);
+	// Looping entries never finish on their own: stop them after 10 s.
+	if (AudioStreamWAV *wav = Object::cast_to<AudioStreamWAV>(picked.ptr()); wav != nullptr && wav->get_loop_mode() != AudioStreamWAV::LOOP_DISABLED) {
+		Ref<SceneTreeTimer> timer = tree->create_timer(10.0);
+		if (timer.is_valid()) {
+			timer->connect("timeout", Callable(player, "queue_free"), Object::CONNECT_ONE_SHOT);
 		}
 	}
 }

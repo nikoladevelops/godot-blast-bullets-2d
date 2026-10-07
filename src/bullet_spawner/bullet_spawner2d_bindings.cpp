@@ -753,6 +753,7 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_sound_listener_update_interval", "value"), &BulletSpawner2D::set_sound_listener_update_interval);
 	ClassDB::bind_method(D_METHOD("refresh_sound_listeners"), &BulletSpawner2D::refresh_sound_listeners);
 	ClassDB::bind_method(D_METHOD("resolve_sound_listeners"), &BulletSpawner2D::resolve_sound_listeners);
+	ClassDB::bind_method(D_METHOD("preview_sound_effect", "index"), &BulletSpawner2D::preview_sound_effect);
 	ClassDB::bind_method(D_METHOD("debug_get_sound_detector_stats"), &BulletSpawner2D::debug_get_sound_detector_stats);
 	ADD_GROUP("Graze", "");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "graze_enabled"), "set_graze_enabled", "get_graze_enabled");

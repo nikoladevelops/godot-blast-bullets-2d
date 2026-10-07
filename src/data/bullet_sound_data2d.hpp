@@ -1,6 +1,7 @@
 #pragma once
 
 #include <godot_cpp/classes/audio_stream.hpp>
+#include <godot_cpp/classes/audio_stream_player2d.hpp>
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/core/property_info.hpp>
 #include <godot_cpp/variant/string_name.hpp>
@@ -201,6 +202,20 @@ public:
 
 	double get_max_duration_sec() const;
 	void set_max_duration_sec(double value);
+
+	// Editor mix preview: plays the picked stream with this entry's mix
+	// applied (volume, one pitch roll, bus, centered), so pitch/volume edits
+	// are audible without running the game. Editor only (else an error);
+	// a second call stops the first, one-shots free themselves on finished,
+	// looping entries are stopped after 10 s. Never saved anywhere.
+	void preview();
+	// Same, at a global pose with a volume offset and positioning honored
+	// (the spawner's preview path). Editor only like preview(), but also
+	// allowed at runtime (harmless: same as a play).
+	void preview_at(const Vector2 &global_position, float volume_offset_db, bool use_position);
+	// This entry's live preview player, or null (tests and the smoke probe
+	// read mix state through it).
+	AudioStreamPlayer2D *debug_get_preview_player() const;
 
 	// Spatial knobs hide while positional is off; the bus enum lists the
 	// project's audio buses (like Godot's AudioStreamPlayer).
