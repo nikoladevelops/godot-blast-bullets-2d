@@ -21,6 +21,7 @@
 #include "data/bullet_effect_layer_data2d.hpp"
 #include "data/bullet_volley_data2d.hpp"
 #include "factory/graze_detector2d.hpp"
+#include "factory/sound_mixer2d.hpp"
 #include "godot_cpp/core/math.hpp"
 #include "godot_cpp/variant/dictionary.hpp"
 #include "godot_cpp/variant/packed_float32_array.hpp"
@@ -508,6 +509,28 @@ public:
 	// Bumped by volleys per emitted graze event (never per bullet).
 	uint64_t stats_graze_events_total = 0;
 
+	// ---- Sound triggers (sound_mixer2d.*) ----
+	// Fire-and-forget audio: trigger sites offer (volley, spawner, user) and
+	// the mixer plays the sweep's winners at the end of _physics_process.
+	// Channels are shared per sound resource across the whole factory.
+	// Volley/spawner entry point (C++ only: the listener spec has no Variant
+	// form): false = dropped (paused, editor, disabled, streamless, chance).
+	bool sound_offer(const Ref<BulletSoundData2D> &sound, const Vector2 &event_pos, float volume_offset_db, const SoundListenerSpec2D &listener);
+	// User hatch: plays `sound` at the end of the next sweep (Godot listener,
+	// or the nearest member of `listener_group`). False = refused (null,
+	// disabled, outside the tree, paused, editor).
+	bool play_sound(const Ref<BulletSoundData2D> &sound, const Vector2 &global_position, const StringName &listener_group = StringName());
+	// Stops every voice (channels kept). reset() also forgets the channels.
+	void stop_sounds();
+	int get_sound_max_voices() const;
+	void set_sound_max_voices(int value);
+	void debug_set_sound_log_enabled(bool enabled);
+	Array debug_get_sound_log() const;
+	void debug_clear_sound_log();
+	Array debug_get_sound_voices() const;
+	Dictionary debug_get_sound_stats() const;
+	void debug_stop_sound_voices();
+
 	//
 
 	void handle_manual_volley_deletion(BulletVolley2D &bullet_multi);
@@ -618,6 +641,7 @@ private:
 	std::vector<VolleyIterationEntry> iteration_scratch;
 	std::vector<VolleyIterationEntry> timer_iteration_scratch;
 	GrazeDetector2D graze_default_detector{ 0 };
+	SoundMixer2D sound_mixer;
 	double graze_clock = 0.0;
 	uint64_t user_code_epoch = 0;
 	// _process runs for the interpolation pass (processing + interpolation)

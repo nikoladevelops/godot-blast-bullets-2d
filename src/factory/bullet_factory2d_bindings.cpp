@@ -187,6 +187,23 @@ void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("debug_get_graze_targets", "group"), &BulletFactory2D::debug_get_graze_targets);
 	ClassDB::bind_method(D_METHOD("debug_get_graze_stats"), &BulletFactory2D::debug_get_graze_stats);
 	ClassDB::bind_method(D_METHOD("debug_set_graze_slab_min_targets", "value"), &BulletFactory2D::debug_set_graze_slab_min_targets);
+
+	ADD_GROUP("Sound", "sound_");
+
+	// Sound triggers (SoundMixer2D): trigger sites offer, the sweep's winners
+	// play at the end of _physics_process. Volley and spawner entries route
+	// automatically when armed; play_sound is the manual hatch.
+	ClassDB::bind_method(D_METHOD("play_sound", "sound", "global_position", "listener_group"), &BulletFactory2D::play_sound, DEFVAL(StringName()));
+	ClassDB::bind_method(D_METHOD("stop_sounds"), &BulletFactory2D::stop_sounds);
+	ClassDB::bind_method(D_METHOD("get_sound_max_voices"), &BulletFactory2D::get_sound_max_voices);
+	ClassDB::bind_method(D_METHOD("set_sound_max_voices", "value"), &BulletFactory2D::set_sound_max_voices);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "sound_max_voices", PROPERTY_HINT_RANGE, "1,256,1,or_greater"), "set_sound_max_voices", "get_sound_max_voices");
+	ClassDB::bind_method(D_METHOD("debug_set_sound_log_enabled", "enabled"), &BulletFactory2D::debug_set_sound_log_enabled);
+	ClassDB::bind_method(D_METHOD("debug_get_sound_log"), &BulletFactory2D::debug_get_sound_log);
+	ClassDB::bind_method(D_METHOD("debug_clear_sound_log"), &BulletFactory2D::debug_clear_sound_log);
+	ClassDB::bind_method(D_METHOD("debug_get_sound_voices"), &BulletFactory2D::debug_get_sound_voices);
+	ClassDB::bind_method(D_METHOD("debug_get_sound_stats"), &BulletFactory2D::debug_get_sound_stats);
+	ClassDB::bind_method(D_METHOD("debug_stop_sound_voices"), &BulletFactory2D::debug_stop_sound_voices);
 }
 
 } // namespace BlastBullets2D

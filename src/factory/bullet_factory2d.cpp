@@ -345,6 +345,7 @@ void BulletFactory2D::set_is_factory_processing_bullets(bool is_processing_enabl
 
 	const bool resuming = is_processing_enabled && !is_factory_processing_bullets;
 	is_factory_processing_bullets = is_processing_enabled;
+	sound_mixer.set_paused(!is_processing_enabled);
 
 	// Overlaps that started during the pause were parked by the volleys;
 	// queue them now so the next tick drains them (exactly once).
@@ -404,6 +405,10 @@ void BulletFactory2D::_physics_process(double delta) {
 		volley->run_custom_timers(delta);
 	}
 	is_iterating_bullets = false;
+
+	// Sound winners play after every volley, effect and timer of the sweep
+	// ran (timer-spawned offers join this sweep), never inside the iteration.
+	sound_mixer.flush(*this);
 
 	stats_last_physics_tick_usec = Time::get_singleton()->get_ticks_usec() - stats_t0;
 	if (stats_last_physics_tick_usec > stats_peak_physics_tick_usec) {

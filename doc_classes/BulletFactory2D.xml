@@ -64,6 +64,12 @@
 				Debug/test helper: empties the effect log (recording stays on).
 			</description>
 		</method>
+		<method name="debug_clear_sound_log">
+			<return type="void" />
+			<description>
+				Debug/test helper: empties the sound log (recording stays on).
+			</description>
+		</method>
 		<method name="debug_expected_pool_key" qualifiers="static">
 			<return type="VolleyPoolKey2D" />
 			<param index="0" name="spawn_data" type="BulletVolleyData2D" />
@@ -158,6 +164,24 @@
 				Pool reuse counters (64-bit): hits, misses. A spawn from inside a volley's own collision handler never reuses that volley (it is mid-tick), so it is served by another pooled instance or a fresh allocation and still succeeds. A 0% hit rate with a pre-populated pool means the spawn key never matches (e.g. helper_skip_indices shrank transforms after populate); compare [method debug_expected_pool_key] against [method debug_get_bullets_pool_info] keys.
 			</description>
 		</method>
+		<method name="debug_get_sound_log" qualifiers="const">
+			<return type="Array" />
+			<description>
+				Test helper: every sound the mixer played while recording was on, as {sound, position, frame} dicts (oldest dropped past 4096 entries).
+			</description>
+		</method>
+		<method name="debug_get_sound_stats" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Sound mixer counters: {voices_total, voices_busy, channels, pending, plays_total, dropped_total}. Sample twice and subtract for per-frame rates.
+			</description>
+		</method>
+		<method name="debug_get_sound_voices" qualifiers="const">
+			<return type="Array" />
+			<description>
+				One dict per voice pool slot: {index, busy, sound, priority, position, volume_db, pitch_scale, bus}.
+			</description>
+		</method>
 		<method name="debug_get_total_attachments_amount">
 			<return type="int" />
 			<description>
@@ -188,6 +212,19 @@
 			<param index="0" name="value" type="int" />
 			<description>
 				Test/profiling hook: zones with more live targets than [param value] (default 8) test each bullet only against the targets near its motion in x instead of every target (same results, far cheaper with many targets). 0 = always, a huge value = never. Process-wide. Returns the previous value; a value outside 0..64 pushes an error and changes nothing.
+			</description>
+		</method>
+		<method name="debug_set_sound_log_enabled">
+			<return type="void" />
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Test helper: records every played sound while on (cleared when switched off). One bool check per play.
+			</description>
+		</method>
+		<method name="debug_stop_sound_voices">
+			<return type="void" />
+			<description>
+				Debug/test helper: stops every voice at once (channels kept).
 			</description>
 		</method>
 		<method name="debug_validate_spawn_data" qualifiers="static">
@@ -316,6 +353,15 @@
 				Get the physics world space in which the bullets interact.
 			</description>
 		</method>
+		<method name="play_sound">
+			<return type="bool" />
+			<param index="0" name="sound" type="BulletSoundData2D" />
+			<param index="1" name="global_position" type="Vector2" />
+			<param index="2" name="listener_group" type="StringName" default="&amp;&quot;&quot;" />
+			<description>
+				Manual sound hatch: plays [param sound] at [param global_position] at the end of the next sweep (Godot listener, or the nearest member of [param listener_group]). Returns false when refused (null, disabled, outside the tree, paused, editor): offers made during a sweep play at the end of that sweep.
+			</description>
+		</method>
 		<method name="populate_attachments_pool">
 			<return type="void" />
 			<param index="0" name="attachment_scene" type="PackedScene" />
@@ -412,6 +458,12 @@
 				Warning: with auto pooling on (the default) an expired volley returns to the pool and a later spawn may hand out the same object again. If you store volleys in your own arrays, set [member BulletVolley2D.is_auto_pooling_enabled] to false on them.
 			</description>
 		</method>
+		<method name="stop_sounds">
+			<return type="void" />
+			<description>
+				Stops every voice at once (channels kept). reset() also forgets the channels.
+			</description>
+		</method>
 		<method name="teleport_shift_all_bullets">
 			<return type="void" />
 			<param index="0" name="shift_amount" type="Vector2" />
@@ -440,6 +492,9 @@
 		</member>
 		<member name="register_performance_monitors" type="bool" setter="set_register_performance_monitors" getter="get_register_performance_monitors" default="true">
 			When on (default), the factory registers custom monitors on ready, graphed while the game runs in the editor's Debugger &gt; Monitors tab: BlastBullets2D/Active Bullets, Active Volleys, Pooled Volleys, Physics Tick (ms), Peak Physics Tick (ms), Interpolation (ms), Active Effects and Active Attachments. Use them to spot which frames are heavy and what causes it. One factory owns the monitor ids at a time (the first to become ready; others skip silently, and a freed owner's ids are reclaimed). Runtime only, never in the editor; removed when the factory leaves the tree.
+		</member>
+		<member name="sound_max_voices" type="int" setter="set_sound_max_voices" getter="get_sound_max_voices" default="32">
+			Voice pool size for the whole factory: one AudioStreamPlayer2D per simultaneous sound. Voices are created on demand; past this a new event steals the oldest voice of equal or lower priority, never a more important one.
 		</member>
 		<member name="use_physics_interpolation" type="bool" setter="set_use_physics_interpolation_editor" getter="get_use_physics_interpolation" default="false">
 			Determines whether physics interpolation is enabled or not. The setter is for the editor only.
