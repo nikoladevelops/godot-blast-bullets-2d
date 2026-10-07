@@ -507,6 +507,7 @@ Array SoundMixer2D::debug_voices() const {
 			d["attenuation"] = voice.player->get_attenuation();
 			d["panning_strength"] = voice.player->get_panning_strength();
 			d["area_mask"] = voice.player->get_area_mask();
+			d["paused"] = voice.player->get_stream_paused();
 		}
 		out.push_back(d);
 	}
