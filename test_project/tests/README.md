@@ -116,6 +116,7 @@ asserts a dangling-free factory plus zero new orphans after every test.
 - `spawner/test_spawner_homing_orbit.gd` — 6 target sources, cache, fire-arc gate, retarget, fuse, stagger.
 - `spawner/test_spawner_signals_sequencing.gd` — handler contracts, burst/telegraph/pattern-list, cap, adopt/clear/override.
 - `integration/test_interpolation_integration.gd` — interpolation agreement/toggle, pause, churn, two factories.
+- `integration/test_engine_interpolation_optout.gd` — engine interpolation opt-out: with tree physics_interpolation on, no CanvasItem under the factory (one-shot shards, trail shards, manual hatch, attachments, debugger) reports interpolated-and-enabled.
 - `common/blast_test_helpers.gd` — shared `BulletVolleyData2D` builders (identical speeds/layers/sizes so failures mean regressions).
 - `factory/test_factory_generator_fuzz.gd` — crash-fuzz for every generator: hostile counts (incl. the 10000 cap on all 29 generators, amount 0 = silent empty), degenerate geometry, NaN inputs, extreme twists/offsets, oversized scales, edge-image extraction, side-spread/skip contracts, exact-geometry semantics. Every rejection is pinned with its exact error right after the call; valid input never errors.
 - `factory/test_factory_layer_rings.gd` — outline-layer design proofs: every extra layer re-spawns the shape scaled about the loop center, facings/quotas/corners exact per ring.

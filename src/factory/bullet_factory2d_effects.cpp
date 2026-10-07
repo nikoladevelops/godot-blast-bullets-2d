@@ -155,6 +155,11 @@ MultiMeshInstance2D *BulletFactory2D::fx_create_shard(Node *parent, const Ref<Te
 	shard->set_visibility_layer(vis);
 	shard->set_light_mask(light);
 	shard->set_visible(false);
+	// The plugin runs its own physics interpolation (same opt-out as the
+	// volley, the debugger and the attachments): with tree physics
+	// interpolation on, Godot 4.6+ MultiMeshInstance2D inherits the mode and
+	// every instance write would lerp over a tick.
+	shard->set_physics_interpolation_mode(Node::PHYSICS_INTERPOLATION_MODE_OFF);
 	parent->add_child(shard);
 	return shard;
 }
@@ -212,6 +217,9 @@ void BulletFactory2D::fx_ensure_effects_container() {
 	}
 	sprite_effects_container = memnew(Node2D);
 	sprite_effects_container->set_name("SpriteEffectsContainer");
+	// Same opt-out as the volley (bullet_volley2d.cpp): shards inherit this
+	// mode, and without the opt-out every one-shot instance write lerps.
+	sprite_effects_container->set_physics_interpolation_mode(Node::PHYSICS_INTERPOLATION_MODE_OFF);
 	add_child(sprite_effects_container);
 }
 

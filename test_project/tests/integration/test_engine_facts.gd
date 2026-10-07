@@ -11,6 +11,10 @@ extends BlastTest
 ## - signal connections live on the EMITTER: freeing the receiver drops the
 ##   connection (has_connections() turns false), so a volley's emit then
 ##   reaches nobody.
+## - a MultiMeshInstance2D under a plain Node2D follows the node mode: with
+##   tree physics_interpolation on it reports interpolated-and-enabled, and
+##   PHYSICS_INTERPOLATION_MODE_OFF opts it back out (the shard opt-out
+##   relies on exactly this).
 
 
 class DeferredProbe extends Node:
@@ -103,3 +107,20 @@ func test_connections_live_on_the_emitter() -> void:
 	assert_false(emitter.has_connections("ping"), "freeing the receiver drops the connection on the emitter")
 	emitter.ping.emit() # reaches nobody, no error
 	expect_no_errors()
+
+
+func test_multimesh_instance_follows_node_interpolation() -> void:
+	get_tree().physics_interpolation = true
+	var holder := Node2D.new()
+	add(holder)
+	var mmi := MultiMeshInstance2D.new()
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_2D
+	mm.mesh = QuadMesh.new()
+	mm.instance_count = 1
+	mmi.multimesh = mm
+	holder.add_child(mmi)
+	assert_true(mmi.is_physics_interpolated_and_enabled(), "a MultiMeshInstance2D under a plain node is interpolated when the tree flag is on")
+	mmi.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
+	assert_false(mmi.is_physics_interpolated_and_enabled(), "PHYSICS_INTERPOLATION_MODE_OFF opts it back out")
+	get_tree().physics_interpolation = false
