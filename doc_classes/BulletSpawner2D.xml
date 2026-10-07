@@ -336,6 +336,13 @@
 				Freezes volley creation keeping all counters: burst, telegraph, pattern-list and timer chains hold where they are and resume on [method resume_shooting]. Spin, retargeting and preview are unaffected. Manual [method shoot_once] still fires. Emits [signal shooting_stopped] on the active-to-idle transition (inside the tree only; a pause made before the tree is kept through _ready).
 			</description>
 		</method>
+		<method name="preview_sound_effect">
+			<return type="void" />
+			<param index="0" name="index" type="int" />
+			<description>
+				Editor tool: plays [member sound_effects] entry [param index] with this spawner's mix applied (global pose, [member sound_volume_db] trim), so entries are audible without running the game. Wrong indexes error, null and streamless entries warn, nothing crashes. Allowed at runtime too, where it behaves like a single play.
+			</description>
+		</method>
 		<method name="refresh_graze_targets">
 			<return type="int" />
 			<description>
@@ -1510,7 +1517,7 @@
 			Global Positions source: one listener per entry (finite only), read every sweep. Points never follow.
 		</member>
 		<member name="sound_listener_node_group" type="StringName" setter="set_sound_listener_node_group" getter="get_sound_listener_node_group" default="&amp;&quot;&quot;">
-			Node Group source: Node2D members of this group (empty by default: the developer names it).
+			Node Group source: Node2D members of this group (empty by default: the developer names it). Player-ears example: a fixed camera shows the whole arena while the ears follow the player, so set the source to Node Group and the group to [code]"player"[/code]: near misses on the player sound loud wherever the camera sits. An empty result falls back to Godot's listener and warns once, naming the empty setting.
 		</member>
 		<member name="sound_listener_node_name" type="String" setter="set_sound_listener_node_name" getter="get_sound_listener_node_name" default="&quot;&quot;">
 			Node Name source: Node2Ds named like this (scene scan, never inside a factory or this spawner).
