@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="BulletSoundData2D" inherits="Resource" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		One stackable sound entry: what plays when one bullet event fires.
+	</brief_description>
+	<description>
+		A [BulletSoundData2D] plays its [member stream] when its [member trigger] fires, subject to its own limits ([member min_interval_sec], [member max_voices]). Drop entries into [member BulletSpawner2D.sound_effects] (or arm a factory volley with [method BulletVolley2D.sound_set_effects]) and stack as many as you like: every enabled entry whose trigger matches plays.
+		Channels are shared per resource across the whole factory: twenty enemies sharing one [code]hit.tres[/code] share one interval and voice budget, and the nearest events win each sweep. Any Godot [AudioStream] works: WAV/OGG/MP3, [AudioStreamRandomizer] (variations, weighted, no repeats), [AudioStreamPlaylist] (sequences), [AudioStreamSynchronized] (layers). Put [AudioEffect] reverb, delay or distortion on the [member bus] and Area2D bus overrides listen on [member area_mask].
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="area_mask" type="int" setter="set_area_mask" getter="get_area_mask" default="1">
+			Physics layers whose [Area2D] audio bus overrides apply to this sound. Hidden while [member positional] is off.
+		</member>
+		<member name="attenuation" type="float" setter="set_attenuation" getter="get_attenuation" default="1.0">
+			Distance falloff curve exponent (Godot's own volume math). Hidden while [member positional] is off.
+		</member>
+		<member name="bus" type="StringName" setter="set_bus" getter="get_bus" default="&amp;&quot;Master&quot;">
+			Mixer bus this sound plays on. Unknown names play on Master with one warning per name.
+		</member>
+		<member name="enabled" type="bool" setter="set_enabled" getter="get_enabled" default="true">
+			Master switch: toggle a sound without removing it. Disabled entries play nothing.
+		</member>
+		<member name="max_distance" type="float" setter="set_max_distance" getter="get_max_distance" default="2000.0">
+			Past this distance from the listener the play is dropped: inaudible events never take a voice. Hidden while [member positional] is off.
+		</member>
+		<member name="max_duration_sec" type="float" setter="set_max_duration_sec" getter="get_max_duration_sec" default="0.0">
+			Stops a voice after this long (looping streams). 0 plays the whole stream.
+		</member>
+		<member name="max_voices" type="int" setter="set_max_voices" getter="get_max_voices" default="4">
+			Simultaneous voices of this sound across the whole factory. Past this, [member when_limit_reached] decides.
+		</member>
+		<member name="min_interval_sec" type="float" setter="set_min_interval_sec" getter="get_min_interval_sec" default="0.05">
+			At most one play per interval across the whole factory; the nearest event wins each sweep. 0 plays up to [member max_voices] per sweep instead.
+		</member>
+		<member name="panning_strength" type="float" setter="set_panning_strength" getter="get_panning_strength" default="1.0">
+			Stereo spread (Godot's own panning math). Hidden while [member positional] is off.
+		</member>
+		<member name="pitch_scale" type="float" setter="set_pitch_scale" getter="get_pitch_scale" default="1.0">
+			Base pitch multiplier, multiplied by the [member random_pitch] roll of each play.
+		</member>
+		<member name="positional" type="bool" setter="set_positional" getter="get_positional" default="true">
+			Off means constant volume, centered (a UI sting). On means Godot's distance falloff and panning from the listener.
+		</member>
+		<member name="priority" type="int" setter="set_priority" getter="get_priority" default="0">
+			Voice-stealing rank for the factory-wide pool: a full pool yields its oldest voice of equal or lower priority, never a more important one.
+		</member>
+		<member name="random_pitch" type="float" setter="set_random_pitch" getter="get_random_pitch" default="1.0">
+			Random pitch range ([AudioStreamRandomizer] math): each play multiplies [member pitch_scale] by a log-uniform roll in [code]1/r..r[/code]. 1 disables it.
+		</member>
+		<member name="random_volume_offset_db" type="float" setter="set_random_volume_offset_db" getter="get_random_volume_offset_db" default="0.0">
+			Random loudness range in dB: each play adds a uniform offset in [code]-v..+v[/code]. 0 disables it.
+		</member>
+		<member name="stream" type="AudioStream" setter="set_stream" getter="get_stream">
+			What plays. Null plays nothing (warns once per resource).
+		</member>
+		<member name="trigger" type="int" setter="set_trigger" getter="get_trigger" default="0">
+			Which event plays this sound. On Shot and On Telegraph are spawner-only: a factory volley never fires them.
+		</member>
+		<member name="trigger_chance" type="float" setter="set_trigger_chance" getter="get_trigger_chance" default="1.0">
+			Play probability per event. 0 never plays, 1 always plays.
+		</member>
+		<member name="volume_db" type="float" setter="set_volume_db" getter="get_volume_db" default="0.0">
+			Base loudness in dB. The spawner's sound volume offset is added on top, plus the [member random_volume_offset_db] roll of each play.
+		</member>
+		<member name="when_limit_reached" type="int" setter="set_when_limit_reached" getter="get_when_limit_reached" default="0">
+			What happens past [member max_voices]: stop this sound's oldest voice and reuse it, or drop the new event.
+		</member>
+	</members>
+	<constants>
+		<constant name="SOUND_ON_SHOT" value="0" enum="SoundTrigger">
+			Plays after a successful spawner shot, at the spawner's position. Spawner-only.
+		</constant>
+		<constant name="SOUND_ON_HIT" value="1" enum="SoundTrigger">
+			Plays on a counted, survived, non-consumed-bounce hit, at the impact pose.
+		</constant>
+		<constant name="SOUND_ON_DESTROY" value="2" enum="SoundTrigger">
+			Plays on a collision kill only, at the impact pose (also for the last bullet).
+		</constant>
+		<constant name="SOUND_ON_BOUNCE" value="3" enum="SoundTrigger">
+			Plays on every ricochet.
+		</constant>
+		<constant name="SOUND_ON_LIFETIME_OVER" value="4" enum="SoundTrigger">
+			Plays on expiry.
+		</constant>
+		<constant name="SOUND_ON_CLEAR" value="5" enum="SoundTrigger">
+			Plays on clear_bullet, clear_all_bullets and factory clears with clear effects. Teardown stays silent.
+		</constant>
+		<constant name="SOUND_ON_HOMING_TARGET_REACHED" value="6" enum="SoundTrigger">
+			Plays on each homing-target-reached event the plugin delivers.
+		</constant>
+		<constant name="SOUND_ON_GRAZE" value="7" enum="SoundTrigger">
+			Plays on each graze event the plugin delivers.
+		</constant>
+		<constant name="SOUND_ON_GRAZE_EXIT" value="8" enum="SoundTrigger">
+			Plays on each graze-exit event the plugin delivers.
+		</constant>
+		<constant name="SOUND_ON_TELEGRAPH" value="9" enum="SoundTrigger">
+			Plays when volley_telegraphed fires. Spawner-only.
+		</constant>
+		<constant name="SOUND_LIMIT_REPLACE_OLDEST" value="0" enum="SoundLimitMode">
+			Past max_voices, stop this sound's oldest voice and reuse it.
+		</constant>
+		<constant name="SOUND_LIMIT_SKIP_NEW" value="1" enum="SoundLimitMode">
+			Past max_voices, drop the new event.
+		</constant>
+	</constants>
+</class>

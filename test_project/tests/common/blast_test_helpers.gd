@@ -134,3 +134,28 @@ static func transforms_at(points: Array) -> Array:
 	for p in points:
 		out.append(Transform2D(0.0, p))
 	return out
+
+## Silent 8-bit mono WAV of `seconds`; loops by default so a voice stays busy
+## for the whole test. 8-bit WAV is UNSIGNED: silence is 128, not 0.
+static func make_sound_stream(seconds := 0.25, loop := true) -> AudioStreamWAV:
+	var w := AudioStreamWAV.new()
+	w.format = AudioStreamWAV.FORMAT_8_BITS
+	w.mix_rate = 8000
+	var bytes := PackedByteArray()
+	bytes.resize(int(8000 * seconds))
+	bytes.fill(128)
+	w.data = bytes
+	if loop:
+		w.loop_mode = AudioStreamWAV.LOOP_FORWARD
+		w.loop_end = bytes.size()
+	return w
+
+## Sound on `trigger` with a looping silent stream; interval 0 so every
+## offer can play (tests that pin the interval set it themselves).
+static func make_sound(trigger: int, max_voices := 4) -> BulletSoundData2D:
+	var s := BulletSoundData2D.new()
+	s.trigger = trigger
+	s.stream = make_sound_stream()
+	s.min_interval_sec = 0.0
+	s.max_voices = max_voices
+	return s

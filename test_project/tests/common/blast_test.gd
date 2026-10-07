@@ -289,3 +289,31 @@ func _mouse_event(screen_pos: Vector2) -> void:
 func step_factory(n: int = 1, delta: float = 1.0 / 60.0) -> void:
 	for i in n:
 		assert_true(factory.debug_advance_time(delta), "factory tick %d advanced" % i)
+
+
+## Node2D sound listener at global `pos`, member of `group` (freed after the test).
+func make_listener(pos: Vector2, group: StringName = &"listeners") -> Node2D:
+	var n := Node2D.new()
+	n.position = pos
+	add(n)
+	n.add_to_group(group)
+	return n
+
+
+## Busy entries of factory.debug_get_sound_voices() (one dict per voice).
+func busy_voices() -> Array:
+	var out: Array = []
+	for e in factory.debug_get_sound_voices():
+		if (e as Dictionary).get("busy", false):
+			out.append(e)
+	return out
+
+
+## Current AudioListener2D at `pos` (freed after the test), so Godot's own
+## falloff and panning measure from an exact known point.
+func godot_listener_at(pos: Vector2) -> AudioListener2D:
+	var l := AudioListener2D.new()
+	l.position = pos
+	add(l)
+	l.make_current()
+	return l

@@ -11,6 +11,7 @@
 #include "data/bullet_effect_layer_data2d.hpp"
 #include "data/bullet_graze_zone2d.hpp"
 #include "data/bullet_rotation_data2d.hpp"
+#include "data/bullet_sound_data2d.hpp"
 #include "data/bullet_speed_data2d.hpp"
 #include "data/bullet_wobble_data2d.hpp"
 #include "pooling/volley_pool_key2d.hpp"
@@ -61,6 +62,7 @@ void initialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(BulletCurvesData2D)
 	GDREGISTER_CLASS(BulletWobbleData2D)
 	GDREGISTER_CLASS(BulletGrazeZone2D)
+	GDREGISTER_CLASS(BulletSoundData2D)
 	GDREGISTER_CLASS(VolleyPoolKey2D)
 	GDREGISTER_CLASS(BulletAttachment2D)
 
