@@ -20,6 +20,7 @@
 [ext_resource type="PackedScene" uid="uid://bqi8tdtf1dh4n" path="res://shared/moving_target.tscn" id="10_nkrfg"]
 [ext_resource type="Texture2D" uid="uid://dwtaxuaickco" path="res://shared/art/player_bullets/9.png" id="11_polqn"]
 [ext_resource type="Texture2D" uid="uid://dbhqsxhfkdrh7" path="res://shared/art/player_bullets/10.png" id="12_b1gms"]
+[ext_resource type="AudioStream" uid="uid://o63fjokh33ki" path="res://shared/sound/hit.wav" id="13_jbfhk"]
 
 [sub_resource type="Gradient" id="Gradient_7gbxi"]
 offsets = PackedFloat32Array(0, 0.486747, 1)
@@ -111,6 +112,7 @@ texture_size = Vector2(127, 127)
 max_life_time = 10.0
 shared_bullet_speed_data = SubResource("BulletSpeedData2D_mouoi")
 shared_bullet_wobble_data = SubResource("BulletWobbleData2D_46wrg")
+bounce_mask = 1
 shared_movement_pattern_face_movement_direction = true
 collision_layer = 2
 effect_layers = Array[BulletEffectLayerData2D]([SubResource("BulletEffectLayerData2D_g0agp")])
@@ -121,6 +123,18 @@ ring_1_radius = 30.5
 ring_2_radius = 65.0
 ring_3_radius = 120.0
 count_bullet_size = false
+
+[sub_resource type="BulletSoundData2D" id="BulletSoundData2D_0yymp"]
+trigger = 3
+stream = ExtResource("13_jbfhk")
+pitch_scale = 2.0999999999999996
+random_pitch = 1.72
+random_volume_offset_db = 3.11
+
+[sub_resource type="BulletSoundData2D" id="BulletSoundData2D_102ar"]
+stream = ExtResource("13_jbfhk")
+random_pitch = 9.98
+max_duration_sec = 5.34
 
 [sub_resource type="Curve" id="Curve_r5nj6"]
 _data = [Vector2(0.13763441, 0.34210527), 0.0, 0.0, 0, 0, Vector2(0.7225807, 0.66315794), 0.0, 0.0, 0, 0]
@@ -189,11 +203,15 @@ orbiting_radius_start = 350.0
 orbiting_lock_policy = 1
 graze_enabled = true
 graze_zones = Array[BulletGrazeZone2D]([SubResource("BulletGrazeZone2D_c5op3")])
+graze_target_source = 1
 graze_node_group = &"enemy"
 graze_target_path = NodePath("../Player")
 graze_node_name_match_mode = 2
 graze_children_parent_path = NodePath("../EnemySpawnersContainer/EnemyShipSpawner")
 graze_preview_during_runtime = true
+sound_enabled = true
+sound_effects = [SubResource("BulletSoundData2D_0yymp"), SubResource("BulletSoundData2D_102ar")]
+sound_listener_path = NodePath("../Player")
 show_preview_during_runtime = true
 preview_draw_collision_rings = true
 preview_collision_ring_color = Color(0.60784316, 0.14117648, 0.57254905, 1)
