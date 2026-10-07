@@ -38,6 +38,19 @@ void BulletSoundData2D::set_stream(const Ref<AudioStream> &new_stream) {
 	emit_changed();
 }
 
+int BulletSoundData2D::get_ring_index() const { return ring_index; }
+void BulletSoundData2D::set_ring_index(int value) {
+	if (value < -1 || value > 3) {
+		UtilityFunctions::push_error("BulletSoundData2D: ring_index must be -1 (any ring) or 0..3, keeping the old value.");
+		return;
+	}
+	if (ring_index == value) {
+		return;
+	}
+	ring_index = value;
+	emit_changed();
+}
+
 Array BulletSoundData2D::get_streams() const { return streams; }
 void BulletSoundData2D::set_streams(const Array &value) {
 	for (int i = 0; i < value.size(); ++i) {
@@ -326,6 +339,10 @@ void BulletSoundData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_trigger"), &BulletSoundData2D::get_trigger);
 	ClassDB::bind_method(D_METHOD("set_trigger", "value"), &BulletSoundData2D::set_trigger);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "trigger", PROPERTY_HINT_ENUM, "On Shot,On Hit,On Destroy,On Bounce,On Lifetime Over,On Clear,On Homing Target Reached,On Graze,On Graze Exit,On Telegraph"), "set_trigger", "get_trigger");
+
+	ClassDB::bind_method(D_METHOD("get_ring_index"), &BulletSoundData2D::get_ring_index);
+	ClassDB::bind_method(D_METHOD("set_ring_index", "value"), &BulletSoundData2D::set_ring_index);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "ring_index", PROPERTY_HINT_RANGE, "-1,3,1"), "set_ring_index", "get_ring_index");
 
 	ClassDB::bind_method(D_METHOD("get_stream"), &BulletSoundData2D::get_stream);
 	ClassDB::bind_method(D_METHOD("set_stream", "stream"), &BulletSoundData2D::set_stream);

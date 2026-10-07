@@ -87,7 +87,7 @@ void BulletVolley2D::sound_release() {
 	sound_volume_offset_db = 0.0f;
 }
 
-void BulletVolley2D::sound_fire(int trigger, int bullet_index, const Vector2 &event_pos) {
+void BulletVolley2D::sound_fire(int trigger, int bullet_index, const Vector2 &event_pos, int ring) {
 	if (trigger < 0 || trigger >= 32 || !(sound_trigger_mask & (1u << trigger))) {
 		return;
 	}
@@ -107,6 +107,9 @@ void BulletVolley2D::sound_fire(int trigger, int bullet_index, const Vector2 &ev
 	}
 	for (const Ref<BulletSoundData2D> &entry : sound_effects) {
 		if (entry.is_null() || !entry->enabled || entry->get_trigger() != trigger) {
+			continue;
+		}
+		if (entry->get_ring_index() >= 0 && entry->get_ring_index() != ring) {
 			continue;
 		}
 		bullet_factory->sound_offer(entry, event_pos, sound_volume_offset_db, spec);

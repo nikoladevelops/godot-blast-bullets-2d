@@ -63,6 +63,11 @@ public:
 	// without building an AudioStreamRandomizer; stream stays the fallback
 	// when the list is empty (or all null).
 	Array streams;
+
+	// Which graze ring this entry listens to (-1 = any ring, else 0..3). A
+	// zone with fewer rings simply never matches (silent, no warning:
+	// zones legitimately vary). Ignored by every non-graze trigger.
+	int ring_index = -1;
 	// How streams is picked (see StreamMode). Weighted reads
 	// stream_weights; Sequence round-robins and Shuffle deals every entry
 	// once per cycle (both cursors live in the shared channel, like the
@@ -122,6 +127,9 @@ public:
 
 	int get_trigger() const;
 	void set_trigger(int value);
+
+	int get_ring_index() const;
+	void set_ring_index(int value);
 
 	Ref<AudioStream> get_stream() const;
 	void set_stream(const Ref<AudioStream> &new_stream);
