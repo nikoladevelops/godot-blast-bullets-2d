@@ -204,6 +204,7 @@ void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("debug_get_sound_voices"), &BulletFactory2D::debug_get_sound_voices);
 	ClassDB::bind_method(D_METHOD("debug_get_sound_stats"), &BulletFactory2D::debug_get_sound_stats);
 	ClassDB::bind_method(D_METHOD("debug_stop_sound_voices"), &BulletFactory2D::debug_stop_sound_voices);
+	ClassDB::bind_method(D_METHOD("debug_explain_sound", "sound", "global_position", "listener_group", "volley_amount"), &BulletFactory2D::debug_explain_sound, DEFVAL(StringName()), DEFVAL(1));
 }
 
 } // namespace BlastBullets2D

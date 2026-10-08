@@ -531,6 +531,7 @@ public:
 	void debug_clear_sound_log();
 	Array debug_get_sound_voices() const;
 	Dictionary debug_get_sound_stats() const;
+	Dictionary debug_explain_sound(const Ref<BulletSoundData2D> &sound, const Vector2 &global_position, const StringName &listener_group, int volley_amount);
 	void debug_stop_sound_voices();
 
 	//

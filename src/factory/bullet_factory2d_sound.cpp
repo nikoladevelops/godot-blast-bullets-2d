@@ -70,6 +70,10 @@ Array BulletFactory2D::debug_get_sound_voices() const {
 	return sound_mixer.debug_voices();
 }
 
+Dictionary BulletFactory2D::debug_explain_sound(const Ref<BulletSoundData2D> &sound, const Vector2 &global_position, const StringName &listener_group, int volley_amount) {
+	return sound_mixer.explain_sound(*this, sound, global_position, listener_group, volley_amount);
+}
+
 Dictionary BulletFactory2D::debug_get_sound_stats() const {
 	return sound_mixer.debug_stats();
 }

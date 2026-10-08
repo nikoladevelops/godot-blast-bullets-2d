@@ -274,3 +274,109 @@ func test_rotated_camera_culls_exact_view() -> void:
 	assert_false(factory.play_sound(s, Vector2(760, 760)), "corner culled by rotation")
 	await physics(2)
 	assert_true(_logged(sid).is_empty(), "axis box alone does not admit it")
+
+
+func _pinned_degenerate_voice(z: Vector2) -> void:
+	# Pinned but never current (and disabled): the engine canvas never uses
+	# the degenerate zoom, so canvas noise stays out of the mixer's reads.
+	var c := Camera2D.new()
+	c.position = Vector2.ZERO
+	c.enabled = false
+	add(c)
+	await idle(1)
+	c.zoom = z
+	await idle(1)
+	var s := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+	s.volume_db = -6.0
+	s.audibility_mode = BulletSoundData2D.SOUND_AUDIBILITY_DISTANCE_AND_CAMERA
+	s.max_distance = 1000.0
+	s.zoom_scales_distance = true
+	s.set("zoom_gain_db", 3.0)
+	s.camera_path = factory.get_path_to(c)
+	assert_true(factory.play_sound(s, Vector2(100, 0)), "zoom %s offers" % str(z))
+	await physics(2)
+	assert_eq(busy_voices().size(), 1, "zoom %s still voices" % str(z))
+	assert_almost_eq(float((busy_voices()[0] as Dictionary)["volume_db"]), -6.0, 0.05, "zoom %s adds nothing" % str(z))
+	factory.stop_sounds()
+	await idle(1)
+	c.queue_free()
+	await idle(1)
+
+
+func test_zero_zoom_pinned_reads_as_one() -> void:
+	godot_listener_at(Vector2.ZERO)
+	_add_camera()
+	await _pinned_degenerate_voice(Vector2.ZERO)
+	# Godot reacts exactly once to a zero-zoom camera living in the tree
+	# (entry/assignment-time canvas check); the mixer's own reads stay
+	# guarded and correct, as the asserts above prove.
+	expect_error_sequence(['Condition "Math::is_zero_approx(p_zoom.x) || Math::is_zero_approx(p_zoom.y)" is true.'])
+
+
+func test_degenerate_zoom_reads_as_one() -> void:
+	godot_listener_at(Vector2.ZERO)
+	_add_camera()
+	for z in [Vector2(-2, -2), Vector2(INF, INF), Vector2(NAN, NAN)]:
+		await _pinned_degenerate_voice(z)
+	expect_no_errors("non-zero degenerate zooms stay fully quiet")
+
+
+func test_explain_names_the_gate() -> void:
+	assert_has_method(factory, "debug_explain_sound", "bound explainer")
+	if not factory.has_method("debug_explain_sound"):
+		return
+	godot_listener_at(Vector2.ZERO)
+	_add_camera()
+	var s := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+	var ok: Dictionary = factory.debug_explain_sound(s, Vector2(100, 0))
+	assert_true(bool(ok["audible"]), "inside everything voices")
+	assert_eq(String(ok["blocked_by"]), "none", "no gate")
+	assert_true(bool(ok["in_camera_view"]), "view reported")
+	assert_true(bool(ok["interval_open"]), "interval open")
+	var far: Dictionary = factory.debug_explain_sound(s, Vector2(5000, 0))
+	assert_false(bool(far["audible"]), "past range stays silent")
+	assert_eq(String(far["blocked_by"]), "distance", "distance gate named")
+	assert_gt(float(far["distance"]), float(far["effective_max_distance"]), "numbers tell the story")
+
+
+func test_explain_covers_view_zoom_interval_and_chance() -> void:
+	assert_has_method(factory, "debug_explain_sound", "bound explainer")
+	if not factory.has_method("debug_explain_sound"):
+		return
+	godot_listener_at(Vector2.ZERO)
+	_add_camera(Vector2(2, 2))
+	var s := _camera_sound()
+	var out: Dictionary = factory.debug_explain_sound(s, Vector2(1000, 0))
+	assert_eq(String(out["blocked_by"]), "camera_view", "view gate named")
+	var z: Dictionary = factory.debug_explain_sound(s, Vector2.ZERO)
+	assert_almost_eq(float(z["zoom"]), 2.0, 0.01, "zoom reported")
+	var gated := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+	gated.min_interval_sec = 100.0
+	assert_true(factory.play_sound(gated, Vector2.ZERO), "first consumes the interval")
+	await physics(2)
+	var held: Dictionary = factory.debug_explain_sound(gated, Vector2.ZERO)
+	assert_false(bool(held["interval_open"]), "interval reported closed")
+	var chanceless := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+	chanceless.trigger_chance = 0.0
+	var no: Dictionary = factory.debug_explain_sound(chanceless, Vector2.ZERO)
+	assert_eq(String(no["blocked_by"]), "chance_zero", "zero chance named")
+	assert_eq(float(no["trigger_chance"]), 0.0, "chance reported")
+
+
+func test_explain_refusals_and_bad_path() -> void:
+	assert_has_method(factory, "debug_explain_sound", "bound explainer")
+	if not factory.has_method("debug_explain_sound"):
+		return
+	godot_listener_at(Vector2.ZERO)
+	_add_camera()
+	var disabled := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+	disabled.enabled = false
+	assert_eq(String(factory.debug_explain_sound(disabled, Vector2.ZERO)["blocked_by"]), "disabled", "disabled named")
+	var streamless := BulletSoundData2D.new()
+	assert_eq(String(factory.debug_explain_sound(streamless, Vector2.ZERO)["blocked_by"]), "streamless", "streamless named")
+	var bad := _camera_sound()
+	bad.camera_path = NodePath("Nope/Node")
+	var fb: Dictionary = factory.debug_explain_sound(bad, Vector2(100, 0))
+	expect_warning_sequence(["BulletSoundData2D: camera_path does not point to a Camera2D in this viewport, using the viewport camera."])
+	assert_eq(String(fb["camera"]), "viewport", "fallback reported honestly")
+	assert_true(bool(fb["audible"]), "falls back to measuring")

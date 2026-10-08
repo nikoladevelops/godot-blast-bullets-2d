@@ -77,6 +77,16 @@
 				Derives the exact pool bucket a spawn would use without spawning. Returns null on empty data.
 			</description>
 		</method>
+		<method name="debug_explain_sound">
+			<return type="Dictionary" />
+			<param index="0" name="sound" type="BulletSoundData2D" />
+			<param index="1" name="global_position" type="Vector2" />
+			<param index="2" name="listener_group" type="StringName" default="&amp;&quot;&quot;" />
+			<param index="3" name="volley_amount" type="int" default="1" />
+			<description>
+				Diagnosis for one entry at one pose: which gate would drop the play, with the measured numbers. Returns {audible, blocked_by (none/paused/disabled/streamless/chance_zero/amount_gate/distance/camera_view), distance, effective_max_distance, zoom, camera (pinned/viewport/none), in_camera_view, interval_open, trigger_chance, chance (always/never/rolling), listener, occluded, volume_base (deterministic mix without the random rolls), volley_amount}. Read-only except reusing the resolve paths (a bad camera_path fires its one warning); never queues candidates. When a sound stays silent, ask here first.
+			</description>
+		</method>
 		<method name="debug_get_active_attachments_amount">
 			<return type="int" />
 			<description>
@@ -179,7 +189,7 @@
 		<method name="debug_get_sound_voices" qualifiers="const">
 			<return type="Array" />
 			<description>
-				One dict per voice pool slot: {index, busy, sound, priority, position, volume_db, pitch_scale, bus}.
+				One dict per voice pool slot: {index, busy, fading, sound, priority, position, volume_db, pitch_scale, bus, stream, max_distance, attenuation, panning_strength, area_mask, paused}. Feed it to your own Node2D _draw loop for a live voice overlay (circle per busy voice at position, radius by volume_db).
 			</description>
 		</method>
 		<method name="debug_get_total_attachments_amount">

@@ -388,6 +388,7 @@ void BulletSoundData2D::set_occlusion_mask(int value) {
 		return;
 	}
 	occlusion_mask = value;
+	notify_property_list_changed(); // occlusion_db/bus gate on it (_validate_property)
 	emit_changed();
 }
 
@@ -401,6 +402,17 @@ void BulletSoundData2D::set_occlusion_db(double value) {
 		return;
 	}
 	occlusion_db = value;
+	emit_changed();
+}
+
+StringName BulletSoundData2D::get_occlusion_bus() const { return occlusion_bus; }
+void BulletSoundData2D::set_occlusion_bus(const StringName &value) {
+	// Any name stores (empty disables the switch): validity resolves at
+	// play time through the bus fallback, like bus itself.
+	if (occlusion_bus == value) {
+		return;
+	}
+	occlusion_bus = value;
 	emit_changed();
 }
 
@@ -655,6 +667,17 @@ void BulletSoundData2D::_validate_property(PropertyInfo &p_property) const {
 		p_property.usage &= ~PROPERTY_USAGE_EDITOR;
 		return;
 	}
+	if (name == "occlusion_db" || name == "occlusion_bus") {
+		// Both only mean something while the raycast can run.
+		if (occlusion_mask == 0) {
+			p_property.usage &= ~PROPERTY_USAGE_EDITOR;
+		}
+		if (name == "occlusion_db") {
+			return;
+		}
+		// occlusion_bus falls through to the live bus list below (a hidden
+		// property still carries its hint).
+	}
 	if (name == "camera_path" || name == "camera_margin_px") {
 		// Both only mean something when the camera takes part in audibility.
 		if (audibility_mode != SOUND_AUDIBILITY_CAMERA && audibility_mode != SOUND_AUDIBILITY_DISTANCE_AND_CAMERA) {
@@ -668,7 +691,7 @@ void BulletSoundData2D::_validate_property(PropertyInfo &p_property) const {
 		}
 		return;
 	}
-	if (name == "bus") {
+	if (name == "bus" || name == "occlusion_bus") {
 		AudioServer *server = AudioServer::get_singleton();
 		if (server == nullptr) {
 			return;
@@ -812,6 +835,9 @@ void BulletSoundData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_occlusion_db"), &BulletSoundData2D::get_occlusion_db);
 	ClassDB::bind_method(D_METHOD("set_occlusion_db", "value"), &BulletSoundData2D::set_occlusion_db);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "occlusion_db", PROPERTY_HINT_RANGE, "0,24,0.01,or_greater,suffix:dB"), "set_occlusion_db", "get_occlusion_db");
+	ClassDB::bind_method(D_METHOD("get_occlusion_bus"), &BulletSoundData2D::get_occlusion_bus);
+	ClassDB::bind_method(D_METHOD("set_occlusion_bus", "value"), &BulletSoundData2D::set_occlusion_bus);
+	ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "occlusion_bus"), "set_occlusion_bus", "get_occlusion_bus");
 
 	ADD_GROUP("Limits", "");
 

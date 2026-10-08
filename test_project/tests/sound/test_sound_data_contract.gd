@@ -161,6 +161,7 @@ func test_hint_strings_byte_exact() -> void:
 	assert_eq(hints.get(&"priority", ""), "-16,16,1,or_greater,or_less", "priority hint")
 	assert_eq(hints.get(&"max_duration_sec", ""), "0,10,0.01,or_greater,suffix:s", "duration hint")
 	assert_string_contains(hints.get(&"bus", ""), "Master", "bus enum lists Master")
+	assert_string_contains(hints.get(&"occlusion_bus", ""), "Master", "muffle bus enum lists Master")
 
 
 func test_spatial_knobs_hide_while_not_positional() -> void:

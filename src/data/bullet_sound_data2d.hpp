@@ -164,6 +164,10 @@ public:
 	// inside it). Editor preview skips occlusion.
 	int occlusion_mask = 0;
 	double occlusion_db = 0.0;
+	// Muffle bus for occluded plays: when the ray hits, the voice routes here
+	// instead of bus (put reverb/lowpass on it as Godot effects). Empty
+	// (default) keeps bus. Unknown names reuse the Master fallback.
+	StringName occlusion_bus;
 
 	// At most one play per interval across the whole factory (shared with
 	// every spawner using this resource); the nearest event wins each sweep.
@@ -304,6 +308,9 @@ public:
 
 	double get_occlusion_db() const;
 	void set_occlusion_db(double value);
+
+	StringName get_occlusion_bus() const;
+	void set_occlusion_bus(const StringName &value);
 
 	double get_min_interval_sec() const;
 	void set_min_interval_sec(double value);

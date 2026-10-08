@@ -395,3 +395,93 @@ func test_occlusion_off_or_wrong_mask_plays_full() -> void:
 	assert_true(factory.play_sound(other, Vector2(500, 0)), "wrong mask offers")
 	await physics(2)
 	assert_almost_eq(_vol(other.get_instance_id()), -6.0, 0.05, "ray misses the wall layer")
+
+
+func _ensure_test_bus(bus_name: StringName) -> void:
+	if AudioServer.get_bus_index(bus_name) < 0:
+		AudioServer.add_bus()
+		AudioServer.set_bus_name(AudioServer.get_bus_count() - 1, bus_name)
+
+
+func _drop_test_bus(bus_name: StringName) -> void:
+	var i := AudioServer.get_bus_index(bus_name)
+	if i > 0:
+		AudioServer.remove_bus(i)
+
+
+func test_occlusion_bus_routes_muffled() -> void:
+	_drop_test_bus(&"Muffled")
+	_ensure_test_bus(&"Muffled")
+	godot_listener_at(Vector2.ZERO)
+	var wall := make_wall(Vector2(250, 0))
+	await physics(2)
+	var s := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+	s.volume_db = -6.0
+	s.set("occlusion_mask", 4)
+	s.set("occlusion_db", 6.0)
+	s.set("occlusion_bus", &"Muffled")
+	var sid: int = s.get_instance_id()
+	assert_true(factory.play_sound(s, Vector2(500, 0)), "offer accepted")
+	await physics(2)
+	assert_eq(String((busy_voices()[0] as Dictionary)["bus"]), "Muffled", "occluded play routes to the muffle bus")
+	assert_almost_eq(_vol(sid), -12.0, 0.05, "dip and bus switch together")
+	factory.stop_sounds()
+	await idle(1)
+	wall.position.x = 2000.0
+	await physics(2)
+	assert_true(factory.play_sound(s, Vector2(500, 0)), "offer accepted again")
+	await physics(2)
+	assert_eq(String((busy_voices()[0] as Dictionary)["bus"]), "Master", "clear play stays on the entry bus")
+	_drop_test_bus(&"Muffled")
+
+
+func test_occlusion_bus_unknown_falls_back() -> void:
+	godot_listener_at(Vector2.ZERO)
+	make_wall(Vector2(250, 0))
+	await physics(2)
+	var s := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+	s.set("occlusion_mask", 4)
+	s.set("occlusion_db", 6.0)
+	s.set("occlusion_bus", &"NoSuchBus_xyz")
+	assert_true(factory.play_sound(s, Vector2(500, 0)), "offer accepted")
+	await physics(2)
+	expect_warning_sequence(["BulletSoundData2D: bus \"NoSuchBus_xyz\" does not exist, playing on Master."])
+	assert_eq(busy_voices().size(), 1, "still plays on Master")
+	assert_eq(String((busy_voices()[0] as Dictionary)["bus"]), "Master", "unknown muffle bus falls back")
+
+
+func test_occlusion_bus_empty_and_gated() -> void:
+	var s := BulletSoundData2D.new()
+	assert_has_method(s, "set_occlusion_bus", "bound set_occlusion_bus")
+	assert_has_method(s, "get_occlusion_bus", "bound get_occlusion_bus")
+	assert_true("occlusion_bus" in s, "property exists")
+	assert_eq(s.get("occlusion_bus"), &"", "empty disables the switch")
+	assert_false(is_editor_visible(s, &"occlusion_bus"), "hidden while mask is 0")
+	assert_false(is_editor_visible(s, &"occlusion_db"), "dip hidden while mask is 0")
+	s.set("occlusion_mask", 4)
+	assert_true(is_editor_visible(s, &"occlusion_bus"), "switch visible with a mask")
+	assert_true(is_editor_visible(s, &"occlusion_db"), "dip visible with a mask")
+	s.set("occlusion_bus", &"Muffled")
+	assert_eq(s.get("occlusion_bus"), &"Muffled", "any name stores, validity resolves at play")
+
+
+func test_explain_reports_occlusion_and_base() -> void:
+	assert_has_method(factory, "debug_explain_sound", "bound explainer")
+	if not factory.has_method("debug_explain_sound"):
+		return
+	godot_listener_at(Vector2.ZERO)
+	var wall := make_wall(Vector2(250, 0))
+	await physics(2)
+	var s := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+	s.volume_db = -6.0
+	s.set("occlusion_mask", 4)
+	s.set("occlusion_db", 6.0)
+	var hit: Dictionary = factory.debug_explain_sound(s, Vector2(500, 0))
+	assert_true(bool(hit["audible"]), "muffled is not dropped")
+	assert_true(bool(hit["occluded"]), "ray hit reported")
+	assert_almost_eq(float(hit["volume_base"]), -12.0, 0.05, "base includes the dip")
+	wall.position.x = 2000.0
+	await physics(2)
+	var clear: Dictionary = factory.debug_explain_sound(s, Vector2(500, 0))
+	assert_false(bool(clear["occluded"]), "moved wall re-evaluated")
+	assert_almost_eq(float(clear["volume_base"]), -6.0, 0.05, "base without the dip")

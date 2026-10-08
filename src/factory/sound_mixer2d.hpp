@@ -72,6 +72,11 @@ public:
 	void set_log_enabled(bool enabled);
 	Array get_log() const { return sound_log; }
 	void clear_log() { sound_log.clear(); }
+	// Diagnosis for one entry at one pose (debug_explain_sound): which gate
+	// would drop the play, with the measured numbers. Read-only except
+	// reusing the resolve paths (a bad camera_path fires its one warning:
+	// diagnosing it is the point). Never queues candidates.
+	Dictionary explain_sound(BulletFactory2D &factory, const Ref<BulletSoundData2D> &sound, const Vector2 &event_pos, const StringName &listener_group, int volley_amount);
 	Array debug_voices() const;
 	Dictionary debug_stats() const;
 	// Applies one play's mix to a player (stream, volume + offset + randoms
@@ -79,7 +84,9 @@ public:
 	// pitch_min/max, bus with Master fallback, spatial or centered
 	// constants). Shared by the sweep flush and the editor preview. Returns
 	// the applied volume (Quietest steal ranks by it).
-	static float apply_playback_mix(AudioStreamPlayer2D *player, const BulletSoundData2D *sound, const Ref<AudioStream> &picked, float volume_offset_db, std::vector<String> *warned_buses, bool force_centered = false);
+	// bus_override routes one play elsewhere (occluded voices): empty keeps
+	// the entry bus. Shared with the sweep flush and the editor preview.
+	static float apply_playback_mix(AudioStreamPlayer2D *player, const BulletSoundData2D *sound, const Ref<AudioStream> &picked, float volume_offset_db, std::vector<String> *warned_buses, bool force_centered = false, const StringName &bus_override = StringName());
 	// Editor preview: plays the entry's picked stream with its mix through a
 	// transient player under the tree root (never the edited scene). A second
 	// call stops the first, one-shots free themselves on finished, looping

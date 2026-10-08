@@ -121,9 +121,9 @@ static float sound_roll_pitch(double range) {
 	return (float)Math::exp(Math::log(range) * (2.0 * u - 1.0));
 }
 
-float SoundMixer2D::apply_playback_mix(AudioStreamPlayer2D *player, const BulletSoundData2D *sound, const Ref<AudioStream> &picked, float volume_offset_db, std::vector<String> *warned_buses, bool force_centered) {
+float SoundMixer2D::apply_playback_mix(AudioStreamPlayer2D *player, const BulletSoundData2D *sound, const Ref<AudioStream> &picked, float volume_offset_db, std::vector<String> *warned_buses, bool force_centered, const StringName &bus_override) {
 	// Bus: unknown names play on Master (one warning per name).
-	String bus = sound->bus;
+	String bus = bus_override.is_empty() ? String(sound->bus) : String(bus_override);
 	AudioServer *server = AudioServer::get_singleton();
 	if (server == nullptr || server->get_bus_index(bus) < 0) {
 		bool warned = true;
@@ -289,11 +289,18 @@ bool SoundMixer2D::sound_in_camera_view(const BulletSoundData2D *sound, const Ve
 		return true;
 	}
 	const Vector2 zoom = camera->get_zoom();
-	const double zx = Math::is_finite((double)zoom.x) && zoom.x > 0.0 ? (double)zoom.x : 1.0;
-	const double zy = Math::is_finite((double)zoom.y) && zoom.y > 0.0 ? (double)zoom.y : 1.0;
+	const bool zoom_ok = Math::is_finite((double)zoom.x) && Math::is_finite((double)zoom.y) && zoom.x > 0.0 && zoom.y > 0.0;
+	const double zx = zoom_ok ? (double)zoom.x : 1.0;
+	const double zy = zoom_ok ? (double)zoom.y : 1.0;
 	const Vector2 half = vp->get_visible_rect().size * Vector2(0.5f / (float)zx, 0.5f / (float)zy);
 	const double margin = Math::is_finite(sound->camera_margin_px) && sound->camera_margin_px > 0.0 ? sound->camera_margin_px : 0.0;
-	const Vector2 center = camera->get_screen_center_position();
+	// Degenerate zoom reads as 1 everywhere, including the center: the
+	// canvas-derived call is skipped outright (it inverts a singular canvas
+	// on zero zoom), and a non-finite result still falls back to the node.
+	Vector2 center = zoom_ok ? camera->get_screen_center_position() : camera->get_global_position();
+	if (!center.is_finite()) {
+		center = camera->get_global_position();
+	}
 	// Exact for any camera rotation: test in the unrotated frame (margin is
 	// screen pixels, so it is un-zoomed per axis; rotation 0 with uniform
 	// zoom behaves exactly as before).
@@ -852,7 +859,11 @@ void SoundMixer2D::flush(BulletFactory2D &factory) {
 			if (Math::is_finite((double)sound->amount_gain_db) && sound->amount_gain_db > 0.0) {
 				amount_gain = (float)((double)sound->amount_gain_db * std::log10((double)MAX(1, winner.volley_amount)));
 			}
-			const float volume = SoundMixer2D::apply_playback_mix(player, sound, picked, winner.volume_offset_db + amount_gain + (float)zoom_gain_for2d(sound, camera) - occlusion_penalty_for2d(factory, sound, winner.listener_pos, winner.event_pos), &warned_buses);
+			// Occlusion is resolved once per winning play: the dip and the bus
+			// switch stay coupled (the helper returns 0 exactly when nothing hit).
+			const float occlusion = occlusion_penalty_for2d(factory, sound, winner.listener_pos, winner.event_pos);
+			const StringName muffle_bus = (occlusion > 0.0f && !sound->occlusion_bus.is_empty()) ? sound->occlusion_bus : StringName();
+			const float volume = SoundMixer2D::apply_playback_mix(player, sound, picked, winner.volume_offset_db + amount_gain + (float)zoom_gain_for2d(sound, camera) - occlusion, &warned_buses, false, muffle_bus);
 			player->set_global_position(at);
 			player->play();
 			Voice &voice = voices[slot];
@@ -999,6 +1010,117 @@ void SoundMixer2D::set_log_enabled(bool enabled) {
 	if (!enabled) {
 		sound_log.clear();
 	}
+}
+
+Dictionary SoundMixer2D::explain_sound(BulletFactory2D &factory, const Ref<BulletSoundData2D> &sound, const Vector2 &event_pos, const StringName &listener_group, int volley_amount) {
+	Dictionary out;
+	out["audible"] = false;
+	out["blocked_by"] = String("none");
+	out["distance"] = 0.0;
+	out["effective_max_distance"] = 0.0;
+	out["zoom"] = 1.0;
+	out["camera"] = String("none");
+	out["in_camera_view"] = true;
+	out["interval_open"] = true;
+	out["trigger_chance"] = 1.0;
+	out["chance"] = String("always");
+	out["listener"] = Vector2();
+	out["occluded"] = false;
+	out["volume_base"] = 0.0;
+	out["volley_amount"] = volley_amount;
+	auto block = [&](const char *reason) {
+		out["blocked_by"] = String(reason);
+	};
+	if (paused || factory.is_bullet_processing_paused()) {
+		block("paused");
+		return out;
+	}
+	if (Engine::get_singleton() != nullptr && Engine::get_singleton()->is_editor_hint()) {
+		block("editor");
+		return out;
+	}
+	if (sound.is_null()) {
+		block("null");
+		return out;
+	}
+	if (!sound->enabled) {
+		block("disabled");
+		return out;
+	}
+	if (!sound_has_audio(sound.ptr())) {
+		block("streamless");
+		return out;
+	}
+	out["trigger_chance"] = sound->trigger_chance;
+	if (!Math::is_finite((double)sound->trigger_chance) || sound->trigger_chance <= 0.0) {
+		out["chance"] = String("never");
+		block("chance_zero");
+		return out;
+	}
+	if (sound->trigger_chance < 1.0) {
+		out["chance"] = String("rolling");
+	}
+	if ((sound->min_volley_amount > 0 && volley_amount < sound->min_volley_amount) || (sound->max_volley_amount > 0 && volley_amount > sound->max_volley_amount)) {
+		block("amount_gate");
+		return out;
+	}
+	SoundListenerSpec2D spec;
+	if (!listener_group.is_empty()) {
+		spec.kind = SoundListenerSpec2D::NODE_GROUP;
+		spec.group = listener_group;
+	}
+	Vector2 listener_pos;
+	uint64_t node_id = 0;
+	bool is_point = false;
+	const bool found = resolve_listener(factory, spec, event_pos, listener_pos, node_id, is_point);
+	const Vector2 anchor = found ? listener_pos : godot_listener_pos(factory);
+	out["listener"] = anchor;
+	const double dist = sound_dist2(event_pos, anchor);
+	out["distance"] = Math::sqrt(dist);
+	Channel scratch;
+	Camera2D *camera = resolve_entry_camera(factory, sound.ptr(), scratch);
+	Viewport *vp = factory.get_viewport();
+	if (camera != nullptr) {
+		const Vector2 z = camera->get_zoom();
+		if (Math::is_finite((double)z.x) && Math::is_finite((double)z.y) && z.x > 0.0 && z.y > 0.0) {
+			out["zoom"] = MIN((double)z.x, (double)z.y);
+		}
+	}
+	if (!sound->camera_path.is_empty()) {
+		const bool pinned = !sound->camera_path.is_empty() && scratch.camera_id != 0 && scratch.camera_path == sound->camera_path;
+		out["camera"] = String(pinned ? String("pinned") : (camera != nullptr ? String("viewport") : String("none")));
+	} else {
+		out["camera"] = String(camera != nullptr ? String("viewport") : String("none"));
+	}
+	const double max_dist = sound_effective_max_distance(sound.ptr(), camera);
+	out["effective_max_distance"] = max_dist;
+	const bool in_view = sound_in_camera_view(sound.ptr(), event_pos, camera, vp);
+	out["in_camera_view"] = in_view;
+	if (sound->positional && dist > max_dist * max_dist) {
+		block("distance");
+		return out;
+	}
+	if (!in_view) {
+		block("camera_view");
+		return out;
+	}
+	if (sound->min_interval_sec > 0.0 && Math::is_finite((double)sound->min_interval_sec)) {
+		bool open = true;
+		const auto it = channels.find(sound->get_instance_id());
+		if (it != channels.end() && factory.get_graze_clock() - it->second.last_play_clock < sound->min_interval_sec) {
+			open = false;
+		}
+		out["interval_open"] = open;
+	}
+	const float occ = occlusion_penalty_for2d(factory, sound.ptr(), anchor, event_pos);
+	out["occluded"] = occ > 0.0f;
+	float gain = 0.0f;
+	if (Math::is_finite((double)sound->amount_gain_db) && sound->amount_gain_db > 0.0) {
+		gain = (float)((double)sound->amount_gain_db * std::log10((double)MAX(1, volley_amount)));
+	}
+	out["volume_base"] = (float)sound->volume_db + gain + (float)zoom_gain_for2d(sound.ptr(), camera) - occ;
+	out["audible"] = true;
+	return out;
 }
 
 Array SoundMixer2D::debug_voices() const {
