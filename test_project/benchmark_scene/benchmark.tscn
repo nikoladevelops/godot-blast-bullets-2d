@@ -125,15 +125,19 @@ ring_3_radius = 120.0
 count_bullet_size = false
 
 [sub_resource type="BulletSoundData2D" id="BulletSoundData2D_0yymp"]
+enabled = false
 trigger = 3
-stream = ExtResource("13_jbfhk")
+streams = [ExtResource("13_jbfhk")]
 pitch_scale = 2.0999999999999996
-random_pitch = 1.72
+random_pitch = 5.31
 random_volume_offset_db = 3.11
+audibility_mode = 1
+zoom_scales_distance = true
 
 [sub_resource type="BulletSoundData2D" id="BulletSoundData2D_102ar"]
-stream = ExtResource("13_jbfhk")
+streams = [ExtResource("13_jbfhk")]
 random_pitch = 9.98
+max_distance = 4096.0
 max_duration_sec = 5.34
 
 [sub_resource type="Curve" id="Curve_r5nj6"]
@@ -222,7 +226,7 @@ movement_transition = 2
 movement_progress_curve = SubResource("Curve_r5nj6")
 movement_rotate_with_path = true
 movement_cubic_sampling = true
-position = Vector2(-390, -28)
+position = Vector2(-2215, -1116)
 
 [node name="Marker2D" type="Marker2D" parent="BulletSpawner2D" unique_id=1785719658]
 position = Vector2(28, -42)
@@ -486,7 +490,7 @@ switch_direction_when_reaching_range_x = false
 [node name="Paths" type="Node" parent="." unique_id=1477841289]
 
 [node name="Path2D" type="Path2D" parent="Paths" unique_id=517491318]
-position = Vector2(250, 293)
+position = Vector2(-3337, -1248)
 curve = SubResource("Curve2D_nkrfg")
 
 [connection signal="area_entered" from="BulletSpawner2D" to="." method="_on_bullet_spawner_2d_area_entered"]

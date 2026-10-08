@@ -38,7 +38,7 @@ func _process(_delta: float) -> void:
 			_finish()
 			return
 		entry = enemy.sound_effects[0] as BulletSoundData2D
-		entry.stream = _silent_loop()
+		entry.streams = [_silent_loop()]
 		entry.min_interval_sec = 0.0
 	if enemy == null or not is_instance_valid(enemy):
 		return

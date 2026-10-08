@@ -210,7 +210,7 @@ func test_silent_entries_play_nothing() -> void:
 	v.sound_set_effects([disabled, null, streamless, live])
 	assert_true(v.clear_bullet(0), "cleared")
 	await physics(2)
-	expect_warning_sequence(["BulletSoundData2D: stream is empty, the sound plays nothing."])
+	expect_warning_sequence(["BulletSoundData2D: streams is empty, the sound plays nothing."])
 	assert_eq(_logged(live.get_instance_id()).size(), 1, "live entry plays")
 
 

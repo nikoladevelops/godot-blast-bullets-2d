@@ -57,7 +57,7 @@ func test_preview_streamless_warns_and_silent() -> void:
 	var sp := make_spawner()
 	sp.sound_effects = [s]
 	sp.preview_sound_effect(0)
-	expect_warning_sequence(["BulletSoundData2D: stream is empty, the sound plays nothing."])
+	expect_warning_sequence(["BulletSoundData2D: streams is empty, the sound plays nothing."])
 	assert_null(_preview_node(s), "streamless plays nothing")
 
 

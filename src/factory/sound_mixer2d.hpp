@@ -14,9 +14,11 @@
 #include <godot_cpp/classes/audio_listener2d.hpp>
 #include <godot_cpp/classes/audio_server.hpp>
 #include <godot_cpp/classes/audio_stream_player2d.hpp>
+#include <godot_cpp/classes/camera2d.hpp>
 #include <godot_cpp/classes/viewport.hpp>
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
+#include <godot_cpp/variant/node_path.hpp>
 
 #include <cstdint>
 #include <memory>
@@ -71,8 +73,9 @@ public:
 	void clear_log() { sound_log.clear(); }
 	Array debug_voices() const;
 	Dictionary debug_stats() const;
-	// Applies one play's mix to a player (stream, volume + offset + random,
-	// pitch * random, bus with Master fallback, spatial or centered
+	// Applies one play's mix to a player (stream, volume + offset + randoms
+	// clamped into volume_min/max_db, pitch * randoms clamped into
+	// pitch_min/max, bus with Master fallback, spatial or centered
 	// constants). Shared by the sweep flush and the editor preview. Returns
 	// the applied volume (Quietest steal ranks by it).
 	static float apply_playback_mix(AudioStreamPlayer2D *player, const BulletSoundData2D *sound, const Ref<AudioStream> &picked, float volume_offset_db, std::vector<String> *warned_buses, bool force_centered = false);
@@ -107,6 +110,10 @@ private:
 		size_t seq_cursor = 0;
 		std::vector<size_t> shuffle_bag;
 		size_t shuffle_n = 0;
+		// Pinned-camera cache (camera_path, per factory: factory-relative
+		// paths resolve differently per factory sharing this resource).
+		NodePath camera_path;
+		uint64_t camera_id = 0;
 	};
 	struct Voice {
 		AudioStreamPlayer2D *player = nullptr;
@@ -115,6 +122,16 @@ private:
 		int priority = 0;
 		double start_clock = 0.0;
 		double max_duration = 0.0;
+		// Fade-out state (fade_out_sec): while fading the voice still counts
+		// busy (caps, steal order) and keeps following its listener; the
+		// sweep ramps fade_from down to silence, then stops and releases it.
+		bool fading = false;
+		double fade_start = 0.0;
+		float fade_from = 0.0f;
+		double fade_len = 0.0;
+		// Last applied duck dip in dB (duck_amount_db): the player sits at
+		// last_volume - duck_dip while dipped, last_volume when open.
+		float duck_dip = 0.0f;
 		// Effective played volume (volume + trim + random): Quietest steal
 		// ranks by it (ties go to the oldest).
 		float last_volume = 0.0f;
@@ -129,15 +146,20 @@ private:
 	};
 
 	Channel &channel_for(uint64_t sound_id, size_t cap);
+	// The camera one entry's view test and zoom scaling measure from: the
+	// pinned camera_path when it resolves to a live Camera2D in the
+	// factory's viewport, else the viewport's current camera (null when
+	// there is none: no culling, zoom 1). Bad paths warn once per resource.
+	static Camera2D *resolve_entry_camera(BulletFactory2D &factory, const BulletSoundData2D *sound, Channel &channel);
 	// Camera view test for one event: false when the event is outside the
-	// camera's view rect (grown by the entry's margin). No camera, or a
+	// given camera's view rect (grown by the entry's margin). No camera, or a
 	// Distance-only entry, never culls.
-	static bool sound_in_camera_view(BulletFactory2D &factory, const BulletSoundData2D *sound, const Vector2 &event_pos);
-	// Effective max_distance for one entry: divided by the camera's minimum
-	// zoom when zoom_scales_distance is set (no camera means zoom 1).
-	static double sound_effective_max_distance(BulletFactory2D &factory, const BulletSoundData2D *sound);
+	static bool sound_in_camera_view(const BulletSoundData2D *sound, const Vector2 &event_pos, const Camera2D *camera, const Viewport *vp);
+	// Effective max_distance for one entry: divided by the given camera's
+	// minimum zoom when zoom_scales_distance is set (no camera means zoom 1).
+	static double sound_effective_max_distance(const BulletSoundData2D *sound, const Camera2D *camera);
 	// The stream this play uses: streams picked per stream_mode (nulls
-	// skipped, stream the fallback), or null when there is nothing to play.
+	// skipped), or null when there is nothing to play.
 	// Round-robin and shuffle state live in the channel (shared).
 	static Ref<AudioStream> pick_stream(const BulletSoundData2D *sound, Channel &channel);
 	// Nearest target of the candidate's spec (fresh list read): returns false
@@ -146,6 +168,11 @@ private:
 	static Vector2 godot_listener_pos(BulletFactory2D &factory);
 	AudioStreamPlayer2D *alloc_voice(BulletFactory2D &factory, int priority);
 	void release_voice(Voice &voice);
+	// Fade-out support (fade_out_sec): the fade length of one sound resource
+	// (0 = stop instantly, like before), and starting a fade on a voice
+	// (false = nothing to fade: stop instantly instead).
+	static double voice_fade_len(uint64_t sound_id);
+	static bool voice_begin_fade(Voice &voice, double clock, double fade_len);
 	void ensure_voices_container(BulletFactory2D &factory);
 
 	std::unordered_map<uint64_t, Channel> channels;

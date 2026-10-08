@@ -155,7 +155,7 @@ static func make_sound_stream(seconds := 0.25, loop := true) -> AudioStreamWAV:
 static func make_sound(trigger: int, max_voices := 4) -> BulletSoundData2D:
 	var s := BulletSoundData2D.new()
 	s.trigger = trigger
-	s.stream = make_sound_stream()
+	s.streams = [make_sound_stream()]
 	s.min_interval_sec = 0.0
 	s.max_voices = max_voices
 	return s

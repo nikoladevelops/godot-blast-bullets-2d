@@ -4,10 +4,11 @@
 		One stackable sound entry: what plays when one bullet event fires.
 	</brief_description>
 	<description>
-		A [BulletSoundData2D] plays its [member stream] when its [member trigger] fires, subject to its own limits ([member min_interval_sec], [member max_voices]). Drop entries into [member BulletSpawner2D.sound_effects] (or arm a factory volley with [method BulletVolley2D.sound_set_effects]) and stack as many as you like: every enabled entry whose trigger matches plays.
+		A [BulletSoundData2D] plays one entry of [member streams] when its [member trigger] fires, subject to its own limits ([member min_interval_sec], [member max_voices]). Drop entries into [member BulletSpawner2D.sound_effects] (or arm a factory volley with [method BulletVolley2D.sound_set_effects]) and stack as many as you like: every enabled entry whose trigger matches plays.
 		Channels are shared per resource across the whole factory: twenty enemies sharing one [code]hit.tres[/code] share one interval and voice budget, and the nearest events win each sweep. Any Godot [AudioStream] works: WAV/OGG/MP3, [AudioStreamRandomizer] (variations, weighted, no repeats), [AudioStreamPlaylist] (sequences), [AudioStreamSynchronized] (layers). Put [AudioEffect] reverb, delay or distortion on the [member bus] and Area2D bus overrides listen on [member area_mask].
 		Stacking cookbook: with the defaults (interval 0.05, 4 voices), 100 simultaneous hits first pass the [member trigger_chance] gate, then keep 1 candidate per channel per 0.05 s (the nearest) when the interval is set, or up to 4 per sweep when the interval is 0. Past the per-sound busy cap, [member when_limit_reached] stops the oldest (or quietest, see [member steal_mode]) voice or drops the newcomer, and a full factory pool steals by [member priority]. For layered hits without extra resources, stack entries in [member streams] instead of building an [AudioStreamRandomizer]: use the built-in list for a few WAV variations, the Randomizer for weighted no-repeat round-robins with per-sample pitch envelopes, [AudioStreamPlaylist] for ordered sequences, and [AudioStreamSynchronized] for layered loops.
 		A lethal hit plays On Destroy only, a survived hit plays On Hit only (mirroring the effect layers, so a killing blow never double-plays). Offers play at the end of the sweep they were made in (at most one tick of latency): there is no immediate-flush option by design.
+		Recipes: three hit WAVs with [member stream_mode] Weighted and [member stream_weights] [code][2, 1, 1][/code] favor the first without starving the rest; a telegraph sting with Sequence cycles its list in order every warning; two On Graze entries with [member ring_index] 0 and 2 split the outer and inner rings across different sounds; a Cave bus carrying reverb plus [member area_mask] on the cave layer makes cave shots echo while arena shots stay dry; a spawner listener source of Node Group on the player group measures every shot from the nearest player.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -51,10 +52,19 @@
 			Mixer bus this sound plays on. Unknown names play on Master with one warning per name.
 		</member>
 		<member name="camera_margin_px" type="float" setter="set_camera_margin_px" getter="get_camera_margin_px" default="200.0">
-			The camera view rect grows by this many pixels on every side before an event counts as outside. Rescues near-outside events from the cull.
+			The camera view rect grows by this many screen pixels on every side before an event counts as outside (zoom-independent). Rescues near-outside events from the cull. Hidden unless [member audibility_mode] includes the camera.
+		</member>
+		<member name="camera_path" type="NodePath" setter="set_camera_path" getter="get_camera_path" default="NodePath(&quot;&quot;)">
+			The camera the view test and the zoom scaling measure from, resolved against the factory (absolute paths work from anywhere). Empty follows the viewport's current camera; a path that names no live Camera2D in the same viewport falls back to it with one warning. Pin the gameplay camera while a cutscene camera is current, or fix the camera a test measures from. Hidden unless [member audibility_mode] includes the camera.
+		</member>
+		<member name="duck_amount_db" type="float" setter="set_duck_amount_db" getter="get_duck_amount_db" default="0.0">
+			Ducking: while a voice of this entry is busy, every busy voice of strictly lower [member priority] is dipped by this many dB (strongest dip wins per victim; ties never dip). 0 never dips. Fading voices sit out both ways; the dip applies and releases every sweep, even with no new offers.
 		</member>
 		<member name="enabled" type="bool" setter="set_enabled" getter="get_enabled" default="true">
 			Master switch: toggle a sound without removing it. Disabled entries play nothing.
+		</member>
+		<member name="fade_out_sec" type="float" setter="set_fade_out_sec" getter="get_fade_out_sec" default="0.0">
+			Fade-out before a voice stops on duration expiry or voice stealing: ramps to silence over this long instead of cutting, so loopers never click. 0 stops instantly, like before. stop_sounds(), reset() and pause stay instant either way; a fading voice still counts busy until it releases.
 		</member>
 		<member name="max_distance" type="float" setter="set_max_distance" getter="get_max_distance" default="2000.0">
 			Past this distance from the listener the play is dropped: inaudible events never take a voice. Hidden while [member positional] is off.
@@ -77,8 +87,14 @@
 		<member name="panning_strength" type="float" setter="set_panning_strength" getter="get_panning_strength" default="1.0">
 			Stereo spread (Godot's own panning math). Hidden while [member positional] is off.
 		</member>
+		<member name="pitch_max" type="float" setter="set_pitch_max" getter="get_pitch_max" default="16.0">
+			Final pitch ceiling (linear multiplier, applied after every random). Inverted bounds sort themselves. Wide open by default, so existing mixes play untouched.
+		</member>
+		<member name="pitch_min" type="float" setter="set_pitch_min" getter="get_pitch_min" default="0.01">
+			Final pitch floor (linear multiplier, applied after every random). Inverted bounds sort themselves. Wide open by default.
+		</member>
 		<member name="pitch_scale" type="float" setter="set_pitch_scale" getter="get_pitch_scale" default="1.0">
-			Base pitch multiplier, multiplied by the [member random_pitch] roll of each play.
+			Base pitch multiplier, multiplied by the [member random_pitch] and [member random_pitch_min]/[member random_pitch_max] rolls of each play, clamped into [member pitch_min]..[member pitch_max].
 		</member>
 		<member name="positional" type="bool" setter="set_positional" getter="get_positional" default="true">
 			Off means constant volume, centered (a UI sting). On means Godot's distance falloff and panning from the listener.
@@ -86,29 +102,41 @@
 		<member name="priority" type="int" setter="set_priority" getter="get_priority" default="0">
 			Voice-stealing rank for the factory-wide pool: a full pool yields its oldest voice of equal or lower priority, never a more important one.
 		</member>
+		<member name="random_pan" type="float" setter="set_random_pan" getter="get_random_pan" default="0.0">
+			Random placement spread (fraction of the listener distance): each positional play is offset perpendicular to the listener direction by a uniform roll in [code]-v..+v[/code] times the distance, so repeated shots spread across the stereo field. 0 disables it; centered voices stay centered.
+		</member>
 		<member name="random_pitch" type="float" setter="set_random_pitch" getter="get_random_pitch" default="1.0">
 			Random pitch range ([AudioStreamRandomizer] math): each play multiplies [member pitch_scale] by a log-uniform roll in [code]1/r..r[/code]. 1 disables it.
+		</member>
+		<member name="random_pitch_max" type="float" setter="set_random_pitch_max" getter="get_random_pitch_max" default="1.0">
+			Random pitch upper bound (linear multiplier): each play multiplies by a uniform roll in [code]min..max[/code] (sorted when inverted). 1/1 disables it; min == max multiplies without burning RNG.
+		</member>
+		<member name="random_pitch_min" type="float" setter="set_random_pitch_min" getter="get_random_pitch_min" default="1.0">
+			Random pitch lower bound (linear multiplier): each play multiplies by a uniform roll in [code]min..max[/code] (sorted when inverted). 1/1 disables it; min == max multiplies without burning RNG.
+		</member>
+		<member name="random_volume_max_db" type="float" setter="set_random_volume_max_db" getter="get_random_volume_max_db" default="0.0">
+			Random loudness upper bound in dB: each play adds a uniform offset in [code]min..max[/code] (sorted when inverted). 0/0 disables it; min == max adds without burning RNG.
+		</member>
+		<member name="random_volume_min_db" type="float" setter="set_random_volume_min_db" getter="get_random_volume_min_db" default="0.0">
+			Random loudness lower bound in dB: each play adds a uniform offset in [code]min..max[/code] (sorted when inverted). 0/0 disables it; min == max adds without burning RNG.
 		</member>
 		<member name="random_volume_offset_db" type="float" setter="set_random_volume_offset_db" getter="get_random_volume_offset_db" default="0.0">
 			Random loudness range in dB: each play adds a uniform offset in [code]-v..+v[/code]. 0 disables it.
 		</member>
 		<member name="ring_index" type="int" setter="set_ring_index" getter="get_ring_index" default="-1">
-			Which graze ring this entry listens to: -1 means any ring, 0..3 means exactly that ring. A zone with fewer rings never matches (silent, no warning). Ignored by every non-graze trigger.
+			Which graze ring this entry listens to: -1 means any ring, 0..3 means exactly that ring. A zone with fewer rings never matches (silent, no warning). Ignored by every non-graze trigger; hidden in the inspector unless [member trigger] is On Graze or On Graze Exit.
 		</member>
 		<member name="steal_mode" type="int" setter="set_steal_mode" getter="get_steal_mode" default="0">
 			Which voice Replace Oldest stops past [member max_voices]: the oldest, or the quietest (lowest played volume, ties go to the oldest). The factory pool steal keeps its own rule (priority, then oldest).
-		</member>
-		<member name="stream" type="AudioStream" setter="set_stream" getter="get_stream">
-			What plays. Null plays nothing (warns once per resource).
 		</member>
 		<member name="stream_mode" type="int" setter="set_stream_mode" getter="get_stream_mode" default="0">
 			How [member streams] is picked: Random (uniform), Weighted (reads [member stream_weights]), Sequence (round-robin), Shuffle (every entry once per cycle). The cursors live in the shared channel, like the limits.
 		</member>
 		<member name="stream_weights" type="PackedFloat32Array" setter="set_stream_weights" getter="get_stream_weights" default="PackedFloat32Array()">
-			Per-entry weight for Weighted mode, parallel to [member streams]. All-zero, empty or size-mismatched means uniform. Swapping the array mid-fight works: the next play re-reads it.
+			Per-entry weight for Weighted mode, parallel to [member streams]. All-zero, empty or size-mismatched means uniform. Swapping the array mid-fight works: the next play re-reads it. Hidden in the inspector unless [member stream_mode] is Weighted and [member streams] holds a playable entry.
 		</member>
 		<member name="streams" type="Array" setter="set_streams" getter="get_streams" default="[]">
-			Stacked alternative streams: when non-empty, each play picks one per [member stream_mode] instead of [member stream] (nulls skipped). Five hit variations without building an [AudioStreamRandomizer]; [member stream] stays the fallback when the list is empty or all null.
+			What plays: each play picks one entry per [member stream_mode] (nulls skipped). Put one WAV for a single sound or five hit variations without building an [AudioStreamRandomizer]; an empty or all-null list plays nothing (warns once).
 		</member>
 		<member name="trigger" type="int" setter="set_trigger" getter="get_trigger" default="0">
 			Which event plays this sound. On Shot and On Telegraph are spawner-only: a factory volley never fires them.
@@ -117,7 +145,13 @@
 			Play probability per event. 0 never plays, 1 always plays.
 		</member>
 		<member name="volume_db" type="float" setter="set_volume_db" getter="get_volume_db" default="0.0">
-			Base loudness in dB. The spawner's sound volume offset is added on top, plus the [member random_volume_offset_db] roll of each play.
+			Base loudness in dB. The spawner's sound volume offset is added on top, plus the [member random_volume_offset_db] and [member random_volume_min_db]/[member random_volume_max_db] rolls of each play, clamped into [member volume_min_db]..[member volume_max_db].
+		</member>
+		<member name="volume_max_db" type="float" setter="set_volume_max_db" getter="get_volume_max_db" default="80.0">
+			Final mixed volume ceiling in dB (applied after the trim, the randoms and the amount gain). Inverted bounds sort themselves. Wide open by default.
+		</member>
+		<member name="volume_min_db" type="float" setter="set_volume_min_db" getter="get_volume_min_db" default="-80.0">
+			Final mixed volume floor in dB (applied after the trim, the randoms and the amount gain). Inverted bounds sort themselves. Wide open by default.
 		</member>
 		<member name="when_limit_reached" type="int" setter="set_when_limit_reached" getter="get_when_limit_reached" default="0">
 			What happens past [member max_voices]: stop this sound's oldest voice and reuse it, or drop the new event.

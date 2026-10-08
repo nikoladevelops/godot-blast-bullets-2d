@@ -185,3 +185,127 @@ func test_amount_setters_reject_and_keep() -> void:
 	assert_eq(s.amount_gain_db, 0.0, "kept")
 	s.set_amount_gain_db(NAN)
 	expect_error_sequence(["BulletSoundData2D: amount_gain_db must be finite and >= 0, keeping the old value."])
+
+
+func test_volume_clamp_applies_last() -> void:
+	godot_listener_at(Vector2.ZERO)
+	var s := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+	s.volume_db = 0.0
+	s.set("volume_min_db", -6.0)
+	s.set("volume_max_db", 6.0)
+	# Loud entry clamps to the ceiling, quiet entry to the floor.
+	s.volume_db = 30.0
+	assert_true(factory.play_sound(s, Vector2.ZERO), "loud offer accepted")
+	await physics(2)
+	assert_almost_eq(float((busy_voices()[0] as Dictionary)["volume_db"]), 6.0, 0.05, "ceiling clamps the mix")
+	factory.stop_sounds()
+	await idle(1)
+	s.volume_db = -30.0
+	assert_true(factory.play_sound(s, Vector2.ZERO), "quiet offer accepted")
+	await physics(2)
+	assert_almost_eq(float((busy_voices()[0] as Dictionary)["volume_db"]), -6.0, 0.05, "floor clamps the mix")
+	factory.stop_sounds()
+	await idle(1)
+	# Inverted bounds sort themselves (no setter cross-check): still clamps.
+	s.volume_db = 30.0
+	s.set("volume_min_db", 6.0)
+	s.set("volume_max_db", -6.0)
+	assert_true(factory.play_sound(s, Vector2.ZERO), "inverted offer accepted")
+	await physics(2)
+	assert_almost_eq(float((busy_voices()[0] as Dictionary)["volume_db"]), 6.0, 0.05, "inverted bounds still clamp")
+
+
+func test_pitch_clamp_applies_last() -> void:
+	godot_listener_at(Vector2.ZERO)
+	var s := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+	s.pitch_scale = 8.0
+	s.set("pitch_min", 0.5)
+	s.set("pitch_max", 2.0)
+	assert_true(factory.play_sound(s, Vector2.ZERO), "offer accepted")
+	await physics(2)
+	assert_almost_eq(float((busy_voices()[0] as Dictionary)["pitch_scale"]), 2.0, 0.01, "ceiling clamps the pitch")
+
+
+func test_asymmetric_volume_random_stays_inside() -> void:
+	godot_listener_at(Vector2.ZERO)
+	var s := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT, 32)
+	s.volume_db = -10.0
+	s.set("random_volume_min_db", -3.0)
+	s.set("random_volume_max_db", 1.0)
+	for i in 12:
+		assert_true(factory.play_sound(s, Vector2(i * 5, 0)), "offer %d accepted" % i)
+	await physics(2)
+	assert_eq(busy_voices().size(), 12, "twelve voices busy")
+	var vols: Array = []
+	for e in busy_voices():
+		vols.append(float((e as Dictionary)["volume_db"]))
+	vols.sort()
+	assert_gte(vols[0], -13.0, "at least base+min")
+	assert_lte(vols[vols.size() - 1], -9.0, "at most base+max")
+	assert_gt(vols[vols.size() - 1] - vols[0], 0.5, "rolls vary across the range")
+
+
+func test_deterministic_volume_offset_without_range() -> void:
+	godot_listener_at(Vector2.ZERO)
+	var s := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+	s.volume_db = -10.0
+	s.set("random_volume_min_db", 2.0)
+	s.set("random_volume_max_db", 2.0)
+	assert_true(factory.play_sound(s, Vector2.ZERO), "offer accepted")
+	await physics(2)
+	assert_almost_eq(float((busy_voices()[0] as Dictionary)["volume_db"]), -8.0, 0.01, "min==max adds without RNG")
+
+
+func test_deterministic_pitch_offset_without_range() -> void:
+	godot_listener_at(Vector2.ZERO)
+	var s := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+	s.pitch_scale = 2.0
+	s.set("random_pitch_min", 1.5)
+	s.set("random_pitch_max", 1.5)
+	assert_true(factory.play_sound(s, Vector2.ZERO), "offer accepted")
+	await physics(2)
+	assert_almost_eq(float((busy_voices()[0] as Dictionary)["pitch_scale"]), 3.0, 0.01, "min==max multiplies without RNG")
+
+
+func test_random_pan_spreads_positional_voices() -> void:
+	godot_listener_at(Vector2.ZERO)
+	var s := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT, 32)
+	s.set("random_pan", 1.0)
+	for i in 12:
+		assert_true(factory.play_sound(s, Vector2(100, 0)), "offer %d accepted" % i)
+	await physics(2)
+	assert_eq(busy_voices().size(), 12, "twelve voices busy")
+	var ys: Array = []
+	for e in busy_voices():
+		ys.append(float((e as Dictionary)["position"].y))
+		assert_almost_eq(float((e as Dictionary)["position"].x), 100.0, 0.6, "x stays on the event")
+	ys.sort()
+	assert_gt(ys[ys.size() - 1] - ys[0], 10.0, "perpendicular offsets vary the placement")
+	assert_gte(ys[0], -100.0, "jitter bounded by distance")
+	assert_lte(ys[ys.size() - 1], 100.0, "jitter bounded by distance")
+
+
+func test_random_pan_leaves_centered_voices_centered() -> void:
+	godot_listener_at(Vector2.ZERO)
+	var s := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+	s.positional = false
+	s.set("random_pan", 1.0)
+	assert_true(factory.play_sound(s, Vector2(5000, 0)), "distance never drops it")
+	await physics(2)
+	var v: Dictionary = busy_voices()[0]
+	assert_almost_eq(v["position"], Vector2.ZERO, Vector2(0.5, 0.5), "still centered on the listener")
+	assert_almost_eq(float(v["panning_strength"]), 0.0, 0.001, "still no panning")
+
+
+func test_random_pan_setter_rejects_and_keeps() -> void:
+	var s := BulletSoundData2D.new()
+	assert_has_method(s, "set_random_pan", "bound set_random_pan")
+	assert_has_method(s, "get_random_pan", "bound get_random_pan")
+	assert_eq(s.get("random_pan"), 0.0, "off by default")
+	s.set("random_pan", NAN)
+	expect_error_sequence(["BulletSoundData2D: random_pan must be finite and between 0 and 1, keeping the old value."])
+	assert_eq(s.get("random_pan"), 0.0, "kept")
+	s.set("random_pan", 1.5)
+	expect_error_sequence(["BulletSoundData2D: random_pan must be finite and between 0 and 1, keeping the old value."])
+	s.set("random_pan", 0.5)
+	assert_eq(s.get("random_pan"), 0.5, "valid value applies")

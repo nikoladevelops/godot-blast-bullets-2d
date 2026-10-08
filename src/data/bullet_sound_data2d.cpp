@@ -34,15 +34,7 @@ void BulletSoundData2D::set_trigger(int value) {
 		return;
 	}
 	trigger = value;
-	emit_changed();
-}
-
-Ref<AudioStream> BulletSoundData2D::get_stream() const { return stream; }
-void BulletSoundData2D::set_stream(const Ref<AudioStream> &new_stream) {
-	if (stream == new_stream) {
-		return;
-	}
-	stream = new_stream;
+	notify_property_list_changed(); // ring_index gates on it (_validate_property)
 	emit_changed();
 }
 
@@ -75,6 +67,7 @@ void BulletSoundData2D::set_streams(const Array &value) {
 		return;
 	}
 	streams = value;
+	notify_property_list_changed(); // stream_weights gates on the list (_validate_property)
 	emit_changed();
 }
 
@@ -88,6 +81,7 @@ void BulletSoundData2D::set_stream_mode(int value) {
 		return;
 	}
 	stream_mode = value;
+	notify_property_list_changed(); // stream_weights gates on it (_validate_property)
 	emit_changed();
 }
 
@@ -155,6 +149,71 @@ void BulletSoundData2D::set_random_volume_offset_db(double value) {
 		return;
 	}
 	random_volume_offset_db = value;
+	emit_changed();
+}
+
+double BulletSoundData2D::get_random_volume_min_db() const { return random_volume_min_db; }
+void BulletSoundData2D::set_random_volume_min_db(double value) {
+	if (!Math::is_finite(value) || value < -40.0 || value > 40.0) {
+		UtilityFunctions::push_error("BulletSoundData2D: random_volume_min_db must be finite and between -40 and 40, keeping the old value.");
+		return;
+	}
+	if (random_volume_min_db == value) {
+		return;
+	}
+	random_volume_min_db = value;
+	emit_changed();
+}
+
+double BulletSoundData2D::get_random_volume_max_db() const { return random_volume_max_db; }
+void BulletSoundData2D::set_random_volume_max_db(double value) {
+	if (!Math::is_finite(value) || value < -40.0 || value > 40.0) {
+		UtilityFunctions::push_error("BulletSoundData2D: random_volume_max_db must be finite and between -40 and 40, keeping the old value.");
+		return;
+	}
+	if (random_volume_max_db == value) {
+		return;
+	}
+	random_volume_max_db = value;
+	emit_changed();
+}
+
+double BulletSoundData2D::get_random_pitch_min() const { return random_pitch_min; }
+void BulletSoundData2D::set_random_pitch_min(double value) {
+	if (!Math::is_finite(value) || value < 0.01 || value > 16.0) {
+		UtilityFunctions::push_error("BulletSoundData2D: random_pitch_min must be finite and between 0.01 and 16, keeping the old value.");
+		return;
+	}
+	if (random_pitch_min == value) {
+		return;
+	}
+	random_pitch_min = value;
+	emit_changed();
+}
+
+double BulletSoundData2D::get_random_pitch_max() const { return random_pitch_max; }
+void BulletSoundData2D::set_random_pitch_max(double value) {
+	if (!Math::is_finite(value) || value < 0.01 || value > 16.0) {
+		UtilityFunctions::push_error("BulletSoundData2D: random_pitch_max must be finite and between 0.01 and 16, keeping the old value.");
+		return;
+	}
+	if (random_pitch_max == value) {
+		return;
+	}
+	random_pitch_max = value;
+	emit_changed();
+}
+
+double BulletSoundData2D::get_random_pan() const { return random_pan; }
+void BulletSoundData2D::set_random_pan(double value) {
+	if (!Math::is_finite(value) || value < 0.0 || value > 1.0) {
+		UtilityFunctions::push_error("BulletSoundData2D: random_pan must be finite and between 0 and 1, keeping the old value.");
+		return;
+	}
+	if (random_pan == value) {
+		return;
+	}
+	random_pan = value;
 	emit_changed();
 }
 
@@ -256,6 +315,18 @@ void BulletSoundData2D::set_audibility_mode(int value) {
 		return;
 	}
 	audibility_mode = value;
+	notify_property_list_changed(); // camera_path/margin gate on it (_validate_property)
+	emit_changed();
+}
+
+NodePath BulletSoundData2D::get_camera_path() const { return camera_path; }
+void BulletSoundData2D::set_camera_path(const NodePath &value) {
+	// Any path stores (empty = viewport camera): the type/viewport checks
+	// need scene context, so they run at resolve time with a fallback.
+	if (camera_path == value) {
+		return;
+	}
+	camera_path = value;
 	emit_changed();
 }
 
@@ -398,6 +469,84 @@ void BulletSoundData2D::set_amount_gain_db(double value) {
 	emit_changed();
 }
 
+double BulletSoundData2D::get_volume_min_db() const { return volume_min_db; }
+void BulletSoundData2D::set_volume_min_db(double value) {
+	if (!Math::is_finite(value)) {
+		UtilityFunctions::push_error("BulletSoundData2D: volume_min_db must be finite, keeping the old value.");
+		return;
+	}
+	if (volume_min_db == value) {
+		return;
+	}
+	volume_min_db = value;
+	emit_changed();
+}
+
+double BulletSoundData2D::get_volume_max_db() const { return volume_max_db; }
+void BulletSoundData2D::set_volume_max_db(double value) {
+	if (!Math::is_finite(value)) {
+		UtilityFunctions::push_error("BulletSoundData2D: volume_max_db must be finite, keeping the old value.");
+		return;
+	}
+	if (volume_max_db == value) {
+		return;
+	}
+	volume_max_db = value;
+	emit_changed();
+}
+
+double BulletSoundData2D::get_pitch_min() const { return pitch_min; }
+void BulletSoundData2D::set_pitch_min(double value) {
+	if (!Math::is_finite(value) || value < 0.01) {
+		UtilityFunctions::push_error("BulletSoundData2D: pitch_min must be finite and >= 0.01, keeping the old value.");
+		return;
+	}
+	if (pitch_min == value) {
+		return;
+	}
+	pitch_min = value;
+	emit_changed();
+}
+
+double BulletSoundData2D::get_pitch_max() const { return pitch_max; }
+void BulletSoundData2D::set_pitch_max(double value) {
+	if (!Math::is_finite(value) || value < 0.01) {
+		UtilityFunctions::push_error("BulletSoundData2D: pitch_max must be finite and >= 0.01, keeping the old value.");
+		return;
+	}
+	if (pitch_max == value) {
+		return;
+	}
+	pitch_max = value;
+	emit_changed();
+}
+
+double BulletSoundData2D::get_fade_out_sec() const { return fade_out_sec; }
+void BulletSoundData2D::set_fade_out_sec(double value) {
+	if (!Math::is_finite(value) || value < 0.0) {
+		UtilityFunctions::push_error("BulletSoundData2D: fade_out_sec must be finite and >= 0, keeping the old value.");
+		return;
+	}
+	if (fade_out_sec == value) {
+		return;
+	}
+	fade_out_sec = value;
+	emit_changed();
+}
+
+double BulletSoundData2D::get_duck_amount_db() const { return duck_amount_db; }
+void BulletSoundData2D::set_duck_amount_db(double value) {
+	if (!Math::is_finite(value) || value < 0.0) {
+		UtilityFunctions::push_error("BulletSoundData2D: duck_amount_db must be finite and >= 0, keeping the old value.");
+		return;
+	}
+	if (duck_amount_db == value) {
+		return;
+	}
+	duck_amount_db = value;
+	emit_changed();
+}
+
 void BulletSoundData2D::preview() {
 	if (Engine::get_singleton() == nullptr || !Engine::get_singleton()->is_editor_hint()) {
 		UtilityFunctions::push_error("BulletSoundData2D.preview: editor only, nothing plays.");
@@ -421,6 +570,36 @@ AudioStreamPlayer2D *BulletSoundData2D::debug_get_preview_player() const {
 
 void BulletSoundData2D::_validate_property(PropertyInfo &p_property) const {
 	const String name = p_property.name;
+	if (name == "ring_index") {
+		// Only graze triggers read it (volley sound_fire filters by ring);
+		// every other trigger ignores it, so hiding avoids dead config.
+		if (trigger != SOUND_ON_GRAZE && trigger != SOUND_ON_GRAZE_EXIT) {
+			p_property.usage &= ~PROPERTY_USAGE_EDITOR;
+		}
+		return;
+	}
+	if (name == "stream_weights") {
+		// Weights only mean something for Weighted picks from a playable list.
+		if (stream_mode != STREAM_WEIGHTED) {
+			p_property.usage &= ~PROPERTY_USAGE_EDITOR;
+			return;
+		}
+		for (int i = 0; i < streams.size(); ++i) {
+			const Variant entry = streams[i];
+			if (entry.get_type() == Variant::OBJECT && Object::cast_to<AudioStream>((Object *)entry) != nullptr) {
+				return;
+			}
+		}
+		p_property.usage &= ~PROPERTY_USAGE_EDITOR;
+		return;
+	}
+	if (name == "camera_path" || name == "camera_margin_px") {
+		// Both only mean something when the camera takes part in audibility.
+		if (audibility_mode != SOUND_AUDIBILITY_CAMERA && audibility_mode != SOUND_AUDIBILITY_DISTANCE_AND_CAMERA) {
+			p_property.usage &= ~PROPERTY_USAGE_EDITOR;
+		}
+		return;
+	}
 	if (name == "max_distance" || name == "attenuation" || name == "panning_strength" || name == "area_mask") {
 		if (!positional) {
 			p_property.usage &= ~PROPERTY_USAGE_EDITOR;
@@ -460,10 +639,6 @@ void BulletSoundData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_ring_index", "value"), &BulletSoundData2D::set_ring_index);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "ring_index", PROPERTY_HINT_RANGE, "-1,3,1"), "set_ring_index", "get_ring_index");
 
-	ClassDB::bind_method(D_METHOD("get_stream"), &BulletSoundData2D::get_stream);
-	ClassDB::bind_method(D_METHOD("set_stream", "stream"), &BulletSoundData2D::set_stream);
-	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "stream", PROPERTY_HINT_RESOURCE_TYPE, "AudioStream"), "set_stream", "get_stream");
-
 	ClassDB::bind_method(D_METHOD("get_streams"), &BulletSoundData2D::get_streams);
 	ClassDB::bind_method(D_METHOD("set_streams", "streams"), &BulletSoundData2D::set_streams);
 	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "streams", PROPERTY_HINT_ARRAY_TYPE, "AudioStream"), "set_streams", "get_streams");
@@ -493,6 +668,26 @@ void BulletSoundData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_random_volume_offset_db"), &BulletSoundData2D::get_random_volume_offset_db);
 	ClassDB::bind_method(D_METHOD("set_random_volume_offset_db", "value"), &BulletSoundData2D::set_random_volume_offset_db);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "random_volume_offset_db", PROPERTY_HINT_RANGE, "0,40,0.01,suffix:dB"), "set_random_volume_offset_db", "get_random_volume_offset_db");
+
+	ClassDB::bind_method(D_METHOD("get_random_volume_min_db"), &BulletSoundData2D::get_random_volume_min_db);
+	ClassDB::bind_method(D_METHOD("set_random_volume_min_db", "value"), &BulletSoundData2D::set_random_volume_min_db);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "random_volume_min_db", PROPERTY_HINT_RANGE, "-40,40,0.01,suffix:dB"), "set_random_volume_min_db", "get_random_volume_min_db");
+
+	ClassDB::bind_method(D_METHOD("get_random_volume_max_db"), &BulletSoundData2D::get_random_volume_max_db);
+	ClassDB::bind_method(D_METHOD("set_random_volume_max_db", "value"), &BulletSoundData2D::set_random_volume_max_db);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "random_volume_max_db", PROPERTY_HINT_RANGE, "-40,40,0.01,suffix:dB"), "set_random_volume_max_db", "get_random_volume_max_db");
+
+	ClassDB::bind_method(D_METHOD("get_random_pitch_min"), &BulletSoundData2D::get_random_pitch_min);
+	ClassDB::bind_method(D_METHOD("set_random_pitch_min", "value"), &BulletSoundData2D::set_random_pitch_min);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "random_pitch_min", PROPERTY_HINT_RANGE, "0.01,16,0.01"), "set_random_pitch_min", "get_random_pitch_min");
+
+	ClassDB::bind_method(D_METHOD("get_random_pitch_max"), &BulletSoundData2D::get_random_pitch_max);
+	ClassDB::bind_method(D_METHOD("set_random_pitch_max", "value"), &BulletSoundData2D::set_random_pitch_max);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "random_pitch_max", PROPERTY_HINT_RANGE, "0.01,16,0.01"), "set_random_pitch_max", "get_random_pitch_max");
+
+	ClassDB::bind_method(D_METHOD("get_random_pan"), &BulletSoundData2D::get_random_pan);
+	ClassDB::bind_method(D_METHOD("set_random_pan", "value"), &BulletSoundData2D::set_random_pan);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "random_pan", PROPERTY_HINT_RANGE, "0,1,0.01"), "set_random_pan", "get_random_pan");
 
 	ClassDB::bind_method(D_METHOD("get_trigger_chance"), &BulletSoundData2D::get_trigger_chance);
 	ClassDB::bind_method(D_METHOD("set_trigger_chance", "value"), &BulletSoundData2D::set_trigger_chance);
@@ -527,6 +722,10 @@ void BulletSoundData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_audibility_mode"), &BulletSoundData2D::get_audibility_mode);
 	ClassDB::bind_method(D_METHOD("set_audibility_mode", "value"), &BulletSoundData2D::set_audibility_mode);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "audibility_mode", PROPERTY_HINT_ENUM, "Distance,Camera,Distance and Camera"), "set_audibility_mode", "get_audibility_mode");
+
+	ClassDB::bind_method(D_METHOD("get_camera_path"), &BulletSoundData2D::get_camera_path);
+	ClassDB::bind_method(D_METHOD("set_camera_path", "value"), &BulletSoundData2D::set_camera_path);
+	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "camera_path", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "Camera2D"), "set_camera_path", "get_camera_path");
 
 	ClassDB::bind_method(D_METHOD("get_camera_margin_px"), &BulletSoundData2D::get_camera_margin_px);
 	ClassDB::bind_method(D_METHOD("set_camera_margin_px", "value"), &BulletSoundData2D::set_camera_margin_px);
@@ -573,6 +772,30 @@ void BulletSoundData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_amount_gain_db"), &BulletSoundData2D::get_amount_gain_db);
 	ClassDB::bind_method(D_METHOD("set_amount_gain_db", "value"), &BulletSoundData2D::set_amount_gain_db);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "amount_gain_db", PROPERTY_HINT_RANGE, "0,24,0.01,or_greater,suffix:dB"), "set_amount_gain_db", "get_amount_gain_db");
+
+	ClassDB::bind_method(D_METHOD("get_volume_min_db"), &BulletSoundData2D::get_volume_min_db);
+	ClassDB::bind_method(D_METHOD("set_volume_min_db", "value"), &BulletSoundData2D::set_volume_min_db);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "volume_min_db", PROPERTY_HINT_RANGE, "-80,80,0.1,suffix:dB"), "set_volume_min_db", "get_volume_min_db");
+
+	ClassDB::bind_method(D_METHOD("get_volume_max_db"), &BulletSoundData2D::get_volume_max_db);
+	ClassDB::bind_method(D_METHOD("set_volume_max_db", "value"), &BulletSoundData2D::set_volume_max_db);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "volume_max_db", PROPERTY_HINT_RANGE, "-80,80,0.1,suffix:dB"), "set_volume_max_db", "get_volume_max_db");
+
+	ClassDB::bind_method(D_METHOD("get_pitch_min"), &BulletSoundData2D::get_pitch_min);
+	ClassDB::bind_method(D_METHOD("set_pitch_min", "value"), &BulletSoundData2D::set_pitch_min);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "pitch_min", PROPERTY_HINT_RANGE, "0.01,16,0.01,or_greater"), "set_pitch_min", "get_pitch_min");
+
+	ClassDB::bind_method(D_METHOD("get_pitch_max"), &BulletSoundData2D::get_pitch_max);
+	ClassDB::bind_method(D_METHOD("set_pitch_max", "value"), &BulletSoundData2D::set_pitch_max);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "pitch_max", PROPERTY_HINT_RANGE, "0.01,16,0.01,or_greater"), "set_pitch_max", "get_pitch_max");
+
+	ClassDB::bind_method(D_METHOD("get_fade_out_sec"), &BulletSoundData2D::get_fade_out_sec);
+	ClassDB::bind_method(D_METHOD("set_fade_out_sec", "value"), &BulletSoundData2D::set_fade_out_sec);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "fade_out_sec", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater,suffix:s"), "set_fade_out_sec", "get_fade_out_sec");
+
+	ClassDB::bind_method(D_METHOD("get_duck_amount_db"), &BulletSoundData2D::get_duck_amount_db);
+	ClassDB::bind_method(D_METHOD("set_duck_amount_db", "value"), &BulletSoundData2D::set_duck_amount_db);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "duck_amount_db", PROPERTY_HINT_RANGE, "0,24,0.01,or_greater,suffix:dB"), "set_duck_amount_db", "get_duck_amount_db");
 
 	ClassDB::bind_method(D_METHOD("preview"), &BulletSoundData2D::preview);
 	ClassDB::bind_method(D_METHOD("preview_at", "global_position", "volume_offset_db", "use_position"), &BulletSoundData2D::preview_at);

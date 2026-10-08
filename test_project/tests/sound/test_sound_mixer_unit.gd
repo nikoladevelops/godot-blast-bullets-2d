@@ -49,7 +49,7 @@ func test_play_sound_refusals() -> void:
 	assert_false(factory.play_sound(disabled, Vector2.ZERO), "disabled plays nothing")
 	var streamless := BulletSoundData2D.new()
 	assert_false(factory.play_sound(streamless, Vector2.ZERO), "streamless refused")
-	expect_warning_sequence(["BulletSoundData2D: stream is empty, the sound plays nothing."])
+	expect_warning_sequence(["BulletSoundData2D: streams is empty, the sound plays nothing."])
 	var chanceless := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
 	chanceless.trigger_chance = 0.0
 	assert_false(factory.play_sound(chanceless, Vector2.ZERO), "chance 0 never plays")
@@ -144,7 +144,7 @@ func test_max_duration_stops_loopers_and_short_streams_finish() -> void:
 	await physics(5)
 	assert_eq(busy_voices().size(), 0, "looper stopped after its duration")
 	var short := BulletSoundData2D.new()
-	short.stream = H.make_sound_stream(0.05, false)
+	short.streams = [H.make_sound_stream(0.05, false)]
 	short.min_interval_sec = 0.0
 	short.max_duration_sec = 0.05 # deterministic under simulated time (headless audio mixes in real time)
 	assert_true(factory.play_sound(short, Vector2.ZERO), "short offer accepted")
@@ -259,3 +259,142 @@ func test_quietest_steal_takes_the_quietest_voice() -> void:
 			assert_eq(_busy_volumes(), [-20.0, -10.0], "oldest stolen")
 		factory.stop_sounds()
 		await idle(1)
+
+
+func test_fade_setter_rejects_and_keeps() -> void:
+	var s := BulletSoundData2D.new()
+	assert_has_method(s, "set_fade_out_sec", "bound set_fade_out_sec")
+	assert_has_method(s, "get_fade_out_sec", "bound get_fade_out_sec")
+	assert_eq(s.get("fade_out_sec"), 0.0, "instant by default")
+	s.set("fade_out_sec", -1.0)
+	expect_error_sequence(["BulletSoundData2D: fade_out_sec must be finite and >= 0, keeping the old value."])
+	assert_eq(s.get("fade_out_sec"), 0.0, "kept")
+	s.set("fade_out_sec", NAN)
+	expect_error_sequence(["BulletSoundData2D: fade_out_sec must be finite and >= 0, keeping the old value."])
+	s.set("fade_out_sec", 0.2)
+	assert_eq(s.get("fade_out_sec"), 0.2, "valid value applies")
+
+
+func test_duration_expiry_fades_before_releasing() -> void:
+	godot_listener_at(Vector2.ZERO)
+	var s := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+	s.volume_db = -6.0
+	s.max_duration_sec = 0.05
+	s.set("fade_out_sec", 0.2)
+	assert_true(factory.play_sound(s, Vector2.ZERO), "offer accepted")
+	await physics(2)
+	assert_eq(busy_voices().size(), 1, "voice busy")
+	assert_almost_eq(float((busy_voices()[0] as Dictionary)["volume_db"]), -6.0, 0.05, "full volume first")
+	await physics(5)
+	assert_eq(busy_voices().size(), 1, "fading voice still counted busy")
+	assert_true(bool((busy_voices()[0] as Dictionary).get("fading", false)), "marked fading past duration")
+	var mid: float = float((busy_voices()[0] as Dictionary)["volume_db"])
+	assert_lt(mid, -6.0, "fade dipped the volume")
+	await physics(20)
+	assert_eq(busy_voices().size(), 0, "fade finished releases the voice")
+
+
+func test_steal_fades_instead_of_cutting() -> void:
+	godot_listener_at(Vector2.ZERO)
+	var s := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT, 1)
+	s.volume_db = -6.0
+	s.set("fade_out_sec", 0.5)
+	assert_true(factory.play_sound(s, Vector2.ZERO), "first plays")
+	await physics(2)
+	assert_true(factory.play_sound(s, Vector2(10, 0)), "second steals under Replace Oldest")
+	await physics(2)
+	assert_eq(busy_voices().size(), 2, "stolen voice fades out under the new one")
+	var vols := _busy_volumes()
+	assert_eq(vols[vols.size() - 1], -6.0, "newcomer at full volume")
+	assert_lt(vols[0], -6.0, "stolen voice fading down")
+
+
+func test_stop_sounds_stays_instant_with_fade() -> void:
+	godot_listener_at(Vector2.ZERO)
+	var s := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+	s.set("fade_out_sec", 0.5)
+	assert_true(factory.play_sound(s, Vector2.ZERO), "offer accepted")
+	await physics(2)
+	assert_eq(busy_voices().size(), 1, "voice busy")
+	factory.stop_sounds()
+	assert_eq(busy_voices().size(), 0, "stop means silence now, fade or not")
+
+
+func test_duck_setter_rejects_and_keeps() -> void:
+	var s := BulletSoundData2D.new()
+	assert_has_method(s, "set_duck_amount_db", "bound set_duck_amount_db")
+	assert_has_method(s, "get_duck_amount_db", "bound get_duck_amount_db")
+	assert_eq(s.get("duck_amount_db"), 0.0, "no ducking by default")
+	s.set("duck_amount_db", -1.0)
+	expect_error_sequence(["BulletSoundData2D: duck_amount_db must be finite and >= 0, keeping the old value."])
+	assert_eq(s.get("duck_amount_db"), 0.0, "kept")
+	s.set("duck_amount_db", NAN)
+	expect_error_sequence(["BulletSoundData2D: duck_amount_db must be finite and >= 0, keeping the old value."])
+	s.set("duck_amount_db", 6.0)
+	assert_eq(s.get("duck_amount_db"), 6.0, "valid value applies")
+
+
+func _voice_volume(sound_id: int) -> float:
+	for e in busy_voices():
+		if int((e as Dictionary)["sound"]) == sound_id:
+			return float((e as Dictionary)["volume_db"])
+	return NAN
+
+
+func test_duck_dips_lower_priority_until_it_ends() -> void:
+	godot_listener_at(Vector2.ZERO)
+	var sting := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+	sting.volume_db = -4.0
+	sting.priority = 0
+	var bomb := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+	bomb.volume_db = -2.0
+	bomb.priority = 5
+	bomb.max_duration_sec = 0.3
+	bomb.set("duck_amount_db", 6.0)
+	var sting_id: int = sting.get_instance_id()
+	var bomb_id: int = bomb.get_instance_id()
+	assert_true(factory.play_sound(sting, Vector2.ZERO), "sting plays")
+	await physics(2)
+	assert_almost_eq(_voice_volume(sting_id), -4.0, 0.05, "sting at base alone")
+	assert_true(factory.play_sound(bomb, Vector2(10, 0)), "bomb plays")
+	await physics(2)
+	assert_almost_eq(_voice_volume(sting_id), -10.0, 0.05, "sting dipped while the bomb lives")
+	assert_almost_eq(_voice_volume(bomb_id), -2.0, 0.05, "bomb itself never dipped")
+	await physics(25)
+	assert_almost_eq(_voice_volume(sting_id), -4.0, 0.05, "sting restored after the bomb ends")
+	factory.stop_sounds()
+	await idle(1)
+
+
+func test_duck_ignores_ties_and_fading_voices() -> void:
+	godot_listener_at(Vector2.ZERO)
+	var a := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+	a.volume_db = -4.0
+	a.priority = 2
+	a.set("duck_amount_db", 6.0)
+	var b := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+	b.volume_db = -4.0
+	b.priority = 2
+	var aid: int = a.get_instance_id()
+	assert_true(factory.play_sound(a, Vector2.ZERO), "a plays")
+	await physics(2)
+	assert_true(factory.play_sound(b, Vector2(10, 0)), "tied b plays")
+	await physics(2)
+	assert_almost_eq(_voice_volume(aid), -4.0, 0.05, "ties never dip each other")
+	factory.stop_sounds()
+	await idle(1)
+	var sting := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+	sting.volume_db = -4.0
+	var loud := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+	loud.priority = 5
+	loud.max_duration_sec = 0.1
+	loud.set("fade_out_sec", 0.5)
+	loud.set("duck_amount_db", 6.0)
+	var sid: int = sting.get_instance_id()
+	assert_true(factory.play_sound(sting, Vector2.ZERO), "sting plays")
+	await physics(2)
+	assert_true(factory.play_sound(loud, Vector2(10, 0)), "loud plays")
+	await physics(2)
+	assert_almost_eq(_voice_volume(sid), -10.0, 0.05, "sting dipped while loud is fully live")
+	await physics(10)
+	assert_almost_eq(_voice_volume(sid), -4.0, 0.05, "fading voices release their duck at once")

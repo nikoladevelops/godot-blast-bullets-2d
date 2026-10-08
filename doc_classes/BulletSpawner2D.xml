@@ -1499,7 +1499,7 @@
 			Also shows the preview while the game runs. Off by default.
 		</member>
 		<member name="sound_effects" type="Array" setter="set_sound_effects" getter="get_sound_effects" default="[]">
-			Stacked [BulletSoundData2D] entries (nulls allowed, skipped). Each entry plays its stream when its trigger fires, subject to its own limits. On Shot and On Telegraph entries offer from the spawner itself; the rest fire from the volley.
+			Stacked [BulletSoundData2D] entries (nulls allowed, skipped). Each entry plays one of its [member BulletSoundData2D.streams] when its trigger fires, subject to its own limits. On Shot and On Telegraph entries offer from the spawner itself; the rest fire from the volley.
 		</member>
 		<member name="sound_enabled" type="bool" setter="set_sound_enabled" getter="get_sound_enabled" default="false">
 			Master switch: every volley this spawner fires is armed with [member sound_effects]. Changes apply to the next shots; volleys already flying keep their entries.
@@ -1532,13 +1532,13 @@
 			Node Path source: the Node2D at this path.
 		</member>
 		<member name="sound_listener_source" type="int" setter="set_sound_listener_source" getter="get_sound_listener_source" enum="BulletSpawner2D.SoundListenerSource" default="0">
-			Who the sounds are measured from: Godot's own 2D listener, or listeners picked like graze/homing targets. Shared with every volley this spawner fired, so edits reach bullets in flight; orphaned volleys keep the settings. A source that finds nobody falls back to Godot's listener.
+			Who the sounds are measured from: Godot's own 2D listener, or listeners picked like graze/homing targets. Shared with every volley this spawner fired, so edits reach bullets in flight; orphaned volleys keep the settings. Each offer and each sweep measures from the nearest listener to the event (tree order breaks ties); a source that finds nobody falls back to Godot's listener. Example: source Node Group with [member sound_listener_node_group] set to the player group makes enemy shots louder as they approach the player, whatever the camera does.
 		</member>
 		<member name="sound_listener_update_interval" type="float" setter="set_sound_listener_update_interval" getter="get_sound_listener_update_interval" default="0.0">
 			Seconds between listener scans (factory time); 0 scans every physics tick. Positions stay live between scans.
 		</member>
 		<member name="sound_volume_db" type="float" setter="set_sound_volume_db" getter="get_sound_volume_db" default="0.0">
-			Mix trim added to every entry's volume on top of its own volume_db (plus each play's random offset).
+			Mix trim added to every entry's volume on top of its own volume_db (plus each play's random rolls), before the entry's [member BulletSoundData2D.volume_min_db]..[member BulletSoundData2D.volume_max_db] clamp.
 		</member>
 		<member name="spawn_data" type="BulletVolleyData2D" setter="set_spawn_data" getter="get_spawn_data">
 			Bullet data for each volley. Duplicated once per resource (the spawner keeps the copy until the resource changes or is replaced), so sharing one resource is safe. Assigning the same resource again keeps the copy.
