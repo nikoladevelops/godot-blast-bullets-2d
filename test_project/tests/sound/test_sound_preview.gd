@@ -111,3 +111,23 @@ func test_preview_at_centered_ignores_pose() -> void:
 	assert_almost_eq(p.max_distance, 1e30, 1e28, "centered max distance")
 	assert_almost_eq(p.attenuation, 0.0, 0.001, "centered attenuation")
 	await _stop_preview(s)
+
+
+## The 10 s cutoff itself is shared lines with the WAV cap (timing-unfriendly
+## to pin at full length, like the WAV one, which is equally unpinned): this
+## locks that looping OGG/MP3 reach the capped path without crashing or hanging.
+func test_preview_looping_compressed_caps_without_hanging() -> void:
+	for path in ["res://shared/sound/loop_silence.ogg", "res://shared/sound/loop_silence.mp3"]:
+		var loaded: AudioStream = (load(path) as AudioStream).duplicate()
+		loaded.set("loop", true)
+		var s := BulletSoundData2D.new()
+		s.streams = [loaded]
+		s.preview_at(Vector2.ZERO, 0.0, true)
+		await physics(2)
+		var pl := _preview_node(s)
+		assert_not_null(pl, "looping %s previews" % path)
+		assert_true(pl.is_playing(), "looping preview plays")
+		s.preview_at(Vector2.ZERO, 0.0, true)
+		await physics(1)
+		await _stop_preview(s)
+	expect_no_errors("looping compressed previews stay quiet")

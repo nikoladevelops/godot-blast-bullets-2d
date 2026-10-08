@@ -151,6 +151,8 @@ func test_hint_strings_byte_exact() -> void:
 	assert_eq(hints.get(&"pitch_max", ""), "0.01,16,0.01,or_greater", "pitch ceiling hint")
 	assert_eq(hints.get(&"fade_out_sec", ""), "0,10,0.01,or_greater,suffix:s", "fade hint")
 	assert_eq(hints.get(&"duck_amount_db", ""), "0,24,0.01,or_greater,suffix:dB", "duck hint")
+	assert_eq(hints.get(&"zoom_gain_db", ""), "-24,24,0.01,suffix:dB", "zoom gain hint")
+	assert_eq(hints.get(&"occlusion_db", ""), "0,24,0.01,or_greater,suffix:dB", "occlusion hint")
 	assert_eq(hints.get(&"trigger_chance", ""), "0,1,0.01", "chance hint")
 	assert_eq(hints.get(&"max_distance", ""), "1,4096,1,or_greater,exp,suffix:px", "max distance hint")
 	assert_eq(hints.get(&"panning_strength", ""), "0,3,0.01,or_greater", "panning hint")

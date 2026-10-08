@@ -10,6 +10,13 @@ func after_all() -> void:
 	await super()
 
 
+func _vol(sound_id: int) -> float:
+	for e in busy_voices():
+		if int((e as Dictionary)["sound"]) == sound_id:
+			return float((e as Dictionary)["volume_db"])
+	return NAN
+
+
 func _logged_count(sound_id: int) -> int:
 	var n := 0
 	for e in factory.debug_get_sound_log():
@@ -309,3 +316,82 @@ func test_random_pan_setter_rejects_and_keeps() -> void:
 	expect_error_sequence(["BulletSoundData2D: random_pan must be finite and between 0 and 1, keeping the old value."])
 	s.set("random_pan", 0.5)
 	assert_eq(s.get("random_pan"), 0.5, "valid value applies")
+
+
+func test_volley_non_positional_plays_centered() -> void:
+	godot_listener_at(Vector2.ZERO)
+	var d := H.make_volley_data(1, 0.0, 30.0)
+	d.transforms = [Transform2D(0.0, Vector2(5000, 0))] as Array
+	var v := factory.spawn_volley(d)
+	var s := H.make_sound(BulletSoundData2D.SOUND_ON_CLEAR)
+	s.positional = false
+	assert_true(v.sound_set_effects([s]), "entry armed")
+	assert_true(v.clear_bullet(0), "cleared")
+	await physics(2)
+	assert_eq(busy_voices().size(), 1, "voice busy despite the far event")
+	var b: Dictionary = busy_voices()[0]
+	assert_almost_eq(b["position"], Vector2.ZERO, Vector2(0.5, 0.5), "centered on the listener")
+	assert_almost_eq(float(b["attenuation"]), 0.0, 0.001, "flat attenuation from a volley too")
+
+
+func test_occlusion_setters_reject_and_keep() -> void:
+	var s := BulletSoundData2D.new()
+	assert_has_method(s, "set_occlusion_mask", "bound set_occlusion_mask")
+	assert_has_method(s, "get_occlusion_mask", "bound get_occlusion_mask")
+	assert_has_method(s, "set_occlusion_db", "bound set_occlusion_db")
+	assert_has_method(s, "get_occlusion_db", "bound get_occlusion_db")
+	assert_eq(s.get("occlusion_mask"), 0, "off by default")
+	assert_eq(s.get("occlusion_db"), 0.0, "no penalty by default")
+	s.set("occlusion_mask", -1)
+	expect_error_sequence(["BulletSoundData2D: occlusion_mask must be >= 0 (0 disables occlusion), keeping the old value."])
+	assert_eq(s.get("occlusion_mask"), 0, "kept")
+	s.set("occlusion_db", -1.0)
+	expect_error_sequence(["BulletSoundData2D: occlusion_db must be finite and >= 0, keeping the old value."])
+	assert_eq(s.get("occlusion_db"), 0.0, "kept")
+	s.set("occlusion_db", NAN)
+	expect_error_sequence(["BulletSoundData2D: occlusion_db must be finite and >= 0, keeping the old value."])
+	s.set("occlusion_mask", 4)
+	s.set("occlusion_db", 6.0)
+	assert_eq(s.get("occlusion_mask"), 4, "valid mask applies")
+	assert_eq(s.get("occlusion_db"), 6.0, "valid penalty applies")
+
+
+func test_wall_between_listener_and_event_muffles() -> void:
+	godot_listener_at(Vector2.ZERO)
+	var wall := make_wall(Vector2(250, 0))
+	await physics(2)
+	var s := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+	s.volume_db = -6.0
+	s.set("occlusion_mask", 4)
+	s.set("occlusion_db", 6.0)
+	var sid: int = s.get_instance_id()
+	assert_true(factory.play_sound(s, Vector2(500, 0)), "offer accepted")
+	await physics(2)
+	assert_almost_eq(_vol(sid), -12.0, 0.05, "wall on the ray dips the play")
+	factory.stop_sounds()
+	await idle(1)
+	wall.position.x = 2000.0
+	await physics(2)
+	assert_true(factory.play_sound(s, Vector2(500, 0)), "offer accepted again")
+	await physics(2)
+	assert_almost_eq(_vol(sid), -6.0, 0.05, "moved wall re-evaluated: full volume")
+
+
+func test_occlusion_off_or_wrong_mask_plays_full() -> void:
+	godot_listener_at(Vector2.ZERO)
+	make_wall(Vector2(250, 0))
+	await physics(2)
+	var off := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+	off.volume_db = -6.0
+	assert_true(factory.play_sound(off, Vector2(500, 0)), "mask 0 offers")
+	await physics(2)
+	assert_almost_eq(_vol(off.get_instance_id()), -6.0, 0.05, "mask 0 never raycasts")
+	factory.stop_sounds()
+	await idle(1)
+	var other := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+	other.volume_db = -6.0
+	other.set("occlusion_mask", 8)
+	other.set("occlusion_db", 6.0)
+	assert_true(factory.play_sound(other, Vector2(500, 0)), "wrong mask offers")
+	await physics(2)
+	assert_almost_eq(_vol(other.get_instance_id()), -6.0, 0.05, "ray misses the wall layer")

@@ -4,14 +4,19 @@
 #include "core/warn_once2d.hpp"
 #include "factory/bullet_factory2d.hpp"
 
+#include <godot_cpp/classes/audio_stream_mp3.hpp>
+#include <godot_cpp/classes/audio_stream_ogg_vorbis.hpp>
 #include <godot_cpp/classes/audio_stream_wav.hpp>
 #include <godot_cpp/classes/camera2d.hpp>
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/node2d.hpp>
+#include <godot_cpp/classes/physics_direct_space_state2d.hpp>
+#include <godot_cpp/classes/physics_ray_query_parameters2d.hpp>
 #include <godot_cpp/classes/scene_tree.hpp>
 #include <godot_cpp/classes/scene_tree_timer.hpp>
 #include <godot_cpp/classes/viewport.hpp>
 #include <godot_cpp/classes/window.hpp>
+#include <godot_cpp/classes/world2d.hpp>
 #include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/core/object.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
@@ -289,12 +294,12 @@ bool SoundMixer2D::sound_in_camera_view(const BulletSoundData2D *sound, const Ve
 	const Vector2 half = vp->get_visible_rect().size * Vector2(0.5f / (float)zx, 0.5f / (float)zy);
 	const double margin = Math::is_finite(sound->camera_margin_px) && sound->camera_margin_px > 0.0 ? sound->camera_margin_px : 0.0;
 	const Vector2 center = camera->get_screen_center_position();
-	// Margin is screen pixels at any zoom: the grown rect is in world units,
-	// so the margin is un-zoomed first (same MIN convention as the distance
-	// scaling; zoom 1 behaves exactly as before).
-	const double zmin = MIN(zx, zy);
-	const Vector2 grown = half + Vector2((float)(margin / zmin), (float)(margin / zmin));
-	return Math::abs((double)event_pos.x - (double)center.x) <= (double)grown.x && Math::abs((double)event_pos.y - (double)center.y) <= (double)grown.y;
+	// Exact for any camera rotation: test in the unrotated frame (margin is
+	// screen pixels, so it is un-zoomed per axis; rotation 0 with uniform
+	// zoom behaves exactly as before).
+	const Vector2 local = (event_pos - center).rotated(-camera->get_global_rotation());
+	const Vector2 grown = half + Vector2((float)(margin / zx), (float)(margin / zy));
+	return Math::abs((double)local.x) <= (double)grown.x && Math::abs((double)local.y) <= (double)grown.y;
 }
 
 double SoundMixer2D::sound_effective_max_distance(const BulletSoundData2D *sound, const Camera2D *camera) {
@@ -340,7 +345,7 @@ Camera2D *SoundMixer2D::resolve_entry_camera(BulletFactory2D &factory, const Bul
 	return pinned;
 }
 
-bool SoundMixer2D::offer(BulletFactory2D &factory, const Ref<BulletSoundData2D> &sound, const Vector2 &event_pos, float volume_offset_db, const SoundListenerSpec2D &listener, int volley_amount) {
+bool SoundMixer2D::offer(BulletFactory2D &factory, const Ref<BulletSoundData2D> &sound, const Vector2 &event_pos, float volume_offset_db, const SoundListenerSpec2D &listener, int volley_amount, uint64_t follow_volley_id, int follow_life_id, int follow_bullet) {
 	if (paused || sound.is_null() || !sound->enabled) {
 		if (paused) {
 			++dropped_total;
@@ -393,6 +398,9 @@ bool SoundMixer2D::offer(BulletFactory2D &factory, const Ref<BulletSoundData2D> 
 	candidate.listener = listener;
 	candidate.order = offer_order++;
 	candidate.volley_amount = volley_amount;
+	candidate.follow_volley = follow_volley_id;
+	candidate.follow_life = follow_life_id;
+	candidate.follow_bullet = follow_bullet;
 	candidate.dist = dist;
 	if (channel.candidates.size() < channel.cap) {
 		channel.candidates.push_back(candidate);
@@ -492,6 +500,10 @@ void SoundMixer2D::release_voice(Voice &voice) {
 	voice.fade_from = 0.0f;
 	voice.fade_len = 0.0;
 	voice.duck_dip = 0.0f;
+	voice.following = false;
+	voice.follow_volley = 0;
+	voice.follow_life = -1;
+	voice.follow_bullet = -1;
 	if (voice.player != nullptr && ObjectDB::get_instance(ObjectID(voice.player->get_instance_id())) == voice.player) {
 		// No resource retention: a finished voice holds no stream Ref.
 		voice.player->set_stream(Ref<AudioStream>());
@@ -512,6 +524,48 @@ static void duck_source2d(uint64_t sound_id, int stored_priority, int &r_priorit
 	if (Math::is_finite((double)sound->duck_amount_db) && sound->duck_amount_db > 0.0) {
 		r_duck = (float)sound->duck_amount_db;
 	}
+}
+
+// Loudness for one entry's zoom gain (k * log2 of the camera's minimum
+// zoom). 0 when disabled, non-finite, zoom 1, or no camera: zoom 1 adds
+// nothing, so the default mix is bit-identical.
+static double zoom_gain_for2d(const BulletSoundData2D *sound, const Camera2D *camera) {
+	if (!(sound->zoom_gain_db > 0.0 || sound->zoom_gain_db < 0.0) || !Math::is_finite((double)sound->zoom_gain_db) || camera == nullptr) {
+		return 0.0;
+	}
+	const Vector2 z = camera->get_zoom();
+	if (!Math::is_finite((double)z.x) || !Math::is_finite((double)z.y) || !(z.x > 0.0) || !(z.y > 0.0)) {
+		return 0.0;
+	}
+	const double zmin = MIN((double)z.x, (double)z.y);
+	return (double)sound->zoom_gain_db * (Math::log(zmin) / Math::log(2.0));
+}
+
+// Occlusion penalty for one winning play: raycasts the anchor (listener)
+// to the event against occlusion_mask (bodies only) and returns
+// occlusion_db on any hit, else 0. Skipped outright while disabled,
+// non-positional, or degenerate: winners only, never per candidate.
+static float occlusion_penalty_for2d(BulletFactory2D &factory, const BulletSoundData2D *sound, const Vector2 &from, const Vector2 &to) {
+	if (!sound->positional || sound->occlusion_mask == 0) {
+		return 0.0f;
+	}
+	if (!Math::is_finite((double)sound->occlusion_db) || !(sound->occlusion_db > 0.0)) {
+		return 0.0f;
+	}
+	if (!from.is_finite() || !to.is_finite() || from.distance_squared_to(to) < 0.01) {
+		return 0.0f;
+	}
+	Ref<World2D> world = factory.get_world_2d();
+	if (world.is_null()) {
+		return 0.0f;
+	}
+	PhysicsDirectSpaceState2D *space = world->get_direct_space_state();
+	if (space == nullptr) {
+		return 0.0f;
+	}
+	Ref<PhysicsRayQueryParameters2D> query = PhysicsRayQueryParameters2D::create(from, to, (uint32_t)sound->occlusion_mask);
+	const Dictionary hit = space->intersect_ray(query);
+	return hit.is_empty() ? 0.0f : (float)sound->occlusion_db;
 }
 
 void SoundMixer2D::flush(BulletFactory2D &factory) {
@@ -559,7 +613,26 @@ void SoundMixer2D::flush(BulletFactory2D &factory) {
 				continue;
 			}
 		}
-		if (voice.follows_node && voice.listener_node_id != 0) {
+		if (voice.following && voice.follow_volley != 0 && voice.follow_bullet >= 0) {
+			// Follow-the-bullet: re-pose to the bullet's live pose (the
+			// caches are global, same source as the offers). A cleared,
+			// expired or pooled-into-a-new-life bullet ends the voice
+			// through the fade path; an already-fading one just keeps
+			// ramping (never restarted). Owns placement: node-follow below
+			// is skipped while the bullet lives.
+			BulletVolley2D *followed = Object::cast_to<BulletVolley2D>(ObjectDB::get_instance(ObjectID(voice.follow_volley)));
+			if (followed == nullptr || followed->is_queued_for_deletion() || followed->get_life_id() != voice.follow_life || voice.follow_bullet >= followed->get_amount_bullets() || !followed->is_bullet_status_enabled(voice.follow_bullet)) {
+				followed = nullptr;
+			}
+			if (followed == nullptr) {
+				if (!voice.fading && !voice_begin_fade(voice, clock, voice_fade_len(voice.sound_id))) {
+					voice.player->stop();
+					release_voice(voice);
+				}
+				continue;
+			}
+			voice.player->set_global_position(followed->get_bullet_transform(voice.follow_bullet).get_origin());
+		} else if (voice.follows_node && voice.listener_node_id != 0) {
 			Object *obj = ObjectDB::get_instance(ObjectID(voice.listener_node_id));
 			if (const Node2D *node = Object::cast_to<Node2D>(obj); node != nullptr) {
 				voice.listener_last_pos = node->get_global_position();
@@ -611,6 +684,17 @@ void SoundMixer2D::flush(BulletFactory2D &factory) {
 			break;
 		}
 	}
+	// Dead-resource channels never play again (their interval memory and
+	// pick cursors are moot): drop them instead of carrying them forever.
+	// Live ones keep everything, even idle. A game minting entries per shot
+	// would otherwise grow this map without bound.
+	for (auto it = channels.begin(); it != channels.end();) {
+		if (it->second.candidates.empty() && ObjectDB::get_instance(ObjectID(it->first)) == nullptr) {
+			it = channels.erase(it);
+		} else {
+			++it;
+		}
+	}
 	if (!any_pending && !any_busy) {
 		return;
 	}
@@ -650,6 +734,9 @@ void SoundMixer2D::flush(BulletFactory2D &factory) {
 			uint64_t node_id = 0;
 			bool is_point = false;
 			uint64_t order = 0;
+			uint64_t follow_volley = 0;
+			int follow_life = -1;
+			int follow_bullet = -1;
 		};
 		std::vector<Winner> winners;
 		winners.reserve(channel.candidates.size());
@@ -675,6 +762,9 @@ void SoundMixer2D::flush(BulletFactory2D &factory) {
 			winner.node_id = found ? node_id : 0;
 			winner.is_point = is_point && found;
 			winner.order = candidate.order;
+			winner.follow_volley = candidate.follow_volley;
+			winner.follow_life = candidate.follow_life;
+			winner.follow_bullet = candidate.follow_bullet;
 			winners.push_back(winner);
 		}
 		channel.candidates.clear();
@@ -762,7 +852,7 @@ void SoundMixer2D::flush(BulletFactory2D &factory) {
 			if (Math::is_finite((double)sound->amount_gain_db) && sound->amount_gain_db > 0.0) {
 				amount_gain = (float)((double)sound->amount_gain_db * std::log10((double)MAX(1, winner.volley_amount)));
 			}
-			const float volume = SoundMixer2D::apply_playback_mix(player, sound, picked, winner.volume_offset_db + amount_gain, &warned_buses);
+			const float volume = SoundMixer2D::apply_playback_mix(player, sound, picked, winner.volume_offset_db + amount_gain + (float)zoom_gain_for2d(sound, camera) - occlusion_penalty_for2d(factory, sound, winner.listener_pos, winner.event_pos), &warned_buses);
 			player->set_global_position(at);
 			player->play();
 			Voice &voice = voices[slot];
@@ -776,6 +866,10 @@ void SoundMixer2D::flush(BulletFactory2D &factory) {
 			voice.listener_node_id = winner.node_id;
 			voice.listener_last_pos = winner.listener_pos;
 			voice.follows_node = winner.node_id != 0;
+			voice.following = sound->follow_bullet;
+			voice.follow_volley = winner.follow_volley;
+			voice.follow_life = winner.follow_life;
+			voice.follow_bullet = winner.follow_bullet;
 			voice.use_order = offer_order++;
 			channel.last_play_clock = clock;
 			++plays_total;
@@ -853,7 +947,17 @@ void SoundMixer2D::preview_play(BulletSoundData2D *sound, const Vector2 &global_
 	player->play();
 	player->connect("finished", Callable(player, "queue_free"), Object::CONNECT_ONE_SHOT);
 	// Looping entries never finish on their own: stop them after 10 s.
-	if (AudioStreamWAV *wav = Object::cast_to<AudioStreamWAV>(picked.ptr()); wav != nullptr && wav->get_loop_mode() != AudioStreamWAV::LOOP_DISABLED) {
+	// Every Godot sample format with a loop switch is covered (WAV modes,
+	// OGG/MP3 loop flags); anything else looping runs until replaced.
+	bool loops = false;
+	if (AudioStreamWAV *wav = Object::cast_to<AudioStreamWAV>(picked.ptr()); wav != nullptr) {
+		loops = wav->get_loop_mode() != AudioStreamWAV::LOOP_DISABLED;
+	} else if (AudioStreamOggVorbis *ogg = Object::cast_to<AudioStreamOggVorbis>(picked.ptr()); ogg != nullptr) {
+		loops = ogg->has_loop();
+	} else if (AudioStreamMP3 *mp3 = Object::cast_to<AudioStreamMP3>(picked.ptr()); mp3 != nullptr) {
+		loops = mp3->has_loop();
+	}
+	if (loops) {
 		Ref<SceneTreeTimer> timer = tree->create_timer(10.0);
 		if (timer.is_valid()) {
 			timer->connect("timeout", Callable(player, "queue_free"), Object::CONNECT_ONE_SHOT);

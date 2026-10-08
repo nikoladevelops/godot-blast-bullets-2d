@@ -2640,7 +2640,7 @@ public:
 	// releases the life (and drops these entries) synchronously.
 	// Graze dispatches pass their ring (entries with ring_index >= 0 only
 	// match it); every other site passes -1 (ring entries never match).
-	void sound_fire(int trigger, int bullet_index, const Vector2 &event_pos, int ring = -1);
+	void sound_fire(int trigger, int bullet_index, const Vector2 &event_pos, int ring = -1, int zone = -1);
 	// Flight pass (called once per tick after the move when the flight mask
 	// bit is set): one offer per live bullet at its current pose. Frozen and
 	// pooled bullets never offer.

@@ -2193,7 +2193,7 @@
 			<param index="0" name="effects" type="Array" />
 			<param index="1" name="listener_group" type="StringName" default="&amp;&quot;&quot;" />
 			<description>
-				Arms a factory volley with sound entries (empty listener_group means Godot's listener, else the nearest member of that group). On Shot and On Telegraph entries never fire on a factory volley: they are spawner-only. Refused on a pooled handle.
+				Arms a factory volley with sound entries (empty listener_group means Godot's listener, else the nearest member of that group). On Shot and On Telegraph entries never fire on a factory volley: they are spawner-only. Refused on a pooled handle. The trigger mask is read when armed: enabling a disabled entry afterwards will not fire it, while disabling a live one skips its plays.
 			</description>
 		</method>
 		<method name="stop_sprite_animation">

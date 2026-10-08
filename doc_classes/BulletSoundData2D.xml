@@ -7,8 +7,8 @@
 		A [BulletSoundData2D] plays one entry of [member streams] when its [member trigger] fires, subject to its own limits ([member min_interval_sec], [member max_voices]). Drop entries into [member BulletSpawner2D.sound_effects] (or arm a factory volley with [method BulletVolley2D.sound_set_effects]) and stack as many as you like: every enabled entry whose trigger matches plays.
 		Channels are shared per resource across the whole factory: twenty enemies sharing one [code]hit.tres[/code] share one interval and voice budget, and the nearest events win each sweep. Any Godot [AudioStream] works: WAV/OGG/MP3, [AudioStreamRandomizer] (variations, weighted, no repeats), [AudioStreamPlaylist] (sequences), [AudioStreamSynchronized] (layers). Put [AudioEffect] reverb, delay or distortion on the [member bus] and Area2D bus overrides listen on [member area_mask].
 		Stacking cookbook: with the defaults (interval 0.05, 4 voices), 100 simultaneous hits first pass the [member trigger_chance] gate, then keep 1 candidate per channel per 0.05 s (the nearest) when the interval is set, or up to 4 per sweep when the interval is 0. Past the per-sound busy cap, [member when_limit_reached] stops the oldest (or quietest, see [member steal_mode]) voice or drops the newcomer, and a full factory pool steals by [member priority]. For layered hits without extra resources, stack entries in [member streams] instead of building an [AudioStreamRandomizer]: use the built-in list for a few WAV variations, the Randomizer for weighted no-repeat round-robins with per-sample pitch envelopes, [AudioStreamPlaylist] for ordered sequences, and [AudioStreamSynchronized] for layered loops.
-		A lethal hit plays On Destroy only, a survived hit plays On Hit only (mirroring the effect layers, so a killing blow never double-plays). Offers play at the end of the sweep they were made in (at most one tick of latency): there is no immediate-flush option by design.
-		Recipes: three hit WAVs with [member stream_mode] Weighted and [member stream_weights] [code][2, 1, 1][/code] favor the first without starving the rest; a telegraph sting with Sequence cycles its list in order every warning; two On Graze entries with [member ring_index] 0 and 2 split the outer and inner rings across different sounds; a Cave bus carrying reverb plus [member area_mask] on the cave layer makes cave shots echo while arena shots stay dry; a spawner listener source of Node Group on the player group measures every shot from the nearest player.
+		Stacking the same entry twice double-offers its channel: with an interval the nearest wins once, without it both win and it double-plays. Offer poses, per trigger: On Shot and On Telegraph at the spawner, On Hit and On Destroy at the impact pose, On Bounce at the ricochet, On Lifetime Over and On Clear at the bullet, On Homing Target Reached at the reached target, On Graze and On Graze Exit at the grazing bullet, On Flight at each live bullet. A lethal hit plays On Destroy only, a survived hit plays On Hit only (mirroring the effect layers, so a killing blow never double-plays). Offers play at the end of the sweep they were made in (at most one tick of latency): there is no immediate-flush option by design.
+		Recipes: a bomb that ducks the mix (high [member priority], [member duck_amount_db] 6, short [member max_duration_sec]) over a looping sting; a boss hum ([member trigger] On Flight, [member follow_bullet], [member fade_out_sec] 0.2, paced by [member min_interval_sec]); a wall-muffled shot ([member occlusion_mask] on the wall layer, [member occlusion_db] 6); three hit WAVs with [member stream_mode] Weighted and [member stream_weights] [code][2, 1, 1][/code] favor the first without starving the rest; a telegraph sting with Sequence cycles its list in order every warning; two On Graze entries with [member ring_index] 0 and 2 split the outer and inner rings across different sounds; a Cave bus carrying reverb plus [member area_mask] on the cave layer makes cave shots echo while arena shots stay dry; a spawner listener source of Node Group on the player group measures every shot from the nearest player.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -22,7 +22,7 @@
 		<method name="preview">
 			<return type="void" />
 			<description>
-				Editor tool: plays the picked stream with this entry's mix applied (volume, one pitch roll, bus, centered), so pitch and volume edits are audible without running the game. Editor only, else an error. A second call stops the first; one-shots free themselves on finished, looping entries stop after 10 s.
+				Editor tool: plays the picked stream with this entry's mix applied (volume and pitch with their randoms and clamps, bus, centered), so edits are audible without running the game. Methods are not inspector buttons in GDExtension: audition from any tool script with [code]entry.preview()[/code] (centered) or [code]entry.preview_at(get_global_mouse_position(), 0.0, true)[/code] (positional). Editor only, else an error. A second call stops the first; one-shots free themselves on finished, looping WAV/OGG/MP3 entries stop after 10 s.
 			</description>
 		</method>
 		<method name="preview_at">
@@ -55,7 +55,7 @@
 			The camera view rect grows by this many screen pixels on every side before an event counts as outside (zoom-independent). Rescues near-outside events from the cull. Hidden unless [member audibility_mode] includes the camera.
 		</member>
 		<member name="camera_path" type="NodePath" setter="set_camera_path" getter="get_camera_path" default="NodePath(&quot;&quot;)">
-			The camera the view test and the zoom scaling measure from, resolved against the factory (absolute paths work from anywhere). Empty follows the viewport's current camera; a path that names no live Camera2D in the same viewport falls back to it with one warning. Pin the gameplay camera while a cutscene camera is current, or fix the camera a test measures from. Hidden unless [member audibility_mode] includes the camera.
+			The camera the view test and the zoom scaling measure from, resolved against the factory (absolute paths work from anywhere). Empty follows the viewport's current camera; a path that names no live Camera2D in the same viewport falls back to it with one warning per resource, shared across every factory using it. Pin the gameplay camera while a cutscene camera is current, or fix the camera a test measures from. Hidden unless [member audibility_mode] includes the camera.
 		</member>
 		<member name="duck_amount_db" type="float" setter="set_duck_amount_db" getter="get_duck_amount_db" default="0.0">
 			Ducking: while a voice of this entry is busy, every busy voice of strictly lower [member priority] is dipped by this many dB (strongest dip wins per victim; ties never dip). 0 never dips. Fading voices sit out both ways; the dip applies and releases every sweep, even with no new offers.
@@ -65,6 +65,9 @@
 		</member>
 		<member name="fade_out_sec" type="float" setter="set_fade_out_sec" getter="get_fade_out_sec" default="0.0">
 			Fade-out before a voice stops on duration expiry or voice stealing: ramps to silence over this long instead of cutting, so loopers never click. 0 stops instantly, like before. stop_sounds(), reset() and pause stay instant either way; a fading voice still counts busy until it releases.
+		</member>
+		<member name="follow_bullet" type="bool" setter="set_follow_bullet" getter="get_follow_bullet" default="false">
+			Follow the bullet: the voice is re-posed to its bullet's live pose every sweep instead of freezing where it started (a hum riding its bullet). Meant for On Flight; harmless elsewhere. When the bullet is gone (cleared, expired, pooled into a new life) the voice ends through [member fade_out_sec]. False freezes at the fire pose, like before.
 		</member>
 		<member name="max_distance" type="float" setter="set_max_distance" getter="get_max_distance" default="2000.0">
 			Past this distance from the listener the play is dropped: inaudible events never take a voice. Hidden while [member positional] is off.
@@ -83,6 +86,12 @@
 		</member>
 		<member name="min_volley_amount" type="int" setter="set_min_volley_amount" getter="get_min_volley_amount" default="0">
 			Offers only from volleys with at least this many bullets. 0 disables the gate. Gates compose with the interval, distance, camera and chance checks by AND.
+		</member>
+		<member name="occlusion_db" type="float" setter="set_occlusion_db" getter="get_occlusion_db" default="0.0">
+			Occlusion dip in dB on a raycast hit (see [member occlusion_mask]). 0 disables the penalty. Moving walls re-evaluated per play: nothing is cached.
+		</member>
+		<member name="occlusion_mask" type="int" setter="set_occlusion_mask" getter="get_occlusion_mask" default="0">
+			Occlusion raycast layers (bodies only): each winning play raycasts listener to event against this mask, and any hit dips the volume by [member occlusion_db] before the clamp. 0 never raycasts. Positional plays only; keep the mask disjoint from characters. Editor preview skips occlusion.
 		</member>
 		<member name="panning_strength" type="float" setter="set_panning_strength" getter="get_panning_strength" default="1.0">
 			Stereo spread (Godot's own panning math). Hidden while [member positional] is off.
@@ -127,7 +136,7 @@
 			Which graze ring this entry listens to: -1 means any ring, 0..3 means exactly that ring. A zone with fewer rings never matches (silent, no warning). Ignored by every non-graze trigger; hidden in the inspector unless [member trigger] is On Graze or On Graze Exit.
 		</member>
 		<member name="steal_mode" type="int" setter="set_steal_mode" getter="get_steal_mode" default="0">
-			Which voice Replace Oldest stops past [member max_voices]: the oldest, or the quietest (lowest played volume, ties go to the oldest). The factory pool steal keeps its own rule (priority, then oldest).
+			Which voice Replace Oldest stops past [member max_voices]: the oldest, or the quietest (lowest played volume, ties go to the oldest, ranking the played base volume before ducking). The factory pool steal keeps its own rule (priority, then oldest).
 		</member>
 		<member name="stream_mode" type="int" setter="set_stream_mode" getter="get_stream_mode" default="0">
 			How [member streams] is picked: Random (uniform), Weighted (reads [member stream_weights]), Sequence (round-robin), Shuffle (every entry once per cycle). The cursors live in the shared channel, like the limits.
@@ -145,7 +154,7 @@
 			Play probability per event. 0 never plays, 1 always plays.
 		</member>
 		<member name="volume_db" type="float" setter="set_volume_db" getter="get_volume_db" default="0.0">
-			Base loudness in dB. The spawner's sound volume offset is added on top, plus the [member random_volume_offset_db] and [member random_volume_min_db]/[member random_volume_max_db] rolls of each play, clamped into [member volume_min_db]..[member volume_max_db].
+			Base loudness in dB. The spawner's sound volume offset is added on top, plus the [member random_volume_offset_db] and [member random_volume_min_db]/[member random_volume_max_db] rolls of each play, clamped into [member volume_min_db]..[member volume_max_db]. Playing voices snapshot the mix at play: editing the entry afterwards affects new plays only.
 		</member>
 		<member name="volume_max_db" type="float" setter="set_volume_max_db" getter="get_volume_max_db" default="80.0">
 			Final mixed volume ceiling in dB (applied after the trim, the randoms and the amount gain). Inverted bounds sort themselves. Wide open by default.
@@ -156,8 +165,14 @@
 		<member name="when_limit_reached" type="int" setter="set_when_limit_reached" getter="get_when_limit_reached" default="0">
 			What happens past [member max_voices]: stop this sound's oldest voice and reuse it, or drop the new event.
 		</member>
+		<member name="zone_index" type="int" setter="set_zone_index" getter="get_zone_index" default="-1">
+			Which graze zone slot this entry listens to: -1 means every armed zone, 0..3 means exactly that slot in graze arming order. An unarmed slot never matches (silent, no warning). Ignored by every non-graze trigger; hidden in the inspector unless [member trigger] is On Graze or On Graze Exit. Combine with [member ring_index] to score one ring of one zone.
+		</member>
+		<member name="zoom_gain_db" type="float" setter="set_zoom_gain_db" getter="get_zoom_gain_db" default="0.0">
+			Loudness added per zoom octave: k times log2 of the camera's minimum zoom, so k = 3 adds +3 dB at zoom 2 and -3 dB at zoom 0.5 (zoom 1 adds nothing, no camera adds nothing). Negative inverts it. 0 disables it. Applied with the trim and the other gains, before the volume clamp.
+		</member>
 		<member name="zoom_scales_distance" type="bool" setter="set_zoom_scales_distance" getter="get_zoom_scales_distance" default="false">
-			When true, the effective [member max_distance] is divided by the camera's minimum zoom: zoomed in hears less, pulled back hears more. No camera means zoom 1.
+			When true, the effective [member max_distance] is divided by the camera's minimum zoom: zoomed in hears less, pulled back hears more. No camera means zoom 1. Range only — [member zoom_gain_db] scales loudness instead.
 		</member>
 	</members>
 	<constants>

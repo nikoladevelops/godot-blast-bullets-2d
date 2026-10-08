@@ -181,3 +181,25 @@ func test_in_place_append_reaches_next_play() -> void:
 	live.append(b)
 	var more := await _play_each_sweep(s, 2)
 	assert_has(more, b.get_instance_id(), "in-place append plays without reassign")
+
+
+func test_swapping_weights_mid_fight_rebalances() -> void:
+	godot_listener_at(Vector2.ZERO)
+	seed(1234)
+	var pair := [H.make_sound_stream(0.2), H.make_sound_stream(0.21)]
+	var s := _list_sound(BulletSoundData2D.STREAM_WEIGHTED, pair, PackedFloat32Array([3.0, 1.0]))
+	var first := await _play_each_sweep(s, 120)
+	var heavy := 0
+	for id in first:
+		if id == (pair[0] as AudioStreamWAV).get_instance_id():
+			heavy += 1
+	assert_gte(heavy, 70, "heavy entry wins first")
+	assert_lte(heavy, 110, "light entry still plays")
+	s.stream_weights = PackedFloat32Array([1.0, 3.0])
+	var second := await _play_each_sweep(s, 120)
+	heavy = 0
+	for id in second:
+		if id == (pair[0] as AudioStreamWAV).get_instance_id():
+			heavy += 1
+	assert_gte(heavy, 10, "rebalanced: first entry still plays")
+	assert_lte(heavy, 50, "rebalanced: second entry wins now")

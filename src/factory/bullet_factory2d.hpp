@@ -517,7 +517,7 @@ public:
 	// form): false = dropped (paused, editor, disabled, streamless, chance).
 	// volley_amount carries the firing volley's size for the amount gates
 	// (manual hatches count as one).
-	bool sound_offer(const Ref<BulletSoundData2D> &sound, const Vector2 &event_pos, float volume_offset_db, const SoundListenerSpec2D &listener, int volley_amount = 1);
+	bool sound_offer(const Ref<BulletSoundData2D> &sound, const Vector2 &event_pos, float volume_offset_db, const SoundListenerSpec2D &listener, int volley_amount = 1, uint64_t follow_volley_id = 0, int follow_life_id = -1, int follow_bullet = -1);
 	// User hatch: plays `sound` at the end of the next sweep (Godot listener,
 	// or the nearest member of `listener_group`). False = refused (null,
 	// disabled, outside the tree, paused, editor).

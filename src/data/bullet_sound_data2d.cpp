@@ -51,6 +51,19 @@ void BulletSoundData2D::set_ring_index(int value) {
 	emit_changed();
 }
 
+int BulletSoundData2D::get_zone_index() const { return zone_index; }
+void BulletSoundData2D::set_zone_index(int value) {
+	if (value < -1 || value > 3) {
+		UtilityFunctions::push_error("BulletSoundData2D: zone_index must be -1 (any zone) or 0..3, keeping the old value.");
+		return;
+	}
+	if (zone_index == value) {
+		return;
+	}
+	zone_index = value;
+	emit_changed();
+}
+
 Array BulletSoundData2D::get_streams() const { return streams; }
 void BulletSoundData2D::set_streams(const Array &value) {
 	for (int i = 0; i < value.size(); ++i) {
@@ -352,6 +365,45 @@ void BulletSoundData2D::set_zoom_scales_distance(bool value) {
 	emit_changed();
 }
 
+double BulletSoundData2D::get_zoom_gain_db() const { return zoom_gain_db; }
+void BulletSoundData2D::set_zoom_gain_db(double value) {
+	if (!Math::is_finite(value) || value < -24.0 || value > 24.0) {
+		UtilityFunctions::push_error("BulletSoundData2D: zoom_gain_db must be finite and between -24 and 24, keeping the old value.");
+		return;
+	}
+	if (zoom_gain_db == value) {
+		return;
+	}
+	zoom_gain_db = value;
+	emit_changed();
+}
+
+int BulletSoundData2D::get_occlusion_mask() const { return occlusion_mask; }
+void BulletSoundData2D::set_occlusion_mask(int value) {
+	if (value < 0) {
+		UtilityFunctions::push_error("BulletSoundData2D: occlusion_mask must be >= 0 (0 disables occlusion), keeping the old value.");
+		return;
+	}
+	if (occlusion_mask == value) {
+		return;
+	}
+	occlusion_mask = value;
+	emit_changed();
+}
+
+double BulletSoundData2D::get_occlusion_db() const { return occlusion_db; }
+void BulletSoundData2D::set_occlusion_db(double value) {
+	if (!Math::is_finite(value) || value < 0.0) {
+		UtilityFunctions::push_error("BulletSoundData2D: occlusion_db must be finite and >= 0, keeping the old value.");
+		return;
+	}
+	if (occlusion_db == value) {
+		return;
+	}
+	occlusion_db = value;
+	emit_changed();
+}
+
 double BulletSoundData2D::get_min_interval_sec() const { return min_interval_sec; }
 void BulletSoundData2D::set_min_interval_sec(double value) {
 	if (!Math::is_finite(value) || value < 0.0) {
@@ -547,6 +599,15 @@ void BulletSoundData2D::set_duck_amount_db(double value) {
 	emit_changed();
 }
 
+bool BulletSoundData2D::get_follow_bullet() const { return follow_bullet; }
+void BulletSoundData2D::set_follow_bullet(bool value) {
+	if (follow_bullet == value) {
+		return;
+	}
+	follow_bullet = value;
+	emit_changed();
+}
+
 void BulletSoundData2D::preview() {
 	if (Engine::get_singleton() == nullptr || !Engine::get_singleton()->is_editor_hint()) {
 		UtilityFunctions::push_error("BulletSoundData2D.preview: editor only, nothing plays.");
@@ -570,9 +631,10 @@ AudioStreamPlayer2D *BulletSoundData2D::debug_get_preview_player() const {
 
 void BulletSoundData2D::_validate_property(PropertyInfo &p_property) const {
 	const String name = p_property.name;
-	if (name == "ring_index") {
-		// Only graze triggers read it (volley sound_fire filters by ring);
-		// every other trigger ignores it, so hiding avoids dead config.
+	if (name == "ring_index" || name == "zone_index") {
+		// Only graze triggers read them (volley sound_fire filters by ring
+		// and zone); every other trigger ignores them, so hiding avoids
+		// dead config.
 		if (trigger != SOUND_ON_GRAZE && trigger != SOUND_ON_GRAZE_EXIT) {
 			p_property.usage &= ~PROPERTY_USAGE_EDITOR;
 		}
@@ -638,6 +700,10 @@ void BulletSoundData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_ring_index"), &BulletSoundData2D::get_ring_index);
 	ClassDB::bind_method(D_METHOD("set_ring_index", "value"), &BulletSoundData2D::set_ring_index);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "ring_index", PROPERTY_HINT_RANGE, "-1,3,1"), "set_ring_index", "get_ring_index");
+
+	ClassDB::bind_method(D_METHOD("get_zone_index"), &BulletSoundData2D::get_zone_index);
+	ClassDB::bind_method(D_METHOD("set_zone_index", "value"), &BulletSoundData2D::set_zone_index);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "zone_index", PROPERTY_HINT_RANGE, "-1,3,1"), "set_zone_index", "get_zone_index");
 
 	ClassDB::bind_method(D_METHOD("get_streams"), &BulletSoundData2D::get_streams);
 	ClassDB::bind_method(D_METHOD("set_streams", "streams"), &BulletSoundData2D::set_streams);
@@ -735,6 +801,18 @@ void BulletSoundData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_zoom_scales_distance", "value"), &BulletSoundData2D::set_zoom_scales_distance);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "zoom_scales_distance"), "set_zoom_scales_distance", "get_zoom_scales_distance");
 
+	ClassDB::bind_method(D_METHOD("get_zoom_gain_db"), &BulletSoundData2D::get_zoom_gain_db);
+	ClassDB::bind_method(D_METHOD("set_zoom_gain_db", "value"), &BulletSoundData2D::set_zoom_gain_db);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "zoom_gain_db", PROPERTY_HINT_RANGE, "-24,24,0.01,suffix:dB"), "set_zoom_gain_db", "get_zoom_gain_db");
+
+	ClassDB::bind_method(D_METHOD("get_occlusion_mask"), &BulletSoundData2D::get_occlusion_mask);
+	ClassDB::bind_method(D_METHOD("set_occlusion_mask", "value"), &BulletSoundData2D::set_occlusion_mask);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "occlusion_mask", PROPERTY_HINT_LAYERS_2D_PHYSICS), "set_occlusion_mask", "get_occlusion_mask");
+
+	ClassDB::bind_method(D_METHOD("get_occlusion_db"), &BulletSoundData2D::get_occlusion_db);
+	ClassDB::bind_method(D_METHOD("set_occlusion_db", "value"), &BulletSoundData2D::set_occlusion_db);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "occlusion_db", PROPERTY_HINT_RANGE, "0,24,0.01,or_greater,suffix:dB"), "set_occlusion_db", "get_occlusion_db");
+
 	ADD_GROUP("Limits", "");
 
 	ClassDB::bind_method(D_METHOD("get_min_interval_sec"), &BulletSoundData2D::get_min_interval_sec);
@@ -796,6 +874,10 @@ void BulletSoundData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_duck_amount_db"), &BulletSoundData2D::get_duck_amount_db);
 	ClassDB::bind_method(D_METHOD("set_duck_amount_db", "value"), &BulletSoundData2D::set_duck_amount_db);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "duck_amount_db", PROPERTY_HINT_RANGE, "0,24,0.01,or_greater,suffix:dB"), "set_duck_amount_db", "get_duck_amount_db");
+
+	ClassDB::bind_method(D_METHOD("get_follow_bullet"), &BulletSoundData2D::get_follow_bullet);
+	ClassDB::bind_method(D_METHOD("set_follow_bullet", "value"), &BulletSoundData2D::set_follow_bullet);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "follow_bullet"), "set_follow_bullet", "get_follow_bullet");
 
 	ClassDB::bind_method(D_METHOD("preview"), &BulletSoundData2D::preview);
 	ClassDB::bind_method(D_METHOD("preview_at", "global_position", "volume_offset_db", "use_position"), &BulletSoundData2D::preview_at);

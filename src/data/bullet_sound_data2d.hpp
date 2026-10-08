@@ -10,7 +10,7 @@ namespace BlastBullets2D {
 using namespace godot;
 
 // One stackable sound entry for a bullet volley. A spawner carries an array
-// of these (BulletSpawner2D.sound_effects); each entry plays its stream when
+// of these (BulletSpawner2D.sound_effects); each entry plays one list entry when
 // its trigger fires, subject to its own limits. A factory volley carries its
 // own entries via BulletVolley2D.sound_set_effects.
 //
@@ -76,6 +76,10 @@ public:
 	// zone with fewer rings simply never matches (silent, no warning:
 	// zones legitimately vary). Ignored by every non-graze trigger.
 	int ring_index = -1;
+	// Which graze zone slot this entry listens to (-1 = every armed zone,
+	// else 0..3 in graze_set_zones order). A slot with no armed zone never
+	// matches (silent). Ignored by every non-graze trigger.
+	int zone_index = -1;
 	// How streams is picked (see StreamMode). Weighted reads
 	// stream_weights; Sequence round-robins and Shuffle deals every entry
 	// once per cycle (both cursors live in the shared channel, like the
@@ -147,6 +151,19 @@ public:
 	// When true, the effective max_distance is divided by the camera's
 	// minimum zoom (zoomed in hears less, pulled back hears more).
 	bool zoom_scales_distance = false;
+	// Loudness added per zoom octave: k * log2 of the camera's minimum zoom,
+	// so k = 3 adds +3 dB at zoom 2 and -3 dB at zoom 0.5 (zoom 1 adds
+	// nothing). Negative inverts it. 0 (default) disables it. Applied with
+	// the trim and the other gains, before the volume clamp.
+	double zoom_gain_db = 0.0;
+	// Occlusion: walls between the listener and the event muffle the play.
+	// Each winning play raycasts listener to event against these physics
+	// layers (bodies only); any hit dips the volume by occlusion_db before
+	// the clamp. 0 (default) never raycasts. Positional plays only; keep the
+	// mask disjoint from characters (a listener inside a body starts the ray
+	// inside it). Editor preview skips occlusion.
+	int occlusion_mask = 0;
+	double occlusion_db = 0.0;
 
 	// At most one play per interval across the whole factory (shared with
 	// every spawner using this resource); the nearest event wins each sweep.
@@ -191,6 +208,12 @@ public:
 	// rank and the duck rank are one rank. 0 (default) never dips. Fading
 	// voices sit out both ways.
 	double duck_amount_db = 0.0;
+	// Follow the bullet: the voice is re-posed to its bullet's live pose
+	// every sweep instead of freezing where it started (a hum riding its
+	// bullet). Meant for On Flight; harmless elsewhere. When the bullet is
+	// gone (cleared, expired, pooled into a new life) the voice ends through
+	// the fade path. False (default) freezes at the fire pose, like before.
+	bool follow_bullet = false;
 
 	bool get_enabled() const;
 	void set_enabled(bool value);
@@ -200,6 +223,9 @@ public:
 
 	int get_ring_index() const;
 	void set_ring_index(int value);
+
+	int get_zone_index() const;
+	void set_zone_index(int value);
 
 	Array get_streams() const;
 	void set_streams(const Array &value);
@@ -270,6 +296,15 @@ public:
 	bool get_zoom_scales_distance() const;
 	void set_zoom_scales_distance(bool value);
 
+	double get_zoom_gain_db() const;
+	void set_zoom_gain_db(double value);
+
+	int get_occlusion_mask() const;
+	void set_occlusion_mask(int value);
+
+	double get_occlusion_db() const;
+	void set_occlusion_db(double value);
+
 	double get_min_interval_sec() const;
 	void set_min_interval_sec(double value);
 
@@ -314,6 +349,9 @@ public:
 
 	double get_duck_amount_db() const;
 	void set_duck_amount_db(double value);
+
+	bool get_follow_bullet() const;
+	void set_follow_bullet(bool value);
 
 	// Editor mix preview: plays the picked stream with this entry's mix
 	// applied (volume, one pitch roll, bus, centered), so pitch/volume edits

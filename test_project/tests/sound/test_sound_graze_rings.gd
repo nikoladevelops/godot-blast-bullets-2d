@@ -101,3 +101,61 @@ func test_exit_names_the_deepest_ring() -> void:
 		results[ring] = _logged(x.get_instance_id()).size()
 	assert_eq(results[-1], 1, "any-ring exit sounds")
 	assert_eq(results[0] + results[1], 1, "exactly one ring owns the exit")
+
+
+func test_zone_setters_reject_and_keep() -> void:
+	var s := BulletSoundData2D.new()
+	assert_has_method(s, "set_zone_index", "bound set_zone_index")
+	assert_has_method(s, "get_zone_index", "bound get_zone_index")
+	assert_true("zone_index" in s, "property exists")
+	assert_eq(s.get("zone_index"), -1, "any zone by default")
+	s.set("zone_index", -2)
+	expect_error_sequence(["BulletSoundData2D: zone_index must be -1 (any zone) or 0..3, keeping the old value."])
+	assert_eq(s.get("zone_index"), -1, "kept")
+	s.set("zone_index", 4)
+	expect_error_sequence(["BulletSoundData2D: zone_index must be -1 (any zone) or 0..3, keeping the old value."])
+	s.set("zone_index", 1)
+	assert_eq(s.get("zone_index"), 1, "valid zone applies")
+
+
+func test_zone_index_visible_only_for_graze_triggers() -> void:
+	var s := BulletSoundData2D.new()
+	assert_false(is_editor_visible(s, &"zone_index"), "zone hidden for On Shot")
+	s.trigger = BulletSoundData2D.SOUND_ON_HIT
+	assert_false(is_editor_visible(s, &"zone_index"), "zone hidden for On Hit")
+	s.trigger = BulletSoundData2D.SOUND_ON_GRAZE
+	assert_true(is_editor_visible(s, &"zone_index"), "zone visible for On Graze")
+	s.trigger = BulletSoundData2D.SOUND_ON_GRAZE_EXIT
+	assert_true(is_editor_visible(s, &"zone_index"), "zone visible for On Graze Exit")
+
+
+func _zone_sound(zone: int) -> BulletSoundData2D:
+	var s := H.make_sound(BulletSoundData2D.SOUND_ON_GRAZE)
+	s.set("zone_index", zone)
+	return s
+
+
+func test_each_zone_fires_its_entry() -> void:
+	factory.debug_set_sound_log_enabled(true)
+	make_graze_target(Vector2(100, 0), &"g")
+	var narrow := H.make_graze_zone([24.0])
+	var wide := H.make_graze_zone([120.0])
+	var v := graze_volley(H.transforms_at([Vector2(-100, 0)]), 200.0)
+	assert_true(v.graze_set_zones([narrow, wide], &"g"), "two zones armed in slot order")
+	var za := _zone_sound(0)
+	var zb := _zone_sound(1)
+	var any := _zone_sound(-1)
+	var missing := _zone_sound(3)
+	v.sound_set_effects([za, zb, any, missing])
+	for i in 120:
+		await physics(1)
+		var done := true
+		for e in [za, zb, any]:
+			if _logged((e as BulletSoundData2D).get_instance_id()).is_empty():
+				done = false
+		if done:
+			break
+	assert_eq(_logged(za.get_instance_id()).size(), 1, "slot 0 sounds once")
+	assert_eq(_logged(zb.get_instance_id()).size(), 1, "slot 1 sounds once")
+	assert_eq(_logged(any.get_instance_id()).size(), 2, "any-zone hears both")
+	assert_true(_logged(missing.get_instance_id()).is_empty(), "unarmed slot stays silent")

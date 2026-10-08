@@ -126,6 +126,55 @@ func test_no_camera_plays_everything() -> void:
 	assert_false(_logged(sid).is_empty(), "no camera means no culling")
 
 
+func test_zoom_gain_follows_the_camera() -> void:
+	godot_listener_at(Vector2.ZERO)
+	var volumes := {}
+	for zoom in [1.0, 2.0, 0.5]:
+		_add_camera(Vector2(zoom, zoom))
+		var s := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+		s.volume_db = -6.0
+		s.set("zoom_gain_db", 3.0)
+		assert_true(factory.play_sound(s, Vector2.ZERO), "offer accepted at zoom %s" % str(zoom))
+		await physics(2)
+		volumes[zoom] = float((busy_voices()[0] as Dictionary)["volume_db"])
+		factory.stop_sounds()
+		await idle(1)
+	assert_almost_eq(volumes[1.0], -6.0, 0.05, "zoom 1 adds nothing")
+	assert_almost_eq(volumes[2.0], -3.0, 0.05, "zoom 2 adds one octave of gain")
+	assert_almost_eq(volumes[0.5], -9.0, 0.05, "zoom 0.5 removes one octave")
+
+
+func test_zoom_gain_off_is_identical_and_clamps_last() -> void:
+	godot_listener_at(Vector2.ZERO)
+	_add_camera(Vector2(2, 2))
+	var s := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+	s.volume_db = -6.0
+	assert_true(factory.play_sound(s, Vector2.ZERO), "offer accepted")
+	await physics(2)
+	assert_almost_eq(float((busy_voices()[0] as Dictionary)["volume_db"]), -6.0, 0.05, "default 0 keeps today's mix")
+	factory.stop_sounds()
+	await idle(1)
+	s.set("zoom_gain_db", 24.0)
+	s.set("volume_max_db", 0.0)
+	assert_true(factory.play_sound(s, Vector2.ZERO), "loud offer accepted")
+	await physics(2)
+	assert_almost_eq(float((busy_voices()[0] as Dictionary)["volume_db"]), 0.0, 0.05, "gain composes under the ceiling")
+
+
+func test_zoom_gain_setter_rejects_and_keeps() -> void:
+	var s := BulletSoundData2D.new()
+	assert_has_method(s, "set_zoom_gain_db", "bound set_zoom_gain_db")
+	assert_has_method(s, "get_zoom_gain_db", "bound get_zoom_gain_db")
+	assert_eq(s.get("zoom_gain_db"), 0.0, "off by default")
+	s.set("zoom_gain_db", NAN)
+	expect_error_sequence(["BulletSoundData2D: zoom_gain_db must be finite and between -24 and 24, keeping the old value."])
+	assert_eq(s.get("zoom_gain_db"), 0.0, "kept")
+	s.set("zoom_gain_db", 25.0)
+	expect_error_sequence(["BulletSoundData2D: zoom_gain_db must be finite and between -24 and 24, keeping the old value."])
+	s.set("zoom_gain_db", 3.0)
+	assert_eq(s.get("zoom_gain_db"), 3.0, "valid value applies")
+
+
 func _camera_at(pos: Vector2, current: bool) -> Camera2D:
 	var c := Camera2D.new()
 	c.position = pos
@@ -205,3 +254,23 @@ func test_freed_pinned_camera_falls_back() -> void:
 	assert_true(factory.play_sound(s, Vector2(1000, 0)), "freed camera falls back without crashing")
 	await physics(2)
 	assert_false(_logged(s.get_instance_id()).is_empty(), "no current camera means no culling")
+
+
+func test_rotated_camera_culls_exact_view() -> void:
+	godot_listener_at(Vector2.ZERO)
+	var c := Camera2D.new()
+	c.position = Vector2.ZERO
+	c.rotation = PI / 4.0
+	add(c)
+	c.make_current()
+	await idle(1)
+	factory.debug_set_sound_log_enabled(true)
+	var s := _camera_sound()
+	var sid: int = s.get_instance_id()
+	assert_true(factory.play_sound(s, Vector2(500, 0)), "inside both offered")
+	await physics(2)
+	assert_false(_logged(sid).is_empty(), "inside the rotated view plays")
+	factory.debug_clear_sound_log()
+	assert_false(factory.play_sound(s, Vector2(760, 760)), "corner culled by rotation")
+	await physics(2)
+	assert_true(_logged(sid).is_empty(), "axis box alone does not admit it")

@@ -494,7 +494,7 @@
 			When on (default), the factory registers custom monitors on ready, graphed while the game runs in the editor's Debugger &gt; Monitors tab: BlastBullets2D/Active Bullets, Active Volleys, Pooled Volleys, Physics Tick (ms), Peak Physics Tick (ms), Interpolation (ms), Active Effects and Active Attachments. Use them to spot which frames are heavy and what causes it. One factory owns the monitor ids at a time (the first to become ready; others skip silently, and a freed owner's ids are reclaimed). Runtime only, never in the editor; removed when the factory leaves the tree.
 		</member>
 		<member name="sound_max_voices" type="int" setter="set_sound_max_voices" getter="get_sound_max_voices" default="32">
-			Voice pool size for the whole factory: one AudioStreamPlayer2D per simultaneous sound. Voices are created on demand; past this a new event steals the oldest voice of equal or lower priority, never a more important one.
+			Voice pool size for the whole factory: one AudioStreamPlayer2D per simultaneous sound. Voices are created on demand; past this a new event steals the oldest voice of equal or lower priority, never a more important one. The pool only grows to its high-water mark: lowering the cap later never frees existing voices.
 		</member>
 		<member name="use_physics_interpolation" type="bool" setter="set_use_physics_interpolation_editor" getter="get_use_physics_interpolation" default="false">
 			Determines whether physics interpolation is enabled or not. The setter is for the editor only.

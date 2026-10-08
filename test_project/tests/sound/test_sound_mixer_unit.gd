@@ -398,3 +398,96 @@ func test_duck_ignores_ties_and_fading_voices() -> void:
 	assert_almost_eq(_voice_volume(sid), -10.0, 0.05, "sting dipped while loud is fully live")
 	await physics(10)
 	assert_almost_eq(_voice_volume(sid), -4.0, 0.05, "fading voices release their duck at once")
+
+
+func test_pause_freezes_fades_until_resume() -> void:
+	godot_listener_at(Vector2.ZERO)
+	var s := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+	s.max_duration_sec = 0.1
+	s.set("fade_out_sec", 0.5)
+	assert_true(factory.play_sound(s, Vector2.ZERO), "offer accepted")
+	await physics(10)
+	assert_true(bool((busy_voices()[0] as Dictionary).get("fading", false)), "fading past duration")
+	factory.set_is_factory_processing_bullets(false)
+	await physics(5)
+	assert_eq(busy_voices().size(), 1, "paused fade frozen, not released")
+	factory.set_is_factory_processing_bullets(true)
+	await physics(40)
+	assert_eq(busy_voices().size(), 0, "resume lets the fade finish")
+
+
+func test_layered_entries_keep_independent_budgets() -> void:
+	godot_listener_at(Vector2.ZERO)
+	var gated := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+	gated.min_interval_sec = 10.0
+	var free := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+	free.min_interval_sec = 0.0
+	free.max_voices = 4
+	for i in 6:
+		assert_true(factory.play_sound(gated, Vector2.ZERO), "gated offer %d accepted" % i)
+		assert_true(factory.play_sound(free, Vector2.ZERO), "free offer %d accepted" % i)
+		await physics(2)
+	var stats: Dictionary = factory.debug_get_sound_stats()
+	assert_eq(int(stats["plays_total"]), 7, "gated plays once, free plays every sweep")
+	factory.stop_sounds()
+	await idle(1)
+
+
+func test_stacking_same_entry_double_offers_without_interval() -> void:
+	godot_listener_at(Vector2.ZERO)
+	var s := H.make_sound(BulletSoundData2D.SOUND_ON_CLEAR)
+	s.min_interval_sec = 0.0
+	s.max_voices = 4
+	var v := quick_volley(1, 0.0, 30.0)
+	assert_true(v.sound_set_effects([s, s]), "same entry twice arms")
+	assert_true(v.clear_bullet(0), "cleared")
+	await physics(2)
+	assert_eq(int(factory.debug_get_sound_stats()["plays_total"]), 2, "one channel, two candidates, both win")
+	factory.stop_sounds()
+	await idle(1)
+
+
+func _offer_temps(n: int) -> void:
+	for i in n:
+		var tmp := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+		tmp.min_interval_sec = 0.0
+		assert_true(factory.play_sound(tmp, Vector2.ZERO), "temp offer %d accepted" % i)
+	await physics(2)
+
+
+func test_dead_resource_channels_pruned() -> void:
+	godot_listener_at(Vector2.ZERO)
+	var base: int = int(factory.debug_get_sound_stats()["channels"])
+	_offer_temps(3)
+	assert_eq(int(factory.debug_get_sound_stats()["channels"]), base + 3, "one channel per resource")
+	await physics(4)
+	assert_eq(int(factory.debug_get_sound_stats()["channels"]), base, "dead channels pruned, live memory kept")
+	factory.stop_sounds()
+	await idle(1)
+
+
+func test_voices_bounded_over_waves() -> void:
+	godot_listener_at(Vector2.ZERO)
+	var s := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT, 4)
+	s.min_interval_sec = 0.0
+	for wave in 5:
+		for i in 4:
+			assert_true(factory.play_sound(s, Vector2(i * 10, 0)), "wave %d offer %d" % [wave, i])
+		await physics(2)
+	var stats: Dictionary = factory.debug_get_sound_stats()
+	assert_lte(int(stats["voices_total"]), 8, "pool never grows past the factory cap")
+	assert_eq(int(stats["channels"]), 1, "one shared channel for one resource")
+	factory.stop_sounds()
+	await idle(1)
+
+
+func test_free_factory_with_busy_voices_cleans_up() -> void:
+	check_factory_after = false
+	godot_listener_at(Vector2.ZERO)
+	var s := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT, 4)
+	assert_true(factory.play_sound(s, Vector2.ZERO), "offer accepted")
+	await physics(2)
+	assert_eq(busy_voices().size(), 1, "voice busy")
+	factory.queue_free()
+	await idle(2)
+	assert_no_new_orphans("voices and container die with the factory")

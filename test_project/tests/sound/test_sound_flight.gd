@@ -76,3 +76,86 @@ func test_frozen_bullets_stay_silent() -> void:
 	await physics(5)
 	var sid: int = s.get_instance_id()
 	assert_true(_logged(sid).is_empty(), "frozen bullets never offer flight")
+
+
+func test_follow_hum_tracks_its_bullet() -> void:
+	godot_listener_at(Vector2.ZERO)
+	var s := H.make_sound(BulletSoundData2D.SOUND_ON_FLIGHT)
+	s.min_interval_sec = 10.0
+	s.max_voices = 1
+	s.set("follow_bullet", true)
+	var v := quick_volley(1, 200.0, 60.0)
+	assert_true(v.sound_set_effects([s]), "entry armed")
+	await physics(2)
+	assert_eq(busy_voices().size(), 1, "hum busy")
+	var first: Vector2 = (busy_voices()[0] as Dictionary)["position"]
+	await physics(10)
+	assert_eq(busy_voices().size(), 1, "hum still the only voice")
+	var later: Vector2 = (busy_voices()[0] as Dictionary)["position"]
+	assert_gt(later.x - first.x, 10.0, "voice moved with the bullet")
+	assert_almost_eq(later, v.get_bullet_transform(0).origin, Vector2(2.0, 2.0), "voice sits on bullet 0")
+
+
+func test_follow_ends_through_fade_when_bullet_dies() -> void:
+	godot_listener_at(Vector2.ZERO)
+	var v := quick_volley(1, 0.0, 60.0)
+	var s := H.make_sound(BulletSoundData2D.SOUND_ON_FLIGHT)
+	s.min_interval_sec = 10.0
+	s.set("follow_bullet", true)
+	s.set("fade_out_sec", 0.5)
+	assert_true(v.sound_set_effects([s]), "entry armed")
+	await physics(2)
+	assert_eq(busy_voices().size(), 1, "hum busy")
+	assert_true(v.clear_bullet(0), "bullet cleared")
+	await physics(2)
+	assert_eq(busy_voices().size(), 1, "dead bullet ends through the fade")
+	assert_true(bool((busy_voices()[0] as Dictionary).get("fading", false)), "fading, not stuck")
+	await physics(40)
+	assert_eq(busy_voices().size(), 0, "fade released it")
+
+
+func test_follow_releases_instantly_without_fade() -> void:
+	godot_listener_at(Vector2.ZERO)
+	var v := quick_volley(1, 0.0, 60.0)
+	var s := H.make_sound(BulletSoundData2D.SOUND_ON_FLIGHT)
+	s.min_interval_sec = 10.0
+	s.set("follow_bullet", true)
+	assert_true(v.sound_set_effects([s]), "entry armed")
+	await physics(2)
+	assert_eq(busy_voices().size(), 1, "hum busy")
+	assert_true(v.clear_bullet(0), "bullet cleared")
+	await physics(2)
+	assert_eq(busy_voices().size(), 0, "no fade configured: released next sweep")
+
+
+func test_unfollowed_flight_freezes_at_fire_pose() -> void:
+	godot_listener_at(Vector2.ZERO)
+	var s := H.make_sound(BulletSoundData2D.SOUND_ON_FLIGHT)
+	s.min_interval_sec = 10.0
+	s.max_voices = 1
+	var v := quick_volley(1, 200.0, 60.0)
+	assert_true(v.sound_set_effects([s]), "entry armed")
+	await physics(2)
+	var at: Vector2 = (busy_voices()[0] as Dictionary)["position"]
+	await physics(10)
+	assert_almost_eq((busy_voices()[0] as Dictionary)["position"], at, Vector2(1.0, 1.0), "unfollowed voice never tracks")
+	assert_gt(v.get_bullet_transform(0).origin.x - at.x, 10.0, "while its bullet flew on")
+
+
+func test_follow_survives_pool_reuse_without_haunting() -> void:
+	godot_listener_at(Vector2.ZERO)
+	var s := H.make_sound(BulletSoundData2D.SOUND_ON_FLIGHT)
+	s.min_interval_sec = 0.0
+	s.max_voices = 4
+	s.set("follow_bullet", true)
+	var v0 := quick_volley(1, 0.0, 60.0)
+	assert_true(v0.sound_set_effects([s]), "entry armed")
+	await physics(2)
+	assert_eq(busy_voices().size(), 1, "hum busy")
+	v0.clear_all_bullets()
+	await idle(1)
+	var v1 := quick_volley(1, 0.0, 60.0)
+	assert_true(v1.sound_set_effects([s]), "entry armed")
+	await physics(4)
+	for e in busy_voices():
+		assert_almost_eq((e as Dictionary)["position"], v1.get_bullet_transform(0).origin, Vector2(2.0, 2.0), "no voice haunts the old life")

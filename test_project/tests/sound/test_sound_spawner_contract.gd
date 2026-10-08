@@ -196,3 +196,19 @@ func test_listener_edits_reach_flying_volleys() -> void:
 	make_listener(Vector2(60, 0))
 	assert_eq(sp.refresh_sound_listeners(), 1, "newcomer counts after refresh")
 	assert_eq((v.sound_get_effects() as Array).size(), 1, "flying volley still armed")
+
+
+func test_orphan_volleys_still_voice() -> void:
+	godot_listener_at(Vector2.ZERO)
+	var sp := make_spawner(H.make_volley_data(2, 200.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 2)
+	sp.sound_enabled = true
+	var hum := H.make_sound(BulletSoundData2D.SOUND_ON_FLIGHT)
+	hum.min_interval_sec = 0.0
+	hum.max_voices = 4
+	sp.sound_effects = [hum]
+	var v: BulletVolley2D = _shot_volley(sp)
+	sp.queue_free()
+	await idle(1)
+	await physics(4)
+	assert_true(is_instance_valid(v), "orphan volley alive")
+	assert_gt(busy_voices().size(), 0, "orphan flight still voices through the factory")

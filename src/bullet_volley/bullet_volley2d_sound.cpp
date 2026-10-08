@@ -87,7 +87,7 @@ void BulletVolley2D::sound_release() {
 	sound_volume_offset_db = 0.0f;
 }
 
-void BulletVolley2D::sound_fire(int trigger, int bullet_index, const Vector2 &event_pos, int ring) {
+void BulletVolley2D::sound_fire(int trigger, int bullet_index, const Vector2 &event_pos, int ring, int zone) {
 	if (trigger < 0 || trigger >= 32 || !(sound_trigger_mask & (1u << trigger))) {
 		return;
 	}
@@ -112,7 +112,10 @@ void BulletVolley2D::sound_fire(int trigger, int bullet_index, const Vector2 &ev
 		if (entry->get_ring_index() >= 0 && entry->get_ring_index() != ring) {
 			continue;
 		}
-		bullet_factory->sound_offer(entry, event_pos, sound_volume_offset_db, spec, amount_bullets);
+		if ((trigger == BulletSoundData2D::SOUND_ON_GRAZE || trigger == BulletSoundData2D::SOUND_ON_GRAZE_EXIT) && entry->get_zone_index() >= 0 && entry->get_zone_index() != zone) {
+			continue;
+		}
+		bullet_factory->sound_offer(entry, event_pos, sound_volume_offset_db, spec, amount_bullets, get_instance_id(), get_life_id(), bullet_index);
 	}
 }
 
@@ -143,7 +146,7 @@ void BulletVolley2D::sound_fire_flight() {
 			if (entry.is_null() || !entry->enabled || entry->get_trigger() != BulletSoundData2D::SOUND_ON_FLIGHT) {
 				continue;
 			}
-			bullet_factory->sound_offer(entry, at, sound_volume_offset_db, spec, amount_bullets);
+			bullet_factory->sound_offer(entry, at, sound_volume_offset_db, spec, amount_bullets, get_instance_id(), get_life_id(), i);
 		}
 	}
 }

@@ -55,8 +55,9 @@ public:
 	// chance, amount gate). True = queued for this sweep's flush (or the next
 	// sweep's when offered outside a sweep). volley_amount is the firing
 	// volley's size (1 for manual hatches): the amount gates read it first,
-	// amount_gain_db is added to the played volume.
-	bool offer(BulletFactory2D &factory, const Ref<BulletSoundData2D> &sound, const Vector2 &event_pos, float volume_offset_db, const SoundListenerSpec2D &listener, int volley_amount = 1);
+	// amount_gain_db is added to the played volume. The follow triple carries
+	// the firing bullet for follow_bullet voices (volley sites only).
+	bool offer(BulletFactory2D &factory, const Ref<BulletSoundData2D> &sound, const Vector2 &event_pos, float volume_offset_db, const SoundListenerSpec2D &listener, int volley_amount = 1, uint64_t follow_volley_id = 0, int follow_life_id = -1, int follow_bullet = -1);
 	// End of sweep: release finished voices, enforce durations, follow node
 	// listeners, pick winners per channel, play them. Returns on one branch
 	// when nothing is pending and no voice is busy.
@@ -94,6 +95,11 @@ private:
 		// Firing volley's size (1 for manual hatches): the amount gates and
 		// the gain read it at flush.
 		int volley_amount = 1;
+		// Follow target (volley offer sites only, else 0/-1): the winning
+		// voice tracks this bullet while follow_bullet is on.
+		uint64_t follow_volley = 0;
+		int follow_life = -1;
+		int follow_bullet = -1;
 		// Offer-time distance to the resolved listener: evicts the farthest
 		// while the per-sweep slots fill, so winners are nearest.
 		double dist = 0.0;
@@ -142,6 +148,14 @@ private:
 		uint64_t listener_node_id = 0;
 		Vector2 listener_last_pos;
 		bool follows_node = false;
+		// Follow-the-bullet state (follow_bullet): the voice is re-posed to
+		// this bullet's live pose every sweep; a cleared/expired/reused
+		// bullet ends it through the fade path. following snapshots the
+		// entry flag at play.
+		bool following = false;
+		uint64_t follow_volley = 0;
+		int follow_life = -1;
+		int follow_bullet = -1;
 		uint64_t use_order = 0;
 	};
 
@@ -186,6 +200,5 @@ private:
 	Array sound_log;
 	// Unknown bus names already warned about (project-level, few).
 	std::vector<String> warned_buses;
-	Array debug_scratch;
 };
 } // namespace BlastBullets2D
