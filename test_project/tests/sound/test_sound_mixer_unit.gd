@@ -491,3 +491,28 @@ func test_free_factory_with_busy_voices_cleans_up() -> void:
 	factory.queue_free()
 	await idle(2)
 	assert_no_new_orphans("voices and container die with the factory")
+
+
+func test_fading_voice_is_never_restarted() -> void:
+	# A fading voice keeps its original fade: a new play in the pool must not
+	# restart the fade every sweep (that starved new plays and never released).
+	godot_listener_at(Vector2.ZERO)
+	factory.sound_max_voices = 1
+	var looper := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+	looper.max_duration_sec = 0.05
+	looper.set("fade_out_sec", 0.2)
+	looper.min_interval_sec = 0.0
+	assert_true(factory.play_sound(looper, Vector2.ZERO), "looper plays")
+	await physics(2)
+	var newcomer := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+	newcomer.min_interval_sec = 0.0
+	newcomer.max_voices = 1
+	var played := false
+	for i in 40:
+		factory.play_sound(newcomer, Vector2.ZERO)
+		await physics(1)
+		for e in busy_voices():
+			if int((e as Dictionary)["sound"]) == newcomer.get_instance_id():
+				played = true
+	assert_true(played, "newcomer plays once the looper's fade has run out")
+	assert_true(busy_voices().size() <= 1, "pool of 1 never holds two voices")

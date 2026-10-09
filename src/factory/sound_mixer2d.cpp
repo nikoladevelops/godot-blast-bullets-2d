@@ -381,6 +381,18 @@ bool SoundMixer2D::offer(BulletFactory2D &factory, const Ref<BulletSoundData2D> 
 		++dropped_total;
 		return false;
 	}
+	// One hum per followed bullet: a bullet whose follow voice is still live
+	// (not fading) never offers a second copy. Each bullet offers at most once
+	// per sweep, so every voice that already plays is visible here.
+	if (sound->follow_bullet && follow_volley_id != 0 && follow_bullet >= 0) {
+		const uint64_t sid = sound->get_instance_id();
+		for (const Voice &voice : voices) {
+			if (voice.busy && !voice.fading && voice.following && voice.sound_id == sid && voice.follow_volley == follow_volley_id && voice.follow_life == follow_life_id && voice.follow_bullet == follow_bullet) {
+				++dropped_total;
+				return false;
+			}
+		}
+	}
 	const size_t cap = sound->min_interval_sec > 0.0 ? 1 : (size_t)Math::max(1, sound->max_voices);
 	Channel &channel = channel_for(sound->get_instance_id(), cap);
 	Camera2D *camera = resolve_entry_camera(factory, sound.ptr(), channel);
@@ -458,18 +470,29 @@ AudioStreamPlayer2D *SoundMixer2D::alloc_voice(BulletFactory2D &factory, int pri
 		voices.push_back(voice);
 		return player;
 	}
-	// Steal the oldest busy voice at equal or lower priority, never above.
+	// Steal at equal or lower priority, never above. A voice already fading
+	// out goes first (its tail is cheap to cut). Otherwise the oldest live
+	// voice starts its fade and this play waits for the next sweep, so a
+	// fade is never restarted and a looper's tail always runs out.
+	const double clock = factory.get_graze_clock();
 	size_t oldest = voices.size();
 	for (size_t i = 0; i < voices.size(); ++i) {
-		if (voices[i].busy && voices[i].priority <= priority && (oldest == voices.size() || voices[i].use_order < voices[oldest].use_order)) {
+		if (voices[i].busy && voices[i].fading && voices[i].priority <= priority && (oldest == voices.size() || voices[i].use_order < voices[oldest].use_order)) {
 			oldest = i;
 		}
 	}
 	if (oldest == voices.size()) {
-		return nullptr;
-	}
-	if (voice_begin_fade(voices[oldest], factory.get_graze_clock(), voice_fade_len(voices[oldest].sound_id))) {
-		return nullptr; // still fading out: no free voice to hand over
+		for (size_t i = 0; i < voices.size(); ++i) {
+			if (voices[i].busy && !voices[i].fading && voices[i].priority <= priority && (oldest == voices.size() || voices[i].use_order < voices[oldest].use_order)) {
+				oldest = i;
+			}
+		}
+		if (oldest == voices.size()) {
+			return nullptr;
+		}
+		if (voice_begin_fade(voices[oldest], clock, voice_fade_len(voices[oldest].sound_id))) {
+			return nullptr; // fading out now: this play waits for the next sweep
+		}
 	}
 	voices[oldest].player->stop();
 	release_voice(voices[oldest]);
@@ -486,6 +509,9 @@ double SoundMixer2D::voice_fade_len(uint64_t sound_id) {
 }
 
 bool SoundMixer2D::voice_begin_fade(Voice &voice, double clock, double fade_len) {
+	if (voice.fading) {
+		return true; // already on its way out: the fade is never restarted
+	}
 	if (!(fade_len > 0.0) || !Math::is_finite(fade_len) || voice.player == nullptr || ObjectDB::get_instance(ObjectID(voice.player->get_instance_id())) != voice.player || !voice.player->is_playing()) {
 		return false;
 	}
@@ -789,10 +815,11 @@ void SoundMixer2D::flush(BulletFactory2D &factory) {
 		for (size_t w = 0; w < winners.size() && w < take; ++w) {
 			const Winner &winner = winners[w];
 			// Per-sound busy cap.
+			// Fading tails do not count: they are already on their way out.
 			size_t busy_same = 0;
 			size_t oldest_same = voices.size();
 			for (size_t i = 0; i < voices.size(); ++i) {
-				if (voices[i].busy && voices[i].sound_id == channel.sound_id) {
+				if (voices[i].busy && !voices[i].fading && voices[i].sound_id == channel.sound_id) {
 					++busy_same;
 					if (oldest_same == voices.size() || voices[i].use_order < voices[oldest_same].use_order) {
 						oldest_same = i;
@@ -807,7 +834,7 @@ void SoundMixer2D::flush(BulletFactory2D &factory) {
 				size_t victim = oldest_same;
 				if (sound->steal_mode == BulletSoundData2D::STEAL_QUIETEST) {
 					for (size_t i = 0; i < voices.size(); ++i) {
-						if (voices[i].busy && voices[i].sound_id == channel.sound_id && voices[i].last_volume < voices[victim].last_volume) {
+						if (voices[i].busy && !voices[i].fading && voices[i].sound_id == channel.sound_id && voices[i].last_volume < voices[victim].last_volume) {
 							victim = i;
 						}
 					}

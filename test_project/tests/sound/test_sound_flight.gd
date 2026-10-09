@@ -159,3 +159,17 @@ func test_follow_survives_pool_reuse_without_haunting() -> void:
 	await physics(4)
 	for e in busy_voices():
 		assert_almost_eq((e as Dictionary)["position"], v1.get_bullet_transform(0).origin, Vector2(2.0, 2.0), "no voice haunts the old life")
+
+
+func test_followed_bullet_keeps_one_hum_voice() -> void:
+	# One bullet, no interval, room for 4 voices: the hum still holds one voice.
+	godot_listener_at(Vector2.ZERO)
+	var s := H.make_sound(BulletSoundData2D.SOUND_ON_FLIGHT)
+	s.min_interval_sec = 0.0
+	s.max_voices = 4
+	s.set("follow_bullet", true)
+	var v := quick_volley(1, 0.0, 60.0)
+	assert_true(v.sound_set_effects([s]), "entry armed")
+	for i in 10:
+		await physics(1)
+	assert_eq(busy_voices().size(), 1, "one bullet, one hum voice")
