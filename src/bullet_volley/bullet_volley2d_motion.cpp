@@ -93,6 +93,12 @@ void BulletVolley2D::bullet_set_velocity(int bullet_index, const Vector2 &new_ve
 	const Vector2 fall = bullet_index >= 0 && bullet_index < (int)all_gravity_velocity.size() ? all_gravity_velocity[bullet_index] : Vector2(0, 0);
 	const Vector2 without_offset = new_velocity - inherited_velocity_offset - fall;
 	const real_t new_speed = without_offset.length();
+	if (!Math::is_finite(new_speed)) {
+		// Finite components whose square overflows float32 (> ~1.8e19): the
+		// speed would become INF, the direction (0, 0) and the position NaN.
+		UtilityFunctions::push_error("bullet_set_velocity: new_velocity magnitude is too large to hold (its square overflows), keeping the old value.");
+		return;
+	}
 
 	if (bullet_index < 0 || bullet_index >= (int)all_cached_direction.size() || bullet_index >= (int)all_cached_speed.size() || bullet_index >= (int)all_cached_max_speed.size() || bullet_index >= (int)all_cached_velocity.size()) {
 		return;
