@@ -786,7 +786,7 @@ void BulletSpawner2D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "sound_listener_node_name"), "set_sound_listener_node_name", "get_sound_listener_node_name");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "sound_listener_node_name_match_mode", PROPERTY_HINT_ENUM, "Exact,Contains,Starts With,Ends With"), "set_sound_listener_node_name_match_mode", "get_sound_listener_node_name_match_mode");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "sound_listener_node_name_case_sensitive"), "set_sound_listener_node_name_case_sensitive", "get_sound_listener_node_name_case_sensitive");
-	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "sound_listener_children_parent_path", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "Node2D"), "set_sound_listener_children_parent_path", "get_sound_listener_children_parent_path");
+	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "sound_listener_children_parent_path"), "set_sound_listener_children_parent_path", "get_sound_listener_children_parent_path");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "sound_listener_children_recursive"), "set_sound_listener_children_recursive", "get_sound_listener_children_recursive");
 	ADD_PROPERTY(PropertyInfo(Variant::PACKED_VECTOR2_ARRAY, "sound_listener_global_positions"), "set_sound_listener_global_positions", "get_sound_listener_global_positions");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "sound_listener_update_interval", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater,suffix:s"), "set_sound_listener_update_interval", "get_sound_listener_update_interval");

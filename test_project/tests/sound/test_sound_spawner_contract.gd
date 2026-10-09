@@ -212,3 +212,13 @@ func test_orphan_volleys_still_voice() -> void:
 	await physics(4)
 	assert_true(is_instance_valid(v), "orphan volley alive")
 	assert_gt(busy_voices().size(), 0, "orphan flight still voices through the factory")
+
+
+func test_listener_children_parent_accepts_any_node() -> void:
+	# Same as graze and homing: a plain Node container is a valid parent.
+	var sp: BulletSpawner2D = add(BulletSpawner2D.new())
+	for p in sp.get_property_list():
+		if p["name"] == "sound_listener_children_parent_path":
+			assert_eq(String(p.get("hint_string", "")), "", "no Node2D-only hint on the parent path")
+			return
+	fail_test("sound_listener_children_parent_path is not exposed")
