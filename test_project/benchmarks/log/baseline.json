@@ -674,6 +674,98 @@
       },
       "warmup_frames": 60
     },
+    "sound_flight_10k": {
+      "active_bullets_mean": 10000.0,
+      "collision_records": 0,
+      "description": "10k bullets in flight, On Flight hum following every bullet",
+      "engine_ms": {
+        "max": 3.176,
+        "mean": 1.51854,
+        "p50": 1.507,
+        "p95": 1.575,
+        "p99": 1.623
+      },
+      "expired_bullets": 0,
+      "extra": {},
+      "factory_tick_ms": {
+        "max": 2.854,
+        "mean": 1.21726666666667,
+        "p50": 1.212,
+        "p95": 1.242,
+        "p99": 1.275
+      },
+      "frame_ms": {
+        "max": 3.176,
+        "mean": 1.51882,
+        "p50": 1.507,
+        "p95": 1.575,
+        "p99": 1.623
+      },
+      "measure_frames": 300,
+      "memory_static_growth_mb": 0.0682792663574219,
+      "memory_static_peak_mb": 32.9038848876953,
+      "nodes_end": 28.0,
+      "objects_end": 1644.0,
+      "objects_growth": 14,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 0,
+      "pool_misses": 10,
+      "spawned_bullets": 0,
+      "step_ms": {
+        "max": 0.003,
+        "mean": 0.00028,
+        "p50": 0.0,
+        "p95": 0.001,
+        "p99": 0.001
+      },
+      "warmup_frames": 60
+    },
+    "sound_hit_storm": {
+      "active_bullets_mean": 1400.0,
+      "collision_records": 60000,
+      "description": "200-bullet volley/frame dying on walls with an On Hit sound",
+      "engine_ms": {
+        "max": 2.179,
+        "mean": 0.709793333333333,
+        "p50": 0.616,
+        "p95": 0.931,
+        "p99": 0.965
+      },
+      "expired_bullets": 0,
+      "extra": {},
+      "factory_tick_ms": {
+        "max": 0.35,
+        "mean": 0.18258,
+        "p50": 0.149,
+        "p95": 0.243,
+        "p99": 0.259
+      },
+      "frame_ms": {
+        "max": 2.237,
+        "mean": 0.784456666666667,
+        "p50": 0.694,
+        "p95": 1.025,
+        "p99": 1.082
+      },
+      "measure_frames": 300,
+      "memory_static_growth_mb": 0.0390663146972656,
+      "memory_static_peak_mb": 30.9989147186279,
+      "nodes_end": 23.0,
+      "objects_end": 2385.0,
+      "objects_growth": 0,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 352,
+      "pool_misses": 8,
+      "spawned_bullets": 60000,
+      "step_ms": {
+        "max": 0.139,
+        "mean": 0.0718733333333333,
+        "p50": 0.069,
+        "p95": 0.1,
+        "p99": 0.118
+      },
+      "warmup_frames": 60
+    },
     "spawner_aimed_regen_2k": {
       "active_bullets_mean": 36000.0,
       "collision_records": 0,
