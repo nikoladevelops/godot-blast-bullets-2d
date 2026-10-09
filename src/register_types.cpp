@@ -90,6 +90,7 @@ void initialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
 
 	CachedStringNames2D::create();
 	WarnOnce2D::create();
+	BulletPatterns2D::register_project_settings();
 }
 
 void uninitialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {

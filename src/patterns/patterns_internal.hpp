@@ -81,12 +81,11 @@ static inline int cross_arm_bullets2d(int amount, int arm_count, int arm) {
 	return (arm < amount) ? (amount - arm + arm_count - 1) / arm_count : 0;
 }
 
-// Cap for every helper_generate_transforms_* call: each one allocates O(n)
-// slots, so an unbounded count (a typo'd 1000000, let alone INT_MAX) would
-// freeze or OOM the game. Batch huge volleys into several calls instead.
-// The same cap as the spawner's helper_bullets_amount (kPatternMaxBullets):
-// the spawner fans its amount straight into these generators.
-inline constexpr int HELPER_MAX_TRANSFORMS = kPatternMaxBullets;
+// Every helper_generate_transforms_* call allocates O(n) slots, so an
+// unbounded count (a typo'd 1000000000, let alone INT_MAX) would freeze or
+// OOM the game: they all share the developer-set pattern_max_bullets() with
+// the spawner's helper_bullets_amount (the spawner fans its amount straight
+// into these generators).
 
 // Clamp finished slot arrays into a sane world box: huge-but-finite inputs
 // (1e30 spacing on an 8k volley) overflow slot math to Inf/NaN, which would

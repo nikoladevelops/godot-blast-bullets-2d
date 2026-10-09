@@ -550,7 +550,7 @@ PatternSlots2D BulletPatterns2D::generate_waterfall2d(int transforms_amount, Tra
 	// columns*rows in 64-bit: 32-bit int math would wrap to negative on
 	// hostile input (100000x100000), turning the emit loop below into a
 	// billion-iteration hang. Reject absurd grids up front.
-	PATTERN_REJECT_IF((int64_t)p.columns * (int64_t)p.rows > (int64_t)HELPER_MAX_TRANSFORMS * 4, "columns*rows is absurdly large; keep the grid reasonable.");
+	PATTERN_REJECT_IF((int64_t)p.columns * (int64_t)p.rows > (int64_t)pattern_max_bullets() * 4, "columns*rows is absurdly large; keep the grid reasonable.");
 	PATTERN_REJECT_IF(!Math::is_finite(p.column_spacing) || p.column_spacing < 0.0 || !Math::is_finite(p.row_spacing) || p.row_spacing < 0.0, "column_spacing and row_spacing must be finite and >= 0.");
 	PATTERN_REJECT_IF(!Math::is_finite(p.stagger) || !Math::is_finite(p.jitter) || p.jitter < 0.0 || !Math::is_finite(p.facing_offset_degrees), "stagger and facing_offset_degrees must be finite, jitter finite and >= 0.");
 	PATTERN_REJECT_IF(!p.rain_direction.is_finite() || p.rain_direction.length_squared() <= 0.0, "rain_direction must be finite and non-zero.");
@@ -599,7 +599,7 @@ PatternSlots2D BulletPatterns2D::generate_lattice2d(int transforms_amount, Trans
 	PATTERN_REJECT_IF(p.columns < 1 || p.rows < 1, "columns and rows must be >= 1.");
 	// Same 64-bit guard as waterfall: hostile columns*rows would wrap a
 	// 32-bit int and hang the emit loop below.
-	PATTERN_REJECT_IF((int64_t)p.columns * (int64_t)p.rows > (int64_t)HELPER_MAX_TRANSFORMS * 4, "columns*rows is absurdly large; keep the grid reasonable.");
+	PATTERN_REJECT_IF((int64_t)p.columns * (int64_t)p.rows > (int64_t)pattern_max_bullets() * 4, "columns*rows is absurdly large; keep the grid reasonable.");
 	PATTERN_REJECT_IF(!Math::is_finite(p.spacing_x) || p.spacing_x < 0.0 || !Math::is_finite(p.spacing_y) || p.spacing_y < 0.0, "spacing_x and spacing_y must be finite and >= 0.");
 	PATTERN_REJECT_IF(!Math::is_finite(p.facing_offset_degrees), "facing_offset_degrees must be finite.");
 	PatternSlots2D generated_transforms = danmaku_make_slots(transforms_amount);

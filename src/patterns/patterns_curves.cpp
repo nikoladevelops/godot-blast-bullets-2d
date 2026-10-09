@@ -473,7 +473,7 @@ PatternSlots2D BulletPatterns2D::generate_ellipse2d(int transforms_amount, Trans
 	// Uncapped gap_count turns the per-bullet gap loop below into O(n*gap):
 	// n=1000 with gap=INT_MAX would hang for hours. Walls don't need more
 	// gaps than bullets anyway.
-	PATTERN_REJECT_IF(p.gap_count > HELPER_MAX_TRANSFORMS, "gap_count is absurdly large; keep it near the bullet count.");
+	PATTERN_REJECT_IF(p.gap_count > pattern_max_bullets(), "gap_count is absurdly large; keep it near the bullet count.");
 	PATTERN_REJECT_IF(p.gap_width < 0.0, "gap_width must be >= 0.");
 	// Slot loop in global space plus geometric (gradient) outward normals.
 	// WALL gaps filter the loop before the shared outline worker sees it, so
@@ -538,7 +538,7 @@ PatternSlots2D BulletPatterns2D::generate_star2d(int transforms_amount, Transfor
 	PATTERN_REJECT_IF(p.points < 2, "points must be >= 2.");
 	// points*2 corners get built below: cap points so a hostile value can't
 	// turn the corner loop into a multi-GB hang (and INT_MAX/2 can't wrap).
-	PATTERN_REJECT_IF(p.points > HELPER_MAX_TRANSFORMS, "points is absurdly large; keep it near the bullet count.");
+	PATTERN_REJECT_IF(p.points > pattern_max_bullets(), "points is absurdly large; keep it near the bullet count.");
 	PATTERN_REJECT_IF(!Math::is_finite(p.outer_radius) || p.outer_radius < 0.0 || !Math::is_finite(p.inner_radius) || p.inner_radius < 0.0, "outer_radius and inner_radius must be finite and >= 0.");
 	PATTERN_REJECT_IF(!Math::is_finite(p.base_rotation) || !Math::is_finite(p.facing_offset_degrees), "base_rotation and facing_offset_degrees must be finite.");
 	PATTERN_REQUIRE(pattern_check_corner_layout(caller, p.corner, p.outline.layer_layout));

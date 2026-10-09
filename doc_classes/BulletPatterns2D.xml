@@ -62,9 +62,15 @@
 			<param index="2" name="marker_transform" type="Transform2D" />
 			<param index="3" name="params" type="Dictionary" default="{}" />
 			<description>
-				Generates any pattern source without a spawner. [param shape] is a [member BulletSpawner2D.pattern_source] id (see [method get_shapes]); [param amount] is the bullet count ([member BulletSpawner2D.helper_bullets_amount], 1 to 10000); [param marker_transform] plays the spawner's generator. [param params] names knobs exactly like the spawner properties, with or without the [code]helper_[/code] prefix ([code]{"ring_radius": 80, "outline_placement": 1}[/code]). Every value is checked with the spawner's own rule: a refused value pushes [code]BulletPatterns2D.generate: &lt;knob&gt; ..., keeping the old value.[/code] and the default stays. Unknown params fail loud with a did-you-mean while the others still apply.
+				Generates any pattern source without a spawner. [param shape] is a [member BulletSpawner2D.pattern_source] id (see [method get_shapes]); [param amount] is the bullet count ([member BulletSpawner2D.helper_bullets_amount], 1 to [method get_max_bullets_per_pattern]); [param marker_transform] plays the spawner's generator. [param params] names knobs exactly like the spawner properties, with or without the [code]helper_[/code] prefix ([code]{"ring_radius": 80, "outline_placement": 1}[/code]). Every value is checked with the spawner's own rule: a refused value pushes [code]BulletPatterns2D.generate: &lt;knob&gt; ..., keeping the old value.[/code] and the default stays. Unknown params fail loud with a did-you-mean while the others still apply.
 				The scene inputs a spawner reads from the tree come in as params: [code]aim_position[/code] (global [Vector2], required by Aimed, optional for Corridor), [code]path_points[/code] ([PackedVector2Array] in marker space, at least 2 points, required by Path2D; recentered like a spawner in Follow Generator space) and [code]children[/code] (an [Array] of global [Transform2D] for From Children; none means the marker itself).
 				Returns the raw pattern a spawner with the same knobs, whose generator sits at [param marker_transform], fires before its pose (spin, [member BulletSpawner2D.pattern_scale], [member BulletSpawner2D.transforms_scale] and the muzzle offset are spawner settings), with [code]skip_indices[/code] applied. Feed it to [member BulletVolleyData2D.transforms] and [method BulletFactory2D.spawn_volley].
+			</description>
+		</method>
+		<method name="get_max_bullets_per_pattern" qualifiers="static">
+			<return type="int" />
+			<description>
+				Returns the per-call bullet limit (default 100000). See [method set_max_bullets_per_pattern].
 			</description>
 		</method>
 		<method name="get_shapes" qualifiers="static">
@@ -1060,6 +1066,14 @@
 			<param index="3" name="direction" type="Vector2" default="Vector2(1, 0)" />
 			<description>
 				Sine center-line sweep (open).
+			</description>
+		</method>
+		<method name="set_max_bullets_per_pattern" qualifiers="static">
+			<return type="void" />
+			<param index="0" name="limit" type="int" />
+			<description>
+				Sets the per-call bullet limit shared by every [code]helper_generate_transforms_*[/code] method, [method generate], [member BulletSpawner2D.helper_bullets_amount], [member BulletSpawner2D.helper_custom_transforms] and the shape counts (star points, polygon vertices, ellipse gaps; grids allow four times as many slots). It only exists so a typo like [code]1000000000[/code] fails loudly instead of freezing or exhausting memory: raise it as high as your game needs. The default is 100000 and can be changed for the whole project with the project setting [code]blastbullets2d/patterns/max_bullets_per_pattern[/code], which is applied when the plugin loads.
+				A [param limit] below 1 pushes an error and keeps the old value. Lowering the limit never edits amounts a spawner already holds: they are refused at the next generation. Main thread only.
 			</description>
 		</method>
 	</methods>

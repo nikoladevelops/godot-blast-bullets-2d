@@ -147,12 +147,12 @@ func test_counts() -> void:
 				expect_no_errors("gen %d amount 1 is silent" % id)
 
 
-func test_count_cap_10000_every_generator() -> void:
-	# The documented per-call cap (HELPER_MAX_TRANSFORMS) holds for EVERY
-	# generator: 10001 is rejected loudly instead of allocating.
+func test_count_cap_every_generator() -> void:
+	# The per-call limit (default 100000) holds for EVERY generator: one
+	# over it is rejected loudly instead of allocating.
 	for id in GEN_COUNT:
-		var v: Array = _gen(id, 10001)
-		assert_true(v.is_empty(), "gen %d amount 10001 rejected" % id)
+		var v: Array = _gen(id, 100001)
+		assert_true(v.is_empty(), "gen %d amount 100001 rejected" % id)
 		expect_error_sequence(["%s: transforms_amount" % GEN_NAMES[id]], "gen %d cap" % id)
 func test_degenerate() -> void:
 	var m := MARKER

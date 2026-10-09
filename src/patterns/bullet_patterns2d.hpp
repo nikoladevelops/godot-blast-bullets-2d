@@ -59,6 +59,15 @@ public:
 	// reads_external_state. Ids are BulletSpawner2D.pattern_source values.
 	static TypedArray<Dictionary> get_shapes();
 
+	// The per-call bullet limit (default 100000; project setting
+	// blastbullets2d/patterns/max_bullets_per_pattern). Rejects values < 1
+	// loudly and keeps the old one. Lowering it never touches amounts a
+	// spawner already holds: they fail loud at the next generation.
+	static void set_max_bullets_per_pattern(int p_limit);
+	static int get_max_bullets_per_pattern();
+	// Registers the project setting and applies its value (module init).
+	static void register_project_settings();
+
 	// Any pattern source by id (BulletSpawner2D.pattern_source, see
 	// get_shapes) without a spawner: `params` names knobs exactly like the
 	// spawner properties, with or without the helper_ prefix

@@ -552,7 +552,7 @@
 			Node the aimed cone points at (also steers the Corridor wall when one is assigned). No target means no bullets in Aimed mode; Corridor falls back to helper_corridor_aim_direction.
 		</member>
 		<member name="helper_bullets_amount" type="int" setter="set_helper_bullets_amount" getter="get_helper_bullets_amount" default="10">
-			Bullet count for helper patterns: every generated pattern draws exactly this many bullets, each on its own spot (Fill Inside, Corridor and Ellipse Wall included). Clamped to 1-10000: one volley fans out to transforms, instance buffers and physics shapes, so uncapped values would freeze on a typo. Children, Self and Custom take their count from the markers or the array instead.
+			Bullet count for helper patterns: every generated pattern draws exactly this many bullets, each on its own spot (Fill Inside, Corridor and Ellipse Wall included). Limited to 1 to [method BulletPatterns2D.get_max_bullets_per_pattern] (default 100000, a project setting): one volley fans out to transforms, instance buffers and physics shapes, so an unlimited value would freeze on a typo. Children, Self and Custom take their count from the markers or the array instead.
 		</member>
 		<member name="helper_circle_face_outward" type="bool" setter="set_helper_circle_face_outward" getter="get_helper_circle_face_outward" default="true">
 			Circle bullets face outward (away from the generator); off faces inward (toward it).
@@ -663,7 +663,7 @@
 			Twists every ellipse facing. Must be finite.
 		</member>
 		<member name="helper_ellipse_gap_count" type="int" setter="set_helper_ellipse_gap_count" getter="get_helper_ellipse_gap_count" default="2">
-			Dodge gaps in Wall mode. Shown only in Wall mode. Must be between 0 and 10000.
+			Dodge gaps in Wall mode. Shown only in Wall mode. Must be between 0 and [method BulletPatterns2D.get_max_bullets_per_pattern].
 		</member>
 		<member name="helper_ellipse_gap_width" type="float" setter="set_helper_ellipse_gap_width" getter="get_helper_ellipse_gap_width" default="0.3">
 			Width of each Wall gap in radians. Shown only in Wall mode. Must be finite and 0 or more.
@@ -777,7 +777,7 @@
 			Heart outline size in pixels. Must be finite and above zero.
 		</member>
 		<member name="helper_lattice_columns" type="int" setter="set_helper_lattice_columns" getter="get_helper_lattice_columns" default="8">
-			Honeycomb columns. Must be between 1 and 40000 (columns times rows is capped at 40000 at generation, with one warning).
+			Honeycomb columns. Must be between 1 and four times [method BulletPatterns2D.get_max_bullets_per_pattern] (columns times rows is capped the same at generation, with one warning).
 		</member>
 		<member name="helper_lattice_face_outward" type="bool" setter="set_helper_lattice_face_outward" getter="get_helper_lattice_face_outward" default="true">
 			Whether slots face away from the marker.
@@ -978,7 +978,7 @@
 			Polygon base rotation in radians. Must be finite.
 		</member>
 		<member name="helper_polygon_vertices" type="int" setter="set_helper_polygon_vertices" getter="get_helper_polygon_vertices" default="6">
-			Polygon corner count (true perimeter, not the Star Polygon scatter mode). Must be between 3 and 10000.
+			Polygon corner count (true perimeter, not the Star Polygon scatter mode). Must be between 3 and [method BulletPatterns2D.get_max_bullets_per_pattern].
 		</member>
 		<member name="helper_rain_band_width" type="float" setter="set_helper_rain_band_width" getter="get_helper_rain_band_width" default="600.0">
 			Width of the rain band in pixels. Must be finite and 0 or more.
@@ -1116,7 +1116,7 @@
 			Outer vertex radius. Must be finite and 0 or more.
 		</member>
 		<member name="helper_star_points" type="int" setter="set_helper_star_points" getter="get_helper_star_points" default="5">
-			Star points (alternating outer/inner vertices). Must be between 2 and 10000.
+			Star points (alternating outer/inner vertices). Must be between 2 and [method BulletPatterns2D.get_max_bullets_per_pattern].
 		</member>
 		<member name="helper_star_polygon_base_rotation" type="float" setter="set_helper_star_polygon_base_rotation" getter="get_helper_star_polygon_base_rotation" default="0.0">
 			Rotates the whole star. Must be finite.
@@ -1176,7 +1176,7 @@
 			Horizontal spacing in pixels. Must be finite and 0 or more.
 		</member>
 		<member name="helper_waterfall_columns" type="int" setter="set_helper_waterfall_columns" getter="get_helper_waterfall_columns" default="12">
-			Curtain columns. Must be between 1 and 40000 (columns times rows is capped at 40000 at generation, with one warning).
+			Curtain columns. Must be between 1 and four times [method BulletPatterns2D.get_max_bullets_per_pattern] (columns times rows is capped the same at generation, with one warning).
 		</member>
 		<member name="helper_waterfall_facing_offset_deg" type="float" setter="set_helper_waterfall_facing_offset_deg" getter="get_helper_waterfall_facing_offset_deg" default="0.0">
 			Extra facing twist in degrees. Must be finite.

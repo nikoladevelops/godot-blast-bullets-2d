@@ -1101,8 +1101,8 @@ bool pattern_check_corner_layout(const char *caller_name, const CornerLayout2D &
 }
 
 bool pattern_check_amount(const char *caller_name, int transforms_amount) {
-	if (transforms_amount < 0 || transforms_amount > HELPER_MAX_TRANSFORMS) {
-		UtilityFunctions::push_error(String(caller_name) + ": transforms_amount must be between 0 and " + String::num_int64(HELPER_MAX_TRANSFORMS) + ".");
+	if (transforms_amount < 0 || transforms_amount > pattern_max_bullets()) {
+		UtilityFunctions::push_error(String(caller_name) + ": transforms_amount must be between 0 and " + String::num_int64(pattern_max_bullets()) + ".");
 		return false;
 	}
 	return true;

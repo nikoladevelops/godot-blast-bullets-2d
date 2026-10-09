@@ -121,8 +121,9 @@ TypedArray<Transform2D> BulletSpawner2D::get_helper_custom_transforms() const { 
 void BulletSpawner2D::set_helper_custom_transforms(const TypedArray<Transform2D> &value) {
 	on_config_changed();
 	// One shoot fires this array into transforms + buffers + physics: the
-	// same freeze/OOM rationale as helper_bullets_amount caps it at 10000.
-	if (const char *problem = pattern_custom_transforms_problem2d(value, kMaxBulletsPerVolley)) {
+	// same freeze/OOM rationale as helper_bullets_amount caps it at the
+	// developer-set pattern limit.
+	if (const String problem = pattern_custom_transforms_problem2d(value, pattern_max_bullets()); !problem.is_empty()) {
 		pattern_knob_reject2d("helper_custom_transforms", problem);
 		return;
 	}

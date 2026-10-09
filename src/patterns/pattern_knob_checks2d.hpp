@@ -47,12 +47,12 @@ static inline void pattern_knob_reject2d(const char *knob, const String &message
 	UtilityFunctions::push_error(String(owner) + ": " + knob + " " + message + ", keeping the old value.");
 }
 
-// Array knobs with hand-written accessors: nullptr when the value is valid,
-// else the rejection message for pattern_knob_reject2d. Shared by the
+// Array knobs with hand-written accessors: an empty String when the value is
+// valid, else the rejection message for pattern_knob_reject2d. Shared by the
 // spawner setters and BulletPatterns2D.generate.
-static inline const char *pattern_custom_transforms_problem2d(const Array &value, int max_entries) {
+static inline String pattern_custom_transforms_problem2d(const Array &value, int max_entries) {
 	if (value.size() > max_entries) {
-		return "must hold <= 10000 entries";
+		return String("must hold <= ") + itos(max_entries) + " entries";
 	}
 	for (int i = 0; i < value.size(); ++i) {
 		// Type first, conversion second: inspector array edits can hand
@@ -65,7 +65,7 @@ static inline const char *pattern_custom_transforms_problem2d(const Array &value
 			return "must hold finite transforms";
 		}
 	}
-	return nullptr;
+	return String();
 }
 
 static inline const char *pattern_layer_scales_problem2d(const PackedFloat32Array &value, int max_entries) {

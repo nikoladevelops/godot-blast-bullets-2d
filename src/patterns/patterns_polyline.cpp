@@ -281,8 +281,8 @@ PatternSlots2D polyline_layout2d(const Transform2D &marker, const PackedVector2A
 PatternSlots2D BulletPatterns2D::generate_polyline2d(int transforms_amount, Transform2D marker_transform, const PolylineParams2D &p) {
 	const char *caller = "helper_generate_transforms_polyline";
 
-	if (transforms_amount < 0 || transforms_amount > HELPER_MAX_TRANSFORMS) {
-		UtilityFunctions::push_error("helper_generate_transforms_polyline: transforms_amount must be in 0.." + itos(HELPER_MAX_TRANSFORMS) + ".");
+	if (transforms_amount < 0 || transforms_amount > pattern_max_bullets()) {
+		UtilityFunctions::push_error("helper_generate_transforms_polyline: transforms_amount must be in 0.." + itos(pattern_max_bullets()) + ".");
 		return PatternSlots2D();
 	}
 	for (int i = 0; i < p.points.size(); ++i) {

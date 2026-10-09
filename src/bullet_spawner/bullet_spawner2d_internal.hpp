@@ -118,7 +118,6 @@ static constexpr const char *GRAZE_PREVIEW_NAME = "~BlastBulletsGrazePreview";
 
 // Shared limits (single definition so validation, generation and preview
 // agree; the inspector hint strings in _bind_methods mirror these).
-static constexpr int kMaxBulletsPerVolley = kPatternMaxBullets; // helper_bullets_amount + helper_custom_transforms
 
 static constexpr int kMaxOutlineLayers = kPatternMaxOutlineLayers; // helper_outline_layer_count + helper_outline_layer_scales
 
@@ -153,9 +152,6 @@ static constexpr uint32_t kWarnSkipIndexOutOfRange = 102; // helper_skip_indices
 static constexpr uint32_t kWarnGridTooLarge = kPatternWarnGridTooLarge; // waterfall/lattice columns*rows
 static constexpr uint32_t kWarnOrbitWithoutHoming = 104; // orbiting needs homing
 
-// Grids (waterfall/lattice) may hold columns * rows up to this many slots
-// (the factory refuses more); each side is capped the same in its setter.
-static constexpr int kMaxGridSlots = kPatternMaxGridSlots;
 // Burst chains longer than this are a typo, not a pattern.
 static constexpr int kMaxBurstCount = 1024;
 

@@ -122,7 +122,7 @@ static KnobWrite2D write_special_knob(PatternKnobs2D &k, const String &name, con
 			return KNOB_REJECTED;
 		}
 		const Array arr = v;
-		if (const char *problem = pattern_custom_transforms_problem2d(arr, kPatternMaxBullets)) {
+		if (const String problem = pattern_custom_transforms_problem2d(arr, pattern_max_bullets()); !problem.is_empty()) {
 			pattern_knob_reject2d("helper_custom_transforms", problem, kGenerateOwner);
 			return KNOB_REJECTED;
 		}

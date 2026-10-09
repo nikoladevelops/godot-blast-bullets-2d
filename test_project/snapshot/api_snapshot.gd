@@ -302,13 +302,21 @@ func _snap_patterns(section: String) -> void:
 	var methods := ClassDB.class_get_method_list(&"BulletPatterns2D", true)
 	methods.sort_custom(func(a, b): return String(a["name"]) < String(b["name"]))
 	for info in methods:
-		if String(info["name"]) in ["get_shapes", "generate"]:
+		# The limit accessors change process-wide state: probed by hand below.
+		if String(info["name"]) in ["get_shapes", "generate", "set_max_bullets_per_pattern", "get_max_bullets_per_pattern"]:
 			continue
 		if (int(info.get("flags", 0)) & METHOD_FLAG_STATIC) == 0:
 			continue
 		_snap_static_method(section, &"BulletPatterns2D", info)
 		await get_tree().process_frame
 	_rec(section, "get_shapes", BulletPatterns2D.get_shapes())
+	var limit_before := BulletPatterns2D.get_max_bullets_per_pattern()
+	_rec(section, "max_bullets_per_pattern default", limit_before)
+	BulletPatterns2D.set_max_bullets_per_pattern(0)
+	_rec(section, "max_bullets_per_pattern reject", BulletPatterns2D.get_max_bullets_per_pattern(), cap.take())
+	BulletPatterns2D.set_max_bullets_per_pattern(250000)
+	_rec(section, "max_bullets_per_pattern raised", BulletPatterns2D.get_max_bullets_per_pattern(), cap.take())
+	BulletPatterns2D.set_max_bullets_per_pattern(limit_before)
 
 
 # ---- 3. BulletPatterns2D.generate --------------------------------------------

@@ -71,7 +71,9 @@ func test_preview_cap_custom_line() -> void:
 	spawner.helper_bullets_amount = 5
 	# (Every source's count/empty-input contract: test_spawner_patterns and
 	# test_spawner_pattern_counts.)
-	# Cap boundary: 10000 accepted and collected, 10001 rejected.
+	# Limit boundary under a lowered limit (keeps the 10k-bullet preview cheap;
+	# the default is pinned in patterns/test_patterns_bullet_limit.gd).
+	BulletPatterns2D.set_max_bullets_per_pattern(10000)
 	spawner.helper_bullets_amount = 10000
 	assert_true(spawner.get_helper_bullets_amount() == 10000, "amount cap accepts 10000")
 	spawner.pattern_source = 3

@@ -2365,7 +2365,7 @@ func test_orbit_endurance_census_telegraph_zero_helper_hostility() -> void:
 	assert_true(BulletPatterns2D.helper_generate_transforms_grid(8, Transform2D.IDENTITY, 0).is_empty(), "zero grid rows refused")
 	assert_true(BulletPatterns2D.helper_generate_transforms_rain(8, Transform2D.IDENTITY, 600.0, Vector2.ZERO, 48.0, 0.0, 1).is_empty(), "zero rain direction refused")
 	assert_true(BulletPatterns2D.helper_generate_transforms_rain(4, Transform2D.IDENTITY).size() == 4, "rain defaults still generate")
-	expect_errors_containing("transforms_amount must be between 0 and 10000", 1, "negative grid amount fails loud")
+	expect_errors_containing("transforms_amount must be between 0 and 100000", 1, "negative grid amount fails loud")
 	expect_errors_containing("rows_per_column must be > 0", 1, "zero grid rows fail loud")
 	expect_errors_containing("rain_direction must be finite and non-zero", 1, "zero rain direction fails loud")
 

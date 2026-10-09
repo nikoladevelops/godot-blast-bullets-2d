@@ -618,7 +618,7 @@ PatternSlots2D BulletPatterns2D::generate_polygon2d(int transforms_amount, Trans
 	PATTERN_REJECT_IF(p.vertices < 3 || !Math::is_finite(p.radius) || p.radius < 0.0 || !Math::is_finite(p.base_rotation) || !Math::is_finite(p.facing_offset_degrees), "vertices must be >= 3, radius finite and >= 0, rotations finite.");
 	// The corner loop below builds `vertices` corners: cap it like star's
 	// points so hostile input can't hang the game.
-	PATTERN_REJECT_IF(p.vertices > HELPER_MAX_TRANSFORMS, "vertices is absurdly large; keep it near the bullet count.");
+	PATTERN_REJECT_IF(p.vertices > pattern_max_bullets(), "vertices is absurdly large; keep it near the bullet count.");
 	PATTERN_REQUIRE(pattern_check_corner_layout(caller, p.corner, p.outline.layer_layout));
 	PackedVector2Array corners;
 	for (int k = 0; k < p.vertices; ++k) {

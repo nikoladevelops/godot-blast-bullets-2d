@@ -140,8 +140,8 @@ func test_a_refused_value_keeps_the_default_with_the_spawner_rule() -> void:
 	expect_error_sequence(["BulletPatterns2D.generate: helper_ring_radius must be a number, keeping the old value.", "BulletPatterns2D.generate: helper_ring_face_outward must be a bool, keeping the old value."])
 	assert_eq(BulletPatterns2D.generate(BulletSpawner2D.PATTERN_FROM_HELPER_RING, 0, MARKER), [], "amount below 1")
 	expect_error_sequence(["BulletPatterns2D.generate: helper_bullets_amount must be >= 1, keeping the old value."])
-	assert_eq(BulletPatterns2D.generate(BulletSpawner2D.PATTERN_FROM_HELPER_RING, 10001, MARKER), [], "amount above the cap")
-	expect_error_sequence(["BulletPatterns2D.generate: helper_bullets_amount must be <= 10000, keeping the old value."])
+	assert_eq(BulletPatterns2D.generate(BulletSpawner2D.PATTERN_FROM_HELPER_RING, 100001, MARKER), [], "amount above the limit")
+	expect_error_sequence(["BulletPatterns2D.generate: helper_bullets_amount must be <= 100000, keeping the old value."])
 
 
 func test_unknown_params_fail_loud_with_a_did_you_mean_and_the_rest_apply() -> void:

@@ -3,6 +3,8 @@
 // plus the helper_generate_transforms_* wrappers themselves. The wrappers and
 // their binds are expanded from patterns/pattern_signatures2d.inc.
 
+#include "godot_cpp/classes/project_settings.hpp"
+#include "patterns/pattern_knob_checks2d.hpp"
 #include "patterns/patterns_internal.hpp"
 
 using namespace godot;
@@ -27,7 +29,46 @@ namespace BlastBullets2D {
 #undef PATTERN_ASSIGN_REQ
 #undef PATTERN_ASSIGN_OPT
 
+void BulletPatterns2D::set_max_bullets_per_pattern(int p_limit) {
+	if (p_limit < 1) {
+		pattern_knob_reject2d("max_bullets_per_pattern", "must be >= 1", "BulletPatterns2D");
+		return;
+	}
+	if (p_limit != g_pattern_max_bullets) {
+		g_pattern_max_bullets = p_limit;
+		++g_pattern_limit_generation;
+	}
+}
+
+int BulletPatterns2D::get_max_bullets_per_pattern() {
+	return g_pattern_max_bullets;
+}
+
+void BulletPatterns2D::register_project_settings() {
+	ProjectSettings *settings = ProjectSettings::get_singleton();
+	if (settings == nullptr) {
+		return;
+	}
+	const String name = "blastbullets2d/patterns/max_bullets_per_pattern";
+	if (!settings->has_setting(name)) {
+		settings->set_setting(name, kPatternDefaultMaxBullets);
+	}
+	settings->set_initial_value(name, kPatternDefaultMaxBullets);
+	Dictionary info;
+	info["name"] = name;
+	info["type"] = Variant::INT;
+	info["hint"] = PROPERTY_HINT_RANGE;
+	info["hint_string"] = "1,1000000,1,or_greater";
+	settings->add_property_info(info);
+	const Variant value = settings->get_setting(name, kPatternDefaultMaxBullets);
+	if (value.get_type() == Variant::INT) {
+		set_max_bullets_per_pattern((int)value);
+	}
+}
+
 void BulletPatterns2D::_bind_methods() {
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("set_max_bullets_per_pattern", "limit"), &BulletPatterns2D::set_max_bullets_per_pattern);
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("get_max_bullets_per_pattern"), &BulletPatterns2D::get_max_bullets_per_pattern);
 	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("get_shapes"), &BulletPatterns2D::get_shapes);
 	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("generate", "shape", "amount", "marker_transform", "params"), &BulletPatterns2D::generate, DEFVAL(Dictionary()));
 	// Every helper_generate_transforms_<shape>, with its defaults.

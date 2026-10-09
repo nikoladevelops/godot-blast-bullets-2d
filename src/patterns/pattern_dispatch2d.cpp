@@ -320,9 +320,9 @@ PatternSlots2D PatternKnobs2D::generate_raw(const PatternInputs2D &in) const {
 		case PATTERN_SHAPE_WATERFALL:
 			// Each side is capped in its setter; the product is checked here
 			// (load order) with one warning, then the shot has no slots.
-			if ((int64_t)helper_waterfall_columns * (int64_t)helper_waterfall_rows > (int64_t)kPatternMaxGridSlots) {
+			if ((int64_t)helper_waterfall_columns * (int64_t)helper_waterfall_rows > (int64_t)pattern_max_grid_slots()) {
 				if (!quiet) {
-					WarnOnce2D::warn(in.warn_owner_id, kPatternWarnGridTooLarge, helper_waterfall_columns, helper_waterfall_rows, String("BulletSpawner2D: helper_waterfall_columns * helper_waterfall_rows exceeds ") + itos(kPatternMaxGridSlots) + " slots; lower them.");
+					WarnOnce2D::warn(in.warn_owner_id, kPatternWarnGridTooLarge, helper_waterfall_columns, helper_waterfall_rows, String("BulletSpawner2D: helper_waterfall_columns * helper_waterfall_rows exceeds ") + itos(pattern_max_grid_slots()) + " slots; lower them.");
 				}
 				break;
 			}
@@ -343,9 +343,9 @@ PatternSlots2D PatternKnobs2D::generate_raw(const PatternInputs2D &in) const {
 		case PATTERN_SHAPE_LATTICE:
 			// Each side is capped in its setter; the product is checked here
 			// (load order) with one warning, then the shot has no slots.
-			if ((int64_t)helper_lattice_columns * (int64_t)helper_lattice_rows > (int64_t)kPatternMaxGridSlots) {
+			if ((int64_t)helper_lattice_columns * (int64_t)helper_lattice_rows > (int64_t)pattern_max_grid_slots()) {
 				if (!quiet) {
-					WarnOnce2D::warn(in.warn_owner_id, kPatternWarnGridTooLarge, helper_lattice_columns, helper_lattice_rows, String("BulletSpawner2D: helper_lattice_columns * helper_lattice_rows exceeds ") + itos(kPatternMaxGridSlots) + " slots; lower them.");
+					WarnOnce2D::warn(in.warn_owner_id, kPatternWarnGridTooLarge, helper_lattice_columns, helper_lattice_rows, String("BulletSpawner2D: helper_lattice_columns * helper_lattice_rows exceeds ") + itos(pattern_max_grid_slots()) + " slots; lower them.");
 				}
 				break;
 			}

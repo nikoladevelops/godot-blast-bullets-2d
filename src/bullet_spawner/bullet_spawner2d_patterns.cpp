@@ -282,11 +282,11 @@ void BulletSpawner2D::resolve_raw_pattern(Node2D *base, const Transform2D &marke
 		// and the bake cache.
 		r_out = generate_raw_pattern(base, m, mirror_sign, q);
 	};
-	pattern_cache.resolve(channel, pattern_version, cache_on, pattern_source_reads_external_state(pattern_source), marker, quiet, generate, r_raw, String("BulletSpawner2D: pattern cache mismatch (pattern_source ") + itos(pattern_source));
+	pattern_cache.resolve(channel, pattern_cache_version2d(pattern_version), cache_on, pattern_source_reads_external_state(pattern_source), marker, quiet, generate, r_raw, String("BulletSpawner2D: pattern cache mismatch (pattern_source ") + itos(pattern_source));
 }
 
 bool BulletSpawner2D::preview_survives_marker_move(const Transform2D &old_marker, const Transform2D &new_marker) const {
-	return pattern_cache.survives_marker_move(pattern_version, pattern_cache_mode == PATTERN_CACHE_AUTO, old_marker, new_marker);
+	return pattern_cache.survives_marker_move(pattern_cache_version2d(pattern_version), pattern_cache_mode == PATTERN_CACHE_AUTO, old_marker, new_marker);
 }
 
 int BulletSpawner2D::get_pattern_cache_mode() const {
@@ -308,8 +308,8 @@ Dictionary BulletSpawner2D::debug_get_pattern_cache_info() const {
 	d["misses"] = (int64_t)pattern_cache.misses;
 	d["bakes"] = (int64_t)pattern_cache.bakes;
 	d["version"] = (int64_t)pattern_version;
-	d["shot_class"] = pattern_cache.motion_class(PatternBakeCache2D::CHANNEL_SHOT, pattern_version);
-	d["preview_class"] = pattern_cache.motion_class(PatternBakeCache2D::CHANNEL_PREVIEW, pattern_version);
+	d["shot_class"] = pattern_cache.motion_class(PatternBakeCache2D::CHANNEL_SHOT, pattern_cache_version2d(pattern_version));
+	d["preview_class"] = pattern_cache.motion_class(PatternBakeCache2D::CHANNEL_PREVIEW, pattern_cache_version2d(pattern_version));
 	// Spawn-data duplicate cache (shoot_once reuses one spawner-owned copy;
 	// resource swaps and in-place edits invalidate it).
 	d["template_valid"] = cached_volley_template.is_valid();

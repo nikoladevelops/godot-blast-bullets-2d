@@ -16,9 +16,25 @@
 namespace BlastBullets2D {
 using namespace godot;
 
+// The per-call bullet limit shared by generation, preview and the spawner
+// setters (helper_bullets_amount, helper_custom_transforms, shape counts).
+// A developer setting, not a constant: BulletPatterns2D.max_bullets_per_pattern
+// (project setting blastbullets2d/patterns/max_bullets_per_pattern). It only
+// guards against a typo'd count freezing or OOM-ing the game. Main thread only.
+static constexpr int kPatternDefaultMaxBullets = 100000;
+inline int g_pattern_max_bullets = kPatternDefaultMaxBullets;
+static inline int pattern_max_bullets() { return g_pattern_max_bullets; }
+// Grid slots (waterfall/lattice columns * rows) follow the same limit, 4x.
+static inline int64_t pattern_max_grid_slots() { return (int64_t)g_pattern_max_bullets * 4; }
+// Bumped on every accepted change of the limit: the bake cache must not serve
+// a bake generated under another limit (the same knobs can now be refused or
+// accepted), so spawners fold it into the version the cache sees.
+inline uint64_t g_pattern_limit_generation = 0;
+static inline uint64_t pattern_cache_version2d(uint64_t pattern_version) {
+	return pattern_version ^ (g_pattern_limit_generation << 48);
+}
+
 // Limits shared by generation, preview and the spawner setters.
-static constexpr int kPatternMaxBullets = 10000; // helper_bullets_amount + helper_custom_transforms
-static constexpr int kPatternMaxGridSlots = kPatternMaxBullets * 4; // waterfall/lattice columns * rows
 static constexpr int kPatternMaxTrackPoints = 256; // path/cross track decimation target
 static constexpr int kPatternMaxOutlineLayers = 64; // helper_outline_layer_count + helper_outline_layer_scales
 
