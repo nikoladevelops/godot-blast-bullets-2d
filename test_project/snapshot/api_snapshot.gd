@@ -70,6 +70,7 @@ func _ready() -> void:
 		"setters": _snap_setters,
 		"traces": _snap_traces,
 		"volley_api": _snap_volley_api,
+		"sound": _snap_sound,
 	}
 	for name in sections:
 		if only != "" and not (name in only.split(",")):
@@ -988,3 +989,107 @@ func _snap_volley_api(section: String) -> void:
 	factory.reset()
 	factory.queue_free()
 	await get_tree().process_frame
+
+
+# ---- sound -------------------------------------------------------------------
+
+## Deterministic sound flights: the plugin's cosmetic RNG is seeded, time is
+## advanced by hand, and every play is recorded (entry index, position) with
+## the busy voices' mix (volume, pitch, bus, fade, duck). Entries and streams
+## are named by their index so instance ids never leak into the snapshot.
+func _sound_state(factory: BulletFactory2D, sounds: Array) -> Array:
+	var ids := {}
+	for i in sounds.size():
+		ids[(sounds[i] as Object).get_instance_id()] = i
+	var plays := []
+	for e in factory.debug_get_sound_log():
+		plays.append([ids.get(int(e["sound"]), -1), e["position"]])
+	var voices := []
+	for v in factory.debug_get_sound_voices():
+		if not v.get("busy", false):
+			continue
+		voices.append([ids.get(int(v["sound"]), -1), v["fading"], v["priority"], v["position"],
+			snappedf(v["volume_db"], 0.0001), snappedf(v["pitch_scale"], 0.0001), v["bus"]])
+	var stats: Dictionary = factory.debug_get_sound_stats()
+	return [plays, voices, [stats["voices_total"], stats["voices_busy"], stats["channels"],
+		stats["pending"], stats["plays_total"], stats["dropped_total"]]]
+
+
+func _sound_entry(trigger: int, setup: Callable = Callable()) -> BulletSoundData2D:
+	var s := H.make_sound(trigger)
+	s.min_interval_sec = 0.0
+	if setup.is_valid():
+		setup.call(s)
+	return s
+
+
+func _sound_run(section: String, label: String, sounds: Array, steps: int, arm: Callable,
+		manual: Array = []) -> void:
+	var factory := BulletFactory2D.new()
+	add_child(factory)
+	await get_tree().process_frame
+	factory.debug_seed_cosmetic_rng(1234)
+	factory.debug_set_sound_log_enabled(true)
+	seed(77)
+	var v: BulletVolley2D = null
+	if arm.is_valid():
+		v = factory.spawn_volley(H.make_volley_data(5, 120.0))
+		arm.call(v)
+	for m in manual:
+		_rec(section, label + "#play", factory.play_sound(m[0], m[1]))
+	for step in steps:
+		factory.debug_advance_time(TRACE_STEP)
+		if step % 10 == 9 or step == steps - 1:
+			_rec(section, "%s#t%d" % [label, step + 1], _sound_state(factory, sounds))
+	if v != null and is_instance_valid(v):
+		v.clear_all_bullets()
+	factory.debug_advance_time(TRACE_STEP)
+	_rec(section, label + "#drained", _sound_state(factory, sounds))
+	factory.debug_stop_sound_voices()
+	factory.free()
+	await get_tree().process_frame
+	cap.take()
+
+
+func _snap_sound(section: String) -> void:
+	# Random mix rolls: volume, pitch, pan and stream picks all draw from the
+	# cosmetic RNG, so a seeded run is a fixed sequence.
+	var mix := _sound_entry(BulletSoundData2D.SOUND_ON_SHOT, func(s):
+		s.random_pitch = 1.5
+		s.random_volume_offset_db = 4.0
+		s.random_pan = 0.3
+		s.streams = [H.make_sound_stream(0.2, false), H.make_sound_stream(0.3, false)])
+	await _sound_run(section, "mix_rolls", [mix], 12, Callable(),
+		[[mix, Vector2(10, 0)], [mix, Vector2(-40, 25)], [mix, Vector2(200, 90)]])
+
+	# A followed hum on a flying volley (one voice per bullet).
+	var hum := _sound_entry(BulletSoundData2D.SOUND_ON_FLIGHT, func(s):
+		s.follow_bullet = true
+		s.max_voices = 8)
+	await _sound_run(section, "flight_hum", [hum], 40, func(v): v.sound_set_effects([hum]))
+
+	# Flight bounded by max_voices and a per-entry interval.
+	var capped := _sound_entry(BulletSoundData2D.SOUND_ON_FLIGHT, func(s):
+		s.max_voices = 2
+		s.min_interval_sec = 0.1)
+	await _sound_run(section, "flight_capped", [capped], 40, func(v): v.sound_set_effects([capped]))
+
+	# Ducking across three priority levels (the dip applies one sweep later).
+	var low := _sound_entry(BulletSoundData2D.SOUND_ON_SHOT, func(s):
+		s.priority = 0)
+	var mid := _sound_entry(BulletSoundData2D.SOUND_ON_SHOT, func(s):
+		s.priority = 1
+		s.duck_amount_db = 6.0)
+	var high := _sound_entry(BulletSoundData2D.SOUND_ON_SHOT, func(s):
+		s.priority = 2
+		s.duck_amount_db = 12.0)
+	await _sound_run(section, "ducking", [low, mid, high], 20, Callable(),
+		[[low, Vector2(0, 0)], [mid, Vector2(5, 0)], [high, Vector2(10, 0)]])
+
+	# Hit and clear triggers on the same volley.
+	var on_clear := _sound_entry(BulletSoundData2D.SOUND_ON_CLEAR)
+	var on_expire := _sound_entry(BulletSoundData2D.SOUND_ON_LIFETIME_OVER)
+	await _sound_run(section, "clear_expire", [on_clear, on_expire], 6, func(v):
+		v.sound_set_effects([on_clear, on_expire])
+		v.clear_bullet(1)
+		v.clear_bullet(3))
