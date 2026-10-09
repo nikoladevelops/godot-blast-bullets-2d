@@ -10,6 +10,8 @@ If you're searching for a **Godot optimized bullets plugin**, **BlastBullets2D**
 
 Also perfect as a **Godot bullet hell plugin** since it allows having **THOUSANDS of bullets visible on screen**.
 
+**New here? Read the [one-page Quickstart](QUICKSTART.md)**: it shows the recommended `BulletSpawner2D` workflow and the common bullet hell recipes (patterns, bursts, homing, graze, hits, budgets).
+
 BlastBullets2D comes already compiled and ready for these platforms:
 - **Windows**
 - **macOS**
