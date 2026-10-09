@@ -24,6 +24,7 @@ OutlineLayout2D PatternKnobs2D::outline_layout() const {
 	o.fill_spacing = helper_outline_fill_spacing;
 	o.fill_stagger = helper_outline_fill_stagger;
 	o.fill_margin = helper_outline_fill_margin;
+	o.fill_min_spacing = helper_outline_fill_min_spacing;
 	o.layer_count = helper_outline_layer_count;
 	o.layer_scale = helper_outline_layer_scale;
 	o.layer_side = helper_outline_layer_side;

@@ -40,7 +40,7 @@ bool PatternKnobs2D::is_knob_relevant(int source, const String &property_name) c
 		}
 		const bool riding = helper_outline_placement == (int)BulletPatterns2D::OUTLINE_ON_OUTLINE || helper_outline_placement == (int)BulletPatterns2D::OUTLINE_LAYERS;
 		const bool layering = helper_outline_placement == (int)BulletPatterns2D::OUTLINE_LAYERS;
-		if (property_name == "helper_outline_fill_spacing" || property_name == "helper_outline_fill_stagger" || property_name == "helper_outline_fill_margin") {
+		if (property_name == "helper_outline_fill_spacing" || property_name == "helper_outline_fill_stagger" || property_name == "helper_outline_fill_margin" || property_name == "helper_outline_fill_min_spacing") {
 			return helper_outline_placement == (int)BulletPatterns2D::OUTLINE_FILL_INSIDE;
 		}
 		if (property_name == "helper_outline_layer_count" || property_name == "helper_outline_layer_scale" || property_name == "helper_outline_layer_side" || property_name == "helper_outline_layer_fill" || property_name == "helper_outline_layer_scale_curve" || property_name == "helper_outline_layer_scales" || property_name == "helper_outline_layer_twist" || property_name == "helper_outline_layer_max_dots" || property_name == "helper_outline_layer_layout") {

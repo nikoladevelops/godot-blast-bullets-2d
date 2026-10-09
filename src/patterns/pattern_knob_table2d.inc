@@ -294,3 +294,4 @@ PATTERN_KNOB(int, int, INT, helper_outline_slot_offset, NONE, 0, 0, "", NONE, 0,
 PATTERN_KNOB(double, double, FLOAT, helper_outline_fill_spacing, FINITE_GT, 0.0, 0, "must be finite and > 0", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")
 PATTERN_KNOB(bool, bool, BOOL, helper_outline_fill_stagger, NONE, 0, 0, "", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")
 PATTERN_KNOB(double, double, FLOAT, helper_outline_fill_margin, FINITE_GE, 0.0, 0, "must be finite and >= 0", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")
+PATTERN_KNOB(double, double, FLOAT, helper_outline_fill_min_spacing, FINITE_GT, 0.0, 0, "must be finite and > 0", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")

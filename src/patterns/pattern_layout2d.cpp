@@ -4,6 +4,10 @@
 
 #include "patterns/patterns_internal.hpp"
 
+#include <limits>
+#include <queue>
+#include <vector>
+
 using namespace godot;
 
 namespace BlastBullets2D {
@@ -387,6 +391,79 @@ static bool fill_build_boundary(const PackedVector2Array &points, const PackedVe
 	return r_center.is_finite();
 }
 
+// Segments bucketed on a uniform grid so "is every segment at least `margin`
+// from this cell" only tests the segments near the cell. EXACT: a segment
+// closer than `margin` has a point within `margin` of the cell, that point
+// lies in a bucket the query covers, and the segment is listed in every bucket
+// its bounding box touches. (The query reach carries a little slack so float
+// rounding at a bucket edge can only test MORE segments, never fewer.)
+struct FillSegmentGrid2D {
+	double min_x = 0.0;
+	double min_y = 0.0;
+	double bucket = 1.0;
+	int nx = 1;
+	int ny = 1;
+	std::vector<std::vector<int>> cells;
+
+	static constexpr int MAX_BUCKETS_PER_AXIS = 256;
+
+	void build(const PackedVector2Array &poly, double margin) {
+		const int bn = poly.size();
+		Vector2 mn = poly[0];
+		Vector2 mx = poly[0];
+		for (int i = 1; i < bn; ++i) {
+			mn = Vector2(MIN(mn.x, poly[i].x), MIN(mn.y, poly[i].y));
+			mx = Vector2(MAX(mx.x, poly[i].x), MAX(mx.y, poly[i].y));
+		}
+		min_x = (double)mn.x;
+		min_y = (double)mn.y;
+		const double extent = MAX((double)mx.x - min_x, (double)mx.y - min_y);
+		bucket = MAX(margin, extent / (double)MAX_BUCKETS_PER_AXIS);
+		if (!(bucket > 0.0) || !Math::is_finite(bucket)) {
+			bucket = 1.0;
+		}
+		nx = (int)MIN((double)MAX_BUCKETS_PER_AXIS + 1.0, ((double)mx.x - min_x) / bucket + 1.0);
+		ny = (int)MIN((double)MAX_BUCKETS_PER_AXIS + 1.0, ((double)mx.y - min_y) / bucket + 1.0);
+		cells.assign((size_t)nx * (size_t)ny, std::vector<int>());
+		for (int k = 0; k < bn; ++k) {
+			const Vector2 a = poly[k];
+			const Vector2 b = poly[(k + 1) % bn];
+			const int x0 = index_x(MIN(a.x, b.x));
+			const int x1 = index_x(MAX(a.x, b.x));
+			const int y0 = index_y(MIN(a.y, b.y));
+			const int y1 = index_y(MAX(a.y, b.y));
+			for (int gy = y0; gy <= y1; ++gy) {
+				for (int gx = x0; gx <= x1; ++gx) {
+					cells[(size_t)gy * (size_t)nx + (size_t)gx].push_back(k);
+				}
+			}
+		}
+	}
+
+	int index_x(double x) const { return CLAMP((int)Math::floor((x - min_x) / bucket), 0, nx - 1); }
+	int index_y(double y) const { return CLAMP((int)Math::floor((y - min_y) / bucket), 0, ny - 1); }
+
+	// True when every segment is at least `margin` from `cell`.
+	bool all_at_least(const PackedVector2Array &poly, const Vector2 &cell, double margin) const {
+		const int bn = poly.size();
+		const double reach = margin * 1.000001 + 1e-6;
+		const int x0 = index_x((double)cell.x - reach);
+		const int x1 = index_x((double)cell.x + reach);
+		const int y0 = index_y((double)cell.y - reach);
+		const int y1 = index_y((double)cell.y + reach);
+		for (int gy = y0; gy <= y1; ++gy) {
+			for (int gx = x0; gx <= x1; ++gx) {
+				for (const int k : cells[(size_t)gy * (size_t)nx + (size_t)gx]) {
+					if (!(outline_point_seg_dist(cell, poly[k], poly[(k + 1) % bn]) >= margin)) {
+						return false;
+					}
+				}
+			}
+		}
+		return true;
+	}
+};
+
 // Row-major interior grid at `spacing` (even-odd rule: a cell is inside
 // when an odd number of boundary crossings lie to its right): counts cells
 // and optionally collects them.
@@ -411,6 +488,10 @@ static int fill_scan_cells(const PackedVector2Array &poly, double spacing, bool 
 	int count = 0;
 	int row = 0;
 	std::vector<double> xs;
+	FillSegmentGrid2D segment_grid;
+	if (margin > 0.0) {
+		segment_grid.build(poly, margin);
+	}
 	for (double y = (double)mn.y; y <= (double)mx.y + 1e-9; y += spacing, ++row) {
 		xs.clear();
 		for (int i = 0, j = bn - 1; i < bn; j = i++) {
@@ -435,14 +516,8 @@ static int fill_scan_cells(const PackedVector2Array &poly, double spacing, bool 
 				continue;
 			}
 			const Vector2 cell((real_t)x, (real_t)y);
-			if (margin > 0.0) {
-				double clearance = 1e30;
-				for (int k = 0; k < bn && clearance >= margin; ++k) {
-					clearance = MIN(clearance, outline_point_seg_dist(cell, poly[k], poly[(k + 1) % bn]));
-				}
-				if (!(clearance >= margin)) {
-					continue;
-				}
+			if (margin > 0.0 && !segment_grid.all_at_least(poly, cell, margin)) {
+				continue;
 			}
 			++count;
 			if (r_cells != nullptr) {
@@ -455,12 +530,100 @@ static int fill_scan_cells(const PackedVector2Array &poly, double spacing, bool 
 	return count;
 }
 
+// Signed distance from (x, y) to the loop: positive inside (the scan's
+// even-odd rule), negative outside. 1-Lipschitz, which the bound below uses.
+static double fill_signed_clearance(const PackedVector2Array &poly, double x, double y) {
+	const int bn = poly.size();
+	const Vector2 cell((real_t)x, (real_t)y);
+	int right = 0;
+	double best = 1e30;
+	for (int i = 0, j = bn - 1; i < bn; j = i++) {
+		const Vector2 a = poly[i];
+		const Vector2 b = poly[j];
+		if (((double)a.y > y) != ((double)b.y > y)) {
+			const double x_int = (double)b.x + (y - (double)b.y) / ((double)a.y - (double)b.y) * ((double)a.x - (double)b.x);
+			if (Math::is_finite(x_int) && x_int > x) {
+				++right;
+			}
+		}
+		best = MIN(best, outline_point_seg_dist(cell, a, b));
+	}
+	return (right & 1) ? best : -best;
+}
+
+// True only when it is CERTAIN that no interior point keeps `margin` from the
+// loop (so every spacing of the fill grid finds zero cells). Branch and bound
+// over squares ordered by their best possible clearance (a square's best point
+// is at most half its diagonal better than its center): it ends with "a point
+// qualifies" (false) as soon as a square center reaches the margin, or with
+// "impossible" (true) once the best remaining bound is below the margin. Gives
+// up with false (the caller then does the full search) on squares of 1e-9 of
+// the shape or after 20000 evaluations, so it never answers wrongly.
+static bool fill_margin_unreachable(const PackedVector2Array &poly, double margin) {
+	const int bn = poly.size();
+	if (bn < 3) {
+		return false;
+	}
+	Vector2 mn = poly[0];
+	Vector2 mx = poly[0];
+	for (int i = 1; i < bn; ++i) {
+		mn = Vector2(MIN(mn.x, poly[i].x), MIN(mn.y, poly[i].y));
+		mx = Vector2(MAX(mx.x, poly[i].x), MAX(mx.y, poly[i].y));
+	}
+	const double width = (double)mx.x - (double)mn.x;
+	const double height = (double)mx.y - (double)mn.y;
+	const double side = MIN(width, height);
+	if (!(side > 0.0) || !Math::is_finite(side) || !((width / side) * (height / side) <= 4096.0)) {
+		return false;
+	}
+	struct Square {
+		double x, y, half, d, bound;
+	};
+	const auto make = [&](double x, double y, double half) {
+		const double d = fill_signed_clearance(poly, x, y);
+		return Square{ x, y, half, d, d + half * 1.4142135623730951 };
+	};
+	const auto lower = [](const Square &a, const Square &b) { return a.bound < b.bound; };
+	std::priority_queue<Square, std::vector<Square>, decltype(lower)> queue(lower);
+	const double half0 = side * 0.5;
+	for (double x = (double)mn.x; x < (double)mx.x; x += side) {
+		for (double y = (double)mn.y; y < (double)mx.y; y += side) {
+			queue.push(make(x + half0, y + half0, half0));
+		}
+	}
+	int evaluations = 0;
+	while (!queue.empty()) {
+		const Square sq = queue.top();
+		queue.pop();
+		if (sq.bound < margin) {
+			return true; // the most promising square cannot reach the margin: neither can the rest
+		}
+		if (sq.d >= margin || sq.half < side * 1e-9 || evaluations > 20000) {
+			return false;
+		}
+		const double half = sq.half * 0.5;
+		for (int k = 0; k < 4; ++k) {
+			queue.push(make(sq.x + ((k & 1) ? half : -half), sq.y + ((k & 2) ? half : -half), half));
+		}
+		evaluations += 4;
+	}
+	return true; // no square left: nothing inside
+}
+
 // Largest spacing <= fill_spacing whose grid holds at least n cells:
 // fill_spacing itself whenever everything fits, else halve to bracket and
-// bisect. Deterministic (pure function of its inputs).
-static double fill_spacing_that_fits(const PackedVector2Array &poly, double fill_spacing, bool stagger, double margin, int n) {
+// bisect. The search never goes finer than `min_spacing` (nor 1e-5 of the
+// shape): a margin that leaves only a sliver used to refine down to
+// thousandths of a pixel, scanning tens of millions of cells per step for
+// minutes. At the floor it settles for the cells that fit (the caller takes
+// min(n, count) or reports "no room"). A fill_spacing the developer set
+// finer than the floor is honored. Deterministic (pure function of its inputs).
+static double fill_spacing_that_fits(const PackedVector2Array &poly, double fill_spacing, bool stagger, double margin, double min_spacing, int n) {
 	if (fill_scan_cells(poly, fill_spacing, stagger, margin, nullptr, n) >= n) {
 		return fill_spacing;
+	}
+	if (margin > 0.0 && fill_margin_unreachable(poly, margin)) {
+		return 0.0; // no point can keep that margin: every spacing finds zero cells (the caller reports)
 	}
 	Vector2 mn = poly[0];
 	Vector2 mx = poly[0];
@@ -469,13 +632,26 @@ static double fill_spacing_that_fits(const PackedVector2Array &poly, double fill
 		mx = Vector2(MAX(mx.x, poly[i].x), MAX(mx.y, poly[i].y));
 	}
 	const double extent = MAX((double)(mx.x - mn.x), (double)(mx.y - mn.y));
+	const double floor_spacing = MAX(min_spacing, extent * 1e-5);
+	if (fill_spacing <= floor_spacing) {
+		return fill_spacing; // asked finer than the floor: the floor only stops the automatic refinement
+	}
 	double hi = fill_spacing;
 	double lo = fill_spacing * 0.5;
-	while (fill_scan_cells(poly, lo, stagger, margin, nullptr, n) < n) {
+	while (lo >= floor_spacing) {
+		if (fill_scan_cells(poly, lo, stagger, margin, nullptr, n) >= n) {
+			break;
+		}
 		hi = lo;
 		lo *= 0.5;
-		if (lo < extent * 1e-5) {
-			return lo; // no interior room (margin eats the shape): caller reports
+	}
+	if (lo < floor_spacing) {
+		// Never held n cells above the floor. The finest allowed grid may
+		// still hold them (the last halving overshot it).
+		if (hi > floor_spacing && fill_scan_cells(poly, floor_spacing, stagger, margin, nullptr, n) >= n) {
+			lo = floor_spacing;
+		} else {
+			return floor_spacing; // settle for the cells that fit at the floor (maybe none: the caller reports)
 		}
 	}
 	for (int it = 0; it < 24; ++it) {
@@ -561,6 +737,7 @@ PatternSlots2D layout_outline_slots(const char *caller_name, const Transform2D &
 	const double fill_spacing = outline.fill_spacing;
 	const bool fill_stagger = outline.fill_stagger;
 	const double fill_margin = outline.fill_margin;
+	const double fill_min_spacing = outline.fill_min_spacing;
 	const int layer_count = outline.layer_count;
 	const double layer_scale = outline.layer_scale;
 	const int layer_side = outline.layer_side;
@@ -623,6 +800,10 @@ PatternSlots2D layout_outline_slots(const char *caller_name, const Transform2D &
 	if (outline_placement == BulletPatterns2D::OUTLINE_FILL_INSIDE) {
 		if (!Math::is_finite(fill_spacing) || fill_spacing <= 0.0 || !Math::is_finite(fill_margin) || fill_margin < 0.0) {
 			UtilityFunctions::push_error(String(caller_name) + ": fill_spacing must be finite and > 0, fill_margin finite and >= 0.");
+			return out;
+		}
+		if (!Math::is_finite(fill_min_spacing) || fill_min_spacing <= 0.0) {
+			UtilityFunctions::push_error(String(caller_name) + ": fill_min_spacing must be finite and > 0.");
 			return out;
 		}
 	}
@@ -852,7 +1033,7 @@ PatternSlots2D layout_outline_slots(const char *caller_name, const Transform2D &
 			UtilityFunctions::push_error(String(caller_name) + ": fill inside needs a usable loop interior (degenerate outline).");
 			return out;
 		}
-		const double spacing = fill_spacing_that_fits(boundary, fill_spacing, fill_stagger, fill_margin, n);
+		const double spacing = fill_spacing_that_fits(boundary, fill_spacing, fill_stagger, fill_margin, fill_min_spacing, n);
 		std::vector<Vector2> cells;
 		fill_scan_cells(boundary, spacing, fill_stagger, fill_margin, &cells, 0);
 		const int count = (int)cells.size();

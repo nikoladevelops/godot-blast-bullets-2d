@@ -49,6 +49,12 @@
 	OPT(int, layer_twist, 0, outline.layer_twist) \
 	OPT(int, layer_max_dots, 0, outline.layer_max_dots)
 
+// Appended at the END of every outline shape's entry (after its own
+// arguments) so positional GDScript calls keep working: the finest grid the
+// Fill Inside spacing search may use (see fill_spacing_that_fits).
+#define PATTERN_OUTLINE_FILL_TAIL(REQ, OPT) \
+	OPT(double, fill_min_spacing, 0.5, outline.fill_min_spacing)
+
 // Corner anchoring of the polygon loops (CornerLayout2D); layer_layout
 // rides here for the corner shapes.
 #define PATTERN_CORNER_TAIL(REQ, OPT) \
@@ -89,7 +95,8 @@ PATTERN_GENERATOR(grid, GridParams2D)
 	OPT(real_t, facing_offset_degrees, 0.0, facing_offset_degrees) \
 	PATTERN_OUTLINE_HEAD(REQ, OPT) \
 	OPT(uint64_t, seed, 0, seed) \
-	OPT(int, layer_layout, 1, outline.layer_layout)
+	OPT(int, layer_layout, 1, outline.layer_layout) \
+	PATTERN_OUTLINE_FILL_TAIL(REQ, OPT)
 
 PATTERN_GENERATOR(ring, RingParams2D)
 
@@ -179,7 +186,8 @@ PATTERN_GENERATOR(aimed, AimedParams2D)
 	OPT(double, spiro_pen, 80.0, spiro_pen) \
 	OPT(double, super_lobes, 6.0, super_lobes) \
 	OPT(double, super_fullness, 1.0, super_fullness) \
-	OPT(int, layer_layout, 1, outline.layer_layout)
+	OPT(int, layer_layout, 1, outline.layer_layout) \
+	PATTERN_OUTLINE_FILL_TAIL(REQ, OPT)
 
 PATTERN_GENERATOR(flower, FlowerParams2D)
 
@@ -201,7 +209,8 @@ PATTERN_GENERATOR(flower, FlowerParams2D)
 	OPT(bool, face_outward, true, face_outward) \
 	OPT(real_t, facing_offset_degrees, 0.0, facing_offset_degrees) \
 	PATTERN_OUTLINE_HEAD(REQ, OPT) \
-	OPT(int, layer_layout, 1, outline.layer_layout)
+	OPT(int, layer_layout, 1, outline.layer_layout) \
+	PATTERN_OUTLINE_FILL_TAIL(REQ, OPT)
 
 PATTERN_GENERATOR(ellipse, EllipseParams2D)
 
@@ -285,7 +294,8 @@ PATTERN_GENERATOR(cross, CrossParams2D)
 	OPT(bool, face_outward, true, face_outward) \
 	OPT(real_t, facing_offset_degrees, 0.0, facing_offset_degrees) \
 	PATTERN_OUTLINE_HEAD(REQ, OPT) \
-	PATTERN_CORNER_TAIL(REQ, OPT)
+	PATTERN_CORNER_TAIL(REQ, OPT) \
+	PATTERN_OUTLINE_FILL_TAIL(REQ, OPT)
 
 PATTERN_GENERATOR(star, StarParams2D)
 
@@ -300,7 +310,8 @@ PATTERN_GENERATOR(star, StarParams2D)
 	OPT(bool, face_outward, true, face_outward) \
 	OPT(real_t, facing_offset_degrees, 0.0, facing_offset_degrees) \
 	PATTERN_OUTLINE_HEAD(REQ, OPT) \
-	OPT(int, layer_layout, 1, outline.layer_layout)
+	OPT(int, layer_layout, 1, outline.layer_layout) \
+	PATTERN_OUTLINE_FILL_TAIL(REQ, OPT)
 
 PATTERN_GENERATOR(heart, HeartParams2D)
 
@@ -356,7 +367,8 @@ PATTERN_GENERATOR(lattice, LatticeParams2D)
 	OPT(bool, face_outward, true, face_outward) \
 	OPT(real_t, facing_offset_degrees, 0.0, facing_offset_degrees) \
 	PATTERN_OUTLINE_HEAD(REQ, OPT) \
-	OPT(int, layer_layout, 1, outline.layer_layout)
+	OPT(int, layer_layout, 1, outline.layer_layout) \
+	PATTERN_OUTLINE_FILL_TAIL(REQ, OPT)
 
 PATTERN_GENERATOR(rose, RoseParams2D)
 
@@ -401,7 +413,8 @@ PATTERN_GENERATOR(corridor, CorridorParams2D)
 	OPT(bool, face_outward, true, face_outward) \
 	OPT(real_t, facing_offset_degrees, 0.0, facing_offset_degrees) \
 	PATTERN_OUTLINE_HEAD(REQ, OPT) \
-	OPT(int, layer_layout, 1, outline.layer_layout)
+	OPT(int, layer_layout, 1, outline.layer_layout) \
+	PATTERN_OUTLINE_FILL_TAIL(REQ, OPT)
 
 PATTERN_GENERATOR(lissajous, LissajousParams2D)
 
@@ -413,7 +426,8 @@ PATTERN_GENERATOR(lissajous, LissajousParams2D)
 	OPT(bool, face_outward, true, face_outward) \
 	OPT(real_t, facing_offset_degrees, 0.0, facing_offset_degrees) \
 	PATTERN_OUTLINE_HEAD(REQ, OPT) \
-	OPT(int, layer_layout, 1, outline.layer_layout)
+	OPT(int, layer_layout, 1, outline.layer_layout) \
+	PATTERN_OUTLINE_FILL_TAIL(REQ, OPT)
 
 PATTERN_GENERATOR(circle, CircleParams2D)
 
@@ -425,7 +439,8 @@ PATTERN_GENERATOR(circle, CircleParams2D)
 	OPT(bool, face_outward, true, face_outward) \
 	OPT(real_t, facing_offset_degrees, 0.0, facing_offset_degrees) \
 	PATTERN_OUTLINE_HEAD(REQ, OPT) \
-	PATTERN_CORNER_TAIL(REQ, OPT)
+	PATTERN_CORNER_TAIL(REQ, OPT) \
+	PATTERN_OUTLINE_FILL_TAIL(REQ, OPT)
 
 PATTERN_GENERATOR(rectangle, RectangleParams2D)
 
@@ -439,7 +454,8 @@ PATTERN_GENERATOR(rectangle, RectangleParams2D)
 	OPT(bool, face_outward, true, face_outward) \
 	OPT(real_t, facing_offset_degrees, 0.0, facing_offset_degrees) \
 	PATTERN_OUTLINE_HEAD(REQ, OPT) \
-	PATTERN_CORNER_TAIL(REQ, OPT)
+	PATTERN_CORNER_TAIL(REQ, OPT) \
+	PATTERN_OUTLINE_FILL_TAIL(REQ, OPT)
 
 PATTERN_GENERATOR(polygon, PolygonParams2D)
 
@@ -457,7 +473,8 @@ PATTERN_GENERATOR(polygon, PolygonParams2D)
 	OPT(bool, face_outward, true, face_outward) \
 	OPT(real_t, facing_offset_degrees, 0.0, facing_offset_degrees) \
 	PATTERN_OUTLINE_HEAD(REQ, OPT) \
-	PATTERN_CORNER_TAIL(REQ, OPT)
+	PATTERN_CORNER_TAIL(REQ, OPT) \
+	PATTERN_OUTLINE_FILL_TAIL(REQ, OPT)
 
 PATTERN_GENERATOR(triangle, TriangleParams2D)
 
@@ -473,7 +490,8 @@ PATTERN_GENERATOR(triangle, TriangleParams2D)
 	OPT(bool, face_outward, true, face_outward) \
 	OPT(real_t, facing_offset_degrees, 0.0, facing_offset_degrees) \
 	PATTERN_OUTLINE_HEAD(REQ, OPT) \
-	PATTERN_CORNER_TAIL(REQ, OPT)
+	PATTERN_CORNER_TAIL(REQ, OPT) \
+	PATTERN_OUTLINE_FILL_TAIL(REQ, OPT)
 
 PATTERN_GENERATOR(trapezoid, TrapezoidParams2D)
 
@@ -488,7 +506,8 @@ PATTERN_GENERATOR(trapezoid, TrapezoidParams2D)
 	OPT(bool, face_outward, true, face_outward) \
 	OPT(real_t, facing_offset_degrees, 0.0, facing_offset_degrees) \
 	PATTERN_OUTLINE_HEAD(REQ, OPT) \
-	PATTERN_CORNER_TAIL(REQ, OPT)
+	PATTERN_CORNER_TAIL(REQ, OPT) \
+	PATTERN_OUTLINE_FILL_TAIL(REQ, OPT)
 
 PATTERN_GENERATOR(diamond, DiamondParams2D)
 

@@ -20,6 +20,7 @@ struct OutlineLayout2D {
 	double fill_spacing = 32.0;
 	bool fill_stagger = false;
 	double fill_margin = 0.0;
+	double fill_min_spacing = 0.5;
 	int layer_count = 1;
 	double layer_scale = 0.2;
 	int layer_side = 0;

@@ -176,7 +176,7 @@ func _outline_expected(prop: String, outline: bool, corners: bool, placement: in
 	var riding := placement == BulletPatterns2D.OUTLINE_ON_OUTLINE or placement == BulletPatterns2D.OUTLINE_LAYERS
 	var layering := placement == BulletPatterns2D.OUTLINE_LAYERS
 	match prop:
-		"helper_outline_fill_spacing", "helper_outline_fill_stagger", "helper_outline_fill_margin":
+		"helper_outline_fill_spacing", "helper_outline_fill_stagger", "helper_outline_fill_margin", "helper_outline_fill_min_spacing":
 			return placement == BulletPatterns2D.OUTLINE_FILL_INSIDE
 		"helper_outline_layer_count", "helper_outline_layer_scale", "helper_outline_layer_side", "helper_outline_layer_fill", "helper_outline_layer_scale_curve", "helper_outline_layer_scales", "helper_outline_layer_twist", "helper_outline_layer_max_dots", "helper_outline_layer_layout":
 			return layering
@@ -195,7 +195,7 @@ func _outline_expected(prop: String, outline: bool, corners: bool, placement: in
 
 func test_outline_knobs_follow_shape_placement_fill_and_corner_mode() -> void:
 	var props := _helper_props("helper_outline_")
-	var known := ["helper_outline_fill_spacing", "helper_outline_fill_stagger", "helper_outline_fill_margin", "helper_outline_layer_count", "helper_outline_layer_scale", "helper_outline_layer_side", "helper_outline_layer_fill", "helper_outline_layer_scale_curve", "helper_outline_layer_scales", "helper_outline_layer_twist", "helper_outline_layer_max_dots", "helper_outline_layer_layout", "helper_outline_layer_start_offset", "helper_outline_reverse", "helper_outline_slot_offset", "helper_outline_distribution", "helper_outline_corner_priority", "helper_outline_corner_mode", "helper_outline_edge_margin", "helper_outline_placement", "helper_outline_facing", "helper_outline_corner_facing"]
+	var known := ["helper_outline_fill_spacing", "helper_outline_fill_stagger", "helper_outline_fill_margin", "helper_outline_fill_min_spacing", "helper_outline_layer_count", "helper_outline_layer_scale", "helper_outline_layer_side", "helper_outline_layer_fill", "helper_outline_layer_scale_curve", "helper_outline_layer_scales", "helper_outline_layer_twist", "helper_outline_layer_max_dots", "helper_outline_layer_layout", "helper_outline_layer_start_offset", "helper_outline_reverse", "helper_outline_slot_offset", "helper_outline_distribution", "helper_outline_corner_priority", "helper_outline_corner_mode", "helper_outline_edge_margin", "helper_outline_placement", "helper_outline_facing", "helper_outline_corner_facing"]
 	assert_eq_deep(props.filter(func(p): return not known.has(p)), [])
 	var problems: Array = []
 	var combos := 0

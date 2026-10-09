@@ -411,6 +411,7 @@ struct PatternKnobs2D {
 	double helper_outline_fill_spacing = 32.0;
 	bool helper_outline_fill_stagger = false;
 	double helper_outline_fill_margin = 0.0;
+	double helper_outline_fill_min_spacing = 0.5;
 
 	// NEGATIVE SPACE (skip slots by index: dodge doors, bullet text).
 	PackedInt32Array helper_skip_indices;
