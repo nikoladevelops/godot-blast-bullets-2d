@@ -2,6 +2,7 @@
 // clear flashes) fired by volleys or by spawn_layer_effect, aged every physics
 // frame. Volley trails live on the volley (bullet_volley2d_effects.cpp).
 
+#include "core/cosmetic_rng2d.hpp"
 #include "factory/bullet_factory2d_internal.hpp"
 
 using namespace godot;
@@ -327,7 +328,7 @@ int BulletFactory2D::fx_fire_into_bake(FXOneShotBake &bake, const Transform2D &a
 	}
 	BulletEffectLayerData2D *layer = bake.layer.ptr();
 	if (layer->trigger_chance < 1.0) {
-		if (!Math::is_finite((double)layer->trigger_chance) || UtilityFunctions::randf() > layer->trigger_chance) {
+		if (!Math::is_finite((double)layer->trigger_chance) || CosmeticRng2D::randf() > layer->trigger_chance) {
 			return -1;
 		}
 	}
@@ -344,14 +345,14 @@ int BulletFactory2D::fx_fire_into_bake(FXOneShotBake &bake, const Transform2D &a
 		t = t.rotated_local(layer->rotation_degrees * Math::PI / 180.0);
 	}
 	if (layer->randomize_rotation) {
-		t = t.rotated_local(UtilityFunctions::randf_range(0.0f, (float)Math::TAU));
+		t = t.rotated_local(CosmeticRng2D::randf_range(0.0f, (float)Math::TAU));
 	}
 	Vector2 s = layer->scale;
 	if (!s.is_finite()) {
 		s = Vector2(1, 1);
 	}
 	if (layer->random_scale_max > layer->random_scale_min && Math::is_finite(layer->random_scale_min) && Math::is_finite(layer->random_scale_max)) {
-		const float mul = UtilityFunctions::randf_range((float)layer->random_scale_min, (float)layer->random_scale_max);
+		const float mul = CosmeticRng2D::randf_range((float)layer->random_scale_min, (float)layer->random_scale_max);
 		if (Math::is_finite((double)mul) && mul > 0.0f) {
 			s *= mul;
 		}
@@ -364,7 +365,7 @@ int BulletFactory2D::fx_fire_into_bake(FXOneShotBake &bake, const Transform2D &a
 	slot.birth_sweep = sweep_counter;
 	slot.birth_needs_rebase = (fx_aged_sweep != sweep_counter);
 	slot.duration = bake.total;
-	slot.start_age = (layer->random_start_frame && bake.total > 0.0) ? (double)UtilityFunctions::randf_range(0.0f, (float)bake.total) : 0.0;
+	slot.start_age = (layer->random_start_frame && bake.total > 0.0) ? (double)CosmeticRng2D::randf_range(0.0f, (float)bake.total) : 0.0;
 	slot.active = true;
 	const int frame = fx_frame_for_age(bake.frame_starts, bake.total, slot.start_age);
 	slot.last_shard = frame;

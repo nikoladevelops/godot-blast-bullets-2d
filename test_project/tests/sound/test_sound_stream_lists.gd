@@ -109,7 +109,7 @@ func test_shuffle_deals_every_entry_per_cycle() -> void:
 
 func test_weighted_favors_heavier_entries() -> void:
 	godot_listener_at(Vector2.ZERO)
-	seed(1234)
+	factory.debug_seed_cosmetic_rng(1234)
 	var pair := [H.make_sound_stream(0.2), H.make_sound_stream(0.21)]
 	var s := _list_sound(BulletSoundData2D.STREAM_WEIGHTED, pair, PackedFloat32Array([3.0, 1.0]))
 	var ids := await _play_each_sweep(s, 200)
@@ -123,7 +123,7 @@ func test_weighted_favors_heavier_entries() -> void:
 
 func test_weighted_fallbacks_play_uniform() -> void:
 	godot_listener_at(Vector2.ZERO)
-	seed(1234)
+	factory.debug_seed_cosmetic_rng(1234)
 	# All-zero, size-mismatched and empty weights all mean uniform (documented).
 	var pair := [H.make_sound_stream(0.2), H.make_sound_stream(0.21)]
 	for weights in [PackedFloat32Array([0.0, 0.0]), PackedFloat32Array([5.0]), PackedFloat32Array()]:
@@ -185,7 +185,7 @@ func test_in_place_append_reaches_next_play() -> void:
 
 func test_swapping_weights_mid_fight_rebalances() -> void:
 	godot_listener_at(Vector2.ZERO)
-	seed(1234)
+	factory.debug_seed_cosmetic_rng(1234)
 	var pair := [H.make_sound_stream(0.2), H.make_sound_stream(0.21)]
 	var s := _list_sound(BulletSoundData2D.STREAM_WEIGHTED, pair, PackedFloat32Array([3.0, 1.0]))
 	var first := await _play_each_sweep(s, 120)

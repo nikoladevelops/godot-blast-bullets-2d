@@ -224,6 +224,13 @@
 				Test/profiling hook: zones with more live targets than [param value] (default 8) test each bullet only against the targets near its motion in x instead of every target (same results, far cheaper with many targets). 0 = always, a huge value = never. Process-wide. Returns the previous value; a value outside 0..64 pushes an error and changes nothing.
 			</description>
 		</method>
+		<method name="debug_seed_cosmetic_rng">
+			<return type="void" />
+			<param index="0" name="seed" type="int" />
+			<description>
+				Test helper: reseeds the plugin's cosmetic generator, which draws sound mix rolls (volume, pitch, pan, stream picks, chance) and effect layer starts, scales and rotations. Godot's [method @GlobalScope.seed] does not reach these rolls, so gameplay randomness stays the same whatever the audio does.
+			</description>
+		</method>
 		<method name="debug_set_sound_log_enabled">
 			<return type="void" />
 			<param index="0" name="enabled" type="bool" />

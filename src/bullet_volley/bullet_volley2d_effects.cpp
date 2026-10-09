@@ -2,6 +2,7 @@
 // and one-shot effects fired on spawn/hit/destroy/bounce/clear.
 
 #include "bullet_volley/bullet_volley2d_internal.hpp"
+#include "core/cosmetic_rng2d.hpp"
 
 using namespace godot;
 
@@ -69,7 +70,7 @@ void BulletVolley2D::fx_rebuild_trail_layers(const TypedArray<BulletEffectLayerD
 		bake.phase.assign(amount_bullets, 0.0);
 		if (layer->random_start_frame && bake.total > 0.0) {
 			for (int i = 0; i < amount_bullets; ++i) {
-				bake.phase[i] = (double)UtilityFunctions::randf_range(0.0f, (float)bake.total);
+				bake.phase[i] = (double)CosmeticRng2D::randf_range(0.0f, (float)bake.total);
 			}
 		}
 		bake.bullet_on.assign(amount_bullets, 1);
@@ -157,7 +158,7 @@ void BulletVolley2D::fx_soft_reset_trail_layers() {
 		bake.phase.assign(amount_bullets, 0.0);
 		if (bake.layer->random_start_frame && bake.total > 0.0) {
 			for (int i = 0; i < amount_bullets; ++i) {
-				bake.phase[i] = (double)UtilityFunctions::randf_range(0.0f, (float)bake.total);
+				bake.phase[i] = (double)CosmeticRng2D::randf_range(0.0f, (float)bake.total);
 			}
 		}
 	}

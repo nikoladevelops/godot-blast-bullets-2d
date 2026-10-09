@@ -2,6 +2,7 @@
 // debug readouts. Volley and spawner trigger sites offer through sound_offer;
 // the mixer plays the sweep's winners at the end of _physics_process.
 
+#include "core/cosmetic_rng2d.hpp"
 #include "factory/bullet_factory2d_internal.hpp"
 
 using namespace godot;
@@ -52,6 +53,10 @@ void BulletFactory2D::set_sound_max_voices(int value) {
 		return;
 	}
 	sound_mixer.max_voices_total = value;
+}
+
+void BulletFactory2D::debug_seed_cosmetic_rng(int64_t seed) {
+	CosmeticRng2D::seed((uint64_t)seed);
 }
 
 void BulletFactory2D::debug_set_sound_log_enabled(bool enabled) {

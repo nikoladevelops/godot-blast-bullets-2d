@@ -199,6 +199,7 @@ void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_sound_max_voices", "value"), &BulletFactory2D::set_sound_max_voices);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "sound_max_voices", PROPERTY_HINT_RANGE, "1,256,1,or_greater"), "set_sound_max_voices", "get_sound_max_voices");
 	ClassDB::bind_method(D_METHOD("debug_set_sound_log_enabled", "enabled"), &BulletFactory2D::debug_set_sound_log_enabled);
+	ClassDB::bind_method(D_METHOD("debug_seed_cosmetic_rng", "seed"), &BulletFactory2D::debug_seed_cosmetic_rng);
 	ClassDB::bind_method(D_METHOD("debug_get_sound_log"), &BulletFactory2D::debug_get_sound_log);
 	ClassDB::bind_method(D_METHOD("debug_clear_sound_log"), &BulletFactory2D::debug_clear_sound_log);
 	ClassDB::bind_method(D_METHOD("debug_get_sound_voices"), &BulletFactory2D::debug_get_sound_voices);

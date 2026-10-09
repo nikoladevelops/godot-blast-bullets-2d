@@ -1,6 +1,7 @@
 #include "factory/sound_mixer2d.hpp"
 
 #include "bullet_volley/bullet_volley2d.hpp"
+#include "core/cosmetic_rng2d.hpp"
 #include "core/warn_once2d.hpp"
 #include "factory/bullet_factory2d.hpp"
 
@@ -76,7 +77,7 @@ Ref<AudioStream> SoundMixer2D::pick_stream(const BulletSoundData2D *sound, Chann
 				channel.shuffle_bag.push_back(i);
 			}
 			for (size_t i = n; i > 1; --i) {
-				const size_t j = (size_t)UtilityFunctions::randi() % i;
+				const size_t j = (size_t)CosmeticRng2D::randi() % i;
 				std::swap(channel.shuffle_bag[i - 1], channel.shuffle_bag[j]);
 			}
 			channel.shuffle_n = n;
@@ -94,7 +95,7 @@ Ref<AudioStream> SoundMixer2D::pick_stream(const BulletSoundData2D *sound, Chann
 			}
 		}
 		if (total > 0.0) {
-			double roll = UtilityFunctions::randf() * total;
+			double roll = CosmeticRng2D::randf() * total;
 			for (int i = 0; i < sound->streams.size(); ++i) {
 				const Variant entry = sound->streams[i];
 				AudioStream *s = entry.get_type() == Variant::OBJECT ? Object::cast_to<AudioStream>((Object *)entry) : nullptr;
@@ -109,7 +110,7 @@ Ref<AudioStream> SoundMixer2D::pick_stream(const BulletSoundData2D *sound, Chann
 			return usable.back();
 		}
 	}
-	return usable[(size_t)UtilityFunctions::randi() % n];
+	return usable[(size_t)CosmeticRng2D::randi() % n];
 }
 // AudioStreamRandomizer pitch math: pitch_scale * exp(lerp(log(1/r),
 // log(r), randf)). Rolled only when r > 1 (no RNG burn otherwise).
@@ -117,7 +118,7 @@ static float sound_roll_pitch(double range) {
 	if (!(range > 1.0) || !Math::is_finite(range)) {
 		return 1.0f;
 	}
-	const double u = UtilityFunctions::randf();
+	const double u = CosmeticRng2D::randf();
 	return (float)Math::exp(Math::log(range) * (2.0 * u - 1.0));
 }
 
@@ -146,7 +147,7 @@ float SoundMixer2D::apply_playback_mix(AudioStreamPlayer2D *player, const Bullet
 	}
 	float volume = (float)sound->volume_db + volume_offset_db;
 	if (Math::is_finite((double)sound->random_volume_offset_db) && sound->random_volume_offset_db > 0.0) {
-		volume += (float)UtilityFunctions::randf_range(-(double)sound->random_volume_offset_db, (double)sound->random_volume_offset_db);
+		volume += (float)CosmeticRng2D::randf_range(-(double)sound->random_volume_offset_db, (double)sound->random_volume_offset_db);
 	}
 	// Asymmetric volume bounds: uniform in [min, max] (sorted when inverted,
 	// so the setters stay independent). 0/0 disables without burning RNG;
@@ -157,7 +158,7 @@ float SoundMixer2D::apply_playback_mix(AudioStreamPlayer2D *player, const Bullet
 		} else {
 			const double lo = sound->random_volume_min_db < sound->random_volume_max_db ? sound->random_volume_min_db : sound->random_volume_max_db;
 			const double hi = sound->random_volume_min_db < sound->random_volume_max_db ? sound->random_volume_max_db : sound->random_volume_min_db;
-			volume += (float)UtilityFunctions::randf_range(lo, hi);
+			volume += (float)CosmeticRng2D::randf_range(lo, hi);
 		}
 	}
 	float pitch = (float)sound->pitch_scale * sound_roll_pitch(sound->random_pitch);
@@ -168,7 +169,7 @@ float SoundMixer2D::apply_playback_mix(AudioStreamPlayer2D *player, const Bullet
 		} else {
 			const double lo = sound->random_pitch_min < sound->random_pitch_max ? sound->random_pitch_min : sound->random_pitch_max;
 			const double hi = sound->random_pitch_min < sound->random_pitch_max ? sound->random_pitch_max : sound->random_pitch_min;
-			pitch *= (float)UtilityFunctions::randf_range(lo, hi);
+			pitch *= (float)CosmeticRng2D::randf_range(lo, hi);
 		}
 	}
 	// Final clamps (applied last: trim, randoms and amount gain all count).
@@ -370,7 +371,7 @@ bool SoundMixer2D::offer(BulletFactory2D &factory, const Ref<BulletSoundData2D> 
 		return false;
 	}
 	if (sound->trigger_chance < 1.0) {
-		if (!Math::is_finite((double)sound->trigger_chance) || UtilityFunctions::randf() > (double)sound->trigger_chance) {
+		if (!Math::is_finite((double)sound->trigger_chance) || CosmeticRng2D::randf() > (double)sound->trigger_chance) {
 			++dropped_total;
 			return false;
 		}
@@ -872,7 +873,7 @@ void SoundMixer2D::flush(BulletFactory2D &factory) {
 			if (sound->positional && Math::is_finite((double)sound->random_pan) && sound->random_pan > 0.0 && winner.dist >= 1.0) {
 				const Vector2 radial = winner.event_pos - winner.listener_pos;
 				const Vector2 tangent = Vector2(-radial.y, radial.x) / (float)winner.dist;
-				const float spread = (float)UtilityFunctions::randf_range(-(double)sound->random_pan, (double)sound->random_pan) * (float)winner.dist;
+				const float spread = (float)CosmeticRng2D::randf_range(-(double)sound->random_pan, (double)sound->random_pan) * (float)winner.dist;
 				at += tangent * spread;
 			}
 			const Ref<AudioStream> picked = pick_stream(sound, channel);

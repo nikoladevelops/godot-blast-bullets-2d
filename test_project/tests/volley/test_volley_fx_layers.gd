@@ -232,7 +232,7 @@ func test_opt_in_desync_same_tick_kills_span_shards() -> void:
 	await _preamble()
 	# FX T6 opt-in desync: same-tick kills span shards
 	await _settle(factory)
-	seed(12345)
+	factory.debug_seed_cosmetic_rng(12345)
 	var dd := BulletVolleyData2D.new()
 	dd.sprite_frames = H.make_sprite_frames()
 	var arr: Array = []

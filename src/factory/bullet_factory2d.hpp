@@ -527,6 +527,9 @@ public:
 	int get_sound_max_voices() const;
 	void set_sound_max_voices(int value);
 	void debug_set_sound_log_enabled(bool enabled);
+	// Test helper: reseeds the plugin's cosmetic generator (sound mix, effect
+	// layer starts). Godot's global seed() does not reach these rolls.
+	void debug_seed_cosmetic_rng(int64_t seed);
 	Array debug_get_sound_log() const;
 	void debug_clear_sound_log();
 	Array debug_get_sound_voices() const;
