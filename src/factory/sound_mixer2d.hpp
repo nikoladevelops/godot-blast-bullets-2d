@@ -171,7 +171,7 @@ private:
 	// pinned camera_path when it resolves to a live Camera2D in the
 	// factory's viewport, else the viewport's current camera (null when
 	// there is none: no culling, zoom 1). Bad paths warn once per resource.
-	static Camera2D *resolve_entry_camera(BulletFactory2D &factory, const BulletSoundData2D *sound, Channel &channel);
+	Camera2D *resolve_entry_camera(BulletFactory2D &factory, const BulletSoundData2D *sound, Channel &channel) const;
 	// Camera view test for one event: false when the event is outside the
 	// given camera's view rect (grown by the entry's margin). No camera, or a
 	// Distance-only entry, never culls.
@@ -186,6 +186,26 @@ private:
 	// Nearest target of the candidate's spec (fresh list read): returns false
 	// when a node source finds nobody (caller falls back to Godot's listener).
 	bool resolve_listener(BulletFactory2D &factory, const SoundListenerSpec2D &spec, const Vector2 &event_pos, Vector2 &r_listener_pos, uint64_t &r_node_id, bool &r_is_point) const;
+	// Per-sweep offer cache: flight offers arrive once per live bullet, so the
+	// Godot listener, the viewport camera and the has-audio answer are read once
+	// per sweep. Used only while the factory iterates bullets; a new sweep or a
+	// user callback (epoch bump) starts it over, so camera and listener moves
+	// made by user code are never missed.
+	struct OfferCache {
+		bool open = false;
+		uint64_t sweep = 0;
+		uint64_t epoch = 0;
+		bool listener_ready = false;
+		Vector2 listener;
+		bool camera_ready = false;
+		Camera2D *camera = nullptr;
+		const BulletSoundData2D *audio_sound = nullptr;
+		bool audio = false;
+	};
+	bool offer_cache_open(BulletFactory2D &factory) const;
+	Vector2 offer_godot_listener(BulletFactory2D &factory) const;
+	Camera2D *offer_viewport_camera(BulletFactory2D &factory) const;
+	bool offer_has_audio(BulletFactory2D &factory, const BulletSoundData2D *sound) const;
 	static Vector2 godot_listener_pos(BulletFactory2D &factory);
 	AudioStreamPlayer2D *alloc_voice(BulletFactory2D &factory, int priority);
 	void release_voice(Voice &voice);
@@ -207,5 +227,6 @@ private:
 	Array sound_log;
 	// Unknown bus names already warned about (project-level, few).
 	std::vector<String> warned_buses;
+	mutable OfferCache offer_cache;
 };
 } // namespace BlastBullets2D

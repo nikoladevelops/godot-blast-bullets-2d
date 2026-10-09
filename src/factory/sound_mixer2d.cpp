@@ -50,6 +50,55 @@ static bool sound_has_audio(const BulletSoundData2D *sound) {
 	return false;
 }
 
+// Offer cache helpers (see OfferCache). Outside the bullet iteration every
+// helper reads the engine directly, exactly as before.
+bool SoundMixer2D::offer_cache_open(BulletFactory2D &factory) const {
+	if (!factory.is_bullets_iterating()) {
+		return false;
+	}
+	if (!offer_cache.open || offer_cache.sweep != factory.get_sweep_counter() || offer_cache.epoch != factory.get_user_code_epoch()) {
+		offer_cache = OfferCache();
+		offer_cache.open = true;
+		offer_cache.sweep = factory.get_sweep_counter();
+		offer_cache.epoch = factory.get_user_code_epoch();
+	}
+	return true;
+}
+
+Vector2 SoundMixer2D::offer_godot_listener(BulletFactory2D &factory) const {
+	if (!offer_cache_open(factory)) {
+		return godot_listener_pos(factory);
+	}
+	if (!offer_cache.listener_ready) {
+		offer_cache.listener = godot_listener_pos(factory);
+		offer_cache.listener_ready = true;
+	}
+	return offer_cache.listener;
+}
+
+Camera2D *SoundMixer2D::offer_viewport_camera(BulletFactory2D &factory) const {
+	Viewport *vp = factory.get_viewport();
+	if (!offer_cache_open(factory)) {
+		return vp != nullptr ? vp->get_camera_2d() : nullptr;
+	}
+	if (!offer_cache.camera_ready) {
+		offer_cache.camera = vp != nullptr ? vp->get_camera_2d() : nullptr;
+		offer_cache.camera_ready = true;
+	}
+	return offer_cache.camera;
+}
+
+bool SoundMixer2D::offer_has_audio(BulletFactory2D &factory, const BulletSoundData2D *sound) const {
+	if (!offer_cache_open(factory)) {
+		return sound_has_audio(sound);
+	}
+	if (offer_cache.audio_sound != sound) {
+		offer_cache.audio_sound = sound;
+		offer_cache.audio = sound_has_audio(sound);
+	}
+	return offer_cache.audio;
+}
+
 Ref<AudioStream> SoundMixer2D::pick_stream(const BulletSoundData2D *sound, Channel &channel) {
 	std::vector<Ref<AudioStream>> usable;
 	usable.reserve((size_t)sound->streams.size());
@@ -250,7 +299,7 @@ bool SoundMixer2D::resolve_listener(BulletFactory2D &factory, const SoundListene
 	r_node_id = 0;
 	r_is_point = false;
 	if (spec.kind == SoundListenerSpec2D::GODOT_LISTENER) {
-		r_listener_pos = godot_listener_pos(factory);
+		r_listener_pos = offer_godot_listener(factory);
 		return true;
 	}
 	const GrazeTargetList2D *list = nullptr;
@@ -327,12 +376,12 @@ double SoundMixer2D::sound_effective_max_distance(const BulletSoundData2D *sound
 	return sound->max_distance / zoom;
 }
 
-Camera2D *SoundMixer2D::resolve_entry_camera(BulletFactory2D &factory, const BulletSoundData2D *sound, Channel &channel) {
+Camera2D *SoundMixer2D::resolve_entry_camera(BulletFactory2D &factory, const BulletSoundData2D *sound, Channel &channel) const {
 	Viewport *vp = factory.get_viewport();
 	if (sound->camera_path.is_empty()) {
 		channel.camera_path = NodePath();
 		channel.camera_id = 0;
-		return vp != nullptr ? vp->get_camera_2d() : nullptr;
+		return offer_viewport_camera(factory);
 	}
 	if (channel.camera_id != 0 && channel.camera_path == sound->camera_path) {
 		Camera2D *cached = Object::cast_to<Camera2D>(ObjectDB::get_instance(ObjectID(channel.camera_id)));
@@ -363,7 +412,7 @@ bool SoundMixer2D::offer(BulletFactory2D &factory, const Ref<BulletSoundData2D> 
 	if (Engine::get_singleton()->is_editor_hint()) {
 		return false;
 	}
-	if (!sound_has_audio(sound.ptr())) {
+	if (!offer_has_audio(factory, sound.ptr())) {
 		if (WarnOnce2D::first(sound->get_instance_id(), SOUND_WARN_EMPTY_STREAM)) {
 			UtilityFunctions::push_warning("BulletSoundData2D: streams is empty, the sound plays nothing.");
 		}
@@ -404,7 +453,7 @@ bool SoundMixer2D::offer(BulletFactory2D &factory, const Ref<BulletSoundData2D> 
 	uint64_t node_id = 0;
 	bool is_point = false;
 	const bool found = resolve_listener(factory, listener, event_pos, listener_pos, node_id, is_point);
-	const Vector2 anchor = found ? listener_pos : godot_listener_pos(factory);
+	const Vector2 anchor = found ? listener_pos : offer_godot_listener(factory);
 	const double dist = Math::sqrt(sound_dist2(event_pos, anchor));
 	const double max_dist = sound_effective_max_distance(sound.ptr(), camera);
 	const bool audible = (!sound->positional || !(dist > max_dist)) && sound_in_camera_view(sound.ptr(), event_pos, camera, vp);
