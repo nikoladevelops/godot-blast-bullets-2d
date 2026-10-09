@@ -22,6 +22,7 @@ for the rest: the sections are written to be looked up, not read once.
 | 8 | Writing tests | 18 | tools/ catalog |
 | 9 | Searching and reading | 19 | Final report template |
 |  |  | 20 | Graze (zones, tick stage, routing, preview) |
+|  |  | 21 | Sound (mixer, triggers, listeners, RNG) |
 
 ## 0. Golden rules
 
@@ -51,7 +52,7 @@ for the rest: the sections are written to be looked up, not read once.
 
 ```sh
 GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py   # build (exit 1 = failed; never raw scons, never edit SConstruct)
-python3 tools/run_tests.py                                       # 155 files / 1074 tests, ~10 s, leak-checked
+python3 tools/run_tests.py                                       # 171 files / 1254 tests, ~10 s, leak-checked
 python3 tools/run_tests.py --suite <substring> --full            # one area, every failure message unclipped
 python3 tools/run_tests.py --self-test                           # proves the harness still catches failures/leaks
 python3 tools/run_editor_smoke.py                                # headless EDITOR run of tests/editor_smoke/ (editor-only paths)
@@ -827,6 +828,9 @@ deduped, cancelled by REMOVED) and replayed once on resume.
 | No graze target cap (300+ targets, a member joining after the shot counts next tick); a target keeps its slot while others come and go | `test_volley_graze_targets` |
 | Graze target sources (node group, path, name, children: the spawner decides who grazes, zones only how), filter, update interval, refresh; edits reach flying bullets; orphans keep the settings; homing's refresh is `retarget_live_volleys()` | `test_spawner_graze_detection` |
 | Past 8 targets the slab finds exactly what testing every target finds (same events, same ties) | `test_volley_graze_slab` |
+| A fading sound voice is never restarted or stolen again; a pool of fading tails never starves new plays | `sound/test_sound_mixer_unit` |
+| A followed bullet keeps one hum voice per sound entry | `sound/test_sound_flight` |
+| Cosmetic sound and effect rolls never consume Godot's global RNG (seeded gameplay is unchanged) | `sound/test_sound_rng_isolation` |
 
 - Edge cases to test everywhere: NaN/Inf scalars and vectors; null array
   entries; empty arrays; short vs oversized arrays; OOB indices (-1/99);
@@ -933,7 +937,7 @@ project's `.so`). For quick numeric comparisons load two
 ## 16. Inspector groups and serialization locks
 
 - Spawner groups, in order (locked by `test_volley_bounce.gd`): Setup,
-  Bullet Patterns, Shooting, Spin, Homing, Orbiting, Graze, Preview,
+  Bullet Patterns, Shooting, Spin, Homing, Orbiting, Graze, Sound, Preview,
   Movement, Performance. Spawn data (`BulletVolleyData2D`): Bullets, Appearance,
   Movement Speed, Bullet Rotation, Wobble, Gravity, Bounce and Ricochet,
   Movement Pattern Paths, Homing, Collision, Attachments, Sprite Effects,
@@ -1114,3 +1118,35 @@ emits `GRAZE_POINT_TARGET_BIT | index` ids and belongs in
 `test_spawner_target_filter` (node sources), `test_spawner_graze_sources`
 (the per-source contract) or `test_spawner_graze_point_sources`, then docs
 (§17).
+
+## 21. Sound (`BulletSoundData2D`, mixer, spawner Sound group)
+
+### 21.1 Pieces
+
+| Piece | Where | Notes |
+|---|---|---|
+| Entry resource | `data/bullet_sound_data2d.*` | One list entry per sound: triggers (11 SOUND_ON_* ids, serialized), streams + stream mode, mix (volume, pitch, randoms, bus), spatial, limits, fades, ducking, follow_bullet |
+| Volley arming | `bullet_volley/bullet_volley2d_sound.cpp` | `sound_set_effects` (factory volleys), `sound_arm_from_spawner` (spawner volleys); trigger sites call `sound_fire`, On Flight calls `sound_fire_flight` from the tick |
+| Factory hatch | `factory/bullet_factory2d_sound.cpp` | `sound_offer` (volleys and spawner), `play_sound` (manual), debug readouts |
+| Mixer | `factory/sound_mixer2d.*` | Channels per resource (shared by every spawner using it), bounded per-sweep candidates (nearest wins), voice pool (one AudioStreamPlayer2D per voice, polyphony 1), `flush` at the end of the factory sweep |
+| Spawner | `bullet_spawner/bullet_spawner2d_sound.cpp` | Sound group: `sound_effects`, `sound_volume_db`, listener source (reuses `GrazeDetector2D`, THE target filter), On Shot / On Telegraph |
+| Cosmetic RNG | `core/cosmetic_rng2d.hpp` | PCG32 for mix and effect-layer rolls only; gameplay keeps Godot's global RNG |
+
+### 21.2 Contract
+
+- Zero cost until armed: a trigger site tests one mask bit; an unarmed volley makes no offers.
+- Offers never play inside the sweep: `flush` plays the winners after every volley, effect and timer of the sweep (at most one tick of latency).
+- A channel's `min_interval_sec` and `max_voices` are shared by every spawner and volley using the resource. Nearest wins each sweep.
+- Fading voices hold their pool slot but never count toward `max_voices` and are never restarted. A full pool steals the oldest fading voice first, then starts the oldest live voice's fade (that one play waits one sweep).
+- `follow_bullet`: one live voice per bullet and entry; the voice rides the bullet and fades when the bullet ends.
+- Cosmetic rolls (volume, pitch, pan, chance, stream picks, effect starts) draw from `CosmeticRng2D`. Tests reseed it with `BulletFactory2D.debug_seed_cosmetic_rng`.
+
+### 21.3 Cost and open work
+
+- Per tick, On Flight offers once per live bullet. A followed bullet also scans the voices of its entry (O(voices)) per offer. Not yet benchmarked: no sound scenario exists in `test_project/benchmarks/scenarios/`.
+- Ducking scans every busy voice against every other (O(V^2) per sweep). Fine at the default 32 voices; a linear pass is the planned fix if a benchmark shows it.
+
+### 21.4 Tests
+
+`test_project/tests/sound/` (13 suites plus `test_sound_rng_isolation`). Mixer rules live in `test_sound_mixer_unit`, flight and hum rules in `test_sound_flight`, spatial and camera in `test_sound_spatial_limits` and `test_sound_camera`.
+
