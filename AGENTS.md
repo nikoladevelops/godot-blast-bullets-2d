@@ -52,7 +52,7 @@ for the rest: the sections are written to be looked up, not read once.
 
 ```sh
 GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py   # build (exit 1 = failed; never raw scons, never edit SConstruct)
-python3 tools/run_tests.py                                       # 171 files / 1254 tests, ~10 s, leak-checked
+python3 tools/run_tests.py                                       # 172 files / 1262 tests, ~10 s, leak-checked
 python3 tools/run_tests.py --suite <substring> --full            # one area, every failure message unclipped
 python3 tools/run_tests.py --self-test                           # proves the harness still catches failures/leaks
 python3 tools/run_editor_smoke.py                                # headless EDITOR run of tests/editor_smoke/ (editor-only paths)
@@ -316,6 +316,9 @@ Sections:
 - `volley_api`: every bound BulletVolley2D method x 3 argument sets on a
   plain and a featured volley: return value, errors, full per-bullet state
   before and after a tick.
+- `sound`: seeded sound flights (`debug_seed_cosmetic_rng`, `debug_advance_time`):
+  rolled mix, followed hum, capped flight, three-level ducking, clear/expiry
+  triggers; plays and busy voices named by entry index, never instance ids.
 
 Unseeded randomness is detected (each call runs twice) and recorded by size
 only. `save` refuses a stale build. `diff a b` exits 1 on any difference and
@@ -859,7 +862,7 @@ deduped, cancelled by REMOVED) and replayed once on resume.
 ### 15.1 Running
 
 ```sh
-python3 tools/run_benchmarks.py                     # 21 headless scenarios x5 (median)
+python3 tools/run_benchmarks.py                     # 23 headless scenarios x5 (median)
 python3 tools/run_benchmarks.py --scenario spawner_ # substring filter (repeatable)
 python3 tools/run_benchmarks.py --gate              # exit 1 on regression vs log/baseline.json
 python3 tools/run_benchmarks.py --update-baseline   # ONLY for an accepted change; say so in the commit
@@ -1135,6 +1138,7 @@ emits `GRAZE_POINT_TARGET_BIT | index` ids and belongs in
 ### 21.2 Contract
 
 - Zero cost until armed: a trigger site tests one mask bit; an unarmed volley makes no offers.
+- Audibility (distance, camera view) is judged at offer AND again at `flush` against the listener as it stands then, so a listener moved by a handler mid-sweep silences that sweep. The per-sweep offer cache is only an optimization of the offer-time check.
 - Offers never play inside the sweep: `flush` plays the winners after every volley, effect and timer of the sweep (at most one tick of latency).
 - A channel's `min_interval_sec` and `max_voices` are shared by every spawner and volley using the resource. Nearest wins each sweep.
 - Fading voices hold their pool slot but never count toward `max_voices` and are never restarted. A full pool steals the oldest fading voice first, then starts the oldest live voice's fade (that one play waits one sweep).
@@ -1149,5 +1153,5 @@ emits `GRAZE_POINT_TARGET_BIT | index` ids and belongs in
 
 ### 21.4 Tests
 
-`test_project/tests/sound/` (13 suites plus `test_sound_rng_isolation`). Mixer rules live in `test_sound_mixer_unit`, flight and hum rules in `test_sound_flight`, spatial and camera in `test_sound_spatial_limits` and `test_sound_camera`.
+`test_project/tests/sound/` (14 suites plus `test_sound_rng_isolation`; `test_sound_reentrancy` pins user code inside the sweep). Mixer rules live in `test_sound_mixer_unit`, flight and hum rules in `test_sound_flight`, spatial and camera in `test_sound_spatial_limits` and `test_sound_camera`.
 
