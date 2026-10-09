@@ -40,11 +40,11 @@ func test_invalid_source_and_amount_cap() -> void:
 	sp.pattern_source = 99
 	expect_error_sequence(["invalid pattern_source, keeping the old value"])
 	assert_eq(sp.get_pattern_source(), src0, "source 99 rejected")
-	sp.helper_bullets_amount = 100000
-	assert_eq(sp.get_helper_bullets_amount(), 100000, "limit accepts 100000")
-	sp.helper_bullets_amount = 100001
-	expect_error_sequence(["helper_bullets_amount must be <= 100000, keeping the old value"])
-	assert_eq(sp.get_helper_bullets_amount(), 100000, "100001 rejected")
+	sp.helper_bullets_amount = 20000
+	assert_eq(sp.get_helper_bullets_amount(), 20000, "limit accepts 20000")
+	sp.helper_bullets_amount = 20001
+	expect_error_sequence(["helper_bullets_amount must be <= 20000, keeping the old value"])
+	assert_eq(sp.get_helper_bullets_amount(), 20000, "20001 rejected")
 
 
 func test_custom_order_ops() -> void:

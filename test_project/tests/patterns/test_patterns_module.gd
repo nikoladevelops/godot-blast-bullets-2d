@@ -99,12 +99,12 @@ func test_polyline_library_matches_the_spawner_path2d_mode() -> void:
 
 func test_polyline_rejects_hostile_input() -> void:
 	BulletPatterns2D.helper_generate_transforms_polyline(-1, Transform2D(), _points())
-	BulletPatterns2D.helper_generate_transforms_polyline(100001, Transform2D(), _points())
+	BulletPatterns2D.helper_generate_transforms_polyline(20001, Transform2D(), _points())
 	BulletPatterns2D.helper_generate_transforms_polyline(4, Transform2D(), PackedVector2Array([Vector2(NAN, 0), Vector2(1, 1)]))
 	BulletPatterns2D.helper_generate_transforms_polyline(4, Transform2D(), PackedVector2Array([Vector2(1, 1)]))
 	expect_error_sequence([
-		"helper_generate_transforms_polyline: transforms_amount must be in 0..100000.",
-		"helper_generate_transforms_polyline: transforms_amount must be in 0..100000.",
+		"helper_generate_transforms_polyline: transforms_amount must be in 0..20000.",
+		"helper_generate_transforms_polyline: transforms_amount must be in 0..20000.",
 		"helper_generate_transforms_polyline: points contain NaN/Inf.",
 		"helper_generate_transforms_polyline: Path2D mode produced no points.",
 	])

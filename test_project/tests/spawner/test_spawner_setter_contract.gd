@@ -159,13 +159,13 @@ func test_enum_properties_reject_unknown_ids() -> void:
 func test_caps_match_the_generators() -> void:
 	var sp := make_spawner()
 	for case in [
-		["helper_ellipse_gap_count", 100001, "helper_ellipse_gap_count must be between 0 and 100000"],
-		["helper_star_points", 100001, "helper_star_points must be between 2 and 100000"],
-		["helper_polygon_vertices", 100001, "helper_polygon_vertices must be between 3 and 100000"],
-		["helper_waterfall_columns", 400001, "helper_waterfall_columns must be between 1 and 400000"],
-		["helper_waterfall_rows", 400001, "helper_waterfall_rows must be between 1 and 400000"],
-		["helper_lattice_columns", 400001, "helper_lattice_columns must be between 1 and 400000"],
-		["helper_lattice_rows", 400001, "helper_lattice_rows must be between 1 and 400000"],
+		["helper_ellipse_gap_count", 20001, "helper_ellipse_gap_count must be between 0 and 20000"],
+		["helper_star_points", 20001, "helper_star_points must be between 2 and 20000"],
+		["helper_polygon_vertices", 20001, "helper_polygon_vertices must be between 3 and 20000"],
+		["helper_waterfall_columns", 80001, "helper_waterfall_columns must be between 1 and 80000"],
+		["helper_waterfall_rows", 80001, "helper_waterfall_rows must be between 1 and 80000"],
+		["helper_lattice_columns", 80001, "helper_lattice_columns must be between 1 and 80000"],
+		["helper_lattice_rows", 80001, "helper_lattice_rows must be between 1 and 80000"],
 		["burst_count", 1025, "burst_count must be between 1 and 1024"],
 		["helper_line_spacing", 0.0, "helper_line_spacing must be finite and > 0"],
 		["helper_line_spacing", -5.0, "helper_line_spacing must be finite and > 0"],
@@ -181,12 +181,12 @@ func test_caps_match_the_generators() -> void:
 func test_grid_product_over_the_cap_warns_once_and_fires_nothing() -> void:
 	var sp := make_spawner(null, BulletSpawner2D.PATTERN_FROM_HELPER_LATTICE, 10)
 	sp.helper_lattice_columns = 1000
-	sp.helper_lattice_rows = 1000 # 1000000 > 400000 slots
+	sp.helper_lattice_rows = 1000 # 1000000 > 80000 slots
 	assert_eq(sp.collect_spawn_transforms().size(), 0, "no slots")
 	assert_eq(sp.collect_spawn_transforms().size(), 0, "still none")
 	var warnings := 0
 	for err in get_errors():
-		if err.is_push_warning() and err.contains_text("helper_lattice_columns * helper_lattice_rows exceeds 400000"):
+		if err.is_push_warning() and err.contains_text("helper_lattice_columns * helper_lattice_rows exceeds 80000"):
 			warnings += 1
 	assert_eq(warnings, 1, "warned once, not per collect")
 

@@ -39,7 +39,7 @@ func after_all() -> void:
 func before_each() -> void:
 	check_factory_after = true
 	# The per-call bullet limit is process-wide: every test starts from the default.
-	BulletPatterns2D.set_max_bullets_per_pattern(100000)
+	BulletPatterns2D.set_max_bullets_per_pattern(20000)
 	factory = BulletFactory2D.new()
 	add_child_autofree(factory)
 	await idle()

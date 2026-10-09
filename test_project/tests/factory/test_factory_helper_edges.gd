@@ -9,11 +9,11 @@ var m := Transform2D(0.0, Vector2.ZERO)
 
 func test_amount_caps() -> void:
 	assert_true(BulletPatterns2D.helper_generate_transforms_grid(200000, m, 10).is_empty(), "grid 200k rejected")
-	expect_error_sequence(["helper_generate_transforms_grid: transforms_amount must be between 0 and 100000."])
+	expect_error_sequence(["helper_generate_transforms_grid: transforms_amount must be between 0 and 20000."])
 	assert_true(BulletPatterns2D.helper_generate_transforms_ring(200000, m).is_empty(), "ring 200k rejected")
-	expect_error_sequence(["helper_generate_transforms_ring: transforms_amount must be between 0 and 100000."])
+	expect_error_sequence(["helper_generate_transforms_ring: transforms_amount must be between 0 and 20000."])
 	assert_true(BulletPatterns2D.helper_generate_transforms_fan(-5, m, 1.0).is_empty(), "fan negative rejected")
-	expect_error_sequence(["helper_generate_transforms_fan: transforms_amount must be between 0 and 100000."])
+	expect_error_sequence(["helper_generate_transforms_fan: transforms_amount must be between 0 and 20000."])
 	assert_true(BulletPatterns2D.helper_generate_transforms_line(0, m, Vector2.RIGHT, 10.0).is_empty(), "line 0 returns empty")
 	assert_eq(BulletPatterns2D.helper_generate_transforms_circle(1, m).size(), 1, "circle 1 returns one slot")
 
@@ -97,10 +97,10 @@ func test_every_generator_reports_amount_and_marker_in_one_wording() -> void:
 	assert_eq(gens.size(), 29, "every shape generator discovered (polyline excluded)")
 	for info in gens:
 		var n := String(info["name"])
-		for amount in [-1, 100001]:
+		for amount in [-1, 20001]:
 			var got: Array = ClassDB.class_call_static.callv([&"BulletPatterns2D", n] + _generator_args(info, amount, m))
 			assert_true(got.is_empty(), "%s amount %d returns empty" % [n, amount])
-			expect_error_sequence(["%s: transforms_amount must be between 0 and 100000." % n])
+			expect_error_sequence(["%s: transforms_amount must be between 0 and 20000." % n])
 		var bad: Array = ClassDB.class_call_static.callv([&"BulletPatterns2D", n] + _generator_args(info, 4, Transform2D(0.0, Vector2(NAN, 0))))
 		assert_true(bad.is_empty(), "%s NaN marker returns empty" % n)
 		expect_error_sequence(["%s: marker_transform contains NaN/Inf." % n])

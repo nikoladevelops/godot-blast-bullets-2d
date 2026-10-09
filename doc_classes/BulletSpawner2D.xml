@@ -552,7 +552,7 @@
 			Node the aimed cone points at (also steers the Corridor wall when one is assigned). No target means no bullets in Aimed mode; Corridor falls back to helper_corridor_aim_direction.
 		</member>
 		<member name="helper_bullets_amount" type="int" setter="set_helper_bullets_amount" getter="get_helper_bullets_amount" default="10">
-			Bullet count for helper patterns: every generated pattern draws exactly this many bullets, each on its own spot (Fill Inside, Corridor and Ellipse Wall included). Limited to 1 to [method BulletPatterns2D.get_max_bullets_per_pattern] (default 100000, a project setting): one volley fans out to transforms, instance buffers and physics shapes, so an unlimited value would freeze on a typo. Children, Self and Custom take their count from the markers or the array instead.
+			Bullet count for helper patterns: every generated pattern draws exactly this many bullets, each on its own spot (Fill Inside, Corridor and Ellipse Wall included). Limited to 1 to [method BulletPatterns2D.get_max_bullets_per_pattern] (default 20000, a project setting): one volley fans out to transforms, instance buffers and physics shapes, so an unlimited value would freeze on a typo. Children, Self and Custom take their count from the markers or the array instead.
 		</member>
 		<member name="helper_circle_face_outward" type="bool" setter="set_helper_circle_face_outward" getter="get_helper_circle_face_outward" default="true">
 			Circle bullets face outward (away from the generator); off faces inward (toward it).

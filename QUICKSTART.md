@@ -83,7 +83,7 @@ var volley := factory.spawn_volley(data)
 - Use areas for enemies and the player; static bodies need `monitorable` on and cost more.
 - Turn on `factory.use_physics_interpolation` (and the matching project setting) for smooth bullets on 120 Hz+ screens.
 - Watch the numbers with `factory.get_frame_stats()` or `register_performance_monitors`, and see the shapes with the factory's debugger (`is_debugger_enabled`).
-- The per-call bullet limit defaults to 100,000 and only exists to catch typos. Raise it with the project setting `blastbullets2d/patterns/max_bullets_per_pattern` or `BulletPatterns2D.set_max_bullets_per_pattern(n)`.
+- The per-call bullet limit defaults to 20,000 and mainly catches typos. Raise it with the project setting `blastbullets2d/patterns/max_bullets_per_pattern` or `BulletPatterns2D.set_max_bullets_per_pattern(n)`, but know the cost: one volley is one physics area with a shape per bullet, and tens of thousands of tightly packed shapes make Godot's broadphase hitch for seconds and can abort the game. For bigger barrages fire several volleys of a few thousand bullets (several spawners, or `burst_count`).
 
 ## 4. Gotchas that bite first-timers
 

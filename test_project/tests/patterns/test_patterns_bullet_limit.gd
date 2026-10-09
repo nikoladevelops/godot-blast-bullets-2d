@@ -1,12 +1,12 @@
 extends BlastTest
 ## The per-call bullet limit is one developer-owned setting, not a baked-in
-## constant: BulletPatterns2D.max_bullets_per_pattern (default 100000, project
+## constant: BulletPatterns2D.max_bullets_per_pattern (default 20000, project
 ## setting blastbullets2d/patterns/max_bullets_per_pattern). Every generator,
 ## the spawner's helper_bullets_amount / helper_custom_transforms, the shape
 ## counts (star points, polygon vertices, ellipse gaps) and generate() read
 ## it live, and every rejection names the CURRENT value.
 
-const DEFAULT_LIMIT := 100000
+const DEFAULT_LIMIT := 20000
 const SETTING := "blastbullets2d/patterns/max_bullets_per_pattern"
 
 
@@ -21,7 +21,7 @@ func test_limit_binds_exist() -> void:
 	assert_true(ClassDB.class_has_method("BulletPatterns2D", "get_max_bullets_per_pattern", true), "getter bound")
 
 
-func test_default_limit_is_one_hundred_thousand() -> void:
+func test_default_limit_is_twenty_thousand() -> void:
 	assert_eq(BulletPatterns2D.get_max_bullets_per_pattern(), DEFAULT_LIMIT, "default")
 
 

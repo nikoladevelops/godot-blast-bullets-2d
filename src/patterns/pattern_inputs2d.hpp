@@ -21,7 +21,7 @@ using namespace godot;
 // A developer setting, not a constant: BulletPatterns2D.max_bullets_per_pattern
 // (project setting blastbullets2d/patterns/max_bullets_per_pattern). It only
 // guards against a typo'd count freezing or OOM-ing the game. Main thread only.
-static constexpr int kPatternDefaultMaxBullets = 100000;
+static constexpr int kPatternDefaultMaxBullets = 20000;
 inline int g_pattern_max_bullets = kPatternDefaultMaxBullets;
 static inline int pattern_max_bullets() { return g_pattern_max_bullets; }
 // Grid slots (waterfall/lattice columns * rows) follow the same limit, 4x.
