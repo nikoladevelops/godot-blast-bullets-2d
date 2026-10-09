@@ -730,34 +730,41 @@ void SoundMixer2D::flush(BulletFactory2D &factory) {
 	// out both ways (the fade owns their fader). Runs every sweep, even with
 	// no new offers, so dips apply and release on time.
 	if (any_busy) {
+		// One live rank per busy voice, then one pass from the highest priority
+		// down: a voice takes the strongest dip among busy voices of strictly
+		// higher priority (equal priorities never dip each other).
+		duck_scratch.clear();
 		for (size_t i = 0; i < voices.size(); ++i) {
-			Voice &voice = voices[i];
+			const Voice &voice = voices[i];
 			if (!voice.busy || voice.fading || voice.player == nullptr || ObjectDB::get_instance(ObjectID(voice.player->get_instance_id())) != voice.player) {
 				continue;
 			}
-			int prio = 0;
-			float unused = 0.0f;
-			duck_source2d(voice.sound_id, voice.priority, prio, unused);
-			float dip = 0.0f;
-			for (size_t j = 0; j < voices.size(); ++j) {
-				if (i == j) {
-					continue;
-				}
-				const Voice &other = voices[j];
-				if (!other.busy || other.fading || other.player == nullptr || ObjectDB::get_instance(ObjectID(other.player->get_instance_id())) != other.player) {
-					continue;
-				}
-				int oprio = 0;
-				float oduck = 0.0f;
-				duck_source2d(other.sound_id, other.priority, oprio, oduck);
-				if (oprio > prio && oduck > dip) {
-					dip = oduck;
+			DuckEntry entry;
+			entry.voice = i;
+			duck_source2d(voice.sound_id, voice.priority, entry.priority, entry.duck);
+			duck_scratch.push_back(entry);
+		}
+		std::sort(duck_scratch.begin(), duck_scratch.end(), [](const DuckEntry &a, const DuckEntry &b) {
+			return a.priority > b.priority;
+		});
+		float higher_dip = 0.0f; // strongest duck among strictly higher priorities
+		for (size_t k = 0; k < duck_scratch.size();) {
+			const int prio = duck_scratch[k].priority;
+			size_t group_end = k;
+			float group_duck = 0.0f;
+			while (group_end < duck_scratch.size() && duck_scratch[group_end].priority == prio) {
+				group_duck = std::max(group_duck, duck_scratch[group_end].duck);
+				++group_end;
+			}
+			for (size_t m = k; m < group_end; ++m) {
+				Voice &voice = voices[duck_scratch[m].voice];
+				if (higher_dip != voice.duck_dip) {
+					voice.duck_dip = higher_dip;
+					voice.player->set_volume_db(voice.last_volume - higher_dip);
 				}
 			}
-			if (dip != voice.duck_dip) {
-				voice.duck_dip = dip;
-				voice.player->set_volume_db(voice.last_volume - dip);
-			}
+			higher_dip = std::max(higher_dip, group_duck);
+			k = group_end;
 		}
 	}
 	bool any_pending = false;

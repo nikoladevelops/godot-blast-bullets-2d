@@ -516,3 +516,31 @@ func test_fading_voice_is_never_restarted() -> void:
 				played = true
 	assert_true(played, "newcomer plays once the looper's fade has run out")
 	assert_true(busy_voices().size() <= 1, "pool of 1 never holds two voices")
+
+
+func test_duck_takes_strongest_higher_priority_dip() -> void:
+	# Three levels: each voice dips by the strongest duck among busy voices of
+	# strictly higher priority; the top priority never dips.
+	godot_listener_at(Vector2.ZERO)
+	var low := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+	low.priority = 0
+	low.volume_db = -6.0
+	var mid := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+	mid.priority = 1
+	mid.duck_amount_db = 3.0
+	mid.volume_db = 0.0
+	var top := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+	top.priority = 2
+	top.duck_amount_db = 9.0
+	top.volume_db = 0.0
+	assert_true(factory.play_sound(low, Vector2.ZERO), "low offered")
+	assert_true(factory.play_sound(mid, Vector2.ZERO), "mid offered")
+	assert_true(factory.play_sound(top, Vector2.ZERO), "top offered")
+	# Ducks apply on the sweep after the voices start: wait a few frames.
+	await physics(4)
+	var vols := {}
+	for e in busy_voices():
+		vols[int((e as Dictionary)["sound"])] = float((e as Dictionary)["volume_db"])
+	assert_almost_eq(float(vols[low.get_instance_id()]), -15.0, 0.1, "low takes top's 9 dB, not mid's 3")
+	assert_almost_eq(float(vols[mid.get_instance_id()]), -9.0, 0.1, "mid takes top's 9 dB")
+	assert_almost_eq(float(vols[top.get_instance_id()]), 0.0, 0.1, "top never ducks")

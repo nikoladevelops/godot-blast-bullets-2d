@@ -228,5 +228,12 @@ private:
 	// Unknown bus names already warned about (project-level, few).
 	std::vector<String> warned_buses;
 	mutable OfferCache offer_cache;
+	// Ducking pass scratch (one entry per busy voice, reused every sweep).
+	struct DuckEntry {
+		int priority = 0;
+		float duck = 0.0f;
+		size_t voice = 0;
+	};
+	std::vector<DuckEntry> duck_scratch;
 };
 } // namespace BlastBullets2D
