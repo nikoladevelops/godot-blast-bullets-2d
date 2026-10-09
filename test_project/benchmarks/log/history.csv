@@ -881,3 +881,7 @@ timestamp,commit,dirty,scenario,frame_p50,frame_p99,frame_max,tick_p50,tick_p99,
 2026-10-07T14-54-33Z,3e830dc,1,volley_10k_flight,0.5680,0.6310,0.6520,0.2710,0.3000,10000,32.67,AMD Ryzen 7 8840HS w/ Radeon 780M Graphics
 2026-10-07T18-35-28Z,05b62d4,0,graze_10k_flight,0.6090,0.6830,2.3130,0.3080,0.3440,10000,32.74,AMD Ryzen 7 8840HS w/ Radeon 780M Graphics
 2026-10-07T18-35-28Z,05b62d4,0,volley_10k_flight,0.5730,0.8000,2.3040,0.2750,0.3150,10000,32.72,AMD Ryzen 7 8840HS w/ Radeon 780M Graphics
+2026-10-09T08-05-57Z,2f5c362,0,sound_flight_10k,2.3240,4.0580,4.1910,2.0280,3.7520,10000,32.89,AMD Ryzen 7 8840HS w/ Radeon 780M Graphics
+2026-10-09T08-05-57Z,2f5c362,0,sound_hit_storm,0.6800,1.8570,2.5550,0.1470,0.3220,1400,31.00,AMD Ryzen 7 8840HS w/ Radeon 780M Graphics
+2026-10-09T08-07-30Z,2f5c362,1,sound_flight_10k,1.5590,1.8840,3.3780,1.2560,1.5550,10000,32.90,AMD Ryzen 7 8840HS w/ Radeon 780M Graphics
+2026-10-09T08-07-30Z,2f5c362,1,sound_hit_storm,0.6770,1.3700,2.5080,0.1480,0.3220,1400,31.00,AMD Ryzen 7 8840HS w/ Radeon 780M Graphics
