@@ -1143,8 +1143,9 @@ emits `GRAZE_POINT_TARGET_BIT | index` ids and belongs in
 
 ### 21.3 Cost and open work
 
-- Per tick, On Flight offers once per live bullet. A followed bullet also scans the voices of its entry (O(voices)) per offer. Not yet benchmarked: no sound scenario exists in `test_project/benchmarks/scenarios/`.
-- Ducking scans every busy voice against every other (O(V^2) per sweep). Fine at the default 32 voices; a linear pass is the planned fix if a benchmark shows it.
+- Per tick, On Flight offers once per live bullet. A followed bullet also scans the voices of its entry (O(voices)) per offer. Measured with `sound_flight_10k` (10k bullets, followed hum): tick p50 2.03 ms before the per-sweep offer cache, 1.26 ms after (plain 10k flight is about 0.28 ms). `sound_hit_storm` (On Hit on every wall hit) is unchanged at about 0.15 ms tick.
+- Ducking scans every busy voice against every other (O(V^2) per sweep). Fine at the default 32 voices; not measured as a cost yet.
+- Offers still do per-bullet work (channel lookup, candidate copy, follow dedup over the entry's voices). The per-sweep cache removed the engine calls; the rest is the next target if the flight cost matters.
 
 ### 21.4 Tests
 
