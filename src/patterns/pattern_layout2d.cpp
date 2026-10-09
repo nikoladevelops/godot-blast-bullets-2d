@@ -612,8 +612,8 @@ static bool fill_margin_unreachable(const PackedVector2Array &poly, double margi
 
 // Largest spacing <= fill_spacing whose grid holds at least n cells:
 // fill_spacing itself whenever everything fits, else halve to bracket and
-// bisect. The search never goes finer than `min_spacing` (nor 1e-5 of the
-// shape): a margin that leaves only a sliver used to refine down to
+// bisect. The search never goes finer than `min_spacing` (nor 1/1000 of the
+// shape, which caps the grid at ~1M cells): a margin that leaves only a sliver used to refine down to
 // thousandths of a pixel, scanning tens of millions of cells per step for
 // minutes. At the floor it settles for the cells that fit (the caller takes
 // min(n, count) or reports "no room"). A fill_spacing the developer set
@@ -632,7 +632,11 @@ static double fill_spacing_that_fits(const PackedVector2Array &poly, double fill
 		mx = Vector2(MAX(mx.x, poly[i].x), MAX(mx.y, poly[i].y));
 	}
 	const double extent = MAX((double)(mx.x - mn.x), (double)(mx.y - mn.y));
-	const double floor_spacing = MAX(min_spacing, extent * 1e-5);
+	// Never finer than min_spacing, and never a grid past ~1M cells whatever the
+	// shape's size (the scan refuses ~40M and answers "zero cells", which the
+	// search would misread as "nothing fits"; at 1M a scan still costs a
+	// fraction of a second, so the 24-step bisection stays bounded).
+	const double floor_spacing = MAX(min_spacing, extent / 1000.0);
 	if (fill_spacing <= floor_spacing) {
 		return fill_spacing; // asked finer than the floor: the floor only stops the automatic refinement
 	}

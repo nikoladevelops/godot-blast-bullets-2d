@@ -130,3 +130,24 @@ func test_min_spacing_never_coarsens_a_finer_requested_spacing() -> void:
 	# it explicitly, so the floor only stops the AUTOMATIC refinement.
 	var v: Array = BulletPatterns2D.generate(CIRCLE, 20, Transform2D(), {"outline_placement": FILL_INSIDE, "outline_fill_spacing": 0.3, "circle_radius": 5.0})
 	assert_eq(v.size(), 20, "the requested spacing is honored")
+
+
+func test_a_giant_shape_with_a_margin_hugging_its_inradius_stays_bounded() -> void:
+	# Radius 3000 with margin 2999: a ~1 px usable disc on a 6000 px shape. The
+	# floor alone (0.5 px) would mean a 144M-cell grid and minutes of work; the
+	# grid budget (1/1000 of the shape) bounds every scan.
+	var t0 := Time.get_ticks_msec()
+	var v: Array = BulletPatterns2D.generate(CIRCLE, 64, Transform2D(), {"outline_placement": FILL_INSIDE, "circle_radius": 3000.0, "outline_fill_margin": 2999.0})
+	var ms := Time.get_ticks_msec() - t0
+	expect_no_errors("a sliver is not an error")
+	assert_lt(ms, 8000, "answered in %d ms (before the budget: over 10 minutes)" % ms)
+	assert_eq(v.size(), 1, "the one cell the budgeted grid holds")
+
+
+func test_a_floor_finer_than_the_grid_budget_still_returns_the_cells_that_fit() -> void:
+	# A 0.01 px floor on a 400 px shape asks for a 1.6 billion cell grid. The
+	# scan refuses such grids with "zero cells", which the search used to read
+	# as "nothing fits": a shape WITH room reported "no room" and fired nothing.
+	var v: Array = BulletPatterns2D.generate(23, 1000, Transform2D(), {"outline_placement": FILL_INSIDE, "outline_fill_min_spacing": 0.01})
+	expect_no_errors("the lissajous interior has room")
+	assert_gt(v.size(), 100, "the cells that fit are returned (old: 0 bullets plus a 'no room' error)")
