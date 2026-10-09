@@ -52,7 +52,7 @@ for the rest: the sections are written to be looked up, not read once.
 
 ```sh
 GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py   # build (exit 1 = failed; never raw scons, never edit SConstruct)
-python3 tools/run_tests.py                                       # 172 files / 1262 tests, ~10 s, leak-checked
+python3 tools/run_tests.py                                       # 175 files / 1290 tests, ~10 s, leak-checked
 python3 tools/run_tests.py --suite <substring> --full            # one area, every failure message unclipped
 python3 tools/run_tests.py --self-test                           # proves the harness still catches failures/leaks
 python3 tools/run_editor_smoke.py                                # headless EDITOR run of tests/editor_smoke/ (editor-only paths)
@@ -572,8 +572,20 @@ Pinned by `spawner/test_spawner_pattern_counts.gd`,
    (dots within 1.5 px x pattern_scale). Formulas both sides need live in
    `patterns_internal.hpp` / `pattern_curves2d.hpp`.
 5. Every bad input fails loud once with exact wording; amount errors read
-   "<fn>: transforms_amount must be between 0 and 10000." for every shape
-   generator (polyline keeps its pinned "must be in 0..10000.").
+   "<fn>: transforms_amount must be between 0 and 20000." for every shape
+   generator (polyline keeps its pinned "must be in 0..20000."). The number
+   is the developer-set limit `BulletPatterns2D.max_bullets_per_pattern`
+   (project setting `blastbullets2d/patterns/max_bullets_per_pattern`,
+   default 20000; `pattern_max_bullets()` in `pattern_inputs2d.hpp`, never a
+   constant). Why 20000: a volley is ONE physics area with a shape per
+   bullet and Godot's broadphase BVH hitches for seconds on thousands of
+   clustered shapes and aborts the game past ~35k (measured on 4.7.2; spread
+   out, 100k works). Tests reset the limit in `BlastTest.before_each`.
+6. Fill Inside never searches forever: `fill_spacing_that_fits` answers an
+   impossible `fill_margin` at once (`fill_margin_unreachable`), floors the
+   refinement at `helper_outline_fill_min_spacing` (default 0.5, also at 1/1000
+   of the shape so a scan stays ~1M cells) and tests cells through a segment
+   grid. Taking it away brings back 20-100 s freezes (the editor preview runs it).
 
 Not merged on purpose: the six arc-length resamplers (precision and
 threshold differences change bits).
@@ -839,7 +851,8 @@ deduped, cancelled by REMOVED) and replayed once on resume.
   entries; empty arrays; short vs oversized arrays; OOB indices (-1/99);
   inverted ranges; zero amounts/sizes/speeds; singular transforms; freed
   factory/generator/target/path mid-flight; pool reuse across lives;
-  pause/resume with overlaps in flight; 10k cap (10000 ok, 10001 rejected);
+  pause/resume with overlaps in flight; the pattern limit (limit ok, limit+1 rejected);
+  finite-but-overflowing values (1e30 velocity: its square is INF in float32);
   maxed timers (64); huge target/queue counts; same-frame expiry+respawn; deferred calls from
   collision handlers; zero-delta ticks; mixed shared + per-bullet features.
 - Godot facts that bit us: GDExtension virtuals
@@ -1142,6 +1155,7 @@ emits `GRAZE_POINT_TARGET_BIT | index` ids and belongs in
 - Offers never play inside the sweep: `flush` plays the winners after every volley, effect and timer of the sweep (at most one tick of latency).
 - A channel's `min_interval_sec` and `max_voices` are shared by every spawner and volley using the resource. Nearest wins each sweep.
 - Fading voices hold their pool slot but never count toward `max_voices` and are never restarted. A full pool steals the oldest fading voice first, then starts the oldest live voice's fade (that one play waits one sweep).
+- `pitch_scale` / `pitch_min` / `pitch_max` stop at 1000: Godot's audio mixer never finishes a looping stream at ~1e8x speed (plain AudioStreamPlayer2D nodes too), a typo like 1e9 froze the game for tens of seconds (pinned in `test_sound_data_contract`).
 - `follow_bullet`: one live voice per bullet and entry; the voice rides the bullet and fades when the bullet ends.
 - Cosmetic rolls (volume, pitch, pan, chance, stream picks, effect starts) draw from `CosmeticRng2D`. Tests reseed it with `BulletFactory2D.debug_seed_cosmetic_rng`.
 
