@@ -101,13 +101,13 @@
 			Stereo spread (Godot's own panning math). Hidden while [member positional] is off.
 		</member>
 		<member name="pitch_max" type="float" setter="set_pitch_max" getter="get_pitch_max" default="16.0">
-			Final pitch ceiling (linear multiplier, applied after every random). Inverted bounds sort themselves. Wide open by default, so existing mixes play untouched.
+			Final pitch ceiling (linear multiplier, applied after every random). Inverted bounds sort themselves. Wide open by default, so existing mixes play untouched. Must be finite and between 0.01 and 1000.
 		</member>
 		<member name="pitch_min" type="float" setter="set_pitch_min" getter="get_pitch_min" default="0.01">
-			Final pitch floor (linear multiplier, applied after every random). Inverted bounds sort themselves. Wide open by default.
+			Final pitch floor (linear multiplier, applied after every random). Inverted bounds sort themselves. Wide open by default. Must be finite and between 0.01 and 1000.
 		</member>
 		<member name="pitch_scale" type="float" setter="set_pitch_scale" getter="get_pitch_scale" default="1.0">
-			Base pitch multiplier, multiplied by the [member random_pitch] and [member random_pitch_min]/[member random_pitch_max] rolls of each play, clamped into [member pitch_min]..[member pitch_max].
+			Base pitch multiplier, multiplied by the [member random_pitch] and [member random_pitch_min]/[member random_pitch_max] rolls of each play, clamped into [member pitch_min]..[member pitch_max]. Must be finite and between 0.01 and 1000: Godot's audio mixer never finishes a looping stream played at around 1e8 times speed, so the setter refuses typos like 1e9.
 		</member>
 		<member name="positional" type="bool" setter="set_positional" getter="get_positional" default="true">
 			Off means constant volume, centered (a UI sting). On means Godot's distance falloff and panning from the listener.

@@ -15,6 +15,12 @@
 using namespace godot;
 namespace BlastBullets2D {
 
+// pitch_scale / pitch_min / pitch_max stop here: Godot's audio mixer never
+// finishes a looping stream played at ~1e8x speed (measured: fine at 1e7,
+// frozen at 1e8, with plain AudioStreamPlayer2D nodes too), so a typo must
+// not reach it. About 10 octaves; far beyond any audible use.
+static constexpr double SOUND_PITCH_CEILING = 1000.0;
+
 bool BulletSoundData2D::get_enabled() const { return enabled; }
 void BulletSoundData2D::set_enabled(bool value) {
 	if (enabled == value) {
@@ -128,8 +134,8 @@ void BulletSoundData2D::set_volume_db(double value) {
 
 double BulletSoundData2D::get_pitch_scale() const { return pitch_scale; }
 void BulletSoundData2D::set_pitch_scale(double value) {
-	if (!Math::is_finite(value) || value < 0.01) {
-		UtilityFunctions::push_error("BulletSoundData2D: pitch_scale must be finite and >= 0.01, keeping the old value.");
+	if (!Math::is_finite(value) || value < 0.01 || value > SOUND_PITCH_CEILING) {
+		UtilityFunctions::push_error("BulletSoundData2D: pitch_scale must be finite and between 0.01 and 1000, keeping the old value.");
 		return;
 	}
 	if (pitch_scale == value) {
@@ -561,8 +567,8 @@ void BulletSoundData2D::set_volume_max_db(double value) {
 
 double BulletSoundData2D::get_pitch_min() const { return pitch_min; }
 void BulletSoundData2D::set_pitch_min(double value) {
-	if (!Math::is_finite(value) || value < 0.01) {
-		UtilityFunctions::push_error("BulletSoundData2D: pitch_min must be finite and >= 0.01, keeping the old value.");
+	if (!Math::is_finite(value) || value < 0.01 || value > SOUND_PITCH_CEILING) {
+		UtilityFunctions::push_error("BulletSoundData2D: pitch_min must be finite and between 0.01 and 1000, keeping the old value.");
 		return;
 	}
 	if (pitch_min == value) {
@@ -574,8 +580,8 @@ void BulletSoundData2D::set_pitch_min(double value) {
 
 double BulletSoundData2D::get_pitch_max() const { return pitch_max; }
 void BulletSoundData2D::set_pitch_max(double value) {
-	if (!Math::is_finite(value) || value < 0.01) {
-		UtilityFunctions::push_error("BulletSoundData2D: pitch_max must be finite and >= 0.01, keeping the old value.");
+	if (!Math::is_finite(value) || value < 0.01 || value > SOUND_PITCH_CEILING) {
+		UtilityFunctions::push_error("BulletSoundData2D: pitch_max must be finite and between 0.01 and 1000, keeping the old value.");
 		return;
 	}
 	if (pitch_max == value) {
@@ -748,7 +754,7 @@ void BulletSoundData2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_pitch_scale"), &BulletSoundData2D::get_pitch_scale);
 	ClassDB::bind_method(D_METHOD("set_pitch_scale", "value"), &BulletSoundData2D::set_pitch_scale);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "pitch_scale", PROPERTY_HINT_RANGE, "0.01,4,0.01,or_greater"), "set_pitch_scale", "get_pitch_scale");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "pitch_scale", PROPERTY_HINT_RANGE, "0.01,1000,0.01,exp"), "set_pitch_scale", "get_pitch_scale");
 
 	ClassDB::bind_method(D_METHOD("get_random_pitch"), &BulletSoundData2D::get_random_pitch);
 	ClassDB::bind_method(D_METHOD("set_random_pitch", "value"), &BulletSoundData2D::set_random_pitch);
@@ -887,11 +893,11 @@ void BulletSoundData2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_pitch_min"), &BulletSoundData2D::get_pitch_min);
 	ClassDB::bind_method(D_METHOD("set_pitch_min", "value"), &BulletSoundData2D::set_pitch_min);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "pitch_min", PROPERTY_HINT_RANGE, "0.01,16,0.01,or_greater"), "set_pitch_min", "get_pitch_min");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "pitch_min", PROPERTY_HINT_RANGE, "0.01,1000,0.01,exp"), "set_pitch_min", "get_pitch_min");
 
 	ClassDB::bind_method(D_METHOD("get_pitch_max"), &BulletSoundData2D::get_pitch_max);
 	ClassDB::bind_method(D_METHOD("set_pitch_max", "value"), &BulletSoundData2D::set_pitch_max);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "pitch_max", PROPERTY_HINT_RANGE, "0.01,16,0.01,or_greater"), "set_pitch_max", "get_pitch_max");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "pitch_max", PROPERTY_HINT_RANGE, "0.01,1000,0.01,exp"), "set_pitch_max", "get_pitch_max");
 
 	ClassDB::bind_method(D_METHOD("get_fade_out_sec"), &BulletSoundData2D::get_fade_out_sec);
 	ClassDB::bind_method(D_METHOD("set_fade_out_sec", "value"), &BulletSoundData2D::set_fade_out_sec);

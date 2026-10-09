@@ -54,10 +54,10 @@ func test_float_setters_reject_and_keep() -> void:
 	expect_error_sequence(["BulletSoundData2D: volume_db must be finite, keeping the old value."])
 	assert_eq(s.volume_db, 0.0, "volume_db kept")
 	s.set_pitch_scale(0.0)
-	expect_error_sequence(["BulletSoundData2D: pitch_scale must be finite and >= 0.01, keeping the old value."])
+	expect_error_sequence(["BulletSoundData2D: pitch_scale must be finite and between 0.01 and 1000, keeping the old value."])
 	assert_eq(s.pitch_scale, 1.0, "pitch_scale kept")
 	s.set_pitch_scale(INF)
-	expect_error_sequence(["BulletSoundData2D: pitch_scale must be finite and >= 0.01, keeping the old value."])
+	expect_error_sequence(["BulletSoundData2D: pitch_scale must be finite and between 0.01 and 1000, keeping the old value."])
 	s.set_random_pitch(0.5)
 	expect_error_sequence(["BulletSoundData2D: random_pitch must be finite and between 1 and 16, keeping the old value."])
 	assert_eq(s.random_pitch, 1.0, "random_pitch kept")
@@ -137,7 +137,7 @@ func test_hint_strings_byte_exact() -> void:
 	for p in s.get_property_list():
 		hints[StringName(p.get("name", ""))] = str(p.get("hint_string", ""))
 	assert_eq(hints.get(&"volume_db", ""), "-80,80,0.1,suffix:dB", "volume hint")
-	assert_eq(hints.get(&"pitch_scale", ""), "0.01,4,0.01,or_greater", "pitch hint")
+	assert_eq(hints.get(&"pitch_scale", ""), "0.01,1000,0.01,exp", "pitch hint")
 	assert_eq(hints.get(&"random_pitch", ""), "1,16,0.01", "random pitch hint")
 	assert_eq(hints.get(&"random_volume_offset_db", ""), "0,40,0.01,suffix:dB", "random volume hint")
 	assert_eq(hints.get(&"random_volume_min_db", ""), "-40,40,0.01,suffix:dB", "random volume min hint")
@@ -147,8 +147,8 @@ func test_hint_strings_byte_exact() -> void:
 	assert_eq(hints.get(&"random_pan", ""), "0,1,0.01", "random pan hint")
 	assert_eq(hints.get(&"volume_min_db", ""), "-80,80,0.1,suffix:dB", "volume floor hint")
 	assert_eq(hints.get(&"volume_max_db", ""), "-80,80,0.1,suffix:dB", "volume ceiling hint")
-	assert_eq(hints.get(&"pitch_min", ""), "0.01,16,0.01,or_greater", "pitch floor hint")
-	assert_eq(hints.get(&"pitch_max", ""), "0.01,16,0.01,or_greater", "pitch ceiling hint")
+	assert_eq(hints.get(&"pitch_min", ""), "0.01,1000,0.01,exp", "pitch floor hint")
+	assert_eq(hints.get(&"pitch_max", ""), "0.01,1000,0.01,exp", "pitch ceiling hint")
 	assert_eq(hints.get(&"fade_out_sec", ""), "0,10,0.01,or_greater,suffix:s", "fade hint")
 	assert_eq(hints.get(&"duck_amount_db", ""), "0,24,0.01,or_greater,suffix:dB", "duck hint")
 	assert_eq(hints.get(&"zoom_gain_db", ""), "-24,24,0.01,suffix:dB", "zoom gain hint")
@@ -254,10 +254,10 @@ func test_new_random_and_limit_setters_reject_and_keep() -> void:
 	expect_error_sequence(["BulletSoundData2D: volume_max_db must be finite, keeping the old value."])
 	assert_eq(s.get("volume_max_db"), 80.0, "kept")
 	s.set("pitch_min", 0.0)
-	expect_error_sequence(["BulletSoundData2D: pitch_min must be finite and >= 0.01, keeping the old value."])
+	expect_error_sequence(["BulletSoundData2D: pitch_min must be finite and between 0.01 and 1000, keeping the old value."])
 	assert_eq(s.get("pitch_min"), 0.01, "kept")
 	s.set("pitch_max", NAN)
-	expect_error_sequence(["BulletSoundData2D: pitch_max must be finite and >= 0.01, keeping the old value."])
+	expect_error_sequence(["BulletSoundData2D: pitch_max must be finite and between 0.01 and 1000, keeping the old value."])
 	assert_eq(s.get("pitch_max"), 16.0, "kept")
 	# Accepted values apply and emit changed (same-value sets stay silent).
 	var log: Array = []
@@ -268,3 +268,21 @@ func test_new_random_and_limit_setters_reject_and_keep() -> void:
 	assert_eq(log.size(), 3, "accepted changes emit changed")
 	s.set("volume_max_db", 6.0)
 	assert_eq(log.size(), 3, "same-value set emits nothing")
+
+
+func test_pitch_ceiling_keeps_absurd_values_away_from_the_audio_engine() -> void:
+	# Godot's audio mixer never finishes a looping stream played at ~1e8x
+	# speed (the game freezes inside the engine), so a typo like 1e9 is
+	# refused here. 1000 (about 10 octaves) is far beyond any real use.
+	for prop in ["pitch_scale", "pitch_min", "pitch_max"]:
+		var s := BulletSoundData2D.new()
+		var before: float = s.get(prop)
+		s.set(prop, 1000.0)
+		assert_eq(s.get(prop), 1000.0, "%s accepts its ceiling" % prop)
+		s.set(prop, 1000.01)
+		expect_error_sequence(["BulletSoundData2D: %s must be finite and between 0.01 and 1000, keeping the old value." % prop])
+		assert_eq(s.get(prop), 1000.0, "%s kept the ceiling after 1000.01" % prop)
+		s.set(prop, 1.0e9)
+		expect_error_sequence(["BulletSoundData2D: %s must be finite and between 0.01 and 1000, keeping the old value." % prop])
+		assert_eq(s.get(prop), 1000.0, "%s kept after 1e9" % prop)
+		assert_gt(before, 0.0, "default stays valid")
