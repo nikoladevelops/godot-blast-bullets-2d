@@ -2744,7 +2744,7 @@ public:
 	// next life): flock with every volley that joined the same flock with
 	// the same scope. Per Spawner groups a factory volley with the
 	// factory's own volleys of that flock.
-	bool flock_join(const Ref<BulletFlock2D> &flock, int scope = BulletFlock2D::SCOPE_SHARED);
+	bool flock_join(const Ref<BulletFlock2D> &flock, BulletFlock2D::Scope scope = BulletFlock2D::SCOPE_SHARED);
 	void flock_leave();
 	// The flock this volley flies in (null when not armed or switched off).
 	Ref<BulletFlock2D> flock_get() const;

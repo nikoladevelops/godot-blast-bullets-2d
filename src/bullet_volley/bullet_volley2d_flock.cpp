@@ -19,7 +19,7 @@ void BulletVolley2D::flock_set_config(const std::shared_ptr<FlockConfig2D> &conf
 	}
 }
 
-bool BulletVolley2D::flock_join(const Ref<BulletFlock2D> &flock, int scope) {
+bool BulletVolley2D::flock_join(const Ref<BulletFlock2D> &flock, BulletFlock2D::Scope scope) {
 	if (reject_pooled_handle("flock_join")) {
 		return false;
 	}

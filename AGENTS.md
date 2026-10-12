@@ -24,6 +24,7 @@ for the rest: the sections are written to be looked up, not read once.
 |  |  | 20 | Graze (zones, tick stage, routing, preview) |
 |  |  | 21 | Sound (mixer, triggers, listeners, RNG) |
 |  |  | 22 | World controls (time scale, despawn bounds, randomization, pickups) |
+|  |  | 23 | Flocking (BulletFlock2D, flock pass, step_flock, spawner group) |
 
 ## 0. Golden rules
 
@@ -53,7 +54,7 @@ for the rest: the sections are written to be looked up, not read once.
 
 ```sh
 GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py   # build (exit 1 = failed; never raw scons, never edit SConstruct)
-python3 tools/run_tests.py                                       # 193 files / 1523 tests, ~10 s, leak-checked
+python3 tools/run_tests.py                                       # 200 files / 1589 tests, ~10 s, leak-checked
 python3 tools/run_tests.py --suite <substring> --full            # one area, every failure message unclipped
 python3 tools/run_tests.py --self-test                           # proves the harness still catches failures/leaks
 python3 tools/run_editor_smoke.py                                # headless EDITOR run of tests/editor_smoke/ (editor-only paths)
@@ -320,6 +321,9 @@ Sections:
 - `sound`: seeded sound flights (`debug_seed_cosmetic_rng`, `debug_advance_time`):
   rolled mix, followed hum, capped flight, three-level ducking, clear/expiry
   triggers; plays and busy voices named by entry index, never instance ids.
+- `flock`: seeded flock flights (each rule alone, defaults, cap, turn cap,
+  face_heading off, wide separation, a parting stack, Shared vs Per Volley,
+  a homing swarm): poses, headings, steering vectors and neighbor counts.
 
 Unseeded randomness is detected (each call runs twice) and recorded by size
 only. `save` refuses a stale build. `diff a b` exits 1 on any difference and
@@ -610,6 +614,7 @@ bullet_volley2d_{bounce,homing,orbit,motion,curves,wobble,gravity,lifetime,timer
                  effects,animation,teleport,area,pickups,debug,bindings}.cpp   one feature each
                                  (area: circle/rect queries + clears, cull_outside_bounds)
 bullet_volley2d_graze.cpp      graze arming, per-tick zone snapshot (prepare_graze_tick), live dispatch (§20)
+bullet_volley2d_flock.cpp      flock arming (flock_set_config = THE choke point), join/leave/get, readouts (§23)
 homing_target_deque.hpp        per-bullet/shared target queue (RingDeque2D: allocates nothing while empty)
 ```
 
@@ -623,7 +628,8 @@ length, lock snapshot, `core_limit` = the size every always-sized array
 covers) and reuses ONE `BulletStep2D b` scratch for all bullets
 (`b.begin(i, ...)` resets only what each bullet must start from). Per
 bullet, in order:
-`step_homing` (own deque wins, shared is the fallback) →
+`step_homing` (own deque wins, shared is the fallback) → `step_flock`
+(turn toward the factory pass's steering vector; §23) →
 `step_direction_curves` → `step_wobble` → `step_rotation` (+ adjust
 direction, bounce visual) → velocity refresh → `step_pattern_and_forces`
 (pattern, wind, gravity) → `step_orbit` → `step_place` (transform, shape,
@@ -686,6 +692,8 @@ src/
   factory/bullet_factory2d_stats.cpp      frame stats, monitors, debugger knobs, debug_*
   factory/bullet_factory2d_graze.cpp      graze debug readouts (the factory's detector lives in it)
   factory/graze_detector2d.cpp            GrazeDetector2D: graze target lists (stable slots, scans on the update interval, x-sorted slab order)
+  factory/bullet_factory2d_flock.cpp      the per-sweep flock pass over the volley snapshot + debug_get_flock_stats (§23)
+  factory/flock_solver2d.cpp              FlockSolver2D: gather, exact spatial hash grid, one steering vector per bullet; FlockConfig2D, FlockView2D
   factory/bullet_factory2d_bindings.cpp   _bind_methods
   bullet_spawner/bullet_spawner2d.cpp     wiring, cadence, spin, bursts/telegraph, pattern lists, shoot_once
   bullet_spawner/bullet_spawner2d_pattern_properties.cpp  hand-written pattern accessors + presets
@@ -695,8 +703,9 @@ src/
   bullet_spawner/bullet_spawner2d_preview_layer.cpp  PatternPreviewLayer2D (draw_multimesh)
   bullet_spawner/bullet_spawner2d_movement.cpp   Path2D movement
   bullet_spawner/bullet_spawner2d_graze.cpp      Graze group: target sources + detector, arming at shot, refresh/resolve_graze_targets, ring preview (GrazePreviewLayer2D)
+  bullet_spawner/bullet_spawner2d_flock.cpp      Flocking group: flock_enabled/flock/flock_scope, the shared FlockConfig2D, arming at shot
   bullet_spawner/bullet_spawner2d_bindings.cpp   _bind_methods (groups/subgroups) + _validate_property
-  data/        inspector Resources: BulletVolleyData2D, BulletSpeed/Rotation/Curves/Wobble/EffectLayerData2D, BulletGrazeZone2D
+  data/        inspector Resources: BulletVolleyData2D, BulletSpeed/Rotation/Curves/Wobble/EffectLayerData2D, BulletGrazeZone2D, BulletFlock2D
   pooling/     VolleyPool (parked volleys per key), VolleyPoolKey2D
   attachments/ BulletAttachment2D + its object pool
   debugger/    BulletVolleyDebugger2D (collision-shape overlay)
@@ -955,12 +964,28 @@ project's `.so`). For quick numeric comparisons load two
   read larger lists IN PLACE (no per-volley copy, no per-volley liveness
   pass: the user-code epoch re-validates the shared list instead), and the
   swept distance is measured once per bullet for every zone.
+- Flocking (§23): the pass costs ~2-5 ns per flockmate looked at plus
+  ~75 ns per turned bullet (atan2, exp, sincos): `flock_2k_swarm` 1.25 ms,
+  `flock_10k_flight` (dense, capped) 4.1 ms, `flock_5k_stacked` 2.0 ms tick
+  (debug build, this machine running ~1.6x slower than the baseline). The
+  candidate loop is bound by unpredictable range tests, not math: a
+  branch-free scalar version and a 4-wide SIMD version (GCC vector
+  extensions) were measured slower in loose swarms (cells hold ~1 bullet,
+  runs too short) and only 25% faster in dense ones, so the loop stays
+  branchy and scalar. What paid: dense per-flock cell arrays instead of hash
+  probes, one routine with plain-local sums (accumulators as struct members
+  were stored and reloaded around every candidate), and a bit-trick inverse
+  sqrt (no div/sqrt latency, the same bits on every CPU). Copying ring
+  flockmates into per-cell lists cost more than scanning them in place.
+  Prototype in a standalone harness (the solver compiles against a tiny
+  Godot shim) before touching the plugin: a full build per experiment is
+  slow, and perf/valgrind are not installed here.
 
 ## 16. Inspector groups and serialization locks
 
 - Spawner groups, in order (locked by `test_volley_bounce.gd`): Setup, Time,
-  Bullet Patterns, Shooting, Randomization, Spin, Homing, Orbiting, Graze,
-  Sound, Preview, Movement, Performance. Spawn data (`BulletVolleyData2D`): Bullets, Appearance,
+  Bullet Patterns, Shooting, Randomization, Spin, Homing, Orbiting, Flocking,
+  Graze, Sound, Preview, Movement, Performance. Spawn data (`BulletVolleyData2D`): Bullets, Appearance,
   Movement Speed, Bullet Rotation, Wobble, Gravity, Bounce and Ricochet,
   Movement Pattern Paths, Homing, Collision, Attachments, Sprite Effects,
   Rendering and Material. No duplicate titles, no ungrouped property
@@ -1249,3 +1274,48 @@ emits `GRAZE_POINT_TARGET_BIT | index` ids and belongs in
   `spawner/test_spawner_time_scale`, `spawner/test_spawner_randomization`,
   `volley/test_volley_attachment_time_scale`, `sound/test_sound_time_scale`,
   `factory/test_factory_despawn_preview` (+ the `despawn_preview` editor smoke probe).
+
+## 23. Flocking (`BulletFlock2D`, flock pass, spawner group)
+
+Boids: every tick each flocking bullet turns its heading toward
+`V = alignment * A + cohesion * C + separation * S`, measured where every
+flockmate stood BEFORE the sweep moved anyone (A = mean flight heading of
+the flockmates within `neighbor_range`, C = mean offset to them /
+`neighbor_range`, S = sum over flockmates closer than `separation_range` of
+(p - q) / d * (1 - d / range)). Only the direction turns, by
+`1 - e^(-|V| dt)` of the angle (never overshoots, frame-rate independent),
+capped by `max_turn_rate_degrees`.
+
+### 23.1 Pieces
+
+| Piece | Where | Notes |
+|---|---|---|
+| Rules | `data/bullet_flock2d.*` | weights (per second), ranges, turn cap, `face_heading`, `max_neighbors` (0 = all), enum `Scope` (Per Spawner 0 / Shared 1 / Per Volley 2, serialized); every accepted change emits `changed` |
+| Who flies together | `FlockConfig2D` (`factory/flock_solver2d.hpp`) | {flock, scope, enabled, captured owner id, serial}; the spawner owns one `std::shared_ptr` shared with every volley it armed (edits reach bullets in flight, orphans keep it); `flock_join` gives a volley its own |
+| Arming | `bullet_volley/bullet_volley2d_flock.cpp` | `flock_set_config` is THE choke point (keeps `BulletFactory2D::flock_armed_volleys` exact): spawner arming, join, leave, `release_life`, PREDELETE (`force_delete` skips `release_life`) |
+| Pass | `factory/bullet_factory2d_flock.cpp`, `factory/flock_solver2d.*` | in `tick_volleys` right after `snapshot_active_volleys`, skipped while nothing is armed or `time_scale` is 0; flock key = (resource id, scope kind, owner id / 0 / volley id); slots `base..base+amount` per volley, zeroed per pass; cell = max(range)/2, 5x5 block, own cell first then the 8- and 16-rings, starts rotating per bullet; per-flock ordinals make each flock bit-identical to flying alone |
+| Turn | `step_flock` in `bullet_volley2d_tick.cpp` | after `step_homing`, before the curves; the volley reads its slice through `FlockView2D` {base, sweep, life, serial} (never a pointer) and only when all match; skipped for locked orbits and zero headings; rotates the basis too when `face_heading` or when the rotation owns the heading (`adjust_direction_based_on_rotation`, or homing in transform mode: `update_homing` re-derives the heading from the basis) |
+| Spawner | `bullet_spawner/bullet_spawner2d_flock.cpp` | Flocking group after Orbiting: `flock_enabled`, `flock`, `flock_scope` (hidden while off); armed in `shoot_once` next to graze/sound (before any signal); setup warnings for an empty flock and snapping homing |
+
+### 23.2 Contract (pinned by the `*flock*` suites)
+
+- Separate flocks never see each other; zero weights, out-of-range
+  flockmates and a calm aligned flock are bit-identical to no flock.
+- Frozen bullets and bullets beyond 2^30 cells are not flockmates; a
+  negative speed flies along -direction (its flight heading counts).
+- A handler mid-sweep that frees, leaves, joins, toggles or edits never
+  steers with stale data (serial/life mismatch = no turn this tick);
+  resource edits apply from the next pass.
+- Spawner: turning flocking off stops it for bullets in flight (on resumes
+  them); bullets fired while it was off never flock; `adopt_live_volley`
+  leaves flocking alone.
+- `debug_assert_no_dangling` fails when the armed count disagrees with the
+  volleys holding a config, or a pooled volley still flocks.
+
+### 23.3 Adding a rule
+
+A field + validated setter on `BulletFlock2D` (standard wording, emit
+`changed`); read it ONCE per flock in `FlockSolver2D::group_for` into
+`Group`; add its term in `solve()` (inside the candidate test if it needs
+pairs, keeping the sums plain locals); a mutation-checked test in
+`volley/test_volley_flock_rules.gd`; the snapshot `flock` section; docs (§17).

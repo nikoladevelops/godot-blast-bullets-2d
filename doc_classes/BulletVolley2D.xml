@@ -1329,6 +1329,20 @@
 				Bounce introspection for one bullet: counts, config echo (mask, strength, mode, max), whether bouncing is armed, pending smooth-visual state and cooldown. Never mutates. Out-of-range indexes report valid = false.
 			</description>
 		</method>
+		<method name="debug_get_bullet_flock_neighbors" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				How many flockmates the last flock pass read for this bullet (at most [member BulletFlock2D.max_neighbors]). 0 when not flocking or not gathered.
+			</description>
+		</method>
+		<method name="debug_get_bullet_flock_steering" qualifiers="const">
+			<return type="Vector2" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				The steering vector (per second) the last flock pass gave this bullet: its direction is the wished heading, its length how hard the bullet turns. Zero when not flocking, not gathered (frozen, or beyond the grid at absurd coordinates) or after the volley's next life.
+			</description>
+		</method>
 		<method name="debug_get_bullet_info" qualifiers="const">
 			<return type="Dictionary" />
 			<param index="0" name="bullet_index" type="int" />
@@ -1477,6 +1491,32 @@
 			<param index="2" name="spawner_id" type="int" default="0" />
 			<description>
 				Manual-pooling reseed: reactivates a fully-disabled volley with fresh data (same amount_bullets required; a different collision shape type is refused inside the physics step: spawn through [BulletFactory2D] instead, which pops a matching pool bucket, or call it from an idle frame). Refuses on active/queued/wrong-type/null/NaN-offset input without touching state. This is the cross-owner reuse path for manual poolers; same-owner revive uses enable_bullet/wake_bullet.
+			</description>
+		</method>
+		<method name="flock_get" qualifiers="const">
+			<return type="BulletFlock2D" />
+			<description>
+				The flock this volley flies in, or null (not armed, or its spawner switched flocking off).
+			</description>
+		</method>
+		<method name="flock_get_scope" qualifiers="const">
+			<return type="int" />
+			<description>
+				The armed scope ([enum BulletFlock2D.Scope]), or -1 when not flocking.
+			</description>
+		</method>
+		<method name="flock_join">
+			<return type="bool" />
+			<param index="0" name="flock" type="BulletFlock2D" />
+			<param index="1" name="scope" type="int" enum="BulletFlock2D.Scope" default="1" />
+			<description>
+				Makes this volley fly as a boids flock by [param flock]'s rules. [param scope] decides who it flies with: Shared (the default: every volley that joined the same flock with Shared, and spawners set to Shared), Per Spawner (its owner spawner's group; for a factory volley the factory's own volleys of this flock) or Per Volley (alone). Replaces any membership until the volley's next life (a spawner's Flocking settings no longer reach it). Returns false and changes nothing for a null flock, a bad scope, a pooled handle or a volley no factory spawned. Steering starts on the next physics tick.
+			</description>
+		</method>
+		<method name="flock_leave">
+			<return type="void" />
+			<description>
+				Stops flocking (the bullets keep their current headings). Harmless when not flocking; refused on a pooled handle.
 			</description>
 		</method>
 		<method name="get_all_bullets_status">
