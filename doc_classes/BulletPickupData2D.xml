@@ -123,6 +123,9 @@
 		<member name="motion_mode" type="int" setter="set_motion_mode" getter="get_motion_mode" default="0">
 			How the pickups move: 0 Burst And Magnet (built-in coin physics), 1 Keep Bullet Motion (each pickup keeps its bullet's speed, top speed and acceleration, only the pull is added), 2 Custom (your [member speed_data] / [member curves_data] decide the speed). The knobs a mode does not read are hidden in the inspector. A new mode applies to the next conversion.
 		</member>
+		<member name="obey_despawn_bounds" type="bool" setter="set_obey_despawn_bounds" getter="get_obey_despawn_bounds" default="true">
+			When on (default), the factory's despawn bounds remove pickups that fly out of them like any other bullet (a coin that falls off the screen is lost). Turn it off for pickups that must never be culled, for example when the target can be outside the bounds.
+		</member>
 		<member name="rotation_data" type="BulletRotationData2D" setter="set_rotation_data" getter="get_rotation_data">
 			Optional [BulletRotationData2D] shared by the pickups: spinning coins. Works in every motion mode and together with the pull towards the target.
 		</member>

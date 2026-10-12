@@ -36,6 +36,19 @@ struct SourceRecord {
 	std::vector<int> indexes;
 };
 
+// Finite columns whose squares and determinant stay finite and non-zero.
+bool pose_is_usable(const Transform2D &pose) {
+	for (int c = 0; c < 3; ++c) {
+		if (!Math::is_finite(pose.columns[c].x) || !Math::is_finite(pose.columns[c].y)) {
+			return false;
+		}
+	}
+	const real_t x_sq = pose.columns[0].x * pose.columns[0].x + pose.columns[0].y * pose.columns[0].y;
+	const real_t y_sq = pose.columns[1].x * pose.columns[1].x + pose.columns[1].y * pose.columns[1].y;
+	const real_t det = pose.columns[0].x * pose.columns[1].y - pose.columns[0].y * pose.columns[1].x;
+	return Math::is_finite(x_sq) && Math::is_finite(y_sq) && Math::is_finite(det) && det != 0.0f;
+}
+
 void fail(const String &fn, const String &text) {
 	UtilityFunctions::push_error(fn + text);
 }
@@ -214,12 +227,19 @@ Array BulletFactory2D::convert_to_pickups_impl(const char *function_name, const 
 				const double hi = Math::max(pickup->scale_random_min, pickup->scale_random_max);
 				pose_scale *= (real_t)(lo + (hi - lo) * UtilityFunctions::randf());
 			}
+			const Transform2D source_pose = pose;
 			pose.columns[0] *= pose_scale;
 			pose.columns[1] *= pose_scale;
 			if (rotate_random) {
 				const double lo = Math::min(pickup->rotation_random_min_degrees, pickup->rotation_random_max_degrees);
 				const double hi = Math::max(pickup->rotation_random_min_degrees, pickup->rotation_random_max_degrees);
 				pose = pose * Transform2D((real_t)Math::deg_to_rad(lo + (hi - lo) * UtilityFunctions::randf()), Vector2());
+			}
+			// Huge scale settings can overflow float32 into infinity or a
+			// singular basis, which the physics server must never see: such a
+			// pose falls back to the bullet's own.
+			if (!pose_is_usable(pose)) {
+				pose = source_pose;
 			}
 			poses.push_back(pose);
 			BulletVolley2D::PickupSeed seed;
@@ -354,6 +374,34 @@ void BulletFactory2D::convert_all_bullets_to_pickups_deferred(const Ref<BulletPi
 		return;
 	}
 	queue_structural_call(Callable(this, "convert_all_bullets_to_pickups").bind(pickup, target));
+}
+
+void BulletFactory2D::populate_pickup_pool(const Ref<BulletPickupData2D> &pickup, int bullet_count, int instance_count) {
+	if (pickup.is_null()) {
+		UtilityFunctions::push_error("BulletFactory2D.populate_pickup_pool: pickup must be a BulletPickupData2D, nothing populated.");
+		return;
+	}
+	if (bullet_count < 1 || bullet_count > pattern_max_bullets()) {
+		UtilityFunctions::push_error(String("BulletFactory2D.populate_pickup_pool: bullet_count must be between 1 and ") + String::num_int64(pattern_max_bullets()) + String(", nothing populated."));
+		return;
+	}
+	// A pooled volley of this key needs spawn data that carries the transforms.
+	Ref<BulletVolleyData2D> data = pickup->get_volley_data()->duplicate();
+	TypedArray<Transform2D> transforms;
+	transforms.resize(bullet_count);
+	for (int i = 0; i < bullet_count; ++i) {
+		transforms[i] = Transform2D();
+	}
+	data->set_transforms(transforms);
+	populate_bullets_pool(debug_expected_pool_key(data), data, instance_count);
+}
+
+void BulletFactory2D::populate_pickup_pool_deferred(const Ref<BulletPickupData2D> &pickup, int bullet_count, int instance_count) {
+	if (is_tearing_down) {
+		UtilityFunctions::push_error("populate_pickup_pool_deferred: BulletFactory2D is being freed. Ignoring the request.");
+		return;
+	}
+	queue_structural_call(Callable(this, "populate_pickup_pool").bind(pickup, bullet_count, instance_count));
 }
 
 } // namespace BlastBullets2D

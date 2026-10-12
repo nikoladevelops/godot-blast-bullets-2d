@@ -1077,6 +1077,9 @@ public:
 	double get_process_time_scale() const;
 	bool get_shoot_outside_despawn_bounds() const { return shoot_outside_despawn_bounds; }
 	void set_shoot_outside_despawn_bounds(bool value) { shoot_outside_despawn_bounds = value; }
+	// True while the factory's despawn bounds are on, this spawner may not shoot
+	// from outside them, and its muzzle is outside. Shots and telegraphs ask.
+	bool muzzle_outside_despawn_bounds(const BulletFactory2D *factory) const;
 	// Turns every live bullet of the volleys this spawner fired into pickups
 	// (see BulletFactory2D.convert_all_bullets_to_pickups). Returns the pickup volleys.
 	Array convert_live_bullets_to_pickups(const Ref<BulletPickupData2D> &pickup, const Variant &target);

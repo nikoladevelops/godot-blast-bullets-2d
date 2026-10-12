@@ -71,6 +71,7 @@ BLAST_PICKUP_PLAIN_SETTER(Ref<BulletEffectLayerData2D>, collect_effect)
 BLAST_PICKUP_PLAIN_SETTER(bool, inherit_custom_data)
 BLAST_PICKUP_PLAIN_SETTER(bool, fire_clear_effects)
 BLAST_PICKUP_PLAIN_SETTER(bool, follow_source_time_scale)
+BLAST_PICKUP_PLAIN_SETTER(bool, obey_despawn_bounds)
 BLAST_PICKUP_PLAIN_SETTER(Variant, value)
 #undef BLAST_PICKUP_PLAIN_SETTER
 
@@ -231,6 +232,7 @@ Ref<BulletVolleyData2D> BulletPickupData2D::get_volley_data() {
 		d->set_material(material);
 	}
 	d->set_z_index(z_index);
+	d->set_ignore_despawn_bounds(!obey_despawn_bounds);
 	if (attachment.is_valid()) {
 		d->set_shared_bullet_attachment(attachment);
 		d->set_shared_bullet_attachment_offset(attachment_offset);
@@ -273,9 +275,11 @@ Ref<BulletVolleyData2D> BulletPickupData2D::get_volley_data() {
 		shape->set_radius((real_t)collision_radius);
 		d->set_collision_shape(shape);
 		d->set_monitorable(true);
-		// Collecting by touch consumes the contact; otherwise the normal
-		// area/body signals report it and the pickup keeps flying.
-		d->set_bullet_max_collision_count(collect_on_collision ? 0 : 1);
+		// A touch never kills a pickup: collecting by touch consumes the
+		// contact before it is counted, and otherwise the normal area/body
+		// signals report it while the pickup keeps flying (0 = never
+		// disabled by collisions).
+		d->set_bullet_max_collision_count(0);
 	} else {
 		d->set_emit_collision_signals(false);
 	}
@@ -428,6 +432,9 @@ void BulletPickupData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_follow_source_time_scale"), &BulletPickupData2D::get_follow_source_time_scale);
 	ClassDB::bind_method(D_METHOD("set_follow_source_time_scale", "value"), &BulletPickupData2D::set_follow_source_time_scale);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "follow_source_time_scale"), "set_follow_source_time_scale", "get_follow_source_time_scale");
+	ClassDB::bind_method(D_METHOD("get_obey_despawn_bounds"), &BulletPickupData2D::get_obey_despawn_bounds);
+	ClassDB::bind_method(D_METHOD("set_obey_despawn_bounds", "value"), &BulletPickupData2D::set_obey_despawn_bounds);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "obey_despawn_bounds"), "set_obey_despawn_bounds", "get_obey_despawn_bounds");
 }
 
 } // namespace BlastBullets2D

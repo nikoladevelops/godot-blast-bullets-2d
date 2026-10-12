@@ -206,6 +206,9 @@
 		<member name="homing_update_interval" type="float" setter="set_homing_update_interval" getter="get_homing_update_interval" default="0.0">
 			Seconds between homing target position refreshes (0 refreshes every tick). Larger values make rings lag and step on moving targets; keep 0 for bodyguard rings.
 		</member>
+		<member name="ignore_despawn_bounds" type="bool" setter="set_ignore_despawn_bounds" getter="get_ignore_despawn_bounds" default="false">
+			When on, the factory's despawn bounds ([member BulletFactory2D.despawn_bounds_enabled]) never remove this volley's bullets: for bullets that are meant to leave the play field and come back (boomerangs, homing shots, lasers, bosses that start off screen). Off by default. It is read when the volley spawns, so a pooled volley takes it from its next data.
+		</member>
 		<member name="instance_shader_parameters" type="Dictionary" setter="set_instance_shader_parameters" getter="get_instance_shader_parameters" default="{}">
 			Per-instance shader overrides, used only when [member material] is a [ShaderMaterial] with [code]instance uniform[/code] declarations. [b]KEY[/b] is the uniform name ([String]), [b]VALUE[/b] is a [Variant] matching that uniform's type (a wrong type warns and skips that key).
 			Applied per bullet instance through [code]set_instance_shader_parameter()[/code] when the volley spawns every live bullet of the volley shares the same override set. An empty dictionary disables the pass. Switching to a non-shader material, or spawning with null material, clears the stored dict so pool reuse never leaks stale overrides into the next volley.

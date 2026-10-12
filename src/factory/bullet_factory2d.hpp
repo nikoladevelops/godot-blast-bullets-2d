@@ -154,6 +154,12 @@ public:
 	Array convert_bullets_in_circle_to_pickups(const Vector2 &center, real_t radius, const Ref<BulletPickupData2D> &pickup, const Variant &target);
 	Array convert_bullets_in_rect_to_pickups(const Rect2 &rect, const Ref<BulletPickupData2D> &pickup, const Variant &target);
 	void convert_all_bullets_to_pickups_deferred(const Ref<BulletPickupData2D> &pickup, const Variant &target);
+	// Pre-warms the pool for pickup volleys of `bullet_count` bullets
+	// (instance_count volleys, like populate_bullets_pool). The pool is keyed
+	// by bullet count, so a game that converts waves of a known size can
+	// build them at load time. Structural (idle frames only).
+	void populate_pickup_pool(const Ref<BulletPickupData2D> &pickup, int bullet_count, int instance_count);
+	void populate_pickup_pool_deferred(const Ref<BulletPickupData2D> &pickup, int bullet_count, int instance_count);
 	struct PickupSelection {
 		enum Kind { ALL,
 			OWNER,

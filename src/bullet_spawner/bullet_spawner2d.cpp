@@ -776,12 +776,8 @@ bool BulletSpawner2D::shoot_once() {
 	// Despawn bounds: bullets born outside them (and not flying in) would be
 	// culled on the first tick, so a muzzle outside simply does not shoot.
 	// Edges count as inside, like the cull pass.
-	if (!shoot_outside_despawn_bounds && factory->get_despawn_bounds_enabled()) {
-		const Rect2 bounds = factory->get_despawn_bounds_rect();
-		const Vector2 muzzle = get_global_position() + resolve_spawn_offset_global();
-		if (muzzle.x < bounds.position.x || muzzle.y < bounds.position.y || muzzle.x > bounds.position.x + bounds.size.x || muzzle.y > bounds.position.y + bounds.size.y) {
-			return fail_early(nullptr, StringName("outside_despawn_bounds"), true);
-		}
+	if (muzzle_outside_despawn_bounds(factory)) {
+		return fail_early(nullptr, StringName("outside_despawn_bounds"), true);
 	}
 	// Duplicate per volley: the user's resource must never be mutated (its
 	// transforms get overwritten below), so shared .tres files stay safe.
@@ -1152,6 +1148,15 @@ void BulletSpawner2D::set_time_scale(double value) {
 	time_scale = value;
 }
 
+bool BulletSpawner2D::muzzle_outside_despawn_bounds(const BulletFactory2D *factory) const {
+	if (shoot_outside_despawn_bounds || factory == nullptr || !factory->get_despawn_bounds_enabled()) {
+		return false;
+	}
+	const Rect2 bounds = factory->get_despawn_bounds_rect();
+	const Vector2 muzzle = get_global_position() + resolve_spawn_offset_global();
+	return muzzle.x < bounds.position.x || muzzle.y < bounds.position.y || muzzle.x > bounds.position.x + bounds.size.x || muzzle.y > bounds.position.y + bounds.size.y;
+}
+
 double BulletSpawner2D::get_process_time_scale() const {
 	double scale = time_scale;
 	const BulletFactory2D *factory = get_bullet_factory();
@@ -1383,6 +1388,12 @@ void BulletSpawner2D::begin_burst_chain(bool auto_started) {
 }
 
 void BulletSpawner2D::begin_telegraph(bool auto_started) {
+	// No warning for a shot that cannot happen (the muzzle is outside the
+	// despawn bounds): report the skip, the pull rearms the interval.
+	if (muzzle_outside_despawn_bounds(get_bullet_factory())) {
+		emit_signal("volley_skipped", StringName("outside_despawn_bounds"));
+		return;
+	}
 	// Snapshot the aim for the warning signal; the actual fire re-collects,
 	// so this is advisory (preview/telegraph visuals), never stale logic.
 	TypedArray<Transform2D> aim = collect_spawn_transforms_impl(true);

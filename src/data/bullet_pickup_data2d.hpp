@@ -100,6 +100,8 @@ public:
 	bool inherit_custom_data = false;
 	bool fire_clear_effects = false;
 	bool follow_source_time_scale = false;
+	// False: the factory's despawn bounds never cull these pickups.
+	bool obey_despawn_bounds = true;
 
 	// The spawn data of the pickup volley (cached until a setter runs).
 	Ref<BulletVolleyData2D> get_volley_data();
@@ -149,6 +151,7 @@ public:
 	BLAST_PICKUP_ACCESSORS(bool, inherit_custom_data)
 	BLAST_PICKUP_ACCESSORS(bool, fire_clear_effects)
 	BLAST_PICKUP_ACCESSORS(bool, follow_source_time_scale)
+	BLAST_PICKUP_ACCESSORS(bool, obey_despawn_bounds)
 #undef BLAST_PICKUP_ACCESSORS
 
 	void _validate_property(PropertyInfo &p_property) const;

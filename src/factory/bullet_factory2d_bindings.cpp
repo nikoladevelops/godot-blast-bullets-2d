@@ -241,6 +241,8 @@ void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("convert_bullets_in_circle_to_pickups", "center", "radius", "pickup", "target"), &BulletFactory2D::convert_bullets_in_circle_to_pickups);
 	ClassDB::bind_method(D_METHOD("convert_bullets_in_rect_to_pickups", "rect", "pickup", "target"), &BulletFactory2D::convert_bullets_in_rect_to_pickups);
 	ClassDB::bind_method(D_METHOD("convert_all_bullets_to_pickups_deferred", "pickup", "target"), &BulletFactory2D::convert_all_bullets_to_pickups_deferred);
+	ClassDB::bind_method(D_METHOD("populate_pickup_pool", "pickup", "bullet_count", "instance_count"), &BulletFactory2D::populate_pickup_pool);
+	ClassDB::bind_method(D_METHOD("populate_pickup_pool_deferred", "pickup", "bullet_count", "instance_count"), &BulletFactory2D::populate_pickup_pool_deferred);
 	// A pickup reached its target (the bullet is still alive in the handler,
 	// then it leaves). `target` is null for a point or the mouse.
 	ADD_SIGNAL(MethodInfo("pickup_collected",

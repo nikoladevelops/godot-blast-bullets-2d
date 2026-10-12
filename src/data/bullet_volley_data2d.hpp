@@ -181,6 +181,8 @@ public:
 
 	// Whether the life_time_over signal will be emitted when the life time of the bullets is over. Tracked by BulletFactory2D
 	bool is_life_time_over_signal_enabled = false;
+	// True: the factory's despawn bounds never cull this volley's bullets.
+	bool ignore_despawn_bounds = false;
 
 	// Whether the lifetime is infinite
 	bool is_life_time_infinite = false;
@@ -323,6 +325,11 @@ public:
 	void set_instance_shader_parameters(const Dictionary &new_instance_shader_parameters);
 
 	bool get_is_life_time_over_signal_enabled() const;
+	bool get_ignore_despawn_bounds() const { return ignore_despawn_bounds; }
+	void set_ignore_despawn_bounds(bool value) {
+		ignore_despawn_bounds = value;
+		emit_changed();
+	}
 	void set_is_life_time_over_signal_enabled(bool new_is_life_time_over_signal_enabled);
 
 	bool get_stop_rotation_when_max_reached() const;

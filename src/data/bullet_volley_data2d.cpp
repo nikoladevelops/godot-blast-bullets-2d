@@ -922,6 +922,10 @@ void BulletVolleyData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_is_life_time_over_signal_enabled", "value"), &BulletVolleyData2D::set_is_life_time_over_signal_enabled);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_life_time_over_signal_enabled"), "set_is_life_time_over_signal_enabled", "get_is_life_time_over_signal_enabled");
 
+	ClassDB::bind_method(D_METHOD("get_ignore_despawn_bounds"), &BulletVolleyData2D::get_ignore_despawn_bounds);
+	ClassDB::bind_method(D_METHOD("set_ignore_despawn_bounds", "value"), &BulletVolleyData2D::set_ignore_despawn_bounds);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "ignore_despawn_bounds"), "set_ignore_despawn_bounds", "get_ignore_despawn_bounds");
+
 	ClassDB::bind_method(D_METHOD("get_is_life_time_infinite"), &BulletVolleyData2D::get_is_life_time_infinite);
 	ClassDB::bind_method(D_METHOD("set_is_life_time_infinite", "value"), &BulletVolleyData2D::set_is_life_time_infinite);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_life_time_infinite"), "set_is_life_time_infinite", "get_is_life_time_infinite");

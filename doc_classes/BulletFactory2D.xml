@@ -484,6 +484,24 @@
 				Deferred [method populate_bullets_pool]: safe from any callback. Null key, null data and instance_count &lt;= 0 are rejected immediately without queuing.
 			</description>
 		</method>
+		<method name="populate_pickup_pool">
+			<return type="void" />
+			<param index="0" name="pickup" type="BulletPickupData2D" />
+			<param index="1" name="bullet_count" type="int" />
+			<param index="2" name="instance_count" type="int" />
+			<description>
+				Pre-builds [param instance_count] pooled volleys for pickup conversions of [param bullet_count] bullets, like [method populate_bullets_pool] but taking the whole [BulletPickupData2D] (look, attachment, effect layers, collision). The volley pool is keyed by bullet count, so a game that converts waves of a known size can do this while loading and avoid the first-conversion hitch. Idle frames only (use [method populate_pickup_pool_deferred] from a callback); [param bullet_count] must be between 1 and [member BulletPatterns2D.max_bullets_per_pattern].
+			</description>
+		</method>
+		<method name="populate_pickup_pool_deferred">
+			<return type="void" />
+			<param index="0" name="pickup" type="BulletPickupData2D" />
+			<param index="1" name="bullet_count" type="int" />
+			<param index="2" name="instance_count" type="int" />
+			<description>
+				Queues [method populate_pickup_pool] for the next idle frame. Safe from anywhere.
+			</description>
+		</method>
 		<method name="reactivate_volley">
 			<return type="void" />
 			<param index="0" name="volley" type="BulletVolley2D" />

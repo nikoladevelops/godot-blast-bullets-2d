@@ -836,6 +836,7 @@ public:
 
 	// Whether the life_time_over signal will be emitted when the life time of the bullets is over. Tracked by BulletFactory2D
 	bool is_life_time_over_signal_enabled = false;
+	bool ignore_despawn_bounds = false; // seeded per life from the data
 
 	// The current life time being processed
 	double current_life_time = 0.0;
