@@ -901,10 +901,12 @@ bool BulletSpawner2D::shoot_once() {
 	// max_volleys cap. Single clear-point right after, so sequential
 	// (non-nested) shots are unaffected. All pre-emit failure paths above
 	// return while the guard is either unset or already cleared.
+	// Read before the emit: a volley_fired handler may free the volley.
+	const int fired_amount = bullets->get_amount_bullets();
 	emit_signal("volley_fired", bullets, volleys_fired);
 	// The shot succeeded (no drop path follows): spawner-only entries fire
 	// at the spawner's global position.
-	fire_spawner_sound(BulletSoundData2D::SOUND_ON_SHOT, bullets->get_amount_bullets());
+	fire_spawner_sound(BulletSoundData2D::SOUND_ON_SHOT, fired_amount);
 	// One-shot budget counts every fired volley (auto or manual) without
 	// touching max_volleys. Spent budget pauses via the standard path, so
 	// transitions stay consistent; placed after volley_fired so the last

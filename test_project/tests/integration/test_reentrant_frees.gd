@@ -156,3 +156,24 @@ func test_last_bullet_killing_hit_handler_sees_its_attachment() -> void:
 	assert_null(v.bullet_get_attachment(1), "slot 1 released after its handler")
 	assert_eq(factory.debug_get_active_attachments_amount(), 0, "no attachment left active")
 	assert_eq(factory.debug_get_attachments_pool_amount(), 2, "both attachments parked in the pool")
+
+
+func _on_fired_free_volley(volley: BulletVolley2D, _count: int) -> void:
+	volley.free()
+	freed_count += 1
+
+
+func test_free_volley_inside_volley_fired_then_spawner_keeps_working() -> void:
+	# shoot_once read bullets->get_amount_bullets() AFTER the volley_fired
+	# emit (for the On Shot sound): a handler that frees the volley made that
+	# a use-after-free. Regression guard: the shot completes, nothing errors,
+	# and the next shot still works.
+	var sp := make_spawner(H.make_volley_data(3, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 3)
+	sp.volley_fired.connect(_on_fired_free_volley)
+	watch_signals(sp)
+	await idle(1)
+	assert_true(sp.shoot_once(), "shot succeeds")
+	assert_eq(freed_count, 1, "handler freed the volley")
+	assert_true(sp.shoot_once(), "spawner still fires afterwards")
+	assert_eq(freed_count, 2, "second volley freed too")
+	assert_signal_emit_count(sp, "volley_fired", 2, "one volley_fired per shot")
