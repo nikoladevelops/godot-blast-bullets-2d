@@ -85,3 +85,28 @@ func test_size_warning_once_per_resource_and_rearms() -> void:
 		if not err.handled and err.is_push_warning() and err.contains_text("all_bullet_speed_data size (3) != bullets (10)"):
 			seen += 1
 	assert_eq(seen, 2, "a different resource with the same mistake warns too")
+
+
+func test_flocking_shots_retain_nothing(scope: int = use_parameters([BulletFlock2D.SCOPE_PER_SPAWNER, BulletFlock2D.SCOPE_SHARED, BulletFlock2D.SCOPE_PER_VOLLEY])) -> void:
+	# Every shot flocks (dense ring, every rule on): configs, views and the
+	# factory's pass buffers must recycle with the pool.
+	var sp := make_spawner(H.make_volley_data(4, 250.0, 0.05), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 24)
+	sp.helper_ring_radius = 30.0
+	sp.flock_enabled = true
+	sp.flock = BulletFlock2D.new()
+	sp.flock_scope = scope
+	var grown: int = await _steady(func(): sp.shoot_once())
+	assert_gt(factory.get_frame_stats()["flock_usec"], -1, "the pass ran")
+	assert_eq(grown, 0, "200 warm flocking shots: zero retained objects")
+	assert_true(factory.debug_assert_no_dangling()["ok"], "consistent")
+
+
+func test_joined_factory_spawns_and_swapped_flocks_retain_nothing() -> void:
+	# A new flock resource per spawn (the old ones must be released with
+	# their volleys), joined by script.
+	var d := H.make_volley_data(4, 250.0, 0.05)
+	var grown: int = await _steady(func():
+		var v: BulletVolley2D = factory.spawn_volley(d)
+		v.flock_join(H.make_flock(1.0, 1.0, 1.0), BulletFlock2D.SCOPE_PER_VOLLEY))
+	assert_eq(grown, 0, "200 warm joined spawns with fresh flocks: zero retained objects")
+	assert_true(factory.debug_assert_no_dangling()["ok"], "consistent")
