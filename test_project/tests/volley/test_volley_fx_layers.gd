@@ -121,8 +121,8 @@ func test_validation_inert_layers_stay_silent_rejects_hold() -> void:
 	assert_true(dead.max_instances == 0, "negative cap rejected")
 	dead.set_max_instances(0)
 	assert_true(dead.max_instances == 0, "auto cap (0) accepted")
-	dead.set_random_scale_min(5.0)
-	assert_true(dead.random_scale_min == 1.0, "scale min above max rejected")
+	dead.set_random_scale_min(NAN)
+	assert_true(dead.random_scale_min == 1.0, "NaN scale min rejected")
 	dead.set_rotation_degrees(NAN)
 	assert_true(dead.rotation_degrees == 0.0, "NaN rotation rejected")
 	dead.set_spin_degrees_per_sec(NAN)
@@ -135,7 +135,7 @@ func test_validation_inert_layers_stay_silent_rejects_hold() -> void:
 	expect_errors_containing("trigger must be", 1, "bad trigger fails loud")
 	expect_errors_containing("trigger_chance must be finite", 2, "bad chance fails loud")
 	expect_errors_containing("max_instances must be", 1, "negative instances fail loud")
-	expect_errors_containing("random_scale_min must be finite", 1, "inverted scale fails loud")
+	expect_errors_containing("random_scale_min must be finite", 1, "NaN scale min fails loud")
 	expect_errors_containing("rotation_degrees must be finite", 1, "NaN rotation fails loud")
 	expect_errors_containing("spin_degrees_per_sec must be finite", 1, "NaN spin fails loud")
 	expect_errors_containing("layer is null or disabled", 2, "dead layers fail loud")
@@ -1174,3 +1174,25 @@ func test_bullet_whiten_override_exact_tint_toggle_reuse() -> void:
 	assert_true(v28d.get_texture().get_image().get_pixel(0, 0).g < 0.1, "reuse without override restores art")
 
 	await idle(1)
+
+
+func test_scale_range_is_order_independent_and_survives_a_round_trip() -> void:
+	# The scene loader assigns random_scale_min before random_scale_max: a
+	# saved 1.5..2.0 range used to load min as 1.0 (rejected against max 1.0).
+	var l := BulletEffectLayerData2D.new()
+	l.random_scale_min = 1.5
+	l.random_scale_max = 2.0
+	assert_eq([l.random_scale_min, l.random_scale_max], [1.5, 2.0], "min then max keeps both")
+	var r := BulletEffectLayerData2D.new()
+	r.random_scale_max = 2.0
+	r.random_scale_min = 1.5
+	assert_eq([r.random_scale_min, r.random_scale_max], [1.5, 2.0], "max then min keeps both")
+	l.random_scale_min = 3.0
+	assert_eq([l.random_scale_min, l.random_scale_max], [3.0, 3.0], "min above max pulls max up")
+	l.random_scale_max = 0.5
+	assert_eq([l.random_scale_min, l.random_scale_max], [0.5, 0.5], "max below min pulls min down")
+	l.random_scale_min = -1.0
+	expect_error_sequence(["BulletEffectLayerData2D: random_scale_min must be finite and >= 0, keeping the old value."])
+	l.random_scale_max = INF
+	expect_error_sequence(["BulletEffectLayerData2D: random_scale_max must be finite and >= 0, keeping the old value."])
+	assert_eq([l.random_scale_min, l.random_scale_max], [0.5, 0.5], "rejected values keep the old pair")

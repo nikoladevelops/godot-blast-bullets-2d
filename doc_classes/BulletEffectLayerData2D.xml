@@ -52,10 +52,10 @@
 			Exact-color mode: the bake replaces every frame's RGB with white (alpha preserved), so [member self_modulate] and [member color_ramp] produce the exact dialed color instead of multiplying the source art. Atlas frames are clipped from the base image; unreadable frames fall back to the original art with one warning. Costs roughly double texture memory for the layer while on. Toggling rebakes (manual-hatch outputs refresh through the layer version).
 		</member>
 		<member name="random_scale_max" type="float" setter="set_random_scale_max" getter="get_random_scale_max" default="1.0">
-			Upper end of the random uniform scale range per fired one-shot slot. Must stay finite and above [member random_scale_min].
+			Upper end of the random uniform scale range per fired one-shot slot. Must be finite and 0 or more. Setting it below [member random_scale_min] pulls the minimum down to it.
 		</member>
 		<member name="random_scale_min" type="float" setter="set_random_scale_min" getter="get_random_scale_min" default="1.0">
-			Lower end of the random uniform scale range per fired one-shot slot. (1, 1) disables the randomization.
+			Lower end of the random uniform scale range per fired one-shot slot. (1, 1) disables the randomization. Must be finite and 0 or more. Setting it above [member random_scale_max] pulls the maximum up to it.
 		</member>
 		<member name="random_start_frame" type="bool" setter="set_random_start_frame" getter="get_random_start_frame" default="false">
 			Desync: one-shot slots start at a random animation age, trail bullets at a random loop phase. Same-frame kills then read as a volley, not a slideshow copy. Off by default so timing stays exact unless asked.

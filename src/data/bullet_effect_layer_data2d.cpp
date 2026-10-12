@@ -276,22 +276,31 @@ real_t BulletEffectLayerData2D::get_random_scale_min() const {
 	return random_scale_min;
 }
 void BulletEffectLayerData2D::set_random_scale_min(real_t value) {
-	if (!Math::is_finite(value) || value < 0.0 || value > random_scale_max) {
-		UtilityFunctions::push_error("BulletEffectLayerData2D: random_scale_min must be finite in [0, random_scale_max], keeping the old value.");
+	if (!Math::is_finite(value) || value < 0.0) {
+		UtilityFunctions::push_error("BulletEffectLayerData2D: random_scale_min must be finite and >= 0, keeping the old value.");
 		return;
 	}
 	random_scale_min = value;
+	// The pair is one range: a minimum above the maximum pulls the maximum up
+	// (assignment order must not matter: the scene loader sets min first).
+	if (random_scale_max < value) {
+		random_scale_max = value;
+	}
 }
 
 real_t BulletEffectLayerData2D::get_random_scale_max() const {
 	return random_scale_max;
 }
 void BulletEffectLayerData2D::set_random_scale_max(real_t value) {
-	if (!Math::is_finite(value) || value < random_scale_min) {
-		UtilityFunctions::push_error("BulletEffectLayerData2D: random_scale_max must be finite and >= random_scale_min, keeping the old value.");
+	if (!Math::is_finite(value) || value < 0.0) {
+		UtilityFunctions::push_error("BulletEffectLayerData2D: random_scale_max must be finite and >= 0, keeping the old value.");
 		return;
 	}
 	random_scale_max = value;
+	// A maximum below the minimum pulls the minimum down (see random_scale_min).
+	if (random_scale_min > value) {
+		random_scale_min = value;
+	}
 }
 
 real_t BulletEffectLayerData2D::get_trigger_chance() const {
