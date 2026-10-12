@@ -1289,6 +1289,11 @@ public:
 	// did not change). Runs script callbacks, so slots are re-read each step.
 	void apply_attachment_time_scale(double scale);
 
+	// Spawner randomization: multiplies the speed, max speed and acceleration
+	// of bullets [0, count) by factors[i] right after the spawn (the cached
+	// velocity is refreshed; a result that would overflow float32 is skipped).
+	void apply_speed_factors(const real_t *factors, int count);
+
 	// ---- Area queries and clears (bullet_volley2d_area.cpp) ----
 	// Global-space centers of the LIVE bullets inside a circle / a rectangle
 	// (edges inclusive; bullet size is not counted: the test is the bullet's

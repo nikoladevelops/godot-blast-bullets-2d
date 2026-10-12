@@ -576,6 +576,26 @@ void BulletVolley2D::all_bullets_set_texture_rotation_degrees(real_t new_rotatio
 	for_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_texture_rotation_degrees", [&](int i) { set_bullet_texture_rotation_degrees(i, new_rotation_degrees); });
 }
 
+void BulletVolley2D::apply_speed_factors(const real_t *factors, int count) {
+	const int limit = Math::min(count, Math::min(amount_bullets, (int)all_cached_speed.size()));
+	for (int i = 0; i < limit; ++i) {
+		const real_t f = factors[i];
+		if (!Math::is_finite(f) || f < 0.0f) {
+			continue;
+		}
+		const real_t speed = all_cached_speed[i] * f;
+		const real_t max_speed = all_cached_max_speed[i] * f;
+		const real_t acceleration = all_cached_acceleration[i] * f;
+		if (!Math::is_finite(speed) || !Math::is_finite(max_speed) || !Math::is_finite(acceleration)) {
+			continue;
+		}
+		all_cached_speed[i] = speed;
+		all_cached_max_speed[i] = max_speed;
+		all_cached_acceleration[i] = acceleration;
+		refresh_cached_velocity(i);
+	}
+}
+
 Transform2D BulletVolley2D::get_bullet_transform(int bullet_index) const {
 	if (!validate_bullet_index(bullet_index, "get_bullet_transform")) {
 		return Transform2D();

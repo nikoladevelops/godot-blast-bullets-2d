@@ -1029,6 +1029,34 @@ public:
 	int orphaned_volleys = ORPHANED_VOLLEYS_KEEP_FLYING;
 	double time_scale = 1.0;
 	bool time_scale_affects_volleys = true;
+
+	// ---- Randomization (bullet_spawner2d_randomization.cpp) ----
+	// Per-bullet rolls applied at shot time on top of the pattern (never to the
+	// preview, the bake cache or collect_spawn_transforms()). Min/max pairs
+	// are NOT checked against each other: they are normalized at use, so
+	// assignment order never matters (scene load sets min before max).
+	enum BulletScaleMode {
+		BULLET_SCALE_OFF = 0,
+		BULLET_SCALE_UNIFORM,
+		BULLET_SCALE_PER_AXIS
+	};
+	int bullet_scale_mode = BULLET_SCALE_OFF;
+	Vector2 bullet_scale_min_xy = Vector2(1, 1);
+	Vector2 bullet_scale_max_xy = Vector2(1, 1);
+	int bullet_random_seed = 0; // 0 = Godot's global RNG
+	bool spin_random_start_phase = false;
+	double bullet_scale_min = 1.0;
+	double bullet_scale_max = 1.0;
+	double bullet_rotation_min_degrees = 0.0;
+	double bullet_rotation_max_degrees = 0.0;
+	double bullet_position_jitter_min = 0.0;
+	double bullet_position_jitter_max = 0.0;
+	double bullet_speed_scale_min = 1.0;
+	double bullet_speed_scale_max = 1.0;
+	double shoot_interval_max_sec = 0.0;
+	double burst_interval_max_sec = 0.0;
+	double telegraph_max_sec = 0.0;
+	std::vector<real_t> shot_speed_factors;
 	int get_orphaned_volleys() const { return orphaned_volleys; }
 	void set_orphaned_volleys(int value);
 
@@ -1044,6 +1072,51 @@ public:
 	void set_time_scale_affects_volleys(bool value) { time_scale_affects_volleys = value; }
 	// spawner scale x factory scale, 0 when either is not finite and positive.
 	double get_process_time_scale() const;
+
+	int get_bullet_scale_mode() const { return bullet_scale_mode; }
+	void set_bullet_scale_mode(int value);
+	Vector2 get_bullet_scale_min_xy() const { return bullet_scale_min_xy; }
+	void set_bullet_scale_min_xy(const Vector2 &value);
+	Vector2 get_bullet_scale_max_xy() const { return bullet_scale_max_xy; }
+	void set_bullet_scale_max_xy(const Vector2 &value);
+	int get_bullet_random_seed() const { return bullet_random_seed; }
+	void set_bullet_random_seed(int value) { bullet_random_seed = value; }
+	bool get_spin_random_start_phase() const { return spin_random_start_phase; }
+	void set_spin_random_start_phase(bool value) { spin_random_start_phase = value; }
+	double get_bullet_scale_min() const { return bullet_scale_min; }
+	void set_bullet_scale_min(double value);
+	double get_bullet_scale_max() const { return bullet_scale_max; }
+	void set_bullet_scale_max(double value);
+	double get_bullet_rotation_min_degrees() const { return bullet_rotation_min_degrees; }
+	void set_bullet_rotation_min_degrees(double value);
+	double get_bullet_rotation_max_degrees() const { return bullet_rotation_max_degrees; }
+	void set_bullet_rotation_max_degrees(double value);
+	double get_bullet_position_jitter_min() const { return bullet_position_jitter_min; }
+	void set_bullet_position_jitter_min(double value);
+	double get_bullet_position_jitter_max() const { return bullet_position_jitter_max; }
+	void set_bullet_position_jitter_max(double value);
+	double get_bullet_speed_scale_min() const { return bullet_speed_scale_min; }
+	void set_bullet_speed_scale_min(double value);
+	double get_bullet_speed_scale_max() const { return bullet_speed_scale_max; }
+	void set_bullet_speed_scale_max(double value);
+	double get_shoot_interval_max_sec() const { return shoot_interval_max_sec; }
+	void set_shoot_interval_max_sec(double value);
+	double get_burst_interval_max_sec() const { return burst_interval_max_sec; }
+	void set_burst_interval_max_sec(double value);
+	double get_telegraph_max_sec() const { return telegraph_max_sec; }
+	void set_telegraph_max_sec(double value);
+	// Rolls for one shot: transforms are rewritten in place; speed factors
+	// (empty when off) are applied by the caller after the spawn.
+	bool randomization_active() const;
+	void randomize_shot_transforms(std::vector<Transform2D> &transforms);
+	void roll_speed_factors(size_t count);
+	// A value in [base, max_value] (max <= base or non-finite = base), seeded
+	// by reload_jitter_seed like the reload jitter.
+	double roll_timing_range(double base, double max_value, uint64_t channel) const;
+	double next_burst_interval_sec() const;
+	double next_telegraph_sec() const;
+	void roll_spin_start_phase();
+	double roll_unit(uint32_t channel, uint64_t index) const;
 	// Debug readout of the yellow preview rings: one PackedVector2Array
 	// per extra outline layer, exactly as drawn (holder-local). Empty
 	// when layers are inactive. Lets scripts/tests verify bullets sit

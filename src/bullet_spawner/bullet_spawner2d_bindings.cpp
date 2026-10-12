@@ -31,7 +31,19 @@ void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
 		}
 		return;
 	}
-	if (property_name == "telegraph_sec") {
+	if (property_name == "bullet_scale_min" || property_name == "bullet_scale_max") {
+		if (bullet_scale_mode != BULLET_SCALE_UNIFORM) {
+			p_property.usage &= ~PROPERTY_USAGE_EDITOR;
+		}
+		return;
+	}
+	if (property_name == "bullet_scale_min_xy" || property_name == "bullet_scale_max_xy") {
+		if (bullet_scale_mode != BULLET_SCALE_PER_AXIS) {
+			p_property.usage &= ~PROPERTY_USAGE_EDITOR;
+		}
+		return;
+	}
+	if (property_name == "telegraph_sec" || property_name == "telegraph_max_sec") {
 		if (!telegraph_enabled) {
 			p_property.usage &= ~PROPERTY_USAGE_EDITOR;
 		}
@@ -354,6 +366,9 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_shoot_interval_sec"), &BulletSpawner2D::get_shoot_interval_sec);
 	ClassDB::bind_method(D_METHOD("set_shoot_interval_sec", "value"), &BulletSpawner2D::set_shoot_interval_sec);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "shoot_interval_sec", PROPERTY_HINT_RANGE, "0.005,30,0.001,or_greater"), "set_shoot_interval_sec", "get_shoot_interval_sec");
+	ClassDB::bind_method(D_METHOD("get_shoot_interval_max_sec"), &BulletSpawner2D::get_shoot_interval_max_sec);
+	ClassDB::bind_method(D_METHOD("set_shoot_interval_max_sec", "value"), &BulletSpawner2D::set_shoot_interval_max_sec);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "shoot_interval_max_sec", PROPERTY_HINT_RANGE, "0,30,0.001,or_greater,suffix:s"), "set_shoot_interval_max_sec", "get_shoot_interval_max_sec");
 
 	ClassDB::bind_method(D_METHOD("get_shoot_initial_delay_sec"), &BulletSpawner2D::get_shoot_initial_delay_sec);
 	ClassDB::bind_method(D_METHOD("set_shoot_initial_delay_sec", "value"), &BulletSpawner2D::set_shoot_initial_delay_sec);
@@ -385,6 +400,9 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_burst_interval_sec"), &BulletSpawner2D::get_burst_interval_sec);
 	ClassDB::bind_method(D_METHOD("set_burst_interval_sec", "value"), &BulletSpawner2D::set_burst_interval_sec);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "burst_interval_sec"), "set_burst_interval_sec", "get_burst_interval_sec");
+	ClassDB::bind_method(D_METHOD("get_burst_interval_max_sec"), &BulletSpawner2D::get_burst_interval_max_sec);
+	ClassDB::bind_method(D_METHOD("set_burst_interval_max_sec", "value"), &BulletSpawner2D::set_burst_interval_max_sec);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "burst_interval_max_sec", PROPERTY_HINT_RANGE, "0,30,0.001,or_greater,suffix:s"), "set_burst_interval_max_sec", "get_burst_interval_max_sec");
 
 	ClassDB::bind_method(D_METHOD("get_burst_alternate_mirror"), &BulletSpawner2D::get_burst_alternate_mirror);
 	ClassDB::bind_method(D_METHOD("set_burst_alternate_mirror", "value"), &BulletSpawner2D::set_burst_alternate_mirror);
@@ -397,6 +415,47 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_telegraph_sec"), &BulletSpawner2D::get_telegraph_sec);
 	ClassDB::bind_method(D_METHOD("set_telegraph_sec", "value"), &BulletSpawner2D::set_telegraph_sec);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "telegraph_sec"), "set_telegraph_sec", "get_telegraph_sec");
+	ClassDB::bind_method(D_METHOD("get_telegraph_max_sec"), &BulletSpawner2D::get_telegraph_max_sec);
+	ClassDB::bind_method(D_METHOD("set_telegraph_max_sec", "value"), &BulletSpawner2D::set_telegraph_max_sec);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "telegraph_max_sec", PROPERTY_HINT_RANGE, "0,30,0.001,or_greater,suffix:s"), "set_telegraph_max_sec", "get_telegraph_max_sec");
+
+	ADD_GROUP("Randomization", "bullet_");
+	ClassDB::bind_method(D_METHOD("get_bullet_scale_mode"), &BulletSpawner2D::get_bullet_scale_mode);
+	ClassDB::bind_method(D_METHOD("set_bullet_scale_mode", "value"), &BulletSpawner2D::set_bullet_scale_mode);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "bullet_scale_mode", PROPERTY_HINT_ENUM, "Off,Uniform,Per Axis"), "set_bullet_scale_mode", "get_bullet_scale_mode");
+	ClassDB::bind_method(D_METHOD("get_bullet_scale_min"), &BulletSpawner2D::get_bullet_scale_min);
+	ClassDB::bind_method(D_METHOD("set_bullet_scale_min", "value"), &BulletSpawner2D::set_bullet_scale_min);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bullet_scale_min", PROPERTY_HINT_RANGE, "0.01,10,0.01,or_greater"), "set_bullet_scale_min", "get_bullet_scale_min");
+	ClassDB::bind_method(D_METHOD("get_bullet_scale_max"), &BulletSpawner2D::get_bullet_scale_max);
+	ClassDB::bind_method(D_METHOD("set_bullet_scale_max", "value"), &BulletSpawner2D::set_bullet_scale_max);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bullet_scale_max", PROPERTY_HINT_RANGE, "0.01,10,0.01,or_greater"), "set_bullet_scale_max", "get_bullet_scale_max");
+	ClassDB::bind_method(D_METHOD("get_bullet_scale_min_xy"), &BulletSpawner2D::get_bullet_scale_min_xy);
+	ClassDB::bind_method(D_METHOD("set_bullet_scale_min_xy", "value"), &BulletSpawner2D::set_bullet_scale_min_xy);
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "bullet_scale_min_xy"), "set_bullet_scale_min_xy", "get_bullet_scale_min_xy");
+	ClassDB::bind_method(D_METHOD("get_bullet_scale_max_xy"), &BulletSpawner2D::get_bullet_scale_max_xy);
+	ClassDB::bind_method(D_METHOD("set_bullet_scale_max_xy", "value"), &BulletSpawner2D::set_bullet_scale_max_xy);
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "bullet_scale_max_xy"), "set_bullet_scale_max_xy", "get_bullet_scale_max_xy");
+	ClassDB::bind_method(D_METHOD("get_bullet_rotation_min_degrees"), &BulletSpawner2D::get_bullet_rotation_min_degrees);
+	ClassDB::bind_method(D_METHOD("set_bullet_rotation_min_degrees", "value"), &BulletSpawner2D::set_bullet_rotation_min_degrees);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bullet_rotation_min_degrees", PROPERTY_HINT_RANGE, "-360,360,0.1,or_less,or_greater,suffix:deg"), "set_bullet_rotation_min_degrees", "get_bullet_rotation_min_degrees");
+	ClassDB::bind_method(D_METHOD("get_bullet_rotation_max_degrees"), &BulletSpawner2D::get_bullet_rotation_max_degrees);
+	ClassDB::bind_method(D_METHOD("set_bullet_rotation_max_degrees", "value"), &BulletSpawner2D::set_bullet_rotation_max_degrees);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bullet_rotation_max_degrees", PROPERTY_HINT_RANGE, "-360,360,0.1,or_less,or_greater,suffix:deg"), "set_bullet_rotation_max_degrees", "get_bullet_rotation_max_degrees");
+	ClassDB::bind_method(D_METHOD("get_bullet_position_jitter_min"), &BulletSpawner2D::get_bullet_position_jitter_min);
+	ClassDB::bind_method(D_METHOD("set_bullet_position_jitter_min", "value"), &BulletSpawner2D::set_bullet_position_jitter_min);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bullet_position_jitter_min", PROPERTY_HINT_RANGE, "0,200,0.1,or_greater,suffix:px"), "set_bullet_position_jitter_min", "get_bullet_position_jitter_min");
+	ClassDB::bind_method(D_METHOD("get_bullet_position_jitter_max"), &BulletSpawner2D::get_bullet_position_jitter_max);
+	ClassDB::bind_method(D_METHOD("set_bullet_position_jitter_max", "value"), &BulletSpawner2D::set_bullet_position_jitter_max);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bullet_position_jitter_max", PROPERTY_HINT_RANGE, "0,200,0.1,or_greater,suffix:px"), "set_bullet_position_jitter_max", "get_bullet_position_jitter_max");
+	ClassDB::bind_method(D_METHOD("get_bullet_speed_scale_min"), &BulletSpawner2D::get_bullet_speed_scale_min);
+	ClassDB::bind_method(D_METHOD("set_bullet_speed_scale_min", "value"), &BulletSpawner2D::set_bullet_speed_scale_min);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bullet_speed_scale_min", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater"), "set_bullet_speed_scale_min", "get_bullet_speed_scale_min");
+	ClassDB::bind_method(D_METHOD("get_bullet_speed_scale_max"), &BulletSpawner2D::get_bullet_speed_scale_max);
+	ClassDB::bind_method(D_METHOD("set_bullet_speed_scale_max", "value"), &BulletSpawner2D::set_bullet_speed_scale_max);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bullet_speed_scale_max", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater"), "set_bullet_speed_scale_max", "get_bullet_speed_scale_max");
+	ClassDB::bind_method(D_METHOD("get_bullet_random_seed"), &BulletSpawner2D::get_bullet_random_seed);
+	ClassDB::bind_method(D_METHOD("set_bullet_random_seed", "value"), &BulletSpawner2D::set_bullet_random_seed);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "bullet_random_seed"), "set_bullet_random_seed", "get_bullet_random_seed");
 
 	ClassDB::bind_method(D_METHOD("get_spin_enabled"), &BulletSpawner2D::get_spin_enabled);
 	ClassDB::bind_method(D_METHOD("set_spin_enabled", "value"), &BulletSpawner2D::set_spin_enabled);
@@ -417,6 +476,10 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_spin_frequency_hz"), &BulletSpawner2D::get_spin_frequency_hz);
 	ClassDB::bind_method(D_METHOD("set_spin_frequency_hz", "value"), &BulletSpawner2D::set_spin_frequency_hz);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "spin_frequency_hz"), "set_spin_frequency_hz", "get_spin_frequency_hz");
+
+	ClassDB::bind_method(D_METHOD("get_spin_random_start_phase"), &BulletSpawner2D::get_spin_random_start_phase);
+	ClassDB::bind_method(D_METHOD("set_spin_random_start_phase", "value"), &BulletSpawner2D::set_spin_random_start_phase);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "spin_random_start_phase"), "set_spin_random_start_phase", "get_spin_random_start_phase");
 
 	ClassDB::bind_method(D_METHOD("get_spin_angle_deg"), &BulletSpawner2D::get_spin_angle_deg);
 	ClassDB::bind_method(D_METHOD("reset_spin_angle"), &BulletSpawner2D::reset_spin_angle);

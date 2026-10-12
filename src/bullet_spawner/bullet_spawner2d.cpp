@@ -352,6 +352,9 @@ double BulletSpawner2D::get_spin_angle_deg() const {
 void BulletSpawner2D::reset_spin_angle() {
 	spin_angle_deg = 0.0;
 	spin_time_sec = 0.0;
+	if (spin_random_start_phase) {
+		roll_spin_start_phase();
+	}
 }
 
 void BulletSpawner2D::advance_spin(double delta) {
@@ -799,6 +802,14 @@ bool BulletSpawner2D::shoot_once() {
 		// back instead of log-diving.
 		return fail_early(String(String("BulletSpawner2D::shoot_once: pattern_source ") + pattern_source_name(pattern_source) + " produced no transforms, volley skipped.").utf8().get_data(), StringName("no_transforms"), true);
 	}
+	// Randomization: per-bullet scale / rotation / position / speed rolls on
+	// top of the pattern (all off = untouched shot, nothing drawn).
+	if (randomization_active()) {
+		randomize_shot_transforms(shot_transforms);
+		roll_speed_factors(shot_transforms.size());
+	} else if (!shot_speed_factors.empty()) {
+		shot_speed_factors.clear();
+	}
 	// Fire-cone gate (homing only): no target inside half the fire arc means
 	// this volley would chase nothing it can see, so the shot is skipped
 	// BEFORE spawning (never a half-built volley to tear down). Empty
@@ -842,6 +853,9 @@ bool BulletSpawner2D::shoot_once() {
 	// every spawn path through this function. Already stamped pre-activation
 	// by the factory call above; re-assert here in case that ever changes.
 	bullets->owner_spawner_id = get_instance_id();
+	if (!shot_speed_factors.empty()) {
+		bullets->apply_speed_factors(shot_speed_factors.data(), (int)shot_speed_factors.size());
+	}
 	// Capture the id BEFORE user code runs: the configuring signals below
 	// execute handlers synchronously, and a handler may free or re-home this
 	// volley. The raw pointer must not be touched again without validation.
@@ -997,6 +1011,9 @@ void BulletSpawner2D::_ready() {
 		graze_preview_layer_id = 0;
 	} else {
 		refresh_graze_preview();
+	}
+	if (spin_random_start_phase) {
+		roll_spin_start_phase(); // each spawner starts its spin somewhere else
 	}
 	// Controls called before the tree (pause, fire_n_volleys, ...) are kept:
 	// only the timer arms here.
@@ -1361,7 +1378,7 @@ void BulletSpawner2D::begin_telegraph(bool auto_started) {
 	TypedArray<Transform2D> aim = collect_spawn_transforms_impl(true);
 	telegraph_pending = true;
 	telegraph_from_auto = auto_started;
-	telegraph_time_left = telegraph_sec;
+	telegraph_time_left = next_telegraph_sec();
 	emit_signal("volley_telegraphed", aim);
 	fire_spawner_sound(BulletSoundData2D::SOUND_ON_TELEGRAPH);
 	set_process(true);
@@ -1409,7 +1426,7 @@ void BulletSpawner2D::fire_burst_volley() {
 		}
 		// On a transient failure the shot is retried next interval (no
 		// decrement above), so the mirror rhythm and shot indexes stay stable.
-		burst_time_left = burst_interval_sec;
+		burst_time_left = next_burst_interval_sec();
 		if (burst_shots_left <= 0) {
 			burst_telegraph_done = false;
 			burst_consecutive_failures = 0;
@@ -1436,8 +1453,9 @@ double BulletSpawner2D::next_shoot_interval_sec() const {
 	// jitter can never invert or stall the timer; the floor sits at 1ms so
 	// fast base intervals keep working with jitter on (the per-tick pull cap
 	// in _process absorbs the rest instead of hot-looping).
+	const double base_interval = roll_timing_range(shoot_interval_sec, shoot_interval_max_sec, 1);
 	if (reload_jitter_sec <= 0.0 || !Math::is_finite(reload_jitter_sec)) {
-		return shoot_interval_sec;
+		return base_interval;
 	}
 	Ref<RandomNumberGenerator> rng = jitter_rng;
 	if (rng.is_null()) {
@@ -1456,7 +1474,7 @@ double BulletSpawner2D::next_shoot_interval_sec() const {
 		jitter_rng_randomized = true;
 	}
 	const double jitter = rng->randf_range(-reload_jitter_sec, reload_jitter_sec);
-	return Math::max(0.001, shoot_interval_sec + jitter);
+	return Math::max(0.001, base_interval + jitter);
 }
 
 int BulletSpawner2D::spawn_pattern_list(const Array &entries, bool simultaneous, double interval_sec) {

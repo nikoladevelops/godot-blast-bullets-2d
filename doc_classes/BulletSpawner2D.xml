@@ -478,6 +478,42 @@
 		<member name="bullet_factory_path" type="NodePath" setter="set_bullet_factory_path" getter="get_bullet_factory_path" default="NodePath(&quot;&quot;)">
 			Path to the [BulletFactory2D] used for spawning. Inside the tree, a path to a node of another type is rejected (old value kept).
 		</member>
+		<member name="bullet_position_jitter_max" type="float" setter="set_bullet_position_jitter_max" getter="get_bullet_position_jitter_max" default="0.0">
+			Outer radius of the random position offset in pixels. See [member bullet_position_jitter_min].
+		</member>
+		<member name="bullet_position_jitter_min" type="float" setter="set_bullet_position_jitter_min" getter="get_bullet_position_jitter_min" default="0.0">
+			Random position offset per bullet: each bullet moves a random distance between this and [member bullet_position_jitter_max] pixels in a random direction (uniform over the ring's area; an inverted pair swaps). Must be finite and 0 or more. 0 and 0 (default) is off. Randomization applies to shots only: the preview, [method collect_spawn_transforms] and the pattern cache never see it.
+		</member>
+		<member name="bullet_random_seed" type="int" setter="set_bullet_random_seed" getter="get_bullet_random_seed" default="0">
+			Seed of the Randomization rolls. 0 (default) draws from Godot's global random generator, so [method @GlobalScope.seed] reproduces a run. Any other value makes every roll a pure function of the seed, the number of volleys fired, the bullet index and the knob, so the same seed replays the same shots and each knob rolls its own numbers independently of the others.
+		</member>
+		<member name="bullet_rotation_max_degrees" type="float" setter="set_bullet_rotation_max_degrees" getter="get_bullet_rotation_max_degrees" default="0.0">
+			Upper end of the random extra rotation per bullet. See [member bullet_rotation_min_degrees].
+		</member>
+		<member name="bullet_rotation_min_degrees" type="float" setter="set_bullet_rotation_min_degrees" getter="get_bullet_rotation_min_degrees" default="0.0">
+			Random extra rotation per bullet, from this angle to [member bullet_rotation_max_degrees] (degrees, any finite values; an inverted pair swaps). The bullet turns around its own position, so its heading changes with it. 0 and 0 (default) is off. Randomization applies to shots only: the preview, [method collect_spawn_transforms] and the pattern cache never see it.
+		</member>
+		<member name="bullet_scale_max" type="float" setter="set_bullet_scale_max" getter="get_bullet_scale_max" default="1.0">
+			Largest uniform scale factor (mode Uniform). Must be finite and above 0. Equal minimum and maximum give an exact fixed scale.
+		</member>
+		<member name="bullet_scale_max_xy" type="Vector2" setter="set_bullet_scale_max_xy" getter="get_bullet_scale_max_xy" default="Vector2(1, 1)">
+			Largest per-axis scale factors (mode Per Axis). Both components must be finite and above 0.
+		</member>
+		<member name="bullet_scale_min" type="float" setter="set_bullet_scale_min" getter="get_bullet_scale_min" default="1.0">
+			Smallest uniform scale factor (mode Uniform). Must be finite and above 0. The pair is not checked against each other: if the minimum is above [member bullet_scale_max] the two simply swap roles, so the order you set them in never matters.
+		</member>
+		<member name="bullet_scale_min_xy" type="Vector2" setter="set_bullet_scale_min_xy" getter="get_bullet_scale_min_xy" default="Vector2(1, 1)">
+			Smallest per-axis scale factors (mode Per Axis). Both components must be finite and above 0; each axis swaps with its maximum when inverted.
+		</member>
+		<member name="bullet_scale_mode" type="int" setter="set_bullet_scale_mode" getter="get_bullet_scale_mode" default="0">
+			How each bullet's size is randomized at shot time: Off (default), Uniform (one factor per bullet from [member bullet_scale_min] to [member bullet_scale_max], both axes together) or Per Axis (an independent factor per axis from [member bullet_scale_min_xy] to [member bullet_scale_max_xy]). The factor multiplies the bullet's transform basis, so its collision shape follows; a graze zone that counts bullet size uses the largest scale of the volley. Randomization applies to shots only: the preview, [method collect_spawn_transforms] and the pattern cache never see it.
+		</member>
+		<member name="bullet_speed_scale_max" type="float" setter="set_bullet_speed_scale_max" getter="get_bullet_speed_scale_max" default="1.0">
+			Upper end of the random speed multiplier. See [member bullet_speed_scale_min].
+		</member>
+		<member name="bullet_speed_scale_min" type="float" setter="set_bullet_speed_scale_min" getter="get_bullet_speed_scale_min" default="1.0">
+			Random speed multiplier per bullet, from this to [member bullet_speed_scale_max] (an inverted pair swaps). It is applied once when the volley spawns to the bullet's speed, max speed and acceleration, so a faster bullet also accelerates and tops out proportionally; curves and later setters act on the result. Must be finite and 0 or more. 1 and 1 (default) is off. Costs nothing per tick.
+		</member>
 		<member name="burst_alternate_mirror" type="bool" setter="set_burst_alternate_mirror" getter="get_burst_alternate_mirror" default="false">
 			Mirror every other burst volley (fan/spiral chirality flip). The first shot is plain, then shots alternate, for any burst_count.
 		</member>
@@ -486,6 +522,9 @@
 		</member>
 		<member name="burst_enabled" type="bool" setter="set_burst_enabled" getter="get_burst_enabled" default="false">
 			Fire multi-volley bursts per trigger: each interval pulls the trigger for burst_count shots spaced burst_interval_sec apart. Mid-burst shots ignore the main interval.
+		</member>
+		<member name="burst_interval_max_sec" type="float" setter="set_burst_interval_max_sec" getter="get_burst_interval_max_sec" default="0.0">
+			When above [member burst_interval_sec], every gap between the shots of a burst is drawn between the two (seeded by [member reload_jitter_seed]). 0 (default) keeps it fixed. Must be finite and 0 or more.
 		</member>
 		<member name="burst_interval_sec" type="float" setter="set_burst_interval_sec" getter="get_burst_interval_sec" default="0.15">
 			Seconds between burst shots. Must be finite and above zero.
@@ -1495,6 +1534,9 @@
 		<member name="shoot_initial_delay_sec" type="float" setter="set_shoot_initial_delay_sec" getter="get_shoot_initial_delay_sec" default="0.0">
 			Delay before the first automatic volley. Applied when the spawner becomes ready and by [method reset_shooting]. Must be finite and 0 or more.
 		</member>
+		<member name="shoot_interval_max_sec" type="float" setter="set_shoot_interval_max_sec" getter="get_shoot_interval_max_sec" default="0.0">
+			When above [member shoot_interval_sec], every wait between shots is drawn between the two (seeded by [member reload_jitter_seed] like the reload jitter, which then adds its own spread on top). 0 (default) keeps the interval fixed. Must be finite and 0 or more.
+		</member>
 		<member name="shoot_interval_sec" type="float" setter="set_shoot_interval_sec" getter="get_shoot_interval_sec" default="1.0">
 			Seconds between automatic volleys. Must be above zero. Shortening it also shortens the wait already running. Runs on an accumulator: overshoot carries over so the average rate is exact at any value (fast intervals repay every due volley in the same tick, up to 8 pulls; hitch backlogs beyond that resync instead of bursting).
 		</member>
@@ -1570,11 +1612,17 @@
 		<member name="spin_mode" type="int" setter="set_spin_mode" getter="get_spin_mode" enum="BulletSpawner2D.SpinMode" default="0">
 			0 rotates forever, 1 swings back and forth (see amplitude and frequency).
 		</member>
+		<member name="spin_random_start_phase" type="bool" setter="set_spin_random_start_phase" getter="get_spin_random_start_phase" default="false">
+			When on, the spin starts at a random phase instead of 0: a random angle for a continuous spin, a random point of the period for an oscillating one. Rolled when the spawner enters play and on every [method reset_spin_angle], seeded by [member bullet_random_seed]. Keeps many spawners from spinning in lockstep.
+		</member>
 		<member name="spin_speed_deg_per_sec" type="float" setter="set_spin_speed_deg_per_sec" getter="get_spin_speed_deg_per_sec" default="90.0">
 			Spin speed in continuous mode. Positive is clockwise.
 		</member>
 		<member name="telegraph_enabled" type="bool" setter="set_telegraph_enabled" getter="get_telegraph_enabled" default="false">
 			Warn before firing: emits volley_telegraphed with the current aim, then fires after telegraph_sec. Transforms re-collect at fire time.
+		</member>
+		<member name="telegraph_max_sec" type="float" setter="set_telegraph_max_sec" getter="get_telegraph_max_sec" default="0.0">
+			When above [member telegraph_sec], every warning lasts a random time between the two (seeded by [member reload_jitter_seed]). 0 (default) keeps it fixed. Must be finite and 0 or more.
 		</member>
 		<member name="telegraph_sec" type="float" setter="set_telegraph_sec" getter="get_telegraph_sec" default="0.5">
 			Warning time before the volley fires. Must be finite and 0 or more.
