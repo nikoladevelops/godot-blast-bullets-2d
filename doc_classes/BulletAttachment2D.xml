@@ -9,6 +9,12 @@
 	<tutorials>
 	</tutorials>
 	<methods>
+		<method name="get_applied_time_scale" qualifiers="const">
+			<return type="float" />
+			<description>
+				The time scale the attachment was last told: the time scale of the volley its bullet belongs to ([member BulletFactory2D.time_scale] times the owner spawner's [member BulletSpawner2D.time_scale] while that lives and has [member BulletSpawner2D.time_scale_affects_volleys] on). 1 means real time and nothing is applied.
+			</description>
+		</method>
 		<method name="on_bullet_disable" qualifiers="virtual">
 			<return type="void" />
 			<description>
@@ -37,5 +43,23 @@
 				Warning: The [BulletAttachment2D] is not yet in the scene tree when this method runs, so avoid calls that need configured children. Store that kind of setup in variables and handle it later in [code]_ready[/code].
 			</description>
 		</method>
+		<method name="on_time_scale_changed" qualifiers="virtual">
+			<return type="void" />
+			<param index="0" name="scale" type="float" />
+			<description>
+				Executed when the time scale of the bullet changes (also when an attachment is handed to a bullet that runs slowed or sped up, and with 1.0 when it returns to the pool). Use it to slow down anything the plugin cannot scale for you: custom scripts, tweens, shaders. Called whether or not [member apply_time_scale] is on. It is never called while the scale stays 1.
+			</description>
+		</method>
+		<method name="refresh_time_scale">
+			<return type="void" />
+			<description>
+				Applies the current time scale again to every descendant particle, animated sprite and animation player. Call it after you add such nodes at runtime while the bullet is slowed, otherwise they pick the scale up on the next change.
+			</description>
+		</method>
 	</methods>
+	<members>
+		<member name="apply_time_scale" type="bool" setter="set_apply_time_scale" getter="get_apply_time_scale" default="true">
+			When on (default), the plugin multiplies the [code]speed_scale[/code] of every descendant [GPUParticles2D], [CPUParticles2D], [AnimatedSprite2D] and [AnimationPlayer] by the time scale of the bullet, so particles and animations slow down, speed up or pause (scale 0) with it. The authored value is remembered and put back exactly at scale 1; do not change [code]speed_scale[/code] of those nodes from script while a scale is applied (use [method on_time_scale_changed] to follow it yourself). Turn it off to handle everything in [method on_time_scale_changed].
+		</member>
+	</members>
 </class>

@@ -572,6 +572,44 @@ bool SoundMixer2D::voice_begin_fade(Voice &voice, double clock, double fade_len)
 	return true;
 }
 
+void SoundMixer2D::apply_voice_time_scale(Voice &voice, double factor) {
+	if (factor == voice.time_factor) {
+		// Godot does not persist a pause requested before the audio server
+		// registered the playback: keep asserting it while the scale holds.
+		if (voice.time_paused && !voice.player->get_stream_paused()) {
+			voice.player->set_stream_paused(true);
+		}
+		return;
+	}
+	voice.time_factor = factor;
+	if (!(factor >= 0.01)) {
+		// Frozen (or absurdly slow): a stopped world is silent, not a growl.
+		if (!voice.time_paused) {
+			voice.time_paused = true;
+			voice.player->set_stream_paused(true);
+		}
+		return;
+	}
+	if (voice.time_paused) {
+		voice.time_paused = false;
+		if (!paused) {
+			voice.player->set_stream_paused(false);
+		}
+	}
+	// Godot's player range; 1000 is the pitch cap the data setters pin.
+	voice.player->set_pitch_scale((float)CLAMP((double)voice.base_pitch * factor, 0.01, 1000.0));
+}
+
+double SoundMixer2D::voice_time_factor(BulletFactory2D &factory, const Voice &voice) const {
+	if (voice.following && voice.follow_volley != 0) {
+		BulletVolley2D *followed = Object::cast_to<BulletVolley2D>(ObjectDB::get_instance(ObjectID(voice.follow_volley)));
+		if (followed != nullptr) {
+			return factory.volley_time_factor(*followed);
+		}
+	}
+	return factory.get_time_scale();
+}
+
 void SoundMixer2D::release_voice(Voice &voice) {
 	voice.busy = false;
 	voice.sound_id = 0;
@@ -587,6 +625,14 @@ void SoundMixer2D::release_voice(Voice &voice) {
 	voice.follow_volley = 0;
 	voice.follow_life = -1;
 	voice.follow_bullet = -1;
+	const bool was_time_paused = voice.time_paused;
+	voice.time_pitch = false;
+	voice.time_paused = false;
+	voice.base_pitch = 1.0f;
+	voice.time_factor = 1.0;
+	if (was_time_paused && voice.player != nullptr && ObjectDB::get_instance(ObjectID(voice.player->get_instance_id())) == voice.player) {
+		voice.player->set_stream_paused(paused); // the pool slot never keeps a time pause
+	}
 	if (voice.player != nullptr && ObjectDB::get_instance(ObjectID(voice.player->get_instance_id())) == voice.player) {
 		// No resource retention: a finished voice holds no stream Ref.
 		voice.player->set_stream(Ref<AudioStream>());
@@ -671,9 +717,12 @@ void SoundMixer2D::flush(BulletFactory2D &factory) {
 		if (!voice.busy || voice.player == nullptr || ObjectDB::get_instance(ObjectID(voice.player->get_instance_id())) != voice.player) {
 			continue;
 		}
-		if (!voice.player->is_playing()) {
+		if (!voice.player->is_playing() && !voice.time_paused) {
 			release_voice(voice);
 			continue;
+		}
+		if (voice.time_pitch) {
+			apply_voice_time_scale(voice, voice_time_factor(factory, voice));
 		}
 		if (voice.fading) {
 			// A fade in progress: ramp to silence, then stop and release.
@@ -966,6 +1015,13 @@ void SoundMixer2D::flush(BulletFactory2D &factory) {
 			voice.follow_life = winner.follow_life;
 			voice.follow_bullet = winner.follow_bullet;
 			voice.use_order = offer_order++;
+			voice.time_pitch = sound->pitch_follows_time_scale;
+			voice.time_paused = false;
+			voice.base_pitch = player->get_pitch_scale();
+			voice.time_factor = 1.0;
+			if (voice.time_pitch) {
+				apply_voice_time_scale(voice, voice_time_factor(factory, voice));
+			}
 			channel.last_play_clock = clock;
 			++plays_total;
 			if (log_enabled) {
@@ -1064,7 +1120,8 @@ void SoundMixer2D::set_paused(bool p_paused) {
 	paused = p_paused;
 	for (size_t i = 0; i < voices.size(); ++i) {
 		if (voices[i].busy && voices[i].player != nullptr && ObjectDB::get_instance(ObjectID(voices[i].player->get_instance_id())) == voices[i].player) {
-			voices[i].player->set_stream_paused(p_paused);
+			// A voice the time scale paused stays paused when a hit-stop ends.
+			voices[i].player->set_stream_paused(p_paused || voices[i].time_paused);
 		}
 	}
 	if (p_paused) {
@@ -1217,6 +1274,9 @@ Array SoundMixer2D::debug_voices() const {
 		d["fading"] = voice.fading;
 		d["sound"] = (int64_t)voice.sound_id;
 		d["priority"] = voice.priority;
+		d["time_pitch"] = voice.time_pitch;
+		d["time_paused"] = voice.time_paused;
+		d["time_factor"] = voice.time_factor;
 		if (voice.player != nullptr && ObjectDB::get_instance(ObjectID(voice.player->get_instance_id())) == voice.player) {
 			d["position"] = voice.player->get_global_position();
 			d["volume_db"] = voice.player->get_volume_db();

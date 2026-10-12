@@ -164,6 +164,13 @@ private:
 		int follow_life = -1;
 		int follow_bullet = -1;
 		uint64_t use_order = 0;
+		// Time scale (pitch_follows_time_scale): the pitch the play started at,
+		// the scale last applied (1 = untouched) and whether the scale paused
+		// this voice (a hit-stop resume must not undo it).
+		bool time_pitch = false;
+		bool time_paused = false;
+		float base_pitch = 1.0f;
+		double time_factor = 1.0;
 	};
 
 	Channel &channel_for(uint64_t sound_id, size_t cap);
@@ -209,6 +216,10 @@ private:
 	static Vector2 godot_listener_pos(BulletFactory2D &factory);
 	AudioStreamPlayer2D *alloc_voice(BulletFactory2D &factory, int priority);
 	void release_voice(Voice &voice);
+	// Applies the time scale `factor` of what the voice belongs to: pitch =
+	// base x factor (clamped to the engine cap), paused while factor < 0.01.
+	void apply_voice_time_scale(Voice &voice, double factor);
+	double voice_time_factor(BulletFactory2D &factory, const Voice &voice) const;
 	// Fade-out support (fade_out_sec): the fade length of one sound resource
 	// (0 = stop instantly, like before), and starting a fade on a voice
 	// (false = nothing to fade: stop instantly instead).

@@ -35,6 +35,12 @@ public:
 	uint64_t owner_volley_id = 0;
 	int owner_bullet_index = -1;
 
+private:
+	bool apply_time_scale = true;
+	double applied_time_scale = 1.0;
+	void scale_descendants(double scale);
+
+public:
 	void _notification(int p_what);
 	// Custom spawn behavior - should be used to set up the BulletAttachment2D in proper state. Executed before _ready when a bullet is in the process of being set up. If you have behavior/data that doesn't require for the node to be in the scene tree, then use this function, otherwise just use _ready. Pooling is keyed by the PackedScene automatically, so there is nothing to set up for pooling here. Note that the attachment is not yet inside the scene tree when this method gets called
 	GDVIRTUAL0(on_bullet_spawn)
@@ -54,6 +60,25 @@ public:
 	void call_on_bullet_disable();
 	void call_on_bullet_enable();
 	void call_on_spawn_in_pool();
+
+	// ---- Time scale (see BulletVolley2D::apply_attachment_time_scale) ----
+	// The volley that owns this attachment tells it the scale its bullet runs
+	// at. With apply_time_scale (default on) the plugin multiplies the
+	// speed_scale of every descendant GPUParticles2D, CPUParticles2D,
+	// AnimatedSprite2D and AnimationPlayer (originals remembered in node meta
+	// and restored exactly at 1.0); on_time_scale_changed tells the script in
+	// both cases so custom nodes can follow too.
+	GDVIRTUAL1(on_time_scale_changed, double)
+	void call_on_time_scale_changed(double scale);
+	bool get_apply_time_scale() const { return apply_time_scale; }
+	void set_apply_time_scale(bool value);
+	double get_applied_time_scale() const { return applied_time_scale; }
+	// Plugin entry: non-finite or negative scales are ignored, an unchanged
+	// scale is free.
+	void set_time_scale_factor(double scale);
+	// Scripts: re-applies the current scale to the descendants (after adding
+	// nodes at runtime).
+	void refresh_time_scale();
 
 protected:
 	static void _bind_methods();

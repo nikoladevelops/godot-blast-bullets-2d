@@ -35,15 +35,15 @@ static _ALWAYS_INLINE_ BulletVolley2D *resolve_iteration_entry(uint64_t id, Bull
 // The delta one volley runs on: the bullet-world delta times the time scale of
 // its owner spawner while that lives (and opted in). Orphans, factory-spawned
 // and pooled volleys (owner 0) run on the factory scale alone.
-double BulletFactory2D::volley_time_delta(const BulletVolley2D &volley, double bullet_delta) const {
-	if (volley.owner_spawner_id == 0) {
-		return bullet_delta;
+double BulletFactory2D::volley_time_factor(const BulletVolley2D &volley) const {
+	double factor = time_scale;
+	if (volley.owner_spawner_id != 0) {
+		const BulletSpawner2D *spawner = Object::cast_to<BulletSpawner2D>(ObjectDB::get_instance(ObjectID(volley.owner_spawner_id)));
+		if (spawner != nullptr && spawner->get_time_scale_affects_volleys()) {
+			factor *= spawner->get_time_scale();
+		}
 	}
-	const BulletSpawner2D *spawner = Object::cast_to<BulletSpawner2D>(ObjectDB::get_instance(ObjectID(volley.owner_spawner_id)));
-	if (spawner == nullptr || !spawner->get_time_scale_affects_volleys()) {
-		return bullet_delta;
-	}
-	return bullet_delta * spawner->get_time_scale();
+	return Math::is_finite(factor) && factor > 0.0 ? factor : 0.0;
 }
 
 void BulletFactory2D::tick_volleys(double delta) {
@@ -60,7 +60,8 @@ void BulletFactory2D::tick_volleys(double delta) {
 			continue;
 		}
 		volley->sweep_tick_stamp = sweep_counter;
-		const double volley_delta = volley_time_delta(*volley, delta);
+		const double time_factor = volley_time_factor(*volley);
+		const double volley_delta = delta * time_factor;
 		// Flag the volley for its whole tick: handlers fired from inside
 		// (collision drain, attachment callbacks) may spawn, and the pool must
 		// never hand out the volley whose drain is still running. Liveness is
@@ -70,6 +71,12 @@ void BulletFactory2D::tick_volleys(double delta) {
 		stats_tick_bullets += volley->active_bullets_counter;
 		volley->is_being_ticked = true;
 		const uint64_t epoch_before_tick = volley_free_epoch;
+		// Attachments hear the scale change first (user code: it may free the
+		// volley, hence the same liveness check as after the tick).
+		volley->apply_attachment_time_scale(time_factor);
+		if (volley_free_epoch != epoch_before_tick && ObjectDB::get_instance(ObjectID(entry.id)) != (Object *)volley) {
+			continue;
+		}
 		volley->tick(volley_delta);
 		if (volley_free_epoch != epoch_before_tick && ObjectDB::get_instance(ObjectID(entry.id)) != (Object *)volley) {
 			continue; // a handler freed this volley
@@ -397,7 +404,7 @@ void BulletFactory2D::_physics_process(double delta) {
 	// The bullet world runs on its own clock (time_scale 1 is bit-identical
 	// to the engine delta); target scans (graze_clock) stay in real time.
 	const double bullet_delta = delta * time_scale;
-	tick_volleys(bullet_delta);
+	tick_volleys(delta);
 	// One-shot sprite effects age on the same clock as bullets (pausing the
 	// factory freezes both). Volley trails tick inside move_bullets instead.
 	age_fx_effects(bullet_delta);
@@ -424,7 +431,7 @@ void BulletFactory2D::_physics_process(double delta) {
 			continue;
 		}
 		volley->sweep_timer_stamp = sweep_counter;
-		volley->run_custom_timers(volley_time_delta(*volley, bullet_delta));
+		volley->run_custom_timers(delta * volley_time_factor(*volley));
 	}
 	is_iterating_bullets = false;
 

@@ -624,6 +624,9 @@ public:
 
 	// Stores each bullet's attachment pooling id
 	std::vector<uint32_t> attachment_pooling_ids;
+	// The time scale this volley's attachments were last told (the factory
+	// updates it in its sweep; 1.0 = real time, nothing applied).
+	double attachment_time_scale = 1.0;
 
 	// Stores pointers to all bullet attachments currently in the scene
 	std::vector<BulletAttachment2D *> attachments;
@@ -1281,6 +1284,10 @@ public:
 	// oldest one-shot slots past the layer ring, so 500 bullets never
 	// spawn 500 live effects. Returns how many bullets were cleared.
 	int clear_all_bullets();
+
+	// Pushes `scale` to every live attachment of this volley (a no-op when it
+	// did not change). Runs script callbacks, so slots are re-read each step.
+	void apply_attachment_time_scale(double scale);
 
 	// ---- Area queries and clears (bullet_volley2d_area.cpp) ----
 	// Global-space centers of the LIVE bullets inside a circle / a rectangle

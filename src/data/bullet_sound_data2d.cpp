@@ -622,6 +622,15 @@ void BulletSoundData2D::set_duck_amount_db(double value) {
 }
 
 bool BulletSoundData2D::get_follow_bullet() const { return follow_bullet; }
+bool BulletSoundData2D::get_pitch_follows_time_scale() const { return pitch_follows_time_scale; }
+void BulletSoundData2D::set_pitch_follows_time_scale(bool value) {
+	if (pitch_follows_time_scale == value) {
+		return;
+	}
+	pitch_follows_time_scale = value;
+	emit_changed();
+}
+
 void BulletSoundData2D::set_follow_bullet(bool value) {
 	if (follow_bullet == value) {
 		return;
@@ -902,6 +911,10 @@ void BulletSoundData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_pitch_max"), &BulletSoundData2D::get_pitch_max);
 	ClassDB::bind_method(D_METHOD("set_pitch_max", "value"), &BulletSoundData2D::set_pitch_max);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "pitch_max", PROPERTY_HINT_RANGE, "0.01,1000,0.01,exp"), "set_pitch_max", "get_pitch_max");
+
+	ClassDB::bind_method(D_METHOD("get_pitch_follows_time_scale"), &BulletSoundData2D::get_pitch_follows_time_scale);
+	ClassDB::bind_method(D_METHOD("set_pitch_follows_time_scale", "value"), &BulletSoundData2D::set_pitch_follows_time_scale);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "pitch_follows_time_scale"), "set_pitch_follows_time_scale", "get_pitch_follows_time_scale");
 
 	ClassDB::bind_method(D_METHOD("get_fade_out_sec"), &BulletSoundData2D::get_fade_out_sec);
 	ClassDB::bind_method(D_METHOD("set_fade_out_sec", "value"), &BulletSoundData2D::set_fade_out_sec);

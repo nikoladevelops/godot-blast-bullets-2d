@@ -166,6 +166,9 @@ void BulletVolley2D::bullet_disable_attachment(int bullet_index) {
 	}
 	const uint64_t detaching_id = detaching->get_instance_id();
 	const uint64_t self_id = get_instance_id();
+	// Back to real time before it is pooled or freed (a reused attachment is
+	// re-scaled for its new owner).
+	detaching->set_time_scale_factor(1.0);
 	if (!was_suspended) {
 		detaching->call_on_bullet_disable();
 	}
@@ -200,6 +203,26 @@ void BulletVolley2D::bullet_disable_attachment(int bullet_index) {
 		// so do that, otherwise the scene will be spammed with hundreds of disabled attachments that never get freed (and user might not even notice this)
 
 		detaching->queue_free();
+	}
+}
+
+void BulletVolley2D::apply_attachment_time_scale(double scale) {
+	if (scale == attachment_time_scale) {
+		return;
+	}
+	attachment_time_scale = scale;
+	if (bullet_factory != nullptr) {
+		bullet_factory->note_user_code(); // on_time_scale_changed is user code inside the sweep
+	}
+	const uint64_t self_id = get_instance_id();
+	for (size_t i = 0; i < attachments.size(); ++i) {
+		BulletAttachment2D *attachment = attachments[i]; // re-read: a callback may drop slots
+		if (attachment != nullptr) {
+			attachment->set_time_scale_factor(scale);
+			if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+				return;
+			}
+		}
 	}
 }
 
@@ -253,6 +276,7 @@ int BulletVolley2D::get_amount_active_attachments() const {
 }
 
 void BulletVolley2D::reset_attachment_state_for_reuse() {
+	attachment_time_scale = 1.0;
 	// Force-disable any surviving slot first. Deferred attachment disables can be
 	// dropped by a generation bump (e.g. lifetime expiry pooled this instance and a
 	// spawn re-enabled it before the deferred flush ran), so a new owner must never

@@ -206,6 +206,8 @@ public:
 	// sort themselves). Wide open by default.
 	double pitch_min = 0.01;
 	double pitch_max = 16.0;
+	// Pitch follows the time scale of what the sound belongs to (opt-in).
+	bool pitch_follows_time_scale = false;
 	// Fade-out before a voice stops (duration expiry, voice stealing).
 	// Ramps the volume to silence over this long instead of cutting, so
 	// loopers never click. 0 (default) stops instantly, like before.
@@ -355,6 +357,8 @@ public:
 
 	double get_pitch_max() const;
 	void set_pitch_max(double value);
+	bool get_pitch_follows_time_scale() const;
+	void set_pitch_follows_time_scale(bool value);
 
 	double get_fade_out_sec() const;
 	void set_fade_out_sec(double value);

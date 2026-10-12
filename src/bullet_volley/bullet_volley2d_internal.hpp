@@ -767,6 +767,14 @@ _ALWAYS_INLINE_ bool BulletVolley2D::attach_bullet_attachment_internal(int bulle
 		return false;
 	}
 
+	// A volley running slowed (or sped up) hands its scale to the newcomer.
+	if (attachment_time_scale != 1.0) {
+		attachment_instance->set_time_scale_factor(attachment_time_scale);
+		if (ObjectDB::get_instance(ObjectID(setup_instance_id)) == nullptr) {
+			return false;
+		}
+	}
+
 	// The slot was claimed right after instance selection; nothing left to assign.
 	return true;
 }
