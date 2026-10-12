@@ -136,6 +136,11 @@ zoom_scales_distance = true
 
 [sub_resource type="BulletSoundData2D" id="BulletSoundData2D_102ar"]
 streams = [ExtResource("13_jbfhk")]
+pitch_scale = 0.51
+random_pitch = 1.99
+random_pitch_min = 0.52
+random_pitch_max = 2.15
+random_pan = 0.18
 max_distance = 4096.0
 when_limit_reached = 1
 
