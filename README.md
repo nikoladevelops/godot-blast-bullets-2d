@@ -59,6 +59,9 @@ The main advantages to using this custom built plugin:
 - **Orbiting Bullets** - Each bullet can begin orbiting a homing target at a custom radius while also moving in a circle around it. Imagine a swarm of bullets orbiting your mouse as you move it, while the radius increases or decreases then some of them go and orbit another target, this is the type of behavior you can implement on the go.
 
 - **Graze (Near Misses)** - Bullets that pass close to the player report it: up to 4 rings per graze zone ("near", "close", "razor"...), swept so fast bullets never skip a ring, once per bullet or again on every visit, with an exit signal when the bullet leaves alive. Configure it once as a `BulletGrazeZone2D` resource, drop it into every enemy spawner, and connect `BulletFactory2D.bullet_grazed` once to count graze for score, even for bullets of enemies that already died. The editor draws the rings around your player.
+- **World controls** - `BulletFactory2D.time_scale` slows everything (spawners, bullets, particles and animations on attachments, effects); each spawner has its own `time_scale` (and `time_scale_affects_volleys`). The factory draws the despawn rectangle (translucent red) in the editor, culled bullets fire an On Despawn effect/sound trigger and the `bullets_despawned` signal, and a spawner outside the rectangle does not shoot.
+- **Randomization** - Per spawner: random bullet scale (uniform or per axis), rotation and position jitter, speed multiplier, random spin start, and random shoot/burst/telegraph intervals, all with an optional `bullet_random_seed`.
+- **Pickups (coins and gems)** - `BulletPickupData2D` turns bullets into animated (SpriteFrames) collectibles that burst out, get pulled to a target and report `pickup_collected`, in one call for a volley, a spawner's bullets, an area or every bullet on screen.
 
 - **Bouncing Bullets (Ricochet)** - Pick bounce layers and bullets reflect off those targets automatically with configurable strength (elastic, damped, dead-stop, super-elastic), optional hit consumption, bounce budgets, radial or shape-accurate normals, instant or smooth visual turn, scatter randomness and overlap cooldown. Full signals (`bounce_area_entered` / `bounce_body_entered`, on the factory or on the spawner that fired the volley) included.
 
@@ -355,6 +358,29 @@ func _on_bullet_graze_exited(target: Node2D, volley: BulletVolley2D, bullet_inde
 Each ring grazes once per bullet by default (`regraze = Once`); `After Exit` re-grazes every time a bullet comes back. Edit the zone at runtime (a power-up widening `ring_1_radius`) and every bullet in flight follows it.
 
 To tune ring sizes while the game runs, tick `graze_preview_during_runtime` on one spawner that uses the zone: it draws the rings around your player, and edits made from a script or the remote inspector show at once. It is off by default and costs nothing while off.
+
+#### World controls, randomization and pickups<br>
+```gdscript
+factory.time_scale = 0.3                       # slow motion: spawners, bullets, attachments, effects
+boss_spawner.time_scale = 0.5                  # factory 0.3 x spawner 0.5 = 0.15 for this boss
+factory.despawn_bounds_enabled = true          # the rectangle is drawn in the editor (despawn_bounds_preview_during_runtime for play)
+factory.bullets_despawned.connect(func(positions, volley, indexes): pass)
+
+spawner.bullet_scale_mode = BulletSpawner2D.BULLET_SCALE_UNIFORM   # random size per bullet
+spawner.bullet_scale_min = 0.7
+spawner.bullet_scale_max = 1.6
+spawner.bullet_random_seed = 1234                           # 0 = Godot's global RNG
+
+var coin := BulletPickupData2D.new()
+coin.sprite_frames = preload("res://coin_frames.tres")      # animated look
+coin.animation = &"spin"
+coin.collect_radius = 20.0
+coin.value = 10
+factory.pickup_collected.connect(func(target, pos, volley, idx, value): score += value)
+factory.convert_all_bullets_to_pickups(coin, player)        # bomb: any Node2D, Vector2, null (mouse) or group name
+boss.convert_live_bullets_to_pickups(coin, player)          # only one spawner's bullets
+```
+`motion_mode` picks how pickups move (Burst And Magnet, Keep Bullet Motion, Custom with your own `speed_data`). Pickups obey the despawn bounds unless `obey_despawn_bounds` is off. Call the `*_deferred` twins from signal handlers, and pre-warm with `factory.populate_pickup_pool(coin, bullet_count, n)`.
 
 #### Accessing advanced features
 

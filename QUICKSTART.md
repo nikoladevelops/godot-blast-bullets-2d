@@ -76,6 +76,21 @@ data.transforms = BulletPatterns2D.helper_generate_transforms_ring(24, Transform
 var volley := factory.spawn_volley(data)
 ```
 
+## Coins, slow motion and variety
+
+```gdscript
+var coin := BulletPickupData2D.new()
+coin.sprite_frames = preload("res://coin_frames.tres")
+coin.animation = &"spin"
+factory.pickup_collected.connect(func(target, pos, volley, idx, value): score += 1)
+factory.convert_all_bullets_to_pickups(coin, player)   # bullets become coins that fly to the player
+factory.time_scale = 0.3                               # slow motion for everything
+spawner.bullet_scale_mode = BulletSpawner2D.BULLET_SCALE_UNIFORM
+spawner.bullet_scale_min = 0.7
+spawner.bullet_scale_max = 1.6
+```
+
+
 ## 3. Performance habits
 
 - **Keep bullet counts steady per volley.** Pooling is by exact `(bullet count, shape)`; a repeat of the same size is a cheap reuse, a new size is a fresh allocation. Constant-size patterns are ideal. Pre-warm the sizes you use with `factory.populate_bullets_pool(key, data, n)` at load time (`factory.debug_expected_pool_key(data)` gives you the key).
