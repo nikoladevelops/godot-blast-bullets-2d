@@ -535,14 +535,17 @@ bool BulletVolley2D::enable_volley(const BulletVolleyData2D &data, const Vector2
 	}
 
 	set_all_physics_shapes_enabled_for_area(true);
+	// Active BEFORE the attachment callbacks, like a cold spawn: an
+	// on_bullet_spawn / on_bullet_enable handler sees enabled bullets and a
+	// disable_bullet from it sticks.
+	set_visible(true);
+	all_bullets_enabled_set.activate_all_data();
+	is_active = true;
 	// Shared spawn-data attachments (slots were blanked by begin_life).
 	apply_shared_bullet_attachment_from_data(data);
 	move_to_front(); // Pooled instances render behind newer ones without this; moving to front emulates fresh spawn order.
 	// Previous life's bakes die here, trail shards rebuild, spawn flashes fire.
 	fx_reseed_from_data(data.effect_layers, true);
-	set_visible(true);
-	all_bullets_enabled_set.activate_all_data();
-	is_active = true;
 	// Join the factory tick (the spawn path does this too; the sparse set
 	// dedups). Without it a direct enable_volley() call left an active
 	// volley that never moved.

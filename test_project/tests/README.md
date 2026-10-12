@@ -148,6 +148,7 @@ asserts a dangling-free factory plus zero new orphans after every test.
 - `spawner/test_spawner_spin_bench.gd` — spin on/off + cold/warm pool timings (heart, 1500 bullets) with catastrophe-only budgets; the warm shot is proven to be a pool hit. Real tracking lives in `tools/run_benchmarks.py`.
 - `spawner/test_spawner_spin_perf.gd` — a 10k spiral collect with advancing spin stays in the millisecond class (catastrophe guard).
 - `pooling/test_pool_attachments.gd` — BulletAttachment2D lifecycle through the pool (AttachmentProbe2D counts callbacks): spawn/disable/enable/in-pool sequences, blank slots on reuse, null/wrong-type scenes rejected.
+- `pooling/test_pool_callback_state.gd` — spawn-time attachment callbacks see enabled bullets on a pooled reuse, like on a cold spawn (AttachmentStatusProbe2D).
 - `pooling/test_pool_cross_owner_handover.gd` — adopt hand-over between spawners, foreign pooled wake warns and reseeds, `free_volley_deferred` from a collision handler never corrupts the sweep.
 - `pooling/test_pool_key_validity.gd` — exact (amount + shape) pool hits; mismatches miss and allocate (never silent reuse); capsule bucket isolation; per-bucket free; mismatched enable refuses cleanly.
 - `pooling/test_pool_multispawner_shared_factory.gd` — three spawners plus direct spawns on ONE factory: census by owner, per-spawner retarget and live-bullet fuse, per-bucket free isolation.
