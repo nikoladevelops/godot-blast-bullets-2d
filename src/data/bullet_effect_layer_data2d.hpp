@@ -31,7 +31,11 @@ enum EffectTrigger {
 	// only. Collision kills fire On Destroy, timeouts fire On Lifetime
 	// Over, teardown (reset/free) stays silent, so a clear layer never
 	// doubles another trigger and never spawns effects while dying.
-	EFFECT_ON_CLEAR
+	EFFECT_ON_CLEAR,
+	// Fired where a bullet leaves through the factory's despawn bounds
+	// (BulletFactory2D.despawn_bounds_*), nowhere else. Appended last: the
+	// ids are serialized.
+	EFFECT_ON_DESPAWN
 };
 
 class BulletEffectLayerData2D : public Resource {

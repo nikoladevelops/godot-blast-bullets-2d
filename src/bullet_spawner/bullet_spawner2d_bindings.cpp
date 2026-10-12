@@ -371,6 +371,10 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_shoot_interval_max_sec", "value"), &BulletSpawner2D::set_shoot_interval_max_sec);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "shoot_interval_max_sec", PROPERTY_HINT_RANGE, "0,30,0.001,or_greater,suffix:s"), "set_shoot_interval_max_sec", "get_shoot_interval_max_sec");
 
+	ClassDB::bind_method(D_METHOD("get_shoot_outside_despawn_bounds"), &BulletSpawner2D::get_shoot_outside_despawn_bounds);
+	ClassDB::bind_method(D_METHOD("set_shoot_outside_despawn_bounds", "value"), &BulletSpawner2D::set_shoot_outside_despawn_bounds);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "shoot_outside_despawn_bounds"), "set_shoot_outside_despawn_bounds", "get_shoot_outside_despawn_bounds");
+
 	ClassDB::bind_method(D_METHOD("get_shoot_initial_delay_sec"), &BulletSpawner2D::get_shoot_initial_delay_sec);
 	ClassDB::bind_method(D_METHOD("set_shoot_initial_delay_sec", "value"), &BulletSpawner2D::set_shoot_initial_delay_sec);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "shoot_initial_delay_sec"), "set_shoot_initial_delay_sec", "get_shoot_initial_delay_sec");

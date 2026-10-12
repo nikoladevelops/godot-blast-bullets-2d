@@ -1029,6 +1029,9 @@ public:
 	int orphaned_volleys = ORPHANED_VOLLEYS_KEEP_FLYING;
 	double time_scale = 1.0;
 	bool time_scale_affects_volleys = true;
+	// False (default): a muzzle outside the factory's despawn bounds (while they
+	// are enabled) does not shoot, the bullets would be culled at once.
+	bool shoot_outside_despawn_bounds = false;
 
 	// ---- Randomization (bullet_spawner2d_randomization.cpp) ----
 	// Per-bullet rolls applied at shot time on top of the pattern (never to the
@@ -1072,6 +1075,8 @@ public:
 	void set_time_scale_affects_volleys(bool value) { time_scale_affects_volleys = value; }
 	// spawner scale x factory scale, 0 when either is not finite and positive.
 	double get_process_time_scale() const;
+	bool get_shoot_outside_despawn_bounds() const { return shoot_outside_despawn_bounds; }
+	void set_shoot_outside_despawn_bounds(bool value) { shoot_outside_despawn_bounds = value; }
 	// Turns every live bullet of the volleys this spawner fired into pickups
 	// (see BulletFactory2D.convert_all_bullets_to_pickups). Returns the pickup volleys.
 	Array convert_live_bullets_to_pickups(const Ref<BulletPickupData2D> &pickup, const Variant &target);

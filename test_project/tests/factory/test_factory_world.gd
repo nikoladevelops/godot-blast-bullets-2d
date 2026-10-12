@@ -222,3 +222,46 @@ func test_time_scale_default_and_validation() -> void:
 	assert_eq(factory.time_scale, 1.0, "rejected values keep the old scale")
 	factory.time_scale = 0.25
 	assert_eq(factory.time_scale, 0.25, "valid value accepted")
+
+
+# --- clear_active_bullets also announces itself -------------------------------------------------
+
+func test_clear_active_bullets_emits_bullets_cleared_per_volley() -> void:
+	var a := _volley_at([Vector2(0, 0), Vector2(10, 0)])
+	var b := _volley_at([Vector2(50, 50)])
+	factory.bullets_cleared.connect(_on_bullets_cleared)
+	assert_eq(factory.clear_active_bullets(), 3, "three bullets cleared")
+	assert_eq(cleared_log.size(), 2, "one signal per volley that lost bullets")
+	var by_volley := {}
+	for e in cleared_log:
+		by_volley[e["volley"]] = e
+	assert_eq(Array(by_volley[a]["positions"]), [Vector2(0, 0), Vector2(10, 0)], "positions of volley a")
+	assert_eq(Array(by_volley[a]["indexes"]), [0, 1], "indexes of volley a")
+	assert_eq(Array(by_volley[b]["positions"]), [Vector2(50, 50)], "positions of volley b")
+
+
+func test_clear_active_bullets_with_a_key_announces_only_that_bucket() -> void:
+	_volley_at([Vector2(0, 0)])
+	_volley_at([Vector2(1, 0), Vector2(2, 0)])
+	factory.bullets_cleared.connect(_on_bullets_cleared)
+	var key: VolleyPoolKey2D = factory.debug_expected_pool_key(H.make_volley_data(2, 0.0, 60.0))
+	assert_eq(factory.clear_active_bullets(key), 2, "only the two-bullet volley")
+	assert_eq(cleared_log.size(), 1, "one signal")
+	assert_eq(cleared_log[0]["positions"].size(), 2, "for that volley")
+
+
+func test_nothing_to_clear_announces_nothing() -> void:
+	factory.bullets_cleared.connect(_on_bullets_cleared)
+	assert_eq(factory.clear_active_bullets(), 0, "empty factory")
+	assert_eq(cleared_log.size(), 0, "no signal")
+
+
+func test_a_cleared_handler_of_clear_active_bullets_may_spawn_pickups() -> void:
+	_volley_at([Vector2(0, 0), Vector2(5, 5)])
+	var made := []
+	factory.bullets_cleared.connect(func(positions, _v, _i):
+		for p in positions:
+			made.append(_volley_at([p])))
+	factory.clear_active_bullets()
+	assert_eq(made.size(), 2, "the busy latch is down when the signal fires")
+	assert_eq(factory.get_active_bullet_count(), 2, "only the spawned replacements live")

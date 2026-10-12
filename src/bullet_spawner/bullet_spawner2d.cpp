@@ -773,6 +773,16 @@ bool BulletSpawner2D::shoot_once() {
 	if (max_live_bullets > 0 && get_active_live_bullet_count() >= max_live_bullets) {
 		return fail_early(nullptr, StringName("over_budget"), true);
 	}
+	// Despawn bounds: bullets born outside them (and not flying in) would be
+	// culled on the first tick, so a muzzle outside simply does not shoot.
+	// Edges count as inside, like the cull pass.
+	if (!shoot_outside_despawn_bounds && factory->get_despawn_bounds_enabled()) {
+		const Rect2 bounds = factory->get_despawn_bounds_rect();
+		const Vector2 muzzle = get_global_position() + resolve_spawn_offset_global();
+		if (muzzle.x < bounds.position.x || muzzle.y < bounds.position.y || muzzle.x > bounds.position.x + bounds.size.x || muzzle.y > bounds.position.y + bounds.size.y) {
+			return fail_early(nullptr, StringName("outside_despawn_bounds"), true);
+		}
+	}
 	// Duplicate per volley: the user's resource must never be mutated (its
 	// transforms get overwritten below), so shared .tres files stay safe.
 	// Duplicate cache: first shot with a resource duplicates once into the

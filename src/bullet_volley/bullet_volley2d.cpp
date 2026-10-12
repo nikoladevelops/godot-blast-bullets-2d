@@ -752,7 +752,7 @@ int BulletVolley2D::disable_bullets_bulk(const std::vector<int> &indexes, int fx
 				// clear of the last bullet releases the life synchronously;
 				// the drain check runs after this loop, but the pose and
 				// the entries are read while both are intact).
-				const int sound_trigger = fx_trigger == EFFECT_ON_CLEAR ? BulletSoundData2D::SOUND_ON_CLEAR : (fx_trigger == EFFECT_ON_LIFETIME_OVER ? BulletSoundData2D::SOUND_ON_LIFETIME_OVER : -1);
+				const int sound_trigger = fx_trigger == EFFECT_ON_CLEAR ? BulletSoundData2D::SOUND_ON_CLEAR : (fx_trigger == EFFECT_ON_LIFETIME_OVER ? BulletSoundData2D::SOUND_ON_LIFETIME_OVER : (fx_trigger == EFFECT_ON_DESPAWN ? BulletSoundData2D::SOUND_ON_DESPAWN : -1));
 				if (sound_trigger >= 0) {
 					sound_fire(sound_trigger, i, fx_pose.get_origin());
 				}

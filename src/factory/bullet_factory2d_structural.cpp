@@ -275,6 +275,15 @@ int BulletFactory2D::clear_active_bullets(const Ref<VolleyPoolKey2D> &key) {
 	const PoolKey *key_ptr = resolve_pool_key(key, resolved);
 
 	int cleared = 0;
+	// bullets_cleared payloads, captured only while somebody listens.
+	struct Announcement {
+		uint64_t volley_id = 0;
+		BulletVolley2D *volley = nullptr;
+		PackedVector2Array positions;
+		Array indexes;
+	};
+	std::vector<Announcement> announcements;
+	const bool announce = has_connections("bullets_cleared");
 	for (BulletVolley2D *volley : snapshot) {
 		if (volley == nullptr) {
 			continue;
@@ -292,9 +301,37 @@ int BulletFactory2D::clear_active_bullets(const Ref<VolleyPoolKey2D> &key) {
 		if (key_ptr != nullptr && !(volley->get_pool_key() == *key_ptr)) {
 			continue;
 		}
-		cleared += volley->clear_all_bullets();
+		Announcement note;
+		if (announce) {
+			// Poses before the clear: the last cleared bullet releases the life.
+			const std::vector<int> live = volley->all_bullets_enabled_set.get_active_indexes();
+			note.positions.resize((int64_t)live.size());
+			note.indexes.resize((int64_t)live.size());
+			for (size_t k = 0; k < live.size(); ++k) {
+				note.positions[(int64_t)k] = volley->all_cached_instance_transforms[live[k]].columns[2];
+				note.indexes[(int64_t)k] = live[k];
+			}
+		}
+		const int done = volley->clear_all_bullets();
+		cleared += done;
+		if (announce && done > 0 && ObjectDB::get_instance(ObjectID(volley_id)) == volley) {
+			note.volley_id = volley_id;
+			note.volley = volley;
+			announcements.push_back(std::move(note));
+		}
 	}
 	is_factory_busy = saved_busy;
+	// The latch is down: handlers may spawn (drop items, replace bullets).
+	for (const Announcement &note : announcements) {
+		if (is_tearing_down) {
+			break;
+		}
+		if (ObjectDB::get_instance(ObjectID(note.volley_id)) != note.volley) {
+			continue;
+		}
+		note_user_code();
+		emit_signal("bullets_cleared", note.positions, note.volley, note.indexes);
+	}
 	return cleared;
 }
 

@@ -23,7 +23,7 @@
 			<return type="int" />
 			<param index="0" name="key" type="VolleyPoolKey2D" default="null" />
 			<description>
-				Clears every live bullet with dismissal visuals: runs each active volley's [method BulletVolley2D.clear_all_bullets], so On Clear effect layers fire, and emptied volleys go back to the pool. Returns how many bullets were cleared. Pass [code]null[/code] (default) for every bucket, or a [VolleyPoolKey2D] for one exact bucket. Allowed inside collision and lifetime handlers. Unlike [method free_active_bullets] (silent deletion) and [method reset] (silent teardown), this is the wave-clear path that reads on screen.
+				Clears every live bullet with dismissal visuals (and announces each volley that lost bullets with [signal bullets_cleared], positions included, after the factory is no longer busy): runs each active volley's [method BulletVolley2D.clear_all_bullets], so On Clear effect layers fire, and emptied volleys go back to the pool. Returns how many bullets were cleared. Pass [code]null[/code] (default) for every bucket, or a [VolleyPoolKey2D] for one exact bucket. Allowed inside collision and lifetime handlers. Unlike [method free_active_bullets] (silent deletion) and [method reset] (silent teardown), this is the wave-clear path that reads on screen.
 			</description>
 		</method>
 		<method name="clear_active_bullets_deferred">
@@ -575,7 +575,7 @@
 			Color of the despawn bounds preview: the fill uses it as is (translucent red by default), the outline is the same color made more opaque. Every component must be finite.
 		</member>
 		<member name="despawn_bounds_enabled" type="bool" setter="set_despawn_bounds_enabled" getter="get_despawn_bounds_enabled" default="false">
-			When on, every live bullet that is outside [member despawn_bounds_rect] and not heading back in is silently disabled each tick (no effects, no sounds, no signals). Keeps off-screen bullets from living until their lifetime ends. A bullet that starts just outside and flies inwards is left alone. Off by default.
+			When on, every live bullet that is outside [member despawn_bounds_rect] and not heading back in is disabled each tick. Keeps off-screen bullets from living until their lifetime ends. A bullet that is outside and flying inwards is left alone. A culled bullet fires the On Despawn effect layers ([constant BulletEffectLayerData2D.EFFECT_ON_DESPAWN]) and sounds ([constant BulletSoundData2D.SOUND_ON_DESPAWN]) it has and is announced by [signal bullets_despawned]; with none of those configured it is silent. A [BulletSpawner2D] whose muzzle is outside the rectangle does not shoot (see [member BulletSpawner2D.shoot_outside_despawn_bounds]). Off by default.
 		</member>
 		<member name="despawn_bounds_preview" type="bool" setter="set_despawn_bounds_preview" getter="get_despawn_bounds_preview" default="true">
 			Draws [member despawn_bounds_rect] while [member despawn_bounds_enabled] is on, so you can see the play field in the editor. At runtime it also needs [member despawn_bounds_preview_during_runtime]. Only a visual aid: culling does not depend on it.
@@ -670,7 +670,7 @@
 			<param index="1" name="volley" type="BulletVolley2D" />
 			<param index="2" name="bullet_indexes" type="int[]" />
 			<description>
-				Emitted after [method clear_bullets_in_circle] or [method clear_bullets_in_rect], once per volley that lost bullets, after the factory is no longer busy so handlers may spawn (turn cleared bullets into score items). [param positions] holds the global position of each cleared bullet, parallel to [param bullet_indexes]. The volley may already be back in the pool when this fires, so read the positions, not the volley. Not emitted by [method clear_active_bullets].
+				Emitted after [method clear_bullets_in_circle] or [method clear_bullets_in_rect], once per volley that lost bullets, after the factory is no longer busy so handlers may spawn (turn cleared bullets into score items). [param positions] holds the global position of each cleared bullet, parallel to [param bullet_indexes]. The volley may already be back in the pool when this fires, so read the positions, not the volley. Also emitted by [method clear_active_bullets], once per volley that lost bullets.
 			</description>
 		</signal>
 		<signal name="bullets_converted">
@@ -678,6 +678,14 @@
 			<param index="1" name="volleys" type="BulletVolley2D[]" />
 			<description>
 				Emitted after a conversion call that converted something: [param count] bullets became pickups, in the new [param volleys] (the same array the call returns). The factory is not busy any more, so a handler may spawn or convert again.
+			</description>
+		</signal>
+		<signal name="bullets_despawned">
+			<param index="0" name="positions" type="PackedVector2Array" />
+			<param index="1" name="volley" type="BulletVolley2D" />
+			<param index="2" name="bullet_indexes" type="int[]" />
+			<description>
+				Emitted once per volley and tick for the bullets that just left through the despawn bounds (see [member despawn_bounds_enabled]), after their On Despawn effects and sounds. [param positions] holds the pose each bullet left from, parallel to [param bullet_indexes]. It runs live inside the sweep: spawn from it (an item where a bullet fell off the screen), but do not free the volley. Nothing is captured while no handler is connected.
 			</description>
 		</signal>
 		<signal name="life_time_over">

@@ -155,7 +155,7 @@
 			What plays: each play picks one entry per [member stream_mode] (nulls skipped). Put one WAV for a single sound or five hit variations without building an [AudioStreamRandomizer]; an empty or all-null list plays nothing (warns once).
 		</member>
 		<member name="trigger" type="int" setter="set_trigger" getter="get_trigger" default="0">
-			Which event plays this sound. On Shot and On Telegraph are spawner-only: a factory volley never fires them.
+			Which event plays this sound. On Shot and On Telegraph are spawner-only: a factory volley never fires them. On Despawn plays where a bullet leaves through the factory's despawn bounds ([member BulletFactory2D.despawn_bounds_enabled]) and nowhere else.
 		</member>
 		<member name="trigger_chance" type="float" setter="set_trigger_chance" getter="get_trigger_chance" default="1.0">
 			Play probability per event. 0 never plays, 1 always plays.
@@ -215,6 +215,8 @@
 		</constant>
 		<constant name="SOUND_ON_FLIGHT" value="10" enum="SoundTrigger">
 			Offers every sweep per live bullet at its current pose, through the same channels (interval, voices, steal all apply). Built for short positional blips: voices sit where they start unless [member follow_bullet] is on. A following entry keeps one voice per bullet, which rides the bullet until it ends, then fades.
+		</constant>
+		<constant name="SOUND_ON_DESPAWN" value="11" enum="SoundTrigger">
 		</constant>
 		<constant name="SOUND_LIMIT_REPLACE_OLDEST" value="0" enum="SoundLimitMode">
 			Past max_voices, stop this sound's oldest voice and reuse it.

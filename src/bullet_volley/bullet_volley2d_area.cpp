@@ -142,7 +142,27 @@ void BulletVolley2D::cull_outside_bounds(const Rect2 &bounds) {
 		// Local copy: disable_bullets_bulk runs attachment callbacks that
 		// may re-enter and reuse the member scratch.
 		const std::vector<int> doomed = despawn_indexes_scratch;
-		disable_bullets_bulk(doomed, -1);
+		// The signal needs the poses they leave from: captured only when
+		// somebody listens (the common game has no handler).
+		const bool announce = bullet_factory != nullptr && bullet_factory->has_connections("bullets_despawned");
+		PackedVector2Array positions;
+		if (announce) {
+			positions.resize((int64_t)doomed.size());
+			for (size_t k = 0; k < doomed.size(); ++k) {
+				positions[(int64_t)k] = all_cached_instance_transforms[doomed[k]].columns[2];
+			}
+		}
+		const uint64_t self_id = get_instance_id();
+		disable_bullets_bulk(doomed, EFFECT_ON_DESPAWN);
+		if (announce && ObjectDB::get_instance(ObjectID(self_id)) == this) {
+			Array indexes;
+			indexes.resize((int64_t)doomed.size());
+			for (size_t k = 0; k < doomed.size(); ++k) {
+				indexes[(int64_t)k] = doomed[k];
+			}
+			bullet_factory->note_user_code();
+			bullet_factory->emit_signal("bullets_despawned", positions, this, indexes);
+		}
 	}
 }
 

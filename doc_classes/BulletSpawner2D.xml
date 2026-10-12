@@ -1548,6 +1548,9 @@
 		<member name="shoot_interval_sec" type="float" setter="set_shoot_interval_sec" getter="get_shoot_interval_sec" default="1.0">
 			Seconds between automatic volleys. Must be above zero. Shortening it also shortens the wait already running. Runs on an accumulator: overshoot carries over so the average rate is exact at any value (fast intervals repay every due volley in the same tick, up to 8 pulls; hitch backlogs beyond that resync instead of bursting).
 		</member>
+		<member name="shoot_outside_despawn_bounds" type="bool" setter="set_shoot_outside_despawn_bounds" getter="get_shoot_outside_despawn_bounds" default="false">
+			When the factory's [member BulletFactory2D.despawn_bounds_enabled] is on, a spawner whose muzzle (its global position plus the spawn position offset) is outside [member BulletFactory2D.despawn_bounds_rect] does not shoot: the bullets would be culled on their first tick. The shot is reported through [signal volley_skipped] with the reason "outside_despawn_bounds" (no error), auto-fire keeps its rhythm, and the spawner shoots again as soon as the muzzle is inside. Edges count as inside. Turn this on to shoot from outside anyway (bullets that fly inwards survive the cull).
+		</member>
 		<member name="shooting_enabled" type="bool" setter="set_shooting_enabled" getter="get_shooting_enabled" default="true">
 			Master switch for automatic shooting. [method shoot_once] works regardless.
 		</member>
@@ -1808,7 +1811,7 @@
 		<signal name="volley_skipped">
 			<param index="0" name="reason" type="StringName" />
 			<description>
-				Fired whenever a shot does not produce a volley, with the reason: "no_factory", "no_spawn_data", "no_transforms" (empty pattern), "over_budget" (max_live_bullets), "outside_fire_arc" (homing fire arc), "factory_refused" (the factory rejected the spawn) or "dropped" (a handler freed or took over the volley before it was configured). Games can fall back on these instead of reading the log.
+				Fired whenever a shot does not produce a volley, with the reason: "no_factory", "no_spawn_data", "no_transforms" (empty pattern), "over_budget" (max_live_bullets), "outside_despawn_bounds" (the muzzle is outside the factory's despawn bounds, see [member shoot_outside_despawn_bounds]), "outside_fire_arc" (homing fire arc), "factory_refused" (the factory rejected the spawn) or "dropped" (a handler freed or took over the volley before it was configured). Games can fall back on these instead of reading the log.
 			</description>
 		</signal>
 		<signal name="volley_telegraphed">

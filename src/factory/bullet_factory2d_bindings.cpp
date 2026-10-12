@@ -228,6 +228,14 @@ void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("count_bullets_in_circle", "center", "radius"), &BulletFactory2D::count_bullets_in_circle);
 	ClassDB::bind_method(D_METHOD("count_bullets_in_rect", "rect"), &BulletFactory2D::count_bullets_in_rect);
 
+	// Bullets that left through the despawn bounds, once per volley and tick
+	// (positions are the poses they left from). Live, inside the sweep: a
+	// handler may spawn (coins, effects) but not free the volley.
+	ADD_SIGNAL(MethodInfo("bullets_despawned",
+			PropertyInfo(Variant::PACKED_VECTOR2_ARRAY, "positions"),
+			PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
+			PropertyInfo(Variant::ARRAY, "bullet_indexes", PROPERTY_HINT_ARRAY_TYPE, "int")));
+
 	// Pickups: bullets to coins/gems that are pulled to a target.
 	ClassDB::bind_method(D_METHOD("convert_all_bullets_to_pickups", "pickup", "target"), &BulletFactory2D::convert_all_bullets_to_pickups);
 	ClassDB::bind_method(D_METHOD("convert_bullets_in_circle_to_pickups", "center", "radius", "pickup", "target"), &BulletFactory2D::convert_bullets_in_circle_to_pickups);

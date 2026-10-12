@@ -35,8 +35,8 @@ void BulletSoundData2D::set_enabled(bool value) {
 
 int BulletSoundData2D::get_trigger() const { return trigger; }
 void BulletSoundData2D::set_trigger(int value) {
-	if (value < SOUND_ON_SHOT || value > SOUND_ON_FLIGHT) {
-		UtilityFunctions::push_error("BulletSoundData2D: trigger must be 0 (On Shot), 1 (On Hit), 2 (On Destroy), 3 (On Bounce), 4 (On Lifetime Over), 5 (On Clear), 6 (On Homing Target Reached), 7 (On Graze), 8 (On Graze Exit), 9 (On Telegraph) or 10 (On Flight), keeping the old value.");
+	if (value < SOUND_ON_SHOT || value > SOUND_ON_DESPAWN) {
+		UtilityFunctions::push_error("BulletSoundData2D: trigger must be 0 (On Shot), 1 (On Hit), 2 (On Destroy), 3 (On Bounce), 4 (On Lifetime Over), 5 (On Clear), 6 (On Homing Target Reached), 7 (On Graze), 8 (On Graze Exit), 9 (On Telegraph), 10 (On Flight) or 11 (On Despawn), keeping the old value.");
 		return;
 	}
 	if (trigger == value) {
@@ -737,7 +737,7 @@ void BulletSoundData2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_trigger"), &BulletSoundData2D::get_trigger);
 	ClassDB::bind_method(D_METHOD("set_trigger", "value"), &BulletSoundData2D::set_trigger);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "trigger", PROPERTY_HINT_ENUM, "On Shot,On Hit,On Destroy,On Bounce,On Lifetime Over,On Clear,On Homing Target Reached,On Graze,On Graze Exit,On Telegraph,On Flight"), "set_trigger", "get_trigger");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "trigger", PROPERTY_HINT_ENUM, "On Shot,On Hit,On Destroy,On Bounce,On Lifetime Over,On Clear,On Homing Target Reached,On Graze,On Graze Exit,On Telegraph,On Flight,On Despawn"), "set_trigger", "get_trigger");
 
 	ClassDB::bind_method(D_METHOD("get_ring_index"), &BulletSoundData2D::get_ring_index);
 	ClassDB::bind_method(D_METHOD("set_ring_index", "value"), &BulletSoundData2D::set_ring_index);
@@ -943,6 +943,7 @@ void BulletSoundData2D::_bind_methods() {
 	BIND_ENUM_CONSTANT(SOUND_ON_GRAZE_EXIT);
 	BIND_ENUM_CONSTANT(SOUND_ON_TELEGRAPH);
 	BIND_ENUM_CONSTANT(SOUND_ON_FLIGHT);
+	BIND_ENUM_CONSTANT(SOUND_ON_DESPAWN);
 	BIND_ENUM_CONSTANT(SOUND_LIMIT_REPLACE_OLDEST);
 	BIND_ENUM_CONSTANT(SOUND_LIMIT_SKIP_NEW);
 	BIND_ENUM_CONSTANT(STEAL_OLDEST);
