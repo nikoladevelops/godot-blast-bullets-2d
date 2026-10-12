@@ -9,6 +9,7 @@
 #include <godot_cpp/core/math.hpp>
 
 #include <cmath>
+#include <cstring>
 #include <limits>
 
 using namespace godot;
@@ -27,21 +28,23 @@ constexpr double COINCIDENT_SQ = 1e-12;
 // |V| cap: keeps extreme weights finite (the turn is complete long before).
 constexpr double MAX_STEER = 1e6;
 
-// Scan order of the neighbor cells around a member's own cell.
-constexpr int RING1_DX[8] = { 1, 1, 0, -1, -1, -1, 0, 1 };
-constexpr int RING1_DY[8] = { 0, 1, 1, 1, 0, -1, -1, -1 };
-constexpr int RING2_DX[16] = { 2, 2, 2, 1, 0, -1, -2, -2, -2, -2, -2, -1, 0, 1, 2, 2 };
-constexpr int RING2_DY[16] = { 0, 1, 2, 2, 2, 2, 2, 1, 0, -1, -2, -2, -2, -2, -2, -1 };
+// Scan order of the neighbor cells around a member's own cell: the 8-ring,
+// then the 16-ring.
+constexpr int RING_DX[24] = { 1, 1, 0, -1, -1, -1, 0, 1, 2, 2, 2, 1, 0, -1, -2, -2, -2, -2, -2, -1, 0, 1, 2, 2 };
+constexpr int RING_DY[24] = { 0, 1, 1, 1, 0, -1, -1, -1, 0, 1, 2, 2, 2, 2, 2, 1, 0, -1, -2, -2, -2, -2, -2, -1 };
+// A flock whose occupied cells fill a box of at most this many cells per
+// occupied cell (plus a small floor) looks neighbors up in a dense array.
+constexpr int DENSE_FACTOR = 8;
 
 // 64 unit directions for stacked pairs (no trig per pair).
 struct CoincidentDirections {
-	double x[64];
-	double y[64];
+	float x[64];
+	float y[64];
 	CoincidentDirections() {
 		for (int k = 0; k < 64; ++k) {
 			const double angle = ((double)k + 0.5) * Math::TAU / 64.0;
-			x[k] = std::cos(angle);
-			y[k] = std::sin(angle);
+			x[k] = (float)std::cos(angle);
+			y[k] = (float)std::sin(angle);
 		}
 	}
 };
@@ -76,6 +79,22 @@ inline size_t next_pow2(size_t value) {
 	return out;
 }
 
+// 1 / sqrt(x) for x > 0, without a division or sqrt instruction: the
+// classic bit-level estimate refined by two Newton steps (relative error
+// below 5e-6). Plain integer and float operations, so every CPU computes the
+// same bits (hardware rsqrt estimates differ between vendors).
+inline float inv_sqrt2d(float x) {
+	uint32_t bits;
+	std::memcpy(&bits, &x, sizeof(bits));
+	bits = 0x5f375a86u - (bits >> 1);
+	float y;
+	std::memcpy(&y, &bits, sizeof(y));
+	const float half = 0.5f * x;
+	y = y * (1.5f - half * y * y);
+	y = y * (1.5f - half * y * y);
+	return y;
+}
+
 inline bool finite_float(float value) {
 	return std::isfinite(value);
 }
@@ -99,12 +118,8 @@ void FlockSolver2D::begin(uint64_t new_sweep) {
 	steer.clear();
 	neighbors.clear();
 	m_slot.clear();
-	m_ordinal.clear();
 	m_cell.clear();
-	m_x.clear();
-	m_y.clear();
-	m_hx.clear();
-	m_hy.clear();
+	m_mate.clear();
 	cell_group.clear();
 	cell_cx.clear();
 	cell_cy.clear();
@@ -286,12 +301,15 @@ void FlockSolver2D::add_volley(BulletVolley2D &volley, const FlockConfig2D &conf
 			hy = 0.0;
 		}
 		m_slot.push_back(base + (uint32_t)i);
-		m_ordinal.push_back(groups[group].next_ordinal++);
 		m_cell.push_back(cell_for(group, (int32_t)std::floor(fx), (int32_t)std::floor(fy)));
-		m_x.push_back(x);
-		m_y.push_back(y);
-		m_hx.push_back((float)hx);
-		m_hy.push_back((float)hy);
+		Mate mate;
+		mate.x = x;
+		mate.y = y;
+		mate.hx = (float)hx;
+		mate.hy = (float)hy;
+		mate.has_heading = (hx != 0.0 || hy != 0.0) ? 1u : 0u;
+		mate.ordinal = groups[group].next_ordinal++;
+		m_mate.push_back(mate);
 	}
 
 	FlockView2D &view = volley.flock_view;
@@ -301,6 +319,64 @@ void FlockSolver2D::add_volley(BulletVolley2D &volley, const FlockConfig2D &conf
 	view.serial = config.serial;
 	view.max_turn_rad = (real_t)Math::deg_to_rad((double)flock->max_turn_rate_degrees);
 	view.face_heading = flock->face_heading;
+}
+
+void FlockSolver2D::build_dense_grids() {
+	// Per flock: when its occupied cells fill a small enough box, a dense
+	// array maps every cell of the box to its id (neighbor lookups become
+	// one indexed read); sparse flocks (far outliers) keep the hash.
+	for (Group &g : groups) {
+		g.cells = 0;
+	}
+	for (uint32_t c = 0; c < cell_total; ++c) {
+		Group &g = groups[cell_group[c]];
+		if (g.cells == 0) {
+			g.min_cx = g.max_cx = cell_cx[c];
+			g.min_cy = g.max_cy = cell_cy[c];
+		} else {
+			g.min_cx = MIN(g.min_cx, cell_cx[c]);
+			g.max_cx = MAX(g.max_cx, cell_cx[c]);
+			g.min_cy = MIN(g.min_cy, cell_cy[c]);
+			g.max_cy = MAX(g.max_cy, cell_cy[c]);
+		}
+		++g.cells;
+	}
+	size_t total = 0;
+	for (Group &g : groups) {
+		g.dense_base = -1;
+		if (g.cells == 0) {
+			continue;
+		}
+		const int64_t width = (int64_t)g.max_cx - (int64_t)g.min_cx + 1;
+		const int64_t height = (int64_t)g.max_cy - (int64_t)g.min_cy + 1;
+		if (width * height > (int64_t)DENSE_FACTOR * (int64_t)g.cells + 256) {
+			continue;
+		}
+		g.dense_width = (uint32_t)width;
+		g.dense_height = (uint32_t)height;
+		g.dense_base = (int64_t)total;
+		total += (size_t)(width * height);
+	}
+	dense_cells.assign(total, -1);
+	for (uint32_t c = 0; c < cell_total; ++c) {
+		const Group &g = groups[cell_group[c]];
+		if (g.dense_base >= 0) {
+			dense_cells[(size_t)g.dense_base + (size_t)(cell_cy[c] - g.min_cy) * g.dense_width + (size_t)(cell_cx[c] - g.min_cx)] = (int32_t)c;
+		}
+	}
+}
+
+int64_t FlockSolver2D::neighbor_cell(uint32_t group, int32_t cx, int32_t cy) const {
+	const Group &g = groups[group];
+	if (g.dense_base < 0) {
+		return find_cell(group, cx, cy);
+	}
+	const int64_t x = (int64_t)cx - (int64_t)g.min_cx;
+	const int64_t y = (int64_t)cy - (int64_t)g.min_cy;
+	if (x < 0 || y < 0 || x >= (int64_t)g.dense_width || y >= (int64_t)g.dense_height) {
+		return -1;
+	}
+	return dense_cells[(size_t)g.dense_base + (size_t)y * g.dense_width + (size_t)x];
 }
 
 void FlockSolver2D::solve() {
@@ -323,145 +399,139 @@ void FlockSolver2D::solve() {
 		run += cell_count[c];
 	}
 	s_slot.resize(total);
-	s_ordinal.resize(total);
-	s_x.resize(total);
-	s_y.resize(total);
-	s_hx.resize(total);
-	s_hy.resize(total);
+	s_mate.resize(total);
 	sort_cursor.assign(cell_start.begin(), cell_start.end());
 	for (uint32_t m = 0; m < total; ++m) {
 		const uint32_t at = sort_cursor[m_cell[m]]++;
 		s_slot[at] = m_slot[m];
-		s_ordinal[at] = m_ordinal[m];
-		s_x[at] = m_x[m];
-		s_y[at] = m_y[m];
-		s_hx[at] = m_hx[m];
-		s_hy[at] = m_hy[m];
+		s_mate[at] = m_mate[m];
 	}
+	build_dense_grids();
 
-	const CoincidentDirections &dirs = coincident_directions();
 	int64_t checks = 0;
 	int capped = 0;
-	uint32_t ring1_start[8], ring1_count[8], ring2_start[16], ring2_count[16];
+	const CoincidentDirections &dirs = coincident_directions();
+	const Mate *const mates = s_mate.data();
+	// The 24 neighbor cells of the cell being queried, in ring order (8-ring
+	// then 16-ring): [start, start + count) runs of the sorted members.
+	uint32_t ring_start[24];
+	uint32_t ring_count[24];
 	for (uint32_t c = 0; c < cell_total; ++c) {
 		const uint32_t group = cell_group[c];
 		const Group &g = groups[group];
-		const int32_t cx = cell_cx[c];
-		const int32_t cy = cell_cy[c];
-		for (int k = 0; k < 8; ++k) {
-			const int64_t id = find_cell(group, cx + RING1_DX[k], cy + RING1_DY[k]);
-			ring1_start[k] = id >= 0 ? cell_start[id] : 0;
-			ring1_count[k] = id >= 0 ? cell_count[id] : 0;
+		for (int k = 0; k < 24; ++k) {
+			const int64_t id = neighbor_cell(group, cell_cx[c] + RING_DX[k], cell_cy[c] + RING_DY[k]);
+			ring_start[k] = id >= 0 ? cell_start[id] : 0;
+			ring_count[k] = id >= 0 ? cell_count[id] : 0;
 		}
-		for (int k = 0; k < 16; ++k) {
-			const int64_t id = find_cell(group, cx + RING2_DX[k], cy + RING2_DY[k]);
-			ring2_start[k] = id >= 0 ? cell_start[id] : 0;
-			ring2_count[k] = id >= 0 ? cell_count[id] : 0;
-		}
+		// The candidate test runs in float (positions are float already);
+		// the sums feed the steering in double below. Plain locals: the
+		// compiler keeps them in registers across every candidate.
+		const float reach_sq = (float)g.reach_sq;
+		const float near_sq = (float)g.neighbor_range_sq;
+		const float sep_sq = (float)g.separation_range_sq;
+		const float inv_sep = (float)g.inv_separation_range;
+		const uint32_t cap = g.max_neighbors;
 		const uint32_t own_start = cell_start[c];
-		const uint32_t own_count = cell_count[c];
-		for (uint32_t q = 0; q < own_count; ++q) {
-			const uint32_t self = own_start + q;
-			const double px = (double)s_x[self];
-			const double py = (double)s_y[self];
-			const uint32_t ordinal = s_ordinal[self];
-			uint32_t accepted = 0;
+		const uint32_t own_end = own_start + cell_count[c];
+		for (uint32_t self = own_start; self < own_end; ++self) {
+			const float px = mates[self].x;
+			const float py = mates[self].y;
+			const uint32_t ordinal = mates[self].ordinal;
+			uint32_t taken = 0;
 			uint32_t near_count = 0;
+			int64_t visited = 0;
 			uint32_t heading_count = 0;
-			double sum_hx = 0.0, sum_hy = 0.0;
-			double sum_ox = 0.0, sum_oy = 0.0;
-			double sep_x = 0.0, sep_y = 0.0;
-			// One flockmate; true = the cap is reached (stop scanning).
-			auto consider = [&](uint32_t j) -> bool {
-				++checks;
-				const double dx = (double)s_x[j] - px;
-				const double dy = (double)s_y[j] - py;
-				const double d2 = dx * dx + dy * dy;
-				if (!(d2 < g.reach_sq)) {
-					return false;
-				}
-				++accepted;
-				if (d2 < g.neighbor_range_sq) {
-					++near_count;
-					sum_ox += dx;
-					sum_oy += dy;
-					const float hx = s_hx[j];
-					const float hy = s_hy[j];
-					if (hx != 0.0f || hy != 0.0f) {
-						++heading_count;
-						sum_hx += (double)hx;
-						sum_hy += (double)hy;
+			float ox = 0.0f, oy = 0.0f, hx = 0.0f, hy = 0.0f, sx = 0.0f, sy = 0.0f;
+			bool full = true;
+			// One flockmate: the rules' sums; jumps to `filled` at the cap.
+#define FLOCK_VISIT(INDEX)                                                                                             \
+	{                                                                                                                  \
+		const Mate &mate = mates[(INDEX)];                                                                             \
+		++visited;                                                                                                     \
+		const float dx = mate.x - px;                                                                                  \
+		const float dy = mate.y - py;                                                                                  \
+		const float d2 = dx * dx + dy * dy;                                                                            \
+		if (d2 < reach_sq) {                                                                                           \
+			++taken;                                                                                                   \
+			if (d2 < near_sq) {                                                                                        \
+				++near_count;                                                                                          \
+				ox += dx;                                                                                              \
+				oy += dy;                                                                                              \
+				heading_count += mate.has_heading;                                                                     \
+				hx += mate.hx;                                                                                         \
+				hy += mate.hy;                                                                                         \
+			}                                                                                                          \
+			if (d2 < sep_sq) {                                                                                         \
+				if (d2 > (float)COINCIDENT_SQ) {                                                                       \
+					/* (p - q) / d * (1 - d / range) = (p - q) * (1/d - 1/range) */                                    \
+					const float w = inv_sqrt2d(d2) - inv_sep;                                                          \
+					sx -= dx * w;                                                                                      \
+					sy -= dy * w;                                                                                      \
+				} else {                                                                                               \
+					/* stacked: part along the pair's own direction, opposite for the two */                           \
+					const uint32_t other = mate.ordinal;                                                               \
+					const uint32_t pick = mix32(MIN(ordinal, other) * 0x9e3779b1u ^ mix32(MAX(ordinal, other))) & 63u; \
+					const float side = ordinal < other ? 1.0f : -1.0f;                                                 \
+					sx += side * dirs.x[pick];                                                                         \
+					sy += side * dirs.y[pick];                                                                         \
+				}                                                                                                      \
+			}                                                                                                          \
+			if (taken >= cap) {                                                                                        \
+				goto filled;                                                                                           \
+			}                                                                                                          \
+		}                                                                                                              \
+	}
+			// Own cell first, from the next member on, wrapping (skips
+			// itself): stacked bullets read different flockmates.
+			for (uint32_t j = self + 1; j < own_end; ++j) {
+				FLOCK_VISIT(j)
+			}
+			for (uint32_t j = own_start; j < self; ++j) {
+				FLOCK_VISIT(j)
+			}
+			{
+				// Then the 8-ring and the 16-ring: the starting cell and each
+				// cell's starting flockmate rotate with the bullet (the offset
+				// is a multiply-shift of a per-bullet hash, no division), so a
+				// capped scan has no drift bias.
+				const uint64_t spin = mix32(ordinal * 0x9e3779b1u + 0x632be5abu);
+				for (int t = 0; t < 24; ++t) {
+					const int k = t < 8 ? (int)((ordinal + (uint32_t)t) & 7u) : 8 + (int)((ordinal + (uint32_t)t) & 15u);
+					const uint32_t count = ring_count[k];
+					if (count == 0) {
+						continue;
+					}
+					const uint32_t start = ring_start[k];
+					const uint32_t offset = start + (uint32_t)((spin * (uint64_t)count) >> 32);
+					const uint32_t end = start + count;
+					for (uint32_t j = offset; j < end; ++j) {
+						FLOCK_VISIT(j)
+					}
+					for (uint32_t j = start; j < offset; ++j) {
+						FLOCK_VISIT(j)
 					}
 				}
-				if (d2 < g.separation_range_sq) {
-					if (d2 > COINCIDENT_SQ) {
-						const double d = std::sqrt(d2);
-						const double w = (1.0 - d * g.inv_separation_range) / d;
-						sep_x -= dx * w;
-						sep_y -= dy * w;
-					} else {
-						// Stacked: part along the pair's own direction,
-						// opposite for its two bullets.
-						const uint32_t other = s_ordinal[j];
-						const uint32_t lo = MIN(ordinal, other);
-						const uint32_t hi = MAX(ordinal, other);
-						const uint32_t pick = mix32(lo * 0x9e3779b1u ^ mix32(hi)) & 63u;
-						const double side = ordinal < other ? 1.0 : -1.0;
-						sep_x += side * dirs.x[pick];
-						sep_y += side * dirs.y[pick];
-					}
-				}
-				return accepted >= g.max_neighbors;
-			};
-			// Scans [start, start + count) from a rotated offset.
-			auto scan = [&](uint32_t start, uint32_t count, uint32_t offset) -> bool {
-				for (uint32_t u = offset; u < count; ++u) {
-					if (consider(start + u)) {
-						return true;
-					}
-				}
-				for (uint32_t u = 0; u < offset; ++u) {
-					if (consider(start + u)) {
-						return true;
-					}
-				}
-				return false;
-			};
-			bool full = false;
-			// Own cell: from the next member on, wrapping (skips itself).
-			for (uint32_t u = q + 1; u < own_count && !full; ++u) {
-				full = consider(own_start + u);
 			}
-			for (uint32_t u = 0; u < q && !full; ++u) {
-				full = consider(own_start + u);
-			}
-			for (int t = 0; t < 8 && !full; ++t) {
-				const int k = (int)((ordinal + (uint32_t)t) & 7u);
-				if (ring1_count[k] > 0) {
-					full = scan(ring1_start[k], ring1_count[k], ordinal % ring1_count[k]);
-				}
-			}
-			for (int t = 0; t < 16 && !full; ++t) {
-				const int k = (int)((ordinal + (uint32_t)t) & 15u);
-				if (ring2_count[k] > 0) {
-					full = scan(ring2_start[k], ring2_count[k], ordinal % ring2_count[k]);
-				}
-			}
+#undef FLOCK_VISIT
+			full = false;
+		filled:
+			checks += visited;
 			if (full) {
 				++capped;
 			}
 
-			double vx = g.separation * sep_x;
-			double vy = g.separation * sep_y;
+			double vx = g.separation * (double)sx;
+			double vy = g.separation * (double)sy;
 			if (heading_count > 0) {
 				const double inv = 1.0 / (double)heading_count;
-				vx += g.alignment * sum_hx * inv;
-				vy += g.alignment * sum_hy * inv;
+				vx += g.alignment * (double)hx * inv;
+				vy += g.alignment * (double)hy * inv;
 			}
 			if (near_count > 0) {
 				const double inv = g.inv_neighbor_range / (double)near_count;
-				vx += g.cohesion * sum_ox * inv;
-				vy += g.cohesion * sum_oy * inv;
+				vx += g.cohesion * (double)ox * inv;
+				vy += g.cohesion * (double)oy * inv;
 			}
 			const double v2 = vx * vx + vy * vy;
 			if (!std::isfinite(v2)) {
@@ -474,7 +544,7 @@ void FlockSolver2D::solve() {
 			}
 			const uint32_t slot = s_slot[self];
 			steer[slot] = Vector2((real_t)vx, (real_t)vy);
-			neighbors[slot] = accepted;
+			neighbors[slot] = taken;
 		}
 	}
 	stats.neighbor_checks = checks;

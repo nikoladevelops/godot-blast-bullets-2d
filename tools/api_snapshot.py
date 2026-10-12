@@ -18,6 +18,10 @@ does as short hashes plus the exact error/warning texts each call produced:
   traces    deterministic volley flights (factory.debug_advance_time) for
             plain, accel, rotation, curves, wobble, gravity, homing (per
             bullet, shared, mixed), orbit, Path2D patterns and pool reuse
+  flock     seeded flock flights (each rule alone, defaults, cap, turn cap,
+            face_heading off, wide separation, a parting stack, Shared vs
+            Per Volley scopes, a homing swarm): poses, headings, steering
+            and neighbor counts every 15 ticks
 
 Usage:
     python3 tools/api_snapshot.py save <label>          # -> test_project/test_results/snapshots/<label>.json

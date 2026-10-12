@@ -54,11 +54,15 @@ struct FlockView2D {
 //     + separation * sum over flockmates closer than separation_range of
 //       (p - q) / d * (1 - d / separation_range)
 // At most max_neighbors flockmates are read per bullet (0 = all): own cell
-// first, then the 8-ring, then the 16-ring, each ring started at an offset
-// that rotates with the bullet's ordinal in its flock (no drift bias), and
-// each cell scanned from a rotated start (stacked bullets see different
-// flockmates). Ordinals count members per flock in gather order, so a flock
-// computes bit-identical steering whether or not other flocks exist.
+// first (from the bullet's own position on: stacked bullets read different
+// flockmates), then the 8-ring, then the 16-ring, each ring started at a
+// cell and each cell at a flockmate that rotate with the bullet's ordinal in
+// its flock (no drift bias when the cap stops the scan). Ordinals count
+// members per flock in gather order, so a flock computes bit-identical
+// steering whether or not other flocks exist. Neighbor cells come from a
+// dense per-flock array when the flock's cells fill a small box, else from
+// the hash. Cost: about 2-5 ns per candidate (one float distance test, one
+// inverse square root inside the separation range) plus the gather.
 class FlockSolver2D {
 public:
 	struct Stats {
@@ -106,11 +110,26 @@ private:
 		double inv_cell = 0.0;
 		uint32_t max_neighbors = 0; // UINT32_MAX = no limit
 		uint32_t next_ordinal = 0;
+		// Occupied cells and their box (build_dense_grids); dense_base >= 0
+		// = neighbor cells come from dense_cells.
+		uint32_t cells = 0;
+		int32_t min_cx = 0, max_cx = 0, min_cy = 0, max_cy = 0;
+		int64_t dense_base = -1;
+		uint32_t dense_width = 0, dense_height = 0;
 	};
 	struct GroupSlot {
 		uint32_t stamp = 0;
 		uint32_t group = 0;
 		GroupKey key;
+	};
+	// One flockmate as the query reads it.
+	struct Mate {
+		float x = 0.0f;
+		float y = 0.0f;
+		float hx = 0.0f; // flight heading (0, 0 = position only)
+		float hy = 0.0f;
+		uint32_t has_heading = 0; // 1 = counts for alignment
+		uint32_t ordinal = 0; // per flock, gather order (rotations, stacked pairs)
 	};
 	struct CellSlot {
 		uint32_t stamp = 0;
@@ -120,6 +139,8 @@ private:
 		uint32_t cell = 0;
 	};
 
+	void build_dense_grids();
+	int64_t neighbor_cell(uint32_t group, int32_t cx, int32_t cy) const;
 	uint32_t group_for(const GroupKey &key, const BulletFlock2D &flock);
 	uint32_t cell_for(uint32_t group, int32_t cx, int32_t cy);
 	int64_t find_cell(uint32_t group, int32_t cx, int32_t cy) const;
@@ -140,19 +161,20 @@ private:
 
 	// Grid members in gather order.
 	std::vector<uint32_t> m_slot;
-	std::vector<uint32_t> m_ordinal;
 	std::vector<uint32_t> m_cell;
-	std::vector<float> m_x, m_y, m_hx, m_hy;
+	std::vector<Mate> m_mate;
 
 	// Cells (exact: one per occupied (flock, cx, cy)).
 	std::vector<CellSlot> cell_table;
 	std::vector<uint32_t> cell_group;
 	std::vector<int32_t> cell_cx, cell_cy;
 	std::vector<uint32_t> cell_start, cell_count, sort_cursor;
+	std::vector<int32_t> dense_cells;
 	uint32_t cell_total = 0;
 
-	// Grid members sorted by cell (stable), cache-friendly SoA.
-	std::vector<uint32_t> s_slot, s_ordinal;
-	std::vector<float> s_x, s_y, s_hx, s_hy;
+	// Grid members sorted by cell (stable): a cell's flockmates are one
+	// contiguous run.
+	std::vector<uint32_t> s_slot;
+	std::vector<Mate> s_mate;
 };
 } //namespace BlastBullets2D

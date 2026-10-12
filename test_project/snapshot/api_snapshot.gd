@@ -71,6 +71,7 @@ func _ready() -> void:
 		"traces": _snap_traces,
 		"volley_api": _snap_volley_api,
 		"sound": _snap_sound,
+		"flock": _snap_flock,
 	}
 	for name in sections:
 		if only != "" and not (name in only.split(",")):
@@ -1101,3 +1102,91 @@ func _snap_sound(section: String) -> void:
 		v.sound_set_effects([on_clear, on_expire])
 		v.clear_bullet(1)
 		v.clear_bullet(3))
+
+
+# ---- 10. Flocking ---------------------------------------------------------------
+
+## Per bullet: pose, heading, the last pass's steering vector and neighbor count.
+func _flock_state(v: BulletVolley2D) -> Array:
+	var rows := []
+	for i in v.get_amount_bullets():
+		rows.append([v.get_bullet_transform(i), v.get_bullet_direction(i),
+				v.debug_get_bullet_flock_steering(i), v.debug_get_bullet_flock_neighbors(i)])
+	return rows
+
+
+## A seeded cloud: count bullets within `spread` px, random headings.
+func _flock_cloud(count: int, seed_value: int, spread: float = 80.0, at: Vector2 = Vector2.ZERO) -> Array:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_value
+	var tr := []
+	for k in count:
+		tr.append(Transform2D(rng.randf_range(-PI, PI), at + Vector2(rng.randf_range(0, spread), rng.randf_range(0, spread))))
+	return tr
+
+
+## Flies `volleys` (already joined) for `steps` ticks, recording every 15.
+func _flock_run(section: String, factory: BulletFactory2D, label: String, volleys: Array, steps: int = 90) -> void:
+	for step in steps:
+		factory.debug_advance_time(TRACE_STEP)
+		if step % 15 == 14:
+			var rows := []
+			for v in volleys:
+				rows.append(_flock_state(v))
+			_rec(section, "%s#t%d" % [label, step + 1], rows)
+	_rec(section, label + "#stats", factory.debug_get_flock_stats().keys())
+	factory.free_active_bullets()
+	cap.take()
+
+
+func _snap_flock(section: String) -> void:
+	var factory := BulletFactory2D.new()
+	add_child(factory)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var capped := BulletFlock2D.new()
+	capped.max_neighbors = 4
+	var turn_cap := BulletFlock2D.new()
+	turn_cap.max_turn_rate_degrees = 90.0
+	var face_off := BulletFlock2D.new()
+	face_off.face_heading = false
+	var cases := {
+		"separation": H.make_flock(2.0, 0.0, 0.0),
+		"alignment": H.make_flock(0.0, 2.0, 0.0),
+		"cohesion": H.make_flock(0.0, 0.0, 2.0),
+		"defaults": BulletFlock2D.new(),
+		"capped": capped,
+		"turn_cap": turn_cap,
+		"face_off": face_off,
+		"wide_separation": H.make_flock(1.5, 1.0, 1.0, 40.0, 90.0),
+	}
+	for label in cases:
+		var v: BulletVolley2D = factory.spawn_volley(H.make_flight_data(_flock_cloud(16, 7), 120.0, 60.0))
+		v.flock_join(cases[label])
+		_rec(section, label + "#t0", _flock_state(v))
+		await _flock_run(section, factory, label, [v])
+	# A stack parting, deterministically.
+	var stack := []
+	for k in 12:
+		stack.append(Transform2D(0.0, Vector2(30, 30)))
+	var stacked: BulletVolley2D = factory.spawn_volley(H.make_flight_data(stack, 80.0, 60.0))
+	stacked.flock_join(H.make_flock(2.0, 0.0, 0.0))
+	await _flock_run(section, factory, "stacked", [stacked])
+	# Scopes: one resource, Shared vs Per Volley vs separate resources.
+	for scope in [BulletFlock2D.SCOPE_SHARED, BulletFlock2D.SCOPE_PER_VOLLEY]:
+		var f := BulletFlock2D.new()
+		var a: BulletVolley2D = factory.spawn_volley(H.make_flight_data(_flock_cloud(8, 11), 120.0, 60.0))
+		var b: BulletVolley2D = factory.spawn_volley(H.make_flight_data(_flock_cloud(8, 12), 120.0, 60.0))
+		a.flock_join(f, scope)
+		b.flock_join(f, scope)
+		await _flock_run(section, factory, "scope_%d" % scope, [a, b])
+	# A homing swarm (homing turns first, the flock bends it).
+	var d := H.make_flight_data(_flock_cloud(16, 21, 40.0), 200.0, 60.0)
+	d.homing_smoothing = 3.0
+	d.homing_take_control_of_texture_rotation = true
+	var swarm: BulletVolley2D = factory.spawn_volley(d)
+	swarm.shared_homing_deque_push_back_global_position_target(Vector2(500, 200))
+	swarm.flock_join(BulletFlock2D.new())
+	await _flock_run(section, factory, "homing_swarm", [swarm], 120)
+	factory.queue_free()
+	await get_tree().process_frame
