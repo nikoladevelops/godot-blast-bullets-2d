@@ -291,9 +291,16 @@ void FlockSolver2D::add_volley(BulletVolley2D &volley, const FlockConfig2D &conf
 	// On an interval the volley keeps each bullet's last steering: a bullet
 	// not due this pass reuses it (and still counts as a flockmate).
 	FlockSteerCache2D *cache = nullptr;
-	if (interval > 0.0) {
-		if ((int)volley.flock_cache.size() != amount) {
+	if (interval <= 0.0) {
+		// Every tick: a cache from an earlier interval setting would be
+		// stale by the time an interval comes back.
+		if (!volley.flock_cache.empty()) {
+			volley.flock_cache.clear();
+		}
+	} else {
+		if ((int)volley.flock_cache.size() != amount || volley.flock_cache_serial != config.serial) {
 			volley.flock_cache.assign((size_t)amount, FlockSteerCache2D());
+			volley.flock_cache_serial = config.serial;
 		}
 		cache = volley.flock_cache.data();
 		CachedVolley cached;

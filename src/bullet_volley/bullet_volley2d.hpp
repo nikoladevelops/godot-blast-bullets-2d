@@ -2740,6 +2740,9 @@ public:
 	// Each bullet's last steering while its flock refreshes on an interval
 	// (written by the pass; dropped with every membership change).
 	std::vector<FlockSteerCache2D> flock_cache;
+	// The config serial the cache was built under: another one (a scope,
+	// flock or switch edit) starts a fresh cache.
+	uint32_t flock_cache_serial = 0;
 	// THE one place that arms or disarms (keeps the factory's armed count
 	// exact): arming, join, leave, release_life and PREDELETE.
 	void flock_set_config(const std::shared_ptr<FlockConfig2D> &config);

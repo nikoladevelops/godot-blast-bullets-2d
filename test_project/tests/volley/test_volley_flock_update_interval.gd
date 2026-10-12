@@ -143,3 +143,43 @@ func test_update_interval_rejects_bad_values() -> void:
 		"BulletFlock2D: update_interval must be finite and >= 0, keeping the old value.",
 	])
 	assert_eq(f.update_interval, 0.0, "kept")
+
+
+func test_a_cache_from_an_older_setup_is_never_reused() -> void:
+	# Interval on, then off while the bullets move apart, then on again: the
+	# steering must be measured anew, never the one cached before the gap.
+	var f := H.make_flock(0.0, 0.0, 1.0)
+	f.update_interval = 100.0
+	var v := _volley([Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 30))], f, 100.0)
+	_step(1)
+	assert_ne(v.debug_get_bullet_flock_steering(0), Vector2(), "pulled together")
+	f.update_interval = 0.0
+	v.teleport_shift_all_bullets(Vector2(0, 0))
+	v.bullet_set_velocity(1, Vector2(0, 2000))
+	_step(10) # bullet 1 flies far away; every tick recomputes, no cache
+	assert_eq(v.debug_get_bullet_flock_neighbors(0), 0, "out of range now")
+	f.update_interval = 100.0
+	_step(1)
+	assert_eq(v.debug_get_bullet_flock_steering(0), Vector2(), "the old cached pull is never reused")
+
+
+func test_a_new_scope_measures_anew() -> void:
+	# A spawner switching scope in flight regroups its bullets: a cached
+	# steering from the old group must not survive the switch.
+	var f := H.make_flock(0.0, 0.0, 1.0, 400.0, 0.0)
+	f.update_interval = 100.0
+	var sp := make_spawner(H.make_volley_data(4, 0.0, 1000.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
+	sp.helper_ring_radius = 30.0
+	sp.flock_enabled = true
+	sp.flock = f
+	sp.flock_scope = BulletFlock2D.SCOPE_SHARED
+	var got: Array = []
+	sp.volley_fired.connect(func(v: BulletVolley2D, _n: int) -> void: got.append(v))
+	sp.shoot_once()
+	sp.global_position = Vector2(200, 0)
+	sp.shoot_once()
+	_step(1)
+	assert_eq(got[0].debug_get_bullet_flock_neighbors(0), 7, "Shared: both shots flock together")
+	sp.flock_scope = BulletFlock2D.SCOPE_PER_VOLLEY
+	_step(1)
+	assert_eq(got[0].debug_get_bullet_flock_neighbors(0), 3, "Per Volley: measured anew right away, not after 100 s")
