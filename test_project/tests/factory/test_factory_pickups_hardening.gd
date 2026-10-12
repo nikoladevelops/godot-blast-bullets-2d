@@ -313,3 +313,43 @@ func test_populate_pickup_pool_validates_and_has_a_deferred_twin() -> void:
 	factory.debug_reset_pool_stats()
 	factory.convert_all_bullets_to_pickups(P.coin(), Vector2(5000, 0))
 	assert_eq(int(factory.debug_get_pool_hit_stats()["hits"]), 1, "the deferred pre-population served a three-bullet conversion")
+
+
+# --- tunnelling: a fast mover cannot skip its target --------------------------------------------------------------------------
+
+func test_a_very_fast_pickup_with_a_tiny_radius_is_still_collected() -> void:
+	P.still(factory, [Vector2.ZERO])
+	var coin := P.coin()
+	coin.motion_mode = BulletPickupData2D.MOTION_CUSTOM
+	coin.speed_data = H.make_speed(30000.0, 30000.0, 0.0) # 500 px per tick
+	coin.magnet_delay_sec = 0.0
+	coin.collect_radius = 3.0
+	factory.convert_all_bullets_to_pickups(coin, Vector2(400, 0))
+	var frames := await _wait(1, 60)
+	assert_eq(collected.size(), 1, "the swept reach test catches it (%d frames)" % frames)
+
+
+func test_a_fast_homing_bullet_reports_reaching_its_target_exactly_once() -> void:
+	var data := H.make_volley_data(1, 30000.0, 30.0)
+	data.transforms = [Transform2D(0.0, Vector2.ZERO)]
+	data.homing_distance_before_reached = 3.0
+	var v := factory.spawn_volley(data)
+	var reached := []
+	v.bullet_homing_target_reached.connect(func(_v, i, _t, _p): reached.append(i))
+	v.bullet_homing_push_back_homing_target(0, Vector2(400, 0))
+	for i in 10:
+		await idle(1)
+	assert_eq(reached, [0], "a bullet that flies through the target in one tick still reached it, once")
+
+
+func test_a_slow_bullet_that_stays_outside_the_radius_does_not_report() -> void:
+	var data := H.make_volley_data(1, 100.0, 30.0)
+	data.transforms = [Transform2D(0.0, Vector2.ZERO)]
+	data.homing_distance_before_reached = 3.0
+	var v := factory.spawn_volley(data)
+	var reached := []
+	v.bullet_homing_target_reached.connect(func(_v, i, _t, _p): reached.append(i))
+	v.bullet_homing_push_back_homing_target(0, Vector2(400, 50)) # passes 50 px beside the point it heads for
+	for i in 20:
+		await idle(1)
+	assert_eq(reached, [], "no false report while it is far away")

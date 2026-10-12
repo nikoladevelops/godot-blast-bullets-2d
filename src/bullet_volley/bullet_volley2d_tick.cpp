@@ -763,6 +763,7 @@ _ALWAYS_INLINE_ void BulletVolley2D::step_orbit(const MoveTick2D &t, BulletStep2
 _ALWAYS_INLINE_ void BulletVolley2D::step_place(const MoveTick2D &t, BulletStep2D &b) {
 	const int i = b.i;
 	Vector2 &origin = all_cached_instance_origin[i];
+	const Vector2 pre_move_origin = origin;
 	origin += b.velocity_delta;
 	b.transf->set_origin(origin);
 
@@ -795,11 +796,11 @@ _ALWAYS_INLINE_ void BulletVolley2D::step_place(const MoveTick2D &t, BulletStep2
 	move_bullet_attachment(b.velocity_delta, i);
 	write_trail_instances(i);
 
-	// 7b. REACHED: tested at the post-move position (predicting again with
-	// velocity_delta would test two ticks ahead); the reach belongs to the
-	// deque the bullet steered by.
+	// 7b. REACHED: the whole move of this tick (pre-move origin -> origin) is
+	// tested, so a fast bullet cannot fly through the threshold circle; the
+	// reach belongs to the deque the bullet steered by.
 	if (b.steering_deque != nullptr && !b.steering_deque->empty() && b.target_pos.is_finite()) {
-		try_to_emit_bullet_homing_target_reached_signal(*b.steering_deque, b.steering_deque == &shared_homing_deque, i, origin, b.target_pos, Vector2(0, 0));
+		try_to_emit_bullet_homing_target_reached_signal(*b.steering_deque, b.steering_deque == &shared_homing_deque, i, pre_move_origin, b.target_pos, b.velocity_delta);
 	}
 }
 
@@ -1354,11 +1355,24 @@ _ALWAYS_INLINE_ void BulletVolley2D::try_to_emit_bullet_homing_target_reached_si
 	if (homing_deque.empty()) {
 		return;
 	}
-	// Reached check against the predicted post-move position: at high speed a bullet
-	// can tunnel past the threshold within one tick and never fire on pre-move pos.
-	const Vector2 check_pos = bullet_pos + post_velocity_delta;
-	Vector2 post_to_target = target_pos - check_pos;
-	real_t post_dist_sq = post_to_target.length_squared();
+	// Reached check against this tick's whole move: the closest point of the
+	// segment from the pre-move to the predicted post-move position. At high
+	// speed a bullet can fly through the threshold circle within one tick and
+	// end beyond it; testing only the end point missed that (a fast pickup
+	// with a small collect radius never got collected). Component math (the
+	// Vector2 helpers are PLT calls); an overflowing segment falls back to the
+	// end point.
+	const real_t seg_x = post_velocity_delta.x;
+	const real_t seg_y = post_velocity_delta.y;
+	const real_t seg_sq = seg_x * seg_x + seg_y * seg_y;
+	real_t t = 1.0f;
+	if (seg_sq > 0.0f && Math::is_finite(seg_sq)) {
+		t = ((target_pos.x - bullet_pos.x) * seg_x + (target_pos.y - bullet_pos.y) * seg_y) / seg_sq;
+		t = t < 0.0f ? 0.0f : (t > 1.0f ? 1.0f : t);
+	}
+	const real_t closest_dx = bullet_pos.x + seg_x * t - target_pos.x;
+	const real_t closest_dy = bullet_pos.y + seg_y * t - target_pos.y;
+	real_t post_dist_sq = closest_dx * closest_dx + closest_dy * closest_dy;
 	real_t threshold_sq = homing_distance_before_reached * homing_distance_before_reached;
 	if (post_dist_sq <= threshold_sq) { // Fully squared for perf
 

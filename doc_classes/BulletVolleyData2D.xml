@@ -189,7 +189,7 @@
 			Seconds of straight flight before homing steering starts (classic aimed-then-homing). 0 steers immediately.
 		</member>
 		<member name="homing_distance_before_reached" type="float" setter="set_homing_distance_before_reached" getter="get_homing_distance_before_reached" default="5.0">
-			Distance in pixels at which a bullet counts as having reached its target (drives the reached signal and auto-pop). Tested against the final steered position, so locked orbiting bullets test their orbit motion.
+			Distance in pixels at which a bullet counts as having reached its target (drives the reached signal and auto-pop). Tested against the whole move of the tick (the closest point of the segment from where the bullet was to where it is), so a fast bullet cannot fly through the target between two ticks, and locked orbiting bullets test their orbit motion.
 		</member>
 		<member name="homing_duration_sec" type="float" setter="set_homing_duration_sec" getter="get_homing_duration_sec" default="0.0">
 			Seconds of steering before bullets fly straight (lets fast players escape). 0 = infinite.
