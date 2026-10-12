@@ -1048,6 +1048,9 @@ void BulletSpawner2D::_notification(int p_what) {
 		factory->apply_orphan_policy(get_instance_id(), orphaned_volleys, path);
 	} else if (p_what == NOTIFICATION_ENTER_TREE) {
 		fill_assigned_node_paths();
+		// Setters only refresh the process flag inside the tree: settings changed
+		// while out of it (a pooled spawner) take effect on re-entry.
+		refresh_process_state();
 	} else if (p_what == NOTIFICATION_EXIT_TREE) {
 		// Leaving the tree (reparent, scene change, quit). Reparenting must
 		// not lose state, so assigned nodes (id-validated caches), tracked

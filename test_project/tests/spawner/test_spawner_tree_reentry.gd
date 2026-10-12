@@ -114,3 +114,22 @@ func test_spawners_enabling_homing_together_stay_staggered() -> void:
 	assert_ne(a.debug_get_retarget_countdown(), b.debug_get_retarget_countdown(), "different instances, different first pass")
 	a.set_homing_retarget_phase(0.2)
 	assert_eq(a.debug_get_retarget_countdown(), 0.2, "an explicit phase is used verbatim")
+
+
+func test_shooting_enabled_while_out_of_tree_fires_after_reentry() -> void:
+	# A pooled enemy: asleep in the tree, taken out, switched to shooting,
+	# put back. The process flag was only refreshed inside the tree, so the
+	# spawner stayed asleep after re-entering.
+	var sp := make_spawner(H.make_volley_data(2, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 2)
+	sp.shoot_interval_sec = 0.05
+	await idle(1)
+	var parent := sp.get_parent()
+	parent.remove_child(sp)
+	sp.set_shooting_enabled(true)
+	parent.add_child(sp)
+	watch_signals(sp)
+	for i in 30: # 0.5 s at 60 fps; the first shot is due immediately
+		await idle(1)
+		if get_signal_emit_count(sp, "volley_fired") > 0:
+			break
+	assert_gt(get_signal_emit_count(sp, "volley_fired"), 0, "a spawner re-entering the tree with shooting on fires")
