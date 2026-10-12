@@ -44,6 +44,7 @@ bool BulletVolley2D::sound_set_effects(const Array &effects, const StringName &l
 	sound_release();
 	sound_effects = entries;
 	sound_trigger_mask = mask;
+	sound_mask_epoch = BulletSoundData2D::mask_epoch;
 	sound_listener_group = listener_group;
 	return true;
 }
@@ -60,6 +61,7 @@ bool BulletVolley2D::sound_arm_from_spawner(const Array &effects, const std::sha
 	sound_release();
 	sound_effects = entries;
 	sound_trigger_mask = mask;
+	sound_mask_epoch = BulletSoundData2D::mask_epoch;
 	// Shared: listener edits and refresh_sound_listeners() reach it in flight.
 	sound_detector = detector;
 	sound_volume_offset_db = volume_offset_db;
@@ -79,6 +81,23 @@ StringName BulletVolley2D::sound_get_listener_group() const {
 	return sound_listener_group;
 }
 
+void BulletVolley2D::sound_refresh_mask() const {
+	if (sound_mask_epoch == BulletSoundData2D::mask_epoch) {
+		return;
+	}
+	sound_mask_epoch = BulletSoundData2D::mask_epoch;
+	uint32_t mask = 0;
+	for (const Ref<BulletSoundData2D> &entry : sound_effects) {
+		if (entry.is_valid() && entry->get_enabled()) {
+			const int trigger = entry->get_trigger();
+			if (trigger >= 0 && trigger < 32) {
+				mask |= (1u << trigger);
+			}
+		}
+	}
+	sound_trigger_mask = mask;
+}
+
 void BulletVolley2D::sound_release() {
 	sound_effects.clear();
 	sound_trigger_mask = 0;
@@ -88,6 +107,7 @@ void BulletVolley2D::sound_release() {
 }
 
 void BulletVolley2D::sound_fire(int trigger, int bullet_index, const Vector2 &event_pos, int ring, int zone) {
+	sound_refresh_mask();
 	if (trigger < 0 || trigger >= 32 || !(sound_trigger_mask & (1u << trigger))) {
 		return;
 	}

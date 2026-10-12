@@ -173,3 +173,33 @@ func test_followed_bullet_keeps_one_hum_voice() -> void:
 	for i in 10:
 		await physics(1)
 	assert_eq(busy_voices().size(), 1, "one bullet, one hum voice")
+
+
+func test_trigger_edit_reaches_a_volley_in_flight() -> void:
+	# The trigger mask used to be frozen when the volley was armed: an entry
+	# armed as On Hit and switched to On Flight afterwards never hummed.
+	factory.debug_set_sound_log_enabled(true)
+	var s := H.make_sound(BulletSoundData2D.SOUND_ON_HIT)
+	s.min_interval_sec = 0.1
+	var v := quick_volley()
+	assert_true(v.sound_set_effects([s]), "entry armed as On Hit")
+	var sid: int = s.get_instance_id()
+	await physics(5)
+	assert_true(_logged(sid).is_empty(), "no flight sound while the trigger is On Hit")
+	s.trigger = BulletSoundData2D.SOUND_ON_FLIGHT
+	await physics(5)
+	assert_false(_logged(sid).is_empty(), "the edited trigger reaches the volley in flight")
+
+
+func test_enabling_a_disabled_entry_reaches_a_volley_in_flight() -> void:
+	factory.debug_set_sound_log_enabled(true)
+	var s := _flight_sound()
+	s.enabled = false
+	var v := quick_volley()
+	assert_true(v.sound_set_effects([s]), "disabled entry armed")
+	var sid: int = s.get_instance_id()
+	await physics(5)
+	assert_true(_logged(sid).is_empty(), "disabled entry stays silent")
+	s.enabled = true
+	await physics(5)
+	assert_false(_logged(sid).is_empty(), "enabling it later reaches the volley in flight")

@@ -22,11 +22,14 @@ namespace BlastBullets2D {
 static constexpr double SOUND_PITCH_CEILING = 1000.0;
 
 bool BulletSoundData2D::get_enabled() const { return enabled; }
+uint64_t BulletSoundData2D::mask_epoch = 0;
+
 void BulletSoundData2D::set_enabled(bool value) {
 	if (enabled == value) {
 		return;
 	}
 	enabled = value;
+	++mask_epoch;
 	emit_changed();
 }
 
@@ -40,6 +43,7 @@ void BulletSoundData2D::set_trigger(int value) {
 		return;
 	}
 	trigger = value;
+	++mask_epoch;
 	notify_property_list_changed(); // ring_index gates on it (_validate_property)
 	emit_changed();
 }

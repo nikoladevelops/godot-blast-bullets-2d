@@ -49,6 +49,7 @@ void BulletVolley2D::tick(double delta) {
 	move_bullets(delta);
 	// 2b. Flight sounds: one offer per live bullet at its current pose, only
 	// when armed (one mask bit, otherwise zero per-bullet cost).
+	sound_refresh_mask();
 	if (sound_trigger_mask & (1u << BulletSoundData2D::SOUND_ON_FLIGHT)) {
 		sound_fire_flight();
 	}

@@ -22,6 +22,11 @@ class BulletSoundData2D : public Resource {
 	GDCLASS(BulletSoundData2D, Resource)
 
 public:
+	// Bumped whenever an accepted edit changes `enabled` or `trigger`: armed
+	// volleys compare it once per tick/event and recompute their trigger mask,
+	// so those edits reach volleys already in flight.
+	static uint64_t mask_epoch;
+
 	// SERIALIZED ids (BulletSoundData2D.trigger): never renumber.
 	enum SoundTrigger {
 		SOUND_ON_SHOT = 0,
