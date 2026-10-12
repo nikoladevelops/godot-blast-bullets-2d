@@ -1290,12 +1290,13 @@ capped by `max_turn_rate_degrees`.
 
 | Piece | Where | Notes |
 |---|---|---|
-| Rules | `data/bullet_flock2d.*` | weights (per second), ranges, turn cap, `face_heading`, `max_neighbors` (0 = all), enum `Scope` (Per Spawner 0 / Shared 1 / Per Volley 2, serialized); every accepted change emits `changed` |
+| Rules | `data/bullet_flock2d.*` | weights (per second), ranges, turn cap, `face_heading`, `max_neighbors` (0 = all), `update_interval` (s, 0 = every tick), `view_angle_degrees` (360 = all around), enum `Scope` (Per Spawner 0 / Shared 1 / Per Volley 2, serialized); every accepted change emits `changed` |
 | Who flies together | `FlockConfig2D` (`factory/flock_solver2d.hpp`) | {flock, scope, enabled, captured owner id, serial}; the spawner owns one `std::shared_ptr` shared with every volley it armed (edits reach bullets in flight, orphans keep it); `flock_join` gives a volley its own |
 | Arming | `bullet_volley/bullet_volley2d_flock.cpp` | `flock_set_config` is THE choke point (keeps `BulletFactory2D::flock_armed_volleys` exact): spawner arming, join, leave, `release_life`, PREDELETE (`force_delete` skips `release_life`) |
 | Pass | `factory/bullet_factory2d_flock.cpp`, `factory/flock_solver2d.*` | in `tick_volleys` right after `snapshot_active_volleys`, skipped while nothing is armed or `time_scale` is 0; flock key = (resource id, scope kind, owner id / 0 / volley id); slots `base..base+amount` per volley, zeroed per pass; cell = max(range)/2, 5x5 block, own cell first then the 8- and 16-rings, starts rotating per bullet; per-flock ordinals make each flock bit-identical to flying alone |
-| Turn | `step_flock` in `bullet_volley2d_tick.cpp` | after `step_homing`, before the curves; the volley reads its slice through `FlockView2D` {base, sweep, life, serial} (never a pointer) and only when all match; skipped for locked orbits and zero headings; rotates the basis too when `face_heading` or when the rotation owns the heading (`adjust_direction_based_on_rotation`, or homing in transform mode: `update_homing` re-derives the heading from the basis) |
-| Spawner | `bullet_spawner/bullet_spawner2d_flock.cpp` | Flocking group after Orbiting: `flock_enabled`, `flock`, `flock_scope` (hidden while off); armed in `shoot_once` next to graze/sound (before any signal); setup warnings for an empty flock and snapping homing |
+| Turn | `step_flock` in `bullet_volley2d_tick.cpp` | after `step_homing`, before the curves; the volley reads its slice through `FlockView2D` {base, sweep, life, serial} (never a pointer) and only when all match; skipped for locked orbits and zero headings; after a turn the basis is ALIGNED to the new heading (absolute, unit rotation: a relative turn drifted when homing snapped the heading) when `face_heading` (unless rotation data spins the sprite) or when the rotation owns the heading (`adjust_direction_based_on_rotation`, or homing in transform mode: `update_homing` re-derives the heading from the basis) |
+| Interval | `FlockSteerCache2D` in `BulletVolley2D::flock_cache` | `update_interval > 0`: each bullet recomputes when the factory's flock clock (bullet time) crosses its golden-ratio phase; between refreshes its slot is filled from the cache; written back after the solve; dropped with every membership change; an invalid entry (new, reused, woken) computes at once |
+| Spawner | `bullet_spawner/bullet_spawner2d_flock.cpp` | Flocking group after Orbiting: `flock_enabled`, `flock`, `flock_scope` (hidden while off); armed in `shoot_once` next to graze/sound (before any signal); `flock_live_volleys()` arms owned volleys fired while off (or taken over by a script); setup warnings for an empty flock and snapping homing |
 
 ### 23.2 Contract (pinned by the `*flock*` suites)
 
@@ -1311,6 +1312,11 @@ capped by `max_turn_rate_degrees`.
   leaves flocking alone.
 - `debug_assert_no_dangling` fails when the armed count disagrees with the
   volleys holding a config, or a pooled volley still flocks.
+- Field of view: flockmates outside the cone around the FLIGHT heading are
+  ignored by every rule and the cap; stacked ones are always seen; a bullet
+  without a heading sees all around. The cone test runs only below 360.
+- A factory frees every tracked volley at teardown when a script moved one
+  out of its subtree (its teardown would otherwise call into freed memory).
 
 ### 23.3 Adding a rule
 
