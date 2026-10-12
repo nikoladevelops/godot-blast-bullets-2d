@@ -1,10 +1,15 @@
 // Bullet world: time scale, despawn bounds and the area clears/counts.
 
+#include "core/node_scan2d.hpp"
 #include "factory/bullet_factory2d_internal.hpp"
 
 using namespace godot;
 
 namespace BlastBullets2D {
+
+// Node name of the despawn bounds preview (tilde: internal, sorts last).
+static constexpr const char *DESPAWN_PREVIEW_NAME = "~BlastBulletsDespawnPreview";
+static constexpr int DESPAWN_PREVIEW_Z_INDEX = 4000;
 
 void BulletFactory2D::set_time_scale(double value) {
 	if (!Math::is_finite(value) || value < 0.0) {
@@ -16,6 +21,7 @@ void BulletFactory2D::set_time_scale(double value) {
 
 void BulletFactory2D::set_despawn_bounds_enabled(bool value) {
 	despawn_bounds_enabled = value;
+	refresh_despawn_bounds_preview();
 }
 
 void BulletFactory2D::set_despawn_bounds_rect(const Rect2 &value) {
@@ -24,6 +30,97 @@ void BulletFactory2D::set_despawn_bounds_rect(const Rect2 &value) {
 		return;
 	}
 	despawn_bounds_rect = value.abs();
+	refresh_despawn_bounds_preview();
+}
+
+void BulletFactory2D::set_despawn_bounds_color(const Color &value) {
+	if (!Math::is_finite(value.r) || !Math::is_finite(value.g) || !Math::is_finite(value.b) || !Math::is_finite(value.a)) {
+		UtilityFunctions::push_error("BulletFactory2D: despawn_bounds_color must be finite, keeping the old value.");
+		return;
+	}
+	despawn_bounds_color = value;
+	refresh_despawn_bounds_preview();
+}
+
+void BulletFactory2D::set_despawn_bounds_preview(bool value) {
+	despawn_bounds_preview = value;
+	refresh_despawn_bounds_preview();
+}
+
+void BulletFactory2D::set_despawn_bounds_preview_during_runtime(bool value) {
+	despawn_bounds_preview_during_runtime = value;
+	refresh_despawn_bounds_preview();
+}
+
+bool BulletFactory2D::despawn_bounds_preview_active() const {
+	if (!despawn_bounds_enabled || !despawn_bounds_preview || !is_inside_tree()) {
+		return false;
+	}
+	return Engine::get_singleton()->is_editor_hint() || despawn_bounds_preview_during_runtime;
+}
+
+DespawnBoundsPreviewLayer2D *BulletFactory2D::resolve_despawn_preview_layer(bool create) {
+	if (despawn_preview_layer != nullptr && ObjectDB::get_instance(ObjectID(despawn_preview_layer_id)) == despawn_preview_layer && despawn_preview_layer->get_parent() == this) {
+		return despawn_preview_layer;
+	}
+	despawn_preview_layer = nullptr;
+	despawn_preview_layer_id = 0;
+	// Heal from the tree (undo/redo, duplication, re-entry): never trust a
+	// cached pointer.
+	Node *existing = get_node_or_null(NodePath(DESPAWN_PREVIEW_NAME));
+	DespawnBoundsPreviewLayer2D *layer = Object::cast_to<DespawnBoundsPreviewLayer2D>(existing);
+	if (existing != nullptr && layer == nullptr) {
+		existing->set_name(String(DESPAWN_PREVIEW_NAME) + "Stale");
+		remove_child(existing);
+		existing->queue_free();
+	}
+	if (layer == nullptr && create) {
+		layer = memnew(DespawnBoundsPreviewLayer2D);
+		layer->set_name(DESPAWN_PREVIEW_NAME);
+		layer->set_meta(PREVIEW_META_KEY, true);
+		layer->set_as_top_level(true);
+		layer->set_z_index(DESPAWN_PREVIEW_Z_INDEX);
+		// Internal: never listed by get_children() and owner-less: never saved.
+		add_child(layer, false, INTERNAL_MODE_BACK);
+	}
+	if (layer != nullptr) {
+		despawn_preview_layer = layer;
+		despawn_preview_layer_id = layer->get_instance_id();
+	}
+	return layer;
+}
+
+void BulletFactory2D::refresh_despawn_bounds_preview() {
+	if (is_tearing_down || !is_inside_tree()) {
+		return;
+	}
+	const bool active = despawn_bounds_preview_active();
+	DespawnBoundsPreviewLayer2D *layer = resolve_despawn_preview_layer(active);
+	if (layer == nullptr) {
+		return;
+	}
+	if (!active) {
+		if (layer->is_visible()) {
+			layer->set_visible(false);
+		}
+		return;
+	}
+	if (!layer->is_visible()) {
+		layer->set_visible(true);
+	}
+	layer->set_snapshot(despawn_bounds_rect, despawn_bounds_color);
+}
+
+Dictionary BulletFactory2D::debug_get_despawn_bounds_preview() const {
+	const bool alive = despawn_preview_layer != nullptr && ObjectDB::get_instance(ObjectID(despawn_preview_layer_id)) == despawn_preview_layer;
+	Dictionary d;
+	d["active"] = despawn_bounds_preview_active();
+	d["exists"] = alive;
+	d["visible"] = alive && despawn_preview_layer->is_visible();
+	d["rect"] = alive ? despawn_preview_layer->rect : Rect2();
+	d["color"] = alive ? despawn_preview_layer->color : Color();
+	d["draws"] = alive ? despawn_preview_layer->debug_draw_count : 0;
+	return d;
 }
 
 namespace {

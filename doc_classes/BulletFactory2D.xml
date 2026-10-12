@@ -153,6 +153,12 @@
 				Describes the volley object pool. Returns a [Dictionary] containing [VolleyPoolKey2D] as the KEY (one per exact amount_bullets + shape bucket) and the amount of pooled multimeshes in that bucket as the VALUE.
 			</description>
 		</method>
+		<method name="debug_get_despawn_bounds_preview" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Test helper: the preview layer's state as a Dictionary (active, exists, visible, rect, color, draws).
+			</description>
+		</method>
 		<method name="debug_get_effect_log" qualifiers="const">
 			<return type="Array" />
 			<description>
@@ -530,8 +536,17 @@
 		<member name="debugger_max_providers" type="int" setter="set_debugger_max_providers" getter="get_debugger_max_providers" default="0">
 			Max debugger providers drawn per tick (0 = unlimited). Beyond the cap extra volleys are hidden, oldest first. Lower this on 10k-bullet demos where the always-draw debugger costs frames.
 		</member>
+		<member name="despawn_bounds_color" type="Color" setter="set_despawn_bounds_color" getter="get_despawn_bounds_color" default="Color(1, 0, 0, 0.25)">
+			Color of the despawn bounds preview: the fill uses it as is (translucent red by default), the outline is the same color made more opaque. Every component must be finite.
+		</member>
 		<member name="despawn_bounds_enabled" type="bool" setter="set_despawn_bounds_enabled" getter="get_despawn_bounds_enabled" default="false">
 			When on, every live bullet that is outside [member despawn_bounds_rect] and not heading back in is silently disabled each tick (no effects, no sounds, no signals). Keeps off-screen bullets from living until their lifetime ends. A bullet that starts just outside and flies inwards is left alone. Off by default.
+		</member>
+		<member name="despawn_bounds_preview" type="bool" setter="set_despawn_bounds_preview" getter="get_despawn_bounds_preview" default="true">
+			Draws [member despawn_bounds_rect] while [member despawn_bounds_enabled] is on, so you can see the play field in the editor. At runtime it also needs [member despawn_bounds_preview_during_runtime]. Only a visual aid: culling does not depend on it.
+		</member>
+		<member name="despawn_bounds_preview_during_runtime" type="bool" setter="set_despawn_bounds_preview_during_runtime" getter="get_despawn_bounds_preview_during_runtime" default="false">
+			Also draws the despawn bounds preview while the game runs (debugging aid). Off by default. Needs [member despawn_bounds_enabled] and [member despawn_bounds_preview].
 		</member>
 		<member name="despawn_bounds_rect" type="Rect2" setter="set_despawn_bounds_rect" getter="get_despawn_bounds_rect" default="Rect2(0, 0, 1152, 648)">
 			The play field for [member despawn_bounds_enabled], in global space. "Not heading back in" means that along every axis where the bullet is outside, its velocity does not point towards the rectangle. Defaults to Godot's default viewport. Must be finite; a negative size is normalized.

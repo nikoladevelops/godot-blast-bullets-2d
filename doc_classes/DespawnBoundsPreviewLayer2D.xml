@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="DespawnBoundsPreviewLayer2D" inherits="Node2D" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		Internal despawn bounds preview layer owned by [BulletFactory2D]. Not for direct use.
+	</brief_description>
+	<description>
+		Internal helper behind the [BulletFactory2D] despawn bounds preview (the "~BlastBulletsDespawnPreview" child of the factory). It draws [member BulletFactory2D.despawn_bounds_rect] as a translucent fill with a stronger outline in [member BulletFactory2D.despawn_bounds_color]. It is top-level (canvas coordinates), internal and owner-less: never saved to scenes, never listed by [method Node.get_children], never a target or marker. In the editor it shows whenever the bounds are enabled; at runtime only with [member BulletFactory2D.despawn_bounds_preview_during_runtime]. Tune it through the factory's Despawn Bounds properties.
+	</description>
+	<tutorials>
+	</tutorials>
+</class>

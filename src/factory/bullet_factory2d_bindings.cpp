@@ -212,6 +212,16 @@ void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_despawn_bounds_rect"), &BulletFactory2D::get_despawn_bounds_rect);
 	ClassDB::bind_method(D_METHOD("set_despawn_bounds_rect", "value"), &BulletFactory2D::set_despawn_bounds_rect);
 	ADD_PROPERTY(PropertyInfo(Variant::RECT2, "despawn_bounds_rect"), "set_despawn_bounds_rect", "get_despawn_bounds_rect");
+	ClassDB::bind_method(D_METHOD("get_despawn_bounds_color"), &BulletFactory2D::get_despawn_bounds_color);
+	ClassDB::bind_method(D_METHOD("set_despawn_bounds_color", "value"), &BulletFactory2D::set_despawn_bounds_color);
+	ADD_PROPERTY(PropertyInfo(Variant::COLOR, "despawn_bounds_color"), "set_despawn_bounds_color", "get_despawn_bounds_color");
+	ClassDB::bind_method(D_METHOD("get_despawn_bounds_preview"), &BulletFactory2D::get_despawn_bounds_preview);
+	ClassDB::bind_method(D_METHOD("set_despawn_bounds_preview", "value"), &BulletFactory2D::set_despawn_bounds_preview);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "despawn_bounds_preview"), "set_despawn_bounds_preview", "get_despawn_bounds_preview");
+	ClassDB::bind_method(D_METHOD("get_despawn_bounds_preview_during_runtime"), &BulletFactory2D::get_despawn_bounds_preview_during_runtime);
+	ClassDB::bind_method(D_METHOD("set_despawn_bounds_preview_during_runtime", "value"), &BulletFactory2D::set_despawn_bounds_preview_during_runtime);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "despawn_bounds_preview_during_runtime"), "set_despawn_bounds_preview_during_runtime", "get_despawn_bounds_preview_during_runtime");
+	ClassDB::bind_method(D_METHOD("debug_get_despawn_bounds_preview"), &BulletFactory2D::debug_get_despawn_bounds_preview);
 
 	ClassDB::bind_method(D_METHOD("clear_bullets_in_circle", "center", "radius"), &BulletFactory2D::clear_bullets_in_circle);
 	ClassDB::bind_method(D_METHOD("clear_bullets_in_rect", "rect"), &BulletFactory2D::clear_bullets_in_rect);

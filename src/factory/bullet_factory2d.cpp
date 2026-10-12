@@ -130,6 +130,9 @@ bool node_in_bullet_factory2d(Node *node) {
 void BulletFactory2D::_notification(int p_what) {
 	if (p_what == NOTIFICATION_ENTER_TREE) {
 		factories_in_tree.push_back(this);
+		// Not _ready: the factory skips it in the editor, and the preview is
+		// the one thing it draws there.
+		refresh_despawn_bounds_preview();
 		return;
 	}
 	if (p_what == NOTIFICATION_EXIT_TREE) {

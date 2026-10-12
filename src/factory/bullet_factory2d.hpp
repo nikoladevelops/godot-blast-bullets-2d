@@ -20,6 +20,7 @@
 #include "core/graze_targets2d.hpp"
 #include "data/bullet_effect_layer_data2d.hpp"
 #include "data/bullet_volley_data2d.hpp"
+#include "debugger/despawn_bounds_preview_layer2d.hpp"
 #include "factory/graze_detector2d.hpp"
 #include "factory/sound_mixer2d.hpp"
 #include "godot_cpp/core/math.hpp"
@@ -118,6 +119,17 @@ public:
 	void set_despawn_bounds_enabled(bool value);
 	Rect2 get_despawn_bounds_rect() const { return despawn_bounds_rect; }
 	void set_despawn_bounds_rect(const Rect2 &value);
+	// Preview of the rectangle (a translucent layer, always in the editor,
+	// at runtime only with the during_runtime flag). Needs the bounds on.
+	Color get_despawn_bounds_color() const { return despawn_bounds_color; }
+	void set_despawn_bounds_color(const Color &value);
+	bool get_despawn_bounds_preview() const { return despawn_bounds_preview; }
+	void set_despawn_bounds_preview(bool value);
+	bool get_despawn_bounds_preview_during_runtime() const { return despawn_bounds_preview_during_runtime; }
+	void set_despawn_bounds_preview_during_runtime(bool value);
+	bool despawn_bounds_preview_active() const;
+	void refresh_despawn_bounds_preview();
+	Dictionary debug_get_despawn_bounds_preview() const;
 	// Clears every live bullet of every active volley inside the area (On
 	// Clear effects and sounds like clear_active_bullets), then emits
 	// bullets_cleared once per volley. Allowed from physics handlers (not
@@ -632,6 +644,13 @@ private:
 	bool despawn_bounds_enabled = false;
 	// Godot's default viewport, so enabling without editing is sensible.
 	Rect2 despawn_bounds_rect = Rect2(0, 0, 1152, 648);
+	Color despawn_bounds_color = Color(1, 0, 0, 0.25f);
+	bool despawn_bounds_preview = true;
+	bool despawn_bounds_preview_during_runtime = false;
+	// Id-checked (a raw pointer outlives a freed child).
+	DespawnBoundsPreviewLayer2D *despawn_preview_layer = nullptr;
+	uint64_t despawn_preview_layer_id = 0;
+	DespawnBoundsPreviewLayer2D *resolve_despawn_preview_layer(bool create);
 	int clear_bullets_in_area(const char *function_name, bool circle, const Vector2 &center, real_t radius, const Rect2 &rect);
 	bool is_ready = false;
 
