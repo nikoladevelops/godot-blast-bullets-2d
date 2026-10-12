@@ -186,6 +186,16 @@ void BulletFactory2D::_notification(int p_what) {
 		// records (with their raw node pointers) before any volley PREDELETE
 		// below tries to unregister through them.
 		fx_unregister_all_bakes();
+		// A volley a script moved out of this subtree (local-space bullets
+		// under a moving ship) would outlive the factory holding a dangling
+		// factory pointer, and its own teardown would call into freed
+		// memory. Free every tracked volley now, while this factory is valid.
+		for (BulletVolley2D *volley : all_volleys) {
+			if (volley != nullptr && !is_ancestor_of(volley)) {
+				free_all_volleys(nullptr);
+				break;
+			}
+		}
 	}
 }
 

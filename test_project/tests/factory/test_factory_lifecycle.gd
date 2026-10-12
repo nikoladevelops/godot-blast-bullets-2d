@@ -128,3 +128,26 @@ func test_live_ids_and_reset() -> void:
 	factory.reset()
 	await physics()
 	assert_eq(factory.debug_get_total_bullets_amount(), 0, "reset drained volleys")
+
+
+func test_freeing_the_factory_frees_volleys_moved_out_of_its_tree() -> void:
+	# A script may move a volley under another node (local-space bullets on
+	# a moving ship). The volley still belongs to the factory: it must die
+	# with it, never outlive it holding a dangling factory pointer (its own
+	# teardown later would call into the freed factory).
+	var other := BulletFactory2D.new()
+	add_child(other)
+	await idle(1)
+	var moved: BulletVolley2D = other.spawn_volley(H.make_flight_data([Transform2D(0.0, Vector2.ZERO), Transform2D(0.0, Vector2(0, 20))], 100.0, 100.0))
+	moved.flock_join(BulletFlock2D.new())
+	var stays: BulletVolley2D = other.spawn_volley(H.make_volley_data(2))
+	var holder := Node2D.new()
+	add_child(holder)
+	moved.reparent(holder)
+	var moved_ref: WeakRef = weakref(moved)
+	var stays_ref: WeakRef = weakref(stays)
+	other.free()
+	assert_false(is_instance_valid(moved_ref.get_ref()), "the moved volley died with its factory")
+	assert_false(is_instance_valid(stays_ref.get_ref()), "the volley in the factory's tree too")
+	assert_eq(holder.get_child_count(), 0, "the holder lost the dead volley")
+	holder.free()
