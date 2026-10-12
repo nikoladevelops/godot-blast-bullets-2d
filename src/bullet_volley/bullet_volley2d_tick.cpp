@@ -133,6 +133,15 @@ struct BulletVolley2D::MoveTick2D {
 	int graze_zone_slots = 0;
 	const GrazeTickZone2D *graze_zones = nullptr;
 	const GrazeTickTargets2D *graze_targets = nullptr;
+	// Flocking: this volley's slice of the factory's pass (null = no turn).
+	const Vector2 *flock_steer = nullptr;
+	real_t flock_max_turn = 0.0; // this tick, radians (0 = unlimited)
+	// The turn also rotates the bullet: face_heading, or the rotation owns
+	// the heading (adjust_direction_based_on_rotation), else it is undone.
+	bool flock_turn_facing = false;
+	// Homing re-derives the heading from the rotation (no shared pattern,
+	// no rotation data): a homing bullet's rotation must turn too.
+	bool flock_homing_basis = false;
 };
 
 // One bullet's scratch while the stages run. Created once per tick and
@@ -336,6 +345,12 @@ void BulletVolley2D::move_bullets(double delta) {
 		t.graze_zone_slots = graze_zone_slots;
 		t.graze_zones = graze_tick_zones;
 		t.graze_targets = &graze_tick_targets;
+		if (flock_config != nullptr && flock_config->enabled && flock_config->flock.is_valid() && flock_view_current()) {
+			t.flock_steer = bullet_factory->get_flock_solver().steer_data() + flock_view.base;
+			t.flock_max_turn = flock_view.max_turn_rad * (real_t)delta;
+			t.flock_turn_facing = flock_view.face_heading || (adjust_direction_based_on_rotation && !rotate_only_textures);
+			t.flock_homing_basis = !t.shared_pattern && !is_rotation_data_active;
+		}
 		return t;
 	}();
 
@@ -364,6 +379,7 @@ void BulletVolley2D::move_bullets(double delta) {
 			// (transform, shape, attachment, trail, reached signal), then
 			// next tick's speed.
 			step_homing(t, b);
+			step_flock(t, b);
 			if (i < (int)all_bullet_curves_data.size() && all_bullet_curves_data[i].is_valid()) {
 				b.curves = all_bullet_curves_data[i].ptr(); // borrowed: valid until the vector is reassigned
 			}
@@ -436,6 +452,60 @@ _ALWAYS_INLINE_ void BulletVolley2D::step_homing(const MoveTick2D &t, BulletStep
 	update_homing(*deque, i, t.delta, b.bullet_pos, b.target_pos);
 	b.direction_updated = true;
 	b.steering_deque = deque;
+}
+
+// 1b. FLOCKING. The factory's pass left one steering vector per bullet,
+// measured where every flockmate stood before this sweep moved anyone. The
+// heading turns toward it by 1 - e^(-|V| dt) of the angle (never past it,
+// the same at any frame rate), capped by the flock's turn rate. Only the
+// direction turns: the speed stays the speed data's. After homing (the
+// flock bends the homing heading), before the curves (Override wins).
+_ALWAYS_INLINE_ void BulletVolley2D::step_flock(const MoveTick2D &t, BulletStep2D &b) {
+	if (t.flock_steer == nullptr) {
+		return;
+	}
+	const int i = b.i;
+	const Vector2 v = t.flock_steer[i];
+	const real_t steer_sq = v.x * v.x + v.y * v.y;
+	if (!(steer_sq > (real_t)1e-12)) {
+		return;
+	}
+	// A locked orbit owns the bullet (the gate of the pattern stage).
+	if (t.orbit_locked != nullptr && i < (int)t.orbit_locked->size() && (*t.orbit_locked)[i] && b.steering_deque != nullptr && !b.steering_deque->empty()) {
+		return;
+	}
+	Vector2 &dir = *b.direction;
+	const real_t heading_sq = dir.x * dir.x + dir.y * dir.y;
+	if (!(heading_sq > (real_t)1e-8) || !Math::is_finite(heading_sq)) {
+		return;
+	}
+	// The flight heading: a negative speed flies against the direction
+	// (rotating either by the same angle is the same turn).
+	const real_t sign = all_cached_speed[i] < 0.0 ? (real_t)-1.0 : (real_t)1.0;
+	const real_t fx = dir.x * sign;
+	const real_t fy = dir.y * sign;
+	const real_t phi = Math::atan2(fx * v.y - fy * v.x, fx * v.x + fy * v.y);
+	real_t theta = phi * ((real_t)1.0 - Math::exp(-Math::sqrt(steer_sq) * (real_t)t.delta));
+	if (t.flock_max_turn > 0.0) {
+		theta = CLAMP(theta, -t.flock_max_turn, t.flock_max_turn);
+	}
+	// A calm flock (or a zero-delta tick) changes nothing, bit for bit.
+	if (!(Math::abs(theta) >= (real_t)1e-6)) {
+		return;
+	}
+	const real_t c = Math::cos(theta);
+	const real_t s = Math::sin(theta);
+	const real_t nx = dir.x * c - dir.y * s;
+	const real_t ny = dir.x * s + dir.y * c;
+	const real_t inv = (real_t)1.0 / Math::sqrt(nx * nx + ny * ny);
+	dir = Vector2(nx * inv, ny * inv);
+	if (t.flock_turn_facing || (b.steering_deque != nullptr && t.flock_homing_basis && !check_exists_bullet_movement_pattern_data(i))) {
+		Vector2 &x_axis = b.transf->columns[0];
+		Vector2 &y_axis = b.transf->columns[1];
+		x_axis = Vector2(x_axis.x * c - x_axis.y * s, x_axis.x * s + x_axis.y * c);
+		y_axis = Vector2(y_axis.x * c - y_axis.y * s, y_axis.x * s + y_axis.y * c);
+	}
+	b.direction_updated = true;
 }
 
 // 2. DIRECTION CURVES. Per channel, the bullet's own curve wins over the

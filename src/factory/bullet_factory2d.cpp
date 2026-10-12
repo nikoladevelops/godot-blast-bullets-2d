@@ -52,6 +52,15 @@ void BulletFactory2D::tick_volleys(double delta) {
 		return;
 	}
 	snapshot_active_volleys();
+	// Flocks steer by where every member stood before this sweep moved any
+	// of them (no user code runs between the snapshot and the pass).
+	if (flock_armed_volleys > 0) {
+		run_flock_pass();
+	} else if (flock_solver.has_results()) {
+		// The last armed volley left: drop the old results once.
+		flock_solver.begin(sweep_counter);
+		stats_last_flock_usec = 0;
+	}
 	const uint64_t snapshot_epoch = volley_free_epoch;
 	for (const VolleyIterationEntry &entry : iteration_scratch) {
 		BulletVolley2D *volley = volley_free_epoch == snapshot_epoch ? entry.volley : resolve_iteration_entry(entry.id, entry.volley);

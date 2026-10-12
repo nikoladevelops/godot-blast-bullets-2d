@@ -38,6 +38,7 @@ Dictionary BulletFactory2D::get_frame_stats() const {
 	d["physics_tick_usec"] = (int64_t)stats_last_physics_tick_usec;
 	d["peak_physics_tick_usec"] = (int64_t)stats_peak_physics_tick_usec;
 	d["render_usec"] = (int64_t)stats_last_render_usec;
+	d["flock_usec"] = (int64_t)stats_last_flock_usec;
 	d["volleys_ticked"] = stats_last_tick_volleys;
 	d["bullets_ticked"] = stats_last_tick_bullets;
 	d["collision_records_total"] = (int64_t)stats_collision_records_total;
@@ -326,7 +327,19 @@ Dictionary BulletFactory2D::debug_assert_no_dangling() {
 			if (!volley->life_released) {
 				return fail("pooled volley was never released" + at);
 			}
+			if (volley->flock_config != nullptr) {
+				return fail("pooled volley still flocks" + at);
+			}
 		}
+	}
+	// The armed count gates the flock pass: it must match the volleys that
+	// hold a flock config (a lower count would silently stop flocking).
+	int flock_held = 0;
+	for (const BulletVolley2D *volley : all_volleys) {
+		flock_held += volley->flock_config != nullptr ? 1 : 0;
+	}
+	if (flock_held != flock_armed_volleys) {
+		return fail("flock armed count (" + String::num_int64(flock_armed_volleys) + ") != volleys holding a flock config (" + String::num_int64(flock_held) + ")");
 	}
 	int pooled_flags = 0;
 	for (const BulletVolley2D *volley : all_volleys) {

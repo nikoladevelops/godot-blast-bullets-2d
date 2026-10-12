@@ -128,6 +128,24 @@ static func graze_kinds(log: Array) -> Array:
 		out.append("%s:%d:%d" % [e[0], e[3], e[5]])
 	return out
 
+## Flock rules with ONLY the given weights (the rest 0): rule tests turn one
+## rule on at a time.
+static func make_flock(separation := 0.0, alignment := 0.0, cohesion := 0.0, neighbor_range := 100.0, separation_range := 40.0) -> BulletFlock2D:
+	var f := BulletFlock2D.new()
+	f.separation = separation
+	f.alignment = alignment
+	f.cohesion = cohesion
+	f.neighbor_range = neighbor_range
+	f.separation_range = separation_range
+	return f
+
+## Spawn data flying the given transforms (each bullet heads along its own
+## rotation) at `speed`, long-lived.
+static func make_flight_data(transforms: Array, speed := 100.0, lifetime := 60.0) -> BulletVolleyData2D:
+	var d := make_volley_data(transforms.size(), speed, lifetime)
+	d.transforms = transforms
+	return d
+
 ## One transform per point, facing +X.
 static func transforms_at(points: Array) -> Array:
 	var out: Array = []

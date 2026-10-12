@@ -636,6 +636,14 @@ void BulletVolley2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("sound_get_effects"), &BulletVolley2D::sound_get_effects);
 	ClassDB::bind_method(D_METHOD("sound_get_listener_group"), &BulletVolley2D::sound_get_listener_group);
 	ClassDB::bind_method(D_METHOD("is_sound_armed"), &BulletVolley2D::is_sound_armed);
+
+	// Flocking (bullet_volley2d_flock.cpp; the pass is the factory's).
+	ClassDB::bind_method(D_METHOD("flock_join", "flock", "scope"), &BulletVolley2D::flock_join, DEFVAL(BulletFlock2D::SCOPE_SHARED));
+	ClassDB::bind_method(D_METHOD("flock_leave"), &BulletVolley2D::flock_leave);
+	ClassDB::bind_method(D_METHOD("flock_get"), &BulletVolley2D::flock_get);
+	ClassDB::bind_method(D_METHOD("flock_get_scope"), &BulletVolley2D::flock_get_scope);
+	ClassDB::bind_method(D_METHOD("debug_get_bullet_flock_steering", "bullet_index"), &BulletVolley2D::debug_get_bullet_flock_steering);
+	ClassDB::bind_method(D_METHOD("debug_get_bullet_flock_neighbors", "bullet_index"), &BulletVolley2D::debug_get_bullet_flock_neighbors);
 	BIND_CONSTANT(MAX_GRAZE_ZONES);
 }
 

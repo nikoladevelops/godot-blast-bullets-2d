@@ -190,6 +190,7 @@ void BulletVolley2D::release_life() {
 	graze_release(); // user resources (zones) and queued events
 	sound_release(); // user resources (sounds) and the listener ref
 	graze_detector.reset(); // the arming spawner's target settings
+	flock_set_config(nullptr); // the flock (and the factory's armed count)
 	// Volley-level listeners belong to the life that connected them.
 	disconnect_sprite_animation_connections();
 	for (const Dictionary &connection : get_signal_connection_list(CachedStringNames2D::get().bullet_homing_target_reached)) {
@@ -360,6 +361,10 @@ void BulletVolley2D::_notification(int p_what) {
 			if (!marked_for_internal_deletion && bullet_factory) {
 				bullet_factory->handle_manual_volley_deletion(*this);
 			}
+			// Every exit path (force_delete skips release_life): the
+			// factory's armed count stays exact. The factory is still alive
+			// here (it frees its volleys inside its own PREDELETE).
+			flock_set_config(nullptr);
 
 			clear_homing_state_for_teardown();
 

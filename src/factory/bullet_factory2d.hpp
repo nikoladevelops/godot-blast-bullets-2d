@@ -22,6 +22,7 @@
 #include "data/bullet_pickup_data2d.hpp"
 #include "data/bullet_volley_data2d.hpp"
 #include "debugger/despawn_bounds_preview_layer2d.hpp"
+#include "factory/flock_solver2d.hpp"
 #include "factory/graze_detector2d.hpp"
 #include "factory/sound_mixer2d.hpp"
 #include "godot_cpp/core/math.hpp"
@@ -581,6 +582,17 @@ public:
 	// Bumped by volleys per emitted graze event (never per bullet).
 	uint64_t stats_graze_events_total = 0;
 
+	// ---- Flocking (flock_solver2d.*, bullet_factory2d_flock.cpp) ----
+	// The flock pass runs once per sweep, before any volley ticks, while at
+	// least one volley holds a flock config (one integer test otherwise).
+	const FlockSolver2D &get_flock_solver() const { return flock_solver; }
+	// BulletVolley2D::flock_set_config is the ONLY caller (arm +1, disarm -1).
+	void flock_note_armed(int delta) { flock_armed_volleys += delta; }
+	int get_flock_armed_volleys() const { return flock_armed_volleys; }
+	// {flocks, members, grid_members, neighbor_checks, capped_members,
+	// pass_usec} of the last pass, plus armed_volleys.
+	Dictionary debug_get_flock_stats() const;
+
 	// ---- Sound triggers (sound_mixer2d.*) ----
 	// Fire-and-forget audio: trigger sites offer (volley, spawner, user) and
 	// the mixer plays the sweep's winners at the end of _physics_process.
@@ -733,6 +745,11 @@ private:
 	std::vector<VolleyIterationEntry> timer_iteration_scratch;
 	GrazeDetector2D graze_default_detector{ 0 };
 	SoundMixer2D sound_mixer;
+	FlockSolver2D flock_solver;
+	int flock_armed_volleys = 0;
+	uint64_t stats_last_flock_usec = 0;
+	// The flock pass over this sweep's snapshot (bullet_factory2d_flock.cpp).
+	void run_flock_pass();
 	double graze_clock = 0.0;
 	uint64_t user_code_epoch = 0;
 	// _process runs for the interpolation pass (processing + interpolation)

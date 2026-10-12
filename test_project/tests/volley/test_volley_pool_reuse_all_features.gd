@@ -3,7 +3,7 @@ extends BlastTest
 ## and was reused for plain bullets must be indistinguishable from a volley
 ## that was never used: homing queues, orbit, bounce, wobble, gravity,
 ## curves, movement patterns, trails, timers, attachments, custom data, tint,
-## spin and graze are all reset, and the reused bullets sit and fly exactly where a
+## spin, graze and flocking are all reset, and the reused bullets sit and fly exactly where a
 ## cold volley's bullets do. Guards the single reset path of the merged
 ## volley class (reset_transient_volley_state + reset_motion_feature_state).
 
@@ -64,6 +64,7 @@ func _volley_state(v: BulletVolley2D) -> Dictionary:
 		"shared_custom_data": v.get_shared_bullets_custom_data(),
 		"shared_pattern": v.has_shared_movement_pattern(),
 		"graze": _graze_state(v),
+		"flock": [v.flock_get(), v.flock_get_scope(), v.debug_get_bullet_flock_neighbors(0), v.debug_get_bullet_flock_steering(0)],
 	}
 
 
@@ -102,6 +103,7 @@ func test_reused_volley_matches_a_cold_volley() -> void:
 	make_graze_target(Vector2(0, 0))
 	v.graze_set_zones([H.make_graze_zone([400.0])], &"graze_targets")
 	factory.bullet_grazed.connect(func(_t: Node2D, _v: BulletVolley2D, _i: int, _z: BulletGrazeZone2D, _r: int) -> void: pass)
+	v.flock_join(H.make_flock(1.5, 1.0, 1.0))
 	expect_no_errors("every feature switches on cleanly")
 	for i in 120: # early break; the lifetime is 15 ticks
 		await physics()
@@ -110,6 +112,7 @@ func test_reused_volley_matches_a_cold_volley() -> void:
 	await idle(2) # the lifetime hold flushes on the idle frame
 	assert_true(bool(v.debug_get_volley_info().get("is_pooled", false)), "expired into the pool")
 	assert_gt(int(factory.debug_get_graze_stats()["events_total"]), 0, "the loaded life really grazed")
+	assert_eq(int(factory.debug_get_flock_stats()["armed_volleys"]), 0, "the pooled life left its flock")
 
 	var hits_before := int(factory.debug_get_pool_hit_stats()["hits"])
 	var reused: BulletVolley2D = factory.spawn_volley(_plain())

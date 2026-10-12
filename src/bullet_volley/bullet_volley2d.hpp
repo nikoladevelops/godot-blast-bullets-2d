@@ -20,6 +20,7 @@
 #include "data/bullet_volley_data2d.hpp"
 #include "data/bullet_wobble_data2d.hpp"
 #include "factory/bullet_factory2d.hpp"
+#include "factory/flock_solver2d.hpp"
 #include "godot_cpp/classes/curve.hpp"
 #include "godot_cpp/classes/curve2d.hpp"
 #include "godot_cpp/classes/node2d.hpp"
@@ -1950,6 +1951,7 @@ public:
 	struct MoveTick2D;
 	struct BulletStep2D;
 	_ALWAYS_INLINE_ void step_homing(const MoveTick2D &t, BulletStep2D &b);
+	_ALWAYS_INLINE_ void step_flock(const MoveTick2D &t, BulletStep2D &b);
 	_ALWAYS_INLINE_ void step_direction_curves(const MoveTick2D &t, BulletStep2D &b);
 	_ALWAYS_INLINE_ void step_wobble(const MoveTick2D &t, BulletStep2D &b);
 	_ALWAYS_INLINE_ void step_rotation(const MoveTick2D &t, BulletStep2D &b);
@@ -2723,6 +2725,37 @@ public:
 	// bit is set): one offer per live bullet at its current pose. Frozen and
 	// pooled bullets never offer.
 	void sound_fire_flight();
+
+	// FLOCKING (bullet_volley2d_flock.cpp; the pass is FlockSolver2D, the
+	// per-bullet turn is step_flock in bullet_volley2d_tick.cpp). An armed
+	// volley holds a FlockConfig2D (who flies together): its spawner's,
+	// shared with every volley it armed (edits reach bullets in flight,
+	// orphans keep it), or its own from flock_join. Each sweep the factory
+	// gathers every armed volley's bullets before any volley ticks and
+	// computes one steering vector per bullet; the volley turns its headings
+	// toward them during its own tick.
+	std::shared_ptr<FlockConfig2D> flock_config;
+	// Where this volley's bullets sit in the factory's last pass.
+	FlockView2D flock_view;
+	// THE one place that arms or disarms (keeps the factory's armed count
+	// exact): arming, join, leave, release_life and PREDELETE.
+	void flock_set_config(const std::shared_ptr<FlockConfig2D> &config);
+	// Factory volleys (or a script override of a spawner volley until its
+	// next life): flock with every volley that joined the same flock with
+	// the same scope. Per Spawner groups a factory volley with the
+	// factory's own volleys of that flock.
+	bool flock_join(const Ref<BulletFlock2D> &flock, int scope = BulletFlock2D::SCOPE_SHARED);
+	void flock_leave();
+	// The flock this volley flies in (null when not armed or switched off).
+	Ref<BulletFlock2D> flock_get() const;
+	// The armed scope, -1 when not flocking.
+	int flock_get_scope() const;
+	// The steering vector (per second) and the flockmates the last pass
+	// gave bullet_index (zero when not flocking or not gathered).
+	Vector2 debug_get_bullet_flock_steering(int bullet_index) const;
+	int debug_get_bullet_flock_neighbors(int bullet_index) const;
+	// True when the last pass gathered this volley in its current life.
+	bool flock_view_current() const;
 
 protected:
 	// Updates homing behavior for a bullet. Zero-delta ticks steer nothing:
