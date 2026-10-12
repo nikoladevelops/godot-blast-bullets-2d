@@ -520,7 +520,7 @@
 			Upper end of the random speed multiplier. See [member bullet_speed_scale_min].
 		</member>
 		<member name="bullet_speed_scale_min" type="float" setter="set_bullet_speed_scale_min" getter="get_bullet_speed_scale_min" default="1.0">
-			Random speed multiplier per bullet, from this to [member bullet_speed_scale_max] (an inverted pair swaps). It is applied once when the volley spawns to the bullet's speed, max speed and acceleration, so a faster bullet also accelerates and tops out proportionally; curves and later setters act on the result. Must be finite and 0 or more. 1 and 1 (default) is off. Costs nothing per tick.
+			Random speed multiplier per bullet, from this to [member bullet_speed_scale_max] (an inverted pair swaps). It is applied once when the volley spawns to the bullet's speed, max speed and acceleration, so a faster bullet also accelerates and tops out proportionally; curves and later setters act on the result. Must be finite and 0 or more. 1 and 1 (default) is off. Costs nothing per tick. It has no effect while a speed curve of the spawn data drives the speed (the curve rewrites the speed every tick).
 		</member>
 		<member name="burst_alternate_mirror" type="bool" setter="set_burst_alternate_mirror" getter="get_burst_alternate_mirror" default="false">
 			Mirror every other burst volley (fan/spiral chirality flip). The first shot is plain, then shots alternate, for any burst_count.

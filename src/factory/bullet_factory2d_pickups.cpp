@@ -7,6 +7,7 @@
 
 #include "bullet_spawner/bullet_spawner2d.hpp"
 #include "core/node_scan2d.hpp"
+#include "core/transform_math2d.hpp"
 #include "factory/bullet_factory2d_internal.hpp"
 #include "patterns/pattern_inputs2d.hpp"
 
@@ -26,28 +27,25 @@ struct PickupTarget {
 		GROUP };
 	Kind kind = MOUSE;
 	Vector2 position;
-	Node2D *node = nullptr;
-	std::vector<std::pair<Node2D *, Vector2>> members; // GROUP: usable members and their positions
+	// Instance ids, never raw pointers: user code (attachment callbacks of the
+	// pickup scene) runs between resolving the target and using it.
+	uint64_t node_id = 0;
+	struct Member {
+		uint64_t id = 0;
+		Vector2 position;
+	};
+	std::vector<Member> members; // GROUP: usable members and their positions at the call
 };
 
 struct SourceRecord {
 	BulletVolley2D *volley = nullptr;
 	uint64_t id = 0;
 	std::vector<int> indexes;
+	// The bullets' collision epochs at the snapshot: user code that runs
+	// during the conversion may recycle an index, and a recycled bullet must
+	// not be taken out in the old one's place.
+	std::vector<uint64_t> epochs;
 };
-
-// Finite columns whose squares and determinant stay finite and non-zero.
-bool pose_is_usable(const Transform2D &pose) {
-	for (int c = 0; c < 3; ++c) {
-		if (!Math::is_finite(pose.columns[c].x) || !Math::is_finite(pose.columns[c].y)) {
-			return false;
-		}
-	}
-	const real_t x_sq = pose.columns[0].x * pose.columns[0].x + pose.columns[0].y * pose.columns[0].y;
-	const real_t y_sq = pose.columns[1].x * pose.columns[1].x + pose.columns[1].y * pose.columns[1].y;
-	const real_t det = pose.columns[0].x * pose.columns[1].y - pose.columns[0].y * pose.columns[1].x;
-	return Math::is_finite(x_sq) && Math::is_finite(y_sq) && Math::is_finite(det) && det != 0.0f;
-}
 
 void fail(const String &fn, const String &text) {
 	UtilityFunctions::push_error(fn + text);
@@ -84,7 +82,7 @@ bool resolve_target(BulletFactory2D &factory, const String &fn, const Variant &t
 				return false;
 			}
 			out.kind = PickupTarget::NODE;
-			out.node = node;
+			out.node_id = node->get_instance_id();
 			out.position = position;
 			return true;
 		}
@@ -98,7 +96,7 @@ bool resolve_target(BulletFactory2D &factory, const String &fn, const Variant &t
 					Node2D *node = Object::cast_to<Node2D>((Object *)nodes[i]);
 					Vector2 position;
 					if (node != nullptr && target_node_usable2d(node, world.ptr(), position)) {
-						out.members.emplace_back(node, position);
+						out.members.push_back({ node->get_instance_id(), position });
 					}
 				}
 			}
@@ -133,6 +131,19 @@ Array BulletFactory2D::convert_to_pickups_impl(const char *function_name, const 
 		fail(fn, ": BulletFactory2D is not ready or is being freed, nothing converted.");
 		return result;
 	}
+	// Attachment callbacks of the new pickups run user code in the middle of
+	// the spawn phase; a conversion started from there would convert the same
+	// sources a second time.
+	if (pickup_conversion_running) {
+		fail(fn, ": a conversion is already running (started from user code inside it), nothing converted.");
+		return result;
+	}
+	struct RunningScope {
+		bool &flag;
+		explicit RunningScope(bool &p_flag) :
+				flag(p_flag) { flag = true; }
+		~RunningScope() { flag = false; }
+	} running_scope(pickup_conversion_running);
 	PickupTarget resolved;
 	if (!resolve_target(*this, fn, target, resolved)) {
 		return result;
@@ -146,6 +157,7 @@ Array BulletFactory2D::convert_to_pickups_impl(const char *function_name, const 
 			record.volley = volley;
 			record.id = volley->get_instance_id();
 			record.indexes = indexes;
+			volley->collect_bullet_epochs(indexes, record.epochs);
 			sources.push_back(std::move(record));
 		}
 	};
@@ -238,7 +250,7 @@ Array BulletFactory2D::convert_to_pickups_impl(const char *function_name, const 
 			// Huge scale settings can overflow float32 into infinity or a
 			// singular basis, which the physics server must never see: such a
 			// pose falls back to the bullet's own.
-			if (!pose_is_usable(pose)) {
+			if (!transform_is_sane2d(pose)) {
 				pose = source_pose;
 			}
 			poses.push_back(pose);
@@ -278,6 +290,8 @@ Array BulletFactory2D::convert_to_pickups_impl(const char *function_name, const 
 				}
 			}
 		}
+		// Resolve the target again NOW: the spawn above ran user code that may
+		// have freed it. A target that is gone leaves the pickups drifting.
 		switch (resolved.kind) {
 			case PickupTarget::MOUSE:
 				volley->shared_homing_deque_push_back_mouse_position_target();
@@ -285,25 +299,42 @@ Array BulletFactory2D::convert_to_pickups_impl(const char *function_name, const 
 			case PickupTarget::POSITION:
 				volley->shared_homing_deque_replace_homing_targets_with_new_target(Variant(resolved.position));
 				break;
-			case PickupTarget::NODE:
-				volley->shared_homing_deque_replace_homing_targets_with_new_target(Variant(resolved.node));
-				break;
-			case PickupTarget::GROUP:
-				for (size_t k = 0; k < count; ++k) {
-					// Nearest member to this bullet at conversion time.
-					const Vector2 at = poses[spawned + k].columns[2];
-					Node2D *best = nullptr;
-					double best_distance = 0.0;
-					for (const auto &member : resolved.members) {
-						const double d = (double)at.distance_squared_to(member.second);
-						if (best == nullptr || d < best_distance) {
-							best = member.first;
-							best_distance = d;
-						}
-					}
-					volley->bullet_homing_push_back_homing_target((int)k, Variant(best));
+			case PickupTarget::NODE: {
+				Node2D *node = Object::cast_to<Node2D>(ObjectDB::get_instance(ObjectID(resolved.node_id)));
+				if (node != nullptr && !node->is_queued_for_deletion()) {
+					volley->shared_homing_deque_replace_homing_targets_with_new_target(Variant(node));
 				}
 				break;
+			}
+			case PickupTarget::GROUP: {
+				// The members that are still alive, once per chunk (no user code
+				// runs between this and the pushes below).
+				std::vector<std::pair<Node2D *, Vector2>> alive;
+				alive.reserve(resolved.members.size());
+				for (const PickupTarget::Member &member : resolved.members) {
+					Node2D *node = Object::cast_to<Node2D>(ObjectDB::get_instance(ObjectID(member.id)));
+					if (node != nullptr && !node->is_queued_for_deletion()) {
+						alive.emplace_back(node, member.position);
+					}
+				}
+				if (!alive.empty()) {
+					for (size_t k = 0; k < count; ++k) {
+						// Nearest member to this bullet at conversion time.
+						const Vector2 at = poses[spawned + k].columns[2];
+						Node2D *best = nullptr;
+						double best_distance = 0.0;
+						for (const auto &member : alive) {
+							const double d = (double)at.distance_squared_to(member.second);
+							if (best == nullptr || d < best_distance) {
+								best = member.first;
+								best_distance = d;
+							}
+						}
+						volley->bullet_homing_push_back_homing_target((int)k, Variant(best));
+					}
+				}
+				break;
+			}
 		}
 		result.push_back(volley);
 		spawned += count;
@@ -322,16 +353,18 @@ Array BulletFactory2D::convert_to_pickups_impl(const char *function_name, const 
 		}
 		if (record.indexes.size() > budget) {
 			record.indexes.resize(budget);
+			record.epochs.resize(budget);
 		}
 		budget -= record.indexes.size();
 		if (ObjectDB::get_instance(ObjectID(record.id)) != record.volley || !record.volley->is_active) {
 			continue; // freed by an earlier callback
 		}
-		record.volley->disable_bullets_bulk(record.indexes, pickup->fire_clear_effects ? (int)EFFECT_ON_CLEAR : -1);
+		record.volley->disable_bullets_bulk(record.indexes, pickup->fire_clear_effects ? (int)EFFECT_ON_CLEAR : -1, &record.epochs);
 	}
 	is_factory_busy = saved_busy;
 
-	// ---- 4. Tell the game (the latch is down: handlers may spawn). -----------------------------
+	// ---- 4. Tell the game (the latch is down: handlers may spawn and convert). ----------------
+	pickup_conversion_running = false;
 	if (!is_tearing_down) {
 		note_user_code();
 		emit_signal("bullets_converted", (int64_t)spawned, result);

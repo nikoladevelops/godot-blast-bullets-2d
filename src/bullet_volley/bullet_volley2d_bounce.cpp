@@ -471,12 +471,13 @@ int BulletVolley2D::try_handle_bounce(CollisionType collision_type, int bullet_i
 		// delta so custom physics rates stay exact. Clamped: a blink
 		// across the screen must not yield a 1e5 px/s phantom kick, and
 		// any unusually stale record is bounded the same way.
-		if (!has_velocity_property && queue_position_valid && queued_target_position.is_finite() && Math::is_finite((double)bounce_last_delta) && bounce_last_delta > 0.0) {
+		const double estimate_delta = real_tick_delta > 0.0 ? real_tick_delta : bounce_last_delta;
+		if (!has_velocity_property && queue_position_valid && queued_target_position.is_finite() && Math::is_finite(estimate_delta) && estimate_delta > 0.0) {
 			Node2D *target_n2d = Object::cast_to<Node2D>(hit_target);
 			if (target_n2d != nullptr) {
 				const Vector2 now_pos = target_n2d->get_global_position();
 				if (now_pos.is_finite()) {
-					Vector2 estimate = (now_pos - queued_target_position) / (real_t)bounce_last_delta;
+					Vector2 estimate = (now_pos - queued_target_position) / (real_t)estimate_delta;
 					if (estimate.is_finite()) {
 						const real_t estimate_len = estimate.length();
 						if (estimate_len > 4000.0) {

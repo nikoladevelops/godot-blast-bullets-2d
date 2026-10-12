@@ -385,3 +385,177 @@ func test_a_big_group_assigns_every_pickup_its_true_nearest_member() -> void:
 	for i in 600:
 		assert_eq(int(pv.bullet_check_has_homing_targets(i)), 1, "pickup %d has its own target" % i)
 		assert_same(pv.bullet_get_current_homing_target(i), expected[i], "pickup %d goes to its nearest member" % i)
+
+
+# --- findings of the independent code review ------------------------------------------------------------------------------------------------
+
+func test_user_code_that_frees_the_volley_while_an_attachment_is_released_is_survived() -> void:
+	var probe := AttachmentSelfFreeProbe2D.new()
+	var scene := PackedScene.new()
+	assert_eq(scene.pack(probe), OK, "packs")
+	probe.free()
+	factory.time_scale = 0.5
+	var data := H.make_volley_data(2, 0.0, 60.0)
+	data.transforms = [Transform2D(0.0, Vector2.ZERO), Transform2D(0.0, Vector2(10, 0))]
+	var v := factory.spawn_volley(data)
+	v.bullet_set_attachment(0, scene, Vector2.ZERO, true)
+	await idle(3) # the attachment is told 0.5
+	AttachmentSelfFreeProbe2D.armed = true
+	AttachmentSelfFreeProbe2D.volley = v
+	v.disable_bullet(0) # released: told 1.0 first, which frees the volley
+	AttachmentSelfFreeProbe2D.armed = false
+	await idle(2)
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "nothing dangles")
+
+
+func test_user_code_that_frees_the_target_during_a_conversion_does_not_crash_it() -> void:
+	var target := _target(Vector2(300, 0))
+	var other := _target(Vector2(-300, 0))
+	other.add_to_group("fragile")
+	target.add_to_group("fragile")
+	var probe := AttachmentFreeTargetProbe2D.new()
+	var scene := PackedScene.new()
+	assert_eq(scene.pack(probe), OK, "packs")
+	probe.free()
+	var coin := P.coin()
+	coin.attachment = scene
+	for mode in ["node", "group"]:
+		AttachmentFreeTargetProbe2D.calls = 0
+		AttachmentFreeTargetProbe2D.victims = [target, other] if mode == "group" else [target]
+		P.still(factory, [Vector2.ZERO, Vector2(20, 0)])
+		var out: Array = factory.convert_all_bullets_to_pickups(coin, target if mode == "node" else "fragile")
+		assert_eq(out.size(), 1, "%s: the conversion completed" % mode)
+		assert_gt(AttachmentFreeTargetProbe2D.calls, 0, "%s: the attachment callback ran inside it" % mode)
+		await idle(3)
+		assert_true(factory.debug_assert_no_dangling().get("ok", false), "%s: nothing dangles" % mode)
+		out[0].clear_all_bullets()
+		await idle(1)
+		target = _target(Vector2(300, 0))
+		other = _target(Vector2(-300, 0))
+		target.add_to_group("fragile")
+		other.add_to_group("fragile")
+
+
+func test_a_spawner_whose_data_ignores_the_bounds_may_shoot_from_outside() -> void:
+	factory.despawn_bounds_rect = Rect2(0, 0, 400, 300)
+	factory.despawn_bounds_enabled = true
+	var data := H.make_volley_data(2, 0.0, 30.0)
+	data.ignore_despawn_bounds = true
+	var sp := make_spawner(data, BulletSpawner2D.PATTERN_FROM_HELPER_RING, 2)
+	sp.position = Vector2(900, 100)
+	assert_true(sp.shoot_once(), "bullets that ignore the bounds are not refused because of them")
+	data.ignore_despawn_bounds = false
+	assert_false(sp.shoot_once(), "with the opt-out off the muzzle rule applies again")
+
+
+func test_bullets_cleared_never_announces_a_volley_reused_by_a_handler() -> void:
+	var a := P.still(factory, [Vector2(10, 0)])
+	var b := P.still(factory, [Vector2(20, 0)])
+	assert_not_null(a)
+	assert_not_null(b)
+	var stale := []
+	var announced := [0]
+	factory.bullets_cleared.connect(func(positions, volley, indexes):
+		announced[0] += 1
+		# At the moment of the announcement the volley must still be the one
+		# the bullets left: a reused volley shows a live bullet somewhere else.
+		var idx := int(indexes[0])
+		if volley.is_bullet_status_enabled(idx) and volley.get_bullet_transform(idx).origin != positions[0]:
+			stale.append(volley)
+		if announced[0] == 1:
+			# Take every pooled one-bullet volley: the second announcement's
+			# volley is reused for a new life at (999, 999).
+			for k in 2:
+				var d := H.make_volley_data(1, 0.0, 30.0)
+				d.transforms = [Transform2D(0.0, Vector2(999, 999))]
+				factory.spawn_volley(d))
+	factory.clear_active_bullets()
+	assert_eq(stale.size(), 0, "no announcement described a life that a handler had already replaced")
+	assert_eq(announced[0], 1, "the second volley, reused by the first handler, was not announced for its old life")
+
+
+func test_a_handler_that_took_the_pickup_out_stops_the_rest_of_the_collection() -> void:
+	P.still(factory, [Vector2.ZERO])
+	var coin := P.coin()
+	var callbacks := [0]
+	coin.collect_callback = func(_t, _p, _v, _i, _val): callbacks[0] += 1
+	coin.collect_effect = H.make_effect_layer(BulletEffectLayerData2D.EFFECT_ON_SPAWN)
+	factory.pickup_collected.connect(func(_t, _p, volley, index, _val): volley.disable_bullet(index))
+	factory.convert_all_bullets_to_pickups(coin, Vector2(150, 0))
+	await _wait(1)
+	await idle(2)
+	assert_eq(callbacks[0], 0, "the callback does not run for a pickup a handler already removed")
+	assert_eq(factory.get_active_effect_count(), 0, "and neither does the collect effect")
+
+
+func test_spawner_randomization_with_overflowing_settings_never_corrupts_the_shot() -> void:
+	var sp := make_spawner(H.make_volley_data(5, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 5)
+	sp.bullet_scale_mode = 1
+	sp.bullet_scale_min = 1.0e39
+	sp.bullet_scale_max = 1.0e39
+	sp.bullet_position_jitter_max = 1.0e39
+	watch_signals(sp)
+	assert_true(sp.shoot_once(), "the shot still happens")
+	var v: BulletVolley2D = get_signal_parameters(sp, "volley_fired", 0)[0]
+	for i in 5:
+		assert_true(v.get_bullet_transform(i).is_finite(), "bullet %d has a finite pose" % i)
+	await idle(3)
+	expect_no_errors("the physics server never saw an infinite transform")
+
+
+func test_a_nested_conversion_from_inside_a_conversion_is_refused() -> void:
+	var probe := AttachmentNestedConvertProbe2D.new()
+	var scene := PackedScene.new()
+	assert_eq(scene.pack(probe), OK, "packs")
+	probe.free()
+	var coin := P.coin()
+	coin.attachment = scene
+	AttachmentNestedConvertProbe2D.factory = factory
+	AttachmentNestedConvertProbe2D.pickup = coin
+	AttachmentNestedConvertProbe2D.results.clear()
+	P.still(factory, [Vector2.ZERO, Vector2(10, 0)])
+	var out: Array = factory.convert_all_bullets_to_pickups(coin, Vector2(0, 900))
+	AttachmentNestedConvertProbe2D.factory = null
+	AttachmentNestedConvertProbe2D.pickup = null
+	assert_eq(out.size(), 1, "the outer conversion made one pickup volley")
+	assert_eq(out[0].get_amount_bullets(), 2, "of exactly the two bullets, not duplicates")
+	expect_errors_containing("a conversion is already running", 2, "each nested attempt (one per pickup) was refused loudly")
+	for r in AttachmentNestedConvertProbe2D.results:
+		assert_eq(r, [], "and returned nothing")
+	assert_eq(factory.get_active_bullet_count(), 2, "two pickups in total")
+
+
+func test_bounce_off_a_position_moved_wall_is_independent_of_the_time_scale() -> void:
+	var speeds := []
+	for scale in [1.0, 0.25]:
+		factory.time_scale = scale
+		# An Area2D hurtbox exposes no motion property: the plugin estimates its
+		# velocity from the position change over one tick.
+		var wall := Area2D.new()
+		wall.position = Vector2(400, 300)
+		wall.collision_layer = 8
+		wall.collision_mask = 0
+		var col := CollisionShape2D.new()
+		col.shape = H.make_circle_shape(12.0)
+		wall.add_child(col)
+		add(wall)
+		var d := H.make_volley_data(1, 200.0, 60.0)
+		d.transforms = [Transform2D(0.0, Vector2(100, 300))]
+		d.monitorable = true
+		d.collision_shape = H.make_circle_shape(6.0)
+		d.bullet_max_collision_count = 0
+		d.set_bounce_mask_from_array([4])
+		d.bounce_mode = 1
+		var v := factory.spawn_volley(d)
+		for i in 600:
+			wall.position.x -= 3.0 # a real 180 px/s toward the bullet
+			await physics(1)
+			if v.bullet_get_bounce_count(0) >= 1:
+				break
+		assert_eq(v.bullet_get_bounce_count(0), 1, "scale %s: it bounced" % scale)
+		await physics(1)
+		speeds.append(v.get_bullet_velocity(0).length())
+		v.clear_all_bullets()
+		wall.free()
+		await idle(2)
+	assert_almost_eq(speeds[1], speeds[0], speeds[0] * 0.15, "the moving wall adds the same kick at any scale (%s)" % [speeds])

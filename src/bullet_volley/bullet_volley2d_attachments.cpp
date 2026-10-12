@@ -169,6 +169,10 @@ void BulletVolley2D::bullet_disable_attachment(int bullet_index) {
 	// Back to real time before it is pooled or freed (a reused attachment is
 	// re-scaled for its new owner).
 	detaching->set_time_scale_factor(1.0);
+	// on_time_scale_changed is user code: look again before the next call.
+	if (ObjectDB::get_instance(ObjectID(self_id)) != this || ObjectDB::get_instance(ObjectID(detaching_id)) == nullptr) {
+		return;
+	}
 	if (!was_suspended) {
 		detaching->call_on_bullet_disable();
 	}

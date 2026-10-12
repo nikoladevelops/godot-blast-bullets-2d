@@ -1305,6 +1305,11 @@ public:
 	// A pickup volley carries the BulletPickupData2D it was converted with;
 	// reaching its homing target collects the bullet. Released with the life.
 	bool is_pickup_volley() const { return pickup_data.is_valid(); }
+	// Set by the factory sweep: the unscaled delta of this tick (see real_tick_delta).
+	void set_real_tick_delta(double delta) { real_tick_delta = delta; }
+	// The collision epochs of the given bullets (a bullet that is disabled or
+	// recycled gets a new one): lets a caller detect index reuse across user code.
+	void collect_bullet_epochs(const std::vector<int> &indexes, std::vector<uint64_t> &r_epochs) const;
 	// Converts this volley's live bullets (all, or the listed indexes) into one
 	// pickup volley per pattern-limit chunk. Returns the new volleys.
 	Array convert_to_pickups(const Ref<BulletPickupData2D> &pickup, const Variant &target, const PackedInt32Array &bullet_indexes);
@@ -1870,6 +1875,10 @@ protected:
 	bool bounce_speed_scaled = false;
 	// Last physics delta, used to size the first smooth step at bounce time.
 	double bounce_last_delta = 0.016;
+	// The unscaled physics delta of the last sweep (set by the factory): the
+	// velocity estimate of a moved target is a real-time displacement, so it
+	// divides by this, not by the time-scaled bounce_last_delta.
+	double real_tick_delta = 0.0;
 	// Once-flag so the mask-mismatch footgun warns once per life instead of
 	// spamming (bounce bits outside collision_mask can never be detected).
 	bool bounce_mask_warning_issued = false;

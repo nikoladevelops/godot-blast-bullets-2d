@@ -127,6 +127,7 @@ namespace {
 struct AreaClearRecord {
 	uint64_t volley_id = 0;
 	BulletVolley2D *volley = nullptr;
+	int life_id = 0; // the volley's life when the bullets left: a reused volley is a different story
 	std::vector<int> indexes;
 	PackedVector2Array positions;
 };
@@ -197,12 +198,13 @@ int BulletFactory2D::clear_bullets_in_area(const char *function_name, bool circl
 		if (done == (int)record.indexes.size() && ObjectDB::get_instance(ObjectID(volley_id)) == volley) {
 			record.volley_id = volley_id;
 			record.volley = volley;
+			record.life_id = volley->get_life_id();
 			records.push_back(std::move(record));
 		}
 	}
 	is_factory_busy = saved_busy;
 	for (const AreaClearRecord &record : records) {
-		if (ObjectDB::get_instance(ObjectID(record.volley_id)) != record.volley || is_tearing_down) {
+		if (ObjectDB::get_instance(ObjectID(record.volley_id)) != record.volley || record.volley->get_life_id() != record.life_id || is_tearing_down) {
 			continue;
 		}
 		Array indexes;

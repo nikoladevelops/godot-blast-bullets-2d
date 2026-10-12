@@ -63,6 +63,7 @@ void BulletFactory2D::tick_volleys(double delta) {
 		volley->sweep_tick_stamp = sweep_counter;
 		const double time_factor = volley_time_factor(*volley);
 		const double volley_delta = delta * time_factor;
+		volley->set_real_tick_delta(delta);
 		// Flag the volley for its whole tick: handlers fired from inside
 		// (collision drain, attachment callbacks) may spawn, and the pool must
 		// never hand out the volley whose drain is still running. Liveness is

@@ -279,6 +279,7 @@ int BulletFactory2D::clear_active_bullets(const Ref<VolleyPoolKey2D> &key) {
 	struct Announcement {
 		uint64_t volley_id = 0;
 		BulletVolley2D *volley = nullptr;
+		int life_id = 0; // a volley reused by an earlier handler is a different life
 		PackedVector2Array positions;
 		Array indexes;
 	};
@@ -317,6 +318,7 @@ int BulletFactory2D::clear_active_bullets(const Ref<VolleyPoolKey2D> &key) {
 		if (announce && done > 0 && ObjectDB::get_instance(ObjectID(volley_id)) == volley) {
 			note.volley_id = volley_id;
 			note.volley = volley;
+			note.life_id = volley->get_life_id();
 			announcements.push_back(std::move(note));
 		}
 	}
@@ -326,7 +328,7 @@ int BulletFactory2D::clear_active_bullets(const Ref<VolleyPoolKey2D> &key) {
 		if (is_tearing_down) {
 			break;
 		}
-		if (ObjectDB::get_instance(ObjectID(note.volley_id)) != note.volley) {
+		if (ObjectDB::get_instance(ObjectID(note.volley_id)) != note.volley || note.volley->get_life_id() != note.life_id) {
 			continue;
 		}
 		note_user_code();

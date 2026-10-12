@@ -45,6 +45,14 @@ void BulletVolley2D::seed_pickups(const Ref<BulletPickupData2D> &pickup, const P
 	}
 }
 
+void BulletVolley2D::collect_bullet_epochs(const std::vector<int> &indexes, std::vector<uint64_t> &r_epochs) const {
+	r_epochs.clear();
+	r_epochs.reserve(indexes.size());
+	for (const int i : indexes) {
+		r_epochs.push_back(collision_epoch_for_bullet(i));
+	}
+}
+
 void BulletVolley2D::maybe_begin_pickup_magnet() {
 	if (pickup_data.is_null() || pickup_magnet_started || curves_elapsed_time < pickup_data->magnet_delay_sec) {
 		return;
@@ -77,6 +85,12 @@ bool BulletVolley2D::collect_pickup_bullet(int bullet_index, Node2D *collector) 
 	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
 		return false;
 	}
+	// A handler that took the bullet out (disabled it, converted it) owns the
+	// outcome: no callback, sound or effect for a collection that did not happen.
+	auto still_ours = [&]() { return all_bullets_enabled_set.contains(bullet_index) && collision_epoch_for_bullet(bullet_index) == epoch; };
+	if (!still_ours()) {
+		return true;
+	}
 	// The optional callback of the pickup resource: same arguments as the signal.
 	if (pickup->collect_callback.is_valid()) {
 		bullet_factory->note_user_code();
@@ -89,6 +103,9 @@ bool BulletVolley2D::collect_pickup_bullet(int bullet_index, Node2D *collector) 
 		pickup->collect_callback.callv(args);
 		if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
 			return false;
+		}
+		if (!still_ours()) {
+			return true;
 		}
 	}
 	if (pickup->collect_sound.is_valid()) {

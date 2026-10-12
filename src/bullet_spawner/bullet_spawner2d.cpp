@@ -1152,6 +1152,11 @@ bool BulletSpawner2D::muzzle_outside_despawn_bounds(const BulletFactory2D *facto
 	if (shoot_outside_despawn_bounds || factory == nullptr || !factory->get_despawn_bounds_enabled()) {
 		return false;
 	}
+	// Bullets that ignore the bounds are never culled, so there is nothing to
+	// protect them from.
+	if (spawn_data.is_valid() && spawn_data->get_ignore_despawn_bounds()) {
+		return false;
+	}
 	const Rect2 bounds = factory->get_despawn_bounds_rect();
 	const Vector2 muzzle = get_global_position() + resolve_spawn_offset_global();
 	return muzzle.x < bounds.position.x || muzzle.y < bounds.position.y || muzzle.x > bounds.position.x + bounds.size.x || muzzle.y > bounds.position.y + bounds.size.y;

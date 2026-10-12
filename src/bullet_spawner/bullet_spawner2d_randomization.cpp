@@ -4,6 +4,7 @@
 // the bake cache and collect_spawn_transforms() stay deterministic.
 
 #include "bullet_spawner/bullet_spawner2d_internal.hpp"
+#include "core/transform_math2d.hpp"
 
 using namespace godot;
 
@@ -128,6 +129,7 @@ void BulletSpawner2D::randomize_shot_transforms(std::vector<Transform2D> &transf
 	const bool jitter = bullet_position_jitter_max > 0.0 || bullet_position_jitter_min > 0.0;
 	for (size_t i = 0; i < transforms.size(); ++i) {
 		Transform2D &t = transforms[i];
+		const Transform2D before_rolls = t;
 		const uint64_t index = (uint64_t)i;
 		if (scale_uniform) {
 			const real_t s = (real_t)lerp_range(bullet_scale_min, bullet_scale_max, roll_unit(CHANNEL_SCALE_X, index));
@@ -150,6 +152,11 @@ void BulletSpawner2D::randomize_shot_transforms(std::vector<Transform2D> &transf
 			const double radius = Math::sqrt(lerp_range(lo * lo, hi * hi, roll_unit(CHANNEL_POSITION_RADIUS, index)));
 			const double theta = Math::TAU * roll_unit(CHANNEL_POSITION_ANGLE, index);
 			t.columns[2] += Vector2((real_t)(Math::cos(theta) * radius), (real_t)(Math::sin(theta) * radius));
+		}
+		// Settings so large that float32 overflows must never reach the physics
+		// server: such a bullet keeps the pattern's own pose.
+		if (!transform_is_sane2d(t)) {
+			t = before_rolls;
 		}
 	}
 }

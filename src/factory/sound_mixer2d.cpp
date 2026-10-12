@@ -603,7 +603,8 @@ void SoundMixer2D::apply_voice_time_scale(Voice &voice, double factor) {
 double SoundMixer2D::voice_time_factor(BulletFactory2D &factory, const Voice &voice) const {
 	if (voice.following && voice.follow_volley != 0) {
 		BulletVolley2D *followed = Object::cast_to<BulletVolley2D>(ObjectDB::get_instance(ObjectID(voice.follow_volley)));
-		if (followed != nullptr) {
+		// A pooled and reused volley is a different life: it lends nothing to a stale voice.
+		if (followed != nullptr && followed->get_life_id() == voice.follow_life) {
 			return factory.volley_time_factor(*followed);
 		}
 	}

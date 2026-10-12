@@ -679,6 +679,7 @@ private:
 	// Set when the factory enters the scene tree. Editor runs of getters/setters only
 	// fill the cached values below; the real ones apply in _ready() once nodes exist.
 	double time_scale = 1.0;
+	bool pickup_conversion_running = false;
 	bool despawn_bounds_enabled = false;
 	// Godot's default viewport, so enabling without editing is sensible.
 	Rect2 despawn_bounds_rect = Rect2(0, 0, 1152, 648);
