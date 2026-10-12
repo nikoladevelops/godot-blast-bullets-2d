@@ -839,6 +839,11 @@ public:
 	void set_flock(const Ref<BulletFlock2D> &value);
 	BulletFlock2D::Scope get_flock_scope() const;
 	void set_flock_scope(BulletFlock2D::Scope value);
+	// Arms every live (or parked) volley this spawner owns that does not fly
+	// in its flock yet: bullets fired while flocking was off, or taken over
+	// by a script's flock_join. Returns how many volleys were armed; 0 while
+	// flocking is off or no flock is set.
+	int flock_live_volleys();
 
 	// SOUND (bullet_spawner2d_sound.cpp)
 	//

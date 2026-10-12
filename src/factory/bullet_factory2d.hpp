@@ -539,6 +539,8 @@ public:
 	// the spawner's capped retarget list). O(volleys).
 	Array get_active_volleys_owned_by(uint64_t owner_spawner_id) const;
 	int count_active_volleys_owned_by(uint64_t owner_spawner_id) const;
+	// Every tracked volley (live or parked) a spawner owns.
+	void collect_volleys_owned_by(uint64_t owner_spawner_id, std::vector<BulletVolley2D *> &r_volleys) const;
 	// Clears every live bullet of one owner (fire_clear_effects: On Clear at
 	// each pose), PARKED volleys of that owner go back to the pool. Not
 	// structural: safe from handlers. Returns the bullets cleared.

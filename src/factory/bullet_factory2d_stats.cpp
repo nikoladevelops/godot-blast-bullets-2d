@@ -518,6 +518,18 @@ Array BulletFactory2D::get_active_volleys_owned_by(uint64_t owner_spawner_id) co
 	return out;
 }
 
+void BulletFactory2D::collect_volleys_owned_by(uint64_t owner_spawner_id, std::vector<BulletVolley2D *> &r_volleys) const {
+	r_volleys.clear();
+	if (owner_spawner_id == 0) {
+		return;
+	}
+	for (BulletVolley2D *volley : all_volleys) {
+		if (volley != nullptr && volley->owner_spawner_id == owner_spawner_id && !volley->is_pooled_in_pool) {
+			r_volleys.push_back(volley);
+		}
+	}
+}
+
 int BulletFactory2D::count_active_volleys_owned_by(uint64_t owner_spawner_id) const {
 	int total = 0;
 	for (const BulletVolley2D *volley : all_volleys) {

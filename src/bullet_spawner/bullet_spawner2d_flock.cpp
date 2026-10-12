@@ -75,4 +75,22 @@ void BulletSpawner2D::apply_volley_flock(BulletVolley2D *volley) {
 	volley->flock_set_config(flock_shared);
 }
 
+int BulletSpawner2D::flock_live_volleys() {
+	BulletFactory2D *factory = get_bullet_factory();
+	if (factory == nullptr || !flock_enabled || flock.is_null()) {
+		return 0;
+	}
+	// Arming runs no user code: the list stays valid while it is walked.
+	std::vector<BulletVolley2D *> owned;
+	factory->collect_volleys_owned_by(get_instance_id(), owned);
+	int armed = 0;
+	for (BulletVolley2D *volley : owned) {
+		if (volley->flock_config == nullptr || volley->flock_config != flock_shared) {
+			apply_volley_flock(volley);
+			++armed;
+		}
+	}
+	return armed;
+}
+
 } //namespace BlastBullets2D

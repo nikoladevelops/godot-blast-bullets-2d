@@ -757,6 +757,7 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_flock", "value"), &BulletSpawner2D::set_flock);
 	ClassDB::bind_method(D_METHOD("get_flock_scope"), &BulletSpawner2D::get_flock_scope);
 	ClassDB::bind_method(D_METHOD("set_flock_scope", "value"), &BulletSpawner2D::set_flock_scope);
+	ClassDB::bind_method(D_METHOD("flock_live_volleys"), &BulletSpawner2D::flock_live_volleys);
 	ADD_GROUP("Flocking", "");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "flock_enabled"), "set_flock_enabled", "get_flock_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "flock", PROPERTY_HINT_RESOURCE_TYPE, "BulletFlock2D"), "set_flock", "get_flock");

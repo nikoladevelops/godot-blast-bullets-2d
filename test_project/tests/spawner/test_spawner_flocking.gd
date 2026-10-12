@@ -242,3 +242,40 @@ func _has(w: PackedStringArray, needle: String) -> bool:
 		if s.contains(needle):
 			return true
 	return false
+
+
+func test_flock_live_volleys_arms_the_bullets_already_flying() -> void:
+	var f := _wide_flock()
+	var sp := _flock_spawner(f)
+	sp.flock_enabled = false
+	var early := _fire(sp)
+	var early2 := _fire(sp)
+	var other := _flock_spawner(H.make_flock(), BulletFlock2D.SCOPE_PER_SPAWNER, Vector2(600, 0))
+	other.flock_enabled = false
+	var foreign := _fire(other)
+	var loose: BulletVolley2D = factory.spawn_volley(H.make_volley_data(3))
+	assert_eq(sp.flock_live_volleys(), 0, "flocking off: nothing to arm")
+	sp.flock_enabled = true
+	assert_null(early.flock_get(), "flying bullets do not flock by themselves")
+	assert_eq(sp.flock_live_volleys(), 2, "both flying volleys of this spawner join")
+	assert_eq([early.flock_get(), early2.flock_get()], [f, f], "armed with the spawner's flock")
+	assert_null(foreign.flock_get(), "another spawner's bullets are untouched")
+	assert_null(loose.flock_get(), "factory volleys are untouched")
+	assert_eq(sp.flock_live_volleys(), 0, "already flocking: nothing new to arm")
+	_step(1)
+	assert_gt(early.debug_get_bullet_flock_neighbors(0), 0, "they flock from the next tick")
+	assert_eq(early.debug_get_bullet_flock_neighbors(0), 7, "with the other early volley (Per Spawner)")
+	sp.flock = null
+	assert_eq(sp.flock_live_volleys(), 0, "no flock: nothing to arm")
+
+
+func test_flock_live_volleys_replaces_a_script_join() -> void:
+	var f := _wide_flock()
+	var sp := _flock_spawner(f)
+	var v := _fire(sp)
+	v.flock_join(H.make_flock(), BulletFlock2D.SCOPE_PER_VOLLEY)
+	assert_ne(v.flock_get(), f, "the script override")
+	assert_eq(sp.flock_live_volleys(), 1, "the explicit call takes it back")
+	assert_eq(v.flock_get(), f, "flying with the spawner's flock again")
+	sp.flock = _wide_flock()
+	assert_eq(v.flock_get(), sp.flock, "and its edits reach it again")
