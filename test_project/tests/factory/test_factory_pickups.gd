@@ -18,6 +18,12 @@ func _on_converted(count: int, volleys: Array) -> void:
 	converted.append({ "count": count, "volleys": volleys })
 
 
+func after_all() -> void:
+	# collect_sound plays a real stream: same headless-audio drain as the sound suites.
+	OS.delay_msec(500)
+	await super()
+
+
 func after_each() -> void:
 	# The pattern limit is process-wide: never leak a test's value.
 	BulletPatterns2D.set_max_bullets_per_pattern(20000)
