@@ -1,0 +1,53 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Texture2D" path="res://icon.svg" id="1_icon"]
+
+[sub_resource type="SpriteFrames" id="Frames_bullet"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("1_icon")
+}],
+"loop": true,
+"name": &"default",
+"speed": 5.0
+}]
+
+[sub_resource type="BulletSpeedData2D" id="Speed_shared"]
+speed = 180.0
+max_speed = 3000.0
+
+[sub_resource type="CircleShape2D" id="Shape_bullet"]
+radius = 5.0
+
+[sub_resource type="BulletVolleyData2D" id="Data_swarm"]
+sprite_frames = SubResource("Frames_bullet")
+texture_size = Vector2(14, 14)
+shared_bullet_speed_data = SubResource("Speed_shared")
+max_life_time = 8.0
+collision_shape = SubResource("Shape_bullet")
+collision_layer = 2
+collision_mask = 4
+homing_smoothing = 3.0
+homing_take_control_of_texture_rotation = true
+
+[sub_resource type="BulletFlock2D" id="Flock_swarm"]
+separation = 2.0
+max_turn_rate_degrees = 360.0
+
+[node name="FlockScene" type="Node2D"]
+
+[node name="BulletFactory2D" type="BulletFactory2D" parent="."]
+
+[node name="Swarm" type="BulletSpawner2D" parent="."]
+position = Vector2(300, 300)
+bullet_factory_path = NodePath("../BulletFactory2D")
+spawn_data = SubResource("Data_swarm")
+pattern_source = 3
+helper_bullets_amount = 24
+shoot_interval_sec = 1.5
+homing_enabled = true
+homing_target_source = 1
+flock_enabled = true
+flock = SubResource("Flock_swarm")
+flock_scope = 1

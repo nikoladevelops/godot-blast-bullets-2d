@@ -819,6 +819,27 @@ public:
 	// (scans run by its own lists; shared lists count on the factory).
 	Dictionary debug_get_graze_detector_stats() const;
 
+	// FLOCKING (bullet_spawner2d_flock.cpp). Every volley fired while
+	// flock_enabled is on (and flock is set) flies as a boids flock by the
+	// rules in flock (BulletFlock2D: separation, alignment, cohesion,
+	// ranges). WHO flies together is decided here: flock_scope groups this
+	// spawner's bullets (Per Spawner), every user of the same resource
+	// (Shared) or each shot alone (Per Volley). The settings are shared with
+	// every volley this spawner armed: turning flocking off stops it for
+	// bullets in flight (on again resumes them), a new flock or scope reaches
+	// them too, and orphaned volleys keep the last settings. Bullets fired
+	// while flocking was off never flock.
+	bool flock_enabled = false;
+	Ref<BulletFlock2D> flock;
+	BulletFlock2D::Scope flock_scope = BulletFlock2D::SCOPE_PER_SPAWNER;
+
+	bool get_flock_enabled() const;
+	void set_flock_enabled(bool value);
+	Ref<BulletFlock2D> get_flock() const;
+	void set_flock(const Ref<BulletFlock2D> &value);
+	BulletFlock2D::Scope get_flock_scope() const;
+	void set_flock_scope(BulletFlock2D::Scope value);
+
 	// SOUND (bullet_spawner2d_sound.cpp)
 	//
 	// Every fired volley is armed with sound_effects (BulletSoundData2D: one
@@ -1859,6 +1880,14 @@ private:
 	// Arms a freshly fired volley with graze_zones (shoot_once, before the
 	// homing signals). Runs no user code.
 	void apply_volley_graze(BulletVolley2D *volley);
+	// The Flocking settings shared with every volley this spawner armed
+	// (created on first arm). Setters push into it (serial bump), so edits
+	// reach bullets in flight; orphans keep it.
+	std::shared_ptr<FlockConfig2D> flock_shared;
+	void apply_flock_config();
+	// Joins a freshly fired volley to flock (shoot_once, before the homing
+	// signals). Runs no user code.
+	void apply_volley_flock(BulletVolley2D *volley);
 	// graze_zones mutated in place (append past 4 zones, non-zone entries):
 	// warned once per assignment, the usable entries still arm.
 	bool graze_zones_misuse_warned = false;

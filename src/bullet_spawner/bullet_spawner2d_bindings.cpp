@@ -73,6 +73,13 @@ void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
 		}
 		return;
 	}
+	// Flocking: the flock and its scope hide while flocking is off.
+	if (property_name == "flock" || property_name == "flock_scope") {
+		if (!flock_enabled) {
+			p_property.usage &= ~PROPERTY_USAGE_EDITOR;
+		}
+		return;
+	}
 	// Graze: everything but the master switch hides while graze is off; the
 	// line width also needs a preview toggle, each target source shows only
 	// its own knobs.
@@ -742,6 +749,18 @@ void BulletSpawner2D::_bind_methods() {
 	BIND_ENUM_CONSTANT(SOUND_LISTENER_NODE_CHILDREN);
 	BIND_ENUM_CONSTANT(SOUND_LISTENER_MOUSE);
 	BIND_ENUM_CONSTANT(SOUND_LISTENER_GLOBAL_POSITIONS);
+
+	// Flocking (bullet_spawner2d_flock.cpp): fired volleys join flock.
+	ClassDB::bind_method(D_METHOD("get_flock_enabled"), &BulletSpawner2D::get_flock_enabled);
+	ClassDB::bind_method(D_METHOD("set_flock_enabled", "value"), &BulletSpawner2D::set_flock_enabled);
+	ClassDB::bind_method(D_METHOD("get_flock"), &BulletSpawner2D::get_flock);
+	ClassDB::bind_method(D_METHOD("set_flock", "value"), &BulletSpawner2D::set_flock);
+	ClassDB::bind_method(D_METHOD("get_flock_scope"), &BulletSpawner2D::get_flock_scope);
+	ClassDB::bind_method(D_METHOD("set_flock_scope", "value"), &BulletSpawner2D::set_flock_scope);
+	ADD_GROUP("Flocking", "");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "flock_enabled"), "set_flock_enabled", "get_flock_enabled");
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "flock", PROPERTY_HINT_RESOURCE_TYPE, "BulletFlock2D"), "set_flock", "get_flock");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "flock_scope", PROPERTY_HINT_ENUM, "Per Spawner:0,Shared:1,Per Volley:2"), "set_flock_scope", "get_flock_scope");
 
 	// Graze (bullet_spawner2d_graze.cpp). The signals bubble: they fire here
 	// first (while this spawner lives), then on the BulletFactory2D, which

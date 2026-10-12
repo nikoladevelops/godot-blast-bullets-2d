@@ -975,7 +975,8 @@ func test_t20_inspector_groups_stay_coherent() -> void:
 	assert_true(not groups_found.has("Burst and Telegraph"), "Burst group merged away")
 	assert_true(groups_found.has("Graze"), "spawner Graze group present")
 	assert_true(groups_found.has("Sound"), "spawner Sound group present")
-	assert_eq(spawner_group_order.slice(0, 13), ["Setup", "Time", "Bullet Patterns", "Shooting", "Randomization", "Spin", "Homing", "Orbiting", "Graze", "Sound", "Preview", "Movement", "Performance"], "spawner group order")
+	assert_true(groups_found.has("Flocking"), "spawner Flocking group present")
+	assert_eq(spawner_group_order.slice(0, 14), ["Setup", "Time", "Bullet Patterns", "Shooting", "Randomization", "Spin", "Homing", "Orbiting", "Flocking", "Graze", "Sound", "Preview", "Movement", "Performance"], "spawner group order")
 	spawner20.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_GRID
 	await idle(1)
 	var ring_visible_grid := false

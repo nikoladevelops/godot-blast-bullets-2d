@@ -675,6 +675,13 @@ PackedStringArray BulletSpawner2D::_get_configuration_warnings() const {
 			out.push_back("homing_target_source is Node Children but homing_children_parent_path is empty: volleys fly without homing.");
 		}
 	}
+	if (flock_enabled) {
+		if (flock.is_null()) {
+			out.push_back("Flocking is enabled but flock is empty: assign a BulletFlock2D, or the bullets fly without flocking.");
+		} else if (homing_enabled && spawn_data.is_valid() && (spawn_data->homing_smoothing <= 0.0 || spawn_data->shared_bullet_rotation_data.is_valid() || !spawn_data->all_bullet_rotation_data.is_empty() || !spawn_data->shared_movement_pattern_path.is_empty() || !spawn_data->all_bullet_movement_pattern_paths.is_empty())) {
+			out.push_back("Flocking with homing that re-aims every tick (spawn_data homing_smoothing 0, rotation data or a movement pattern): the flock can only nudge the bullets. Give homing a turn rate (homing_smoothing > 0, no rotation data or pattern) so the swarm flocks on its way.");
+		}
+	}
 	if (graze_enabled) {
 		bool any_zone = false;
 		for (int i = 0; i < graze_zones.size(); ++i) {
@@ -900,6 +907,7 @@ bool BulletSpawner2D::shoot_once() {
 	// so every handler from here on sees an armed volley.
 	apply_volley_graze(bullets);
 	apply_volley_sound(bullets);
+	apply_volley_flock(bullets);
 	apply_volley_homing_and_orbiting(bullets, arc_resolved ? &arc_targets : nullptr);
 	// Re-validate: handlers of homing_targets_resolved/volley_homing_configured
 	// ran above and may have freed this volley or handed it to another owner.
