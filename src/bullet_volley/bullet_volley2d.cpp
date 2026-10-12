@@ -183,6 +183,8 @@ void BulletVolley2D::release_life() {
 	paused_overlaps.clear();
 	homing_reached_events.clear();
 	shared_pop_requested = false;
+	pickup_data.unref(); // a pooled volley is a plain one again
+	pickup_magnet_started = false;
 	anim_finished_event_pending = false;
 	graze_release(); // user resources (zones) and queued events
 	sound_release(); // user resources (sounds) and the listener ref

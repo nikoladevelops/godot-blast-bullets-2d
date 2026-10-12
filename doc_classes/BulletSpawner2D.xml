@@ -51,6 +51,14 @@
 				Returns one global transform per bullet for the current [member pattern_source]. Empty [member transforms_generator] means this node. Children mode with no markers falls back to the generator itself. Aimed mode with no target returns an empty array. Corridor mode with no target falls back to [member helper_corridor_aim_direction] so the wall still draws. Every helper pattern returns exactly [member helper_bullets_amount] transforms (gaps and fills included), minus any [member helper_skip_indices].
 			</description>
 		</method>
+		<method name="convert_live_bullets_to_pickups">
+			<return type="Array" />
+			<param index="0" name="pickup" type="BulletPickupData2D" />
+			<param index="1" name="target" type="Variant" />
+			<description>
+				Turns every live bullet of the volleys this spawner fired into pickups described by [param pickup]: the way to say "when the boss dies, all its bullets become gems and fly to the player". Other spawners' bullets are left alone (use [method BulletFactory2D.convert_all_bullets_to_pickups] for everything). Returns the new pickup volleys. Needs a factory; the bullets stop counting against [member max_live_bullets]. The converted bullets leave their volleys (silently, or with their On Clear effects when [member BulletPickupData2D.fire_clear_effects] is on) and reappear as pickups at the same pose, scaled by [member BulletPickupData2D.scale_multiplier]. Pickups are owned by the factory, follow [member BulletFactory2D.time_scale] and are never converted again. Collecting one emits [signal BulletFactory2D.pickup_collected]. [param target] is where the pickups are pulled: a [Node2D] (followed while it moves), a [Vector2] (a global position), a group name as a String or StringName (each pickup goes to the nearest usable member of that group at the moment of the call), or null (the mouse cursor). Anything else, an empty group, or a node outside the tree pushes one error and converts nothing.
+			</description>
+		</method>
 		<method name="debug_check_layer_coincidence" qualifiers="const">
 			<return type="Dictionary" />
 			<param index="0" name="tolerance_px" type="float" default="1.0" />

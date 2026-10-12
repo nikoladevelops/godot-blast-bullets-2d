@@ -1271,6 +1271,15 @@
 				Clears per-bullet smoothing mode: the shared [member homing_smoothing] drives every bullet again. No-op when per-bullet mode was never enabled.
 			</description>
 		</method>
+		<method name="convert_to_pickups">
+			<return type="Array" />
+			<param index="0" name="pickup" type="BulletPickupData2D" />
+			<param index="1" name="target" type="Variant" />
+			<param index="2" name="bullet_indexes" type="PackedInt32Array" default="PackedInt32Array()" />
+			<description>
+				Turns this volley's live bullets into pickups described by [param pickup], all of them or only the ones in [param bullet_indexes] (an index out of range pushes one error and converts nothing; frozen bullets are skipped). Returns the new pickup volleys, see [method BulletFactory2D.convert_all_bullets_to_pickups] for the details, the [param target] forms and the rules. The converted bullets leave their volleys (silently, or with their On Clear effects when [member BulletPickupData2D.fire_clear_effects] is on) and reappear as pickups at the same pose, scaled by [member BulletPickupData2D.scale_multiplier]. Pickups are owned by the factory, follow [member BulletFactory2D.time_scale] and are never converted again. Collecting one emits [signal BulletFactory2D.pickup_collected]. [param target] is where the pickups are pulled: a [Node2D] (followed while it moves), a [Vector2] (a global position), a group name as a String or StringName (each pickup goes to the nearest usable member of that group at the moment of the call), or null (the mouse cursor). Anything else, an empty group, or a node outside the tree pushes one error and converts nothing.
+			</description>
+		</method>
 		<method name="debug_dedup_find_collision" qualifiers="const">
 			<return type="Dictionary" />
 			<param index="0" name="probe_count" type="int" />
@@ -1743,6 +1752,12 @@
 			<return type="bool" />
 			<description>
 				Whether every bullet is disabled but the volley was kept (auto pooling off): frozen and still yours, wake it with [method enable_bullet].
+			</description>
+		</method>
+		<method name="is_pickup_volley" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Whether this volley was made by a pickup conversion and is still in that life. A pooled volley that is reused for ordinary bullets is not one any more.
 			</description>
 		</method>
 		<method name="is_pooled" qualifiers="const">

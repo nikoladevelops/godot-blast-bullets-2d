@@ -19,6 +19,7 @@
 #include "core/dynamic_sparse_set.hpp"
 #include "core/graze_targets2d.hpp"
 #include "data/bullet_effect_layer_data2d.hpp"
+#include "data/bullet_pickup_data2d.hpp"
 #include "data/bullet_volley_data2d.hpp"
 #include "debugger/despawn_bounds_preview_layer2d.hpp"
 #include "factory/graze_detector2d.hpp"
@@ -141,6 +142,33 @@ public:
 	int clear_bullets_in_circle(const Vector2 &center, real_t radius);
 	int clear_bullets_in_rect(const Rect2 &rect);
 	int count_bullets_in_circle(const Vector2 &center, real_t radius) const;
+
+	// ---- Pickups (bullet_factory2d_pickups.cpp) ----
+	// Turns live bullets into one pickup volley per call (split by the pattern
+	// limit): they leave their volleys, burst out, are pulled to `target` (a
+	// Node2D, a Vector2, a group name = nearest member per bullet, or null =
+	// the mouse) and are collected on arrival (signal pickup_collected). Not
+	// structural: allowed from physics handlers, refused while a sweep runs
+	// (use the deferred twin there). Bad input converts nothing.
+	Array convert_all_bullets_to_pickups(const Ref<BulletPickupData2D> &pickup, const Variant &target);
+	Array convert_bullets_in_circle_to_pickups(const Vector2 &center, real_t radius, const Ref<BulletPickupData2D> &pickup, const Variant &target);
+	Array convert_bullets_in_rect_to_pickups(const Rect2 &rect, const Ref<BulletPickupData2D> &pickup, const Variant &target);
+	void convert_all_bullets_to_pickups_deferred(const Ref<BulletPickupData2D> &pickup, const Variant &target);
+	struct PickupSelection {
+		enum Kind { ALL,
+			OWNER,
+			CIRCLE,
+			RECT,
+			VOLLEY };
+		Kind kind = ALL;
+		uint64_t owner_spawner_id = 0;
+		Vector2 center;
+		real_t radius = 0.0;
+		Rect2 rect;
+		BulletVolley2D *volley = nullptr; // VOLLEY: used immediately, never kept
+		const PackedInt32Array *indexes = nullptr; // VOLLEY: empty = every live bullet
+	};
+	Array convert_to_pickups_impl(const char *function_name, const Ref<BulletPickupData2D> &pickup, const Variant &target, const PickupSelection &selection);
 	int count_bullets_in_rect(const Rect2 &rect) const;
 
 	void free_disabled_bullets(const Ref<VolleyPoolKey2D> &key = Ref<VolleyPoolKey2D>());

@@ -16,7 +16,7 @@ const PLUGIN_CLASSES: Array[StringName] = [
 	&"BulletWobbleData2D", &"VolleyPoolKey2D", &"BulletAttachment2D", &"BulletPatterns2D",
 	&"BulletFactory2D", &"BulletVolleyDebugger2D", &"BulletVolleyData2D", &"BulletVolley2D",
 	&"BulletSpawner2D", &"PatternPreviewLayer2D", &"BulletGrazeZone2D", &"GrazePreviewLayer2D",
-	&"BulletSoundData2D",
+	&"BulletSoundData2D", &"BulletPickupData2D", &"DespawnBoundsPreviewLayer2D",
 ]
 const AMOUNTS := [-1, 0, 1, 2, 7, 24, 10001]
 const TRACE_STEP := 1.0 / 60.0
@@ -569,7 +569,7 @@ func _probe_setters(section: String, label: String, obj: Object) -> void:
 
 func _snap_setters(section: String) -> void:
 	for cls in [&"BulletVolleyData2D", &"BulletSpeedData2D", &"BulletRotationData2D", &"BulletCurvesData2D",
-			&"BulletWobbleData2D", &"BulletEffectLayerData2D", &"BulletGrazeZone2D"]:
+			&"BulletWobbleData2D", &"BulletEffectLayerData2D", &"BulletGrazeZone2D", &"BulletPickupData2D"]:
 		_probe_setters(section, cls, ClassDB.instantiate(cls))
 	var sp := BulletSpawner2D.new()
 	sp.set_shooting_enabled(false)

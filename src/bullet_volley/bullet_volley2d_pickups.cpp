@@ -1,0 +1,101 @@
+// Pickups on the volley side: the burst-out / magnet phases, collection when
+// a pickup reaches its target, and the volley-scoped conversion entry. The
+// conversion engine itself (all scopes, one new volley per call) lives in
+// factory/bullet_factory2d_pickups.cpp.
+
+#include "bullet_volley/bullet_volley2d_internal.hpp"
+
+using namespace godot;
+
+namespace BlastBullets2D {
+
+void BulletVolley2D::seed_pickups(const Ref<BulletPickupData2D> &pickup, const Vector2 *velocities, int count) {
+	pickup_data = pickup;
+	pickup_magnet_started = false;
+	const int limit = Math::min(count, Math::min(amount_bullets, (int)all_cached_speed.size()));
+	for (int i = 0; i < limit; ++i) {
+		const Vector2 v = velocities[i];
+		const real_t speed = Math::sqrt(v.x * v.x + v.y * v.y);
+		if (!Math::is_finite(speed)) {
+			continue; // keeps the spawn-time (zero) motion
+		}
+		if (speed > 0.0001f) {
+			all_cached_direction[i] = Vector2(v.x / speed, v.y / speed);
+		}
+		all_cached_speed[i] = speed;
+		// Burst phase: no growth until the magnet starts.
+		all_cached_max_speed[i] = speed;
+		all_cached_acceleration[i] = 0.0f;
+		refresh_cached_velocity(i);
+	}
+	if (pickup->magnet_delay_sec <= 0.0) {
+		maybe_begin_pickup_magnet();
+	}
+}
+
+void BulletVolley2D::maybe_begin_pickup_magnet() {
+	if (pickup_data.is_null() || pickup_magnet_started || curves_elapsed_time < pickup_data->magnet_delay_sec) {
+		return;
+	}
+	pickup_magnet_started = true;
+	linear_drag = 0.0f; // the burst is over; the pool re-seeds this from the data
+	const real_t acceleration = (real_t)pickup_data->magnet_acceleration;
+	const real_t top_speed = (real_t)pickup_data->magnet_max_speed;
+	for (const int i : all_bullets_enabled_set.get_active_indexes()) {
+		if (i < 0 || i >= (int)all_cached_speed.size()) {
+			continue;
+		}
+		all_cached_acceleration[i] = acceleration;
+		all_cached_max_speed[i] = Math::max(all_cached_speed[i], top_speed);
+	}
+}
+
+bool BulletVolley2D::collect_pickup_bullet(int bullet_index, Node2D *target) {
+	if (bullet_index < 0 || bullet_index >= (int)all_cached_instance_transforms.size() || bullet_factory == nullptr) {
+		return true;
+	}
+	const uint64_t self_id = get_instance_id();
+	const Ref<BulletPickupData2D> pickup = pickup_data; // survives a handler that releases the life
+	const Vector2 position = all_cached_instance_transforms[bullet_index].columns[2];
+	const uint64_t epoch = collision_epoch_for_bullet(bullet_index);
+	// The bullet is alive in the handler (contract of every bullet signal).
+	bullet_factory->note_user_code();
+	bullet_factory->emit_signal("pickup_collected", target != nullptr ? Variant(target) : Variant(), position, this, bullet_index, pickup->value);
+	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+		return false;
+	}
+	if (pickup->collect_sound.is_valid()) {
+		bullet_factory->play_sound(pickup->collect_sound, position);
+	}
+	if (pickup->collect_effect.is_valid()) {
+		bullet_factory->spawn_layer_effect(pickup->collect_effect, Transform2D(0.0f, position));
+	}
+	// A handler may have disabled or recycled the bullet: only a still-live,
+	// same-life bullet is taken out now.
+	if (all_bullets_enabled_set.contains(bullet_index) && collision_epoch_for_bullet(bullet_index) == epoch) {
+		disable_bullet(bullet_index, true);
+	}
+	return ObjectDB::get_instance(ObjectID(self_id)) == this;
+}
+
+Array BulletVolley2D::convert_to_pickups(const Ref<BulletPickupData2D> &pickup, const Variant &target, const PackedInt32Array &bullet_indexes) {
+	const char *function_name = "BulletVolley2D.convert_to_pickups";
+	for (int64_t k = 0; k < bullet_indexes.size(); ++k) {
+		const int i = bullet_indexes[k];
+		if (i < 0 || i >= amount_bullets) {
+			UtilityFunctions::push_error(String(function_name) + ": bullet index " + String::num_int64(i) + " is out of range (0.." + String::num_int64(amount_bullets - 1) + "), nothing converted.");
+			return Array();
+		}
+	}
+	if (bullet_factory == nullptr) {
+		UtilityFunctions::push_error(String(function_name) + ": this volley was never spawned through a BulletFactory2D, nothing converted.");
+		return Array();
+	}
+	BulletFactory2D::PickupSelection selection;
+	selection.kind = BulletFactory2D::PickupSelection::VOLLEY;
+	selection.volley = this;
+	selection.indexes = &bullet_indexes;
+	return bullet_factory->convert_to_pickups_impl(function_name, pickup, target, selection);
+}
+
+} // namespace BlastBullets2D

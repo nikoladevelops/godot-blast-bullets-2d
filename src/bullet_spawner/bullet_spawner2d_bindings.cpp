@@ -241,6 +241,7 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_time_scale_affects_volleys", "value"), &BulletSpawner2D::set_time_scale_affects_volleys);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "time_scale_affects_volleys"), "set_time_scale_affects_volleys", "get_time_scale_affects_volleys");
 	ClassDB::bind_method(D_METHOD("get_process_time_scale"), &BulletSpawner2D::get_process_time_scale);
+	ClassDB::bind_method(D_METHOD("convert_live_bullets_to_pickups", "pickup", "target"), &BulletSpawner2D::convert_live_bullets_to_pickups);
 
 	ADD_GROUP("Bullet Patterns", "");
 	// Hand-written accessors of the group (PATTERN_PROPERTY rows); the

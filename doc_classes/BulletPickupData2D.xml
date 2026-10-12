@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="BulletPickupData2D" inherits="Resource" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		What a bullet becomes when it is turned into a pickup: coin, gem, score item.
+	</brief_description>
+	<description>
+		Describes a pickup for [method BulletFactory2D.convert_all_bullets_to_pickups], [method BulletFactory2D.convert_bullets_in_circle_to_pickups], [method BulletFactory2D.convert_bullets_in_rect_to_pickups], [method BulletSpawner2D.convert_live_bullets_to_pickups] and [method BulletVolley2D.convert_to_pickups]. A converted bullet appears again where it was with the look settings (texture or animation, size, tint and opacity, fades), keeps part of its velocity and drifts out with drag, then after the magnet delay accelerates towards the target and is collected on arrival ([signal BulletFactory2D.pickup_collected]). Optionally it also has a collision layer, so a player [Area2D] can touch it through [signal BulletFactory2D.area_entered].
+
+		[codeblock]
+		var coin := BulletPickupData2D.new()
+		coin.texture = preload("res://coin.png")
+		coin.value = 10
+		coin.magnet_delay_sec = 0.4
+
+		# the boss died: all its bullets become coins and fly to the player
+		boss_spawner.convert_live_bullets_to_pickups(coin, player)
+		# a bomb: everything on screen
+		factory.convert_all_bullets_to_pickups(coin, player)
+		factory.pickup_collected.connect(func(target, position, volley, bullet_index, value): score += value)
+		[/codeblock]
+		Every accepted change emits [signal Resource.changed]; an edit reaches the next conversion, not pickups already flying.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="get_volley_data">
+			<return type="BulletVolleyData2D" />
+			<description>
+				The spawn data of the pickup volley this resource produces (built from the look, motion and collision settings, cached until a property changes). Read it to see exactly what is spawned; changing the returned resource does not change the pickup.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="collect_effect" type="BulletEffectLayerData2D" setter="set_collect_effect" getter="get_collect_effect">
+			A sprite effect fired at the pickup's position when it is collected (see [method BulletFactory2D.spawn_layer_effect]).
+		</member>
+		<member name="collect_radius" type="float" setter="set_collect_radius" getter="get_collect_radius" default="24.0">
+			A pickup is collected when it comes this close to its target (pixels). Must be finite and above 0.
+		</member>
+		<member name="collect_sound" type="BulletSoundData2D" setter="set_collect_sound" getter="get_collect_sound">
+			Played once at the pickup's position when it is collected (see [method BulletFactory2D.play_sound]; its limits and listener rules apply).
+		</member>
+		<member name="collision_layer" type="int" setter="set_collision_layer" getter="get_collision_layer" default="0">
+			Physics layer of the pickup. With a layer or a mask set, the pickup has a small circle area ([member collision_radius]) and the factory's [signal BulletFactory2D.area_entered] / [signal BulletFactory2D.body_entered] work for it, so a player Area2D can touch coins. 0 and 0 (default) means pure distance collection with no physics at all.
+		</member>
+		<member name="collision_mask" type="int" setter="set_collision_mask" getter="get_collision_mask" default="0">
+			Physics layers the pickup detects. See [member collision_layer].
+		</member>
+		<member name="collision_radius" type="float" setter="set_collision_radius" getter="get_collision_radius" default="8.0">
+			Radius of the pickup's collision circle in pixels, used only with a collision layer or mask. Must be finite and above 0.
+		</member>
+		<member name="drag" type="float" setter="set_drag" getter="get_drag" default="4.0">
+			How fast the burst slows down (per second, 1 loses all speed in a second). Applies until the magnet starts. Must be finite and 0 or more.
+		</member>
+		<member name="fade_in_sec" type="float" setter="set_fade_in_sec" getter="get_fade_in_sec" default="0.0">
+			Seconds the pickup takes to reach full opacity after the conversion. Clamped to the lifetime. Must be finite and 0 or more.
+		</member>
+		<member name="fade_out_sec" type="float" setter="set_fade_out_sec" getter="get_fade_out_sec" default="0.5">
+			Seconds before expiry over which the pickup fades out (a blinking-out coin). Needs a finite [member lifetime_sec]; clamped to it. Must be finite and 0 or more.
+		</member>
+		<member name="fire_clear_effects" type="bool" setter="set_fire_clear_effects" getter="get_fire_clear_effects" default="false">
+			When on, each converted bullet fires its On Clear effects and sounds as it leaves (a bomb flash). Off by default: the bullet just becomes the pickup.
+		</member>
+		<member name="inherit_custom_data" type="bool" setter="set_inherit_custom_data" getter="get_inherit_custom_data" default="false">
+			Copies each bullet's custom data resource onto its pickup, readable in [signal BulletFactory2D.pickup_collected] through [method BulletVolley2D.bullet_get_custom_data]. Off by default.
+		</member>
+		<member name="initial_velocity_scale" type="float" setter="set_initial_velocity_scale" getter="get_initial_velocity_scale" default="0.4">
+			Fraction of the bullet's velocity the pickup keeps for its burst phase (0 stops it dead, 1 keeps the bullet's speed). Must be finite and 0 or more.
+		</member>
+		<member name="lifetime_sec" type="float" setter="set_lifetime_sec" getter="get_lifetime_sec" default="12.0">
+			How long a pickup lives if nobody collects it. 0 means forever. Must be finite and 0 or more.
+		</member>
+		<member name="magnet_acceleration" type="float" setter="set_magnet_acceleration" getter="get_magnet_acceleration" default="1200.0">
+			How fast the pull accelerates a pickup, in px/s per second, once the magnet runs. Must be finite and 0 or more.
+		</member>
+		<member name="magnet_delay_sec" type="float" setter="set_magnet_delay_sec" getter="get_magnet_delay_sec" default="0.35">
+			Seconds of burst before the pull to the target begins (steering and acceleration both start then). 0 pulls at once. Must be finite and 0 or more.
+		</member>
+		<member name="magnet_max_speed" type="float" setter="set_magnet_max_speed" getter="get_magnet_max_speed" default="900.0">
+			Top speed of the pull in px/s (never below the speed the pickup already has). Must be finite and 0 or more.
+		</member>
+		<member name="magnet_smoothing" type="float" setter="set_magnet_smoothing" getter="get_magnet_smoothing" default="0.0">
+			Cap on how fast a pickup may turn towards its target (radians per second per unit; the volley homing smoothing). 0 steers straight at the target at once. A small positive value limits the turning, so pickups swing around in arcs before settling on the target; large values behave like 0. Must be finite and 0 or more.
+		</member>
+		<member name="scale_multiplier" type="float" setter="set_scale_multiplier" getter="get_scale_multiplier" default="1.0">
+			Multiplies the scale the bullet had when it was converted, so a big bullet can give a bigger coin. Must be finite and above 0.
+		</member>
+		<member name="scatter_speed_max" type="float" setter="set_scatter_speed_max" getter="get_scatter_speed_max" default="0.0">
+			Upper end of the random extra burst speed. See [member scatter_speed_min].
+		</member>
+		<member name="scatter_speed_min" type="float" setter="set_scatter_speed_min" getter="get_scatter_speed_min" default="0.0">
+			With [member scatter_speed_max]: a random extra burst, each pickup gets a speed between the two in a random direction (Godot's global random generator, so [method @GlobalScope.seed] reproduces it). 0 and 0 is off. The pair is not checked against each other; an inverted pair swaps. Must be finite and 0 or more.
+		</member>
+		<member name="sprite_frames" type="SpriteFrames" setter="set_sprite_frames" getter="get_sprite_frames">
+			An animation for the pickup (its first animation plays). Wins over [member texture].
+		</member>
+		<member name="texture" type="Texture2D" setter="set_texture" getter="get_texture">
+			The pickup's image when [member sprite_frames] is empty. With neither, a small white disc is used so a pickup is never invisible.
+		</member>
+		<member name="texture_size" type="Vector2" setter="set_texture_size" getter="get_texture_size" default="Vector2(0, 0)">
+			Drawn size in pixels. (0, 0) uses the size of the texture or of the animation's first frame. Both components must be finite and 0 or more.
+		</member>
+		<member name="tint" type="Color" setter="set_tint" getter="get_tint" default="Color(1, 1, 1, 1)">
+			Color and opacity of the pickup (alpha is the opacity): a translucent bullet can become a solid gem or the other way round. Every component must be finite.
+		</member>
+		<member name="value" type="Variant" setter="set_value" getter="get_value" default="null">
+			Anything you want back in [signal BulletFactory2D.pickup_collected]: a number of coins, a dictionary, a resource.
+		</member>
+	</members>
+</class>

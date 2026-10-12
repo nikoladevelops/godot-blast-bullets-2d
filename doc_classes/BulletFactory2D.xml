@@ -54,6 +54,41 @@
 				Stops every active sprite visual. Volley bakes keep their configs (triggers keep working); the manual hatch bakes are dropped entirely.
 			</description>
 		</method>
+		<method name="convert_all_bullets_to_pickups">
+			<return type="Array" />
+			<param index="0" name="pickup" type="BulletPickupData2D" />
+			<param index="1" name="target" type="Variant" />
+			<description>
+				Turns every live bullet of every active volley on screen, whoever fired it, into pickups (coins, gems, score items) described by [param pickup]. Returns the new pickup volleys, usually one: a call that converts more bullets than [member BulletPatterns2D.max_bullets_per_pattern] is split into volleys of at most that size. Converting nothing returns an empty array without an error. Allowed from physics handlers (a bomb, a boss dying); refused while a sweep is running, use [method convert_all_bullets_to_pickups_deferred] there. The converted bullets leave their volleys (silently, or with their On Clear effects when [member BulletPickupData2D.fire_clear_effects] is on) and reappear as pickups at the same pose, scaled by [member BulletPickupData2D.scale_multiplier]. Pickups are owned by the factory, follow [member BulletFactory2D.time_scale] and are never converted again. Collecting one emits [signal BulletFactory2D.pickup_collected]. [param target] is where the pickups are pulled: a [Node2D] (followed while it moves), a [Vector2] (a global position), a group name as a String or StringName (each pickup goes to the nearest usable member of that group at the moment of the call), or null (the mouse cursor). Anything else, an empty group, or a node outside the tree pushes one error and converts nothing.
+			</description>
+		</method>
+		<method name="convert_all_bullets_to_pickups_deferred">
+			<return type="void" />
+			<param index="0" name="pickup" type="BulletPickupData2D" />
+			<param index="1" name="target" type="Variant" />
+			<description>
+				Queues [method convert_all_bullets_to_pickups] for the next idle frame, in call order with the other deferred structural calls. Safe from anywhere, including callbacks that run inside a sweep. The result of the queued call is not returned.
+			</description>
+		</method>
+		<method name="convert_bullets_in_circle_to_pickups">
+			<return type="Array" />
+			<param index="0" name="center" type="Vector2" />
+			<param index="1" name="radius" type="float" />
+			<param index="2" name="pickup" type="BulletPickupData2D" />
+			<param index="3" name="target" type="Variant" />
+			<description>
+				Like [method convert_all_bullets_to_pickups], but only the bullets whose centre is inside the circle (global space, edge inclusive). [param center] must be finite and [param radius] a finite number 0 or more, otherwise one error is pushed and nothing is converted.
+			</description>
+		</method>
+		<method name="convert_bullets_in_rect_to_pickups">
+			<return type="Array" />
+			<param index="0" name="rect" type="Rect2" />
+			<param index="1" name="pickup" type="BulletPickupData2D" />
+			<param index="2" name="target" type="Variant" />
+			<description>
+				Like [method convert_all_bullets_to_pickups], but only the bullets whose centre is inside the rectangle (global space, edges inclusive, a negative size is the same rectangle). [param rect] must be finite.
+			</description>
+		</method>
 		<method name="count_bullets_in_circle" qualifiers="const">
 			<return type="int" />
 			<param index="0" name="center" type="Vector2" />
@@ -638,11 +673,28 @@
 				Emitted after [method clear_bullets_in_circle] or [method clear_bullets_in_rect], once per volley that lost bullets, after the factory is no longer busy so handlers may spawn (turn cleared bullets into score items). [param positions] holds the global position of each cleared bullet, parallel to [param bullet_indexes]. The volley may already be back in the pool when this fires, so read the positions, not the volley. Not emitted by [method clear_active_bullets].
 			</description>
 		</signal>
+		<signal name="bullets_converted">
+			<param index="0" name="count" type="int" />
+			<param index="1" name="volleys" type="BulletVolley2D[]" />
+			<description>
+				Emitted after a conversion call that converted something: [param count] bullets became pickups, in the new [param volleys] (the same array the call returns). The factory is not busy any more, so a handler may spawn or convert again.
+			</description>
+		</signal>
 		<signal name="life_time_over">
 			<param index="0" name="volley" type="BulletVolley2D" />
 			<param index="1" name="bullet_indexes" type="int[]" />
 			<description>
 				Emitted live, inside the physics tick, when bullets of a volley reach the end of their lifetime, only if [member BulletVolleyData2D.is_life_time_over_signal_enabled] is on. [param bullet_indexes] lists the expiring bullets, still alive in the handler (custom data, transforms and attachments readable). After the handler, every listed bullet still alive dies with its On Lifetime Over effects, unless the handler extended its life ([method BulletVolley2D.set_life_time_left]) or made the volley infinite. Spawning from the handler is fine; structural calls need their [code]*_deferred[/code] twins.
+			</description>
+		</signal>
+		<signal name="pickup_collected">
+			<param index="0" name="target" type="Node2D" />
+			<param index="1" name="position" type="Vector2" />
+			<param index="2" name="volley" type="BulletVolley2D" />
+			<param index="3" name="bullet_index" type="int" />
+			<param index="4" name="value" type="Variant" />
+			<description>
+				A pickup reached its target (within [member BulletPickupData2D.collect_radius]). [param target] is the node that was followed (null for a point or the mouse), [param position] where the pickup is, [param volley] its pickup volley, [param bullet_index] its slot and [param value] the [member BulletPickupData2D.value] payload. The bullet is still alive in the handler (custom data and transform are readable) and leaves right after it. Emitted on the factory only, exactly once per pickup.
 			</description>
 		</signal>
 		<signal name="reset_finished">

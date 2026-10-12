@@ -79,6 +79,8 @@ void BulletVolley2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_bullet_indexes_in_rect", "rect"), &BulletVolley2D::get_bullet_indexes_in_rect);
 	ClassDB::bind_method(D_METHOD("clear_bullets_in_circle", "center", "radius"), &BulletVolley2D::clear_bullets_in_circle);
 	ClassDB::bind_method(D_METHOD("clear_bullets_in_rect", "rect"), &BulletVolley2D::clear_bullets_in_rect);
+	ClassDB::bind_method(D_METHOD("convert_to_pickups", "pickup", "target", "bullet_indexes"), &BulletVolley2D::convert_to_pickups, DEFVAL(PackedInt32Array()));
+	ClassDB::bind_method(D_METHOD("is_pickup_volley"), &BulletVolley2D::is_pickup_volley);
 	ClassDB::bind_method(D_METHOD("enable_bullet", "bullet_index", "collision_amount", "enable_attachment"), &BulletVolley2D::enable_bullet, DEFVAL(-1), DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("wake_bullet", "bullet_index", "collision_amount", "enable_attachment"), &BulletVolley2D::wake_bullet, DEFVAL(-1), DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("debug_get_volley_info"), &BulletVolley2D::debug_get_volley_info);

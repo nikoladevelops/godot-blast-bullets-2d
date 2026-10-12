@@ -1072,6 +1072,9 @@ public:
 	void set_time_scale_affects_volleys(bool value) { time_scale_affects_volleys = value; }
 	// spawner scale x factory scale, 0 when either is not finite and positive.
 	double get_process_time_scale() const;
+	// Turns every live bullet of the volleys this spawner fired into pickups
+	// (see BulletFactory2D.convert_all_bullets_to_pickups). Returns the pickup volleys.
+	Array convert_live_bullets_to_pickups(const Ref<BulletPickupData2D> &pickup, const Variant &target);
 
 	int get_bullet_scale_mode() const { return bullet_scale_mode; }
 	void set_bullet_scale_mode(int value);

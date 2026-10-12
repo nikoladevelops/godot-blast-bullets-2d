@@ -44,6 +44,9 @@ void BulletVolley2D::tick(double delta) {
 	if (graze_zone_slots > 0) {
 		prepare_graze_tick();
 	}
+	if (pickup_data.is_valid() && !pickup_magnet_started) {
+		maybe_begin_pickup_magnet();
+	}
 	// 2. Integration (no user code runs inside; homing reaches and grazes
 	// are queued).
 	move_bullets(delta);

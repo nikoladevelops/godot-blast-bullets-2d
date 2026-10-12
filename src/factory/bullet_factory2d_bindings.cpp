@@ -227,6 +227,24 @@ void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("clear_bullets_in_rect", "rect"), &BulletFactory2D::clear_bullets_in_rect);
 	ClassDB::bind_method(D_METHOD("count_bullets_in_circle", "center", "radius"), &BulletFactory2D::count_bullets_in_circle);
 	ClassDB::bind_method(D_METHOD("count_bullets_in_rect", "rect"), &BulletFactory2D::count_bullets_in_rect);
+
+	// Pickups: bullets to coins/gems that are pulled to a target.
+	ClassDB::bind_method(D_METHOD("convert_all_bullets_to_pickups", "pickup", "target"), &BulletFactory2D::convert_all_bullets_to_pickups);
+	ClassDB::bind_method(D_METHOD("convert_bullets_in_circle_to_pickups", "center", "radius", "pickup", "target"), &BulletFactory2D::convert_bullets_in_circle_to_pickups);
+	ClassDB::bind_method(D_METHOD("convert_bullets_in_rect_to_pickups", "rect", "pickup", "target"), &BulletFactory2D::convert_bullets_in_rect_to_pickups);
+	ClassDB::bind_method(D_METHOD("convert_all_bullets_to_pickups_deferred", "pickup", "target"), &BulletFactory2D::convert_all_bullets_to_pickups_deferred);
+	// A pickup reached its target (the bullet is still alive in the handler,
+	// then it leaves). `target` is null for a point or the mouse.
+	ADD_SIGNAL(MethodInfo("pickup_collected",
+			PropertyInfo(Variant::OBJECT, "target", PROPERTY_HINT_RESOURCE_TYPE, "Node2D"),
+			PropertyInfo(Variant::VECTOR2, "position"),
+			PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
+			PropertyInfo(Variant::INT, "bullet_index"),
+			PropertyInfo(Variant::NIL, "value", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NIL_IS_VARIANT)));
+	// After a conversion call: how many bullets became pickups and the new volleys.
+	ADD_SIGNAL(MethodInfo("bullets_converted",
+			PropertyInfo(Variant::INT, "count"),
+			PropertyInfo(Variant::ARRAY, "volleys", PROPERTY_HINT_ARRAY_TYPE, "BulletVolley2D")));
 	// Once per volley after an area clear: where the cleared bullets were
 	// (global positions, parallel to bullet_indexes). The volley may already
 	// be pooled when this fires (positions are the payload).

@@ -90,6 +90,18 @@ void BulletSpawner2D::set_bullet_scale_max_xy(const Vector2 &value) {
 	bullet_scale_max_xy = value;
 }
 
+Array BulletSpawner2D::convert_live_bullets_to_pickups(const Ref<BulletPickupData2D> &pickup, const Variant &target) {
+	BulletFactory2D *factory = get_bullet_factory();
+	if (factory == nullptr) {
+		UtilityFunctions::push_error("BulletSpawner2D.convert_live_bullets_to_pickups: the spawner has no BulletFactory2D, nothing converted.");
+		return Array();
+	}
+	BulletFactory2D::PickupSelection selection;
+	selection.kind = BulletFactory2D::PickupSelection::OWNER;
+	selection.owner_spawner_id = get_instance_id();
+	return factory->convert_to_pickups_impl("BulletSpawner2D.convert_live_bullets_to_pickups", pickup, target, selection);
+}
+
 // ---- Rolls ----------------------------------------------------------------------------
 
 // [0, 1). Seeded: a pure function of (seed, shots fired, channel, index), no

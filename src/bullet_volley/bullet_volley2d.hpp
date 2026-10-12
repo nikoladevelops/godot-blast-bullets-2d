@@ -13,6 +13,7 @@
 #include "data/bullet_curves_data2d.hpp"
 #include "data/bullet_effect_layer_data2d.hpp"
 #include "data/bullet_graze_zone2d.hpp"
+#include "data/bullet_pickup_data2d.hpp"
 #include "data/bullet_rotation_data2d.hpp"
 #include "data/bullet_sound_data2d.hpp"
 #include "data/bullet_speed_data2d.hpp"
@@ -250,6 +251,8 @@ public:
 	// disables the bullets the handler left untouched (On Lifetime Over each)
 	// unless the handler vetoed (infinite lifetime or set_life_time_left).
 	void expire_live_bullets();
+	Ref<BulletPickupData2D> pickup_data;
+	bool pickup_magnet_started = false;
 	std::vector<int> expiry_indexes_scratch;
 	// Reused by cull_outside_bounds (no allocation per tick once warm).
 	std::vector<int> despawn_indexes_scratch;
@@ -1293,6 +1296,23 @@ public:
 	// of bullets [0, count) by factors[i] right after the spawn (the cached
 	// velocity is refreshed; a result that would overflow float32 is skipped).
 	void apply_speed_factors(const real_t *factors, int count);
+
+	// ---- Pickups (bullet_volley2d_pickups.cpp) ----
+	// A pickup volley carries the BulletPickupData2D it was converted with;
+	// reaching its homing target collects the bullet. Released with the life.
+	bool is_pickup_volley() const { return pickup_data.is_valid(); }
+	// Converts this volley's live bullets (all, or the listed indexes) into one
+	// pickup volley per pattern-limit chunk. Returns the new volleys.
+	Array convert_to_pickups(const Ref<BulletPickupData2D> &pickup, const Variant &target, const PackedInt32Array &bullet_indexes);
+	// Conversion step: gives the freshly spawned volley its pickup identity
+	// and burst-out motion (velocities[i] is bullet i's initial velocity).
+	void seed_pickups(const Ref<BulletPickupData2D> &pickup, const Vector2 *velocities, int count);
+	// The magnet phase: once the delay has passed, drag ends and the bullets
+	// accelerate towards their homing target. One branch per tick until then.
+	void maybe_begin_pickup_magnet();
+	// Reached the target: pickup_collected, optional sound/effect, the bullet
+	// leaves. False when a handler freed this volley.
+	bool collect_pickup_bullet(int bullet_index, Node2D *target);
 
 	// ---- Area queries and clears (bullet_volley2d_area.cpp) ----
 	// Global-space centers of the LIVE bullets inside a circle / a rectangle
