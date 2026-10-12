@@ -353,3 +353,35 @@ func test_a_slow_bullet_that_stays_outside_the_radius_does_not_report() -> void:
 	for i in 20:
 		await idle(1)
 	assert_eq(reached, [], "no false report while it is far away")
+
+
+func test_a_big_group_assigns_every_pickup_its_true_nearest_member() -> void:
+	var members: Array = []
+	for k in 120:
+		var m := _target(Vector2(300 + 220 * cos(k * TAU / 120.0), 300 + 220 * sin(k * TAU / 120.0)))
+		m.add_to_group("many")
+		members.append(m)
+	var points: Array = []
+	var rnd := RandomNumberGenerator.new()
+	rnd.seed = 7
+	for i in 600:
+		points.append(Vector2(rnd.randf_range(0, 600), rnd.randf_range(0, 600)))
+	P.still(factory, points)
+	var coin := P.coin()
+	coin.motion_mode = BulletPickupData2D.MOTION_KEEP_BULLET_MOTION
+	coin.magnet_delay_sec = 0.0
+	coin.collect_radius = 12.0
+	var pv: BulletVolley2D = factory.convert_all_bullets_to_pickups(coin, "many")[0]
+	# Expected owner of each pickup: the brute-force nearest member.
+	var expected: Array = []
+	for i in 600:
+		var at: Vector2 = pv.get_bullet_transform(i).origin
+		var best: Node2D = members[0]
+		for m in members:
+			if at.distance_squared_to(m.position) < at.distance_squared_to(best.position):
+				best = m
+		expected.append(best)
+	assert_eq(pv.get_amount_bullets(), 600, "one volley of 600")
+	for i in 600:
+		assert_eq(int(pv.bullet_check_has_homing_targets(i)), 1, "pickup %d has its own target" % i)
+		assert_same(pv.bullet_get_current_homing_target(i), expected[i], "pickup %d goes to its nearest member" % i)
