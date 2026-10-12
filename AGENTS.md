@@ -23,6 +23,7 @@ for the rest: the sections are written to be looked up, not read once.
 | 9 | Searching and reading | 19 | Final report template |
 |  |  | 20 | Graze (zones, tick stage, routing, preview) |
 |  |  | 21 | Sound (mixer, triggers, listeners, RNG) |
+|  |  | 22 | World controls (time scale, despawn bounds, randomization, pickups) |
 
 ## 0. Golden rules
 
@@ -52,7 +53,7 @@ for the rest: the sections are written to be looked up, not read once.
 
 ```sh
 GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py   # build (exit 1 = failed; never raw scons, never edit SConstruct)
-python3 tools/run_tests.py                                       # 178 files / 1315 tests, ~10 s, leak-checked
+python3 tools/run_tests.py                                       # 187 files / 1430 tests, ~10 s, leak-checked
 python3 tools/run_tests.py --suite <substring> --full            # one area, every failure message unclipped
 python3 tools/run_tests.py --self-test                           # proves the harness still catches failures/leaks
 python3 tools/run_editor_smoke.py                                # headless EDITOR run of tests/editor_smoke/ (editor-only paths)
@@ -606,7 +607,7 @@ bullet_volley2d_render.cpp     physics interpolation pass
 bullet_volley2d_setup.cpp      MultiMesh/buffer setup (one set_buffer per spawn)
 bullet_volley2d_collision.cpp  area + ONE shared shape, intake, dedup, paused-overlap park/replay, drain
 bullet_volley2d_{bounce,homing,orbit,motion,curves,wobble,gravity,lifetime,timers,attachments,
-                 effects,animation,teleport,area,debug,bindings}.cpp   one feature each
+                 effects,animation,teleport,area,pickups,debug,bindings}.cpp   one feature each
                                  (area: circle/rect queries + clears, cull_outside_bounds)
 bullet_volley2d_graze.cpp      graze arming, per-tick zone snapshot (prepare_graze_tick), live dispatch (§20)
 homing_target_deque.hpp        per-bullet/shared target queue (RingDeque2D: allocates nothing while empty)
@@ -680,7 +681,8 @@ src/
   factory/bullet_factory2d_spawn.cpp      request validation, spawn_volley(+_span), pool pre-population
   factory/bullet_factory2d_structural.cpp reset/free_*/clear_*, *_deferred queue, bookkeeping
   factory/bullet_factory2d_effects.cpp    factory-owned one-shot effects
-  factory/bullet_factory2d_world.cpp      time_scale, despawn bounds, area clears/counts + bullets_cleared
+  factory/bullet_factory2d_world.cpp      time_scale, despawn bounds (+ preview layer), area clears/counts + bullets_cleared
+  factory/bullet_factory2d_pickups.cpp    bullets -> pickups conversion engine (§22.3)
   factory/bullet_factory2d_stats.cpp      frame stats, monitors, debugger knobs, debug_*
   factory/bullet_factory2d_graze.cpp      graze debug readouts (the factory's detector lives in it)
   factory/graze_detector2d.cpp            GrazeDetector2D: graze target lists (stable slots, scans on the update interval, x-sorted slab order)
@@ -879,7 +881,7 @@ deduped, cancelled by REMOVED) and replayed once on resume.
 ### 15.1 Running
 
 ```sh
-python3 tools/run_benchmarks.py                     # 23 headless scenarios x5 (median)
+python3 tools/run_benchmarks.py                     # 24 headless scenarios x5 (median)
 python3 tools/run_benchmarks.py --scenario spawner_ # substring filter (repeatable)
 python3 tools/run_benchmarks.py --gate              # exit 1 on regression vs log/baseline.json
 python3 tools/run_benchmarks.py --update-baseline   # ONLY for an accepted change; say so in the commit
@@ -956,9 +958,9 @@ project's `.so`). For quick numeric comparisons load two
 
 ## 16. Inspector groups and serialization locks
 
-- Spawner groups, in order (locked by `test_volley_bounce.gd`): Setup,
-  Bullet Patterns, Shooting, Spin, Homing, Orbiting, Graze, Sound, Preview,
-  Movement, Performance. Spawn data (`BulletVolleyData2D`): Bullets, Appearance,
+- Spawner groups, in order (locked by `test_volley_bounce.gd`): Setup, Time,
+  Bullet Patterns, Shooting, Randomization, Spin, Homing, Orbiting, Graze,
+  Sound, Preview, Movement, Performance. Spawn data (`BulletVolleyData2D`): Bullets, Appearance,
   Movement Speed, Bullet Rotation, Wobble, Gravity, Bounce and Ricochet,
   Movement Pattern Paths, Homing, Collision, Attachments, Sprite Effects,
   Rendering and Material. No duplicate titles, no ungrouped property
@@ -1173,3 +1175,59 @@ emits `GRAZE_POINT_TARGET_BIT | index` ids and belongs in
 
 `test_project/tests/sound/` (14 suites plus `test_sound_rng_isolation`; `test_sound_reentrancy` pins user code inside the sweep). Mixer rules live in `test_sound_mixer_unit`, flight and hum rules in `test_sound_flight`, spatial and camera in `test_sound_spatial_limits` and `test_sound_camera`.
 
+## 22. World controls (time scale, despawn bounds, randomization, pickups)
+
+### 22.1 Time scale
+
+- One bullet-world clock: `BulletFactory2D.time_scale` (default 1, 0 = frozen, still processing).
+  A volley ticks on `delta * factory.volley_time_factor(volley)` = factory scale x its owner
+  spawner's `time_scale` (only while that spawner lives and `time_scale_affects_volleys` is on;
+  orphans, factory-spawned and pooled volleys use the factory scale alone). Custom timers use the
+  same factor. One-shot effects (`age_fx_effects`) use the factory scale only.
+- A spawner's own clock (`BulletSpawner2D::get_process_time_scale`) = hitch-clamped delta (0.5 s)
+  x spawner scale x factory scale; every countdown, spin and the Path2D movement run on it.
+  Scale 0 freezes everything and resumes with the exact remaining time; large scales stay bounded
+  by the existing caps (8 shot pulls per frame, 64 movement legs).
+- Real time on purpose: `graze_clock` (target rescans), sound fades/intervals/`min_interval_sec`.
+  Opt-in: `BulletSoundData2D.pitch_follows_time_scale` (pitch x scale, paused below 0.01; a pause
+  is re-asserted every sweep because Godot drops one requested before the playback registers).
+- Attachments: `BulletAttachment2D` multiplies `speed_scale` of descendant particles, animated
+  sprites and animation players (originals in node meta, restored exactly at 1.0) and calls
+  `on_time_scale_changed`; the factory pushes the volley's factor once per change
+  (`apply_attachment_time_scale`), released attachments go back to 1.0.
+- Physics interpolation needs nothing: prev/cur are copied once per tick, so any scale is smooth
+  (`volley/test_volley_time_scale_interpolation`).
+
+### 22.2 Randomization (spawner, applied at shot time)
+
+- Group "Randomization": scale (Off/Uniform/Per Axis), rotation and position jitter, speed
+  multiplier, `bullet_random_seed`; plus `spin_random_start_phase` and the timing ranges
+  `shoot_interval_max_sec` / `burst_interval_max_sec` / `telegraph_max_sec`.
+- Rules: min/max pairs are never validated against each other (normalized at use: scene loading
+  sets min before max); every knob off draws nothing from the global RNG; seeded rolls are a pure
+  SplitMix64 hash of (seed, shots fired, channel, bullet index) so channels never share numbers;
+  unseeded rolls use Godot's global RNG; the pattern, preview, bake cache and
+  `collect_spawn_transforms()` never see the rolls (they run in `shoot_once` after the collect).
+  The speed multiplier is applied once after the spawn (`BulletVolley2D::apply_speed_factors`);
+  nothing changed in the tick.
+
+### 22.3 Pickups
+
+- `BulletPickupData2D` (look, burst, magnet, collection, optional collision) is converted into
+  one `BulletVolleyData2D` (cached, dropped on `changed`). Entry points all end in
+  `BulletFactory2D::convert_to_pickups_impl`: validate (pickup, busy latch, target) -> snapshot the
+  sources (read-only) -> spawn one pickup volley per `pattern_max_bullets()` chunk -> only then
+  disable the sources under the busy latch (a refused spawn never costs a bullet) -> signal.
+- A pickup volley carries `pickup_data` (cleared in `release_life`, so a pooled volley is plain
+  again). Burst phase = initial velocity + `linear_drag`; at `magnet_delay_sec` the tick hook
+  (`maybe_begin_pickup_magnet`) ends the drag and sets acceleration/max speed; steering is the
+  normal homing (`homing_take_control_of_texture_rotation` must be on or nothing turns). Collection
+  is the homing reach event routed to `collect_pickup_bullet` (factory `pickup_collected`, optional
+  sound/effect, the bullet leaves). Pickups are owned by the factory and never converted again.
+- Despawn bounds preview: `DespawnBoundsPreviewLayer2D` (internal, owner-less, tagged, top-level),
+  created lazily outside `_ready` (the factory skips `_ready` in the editor); editor always,
+  runtime only with `despawn_bounds_preview_during_runtime`.
+- Tests: `factory/test_factory_pickups*`, `data/test_pickup_data_resource`,
+  `spawner/test_spawner_time_scale`, `spawner/test_spawner_randomization`,
+  `volley/test_volley_attachment_time_scale`, `sound/test_sound_time_scale`,
+  `factory/test_factory_despawn_preview` (+ the `despawn_preview` editor smoke probe).
