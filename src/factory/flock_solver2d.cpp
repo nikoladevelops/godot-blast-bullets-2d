@@ -95,6 +95,16 @@ inline float inv_sqrt2d(float x) {
 	return y;
 }
 
+// Whether a flockmate at offset (dx, dy) (squared distance d2) lies within
+// half_cos of the unit heading (hx, hy): the field of view, without a sqrt.
+inline bool in_view2d(float dx, float dy, float d2, float hx, float hy, float half_cos, float half_cos2) {
+	const float along = dx * hx + dy * hy;
+	if (half_cos >= 0.0f) {
+		return along > 0.0f && along * along >= half_cos2 * d2;
+	}
+	return along >= 0.0f || along * along <= half_cos2 * d2;
+}
+
 inline bool finite_float(float value) {
 	return std::isfinite(value);
 }
@@ -182,6 +192,9 @@ uint32_t FlockSolver2D::group_for(const GroupKey &key, const BulletFlock2D &floc
 	g.inv_cell = reach > 0.0 ? 2.0 / reach : 0.0;
 	g.max_neighbors = flock.max_neighbors > 0 ? (uint32_t)flock.max_neighbors : std::numeric_limits<uint32_t>::max();
 	g.update_interval = (double)flock.update_interval;
+	g.view_limited = flock.view_angle_degrees < 360.0;
+	g.view_cos = (float)std::cos(Math::deg_to_rad((double)flock.view_angle_degrees) * 0.5);
+	g.view_cos2 = g.view_cos * g.view_cos;
 	const uint32_t index = (uint32_t)groups.size();
 	groups.push_back(g);
 	GroupSlot &slot = group_table[at];
@@ -470,6 +483,8 @@ void FlockSolver2D::solve() {
 		const float sep_sq = (float)g.separation_range_sq;
 		const float inv_sep = (float)g.inv_separation_range;
 		const uint32_t cap = g.max_neighbors;
+		const float view_cos = g.view_cos;
+		const float view_cos2 = g.view_cos2;
 		const uint32_t own_start = cell_start[c];
 		const uint32_t own_end = own_start + cell_count[c];
 		for (uint32_t self = own_start; self < own_end; ++self) {
@@ -480,6 +495,11 @@ void FlockSolver2D::solve() {
 			const float px = mates[self].x;
 			const float py = mates[self].y;
 			const uint32_t ordinal = mates[self].ordinal;
+			// Field of view: around the flight heading (a bullet without one
+			// sees all around); stacked flockmates are always seen.
+			const float view_hx = mates[self].hx;
+			const float view_hy = mates[self].hy;
+			const bool cone = g.view_limited && mates[self].has_heading != 0;
 			uint32_t taken = 0;
 			uint32_t near_count = 0;
 			int64_t visited = 0;
@@ -487,42 +507,42 @@ void FlockSolver2D::solve() {
 			float ox = 0.0f, oy = 0.0f, hx = 0.0f, hy = 0.0f, sx = 0.0f, sy = 0.0f;
 			bool full = true;
 			// One flockmate: the rules' sums; jumps to `filled` at the cap.
-#define FLOCK_VISIT(INDEX)                                                                                             \
-	{                                                                                                                  \
-		const Mate &mate = mates[(INDEX)];                                                                             \
-		++visited;                                                                                                     \
-		const float dx = mate.x - px;                                                                                  \
-		const float dy = mate.y - py;                                                                                  \
-		const float d2 = dx * dx + dy * dy;                                                                            \
-		if (d2 < reach_sq) {                                                                                           \
-			++taken;                                                                                                   \
-			if (d2 < near_sq) {                                                                                        \
-				++near_count;                                                                                          \
-				ox += dx;                                                                                              \
-				oy += dy;                                                                                              \
-				heading_count += mate.has_heading;                                                                     \
-				hx += mate.hx;                                                                                         \
-				hy += mate.hy;                                                                                         \
-			}                                                                                                          \
-			if (d2 < sep_sq) {                                                                                         \
-				if (d2 > (float)COINCIDENT_SQ) {                                                                       \
-					/* (p - q) / d * (1 - d / range) = (p - q) * (1/d - 1/range) */                                    \
-					const float w = inv_sqrt2d(d2) - inv_sep;                                                          \
-					sx -= dx * w;                                                                                      \
-					sy -= dy * w;                                                                                      \
-				} else {                                                                                               \
-					/* stacked: part along the pair's own direction, opposite for the two */                           \
-					const uint32_t other = mate.ordinal;                                                               \
-					const uint32_t pick = mix32(MIN(ordinal, other) * 0x9e3779b1u ^ mix32(MAX(ordinal, other))) & 63u; \
-					const float side = ordinal < other ? 1.0f : -1.0f;                                                 \
-					sx += side * dirs.x[pick];                                                                         \
-					sy += side * dirs.y[pick];                                                                         \
-				}                                                                                                      \
-			}                                                                                                          \
-			if (taken >= cap) {                                                                                        \
-				goto filled;                                                                                           \
-			}                                                                                                          \
-		}                                                                                                              \
+#define FLOCK_VISIT(INDEX)                                                                                                            \
+	{                                                                                                                                 \
+		const Mate &mate = mates[(INDEX)];                                                                                            \
+		++visited;                                                                                                                    \
+		const float dx = mate.x - px;                                                                                                 \
+		const float dy = mate.y - py;                                                                                                 \
+		const float d2 = dx * dx + dy * dy;                                                                                           \
+		if (d2 < reach_sq && (!cone || d2 <= (float)COINCIDENT_SQ || in_view2d(dx, dy, d2, view_hx, view_hy, view_cos, view_cos2))) { \
+			++taken;                                                                                                                  \
+			if (d2 < near_sq) {                                                                                                       \
+				++near_count;                                                                                                         \
+				ox += dx;                                                                                                             \
+				oy += dy;                                                                                                             \
+				heading_count += mate.has_heading;                                                                                    \
+				hx += mate.hx;                                                                                                        \
+				hy += mate.hy;                                                                                                        \
+			}                                                                                                                         \
+			if (d2 < sep_sq) {                                                                                                        \
+				if (d2 > (float)COINCIDENT_SQ) {                                                                                      \
+					/* (p - q) / d * (1 - d / range) = (p - q) * (1/d - 1/range) */                                                   \
+					const float w = inv_sqrt2d(d2) - inv_sep;                                                                         \
+					sx -= dx * w;                                                                                                     \
+					sy -= dy * w;                                                                                                     \
+				} else {                                                                                                              \
+					/* stacked: part along the pair's own direction, opposite for the two */                                          \
+					const uint32_t other = mate.ordinal;                                                                              \
+					const uint32_t pick = mix32(MIN(ordinal, other) * 0x9e3779b1u ^ mix32(MAX(ordinal, other))) & 63u;                \
+					const float side = ordinal < other ? 1.0f : -1.0f;                                                                \
+					sx += side * dirs.x[pick];                                                                                        \
+					sy += side * dirs.y[pick];                                                                                        \
+				}                                                                                                                     \
+			}                                                                                                                         \
+			if (taken >= cap) {                                                                                                       \
+				goto filled;                                                                                                          \
+			}                                                                                                                         \
+		}                                                                                                                             \
 	}
 			// Own cell first, from the next member on, wrapping (skips
 			// itself): stacked bullets read different flockmates.

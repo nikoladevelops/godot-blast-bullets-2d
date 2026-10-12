@@ -43,6 +43,9 @@
 		<member name="update_interval" type="float" setter="set_update_interval" getter="get_update_interval" default="0.0">
 			Seconds of bullet time between two steering updates of a bullet (0 = every physics tick, the default). A positive interval recomputes each bullet once per interval, staggered across the flock so the work spreads evenly over the ticks; in between, every bullet keeps turning toward its last steering and still counts as a flockmate for the others. The flock pass costs roughly 1 / (interval x physics ticks per second) of the every-tick cost, so [code]3.0 / 60.0[/code] cuts it to a third with hardly a visible difference. A bullet with no steering yet (a new or reused volley, a bullet woken from a freeze) computes at once.
 		</member>
+		<member name="view_angle_degrees" type="float" setter="set_view_angle_degrees" getter="get_view_angle_degrees" default="360.0">
+			Field of view in degrees, centered on each bullet's flight heading: flockmates outside it are ignored by every rule (and do not count toward [member max_neighbors]). 360 (the default) sees all around; 180 sees only what is ahead, which turns a loose flock into leader-and-follower streams. Stacked flockmates (same position) are always seen so a stack still parts, and a bullet with no heading sees all around. Between 0 and 360.
+		</member>
 	</members>
 	<constants>
 		<constant name="SCOPE_PER_SPAWNER" value="0" enum="Scope">

@@ -61,6 +61,19 @@ void BulletFlock2D::set_max_neighbors(int value) {
 real_t BulletFlock2D::get_update_interval() const { return update_interval; }
 void BulletFlock2D::set_update_interval(real_t value) { store_amount(update_interval, value, "update_interval", false); }
 
+real_t BulletFlock2D::get_view_angle_degrees() const { return view_angle_degrees; }
+void BulletFlock2D::set_view_angle_degrees(real_t value) {
+	if (!Math::is_finite(value) || value < 0.0 || value > 360.0) {
+		UtilityFunctions::push_error("BulletFlock2D: view_angle_degrees must be between 0 and 360, keeping the old value.");
+		return;
+	}
+	if (view_angle_degrees == value) {
+		return;
+	}
+	view_angle_degrees = value;
+	emit_changed();
+}
+
 void BulletFlock2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_separation"), &BulletFlock2D::get_separation);
 	ClassDB::bind_method(D_METHOD("set_separation", "value"), &BulletFlock2D::set_separation);
@@ -97,6 +110,10 @@ void BulletFlock2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_update_interval"), &BulletFlock2D::get_update_interval);
 	ClassDB::bind_method(D_METHOD("set_update_interval", "value"), &BulletFlock2D::set_update_interval);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "update_interval", PROPERTY_HINT_RANGE, "0,1,0.01,or_greater,suffix:s"), "set_update_interval", "get_update_interval");
+
+	ClassDB::bind_method(D_METHOD("get_view_angle_degrees"), &BulletFlock2D::get_view_angle_degrees);
+	ClassDB::bind_method(D_METHOD("set_view_angle_degrees", "value"), &BulletFlock2D::set_view_angle_degrees);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "view_angle_degrees", PROPERTY_HINT_RANGE, "0,360,1,suffix:deg"), "set_view_angle_degrees", "get_view_angle_degrees");
 
 	BIND_ENUM_CONSTANT(SCOPE_PER_SPAWNER);
 	BIND_ENUM_CONSTANT(SCOPE_SHARED);

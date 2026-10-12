@@ -8,7 +8,7 @@ extends BlastTest
 
 const TRES_PATH := "user://flock_round_trip.tres"
 const PROPS := ["separation", "alignment", "cohesion", "neighbor_range", "separation_range",
-	"max_turn_rate_degrees", "face_heading", "max_neighbors", "update_interval"]
+	"max_turn_rate_degrees", "face_heading", "max_neighbors", "update_interval", "view_angle_degrees"]
 
 
 func test_defaults_match_the_documented_values() -> void:
@@ -37,6 +37,7 @@ func test_property_list_order_and_hints_are_pinned() -> void:
 		"face_heading": [TYPE_BOOL, PROPERTY_HINT_NONE, ""],
 		"max_neighbors": [TYPE_INT, PROPERTY_HINT_RANGE, "0,256,1,or_greater"],
 		"update_interval": [TYPE_FLOAT, PROPERTY_HINT_RANGE, "0,1,0.01,or_greater,suffix:s"],
+		"view_angle_degrees": [TYPE_FLOAT, PROPERTY_HINT_RANGE, "0,360,1,suffix:deg"],
 	}
 	var order: Array = []
 	var problems: Array = []
@@ -58,7 +59,7 @@ func test_every_accepted_set_emits_changed_once() -> void:
 	var f := BulletFlock2D.new()
 	watch_signals(f)
 	var sets := [["separation", 3.0], ["alignment", 0.0], ["cohesion", 2.5], ["neighbor_range", 64.0],
-		["separation_range", 0.0], ["max_turn_rate_degrees", 180.0], ["face_heading", false], ["max_neighbors", 0], ["update_interval", 0.25]]
+		["separation_range", 0.0], ["max_turn_rate_degrees", 180.0], ["face_heading", false], ["max_neighbors", 0], ["update_interval", 0.25], ["view_angle_degrees", 270.0]]
 	var expected := 0
 	for entry in sets:
 		assert_true(entry[0] in f, "%s exists" % entry[0])
@@ -132,6 +133,7 @@ func test_flock_survives_a_tres_round_trip() -> void:
 	f.face_heading = false
 	f.max_neighbors = 12
 	f.update_interval = 0.125
+	f.view_angle_degrees = 300.0
 	assert_eq(ResourceSaver.save(f, TRES_PATH), OK, "saved")
 	var back := ResourceLoader.load(TRES_PATH, "", ResourceLoader.CACHE_MODE_IGNORE) as BulletFlock2D
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(TRES_PATH))

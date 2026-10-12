@@ -50,6 +50,7 @@ public:
 	bool face_heading = true;
 	int max_neighbors = 32; // 0 = no limit
 	real_t update_interval = 0.0; // seconds between steering updates, 0 = every tick
+	real_t view_angle_degrees = 360.0; // field of view around the flight heading
 
 	real_t get_separation() const;
 	void set_separation(real_t value);
@@ -77,6 +78,9 @@ public:
 
 	real_t get_update_interval() const;
 	void set_update_interval(real_t value);
+
+	real_t get_view_angle_degrees() const;
+	void set_view_angle_degrees(real_t value);
 
 protected:
 	static void _bind_methods();

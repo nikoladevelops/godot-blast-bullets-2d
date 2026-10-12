@@ -122,6 +122,10 @@ private:
 		uint32_t max_neighbors = 0; // UINT32_MAX = no limit
 		uint32_t next_ordinal = 0;
 		double update_interval = 0.0; // > 0: refresh each bullet once per interval
+		// Field of view: cos and cos^2 of half the view angle; limited = < 360.
+		bool view_limited = false;
+		float view_cos = -1.0f;
+		float view_cos2 = 1.0f;
 		// Occupied cells and their box (build_dense_grids); dense_base >= 0
 		// = neighbor cells come from dense_cells.
 		uint32_t cells = 0;

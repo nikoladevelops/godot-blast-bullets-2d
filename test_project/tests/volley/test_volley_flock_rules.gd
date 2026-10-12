@@ -359,3 +359,60 @@ func test_a_negative_speed_flies_with_its_flock() -> void:
 	assert_almost_eq(v.get_bullet_direction(1), Vector2(-1, 0), Vector2(1e-6, 1e-6), "bullet 1 flies +x on a negative speed: nothing to align")
 	assert_eq(v.debug_get_bullet_flock_neighbors(1), 1, "the pair sees each other")
 	assert_almost_eq(v.get_bullet_transform(1).origin.x - v.get_bullet_transform(0).origin.x, 0.0, 1e-3, "side by side")
+
+
+func test_the_view_angle_hides_flockmates_behind() -> void:
+	# Bullet 0 flies +x; bullet 1 sits 30 px straight behind it, bullet 2
+	# 30 px straight ahead of bullet 1 (so bullet 1 sees it).
+	var tr := [Transform2D(0.0, Vector2(30, 0)), Transform2D(0.0, Vector2(0, 0))]
+	var narrow := H.make_flock(0.0, 0.0, 1.0)
+	narrow.view_angle_degrees = 180.0
+	var v := _flocked(tr, narrow)
+	var wide := _flocked([Transform2D(0.0, Vector2(30, 500)), Transform2D(0.0, Vector2(0, 500))], H.make_flock(0.0, 0.0, 1.0))
+	_step(1)
+	assert_eq(v.debug_get_bullet_flock_neighbors(0), 0, "180 deg: the flockmate behind is not seen")
+	assert_eq(v.debug_get_bullet_flock_steering(0), Vector2(), "and does not pull")
+	assert_eq(v.debug_get_bullet_flock_neighbors(1), 1, "the one ahead is seen")
+	assert_gt(v.debug_get_bullet_flock_steering(1).x, 0.0, "and pulls forward")
+	assert_eq(wide.debug_get_bullet_flock_neighbors(0), 1, "360 deg (the default) sees all around")
+
+
+func test_the_view_cone_follows_the_flight_heading() -> void:
+	# A negative speed flies against the direction: the cone faces the flight.
+	var d := H.make_flight_data([Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(-30, 0))], -100.0, 1000.0)
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	var f := H.make_flock(0.0, 0.0, 1.0)
+	f.view_angle_degrees = 90.0
+	v.flock_join(f)
+	_step(1)
+	assert_eq(v.debug_get_bullet_flock_neighbors(0), 1, "bullet 0 flies -x: bullet 1 at -30 is ahead of it")
+	assert_eq(v.debug_get_bullet_flock_neighbors(1), 0, "bullet 1 flies -x: bullet 0 at +30 is behind it")
+
+
+func test_a_narrow_view_still_parts_stacked_bullets() -> void:
+	var tr: Array = []
+	for k in 6:
+		tr.append(Transform2D(0.0, Vector2(50, 50)))
+	var f := H.make_flock(2.0, 0.0, 0.0)
+	f.view_angle_degrees = 10.0
+	var v := _flocked(tr, f)
+	_step(60)
+	# Once parted they leave each other's 10 deg view (and stop pushing):
+	# what matters is that no two stay stacked.
+	assert_gt(_min_pair_distance(_origins(v)), 0.5, "stacked flockmates are always seen: the stack parts")
+
+
+func test_the_view_angle_is_validated() -> void:
+	var f := BulletFlock2D.new()
+	assert_eq(f.view_angle_degrees, 360.0, "sees all around by default")
+	f.view_angle_degrees = 0.0
+	assert_eq(f.view_angle_degrees, 0.0, "0 is valid (sees only straight ahead)")
+	f.view_angle_degrees = -1.0
+	f.view_angle_degrees = 361.0
+	f.view_angle_degrees = NAN
+	expect_error_sequence([
+		"BulletFlock2D: view_angle_degrees must be between 0 and 360, keeping the old value.",
+		"BulletFlock2D: view_angle_degrees must be between 0 and 360, keeping the old value.",
+		"BulletFlock2D: view_angle_degrees must be between 0 and 360, keeping the old value.",
+	])
+	assert_eq(f.view_angle_degrees, 0.0, "kept")
