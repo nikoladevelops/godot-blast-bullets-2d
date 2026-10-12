@@ -53,7 +53,7 @@ for the rest: the sections are written to be looked up, not read once.
 
 ```sh
 GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py   # build (exit 1 = failed; never raw scons, never edit SConstruct)
-python3 tools/run_tests.py                                       # 187 files / 1430 tests, ~10 s, leak-checked
+python3 tools/run_tests.py                                       # 194 files / 1515 tests, ~10 s, leak-checked
 python3 tools/run_tests.py --suite <substring> --full            # one area, every failure message unclipped
 python3 tools/run_tests.py --self-test                           # proves the harness still catches failures/leaks
 python3 tools/run_editor_smoke.py                                # headless EDITOR run of tests/editor_smoke/ (editor-only paths)
@@ -1218,16 +1218,34 @@ emits `GRAZE_POINT_TARGET_BIT | index` ids and belongs in
   `BulletFactory2D::convert_to_pickups_impl`: validate (pickup, busy latch, target) -> snapshot the
   sources (read-only) -> spawn one pickup volley per `pattern_max_bullets()` chunk -> only then
   disable the sources under the busy latch (a refused spawn never costs a bullet) -> signal.
-- A pickup volley carries `pickup_data` (cleared in `release_life`, so a pooled volley is plain
-  again). Burst phase = initial velocity + `linear_drag`; at `magnet_delay_sec` the tick hook
-  (`maybe_begin_pickup_magnet`) ends the drag and sets acceleration/max speed; steering is the
-  normal homing (`homing_take_control_of_texture_rotation` must be on or nothing turns). Collection
-  is the homing reach event routed to `collect_pickup_bullet` (factory `pickup_collected`, optional
-  sound/effect, the bullet leaves). Pickups are owned by the factory and never converted again.
+- A pickup volley carries `pickup_data` and `pickup_time_scale_owner_id` (both cleared in
+  `release_life`, so a pooled volley is plain again). `motion_mode`: Burst And Magnet (initial
+  velocity + `linear_drag`; at `magnet_delay_sec` the tick hook `maybe_begin_pickup_magnet` ends the
+  drag and sets acceleration/max speed), Keep Bullet Motion (each pickup keeps the source's speed,
+  top speed, acceleration: `PickupSeed`), Custom (the developer's `speed_data`/`curves_data`; only
+  the heading comes from the source). Steering is the normal homing after `magnet_delay_sec`
+  (`homing_take_control_of_texture_rotation` must be on or nothing turns). Collection = the homing
+  reach event routed to `collect_pickup_bullet`, or a touch with `collect_on_collision` (hook in
+  `handle_bullet_collision`, before bounce/counters): signal, then `collect_callback`, then
+  sound/effect, then the bullet leaves. Pickup volleys use `bullet_max_collision_count = 0`: a
+  touch never kills one. Poses that overflow float32 fall back to the source pose
+  (`pose_is_usable`). Pickups are owned by the factory and never converted again.
+- The homing reach test is SWEPT: `try_to_emit_bullet_homing_target_reached_signal` gets the
+  pre-move origin and the move, and tests the closest point of the segment (a fast bullet or
+  pickup cannot fly through the threshold circle in one tick).
+- Despawn bounds: a culled bullet fires `EFFECT_ON_DESPAWN` / `SOUND_ON_DESPAWN` and the factory
+  signal `bullets_despawned` (positions captured only while connected); `BulletVolleyData2D.
+  ignore_despawn_bounds` and `BulletPickupData2D.obey_despawn_bounds` opt out; a spawner whose
+  muzzle (global position + spawn offset) is outside does not shoot or telegraph
+  (`volley_skipped` "outside_despawn_bounds", opt-out `shoot_outside_despawn_bounds`).
+  `clear_active_bullets` announces each volley through `bullets_cleared` like the area clears.
+  Pre-warm pickup pools with `populate_pickup_pool(pickup, bullet_count, n)` (pool keys use the
+  bullet count, which the pickup data alone does not have).
 - Despawn bounds preview: `DespawnBoundsPreviewLayer2D` (internal, owner-less, tagged, top-level),
   created lazily outside `_ready` (the factory skips `_ready` in the editor); editor always,
   runtime only with `despawn_bounds_preview_during_runtime`.
-- Tests: `factory/test_factory_pickups*`, `data/test_pickup_data_resource`,
+- Tests: `factory/test_factory_pickups*` (looks, motion, targets, hardening, stability fuzz),
+  `factory/test_factory_despawn_triggers`, `data/test_pickup_data_resource`,
   `spawner/test_spawner_time_scale`, `spawner/test_spawner_randomization`,
   `volley/test_volley_attachment_time_scale`, `sound/test_sound_time_scale`,
   `factory/test_factory_despawn_preview` (+ the `despawn_preview` editor smoke probe).
