@@ -57,6 +57,17 @@ func test_play_sound_refusals() -> void:
 	assert_eq(busy_voices().size(), 0, "nothing busy after refusals")
 
 
+func test_chance_zero_never_plays_even_on_a_zero_roll() -> void:
+	# This seed puts the PCG state at 0, whose first output is exactly 0:
+	# randf() == 0.0, the one roll a "> chance" test lets through at chance 0.
+	factory.debug_seed_cosmetic_rng(-7379792620528906219)
+	var chanceless := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+	chanceless.trigger_chance = 0.0
+	assert_false(factory.play_sound(chanceless, Vector2.ZERO), "chance 0 never plays, even for a roll of 0")
+	await physics(2)
+	assert_eq(busy_voices().size(), 0, "nothing busy")
+
+
 func test_interval_budget_is_shared_per_resource() -> void:
 	godot_listener_at(Vector2.ZERO)
 	var s := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)

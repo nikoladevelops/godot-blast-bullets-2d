@@ -420,7 +420,7 @@ bool SoundMixer2D::offer(BulletFactory2D &factory, const Ref<BulletSoundData2D> 
 		return false;
 	}
 	if (sound->trigger_chance < 1.0) {
-		if (!Math::is_finite((double)sound->trigger_chance) || CosmeticRng2D::randf() > (double)sound->trigger_chance) {
+		if (!Math::is_finite((double)sound->trigger_chance) || !(CosmeticRng2D::randf() < (double)sound->trigger_chance)) {
 			++dropped_total;
 			return false;
 		}
