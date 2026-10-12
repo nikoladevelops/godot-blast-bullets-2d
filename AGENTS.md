@@ -52,7 +52,7 @@ for the rest: the sections are written to be looked up, not read once.
 
 ```sh
 GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py   # build (exit 1 = failed; never raw scons, never edit SConstruct)
-python3 tools/run_tests.py                                       # 175 files / 1290 tests, ~10 s, leak-checked
+python3 tools/run_tests.py                                       # 178 files / 1315 tests, ~10 s, leak-checked
 python3 tools/run_tests.py --suite <substring> --full            # one area, every failure message unclipped
 python3 tools/run_tests.py --self-test                           # proves the harness still catches failures/leaks
 python3 tools/run_editor_smoke.py                                # headless EDITOR run of tests/editor_smoke/ (editor-only paths)
@@ -606,7 +606,8 @@ bullet_volley2d_render.cpp     physics interpolation pass
 bullet_volley2d_setup.cpp      MultiMesh/buffer setup (one set_buffer per spawn)
 bullet_volley2d_collision.cpp  area + ONE shared shape, intake, dedup, paused-overlap park/replay, drain
 bullet_volley2d_{bounce,homing,orbit,motion,curves,wobble,gravity,lifetime,timers,attachments,
-                 effects,animation,teleport,debug,bindings}.cpp   one feature each
+                 effects,animation,teleport,area,debug,bindings}.cpp   one feature each
+                                 (area: circle/rect queries + clears, cull_outside_bounds)
 bullet_volley2d_graze.cpp      graze arming, per-tick zone snapshot (prepare_graze_tick), live dispatch (§20)
 homing_target_deque.hpp        per-bullet/shared target queue (RingDeque2D: allocates nothing while empty)
 ```
@@ -679,6 +680,7 @@ src/
   factory/bullet_factory2d_spawn.cpp      request validation, spawn_volley(+_span), pool pre-population
   factory/bullet_factory2d_structural.cpp reset/free_*/clear_*, *_deferred queue, bookkeeping
   factory/bullet_factory2d_effects.cpp    factory-owned one-shot effects
+  factory/bullet_factory2d_world.cpp      time_scale, despawn bounds, area clears/counts + bullets_cleared
   factory/bullet_factory2d_stats.cpp      frame stats, monitors, debugger knobs, debug_*
   factory/bullet_factory2d_graze.cpp      graze debug readouts (the factory's detector lives in it)
   factory/graze_detector2d.cpp            GrazeDetector2D: graze target lists (stable slots, scans on the update interval, x-sorted slab order)
@@ -843,6 +845,8 @@ deduped, cancelled by REMOVED) and replayed once on resume.
 | No graze target cap (300+ targets, a member joining after the shot counts next tick); a target keeps its slot while others come and go | `test_volley_graze_targets` |
 | Graze target sources (node group, path, name, children: the spawner decides who grazes, zones only how), filter, update interval, refresh; edits reach flying bullets; orphans keep the settings; homing's refresh is `retarget_live_volleys()` | `test_spawner_graze_detection` |
 | Past 8 targets the slab finds exactly what testing every target finds (same events, same ties) | `test_volley_graze_slab` |
+| Area clears: edge-inclusive circle/rect, negative rects normalized, `bullets_cleared` after the busy latch (handlers can spawn); despawn bounds spare bullets heading back in and are silent; `time_scale` scales volley ticks, effects and timers (not spawners) | `factory/test_factory_world` |
+| A sound entry's `trigger`/`enabled` edits reach volleys in flight (`BulletSoundData2D::mask_epoch`, recomputed lazily) | `sound/test_sound_flight` |
 | A fading sound voice is never restarted or stolen again; a pool of fading tails never starves new plays | `sound/test_sound_mixer_unit` |
 | A followed bullet keeps one hum voice per sound entry | `sound/test_sound_flight` |
 | Cosmetic sound and effect rolls never consume Godot's global RNG (seeded gameplay is unchanged) | `sound/test_sound_rng_isolation` |
