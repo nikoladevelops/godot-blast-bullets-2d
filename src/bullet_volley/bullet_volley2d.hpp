@@ -251,6 +251,8 @@ public:
 	// unless the handler vetoed (infinite lifetime or set_life_time_left).
 	void expire_live_bullets();
 	std::vector<int> expiry_indexes_scratch;
+	// Reused by cull_outside_bounds (no allocation per tick once warm).
+	std::vector<int> despawn_indexes_scratch;
 	std::vector<uint64_t> expiry_epochs_scratch;
 	// Remaining lifetime in seconds (0 for infinite volleys). The setter
 	// extends or shortens the countdown only (the curve clock keeps
@@ -1279,6 +1281,26 @@ public:
 	// oldest one-shot slots past the layer ring, so 500 bullets never
 	// spawn 500 live effects. Returns how many bullets were cleared.
 	int clear_all_bullets();
+
+	// ---- Area queries and clears (bullet_volley2d_area.cpp) ----
+	// Global-space centers of the LIVE bullets inside a circle / a rectangle
+	// (edges inclusive; bullet size is not counted: the test is the bullet's
+	// centre). Frozen and pooled bullets are never listed. Bad input pushes
+	// one error and returns an empty array.
+	PackedInt32Array get_bullet_indexes_in_circle(const Vector2 &center, real_t radius) const;
+	PackedInt32Array get_bullet_indexes_in_rect(const Rect2 &rect) const;
+	// Clears (On Clear effects and sounds, like clear_bullet) every live
+	// bullet inside the area. Returns how many were cleared.
+	int clear_bullets_in_circle(const Vector2 &center, real_t radius);
+	int clear_bullets_in_rect(const Rect2 &rect);
+	// C++ only, no validation (callers validated): live indexes in the area.
+	void collect_indexes_in_circle(const Vector2 &center, real_t radius, std::vector<int> &out) const;
+	void collect_indexes_in_rect(const Rect2 &normalized_rect, std::vector<int> &out) const;
+	// Factory despawn bounds: silently disables every live bullet that is
+	// outside `bounds` and not heading back in (no effects, no sounds, no
+	// signals). One pass over the live set per tick, only while the factory
+	// has bounds enabled.
+	void cull_outside_bounds(const Rect2 &bounds);
 
 	// Resolves who owns the collision/lifetime signals for this multimesh: the
 	// tagged BulletSpawner2D while it is alive, else the BulletFactory2D.

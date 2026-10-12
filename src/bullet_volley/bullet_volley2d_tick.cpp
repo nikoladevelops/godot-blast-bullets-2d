@@ -77,6 +77,14 @@ void BulletVolley2D::tick(double delta) {
 			return;
 		}
 	}
+	// 4b. Factory despawn bounds (silent; user callbacks of released
+	// attachments may run, so re-check liveness).
+	if (bullet_factory != nullptr && bullet_factory->get_despawn_bounds_enabled() && active_bullets_counter > 0) {
+		cull_outside_bounds(bullet_factory->get_despawn_bounds_rect());
+		if (!tick_may_continue(self_id) || !is_active) {
+			return;
+		}
+	}
 	// 5. Lifetime (may emit life_time_over, live).
 	reduce_lifetime(delta);
 }

@@ -33,10 +33,40 @@
 				Deferred [method clear_active_bullets]: safe from any callback.
 			</description>
 		</method>
+		<method name="clear_bullets_in_circle">
+			<return type="int" />
+			<param index="0" name="center" type="Vector2" />
+			<param index="1" name="radius" type="float" />
+			<description>
+				Clears every live bullet of every active volley whose centre is inside the circle (global space, edge inclusive), with the same On Clear effects and sounds as [method clear_active_bullets]. Then emits [signal bullets_cleared] once per volley that lost bullets. Allowed from physics handlers (a bomb on a hit); refused while a sweep is running. Returns how many bullets were cleared. [param center] must be finite and [param radius] a finite number 0 or more, else one error is pushed and nothing is cleared.
+			</description>
+		</method>
+		<method name="clear_bullets_in_rect">
+			<return type="int" />
+			<param index="0" name="rect" type="Rect2" />
+			<description>
+				Like [method clear_bullets_in_circle] for a rectangle (global space, all four edges inclusive). A negative size is accepted and means the same rectangle. [param rect] must be finite.
+			</description>
+		</method>
 		<method name="clear_sprite_effects">
 			<return type="void" />
 			<description>
 				Stops every active sprite visual. Volley bakes keep their configs (triggers keep working); the manual hatch bakes are dropped entirely.
+			</description>
+		</method>
+		<method name="count_bullets_in_circle" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="center" type="Vector2" />
+			<param index="1" name="radius" type="float" />
+			<description>
+				How many live bullets, across every active volley, have their centre inside the circle (edge inclusive). Bullet size is not counted. Use it for danger meters and proximity checks. Bad input pushes one error and returns 0.
+			</description>
+		</method>
+		<method name="count_bullets_in_rect" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="rect" type="Rect2" />
+			<description>
+				Like [method count_bullets_in_circle] for a rectangle. A negative size is accepted. Bad input pushes one error and returns 0.
 			</description>
 		</method>
 		<method name="debug_advance_time">
@@ -210,6 +240,13 @@
 				Resets the pool hit/miss counters from [method debug_get_pool_hit_stats].
 			</description>
 		</method>
+		<method name="debug_seed_cosmetic_rng">
+			<return type="void" />
+			<param index="0" name="seed" type="int" />
+			<description>
+				Test helper: reseeds the plugin's cosmetic generator, which draws sound mix rolls (volume, pitch, pan, stream picks, chance) and effect layer starts, scales and rotations. Godot's [method @GlobalScope.seed] does not reach these rolls, so gameplay randomness stays the same whatever the audio does.
+			</description>
+		</method>
 		<method name="debug_set_effect_log_enabled">
 			<return type="void" />
 			<param index="0" name="enabled" type="bool" />
@@ -222,13 +259,6 @@
 			<param index="0" name="value" type="int" />
 			<description>
 				Test/profiling hook: zones with more live targets than [param value] (default 8) test each bullet only against the targets near its motion in x instead of every target (same results, far cheaper with many targets). 0 = always, a huge value = never. Process-wide. Returns the previous value; a value outside 0..64 pushes an error and changes nothing.
-			</description>
-		</method>
-		<method name="debug_seed_cosmetic_rng">
-			<return type="void" />
-			<param index="0" name="seed" type="int" />
-			<description>
-				Test helper: reseeds the plugin's cosmetic generator, which draws sound mix rolls (volume, pitch, pan, stream picks, chance) and effect layer starts, scales and rotations. Godot's [method @GlobalScope.seed] does not reach these rolls, so gameplay randomness stays the same whatever the audio does.
 			</description>
 		</method>
 		<method name="debug_set_sound_log_enabled">
@@ -500,6 +530,12 @@
 		<member name="debugger_max_providers" type="int" setter="set_debugger_max_providers" getter="get_debugger_max_providers" default="0">
 			Max debugger providers drawn per tick (0 = unlimited). Beyond the cap extra volleys are hidden, oldest first. Lower this on 10k-bullet demos where the always-draw debugger costs frames.
 		</member>
+		<member name="despawn_bounds_enabled" type="bool" setter="set_despawn_bounds_enabled" getter="get_despawn_bounds_enabled" default="false">
+			When on, every live bullet that is outside [member despawn_bounds_rect] and not heading back in is silently disabled each tick (no effects, no sounds, no signals). Keeps off-screen bullets from living until their lifetime ends. A bullet that starts just outside and flies inwards is left alone. Off by default.
+		</member>
+		<member name="despawn_bounds_rect" type="Rect2" setter="set_despawn_bounds_rect" getter="get_despawn_bounds_rect" default="Rect2(0, 0, 1152, 648)">
+			The play field for [member despawn_bounds_enabled], in global space. "Not heading back in" means that along every axis where the bullet is outside, its velocity does not point towards the rectangle. Defaults to Godot's default viewport. Must be finite; a negative size is normalized.
+		</member>
 		<member name="is_debugger_enabled" type="bool" setter="set_is_debugger_enabled" getter="get_is_debugger_enabled" default="false">
 			Whether the debugger of the collision shapes is enabled or not.
 		</member>
@@ -512,6 +548,9 @@
 		</member>
 		<member name="sound_max_voices" type="int" setter="set_sound_max_voices" getter="get_sound_max_voices" default="32">
 			Voice pool size for the whole factory: one AudioStreamPlayer2D per simultaneous sound. Voices are created on demand; past this a new event steals the oldest voice of equal or lower priority, never a more important one. The pool only grows to its high-water mark: lowering the cap later never frees existing voices.
+		</member>
+		<member name="time_scale" type="float" setter="set_time_scale" getter="get_time_scale" default="1.0">
+			Speed of the bullet world. Every volley tick, one-shot effect and bullet timer advances by delta times this value: 1 is real time, 0.25 is slow motion, 0 freezes bullets while the factory keeps processing (collisions already in flight still resolve). Spawners keep their own clock, and so does the rescan interval of graze targets. Must be finite and 0 or more. This is not [member Engine.time_scale].
 		</member>
 		<member name="use_physics_interpolation" type="bool" setter="set_use_physics_interpolation_editor" getter="get_use_physics_interpolation" default="false">
 			Determines whether physics interpolation is enabled or not. The setter is for the editor only.
@@ -574,6 +613,14 @@
 			<param index="4" name="ring_index" type="int" />
 			<description>
 				Emitted live, inside the physics tick right after the bullets moved, when a bullet comes within ring [param ring_index] of [param zone] around [param target] (see [BulletGrazeZone2D]). [param target] is null when the target is a point (a spawner's Mouse or Global Positions source). The bullet is alive in the handler: transforms, velocity and custom data are readable and writable through [param volley]. Several rings entered in one tick fire from the largest radius to the smallest. Every graze in the game reaches the factory whoever owns the volley (the owner [BulletSpawner2D] emits first while it lives), including bullets of spawners already freed: connect here once to count graze for score. Structural calls need their [code]_deferred[/code] twins inside the handler.
+			</description>
+		</signal>
+		<signal name="bullets_cleared">
+			<param index="0" name="positions" type="PackedVector2Array" />
+			<param index="1" name="volley" type="BulletVolley2D" />
+			<param index="2" name="bullet_indexes" type="int[]" />
+			<description>
+				Emitted after [method clear_bullets_in_circle] or [method clear_bullets_in_rect], once per volley that lost bullets, after the factory is no longer busy so handlers may spawn (turn cleared bullets into score items). [param positions] holds the global position of each cleared bullet, parallel to [param bullet_indexes]. The volley may already be back in the pool when this fires, so read the positions, not the volley. Not emitted by [method clear_active_bullets].
 			</description>
 		</signal>
 		<signal name="life_time_over">

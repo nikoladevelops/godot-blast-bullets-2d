@@ -1243,6 +1243,21 @@
 				Turns rotation off for the whole volley (same as seeding an empty array). Re-seed with spawn/enable or [method set_bullet_rotation_data] to spin again.
 			</description>
 		</method>
+		<method name="clear_bullets_in_circle">
+			<return type="int" />
+			<param index="0" name="center" type="Vector2" />
+			<param index="1" name="radius" type="float" />
+			<description>
+				Clears every live bullet of this volley whose centre is inside the circle (global space, edge inclusive), firing the same On Clear effects and sounds as [method clear_bullet]. Returns how many were cleared. Bad input pushes one error and clears nothing. For every volley at once use [method BulletFactory2D.clear_bullets_in_circle].
+			</description>
+		</method>
+		<method name="clear_bullets_in_rect">
+			<return type="int" />
+			<param index="0" name="rect" type="Rect2" />
+			<description>
+				Like [method clear_bullets_in_circle] for a rectangle (global space, all four edges inclusive). A negative size is accepted.
+			</description>
+		</method>
 		<method name="clear_per_bullet_curves_data">
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
@@ -1500,6 +1515,21 @@
 			<param index="1" name="zone_index" type="int" />
 			<description>
 				Bitmask of the rings of zone [param zone_index] that bullet [param bullet_index] already grazed (bit k = ring k). With [constant BulletGrazeZone2D.REGRAZE_ONCE] the bits stay for the bullet's life.
+			</description>
+		</method>
+		<method name="get_bullet_indexes_in_circle" qualifiers="const">
+			<return type="PackedInt32Array" />
+			<param index="0" name="center" type="Vector2" />
+			<param index="1" name="radius" type="float" />
+			<description>
+				Indexes of the live bullets whose centre is inside the circle (global space, edge inclusive). Frozen and pooled bullets are never listed. Bullet size is not counted. Bad input pushes one error and returns an empty array.
+			</description>
+		</method>
+		<method name="get_bullet_indexes_in_rect" qualifiers="const">
+			<return type="PackedInt32Array" />
+			<param index="0" name="rect" type="Rect2" />
+			<description>
+				Like [method get_bullet_indexes_in_circle] for a rectangle. A negative size is accepted.
 			</description>
 		</method>
 		<method name="get_bullet_movement_pattern_curve" qualifiers="const">

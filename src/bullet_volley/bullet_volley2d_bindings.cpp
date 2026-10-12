@@ -75,6 +75,10 @@ void BulletVolley2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("debug_get_clocks"), &BulletVolley2D::debug_get_clocks);
 	ClassDB::bind_method(D_METHOD("clear_bullet", "bullet_index"), &BulletVolley2D::clear_bullet);
 	ClassDB::bind_method(D_METHOD("clear_all_bullets"), &BulletVolley2D::clear_all_bullets);
+	ClassDB::bind_method(D_METHOD("get_bullet_indexes_in_circle", "center", "radius"), &BulletVolley2D::get_bullet_indexes_in_circle);
+	ClassDB::bind_method(D_METHOD("get_bullet_indexes_in_rect", "rect"), &BulletVolley2D::get_bullet_indexes_in_rect);
+	ClassDB::bind_method(D_METHOD("clear_bullets_in_circle", "center", "radius"), &BulletVolley2D::clear_bullets_in_circle);
+	ClassDB::bind_method(D_METHOD("clear_bullets_in_rect", "rect"), &BulletVolley2D::clear_bullets_in_rect);
 	ClassDB::bind_method(D_METHOD("enable_bullet", "bullet_index", "collision_amount", "enable_attachment"), &BulletVolley2D::enable_bullet, DEFVAL(-1), DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("wake_bullet", "bullet_index", "collision_amount", "enable_attachment"), &BulletVolley2D::wake_bullet, DEFVAL(-1), DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("debug_get_volley_info"), &BulletVolley2D::debug_get_volley_info);

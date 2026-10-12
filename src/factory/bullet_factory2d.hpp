@@ -105,6 +105,28 @@ public:
 	// silent teardown and never fire effect layers.
 	int clear_active_bullets(const Ref<VolleyPoolKey2D> &key = Ref<VolleyPoolKey2D>());
 
+	// ---- Bullet world: time scale, despawn bounds, area clears/counts
+	// (bullet_factory2d_world.cpp) ----
+	// Speed of the bullet world: every volley tick, effect and bullet timer
+	// advances by delta * time_scale (1 = real time, 0 = frozen but still
+	// processing). Spawners keep their own clock.
+	double get_time_scale() const { return time_scale; }
+	void set_time_scale(double value);
+	// Bullets outside the rect (global space) and not heading back in are
+	// silently disabled each tick while enabled.
+	bool get_despawn_bounds_enabled() const { return despawn_bounds_enabled; }
+	void set_despawn_bounds_enabled(bool value);
+	Rect2 get_despawn_bounds_rect() const { return despawn_bounds_rect; }
+	void set_despawn_bounds_rect(const Rect2 &value);
+	// Clears every live bullet of every active volley inside the area (On
+	// Clear effects and sounds like clear_active_bullets), then emits
+	// bullets_cleared once per volley. Allowed from physics handlers (not
+	// structural). Returns how many bullets were cleared.
+	int clear_bullets_in_circle(const Vector2 &center, real_t radius);
+	int clear_bullets_in_rect(const Rect2 &rect);
+	int count_bullets_in_circle(const Vector2 &center, real_t radius) const;
+	int count_bullets_in_rect(const Rect2 &rect) const;
+
 	void free_disabled_bullets(const Ref<VolleyPoolKey2D> &key = Ref<VolleyPoolKey2D>());
 
 	// OBJECT POOLING RELATED
@@ -606,6 +628,11 @@ protected:
 private:
 	// Set when the factory enters the scene tree. Editor runs of getters/setters only
 	// fill the cached values below; the real ones apply in _ready() once nodes exist.
+	double time_scale = 1.0;
+	bool despawn_bounds_enabled = false;
+	// Godot's default viewport, so enabling without editing is sensible.
+	Rect2 despawn_bounds_rect = Rect2(0, 0, 1152, 648);
+	int clear_bullets_in_area(const char *function_name, bool circle, const Vector2 &center, real_t radius, const Rect2 &rect);
 	bool is_ready = false;
 
 	// Set in NOTIFICATION_PREDELETE (parent notified before children are destroyed).

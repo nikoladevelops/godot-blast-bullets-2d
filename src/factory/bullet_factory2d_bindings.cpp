@@ -198,6 +198,32 @@ void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_sound_max_voices"), &BulletFactory2D::get_sound_max_voices);
 	ClassDB::bind_method(D_METHOD("set_sound_max_voices", "value"), &BulletFactory2D::set_sound_max_voices);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "sound_max_voices", PROPERTY_HINT_RANGE, "1,256,1,or_greater"), "set_sound_max_voices", "get_sound_max_voices");
+
+	// Bullet world: speed of time, play-field bounds, area clears.
+	ADD_GROUP("Time", "time_");
+	ClassDB::bind_method(D_METHOD("get_time_scale"), &BulletFactory2D::get_time_scale);
+	ClassDB::bind_method(D_METHOD("set_time_scale", "value"), &BulletFactory2D::set_time_scale);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "time_scale", PROPERTY_HINT_RANGE, "0,4,0.01,or_greater"), "set_time_scale", "get_time_scale");
+
+	ADD_GROUP("Despawn Bounds", "despawn_bounds_");
+	ClassDB::bind_method(D_METHOD("get_despawn_bounds_enabled"), &BulletFactory2D::get_despawn_bounds_enabled);
+	ClassDB::bind_method(D_METHOD("set_despawn_bounds_enabled", "value"), &BulletFactory2D::set_despawn_bounds_enabled);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "despawn_bounds_enabled"), "set_despawn_bounds_enabled", "get_despawn_bounds_enabled");
+	ClassDB::bind_method(D_METHOD("get_despawn_bounds_rect"), &BulletFactory2D::get_despawn_bounds_rect);
+	ClassDB::bind_method(D_METHOD("set_despawn_bounds_rect", "value"), &BulletFactory2D::set_despawn_bounds_rect);
+	ADD_PROPERTY(PropertyInfo(Variant::RECT2, "despawn_bounds_rect"), "set_despawn_bounds_rect", "get_despawn_bounds_rect");
+
+	ClassDB::bind_method(D_METHOD("clear_bullets_in_circle", "center", "radius"), &BulletFactory2D::clear_bullets_in_circle);
+	ClassDB::bind_method(D_METHOD("clear_bullets_in_rect", "rect"), &BulletFactory2D::clear_bullets_in_rect);
+	ClassDB::bind_method(D_METHOD("count_bullets_in_circle", "center", "radius"), &BulletFactory2D::count_bullets_in_circle);
+	ClassDB::bind_method(D_METHOD("count_bullets_in_rect", "rect"), &BulletFactory2D::count_bullets_in_rect);
+	// Once per volley after an area clear: where the cleared bullets were
+	// (global positions, parallel to bullet_indexes). The volley may already
+	// be pooled when this fires (positions are the payload).
+	ADD_SIGNAL(MethodInfo("bullets_cleared",
+			PropertyInfo(Variant::PACKED_VECTOR2_ARRAY, "positions"),
+			PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
+			PropertyInfo(Variant::ARRAY, "bullet_indexes", PROPERTY_HINT_ARRAY_TYPE, "int")));
 	ClassDB::bind_method(D_METHOD("debug_set_sound_log_enabled", "enabled"), &BulletFactory2D::debug_set_sound_log_enabled);
 	ClassDB::bind_method(D_METHOD("debug_seed_cosmetic_rng", "seed"), &BulletFactory2D::debug_seed_cosmetic_rng);
 	ClassDB::bind_method(D_METHOD("debug_get_sound_log"), &BulletFactory2D::debug_get_sound_log);

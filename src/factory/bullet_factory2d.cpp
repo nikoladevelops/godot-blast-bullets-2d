@@ -375,10 +375,13 @@ void BulletFactory2D::_physics_process(double delta) {
 	is_iterating_bullets = true;
 	++sweep_counter;
 	graze_clock += delta;
-	tick_volleys(delta);
+	// The bullet world runs on its own clock (time_scale 1 is bit-identical
+	// to the engine delta); target scans (graze_clock) stay in real time.
+	const double bullet_delta = delta * time_scale;
+	tick_volleys(bullet_delta);
 	// One-shot sprite effects age on the same clock as bullets (pausing the
 	// factory freezes both). Volley trails tick inside move_bullets instead.
-	age_fx_effects(delta);
+	age_fx_effects(bullet_delta);
 
 	// Timers run for every volley that holds some (parked ones included:
 	// their timers may be wake-up timers; pooled ones released theirs).
@@ -402,7 +405,7 @@ void BulletFactory2D::_physics_process(double delta) {
 			continue;
 		}
 		volley->sweep_timer_stamp = sweep_counter;
-		volley->run_custom_timers(delta);
+		volley->run_custom_timers(bullet_delta);
 	}
 	is_iterating_bullets = false;
 
