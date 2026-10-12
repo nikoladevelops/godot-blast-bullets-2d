@@ -201,26 +201,28 @@ func test_mirrored_flocks_fly_mirrored() -> void:
 	assert_eq("\n".join(problems), "", "the mirror image of a flock flies the mirror image")
 
 
-func test_a_capped_ring_has_no_net_pull() -> void:
-	# 72 still bullets on a ring, each pulled toward the flockmates it reads:
-	# with the scan start rotating per bullet, the pulls cancel out.
+func test_a_capped_lattice_has_no_net_pull() -> void:
+	# One still bullet per grid cell (cells are half the neighbor range), so
+	# every flockmate a capped bullet reads comes from the cell rings around
+	# it: with the ring start rotating per bullet the pulls cancel out (a
+	# fixed scan order would pull every bullet toward the same corner).
 	var tr: Array = []
-	for k in 72:
-		var angle := TAU * k / 72.0
-		tr.append(Transform2D(angle, Vector2(500, 500) + Vector2.from_angle(angle) * 40.0))
+	for row in 20:
+		for col in 20:
+			tr.append(Transform2D(0.0, Vector2(25.0 + 50.0 * col, 25.0 + 50.0 * row)))
 	var capped := H.make_flock(0.0, 0.0, 1.0)
-	capped.max_neighbors = 6
+	capped.max_neighbors = 3
 	var v := _flocked(tr, capped, 0.0)
 	_step(1)
 	var net := Vector2()
 	var total := 0.0
-	for i in 72:
+	for i in tr.size():
 		var s: Vector2 = v.debug_get_bullet_flock_steering(i)
 		net += s
 		total += s.length()
-		assert_eq(v.debug_get_bullet_flock_neighbors(i), 6, "bullet %d reads exactly the cap" % i)
-	assert_gt(total, 1.0, "there is a pull to cancel")
-	assert_lt(net.length() / total, 0.05, "no drift bias: |sum| / sum|.| = %.4f" % (net.length() / total))
+		assert_eq(v.debug_get_bullet_flock_neighbors(i), 3, "bullet %d reads exactly the cap" % i)
+	assert_gt(total, 10.0, "there is a pull to cancel")
+	assert_lt(net.length() / total, 0.1, "no drift bias: |sum| / sum|.| = %.4f" % (net.length() / total))
 
 
 func test_max_neighbors_is_exact_and_bounds_the_work(cap: int = use_parameters([0, 1, 5, 49, 100])) -> void:

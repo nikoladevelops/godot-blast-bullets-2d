@@ -223,7 +223,8 @@ func test_handlers_mid_sweep_never_steer_with_stale_data() -> void:
 	var joiner := _volley(_cluster(Vector2(400, 0), 4, 3))
 	var woken := _volley([Transform2D(0.0, Vector2(600, 0)), Transform2D(PI * 0.5, Vector2(600, 30))])
 	woken.set_is_auto_pooling_enabled(false)
-	for flocked in [freed, leaver, woken]:
+	var rejoiner := _volley(_cluster(Vector2(800, 0), 4, 4))
+	for flocked in [freed, leaver, woken, rejoiner]:
 		flocked.flock_join(f)
 	woken.disable_bullet(1) # not gathered while frozen
 	var seen := {}
@@ -235,6 +236,8 @@ func test_handlers_mid_sweep_never_steer_with_stale_data() -> void:
 		joiner.flock_join(f, BulletFlock2D.SCOPE_PER_VOLLEY)
 		f.cohesion = 50.0 # applies from the next pass
 		woken.enable_bullet(1)
+		rejoiner.flock_join(H.make_flock(0.0, 0.0, 3.0), BulletFlock2D.SCOPE_PER_VOLLEY)
+		seen["rejoiner"] = rejoiner.get_bullet_direction(0)
 		seen["leaver"] = [leaver.get_bullet_direction(0), leaver.get_bullet_direction(1)]
 		seen["joiner"] = joiner.get_bullet_direction(0)
 		seen["woken"] = woken.get_bullet_direction(1)
@@ -248,10 +251,11 @@ func test_handlers_mid_sweep_never_steer_with_stale_data() -> void:
 	assert_eq(joiner.get_bullet_direction(0), seen["joiner"], "a volley that joined mid-sweep waits for the next pass")
 	assert_eq(woken.get_bullet_direction(1), seen["woken"], "a bullet woken mid-sweep was not gathered: no turn")
 	assert_eq(woken.debug_get_bullet_flock_steering(1), Vector2(), "its slot reads zero")
+	assert_eq(rejoiner.get_bullet_direction(0), seen["rejoiner"], "a volley that switched flocks mid-sweep never steers by the old flock's result")
 	_step(1)
 	assert_ne(joiner.get_bullet_direction(0), seen["joiner"], "the joiner turns from the next tick on")
 	assert_gt(woken.debug_get_bullet_flock_neighbors(1), 0, "the woken bullet is gathered next pass")
-	assert_eq(factory.debug_get_flock_stats()["armed_volleys"], 2, "the freed volley left the armed count")
+	assert_eq(factory.debug_get_flock_stats()["armed_volleys"], 3, "the freed volley left the armed count")
 
 
 func test_every_exit_path_keeps_the_armed_count_exact() -> void:
