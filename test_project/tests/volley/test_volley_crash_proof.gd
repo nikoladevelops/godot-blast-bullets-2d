@@ -254,3 +254,236 @@ func test_live_volley_survives_every_method_out_of_range() -> void:
 	await physics(5)
 	assert_true(_finite_volley(v), "no NaN after the out-of-range sweep")
 	swallow_errors()
+
+
+# ---- Random API storm -----------------------------------------------------------
+# Seeded random SEQUENCES of every bound BulletVolley2D method with typed
+# arguments (mostly valid, some hostile) on several live volleys (some
+# flocking), interleaved with ticks of random length and real frames: the
+# state interactions a one-call-per-method sweep never reaches. Contract:
+# never crash, never a non-finite bullet, the factory books always balance.
+
+const STORM_SEEDS := [5, 29, 61, 97]
+const STORM_STEPS := 250
+const STORM_SKIP := ["enable_volley_for_script"] # needs a disabled volley; covered by the pooling suites
+
+var storm_rng := RandomNumberGenerator.new()
+var storm_calls := 0
+var storm_target: Node2D
+var storm_scene: PackedScene
+
+
+func _storm_object(class_name_hint: String) -> Variant:
+	if storm_rng.randf() < 0.15:
+		return null
+	match class_name_hint:
+		"Node2D", "Node":
+			return storm_target
+		"BulletSpeedData2D":
+			return H.make_speed(storm_rng.randf_range(-50, 400), storm_rng.randf_range(0, 800), storm_rng.randf_range(-200, 200))
+		"BulletRotationData2D":
+			return H.make_rotation(storm_rng.randf_range(-5, 5), storm_rng.randf_range(0, 10), storm_rng.randf_range(-2, 2))
+		"BulletWobbleData2D":
+			return _wob(storm_rng.randf_range(0, 40))
+		"BulletCurvesData2D":
+			var c := BulletCurvesData2D.new()
+			c.movement_speed_curve = H.make_flat_curve(storm_rng.randf_range(0, 300))
+			if storm_rng.randf() < 0.5:
+				c.x_direction_curve = H.make_flat_curve(storm_rng.randf_range(-1, 1))
+				c.x_direction_curve_mode = storm_rng.randi() % 2
+			return c
+		"BulletFlock2D":
+			return H.make_flock(storm_rng.randf_range(0, 3), storm_rng.randf_range(0, 3), storm_rng.randf_range(0, 3))
+		"PackedScene":
+			return storm_scene
+		"Curve2D":
+			var c2 := Curve2D.new()
+			c2.add_point(Vector2.ZERO)
+			c2.add_point(Vector2(storm_rng.randf_range(20, 200), storm_rng.randf_range(-80, 80)))
+			return c2
+		"Resource":
+			return Resource.new()
+	return null
+
+
+func _storm_arg(a: Dictionary, v: BulletVolley2D) -> Variant:
+	var n := v.get_amount_bullets()
+	match int(a["type"]):
+		TYPE_INT:
+			return [0, 1, n - 1, -1, n, 99, storm_rng.randi_range(0, maxi(n - 1, 0)), storm_rng.randi_range(0, maxi(n - 1, 0))][storm_rng.randi() % 8]
+		TYPE_FLOAT:
+			return [0.0, 0.5, 1.0, 2.0, 30.0, 300.0, -1.0, storm_rng.randf_range(-10, 10), NAN, INF][storm_rng.randi() % 10]
+		TYPE_BOOL:
+			return storm_rng.randf() < 0.5
+		TYPE_VECTOR2:
+			return Vector2(NAN, 0) if storm_rng.randf() < 0.05 else Vector2(storm_rng.randf_range(-300, 300), storm_rng.randf_range(-300, 300))
+		TYPE_TRANSFORM2D:
+			return Transform2D(storm_rng.randf_range(-PI, PI), Vector2(storm_rng.randf_range(-300, 300), storm_rng.randf_range(-300, 300)))
+		TYPE_COLOR:
+			return Color(storm_rng.randf(), storm_rng.randf(), storm_rng.randf(), storm_rng.randf())
+		TYPE_STRING, TYPE_STRING_NAME:
+			return [&"", &"graze_targets", &"storm"][storm_rng.randi() % 3]
+		TYPE_NODE_PATH:
+			return NodePath()
+		TYPE_ARRAY:
+			return []
+		TYPE_DICTIONARY:
+			return {}
+		TYPE_CALLABLE:
+			return (func(_a = null, _b = null, _c = null) -> void: storm_calls += 1) if storm_rng.randf() < 0.8 else Callable()
+		TYPE_PACKED_INT32_ARRAY:
+			return PackedInt32Array([0, storm_rng.randi_range(0, maxi(n - 1, 0))])
+		TYPE_PACKED_INT64_ARRAY:
+			return PackedInt64Array()
+		TYPE_PACKED_FLOAT32_ARRAY:
+			return PackedFloat32Array([storm_rng.randf_range(0, 2)])
+		TYPE_PACKED_VECTOR2_ARRAY:
+			return PackedVector2Array([Vector2(storm_rng.randf_range(-200, 200), 0)])
+		TYPE_OBJECT:
+			return _storm_object(str(a["class_name"]))
+	return null
+
+
+func _storm_volley(index: int) -> BulletVolley2D:
+	var n := storm_rng.randi_range(1, 24)
+	var d := H.make_volley_data(n, storm_rng.randf_range(0, 250), 60.0)
+	var tr: Array = []
+	for i in n:
+		tr.append(Transform2D(storm_rng.randf_range(-PI, PI), Vector2(storm_rng.randf_range(-100, 300), storm_rng.randf_range(-100, 300))))
+	d.transforms = tr
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	if index % 2 == 0:
+		v.flock_join(H.make_flock(1.5, 1.0, 1.0), storm_rng.randi() % 3)
+	return v
+
+
+func test_random_api_storm_keeps_every_invariant() -> void:
+	storm_target = make_graze_target(Vector2(120, 80))
+	storm_scene = make_probe_scene()
+	var methods: Array = []
+	for m in ClassDB.class_get_method_list("BulletVolley2D", true):
+		var name := str(m["name"])
+		if not name.begins_with("_") and not (name in STORM_SKIP):
+			methods.append(m)
+	var total_calls := 0
+	for sd in STORM_SEEDS:
+		storm_rng.seed = sd
+		seed(sd)
+		var volleys: Array = []
+		for k in 4:
+			volleys.append(_storm_volley(k))
+		for step in STORM_STEPS:
+			for k in volleys.size():
+				var live: BulletVolley2D = volleys[k]
+				if not is_instance_valid(live) or live.debug_get_life_state() == "pooled":
+					volleys[k] = _storm_volley(k)
+			for c in 3:
+				var v: BulletVolley2D = volleys[storm_rng.randi() % volleys.size()]
+				var m: Dictionary = methods[storm_rng.randi() % methods.size()]
+				var args: Array = []
+				for a in m["args"]:
+					args.append(_storm_arg(a, v))
+				v.callv(str(m["name"]), args)
+				total_calls += 1
+			if storm_rng.randf() < 0.15:
+				await physics(1)
+				await idle(1)
+			else:
+				factory.debug_advance_time([0.0, 1.0 / 60.0, 1.0 / 30.0, 0.25][storm_rng.randi() % 4])
+			swallow_errors()
+			var where := "seed %d step %d" % [sd, step]
+			for v in volleys:
+				if is_instance_valid(v) and v.debug_get_life_state() == "active":
+					assert_true(_finite_volley(v), "finite bullets, " + where)
+			var books: Dictionary = factory.debug_assert_no_dangling()
+			if not books["ok"]:
+				assert_true(false, "books balance, %s: %s" % [where, books["error"]])
+				return
+		factory.reset()
+		await idle(2)
+		swallow_errors()
+	assert_gt(total_calls, 2500, "the storm made %d calls" % total_calls)
+
+
+func test_random_spawner_and_factory_storm_keeps_every_invariant() -> void:
+	# The same storm over every bound BulletSpawner2D and BulletFactory2D
+	# method (setters, shots, conversions, clears, structural calls on idle
+	# points), with flocking spawners firing throughout.
+	storm_target = make_graze_target(Vector2(120, 80))
+	storm_scene = make_probe_scene()
+	var fired: Array = []
+	var calls := 0
+	for sd in STORM_SEEDS:
+		storm_rng.seed = sd
+		seed(sd)
+		var spawners: Array = []
+		for k in 2:
+			var sp := make_spawner(H.make_volley_data(storm_rng.randi_range(1, 16), 120.0, 3.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, storm_rng.randi_range(1, 16))
+			sp.helper_ring_radius = 30.0
+			sp.flock_enabled = true
+			sp.flock = H.make_flock(1.5, 1.0, 1.0)
+			sp.volley_fired.connect(func(v: BulletVolley2D, _n: int) -> void: fired.append(v))
+			spawners.append(sp)
+		var targets: Array = [] # [object, method dict]
+		for m in ClassDB.class_get_method_list("BulletSpawner2D", true):
+			targets.append(["spawner", m])
+		for m in ClassDB.class_get_method_list("BulletFactory2D", true):
+			targets.append(["factory", m])
+		targets = targets.filter(func(t): return not str(t[1]["name"]).begins_with("_") and not (t[1]["args"] as Array).any(func(a): return int(a["type"]) == TYPE_RID))
+		for step in 150:
+			for c in 3:
+				var pick: Array = targets[storm_rng.randi() % targets.size()]
+				var obj: Object = factory
+				if pick[0] == "spawner":
+					spawners = spawners.filter(func(s): return is_instance_valid(s))
+					if spawners.is_empty():
+						continue
+					obj = spawners[storm_rng.randi() % spawners.size()]
+				var args: Array = []
+				for a in pick[1]["args"]:
+					var arg: Variant = null
+					if int(a["type"]) == TYPE_OBJECT and str(a["class_name"]) == "BulletVolley2D":
+						fired = fired.filter(func(v): return is_instance_valid(v))
+						arg = null if fired.is_empty() else fired[storm_rng.randi() % fired.size()]
+					elif int(a["type"]) == TYPE_OBJECT and str(a["class_name"]) == "BulletPickupData2D":
+						arg = load("res://tests/common/pickup_test_helpers.gd").coin()
+					else:
+						var probe_volley: BulletVolley2D = null
+						fired = fired.filter(func(v): return is_instance_valid(v))
+						if not fired.is_empty():
+							probe_volley = fired[0]
+						arg = _storm_arg(a, probe_volley) if probe_volley != null else 0
+					args.append(arg)
+				obj.callv(str(pick[1]["name"]), args)
+				calls += 1
+			if not factory.is_inside_tree():
+				break
+			if storm_rng.randf() < 0.2:
+				await physics(1)
+				await idle(1)
+			else:
+				factory.debug_advance_time([0.0, 1.0 / 60.0, 1.0 / 30.0][storm_rng.randi() % 3])
+			for sp in spawners:
+				if is_instance_valid(sp) and storm_rng.randf() < 0.3:
+					sp.shoot_once()
+			swallow_errors()
+			var where := "seed %d step %d" % [sd, step]
+			fired = fired.filter(func(v): return is_instance_valid(v))
+			for v in fired:
+				if v.debug_get_life_state() == "active":
+					assert_true(_finite_volley(v), "finite bullets, " + where)
+			var books: Dictionary = factory.debug_assert_no_dangling()
+			if not books["ok"]:
+				assert_true(false, "books balance, %s: %s" % [where, books["error"]])
+				return
+		factory.set_is_factory_processing_bullets(true)
+		factory.time_scale = 1.0
+		factory.reset()
+		await idle(2)
+		swallow_errors()
+		for sp in spawners:
+			if is_instance_valid(sp):
+				sp.queue_free()
+		await idle(1)
+		fired.clear()
+	assert_gt(calls, 1500, "the storm made %d calls" % calls)
