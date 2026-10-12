@@ -253,6 +253,9 @@ public:
 	void expire_live_bullets();
 	Ref<BulletPickupData2D> pickup_data;
 	bool pickup_magnet_started = false;
+	// Spawner whose time_scale this pickup volley follows (pickup option
+	// follow_source_time_scale), 0 = none. Cleared with the life.
+	uint64_t pickup_time_scale_owner_id = 0;
 	std::vector<int> expiry_indexes_scratch;
 	// Reused by cull_outside_bounds (no allocation per tick once warm).
 	std::vector<int> despawn_indexes_scratch;
@@ -1306,13 +1309,18 @@ public:
 	Array convert_to_pickups(const Ref<BulletPickupData2D> &pickup, const Variant &target, const PackedInt32Array &bullet_indexes);
 	// Conversion step: gives the freshly spawned volley its pickup identity
 	// and burst-out motion (velocities[i] is bullet i's initial velocity).
-	void seed_pickups(const Ref<BulletPickupData2D> &pickup, const Vector2 *velocities, int count);
+	struct PickupSeed {
+		Vector2 velocity; // the source bullet's total velocity (already scaled for the burst)
+		real_t max_speed = 0.0; // the source's top speed and acceleration, kept in
+		real_t acceleration = 0.0; // MOTION_KEEP_BULLET_MOTION
+	};
+	void seed_pickups(const Ref<BulletPickupData2D> &pickup, const PickupSeed *seeds, int count);
 	// The magnet phase: once the delay has passed, drag ends and the bullets
 	// accelerate towards their homing target. One branch per tick until then.
 	void maybe_begin_pickup_magnet();
 	// Reached the target: pickup_collected, optional sound/effect, the bullet
 	// leaves. False when a handler freed this volley.
-	bool collect_pickup_bullet(int bullet_index, Node2D *target);
+	bool collect_pickup_bullet(int bullet_index, Node2D *collector);
 
 	// ---- Area queries and clears (bullet_volley2d_area.cpp) ----
 	// Global-space centers of the LIVE bullets inside a circle / a rectangle

@@ -4,20 +4,31 @@
 		What a bullet becomes when it is turned into a pickup: coin, gem, score item.
 	</brief_description>
 	<description>
-		Describes a pickup for [method BulletFactory2D.convert_all_bullets_to_pickups], [method BulletFactory2D.convert_bullets_in_circle_to_pickups], [method BulletFactory2D.convert_bullets_in_rect_to_pickups], [method BulletSpawner2D.convert_live_bullets_to_pickups] and [method BulletVolley2D.convert_to_pickups]. A converted bullet appears again where it was with the look settings (texture or animation, size, tint and opacity, fades), keeps part of its velocity and drifts out with drag, then after the magnet delay accelerates towards the target and is collected on arrival ([signal BulletFactory2D.pickup_collected]). Optionally it also has a collision layer, so a player [Area2D] can touch it through [signal BulletFactory2D.area_entered].
+		Describes a pickup for [method BulletFactory2D.convert_all_bullets_to_pickups], [method BulletFactory2D.convert_bullets_in_circle_to_pickups], [method BulletFactory2D.convert_bullets_in_rect_to_pickups], [method BulletSpawner2D.convert_live_bullets_to_pickups] and [method BulletVolley2D.convert_to_pickups]. A converted bullet appears again where it was, with the look settings (a [SpriteFrames] animation or one texture, size, tint and opacity, fades, material, an attachment, effect layers), moves the way [member motion_mode] says, and is collected when it comes within [member collect_radius] of the target or, with [member collect_on_collision], touches something on its collision mask ([signal BulletFactory2D.pickup_collected], [member collect_callback]).
+
+		Look: set [member sprite_frames] (and [member animation]) for an animated coin or gem. The whole pickup volley shows one frame at a time, so every pickup of one conversion animates in sync. [member texture] is only the shortcut for a single static image; with neither, a small white disc is used.
+
+		Motion ([member motion_mode]): Burst And Magnet is the built-in coin physics (keeps part of the bullet's velocity, drifts out with drag, then accelerates to the target). Keep Bullet Motion lets every pickup keep the speed, top speed and acceleration its bullet had, and only adds the pull towards the target. Custom hands the speed to your own [member speed_data] and/or [member curves_data] (a speed curve's X axis is the pickup's normalized lifetime). [member rotation_data] spins the pickup in every mode. In all modes the steering towards the target starts after [member magnet_delay_sec].
 
 		[codeblock]
+		var frames: SpriteFrames = preload("res://coin_frames.tres")  # animations: "spin", "pop"
+
 		var coin := BulletPickupData2D.new()
-		coin.texture = preload("res://coin.png")
+		coin.sprite_frames = frames
+		coin.animation = &amp;"spin"
 		coin.value = 10
 		coin.magnet_delay_sec = 0.4
+		coin.collect_callback = func(target, position, volley, bullet_index, value): score += value
 
 		# the boss died: all its bullets become coins and fly to the player
 		boss_spawner.convert_live_bullets_to_pickups(coin, player)
 		# a bomb: everything on screen
 		factory.convert_all_bullets_to_pickups(coin, player)
-		factory.pickup_collected.connect(func(target, position, volley, bullet_index, value): score += value)
+		# the same through the signal
+		factory.pickup_collected.connect(func(target, position, volley, bullet_index, value): print(value))
 		[/codeblock]
+		[signal BulletFactory2D.pickup_collected] works for any Node2D target: an Area2D, a CharacterBody2D, a RigidBody2D, a plain Node2D... With [member collect_on_collision] and a [member collision_mask] the collector is whatever the pickup touches.
+
 		Every accepted change emits [signal Resource.changed]; an edit reaches the next conversion, not pickups already flying.
 	</description>
 	<tutorials>
@@ -31,8 +42,23 @@
 		</method>
 	</methods>
 	<members>
+		<member name="animation" type="StringName" setter="set_animation" getter="get_animation" default="&amp;&quot;default&quot;">
+			Which animation of [member sprite_frames] plays. Empty or "default" resolves silently to the first animation of the list when there is no "default"; an unknown name plays the first animation and pushes one warning. An animation without frames falls back to [member texture] or the placeholder disc (also one warning). Looping and speed come from the SpriteFrames animation.
+		</member>
+		<member name="attachment" type="PackedScene" setter="set_attachment" getter="get_attachment">
+			A [BulletAttachment2D] scene carried by every pickup (a glow, a sparkle trail, a light). It is pooled and released with the pickup like any bullet attachment and follows [member BulletFactory2D.time_scale] (see [member BulletAttachment2D.apply_time_scale]).
+		</member>
+		<member name="attachment_offset" type="Vector2" setter="set_attachment_offset" getter="get_attachment_offset" default="Vector2(0, 0)">
+			Offset of the attachment from the pickup, in pixels. Must be finite.
+		</member>
+		<member name="collect_callback" type="Callable" setter="set_collect_callback" getter="get_collect_callback">
+			Optional [Callable] run for every collected pickup, right after [signal BulletFactory2D.pickup_collected], with the same arguments: [code](target, position, volley, bullet_index, value)[/code]. Runtime only: it is never saved with the resource. An invalid callable is ignored. The bullet is still alive inside the callback.
+		</member>
 		<member name="collect_effect" type="BulletEffectLayerData2D" setter="set_collect_effect" getter="get_collect_effect">
 			A sprite effect fired at the pickup's position when it is collected (see [method BulletFactory2D.spawn_layer_effect]).
+		</member>
+		<member name="collect_on_collision" type="bool" setter="set_collect_on_collision" getter="get_collect_on_collision" default="false">
+			When on, a pickup is collected by touching something on its [member collision_mask] (an Area2D, a CharacterBody2D, a RigidBody2D, any collision object), and that node is reported as the collector. Needs a collision layer or mask. The touch is consumed: no area/body signal, no bounce. Combined with the radius rule a pickup is still collected exactly once.
 		</member>
 		<member name="collect_radius" type="float" setter="set_collect_radius" getter="get_collect_radius" default="24.0">
 			A pickup is collected when it comes this close to its target (pixels). Must be finite and above 0.
@@ -49,8 +75,14 @@
 		<member name="collision_radius" type="float" setter="set_collision_radius" getter="get_collision_radius" default="8.0">
 			Radius of the pickup's collision circle in pixels, used only with a collision layer or mask. Must be finite and above 0.
 		</member>
+		<member name="curves_data" type="BulletCurvesData2D" setter="set_curves_data" getter="get_curves_data">
+			Custom motion only: shared [BulletCurvesData2D] of the pickup volley (for example a movement speed curve). The curve's X axis is the pickup's normalized lifetime.
+		</member>
 		<member name="drag" type="float" setter="set_drag" getter="get_drag" default="4.0">
 			How fast the burst slows down (per second, 1 loses all speed in a second). Applies until the magnet starts. Must be finite and 0 or more.
+		</member>
+		<member name="effect_layers" type="BulletEffectLayerData2D[]" setter="set_effect_layers" getter="get_effect_layers" default="[]">
+			Sprite effect layers of the pickup volley, exactly like [member BulletVolleyData2D.effect_layers]: a trail that follows the pickup, an On Spawn flash, an On Despawn puff when it leaves the despawn bounds. Collecting a pickup fires none of the hit or destroy layers (use [member collect_effect]).
 		</member>
 		<member name="fade_in_sec" type="float" setter="set_fade_in_sec" getter="get_fade_in_sec" default="0.0">
 			Seconds the pickup takes to reach full opacity after the conversion. Clamped to the lifetime. Must be finite and 0 or more.
@@ -60,6 +92,9 @@
 		</member>
 		<member name="fire_clear_effects" type="bool" setter="set_fire_clear_effects" getter="get_fire_clear_effects" default="false">
 			When on, each converted bullet fires its On Clear effects and sounds as it leaves (a bomb flash). Off by default: the bullet just becomes the pickup.
+		</member>
+		<member name="follow_source_time_scale" type="bool" setter="set_follow_source_time_scale" getter="get_follow_source_time_scale" default="false">
+			When on and every converted bullet came from volleys of the same spawner, the pickups follow that spawner's [member BulletSpawner2D.time_scale] (while the spawner lives and has [member BulletSpawner2D.time_scale_affects_volleys] on). Off by default: pickups are owned by the factory and run on [member BulletFactory2D.time_scale] only. Conversions that mix spawners ignore the option.
 		</member>
 		<member name="inherit_custom_data" type="bool" setter="set_inherit_custom_data" getter="get_inherit_custom_data" default="false">
 			Copies each bullet's custom data resource onto its pickup, readable in [signal BulletFactory2D.pickup_collected] through [method BulletVolley2D.bullet_get_custom_data]. Off by default.
@@ -82,8 +117,29 @@
 		<member name="magnet_smoothing" type="float" setter="set_magnet_smoothing" getter="get_magnet_smoothing" default="0.0">
 			Cap on how fast a pickup may turn towards its target (radians per second per unit; the volley homing smoothing). 0 steers straight at the target at once. A small positive value limits the turning, so pickups swing around in arcs before settling on the target; large values behave like 0. Must be finite and 0 or more.
 		</member>
+		<member name="material" type="Material" setter="set_material" getter="get_material">
+			Material of the pickup volley (an additive glow shader, for example).
+		</member>
+		<member name="motion_mode" type="int" setter="set_motion_mode" getter="get_motion_mode" default="0">
+			How the pickups move: 0 Burst And Magnet (built-in coin physics), 1 Keep Bullet Motion (each pickup keeps its bullet's speed, top speed and acceleration, only the pull is added), 2 Custom (your [member speed_data] / [member curves_data] decide the speed). The knobs a mode does not read are hidden in the inspector. A new mode applies to the next conversion.
+		</member>
+		<member name="rotation_data" type="BulletRotationData2D" setter="set_rotation_data" getter="get_rotation_data">
+			Optional [BulletRotationData2D] shared by the pickups: spinning coins. Works in every motion mode and together with the pull towards the target.
+		</member>
+		<member name="rotation_random_max_degrees" type="float" setter="set_rotation_random_max_degrees" getter="get_rotation_random_max_degrees" default="0.0">
+			With [member rotation_random_min_degrees]: every pickup is turned by a random angle between the two (global random generator). 0 and 0 is off. The pair is not checked against each other; an inverted pair swaps.
+		</member>
+		<member name="rotation_random_min_degrees" type="float" setter="set_rotation_random_min_degrees" getter="get_rotation_random_min_degrees" default="0.0">
+			Lower end of the random extra rotation. See [member rotation_random_max_degrees].
+		</member>
 		<member name="scale_multiplier" type="float" setter="set_scale_multiplier" getter="get_scale_multiplier" default="1.0">
 			Multiplies the scale the bullet had when it was converted, so a big bullet can give a bigger coin. Must be finite and above 0.
+		</member>
+		<member name="scale_random_max" type="float" setter="set_scale_random_max" getter="get_scale_random_max" default="1.0">
+			With [member scale_random_min]: every pickup is additionally scaled by a random factor between the two (global random generator, applied on top of [member scale_multiplier]). 1 and 1 is off. Each must be finite and above 0; an inverted pair swaps.
+		</member>
+		<member name="scale_random_min" type="float" setter="set_scale_random_min" getter="get_scale_random_min" default="1.0">
+			Lower end of the random scale factor. See [member scale_random_max].
 		</member>
 		<member name="scatter_speed_max" type="float" setter="set_scatter_speed_max" getter="get_scatter_speed_max" default="0.0">
 			Upper end of the random extra burst speed. See [member scatter_speed_min].
@@ -91,11 +147,14 @@
 		<member name="scatter_speed_min" type="float" setter="set_scatter_speed_min" getter="get_scatter_speed_min" default="0.0">
 			With [member scatter_speed_max]: a random extra burst, each pickup gets a speed between the two in a random direction (Godot's global random generator, so [method @GlobalScope.seed] reproduces it). 0 and 0 is off. The pair is not checked against each other; an inverted pair swaps. Must be finite and 0 or more.
 		</member>
+		<member name="speed_data" type="BulletSpeedData2D" setter="set_speed_data" getter="get_speed_data">
+			Custom motion only: the [BulletSpeedData2D] (speed, top speed, acceleration) shared by the pickups. Without it a custom pickup has speed 0 and stays where it is until it expires.
+		</member>
 		<member name="sprite_frames" type="SpriteFrames" setter="set_sprite_frames" getter="get_sprite_frames">
-			An animation for the pickup (its first animation plays). Wins over [member texture].
+			The pickup's image and animation: a [SpriteFrames] resource (the animation named by [member animation] plays, its speed and looping come from the resource). Wins over [member texture]. Set this for animated coins and gems.
 		</member>
 		<member name="texture" type="Texture2D" setter="set_texture" getter="get_texture">
-			The pickup's image when [member sprite_frames] is empty. With neither, a small white disc is used so a pickup is never invisible.
+			Shortcut for a single static image, used only when [member sprite_frames] is empty. With neither, a small white disc is used so a pickup is never invisible.
 		</member>
 		<member name="texture_size" type="Vector2" setter="set_texture_size" getter="get_texture_size" default="Vector2(0, 0)">
 			Drawn size in pixels. (0, 0) uses the size of the texture or of the animation's first frame. Both components must be finite and 0 or more.
@@ -106,5 +165,16 @@
 		<member name="value" type="Variant" setter="set_value" getter="get_value" default="null">
 			Anything you want back in [signal BulletFactory2D.pickup_collected]: a number of coins, a dictionary, a resource.
 		</member>
+		<member name="z_index" type="int" setter="set_z_index" getter="get_z_index" default="0">
+			Draw order of the pickup volley (between -4096 and 4096), so coins can sit above or below bullets.
+		</member>
 	</members>
+	<constants>
+		<constant name="MOTION_BURST_AND_MAGNET" value="0" enum="MotionMode">
+		</constant>
+		<constant name="MOTION_KEEP_BULLET_MOTION" value="1" enum="MotionMode">
+		</constant>
+		<constant name="MOTION_CUSTOM" value="2" enum="MotionMode">
+		</constant>
+	</constants>
 </class>

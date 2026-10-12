@@ -9,26 +9,38 @@ using namespace godot;
 
 namespace BlastBullets2D {
 
-void BulletVolley2D::seed_pickups(const Ref<BulletPickupData2D> &pickup, const Vector2 *velocities, int count) {
+void BulletVolley2D::seed_pickups(const Ref<BulletPickupData2D> &pickup, const PickupSeed *seeds, int count) {
 	pickup_data = pickup;
-	pickup_magnet_started = false;
+	const int mode = pickup->motion_mode;
+	// Only the built-in coin physics has a magnet phase; the other modes steer
+	// from the start of the pull (homing delay) with the speed they were given.
+	pickup_magnet_started = mode != BulletPickupData2D::MOTION_BURST_AND_MAGNET;
 	const int limit = Math::min(count, Math::min(amount_bullets, (int)all_cached_speed.size()));
 	for (int i = 0; i < limit; ++i) {
-		const Vector2 v = velocities[i];
+		const Vector2 v = seeds[i].velocity;
 		const real_t speed = Math::sqrt(v.x * v.x + v.y * v.y);
 		if (!Math::is_finite(speed)) {
-			continue; // keeps the spawn-time (zero) motion
+			continue; // keeps the spawn-time motion
 		}
+		// The heading is always the source's; the speed depends on the mode.
 		if (speed > 0.0001f) {
 			all_cached_direction[i] = Vector2(v.x / speed, v.y / speed);
 		}
-		all_cached_speed[i] = speed;
-		// Burst phase: no growth until the magnet starts.
-		all_cached_max_speed[i] = speed;
-		all_cached_acceleration[i] = 0.0f;
+		if (mode == BulletPickupData2D::MOTION_BURST_AND_MAGNET) {
+			all_cached_speed[i] = speed;
+			// Burst phase: no growth until the magnet starts.
+			all_cached_max_speed[i] = speed;
+			all_cached_acceleration[i] = 0.0f;
+		} else if (mode == BulletPickupData2D::MOTION_KEEP_BULLET_MOTION) {
+			all_cached_speed[i] = speed;
+			all_cached_max_speed[i] = Math::max(seeds[i].max_speed, speed);
+			all_cached_acceleration[i] = seeds[i].acceleration;
+		}
+		// MOTION_CUSTOM: speed, top speed and acceleration stay what the
+		// developer's speed_data (or the volley's defaults) seeded.
 		refresh_cached_velocity(i);
 	}
-	if (pickup->magnet_delay_sec <= 0.0) {
+	if (mode == BulletPickupData2D::MOTION_BURST_AND_MAGNET && pickup->magnet_delay_sec <= 0.0) {
 		maybe_begin_pickup_magnet();
 	}
 }
@@ -50,7 +62,7 @@ void BulletVolley2D::maybe_begin_pickup_magnet() {
 	}
 }
 
-bool BulletVolley2D::collect_pickup_bullet(int bullet_index, Node2D *target) {
+bool BulletVolley2D::collect_pickup_bullet(int bullet_index, Node2D *collector) {
 	if (bullet_index < 0 || bullet_index >= (int)all_cached_instance_transforms.size() || bullet_factory == nullptr) {
 		return true;
 	}
@@ -60,9 +72,24 @@ bool BulletVolley2D::collect_pickup_bullet(int bullet_index, Node2D *target) {
 	const uint64_t epoch = collision_epoch_for_bullet(bullet_index);
 	// The bullet is alive in the handler (contract of every bullet signal).
 	bullet_factory->note_user_code();
-	bullet_factory->emit_signal("pickup_collected", target != nullptr ? Variant(target) : Variant(), position, this, bullet_index, pickup->value);
+	const Variant collector_variant = collector != nullptr ? Variant(collector) : Variant();
+	bullet_factory->emit_signal("pickup_collected", collector_variant, position, this, bullet_index, pickup->value);
 	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
 		return false;
+	}
+	// The optional callback of the pickup resource: same arguments as the signal.
+	if (pickup->collect_callback.is_valid()) {
+		bullet_factory->note_user_code();
+		Array args;
+		args.push_back(collector_variant);
+		args.push_back(position);
+		args.push_back(this);
+		args.push_back(bullet_index);
+		args.push_back(pickup->value);
+		pickup->collect_callback.callv(args);
+		if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+			return false;
+		}
 	}
 	if (pickup->collect_sound.is_valid()) {
 		bullet_factory->play_sound(pickup->collect_sound, position);

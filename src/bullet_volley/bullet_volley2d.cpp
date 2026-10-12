@@ -185,6 +185,7 @@ void BulletVolley2D::release_life() {
 	shared_pop_requested = false;
 	pickup_data.unref(); // a pooled volley is a plain one again
 	pickup_magnet_started = false;
+	pickup_time_scale_owner_id = 0;
 	anim_finished_event_pending = false;
 	graze_release(); // user resources (zones) and queued events
 	sound_release(); // user resources (sounds) and the listener ref

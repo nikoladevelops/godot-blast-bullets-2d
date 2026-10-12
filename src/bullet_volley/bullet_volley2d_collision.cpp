@@ -723,6 +723,13 @@ void BulletVolley2D::handle_bullet_collision(const BulletCollisionData2D &record
 	if (bullet_factory != nullptr) {
 		++bullet_factory->stats_collision_records_total;
 	}
+	// A pickup that collects by touch: whatever it touched (an Area2D, a
+	// CharacterBody2D, any Node2D) is the collector. The hit is consumed here:
+	// no bounce, no counter, no area/body signal.
+	if (pickup_data.is_valid() && pickup_data->collect_on_collision) {
+		collect_pickup_bullet(bullet_index, Object::cast_to<Node2D>(hit_target));
+		return;
+	}
 	const uint64_t self_id = get_instance_id();
 	const uint64_t record_epoch = record.queue_bullet_epoch;
 	auto same_live_bullet = [&]() -> bool {

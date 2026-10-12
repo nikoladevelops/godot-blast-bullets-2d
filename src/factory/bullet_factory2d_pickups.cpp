@@ -183,36 +183,61 @@ Array BulletFactory2D::convert_to_pickups_impl(const char *function_name, const 
 		return result; // nothing to convert is not an error
 	}
 
-	// Flatten: pose, velocity, custom data per bullet, in source order.
+	// Flatten: pose, motion seed, custom data per bullet, in source order.
 	std::vector<Transform2D> poses;
-	std::vector<Vector2> velocities;
+	std::vector<BulletVolley2D::PickupSeed> seeds;
 	std::vector<Ref<Resource>> custom;
 	poses.reserve(total);
-	velocities.reserve(total);
+	seeds.reserve(total);
+	const int mode = pickup->motion_mode;
 	const real_t scale = (real_t)pickup->scale_multiplier;
-	const double keep = pickup->initial_velocity_scale;
-	const bool scatter = pickup->scatter_speed_max > 0.0 || pickup->scatter_speed_min > 0.0;
+	const bool scale_random = pickup->scale_random_min != 1.0 || pickup->scale_random_max != 1.0;
+	const bool rotate_random = pickup->rotation_random_min_degrees != 0.0 || pickup->rotation_random_max_degrees != 0.0;
+	const double keep = mode == BulletPickupData2D::MOTION_BURST_AND_MAGNET ? pickup->initial_velocity_scale : 1.0;
+	const bool scatter = mode == BulletPickupData2D::MOTION_BURST_AND_MAGNET && (pickup->scatter_speed_max > 0.0 || pickup->scatter_speed_min > 0.0);
 	const double scatter_lo = Math::min(pickup->scatter_speed_min, pickup->scatter_speed_max);
 	const double scatter_hi = Math::max(pickup->scatter_speed_min, pickup->scatter_speed_max);
+	// Every source volley belongs to the same spawner? Then a pickup that
+	// follows its source's time scale knows which one.
+	const uint64_t common_owner = sources.front().volley->owner_spawner_id;
+	bool owners_differ = false;
 	for (const SourceRecord &record : sources) {
 		BulletVolley2D *volley = record.volley;
+		if (volley->owner_spawner_id != common_owner) {
+			owners_differ = true;
+		}
 		for (const int i : record.indexes) {
 			Transform2D pose = volley->all_cached_instance_transforms[i];
-			pose.columns[0] *= scale;
-			pose.columns[1] *= scale;
+			real_t pose_scale = scale;
+			if (scale_random) {
+				const double lo = Math::min(pickup->scale_random_min, pickup->scale_random_max);
+				const double hi = Math::max(pickup->scale_random_min, pickup->scale_random_max);
+				pose_scale *= (real_t)(lo + (hi - lo) * UtilityFunctions::randf());
+			}
+			pose.columns[0] *= pose_scale;
+			pose.columns[1] *= pose_scale;
+			if (rotate_random) {
+				const double lo = Math::min(pickup->rotation_random_min_degrees, pickup->rotation_random_max_degrees);
+				const double hi = Math::max(pickup->rotation_random_min_degrees, pickup->rotation_random_max_degrees);
+				pose = pose * Transform2D((real_t)Math::deg_to_rad(lo + (hi - lo) * UtilityFunctions::randf()), Vector2());
+			}
 			poses.push_back(pose);
-			Vector2 velocity = volley->all_cached_velocity[i] * (real_t)keep;
+			BulletVolley2D::PickupSeed seed;
+			seed.velocity = volley->all_cached_velocity[i] * (real_t)keep;
 			if (scatter) {
 				const double speed = scatter_lo + (scatter_hi - scatter_lo) * UtilityFunctions::randf();
 				const double angle = Math::TAU * UtilityFunctions::randf();
-				velocity += Vector2((real_t)(Math::cos(angle) * speed), (real_t)(Math::sin(angle) * speed));
+				seed.velocity += Vector2((real_t)(Math::cos(angle) * speed), (real_t)(Math::sin(angle) * speed));
 			}
-			velocities.push_back(velocity);
+			seed.max_speed = volley->all_cached_max_speed[i];
+			seed.acceleration = volley->all_cached_acceleration[i];
+			seeds.push_back(seed);
 			if (pickup->inherit_custom_data) {
 				custom.push_back(volley->bullet_get_custom_data(i));
 			}
 		}
 	}
+	const uint64_t time_scale_owner = (pickup->follow_source_time_scale && !owners_differ) ? common_owner : 0;
 
 	// ---- 2. Spawn the pickup volleys (one per pattern-limit chunk). -------------------------
 	const Ref<BulletVolleyData2D> data = pickup->get_volley_data();
@@ -224,7 +249,8 @@ Array BulletFactory2D::convert_to_pickups_impl(const char *function_name, const 
 		if (volley == nullptr) {
 			break; // the spawn already said why; what spawned stays, the rest of the sources stay too
 		}
-		volley->seed_pickups(pickup, velocities.data() + spawned, (int)count);
+		volley->seed_pickups(pickup, seeds.data() + spawned, (int)count);
+		volley->pickup_time_scale_owner_id = time_scale_owner;
 		if (pickup->inherit_custom_data) {
 			for (size_t k = 0; k < count; ++k) {
 				if (custom[spawned + k].is_valid()) {
