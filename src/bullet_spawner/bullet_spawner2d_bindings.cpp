@@ -221,6 +221,15 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_orphaned_volleys", "value"), &BulletSpawner2D::set_orphaned_volleys);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "orphaned_volleys", PROPERTY_HINT_ENUM, "Keep Flying,Hand To Factory,Clear,Remove"), "set_orphaned_volleys", "get_orphaned_volleys");
 
+	ADD_GROUP("Time", "time_");
+	ClassDB::bind_method(D_METHOD("get_time_scale"), &BulletSpawner2D::get_time_scale);
+	ClassDB::bind_method(D_METHOD("set_time_scale", "value"), &BulletSpawner2D::set_time_scale);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "time_scale", PROPERTY_HINT_RANGE, "0,4,0.01,or_greater"), "set_time_scale", "get_time_scale");
+	ClassDB::bind_method(D_METHOD("get_time_scale_affects_volleys"), &BulletSpawner2D::get_time_scale_affects_volleys);
+	ClassDB::bind_method(D_METHOD("set_time_scale_affects_volleys", "value"), &BulletSpawner2D::set_time_scale_affects_volleys);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "time_scale_affects_volleys"), "set_time_scale_affects_volleys", "get_time_scale_affects_volleys");
+	ClassDB::bind_method(D_METHOD("get_process_time_scale"), &BulletSpawner2D::get_process_time_scale);
+
 	ADD_GROUP("Bullet Patterns", "");
 	// Hand-written accessors of the group (PATTERN_PROPERTY rows); the
 	// table-driven knobs bind themselves in the expansion below.

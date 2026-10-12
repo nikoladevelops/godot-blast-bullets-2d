@@ -1027,8 +1027,23 @@ public:
 	// from handlers. Returns how many bullets were cleared.
 	int clear_active_bullets(bool fire_clear_effects = true);
 	int orphaned_volleys = ORPHANED_VOLLEYS_KEEP_FLYING;
+	double time_scale = 1.0;
+	bool time_scale_affects_volleys = true;
 	int get_orphaned_volleys() const { return orphaned_volleys; }
 	void set_orphaned_volleys(int value);
+
+	// ---- Time (the spawner's own clock) ----
+	// The spawner's cadence, initial delay, telegraph, bursts, pattern list,
+	// retarget, spin and movement run on delta x time_scale x the factory's
+	// time_scale (frozen at 0). With time_scale_affects_volleys the volleys it
+	// fired run at the same scale (the factory multiplies it into their tick
+	// while the spawner lives).
+	double get_time_scale() const { return time_scale; }
+	void set_time_scale(double value);
+	bool get_time_scale_affects_volleys() const { return time_scale_affects_volleys; }
+	void set_time_scale_affects_volleys(bool value) { time_scale_affects_volleys = value; }
+	// spawner scale x factory scale, 0 when either is not finite and positive.
+	double get_process_time_scale() const;
 	// Debug readout of the yellow preview rings: one PackedVector2Array
 	// per extra outline layer, exactly as drawn (holder-local). Empty
 	// when layers are inactive. Lets scripts/tests verify bullets sit

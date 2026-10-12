@@ -237,6 +237,12 @@
 				Velocity of the last movement step in px/s; zero while paused, stopped, waiting (start delay, endpoint pause) or not moving. This is the velocity [member inherit_movement_velocity] adds to bullets.
 			</description>
 		</method>
+		<method name="get_process_time_scale" qualifiers="const">
+			<return type="float" />
+			<description>
+				The factor the spawner's clock currently runs at: [member time_scale] times [member BulletFactory2D.time_scale] of its factory (1 with no factory), or 0 when the product is not a finite positive number.
+			</description>
+		</method>
 		<method name="get_setup_warnings" qualifiers="const">
 			<return type="PackedStringArray" />
 			<description>
@@ -1572,6 +1578,12 @@
 		</member>
 		<member name="telegraph_sec" type="float" setter="set_telegraph_sec" getter="get_telegraph_sec" default="0.5">
 			Warning time before the volley fires. Must be finite and 0 or more.
+		</member>
+		<member name="time_scale" type="float" setter="set_time_scale" getter="get_time_scale" default="1.0">
+			The spawner's own clock speed. Its shot interval, initial delay, burst and telegraph timers, pattern list, retarget interval, spin and Path2D movement all run on real delta times this value times [member BulletFactory2D.time_scale] of the factory it serves: 1 is real time, 0.5 slow motion, 0 freezes the spawner and it resumes with exactly the time it had left. While it lives, the bullets it fired follow the same product unless [member time_scale_affects_volleys] is off. Must be finite and 0 or more. A very large value cannot spiral: at most 8 shots per frame fire and the rest of the backlog is dropped.
+		</member>
+		<member name="time_scale_affects_volleys" type="bool" setter="set_time_scale_affects_volleys" getter="get_time_scale_affects_volleys" default="true">
+			When on (default), the volleys this spawner fired run at its [member time_scale] too (motion, lifetime, timers), as long as the spawner exists; after it is freed they follow the factory scale only. Turn it off to slow just the spawner's own actions while its bullets keep flying at the factory scale. [member inherit_movement_velocity] reports the path speed in the spawner's own time.
 		</member>
 		<member name="transforms_generator" type="NodePath" setter="set_transforms_generator_path" getter="get_transforms_generator_path" default="NodePath(&quot;&quot;)">
 			Node patterns are built on. Empty means this spawner. Point it at another Node2D to move children markers, helper shapes, spin pivot, scale center, and the preview there. Inside the tree, a path to a non-Node2D is rejected (old value kept).

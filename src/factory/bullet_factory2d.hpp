@@ -110,7 +110,8 @@ public:
 	// (bullet_factory2d_world.cpp) ----
 	// Speed of the bullet world: every volley tick, effect and bullet timer
 	// advances by delta * time_scale (1 = real time, 0 = frozen but still
-	// processing). Spawners keep their own clock.
+	// processing). Spawners using this factory run on it too, times their own
+	// time_scale (BulletSpawner2D::get_process_time_scale).
 	double get_time_scale() const { return time_scale; }
 	void set_time_scale(double value);
 	// Bullets outside the rect (global space) and not heading back in are
@@ -651,6 +652,7 @@ private:
 	DespawnBoundsPreviewLayer2D *despawn_preview_layer = nullptr;
 	uint64_t despawn_preview_layer_id = 0;
 	DespawnBoundsPreviewLayer2D *resolve_despawn_preview_layer(bool create);
+	double volley_time_delta(const BulletVolley2D &volley, double bullet_delta) const;
 	int clear_bullets_in_area(const char *function_name, bool circle, const Vector2 &center, real_t radius, const Rect2 &rect);
 	bool is_ready = false;
 

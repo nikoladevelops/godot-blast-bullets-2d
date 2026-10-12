@@ -3,6 +3,7 @@
 // per-frame volley sweep (_physics_process -> tick_volleys) and teleporting.
 // Spawning: bullet_factory2d_spawn.cpp. Freeing/resetting: bullet_factory2d_structural.cpp.
 
+#include "bullet_spawner/bullet_spawner2d.hpp"
 #include "factory/bullet_factory2d_internal.hpp"
 
 using namespace godot;
@@ -31,6 +32,20 @@ static _ALWAYS_INLINE_ BulletVolley2D *resolve_iteration_entry(uint64_t id, Bull
 	return ObjectDB::get_instance(ObjectID(id)) == (Object *)volley ? volley : nullptr;
 }
 
+// The delta one volley runs on: the bullet-world delta times the time scale of
+// its owner spawner while that lives (and opted in). Orphans, factory-spawned
+// and pooled volleys (owner 0) run on the factory scale alone.
+double BulletFactory2D::volley_time_delta(const BulletVolley2D &volley, double bullet_delta) const {
+	if (volley.owner_spawner_id == 0) {
+		return bullet_delta;
+	}
+	const BulletSpawner2D *spawner = Object::cast_to<BulletSpawner2D>(ObjectDB::get_instance(ObjectID(volley.owner_spawner_id)));
+	if (spawner == nullptr || !spawner->get_time_scale_affects_volleys()) {
+		return bullet_delta;
+	}
+	return bullet_delta * spawner->get_time_scale();
+}
+
 void BulletFactory2D::tick_volleys(double delta) {
 	if (!Math::is_finite(delta) || delta < 0.0) {
 		return;
@@ -45,6 +60,7 @@ void BulletFactory2D::tick_volleys(double delta) {
 			continue;
 		}
 		volley->sweep_tick_stamp = sweep_counter;
+		const double volley_delta = volley_time_delta(*volley, delta);
 		// Flag the volley for its whole tick: handlers fired from inside
 		// (collision drain, attachment callbacks) may spawn, and the pool must
 		// never hand out the volley whose drain is still running. Liveness is
@@ -54,7 +70,7 @@ void BulletFactory2D::tick_volleys(double delta) {
 		stats_tick_bullets += volley->active_bullets_counter;
 		volley->is_being_ticked = true;
 		const uint64_t epoch_before_tick = volley_free_epoch;
-		volley->tick(delta);
+		volley->tick(volley_delta);
 		if (volley_free_epoch != epoch_before_tick && ObjectDB::get_instance(ObjectID(entry.id)) != (Object *)volley) {
 			continue; // a handler freed this volley
 		}
@@ -408,7 +424,7 @@ void BulletFactory2D::_physics_process(double delta) {
 			continue;
 		}
 		volley->sweep_timer_stamp = sweep_counter;
-		volley->run_custom_timers(bullet_delta);
+		volley->run_custom_timers(volley_time_delta(*volley, bullet_delta));
 	}
 	is_iterating_bullets = false;
 

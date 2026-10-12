@@ -1117,6 +1117,23 @@ void BulletSpawner2D::arm_retarget_countdown() {
 	}
 }
 
+void BulletSpawner2D::set_time_scale(double value) {
+	if (!Math::is_finite(value) || value < 0.0) {
+		UtilityFunctions::push_error("BulletSpawner2D: time_scale must be finite and >= 0, keeping the old value.");
+		return;
+	}
+	time_scale = value;
+}
+
+double BulletSpawner2D::get_process_time_scale() const {
+	double scale = time_scale;
+	const BulletFactory2D *factory = get_bullet_factory();
+	if (factory != nullptr) {
+		scale *= factory->get_time_scale();
+	}
+	return (Math::is_finite(scale) && scale > 0.0) ? scale : 0.0;
+}
+
 void BulletSpawner2D::_process(double delta) {
 	// Self-healing: even if processing gets enabled in the editor somehow
 	// (e.g. set_shooting_enabled(true) from an editor dock), never shoot.
@@ -1130,9 +1147,19 @@ void BulletSpawner2D::_process(double delta) {
 		}
 		return;
 	}
-	const bool delta_ok = Math::is_finite(delta) && delta > 0.0;
+	bool delta_ok = Math::is_finite(delta) && delta > 0.0;
 	if (delta_ok && delta > 0.5) {
 		delta = 0.5; // clamp hitch spikes so one stall can't fast-forward volleys
+	}
+	if (delta_ok) {
+		// The spawner's clock: real delta (hitch-clamped above) x its own
+		// time_scale x the factory's. A product of 0 freezes everything below
+		// (movement, spin, countdowns) and the remaining times resume exactly.
+		delta *= get_process_time_scale();
+		if (!(delta > 0.0) || !Math::is_finite(delta)) {
+			delta_ok = false;
+			movement_velocity = Vector2(); // standing still: nothing to inherit
+		}
 	}
 	// Movement first: shots and the preview this frame use the new pose.
 	// A movement signal handler may free this spawner: stop touching it.
