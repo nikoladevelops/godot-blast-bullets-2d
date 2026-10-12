@@ -28,6 +28,14 @@ struct FlockConfig2D {
 	uint32_t serial = 1;
 };
 
+// One bullet's last steering, kept by its volley while its flock refreshes
+// steering on an interval (BulletFlock2D.update_interval > 0).
+struct FlockSteerCache2D {
+	Vector2 steer;
+	uint32_t neighbors = 0;
+	bool valid = false; // false = compute at the next pass
+};
+
 // Where one volley's bullets sit in the last pass (written by the pass,
 // read by the volley's own tick). Never a pointer: the volley resolves the
 // solver's buffer at move time and checks every field first.
@@ -71,11 +79,14 @@ public:
 		int grid_members = 0; // live, finite bullets inside the grid
 		int64_t neighbor_checks = 0; // candidates distance-tested
 		int capped_members = 0; // stopped at max_neighbors
+		int queried_members = 0; // steering recomputed this pass
 		uint64_t pass_usec = 0;
 	};
 
-	// One pass: begin, gather every armed volley, solve.
-	void begin(uint64_t sweep);
+	// One pass: begin, gather every armed volley, solve. now / previous:
+	// the flock clock (bullet time) now and at the last pass, for
+	// update_interval.
+	void begin(uint64_t sweep, double now = 0.0, double previous = 0.0);
 	// Gathers the volley's bullets into slots base..base+amount and writes
 	// its view. volley_id keys Per Volley flocks.
 	void add_volley(BulletVolley2D &volley, const FlockConfig2D &config, uint64_t volley_id);
@@ -110,6 +121,7 @@ private:
 		double inv_cell = 0.0;
 		uint32_t max_neighbors = 0; // UINT32_MAX = no limit
 		uint32_t next_ordinal = 0;
+		double update_interval = 0.0; // > 0: refresh each bullet once per interval
 		// Occupied cells and their box (build_dense_grids); dense_base >= 0
 		// = neighbor cells come from dense_cells.
 		uint32_t cells = 0;
@@ -150,6 +162,8 @@ private:
 
 	uint64_t sweep = 0;
 	uint32_t stamp = 0; // per pass: occupied table slots carry it
+	double clock_now = 0.0;
+	double clock_previous = 0.0;
 	Stats stats;
 
 	std::vector<Group> groups;
@@ -158,10 +172,22 @@ private:
 	// Per slot (base + bullet index), zeroed every pass.
 	std::vector<Vector2> steer;
 	std::vector<uint32_t> neighbors;
+	std::vector<uint8_t> gathered; // 1 = in the grid this pass
+
+	// Volleys whose flock refreshes on an interval: their caches are
+	// written back after the solve (raw pointers: no user code runs in a
+	// pass).
+	struct CachedVolley {
+		BulletVolley2D *volley = nullptr;
+		uint32_t base = 0;
+		uint32_t amount = 0;
+	};
+	std::vector<CachedVolley> cached_volleys;
 
 	// Grid members in gather order.
 	std::vector<uint32_t> m_slot;
 	std::vector<uint32_t> m_cell;
+	std::vector<uint8_t> m_query; // 1 = recompute this pass
 	std::vector<Mate> m_mate;
 
 	// Cells (exact: one per occupied (flock, cx, cy)).
@@ -175,6 +201,7 @@ private:
 	// Grid members sorted by cell (stable): a cell's flockmates are one
 	// contiguous run.
 	std::vector<uint32_t> s_slot;
+	std::vector<uint8_t> s_query;
 	std::vector<Mate> s_mate;
 };
 } //namespace BlastBullets2D

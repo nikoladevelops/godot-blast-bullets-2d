@@ -135,7 +135,7 @@ func test_stats_keys_are_exact() -> void:
 	var stats: Dictionary = factory.debug_get_flock_stats()
 	var keys: Array = stats.keys()
 	keys.sort()
-	assert_eq(keys, ["armed_volleys", "capped_members", "flocks", "grid_members", "members", "neighbor_checks", "pass_usec"], "debug_get_flock_stats keys")
+	assert_eq(keys, ["armed_volleys", "capped_members", "flocks", "grid_members", "members", "neighbor_checks", "pass_usec", "queried_members"], "debug_get_flock_stats keys")
 	assert_true(factory.get_frame_stats().has("flock_usec"), "the frame stats carry the pass time")
 	var v := _volley(_cluster(Vector2(0, 0), 5, 1))
 	v.disable_bullet(4)

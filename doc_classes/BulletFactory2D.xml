@@ -215,7 +215,7 @@
 		<method name="debug_get_flock_stats" qualifiers="const">
 			<return type="Dictionary" />
 			<description>
-				The last flock pass: [code]flocks[/code] (distinct flocks), [code]members[/code] (bullets of every flocking volley), [code]grid_members[/code] (live, finite bullets in the grid), [code]neighbor_checks[/code] (flockmates distance-tested), [code]capped_members[/code] (bullets that stopped at [member BulletFlock2D.max_neighbors]), [code]pass_usec[/code], plus [code]armed_volleys[/code] (volleys holding a flock). The pass runs once per physics tick before any volley moves, and is skipped (zero cost) while no volley flocks.
+				The last flock pass: [code]flocks[/code] (distinct flocks), [code]members[/code] (bullets of every flocking volley), [code]grid_members[/code] (live, finite bullets in the grid), [code]neighbor_checks[/code] (flockmates distance-tested), [code]capped_members[/code] (bullets that stopped at [member BulletFlock2D.max_neighbors]), [code]queried_members[/code] (bullets whose steering was recomputed, see [member BulletFlock2D.update_interval]), [code]pass_usec[/code], plus [code]armed_volleys[/code] (volleys holding a flock). The pass runs once per physics tick before any volley moves, and is skipped (zero cost) while no volley flocks.
 			</description>
 		</method>
 		<method name="debug_get_graze_stats" qualifiers="const">

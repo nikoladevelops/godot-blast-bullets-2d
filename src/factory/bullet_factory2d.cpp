@@ -55,7 +55,7 @@ void BulletFactory2D::tick_volleys(double delta) {
 	// Flocks steer by where every member stood before this sweep moved any
 	// of them (no user code runs between the snapshot and the pass).
 	if (flock_armed_volleys > 0) {
-		run_flock_pass();
+		run_flock_pass(delta);
 	} else if (flock_solver.has_results()) {
 		// The last armed volley left: drop the old results once.
 		flock_solver.begin(sweep_counter);

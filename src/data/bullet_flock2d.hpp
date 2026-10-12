@@ -49,6 +49,7 @@ public:
 	real_t max_turn_rate_degrees = 0.0; // degrees per second, 0 = unlimited
 	bool face_heading = true;
 	int max_neighbors = 32; // 0 = no limit
+	real_t update_interval = 0.0; // seconds between steering updates, 0 = every tick
 
 	real_t get_separation() const;
 	void set_separation(real_t value);
@@ -73,6 +74,9 @@ public:
 
 	int get_max_neighbors() const;
 	void set_max_neighbors(int value);
+
+	real_t get_update_interval() const;
+	void set_update_interval(real_t value);
 
 protected:
 	static void _bind_methods();

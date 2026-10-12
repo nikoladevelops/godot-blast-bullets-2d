@@ -101,8 +101,10 @@ inline bool finite_float(float value) {
 
 } // namespace
 
-void FlockSolver2D::begin(uint64_t new_sweep) {
+void FlockSolver2D::begin(uint64_t new_sweep, double now, double previous) {
 	sweep = new_sweep;
+	clock_now = now;
+	clock_previous = previous;
 	++stamp;
 	if (stamp == 0) {
 		// Wrapped: no slot may look occupied by accident.
@@ -117,8 +119,11 @@ void FlockSolver2D::begin(uint64_t new_sweep) {
 	groups.clear();
 	steer.clear();
 	neighbors.clear();
+	gathered.clear();
+	cached_volleys.clear();
 	m_slot.clear();
 	m_cell.clear();
+	m_query.clear();
 	m_mate.clear();
 	cell_group.clear();
 	cell_cx.clear();
@@ -176,6 +181,7 @@ uint32_t FlockSolver2D::group_for(const GroupKey &key, const BulletFlock2D &floc
 	g.reach_sq = reach * reach;
 	g.inv_cell = reach > 0.0 ? 2.0 / reach : 0.0;
 	g.max_neighbors = flock.max_neighbors > 0 ? (uint32_t)flock.max_neighbors : std::numeric_limits<uint32_t>::max();
+	g.update_interval = (double)flock.update_interval;
 	const uint32_t index = (uint32_t)groups.size();
 	groups.push_back(g);
 	GroupSlot &slot = group_table[at];
@@ -261,12 +267,28 @@ void FlockSolver2D::add_volley(BulletVolley2D &volley, const FlockConfig2D &conf
 	}
 	const uint32_t group = group_for(key, *flock);
 	const double inv_cell = groups[group].inv_cell;
+	const double interval = groups[group].update_interval;
 
 	const int amount = MAX(volley.amount_bullets, 0);
 	const uint32_t base = (uint32_t)steer.size();
 	steer.resize((size_t)base + (size_t)amount);
 	neighbors.resize((size_t)base + (size_t)amount);
+	gathered.resize((size_t)base + (size_t)amount);
 	stats.members += amount;
+	// On an interval the volley keeps each bullet's last steering: a bullet
+	// not due this pass reuses it (and still counts as a flockmate).
+	FlockSteerCache2D *cache = nullptr;
+	if (interval > 0.0) {
+		if ((int)volley.flock_cache.size() != amount) {
+			volley.flock_cache.assign((size_t)amount, FlockSteerCache2D());
+		}
+		cache = volley.flock_cache.data();
+		CachedVolley cached;
+		cached.volley = &volley;
+		cached.base = base;
+		cached.amount = (uint32_t)amount;
+		cached_volleys.push_back(cached);
+	}
 
 	const int limit = MIN(MIN(amount, (int)volley.all_cached_instance_origin.size()), MIN((int)volley.all_cached_direction.size(), (int)volley.all_cached_speed.size()));
 	const Vector2 *origins = volley.all_cached_instance_origin.data();
@@ -300,7 +322,20 @@ void FlockSolver2D::add_volley(BulletVolley2D &volley, const FlockConfig2D &conf
 			hx = 0.0;
 			hy = 0.0;
 		}
+		const uint32_t ordinal = groups[group].next_ordinal++;
+		uint8_t query = 1;
+		if (cache != nullptr && cache[i].valid) {
+			steer[base + (uint32_t)i] = cache[i].steer;
+			neighbors[base + (uint32_t)i] = cache[i].neighbors;
+			// Due when the clock crossed this bullet's next refresh: phases
+			// spread by the golden ratio, so the refreshes of a flock spread
+			// evenly over the interval.
+			const double phase = (ordinal * 0.6180339887498949 - std::floor(ordinal * 0.6180339887498949)) * interval;
+			query = std::floor((clock_now + phase) / interval) != std::floor((clock_previous + phase) / interval) ? 1 : 0;
+		}
+		gathered[base + (uint32_t)i] = 1;
 		m_slot.push_back(base + (uint32_t)i);
+		m_query.push_back(query);
 		m_cell.push_back(cell_for(group, (int32_t)std::floor(fx), (int32_t)std::floor(fy)));
 		Mate mate;
 		mate.x = x;
@@ -308,7 +343,7 @@ void FlockSolver2D::add_volley(BulletVolley2D &volley, const FlockConfig2D &conf
 		mate.hx = (float)hx;
 		mate.hy = (float)hy;
 		mate.has_heading = (hx != 0.0 || hy != 0.0) ? 1u : 0u;
-		mate.ordinal = groups[group].next_ordinal++;
+		mate.ordinal = ordinal;
 		m_mate.push_back(mate);
 	}
 
@@ -399,17 +434,20 @@ void FlockSolver2D::solve() {
 		run += cell_count[c];
 	}
 	s_slot.resize(total);
+	s_query.resize(total);
 	s_mate.resize(total);
 	sort_cursor.assign(cell_start.begin(), cell_start.end());
 	for (uint32_t m = 0; m < total; ++m) {
 		const uint32_t at = sort_cursor[m_cell[m]]++;
 		s_slot[at] = m_slot[m];
+		s_query[at] = m_query[m];
 		s_mate[at] = m_mate[m];
 	}
 	build_dense_grids();
 
 	int64_t checks = 0;
 	int capped = 0;
+	int queried = 0;
 	const CoincidentDirections &dirs = coincident_directions();
 	const Mate *const mates = s_mate.data();
 	// The 24 neighbor cells of the cell being queried, in ring order (8-ring
@@ -435,6 +473,10 @@ void FlockSolver2D::solve() {
 		const uint32_t own_start = cell_start[c];
 		const uint32_t own_end = own_start + cell_count[c];
 		for (uint32_t self = own_start; self < own_end; ++self) {
+			if (s_query[self] == 0) {
+				continue; // not due: keeps its cached steering (already in its slot)
+			}
+			++queried;
 			const float px = mates[self].x;
 			const float py = mates[self].y;
 			const uint32_t ordinal = mates[self].ordinal;
@@ -549,6 +591,18 @@ void FlockSolver2D::solve() {
 	}
 	stats.neighbor_checks = checks;
 	stats.capped_members = capped;
+	stats.queried_members = queried;
+	// Interval flocks: every bullet's steering back into its volley's cache
+	// (a bullet outside the grid this pass computes again when it returns).
+	for (const CachedVolley &cached : cached_volleys) {
+		FlockSteerCache2D *cache = cached.volley->flock_cache.data();
+		for (uint32_t i = 0; i < cached.amount; ++i) {
+			const uint32_t slot = cached.base + i;
+			cache[i].valid = gathered[slot] != 0;
+			cache[i].steer = steer[slot];
+			cache[i].neighbors = neighbors[slot];
+		}
+	}
 }
 
 } //namespace BlastBullets2D

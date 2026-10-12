@@ -2737,6 +2737,9 @@ public:
 	std::shared_ptr<FlockConfig2D> flock_config;
 	// Where this volley's bullets sit in the factory's last pass.
 	FlockView2D flock_view;
+	// Each bullet's last steering while its flock refreshes on an interval
+	// (written by the pass; dropped with every membership change).
+	std::vector<FlockSteerCache2D> flock_cache;
 	// THE one place that arms or disarms (keeps the factory's armed count
 	// exact): arming, join, leave, release_life and PREDELETE.
 	void flock_set_config(const std::shared_ptr<FlockConfig2D> &config);

@@ -277,7 +277,10 @@ func test_only_the_direction_turns() -> void:
 				problems.append("tick %d bullet %d: |direction| = %.7f" % [(round + 1) * 100, i, d.length()])
 			if absf(v.get_bullet_velocity(i).length() - 120.0) > 1e-3:
 				problems.append("tick %d bullet %d: |velocity| = %.5f" % [(round + 1) * 100, i, v.get_bullet_velocity(i).length()])
-	assert_eq("\n".join(problems.slice(0, 8)), "", "10k ticks: unit direction, speed untouched")
+			var basis: Transform2D = v.get_bullet_transform(i)
+			if absf(basis.x.length() - 1.0) > 1e-4 or absf(basis.y.length() - 1.0) > 1e-4:
+				problems.append("tick %d bullet %d: the rotation scaled the bullet (%f, %f)" % [(round + 1) * 100, i, basis.x.length(), basis.y.length()])
+	assert_eq("\n".join(problems.slice(0, 8)), "", "10k ticks: unit direction, speed untouched, the sprite keeps its size")
 
 
 func test_two_runs_are_bit_identical() -> void:

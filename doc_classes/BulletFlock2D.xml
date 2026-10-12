@@ -11,7 +11,7 @@
 		Only the direction turns: the speed stays the speed data's (acceleration, max speed and time scale keep working). The heading approaches the wished one by [code]1 - e^(-strength * delta)[/code] of the angle each tick, so it never overshoots and looks the same at any frame rate.
 		WHO flies together is decided where the flock is armed ([member BulletSpawner2D.flock_scope], the scope of [method BulletVolley2D.flock_join]); separate flocks never see each other. Edits reach every bullet already in flight on the next tick ([code]swarm.cohesion = 2.0[/code]). Every accepted change emits [signal Resource.changed]; a rejected value pushes an error and keeps the old one.
 		Homing turns first and the flock bends the result: give homing a turn rate ([member BulletVolleyData2D.homing_smoothing] above 0) so a homing swarm has room to flock. Direction curves in Override mode win their axis. Frozen bullets are not flockmates, and bullets of a frozen bullet world (time scale 0) do not turn.
-		Cost: one pass per physics tick over every flocking bullet (an exact spatial hash grid), a few nanoseconds per flockmate looked at; [member max_neighbors] bounds the work per bullet. Nothing is paid while no bullet flocks.
+		Cost: one pass per physics tick over every flocking bullet (an exact spatial hash grid), a few nanoseconds per flockmate looked at; [member max_neighbors] bounds the work per bullet and [member update_interval] spreads it over several ticks. Nothing is paid while no bullet flocks.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -39,6 +39,9 @@
 		</member>
 		<member name="separation_range" type="float" setter="set_separation_range" getter="get_separation_range" default="40.0">
 			Pixels: flockmates closer than this push the bullet away (the protected range). Independent of [member neighbor_range] (it may be larger). 0 turns separation off.
+		</member>
+		<member name="update_interval" type="float" setter="set_update_interval" getter="get_update_interval" default="0.0">
+			Seconds of bullet time between two steering updates of a bullet (0 = every physics tick, the default). A positive interval recomputes each bullet once per interval, staggered across the flock so the work spreads evenly over the ticks; in between, every bullet keeps turning toward its last steering and still counts as a flockmate for the others. The flock pass costs roughly 1 / (interval x physics ticks per second) of the every-tick cost, so [code]3.0 / 60.0[/code] cuts it to a third with hardly a visible difference. A bullet with no steering yet (a new or reused volley, a bullet woken from a freeze) computes at once.
 		</member>
 	</members>
 	<constants>

@@ -58,6 +58,9 @@ void BulletFlock2D::set_max_neighbors(int value) {
 	emit_changed();
 }
 
+real_t BulletFlock2D::get_update_interval() const { return update_interval; }
+void BulletFlock2D::set_update_interval(real_t value) { store_amount(update_interval, value, "update_interval", false); }
+
 void BulletFlock2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_separation"), &BulletFlock2D::get_separation);
 	ClassDB::bind_method(D_METHOD("set_separation", "value"), &BulletFlock2D::set_separation);
@@ -90,6 +93,10 @@ void BulletFlock2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_max_neighbors"), &BulletFlock2D::get_max_neighbors);
 	ClassDB::bind_method(D_METHOD("set_max_neighbors", "value"), &BulletFlock2D::set_max_neighbors);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "max_neighbors", PROPERTY_HINT_RANGE, "0,256,1,or_greater"), "set_max_neighbors", "get_max_neighbors");
+
+	ClassDB::bind_method(D_METHOD("get_update_interval"), &BulletFlock2D::get_update_interval);
+	ClassDB::bind_method(D_METHOD("set_update_interval", "value"), &BulletFlock2D::set_update_interval);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "update_interval", PROPERTY_HINT_RANGE, "0,1,0.01,or_greater,suffix:s"), "set_update_interval", "get_update_interval");
 
 	BIND_ENUM_CONSTANT(SCOPE_PER_SPAWNER);
 	BIND_ENUM_CONSTANT(SCOPE_SHARED);

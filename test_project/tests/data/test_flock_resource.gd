@@ -8,7 +8,7 @@ extends BlastTest
 
 const TRES_PATH := "user://flock_round_trip.tres"
 const PROPS := ["separation", "alignment", "cohesion", "neighbor_range", "separation_range",
-	"max_turn_rate_degrees", "face_heading", "max_neighbors"]
+	"max_turn_rate_degrees", "face_heading", "max_neighbors", "update_interval"]
 
 
 func test_defaults_match_the_documented_values() -> void:
@@ -21,6 +21,7 @@ func test_defaults_match_the_documented_values() -> void:
 	assert_eq(f.max_turn_rate_degrees, 0.0, "no turn cap")
 	assert_true(f.face_heading, "the rotation follows the heading")
 	assert_eq(f.max_neighbors, 32, "32 flockmates per bullet")
+	assert_eq(f.update_interval, 0.0, "steering recomputed every tick")
 	for banned in ["scope", "flock_scope", "enabled", "group", "flock_index"]:
 		assert_false(banned in f, "%s: who flies together is decided where the flock is armed" % banned)
 
@@ -35,6 +36,7 @@ func test_property_list_order_and_hints_are_pinned() -> void:
 		"max_turn_rate_degrees": [TYPE_FLOAT, PROPERTY_HINT_RANGE, "0,1440,1,or_greater,suffix:deg/s"],
 		"face_heading": [TYPE_BOOL, PROPERTY_HINT_NONE, ""],
 		"max_neighbors": [TYPE_INT, PROPERTY_HINT_RANGE, "0,256,1,or_greater"],
+		"update_interval": [TYPE_FLOAT, PROPERTY_HINT_RANGE, "0,1,0.01,or_greater,suffix:s"],
 	}
 	var order: Array = []
 	var problems: Array = []
@@ -56,7 +58,7 @@ func test_every_accepted_set_emits_changed_once() -> void:
 	var f := BulletFlock2D.new()
 	watch_signals(f)
 	var sets := [["separation", 3.0], ["alignment", 0.0], ["cohesion", 2.5], ["neighbor_range", 64.0],
-		["separation_range", 0.0], ["max_turn_rate_degrees", 180.0], ["face_heading", false], ["max_neighbors", 0]]
+		["separation_range", 0.0], ["max_turn_rate_degrees", 180.0], ["face_heading", false], ["max_neighbors", 0], ["update_interval", 0.25]]
 	var expected := 0
 	for entry in sets:
 		assert_true(entry[0] in f, "%s exists" % entry[0])
@@ -129,6 +131,7 @@ func test_flock_survives_a_tres_round_trip() -> void:
 	f.max_turn_rate_degrees = 270.0
 	f.face_heading = false
 	f.max_neighbors = 12
+	f.update_interval = 0.125
 	assert_eq(ResourceSaver.save(f, TRES_PATH), OK, "saved")
 	var back := ResourceLoader.load(TRES_PATH, "", ResourceLoader.CACHE_MODE_IGNORE) as BulletFlock2D
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(TRES_PATH))

@@ -514,10 +514,14 @@ _ALWAYS_INLINE_ void BulletVolley2D::step_flock(const MoveTick2D &t, BulletStep2
 		const real_t fy = x_axis.x * t.strip_sin + x_axis.y * t.strip_cos;
 		const real_t f2 = fx * fx + fy * fy;
 		if (f2 > (real_t)1e-8) {
-			const real_t f_inv = (real_t)1.0 / Math::sqrt(f2);
-			// The rotation taking the forward axis onto the heading.
-			const real_t rc = (fx * dir.x + fy * dir.y) * f_inv;
-			const real_t rs = (fx * dir.y - fy * dir.x) * f_inv;
+			// The rotation taking the forward axis onto the heading, made
+			// exactly unit (a rounding error repeated every tick would
+			// otherwise slowly scale the bullet).
+			real_t rc = fx * dir.x + fy * dir.y;
+			real_t rs = fx * dir.y - fy * dir.x;
+			const real_t r_inv = (real_t)1.0 / Math::sqrt(rc * rc + rs * rs);
+			rc *= r_inv;
+			rs *= r_inv;
 			x_axis = Vector2(x_axis.x * rc - x_axis.y * rs, x_axis.x * rs + x_axis.y * rc);
 			y_axis = Vector2(y_axis.x * rc - y_axis.y * rs, y_axis.x * rs + y_axis.y * rc);
 		}
