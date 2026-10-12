@@ -165,14 +165,25 @@ void BulletVolley2D::bullet_disable_attachment(int bullet_index) {
 		attachment_suspended[bullet_index] = 0;
 	}
 	const uint64_t detaching_id = detaching->get_instance_id();
+	const uint64_t self_id = get_instance_id();
 	if (!was_suspended) {
 		detaching->call_on_bullet_disable();
 	}
 
-	// The callback may have freed the attachment itself (immediate free()).
-	// Everything below touches detaching, so revalidate first; the slot is
-	// already null, so there is nothing left to clean up when it is gone.
-	if (ObjectDB::get_instance(ObjectID(detaching_id)) == nullptr) {
+	// The callback may have freed the attachment itself (immediate free()) or
+	// this volley. Everything below touches detaching and members of this
+	// volley, so revalidate both first; the slot is already null, so there is
+	// nothing left to clean up when the attachment is gone.
+	Object *detaching_alive = ObjectDB::get_instance(ObjectID(detaching_id));
+	if (detaching_alive == nullptr) {
+		return;
+	}
+	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+		// The volley is gone and already let go of this attachment: nothing
+		// pools it any more, so it must not stay behind in the scene.
+		if (!detaching->is_queued_for_deletion()) {
+			detaching->queue_free();
+		}
 		return;
 	}
 
@@ -181,7 +192,7 @@ void BulletVolley2D::bullet_disable_attachment(int bullet_index) {
 		return;
 	}
 
-	if (is_attachments_auto_pooling_enabled) {
+	if (is_attachments_auto_pooling_enabled && bullet_index < (int)attachment_pooling_ids.size()) {
 		bullet_factory->bullet_attachments_pool.push(detaching, attachment_pooling_ids[bullet_index]);
 	} else {
 		// If the user has selected to not use auto pooling,

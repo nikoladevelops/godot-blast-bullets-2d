@@ -177,3 +177,21 @@ func test_free_volley_inside_volley_fired_then_spawner_keeps_working() -> void:
 	assert_true(sp.shoot_once(), "spawner still fires afterwards")
 	assert_eq(freed_count, 2, "second volley freed too")
 	assert_signal_emit_count(sp, "volley_fired", 2, "one volley_fired per shot")
+
+
+func test_free_volley_inside_attachment_disable_callback() -> void:
+	# bullet_disable_attachment read volley members (pool flag, pooling ids)
+	# after on_bullet_disable without checking the volley survived the callback.
+	var probe: Node = AttachmentFreeVolleyProbe2D.new()
+	var ps := PackedScene.new()
+	assert_eq(ps.pack(probe), OK, "probe scene packs")
+	probe.free()
+	AttachmentFreeVolleyProbe2D.freed = 0
+	var v: BulletVolley2D = factory.spawn_volley(H.make_volley_data(2, 0.0, 30.0))
+	v.bullet_set_attachment(0, ps, Vector2.ZERO, true)
+	await idle(1)
+	AttachmentFreeVolleyProbe2D.volley = v
+	v.disable_bullet(0)
+	assert_eq(AttachmentFreeVolleyProbe2D.freed, 1, "the callback freed the volley")
+	await idle(2)
+	assert_eq(factory.get_active_bullet_count(), 0, "factory keeps running with no dangling volley")
