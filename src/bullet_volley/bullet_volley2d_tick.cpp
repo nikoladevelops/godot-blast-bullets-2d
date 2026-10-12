@@ -136,11 +136,14 @@ struct BulletVolley2D::MoveTick2D {
 	// Flocking: this volley's slice of the factory's pass (null = no turn).
 	const Vector2 *flock_steer = nullptr;
 	real_t flock_max_turn = 0.0; // this tick, radians (0 = unlimited)
-	// The turn also rotates the bullet: face_heading, or the rotation owns
-	// the heading (adjust_direction_based_on_rotation), else it is undone.
-	bool flock_turn_facing = false;
+	// After a turn the bullet's rotation is aligned with the new heading
+	// when face_heading asks for it (and no rotation data owns the sprite),
+	// or when the rotation owns the heading (adjust_direction_based_on_
+	// rotation): the next stages would otherwise undo the turn.
+	bool flock_face = false;
+	bool flock_basis_owns_heading = false;
 	// Homing re-derives the heading from the rotation (no shared pattern,
-	// no rotation data): a homing bullet's rotation must turn too.
+	// no rotation data): a homing bullet's rotation must follow too.
 	bool flock_homing_basis = false;
 };
 
@@ -348,7 +351,8 @@ void BulletVolley2D::move_bullets(double delta) {
 		if (flock_config != nullptr && flock_config->enabled && flock_config->flock.is_valid() && flock_view_current()) {
 			t.flock_steer = bullet_factory->get_flock_solver().steer_data() + flock_view.base;
 			t.flock_max_turn = flock_view.max_turn_rad * (real_t)delta;
-			t.flock_turn_facing = flock_view.face_heading || (adjust_direction_based_on_rotation && !rotate_only_textures);
+			t.flock_face = flock_view.face_heading && !is_rotation_data_active;
+			t.flock_basis_owns_heading = adjust_direction_based_on_rotation && !rotate_only_textures;
 			t.flock_homing_basis = !t.shared_pattern && !is_rotation_data_active;
 		}
 		return t;
@@ -499,11 +503,24 @@ _ALWAYS_INLINE_ void BulletVolley2D::step_flock(const MoveTick2D &t, BulletStep2
 	const real_t ny = dir.x * s + dir.y * c;
 	const real_t inv = (real_t)1.0 / Math::sqrt(nx * nx + ny * ny);
 	dir = Vector2(nx * inv, ny * inv);
-	if (t.flock_turn_facing || (b.steering_deque != nullptr && t.flock_homing_basis && !check_exists_bullet_movement_pattern_data(i))) {
+	if (t.flock_face || t.flock_basis_owns_heading || (b.steering_deque != nullptr && t.flock_homing_basis && !check_exists_bullet_movement_pattern_data(i))) {
+		// Align the rotation with the new heading ABSOLUTELY (not by theta):
+		// a heading something else snapped this tick (homing toward a
+		// target, a curve) would otherwise leave the sprite drifting. The
+		// forward axis strips the texture rotation, like the heading does.
 		Vector2 &x_axis = b.transf->columns[0];
 		Vector2 &y_axis = b.transf->columns[1];
-		x_axis = Vector2(x_axis.x * c - x_axis.y * s, x_axis.x * s + x_axis.y * c);
-		y_axis = Vector2(y_axis.x * c - y_axis.y * s, y_axis.x * s + y_axis.y * c);
+		const real_t fx = x_axis.x * t.strip_cos - x_axis.y * t.strip_sin;
+		const real_t fy = x_axis.x * t.strip_sin + x_axis.y * t.strip_cos;
+		const real_t f2 = fx * fx + fy * fy;
+		if (f2 > (real_t)1e-8) {
+			const real_t f_inv = (real_t)1.0 / Math::sqrt(f2);
+			// The rotation taking the forward axis onto the heading.
+			const real_t rc = (fx * dir.x + fy * dir.y) * f_inv;
+			const real_t rs = (fx * dir.y - fy * dir.x) * f_inv;
+			x_axis = Vector2(x_axis.x * rc - x_axis.y * rs, x_axis.x * rs + x_axis.y * rc);
+			y_axis = Vector2(y_axis.x * rc - y_axis.y * rs, y_axis.x * rs + y_axis.y * rc);
+		}
 	}
 	b.direction_updated = true;
 }

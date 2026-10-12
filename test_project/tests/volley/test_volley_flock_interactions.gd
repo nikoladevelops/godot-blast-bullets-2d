@@ -276,3 +276,44 @@ func test_despawned_bullets_leave_the_flock() -> void:
 	assert_false(v.is_bullet_status_enabled(2), "culled")
 	_step(1)
 	assert_eq(factory.debug_get_flock_stats()["grid_members"], 2, "the culled bullet left the flock")
+
+
+func test_face_heading_keeps_facing_while_homing_snaps_the_heading() -> void:
+	# A movement pattern makes homing snap the heading straight at the target
+	# every tick (the sprite is not touched by that snap): face_heading must
+	# still leave the sprite facing the flight, never drift away from it.
+	var tr := [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 40)), Transform2D(0.0, Vector2(30, 20))]
+	var v := _volley(H.make_flight_data(tr, 120.0, 1000.0), H.make_flock(2.0, 1.0, 3.0))
+	var c := Curve2D.new()
+	c.add_point(Vector2.ZERO)
+	c.add_point(Vector2(100, 0))
+	v.set_shared_movement_pattern_curve(c)
+	v.shared_homing_deque_push_back_global_position_target(Vector2(800, 20))
+	var worst := 0.0
+	var turned := false
+	for tick in 120:
+		_step(1)
+		for i in 3:
+			var sprite := v.get_bullet_transform(i).get_rotation()
+			var heading := v.get_bullet_direction(i).angle()
+			if v.debug_get_bullet_flock_steering(i) != Vector2():
+				turned = true
+			worst = maxf(worst, absf(angle_difference(sprite, heading)))
+	assert_true(turned, "the flock steered")
+	assert_lt(worst, 0.02, "the sprite faces the flight heading every tick (worst %.4f rad)" % worst)
+
+
+func test_face_heading_leaves_a_spinning_sprite_to_its_spin() -> void:
+	# Rotation data owns the sprite (it spins): the flock turns the heading
+	# but never adds its turns to the spinning sprite.
+	var tr := [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 40))]
+	var d := H.make_flight_data(tr, 100.0, 1000.0)
+	d.shared_bullet_rotation_data = H.make_rotation(2.0, 10.0)
+	var flocked := _volley(d, H.make_flock(0.0, 0.0, 3.0))
+	var d2 := H.make_flight_data(tr, 100.0, 1000.0)
+	d2.shared_bullet_rotation_data = H.make_rotation(2.0, 10.0)
+	var control := _volley(d2)
+	_step(40)
+	assert_ne(flocked.get_bullet_direction(0), control.get_bullet_direction(0), "the flock turned the heading")
+	for i in 2:
+		assert_almost_eq(flocked.get_bullet_transform(i).get_rotation(), control.get_bullet_transform(i).get_rotation(), 1e-5, "bullet %d spins exactly like the unflocked one" % i)

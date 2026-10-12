@@ -23,7 +23,7 @@
 			Per second: how hard each bullet turns toward the center of its flockmates within [member neighbor_range] (stronger the farther the center is, relative to the range). 0 turns this rule off. Finite and &gt;= 0.
 		</member>
 		<member name="face_heading" type="bool" setter="set_face_heading" getter="get_face_heading" default="true">
-			When on, the bullet's rotation (sprite and collision shape) turns with its heading, so arrows and fish keep facing where they fly. When off, only the flight direction turns; a rotation that drives the heading ([member BulletVolleyData2D.adjust_direction_based_on_rotation], or homing that steers through the rotation) still turns with it, or the flock's turn would be undone.
+			When on, every flock turn also turns the bullet's rotation (sprite and collision shape) to face the new heading, so arrows and fish keep facing where they fly, even when homing snaps the heading toward its target every tick. Rotation data that spins the bullet owns the sprite and is left alone. When off, only the flight direction turns; a rotation that drives the heading ([member BulletVolleyData2D.adjust_direction_based_on_rotation], or homing that steers through the rotation) still follows it, or the flock's turn would be undone.
 		</member>
 		<member name="max_neighbors" type="int" setter="set_max_neighbors" getter="get_max_neighbors" default="32">
 			Flockmates each bullet reads per tick, nearest cells first (0 = no limit). Bounds the cost of dense swarms: a stack of N bullets costs exactly N x max_neighbors distance checks. The scan start rotates per bullet, so a capped flock has no drift bias. Real starlings track about 7.
