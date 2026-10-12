@@ -180,9 +180,16 @@ BulletVolley2D *BulletFactory2D::spawn_volley_internal(const Ref<BulletVolleyDat
 	if (volley != nullptr) {
 		volley->spawn_transforms_ptr = transforms_ptr;
 		volley->spawn_transforms_count = bullet_count;
+		const uint64_t reuse_volley_id = volley->get_instance_id();
 		const bool enabled = volley->enable_volley(*spawn_data.ptr(), new_inherited_velocity_offset, spawner_id);
-		volley->spawn_transforms_ptr = nullptr;
-		if (!enabled) {
+		if (ObjectDB::get_instance(ObjectID(reuse_volley_id)) != volley) {
+			// A callback inside begin_life freed the volley: it is gone, so
+			// nothing may touch or re-pool it. Fall through to a fresh one.
+			volley = nullptr;
+		} else {
+			volley->spawn_transforms_ptr = nullptr;
+		}
+		if (volley != nullptr && !enabled) {
 			// enable_volley rolls its own mutations back on failure, so the
 			// volley is a clean disabled one: file it back under its live key
 			// (not the spawn key) and fall through to a fresh allocation. A
