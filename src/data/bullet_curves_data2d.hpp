@@ -7,15 +7,19 @@
 namespace BlastBullets2D {
 using namespace godot;
 
-enum DirectionCurveMode {
-	Additive,
-	Override
-};
-
 class BulletCurvesData2D : public Resource {
 	GDCLASS(BulletCurvesData2D, Resource)
 
 public:
+	// Nested on purpose: a namespace-level enum is exposed to scripts as
+	// "BlastBullets2D.DirectionCurveMode", which typed GDScript refuses to
+	// assign from the class constants (BulletCurvesData2D.Override).
+	// SERIALIZED ids: never renumber.
+	enum DirectionCurveMode {
+		Additive,
+		Override
+	};
+
 	Ref<Curve> movement_speed_curve;
 	bool movement_use_unit_curve = true;
 
@@ -93,6 +97,9 @@ public:
 protected:
 	static void _bind_methods();
 };
+
+// The volley code names the enum without its class.
+using DirectionCurveMode = BulletCurvesData2D::DirectionCurveMode;
 } //namespace BlastBullets2D
 
-VARIANT_ENUM_CAST(BlastBullets2D::DirectionCurveMode);
+VARIANT_ENUM_CAST(BlastBullets2D::BulletCurvesData2D::DirectionCurveMode);

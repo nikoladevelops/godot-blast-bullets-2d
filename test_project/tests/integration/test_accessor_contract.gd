@@ -173,3 +173,51 @@ func test_every_bound_method_names_every_argument() -> void:
 					unnamed.append("%s.%s(%s)" % [cls, m["name"], arg_name])
 	assert_gte(classes, 16, "every plugin class checked")
 	assert_eq(unnamed, [], "every argument has a name")
+
+
+func test_every_enum_the_api_mentions_is_bound_with_its_constants() -> void:
+	# A property, argument or return typed with an enum names it
+	# "<Class>.<Enum>". Scripts can only use it (typed assignment, named
+	# constants, autocompletion) when that class binds that enum with its
+	# constants: a namespace-level C++ enum leaks as "BlastBullets2D.<Enum>",
+	# which typed GDScript then refuses to assign from the class constants.
+	var problems: Array = []
+	var seen := 0
+	for cls in ClassDB.get_class_list():
+		if ClassDB.class_get_api_type(cls) != ClassDB.API_EXTENSION:
+			continue
+		var typed: Array = [] # [where, class_name]
+		for p in ClassDB.class_get_property_list(cls, true):
+			if int(p["usage"]) & PROPERTY_USAGE_CLASS_IS_ENUM:
+				typed.append(["%s.%s" % [cls, p["name"]], str(p["class_name"])])
+		for m in ClassDB.class_get_method_list(cls, true):
+			var ret: Dictionary = m["return"]
+			if int(ret["usage"]) & PROPERTY_USAGE_CLASS_IS_ENUM:
+				typed.append(["%s.%s() return" % [cls, m["name"]], str(ret["class_name"])])
+			for a in m["args"]:
+				if int(a["usage"]) & PROPERTY_USAGE_CLASS_IS_ENUM:
+					typed.append(["%s.%s(%s)" % [cls, m["name"], a["name"]], str(a["class_name"])])
+		for entry in typed:
+			seen += 1
+			var parts: PackedStringArray = (entry[1] as String).split(".")
+			if parts.size() != 2 or not ClassDB.class_exists(parts[0]):
+				problems.append("%s: enum %s names no class" % entry)
+			elif not ClassDB.class_has_enum(parts[0], parts[1], true) or ClassDB.class_get_enum_constants(parts[0], parts[1], true).is_empty():
+				problems.append("%s: %s binds no such enum (or no constants)" % entry)
+	assert_gt(seen, 50, "the sweep reached the enum-typed API (%d uses)" % seen)
+	assert_eq("\n".join(problems), "", "every enum the API mentions is bound with its constants")
+
+
+func test_enums_work_in_typed_scripts() -> void:
+	# The enum fix above as users write it: typed variables, named constants.
+	var curves := BulletCurvesData2D.new()
+	curves.x_direction_curve_mode = BulletCurvesData2D.Override
+	var mode: BulletCurvesData2D.DirectionCurveMode = curves.get_x_direction_curve_mode()
+	assert_eq(mode, BulletCurvesData2D.Override, "a typed DirectionCurveMode round-trips")
+	var v := quick_volley(2)
+	assert_eq(v.bullet_homing_check_current_target_type(0), BulletVolley2D.NotHoming, "no target yet")
+	v.bullet_homing_push_back_global_position_target(0, Vector2(100, 0))
+	var kind: BulletVolley2D.HomingType = v.bullet_homing_check_current_target_type(0)
+	assert_eq(kind, BulletVolley2D.GlobalPositionTarget, "a typed HomingType compares with the named constants")
+	var scope: BulletFlock2D.Scope = BulletFlock2D.SCOPE_PER_VOLLEY
+	assert_true(v.flock_join(BulletFlock2D.new(), scope), "typed Scope arguments")

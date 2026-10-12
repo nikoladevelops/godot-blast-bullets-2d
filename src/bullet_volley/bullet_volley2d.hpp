@@ -2851,7 +2851,43 @@ protected:
 };
 } // namespace BlastBullets2D
 
-VARIANT_ENUM_CAST(BlastBullets2D::HomingType);
+// HomingType lives at namespace level (the target deque uses it without the
+// volley class), so VARIANT_ENUM_CAST would expose it to scripts as
+// "BlastBullets2D.HomingType", a type no class binds. It is named
+// BulletVolley2D.HomingType instead, where its constants are bound.
+namespace godot {
+#define BLAST_HOMING_TYPE_INFO(m_impl)                                                                                                       \
+	template <>                                                                                                                              \
+	struct GetTypeInfo<m_impl> {                                                                                                             \
+		static constexpr Variant::Type VARIANT_TYPE = Variant::INT;                                                                          \
+		static constexpr GDExtensionClassMethodArgumentMetadata METADATA = GDEXTENSION_METHOD_ARGUMENT_METADATA_NONE;                        \
+		static inline PropertyInfo get_class_info() {                                                                                        \
+			return make_property_info(Variant::Type::INT, "", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, \
+					"BulletVolley2D.HomingType");                                                                                            \
+		}                                                                                                                                    \
+	};
+BLAST_HOMING_TYPE_INFO(BlastBullets2D::HomingType)
+BLAST_HOMING_TYPE_INFO(BlastBullets2D::HomingType const)
+BLAST_HOMING_TYPE_INFO(BlastBullets2D::HomingType &)
+BLAST_HOMING_TYPE_INFO(const BlastBullets2D::HomingType &)
+#undef BLAST_HOMING_TYPE_INFO
+template <>
+struct VariantCaster<BlastBullets2D::HomingType> {
+	static _FORCE_INLINE_ BlastBullets2D::HomingType cast(const Variant &p_variant) {
+		return (BlastBullets2D::HomingType)p_variant.operator int64_t();
+	}
+};
+template <>
+struct PtrToArg<BlastBullets2D::HomingType> {
+	_FORCE_INLINE_ static BlastBullets2D::HomingType convert(const void *p_ptr) {
+		return BlastBullets2D::HomingType(*reinterpret_cast<const int64_t *>(p_ptr));
+	}
+	typedef int64_t EncodeT;
+	_FORCE_INLINE_ static void encode(BlastBullets2D::HomingType p_val, void *p_ptr) {
+		*reinterpret_cast<int64_t *>(p_ptr) = static_cast<int64_t>(p_val);
+	}
+};
+} // namespace godot
 VARIANT_ENUM_CAST(BlastBullets2D::BulletVolley2D::OrbitingDirection);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletVolley2D::OrbitingTextureRotation);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletVolley2D::OrbitingFollowMode);

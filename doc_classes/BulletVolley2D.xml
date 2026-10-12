@@ -935,7 +935,7 @@
 			</description>
 		</method>
 		<method name="bullet_homing_check_current_target_type" qualifiers="const">
-			<return type="int" enum="BlastBullets2D.HomingType" />
+			<return type="int" enum="BulletVolley2D.HomingType" />
 			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Returns the type of the current (front) homing target for the specified bullet's per-bullet deque (NotHoming if empty).
@@ -2110,7 +2110,7 @@
 			</description>
 		</method>
 		<method name="shared_homing_deque_check_current_target_type" qualifiers="const">
-			<return type="int" enum="BlastBullets2D.HomingType" />
+			<return type="int" enum="BulletVolley2D.HomingType" />
 			<description>
 				Returns the type of the current (front) homing target in the shared deque (NotHoming if empty).
 
