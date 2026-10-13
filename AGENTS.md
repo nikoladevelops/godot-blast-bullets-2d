@@ -55,7 +55,7 @@ for the rest: the sections are written to be looked up, not read once.
 
 ```sh
 GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py   # build (exit 1 = failed; never raw scons, never edit SConstruct)
-python3 tools/run_tests.py                                       # 200 files / 1589 tests, ~10 s, leak-checked
+python3 tools/run_tests.py                                       # 191 files / 1671 tests, ~10 s, leak-checked
 python3 tools/run_tests.py --suite <substring> --full            # one area, every failure message unclipped
 python3 tools/run_tests.py --self-test                           # proves the harness still catches failures/leaks
 python3 tools/run_editor_smoke.py                                # headless EDITOR run of tests/editor_smoke/ (editor-only paths)
@@ -422,6 +422,8 @@ func test_<behavior>_<expectation>() -> void:
 
 ### 8.6 GUT reference
 
+(See also §8.8 for merging suites.)
+
 - Discovery: `.gutconfig.json` points at `res://tests/`; files named
   `test_*.gd`, extending `BlastTest`. Each file runs in its OWN Godot process.
 - Lifecycle: `before_all` / `before_each` / `after_each` / `after_all`.
@@ -466,6 +468,22 @@ func test_<behavior>_<expectation>() -> void:
   (spin/move keep `rebuilds`/`*_draws` flat).
 - Spawner-owned vs factory-owned routing: connect BOTH signal sets and
   assert the silent side stayed silent.
+
+### 8.8 Merging suites and shared helpers
+
+- One contract, one suite: before adding a file, find the suite that pins
+  the contract (`tests/README.md`) and add the test there. A suite is split
+  only by lifecycle needs (a `before_each` the other tests must not get).
+- Shared test helpers live in `common/blast_test.gd` (`step_factory`,
+  `origins`, `min_pair_distance`, `broken_bullets`, the builders) and
+  `common/blast_test_helpers.gd` (`H.*` data builders); a private copy of
+  one is a merge to do.
+- To merge suites: `python3 tools/test_inventory.py save before.json`,
+  merge (lifecycle overrides must not clash; a helper with the same name
+  but another body gets a descriptive name), move the README entries,
+  `save after.json`, `diff before.json after.json` (no MISSING, no FEWER
+  ASSERTS), full suite green. The October 2026 merge took 210 files to 191
+  with every test and assert kept.
 
 ## 9. Searching and reading
 
@@ -856,7 +874,7 @@ deduped, cancelled by REMOVED) and replayed once on resume.
 | Mouse and Global Positions graze: points with a null signal target, visits follow the point's index, read every tick (no filter, no interval), no cap | `test_spawner_graze_point_sources` |
 | Every bound method names every argument (no `_unnamed_argN`) | `integration/test_accessor_contract` |
 | Homing queues have no cap (300 targets queue, shared and per bullet); freed targets trimmed; retarget skips dead/pooled/foreign volleys | `test_spawner_homing_queues` |
-| No hidden caps: every live homing volley stays tracked and retargets; `homing_max_targets` has no upper bound; no default homing/graze group or name (empty settings are named in warnings) | `test_spawner_tracker_cap`, `test_spawner_homing_selection`, `test_spawner_homing_detection` |
+| No hidden caps: every live homing volley stays tracked and retargets; `homing_max_targets` has no upper bound; no default homing/graze group or name (empty settings are named in warnings) | `test_spawner_homing_tracking`, `test_spawner_homing_selection`, `test_spawner_homing_sources` |
 | A bullet steering by its own targets owns its reach even while the shared deque has targets | `test_volley_homing_mixed_deques` |
 | Every orbiting bullet circles its own front target; a zero-delta tick moves nothing | `test_volley_orbit_own_center` |
 | `get_bullet_velocity` = direction x speed + inherited + fall speed, in the tick AND right after every setter; `bullet_set_velocity` sets the exact total | `test_volley_velocity_composition` |
@@ -872,14 +890,14 @@ deduped, cancelled by REMOVED) and replayed once on resume.
 | orphaned_volleys policies; unhandled hits warn once | `test_spawner_orphan_policy` |
 | Every setter round-trips or rejects loudly and keeps the old value | `integration/test_accessor_contract` |
 | Homing aims through inherited spawner momentum | `test_volley_homing_drift` |
-| reset_finished fires after the reset; handlers can respawn | `test_factory_reset_finished` |
+| reset_finished fires after the reset; handlers can respawn | `test_factory_lifecycle` |
 | Graze: one graze per ring per bullet life (Once), outer ring first, swept test, inclusive effective radius (bullet size counted) | `test_volley_graze_core` |
 | Graze visits: one exit per visit that grazed, naming its target; killed/frozen bullets never exit; a vanished target ends or moves its visits silently | `test_volley_graze_exit` |
 | Graze handlers are live; events of disabled/woken bullets, freed targets, replaced zones are dropped; a pause finishes the batch | `test_volley_graze_handlers` |
 | Spawner volleys are armed before any shot signal; graze bubbles spawner -> factory; orphans keep grazing on the factory | `test_spawner_graze`, `test_spawner_graze_orphans` |
 | The ring preview draws exactly the runtime targets; never saved, never a marker or homing candidate | `test_spawner_graze_preview`, `run_editor_smoke.py` |
 | No graze target cap (300+ targets, a member joining after the shot counts next tick); a target keeps its slot while others come and go | `test_volley_graze_targets` |
-| Graze target sources (node group, path, name, children: the spawner decides who grazes, zones only how), filter, update interval, refresh; edits reach flying bullets; orphans keep the settings; homing's refresh is `retarget_live_volleys()` | `test_spawner_graze_detection` |
+| Graze target sources (node group, path, name, children: the spawner decides who grazes, zones only how), filter, update interval, refresh; edits reach flying bullets; orphans keep the settings; homing's refresh is `retarget_live_volleys()` | `test_spawner_graze_sources` |
 | Past 8 targets the slab finds exactly what testing every target finds (same events, same ties) | `test_volley_graze_slab` |
 | Area clears: edge-inclusive circle/rect, negative rects normalized, `bullets_cleared` after the busy latch (handlers can spawn); despawn bounds spare bullets heading back in and are silent; `time_scale` scales volley ticks, effects and timers (not spawners) | `factory/test_factory_world` |
 | A sound entry's `trigger`/`enabled` edits reach volleys in flight (`BulletSoundData2D::mask_epoch`, recomputed lazily) | `sound/test_sound_flight` |
@@ -1087,6 +1105,8 @@ project's `.so`). For quick numeric comparisons load two
   / `edit_build_profile.py` / `change_lto_mode.py` / `toggle_editor_target.py`
   / `toggle_debug_symbols.py` / `toggle_reloadable.py`.
 - Verification: `run_tests.py`, `lint_tests.py`, `api_snapshot.py` (§7.4),
+  `test_inventory.py` (save/diff every test name with its assert count:
+  proves a suite merge or helper move lost nothing; §8.8),
   `format_code.py`, `run_benchmarks.py`, `run_editor_smoke.py` (headless
   editor + @tool probes in `test_project/tests/editor_smoke/`, run on a
   throwaway COPY of the project; probes act only with `--blast-editor-smoke`),

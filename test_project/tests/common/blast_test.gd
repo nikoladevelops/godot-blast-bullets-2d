@@ -301,6 +301,36 @@ func step_factory(n: int = 1, delta: float = 1.0 / 60.0) -> void:
 		assert_true(factory.debug_advance_time(delta), "factory tick %d advanced" % i)
 
 
+## Every bullet's position (disabled bullets included), in index order.
+func origins(v: BulletVolley2D) -> Array:
+	var out: Array = []
+	for i in v.get_amount_bullets():
+		out.append(v.get_bullet_transform(i).origin)
+	return out
+
+
+## The smallest distance between any two of `points` (INF for fewer than 2).
+func min_pair_distance(points: Array) -> float:
+	var best := INF
+	for a in points.size():
+		for b in range(a + 1, points.size()):
+			best = minf(best, (points[a] as Vector2).distance_to(points[b]))
+	return best
+
+
+## Enabled bullets with a non-finite pose or heading, or (check_unit) a
+## heading that is not unit length, as "index: origin heading" lines.
+func broken_bullets(v: BulletVolley2D, check_unit := true) -> Array:
+	var bad: Array = []
+	for i in v.get_amount_bullets():
+		if not v.is_bullet_status_enabled(i):
+			continue
+		var d: Vector2 = v.get_bullet_direction(i)
+		if not v.get_bullet_transform(i).is_finite() or not d.is_finite() or (check_unit and absf(d.length() - 1.0) > 1e-4):
+			bad.append("%d: %s %s" % [i, v.get_bullet_transform(i).origin, d])
+	return bad
+
+
 ## Node2D sound listener at global `pos`, member of `group` (freed after the test).
 func make_listener(pos: Vector2, group: StringName = &"listeners") -> Node2D:
 	var n := Node2D.new()

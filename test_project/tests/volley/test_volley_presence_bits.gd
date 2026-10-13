@@ -4,6 +4,19 @@ extends BlastTest
 ## means "don't move/spin" and must survive shared data; only invalid (null)
 ## entries are gaps. Fill-once order holds; direct writes claim presence;
 ## pooled reuse starts with fresh bits.
+##
+## clear_bullet_rotation_data() clears the presence bits with the values: a
+## later shared fallback fills genuine gaps, an explicit zero still wins,
+## and clear alone + shared full-seeds.
+##
+## Plain (same-owner) disables keep rotation presence decisions for the wake:
+## authored entries survive disable -> wake -> shared write, genuine gaps
+## still fill; a new pooled life re-derives presence from its seed.
+##
+## set_gravity() fills genuine gaps only (presence bits): authored per-bullet
+## gravity (bullet_set_gravity or seeded) survives a shared write.
+
+
 
 
 ## n bullets at the origin; the caller supplies per-bullet data.
@@ -178,3 +191,86 @@ func test_pool_reuse_starts_fresh() -> void:
 	var vb := _spawn(db)
 	vb.set_shared_bullet_speed_data(_spd(160.0))
 	assert_almost_eq(_speed_of(vb, 1), 160.0, 0.01, "new life fills its own gap (no inherited bit)")
+
+
+func _data() -> BulletVolleyData2D:
+	var d := H.make_still_data(2)
+	d.all_bullet_rotation_data = [H.make_rotation(0.0), H.make_rotation(9.0)]
+	return d
+
+
+func test_cleared_bits_let_shared_fill_gaps() -> void:
+	var v: BulletVolley2D = factory.spawn_volley(_data())
+	v.clear_bullet_rotation_data()
+	v.set_bullet_rotation_data(0, H.make_rotation(0.0))
+	v.set_shared_bullet_rotation_data(H.make_rotation(7.0))
+	assert_almost_eq(v.bullet_get_rotation_speed(1), 7.0, 0.01, "gap slot filled by shared")
+	assert_almost_eq(v.bullet_get_rotation_speed(0), 0.0, 0.01, "authored zero survives")
+
+
+func test_clear_alone_then_shared_full_seeds() -> void:
+	var v: BulletVolley2D = factory.spawn_volley(_data())
+	v.clear_bullet_rotation_data()
+	v.set_shared_bullet_rotation_data(H.make_rotation(5.0))
+	assert_almost_eq(v.bullet_get_rotation_speed(0), 5.0, 0.01, "slot 0 seeded")
+	assert_almost_eq(v.bullet_get_rotation_speed(1), 5.0, 0.01, "slot 1 seeded")
+
+
+func _data_2() -> BulletVolleyData2D:
+	var d := H.make_still_data(3)
+	# Slot 0 deliberate zero, slot 1 authored spin, slot 2 a genuine gap.
+	d.all_bullet_rotation_data = [H.make_rotation(0.0), H.make_rotation(9.0)]
+	return d
+
+
+func test_same_owner_wake_keeps_decisions() -> void:
+	var v: BulletVolley2D = factory.spawn_volley(_data_2())
+	v.set_is_auto_pooling_enabled(false)
+	for i in 3:
+		v.disable_bullet(i)
+	await idle(1)
+	assert_eq(factory.debug_get_bullets_pool_amount(), 0, "unpooled disable parks nothing")
+	for i in 3:
+		v.wake_bullet(i)
+	v.set_shared_bullet_rotation_data(H.make_rotation(7.0))
+	assert_almost_eq(v.bullet_get_rotation_speed(0), 0.0, 0.01, "authored zero survives wake + shared")
+	assert_almost_eq(v.bullet_get_rotation_speed(1), 9.0, 0.01, "authored spin survives wake + shared")
+	assert_almost_eq(v.bullet_get_rotation_speed(2), 7.0, 0.01, "gap fills after the wake")
+
+
+func test_new_pooled_life_rederives_presence() -> void:
+	var a: BulletVolley2D = factory.spawn_volley(_data_2())
+	for i in 3:
+		a.disable_bullet(i)
+	await idle(1)
+	factory.debug_reset_pool_stats()
+	var w: BulletVolley2D = factory.spawn_volley(_data_2())
+	assert_eq(int(factory.debug_get_pool_hit_stats().get("hits", 0)), 1, "second life reuses the pool")
+	w.set_shared_bullet_rotation_data(H.make_rotation(7.0))
+	assert_almost_eq(w.bullet_get_rotation_speed(0), 0.0, 0.01, "new life honors the authored zero")
+	assert_almost_eq(w.bullet_get_rotation_speed(1), 9.0, 0.01, "new life honors the authored spin")
+
+
+func _data_3() -> BulletVolleyData2D:
+	var d := H.make_still_data(2)
+	d.gravity = Vector2(0, 100)
+	return d
+
+
+func test_authored_slot_survives_gap_fills() -> void:
+	var v: BulletVolley2D = factory.spawn_volley(_data_3())
+	v.bullet_set_gravity(0, Vector2(50, 0))
+	v.set_gravity(Vector2(0, 300))
+	assert_eq(v.bullet_get_gravity(0), Vector2(50, 0), "authored gravity kept")
+	assert_eq(v.bullet_get_gravity(1), Vector2(0, 300), "gap filled by shared")
+	await physics(5)
+	assert_true(v.get_bullet_velocity(0).is_finite() and v.get_bullet_velocity(1).is_finite(), "velocities finite under gravity")
+
+
+func test_seeded_entries_claim_presence() -> void:
+	var d := _data_3()
+	d.all_bullet_gravity = [Vector2(10, 0), Vector2(20, 0)]
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	v.set_gravity(Vector2(0, 300))
+	assert_eq(v.bullet_get_gravity(0), Vector2(10, 0), "seeded slot 0 kept")
+	assert_eq(v.bullet_get_gravity(1), Vector2(20, 0), "seeded slot 1 kept")

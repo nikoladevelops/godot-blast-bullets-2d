@@ -3,8 +3,33 @@ extends BlastTest
 ## NODES (O(1)) instead of rebuilding geometry or re-issuing draw commands.
 ## Regression pins for P1 (track spun twice), P2 (spin hid other changes),
 ## P3 (pose one frame behind), mirrored-generator pose, P8/P9 inspector.
+##
+## Preview state: a dead track (zero path width) drops the layer rings while
+## the dots survive; seed setters rebuild the gizmo (scatter positions move).
+##
+## helper_outline_distribution only steers corner-anchored apportionment, so
+## the inspector hides it for smooth loops and shows it for corner shapes.
 
 const HOLDER := "~BlastBulletsPatternPreview"
+const SMOOTH := [
+	BulletSpawner2D.PATTERN_FROM_HELPER_CIRCLE,
+	BulletSpawner2D.PATTERN_FROM_HELPER_ELLIPSE,
+	BulletSpawner2D.PATTERN_FROM_HELPER_HEART,
+	BulletSpawner2D.PATTERN_FROM_HELPER_FLOWER,
+	BulletSpawner2D.PATTERN_FROM_HELPER_ROSE,
+	BulletSpawner2D.PATTERN_FROM_HELPER_LISSAJOUS,
+]
+
+
+const CORNER := [
+	BulletSpawner2D.PATTERN_FROM_HELPER_RECTANGLE,
+	BulletSpawner2D.PATTERN_FROM_HELPER_SQUARE,
+	BulletSpawner2D.PATTERN_FROM_HELPER_POLYGON,
+	BulletSpawner2D.PATTERN_FROM_HELPER_TRIANGLE,
+	BulletSpawner2D.PATTERN_FROM_HELPER_TRAPEZOID,
+	BulletSpawner2D.PATTERN_FROM_HELPER_DIAMOND,
+	BulletSpawner2D.PATTERN_FROM_HELPER_STAR,
+]
 
 
 func _layers(n: Node) -> Array:
@@ -164,3 +189,52 @@ func test_layer_start_offset_hidden_outside_outline_sources() -> void:
 	assert_false(is_editor_visible(sp, &"helper_outline_layer_start_offset"), "hidden for GRID")
 	sp.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_CIRCLE
 	assert_true(is_editor_visible(sp, &"helper_outline_layer_start_offset"), "shown for an outline source in LAYERS + sequential")
+
+
+func test_dead_track_drops_rings_keeps_dots() -> void:
+	var sp := make_preview_spawner(BulletSpawner2D.PATTERN_FROM_HELPER_RING, 24)
+	sp.helper_ring_radius = 120.0
+	sp.helper_outline_placement = 1 # LAYERS
+	sp.helper_outline_layer_count = 3
+	await idle(8)
+	assert_eq(sp.debug_get_layer_rings().size(), 2, "two rings while live")
+	assert_false(sp.debug_get_preview_dot_points().is_empty(), "dots present while live")
+	sp.preview_path_width = 0.0
+	await idle(8)
+	assert_true(sp.debug_get_layer_rings().is_empty(), "rings dropped when the track dies")
+	assert_false(sp.debug_get_preview_dot_points().is_empty(), "dots survive")
+
+
+func test_scatter_seed_rebuilds_dots() -> void:
+	var sp := make_preview_spawner(BulletSpawner2D.PATTERN_FROM_HELPER_SCATTER, 12)
+	sp.helper_scatter_burst_radius = 130.0
+	sp.helper_scatter_seed = 11
+	await idle(8)
+	var before := sp.debug_get_preview_dot_points()
+	assert_eq(before.size(), 12)
+	sp.helper_scatter_seed = 77
+	await idle(8)
+	var after := sp.debug_get_preview_dot_points()
+	assert_eq(after.size(), 12)
+	var moved := false
+	for i in mini(before.size(), after.size()):
+		if before[i].distance_to(after[i]) > 0.5:
+			moved = true
+	assert_true(moved, "seeded layout refreshed the dots")
+
+
+func _visible_for(src: int) -> bool:
+	var sp := make_spawner()
+	sp.helper_outline_placement = 0 # ON_OUTLINE
+	sp.pattern_source = src
+	return is_editor_visible(sp, &"helper_outline_distribution")
+
+
+func test_hidden_for_smooth_loops() -> void:
+	for src in SMOOTH:
+		assert_false(_visible_for(src), "distribution hidden for smooth source %d" % src)
+
+
+func test_shown_for_corner_shapes() -> void:
+	for src in CORNER:
+		assert_true(_visible_for(src), "distribution shown for corner source %d" % src)

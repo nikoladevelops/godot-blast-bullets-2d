@@ -37,11 +37,6 @@ func _fire(sp: BulletSpawner2D) -> BulletVolley2D:
 	return got[0] if got.size() > 0 else null
 
 
-func _step(n: int) -> void:
-	for k in n:
-		assert_true(factory.debug_advance_time(DT), "tick %d runs" % k)
-
-
 func _headings(v: BulletVolley2D) -> Array:
 	var out: Array = []
 	for i in v.get_amount_bullets():
@@ -119,17 +114,17 @@ func test_scopes_group_bullets_across_spawners_and_shots() -> void:
 	var b := _flock_spawner(f, BulletFlock2D.SCOPE_PER_SPAWNER, Vector2(30, 0))
 	var va := _fire(a)
 	var vb := _fire(b)
-	_step(1)
+	step_factory(1)
 	assert_eq(va.debug_get_bullet_flock_neighbors(0), 3, "Per Spawner: a's bullets see each other only")
 	assert_eq(factory.debug_get_flock_stats()["flocks"], 2, "two flocks")
 	a.flock_scope = BulletFlock2D.SCOPE_SHARED
 	b.flock_scope = BulletFlock2D.SCOPE_SHARED
-	_step(1)
+	step_factory(1)
 	assert_eq(va.debug_get_bullet_flock_neighbors(0), 7, "Shared: both spawners' bullets fly as one flock (the edit reached them in flight)")
 	assert_eq(factory.debug_get_flock_stats()["flocks"], 1, "one flock")
 	a.flock_scope = BulletFlock2D.SCOPE_PER_VOLLEY
 	var va2 := _fire(a)
-	_step(1)
+	step_factory(1)
 	assert_eq(va.debug_get_bullet_flock_neighbors(0), 3, "Per Volley: each shot alone")
 	assert_eq(va2.debug_get_bullet_flock_neighbors(0), 3, "the second shot too")
 	assert_eq(vb.debug_get_bullet_flock_neighbors(0), 3, "b (Shared) flies alone now that a left")
@@ -139,12 +134,12 @@ func test_edits_reach_bullets_in_flight_but_never_arm_old_shots() -> void:
 	var f := _wide_flock()
 	var sp := _flock_spawner(f)
 	var v := _fire(sp)
-	_step(1)
+	step_factory(1)
 	assert_gt(v.debug_get_bullet_flock_neighbors(0), 0, "flocking")
 	sp.flock_enabled = false
 	assert_null(v.flock_get(), "off: the flying volley stops flocking")
 	var headings := _headings(v)
-	_step(10)
+	step_factory(10)
 	assert_eq(_headings(v), headings, "no turn while off")
 	var plain := _fire(sp)
 	sp.flock_enabled = true
@@ -153,11 +148,11 @@ func test_edits_reach_bullets_in_flight_but_never_arm_old_shots() -> void:
 	var other := H.make_flock(0.0, 0.0, 2.0, 400.0, 0.0)
 	sp.flock = other
 	assert_eq(v.flock_get(), other, "a new flock reaches bullets in flight")
-	_step(1)
+	step_factory(1)
 	assert_gt(v.debug_get_bullet_flock_neighbors(0), 0, "flocking by the new rules")
 	sp.flock = null
 	assert_eq(v.flock_get(), factory.get_default_flock(), "an emptied slot: the factory's default flock")
-	_step(1)
+	step_factory(1)
 	assert_eq(factory.debug_get_flock_stats()["grid_members"], v.get_amount_bullets(), "still flocking, by the default rules")
 
 
@@ -174,7 +169,7 @@ func test_a_handler_turning_flocking_off_mid_sweep_stops_the_turn_at_once() -> v
 			seen["headings"] = _headings(v)
 	)
 	for tick in 10: # early break once the trigger expired
-		_step(1)
+		step_factory(1)
 		if seen.has("headings"):
 			break
 	assert_true(seen.has("headings"), "the handler ran inside a sweep")
@@ -192,7 +187,7 @@ func test_orphans_and_adopted_volleys_keep_their_flock() -> void:
 	assert_eq(adopted.flock_get(), f, "adoption leaves flocking alone")
 	sp.queue_free()
 	await idle(1)
-	_step(1)
+	step_factory(1)
 	assert_eq(v.flock_get(), f, "the orphan keeps its flock")
 	assert_eq(v.debug_get_bullet_flock_neighbors(0), 7, "and its swarm: both of the dead spawner's volleys still fly as one flock")
 
@@ -201,10 +196,10 @@ func test_the_spawner_time_scale_freezes_its_bullets_turning() -> void:
 	var sp := _flock_spawner(H.make_flock(0.0, 0.0, 5.0, 400.0, 0.0))
 	sp.time_scale_affects_volleys = true
 	var v := _fire(sp)
-	_step(1)
+	step_factory(1)
 	sp.time_scale = 0.0
 	var headings := _headings(v)
-	_step(10)
+	step_factory(10)
 	assert_eq(_headings(v), headings, "a frozen spawner clock turns nothing")
 	assert_gt(v.debug_get_bullet_flock_neighbors(0), 0, "the flock is still measured")
 
@@ -263,7 +258,7 @@ func test_flock_live_volleys_arms_the_bullets_already_flying() -> void:
 	assert_null(foreign.flock_get(), "another spawner's bullets are untouched")
 	assert_null(loose.flock_get(), "factory volleys are untouched")
 	assert_eq(sp.flock_live_volleys(), 0, "already flocking: nothing new to arm")
-	_step(1)
+	step_factory(1)
 	assert_gt(early.debug_get_bullet_flock_neighbors(0), 0, "they flock from the next tick")
 	assert_eq(early.debug_get_bullet_flock_neighbors(0), 7, "with the other early volley (Per Spawner)")
 	sp.flock = null
@@ -295,7 +290,7 @@ func test_an_empty_flock_slot_flies_the_factory_default_flock() -> void:
 	assert_eq(factory.get_default_flock(), def, "always the same one")
 	assert_eq(def.get_matching_preset(), BulletFlock2D.PRESET_SWARM, "with the default (Swarm) rules")
 	assert_eq([va.flock_get(), vb.flock_get()], [def, def], "both spawners fly it")
-	_step(1)
+	step_factory(1)
 	# The rings are wider than the default range: each bullet sees only its
 	# twin of the other spawner, 30 px away (separate flocks would see 0).
 	assert_eq(va.debug_get_bullet_flock_neighbors(0), 1, "Shared: one flock across both spawners")

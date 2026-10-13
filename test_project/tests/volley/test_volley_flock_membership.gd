@@ -23,18 +23,6 @@ func _cluster(origin: Vector2, count := 6, seed_value := 1) -> Array:
 	return tr
 
 
-func _step(n: int) -> void:
-	for k in n:
-		assert_true(factory.debug_advance_time(DT), "tick %d runs" % k)
-
-
-func _origins(v: BulletVolley2D) -> Array:
-	var out: Array = []
-	for i in v.get_amount_bullets():
-		out.append(v.get_bullet_transform(i).origin)
-	return out
-
-
 func _sees_across(a: BulletVolley2D, b: BulletVolley2D) -> bool:
 	# a's bullets are counted by b's flock readout when they share a flock.
 	return b.debug_get_bullet_flock_neighbors(0) > b.get_amount_bullets() - 1
@@ -48,8 +36,8 @@ func test_separate_flocks_never_see_each_other() -> void:
 	b.flock_join(H.make_flock(3.0, 0.5, 2.0))
 	var solo := _volley(tr) # a's twin in a third flock with a's rules
 	solo.flock_join(H.make_flock(1.5, 1.0, 1.0))
-	_step(60)
-	assert_eq(_origins(a), _origins(solo), "a flies exactly as if b did not exist")
+	step_factory(60)
+	assert_eq(origins(a), origins(solo), "a flies exactly as if b did not exist")
 	assert_eq(factory.debug_get_flock_stats()["flocks"], 3, "three flocks")
 
 
@@ -59,7 +47,7 @@ func test_shared_scope_merges_volleys_of_one_resource() -> void:
 	var b := _volley(_cluster(Vector2(0, 0), 4, 2))
 	a.flock_join(f)
 	b.flock_join(f, BulletFlock2D.SCOPE_SHARED)
-	_step(1)
+	step_factory(1)
 	assert_eq(a.flock_get_scope(), BulletFlock2D.SCOPE_SHARED, "Shared is the default scope of flock_join")
 	assert_true(_sees_across(a, b), "the two volleys flock as one")
 	assert_eq(factory.debug_get_flock_stats()["flocks"], 1, "one flock")
@@ -80,13 +68,13 @@ func test_scopes_split_one_resource_into_separate_flocks() -> void:
 	alone_b.flock_join(f, BulletFlock2D.SCOPE_PER_VOLLEY)
 	var solo := _volley(tr)
 	solo.flock_join(H.make_flock(1.5, 1.0, 1.0))
-	_step(1)
+	step_factory(1)
 	assert_eq(factory.debug_get_flock_stats()["flocks"], 5, "shared + the factory's own group + two single volleys + the twin")
 	assert_true(_sees_across(factory_group_a, factory_group_b), "Per Spawner groups the factory's own volleys")
 	assert_false(_sees_across(alone_a, alone_b), "Per Volley keeps each volley alone")
 	assert_eq(alone_a.debug_get_bullet_flock_neighbors(0), 4, "a Per Volley bullet sees its own volley only")
-	_step(45)
-	assert_eq(_origins(shared), _origins(solo), "Shared never sees the Per Spawner / Per Volley users of the same resource")
+	step_factory(45)
+	assert_eq(origins(shared), origins(solo), "Shared never sees the Per Spawner / Per Volley users of the same resource")
 
 
 func test_frozen_bullets_are_not_flockmates() -> void:
@@ -94,12 +82,12 @@ func test_frozen_bullets_are_not_flockmates() -> void:
 	var v := _volley(tr)
 	v.flock_join(H.make_flock(0.0, 0.0, 1.0))
 	v.disable_bullet(1)
-	_step(1)
+	step_factory(1)
 	assert_eq(v.debug_get_bullet_flock_neighbors(0), 1, "bullet 0 sees bullet 2 only")
 	assert_eq(v.debug_get_bullet_flock_neighbors(1), 0, "the frozen bullet is not gathered")
 	assert_almost_eq(v.debug_get_bullet_flock_steering(0).y, 40.0 / 100.0, 1e-5, "bullet 0 is pulled toward bullet 2 alone")
 	var frozen_dir: Vector2 = v.get_bullet_direction(1)
-	_step(10)
+	step_factory(10)
 	assert_eq(v.get_bullet_direction(1), frozen_dir, "and never turns")
 
 
@@ -115,7 +103,7 @@ func test_join_leave_get_contract() -> void:
 	assert_eq(factory.debug_get_flock_stats()["armed_volleys"], 1, "one armed volley")
 	assert_true(v.flock_join(f, BulletFlock2D.SCOPE_SHARED), "joining again replaces the membership")
 	assert_eq(factory.debug_get_flock_stats()["armed_volleys"], 1, "still one armed volley")
-	_step(1)
+	step_factory(1)
 	assert_gt(v.debug_get_bullet_flock_neighbors(0), 0, "flocking")
 	v.flock_leave()
 	assert_null(v.flock_get(), "left")
@@ -124,7 +112,7 @@ func test_join_leave_get_contract() -> void:
 	var directions: Array = []
 	for i in 4:
 		directions.append(v.get_bullet_direction(i))
-	_step(10)
+	step_factory(10)
 	for i in 4:
 		assert_eq(v.get_bullet_direction(i), directions[i], "bullet %d flies straight after leaving" % i)
 	v.flock_leave()
@@ -140,13 +128,13 @@ func test_stats_keys_are_exact() -> void:
 	var v := _volley(_cluster(Vector2(0, 0), 5, 1))
 	v.disable_bullet(4)
 	v.flock_join(H.make_flock(1.0, 1.0, 1.0))
-	_step(1)
+	step_factory(1)
 	stats = factory.debug_get_flock_stats()
 	assert_eq(stats["flocks"], 1, "one flock")
 	assert_eq(stats["members"], 5, "every bullet has a slot")
 	assert_eq(stats["grid_members"], 4, "the frozen one is not in the grid")
 	v.flock_leave()
-	_step(1)
+	step_factory(1)
 	stats = factory.debug_get_flock_stats()
 	assert_eq([stats["flocks"], stats["members"], stats["grid_members"], stats["neighbor_checks"]], [0, 0, 0, 0], "no armed volley: the old results are dropped")
 	assert_eq(factory.get_frame_stats()["flock_usec"], 0, "and the pass costs nothing")
@@ -182,7 +170,7 @@ func test_bad_arguments_fail_loud_and_change_nothing() -> void:
 func test_a_pooled_handle_is_refused() -> void:
 	var v := _volley(_cluster(Vector2(0, 0), 3, 1), 100.0, 0.05)
 	v.flock_join(H.make_flock(1.0, 1.0, 1.0))
-	_step(6)
+	step_factory(6)
 	assert_true(v.debug_get_volley_info()["is_pooled"], "expired into the pool")
 	assert_null(v.flock_get(), "the pool dropped the flock")
 	assert_eq(factory.debug_get_flock_stats()["armed_volleys"], 0, "disarmed with the life")
@@ -198,14 +186,14 @@ func test_live_edits_of_the_resource_reach_the_flock_next_tick() -> void:
 	var f := H.make_flock(0.0, 0.0, 0.0)
 	var v := _volley([Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 30))])
 	v.flock_join(f)
-	_step(1)
+	step_factory(1)
 	assert_eq(v.debug_get_bullet_flock_steering(0), Vector2(), "weightless")
 	f.cohesion = 1.0
-	_step(1)
+	step_factory(1)
 	assert_gt(v.debug_get_bullet_flock_steering(0).y, 0.0, "cohesion reaches the flying flock")
 	f.neighbor_range = 10.0
 	f.separation_range = 0.0
-	_step(1)
+	step_factory(1)
 	assert_eq(v.debug_get_bullet_flock_neighbors(0), 0, "a shorter range drops the flockmate")
 	assert_eq(v.debug_get_bullet_flock_steering(0), Vector2(), "and its pull")
 
@@ -242,7 +230,7 @@ func test_handlers_mid_sweep_never_steer_with_stale_data() -> void:
 		seen["woken"] = woken.get_bullet_direction(1)
 	)
 	for tick in 10: # early break once the trigger expired
-		_step(1)
+		step_factory(1)
 		if seen.has("joiner"):
 			break
 	assert_true(seen.has("joiner"), "the handler ran inside a sweep")
@@ -251,7 +239,7 @@ func test_handlers_mid_sweep_never_steer_with_stale_data() -> void:
 	assert_eq(woken.get_bullet_direction(1), seen["woken"], "a bullet woken mid-sweep was not gathered: no turn")
 	assert_eq(woken.debug_get_bullet_flock_steering(1), Vector2(), "its slot reads zero")
 	assert_eq(rejoiner.get_bullet_direction(0), seen["rejoiner"], "a volley that switched flocks mid-sweep never steers by the old flock's result")
-	_step(1)
+	step_factory(1)
 	assert_ne(joiner.get_bullet_direction(0), seen["joiner"], "the joiner turns from the next tick on")
 	assert_gt(woken.debug_get_bullet_flock_neighbors(1), 0, "the woken bullet is gathered next pass")
 	assert_eq(factory.debug_get_flock_stats()["armed_volleys"], 3, "the freed volley left the armed count")

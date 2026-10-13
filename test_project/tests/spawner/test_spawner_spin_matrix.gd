@@ -3,7 +3,12 @@ extends BlastTest
 ## spun volley is a rigid rotation of the plain one, mirrored generators stay
 ## mirrored, sheared customs keep their shear, transforms_scale scales bases
 ## without un-mirroring, spin off leaves the layout exact.
-
+##
+## Spin-path perf: a 10k-bullet collect with advancing spin must stay far
+## below frame budget. Spin is one folded matrix per volley (not per-bullet
+## trig), so the collect cost is the generator's alone. Bound is generous
+## on purpose (debug headless jitters): it catches pathological regressions
+## (per-bullet extension round-trips, trig storms), not 10% drift.
 
 func _line_spawner() -> BulletSpawner2D:
 	var sp := make_spawner(H.make_volley_data(1, 0.0, 60.0), BulletSpawner2D.PATTERN_FROM_HELPER_LINE, 3)
@@ -106,3 +111,20 @@ func test_spin_off_layout_exact() -> void:
 	var v = sp.collect_spawn_transforms()
 	assert_eq(v.size(), 3)
 	assert_almost_eq((v[0] as Transform2D).get_origin(), Vector2(-40, 0), Vector2(0.5, 0.5), "unspun layout exact")
+
+
+func test_10k_spin_collect_budget() -> void:
+	var sp := make_spawner(H.make_volley_data(4), BulletSpawner2D.PATTERN_FROM_HELPER_SPIRAL, 10000)
+	sp.set_spin_enabled(true)
+	sp.set_spin_speed_deg_per_sec(90.0)
+	await idle(2)
+	var worst := 0
+	for i in 5:
+		var t0 := Time.get_ticks_usec()
+		var tf: Array = sp.collect_spawn_transforms()
+		var dt := int(Time.get_ticks_usec() - t0)
+		worst = maxi(worst, dt)
+		assert_eq(tf.size(), 10000, "10k spiral collects with spin on")
+		await idle(1)
+	print("BENCH worst 10k spin collect usec=", worst)
+	assert_lt(worst, 25000, "10k spin collect stays in the millisecond class")

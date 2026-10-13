@@ -3,8 +3,15 @@ extends BlastTest
 ## negative/huge/NaN/Inf/zero inputs and the caps (amount per call,
 ## grid-product, gap/points/vertices, scale-factor band). Helpers must fail
 ## loud with empty arrays - never hang, OOM, or emit NaN/Inf slots.
+##
+## Singular markers: generators that invert the marker must reject singular
+## markers loudly; non-inverting generators degrade to finite zero-size.
+##
+## A (0, 1)-scale marker passes every finite check but has determinant 0, so
+## affine_inverse() (outline layout, Path2D linker) is garbage.
 
 var m := Transform2D(0.0, Vector2.ZERO)
+var singular := Transform2D(Vector2(0, 0), Vector2(0, 1), Vector2(100, 50))
 
 
 func test_amount_caps() -> void:
@@ -104,3 +111,32 @@ func test_every_generator_reports_amount_and_marker_in_one_wording() -> void:
 		var bad: Array = ClassDB.class_call_static.callv([&"BulletPatterns2D", n] + _generator_args(info, 4, Transform2D(0.0, Vector2(NAN, 0))))
 		assert_true(bad.is_empty(), "%s NaN marker returns empty" % n)
 		expect_error_sequence(["%s: marker_transform contains NaN/Inf." % n])
+
+
+func test_singular_marker_is_finite_but_singular() -> void:
+	assert_true(singular.is_finite(), "passes finite-only guards")
+	assert_eq(singular.determinant(), 0.0)
+
+
+func test_ring_rejects_singular_marker() -> void:
+	var ring = BulletPatterns2D.helper_generate_transforms_ring(12, singular, 60.0, 0.0, TAU, true, false, true)
+	assert_eq(ring.size(), 0, "ring volley empty on singular marker")
+	expect_error_sequence(["helper_generate_transforms_ring: marker_transform is singular (zero or degenerate scale); volley skipped."])
+
+
+func test_circle_rejects_singular_marker() -> void:
+	var circ = BulletPatterns2D.helper_generate_transforms_circle(12, singular, 60.0, true, 0.0)
+	assert_eq(circ.size(), 0, "circle volley empty on singular marker")
+	expect_error_sequence(["helper_generate_transforms_circle: marker_transform is singular (zero or degenerate scale); volley skipped."])
+
+
+func test_grid_degrades_finite_on_singular_marker() -> void:
+	var grid = BulletPatterns2D.helper_generate_transforms_grid(6, singular, 3, 4, 32.0, 32.0, true, false, 0.0, 0)
+	assert_eq(grid.size(), 6, "grid still emits")
+	assert_true(H.finite_volley(grid), "grid slots finite (graceful zero-size)")
+
+
+func test_sane_marker_unaffected() -> void:
+	var ring_ok = BulletPatterns2D.helper_generate_transforms_ring(12, Transform2D(0.3, Vector2(100, 50)), 60.0, 0.0, TAU, true, false, true)
+	assert_eq(ring_ok.size(), 12)
+	assert_true(H.finite_volley(ring_ok), "ring slots finite")

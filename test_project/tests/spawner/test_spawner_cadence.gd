@@ -5,6 +5,18 @@ extends BlastTest
 ## nested shots, skip reasons for every failure, reload jitter, and
 ## shooting_* signals tracking AUTO-fire only.
 ## Time is simulated (60 fps): one idle frame = 1/60 s.
+##
+## Documented setter/signal split: with auto-fire configured, the shot that
+## trips max_volleys emits shooting_finished exactly once; set_max_volleys()
+## only reports start/stop transitions (lowering onto the count -> stopped,
+## never a second finished). Manual-only spawners never report a finish
+## (test_spawner_cadence).
+##
+## Shooting transitions report exactly once, and only inside the tree: the
+## scene loader calls setters before _ready (which emits the start itself),
+## so pre-tree setters must stay silent.
+
+
 
 
 ## Spawner wired to the factory, shooting still OFF (tests arm it).
@@ -197,3 +209,71 @@ func test_reload_jitter_is_bounded_reproducible_and_seed_independent() -> void:
 		if absi(int(b[i]) - int(a[i + 1])) > 1:
 			lagged = false
 	assert_false(lagged, "consecutive seeds are not lagged copies of one sequence (a=%s b=%s)" % [a, b])
+
+
+func test_cap_trip_by_shot_emits_finished_once() -> void:
+	var sp := make_spawner(H.make_volley_data(1, 0.0, 60.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
+	sp.max_volleys = 2
+	sp.set_shooting_enabled(true) # auto-fire configured: the cap trip is a finish
+	watch_signals(sp)
+	assert_true(sp.shoot_once())
+	assert_true(sp.shoot_once())
+	assert_signal_emit_count(sp, "shooting_finished", 1, "finished exactly once")
+	assert_true(sp.shoot_once(), "manual shot past the cap still fires")
+	assert_signal_emit_count(sp, "shooting_finished", 1, "no second finish past the cap")
+
+
+func test_lowering_then_raising_the_cap() -> void:
+	var sp := make_spawner(H.make_volley_data(1, 0.0, 60.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
+	sp.max_volleys = -1
+	sp.set_shooting_enabled(true)
+	assert_true(sp.shoot_once())
+	assert_true(sp.shoot_once())
+	watch_signals(sp)
+	sp.max_volleys = sp.get_volleys_fired()
+	assert_signal_emit_count(sp, "shooting_stopped", 1, "stopped on the crossing")
+	assert_signal_emit_count(sp, "shooting_finished", 0, "no finish from the setter")
+	assert_false(sp.is_shooting_active(), "inactive at the lowered cap")
+	sp.max_volleys = sp.get_volleys_fired() + 3
+	assert_signal_emit_count(sp, "shooting_started", 1, "started on raising")
+	assert_true(sp.is_shooting_active(), "active again")
+
+
+func _fresh() -> BulletSpawner2D:
+	var sp := BulletSpawner2D.new()
+	sp.set_spawn_data(H.make_volley_data(1, 0.0, 60.0))
+	autofree(sp)
+	watch_signals(sp)
+	return sp
+
+
+func test_pre_tree_setters_silent_then_load_emits_once() -> void:
+	var sp := _fresh()
+	sp.set_shooting_enabled(false)
+	sp.set_shooting_enabled(true)
+	sp.max_volleys = 0
+	sp.max_volleys = -1
+	assert_signal_emit_count(sp, "shooting_started", 0, "no started before the tree")
+	assert_signal_emit_count(sp, "shooting_stopped", 0, "no stopped before the tree")
+	sp.set_bullet_factory(factory)
+	add_child(sp)
+	await idle(5)
+	assert_signal_emit_count(sp, "shooting_started", 1, "exactly one started across load")
+	sp.set_shooting_enabled(false)
+	assert_signal_emit_count(sp, "shooting_stopped", 1, "one stopped on disable")
+	sp.set_shooting_enabled(true)
+	assert_signal_emit_count(sp, "shooting_started", 2, "one more started on re-enable")
+
+
+func test_pre_tree_cap_silent_tree_cap_reports() -> void:
+	var sp := _fresh()
+	sp.max_volleys = 0
+	assert_signal_emit_count(sp, "shooting_stopped", 0, "pre-tree cap silent")
+	sp.set_bullet_factory(factory)
+	add_child(sp)
+	await idle(1)
+	var started_before: int = get_signal_emit_count(sp, "shooting_started")
+	sp.max_volleys = -1
+	assert_eq(get_signal_emit_count(sp, "shooting_started"), started_before + 1, "tree raise reports started")
+	sp.max_volleys = 0
+	assert_signal_emit_count(sp, "shooting_stopped", 1, "tree cap reports stopped")
