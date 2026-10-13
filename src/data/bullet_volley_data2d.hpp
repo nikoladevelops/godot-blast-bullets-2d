@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/variant_enum_cast2d.hpp"
 #include "data/bullet_curves_data2d.hpp"
 #include "data/bullet_effect_layer_data2d.hpp"
 #include "data/bullet_rotation_data2d.hpp"
@@ -538,7 +539,7 @@ public:
 	// reflects across the analytic surface normal (flat walls bounce flat):
 	// slightly costlier, runs only on bounce ticks, falls back to radial
 	// when the target has no usable shape.
-	enum BounceMode {
+	enum BounceMode : int {
 		BOUNCE_SIMPLE_RADIAL = 0,
 		BOUNCE_PRECISE_SHAPE = 1
 	};
@@ -768,4 +769,4 @@ protected:
 };
 } //namespace BlastBullets2D
 
-VARIANT_ENUM_CAST(BlastBullets2D::BulletVolleyData2D::BounceMode);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletVolleyData2D::BounceMode);

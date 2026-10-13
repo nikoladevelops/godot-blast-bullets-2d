@@ -20,7 +20,7 @@ using namespace godot;
 // Two behaviors: TRAIL_FOLLOW sticks to its bullet every tick, the ON_*
 // triggers fire one-shot visuals (spawn flash, hit sparks, destroy
 // explosion, bounce sparks) that play once and die by age.
-enum EffectTrigger {
+enum EffectTrigger : int {
 	EFFECT_TRAIL_FOLLOW,
 	EFFECT_ON_SPAWN,
 	EFFECT_ON_HIT,

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/variant_enum_cast2d.hpp"
 #include "godot_cpp/classes/curve.hpp"
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
@@ -15,7 +16,7 @@ public:
 	// "BlastBullets2D.DirectionCurveMode", which typed GDScript refuses to
 	// assign from the class constants (BulletCurvesData2D.Override).
 	// SERIALIZED ids: never renumber.
-	enum DirectionCurveMode {
+	enum DirectionCurveMode : int {
 		Additive,
 		Override
 	};
@@ -102,4 +103,4 @@ protected:
 using DirectionCurveMode = BulletCurvesData2D::DirectionCurveMode;
 } //namespace BlastBullets2D
 
-VARIANT_ENUM_CAST(BlastBullets2D::BulletCurvesData2D::DirectionCurveMode);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletCurvesData2D::DirectionCurveMode);

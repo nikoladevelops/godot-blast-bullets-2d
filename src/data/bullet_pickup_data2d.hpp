@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/variant_enum_cast2d.hpp"
 #include "data/bullet_curves_data2d.hpp"
 #include "data/bullet_effect_layer_data2d.hpp"
 #include "data/bullet_rotation_data2d.hpp"
@@ -39,7 +40,7 @@ class BulletPickupData2D : public Resource {
 
 public:
 	// SERIALIZED ids: never renumber.
-	enum MotionMode {
+	enum MotionMode : int {
 		// Built-in coin physics: keeps part of the bullet's velocity, drifts
 		// out with drag, then the magnet accelerates it to the target.
 		MOTION_BURST_AND_MAGNET = 0,
@@ -166,4 +167,4 @@ private:
 
 } // namespace BlastBullets2D
 
-VARIANT_ENUM_CAST(BlastBullets2D::BulletPickupData2D::MotionMode);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletPickupData2D::MotionMode);

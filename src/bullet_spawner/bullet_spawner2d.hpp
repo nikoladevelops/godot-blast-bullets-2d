@@ -2,6 +2,7 @@
 
 #include "bullet_spawner/volley_tracker2d.hpp"
 #include "bullet_volley/bullet_volley2d.hpp"
+#include "core/variant_enum_cast2d.hpp"
 #include "debugger/graze_preview_layer2d.hpp"
 #include "factory/bullet_factory2d.hpp"
 #include "patterns/bullet_patterns2d.hpp"
@@ -179,7 +180,7 @@ public:
 	// and only the two static_asserts below would notice, so slots they
 	// do not cover (1..11, 29..32) were entirely unguarded. Never
 	// renumber: append new sources at the end with the next free integer.
-	enum PatternSource {
+	enum PatternSource : int {
 		PATTERN_FROM_CHILDREN = PATTERN_SHAPE_CHILDREN, // 0
 		PATTERN_FROM_SELF = PATTERN_SHAPE_SELF, // 1
 		PATTERN_FROM_HELPER_GRID = PATTERN_SHAPE_GRID, // 2
@@ -227,7 +228,7 @@ public:
 	// Path2D layout: how bullets are placed along the baked curve.
 	// FIXED_SPACING lays count bullets run=(count-1)*spacing apart;
 	// EVEN_DISTRIBUTION spreads count bullets over the whole length.
-	enum Path2DDistribution {
+	enum Path2DDistribution : int {
 		PATH2D_DISTRIBUTION_FIXED_SPACING = 0,
 		PATH2D_DISTRIBUTION_EVEN
 	};
@@ -236,14 +237,14 @@ public:
 	// (run longer than the curve, or shifted past its ends). CLAMP piles
 	// extras at the end, WRAP continues from the start (mod length),
 	// SHRINK_TO_FIT scales spacing down so the run fits exactly.
-	enum Path2DOverflow {
+	enum Path2DOverflow : int {
 		PATH2D_OVERFLOW_CLAMP = 0,
 		PATH2D_OVERFLOW_WRAP,
 		PATH2D_OVERFLOW_SHRINK_TO_FIT
 	};
 
 	// Path2D anchor: where a fixed run sits when shorter than the curve.
-	enum Path2DAnchor {
+	enum Path2DAnchor : int {
 		PATH2D_ANCHOR_START = 0,
 		PATH2D_ANCHOR_CENTER,
 		PATH2D_ANCHOR_END
@@ -252,7 +253,7 @@ public:
 	// Path2D facing: ALONG_PATH aims +X with travel (tangent), the two
 	// NORMAL modes aim across it (+/-90 degrees). facing_offset applies
 	// on top of all three.
-	enum Path2DFacing {
+	enum Path2DFacing : int {
 		PATH2D_FACING_ALONG_PATH = 0,
 		PATH2D_FACING_NORMAL_P90,
 		PATH2D_FACING_NORMAL_M90
@@ -264,7 +265,7 @@ public:
 	// points matter, like every other pattern). AT_PATH2D keeps the
 	// legacy pose: the volley materializes where the Path2D node sits
 	// in the world.
-	enum Path2DSpace {
+	enum Path2DSpace : int {
 		PATH2D_SPACE_FOLLOW_GENERATOR = 0,
 		PATH2D_SPACE_AT_PATH2D = 1
 	};
@@ -273,7 +274,7 @@ public:
 	// spin_speed_deg_per_sec (signed: positive = clockwise, per the
 	// Godot 2D convention); OSCILLATE swings +-spin_amplitude_deg at
 	// spin_frequency_hz instead, ignoring the speed.
-	enum SpinMode {
+	enum SpinMode : int {
 		SPIN_CONTINUOUS = 0,
 		SPIN_OSCILLATE
 	};
@@ -283,7 +284,7 @@ public:
 	// live on the emitter, so once the spawner is gone nothing can handle
 	// its bullets' hits or expiry - not even a callback that belongs to a
 	// node that is still alive. Serialized ids: never renumber.
-	enum OrphanedVolleys {
+	enum OrphanedVolleys : int {
 		// Bullets keep flying and dying; their hits reach no one, and a
 		// one-time warning explains why (default).
 		ORPHANED_VOLLEYS_KEEP_FLYING = 0,
@@ -446,7 +447,7 @@ public:
 	//   (the engine class defaults to false, which silently steers
 	//   nothing). Turn it off only when a movement pattern, rotation
 	//   data, or orbiting texture mode already owns the facing.
-	enum HomingMode {
+	enum HomingMode : int {
 		HOMING_SHARED = 0, // one deque shared by every bullet of the volley
 		HOMING_PER_BULLET // every bullet owns its own deque (same queue each)
 	};
@@ -455,7 +456,7 @@ public:
 	// setting group below (same dropdown-and-details pattern as
 	// pattern_source): only the active source's options show in the
 	// inspector, plus the shared steering block.
-	enum HomingTargetSource {
+	enum HomingTargetSource : int {
 		HOMING_SOURCE_NODE_GROUP = 0, // poll get_nodes_in_group(homing_node_group)
 		HOMING_SOURCE_MOUSE, // chase the mouse cursor position
 		HOMING_SOURCE_GLOBAL_POSITION, // chase homing_global_position (snapshot per volley)
@@ -465,7 +466,7 @@ public:
 	};
 
 	// How homing_node_name is compared against node names (node-name source).
-	enum HomingNodeNameMatch {
+	enum HomingNodeNameMatch : int {
 		HOMING_NAME_MATCH_EXACT = 0, // "Player" matches only "Player"
 		HOMING_NAME_MATCH_CONTAINS, // "Player" matches "Player2", "EnemyPlayer", ...
 		HOMING_NAME_MATCH_STARTS_WITH, // "Player" matches "Player2" but not "EnemyPlayer"
@@ -473,7 +474,7 @@ public:
 	};
 
 	// Which of the detected nodes become targets (node-group source).
-	enum HomingTargetSelection {
+	enum HomingTargetSelection : int {
 		HOMING_SELECT_NEAREST = 0, // closest to the spawner, up to homing_max_targets
 		HOMING_SELECT_RANDOM, // random pick, up to homing_max_targets
 		HOMING_SELECT_FIRST, // tree order, up to homing_max_targets
@@ -482,7 +483,7 @@ public:
 	};
 
 	// Whether already-flying volleys keep chasing fresh targets.
-	enum HomingRetargetMode {
+	enum HomingRetargetMode : int {
 		HOMING_RETARGET_OFF = 0,
 		HOMING_RETARGET_ON_INTERVAL // re-resolve + replace every homing_retarget_interval_sec
 	};
@@ -732,7 +733,7 @@ public:
 	// (the inspector adds them) and skipped.
 	TypedArray<BulletGrazeZone2D> graze_zones;
 	// SERIALIZED ids (GrazeDetector2D::Source): never renumber.
-	enum GrazeTargetSource {
+	enum GrazeTargetSource : int {
 		GRAZE_SOURCE_NODE_GROUP = 0, // Node2D members of graze_node_group (default)
 		GRAZE_SOURCE_NODE_PATH = 1, // the Node2D at graze_target_path
 		GRAZE_SOURCE_NODE_NAME = 2, // Node2Ds named like graze_node_name (scene scan)
@@ -870,7 +871,7 @@ public:
 	double sound_volume_db = 0.0;
 	// SERIALIZED ids: never renumber. Like GrazeDetector2D::Source with a
 	// Godot-listener default in front (never cast between the two enums).
-	enum SoundListenerSource {
+	enum SoundListenerSource : int {
 		SOUND_LISTENER_GODOT_LISTENER = 0, // Godot's current AudioListener2D / camera
 		SOUND_LISTENER_NODE_GROUP = 1, // Node2D members of sound_listener_node_group
 		SOUND_LISTENER_NODE_PATH = 2, // the Node2D at sound_listener_path
@@ -1301,7 +1302,7 @@ public:
 	// historical behavior) shifts every volley by a world-space vector;
 	// LOCAL treats it as a muzzle in the generator's frame, so it turns
 	// (and scales) with the spawner / generator.
-	enum SpawnOffsetSpace {
+	enum SpawnOffsetSpace : int {
 		SPAWN_OFFSET_GLOBAL = 0,
 		SPAWN_OFFSET_LOCAL = 1,
 	};
@@ -1327,20 +1328,20 @@ public:
 	// The spawner node itself travels along movement_path at runtime
 	// (never in the editor). Progress per leg = easing(leg time) using
 	// Godot's Tween transitions, or a custom progress Curve.
-	enum MovementSpace {
+	enum MovementSpace : int {
 		MOVEMENT_SPACE_ATTACH = 0, // spawner sits ON the path (PathFollow2D-like)
 		MOVEMENT_SPACE_RELATIVE_TO_START = 1, // path shape replayed from where the spawner started
 	};
-	enum MovementLoopMode {
+	enum MovementLoopMode : int {
 		MOVEMENT_LOOP_ONCE = 0,
 		MOVEMENT_LOOP_LOOP = 1, // restart from the beginning every leg
 		MOVEMENT_LOOP_PING_PONG = 2, // back and forth
 	};
-	enum MovementDirection {
+	enum MovementDirection : int {
 		MOVEMENT_DIRECTION_FORWARD = 0,
 		MOVEMENT_DIRECTION_REVERSE = 1,
 	};
-	enum MovementTiming {
+	enum MovementTiming : int {
 		MOVEMENT_TIMING_DURATION = 0, // each leg takes movement_duration_sec
 		MOVEMENT_TIMING_SPEED = 1, // each leg takes length / movement_speed
 	};
@@ -1418,7 +1419,7 @@ public:
 	// transforms provably follow the generator rigidly are generated once
 	// and re-posed per shot; OFF: always regenerate (debugging, or
 	// scripts that mutate pattern inputs behind the setters' back).
-	enum PatternCacheMode {
+	enum PatternCacheMode : int {
 		PATTERN_CACHE_AUTO = 0,
 		PATTERN_CACHE_OFF = 1,
 	};
@@ -1960,24 +1961,24 @@ private:
 } // namespace BlastBullets2D
 
 // Need this in order to expose the enum to Godot Engine
-VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::PatternSource);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::Path2DDistribution);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::Path2DOverflow);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::Path2DAnchor);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::Path2DFacing);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::Path2DSpace);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::SpinMode);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::OrphanedVolleys);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingMode);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingTargetSource);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingNodeNameMatch);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingTargetSelection);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingRetargetMode);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::GrazeTargetSource);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::SoundListenerSource);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::PatternCacheMode);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::MovementSpace);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::MovementLoopMode);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::MovementDirection);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::MovementTiming);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::SpawnOffsetSpace);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::PatternSource);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::Path2DDistribution);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::Path2DOverflow);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::Path2DAnchor);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::Path2DFacing);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::Path2DSpace);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::SpinMode);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::OrphanedVolleys);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingMode);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingTargetSource);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingNodeNameMatch);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingTargetSelection);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingRetargetMode);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::GrazeTargetSource);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::SoundListenerSource);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::PatternCacheMode);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::MovementSpace);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::MovementLoopMode);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::MovementDirection);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::MovementTiming);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::SpawnOffsetSpace);

@@ -9,6 +9,7 @@
 #include "core/dynamic_sparse_set.hpp"
 #include "core/reentrancy_guard2d.hpp"
 #include "core/transform_math2d.hpp"
+#include "core/variant_enum_cast2d.hpp"
 #include "core/warn_once2d.hpp"
 #include "data/bullet_curves_data2d.hpp"
 #include "data/bullet_effect_layer_data2d.hpp"
@@ -1579,27 +1580,27 @@ public:
 	// homing tick forever. Pop paths never touch the tree, so this is safe.
 	~BulletVolley2D();
 
-	enum OrbitingDirection {
+	enum OrbitingDirection : int {
 		DontMove = 0,
 		OrbitLeft,
 		OrbitRight,
 		OrbitRandom
 	};
 
-	enum OrbitingTextureRotation {
+	enum OrbitingTextureRotation : int {
 		FaceTarget = 0,
 		FaceOppositeTarget,
 		FaceOrbitingDirection,
 		FaceOppositeOrbitingDirection
 	};
 
-	enum OrbitingFollowMode {
+	enum OrbitingFollowMode : int {
 		FollowTarget = 0,
 		FollowDeadzone,
 		Anchored
 	};
 
-	enum OrbitingLockPolicy {
+	enum OrbitingLockPolicy : int {
 		RelockAlways = 0,
 		StayLocked,
 		RelockOnTargetChange
@@ -2872,6 +2873,7 @@ namespace godot {
 					"BulletVolley2D.HomingType");                                                                                            \
 		}                                                                                                                                    \
 	};
+static_assert(std::is_same_v<std::underlying_type_t<BlastBullets2D::HomingType>, int>, "HomingType must be `enum : int` (see BLAST_VARIANT_ENUM_CAST)");
 BLAST_HOMING_TYPE_INFO(BlastBullets2D::HomingType)
 BLAST_HOMING_TYPE_INFO(BlastBullets2D::HomingType const)
 BLAST_HOMING_TYPE_INFO(BlastBullets2D::HomingType &)
@@ -2894,7 +2896,7 @@ struct PtrToArg<BlastBullets2D::HomingType> {
 	}
 };
 } // namespace godot
-VARIANT_ENUM_CAST(BlastBullets2D::BulletVolley2D::OrbitingDirection);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletVolley2D::OrbitingTextureRotation);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletVolley2D::OrbitingFollowMode);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletVolley2D::OrbitingLockPolicy);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletVolley2D::OrbitingDirection);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletVolley2D::OrbitingTextureRotation);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletVolley2D::OrbitingFollowMode);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletVolley2D::OrbitingLockPolicy);

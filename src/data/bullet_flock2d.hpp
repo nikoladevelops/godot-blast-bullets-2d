@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/variant_enum_cast2d.hpp"
 #include <godot_cpp/classes/resource.hpp>
 
 namespace BlastBullets2D {
@@ -31,7 +32,7 @@ class BulletFlock2D : public Resource {
 
 public:
 	// SERIALIZED ids: never renumber (BulletSpawner2D.flock_scope stores them).
-	enum Scope {
+	enum Scope : int {
 		// The bullets of one spawner flock together (a factory volley: the
 		// factory's own volleys of this flock).
 		SCOPE_PER_SPAWNER = 0,
@@ -91,4 +92,4 @@ private:
 };
 } //namespace BlastBullets2D
 
-VARIANT_ENUM_CAST(BlastBullets2D::BulletFlock2D::Scope);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletFlock2D::Scope);

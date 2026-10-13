@@ -21,6 +21,7 @@
 // (BulletPatterns2D.helper_generate_transforms_ring(...)). The class is
 // registered abstract: it is never instantiated.
 
+#include "core/variant_enum_cast2d.hpp"
 #include "godot_cpp/classes/image.hpp"
 #include "godot_cpp/classes/object.hpp"
 #include "godot_cpp/core/class_db.hpp"
@@ -82,7 +83,7 @@ public:
 	static TypedArray<Transform2D> generate(int shape, int amount, const Transform2D &marker_transform, const Dictionary &params = Dictionary());
 
 	// Enum class for grid alignment
-	enum Alignment {
+	enum Alignment : int {
 		TOP_LEFT,
 		TOP_CENTER,
 		TOP_RIGHT,
@@ -99,7 +100,7 @@ public:
 	// RADIAL_OUTWARD keeps the historical behavior (away from the marker,
 	// mirrored for negative radii); TOWARD_CENTER faces the marker;
 	// KEEP_MARKER keeps the marker rotation on every transform.
-	enum SpiralFacingMode {
+	enum SpiralFacingMode : int {
 		SPIRAL_FACING_TANGENT,
 		SPIRAL_FACING_RADIAL_OUTWARD,
 		SPIRAL_FACING_TOWARD_CENTER,
@@ -109,7 +110,7 @@ public:
 	// Scatter facing: which way burst bullets look. OUTWARD faces away from
 	// the marker (explosions), RANDOM faces anywhere (shotgun spray),
 	// INWARD faces the marker (implosions).
-	enum ScatterFacingMode {
+	enum ScatterFacingMode : int {
 		SCATTER_FACING_OUTWARD,
 		SCATTER_FACING_RANDOM,
 		SCATTER_FACING_INWARD
@@ -117,7 +118,7 @@ public:
 
 	// Anchor for the line transform generator: which end of the row the
 	// marker sits at. CENTER (default) preserves the historical behavior.
-	enum LineAnchor {
+	enum LineAnchor : int {
 		LINE_ANCHOR_START,
 		LINE_ANCHOR_CENTER,
 		LINE_ANCHOR_END
@@ -126,7 +127,7 @@ public:
 	// Ring mode for the ellipse transform generator: FULL draws every slot
 	// around the ellipse; ARC draws a spaced arc segment; WALL draws a dense
 	// arc with carved dodge gaps (danmaku wall with readable escape routes).
-	enum EllipseMode {
+	enum EllipseMode : int {
 		ELLIPSE_FULL,
 		ELLIPSE_ARC,
 		ELLIPSE_WALL
@@ -136,7 +137,7 @@ public:
 	// (circumradius), isosceles (base + height, apex up) and right-angled
 	// (X/Y legs from the corner, recentered). All corners recentre on the
 	// marker and walk counter-clockwise like the rectangle primitive.
-	enum TriangleType {
+	enum TriangleType : int {
 		TRIANGLE_EQUILATERAL = 0,
 		TRIANGLE_ISOSCELES = 1,
 		TRIANGLE_RIGHT = 2
@@ -147,7 +148,7 @@ public:
 	// continuous rhodonea sweep; PHYLLOTAXIS is a Vogel golden-angle disc;
 	// SPIROGRAPH is a hypotrochoid lacy bloom; SUPERFORMULA is a simplified
 	// Gielis curve (lobes m + fullness exponent).
-	enum FlowerBloom {
+	enum FlowerBloom : int {
 		FLOWER_FAN = 0,
 		FLOWER_RHODONEA = 1,
 		FLOWER_PHYLLOTAXIS = 2,
@@ -158,7 +159,7 @@ public:
 	// Named pattern presets that fill the spawner's helper_* properties in
 	// one call (discoverability over 40 raw knobs; see
 	// BulletSpawner2D::apply_pattern_preset).
-	enum PatternPreset {
+	enum PatternPreset : int {
 		PATTERN_PRESET_CUSTOM = -1,
 		PATTERN_PRESET_RADIAL_DENSE = 0,
 		PATTERN_PRESET_RADIAL_SPARSE,
@@ -189,7 +190,7 @@ public:
 	// untouched). OUTSIDE/INSIDE push along each slot's facing by
 	// spread * pow(rand, exponent); BOTH picks a random side per bullet.
 	// Positions move; facings never change.
-	enum SideMode {
+	enum SideMode : int {
 		SIDE_ON_PATH = 0,
 		SIDE_OUTSIDE = 1,
 		SIDE_INSIDE = 2,
@@ -204,7 +205,7 @@ public:
 	// replaces the loop with a grid masked to the shape interior: exactly
 	// transforms_amount cells, picked evenly over the shape; fill_spacing is
 	// honored when they fit and shrinks just enough when they do not.
-	enum OutlinePlacement {
+	enum OutlinePlacement : int {
 		OUTLINE_ON_OUTLINE = 0,
 		OUTLINE_LAYERS = 1,
 		OUTLINE_FILL_INSIDE = 2
@@ -213,7 +214,7 @@ public:
 	// Layer side: which side of the base outline extra layers grow toward.
 	// OUTWARD scales each ring up, INWARD scales down toward the center,
 	// BOTH alternates (up, down, further up, ...).
-	enum OutlineLayerSide {
+	enum OutlineLayerSide : int {
 		OUTLINE_LAYER_OUTWARD = 0,
 		OUTLINE_LAYER_INWARD = 1,
 		OUTLINE_LAYER_BOTH = 2
@@ -225,7 +226,7 @@ public:
 	// volleys still read as the base shape (layer = i * layer_count / n);
 	// OUTER_FIRST fills from the outermost ring inward (implosion readings);
 	// PINGPONG waves 0,1,..,last,..,1 (pairs with spin).
-	enum OutlineLayerFill {
+	enum OutlineLayerFill : int {
 		OUTLINE_LAYER_INTERLEAVED = 0,
 		OUTLINE_LAYER_SEQUENTIAL = 1,
 		OUTLINE_LAYER_OUTER_FIRST = 2,
@@ -235,14 +236,14 @@ public:
 	// Layer scale curve: how ring sizes progress. LINEAR steps evenly
 	// (1+step per layer); EXPONENTIAL compounds ((1+step)^L, mirrored
 	// reciprocally inward). A non-empty custom scale list overrides both.
-	enum OutlineLayerScaleCurve {
+	enum OutlineLayerScaleCurve : int {
 		OUTLINE_LAYER_CURVE_LINEAR = 0,
 		OUTLINE_LAYER_CURVE_EXPONENTIAL = 1
 	};
 
 	// Outline facing: rotates each generated default facing. NORMAL keeps it,
 	// ALONG_P90 / ALONG_M90 turn it toward the loop tangent (+-90 deg).
-	enum OutlineFacing {
+	enum OutlineFacing : int {
 		OUTLINE_FACING_NORMAL = 0,
 		OUTLINE_FACING_ALONG_P90 = 1,
 		OUTLINE_FACING_ALONG_M90 = 2
@@ -254,7 +255,7 @@ public:
 	// edges win ties, so equal sides can differ); SYMMETRIC pairs opposite
 	// edges so opposite sides stay equal (a single leftover dot breaks one
 	// pair by exactly one, which is unavoidable for odd remainders).
-	enum OutlineDistribution {
+	enum OutlineDistribution : int {
 		OUTLINE_DISTRIBUTION_LEGACY = 0,
 		OUTLINE_DISTRIBUTION_SYMMETRIC = 1
 	};
@@ -265,7 +266,7 @@ public:
 	// layers); EVEN_PER_LAYER rebuilds an even symmetric loop per ring, so
 	// every ring has corners/endpoints and even gaps. SEQUENTIAL-family
 	// deals only choose which bullets ride which ring; positions stay even.
-	enum OutlineLayerLayout {
+	enum OutlineLayerLayout : int {
 		OUTLINE_LAYER_LAYOUT_SHARED_LOOP = 0,
 		OUTLINE_LAYER_LAYOUT_EVEN_PER_LAYER = 1
 	};
@@ -278,7 +279,7 @@ public:
 	// corner dot faces UP with the top side); VERTICAL_SIDES: left/right own
 	// them (faces +X with the right side); BALANCED: keeps the outgoing-edge
 	// owner (previous behavior) with symmetric opposite-pair leftovers.
-	enum OutlineCornerPriority {
+	enum OutlineCornerPriority : int {
 		OUTLINE_CORNER_PRIORITY_HORIZONTAL = 0,
 		OUTLINE_CORNER_PRIORITY_VERTICAL = 1,
 		OUTLINE_CORNER_PRIORITY_BALANCED = 2
@@ -288,7 +289,7 @@ public:
 	// on every corner; EVEN_ARC spreads dots purely evenly by arc length
 	// (corners only coincide when the count aligns). Pair with
 	// outline_edge_margin to un-cram dense sides.
-	enum OutlineCornerMode {
+	enum OutlineCornerMode : int {
 		OUTLINE_CORNER_MODE_PIN_CORNERS = 0,
 		OUTLINE_CORNER_MODE_EVEN_ARC = 1
 	};
@@ -301,7 +302,7 @@ public:
 	// high-frequency outlines like many-pointed stars, where even mid-edge
 	// normals swing wildly). Interiors always keep their edge normal except
 	// under SMOOTH, which interpolates the averaged normals along the edge.
-	enum OutlineCornerFacing {
+	enum OutlineCornerFacing : int {
 		OUTLINE_CORNER_FACING_SIDE = 0,
 		OUTLINE_CORNER_FACING_MITER = 1,
 		OUTLINE_CORNER_FACING_SMOOTH = 2
@@ -312,7 +313,7 @@ public:
 	// -normal, BOTH picks a random side per bullet. (Custom mode now drives
 	// these from its single helper_edge_side knob; callers may still use
 	// them directly.)
-	enum EdgeSpreadSide {
+	enum EdgeSpreadSide : int {
 		EDGE_SPREAD_ALONG_NORMAL = 0,
 		EDGE_SPREAD_BEHIND_NORMAL = 1,
 		EDGE_SPREAD_BOTH = 2
@@ -321,25 +322,25 @@ public:
 	// Polyline layout (helper_generate_transforms_polyline and the spawner's
 	// Path2D mode; ids mirror BulletSpawner2D's PATH2D_* enums).
 	// FIXED_SPACING lays a run `spacing` apart; EVEN covers the whole line.
-	enum PolylineDistribution {
+	enum PolylineDistribution : int {
 		POLYLINE_DISTRIBUTION_FIXED_SPACING = 0,
 		POLYLINE_DISTRIBUTION_EVEN = 1
 	};
 	// A fixed run that does not fit: CLAMP piles at the end, WRAP continues
 	// from the start, SHRINK_TO_FIT shrinks the spacing until it fits.
-	enum PolylineOverflow {
+	enum PolylineOverflow : int {
 		POLYLINE_OVERFLOW_CLAMP = 0,
 		POLYLINE_OVERFLOW_WRAP = 1,
 		POLYLINE_OVERFLOW_SHRINK_TO_FIT = 2
 	};
 	// Where a fixed run shorter than the line sits.
-	enum PolylineAnchor {
+	enum PolylineAnchor : int {
 		POLYLINE_ANCHOR_START = 0,
 		POLYLINE_ANCHOR_CENTER = 1,
 		POLYLINE_ANCHOR_END = 2
 	};
 	// ALONG_PATH aims +X with travel, the NORMAL modes aim across (+/-90 deg).
-	enum PolylineFacing {
+	enum PolylineFacing : int {
 		POLYLINE_FACING_ALONG_PATH = 0,
 		POLYLINE_FACING_NORMAL_P90 = 1,
 		POLYLINE_FACING_NORMAL_M90 = 2
@@ -390,7 +391,7 @@ public:
 
 	// Closed outline shapes addressable by the debug inspectors below. Values
 	// mirror BulletSpawner2D::PatternSource for these shapes only.
-	enum DebugOutlineShape {
+	enum DebugOutlineShape : int {
 		DEBUG_SHAPE_CIRCLE = 0,
 		DEBUG_SHAPE_RING = 1,
 		DEBUG_SHAPE_ELLIPSE = 2,
@@ -524,28 +525,28 @@ protected:
 };
 } //namespace BlastBullets2D
 
-VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::Alignment);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::SpiralFacingMode);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::ScatterFacingMode);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::LineAnchor);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::EllipseMode);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::TriangleType);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::PatternPreset);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::EdgeSpreadSide);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::SideMode);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::OutlinePlacement);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::OutlineDistribution);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::OutlineLayerLayout);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::OutlineCornerPriority);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::OutlineCornerMode);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::OutlineCornerFacing);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::DebugOutlineShape);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::OutlineLayerSide);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::OutlineLayerFill);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::OutlineLayerScaleCurve);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::OutlineFacing);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::FlowerBloom);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::PolylineDistribution);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::PolylineOverflow);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::PolylineAnchor);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::PolylineFacing);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::Alignment);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::SpiralFacingMode);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::ScatterFacingMode);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::LineAnchor);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::EllipseMode);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::TriangleType);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::PatternPreset);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::EdgeSpreadSide);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::SideMode);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::OutlinePlacement);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::OutlineDistribution);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::OutlineLayerLayout);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::OutlineCornerPriority);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::OutlineCornerMode);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::OutlineCornerFacing);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::DebugOutlineShape);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::OutlineLayerSide);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::OutlineLayerFill);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::OutlineLayerScaleCurve);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::OutlineFacing);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::FlowerBloom);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::PolylineDistribution);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::PolylineOverflow);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::PolylineAnchor);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::PolylineFacing);

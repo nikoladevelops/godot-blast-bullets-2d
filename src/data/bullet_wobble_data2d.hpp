@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/variant_enum_cast2d.hpp"
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
 
@@ -10,12 +11,12 @@ class BulletWobbleData2D : public Resource {
 	GDCLASS(BulletWobbleData2D, Resource)
 
 public:
-	enum WobbleMode {
+	enum WobbleMode : int {
 		WOBBLE_LATERAL = 0,
 		WOBBLE_ANGULAR
 	};
 
-	enum WobbleWaveform {
+	enum WobbleWaveform : int {
 		WOBBLE_SINE = 0,
 		WOBBLE_COSINE
 	};
@@ -94,5 +95,5 @@ protected:
 };
 } //namespace BlastBullets2D
 
-VARIANT_ENUM_CAST(BlastBullets2D::BulletWobbleData2D::WobbleMode);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletWobbleData2D::WobbleWaveform);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletWobbleData2D::WobbleMode);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletWobbleData2D::WobbleWaveform);

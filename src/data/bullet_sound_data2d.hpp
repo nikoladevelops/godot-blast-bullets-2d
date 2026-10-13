@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/variant_enum_cast2d.hpp"
 #include <godot_cpp/classes/audio_stream.hpp>
 #include <godot_cpp/classes/audio_stream_player2d.hpp>
 #include <godot_cpp/classes/resource.hpp>
@@ -28,7 +29,7 @@ public:
 	static uint64_t mask_epoch;
 
 	// SERIALIZED ids (BulletSoundData2D.trigger): never renumber.
-	enum SoundTrigger {
+	enum SoundTrigger : int {
 		SOUND_ON_SHOT = 0,
 		SOUND_ON_HIT = 1,
 		SOUND_ON_DESTROY = 2,
@@ -43,24 +44,24 @@ public:
 		SOUND_ON_DESPAWN = 11
 	};
 	// SERIALIZED ids (BulletSoundData2D.when_limit_reached): never renumber.
-	enum SoundLimitMode {
+	enum SoundLimitMode : int {
 		SOUND_LIMIT_REPLACE_OLDEST = 0,
 		SOUND_LIMIT_SKIP_NEW = 1
 	};
 	// SERIALIZED ids (BulletSoundData2D.steal_mode): never renumber.
-	enum StealMode {
+	enum StealMode : int {
 		STEAL_OLDEST = 0,
 		STEAL_QUIETEST = 1
 	};
 	// SERIALIZED ids (BulletSoundData2D.stream_mode): never renumber.
-	enum StreamMode {
+	enum StreamMode : int {
 		STREAM_RANDOM = 0,
 		STREAM_WEIGHTED = 1,
 		STREAM_SEQUENCE = 2,
 		STREAM_SHUFFLE = 3
 	};
 	// SERIALIZED ids (BulletSoundData2D.audibility_mode): never renumber.
-	enum AudibilityMode {
+	enum AudibilityMode : int {
 		SOUND_AUDIBILITY_DISTANCE = 0,
 		SOUND_AUDIBILITY_CAMERA = 1,
 		SOUND_AUDIBILITY_DISTANCE_AND_CAMERA = 2
@@ -393,8 +394,8 @@ protected:
 };
 } //namespace BlastBullets2D
 
-VARIANT_ENUM_CAST(BlastBullets2D::BulletSoundData2D::SoundTrigger);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletSoundData2D::SoundLimitMode);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletSoundData2D::StealMode);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletSoundData2D::StreamMode);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletSoundData2D::AudibilityMode);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSoundData2D::SoundTrigger);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSoundData2D::SoundLimitMode);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSoundData2D::StealMode);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSoundData2D::StreamMode);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSoundData2D::AudibilityMode);

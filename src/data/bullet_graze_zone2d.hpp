@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/variant_enum_cast2d.hpp"
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/core/property_info.hpp>
 #include <godot_cpp/variant/color.hpp>
@@ -31,7 +32,7 @@ public:
 	static constexpr int MAX_RINGS = 4;
 
 	// SERIALIZED ids: never renumber.
-	enum Regraze {
+	enum Regraze : int {
 		// Each ring of the zone grazes at most once per bullet life.
 		REGRAZE_ONCE = 0,
 		// Leaving the zone (the outermost ring of every target) re-arms
@@ -88,4 +89,4 @@ private:
 };
 } //namespace BlastBullets2D
 
-VARIANT_ENUM_CAST(BlastBullets2D::BulletGrazeZone2D::Regraze);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletGrazeZone2D::Regraze);

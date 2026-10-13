@@ -9,7 +9,7 @@ namespace BlastBullets2D {
 using namespace godot;
 
 // The supported homing types
-enum HomingType {
+enum HomingType : int {
 	NotHoming,
 	GlobalPositionTarget,
 	Node2DTarget,

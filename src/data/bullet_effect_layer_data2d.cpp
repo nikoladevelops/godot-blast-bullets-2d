@@ -1,4 +1,5 @@
 #include "data/bullet_effect_layer_data2d.hpp"
+#include "core/variant_enum_cast2d.hpp"
 
 #include <godot_cpp/classes/atlas_texture.hpp>
 #include <godot_cpp/classes/image.hpp>
@@ -552,4 +553,4 @@ void BulletEffectLayerData2D::_bind_methods() {
 }
 } //namespace BlastBullets2D
 
-VARIANT_ENUM_CAST(BlastBullets2D::EffectTrigger);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::EffectTrigger);
