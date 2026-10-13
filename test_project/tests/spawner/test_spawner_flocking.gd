@@ -89,13 +89,17 @@ func test_setup_warnings_name_snapping_homing_only() -> void:
 	sp.flock = BulletFlock2D.new()
 	assert_false(_has(sp.get_setup_warnings(), "Flocking"), "a flock without homing is fine")
 	sp.set_homing_enabled(true)
+	# The spawner steers its volleys with ITS homing_smoothing (5 by default);
+	# the spawn data's value (0 by default) never reaches them.
+	assert_false(_has(sp.get_setup_warnings(), "Flocking with homing"), "the default homing turns at 5 rad/s: room to flock, no warning")
+	sp.homing_smoothing = 0.0
 	assert_true(_has(sp.get_setup_warnings(), "Flocking with homing that re-aims every tick"), "homing_smoothing 0 snaps every tick")
-	var data := H.make_volley_data(4)
-	data.homing_smoothing = 3.0
-	sp.set_spawn_data(data)
+	sp.homing_smoothing = 3.0
 	assert_false(_has(sp.get_setup_warnings(), "Flocking with homing"), "a homing turn rate leaves room to flock")
+	var data := H.make_volley_data(4)
 	data.shared_bullet_rotation_data = H.make_rotation(1.0)
-	assert_true(_has(sp.get_setup_warnings(), "Flocking with homing that re-aims every tick"), "rotation data makes homing snap")
+	sp.set_spawn_data(data)
+	assert_true(_has(sp.get_setup_warnings(), "Flocking with homing that re-aims every tick"), "rotation data makes homing aim the direction every tick")
 
 
 func test_fired_volleys_are_armed_before_volley_fired() -> void:
