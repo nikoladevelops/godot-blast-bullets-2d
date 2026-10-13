@@ -34,6 +34,7 @@
 #include "godot_cpp/variant/typed_array.hpp"
 #include "godot_cpp/variant/vector2.hpp"
 #include "pooling/volley_pool2d.hpp"
+#include <cstring>
 #include <godot_cpp/classes/atlas_texture.hpp>
 #include <godot_cpp/classes/image.hpp>
 #include <godot_cpp/classes/image_texture.hpp>
@@ -815,9 +816,17 @@ _ALWAYS_INLINE_ uint64_t BulletVolley2D::orbit_target_identity(const HomingTarge
 			// Upper bits set: a hashed position can never equal the mouse
 			// sentinel (3) or an empty deque (0), and sign information
 			// survives (abs() collapsed +p/-p onto one identity before).
-			int32_t bx = (int32_t)Math::round(p.x * 16.0);
-			int32_t by = (int32_t)Math::round(p.y * 16.0);
-			uint64_t h = ((uint64_t)(uint32_t)bx * 0x9E3779B1ULL) ^ ((uint64_t)(uint32_t)by * 0x85EBCA77ULL) ^ ((uint64_t)GlobalPositionTarget * 0xC2B2AE35ULL);
+			// The 1/16 px grid is hashed as the bits of a double: an int32
+			// cast overflowed past ~1.3e8 px (UB, one identity for all).
+			double qx = Math::round((double)p.x * 16.0);
+			double qy = Math::round((double)p.y * 16.0);
+			qx = (qx == 0.0) ? 0.0 : qx; // -0 and +0 are one grid point
+			qy = (qy == 0.0) ? 0.0 : qy;
+			uint64_t bx;
+			uint64_t by;
+			std::memcpy(&bx, &qx, sizeof(bx));
+			std::memcpy(&by, &qy, sizeof(by));
+			uint64_t h = (bx * 0x9E3779B97F4A7C15ULL) ^ (((by * 0xC2B2AE3D27D4EB4FULL) << 31) | ((by * 0xC2B2AE3D27D4EB4FULL) >> 33)) ^ ((uint64_t)GlobalPositionTarget * 0xC2B2AE35ULL);
 			return h | 0x4000000000000000ULL;
 		}
 		case MousePositionTarget:

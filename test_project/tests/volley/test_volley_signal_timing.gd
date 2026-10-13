@@ -73,6 +73,24 @@ func test_per_bullet_auto_pop_never_eats_a_new_front_pushed_by_the_handler() -> 
 	assert_almost_eq(v.bullet_get_current_homing_target(0), Vector2(900, 0), Vector2(0.01, 0.01), "a new front pushed by the handler is never auto-popped")
 
 
+func test_far_away_fronts_keep_distinct_identities() -> void:
+	# Position targets are told apart by their position: past ~1.3e8 px it
+	# no longer fits an int32, and +3e8 / -3e8 must still differ (the
+	# handler's new front is spared, the reached one is popped).
+	var d := _homing_data(1, true)
+	d.transforms = [Transform2D(0.0, Vector2(3e8, 0))]
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	v.bullet_homing_push_back_global_position_target(0, Vector2(3e8, 0))
+	v.bullet_homing_target_reached.connect(func(vol: BulletVolley2D, idx: int, _t, _p):
+		if events.is_empty():
+			events.append(idx)
+			vol.bullet_homing_push_front_global_position_target(idx, Vector2(-3e8, 0)))
+	await physics(2)
+	assert_eq(events.size(), 1, "reached once")
+	assert_eq(v.bullet_homing_check_targets_amount(0), 2, "the handler's new front was spared")
+	assert_eq(v.bullet_get_current_homing_target(0), Vector2(-3e8, 0), "the front is the handler's target")
+
+
 func test_shared_auto_pop_pops_once_per_tick() -> void:
 	var v: BulletVolley2D = factory.spawn_volley(_homing_data(3, false, true))
 	v.bullet_homing_target_reached.connect(_on_reached)
