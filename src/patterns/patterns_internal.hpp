@@ -51,14 +51,17 @@ PatternSlots2D polyline_layout2d(const Transform2D &marker, const PackedVector2A
 // by spawner/test_spawner_preview_track_coincidence.gd).
 
 // Rain: drops per row (band_width / drop_spacing gaps + 1, capped by the
-// amount; one row when the spacing is 0).
+// amount; one row when the spacing is 0). The gap count saturates at the
+// amount BEFORE the int cast: a huge band would overflow it.
 static inline int rain_columns2d(int amount, real_t band_width, real_t drop_spacing) {
 	if (amount <= 0) {
 		return 1;
 	}
-	return (drop_spacing > 0.0)
-			? Math::clamp((int)Math::floor(band_width / Math::max((real_t)drop_spacing, (real_t)1.0)) + 1, 1, amount)
-			: amount;
+	if (!(drop_spacing > 0.0)) {
+		return amount;
+	}
+	const real_t gaps = Math::floor(band_width / Math::max((real_t)drop_spacing, (real_t)1.0));
+	return (gaps >= (real_t)amount) ? amount : Math::max((int)gaps + 1, 1);
 }
 // Rain: drop i's offset across the band. Each row (the last, partial one
 // included) spreads its own drops over the full band width.

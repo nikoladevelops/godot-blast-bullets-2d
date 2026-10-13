@@ -351,6 +351,29 @@ func test_rain_rows_are_layered_sheets() -> void:
 	assert_almost_eq(ys[1] - ys[0], sp.helper_rain_drop_spacing, 0.01, "sheets are drop_spacing apart")
 
 
+func test_a_band_wider_than_the_int_range_stays_one_sheet() -> void:
+	# 1e12 / 48 gaps does not fit an int: the column count must saturate at
+	# the amount (one sheet across the band), never wrap into one column of
+	# rows. The sheet then leaves the world box: its drops land on the box
+	# edge (+-400000) with the documented warning.
+	var tr: Array = BulletPatterns2D.helper_generate_transforms_rain(8, Transform2D(), 1e12, Vector2(0, 1), 48.0, 0.0)
+	expect_warning_sequence(["helper_generate_transforms_rain: some slots overflowed to Inf/NaN or left the world box and were clamped to its edge; shrink the spacing/radius."])
+	var problems: Array = []
+	for k in tr.size():
+		var o: Vector2 = (tr[k] as Transform2D).origin
+		var want := Vector2(-400000.0 if k < 4 else 400000.0, 0.0)
+		if o != want:
+			problems.append("drop %d at %s, want %s" % [k, o, want])
+	assert_eq(tr.size(), 8, "every drop")
+	assert_eq("\n".join(problems), "", "one sheet across the band, clamped to the box edge")
+	var track: PackedVector2Array = BulletPatterns2D.helper_sample_outline_rain(8, 1e12, Vector2(0, 1), 48.0)["points"]
+	var rows := 0
+	for p in track:
+		if not p.is_finite():
+			rows += 1
+	assert_eq(rows, 1, "the preview track draws one sheet too")
+
+
 func test_flower_fan_track_skips_petals_without_bullets() -> void:
 	var sp := make_preview_spawner(BulletSpawner2D.PATTERN_FROM_HELPER_FLOWER, 3)
 	sp.helper_flower_type = BulletPatterns2D.FLOWER_FAN
