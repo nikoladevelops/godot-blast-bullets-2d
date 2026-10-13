@@ -399,7 +399,7 @@ PatternSlots2D PatternKnobs2D::generate_raw(const PatternInputs2D &in) const {
 			if (corridor_gap >= helper_corridor_width) {
 				corridor_gap = helper_corridor_width * 0.5;
 				if (!quiet) {
-					WarnOnce2D::warn(in.warn_owner_id, kPatternWarnCorridorGap, (int64_t)(helper_corridor_gap_width * 1000.0), (int64_t)(helper_corridor_width * 1000.0),
+					WarnOnce2D::warn(in.warn_owner_id, kPatternWarnCorridorGap, WarnOnce2D::key_of(helper_corridor_gap_width * 1000.0), WarnOnce2D::key_of(helper_corridor_width * 1000.0),
 							"BulletSpawner2D: helper_corridor_gap_width must be smaller than helper_corridor_width; using half the width for the door.");
 				}
 			}

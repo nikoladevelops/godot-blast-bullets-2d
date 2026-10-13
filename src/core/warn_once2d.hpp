@@ -41,6 +41,20 @@ struct WarnOnce2D {
 		return h;
 	}
 
+	// A float as a key part: saturated, never an out-of-range cast (UB).
+	static int64_t key_of(double v) {
+		if (!(v == v)) {
+			return INT64_MIN + 1; // NaN: its own key
+		}
+		if (v >= 9.2e18) {
+			return INT64_MAX;
+		}
+		if (v <= -9.2e18) {
+			return INT64_MIN;
+		}
+		return (int64_t)v;
+	}
+
 	// True the first time this key is seen (the caller then warns).
 	static bool first(uint64_t resource_id, uint32_t code, int64_t a = 0, int64_t b = 0) {
 		create();

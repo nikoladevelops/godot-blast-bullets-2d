@@ -198,3 +198,31 @@ func test_phyllotaxis_dots_stay_inside_the_drawn_disc_rim() -> void:
 			radius = maxf(radius, p.distance_to(center))
 		for d in m["dots"]:
 			assert_lte((d as Vector2).distance_to(center), radius + 0.5, "every phyllotaxis dot inside the rim (posed %s)" % posed)
+
+
+func test_a_far_aimed_target_draws_the_full_cone_arc() -> void:
+	# The tip arc gets one segment per 8 px (8..64): a target far enough to
+	# overflow an int (1e11 px) still draws the full 64, never the floor.
+	var counts: Array = []
+	for far in [Vector2(4000, 0), Vector2(1e11, 0)]:
+		var sp := make_preview_spawner(BulletSpawner2D.PATTERN_FROM_HELPER_AIMED, 5)
+		sp.helper_aimed_spread = 1.0
+		var t: Node2D = add(Node2D.new())
+		t.position = far
+		sp.set_helper_aimed_target(t)
+		await idle(6)
+		counts.append(sp.debug_get_preview_track_points().size())
+	assert_gt(counts[0], 64, "a near target draws the full arc")
+	assert_eq(counts[1], counts[0], "a far target too: %s" % [counts])
+
+
+func test_a_huge_outline_track_keeps_the_densest_sweep() -> void:
+	# One sample per 8 px of perimeter (32..256): a perimeter past the int
+	# range (radius 1e10) still sweeps the densest 256, never the floor.
+	var near: int = (BulletPatterns2D.helper_sample_outline_circle(1e4)["points"] as PackedVector2Array).size()
+	var far: int = (BulletPatterns2D.helper_sample_outline_circle(1e10)["points"] as PackedVector2Array).size()
+	assert_gte(near, 256, "a big circle sweeps the densest track")
+	assert_eq(far, near, "a huge one too")
+	var ring_near: int = (BulletPatterns2D.helper_sample_outline_ring(1e4, TAU, 1.0, 0.0)["points"] as PackedVector2Array).size()
+	var ring_far: int = (BulletPatterns2D.helper_sample_outline_ring(1e10, TAU, 1.0, 0.0)["points"] as PackedVector2Array).size()
+	assert_eq(ring_far, ring_near, "the ring track too")

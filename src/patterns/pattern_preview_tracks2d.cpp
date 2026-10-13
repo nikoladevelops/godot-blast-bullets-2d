@@ -16,7 +16,8 @@ static int outline_sweep_count(double perimeter) {
 	if (!Math::is_finite(perimeter) || perimeter <= 0.0) {
 		return 0;
 	}
-	return Math::clamp((int)(perimeter / 8.0), 32, 256);
+	// Clamped before the cast: a huge perimeter overflows an int.
+	return (int)Math::clamp(perimeter / 8.0, 32.0, 256.0);
 }
 
 // Track result {points, closed} (+ "local" for the row/arm strips: true

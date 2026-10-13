@@ -29,7 +29,8 @@ static void build_cone_strip(const Vector2 &origin, real_t dir_angle, real_t hal
 	r_out.push_back(origin);
 	r_out.push_back(left_tip);
 	// Arc from left tip to right tip (across the spread).
-	const int arc_n = Math::clamp((int)(tip_radius * spread / 8.0), 8, 64);
+	// Clamped before the cast: a far tip overflows an int (UB, 8 segments).
+	const int arc_n = (int)Math::clamp((double)(tip_radius * spread) / 8.0, 8.0, 64.0);
 	for (int i = 1; i < arc_n; i++) {
 		const real_t t = (real_t)i / (real_t)arc_n;
 		const real_t ang = left_ang + (right_ang - left_ang) * t;

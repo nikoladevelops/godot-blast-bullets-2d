@@ -26,7 +26,8 @@ void GrazePreviewLayer2D::_draw() {
 			continue;
 		}
 		// Enough segments for a smooth ring at any preview size.
-		const int segments = CLAMP((int)(c.radius / 4.0), 24, 128);
+		// Clamped before the cast: a huge radius overflows an int.
+		const int segments = (int)CLAMP((double)c.radius / 4.0, 24.0, 128.0);
 		draw_arc(c.center, c.radius, 0.0, Math::TAU, segments, c.color, line_width, false);
 	}
 }

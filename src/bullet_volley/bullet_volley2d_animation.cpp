@@ -403,7 +403,7 @@ Vector2 BulletVolley2D::resolve_quad_size(const Ref<SpriteFrames> &p_sprite_fram
 		return override_size;
 	}
 	if (override_size != Vector2(0, 0) && (!override_size.is_finite() || override_size.x <= 0.0f || override_size.y <= 0.0f)) {
-		WarnOnce2D::warn(0, 3u, (int64_t)(override_size.x * 1024.0f), (int64_t)(override_size.y * 1024.0f), "BulletVolley2D: texture_size override is non-finite or non-positive, deriving size from the first frame.");
+		WarnOnce2D::warn(0, 3u, WarnOnce2D::key_of(override_size.x * 1024.0f), WarnOnce2D::key_of(override_size.y * 1024.0f), "BulletVolley2D: texture_size override is non-finite or non-positive, deriving size from the first frame.");
 	}
 	// Silent fallback: rebuild_sprite_animation owns all error reporting (spawn calls
 	// both, so resolving loudly here would print every failure twice).
