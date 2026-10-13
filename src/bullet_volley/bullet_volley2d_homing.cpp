@@ -774,8 +774,12 @@ bool BulletVolley2D::dispatch_homing_events() {
 		// offers whether or not anything is connected.
 		sound_fire(BulletSoundData2D::SOUND_ON_HOMING_TARGET_REACHED, ev.bullet_index, ev.target_position);
 		note_user_code();
+		++self_emit_depth;
 		emit_signal(reached_signal, this, ev.bullet_index, target, ev.target_position);
-		if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+		if (ObjectDB::get_instance(ObjectID(self_id)) == this) {
+			--self_emit_depth;
+		}
+		if (!survived_user_code(self_id)) {
 			return false;
 		}
 		// Owner spawner forward: a direct emit on the owner (no per-volley

@@ -491,6 +491,11 @@ public:
 	PredeleteState predelete_state = PREDELETE_NONE;
 	bool refused_nested_free = false;
 	void predelete_teardown();
+	// > 0 while this volley emits one of its OWN signals
+	// (sprite_animation_finished, bullet_homing_target_reached). A handler
+	// that frees the factory then must not get this volley deleted under
+	// Godot's emit: the factory teardown detaches it and queue_frees it.
+	int self_emit_depth = 0;
 	// Optional spawner owner (ObjectID, 0 = none), mirroring owner_volley_id
 	// on attachments. When a live BulletSpawner2D is tagged, collision and
 	// lifetime signals are possessed by it; otherwise they stay on the factory.

@@ -15,7 +15,7 @@ bool BulletVolley2D::tick_may_continue(uint64_t self_id) const {
 	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
 		return false;
 	}
-	if (is_queued_for_deletion()) {
+	if (is_queued_for_deletion() || !factory_alive()) {
 		return false;
 	}
 	return bullet_factory == nullptr || !bullet_factory->is_bullet_processing_paused();
@@ -77,7 +77,11 @@ void BulletVolley2D::tick(double delta) {
 	if (anim_finished_event_pending) {
 		anim_finished_event_pending = false;
 		note_user_code();
+		++self_emit_depth;
 		emit_signal(CachedStringNames2D::get().sprite_animation_finished, this);
+		if (ObjectDB::get_instance(ObjectID(self_id)) == this) {
+			--self_emit_depth;
+		}
 		if (!tick_may_continue(self_id) || !is_active) {
 			return;
 		}

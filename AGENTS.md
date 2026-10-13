@@ -791,8 +791,11 @@ src/
   ok" flag per object, so the refusal also cancels the running deletion,
   which then finishes with `queue_free()`. The factory deletes its children
   inside its own PREDELETE handler: Node's teardown (after the handler) would
-  run their callbacks where a second free is no longer refused. Pinned by
-  `integration/test_callback_free_matrix` (run it under
+  run their callbacks where a second free is no longer refused. A volley
+  emitting its OWN signal (`self_emit_depth`: sprite_animation_finished,
+  bullet_homing_target_reached) whose handler frees the factory is detached
+  and queue_freed by the teardown, never deleted under Godot's emit. Pinned by
+  `integration/test_callback_free_matrix`, `test_signal_free_matrix` (run them under
   `tools/run_sanitizer_tests.py --sanitizer address` after touching any of
   this: a write into freed memory passes every assert).
 - Pinned by `volley/test_volley_hit_contract`, `test_volley_lifetime_contract`,

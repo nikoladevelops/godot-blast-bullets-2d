@@ -225,6 +225,22 @@ void BulletFactory2D::_notification(int p_what) {
 		// records (with their raw node pointers) before any volley PREDELETE
 		// below tries to unregister through them.
 		fx_unregister_all_bakes();
+		// A volley emitting its own signal whose handler freed this factory
+		// must not be deleted under Godot's emit (the engine reports "freed
+		// while a signal is being emitted from it"): it leaves the tree and
+		// the tracking now and dies at the end of the frame. Its own
+		// liveness checks (factory_life) stop it touching this factory.
+		for (const VolleyIterationEntry &entry : snapshot_volley_entries()) {
+			BulletVolley2D *volley = entry.volley;
+			if (ObjectDB::get_instance(ObjectID(entry.id)) != volley || volley->self_emit_depth <= 0) {
+				continue;
+			}
+			remove_volley_from_tracking(volley);
+			if (Node *parent = volley->get_parent()) {
+				parent->remove_child(volley);
+			}
+			volley->queue_free();
+		}
 		// A volley a script moved out of this subtree (local-space bullets
 		// under a moving ship) would outlive the factory holding a dangling
 		// factory pointer, and its own teardown would call into freed

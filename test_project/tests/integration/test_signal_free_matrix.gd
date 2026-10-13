@@ -1,8 +1,10 @@
 extends BlastTest
 ## Spawner signals are user code the spawner emits from inside its own
-## operations (a shot, auto-fire, a pattern list) and the factory sweep
-## emits on the spawner (hits, lifetime, homing reached, graze, which then
-## bubbles on to the factory). The spawner is locked while it emits, but its
+## operations (a shot, auto-fire, a pattern list, its Path2D movement) and
+## the factory sweep emits on the spawner (hits, bounces, lifetime, homing
+## reached, graze, which then bubbles on to the factory); custom timer
+## callbacks and the volley's own sprite_animation_finished run inside the
+## sweep too. The spawner is locked while it emits, but its
 ## FACTORY is not: a handler may free() the factory, or the volley the
 ## signal names. The contract: nothing touches freed memory afterwards
 ## (tools/run_sanitizer_tests.py runs this under AddressSanitizer), nothing
@@ -108,6 +110,60 @@ func _run_case(signal_name: String, victim: String) -> String:
 			sp = _spawner(_data(0.0))
 			sp.connect(signal_name, _freeing(victim))
 			sp.spawn_pattern_list([{}], true)
+		"bounce_body_entered":
+			make_wall(Vector2(60, 0))
+			await physics()
+			var d := _data(600.0)
+			d.set_bounce_mask_from_array([3])
+			sp = _spawner(d)
+			sp.body_entered.connect(func(_b, _v, _i) -> void: pass) # the hit is handled
+			sp.connect(signal_name, _freeing(victim))
+			sp.shoot_once()
+		"movement_finished":
+			var path := Path2D.new()
+			var curve := Curve2D.new()
+			curve.add_point(Vector2.ZERO)
+			curve.add_point(Vector2(50, 0))
+			path.curve = curve
+			add(path)
+			sp = _spawner(_data(0.0))
+			sp.shoot_once() # the volley a volley victim names
+			sp.movement_duration_sec = 0.1
+			sp.set_movement_path_node(path)
+			sp.connect(signal_name, _freeing(victim))
+			sp.movement_enabled = true
+		"timer":
+			# A custom timer callback: a plain call from the factory sweep.
+			sp = _spawner(_data(0.0))
+			sp.shoot_once()
+			victim_volley.attach_time_based_function(0.05, _freeing(victim), false, false)
+		"bullet_homing_target_reached":
+			# The volley's OWN reached signal (emitted before the spawner's).
+			make_graze_target(Vector2(40, 0), &"signal_targets")
+			var d := _data(300.0)
+			d.homing_distance_before_reached = 10.0
+			sp = _spawner(d)
+			sp.homing_node_group = &"signal_targets"
+			sp.set_homing_enabled(true)
+			sp.shoot_once()
+			victim_volley.bullet_homing_target_reached.connect(_freeing(victim))
+		"sprite_animation_finished":
+			# Emitted by the volley itself (Godot refuses to free the emitter,
+			# so only its factory is a victim): the factory teardown must not
+			# delete the emitting volley under Godot's emit.
+			var d := _data(0.0)
+			var frames := SpriteFrames.new()
+			var img := Image.create_empty(1, 1, false, Image.FORMAT_RGBA8)
+			img.fill(Color.WHITE)
+			var tex := ImageTexture.create_from_image(img)
+			frames.add_frame("default", tex)
+			frames.add_frame("default", tex)
+			frames.set_animation_speed("default", 30.0)
+			frames.set_animation_loop("default", false)
+			d.sprite_frames = frames
+			sp = _spawner(d)
+			sp.shoot_once()
+			victim_volley.sprite_animation_finished.connect(_freeing(victim))
 	for k in 40:
 		await physics(1)
 		if fired > 0:
@@ -145,8 +201,11 @@ func _run_case(signal_name: String, victim: String) -> String:
 func test_freeing_from_spawner_signal_handlers_never_touches_freed_memory() -> void:
 	var problems: Array = []
 	for signal_name in ["pre_shoot", "volley_fired", "homing_targets_resolved", "body_entered", "life_time_over",
-			"volley_bullet_homing_target_reached", "bullet_grazed", "shooting_started", "pattern_list_finished"]:
+			"volley_bullet_homing_target_reached", "bullet_grazed", "shooting_started", "pattern_list_finished",
+			"bounce_body_entered", "movement_finished", "timer", "bullet_homing_target_reached", "sprite_animation_finished"]:
 		for victim in VICTIMS:
+			if signal_name in ["bullet_homing_target_reached", "sprite_animation_finished"] and victim == "volley":
+				continue # the volley emits these: Godot refuses that free itself
 			var p: String = await _run_case(signal_name, victim)
 			if p != "":
 				problems.append(p)
