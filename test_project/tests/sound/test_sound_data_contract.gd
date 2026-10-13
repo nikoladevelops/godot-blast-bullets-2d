@@ -138,7 +138,7 @@ func test_hint_strings_byte_exact() -> void:
 	var hints := {}
 	for p in s.get_property_list():
 		hints[StringName(p.get("name", ""))] = str(p.get("hint_string", ""))
-	assert_eq(hints.get(&"volume_db", ""), "-80,80,0.1,suffix:dB", "volume hint")
+	assert_eq(hints.get(&"volume_db", ""), "-80,80,0.1,or_less,or_greater,suffix:dB", "volume hint")
 	assert_eq(hints.get(&"pitch_scale", ""), "0.01,1000,0.01,exp", "pitch hint")
 	assert_eq(hints.get(&"random_pitch", ""), "1,16,0.01", "random pitch hint")
 	assert_eq(hints.get(&"random_volume_offset_db", ""), "0,40,0.01,suffix:dB", "random volume hint")
@@ -147,8 +147,8 @@ func test_hint_strings_byte_exact() -> void:
 	assert_eq(hints.get(&"random_pitch_min", ""), "0.01,16,0.01", "random pitch min hint")
 	assert_eq(hints.get(&"random_pitch_max", ""), "0.01,16,0.01", "random pitch max hint")
 	assert_eq(hints.get(&"random_pan", ""), "0,1,0.01", "random pan hint")
-	assert_eq(hints.get(&"volume_min_db", ""), "-80,80,0.1,suffix:dB", "volume floor hint")
-	assert_eq(hints.get(&"volume_max_db", ""), "-80,80,0.1,suffix:dB", "volume ceiling hint")
+	assert_eq(hints.get(&"volume_min_db", ""), "-80,80,0.1,or_less,or_greater,suffix:dB", "volume floor hint")
+	assert_eq(hints.get(&"volume_max_db", ""), "-80,80,0.1,or_less,or_greater,suffix:dB", "volume ceiling hint")
 	assert_eq(hints.get(&"pitch_min", ""), "0.01,1000,0.01,exp", "pitch floor hint")
 	assert_eq(hints.get(&"pitch_max", ""), "0.01,1000,0.01,exp", "pitch ceiling hint")
 	assert_eq(hints.get(&"fade_out_sec", ""), "0,10,0.01,or_greater,suffix:s", "fade hint")

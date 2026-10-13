@@ -763,7 +763,7 @@ void BulletSoundData2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_volume_db"), &BulletSoundData2D::get_volume_db);
 	ClassDB::bind_method(D_METHOD("set_volume_db", "value"), &BulletSoundData2D::set_volume_db);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "volume_db", PROPERTY_HINT_RANGE, "-80,80,0.1,suffix:dB"), "set_volume_db", "get_volume_db");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "volume_db", PROPERTY_HINT_RANGE, "-80,80,0.1,or_less,or_greater,suffix:dB"), "set_volume_db", "get_volume_db");
 
 	ClassDB::bind_method(D_METHOD("get_pitch_scale"), &BulletSoundData2D::get_pitch_scale);
 	ClassDB::bind_method(D_METHOD("set_pitch_scale", "value"), &BulletSoundData2D::set_pitch_scale);
@@ -898,11 +898,11 @@ void BulletSoundData2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_volume_min_db"), &BulletSoundData2D::get_volume_min_db);
 	ClassDB::bind_method(D_METHOD("set_volume_min_db", "value"), &BulletSoundData2D::set_volume_min_db);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "volume_min_db", PROPERTY_HINT_RANGE, "-80,80,0.1,suffix:dB"), "set_volume_min_db", "get_volume_min_db");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "volume_min_db", PROPERTY_HINT_RANGE, "-80,80,0.1,or_less,or_greater,suffix:dB"), "set_volume_min_db", "get_volume_min_db");
 
 	ClassDB::bind_method(D_METHOD("get_volume_max_db"), &BulletSoundData2D::get_volume_max_db);
 	ClassDB::bind_method(D_METHOD("set_volume_max_db", "value"), &BulletSoundData2D::set_volume_max_db);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "volume_max_db", PROPERTY_HINT_RANGE, "-80,80,0.1,suffix:dB"), "set_volume_max_db", "get_volume_max_db");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "volume_max_db", PROPERTY_HINT_RANGE, "-80,80,0.1,or_less,or_greater,suffix:dB"), "set_volume_max_db", "get_volume_max_db");
 
 	ClassDB::bind_method(D_METHOD("get_pitch_min"), &BulletSoundData2D::get_pitch_min);
 	ClassDB::bind_method(D_METHOD("set_pitch_min", "value"), &BulletSoundData2D::set_pitch_min);
