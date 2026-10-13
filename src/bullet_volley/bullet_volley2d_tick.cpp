@@ -5,6 +5,8 @@
 
 #include "bullet_volley/bullet_volley2d_internal.hpp"
 
+#include <cmath>
+
 using namespace godot;
 
 namespace BlastBullets2D {
@@ -1269,8 +1271,11 @@ _ALWAYS_INLINE_ bool BulletVolley2D::advance_movement_pattern(const Ref<Curve2D>
 	const real_t clamped_dist = (!repeat_pattern && distance_traveled >= len) ? len : distance_traveled;
 	const real_t s1 = Math::fmod(prev_dist, len);
 	const real_t s2 = Math::fmod(clamped_dist, len);
-	const int64_t l1 = (int64_t)(prev_dist / len);
-	const int64_t l2 = (int64_t)(clamped_dist / len);
+	// Lap counts stay in double (truncated like the old int cast): past
+	// 2^63 laps (a tiny tile at an extreme speed) the int64 cast overflowed
+	// and the lap term turned the bullet back.
+	const double l1 = std::trunc((double)(prev_dist / len));
+	const double l2 = std::trunc((double)(clamped_dist / len));
 	// p2 - p1 = (l2 - l1) * disp + sample(s2) - sample(s1): the curve
 	// start cancels, and the lap displacement only matters on the tick a
 	// lap boundary is crossed. Two sample_baked calls per bullet per tick

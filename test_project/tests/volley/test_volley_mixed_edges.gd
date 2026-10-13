@@ -157,6 +157,29 @@ func test_non_repeating_pattern_finishes() -> void:
 	assert_true(v.get_bullet_transform(0).is_finite(), "pattern finish finite")
 
 
+func test_a_repeating_pattern_never_turns_back_past_any_lap_count() -> void:
+	# A 0.0015 px straight tile at 1e17 px/s: ~1.1e18 laps per tick, past
+	# 2^63 laps after ~9 ticks. The lap count must not overflow: every tick
+	# moves forward along the tile.
+	var d := H.make_volley_data(1, 1e17, 100.0)
+	d.transforms = [Transform2D()]
+	d.all_bullet_speed_data = [H.make_speed(1e17, 0.0)] # no speed cap
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	var c := Curve2D.new()
+	c.add_point(Vector2(0, 0))
+	c.add_point(Vector2(0.0015, 0))
+	v.set_bullet_movement_pattern_from_curve(0, c, false, true)
+	var steps: Array = []
+	var last: Vector2 = v.get_bullet_transform(0).origin
+	for k in 16:
+		assert_true(factory.debug_advance_time(1.0 / 60.0), "tick %d runs" % k)
+		var o: Vector2 = v.get_bullet_transform(0).origin
+		if not (o.x > last.x) or o.y != last.y:
+			steps.append("tick %d: %s -> %s" % [k, last, o])
+		last = o
+	assert_eq("\n".join(steps), "", "always forward along the tile")
+
+
 func test_monitorable_round_trip() -> void:
 	var v: BulletVolley2D = quick_volley(1, 100.0)
 	v.set_monitorable(true)
