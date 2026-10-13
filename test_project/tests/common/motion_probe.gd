@@ -5,6 +5,9 @@ extends RefCounted
 ## - turn rate: how fast each bullet's flight heading turns (deg/s);
 ## - turn flips: how often a bullet's turn changes side (left, right, left)
 ##   while it turns noticeably: the "spinning / jittering" a player sees;
+## - snaps: turns of `snap_deg` or more in ONE tick (a sprite whipping
+##   around); `steer_snaps` counts only those on a tick the bullet did not
+##   bounce (a wall reflection is a legitimate snap, steering never is);
 ## - facing error: the angle between the sprite's forward axis (texture
 ##   rotation stripped) and the flight heading;
 ## - edge gaps: center distance minus both bullets' drawn radii (negative =
@@ -18,6 +21,8 @@ var flip_floor_deg := 0.5
 ## Ticks at the start of the run that the rates and flips skip (a spawn or a
 ## blend-in settling). Facing and finiteness are always checked.
 var settle_ticks := 0
+## A turn this large in one tick counts as a snap.
+var snap_deg := 20.0
 
 var _factory: BulletFactory2D
 var _volleys: Array = []
@@ -29,10 +34,15 @@ var bullet_ticks := 0
 var max_turn_deg_per_sec := 0.0
 var turn_sum_deg := 0.0
 var flips := 0
+var snaps := 0
+var steer_snaps := 0
+## The first snaps as [volley index, bullet index, tick, turn degrees].
+var snap_log: Array = []
 var max_facing_error_deg := 0.0
 var nonfinite := 0
 var _last_heading := {}
 var _last_turn := {}
+var _last_bounces := {}
 
 
 ## `texture_rotations` / `quad_sizes`: per volley, its spawn data's
@@ -74,6 +84,7 @@ func sample(dt: float, check_facing := false) -> void:
 			if not v.is_bullet_status_enabled(i):
 				_last_heading.erase(key)
 				_last_turn.erase(key)
+				_last_bounces.erase(key)
 				continue
 			var t: Transform2D = v.get_bullet_transform(i)
 			var dir: Vector2 = v.get_bullet_direction(i)
@@ -83,6 +94,8 @@ func sample(dt: float, check_facing := false) -> void:
 			if dir.length_squared() < 1e-8:
 				continue
 			var heading := dir.angle()
+			var bounced := v.bullet_get_bounce_count(i) != int(_last_bounces.get(key, v.bullet_get_bounce_count(i)))
+			_last_bounces[key] = v.bullet_get_bounce_count(i)
 			if check_facing:
 				var facing := t.x.angle() - float(_texture_rotation[vi])
 				max_facing_error_deg = maxf(max_facing_error_deg, absf(rad_to_deg(angle_difference(heading, facing))))
@@ -91,6 +104,12 @@ func sample(dt: float, check_facing := false) -> void:
 				bullet_ticks += 1
 				turn_sum_deg += absf(turn)
 				max_turn_deg_per_sec = maxf(max_turn_deg_per_sec, absf(turn) / dt)
+				if absf(turn) >= snap_deg:
+					snaps += 1
+					if not bounced:
+						steer_snaps += 1
+					if snap_log.size() < 16:
+						snap_log.append([vi, i, ticks, turn])
 				if absf(turn) >= flip_floor_deg:
 					if _last_turn.has(key) and signf(_last_turn[key]) != signf(turn):
 						flips += 1
@@ -106,6 +125,11 @@ func mean_turn_deg_per_sec(dt := 1.0 / 60.0) -> float:
 ## Turn flips per bullet per second of measured flight.
 func flips_per_bullet_sec(dt := 1.0 / 60.0) -> float:
 	return float(flips) / maxf(1.0, float(bullet_ticks) * dt)
+
+
+## Snaps per bullet per second of measured flight.
+func snaps_per_bullet_sec(dt := 1.0 / 60.0) -> float:
+	return float(snaps) / maxf(1.0, float(bullet_ticks) * dt)
 
 
 ## The drawn radius of bullet i of volley vi (the flock's count_bullet_size
@@ -152,6 +176,6 @@ func gaps() -> Dictionary:
 ## One line for failure messages and probes.
 func summary(dt := 1.0 / 60.0) -> String:
 	var g := gaps()
-	return "max_turn=%.0f deg/s mean_turn=%.1f deg/s flips=%.2f /bullet/s facing_err=%.2f deg min_gap=%.1f overlap=%.2f mean_gap=%.1f nonfinite=%d" % [
-		max_turn_deg_per_sec, mean_turn_deg_per_sec(dt), flips_per_bullet_sec(dt), max_facing_error_deg,
+	return "max_turn=%.0f deg/s mean_turn=%.1f deg/s flips=%.2f /bullet/s snaps=%.3f /bullet/s (%d not bounces) facing_err=%.2f deg min_gap=%.1f overlap=%.2f mean_gap=%.1f nonfinite=%d" % [
+		max_turn_deg_per_sec, mean_turn_deg_per_sec(dt), flips_per_bullet_sec(dt), snaps_per_bullet_sec(dt), steer_snaps, max_facing_error_deg,
 		g["min_gap"], g["overlap_fraction"], g["mean_nearest_gap"], nonfinite]

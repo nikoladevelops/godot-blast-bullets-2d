@@ -54,6 +54,7 @@ func test_a_burst_stack_of_big_random_sized_bullets_never_spins() -> void:
 	assert_lte(probe.max_turn_deg_per_sec, 270.0 * 1.001, "never faster than the default turn cap: " + probe.summary())
 	assert_lt(probe.flips_per_bullet_sec(), 4.0, "no left-right jitter: " + probe.summary())
 	assert_lt(probe.mean_turn_deg_per_sec(), 150.0, "calm on average: " + probe.summary())
+	assert_eq(probe.snaps, 0, "no bullet ever whips 20 deg in one tick: " + probe.summary())
 	assert_lt(probe.max_facing_error_deg, 0.01, "the sprite stays on the heading: " + probe.summary())
 	assert_eq(probe.nonfinite, 0, "finite")
 
@@ -71,6 +72,7 @@ func test_a_homing_swarm_buzzes_but_never_spins() -> void:
 	var probe := _burst(BulletFlock2D.new(), 128.0, 2.0, true, 0.7)
 	assert_lte(probe.max_turn_deg_per_sec, (270.0 + rad_to_deg(5.0)) * 1.001, "flock cap + homing rate at most: " + probe.summary())
 	assert_lt(probe.mean_turn_deg_per_sec(), 120.0, "calm on average: " + probe.summary())
+	assert_eq(probe.snaps, 0, "no snap: " + probe.summary())
 	assert_lt(probe.max_facing_error_deg, 0.01, "the sprite (texture rotation stripped) stays on the heading: " + probe.summary())
 
 
@@ -153,5 +155,6 @@ func test_every_preset_flies_a_burst_calmly(preset: int = use_parameters([Bullet
 	var probe := _burst(f, 64.0, 1.5)
 	assert_lte(probe.max_turn_deg_per_sec, f.max_turn_rate_degrees * 1.001, "preset %d: within its cap: %s" % [preset, probe.summary()])
 	assert_lt(probe.flips_per_bullet_sec(), 4.0, "preset %d: no jitter: %s" % [preset, probe.summary()])
+	assert_eq(probe.snaps, 0, "preset %d: no snap" % preset)
 	assert_lt(probe.max_facing_error_deg, 0.01, "preset %d: sprites on the heading" % preset)
 	assert_eq(probe.nonfinite, 0, "finite")
