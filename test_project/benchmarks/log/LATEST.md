@@ -1,6 +1,6 @@
 # BlastBullets2D benchmark: latest run
 
-- run: `2026-10-13T14-20-34Z` commit `7fe53f4` (dirty src/)
+- run: `2026-10-13T18-40-40Z` commit `d73c8da`
 - machine: AMD Ryzen 7 8840HS w/ Radeon 780M Graphics (16 threads), Linux-7.2.9-2-cachyos-x86_64-with-glibc2.44
 - godot: 4.7.2-stable (arch_linux), debug build: True, repeats: 5 (median)
 - baseline: `cedbd11` (2026-10-06T05-29-10Z)
@@ -11,21 +11,14 @@ Times are milliseconds of CPU per frame (simulated time, `--fixed-fps 60`).
 
 | scenario | frame p50 | frame p95 | frame p99 | frame max | step max | engine max | tick p50 | tick p99 | bullets | mem peak MB | objects +/- | vs baseline |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| flock_10k_flight | 5.675 | 6.334 | 7.306 | 7.704 | 0.016 | 7.701 | 5.072 | 6.611 | 10000 | 33.4 | +0 | new |
-| flock_10k_interval | 3.454 | 3.810 | 3.954 | 4.102 | 0.011 | 4.099 | 2.839 | 3.232 | 10000 | 33.4 | +0 | new |
-| flock_2k_swarm | 1.564 | 1.645 | 1.743 | 2.984 | 0.007 | 2.982 | 1.435 | 1.573 | 2000 | 30.7 | +0 | new |
-| flock_5k_stacked | 2.657 | 2.816 | 2.929 | 3.052 | 0.013 | 3.050 | 2.309 | 2.493 | 5000 | 34.3 | +0 | new |
+| hit_handlers_2k | 1.345 | 1.758 | 1.932 | 2.654 | 0.403 | 2.598 | 0.362 | 0.630 | 1870 | 36.9 | +318 | **REGRESSION**: factory_tick_ms.p50 0.297->0.362 ms (+22%) |
+| spawner_warm_shot_5k | 15.358 | 18.593 | 19.436 | 20.659 | 2.190 | 18.564 | 3.797 | 4.758 | 90000 | 159.6 | +0 | **REGRESSION**: frame_ms.p50 12.730->15.358 ms (+21%); frame_ms.p95 14.745->18.593 ms (+26%); factory_tick_ms.p50 3.286->3.797 ms (+16%); factory_tick_ms.p95 3.594->4.585 ms (+28%) |
 
 ## Scenario extras
 
-- **flock_10k_flight**: flock_pass_usec=4659, neighbor_checks=360928
-- **flock_10k_interval**: flock_pass_usec=2011, neighbor_checks=119620, queried_members=3330
-- **flock_2k_swarm**: flock_pass_usec=1125, neighbor_checks=63800
-- **flock_5k_stacked**: flock_pass_usec=1875, neighbor_checks=163679
+- **hit_handlers_2k**: handler_calls=38157, healed=4769
 
 ## Scenarios
 
-- **flock_10k_flight**: 10k bullets in flight, 10 Per Volley flocks (dense, capped)
-- **flock_10k_interval**: 10k bullets, 10 Per Volley flocks, steering refreshed every 3 ticks
-- **flock_2k_swarm**: 2k bullets, one Shared flock (default rules)
-- **flock_5k_stacked**: 5k bullets stacked on one point, one flock (cap bound)
+- **hit_handlers_2k**: 100-bullet volley/frame into walls, a GDScript hit handler per bullet (live emit + kill decision)
+- **spawner_warm_shot_5k**: 5000-bullet heart spawner, shoot_once every frame, warm pool
