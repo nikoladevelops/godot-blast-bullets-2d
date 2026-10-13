@@ -1176,6 +1176,57 @@ func test_bullet_whiten_override_exact_tint_toggle_reuse() -> void:
 	await idle(1)
 
 
+## An AtlasTexture frame on a 4x4 base: red, pixel (1, 1) half transparent.
+func _atlas_frames(region: Rect2) -> SpriteFrames:
+	var img := Image.create_empty(4, 4, false, Image.FORMAT_RGBA8)
+	img.fill(Color(1, 0, 0, 1))
+	img.set_pixel(1, 1, Color(1, 0, 0, 0.5))
+	var atlas := AtlasTexture.new()
+	atlas.atlas = ImageTexture.create_from_image(img)
+	atlas.region = region
+	var sf := SpriteFrames.new()
+	sf.add_frame("default", atlas)
+	return sf
+
+
+func test_whiten_reads_an_atlas_region_only_inside_its_atlas() -> void:
+	# override_frame_color reads AtlasTexture frames through their region.
+	# A region that is not fully inside the atlas (non-finite, huge, partly
+	# outside, or whose end overflows an int: 2147483520 + 256) keeps the
+	# original art with the documented texts, never a silent blank frame.
+	var bad := [Rect2(2147483520, 0, 256, 4), Rect2(0, 2147483520, 4, 256), Rect2(2147483520, 0, 128, 4),
+		Rect2(NAN, 0, 4, 4), Rect2(0, 0, INF, 4), Rect2(1e12, 0, 4, 4), Rect2(-1e12, 0, 4, 4),
+		Rect2(0, 0, 1e12, 4), Rect2(2, 2, 4, 4), Rect2(-1, 0, 4, 4)]
+	var problems: Array = []
+	for r in bad:
+		var d := _fx_data(Vector2.ZERO, 0.0, [], false)
+		d.sprite_frames = _atlas_frames(r)
+		d.override_frame_color = true
+		var v: BulletVolley2D = factory.spawn_volley(d)
+		if not (v.get_texture() is AtlasTexture):
+			problems.append("bullet %s: %s instead of the original art" % [r, v.get_texture()])
+		expect_error_sequence(["BulletEffectLayerData2D.whiten_image_copy: source image is null or empty."])
+		expect_warning_sequence(["BulletVolley2D: override_frame_color could not read a frame of 'default', keeping the original art for unreadable frames."])
+		var layer := BulletEffectLayerData2D.new()
+		layer.sprite_frames = _atlas_frames(r)
+		layer.override_frame_color = true
+		if factory.spawn_layer_effect(layer, Transform2D.IDENTITY) < 0:
+			problems.append("layer %s: not spawned" % r)
+		expect_error_sequence(["BulletEffectLayerData2D.whiten_image_copy: source image is null or empty."])
+		expect_warning_sequence(["BulletEffectLayerData2D: override_frame_color could not read a frame of 'default', keeping the original art for unreadable frames."])
+		await _settle(factory)
+	assert_eq("\n".join(problems), "", "every bad region keeps the original art")
+	# A region inside the atlas reads exactly its pixels.
+	var dg := _fx_data(Vector2.ZERO, 0.0, [], false)
+	dg.sprite_frames = _atlas_frames(Rect2(1, 1, 2, 3))
+	dg.override_frame_color = true
+	var img: Image = factory.spawn_volley(dg).get_texture().get_image()
+	assert_eq([img.get_width(), img.get_height()], [2, 3], "the region's size")
+	assert_almost_eq(img.get_pixel(0, 0).a, 0.5, 0.01, "pixel (1, 1) of the atlas, whitened")
+	assert_eq(img.get_pixel(1, 2), Color(1, 1, 1, 1), "an opaque pixel, whitened")
+	expect_no_errors("a readable region bakes silently")
+
+
 func test_scale_range_is_order_independent_and_survives_a_round_trip() -> void:
 	# The scene loader assigns random_scale_min before random_scale_max: a
 	# saved 1.5..2.0 range used to load min as 1.0 (rejected against max 1.0).

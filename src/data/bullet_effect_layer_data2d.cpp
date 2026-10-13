@@ -412,14 +412,21 @@ Ref<Image> BulletEffectLayerData2D::read_frame_image(const Ref<Texture2D> &tex) 
 		if (base_img.is_null() || base_img->is_empty()) {
 			return out;
 		}
+		// Bounds in double BEFORE any int cast: a huge or non-finite region
+		// overflows the cast or x + w and slipped past an int check (a blank
+		// frame instead of the original art). NaN fails every comparison.
 		const Rect2 region = atlas->get_region();
-		const int x = (int)Math::round(region.position.x);
-		const int y = (int)Math::round(region.position.y);
-		const int w = (int)Math::round(region.size.x);
-		const int h = (int)Math::round(region.size.y);
-		if (w <= 0 || h <= 0 || x < 0 || y < 0 || x + w > base_img->get_width() || y + h > base_img->get_height()) {
+		const double rx = Math::round((double)region.position.x);
+		const double ry = Math::round((double)region.position.y);
+		const double rw = Math::round((double)region.size.x);
+		const double rh = Math::round((double)region.size.y);
+		if (!(rw > 0.0) || !(rh > 0.0) || !(rx >= 0.0) || !(ry >= 0.0) || !(rx + rw <= (double)base_img->get_width()) || !(ry + rh <= (double)base_img->get_height())) {
 			return out;
 		}
+		const int x = (int)rx;
+		const int y = (int)ry;
+		const int w = (int)rw;
+		const int h = (int)rh;
 		base_img = base_img->duplicate();
 		if (base_img.is_null()) {
 			return out;
