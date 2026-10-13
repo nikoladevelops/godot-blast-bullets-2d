@@ -133,6 +133,9 @@ public:
 	void apply_preset(Preset preset);
 	// The preset whose steering knobs equal the current ones, else Custom.
 	Preset get_matching_preset() const;
+	// What the inspector's Preset menu shows: Custom once Custom was picked
+	// (until a preset is picked again), else the matching preset.
+	Preset get_preset() const;
 	// A new flock with a preset's rules.
 	static Ref<BulletFlock2D> create_preset(Preset preset);
 
@@ -140,9 +143,15 @@ protected:
 	static void _bind_methods();
 
 private:
+	// Custom picked in the menu: the menu keeps showing Custom.
+	bool custom_chosen = false;
+	// What the menu showed last: a change repaints the inspector.
+	Preset shown_preset = PRESET_SWARM;
+	void refresh_preset_menu();
 	void rules_changed() {
 		++rules_serial;
 		emit_changed();
+		refresh_preset_menu();
 	}
 	// A finite value >= 0 (or > 0 when positive_only) stored into field.
 	void store_amount(real_t &field, real_t value, const char *property_name, bool positive_only);

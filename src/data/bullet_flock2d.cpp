@@ -121,10 +121,15 @@ void BulletFlock2D::apply_preset(Preset preset) {
 		return;
 	}
 	if (preset == PRESET_CUSTOM) {
+		// Keeps every value; the menu shows Custom from now on.
+		custom_chosen = true;
+		refresh_preset_menu();
 		return;
 	}
+	custom_chosen = false;
 	const FlockPresetRow2D &row = FLOCK_PRESETS[preset];
 	if (get_matching_preset() == preset) {
+		refresh_preset_menu();
 		return;
 	}
 	separation = row.separation;
@@ -137,7 +142,20 @@ void BulletFlock2D::apply_preset(Preset preset) {
 	blend_in_sec = row.blend_in_sec;
 	view_angle_degrees = row.view_angle_degrees;
 	rules_changed();
-	notify_property_list_changed();
+}
+
+BulletFlock2D::Preset BulletFlock2D::get_preset() const {
+	return custom_chosen ? PRESET_CUSTOM : get_matching_preset();
+}
+
+void BulletFlock2D::refresh_preset_menu() {
+	// The inspector repaints the menu only when told: whenever what it shows
+	// changes (a preset or Custom picked, a knob tuned off a preset).
+	const Preset now = get_preset();
+	if (now != shown_preset) {
+		shown_preset = now;
+		notify_property_list_changed();
+	}
 }
 
 BulletFlock2D::Preset BulletFlock2D::get_matching_preset() const {
@@ -164,9 +182,10 @@ Ref<BulletFlock2D> BulletFlock2D::create_preset(Preset preset) {
 void BulletFlock2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("apply_preset", "preset"), &BulletFlock2D::apply_preset);
 	ClassDB::bind_method(D_METHOD("get_matching_preset"), &BulletFlock2D::get_matching_preset);
+	ClassDB::bind_method(D_METHOD("get_preset"), &BulletFlock2D::get_preset);
 	ClassDB::bind_static_method("BulletFlock2D", D_METHOD("create_preset", "preset"), &BulletFlock2D::create_preset);
 	// Editor only (never saved): picking a preset writes the knobs below.
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "preset", PROPERTY_HINT_ENUM, "Custom,Swarm,Fly Together,Keep Distance,Tight Group", PROPERTY_USAGE_EDITOR), "apply_preset", "get_matching_preset");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "preset", PROPERTY_HINT_ENUM, "Custom,Swarm,Fly Together,Keep Distance,Tight Group", PROPERTY_USAGE_EDITOR), "apply_preset", "get_preset");
 
 	ClassDB::bind_method(D_METHOD("get_separation"), &BulletFlock2D::get_separation);
 	ClassDB::bind_method(D_METHOD("set_separation", "value"), &BulletFlock2D::set_separation);

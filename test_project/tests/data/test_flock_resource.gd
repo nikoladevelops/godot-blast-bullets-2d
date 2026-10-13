@@ -219,3 +219,26 @@ func test_the_preset_menu_is_editor_only_and_its_ids_are_locked() -> void:
 	var back := ResourceLoader.load(TRES_PATH, "", ResourceLoader.CACHE_MODE_IGNORE) as BulletFlock2D
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(TRES_PATH))
 	assert_eq(back.get_matching_preset(), BulletFlock2D.PRESET_TIGHT_GROUP, "the saved knobs still match the preset")
+
+
+func test_the_preset_menu_shows_custom_when_picked_and_repaints_on_change() -> void:
+	var f := BulletFlock2D.new()
+	var repaints := [0]
+	f.property_list_changed.connect(func() -> void: repaints[0] += 1)
+	assert_eq(f.preset, BulletFlock2D.PRESET_SWARM, "a new flock shows Swarm")
+	f.preset = BulletFlock2D.PRESET_CUSTOM
+	assert_eq(f.preset, BulletFlock2D.PRESET_CUSTOM, "picking Custom sticks (it no longer snaps back)")
+	assert_eq(f.get_matching_preset(), BulletFlock2D.PRESET_SWARM, "and keeps every value")
+	assert_eq(repaints[0], 1, "the inspector repaints the menu once")
+	f.separation = 4.0
+	assert_eq(f.preset, BulletFlock2D.PRESET_CUSTOM, "tuning while Custom stays Custom")
+	assert_eq(repaints[0], 1, "no repaint when the menu does not change")
+	f.preset = BulletFlock2D.PRESET_TIGHT_GROUP
+	assert_eq(f.preset, BulletFlock2D.PRESET_TIGHT_GROUP, "a picked preset shows and applies")
+	assert_eq(f.cohesion, 5.0, "Tight Group's values")
+	assert_eq(repaints[0], 2, "repainted")
+	f.alignment = 2.0
+	assert_eq(f.preset, BulletFlock2D.PRESET_CUSTOM, "tuning a preset's knob shows Custom at once")
+	assert_eq(repaints[0], 3, "and repaints the menu")
+	f.alignment = 0.5
+	assert_eq(f.preset, BulletFlock2D.PRESET_TIGHT_GROUP, "back on the preset's values: the preset again")

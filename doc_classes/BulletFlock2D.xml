@@ -50,6 +50,11 @@
 				[/codeblock]
 			</description>
 		</method>
+		<method name="get_matching_preset" qualifiers="const">
+			<return type="int" enum="BulletFlock2D.Preset" />
+			<description>
+			</description>
+		</method>
 	</methods>
 	<members>
 		<member name="alignment" type="float" setter="set_alignment" getter="get_alignment" default="1.0">
@@ -81,8 +86,8 @@
 			How far a bullet sees its flockmates, in pixels: [member alignment] and [member cohesion] only consider flockmates closer than this. With [member count_bullet_size] (the default) it is the gap between the bullets' edges, so the default 150 works for any sprite size.
 			[b]Larger[/b] (250 to 400) makes the whole swarm act as one big group (and costs a little more); [b]smaller[/b] (50 to 100) makes many small groups that ignore each other. If the bullets spread out farther than this, they stop flocking because nobody is in range. Finite and &gt; 0.
 		</member>
-		<member name="preset" type="int" setter="apply_preset" getter="get_matching_preset" enum="BulletFlock2D.Preset" default="1">
-			The fastest way to a good swarm: pick a ready-made rule set in the inspector, then fine-tune. Picking one writes the steering knobs ([member separation], [member alignment], [member cohesion], both ranges, [member separation_lookahead_sec], [member max_turn_rate_degrees], [member blend_in_sec], [member view_angle_degrees]) and leaves [member count_bullet_size], [member face_heading], [member max_neighbors] and [member update_interval] alone. The menu shows the preset the current knobs match, or Custom once you tune one. It is never saved (the knobs are). From code: [code]flock.apply_preset(BulletFlock2D.PRESET_KEEP_DISTANCE)[/code] (or [code]flock.preset = ...[/code]), [code]flock.get_matching_preset()[/code], [method create_preset]. A bad id pushes an error and keeps the old values.
+		<member name="preset" type="int" setter="apply_preset" getter="get_preset" enum="BulletFlock2D.Preset" default="1">
+			The fastest way to a good swarm: pick a ready-made rule set in the inspector, then fine-tune. Picking one writes the steering knobs ([member separation], [member alignment], [member cohesion], both ranges, [member separation_lookahead_sec], [member max_turn_rate_degrees], [member blend_in_sec], [member view_angle_degrees]) and leaves [member count_bullet_size], [member face_heading], [member max_neighbors] and [member update_interval] alone. The menu shows the preset the current knobs match; it shows Custom as soon as you tune a knob off the preset, or when you pick Custom yourself (your values stay as they are and the menu stays on Custom until you pick a preset again). It is never saved (the knobs are). From code: [code]flock.apply_preset(BulletFlock2D.PRESET_KEEP_DISTANCE)[/code] (or [code]flock.preset = ...[/code]), [code]flock.get_preset()[/code] (what the menu shows), [code]flock.get_matching_preset()[/code] (the preset the values match), [method create_preset]. A bad id pushes an error and keeps the old values.
 		</member>
 		<member name="separation" type="float" setter="set_separation" getter="get_separation" default="10.0">
 			How fast each bullet turns away from flockmates inside [member separation_range] (radians per second at full push), and the rule that makes bullets keep their distance. Each flockmate pushes by [code]1 - gap / separation_range[/code] (touching: 1, overlapping: harder, at most 2). The bullet turns away from the side its flockmates are on, as hard as the geometric mean of its strongest single push and its average push: a crowd never dilutes the push to nothing, pushes from both sides still cancel, and a bullet buried in a stack pushes less than one at its edge, so a stack opens up like a fan. A bullet keeps its speed, so it steers [b]sideways[/b]: a flockmate dead ahead turns it aside, never around.
