@@ -42,11 +42,16 @@ public:
 		SCOPE_PER_VOLLEY = 2
 	};
 
-	real_t separation = 1.5;
+	// Defaults tuned so homing + flocking is clearly visible out of the box
+	// with any sprite size (ranges are edge gaps, see count_bullet_size).
+	real_t separation = 12.0;
 	real_t alignment = 1.0;
-	real_t cohesion = 1.0;
-	real_t neighbor_range = 100.0;
-	real_t separation_range = 40.0;
+	real_t cohesion = 1.5;
+	real_t neighbor_range = 150.0;
+	real_t separation_range = 24.0;
+	// Ranges measured between bullet EDGES (the drawn sprite times the
+	// bullet's scale) instead of centers: one setting fits every sprite size.
+	bool count_bullet_size = true;
 	real_t max_turn_rate_degrees = 0.0; // degrees per second, 0 = unlimited
 	bool face_heading = true;
 	int max_neighbors = 32; // 0 = no limit
@@ -67,6 +72,9 @@ public:
 
 	real_t get_separation_range() const;
 	void set_separation_range(real_t value);
+
+	bool get_count_bullet_size() const;
+	void set_count_bullet_size(bool value);
 
 	real_t get_max_turn_rate_degrees() const;
 	void set_max_turn_rate_degrees(real_t value);

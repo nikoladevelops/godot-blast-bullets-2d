@@ -60,7 +60,10 @@ struct FlockView2D {
 //   V = alignment * mean flight heading of the flockmates in neighbor_range
 //     + cohesion * mean offset to them / neighbor_range
 //     + separation * sum over flockmates closer than separation_range of
-//       (p - q) / d * (1 - d / separation_range)
+//       (p - q) / d * (1 - gap / separation_range)
+// where gap = d (count_bullet_size off) or the distance between the two
+// bullets' edges, d - r_p - r_q (on; ranges then compare against the gap,
+// and overlapping bullets push harder than touching ones).
 // At most max_neighbors flockmates are read per bullet (0 = all): own cell
 // first (from the bullet's own position on: stacked bullets read different
 // flockmates), then the 8-ring, then the 16-ring, each ring started at a
@@ -117,8 +120,14 @@ private:
 		double separation_range_sq = 0.0;
 		double inv_neighbor_range = 0.0;
 		double inv_separation_range = 0.0; // 0 when separation_range is 0
-		double reach_sq = 0.0; // max range squared
-		double inv_cell = 0.0;
+		double reach_sq = 0.0; // max range squared (+ the largest bullet pair when sized)
+		double inv_cell = 0.0; // set in solve(): the cell covers the largest bullets gathered
+		// count_bullet_size: ranges between bullet edges. Raw ranges for the
+		// per-pair tests, and the largest bullet radius gathered this pass.
+		bool sized = false;
+		float neighbor_range = 0.0f;
+		float separation_range = 0.0f;
+		double max_radius = 0.0;
 		uint32_t max_neighbors = 0; // UINT32_MAX = no limit
 		uint32_t next_ordinal = 0;
 		double update_interval = 0.0; // > 0: refresh each bullet once per interval
@@ -146,6 +155,7 @@ private:
 		float hy = 0.0f;
 		uint32_t has_heading = 0; // 1 = counts for alignment
 		uint32_t ordinal = 0; // per flock, gather order (rotations, stacked pairs)
+		float r = 0.0f; // bullet radius (sized flocks only)
 	};
 	struct CellSlot {
 		uint32_t stamp = 0;
@@ -190,6 +200,7 @@ private:
 
 	// Grid members in gather order.
 	std::vector<uint32_t> m_slot;
+	std::vector<uint32_t> m_group;
 	std::vector<uint32_t> m_cell;
 	std::vector<uint8_t> m_query; // 1 = recompute this pass
 	std::vector<Mate> m_mate;

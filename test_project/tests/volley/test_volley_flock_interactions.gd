@@ -67,16 +67,19 @@ func _homing_data(tr: Array, smoothing := 3.0) -> BulletVolleyData2D:
 
 
 func test_a_homing_swarm_reaches_its_target_spread_out() -> void:
+	# The default flock at the spawner's default homing turn rate (5): the
+	# separation spreads the arrival (bullets queue around the target)
+	# but every bullet still gets there.
 	var target := Vector2(600, 200)
 	var tr := _stream(24, 3)
-	var swarm := _volley(_homing_data(tr), BulletFlock2D.new())
-	var plain := _volley(_homing_data(tr))
+	var swarm := _volley(_homing_data(tr, 5.0), BulletFlock2D.new())
+	var plain := _volley(_homing_data(tr, 5.0))
 	swarm.shared_homing_deque_push_back_global_position_target(target)
 	plain.shared_homing_deque_push_back_global_position_target(target)
 	var reached := {}
 	var problems: Array = []
 	var plain_min := INF
-	for tick in 300:
+	for tick in 480: # 8 s: a strong default separation spreads the arrival
 		_step(1)
 		for i in 24:
 			if swarm.get_bullet_transform(i).origin.distance_to(target) < 40.0:

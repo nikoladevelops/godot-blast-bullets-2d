@@ -130,8 +130,12 @@ static func graze_kinds(log: Array) -> Array:
 
 ## Flock rules with ONLY the given weights (the rest 0): rule tests turn one
 ## rule on at a time.
-static func make_flock(separation := 0.0, alignment := 0.0, cohesion := 0.0, neighbor_range := 100.0, separation_range := 40.0) -> BulletFlock2D:
+## A flock with exact weights and ranges. count_bullet_size defaults OFF here:
+## the rule tests pin the center-to-center pixel formulas (the edge-gap
+## formulas have their own tests in volley/test_volley_flock_rules.gd).
+static func make_flock(separation := 0.0, alignment := 0.0, cohesion := 0.0, neighbor_range := 100.0, separation_range := 40.0, count_bullet_size := false) -> BulletFlock2D:
 	var f := BulletFlock2D.new()
+	f.count_bullet_size = count_bullet_size
 	f.separation = separation
 	f.alignment = alignment
 	f.cohesion = cohesion

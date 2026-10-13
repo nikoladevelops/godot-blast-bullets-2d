@@ -38,7 +38,7 @@ You can call `BulletFactory2D.spawn_volley()` yourself, but for a bullet hell **
 | Chain attacks | `spawn_pattern_list(...)`; the `pattern_list_finished` signal tells you when to pick the next one |
 | Aim at the player | `pattern_source` = Aimed, or enable `homing_enabled` with `homing_target_source` = Node Group and `homing_node_group` = your player group |
 | Hurt the player | Connect the spawner's `area_entered` / `body_entered` signals (see below) |
-| Swarm the player (boids) | `flock_enabled` and a `BulletFlock2D` in `flock` (Flocking group); add homing with `homing_smoothing` > 0 so the swarm chases without stacking |
+| Swarm the player (boids) | `flock_enabled` and a new `BulletFlock2D` in `flock` (Flocking group), plus `homing_enabled`: the defaults keep the bullets apart while they chase, for any sprite size |
 | Reward near misses | `graze_enabled`, `graze_node_group`, and one or more `BulletGrazeZone2D` in `graze_zones` |
 | Cap the screen | `max_live_bullets` on the spawner (0 = unlimited): shots are skipped with `volley_skipped("over_budget")` |
 | Move the boss | `movement_enabled` with a `Path2D` in `movement_path`; shots inherit its speed (`inherit_movement_velocity`) |

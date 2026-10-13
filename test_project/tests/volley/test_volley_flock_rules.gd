@@ -416,3 +416,80 @@ func test_the_view_angle_is_validated() -> void:
 		"BulletFlock2D: view_angle_degrees must be between 0 and 360, keeping the old value.",
 	])
 	assert_eq(f.view_angle_degrees, 0.0, "kept")
+
+
+# ---- count_bullet_size: ranges between bullet EDGES ------------------------------
+
+## Still bullets drawn `size` px wide (the quad), at the given transforms.
+func _sized(transforms: Array, size: float, flock: BulletFlock2D) -> BulletVolley2D:
+	var d := H.make_flight_data(transforms, 0.0, 1000.0)
+	d.texture_size = Vector2(size, size)
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	assert_true(v.flock_join(flock), "joins")
+	return v
+
+
+func test_separation_counts_the_gap_between_bullet_edges() -> void:
+	# Two 64 px bullets 80 px apart: a 16 px gap inside the 24 px personal
+	# space. Push = weight x (1 - gap / range) along the pair.
+	var tr := [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 80))]
+	var v := _sized(tr, 64.0, H.make_flock(3.0, 0.0, 0.0, 100.0, 24.0, true))
+	_step(1)
+	assert_almost_eq(v.debug_get_bullet_flock_steering(0).y, -3.0 * (1.0 - 16.0 / 24.0), 1e-4, "edge gap 16 of 24")
+	# Centers only (off): 80 px is far outside 24 px, no push at all.
+	var w := _sized([Transform2D(0.0, Vector2(500, 0)), Transform2D(0.0, Vector2(500, 80))], 64.0, H.make_flock(3.0, 0.0, 0.0, 100.0, 24.0, false))
+	_step(1)
+	assert_eq(w.debug_get_bullet_flock_steering(0), Vector2(), "off: center distance, no push")
+
+
+func test_overlapping_bullets_push_harder_than_touching_ones() -> void:
+	var touching := _sized([Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 64))], 64.0, H.make_flock(1.0, 0.0, 0.0, 100.0, 24.0, true))
+	var overlapping := _sized([Transform2D(0.0, Vector2(400, 0)), Transform2D(0.0, Vector2(400, 32))], 64.0, H.make_flock(1.0, 0.0, 0.0, 100.0, 24.0, true))
+	_step(1)
+	assert_almost_eq(touching.debug_get_bullet_flock_steering(0).y, -1.0, 1e-4, "touching (gap 0): the full weight")
+	assert_almost_eq(overlapping.debug_get_bullet_flock_steering(0).y, -1.0 * (1.0 + 32.0 / 24.0), 1e-4, "half overlapped (gap -32): harder")
+
+
+func test_each_bullets_scale_counts() -> void:
+	# A bullet drawn at 2x is twice as wide: 16 px quads at 2x = 32 px.
+	var tr := [Transform2D(0.0, Vector2(2, 2), 0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(2, 2), 0.0, Vector2(0, 50))]
+	var v := _sized(tr, 16.0, H.make_flock(3.0, 0.0, 0.0, 100.0, 24.0, true))
+	_step(1)
+	assert_almost_eq(v.debug_get_bullet_flock_steering(0).y, -3.0 * (1.0 - 18.0 / 24.0), 1e-4, "50 - 16 - 16 = an 18 px gap")
+
+
+func test_neighbor_range_counts_the_gap_between_bullet_edges() -> void:
+	# 64 px bullets 150 px apart: an 86 px gap, inside a 100 px range.
+	var v := _sized([Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(150, 0))], 64.0, H.make_flock(0.0, 0.0, 1.0, 100.0, 0.0, true))
+	var w := _sized([Transform2D(0.0, Vector2(0, 500)), Transform2D(0.0, Vector2(150, 500))], 64.0, H.make_flock(0.0, 0.0, 1.0, 100.0, 0.0, false))
+	_step(1)
+	assert_eq(v.debug_get_bullet_flock_neighbors(0), 1, "edges: in range")
+	assert_gt(v.debug_get_bullet_flock_steering(0).x, 0.0, "cohesion pulls toward it")
+	assert_eq(w.debug_get_bullet_flock_neighbors(0), 0, "centers: out of range")
+
+
+func test_the_grid_covers_very_large_bullets() -> void:
+	# 512 px bullets 600 px apart: an 88 px gap in a 100 px range. The grid
+	# cell must grow with the largest bullet or the pair never meets.
+	var v := _sized([Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(600, 0))], 512.0, H.make_flock(0.0, 0.0, 1.0, 100.0, 24.0, true))
+	_step(1)
+	assert_eq(v.debug_get_bullet_flock_neighbors(0), 1, "found across a 600 px center distance")
+	assert_eq(v.debug_get_bullet_flock_neighbors(1), 1, "both ways")
+
+
+func test_the_defaults_spread_overlapping_bullets_of_any_size() -> void:
+	# The out-of-the-box flock: a 5-bullet clump of 16 px or 128 px bullets
+	# (overlapping) parts until every pair has a visible gap.
+	for size in [16.0, 128.0]:
+		var tr: Array = []
+		for k in 5:
+			tr.append(Transform2D(0.0, Vector2(k * size * 0.5, 0.0) + Vector2(0, size * 10.0)))
+		var d := H.make_flight_data(tr, 120.0, 1000.0)
+		d.texture_size = Vector2(size, size)
+		var v: BulletVolley2D = factory.spawn_volley(d)
+		v.flock_join(BulletFlock2D.new())
+		_step(120)
+		var gap: float = _min_pair_distance(_origins(v)) - size
+		assert_gt(gap, 0.0, "%d px bullets: no pair overlaps after 2 s (gap %.1f)" % [size, gap])
+		factory.free_active_bullets()
+		await idle(1)

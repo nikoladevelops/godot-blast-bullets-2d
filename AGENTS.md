@@ -1022,6 +1022,9 @@ project's `.so`). For quick numeric comparisons load two
   were stored and reloaded around every candidate), and a bit-trick inverse
   sqrt (no div/sqrt latency, the same bits on every CPU). Copying ring
   flockmates into per-cell lists cost more than scanning them in place.
+  `count_bullet_size` (edge gaps, on by default) costs ~8-14% of the pass
+  with the same neighbors (one add and multiply per range test, one more
+  float per flockmate); off is bit-identical and as fast as before.
   Prototype in a standalone harness (the solver compiles against a tiny
   Godot shim) before touching the plugin: a full build per experiment is
   slow, and perf/valgrind are not installed here.
@@ -1341,7 +1344,7 @@ capped by `max_turn_rate_degrees`.
 
 | Piece | Where | Notes |
 |---|---|---|
-| Rules | `data/bullet_flock2d.*` | weights (per second), ranges, turn cap, `face_heading`, `max_neighbors` (0 = all), `update_interval` (s, 0 = every tick), `view_angle_degrees` (360 = all around), enum `Scope` (Per Spawner 0 / Shared 1 / Per Volley 2, serialized); every accepted change emits `changed` |
+| Rules | `data/bullet_flock2d.*` | weights (per second), ranges (edge gaps while `count_bullet_size`, the default: radius = half the quad's mean side x the bullet's scale; the grid cell then grows by the flock's largest bullet pair, decided in `solve()` after every volley is gathered), turn cap, `face_heading`, `max_neighbors` (0 = all), `update_interval` (s, 0 = every tick), `view_angle_degrees` (360 = all around), enum `Scope` (Per Spawner 0 / Shared 1 / Per Volley 2, serialized); every accepted change emits `changed` |
 | Who flies together | `FlockConfig2D` (`factory/flock_solver2d.hpp`) | {flock, scope, enabled, captured owner id, serial}; the spawner owns one `std::shared_ptr` shared with every volley it armed (edits reach bullets in flight, orphans keep it); `flock_join` gives a volley its own |
 | Arming | `bullet_volley/bullet_volley2d_flock.cpp` | `flock_set_config` is THE choke point (keeps `BulletFactory2D::flock_armed_volleys` exact): spawner arming, join, leave, `release_life`, PREDELETE (`force_delete` skips `release_life`) |
 | Pass | `factory/bullet_factory2d_flock.cpp`, `factory/flock_solver2d.*` | in `tick_volleys` right after `snapshot_active_volleys`, skipped while nothing is armed or `time_scale` is 0; flock key = (resource id, scope kind, owner id / 0 / volley id); slots `base..base+amount` per volley, zeroed per pass; cell = max(range)/2, 5x5 block, own cell first then the 8- and 16-rings, starts rotating per bullet; per-flock ordinals make each flock bit-identical to flying alone |
@@ -1368,6 +1371,15 @@ capped by `max_turn_rate_degrees`.
   without a heading sees all around. The cone test runs only below 360.
 - A factory frees every tracked volley at teardown when a script moved one
   out of its subtree (its teardown would otherwise call into freed memory).
+
+- Defaults (separation 12, alignment 1, cohesion 1.5, neighbor_range 150,
+  separation_range 24, edge gaps) are tuned so a spawner with homing on
+  (its default `homing_smoothing` 5) and flocking on shows a swarm that
+  keeps clear gaps for 16 px and 128 px bullets alike; the strong
+  separation spreads the arrival at a shared target (pinned:
+  `test_a_homing_swarm_reaches_its_target_spread_out`, 8 s budget). The
+  rule tests use `H.make_flock(..., count_bullet_size = false)` to pin the
+  center-distance formulas; the edge formulas have their own tests.
 
 ### 23.3 Adding a rule
 

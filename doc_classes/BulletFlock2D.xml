@@ -8,11 +8,11 @@
 		- [member separation]: turn away from flockmates closer than [member separation_range] (personal space; this is what makes bullets avoid each other and re-order instead of overlapping).
 		- [member alignment]: turn toward the average heading of the flockmates within [member neighbor_range] (makes the swarm fly the same way, like a school of fish).
 		- [member cohesion]: turn toward the center of the flockmates within [member neighbor_range] (keeps the swarm together instead of drifting apart).
-		[b]How to use it:[/b] on a [BulletSpawner2D], open the Flocking group, turn on [member BulletSpawner2D.flock_enabled] and set [member BulletSpawner2D.flock] to a new BulletFlock2D. For a volley you spawned from the factory, call [method BulletVolley2D.flock_join]:
+		[b]How to use it:[/b] on a [BulletSpawner2D], open the Flocking group, turn on [member BulletSpawner2D.flock_enabled] and set [member BulletSpawner2D.flock] to a new BulletFlock2D. Turn on homing too ([member BulletSpawner2D.homing_enabled]) and you see the swarm right away: the defaults are tuned for that, for any sprite size. For a volley you spawned from the factory, call [method BulletVolley2D.flock_join]:
 		[codeblock]
 		var swarm := BulletFlock2D.new()
-		swarm.neighbor_range = 200.0   # how far a bullet "sees" its flockmates
-		swarm.separation_range = 50.0  # personal space: a bit more than one bullet's width
+		swarm.separation = 15.0        # stronger personal space than the default 12
+		swarm.separation_range = 40.0  # a 40 px gap between bullet edges
 		$Spawner.flock = swarm
 		$Spawner.flock_enabled = true
 
@@ -20,17 +20,20 @@
 		var volley: BulletVolley2D = $BulletFactory2D.spawn_volley(data)
 		volley.flock_join(swarm)
 		[/codeblock]
-		[b]Size the ranges to your bullets.[/b] The ranges are in pixels and the defaults (100 and 40) suit small bullets (about 10 to 20 px). With big bullets, set [member separation_range] a bit larger than one bullet's width and [member neighbor_range] to several bullet widths, or the bullets overlap before they feel each other and lose sight of each other almost at once. Example for 128 px bullets: [code]neighbor_range = 350[/code], [code]separation_range = 160[/code].
+		[b]Bullet size is counted for you.[/b] With [member count_bullet_size] (the default) the ranges are gaps between bullet edges, so the same flock works for 16 px and 128 px bullets, scaled ones included. Turn it off only if you want plain center-to-center pixels.
 		[b]Give the swarm a reason to stay together.[/b] Flocking only turns bullets, it never changes their speed. A pattern that explodes outward (a big ring or a wide triangle) carries the bullets out of each other's [member neighbor_range] within a second, and then there is nobody left to flock with. A swarm looks alive when the bullets share a goal: turn on homing ([member BulletSpawner2D.homing_enabled]) so they chase the target together while separation keeps them apart, or fire a tight pattern (fan, aimed, small ring).
 		[b]Recipes[/b] (start here, then tune):
-		- [i]Fish school chasing the player:[/i] homing on with [member BulletVolleyData2D.homing_smoothing] around 3, [code]separation = 4, alignment = 1.5, cohesion = 2[/code], ranges sized to the bullets.
-		- [i]Bullets that only avoid each other[/i] (no grouping, no lining up): [code]alignment = 0, cohesion = 0, separation = 6[/code].
-		- [i]Tight ball that swirls:[/i] [code]cohesion = 4, alignment = 0.5, separation = 2[/code].
+		- [i]Swarm chasing the player:[/i] the defaults with homing on. They hold a clear gap between bullets while the swarm closes in; a strong separation spreads the arrival (bullets queue around the target), so lower [member separation] to about 6 when every bullet should hit fast.
+		- [i]Orderly fish school:[/i] [code]alignment = 3, cohesion = 2[/code], the rest default.
+		- [i]Bullets that only avoid each other[/i] (no grouping, no lining up): [code]alignment = 0, cohesion = 0[/code].
+		- [i]Tight ball that swirls:[/i] [code]cohesion = 5, alignment = 0.5, separation = 6, separation_range = 8[/code].
+		- [i]Wide, loose cloud:[/i] [code]separation_range = 80, neighbor_range = 300[/code].
 		- [i]Fair to dodge:[/i] add [code]max_turn_rate_degrees = 180[/code] so no bullet can whip around faster than half a turn per second.
 		- [i]Leader-and-follower streams:[/i] [code]view_angle_degrees = 180[/code] (bullets only follow what is ahead of them).
-		[b]How strong is "strong"?[/b] Each turn closes [code]1 - e^(-strength * delta)[/code] of the angle per tick, where strength is the length of the mixed wish (roughly the weights that are active). A strength of 1 turns a bullet about 63% of the way in one second, 3 in a third of a second. It never overshoots and looks the same at any frame rate. Values around 1 to 6 are typical; 20 and more snap.
+		[b]How strong is "strong"?[/b] Each turn closes [code]1 - e^(-strength * delta)[/code] of the angle per tick, where strength is the length of the mixed wish (roughly the weights that are active). A strength of 1 turns a bullet about 63% of the way in one second, 3 in a third of a second. It never overshoots and looks the same at any frame rate. Weights from 1 to 20 are typical (the inspector slider covers them; type a larger value if you need one); much more than that snaps.
 		[b]Who flies together[/b] is decided where the flock is armed ([member BulletSpawner2D.flock_scope], or the scope of [method BulletVolley2D.flock_join]); separate flocks never see each other. Edits reach every bullet already in flight on the next tick ([code]swarm.cohesion = 2.0[/code]). Every accepted change emits [signal Resource.changed]; a rejected value pushes an error and keeps the old one.
-		[b]Mixing with other features:[/b] homing turns first and the flock bends the result (give homing a turn rate, [member BulletVolleyData2D.homing_smoothing] above 0, or it re-aims every tick and leaves the flock only a nudge). Wobble sways on top of the flock's heading; spin, bounce, graze, sound, pooling and time scale work as usual. A locked orbit owns the bullet's motion, and a direction curve in Override mode wins its axis. Frozen bullets are not flockmates, and nothing turns while the bullet world is frozen (time scale 0).
+		[b]Mixing with other features:[/b] homing turns first and the flock bends the result. A spawner's homing turns at 5 per second by default ([member BulletSpawner2D.homing_smoothing]), which leaves the flock room; a homing that re-aims every tick ([member BulletVolleyData2D.homing_smoothing] 0) leaves it only a nudge. Wobble sways on top of the flock's heading; spin, bounce, graze, sound, pooling and time scale work as usual. A locked orbit owns the bullet's motion, and a direction curve in Override mode wins its axis. Frozen bullets are not flockmates, and nothing turns while the bullet world is frozen (time scale 0).
+		[b]Limits:[/b] none hidden. The inspector sliders end at typical values but accept larger ones (type them in); a setter only refuses what has no meaning (negative or non-finite values, a [member neighbor_range] of 0, a [member view_angle_degrees] outside 0 to 360).
 		[b]Cost:[/b] one pass per physics tick over every flocking bullet (an exact spatial hash grid), a few nanoseconds per flockmate looked at. [member max_neighbors] bounds the work per bullet and [member update_interval] spreads it over several ticks. Nothing is paid while no bullet flocks.
 	</description>
 	<tutorials>
@@ -40,9 +43,13 @@
 			How strongly each bullet turns to fly the same way as its flockmates within [member neighbor_range] (per second).
 			[b]Raise it[/b] (2 to 4) for an orderly school where everybody heads the same way; the swarm turns as one body. [b]Lower it[/b] toward 0 for a looser, messier swarm where bullets cross paths. 0 turns this rule off. Example: [code]alignment = 0[/code] together with [code]cohesion = 0[/code] keeps only the avoidance. Finite and &gt;= 0.
 		</member>
-		<member name="cohesion" type="float" setter="set_cohesion" getter="get_cohesion" default="1.0">
+		<member name="cohesion" type="float" setter="set_cohesion" getter="get_cohesion" default="1.5">
 			How strongly each bullet turns toward the center of its flockmates within [member neighbor_range] (per second; it pulls harder the farther the center is, relative to the range).
 			[b]Raise it[/b] (2 to 5) to keep the swarm in one tight blob that pulls stragglers back in; too high together with weak [member separation] makes bullets bunch up. [b]Lower it[/b] to let the swarm stretch and split into smaller groups. 0 turns this rule off. Finite and &gt;= 0.
+		</member>
+		<member name="count_bullet_size" type="bool" setter="set_count_bullet_size" getter="get_count_bullet_size" default="true">
+			When on (the default), [member separation_range] and [member neighbor_range] are measured between bullet [b]edges[/b] instead of centers, so one setting fits every sprite: [code]separation_range = 24[/code] keeps a 24 px gap between 16 px bullets and between 128 px bullets alike, and bullets that overlap push harder than touching ones. A bullet's size is its drawn sprite ([member BulletVolleyData2D.texture_size], or the frame's size) times its own scale, so randomly scaled bullets keep their gaps too.
+			Turn it off to measure plain center-to-center pixels (then size the ranges to your bullets yourself: [member separation_range] a bit more than one bullet's width). Costs about 10% more per flockmate check.
 		</member>
 		<member name="face_heading" type="bool" setter="set_face_heading" getter="get_face_heading" default="true">
 			When on (the default), the bullet's sprite and collision shape turn with every flock turn, so arrows, fish and missiles always face where they fly. Turn it off for round bullets, or when the sprite should keep its own rotation while the flight path bends. Rotation data that spins the bullet owns the sprite and is left alone either way. A rotation that drives the heading ([member BulletVolleyData2D.adjust_direction_based_on_rotation], or homing that steers through the rotation) still follows the flock, or the flock's turn would be undone.
@@ -53,17 +60,17 @@
 		<member name="max_turn_rate_degrees" type="float" setter="set_max_turn_rate_degrees" getter="get_max_turn_rate_degrees" default="0.0">
 			The fastest the flock may turn a bullet, in degrees per second (0 = no cap, the default). Use it to keep swarms fair to dodge: with [code]max_turn_rate_degrees = 180[/code] no bullet can reverse in less than a second, so the player can read the swarm. Lower values give wide, graceful curves; very low values (below about 45) make the rules too slow to matter. Homing and other steering are not capped by it.
 		</member>
-		<member name="neighbor_range" type="float" setter="set_neighbor_range" getter="get_neighbor_range" default="100.0">
-			How far a bullet sees its flockmates, in pixels: [member alignment] and [member cohesion] only consider flockmates closer than this.
-			[b]Size it to your bullets:[/b] a few bullet widths, for example 100 to 200 for 16 px bullets, or 300 to 400 for 128 px bullets. [b]Larger[/b] makes the whole swarm act as one big group (and costs a little more); [b]smaller[/b] makes many small groups that ignore each other. If the bullets spread out farther than this, they stop flocking because nobody is in range. Finite and &gt; 0.
+		<member name="neighbor_range" type="float" setter="set_neighbor_range" getter="get_neighbor_range" default="150.0">
+			How far a bullet sees its flockmates, in pixels: [member alignment] and [member cohesion] only consider flockmates closer than this. With [member count_bullet_size] (the default) it is the gap between the bullets' edges, so the default 150 works for any sprite size.
+			[b]Larger[/b] (250 to 400) makes the whole swarm act as one big group (and costs a little more); [b]smaller[/b] (50 to 100) makes many small groups that ignore each other. If the bullets spread out farther than this, they stop flocking because nobody is in range. Finite and &gt; 0.
 		</member>
-		<member name="separation" type="float" setter="set_separation" getter="get_separation" default="1.5">
-			How strongly each bullet turns away from flockmates inside [member separation_range] (per second). Closer flockmates push harder (weighted by [code]1 - distance / separation_range[/code]), so touching bullets push hardest.
-			This is the "avoid each other" rule: it keeps bullets from overlapping and makes them re-order around each other. [b]Raise it[/b] (3 to 8) for crisp personal space; [b]lower it[/b] to let bullets brush past each other. It should usually be the strongest weight. Bullets stacked on the same spot part along a fixed direction per pair. 0 turns this rule off. Finite and &gt;= 0.
+		<member name="separation" type="float" setter="set_separation" getter="get_separation" default="12.0">
+			How strongly each bullet turns away from flockmates inside [member separation_range] (per second). Closer flockmates push harder (weighted by [code]1 - gap / separation_range[/code]), so touching bullets push with the full weight and overlapping ones harder still.
+			This is the "avoid each other" rule: it keeps bullets from overlapping and makes them re-order around each other. The default 12 holds a visible gap even against homing that turns at 5 per second (the spawner's default [member BulletSpawner2D.homing_smoothing]). [b]Raise it[/b] (15 to 20) for crisp personal space; [b]lower it[/b] (2 to 6) to let bullets brush past each other and reach a shared target sooner. It should usually be the strongest weight. Bullets stacked on the same spot part along a fixed direction per pair. 0 turns this rule off. Finite and &gt;= 0.
 		</member>
-		<member name="separation_range" type="float" setter="set_separation_range" getter="get_separation_range" default="40.0">
-			Personal space in pixels: flockmates closer than this push the bullet away (see [member separation]).
-			[b]Set it a bit larger than one bullet's width[/b] (for example 24 for 16 px bullets, 160 for 128 px bullets, more when bullets are scaled up). Smaller than the bullet means the sprites overlap before they feel each other. It is independent of [member neighbor_range] and may even be larger. 0 turns separation off.
+		<member name="separation_range" type="float" setter="set_separation_range" getter="get_separation_range" default="24.0">
+			Personal space in pixels: flockmates closer than this push the bullet away (see [member separation]). With [member count_bullet_size] (the default) it is the gap between the bullets' edges: the default 24 keeps about a 24 px gap whatever the sprite size. With it off, it is the distance between centers, so set it a bit larger than one bullet's width.
+			[b]Larger[/b] spreads the swarm out; [b]smaller[/b] packs it tight. It is independent of [member neighbor_range] and may even be larger. 0 turns separation off.
 		</member>
 		<member name="update_interval" type="float" setter="set_update_interval" getter="get_update_interval" default="0.0">
 			Seconds between two steering updates of a bullet (0 = every physics tick, the default). Use it to make very large swarms cheaper: [code]update_interval = 3.0 / 60.0[/code] cuts the flock's cost to about a third with hardly a visible difference; values above about 0.2 s make the swarm react sluggishly.

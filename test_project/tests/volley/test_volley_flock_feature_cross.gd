@@ -66,7 +66,7 @@ func test_graze_reports_while_the_flock_steers() -> void:
 	make_graze_target(Vector2(150, 20))
 	var log := H.record_graze(factory)
 	var v := _flock_volley(_cluster(8))
-	v.graze_set_zones([H.make_graze_zone([40.0])], &"graze_targets")
+	v.graze_set_zones([H.make_graze_zone([80.0])], &"graze_targets") # the default flock spreads the cluster
 	_step(90)
 	assert_gt(log.size(), 0, "the flock grazed the target")
 	assert_true(_steered(v), "and kept flocking")
@@ -118,7 +118,7 @@ func test_per_bullet_homing_closes_in_while_flocking() -> void:
 	for i in 6:
 		v.bullet_homing_push_back_global_position_target(i, targets[i % 2])
 		start.append(v.get_bullet_transform(i).origin.distance_to(targets[i % 2]))
-	_step(60)
+	_step(90) # 1.5 s: the default separation pushes the pairs sideways first
 	for i in 6:
 		assert_lt(v.get_bullet_transform(i).origin.distance_to(targets[i % 2]), start[i] - 100.0, "bullet %d closes in on its own target" % i)
 	assert_true(_steered(v), "while the flock steers")

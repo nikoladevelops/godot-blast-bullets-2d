@@ -1,23 +1,24 @@
 extends BlastTest
 ## BulletFlock2D, the flock rules resource (how a flock steers; who flies
 ## together is the arming side's business, never a property here):
-## documented defaults, every accepted change emits `changed` exactly once
+## documented defaults (tuned so homing + flocking is visible out of the box), every accepted change emits `changed` exactly once
 ## (rejected and same-value sets emit nothing), rejects keep the old value
 ## with exact texts, the serialized Scope ids are locked, the inspector
 ## hints are pinned, and a flock survives a .tres round trip.
 
 const TRES_PATH := "user://flock_round_trip.tres"
 const PROPS := ["separation", "alignment", "cohesion", "neighbor_range", "separation_range",
-	"max_turn_rate_degrees", "face_heading", "max_neighbors", "update_interval", "view_angle_degrees"]
+	"count_bullet_size", "max_turn_rate_degrees", "face_heading", "max_neighbors", "update_interval", "view_angle_degrees"]
 
 
 func test_defaults_match_the_documented_values() -> void:
 	var f := BulletFlock2D.new()
-	assert_eq(f.separation, 1.5, "separation")
+	assert_eq(f.separation, 12.0, "separation: strong enough to hold a gap against homing")
 	assert_eq(f.alignment, 1.0, "alignment")
-	assert_eq(f.cohesion, 1.0, "cohesion")
-	assert_eq(f.neighbor_range, 100.0, "neighbor range")
-	assert_eq(f.separation_range, 40.0, "separation range")
+	assert_eq(f.cohesion, 1.5, "cohesion")
+	assert_eq(f.neighbor_range, 150.0, "neighbor range (an edge gap)")
+	assert_eq(f.separation_range, 24.0, "separation range (an edge gap)")
+	assert_true(f.count_bullet_size, "ranges between bullet edges: one default fits every sprite size")
 	assert_eq(f.max_turn_rate_degrees, 0.0, "no turn cap")
 	assert_true(f.face_heading, "the rotation follows the heading")
 	assert_eq(f.max_neighbors, 32, "32 flockmates per bullet")
@@ -28,11 +29,12 @@ func test_defaults_match_the_documented_values() -> void:
 
 func test_property_list_order_and_hints_are_pinned() -> void:
 	var want := {
-		"separation": [TYPE_FLOAT, PROPERTY_HINT_RANGE, "0,10,0.01,or_greater"],
-		"alignment": [TYPE_FLOAT, PROPERTY_HINT_RANGE, "0,10,0.01,or_greater"],
-		"cohesion": [TYPE_FLOAT, PROPERTY_HINT_RANGE, "0,10,0.01,or_greater"],
+		"separation": [TYPE_FLOAT, PROPERTY_HINT_RANGE, "0,20,0.01,or_greater"],
+		"alignment": [TYPE_FLOAT, PROPERTY_HINT_RANGE, "0,20,0.01,or_greater"],
+		"cohesion": [TYPE_FLOAT, PROPERTY_HINT_RANGE, "0,20,0.01,or_greater"],
 		"neighbor_range": [TYPE_FLOAT, PROPERTY_HINT_RANGE, "1,1000,0.5,or_greater,suffix:px"],
 		"separation_range": [TYPE_FLOAT, PROPERTY_HINT_RANGE, "0,500,0.5,or_greater,suffix:px"],
+		"count_bullet_size": [TYPE_BOOL, PROPERTY_HINT_NONE, ""],
 		"max_turn_rate_degrees": [TYPE_FLOAT, PROPERTY_HINT_RANGE, "0,1440,1,or_greater,suffix:deg/s"],
 		"face_heading": [TYPE_BOOL, PROPERTY_HINT_NONE, ""],
 		"max_neighbors": [TYPE_INT, PROPERTY_HINT_RANGE, "0,256,1,or_greater"],
@@ -59,7 +61,7 @@ func test_every_accepted_set_emits_changed_once() -> void:
 	var f := BulletFlock2D.new()
 	watch_signals(f)
 	var sets := [["separation", 3.0], ["alignment", 0.0], ["cohesion", 2.5], ["neighbor_range", 64.0],
-		["separation_range", 0.0], ["max_turn_rate_degrees", 180.0], ["face_heading", false], ["max_neighbors", 0], ["update_interval", 0.25], ["view_angle_degrees", 270.0]]
+		["separation_range", 0.0], ["count_bullet_size", false], ["max_turn_rate_degrees", 180.0], ["face_heading", false], ["max_neighbors", 0], ["update_interval", 0.25], ["view_angle_degrees", 270.0]]
 	var expected := 0
 	for entry in sets:
 		assert_true(entry[0] in f, "%s exists" % entry[0])
@@ -129,6 +131,7 @@ func test_flock_survives_a_tres_round_trip() -> void:
 	f.cohesion = 0.75
 	f.neighbor_range = 72.0
 	f.separation_range = 18.5
+	f.count_bullet_size = false
 	f.max_turn_rate_degrees = 270.0
 	f.face_heading = false
 	f.max_neighbors = 12

@@ -33,6 +33,15 @@ void BulletFlock2D::set_neighbor_range(real_t value) { store_amount(neighbor_ran
 real_t BulletFlock2D::get_separation_range() const { return separation_range; }
 void BulletFlock2D::set_separation_range(real_t value) { store_amount(separation_range, value, "separation_range", false); }
 
+bool BulletFlock2D::get_count_bullet_size() const { return count_bullet_size; }
+void BulletFlock2D::set_count_bullet_size(bool value) {
+	if (count_bullet_size == value) {
+		return;
+	}
+	count_bullet_size = value;
+	emit_changed();
+}
+
 real_t BulletFlock2D::get_max_turn_rate_degrees() const { return max_turn_rate_degrees; }
 void BulletFlock2D::set_max_turn_rate_degrees(real_t value) { store_amount(max_turn_rate_degrees, value, "max_turn_rate_degrees", false); }
 
@@ -77,15 +86,15 @@ void BulletFlock2D::set_view_angle_degrees(real_t value) {
 void BulletFlock2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_separation"), &BulletFlock2D::get_separation);
 	ClassDB::bind_method(D_METHOD("set_separation", "value"), &BulletFlock2D::set_separation);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "separation", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater"), "set_separation", "get_separation");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "separation", PROPERTY_HINT_RANGE, "0,20,0.01,or_greater"), "set_separation", "get_separation");
 
 	ClassDB::bind_method(D_METHOD("get_alignment"), &BulletFlock2D::get_alignment);
 	ClassDB::bind_method(D_METHOD("set_alignment", "value"), &BulletFlock2D::set_alignment);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "alignment", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater"), "set_alignment", "get_alignment");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "alignment", PROPERTY_HINT_RANGE, "0,20,0.01,or_greater"), "set_alignment", "get_alignment");
 
 	ClassDB::bind_method(D_METHOD("get_cohesion"), &BulletFlock2D::get_cohesion);
 	ClassDB::bind_method(D_METHOD("set_cohesion", "value"), &BulletFlock2D::set_cohesion);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "cohesion", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater"), "set_cohesion", "get_cohesion");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "cohesion", PROPERTY_HINT_RANGE, "0,20,0.01,or_greater"), "set_cohesion", "get_cohesion");
 
 	ClassDB::bind_method(D_METHOD("get_neighbor_range"), &BulletFlock2D::get_neighbor_range);
 	ClassDB::bind_method(D_METHOD("set_neighbor_range", "value"), &BulletFlock2D::set_neighbor_range);
@@ -94,6 +103,10 @@ void BulletFlock2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_separation_range"), &BulletFlock2D::get_separation_range);
 	ClassDB::bind_method(D_METHOD("set_separation_range", "value"), &BulletFlock2D::set_separation_range);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "separation_range", PROPERTY_HINT_RANGE, "0,500,0.5,or_greater,suffix:px"), "set_separation_range", "get_separation_range");
+
+	ClassDB::bind_method(D_METHOD("get_count_bullet_size"), &BulletFlock2D::get_count_bullet_size);
+	ClassDB::bind_method(D_METHOD("set_count_bullet_size", "value"), &BulletFlock2D::set_count_bullet_size);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "count_bullet_size"), "set_count_bullet_size", "get_count_bullet_size");
 
 	ClassDB::bind_method(D_METHOD("get_max_turn_rate_degrees"), &BulletFlock2D::get_max_turn_rate_degrees);
 	ClassDB::bind_method(D_METHOD("set_max_turn_rate_degrees", "value"), &BulletFlock2D::set_max_turn_rate_degrees);
