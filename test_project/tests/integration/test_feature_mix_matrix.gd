@@ -175,3 +175,80 @@ func test_debug_explain_features_says_what_each_group_does_and_why_not() -> void
 	assert_string_contains(_line(lines, "Flocking:"), "is weaker than homing (5.0 rad/s): bullets bunch up at the target.")
 	assert_string_contains(_line(lines, "Randomization:"), "bullet sizes vary (1.0 to 2.0)")
 	expect_no_errors("explaining pushes nothing")
+
+
+const FEATURES := ["flock", "homing", "orbit", "graze", "wobble", "bounce", "random_scale", "burst", "pool"]
+const PAIRS := ["flock+homing", "flock+orbit", "flock+graze", "flock+wobble", "flock+bounce", "flock+random_scale", "flock+burst", "flock+pool", "homing+orbit", "homing+graze", "homing+wobble", "homing+bounce", "homing+random_scale", "homing+burst", "homing+pool", "orbit+graze", "orbit+wobble", "orbit+bounce", "orbit+random_scale", "orbit+burst", "orbit+pool", "graze+wobble", "graze+bounce", "graze+random_scale", "graze+burst", "graze+pool", "wobble+bounce", "wobble+random_scale", "wobble+burst", "wobble+pool", "bounce+random_scale", "bounce+burst", "bounce+pool", "random_scale+burst", "random_scale+pool", "burst+pool"]
+
+
+## One spawner with `features` on, firing a 12-bullet ring through real
+## physics frames (bounce needs them), measured every frame.
+func _fly_mix(features: Array) -> MotionProbe:
+	var d := H.make_volley_data(12, 160.0, 30.0)
+	d.texture_size = Vector2(32, 32)
+	d.collision_shape = H.make_circle_shape(6.0)
+	d.bullet_max_collision_count = 0
+	if "wobble" in features:
+		var w := BulletWobbleData2D.new()
+		w.enabled = true
+		d.shared_bullet_wobble_data = w
+	if "bounce" in features:
+		d.set_collision_mask_from_array([3]) # make_wall's layer
+		d.set_bounce_mask_from_array([3])
+		make_wall(Vector2(120, 0))
+		make_wall(Vector2(-120, 0))
+	var sp := make_spawner(d, BulletSpawner2D.PATTERN_FROM_HELPER_RING, 12)
+	sp.helper_ring_radius = 20.0
+	if "bounce" in features:
+		sp.body_entered.connect(func(_b, _v, _i) -> void: pass) # the hits are handled
+	make_graze_target(Vector2(260, 60), &"mix_pair")
+	if "homing" in features or "orbit" in features:
+		sp.homing_node_group = &"mix_pair"
+		sp.set_homing_enabled(true)
+	if "orbit" in features:
+		sp.orbiting_enabled = true
+		sp.orbiting_radius = 50.0
+	if "graze" in features:
+		sp.graze_zones = [H.make_graze_zone([40.0], true)]
+		sp.graze_node_group = &"mix_pair"
+		sp.graze_enabled = true
+	if "flock" in features:
+		sp.flock_enabled = true
+	if "random_scale" in features:
+		sp.bullet_scale_mode = 1 # Uniform
+		sp.bullet_scale_min = 0.5
+		sp.bullet_scale_max = 2.0
+		sp.bullet_random_seed = 5
+	var probe := MotionProbe.new(factory, [])
+	sp.volley_fired.connect(func(v: BulletVolley2D, _n: int) -> void: probe.add_volley(v, 0.0, Vector2(32, 32)))
+	for shot in (3 if "burst" in features else 1):
+		assert_true(sp.shoot_once(), "fires")
+		for f in 9:
+			await physics(1)
+			probe.sample(1.0 / 60.0)
+	for f in 80:
+		await physics(1)
+		probe.sample(1.0 / 60.0)
+	if "pool" in features:
+		await idle(1)
+		factory.clear_active_bullets()
+		await idle(2)
+		assert_true(sp.shoot_once(), "fires from the pool")
+		for f in 40:
+			await physics(1)
+			probe.sample(1.0 / 60.0)
+	return probe
+
+
+func test_every_feature_pair_flies_cleanly(pair: String = use_parameters(PAIRS)) -> void:
+	var features := Array(pair.split("+"))
+	var probe: MotionProbe = await _fly_mix(features)
+	assert_eq(probe.nonfinite, 0, "%s: finite poses" % pair)
+	assert_eq(probe.steer_snaps, 0, "%s: no steering snap (wall bounces aside): %s" % [pair, probe.summary()])
+	var bad: Array = []
+	for v in probe._volleys:
+		if is_instance_valid(v):
+			bad.append_array(broken_bullets(v))
+	assert_eq("\n".join(bad.slice(0, 4)), "", "%s: finite, unit headings" % pair)
+	assert_true(factory.debug_assert_no_dangling()["ok"], "%s: balanced books" % pair)
+	expect_no_errors("%s: nothing pushed" % pair)

@@ -43,6 +43,7 @@ var nonfinite := 0
 var _last_heading := {}
 var _last_turn := {}
 var _last_bounces := {}
+var _lives := {}
 
 
 ## `texture_rotations` / `quad_sizes`: per volley, its spawn data's
@@ -79,6 +80,14 @@ func sample(dt: float, check_facing := false) -> void:
 		if not is_instance_valid(v):
 			continue
 		var n := v.get_amount_bullets()
+		# A volley back from the pool starts a new life: its old headings
+		# are no turn.
+		if int(_lives.get(vi, v.get_life_id())) != v.get_life_id():
+			for i in n:
+				_last_heading.erase(Vector2i(vi, i))
+				_last_turn.erase(Vector2i(vi, i))
+				_last_bounces.erase(Vector2i(vi, i))
+		_lives[vi] = v.get_life_id()
 		for i in n:
 			var key := Vector2i(vi, i)
 			if not v.is_bullet_status_enabled(i):
