@@ -46,7 +46,7 @@ void BulletVolley2D::run_custom_timers(double delta) {
 	if (_timers_running_depth > 0) {
 		return; // a callback re-entered the sweep: the outer pass owns this tick
 	}
-	ReentrancyGuard timers_guard(_timers_running_depth);
+	ReentrancyGuard timers_guard(_timers_running_depth, this);
 	// Pass 1: advance and collect. No user code runs here. A timer that only
 	// runs for an active volley HOLDS while the volley is parked (every
 	// bullet disabled, still owned): its remaining time resumes on wake, so

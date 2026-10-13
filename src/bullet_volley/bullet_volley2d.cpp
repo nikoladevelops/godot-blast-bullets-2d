@@ -607,7 +607,7 @@ void BulletVolley2D::enable_bullet(int bullet_index, int collision_amount, bool 
 		UtilityFunctions::push_error("enable_bullet: re-entrant call from inside on_bullet_enable is not allowed. Use call_deferred to change bullet state from that callback.");
 		return;
 	}
-	ReentrancyGuard bullet_enable_guard(_bullet_enable_depth);
+	ReentrancyGuard bullet_enable_guard(_bullet_enable_depth, this);
 
 	const bool waking_volley = !is_active;
 	all_bullets_enabled_set.activate_data(bullet_index);
@@ -692,7 +692,7 @@ void BulletVolley2D::disable_bullet(int bullet_index, bool release_attachment, b
 		}
 		return;
 	}
-	ReentrancyGuard bullet_disable_guard(_bullet_enable_depth);
+	ReentrancyGuard bullet_disable_guard(_bullet_enable_depth, this);
 
 	all_bullets_enabled_set.disable_data(bullet_index);
 	--active_bullets_counter;
@@ -742,7 +742,7 @@ int BulletVolley2D::disable_bullets_bulk(const std::vector<int> &indexes, int fx
 	const uint64_t self_id = get_instance_id();
 	int disabled_count = 0;
 	{
-		ReentrancyGuard bullet_disable_guard(_bullet_enable_depth);
+		ReentrancyGuard bullet_disable_guard(_bullet_enable_depth, this);
 		for (size_t k = 0; k < indexes.size(); ++k) {
 			const int i = indexes[k];
 			if (i < 0 || i >= amount_bullets || !all_bullets_enabled_set.contains(i)) {

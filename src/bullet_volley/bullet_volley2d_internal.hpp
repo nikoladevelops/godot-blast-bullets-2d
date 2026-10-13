@@ -665,7 +665,7 @@ _ALWAYS_INLINE_ bool BulletVolley2D::attach_bullet_attachment_internal(int bulle
 		UtilityFunctions::push_error("bullet_set_attachment: re-entrant call from inside on_bullet_spawn/on_bullet_enable/on_bullet_disable is not allowed. Use call_deferred to replace attachments from those callbacks.");
 		return false;
 	}
-	ReentrancyGuard attachment_setup_guard(_attachment_setup_depth);
+	ReentrancyGuard attachment_setup_guard(_attachment_setup_depth, this);
 
 	// Pooling is keyed by the scene itself: every loader of the same scene
 	// shares one bucket, no ids needed. A remembered (recognized) key pops
