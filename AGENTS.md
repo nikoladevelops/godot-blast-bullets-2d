@@ -48,6 +48,7 @@ for the rest: the sections are written to be looked up, not read once.
    defaults); fix plain bugs without asking but list them in the report.
 10. **Finish green:** full suite + `--self-test` + format check + snapshot
     diff + benchmark gate (+ `run_editor_smoke.py` when editor/preview code
+    changed, + `run_ubsan_tests.py` when casts, enums or integer math
     changed), then report with Big-O and a ratings table (§19).
 
 ## 1. Commands
@@ -58,6 +59,7 @@ python3 tools/run_tests.py                                       # 200 files / 1
 python3 tools/run_tests.py --suite <substring> --full            # one area, every failure message unclipped
 python3 tools/run_tests.py --self-test                           # proves the harness still catches failures/leaks
 python3 tools/run_editor_smoke.py                                # headless EDITOR run of tests/editor_smoke/ (editor-only paths)
+python3 tools/run_ubsan_tests.py [--suite <x>]                    # suites against a UBSan build (~1 min build + suite; Linux/GCC)
 python3 tools/api_snapshot.py save <label>                       # behavior snapshot (~10 s, §7.4)
 python3 tools/api_snapshot.py diff <label_a> <label_b>           # must print IDENTICAL for a refactor
 python3 tools/format_code.py [--check] [files or dirs]           # clang-format (repo .clang-format)
@@ -884,6 +886,21 @@ deduped, cancelled by REMOVED) and replayed once on resume.
   symbol, glibc then marks the library NODELETE, `dlclose` keeps it, its
   statics outlive Godot's StringName table and EVERY test file reports ~86
   `Orphan StringName` leaks (diagnose with `LD_DEBUG=all ... | grep NODELETE`).
+- Undefined behavior the suites cannot see (x86 hides most of it; ARM and
+  the optimizer do not): `tools/run_ubsan_tests.py` finds it with file:line
+  and a stack. Rules it taught us:
+  - Every script-bound enum is `enum X : int` and uses
+    `BLAST_VARIANT_ENUM_CAST` (`core/variant_enum_cast2d.hpp`, a
+    compile-time assert): GDScript may pass any int, and an out-of-range
+    value in an enum without a fixed type is UB before a setter rejects it.
+  - Clamp a float in floating point BEFORE an int cast
+    (`(int)Math::clamp(x / 8.0, 32.0, 256.0)`, never `clamp((int)(x / 8.0),
+    ...)`): an out-of-range cast is UB (x86 yields INT_MIN, so a huge track
+    fell to its minimum density, a far homing position collapsed onto one
+    identity, and 1e17 px/s movement-pattern laps turned bullets back).
+    Never let `x + w` of two casted ints overflow a bounds check.
+  - Read GDScript ints from an Array/TypedArray as `int64_t`: an int32
+    cast wraps 2^32 + 1 onto 1 (a valid layer, a valid hit count).
 
 ## 15. Benchmarks and performance lessons
 
@@ -1034,7 +1051,11 @@ project's `.so`). For quick numeric comparisons load two
 - Verification: `run_tests.py`, `lint_tests.py`, `api_snapshot.py` (§7.4),
   `format_code.py`, `run_benchmarks.py`, `run_editor_smoke.py` (headless
   editor + @tool probes in `test_project/tests/editor_smoke/`, run on a
-  throwaway COPY of the project; probes act only with `--blast-editor-smoke`).
+  throwaway COPY of the project; probes act only with `--blast-editor-smoke`),
+  `run_ubsan_tests.py` (UBSan objects from compile_commands.json under
+  `test_project/test_results/ubsan/`, swapped in for the installed library
+  and always restored; leak gate off: the sanitizer runtime makes every file
+  report Orphan StringNames).
 - Config: `select_godot_path.py`, `select_godot_project.py`,
   `change_godot_target_version.py`, `update_godot_cpp.py`,
   `config_manager.py` + `config.json` (machine state), `paths.py`.
