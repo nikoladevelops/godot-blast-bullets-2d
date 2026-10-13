@@ -775,6 +775,26 @@ src/
   `ObjectDB::get_instance(id) == expected_ptr` after (`tick_may_continue`,
   `revalidate_configured_volley`, the movement `alive()` lambda). Stop
   touching `this` when it fails.
+- Attachment callbacks (`on_bullet_spawn/enable/disable`, `on_spawn_in_pool`)
+  and timer callbacks are plain calls, not signals: Godot locks neither the
+  factory nor the volley, so user code may `free()` either in the middle of
+  any operation (a spawn, a tick, a clear, a reset, a teardown). After user
+  code: a volley tests `survived_user_code(self_id)` (itself AND its
+  `factory_life`); a factory operation holds `watch_life()` and stops on
+  `died()` (the bool outlives the factory; `this` does not); a loop over
+  volleys snapshots (pointer, id) pairs BEFORE user code
+  (`snapshot_volley_entries`) and validates each through ObjectDB, never
+  reading `get_instance_id()` from a pointer that may be freed; an RAII
+  scope re-checks its owner in the destructor (`ReentrancyGuard`,
+  `FactoryOperationGuard`). A second `free()` from inside a PREDELETE is
+  refused with `cancel_free()` (`predelete_state`); Godot keeps ONE "free
+  ok" flag per object, so the refusal also cancels the running deletion,
+  which then finishes with `queue_free()`. The factory deletes its children
+  inside its own PREDELETE handler: Node's teardown (after the handler) would
+  run their callbacks where a second free is no longer refused. Pinned by
+  `integration/test_callback_free_matrix` (run it under
+  `tools/run_sanitizer_tests.py --sanitizer address` after touching any of
+  this: a write into freed memory passes every assert).
 - Pinned by `volley/test_volley_hit_contract`, `test_volley_lifetime_contract`,
   `test_volley_signal_timing`, `test_volley_bounce_signals`,
   `test_volley_homing_mixed_deques`, `spawner/test_spawner_orphan_policy`.
