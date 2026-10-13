@@ -1024,7 +1024,14 @@ project's `.so`). For quick numeric comparisons load two
   flockmates into per-cell lists cost more than scanning them in place.
   `count_bullet_size` (edge gaps, on by default) costs ~8-14% of the pass
   with the same neighbors (one add and multiply per range test, one more
-  float per flockmate); off is bit-identical and as fast as before.
+  float per flockmate). The sideways separation (bearing, capped push,
+  lookahead) roughly doubles the work per separating pair: dense capped
+  swarms tick +36% (`flock_10k_flight` 3.1 -> 4.2 ms), `flock_5k_stacked`
+  +44%, a loose 2k swarm +6%. The loop is throughput-bound there: the
+  lookahead is a per-bullet predicted position stored at gather (a pair's
+  offset ahead is one subtraction; per-pair velocity math cost ~1.5 ns per
+  check), the push has no branch (max with 0), and the side is summed as a
+  scalar along the bullet's own perpendicular.
   Prototype in a standalone harness (the solver compiles against a tiny
   Godot shim) before touching the plugin: a full build per experiment is
   slow, and perf/valgrind are not installed here.
@@ -1331,14 +1338,22 @@ emits `GRAZE_POINT_TARGET_BIT | index` ids and belongs in
 
 ## 23. Flocking (`BulletFlock2D`, flock pass, spawner group)
 
-Boids: every tick each flocking bullet turns its heading toward
-`V = alignment * A + cohesion * C + separation * S`, measured where every
-flockmate stood BEFORE the sweep moved anyone (A = mean flight heading of
-the flockmates within `neighbor_range`, C = mean offset to them /
-`neighbor_range`, S = sum over flockmates closer than `separation_range` of
-(p - q) / d * (1 - d / range)). Only the direction turns, by
-`1 - e^(-|V| dt)` of the angle (never overshoots, frame-rate independent),
-capped by `max_turn_rate_degrees`.
+Boids: every tick each flocking bullet steers by
+`V = alignment * A + cohesion * C + separation * S` (radians per second),
+measured where every flockmate stood BEFORE the sweep moved anyone (A = mean
+flight heading of the flockmates within `neighbor_range`, C = mean offset to
+them / `neighbor_range`, S = the MEAN push of the flockmates in
+`separation_range`, each pair measured `separation_lookahead_sec` ahead along
+its own flight, push = 1 - gap / range capped at 2). A bullet keeps its
+speed, so V is a sideways force: the heading turns at cross(heading, V) per
+second (never past V, capped by `max_turn_rate_degrees`, faded in over the
+volley's first `blend_in_sec`); a bullet with a heading is pushed
+perpendicular to it, away from the side each flockmate is on (by the
+bearing: full past 30 deg off the heading line, proportional inside; a
+flockmate exactly on the line or stacked takes the bullet's golden-ratio fan
+side). The old target-heading turn (`1 - e^(-|V| dt)` of the angle) flipped
+crowded bullets 180 deg per tick; summed pushes saturated the turn and
+chattered; both were measured with `tests/common/motion_probe.gd`.
 
 ### 23.1 Pieces
 
@@ -1372,14 +1387,21 @@ capped by `max_turn_rate_degrees`.
 - A factory frees every tracked volley at teardown when a script moved one
   out of its subtree (its teardown would otherwise call into freed memory).
 
-- Defaults (separation 12, alignment 1, cohesion 1.5, neighbor_range 150,
-  separation_range 24, edge gaps) are tuned so a spawner with homing on
-  (its default `homing_smoothing` 5) and flocking on shows a swarm that
-  keeps clear gaps for 16 px and 128 px bullets alike; the strong
-  separation spreads the arrival at a shared target (pinned:
-  `test_a_homing_swarm_reaches_its_target_spread_out`, 8 s budget). The
-  rule tests use `H.make_flock(..., count_bullet_size = false)` to pin the
-  center-distance formulas; the edge formulas have their own tests.
+- Defaults (separation 10, alignment 1, cohesion 1.5, neighbor_range 150,
+  separation_range 24, edge gaps, lookahead 0.2 s, turn cap 270 deg/s,
+  blend-in 0.3 s, 32 neighbors) were picked with MotionProbe sweeps (16 and
+  128 px, random scale 1-2, 3-shot bursts, homing, wobble): no 180 deg
+  flips, about 1-2.5 turn-side flips per bullet per second in crowds (a
+  homing crowd at its target buzzes at about 5), sprites on the heading,
+  clear gaps wherever the geometry allows. Fewer neighbors (16, 12) measured
+  noisier (the sampled set changes per tick). Pinned by
+  `volley/test_volley_flock_motion.gd`. The rule tests use
+  `H.make_flock(...)` (count_bullet_size, blend-in, lookahead and the turn
+  cap OFF) to pin the formulas alone.
+- Texture rotation is cosmetic for every feature that faces or steers by
+  the basis (the basis carries heading + offset): pinned by
+  `volley/test_volley_texture_rotation_paths.gd` (homing once turned by
+  MINUS the offset and flew off course).
 
 ### 23.3 Adding a rule
 

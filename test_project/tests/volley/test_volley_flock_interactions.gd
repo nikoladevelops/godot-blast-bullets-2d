@@ -68,8 +68,8 @@ func _homing_data(tr: Array, smoothing := 3.0) -> BulletVolleyData2D:
 
 func test_a_homing_swarm_reaches_its_target_spread_out() -> void:
 	# The default flock at the spawner's default homing turn rate (5): the
-	# separation spreads the arrival (bullets queue around the target)
-	# but every bullet still gets there.
+	# separation (10, faster than homing) spreads the arrival (bullets
+	# queue around the target) but every bullet still gets there.
 	var target := Vector2(600, 200)
 	var tr := _stream(24, 3)
 	var swarm := _volley(_homing_data(tr, 5.0), BulletFlock2D.new())
@@ -89,7 +89,9 @@ func test_a_homing_swarm_reaches_its_target_spread_out() -> void:
 			var plain_mean := _mean_nearest_distance(_origins(plain))
 			var swarm_min := _min_pair_distance(_origins(swarm))
 			plain_min = _min_pair_distance(_origins(plain))
-			if swarm_mean < plain_mean * 1.8 or swarm_min < 4.0:
+			# Separation is the MEAN push (calm, never saturating): a homing
+			# stream widens steadily instead of exploding apart.
+			if swarm_mean < plain_mean * 1.3 or swarm_min < 4.0:
 				problems.append("tick %d: swarm mean %.1f min %.1f vs plain mean %.1f" % [tick, swarm_mean, swarm_min, plain_mean])
 	assert_eq(reached.size(), 24, "every flocking bullet still reaches the target")
 	assert_eq("\n".join(problems), "", "the flock keeps the stream apart all the way")

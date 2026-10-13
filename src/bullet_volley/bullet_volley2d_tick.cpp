@@ -142,6 +142,7 @@ struct BulletVolley2D::MoveTick2D {
 	// Flocking: this volley's slice of the factory's pass (null = no turn).
 	const Vector2 *flock_steer = nullptr;
 	real_t flock_max_turn = 0.0; // this tick, radians (0 = unlimited)
+	real_t flock_blend = 1.0; // the blend-in fade of this tick (0..1)
 	// After a turn the bullet's rotation is aligned with the new heading
 	// when face_heading asks for it (and no rotation data owns the sprite),
 	// or when the rotation owns the heading (adjust_direction_based_on_
@@ -357,6 +358,12 @@ void BulletVolley2D::move_bullets(double delta) {
 		if (flock_config != nullptr && flock_config->enabled && flock_config->flock.is_valid() && flock_view_current()) {
 			t.flock_steer = bullet_factory->get_flock_solver().steer_data() + flock_view.base;
 			t.flock_max_turn = flock_view.max_turn_rad * (real_t)delta;
+			if (flock_view.blend_in_sec > 0.0) {
+				// Smoothstep of the volley's age at the end of this tick (the
+				// clock restarts with every spawn and pool reuse).
+				const real_t x = CLAMP((real_t)((curves_elapsed_time + delta) / (double)flock_view.blend_in_sec), (real_t)0.0, (real_t)1.0);
+				t.flock_blend = x * x * ((real_t)3.0 - (real_t)2.0 * x);
+			}
 			t.flock_face = flock_view.face_heading && !is_rotation_data_active;
 			t.flock_basis_owns_heading = adjust_direction_based_on_rotation && !rotate_only_textures;
 			t.flock_homing_basis = !t.shared_pattern && !is_rotation_data_active;
@@ -464,12 +471,15 @@ _ALWAYS_INLINE_ void BulletVolley2D::step_homing(const MoveTick2D &t, BulletStep
 	b.steering_deque = deque;
 }
 
-// 1b. FLOCKING. The factory's pass left one steering vector per bullet,
-// measured where every flockmate stood before this sweep moved anyone. The
-// heading turns toward it by 1 - e^(-|V| dt) of the angle (never past it,
-// the same at any frame rate), capped by the flock's turn rate. Only the
-// direction turns: the speed stays the speed data's. After homing (the
-// flock bends the homing heading), before the curves (Override wins).
+// 1b. FLOCKING. The factory's pass left one steering vector V per bullet,
+// measured where every flockmate stood before this sweep moved anyone. A
+// bullet flies at its own speed, so V acts like a sideways force on a car:
+// the heading turns at |V| sin(angle to V) radians per second (the part of
+// V pointing straight back cannot turn it: a flockmate dead ahead never
+// flips a bullet around), never past V's direction, capped by the flock's
+// turn rate and faded in over the flock's blend-in. Only the direction
+// turns: the speed stays the speed data's. After homing (the flock bends
+// the homing heading), before the curves (Override wins).
 _ALWAYS_INLINE_ void BulletVolley2D::step_flock(const MoveTick2D &t, BulletStep2D &b) {
 	if (t.flock_steer == nullptr) {
 		return;
@@ -492,10 +502,21 @@ _ALWAYS_INLINE_ void BulletVolley2D::step_flock(const MoveTick2D &t, BulletStep2
 	// The flight heading: a negative speed flies against the direction
 	// (rotating either by the same angle is the same turn).
 	const real_t sign = all_cached_speed[i] < 0.0 ? (real_t)-1.0 : (real_t)1.0;
-	const real_t fx = dir.x * sign;
-	const real_t fy = dir.y * sign;
-	const real_t phi = Math::atan2(fx * v.y - fy * v.x, fx * v.x + fy * v.y);
-	real_t theta = phi * ((real_t)1.0 - Math::exp(-Math::sqrt(steer_sq) * (real_t)t.delta));
+	const real_t inv_heading = (real_t)1.0 / Math::sqrt(heading_sq);
+	const real_t fx = dir.x * sign * inv_heading;
+	const real_t fy = dir.y * sign * inv_heading;
+	// cross = |V| sin(phi): the sideways part of V (radians per second).
+	const real_t cross = fx * v.y - fy * v.x;
+	const real_t dt = (real_t)t.delta * t.flock_blend;
+	real_t theta = cross * dt;
+	// |V| dt <= 1 can never turn past V (|sin phi| <= |phi|); beyond that the
+	// turn stops at V's direction.
+	if (steer_sq * dt * dt > (real_t)1.0) {
+		const real_t phi = Math::atan2(cross, fx * v.x + fy * v.y);
+		if (Math::abs(theta) > Math::abs(phi)) {
+			theta = phi;
+		}
+	}
 	if (t.flock_max_turn > 0.0) {
 		theta = CLAMP(theta, -t.flock_max_turn, t.flock_max_turn);
 	}
@@ -523,13 +544,15 @@ _ALWAYS_INLINE_ void BulletVolley2D::step_flock(const MoveTick2D &t, BulletStep2
 			// The rotation taking the forward axis onto the heading, made
 			// exactly unit (a rounding error repeated every tick would
 			// otherwise slowly scale the bullet).
-			real_t rc = fx * dir.x + fy * dir.y;
-			real_t rs = fx * dir.y - fy * dir.x;
-			const real_t r_inv = (real_t)1.0 / Math::sqrt(rc * rc + rs * rs);
+			// In double: one rounding per stored component, so thousands of
+			// small turns never drift the bullet's scale.
+			double rc = (double)fx * dir.x + (double)fy * dir.y;
+			double rs = (double)fx * dir.y - (double)fy * dir.x;
+			const double r_inv = 1.0 / std::sqrt(rc * rc + rs * rs);
 			rc *= r_inv;
 			rs *= r_inv;
-			x_axis = Vector2(x_axis.x * rc - x_axis.y * rs, x_axis.x * rs + x_axis.y * rc);
-			y_axis = Vector2(y_axis.x * rc - y_axis.y * rs, y_axis.x * rs + y_axis.y * rc);
+			x_axis = Vector2((real_t)(x_axis.x * rc - x_axis.y * rs), (real_t)(x_axis.x * rs + x_axis.y * rc));
+			y_axis = Vector2((real_t)(y_axis.x * rc - y_axis.y * rs), (real_t)(y_axis.x * rs + y_axis.y * rc));
 		}
 	}
 	b.direction_updated = true;

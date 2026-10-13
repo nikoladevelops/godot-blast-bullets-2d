@@ -194,6 +194,7 @@ uint32_t FlockSolver2D::group_for(const GroupKey &key, const BulletFlock2D &floc
 	g.sized = flock.count_bullet_size;
 	g.neighbor_range = (float)neighbor_range;
 	g.separation_range = (float)separation_range;
+	g.lookahead = (float)flock.separation_lookahead_sec;
 	g.max_neighbors = flock.max_neighbors > 0 ? (uint32_t)flock.max_neighbors : std::numeric_limits<uint32_t>::max();
 	g.update_interval = (double)flock.update_interval;
 	g.view_limited = flock.view_angle_degrees < 360.0;
@@ -378,9 +379,20 @@ void FlockSolver2D::add_volley(BulletVolley2D &volley, const FlockConfig2D &conf
 		mate.y = y;
 		mate.hx = (float)hx;
 		mate.hy = (float)hy;
-		mate.has_heading = (hx != 0.0 || hy != 0.0) ? 1u : 0u;
-		mate.ordinal = ordinal;
+		mate.ordinal = (ordinal & MATE_ORDINAL_MASK) | ((hx != 0.0 || hy != 0.0) ? MATE_HEADING_BIT : 0u);
 		mate.r = radius;
+		// Ahead along its own flight (0 lookahead: exactly here).
+		const float ahead = (float)(std::fabs((double)speeds[i]) * groups[group].lookahead);
+		mate.ax = x;
+		mate.ay = y;
+		if (ahead > 0.0f && finite_float(ahead)) {
+			const float ax = x + (float)hx * ahead;
+			const float ay = y + (float)hy * ahead;
+			if (finite_float(ax) && finite_float(ay)) {
+				mate.ax = ax;
+				mate.ay = ay;
+			}
+		}
 		m_mate.push_back(mate);
 	}
 
@@ -390,6 +402,7 @@ void FlockSolver2D::add_volley(BulletVolley2D &volley, const FlockConfig2D &conf
 	view.life = volley.volley_generation;
 	view.serial = config.serial;
 	view.max_turn_rad = (real_t)Math::deg_to_rad((double)flock->max_turn_rate_degrees);
+	view.blend_in_sec = flock->blend_in_sec;
 	view.face_heading = flock->face_heading;
 }
 
@@ -557,18 +570,25 @@ void FlockSolver2D::solve() {
 			++queried;
 			const float px = mates[self].x;
 			const float py = mates[self].y;
-			const uint32_t ordinal = mates[self].ordinal;
+			const uint32_t ordinal = mates[self].ordinal & MATE_ORDINAL_MASK;
 			// Field of view: around the flight heading (a bullet without one
 			// sees all around); stacked flockmates are always seen.
 			const float self_r = mates[self].r;
+			const float self_ax = mates[self].ax;
+			const float self_ay = mates[self].ay;
 			const float view_hx = mates[self].hx;
 			const float view_hy = mates[self].hy;
-			const bool cone = g.view_limited && mates[self].has_heading != 0;
+			const bool cone = g.view_limited && (mates[self].ordinal & MATE_HEADING_BIT) != 0;
+			const bool self_heading = (mates[self].ordinal & MATE_HEADING_BIT) != 0;
+			// A stacked bullet's lateral push, spread over -1..1 by the golden
+			// ratio of its ordinal: a stack fans out evenly.
+			const float fan_side = 2.0f * (float)((double)ordinal * 0.6180339887498949 - std::floor((double)ordinal * 0.6180339887498949)) - 1.0f;
 			uint32_t taken = 0;
 			uint32_t near_count = 0;
+			uint32_t sep_count = 0;
 			int64_t visited = 0;
 			uint32_t heading_count = 0;
-			float ox = 0.0f, oy = 0.0f, hx = 0.0f, hy = 0.0f, sx = 0.0f, sy = 0.0f;
+			float ox = 0.0f, oy = 0.0f, hx = 0.0f, hy = 0.0f, sx = 0.0f, sy = 0.0f, lat = 0.0f;
 			bool full = true;
 			// One flockmate: the rules' sums; jumps to `filled` at the cap.
 #define FLOCK_VISIT(INDEX)                                                                                                                                               \
@@ -589,20 +609,46 @@ void FlockSolver2D::solve() {
 				++near_count;                                                                                                                                            \
 				ox += dx;                                                                                                                                                \
 				oy += dy;                                                                                                                                                \
-				heading_count += mate.has_heading;                                                                                                                       \
+				heading_count += mate.ordinal >> 31;                                                                                                                     \
 				hx += mate.hx;                                                                                                                                           \
 				hy += mate.hy;                                                                                                                                           \
 			}                                                                                                                                                            \
 			if (sized ? (sep_range > 0.0f && d2 < sep_p * sep_p) : d2 < sep_sq) {                                                                                        \
-				if (d2 > (float)COINCIDENT_SQ) {                                                                                                                         \
-					/* (p - q) / d * (1 - gap / range), gap = d - rr:                                                                                                    \
-					   (p - q) * (1/d * (1 + rr/range) - 1/range) */                                                                                                     \
-					const float w = sized ? inv_sqrt2d(d2) * (1.0f + rr * inv_sep) - inv_sep : inv_sqrt2d(d2) - inv_sep;                                                 \
-					sx -= dx * w;                                                                                                                                        \
-					sy -= dy * w;                                                                                                                                        \
+				++sep_count;                                                                                                                                             \
+				/* lookahead: the offset where both will be (0 = exactly now) */                                                                                         \
+				const float qx = mate.ax - self_ax;                                                                                                                      \
+				const float qy = mate.ay - self_ay;                                                                                                                      \
+				const float q2 = qx * qx + qy * qy;                                                                                                                      \
+				if (q2 > (float)COINCIDENT_SQ) {                                                                                                                         \
+					/* the push: 1 - gap / range, gap = d - rr (an overlap pushes                                                                                        \
+					   at most twice as hard as touching); parting beyond the range                                                                                      \
+					   ahead pushes nothing */                                                                                                                           \
+					const float inv_d = inv_sqrt2d(q2);                                                                                                                  \
+					const float d = q2 * inv_d;                                                                                                                          \
+					/* branch-free: a pair parting beyond the range pushes 0 */                                                                                          \
+					const float push = MAX(sized ? MIN(1.0f + (rr - d) * inv_sep, 2.0f) : 1.0f - d * inv_sep, 0.0f);                                                     \
+					if (self_heading) {                                                                                                                                  \
+						/* a bullet keeps its speed: it steers SIDEWAYS (summed as a                                                                                     \
+						   scalar along its own perpendicular), away from the side                                                                                       \
+						   the flockmate is on, by the bearing (scale-free,                                                                                              \
+						   continuous, mirror-symmetric): the full push once the                                                                                         \
+						   flockmate is 30 degrees or more off the heading's line,                                                                                       \
+						   proportional closer to it; exactly on the line (a convoy)                                                                                     \
+						   the bullet's own fan side breaks the tie */                                                                                                   \
+						const float bearing = (qx * view_hy - qy * view_hx) * inv_d;                                                                                     \
+						lat += push * (Math::abs(bearing) > 1e-4f ? CLAMP(2.0f * bearing, -1.0f, 1.0f) : fan_side);                                                      \
+					} else {                                                                                                                                             \
+						sx -= qx * inv_d * push;                                                                                                                         \
+						sy -= qy * inv_d * push;                                                                                                                         \
+					}                                                                                                                                                    \
+				} else if (self_heading) {                                                                                                                               \
+					/* stacked: the bullet's own fan side (a stack fans out evenly                                                                                       \
+					   however its flockmates are sampled) */                                                                                                            \
+					lat += fan_side;                                                                                                                                     \
 				} else {                                                                                                                                                 \
-					/* stacked: part along the pair's own direction, opposite for the two */                                                                             \
-					const uint32_t other = mate.ordinal;                                                                                                                 \
+					/* stacked without a heading: along the pair's own direction,                                                                                        \
+					   opposite for the two */                                                                                                                           \
+					const uint32_t other = mate.ordinal & MATE_ORDINAL_MASK;                                                                                             \
 					const uint32_t pick = mix32(MIN(ordinal, other) * 0x9e3779b1u ^ mix32(MAX(ordinal, other))) & 63u;                                                   \
 					const float side = ordinal < other ? 1.0f : -1.0f;                                                                                                   \
 					sx += side * dirs.x[pick];                                                                                                                           \
@@ -649,12 +695,20 @@ void FlockSolver2D::solve() {
 			full = false;
 		filled:
 			checks += visited;
+			// The sideways separation of a bullet with a heading, along its
+			// perpendicular (-hy, hx).
+			sx -= lat * view_hy;
+			sy += lat * view_hx;
 			if (full) {
 				++capped;
 			}
 
-			double vx = g.separation * (double)sx;
-			double vy = g.separation * (double)sy;
+			// The MEAN push of the flockmates in separation range: a crowd
+			// pushes no harder than one overlapping flockmate, so the turn
+			// stays proportional (smooth) instead of saturating every tick.
+			const double sep_scale = sep_count > 0 ? g.separation / (double)sep_count : 0.0;
+			double vx = sep_scale * (double)sx;
+			double vy = sep_scale * (double)sy;
 			if (heading_count > 0) {
 				const double inv = 1.0 / (double)heading_count;
 				vx += g.alignment * (double)hx * inv;
@@ -677,7 +731,7 @@ void FlockSolver2D::solve() {
 			const uint32_t slot = s_slot[self];
 			steer[slot] = Vector2((real_t)vx, (real_t)vy);
 			neighbors[slot] = taken;
-		}
+		} //namespace BlastBullets2D
 	}
 	stats.neighbor_checks = checks;
 	stats.capped_members = capped;

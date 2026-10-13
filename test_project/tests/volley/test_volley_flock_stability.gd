@@ -46,7 +46,7 @@ func test_ten_thousand_stacked_bullets_cost_exactly_the_cap() -> void:
 	assert_eq(stats["grid_members"], 10000, "every bullet is in the grid")
 	assert_eq(stats["neighbor_checks"], 10000 * 32, "stacked: exactly 32 checks per bullet")
 	assert_eq(stats["capped_members"], 10000, "every bullet hit the cap")
-	_step(30)
+	_step(59) # a stack fans out at the separation turn rate (1.5 rad/s here)
 	assert_eq("\n".join(_broken_bullets(v).slice(0, 5)), "", "finite, unit headings")
 	var spread := Rect2(v.get_bullet_transform(0).origin, Vector2())
 	for i in range(0, 10000, 97):

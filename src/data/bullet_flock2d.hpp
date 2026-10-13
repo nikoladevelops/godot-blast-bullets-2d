@@ -19,9 +19,11 @@ using namespace godot;
 //     harder the closer they are;
 //   - alignment: the mean flight heading of its flockmates;
 //   - cohesion: the center of its flockmates.
-// Only the direction turns (speed stays owned by the speed data), with an
-// exponential approach that never overshoots and looks the same at any
-// frame rate.
+// Only the direction turns (speed stays owned by the speed data): a bullet
+// keeps its speed, so the wish acts like a sideways force on a car (the
+// heading turns at |V| sin(angle to V) radians per second, never past V's
+// direction, capped by max_turn_rate_degrees). A wish pointing straight
+// back cannot turn a bullet, so a flockmate dead ahead never flips it.
 //
 // Armed volleys keep a reference and the factory reads these fields once
 // per flock per tick, so a script that edits the resource changes every
@@ -44,15 +46,22 @@ public:
 
 	// Defaults tuned so homing + flocking is clearly visible out of the box
 	// with any sprite size (ranges are edge gaps, see count_bullet_size).
-	real_t separation = 12.0;
+	real_t separation = 10.0;
 	real_t alignment = 1.0;
 	real_t cohesion = 1.5;
 	real_t neighbor_range = 150.0;
 	real_t separation_range = 24.0;
+	// Separation measures where each pair will be this far ahead: bullets
+	// already moving apart push less (no zigzag in a crowd).
+	real_t separation_lookahead_sec = 0.2;
 	// Ranges measured between bullet EDGES (the drawn sprite times the
 	// bullet's scale) instead of centers: one setting fits every sprite size.
 	bool count_bullet_size = true;
-	real_t max_turn_rate_degrees = 0.0; // degrees per second, 0 = unlimited
+	// A cap keeps every turn a smooth arc (no snap in a crowded stack).
+	real_t max_turn_rate_degrees = 270.0; // degrees per second, 0 = unlimited
+	// A new bullet's steering fades in over this time (seconds since its
+	// volley spawned): a burst stacked at the muzzle opens up first.
+	real_t blend_in_sec = 0.3;
 	bool face_heading = true;
 	int max_neighbors = 32; // 0 = no limit
 	real_t update_interval = 0.0; // seconds between steering updates, 0 = every tick
@@ -73,11 +82,17 @@ public:
 	real_t get_separation_range() const;
 	void set_separation_range(real_t value);
 
+	real_t get_separation_lookahead_sec() const;
+	void set_separation_lookahead_sec(real_t value);
+
 	bool get_count_bullet_size() const;
 	void set_count_bullet_size(bool value);
 
 	real_t get_max_turn_rate_degrees() const;
 	void set_max_turn_rate_degrees(real_t value);
+
+	real_t get_blend_in_sec() const;
+	void set_blend_in_sec(real_t value);
 
 	bool get_face_heading() const;
 	void set_face_heading(bool value);

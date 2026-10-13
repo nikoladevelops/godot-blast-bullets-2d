@@ -65,7 +65,10 @@ func test_cohesion_turns_flockmates_toward_each_other() -> void:
 	assert_gt(s0.y, 0.0, "bullet 0 is pulled toward bullet 1 (+y)")
 	assert_almost_eq(s0.x, 0.0, 1e-6, "straight toward the center")
 	assert_almost_eq(s0.y, 30.0 / 100.0, 1e-5, "cohesion = mean offset / neighbor_range")
-	_step(20)
+	# A bullet keeps its speed: it turns at the sideways part of V, |V| sin
+	# (90 deg) = 0.3 rad/s, so one tick turns it by exactly 0.3 / 60.
+	assert_almost_eq(v.get_bullet_direction(0).angle(), 0.3 / 60.0, 1e-6, "turned at |V| sin(angle) rad/s")
+	_step(39)
 	var p: Array = _origins(v)
 	assert_lt((p[0] as Vector2).distance_to(p[1]), 25.0, "the gap closes")
 	assert_gt(v.get_bullet_direction(0).y, 0.0, "bullet 0 heads down")
@@ -445,9 +448,11 @@ func test_separation_counts_the_gap_between_bullet_edges() -> void:
 func test_overlapping_bullets_push_harder_than_touching_ones() -> void:
 	var touching := _sized([Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 64))], 64.0, H.make_flock(1.0, 0.0, 0.0, 100.0, 24.0, true))
 	var overlapping := _sized([Transform2D(0.0, Vector2(400, 0)), Transform2D(0.0, Vector2(400, 32))], 64.0, H.make_flock(1.0, 0.0, 0.0, 100.0, 24.0, true))
+	var slightly := _sized([Transform2D(0.0, Vector2(800, 0)), Transform2D(0.0, Vector2(800, 56))], 64.0, H.make_flock(1.0, 0.0, 0.0, 100.0, 24.0, true))
 	_step(1)
 	assert_almost_eq(touching.debug_get_bullet_flock_steering(0).y, -1.0, 1e-4, "touching (gap 0): the full weight")
-	assert_almost_eq(overlapping.debug_get_bullet_flock_steering(0).y, -1.0 * (1.0 + 32.0 / 24.0), 1e-4, "half overlapped (gap -32): harder")
+	assert_almost_eq(slightly.debug_get_bullet_flock_steering(0).y, -1.0 * (1.0 + 8.0 / 24.0), 1e-4, "overlapped by 8 px (gap -8): harder")
+	assert_almost_eq(overlapping.debug_get_bullet_flock_steering(0).y, -2.0, 1e-4, "half overlapped (gap -32): at most twice the touching push")
 
 
 func test_each_bullets_scale_counts() -> void:

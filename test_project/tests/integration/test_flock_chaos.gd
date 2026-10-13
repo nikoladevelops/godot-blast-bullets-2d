@@ -146,7 +146,10 @@ func _edit_flock() -> void:
 	if flocks.is_empty():
 		return
 	var f: BulletFlock2D = flocks[rng.randi() % flocks.size()]
-	match rng.randi() % 6:
+	match rng.randi() % 9:
+		6: f.blend_in_sec = rng.randf_range(0, 1)
+		7: f.separation_lookahead_sec = rng.randf_range(0, 1)
+		8: f.max_turn_rate_degrees = rng.randf_range(0, 720)
 		0: f.separation = rng.randf_range(0, 10)
 		1: f.alignment = rng.randf_range(0, 10)
 		2: f.cohesion = rng.randf_range(0, 10)
@@ -174,7 +177,9 @@ func _touch_volley() -> void:
 		5:
 			if v.is_bullet_status_enabled(i):
 				v.bullet_set_velocity(i, Vector2(rng.randf_range(-200, 200), rng.randf_range(-200, 200)))
-		6: volleys.append(factory.spawn_volley(trigger_data)) # its expiry runs _on_lifetime inside a sweep
+		6: # their expiry runs _on_lifetime inside a sweep
+			volleys.append(factory.spawn_volley(trigger_data))
+			volleys.append(factory.spawn_volley(trigger_data))
 
 
 func _on_lifetime(v: BulletVolley2D, _indexes: Array) -> void:

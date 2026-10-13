@@ -33,6 +33,9 @@ void BulletFlock2D::set_neighbor_range(real_t value) { store_amount(neighbor_ran
 real_t BulletFlock2D::get_separation_range() const { return separation_range; }
 void BulletFlock2D::set_separation_range(real_t value) { store_amount(separation_range, value, "separation_range", false); }
 
+real_t BulletFlock2D::get_separation_lookahead_sec() const { return separation_lookahead_sec; }
+void BulletFlock2D::set_separation_lookahead_sec(real_t value) { store_amount(separation_lookahead_sec, value, "separation_lookahead_sec", false); }
+
 bool BulletFlock2D::get_count_bullet_size() const { return count_bullet_size; }
 void BulletFlock2D::set_count_bullet_size(bool value) {
 	if (count_bullet_size == value) {
@@ -44,6 +47,9 @@ void BulletFlock2D::set_count_bullet_size(bool value) {
 
 real_t BulletFlock2D::get_max_turn_rate_degrees() const { return max_turn_rate_degrees; }
 void BulletFlock2D::set_max_turn_rate_degrees(real_t value) { store_amount(max_turn_rate_degrees, value, "max_turn_rate_degrees", false); }
+
+real_t BulletFlock2D::get_blend_in_sec() const { return blend_in_sec; }
+void BulletFlock2D::set_blend_in_sec(real_t value) { store_amount(blend_in_sec, value, "blend_in_sec", false); }
 
 bool BulletFlock2D::get_face_heading() const { return face_heading; }
 void BulletFlock2D::set_face_heading(bool value) {
@@ -104,6 +110,10 @@ void BulletFlock2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_separation_range", "value"), &BulletFlock2D::set_separation_range);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "separation_range", PROPERTY_HINT_RANGE, "0,500,0.5,or_greater,suffix:px"), "set_separation_range", "get_separation_range");
 
+	ClassDB::bind_method(D_METHOD("get_separation_lookahead_sec"), &BulletFlock2D::get_separation_lookahead_sec);
+	ClassDB::bind_method(D_METHOD("set_separation_lookahead_sec", "value"), &BulletFlock2D::set_separation_lookahead_sec);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "separation_lookahead_sec", PROPERTY_HINT_RANGE, "0,1,0.01,or_greater,suffix:s"), "set_separation_lookahead_sec", "get_separation_lookahead_sec");
+
 	ClassDB::bind_method(D_METHOD("get_count_bullet_size"), &BulletFlock2D::get_count_bullet_size);
 	ClassDB::bind_method(D_METHOD("set_count_bullet_size", "value"), &BulletFlock2D::set_count_bullet_size);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "count_bullet_size"), "set_count_bullet_size", "get_count_bullet_size");
@@ -111,6 +121,10 @@ void BulletFlock2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_max_turn_rate_degrees"), &BulletFlock2D::get_max_turn_rate_degrees);
 	ClassDB::bind_method(D_METHOD("set_max_turn_rate_degrees", "value"), &BulletFlock2D::set_max_turn_rate_degrees);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "max_turn_rate_degrees", PROPERTY_HINT_RANGE, "0,1440,1,or_greater,suffix:deg/s"), "set_max_turn_rate_degrees", "get_max_turn_rate_degrees");
+
+	ClassDB::bind_method(D_METHOD("get_blend_in_sec"), &BulletFlock2D::get_blend_in_sec);
+	ClassDB::bind_method(D_METHOD("set_blend_in_sec", "value"), &BulletFlock2D::set_blend_in_sec);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "blend_in_sec", PROPERTY_HINT_RANGE, "0,2,0.01,or_greater,suffix:s"), "set_blend_in_sec", "get_blend_in_sec");
 
 	ClassDB::bind_method(D_METHOD("get_face_heading"), &BulletFlock2D::get_face_heading);
 	ClassDB::bind_method(D_METHOD("set_face_heading", "value"), &BulletFlock2D::set_face_heading);

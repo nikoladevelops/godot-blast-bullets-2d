@@ -45,6 +45,7 @@ struct FlockView2D {
 	int life = -1;
 	uint32_t serial = 0;
 	real_t max_turn_rad = 0.0; // per second, 0 = unlimited
+	real_t blend_in_sec = 0.0; // steering fades in over the volley's first seconds
 	bool face_heading = false;
 };
 
@@ -55,15 +56,24 @@ struct FlockView2D {
 // and computes one steering vector per bullet. No user code runs inside;
 // every buffer only grows, so a warm pass allocates nothing.
 //
-// Steering V (per second, the volley turns its heading toward V's direction
-// by 1 - e^(-|V| dt) of the angle):
+// Steering V (radians per second; the volley turns its heading at the
+// sideways part of V, |V| sin(angle to V), never past V's direction):
 //   V = alignment * mean flight heading of the flockmates in neighbor_range
 //     + cohesion * mean offset to them / neighbor_range
-//     + separation * sum over flockmates closer than separation_range of
-//       (p - q) / d * (1 - gap / separation_range)
+//     + separation * MEAN over flockmates closer than separation_range of
+//       the push (1 - gap / separation_range, at most 2)
 // where gap = d (count_bullet_size off) or the distance between the two
 // bullets' edges, d - r_p - r_q (on; ranges then compare against the gap,
-// and overlapping bullets push harder than touching ones).
+// and overlapping bullets push harder than touching ones). The separation
+// pair is measured separation_lookahead_sec ahead (each along its own flight), so
+// flockmates already parting push less. A bullet with a heading is pushed
+// SIDEWAYS (perpendicular to its heading, at the full push) away from the
+// side the flockmate is on: a flockmate dead ahead turns it aside instead of
+// pushing it back (a constant-speed bullet cannot back off). Within a
+// quarter of the separation reach of its heading line the side blends into
+// the pair's rank (opposite for the two), so the side never flips with a
+// hair's change; stacked bullets fan out by a per-bullet golden-ratio side.
+// A bullet without a heading is pushed along (p - q) / d.
 // At most max_neighbors flockmates are read per bullet (0 = all): own cell
 // first (from the bullet's own position on: stacked bullets read different
 // flockmates), then the 8-ring, then the 16-ring, each ring started at a
@@ -128,6 +138,9 @@ private:
 		float neighbor_range = 0.0f;
 		float separation_range = 0.0f;
 		double max_radius = 0.0;
+		// Separation looks this far ahead (seconds): flockmates already
+		// parting push less, so a crowd parts without zigzagging.
+		float lookahead = 0.0f;
 		uint32_t max_neighbors = 0; // UINT32_MAX = no limit
 		uint32_t next_ordinal = 0;
 		double update_interval = 0.0; // > 0: refresh each bullet once per interval
@@ -153,10 +166,19 @@ private:
 		float y = 0.0f;
 		float hx = 0.0f; // flight heading (0, 0 = position only)
 		float hy = 0.0f;
-		uint32_t has_heading = 0; // 1 = counts for alignment
-		uint32_t ordinal = 0; // per flock, gather order (rotations, stacked pairs)
+		// Bits 0-30: per flock, gather order (rotations, stacked pairs);
+		// bit 31: has a heading (counts for alignment). Packed: the candidate
+		// loop streams these, and every byte per flockmate costs.
+		uint32_t ordinal = 0;
 		float r = 0.0f; // bullet radius (sized flocks only)
+		// Where the bullet will be separation_lookahead_sec ahead (its own
+		// flight: heading x speed), worked out once at gather: a pair's
+		// offset ahead is then one subtraction, like its offset now.
+		float ax = 0.0f;
+		float ay = 0.0f;
 	};
+	static constexpr uint32_t MATE_HEADING_BIT = 0x80000000u;
+	static constexpr uint32_t MATE_ORDINAL_MASK = 0x7fffffffu;
 	struct CellSlot {
 		uint32_t stamp = 0;
 		uint32_t group = 0;

@@ -133,9 +133,15 @@ static func graze_kinds(log: Array) -> Array:
 ## A flock with exact weights and ranges. count_bullet_size defaults OFF here:
 ## the rule tests pin the center-to-center pixel formulas (the edge-gap
 ## formulas have their own tests in volley/test_volley_flock_rules.gd).
+## The motion smoothing (blend-in, separation lookahead, turn cap) is OFF
+## here too: rule tests pin the rules alone (the smoothing has its own tests
+## in volley/test_volley_flock_motion.gd).
 static func make_flock(separation := 0.0, alignment := 0.0, cohesion := 0.0, neighbor_range := 100.0, separation_range := 40.0, count_bullet_size := false) -> BulletFlock2D:
 	var f := BulletFlock2D.new()
 	f.count_bullet_size = count_bullet_size
+	f.blend_in_sec = 0.0
+	f.separation_lookahead_sec = 0.0
+	f.max_turn_rate_degrees = 0.0
 	f.separation = separation
 	f.alignment = alignment
 	f.cohesion = cohesion
