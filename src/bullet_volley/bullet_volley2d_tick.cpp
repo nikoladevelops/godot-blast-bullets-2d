@@ -628,7 +628,8 @@ _ALWAYS_INLINE_ void BulletVolley2D::step_wobble(const MoveTick2D &t, BulletStep
 	}
 	b.direction_updated = true;
 	if (w.face_movement_direction && !is_rotation_data_active && delta > 0.0) {
-		const real_t target = dir.angle();
+		// The basis carries the texture rotation (the art's forward offset).
+		const real_t target = dir.angle() + cache_texture_rotation_radians;
 		const real_t current = b.transf->get_rotation();
 		const real_t diff = Math::fposmod(target - current + static_cast<real_t>(Math::PI), static_cast<real_t>(Math::TAU)) - static_cast<real_t>(Math::PI);
 		if (Math::is_finite(diff) && Math::abs(diff) > 0.00001) {
@@ -1171,7 +1172,8 @@ _ALWAYS_INLINE_ void BulletVolley2D::apply_direction_curve_texture_rotation_if_n
 		return;
 	}
 
-	real_t target = curr_bullet_direction.angle();
+	// The basis carries the texture rotation (the art's forward offset).
+	real_t target = curr_bullet_direction.angle() + cache_texture_rotation_radians;
 	real_t current = curr_bullet_transf.get_rotation();
 
 	real_t diff = Math::fposmod(target - current + static_cast<real_t>(Math::PI), static_cast<real_t>(Math::TAU)) - static_cast<real_t>(Math::PI);
@@ -1299,13 +1301,14 @@ _ALWAYS_INLINE_ bool BulletVolley2D::advance_movement_pattern(const Ref<Curve2D>
 		const Vector2 tangent = velocity_delta.normalized();
 		// Preserve scale like set_bullet_texture_rotation_towards_position does.
 		const Vector2 pattern_scale = curr_bullet_transf.get_scale();
-		curr_bullet_transf.set_rotation_and_scale(tangent.angle(), pattern_scale);
+		// The basis carries the texture rotation (the art's forward offset).
+		curr_bullet_transf.set_rotation_and_scale(tangent.angle() + cache_texture_rotation_radians, pattern_scale);
 	}
 	if (!repeat_pattern && distance_traveled >= len) {
 		if (face_movement_direction) {
 			const Vector2 logical_dir = curr_bullet_direction.normalized();
 			const Vector2 pattern_scale = curr_bullet_transf.get_scale();
-			curr_bullet_transf.set_rotation_and_scale(logical_dir.angle(), pattern_scale);
+			curr_bullet_transf.set_rotation_and_scale(logical_dir.angle() + cache_texture_rotation_radians, pattern_scale);
 		}
 		return false;
 	}

@@ -1033,8 +1033,11 @@ _ALWAYS_INLINE_ void BulletVolley2D::rotate_to_target(int bullet_index, const Ve
 	real_t dist_to_target = diff.length();
 	Vector2 face_dir = diff / dist_to_target;
 
-	// Adjust for texture offset: target_forward is the transform's [0] dir that makes visual face target
-	Vector2 target_forward = face_dir.rotated(-cache_texture_rotation_radians);
+	// The basis carries the texture rotation (heading + offset): the
+	// transform's [0] that makes the logical forward face the target is the
+	// face direction turned BY the offset (turning it back doubled the
+	// offset: a homing bullet with a texture rotation flew off course).
+	Vector2 target_forward = face_dir.rotated(cache_texture_rotation_radians);
 
 	// Current forward from transform
 	Vector2 current_forward = all_cached_instance_transforms[bullet_index][0].normalized();
