@@ -9,7 +9,9 @@ namespace BlastBullets2D {
 int BulletVolleyData2D::calculate_bitmask(const TypedArray<int> &numbers) {
 	int bitmask_value = 0;
 	for (int i = 0; i < numbers.size(); ++i) {
-		int n = static_cast<int>(numbers[i]);
+		// Read the whole 64-bit GDScript int: an int32 cast wrapped 2^32 + 1
+		// onto layer 1.
+		const int64_t n = numbers[i];
 		if (n < 1 || n > 32) {
 			UtilityFunctions::push_error("Invalid layer number " + String::num_int64(n) + " in calculate_bitmask. Valid range is 1..32. Ignoring.");
 			continue;

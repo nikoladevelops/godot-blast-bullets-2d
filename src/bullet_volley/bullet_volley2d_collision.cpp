@@ -285,7 +285,8 @@ bool BulletVolley2D::set_bullets_current_collision_count(const TypedArray<int> &
 	// Strict: slot i reads entry i. With the tile checkbox, wraps (i % size).
 	for (int i = 0; i < amount_bullets; ++i) {
 		const int src = tile_short_arrays ? (i % arr_size) : i;
-		const int collision_count = (src >= 0 && src < arr_size) ? (int)arr[src] : 0;
+		// The whole 64-bit GDScript int: an int32 cast wrapped 2^32 + 1 to 1.
+		const int64_t collision_count = (src >= 0 && src < arr_size) ? (int64_t)arr[src] : 0;
 		if (collision_count < 0) {
 			bullets_current_collision_count.push_back(0);
 			continue;
@@ -294,7 +295,7 @@ bool BulletVolley2D::set_bullets_current_collision_count(const TypedArray<int> &
 			continue;
 		}
 
-		bullets_current_collision_count.push_back(collision_count);
+		bullets_current_collision_count.push_back((int)Math::min(collision_count, (int64_t)INT32_MAX));
 	}
 
 	return true;

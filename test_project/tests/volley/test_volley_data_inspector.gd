@@ -94,3 +94,10 @@ func test_calculate_bitmask_keeps_the_layer_contract() -> void:
 		"Invalid layer number 0 in calculate_bitmask. Valid range is 1..32. Ignoring.",
 		"Invalid layer number 33 in calculate_bitmask. Valid range is 1..32. Ignoring.",
 	])
+	# GDScript ints are 64-bit: a number past the int32 range is out of
+	# range too, never wrapped onto a real layer (2^32 + 1 is not layer 1).
+	assert_eq(BulletVolleyData2D.calculate_bitmask([4294967297, -4294967294]), 0, "huge layers are skipped")
+	expect_error_sequence([
+		"Invalid layer number 4294967297 in calculate_bitmask. Valid range is 1..32. Ignoring.",
+		"Invalid layer number -4294967294 in calculate_bitmask. Valid range is 1..32. Ignoring.",
+	])

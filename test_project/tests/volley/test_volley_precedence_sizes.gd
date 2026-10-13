@@ -239,6 +239,17 @@ func test_collision_counts_strict_tiled_clamp() -> void:
 	var v11b: BulletVolley2D = factory.spawn_volley(d11b)
 	var cc2: Array = v11b.get_bullets_current_collision_count()
 	assert_true(int(cc2[0]) == 0 and int(cc2[1]) == 2, "counts clamp (neg->0, over->max-1)")
+	# Counts past the int32 range clamp the same way (never wrapped: 2^32 + 1
+	# is not one hit, 3e9 is not negative); with no max they saturate.
+	var d11h := H.make_volley_data(3, 100.0)
+	d11h.bullet_max_collision_count = 3
+	d11h.bullets_current_collision_count = [4294967297, 3000000000, -4294967295]
+	var hc: Array = Array(factory.spawn_volley(d11h).get_bullets_current_collision_count())
+	assert_eq(hc, [2, 2, 0], "huge counts clamp like any other")
+	var d11u := H.make_volley_data(1, 100.0)
+	d11u.bullet_max_collision_count = 0
+	d11u.bullets_current_collision_count = [3000000000]
+	assert_eq(Array(factory.spawn_volley(d11u).get_bullets_current_collision_count()), [2147483647], "no max: saturates")
 
 
 func test_custom_data_strict_tiled_never_falls_back_to_shared() -> void:
