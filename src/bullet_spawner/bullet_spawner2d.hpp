@@ -1417,6 +1417,10 @@ public:
 	// Same list as the editor warning triangle, callable from scripts
 	// (debug UIs, CI scene checks).
 	PackedStringArray get_setup_warnings() const { return _get_configuration_warnings(); }
+	// One plain sentence per steering group (homing, orbiting, flocking,
+	// graze, random sizes): what it will do now, why it would do nothing,
+	// which features fight; then the setup warnings (bullet_spawner2d_explain.cpp).
+	PackedStringArray debug_explain_features() const;
 
 	// Pattern bake cache (see PatternBake). AUTO: patterns whose raw
 	// transforms provably follow the generator rigidly are generated once

@@ -130,3 +130,48 @@ func test_burst_shots_flock_as_the_scope_says(scope: int = use_parameters([Bulle
 	var want: int = {BulletFlock2D.SCOPE_PER_VOLLEY: 6, BulletFlock2D.SCOPE_PER_SPAWNER: 2, BulletFlock2D.SCOPE_SHARED: 1}[scope]
 	assert_eq(stats["flocks"], want, "scope %d: %d flocks" % [scope, want])
 	assert_eq(stats["members"], 36, "every bullet of every shot flocks")
+
+
+func _line(lines: PackedStringArray, prefix: String) -> String:
+	for l in lines:
+		if l.begins_with(prefix):
+			return l
+	return ""
+
+
+func test_debug_explain_features_says_what_each_group_does_and_why_not() -> void:
+	var sp := _sized_spawner(6, Vector2.ZERO, 1.0, 1.0)
+	var lines := sp.debug_explain_features()
+	for prefix in ["Homing: off.", "Orbiting: off.", "Flocking: off.", "Graze: off."]:
+		assert_ne(_line(lines, prefix), "", prefix)
+	# Inert setups are explained.
+	sp.set_homing_enabled(true)
+	sp.homing_node_group = &"nobody_here"
+	sp.orbiting_enabled = true
+	sp.graze_enabled = true
+	sp.flock_enabled = true
+	lines = sp.debug_explain_features()
+	assert_string_contains(_line(lines, "Homing:"), "0 target(s) found now. Bullets fly straight until a target appears")
+	assert_string_contains(_line(lines, "Orbiting:"), "(no target found now)")
+	assert_string_contains(_line(lines, "Graze:"), "graze_zones is empty: nothing grazes")
+	assert_string_contains(_line(lines, "Flocking:"), "the factory's default flock (Swarm), scope Per Spawner. Turns at most 270 deg/s, eases in over 0.3 s.")
+	assert_string_contains(_line(lines, "Flocking:"), "separation (10.0 rad/s) outpaces homing (5.0 rad/s)")
+	assert_string_contains(_line(lines, "Flocking:"), "A bullet locked in an orbit is never turned by the flock.")
+	# A working setup.
+	make_graze_target(Vector2(500, 0), &"explain_targets")
+	sp.homing_node_group = &"explain_targets"
+	sp.graze_node_group = &"explain_targets"
+	sp.graze_zones = [H.make_graze_zone([30.0], true)]
+	sp.homing_reach_counts_bullet_size = true
+	sp.bullet_scale_mode = 1
+	sp.bullet_scale_max = 2.0
+	var f := BulletFlock2D.create_preset(BulletFlock2D.PRESET_SPREAD)
+	f.separation = 2.0
+	sp.flock = f
+	lines = sp.debug_explain_features()
+	assert_string_contains(_line(lines, "Homing:"), "1 target(s) found now. Turns at 5.0 rad/s (homing_smoothing). Reached within 5.0 px of each bullet's edge.")
+	assert_string_contains(_line(lines, "Graze:"), "1 zone(s), source Node Group, 1 target(s) found now; rings grow by each bullet's own size.")
+	assert_string_contains(_line(lines, "Flocking:"), "its own BulletFlock2D (Custom)")
+	assert_string_contains(_line(lines, "Flocking:"), "is weaker than homing (5.0 rad/s): bullets bunch up at the target.")
+	assert_string_contains(_line(lines, "Randomization:"), "bullet sizes vary (1.0 to 2.0)")
+	expect_no_errors("explaining pushes nothing")

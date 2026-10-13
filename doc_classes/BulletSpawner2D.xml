@@ -7,6 +7,20 @@
 		Assign a [BulletFactory2D], a [BulletVolleyData2D], and a [member pattern_source]. Each volley collects one global transform per bullet from the [member transforms_generator] (empty means this node; a generator outside the tree while the spawner is inside also falls back to this node) and spawns it through the factory. It never fires in the editor.
 		Homing quick-start: turn on [member homing_enabled], leave [member homing_target_source] on Node Group, and put your targets (any Node2D) in a group and name it in [member homing_node_group] (there is no default group: you decide who is chased). Every volley then chases [member homing_target_selection] targets with [member homing_smoothing] turn rate. Set [member homing_target_source] to Mouse to chase the cursor instead, and turn on [member orbiting_enabled] to make bullets ring their target once they arrive. Use [member homing_retarget_mode] so flying volleys keep following fresh targets, and [signal volley_bullet_homing_target_reached] to react when a bullet arrives.
 		Pattern quick-start: pick a [member pattern_source] helper (Ring, Fan, Spiral, Rose, Corridor...) or call [method apply_pattern_preset] for a starter, tune the matching helper_* group, and call [method shoot_once] (or enable [member shooting_enabled] for the auto loop). Add [member pattern_scale] / spin for motion, [member helper_skip_indices] for dodge doors, and [method spawn_pattern_list] for phased sequences. See [member pattern_source] for the full 33-mode list.
+		[b]Steering features and how they mix[/b] (each group has a master switch; every switch works on its own with sane defaults):
+		- [b]Homing[/b] ([member homing_enabled]): bullets turn toward a target at [member homing_smoothing] radians per second. Needs a target source (a group, path, name, the mouse...). Turns first every tick.
+		- [b]Orbiting[/b] ([member orbiting_enabled]): bullets that reach their homing target circle it. Depends on homing; a locked orbit owns the bullet (the flock never turns it).
+		- [b]Flocking[/b] ([member flock_enabled]): bullets avoid each other, line up and group. Works alone (an empty [member flock] flies the default rules); with homing it bends the homing heading, so a homing swarm spreads out on its way and buzzes around its target. Its separation (10 rad/s by default) outpaces the default homing (5 rad/s): raise [member homing_smoothing] above it for bullets that bunch up and hit fast.
+		- [b]Graze[/b] ([member graze_enabled]): reports bullets passing near targets ([signal bullet_grazed]); changes no motion, mixes with everything.
+		- [b]Randomization[/b] ([member bullet_scale_mode] and friends): random sizes, rotations and speeds per bullet. The flock, graze rings ([member BulletGrazeZone2D.count_bullet_size]) and homing reach ([member homing_reach_counts_bullet_size]) count each bullet's own size.
+		- Spawn-data features (wobble, rotation data, direction curves, bounce, gravity) run after homing and the flock: wobble sways on top, rotation data that spins a sprite owns its rotation, a bounce reflects the heading.
+		Call [method debug_explain_features] to read, in plain sentences, what each group will do with the current settings and why one would do nothing.
+		[b]Recipes:[/b]
+		- [i]Homing swarm chasing the player:[/i] [code]homing_enabled = true[/code], [code]homing_node_group = &amp;"player"[/code], [code]flock_enabled = true[/code]. Bullets spread out while they close in.
+		- [i]Burst that fans out, then flocks:[/i] [code]burst_enabled = true[/code], a Ring or Fan pattern, [code]flock_enabled = true[/code] with [member flock_scope] Shared: each shot opens up for [member BulletFlock2D.blend_in_sec], then the shots merge into one swarm.
+		- [i]Random-size swarm that never overlaps:[/i] [code]bullet_scale_mode = Uniform[/code] (0.5 to 2), [code]flock_enabled = true[/code], [code]flock = BulletFlock2D.create_preset(BulletFlock2D.PRESET_SPREAD)[/code].
+		- [i]Graze-able swarm:[/i] the homing swarm above plus [code]graze_enabled = true[/code], one [BulletGrazeZone2D] in [member graze_zones] and [member graze_node_group] naming the player: score points while dodging.
+		- [i]Orbit ring that keeps its spacing:[/i] [code]homing_enabled = true[/code], [code]orbiting_enabled = true[/code], [code]flock_enabled = true[/code] with the Spread preset: bullets space out while they fly in, then lock into the ring.
 		Reparenting is safe: removing the spawner from the tree and adding it back keeps assigned nodes, tracked homing volleys, burst chains, telegraphs and pattern lists. They pause while the spawner is out of the tree and resume when it returns. Node paths are rewritten from the live nodes on re-entry, so saving the scene keeps the right targets.
 	</description>
 	<tutorials>
@@ -79,6 +93,17 @@
 			<param index="2" name="ease" type="int" />
 			<description>
 				Static test hook: the easing value movement uses at [param t] for a [enum Tween.TransitionType] and [enum Tween.EaseType]. Matches [method Tween.interpolate_value] for every transition and ease (pinned by tests).
+			</description>
+		</method>
+		<method name="debug_explain_features" qualifiers="const">
+			<return type="PackedStringArray" />
+			<description>
+				Explains the spawner's steering features in plain sentences, one per group: Homing (its source, how many targets it finds right now, its turn rate and reach), Orbiting, Flocking (which flock and preset, the scope, the turn cap and blend-in, how it mixes with homing and orbiting), Graze (zones, source, targets found now, whether rings count bullet size) and Randomization (when sizes vary), followed by the setup warnings. Use it when a feature seems to do nothing:
+				[codeblock]
+				for line in $BulletSpawner2D.debug_explain_features():
+				    print(line)
+				# Homing: on, source Node Group, 0 target(s) found now. Bullets fly straight until a target appears ...
+				[/codeblock]
 			</description>
 		</method>
 		<method name="debug_get_graze_detector_stats" qualifiers="const">

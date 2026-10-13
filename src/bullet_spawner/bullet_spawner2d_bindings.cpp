@@ -986,6 +986,7 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_movement_path_node"), &BulletSpawner2D::get_movement_path_node);
 	ClassDB::bind_method(D_METHOD("set_movement_path_node", "node"), &BulletSpawner2D::set_movement_path_node);
 	ClassDB::bind_method(D_METHOD("get_setup_warnings"), &BulletSpawner2D::get_setup_warnings);
+	ClassDB::bind_method(D_METHOD("debug_explain_features"), &BulletSpawner2D::debug_explain_features);
 	ClassDB::bind_method(D_METHOD("movement_play"), &BulletSpawner2D::movement_play);
 	ClassDB::bind_method(D_METHOD("movement_pause"), &BulletSpawner2D::movement_pause);
 	ClassDB::bind_method(D_METHOD("movement_stop", "reset_to_start"), &BulletSpawner2D::movement_stop, DEFVAL(true));
