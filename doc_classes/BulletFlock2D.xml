@@ -8,7 +8,7 @@
 		- [member separation]: turn away from flockmates closer than [member separation_range] (personal space; this is what makes bullets avoid each other and re-order instead of overlapping).
 		- [member alignment]: turn toward the average heading of the flockmates within [member neighbor_range] (makes the swarm fly the same way, like a school of fish).
 		- [member cohesion]: turn toward the center of the flockmates within [member neighbor_range] (keeps the swarm together instead of drifting apart).
-		[b]How to use it:[/b] on a [BulletSpawner2D], open the Flocking group, turn on [member BulletSpawner2D.flock_enabled] and set [member BulletSpawner2D.flock] to a new BulletFlock2D. Turn on homing too ([member BulletSpawner2D.homing_enabled]) and you see the swarm right away: the defaults are tuned for that, for any sprite size. For a volley you spawned from the factory, call [method BulletVolley2D.flock_join]:
+		[b]How to use it:[/b] on a [BulletSpawner2D], open the Flocking group and turn on [member BulletSpawner2D.flock_enabled]: that alone works, an empty [member BulletSpawner2D.flock] slot flies the default rules (the factory's [method BulletFactory2D.get_default_flock]). To tune, set [member BulletSpawner2D.flock] to a new BulletFlock2D and pick a [member preset] (Swarm, School, Spread, Cluster) as a starting point. Turn on homing too ([member BulletSpawner2D.homing_enabled]) and you see the swarm right away: the defaults are tuned for that, for any sprite size. For a volley you spawned from the factory, call [method BulletVolley2D.flock_join]:
 		[codeblock]
 		var swarm := BulletFlock2D.new()
 		swarm.separation = 15.0        # stronger personal space than the default 10
@@ -39,6 +39,18 @@
 	</description>
 	<tutorials>
 	</tutorials>
+	<methods>
+		<method name="create_preset" qualifiers="static">
+			<return type="BulletFlock2D" />
+			<param index="0" name="preset" type="int" enum="BulletFlock2D.Preset" />
+			<description>
+				Returns a new flock with the rules of [param preset] (see [enum Preset]; [constant PRESET_CUSTOM] returns the defaults). A bad id pushes an error and returns null.
+				[codeblock]
+				$Spawner.flock = BulletFlock2D.create_preset(BulletFlock2D.PRESET_SCHOOL)
+				[/codeblock]
+			</description>
+		</method>
+	</methods>
 	<members>
 		<member name="alignment" type="float" setter="set_alignment" getter="get_alignment" default="1.0">
 			How strongly each bullet turns to fly the same way as its flockmates within [member neighbor_range] (per second).
@@ -69,6 +81,9 @@
 			How far a bullet sees its flockmates, in pixels: [member alignment] and [member cohesion] only consider flockmates closer than this. With [member count_bullet_size] (the default) it is the gap between the bullets' edges, so the default 150 works for any sprite size.
 			[b]Larger[/b] (250 to 400) makes the whole swarm act as one big group (and costs a little more); [b]smaller[/b] (50 to 100) makes many small groups that ignore each other. If the bullets spread out farther than this, they stop flocking because nobody is in range. Finite and &gt; 0.
 		</member>
+		<member name="preset" type="int" setter="apply_preset" getter="get_matching_preset" enum="BulletFlock2D.Preset" default="1">
+			The fastest way to a good swarm: pick a ready-made rule set in the inspector, then fine-tune. Picking one writes the steering knobs ([member separation], [member alignment], [member cohesion], both ranges, [member separation_lookahead_sec], [member max_turn_rate_degrees], [member blend_in_sec], [member view_angle_degrees]) and leaves [member count_bullet_size], [member face_heading], [member max_neighbors] and [member update_interval] alone. The menu shows the preset the current knobs match, or Custom once you tune one. It is never saved (the knobs are). From code: [code]flock.apply_preset(BulletFlock2D.PRESET_SPREAD)[/code] (or [code]flock.preset = ...[/code]), [code]flock.get_matching_preset()[/code], [method create_preset]. A bad id pushes an error and keeps the old values.
+		</member>
 		<member name="separation" type="float" setter="set_separation" getter="get_separation" default="10.0">
 			How fast each bullet turns away from flockmates inside [member separation_range] (radians per second at full push). Each flockmate pushes by [code]1 - gap / separation_range[/code] (touching: 1, overlapping: harder, at most 2) and the bullet averages the pushes of all of them, so a crowd never pushes harder than one overlapping flockmate and the turn stays smooth. A bullet keeps its speed, so it steers [b]sideways[/b] away from the side each flockmate is on: a flockmate dead ahead turns it aside, never around. Bullets stacked on the same spot fan out evenly.
 			This is the "avoid each other" rule: it keeps bullets from overlapping and makes them re-order around each other. The default 10 outpaces homing that turns at 5 per second (the spawner's default [member BulletSpawner2D.homing_smoothing]). [b]Raise it[/b] (15 to 20) for crisp personal space; [b]lower it[/b] (2 to 6) to let bullets brush past each other and reach a shared target sooner. It should usually be the strongest weight. 0 turns this rule off. Finite and &gt;= 0.
@@ -98,6 +113,21 @@
 		</constant>
 		<constant name="SCOPE_PER_VOLLEY" value="2" enum="Scope">
 			Each volley (one shot) is its own flock: waves pass through each other without reacting.
+		</constant>
+		<constant name="PRESET_CUSTOM" value="0" enum="Preset">
+			Your own values (picking it changes nothing; the menu shows it once a knob differs from every preset).
+		</constant>
+		<constant name="PRESET_SWARM" value="1" enum="Preset">
+			The defaults: a swarm that spreads out while it chases its target and keeps clear gaps between bullets of any size. Start here for homing swarms.
+		</constant>
+		<constant name="PRESET_SCHOOL" value="2" enum="Preset">
+			One aligned ribbon, like a school of fish: strong [member alignment] (3) and [member cohesion] (2), a gentle [member separation] (6), a 180 deg/s turn cap. Good for streams that sweep across the screen.
+		</constant>
+		<constant name="PRESET_SPREAD" value="3" enum="Preset">
+			Only avoid each other: [member alignment] and [member cohesion] 0, a wider personal space (32 px). Bullets keep their own paths and never overlap; ideal for bursts and random-size patterns.
+		</constant>
+		<constant name="PRESET_CLUSTER" value="4" enum="Preset">
+			Tight balls that swirl: strong [member cohesion] (5), a small personal space (8 px), a wide view (200 px). Good for blobs that orbit or roll toward the player.
 		</constant>
 	</constants>
 </class>

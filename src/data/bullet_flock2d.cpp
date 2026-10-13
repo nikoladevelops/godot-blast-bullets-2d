@@ -89,7 +89,82 @@ void BulletFlock2D::set_view_angle_degrees(real_t value) {
 	emit_changed();
 }
 
+namespace {
+
+// The steering knobs a preset writes, in one row per preset (index = id).
+struct FlockPresetRow2D {
+	real_t separation, alignment, cohesion, neighbor_range, separation_range, separation_lookahead_sec, max_turn_rate_degrees, blend_in_sec, view_angle_degrees;
+};
+constexpr FlockPresetRow2D FLOCK_PRESETS[] = {
+	{ 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // Custom: never written
+	{ 10.0, 1.0, 1.5, 150.0, 24.0, 0.2, 270.0, 0.3, 360.0 }, // Swarm (the defaults)
+	{ 6.0, 3.0, 2.0, 150.0, 16.0, 0.2, 180.0, 0.3, 360.0 }, // School
+	{ 10.0, 0.0, 0.0, 150.0, 32.0, 0.2, 270.0, 0.2, 360.0 }, // Spread
+	{ 6.0, 0.5, 5.0, 200.0, 8.0, 0.2, 360.0, 0.3, 360.0 }, // Cluster
+};
+constexpr int FLOCK_PRESET_COUNT = sizeof(FLOCK_PRESETS) / sizeof(FLOCK_PRESETS[0]);
+
+bool flock_preset_valid(int preset) {
+	return preset >= BulletFlock2D::PRESET_CUSTOM && preset < FLOCK_PRESET_COUNT;
+}
+
+const char *FLOCK_PRESET_IDS = "0 (Custom), 1 (Swarm), 2 (School), 3 (Spread) or 4 (Cluster)";
+
+} // namespace
+
+void BulletFlock2D::apply_preset(Preset preset) {
+	if (!flock_preset_valid(preset)) {
+		UtilityFunctions::push_error(String("BulletFlock2D: preset must be ") + FLOCK_PRESET_IDS + ", keeping the old values.");
+		return;
+	}
+	if (preset == PRESET_CUSTOM) {
+		return;
+	}
+	const FlockPresetRow2D &row = FLOCK_PRESETS[preset];
+	if (get_matching_preset() == preset) {
+		return;
+	}
+	separation = row.separation;
+	alignment = row.alignment;
+	cohesion = row.cohesion;
+	neighbor_range = row.neighbor_range;
+	separation_range = row.separation_range;
+	separation_lookahead_sec = row.separation_lookahead_sec;
+	max_turn_rate_degrees = row.max_turn_rate_degrees;
+	blend_in_sec = row.blend_in_sec;
+	view_angle_degrees = row.view_angle_degrees;
+	emit_changed();
+	notify_property_list_changed();
+}
+
+BulletFlock2D::Preset BulletFlock2D::get_matching_preset() const {
+	for (int id = PRESET_SWARM; id < FLOCK_PRESET_COUNT; ++id) {
+		const FlockPresetRow2D &row = FLOCK_PRESETS[id];
+		if (separation == row.separation && alignment == row.alignment && cohesion == row.cohesion && neighbor_range == row.neighbor_range && separation_range == row.separation_range && separation_lookahead_sec == row.separation_lookahead_sec && max_turn_rate_degrees == row.max_turn_rate_degrees && blend_in_sec == row.blend_in_sec && view_angle_degrees == row.view_angle_degrees) {
+			return (Preset)id;
+		}
+	}
+	return PRESET_CUSTOM;
+}
+
+Ref<BulletFlock2D> BulletFlock2D::create_preset(Preset preset) {
+	if (!flock_preset_valid(preset)) {
+		UtilityFunctions::push_error(String("BulletFlock2D.create_preset: preset must be ") + FLOCK_PRESET_IDS + ", nothing created.");
+		return Ref<BulletFlock2D>();
+	}
+	Ref<BulletFlock2D> flock;
+	flock.instantiate();
+	flock->apply_preset(preset);
+	return flock;
+}
+
 void BulletFlock2D::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("apply_preset", "preset"), &BulletFlock2D::apply_preset);
+	ClassDB::bind_method(D_METHOD("get_matching_preset"), &BulletFlock2D::get_matching_preset);
+	ClassDB::bind_static_method("BulletFlock2D", D_METHOD("create_preset", "preset"), &BulletFlock2D::create_preset);
+	// Editor only (never saved): picking a preset writes the knobs below.
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "preset", PROPERTY_HINT_ENUM, "Custom,Swarm,School,Spread,Cluster", PROPERTY_USAGE_EDITOR), "apply_preset", "get_matching_preset");
+
 	ClassDB::bind_method(D_METHOD("get_separation"), &BulletFlock2D::get_separation);
 	ClassDB::bind_method(D_METHOD("set_separation", "value"), &BulletFlock2D::set_separation);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "separation", PROPERTY_HINT_RANGE, "0,20,0.01,or_greater"), "set_separation", "get_separation");
@@ -145,5 +220,11 @@ void BulletFlock2D::_bind_methods() {
 	BIND_ENUM_CONSTANT(SCOPE_PER_SPAWNER);
 	BIND_ENUM_CONSTANT(SCOPE_SHARED);
 	BIND_ENUM_CONSTANT(SCOPE_PER_VOLLEY);
+
+	BIND_ENUM_CONSTANT(PRESET_CUSTOM);
+	BIND_ENUM_CONSTANT(PRESET_SWARM);
+	BIND_ENUM_CONSTANT(PRESET_SCHOOL);
+	BIND_ENUM_CONSTANT(PRESET_SPREAD);
+	BIND_ENUM_CONSTANT(PRESET_CLUSTER);
 }
 } //namespace BlastBullets2D

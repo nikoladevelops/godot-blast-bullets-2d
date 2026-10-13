@@ -676,9 +676,7 @@ PackedStringArray BulletSpawner2D::_get_configuration_warnings() const {
 		}
 	}
 	if (flock_enabled) {
-		if (flock.is_null()) {
-			out.push_back("Flocking is enabled but flock is empty: assign a BulletFlock2D, or the bullets fly without flocking.");
-		} else if (homing_enabled && spawn_data.is_valid() && (spawn_data->homing_smoothing <= 0.0 || spawn_data->shared_bullet_rotation_data.is_valid() || !spawn_data->all_bullet_rotation_data.is_empty() || !spawn_data->shared_movement_pattern_path.is_empty() || !spawn_data->all_bullet_movement_pattern_paths.is_empty())) {
+		if (homing_enabled && spawn_data.is_valid() && (spawn_data->homing_smoothing <= 0.0 || spawn_data->shared_bullet_rotation_data.is_valid() || !spawn_data->all_bullet_rotation_data.is_empty() || !spawn_data->shared_movement_pattern_path.is_empty() || !spawn_data->all_bullet_movement_pattern_paths.is_empty())) {
 			out.push_back("Flocking with homing that re-aims every tick (spawn_data homing_smoothing 0, rotation data or a movement pattern): the flock can only nudge the bullets. Give homing a turn rate (homing_smoothing > 0, no rotation data or pattern) so the swarm flocks on its way.");
 		}
 	}

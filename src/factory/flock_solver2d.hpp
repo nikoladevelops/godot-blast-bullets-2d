@@ -2,7 +2,10 @@
 
 #include "data/bullet_flock2d.hpp"
 
+#include <godot_cpp/variant/transform2d.hpp>
 #include <godot_cpp/variant/vector2.hpp>
+
+#include <cmath>
 
 #include <cstdint>
 #include <vector>
@@ -11,6 +14,19 @@ namespace BlastBullets2D {
 using namespace godot;
 
 class BulletVolley2D;
+
+// A bullet's radius for count_bullet_size: half the drawn quad's mean side
+// times the bullet's mean scale (0 when broken or absurd). The solver and
+// the debug readouts share it.
+inline double flock_quad_radius2d(const Vector2 &quad) {
+	return (Math::is_finite(quad.x) && Math::is_finite(quad.y)) ? MAX(0.0, 0.25 * ((double)quad.x + (double)quad.y)) : 0.0;
+}
+inline double flock_bullet_radius2d(double quad_radius, const Transform2D &pose) {
+	const double sx = std::sqrt((double)pose.columns[0].x * pose.columns[0].x + (double)pose.columns[0].y * pose.columns[0].y);
+	const double sy = std::sqrt((double)pose.columns[1].x * pose.columns[1].x + (double)pose.columns[1].y * pose.columns[1].y);
+	const double r = quad_radius * 0.5 * (sx + sy);
+	return (std::isfinite(r) && r > 0.0 && r < 1e7) ? r : 0.0;
+}
 
 // WHO flies together for one armed volley: the flock rules plus the scope
 // that turns them into a flock key. A spawner owns one (std::shared_ptr) and

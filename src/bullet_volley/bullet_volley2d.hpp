@@ -2786,6 +2786,11 @@ public:
 	// gave bullet_index (zero when not flocking or not gathered).
 	Vector2 debug_get_bullet_flock_steering(int bullet_index) const;
 	int debug_get_bullet_flock_neighbors(int bullet_index) const;
+	// One bullet's flocking at a glance: {flocking, flock, scope, steering,
+	// neighbors, blend (the blend-in fade now, 0..1), radius (its size for
+	// count_bullet_size, 0 when off), heading (its flight heading), facing
+	// (the sprite's forward angle, texture rotation stripped), max_turn_deg}.
+	Dictionary debug_get_bullet_flock_info(int bullet_index) const;
 	// True when the last pass gathered this volley in its current life.
 	bool flock_view_current() const;
 

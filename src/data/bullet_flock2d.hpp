@@ -44,6 +44,19 @@ public:
 		SCOPE_PER_VOLLEY = 2
 	};
 
+	// Ready-made rule sets (apply_preset / create_preset; the inspector's
+	// Preset menu). A preset writes the steering knobs only (weights, ranges,
+	// lookahead, turn cap, blend-in, view angle); bullet size, facing, the
+	// neighbor cap and the update interval are left alone. Never saved: the
+	// menu shows the preset the current values match (Custom otherwise).
+	enum Preset : int {
+		PRESET_CUSTOM = 0, // the values as they are (applying it changes nothing)
+		PRESET_SWARM = 1, // the defaults: spreads out while it chases, keeps clear gaps
+		PRESET_SCHOOL = 2, // one aligned ribbon: everybody heads the same way
+		PRESET_SPREAD = 3, // only avoid each other: no grouping, no lining up
+		PRESET_CLUSTER = 4 // tight balls that swirl
+	};
+
 	// Defaults tuned so homing + flocking is clearly visible out of the box
 	// with any sprite size (ranges are edge gaps, see count_bullet_size).
 	real_t separation = 10.0;
@@ -106,6 +119,13 @@ public:
 	real_t get_view_angle_degrees() const;
 	void set_view_angle_degrees(real_t value);
 
+	// Writes a preset's steering knobs (one `changed` when anything moved).
+	void apply_preset(Preset preset);
+	// The preset whose steering knobs equal the current ones, else Custom.
+	Preset get_matching_preset() const;
+	// A new flock with a preset's rules.
+	static Ref<BulletFlock2D> create_preset(Preset preset);
+
 protected:
 	static void _bind_methods();
 
@@ -116,3 +136,4 @@ private:
 } //namespace BlastBullets2D
 
 BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletFlock2D::Scope);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletFlock2D::Preset);

@@ -155,3 +155,62 @@ func test_flock_survives_a_tres_round_trip() -> void:
 		return
 	for prop in PROPS:
 		assert_eq(back.get(prop), f.get(prop), prop + " survives")
+
+
+func test_presets_write_the_steering_knobs_and_report_the_match() -> void:
+	var f := BulletFlock2D.new()
+	assert_eq(f.get_matching_preset(), BulletFlock2D.PRESET_SWARM, "the defaults are the Swarm preset")
+	f.count_bullet_size = false
+	f.face_heading = false
+	f.max_neighbors = 9
+	f.update_interval = 0.25 # exact in float32
+	watch_signals(f)
+	f.apply_preset(BulletFlock2D.PRESET_SCHOOL)
+	assert_signal_emit_count(f, "changed", 1, "one changed per preset")
+	assert_eq([f.separation, f.alignment, f.cohesion, f.neighbor_range, f.separation_range, f.max_turn_rate_degrees, f.view_angle_degrees],
+		[6.0, 3.0, 2.0, 150.0, 16.0, 180.0, 360.0], "School: an aligned ribbon")
+	assert_eq(f.get_matching_preset(), BulletFlock2D.PRESET_SCHOOL, "reported")
+	assert_eq([f.count_bullet_size, f.face_heading, f.max_neighbors, f.update_interval], [false, false, 9, 0.25], "size, facing, cap and interval are left alone")
+	f.apply_preset(BulletFlock2D.PRESET_SCHOOL)
+	f.apply_preset(BulletFlock2D.PRESET_CUSTOM)
+	assert_signal_emit_count(f, "changed", 1, "re-applying the same preset or Custom changes nothing")
+	f.preset = BulletFlock2D.PRESET_SPREAD
+	assert_eq([f.alignment, f.cohesion], [0.0, 0.0], "Spread: only avoid each other")
+	assert_eq(f.preset, BulletFlock2D.PRESET_SPREAD, "the inspector menu reads the match")
+	f.separation = 2.0
+	assert_eq(f.preset, BulletFlock2D.PRESET_CUSTOM, "a tuned knob is Custom")
+	f.apply_preset(5)
+	f.apply_preset(-1)
+	expect_error_sequence([
+		"BulletFlock2D: preset must be 0 (Custom), 1 (Swarm), 2 (School), 3 (Spread) or 4 (Cluster), keeping the old values.",
+		"BulletFlock2D: preset must be 0 (Custom), 1 (Swarm), 2 (School), 3 (Spread) or 4 (Cluster), keeping the old values.",
+	])
+	assert_eq(f.separation, 2.0, "kept")
+
+
+func test_create_preset_builds_each_preset() -> void:
+	for p in [BulletFlock2D.PRESET_CUSTOM, BulletFlock2D.PRESET_SWARM, BulletFlock2D.PRESET_SCHOOL, BulletFlock2D.PRESET_SPREAD, BulletFlock2D.PRESET_CLUSTER]:
+		var f := BulletFlock2D.create_preset(p)
+		assert_not_null(f, "preset %d built" % p)
+		var want: int = BulletFlock2D.PRESET_SWARM if p == BulletFlock2D.PRESET_CUSTOM else p
+		assert_eq(f.get_matching_preset(), want, "preset %d: its rules (Custom = the defaults)" % p)
+	assert_null(BulletFlock2D.create_preset(9), "a bad id builds nothing")
+	expect_error("BulletFlock2D.create_preset: preset must be 0 (Custom), 1 (Swarm), 2 (School), 3 (Spread) or 4 (Cluster), nothing created.")
+
+
+func test_the_preset_menu_is_editor_only_and_its_ids_are_locked() -> void:
+	assert_eq([BulletFlock2D.PRESET_CUSTOM, BulletFlock2D.PRESET_SWARM, BulletFlock2D.PRESET_SCHOOL, BulletFlock2D.PRESET_SPREAD, BulletFlock2D.PRESET_CLUSTER], [0, 1, 2, 3, 4], "ids")
+	var found := false
+	for p in ClassDB.class_get_property_list("BulletFlock2D", true):
+		if str(p["name"]) != "preset":
+			continue
+		found = true
+		assert_eq(str(p["hint_string"]), "Custom,Swarm,School,Spread,Cluster", "menu entries")
+		assert_true((int(p["usage"]) & PROPERTY_USAGE_EDITOR) != 0, "shown")
+		assert_eq(int(p["usage"]) & PROPERTY_USAGE_STORAGE, 0, "never saved (the knobs are)")
+	assert_true(found, "the inspector has a preset menu")
+	var f := BulletFlock2D.create_preset(BulletFlock2D.PRESET_CLUSTER)
+	assert_eq(ResourceSaver.save(f, TRES_PATH), OK, "saved")
+	var back := ResourceLoader.load(TRES_PATH, "", ResourceLoader.CACHE_MODE_IGNORE) as BulletFlock2D
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(TRES_PATH))
+	assert_eq(back.get_matching_preset(), BulletFlock2D.PRESET_CLUSTER, "the saved knobs still match the preset")

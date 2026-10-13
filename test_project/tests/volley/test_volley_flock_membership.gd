@@ -155,19 +155,18 @@ func test_stats_keys_are_exact() -> void:
 func test_bad_arguments_fail_loud_and_change_nothing() -> void:
 	var v := _volley(_cluster(Vector2(0, 0), 3, 1))
 	var f := H.make_flock(1.0, 1.0, 1.0)
-	assert_false(v.flock_join(null), "null refused")
 	assert_false(v.flock_join(f, 3), "scope 3 refused")
 	assert_false(v.flock_join(f, -1), "scope -1 refused")
 	expect_error_sequence([
-		"flock_join: flock is null (call flock_leave to stop flocking), nothing changed.",
 		"flock_join: scope must be 0 (Per Spawner), 1 (Shared) or 2 (Per Volley), nothing changed.",
 		"flock_join: scope must be 0 (Per Spawner), 1 (Shared) or 2 (Per Volley), nothing changed.",
 	])
 	assert_null(v.flock_get(), "still not flocking")
 	v.flock_join(f)
-	assert_false(v.flock_join(null), "null refused while flocking")
-	expect_error("flock_join: flock is null (call flock_leave to stop flocking), nothing changed.")
-	assert_eq(v.flock_get(), f, "the old membership is kept")
+	assert_true(v.flock_join(null), "null joins the factory's default flock")
+	expect_no_errors("null is the default rules, not an error")
+	assert_eq(v.flock_get(), factory.get_default_flock(), "the default flock")
+	assert_eq(v.flock_get_scope(), BulletFlock2D.SCOPE_SHARED, "with the default scope")
 	assert_eq(v.debug_get_bullet_flock_steering(3), Vector2(), "OOB reads zero")
 	assert_eq(v.debug_get_bullet_flock_neighbors(-1), 0, "OOB reads zero")
 	expect_error_sequence([
@@ -297,3 +296,34 @@ func test_a_freed_factory_takes_its_flocks_along() -> void:
 	var ref: WeakRef = weakref(f)
 	f = null
 	assert_null(ref.get_ref(), "no volley keeps the flock alive after its factory died")
+
+
+func test_debug_get_bullet_flock_info_reads_one_bullet_at_a_glance() -> void:
+	var tr := [Transform2D(0.0, Vector2(2, 2), 0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 30))]
+	var d := H.make_flight_data(tr, 100.0)
+	d.texture_size = Vector2(16, 16)
+	d.texture_rotation_radians = 0.5
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	var plain: Dictionary = v.debug_get_bullet_flock_info(0)
+	assert_eq(plain.keys(), ["flocking", "flock", "scope", "steering", "neighbors", "blend", "radius", "heading", "facing", "max_turn_deg"], "exact keys")
+	assert_eq([plain["flocking"], plain["blend"], plain["radius"], plain["scope"]], [false, 0.0, 0.0, -1], "a volley without a flock")
+	var f := BulletFlock2D.new()
+	f.blend_in_sec = 0.5
+	v.flock_join(f)
+	for k in 15:
+		factory.debug_advance_time(DT)
+	var info: Dictionary = v.debug_get_bullet_flock_info(0)
+	assert_true(info["flocking"], "flocking")
+	assert_eq(info["flock"], f, "its flock")
+	assert_eq(info["scope"], BulletFlock2D.SCOPE_SHARED, "join's default scope")
+	assert_eq(info["steering"], v.debug_get_bullet_flock_steering(0), "the pass's steering")
+	assert_eq(info["neighbors"], 1, "one flockmate")
+	var x := 0.25 / 0.5
+	assert_almost_eq(float(info["blend"]), x * x * (3.0 - 2.0 * x), 1e-6, "halfway through the blend-in")
+	assert_almost_eq(float(info["radius"]), 16.0, 1e-4, "a 16 px quad at 2x: radius 16")
+	assert_almost_eq(float(v.debug_get_bullet_flock_info(1)["radius"]), 8.0, 1e-4, "at 1x: radius 8")
+	assert_eq(info["heading"], v.get_bullet_direction(0), "the flight heading")
+	assert_almost_eq(float(info["facing"]), v.get_bullet_direction(0).angle(), 1e-4, "face_heading: the sprite (texture rotation stripped) faces the heading")
+	assert_eq(info["max_turn_deg"], 270.0, "the cap")
+	assert_eq(v.debug_get_bullet_flock_info(5), {}, "OOB: empty")
+	expect_error("Invalid bullet index in debug_get_bullet_flock_info: 5 (amount_bullets: 2)")

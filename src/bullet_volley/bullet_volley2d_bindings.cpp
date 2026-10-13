@@ -644,6 +644,7 @@ void BulletVolley2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("flock_get_scope"), &BulletVolley2D::flock_get_scope);
 	ClassDB::bind_method(D_METHOD("debug_get_bullet_flock_steering", "bullet_index"), &BulletVolley2D::debug_get_bullet_flock_steering);
 	ClassDB::bind_method(D_METHOD("debug_get_bullet_flock_neighbors", "bullet_index"), &BulletVolley2D::debug_get_bullet_flock_neighbors);
+	ClassDB::bind_method(D_METHOD("debug_get_bullet_flock_info", "bullet_index"), &BulletVolley2D::debug_get_bullet_flock_info);
 	BIND_CONSTANT(MAX_GRAZE_ZONES);
 }
 

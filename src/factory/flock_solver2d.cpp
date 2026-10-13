@@ -289,7 +289,7 @@ void FlockSolver2D::add_volley(BulletVolley2D &volley, const FlockConfig2D &conf
 	// times each bullet's own scale below.
 	const bool sized = groups[group].sized;
 	const Vector2 quad = volley.texture_size;
-	const double quad_radius = (Math::is_finite(quad.x) && Math::is_finite(quad.y)) ? MAX(0.0, 0.25 * ((double)quad.x + (double)quad.y)) : 0.0;
+	const double quad_radius = flock_quad_radius2d(quad);
 	const Transform2D *poses = volley.all_cached_instance_transforms.data();
 	const int pose_count = (int)volley.all_cached_instance_transforms.size();
 
@@ -336,11 +336,8 @@ void FlockSolver2D::add_volley(BulletVolley2D &volley, const FlockConfig2D &conf
 		}
 		float radius = 0.0f;
 		if (sized && i < pose_count) {
-			const Transform2D &pose = poses[i];
-			const double sx = std::sqrt((double)pose.columns[0].x * pose.columns[0].x + (double)pose.columns[0].y * pose.columns[0].y);
-			const double sy = std::sqrt((double)pose.columns[1].x * pose.columns[1].x + (double)pose.columns[1].y * pose.columns[1].y);
-			const double r = quad_radius * 0.5 * (sx + sy);
-			if (std::isfinite(r) && r > 0.0 && r < 1e7) {
+			const double r = flock_bullet_radius2d(quad_radius, poses[i]);
+			if (r > 0.0) {
 				radius = (float)r;
 				groups[group].max_radius = MAX(groups[group].max_radius, r);
 			}

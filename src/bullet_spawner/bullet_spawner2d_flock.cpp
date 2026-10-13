@@ -53,31 +53,45 @@ void BulletSpawner2D::set_flock_scope(BulletFlock2D::Scope value) {
 	on_config_changed();
 }
 
+Ref<BulletFlock2D> BulletSpawner2D::effective_flock() const {
+	if (flock.is_valid()) {
+		return flock;
+	}
+	// An empty slot flies the default rules: the factory's default flock.
+	BulletFactory2D *factory = get_bullet_factory();
+	return factory != nullptr ? factory->get_default_flock() : Ref<BulletFlock2D>();
+}
+
 void BulletSpawner2D::apply_flock_config() {
 	if (flock_shared == nullptr) {
 		return; // nothing armed yet: the first arm copies the settings
 	}
-	flock_shared->flock = flock;
+	flock_shared->flock = effective_flock();
 	flock_shared->scope = flock_scope;
 	flock_shared->enabled = flock_enabled;
 	++flock_shared->serial;
 }
 
 void BulletSpawner2D::apply_volley_flock(BulletVolley2D *volley) {
-	if (volley == nullptr || !flock_enabled || flock.is_null()) {
+	if (volley == nullptr || !flock_enabled) {
 		return;
 	}
 	if (flock_shared == nullptr) {
 		flock_shared = std::shared_ptr<FlockConfig2D>(new FlockConfig2D());
 		flock_shared->owner_id = get_instance_id();
 		apply_flock_config();
+	} else if (flock.is_null() && flock_shared->flock != effective_flock()) {
+		apply_flock_config(); // an empty slot follows the current factory's default
+	}
+	if (flock_shared->flock.is_null()) {
+		return; // no flock and no factory to lend its default
 	}
 	volley->flock_set_config(flock_shared);
 }
 
 int BulletSpawner2D::flock_live_volleys() {
 	BulletFactory2D *factory = get_bullet_factory();
-	if (factory == nullptr || !flock_enabled || flock.is_null()) {
+	if (factory == nullptr || !flock_enabled) {
 		return 0;
 	}
 	// Arming runs no user code: the list stays valid while it is walked.

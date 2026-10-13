@@ -611,6 +611,11 @@ public:
 	// BulletVolley2D::flock_set_config is the ONLY caller (arm +1, disarm -1).
 	void flock_note_armed(int delta) { flock_armed_volleys += delta; }
 	int get_flock_armed_volleys() const { return flock_armed_volleys; }
+	// The flock an empty flock slot stands for (a spawner's Flocking group
+	// with no BulletFlock2D, BulletVolley2D.flock_join(null)): one per
+	// factory, made on first use with the default rules. Editing it tunes
+	// every such flock of this factory.
+	Ref<BulletFlock2D> get_default_flock();
 	// {flocks, members, grid_members, neighbor_checks, capped_members, queried_members,
 	// pass_usec} of the last pass, plus armed_volleys.
 	Dictionary debug_get_flock_stats() const;
@@ -787,6 +792,7 @@ private:
 	SoundMixer2D sound_mixer;
 	FlockSolver2D flock_solver;
 	int flock_armed_volleys = 0;
+	Ref<BulletFlock2D> default_flock; // get_default_flock (made on first use)
 	uint64_t stats_last_flock_usec = 0;
 	// Bullet time of the flock passes (BulletFlock2D.update_interval).
 	double flock_clock = 0.0;

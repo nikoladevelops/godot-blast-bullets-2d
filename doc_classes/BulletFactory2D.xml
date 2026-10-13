@@ -422,6 +422,12 @@
 				Total live one-shot effect slots across all bakes (plus the manual hatch).
 			</description>
 		</method>
+		<method name="get_default_flock">
+			<return type="BulletFlock2D" />
+			<description>
+				The flock an empty flock slot stands for: a spawner with [member BulletSpawner2D.flock_enabled] on and no [member BulletSpawner2D.flock], and [method BulletVolley2D.flock_join] with null. One per factory, made on first use with the default rules ([constant BulletFlock2D.PRESET_SWARM]). Edit it to tune every such flock of this factory at once, e.g. [code]$BulletFactory2D.get_default_flock().separation = 15.0[/code].
+			</description>
+		</method>
 		<method name="get_frame_stats" qualifiers="const">
 			<return type="Dictionary" />
 			<description>

@@ -1,8 +1,9 @@
 extends BlastTest
 ## The spawner's Flocking group: flock_enabled + flock (BulletFlock2D) +
 ## flock_scope sit between Orbiting and Graze, the flock and scope hide while
-## flocking is off, bad scopes are refused with the standard wording, the
-## setup warnings name an empty flock and homing that re-aims every tick,
+## flocking is off, bad scopes are refused with the standard wording, an
+## empty flock slot flies the factory's default flock (no warning), the
+## setup warnings name homing that re-aims every tick,
 ## fired volleys are armed before volley_fired, the scopes group bullets
 ## across spawners and shots as documented, edits (off, on, a new flock, a
 ## new scope) reach bullets in flight while bullets fired with flocking off
@@ -85,11 +86,11 @@ func test_a_bad_scope_is_refused_and_kept() -> void:
 	assert_eq(sp.flock_scope, BulletFlock2D.SCOPE_SHARED, "kept")
 
 
-func test_setup_warnings_name_an_empty_flock_and_snapping_homing() -> void:
+func test_setup_warnings_name_snapping_homing_only() -> void:
 	var sp := make_spawner()
 	assert_false(_has(sp.get_setup_warnings(), "Flocking"), "off: no flocking warning")
 	sp.flock_enabled = true
-	assert_true(_has(sp.get_setup_warnings(), "Flocking is enabled but flock is empty"), "an empty flock is named")
+	assert_false(_has(sp.get_setup_warnings(), "Flocking"), "an empty slot flies the default rules: nothing to warn about")
 	sp.flock = BulletFlock2D.new()
 	assert_false(_has(sp.get_setup_warnings(), "Flocking"), "a flock without homing is fine")
 	sp.set_homing_enabled(true)
@@ -155,9 +156,9 @@ func test_edits_reach_bullets_in_flight_but_never_arm_old_shots() -> void:
 	_step(1)
 	assert_gt(v.debug_get_bullet_flock_neighbors(0), 0, "flocking by the new rules")
 	sp.flock = null
-	assert_null(v.flock_get(), "no flock: no flocking")
+	assert_eq(v.flock_get(), factory.get_default_flock(), "an emptied slot: the factory's default flock")
 	_step(1)
-	assert_eq(v.debug_get_bullet_flock_neighbors(0), 0, "nothing gathered")
+	assert_eq(factory.debug_get_flock_stats()["grid_members"], v.get_amount_bullets(), "still flocking, by the default rules")
 
 
 func test_a_handler_turning_flocking_off_mid_sweep_stops_the_turn_at_once() -> void:
@@ -266,7 +267,8 @@ func test_flock_live_volleys_arms_the_bullets_already_flying() -> void:
 	assert_gt(early.debug_get_bullet_flock_neighbors(0), 0, "they flock from the next tick")
 	assert_eq(early.debug_get_bullet_flock_neighbors(0), 7, "with the other early volley (Per Spawner)")
 	sp.flock = null
-	assert_eq(sp.flock_live_volleys(), 0, "no flock: nothing to arm")
+	assert_eq(sp.flock_live_volleys(), 0, "an emptied slot: the flying volleys already follow the default flock")
+	assert_eq(early.flock_get(), factory.get_default_flock(), "the default flock")
 
 
 func test_flock_live_volleys_replaces_a_script_join() -> void:
@@ -279,3 +281,27 @@ func test_flock_live_volleys_replaces_a_script_join() -> void:
 	assert_eq(v.flock_get(), f, "flying with the spawner's flock again")
 	sp.flock = _wide_flock()
 	assert_eq(v.flock_get(), sp.flock, "and its edits reach it again")
+
+
+func test_an_empty_flock_slot_flies_the_factory_default_flock() -> void:
+	# Flocking on, no BulletFlock2D: the bullets flock by the default rules,
+	# and every empty-slot spawner of one factory shares one default flock.
+	var a := _flock_spawner(null, BulletFlock2D.SCOPE_SHARED, Vector2(0, 0))
+	var b := _flock_spawner(null, BulletFlock2D.SCOPE_SHARED, Vector2(30, 0))
+	var va := _fire(a)
+	var vb := _fire(b)
+	var def: BulletFlock2D = factory.get_default_flock()
+	assert_not_null(def, "the factory lends a default flock")
+	assert_eq(factory.get_default_flock(), def, "always the same one")
+	assert_eq(def.get_matching_preset(), BulletFlock2D.PRESET_SWARM, "with the default (Swarm) rules")
+	assert_eq([va.flock_get(), vb.flock_get()], [def, def], "both spawners fly it")
+	_step(1)
+	# The rings are wider than the default range: each bullet sees only its
+	# twin of the other spawner, 30 px away (separate flocks would see 0).
+	assert_eq(va.debug_get_bullet_flock_neighbors(0), 1, "Shared: one flock across both spawners")
+	assert_null(a.flock, "the slot itself stays empty (nothing is saved)")
+	def.separation = 3.0
+	assert_eq(va.flock_get().separation, 3.0, "tuning the default flock tunes every empty slot of the factory")
+	var mine := BulletFlock2D.new()
+	a.flock = mine
+	assert_eq(va.flock_get(), mine, "assigning a flock takes over in flight")

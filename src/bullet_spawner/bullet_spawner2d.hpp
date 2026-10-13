@@ -1891,6 +1891,8 @@ private:
 	// reach bullets in flight; orphans keep it.
 	std::shared_ptr<FlockConfig2D> flock_shared;
 	void apply_flock_config();
+	// `flock`, or the factory's default flock while the slot is empty.
+	Ref<BulletFlock2D> effective_flock() const;
 	// Joins a freshly fired volley to flock (shoot_once, before the homing
 	// signals). Runs no user code.
 	void apply_volley_flock(BulletVolley2D *volley);

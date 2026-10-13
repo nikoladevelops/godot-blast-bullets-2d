@@ -36,6 +36,13 @@ _NO_INLINE_ void BulletFactory2D::run_flock_pass(double delta) {
 	flock_solver.set_pass_usec(stats_last_flock_usec);
 }
 
+Ref<BulletFlock2D> BulletFactory2D::get_default_flock() {
+	if (default_flock.is_null()) {
+		default_flock.instantiate();
+	}
+	return default_flock;
+}
+
 Dictionary BulletFactory2D::debug_get_flock_stats() const {
 	const FlockSolver2D::Stats &s = flock_solver.get_stats();
 	Dictionary d;

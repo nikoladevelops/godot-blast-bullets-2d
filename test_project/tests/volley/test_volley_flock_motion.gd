@@ -146,3 +146,12 @@ func test_a_pooled_volley_eases_in_again() -> void:
 	fresh.flock_join(g)
 	factory.debug_advance_time(DT)
 	assert_lt(eased, absf(fresh.get_bullet_direction(0).angle()) * 0.05, "the reused volley's clock restarted: it eases in again")
+
+
+func test_every_preset_flies_a_burst_calmly(preset: int = use_parameters([BulletFlock2D.PRESET_SWARM, BulletFlock2D.PRESET_SCHOOL, BulletFlock2D.PRESET_SPREAD, BulletFlock2D.PRESET_CLUSTER])) -> void:
+	var f := BulletFlock2D.create_preset(preset)
+	var probe := _burst(f, 64.0, 1.5)
+	assert_lte(probe.max_turn_deg_per_sec, f.max_turn_rate_degrees * 1.001, "preset %d: within its cap: %s" % [preset, probe.summary()])
+	assert_lt(probe.flips_per_bullet_sec(), 4.0, "preset %d: no jitter: %s" % [preset, probe.summary()])
+	assert_lt(probe.max_facing_error_deg, 0.01, "preset %d: sprites on the heading" % preset)
+	assert_eq(probe.nonfinite, 0, "finite")
