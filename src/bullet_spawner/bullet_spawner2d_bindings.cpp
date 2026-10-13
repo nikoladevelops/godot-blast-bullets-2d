@@ -602,6 +602,10 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_homing_distance_before_reached", "value"), &BulletSpawner2D::set_homing_distance_before_reached);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_distance_before_reached"), "set_homing_distance_before_reached", "get_homing_distance_before_reached");
 
+	ClassDB::bind_method(D_METHOD("get_homing_reach_counts_bullet_size"), &BulletSpawner2D::get_homing_reach_counts_bullet_size);
+	ClassDB::bind_method(D_METHOD("set_homing_reach_counts_bullet_size", "value"), &BulletSpawner2D::set_homing_reach_counts_bullet_size);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "homing_reach_counts_bullet_size"), "set_homing_reach_counts_bullet_size", "get_homing_reach_counts_bullet_size");
+
 	ClassDB::bind_method(D_METHOD("get_homing_take_control_of_texture_rotation"), &BulletSpawner2D::get_homing_take_control_of_texture_rotation);
 	ClassDB::bind_method(D_METHOD("set_homing_take_control_of_texture_rotation", "value"), &BulletSpawner2D::set_homing_take_control_of_texture_rotation);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "homing_take_control_of_texture_rotation"), "set_homing_take_control_of_texture_rotation", "get_homing_take_control_of_texture_rotation");

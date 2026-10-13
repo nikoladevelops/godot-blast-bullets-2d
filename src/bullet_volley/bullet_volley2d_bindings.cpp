@@ -388,6 +388,9 @@ void BulletVolley2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_homing_distance_before_reached"), &BulletVolley2D::get_homing_distance_before_reached);
 	ClassDB::bind_method(D_METHOD("set_homing_distance_before_reached", "value"), &BulletVolley2D::set_homing_distance_before_reached);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_distance_before_reached"), "set_homing_distance_before_reached", "get_homing_distance_before_reached");
+	ClassDB::bind_method(D_METHOD("get_homing_reach_counts_bullet_size"), &BulletVolley2D::get_homing_reach_counts_bullet_size);
+	ClassDB::bind_method(D_METHOD("set_homing_reach_counts_bullet_size", "value"), &BulletVolley2D::set_homing_reach_counts_bullet_size);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "homing_reach_counts_bullet_size"), "set_homing_reach_counts_bullet_size", "get_homing_reach_counts_bullet_size");
 
 	ClassDB::bind_method(D_METHOD("get_homing_smoothing"), &BulletVolley2D::get_homing_smoothing);
 	ClassDB::bind_method(D_METHOD("set_homing_smoothing", "value"), &BulletVolley2D::set_homing_smoothing);

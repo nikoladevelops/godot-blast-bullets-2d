@@ -591,6 +591,14 @@ void BulletVolleyData2D::set_homing_distance_before_reached(double value) {
 	emit_changed();
 }
 
+bool BulletVolleyData2D::get_homing_reach_counts_bullet_size() const {
+	return homing_reach_counts_bullet_size;
+}
+void BulletVolleyData2D::set_homing_reach_counts_bullet_size(bool value) {
+	homing_reach_counts_bullet_size = value;
+	emit_changed();
+}
+
 bool BulletVolleyData2D::get_homing_take_control_of_texture_rotation() const {
 	return homing_take_control_of_texture_rotation;
 }
@@ -1154,6 +1162,10 @@ void BulletVolleyData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_homing_distance_before_reached"), &BulletVolleyData2D::get_homing_distance_before_reached);
 	ClassDB::bind_method(D_METHOD("set_homing_distance_before_reached", "value"), &BulletVolleyData2D::set_homing_distance_before_reached);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_distance_before_reached"), "set_homing_distance_before_reached", "get_homing_distance_before_reached");
+
+	ClassDB::bind_method(D_METHOD("get_homing_reach_counts_bullet_size"), &BulletVolleyData2D::get_homing_reach_counts_bullet_size);
+	ClassDB::bind_method(D_METHOD("set_homing_reach_counts_bullet_size", "value"), &BulletVolleyData2D::set_homing_reach_counts_bullet_size);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "homing_reach_counts_bullet_size"), "set_homing_reach_counts_bullet_size", "get_homing_reach_counts_bullet_size");
 
 	ClassDB::bind_method(D_METHOD("get_homing_take_control_of_texture_rotation"), &BulletVolleyData2D::get_homing_take_control_of_texture_rotation);
 	ClassDB::bind_method(D_METHOD("set_homing_take_control_of_texture_rotation", "value"), &BulletVolleyData2D::set_homing_take_control_of_texture_rotation);

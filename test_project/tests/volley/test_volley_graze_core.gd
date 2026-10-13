@@ -101,6 +101,23 @@ func test_bullet_size_counts_for_each_shape_and_scale() -> void:
 		v.graze_clear()
 
 
+func test_each_bullet_counts_its_own_size() -> void:
+	# One volley, bullets of random sizes (a spawner's Randomization scale):
+	# a 3x bullet and a 1x bullet, each 30 px from a target. Ring 20 + the
+	# bullet's own radius: 20 + 12 reaches, 20 + 4 does not (the volley's
+	# largest bullet must not lend its size to the small one).
+	make_graze_target(Vector2(30, 0))
+	make_graze_target(Vector2(30, 200))
+	var log := H.record_graze(factory)
+	var v := graze_volley([Transform2D(0.0, Vector2(3, 3), 0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 200))], 0.0)
+	var z := H.make_graze_zone([20.0], true)
+	v.graze_set_zones([z], &"graze_targets")
+	step_factory()
+	assert_eq(H.graze_kinds(log), ["enter:0:0"], "only the big bullet grazes")
+	assert_true(v.is_bullet_inside_graze(0, 0), "the big bullet is inside")
+	assert_false(v.is_bullet_inside_graze(1, 0), "the small one is not")
+
+
 func _rect(size: Vector2) -> RectangleShape2D:
 	var r := RectangleShape2D.new()
 	r.size = size

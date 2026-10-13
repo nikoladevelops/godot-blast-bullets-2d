@@ -2432,6 +2432,9 @@
 		<member name="homing_lose_range_px" type="float" setter="set_homing_lose_range_px" getter="get_homing_lose_range_px" default="0.0">
 			Steering pauses while the bullet is farther than this from its target. 0 is unlimited.
 		</member>
+		<member name="homing_reach_counts_bullet_size" type="bool" setter="set_homing_reach_counts_bullet_size" getter="get_homing_reach_counts_bullet_size" default="false">
+			When on, the homing reach test adds the bullet's own size: [code]homing_distance_before_reached[/code] is measured from the bullet's EDGE (its collision shape's bounding radius times its own scale) instead of its center, so a big or randomly scaled bullet reaches (and auto-pops, and fires the reached signal) when it visibly touches its target. Off (the default) keeps the center-to-center distance. Seeded from [member BulletVolleyData2D.homing_reach_counts_bullet_size] (or the spawner's setting); changeable on a live volley.
+		</member>
 		<member name="homing_smoothing" type="float" setter="set_homing_smoothing" getter="get_homing_smoothing" default="0.0">
 			Adjust this value for natural smooth turning. Test with values [code]0.00-20.00[/code] or even bigger. Latch note: the first per-bullet write ([method bullet_set_homing_smoothing]) snapshots every sibling at the current shared value, so later shared writes only affect never-latched volleys — call [method clear_per_bullet_homing_smoothing] to hand control back to shared. The spawner equivalent fans [code]homing_smoothing_start + homing_smoothing_step * i[/code] per slot.
 		</member>

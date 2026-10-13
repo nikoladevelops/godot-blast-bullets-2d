@@ -1350,6 +1350,9 @@
 		<member name="homing_random_seed" type="int" setter="set_homing_random_seed" getter="get_homing_random_seed" default="0">
 			Seed for homing random-target selection ([constant BulletSpawner2D.HOMING_SELECT_RANDOM]) only. 0 is non-deterministic, otherwise picks reproduce. Only shown when that selection is active. Does not affect steering, smoothing, retargeting or any bullet pattern.
 		</member>
+		<member name="homing_reach_counts_bullet_size" type="bool" setter="set_homing_reach_counts_bullet_size" getter="get_homing_reach_counts_bullet_size" default="false">
+			When on, the homing reach test adds the bullet's own size: [code]homing_distance_before_reached[/code] is measured from the bullet's EDGE (its collision shape's bounding radius times its own scale) instead of its center, so a big or randomly scaled bullet reaches (and auto-pops, and fires the reached signal) when it visibly touches its target. Off (the default) keeps the center-to-center distance. Pair it with the Randomization group's [member bullet_scale_mode]: every bullet counts its own size. Example: a 64 px boulder with [code]homing_distance_before_reached = 5[/code] reaches when its edge is 5 px from the target.
+		</member>
 		<member name="homing_retarget_interval_sec" type="float" setter="set_homing_retarget_interval_sec" getter="get_homing_retarget_interval_sec" default="0.5">
 			Seconds between automatic retarget passes. Must be above zero.
 		</member>

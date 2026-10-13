@@ -197,6 +197,9 @@
 		<member name="homing_lose_range_px" type="float" setter="set_homing_lose_range_px" getter="get_homing_lose_range_px" default="0.0">
 			Steering pauses while the bullet is farther than this from its target. 0 = unlimited.
 		</member>
+		<member name="homing_reach_counts_bullet_size" type="bool" setter="set_homing_reach_counts_bullet_size" getter="get_homing_reach_counts_bullet_size" default="false">
+			When on, the homing reach test adds the bullet's own size: [code]homing_distance_before_reached[/code] is measured from the bullet's EDGE (its collision shape's bounding radius times its own scale) instead of its center, so a big or randomly scaled bullet reaches (and auto-pops, and fires the reached signal) when it visibly touches its target. Off (the default) keeps the center-to-center distance. A [BulletSpawner2D] overwrites it with [member BulletSpawner2D.homing_reach_counts_bullet_size].
+		</member>
 		<member name="homing_smoothing" type="float" setter="set_homing_smoothing" getter="get_homing_smoothing" default="0.0">
 			Shared homing turn agility (0 snaps instantly). Pooled reuse re-seeds this from the spawn data. Setting any per-bullet smoothing on the live volley switches it to per-bullet mode.
 		</member>

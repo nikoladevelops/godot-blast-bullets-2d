@@ -1029,6 +1029,7 @@ void BulletVolley2D::seed_motion_features(const BulletVolleyData2D &data) {
 	homing_update_timer = 0.0;
 	homing_take_control_of_texture_rotation = volley_data->homing_take_control_of_texture_rotation;
 	homing_distance_before_reached = (real_t)volley_data->homing_distance_before_reached;
+	homing_reach_counts_bullet_size = volley_data->homing_reach_counts_bullet_size;
 	bullet_homing_auto_pop_after_target_reached = volley_data->bullet_homing_auto_pop_after_target_reached;
 	shared_homing_deque_auto_pop_after_target_reached = volley_data->shared_homing_deque_auto_pop_after_target_reached;
 	linear_drag = (real_t)volley_data->linear_drag;

@@ -1695,6 +1695,9 @@ protected:
 
 	// Minimum distance (in pixels) from the homing target at which the bullet is considered to have reached it. Once within this distance, the bullet_homing_target_reached signal is emitted
 	real_t homing_distance_before_reached = 5.0;
+	// The reach test adds the bullet's own size (collision shape bounding
+	// radius x its scale): a big bullet reaches when its edge does.
+	bool homing_reach_counts_bullet_size = false;
 
 	// This tracks each bullet's homing deque - allows each bullet to have its own separate homing targets (per-bullet homing)
 	std::vector<HomingTargetDeque> all_bullet_homing_targets;
@@ -2285,6 +2288,8 @@ public:
 	void set_bullet_homing_auto_pop_after_target_reached(bool value) { bullet_homing_auto_pop_after_target_reached = value; }
 	real_t get_homing_distance_before_reached() const { return homing_distance_before_reached; }
 	void set_homing_distance_before_reached(real_t value);
+	bool get_homing_reach_counts_bullet_size() const { return homing_reach_counts_bullet_size; }
+	void set_homing_reach_counts_bullet_size(bool value) { homing_reach_counts_bullet_size = value; }
 	bool get_shared_homing_deque_auto_pop_after_target_reached() const { return shared_homing_deque_auto_pop_after_target_reached; }
 	void set_shared_homing_deque_auto_pop_after_target_reached(bool value) { shared_homing_deque_auto_pop_after_target_reached = value; }
 
@@ -2632,6 +2637,11 @@ public:
 		uint8_t ring_index[BulletGrazeZone2D::MAX_RINGS] = {};
 		uint8_t ring_slot[BulletGrazeZone2D::MAX_RINGS] = {};
 		bool regraze_after_exit = false;
+		// count_bullet_size: ring_r2 is inflated by the volley's LARGEST
+		// bullet (a cheap superset for the fast reject); graze_visit tests
+		// the bullet's own size against the raw radii (same sorted order).
+		bool sized = false;
+		real_t ring_raw[BulletGrazeZone2D::MAX_RINGS] = {};
 		// Outermost effective radius plus a rounding margin: no target
 		// farther than this in x can touch the zone.
 		real_t reach = 0.0;
@@ -2680,6 +2690,8 @@ public:
 	uint32_t graze_generation = 0;
 	// Largest bullet basis scale at arming time (bullet size scaling).
 	real_t graze_bullet_scale = 1.0;
+	// The shape's bounding radius at scale 1, read once per tick.
+	real_t graze_tick_shape_radius = 0.0;
 	std::vector<uint16_t> graze_state;
 	GrazeTickTargets2D graze_tick_targets;
 	GrazeTickZone2D graze_tick_zones[MAX_GRAZE_ZONES];

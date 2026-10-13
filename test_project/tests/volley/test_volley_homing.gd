@@ -96,3 +96,28 @@ func test_per_bullet_smoothing_fan() -> void:
 	assert_almost_eq(f.bullet_get_homing_smoothing(2), 6.0, 0.01, "per-bullet smoothing stored")
 	f.all_bullets_set_homing_smoothing(3.0)
 	assert_almost_eq(f.bullet_get_homing_smoothing(0), 3.0, 0.01, "all_bullets smoothing fans out")
+
+
+func test_homing_reach_can_count_the_bullets_own_size() -> void:
+	# A 4x bullet (circle r4: radius 16) resting 15 px from its target, a
+	# 5 px reach: off, it never reaches; on, its edge reaches (15 <= 5 + 16);
+	# a 1x bullet (radius 4) does not (15 > 5 + 4).
+	var got := {}
+	var made: Array = []
+	for counts in [false, true]:
+		var d := H.make_volley_data(2, 0.0, 60.0)
+		d.transforms = [Transform2D(0.0, Vector2(4, 4), 0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 300))]
+		d.collision_shape = H.make_circle_shape(4.0)
+		d.homing_distance_before_reached = 5.0
+		d.homing_reach_counts_bullet_size = counts
+		var v: BulletVolley2D = factory.spawn_volley(d)
+		var id := v.get_instance_id()
+		v.bullet_homing_target_reached.connect(func(_v, i: int, _t, _p) -> void: got[id * 10 + i] = true)
+		assert_eq(v.homing_reach_counts_bullet_size, counts, "seeded from the data")
+		v.bullet_homing_push_back_global_position_target(0, Vector2(15, 0))
+		v.bullet_homing_push_back_global_position_target(1, Vector2(15, 300))
+		made.append(v)
+	step_factory(2)
+	assert_false(got.has(made[0].get_instance_id() * 10), "off: the center must come within 5 px")
+	assert_true(got.has(made[1].get_instance_id() * 10), "on: the 4x bullet's edge reaches")
+	assert_false(got.has(made[1].get_instance_id() * 10 + 1), "on: a 1x bullet still needs 5 + 4 px")

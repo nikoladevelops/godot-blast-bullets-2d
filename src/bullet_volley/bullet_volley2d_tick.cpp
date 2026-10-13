@@ -1014,6 +1014,26 @@ _NO_INLINE_ void BulletVolley2D::graze_visit(int z, int bullet_index, const Vect
 	const GrazeTickTargets2D &tg = graze_tick_targets;
 	const GrazeTickZone2D &zone = graze_tick_zones[z];
 	const size_t at = (size_t)bullet_index * (size_t)graze_zone_slots + (size_t)z;
+	// The bullet's own size (count_bullet_size): its largest basis scale,
+	// at most the volley's largest measured at arming (the fast reject in
+	// step_graze used that one, so it stays a superset).
+	real_t ring_r2[BulletGrazeZone2D::MAX_RINGS];
+	if (zone.sized && bullet_index < (int)all_cached_instance_transforms.size()) {
+		const Transform2D &pose = all_cached_instance_transforms[bullet_index];
+		const real_t sx = pose.columns[0].x * pose.columns[0].x + pose.columns[0].y * pose.columns[0].y;
+		const real_t sy = pose.columns[1].x * pose.columns[1].x + pose.columns[1].y * pose.columns[1].y;
+		real_t own = Math::sqrt(MAX(sx, sy));
+		own = (Math::is_finite(own) && own > (real_t)0.0) ? MIN(own, graze_bullet_scale) : graze_bullet_scale;
+		const real_t inflate = graze_tick_shape_radius * own;
+		for (int s = 0; s < zone.ring_count; ++s) {
+			const real_t r = zone.ring_raw[s] + inflate;
+			ring_r2[s] = r * r;
+		}
+	} else {
+		for (int s = 0; s < zone.ring_count; ++s) {
+			ring_r2[s] = zone.ring_r2[s];
+		}
+	}
 	// The nearest target to the end point among those that can be inside
 	// the zone (the x slab of the zone's reach when sorted); none = INF.
 	real_t end = (real_t)Math::INF;
@@ -1049,7 +1069,7 @@ _NO_INLINE_ void BulletVolley2D::graze_visit(int z, int bullet_index, const Vect
 	uint32_t anchor = graze_anchor[at];
 	bool was_inside = (st & GRAZE_INSIDE) != 0;
 	if (was_inside && tg.anchor_changed(anchor)) {
-		if (end <= zone.ring_r2[0]) {
+		if (end <= ring_r2[0]) {
 			// Still inside another target: the visit moves on to it.
 			anchor = tg.slots[end_target];
 		} else {
@@ -1062,14 +1082,14 @@ _NO_INLINE_ void BulletVolley2D::graze_visit(int z, int bullet_index, const Vect
 		}
 	}
 	// Not inside (or the visit just ended silently) and nothing touched.
-	if (!(swept <= zone.ring_r2[0]) && !was_inside) {
+	if (!(swept <= ring_r2[0]) && !was_inside) {
 		graze_state[at] = st;
 		graze_anchor[at] = anchor;
 		return;
 	}
 	// Rings are sorted largest first: the touched ones are a prefix.
 	int touched = 0;
-	while (touched < zone.ring_count && swept <= zone.ring_r2[touched]) {
+	while (touched < zone.ring_count && swept <= ring_r2[touched]) {
 		++touched;
 	}
 	if (touched > 0) {
@@ -1104,7 +1124,7 @@ _NO_INLINE_ void BulletVolley2D::graze_visit(int z, int bullet_index, const Vect
 			graze_events.push_back(ev);
 		}
 	}
-	if (end <= zone.ring_r2[0]) {
+	if (end <= ring_r2[0]) {
 		st |= GRAZE_INSIDE;
 	} else if (was_inside || touched > 0) {
 		// The visit ends with the bullet alive and outside: the exit
@@ -1499,7 +1519,18 @@ _ALWAYS_INLINE_ void BulletVolley2D::try_to_emit_bullet_homing_target_reached_si
 	const real_t closest_dx = bullet_pos.x + seg_x * t - target_pos.x;
 	const real_t closest_dy = bullet_pos.y + seg_y * t - target_pos.y;
 	real_t post_dist_sq = closest_dx * closest_dx + closest_dy * closest_dy;
-	real_t threshold_sq = homing_distance_before_reached * homing_distance_before_reached;
+	real_t threshold = homing_distance_before_reached;
+	if (homing_reach_counts_bullet_size && bullet_index >= 0 && bullet_index < (int)all_cached_instance_transforms.size()) {
+		// Its edge reaches: the shape's bounding radius times its own scale.
+		const Transform2D &pose = all_cached_instance_transforms[bullet_index];
+		const real_t sx = pose.columns[0].x * pose.columns[0].x + pose.columns[0].y * pose.columns[0].y;
+		const real_t sy = pose.columns[1].x * pose.columns[1].x + pose.columns[1].y * pose.columns[1].y;
+		const real_t size = graze_shape_bound_radius2d(cached_effective_shape_type, cached_circle_radius, cached_rect_size, cached_capsule_height) * Math::sqrt(MAX(sx, sy));
+		if (Math::is_finite(size) && size > (real_t)0.0) {
+			threshold += size;
+		}
+	}
+	real_t threshold_sq = threshold * threshold;
 	if (post_dist_sq <= threshold_sq) { // Fully squared for perf
 
 		HomingTarget &target = homing_deque.front();

@@ -574,6 +574,7 @@ public:
 	// A target counts as reached inside this distance (predictive, so
 	// fast bullets still trigger). Must stay finite and >= 0.
 	double homing_distance_before_reached = 5.0;
+	bool homing_reach_counts_bullet_size = false;
 	bool homing_take_control_of_texture_rotation = true;
 	// Pop the reached target so the queue advances: per bullet in
 	// per-bullet mode, once per tick for the shared queue in shared mode.
@@ -670,6 +671,8 @@ public:
 	void set_homing_update_interval(double value);
 	double get_homing_distance_before_reached() const;
 	void set_homing_distance_before_reached(double value);
+	bool get_homing_reach_counts_bullet_size() const;
+	void set_homing_reach_counts_bullet_size(bool value);
 	bool get_homing_take_control_of_texture_rotation() const;
 	void set_homing_take_control_of_texture_rotation(bool value);
 	bool get_homing_auto_pop_after_target_reached() const;

@@ -35,7 +35,7 @@
 	</methods>
 	<members>
 		<member name="count_bullet_size" type="bool" setter="set_count_bullet_size" getter="get_count_bullet_size" default="true">
-			When on, a bullet's collision bounding radius (circle radius, half the shorter rectangle side, half the capsule height, times the bullet's scale) is added to every ring, so big bullets graze earlier. Off measures center to center.
+			When on, a bullet's collision bounding radius (circle radius, half the shorter rectangle side, half the capsule height, times the bullet's scale) is added to every ring, so big bullets graze earlier. Each bullet counts its OWN size, so a volley of randomly scaled bullets (the spawner's Randomization group) grazes bullet by bullet; a bullet scaled up after the zones were armed counts at most the largest size measured then. Off measures center to center.
 		</member>
 		<member name="enabled" type="bool" setter="set_enabled" getter="get_enabled" default="true">
 			When off, the zone tests nothing and bullets inside it end their visit silently. Applies to bullets in flight on the next tick.

@@ -504,6 +504,7 @@ public:
 	// Distance in pixels at which a bullet counts as having reached its
 	// target. Must stay finite and >= 0.
 	double homing_distance_before_reached = 5.0;
+	bool homing_reach_counts_bullet_size = false;
 
 	// Whether homing steers the bullet facing (leave off when a movement
 	// pattern, rotation data, or orbiting texture mode already owns it).
@@ -628,6 +629,8 @@ public:
 
 	double get_homing_distance_before_reached() const;
 	void set_homing_distance_before_reached(double value);
+	bool get_homing_reach_counts_bullet_size() const;
+	void set_homing_reach_counts_bullet_size(bool value);
 
 	bool get_homing_take_control_of_texture_rotation() const;
 	void set_homing_take_control_of_texture_rotation(bool value);

@@ -704,6 +704,7 @@ void BulletVolley2D::clear_homing_state_for_teardown() {
 	homing_smoothing = 0.0;
 	homing_take_control_of_texture_rotation = false;
 	homing_distance_before_reached = 5.0;
+	homing_reach_counts_bullet_size = false;
 	bullet_homing_auto_pop_after_target_reached = false;
 	shared_homing_deque_auto_pop_after_target_reached = false;
 	adjust_direction_based_on_rotation = false;

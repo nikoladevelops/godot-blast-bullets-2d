@@ -313,6 +313,14 @@ void BulletSpawner2D::set_homing_distance_before_reached(double value) {
 	homing_distance_before_reached = value;
 }
 
+bool BulletSpawner2D::get_homing_reach_counts_bullet_size() const {
+	return homing_reach_counts_bullet_size;
+}
+
+void BulletSpawner2D::set_homing_reach_counts_bullet_size(bool value) {
+	homing_reach_counts_bullet_size = value;
+}
+
 bool BulletSpawner2D::get_homing_take_control_of_texture_rotation() const {
 	return homing_take_control_of_texture_rotation;
 }
@@ -1113,6 +1121,7 @@ void BulletSpawner2D::apply_steering_to_volley(BulletVolley2D *volley) const {
 	volley->set_homing_smoothing((real_t)homing_smoothing);
 	volley->set_homing_update_interval((real_t)homing_update_interval);
 	volley->set_homing_distance_before_reached((real_t)homing_distance_before_reached);
+	volley->set_homing_reach_counts_bullet_size(homing_reach_counts_bullet_size);
 	volley->set_homing_take_control_of_texture_rotation(homing_take_control_of_texture_rotation);
 	// One switch for both queue kinds: the volley only reads the one that
 	// matches its homing mode.

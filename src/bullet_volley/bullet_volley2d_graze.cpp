@@ -201,8 +201,10 @@ void BulletVolley2D::prepare_graze_tick() {
 		return;
 	}
 	// Bullet size: the shape's bounding radius (read every tick: a runtime
-	// shape change counts at once) times the scale measured at arming.
-	const real_t bullet_radius = graze_shape_bound_radius2d(cached_effective_shape_type, cached_circle_radius, cached_rect_size, cached_capsule_height) * graze_bullet_scale;
+	// shape change counts at once) times the largest scale measured at
+	// arming; graze_visit narrows it to each bullet's own scale.
+	graze_tick_shape_radius = graze_shape_bound_radius2d(cached_effective_shape_type, cached_circle_radius, cached_rect_size, cached_capsule_height);
+	const real_t bullet_radius = graze_tick_shape_radius * graze_bullet_scale;
 	// The targets: one list for every zone, updated at most once per sweep
 	// and shared by every volley of its detector. Read in place; copied only
 	// when few (inline) or when this volley's owner spawner is one of them.
@@ -292,8 +294,10 @@ void BulletVolley2D::prepare_graze_tick() {
 				radius[at] = value;
 				tz.ring_index[at] = (uint8_t)r;
 			}
+			tz.sized = zone->count_bullet_size;
 			for (int s = 0; s < tz.ring_count; ++s) {
 				tz.ring_r2[s] = radius[s] * radius[s];
+				tz.ring_raw[s] = radius[s] - inflate;
 				tz.ring_slot[tz.ring_index[s]] = (uint8_t)s;
 			}
 			tz.regraze_after_exit = zone->regraze == BulletGrazeZone2D::REGRAZE_AFTER_EXIT;
