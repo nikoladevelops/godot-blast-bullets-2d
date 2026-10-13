@@ -26,6 +26,20 @@ void BulletFactory2D::snapshot_active_volleys() {
 	}
 }
 
+std::vector<BulletFactory2D::VolleyIterationEntry> BulletFactory2D::snapshot_volley_entries() const {
+	std::vector<VolleyIterationEntry> entries;
+	entries.reserve(all_volleys.size());
+	for (BulletVolley2D *volley : all_volleys) {
+		if (volley != nullptr) {
+			VolleyIterationEntry entry;
+			entry.volley = volley;
+			entry.id = volley->get_cached_instance_id();
+			entries.push_back(entry);
+		}
+	}
+	return entries;
+}
+
 // The snapshot entry's volley if it still exists (a handler may have freed
 // it since), else nullptr. One ObjectDB lookup, no dereference before it.
 static _ALWAYS_INLINE_ BulletVolley2D *resolve_iteration_entry(uint64_t id, BulletVolley2D *volley) {
@@ -47,9 +61,9 @@ double BulletFactory2D::volley_time_factor(const BulletVolley2D &volley) const {
 	return Math::is_finite(factor) && factor > 0.0 ? factor : 0.0;
 }
 
-void BulletFactory2D::tick_volleys(double delta) {
+bool BulletFactory2D::tick_volleys(double delta, const bool &alive) {
 	if (!Math::is_finite(delta) || delta < 0.0) {
-		return;
+		return true;
 	}
 	snapshot_active_volleys();
 	// Flocks steer by where every member stood before this sweep moved any
@@ -85,10 +99,16 @@ void BulletFactory2D::tick_volleys(double delta) {
 		// Attachments hear the scale change first (user code: it may free the
 		// volley, hence the same liveness check as after the tick).
 		volley->apply_attachment_time_scale(time_factor);
+		if (!alive) {
+			return false; // user code freed this factory
+		}
 		if (volley_free_epoch != epoch_before_tick && ObjectDB::get_instance(ObjectID(entry.id)) != (Object *)volley) {
 			continue;
 		}
 		volley->tick(volley_delta);
+		if (!alive) {
+			return false;
+		}
 		if (volley_free_epoch != epoch_before_tick && ObjectDB::get_instance(ObjectID(entry.id)) != (Object *)volley) {
 			continue; // a handler freed this volley
 		}
@@ -99,6 +119,7 @@ void BulletFactory2D::tick_volleys(double delta) {
 			break;
 		}
 	}
+	return true;
 }
 
 void BulletFactory2D::interpolate_volleys() {
@@ -118,6 +139,8 @@ void BulletFactory2D::interpolate_volleys() {
 
 FactoryOperationGuard::FactoryOperationGuard(BulletFactory2D *p_factory, bool p_manage_debuggers, bool p_defer_debugger_restore) :
 		factory(p_factory), manage_debuggers(p_manage_debuggers), defer_debugger_restore(p_defer_debugger_restore) {
+	life = factory->life_token();
+	started_alive = *life;
 	saved_busy = factory->is_factory_busy;
 	resume_processing = factory->is_factory_processing_bullets;
 	if (manage_debuggers) {
@@ -131,6 +154,9 @@ FactoryOperationGuard::FactoryOperationGuard(BulletFactory2D *p_factory, bool p_
 }
 
 FactoryOperationGuard::~FactoryOperationGuard() {
+	if (started_alive && !*life) {
+		return; // user code inside the operation freed the factory
+	}
 	// Drop the busy flag before resuming anything - resuming while busy errors out, and doing it in this order keeps a nested busy state intact.
 	factory->is_factory_busy = false;
 	if (resume_processing) {
@@ -175,6 +201,19 @@ void BulletFactory2D::_notification(int p_what) {
 		return;
 	}
 	if (p_what == NOTIFICATION_PREDELETE) {
+		if (predelete_state == PREDELETE_RUNNING) {
+			// Freed again from user code inside its own teardown (an
+			// attachment callback of a dying volley): a second deletion would
+			// free this memory under the running one.
+			cancel_free();
+			refused_nested_free = true;
+			return;
+		}
+		if (predelete_state == PREDELETE_DONE) {
+			return; // the deferred deletion below: everything is torn down
+		}
+		predelete_state = PREDELETE_RUNNING;
+		*alive_flag = false;
 		unregister_monitors();
 		// Parent is notified before children are destroyed. From here on no child
 		// pointer (debuggers, containers) may be touched by teardown paths.
@@ -195,6 +234,24 @@ void BulletFactory2D::_notification(int p_what) {
 				free_all_volleys(nullptr);
 				break;
 			}
+		}
+		// The children die HERE, not in Node's own PREDELETE that runs after
+		// this handler: their teardown runs user code (attachment callbacks of
+		// the dying volleys) that may free this factory again, which is
+		// refused only while this handler runs.
+		for (int64_t count = get_child_count(true); count > 0;) {
+			memdelete(get_child(count - 1, true));
+			const int64_t left = get_child_count(true);
+			if (left >= count) {
+				break; // a child refused to die: Node's own teardown handles the rest
+			}
+			count = left;
+		}
+		predelete_state = PREDELETE_DONE;
+		if (refused_nested_free) {
+			// Godot keeps ONE "free ok" flag per object: the refused free
+			// cancelled this deletion too. Finish it at the end of the frame.
+			queue_free();
 		}
 	}
 }
@@ -425,7 +482,13 @@ void BulletFactory2D::_physics_process(double delta) {
 	// The bullet world runs on its own clock (time_scale 1 is bit-identical
 	// to the engine delta); target scans (graze_clock) stay in real time.
 	const double bullet_delta = delta * time_scale;
-	tick_volleys(delta);
+	// User code in the sweep (attachment callbacks, timers) may free this
+	// factory: the copy outlives it and every step after user code tests it.
+	const std::shared_ptr<bool> life = alive_flag;
+	const bool &alive = *life;
+	if (!tick_volleys(delta, alive)) {
+		return;
+	}
 	// One-shot sprite effects age on the same clock as bullets (pausing the
 	// factory freezes both). Volley trails tick inside move_bullets instead.
 	age_fx_effects(bullet_delta);
@@ -453,6 +516,9 @@ void BulletFactory2D::_physics_process(double delta) {
 		}
 		volley->sweep_timer_stamp = sweep_counter;
 		volley->run_custom_timers(delta * volley_time_factor(*volley));
+		if (!alive) {
+			return;
+		}
 	}
 	is_iterating_bullets = false;
 

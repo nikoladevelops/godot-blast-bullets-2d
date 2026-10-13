@@ -753,13 +753,34 @@ _ALWAYS_INLINE_ bool BulletVolley2D::attach_bullet_attachment_internal(int bulle
 	}
 
 	const uint64_t setup_instance_id = attachment_instance->get_instance_id();
+	// The callbacks below are user code: they may free this volley or the
+	// factory. Read what is needed after them NOW.
+	const uint64_t self_id = get_instance_id();
+	BulletFactory2D *factory = bullet_factory;
+	const std::shared_ptr<bool> life = factory_life;
 
 	if (created_brand_new_instance) {
 		attachment_instance->set_physics_interpolation_mode(Node::PHYSICS_INTERPOLATION_MODE_OFF); // I have custom physics interpolation logic, so disable the Godot one
 		attachment_instance->call_on_bullet_spawn(); // Call GDScript custom virtual method to ensure the proper state before adding to the scene tree
-		bullet_factory->bullet_attachments_container->add_child(attachment_instance);
+		const bool instance_alive = ObjectDB::get_instance(ObjectID(setup_instance_id)) != nullptr;
+		if (life != nullptr && !*life) {
+			// The callback freed the factory (and this volley with it): the
+			// new node never joined the tree and nothing owns it any more.
+			if (instance_alive && !attachment_instance->is_queued_for_deletion()) {
+				attachment_instance->queue_free();
+			}
+			return false;
+		}
+		// Joins the tree even when the callback freed this volley: its
+		// teardown already pooled (or queue_freed) the node.
+		if (instance_alive && !attachment_instance->is_inside_tree()) {
+			factory->bullet_attachments_container->add_child(attachment_instance);
+		}
 	} else {
 		attachment_instance->call_on_bullet_enable(); // Call GDScript custom virtual method so that it gets enabled properly
+	}
+	if (!survived_user_code(self_id)) {
+		return false;
 	}
 
 	// The callback may have freed the attachment itself (immediate free()); the

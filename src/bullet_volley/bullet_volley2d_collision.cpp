@@ -794,7 +794,11 @@ void BulletVolley2D::handle_bullet_collision(const BulletCollisionData2D &record
 		// Destroy explosion only (never the hit spark too): the killing blow
 		// gets one visual, at the impact pose. The attachment goes back to
 		// the pool with the bullet (the handler already saw it).
+		const uint64_t self_id = get_instance_id();
 		disable_bullet(bullet_index, true);
+		if (!survived_user_code(self_id)) {
+			return; // on_bullet_disable freed this volley or the factory
+		}
 		fx_fire_oneshot(EFFECT_ON_DESTROY, bullet_index, impact_transf);
 	} else if (bounce_decision != 2) {
 		// Hit sparks for counted, survived hits (a consumed bounce already

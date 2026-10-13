@@ -176,12 +176,18 @@ BulletVolley2D *BulletFactory2D::spawn_volley_internal(const Ref<BulletVolleyDat
 	const int bullet_count = transforms_ptr != nullptr ? transforms_count : (int)spawn_data->transforms.size();
 	const PoolKey key{ bullet_count, shape_type };
 
+	// The attachment callbacks of a spawn are user code: they may free the
+	// volley being set up, or this factory (then nothing is returned).
+	const LifeWatch watch = watch_life();
 	BulletVolley2D *volley = volley_pool.pop(key);
 	if (volley != nullptr) {
 		volley->spawn_transforms_ptr = transforms_ptr;
 		volley->spawn_transforms_count = bullet_count;
 		const uint64_t reuse_volley_id = volley->get_instance_id();
 		const bool enabled = volley->enable_volley(*spawn_data.ptr(), new_inherited_velocity_offset, spawner_id);
+		if (watch.died()) {
+			return nullptr;
+		}
 		if (ObjectDB::get_instance(ObjectID(reuse_volley_id)) != volley) {
 			// A callback inside begin_life freed the volley: it is gone, so
 			// nothing may touch or re-pool it. Fall through to a fresh one.
@@ -232,7 +238,14 @@ BulletVolley2D *BulletFactory2D::spawn_volley_internal(const Ref<BulletVolleyDat
 	volley = memnew(BulletVolley2D);
 	volley->spawn_transforms_ptr = transforms_ptr;
 	volley->spawn_transforms_count = bullet_count;
+	const uint64_t fresh_volley_id = volley->get_instance_id();
 	volley->spawn(*spawn_data.ptr(), &volley_pool, this, volley_container, new_inherited_velocity_offset, sparse_set_id, false, spawner_id);
+	if (watch.died()) {
+		return nullptr;
+	}
+	if (ObjectDB::get_instance(ObjectID(fresh_volley_id)) != volley) {
+		return nullptr; // its own attachment callback freed it mid-spawn: never tracked
+	}
 	volley->spawn_transforms_ptr = nullptr;
 	all_volleys.emplace_back(volley);
 	volley_set.activate_data(sparse_set_id);
@@ -369,18 +382,34 @@ void BulletFactory2D::populate_attachments_pool(const Ref<PackedScene> attachmen
 	}
 	bullet_attachments_pool.note_key_label(pooling_key, BulletAttachmentObjectPool2D::make_key_label_for_scene(attachment_scene));
 
-	auto setup_attachment = [&](BulletAttachment2D *a, uint32_t key) {
+	// on_spawn_in_pool is user code: it may free the attachment or this factory.
+	const LifeWatch watch = watch_life();
+	auto setup_attachment = [&](BulletAttachment2D *a, uint32_t key) -> bool {
 		a->set_physics_interpolation_mode(Node::PHYSICS_INTERPOLATION_MODE_OFF);
 		// Stamp the source scene like the attach path does: the pop guard
 		// verifies identity against it, and pre-pooled stock without a stamp
 		// would never match (fresh instantiate every attach instead).
 		a->source_scene = attachment_scene;
+		const uint64_t a_id = a->get_instance_id();
 		a->call_on_spawn_in_pool();
+		const bool a_alive = ObjectDB::get_instance(ObjectID(a_id)) != nullptr;
+		if (watch.died()) {
+			if (a_alive && !a->is_queued_for_deletion()) {
+				a->queue_free(); // never joined the tree, nothing owns it
+			}
+			return false;
+		}
+		if (!a_alive) {
+			return true; // it freed itself: nothing to pool
+		}
 		bullet_attachments_container->add_child(a);
 		bullet_attachments_pool.push(a, key);
+		return true;
 	};
 
-	setup_attachment(first_attachment, pooling_key);
+	if (!setup_attachment(first_attachment, pooling_key)) {
+		return;
+	}
 
 	for (int i = 1; i < amount_instances; ++i) {
 		Node *later_inst = attachment_scene->instantiate();
@@ -392,7 +421,9 @@ void BulletFactory2D::populate_attachments_pool(const Ref<PackedScene> attachmen
 			}
 			break;
 		}
-		setup_attachment(a, pooling_key);
+		if (!setup_attachment(a, pooling_key)) {
+			return;
+		}
 	}
 }
 

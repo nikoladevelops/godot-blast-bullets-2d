@@ -167,14 +167,14 @@ int BulletFactory2D::clear_bullets_in_area(const char *function_name, bool circl
 	// AFTER the latch is released, so handlers can spawn (pickups, ...).
 	const bool saved_busy = is_factory_busy;
 	is_factory_busy = true;
-	std::vector<BulletVolley2D *> snapshot = all_volleys;
+	// The callbacks may free any volley or this factory (life).
+	const std::vector<VolleyIterationEntry> snapshot = snapshot_volley_entries();
+	const std::shared_ptr<bool> life = alive_flag;
 	std::vector<AreaClearRecord> records;
 	int cleared = 0;
-	for (BulletVolley2D *volley : snapshot) {
-		if (volley == nullptr) {
-			continue;
-		}
-		const uint64_t volley_id = volley->get_instance_id();
+	for (const VolleyIterationEntry &entry : snapshot) {
+		BulletVolley2D *volley = entry.volley;
+		const uint64_t volley_id = entry.id;
 		if (ObjectDB::get_instance(ObjectID(volley_id)) != volley || !volley->is_active || volley->is_queued_for_deletion()) {
 			continue;
 		}
@@ -194,6 +194,9 @@ int BulletFactory2D::clear_bullets_in_area(const char *function_name, bool circl
 		}
 		const int done = volley->disable_bullets_bulk(record.indexes, EFFECT_ON_CLEAR);
 		cleared += done;
+		if (!*life) {
+			return cleared; // a callback freed this factory
+		}
 		// The callbacks of the clear may have freed this volley.
 		if (done == (int)record.indexes.size() && ObjectDB::get_instance(ObjectID(volley_id)) == volley) {
 			record.volley_id = volley_id;
@@ -214,6 +217,9 @@ int BulletFactory2D::clear_bullets_in_area(const char *function_name, bool circl
 		}
 		note_user_code();
 		emit_signal("bullets_cleared", record.positions, record.volley, indexes);
+		if (!*life) {
+			return cleared;
+		}
 	}
 	return cleared;
 }

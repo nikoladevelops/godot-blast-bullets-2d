@@ -24,6 +24,8 @@
 // NOT for the spawn fast path: spawning only appends and stays allowed while
 // iterating, so it must not pause processing or hold busy.
 
+#include <memory>
+
 namespace BlastBullets2D {
 
 class BulletFactory2D;
@@ -38,6 +40,10 @@ public:
 
 private:
 	BulletFactory2D *factory = nullptr;
+	// The factory's life_token() and whether it was alive at construction:
+	// user code inside the operation may free it (see BulletFactory2D::alive_flag).
+	std::shared_ptr<bool> life;
+	bool started_alive = false;
 	bool saved_busy = false;
 	bool resume_processing = false;
 	bool saved_debuggers = false;

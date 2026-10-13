@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <unordered_map>
 
 #include <algorithm>
@@ -442,6 +443,25 @@ public:
 	// True once NOTIFICATION_PREDELETE started. Teardown paths use this to avoid
 	// touching half-destroyed state (e.g. re-pooling attachments into a dying pool).
 	bool get_is_tearing_down() const { return is_tearing_down; }
+	// See alive_flag: copy it before user code runs, test it after.
+	std::shared_ptr<bool> life_token() const { return alive_flag; }
+	// Watches this factory across user code: died() turns true once user code
+	// freed it after the watch began. A watch begun during teardown never
+	// trips (the teardown frame owns the factory until it returns).
+	struct LifeWatch {
+		std::shared_ptr<bool> life;
+		bool started_alive = false;
+		explicit LifeWatch(const std::shared_ptr<bool> &p_life) :
+				life(p_life), started_alive(*p_life) {}
+		bool died() const { return started_alive && !*life; }
+	};
+	LifeWatch watch_life() const { return LifeWatch(alive_flag); }
+	// A volley and its instance id read while it was alive (see the sweep
+	// snapshot below): validated through ObjectDB after user code ran.
+	struct VolleyIterationEntry {
+		uint64_t id = 0;
+		BulletVolley2D *volley = nullptr;
+	};
 
 	// Debugger provider budget passthrough (applies to both debuggers).
 	// max_providers 0 = unlimited (default, preserves always-draw behavior).
@@ -711,6 +731,23 @@ private:
 	// Teardown paths must not touch child pointers (debuggers/containers may be gone).
 	bool is_tearing_down = false;
 
+	// Cleared in NOTIFICATION_PREDELETE. User code (attachment callbacks,
+	// timers) may free() this factory in the middle of one of its own
+	// operations: an operation that runs user code holds a COPY of this
+	// pointer (life_token()) and stops touching the factory once it reads
+	// false. The bool outlives the factory; `this` does not.
+	std::shared_ptr<bool> alive_flag = std::shared_ptr<bool>(new bool(true));
+	// NOTIFICATION_PREDELETE progress: user code inside the teardown (an
+	// attachment callback of a dying volley) that frees this factory again is
+	// refused with cancel_free() instead of deleting it twice.
+	enum PredeleteState : uint8_t {
+		PREDELETE_NONE,
+		PREDELETE_RUNNING,
+		PREDELETE_DONE,
+	};
+	PredeleteState predelete_state = PREDELETE_NONE;
+	bool refused_nested_free = false;
+
 	// Whether the factory is currently busy doing stuff and no other functions should be executed during this time
 	bool is_factory_busy = false;
 
@@ -738,12 +775,13 @@ private:
 	// handler swap-removes the list, moving the last volley into the freed
 	// slot (possibly one the sweep already passed), so a slot-based sweep
 	// SKIPPED that volley for the frame. The id finds it wherever it moved;
-	// the per-volley sweep stamps keep it to one tick.
-	struct VolleyIterationEntry {
-		uint64_t id = 0;
-		BulletVolley2D *volley = nullptr;
-	};
+	// the per-volley sweep stamps keep it to one tick (VolleyIterationEntry).
 	std::vector<VolleyIterationEntry> iteration_scratch;
+	// (pointer, id) of every tracked volley, ids read NOW: a loop that runs
+	// user code (which may free any volley, or this factory) validates each
+	// entry through ObjectDB before touching it, never by reading the id
+	// from a pointer that may be freed.
+	std::vector<VolleyIterationEntry> snapshot_volley_entries() const;
 	std::vector<VolleyIterationEntry> timer_iteration_scratch;
 	GrazeDetector2D graze_default_detector{ 0 };
 	SoundMixer2D sound_mixer;
@@ -952,7 +990,9 @@ private:
 	void snapshot_active_volleys();
 
 	// Physics tick of every active volley: movement, animation, lifetime.
-	void tick_volleys(double delta);
+	// False when user code inside the sweep freed this factory (`alive` is
+	// a copy of life_token(): `this` must not be touched any more).
+	bool tick_volleys(double delta, const bool &alive);
 
 	// Render-frame interpolation pass of every active volley.
 	void interpolate_volleys();

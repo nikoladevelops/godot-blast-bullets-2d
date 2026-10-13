@@ -15,7 +15,7 @@ void BulletVolley2D::flock_set_config(const std::shared_ptr<FlockConfig2D> &conf
 	flock_config = config;
 	flock_view = FlockView2D();
 	flock_cache.clear();
-	if (had != has && bullet_factory != nullptr) {
+	if (had != has && bullet_factory != nullptr && factory_alive()) {
 		bullet_factory->flock_note_armed(has ? 1 : -1);
 	}
 }

@@ -471,6 +471,26 @@ public:
 	// Which bullets are still alive (fast add/remove/lookup while the tick runs)
 	DynamicSparseSet all_bullets_enabled_set;
 	BulletFactory2D *bullet_factory = nullptr;
+	// The factory's life_token(), taken at spawn. User code (an attachment
+	// callback) may free the factory while this volley still runs one of its
+	// methods (mid-spawn, mid-teardown): after user code, test
+	// survived_user_code() before touching this volley or bullet_factory.
+	std::shared_ptr<bool> factory_life;
+	_ALWAYS_INLINE_ bool factory_alive() const { return factory_life == nullptr || *factory_life; }
+	_ALWAYS_INLINE_ bool survived_user_code(uint64_t self_id) const {
+		return ObjectDB::get_instance(ObjectID(self_id)) == this && factory_alive();
+	}
+	// NOTIFICATION_PREDELETE progress: a free() of this volley from user code
+	// inside the teardown (an attachment callback, or the factory teardown it
+	// triggered) is refused with cancel_free() instead of deleting it twice.
+	enum PredeleteState : uint8_t {
+		PREDELETE_NONE,
+		PREDELETE_RUNNING,
+		PREDELETE_DONE,
+	};
+	PredeleteState predelete_state = PREDELETE_NONE;
+	bool refused_nested_free = false;
+	void predelete_teardown();
 	// Optional spawner owner (ObjectID, 0 = none), mirroring owner_volley_id
 	// on attachments. When a live BulletSpawner2D is tagged, collision and
 	// lifetime signals are possessed by it; otherwise they stay on the factory.

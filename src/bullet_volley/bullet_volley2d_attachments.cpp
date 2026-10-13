@@ -198,6 +198,13 @@ void BulletVolley2D::bullet_disable_attachment(int bullet_index) {
 		UtilityFunctions::push_error("bullet_disable_attachment: multimesh was never spawned through BulletFactory2D.");
 		return;
 	}
+	if (!factory_alive()) {
+		// The callback freed the factory (its pool with it).
+		if (!detaching->is_queued_for_deletion()) {
+			detaching->queue_free();
+		}
+		return;
+	}
 
 	if (is_attachments_auto_pooling_enabled && bullet_index < (int)attachment_pooling_ids.size()) {
 		bullet_factory->bullet_attachments_pool.push(detaching, attachment_pooling_ids[bullet_index]);

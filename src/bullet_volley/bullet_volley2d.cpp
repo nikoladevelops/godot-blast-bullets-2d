@@ -353,78 +353,104 @@ void BulletVolley2D::begin_life(const BulletVolleyData2D &data, uint64_t new_own
 void BulletVolley2D::_notification(int p_what) {
 	switch (p_what) {
 		case NOTIFICATION_PREDELETE: {
-			// The destructor also runs for editor-time instances, which have no runtime state.
-			if (Engine::get_singleton()->is_editor_hint()) {
+			if (predelete_state == PREDELETE_RUNNING) {
+				// A free() of this volley from user code inside its own
+				// teardown (an attachment callback freed it, or freed the
+				// factory, which deletes its children): a second deletion
+				// would free this memory under the running one.
+				cancel_free();
+				refused_nested_free = true;
 				break;
 			}
-
-			if (!marked_for_internal_deletion && bullet_factory) {
-				bullet_factory->handle_manual_volley_deletion(*this);
+			if (predelete_state == PREDELETE_DONE) {
+				break; // the deferred deletion below: everything is torn down
 			}
-			// Every exit path (force_delete skips release_life): the
-			// factory's armed count stays exact. The factory is still alive
-			// here (it frees its volleys inside its own PREDELETE).
-			flock_set_config(nullptr);
-
-			clear_homing_state_for_teardown();
-
-			// Sprite effect teardown first: factory one-shot bakes keyed by
-			// this volley die here (in-flight visuals stop), trail shard
-			// children are freed with the node below. Safe during factory
-			// teardown too (its vectors were already cleared, unregister
-			// no-ops, and our own children are still alive).
-			if (bullet_factory != nullptr) {
-				bullet_factory->fx_unregister_volley(get_instance_id());
-			}
-			fx_clear_trail_layers();
-
-			if (physics_server && area.is_valid()) {
-				// Disable every shape of the area (enabled or not).
-				// Bounds-checked: never let a desynced attachments vector take down PREDELETE.
-				// When the factory itself is tearing down, only run the script callback and
-				// drop the slot: re-pooling into (or queue_freeing from) a dying factory is
-				// pointless, the engine destroys the whole subtree anyway.
-				const bool factory_is_dying = bullet_factory == nullptr || bullet_factory->get_is_tearing_down();
-				for (int i = 0; i < amount_bullets && i < area_shape_count; ++i) {
-					physics_server->area_set_shape_disabled(area, i, true);
-
-					if (i >= 0 && i < (int)attachments.size() && attachments[i] != nullptr) {
-						if (factory_is_dying) {
-							// Null the slot BEFORE the callback (same ordering as
-							// bullet_disable_attachment): re-entrant API calls from the
-							// script must see an empty slot.
-							BulletAttachment2D *detaching = attachments[i];
-							attachments[i] = nullptr;
-							// Every ownership change bumps the slot epoch, including
-							// this teardown path, so the "bumped on every change"
-							// invariant holds without exceptions.
-							bump_attachment_epoch(i);
-							// Owner tracking cleared like bullet_disable_attachment:
-							// attachments outlive this multimesh (siblings in the
-							// container), and a stale owner id would make their
-							// PREDELETE resolve a dead multimesh.
-							detaching->owner_volley_id = 0;
-							detaching->owner_bullet_index = -1;
-							detaching->call_on_bullet_disable();
-						} else {
-							bullet_disable_attachment(i);
-						}
-					}
-				}
-
-				physics_server->area_set_area_monitor_callback(area, Variant());
-				physics_server->area_set_monitor_callback(area, Variant());
-
-				// Detach the shapes from the area BEFORE freeing the RID (freeing a
-				// still-attached shape RID warns/leaks on the physics server).
-				release_volley_shape();
-
-				if (area.is_valid()) {
-					physics_server->free_rid(area);
-				}
-				area = RID();
+			predelete_state = PREDELETE_RUNNING;
+			predelete_teardown();
+			predelete_state = PREDELETE_DONE;
+			if (refused_nested_free) {
+				// Godot keeps ONE "free ok" flag per object: the refused free
+				// cancelled this deletion too. Finish it at the end of the frame.
+				queue_free();
 			}
 		} break;
+	}
+}
+
+void BulletVolley2D::predelete_teardown() {
+	// The destructor also runs for editor-time instances, which have no runtime state.
+	if (Engine::get_singleton()->is_editor_hint()) {
+		return;
+	}
+
+	if (!marked_for_internal_deletion && bullet_factory && factory_alive()) {
+		bullet_factory->handle_manual_volley_deletion(*this);
+	}
+	// Every exit path (force_delete skips release_life): the
+	// factory's armed count stays exact. The factory is still alive
+	// here (it frees its volleys inside its own PREDELETE).
+	flock_set_config(nullptr);
+
+	clear_homing_state_for_teardown();
+
+	// Sprite effect teardown first: factory one-shot bakes keyed by
+	// this volley die here (in-flight visuals stop), trail shard
+	// children are freed with the node below. Safe during factory
+	// teardown too (its vectors were already cleared, unregister
+	// no-ops, and our own children are still alive).
+	if (bullet_factory != nullptr && factory_alive()) {
+		bullet_factory->fx_unregister_volley(get_instance_id());
+	}
+	fx_clear_trail_layers();
+
+	if (physics_server && area.is_valid()) {
+		// Disable every shape of the area (enabled or not).
+		// Bounds-checked: never let a desynced attachments vector take down PREDELETE.
+		// When the factory itself is tearing down, only run the script callback and
+		// drop the slot: re-pooling into (or queue_freeing from) a dying factory is
+		// pointless, the engine destroys the whole subtree anyway.
+		bool factory_is_dying = bullet_factory == nullptr || !factory_alive() || bullet_factory->get_is_tearing_down();
+		for (int i = 0; i < amount_bullets && i < area_shape_count; ++i) {
+			physics_server->area_set_shape_disabled(area, i, true);
+
+			if (i >= 0 && i < (int)attachments.size() && attachments[i] != nullptr) {
+				// A callback of an earlier slot may have freed the
+				// factory: never touch it (or its pool) after that.
+				factory_is_dying = factory_is_dying || !factory_alive();
+				if (factory_is_dying) {
+					// Null the slot BEFORE the callback (same ordering as
+					// bullet_disable_attachment): re-entrant API calls from the
+					// script must see an empty slot.
+					BulletAttachment2D *detaching = attachments[i];
+					attachments[i] = nullptr;
+					// Every ownership change bumps the slot epoch, including
+					// this teardown path, so the "bumped on every change"
+					// invariant holds without exceptions.
+					bump_attachment_epoch(i);
+					// Owner tracking cleared like bullet_disable_attachment:
+					// attachments outlive this multimesh (siblings in the
+					// container), and a stale owner id would make their
+					// PREDELETE resolve a dead multimesh.
+					detaching->owner_volley_id = 0;
+					detaching->owner_bullet_index = -1;
+					detaching->call_on_bullet_disable();
+				} else {
+					bullet_disable_attachment(i);
+				}
+			}
+		}
+
+		physics_server->area_set_area_monitor_callback(area, Variant());
+		physics_server->area_set_monitor_callback(area, Variant());
+
+		// Detach the shapes from the area BEFORE freeing the RID (freeing a
+		// still-attached shape RID warns/leaks on the physics server).
+		release_volley_shape();
+
+		if (area.is_valid()) {
+			physics_server->free_rid(area);
+		}
+		area = RID();
 	}
 }
 
@@ -435,6 +461,7 @@ void BulletVolley2D::spawn(const BulletVolleyData2D &data, VolleyPool *pool, Bul
 	sparse_set_id = new_sparse_set_id;
 	bullets_pool = pool;
 	bullet_factory = factory;
+	factory_life = factory != nullptr ? factory->life_token() : std::shared_ptr<bool>();
 	physics_server = PhysicsServer2D::get_singleton();
 
 	warn_data_id = data.get_instance_id();
@@ -472,7 +499,11 @@ void BulletVolley2D::spawn(const BulletVolleyData2D &data, VolleyPool *pool, Bul
 	bullets_container->add_child(this);
 	// Shared spawn-data attachments and effect layers (trail shards rebuilt,
 	// factory one-shot bakes registered, spawn flashes at every bullet).
+	const uint64_t self_id = get_instance_id();
 	apply_shared_bullet_attachment_from_data(data);
+	if (!survived_user_code(self_id)) {
+		return; // an attachment callback freed this volley or the factory
+	}
 	fx_reseed_from_data(data.effect_layers, true);
 }
 
@@ -551,6 +582,9 @@ bool BulletVolley2D::enable_volley(const BulletVolleyData2D &data, const Vector2
 	is_active = true;
 	// Shared spawn-data attachments (slots were blanked by begin_life).
 	apply_shared_bullet_attachment_from_data(data);
+	if (!survived_user_code(self_id)) {
+		return false; // an attachment callback freed this volley or the factory
+	}
 	move_to_front(); // Pooled instances render behind newer ones without this; moving to front emulates fresh spawn order.
 	// Previous life's bakes die here, trail shards rebuild, spawn flashes fire.
 	fx_reseed_from_data(data.effect_layers, true);

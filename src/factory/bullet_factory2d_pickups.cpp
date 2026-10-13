@@ -138,12 +138,21 @@ Array BulletFactory2D::convert_to_pickups_impl(const char *function_name, const 
 		fail(fn, ": a conversion is already running (started from user code inside it), nothing converted.");
 		return result;
 	}
+	// User code runs inside (attachment callbacks of the spawns and of the
+	// disables): it may free this factory, so the scope and every step after
+	// user code test the watch first.
+	const LifeWatch watch = watch_life();
 	struct RunningScope {
 		bool &flag;
-		explicit RunningScope(bool &p_flag) :
-				flag(p_flag) { flag = true; }
-		~RunningScope() { flag = false; }
-	} running_scope(pickup_conversion_running);
+		const LifeWatch &watch;
+		RunningScope(bool &p_flag, const LifeWatch &p_watch) :
+				flag(p_flag), watch(p_watch) { flag = true; }
+		~RunningScope() {
+			if (!watch.died()) {
+				flag = false;
+			}
+		}
+	} running_scope(pickup_conversion_running, watch);
 	PickupTarget resolved;
 	if (!resolve_target(*this, fn, target, resolved)) {
 		return result;
@@ -278,6 +287,9 @@ Array BulletFactory2D::convert_to_pickups_impl(const char *function_name, const 
 	while (spawned < total) {
 		const size_t count = Math::min(limit, total - spawned);
 		BulletVolley2D *volley = spawn_volley_span(data, poses.data() + spawned, (int)count, Vector2(), 0);
+		if (watch.died()) {
+			return result;
+		}
 		if (volley == nullptr) {
 			break; // the spawn already said why; what spawned stays, the rest of the sources stay too
 		}
@@ -360,6 +372,9 @@ Array BulletFactory2D::convert_to_pickups_impl(const char *function_name, const 
 			continue; // freed by an earlier callback
 		}
 		record.volley->disable_bullets_bulk(record.indexes, pickup->fire_clear_effects ? (int)EFFECT_ON_CLEAR : -1, &record.epochs);
+		if (watch.died()) {
+			return result;
+		}
 	}
 	is_factory_busy = saved_busy;
 

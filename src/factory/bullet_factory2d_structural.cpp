@@ -30,6 +30,25 @@ static std::vector<BulletVolley2D *> extract_matching_volleys(std::vector<Bullet
 	return removed;
 }
 
+// (pointer, id) for volleys that are alive NOW: deleting one runs its
+// attachment callbacks, user code that may free any other one, or this
+// factory. Each is re-validated through ObjectDB before it is deleted.
+static std::vector<BulletFactory2D::VolleyIterationEntry> entries_of(const std::vector<BulletVolley2D *> &volleys) {
+	std::vector<BulletFactory2D::VolleyIterationEntry> entries;
+	entries.reserve(volleys.size());
+	for (BulletVolley2D *volley : volleys) {
+		BulletFactory2D::VolleyIterationEntry entry;
+		entry.volley = volley;
+		entry.id = volley->get_cached_instance_id();
+		entries.push_back(entry);
+	}
+	return entries;
+}
+
+static bool entry_alive(const BulletFactory2D::VolleyIterationEntry &entry) {
+	return ObjectDB::get_instance(ObjectID(entry.id)) == entry.volley;
+}
+
 void BulletFactory2D::unlink_and_delete_volley(BulletVolley2D *volley) {
 	volley_pool.try_remove_instance(volley, volley->get_pool_key());
 	volley->force_delete();
@@ -51,12 +70,19 @@ void BulletFactory2D::reindex_volleys() {
 void BulletFactory2D::free_pooled_volleys(const PoolKey *key) {
 	// Disabled volleys only. Correct whether auto pooling is on (pooled),
 	// off (never pooled) or was toggled mid-game (mixed).
-	std::vector<BulletVolley2D *> removed = extract_matching_volleys(all_volleys, [key](BulletVolley2D *volley) {
+	const std::vector<VolleyIterationEntry> removed = entries_of(extract_matching_volleys(all_volleys, [key](BulletVolley2D *volley) {
 		return !volley->is_active && (key == nullptr || volley->get_pool_key() == *key);
-	});
+	}));
 	reindex_volleys();
-	for (BulletVolley2D *volley : removed) {
-		unlink_and_delete_volley(volley);
+	const LifeWatch watch = watch_life();
+	for (const VolleyIterationEntry &entry : removed) {
+		if (!entry_alive(entry)) {
+			continue; // freed by a callback of an earlier delete
+		}
+		unlink_and_delete_volley(entry.volley);
+		if (watch.died()) {
+			return;
+		}
 	}
 	// Free leftovers the pool holds but all_volleys never tracked.
 	if (key != nullptr) {
@@ -67,10 +93,16 @@ void BulletFactory2D::free_pooled_volleys(const PoolKey *key) {
 }
 
 void BulletFactory2D::free_all_volleys(const PoolKey *key) {
+	const LifeWatch watch = watch_life();
 	if (key == nullptr) {
-		for (BulletVolley2D *volley : all_volleys) {
-			if (volley != nullptr) {
-				volley->force_delete();
+		// A snapshot: a callback that frees a volley edits all_volleys.
+		for (const VolleyIterationEntry &entry : snapshot_volley_entries()) {
+			if (!entry_alive(entry)) {
+				continue; // freed by a callback of an earlier delete
+			}
+			entry.volley->force_delete();
+			if (watch.died()) {
+				return;
 			}
 		}
 		// Every tracked volley (pooled ones included) is deleted above, so
@@ -83,11 +115,17 @@ void BulletFactory2D::free_all_volleys(const PoolKey *key) {
 	}
 	// Unlink matches from the pool first when present (disabled + auto
 	// pooling on), then free exactly once. Active volleys are never pooled.
-	std::vector<BulletVolley2D *> removed = extract_matching_volleys(all_volleys, [key](BulletVolley2D *volley) {
+	const std::vector<VolleyIterationEntry> removed = entries_of(extract_matching_volleys(all_volleys, [key](BulletVolley2D *volley) {
 		return volley->get_pool_key() == *key;
-	});
-	for (BulletVolley2D *volley : removed) {
-		unlink_and_delete_volley(volley);
+	}));
+	for (const VolleyIterationEntry &entry : removed) {
+		if (!entry_alive(entry)) {
+			continue;
+		}
+		unlink_and_delete_volley(entry.volley);
+		if (watch.died()) {
+			return;
+		}
 	}
 	reindex_volleys();
 	// Frees pooled leftovers that were never tracked in all_volleys.
@@ -95,30 +133,43 @@ void BulletFactory2D::free_all_volleys(const PoolKey *key) {
 }
 
 void BulletFactory2D::free_active_volleys(const PoolKey *key) {
-	std::vector<BulletVolley2D *> removed = extract_matching_volleys(all_volleys, [key](BulletVolley2D *volley) {
+	const std::vector<VolleyIterationEntry> removed = entries_of(extract_matching_volleys(all_volleys, [key](BulletVolley2D *volley) {
 		return volley->is_active && (key == nullptr || volley->get_pool_key() == *key);
-	});
-	for (BulletVolley2D *volley : removed) {
-		volley->force_delete();
+	}));
+	const LifeWatch watch = watch_life();
+	for (const VolleyIterationEntry &entry : removed) {
+		if (!entry_alive(entry)) {
+			continue; // freed by a callback of an earlier delete
+		}
+		entry.volley->force_delete();
+		if (watch.died()) {
+			return;
+		}
 	}
 	reindex_volleys();
 }
 
 void BulletFactory2D::free_disabled_volleys(const PoolKey *key) {
-	std::vector<BulletVolley2D *> removed = extract_matching_volleys(all_volleys, [key](BulletVolley2D *volley) {
+	const std::vector<VolleyIterationEntry> removed = entries_of(extract_matching_volleys(all_volleys, [key](BulletVolley2D *volley) {
 		return !volley->is_active && (key == nullptr || volley->get_pool_key() == *key);
-	});
-	if (key == nullptr) {
-		// force_delete memdeletes every disabled volley, so the pool only
-		// needs its pointers dropped.
-		for (BulletVolley2D *volley : removed) {
-			volley->force_delete();
+	}));
+	const LifeWatch watch = watch_life();
+	for (const VolleyIterationEntry &entry : removed) {
+		if (!entry_alive(entry)) {
+			continue; // freed by a callback of an earlier delete
 		}
+		if (key == nullptr) {
+			entry.volley->force_delete(); // the pool only needs its pointers dropped (below)
+		} else {
+			unlink_and_delete_volley(entry.volley);
+		}
+		if (watch.died()) {
+			return;
+		}
+	}
+	if (key == nullptr) {
 		volley_pool.clear();
 	} else {
-		for (BulletVolley2D *volley : removed) {
-			unlink_and_delete_volley(volley);
-		}
 		volley_pool.free_specific_bullets(*key);
 	}
 	reindex_volleys();
@@ -174,7 +225,11 @@ void BulletFactory2D::reset_factory_state(const PoolKey *key) {
 	// vectors are rebuilt; the guard restores them afterwards.
 
 	// Free all BulletVolley2D, their attachments and the object pool
+	const LifeWatch watch = watch_life();
 	free_all_volleys(key);
+	if (watch.died()) {
+		return; // an attachment callback freed this factory
+	}
 
 	// Freed volleys unregister their bakes through PREDELETE; only a full
 	// reset wipes the rest (manual hatch included). A scoped reset must
@@ -209,10 +264,14 @@ void BulletFactory2D::reset(const Ref<VolleyPoolKey2D> &key) {
 		return;
 	}
 
+	const LifeWatch watch = watch_life();
 	{
 		FactoryOperationGuard op(this);
 		PoolKey resolved;
 		reset_factory_state(resolve_pool_key(key, resolved));
+	}
+	if (watch.died()) {
+		return; // an attachment callback freed this factory
 	}
 	clear_graze_cache();
 	sound_mixer.clear(); // full or scoped: voices stop, channels forgotten
@@ -268,8 +327,10 @@ int BulletFactory2D::clear_active_bullets(const Ref<VolleyPoolKey2D> &key) {
 	is_factory_busy = true;
 
 	// Snapshot first: each clear mutates live sets below (the last cleared
-	// bullet funnels its volley into the pool).
-	std::vector<BulletVolley2D *> snapshot = all_volleys;
+	// bullet funnels its volley into the pool). The callbacks may free any
+	// volley or this factory (life).
+	const std::vector<VolleyIterationEntry> snapshot = snapshot_volley_entries();
+	const std::shared_ptr<bool> life = alive_flag;
 
 	PoolKey resolved;
 	const PoolKey *key_ptr = resolve_pool_key(key, resolved);
@@ -285,14 +346,12 @@ int BulletFactory2D::clear_active_bullets(const Ref<VolleyPoolKey2D> &key) {
 	};
 	std::vector<Announcement> announcements;
 	const bool announce = has_connections("bullets_cleared");
-	for (BulletVolley2D *volley : snapshot) {
-		if (volley == nullptr) {
-			continue;
-		}
+	for (const VolleyIterationEntry &entry : snapshot) {
+		BulletVolley2D *volley = entry.volley;
 		// An earlier clear ran user callbacks (on_bullet_disable) that may
 		// have freed a volley later in this snapshot: validate via ObjectDB
-		// (no dereference) instead of trusting the raw pointer.
-		const uint64_t volley_id = volley->get_instance_id();
+		// with the id taken before (no dereference of the raw pointer).
+		const uint64_t volley_id = entry.id;
 		if (ObjectDB::get_instance(ObjectID(volley_id)) != volley) {
 			continue;
 		}
@@ -315,6 +374,9 @@ int BulletFactory2D::clear_active_bullets(const Ref<VolleyPoolKey2D> &key) {
 		}
 		const int done = volley->clear_all_bullets();
 		cleared += done;
+		if (!*life) {
+			return cleared; // a callback freed this factory
+		}
 		if (announce && done > 0 && ObjectDB::get_instance(ObjectID(volley_id)) == volley) {
 			note.volley_id = volley_id;
 			note.volley = volley;
@@ -333,6 +395,9 @@ int BulletFactory2D::clear_active_bullets(const Ref<VolleyPoolKey2D> &key) {
 		}
 		note_user_code();
 		emit_signal("bullets_cleared", note.positions, note.volley, note.indexes);
+		if (!*life) {
+			return cleared;
+		}
 	}
 	return cleared;
 }
@@ -349,30 +414,28 @@ int BulletFactory2D::clear_bullets_owned_by(uint64_t owner_spawner_id, bool fire
 	// handlers, busy latch held across the user callbacks of the sweep.
 	const bool saved_busy = is_factory_busy;
 	is_factory_busy = true;
-	std::vector<BulletVolley2D *> snapshot = all_volleys;
+	const std::vector<VolleyIterationEntry> snapshot = snapshot_volley_entries();
+	const std::shared_ptr<bool> life = alive_flag;
 	int cleared = 0;
-	for (BulletVolley2D *volley : snapshot) {
-		if (volley == nullptr) {
-			continue;
-		}
-		const uint64_t volley_id = volley->get_instance_id();
-		if (ObjectDB::get_instance(ObjectID(volley_id)) != volley || volley->owner_spawner_id != owner_spawner_id || volley->is_queued_for_deletion()) {
+	for (const VolleyIterationEntry &entry : snapshot) {
+		BulletVolley2D *volley = entry.volley;
+		if (ObjectDB::get_instance(ObjectID(entry.id)) != volley || volley->owner_spawner_id != owner_spawner_id || volley->is_queued_for_deletion()) {
 			continue;
 		}
 		if (volley->is_active) {
 			const std::vector<int> live = volley->all_bullets_enabled_set.get_active_indexes();
 			cleared += volley->disable_bullets_bulk(live, fire_clear_effects ? (int)EFFECT_ON_CLEAR : -1);
+			if (!*life) {
+				return cleared; // a callback freed this factory
+			}
 		}
 	}
 	is_factory_busy = saved_busy;
 	// Parked volleys of this owner (drained with pooling off) go back to the
 	// pool: the owner asked for its bullets to be gone.
-	for (BulletVolley2D *volley : snapshot) {
-		if (volley == nullptr) {
-			continue;
-		}
-		const uint64_t volley_id = volley->get_instance_id();
-		if (ObjectDB::get_instance(ObjectID(volley_id)) != volley || volley->owner_spawner_id != owner_spawner_id) {
+	for (const VolleyIterationEntry &entry : snapshot) {
+		BulletVolley2D *volley = entry.volley;
+		if (ObjectDB::get_instance(ObjectID(entry.id)) != volley || volley->owner_spawner_id != owner_spawner_id) {
 			continue;
 		}
 		if (volley->is_parked()) {
