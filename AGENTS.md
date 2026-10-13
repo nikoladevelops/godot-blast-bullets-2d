@@ -1362,18 +1362,25 @@ Boids: every tick each flocking bullet steers by
 `V = alignment * A + cohesion * C + separation * S` (radians per second),
 measured where every flockmate stood BEFORE the sweep moved anyone (A = mean
 flight heading of the flockmates within `neighbor_range`, C = mean offset to
-them / `neighbor_range`, S = the MEAN push of the flockmates in
-`separation_range`, each pair measured `separation_lookahead_sec` ahead along
-its own flight, push = 1 - gap / range capped at 2). A bullet keeps its
-speed, so V is a sideways force: the heading turns at cross(heading, V) per
-second (never past V, capped by `max_turn_rate_degrees`, faded in over the
-volley's first `blend_in_sec`); a bullet with a heading is pushed
+them / `neighbor_range`, S = the summed pushes of the flockmates in
+`separation_range` scaled to sqrt(strongest push x mean push), each pair
+measured `separation_lookahead_sec` ahead along its own flight, push =
+1 - gap / range capped at 2). A bullet keeps its speed, so V is a sideways
+force: the heading turns at cross(heading, V) per second (never past V,
+eased by `turn_smoothing_sec` turn inertia, capped by
+`max_turn_rate_degrees`, faded in over the volley's first `blend_in_sec`).
+Separation outranks homing: the pass also writes each bullet's crowding
+(its strongest single push, 0..1) and `step_flock` gives back that share of
+the tick's homing turn (`BulletStep2D::pre_homing`) before turning; a bullet with a heading is pushed
 perpendicular to it, away from the side each flockmate is on (by the
 bearing: full past 30 deg off the heading line, proportional inside; a
 flockmate exactly on the line or stacked takes the bullet's golden-ratio fan
-side). The old target-heading turn (`1 - e^(-|V| dt)` of the angle) flipped
-crowded bullets 180 deg per tick; summed pushes saturated the turn and
-chattered; both were measured with `tests/common/motion_probe.gd`.
+side). Measured with `tests/common/motion_probe.gd`: the old
+target-heading turn (`1 - e^(-|V| dt)` of the angle) flipped crowded
+bullets 180 deg per tick; the MEAN push alone was too weak to hold any gap
+against homing (a homing swarm piled up as if there were no flock); the
+strongest push alone made whole stacks turn in lockstep; strong pushes
+without turn inertia chattered left-right at the cap.
 
 ### 23.1 Pieces
 
@@ -1386,7 +1393,7 @@ chattered; both were measured with `tests/common/motion_probe.gd`.
 | Turn | `step_flock` in `bullet_volley2d_tick.cpp` | after `step_homing`, before the curves; the volley reads its slice through `FlockView2D` {base, sweep, life, serial} (never a pointer) and only when all match; skipped for locked orbits and zero headings; after a turn the basis is ALIGNED to the new heading (absolute, unit rotation: a relative turn drifted when homing snapped the heading) when `face_heading` (unless rotation data spins the sprite) or when the rotation owns the heading (`adjust_direction_based_on_rotation`, or homing in transform mode: `update_homing` re-derives the heading from the basis) |
 | Interval | `FlockSteerCache2D` in `BulletVolley2D::flock_cache` | `update_interval > 0`: each bullet recomputes when the factory's flock clock (bullet time) crosses its golden-ratio phase; between refreshes its slot is filled from the cache; written back after the solve; dropped with every membership change and every rules edit (`BulletFlock2D::rules_serial`, bumped with `changed`); an invalid entry (new, reused, woken) computes at once |
 | Spawner | `bullet_spawner/bullet_spawner2d_flock.cpp` | Flocking group after Orbiting: `flock_enabled`, `flock`, `flock_scope` (hidden while off); an empty `flock` = `BulletFactory2D.get_default_flock()` (`effective_flock()`, also `flock_join(null)`); armed in `shoot_once` next to graze/sound (before any signal); `flock_live_volleys()` arms owned volleys fired while off (or taken over by a script); setup warning for snapping homing |
-| Presets | `data/bullet_flock2d.cpp` (`FLOCK_PRESETS`) | `Preset` enum (Custom 0, Swarm 1 = the defaults, School 2, Spread 3, Cluster 4); `apply_preset` / `get_matching_preset` back the editor-only `preset` property (never saved, so the setter walks skip it), `create_preset` is static; a preset writes the steering knobs only |
+| Presets | `data/bullet_flock2d.cpp` (`FLOCK_PRESETS`) | `Preset` enum (Custom 0, Swarm 1 = the defaults, Fly Together 2, Keep Distance 3, Tight Group 4); `apply_preset` / `get_matching_preset` back the editor-only `preset` property (never saved, so the setter walks skip it), `create_preset` is static; a preset writes the steering knobs only |
 | Readouts | `bullet_volley2d_flock.cpp`, `bullet_spawner2d_explain.cpp` | `debug_get_bullet_flock_info(i)` (steering, neighbors, blend, radius via `flock_bullet_radius2d`, heading, facing); `BulletSpawner2D.debug_explain_features()` (one sentence per steering group + the setup warnings) |
 
 ### 23.2 Contract (pinned by the `*flock*` suites)
@@ -1411,7 +1418,9 @@ chattered; both were measured with `tests/common/motion_probe.gd`.
 
 - Defaults (separation 10, alignment 1, cohesion 1.5, neighbor_range 150,
   separation_range 24, edge gaps, lookahead 0.2 s, turn cap 270 deg/s,
-  blend-in 0.3 s, 32 neighbors) were picked with MotionProbe sweeps (16 and
+  turn inertia 0.1 s, blend-in 0.3 s, 32 neighbors); a homing swarm of 16 px
+  bullets keeps 89% of them apart around one target point
+  (`test_a_homing_swarm_keeps_its_distance`) were picked with MotionProbe sweeps (16 and
   128 px, random scale 1-2, 3-shot bursts, homing, wobble): no 180 deg
   flips, about 1-2.5 turn-side flips per bullet per second in crowds (a
   homing crowd at its target buzzes at about 5), sprites on the heading,

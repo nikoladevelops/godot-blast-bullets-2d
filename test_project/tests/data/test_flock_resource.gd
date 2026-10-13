@@ -8,7 +8,7 @@ extends BlastTest
 
 const TRES_PATH := "user://flock_round_trip.tres"
 const PROPS := ["separation", "alignment", "cohesion", "neighbor_range", "separation_range", "separation_lookahead_sec",
-	"count_bullet_size", "max_turn_rate_degrees", "blend_in_sec", "face_heading", "max_neighbors", "update_interval", "view_angle_degrees"]
+	"count_bullet_size", "max_turn_rate_degrees", "turn_smoothing_sec", "blend_in_sec", "face_heading", "max_neighbors", "update_interval", "view_angle_degrees"]
 
 
 func test_defaults_match_the_documented_values() -> void:
@@ -21,6 +21,7 @@ func test_defaults_match_the_documented_values() -> void:
 	assert_almost_eq(f.separation_lookahead_sec, 0.2, 1e-6, "separation looks 0.2 s ahead: parting flockmates push less")
 	assert_true(f.count_bullet_size, "ranges between bullet edges: one default fits every sprite size")
 	assert_eq(f.max_turn_rate_degrees, 270.0, "every turn a smooth arc")
+	assert_almost_eq(f.turn_smoothing_sec, 0.1, 1e-6, "turn inertia: a crowd never makes a bullet vibrate")
 	assert_almost_eq(f.blend_in_sec, 0.3, 1e-6, "a new volley eases in over 0.3 s")
 	assert_true(f.face_heading, "the rotation follows the heading")
 	assert_eq(f.max_neighbors, 32, "32 flockmates per bullet")
@@ -39,6 +40,7 @@ func test_property_list_order_and_hints_are_pinned() -> void:
 		"separation_lookahead_sec": [TYPE_FLOAT, PROPERTY_HINT_RANGE, "0,1,0.01,or_greater,suffix:s"],
 		"count_bullet_size": [TYPE_BOOL, PROPERTY_HINT_NONE, ""],
 		"max_turn_rate_degrees": [TYPE_FLOAT, PROPERTY_HINT_RANGE, "0,1440,1,or_greater,suffix:deg/s"],
+		"turn_smoothing_sec": [TYPE_FLOAT, PROPERTY_HINT_RANGE, "0,1,0.01,or_greater,suffix:s"],
 		"blend_in_sec": [TYPE_FLOAT, PROPERTY_HINT_RANGE, "0,2,0.01,or_greater,suffix:s"],
 		"face_heading": [TYPE_BOOL, PROPERTY_HINT_NONE, ""],
 		"max_neighbors": [TYPE_INT, PROPERTY_HINT_RANGE, "0,256,1,or_greater"],
@@ -65,7 +67,7 @@ func test_every_accepted_set_emits_changed_once() -> void:
 	var f := BulletFlock2D.new()
 	watch_signals(f)
 	var sets := [["separation", 3.0], ["alignment", 0.0], ["cohesion", 2.5], ["neighbor_range", 64.0],
-		["separation_range", 0.0], ["separation_lookahead_sec", 0.0], ["count_bullet_size", false], ["max_turn_rate_degrees", 180.0], ["blend_in_sec", 1.5], ["face_heading", false], ["max_neighbors", 0], ["update_interval", 0.25], ["view_angle_degrees", 270.0]]
+		["separation_range", 0.0], ["separation_lookahead_sec", 0.0], ["count_bullet_size", false], ["max_turn_rate_degrees", 180.0], ["turn_smoothing_sec", 0.25], ["blend_in_sec", 1.5], ["face_heading", false], ["max_neighbors", 0], ["update_interval", 0.25], ["view_angle_degrees", 270.0]]
 	var expected := 0
 	for entry in sets:
 		assert_true(entry[0] in f, "%s exists" % entry[0])
@@ -92,6 +94,7 @@ func test_rejected_sets_keep_the_value_and_emit_nothing() -> void:
 	f.max_neighbors = -1
 	f.separation_lookahead_sec = -0.1
 	f.blend_in_sec = NAN
+	f.turn_smoothing_sec = -1.0
 	expect_error_sequence([
 		"BulletFlock2D: separation must be finite and >= 0, keeping the old value.",
 		"BulletFlock2D: alignment must be finite and >= 0, keeping the old value.",
@@ -104,6 +107,7 @@ func test_rejected_sets_keep_the_value_and_emit_nothing() -> void:
 		"BulletFlock2D: max_neighbors must be >= 0 (0 = no limit), keeping the old value.",
 		"BulletFlock2D: separation_lookahead_sec must be finite and >= 0, keeping the old value.",
 		"BulletFlock2D: blend_in_sec must be finite and >= 0, keeping the old value.",
+		"BulletFlock2D: turn_smoothing_sec must be finite and >= 0, keeping the old value.",
 	])
 	var fresh := BulletFlock2D.new()
 	for prop in PROPS:
@@ -143,6 +147,7 @@ func test_flock_survives_a_tres_round_trip() -> void:
 	f.max_turn_rate_degrees = 90.0
 	f.separation_lookahead_sec = 0.45
 	f.blend_in_sec = 0.75
+	f.turn_smoothing_sec = 0.375
 	f.face_heading = false
 	f.max_neighbors = 12
 	f.update_interval = 0.125
@@ -165,52 +170,52 @@ func test_presets_write_the_steering_knobs_and_report_the_match() -> void:
 	f.max_neighbors = 9
 	f.update_interval = 0.25 # exact in float32
 	watch_signals(f)
-	f.apply_preset(BulletFlock2D.PRESET_SCHOOL)
+	f.apply_preset(BulletFlock2D.PRESET_FLY_TOGETHER)
 	assert_signal_emit_count(f, "changed", 1, "one changed per preset")
 	assert_eq([f.separation, f.alignment, f.cohesion, f.neighbor_range, f.separation_range, f.max_turn_rate_degrees, f.view_angle_degrees],
-		[6.0, 3.0, 2.0, 150.0, 16.0, 180.0, 360.0], "School: an aligned ribbon")
-	assert_eq(f.get_matching_preset(), BulletFlock2D.PRESET_SCHOOL, "reported")
+		[6.0, 3.0, 2.0, 150.0, 16.0, 180.0, 360.0], "Fly Together: an aligned ribbon")
+	assert_eq(f.get_matching_preset(), BulletFlock2D.PRESET_FLY_TOGETHER, "reported")
 	assert_eq([f.count_bullet_size, f.face_heading, f.max_neighbors, f.update_interval], [false, false, 9, 0.25], "size, facing, cap and interval are left alone")
-	f.apply_preset(BulletFlock2D.PRESET_SCHOOL)
+	f.apply_preset(BulletFlock2D.PRESET_FLY_TOGETHER)
 	f.apply_preset(BulletFlock2D.PRESET_CUSTOM)
 	assert_signal_emit_count(f, "changed", 1, "re-applying the same preset or Custom changes nothing")
-	f.preset = BulletFlock2D.PRESET_SPREAD
-	assert_eq([f.alignment, f.cohesion], [0.0, 0.0], "Spread: only avoid each other")
-	assert_eq(f.preset, BulletFlock2D.PRESET_SPREAD, "the inspector menu reads the match")
+	f.preset = BulletFlock2D.PRESET_KEEP_DISTANCE
+	assert_eq([f.alignment, f.cohesion], [0.0, 0.0], "Keep Distance: only avoid each other")
+	assert_eq(f.preset, BulletFlock2D.PRESET_KEEP_DISTANCE, "the inspector menu reads the match")
 	f.separation = 2.0
 	assert_eq(f.preset, BulletFlock2D.PRESET_CUSTOM, "a tuned knob is Custom")
 	f.apply_preset(5)
 	f.apply_preset(-1)
 	expect_error_sequence([
-		"BulletFlock2D: preset must be 0 (Custom), 1 (Swarm), 2 (School), 3 (Spread) or 4 (Cluster), keeping the old values.",
-		"BulletFlock2D: preset must be 0 (Custom), 1 (Swarm), 2 (School), 3 (Spread) or 4 (Cluster), keeping the old values.",
+		"BulletFlock2D: preset must be 0 (Custom), 1 (Swarm), 2 (Fly Together), 3 (Keep Distance) or 4 (Tight Group), keeping the old values.",
+		"BulletFlock2D: preset must be 0 (Custom), 1 (Swarm), 2 (Fly Together), 3 (Keep Distance) or 4 (Tight Group), keeping the old values.",
 	])
 	assert_eq(f.separation, 2.0, "kept")
 
 
 func test_create_preset_builds_each_preset() -> void:
-	for p in [BulletFlock2D.PRESET_CUSTOM, BulletFlock2D.PRESET_SWARM, BulletFlock2D.PRESET_SCHOOL, BulletFlock2D.PRESET_SPREAD, BulletFlock2D.PRESET_CLUSTER]:
+	for p in [BulletFlock2D.PRESET_CUSTOM, BulletFlock2D.PRESET_SWARM, BulletFlock2D.PRESET_FLY_TOGETHER, BulletFlock2D.PRESET_KEEP_DISTANCE, BulletFlock2D.PRESET_TIGHT_GROUP]:
 		var f := BulletFlock2D.create_preset(p)
 		assert_not_null(f, "preset %d built" % p)
 		var want: int = BulletFlock2D.PRESET_SWARM if p == BulletFlock2D.PRESET_CUSTOM else p
 		assert_eq(f.get_matching_preset(), want, "preset %d: its rules (Custom = the defaults)" % p)
 	assert_null(BulletFlock2D.create_preset(9), "a bad id builds nothing")
-	expect_error("BulletFlock2D.create_preset: preset must be 0 (Custom), 1 (Swarm), 2 (School), 3 (Spread) or 4 (Cluster), nothing created.")
+	expect_error("BulletFlock2D.create_preset: preset must be 0 (Custom), 1 (Swarm), 2 (Fly Together), 3 (Keep Distance) or 4 (Tight Group), nothing created.")
 
 
 func test_the_preset_menu_is_editor_only_and_its_ids_are_locked() -> void:
-	assert_eq([BulletFlock2D.PRESET_CUSTOM, BulletFlock2D.PRESET_SWARM, BulletFlock2D.PRESET_SCHOOL, BulletFlock2D.PRESET_SPREAD, BulletFlock2D.PRESET_CLUSTER], [0, 1, 2, 3, 4], "ids")
+	assert_eq([BulletFlock2D.PRESET_CUSTOM, BulletFlock2D.PRESET_SWARM, BulletFlock2D.PRESET_FLY_TOGETHER, BulletFlock2D.PRESET_KEEP_DISTANCE, BulletFlock2D.PRESET_TIGHT_GROUP], [0, 1, 2, 3, 4], "ids")
 	var found := false
 	for p in ClassDB.class_get_property_list("BulletFlock2D", true):
 		if str(p["name"]) != "preset":
 			continue
 		found = true
-		assert_eq(str(p["hint_string"]), "Custom,Swarm,School,Spread,Cluster", "menu entries")
+		assert_eq(str(p["hint_string"]), "Custom,Swarm,Fly Together,Keep Distance,Tight Group", "menu entries")
 		assert_true((int(p["usage"]) & PROPERTY_USAGE_EDITOR) != 0, "shown")
 		assert_eq(int(p["usage"]) & PROPERTY_USAGE_STORAGE, 0, "never saved (the knobs are)")
 	assert_true(found, "the inspector has a preset menu")
-	var f := BulletFlock2D.create_preset(BulletFlock2D.PRESET_CLUSTER)
+	var f := BulletFlock2D.create_preset(BulletFlock2D.PRESET_TIGHT_GROUP)
 	assert_eq(ResourceSaver.save(f, TRES_PATH), OK, "saved")
 	var back := ResourceLoader.load(TRES_PATH, "", ResourceLoader.CACHE_MODE_IGNORE) as BulletFlock2D
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(TRES_PATH))
-	assert_eq(back.get_matching_preset(), BulletFlock2D.PRESET_CLUSTER, "the saved knobs still match the preset")
+	assert_eq(back.get_matching_preset(), BulletFlock2D.PRESET_TIGHT_GROUP, "the saved knobs still match the preset")

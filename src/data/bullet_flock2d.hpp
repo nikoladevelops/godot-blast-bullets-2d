@@ -52,9 +52,9 @@ public:
 	enum Preset : int {
 		PRESET_CUSTOM = 0, // the values as they are (applying it changes nothing)
 		PRESET_SWARM = 1, // the defaults: spreads out while it chases, keeps clear gaps
-		PRESET_SCHOOL = 2, // one aligned ribbon: everybody heads the same way
-		PRESET_SPREAD = 3, // only avoid each other: no grouping, no lining up
-		PRESET_CLUSTER = 4 // tight balls that swirl
+		PRESET_FLY_TOGETHER = 2, // one aligned ribbon: everybody heads the same way
+		PRESET_KEEP_DISTANCE = 3, // only avoid each other: no grouping, no lining up
+		PRESET_TIGHT_GROUP = 4 // tight balls that swirl
 	};
 
 	// Defaults tuned so homing + flocking is clearly visible out of the box
@@ -72,6 +72,9 @@ public:
 	bool count_bullet_size = true;
 	// A cap keeps every turn a smooth arc (no snap in a crowded stack).
 	real_t max_turn_rate_degrees = 270.0; // degrees per second, 0 = unlimited
+	// Turn inertia: a bullet's turn rate eases toward the rules' rate over
+	// about this time (0 = instant), so a crowd never makes it vibrate.
+	real_t turn_smoothing_sec = 0.1;
 	// A new bullet's steering fades in over this time (seconds since its
 	// volley spawned): a burst stacked at the muzzle opens up first.
 	real_t blend_in_sec = 0.3;
@@ -107,6 +110,9 @@ public:
 
 	real_t get_max_turn_rate_degrees() const;
 	void set_max_turn_rate_degrees(real_t value);
+
+	real_t get_turn_smoothing_sec() const;
+	void set_turn_smoothing_sec(real_t value);
 
 	real_t get_blend_in_sec() const;
 	void set_blend_in_sec(real_t value);

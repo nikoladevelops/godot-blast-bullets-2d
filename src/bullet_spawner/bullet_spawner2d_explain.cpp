@@ -22,7 +22,7 @@ const char *graze_source_name2d(int source) {
 }
 
 const char *flock_preset_name2d(int preset) {
-	static const char *names[] = { "Custom", "Swarm", "School", "Spread", "Cluster" };
+	static const char *names[] = { "Custom", "Swarm", "Fly Together", "Keep Distance", "Tight Group" };
 	return preset >= 0 && preset < 5 ? names[preset] : "?";
 }
 

@@ -48,6 +48,9 @@ void BulletFlock2D::set_count_bullet_size(bool value) {
 real_t BulletFlock2D::get_max_turn_rate_degrees() const { return max_turn_rate_degrees; }
 void BulletFlock2D::set_max_turn_rate_degrees(real_t value) { store_amount(max_turn_rate_degrees, value, "max_turn_rate_degrees", false); }
 
+real_t BulletFlock2D::get_turn_smoothing_sec() const { return turn_smoothing_sec; }
+void BulletFlock2D::set_turn_smoothing_sec(real_t value) { store_amount(turn_smoothing_sec, value, "turn_smoothing_sec", false); }
+
 real_t BulletFlock2D::get_blend_in_sec() const { return blend_in_sec; }
 void BulletFlock2D::set_blend_in_sec(real_t value) { store_amount(blend_in_sec, value, "blend_in_sec", false); }
 
@@ -98,9 +101,9 @@ struct FlockPresetRow2D {
 constexpr FlockPresetRow2D FLOCK_PRESETS[] = {
 	{ 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // Custom: never written
 	{ 10.0, 1.0, 1.5, 150.0, 24.0, 0.2, 270.0, 0.3, 360.0 }, // Swarm (the defaults)
-	{ 6.0, 3.0, 2.0, 150.0, 16.0, 0.2, 180.0, 0.3, 360.0 }, // School
-	{ 10.0, 0.0, 0.0, 150.0, 32.0, 0.2, 270.0, 0.2, 360.0 }, // Spread
-	{ 6.0, 0.5, 5.0, 200.0, 8.0, 0.2, 360.0, 0.3, 360.0 }, // Cluster
+	{ 6.0, 3.0, 2.0, 150.0, 16.0, 0.2, 180.0, 0.3, 360.0 }, // Fly Together
+	{ 10.0, 0.0, 0.0, 150.0, 32.0, 0.2, 270.0, 0.2, 360.0 }, // Keep Distance
+	{ 6.0, 0.5, 5.0, 200.0, 8.0, 0.2, 360.0, 0.3, 360.0 }, // Tight Group
 };
 constexpr int FLOCK_PRESET_COUNT = sizeof(FLOCK_PRESETS) / sizeof(FLOCK_PRESETS[0]);
 
@@ -108,7 +111,7 @@ bool flock_preset_valid(int preset) {
 	return preset >= BulletFlock2D::PRESET_CUSTOM && preset < FLOCK_PRESET_COUNT;
 }
 
-const char *FLOCK_PRESET_IDS = "0 (Custom), 1 (Swarm), 2 (School), 3 (Spread) or 4 (Cluster)";
+const char *FLOCK_PRESET_IDS = "0 (Custom), 1 (Swarm), 2 (Fly Together), 3 (Keep Distance) or 4 (Tight Group)";
 
 } // namespace
 
@@ -163,7 +166,7 @@ void BulletFlock2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_matching_preset"), &BulletFlock2D::get_matching_preset);
 	ClassDB::bind_static_method("BulletFlock2D", D_METHOD("create_preset", "preset"), &BulletFlock2D::create_preset);
 	// Editor only (never saved): picking a preset writes the knobs below.
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "preset", PROPERTY_HINT_ENUM, "Custom,Swarm,School,Spread,Cluster", PROPERTY_USAGE_EDITOR), "apply_preset", "get_matching_preset");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "preset", PROPERTY_HINT_ENUM, "Custom,Swarm,Fly Together,Keep Distance,Tight Group", PROPERTY_USAGE_EDITOR), "apply_preset", "get_matching_preset");
 
 	ClassDB::bind_method(D_METHOD("get_separation"), &BulletFlock2D::get_separation);
 	ClassDB::bind_method(D_METHOD("set_separation", "value"), &BulletFlock2D::set_separation);
@@ -197,6 +200,10 @@ void BulletFlock2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_max_turn_rate_degrees", "value"), &BulletFlock2D::set_max_turn_rate_degrees);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "max_turn_rate_degrees", PROPERTY_HINT_RANGE, "0,1440,1,or_greater,suffix:deg/s"), "set_max_turn_rate_degrees", "get_max_turn_rate_degrees");
 
+	ClassDB::bind_method(D_METHOD("get_turn_smoothing_sec"), &BulletFlock2D::get_turn_smoothing_sec);
+	ClassDB::bind_method(D_METHOD("set_turn_smoothing_sec", "value"), &BulletFlock2D::set_turn_smoothing_sec);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "turn_smoothing_sec", PROPERTY_HINT_RANGE, "0,1,0.01,or_greater,suffix:s"), "set_turn_smoothing_sec", "get_turn_smoothing_sec");
+
 	ClassDB::bind_method(D_METHOD("get_blend_in_sec"), &BulletFlock2D::get_blend_in_sec);
 	ClassDB::bind_method(D_METHOD("set_blend_in_sec", "value"), &BulletFlock2D::set_blend_in_sec);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "blend_in_sec", PROPERTY_HINT_RANGE, "0,2,0.01,or_greater,suffix:s"), "set_blend_in_sec", "get_blend_in_sec");
@@ -223,8 +230,8 @@ void BulletFlock2D::_bind_methods() {
 
 	BIND_ENUM_CONSTANT(PRESET_CUSTOM);
 	BIND_ENUM_CONSTANT(PRESET_SWARM);
-	BIND_ENUM_CONSTANT(PRESET_SCHOOL);
-	BIND_ENUM_CONSTANT(PRESET_SPREAD);
-	BIND_ENUM_CONSTANT(PRESET_CLUSTER);
+	BIND_ENUM_CONSTANT(PRESET_FLY_TOGETHER);
+	BIND_ENUM_CONSTANT(PRESET_KEEP_DISTANCE);
+	BIND_ENUM_CONSTANT(PRESET_TIGHT_GROUP);
 }
 } //namespace BlastBullets2D

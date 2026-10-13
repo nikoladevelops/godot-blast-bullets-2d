@@ -71,7 +71,10 @@ func test_a_homing_swarm_buzzes_but_never_spins() -> void:
 	# its target buzzes, it never snaps around.
 	var probe := _burst(BulletFlock2D.new(), 128.0, 2.0, true, 0.7)
 	assert_lte(probe.max_turn_deg_per_sec, (270.0 + rad_to_deg(5.0)) * 1.001, "flock cap + homing rate at most: " + probe.summary())
-	assert_lt(probe.mean_turn_deg_per_sec(), 120.0, "calm on average: " + probe.summary())
+	# A crowd at its target turns a lot (separation outranks homing there),
+	# but smoothly: no snaps, few side changes.
+	assert_lt(probe.mean_turn_deg_per_sec(), 180.0, "calm on average: " + probe.summary())
+	assert_lt(probe.flips_per_bullet_sec(), 5.0, "no jitter: " + probe.summary())
 	assert_eq(probe.snaps, 0, "no snap: " + probe.summary())
 	assert_lt(probe.max_facing_error_deg, 0.01, "the sprite (texture rotation stripped) stays on the heading: " + probe.summary())
 
@@ -79,6 +82,7 @@ func test_a_homing_swarm_buzzes_but_never_spins() -> void:
 func test_the_turn_never_exceeds_max_turn_rate_degrees(cap: float = use_parameters([45.0, 270.0, 1440.0])) -> void:
 	var f := BulletFlock2D.new()
 	f.max_turn_rate_degrees = cap
+	f.turn_smoothing_sec = 0.0 # instant turns: the cap alone limits them
 	var probe := _burst(f, 128.0, 2.0)
 	assert_lte(probe.max_turn_deg_per_sec, cap * 1.001, "cap %.0f deg/s: %s" % [cap, probe.summary()])
 	assert_gt(probe.max_turn_deg_per_sec, cap * 0.5, "the cap is actually reached in a stack")
@@ -150,7 +154,7 @@ func test_a_pooled_volley_eases_in_again() -> void:
 	assert_lt(eased, absf(fresh.get_bullet_direction(0).angle()) * 0.05, "the reused volley's clock restarted: it eases in again")
 
 
-func test_every_preset_flies_a_burst_calmly(preset: int = use_parameters([BulletFlock2D.PRESET_SWARM, BulletFlock2D.PRESET_SCHOOL, BulletFlock2D.PRESET_SPREAD, BulletFlock2D.PRESET_CLUSTER])) -> void:
+func test_every_preset_flies_a_burst_calmly(preset: int = use_parameters([BulletFlock2D.PRESET_SWARM, BulletFlock2D.PRESET_FLY_TOGETHER, BulletFlock2D.PRESET_KEEP_DISTANCE, BulletFlock2D.PRESET_TIGHT_GROUP])) -> void:
 	var f := BulletFlock2D.create_preset(preset)
 	var probe := _burst(f, 64.0, 1.5)
 	assert_lte(probe.max_turn_deg_per_sec, f.max_turn_rate_degrees * 1.001, "preset %d: within its cap: %s" % [preset, probe.summary()])
@@ -158,3 +162,69 @@ func test_every_preset_flies_a_burst_calmly(preset: int = use_parameters([Bullet
 	assert_eq(probe.snaps, 0, "preset %d: no snap" % preset)
 	assert_lt(probe.max_facing_error_deg, 0.01, "preset %d: sprites on the heading" % preset)
 	assert_eq(probe.nonfinite, 0, "finite")
+
+
+## Three 24-bullet homing shots (scale 1..1.5) into one default flock, all
+## chasing one point; the mean overlap fraction and nearest edge gap over the
+## last 2.5 s (sampled every 15 ticks).
+func _homing_swarm_spacing(f: BulletFlock2D, quad: float) -> Array:
+	var probe := MotionProbe.new(factory, [])
+	for shot in 3:
+		var tr: Array = []
+		seed(5 + shot)
+		for k in 24:
+			var a := TAU * k / 24
+			tr.append(Transform2D(a, Vector2(cos(a), sin(a)) * 12.0).scaled_local(Vector2.ONE * randf_range(1.0, 1.5)))
+		var d := H.make_flight_data(tr, 300.0, 1000.0)
+		d.texture_size = Vector2(quad, quad)
+		d.homing_smoothing = 5.0
+		d.homing_take_control_of_texture_rotation = true
+		var v: BulletVolley2D = factory.spawn_volley(d)
+		v.flock_join(f, BulletFlock2D.SCOPE_SHARED)
+		v.shared_homing_deque_push_back_global_position_target(Vector2(500, 150))
+		probe.add_volley(v, 0.0, Vector2(quad, quad))
+		probe.run(9)
+	var overlap := 0.0
+	var gap := 0.0
+	for k in 10:
+		probe.run(15)
+		var g := probe.gaps()
+		overlap += float(g["overlap_fraction"]) / 10.0
+		gap += float(g["mean_nearest_gap"]) / 10.0
+	var snaps := probe.steer_snaps
+	factory.free_active_bullets()
+	await idle(1)
+	return [overlap, gap, snaps]
+
+
+func test_a_homing_swarm_keeps_its_distance(quad: float = use_parameters([16.0, 64.0])) -> void:
+	# Separation outranks homing: crowded bullets give back their homing turn
+	# and steer away, so a swarm chasing ONE point keeps its spacing instead
+	# of piling onto it (big bullets can only fit so many around a point).
+	var swarm: Array = await _homing_swarm_spacing(BulletFlock2D.new(), quad)
+	var no_separation := BulletFlock2D.new()
+	no_separation.separation = 0.0
+	var piled: Array = await _homing_swarm_spacing(no_separation, quad)
+	var max_overlap := 0.2 if quad < 32.0 else 0.55
+	var min_gap := 0.0 if quad < 32.0 else -20.0
+	assert_lt(swarm[0], max_overlap, "%d px: few bullets overlap (%.2f; without separation %.2f)" % [quad, swarm[0], piled[0]])
+	assert_gt(swarm[1], min_gap, "%d px: mean nearest edge gap %.1f px (without separation %.1f)" % [quad, swarm[1], piled[1]])
+	assert_gt(piled[0] - swarm[0], 0.4, "%d px: the flock is what keeps them apart" % quad)
+	assert_eq(swarm[2], 0, "%d px: no snap while keeping the distance" % quad)
+
+
+func test_turn_inertia_eases_the_turn_rate() -> void:
+	# The first tick of a turn with turn_smoothing_sec tau turns exactly
+	# 1 - e^(-dt / tau) as far as an instant turn.
+	var smooth := H.make_flock(1.0, 0.0, 0.0, 100.0, 40.0)
+	smooth.turn_smoothing_sec = 0.1
+	var instant := H.make_flock(1.0, 0.0, 0.0, 100.0, 40.0)
+	var a: BulletVolley2D = factory.spawn_volley(H.make_flight_data([Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 20))], 100.0))
+	var b: BulletVolley2D = factory.spawn_volley(H.make_flight_data([Transform2D(0.0, Vector2(0, 900)), Transform2D(0.0, Vector2(0, 920))], 100.0))
+	a.flock_join(smooth)
+	b.flock_join(instant)
+	factory.debug_advance_time(DT)
+	var turned_smooth := a.get_bullet_direction(0).angle()
+	var turned_instant := b.get_bullet_direction(0).angle()
+	assert_ne(turned_instant, 0.0, "the instant flock turns at once")
+	assert_almost_eq(turned_smooth / turned_instant, 1.0 - exp(-DT / 0.1), 1e-3, "eased by 1 - e^(-dt / tau)")

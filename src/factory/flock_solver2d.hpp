@@ -48,6 +48,7 @@ struct FlockConfig2D {
 // steering on an interval (BulletFlock2D.update_interval > 0).
 struct FlockSteerCache2D {
 	Vector2 steer;
+	float crowd = 0.0f;
 	uint32_t neighbors = 0;
 	bool valid = false; // false = compute at the next pass
 };
@@ -62,6 +63,7 @@ struct FlockView2D {
 	uint32_t serial = 0;
 	real_t max_turn_rad = 0.0; // per second, 0 = unlimited
 	real_t blend_in_sec = 0.0; // steering fades in over the volley's first seconds
+	real_t turn_smoothing_sec = 0.0; // turn inertia (0 = instant)
 	bool face_heading = false;
 };
 
@@ -125,6 +127,11 @@ public:
 	bool has_results() const { return !steer.empty() || stats.flocks > 0 || stats.pass_usec > 0; }
 	bool covers(uint32_t base, int amount) const { return amount >= 0 && (uint64_t)base + (uint64_t)amount <= (uint64_t)steer.size(); }
 	const Vector2 *steer_data() const { return steer.data(); }
+	// Per slot, 0..1: how crowded the bullet is (its strongest single
+	// separation push, 1 = touching or overlapping a flockmate). The volley
+	// gives separation that much priority over homing.
+	const float *crowding_data() const { return crowding.data(); }
+	float crowding_at(uint32_t slot) const { return slot < crowding.size() ? crowding[slot] : 0.0f; }
 	Vector2 steer_at(uint32_t slot) const { return slot < steer.size() ? steer[slot] : Vector2(); }
 	int neighbors_at(uint32_t slot) const { return slot < neighbors.size() ? (int)neighbors[slot] : 0; }
 	const Stats &get_stats() const { return stats; }
@@ -223,6 +230,7 @@ private:
 
 	// Per slot (base + bullet index), zeroed every pass.
 	std::vector<Vector2> steer;
+	std::vector<float> crowding;
 	std::vector<uint32_t> neighbors;
 	std::vector<uint8_t> gathered; // 1 = in the grid this pass
 

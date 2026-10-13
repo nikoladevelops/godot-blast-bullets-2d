@@ -7,7 +7,8 @@ extends RefCounted
 ##   while it turns noticeably: the "spinning / jittering" a player sees;
 ## - snaps: turns of `snap_deg` or more in ONE tick (a sprite whipping
 ##   around); `steer_snaps` counts only those on a tick the bullet did not
-##   bounce (a wall reflection is a legitimate snap, steering never is);
+##   bounce and did not just lock onto its orbit (a wall reflection and an
+##   orbit taking the bullet over are legitimate snaps, steering never is);
 ## - facing error: the angle between the sprite's forward axis (texture
 ##   rotation stripped) and the flight heading;
 ## - edge gaps: center distance minus both bullets' drawn radii (negative =
@@ -44,6 +45,7 @@ var _last_heading := {}
 var _last_turn := {}
 var _last_bounces := {}
 var _lives := {}
+var _lock_tick := {}
 
 
 ## `texture_rotations` / `quad_sizes`: per volley, its spawn data's
@@ -105,6 +107,14 @@ func sample(dt: float, check_facing := false) -> void:
 			var heading := dir.angle()
 			var bounced := v.bullet_get_bounce_count(i) != int(_last_bounces.get(key, v.bullet_get_bounce_count(i)))
 			_last_bounces[key] = v.bullet_get_bounce_count(i)
+			# An orbit lock re-aims the sprite (and homing re-derives the
+			# heading from it on the next tick).
+			var locked := v.bullet_is_orbiting_locked(i)
+			if locked and int(_lock_tick.get(key, -1)) < 0:
+				_lock_tick[key] = ticks
+			elif not locked:
+				_lock_tick[key] = -1
+			var took_over := locked and ticks - int(_lock_tick[key]) <= 1
 			if check_facing:
 				var facing := t.x.angle() - float(_texture_rotation[vi])
 				max_facing_error_deg = maxf(max_facing_error_deg, absf(rad_to_deg(angle_difference(heading, facing))))
@@ -115,7 +125,7 @@ func sample(dt: float, check_facing := false) -> void:
 				max_turn_deg_per_sec = maxf(max_turn_deg_per_sec, absf(turn) / dt)
 				if absf(turn) >= snap_deg:
 					snaps += 1
-					if not bounced:
+					if not bounced and not took_over:
 						steer_snaps += 1
 					if snap_log.size() < 16:
 						snap_log.append([vi, i, ticks, turn])

@@ -18,9 +18,9 @@
 		[b]Recipes:[/b]
 		- [i]Homing swarm chasing the player:[/i] [code]homing_enabled = true[/code], [code]homing_node_group = &amp;"player"[/code], [code]flock_enabled = true[/code]. Bullets spread out while they close in.
 		- [i]Burst that fans out, then flocks:[/i] [code]burst_enabled = true[/code], a Ring or Fan pattern, [code]flock_enabled = true[/code] with [member flock_scope] Shared: each shot opens up for [member BulletFlock2D.blend_in_sec], then the shots merge into one swarm.
-		- [i]Random-size swarm that never overlaps:[/i] [code]bullet_scale_mode = Uniform[/code] (0.5 to 2), [code]flock_enabled = true[/code], [code]flock = BulletFlock2D.create_preset(BulletFlock2D.PRESET_SPREAD)[/code].
+		- [i]Random-size swarm that never overlaps:[/i] [code]bullet_scale_mode = Uniform[/code] (0.5 to 2), [code]flock_enabled = true[/code], [code]flock = BulletFlock2D.create_preset(BulletFlock2D.PRESET_KEEP_DISTANCE)[/code].
 		- [i]Graze-able swarm:[/i] the homing swarm above plus [code]graze_enabled = true[/code], one [BulletGrazeZone2D] in [member graze_zones] and [member graze_node_group] naming the player: score points while dodging.
-		- [i]Orbit ring that keeps its spacing:[/i] [code]homing_enabled = true[/code], [code]orbiting_enabled = true[/code], [code]flock_enabled = true[/code] with the Spread preset: bullets space out while they fly in, then lock into the ring.
+		- [i]Orbit ring that keeps its spacing:[/i] [code]homing_enabled = true[/code], [code]orbiting_enabled = true[/code], [code]flock_enabled = true[/code] with the Keep Distance preset: bullets space out while they fly in, then lock into the ring.
 		Reparenting is safe: removing the spawner from the tree and adding it back keeps assigned nodes, tracked homing volleys, burst chains, telegraphs and pattern lists. They pause while the spawner is out of the tree and resume when it returns. Node paths are rewritten from the live nodes on re-entry, so saving the scene keeps the right targets.
 	</description>
 	<tutorials>
@@ -569,7 +569,7 @@
 			Seconds between burst shots. Must be finite and above zero.
 		</member>
 		<member name="flock" type="BulletFlock2D" setter="set_flock" getter="get_flock">
-			The flock rules ([BulletFlock2D]) this spawner's bullets fly by while [member flock_enabled] is on. Example: [code]flock = BulletFlock2D.new()[/code]; raise [member BulletFlock2D.separation_range] for a wider swarm. A new flock, and every edit of this one, reaches bullets already in flight. Empty (the default) flies the default rules: the factory's [method BulletFactory2D.get_default_flock], shared by every empty slot of that factory. Pick a [member BulletFlock2D.preset] to start from Swarm, School, Spread or Cluster. Shown while [member flock_enabled] is on.
+			The flock rules ([BulletFlock2D]) this spawner's bullets fly by while [member flock_enabled] is on. Example: [code]flock = BulletFlock2D.new()[/code]; raise [member BulletFlock2D.separation_range] for a wider swarm. A new flock, and every edit of this one, reaches bullets already in flight. Empty (the default) flies the default rules: the factory's [method BulletFactory2D.get_default_flock], shared by every empty slot of that factory. Pick a [member BulletFlock2D.preset] to start from Swarm, Fly Together, Keep Distance or Tight Group. Shown while [member flock_enabled] is on.
 		</member>
 		<member name="flock_enabled" type="bool" setter="set_flock_enabled" getter="get_flock_enabled" default="false">
 			Master switch of the Flocking group: every volley fired while it is on flies as a flock, where bullets avoid each other, line up and stay grouped. Turning it on is enough (an empty [member flock] flies the default rules); set [member flock] to a new [BulletFlock2D] to tune it (its defaults work for any sprite size; see [BulletFlock2D] for what every setting does and ready-made recipes).

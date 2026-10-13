@@ -128,6 +128,7 @@ void FlockSolver2D::begin(uint64_t new_sweep, double now, double previous) {
 	}
 	groups.clear();
 	steer.clear();
+	crowding.clear();
 	neighbors.clear();
 	gathered.clear();
 	cached_volleys.clear();
@@ -296,6 +297,7 @@ void FlockSolver2D::add_volley(BulletVolley2D &volley, const FlockConfig2D &conf
 	const int amount = MAX(volley.amount_bullets, 0);
 	const uint32_t base = (uint32_t)steer.size();
 	steer.resize((size_t)base + (size_t)amount);
+	crowding.resize((size_t)base + (size_t)amount);
 	neighbors.resize((size_t)base + (size_t)amount);
 	gathered.resize((size_t)base + (size_t)amount);
 	stats.members += amount;
@@ -363,6 +365,7 @@ void FlockSolver2D::add_volley(BulletVolley2D &volley, const FlockConfig2D &conf
 		uint8_t query = 1;
 		if (cache != nullptr && cache[i].valid) {
 			steer[base + (uint32_t)i] = cache[i].steer;
+			crowding[base + (uint32_t)i] = cache[i].crowd;
 			neighbors[base + (uint32_t)i] = cache[i].neighbors;
 			// Due when the clock crossed this bullet's next refresh: phases
 			// spread by the golden ratio, so the refreshes of a flock spread
@@ -403,6 +406,7 @@ void FlockSolver2D::add_volley(BulletVolley2D &volley, const FlockConfig2D &conf
 	view.serial = config.serial;
 	view.max_turn_rad = (real_t)Math::deg_to_rad((double)flock->max_turn_rate_degrees);
 	view.blend_in_sec = flock->blend_in_sec;
+	view.turn_smoothing_sec = flock->turn_smoothing_sec;
 	view.face_heading = flock->face_heading;
 }
 
@@ -487,6 +491,7 @@ void FlockSolver2D::solve() {
 			const uint32_t slot = m_slot[m];
 			gathered[slot] = 0;
 			steer[slot] = Vector2();
+			crowding[slot] = 0.0f;
 			neighbors[slot] = 0;
 			continue;
 		}
@@ -582,13 +587,16 @@ void FlockSolver2D::solve() {
 			const bool self_heading = (mates[self].ordinal & MATE_HEADING_BIT) != 0;
 			// A stacked bullet's lateral push, spread over -1..1 by the golden
 			// ratio of its ordinal: a stack fans out evenly.
-			const float fan_side = 2.0f * (float)((double)ordinal * 0.6180339887498949 - std::floor((double)ordinal * 0.6180339887498949)) - 1.0f;
+			// (signed square: the separation strength takes a square root of
+			// the mean push, which turns this back into an evenly spread fan)
+			const float fan_unit = 2.0f * (float)((double)ordinal * 0.6180339887498949 - std::floor((double)ordinal * 0.6180339887498949)) - 1.0f;
+			const float fan_side = fan_unit * Math::abs(fan_unit);
 			uint32_t taken = 0;
 			uint32_t near_count = 0;
 			uint32_t sep_count = 0;
 			int64_t visited = 0;
 			uint32_t heading_count = 0;
-			float ox = 0.0f, oy = 0.0f, hx = 0.0f, hy = 0.0f, sx = 0.0f, sy = 0.0f, lat = 0.0f;
+			float ox = 0.0f, oy = 0.0f, hx = 0.0f, hy = 0.0f, sx = 0.0f, sy = 0.0f, lat = 0.0f, crowd = 0.0f;
 			bool full = true;
 			// One flockmate: the rules' sums; jumps to `filled` at the cap.
 #define FLOCK_VISIT(INDEX)                                                                                                                                               \
@@ -627,6 +635,7 @@ void FlockSolver2D::solve() {
 					const float d = q2 * inv_d;                                                                                                                          \
 					/* branch-free: a pair parting beyond the range pushes 0 */                                                                                          \
 					const float push = MAX(sized ? MIN(1.0f + (rr - d) * inv_sep, 2.0f) : 1.0f - d * inv_sep, 0.0f);                                                     \
+					crowd = MAX(crowd, push); /* crowding: the strongest single push */                                                                                  \
 					if (self_heading) {                                                                                                                                  \
 						/* a bullet keeps its speed: it steers SIDEWAYS (summed as a                                                                                     \
 						   scalar along its own perpendicular), away from the side                                                                                       \
@@ -642,10 +651,12 @@ void FlockSolver2D::solve() {
 						sy -= qy * inv_d * push;                                                                                                                         \
 					}                                                                                                                                                    \
 				} else if (self_heading) {                                                                                                                               \
+					crowd = 1.0f; /* stacked: as crowded as it gets */                                                                                                   \
 					/* stacked: the bullet's own fan side (a stack fans out evenly                                                                                       \
 					   however its flockmates are sampled) */                                                                                                            \
 					lat += fan_side;                                                                                                                                     \
 				} else {                                                                                                                                                 \
+					crowd = 1.0f;                                                                                                                                        \
 					/* stacked without a heading: along the pair's own direction,                                                                                        \
 					   opposite for the two */                                                                                                                           \
 					const uint32_t other = mate.ordinal & MATE_ORDINAL_MASK;                                                                                             \
@@ -703,10 +714,14 @@ void FlockSolver2D::solve() {
 				++capped;
 			}
 
-			// The MEAN push of the flockmates in separation range: a crowd
-			// pushes no harder than one overlapping flockmate, so the turn
-			// stays proportional (smooth) instead of saturating every tick.
-			const double sep_scale = sep_count > 0 ? g.separation / (double)sep_count : 0.0;
+			// Separation strength: the geometric mean of the strongest single
+			// push (crowd) and the mean push, along the mean push. A crowd is
+			// never diluted to nothing by its count (the mean alone was), a
+			// bullet buried in a stack still pushes less than one at its edge
+			// (the max alone made a whole stack turn in lockstep), balanced
+			// pushes still cancel, and the turn stays continuous.
+			const double sum = std::sqrt((double)sx * sx + (double)sy * sy);
+			const double sep_scale = (sep_count > 0 && sum > 0.0) ? g.separation * std::sqrt((double)crowd / ((double)sep_count * sum)) : 0.0;
 			double vx = sep_scale * (double)sx;
 			double vy = sep_scale * (double)sy;
 			if (heading_count > 0) {
@@ -730,6 +745,8 @@ void FlockSolver2D::solve() {
 			}
 			const uint32_t slot = s_slot[self];
 			steer[slot] = Vector2((real_t)vx, (real_t)vy);
+			// Separation off: no priority over homing.
+			crowding[slot] = g.separation > 0.0 ? MIN(crowd, 1.0f) : 0.0f;
 			neighbors[slot] = taken;
 		} //namespace BlastBullets2D
 	}
@@ -744,6 +761,7 @@ void FlockSolver2D::solve() {
 			const uint32_t slot = cached.base + i;
 			cache[i].valid = gathered[slot] != 0;
 			cache[i].steer = steer[slot];
+			cache[i].crowd = crowding[slot];
 			cache[i].neighbors = neighbors[slot];
 		}
 	}

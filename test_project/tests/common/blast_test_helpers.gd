@@ -142,6 +142,7 @@ static func make_flock(separation := 0.0, alignment := 0.0, cohesion := 0.0, nei
 	f.blend_in_sec = 0.0
 	f.separation_lookahead_sec = 0.0
 	f.max_turn_rate_degrees = 0.0
+	f.turn_smoothing_sec = 0.0
 	f.separation = separation
 	f.alignment = alignment
 	f.cohesion = cohesion

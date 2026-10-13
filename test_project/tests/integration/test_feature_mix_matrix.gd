@@ -165,7 +165,7 @@ func test_debug_explain_features_says_what_each_group_does_and_why_not() -> void
 	sp.homing_reach_counts_bullet_size = true
 	sp.bullet_scale_mode = 1
 	sp.bullet_scale_max = 2.0
-	var f := BulletFlock2D.create_preset(BulletFlock2D.PRESET_SPREAD)
+	var f := BulletFlock2D.create_preset(BulletFlock2D.PRESET_KEEP_DISTANCE)
 	f.separation = 2.0
 	sp.flock = f
 	lines = sp.debug_explain_features()

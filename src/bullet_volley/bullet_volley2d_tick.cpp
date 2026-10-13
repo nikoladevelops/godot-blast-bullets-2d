@@ -141,8 +141,11 @@ struct BulletVolley2D::MoveTick2D {
 	const GrazeTickTargets2D *graze_targets = nullptr;
 	// Flocking: this volley's slice of the factory's pass (null = no turn).
 	const Vector2 *flock_steer = nullptr;
+	const float *flock_crowd = nullptr; // 0..1 per bullet: separation's priority over homing
 	real_t flock_max_turn = 0.0; // this tick, radians (0 = unlimited)
 	real_t flock_blend = 1.0; // the blend-in fade of this tick (0..1)
+	real_t *flock_rate = nullptr; // per bullet turn rate (turn inertia), null = instant
+	real_t flock_rate_keep = 0.0; // share of the old rate kept this tick: e^(-dt / smoothing)
 	// After a turn the bullet's rotation is aligned with the new heading
 	// when face_heading asks for it (and no rotation data owns the sprite),
 	// or when the rotation owns the heading (adjust_direction_based_on_
@@ -170,6 +173,7 @@ struct BulletVolley2D::BulletStep2D {
 	Vector2 bullet_pos;
 	const BulletCurvesData2D *curves = nullptr; // per-bullet curves, null when none
 	Vector2 velocity_delta; // this tick's displacement
+	Vector2 pre_homing; // the heading before step_homing (flocking volleys only)
 
 	void begin(int index, Transform2D &instance_transf, Vector2 &heading) {
 		i = index;
@@ -357,7 +361,15 @@ void BulletVolley2D::move_bullets(double delta) {
 		t.graze_targets = &graze_tick_targets;
 		if (flock_config != nullptr && flock_config->enabled && flock_config->flock.is_valid() && flock_view_current()) {
 			t.flock_steer = bullet_factory->get_flock_solver().steer_data() + flock_view.base;
+			t.flock_crowd = bullet_factory->get_flock_solver().crowding_data() + flock_view.base;
 			t.flock_max_turn = flock_view.max_turn_rad * (real_t)delta;
+			if (flock_view.turn_smoothing_sec > 0.0 && delta > 0.0) {
+				if ((int)flock_turn_rate.size() != amount_bullets) {
+					flock_turn_rate.assign((size_t)MAX(amount_bullets, 0), (real_t)0.0);
+				}
+				t.flock_rate = flock_turn_rate.data();
+				t.flock_rate_keep = (real_t)Math::exp(-delta / (double)flock_view.turn_smoothing_sec);
+			}
 			if (flock_view.blend_in_sec > 0.0) {
 				// Smoothstep of the volley's age at the end of this tick (the
 				// clock restarts with every spawn and pool reuse).
@@ -395,6 +407,9 @@ void BulletVolley2D::move_bullets(double delta) {
 			// displacement (pattern, wind, gravity, orbit), then the write
 			// (transform, shape, attachment, trail, reached signal), then
 			// next tick's speed.
+			if (t.flock_steer != nullptr) {
+				b.pre_homing = all_cached_direction[i];
+			}
 			step_homing(t, b);
 			step_flock(t, b);
 			if (i < (int)all_bullet_curves_data.size() && all_bullet_curves_data[i].is_valid()) {
@@ -487,7 +502,8 @@ _ALWAYS_INLINE_ void BulletVolley2D::step_flock(const MoveTick2D &t, BulletStep2
 	const int i = b.i;
 	const Vector2 v = t.flock_steer[i];
 	const real_t steer_sq = v.x * v.x + v.y * v.y;
-	if (!(steer_sq > (real_t)1e-12)) {
+	const real_t crowd = (b.steering_deque != nullptr) ? (real_t)t.flock_crowd[i] * t.flock_blend : (real_t)0.0;
+	if (!(steer_sq > (real_t)1e-12) && !(crowd > (real_t)0.0)) {
 		return;
 	}
 	// A locked orbit owns the bullet (the gate of the pattern stage).
@@ -495,8 +511,34 @@ _ALWAYS_INLINE_ void BulletVolley2D::step_flock(const MoveTick2D &t, BulletStep2
 		return;
 	}
 	Vector2 &dir = *b.direction;
-	const real_t heading_sq = dir.x * dir.x + dir.y * dir.y;
+	real_t heading_sq = dir.x * dir.x + dir.y * dir.y;
 	if (!(heading_sq > (real_t)1e-8) || !Math::is_finite(heading_sq)) {
+		return;
+	}
+	// Separation outranks homing: a crowded bullet (touching or overlapping
+	// a flockmate: crowd 1) gives back that share of this tick's homing turn,
+	// so it keeps its distance instead of piling onto the shared target; with
+	// room again (crowd 0) homing steers it fully.
+	bool yielded = false;
+	if (crowd > (real_t)0.0) {
+		const Vector2 pre = b.pre_homing;
+		const real_t turned = Math::atan2(pre.x * dir.y - pre.y * dir.x, pre.x * dir.x + pre.y * dir.y);
+		if (Math::is_finite(turned) && Math::abs(turned) > (real_t)1e-6) {
+			const real_t back = -turned * MIN(crowd, (real_t)1.0);
+			const real_t bc = Math::cos(back);
+			const real_t bs = Math::sin(back);
+			const real_t nx = dir.x * bc - dir.y * bs;
+			const real_t ny = dir.x * bs + dir.y * bc;
+			const real_t inv = (real_t)1.0 / Math::sqrt(nx * nx + ny * ny);
+			dir = Vector2(nx * inv, ny * inv);
+			heading_sq = (real_t)1.0;
+			yielded = true;
+		}
+	}
+	if (!(steer_sq > (real_t)1e-12) && !yielded) {
+		if (t.flock_rate != nullptr) {
+			t.flock_rate[i] = 0.0;
+		}
 		return;
 	}
 	// The flight heading: a negative speed flies against the direction
@@ -517,19 +559,33 @@ _ALWAYS_INLINE_ void BulletVolley2D::step_flock(const MoveTick2D &t, BulletStep2
 			theta = phi;
 		}
 	}
+	if (t.flock_rate != nullptr) {
+		// Turn inertia: the rate eases toward the rules' rate (a crowd whose
+		// push flips side every tick never makes the bullet vibrate).
+		const real_t wanted = theta / (real_t)t.delta;
+		real_t &rate = t.flock_rate[i];
+		rate = wanted + (rate - wanted) * t.flock_rate_keep;
+		theta = rate * (real_t)t.delta;
+	}
 	if (t.flock_max_turn > 0.0) {
 		theta = CLAMP(theta, -t.flock_max_turn, t.flock_max_turn);
+		if (t.flock_rate != nullptr) {
+			t.flock_rate[i] = theta / (real_t)t.delta; // no wind-up past the cap
+		}
 	}
 	// A calm flock (or a zero-delta tick) changes nothing, bit for bit.
-	if (!(Math::abs(theta) >= (real_t)1e-6)) {
+	const bool turns = Math::abs(theta) >= (real_t)1e-6;
+	if (!turns && !yielded) {
 		return;
 	}
-	const real_t c = Math::cos(theta);
-	const real_t s = Math::sin(theta);
-	const real_t nx = dir.x * c - dir.y * s;
-	const real_t ny = dir.x * s + dir.y * c;
-	const real_t inv = (real_t)1.0 / Math::sqrt(nx * nx + ny * ny);
-	dir = Vector2(nx * inv, ny * inv);
+	if (turns) {
+		const real_t c = Math::cos(theta);
+		const real_t s = Math::sin(theta);
+		const real_t nx = dir.x * c - dir.y * s;
+		const real_t ny = dir.x * s + dir.y * c;
+		const real_t inv = (real_t)1.0 / Math::sqrt(nx * nx + ny * ny);
+		dir = Vector2(nx * inv, ny * inv);
+	}
 	if (t.flock_face || t.flock_basis_owns_heading || (b.steering_deque != nullptr && t.flock_homing_basis && !check_exists_bullet_movement_pattern_data(i))) {
 		// Align the rotation with the new heading ABSOLUTELY (not by theta):
 		// a heading something else snapped this tick (homing toward a

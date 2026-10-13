@@ -2778,6 +2778,9 @@ public:
 	// Each bullet's last steering while its flock refreshes on an interval
 	// (written by the pass; dropped with every membership change).
 	std::vector<FlockSteerCache2D> flock_cache;
+	// Per bullet: its flock turn rate (rad/s) carried between ticks (turn
+	// inertia, BulletFlock2D.turn_smoothing_sec); dropped with every config.
+	std::vector<real_t> flock_turn_rate;
 	// The config serial the cache was built under: another one (a scope,
 	// flock or switch edit) starts a fresh cache.
 	uint32_t flock_cache_serial = 0;
