@@ -165,6 +165,14 @@ func swallow_errors() -> int:
 	return n
 
 
+## A wall-clock budget in ms, scaled by BLAST_TIME_BUDGET_SCALE (default 1):
+## sanitizer runs (tools/run_sanitizer_tests.py) execute several times slower
+## and widen budgets that guard against minutes-long searches.
+func time_budget_ms(ms: float) -> float:
+	var scale := OS.get_environment("BLAST_TIME_BUDGET_SCALE")
+	return ms * (float(scale) if scale.is_valid_float() and float(scale) >= 1.0 else 1.0)
+
+
 ## Builds a factory-owned volley (shared test data builders).
 func quick_volley(n: int = 4, speed: float = 200.0, lifetime: float = 5.0) -> BulletVolley2D:
 	return factory.spawn_volley(H.make_volley_data(n, speed, lifetime))

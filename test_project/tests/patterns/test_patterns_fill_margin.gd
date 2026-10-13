@@ -31,7 +31,7 @@ func test_margin_larger_than_the_shape_fails_fast_with_the_same_error() -> void:
 	var r := _timed_fill(CIRCLE, 64, 200.0)
 	expect_error_sequence(["helper_generate_transforms_circle: " + NO_ROOM])
 	assert_eq(r["n"], 0, "no room: empty result")
-	assert_lt(r["ms"], FAST_MS, "answered in %d ms (old search: ~11 s)" % r["ms"])
+	assert_lt(r["ms"], time_budget_ms(FAST_MS), "answered in %d ms (old search: ~11 s)" % r["ms"])
 
 
 func test_margin_equal_to_the_radius_fails_fast() -> void:
@@ -40,7 +40,7 @@ func test_margin_equal_to_the_radius_fails_fast() -> void:
 	var r := _timed_fill(CIRCLE, 64, 150.0)
 	expect_error_sequence(["helper_generate_transforms_circle: " + NO_ROOM])
 	assert_eq(r["n"], 0, "empty result")
-	assert_lt(r["ms"], FAST_MS, "answered in %d ms (old search: ~23 s)" % r["ms"])
+	assert_lt(r["ms"], time_budget_ms(FAST_MS), "answered in %d ms (old search: ~23 s)" % r["ms"])
 
 
 func test_thin_shapes_fail_fast_when_the_margin_eats_them() -> void:
@@ -48,7 +48,7 @@ func test_thin_shapes_fail_fast_when_the_margin_eats_them() -> void:
 		var r := _timed_fill(case[0], 64, case[1])
 		expect_error_sequence(["helper_generate_transforms_%s: %s" % [case[2], NO_ROOM]], case[2])
 		assert_eq(r["n"], 0, "%s: empty result" % case[2])
-		assert_lt(r["ms"], FAST_MS, "%s answered in %d ms (old search: 4-13 s)" % [case[2], r["ms"]])
+		assert_lt(r["ms"], time_budget_ms(FAST_MS), "%s answered in %d ms (old search: 4-13 s)" % [case[2], r["ms"]])
 
 
 func test_a_margin_that_leaves_room_still_fills_exactly_n() -> void:
@@ -98,7 +98,7 @@ func test_sliver_region_answers_fast_instead_of_searching_for_minutes() -> void:
 		var v := _fill(CIRCLE, amount, 149.9)
 		var ms := Time.get_ticks_msec() - t0
 		expect_no_errors("a sliver is not an error: the grid holds one cell")
-		assert_lt(ms, FAST_MS, "%d bullets answered in %d ms" % [amount, ms])
+		assert_lt(ms, time_budget_ms(FAST_MS), "%d bullets answered in %d ms" % [amount, ms])
 		assert_eq(v.size(), 1, "%d asked: the one cell that fits at the 0.5 px floor" % amount)
 
 
@@ -140,7 +140,7 @@ func test_a_giant_shape_with_a_margin_hugging_its_inradius_stays_bounded() -> vo
 	var v: Array = BulletPatterns2D.generate(CIRCLE, 64, Transform2D(), {"outline_placement": FILL_INSIDE, "circle_radius": 3000.0, "outline_fill_margin": 2999.0})
 	var ms := Time.get_ticks_msec() - t0
 	expect_no_errors("a sliver is not an error")
-	assert_lt(ms, 8000, "answered in %d ms (before the budget: over 10 minutes)" % ms)
+	assert_lt(ms, time_budget_ms(8000), "answered in %d ms (before the budget: over 10 minutes)" % ms)
 	assert_eq(v.size(), 1, "the one cell the budgeted grid holds")
 
 

@@ -48,8 +48,8 @@ for the rest: the sections are written to be looked up, not read once.
    defaults); fix plain bugs without asking but list them in the report.
 10. **Finish green:** full suite + `--self-test` + format check + snapshot
     diff + benchmark gate (+ `run_editor_smoke.py` when editor/preview code
-    changed, + `run_ubsan_tests.py` when casts, enums or integer math
-    changed), then report with Big-O and a ratings table (§19).
+    changed, + `run_sanitizer_tests.py` when casts, enums, integer math,
+    lifetimes or user-callback paths changed), then report with Big-O and a ratings table (§19).
 
 ## 1. Commands
 
@@ -59,7 +59,7 @@ python3 tools/run_tests.py                                       # 200 files / 1
 python3 tools/run_tests.py --suite <substring> --full            # one area, every failure message unclipped
 python3 tools/run_tests.py --self-test                           # proves the harness still catches failures/leaks
 python3 tools/run_editor_smoke.py                                # headless EDITOR run of tests/editor_smoke/ (editor-only paths)
-python3 tools/run_ubsan_tests.py [--suite <x>]                    # suites against a UBSan build (~1 min build + suite; Linux/GCC)
+python3 tools/run_sanitizer_tests.py [--sanitizer address|undefined] [--suite <x>]  # suites under ASan + UBSan (~12 min both; Linux/GCC)
 python3 tools/api_snapshot.py save <label>                       # behavior snapshot (~10 s, §7.4)
 python3 tools/api_snapshot.py diff <label_a> <label_b>           # must print IDENTICAL for a refactor
 python3 tools/format_code.py [--check] [files or dirs]           # clang-format (repo .clang-format)
@@ -886,9 +886,14 @@ deduped, cancelled by REMOVED) and replayed once on resume.
   symbol, glibc then marks the library NODELETE, `dlclose` keeps it, its
   statics outlive Godot's StringName table and EVERY test file reports ~86
   `Orphan StringName` leaks (diagnose with `LD_DEBUG=all ... | grep NODELETE`).
-- Undefined behavior the suites cannot see (x86 hides most of it; ARM and
-  the optimizer do not): `tools/run_ubsan_tests.py` finds it with file:line
-  and a stack. Rules it taught us:
+- Memory errors and undefined behavior the suites cannot see (a write into
+  freed memory passes every assert; x86 hides most UB, ARM and the optimizer
+  do not): `tools/run_sanitizer_tests.py` finds them with file:line and a
+  stack. Rules it taught us:
+  - An RAII scope that writes into an object must re-check the owner after
+    user code ran inside it (`ReentrancyGuard(depth, this)`,
+    `FactoryBusyScope2D`): a callback may `free()` the owner, and the
+    destructor otherwise writes freed memory (heap-use-after-free).
   - Every script-bound enum is `enum X : int` and uses
     `BLAST_VARIANT_ENUM_CAST` (`core/variant_enum_cast2d.hpp`, a
     compile-time assert): GDScript may pass any int, and an out-of-range
@@ -1052,10 +1057,12 @@ project's `.so`). For quick numeric comparisons load two
   `format_code.py`, `run_benchmarks.py`, `run_editor_smoke.py` (headless
   editor + @tool probes in `test_project/tests/editor_smoke/`, run on a
   throwaway COPY of the project; probes act only with `--blast-editor-smoke`),
-  `run_ubsan_tests.py` (UBSan objects from compile_commands.json under
-  `test_project/test_results/ubsan/`, swapped in for the installed library
-  and always restored; leak gate off: the sanitizer runtime makes every file
-  report Orphan StringNames).
+  `run_sanitizer_tests.py` (ASan / UBSan objects from compile_commands.json
+  under `test_project/test_results/sanitizers/`, swapped in for the installed
+  library and always restored; ASan is preloaded with a shim that drops
+  Godot's RTLD_DEEPBIND; leak gate off: a sanitizer runtime makes every file
+  report Orphan StringNames; wall-clock budgets scale through
+  `BLAST_TIME_BUDGET_SCALE` / `BlastTest.time_budget_ms`).
 - Config: `select_godot_path.py`, `select_godot_project.py`,
   `change_godot_target_version.py`, `update_godot_cpp.py`,
   `config_manager.py` + `config.json` (machine state), `paths.py`.
