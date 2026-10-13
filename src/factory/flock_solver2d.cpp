@@ -309,9 +309,12 @@ void FlockSolver2D::add_volley(BulletVolley2D &volley, const FlockConfig2D &conf
 			volley.flock_cache.clear();
 		}
 	} else {
-		if ((int)volley.flock_cache.size() != amount || volley.flock_cache_serial != config.serial) {
+		// A rules edit (rules_serial) reaches every bullet on the next tick,
+		// even between its refreshes.
+		if ((int)volley.flock_cache.size() != amount || volley.flock_cache_serial != config.serial || volley.flock_cache_rules != flock->rules_serial) {
 			volley.flock_cache.assign((size_t)amount, FlockSteerCache2D());
 			volley.flock_cache_serial = config.serial;
+			volley.flock_cache_rules = flock->rules_serial;
 		}
 		cache = volley.flock_cache.data();
 		CachedVolley cached;

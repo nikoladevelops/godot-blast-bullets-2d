@@ -79,6 +79,10 @@ public:
 	int max_neighbors = 32; // 0 = no limit
 	real_t update_interval = 0.0; // seconds between steering updates, 0 = every tick
 	real_t view_angle_degrees = 360.0; // field of view around the flight heading
+	// Bumped by every accepted change (with `changed`): steering cached
+	// between interval refreshes is only reused under the rules it was
+	// computed with.
+	uint32_t rules_serial = 0;
 
 	real_t get_separation() const;
 	void set_separation(real_t value);
@@ -130,6 +134,10 @@ protected:
 	static void _bind_methods();
 
 private:
+	void rules_changed() {
+		++rules_serial;
+		emit_changed();
+	}
 	// A finite value >= 0 (or > 0 when positive_only) stored into field.
 	void store_amount(real_t &field, real_t value, const char *property_name, bool positive_only);
 };

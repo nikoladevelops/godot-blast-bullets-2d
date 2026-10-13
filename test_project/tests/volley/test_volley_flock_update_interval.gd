@@ -178,3 +178,24 @@ func test_a_new_scope_measures_anew() -> void:
 	sp.flock_scope = BulletFlock2D.SCOPE_PER_VOLLEY
 	step_factory(1)
 	assert_eq(got[0].debug_get_bullet_flock_neighbors(0), 3, "Per Volley: measured anew right away, not after 100 s")
+
+
+func test_a_rules_edit_reaches_every_bullet_on_the_next_tick() -> void:
+	# Edits apply on the next tick even between refreshes: the cached
+	# steering was computed by the old rules (found by the chaos soak: a
+	# lowered max_neighbors still read 25 flockmates for a whole interval).
+	var f := H.make_flock(1.0, 1.0, 1.0, 400.0, 40.0)
+	f.update_interval = 0.5
+	var v := _volley(_stack(40), f)
+	step_factory(2)
+	assert_eq(v.debug_get_bullet_flock_neighbors(7), 32, "the default cap of 32")
+	f.max_neighbors = 3
+	step_factory(1)
+	var over: Array = []
+	for i in 40:
+		if v.debug_get_bullet_flock_neighbors(i) > 3:
+			over.append(i)
+	assert_eq(over, [], "every bullet reads at most the new cap at once")
+	assert_eq(factory.debug_get_flock_stats()["queried_members"], 40, "the edit made every bullet compute anew")
+	step_factory(1)
+	assert_lt(factory.debug_get_flock_stats()["queried_members"], 40, "then the interval spreads the work again")

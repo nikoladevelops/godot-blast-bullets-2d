@@ -15,7 +15,7 @@ void BulletFlock2D::store_amount(real_t &field, real_t value, const char *proper
 		return;
 	}
 	field = value;
-	emit_changed();
+	rules_changed();
 }
 
 real_t BulletFlock2D::get_separation() const { return separation; }
@@ -42,7 +42,7 @@ void BulletFlock2D::set_count_bullet_size(bool value) {
 		return;
 	}
 	count_bullet_size = value;
-	emit_changed();
+	rules_changed();
 }
 
 real_t BulletFlock2D::get_max_turn_rate_degrees() const { return max_turn_rate_degrees; }
@@ -57,7 +57,7 @@ void BulletFlock2D::set_face_heading(bool value) {
 		return;
 	}
 	face_heading = value;
-	emit_changed();
+	rules_changed();
 }
 
 int BulletFlock2D::get_max_neighbors() const { return max_neighbors; }
@@ -70,7 +70,7 @@ void BulletFlock2D::set_max_neighbors(int value) {
 		return;
 	}
 	max_neighbors = value;
-	emit_changed();
+	rules_changed();
 }
 
 real_t BulletFlock2D::get_update_interval() const { return update_interval; }
@@ -86,7 +86,7 @@ void BulletFlock2D::set_view_angle_degrees(real_t value) {
 		return;
 	}
 	view_angle_degrees = value;
-	emit_changed();
+	rules_changed();
 }
 
 namespace {
@@ -133,7 +133,7 @@ void BulletFlock2D::apply_preset(Preset preset) {
 	max_turn_rate_degrees = row.max_turn_rate_degrees;
 	blend_in_sec = row.blend_in_sec;
 	view_angle_degrees = row.view_angle_degrees;
-	emit_changed();
+	rules_changed();
 	notify_property_list_changed();
 }
 

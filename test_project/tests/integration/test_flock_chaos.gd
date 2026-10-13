@@ -21,6 +21,11 @@ var spawners: Array = []
 var volleys: Array = []
 var trigger_data: BulletVolleyData2D
 var handler_ops := 0
+## Flocks a handler edited inside a sweep this step: the documented rule is
+## that such an edit applies from the NEXT pass, so this step's counts may
+## still follow the old cap.
+var handler_edited: Array = []
+var in_handler := false
 
 
 func before_each() -> void:
@@ -48,6 +53,10 @@ func before_each() -> void:
 func _random_flock() -> BulletFlock2D:
 	if not flocks.is_empty() and rng.randf() < 0.6:
 		return flocks[rng.randi() % flocks.size()]
+	if rng.randf() < 0.25:
+		var p := BulletFlock2D.create_preset(rng.randi_range(0, 4))
+		flocks.append(p)
+		return p
 	var f := H.make_flock(rng.randf_range(0, 4), rng.randf_range(0, 3), rng.randf_range(0, 3), rng.randf_range(20, 160), rng.randf_range(0, 80))
 	f.max_neighbors = [0, 1, 4, 32][rng.randi() % 4]
 	f.max_turn_rate_degrees = [0.0, 90.0, 720.0][rng.randi() % 3]
@@ -92,14 +101,26 @@ func _new_spawner() -> void:
 	sp.position = Vector2(rng.randf_range(0, 500), rng.randf_range(0, 400))
 	sp.helper_ring_radius = rng.randf_range(5, 60)
 	sp.flock_enabled = rng.randf() < 0.8
-	sp.flock = _random_flock()
+	sp.flock = _random_flock() if rng.randf() < 0.8 else null # null: the factory's default flock
 	sp.flock_scope = rng.randi() % 3
+	if rng.randf() < 0.3:
+		sp.bullet_scale_mode = 1 + rng.randi() % 2 # Uniform / Per Axis
+		sp.bullet_scale_min = rng.randf_range(0.2, 1.0)
+		sp.bullet_scale_max = rng.randf_range(1.0, 3.0)
+		sp.bullet_scale_min_xy = Vector2(rng.randf_range(0.2, 1.0), rng.randf_range(0.2, 1.0))
+		sp.bullet_scale_max_xy = Vector2(rng.randf_range(1.0, 3.0), rng.randf_range(1.0, 3.0))
+	if rng.randf() < 0.2:
+		sp.burst_enabled = true
+		sp.burst_count = rng.randi_range(2, 4)
+		sp.burst_interval_sec = rng.randf_range(0.02, 0.2)
 	sp.time_scale = [0.0, 0.5, 1.0, 2.0][rng.randi() % 4]
 	sp.orphaned_volleys = rng.randi() % 4
 	if rng.randf() < 0.3:
 		sp.graze_zones = [H.make_graze_zone([rng.randf_range(10, 80)])]
 		sp.graze_node_group = &"chaos_graze"
 		sp.graze_enabled = true
+	# Burst shots come over later frames: every shot joins the checks.
+	sp.volley_fired.connect(func(v: BulletVolley2D, _n: int) -> void: volleys.append(v))
 	spawners.append(sp)
 
 
@@ -138,6 +159,10 @@ func _edit_spawner() -> void:
 		0: sp.flock_enabled = not sp.flock_enabled
 		1: sp.flock = _random_flock() if rng.randf() < 0.8 else null
 		2: sp.flock_scope = rng.randi() % 3
+		3:
+			if sp.burst_enabled:
+				sp.begin_burst() # the shots come over the next frames
+		4: sp.bullet_scale_mode = rng.randi() % 3
 		3: sp.queue_free() # orphans its volleys per orphaned_volleys
 		4: sp.time_scale = [0.0, 1.0, 3.0][rng.randi() % 3]
 
@@ -146,7 +171,10 @@ func _edit_flock() -> void:
 	if flocks.is_empty():
 		return
 	var f: BulletFlock2D = flocks[rng.randi() % flocks.size()]
-	match rng.randi() % 9:
+	if in_handler:
+		handler_edited.append(f)
+	match rng.randi() % 10:
+		9: f.apply_preset(rng.randi_range(0, 4))
 		6: f.blend_in_sec = rng.randf_range(0, 1)
 		7: f.separation_lookahead_sec = rng.randf_range(0, 1)
 		8: f.max_turn_rate_degrees = rng.randf_range(0, 720)
@@ -165,7 +193,7 @@ func _touch_volley() -> void:
 	var i := rng.randi() % v.get_amount_bullets()
 	match rng.randi() % 7:
 		0: v.flock_leave()
-		1: v.flock_join(_random_flock(), rng.randi() % 3)
+		1: v.flock_join(_random_flock() if rng.randf() < 0.8 else null, rng.randi() % 3)
 		2:
 			if v.is_bullet_status_enabled(i):
 				v.disable_bullet(i)
@@ -193,7 +221,10 @@ func _on_lifetime(v: BulletVolley2D, _indexes: Array) -> void:
 	match rng.randi() % 4:
 		0: other.flock_join(_random_flock(), rng.randi() % 3)
 		1: other.flock_leave()
-		2: _edit_flock()
+		2:
+			in_handler = true
+			_edit_flock()
+			in_handler = false
 		3:
 			if other != v:
 				other.queue_free()
@@ -229,7 +260,7 @@ func _broken() -> Array:
 				bad.append("non-finite bullet %d" % i)
 			elif f != null and d.length_squared() > 1e-8 and absf(d.length() - 1.0) > 1e-3:
 				bad.append("flocking heading |%s| = %f" % [d, d.length()])
-			if f != null and f.max_neighbors > 0 and v.debug_get_bullet_flock_neighbors(i) > f.max_neighbors:
+			if f != null and f.max_neighbors > 0 and not handler_edited.has(f) and v.debug_get_bullet_flock_neighbors(i) > f.max_neighbors:
 				bad.append("bullet %d read %d > cap %d" % [i, v.debug_get_bullet_flock_neighbors(i), f.max_neighbors])
 	var dangling: Dictionary = factory.debug_assert_no_dangling()
 	if not dangling["ok"]:
@@ -237,16 +268,26 @@ func _broken() -> Array:
 	return bad
 
 
+## SEEDS, plus BLAST_FUZZ_SEEDS more for a soak run:
+## BLAST_FUZZ_SEEDS=200 python3 tools/run_tests.py --suite flock_chaos
+func _seeds() -> Array:
+	var out: Array = SEEDS.duplicate()
+	for k in int(OS.get_environment("BLAST_FUZZ_SEEDS")):
+		out.append(1000 + k)
+	return out
+
+
 func test_random_flocking_sequences_keep_every_invariant() -> void:
 	var weak_flocks: Array = []
 	var peak_armed := 0
 	var peak_grid := 0
 	var checks := 0
-	for sd in SEEDS:
+	for sd in _seeds():
 		rng.seed = sd
 		seed(sd)
 		for step in STEPS:
 			var op := rng.randi() % 14
+			handler_edited.clear()
 			_step(op)
 			for k in rng.randi_range(1, 3):
 				await physics()
