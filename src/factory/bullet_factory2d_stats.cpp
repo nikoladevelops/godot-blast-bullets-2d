@@ -330,7 +330,7 @@ Dictionary BulletFactory2D::debug_assert_no_dangling() {
 			if (volley->flock_config != nullptr) {
 				return fail("pooled volley still flocks" + at);
 			}
-			if (volley->split_config != nullptr || volley->split_spawn_data.is_valid() || volley->split_arming_cache != nullptr) {
+			if (volley->split_config != nullptr || volley->split_spawn_data.is_valid() || volley->split_arming_cache != nullptr || !volley->split_counts.empty()) {
 				return fail("pooled volley still splits" + at);
 			}
 		}

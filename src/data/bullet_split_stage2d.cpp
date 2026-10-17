@@ -43,6 +43,27 @@ void BulletSplitStage2D::set_count(int value) {
 	emit_changed();
 }
 
+void BulletSplitStage2D::set_parent_survives(bool value) {
+	if (parent_survives == value) {
+		return;
+	}
+	parent_survives = value;
+	notify_property_list_changed();
+	emit_changed();
+}
+
+void BulletSplitStage2D::set_max_splits_per_bullet(int value) {
+	if (value < 0) {
+		UtilityFunctions::push_error("BulletSplitStage2D: max_splits_per_bullet must be >= 0 (0 = no limit), keeping the old value.");
+		return;
+	}
+	if (max_splits_per_bullet == value) {
+		return;
+	}
+	max_splits_per_bullet = value;
+	emit_changed();
+}
+
 void BulletSplitStage2D::set_seed(int64_t value) {
 	if (seed == value) {
 		return;
@@ -155,7 +176,7 @@ real_t BulletSplitStage2D::child_speed_multiplier(int k, int children, double ra
 }
 
 void BulletSplitStage2D::_validate_property(PropertyInfo &p_property) const {
-	const bool hide = (p_property.name == StringName("spread_degrees") && direction_mode == DIRECTION_RING) || (p_property.name == StringName("fixed_speed") && speed_mode != SPEED_FIXED);
+	const bool hide = (p_property.name == StringName("spread_degrees") && direction_mode == DIRECTION_RING) || (p_property.name == StringName("fixed_speed") && speed_mode != SPEED_FIXED) || (p_property.name == StringName("max_splits_per_bullet") && !parent_survives);
 	if (hide) {
 		p_property.usage &= ~PROPERTY_USAGE_EDITOR;
 	}
@@ -173,6 +194,10 @@ void BulletSplitStage2D::_bind_methods() {
 	SPLIT_BIND(split_after_sec, FLOAT, PROPERTY_HINT_RANGE, "0,10,0.01,or_greater,suffix:s")
 	SPLIT_BIND(split_on_despawn, BOOL)
 	SPLIT_BIND(split_on_clear, BOOL)
+	SPLIT_BIND(split_on_bounce, BOOL)
+	SPLIT_BIND(split_on_non_lethal_hit, BOOL)
+	SPLIT_BIND(split_on_homing_reached, BOOL)
+	SPLIT_BIND(split_on_graze, BOOL)
 
 	ADD_GROUP("Children", "");
 	SPLIT_BIND(count, INT, PROPERTY_HINT_RANGE, "1,64,1,or_greater")
@@ -209,6 +234,8 @@ void BulletSplitStage2D::_bind_methods() {
 
 	ADD_GROUP("Parent", "");
 	SPLIT_BIND(fire_death_effects, BOOL)
+	SPLIT_BIND(parent_survives, BOOL)
+	SPLIT_BIND(max_splits_per_bullet, INT, PROPERTY_HINT_RANGE, "0,16,1,or_greater")
 #undef SPLIT_BIND
 
 	ClassDB::bind_method(D_METHOD("child_angle_radians", "child_index", "children", "random_roll", "jitter_roll"), &BulletSplitStage2D::child_angle_radians);

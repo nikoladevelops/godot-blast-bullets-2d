@@ -391,6 +391,18 @@ bool BulletVolley2D::dispatch_graze_events() {
 			++bullet_factory->stats_graze_events_total;
 		}
 		++graze_events_dispatched;
+		// Split on graze: after every handler, only for the same live bullet.
+		if (!ev.exit && split_config != nullptr && all_bullets_enabled_set.contains(ev.bullet_index) && collision_epoch_for_bullet(ev.bullet_index) == ev.epoch && ev.bullet_index < (int)all_cached_instance_transforms.size()) {
+			if (split_on_event(ev.bullet_index, SPLIT_CAUSE_GRAZE, all_cached_instance_transforms[ev.bullet_index])) {
+				if (!survived_user_code(self_id)) {
+					return false;
+				}
+				if (!is_active || is_queued_for_deletion()) {
+					graze_dispatch_scratch.clear();
+					return true;
+				}
+			}
+		}
 		if (!handled && !ev.exit) {
 			Object *emitter = spawner != nullptr ? spawner : (Object *)bullet_factory;
 			if (emitter != nullptr) {

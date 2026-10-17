@@ -700,7 +700,7 @@
 			<param index="0" name="bullet_index_start" type="int" default="0" />
 			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
-				Splits every live bullet in the range right now (cause [constant SPLIT_CAUSE_MANUAL]) and returns how many split. Needs a stage for this volley's generation; its triggers and [member BulletSplitStage2D.chance] are ignored. The bullets leave like a clear (On Clear effects). The children spawn after the next factory sweep.
+				Splits every live bullet in the range right now (cause [constant SPLIT_CAUSE_MANUAL]) and returns how many split. Needs a stage for this volley's generation; its triggers, [member BulletSplitStage2D.chance] and [member BulletSplitStage2D.max_splits_per_bullet] are ignored. The bullets leave like a clear (On Clear effects), or keep flying with [member BulletSplitStage2D.parent_survives]. The children spawn after the next factory sweep.
 			</description>
 		</method>
 		<method name="attach_time_based_function">
@@ -2637,6 +2637,18 @@
 		</constant>
 		<constant name="SPLIT_CAUSE_MANUAL" value="5">
 			Split by [method split_bullet] or [method all_bullets_split].
+		</constant>
+		<constant name="SPLIT_CAUSE_BOUNCE" value="6">
+			Split by a bounce ([member BulletSplitStage2D.split_on_bounce]).
+		</constant>
+		<constant name="SPLIT_CAUSE_NON_LETHAL_HIT" value="7">
+			Split by a hit the bullet survived ([member BulletSplitStage2D.split_on_non_lethal_hit]).
+		</constant>
+		<constant name="SPLIT_CAUSE_HOMING_REACHED" value="8">
+			Split on reaching the homing target ([member BulletSplitStage2D.split_on_homing_reached]).
+		</constant>
+		<constant name="SPLIT_CAUSE_GRAZE" value="9">
+			Split by a graze ([member BulletSplitStage2D.split_on_graze]).
 		</constant>
 		<constant name="MAX_GRAZE_ZONES" value="4">
 			Graze zones per volley (and per spawner).

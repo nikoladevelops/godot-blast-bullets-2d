@@ -57,6 +57,12 @@ public:
 	real_t split_after_sec = 0.0;
 	bool split_on_despawn = false;
 	bool split_on_clear = false;
+	// Triggers that do not kill the bullet (parent_survives decides whether
+	// the parent stays).
+	bool split_on_bounce = false;
+	bool split_on_non_lethal_hit = false;
+	bool split_on_homing_reached = false;
+	bool split_on_graze = false;
 
 	// Children.
 	int count = 3;
@@ -93,6 +99,8 @@ public:
 
 	// The parent.
 	bool fire_death_effects = true;
+	bool parent_survives = false;
+	int max_splits_per_bullet = 1;
 
 	bool get_split_on_hit() const { return split_on_hit; }
 	void set_split_on_hit(bool value) { store_flag(split_on_hit, value); }
@@ -104,6 +112,14 @@ public:
 	void set_split_on_despawn(bool value) { store_flag(split_on_despawn, value); }
 	bool get_split_on_clear() const { return split_on_clear; }
 	void set_split_on_clear(bool value) { store_flag(split_on_clear, value); }
+	bool get_split_on_bounce() const { return split_on_bounce; }
+	void set_split_on_bounce(bool value) { store_flag(split_on_bounce, value); }
+	bool get_split_on_non_lethal_hit() const { return split_on_non_lethal_hit; }
+	void set_split_on_non_lethal_hit(bool value) { store_flag(split_on_non_lethal_hit, value); }
+	bool get_split_on_homing_reached() const { return split_on_homing_reached; }
+	void set_split_on_homing_reached(bool value) { store_flag(split_on_homing_reached, value); }
+	bool get_split_on_graze() const { return split_on_graze; }
+	void set_split_on_graze(bool value) { store_flag(split_on_graze, value); }
 
 	int get_count() const { return count; }
 	void set_count(int value);
@@ -158,6 +174,10 @@ public:
 
 	bool get_fire_death_effects() const { return fire_death_effects; }
 	void set_fire_death_effects(bool value) { store_flag(fire_death_effects, value); }
+	bool get_parent_survives() const { return parent_survives; }
+	void set_parent_survives(bool value);
+	int get_max_splits_per_bullet() const { return max_splits_per_bullet; }
+	void set_max_splits_per_bullet(int value);
 
 	// The angle (radians, relative to the reference direction) and speed
 	// multiplier of child k of `children`, given unit rolls in [0, 1].
@@ -165,7 +185,8 @@ public:
 	real_t child_angle_radians(int k, int children, double random_roll, double jitter_roll) const;
 	real_t child_speed_multiplier(int k, int children, double random_roll) const;
 
-	// spread_degrees hides in Ring mode, fixed_speed outside Fixed.
+	// spread_degrees hides in Ring mode, fixed_speed outside Fixed,
+	// max_splits_per_bullet while the parent never survives a split.
 	void _validate_property(PropertyInfo &p_property) const;
 
 protected:

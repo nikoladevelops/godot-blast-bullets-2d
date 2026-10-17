@@ -1246,6 +1246,13 @@ func _snap_split(section: String) -> void:
 	timer.split_after_sec = 0.05
 	timer.count = 2
 	cases["timer"] = [timer]
+	var survivor := BulletSplitStage2D.new()
+	survivor.split_on_lifetime_over = false
+	survivor.split_after_sec = 0.03
+	survivor.parent_survives = true
+	survivor.count = 3
+	survivor.direction_mode = BulletSplitStage2D.DIRECTION_RING
+	cases["timer_parent_survives"] = [survivor]
 	for label in cases:
 		log.clear()
 		var data := H.make_volley_data(3, 120.0, 0.1)

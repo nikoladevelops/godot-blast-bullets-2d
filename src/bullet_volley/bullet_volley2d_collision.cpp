@@ -744,6 +744,14 @@ void BulletVolley2D::handle_bullet_collision(const BulletCollisionData2D &record
 	// signal) and never reaches the counter below, unless the volley asked
 	// to consume the hit too (decision 2).
 	const int bounce_decision = try_handle_bounce(record.collision_type, bullet_index, record.collided_instance_id, record.queue_target_velocity, record.queue_target_velocity_valid, record.queue_target_position, record.queue_target_position_valid);
+	// Split on bounce: after the bounce handler, at the bounced pose (the
+	// children fan around the NEW heading), only for the same live bullet.
+	// A parent that leaves ends the record (its hit is never counted).
+	if (bounce_decision >= 1 && same_live_bullet() && split_config != nullptr && bullet_index < (int)all_cached_instance_transforms.size()) {
+		if (split_on_event(bullet_index, SPLIT_CAUSE_BOUNCE, all_cached_instance_transforms[bullet_index])) {
+			return;
+		}
+	}
 	if (bounce_decision == 1) {
 		return;
 	}
@@ -793,7 +801,7 @@ void BulletVolley2D::handle_bullet_collision(const BulletCollisionData2D &record
 		// Destroy sound only (never the hit sound too): the killing blow
 		// gets one report, at the impact pose, BEFORE the disable below
 		// (the last bullet's disable releases the life synchronously).
-		if (split != 2) {
+		if (!(split & SPLIT_SILENCE_DEATH)) {
 			sound_fire(BulletSoundData2D::SOUND_ON_DESTROY, bullet_index, impact_transf.get_origin());
 		}
 		// Destroy explosion only (never the hit spark too): the killing blow
@@ -804,7 +812,7 @@ void BulletVolley2D::handle_bullet_collision(const BulletCollisionData2D &record
 		if (!survived_user_code(self_id)) {
 			return; // on_bullet_disable freed this volley or the factory
 		}
-		if (split != 2) {
+		if (!(split & SPLIT_SILENCE_DEATH)) {
 			fx_fire_oneshot(EFFECT_ON_DESTROY, bullet_index, impact_transf);
 		}
 	} else if (bounce_decision != 2) {
@@ -812,6 +820,11 @@ void BulletVolley2D::handle_bullet_collision(const BulletCollisionData2D &record
 		// fired its bounce spark, so it stays silent here).
 		sound_fire(BulletSoundData2D::SOUND_ON_HIT, bullet_index, impact_transf.get_origin());
 		fx_fire_oneshot(EFFECT_ON_HIT, bullet_index, impact_transf);
+		// Split on a hit it survived, at the impact pose (a consumed bounce
+		// already had its chance to split as a bounce).
+		if (split_config != nullptr) {
+			split_on_event(bullet_index, SPLIT_CAUSE_NON_LETHAL_HIT, impact_transf);
+		}
 	}
 }
 

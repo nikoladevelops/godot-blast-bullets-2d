@@ -15,6 +15,7 @@ void BulletVolley2D::split_arm(const std::shared_ptr<SplitConfig2D> &config, con
 	split_spawn_data = config != nullptr ? spawn_data : Ref<BulletVolleyData2D>();
 	split_depth = config != nullptr ? Math::max(0, depth) : 0;
 	split_timer_fired = false;
+	split_counts.clear();
 	split_arming_cache.reset();
 	split_arming_cache_serial = 0;
 }
@@ -54,6 +55,18 @@ int BulletVolley2D::split_capture(int bullet_index, int cause, const Transform2D
 		case SPLIT_CAUSE_MANUAL:
 			wanted = true;
 			break;
+		case SPLIT_CAUSE_BOUNCE:
+			wanted = stage->split_on_bounce;
+			break;
+		case SPLIT_CAUSE_NON_LETHAL_HIT:
+			wanted = stage->split_on_non_lethal_hit;
+			break;
+		case SPLIT_CAUSE_HOMING_REACHED:
+			wanted = stage->split_on_homing_reached;
+			break;
+		case SPLIT_CAUSE_GRAZE:
+			wanted = stage->split_on_graze;
+			break;
 		default:
 			break;
 	}
@@ -64,7 +77,12 @@ int BulletVolley2D::split_capture(int bullet_index, int cause, const Transform2D
 	if (data.is_null()) {
 		return 0;
 	}
-	// Manual splits ignore the odds (the script decided).
+	// A bullet that already split max_splits_per_bullet times (it survived
+	// its earlier splits) splits no more; manual splits ignore the limit
+	// and the odds (the script decided).
+	if (cause != SPLIT_CAUSE_MANUAL && stage->max_splits_per_bullet > 0 && bullet_index < (int)split_counts.size() && (int)split_counts[bullet_index] >= stage->max_splits_per_bullet) {
+		return 0;
+	}
 	if (cause != SPLIT_CAUSE_MANUAL && stage->chance < 1.0) {
 		if (stage->chance <= 0.0) {
 			return 0;
@@ -142,11 +160,52 @@ int BulletVolley2D::split_capture(int bullet_index, int cause, const Transform2D
 		request.arming = split_arming_cache;
 	}
 	bullet_factory->split_enqueue(std::move(request));
+	if ((int)split_counts.size() != amount_bullets) {
+		split_counts.assign(amount_bullets, 0);
+	}
+	if (split_counts[bullet_index] < UINT16_MAX) {
+		++split_counts[bullet_index];
+	}
 	// The split's own report, at the parent's pose (no user code: offers and
 	// one-shot effects only).
 	sound_fire(BulletSoundData2D::SOUND_ON_SPLIT, bullet_index, pose.get_origin());
 	fx_fire_oneshot(EFFECT_ON_SPLIT, bullet_index, pose);
-	return stage->fire_death_effects ? 1 : 2;
+	int flags = SPLIT_RECORDED;
+	if (!stage->fire_death_effects) {
+		flags |= SPLIT_SILENCE_DEATH;
+	}
+	if (stage->parent_survives && split_cause_survivable(cause)) {
+		flags |= SPLIT_PARENT_SURVIVES;
+	}
+	return flags;
+}
+
+bool BulletVolley2D::split_on_event(int bullet_index, int cause, const Transform2D &pose) {
+	const int flags = split_capture(bullet_index, cause, pose);
+	if (!(flags & SPLIT_RECORDED) || (flags & SPLIT_PARENT_SURVIVES)) {
+		return false;
+	}
+	// The children replace it: no death effect of its own (it did not die),
+	// On Split already fired. Attachment callbacks run inside.
+	disable_bullet(bullet_index, true);
+	return true;
+}
+
+int BulletVolley2D::split_live_bullets(const std::vector<int> &indexes, int cause, int death_trigger) {
+	// The stage decides whether the parents stay (no disable, no user code)
+	// or leave through the batch disable (attachment callbacks run inside).
+	const Ref<BulletSplitStage2D> stage = split_config != nullptr && split_config->split.is_valid() ? split_config->split->get_stage_for_depth(split_depth) : Ref<BulletSplitStage2D>();
+	if (stage.is_valid() && stage->parent_survives && split_cause_survivable(cause)) {
+		int recorded = 0;
+		for (const int i : indexes) {
+			if (i >= 0 && i < (int)all_cached_instance_transforms.size() && all_bullets_enabled_set.contains(i) && (split_capture(i, cause, all_cached_instance_transforms[i]) & SPLIT_RECORDED)) {
+				++recorded;
+			}
+		}
+		return recorded;
+	}
+	disable_bullets_bulk(indexes, death_trigger, nullptr, cause);
+	return -1; // the caller counts through the factory (the batch may free things)
 }
 
 void BulletVolley2D::split_check_timer() {
@@ -160,7 +219,7 @@ void BulletVolley2D::split_check_timer() {
 	split_timer_fired = true;
 	// Local copy: the batch mutates the live set and runs attachment callbacks.
 	const std::vector<int> live = all_bullets_enabled_set.get_active_indexes();
-	disable_bullets_bulk(live, -1, nullptr, SPLIT_CAUSE_TIMER);
+	split_live_bullets(live, SPLIT_CAUSE_TIMER, -1);
 }
 
 void BulletVolley2D::split_seed_children(const SplitRequest2D &request, const Vector2 *directions, const real_t *speed_multipliers, int count) {
@@ -330,7 +389,10 @@ int BulletVolley2D::all_bullets_split(int bullet_index_start, int bullet_index_e
 	BulletFactory2D *factory = bullet_factory;
 	const std::shared_ptr<bool> life = factory_life;
 	const uint64_t recorded_before = factory->get_split_recorded_total();
-	disable_bullets_bulk(picked, EFFECT_ON_CLEAR, nullptr, SPLIT_CAUSE_MANUAL);
+	const int kept = split_live_bullets(picked, SPLIT_CAUSE_MANUAL, EFFECT_ON_CLEAR);
+	if (kept >= 0) {
+		return kept; // the parents stayed: no user code ran
+	}
 	if (life != nullptr && !*life) {
 		return 0; // a callback freed the factory
 	}

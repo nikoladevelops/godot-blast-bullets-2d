@@ -76,6 +76,12 @@
 		<member name="keep_sound" type="bool" setter="set_keep_sound" getter="get_keep_sound" default="true">
 			When on, the children keep their parent's sound effects.
 		</member>
+		<member name="max_splits_per_bullet" type="int" setter="set_max_splits_per_bullet" getter="get_max_splits_per_bullet" default="1">
+			How many times one bullet may split in one life, counted over every trigger (0 = no limit; the spawner warns about an unlimited survivor). Only matters with [member parent_survives]. Manual splits ignore it. Hidden while [member parent_survives] is off.
+		</member>
+		<member name="parent_survives" type="bool" setter="set_parent_survives" getter="get_parent_survives" default="false">
+			When on, a split that does not kill the bullet (bounce, survived hit, homing reached, graze, the [member split_after_sec] timer, a manual split) adds the children and the parent keeps flying, splitting again on later triggers up to [member max_splits_per_bullet]. Deaths (killing hit, lifetime, despawn, clear) always take the parent. Off: the children replace the parent (it leaves without death effects of its own; On Split fires).
+		</member>
 		<member name="relative_to_parent_heading" type="bool" setter="set_relative_to_parent_heading" getter="get_relative_to_parent_heading" default="true">
 			When on, directions are measured from the parent's flight heading; off, from the world's +X axis.
 		</member>
@@ -101,7 +107,10 @@
 			The smallest speed multiplier.
 		</member>
 		<member name="split_after_sec" type="float" setter="set_split_after_sec" getter="get_split_after_sec" default="0.0">
-			Seconds after the volley spawned when every live bullet of the volley splits by itself (0 = off). The volley clock: the whole volley splits together, once per life.
+			Seconds after the volley spawned when every live bullet of the volley splits by itself (0 = off). The volley clock: the whole volley splits together, once per life. The bullets keep flying with [member parent_survives].
+		</member>
+		<member name="split_on_bounce" type="bool" setter="set_split_on_bounce" getter="get_split_on_bounce" default="false">
+			Split when the bullet bounces (after the bounce handler, at the bounced pose: the children fan around the new heading). The parent stays only with [member parent_survives].
 		</member>
 		<member name="split_on_clear" type="bool" setter="set_split_on_clear" getter="get_split_on_clear" default="false">
 			Split when cleared ([method BulletVolley2D.clear_bullet], area clears, factory clears). Off by default. Resets, frees and pickup conversions never split.
@@ -109,11 +118,20 @@
 		<member name="split_on_despawn" type="bool" setter="set_split_on_despawn" getter="get_split_on_despawn" default="false">
 			Split when leaving the factory's despawn bounds. Off by default.
 		</member>
+		<member name="split_on_graze" type="bool" setter="set_split_on_graze" getter="get_split_on_graze" default="false">
+			Split when the bullet grazes a target (one split per graze event, after the graze handlers). The parent stays only with [member parent_survives].
+		</member>
 		<member name="split_on_hit" type="bool" setter="set_split_on_hit" getter="get_split_on_hit" default="true">
 			Split when a hit kills the bullet (decided after the hit handler: a heal vetoes the split too).
 		</member>
+		<member name="split_on_homing_reached" type="bool" setter="set_split_on_homing_reached" getter="get_split_on_homing_reached" default="false">
+			Split when the bullet reaches its homing target (after the reached handler). Turn [member keep_homing] off for children that should scatter instead of chasing the same target. The parent stays only with [member parent_survives].
+		</member>
 		<member name="split_on_lifetime_over" type="bool" setter="set_split_on_lifetime_over" getter="get_split_on_lifetime_over" default="true">
 			Split when the lifetime runs out (an extension from the [code]life_time_over[/code] handler vetoes it).
+		</member>
+		<member name="split_on_non_lethal_hit" type="bool" setter="set_split_on_non_lethal_hit" getter="get_split_on_non_lethal_hit" default="false">
+			Split on every counted hit the bullet survives (piercing bullets that shed children). The killing hit is [member split_on_hit]. The parent stays only with [member parent_survives].
 		</member>
 		<member name="spread_degrees" type="float" setter="set_spread_degrees" getter="get_spread_degrees" default="60.0">
 			The angle the children cover in Fan and Random In Spread modes (0 to 360). Hidden in Ring mode.

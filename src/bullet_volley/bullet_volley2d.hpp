@@ -2821,6 +2821,10 @@ public:
 	Ref<BulletVolleyData2D> split_spawn_data;
 	int split_depth = 0;
 	bool split_timer_fired = false;
+	// Per bullet: how many times it split this life (a parent that survives
+	// its splits stops at BulletSplitStage2D.max_splits_per_bullet). Sized on
+	// the first recorded split.
+	std::vector<uint16_t> split_counts;
 	// The arming snapshot shared by this life's requests, rebuilt when an
 	// arming choke point (graze_arm/release, sound arm/release,
 	// flock_set_config) bumped split_arming_serial.
@@ -2836,6 +2840,15 @@ public:
 	// no user code. Call only while split_config is set (hot paths test the
 	// pointer first).
 	_NO_INLINE_ int split_capture(int bullet_index, int cause, const Transform2D &pose);
+	// Non-lethal triggers (bounce, non-lethal hit, homing reached, graze):
+	// records the split and, unless the stage keeps the parent, takes the
+	// parent out (disable_bullet: attachment callbacks run). True when the
+	// parent left; callers re-check liveness after it.
+	bool split_on_event(int bullet_index, int cause, const Transform2D &pose);
+	// Timer and manual splits of many bullets: the parents stay
+	// (parent_survives, returns how many split, no user code) or leave
+	// through the batch disable (returns -1).
+	int split_live_bullets(const std::vector<int> &indexes, int cause, int death_trigger);
 	// The volley clock reached the stage's split_after_sec: every live
 	// bullet splits (once per life).
 	void split_check_timer();

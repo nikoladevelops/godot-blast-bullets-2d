@@ -116,10 +116,25 @@ PackedStringArray BulletSpawner2D::debug_explain_features() const {
 			if (first->split_on_clear) {
 				when.push_back("is cleared");
 			}
+			if (first->split_on_bounce) {
+				when.push_back("bounces");
+			}
+			if (first->split_on_non_lethal_hit) {
+				when.push_back("survives a hit");
+			}
+			if (first->split_on_homing_reached) {
+				when.push_back("reaches its homing target");
+			}
+			if (first->split_on_graze) {
+				when.push_back("grazes a target");
+			}
 			if (when.is_empty()) {
 				line += " No trigger is on in the first stage: bullets split only through split_bullet().";
 			} else {
 				line += String(" A fired bullet bursts into ") + String::num_int64(first->count) + " when it " + String(", ").join(when) + ".";
+				if (first->parent_survives) {
+					line += first->max_splits_per_bullet > 0 ? String(" The bullet keeps flying after a split that does not kill it (at most ") + String::num_int64(first->max_splits_per_bullet) + " split(s) per bullet)." : String(" The bullet keeps flying after a split that does not kill it (no limit per bullet).");
+				}
 			}
 		}
 		out.push_back(line);

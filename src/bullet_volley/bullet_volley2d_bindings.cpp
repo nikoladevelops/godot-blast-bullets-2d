@@ -653,6 +653,10 @@ void BulletVolley2D::_bind_methods() {
 	BIND_CONSTANT(SPLIT_CAUSE_DESPAWN);
 	BIND_CONSTANT(SPLIT_CAUSE_CLEAR);
 	BIND_CONSTANT(SPLIT_CAUSE_MANUAL);
+	BIND_CONSTANT(SPLIT_CAUSE_BOUNCE);
+	BIND_CONSTANT(SPLIT_CAUSE_NON_LETHAL_HIT);
+	BIND_CONSTANT(SPLIT_CAUSE_HOMING_REACHED);
+	BIND_CONSTANT(SPLIT_CAUSE_GRAZE);
 
 	// Flocking (bullet_volley2d_flock.cpp; the pass is the factory's).
 	ClassDB::bind_method(D_METHOD("flock_join", "flock", "scope"), &BulletVolley2D::flock_join, DEFVAL(BulletFlock2D::SCOPE_SHARED));

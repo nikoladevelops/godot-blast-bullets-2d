@@ -702,8 +702,14 @@ PackedStringArray BulletSpawner2D::_get_configuration_warnings() const {
 					}
 					break;
 				}
-				per_parent *= (double)stage->count;
+				// A parent that survives its splits may split up to
+				// max_splits_per_bullet times.
+				const double splits = stage->parent_survives ? (double)Math::max(1, stage->max_splits_per_bullet) : 1.0;
+				per_parent *= (double)stage->count * splits;
 				total += per_parent;
+				if (stage->parent_survives && stage->max_splits_per_bullet == 0 && (stage->split_on_bounce || stage->split_on_non_lethal_hit || stage->split_on_homing_reached || stage->split_on_graze)) {
+					out.push_back("split_data.stages[" + String::num_int64(g) + "] keeps the parent and has no max_splits_per_bullet: a bullet splits again on every bounce, surviving hit, homing reach or graze.");
+				}
 			}
 			if (total > 5.0 * (double)pattern_max_bullets()) {
 				const String amount = total > 1e12 ? String("more than 1000000000000") : String::num_int64((int64_t)total);

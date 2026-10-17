@@ -253,6 +253,64 @@ func test_freeing_inside_a_split_never_touches_freed_memory() -> void:
 	assert_eq("\n".join(problems), "", "a split survives a free from any callback inside it")
 
 
+func test_freeing_inside_a_non_lethal_split_never_touches_freed_memory() -> void:
+	# The parent leaves through disable_bullet inside the bounce drain, the
+	# hit drain, the homing dispatch and the graze dispatch: its
+	# on_bullet_disable frees the volley, another volley or the factory.
+	var problems: Array = []
+	for trigger in ["bounce", "non_lethal_hit", "homing_reached", "graze"]:
+		for victim in VICTIMS:
+			await _new_case()
+			var where := "split on %s / %s" % [trigger, victim]
+			var d := _data(trigger in ["bounce", "non_lethal_hit"])
+			var stage := BulletSplitStage2D.new()
+			stage.count = 2
+			# Children and the other volley may touch the walls too: handled.
+			factory.body_entered.connect(func(_b, _v, _i) -> void: pass)
+			factory.area_entered.connect(func(_a, _v, _i) -> void: pass)
+			match trigger:
+				"bounce":
+					make_wall(Vector2(60, 0), Vector2(20, 400), 8, 2)
+					d.set_collision_mask_from_array([4])
+					d.set_bounce_mask_from_array([4])
+					stage.split_on_bounce = true
+				"non_lethal_hit":
+					make_wall(Vector2(60, 0))
+					d.bullet_max_collision_count = 5
+					stage.split_on_non_lethal_hit = true
+				"homing_reached":
+					d = _data(true)
+					d.set_collision_mask_from_array([])
+					d.homing_distance_before_reached = 10.0
+					d.homing_take_control_of_texture_rotation = true
+					stage.split_on_homing_reached = true
+					stage.keep_homing = false # the plain children data cannot steer
+				"graze":
+					d = _data(true)
+					d.set_collision_mask_from_array([])
+					make_graze_target(Vector2(60, 15), &"matrix_grazers")
+					factory.bullet_grazed.connect(func(_t, _v, _i, _z, _r) -> void: pass)
+					stage.split_on_graze = true
+			await physics()
+			var chain := BulletSplitData2D.new()
+			chain.stages = [stage]
+			var plain := _data(false)
+			plain.shared_bullet_attachment = null
+			var v: BulletVolley2D = factory.spawn_volley(d)
+			v.split_set_data(chain, plain)
+			var other: BulletVolley2D = factory.spawn_volley(_data(false))
+			if trigger == "homing_reached":
+				v.shared_homing_deque_push_back_global_position_target(Vector2(40, 0))
+			if trigger == "graze":
+				v.graze_set_zones([H.make_graze_zone([30.0])], &"matrix_grazers")
+			await idle(1)
+			_arm(["disable"], victim, v, other)
+			await _await_hook(40)
+			problems.append_array(await _settle_and_check(where))
+			problems.append_array(_claim_errors().map(func(e): return "%s error: %s" % [where, e]))
+	assert_eq("\n".join(problems), "", "every non-lethal split survives a free from the parent's callback")
+
+
 ## Every case starts clean: no armed hook, a fresh factory (the last case may
 ## have freed its factory or left world settings such as despawn bounds).
 func _new_case() -> void:

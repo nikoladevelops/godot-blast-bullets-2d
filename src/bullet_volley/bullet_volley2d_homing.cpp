@@ -807,6 +807,18 @@ bool BulletVolley2D::dispatch_homing_events() {
 				bullet_homing_pop_front_target(ev.bullet_index);
 			}
 		}
+		// Split on reach: after every handler, only for the same live bullet.
+		if (split_config != nullptr && all_bullets_enabled_set.contains(ev.bullet_index) && collision_epoch_for_bullet(ev.bullet_index) == ev.epoch && ev.bullet_index < (int)all_cached_instance_transforms.size()) {
+			if (split_on_event(ev.bullet_index, SPLIT_CAUSE_HOMING_REACHED, all_cached_instance_transforms[ev.bullet_index])) {
+				if (!survived_user_code(self_id)) {
+					return false;
+				}
+				if (!is_active || is_queued_for_deletion()) {
+					homing_dispatch_scratch.clear();
+					return true;
+				}
+			}
+		}
 	}
 	homing_dispatch_scratch.clear();
 	if (shared_pop && !shared_homing_deque.empty() && orbit_target_identity(shared_homing_deque) == shared_identity) {

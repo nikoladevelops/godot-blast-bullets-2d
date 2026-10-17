@@ -8,10 +8,12 @@ extends BlastTest
 
 const TRES_PATH := "user://split_round_trip.tres"
 const STAGE_PROPS := ["split_on_hit", "split_on_lifetime_over", "split_after_sec", "split_on_despawn", "split_on_clear",
+	"split_on_bounce", "split_on_non_lethal_hit", "split_on_homing_reached", "split_on_graze",
 	"count", "chance", "seed", "direction_mode", "spread_degrees", "angle_offset_degrees", "relative_to_parent_heading",
 	"angle_jitter_degrees", "speed_mode", "speed_multiplier_min", "speed_multiplier_max", "speed_distribution", "fixed_speed",
 	"spawn_offset_px", "scale_multiplier", "child_data", "keep_custom_data", "keep_collision_count", "keep_homing",
-	"keep_graze", "keep_sound", "keep_flock", "inherit_parent_velocity", "fire_death_effects"]
+	"keep_graze", "keep_sound", "keep_flock", "inherit_parent_velocity", "fire_death_effects", "parent_survives",
+	"max_splits_per_bullet"]
 
 
 func _count_changed(r: Resource) -> Array:
@@ -49,6 +51,8 @@ func test_stage_defaults() -> void:
 	assert_eq([s.keep_custom_data, s.keep_collision_count, s.keep_homing, s.keep_graze, s.keep_sound, s.keep_flock, s.inherit_parent_velocity],
 		[true, false, true, true, true, true, false], "keep everything but the hit count and inherited momentum")
 	assert_true(s.fire_death_effects, "the parent's own death effects still fire")
+	assert_eq([s.split_on_bounce, s.split_on_non_lethal_hit, s.split_on_homing_reached, s.split_on_graze], [false, false, false, false], "the non-lethal triggers are opt-in")
+	assert_eq([s.parent_survives, s.max_splits_per_bullet], [false, 1], "children replace the parent; a surviving parent splits once")
 
 
 func test_stage_inspector_order_is_pinned() -> void:
@@ -64,6 +68,9 @@ func test_stage_gating_follows_the_modes() -> void:
 	assert_false(_visible(s, "spread_degrees"), "a ring has no spread")
 	s.speed_mode = BulletSplitStage2D.SPEED_FIXED
 	assert_true(_visible(s, "fixed_speed"), "fixed speed shows in Fixed")
+	assert_false(_visible(s, "max_splits_per_bullet"), "the limit hides while the parent never survives")
+	s.parent_survives = true
+	assert_true(_visible(s, "max_splits_per_bullet"), "shown with parent_survives")
 	var d := BulletSplitData2D.new()
 	assert_false(_visible(d, "max_depth"), "max_depth hides without repeat")
 	d.repeat_last_stage = true
@@ -100,6 +107,8 @@ func test_accepted_edits_emit_changed_and_rejected_ones_do_not() -> void:
 	expect_error_sequence(["BulletSplitStage2D: speed_mode must be 0 (Multiply Parent), 1 (Fixed) or 2 (From Spawn Data), keeping the old value."])
 	s.speed_distribution = 2
 	expect_error_sequence(["BulletSplitStage2D: speed_distribution must be 0 (Ramp) or 1 (Random), keeping the old value."])
+	s.max_splits_per_bullet = -1
+	expect_error_sequence(["BulletSplitStage2D: max_splits_per_bullet must be >= 0 (0 = no limit), keeping the old value."])
 	assert_eq([s.count, s.chance, s.direction_mode], [8, 0.5, BulletSplitStage2D.DIRECTION_RING], "old values kept")
 	assert_eq(n[0], 5, "no change for any rejected edit")
 	var d := BulletSplitData2D.new()

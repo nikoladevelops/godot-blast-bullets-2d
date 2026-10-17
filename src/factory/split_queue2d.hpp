@@ -55,7 +55,24 @@ enum SplitCause2D : int {
 	SPLIT_CAUSE_TIMER = 2,
 	SPLIT_CAUSE_DESPAWN = 3,
 	SPLIT_CAUSE_CLEAR = 4,
-	SPLIT_CAUSE_MANUAL = 5
+	SPLIT_CAUSE_MANUAL = 5,
+	SPLIT_CAUSE_BOUNCE = 6,
+	SPLIT_CAUSE_NON_LETHAL_HIT = 7,
+	SPLIT_CAUSE_HOMING_REACHED = 8,
+	SPLIT_CAUSE_GRAZE = 9
+};
+
+// A cause the parent can outlive (BulletSplitStage2D.parent_survives); the
+// others are deaths.
+inline bool split_cause_survivable(int cause) {
+	return cause == SPLIT_CAUSE_TIMER || cause == SPLIT_CAUSE_MANUAL || cause == SPLIT_CAUSE_BOUNCE || cause == SPLIT_CAUSE_NON_LETHAL_HIT || cause == SPLIT_CAUSE_HOMING_REACHED || cause == SPLIT_CAUSE_GRAZE;
+}
+
+// What split_capture did (bit flags).
+enum SplitCaptureFlags2D : int {
+	SPLIT_RECORDED = 1,
+	SPLIT_SILENCE_DEATH = 2, // fire_death_effects off: the parent's own death effects stay silent
+	SPLIT_PARENT_SURVIVES = 4 // parent_survives on a survivable cause: the parent keeps flying
 };
 
 // One parent that split, everything its children need, captured before the

@@ -264,3 +264,20 @@ func test_setup_warning_names_an_exploding_chain() -> void:
 	(chain.stages[0] as BulletSplitStage2D).count = 400
 	chain.max_depth = 2
 	assert_true(_has(sp.get_setup_warnings(), "split_data can turn one fired bullet into 160400 bullets over its generations"), "400 + 400 x 400")
+
+
+func test_surviving_parents_are_named_in_warnings_and_explain() -> void:
+	var sp := make_spawner()
+	sp.split_enabled = true
+	var chain := _chain(3, false)
+	var stage: BulletSplitStage2D = chain.stages[0]
+	stage.split_on_hit = false
+	stage.split_on_bounce = true
+	stage.parent_survives = true
+	sp.split_data = chain
+	assert_true(_has(sp.debug_explain_features(), "A fired bullet bursts into 3 when it bounces. The bullet keeps flying after a split that does not kill it (at most 1 split(s) per bullet)."), "explain")
+	assert_false(_has(sp.get_setup_warnings(), "has no max_splits_per_bullet"), "a limit: no warning")
+	stage.max_splits_per_bullet = 0
+	assert_true(_has(sp.get_setup_warnings(), "split_data.stages[0] keeps the parent and has no max_splits_per_bullet: a bullet splits again on every bounce, surviving hit, homing reach or graze."), "unlimited survivor named")
+	stage.max_splits_per_bullet = 40000
+	assert_true(_has(sp.get_setup_warnings(), "split_data can turn one fired bullet into 120000 bullets"), "the size estimate counts every split a survivor may make (3 x 40000)")
