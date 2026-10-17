@@ -15,6 +15,8 @@
 #include "data/bullet_rotation_data2d.hpp"
 #include "data/bullet_sound_data2d.hpp"
 #include "data/bullet_speed_data2d.hpp"
+#include "data/bullet_split_data2d.hpp"
+#include "data/bullet_split_stage2d.hpp"
 #include "data/bullet_wobble_data2d.hpp"
 #include "pooling/volley_pool_key2d.hpp"
 
@@ -65,6 +67,8 @@ void initialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(BulletWobbleData2D)
 	GDREGISTER_CLASS(BulletGrazeZone2D)
 	GDREGISTER_CLASS(BulletFlock2D)
+	GDREGISTER_CLASS(BulletSplitStage2D)
+	GDREGISTER_CLASS(BulletSplitData2D)
 	GDREGISTER_CLASS(BulletSoundData2D)
 	GDREGISTER_CLASS(BulletPickupData2D)
 	GDREGISTER_CLASS(VolleyPoolKey2D)

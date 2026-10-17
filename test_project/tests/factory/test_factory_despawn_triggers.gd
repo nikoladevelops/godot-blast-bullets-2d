@@ -195,9 +195,13 @@ func test_trigger_ids_are_stable_and_validated() -> void:
 	layer.trigger = 7
 	assert_eq(layer.trigger, 7, "accepted")
 	layer.trigger = 8
-	expect_errors_containing("BulletEffectLayerData2D: trigger must be", 1, "8 is out of range")
+	assert_eq(layer.trigger, 8, "On Split (8) is accepted")
+	layer.trigger = 9
+	expect_errors_containing("BulletEffectLayerData2D: trigger must be", 1, "9 is out of range")
 	var sound := BulletSoundData2D.new()
 	sound.trigger = 11
 	assert_eq(sound.trigger, 11, "accepted")
 	sound.trigger = 12
-	expect_errors_containing("BulletSoundData2D: trigger must be", 1, "12 is out of range")
+	assert_eq(sound.trigger, 12, "On Split (12) is accepted")
+	sound.trigger = 13
+	expect_errors_containing("BulletSoundData2D: trigger must be", 1, "13 is out of range")

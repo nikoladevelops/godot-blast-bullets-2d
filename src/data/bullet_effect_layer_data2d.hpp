@@ -35,7 +35,10 @@ enum EffectTrigger : int {
 	// Fired where a bullet leaves through the factory's despawn bounds
 	// (BulletFactory2D.despawn_bounds_*), nowhere else. Appended last: the
 	// ids are serialized.
-	EFFECT_ON_DESPAWN
+	EFFECT_ON_DESPAWN,
+	// Fired where a bullet splits into children (BulletSplitStage2D), at
+	// the parent's pose, whatever made it split. Appended last.
+	EFFECT_ON_SPLIT
 };
 
 class BulletEffectLayerData2D : public Resource {
