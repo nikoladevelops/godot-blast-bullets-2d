@@ -204,6 +204,95 @@ func test_freeing_inside_a_spawn_never_returns_a_freed_volley() -> void:
 	assert_eq("\n".join(problems), "", "a spawn survives a free from its callbacks")
 
 
+## A fresh spawn's on_bullet_spawn that spawns ANOTHER fresh volley (or frees
+## an older one) changes the factory's volley list before the first spawn
+## files its own volley: both volleys must still tick (move, expire) and the
+## books must stay balanced.
+func test_spawning_or_freeing_inside_a_fresh_spawn_keeps_every_volley_ticking() -> void:
+	var problems: Array = []
+	for action in ["spawn_other", "free_other"]:
+		await _new_case()
+		var f := factory
+		var older: BulletVolley2D = f.spawn_volley(H.make_volley_data(2, 100.0, 30.0))
+		await idle(1)
+		var inner: Array = []
+		AttachmentHookProbe2D.hook_on = ["spawn"]
+		AttachmentHookProbe2D.hook = func() -> void:
+			if action == "spawn_other":
+				inner.append(f.spawn_volley(H.make_volley_data(5, 100.0, 30.0))) # another key: a pool miss
+			elif is_instance_valid(older):
+				older.free()
+		var outer: BulletVolley2D = f.spawn_volley(_data(true))
+		if outer == null:
+			problems.append("%s: the outer spawn failed" % action)
+			continue
+		var start: Vector2 = outer.get_bullet_transform(0).origin
+		await idle(1)
+		var books: Dictionary = f.debug_assert_no_dangling()
+		if not books["ok"]:
+			problems.append("%s: %s" % [action, books["error"]])
+		for k in 5:
+			await physics(1)
+		if outer.get_bullet_transform(0).origin == start:
+			problems.append("%s: the outer volley never moved (not ticking)" % action)
+		problems.append_array(await _settle_and_check(action))
+		problems.append_array(_claim_errors().map(func(e): return "%s error: %s" % [action, e]))
+	assert_eq("\n".join(problems), "", "both volleys tick after user code changed the volley list mid-spawn")
+
+
+## A spawn whose own callback clears every bullet (on_bullet_spawn of a fresh
+## volley, on_bullet_enable of a pooled one, the pickup volley of a
+## conversion) drains the volley before the spawn returns: the spawn never
+## hands out the pooled handle, never re-tracks it, and the pool keeps a
+## plain volley (a later ordinary volley reusing it is no pickup).
+func test_a_volley_drained_by_its_own_spawn_callbacks_is_never_handed_out() -> void:
+	var problems: Array = []
+	for path in ["fresh", "pooled", "pickups"]:
+		await _new_case()
+		var f := factory
+		var d := _data(false)
+		if path == "pooled":
+			f.spawn_volley(d)
+			await idle(1)
+			f.clear_active_bullets()
+			await idle(1)
+		var pickup := BulletPickupData2D.new()
+		if path == "pickups":
+			# A first conversion (no hook) pools a pickup volley, so the
+			# hooked conversion below reuses it (on_bullet_enable).
+			pickup.attachment = probe_scene
+			f.spawn_volley(H.make_volley_data(3, 0.0, 30.0))
+			await idle(1)
+			f.convert_all_bullets_to_pickups(pickup, Vector2(300, 0))
+			await idle(1)
+			f.clear_active_bullets()
+			await idle(1)
+			f.spawn_volley(H.make_volley_data(3, 0.0, 30.0))
+			await idle(1)
+		AttachmentHookProbe2D.hook_on = ["spawn", "enable"]
+		AttachmentHookProbe2D.hook = func() -> void:
+			f.clear_active_bullets()
+		var got = null
+		if path == "pickups":
+			f.convert_all_bullets_to_pickups(pickup, Vector2(300, 0))
+		else:
+			got = f.spawn_volley(d)
+		if got != null and (not is_instance_valid(got) or got.is_pooled()):
+			problems.append("%s: spawn_volley returned a drained volley" % path)
+		await idle(1)
+		var books: Dictionary = f.debug_assert_no_dangling()
+		if not books["ok"]:
+			problems.append("%s: %s" % [path, books["error"]])
+		AttachmentHookProbe2D.clear_hook()
+		# Reuse every pooled instance of that size as a plain volley.
+		for k in 4:
+			var plain: BulletVolley2D = f.spawn_volley(H.make_volley_data(3, 0.0, 30.0))
+			if plain != null and plain.is_pickup_volley():
+				problems.append("%s: a plain volley came out of the pool as a pickup" % path)
+		problems.append_array(_claim_errors().map(func(e): return "%s error: %s" % [path, e]))
+	assert_eq("\n".join(problems), "", "a volley drained during its spawn stays pooled and plain")
+
+
 func _split_chain() -> BulletSplitData2D:
 	var stage := BulletSplitStage2D.new()
 	stage.count = 3

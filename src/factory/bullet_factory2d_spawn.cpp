@@ -158,13 +158,15 @@ void BulletFactory2D::populate_pool_bucket(const PoolKey &key, const Ref<BulletV
 		BulletVolley2D *volley = memnew(BulletVolley2D);
 		// The index is claimed now so a later pop() + activate_data() reuses a
 		// stable slot. Disabled volleys stay out of volley_set's dense list.
-		const int sparse_set_id = (int)all_volleys.size();
-		volley->spawn(*spawn_data.ptr(), &volley_pool, this, volley_container, Vector2(0, 0), sparse_set_id, true);
+		volley->spawn(*spawn_data.ptr(), &volley_pool, this, volley_container, Vector2(0, 0), (int)all_volleys.size(), true);
 #ifdef DEV_ENABLED
 		ERR_FAIL_COND(!(volley->get_pool_key() == key));
 #else
 		(void)key;
 #endif
+		// The slot is taken AFTER the spawn: its on_spawn_in_pool callbacks
+		// may have spawned or freed volleys, which moves the list's end.
+		volley->sparse_set_id = (int)all_volleys.size();
 		all_volleys.emplace_back(volley);
 	}
 }
@@ -203,6 +205,12 @@ BulletVolley2D *BulletFactory2D::spawn_volley_internal(const Ref<BulletVolleyDat
 			volley_pool.push(volley, volley->get_pool_key());
 			volley = nullptr;
 		}
+		if (volley != nullptr && !volley->is_active) {
+			// An attachment callback drained it (a clear from on_bullet_enable):
+			// it went back to the pool on its own. Never hand out (or re-track)
+			// a pooled handle.
+			return nullptr;
+		}
 	}
 	if (volley != nullptr) {
 		// Counted only on success: a popped-but-refused reuse must not skew
@@ -234,12 +242,11 @@ BulletVolley2D *BulletFactory2D::spawn_volley_internal(const Ref<BulletVolleyDat
 
 	// Pool miss: allocate a brand new volley.
 	++pool_misses;
-	const int sparse_set_id = (int)all_volleys.size();
 	volley = memnew(BulletVolley2D);
 	volley->spawn_transforms_ptr = transforms_ptr;
 	volley->spawn_transforms_count = bullet_count;
 	const uint64_t fresh_volley_id = volley->get_instance_id();
-	volley->spawn(*spawn_data.ptr(), &volley_pool, this, volley_container, new_inherited_velocity_offset, sparse_set_id, false, spawner_id);
+	volley->spawn(*spawn_data.ptr(), &volley_pool, this, volley_container, new_inherited_velocity_offset, (int)all_volleys.size(), false, spawner_id);
 	if (watch.died()) {
 		return nullptr;
 	}
@@ -247,7 +254,15 @@ BulletVolley2D *BulletFactory2D::spawn_volley_internal(const Ref<BulletVolleyDat
 		return nullptr; // its own attachment callback freed it mid-spawn: never tracked
 	}
 	volley->spawn_transforms_ptr = nullptr;
+	const bool drained = !volley->is_active; // a callback cleared it: pooled already
+	// The slot is taken AFTER the spawn: its on_bullet_spawn callbacks may
+	// have spawned or freed other volleys, which moves the list's end.
+	const int sparse_set_id = (int)all_volleys.size();
+	volley->sparse_set_id = sparse_set_id;
 	all_volleys.emplace_back(volley);
+	if (drained) {
+		return nullptr; // tracked (frees reach it), never ticked or handed out
+	}
 	volley_set.activate_data(sparse_set_id);
 	stats_spawned_bullets_total += (uint64_t)volley->amount_bullets;
 	return volley;

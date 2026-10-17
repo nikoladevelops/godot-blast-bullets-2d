@@ -55,6 +55,15 @@ _ALWAYS_INLINE_ void BulletVolley2D::apply_shared_bullet_attachment_from_data(co
 		return;
 	}
 	for (int i = 0; i < amount_bullets; ++i) {
+		// A callback of an earlier bullet may have drained this volley (it is
+		// pooled or parked now: attaching would leak into the pool) or
+		// disabled later bullets (a disabled bullet carries no attachment).
+		if (!is_active) {
+			break;
+		}
+		if (!all_bullets_enabled_set.contains(i)) {
+			continue;
+		}
 		if (!attach_bullet_attachment_internal(i, data.shared_bullet_attachment, data.shared_bullet_attachment_offset, data.shared_bullet_attachment_stick_relative_to_bullet)) {
 			break;
 		}
@@ -323,6 +332,11 @@ void BulletVolley2D::begin_life(const BulletVolleyData2D &data, uint64_t new_own
 	curves_elapsed_time = 0.0;
 	split_timer_fired = false;
 	split_counts.clear();
+	// Pickup state belongs to one life (release_life drops it too; this
+	// covers a life that was never released, e.g. a pre-populated volley).
+	pickup_data.unref();
+	pickup_magnet_started = false;
+	pickup_time_scale_owner_id = 0;
 	anim_frame_index = 0;
 	anim_paused = false;
 	anim_finished = false;
@@ -500,14 +514,13 @@ void BulletVolley2D::spawn(const BulletVolleyData2D &data, VolleyPool *pool, Bul
 	all_bullets_enabled_set.activate_all_data();
 	is_active = true;
 	bullets_container->add_child(this);
-	// Shared spawn-data attachments and effect layers (trail shards rebuilt,
-	// factory one-shot bakes registered, spawn flashes at every bullet).
-	const uint64_t self_id = get_instance_id();
-	apply_shared_bullet_attachment_from_data(data);
-	if (!survived_user_code(self_id)) {
-		return; // an attachment callback freed this volley or the factory
-	}
+	// Effect layers first (trail shards rebuilt, factory one-shot bakes
+	// registered, spawn flashes at every bullet): an attachment callback
+	// below that clears bullets fires THIS life's effects.
 	fx_reseed_from_data(data.effect_layers, true);
+	// Shared spawn-data attachments (user code: on_bullet_spawn). The caller
+	// checks is_active afterwards: a callback may drain this volley.
+	apply_shared_bullet_attachment_from_data(data);
 }
 
 // Activates the multimesh
@@ -583,14 +596,21 @@ bool BulletVolley2D::enable_volley(const BulletVolleyData2D &data, const Vector2
 	set_visible(true);
 	all_bullets_enabled_set.activate_all_data();
 	is_active = true;
+	move_to_front(); // Pooled instances render behind newer ones without this; moving to front emulates fresh spawn order.
+	// Previous life's bakes die here, trail shards rebuild, spawn flashes
+	// fire: BEFORE the attachment callbacks, so a clear from one of them
+	// fires this life's effects, never the previous life's.
+	fx_reseed_from_data(data.effect_layers, true);
 	// Shared spawn-data attachments (slots were blanked by begin_life).
 	apply_shared_bullet_attachment_from_data(data);
 	if (!survived_user_code(self_id)) {
 		return false; // an attachment callback freed this volley or the factory
 	}
-	move_to_front(); // Pooled instances render behind newer ones without this; moving to front emulates fresh spawn order.
-	// Previous life's bakes die here, trail shards rebuild, spawn flashes fire.
-	fx_reseed_from_data(data.effect_layers, true);
+	if (!is_active) {
+		// A callback drained this volley: it is back in the pool (or
+		// parked). The enable itself succeeded; the caller checks is_active.
+		return true;
+	}
 	// Join the factory tick (the spawn path does this too; the sparse set
 	// dedups). Without it a direct enable_volley() call left an active
 	// volley that never moved.
