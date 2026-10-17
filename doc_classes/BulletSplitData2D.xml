@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="BulletSplitData2D" inherits="Resource" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		A split chain: how bullets burst into children, generation by generation.
+	</brief_description>
+	<description>
+		[member stages][code][d][/code] decides how the bullets of generation [code]d[/code] split (0 = the bullets a spawner fired, 1 = their children, ...). A generation without a stage never splits, so the chain is as deep as [member stages], or [member max_depth] generations with [member repeat_last_stage] on.
+		Arm it with [member BulletSpawner2D.split_data] (with [member BulletSpawner2D.split_enabled]) or [method BulletVolley2D.split_set_data]. Volleys read the chain when a bullet dies, so edits reach bullets already in flight.
+		A dying bullet never spawns where it dies: its split is recorded and the [BulletFactory2D] spawns the children (one new volley per parent) right after the sweep, at the pose the parent died at; they move from the next sweep. Pool-safe: a pooled volley never keeps a chain.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="apply_preset">
+			<return type="void" />
+			<param index="0" name="preset" type="int" enum="BulletSplitData2D.Preset" />
+			<description>
+				Replaces [member stages] with a ready-made chain (see [enum Preset]) and turns [member repeat_last_stage] off.
+			</description>
+		</method>
+		<method name="create_preset" qualifiers="static">
+			<return type="BulletSplitData2D" />
+			<param index="0" name="preset" type="int" enum="BulletSplitData2D.Preset" />
+			<description>
+				A new chain built from a preset.
+			</description>
+		</method>
+		<method name="get_generation_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				How many generations split: the size of [member stages], or [member max_depth] while [member repeat_last_stage] is on.
+			</description>
+		</method>
+		<method name="get_stage_for_depth" qualifiers="const">
+			<return type="BulletSplitStage2D" />
+			<param index="0" name="depth" type="int" />
+			<description>
+				The stage that splits generation [param depth], or [code]null[/code] when that generation does not split (past the chain, an empty entry, a negative depth).
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="max_depth" type="int" setter="set_max_depth" getter="get_max_depth" default="8">
+			With [member repeat_last_stage] on: generations [code]0 .. max_depth - 1[/code] split (1 to 64). Hidden while repeating is off.
+		</member>
+		<member name="repeat_last_stage" type="bool" setter="set_repeat_last_stage" getter="get_repeat_last_stage" default="false">
+			When on, generations past the last stage reuse it, up to [member max_depth].
+		</member>
+		<member name="stages" type="BulletSplitStage2D[]" setter="set_stages" getter="get_stages" default="[]">
+			One [BulletSplitStage2D] per generation. An empty entry stops the chain at that generation.
+		</member>
+	</members>
+	<constants>
+		<constant name="MAX_DEPTH_LIMIT" value="64">
+			The largest [member max_depth].
+		</constant>
+		<constant name="PRESET_BURST_RING" value="0" enum="Preset">
+			One ring of 8 when a bullet expires or is killed by a hit.
+		</constant>
+		<constant name="PRESET_FAN_FORWARD" value="1" enum="Preset">
+			A forward fan of 3, 20% faster.
+		</constant>
+		<constant name="PRESET_CASCADE" value="2" enum="Preset">
+			A ring of 6 (smaller), then each child fans into 3 (smaller and slower).
+		</constant>
+	</constants>
+</class>

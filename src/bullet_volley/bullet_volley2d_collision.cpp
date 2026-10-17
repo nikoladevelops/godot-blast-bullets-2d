@@ -787,10 +787,15 @@ void BulletVolley2D::handle_bullet_collision(const BulletCollisionData2D &record
 	// raised max vetoes the kill; max 0 is infinite.
 	const bool lethal = bullet_max_collision_count > 0 && bullets_current_collision_count[bullet_index] >= bullet_max_collision_count;
 	if (lethal) {
+		// A split is recorded at the impact pose BEFORE the disable (the
+		// last bullet's disable releases the life synchronously).
+		const int split = split_config != nullptr ? split_capture(bullet_index, SPLIT_CAUSE_HIT, impact_transf) : 0;
 		// Destroy sound only (never the hit sound too): the killing blow
 		// gets one report, at the impact pose, BEFORE the disable below
 		// (the last bullet's disable releases the life synchronously).
-		sound_fire(BulletSoundData2D::SOUND_ON_DESTROY, bullet_index, impact_transf.get_origin());
+		if (split != 2) {
+			sound_fire(BulletSoundData2D::SOUND_ON_DESTROY, bullet_index, impact_transf.get_origin());
+		}
 		// Destroy explosion only (never the hit spark too): the killing blow
 		// gets one visual, at the impact pose. The attachment goes back to
 		// the pool with the bullet (the handler already saw it).
@@ -799,7 +804,9 @@ void BulletVolley2D::handle_bullet_collision(const BulletCollisionData2D &record
 		if (!survived_user_code(self_id)) {
 			return; // on_bullet_disable freed this volley or the factory
 		}
-		fx_fire_oneshot(EFFECT_ON_DESTROY, bullet_index, impact_transf);
+		if (split != 2) {
+			fx_fire_oneshot(EFFECT_ON_DESTROY, bullet_index, impact_transf);
+		}
 	} else if (bounce_decision != 2) {
 		// Hit sparks for counted, survived hits (a consumed bounce already
 		// fired its bounce spark, so it stays silent here).

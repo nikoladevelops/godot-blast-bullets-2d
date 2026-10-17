@@ -330,6 +330,9 @@ Dictionary BulletFactory2D::debug_assert_no_dangling() {
 			if (volley->flock_config != nullptr) {
 				return fail("pooled volley still flocks" + at);
 			}
+			if (volley->split_config != nullptr || volley->split_spawn_data.is_valid() || volley->split_arming_cache != nullptr) {
+				return fail("pooled volley still splits" + at);
+			}
 		}
 	}
 	// The armed count gates the flock pass: it must match the volleys that
@@ -360,6 +363,14 @@ Dictionary BulletFactory2D::debug_assert_no_dangling() {
 		if (!(entry.first == volley->get_pool_key())) {
 			return fail("pooled volley sits in the wrong bucket");
 		}
+	}
+	// Splits wait only between a sweep and its flush (or until the next
+	// sweep when recorded outside one): never while tearing down.
+	if (is_tearing_down && !pending_splits.empty()) {
+		return fail("pending splits survive the teardown");
+	}
+	if (split_flush_running) {
+		return fail("a split flush never finished");
 	}
 	d["volleys_total"] = (int)all_volleys.size();
 	return d;

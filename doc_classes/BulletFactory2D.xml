@@ -269,6 +269,12 @@
 				One dict per voice pool slot: {index, busy, fading, sound, priority, position, volume_db, pitch_scale, bus, stream, max_distance, attenuation, panning_strength, area_mask, paused}. Feed it to your own Node2D _draw loop for a live voice overlay (circle per busy voice at position, radius by volume_db).
 			</description>
 		</method>
+		<method name="debug_get_split_stats" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Splitting counters: [code]pending[/code] (splits waiting for the next flush), [code]flushed_last[/code] / [code]children_last[/code] / [code]carried_over_last[/code] (the last flush: parents handled, children spawned, splits that waited because of [member split_max_children_per_sweep]), [code]flushed_total[/code], [code]children_total[/code] and [code]templates[/code] (cached spawn data copies without per-bullet arrays).
+			</description>
+		</method>
 		<method name="debug_get_total_attachments_amount">
 			<return type="int" />
 			<description>
@@ -445,6 +451,12 @@
 			<return type="bool" />
 			<description>
 				Returns true once the factory started destroying itself. While true, teardown paths stop touching child nodes and most factory operations report an error instead of running.
+			</description>
+		</method>
+		<method name="get_pending_split_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				How many recorded splits wait to be spawned. Splits recorded inside a sweep spawn right after it; splits recorded outside one (a clear from [code]_process[/code], a manual split) spawn on the next sweep.
 			</description>
 		</method>
 		<method name="get_physics_space" qualifiers="const">
@@ -629,6 +641,9 @@
 		<member name="sound_max_voices" type="int" setter="set_sound_max_voices" getter="get_sound_max_voices" default="32">
 			Voice pool size for the whole factory: one AudioStreamPlayer2D per simultaneous sound. Voices are created on demand; past this a new event steals the oldest voice of equal or lower priority, never a more important one. The pool only grows to its high-water mark: lowering the cap later never frees existing voices.
 		</member>
+		<member name="split_max_children_per_sweep" type="int" setter="set_split_max_children_per_sweep" getter="get_split_max_children_per_sweep" default="0">
+			The most children one sweep spawns (0 = no cap, the default). Splits over the cap wait for the next sweep in order and are never dropped; a first split larger than the cap still spawns. Use it to spread a mass split over a few frames.
+		</member>
 		<member name="time_scale" type="float" setter="set_time_scale" getter="get_time_scale" default="1.0">
 			Speed of the bullet world. Every volley tick, one-shot effect and bullet timer advances by delta times this value: 1 is real time, 0.25 is slow motion, 0 freezes bullets while the factory keeps processing (collisions already in flight still resolve). Spawners that use this factory run on it too (their cadence, bursts, telegraph, spin and movement, multiplied by their own [member BulletSpawner2D.time_scale]), and so do the bullets they fired. The rescan interval of graze targets and sound fades and intervals stay in real time. Must be finite and 0 or more. This is not [member Engine.time_scale].
 		</member>
@@ -693,6 +708,15 @@
 			<param index="4" name="ring_index" type="int" />
 			<description>
 				Emitted live, inside the physics tick right after the bullets moved, when a bullet comes within ring [param ring_index] of [param zone] around [param target] (see [BulletGrazeZone2D]). [param target] is null when the target is a point (a spawner's Mouse or Global Positions source). The bullet is alive in the handler: transforms, velocity and custom data are readable and writable through [param volley]. Several rings entered in one tick fire from the largest radius to the smallest. Every graze in the game reaches the factory whoever owns the volley (the owner [BulletSpawner2D] emits first while it lives), including bullets of spawners already freed: connect here once to count graze for score. Structural calls need their [code]_deferred[/code] twins inside the handler.
+			</description>
+		</signal>
+		<signal name="bullet_split">
+			<param index="0" name="position" type="Vector2" />
+			<param index="1" name="cause" type="int" />
+			<param index="2" name="children" type="BulletVolley2D" />
+			<param index="3" name="depth" type="int" />
+			<description>
+				A bullet of a factory volley split: [param children] is the new volley (exactly [member BulletSplitStage2D.count] bullets, already moving and armed), spawned at [param position] where the parent died. [param cause] is one of the [code]BulletVolley2D.SPLIT_CAUSE_*[/code] constants and [param depth] the children's generation (1 = children of fired bullets). Emitted once per parent right after its children spawned, after the sweep in which it died. Spawner volleys report on their spawner instead ([signal BulletSpawner2D.bullet_split]).
 			</description>
 		</signal>
 		<signal name="bullets_cleared">

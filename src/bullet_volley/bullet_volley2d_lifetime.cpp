@@ -115,7 +115,7 @@ void BulletVolley2D::expire_live_bullets() {
 	// Batched expiry (On Lifetime Over at each pose, one render upload when
 	// the whole volley expires). Bullets the handler disabled/woke (epoch
 	// moved) are skipped.
-	disable_bullets_bulk(expiry_indexes_scratch, EFFECT_ON_LIFETIME_OVER, is_life_time_over_signal_enabled ? &expiry_epochs_scratch : nullptr);
+	disable_bullets_bulk(expiry_indexes_scratch, EFFECT_ON_LIFETIME_OVER, is_life_time_over_signal_enabled ? &expiry_epochs_scratch : nullptr, SPLIT_CAUSE_LIFETIME_OVER);
 }
 
 } // namespace BlastBullets2D

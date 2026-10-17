@@ -13,6 +13,7 @@ void BulletVolley2D::flock_set_config(const std::shared_ptr<FlockConfig2D> &conf
 	const bool had = flock_config != nullptr;
 	const bool has = config != nullptr;
 	flock_config = config;
+	++split_arming_serial;
 	flock_view = FlockView2D();
 	flock_cache.clear();
 	flock_turn_rate.clear();

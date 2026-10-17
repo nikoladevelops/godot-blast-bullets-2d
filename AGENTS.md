@@ -25,6 +25,7 @@ for the rest: the sections are written to be looked up, not read once.
 |  |  | 21 | Sound (mixer, triggers, listeners, RNG) |
 |  |  | 22 | World controls (time scale, despawn bounds, randomization, pickups) |
 |  |  | 23 | Flocking (BulletFlock2D, flock pass, step_flock, spawner group) |
+|  |  | 24 | Splitting (BulletSplitData2D, capture, flush, spawner group) |
 
 ## 0. Golden rules
 
@@ -55,7 +56,7 @@ for the rest: the sections are written to be looked up, not read once.
 
 ```sh
 GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py   # build (exit 1 = failed; never raw scons, never edit SConstruct)
-python3 tools/run_tests.py                                       # 191 files / 1671 tests, ~10 s, leak-checked
+python3 tools/run_tests.py                                       # 196 files / 1733 tests, ~10 s, leak-checked
 python3 tools/run_tests.py --suite <substring> --full            # one area, every failure message unclipped
 python3 tools/run_tests.py --self-test                           # proves the harness still catches failures/leaks
 python3 tools/run_editor_smoke.py                                # headless EDITOR run of tests/editor_smoke/ (editor-only paths)
@@ -1058,7 +1059,7 @@ project's `.so`). For quick numeric comparisons load two
 
 - Spawner groups, in order (locked by `test_volley_bounce.gd`): Setup, Time,
   Bullet Patterns, Shooting, Randomization, Spin, Homing, Orbiting, Flocking,
-  Graze, Sound, Preview, Movement, Performance. Spawn data (`BulletVolleyData2D`): Bullets, Appearance,
+  Splitting, Graze, Sound, Preview, Movement, Performance. Spawn data (`BulletVolleyData2D`): Bullets, Appearance,
   Movement Speed, Bullet Rotation, Wobble, Gravity, Bounce and Ricochet,
   Movement Pattern Paths, Homing, Collision, Attachments, Sprite Effects,
   Rendering and Material. No duplicate titles, no ungrouped property
@@ -1442,3 +1443,28 @@ A field + validated setter on `BulletFlock2D` (standard wording, emit
 `Group`; add its term in `solve()` (inside the candidate test if it needs
 pairs, keeping the sums plain locals); a mutation-checked test in
 `volley/test_volley_flock_rules.gd`; the snapshot `flock` section; docs (§17).
+
+## 24. Splitting (`BulletSplitData2D`, capture, flush, spawner group)
+
+A dying bullet bursts into `count` children: ONE new volley of exactly
+`count` bullets per parent (one pool key, perfect reuse). `stages[d]`
+(`BulletSplitStage2D`) splits generation d; the chain ends at the last stage
+(or `max_depth` with `repeat_last_stage`).
+
+| Piece | Where | Notes |
+|---|---|---|
+| Resources | `data/bullet_split_stage2d.*`, `data/bullet_split_data2d.*` | triggers (hit, lifetime, `split_after_sec`, despawn, clear: the last two off by default), count/chance/seed, direction (Fan 0 / Ring 1 / Random In Spread 2), speed (Multiply Parent 0 / Fixed 1 / From Spawn Data 2; Ramp/Random), offset, scale, `child_data`, keep flags, `fire_death_effects`; enum ids serialized; `EFFECT_ON_SPLIT` 8 / `SOUND_ON_SPLIT` 12 appended |
+| Shared types | `factory/split_queue2d.hpp` | `SplitConfig2D` (chain + switch, shared like `FlockConfig2D`), `SplitArming2D` (graze/sound/flock snapshot, one per arming change of a life), `SplitRequest2D` (POD: never a volley pointer), `SplitCause2D` (signal ids, serialized), seeded rolls = SplitMix64 of (seed, generation, parent index, child, channel) |
+| Capture | `bullet_volley/bullet_volley2d_split.cpp` | `split_capture` runs no user code and is called BEFORE every disable (the last disable pools the volley): lethal hit (after the handler), `disable_bullets_bulk(..., split_cause)` (lifetime, despawn, clears, timer, manual), `clear_bullet`. `split_arm` is THE choke point (`release_life` disarms). Pickup conversion, reset and free pass no cause |
+| Flush | `factory/bullet_factory2d_split.cpp` | `_physics_process` after the timers, before the sound flush; works on a swapped-out batch (splits recorded meanwhile wait: one generation per sweep, never an endless chain); `split_drop_epoch` cancels the rest when a handler resets; `split_max_children_per_sweep` carries over in order; children of the parent's data spawn from `split_child_template` (per-bullet arrays removed, cached per source until `changed`) and get the parent bullet's own spin/gravity/curves/wobble; `child_data` is used exactly |
+| Spawner | `bullet_spawner/bullet_spawner2d_split.cpp` | Splitting group after Flocking; armed in `shoot_once` next to flock (before any signal) with the shot's spawn data; `split_configure_child_homing` re-aims children like a fresh shot |
+
+Contract (the `*split*` suites, `integration/test_*_free_matrix`): exact
+count at the death pose in the same sweep, first move next sweep; heal /
+lifetime extension vetoes; routing like hits (spawner, factory, silent
+orphan); pooled volleys never keep a chain (`debug_assert_no_dangling`);
+reset/free drop queued splits; a handler freeing anything mid-flush is
+survived. ASan found two use-after-frees while this was built (a member read
+after the `life_time_over` handler; a drop after free_active's callbacks):
+read nothing of `this` after user code before the liveness check.
+

@@ -91,6 +91,40 @@ PackedStringArray BulletSpawner2D::debug_explain_features() const {
 		}
 	}
 
+	// Splitting.
+	if (!split_enabled) {
+		out.push_back("Splitting: off.");
+	} else if (split_data.is_null() || split_data->get_generation_count() == 0) {
+		out.push_back("Splitting: on, no stages: nothing splits.");
+	} else {
+		const Ref<BulletSplitStage2D> first = split_data->get_stage_for_depth(0);
+		String line = String("Splitting: on, ") + String::num_int64(split_data->get_generation_count()) + " generation(s) split.";
+		if (first.is_valid()) {
+			PackedStringArray when;
+			if (first->split_on_hit) {
+				when.push_back("is killed by a hit");
+			}
+			if (first->split_on_lifetime_over) {
+				when.push_back("expires");
+			}
+			if (first->split_after_sec > 0.0) {
+				when.push_back(String("reaches ") + String::num(first->split_after_sec, 2) + " s");
+			}
+			if (first->split_on_despawn) {
+				when.push_back("leaves the despawn bounds");
+			}
+			if (first->split_on_clear) {
+				when.push_back("is cleared");
+			}
+			if (when.is_empty()) {
+				line += " No trigger is on in the first stage: bullets split only through split_bullet().";
+			} else {
+				line += String(" A fired bullet bursts into ") + String::num_int64(first->count) + " when it " + String(", ").join(when) + ".";
+			}
+		}
+		out.push_back(line);
+	}
+
 	// Graze.
 	if (!graze_enabled) {
 		out.push_back("Graze: off.");

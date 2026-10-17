@@ -26,6 +26,7 @@
 #include "factory/flock_solver2d.hpp"
 #include "factory/graze_detector2d.hpp"
 #include "factory/sound_mixer2d.hpp"
+#include "factory/split_queue2d.hpp"
 #include "godot_cpp/core/math.hpp"
 #include "godot_cpp/variant/dictionary.hpp"
 #include "godot_cpp/variant/packed_float32_array.hpp"
@@ -620,6 +621,23 @@ public:
 	// pass_usec} of the last pass, plus armed_volleys.
 	Dictionary debug_get_flock_stats() const;
 
+	// ---- Splitting (split_queue2d.hpp, bullet_factory2d_split.cpp) ----
+	// Volleys record the splits of dying bullets here (C++ only, no user
+	// code); flush_splits spawns them once per sweep, after the timers and
+	// before the sound flush. Requests recorded outside a sweep spawn on the
+	// next one; reset/free_active_bullets/teardown drop them.
+	void split_enqueue(SplitRequest2D &&request);
+	// Children spawned per sweep at most (0 = no cap, the default). Splits
+	// over the cap wait for the next sweep in order, never dropped; one
+	// split larger than the cap still spawns when it comes first.
+	int get_split_max_children_per_sweep() const { return split_max_children_per_sweep; }
+	void set_split_max_children_per_sweep(int value);
+	int get_pending_split_count() const { return (int)pending_splits.size(); }
+	// Every split ever recorded (monotonic: a manual split counts its own).
+	uint64_t get_split_recorded_total() const { return split_recorded_total; }
+	// {pending, flushed_last, children_last, carried_over_last, flushed_total, children_total}.
+	Dictionary debug_get_split_stats() const;
+
 	// ---- Sound triggers (sound_mixer2d.*) ----
 	// Fire-and-forget audio: trigger sites offer (volley, spawner, user) and
 	// the mixer plays the sweep's winners at the end of _physics_process.
@@ -793,6 +811,44 @@ private:
 	FlockSolver2D flock_solver;
 	int flock_armed_volleys = 0;
 	Ref<BulletFlock2D> default_flock; // get_default_flock (made on first use)
+	// Splitting: the recorded splits (swapped out by each flush, so splits
+	// recorded during a flush wait for the next sweep) and reused scratch.
+	std::vector<SplitRequest2D> pending_splits;
+	std::vector<SplitRequest2D> split_flush_scratch;
+	std::vector<Transform2D> split_pose_scratch;
+	std::vector<Vector2> split_direction_scratch;
+	std::vector<real_t> split_speed_scratch;
+	int split_max_children_per_sweep = 0;
+	uint64_t split_recorded_total = 0;
+	bool split_flush_running = false;
+	// Bumped by every drop: a running flush stops spawning its batch.
+	uint64_t split_drop_epoch = 0;
+	int split_stats_flushed_last = 0;
+	int split_stats_children_last = 0;
+	int split_stats_carried_last = 0;
+	uint64_t split_stats_flushed_total = 0;
+	uint64_t split_stats_children_total = 0;
+	// The spawn data children use: `source` itself when it has no per-bullet
+	// arrays (the common case), else a copy without them (entry i of the
+	// parent's arrays means nothing to child i; children receive their
+	// parent's own values instead). Cached per source until it changes.
+	std::unordered_map<uint64_t, Ref<BulletVolleyData2D>> split_templates;
+	Ref<BulletVolleyData2D> split_child_template(const Ref<BulletVolleyData2D> &source);
+	void split_source_changed(uint64_t source_id);
+	// Spawns every pending split (bullet_factory2d_split.cpp). False when
+	// user code inside freed this factory.
+	bool flush_splits(const bool &alive);
+	// Drops every pending split (reset, free_active_bullets, teardown).
+	void drop_pending_splits();
+	// Scoped reset/free: drops the splits whose children use this pool key.
+	void drop_pending_splits_for_key(const PoolKey &key);
+	void drop_pending_splits_for(const PoolKey *key) {
+		if (key == nullptr) {
+			drop_pending_splits();
+		} else {
+			drop_pending_splits_for_key(*key);
+		}
+	}
 	uint64_t stats_last_flock_usec = 0;
 	// Bullet time of the flock passes (BulletFlock2D.update_interval).
 	double flock_clock = 0.0;

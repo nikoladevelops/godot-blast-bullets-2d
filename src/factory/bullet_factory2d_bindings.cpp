@@ -190,6 +190,21 @@ void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_default_flock"), &BulletFactory2D::get_default_flock);
 	ClassDB::bind_method(D_METHOD("debug_set_graze_slab_min_targets", "value"), &BulletFactory2D::debug_set_graze_slab_min_targets);
 
+	// Splitting (bullet_factory2d_split.cpp): splits recorded during a sweep
+	// spawn right after it. bullet_split fires once per parent that split
+	// (factory volleys here; spawner volleys on their spawner).
+	ClassDB::bind_method(D_METHOD("get_split_max_children_per_sweep"), &BulletFactory2D::get_split_max_children_per_sweep);
+	ClassDB::bind_method(D_METHOD("set_split_max_children_per_sweep", "value"), &BulletFactory2D::set_split_max_children_per_sweep);
+	ClassDB::bind_method(D_METHOD("get_pending_split_count"), &BulletFactory2D::get_pending_split_count);
+	ClassDB::bind_method(D_METHOD("debug_get_split_stats"), &BulletFactory2D::debug_get_split_stats);
+	ADD_GROUP("Splitting", "split_");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "split_max_children_per_sweep", PROPERTY_HINT_RANGE, "0,10000,1,or_greater"), "set_split_max_children_per_sweep", "get_split_max_children_per_sweep");
+	ADD_SIGNAL(MethodInfo("bullet_split",
+			PropertyInfo(Variant::VECTOR2, "position"),
+			PropertyInfo(Variant::INT, "cause"),
+			PropertyInfo(Variant::OBJECT, "children", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
+			PropertyInfo(Variant::INT, "depth")));
+
 	ADD_GROUP("Sound", "sound_");
 
 	// Sound triggers (SoundMixer2D): trigger sites offer, the sweep's winners

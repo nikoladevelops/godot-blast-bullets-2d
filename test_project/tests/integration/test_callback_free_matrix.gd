@@ -204,6 +204,55 @@ func test_freeing_inside_a_spawn_never_returns_a_freed_volley() -> void:
 	assert_eq("\n".join(problems), "", "a spawn survives a free from its callbacks")
 
 
+func _split_chain() -> BulletSplitData2D:
+	var stage := BulletSplitStage2D.new()
+	stage.count = 3
+	var chain := BulletSplitData2D.new()
+	chain.stages = [stage]
+	return chain
+
+
+func test_freeing_inside_a_split_never_touches_freed_memory() -> void:
+	# Parents carry the probe: on_bullet_disable runs right after each
+	# parent's split was recorded (the batch disable of an expiry).
+	# Children carry the probe: on_bullet_spawn / on_bullet_enable run inside
+	# the factory's split flush, with more splits of the batch still waiting.
+	var problems: Array = []
+	for side in ["parents", "children"]:
+		for victim in VICTIMS:
+			if side == "children" and victim == "other_volley":
+				continue
+			await _new_case()
+			var where := "split %s / %s" % [side, victim]
+			var plain := _data(false, 0.05)
+			plain.shared_bullet_attachment = null
+			var probed := _data(false, 0.05)
+			var parent_data := probed if side == "parents" else plain
+			var child_data := plain if side == "parents" else _data(false)
+			var v: BulletVolley2D = factory.spawn_volley(parent_data)
+			v.split_set_data(_split_chain(), child_data)
+			var other: BulletVolley2D = factory.spawn_volley(parent_data)
+			other.split_set_data(_split_chain(), child_data)
+			await idle(1)
+			if side == "parents":
+				_arm(["disable"], victim, v, other)
+			else:
+				_arm(["spawn", "enable"], victim, v)
+				if victim == "volley":
+					# The children volley being set up right now.
+					var known: Array = Array(factory.debug_get_live_volley_ids(0))
+					var f := factory
+					AttachmentHookProbe2D.hook = func() -> void:
+						for id in f.debug_get_live_volley_ids(0):
+							if not known.has(id):
+								instance_from_id(id).free()
+								return
+			await _await_hook(30)
+			problems.append_array(await _settle_and_check(where))
+			problems.append_array(_claim_errors().map(func(e): return "%s error: %s" % [where, e]))
+	assert_eq("\n".join(problems), "", "a split survives a free from any callback inside it")
+
+
 ## Every case starts clean: no armed hook, a fresh factory (the last case may
 ## have freed its factory or left world settings such as despawn bounds).
 func _new_case() -> void:

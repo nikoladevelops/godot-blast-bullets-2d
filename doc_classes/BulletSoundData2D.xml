@@ -218,6 +218,9 @@
 		</constant>
 		<constant name="SOUND_ON_DESPAWN" value="11" enum="SoundTrigger">
 		</constant>
+		<constant name="SOUND_ON_SPLIT" value="12" enum="SoundTrigger">
+			Played where a bullet splits into children ([BulletSplitStage2D]), whatever made it split.
+		</constant>
 		<constant name="SOUND_LIMIT_REPLACE_OLDEST" value="0" enum="SoundLimitMode">
 			Past max_voices, stop this sound's oldest voice and reuse it.
 		</constant>

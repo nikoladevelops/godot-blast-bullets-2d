@@ -849,6 +849,28 @@ public:
 	// flocking is off or no flock is set.
 	int flock_live_volleys();
 
+	// SPLITTING (bullet_spawner2d_split.cpp). Every volley fired while
+	// split_enabled is on (and split_data is set) splits by split_data: a
+	// bullet that dies by one of its stage's triggers bursts into children
+	// that copy this spawner's spawn data, with the stage's direction and
+	// speed. Children stay this spawner's (its signals, graze, sound, flock,
+	// time scale, orphan policy) and split again by the next stage. The
+	// settings are shared with every volley this spawner armed: turning
+	// splitting off stops it for bullets in flight (on again resumes them),
+	// edits to split_data reach them too, orphans keep the last settings.
+	// Bullets fired while splitting was off never split.
+	bool split_enabled = false;
+	Ref<BulletSplitData2D> split_data;
+
+	bool get_split_enabled() const;
+	void set_split_enabled(bool value);
+	Ref<BulletSplitData2D> get_split_data() const;
+	void set_split_data(const Ref<BulletSplitData2D> &value);
+	// The factory flush: aims a child volley like a fresh shot of this
+	// spawner (homing and orbiting, with their signals). False while homing
+	// is off: the children then chase their parent's target.
+	bool split_configure_child_homing(BulletVolley2D *child);
+
 	// SOUND (bullet_spawner2d_sound.cpp)
 	//
 	// Every fired volley is armed with sound_effects (BulletSoundData2D: one
@@ -1903,6 +1925,13 @@ private:
 	// Joins a freshly fired volley to flock (shoot_once, before the homing
 	// signals). Runs no user code.
 	void apply_volley_flock(BulletVolley2D *volley);
+	// The Splitting settings shared with every volley this spawner armed
+	// (created on first arm); setters push into it.
+	std::shared_ptr<SplitConfig2D> split_shared;
+	void apply_split_config();
+	// Arms a freshly fired volley with split_data; its children copy
+	// spawn_data (the shot's data). Runs no user code.
+	void apply_volley_split(BulletVolley2D *volley, const Ref<BulletVolleyData2D> &spawn_data);
 	// graze_zones mutated in place (append past 4 zones, non-zone entries):
 	// warned once per assignment, the usable entries still arm.
 	bool graze_zones_misuse_warned = false;

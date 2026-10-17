@@ -96,6 +96,16 @@ void BulletVolley2D::tick(double delta) {
 	}
 	// 5. Lifetime (may emit life_time_over, live).
 	reduce_lifetime(delta);
+	// 6. Split timer (one test per armed volley; records splits, then the
+	// batch disable may run attachment callbacks). Liveness FIRST: the
+	// life_time_over handler above may have freed this volley, and reading
+	// any member before the check would read freed memory.
+	if (!tick_may_continue(self_id)) {
+		return;
+	}
+	if (split_config != nullptr && is_active) {
+		split_check_timer();
+	}
 }
 
 // Values move_bullets computes once per tick, before the bullet loop.

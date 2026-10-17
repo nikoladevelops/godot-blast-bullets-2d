@@ -92,6 +92,7 @@ void BulletVolley2D::graze_clear() {
 }
 
 void BulletVolley2D::graze_release() {
+	++split_arming_serial;
 	for (Ref<BulletGrazeZone2D> &zone : graze_zones) {
 		zone.unref();
 	}

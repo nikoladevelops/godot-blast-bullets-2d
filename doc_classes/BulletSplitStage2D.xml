@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="BulletSplitStage2D" inherits="Resource" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		One generation of a split chain: when a bullet splits and what its children do.
+	</brief_description>
+	<description>
+		A bullet that dies by one of the enabled triggers bursts into [member count] children at its pose: ONE new volley of exactly [member count] bullets per parent. Children copy the parent's spawn data (or [member child_data]); without [member child_data] the data's per-bullet arrays are left out (their entries index the parent's volley) and every child takes its parent bullet's own per-bullet values instead (spin, gravity, curves, wobble). Direction comes from [member direction_mode], speed from [member speed_mode]; the Keep group decides what else the children inherit.
+		Every accepted change emits [code]changed[/code]; volleys read the stage when a bullet dies, so edits reach bullets in flight. Bad values are refused with an error and the old value is kept.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="child_angle_radians" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="child_index" type="int" />
+			<param index="1" name="children" type="int" />
+			<param index="2" name="random_roll" type="float" />
+			<param index="3" name="jitter_roll" type="float" />
+			<description>
+				The direction of child [param child_index] of [param children], in radians relative to the reference direction (the parent's heading, or the world's +X), for the unit rolls [param random_roll] (Random In Spread) and [param jitter_roll] (0.5 = no jitter). Use it to preview a split.
+			</description>
+		</method>
+		<method name="child_speed_multiplier" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="child_index" type="int" />
+			<param index="1" name="children" type="int" />
+			<param index="2" name="random_roll" type="float" />
+			<description>
+				The speed multiplier of child [param child_index] of [param children] for the unit roll [param random_roll] (used by the Random distribution).
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="angle_jitter_degrees" type="float" setter="set_angle_jitter_degrees" getter="get_angle_jitter_degrees" default="0.0">
+			Each child turns by a random angle up to this many degrees either way (0 = none, up to 360).
+		</member>
+		<member name="angle_offset_degrees" type="float" setter="set_angle_offset_degrees" getter="get_angle_offset_degrees" default="0.0">
+			Turns the whole pattern: the fan's center, the ring's first child.
+		</member>
+		<member name="chance" type="float" setter="set_chance" getter="get_chance" default="1.0">
+			The odds that a bullet splits when a trigger fires (0 to 1). Manual splits ignore it.
+		</member>
+		<member name="child_data" type="BulletVolleyData2D" setter="set_child_data" getter="get_child_data">
+			Spawn data for the children instead of the parent's. Its per-bullet arrays index the children (entry [code]k[/code] drives child [code]k[/code]). Grandchildren copy it too unless their stage has its own.
+		</member>
+		<member name="count" type="int" setter="set_count" getter="get_count" default="3">
+			How many children each parent becomes (1 up to the pattern limit, [code]BulletPatterns2D.max_bullets_per_pattern[/code]; a limit lowered later caps it).
+		</member>
+		<member name="direction_mode" type="int" setter="set_direction_mode" getter="get_direction_mode" enum="BulletSplitStage2D.DirectionMode" default="0">
+			How the children spread out (see [enum DirectionMode]).
+		</member>
+		<member name="fire_death_effects" type="bool" setter="set_fire_death_effects" getter="get_fire_death_effects" default="true">
+			When on, a splitting bullet also fires its normal death effects and sounds (On Destroy, On Lifetime Over, On Clear, On Despawn) besides On Split. Off: only On Split.
+		</member>
+		<member name="fixed_speed" type="float" setter="set_fixed_speed" getter="get_fixed_speed" default="100.0">
+			The children's speed in Fixed mode (times their multiplier). Shown only in Fixed mode.
+		</member>
+		<member name="inherit_parent_velocity" type="bool" setter="set_inherit_parent_velocity" getter="get_inherit_parent_velocity" default="false">
+			When on, the children also carry the parent volley's inherited momentum (a moving spawner's velocity).
+		</member>
+		<member name="keep_collision_count" type="bool" setter="set_keep_collision_count" getter="get_keep_collision_count" default="false">
+			When on, children start with their parent's hit count (they may die on their first hit); off, they start at 0.
+		</member>
+		<member name="keep_custom_data" type="bool" setter="set_keep_custom_data" getter="get_keep_custom_data" default="true">
+			When on, every child carries its parent bullet's custom data (the same resource).
+		</member>
+		<member name="keep_flock" type="bool" setter="set_keep_flock" getter="get_keep_flock" default="true">
+			When on, the children fly in their parent's flock.
+		</member>
+		<member name="keep_graze" type="bool" setter="set_keep_graze" getter="get_keep_graze" default="true">
+			When on, the children keep their parent's graze zones and graze targets.
+		</member>
+		<member name="keep_homing" type="bool" setter="set_keep_homing" getter="get_keep_homing" default="true">
+			When on, children home like their parent: a live owner spawner with homing on aims them like a fresh shot (its homing signals fire), otherwise they chase the parent's current target. Off: they fly straight.
+		</member>
+		<member name="keep_sound" type="bool" setter="set_keep_sound" getter="get_keep_sound" default="true">
+			When on, the children keep their parent's sound effects.
+		</member>
+		<member name="relative_to_parent_heading" type="bool" setter="set_relative_to_parent_heading" getter="get_relative_to_parent_heading" default="true">
+			When on, directions are measured from the parent's flight heading; off, from the world's +X axis.
+		</member>
+		<member name="scale_multiplier" type="float" setter="set_scale_multiplier" getter="get_scale_multiplier" default="1.0">
+			The children's size relative to the parent (must be greater than 0).
+		</member>
+		<member name="seed" type="int" setter="set_seed" getter="get_seed" default="0">
+			0 = Godot's global random numbers. Any other value makes the random parts (chance, Random In Spread, jitter, Random speed) a pure function of the seed, the generation and the parent bullet's index: a seeded stage splits a given bullet the same way every time.
+		</member>
+		<member name="spawn_offset_px" type="float" setter="set_spawn_offset_px" getter="get_spawn_offset_px" default="0.0">
+			Children start this far from the parent's position, each along its own direction (0 = all on the parent's position).
+		</member>
+		<member name="speed_distribution" type="int" setter="set_speed_distribution" getter="get_speed_distribution" enum="BulletSplitStage2D.SpeedDistribution" default="0">
+			How the children's multipliers spread between min and max (see [enum SpeedDistribution]).
+		</member>
+		<member name="speed_mode" type="int" setter="set_speed_mode" getter="get_speed_mode" enum="BulletSplitStage2D.SpeedMode" default="0">
+			Where the children's speed comes from (see [enum SpeedMode]).
+		</member>
+		<member name="speed_multiplier_max" type="float" setter="set_speed_multiplier_max" getter="get_speed_multiplier_max" default="1.0">
+			The largest speed multiplier (min and max are sorted when used, never refused against each other).
+		</member>
+		<member name="speed_multiplier_min" type="float" setter="set_speed_multiplier_min" getter="get_speed_multiplier_min" default="1.0">
+			The smallest speed multiplier.
+		</member>
+		<member name="split_after_sec" type="float" setter="set_split_after_sec" getter="get_split_after_sec" default="0.0">
+			Seconds after the volley spawned when every live bullet of the volley splits by itself (0 = off). The volley clock: the whole volley splits together, once per life.
+		</member>
+		<member name="split_on_clear" type="bool" setter="set_split_on_clear" getter="get_split_on_clear" default="false">
+			Split when cleared ([method BulletVolley2D.clear_bullet], area clears, factory clears). Off by default. Resets, frees and pickup conversions never split.
+		</member>
+		<member name="split_on_despawn" type="bool" setter="set_split_on_despawn" getter="get_split_on_despawn" default="false">
+			Split when leaving the factory's despawn bounds. Off by default.
+		</member>
+		<member name="split_on_hit" type="bool" setter="set_split_on_hit" getter="get_split_on_hit" default="true">
+			Split when a hit kills the bullet (decided after the hit handler: a heal vetoes the split too).
+		</member>
+		<member name="split_on_lifetime_over" type="bool" setter="set_split_on_lifetime_over" getter="get_split_on_lifetime_over" default="true">
+			Split when the lifetime runs out (an extension from the [code]life_time_over[/code] handler vetoes it).
+		</member>
+		<member name="spread_degrees" type="float" setter="set_spread_degrees" getter="get_spread_degrees" default="60.0">
+			The angle the children cover in Fan and Random In Spread modes (0 to 360). Hidden in Ring mode.
+		</member>
+	</members>
+	<constants>
+		<constant name="DIRECTION_FAN" value="0" enum="DirectionMode">
+			Evenly across [member spread_degrees], centered on [member angle_offset_degrees].
+		</constant>
+		<constant name="DIRECTION_RING" value="1" enum="DirectionMode">
+			360 / [member count] degrees apart, the first child at [member angle_offset_degrees].
+		</constant>
+		<constant name="DIRECTION_RANDOM_IN_SPREAD" value="2" enum="DirectionMode">
+			A random angle per child within [member spread_degrees] around [member angle_offset_degrees].
+		</constant>
+		<constant name="SPEED_MULTIPLY_PARENT" value="0" enum="SpeedMode">
+			The parent's current speed, top speed and acceleration, times the child's multiplier.
+		</constant>
+		<constant name="SPEED_FIXED" value="1" enum="SpeedMode">
+			[member fixed_speed] times the child's multiplier (top speed and acceleration from the spawn data).
+		</constant>
+		<constant name="SPEED_FROM_SPAWN_DATA" value="2" enum="SpeedMode">
+			The children's spawn data speed, times the child's multiplier (without [member child_data]: the data's shared speed).
+		</constant>
+		<constant name="SPEED_RAMP" value="0" enum="SpeedDistribution">
+			From [member speed_multiplier_min] (first child) to [member speed_multiplier_max] (last child).
+		</constant>
+		<constant name="SPEED_RANDOM" value="1" enum="SpeedDistribution">
+			A random multiplier per child between min and max.
+		</constant>
+	</constants>
+</class>

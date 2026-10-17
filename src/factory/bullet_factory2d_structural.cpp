@@ -268,7 +268,11 @@ void BulletFactory2D::reset(const Ref<VolleyPoolKey2D> &key) {
 	{
 		FactoryOperationGuard op(this);
 		PoolKey resolved;
-		reset_factory_state(resolve_pool_key(key, resolved));
+		const PoolKey *key_ptr = resolve_pool_key(key, resolved);
+		reset_factory_state(key_ptr);
+		if (!watch.died()) {
+			drop_pending_splits_for(key_ptr); // reset bullets never split
+		}
 	}
 	if (watch.died()) {
 		return; // an attachment callback freed this factory
@@ -301,6 +305,9 @@ void BulletFactory2D::free_active_bullets(const Ref<VolleyPoolKey2D> &key) {
 	// Free all ACTIVE BulletVolley2D
 	PoolKey resolved;
 	const PoolKey *key_ptr = resolve_pool_key(key, resolved);
+	// Before the free: its attachment callbacks may free this factory (a
+	// free never records splits, so nothing new can arrive meanwhile).
+	drop_pending_splits_for(key_ptr); // freed bullets never split
 	free_active_volleys(key_ptr);
 }
 
@@ -424,7 +431,7 @@ int BulletFactory2D::clear_bullets_owned_by(uint64_t owner_spawner_id, bool fire
 		}
 		if (volley->is_active) {
 			const std::vector<int> live = volley->all_bullets_enabled_set.get_active_indexes();
-			cleared += volley->disable_bullets_bulk(live, fire_clear_effects ? (int)EFFECT_ON_CLEAR : -1);
+			cleared += volley->disable_bullets_bulk(live, fire_clear_effects ? (int)EFFECT_ON_CLEAR : -1, nullptr, SPLIT_CAUSE_CLEAR);
 			if (!*life) {
 				return cleared; // a callback freed this factory
 			}

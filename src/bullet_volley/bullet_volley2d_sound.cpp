@@ -46,6 +46,7 @@ bool BulletVolley2D::sound_set_effects(const Array &effects, const StringName &l
 	sound_trigger_mask = mask;
 	sound_mask_epoch = BulletSoundData2D::mask_epoch;
 	sound_listener_group = listener_group;
+	++split_arming_serial;
 	return true;
 }
 
@@ -65,6 +66,7 @@ bool BulletVolley2D::sound_arm_from_spawner(const Array &effects, const std::sha
 	// Shared: listener edits and refresh_sound_listeners() reach it in flight.
 	sound_detector = detector;
 	sound_volume_offset_db = volume_offset_db;
+	++split_arming_serial;
 	return true;
 }
 
@@ -99,6 +101,7 @@ void BulletVolley2D::sound_refresh_mask() const {
 }
 
 void BulletVolley2D::sound_release() {
+	++split_arming_serial;
 	sound_effects.clear();
 	sound_trigger_mask = 0;
 	sound_detector.reset();

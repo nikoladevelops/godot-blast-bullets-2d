@@ -1674,6 +1674,12 @@
 		<member name="spin_speed_deg_per_sec" type="float" setter="set_spin_speed_deg_per_sec" getter="get_spin_speed_deg_per_sec" default="90.0">
 			Spin speed in continuous mode. Positive is clockwise.
 		</member>
+		<member name="split_data" type="BulletSplitData2D" setter="set_split_data" getter="get_split_data">
+			The split chain fired volleys carry: [member BulletSplitData2D.stages][code][d][/code] decides how generation [code]d[/code] splits. Edits reach bullets already in flight. Children copy this spawner's spawn data (or the stage's [member BulletSplitStage2D.child_data]) and stay owned by this spawner.
+		</member>
+		<member name="split_enabled" type="bool" setter="set_split_enabled" getter="get_split_enabled" default="false">
+			Turns splitting on for volleys fired from now on. Turning it off stops splitting for bullets already in flight (on again resumes them); bullets fired while it was off never split. Orphaned volleys keep the last settings.
+		</member>
 		<member name="telegraph_enabled" type="bool" setter="set_telegraph_enabled" getter="get_telegraph_enabled" default="false">
 			Warn before firing: emits volley_telegraphed with the current aim, then fires after telegraph_sec. Transforms re-collect at fire time.
 		</member>
@@ -1747,6 +1753,15 @@
 			<param index="4" name="ring_index" type="int" />
 			<description>
 				Fired live when one of this spawner's bullets grazes a ring of a zone (see [BulletGrazeZone2D]). [param target] is null for the point sources (Mouse, Global Positions). Same payload and contract as [signal BulletFactory2D.bullet_grazed], which fires right after this one for the same graze: count graze on one of the two. Once this spawner is freed its flying bullets keep grazing and only the factory signal fires.
+			</description>
+		</signal>
+		<signal name="bullet_split">
+			<param index="0" name="position" type="Vector2" />
+			<param index="1" name="cause" type="int" />
+			<param index="2" name="children" type="BulletVolley2D" />
+			<param index="3" name="depth" type="int" />
+			<description>
+				A bullet of this spawner split: [param children] is the new volley (owned by this spawner, already armed), spawned at [param position] where the parent died. [param cause] is one of the [code]BulletVolley2D.SPLIT_CAUSE_*[/code] constants and [param depth] the children's generation. Emitted once per parent after the factory sweep in which it died. An orphaned volley's splits are silent (like its hits) unless [member orphaned_volleys] handed it to the factory.
 			</description>
 		</signal>
 		<signal name="burst_finished">

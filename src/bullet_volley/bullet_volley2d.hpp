@@ -1302,7 +1302,8 @@ public:
 	// Batched disable (expiry, clear_all_bullets): disable_bullet(i, true)
 	// semantics per bullet with one render upload for a drained volley.
 	// Returns how many bullets it disabled.
-	int disable_bullets_bulk(const std::vector<int> &indexes, int fx_trigger = -1, const std::vector<uint64_t> *expected_epochs = nullptr);
+	// split_cause >= 0 (SplitCause2D) records each bullet's split first.
+	int disable_bullets_bulk(const std::vector<int> &indexes, int fx_trigger = -1, const std::vector<uint64_t> *expected_epochs = nullptr, int split_cause = -1);
 	// Manual clear with visuals: captures the death pose, runs the silent
 	// disable_bullet() above, then fires EFFECT_ON_CLEAR one-shots. Use
 	// this instead of disable_bullet() when the disappearance should read
@@ -2809,6 +2810,55 @@ public:
 	Dictionary debug_get_bullet_flock_info(int bullet_index) const;
 	// True when the last pass gathered this volley in its current life.
 	bool flock_view_current() const;
+
+	// SPLITTING (bullet_volley2d_split.cpp; the spawns are the factory's
+	// flush_splits). An armed volley holds a SplitConfig2D (the chain + the
+	// switch: its spawner's, shared like the flock config, or its own from
+	// split_set_data), the spawn data its children copy, and its generation.
+	// A dying bullet records a SplitRequest2D BEFORE it is disabled (the
+	// disable may pool this volley); nothing spawns at the death site.
+	std::shared_ptr<SplitConfig2D> split_config;
+	Ref<BulletVolleyData2D> split_spawn_data;
+	int split_depth = 0;
+	bool split_timer_fired = false;
+	// The arming snapshot shared by this life's requests, rebuilt when an
+	// arming choke point (graze_arm/release, sound arm/release,
+	// flock_set_config) bumped split_arming_serial.
+	std::shared_ptr<const SplitArming2D> split_arming_cache;
+	uint32_t split_arming_serial = 1;
+	uint32_t split_arming_cache_serial = 0;
+	// THE one place that arms or disarms splitting (spawner arming, the
+	// factory flush, split_set_data/split_clear, release_life).
+	void split_arm(const std::shared_ptr<SplitConfig2D> &config, const Ref<BulletVolleyData2D> &spawn_data, int depth);
+	// Records bullet i's split when its stage splits on `cause` (and the
+	// chance roll passes). 0 = no split, 1 = split, 2 = split and the
+	// parent's own death effects stay silent (fire_death_effects off). Runs
+	// no user code. Call only while split_config is set (hot paths test the
+	// pointer first).
+	_NO_INLINE_ int split_capture(int bullet_index, int cause, const Transform2D &pose);
+	// The volley clock reached the stage's split_after_sec: every live
+	// bullet splits (once per life).
+	void split_check_timer();
+	// The factory flush seeds a child volley (motion, kept state, arming).
+	void split_seed_children(const SplitRequest2D &request, const Vector2 *directions, const real_t *speed_multipliers, int count);
+	// Script API. Factory volleys (or a script override of a spawner
+	// volley until its next life): split by `split`, children spawned from
+	// `child_spawn_data`. A null child_spawn_data keeps what this volley was
+	// armed with (a spawner volley: the spawner's data); a volley that never
+	// had spawn data needs it (refused otherwise).
+	bool split_set_data(const Ref<BulletSplitData2D> &split, const Ref<BulletVolleyData2D> &child_spawn_data = Ref<BulletVolleyData2D>());
+	void split_clear();
+	Ref<BulletSplitData2D> split_get_data() const;
+	int split_get_depth() const;
+	// Split now (cause Manual): needs a stage for this generation, ignores
+	// its triggers and chance. The bullet leaves like a clear (its death
+	// effects: On Clear). True when the bullet split.
+	bool split_bullet(int bullet_index);
+	// Every live bullet in the range (for_range contract). Returns how many split.
+	int all_bullets_split(int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
+	// A manual split would record (armed, switched on, a stage for this
+	// generation, spawn data to copy, not a pickup).
+	bool split_possible_now() const;
 
 protected:
 	// Updates homing behavior for a bullet. Zero-delta ticks steer nothing:

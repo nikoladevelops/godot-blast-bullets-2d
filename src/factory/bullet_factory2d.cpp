@@ -218,6 +218,7 @@ void BulletFactory2D::_notification(int p_what) {
 		// Parent is notified before children are destroyed. From here on no child
 		// pointer (debuggers, containers) may be touched by teardown paths.
 		is_tearing_down = true;
+		drop_pending_splits(); // destroyed bullets never split; their Refs go now
 		// Pooled attachments outlive this call as engine children; drop their pool
 		// tracking now so their later PREDELETEs never touch this pool object again.
 		bullet_attachments_pool.detach_all();
@@ -537,6 +538,13 @@ void BulletFactory2D::_physics_process(double delta) {
 		}
 	}
 	is_iterating_bullets = false;
+
+	// Splits recorded this sweep (and before it) spawn now, at the poses
+	// their parents died at; the children tick from the next sweep. User
+	// code runs inside (spawn callbacks, homing and bullet_split signals).
+	if (!flush_splits(alive)) {
+		return;
+	}
 
 	// Sound winners play after every volley, effect and timer of the sweep
 	// ran (timer-spawned offers join this sweep), never inside the iteration.

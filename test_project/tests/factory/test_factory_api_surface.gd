@@ -89,6 +89,7 @@ func test_factory_and_spawner_declare_the_same_graze_signals() -> void:
 	var expected := {
 		"bullet_grazed": [["target", "Node2D"], ["volley", "BulletVolley2D"], ["bullet_index", ""], ["zone", "BulletGrazeZone2D"], ["ring_index", ""]],
 		"bullet_graze_exited": [["target", "Node2D"], ["volley", "BulletVolley2D"], ["bullet_index", ""], ["zone", "BulletGrazeZone2D"], ["deepest_ring_index", ""]],
+		"bullet_split": [["position", ""], ["cause", ""], ["children", "BulletVolley2D"], ["depth", ""]],
 	}
 	for owner in [factory, spawner]:
 		for name in expected:
@@ -110,6 +111,9 @@ func test_stats_dictionaries_have_exact_keys() -> void:
 	var state_keys: Array = factory.debug_get_factory_state().keys()
 	state_keys.sort()
 	assert_eq(state_keys, ["attachments_pooled", "is_busy", "is_iterating", "is_ready", "is_tearing_down", "processing", "volleys_pooled", "volleys_total"], "factory state keys")
+	var split_keys: Array = factory.debug_get_split_stats().keys()
+	split_keys.sort()
+	assert_eq(split_keys, ["carried_over_last", "children_last", "children_total", "flushed_last", "flushed_total", "pending", "templates"], "split stats keys")
 
 
 func test_factory_owns_one_volley_container_and_one_debugger() -> void:

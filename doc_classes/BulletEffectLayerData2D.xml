@@ -118,5 +118,8 @@
 		</constant>
 		<constant name="EFFECT_ON_DESPAWN" value="7" enum="EffectTrigger">
 		</constant>
+		<constant name="EFFECT_ON_SPLIT" value="8" enum="EffectTrigger">
+			Fired at a bullet's pose when it splits into children ([BulletSplitStage2D]), whatever made it split. The parent's own death trigger (On Destroy, On Lifetime Over, ...) fires too unless [member BulletSplitStage2D.fire_death_effects] is off.
+		</constant>
 	</constants>
 </class>

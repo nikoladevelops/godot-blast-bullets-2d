@@ -102,6 +102,25 @@ func _run_case(signal_name: String, victim: String) -> String:
 			factory.bullet_grazed.connect(func(_t, _v, _i, _z, _r) -> void: pass)
 			sp.connect(signal_name, _freeing(victim))
 			sp.shoot_once()
+		"bullet_split":
+			# Emitted by the factory's split flush on the spawner, after the
+			# children spawned. The volley victim is the children volley the
+			# signal names. A second split waits in the same flush (a factory
+			# volley expiring in the same sweep): a freed factory must stop
+			# the flush without touching the rest of its batch.
+			var d := _data(0.0, 0.05)
+			d.is_life_time_over_signal_enabled = false
+			var chain := BulletSplitData2D.create_preset(BulletSplitData2D.PRESET_BURST_RING)
+			sp = _spawner(d)
+			sp.split_data = chain
+			sp.split_enabled = true
+			sp.bullet_split.connect(func(_p, _c, children, _d) -> void:
+				if fired == 0:
+					victim_volley = children)
+			sp.connect(signal_name, _freeing(victim))
+			sp.shoot_once()
+			var other := factory.spawn_volley(d)
+			other.split_set_data(chain, d)
 		"shooting_started":
 			sp = _spawner(_data(0.0))
 			sp.connect(signal_name, _freeing(victim))
@@ -202,7 +221,7 @@ func test_freeing_from_spawner_signal_handlers_never_touches_freed_memory() -> v
 	var problems: Array = []
 	for signal_name in ["pre_shoot", "volley_fired", "homing_targets_resolved", "body_entered", "life_time_over",
 			"volley_bullet_homing_target_reached", "bullet_grazed", "shooting_started", "pattern_list_finished",
-			"bounce_body_entered", "movement_finished", "timer", "bullet_homing_target_reached", "sprite_animation_finished"]:
+			"bounce_body_entered", "movement_finished", "timer", "bullet_homing_target_reached", "sprite_animation_finished", "bullet_split"]:
 		for victim in VICTIMS:
 			if signal_name in ["bullet_homing_target_reached", "sprite_animation_finished"] and victim == "volley":
 				continue # the volley emits these: Godot refuses that free itself

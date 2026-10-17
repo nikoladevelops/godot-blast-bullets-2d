@@ -695,6 +695,14 @@
 				Seeds wobble live over a range (null clears each slot back to the shared fallback). Per-bullet wins over shared.
 			</description>
 		</method>
+		<method name="all_bullets_split">
+			<return type="int" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Splits every live bullet in the range right now (cause [constant SPLIT_CAUSE_MANUAL]) and returns how many split. Needs a stage for this volley's generation; its triggers and [member BulletSplitStage2D.chance] are ignored. The bullets leave like a clear (On Clear effects). The children spawn after the next factory sweep.
+			</description>
+		</method>
 		<method name="attach_time_based_function">
 			<return type="void" />
 			<param index="0" name="time" type="float" />
@@ -2288,6 +2296,39 @@
 				Arms a factory volley with sound entries (empty listener_group means Godot's listener, else the nearest member of that group). On Shot and On Telegraph entries never fire on a factory volley: they are spawner-only. Refused on a pooled handle. The trigger mask is read when armed: enabling a disabled entry afterwards will not fire it, while disabling a live one skips its plays.
 			</description>
 		</method>
+		<method name="split_bullet">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Splits one live bullet right now (see [method all_bullets_split]). Returns [code]true[/code] when it split; a volley without a chain (or without a stage for its generation) keeps the bullet and returns [code]false[/code].
+			</description>
+		</method>
+		<method name="split_clear">
+			<return type="void" />
+			<description>
+				Stops this volley from splitting (until its next life). A spawner volley gets its spawner's settings again on its next shot.
+			</description>
+		</method>
+		<method name="split_get_data" qualifiers="const">
+			<return type="BulletSplitData2D" />
+			<description>
+				The chain this volley splits by, or [code]null[/code] when it does not split (never armed, cleared, or its spawner's splitting is off).
+			</description>
+		</method>
+		<method name="split_get_depth" qualifiers="const">
+			<return type="int" />
+			<description>
+				This volley's generation: 0 for fired volleys, 1 for their children, and so on. Generation [code]d[/code] splits by [member BulletSplitData2D.stages][code][d][/code].
+			</description>
+		</method>
+		<method name="split_set_data">
+			<return type="bool" />
+			<param index="0" name="split" type="BulletSplitData2D" />
+			<param index="1" name="child_spawn_data" type="BulletVolleyData2D" default="null" />
+			<description>
+				Arms this volley to split by [param split] (for factory volleys, or to override a spawner volley until its next life). Children spawn from [param child_spawn_data]; [code]null[/code] keeps the data this volley was armed with (a spawner volley: its spawner's data). Refused (with an error, nothing changed) for a null chain, a pickup volley, or a volley without any spawn data to copy.
+			</description>
+		</method>
 		<method name="stop_sprite_animation">
 			<return type="void" />
 			<description>
@@ -2578,6 +2619,24 @@
 		</constant>
 		<constant name="RelockOnTargetChange" value="2" enum="OrbitingLockPolicy">
 			Orbiting lock policy, the lock drops only when the front target is a different target than the one the bullet locked onto. The same moving Node2D never breaks the ring, but switching enemies re-acquires it.
+		</constant>
+		<constant name="SPLIT_CAUSE_HIT" value="0">
+			Split by a killing hit (decided after the hit handler: a heal vetoes it).
+		</constant>
+		<constant name="SPLIT_CAUSE_LIFETIME_OVER" value="1">
+			Split when the lifetime ran out (an extension from the [code]life_time_over[/code] handler vetoes it).
+		</constant>
+		<constant name="SPLIT_CAUSE_TIMER" value="2">
+			Split by the stage's [member BulletSplitStage2D.split_after_sec] timer.
+		</constant>
+		<constant name="SPLIT_CAUSE_DESPAWN" value="3">
+			Split when leaving the factory's despawn bounds.
+		</constant>
+		<constant name="SPLIT_CAUSE_CLEAR" value="4">
+			Split by a clear ([method clear_bullet], [method clear_all_bullets], the area and factory clears).
+		</constant>
+		<constant name="SPLIT_CAUSE_MANUAL" value="5">
+			Split by [method split_bullet] or [method all_bullets_split].
 		</constant>
 		<constant name="MAX_GRAZE_ZONES" value="4">
 			Graze zones per volley (and per spawner).

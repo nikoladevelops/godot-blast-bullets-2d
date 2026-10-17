@@ -17,6 +17,7 @@ const PLUGIN_CLASSES: Array[StringName] = [
 	&"BulletFactory2D", &"BulletVolleyDebugger2D", &"BulletVolleyData2D", &"BulletVolley2D",
 	&"BulletSpawner2D", &"PatternPreviewLayer2D", &"BulletGrazeZone2D", &"GrazePreviewLayer2D",
 	&"BulletSoundData2D", &"BulletPickupData2D", &"DespawnBoundsPreviewLayer2D", &"BulletFlock2D",
+	&"BulletSplitStage2D", &"BulletSplitData2D",
 ]
 const AMOUNTS := [-1, 0, 1, 2, 7, 24, 10001]
 const TRACE_STEP := 1.0 / 60.0
@@ -72,6 +73,7 @@ func _ready() -> void:
 		"volley_api": _snap_volley_api,
 		"sound": _snap_sound,
 		"flock": _snap_flock,
+		"split": _snap_split,
 	}
 	for name in sections:
 		if only != "" and not (name in only.split(",")):
@@ -570,7 +572,7 @@ func _probe_setters(section: String, label: String, obj: Object) -> void:
 
 func _snap_setters(section: String) -> void:
 	for cls in [&"BulletVolleyData2D", &"BulletSpeedData2D", &"BulletRotationData2D", &"BulletCurvesData2D",
-			&"BulletWobbleData2D", &"BulletEffectLayerData2D", &"BulletGrazeZone2D", &"BulletPickupData2D", &"BulletFlock2D"]:
+			&"BulletWobbleData2D", &"BulletEffectLayerData2D", &"BulletGrazeZone2D", &"BulletPickupData2D", &"BulletFlock2D", &"BulletSplitStage2D", &"BulletSplitData2D"]:
 		_probe_setters(section, cls, ClassDB.instantiate(cls))
 	var sp := BulletSpawner2D.new()
 	sp.set_shooting_enabled(false)
@@ -1188,5 +1190,83 @@ func _snap_flock(section: String) -> void:
 	swarm.shared_homing_deque_push_back_global_position_target(Vector2(500, 200))
 	swarm.flock_join(BulletFlock2D.new())
 	await _flock_run(section, factory, "homing_swarm", [swarm], 120)
+	factory.queue_free()
+	await get_tree().process_frame
+
+
+## Splitting: seeded split flights through debug_advance_time. Every
+## bullet_split payload (position, cause, depth) and each children volley's
+## poses, headings and speeds right after the spawn and a few ticks later.
+func _split_state(v: BulletVolley2D) -> Array:
+	var rows: Array = []
+	for i in v.get_amount_bullets():
+		rows.append([v.get_bullet_transform(i), v.get_bullet_direction(i), v.get_bullet_speed_data(i).speed, v.is_bullet_status_enabled(i)])
+	return rows
+
+
+func _snap_split(section: String) -> void:
+	var factory := BulletFactory2D.new()
+	add_child(factory)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var log: Array = []
+	factory.bullet_split.connect(func(pos, cause, children, depth): log.append([pos, cause, depth, children]))
+	var cases := {}
+	var fan := BulletSplitStage2D.new()
+	fan.count = 5
+	fan.spread_degrees = 70.0
+	fan.speed_multiplier_min = 0.5
+	fan.speed_multiplier_max = 1.5
+	cases["fan_ramp"] = [fan]
+	var ring := BulletSplitStage2D.new()
+	ring.count = 6
+	ring.direction_mode = BulletSplitStage2D.DIRECTION_RING
+	ring.relative_to_parent_heading = false
+	ring.angle_offset_degrees = 15.0
+	ring.spawn_offset_px = 6.0
+	ring.scale_multiplier = 0.75
+	cases["ring_world_offset_scale"] = [ring]
+	var random := BulletSplitStage2D.new()
+	random.count = 7
+	random.direction_mode = BulletSplitStage2D.DIRECTION_RANDOM_IN_SPREAD
+	random.angle_jitter_degrees = 4.0
+	random.speed_distribution = BulletSplitStage2D.SPEED_RANDOM
+	random.speed_multiplier_max = 2.0
+	random.seed = 1234
+	cases["random_seeded"] = [random]
+	var fixed := BulletSplitStage2D.new()
+	fixed.speed_mode = BulletSplitStage2D.SPEED_FIXED
+	fixed.fixed_speed = 75.0
+	var second := BulletSplitStage2D.new()
+	second.count = 2
+	second.speed_mode = BulletSplitStage2D.SPEED_FROM_SPAWN_DATA
+	cases["two_stage_fixed_then_data"] = [fixed, second]
+	var timer := BulletSplitStage2D.new()
+	timer.split_on_lifetime_over = false
+	timer.split_after_sec = 0.05
+	timer.count = 2
+	cases["timer"] = [timer]
+	for label in cases:
+		log.clear()
+		var data := H.make_volley_data(3, 120.0, 0.1)
+		data.transforms = [Transform2D(0.3, Vector2(0, 0)), Transform2D(-0.6, Vector2(40, 10)), Transform2D(1.2, Vector2(80, -20))]
+		data.all_bullet_rotation_data = [H.make_rotation(1.0, 5.0), H.make_rotation(2.0, 5.0), H.make_rotation(3.0, 5.0)]
+		var chain := BulletSplitData2D.new()
+		chain.stages = cases[label]
+		var v: BulletVolley2D = factory.spawn_volley(data)
+		v.split_set_data(chain, data)
+		var seen := 0
+		for t in 30:
+			factory.debug_advance_time(TRACE_STEP)
+			while seen < log.size():
+				var e: Array = log[seen]
+				_rec(section, "%s#split%d" % [label, seen], [e[0], e[1], e[2], _split_state(e[3])])
+				seen += 1
+		var last: Array = []
+		for e in log:
+			last.append(_split_state(e[3]))
+		_rec(section, label + "#end", last)
+		factory.free_active_bullets()
+		await get_tree().process_frame
 	factory.queue_free()
 	await get_tree().process_frame

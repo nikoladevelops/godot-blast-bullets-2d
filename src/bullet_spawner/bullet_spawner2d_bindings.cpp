@@ -80,6 +80,13 @@ void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
 		}
 		return;
 	}
+	// Splitting: the chain hides while splitting is off.
+	if (property_name == "split_data") {
+		if (!split_enabled) {
+			p_property.usage &= ~PROPERTY_USAGE_EDITOR;
+		}
+		return;
+	}
 	// Graze: everything but the master switch hides while graze is off; the
 	// line width also needs a preview toggle, each target source shows only
 	// its own knobs.
@@ -766,6 +773,22 @@ void BulletSpawner2D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "flock_enabled"), "set_flock_enabled", "get_flock_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "flock", PROPERTY_HINT_RESOURCE_TYPE, "BulletFlock2D"), "set_flock", "get_flock");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "flock_scope", PROPERTY_HINT_ENUM, "Per Spawner:0,Shared:1,Per Volley:2"), "set_flock_scope", "get_flock_scope");
+
+	// Splitting (bullet_spawner2d_split.cpp): fired volleys split by
+	// split_data. bullet_split fires here once per parent that split, after
+	// its children spawned (same payload on the factory for factory volleys).
+	ClassDB::bind_method(D_METHOD("get_split_enabled"), &BulletSpawner2D::get_split_enabled);
+	ClassDB::bind_method(D_METHOD("set_split_enabled", "value"), &BulletSpawner2D::set_split_enabled);
+	ClassDB::bind_method(D_METHOD("get_split_data"), &BulletSpawner2D::get_split_data);
+	ClassDB::bind_method(D_METHOD("set_split_data", "value"), &BulletSpawner2D::set_split_data);
+	ADD_GROUP("Splitting", "");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "split_enabled"), "set_split_enabled", "get_split_enabled");
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "split_data", PROPERTY_HINT_RESOURCE_TYPE, "BulletSplitData2D"), "set_split_data", "get_split_data");
+	ADD_SIGNAL(MethodInfo("bullet_split",
+			PropertyInfo(Variant::VECTOR2, "position"),
+			PropertyInfo(Variant::INT, "cause"),
+			PropertyInfo(Variant::OBJECT, "children", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
+			PropertyInfo(Variant::INT, "depth")));
 
 	// Graze (bullet_spawner2d_graze.cpp). The signals bubble: they fire here
 	// first (while this spawner lives), then on the BulletFactory2D, which

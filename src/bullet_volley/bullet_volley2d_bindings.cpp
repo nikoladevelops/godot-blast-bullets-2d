@@ -640,6 +640,20 @@ void BulletVolley2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("sound_get_listener_group"), &BulletVolley2D::sound_get_listener_group);
 	ClassDB::bind_method(D_METHOD("is_sound_armed"), &BulletVolley2D::is_sound_armed);
 
+	// Splitting (bullet_volley2d_split.cpp; the spawns are the factory's).
+	ClassDB::bind_method(D_METHOD("split_set_data", "split", "child_spawn_data"), &BulletVolley2D::split_set_data, DEFVAL(Ref<BulletVolleyData2D>()));
+	ClassDB::bind_method(D_METHOD("split_clear"), &BulletVolley2D::split_clear);
+	ClassDB::bind_method(D_METHOD("split_get_data"), &BulletVolley2D::split_get_data);
+	ClassDB::bind_method(D_METHOD("split_get_depth"), &BulletVolley2D::split_get_depth);
+	ClassDB::bind_method(D_METHOD("split_bullet", "bullet_index"), &BulletVolley2D::split_bullet);
+	ClassDB::bind_method(D_METHOD("all_bullets_split", "bullet_index_start", "bullet_index_end_inclusive"), &BulletVolley2D::all_bullets_split, DEFVAL(0), DEFVAL(-1));
+	BIND_CONSTANT(SPLIT_CAUSE_HIT);
+	BIND_CONSTANT(SPLIT_CAUSE_LIFETIME_OVER);
+	BIND_CONSTANT(SPLIT_CAUSE_TIMER);
+	BIND_CONSTANT(SPLIT_CAUSE_DESPAWN);
+	BIND_CONSTANT(SPLIT_CAUSE_CLEAR);
+	BIND_CONSTANT(SPLIT_CAUSE_MANUAL);
+
 	// Flocking (bullet_volley2d_flock.cpp; the pass is the factory's).
 	ClassDB::bind_method(D_METHOD("flock_join", "flock", "scope"), &BulletVolley2D::flock_join, DEFVAL(BulletFlock2D::SCOPE_SHARED));
 	ClassDB::bind_method(D_METHOD("flock_leave"), &BulletVolley2D::flock_leave);

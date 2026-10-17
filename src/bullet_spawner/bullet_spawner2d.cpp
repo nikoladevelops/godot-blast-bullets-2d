@@ -683,6 +683,34 @@ PackedStringArray BulletSpawner2D::_get_configuration_warnings() const {
 			out.push_back("Flocking with homing that re-aims every tick (homing_smoothing 0, rotation data or a movement pattern): the flock can only nudge the bullets. Give homing a turn rate (homing_smoothing > 0, no rotation data or pattern) so the swarm flocks on its way.");
 		}
 	}
+	if (split_enabled) {
+		if (split_data.is_null()) {
+			out.push_back("split_enabled is on but split_data is empty: nothing splits. Assign a BulletSplitData2D.");
+		} else if (split_data->stages.is_empty()) {
+			out.push_back("split_data has no stages: nothing splits. Add a BulletSplitStage2D per generation.");
+		} else {
+			// How many bullets one fired bullet can become over the chain:
+			// named (never capped) when it outgrows five full patterns.
+			double per_parent = 1.0;
+			double total = 0.0;
+			const int generations = split_data->get_generation_count();
+			for (int g = 0; g < generations; ++g) {
+				const Ref<BulletSplitStage2D> stage = split_data->get_stage_for_depth(g);
+				if (stage.is_null()) {
+					if (g < split_data->stages.size()) {
+						out.push_back("split_data.stages[" + String::num_int64(g) + "] is empty: generation " + String::num_int64(g) + " and every later one never split.");
+					}
+					break;
+				}
+				per_parent *= (double)stage->count;
+				total += per_parent;
+			}
+			if (total > 5.0 * (double)pattern_max_bullets()) {
+				const String amount = total > 1e12 ? String("more than 1000000000000") : String::num_int64((int64_t)total);
+				out.push_back("split_data can turn one fired bullet into " + amount + " bullets over its generations (more than five full patterns): expect heavy frames. Lower the stage counts or max_depth, or spread the spawns with BulletFactory2D.split_max_children_per_sweep.");
+			}
+		}
+	}
 	if (graze_enabled) {
 		bool any_zone = false;
 		for (int i = 0; i < graze_zones.size(); ++i) {
@@ -909,6 +937,7 @@ bool BulletSpawner2D::shoot_once() {
 	apply_volley_graze(bullets);
 	apply_volley_sound(bullets);
 	apply_volley_flock(bullets);
+	apply_volley_split(bullets, volley_data);
 	apply_volley_homing_and_orbiting(bullets, arc_resolved ? &arc_targets : nullptr);
 	// Re-validate: handlers of homing_targets_resolved/volley_homing_configured
 	// ran above and may have freed this volley or handed it to another owner.

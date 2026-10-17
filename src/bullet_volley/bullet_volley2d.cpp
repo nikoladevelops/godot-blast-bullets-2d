@@ -191,6 +191,7 @@ void BulletVolley2D::release_life() {
 	sound_release(); // user resources (sounds) and the listener ref
 	graze_detector.reset(); // the arming spawner's target settings
 	flock_set_config(nullptr); // the flock (and the factory's armed count)
+	split_arm(nullptr, Ref<BulletVolleyData2D>(), 0); // the chain and the spawn data copy
 	// Volley-level listeners belong to the life that connected them.
 	disconnect_sprite_animation_connections();
 	for (const Dictionary &connection : get_signal_connection_list(CachedStringNames2D::get().bullet_homing_target_reached)) {
@@ -320,6 +321,7 @@ void BulletVolley2D::begin_life(const BulletVolleyData2D &data, uint64_t new_own
 	reset_pooling_flags_to_default();
 	collision_dedup_by_object = true;
 	curves_elapsed_time = 0.0;
+	split_timer_fired = false;
 	anim_frame_index = 0;
 	anim_paused = false;
 	anim_finished = false;
@@ -758,7 +760,7 @@ void BulletVolley2D::disable_bullet(int bullet_index, bool release_attachment, b
 	}
 }
 
-int BulletVolley2D::disable_bullets_bulk(const std::vector<int> &indexes, int fx_trigger, const std::vector<uint64_t> *expected_epochs) {
+int BulletVolley2D::disable_bullets_bulk(const std::vector<int> &indexes, int fx_trigger, const std::vector<uint64_t> *expected_epochs, int split_cause) {
 	// Same per-bullet contract as disable_bullet(i, true) (freeze, epoch
 	// bump, trail hidden, shape off, attachment released), but the render
 	// side is batched: the per-instance zero writes are collected into ONE
@@ -766,6 +768,9 @@ int BulletVolley2D::disable_bullets_bulk(const std::vector<int> &indexes, int fx
 	// whole volley: N render-server calls -> 1). fx_trigger >= 0 fires that
 	// one-shot layer at each disabled bullet's pose. expected_epochs (same
 	// length as indexes) skips bullets a handler took over in between.
+	// split_cause >= 0 records each bullet's split (pose and state intact)
+	// before its disable; a stage with fire_death_effects off silences that
+	// bullet's death effects.
 	if (multi.is_null() || !multi.is_valid() || physics_server == nullptr || !area.is_valid()) {
 		return 0;
 	}
@@ -785,7 +790,11 @@ int BulletVolley2D::disable_bullets_bulk(const std::vector<int> &indexes, int fx
 			if (expected_epochs != nullptr && k < expected_epochs->size() && (*expected_epochs)[k] != collision_epoch_for_bullet(i)) {
 				continue;
 			}
-			const bool fx_have_pose = fx_trigger >= 0 && i < (int)all_cached_instance_transforms.size();
+			int split = 0;
+			if (split_cause >= 0 && split_config != nullptr && i < (int)all_cached_instance_transforms.size()) {
+				split = split_capture(i, split_cause, all_cached_instance_transforms[i]);
+			}
+			const bool fx_have_pose = split != 2 && fx_trigger >= 0 && i < (int)all_cached_instance_transforms.size();
 			const Transform2D fx_pose = fx_have_pose ? all_cached_instance_transforms[i] : Transform2D();
 			if (fx_have_pose) {
 				// The matching sound trigger, BEFORE the disable below (a
@@ -917,12 +926,18 @@ bool BulletVolley2D::clear_bullet(int bullet_index) {
 	// instance; the DESTROY path fires the same way).
 	Transform2D fx_clear_transf;
 	const bool fx_have_pose = bullet_index >= 0 && bullet_index < (int)all_cached_instance_transforms.size();
+	int split = 0;
 	if (fx_have_pose) {
 		fx_clear_transf = all_cached_instance_transforms[bullet_index];
-		sound_fire(BulletSoundData2D::SOUND_ON_CLEAR, bullet_index, fx_clear_transf.get_origin());
+		if (split_config != nullptr) {
+			split = split_capture(bullet_index, SPLIT_CAUSE_CLEAR, fx_clear_transf);
+		}
+		if (split != 2) {
+			sound_fire(BulletSoundData2D::SOUND_ON_CLEAR, bullet_index, fx_clear_transf.get_origin());
+		}
 	}
 	disable_bullet(bullet_index, true);
-	if (fx_have_pose) {
+	if (fx_have_pose && split != 2) {
 		fx_fire_oneshot(EFFECT_ON_CLEAR, bullet_index, fx_clear_transf);
 	}
 	return true;
@@ -935,7 +950,7 @@ int BulletVolley2D::clear_all_bullets() {
 	// clear_all_bullets() (rejected by the latch inside, but it must not
 	// rewrite the list this batch is walking).
 	const std::vector<int> live = all_bullets_enabled_set.get_active_indexes();
-	return disable_bullets_bulk(live, EFFECT_ON_CLEAR);
+	return disable_bullets_bulk(live, EFFECT_ON_CLEAR, nullptr, SPLIT_CAUSE_CLEAR);
 }
 
 BulletVolley2D::~BulletVolley2D() {

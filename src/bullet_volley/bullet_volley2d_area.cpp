@@ -93,7 +93,7 @@ int BulletVolley2D::clear_bullets_in_circle(const Vector2 &center, real_t radius
 	}
 	std::vector<int> found;
 	collect_indexes_in_circle(center, radius, found);
-	return found.empty() ? 0 : disable_bullets_bulk(found, EFFECT_ON_CLEAR);
+	return found.empty() ? 0 : disable_bullets_bulk(found, EFFECT_ON_CLEAR, nullptr, SPLIT_CAUSE_CLEAR);
 }
 
 int BulletVolley2D::clear_bullets_in_rect(const Rect2 &rect) {
@@ -103,7 +103,7 @@ int BulletVolley2D::clear_bullets_in_rect(const Rect2 &rect) {
 	}
 	std::vector<int> found;
 	collect_indexes_in_rect(r, found);
-	return found.empty() ? 0 : disable_bullets_bulk(found, EFFECT_ON_CLEAR);
+	return found.empty() ? 0 : disable_bullets_bulk(found, EFFECT_ON_CLEAR, nullptr, SPLIT_CAUSE_CLEAR);
 }
 
 void BulletVolley2D::cull_outside_bounds(const Rect2 &bounds) {
@@ -153,7 +153,7 @@ void BulletVolley2D::cull_outside_bounds(const Rect2 &bounds) {
 			}
 		}
 		const uint64_t self_id = get_instance_id();
-		disable_bullets_bulk(doomed, EFFECT_ON_DESPAWN);
+		disable_bullets_bulk(doomed, EFFECT_ON_DESPAWN, nullptr, SPLIT_CAUSE_DESPAWN);
 		if (announce && ObjectDB::get_instance(ObjectID(self_id)) == this) {
 			Array indexes;
 			indexes.resize((int64_t)doomed.size());
