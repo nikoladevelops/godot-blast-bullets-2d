@@ -421,7 +421,7 @@ void BulletFactory2D::convert_all_bullets_to_pickups_deferred(const Ref<BulletPi
 		UtilityFunctions::push_error("convert_all_bullets_to_pickups_deferred: BulletFactory2D is being freed. Ignoring the request.");
 		return;
 	}
-	queue_structural_call(Callable(this, "convert_all_bullets_to_pickups").bind(pickup, target));
+	queue_structural_call([this, pickup, target]() { convert_all_bullets_to_pickups(pickup, target); });
 }
 
 void BulletFactory2D::populate_pickup_pool(const Ref<BulletPickupData2D> &pickup, int bullet_count, int instance_count) {
@@ -449,7 +449,7 @@ void BulletFactory2D::populate_pickup_pool_deferred(const Ref<BulletPickupData2D
 		UtilityFunctions::push_error("populate_pickup_pool_deferred: BulletFactory2D is being freed. Ignoring the request.");
 		return;
 	}
-	queue_structural_call(Callable(this, "populate_pickup_pool").bind(pickup, bullet_count, instance_count));
+	queue_structural_call([this, pickup, bullet_count, instance_count]() { populate_pickup_pool(pickup, bullet_count, instance_count); });
 }
 
 } // namespace BlastBullets2D

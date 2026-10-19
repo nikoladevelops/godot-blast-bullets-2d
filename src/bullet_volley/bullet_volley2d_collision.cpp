@@ -562,10 +562,14 @@ void BulletVolley2D::set_collision_shape_runtime_deferred(const Ref<Shape2D> &ne
 		return;
 	}
 	// The factory's idle queue (not call_deferred): it flushes on the next
-	// process frame, outside the physics step, in call order. The Callable
-	// targets this volley by object, so a volley freed before the flush is
-	// simply skipped (an invalid Callable is never called).
-	bullet_factory->queue_structural_call(Callable(this, "set_collision_shape_runtime").bind(new_shape));
+	// process frame, outside the physics step, in call order. The call finds
+	// this volley by id, so a volley freed before the flush is skipped.
+	const uint64_t self_id = get_instance_id();
+	bullet_factory->queue_structural_call([self_id, new_shape]() {
+		if (BulletVolley2D *volley = Object::cast_to<BulletVolley2D>(ObjectDB::get_instance(ObjectID(self_id))); volley != nullptr) {
+			volley->set_collision_shape_runtime(new_shape);
+		}
+	});
 }
 
 int BulletVolley2D::get_bullet_collision_count(int bullet_index) const {

@@ -12,7 +12,7 @@ extends BlastTest
 ## surviving factory keeps balanced books and keeps spawning.
 
 const DISABLE_TRIGGERS := ["disable_bullet", "clear_bullet", "killing_hit", "expiry", "clear_active", "clear_circle",
-	"clear_rect", "despawn", "reset", "free_active", "pickups"]
+	"clear_rect", "despawn", "reset", "free_active", "pickups", "deferred_queue"]
 const VICTIMS := ["volley", "other_volley", "factory", "factory_again"]
 
 var probe_scene: PackedScene
@@ -94,6 +94,13 @@ func _trigger(trigger: String, v: BulletVolley2D) -> void:
 			factory.free_active_bullets()
 		"pickups":
 			factory.convert_all_bullets_to_pickups(BulletPickupData2D.new(), Vector2(300, 0))
+		"deferred_queue":
+			# Several queued structural calls: the first one's callbacks run
+			# while the rest still wait in the same flush.
+			factory.reset_deferred()
+			factory.free_active_bullets_deferred()
+			factory.clear_active_bullets_deferred()
+			await idle(2)
 
 
 ## Claims the case's errors and returns their texts: no case may print one.

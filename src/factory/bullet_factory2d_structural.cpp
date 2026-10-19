@@ -629,8 +629,8 @@ void BulletFactory2D::free_attachments_pool_for_scene(const Ref<PackedScene> &at
 // was silently refused. These wrappers queue onto the next SceneTree
 // process_frame instead (idle, after the physics step), in call order.
 
-void BulletFactory2D::queue_structural_call(const Callable &call) {
-	pending_structural_calls.push_back(call);
+void BulletFactory2D::queue_structural_call(std::function<void()> call) {
+	pending_structural_calls.push_back(std::move(call));
 	if (structural_flush_connected) {
 		return;
 	}
@@ -645,15 +645,17 @@ void BulletFactory2D::queue_structural_call(const Callable &call) {
 
 void BulletFactory2D::_flush_structural_calls() {
 	structural_flush_connected = false;
-	std::vector<Callable> calls;
+	std::vector<std::function<void()>> calls;
 	calls.swap(pending_structural_calls);
-	for (const Callable &call : calls) {
-		if (is_tearing_down) {
+	// Each call runs user code (attachment callbacks inside a reset or a
+	// free, reset_finished): it may free this factory, so nothing of `this`
+	// is read after a call before the liveness check.
+	const LifeWatch watch = watch_life();
+	for (const std::function<void()> &call : calls) {
+		if (watch.died() || is_tearing_down) {
 			return;
 		}
-		if (call.is_valid()) {
-			call.call();
-		}
+		call();
 	}
 }
 
@@ -666,7 +668,7 @@ void BulletFactory2D::reset_deferred(const Ref<VolleyPoolKey2D> &key) {
 		UtilityFunctions::push_error("reset_deferred: BulletFactory2D is being freed. Ignoring the request.");
 		return;
 	}
-	queue_structural_call(Callable(this, "reset").bind(key));
+	queue_structural_call([this, key]() { reset(key); });
 }
 
 void BulletFactory2D::free_active_bullets_deferred(const Ref<VolleyPoolKey2D> &key) {
@@ -674,7 +676,7 @@ void BulletFactory2D::free_active_bullets_deferred(const Ref<VolleyPoolKey2D> &k
 		UtilityFunctions::push_error("free_active_bullets_deferred: BulletFactory2D is being freed. Ignoring the request.");
 		return;
 	}
-	queue_structural_call(Callable(this, "free_active_bullets").bind(key));
+	queue_structural_call([this, key]() { free_active_bullets(key); });
 }
 
 void BulletFactory2D::clear_active_bullets_deferred(const Ref<VolleyPoolKey2D> &key) {
@@ -682,7 +684,7 @@ void BulletFactory2D::clear_active_bullets_deferred(const Ref<VolleyPoolKey2D> &
 		UtilityFunctions::push_error("clear_active_bullets_deferred: BulletFactory2D is being freed. Ignoring the request.");
 		return;
 	}
-	queue_structural_call(Callable(this, "clear_active_bullets").bind(key));
+	queue_structural_call([this, key]() { clear_active_bullets(key); });
 }
 
 void BulletFactory2D::free_disabled_bullets_deferred(const Ref<VolleyPoolKey2D> &key) {
@@ -690,7 +692,7 @@ void BulletFactory2D::free_disabled_bullets_deferred(const Ref<VolleyPoolKey2D> 
 		UtilityFunctions::push_error("free_disabled_bullets_deferred: BulletFactory2D is being freed. Ignoring the request.");
 		return;
 	}
-	queue_structural_call(Callable(this, "free_disabled_bullets").bind(key));
+	queue_structural_call([this, key]() { free_disabled_bullets(key); });
 }
 
 void BulletFactory2D::free_bullets_pool_deferred(const Ref<VolleyPoolKey2D> &key) {
@@ -698,7 +700,7 @@ void BulletFactory2D::free_bullets_pool_deferred(const Ref<VolleyPoolKey2D> &key
 		UtilityFunctions::push_error("free_bullets_pool_deferred: BulletFactory2D is being freed. Ignoring the request.");
 		return;
 	}
-	queue_structural_call(Callable(this, "free_bullets_pool").bind(key));
+	queue_structural_call([this, key]() { free_bullets_pool(key); });
 }
 
 void BulletFactory2D::populate_bullets_pool_deferred(const Ref<VolleyPoolKey2D> &key, const Ref<BulletVolleyData2D> &spawn_data, int instance_count) {
@@ -718,7 +720,7 @@ void BulletFactory2D::populate_bullets_pool_deferred(const Ref<VolleyPoolKey2D> 
 		UtilityFunctions::push_error("populate_bullets_pool_deferred: instance_count must be > 0. Nothing was queued.");
 		return;
 	}
-	queue_structural_call(Callable(this, "populate_bullets_pool").bind(key, spawn_data, instance_count));
+	queue_structural_call([this, key, spawn_data, instance_count]() { populate_bullets_pool(key, spawn_data, instance_count); });
 }
 
 void BulletFactory2D::free_attachments_pool_deferred() {
@@ -726,7 +728,7 @@ void BulletFactory2D::free_attachments_pool_deferred() {
 		UtilityFunctions::push_error("free_attachments_pool_deferred: BulletFactory2D is being freed. Ignoring the request.");
 		return;
 	}
-	queue_structural_call(Callable(this, "free_attachments_pool"));
+	queue_structural_call([this]() { free_attachments_pool(); });
 }
 
 void BulletFactory2D::populate_attachments_pool_deferred(const Ref<PackedScene> &attachment_scene, int amount_instances) {
@@ -738,7 +740,7 @@ void BulletFactory2D::populate_attachments_pool_deferred(const Ref<PackedScene> 
 		UtilityFunctions::push_error("populate_attachments_pool_deferred: needs a scene and amount_attachments > 0. Nothing was queued.");
 		return;
 	}
-	queue_structural_call(Callable(this, "populate_attachments_pool").bind(attachment_scene, amount_instances));
+	queue_structural_call([this, attachment_scene, amount_instances]() { populate_attachments_pool(attachment_scene, amount_instances); });
 }
 
 void BulletFactory2D::free_attachments_pool_for_scene_deferred(const Ref<PackedScene> &attachment_scene) {
@@ -750,7 +752,7 @@ void BulletFactory2D::free_attachments_pool_for_scene_deferred(const Ref<PackedS
 		UtilityFunctions::push_error("free_attachments_pool_for_scene_deferred: attachment_scene is null. Nothing was queued.");
 		return;
 	}
-	queue_structural_call(Callable(this, "free_attachments_pool_for_scene").bind(attachment_scene));
+	queue_structural_call([this, attachment_scene]() { free_attachments_pool_for_scene(attachment_scene); });
 }
 
 void BulletFactory2D::free_volley_deferred(Node *volley) {

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <unordered_map>
 
@@ -349,9 +350,13 @@ public:
 
 	// Structural calls queued by the *_deferred wrappers, flushed together on
 	// the next SceneTree process_frame (idle, outside the physics step).
-	std::vector<Callable> pending_structural_calls;
+	// Plain C++ calls, never method-name Callables: Object::callp locks the
+	// target for the call, so a free() of this factory from user code inside
+	// a deferred reset would be refused (unlike the same reset called
+	// directly); the flush checks liveness after each call instead.
+	std::vector<std::function<void()>> pending_structural_calls;
 	bool structural_flush_connected = false;
-	void queue_structural_call(const Callable &call);
+	void queue_structural_call(std::function<void()> call);
 
 	// Whitened bullet frames (override_frame_color), keyed by the source
 	// texture's instance id (ids are never reused within a session). The
