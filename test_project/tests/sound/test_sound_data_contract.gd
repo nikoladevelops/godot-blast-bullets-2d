@@ -288,3 +288,48 @@ func test_pitch_ceiling_keeps_absurd_values_away_from_the_audio_engine() -> void
 		expect_error_sequence(["BulletSoundData2D: %s must be finite and between 0.01 and 1000, keeping the old value." % prop])
 		assert_eq(s.get(prop), 1000.0, "%s kept after 1e9" % prop)
 		assert_gt(before, 0.0, "default stays valid")
+
+
+## The mixer hands these values to AudioStreamPlayer2D as 32-bit floats: a
+## finite double past FLT_MAX would arrive as INF (a ducked voice then went
+## to -INF dB and a fade made it NaN). Every float property refuses such a
+## value with the standard text, or plays with every voice value finite.
+func test_float_properties_never_reach_the_player_as_inf() -> void:
+	godot_listener_at(Vector2.ZERO)
+	var bad: Array = []
+	var own := {}
+	for p in ClassDB.class_get_property_list("BulletSoundData2D", true):
+		own[str(p.name)] = int(p.type)
+	for prop in own:
+		if own[prop] != TYPE_FLOAT:
+			continue
+		var loud := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+		loud.priority = 1
+		var soft := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+		loud.set(prop, 1e300)
+		soft.set(prop, 1e300)
+		var refused := 0
+		for err in get_errors():
+			if not err.handled:
+				err.handled = true
+				if err.contains_text("keeping the old value"):
+					refused += 1
+				else:
+					bad.append("%s: unexpected error %s" % [prop, err.code])
+		if refused > 0:
+			continue
+		factory.play_sound(soft, Vector2(10, 0))
+		factory.play_sound(loud, Vector2(20, 0))
+		await physics(3)
+		for e in factory.debug_get_sound_voices():
+			if not e.get("busy", false):
+				continue
+			for key in ["volume_db", "pitch_scale", "max_distance", "attenuation", "panning_strength"]:
+				if e.has(key) and not is_finite(float(e[key])):
+					bad.append("%s = 1e300: a voice has %s = %s" % [prop, key, e[key]])
+		factory.stop_sounds()
+		for err in get_errors():
+			if not err.handled:
+				err.handled = true
+				bad.append("%s = 1e300: the play reported %s" % [prop, err.code])
+	assert_eq("\n".join(bad), "", "no INF reaches a voice")

@@ -1,5 +1,6 @@
 #include "data/bullet_sound_data2d.hpp"
 
+#include "core/transform_math2d.hpp"
 #include "factory/sound_mixer2d.hpp"
 
 #include <godot_cpp/classes/audio_server.hpp>
@@ -280,7 +281,7 @@ void BulletSoundData2D::set_positional(bool value) {
 
 double BulletSoundData2D::get_max_distance() const { return max_distance; }
 void BulletSoundData2D::set_max_distance(double value) {
-	if (!Math::is_finite(value) || value < 1.0) {
+	if (!is_finite_float2d(value) || value < 1.0) {
 		UtilityFunctions::push_error("BulletSoundData2D: max_distance must be finite and >= 1, keeping the old value.");
 		return;
 	}
@@ -293,7 +294,7 @@ void BulletSoundData2D::set_max_distance(double value) {
 
 double BulletSoundData2D::get_attenuation() const { return attenuation; }
 void BulletSoundData2D::set_attenuation(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_float2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSoundData2D: attenuation must be finite and >= 0, keeping the old value.");
 		return;
 	}
@@ -306,7 +307,7 @@ void BulletSoundData2D::set_attenuation(double value) {
 
 double BulletSoundData2D::get_panning_strength() const { return panning_strength; }
 void BulletSoundData2D::set_panning_strength(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_float2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSoundData2D: panning_strength must be finite and >= 0, keeping the old value.");
 		return;
 	}
@@ -406,7 +407,7 @@ void BulletSoundData2D::set_occlusion_mask(int value) {
 
 double BulletSoundData2D::get_occlusion_db() const { return occlusion_db; }
 void BulletSoundData2D::set_occlusion_db(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_float2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSoundData2D: occlusion_db must be finite and >= 0, keeping the old value.");
 		return;
 	}
@@ -616,7 +617,7 @@ void BulletSoundData2D::set_fade_out_sec(double value) {
 
 double BulletSoundData2D::get_duck_amount_db() const { return duck_amount_db; }
 void BulletSoundData2D::set_duck_amount_db(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_float2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSoundData2D: duck_amount_db must be finite and >= 0, keeping the old value.");
 		return;
 	}

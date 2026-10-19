@@ -18,6 +18,12 @@ inline bool is_finite_real2d(double v) {
 	return Math::is_finite(v) && Math::is_finite((real_t)v);
 }
 
+// Same for values handed to the engine as 32-bit floats whatever real_t is
+// (AudioStreamPlayer2D volume, distance, attenuation, panning).
+inline bool is_finite_float2d(double v) {
+	return Math::is_finite(v) && Math::is_finite((float)v);
+}
+
 inline bool is_transform_invertible_safe2d(const Transform2D &t) {
 	if (!t.is_finite()) {
 		return false;
