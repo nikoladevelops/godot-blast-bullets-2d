@@ -226,3 +226,15 @@ func test_a_huge_outline_track_keeps_the_densest_sweep() -> void:
 	var ring_near: int = (BulletPatterns2D.helper_sample_outline_ring(1e4, TAU, 1.0, 0.0)["points"] as PackedVector2Array).size()
 	var ring_far: int = (BulletPatterns2D.helper_sample_outline_ring(1e10, TAU, 1.0, 0.0)["points"] as PackedVector2Array).size()
 	assert_eq(ring_far, ring_near, "the ring track too")
+
+
+## A corridor door as wide as the wall (or wider) is clamped to half the
+## width by the generator; the track draws that clamped door too, under the
+## bullets, instead of vanishing.
+func test_a_corridor_door_wider_than_the_wall_draws_the_clamped_track() -> void:
+	for posed in [false, true]:
+		var m: Dictionary = await _measure(BulletSpawner2D.PATTERN_FROM_HELPER_CORRIDOR, 24, posed, 0.0, {"helper_corridor_width": 200.0, "helper_corridor_gap_width": 300.0})
+		assert_false((m["dots"] as PackedVector2Array).is_empty(), "posed %s: bullets drawn" % posed)
+		assert_eq((m["runs"] as Array).size(), 2, "posed %s: two strips beside the clamped door" % posed)
+		if not (m["runs"] as Array).is_empty():
+			assert_lte(float(m["worst"]), TOL * (POSED_SCALE if posed else 1.0), "posed %s: every dot on the track" % posed)

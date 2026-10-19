@@ -53,6 +53,13 @@ PatternSlots2D polyline_layout2d(const Transform2D &marker, const PackedVector2A
 // Rain: drops per row (band_width / drop_spacing gaps + 1, capped by the
 // amount; one row when the spacing is 0). The gap count saturates at the
 // amount BEFORE the int cast: a huge band would overflow it.
+// The corridor door the volley really uses: width and gap are set
+// independently (scene load order must not matter), so a door as wide as the
+// wall is clamped to half the width. Shared by the dispatch and the track.
+static inline double corridor_effective_gap2d(double gap_width, double width) {
+	return gap_width >= width ? width * 0.5 : gap_width;
+}
+
 static inline int rain_columns2d(int amount, real_t band_width, real_t drop_spacing) {
 	if (amount <= 0) {
 		return 1;

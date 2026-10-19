@@ -395,9 +395,8 @@ PatternSlots2D PatternKnobs2D::generate_raw(const PatternInputs2D &in) const {
 			// Width and gap are set independently (scene load order must not
 			// matter). A door as wide as the wall is clamped to half the
 			// width here, with one warning per (gap, width) pair.
-			double corridor_gap = helper_corridor_gap_width;
-			if (corridor_gap >= helper_corridor_width) {
-				corridor_gap = helper_corridor_width * 0.5;
+			const double corridor_gap = corridor_effective_gap2d(helper_corridor_gap_width, helper_corridor_width);
+			if (helper_corridor_gap_width >= helper_corridor_width) {
 				if (!quiet) {
 					WarnOnce2D::warn(in.warn_owner_id, kPatternWarnCorridorGap, WarnOnce2D::key_of(helper_corridor_gap_width * 1000.0), WarnOnce2D::key_of(helper_corridor_width * 1000.0),
 							"BulletSpawner2D: helper_corridor_gap_width must be smaller than helper_corridor_width; using half the width for the door.");

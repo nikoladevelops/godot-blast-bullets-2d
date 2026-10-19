@@ -308,8 +308,10 @@ void PatternKnobs2D::build_preview_track(const PatternTrackInputs2D &in, Pattern
 				break;
 			}
 			const real_t half_width = (real_t)(helper_corridor_width * 0.5);
-			const real_t half_gap = Math::is_finite(helper_corridor_gap_width) && helper_corridor_gap_width > 0.0
-					? (real_t)(helper_corridor_gap_width * 0.5)
+			// The door the bullets really leave (clamped like the dispatch).
+			const double corridor_gap = corridor_effective_gap2d(helper_corridor_gap_width, helper_corridor_width);
+			const real_t half_gap = Math::is_finite(corridor_gap) && corridor_gap > 0.0
+					? (real_t)(corridor_gap * 0.5)
 					: 0.0;
 			if (half_gap >= half_width) {
 				break;
