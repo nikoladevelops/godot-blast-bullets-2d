@@ -485,6 +485,12 @@ static int fill_scan_cells(const PackedVector2Array &poly, double spacing, bool 
 	if (!(rows * cols < 4.0e7)) {
 		return 0; // spacing absurdly small for the shape
 	}
+	// Hard trip bounds (never reached normally: the loops step at most
+	// rows / cols - 1 times). At coordinates where one spacing is below half
+	// a double ULP (|y| ~1e18 in a precision=double build) `y += spacing`
+	// stops moving and the loop would never end.
+	const int64_t max_rows = (int64_t)rows + 1;
+	const int64_t max_cols = (int64_t)cols + 1;
 	int count = 0;
 	int row = 0;
 	std::vector<double> xs;
@@ -492,7 +498,7 @@ static int fill_scan_cells(const PackedVector2Array &poly, double spacing, bool 
 	if (margin > 0.0) {
 		segment_grid.build(poly, margin);
 	}
-	for (double y = (double)mn.y; y <= (double)mx.y + 1e-9; y += spacing, ++row) {
+	for (double y = (double)mn.y; y <= (double)mx.y + 1e-9 && row <= max_rows; y += spacing, ++row) {
 		xs.clear();
 		for (int i = 0, j = bn - 1; i < bn; j = i++) {
 			const Vector2 a = poly[i];
@@ -509,7 +515,8 @@ static int fill_scan_cells(const PackedVector2Array &poly, double spacing, bool 
 		}
 		std::sort(xs.begin(), xs.end());
 		const double x0 = (double)mn.x + ((stagger && (row % 2 == 1)) ? spacing * 0.5 : 0.0);
-		for (double x = x0; x <= (double)mx.x + 1e-9; x += spacing) {
+		int64_t col = 0;
+		for (double x = x0; x <= (double)mx.x + 1e-9 && col <= max_cols; x += spacing, ++col) {
 			// Inside when an odd number of crossings lie strictly right of x.
 			const size_t right = xs.end() - std::upper_bound(xs.begin(), xs.end(), x);
 			if ((right & 1) == 0) {
