@@ -1699,7 +1699,10 @@ bool BulletSpawner2D::apply_pattern_list_entry(const Variant &entry) {
 	if (dict.has("preset")) {
 		Variant v = dict["preset"];
 		if (v.get_type() == Variant::INT) {
-			apply_pattern_preset((int)v);
+			// The whole 64-bit int: out of int range is out of preset range
+			// (apply_pattern_preset reports it), never wrapped into it.
+			const int64_t preset = v;
+			apply_pattern_preset(preset >= (int64_t)INT32_MIN && preset <= (int64_t)INT32_MAX ? (int)preset : INT32_MAX);
 		} else {
 			UtilityFunctions::push_error("BulletSpawner2D::spawn_pattern_list: entry 'preset' must be an int, skipping preset.");
 		}
@@ -1708,8 +1711,8 @@ bool BulletSpawner2D::apply_pattern_list_entry(const Variant &entry) {
 	if (dict.has(source_key)) {
 		Variant v = dict[source_key];
 		if (v.get_type() == Variant::INT) {
-			const int src = (int)v;
-			if (src < (int)PATTERN_FROM_CHILDREN || src >= (int)PATTERN_FROM_LAST) {
+			const int64_t src = v; // the whole 64-bit int: never wrapped into range
+			if (src < (int64_t)PATTERN_FROM_CHILDREN || src >= (int64_t)PATTERN_FROM_LAST) {
 				UtilityFunctions::push_error("BulletSpawner2D::spawn_pattern_list: entry 'pattern_source' out of range, keeping current.");
 			} else {
 				set_pattern_source((PatternSource)src);
@@ -1721,7 +1724,7 @@ bool BulletSpawner2D::apply_pattern_list_entry(const Variant &entry) {
 	if (dict.has("helper_bullets_amount")) {
 		Variant v = dict["helper_bullets_amount"];
 		if (v.get_type() == Variant::INT) {
-			set_helper_bullets_amount((int)v);
+			set_helper_bullets_amount((int64_t)v); // the knob refuses what an int cannot hold
 		} else {
 			UtilityFunctions::push_error("BulletSpawner2D::spawn_pattern_list: entry 'helper_bullets_amount' must be an int, keeping current.");
 		}

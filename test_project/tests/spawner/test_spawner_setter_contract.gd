@@ -367,3 +367,34 @@ func test_float_properties_never_overflow_real_t() -> void:
 				bad.append("%s = 1e39: accepted, then the shot reported %s" % [prop, err.code])
 		sp.queue_free()
 	_assert_none(bad, "float properties stay within real_t")
+
+
+## GDScript ints are 64-bit: a pattern knob never wraps one into range
+## (2^32 + 3 is not 3). The table-driven knobs, BulletPatterns2D.generate and
+## spawn_pattern_list entries refuse a value outside 32 bits and keep the old
+## one.
+func test_pattern_ints_never_wrap_from_64_bits() -> void:
+	const WIDE := 4294967299 # 2^32 + 3
+	var sp := make_spawner()
+	var bad: Array = []
+	for p in _editor_props(sp):
+		var prop := str(p.name)
+		if int(p.type) != TYPE_INT or not prop.begins_with("helper_") or prop.begins_with("helper_path2d_"):
+			continue
+		var problem := _probe(sp, prop, WIDE)
+		if problem != "":
+			bad.append(problem)
+	_assert_none(bad, "table knobs refuse 64-bit ints")
+	BulletPatterns2D.generate(BulletSpawner2D.PATTERN_FROM_HELPER_GRID, 4, Transform2D(), {"helper_grid_alignment": WIDE})
+	expect_error_sequence(["BulletPatterns2D.generate: helper_grid_alignment must be between -2147483648 and 2147483647, keeping the old value."])
+	BulletPatterns2D.generate(BulletSpawner2D.PATTERN_FROM_HELPER_PATH2D, 4, Transform2D(), {"helper_path2d_space": WIDE, "path_points": PackedVector2Array([Vector2.ZERO, Vector2(10, 0)])})
+	expect_error_sequence(["BulletPatterns2D.generate: helper_path2d_space must be an int in [0, 1], keeping the old value."])
+	var before_source := sp.pattern_source
+	var before_amount := sp.helper_bullets_amount
+	sp.spawn_pattern_list([{"helper_bullets_amount": WIDE + 1}], true)
+	expect_errors_containing("helper_bullets_amount must be between -2147483648 and 2147483647", 1)
+	sp.spawn_pattern_list([{"pattern_source": WIDE}], true)
+	expect_error_sequence(["BulletSpawner2D::spawn_pattern_list: entry 'pattern_source' out of range, keeping current."])
+	sp.spawn_pattern_list([{"preset": WIDE}], true)
+	expect_errors_containing("preset out of range", 1)
+	assert_eq([sp.pattern_source, sp.helper_bullets_amount], [before_source, before_amount], "nothing applied")

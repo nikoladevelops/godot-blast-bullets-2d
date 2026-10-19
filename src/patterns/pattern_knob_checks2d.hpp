@@ -23,6 +23,17 @@ template <typename T>
 static inline bool NONE(const T &, double, double) {
 	return false;
 }
+// The parameter fits the stored type: int knobs take the whole 64-bit
+// GDScript int (a 32-bit parameter wrapped 2^32 + 3 onto 3 before any check
+// ran) and refuse what an int cannot hold. Every other type always fits.
+template <typename P, typename C>
+static inline bool FITS(const P &, const C &) {
+	return true;
+}
+static inline bool FITS(int64_t v, int) {
+	return v >= (int64_t)INT32_MIN && v <= (int64_t)INT32_MAX;
+}
+static constexpr const char *FITS_INT_MESSAGE = "must be between -2147483648 and 2147483647";
 // Floats.
 static inline bool FINITE(double v, double, double) { return !is_finite_real2d(v); }
 static inline bool FINITE_GE(double v, double a, double) { return !is_finite_real2d(v) || v < a; }

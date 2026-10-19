@@ -284,6 +284,10 @@ void BulletSpawner2D::apply_pattern_preset(int preset) {
 		return NAME;                                                                                       \
 	}                                                                                                      \
 	void BulletSpawner2D::set_##NAME(PTYPE value) {                                                        \
+		if (!PatternKnobCheck2D::FITS(value, NAME)) {                                                      \
+			pattern_knob_reject2d(#NAME, PatternKnobCheck2D::FITS_INT_MESSAGE);                            \
+			return;                                                                                        \
+		}                                                                                                  \
 		if (PatternKnobCheck2D::C1(value, A1, B1)) {                                                       \
 			pattern_knob_reject2d(#NAME, M1);                                                              \
 			return;                                                                                        \
@@ -292,7 +296,7 @@ void BulletSpawner2D::apply_pattern_preset(int preset) {
 			pattern_knob_reject2d(#NAME, M2);                                                              \
 			return;                                                                                        \
 		}                                                                                                  \
-		NAME = value;                                                                                      \
+		NAME = (CTYPE)value;                                                                               \
 		if (NOTIFY) {                                                                                      \
 			notify_property_list_changed();                                                                \
 		}                                                                                                  \

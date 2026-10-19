@@ -8,6 +8,8 @@
 #include "patterns/pattern_registry2d.hpp"
 #include "patterns/patterns_internal.hpp"
 
+#include <type_traits>
+
 using namespace godot;
 
 namespace BlastBullets2D {
@@ -22,9 +24,9 @@ static bool knob_value(const Variant &v, double &r) {
 	}
 	return false;
 }
-static bool knob_value(const Variant &v, int &r) {
+static bool knob_value(const Variant &v, int64_t &r) {
 	if (v.get_type() == Variant::INT) {
-		r = (int)v;
+		r = (int64_t)v; // the whole GDScript int: FITS refuses what an int cannot hold
 		return true;
 	}
 	return false;
@@ -51,7 +53,7 @@ static bool knob_value(const Variant &v, PackedInt32Array &r) {
 	return false;
 }
 static const char *knob_kind(double) { return "a number"; }
-static const char *knob_kind(int) { return "an int"; }
+static const char *knob_kind(int64_t) { return "an int"; }
 static const char *knob_kind(bool) { return "a bool"; }
 static const char *knob_kind(const Vector2 &) { return "a Vector2"; }
 static const char *knob_kind(const PackedInt32Array &) { return "an array of ints"; }
@@ -68,9 +70,13 @@ static KnobWrite2D write_table_knob(PatternKnobs2D &k, const String &name, const
 #define PATTERN_PROPERTY(VTYPE, NAME, HINT, HINT_STRING, SETTER, GETTER)
 #define PATTERN_KNOB(PTYPE, CTYPE, VTYPE, NAME, C1, A1, B1, M1, C2, A2, B2, M2, NOTIFY, HINT, HINT_STRING) \
 	if (name == #NAME) {                                                                                   \
-		CTYPE value{};                                                                                     \
+		std::decay_t<PTYPE> value{};                                                                       \
 		if (!knob_value(v, value)) {                                                                       \
 			pattern_knob_reject2d(#NAME, String("must be ") + knob_kind(value), kGenerateOwner);           \
+			return KNOB_REJECTED;                                                                          \
+		}                                                                                                  \
+		if (!PatternKnobCheck2D::FITS(value, k.NAME)) {                                                    \
+			pattern_knob_reject2d(#NAME, PatternKnobCheck2D::FITS_INT_MESSAGE, kGenerateOwner);            \
 			return KNOB_REJECTED;                                                                          \
 		}                                                                                                  \
 		if (PatternKnobCheck2D::C1(value, A1, B1)) {                                                       \
@@ -81,7 +87,7 @@ static KnobWrite2D write_table_knob(PatternKnobs2D &k, const String &name, const
 			pattern_knob_reject2d(#NAME, M2, kGenerateOwner);                                              \
 			return KNOB_REJECTED;                                                                          \
 		}                                                                                                  \
-		k.NAME = value;                                                                                    \
+		k.NAME = (CTYPE)value;                                                                             \
 		return KNOB_WRITTEN;                                                                               \
 	}
 #include "patterns/pattern_knob_table2d.inc"
@@ -108,7 +114,7 @@ static KnobWrite2D write_special_knob(PatternKnobs2D &k, const String &name, con
 	};
 	for (const EnumKnob &e : kEnums) {
 		if (name == e.name) {
-			if (v.get_type() != Variant::INT || (int)v < 0 || (int)v > e.max) {
+			if (v.get_type() != Variant::INT || (int64_t)v < 0 || (int64_t)v > e.max) {
 				pattern_knob_reject2d(e.name, String("must be an int in [0, ") + itos(e.max) + "]", kGenerateOwner);
 				return KNOB_REJECTED;
 			}
