@@ -592,3 +592,47 @@ func test_counters_read_inside_a_mass_free_never_touch_deleted_volleys() -> void
 		AttachmentHookProbe2D.clear_hook()
 		problems.append_array(_claim_errors().map(func(e): return "%s error: %s" % [how, e]))
 	assert_eq("\n".join(problems), "", "counters read during a mass free stay on live volleys")
+
+
+## A graze can split its bullet (split_on_graze); the split disables the
+## parent, whose on_bullet_disable is user code. Freeing the owner spawner
+## there must not leave the graze dispatch holding the dead spawner (it is
+## named in the "nothing connected to bullet_grazed" warning right after).
+func test_freeing_the_spawner_inside_a_graze_split_never_touches_freed_memory() -> void:
+	var grazed := Node2D.new()
+	grazed.position = Vector2(20, 0)
+	grazed.add_to_group(&"cfm_graze")
+	add(grazed)
+	var stage := BulletSplitStage2D.new()
+	stage.count = 2
+	stage.split_on_graze = true
+	stage.split_on_lifetime_over = false
+	var chain := BulletSplitData2D.new()
+	chain.stages = [stage]
+	var d := _data(true)
+	d.transforms = [Transform2D(), Transform2D(0.0, Vector2(0, 300))]
+	d.bullet_max_collision_count = 0
+	var sp := make_spawner(d, BulletSpawner2D.PATTERN_FROM_HELPER_CUSTOM, 2)
+	sp.helper_custom_transforms = [Transform2D(), Transform2D(0.0, Vector2(0, 300))]
+	sp.orphaned_volleys = BulletSpawner2D.ORPHANED_VOLLEYS_KEEP_FLYING
+	sp.graze_enabled = true
+	sp.graze_zones = [H.make_graze_zone([30.0])]
+	sp.graze_node_group = &"cfm_graze"
+	sp.split_enabled = true
+	sp.split_data = chain
+	AttachmentHookProbe2D.hook_on = ["disable"]
+	AttachmentHookProbe2D.hook = func() -> void:
+		if is_instance_valid(sp):
+			sp.free()
+	assert_true(sp.shoot_once(), "shot")
+	for k in 20:
+		await physics(1)
+		if AttachmentHookProbe2D.fired > 0:
+			break
+	assert_gt(AttachmentHookProbe2D.fired, 0, "the split's disable callback ran")
+	AttachmentHookProbe2D.clear_hook()
+	await physics(2)
+	for err in get_errors(): # the warning about the unhandled graze may name the factory
+		if err.is_push_warning():
+			err.handled = true
+	assert_eq(_claim_errors(), [], "no error")

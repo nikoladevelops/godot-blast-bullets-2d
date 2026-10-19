@@ -405,7 +405,10 @@ bool BulletVolley2D::dispatch_graze_events() {
 			}
 		}
 		if (!handled && !ev.exit) {
-			Object *emitter = spawner != nullptr ? spawner : (Object *)bullet_factory;
+			// Re-resolved: the split above ran user code (on_bullet_disable)
+			// that may have freed the spawner.
+			Object *live_spawner = owner_spawner_id != 0 ? ObjectDB::get_instance(ObjectID(owner_spawner_id)) : nullptr;
+			Object *emitter = live_spawner != nullptr ? live_spawner : (Object *)bullet_factory;
 			if (emitter != nullptr) {
 				WarnOnce2D::warn(emitter->get_instance_id(), 25u, 0, 0, describe_emitter2d(emitter) + ": its bullets were grazed, but nothing is connected to bullet_grazed (on it or on BulletFactory2D), so the graze is not handled. Connect BulletFactory2D.bullet_grazed once (it receives every graze), or remove the graze zones.");
 			}
