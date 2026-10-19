@@ -94,3 +94,29 @@ func test_pool_hit_observability() -> void:
 	factory.spawn_volley(carved)
 	await idle(1)
 	assert_eq(factory.debug_get_pool_hit_stats().get("misses", 0), 1, "size mismatch counted as miss")
+
+
+## The collision debugger draws every shape where the physics shape is, in
+## the debugger color: its multimesh buffer (8 transform + 4 color floats per
+## instance, uploaded in one set_buffer per volley per tick) holds each
+## bullet's global pose, frame after frame.
+func test_debugger_draws_every_shape_where_it_is() -> void:
+	factory.debugger_color = Color(1, 0, 0, 0.5)
+	factory.is_debugger_enabled = true
+	var v: BulletVolley2D = factory.spawn_volley(H.make_volley_data(5, 100.0, 30.0))
+	for k in 2:
+		await physics(3)
+		var dbg: Node = factory.get_node("BulletVolleysDebugger")
+		assert_eq(dbg.get_child_count(true), 1, "one debug multimesh per volley")
+		var buf: PackedFloat32Array = (dbg.get_child(0, true) as MultiMeshInstance2D).multimesh.buffer
+		assert_eq(buf.size(), 5 * 12, "transform + color per shape")
+		var bad := ""
+		for i in 5:
+			var b := i * 12
+			var got := Vector2(buf[b + 3], buf[b + 7])
+			var want: Vector2 = v.get_bullet_global_transform(i).origin
+			if got.distance_to(want) > 0.01:
+				bad += "shape %d at %s, bullet at %s; " % [i, got, want]
+			if Color(buf[b + 8], buf[b + 9], buf[b + 10], buf[b + 11]) != Color(1, 0, 0, 0.5):
+				bad += "shape %d color; " % i
+		assert_eq(bad, "", "pass %d: every shape drawn on its bullet in the debugger color" % k)

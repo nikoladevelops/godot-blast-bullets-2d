@@ -6,6 +6,7 @@
 
 #include "core/owned_node2d.hpp"
 
+#include <unordered_set>
 #include <vector>
 
 namespace godot {
@@ -99,6 +100,14 @@ private:
 
 	// Entries whose debug node was lost this tick (reused, no per-tick alloc).
 	std::vector<int> lost_entries_scratch;
+
+	// Providers already drawn (O(1) dedupe when a volley re-enters).
+	std::unordered_set<const BulletVolley2D *> debug_provider_set;
+
+	// One provider's instance buffer (8 transform + 4 color floats per
+	// shape), uploaded with ONE set_buffer per provider per tick instead of
+	// an engine call per shape.
+	PackedFloat32Array debug_buffer_scratch;
 
 	// The container whose volley children get debugged (the factory
 	// re-points it when a script freed the container and it was recreated).

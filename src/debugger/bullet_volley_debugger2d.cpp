@@ -145,6 +145,7 @@ void BulletVolleyDebugger2D::disable() {
 	// Clear both vectors so they hold no stale pointers. clear() keeps capacity.
 	debugger_multimeshes.clear();
 	debug_data_providers.clear();
+	debug_provider_set.clear();
 	debug_data_provider_ids.clear();
 	debug_data_provider_nodes.clear();
 	debugger_mesh_types.clear();
@@ -180,6 +181,7 @@ void BulletVolleyDebugger2D::erase_debug_entry(int i) {
 			memdelete(mesh);
 		}
 	}
+	debug_provider_set.erase(debug_data_providers[i]);
 	debug_data_providers.erase(debug_data_providers.begin() + i);
 	if (i < (int)debug_data_provider_ids.size()) {
 		debug_data_provider_ids.erase(debug_data_provider_ids.begin() + i);
@@ -211,10 +213,8 @@ void BulletVolleyDebugger2D::generate_debug_multimesh(Node *node_entered_contain
 
 	// Dedupe guard: a multimesh that re-enters the container (reparent flows) would
 	// otherwise get a second debug mesh + a second entry (double rendering, growth).
-	for (BulletVolley2D *tracked : debug_data_providers) {
-		if (tracked == debugger_data_provider) {
-			return;
-		}
+	if (debug_provider_set.count(debugger_data_provider) != 0) {
+		return;
 	}
 
 	// Provider type drives mesh: rect->QuadMesh(size), circle->ArrayMesh fan(r), capsule->ArrayMesh rect+caps.
@@ -267,6 +267,7 @@ void BulletVolleyDebugger2D::generate_debug_multimesh(Node *node_entered_contain
 
 	// Store the debugger_data_provider so I can track him
 	debug_data_providers.emplace_back(debugger_data_provider);
+	debug_provider_set.insert(debugger_data_provider);
 	debug_data_provider_ids.emplace_back(bullets_node->get_instance_id());
 	debug_data_provider_nodes.emplace_back(bullets_node);
 
@@ -435,9 +436,34 @@ void BulletVolleyDebugger2D::update_debug_multimesh_transforms_to_match_data_pro
 	// Policy: the debugger ALWAYS draws every shape. Disabled bullets keep their last
 	// cached transform (frozen where they died), pooled instances render their full
 	// frozen set - nothing is ever hidden with the zero transform on the debug side.
-	for (int i = 0; i < amount_quadmeshes; ++i) {
-		multi->set_instance_transform_2d(i, collision_shape_transforms_for_debugging[i]);
+	// One buffer upload (2D transform + color per instance, the MultiMesh
+	// layout) instead of an engine call per shape.
+	constexpr int stride = 12;
+	if (debug_buffer_scratch.size() != (int64_t)amount_quadmeshes * stride) {
+		debug_buffer_scratch.resize((int64_t)amount_quadmeshes * stride);
 	}
+	float *w = debug_buffer_scratch.ptrw();
+	const float r = debugger_color.r;
+	const float g = debugger_color.g;
+	const float b = debugger_color.b;
+	const float a = debugger_color.a;
+	for (int i = 0; i < amount_quadmeshes; ++i) {
+		const Transform2D &t = collision_shape_transforms_for_debugging[i];
+		float *o = w + (int64_t)i * stride;
+		o[0] = (float)t.columns[0].x;
+		o[1] = (float)t.columns[1].x;
+		o[2] = 0.0f;
+		o[3] = (float)t.columns[2].x;
+		o[4] = (float)t.columns[0].y;
+		o[5] = (float)t.columns[1].y;
+		o[6] = 0.0f;
+		o[7] = (float)t.columns[2].y;
+		o[8] = r;
+		o[9] = g;
+		o[10] = b;
+		o[11] = a;
+	}
+	multi->set_buffer(debug_buffer_scratch);
 }
 
 void BulletVolleyDebugger2D::change_debug_multimeshes_color(const Color &new_multimesh_color) {
