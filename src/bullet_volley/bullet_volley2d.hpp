@@ -2321,8 +2321,9 @@ public:
 	}
 
 	// BOUNCE / RICOCHET RUNTIME API (spawn-data equivalents, editable live).
-	int get_bounce_mask() const { return bounce_mask; }
-	void set_bounce_mask(int value);
+	// Unsigned 32-bit view like BulletVolleyData2D (layer 32 = 2147483648).
+	int64_t get_bounce_mask() const { return (int64_t)(uint32_t)bounce_mask; }
+	void set_bounce_mask(int64_t value);
 	void set_bounce_mask_from_array(const TypedArray<int> &numbers);
 	bool get_bounce_tilemap_layers() const { return bounce_tilemap_layers; }
 	void set_bounce_tilemap_layers(bool value) {

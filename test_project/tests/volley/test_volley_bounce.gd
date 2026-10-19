@@ -2891,3 +2891,34 @@ func test_forensics_reuse_energy_shared_walls_tilemap_budgets() -> void:
 	await idle(1)
 
 	await idle(1)
+
+
+## Layer 32 is a bounce layer like any other: the array builder, the raw
+## mask (2147483648, what the inspector's layer grid writes) and the live
+## volley all take it, and a bullet bounces off a layer-32 wall. Negative
+## masks stay refused.
+func test_layer_32_bounces() -> void:
+	_connect_signals()
+	const LAYER_32 := 2147483648
+	var d := _bounce_data(Vector2.ZERO, 0.0, 300.0, [32], [32])
+	assert_eq(d.bounce_mask, LAYER_32, "array builder sets layer 32")
+	d.bounce_mask = 0
+	d.bounce_mask = LAYER_32
+	assert_eq(d.bounce_mask, LAYER_32, "the raw layer-32 mask is accepted")
+	d.set_bounce_mask(-1)
+	expect_error_sequence(["BulletVolleyData2D: bounce_mask must be >= 0 (0 = bouncing disabled), keeping the old value."])
+	d.set_bounce_mask(LAYER_32 * 2)
+	expect_error_sequence(["BulletVolleyData2D: bounce_mask must be at most 4294967295 (layers 1..32), keeping the old value."])
+	assert_eq(d.bounce_mask, LAYER_32, "refused values keep the old mask")
+	_make_wall(Vector2(200, 0), LAYER_32)
+	await physics()
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	assert_eq(v.get_bounce_mask(), LAYER_32, "the volley mirrors layer 32")
+	v.set_bounce_mask_from_array([32])
+	assert_eq(v.get_bounce_mask(), LAYER_32, "live array builder")
+	for k in 90:
+		await physics(1)
+		if _bounce_body.size() > 0:
+			break
+	assert_eq(_bounce_body.size(), 1, "bounced off the layer-32 wall")
+	assert_lt(v.get_bullet_velocity(0).x, 0.0, "heading back")

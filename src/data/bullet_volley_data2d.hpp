@@ -731,8 +731,10 @@ public:
 	double get_homing_lose_range_px() const;
 	void set_homing_lose_range_px(double value);
 
-	int get_bounce_mask() const;
-	void set_bounce_mask(int value);
+	// The mask as an unsigned 32-bit value (layer 32 = 2147483648, what the
+	// inspector's layer grid writes); stored as the same 32 bits.
+	int64_t get_bounce_mask() const;
+	void set_bounce_mask(int64_t value);
 	void set_bounce_mask_from_array(const TypedArray<int> &numbers);
 	bool get_bounce_tilemap_layers() const;
 	void set_bounce_tilemap_layers(bool value);

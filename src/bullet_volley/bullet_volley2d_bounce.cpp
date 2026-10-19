@@ -184,12 +184,16 @@ void BulletVolley2D::ensure_bounce_vectors() {
 	});
 }
 
-void BulletVolley2D::set_bounce_mask(int value) {
+void BulletVolley2D::set_bounce_mask(int64_t value) {
 	if (value < 0) {
 		UtilityFunctions::push_error("BulletVolley2D.set_bounce_mask: value must be >= 0 (0 = bouncing disabled), keeping the old value.");
 		return;
 	}
-	bounce_mask = value;
+	if (value > (int64_t)UINT32_MAX) {
+		UtilityFunctions::push_error("BulletVolley2D.set_bounce_mask: value must be at most 4294967295 (layers 1..32), keeping the old value.");
+		return;
+	}
+	bounce_mask = (int)(uint32_t)value;
 	bounce_mask_warning_issued = false;
 	ensure_bounce_vectors();
 }

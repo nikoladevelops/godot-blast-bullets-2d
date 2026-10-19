@@ -752,23 +752,25 @@ void BulletVolleyData2D::set_homing_lose_range_px(double value) {
 	emit_changed();
 }
 
-int BulletVolleyData2D::get_bounce_mask() const {
-	return bounce_mask;
+int64_t BulletVolleyData2D::get_bounce_mask() const {
+	return (int64_t)(uint32_t)bounce_mask;
 }
-void BulletVolleyData2D::set_bounce_mask(int value) {
+void BulletVolleyData2D::set_bounce_mask(int64_t value) {
 	if (value < 0) {
 		UtilityFunctions::push_error("BulletVolleyData2D: bounce_mask must be >= 0 (0 = bouncing disabled), keeping the old value.");
 		return;
 	}
-	bounce_mask = value;
+	if (value > (int64_t)UINT32_MAX) {
+		UtilityFunctions::push_error("BulletVolleyData2D: bounce_mask must be at most 4294967295 (layers 1..32), keeping the old value.");
+		return;
+	}
+	bounce_mask = (int)(uint32_t)value;
 	emit_changed();
 }
 void BulletVolleyData2D::set_bounce_mask_from_array(const TypedArray<int> &numbers) {
-	int bitmask = BulletVolleyData2D::calculate_bitmask(numbers);
-	if (bitmask < 0) {
-		return;
-	}
-	bounce_mask = bitmask;
+	// Layer 32 is the sign bit of the 32-bit mask: a negative value is a
+	// valid mask here (bad entries were already reported and skipped).
+	bounce_mask = BulletVolleyData2D::calculate_bitmask(numbers);
 	emit_changed();
 }
 
