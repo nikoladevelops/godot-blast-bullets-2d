@@ -514,4 +514,47 @@ Dictionary BulletVolley2D::debug_get_clocks() const {
 	return d;
 }
 
+String BulletVolley2D::debug_check_invariants() const {
+	if (is_pooled_in_pool) {
+		if (pickup_data.is_valid() || pickup_time_scale_owner_id != 0) {
+			return "pooled volley is still a pickup";
+		}
+		if (graze_zone_slots != 0 || graze_detector != nullptr) {
+			return "pooled volley still grazes";
+		}
+		if (!sound_effects.empty() || sound_detector != nullptr) {
+			return "pooled volley still plays sounds";
+		}
+		if (get_material().is_valid() || shared_bullets_custom_data.is_valid()) {
+			return "pooled volley still holds its life's resources";
+		}
+	}
+	// Per-bullet storage covers every bullet (the tick indexes it without
+	// bounds checks up to MoveTick2D::core_limit).
+	if (amount_bullets > 0 && !is_queued_for_deletion()) {
+		const size_t n = (size_t)amount_bullets;
+		if (all_cached_instance_transforms.size() != n || all_cached_instance_origin.size() != n || all_cached_speed.size() != n || all_cached_direction.size() != n || bullets_current_collision_count.size() != n || attachments.size() != n) {
+			return "per-bullet storage does not cover the bullets";
+		}
+		if (all_bullets_enabled_set.size() > amount_bullets) {
+			return "more live bullets than bullets";
+		}
+	}
+	int orbiting = 0;
+	for (const uint8_t status : all_orbiting_status) {
+		orbiting += status != 0 ? 1 : 0;
+	}
+	if (orbiting != active_orbiting_count) {
+		return "orbit counter (" + String::num_int64(active_orbiting_count) + ") != orbiting bullets (" + String::num_int64(orbiting) + ")";
+	}
+	int homing = 0;
+	for (const int count : all_homing_count) {
+		homing += count;
+	}
+	if (homing != active_homing_count) {
+		return "homing counter (" + String::num_int64(active_homing_count) + ") != per-bullet targets (" + String::num_int64(homing) + ")";
+	}
+	return String();
+}
+
 } // namespace BlastBullets2D

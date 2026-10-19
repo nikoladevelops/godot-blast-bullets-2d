@@ -1219,6 +1219,12 @@ public:
 	bool is_parked() const;
 	// "active", "parked", "pooled", "fresh" or "dying" (tests/support).
 	String debug_get_life_state() const;
+	// Internal consistency of this volley: "" when every invariant holds,
+	// else the first one that does not (per-bullet storage covers every
+	// bullet, the orbit and homing counters match their arrays, a pooled
+	// volley holds nothing of its last life). BulletFactory2D's
+	// debug_assert_no_dangling runs it for every tracked volley.
+	String debug_check_invariants() const;
 	// Life id: bumped exactly once per life (spawn / enable_volley). Store it
 	// next to a volley you keep across frames and compare before using the
 	// volley again: a different id means the pool handed it to a new owner.

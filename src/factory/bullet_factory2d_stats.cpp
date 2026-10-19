@@ -3,6 +3,8 @@
 
 #include "factory/bullet_factory2d_internal.hpp"
 
+#include <unordered_set>
+
 using namespace godot;
 
 namespace BlastBullets2D {
@@ -345,6 +347,10 @@ Dictionary BulletFactory2D::debug_assert_no_dangling() {
 				return fail("pooled volley still splits" + at);
 			}
 		}
+		const String problem = volley->debug_check_invariants();
+		if (!problem.is_empty()) {
+			return fail(problem + at);
+		}
 	}
 	// The armed count gates the flock pass: it must match the volleys that
 	// hold a flock config (a lower count would silently stop flocking).
@@ -363,10 +369,14 @@ Dictionary BulletFactory2D::debug_assert_no_dangling() {
 	if ((int)entries.size() != pooled_flags) {
 		return fail("pool holds " + String::num_int64((int64_t)entries.size()) + " entries but " + String::num_int64(pooled_flags) + " volleys are flagged pooled");
 	}
+	std::unordered_set<const BulletVolley2D *> pooled_seen;
 	for (const auto &entry : entries) {
 		const BulletVolley2D *volley = entry.second;
 		if (volley == nullptr) {
 			return fail("pool holds a null entry");
+		}
+		if (!pooled_seen.insert(volley).second) {
+			return fail("pool holds a volley twice");
 		}
 		if (volley->sparse_set_id < 0 || volley->sparse_set_id >= (int)all_volleys.size() || all_volleys[volley->sparse_set_id] != volley) {
 			return fail("pool holds an untracked volley");
@@ -382,6 +392,11 @@ Dictionary BulletFactory2D::debug_assert_no_dangling() {
 	}
 	if (split_flush_running) {
 		return fail("a split flush never finished");
+	}
+	for (const SplitRequest2D &r : pending_splits) {
+		if (r.stage.is_null() || r.data.is_null() || r.config == nullptr || r.child_depth < 1) {
+			return fail("a queued split is incomplete");
+		}
 	}
 	d["volleys_total"] = (int)all_volleys.size();
 	return d;

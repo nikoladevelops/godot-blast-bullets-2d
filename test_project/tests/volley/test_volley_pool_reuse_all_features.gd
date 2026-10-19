@@ -219,6 +219,8 @@ func test_a_pooled_volley_keeps_no_material() -> void:
 	factory.clear_active_bullets()
 	await idle(1)
 	assert_true(v.is_pooled(), "pooled")
+	assert_true(v.has_method("debug_check_invariants"), "bound")
+	assert_eq(v.debug_check_invariants(), "", "a pooled volley passes every invariant")
 	assert_null(v.material, "no material while pooled")
 	data.material = null
 	mat = null

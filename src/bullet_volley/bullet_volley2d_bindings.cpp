@@ -72,6 +72,7 @@ void BulletVolley2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("is_parked"), &BulletVolley2D::is_parked);
 	ClassDB::bind_method(D_METHOD("get_life_id"), &BulletVolley2D::get_life_id);
 	ClassDB::bind_method(D_METHOD("debug_get_life_state"), &BulletVolley2D::debug_get_life_state);
+	ClassDB::bind_method(D_METHOD("debug_check_invariants"), &BulletVolley2D::debug_check_invariants);
 	ClassDB::bind_method(D_METHOD("debug_get_clocks"), &BulletVolley2D::debug_get_clocks);
 	ClassDB::bind_method(D_METHOD("clear_bullet", "bullet_index"), &BulletVolley2D::clear_bullet);
 	ClassDB::bind_method(D_METHOD("clear_all_bullets"), &BulletVolley2D::clear_all_bullets);
