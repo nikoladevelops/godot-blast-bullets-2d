@@ -53,6 +53,8 @@ public:
 	void set_shape_type(int p_shape_type);
 
 	static Ref<VolleyPoolKey2D> make(int p_amount_bullets, int p_shape_type);
+	// Same bucket (amount + shape). Keys are Resources: == compares identity.
+	bool equals(const Ref<VolleyPoolKey2D> &other) const;
 
 	PoolKey to_internal() const { return PoolKey{ amount_bullets, static_cast<PhysicsServer2D::ShapeType>(shape_type) }; }
 	static Ref<VolleyPoolKey2D> from_internal(const PoolKey &key);

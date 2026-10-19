@@ -217,3 +217,26 @@ func test_free_disabled_and_pool_spare_parked_volleys() -> void:
 	assert_true(v.is_bullet_status_enabled(0), "the parked volley still wakes")
 	factory.free_active_bullets()
 	assert_false(is_instance_valid(v), "free_active_bullets destroys it")
+
+
+## Pool keys are Resources, so == compares identity: equals() compares the
+## bucket (amount + shape), which is how debug_expected_pool_key is matched
+## against the keys of debug_get_bullets_pool_info.
+func test_pool_keys_compare_by_value_with_equals() -> void:
+	var a := VolleyPoolKey2D.make(4, PhysicsServer2D.SHAPE_CIRCLE)
+	assert_has_method(a, "equals", "bound equals")
+	assert_true(a.equals(VolleyPoolKey2D.make(4, PhysicsServer2D.SHAPE_CIRCLE)), "same bucket")
+	assert_false(a.equals(VolleyPoolKey2D.make(5, PhysicsServer2D.SHAPE_CIRCLE)), "another amount")
+	assert_false(a.equals(VolleyPoolKey2D.make(4, PhysicsServer2D.SHAPE_RECTANGLE)), "another shape")
+	assert_false(a.equals(null), "null is no bucket")
+	var data := H.make_still_data(4)
+	factory.spawn_volley(data)
+	await idle(1)
+	factory.clear_active_bullets()
+	await idle(1)
+	var expected: VolleyPoolKey2D = BulletFactory2D.debug_expected_pool_key(data)
+	var found := 0
+	for key in factory.debug_get_bullets_pool_info():
+		if expected.equals(key):
+			found += 1
+	assert_eq(found, 1, "the expected key matches its pool bucket by value")

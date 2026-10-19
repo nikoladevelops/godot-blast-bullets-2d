@@ -45,6 +45,10 @@ Ref<VolleyPoolKey2D> VolleyPoolKey2D::from_internal(const PoolKey &key) {
 	return res;
 }
 
+bool VolleyPoolKey2D::equals(const Ref<VolleyPoolKey2D> &other) const {
+	return other.is_valid() && other->amount_bullets == amount_bullets && other->shape_type == shape_type;
+}
+
 void VolleyPoolKey2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_amount_bullets"), &VolleyPoolKey2D::get_amount_bullets);
 	ClassDB::bind_method(D_METHOD("set_amount_bullets", "amount_bullets"), &VolleyPoolKey2D::set_amount_bullets);
@@ -55,6 +59,7 @@ void VolleyPoolKey2D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "shape_type", PROPERTY_HINT_ENUM, "Circle:3,Rectangle:4,Capsule:5"), "set_shape_type", "get_shape_type");
 
 	ClassDB::bind_static_method("VolleyPoolKey2D", D_METHOD("make", "amount_bullets", "shape_type"), &VolleyPoolKey2D::make);
+	ClassDB::bind_method(D_METHOD("equals", "other"), &VolleyPoolKey2D::equals);
 }
 
 } //namespace BlastBullets2D
