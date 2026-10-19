@@ -153,3 +153,18 @@ func test_each_zone_fires_its_entry() -> void:
 	assert_eq(_logged(zb.get_instance_id()).size(), 1, "slot 1 sounds once")
 	assert_eq(_logged(any.get_instance_id()).size(), 2, "any-zone hears both")
 	assert_true(_logged(missing.get_instance_id()).is_empty(), "unarmed slot stays silent")
+
+
+## ring_index is ignored by every non-graze trigger (the inspector only hides
+## it): an entry switched from On Graze with ring 2 to On Clear still plays.
+## Graze entries keep filtering by ring (pinned above).
+func test_ring_index_is_ignored_by_non_graze_triggers() -> void:
+	factory.debug_set_sound_log_enabled(true)
+	var s := _ring_sound(2)
+	s.trigger = BulletSoundData2D.SOUND_ON_CLEAR
+	assert_eq(s.ring_index, 2, "the ring setting stays stored")
+	var v: BulletVolley2D = factory.spawn_volley(H.make_volley_data(2, 0.0, 30.0))
+	assert_true(v.sound_set_effects([s]), "armed")
+	assert_true(v.clear_bullet(0), "cleared")
+	await physics(2)
+	assert_eq(_logged(s.get_instance_id()).size(), 1, "the On Clear entry plays despite ring_index")

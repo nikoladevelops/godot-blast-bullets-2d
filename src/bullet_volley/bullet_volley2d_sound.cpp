@@ -132,10 +132,14 @@ void BulletVolley2D::sound_fire(int trigger, int bullet_index, const Vector2 &ev
 		if (entry.is_null() || !entry->enabled || entry->get_trigger() != trigger) {
 			continue;
 		}
-		if (entry->get_ring_index() >= 0 && entry->get_ring_index() != ring) {
+		// Ring and zone filters belong to the graze triggers only: every
+		// other trigger ignores them (they stay stored when the trigger
+		// changes, hidden in the inspector).
+		const bool graze_trigger = trigger == BulletSoundData2D::SOUND_ON_GRAZE || trigger == BulletSoundData2D::SOUND_ON_GRAZE_EXIT;
+		if (graze_trigger && entry->get_ring_index() >= 0 && entry->get_ring_index() != ring) {
 			continue;
 		}
-		if ((trigger == BulletSoundData2D::SOUND_ON_GRAZE || trigger == BulletSoundData2D::SOUND_ON_GRAZE_EXIT) && entry->get_zone_index() >= 0 && entry->get_zone_index() != zone) {
+		if (graze_trigger && entry->get_zone_index() >= 0 && entry->get_zone_index() != zone) {
 			continue;
 		}
 		bullet_factory->sound_offer(entry, event_pos, sound_volume_offset_db, spec, amount_bullets, get_instance_id(), get_life_id(), bullet_index);
