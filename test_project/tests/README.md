@@ -8,6 +8,7 @@ asserts a dangling-free factory plus zero new orphans after every test.
 
 ## Layout (mirrors `src/`)
 
+- `volley/test_volley_pooled_handle_writes.gd` — every bound BulletVolley2D method called with valid arguments on a POOLED handle (read from ClassDB): the life that reuses the volley starts exactly like the previous life (full per-bullet state, clocks, timers), before and after a tick.
 - `volley/test_volley_presence_bits.gd` — per-bullet seed PRESENCE: a valid all-zero speed/rotation entry is intent and survives a shared fallback (no travel, no spin), null/absent entries still fall back, direct per-bullet writes claim presence, fill-once, rejected-NaN degrades to a valid zero, pool-reuse neutrality. Also: clearing rotation data clears presence bits: gaps refill from shared, authored zeros still win; same-owner wakes keep presence decisions; new lives reset them; shared gravity fills gaps only; seeded/per-bullet values survive.
 - `volley/test_volley_timer_identity.gd` — per-timer ids: a targeted detach cancels a queued one-shot fire (the volley-wide generation could not), repeat timers stop cleanly, a sibling timer survives, re-attach works, pool-reuse neutrality, 64-timer cap.
 - `volley/test_volley_shared_homing_epoch.gd` — shared deque auto-pop identity: the in-tick auto-pop removes the front only while it is still the reached target, so a manual push-front/clear/pop is never undone, a back-push keeps a legitimate pop, a storm pops at most once per tick and a skipped pop never wedges later ones.

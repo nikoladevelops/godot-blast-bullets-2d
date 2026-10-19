@@ -530,6 +530,9 @@ String BulletVolley2D::debug_check_invariants() const {
 		if (get_material().is_valid() || shared_bullets_custom_data.is_valid()) {
 			return "pooled volley still holds its life's resources";
 		}
+		if (!custom_timers.empty()) {
+			return "pooled volley still holds timers";
+		}
 	}
 	// Per-bullet storage covers every bullet (the tick indexes it without
 	// bounds checks up to MoveTick2D::core_limit).

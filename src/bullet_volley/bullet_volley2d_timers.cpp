@@ -8,6 +8,11 @@ using namespace godot;
 namespace BlastBullets2D {
 
 void BulletVolley2D::attach_time_based_function(double time, const Callable &callable, bool repeat, bool execute_only_if_volley_is_active) {
+	// A pooled handle is stale: a timer attached to it would run while pooled
+	// and carry into the next owner's life (timers are released at pooling).
+	if (reject_pooled_handle("attach_time_based_function")) {
+		return;
+	}
 	if (!Math::is_finite(time) || time <= 0.0) {
 		UtilityFunctions::push_error("When calling attach_time_based_function(), you need to provide a time value that is above 0");
 		return;
