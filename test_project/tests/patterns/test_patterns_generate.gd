@@ -170,3 +170,32 @@ func test_skip_indices_carve_the_result() -> void:
 	assert_eq(carved.size(), 6, "two slots removed")
 	assert_eq(carved[0], full[1], "slot 0 skipped")
 	assert_eq(carved[2], full[4], "slot 3 skipped")
+
+
+## Layers with one layer is documented as identical to On Outline, and that
+## includes helper_outline_reverse: the same slots in the same bullet order
+## (a doorway cut with skip_indices lands on the same bullets), for every
+## outline shape, every amount.
+func test_one_layer_matches_on_outline_with_reverse() -> void:
+	var problems: Array = []
+	for s in BulletPatterns2D.get_shapes():
+		if not s["outline"]:
+			continue
+		for amount in [5, 8, 13, 24]:
+			for reverse in [false, true]:
+				var base := {"helper_outline_reverse": reverse}
+				var on_outline: Array = BulletPatterns2D.generate(s["id"], amount, MARKER, base)
+				var layered := base.duplicate()
+				layered["helper_outline_placement"] = BulletPatterns2D.OUTLINE_LAYERS
+				layered["helper_outline_layer_count"] = 1
+				var layers: Array = BulletPatterns2D.generate(s["id"], amount, MARKER, layered)
+				if on_outline.size() != layers.size():
+					problems.append("%s x%d reverse %s: %d vs %d bullets" % [s["name"], amount, reverse, on_outline.size(), layers.size()])
+					continue
+				for i in on_outline.size():
+					var a: Transform2D = on_outline[i]
+					var b: Transform2D = layers[i]
+					if a.origin.distance_to(b.origin) > 0.01 or absf(angle_difference(a.get_rotation(), b.get_rotation())) > 0.0001:
+						problems.append("%s x%d reverse %s: bullet %d moved or turned" % [s["name"], amount, reverse, i])
+						break
+	assert_eq("\n".join(problems), "", "one layer = On Outline, reversed too")

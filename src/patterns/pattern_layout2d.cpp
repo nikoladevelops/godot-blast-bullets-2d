@@ -1102,23 +1102,26 @@ PatternSlots2D layout_outline_slots(const char *caller_name, const Transform2D &
 			}
 			PackedVector2Array lp;
 			PackedVector2Array ln;
-			// Mirror winding first when reversed, so every ring mirrors.
-			PackedVector2Array use_corners = corner_slot;
-			PackedVector2Array use_normals = corner_normals;
-			if (outline_reverse && use_corners.size() >= 3) {
-				PackedVector2Array mc;
-				PackedVector2Array mn;
-				mc.push_back(use_corners[0]);
-				mn.push_back(use_normals[0]);
-				for (int k = (int)use_corners.size() - 1; k >= 1; --k) {
-					mc.push_back(use_corners[k]);
-					mn.push_back(use_normals[k]);
-				}
-				use_corners = mc;
-				use_normals = mn;
-			}
-			if (!build_symmetric_polygon_loop(use_corners, use_normals, layer_keep[L], corner, lp, ln)) {
+			if (!build_symmetric_polygon_loop(corner_slot, corner_normals, layer_keep[L], corner, lp, ln)) {
 				continue;
+			}
+			// Reverse walks the built loop backwards, exactly like On Outline
+			// (idx = n - 1 - i): a loop built over mirrored corners hands the
+			// remainder bullets to other edges and starts on another slot, so
+			// Layers(1) + reverse stopped matching On Outline.
+			if (outline_reverse && lp.size() > 1) {
+				PackedVector2Array rp;
+				PackedVector2Array rn;
+				rp.resize(lp.size());
+				rn.resize(ln.size());
+				for (int k = 0; k < (int)lp.size(); ++k) {
+					rp[k] = lp[(int)lp.size() - 1 - k];
+				}
+				for (int k = 0; k < (int)ln.size(); ++k) {
+					rn[k] = ln[(int)ln.size() - 1 - k];
+				}
+				lp = rp;
+				ln = rn;
 			}
 			PackedFloat32Array no_ovr;
 			rotate_ring_slots(lp, ln, no_ovr, ring_start(L, (int)lp.size()));
