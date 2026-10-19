@@ -34,6 +34,13 @@ func before_all() -> void:
 
 func after_all() -> void:
 	BulletSpawner2D.debug_set_pattern_cache_verify(false)
+	# Headless audio mixes in real time while tests run faster: Godot frees a
+	# stopped AudioStreamPlayback on its own mix cycles, not on stop(). One
+	# drain per file that played sound (H.make_sound_stream marks it) keeps
+	# the exit leak gate green without slowing the other files.
+	if H.audio_used:
+		H.audio_used = false
+		OS.delay_msec(500)
 
 
 func before_each() -> void:

@@ -4,12 +4,6 @@ extends BlastTest
 ## stops the first, spawner preview_sound_effect() routes by index.
 
 
-func after_all() -> void:
-	# Same headless-audio drain as the other sound suites.
-	OS.delay_msec(500)
-	await super()
-
-
 func _preview_node(s: BulletSoundData2D) -> AudioStreamPlayer2D:
 	return s.debug_get_preview_player() as AudioStreamPlayer2D
 

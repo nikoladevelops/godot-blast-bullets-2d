@@ -166,7 +166,13 @@ static func transforms_at(points: Array) -> Array:
 
 ## Silent 8-bit mono WAV of `seconds`; loops by default so a voice stays busy
 ## for the whole test. 8-bit WAV is UNSIGNED: silence is 128, not 0.
+## Set by make_sound_stream: the file played real audio, so BlastTest drains
+## the headless audio server once in after_all.
+static var audio_used := false
+
+
 static func make_sound_stream(seconds := 0.25, loop := true) -> AudioStreamWAV:
+	audio_used = true
 	var w := AudioStreamWAV.new()
 	w.format = AudioStreamWAV.FORMAT_8_BITS
 	w.mix_rate = 8000

@@ -12,12 +12,6 @@ func _on_despawned(positions: PackedVector2Array, volley: BulletVolley2D, indexe
 	despawned.append({ "positions": positions, "volley": volley, "indexes": indexes })
 
 
-func after_all() -> void:
-	# The sound trigger test plays a real stream: same headless-audio drain as the sound suites.
-	OS.delay_msec(500)
-	await super()
-
-
 func before_each() -> void:
 	await super()
 	despawned.clear()

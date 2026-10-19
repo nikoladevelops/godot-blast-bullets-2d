@@ -8,12 +8,6 @@ extends BlastTest
 var moved := 0
 
 
-func after_all() -> void:
-	# Same headless-audio drain as the other sound suites.
-	OS.delay_msec(500)
-	await super()
-
-
 func before_each() -> void:
 	await super()
 	moved = 0

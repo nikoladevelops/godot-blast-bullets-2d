@@ -4,12 +4,6 @@ extends BlastTest
 ## unarmed volleys create no voices; frozen bullets stay silent.
 
 
-func after_all() -> void:
-	# Same headless-audio drain as the other sound suites.
-	OS.delay_msec(500)
-	await super()
-
-
 func _flight_sound() -> BulletSoundData2D:
 	var s := H.make_sound(BulletSoundData2D.SOUND_ON_FLIGHT)
 	s.min_interval_sec = 0.1

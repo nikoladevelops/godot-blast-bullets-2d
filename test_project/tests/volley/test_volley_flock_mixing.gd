@@ -311,13 +311,6 @@ func test_face_heading_leaves_a_spinning_sprite_to_its_spin() -> void:
 		assert_almost_eq(flocked.get_bullet_transform(i).get_rotation(), control.get_bullet_transform(i).get_rotation(), 1e-5, "bullet %d spins exactly like the unflocked one" % i)
 
 
-func after_all() -> void:
-	# The flight-sound test plays real streams: the same headless-audio drain
-	# as the sound suites (the mixer thread releases playbacks a moment later).
-	OS.delay_msec(500)
-	await super()
-
-
 func _cluster(count: int, at := Vector2.ZERO, seed_value := 3, spread := 40.0) -> Array:
 	seed(seed_value)
 	var tr: Array = []

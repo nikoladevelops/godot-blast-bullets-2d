@@ -5,12 +5,6 @@ extends BlastTest
 ## flying volleys keep the spawner's settings.
 
 
-func after_all() -> void:
-	# Same headless-audio drain as the other sound suites.
-	OS.delay_msec(500)
-	await super()
-
-
 func _spawner_with_listener(source: int) -> BulletSpawner2D:
 	var sp := make_spawner(H.make_volley_data(1, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 1)
 	sp.sound_enabled = true

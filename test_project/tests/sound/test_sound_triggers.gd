@@ -5,13 +5,6 @@ extends BlastTest
 ## unconnected, spawner-only triggers never fire on factory volleys.
 
 
-func after_all() -> void:
-	# Same headless-audio drain as the mixer suite: the dummy server releases
-	# stopped playbacks on its own mix cycles, not on stop().
-	OS.delay_msec(500)
-	await super()
-
-
 func _logged(sound_id: int) -> Array:
 	var out: Array = []
 	for e in factory.debug_get_sound_log():

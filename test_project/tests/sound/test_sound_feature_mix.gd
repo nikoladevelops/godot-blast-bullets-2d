@@ -4,12 +4,6 @@ extends BlastTest
 ## durations). If any of these fails on unchanged C++, a composition is broken.
 
 
-func after_all() -> void:
-	# Same headless-audio drain as the other sound suites.
-	OS.delay_msec(500)
-	await super()
-
-
 func _vol(sound_id: int) -> float:
 	for e in busy_voices():
 		if int((e as Dictionary)["sound"]) == sound_id:

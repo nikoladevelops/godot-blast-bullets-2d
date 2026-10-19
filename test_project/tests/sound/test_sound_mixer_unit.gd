@@ -4,15 +4,6 @@ extends BlastTest
 ## max_distance drop, Replace/Skip, priority steal, durations, pause, voices.
 
 
-func after_all() -> void:
-	# Headless audio mixes in real time while tests run faster: the dummy
-	# server releases stopped playbacks on its own mix cycles, not on stop().
-	# One drain per file (resets already stopped every voice) keeps the exit
-	# leak gate green without slowing the tests.
-	OS.delay_msec(500)
-	await super()
-
-
 func test_bind_and_max_voices_default() -> void:
 	for m in ["play_sound", "stop_sounds", "get_sound_max_voices", "set_sound_max_voices", "debug_set_sound_log_enabled", "debug_get_sound_log", "debug_clear_sound_log", "debug_get_sound_voices", "debug_get_sound_stats", "debug_stop_sound_voices"]:
 		assert_has_method(factory, m, "bound " + m)

@@ -3,12 +3,6 @@ extends BlastTest
 ## stream the fallback), pick cursors shared per resource like the limits.
 
 
-func after_all() -> void:
-	# Same headless-audio drain as the other sound suites.
-	OS.delay_msec(500)
-	await super()
-
-
 func _list_sound(mode: int, streams: Array, weights := PackedFloat32Array()) -> BulletSoundData2D:
 	var s := BulletSoundData2D.new()
 	s.streams = streams

@@ -4,12 +4,6 @@ extends BlastTest
 ## unused factory creates no voices at all (zero cost).
 
 
-func after_all() -> void:
-	# Same headless-audio drain as the other sound suites.
-	OS.delay_msec(500)
-	await super()
-
-
 func test_pause_freezes_busy_voices_and_drops_offers() -> void:
 	godot_listener_at(Vector2.ZERO)
 	var s := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)

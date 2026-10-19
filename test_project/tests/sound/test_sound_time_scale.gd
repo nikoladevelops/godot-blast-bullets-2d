@@ -6,12 +6,6 @@ extends BlastTest
 ## intervals stay in real time.
 
 
-func after_all() -> void:
-	# Same headless-audio drain as the other sound suites.
-	OS.delay_msec(500)
-	await super()
-
-
 func _hum(follow_scale: bool, pitch := 1.0) -> BulletSoundData2D:
 	var s := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
 	s.pitch_scale = pitch

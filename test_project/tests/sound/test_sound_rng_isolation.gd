@@ -4,12 +4,6 @@ extends BlastTest
 ## game rolls the same whether sounds play or not.
 
 
-func after_all() -> void:
-	# Same headless-audio drain as the other sound suites.
-	OS.delay_msec(500)
-	await super()
-
-
 func test_audible_sound_rolls_leave_global_rng_alone() -> void:
 	godot_listener_at(Vector2.ZERO)
 	seed(7)

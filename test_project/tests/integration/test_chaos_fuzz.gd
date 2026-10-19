@@ -423,11 +423,6 @@ func test_chaos_battlefield_never_breaks(chaos_seed: int = use_parameters(_seeds
 	factory.reset()
 	await idle(2)
 	problems.append_array(_check("seed %d wind-down" % chaos_seed))
-	# Godot frees a stopped AudioStreamPlayback on its audio thread: give it a
-	# moment of real time, or voices stopped by the reset above show up in
-	# the exit leak report (an engine timing artifact, no plugin reference).
-	OS.delay_msec(300)
-	await idle(2)
 	gut.p("chaos seed %d: %s" % [chaos_seed, stats])
 	assert_eq("\n".join(problems), "", "seed %d: no error, balanced books, finite bullets" % chaos_seed)
 	assert_gt(stats["shots"], 50, "the battlefield fired (%s)" % [stats])
