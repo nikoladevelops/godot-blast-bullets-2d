@@ -525,6 +525,14 @@ void BulletVolley2D::spawn(const BulletVolleyData2D &data, VolleyPool *pool, Bul
 
 // Activates the multimesh
 bool BulletVolley2D::enable_volley(const BulletVolleyData2D &data, const Vector2 &new_inherited_velocity_offset, uint64_t spawner_id) {
+	// A busy factory (a callback inside a clear, reset or pool release)
+	// cannot take the volley into its tick set: refuse before touching
+	// anything, like spawn_volley does, instead of enabling a volley that
+	// never moves.
+	if (bullet_factory != nullptr && factory_alive() && bullet_factory->get_is_factory_busy()) {
+		UtilityFunctions::push_error("enable_volley: BulletFactory2D is currently busy. Ignoring the request.");
+		return false;
+	}
 	warn_data_id = data.get_instance_id();
 	// The pool sorts volleys by bullet count, so a wrong-size array here would read past the end - bail before touching anything.
 	if (spawn_transform_count(data) != amount_bullets) {

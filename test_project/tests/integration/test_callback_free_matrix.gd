@@ -412,3 +412,39 @@ func _new_case() -> void:
 	check_factory_after = true
 	await idle()
 	orphans_at_case_start = int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
+
+
+## An attachment callback that runs while the factory is busy (the pool
+## release of a drained volley holds the busy latch) and enables a parked
+## volley: the enable is refused up front with the busy wording and changes
+## nothing (it used to succeed but leave the volley out of the tick set, so
+## it never moved).
+func test_enable_volley_inside_a_busy_factory_is_refused_and_changes_nothing() -> void:
+	var plain := _data(true)
+	plain.shared_bullet_attachment = null
+	var parked: BulletVolley2D = factory.spawn_volley(plain)
+	parked.set_is_auto_pooling_enabled(false)
+	for i in 3:
+		parked.disable_bullet(i)
+	await idle(1)
+	assert_true(parked.is_parked(), "parked before the case")
+	var results: Array = []
+	var books_in_hook: Array = []
+	AttachmentHookProbe2D.hook_on = ["disable"]
+	AttachmentHookProbe2D.hook = func() -> void:
+		results.append(parked.enable_volley(plain))
+		books_in_hook.append(parked.is_parked())
+	var hooked: BulletVolley2D = factory.spawn_volley(_data(false))
+	await idle(1)
+	factory.clear_active_bullets()
+	assert_eq(results, [false], "the enable inside the busy factory is refused")
+	expect_error_sequence(["enable_volley: BulletFactory2D is currently busy. Ignoring the request."])
+	assert_eq(books_in_hook, [true], "the refused enable changed nothing")
+	await idle(1)
+	assert_true(parked.is_parked(), "still parked after the clear")
+	assert_true(parked.enable_volley(plain), "an idle-frame enable works")
+	var start: Vector2 = parked.get_bullet_transform(0).origin
+	for k in 3:
+		await physics(1)
+	assert_ne(parked.get_bullet_transform(0).origin, start, "the enabled volley ticks")
+	assert_true(is_instance_valid(hooked), "hooked volley alive")
