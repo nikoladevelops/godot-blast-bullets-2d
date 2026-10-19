@@ -1136,10 +1136,27 @@ void SoundMixer2D::preview_play(BulletSoundData2D *sound, const Vector2 &global_
 		}
 		return;
 	}
-	// Sequence/shuffle cursors need a channel; preview shares the pick, not
-	// the limits (it always plays the picked stream).
+	// Sequence/shuffle cursors live on a channel. Previews have no mixer (the
+	// editor), so each resource keeps its own preview cursor here: plain
+	// values only (no Godot types in a static), pruned of dead resources.
+	struct PreviewPick {
+		size_t seq_cursor = 0;
+		std::vector<size_t> shuffle_bag;
+		size_t shuffle_n = 0;
+	};
+	static std::unordered_map<uint64_t, PreviewPick> preview_picks;
+	for (auto it = preview_picks.begin(); it != preview_picks.end();) {
+		it = ObjectDB::get_instance(ObjectID(it->first)) == nullptr ? preview_picks.erase(it) : std::next(it);
+	}
+	PreviewPick &state = preview_picks[sound->get_instance_id()];
 	Channel channel;
+	channel.seq_cursor = state.seq_cursor;
+	channel.shuffle_bag = state.shuffle_bag;
+	channel.shuffle_n = state.shuffle_n;
 	const Ref<AudioStream> picked = pick_stream(sound, channel);
+	state.seq_cursor = channel.seq_cursor;
+	state.shuffle_bag = channel.shuffle_bag;
+	state.shuffle_n = channel.shuffle_n;
 	if (picked.is_null()) {
 		if (WarnOnce2D::first(sound->get_instance_id(), SOUND_WARN_EMPTY_STREAM)) {
 			UtilityFunctions::push_warning("BulletSoundData2D: streams is empty, the sound plays nothing.");
@@ -1162,7 +1179,9 @@ void SoundMixer2D::preview_play(BulletSoundData2D *sound, const Vector2 &global_
 	player->set_name(name);
 	player->set_max_polyphony(1);
 	player->set_physics_interpolation_mode(Node::PHYSICS_INTERPOLATION_MODE_OFF);
-	apply_playback_mix(player, sound, picked, volume_offset_db, nullptr, !use_position);
+	// An unknown bus is named once per preview (a fresh list each call).
+	std::vector<String> warned_buses_once;
+	apply_playback_mix(player, sound, picked, volume_offset_db, &warned_buses_once, !use_position);
 	player->set_global_position(global_position);
 	root->add_child(player);
 	player->play();

@@ -125,3 +125,25 @@ func test_preview_looping_compressed_caps_without_hanging() -> void:
 		await physics(1)
 		await _stop_preview(s)
 	expect_no_errors("looping compressed previews stay quiet")
+
+
+## preview_at walks a Sequence list like the game does (each preview plays
+## the next stream, it never restarts at the first), and an unknown bus is
+## named in a warning before the preview falls back to Master.
+func test_preview_cycles_a_sequence_and_warns_about_a_bus() -> void:
+	var s := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+	var a := H.make_sound_stream()
+	var b := H.make_sound_stream()
+	s.streams = [a, b]
+	s.stream_mode = BulletSoundData2D.STREAM_SEQUENCE
+	var played: Array = []
+	for k in 3:
+		s.preview_at(Vector2.ZERO, 0.0, true)
+		played.append(_preview_node(s).stream)
+	assert_eq(played, [a, b, a], "each preview plays the next stream of the sequence")
+	await _stop_preview(s)
+	s.bus = &"NoSuchBus"
+	s.preview_at(Vector2.ZERO, 0.0, true)
+	expect_warning_sequence(["BulletSoundData2D: bus \"NoSuchBus\" does not exist, playing on Master."])
+	assert_eq(str(_preview_node(s).bus), "Master", "falls back to Master")
+	await _stop_preview(s)
