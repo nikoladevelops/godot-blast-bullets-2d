@@ -191,3 +191,29 @@ func test_a_reset_finished_handler_can_spawn_the_next_wave() -> void:
 	assert_eq(factory.get_active_bullet_count(), 2, "and is alive after the reset returns")
 	await idle(3)
 	assert_almost_eq((next[0] as BulletVolley2D).get_curves_elapsed_time(), 3.0 / 60.0, 1e-6, "and ticks normally")
+
+
+## A PARKED volley (auto pooling off, every bullet out) is frozen but still
+## the caller's, documented as wakeable: free_disabled_bullets() and
+## free_bullets_pool() free POOLED volleys only and leave it alone (it wakes
+## afterwards); free_active_bullets() still destroys everything.
+func test_free_disabled_and_pool_spare_parked_volleys() -> void:
+	var v: BulletVolley2D = factory.spawn_volley(H.make_still_data(2))
+	v.set_is_auto_pooling_enabled(false)
+	var pooled: BulletVolley2D = factory.spawn_volley(H.make_still_data(3))
+	await idle(1)
+	v.disable_bullet(0)
+	v.disable_bullet(1)
+	factory.clear_active_bullets() # pools the other one
+	await idle(1)
+	assert_true(v.is_parked(), "drained with pooling off: parked")
+	assert_true(pooled.is_pooled(), "the other volley is pooled")
+	factory.free_disabled_bullets()
+	assert_true(is_instance_valid(v) and v.is_parked(), "free_disabled_bullets spares the parked volley")
+	assert_false(is_instance_valid(pooled), "and frees the pooled one")
+	factory.free_bullets_pool()
+	assert_true(is_instance_valid(v) and v.is_parked(), "free_bullets_pool spares it too")
+	v.enable_bullet(0)
+	assert_true(v.is_bullet_status_enabled(0), "the parked volley still wakes")
+	factory.free_active_bullets()
+	assert_false(is_instance_valid(v), "free_active_bullets destroys it")

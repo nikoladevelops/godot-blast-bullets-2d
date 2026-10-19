@@ -68,10 +68,11 @@ void BulletFactory2D::reindex_volleys() {
 }
 
 void BulletFactory2D::free_pooled_volleys(const PoolKey *key) {
-	// Disabled volleys only. Correct whether auto pooling is on (pooled),
-	// off (never pooled) or was toggled mid-game (mixed).
+	// Disabled volleys only, never a PARKED one (auto pooling off: frozen,
+	// still the caller's, documented as wakeable; free_active_bullets frees
+	// it).
 	const std::vector<VolleyIterationEntry> removed = entries_of(extract_matching_volleys(all_volleys, [key](BulletVolley2D *volley) {
-		return !volley->is_active && (key == nullptr || volley->get_pool_key() == *key);
+		return !volley->is_active && !volley->is_parked() && (key == nullptr || volley->get_pool_key() == *key);
 	}));
 	reindex_volleys();
 	const LifeWatch watch = watch_life();
@@ -150,8 +151,9 @@ void BulletFactory2D::free_active_volleys(const PoolKey *key) {
 }
 
 void BulletFactory2D::free_disabled_volleys(const PoolKey *key) {
+	// Same rule as free_pooled_volleys: a parked volley is spared.
 	const std::vector<VolleyIterationEntry> removed = entries_of(extract_matching_volleys(all_volleys, [key](BulletVolley2D *volley) {
-		return !volley->is_active && (key == nullptr || volley->get_pool_key() == *key);
+		return !volley->is_active && !volley->is_parked() && (key == nullptr || volley->get_pool_key() == *key);
 	}));
 	const LifeWatch watch = watch_life();
 	for (const VolleyIterationEntry &entry : removed) {
