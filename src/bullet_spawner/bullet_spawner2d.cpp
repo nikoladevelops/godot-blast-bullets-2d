@@ -1222,7 +1222,10 @@ bool BulletSpawner2D::muzzle_outside_despawn_bounds(const BulletFactory2D *facto
 		return false;
 	}
 	const Rect2 bounds = factory->get_despawn_bounds_rect();
-	const Vector2 muzzle = get_global_position() + resolve_spawn_offset_global();
+	// Bullets are born at the effective generator (the transforms generator
+	// when set), so that is where the muzzle sits.
+	const Node2D *base = is_inside_tree() ? get_effective_generator() : nullptr;
+	const Vector2 muzzle = (base != nullptr ? base->get_global_position() : get_global_position()) + resolve_spawn_offset_global();
 	return muzzle.x < bounds.position.x || muzzle.y < bounds.position.y || muzzle.x > bounds.position.x + bounds.size.x || muzzle.y > bounds.position.y + bounds.size.y;
 }
 

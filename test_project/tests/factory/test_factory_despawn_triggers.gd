@@ -80,6 +80,20 @@ func test_the_muzzle_offset_decides() -> void:
 	assert_false(sp.shoot_once(), "inside the bounds itself, but the muzzle is outside")
 
 
+## Bullets are born at the effective generator (transforms_generator), so
+## the generator's position decides, not the spawner node's.
+func test_an_external_generator_decides() -> void:
+	var gen: Node2D = add(Node2D.new())
+	gen.position = Vector2(900, 100)
+	var sp := _spawner(Vector2(200, 100))
+	sp.set_transforms_generator(gen)
+	assert_false(sp.shoot_once(), "the spawner sits inside, but its generator (where bullets spawn) is outside")
+	assert_eq(skipped, [&"outside_despawn_bounds"], "with a reason")
+	gen.position = Vector2(200, 100)
+	sp.position = Vector2(900, 100)
+	assert_true(sp.shoot_once(), "the spawner sits outside, but its generator is inside")
+
+
 func test_an_auto_firing_spawner_waits_outside_and_starts_when_it_enters() -> void:
 	var sp := _spawner(Vector2(900, 100))
 	sp.shoot_interval_sec = 0.1
