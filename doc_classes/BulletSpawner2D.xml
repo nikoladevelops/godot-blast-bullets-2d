@@ -37,7 +37,7 @@
 			<return type="void" />
 			<param index="0" name="preset" type="int" />
 			<description>
-				Applies a named starter pattern (radial dense/sparse, 3-arm spiral, narrow/wide aimed fan, slow ring, gap wall, rain, 6-petal flower, scatter burst, cross burst, star shell, heart bloom, snake wave, waterfall curtain, petal storm via Rose, twin counter-spiral, aimed trap via Corridor, blossom finale via Rose, terrain crest via Custom) and switches pattern_source to match. Presets are clean: every Bullet Patterns knob and Spin first return to their defaults, so the same preset always gives the same pattern. The Transform subgroup (scales, muzzle offset, skip indices) and node wiring (aimed target, Path2D, custom array) are kept. Nothing fires. Custom (-1) does nothing; other values out of range fail loud. The twin counter-spiral and blossom finale presets turn spin on.
+				Applies a named starter pattern (radial dense/sparse, 3-arm spiral, narrow/wide aimed fan, slow ring, gap wall, rain, 6-petal flower, scatter burst, cross burst, star shell, heart bloom, snake wave, waterfall curtain, petal storm via Rose, twin counter-spiral, aimed trap via Corridor, blossom finale via Rose, terrain crest via Custom) and switches pattern_source to match. Presets are clean: every Bullet Patterns number, switch and vector knob and Spin first return to their defaults, so the same preset always gives the same pattern; the user lists ([member helper_skip_indices], [member helper_outline_layer_scales], [member helper_custom_transforms]) are kept like the wiring. The Transform subgroup (scales, muzzle offset, skip indices) and node wiring (aimed target, Path2D, custom array) are kept. Nothing fires. Custom (-1) does nothing; other values out of range fail loud. The twin counter-spiral and blossom finale presets turn spin on.
 			</description>
 		</method>
 		<method name="begin_burst">
@@ -1582,7 +1582,7 @@
 			Reload jitter in seconds: each auto volley waits shoot_interval_sec +/- uniform jitter (seeded by [member reload_jitter_seed], floored at 0.001s so fast intervals keep working with jitter on). 0 is exact. Must be finite and 0 or more.
 		</member>
 		<member name="reload_jitter_seed" type="int" setter="set_reload_jitter_seed" getter="get_reload_jitter_seed" default="0">
-			Seed for [member reload_jitter_sec] only. 0 is non-deterministic, otherwise the jitter sequence reproduces exactly; different seeds give independent sequences. Does nothing while [member reload_jitter_sec] is 0. Does not affect any bullet pattern or homing pick.
+			Seed for every timing roll: [member reload_jitter_sec] and the ranges of [member shoot_interval_max_sec], [member burst_interval_max_sec] and [member telegraph_max_sec]. 0 is non-deterministic, otherwise the timing sequence reproduces exactly; different seeds give independent sequences. Does not affect any bullet pattern or homing pick.
 		</member>
 		<member name="shoot_initial_delay_sec" type="float" setter="set_shoot_initial_delay_sec" getter="get_shoot_initial_delay_sec" default="0.0">
 			Delay before the first automatic volley. Applied when the spawner becomes ready and by [method reset_shooting]. Must be finite and 0 or more.
@@ -1591,7 +1591,7 @@
 			When above [member shoot_interval_sec], every wait between shots is drawn between the two (seeded by [member reload_jitter_seed] like the reload jitter, which then adds its own spread on top). 0 (default) keeps the interval fixed. Must be finite and 0 or more.
 		</member>
 		<member name="shoot_interval_sec" type="float" setter="set_shoot_interval_sec" getter="get_shoot_interval_sec" default="1.0">
-			Seconds between automatic volleys. Must be above zero. Shortening it also shortens the wait already running. Runs on an accumulator: overshoot carries over so the average rate is exact at any value (fast intervals repay every due volley in the same tick, up to 8 pulls; hitch backlogs beyond that resync instead of bursting).
+			Seconds between automatic volleys. Must be above zero. Shortening it also shortens the wait already running. Runs on an accumulator: overshoot carries over so the average rate is exact at any value (fast intervals repay every due volley in the same tick, up to 8 pulls; hitch backlogs beyond that resync instead of bursting). With bursts or a telegraph the interval starts after the chain: a trigger pull waits the interval, then the whole chain (telegraph, burst shots) plays before the next wait begins. Burst steps and pattern-list entries keep their own average rate the same way.
 		</member>
 		<member name="shoot_outside_despawn_bounds" type="bool" setter="set_shoot_outside_despawn_bounds" getter="get_shoot_outside_despawn_bounds" default="false">
 			When the factory's [member BulletFactory2D.despawn_bounds_enabled] is on, a spawner whose muzzle (its global position plus the spawn position offset) is outside [member BulletFactory2D.despawn_bounds_rect] does not shoot: the bullets would be culled on their first tick. The shot is reported through [signal volley_skipped] with the reason "outside_despawn_bounds" (no error), auto-fire keeps its rhythm, and the spawner shoots again as soon as the muzzle is inside. Edges count as inside. Turn this on to shoot from outside anyway (bullets that fly inwards survive the cull).
@@ -1766,7 +1766,7 @@
 		</signal>
 		<signal name="burst_finished">
 			<description>
-				Fired once whenever a burst chain ends: after its last shot, when it aborts after a full burst's worth of consecutive failed shots (a failed shot is retried, never silently consumed; each attempt reports through volley_skipped), or when it is cancelled (auto-fire or burst mode switched off, burst_count shrunk below the shots already fired).
+				Fired once whenever a burst chain ends: after its last shot, when it aborts after a full burst's worth of consecutive failed shots (a failed shot is retried, never silently consumed; each attempt reports through volley_skipped), or when it is cancelled (auto-fire or burst mode switched off, burst_count shrunk to the shots already fired or fewer, [method reset_shooting], or a new [method begin_burst] over a running chain, which then reports its own end too).
 			</description>
 		</signal>
 		<signal name="burst_shot_fired">

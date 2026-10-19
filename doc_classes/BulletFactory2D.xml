@@ -108,7 +108,7 @@
 			<return type="bool" />
 			<param index="0" name="delta" type="float" />
 			<description>
-				Debug/test helper: runs one factory physics step with an explicit [param delta] (hitch and zero-delta audits; the engine loop always steps at the physics rate). Returns [code]false[/code] and advances nothing while the factory is paused. A non-finite or negative delta, or a call from inside a running tick, is refused with an error.
+				Debug/test helper: runs one factory physics step with an explicit [param delta] (hitch and zero-delta audits; the engine loop always steps at the physics rate). Returns [code]false[/code] and advances nothing while the factory is paused. A non-finite or negative delta, a call from inside a running tick, and a factory that is not in the tree or is being freed are refused with an error.
 			</description>
 		</method>
 		<method name="debug_assert_no_dangling">
@@ -248,7 +248,7 @@
 		<method name="debug_get_pool_hit_stats" qualifiers="const">
 			<return type="Dictionary" />
 			<description>
-				Pool reuse counters (64-bit): hits, misses. A spawn from inside a volley's own collision handler never reuses that volley (it is mid-tick), so it is served by another pooled instance or a fresh allocation and still succeeds. A 0% hit rate with a pre-populated pool means the spawn key never matches (e.g. helper_skip_indices shrank transforms after populate); compare [method debug_expected_pool_key] against [method debug_get_bullets_pool_info] keys.
+				Pool reuse counters (64-bit): hits, misses. A spawn from inside a volley's own collision handler never reuses that volley (it is mid-tick), so it is served by another pooled instance or a fresh allocation and still succeeds. A 0% hit rate with a pre-populated pool means the spawn key never matches (e.g. helper_skip_indices shrank transforms after populate); compare [method debug_expected_pool_key] against [method debug_get_bullets_pool_info] keys with [method VolleyPoolKey2D.equals] (keys are Resources: [code]==[/code] compares identity).
 			</description>
 		</method>
 		<method name="debug_get_sound_log" qualifiers="const">
@@ -385,7 +385,7 @@
 			<return type="void" />
 			<param index="0" name="key" type="VolleyPoolKey2D" default="null" />
 			<description>
-				Frees pooled (disabled) volleys. Pass [code]null[/code] (default) to free the whole pool, or a [VolleyPoolKey2D] to free only that exact amount_bullets + shape bucket. Example: [code]VolleyPoolKey2D.make(200, PhysicsServer2D.SHAPE_CIRCLE)[/code]. Refused during the physics step; call it deferred then.
+				Frees pooled (disabled) volleys; parked volleys (auto pooling off: frozen, still yours, wakeable) are kept, [method free_active_bullets] frees them. Pass [code]null[/code] (default) to free the whole pool, or a [VolleyPoolKey2D] to free only that exact amount_bullets + shape bucket. Example: [code]VolleyPoolKey2D.make(200, PhysicsServer2D.SHAPE_CIRCLE)[/code]. Refused during the physics step; call it deferred then.
 			</description>
 		</method>
 		<method name="free_bullets_pool_deferred">
@@ -399,7 +399,7 @@
 			<return type="void" />
 			<param index="0" name="key" type="VolleyPoolKey2D" default="null" />
 			<description>
-				Frees disabled (pooled) bullets. Pass [code]null[/code] (default) to free all, or a [VolleyPoolKey2D] to free only that exact amount_bullets + shape bucket. Refused during the physics step; call it deferred then.
+				Frees disabled (pooled) bullets; parked volleys (auto pooling off: frozen, still yours, wakeable) are kept, [method free_active_bullets] frees them. Pass [code]null[/code] (default) to free all, or a [VolleyPoolKey2D] to free only that exact amount_bullets + shape bucket. Refused during the physics step; call it deferred then.
 			</description>
 		</method>
 		<method name="free_disabled_bullets_deferred">
@@ -639,13 +639,13 @@
 			When on (default), the factory registers custom monitors on ready, graphed while the game runs in the editor's Debugger &gt; Monitors tab: BlastBullets2D/Active Bullets, Active Volleys, Pooled Volleys, Physics Tick (ms), Peak Physics Tick (ms), Interpolation (ms), Active Effects and Active Attachments. Use them to spot which frames are heavy and what causes it. One factory owns the monitor ids at a time (the first to become ready; others skip silently, and a freed owner's ids are reclaimed). Runtime only, never in the editor; removed when the factory leaves the tree.
 		</member>
 		<member name="sound_max_voices" type="int" setter="set_sound_max_voices" getter="get_sound_max_voices" default="32">
-			Voice pool size for the whole factory: one AudioStreamPlayer2D per simultaneous sound. Voices are created on demand; past this a new event steals the oldest voice of equal or lower priority, never a more important one. The pool only grows to its high-water mark: lowering the cap later never frees existing voices.
+			Voice pool size for the whole factory: one AudioStreamPlayer2D per simultaneous sound. Voices are created on demand; past this a new event steals the oldest voice of equal or lower priority, never a more important one. The pool only grows to its high-water mark: lowering the cap later never frees existing voices, but no more than the new cap play at once (the idle ones past it wait until the cap grows).
 		</member>
 		<member name="split_max_children_per_sweep" type="int" setter="set_split_max_children_per_sweep" getter="get_split_max_children_per_sweep" default="0">
 			The most children one sweep spawns (0 = no cap, the default). Splits over the cap wait for the next sweep in order and are never dropped; a first split larger than the cap still spawns. Use it to spread a mass split over a few frames.
 		</member>
 		<member name="time_scale" type="float" setter="set_time_scale" getter="get_time_scale" default="1.0">
-			Speed of the bullet world. Every volley tick, one-shot effect and bullet timer advances by delta times this value: 1 is real time, 0.25 is slow motion, 0 freezes bullets while the factory keeps processing (collisions already in flight still resolve). Spawners that use this factory run on it too (their cadence, bursts, telegraph, spin and movement, multiplied by their own [member BulletSpawner2D.time_scale]), and so do the bullets they fired. The rescan interval of graze targets and sound fades and intervals stay in real time. Must be finite and 0 or more. This is not [member Engine.time_scale].
+			Speed of the bullet world. Every volley tick, one-shot effect and bullet timer advances by delta times this value: 1 is real time, 0.25 is slow motion, 0 freezes bullets while the factory keeps processing (collisions already in flight still resolve). Spawners that use this factory run on it too (their cadence, bursts, telegraph, spin and movement, multiplied by their own [member BulletSpawner2D.time_scale]), and so do the bullets they fired. The rescan interval of graze targets and sound fades and intervals stay in real time. Must be finite and 0 or more; any such value is accepted, but one volley tick never covers more than 10 s of bullet time (a huge scale slows down there instead of turning bullets into INF). This is not [member Engine.time_scale].
 		</member>
 		<member name="use_physics_interpolation" type="bool" setter="set_use_physics_interpolation_editor" getter="get_use_physics_interpolation" default="false">
 			Determines whether physics interpolation is enabled or not. The setter is for the editor only.

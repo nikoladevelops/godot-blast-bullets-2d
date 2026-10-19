@@ -380,7 +380,8 @@ public:
 	void preview();
 	// Same, at a global pose with a volume offset and positioning honored
 	// (the spawner's preview path). Editor only like preview(), but also
-	// allowed at runtime (harmless: same as a play).
+	// allowed at runtime, where it bypasses the mixer (no interval, voice
+	// cap, priority, distance, camera or occlusion rules).
 	void preview_at(const Vector2 &global_position, float volume_offset_db, bool use_position);
 	// This entry's live preview player, or null (tests and the smoke probe
 	// read mix state through it).

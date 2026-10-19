@@ -2393,7 +2393,7 @@
 			Whether a bounce also counts as a normal hit, set live. False (default) means free bounces. A consumed bounce emits BOTH the bounce signal and the matching area/body signal.
 		</member>
 		<member name="bounce_mask" type="int" setter="set_bounce_mask" getter="get_bounce_mask" default="0">
-			Bitmask of target collision layers that trigger a bounce, set live. Takes precedence over the normal collision path. 0 (default) disables bouncing. Spawn-time equivalent lives on [member BulletVolleyData2D.bounce_mask] (reseeded on every pool reuse).
+			Bitmask of target collision layers that trigger a bounce, set live. An unsigned 32-bit value like [member BulletVolleyData2D.bounce_mask] (layer 32 is 2147483648). Takes precedence over the normal collision path. 0 (default) disables bouncing. Spawn-time equivalent lives on [member BulletVolleyData2D.bounce_mask] (reseeded on every pool reuse).
 		</member>
 		<member name="bounce_max_count" type="int" setter="set_bounce_max_count" getter="get_bounce_max_count" default="0">
 			How many times a single bullet may bounce before bounces stop for it, set live. 0 (default) = unlimited. Read per-bullet progress with [method bullet_get_bounce_count].

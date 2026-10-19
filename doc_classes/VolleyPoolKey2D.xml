@@ -13,6 +13,13 @@
 	<tutorials>
 	</tutorials>
 	<methods>
+		<method name="equals" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="other" type="VolleyPoolKey2D" />
+			<description>
+				True when [param other] names the same pool bucket (same [member amount_bullets] and [member shape_type]). Keys are Resources, so [code]==[/code] compares identity; use this to match [method BulletFactory2D.debug_expected_pool_key] against the keys of [method BulletFactory2D.debug_get_bullets_pool_info]. False for null.
+			</description>
+		</method>
 		<method name="make" qualifiers="static">
 			<return type="VolleyPoolKey2D" />
 			<param index="0" name="amount_bullets" type="int" />

@@ -108,7 +108,7 @@
 			Whether a bounce also counts as a normal hit (increments the collision counter and can disable the bullet at [member bullet_max_collision_count]). False (default) means free bounces that never kill the bullet. A consumed bounce emits BOTH the bounce signal and the matching area/body signal.
 		</member>
 		<member name="bounce_mask" type="int" setter="set_bounce_mask" getter="get_bounce_mask" default="0">
-			Bitmask of target collision layers that trigger a bounce, applied at spawn time (and on pool reuse). Checked against the collided object's collision_layer and takes precedence over the normal collision path. 0 (default) disables bouncing. NOTE: these bits must overlap [member collision_mask], otherwise the bullet never detects those targets at all (warned once per spawn). Use [method set_bounce_mask_from_array] to build it from layer numbers.
+			Bitmask of target collision layers that trigger a bounce, applied at spawn time (and on pool reuse). An unsigned 32-bit value: layer 32 is 2147483648, the most is 4294967295; negative values are refused. Checked against the collided object's collision_layer and takes precedence over the normal collision path. 0 (default) disables bouncing. NOTE: these bits must overlap [member collision_mask], otherwise the bullet never detects those targets at all (warned once per spawn). Use [method set_bounce_mask_from_array] to build it from layer numbers.
 		</member>
 		<member name="bounce_max_count" type="int" setter="set_bounce_max_count" getter="get_bounce_max_count" default="0">
 			How many times a single bullet may bounce before bounces stop working for it (further hits take the normal collision path). 0 (default) = unlimited (lifetime still bounds it). Stops wall-to-wall ping-pong from living forever.
