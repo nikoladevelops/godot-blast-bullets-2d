@@ -174,10 +174,13 @@
 	</members>
 	<constants>
 		<constant name="MOTION_BURST_AND_MAGNET" value="0" enum="MotionMode">
+			Built-in coin physics: each pickup keeps part of its bullet's velocity, drifts out with drag, and after [member magnet_delay_sec] the magnet accelerates it to the target.
 		</constant>
 		<constant name="MOTION_KEEP_BULLET_MOTION" value="1" enum="MotionMode">
+			Each pickup keeps the speed, top speed and acceleration of the bullet it was; only the steering towards the target is added.
 		</constant>
 		<constant name="MOTION_CUSTOM" value="2" enum="MotionMode">
+			Your own speed and curves data decide the motion; only the heading comes from the bullet.
 		</constant>
 	</constants>
 </class>

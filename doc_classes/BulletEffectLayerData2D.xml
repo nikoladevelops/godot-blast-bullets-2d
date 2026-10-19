@@ -117,6 +117,7 @@
 			One-shot fired by manual clears only ([method BulletVolley2D.clear_all_bullets], [method BulletFactory2D.clear_active_bullets] and the single-bullet clear). Collision kills fire On Destroy, timeouts fire On Lifetime Over and teardown (reset/free) stays silent, so a clear layer never doubles another trigger.
 		</constant>
 		<constant name="EFFECT_ON_DESPAWN" value="7" enum="EffectTrigger">
+			One-shot fired at a bullet culled by the factory's despawn bounds ([member BulletFactory2D.despawn_bounds_enabled]), at its last pose. Bullets with [member BulletVolleyData2D.ignore_despawn_bounds] are never culled, so they never fire it.
 		</constant>
 		<constant name="EFFECT_ON_SPLIT" value="8" enum="EffectTrigger">
 			Fired at a bullet's pose when it splits into children ([BulletSplitStage2D]), whatever made it split. The parent's own death trigger (On Destroy, On Lifetime Over, ...) fires too unless [member BulletSplitStage2D.fire_death_effects] is off.

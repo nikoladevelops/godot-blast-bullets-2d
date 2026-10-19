@@ -1964,18 +1964,25 @@
 			Every entry of [member graze_global_positions], read every tick. The signals carry a null [code]target[/code].
 		</constant>
 		<constant name="SOUND_LISTENER_GODOT_LISTENER" value="0" enum="SoundListenerSource">
+			Godot's current listener: the active AudioListener2D, else the current Camera2D.
 		</constant>
 		<constant name="SOUND_LISTENER_NODE_GROUP" value="1" enum="SoundListenerSource">
+			The Node2D members of [member sound_listener_node_group].
 		</constant>
 		<constant name="SOUND_LISTENER_NODE_PATH" value="2" enum="SoundListenerSource">
+			The Node2D at [member sound_listener_path].
 		</constant>
 		<constant name="SOUND_LISTENER_NODE_NAME" value="3" enum="SoundListenerSource">
+			The Node2Ds named like [member sound_listener_node_name] (a scene scan).
 		</constant>
 		<constant name="SOUND_LISTENER_NODE_CHILDREN" value="4" enum="SoundListenerSource">
+			The Node2D children of [member sound_listener_children_parent_path].
 		</constant>
 		<constant name="SOUND_LISTENER_MOUSE" value="5" enum="SoundListenerSource">
+			The mouse cursor, in the bullets' canvas coordinates.
 		</constant>
 		<constant name="SOUND_LISTENER_GLOBAL_POSITIONS" value="6" enum="SoundListenerSource">
+			Every entry of [member sound_listener_global_positions].
 		</constant>
 		<constant name="MOVEMENT_SPACE_ATTACH" value="0" enum="MovementSpace">
 			The spawner sits on the path (like [PathFollow2D]).

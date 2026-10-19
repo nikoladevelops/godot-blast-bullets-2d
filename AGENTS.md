@@ -270,7 +270,12 @@ python3 tools/lint_tests.py                  # static test lint (run first by th
   `Leaked instance:`, `RID ... leaked`, `resources still in use`,
   `Orphan StringName`.
 - `BlastTest.after_each` asserts `debug_assert_no_dangling()` and zero new
-  orphans after EVERY test: a leak fails at the test, not at exit.
+  orphans after EVERY test: a leak fails at the test, not at exit. The
+  dangling check also runs `BulletVolley2D.debug_check_invariants()` on every
+  tracked volley (per-bullet storage covers the bullets, orbit/homing
+  counters match their arrays, a pooled volley holds no pickup, graze,
+  sound, material or custom data) and rejects duplicate pool entries and
+  incomplete queued splits. A new per-volley invariant goes there.
 - Deliberate leakers/failers live in `test_project/tests_meta/` and run only
   via `--self-test` (they must be reported, never green).
 - `integration/test_steady_state_memory.gd` pins the live Object count over
@@ -460,7 +465,15 @@ func test_<behavior>_<expectation>() -> void:
 - Physics tests need REAL frames: spawn → `await physics(k)` with
   early-break; assert counts, signals AND finiteness.
 - Re-entrancy: `integration/test_reentrant_frees.gd` frees things inside
-  every signal handler. Godot REFUSES `free()` on an object that is
+  every signal handler.
+- Chaos: `integration/test_chaos_fuzz.gd` runs a seeded battlefield (up to 8
+  spawners sharing flock/graze/sound/split Resources, real physics, frees,
+  reparents, resets, pickups, live edits, handlers acting inside the sweep)
+  and demands zero errors, balanced books and finite bullets after every
+  step. A failure names its seed: rerun it alone with `CHAOS_SEEDS=<seed>,`,
+  bisect with `CHAOS_SKIP=<op ids>` / `CHAOS_SKIP_HANDLERS=1`, soak with
+  `CHAOS_SEEDS=200`. New operations go into `_operate` (idle point) or
+  `_handler` (inside the sweep: only what is legal there). Godot REFUSES `free()` on an object that is
   emitting; handlers must `queue_free()` the emitter.
 - Feature crosses: combine 2–4 systems; assert each system's signature, full
   finiteness and pool-reuse neutrality. Pairwise beats exhaustive.
@@ -536,7 +549,7 @@ bullet). Inside, inputs read as `p.<field>`; the function names itself once
 and rejects input in a fixed order (`patterns_shapes.cpp`, grid):
 ```cpp
 const char *caller = "helper_generate_transforms_grid";
-PATTERN_REQUIRE(pattern_check_amount(caller, transforms_amount));       // "<caller>: transforms_amount must be between 0 and 10000."
+PATTERN_REQUIRE(pattern_check_amount(caller, transforms_amount));       // "<caller>: transforms_amount must be between 0 and 20000." (the limit: §10.4)
 PATTERN_REJECT_IF(!Math::is_finite(p.jitter) || p.jitter < 0.0, "jitter must be a finite number >= 0."); // pushes "<caller>: <tail>", returns {}
 PATTERN_REQUIRE(pattern_check_marker(caller, marker_transform, false)); // finite marker (true = also invertible)
 ```
@@ -726,7 +739,9 @@ src/
   bullet_spawner/bullet_spawner2d_graze.cpp      Graze group: target sources + detector, arming at shot, refresh/resolve_graze_targets, ring preview (GrazePreviewLayer2D)
   bullet_spawner/bullet_spawner2d_flock.cpp      Flocking group: flock_enabled/flock/flock_scope, the shared FlockConfig2D, arming at shot
   bullet_spawner/bullet_spawner2d_bindings.cpp   _bind_methods (groups/subgroups) + _validate_property
-  data/        inspector Resources: BulletVolleyData2D, BulletSpeed/Rotation/Curves/Wobble/EffectLayerData2D, BulletGrazeZone2D, BulletFlock2D
+  data/        inspector Resources: BulletVolleyData2D, BulletSpeed/Rotation/Curves/Wobble/EffectLayerData2D, BulletGrazeZone2D, BulletFlock2D,
+               BulletSoundData2D, BulletPickupData2D, BulletSplitStage2D, BulletSplitData2D (every accepted edit emits `changed` once:
+               `data/test_data_setter_contract.gd` sweeps it)
   pooling/     VolleyPool (parked volleys per key), VolleyPoolKey2D
   attachments/ BulletAttachment2D + its object pool
   debugger/    BulletVolleyDebugger2D (collision-shape overlay)
@@ -762,6 +777,10 @@ src/
 - Structural ops (`reset/free_*/populate_*`, shape changes) are idle-frame
   only: inside a physics frame they are REJECTED loudly. Their `*_deferred`
   twins queue through `queue_structural_call` and are safe from anywhere.
+  The queue holds plain C++ calls (`std::function`), never method-name
+  Callables: `Object::callp` locks the factory for the call, so a `free()`
+  of it from a callback inside a deferred reset was refused ("locked
+  object"). The flush checks `watch_life()` after every call.
   `free_active_bullets()` DESTROYS; clear/expiry return drained volleys to
   the pool (or park them with auto pooling off).
 
@@ -847,6 +866,10 @@ deduped, cancelled by REMOVED) and replayed once on resume.
 
 ## 14. Contracts and pitfalls catalog (pinned by tests — do not "fix" back)
 
+- Pool time drops everything a life brought: `release_life` unrefs the
+  material and its instance shader parameter values too, and a
+  pre-populated volley runs the real `release_life` (it kept the populate
+  data's resources alive before).
 - Ranges: `all_bullets_*(start, end)`: (0, -1) = whole volley, end -1 =
   through the last bullet; out-of-range/inverted ranges push `Invalid index
   range in <fn> ...` once and apply NOTHING (`volley/test_volley_range_contract.gd`).
@@ -954,7 +977,7 @@ deduped, cancelled by REMOVED) and replayed once on resume.
 ### 15.1 Running
 
 ```sh
-python3 tools/run_benchmarks.py                     # 24 headless scenarios x5 (median)
+python3 tools/run_benchmarks.py                     # 30 headless scenarios x5 (median)
 python3 tools/run_benchmarks.py --scenario spawner_ # substring filter (repeatable)
 python3 tools/run_benchmarks.py --gate              # exit 1 on regression vs log/baseline.json
 python3 tools/run_benchmarks.py --update-baseline   # ONLY for an accepted change; say so in the commit
@@ -1254,7 +1277,7 @@ emits `GRAZE_POINT_TARGET_BIT | index` ids and belongs in
 
 | Piece | Where | Notes |
 |---|---|---|
-| Entry resource | `data/bullet_sound_data2d.*` | One list entry per sound: triggers (11 SOUND_ON_* ids, serialized), streams + stream mode, mix (volume, pitch, randoms, bus), spatial, limits, fades, ducking, follow_bullet |
+| Entry resource | `data/bullet_sound_data2d.*` | One list entry per sound: triggers (13 SOUND_ON_* ids, serialized), streams + stream mode, mix (volume, pitch, randoms, bus), spatial, limits, fades, ducking, follow_bullet |
 | Volley arming | `bullet_volley/bullet_volley2d_sound.cpp` | `sound_set_effects` (factory volleys), `sound_arm_from_spawner` (spawner volleys); trigger sites call `sound_fire`, On Flight calls `sound_fire_flight` from the tick |
 | Factory hatch | `factory/bullet_factory2d_sound.cpp` | `sound_offer` (volleys and spawner), `play_sound` (manual), debug readouts |
 | Mixer | `factory/sound_mixer2d.*` | Channels per resource (shared by every spawner using it), bounded per-sweep candidates (nearest wins), voice pool (one AudioStreamPlayer2D per voice, polyphony 1), `flush` at the end of the factory sweep |
@@ -1280,7 +1303,7 @@ emits `GRAZE_POINT_TARGET_BIT | index` ids and belongs in
 
 ### 21.4 Tests
 
-`test_project/tests/sound/` (14 suites plus `test_sound_rng_isolation`; `test_sound_reentrancy` pins user code inside the sweep). Mixer rules live in `test_sound_mixer_unit`, flight and hum rules in `test_sound_flight`, spatial and camera in `test_sound_spatial_limits` and `test_sound_camera`.
+`test_project/tests/sound/` (16 suites, `test_sound_rng_isolation` among them; `test_sound_reentrancy` pins user code inside the sweep). Mixer rules live in `test_sound_mixer_unit`, flight and hum rules in `test_sound_flight`, spatial and camera in `test_sound_spatial_limits` and `test_sound_camera`.
 
 ## 22. World controls (time scale, despawn bounds, randomization, pickups)
 
@@ -1308,8 +1331,9 @@ emits `GRAZE_POINT_TARGET_BIT | index` ids and belongs in
 ### 22.2 Randomization (spawner, applied at shot time)
 
 - Group "Randomization": scale (Off/Uniform/Per Axis), rotation and position jitter, speed
-  multiplier, `bullet_random_seed`; plus `spin_random_start_phase` and the timing ranges
-  `shoot_interval_max_sec` / `burst_interval_max_sec` / `telegraph_max_sec`.
+  multiplier, `bullet_random_seed`. Randomized by the same rules but shown in their own groups:
+  `spin_random_start_phase` (Spin) and the timing ranges `shoot_interval_max_sec` /
+  `burst_interval_max_sec` / `telegraph_max_sec` (Shooting).
 - Rules: min/max pairs are never validated against each other (normalized at use: scene loading
   sets min before max); every knob off draws nothing from the global RNG; seeded rolls are a pure
   SplitMix64 hash of (seed, shots fired, channel, bullet index) so channels never share numbers;

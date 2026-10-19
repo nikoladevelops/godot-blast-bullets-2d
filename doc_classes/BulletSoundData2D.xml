@@ -217,6 +217,7 @@
 			Offers every sweep per live bullet at its current pose, through the same channels (interval, voices, steal all apply). Built for short positional blips: voices sit where they start unless [member follow_bullet] is on. A following entry keeps one voice per bullet, which rides the bullet until it ends, then fades.
 		</constant>
 		<constant name="SOUND_ON_DESPAWN" value="11" enum="SoundTrigger">
+			Plays when the factory's despawn bounds cull a bullet, at its last position.
 		</constant>
 		<constant name="SOUND_ON_SPLIT" value="12" enum="SoundTrigger">
 			Played where a bullet splits into children ([BulletSplitStage2D]), whatever made it split.

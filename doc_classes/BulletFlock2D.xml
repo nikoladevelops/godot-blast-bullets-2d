@@ -53,6 +53,7 @@
 		<method name="get_matching_preset" qualifiers="const">
 			<return type="int" enum="BulletFlock2D.Preset" />
 			<description>
+				The preset whose steering knobs equal this flock's exactly, or [constant PRESET_CUSTOM] when none does. Unlike [member preset], it ignores whether Custom was picked by hand.
 			</description>
 		</method>
 	</methods>

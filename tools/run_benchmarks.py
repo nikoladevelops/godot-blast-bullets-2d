@@ -4,7 +4,7 @@
 Each scenario in test_project/benchmarks/scenarios/*.gd (a BlastBenchmark)
 runs in its own headless Godot process with SIMULATED time
 (`--fixed-fps 60`): frames are never slept on, so a frame's wall time is the
-CPU cost of that frame. Every scenario is repeated (--repeat, default 3) and
+CPU cost of that frame. Every scenario is repeated (--repeat, default 5) and
 the median of each statistic is kept to damp OS noise.
 
 Outputs (all under test_project/benchmarks/log/):
