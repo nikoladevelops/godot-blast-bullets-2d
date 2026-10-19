@@ -137,7 +137,7 @@ MultiMeshInstance2D *BulletFactory2D::fx_create_shard(Node *parent, const Ref<Te
 	quad->set_size(quad_size);
 	mm->set_mesh(quad);
 	// Same never-cull box as the bullet volleys: effects live all over the level.
-	mm->set_custom_aabb(AABB(Vector3(-100000, -100000, -1000), Vector3(200000, 200000, 2000)));
+	mm->set_custom_aabb(never_culled_aabb2d());
 	mm->set_instance_count(Math::max(1, instance_count));
 	for (int i = 0; i < mm->get_instance_count(); ++i) {
 		mm->set_instance_transform_2d(i, FX_HIDDEN_TRANSF);

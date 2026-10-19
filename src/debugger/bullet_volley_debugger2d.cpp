@@ -1,5 +1,6 @@
 #include "debugger/bullet_volley_debugger2d.hpp"
 #include "bullet_volley/bullet_volley2d.hpp"
+#include "core/transform_math2d.hpp"
 #include "godot_cpp/core/memory.hpp"
 #include "godot_cpp/core/object.hpp"
 
@@ -237,6 +238,10 @@ void BulletVolleyDebugger2D::generate_debug_multimesh(Node *node_entered_contain
 
 	// Allow for the multimesh instances (for each QuadMesh) to have a different color -- this is needed in order to support debugger_color
 	multi->set_use_colors(true);
+
+	// Never culled (see never_culled_aabb2d): without fixed bounds a moved
+	// volley's shapes vanished while its bullets stayed on screen.
+	multi->set_custom_aabb(never_culled_aabb2d());
 
 	// Get all collision shape transforms that the multimesh will have to render. The whole idea is give me a bunch of collision shape transforms and render them as a bunch of rectangles (QuadMeshes)
 	const std::vector<Transform2D> &all_collision_shape_transforms_for_debugging = debugger_data_provider->get_all_collision_shape_transforms_for_debugging();

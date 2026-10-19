@@ -120,3 +120,34 @@ func test_debugger_draws_every_shape_where_it_is() -> void:
 			if Color(buf[b + 8], buf[b + 9], buf[b + 10], buf[b + 11]) != Color(1, 0, 0, 0.5):
 				bad += "shape %d color; " % i
 		assert_eq(bad, "", "pass %d: every shape drawn on its bullet in the debugger color" % k)
+
+
+## A 2D canvas item culls by the bounds it had when it was drawn, while the
+## plugin's instances move every tick: every multimesh the plugin draws
+## (bullets, trail and one-shot effect shards, debugger shapes) carries fixed
+## bounds wider than any world, so nothing is culled by stale bounds and no
+## bullet vanishes far from the origin. (The debugger had none: its shapes
+## disappeared from moved volleys; the old +-100000 px box hid far bullets.)
+func test_every_plugin_multimesh_is_never_culled() -> void:
+	factory.is_debugger_enabled = true
+	var d := H.make_volley_data(3, 100.0, 30.0)
+	d.effect_layers = [H.make_effect_layer(BulletEffectLayerData2D.EFFECT_TRAIL_FOLLOW, 2), H.make_effect_layer(BulletEffectLayerData2D.EFFECT_ON_CLEAR, 2)]
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	await physics(2)
+	v.clear_bullet(0) # the On Clear flash makes the one-shot effect shards
+	await physics(2)
+	var meshes: Array = [v.multimesh]
+	for c in v.get_children(true):
+		if c is MultiMeshInstance2D:
+			meshes.append(c.multimesh)
+	for path in ["BulletVolleysDebugger", "SpriteEffectsContainer"]:
+		for c in factory.get_node(path).get_children(true):
+			if c is MultiMeshInstance2D:
+				meshes.append(c.multimesh)
+	assert_gt(meshes.size(), 4, "volley, trail shards, effect shards and debugger nodes found")
+	var far := AABB(Vector3(-1e9, -1e9, 0), Vector3(2e9, 2e9, 0))
+	var bad := 0
+	for mm in meshes:
+		if not (mm as MultiMesh).custom_aabb.encloses(far):
+			bad += 1
+	assert_eq(bad, 0, "every multimesh's bounds cover +-1e9 px")

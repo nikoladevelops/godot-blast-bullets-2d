@@ -1,6 +1,7 @@
 #pragma once
 
 #include "godot_cpp/core/math.hpp"
+#include "godot_cpp/variant/aabb.hpp"
 #include "godot_cpp/variant/transform2d.hpp"
 #include "godot_cpp/variant/vector2.hpp"
 
@@ -22,6 +23,16 @@ inline bool is_finite_real2d(double v) {
 // (AudioStreamPlayer2D volume, distance, attenuation, panning).
 inline bool is_finite_float2d(double v) {
 	return Math::is_finite(v) && Math::is_finite((float)v);
+}
+
+// Fixed bounds for every multimesh the plugin draws (bullets, effect
+// shards, debugger shapes). A 2D canvas item culls by the bounds it had when
+// drawn, and instances move every tick: a box wider than any game world means
+// nothing is ever culled by stale bounds (the old +-100000 px box made bullets
+// and effects vanish past 100k px; the debugger had none and lost its shapes).
+inline AABB never_culled_aabb2d() {
+	constexpr real_t extent = (real_t)1.0e12;
+	return AABB(Vector3(-extent, -extent, -1.0f), Vector3(2.0f * extent, 2.0f * extent, 2.0f));
 }
 
 inline bool is_transform_invertible_safe2d(const Transform2D &t) {

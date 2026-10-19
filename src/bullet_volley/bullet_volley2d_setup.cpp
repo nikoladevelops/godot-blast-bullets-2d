@@ -150,7 +150,7 @@ void BulletVolley2D::set_up_multimesh(int new_instance_count, const Ref<Mesh> &n
 	texture_size = new_texture_size;
 
 	// One huge bounding box so the camera can never cull the whole volley by mistake (bullets live all over the level). Hidden bullets cost nothing - they're written as zero-scale.
-	multi->set_custom_aabb(AABB(Vector3(-100000, -100000, -1000), Vector3(200000, 200000, 2000)));
+	multi->set_custom_aabb(never_culled_aabb2d());
 
 	// MultiMesh::set_instance_count reallocates the RS buffer even for an
 	// unchanged count, and the count never changes on pool reuse (it is
