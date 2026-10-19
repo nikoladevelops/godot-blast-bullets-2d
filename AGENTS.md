@@ -56,7 +56,7 @@ for the rest: the sections are written to be looked up, not read once.
 
 ```sh
 GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py   # build (exit 1 = failed; never raw scons, never edit SConstruct)
-python3 tools/run_tests.py                                       # 196 files / 1774 tests, ~10 s, leak-checked
+python3 tools/run_tests.py                                       # 197 files / 1804 tests, ~10 s, leak-checked
 python3 tools/run_tests.py --suite <substring> --full            # one area, every failure message unclipped
 python3 tools/run_tests.py --self-test                           # proves the harness still catches failures/leaks
 python3 tools/run_editor_smoke.py                                # headless EDITOR run of tests/editor_smoke/ (editor-only paths)
@@ -767,6 +767,10 @@ src/
   misconfiguration until a config setter re-arms it).
 - Preview: geometry snapshotted UNSPUN in holder space; spin/move are the
   layer NODE transform, so spinning/moving costs 0 rebuilds / 0 redraws.
+  Holders are found by OWNER (meta `_blast_preview_owner` = spawner id),
+  never by name: spawners sharing a generator each keep their own holder,
+  and the cached holder/layers are read through id-checked `live_*`
+  accessors (a script clearing the generator's children frees them).
 - Movement: the spawner travels a Path2D at runtime (`advance_movement`,
   bounded 64-leg catch-up; `Easing2D::ease` parity-tested vs Tween).
 
@@ -970,7 +974,29 @@ deduped, cancelled by REMOVED) and replayed once on resume.
     identity, and 1e17 px/s movement-pattern laps turned bullets back).
     Never let `x + w` of two casted ints overflow a bounds check.
   - Read GDScript ints from an Array/TypedArray as `int64_t`: an int32
-    cast wraps 2^32 + 1 onto 1 (a valid layer, a valid hit count).
+    cast wraps 2^32 + 1 onto 1 (a valid layer, a valid hit count). Bound
+    `int` parameters wrap the same way before the setter runs: the pattern
+    knob table binds int knobs as `int64_t` and refuses what an int cannot
+    hold (`PatternKnobCheck2D::FITS`); hand-written int setters still wrap
+    like Godot's own int properties.
+  - A finite double above FLT_MAX is INF as `real_t`/`float`: setters that
+    feed real_t math check `is_finite_real2d`, values handed to the engine as
+    floats (sound) `is_finite_float2d` (`core/transform_math2d.hpp`).
+- Plugin-created nodes (containers, debugger and its multimesh nodes, sound
+  voices, effect and trail shards, preview holders) are ordinary children a
+  script can `free()`. Cache them as `OwnedNode2D<T>` (`core/owned_node2d.hpp`)
+  and read them through `get()`; NEVER validate a pointer with
+  `ObjectDB::get_instance(ObjectID(p->get_instance_id())) == p` (that reads
+  freed memory). Cold paths heal (`heal_owned_children`, the voice and effects
+  containers); hot paths test `.ptr` for existence and write through the
+  cached `Ref<MultiMesh>`, touching the node only on rare calls.
+  `integration/test_owned_children_free.gd` frees each one.
+- A spawner freed from user code inside its own shot (an attachment
+  callback of the new volley) is refused in PREDELETE and queue_freed when the
+  shot ends (`refused_free_during_shot`), like the factory and volleys.
+- A node freed inside its OWN `add_child` (a `child_entered_tree` handler
+  freeing the node being added or the emitting parent) crashes inside Godot
+  itself; the plugin cannot guard that, so tests never do it.
 
 ## 15. Benchmarks and performance lessons
 
