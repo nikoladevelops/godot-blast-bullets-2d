@@ -1,4 +1,8 @@
 extends BlastTest
+## Pool reuse neutrality: a volley that comes back out of the pool (after any
+## life, or pre-populated) is indistinguishable from a cold volley of the data
+## it is spawned with. Merged from four suites that pinned this one contract:
+##
 ## A volley that lived with EVERY feature switched on, expired into the pool
 ## and was reused for plain bullets must be indistinguishable from a volley
 ## that was never used: homing queues, orbit, bounce, wobble, gravity,
@@ -6,6 +10,21 @@ extends BlastTest
 ## spin, graze and flocking are all reset, and the reused bullets sit and fly exactly where a
 ## cold volley's bullets do. Guards the single reset path of the merged
 ## volley class (reset_transient_volley_state + reset_motion_feature_state).
+##
+## Pool neutrality: a volley that lived with non-default runtime settings,
+## went back to the pool and was popped again must read exactly like a cold
+## volley built from the same plain data. Runtime-only knobs (ones that spawn
+## data never seeds) are the classic leak: they survive the reset unless the
+## new life resets them explicitly.
+##
+## A pooled volley's reuse is a new life: pool hit, zeroed collision counts,
+## a fresh dedup window (the same wall counts again), old custom timers never
+## fire, no attachments carried over, reseeded ballistics win over the old
+## per-bullet edits.
+##
+## Spawn-time attachment callbacks see the same volley state on a cold spawn
+## and on a pooled reuse: the bullets already report enabled (a disable_bullet
+## from the callback must take effect on both paths).
 
 const N := 4
 const LOADED_LIFETIME := 0.25 # seconds: short enough to expire into the pool quickly
@@ -228,3 +247,199 @@ func test_a_pooled_volley_keeps_no_material() -> void:
 	var reused: BulletVolley2D = factory.spawn_volley(_plain())
 	assert_eq(reused, v, "reused")
 	assert_null(reused.get_instance_shader_parameter(&"tint"), "the old life's parameter is gone")
+
+
+# ---- Runtime-only knobs and node decorations (property sweep) ----
+
+const SWEEP_N := 3
+
+
+func _sweep_plain() -> BulletVolleyData2D:
+	return H.make_volley_data(SWEEP_N, 120.0, 5.0)
+
+
+## Drains every bullet so the volley goes back to the pool, then spawns the
+## same key again and returns the reused instance (asserted to be a pool hit).
+func _drain_and_reuse(v: BulletVolley2D) -> BulletVolley2D:
+	for i in v.get_amount_bullets():
+		v.disable_bullet(i)
+	await idle(1)
+	var reused: BulletVolley2D = factory.spawn_volley(_sweep_plain())
+	assert_same(reused, v, "same key reuses the pooled instance")
+	return reused
+
+
+func test_collision_dedup_mode_is_reset_for_the_next_life() -> void:
+	var v: BulletVolley2D = factory.spawn_volley(_sweep_plain())
+	v.set_collision_dedup_by_object(false)
+	var reused := await _drain_and_reuse(v)
+	assert_true(reused.get_collision_dedup_by_object(), "dedup mode is per life: the next owner starts object-level (default)")
+
+
+## Properties the sweep leaves alone: engine bookkeeping the plugin owns
+## (interpolation mode, multimesh, texture), lifecycle flags with their own
+## suite (auto pooling: a pooling-off volley parks instead of pooling), and
+## Node identity knobs that never affect bullets.
+const SWEEP_SKIP := [
+	"script", "multimesh", "texture", "visible", "physics_interpolation_mode",
+	"process_thread_group", "auto_translate_mode", "unique_name_in_owner",
+	"editor_description", "is_auto_pooling_enabled", "is_attachments_auto_pooling_enabled",
+	"effect_layers", "bullets_current_collision_count",
+]
+
+
+## A value every setter accepts and that differs from `current`.
+func _mutated(p: Dictionary, current: Variant) -> Variant:
+	match int(p.type):
+		TYPE_BOOL:
+			return not bool(current)
+		TYPE_INT:
+			return int(current) + 1
+		TYPE_FLOAT:
+			return 0.37 if not is_equal_approx(float(current), 0.37) else 0.21
+		TYPE_VECTOR2:
+			return Vector2(3, 4)
+		TYPE_COLOR:
+			return Color(0.5, 0.4, 0.3, 0.9)
+		TYPE_OBJECT:
+			# Resource hints may list several classes ("A,B"): take the first.
+			var cls: String = String(p.hint_string).get_slice(",", 0)
+			if cls != "" and ClassDB.class_exists(cls) and ClassDB.can_instantiate(cls):
+				return ClassDB.instantiate(cls)
+	return null
+
+
+func test_every_volley_property_returns_to_its_cold_value_after_reuse() -> void:
+	var v: BulletVolley2D = factory.spawn_volley(_sweep_plain())
+	var cold := {}
+	var mutated: Array = []
+	for p in v.get_property_list():
+		var usage := int(p.usage)
+		if (usage & (PROPERTY_USAGE_STORAGE | PROPERTY_USAGE_EDITOR)) == 0 or String(p.name) in SWEEP_SKIP:
+			continue
+		var current: Variant = v.get(p.name)
+		var value: Variant = _mutated(p, current)
+		if value == null:
+			continue
+		cold[p.name] = current
+		v.set(p.name, value)
+		mutated.append(p.name)
+	expect_no_errors("every mutation was accepted")
+	assert_gt(mutated.size(), 40, "the sweep really mutated the volley (%d properties)" % mutated.size())
+	var reused := await _drain_and_reuse(v)
+	var leaks: Array = []
+	for name in mutated:
+		var now: Variant = reused.get(name)
+		var was: Variant = cold[name]
+		var same: bool = (now == was) if typeof(was) != TYPE_FLOAT else is_equal_approx(float(now), float(was))
+		if not same:
+			leaks.append("%s: %s (cold %s)" % [name, str(now), str(was)])
+	assert_eq(" | ".join(leaks), "", "no runtime setting of the previous life leaks into the reused volley")
+
+
+func test_node_decorations_are_cleared_on_reuse() -> void:
+	var v: BulletVolley2D = factory.spawn_volley(_sweep_plain())
+	v.add_to_group("enemy_bullets")
+	v.set_meta("owner_tag", 42)
+	var reused := await _drain_and_reuse(v)
+	assert_false(reused.is_in_group("enemy_bullets"), "user groups are dropped")
+	assert_false(reused.has_meta("owner_tag"), "metadata is dropped")
+	var internal_groups := 0
+	for g in reused.get_groups():
+		if String(g).begins_with("_"):
+			internal_groups += 1
+	assert_gt(internal_groups, 0, "engine-internal groups are kept")
+
+
+# ---- A pooled reuse is a new life (real wall hits, timers, edits) ----
+
+var _old_timer_fired := false
+
+
+func _on_old_timer() -> void:
+	_old_timer_fired = true
+
+
+func _wall_data() -> BulletVolleyData2D:
+	var d := H.make_volley_data(1, 900.0, 60.0)
+	d.monitorable = true
+	d.collision_shape = H.make_circle_shape(6.0)
+	d.bullet_max_collision_count = 0
+	return d
+
+
+func test_pooled_reuse_is_a_new_life() -> void:
+	make_wall(Vector2(200, 0), Vector2(20, 400), 8, 2)
+	await physics()
+	var a: BulletVolley2D = factory.spawn_volley(_wall_data())
+	for i in 40:
+		await physics()
+		if a.get_bullet_collision_count(0) >= 1:
+			break
+	assert_eq(a.get_bullet_collision_count(0), 1, "first life registered the hit")
+	await idle(1)
+	a.attach_time_based_function(0.5, _on_old_timer, false, true)
+	assert_eq(a.debug_get_timer_count(), 1, "old-life timer attached")
+	var spd := BulletSpeedData2D.new()
+	spd.speed = 111.0
+	spd.max_speed = 222.0
+	a.set_bullet_speed_data(0, spd)
+	for i in a.get_amount_bullets():
+		a.disable_bullet(i)
+	await idle(1)
+	assert_eq(factory.debug_get_bullets_pool_amount(), 1, "emptied volley parked pooled")
+
+	factory.debug_reset_pool_stats()
+	var b: BulletVolley2D = factory.spawn_volley(_wall_data())
+	assert_eq(int(factory.debug_get_pool_hit_stats().get("hits", 0)), 1, "second life is a pool hit")
+	assert_eq(b.get_bullet_collision_count(0), 0, "collision count reset")
+	assert_eq(b.debug_get_timer_count(), 0, "new life holds no timers")
+	assert_eq(b.get_amount_active_attachments(), 0, "no attachments leak across")
+	assert_almost_eq(b.get_bullet_speed_data(0).speed, 900.0, 0.01, "reseeded speed wins over the old edit")
+
+	var rehit := false
+	for i in 40:
+		await physics()
+		if b.get_bullet_collision_count(0) >= 1:
+			rehit = true
+			break
+	assert_true(rehit, "dedup window is fresh: the same wall registers again")
+	_old_timer_fired = false
+	for i in 90:
+		await physics()
+		if _old_timer_fired:
+			break
+	assert_false(_old_timer_fired, "old 0.5s timer stayed dead after pooling")
+
+
+# ---- Spawn-time callbacks see the same state on both paths ----
+
+func _status_probe_scene() -> PackedScene:
+	var probe: Node = AttachmentStatusProbe2D.new()
+	var ps := PackedScene.new()
+	assert_eq(ps.pack(probe), OK, "probe scene packs")
+	probe.free()
+	return ps
+
+
+func before_each() -> void:
+	await super()
+	AttachmentStatusProbe2D.volley = null
+	AttachmentStatusProbe2D.spawn_seen.clear()
+	AttachmentStatusProbe2D.enable_seen.clear()
+
+
+func test_enable_callback_on_pooled_reuse_sees_enabled_bullets() -> void:
+	var data := H.make_volley_data(2, 0.0, 30.0)
+	data.shared_bullet_attachment = _status_probe_scene()
+	var cold: BulletVolley2D = factory.spawn_volley(data)
+	await idle(1)
+	factory.clear_active_bullets()
+	await idle(1)
+	# The pooled volley IS this instance: point the probe at it before the
+	# respawn, because the callbacks run inside spawn_volley.
+	AttachmentStatusProbe2D.volley = cold
+	var reused: BulletVolley2D = factory.spawn_volley(data)
+	assert_same(reused, cold, "the pooled volley was reused")
+	assert_eq(AttachmentStatusProbe2D.enable_seen.size(), 2, "one on_bullet_enable per pooled attachment")
+	assert_eq(str(AttachmentStatusProbe2D.enable_seen), "[true, true]", "bullet 0 already reads enabled inside the callback")

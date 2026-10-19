@@ -29,6 +29,9 @@ def inventory():
             if cur:
                 inv[cur]["asserts"] += len(re.findall(r'\b(assert_\w+|expect_\w+)\(', line))
     return inv
+if len(sys.argv) < 3 or sys.argv[1] not in ('save', 'diff') or (sys.argv[1] == 'diff' and len(sys.argv) < 4):
+    print(__doc__)
+    sys.exit(2)
 if sys.argv[1] == 'save':
     inv = inventory()
     json.dump(inv, open(sys.argv[2], 'w'), indent=0, sort_keys=True)
