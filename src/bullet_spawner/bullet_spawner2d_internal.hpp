@@ -113,6 +113,9 @@ static inline T *validate_cached_node(const Node *self, const NodePath &p_path, 
 // PREVIEW_META_KEY, core/node_scan2d.hpp). The tilde sorts it last and marks
 // it as internal. The holder is owner-less: never saved, never exported.
 static constexpr const char *PREVIEW_HOLDER_NAME = "~BlastBulletsPatternPreview";
+// Instance id of the spawner that owns a preview holder: holders are found by
+// owner, so spawners sharing one generator never touch each other's.
+static constexpr const char *PREVIEW_OWNER_META_KEY = "_blast_preview_owner";
 // The graze ring preview layer (internal child of the spawner).
 static constexpr const char *GRAZE_PREVIEW_NAME = "~BlastBulletsGrazePreview";
 

@@ -238,3 +238,51 @@ func test_hidden_for_smooth_loops() -> void:
 func test_shown_for_corner_shapes() -> void:
 	for src in CORNER:
 		assert_true(_visible_for(src), "distribution shown for corner source %d" % src)
+
+
+## Two spawners on ONE external generator each own their preview: turning
+## one preview off (which deletes its holder) never deletes the other's,
+## the other keeps spinning on live nodes, and each draws its own dots.
+func test_spawners_sharing_a_generator_own_separate_previews() -> void:
+	var gen: Node2D = add(Node2D.new())
+	gen.position = Vector2(300, 200)
+	var a := _spinning_preview(BulletSpawner2D.PATTERN_FROM_HELPER_STAR, 10)
+	var b := _spinning_preview(BulletSpawner2D.PATTERN_FROM_HELPER_RING, 6)
+	a.set_transforms_generator(gen)
+	b.set_transforms_generator(gen)
+	await idle(4)
+	assert_eq(a.debug_get_preview_dot_points().size(), 10, "A draws its 10 dots")
+	assert_eq(b.debug_get_preview_dot_points().size(), 6, "B draws its own 6 dots")
+	a.show_pattern_preview = false
+	for k in 10:
+		await idle(1)
+	assert_eq(b.debug_get_preview_dot_points().size(), 6, "B's preview survives A turning its own off")
+	var layer: Node2D = null
+	for c in gen.get_children(true):
+		if c.has_meta("_blast_preview_owner") and int(c.get_meta("_blast_preview_owner")) == b.get_instance_id():
+			layer = c.get_node_or_null("Dots")
+	assert_not_null(layer, "B's holder still sits under the generator")
+	if layer != null:
+		assert_almost_eq(angle_difference(layer.rotation, deg_to_rad(b.get_spin_angle_deg())), 0.0, 0.0001, "B keeps posing its live layer")
+
+
+## A script that clears the external generator's children (the Children
+## marker source invites it) frees the runtime preview holder with them: the
+## spinning spawner and a muzzle-offset edit never touch the freed nodes,
+## and the preview rebuilds.
+func test_clearing_the_generator_children_never_touches_a_freed_preview() -> void:
+	var gen: Node2D = add(Node2D.new())
+	var sp := _spinning_preview(BulletSpawner2D.PATTERN_FROM_HELPER_STAR, 10)
+	sp.set_transforms_generator(gen)
+	await idle(4)
+	assert_eq(sp.debug_get_preview_dot_points().size(), 10, "preview drawn under the generator")
+	for c in gen.get_children(true):
+		c.free()
+	sp.spawn_position_offset = Vector2(5, 0)
+	assert_eq(sp.debug_get_preview_dot_points().size(), 10, "the edit rebuilt the lost preview")
+	for c in gen.get_children(true):
+		c.free()
+	await idle(3)
+	assert_eq(sp.debug_get_preview_dot_points().size(), 10, "spinning rebuilt the lost preview")
+	var stats: Dictionary = sp.debug_get_preview_stats()
+	assert_gt(int(stats["dots_draws"]), 0, "stats read live layers")

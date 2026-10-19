@@ -237,22 +237,34 @@ Array BulletSpawner2D::debug_get_layer_rings() const {
 	return preview_last_layer_rings.duplicate();
 }
 
+void BulletSpawner2D::set_preview_nodes(Node2D *holder, PatternPreviewLayer2D *dots, PatternPreviewLayer2D *arrows) {
+	preview_holder = holder;
+	preview_dots_layer = dots;
+	preview_arrows_layer = arrows;
+	preview_holder_id = holder != nullptr ? holder->get_instance_id() : 0;
+	preview_dots_layer_id = dots != nullptr ? dots->get_instance_id() : 0;
+	preview_arrows_layer_id = arrows != nullptr ? arrows->get_instance_id() : 0;
+}
+
 PackedVector2Array BulletSpawner2D::debug_get_preview_dot_points() const {
-	if (preview_dots_layer == nullptr) {
+	const PatternPreviewLayer2D *dots = live_preview_dots();
+	if (dots == nullptr) {
 		return PackedVector2Array();
 	}
-	return preview_dots_layer->dots;
+	return dots->dots;
 }
 
 PackedVector2Array BulletSpawner2D::debug_get_preview_track_points() const {
-	if (preview_dots_layer == nullptr) {
+	const PatternPreviewLayer2D *dots = live_preview_dots();
+	if (dots == nullptr) {
 		return PackedVector2Array();
 	}
-	return preview_dots_layer->path_points;
+	return dots->path_points;
 }
 
 bool BulletSpawner2D::debug_get_preview_track_closed() const {
-	return preview_dots_layer != nullptr && preview_dots_layer->path_closed;
+	const PatternPreviewLayer2D *dots = live_preview_dots();
+	return dots != nullptr && dots->path_closed;
 }
 
 // Debugging function: proves dots sit on the drawn geometry (base track or
@@ -268,7 +280,7 @@ Dictionary BulletSpawner2D::debug_check_layer_coincidence(double tolerance_px) c
 	out["max_deviation_px"] = -1.0;
 	out["mean_deviation_px"] = -1.0;
 	out["ok"] = false;
-	if (preview_dots_layer == nullptr) {
+	if (live_preview_dots() == nullptr) {
 		return out;
 	}
 	const PackedVector2Array dots = preview_dots_layer->dots;
@@ -369,8 +381,8 @@ Dictionary BulletSpawner2D::debug_get_preview_stats() const {
 	Dictionary d;
 	d["rebuilds"] = (int64_t)preview_rebuild_count;
 	d["last_rebuild_usec"] = (int64_t)preview_last_rebuild_usec;
-	d["dots_draws"] = preview_dots_layer != nullptr ? preview_dots_layer->debug_draw_count : 0;
-	d["arrows_draws"] = preview_arrows_layer != nullptr ? preview_arrows_layer->debug_draw_count : 0;
+	d["dots_draws"] = live_preview_dots() != nullptr ? preview_dots_layer->debug_draw_count : 0;
+	d["arrows_draws"] = live_preview_arrows() != nullptr ? preview_arrows_layer->debug_draw_count : 0;
 	return d;
 }
 
@@ -401,6 +413,16 @@ void BulletSpawner2D::set_preview_pose(double spin_angle_degrees) {
 	// Keep the snapshot in step so a later rebuild reproduces the same pose
 	// instead of treating the current angle as fresh geometry.
 	tracked_spin_angle = spin_angle_degrees;
+	if (preview_nodes_lost()) {
+		// Freed behind our back (a script cleared an external generator's
+		// children): never touch the old nodes; rebuild them (the rebuild
+		// poses the new layers itself).
+		set_preview_nodes(nullptr, nullptr, nullptr);
+		if (!preview_rebuild_in_progress) {
+			rebuild_preview();
+		}
+		return;
+	}
 	if (preview_holder == nullptr || (preview_dots_layer == nullptr && preview_arrows_layer == nullptr)) {
 		return;
 	}
@@ -592,24 +614,64 @@ void BulletSpawner2D::rebuild_preview() {
 		preview_rebuild_in_progress = false;
 		return;
 	}
-	// Removes a preview holder child from a parent without trusting caches.
+	// Holders are found by OWNER, never by name: spawners sharing one
+	// generator each keep their own holder under it, and one turning its
+	// preview off deletes only its own (a name lookup deleted the other's
+	// holder under its live pointers).
+	const uint64_t self_id = get_instance_id();
+	auto own_holder_under = [&](Node *parent) -> Node2D * {
+		if (parent == nullptr) {
+			return nullptr;
+		}
+		for (int64_t i = 0, n = parent->get_child_count(true); i < n; ++i) {
+			Node2D *child = Object::cast_to<Node2D>(parent->get_child(i, true));
+			if (child != nullptr && child->has_meta(PREVIEW_OWNER_META_KEY) && (uint64_t)(int64_t)child->get_meta(PREVIEW_OWNER_META_KEY) == self_id) {
+				return child;
+			}
+		}
+		return nullptr;
+	};
+	// memdelete (not queue_free) is REQUIRED here: the caller recreates the
+	// holder immediately below, and a queued node would still be found until
+	// the flush. This runs on the preview path only (never physics
+	// callbacks), so immediate deletion is safe.
+	auto delete_holder = [](Node *holder) {
+		if (Node *parent = holder->get_parent()) {
+			parent->remove_child(holder);
+		}
+		memdelete(holder);
+	};
 	// Returns true when something was removed.
 	auto remove_holder_from = [&](Node *parent) -> bool {
-		if (parent == nullptr) {
-			return false;
-		}
-		Node *live = parent->get_node_or_null(NodePath(PREVIEW_HOLDER_NAME));
+		Node2D *live = own_holder_under(parent);
 		if (live == nullptr) {
 			return false;
 		}
-		parent->remove_child(live);
-		// memdelete (not queue_free) is REQUIRED here: the caller recreates
-		// the holder under the same name immediately below, and a queued
-		// node would still resolve by name until the flush (name clash +
-		// reuse of a dying holder). This runs on the preview path only
-		// (never physics callbacks), so immediate deletion is safe.
-		memdelete(live);
+		delete_holder(live);
 		return true;
+	};
+	// Strays: a holder whose owner is gone or no longer uses it (a spawner
+	// freed or retargeted while out of the tree, a duplicated subtree, an
+	// untagged holder from an older build).
+	auto prune_stray_holders = [&](Node *parent) {
+		for (int64_t i = parent->get_child_count(true) - 1; i >= 0; --i) {
+			Node *child = parent->get_child(i, true);
+			const bool tagged = child->has_meta(PREVIEW_OWNER_META_KEY);
+			if (!tagged && String(child->get_name()) != String(PREVIEW_HOLDER_NAME)) {
+				continue;
+			}
+			if (tagged) {
+				const uint64_t owner_id = (uint64_t)(int64_t)child->get_meta(PREVIEW_OWNER_META_KEY);
+				if (owner_id == self_id) {
+					continue;
+				}
+				const BulletSpawner2D *owner_spawner = Object::cast_to<BulletSpawner2D>(ObjectDB::get_instance(ObjectID(owner_id)));
+				if (owner_spawner != nullptr && owner_spawner->preview_holder == child) {
+					continue;
+				}
+			}
+			delete_holder(child);
+		}
 	};
 	if (!show_pattern_preview) {
 		remove_holder_from(this);
@@ -622,16 +684,15 @@ void BulletSpawner2D::rebuild_preview() {
 				is_tracked_node_alive(tracked_base, tracked_base_id)) {
 			remove_holder_from(tracked_base);
 		}
-		preview_holder = nullptr;
-		preview_dots_layer = nullptr;
-		preview_arrows_layer = nullptr;
+		set_preview_nodes(nullptr, nullptr, nullptr);
 		preview_rebuild_in_progress = false;
 		return;
 	}
 	// Preview lives under the effective generator so patterns are drawn where
 	// they spawn. Heal from the tree every rebuild: never trust cached
 	// pointers (undo/redo, duplication, scene reload can drop nodes).
-	preview_holder = Object::cast_to<Node2D>(effective_base->get_node_or_null(NodePath(PREVIEW_HOLDER_NAME)));
+	prune_stray_holders(effective_base);
+	preview_holder = own_holder_under(effective_base);
 	if (preview_holder == nullptr) {
 		// Generator was retargeted: drop the stale holder under the spawner
 		// (or under the previously tracked base) so only one preview exists.
@@ -640,20 +701,16 @@ void BulletSpawner2D::rebuild_preview() {
 				is_tracked_node_alive(tracked_base, tracked_base_id)) {
 			remove_holder_from(tracked_base);
 		}
-		preview_holder = Object::cast_to<Node2D>(effective_base->get_node_or_null(NodePath(PREVIEW_HOLDER_NAME)));
 	}
 	if (preview_holder == nullptr) {
 		// Owner-less on purpose: never written to the scene, never exported.
+		// The first holder under a node takes the plain name; another
+		// spawner sharing the generator adds its id.
 		preview_holder = memnew(Node2D);
-		preview_holder->set_name(PREVIEW_HOLDER_NAME);
+		const bool name_taken = effective_base->get_node_or_null(NodePath(PREVIEW_HOLDER_NAME)) != nullptr;
+		preview_holder->set_name(name_taken ? String(PREVIEW_HOLDER_NAME) + "_" + String::num_uint64(self_id) : String(PREVIEW_HOLDER_NAME));
 		preview_holder->set_meta(PREVIEW_META_KEY, true);
-		effective_base->add_child(preview_holder);
-	} else if (preview_holder->get_parent() != effective_base) {
-		// Healed a holder from the wrong parent (e.g. duplicated subtree).
-		Node *old_parent = preview_holder->get_parent();
-		if (old_parent != nullptr) {
-			old_parent->remove_child(preview_holder);
-		}
+		preview_holder->set_meta(PREVIEW_OWNER_META_KEY, (int64_t)self_id);
 		effective_base->add_child(preview_holder);
 	}
 	// Cleanup first: older versions drew the preview with Line2D strips
@@ -700,6 +757,7 @@ void BulletSpawner2D::rebuild_preview() {
 		preview_arrows_layer->set_z_index(kPreviewZIndex);
 		preview_holder->add_child(preview_arrows_layer);
 	}
+	set_preview_nodes(preview_holder, preview_dots_layer, preview_arrows_layer);
 	// Quiet collect: the preview must visualize, never scold (e.g. aimed
 	// without a target simply draws nothing instead of erroring per rebuild).
 	// Snapshot the geometry UNSPUN; the layer applies spin_angle_deg at draw
@@ -1089,6 +1147,9 @@ bool BulletSpawner2D::preview_sources_dirty() {
 	}
 	if (!is_inside_tree()) {
 		return false;
+	}
+	if (preview_nodes_lost()) {
+		return true;
 	}
 	Node2D *base = get_effective_generator();
 	if (base == nullptr) {

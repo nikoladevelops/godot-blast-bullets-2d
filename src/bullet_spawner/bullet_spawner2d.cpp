@@ -44,6 +44,12 @@ void BulletSpawner2D::clear_shoot_once_latch() {
 	if (g_shoot_once_nesting_depth < 0) {
 		g_shoot_once_nesting_depth = 0;
 	}
+	if (refused_free_during_shot) {
+		// Godot keeps ONE "free ok" flag per object: the refused free()
+		// cancelled the deletion. Finish it at the end of the frame.
+		refused_free_during_shot = false;
+		queue_free();
+	}
 }
 
 NodePath BulletSpawner2D::get_bullet_factory_path() const {
@@ -893,7 +899,14 @@ bool BulletSpawner2D::shoot_once() {
 	BulletVolley2D *bullets = factory->spawn_volley_span(volley_data, shot_transforms.data(), (int)shot_transforms.size(), inherited_velocity, get_instance_id());
 	if (bullets == nullptr) {
 		// The factory already reported why (busy, teardown, bad data).
-		return fail_early(nullptr, StringName("factory_refused"), true);
+		return fail_early(nullptr, StringName("factory_refused"), !refused_free_during_shot);
+	}
+	if (refused_free_during_shot) {
+		// An attachment callback of the new volley freed this spawner (the
+		// free waits for the latch, see refused_free_during_shot): the dying
+		// spawner configures nothing and reports nothing. Its PREDELETE
+		// applies orphaned_volleys to the volley like to every other.
+		return fail_early(nullptr, StringName("dropped"), false);
 	}
 	// Tag the instance (fresh or pooled): from here on its area_entered,
 	// body_entered and life_time_over signals are possessed by this spawner
@@ -1032,9 +1045,7 @@ void BulletSpawner2D::_ready() {
 	// only when the user opted into a runtime preview; else drop it so
 	// runtime is never affected.
 	if (!preview_active()) {
-		preview_holder = nullptr;
-		preview_dots_layer = nullptr;
-		preview_arrows_layer = nullptr;
+		set_preview_nodes(nullptr, nullptr, nullptr);
 		Node *stray = get_node_or_null(NodePath(PREVIEW_HOLDER_NAME));
 		if (stray != nullptr) {
 			remove_child(stray);
@@ -1101,6 +1112,13 @@ void BulletSpawner2D::_notification(int p_what) {
 			// Rebuild already re-snapshots; the loop below stays in sync.
 		}
 	} else if (p_what == NOTIFICATION_PREDELETE) {
+		if (shoot_once_reentrant_guard) {
+			// Freed from user code inside a shot: refuse (see
+			// refused_free_during_shot); the latch's clear-point queues it.
+			cancel_free();
+			refused_free_during_shot = true;
+			return;
+		}
 		// Freed for good (a reparent never gets here): apply the
 		// orphaned_volleys policy to every volley this spawner still owns.
 		// Teardown-safe: the factory is resolved by its cached id only (no
@@ -1126,9 +1144,7 @@ void BulletSpawner2D::_notification(int p_what) {
 		// pause with _process and resume on re-entry. Only the preview gizmo
 		// is dropped (the holder is a child and frees itself; only null the
 		// pointers, never memdelete detached nodes here).
-		preview_holder = nullptr;
-		preview_dots_layer = nullptr;
-		preview_arrows_layer = nullptr;
+		set_preview_nodes(nullptr, nullptr, nullptr);
 		graze_preview_layer = nullptr;
 		graze_preview_layer_id = 0;
 		tracked_base = nullptr;

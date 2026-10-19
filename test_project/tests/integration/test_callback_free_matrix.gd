@@ -494,3 +494,46 @@ func test_clear_bullet_refused_by_the_latch_records_no_split() -> void:
 	factory.debug_advance_time(1.0 / 60.0)
 	assert_eq(splits.size(), 0, "no split for a bullet that did not die")
 	assert_eq(factory.debug_get_effect_log().size(), 0, "no On Clear flash either")
+
+
+## A spawner shot runs the attachment callbacks of its new volley (fresh:
+## on_bullet_spawn, pooled: on_bullet_enable) inside shoot_once, outside any
+## of the spawner's own emits: a callback may free() the spawner itself. The
+## shot then stops without touching the freed spawner (manual shot, auto-fire
+## and a burst step), and the factory keeps running.
+func test_freeing_the_spawner_inside_its_shot_never_touches_freed_memory() -> void:
+	var problems: Array = []
+	for pooled in [false, true]:
+		for path in ["shoot_once", "auto_fire", "burst"]:
+			await _new_case()
+			var where := "%s %s" % ["pooled" if pooled else "fresh", path]
+			var d := _data(false)
+			if pooled:
+				factory.spawn_volley(d)
+				await idle(1)
+				factory.clear_active_bullets()
+				await idle(1)
+			var sp := make_spawner(d, BulletSpawner2D.PATTERN_FROM_HELPER_RING, 3)
+			if path == "burst":
+				sp.burst_enabled = true
+				sp.burst_count = 3
+				sp.burst_interval_sec = 0.01
+			AttachmentHookProbe2D.hook_on = ["spawn", "enable"]
+			AttachmentHookProbe2D.hook = func() -> void:
+				if is_instance_valid(sp):
+					sp.free()
+			match path:
+				"shoot_once":
+					sp.shoot_once()
+				"auto_fire", "burst":
+					sp.shoot_interval_sec = 0.01
+					sp.set_shooting_enabled(true)
+					for k in 10:
+						await idle(1)
+						if AttachmentHookProbe2D.fired > 0:
+							break
+			problems.append_array(await _settle_and_check(where))
+			if is_instance_valid(sp):
+				problems.append("%s: the spawner outlived its free()" % where)
+			problems.append_array(_claim_errors().map(func(e): return "%s error: %s" % [where, e]))
+	assert_eq("\n".join(problems), "", "a shot survives its spawner being freed by a callback")

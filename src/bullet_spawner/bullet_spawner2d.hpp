@@ -1525,6 +1525,11 @@ private:
 	// Cross-spawner A->B->A nesting is stopped by the file-local global
 	// depth guard in the .cpp.
 	bool shoot_once_reentrant_guard = false;
+	// A free() of this spawner from user code inside a shot (an attachment
+	// callback of the new volley runs outside any of our emits) is refused
+	// in PREDELETE with cancel_free(): the shot and its callers still use
+	// `this`. The latch's clear-point finishes it with queue_free().
+	bool refused_free_during_shot = false;
 	// Single clear-point for the latch + global depth above.
 	void clear_shoot_once_latch();
 	// Homing/orbiting runtime state (never stored).
@@ -1661,9 +1666,28 @@ private:
 	mutable bool tracked_has_path2d_node_global = false;
 	// Editor-only pattern preview holder (null at runtime, never saved),
 	// plus its two self-repainting _draw layers (dots + arrows).
+	// The pointers may dangle (a script clearing an external generator's
+	// children frees the holder with them): read them through the live_*
+	// accessors, which check the ids through ObjectDB.
 	Node2D *preview_holder = nullptr;
 	PatternPreviewLayer2D *preview_dots_layer = nullptr;
 	PatternPreviewLayer2D *preview_arrows_layer = nullptr;
+	uint64_t preview_holder_id = 0;
+	uint64_t preview_dots_layer_id = 0;
+	uint64_t preview_arrows_layer_id = 0;
+	void set_preview_nodes(Node2D *holder, PatternPreviewLayer2D *dots, PatternPreviewLayer2D *arrows);
+	PatternPreviewLayer2D *live_preview_dots() const {
+		return is_tracked_node_alive(preview_dots_layer, preview_dots_layer_id) ? preview_dots_layer : nullptr;
+	}
+	PatternPreviewLayer2D *live_preview_arrows() const {
+		return is_tracked_node_alive(preview_arrows_layer, preview_arrows_layer_id) ? preview_arrows_layer : nullptr;
+	}
+	// A cached preview node was freed behind our back: the gizmo must rebuild.
+	bool preview_nodes_lost() const {
+		return (preview_holder != nullptr && !is_tracked_node_alive(preview_holder, preview_holder_id)) ||
+				(preview_dots_layer != nullptr && live_preview_dots() == nullptr) ||
+				(preview_arrows_layer != nullptr && live_preview_arrows() == nullptr);
+	}
 	// Last built layer rings (one PackedVector2Array per extra layer,
 	// holder-local, exactly what the yellow pass draws: runs
 	// INF-separated with a closing duplicate per closed run). Debug
