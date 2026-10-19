@@ -101,8 +101,10 @@ private:
 	// Entries whose debug node was lost this tick (reused, no per-tick alloc).
 	std::vector<int> lost_entries_scratch;
 
-	// Providers already drawn (O(1) dedupe when a volley re-enters).
-	std::unordered_set<const BulletVolley2D *> debug_provider_set;
+	// Instance ids of the providers already drawn (O(1) dedupe when a volley
+	// re-enters). Ids, not pointers: a new volley may reuse a freed one's
+	// address.
+	std::unordered_set<uint64_t> debug_provider_set;
 
 	// One provider's instance buffer (8 transform + 4 color floats per
 	// shape), uploaded with ONE set_buffer per provider per tick instead of

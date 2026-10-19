@@ -182,7 +182,9 @@ void BulletVolleyDebugger2D::erase_debug_entry(int i) {
 			memdelete(mesh);
 		}
 	}
-	debug_provider_set.erase(debug_data_providers[i]);
+	if (i < (int)debug_data_provider_ids.size()) {
+		debug_provider_set.erase(debug_data_provider_ids[i]);
+	}
 	debug_data_providers.erase(debug_data_providers.begin() + i);
 	if (i < (int)debug_data_provider_ids.size()) {
 		debug_data_provider_ids.erase(debug_data_provider_ids.begin() + i);
@@ -214,7 +216,7 @@ void BulletVolleyDebugger2D::generate_debug_multimesh(Node *node_entered_contain
 
 	// Dedupe guard: a multimesh that re-enters the container (reparent flows) would
 	// otherwise get a second debug mesh + a second entry (double rendering, growth).
-	if (debug_provider_set.count(debugger_data_provider) != 0) {
+	if (debug_provider_set.count((uint64_t)bullets_node->get_instance_id()) != 0) {
 		return;
 	}
 
@@ -272,7 +274,7 @@ void BulletVolleyDebugger2D::generate_debug_multimesh(Node *node_entered_contain
 
 	// Store the debugger_data_provider so I can track him
 	debug_data_providers.emplace_back(debugger_data_provider);
-	debug_provider_set.insert(debugger_data_provider);
+	debug_provider_set.insert((uint64_t)bullets_node->get_instance_id());
 	debug_data_provider_ids.emplace_back(bullets_node->get_instance_id());
 	debug_data_provider_nodes.emplace_back(bullets_node);
 
