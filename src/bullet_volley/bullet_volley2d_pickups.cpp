@@ -4,6 +4,7 @@
 // factory/bullet_factory2d_pickups.cpp.
 
 #include "bullet_volley/bullet_volley2d_internal.hpp"
+#include "core/emit_on2d.hpp"
 
 using namespace godot;
 
@@ -81,7 +82,7 @@ bool BulletVolley2D::collect_pickup_bullet(int bullet_index, Node2D *collector) 
 	// The bullet is alive in the handler (contract of every bullet signal).
 	bullet_factory->note_user_code();
 	const Variant collector_variant = collector != nullptr ? Variant(collector) : Variant();
-	bullet_factory->emit_signal("pickup_collected", collector_variant, position, this, bullet_index, pickup->value);
+	emit_on2d(bullet_factory, "pickup_collected", collector_variant, position, this, bullet_index, pickup->value);
 	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
 		return false;
 	}

@@ -4,6 +4,7 @@
 // once per active volley per physics frame.
 
 #include "bullet_volley/bullet_volley2d_internal.hpp"
+#include "core/emit_on2d.hpp"
 
 #include <cmath>
 
@@ -78,7 +79,7 @@ void BulletVolley2D::tick(double delta) {
 		anim_finished_event_pending = false;
 		note_user_code();
 		++self_emit_depth;
-		emit_signal(CachedStringNames2D::get().sprite_animation_finished, this);
+		emit_on2d(this, CachedStringNames2D::get().sprite_animation_finished, this);
 		if (ObjectDB::get_instance(ObjectID(self_id)) == this) {
 			--self_emit_depth;
 		}

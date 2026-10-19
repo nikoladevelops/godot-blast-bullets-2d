@@ -4,6 +4,7 @@
 // Bounce decisions live in bullet_volley2d_bounce.cpp.
 
 #include "bullet_volley/bullet_volley2d_internal.hpp"
+#include "core/emit_on2d.hpp"
 
 using namespace godot;
 
@@ -784,7 +785,7 @@ void BulletVolley2D::handle_bullet_collision(const BulletCollisionData2D &record
 	if (emitter != nullptr) {
 		const StringName &signal_name = record.collision_type == CollisionType::AREA ? CachedStringNames2D::get().area_entered : CachedStringNames2D::get().body_entered;
 		note_user_code();
-		emitter->emit_signal(signal_name, hit_target, this, bullet_index);
+		emit_on2d(emitter, signal_name, hit_target, this, bullet_index);
 	}
 
 	// The handler owns whatever it changed: a disable/clear/wake (epoch

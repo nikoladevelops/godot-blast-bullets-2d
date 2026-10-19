@@ -2,6 +2,7 @@
 
 #include "bullet_spawner/volley_tracker2d.hpp"
 #include "bullet_volley/bullet_volley2d.hpp"
+#include "core/emit_guard2d.hpp"
 #include "core/variant_enum_cast2d.hpp"
 #include "debugger/graze_preview_layer2d.hpp"
 #include "factory/bullet_factory2d.hpp"
@@ -167,6 +168,9 @@ class BulletSpawner2D : public Node2D, public PatternKnobs2D {
 	}
 
 public:
+	// Refuses a release-build free() while this node emits (core/emit_guard2d.hpp).
+	EmitGuardState2D emit_guard;
+
 	// Where volley transforms come from. Children/Self read the scene
 	// tree; the helper modes call the BulletFactory2D static generators
 	// with the properties below, relative to the generator's transform.
@@ -1530,6 +1534,9 @@ private:
 	// in PREDELETE with cancel_free(): the shot and its callers still use
 	// `this`. The latch's clear-point finishes it with queue_free().
 	bool refused_free_during_shot = false;
+	// A handler inside the running shot freed this spawner (refused, and
+	// finished at the end of the frame): the shot stops.
+	bool shot_owner_dying() const { return refused_free_during_shot || emit_guard.refused_free || is_queued_for_deletion(); }
 	// Single clear-point for the latch + global depth above.
 	void clear_shoot_once_latch();
 	// Homing/orbiting runtime state (never stored).

@@ -3,6 +3,7 @@
 // pose application and the play/pause/stop/seek/reverse API.
 
 #include "bullet_spawner/bullet_spawner2d_internal.hpp"
+#include "core/emit_on2d.hpp"
 
 using namespace godot;
 
@@ -362,7 +363,7 @@ bool BulletSpawner2D::advance_movement(double delta) {
 		const bool at_end = movement_leg_forward;
 		++movement_legs_completed;
 		apply_movement_pose(delta);
-		emit_signal("movement_endpoint_reached", at_end);
+		emit_on2d(this, "movement_endpoint_reached", at_end);
 		if (!alive()) {
 			return false;
 		}
@@ -371,14 +372,14 @@ bool BulletSpawner2D::advance_movement(double delta) {
 			movement_playing = false;
 			movement_finished = true;
 			movement_velocity = Vector2();
-			emit_signal("movement_finished");
+			emit_on2d(this, "movement_finished");
 			if (!alive()) {
 				return false;
 			}
 			refresh_process_state();
 			return true;
 		}
-		emit_signal("movement_loop_completed", movement_legs_completed - 1);
+		emit_on2d(this, "movement_loop_completed", movement_legs_completed - 1);
 		if (!alive()) {
 			return false;
 		}
@@ -422,7 +423,7 @@ void BulletSpawner2D::movement_play() {
 		refresh_process_state();
 	}
 	if (!was_playing) {
-		emit_signal("movement_started");
+		emit_on2d(this, "movement_started");
 	}
 }
 

@@ -5,6 +5,7 @@
 // bullet_volley2d_tick.cpp with the other move stages.
 
 #include "bullet_volley/bullet_volley2d_internal.hpp"
+#include "core/emit_on2d.hpp"
 
 using namespace godot;
 
@@ -358,7 +359,7 @@ bool BulletVolley2D::dispatch_graze_events() {
 		if (spawner != nullptr && spawner->has_connections(signal_name)) {
 			handled = true;
 			note_user_code();
-			spawner->emit_signal(signal_name, target, this, ev.bullet_index, zone, (int)ev.ring);
+			emit_on2d(spawner, signal_name, target, this, ev.bullet_index, zone, (int)ev.ring);
 			if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
 				return false;
 			}
@@ -378,7 +379,7 @@ bool BulletVolley2D::dispatch_graze_events() {
 		if (bullet_factory != nullptr && bullet_factory->has_connections(signal_name)) {
 			handled = true;
 			note_user_code();
-			bullet_factory->emit_signal(signal_name, target, this, ev.bullet_index, zone, (int)ev.ring);
+			emit_on2d(bullet_factory, signal_name, target, this, ev.bullet_index, zone, (int)ev.ring);
 			if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
 				return false;
 			}

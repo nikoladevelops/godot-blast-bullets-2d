@@ -3,6 +3,7 @@
 // retargeting and the per-volley steering/orbit configuration.
 
 #include "bullet_spawner/bullet_spawner2d_internal.hpp"
+#include "core/emit_on2d.hpp"
 #include "core/node_scan2d.hpp"
 #include "core/transform_math2d.hpp"
 
@@ -1263,7 +1264,7 @@ void BulletSpawner2D::apply_volley_homing_and_orbiting(BulletVolley2D *bullets, 
 		track_live_volley(bullets);
 	}
 	const uint64_t volley_id = bullets->get_instance_id();
-	emit_signal("homing_targets_resolved", bullets, resolved_targets);
+	emit_on2d(this, "homing_targets_resolved", bullets, resolved_targets);
 	// The handler may have freed the volley: a Variant built from the freed
 	// pointer would read freed memory. The caller revalidates and drops it.
 	if (ObjectDB::get_instance(ObjectID(volley_id)) != bullets) {
@@ -1271,7 +1272,7 @@ void BulletSpawner2D::apply_volley_homing_and_orbiting(BulletVolley2D *bullets, 
 	}
 	// volleys_fired still holds the previous count here (shoot_once bumps it
 	// right after), so +1 names the volley being configured.
-	emit_signal("volley_homing_configured", bullets, volleys_fired + 1);
+	emit_on2d(this, "volley_homing_configured", bullets, volleys_fired + 1);
 }
 
 bool BulletSpawner2D::fire_arc_covers_targets(const Array &targets) const {

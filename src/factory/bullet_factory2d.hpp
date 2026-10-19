@@ -19,6 +19,7 @@
 #include "attachments/bullet_attachment_object_pool2d.hpp"
 #include "core/collision_shape_helper2d.hpp"
 #include "core/dynamic_sparse_set.hpp"
+#include "core/emit_guard2d.hpp"
 #include "core/graze_targets2d.hpp"
 #include "core/owned_node2d.hpp"
 #include "data/bullet_effect_layer_data2d.hpp"
@@ -66,6 +67,9 @@ class BulletFactory2D : public Node2D {
 	friend class FactoryOperationGuard;
 
 public:
+	// Refuses a release-build free() while this node emits (core/emit_guard2d.hpp).
+	EmitGuardState2D emit_guard;
+
 	// Whether the factory is currently busy doing something important and it can't handle any other requests
 	bool get_is_factory_busy() const;
 
@@ -556,6 +560,12 @@ public:
 	// Non-mutating validation of spawn data. Returns {ok, error}. Never spawns,
 	// never touches the pool. Use from crash-fuzz tests before spawn_*().
 	static Dictionary debug_validate_spawn_data(const Ref<BulletVolleyData2D> &spawn_data);
+	// Test seam: frees a Node the way an exported RELEASE game does. Godot
+	// refuses free() on an object that is emitting a signal only in debug
+	// builds (the lock check of Object::callp is DEBUG_ENABLED); this deletes
+	// through the C++ path that skips it. Nodes only (a RefCounted would be
+	// freed under its references).
+	static void debug_free_like_release(Object *object);
 	// Interpolation status. Keys: factory_enabled, project_enabled_2d,
 	// project_enabled_3d, mismatch (bool), hint. Mismatch = bullets look
 	// steppy despite the factory flag, or vice versa.

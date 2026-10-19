@@ -7,6 +7,7 @@
 #include "core/cached_string_names2d.hpp"
 #include "core/collision_shape_helper2d.hpp"
 #include "core/dynamic_sparse_set.hpp"
+#include "core/emit_guard2d.hpp"
 #include "core/owned_node2d.hpp"
 #include "core/reentrancy_guard2d.hpp"
 #include "core/transform_math2d.hpp"
@@ -105,6 +106,9 @@ class VolleyPool;
 class BulletVolley2D : public MultiMeshInstance2D {
 	GDCLASS(BulletVolley2D, MultiMeshInstance2D)
 public:
+	// Refuses a release-build free() while this node emits (core/emit_guard2d.hpp).
+	EmitGuardState2D emit_guard;
+
 	// Godot's memnew cannot forward constructor arguments, so instances are created
 	// with memnew and then initialized through spawn(). Always call spawn() after memnew.
 

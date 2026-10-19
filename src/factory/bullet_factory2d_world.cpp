@@ -1,5 +1,6 @@
 // Bullet world: time scale, despawn bounds and the area clears/counts.
 
+#include "core/emit_on2d.hpp"
 #include "core/node_scan2d.hpp"
 #include "factory/bullet_factory2d_internal.hpp"
 
@@ -216,7 +217,7 @@ int BulletFactory2D::clear_bullets_in_area(const char *function_name, bool circl
 			indexes[(int64_t)k] = record.indexes[k];
 		}
 		note_user_code();
-		emit_signal("bullets_cleared", record.positions, record.volley, indexes);
+		emit_on2d(this, "bullets_cleared", record.positions, record.volley, indexes);
 		if (!*life) {
 			return cleared;
 		}

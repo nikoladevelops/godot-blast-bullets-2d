@@ -1,4 +1,5 @@
 #include "bullet_spawner/bullet_spawner2d_internal.hpp"
+#include "core/emit_on2d.hpp"
 
 // Wiring (factory/generator/spawn data), shooting cadence, spin, bursts,
 // telegraph, pattern lists, lifecycle (_ready/_notification/_process) and
@@ -201,9 +202,9 @@ void BulletSpawner2D::set_shooting_enabled(bool value) {
 		return;
 	}
 	if (!was_active && now_active) {
-		emit_signal("shooting_started");
+		emit_on2d(this, "shooting_started");
 	} else if (was_active && !now_active) {
-		emit_signal("shooting_stopped");
+		emit_on2d(this, "shooting_stopped");
 	}
 }
 
@@ -263,9 +264,9 @@ void BulletSpawner2D::set_max_volleys(int value) {
 		return;
 	}
 	if (!was_active && now_active) {
-		emit_signal("shooting_started");
+		emit_on2d(this, "shooting_started");
 	} else if (was_active && !now_active) {
-		emit_signal("shooting_stopped");
+		emit_on2d(this, "shooting_stopped");
 	}
 }
 
@@ -541,7 +542,7 @@ void BulletSpawner2D::reset_shooting() {
 	// Transitions only (like every other emitter): a spawner that was
 	// already firing restarts its cadence silently.
 	if (!was_active && auto_shooting_active() && reports_shooting_transitions(this)) {
-		emit_signal("shooting_started");
+		emit_on2d(this, "shooting_started");
 	}
 }
 
@@ -561,7 +562,7 @@ void BulletSpawner2D::fire_n_volleys(int n) {
 		refresh_process_state();
 	}
 	if (!was_active && auto_shooting_active() && reports_shooting_transitions(this)) {
-		emit_signal("shooting_started");
+		emit_on2d(this, "shooting_started");
 	}
 }
 
@@ -572,7 +573,7 @@ void BulletSpawner2D::pause_shooting() {
 		refresh_process_state();
 	}
 	if (was_active && !auto_shooting_active() && reports_shooting_transitions(this)) {
-		emit_signal("shooting_stopped");
+		emit_on2d(this, "shooting_stopped");
 	}
 }
 
@@ -583,7 +584,7 @@ void BulletSpawner2D::resume_shooting() {
 		refresh_process_state();
 	}
 	if (!was_active && auto_shooting_active() && reports_shooting_transitions(this)) {
-		emit_signal("shooting_started");
+		emit_on2d(this, "shooting_started");
 	}
 }
 
@@ -782,6 +783,9 @@ PackedStringArray BulletSpawner2D::_get_configuration_warnings() const {
 }
 
 bool BulletSpawner2D::shoot_once() {
+	if (shot_owner_dying()) {
+		return false; // freed from a handler (the free finishes this frame): never shoots again
+	}
 	// No nesting: every emit below runs user handlers synchronously, and a
 	// nested shoot_once() would recurse past the volley cap. Per-spawner latch
 	// stops self-recursion; global depth stops cross-spawner A->B->A ping-pong.
@@ -807,7 +811,7 @@ bool BulletSpawner2D::shoot_once() {
 			}
 		}
 		if (with_signal) {
-			emit_signal("volley_skipped", skip_reason);
+			emit_on2d(this, "volley_skipped", skip_reason);
 		}
 		clear_shoot_once_latch();
 		return false;
@@ -936,18 +940,21 @@ bool BulletSpawner2D::shoot_once() {
 	// Last-chance hook on the freshly spawned, stamped volley (before the
 	// muzzle offset, homing and orbit are configured): handlers may tweak the
 	// live instance (speeds, custom data) or drop it via queue_free().
-	emit_signal("pre_shoot", bullets, volleys_fired + 1);
+	emit_on2d(this, "pre_shoot", bullets, volleys_fired + 1);
 	// G1: a pre_shoot handler may have freed this volley (factory reset/free_*,
 	// queue_free) or handed it to another owner (adopt_live_volley). Feeding a
 	// dead/foreign pointer into the configuring step below would be
 	// use-after-free (or silently overwrite the new owner's steering), so
 	// revalidate BEFORE configuring, not just before volley_fired.
+	if (shot_owner_dying()) {
+		// A pre_shoot handler freed this spawner: the free was refused
+		// (emit guard) and finishes at the end of the frame. A dying spawner
+		// configures nothing and reports nothing.
+		return fail_early(nullptr, StringName("dropped"), false);
+	}
 	if (revalidate_configured_volley(volley_id, bullets, self_id) == nullptr) {
 		// Same drop semantics as below: the spawn succeeded but this shot is
 		// dropped (no count, no volley_fired).
-		// (The spawner itself cannot be freed here: Godot refuses to free
-		// an object while it emits, and every handler above ran inside one
-		// of this spawner's emits.)
 		return fail_early(nullptr, StringName("dropped"), true);
 	}
 	// Homing/orbiting runs on the same stamp: the instance is fully
@@ -966,13 +973,13 @@ bool BulletSpawner2D::shoot_once() {
 	// ran above and may have freed this volley or handed it to another owner.
 	// Dereferencing the raw pointer now would be use-after-free: resolve by id
 	// and compare BY VALUE.
+	if (shot_owner_dying()) {
+		return fail_early(nullptr, StringName("dropped"), false); // freed by a homing handler (see above)
+	}
 	if (revalidate_configured_volley(volley_id, bullets, self_id) == nullptr) {
 		// Volley is gone or foreign: counting it or emitting volley_fired for it
 		// would lie about ownership and hand out a dead pointer. The spawn
 		// itself succeeded (bullets were created), but this shot is dropped.
-		// (The spawner itself cannot be freed here: Godot refuses to free
-		// an object while it emits, and every handler above ran inside one
-		// of this spawner's emits.)
 		return fail_early(nullptr, StringName("dropped"), true);
 	}
 	volleys_fired += 1;
@@ -984,7 +991,7 @@ bool BulletSpawner2D::shoot_once() {
 	// return while the guard is either unset or already cleared.
 	// Read before the emit: a volley_fired handler may free the volley.
 	const int fired_amount = bullets->get_amount_bullets();
-	emit_signal("volley_fired", bullets, volleys_fired);
+	emit_on2d(this, "volley_fired", bullets, volleys_fired);
 	// The shot succeeded (no drop path follows): spawner-only entries fire
 	// at the spawner's global position.
 	fire_spawner_sound(BulletSoundData2D::SOUND_ON_SHOT, fired_amount);
@@ -1009,7 +1016,7 @@ bool BulletSpawner2D::shoot_once() {
 		// shooting_* signals track auto-fire: manual shots on a spawner with
 		// auto-shooting off never report a finish.
 		if (shooting_enabled && reports_shooting_transitions(this)) {
-			emit_signal("shooting_finished");
+			emit_on2d(this, "shooting_finished");
 		}
 	}
 	shoot_error_latch = 0;
@@ -1101,7 +1108,7 @@ void BulletSpawner2D::_ready() {
 		refresh_process_state();
 	}
 	if (auto_shooting_active()) {
-		emit_signal("shooting_started");
+		emit_on2d(this, "shooting_started");
 	}
 }
 
@@ -1115,6 +1122,13 @@ void BulletSpawner2D::_notification(int p_what) {
 			// Rebuild already re-snapshots; the loop below stays in sync.
 		}
 	} else if (p_what == NOTIFICATION_PREDELETE) {
+		if (emit_guard.depth > 0) {
+			// Freed from a handler of one of our own signals (a release
+			// build: debug builds refuse first). The emit queues it.
+			cancel_free();
+			emit_guard.refused_free = true;
+			return;
+		}
 		if (shoot_once_reentrant_guard) {
 			// Freed from user code inside a shot: refuse (see
 			// refused_free_during_shot); the latch's clear-point queues it.
@@ -1300,7 +1314,10 @@ void BulletSpawner2D::_process(double delta) {
 			const int retargeted = retarget_live_volleys();
 			homing_retarget_time_left = homing_retarget_interval_sec;
 			if (retargeted > 0) {
-				emit_signal("retarget_applied", retargeted);
+				emit_on2d(this, "retarget_applied", retargeted);
+				if (shot_owner_dying()) {
+					return; // its handler freed this spawner
+				}
 			}
 		}
 	}
@@ -1500,7 +1517,7 @@ void BulletSpawner2D::begin_telegraph(bool auto_started) {
 	// No warning for a shot that cannot happen (the muzzle is outside the
 	// despawn bounds): report the skip, the pull rearms the interval.
 	if (muzzle_outside_despawn_bounds(get_bullet_factory())) {
-		emit_signal("volley_skipped", StringName("outside_despawn_bounds"));
+		emit_on2d(this, "volley_skipped", StringName("outside_despawn_bounds"));
 		return;
 	}
 	// Snapshot the aim for the warning signal; the actual fire re-collects,
@@ -1509,7 +1526,7 @@ void BulletSpawner2D::begin_telegraph(bool auto_started) {
 	telegraph_pending = true;
 	telegraph_from_auto = auto_started;
 	telegraph_time_left = next_telegraph_sec();
-	emit_signal("volley_telegraphed", aim);
+	emit_on2d(this, "volley_telegraphed", aim);
 	fire_spawner_sound(BulletSoundData2D::SOUND_ON_TELEGRAPH);
 	set_process(true);
 }
@@ -1523,7 +1540,7 @@ void BulletSpawner2D::cancel_burst_chain() {
 	burst_telegraph_done = false;
 	burst_mirror_next = false;
 	if (was_running) {
-		emit_signal("burst_finished");
+		emit_on2d(this, "burst_finished");
 	}
 }
 
@@ -1546,7 +1563,7 @@ void BulletSpawner2D::fire_burst_volley() {
 			++burst_shots_fired;
 			--burst_shots_left;
 			burst_consecutive_failures = 0;
-			emit_signal("burst_shot_fired", burst_shots_fired, mirrored);
+			emit_on2d(this, "burst_shot_fired", burst_shots_fired, mirrored);
 		} else if (++burst_consecutive_failures >= burst_count) {
 			// Persistent failure (bad config, permanent over-budget): end the
 			// chain instead of retrying forever. Each attempt already reported
@@ -1561,7 +1578,7 @@ void BulletSpawner2D::fire_burst_volley() {
 			burst_telegraph_done = false;
 			burst_consecutive_failures = 0;
 			burst_shots_fired = 0;
-			emit_signal("burst_finished");
+			emit_on2d(this, "burst_finished");
 		}
 		set_process(true);
 		return;
@@ -1639,7 +1656,7 @@ int BulletSpawner2D::spawn_pattern_list(const Array &entries, bool simultaneous,
 		pattern_list_active = false;
 		pattern_list_entries.clear();
 		pattern_list_cursor = 0;
-		emit_signal("pattern_list_finished");
+		emit_on2d(this, "pattern_list_finished");
 		return fired;
 	}
 	set_process(true);
@@ -1757,7 +1774,7 @@ void BulletSpawner2D::fire_pattern_list_entry() {
 	fire_pattern_list_override(entry);
 	if (pattern_list_cursor >= pattern_list_entries.size()) {
 		stop_pattern_list();
-		emit_signal("pattern_list_finished");
+		emit_on2d(this, "pattern_list_finished");
 	}
 }
 

@@ -377,6 +377,13 @@ void BulletVolley2D::begin_life(const BulletVolleyData2D &data, uint64_t new_own
 void BulletVolley2D::_notification(int p_what) {
 	switch (p_what) {
 		case NOTIFICATION_PREDELETE: {
+			if (emit_guard.depth > 0 && predelete_state == PREDELETE_NONE) {
+				// Freed from a handler of one of its own signals (a release
+				// build: debug builds refuse first). The emit queues it.
+				cancel_free();
+				emit_guard.refused_free = true;
+				break;
+			}
 			if (predelete_state == PREDELETE_RUNNING) {
 				// A free() of this volley from user code inside its own
 				// teardown (an attachment callback freed it, or freed the

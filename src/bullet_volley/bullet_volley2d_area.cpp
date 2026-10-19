@@ -3,6 +3,7 @@
 // linear pass over the live set, only with bounds enabled).
 
 #include "bullet_volley/bullet_volley2d_internal.hpp"
+#include "core/emit_on2d.hpp"
 
 using namespace godot;
 
@@ -161,7 +162,7 @@ void BulletVolley2D::cull_outside_bounds(const Rect2 &bounds) {
 				indexes[(int64_t)k] = doomed[k];
 			}
 			bullet_factory->note_user_code();
-			bullet_factory->emit_signal("bullets_despawned", positions, this, indexes);
+			emit_on2d(bullet_factory, "bullets_despawned", positions, this, indexes);
 		}
 	}
 }

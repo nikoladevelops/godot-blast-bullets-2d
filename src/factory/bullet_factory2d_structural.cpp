@@ -2,6 +2,7 @@
 // their *_deferred twins (queued to the next idle frame) and the bookkeeping that
 // keeps all_volleys, volley_set and volley_pool in sync.
 
+#include "core/emit_on2d.hpp"
 #include "factory/bullet_factory2d_internal.hpp"
 
 using namespace godot;
@@ -284,7 +285,7 @@ void BulletFactory2D::reset(const Ref<VolleyPoolKey2D> &key) {
 	// Finished means finished: the guard has restored processing and the
 	// debuggers, so a handler can spawn the next wave right away (emitting
 	// inside the guard made every spawn from the handler fail as busy).
-	emit_signal("reset_finished");
+	emit_on2d(this, "reset_finished");
 }
 
 void BulletFactory2D::free_active_bullets(const Ref<VolleyPoolKey2D> &key) {
@@ -403,7 +404,7 @@ int BulletFactory2D::clear_active_bullets(const Ref<VolleyPoolKey2D> &key) {
 			continue;
 		}
 		note_user_code();
-		emit_signal("bullets_cleared", note.positions, note.volley, note.indexes);
+		emit_on2d(this, "bullets_cleared", note.positions, note.volley, note.indexes);
 		if (!*life) {
 			return cleared;
 		}

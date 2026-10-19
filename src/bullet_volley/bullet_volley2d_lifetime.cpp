@@ -3,6 +3,7 @@
 // its deferred work flushed.
 
 #include "bullet_volley/bullet_volley2d_internal.hpp"
+#include "core/emit_on2d.hpp"
 
 using namespace godot;
 
@@ -101,7 +102,7 @@ void BulletVolley2D::expire_live_bullets() {
 		Object *emitter = resolve_lifetime_emitter_checked();
 		if (emitter != nullptr) {
 			note_user_code();
-			emitter->emit_signal(CachedStringNames2D::get().life_time_over, this, bullet_indexes);
+			emit_on2d(emitter, CachedStringNames2D::get().life_time_over, this, bullet_indexes);
 		}
 		if (ObjectDB::get_instance(ObjectID(self_id)) != this || is_queued_for_deletion()) {
 			return;

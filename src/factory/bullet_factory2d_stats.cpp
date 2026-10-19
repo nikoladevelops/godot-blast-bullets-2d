@@ -191,6 +191,15 @@ void BulletFactory2D::debug_reset_pool_stats() {
 	pool_misses = 0;
 }
 
+void BulletFactory2D::debug_free_like_release(Object *object) {
+	Node *node = Object::cast_to<Node>(object);
+	if (node == nullptr) {
+		UtilityFunctions::push_error("BulletFactory2D.debug_free_like_release: expects a live Node, nothing freed.");
+		return;
+	}
+	memdelete(node);
+}
+
 Dictionary BulletFactory2D::debug_validate_spawn_data(const Ref<BulletVolleyData2D> &spawn_data) {
 	Dictionary d;
 	d["warning"] = ""; // every result carries {ok, error, warning}

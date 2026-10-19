@@ -3,6 +3,7 @@
 // runs inside move_bullets (bullet_volley2d_tick.cpp).
 
 #include "bullet_volley/bullet_volley2d_internal.hpp"
+#include "core/emit_on2d.hpp"
 
 using namespace godot;
 
@@ -776,7 +777,7 @@ bool BulletVolley2D::dispatch_homing_events() {
 		sound_fire(BulletSoundData2D::SOUND_ON_HOMING_TARGET_REACHED, ev.bullet_index, ev.target_position);
 		note_user_code();
 		++self_emit_depth;
-		emit_signal(reached_signal, this, ev.bullet_index, target, ev.target_position);
+		emit_on2d(this, reached_signal, this, ev.bullet_index, target, ev.target_position);
 		if (ObjectDB::get_instance(ObjectID(self_id)) == this) {
 			--self_emit_depth;
 		}
@@ -789,7 +790,7 @@ bool BulletVolley2D::dispatch_homing_events() {
 			Object *owner = ObjectDB::get_instance(ObjectID(owner_spawner_id));
 			if (owner != nullptr) {
 				note_user_code();
-				owner->emit_signal(forward_signal, this, ev.bullet_index, target, ev.target_position);
+				emit_on2d(owner, forward_signal, this, ev.bullet_index, target, ev.target_position);
 				if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
 					return false;
 				}

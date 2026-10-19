@@ -208,6 +208,13 @@ void BulletFactory2D::_notification(int p_what) {
 		return;
 	}
 	if (p_what == NOTIFICATION_PREDELETE) {
+		if (emit_guard.depth > 0 && predelete_state == PREDELETE_NONE) {
+			// Freed from a handler of one of its own signals (a release
+			// build: debug builds refuse first). The emit queues it.
+			cancel_free();
+			emit_guard.refused_free = true;
+			return;
+		}
 		if (predelete_state == PREDELETE_RUNNING) {
 			// Freed again from user code inside its own teardown (an
 			// attachment callback of a dying volley): a second deletion would

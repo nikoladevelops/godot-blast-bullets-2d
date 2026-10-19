@@ -6,6 +6,7 @@
 // refused spawn never costs a bullet.
 
 #include "bullet_spawner/bullet_spawner2d.hpp"
+#include "core/emit_on2d.hpp"
 #include "core/node_scan2d.hpp"
 #include "core/transform_math2d.hpp"
 #include "factory/bullet_factory2d_internal.hpp"
@@ -382,7 +383,7 @@ Array BulletFactory2D::convert_to_pickups_impl(const char *function_name, const 
 	pickup_conversion_running = false;
 	if (!is_tearing_down) {
 		note_user_code();
-		emit_signal("bullets_converted", (int64_t)spawned, result);
+		emit_on2d(this, "bullets_converted", (int64_t)spawned, result);
 	}
 	return result;
 }

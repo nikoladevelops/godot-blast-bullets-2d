@@ -8,6 +8,7 @@
 // factory, and a reset from a handler cancels the rest of the batch.
 
 #include "bullet_spawner/bullet_spawner2d.hpp"
+#include "core/emit_on2d.hpp"
 #include "core/transform_math2d.hpp"
 #include "factory/bullet_factory2d_internal.hpp"
 #include "patterns/pattern_inputs2d.hpp"
@@ -298,7 +299,7 @@ bool BulletFactory2D::flush_splits(const bool &alive) {
 		}
 		if (emitter != nullptr) {
 			note_user_code();
-			emitter->emit_signal("bullet_split", r.pose.columns[2], r.cause, child, r.child_depth);
+			emit_on2d(emitter, "bullet_split", r.pose.columns[2], r.cause, child, r.child_depth);
 			if (!alive) {
 				return false;
 			}

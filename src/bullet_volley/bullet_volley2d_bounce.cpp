@@ -3,6 +3,7 @@
 // handle_bullet_collision).
 
 #include "bullet_volley/bullet_volley2d_internal.hpp"
+#include "core/emit_on2d.hpp"
 
 using namespace godot;
 
@@ -733,9 +734,9 @@ int BulletVolley2D::try_handle_bounce(CollisionType collision_type, int bullet_i
 	if (emitter != nullptr) {
 		note_user_code();
 		if (collision_type == CollisionType::AREA) {
-			emitter->emit_signal(CachedStringNames2D::get().bounce_area_entered, hit_target, this, bullet_index);
+			emit_on2d(emitter, CachedStringNames2D::get().bounce_area_entered, hit_target, this, bullet_index);
 		} else {
-			emitter->emit_signal(CachedStringNames2D::get().bounce_body_entered, hit_target, this, bullet_index);
+			emit_on2d(emitter, CachedStringNames2D::get().bounce_body_entered, hit_target, this, bullet_index);
 		}
 	}
 	// A handler that freed this volley leaves every member access below as
