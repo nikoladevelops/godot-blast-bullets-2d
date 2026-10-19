@@ -129,7 +129,11 @@ void BulletSplitData2D::apply_preset(Preset preset) {
 			UtilityFunctions::push_error("BulletSplitData2D: preset must be 0 (Burst Ring), 1 (Fan Forward) or 2 (Cascade), keeping the old values.");
 			return;
 	}
+	// Same relay bookkeeping as set_stages: the new stages relay their
+	// edits, the replaced ones stop.
+	connect_stages(false);
 	stages = chain;
+	connect_stages(true);
 	repeat_last_stage = false;
 	notify_property_list_changed();
 	++BulletSplitStage2D::rules_epoch;

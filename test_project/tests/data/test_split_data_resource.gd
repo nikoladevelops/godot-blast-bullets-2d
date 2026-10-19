@@ -228,3 +228,18 @@ func test_chain_survives_a_tres_round_trip() -> void:
 	for prop in STAGE_PROPS:
 		if prop != "child_data":
 			assert_eq(first.get(prop), s.get(prop), prop + " survives")
+
+
+## A preset's stages relay their edits like assigned ones (an edit to a
+## preset stage reaches every volley through `changed`), and the stages a
+## preset replaced stop relaying.
+func test_preset_stages_relay_and_replaced_stages_go_quiet() -> void:
+	var d := BulletSplitData2D.new()
+	var old_stage := BulletSplitStage2D.new()
+	d.stages = [old_stage]
+	d.apply_preset(BulletSplitData2D.PRESET_FAN_FORWARD)
+	var n := _count_changed(d)
+	(d.stages[0] as BulletSplitStage2D).count = 5
+	assert_eq(n[0], 1, "an edit to a preset stage relays once")
+	old_stage.count = 7
+	assert_eq(n[0], 1, "the replaced stage no longer relays")
