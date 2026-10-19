@@ -520,6 +520,7 @@ int BulletSpawner2D::get_active_live_bullet_count() const {
 }
 
 void BulletSpawner2D::reset_shooting() {
+	const bool was_active = auto_shooting_active();
 	volleys_fired = 0;
 	shooting_paused = false;
 	oneshot_volleys_left = -1;
@@ -537,8 +538,9 @@ void BulletSpawner2D::reset_shooting() {
 	if (is_inside_tree()) {
 		refresh_process_state();
 	}
-	// An explicit restart counts as a (re)start whenever it arms shooting.
-	if (auto_shooting_active() && reports_shooting_transitions(this)) {
+	// Transitions only (like every other emitter): a spawner that was
+	// already firing restarts its cadence silently.
+	if (!was_active && auto_shooting_active() && reports_shooting_transitions(this)) {
 		emit_signal("shooting_started");
 	}
 }

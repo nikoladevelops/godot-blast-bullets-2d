@@ -277,3 +277,26 @@ func test_pre_tree_cap_silent_tree_cap_reports() -> void:
 	assert_eq(get_signal_emit_count(sp, "shooting_started"), started_before + 1, "tree raise reports started")
 	sp.max_volleys = 0
 	assert_signal_emit_count(sp, "shooting_stopped", 1, "tree cap reports stopped")
+
+
+## shooting_started / shooting_stopped report auto-fire TRANSITIONS only:
+## reset_shooting() on a spawner that is already firing restarts its cadence
+## silently (no second shooting_started without a stop between), while a
+## reset that really restarts a finished or paused spawner reports once.
+func test_reset_shooting_reports_only_a_real_restart() -> void:
+	var sp := _spawner()
+	sp.shoot_interval_sec = 0.05
+	sp.set_shooting_enabled(true)
+	assert_signal_emit_count(sp, "shooting_started", 1, "auto-fire started")
+	sp.reset_shooting()
+	assert_signal_emit_count(sp, "shooting_started", 1, "already firing: the restart is silent")
+	sp.max_volleys = 1
+	assert_gte(await _frames_until(sp, "shooting_finished", 1), 0, "the cap ends auto-fire")
+	sp.reset_shooting()
+	assert_signal_emit_count(sp, "shooting_started", 2, "a finished spawner restarting reports once")
+	sp.max_volleys = -1
+	sp.pause_shooting()
+	sp.reset_shooting()
+	assert_signal_emit_count(sp, "shooting_started", 3, "a paused spawner restarting reports once")
+	assert_signal_emit_count(sp, "shooting_stopped", 1, "one stop: the pause")
+	sp.set_shooting_enabled(false)
