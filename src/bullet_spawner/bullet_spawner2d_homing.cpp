@@ -98,11 +98,10 @@ void BulletSpawner2D::set_homing_retarget_phase(double value) {
 	}
 	homing_retarget_phase = value;
 	// A re-tuned phase takes effect on the pending countdown immediately:
-	// the phase IS the pending countdown for an armed-but-waiting pass
-	// (mirrors update_homing_process_state's reset arm). Stagger is only
-	// flattened when the user edits the phase itself, never by unrelated
-	// setters (those snapshot was_active and skip the reset).
-	homing_retarget_time_left = value;
+	// the phase IS the pending countdown for an armed-but-waiting pass, and
+	// 0 re-arms the automatic per-spawner stagger (it used to make the pass
+	// due at once, for every spawner the script touched).
+	arm_retarget_countdown();
 }
 
 // HOMING + ORBITING (EASY API)

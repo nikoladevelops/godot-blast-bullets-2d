@@ -196,3 +196,24 @@ func test_volley_freed_by_homing_targets_resolved_is_dropped() -> void:
 	assert_eq(skipped, [&"dropped"], "reported as dropped")
 	assert_true(sp.shoot_once(), "the next shot fires")
 	assert_eq(configured.size(), 1, "and is configured")
+
+
+## homing_retarget_phase 0 means "stagger per spawner automatically", also
+## when a script sets it at runtime: the first pass lands at the spawner's
+## own offset into the interval, never on the very next frame for everyone.
+func test_runtime_phase_zero_keeps_the_stagger() -> void:
+	var sp := _homing_spawner()
+	sp.homing_retarget_mode = BulletSpawner2D.HOMING_RETARGET_ON_INTERVAL
+	sp.homing_retarget_interval_sec = 1.0
+	assert_true(sp.shoot_once(), "a live homing volley to retarget")
+	sp.set_homing_retarget_phase(0.5)
+	await idle(2)
+	sp.set_homing_retarget_phase(0.0)
+	var expected_frames: float = fposmod(float(sp.get_instance_id()) * 0.137, 1.0) * 60.0
+	var frames := -1
+	for i in 90:
+		await idle(1)
+		if get_signal_emit_count(sp, "retarget_applied") > 0:
+			frames = i + 1
+			break
+	assert_almost_eq(float(frames), expected_frames, 2.0, "the first pass lands at the spawner's stagger (expected %.1f frames)" % expected_frames)
