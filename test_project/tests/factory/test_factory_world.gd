@@ -211,6 +211,23 @@ func test_time_scale_scales_motion_and_lifetime() -> void:
 	assert_almost_eq(v.get_bullet_transform(0).origin.x - x0, 250.0, 0.01, "double speed: +200 px")
 
 
+## Any finite time_scale is accepted, but one volley tick never covers more
+## than 10 s of bullet time: 1e300 would turn every pose into INF (and hand
+## INF shapes to the physics server). The lifetime runs on the same clamped
+## clock. Scales whose ticks stay below the cap are untouched (above: x2).
+func test_a_huge_time_scale_keeps_bullets_finite() -> void:
+	var v := _volley_at([Vector2.ZERO], 0.0)
+	v.bullet_set_velocity(0, Vector2(100, 0))
+	await idle(1)
+	var x0: float = v.get_bullet_transform(0).origin.x
+	factory.time_scale = 1e300
+	factory.debug_advance_time(1.0 / 60.0)
+	var p: Vector2 = v.get_bullet_transform(0).origin
+	assert_true(p.is_finite(), "the bullet stays finite")
+	assert_almost_eq(p.x - x0, 1000.0, 0.01, "one tick covers at most 10 s of bullet time (100 px/s)")
+	expect_no_errors("no engine error from a huge scale")
+
+
 func test_time_scale_default_and_validation() -> void:
 	assert_eq(factory.time_scale, 1.0, "default is real time")
 	factory.time_scale = -1.0

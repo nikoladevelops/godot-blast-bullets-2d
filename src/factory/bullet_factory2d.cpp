@@ -85,7 +85,7 @@ bool BulletFactory2D::tick_volleys(double delta, const bool &alive) {
 		}
 		volley->sweep_tick_stamp = sweep_counter;
 		const double time_factor = volley_time_factor(*volley);
-		const double volley_delta = delta * time_factor;
+		const double volley_delta = capped_volley_delta(delta, time_factor);
 		volley->set_real_tick_delta(delta);
 		// Flag the volley for its whole tick: handlers fired from inside
 		// (collision drain, attachment callbacks) may spawn, and the pool must
@@ -565,7 +565,7 @@ void BulletFactory2D::_physics_process(double delta) {
 			continue;
 		}
 		volley->sweep_timer_stamp = sweep_counter;
-		volley->run_custom_timers(delta * volley_time_factor(*volley));
+		volley->run_custom_timers(capped_volley_delta(delta, volley_time_factor(*volley)));
 		if (!alive) {
 			return;
 		}

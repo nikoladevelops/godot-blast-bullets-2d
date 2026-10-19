@@ -122,6 +122,15 @@ public:
 	// time_scale x the owner spawner scale (while it lives and opted in): the
 	// clock one volley (and its attachments, hum voices) runs on. Non-finite -> 0.
 	double volley_time_factor(const BulletVolley2D &volley) const;
+	// Most bullet time one volley tick covers: any finite time_scale is
+	// accepted, but 1e300 x delta would turn every pose into INF. Above the
+	// cap bullet time slows down instead of exploding.
+	static constexpr double MAX_VOLLEY_TICK_DELTA = 10.0;
+	// delta x volley_time_factor, capped at MAX_VOLLEY_TICK_DELTA.
+	static double capped_volley_delta(double delta, double time_factor) {
+		const double scaled = delta * time_factor;
+		return scaled < MAX_VOLLEY_TICK_DELTA ? scaled : MAX_VOLLEY_TICK_DELTA;
+	}
 	void set_time_scale(double value);
 	// Bullets outside the rect (global space) and not heading back in are
 	// silently disabled each tick while enabled.
