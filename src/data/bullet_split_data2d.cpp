@@ -13,9 +13,32 @@ TypedArray<BulletSplitStage2D> BulletSplitData2D::get_stages() const {
 void BulletSplitData2D::set_stages(const TypedArray<BulletSplitStage2D> &value) {
 	// Empty entries are allowed (the inspector adds one before the user picks
 	// a resource): that generation simply does not split.
+	connect_stages(false);
 	stages = value;
+	connect_stages(true);
 	++BulletSplitStage2D::rules_epoch;
 	emit_changed();
+}
+
+void BulletSplitData2D::connect_stages(bool connect) {
+	const Callable on_changed = callable_mp(this, &BulletSplitData2D::_on_stage_changed);
+	const StringName changed("changed");
+	for (int64_t i = 0; i < stages.size(); ++i) {
+		BulletSplitStage2D *stage = Object::cast_to<BulletSplitStage2D>((Object *)stages[i]);
+		if (stage == nullptr) {
+			continue;
+		}
+		const bool connected = stage->is_connected(changed, on_changed);
+		if (connect && !connected) {
+			stage->connect(changed, on_changed);
+		} else if (!connect && connected) {
+			stage->disconnect(changed, on_changed);
+		}
+	}
+}
+
+void BulletSplitData2D::_on_stage_changed() {
+	emit_changed(); // the stage already bumped the rules epoch
 }
 
 bool BulletSplitData2D::get_repeat_last_stage() const {

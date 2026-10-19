@@ -1963,6 +1963,10 @@ private:
 	// Zone resources' `changed` -> ring preview refresh.
 	void connect_graze_zones(bool connect);
 	void _on_graze_zone_changed();
+	// The chain's `changed` (its stages relay theirs): the warnings and the
+	// auto-fire error latch follow chain edits like any config setter.
+	void connect_split_data(bool connect);
+	void _on_split_data_changed();
 	// Ring preview: allowed + toggled on (editor: graze_show_preview;
 	// runtime: also graze_preview_during_runtime) + graze on.
 	bool graze_preview_active() const;

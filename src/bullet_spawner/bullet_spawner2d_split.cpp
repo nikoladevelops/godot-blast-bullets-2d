@@ -32,8 +32,28 @@ void BulletSpawner2D::set_split_data(const Ref<BulletSplitData2D> &value) {
 	if (split_data == value) {
 		return;
 	}
+	connect_split_data(false);
 	split_data = value;
+	connect_split_data(true);
 	apply_split_config();
+	on_config_changed();
+}
+
+void BulletSpawner2D::connect_split_data(bool connect) {
+	if (split_data.is_null()) {
+		return;
+	}
+	const Callable on_changed = callable_mp(this, &BulletSpawner2D::_on_split_data_changed);
+	const StringName changed("changed");
+	const bool connected = split_data->is_connected(changed, on_changed);
+	if (connect && !connected) {
+		split_data->connect(changed, on_changed);
+	} else if (!connect && connected) {
+		split_data->disconnect(changed, on_changed);
+	}
+}
+
+void BulletSpawner2D::_on_split_data_changed() {
 	on_config_changed();
 }
 

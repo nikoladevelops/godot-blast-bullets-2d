@@ -36,6 +36,10 @@ public:
 
 	TypedArray<BulletSplitStage2D> get_stages() const;
 	void set_stages(const TypedArray<BulletSplitStage2D> &value);
+	// A stage edit is a chain edit: the chain re-emits `changed` so its
+	// listeners (the spawner's warnings, the editor) see it.
+	void connect_stages(bool connect);
+	void _on_stage_changed();
 	bool get_repeat_last_stage() const;
 	void set_repeat_last_stage(bool value);
 	int get_max_depth() const;

@@ -457,3 +457,25 @@ func test_seeded_splits_differ_per_shot_and_per_repeat_split() -> void:
 	assert_ne(runs[0][0], runs[0][1], "the second shot splits another way")
 	assert_ne(runs[0][0], runs[0][2], "a repeat split of one parent splits another way")
 	assert_eq(runs[0], runs[1], "same seed, same events: the same splits")
+
+
+## A stage edit is a chain edit: the chain relays its stages' `changed` (only
+## the stages it holds now), and the spawner listens to its chain (only the
+## one it holds now), like graze zones.
+func test_stage_edits_reach_the_chain_and_the_spawner() -> void:
+	var chain := _chain(2)
+	var stage: BulletSplitStage2D = chain.stages[0]
+	var seen := [0]
+	chain.changed.connect(func() -> void: seen[0] += 1)
+	stage.count = 5
+	assert_eq(seen[0], 1, "the chain re-emits its stage's changed")
+	var old_stage := stage
+	chain.stages = [BulletSplitStage2D.new()]
+	seen[0] = 0
+	old_stage.count = 6
+	assert_eq(seen[0], 0, "a replaced stage is no longer relayed")
+	var sp := make_spawner()
+	sp.split_data = chain
+	assert_eq(chain.changed.get_connections().filter(func(c): return c["callable"].get_object() == sp).size(), 1, "the spawner listens to its chain")
+	sp.split_data = _chain(2)
+	assert_eq(chain.changed.get_connections().filter(func(c): return c["callable"].get_object() == sp).size(), 0, "and lets a replaced one go")
