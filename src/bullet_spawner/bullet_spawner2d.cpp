@@ -1338,12 +1338,28 @@ void BulletSpawner2D::_process(double delta) {
 	}
 	if (burst_shots_left > 0 && !shooting_paused) {
 		burst_time_left -= delta;
-		if (burst_time_left <= 0.0) {
+		// Overshoot carries into the next wait (like the main timer below),
+		// so sub-frame intervals keep their average rate; bounded catch-up.
+		int pulls = 0;
+		while (burst_shots_left > 0 && !shooting_paused && burst_time_left <= 0.0) {
+			if (++pulls > 8) {
+				burst_time_left = next_burst_interval_sec(); // anti-spiral resync
+				break;
+			}
+			const double overshoot = burst_time_left;
+			const int left_before = burst_shots_left;
 			// Auto chains report a misconfiguration once (like plain auto
 			// shots); manual chains report every attempt.
 			auto_fire_in_progress = burst_from_auto;
 			fire_burst_volley();
 			auto_fire_in_progress = false;
+			if (burst_shots_left <= 0) {
+				break;
+			}
+			if (burst_shots_left == left_before) {
+				break; // failed shot: retried a full interval out (no catch-up)
+			}
+			burst_time_left += overshoot; // fire_burst_volley set the next wait
 		}
 		if (!is_processing()) {
 			set_process(true);
@@ -1354,11 +1370,24 @@ void BulletSpawner2D::_process(double delta) {
 	// Runs even with auto-shooting off (manual boss-phase driver).
 	if (pattern_list_active && !shooting_paused) {
 		pattern_list_time_left -= delta;
-		if (pattern_list_time_left <= 0.0) {
-			fire_pattern_list_entry();
-			if (pattern_list_active) {
-				pattern_list_time_left = pattern_list_interval_sec;
+		// Same overshoot carry as the burst chain; interval 0 stays one
+		// entry per frame.
+		int pulls = 0;
+		while (pattern_list_active && !shooting_paused && pattern_list_time_left <= 0.0) {
+			if (++pulls > 8) {
+				pattern_list_time_left = pattern_list_interval_sec; // anti-spiral resync
+				break;
 			}
+			const double overshoot = pattern_list_time_left;
+			fire_pattern_list_entry();
+			if (!pattern_list_active) {
+				break;
+			}
+			if (!(pattern_list_interval_sec > 0.0)) {
+				pattern_list_time_left = 0.0;
+				break;
+			}
+			pattern_list_time_left = pattern_list_interval_sec + overshoot;
 		}
 		if (!is_processing()) {
 			set_process(true);

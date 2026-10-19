@@ -300,3 +300,33 @@ func test_reset_shooting_reports_only_a_real_restart() -> void:
 	assert_signal_emit_count(sp, "shooting_started", 3, "a paused spawner restarting reports once")
 	assert_signal_emit_count(sp, "shooting_stopped", 1, "one stop: the pause")
 	sp.set_shooting_enabled(false)
+
+
+## Burst steps and pattern-list entries keep their average rate at any
+## interval, like the main shooting timer: overshoot carries into the next
+## wait instead of rounding every step up to whole frames (0.02 s at 60 fps
+## once took 2 frames = 0.033 s per step). A pattern-list interval of 0
+## stays one entry per frame.
+func test_burst_and_pattern_list_steps_keep_their_rate() -> void:
+	var sp := _spawner()
+	sp.shoot_interval_sec = 100.0
+	sp.burst_enabled = true
+	sp.burst_count = 31
+	sp.burst_interval_sec = 0.02
+	sp.begin_burst()
+	var frames := await _frames_until(sp, "burst_finished", 1)
+	# 30 waits of 0.02 s = 0.6 s = 36 frames at 60 fps (+1 frame of slack).
+	assert_between(frames, 35, 37, "a 31-shot chain at 0.02 s takes about 0.6 s")
+	var entries: Array = []
+	for i in 31:
+		entries.append({"helper_bullets_amount": 2})
+	var fired_before: int = get_signal_emit_count(sp, "volley_fired")
+	sp.spawn_pattern_list(entries, false, 0.02)
+	frames = await _frames_until(sp, "pattern_list_finished", 1)
+	assert_between(frames, 35, 37, "31 entries at 0.02 s take about 0.6 s")
+	assert_eq(get_signal_emit_count(sp, "volley_fired") - fired_before, 31, "every entry fired once")
+	fired_before = get_signal_emit_count(sp, "volley_fired")
+	sp.spawn_pattern_list([{"helper_bullets_amount": 2}, {"helper_bullets_amount": 2}, {"helper_bullets_amount": 2}], false, 0.0)
+	await idle(1)
+	assert_lte(get_signal_emit_count(sp, "volley_fired") - fired_before, 2, "interval 0: one entry per frame")
+	await _frames_until(sp, "pattern_list_finished", 2)
