@@ -38,6 +38,7 @@ var sound: BulletSoundData2D
 var chain: BulletSplitData2D
 var datas: Array = []
 var pickup: BulletPickupData2D
+var probe_scene: PackedScene
 var stats := {}
 var skipped_ops: Array = []
 var passive_handlers := false
@@ -134,6 +135,8 @@ func _build_world() -> void:
 	for k in 6:
 		datas.append(_data([1, 2, 4, 8, 16, 32, 64][rng.randi() % 7]))
 	pickup = BulletPickupData2D.new()
+	pickup.collect_on_collision = rng.randf() < 0.5
+	probe_scene = make_probe_scene()
 	factory.split_max_children_per_sweep = [0, 32, 256][rng.randi() % 3]
 
 
@@ -244,8 +247,8 @@ func _live_target():
 
 ## One operation from an idle point (structural calls allowed).
 func _operate() -> void:
-	var roll := rng.randi() % 40
-	if roll >= 20:
+	var roll := rng.randi() % 56
+	if roll >= 28:
 		roll = 0 # half of all operations are shots
 	if skipped_ops.has(roll):
 		return
@@ -342,6 +345,45 @@ func _operate() -> void:
 		19:
 			for k in 3:
 				_add_target()
+		20:
+			factory.despawn_bounds_rect = Rect2(rng.randf_range(-600, -200), rng.randf_range(-600, -200), rng.randf_range(400, 1200), rng.randf_range(400, 1200))
+			factory.despawn_bounds_enabled = rng.randf() < 0.6
+		21:
+			factory.use_physics_interpolation = not factory.use_physics_interpolation
+		22:
+			var sp = _live_spawner()
+			if sp != null:
+				sp.homing_target_source = BulletSpawner2D.HOMING_SOURCE_NODE_GROUP
+				sp.homing_node_group = TARGET_GROUP
+				sp.homing_enabled = true
+				sp.orbiting_radius = rng.randf_range(20.0, 120.0)
+				sp.orbiting_enabled = not sp.orbiting_enabled
+		23:
+			var sp = _live_spawner()
+			if sp != null:
+				sp.show_pattern_preview = rng.randf() < 0.5
+				sp.show_preview_during_runtime = rng.randf() < 0.5
+		24:
+			if rng.randf() < 0.6:
+				factory.populate_attachments_pool(probe_scene, rng.randi_range(1, 8))
+			else:
+				factory.free_attachments_pool()
+		25:
+			var live := volleys.filter(func(v): return is_instance_valid(v) and v.debug_get_life_state() == "active")
+			if not live.is_empty():
+				var shapes := [H.make_circle_shape(rng.randf_range(2.0, 10.0)), RectangleShape2D.new(), CapsuleShape2D.new()]
+				(live[rng.randi() % live.size()] as BulletVolley2D).set_collision_shape_runtime_deferred(shapes[rng.randi() % shapes.size()])
+		26:
+			# A timer whose callback acts inside the sweep's timer pass.
+			var live := volleys.filter(func(v): return is_instance_valid(v) and v.debug_get_life_state() == "active")
+			if not live.is_empty():
+				var v: BulletVolley2D = live[rng.randi() % live.size()]
+				v.attach_time_based_function(rng.randf_range(0.02, 0.3), func() -> void: _handler(v, -1), rng.randf() < 0.5, rng.randf() < 0.5)
+		27:
+			var t = _live_target()
+			if t != null:
+				stats["pickups"] += 1
+				factory.convert_all_bullets_to_pickups(pickup, t) # collected by homing onto a live node
 
 
 func _shape_type(d: BulletVolleyData2D) -> int:
