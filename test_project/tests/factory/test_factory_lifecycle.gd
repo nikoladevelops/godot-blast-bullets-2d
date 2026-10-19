@@ -240,3 +240,13 @@ func test_pool_keys_compare_by_value_with_equals() -> void:
 		if expected.equals(key):
 			found += 1
 	assert_eq(found, 1, "the expected key matches its pool bucket by value")
+
+
+## debug_get_live_volley_ids lists live volleys only, like every sibling
+## counter: a volley queued for deletion is not live.
+func test_live_volley_ids_skip_volleys_queued_for_deletion() -> void:
+	var keep: BulletVolley2D = factory.spawn_volley(H.make_still_data(2))
+	var gone: BulletVolley2D = factory.spawn_volley(H.make_still_data(2))
+	gone.queue_free()
+	assert_eq(Array(factory.debug_get_live_volley_ids(0)), [keep.get_instance_id()], "the queued volley is not listed")
+	assert_eq(factory.debug_get_active_bullets_amount(), 1, "the sibling counter agrees")

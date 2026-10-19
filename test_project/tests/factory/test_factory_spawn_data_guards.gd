@@ -87,3 +87,20 @@ func test_volley_with_texture_rotation_stays_finite() -> void:
 	await physics(2)
 	for i in 3:
 		assert_true((v.debug_get_bullet_info(i)["velocity"] as Vector2).is_finite(), "bullet %d velocity finite" % i)
+
+
+## debug_validate_spawn_data always returns {ok, error, warning}; the
+## invisible-bullet warning matches the spawn-time lint: a mesh is enough to
+## be visible.
+func test_validate_spawn_data_keys_and_mesh_lint() -> void:
+	for d in [null, BulletVolleyData2D.new(), _data()]:
+		var res: Dictionary = BulletFactory2D.debug_validate_spawn_data(d)
+		var keys := res.keys()
+		keys.sort()
+		assert_eq(keys, ["error", "ok", "warning"], "every result carries the three keys")
+	var invisible := _data()
+	invisible.sprite_frames = null
+	invisible.texture_size = Vector2.ZERO
+	assert_ne(str(BulletFactory2D.debug_validate_spawn_data(invisible)["warning"]), "", "nothing to draw: warned")
+	invisible.mesh = QuadMesh.new()
+	assert_eq(str(BulletFactory2D.debug_validate_spawn_data(invisible)["warning"]), "", "a mesh draws: no warning")

@@ -193,6 +193,7 @@ void BulletFactory2D::debug_reset_pool_stats() {
 
 Dictionary BulletFactory2D::debug_validate_spawn_data(const Ref<BulletVolleyData2D> &spawn_data) {
 	Dictionary d;
+	d["warning"] = ""; // every result carries {ok, error, warning}
 	if (spawn_data.is_null()) {
 		d["ok"] = false;
 		d["error"] = "spawn_data is null.";
@@ -216,7 +217,7 @@ Dictionary BulletFactory2D::debug_validate_spawn_data(const Ref<BulletVolleyData
 		// means nothing renders; warn loudly in tests before shipping invisible volleys.
 		// Note: texture facing (RIGHT) cannot be detected automatically; the
 		// docs + spawn warning below are the lint for that.
-		if (spawn_data->sprite_frames.is_null() && spawn_data->texture_size == Vector2(0, 0)) {
+		if (spawn_data->sprite_frames.is_null() && spawn_data->mesh.is_null() && spawn_data->texture_size == Vector2(0, 0)) {
 			d["warning"] = "No sprite_frames and zero texture_size: bullets will be invisible. Assign SpriteFrames (art facing Vector2.RIGHT) or a texture_size/mesh.";
 		}
 	}
@@ -246,7 +247,7 @@ Dictionary BulletFactory2D::debug_check_interpolation_status() {
 PackedInt64Array BulletFactory2D::debug_get_live_volley_ids(uint64_t owner_spawner_id) {
 	PackedInt64Array ids;
 	for (const BulletVolley2D *volley : all_volleys) {
-		if (volley != nullptr && volley->is_active && volley->owner_spawner_id == owner_spawner_id) {
+		if (volley != nullptr && volley->is_active && !volley->is_queued_for_deletion() && volley->owner_spawner_id == owner_spawner_id) {
 			ids.push_back((int64_t)volley->get_instance_id());
 		}
 	}
@@ -283,6 +284,7 @@ Dictionary BulletFactory2D::debug_assert_no_dangling() {
 	Dictionary d;
 	d["ok"] = true;
 	d["error"] = "";
+	d["volleys_total"] = (int)all_volleys.size(); // on the failure paths too
 	auto fail = [&d](const String &why) {
 		d["ok"] = false;
 		d["error"] = "volleys: " + why;
