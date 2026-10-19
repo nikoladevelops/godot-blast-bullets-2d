@@ -2685,6 +2685,9 @@ public:
 	// listens is the arming spawner's detector (orphans keep it) or, for
 	// factory volleys, sound_listener_group through the factory's detector.
 	std::vector<Ref<BulletSoundData2D>> sound_effects;
+	// sound_fire_flight: the On Flight entries of this tick (pointers into
+	// sound_effects; sound_offer runs no user code, so they stay valid).
+	std::vector<const Ref<BulletSoundData2D> *> flight_entries_scratch;
 	// mutable: recomputed lazily when BulletSoundData2D::mask_epoch moved.
 	mutable uint32_t sound_trigger_mask = 0;
 	mutable uint64_t sound_mask_epoch = 0;

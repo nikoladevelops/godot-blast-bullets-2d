@@ -161,6 +161,18 @@ void BulletVolley2D::sound_fire_flight() {
 		spec.kind = SoundListenerSpec2D::NODE_GROUP;
 		spec.group = sound_listener_group;
 	}
+	// The On Flight entries, once per tick (not per bullet x entry).
+	flight_entries_scratch.clear();
+	for (const Ref<BulletSoundData2D> &entry : sound_effects) {
+		if (entry.is_valid() && entry->enabled && entry->get_trigger() == BulletSoundData2D::SOUND_ON_FLIGHT) {
+			flight_entries_scratch.push_back(&entry);
+		}
+	}
+	if (flight_entries_scratch.empty()) {
+		return;
+	}
+	const uint64_t self_id = get_instance_id();
+	const int life_id = get_life_id();
 	for (int i : all_bullets_enabled_set.get_active_indexes()) {
 		if (i < 0 || i >= amount_bullets) {
 			continue;
@@ -169,11 +181,8 @@ void BulletVolley2D::sound_fire_flight() {
 		if (!at.is_finite()) {
 			continue;
 		}
-		for (const Ref<BulletSoundData2D> &entry : sound_effects) {
-			if (entry.is_null() || !entry->enabled || entry->get_trigger() != BulletSoundData2D::SOUND_ON_FLIGHT) {
-				continue;
-			}
-			bullet_factory->sound_offer(entry, at, sound_volume_offset_db, spec, amount_bullets, get_instance_id(), get_life_id(), i);
+		for (const Ref<BulletSoundData2D> *entry : flight_entries_scratch) {
+			bullet_factory->sound_offer(*entry, at, sound_volume_offset_db, spec, amount_bullets, self_id, life_id, i);
 		}
 	}
 }
