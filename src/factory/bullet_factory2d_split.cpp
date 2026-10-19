@@ -150,7 +150,7 @@ Dictionary BulletFactory2D::debug_get_split_stats() const {
 namespace {
 
 double split_roll(const SplitRequest2D &r, int child, uint64_t channel) {
-	return r.stage->seed != 0 ? split_seeded_unit(r.stage->seed, r.child_depth - 1, r.parent_index, child, channel) : UtilityFunctions::randf();
+	return r.stage->seed != 0 ? split_seeded_unit(r.stage->seed, r.roll_salt, r.child_depth - 1, r.parent_index, child, channel) : UtilityFunctions::randf();
 }
 
 } // namespace
@@ -249,7 +249,7 @@ bool BulletFactory2D::flush_splits(const bool &alive) {
 		split_stats_children_last += count;
 		// No user code from here to the homing step.
 		child->split_seed_children(r, split_direction_scratch.data(), split_speed_scratch.data(), count);
-		child->split_arm(r.config, r.data, r.child_depth);
+		child->split_arm(r.config, r.data, r.child_depth, r.shot_salt);
 
 		// ---- Homing: a live owner spawner aims the children like a fresh
 		// shot (user code: its homing signals); otherwise they chase the

@@ -124,25 +124,43 @@ func test_random_in_spread_stays_inside_the_spread_and_jitter_is_bounded() -> vo
 	assert_eq(bad, [], "every child within +-(spread/2 + jitter) of the heading")
 
 
+## The same seed and the same events (a fresh world each run) split the
+## same way; another seed differs; a second life of the parent volley (the
+## pool reuses it: another life id salts the rolls) differs too.
 func test_seeded_splits_repeat_and_other_seeds_differ() -> void:
 	var runs: Array = []
-	for seed_value in [11, 11, 12]:
+	var lives: Array = []
+	for seed_value in [11, 11, 12, 11]:
 		splits.clear()
+		if runs.size() < 3:
+			await _fresh_factory()
 		var s := _stage(6)
 		s.direction_mode = BulletSplitStage2D.DIRECTION_RANDOM_IN_SPREAD
 		s.speed_distribution = BulletSplitStage2D.SPEED_RANDOM
 		s.speed_multiplier_min = 0.5
 		s.speed_multiplier_max = 2.0
 		s.seed = seed_value
-		_armed([s])
+		lives.append(_armed([s]).get_life_id())
 		_step_until_split()
 		var children: BulletVolley2D = splits[0][2]
 		var speeds: Array = []
 		for i in children.get_amount_bullets():
 			speeds.append(snappedf(children.get_bullet_speed_data(i).speed, 0.001))
 		runs.append([_angles(children), speeds])
-	assert_eq(runs[0], runs[1], "same seed, same split")
+	assert_eq(runs[0], runs[1], "same seed, same events: same split")
 	assert_ne(runs[0], runs[2], "another seed, another split")
+	assert_eq(lives, [1, 1, 1, 2], "the last run reuses the pooled parent volley (its second life)")
+	assert_ne(runs[0], runs[3], "the next life of the same seed splits another way")
+
+
+## A fresh factory (the old one is freed): a run with no pool history.
+func _fresh_factory() -> void:
+	if is_instance_valid(factory):
+		factory.free()
+	factory = BulletFactory2D.new()
+	add_child_autofree(factory)
+	await idle(1)
+	factory.bullet_split.connect(func(pos, cause, children, depth): splits.append([pos, cause, children, depth]))
 
 
 func test_speed_modes_and_ramp() -> void:

@@ -413,3 +413,47 @@ func test_pre_shoot_sees_the_arming_and_its_own_arming_sticks() -> void:
 	assert_eq(v.flock_get(), mine_flock, "the handler's flock stuck")
 	assert_eq(int(v.debug_get_graze_info()["zone_slots"]), 2, "the handler's zones stuck")
 	assert_eq(v.sound_get_effects(), [mine_sound], "the handler's sounds stuck")
+
+
+
+## Seeded splits are salted with the shot number and the parent's earlier
+## splits: two shots of one spawner split differently, a surviving parent's
+## second split differs from its first, and the same seed with the same
+## events (a fresh world) repeats exactly.
+func test_seeded_splits_differ_per_shot_and_per_repeat_split() -> void:
+	var runs: Array = []
+	for run in 2:
+		if run > 0:
+			factory.free()
+			factory = BulletFactory2D.new()
+			add_child_autofree(factory)
+			await idle(1)
+		var chain := _chain(4, false)
+		var stage: BulletSplitStage2D = chain.stages[0]
+		stage.direction_mode = BulletSplitStage2D.DIRECTION_RANDOM_IN_SPREAD
+		stage.seed = 5
+		stage.parent_survives = true
+		stage.max_splits_per_bullet = 0
+		stage.child_data = H.make_volley_data(1, 0.0, 30.0)
+		var sp := _split_spawner(chain, 1, 30.0)
+		var children: Array = []
+		sp.bullet_split.connect(func(_p, _c, ch, _d) -> void: children.append(ch))
+		var first := _fire(sp)
+		var second := _fire(sp)
+		first.split_bullet(0)
+		second.split_bullet(0)
+		step_factory(1)
+		first.split_bullet(0) # the surviving parent's second split
+		step_factory(1)
+		var angles: Array = []
+		for ch in children:
+			var a: Array = []
+			for i in ch.get_amount_bullets():
+				a.append(snappedf(ch.get_bullet_direction(i).angle(), 0.0001))
+			angles.append(a)
+		runs.append(angles)
+		sp.free()
+	assert_eq(runs[0].size(), 3, "three splits")
+	assert_ne(runs[0][0], runs[0][1], "the second shot splits another way")
+	assert_ne(runs[0][0], runs[0][2], "a repeat split of one parent splits another way")
+	assert_eq(runs[0], runs[1], "same seed, same events: the same splits")

@@ -4,7 +4,7 @@
 		A split chain: how bullets burst into children, generation by generation.
 	</brief_description>
 	<description>
-		[member stages][code][d][/code] decides how the bullets of generation [code]d[/code] split (0 = the bullets a spawner fired, 1 = their children, ...). A generation without a stage never splits, so the chain is as deep as [member stages], or [member max_depth] generations with [member repeat_last_stage] on.
+		[member stages][code][d][/code] decides how the bullets of generation [code]d[/code] split (0 = the bullets a spawner fired, 1 = their children, ...). A generation without a stage never splits, so the chain is as deep as [member stages]. With [member repeat_last_stage] on, the generations past the last stage reuse it until [member max_depth]: [code]max(stages.size(), max_depth)[/code] generations split (every listed stage always splits, even past [member max_depth]).
 		Arm it with [member BulletSpawner2D.split_data] (with [member BulletSpawner2D.split_enabled]) or [method BulletVolley2D.split_set_data]. Volleys read the chain when a bullet dies, so edits reach bullets already in flight.
 		A dying bullet never spawns where it dies: its split is recorded and the [BulletFactory2D] spawns the children (one new volley per parent) right after the sweep, at the pose the parent died at; they move from the next sweep. Pool-safe: a pooled volley never keeps a chain.
 	</description>
@@ -28,7 +28,7 @@
 		<method name="get_generation_count" qualifiers="const">
 			<return type="int" />
 			<description>
-				How many generations split: the size of [member stages], or [member max_depth] while [member repeat_last_stage] is on.
+				How many generations split: the size of [member stages], or [code]max(stages.size(), max_depth)[/code] while [member repeat_last_stage] is on (0 for an empty chain).
 			</description>
 		</method>
 		<method name="get_stage_for_depth" qualifiers="const">
@@ -41,10 +41,10 @@
 	</methods>
 	<members>
 		<member name="max_depth" type="int" setter="set_max_depth" getter="get_max_depth" default="8">
-			With [member repeat_last_stage] on: generations [code]0 .. max_depth - 1[/code] split (1 to 64). Hidden while repeating is off.
+			With [member repeat_last_stage] on: the last stage repeats until generation [code]max_depth - 1[/code] (1 to 64). It only extends the chain: every stage in [member stages] splits its generation even when the list is longer than [member max_depth]. Hidden while repeating is off.
 		</member>
 		<member name="repeat_last_stage" type="bool" setter="set_repeat_last_stage" getter="get_repeat_last_stage" default="false">
-			When on, generations past the last stage reuse it, up to [member max_depth].
+			When on, generations past the last stage reuse it, up to generation [code]max_depth - 1[/code] (see [method get_generation_count]).
 		</member>
 		<member name="stages" type="BulletSplitStage2D[]" setter="set_stages" getter="get_stages" default="[]">
 			One [BulletSplitStage2D] per generation. An empty entry stops the chain at that generation.

@@ -53,7 +53,8 @@ void BulletSpawner2D::apply_volley_split(BulletVolley2D *volley, const Ref<Bulle
 		split_shared = std::shared_ptr<SplitConfig2D>(new SplitConfig2D());
 		apply_split_config();
 	}
-	volley->split_arm(split_shared, spawn_data, 0);
+	// The shot number salts the seeded rolls: successive shots differ.
+	volley->split_arm(split_shared, spawn_data, 0, (uint64_t)volleys_fired + 1);
 }
 
 bool BulletSpawner2D::split_configure_child_homing(BulletVolley2D *child) {

@@ -108,6 +108,8 @@ struct SplitRequest2D {
 	real_t max_speed = 0.0;
 	real_t acceleration = 0.0;
 	uint64_t owner_id = 0; // the parent's owner spawner (0 = the factory)
+	uint64_t shot_salt = 0; // the parent volley's shot salt (children inherit it)
+	uint64_t roll_salt = 0; // split_roll_salt(shot_salt, the parent's earlier splits)
 	PoolKey parent_key; // the parent volley's bucket (scoped reset/free drop by it)
 	// Set on a request a flush is walking (it must not lose its Refs while
 	// the flush may still read them): the flush skips it.
@@ -118,11 +120,13 @@ struct SplitRequest2D {
 	int collision_count = 0;
 };
 
-// Seeded split rolls: a pure SplitMix64 hash of (seed, generation, parent
-// bullet index, child, channel), so channels never share numbers and a
-// seeded stage splits bullet i the same way every time (pool history and
-// timing never change it). Unseeded rolls use Godot's global RNG (the
-// caller decides).
+// Seeded split rolls: a pure SplitMix64 hash of (seed, salt, generation,
+// parent bullet index, child, channel), so channels never share numbers. The
+// salt is the shot (a spawner volley: its spawner's shot number; a factory
+// volley: its life id) mixed with how many times the parent bullet split
+// before: the same seed and the same events split the same way, while
+// successive shots and a surviving parent's repeat splits differ. Unseeded
+// rolls use Godot's global RNG (the caller decides).
 enum SplitRollChannel2D : uint64_t {
 	SPLIT_ROLL_CHANCE = 1,
 	SPLIT_ROLL_ANGLE = 2,
@@ -137,8 +141,13 @@ inline uint64_t split_mix64(uint64_t x) {
 	return x ^ (x >> 31);
 }
 
-inline double split_seeded_unit(int64_t seed, int depth, int parent_index, int child, uint64_t channel) {
+inline uint64_t split_roll_salt(uint64_t shot_salt, int splits_before) {
+	return split_mix64(shot_salt) ^ (uint64_t)(uint32_t)splits_before;
+}
+
+inline double split_seeded_unit(int64_t seed, uint64_t salt, int depth, int parent_index, int child, uint64_t channel) {
 	uint64_t h = split_mix64((uint64_t)seed);
+	h = split_mix64(h ^ salt);
 	h = split_mix64(h ^ (uint64_t)(uint32_t)depth);
 	h = split_mix64(h ^ (uint64_t)(uint32_t)parent_index);
 	h = split_mix64(h ^ (((uint64_t)(uint32_t)child << 8) | channel));

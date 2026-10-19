@@ -104,7 +104,7 @@
 			When on, the sound plays at its pitch times the time scale of what it belongs to: [member BulletFactory2D.time_scale] for plain sounds, and the scale of the followed bullet's volley (so a spawner's [member BulletSpawner2D.time_scale] counts) for a [member follow_bullet] hum. The voice pauses while the scale is below 0.01 and resumes when it rises; the pitch never exceeds 1000. Fades and minimum intervals always run in real time. Off by default.
 		</member>
 		<member name="pitch_max" type="float" setter="set_pitch_max" getter="get_pitch_max" default="16.0">
-			Final pitch ceiling (linear multiplier, applied after every random). Inverted bounds sort themselves. Wide open by default, so existing mixes play untouched. Must be finite and between 0.01 and 1000.
+			Final pitch ceiling (linear multiplier, applied after every random). Inverted bounds sort themselves. Caps the final pitch at 16 by default (raise it for a wilder mix). Must be finite and between 0.01 and 1000.
 		</member>
 		<member name="pitch_min" type="float" setter="set_pitch_min" getter="get_pitch_min" default="0.01">
 			Final pitch floor (linear multiplier, applied after every random). Inverted bounds sort themselves. Wide open by default. Must be finite and between 0.01 and 1000.

@@ -243,3 +243,33 @@ func test_the_split_count_comes_back_clean_through_the_pool() -> void:
 	assert_eq(splits.size(), 1, "a new life starts with a fresh count")
 	var state: Dictionary = factory.debug_assert_no_dangling()
 	assert_true(state["ok"], str(state["error"]))
+
+
+## A bounce contact that is also the killing hit splits twice, by design: the
+## limit is "counted over every trigger", and each trigger is a split of its
+## own (the bounce with the parent surviving, then the death).
+func test_a_bounce_that_is_the_killing_hit_splits_for_both() -> void:
+	var s := _stage(2)
+	s.split_on_bounce = true
+	s.split_on_hit = true
+	s.parent_survives = true
+	s.max_splits_per_bullet = 0
+	make_wall(Vector2(120, 0), Vector2(20, 200), 8, 2)
+	await physics()
+	var d := H.make_volley_data(1, 300.0, 8.0)
+	d.monitorable = true
+	d.set_collision_mask_from_array([4])
+	d.set_bounce_mask_from_array([4])
+	d.collision_shape = H.make_circle_shape(6.0)
+	d.bounce_hit_consumed = true # the bounce also counts as a hit
+	d.bullet_max_collision_count = 1 # and that hit kills
+	var v := factory.spawn_volley(d)
+	v.split_set_data(_chain(s), _quiet_child_data())
+	factory.body_entered.connect(func(_b, _v, _i) -> void: pass)
+	for i in 60:
+		await physics()
+		if splits.size() >= 2:
+			break
+	await physics(2)
+	assert_eq(_causes(), [BulletVolley2D.SPLIT_CAUSE_BOUNCE, BulletVolley2D.SPLIT_CAUSE_HIT], "a bounce split, then the death split")
+	assert_false(v.is_bullet_status_enabled(0) and v.get_life_id() == 1, "the parent died")

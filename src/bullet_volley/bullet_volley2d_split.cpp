@@ -10,8 +10,9 @@ using namespace godot;
 
 namespace BlastBullets2D {
 
-void BulletVolley2D::split_arm(const std::shared_ptr<SplitConfig2D> &config, const Ref<BulletVolleyData2D> &spawn_data, int depth) {
+void BulletVolley2D::split_arm(const std::shared_ptr<SplitConfig2D> &config, const Ref<BulletVolleyData2D> &spawn_data, int depth, uint64_t shot_salt) {
 	split_config = config;
+	split_shot_salt = config != nullptr ? shot_salt : 0;
 	split_spawn_data = config != nullptr ? spawn_data : Ref<BulletVolleyData2D>();
 	split_depth = config != nullptr ? Math::max(0, depth) : 0;
 	split_timer_fired = false;
@@ -89,7 +90,7 @@ int BulletVolley2D::split_capture(int bullet_index, int cause, const Transform2D
 		if (stage->chance <= 0.0) {
 			return 0;
 		}
-		const double roll = stage->seed != 0 ? split_seeded_unit(stage->seed, split_depth, bullet_index, 0, SPLIT_ROLL_CHANCE) : UtilityFunctions::randf();
+		const double roll = stage->seed != 0 ? split_seeded_unit(stage->seed, split_roll_salt(split_shot_salt, split_count_of(bullet_index)), split_depth, bullet_index, 0, SPLIT_ROLL_CHANCE) : UtilityFunctions::randf();
 		if (roll >= (double)stage->chance) {
 			return 0;
 		}
@@ -106,6 +107,8 @@ int BulletVolley2D::split_capture(int bullet_index, int cause, const Transform2D
 	request.acceleration = bullet_index < (int)all_cached_acceleration.size() ? all_cached_acceleration[bullet_index] : 0.0f;
 	request.inherited_velocity = inherited_velocity_offset;
 	request.owner_id = owner_spawner_id;
+	request.shot_salt = split_shot_salt;
+	request.roll_salt = split_roll_salt(split_shot_salt, split_count_of(bullet_index));
 	request.parent_key = get_pool_key();
 	request.parent_index = bullet_index;
 	request.child_depth = split_depth + 1;
@@ -358,7 +361,7 @@ bool BulletVolley2D::split_set_data(const Ref<BulletSplitData2D> &split, const R
 	config->split = split;
 	// A script call starts a fresh chain: generation 0 (children re-armed
 	// this way split by the chain's first stage).
-	split_arm(config, data, 0);
+	split_arm(config, data, 0, (uint64_t)volley_generation);
 	return true;
 }
 

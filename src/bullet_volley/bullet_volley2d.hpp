@@ -2820,6 +2820,9 @@ public:
 	std::shared_ptr<SplitConfig2D> split_config;
 	Ref<BulletVolleyData2D> split_spawn_data;
 	int split_depth = 0;
+	// Salts the seeded rolls (split_queue2d.hpp): the shot this chain began
+	// with (spawner shot number, factory volley life id), kept by children.
+	uint64_t split_shot_salt = 0;
 	bool split_timer_fired = false;
 	// The chain and rules epoch at which split_check_timer found no timer
 	// for this generation: no lookup until either changes (or a new arming).
@@ -2837,7 +2840,9 @@ public:
 	uint32_t split_arming_cache_serial = 0;
 	// THE one place that arms or disarms splitting (spawner arming, the
 	// factory flush, split_set_data/split_clear, release_life).
-	void split_arm(const std::shared_ptr<SplitConfig2D> &config, const Ref<BulletVolleyData2D> &spawn_data, int depth);
+	void split_arm(const std::shared_ptr<SplitConfig2D> &config, const Ref<BulletVolleyData2D> &spawn_data, int depth, uint64_t shot_salt = 0);
+	// How many times bullet i split this life (0 before its first split).
+	int split_count_of(int bullet_index) const { return bullet_index >= 0 && bullet_index < (int)split_counts.size() ? (int)split_counts[bullet_index] : 0; }
 	// Records bullet i's split when its stage splits on `cause` (and the
 	// chance roll passes). 0 = no split, 1 = split, 2 = split and the
 	// parent's own death effects stay silent (fire_death_effects off). Runs
