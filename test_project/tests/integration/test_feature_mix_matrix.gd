@@ -177,8 +177,8 @@ func test_debug_explain_features_says_what_each_group_does_and_why_not() -> void
 	expect_no_errors("explaining pushes nothing")
 
 
-const FEATURES := ["flock", "homing", "orbit", "graze", "wobble", "bounce", "random_scale", "burst", "pool"]
-const PAIRS := ["flock+homing", "flock+orbit", "flock+graze", "flock+wobble", "flock+bounce", "flock+random_scale", "flock+burst", "flock+pool", "homing+orbit", "homing+graze", "homing+wobble", "homing+bounce", "homing+random_scale", "homing+burst", "homing+pool", "orbit+graze", "orbit+wobble", "orbit+bounce", "orbit+random_scale", "orbit+burst", "orbit+pool", "graze+wobble", "graze+bounce", "graze+random_scale", "graze+burst", "graze+pool", "wobble+bounce", "wobble+random_scale", "wobble+burst", "wobble+pool", "bounce+random_scale", "bounce+burst", "bounce+pool", "random_scale+burst", "random_scale+pool", "burst+pool"]
+const FEATURES := ["flock", "homing", "orbit", "graze", "wobble", "bounce", "random_scale", "burst", "pool", "split", "sound"]
+const PAIRS := ["flock+homing", "flock+orbit", "flock+graze", "flock+wobble", "flock+bounce", "flock+random_scale", "flock+burst", "flock+pool", "flock+split", "flock+sound", "homing+orbit", "homing+graze", "homing+wobble", "homing+bounce", "homing+random_scale", "homing+burst", "homing+pool", "homing+split", "homing+sound", "orbit+graze", "orbit+wobble", "orbit+bounce", "orbit+random_scale", "orbit+burst", "orbit+pool", "orbit+split", "orbit+sound", "graze+wobble", "graze+bounce", "graze+random_scale", "graze+burst", "graze+pool", "graze+split", "graze+sound", "wobble+bounce", "wobble+random_scale", "wobble+burst", "wobble+pool", "wobble+split", "wobble+sound", "bounce+random_scale", "bounce+burst", "bounce+pool", "bounce+split", "bounce+sound", "random_scale+burst", "random_scale+pool", "random_scale+split", "random_scale+sound", "burst+pool", "burst+split", "burst+sound", "pool+split", "pool+sound", "split+sound"]
 
 
 ## One spawner with `features` on, firing a 12-bullet ring through real
@@ -219,8 +219,27 @@ func _fly_mix(features: Array) -> MotionProbe:
 		sp.bullet_scale_min = 0.5
 		sp.bullet_scale_max = 2.0
 		sp.bullet_random_seed = 5
+	if "split" in features:
+		# The timer splits every bullet once (the parent keeps flying: the
+		# pair keeps its motion) into 3 children that fly too.
+		var stage := BulletSplitStage2D.new()
+		stage.count = 3
+		stage.split_on_lifetime_over = false
+		stage.split_after_sec = 0.3
+		stage.parent_survives = true
+		var chain := BulletSplitData2D.new()
+		chain.stages = [stage]
+		sp.split_data = chain
+		sp.split_enabled = true
+	if "sound" in features:
+		sp.sound_effects = [H.make_sound(BulletSoundData2D.SOUND_ON_FLIGHT), H.make_sound(BulletSoundData2D.SOUND_ON_SPLIT), H.make_sound(BulletSoundData2D.SOUND_ON_GRAZE)]
+		sp.sound_enabled = true
 	var probe := MotionProbe.new(factory, [])
 	sp.volley_fired.connect(func(v: BulletVolley2D, _n: int) -> void: probe.add_volley(v, 0.0, Vector2(32, 32)))
+	var splits := [0]
+	sp.bullet_split.connect(func(_p, _c, children: BulletVolley2D, _d) -> void:
+		splits[0] += 1
+		probe.add_volley(children, 0.0, Vector2(32, 32)))
 	for shot in (3 if "burst" in features else 1):
 		assert_true(sp.shoot_once(), "fires")
 		for f in 9:
@@ -237,6 +256,8 @@ func _fly_mix(features: Array) -> MotionProbe:
 		for f in 40:
 			await physics(1)
 			probe.sample(1.0 / 60.0)
+	if "split" in features:
+		assert_gt(splits[0], 0, "%s: the bullets split" % "+".join(features))
 	return probe
 
 
