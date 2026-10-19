@@ -320,3 +320,50 @@ func test_range_hints_are_enforced() -> void:
 				bad.append(problem)
 	assert_gt(probed, 10, "the sweep reached the ranged properties (%d probes)" % probed)
 	_assert_none(bad, "values outside a strict range hint are rejected and the old value kept")
+
+
+## A finite double above what real_t holds (1e39 > FLT_MAX in a float build)
+## would turn into INF in the pattern, homing or orbit math. Every float
+## property either refuses it loudly (and keeps the old value) or takes it
+## and still fires a clean volley: no error at the shot, every bullet finite.
+func test_float_properties_never_overflow_real_t() -> void:
+	var target: Node2D = add(Node2D.new())
+	target.position = Vector2(300, 0)
+	var bad: Array = []
+	for p in _editor_props(make_spawner()):
+		if int(p.type) != TYPE_FLOAT:
+			continue
+		var prop := str(p.name)
+		var sp := make_spawner(H.make_volley_data(4, 50.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
+		sp.set_homing_enabled(true)
+		sp.set_homing_target_source(BulletSpawner2D.HOMING_SOURCE_NODE_PATH)
+		sp.set_homing_target_path(sp.get_path_to(target))
+		sp.orbiting_enabled = true
+		var before: Variant = sp.get(prop)
+		sp.set(prop, 1e39)
+		var refused := 0
+		for err in get_errors():
+			if not err.handled:
+				err.handled = true
+				if err.contains_text(KEEP_TEXT):
+					refused += 1
+				else:
+					bad.append("%s = 1e39: unexpected error %s" % [prop, err.code])
+		if refused > 0:
+			if sp.get(prop) != before:
+				bad.append("%s = 1e39: refused but changed" % prop)
+			sp.queue_free()
+			continue
+		if not sp.shoot_once():
+			bad.append("%s = 1e39: accepted, then the shot failed" % prop)
+		for v in sp.get_live_volleys():
+			for i in v.get_amount_bullets():
+				if not v.get_bullet_transform(i).origin.is_finite():
+					bad.append("%s = 1e39: accepted, bullet %d not finite" % [prop, i])
+					break
+		for err in get_errors():
+			if not err.handled:
+				err.handled = true
+				bad.append("%s = 1e39: accepted, then the shot reported %s" % [prop, err.code])
+		sp.queue_free()
+	_assert_none(bad, "float properties stay within real_t")

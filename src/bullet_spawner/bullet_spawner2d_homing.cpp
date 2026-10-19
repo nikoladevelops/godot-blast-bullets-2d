@@ -4,6 +4,9 @@
 
 #include "bullet_spawner/bullet_spawner2d_internal.hpp"
 #include "core/node_scan2d.hpp"
+#include "core/transform_math2d.hpp"
+
+#include <limits>
 
 using namespace godot;
 
@@ -35,7 +38,7 @@ struct HomingCandidatePass {
 double BulletSpawner2D::get_homing_delay_sec() const { return homing_delay_sec; }
 
 void BulletSpawner2D::set_homing_delay_sec(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: homing_delay_sec must be finite and >= 0, keeping the old value.");
 		return;
 	}
@@ -45,7 +48,7 @@ void BulletSpawner2D::set_homing_delay_sec(double value) {
 double BulletSpawner2D::get_homing_duration_sec() const { return homing_duration_sec; }
 
 void BulletSpawner2D::set_homing_duration_sec(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: homing_duration_sec must be finite and >= 0 (0 = infinite), keeping the old value.");
 		return;
 	}
@@ -55,7 +58,7 @@ void BulletSpawner2D::set_homing_duration_sec(double value) {
 double BulletSpawner2D::get_homing_lose_range_px() const { return homing_lose_range_px; }
 
 void BulletSpawner2D::set_homing_lose_range_px(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: homing_lose_range_px must be finite and >= 0 (0 = unlimited), keeping the old value.");
 		return;
 	}
@@ -282,7 +285,7 @@ double BulletSpawner2D::get_homing_smoothing() const {
 }
 
 void BulletSpawner2D::set_homing_smoothing(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: homing_smoothing must be finite and >= 0 (0 snaps instantly), keeping the old value.");
 		return;
 	}
@@ -294,7 +297,7 @@ double BulletSpawner2D::get_homing_update_interval() const {
 }
 
 void BulletSpawner2D::set_homing_update_interval(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: homing_update_interval must be finite and >= 0 (0 refreshes every tick), keeping the old value.");
 		return;
 	}
@@ -306,7 +309,7 @@ double BulletSpawner2D::get_homing_distance_before_reached() const {
 }
 
 void BulletSpawner2D::set_homing_distance_before_reached(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: homing_distance_before_reached must be finite and >= 0, keeping the old value.");
 		return;
 	}
@@ -351,7 +354,7 @@ double BulletSpawner2D::get_homing_smoothing_start() const {
 }
 
 void BulletSpawner2D::set_homing_smoothing_start(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: homing_smoothing_start must be finite and >= 0, keeping the old value.");
 		return;
 	}
@@ -365,7 +368,7 @@ double BulletSpawner2D::get_homing_smoothing_step() const {
 void BulletSpawner2D::set_homing_smoothing_step(double value) {
 	// Any finite step is allowed (even negative): per-bullet results are
 	// clamped at 0 when applied, so a downward fan can never poison steering.
-	if (!Math::is_finite(value)) {
+	if (!is_finite_real2d(value)) {
 		UtilityFunctions::push_error("BulletSpawner2D: homing_smoothing_step must be finite, keeping the old value.");
 		return;
 	}
@@ -434,7 +437,7 @@ double BulletSpawner2D::get_orbiting_radius() const {
 }
 
 void BulletSpawner2D::set_orbiting_radius(double value) {
-	if (!Math::is_finite(value) || value < 0.01) {
+	if (!is_finite_real2d(value) || value < 0.01) {
 		UtilityFunctions::push_error("BulletSpawner2D: orbiting_radius must be finite and >= 0.01, keeping the old value.");
 		return;
 	}
@@ -479,7 +482,7 @@ double BulletSpawner2D::get_orbiting_radius_start() const {
 }
 
 void BulletSpawner2D::set_orbiting_radius_start(double value) {
-	if (!Math::is_finite(value) || value < 0.01) {
+	if (!is_finite_real2d(value) || value < 0.01) {
 		UtilityFunctions::push_error("BulletSpawner2D: orbiting_radius_start must be finite and >= 0.01, keeping the old value.");
 		return;
 	}
@@ -493,7 +496,7 @@ double BulletSpawner2D::get_orbiting_radius_step() const {
 void BulletSpawner2D::set_orbiting_radius_step(double value) {
 	// Any finite step is allowed (even negative): per-bullet results are
 	// clamped at 0.01 when applied, so a shrinking fan stays valid.
-	if (!Math::is_finite(value)) {
+	if (!is_finite_real2d(value)) {
 		UtilityFunctions::push_error("BulletSpawner2D: orbiting_radius_step must be finite, keeping the old value.");
 		return;
 	}
@@ -518,7 +521,7 @@ double BulletSpawner2D::get_orbiting_follow_deadzone() const {
 }
 
 void BulletSpawner2D::set_orbiting_follow_deadzone(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: orbiting_follow_deadzone must be finite and >= 0, keeping the old value.");
 		return;
 	}
@@ -1152,10 +1155,11 @@ void BulletSpawner2D::apply_orbiting_to_volley(BulletVolley2D *volley) const {
 		if (!volley->is_bullet_status_enabled(i)) {
 			continue;
 		}
-		// Negative linear steps fan downward: clamp per bullet so the
-		// engine never sees an invalid radius (it errors per bullet).
+		// Negative linear steps fan downward, huge ones past what real_t
+		// holds: clamp per bullet so the engine never sees an invalid radius
+		// (it errors per bullet).
 		const double radius = orbiting_radius_linear_enabled
-				? MAX(orbiting_radius_start + orbiting_radius_step * i, 0.01)
+				? Math::clamp(orbiting_radius_start + orbiting_radius_step * i, 0.01, (double)std::numeric_limits<real_t>::max())
 				: orbiting_radius;
 		if (!volley->bullet_is_orbiting_enabled(i)) {
 			volley->bullet_enable_orbiting(i, (real_t)radius, orbiting_direction, orbiting_texture_rotation, orbiting_follow_mode, (real_t)orbiting_follow_deadzone, orbiting_lock_policy, orbiting_rigid_follow);

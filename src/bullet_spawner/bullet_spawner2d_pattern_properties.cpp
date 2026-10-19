@@ -15,7 +15,7 @@ double BulletSpawner2D::get_pattern_scale() const {
 }
 
 void BulletSpawner2D::set_pattern_scale(double value) {
-	if (!Math::is_finite(value)) {
+	if (!is_finite_real2d(value)) {
 		UtilityFunctions::push_error("BulletSpawner2D: pattern_scale must be finite, keeping the old value.");
 		return;
 	}
@@ -28,7 +28,7 @@ double BulletSpawner2D::get_transforms_scale() const {
 }
 
 void BulletSpawner2D::set_transforms_scale(double value) {
-	if (!Math::is_finite(value)) {
+	if (!is_finite_real2d(value)) {
 		UtilityFunctions::push_error("BulletSpawner2D: transforms_scale must be finite, keeping the old value.");
 		return;
 	}

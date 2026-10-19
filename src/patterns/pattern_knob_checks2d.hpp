@@ -5,6 +5,7 @@
 // when unused). Every comparison is the one the hand-written setters did,
 // so NaN fails exactly where it failed before.
 
+#include "core/transform_math2d.hpp"
 #include "godot_cpp/core/math.hpp"
 #include "godot_cpp/variant/array.hpp"
 #include "godot_cpp/variant/packed_float32_array.hpp"
@@ -23,12 +24,12 @@ static inline bool NONE(const T &, double, double) {
 	return false;
 }
 // Floats.
-static inline bool FINITE(double v, double, double) { return !Math::is_finite(v); }
-static inline bool FINITE_GE(double v, double a, double) { return !Math::is_finite(v) || v < a; }
-static inline bool FINITE_GT(double v, double a, double) { return !Math::is_finite(v) || !(v > a); }
-static inline bool FINITE_IN(double v, double a, double b) { return !Math::is_finite(v) || v < a || v > b; }
-static inline bool FINITE_IN_OC(double v, double a, double b) { return !Math::is_finite(v) || v <= a || v > b; }
-static inline bool FINITE_IN_CO(double v, double a, double b) { return !Math::is_finite(v) || v < a || v >= b; }
+static inline bool FINITE(double v, double, double) { return !is_finite_real2d(v); }
+static inline bool FINITE_GE(double v, double a, double) { return !is_finite_real2d(v) || v < a; }
+static inline bool FINITE_GT(double v, double a, double) { return !is_finite_real2d(v) || !(v > a); }
+static inline bool FINITE_IN(double v, double a, double b) { return !is_finite_real2d(v) || v < a || v > b; }
+static inline bool FINITE_IN_OC(double v, double a, double b) { return !is_finite_real2d(v) || v <= a || v > b; }
+static inline bool FINITE_IN_CO(double v, double a, double b) { return !is_finite_real2d(v) || v < a || v >= b; }
 // Numbers (ints and second-stage float checks).
 static inline bool GE(double v, double a, double) { return v < a; }
 static inline bool LE(double v, double a, double) { return v > a; } // single bound in a, like GE

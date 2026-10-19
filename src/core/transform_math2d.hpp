@@ -11,6 +11,13 @@ using namespace godot;
 // alone accepts singular bases like scale (0,1) (det == 0) whose
 // affine_inverse() is garbage. Every conversion/validation path (volleys,
 // patterns, the spawner) uses this one definition.
+// Finite as a double AND as real_t: a finite double above FLT_MAX turns into
+// INF when narrowed (float builds), so setters feeding real_t math refuse it
+// up front instead of failing at every shot or every bullet.
+inline bool is_finite_real2d(double v) {
+	return Math::is_finite(v) && Math::is_finite((real_t)v);
+}
+
 inline bool is_transform_invertible_safe2d(const Transform2D &t) {
 	if (!t.is_finite()) {
 		return false;
