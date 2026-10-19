@@ -65,7 +65,23 @@ func _volley_state(v: BulletVolley2D) -> Dictionary:
 		"shared_pattern": v.has_shared_movement_pattern(),
 		"graze": _graze_state(v),
 		"flock": [v.flock_get(), v.flock_get_scope(), v.debug_get_bullet_flock_neighbors(0), v.debug_get_bullet_flock_steering(0)],
+		"sound": [v.sound_get_effects(), v.sound_get_listener_group()],
+		"split": [v.split_get_data(), v.split_get_depth()],
+		"pickup": v.is_pickup_volley(),
+		"collision": [v.get_collision_layer(), v.get_collision_mask(), v.get_bullet_max_collision_count()],
+		"material": [v.material, v.texture, v.z_index, v.light_mask, v.visibility_layer],
+		"groups": v.get_groups().filter(func(g): return not str(g).begins_with("_")),
+		"meta": v.get_meta_list(),
 	}
+
+
+## The keys whose values differ: {key: [a, b]} (empty = equal).
+func _diff(a: Dictionary, b: Dictionary) -> Dictionary:
+	var out := {}
+	for k in a:
+		if not b.has(k) or str(a[k]) != str(b[k]):
+			out[k] = [a[k], b.get(k)]
+	return out
 
 
 func _graze_state(v: BulletVolley2D) -> Dictionary:
@@ -104,6 +120,14 @@ func test_reused_volley_matches_a_cold_volley() -> void:
 	v.graze_set_zones([H.make_graze_zone([400.0])], &"graze_targets")
 	factory.bullet_grazed.connect(func(_t: Node2D, _v: BulletVolley2D, _i: int, _z: BulletGrazeZone2D, _r: int) -> void: pass)
 	v.flock_join(H.make_flock(1.5, 1.0, 1.0))
+	v.sound_set_effects([H.make_sound(BulletSoundData2D.SOUND_ON_HIT)], &"listeners")
+	var stage := BulletSplitStage2D.new()
+	stage.split_on_lifetime_over = false # the expiry pools it plain, no children
+	var chain := BulletSplitData2D.new()
+	chain.stages = [stage]
+	v.split_set_data(chain, _plain())
+	v.add_to_group(&"loaded_life")
+	v.set_meta(&"loaded_life", 1)
 	expect_no_errors("every feature switches on cleanly")
 	for i in 120: # early break; the lifetime is 15 ticks
 		await physics()
@@ -115,13 +139,14 @@ func test_reused_volley_matches_a_cold_volley() -> void:
 	assert_eq(int(factory.debug_get_flock_stats()["armed_volleys"]), 0, "the pooled life left its flock")
 
 	var hits_before := int(factory.debug_get_pool_hit_stats()["hits"])
-	var reused: BulletVolley2D = factory.spawn_volley(_plain())
+	var plain := _plain() # one data for both: its texture is compared too
+	var reused: BulletVolley2D = factory.spawn_volley(plain)
 	assert_eq(reused, v, "the pooled instance is reused")
 	assert_eq(int(factory.debug_get_pool_hit_stats()["hits"]), hits_before + 1, "counted as a pool hit")
-	var cold: BulletVolley2D = factory.spawn_volley(_plain())
+	var cold: BulletVolley2D = factory.spawn_volley(plain)
 	assert_ne(cold, reused, "the second spawn allocates a fresh volley")
 
-	assert_eq(_volley_state(reused), _volley_state(cold), "volley-wide state matches a cold volley")
+	assert_eq(_diff(_volley_state(reused), _volley_state(cold)), {}, "volley-wide state matches a cold volley")
 	for i in N:
 		assert_eq(_bullet_state(reused, i), _bullet_state(cold, i), "bullet %d state matches a cold volley" % i)
 		assert_eq(reused.get_bullet_transform(i), cold.get_bullet_transform(i), "bullet %d starts at the cold pose" % i)
@@ -133,3 +158,71 @@ func test_reused_volley_matches_a_cold_volley() -> void:
 		var b: Vector2 = cold.get_bullet_transform(i).origin
 		assert_almost_eq(a.distance_to(b), 0.0, 0.001, "bullet %d flies like the cold volley" % i)
 	assert_eq(_timer_fired, 0, "the previous life's timer never fires")
+
+
+
+## Spawn data that leaves a mark everywhere a cold spawn of other data must
+## not see: a pre-populated volley is seeded once from it and must come out
+## of the pool exactly like a cold volley of the data it is spawned with.
+func _populate_data() -> BulletVolleyData2D:
+	var d := _loaded()
+	d.shared_bullet_attachment = null # populate never attaches
+	d.material = CanvasItemMaterial.new()
+	d.z_index = 7
+	d.light_mask = 3
+	return d
+
+
+func test_a_populated_volley_matches_a_cold_volley() -> void:
+	var key := VolleyPoolKey2D.make(N, PhysicsServer2D.SHAPE_CIRCLE)
+	var data := _populate_data()
+	data.collision_shape = H.make_circle_shape(6.0)
+	factory.populate_bullets_pool(key, data, 1)
+	var plain := _plain()
+	plain.collision_shape = H.make_circle_shape(6.0)
+	var reused: BulletVolley2D = factory.spawn_volley(plain)
+	assert_eq(int(factory.debug_get_pool_hit_stats()["hits"]), 1, "the populated volley was reused")
+	var cold: BulletVolley2D = factory.spawn_volley(plain)
+	assert_eq(_diff(_volley_state(reused), _volley_state(cold)), {}, "volley-wide state matches a cold volley")
+	for i in N:
+		assert_eq(_bullet_state(reused, i), _bullet_state(cold, i), "bullet %d state matches a cold volley" % i)
+
+
+## A pre-populated volley waits in the pool as a released one: it keeps none
+## of the populate data's resources alive (custom data, curves, material...).
+func test_a_populated_volley_keeps_no_resource_of_its_data() -> void:
+	var key := VolleyPoolKey2D.make(N, PhysicsServer2D.SHAPE_CIRCLE)
+	var data := _populate_data()
+	data.collision_shape = H.make_circle_shape(6.0)
+	var refs := [weakref(data.shared_bullets_custom_data), weakref(data.shared_bullet_curves_data), weakref(data.shared_bullet_wobble_data), weakref(data.material), weakref(data.sprite_frames)]
+	factory.populate_bullets_pool(key, data, 2)
+	data = null
+	var alive: Array = []
+	for r in refs:
+		alive.append(r.get_ref() != null)
+	assert_eq(alive, [false, false, false, false, false], "the pool holds none of them")
+
+
+## A volley that went back to the pool keeps none of its life's resources
+## either: the material and its shader parameter values go with the life.
+func test_a_pooled_volley_keeps_no_material() -> void:
+	var data := _plain()
+	var shader := Shader.new()
+	shader.code = "shader_type canvas_item; instance uniform vec4 tint : source_color = vec4(1.0);"
+	var mat := ShaderMaterial.new()
+	mat.shader = shader
+	data.material = mat
+	data.instance_shader_parameters = {"tint": Color(1, 0, 0, 1)}
+	var v: BulletVolley2D = factory.spawn_volley(data)
+	var ref: WeakRef = weakref(mat)
+	await idle(1)
+	factory.clear_active_bullets()
+	await idle(1)
+	assert_true(v.is_pooled(), "pooled")
+	assert_null(v.material, "no material while pooled")
+	data.material = null
+	mat = null
+	assert_null(ref.get_ref(), "the pool keeps the material alive no more")
+	var reused: BulletVolley2D = factory.spawn_volley(_plain())
+	assert_eq(reused, v, "reused")
+	assert_null(reused.get_instance_shader_parameter(&"tint"), "the old life's parameter is gone")

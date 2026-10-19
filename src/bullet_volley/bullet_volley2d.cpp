@@ -232,6 +232,13 @@ void BulletVolley2D::release_life() {
 	anim_frames.clear();
 	anim_frame_secs.clear();
 	set_texture(Ref<Texture2D>());
+	// The material (and its instance parameter values, which may hold
+	// textures) belongs to the spawn data: the next life sets its own.
+	if (get_material().is_valid()) {
+		clear_applied_instance_shader_overrides();
+		instance_shader_parameters.clear();
+		set_material(Ref<Material>());
+	}
 	// Node-level decorations a previous owner may have added: user groups
 	// (engine-internal groups start with '_'), metadata and the CanvasItem
 	// modulate. The next owner starts from a neutral node.
@@ -507,7 +514,11 @@ void BulletVolley2D::spawn(const BulletVolleyData2D &data, VolleyPool *pool, Bul
 		active_bullets_counter = 0;
 		set_all_physics_shapes_enabled_for_area(false);
 		bullets_container->add_child(this);
-		life_released = true;
+		// Released for real: the populate data seeded this life, and a
+		// pooled volley keeps none of its resources (custom data, curves,
+		// texture, material...). No attachment was applied, so no user
+		// code runs here.
+		release_life();
 		bullets_pool->push(this, get_pool_key());
 		return;
 	}
