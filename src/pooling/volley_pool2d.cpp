@@ -34,34 +34,34 @@ BulletVolley2D *VolleyPool::pop(const PoolKey &key) {
 		return nullptr;
 	}
 
-	// Skip any entries that can never be reused: null leftovers (bad push) and
-	// instances the user queue_free'd while pooled. Handing out a dying instance
-	// would silently lose the caller's volley when the deferred deletion lands.
+	// Newest first (back). Entries that can never be reused are dropped
+	// wherever they sit: null leftovers (bad push) and instances the user
+	// queue_free'd while pooled (handing out a dying instance would make a
+	// valid spawn fail). A volley whose own tick is still running (it pooled
+	// itself mid-drain, e.g. a killing blow, and a handler is spawning right
+	// now) stays pooled for the next caller. Dropping keeps the order (the
+	// common case drops the back: O(1)).
 	std::vector<BulletVolley2D *> &bucket = it->second;
-	while (!bucket.empty()) {
-		BulletVolley2D *candidate = bucket.back();
+	int pick = (int)bucket.size() - 1;
+	while (pick >= 0) {
+		BulletVolley2D *candidate = bucket[pick];
 		if (candidate == nullptr || candidate->is_queued_for_deletion()) {
 			if (candidate != nullptr) {
 				candidate->is_pooled_in_pool = false;
 			}
-			bucket.pop_back();
+			bucket.erase(bucket.begin() + pick);
+			--pick;
 			continue;
 		}
-		break;
-	}
-	if (bucket.empty()) {
-		pool.erase(it);
-		return nullptr;
-	}
-
-	// Newest first (back), but never a volley whose own tick is still
-	// running (it pooled itself mid-drain, e.g. a killing blow, and a
-	// handler is spawning right now): it stays pooled for the next caller.
-	int pick = (int)bucket.size() - 1;
-	while (pick >= 0 && bucket[pick] != nullptr && bucket[pick]->is_being_ticked) {
+		if (!candidate->is_being_ticked) {
+			break;
+		}
 		--pick;
 	}
-	if (pick < 0 || bucket[pick] == nullptr) {
+	if (pick < 0) {
+		if (bucket.empty()) {
+			pool.erase(it);
+		}
 		return nullptr;
 	}
 	BulletVolley2D *found_multimesh = bucket[pick];
