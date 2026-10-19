@@ -158,3 +158,30 @@ func test_spin_preview_survives() -> void:
 	await idle(120)
 	assert_eq(sp.debug_get_preview_dot_points().size(), 200, "200-dot spinning preview intact after 120 frames")
 	assert_gt(absf(sp.get_spin_angle_deg()), 1.0, "spin advanced")
+
+
+## A pattern edit during a mirrored burst shot (from pre_shoot) rebuilds the
+## preview while the mirror is on: the preview keeps drawing the plain
+## pattern (it never shows one shot's mirror) and the preview bake is never
+## poisoned with the mirrored winding (the cache verifier would report it).
+func test_a_mirrored_shot_never_poisons_the_preview() -> void:
+	var sp := make_preview_spawner(BulletSpawner2D.PATTERN_FROM_HELPER_SPIRAL, 12)
+	var reference := make_preview_spawner(BulletSpawner2D.PATTERN_FROM_HELPER_SPIRAL, 12)
+	reference.position = sp.position
+	watch_signals(sp)
+	sp.volley_fired.connect(_on_volley_fired)
+	await idle(2)
+	var edited := [false]
+	sp.pre_shoot.connect(func(_v, _n) -> void:
+		if not edited[0] and _vols.size() == 1: # the second shot of the pair: mirrored
+			edited[0] = true
+			sp.helper_spiral_angle_step = 0.4)
+	await _fire_burst_pair(sp)
+	assert_true(edited[0], "the second (mirrored) shot edited the pattern")
+	reference.helper_spiral_angle_step = 0.4
+	await idle(6)
+	expect_no_errors("no pattern cache mismatch")
+	var got: Array = Array(sp.debug_get_preview_dot_points())
+	var want: Array = Array(reference.debug_get_preview_dot_points())
+	assert_eq(got.size(), 12, "the preview draws the pattern")
+	assert_eq(str(got), str(want), "the plain pattern, like a spawner that never mirrored")

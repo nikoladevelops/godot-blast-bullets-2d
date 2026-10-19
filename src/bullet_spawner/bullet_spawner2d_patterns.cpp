@@ -276,7 +276,9 @@ static bool pattern_source_reads_external_state(int source) {
 
 void BulletSpawner2D::resolve_raw_pattern(Node2D *base, const Transform2D &marker, real_t mirror_sign, bool quiet, std::vector<Transform2D> &r_raw) const {
 	const bool cache_on = pattern_cache_mode == PATTERN_CACHE_AUTO && !pattern_cache_bypass;
-	const int channel = quiet ? PatternBakeCache2D::CHANNEL_PREVIEW : (mirror_sign < 0.0 ? PatternBakeCache2D::CHANNEL_MIRRORED_SHOT : PatternBakeCache2D::CHANNEL_SHOT);
+	// The mirror picks the bake (a mirrored telegraph aim shares the mirrored
+	// shot's): a channel never mixes windings.
+	const int channel = mirror_sign < 0.0 ? PatternBakeCache2D::CHANNEL_MIRRORED_SHOT : (quiet ? PatternBakeCache2D::CHANNEL_PREVIEW : PatternBakeCache2D::CHANNEL_SHOT);
 	const PatternBakeCache2D::Generator generate = [this, base, mirror_sign](const Transform2D &m, bool q, std::vector<Transform2D> &r_out) {
 		// Native end to end: no Variant per bullet between the generator
 		// and the bake cache.
@@ -352,8 +354,11 @@ void BulletSpawner2D::collect_spawn_transforms_native(bool quiet, std::vector<Tr
 	// "mirror" actually promises; the previous code only negated the spin, so
 	// a mirrored spiral wound identically and merely pointed the opposite
 	// way. Always 1 outside a mirrored burst shot, so every other path is
-	// bit-identical to before.
-	const real_t mirror_sign = (burst_alternate_mirror && burst_mirror_next) ? (real_t)-1.0 : (real_t)1.0;
+	// bit-identical to before. The preview gizmo never mirrors (it draws the
+	// pattern, not one shot of a burst; a rebuild during a mirrored shot
+	// would otherwise freeze the mirrored winding into it).
+	const bool mirrored_shot = burst_alternate_mirror && burst_mirror_next && !preview_suppress_spin;
+	const real_t mirror_sign = mirrored_shot ? (real_t)-1.0 : (real_t)1.0;
 	std::vector<Transform2D> raw;
 	resolve_raw_pattern(base, marker, mirror_sign, quiet, raw);
 	// Spin first, then scale: both pivot around the generator origin, so a
@@ -370,7 +375,7 @@ void BulletSpawner2D::collect_spawn_transforms_native(bool quiet, std::vector<Tr
 	real_t spin_radians = 0.0;
 	if (!preview_suppress_spin) {
 		spin_radians = Math::deg_to_rad((real_t)spin_angle_deg);
-		if (burst_alternate_mirror && burst_mirror_next) {
+		if (mirrored_shot) {
 			spin_radians = -spin_radians;
 		}
 	}
