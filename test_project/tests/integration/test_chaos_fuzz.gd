@@ -38,6 +38,7 @@ var sound: BulletSoundData2D
 var chain: BulletSplitData2D
 var datas: Array = []
 var pickup: BulletPickupData2D
+var shared_generator: Node2D # the generator two spawners share (op 30)
 var probe_scene: PackedScene
 var stats := {}
 var skipped_ops: Array = []
@@ -247,8 +248,8 @@ func _live_target():
 
 ## One operation from an idle point (structural calls allowed).
 func _operate() -> void:
-	var roll := rng.randi() % 56
-	if roll >= 28:
+	var roll := rng.randi() % 62
+	if roll >= 31:
 		roll = 0 # half of all operations are shots
 	if skipped_ops.has(roll):
 		return
@@ -384,6 +385,33 @@ func _operate() -> void:
 			if t != null:
 				stats["pickups"] += 1
 				factory.convert_all_bullets_to_pickups(pickup, t) # collected by homing onto a live node
+		28:
+			# A script frees one of the plugin's helper nodes (the factory
+			# recreates what it needs).
+			var names := ["BulletVolleysContainer", "BulletAttachmentsContainer", "BulletVolleysDebugger", "SpriteEffectsContainer", "SoundVoices"]
+			var helper: Node = factory.get_node_or_null(names[rng.randi() % names.size()])
+			if helper != null:
+				volleys = volleys.filter(func(v): return is_instance_valid(v) and not helper.is_ancestor_of(v))
+				helper.free()
+		29:
+			# A script frees one sound voice (playing or idle).
+			var voices: Node = factory.get_node_or_null("SoundVoices")
+			if voices != null and voices.get_child_count(true) > 0:
+				voices.get_child(rng.randi() % voices.get_child_count(true), true).free()
+		30:
+			# Two spawners share one generator with runtime previews; one
+			# toggles its preview (each owns its holder).
+			var a = _live_spawner()
+			var b = _live_spawner()
+			if a != null and b != null:
+				if shared_generator == null or not is_instance_valid(shared_generator):
+					shared_generator = add(Node2D.new())
+				shared_generator.position = Vector2(rng.randf_range(0, 800), rng.randf_range(0, 600))
+				for sp in [a, b]:
+					sp.set_transforms_generator(shared_generator)
+					sp.show_preview_during_runtime = true
+					sp.show_pattern_preview = true
+				a.show_pattern_preview = rng.randf() < 0.5
 
 
 func _shape_type(d: BulletVolleyData2D) -> int:
