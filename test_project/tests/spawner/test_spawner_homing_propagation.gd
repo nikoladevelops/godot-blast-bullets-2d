@@ -171,3 +171,28 @@ func test_fire_arc_volley_chases_the_target_it_approved() -> void:
 		assert_true(sp.shoot_once(), "shot %d" % i)
 		var v: BulletVolley2D = sp.get_live_volleys()[i]
 		assert_eq(v.shared_homing_deque_get_current_homing_target(), expected[0], "shot %d chases the seeded pick (one draw per shot)" % i)
+
+
+## homing_targets_resolved runs user code: a handler that free()s the volley
+## gets no volley_homing_configured for it (the second signal would carry a
+## freed object), the shot is reported as dropped, and the spawner keeps
+## firing.
+func test_volley_freed_by_homing_targets_resolved_is_dropped() -> void:
+	var sp := make_spawner(H.make_volley_data(3, 50.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 3)
+	sp.set_homing_enabled(true)
+	sp.set_homing_target_source(BulletSpawner2D.HOMING_SOURCE_NODE_PATH)
+	sp.set_homing_target_path(sp.get_path_to(target))
+	var configured: Array = []
+	var skipped: Array = []
+	sp.volley_homing_configured.connect(func(v, _n) -> void: configured.append(v))
+	sp.volley_skipped.connect(func(reason) -> void: skipped.append(reason))
+	var once := [true]
+	sp.homing_targets_resolved.connect(func(v, _t) -> void:
+		if once[0]:
+			once[0] = false
+			v.free())
+	assert_false(sp.shoot_once(), "the freed volley's shot reports false")
+	assert_eq(configured.size(), 0, "no volley_homing_configured for a freed volley")
+	assert_eq(skipped, [&"dropped"], "reported as dropped")
+	assert_true(sp.shoot_once(), "the next shot fires")
+	assert_eq(configured.size(), 1, "and is configured")
