@@ -280,7 +280,8 @@ Dictionary BulletVolley2D::debug_get_attachment_info(int bullet_index) const {
 	d["has_attachment"] = true;
 	d["pooling_id"] = (int64_t)attachment_pooling_ids[bullet_index];
 	// Owner ids must point back here; a stale owner after pool reuse fails.
-	// Never dereferences a: ids are plain values, compared by value.
+	// Reading a is safe: attaching stamps the owner, and the attachment's
+	// PREDELETE clears its owner's slot, so a filled slot is never freed.
 	d["owner_match"] = a->owner_volley_id == get_instance_id() && a->owner_bullet_index == bullet_index;
 	return d;
 }

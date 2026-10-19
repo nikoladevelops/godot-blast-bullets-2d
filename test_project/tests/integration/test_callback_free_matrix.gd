@@ -537,3 +537,27 @@ func test_freeing_the_spawner_inside_its_shot_never_touches_freed_memory() -> vo
 				problems.append("%s: the spawner outlived its free()" % where)
 			problems.append_array(_claim_errors().map(func(e): return "%s error: %s" % [where, e]))
 	assert_eq("\n".join(problems), "", "a shot survives its spawner being freed by a callback")
+
+
+## debug_advance_time steps the whole bullet world: a factory that is not
+## in the tree yet, or is being freed (user code inside its teardown calls
+## it), refuses with one error and advances nothing.
+func test_debug_advance_time_refuses_outside_a_live_factory() -> void:
+	var loose := BulletFactory2D.new()
+	assert_false(loose.debug_advance_time(0.016), "not ready: nothing advanced")
+	expect_error_sequence(["BulletFactory2D::debug_advance_time: the factory is not in the scene tree or is being freed, nothing advanced."])
+	loose.free()
+	await _new_case()
+	var f := factory
+	f.spawn_volley(_data(false))
+	await idle(1)
+	var results: Array = []
+	# A child of the factory dies inside the factory's teardown: its
+	# tree_exiting handler is user code running there.
+	var child := Node.new()
+	f.add_child(child)
+	child.tree_exiting.connect(func() -> void: results.append(f.debug_advance_time(0.016)))
+	check_factory_after = false
+	f.free()
+	assert_eq(results, [false], "teardown: nothing advanced")
+	expect_error_sequence(["BulletFactory2D::debug_advance_time: the factory is not in the scene tree or is being freed, nothing advanced."])

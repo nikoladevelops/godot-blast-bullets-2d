@@ -589,6 +589,12 @@ bool BulletFactory2D::debug_advance_time(double delta) {
 		UtilityFunctions::push_error("BulletFactory2D::debug_advance_time: delta must be finite and >= 0, nothing advanced.");
 		return false;
 	}
+	if (!is_ready || is_tearing_down) {
+		// Not set up yet, or inside its own teardown (an attachment callback
+		// of a dying volley): a sweep would tick volleys being destroyed.
+		UtilityFunctions::push_error("BulletFactory2D::debug_advance_time: the factory is not in the scene tree or is being freed, nothing advanced.");
+		return false;
+	}
 	if (is_iterating_bullets) {
 		UtilityFunctions::push_error("BulletFactory2D::debug_advance_time: called from inside a factory tick, nothing advanced.");
 		return false;
