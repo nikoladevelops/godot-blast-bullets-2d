@@ -62,13 +62,7 @@ static Vector2 debug_param_v2(const Dictionary &p, const StringName &k, const Ve
 }
 
 static real_t debug_wrap_angle(real_t a) {
-	while (a > Math::PI) {
-		a -= Math::TAU;
-	}
-	while (a < -Math::PI) {
-		a += Math::TAU;
-	}
-	return a;
+	return (real_t)wrap_angle_pi2d((double)a);
 }
 
 Dictionary BulletPatterns2D::debug_describe_outline(int shape, int count, const Dictionary &params) {

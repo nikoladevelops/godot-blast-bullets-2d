@@ -293,3 +293,19 @@ func test_scale_does_not_leak_into_pooled_volleys() -> void:
 	var x0: float = fresh.get_bullet_transform(0).origin.x
 	await idle(60)
 	assert_almost_eq(fresh.get_bullet_transform(0).origin.x - x0, 100.0, 3.0, "a reused volley with no owner runs at full speed")
+
+
+## Any finite time_scale is accepted, so the spin step can overflow (a huge
+## scale times the spin speed, or the oscillation clock): the spin angle stays
+## finite (a NaN angle once stuck forever and broke every later shot).
+func test_spin_angle_stays_finite_at_a_huge_time_scale() -> void:
+	for mode in [BulletSpawner2D.SPIN_CONTINUOUS]:
+		var sp := make_spawner()
+		sp.spin_enabled = true
+		sp.spin_mode = mode
+		sp.spin_speed_deg_per_sec = 1e30 # x (delta x 1e300) overflows a double
+		sp.time_scale = 1e300
+		await idle(3)
+		assert_true(is_finite(sp.get_spin_angle_deg()), "mode %d: the spin angle stays finite" % mode)
+		sp.time_scale = 1.0
+		assert_true(sp.shoot_once(), "mode %d: shots still work" % mode)

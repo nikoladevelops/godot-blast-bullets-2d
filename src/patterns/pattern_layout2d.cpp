@@ -215,11 +215,17 @@ void resample_loop_even(const PackedVector2Array &pts, const PackedVector2Array 
 			const double oa = (double)ovr[ia];
 			double ob = (double)ovr[ib];
 			if (Math::is_finite(oa) && Math::is_finite(ob)) {
-				while (ob - oa > Math::PI) {
+				// The classic wrap (bit-identical results), bounded: past 64
+				// turns a step no longer moves a huge angle.
+				int turns = 0;
+				while (ob - oa > Math::PI && turns++ < 64) {
 					ob -= Math::TAU;
 				}
-				while (ob - oa < -Math::PI) {
+				while (ob - oa < -Math::PI && turns++ < 128) {
 					ob += Math::TAU;
+				}
+				if (!(Math::abs(ob - oa) <= Math::PI)) {
+					ob = oa + wrap_angle_pi2d(ob - oa);
 				}
 				r_ovr.push_back((real_t)(oa + (ob - oa) * t));
 			} else if (Math::is_finite(oa)) {

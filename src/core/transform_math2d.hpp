@@ -35,6 +35,27 @@ inline AABB never_culled_aabb2d() {
 	return AABB(Vector3(-extent, -extent, -1.0f), Vector3(2.0f * extent, 2.0f * extent, 2.0f));
 }
 
+// An angle wrapped into [-PI, PI) in constant time. Subtracting TAU in a loop
+// never ends once TAU is below half the angle's ULP (~1e8 rad as a float, a
+// huge spin or node rotation); a non-finite angle becomes 0.
+inline double wrap_angle_pi2d(double angle) {
+	if (!Math::is_finite(angle)) {
+		return 0.0;
+	}
+	if (Math::abs(angle) <= 64.0 * Math::TAU) {
+		// Ordinary angles: the classic loop (at most 64 steps), so results
+		// stay bit-identical to the code this replaced.
+		while (angle > Math::PI) {
+			angle -= Math::TAU;
+		}
+		while (angle < -Math::PI) {
+			angle += Math::TAU;
+		}
+		return angle;
+	}
+	return Math::fposmod(angle + Math::PI, Math::TAU) - Math::PI;
+}
+
 inline bool is_transform_invertible_safe2d(const Transform2D &t) {
 	if (!t.is_finite()) {
 		return false;

@@ -217,3 +217,24 @@ func test_runtime_phase_zero_keeps_the_stagger() -> void:
 			frames = i + 1
 			break
 	assert_almost_eq(float(frames), expected_frames, 2.0, "the first pass lands at the spawner's stagger (expected %.1f frames)" % expected_frames)
+
+
+## The fire-arc gate wraps the facing angle into [-PI, PI]. A huge but
+## finite angle (an oscillating spin of 1e20 degrees, a node rotated 1e20
+## radians) once spun the wrap loop forever (subtracting TAU no longer changes
+## a float that large): the shot must return and decide the arc.
+func test_fire_arc_with_a_huge_angle_returns() -> void:
+	for how in ["spin", "rotation"]:
+		var sp := _homing_spawner()
+		sp.set_homing_fire_arc_deg(90.0)
+		if how == "spin":
+			sp.spin_enabled = true
+			sp.spin_mode = BulletSpawner2D.SPIN_OSCILLATE
+			sp.spin_amplitude_deg = 1e20
+			sp.spin_frequency_hz = 0.25
+			await idle(2)
+		else:
+			sp.rotation = 1e20
+		var t0 := Time.get_ticks_msec()
+		sp.shoot_once()
+		assert_lt(Time.get_ticks_msec() - t0, 1000, "%s: the fire-arc gate returns" % how)

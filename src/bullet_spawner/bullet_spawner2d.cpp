@@ -375,9 +375,19 @@ void BulletSpawner2D::advance_spin(double delta) {
 		} else {
 			spin_time_sec += delta;
 		}
-		spin_angle_deg = spin_amplitude_deg * Math::sin(Math::TAU * spin_frequency_hz * spin_time_sec);
+		const double angle = spin_amplitude_deg * Math::sin(Math::TAU * spin_frequency_hz * spin_time_sec);
+		if (Math::is_finite(angle) && Math::is_finite(spin_time_sec)) {
+			spin_angle_deg = angle;
+		} else {
+			spin_time_sec = 0.0; // an overflowed clock restarts (never a NaN angle for good)
+		}
 	} else {
-		spin_angle_deg = Math::fposmod(spin_angle_deg + spin_speed_deg_per_sec * delta, 360.0);
+		// Any finite time_scale is accepted: a step that overflows holds the
+		// angle (fposmod of INF is NaN, and NaN would stick forever).
+		const double step = spin_speed_deg_per_sec * delta;
+		if (Math::is_finite(step)) {
+			spin_angle_deg = Math::fposmod(spin_angle_deg + step, 360.0);
+		}
 	}
 }
 

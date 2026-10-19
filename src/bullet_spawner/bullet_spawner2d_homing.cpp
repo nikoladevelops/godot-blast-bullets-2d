@@ -1316,13 +1316,7 @@ bool BulletSpawner2D::fire_arc_covers_targets(const Array &targets) const {
 		if (diff.length_squared() <= 0.0) {
 			return true;
 		}
-		real_t delta = diff.angle() - facing;
-		while (delta > Math::PI) {
-			delta -= Math::TAU;
-		}
-		while (delta < -Math::PI) {
-			delta += Math::TAU;
-		}
+		const real_t delta = (real_t)wrap_angle_pi2d((double)diff.angle() - (double)facing);
 		if (Math::abs(delta) <= half_arc) {
 			return true;
 		}
