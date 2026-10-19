@@ -97,8 +97,15 @@ void BulletFactory2D::free_pooled_volleys(const PoolKey *key) {
 void BulletFactory2D::free_all_volleys(const PoolKey *key) {
 	const LifeWatch watch = watch_life();
 	if (key == nullptr) {
-		// A snapshot: a callback that frees a volley edits all_volleys.
-		for (const VolleyIterationEntry &entry : snapshot_volley_entries()) {
+		// Untrack EVERY volley first, then delete: each deletion runs the
+		// attachment callbacks of its bullets (user code), which may read the
+		// counters that walk all_volleys or the pool; a volley deleted earlier
+		// must no longer be in either.
+		const std::vector<VolleyIterationEntry> doomed = snapshot_volley_entries();
+		volley_pool.clear();
+		all_volleys.clear();
+		volley_set.clear();
+		for (const VolleyIterationEntry &entry : doomed) {
 			if (!entry_alive(entry)) {
 				continue; // freed by a callback of an earlier delete
 			}
@@ -107,12 +114,6 @@ void BulletFactory2D::free_all_volleys(const PoolKey *key) {
 				return;
 			}
 		}
-		// Every tracked volley (pooled ones included) is deleted above, so
-		// only drop the pool's dangling pointers. free_all_bullets() here
-		// would delete the same objects twice.
-		volley_pool.clear();
-		all_volleys.clear();
-		volley_set.clear();
 		return;
 	}
 	// Unlink matches from the pool first when present (disabled + auto

@@ -561,3 +561,34 @@ func test_debug_advance_time_refuses_outside_a_live_factory() -> void:
 	f.free()
 	assert_eq(results, [false], "teardown: nothing advanced")
 	expect_error_sequence(["BulletFactory2D::debug_advance_time: the factory is not in the scene tree or is being freed, nothing advanced."])
+
+
+## A mass free (reset(), free_active_bullets()) deletes one volley after the
+## other, and each deletion runs the attachment callbacks of its bullets. A
+## callback that reads the factory and spawner counters in between must never
+## see a volley that was already deleted (they walk every tracked volley).
+func test_counters_read_inside_a_mass_free_never_touch_deleted_volleys() -> void:
+	var problems: Array = []
+	for how in ["reset", "free_active"]:
+		await _new_case()
+		var f := factory
+		var sp := make_spawner(_data(false), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 3)
+		for k in 4:
+			f.spawn_volley(_data(false))
+			sp.shoot_once()
+		await idle(1)
+		var reads: Array = []
+		AttachmentHookProbe2D.hook_on = ["disable"]
+		AttachmentHookProbe2D.hook_repeat = true
+		AttachmentHookProbe2D.hook = func() -> void:
+			if is_instance_valid(f) and is_instance_valid(sp):
+				reads.append([f.count_bullets_in_circle(Vector2.ZERO, 1e6), f.count_bullets_in_rect(Rect2(-1e6, -1e6, 2e6, 2e6)), f.get_active_bullet_count(), f.debug_get_active_bullets_amount(), f.debug_get_live_volley_ids(0).size(), sp.get_live_volley_count(), sp.get_active_live_bullet_count()])
+		if how == "reset":
+			f.reset()
+		else:
+			f.free_active_bullets()
+		if reads.is_empty():
+			problems.append("%s: the callbacks never ran" % how)
+		AttachmentHookProbe2D.clear_hook()
+		problems.append_array(_claim_errors().map(func(e): return "%s error: %s" % [how, e]))
+	assert_eq("\n".join(problems), "", "counters read during a mass free stay on live volleys")
