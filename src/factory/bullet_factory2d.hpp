@@ -909,6 +909,9 @@ private:
 	bool register_performance_monitors = true;
 	bool owns_performance_monitors = false;
 	static uint64_t performance_monitors_owner_id;
+	// After this owner unregistered on tree exit / free: the first other
+	// factory in the tree that wants the monitors registers them.
+	void hand_monitors_to_another_factory();
 	void register_monitors();
 	void unregister_monitors();
 	Variant _monitor_active_bullets();

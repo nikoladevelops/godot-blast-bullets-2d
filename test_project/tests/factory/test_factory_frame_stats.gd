@@ -102,3 +102,31 @@ func test_monitors_removed_when_owner_leaves() -> void:
 	parent.add_child(factory)
 	await idle()
 	check_factory_after = true
+
+
+## The monitors outlive their owner while another factory lives: an owner
+## that leaves the tree or is freed hands them to a factory still in the
+## tree, and a factory re-entering the tree takes them again when free.
+func test_monitors_move_to_another_live_factory() -> void:
+	var second := BulletFactory2D.new()
+	add(second)
+	await idle()
+	second.spawn_volley(H.make_volley_data(5, 0.0, 30.0))
+	quick_volley(3)
+	assert_eq(int(Performance.get_custom_monitor(MON_ACTIVE)), 3, "the first factory owns them")
+	var parent := factory.get_parent()
+	parent.remove_child(factory)
+	assert_true(Performance.has_custom_monitor(MON_ACTIVE), "handed over when the owner left the tree")
+	assert_eq(int(Performance.get_custom_monitor(MON_ACTIVE)), 5, "the second factory reports now")
+	parent.add_child(factory)
+	await idle()
+	assert_eq(int(Performance.get_custom_monitor(MON_ACTIVE)), 5, "the owner keeps them while it lives")
+	second.free()
+	assert_true(Performance.has_custom_monitor(MON_ACTIVE), "handed back when the owner is freed")
+	assert_eq(int(Performance.get_custom_monitor(MON_ACTIVE)), 3, "the first factory reports again")
+	parent.remove_child(factory)
+	assert_false(Performance.has_custom_monitor(MON_ACTIVE), "no factory left in the tree: removed")
+	parent.add_child(factory)
+	await idle()
+	assert_true(Performance.has_custom_monitor(MON_ACTIVE), "re-entering the tree registers again")
+	check_factory_after = true

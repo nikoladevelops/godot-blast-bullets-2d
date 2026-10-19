@@ -150,6 +150,17 @@ void BulletFactory2D::unregister_monitors() {
 	}
 }
 
+void BulletFactory2D::hand_monitors_to_another_factory() {
+	// The owner left the tree or is being freed: another ready factory in
+	// the tree (that wants them) keeps the monitors alive.
+	for (BulletFactory2D *other : factories_in_tree) {
+		if (other != this && other->is_ready && !other->is_tearing_down && other->register_performance_monitors) {
+			other->register_monitors();
+			return;
+		}
+	}
+}
+
 Variant BulletFactory2D::_monitor_active_bullets() { return get_active_bullet_count(); }
 
 Variant BulletFactory2D::_monitor_active_volleys() { return get_frame_stats()["active_volleys"]; }

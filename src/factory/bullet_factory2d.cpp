@@ -193,11 +193,18 @@ void BulletFactory2D::_notification(int p_what) {
 		// Not _ready: the factory skips it in the editor, and the preview is
 		// the one thing it draws there.
 		refresh_despawn_bounds_preview();
+		// Re-entry (_ready runs once): take the monitors when nobody has them.
+		if (is_ready) {
+			register_monitors();
+		}
 		return;
 	}
 	if (p_what == NOTIFICATION_EXIT_TREE) {
 		factories_in_tree.erase(std::remove(factories_in_tree.begin(), factories_in_tree.end(), this), factories_in_tree.end());
-		unregister_monitors();
+		if (owns_performance_monitors) {
+			unregister_monitors();
+			hand_monitors_to_another_factory();
+		}
 		return;
 	}
 	if (p_what == NOTIFICATION_PREDELETE) {
@@ -214,7 +221,10 @@ void BulletFactory2D::_notification(int p_what) {
 		}
 		predelete_state = PREDELETE_RUNNING;
 		*alive_flag = false;
-		unregister_monitors();
+		if (owns_performance_monitors) {
+			unregister_monitors();
+			hand_monitors_to_another_factory();
+		}
 		// Parent is notified before children are destroyed. From here on no child
 		// pointer (debuggers, containers) may be touched by teardown paths.
 		is_tearing_down = true;
