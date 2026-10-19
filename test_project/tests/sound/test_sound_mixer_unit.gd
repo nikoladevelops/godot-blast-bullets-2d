@@ -546,3 +546,28 @@ func test_duck_takes_strongest_higher_priority_dip() -> void:
 	assert_almost_eq(float(vols[low.get_instance_id()]), -15.0, 0.1, "low takes top's 9 dB, not mid's 3")
 	assert_almost_eq(float(vols[mid.get_instance_id()]), -9.0, 0.1, "mid takes top's 9 dB")
 	assert_almost_eq(float(vols[top.get_instance_id()]), 0.0, 0.1, "top never ducks")
+
+
+## Lowering sound_max_voices caps the voices playing at once, even when more
+## idle voices exist from the higher cap (they stay unused until it grows).
+func test_lowered_max_voices_caps_new_plays() -> void:
+	godot_listener_at(Vector2.ZERO)
+	var s := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT, 16)
+	factory.set_sound_max_voices(16)
+	for i in 16:
+		assert_true(factory.play_sound(s, Vector2(i, 0)), "offer %d accepted" % i)
+	await physics(2)
+	assert_eq(busy_voices().size(), 16, "16 voices at the high cap")
+	factory.stop_sounds()
+	await physics(1)
+	factory.set_sound_max_voices(4)
+	for i in 10:
+		factory.play_sound(s, Vector2(i, 0))
+	await physics(2)
+	assert_eq(busy_voices().size(), 4, "the lowered cap holds")
+	factory.set_sound_max_voices(16)
+	factory.stop_sounds()
+	for i in 10:
+		factory.play_sound(s, Vector2(i, 0))
+	await physics(2)
+	assert_eq(busy_voices().size(), 10, "the idle voices serve again once the cap grows")

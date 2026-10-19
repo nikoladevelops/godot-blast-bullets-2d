@@ -534,7 +534,10 @@ AudioStreamPlayer2D *SoundMixer2D::make_voice_player(Voice &voice, size_t index)
 
 AudioStreamPlayer2D *SoundMixer2D::alloc_voice(BulletFactory2D &factory, int priority) {
 	ensure_voices_container(factory);
-	for (size_t i = 0; i < voices.size(); ++i) {
+	// A lowered max_voices_total caps the voices in use too: slots past it
+	// stay idle (never reused) until the cap grows again.
+	const size_t usable = (size_t)Math::max(0, max_voices_total);
+	for (size_t i = 0; i < voices.size() && i < usable; ++i) {
 		if (voices[i].busy) {
 			continue;
 		}
