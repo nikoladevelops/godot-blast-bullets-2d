@@ -94,8 +94,8 @@ PATTERN_KNOB(double, double, FLOAT, helper_flower_petal_spread, FINITE_GE, 0.0, 
 // FAN + RHODONEA: waist pinch between lobes.
 PATTERN_KNOB(double, double, FLOAT, helper_flower_petal_sharpness, FINITE_GE, 0.0, 0, "must be finite and >= 0", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")
 // SPIROGRAPH: hypotrochoid roller radius r (> 0) and pen offset d (>= 0).
-PATTERN_KNOB(double, double, FLOAT, helper_flower_spiro_roller, FINITE_GT, 0.0, 0, "must be finite and > 0", NONE, 0, 0, "", false, PROPERTY_HINT_RANGE, "0.5,2048,0.5,greater_than,0")
-PATTERN_KNOB(double, double, FLOAT, helper_flower_spiro_pen, FINITE_GE, 0.0, 0, "must be finite and >= 0", NONE, 0, 0, "", false, PROPERTY_HINT_RANGE, "0,2048,0.5")
+PATTERN_KNOB(double, double, FLOAT, helper_flower_spiro_roller, FINITE_GT, 0.0, 0, "must be finite and > 0", NONE, 0, 0, "", false, PROPERTY_HINT_RANGE, "0.5,2048,0.5,or_greater,greater_than,0")
+PATTERN_KNOB(double, double, FLOAT, helper_flower_spiro_pen, FINITE_GE, 0.0, 0, "must be finite and >= 0", NONE, 0, 0, "", false, PROPERTY_HINT_RANGE, "0,2048,0.5,or_greater")
 // SUPERFORMULA: lobe count m and fullness exponent.
 PATTERN_KNOB(double, double, FLOAT, helper_flower_super_lobes, FINITE_IN, 2.0, 64.0, "must be finite in [2, 64]", NONE, 0, 0, "", false, PROPERTY_HINT_RANGE, "2,64,1")
 PATTERN_KNOB(double, double, FLOAT, helper_flower_super_fullness, FINITE_IN_OC, 0.0, 8.0, "must be finite in (0, 8]", NONE, 0, 0, "", false, PROPERTY_HINT_RANGE, "0.05,8,0.05,greater_than,0")
@@ -266,7 +266,7 @@ PATTERN_KNOB(double, double, FLOAT, helper_square_size, FINITE_GE, 0.0, 0, "must
 PATTERN_KNOB(bool, bool, BOOL, helper_square_face_outward, NONE, 0, 0, "", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")
 PATTERN_KNOB(double, double, FLOAT, helper_square_facing_offset_deg, FINITE, 0, 0, "must be finite", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")
 PATTERN_SUBGROUP("Polygon", "helper_polygon_")
-PATTERN_KNOB(int, int, INT, helper_polygon_vertices, IN, 3, pattern_max_bullets(), String("must be between 3 and ") + itos(pattern_max_bullets()), NONE, 0, 0, "", false, PROPERTY_HINT_RANGE, "3,64,1")
+PATTERN_KNOB(int, int, INT, helper_polygon_vertices, IN, 3, pattern_max_bullets(), String("must be between 3 and ") + itos(pattern_max_bullets()), NONE, 0, 0, "", false, PROPERTY_HINT_RANGE, "3,64,1,or_greater")
 PATTERN_KNOB(double, double, FLOAT, helper_polygon_radius, FINITE_GE, 0.0, 0, "must be finite and >= 0", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")
 PATTERN_KNOB(double, double, FLOAT, helper_polygon_rotation, FINITE, 0, 0, "must be finite", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")
 PATTERN_KNOB(bool, bool, BOOL, helper_polygon_face_outward, NONE, 0, 0, "", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")

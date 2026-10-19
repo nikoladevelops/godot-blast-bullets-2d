@@ -125,8 +125,10 @@ void BulletSoundData2D::set_stream_weights(const PackedFloat32Array &value) {
 
 double BulletSoundData2D::get_volume_db() const { return volume_db; }
 void BulletSoundData2D::set_volume_db(double value) {
-	if (!Math::is_finite(value)) {
-		UtilityFunctions::push_error("BulletSoundData2D: volume_db must be finite, keeping the old value.");
+	// The player turns dB into a linear gain: 1e30 dB is an infinite gain
+	// and a huge pair (base + trim) sums to NaN.
+	if (!Math::is_finite(value) || value < -80.0 || value > 80.0) {
+		UtilityFunctions::push_error("BulletSoundData2D: volume_db must be finite and between -80 and 80, keeping the old value.");
 		return;
 	}
 	if (volume_db == value) {
@@ -545,8 +547,10 @@ void BulletSoundData2D::set_amount_gain_db(double value) {
 
 double BulletSoundData2D::get_volume_min_db() const { return volume_min_db; }
 void BulletSoundData2D::set_volume_min_db(double value) {
-	if (!Math::is_finite(value)) {
-		UtilityFunctions::push_error("BulletSoundData2D: volume_min_db must be finite, keeping the old value.");
+	// The player turns dB into a linear gain: 1e30 dB is an infinite gain
+	// and a huge pair (base + trim) sums to NaN.
+	if (!Math::is_finite(value) || value < -80.0 || value > 80.0) {
+		UtilityFunctions::push_error("BulletSoundData2D: volume_min_db must be finite and between -80 and 80, keeping the old value.");
 		return;
 	}
 	if (volume_min_db == value) {
@@ -558,8 +562,10 @@ void BulletSoundData2D::set_volume_min_db(double value) {
 
 double BulletSoundData2D::get_volume_max_db() const { return volume_max_db; }
 void BulletSoundData2D::set_volume_max_db(double value) {
-	if (!Math::is_finite(value)) {
-		UtilityFunctions::push_error("BulletSoundData2D: volume_max_db must be finite, keeping the old value.");
+	// The player turns dB into a linear gain: 1e30 dB is an infinite gain
+	// and a huge pair (base + trim) sums to NaN.
+	if (!Math::is_finite(value) || value < -80.0 || value > 80.0) {
+		UtilityFunctions::push_error("BulletSoundData2D: volume_max_db must be finite and between -80 and 80, keeping the old value.");
 		return;
 	}
 	if (volume_max_db == value) {
@@ -763,7 +769,7 @@ void BulletSoundData2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_volume_db"), &BulletSoundData2D::get_volume_db);
 	ClassDB::bind_method(D_METHOD("set_volume_db", "value"), &BulletSoundData2D::set_volume_db);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "volume_db", PROPERTY_HINT_RANGE, "-80,80,0.1,or_less,or_greater,suffix:dB"), "set_volume_db", "get_volume_db");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "volume_db", PROPERTY_HINT_RANGE, "-80,80,0.1,suffix:dB"), "set_volume_db", "get_volume_db");
 
 	ClassDB::bind_method(D_METHOD("get_pitch_scale"), &BulletSoundData2D::get_pitch_scale);
 	ClassDB::bind_method(D_METHOD("set_pitch_scale", "value"), &BulletSoundData2D::set_pitch_scale);
@@ -898,11 +904,11 @@ void BulletSoundData2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_volume_min_db"), &BulletSoundData2D::get_volume_min_db);
 	ClassDB::bind_method(D_METHOD("set_volume_min_db", "value"), &BulletSoundData2D::set_volume_min_db);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "volume_min_db", PROPERTY_HINT_RANGE, "-80,80,0.1,or_less,or_greater,suffix:dB"), "set_volume_min_db", "get_volume_min_db");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "volume_min_db", PROPERTY_HINT_RANGE, "-80,80,0.1,suffix:dB"), "set_volume_min_db", "get_volume_min_db");
 
 	ClassDB::bind_method(D_METHOD("get_volume_max_db"), &BulletSoundData2D::get_volume_max_db);
 	ClassDB::bind_method(D_METHOD("set_volume_max_db", "value"), &BulletSoundData2D::set_volume_max_db);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "volume_max_db", PROPERTY_HINT_RANGE, "-80,80,0.1,or_less,or_greater,suffix:dB"), "set_volume_max_db", "get_volume_max_db");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "volume_max_db", PROPERTY_HINT_RANGE, "-80,80,0.1,suffix:dB"), "set_volume_max_db", "get_volume_max_db");
 
 	ClassDB::bind_method(D_METHOD("get_pitch_min"), &BulletSoundData2D::get_pitch_min);
 	ClassDB::bind_method(D_METHOD("set_pitch_min", "value"), &BulletSoundData2D::set_pitch_min);

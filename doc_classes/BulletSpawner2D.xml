@@ -1645,7 +1645,7 @@
 			Seconds between listener scans (factory time); 0 scans every physics tick. Positions stay live between scans.
 		</member>
 		<member name="sound_volume_db" type="float" setter="set_sound_volume_db" getter="get_sound_volume_db" default="0.0">
-			Mix trim added to every entry's volume on top of its own volume_db (plus each play's random rolls), before the entry's [member BulletSoundData2D.volume_min_db]..[member BulletSoundData2D.volume_max_db] clamp.
+			Mix trim added to every entry's volume on top of its own volume_db (plus each play's random rolls), before the entry's [member BulletSoundData2D.volume_min_db]..[member BulletSoundData2D.volume_max_db] clamp. Between -80 and 24.
 		</member>
 		<member name="spawn_data" type="BulletVolleyData2D" setter="set_spawn_data" getter="get_spawn_data">
 			Bullet data for each volley. Duplicated once per resource (the spawner keeps the copy until the resource changes or is replaced), so sharing one resource is safe. Assigning the same resource again keeps the copy.

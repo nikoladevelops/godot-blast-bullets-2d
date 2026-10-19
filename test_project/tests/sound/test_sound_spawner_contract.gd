@@ -49,7 +49,7 @@ func test_setters_reject_and_keep() -> void:
 	expect_error_sequence(["BulletSpawner2D: sound_listener_global_positions must hold finite positions only, keeping the old value."])
 	assert_true(sp.sound_listener_global_positions.is_empty(), "positions kept")
 	sp.set_sound_volume_db(NAN)
-	expect_error_sequence(["BulletSpawner2D: sound_volume_db must be finite, keeping the old value."])
+	expect_error_sequence(["BulletSpawner2D: sound_volume_db must be finite and between -80 and 24, keeping the old value."])
 	assert_eq(sp.sound_volume_db, 0.0, "volume kept")
 	sp.set_sound_effects(["nope"] as Array)
 	expect_error_sequence(["BulletSpawner2D: sound_effects entries must be BulletSoundData2D or null, keeping the old value."])

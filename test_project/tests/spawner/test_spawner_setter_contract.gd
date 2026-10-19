@@ -283,3 +283,40 @@ func test_out_of_range_skip_index_warns_once_and_never_from_the_preview() -> voi
 		if err.is_push_warning() and err.contains_text("helper_skip_indices holds an index outside"):
 			warnings += 1
 	assert_eq(warnings, 1, "one warning for two shots")
+
+
+## A strict range hint (min,max without or_greater / or_less) is a promise:
+## a value just outside it is rejected the same way. Pure editor sliders
+## (any value is valid) are listed in RANGE_IS_A_SLIDER with a reason.
+const RANGE_IS_A_SLIDER := {
+}
+
+
+func test_range_hints_are_enforced() -> void:
+	var sp := make_spawner()
+	var bad: Array = []
+	var probed := 0
+	for p in _editor_props(sp):
+		var prop := str(p.name)
+		var t := int(p.type)
+		if int(p.get("hint", 0)) != PROPERTY_HINT_RANGE or RANGE_IS_A_SLIDER.has(prop) or (t != TYPE_FLOAT and t != TYPE_INT):
+			continue
+		var hs := str(p.get("hint_string", ""))
+		var parts := hs.split(",")
+		if parts.size() < 2:
+			continue
+		var lo := float(parts[0])
+		var hi := float(parts[1])
+		var step := 1.0 if t == TYPE_INT else maxf(absf(hi - lo), 1.0) * 0.25
+		var outside: Array = []
+		if not hs.contains("or_less"):
+			outside.append(int(lo) - 1 if t == TYPE_INT else lo - step)
+		if not hs.contains("or_greater"):
+			outside.append(int(hi) + 1 if t == TYPE_INT else hi + step)
+		for v in outside:
+			probed += 1
+			var problem := _probe(sp, prop, v)
+			if problem != "":
+				bad.append(problem)
+	assert_gt(probed, 10, "the sweep reached the ranged properties (%d probes)" % probed)
+	_assert_none(bad, "values outside a strict range hint are rejected and the old value kept")

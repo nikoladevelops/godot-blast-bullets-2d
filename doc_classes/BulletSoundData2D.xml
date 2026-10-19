@@ -161,13 +161,13 @@
 			Play probability per event. 0 never plays, 1 always plays.
 		</member>
 		<member name="volume_db" type="float" setter="set_volume_db" getter="get_volume_db" default="0.0">
-			Base loudness in dB. The spawner's sound volume offset is added on top, plus the [member random_volume_offset_db] and [member random_volume_min_db]/[member random_volume_max_db] rolls of each play, clamped into [member volume_min_db]..[member volume_max_db]. Playing voices snapshot the mix at play: editing the entry afterwards affects new plays only.
+			Base loudness in dB. The spawner's sound volume offset is added on top, plus the [member random_volume_offset_db] and [member random_volume_min_db]/[member random_volume_max_db] rolls of each play, clamped into [member volume_min_db]..[member volume_max_db]. Playing voices snapshot the mix at play: editing the entry afterwards affects new plays only. Must be finite and between -80 and 80.
 		</member>
 		<member name="volume_max_db" type="float" setter="set_volume_max_db" getter="get_volume_max_db" default="80.0">
-			Final mixed volume ceiling in dB (applied after the trim, the randoms and the amount gain). Inverted bounds sort themselves. Wide open by default.
+			Final mixed volume ceiling in dB (applied after the trim, the randoms and the amount gain). Inverted bounds sort themselves. Wide open by default (between -80 and 80).
 		</member>
 		<member name="volume_min_db" type="float" setter="set_volume_min_db" getter="get_volume_min_db" default="-80.0">
-			Final mixed volume floor in dB (applied after the trim, the randoms and the amount gain). Inverted bounds sort themselves. Wide open by default.
+			Final mixed volume floor in dB (applied after the trim, the randoms and the amount gain). Inverted bounds sort themselves. Wide open by default (between -80 and 80).
 		</member>
 		<member name="when_limit_reached" type="int" setter="set_when_limit_reached" getter="get_when_limit_reached" default="0">
 			What happens past [member max_voices]: stop this sound's oldest voice and reuse it, or drop the new event.

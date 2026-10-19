@@ -46,8 +46,8 @@ double BulletSpawner2D::get_sound_volume_db() const {
 }
 
 void BulletSpawner2D::set_sound_volume_db(double value) {
-	if (!Math::is_finite(value)) {
-		UtilityFunctions::push_error("BulletSpawner2D: sound_volume_db must be finite, keeping the old value.");
+	if (!Math::is_finite(value) || value < -80.0 || value > 24.0) {
+		UtilityFunctions::push_error("BulletSpawner2D: sound_volume_db must be finite and between -80 and 24, keeping the old value.");
 		return;
 	}
 	sound_volume_db = value;
