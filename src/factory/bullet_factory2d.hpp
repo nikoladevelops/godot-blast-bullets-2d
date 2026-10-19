@@ -565,7 +565,9 @@ public:
 	// Clears every live bullet of one owner (fire_clear_effects: On Clear at
 	// each pose), PARKED volleys of that owner go back to the pool. Not
 	// structural: safe from handlers. Returns the bullets cleared.
-	int clear_bullets_owned_by(uint64_t owner_spawner_id, bool fire_clear_effects);
+	// split_cause: SPLIT_CAUSE_CLEAR lets the cleared bullets split (a
+	// spawner clearing its own bullets); -1 never splits (orphan cleanup).
+	int clear_bullets_owned_by(uint64_t owner_spawner_id, bool fire_clear_effects, int split_cause = SPLIT_CAUSE_CLEAR);
 	// A spawner was freed: apply its orphaned_volleys policy to every volley
 	// it owns (active and parked). keep_flying records the spawner path for
 	// the orphan warnings; hand_to_factory makes them factory-owned.
@@ -821,6 +823,8 @@ private:
 	int split_max_children_per_sweep = 0;
 	uint64_t split_recorded_total = 0;
 	bool split_flush_running = false;
+	// The request the running flush is spawning (split_flush_scratch index).
+	size_t split_flush_next = 0;
 	// Bumped by every drop: a running flush stops spawning its batch.
 	uint64_t split_drop_epoch = 0;
 	int split_stats_flushed_last = 0;
@@ -840,8 +844,13 @@ private:
 	bool flush_splits(const bool &alive);
 	// Drops every pending split (reset, free_active_bullets, teardown).
 	void drop_pending_splits();
-	// Scoped reset/free: drops the splits whose children use this pool key.
+	// Scoped reset/free: drops the splits whose PARENTS were in this pool
+	// key's bucket (the rest of a running flush keeps spawning).
 	void drop_pending_splits_for_key(const PoolKey &key);
+	// A freed spawner's queued splits (pending, and the rest of a running
+	// flush) follow its orphaned_volleys policy: Hand To Factory re-owns
+	// them, Clear / Remove drop them, Keep Flying keeps them.
+	void orphan_pending_splits(uint64_t owner_spawner_id, int policy);
 	void drop_pending_splits_for(const PoolKey *key) {
 		if (key == nullptr) {
 			drop_pending_splits();

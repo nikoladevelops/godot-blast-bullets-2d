@@ -34,6 +34,9 @@ void BulletFactory2D::set_split_max_children_per_sweep(int value) {
 
 void BulletFactory2D::drop_pending_splits() {
 	pending_splits.clear();
+	// The cached child templates go too: they keep the sources' sub-resources
+	// (textures, shapes, materials) alive past a reset.
+	split_templates.clear();
 	// A flush running right now (a reset from one of its handlers) stops
 	// spawning the rest of its batch.
 	++split_drop_epoch;
@@ -41,14 +44,53 @@ void BulletFactory2D::drop_pending_splits() {
 
 void BulletFactory2D::drop_pending_splits_for_key(const PoolKey &key) {
 	pending_splits.erase(std::remove_if(pending_splits.begin(), pending_splits.end(), [&](const SplitRequest2D &r) {
-		if (r.stage.is_null() || r.data.is_null()) {
-			return true;
-		}
-		const int count = Math::min(r.stage->count, pattern_max_bullets());
-		return count == key.amount_bullets && CollisionShapeHelper2D::get_effective_type(r.data->collision_shape, false) == key.shape_type;
+		return r.parent_key == key;
 	}),
 			pending_splits.end());
-	++split_drop_epoch;
+	// A running flush (a scoped reset from one of its handlers) skips the
+	// rest of that bucket's requests and keeps spawning the others.
+	if (split_flush_running) {
+		for (size_t i = split_flush_next + 1; i < split_flush_scratch.size(); ++i) {
+			if (split_flush_scratch[i].parent_key == key) {
+				split_flush_scratch[i].dropped = true;
+			}
+		}
+	}
+}
+
+void BulletFactory2D::orphan_pending_splits(uint64_t owner_spawner_id, int policy) {
+	if (owner_spawner_id == 0 || policy == 0) {
+		return; // Keep Flying: the children fly as silent orphans
+	}
+	const bool drop = policy == 2 || policy == 3;
+	if (drop) {
+		pending_splits.erase(std::remove_if(pending_splits.begin(), pending_splits.end(), [&](const SplitRequest2D &r) {
+			return r.owner_id == owner_spawner_id;
+		}),
+				pending_splits.end());
+	} else {
+		for (SplitRequest2D &r : pending_splits) {
+			if (r.owner_id == owner_spawner_id) {
+				r.owner_id = 0;
+			}
+		}
+	}
+	if (!split_flush_running) {
+		return;
+	}
+	// The running flush: the request it is spawning right now only changes
+	// its owner (its children already exist and follow the volley policy).
+	for (size_t i = split_flush_next; i < split_flush_scratch.size(); ++i) {
+		SplitRequest2D &r = split_flush_scratch[i];
+		if (r.owner_id != owner_spawner_id) {
+			continue;
+		}
+		if (drop && i > split_flush_next) {
+			r.dropped = true;
+		} else if (!drop) {
+			r.owner_id = 0;
+		}
+	}
 }
 
 Ref<BulletVolleyData2D> BulletFactory2D::split_child_template(const Ref<BulletVolleyData2D> &source) {
@@ -138,9 +180,10 @@ bool BulletFactory2D::flush_splits(const bool &alive) {
 		if (split_drop_epoch != drop_epoch) {
 			break; // a handler reset the factory: the rest never spawns
 		}
+		split_flush_next = next;
 		const SplitRequest2D &r = batch[next];
 		const BulletSplitStage2D *stage = r.stage.ptr();
-		if (stage == nullptr || r.data.is_null()) {
+		if (r.dropped || stage == nullptr || r.data.is_null()) {
 			continue;
 		}
 		const int count = Math::min(stage->count, pattern_max_bullets());
@@ -191,11 +234,11 @@ bool BulletFactory2D::flush_splits(const bool &alive) {
 		if (!alive) {
 			return false;
 		}
-		children_this_flush += count;
 		++split_stats_flushed_last;
 		if (child == nullptr) {
-			continue; // the spawn already said why
+			continue; // the spawn already said why (a refused spawn takes no room under the cap)
 		}
+		children_this_flush += count;
 		const uint64_t child_id = child->get_instance_id();
 		auto child_alive = [&]() {
 			return ObjectDB::get_instance(ObjectID(child_id)) == (Object *)child && child->is_active && !child->is_queued_for_deletion();
@@ -269,7 +312,9 @@ bool BulletFactory2D::flush_splits(const bool &alive) {
 		std::vector<SplitRequest2D> carried;
 		carried.reserve(batch.size() - next + pending_splits.size());
 		for (size_t i = next; i < batch.size(); ++i) {
-			carried.push_back(std::move(batch[i]));
+			if (!batch[i].dropped) {
+				carried.push_back(std::move(batch[i]));
+			}
 		}
 		for (SplitRequest2D &late : pending_splits) {
 			carried.push_back(std::move(late));

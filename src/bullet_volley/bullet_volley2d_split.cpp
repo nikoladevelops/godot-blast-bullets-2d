@@ -104,6 +104,7 @@ int BulletVolley2D::split_capture(int bullet_index, int cause, const Transform2D
 	request.acceleration = bullet_index < (int)all_cached_acceleration.size() ? all_cached_acceleration[bullet_index] : 0.0f;
 	request.inherited_velocity = inherited_velocity_offset;
 	request.owner_id = owner_spawner_id;
+	request.parent_key = get_pool_key();
 	request.parent_index = bullet_index;
 	request.child_depth = split_depth + 1;
 	request.cause = cause;

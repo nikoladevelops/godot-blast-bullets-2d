@@ -9,6 +9,7 @@
 #include "data/bullet_wobble_data2d.hpp"
 #include "factory/flock_solver2d.hpp"
 #include "factory/graze_detector2d.hpp"
+#include "pooling/volley_pool_key2d.hpp"
 
 #include <cstdint>
 #include <memory>
@@ -107,6 +108,10 @@ struct SplitRequest2D {
 	real_t max_speed = 0.0;
 	real_t acceleration = 0.0;
 	uint64_t owner_id = 0; // the parent's owner spawner (0 = the factory)
+	PoolKey parent_key; // the parent volley's bucket (scoped reset/free drop by it)
+	// Set on a request a flush is walking (it must not lose its Refs while
+	// the flush may still read them): the flush skips it.
+	bool dropped = false;
 	int parent_index = 0;
 	int child_depth = 1; // the generation of the children
 	int cause = SPLIT_CAUSE_NONE;

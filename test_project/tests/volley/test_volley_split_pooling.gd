@@ -149,3 +149,47 @@ func test_a_cached_template_outlives_its_factory_safely() -> void:
 	other.free()
 	data.max_life_time = 2.0 # emits changed
 	expect_no_errors("the freed factory's listener is gone")
+
+
+## A scoped reset / free_active_bullets drops the queued splits of the
+## volleys it resets (their PARENTS were in that bucket), never the splits of
+## other buckets whose children happen to use that key; and it never cancels
+## the rest of a running flush.
+func test_a_scoped_reset_drops_only_the_splits_of_its_bucket() -> void:
+	# Parents of 3 bullets whose children (2) use the 2-bullet bucket, and
+	# parents of 2 bullets (the 2-bullet bucket) whose children use 2 too.
+	var three := factory.spawn_volley(H.make_volley_data(3, 0.0, 5.0))
+	three.split_set_data(_chain(), H.make_volley_data(1, 0.0, 5.0))
+	var two := _armed(2, 5.0)
+	three.split_bullet(0)
+	two.split_bullet(0)
+	assert_eq(factory.get_pending_split_count(), 2, "two queued")
+	factory.free_active_bullets(factory.debug_get_pool_bucket(two))
+	assert_eq(factory.get_pending_split_count(), 1, "only the freed bucket's split went")
+	factory.debug_advance_time(DT)
+	assert_eq(splits.size(), 1, "the other bucket's parent still splits")
+	assert_eq(splits[0][0], Vector2(0, 0), "the 3-bullet parent's split")
+	# A scoped reset from a handler during the flush keeps the rest of the batch.
+	splits.clear()
+	var a := factory.spawn_volley(H.make_volley_data(3, 0.0, 5.0))
+	a.split_set_data(_chain(), H.make_volley_data(1, 0.0, 5.0))
+	a.all_bullets_split()
+	var key := factory.debug_get_pool_bucket(_armed(5, 5.0))
+	factory.bullet_split.connect(func(_p, _c, _ch, _d) -> void:
+		if splits.size() == 1:
+			factory.free_active_bullets(key), CONNECT_ONE_SHOT)
+	factory.debug_advance_time(DT)
+	assert_eq(splits.size(), 3, "every split of the batch spawned")
+
+
+## reset() and free_active_bullets() drop the cached child templates with
+## the queued splits (a template keeps its source's sub-resources alive).
+func test_reset_and_free_drop_the_cached_templates() -> void:
+	for op in ["reset", "free_active_bullets"]:
+		var data := H.make_volley_data(2, 0.0, DT * 0.5) # one speed entry per bullet: a template
+		var v := factory.spawn_volley(data)
+		v.split_set_data(_chain(), data)
+		factory.debug_advance_time(DT)
+		assert_eq(int(factory.debug_get_split_stats()["templates"]), 1, "%s: cached" % op)
+		factory.call(op)
+		assert_eq(int(factory.debug_get_split_stats()["templates"]), 0, "%s: dropped" % op)

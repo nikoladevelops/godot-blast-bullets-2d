@@ -409,7 +409,7 @@ int BulletFactory2D::clear_active_bullets(const Ref<VolleyPoolKey2D> &key) {
 	return cleared;
 }
 
-int BulletFactory2D::clear_bullets_owned_by(uint64_t owner_spawner_id, bool fire_clear_effects) {
+int BulletFactory2D::clear_bullets_owned_by(uint64_t owner_spawner_id, bool fire_clear_effects, int split_cause) {
 	if (owner_spawner_id == 0 || !is_ready || is_tearing_down) {
 		return 0;
 	}
@@ -431,7 +431,7 @@ int BulletFactory2D::clear_bullets_owned_by(uint64_t owner_spawner_id, bool fire
 		}
 		if (volley->is_active) {
 			const std::vector<int> live = volley->all_bullets_enabled_set.get_active_indexes();
-			cleared += volley->disable_bullets_bulk(live, fire_clear_effects ? (int)EFFECT_ON_CLEAR : -1, nullptr, SPLIT_CAUSE_CLEAR);
+			cleared += volley->disable_bullets_bulk(live, fire_clear_effects ? (int)EFFECT_ON_CLEAR : -1, nullptr, split_cause);
 			if (!*life) {
 				return cleared; // a callback freed this factory
 			}
@@ -456,10 +456,13 @@ void BulletFactory2D::apply_orphan_policy(uint64_t owner_spawner_id, int policy,
 	if (owner_spawner_id == 0 || !is_ready || is_tearing_down) {
 		return;
 	}
-	// Policy ids mirror BulletSpawner2D::OrphanedVolleys.
+	// Policy ids mirror BulletSpawner2D::OrphanedVolleys. The queued splits
+	// follow first (dropping or re-owning a request runs no user code).
+	orphan_pending_splits(owner_spawner_id, policy);
 	if (policy == 2 || policy == 3) {
 		if (!is_factory_busy) {
-			clear_bullets_owned_by(owner_spawner_id, policy == 2);
+			// The cleanup never splits: the spawner asked for its bullets to go.
+			clear_bullets_owned_by(owner_spawner_id, policy == 2, SPLIT_CAUSE_NONE);
 			return;
 		}
 		// Busy (freed from inside a sweep callback): fall back to keeping

@@ -281,3 +281,103 @@ func test_surviving_parents_are_named_in_warnings_and_explain() -> void:
 	assert_true(_has(sp.get_setup_warnings(), "split_data.stages[0] keeps the parent and has no max_splits_per_bullet: a bullet splits again on every bounce, surviving hit, homing reach or graze."), "unlimited survivor named")
 	stage.max_splits_per_bullet = 40000
 	assert_true(_has(sp.get_setup_warnings(), "split_data can turn one fired bullet into 120000 bullets"), "the size estimate counts every split a survivor may make (3 x 40000)")
+
+
+const ORPHAN_POLICIES := [
+	BulletSpawner2D.ORPHANED_VOLLEYS_KEEP_FLYING,
+	BulletSpawner2D.ORPHANED_VOLLEYS_HAND_TO_FACTORY,
+	BulletSpawner2D.ORPHANED_VOLLEYS_CLEAR,
+	BulletSpawner2D.ORPHANED_VOLLEYS_REMOVE,
+]
+
+
+## Two parents split into two long-lived children each (On Clear splits too:
+## the orphan cleanup must never use it).
+func _orphan_chain() -> BulletSplitData2D:
+	var chain := _chain(2)
+	chain.stages[0].split_on_clear = true
+	chain.stages[0].child_data = H.make_volley_data(1, 0.0, 30.0)
+	return chain
+
+
+## Runs one orphan case; returns [factory splits, live bullets, On Split effects].
+func _orphan_case(policy: int, timing: String) -> Array:
+	factory_splits.clear()
+	factory.debug_clear_effect_log()
+	factory.debug_set_effect_log_enabled(true)
+	var sp := _split_spawner(_orphan_chain(), 2, DT * 0.5 if timing != "before_capture" else 30.0)
+	sp.spawn_data.effect_layers = [H.make_effect_layer(BulletEffectLayerData2D.EFFECT_ON_SPLIT)]
+	sp.orphaned_volleys = policy
+	if timing == "carry_over":
+		factory.split_max_children_per_sweep = 2 # one parent's children per sweep
+	var trap_split: BulletVolley2D = null
+	if timing == "during_flush":
+		# A factory volley ticked (and split) BEFORE the spawner's: its
+		# bullet_split handler frees the spawner while the spawner's splits
+		# still wait in the running flush.
+		var trap_data := H.make_volley_data(1, 0.0, DT * 0.5)
+		trap_split = factory.spawn_volley(trap_data)
+		var trap_chain := _chain(1)
+		trap_chain.stages[0].child_data = H.make_volley_data(1, 0.0, 30.0)
+		trap_split.split_set_data(trap_chain, trap_data)
+	var v := _fire(sp)
+	match timing:
+		"during_flush":
+			var doomed := [sp]
+			factory.bullet_split.connect(func(_p, _c, _ch, _d) -> void:
+				if is_instance_valid(doomed[0]):
+					doomed[0].free(), CONNECT_ONE_SHOT)
+			step_factory(3)
+		"before_capture":
+			sp.free() # the parents are orphans before they ever split
+			v.set_life_time_left(0.001) # the survivors (Keep / Hand) split now
+			step_factory(3)
+		"between":
+			# A factory volley ticked after the spawner's: its expiry handler
+			# frees the spawner after the parents' splits were recorded and
+			# before the flush spawns them.
+			var trap_data := H.make_volley_data(1, 0.0, DT * 0.5)
+			trap_data.is_life_time_over_signal_enabled = true
+			var trap := factory.spawn_volley(trap_data)
+			var doomed := [sp]
+			factory.life_time_over.connect(func(volley, _i) -> void:
+				if volley == trap and is_instance_valid(doomed[0]):
+					doomed[0].free(), CONNECT_ONE_SHOT)
+			step_factory(3)
+		"carry_over":
+			step_factory(1) # the first parent's children spawn, the second waits
+			sp.free()
+			step_factory(3)
+	factory.split_max_children_per_sweep = 0
+	var effects := 0
+	for e in factory.debug_get_effect_log():
+		if int(e.get("trigger", -1)) == BulletEffectLayerData2D.EFFECT_ON_SPLIT:
+			effects += 1
+	return [factory_splits.size(), factory.get_active_bullet_count(), effects]
+
+
+## orphaned_volleys decides what a freed spawner's queued splits become, at
+## every moment it can be freed: before its bullets split, between a split
+## being recorded and spawned, and with splits carried over to a later sweep.
+## Keep Flying: silent children fly. Hand To Factory: factory-owned children,
+## reported on the factory. Clear / Remove: nothing of the spawner survives,
+## and the cleanup itself never splits.
+func test_orphan_policies_reach_every_queued_split() -> void:
+	# [factory splits, live bullets, On Split effects at the parents]
+	var expected := {
+		"before_capture": [[0, 4, 2], [2, 4, 2], [0, 0, 0], [0, 0, 0]],
+		"between": [[0, 4, 2], [2, 4, 2], [0, 0, 2], [0, 0, 2]],
+		"carry_over": [[0, 4, 2], [1, 4, 2], [0, 0, 2], [0, 0, 2]],
+		# + the factory volley's own split (one report, one child)
+		"during_flush": [[1, 5, 2], [3, 5, 2], [1, 1, 2], [1, 1, 2]],
+	}
+	var problems: Array = []
+	for timing in expected:
+		for p in ORPHAN_POLICIES.size():
+			var got := _orphan_case(ORPHAN_POLICIES[p], timing)
+			var want: Array = expected[timing][p]
+			if got != want:
+				problems.append("%s / policy %d: got %s, want %s" % [timing, p, got, want])
+			factory.free_active_bullets()
+			await idle(1)
+	assert_eq("\n".join(problems), "", "every policy at every moment")
