@@ -15,6 +15,7 @@ void BulletVolley2D::split_arm(const std::shared_ptr<SplitConfig2D> &config, con
 	split_spawn_data = config != nullptr ? spawn_data : Ref<BulletVolleyData2D>();
 	split_depth = config != nullptr ? Math::max(0, depth) : 0;
 	split_timer_fired = false;
+	split_timer_idle_chain = nullptr;
 	split_counts.clear();
 	split_arming_cache.reset();
 	split_arming_cache_serial = 0;
@@ -216,8 +217,19 @@ void BulletVolley2D::split_check_timer() {
 	if (split_timer_fired || split_config == nullptr || !split_config->enabled || split_config->split.is_null() || active_bullets_counter <= 0) {
 		return;
 	}
-	const Ref<BulletSplitStage2D> stage = split_config->split->get_stage_for_depth(split_depth);
-	if (stage.is_null() || stage->split_after_sec <= 0.0 || curves_elapsed_time < (double)stage->split_after_sec) {
+	// Most stages have no timer: remember that until the chain or any
+	// split rules change (the lookup reads a script Array every tick).
+	const BulletSplitData2D *chain = split_config->split.ptr();
+	if (split_timer_idle_chain == chain && split_timer_idle_epoch == BulletSplitStage2D::rules_epoch) {
+		return;
+	}
+	const Ref<BulletSplitStage2D> stage = chain->get_stage_for_depth(split_depth);
+	if (stage.is_null() || stage->split_after_sec <= 0.0) {
+		split_timer_idle_chain = chain;
+		split_timer_idle_epoch = BulletSplitStage2D::rules_epoch;
+		return;
+	}
+	if (curves_elapsed_time < (double)stage->split_after_sec) {
 		return;
 	}
 	split_timer_fired = true;

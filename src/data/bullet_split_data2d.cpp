@@ -14,6 +14,7 @@ void BulletSplitData2D::set_stages(const TypedArray<BulletSplitStage2D> &value) 
 	// Empty entries are allowed (the inspector adds one before the user picks
 	// a resource): that generation simply does not split.
 	stages = value;
+	++BulletSplitStage2D::rules_epoch;
 	emit_changed();
 }
 
@@ -27,6 +28,7 @@ void BulletSplitData2D::set_repeat_last_stage(bool value) {
 	}
 	repeat_last_stage = value;
 	notify_property_list_changed();
+	++BulletSplitStage2D::rules_epoch;
 	emit_changed();
 }
 
@@ -43,6 +45,7 @@ void BulletSplitData2D::set_max_depth(int value) {
 		return;
 	}
 	max_depth = value;
+	++BulletSplitStage2D::rules_epoch;
 	emit_changed();
 }
 
@@ -106,6 +109,7 @@ void BulletSplitData2D::apply_preset(Preset preset) {
 	stages = chain;
 	repeat_last_stage = false;
 	notify_property_list_changed();
+	++BulletSplitStage2D::rules_epoch;
 	emit_changed();
 }
 

@@ -272,6 +272,22 @@ func test_timer_keeps_the_bullets_that_did_not_split() -> void:
 	for e in splits:
 		assert_eq(e[1], BulletVolley2D.SPLIT_CAUSE_TIMER, "timer cause")
 
+
+## A volley that found no split timer skips the lookup until a split rule
+## changes: turning the timer on in flight still splits on time.
+func test_a_timer_switched_on_in_flight_splits() -> void:
+	var s := _stage(2)
+	s.split_on_lifetime_over = false
+	var v := _armed([s], 3, 50.0, 5.0) # 3 parents: their 2-child volleys never reuse v
+	for i in 3:
+		factory.debug_advance_time(DT)
+	assert_eq(splits.size(), 0, "no timer, no split")
+	s.split_after_sec = 0.1 # the volley clock is already at 0.05
+	for i in 5:
+		factory.debug_advance_time(DT)
+	assert_eq(splits.size(), 3, "the new timer split every parent at 0.1 s")
+	assert_eq(int(v.debug_get_volley_info()["active_bullets"]), 0, "the parents left")
+
 func test_clear_and_despawn_split_only_when_switched_on() -> void:
 	var s := _stage(2)
 	var v := _armed([s], 2, 0.0, 5.0)

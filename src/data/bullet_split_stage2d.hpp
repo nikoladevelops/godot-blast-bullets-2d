@@ -22,6 +22,12 @@ class BulletSplitStage2D : public Resource {
 	GDCLASS(BulletSplitStage2D, Resource)
 
 public:
+	// Bumped by every accepted edit of any stage or chain: a volley that
+	// found no split timer remembers the epoch and skips the lookup until
+	// something changed (BulletVolley2D::split_check_timer).
+	static uint64_t rules_epoch;
+
+public:
 	// SERIALIZED ids: never renumber.
 	enum DirectionMode : int {
 		// Evenly across spread_degrees, centered on angle_offset_degrees.

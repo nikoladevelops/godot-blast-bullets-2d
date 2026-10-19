@@ -8,11 +8,14 @@
 using namespace godot;
 namespace BlastBullets2D {
 
+uint64_t BulletSplitStage2D::rules_epoch = 0;
+
 void BulletSplitStage2D::store_flag(bool &field, bool value) {
 	if (field == value) {
 		return;
 	}
 	field = value;
+	++BulletSplitStage2D::rules_epoch;
 	emit_changed();
 }
 
@@ -27,6 +30,7 @@ void BulletSplitStage2D::store_amount(real_t &field, real_t value, const char *p
 		return;
 	}
 	field = value;
+	++BulletSplitStage2D::rules_epoch;
 	emit_changed();
 }
 
@@ -40,6 +44,7 @@ void BulletSplitStage2D::set_count(int value) {
 		return;
 	}
 	count = value;
+	++BulletSplitStage2D::rules_epoch;
 	emit_changed();
 }
 
@@ -49,6 +54,7 @@ void BulletSplitStage2D::set_parent_survives(bool value) {
 	}
 	parent_survives = value;
 	notify_property_list_changed();
+	++BulletSplitStage2D::rules_epoch;
 	emit_changed();
 }
 
@@ -61,6 +67,7 @@ void BulletSplitStage2D::set_max_splits_per_bullet(int value) {
 		return;
 	}
 	max_splits_per_bullet = value;
+	++BulletSplitStage2D::rules_epoch;
 	emit_changed();
 }
 
@@ -69,6 +76,7 @@ void BulletSplitStage2D::set_seed(int64_t value) {
 		return;
 	}
 	seed = value;
+	++BulletSplitStage2D::rules_epoch;
 	emit_changed();
 }
 
@@ -82,6 +90,7 @@ void BulletSplitStage2D::set_direction_mode(DirectionMode value) {
 	}
 	direction_mode = value;
 	notify_property_list_changed();
+	++BulletSplitStage2D::rules_epoch;
 	emit_changed();
 }
 
@@ -94,6 +103,7 @@ void BulletSplitStage2D::set_angle_offset_degrees(real_t value) {
 		return;
 	}
 	angle_offset_degrees = value;
+	++BulletSplitStage2D::rules_epoch;
 	emit_changed();
 }
 
@@ -107,6 +117,7 @@ void BulletSplitStage2D::set_speed_mode(SpeedMode value) {
 	}
 	speed_mode = value;
 	notify_property_list_changed();
+	++BulletSplitStage2D::rules_epoch;
 	emit_changed();
 }
 
@@ -119,6 +130,7 @@ void BulletSplitStage2D::set_speed_distribution(SpeedDistribution value) {
 		return;
 	}
 	speed_distribution = value;
+	++BulletSplitStage2D::rules_epoch;
 	emit_changed();
 }
 
@@ -131,6 +143,7 @@ void BulletSplitStage2D::set_scale_multiplier(real_t value) {
 		return;
 	}
 	scale_multiplier = value;
+	++BulletSplitStage2D::rules_epoch;
 	emit_changed();
 }
 
@@ -139,6 +152,7 @@ void BulletSplitStage2D::set_child_data(const Ref<BulletVolleyData2D> &value) {
 		return;
 	}
 	child_data = value;
+	++BulletSplitStage2D::rules_epoch;
 	emit_changed();
 }
 

@@ -2821,6 +2821,10 @@ public:
 	Ref<BulletVolleyData2D> split_spawn_data;
 	int split_depth = 0;
 	bool split_timer_fired = false;
+	// The chain and rules epoch at which split_check_timer found no timer
+	// for this generation: no lookup until either changes (or a new arming).
+	const BulletSplitData2D *split_timer_idle_chain = nullptr;
+	uint64_t split_timer_idle_epoch = 0;
 	// Per bullet: how many times it split this life (a parent that survives
 	// its splits stops at BulletSplitStage2D.max_splits_per_bullet). Sized on
 	// the first recorded split.
