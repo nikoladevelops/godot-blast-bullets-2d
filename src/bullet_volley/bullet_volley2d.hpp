@@ -1303,7 +1303,7 @@ public:
 	// semantics per bullet with one render upload for a drained volley.
 	// Returns how many bullets it disabled.
 	// split_cause >= 0 (SplitCause2D) records each bullet's split first.
-	int disable_bullets_bulk(const std::vector<int> &indexes, int fx_trigger = -1, const std::vector<uint64_t> *expected_epochs = nullptr, int split_cause = -1);
+	int disable_bullets_bulk(const std::vector<int> &indexes, int fx_trigger = -1, const std::vector<uint64_t> *expected_epochs = nullptr, int split_cause = -1, bool only_split = false);
 	// Manual clear with visuals: captures the death pose, runs the silent
 	// disable_bullet() above, then fires EFFECT_ON_CLEAR one-shots. Use
 	// this instead of disable_bullet() when the disappearance should read

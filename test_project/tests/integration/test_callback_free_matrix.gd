@@ -11,7 +11,7 @@ extends BlastTest
 ## this suite under AddressSanitizer), never hangs, keeps running, and a
 ## surviving factory keeps balanced books and keeps spawning.
 
-const DISABLE_TRIGGERS := ["disable_bullet", "killing_hit", "expiry", "clear_active", "clear_circle",
+const DISABLE_TRIGGERS := ["disable_bullet", "clear_bullet", "killing_hit", "expiry", "clear_active", "clear_circle",
 	"clear_rect", "despawn", "reset", "free_active", "pickups"]
 const VICTIMS := ["volley", "other_volley", "factory", "factory_again"]
 
@@ -74,6 +74,8 @@ func _trigger(trigger: String, v: BulletVolley2D) -> void:
 	match trigger:
 		"disable_bullet":
 			v.disable_bullet(0)
+		"clear_bullet":
+			v.clear_bullet(0)
 		"killing_hit", "expiry":
 			await _await_hook(30)
 		"clear_active":
@@ -134,6 +136,10 @@ func _run_disable_case(trigger: String, victim: String) -> Array:
 	if trigger == "expiry":
 		factory.life_time_over.connect(func(_v, _i) -> void: pass)
 	var d := _data(trigger in ["killing_hit", "despawn"], 0.05 if trigger == "expiry" else 30.0)
+	if trigger == "clear_bullet":
+		# The On Clear flash fires after the disable's callback: it must
+		# never run on a volley that callback freed.
+		d.effect_layers = [H.make_effect_layer(BulletEffectLayerData2D.EFFECT_ON_CLEAR)]
 	var v: BulletVolley2D = factory.spawn_volley(d)
 	var other: BulletVolley2D = factory.spawn_volley(d)
 	await idle(1)
@@ -448,3 +454,36 @@ func test_enable_volley_inside_a_busy_factory_is_refused_and_changes_nothing() -
 		await physics(1)
 	assert_ne(parked.get_bullet_transform(0).origin, start, "the enabled volley ticks")
 	assert_true(is_instance_valid(hooked), "hooked volley alive")
+
+
+
+## clear_bullet from inside an attachment callback is refused by the same
+## re-entrancy latch as disable_bullet: it reports false and records nothing
+## (no split, no On Clear sound or flash) for a bullet that does not die.
+func test_clear_bullet_refused_by_the_latch_records_no_split() -> void:
+	var d := _data(false)
+	d.effect_layers = [H.make_effect_layer(BulletEffectLayerData2D.EFFECT_ON_CLEAR)]
+	var stage := BulletSplitStage2D.new()
+	stage.count = 2
+	stage.split_on_clear = true
+	var chain := BulletSplitData2D.new()
+	chain.stages = [stage]
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	var plain := _data(false)
+	plain.shared_bullet_attachment = null
+	v.split_set_data(chain, plain)
+	await idle(1)
+	var splits: Array = []
+	factory.bullet_split.connect(func(_p, _c, _ch, _d) -> void: splits.append(1))
+	factory.debug_set_effect_log_enabled(true)
+	var results: Array = []
+	AttachmentHookProbe2D.hook_on = ["disable"]
+	AttachmentHookProbe2D.hook = func() -> void:
+		results.append(v.clear_bullet(1))
+	v.disable_bullet(0)
+	expect_error_sequence(["disable_bullet: re-entrant call from inside on_bullet_enable/on_bullet_disable is not allowed. Use call_deferred to change bullet state from that callback."])
+	assert_eq(results, [false], "the refused clear reports false")
+	assert_true(v.is_bullet_status_enabled(1), "bullet 1 still flies")
+	factory.debug_advance_time(1.0 / 60.0)
+	assert_eq(splits.size(), 0, "no split for a bullet that did not die")
+	assert_eq(factory.debug_get_effect_log().size(), 0, "no On Clear flash either")

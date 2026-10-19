@@ -789,7 +789,7 @@ void BulletVolley2D::disable_bullet(int bullet_index, bool release_attachment, b
 	}
 }
 
-int BulletVolley2D::disable_bullets_bulk(const std::vector<int> &indexes, int fx_trigger, const std::vector<uint64_t> *expected_epochs, int split_cause) {
+int BulletVolley2D::disable_bullets_bulk(const std::vector<int> &indexes, int fx_trigger, const std::vector<uint64_t> *expected_epochs, int split_cause, bool only_split) {
 	// Same per-bullet contract as disable_bullet(i, true) (freeze, epoch
 	// bump, trail hidden, shape off, attachment released), but the render
 	// side is batched: the per-instance zero writes are collected into ONE
@@ -799,7 +799,8 @@ int BulletVolley2D::disable_bullets_bulk(const std::vector<int> &indexes, int fx
 	// length as indexes) skips bullets a handler took over in between.
 	// split_cause >= 0 records each bullet's split (pose and state intact)
 	// before its disable; a stage with fire_death_effects off silences that
-	// bullet's death effects.
+	// bullet's death effects. only_split keeps every bullet whose split was
+	// not recorded (the split IS the reason it leaves: timer, manual).
 	if (multi.is_null() || !multi.is_valid() || physics_server == nullptr || !area.is_valid()) {
 		return 0;
 	}
@@ -822,6 +823,9 @@ int BulletVolley2D::disable_bullets_bulk(const std::vector<int> &indexes, int fx
 			int split = 0;
 			if (split_cause >= 0 && split_config != nullptr && i < (int)all_cached_instance_transforms.size()) {
 				split = split_capture(i, split_cause, all_cached_instance_transforms[i]);
+			}
+			if (only_split && !(split & SPLIT_RECORDED)) {
+				continue;
 			}
 			const bool fx_have_pose = !(split & SPLIT_SILENCE_DEATH) && fx_trigger >= 0 && i < (int)all_cached_instance_transforms.size();
 			const Transform2D fx_pose = fx_have_pose ? all_cached_instance_transforms[i] : Transform2D();
@@ -953,6 +957,13 @@ bool BulletVolley2D::clear_bullet(int bullet_index) {
 	if (!all_bullets_enabled_set.contains(bullet_index)) {
 		return false;
 	}
+	// Refused by the re-entrancy latch (called from an attachment callback):
+	// disable_bullet reports it, and nothing is recorded for a bullet that
+	// does not die (no split, no On Clear sound or flash).
+	if (_bullet_enable_depth > 0) {
+		disable_bullet(bullet_index, true);
+		return false;
+	}
 	// Pose captured before the disable below (disable never moves the
 	// bullet, but the last-bullet disable releases the life and pools the
 	// instance; the DESTROY path fires the same way).
@@ -968,7 +979,13 @@ bool BulletVolley2D::clear_bullet(int bullet_index) {
 			sound_fire(BulletSoundData2D::SOUND_ON_CLEAR, bullet_index, fx_clear_transf.get_origin());
 		}
 	}
+	const uint64_t self_id = get_instance_id();
 	disable_bullet(bullet_index, true);
+	// The attachment callback inside ran user code: it may have freed this
+	// volley or the factory.
+	if (!survived_user_code(self_id)) {
+		return true;
+	}
 	if (fx_have_pose && !(split & SPLIT_SILENCE_DEATH)) {
 		fx_fire_oneshot(EFFECT_ON_CLEAR, bullet_index, fx_clear_transf);
 	}

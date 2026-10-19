@@ -254,6 +254,24 @@ func test_timer_splits_the_whole_volley_once() -> void:
 	assert_eq(splits.size(), 3, "children of a one-stage chain never split again")
 
 
+
+## The timer splits the bullets the stage lets split; a bullet that lost its
+## roll (chance) keeps flying instead of vanishing without a split.
+func test_timer_keeps_the_bullets_that_did_not_split() -> void:
+	var s := _stage(2)
+	s.split_on_lifetime_over = false
+	s.split_after_sec = 0.05
+	s.chance = 0.5
+	s.seed = 7
+	var v := _armed([s], 8, 50.0, 5.0)
+	for i in 6:
+		factory.debug_advance_time(DT)
+	var split_count := splits.size()
+	assert_between(split_count, 1, 7, "the seeded roll splits some and keeps some")
+	assert_eq(int(v.debug_get_volley_info()["active_bullets"]), 8 - split_count, "every bullet that did not split still flies")
+	for e in splits:
+		assert_eq(e[1], BulletVolley2D.SPLIT_CAUSE_TIMER, "timer cause")
+
 func test_clear_and_despawn_split_only_when_switched_on() -> void:
 	var s := _stage(2)
 	var v := _armed([s], 2, 0.0, 5.0)

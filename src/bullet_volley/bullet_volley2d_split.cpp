@@ -204,7 +204,9 @@ int BulletVolley2D::split_live_bullets(const std::vector<int> &indexes, int caus
 		}
 		return recorded;
 	}
-	disable_bullets_bulk(indexes, death_trigger, nullptr, cause);
+	// Only the bullets that split leave (a lost roll, a reached
+	// max_splits_per_bullet or a missing child data keeps the bullet).
+	disable_bullets_bulk(indexes, death_trigger, nullptr, cause, true);
 	return -1; // the caller counts through the factory (the batch may free things)
 }
 
