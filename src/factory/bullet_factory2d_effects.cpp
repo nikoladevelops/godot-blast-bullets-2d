@@ -41,7 +41,7 @@ static void fx_apply_slot_spin(BulletFactory2D::FXOneShotBake &bake, int slot_in
 		return;
 	}
 	BulletFactory2D::FXOneShotSlot &slot = bake.slots[slot_index];
-	if (!slot.active || slot.last_shard < 0 || slot.last_shard >= (int)bake.shards.size() || bake.shards[slot.last_shard] == nullptr) {
+	if (!slot.active || slot.last_shard < 0 || slot.last_shard >= (int)bake.shards.size() || bake.shards[slot.last_shard].ptr == nullptr) {
 		return;
 	}
 	if (!slot.fixed.is_finite()) {
@@ -83,7 +83,7 @@ static void fx_refresh_slot_color(BulletFactory2D::FXOneShotBake &bake, int slot
 		return;
 	}
 	BulletFactory2D::FXOneShotSlot &slot = bake.slots[slot_index];
-	if (!slot.active || slot.last_shard < 0 || slot.last_shard >= (int)bake.shards.size() || bake.shards[slot.last_shard] == nullptr) {
+	if (!slot.active || slot.last_shard < 0 || slot.last_shard >= (int)bake.shards.size() || bake.shards[slot.last_shard].ptr == nullptr) {
 		return;
 	}
 	Color tint(1, 1, 1, 1);
@@ -213,15 +213,19 @@ Ref<Texture2D> BulletFactory2D::get_whitened_frame(const Ref<Texture2D> &source)
 }
 
 void BulletFactory2D::fx_ensure_effects_container() {
-	if (sprite_effects_container != nullptr) {
+	if (sprite_effects_container.get() != nullptr) {
 		return;
 	}
-	sprite_effects_container = memnew(Node2D);
-	sprite_effects_container->set_name("SpriteEffectsContainer");
+	// First use, or a script freed the container (and the shards with it):
+	// make a new one. Bakes whose shards died stay invisible until they are
+	// registered again (their volley's next life); manual bakes rebuild.
+	Node2D *container = memnew(Node2D);
+	sprite_effects_container.set(container);
+	container->set_name("SpriteEffectsContainer");
 	// Same opt-out as the volley (bullet_volley2d.cpp): shards inherit this
 	// mode, and without the opt-out every one-shot instance write lerps.
-	sprite_effects_container->set_physics_interpolation_mode(Node::PHYSICS_INTERPOLATION_MODE_OFF);
-	add_child(sprite_effects_container);
+	container->set_physics_interpolation_mode(Node::PHYSICS_INTERPOLATION_MODE_OFF);
+	add_child(container);
 }
 
 // Frees one bake's shard nodes (zeroed first so this frame never renders
@@ -229,9 +233,9 @@ void BulletFactory2D::fx_ensure_effects_container() {
 // teardown and reseed paths share it.
 void BulletFactory2D::fx_erase_bake(FXOneShotBake &bake) {
 	for (size_t s = 0; s < bake.shards.size(); ++s) {
-		MultiMeshInstance2D *shard = bake.shards[s];
+		MultiMeshInstance2D *shard = bake.shards[s].get();
 		if (shard == nullptr) {
-			continue;
+			continue; // never made, or freed by a script
 		}
 		Ref<MultiMesh> mm = shard->get_multimesh();
 		if (mm.is_valid()) {
@@ -261,7 +265,7 @@ bool BulletFactory2D::fx_register_volley_bake(uint64_t volley_id, int layer_inde
 	}
 	fx_unregister_volley_bake(volley_id, layer_index);
 	fx_ensure_effects_container();
-	if (sprite_effects_container == nullptr) {
+	if (sprite_effects_container.get() == nullptr) {
 		UtilityFunctions::push_error("BulletFactory2D: sprite effects container missing, one-shot layer not registered.");
 		return false;
 	}
@@ -282,7 +286,7 @@ bool BulletFactory2D::fx_register_volley_bake(uint64_t volley_id, int layer_inde
 	const int ring = fx_ring_size_for_layer(layer, amount_bullets);
 	bake.slots.assign(ring, FXOneShotSlot());
 	for (size_t f = 0; f < frames.size(); ++f) {
-		MultiMeshInstance2D *shard = fx_create_shard(sprite_effects_container, frames[f], fx_quad_size_for_texture(frames[f]), layer->material, layer->self_modulate, layer->z_index, layer->z_as_relative, layer->visibility_layer, layer->light_mask, ring, true);
+		MultiMeshInstance2D *shard = fx_create_shard(sprite_effects_container.ptr, frames[f], fx_quad_size_for_texture(frames[f]), layer->material, layer->self_modulate, layer->z_index, layer->z_as_relative, layer->visibility_layer, layer->light_mask, ring, true);
 		bake.add_shard(shard);
 	}
 	fx_bakes.push_back(bake);
@@ -335,7 +339,7 @@ int BulletFactory2D::fx_fire_into_bake(FXOneShotBake &bake, const Transform2D &a
 	FXOneShotSlot &slot = bake.slots[bake.ring_cursor];
 	const int slot_index = bake.ring_cursor;
 	bake.ring_cursor = (bake.ring_cursor + 1) % (int)bake.slots.size();
-	if (slot.active && slot.last_shard >= 0 && slot.last_shard < (int)bake.shards.size() && bake.shards[slot.last_shard] != nullptr) {
+	if (slot.active && slot.last_shard >= 0 && slot.last_shard < (int)bake.shards.size() && bake.shards[slot.last_shard].ptr != nullptr) {
 		bake.shard_multimesh(slot.last_shard)->set_instance_transform_2d(slot_index, FX_HIDDEN_TRANSF);
 	} else if (!slot.active) {
 		++bake.active_count;
@@ -376,10 +380,10 @@ int BulletFactory2D::fx_fire_into_bake(FXOneShotBake &bake, const Transform2D &a
 		spun = spun.rotated_local(Math::fposmod(layer->spin_degrees_per_sec * Math::PI / 180.0 * slot.start_age, Math::TAU));
 	}
 	slot.last_angle = spun.is_finite() ? spun.get_rotation() : t.get_rotation();
-	if (frame >= 0 && frame < (int)bake.shards.size() && bake.shards[frame] != nullptr) {
+	if (frame >= 0 && frame < (int)bake.shards.size() && bake.shards[frame].ptr != nullptr) {
 		Transform2D local = spun;
-		if (sprite_effects_container != nullptr) {
-			const Transform2D node_global = sprite_effects_container->get_global_transform();
+		if (const Node2D *container = sprite_effects_container.get()) {
+			const Transform2D node_global = container->get_global_transform();
 			if (BulletVolley2D::is_transform_invertible_safe(node_global)) {
 				// MUST convert the SPUN pose, matching the aging path
 				// (fx_apply_slot_spin). Converting the unspun base here wrote a
@@ -391,7 +395,9 @@ int BulletFactory2D::fx_fire_into_bake(FXOneShotBake &bake, const Transform2D &a
 		}
 		if (local.get_origin().is_finite()) {
 			bake.shard_multimesh(frame)->set_instance_transform_2d(slot_index, local);
-			bake.shards[frame]->set_visible(true);
+			if (MultiMeshInstance2D *node = bake.shards[frame].get()) {
+				node->set_visible(true);
+			}
 			fx_refresh_slot_color(bake, slot_index, slot.start_age);
 		}
 	}
@@ -435,6 +441,7 @@ void BulletFactory2D::age_fx_bake(FXOneShotBake &bake) {
 	if (bake.active_count <= 0 || bake.slots.empty() || bake.shards.empty()) {
 		return;
 	}
+	Node2D *container = sprite_effects_container.get();
 	for (size_t s = 0; s < bake.slots.size(); ++s) {
 		FXOneShotSlot &slot = bake.slots[s];
 		if (!slot.active) {
@@ -449,7 +456,7 @@ void BulletFactory2D::age_fx_bake(FXOneShotBake &bake) {
 		}
 		const double age = slot.start_age + (fx_clock - slot.birth);
 		if (!Math::is_finite(age) || age >= slot.duration) {
-			if (slot.last_shard >= 0 && slot.last_shard < (int)bake.shards.size() && bake.shards[slot.last_shard] != nullptr) {
+			if (slot.last_shard >= 0 && slot.last_shard < (int)bake.shards.size() && bake.shards[slot.last_shard].ptr != nullptr) {
 				bake.shard_multimesh(slot.last_shard)->set_instance_transform_2d((int)s, FX_HIDDEN_TRANSF);
 			}
 			slot.active = false;
@@ -464,24 +471,26 @@ void BulletFactory2D::age_fx_bake(FXOneShotBake &bake) {
 			continue;
 		}
 		fx_refresh_slot_color(bake, (int)s, age);
-		fx_apply_slot_spin(bake, (int)s, age, sprite_effects_container);
+		fx_apply_slot_spin(bake, (int)s, age, container);
 		const int frame = fx_frame_for_age(bake.frame_starts, bake.total, age);
 		if (frame != slot.last_shard && frame >= 0 && frame < (int)bake.shards.size()) {
-			if (slot.last_shard >= 0 && slot.last_shard < (int)bake.shards.size() && bake.shards[slot.last_shard] != nullptr) {
+			if (slot.last_shard >= 0 && slot.last_shard < (int)bake.shards.size() && bake.shards[slot.last_shard].ptr != nullptr) {
 				bake.shard_multimesh(slot.last_shard)->set_instance_transform_2d((int)s, FX_HIDDEN_TRANSF);
 			}
 			slot.last_shard = frame;
-			if (bake.shards[frame] != nullptr) {
+			if (bake.shards[frame].ptr != nullptr) {
 				Transform2D local = slot.fixed;
-				if (sprite_effects_container != nullptr) {
-					const Transform2D node_global = sprite_effects_container->get_global_transform();
+				if (container != nullptr) {
+					const Transform2D node_global = container->get_global_transform();
 					if (BulletVolley2D::is_transform_invertible_safe(node_global)) {
 						local = node_global.affine_inverse() * slot.fixed;
 					}
 				}
 				if (local.get_origin().is_finite()) {
 					bake.shard_multimesh(frame)->set_instance_transform_2d((int)s, local);
-					bake.shards[frame]->set_visible(true);
+					if (MultiMeshInstance2D *node = bake.shards[frame].get()) {
+						node->set_visible(true);
+					}
 				}
 			}
 		}
@@ -494,8 +503,8 @@ void BulletFactory2D::age_fx_bake(FXOneShotBake &bake) {
 		}
 	}
 	for (size_t s = 0; s < bake.shards.size(); ++s) {
-		if (bake.shards[s] != nullptr) {
-			bake.shards[s]->set_visible(occupancy[s] > 0);
+		if (MultiMeshInstance2D *node = bake.shards[s].get()) {
+			node->set_visible(occupancy[s] > 0);
 		}
 	}
 }
@@ -522,8 +531,9 @@ int BulletFactory2D::spawn_layer_effect(const Ref<BulletEffectLayerData2D> &laye
 	}
 	for (size_t i = 0; i < fx_manual_bakes.size(); ++i) {
 		// Same resource, edited content: the stored generation trails the
-		// layer's, so drop the stale bake and rebuild below.
-		if (fx_manual_bakes[i].layer == layer && fx_manual_bakes[i].layer_version != layer->get_bake_version()) {
+		// layer's, so drop the stale bake and rebuild below. Same when a
+		// script freed its shards (or the whole effects container).
+		if (fx_manual_bakes[i].layer == layer && (fx_manual_bakes[i].layer_version != layer->get_bake_version() || fx_manual_bakes[i].any_shard_lost())) {
 			fx_erase_bake(fx_manual_bakes[i]);
 			fx_manual_bakes.erase(fx_manual_bakes.begin() + i);
 			break;
@@ -539,7 +549,7 @@ int BulletFactory2D::spawn_layer_effect(const Ref<BulletEffectLayerData2D> &laye
 		fx_manual_bakes.erase(fx_manual_bakes.begin());
 	}
 	fx_ensure_effects_container();
-	if (sprite_effects_container == nullptr) {
+	if (sprite_effects_container.get() == nullptr) {
 		UtilityFunctions::push_error("BulletFactory2D: sprite effects container missing, manual effect not spawned.");
 		return -1;
 	}
@@ -561,7 +571,7 @@ int BulletFactory2D::spawn_layer_effect(const Ref<BulletEffectLayerData2D> &laye
 	const int ring = fx_ring_size_for_layer(layer, 32);
 	bake.slots.assign(ring, FXOneShotSlot());
 	for (size_t f = 0; f < frames.size(); ++f) {
-		bake.add_shard(fx_create_shard(sprite_effects_container, frames[f], fx_quad_size_for_texture(frames[f]), layer->material, layer->self_modulate, layer->z_index, layer->z_as_relative, layer->visibility_layer, layer->light_mask, ring, true));
+		bake.add_shard(fx_create_shard(sprite_effects_container.ptr, frames[f], fx_quad_size_for_texture(frames[f]), layer->material, layer->self_modulate, layer->z_index, layer->z_as_relative, layer->visibility_layer, layer->light_mask, ring, true));
 	}
 	fx_manual_bakes.push_back(bake);
 	return fx_fire_into_bake(fx_manual_bakes[fx_manual_bakes.size() - 1], at);
@@ -577,15 +587,15 @@ void BulletFactory2D::clear_sprite_effects() {
 			bake.slots[s].last_shard = -1;
 		}
 		for (size_t s = 0; s < bake.shards.size(); ++s) {
-			if (bake.shards[s] != nullptr) {
-				Ref<MultiMesh> mm = bake.shards[s]->get_multimesh();
+			if (MultiMeshInstance2D *node = bake.shards[s].get()) {
+				Ref<MultiMesh> mm = node->get_multimesh();
 				if (mm.is_valid()) {
 					const Transform2D hidden = FX_HIDDEN_TRANSF;
 					for (int k = 0; k < mm->get_instance_count(); ++k) {
 						mm->set_instance_transform_2d(k, hidden);
 					}
 				}
-				bake.shards[s]->set_visible(false);
+				node->set_visible(false);
 			}
 		}
 		bake.active_count = 0;
@@ -634,7 +644,7 @@ Dictionary BulletFactory2D::debug_get_effect_state() const {
 	d["manual_active"] = manual_active;
 	d["manual_frames"] = manual_frames;
 	d["manual_bakes"] = (int)fx_manual_bakes.size();
-	d["container_valid"] = sprite_effects_container != nullptr;
+	d["container_valid"] = sprite_effects_container.get() != nullptr;
 	Array bakes;
 	for (size_t i = 0; i < fx_bakes.size(); ++i) {
 		const FXOneShotBake &bake = fx_bakes[i];
@@ -643,10 +653,11 @@ Dictionary BulletFactory2D::debug_get_effect_state() const {
 		e["layer"] = bake.layer_index;
 		e["active"] = bake.active_count;
 		e["slots"] = (int)bake.slots.size();
-		if (!bake.shards.empty() && bake.shards[0] != nullptr) {
-			e["z_index"] = bake.shards[0]->get_z_index();
-			e["visibility_layer"] = bake.shards[0]->get_visibility_layer();
-			e["light_mask"] = bake.shards[0]->get_light_mask();
+		const MultiMeshInstance2D *first = bake.shards.empty() ? nullptr : bake.shards[0].get();
+		if (first != nullptr) {
+			e["z_index"] = first->get_z_index();
+			e["visibility_layer"] = first->get_visibility_layer();
+			e["light_mask"] = first->get_light_mask();
 		}
 		int busy = 0;
 		std::vector<uint8_t> seen(bake.shards.size(), 0);

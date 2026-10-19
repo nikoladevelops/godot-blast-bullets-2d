@@ -287,7 +287,7 @@ _ALWAYS_INLINE_ void BulletVolley2D::write_trail_from_global(int bullet_index, c
 		}
 		if (bake.bullet_shard[bullet_index] != frame) {
 			const int prev = bake.bullet_shard[bullet_index];
-			if (prev >= 0 && prev < (int)bake.shards.size() && bake.shards[prev] != nullptr) {
+			if (prev >= 0 && prev < (int)bake.shards.size() && bake.shards[prev].ptr != nullptr) {
 				bake.shard_multimesh(prev)->set_instance_transform_2d(bullet_index, zero_transform);
 				// Leaving shard: hide it now when nobody else rides it
 				// (previously it stayed flagged visible until an
@@ -295,7 +295,9 @@ _ALWAYS_INLINE_ void BulletVolley2D::write_trail_from_global(int bullet_index, c
 				if (prev < (int)bake.shard_refcount.size() && bake.shard_refcount[prev] > 0) {
 					if (--bake.shard_refcount[prev] == 0 && prev < (int)bake.shard_visible.size()) {
 						bake.shard_visible[prev] = 0;
-						bake.shards[prev]->set_visible(false);
+						if (MultiMeshInstance2D *node = bake.shards[prev].get()) {
+							node->set_visible(false);
+						}
 					}
 				}
 			}
@@ -304,8 +306,9 @@ _ALWAYS_INLINE_ void BulletVolley2D::write_trail_from_global(int bullet_index, c
 				++bake.shard_refcount[frame];
 			}
 		}
-		MultiMeshInstance2D *shard = bake.shards[frame];
-		if (shard == nullptr) {
+		// Existence only (a pointer compare): the writes below go through
+		// the cached MultiMesh Ref, which outlives a freed shard node.
+		if (bake.shards[frame].ptr == nullptr) {
 			continue;
 		}
 		bake.shard_multimesh(frame)->set_instance_transform_2d(bullet_index, local);
@@ -347,7 +350,9 @@ _ALWAYS_INLINE_ void BulletVolley2D::write_trail_from_global(int bullet_index, c
 			if (frame < (int)bake.shard_visible.size()) {
 				bake.shard_visible[frame] = 1;
 			}
-			shard->set_visible(true);
+			if (MultiMeshInstance2D *node = bake.shards[frame].get()) {
+				node->set_visible(true);
+			}
 		}
 	}
 }
@@ -361,7 +366,7 @@ _ALWAYS_INLINE_ void BulletVolley2D::hide_trail_instances(int bullet_index) {
 			continue;
 		}
 		const int prev = bake.bullet_shard[bullet_index];
-		if (prev >= 0 && prev < (int)bake.shards.size() && bake.shards[prev] != nullptr) {
+		if (prev >= 0 && prev < (int)bake.shards.size() && bake.shards[prev].ptr != nullptr) {
 			bake.shard_multimesh(prev)->set_instance_transform_2d(bullet_index, zero_transform);
 		}
 		bake.bullet_shard[bullet_index] = -1;
@@ -370,8 +375,10 @@ _ALWAYS_INLINE_ void BulletVolley2D::hide_trail_instances(int bullet_index) {
 		if (prev >= 0 && prev < (int)bake.shard_refcount.size() && bake.shard_refcount[prev] > 0) {
 			if (--bake.shard_refcount[prev] == 0 && prev < (int)bake.shard_visible.size()) {
 				bake.shard_visible[prev] = 0;
-				if (prev < (int)bake.shards.size() && bake.shards[prev] != nullptr) {
-					bake.shards[prev]->set_visible(false);
+				if (prev < (int)bake.shards.size() && bake.shards[prev].ptr != nullptr) {
+					if (MultiMeshInstance2D *node = bake.shards[prev].get()) {
+						node->set_visible(false);
+					}
 				}
 			}
 		}
@@ -774,7 +781,10 @@ _ALWAYS_INLINE_ bool BulletVolley2D::attach_bullet_attachment_internal(int bulle
 		// Joins the tree even when the callback freed this volley: its
 		// teardown already pooled (or queue_freed) the node.
 		if (instance_alive && !attachment_instance->is_inside_tree()) {
-			factory->bullet_attachments_container->add_child(attachment_instance);
+			factory->heal_owned_children(); // a script may have freed the container
+			if (Node *container = factory->bullet_attachments_container.get()) {
+				container->add_child(attachment_instance);
+			}
 		}
 	} else {
 		attachment_instance->call_on_bullet_enable(); // Call GDScript custom virtual method so that it gets enabled properly

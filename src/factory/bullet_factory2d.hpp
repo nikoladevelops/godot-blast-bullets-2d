@@ -20,6 +20,7 @@
 #include "core/collision_shape_helper2d.hpp"
 #include "core/dynamic_sparse_set.hpp"
 #include "core/graze_targets2d.hpp"
+#include "core/owned_node2d.hpp"
 #include "data/bullet_effect_layer_data2d.hpp"
 #include "data/bullet_pickup_data2d.hpp"
 #include "data/bullet_volley_data2d.hpp"
@@ -242,8 +243,10 @@ public:
 	// Holds all disabled BulletAttachment2D
 	BulletAttachmentObjectPool2D bullet_attachments_pool;
 
-	// Contains all BulletAttachment2D in the scene tree
-	Node *bullet_attachments_container = nullptr;
+	// Contains all BulletAttachment2D in the scene tree. Like every helper
+	// child below, an ordinary node a script may free: read through get()
+	// (heal_owned_children() recreates it).
+	OwnedNode2D<Node> bullet_attachments_container;
 
 	//
 
@@ -294,7 +297,8 @@ public:
 		// Rebuilt wherever secs is assigned; cleared with it.
 		std::vector<double> frame_starts;
 		double total = 0.0;
-		std::vector<MultiMeshInstance2D *> shards;
+		// Ordinary children a script may free: read through get().
+		std::vector<OwnedNode2D<MultiMeshInstance2D>> shards;
 		// Parallel to shards: each shard's MultiMesh, cached so the per-slot
 		// writes every frame skip a get_multimesh() engine call and the
 		// Ref reference()/unreference() pair that comes with it.
@@ -303,6 +307,15 @@ public:
 		int ring_cursor = 0;
 		int active_count = 0;
 
+		// A shard node a script freed (cold paths only: one ObjectDB lookup each).
+		bool any_shard_lost() const {
+			for (const OwnedNode2D<MultiMeshInstance2D> &shard : shards) {
+				if (shard.lost()) {
+					return true;
+				}
+			}
+			return false;
+		}
 		// Appends a shard and caches its MultiMesh.
 		void add_shard(MultiMeshInstance2D *shard) {
 			shards.push_back(shard);
@@ -314,7 +327,11 @@ public:
 			if (shard_index >= 0 && shard_index < (int)shard_multimeshes.size() && shard_multimeshes[shard_index].is_valid()) {
 				return shard_multimeshes[shard_index].ptr();
 			}
-			const Ref<MultiMesh> owned_by_node = shards[shard_index]->get_multimesh();
+			MultiMeshInstance2D *node = shards[shard_index].get();
+			if (node == nullptr) {
+				return nullptr;
+			}
+			const Ref<MultiMesh> owned_by_node = node->get_multimesh();
 			return owned_by_node.ptr();
 		}
 	};
@@ -372,7 +389,7 @@ public:
 	void clear_whitened_frame_cache() { whitened_frame_cache.clear(); }
 
 	// Contains all one-shot effect shard nodes in the scene tree.
-	Node2D *sprite_effects_container = nullptr;
+	OwnedNode2D<Node2D> sprite_effects_container;
 
 	// Shared shard helpers (volleys reuse these for trail shards): per-frame
 	// node owning one baked texture, sized from that texture. with_colors
@@ -978,7 +995,7 @@ private:
 	VolleyPool volley_pool;
 
 	// Parent node of every volley in the scene tree.
-	Node *volley_container = nullptr;
+	OwnedNode2D<Node> volley_container;
 
 	// DEBUGGER RELATED
 
@@ -988,8 +1005,18 @@ private:
 	void set_is_debugger_enabled(bool new_is_enabled);
 
 	// Draws the collision shapes of every volley when enabled.
-	BulletVolleyDebugger2D *volley_debugger = nullptr;
+	OwnedNode2D<BulletVolleyDebugger2D> volley_debugger;
+	// Pushes the cached debugger settings (always current) to a debugger.
+	void apply_debugger_settings(BulletVolleyDebugger2D &debugger) const;
 
+public:
+	// Recreates the helper children (volley and attachment containers, the
+	// debugger) a script freed; the debugger follows a new volley container.
+	// No-op before ready and during teardown. Cheap when nothing is lost
+	// (three ObjectDB lookups).
+	void heal_owned_children();
+
+private:
 	// The color of the debug collision shapes.
 	Color debugger_color_cached_before_ready = Color(0, 0, 1, 0.8);
 	Color get_debugger_color() const;

@@ -27,7 +27,7 @@ void BulletVolleyDebugger2D::configure(Node *new_container_to_debug, const Strin
 		disable();
 	}
 	physics_server = PhysicsServer2D::get_singleton();
-	container_to_debug = new_container_to_debug;
+	container_to_debug.set(new_container_to_debug);
 	debugger_color = new_debugger_color;
 
 	this->set_physics_interpolation_mode(Node::PHYSICS_INTERPOLATION_MODE_OFF); // We have custom physics interpolation logic, so disable the Godot one that comes from Godot 4.5
@@ -75,12 +75,13 @@ bool BulletVolleyDebugger2D::enable() {
 	if (is_debugger_enabled) {
 		return true;
 	}
-	if (container_to_debug == nullptr) {
+	Node *container = container_to_debug.get();
+	if (container == nullptr) {
 		UtilityFunctions::push_error("BulletVolleyDebugger2D::enable with no container, call configure() first.");
 		return false;
 	}
 	// In case the container to debug already has things to debug
-	TypedArray<Node> already_spawned_debugger_data_providers = container_to_debug->get_children();
+	TypedArray<Node> already_spawned_debugger_data_providers = container->get_children();
 	int amount_already_spawned = already_spawned_debugger_data_providers.size();
 
 	if (amount_already_spawned > 0) {
@@ -97,17 +98,17 @@ bool BulletVolleyDebugger2D::enable() {
 	}
 
 	// Add a function that runs whenever a new child gets added to the container to debug / when the child_entered_tree signal gets emitted
-	if (container_to_debug) {
+	{
 		Callable cb = callable_mp(this, &BulletVolleyDebugger2D::generate_debug_multimesh);
-		if (!container_to_debug->is_connected("child_entered_tree", cb)) {
-			container_to_debug->connect("child_entered_tree", cb);
+		if (!container->is_connected("child_entered_tree", cb)) {
+			container->connect("child_entered_tree", cb);
 		}
 		// Track exits too: a multimesh freed/reparented by the user while debugging
 		// must drop its entry here, otherwise the raw provider pointer dangles and
 		// _physics_process dereferences freed memory every tick.
 		Callable cb_exit = callable_mp(this, &BulletVolleyDebugger2D::remove_debug_multimesh_for_node);
-		if (!container_to_debug->is_connected("child_exiting_tree", cb_exit)) {
-			container_to_debug->connect("child_exiting_tree", cb_exit);
+		if (!container->is_connected("child_exiting_tree", cb_exit)) {
+			container->connect("child_exiting_tree", cb_exit);
 		}
 	}
 
@@ -120,24 +121,24 @@ void BulletVolleyDebugger2D::disable() {
 	set_physics_process(false);
 	is_debugger_enabled = false;
 
-	// Disconnect the enter/exit handlers
-	if (container_to_debug) {
+	// Disconnect the enter/exit handlers (a freed container took them along)
+	if (Node *container = container_to_debug.get()) {
 		Callable cb = callable_mp(this, &BulletVolleyDebugger2D::generate_debug_multimesh);
-		if (container_to_debug->is_connected("child_entered_tree", cb)) {
-			container_to_debug->disconnect("child_entered_tree", cb);
+		if (container->is_connected("child_entered_tree", cb)) {
+			container->disconnect("child_entered_tree", cb);
 		}
 		Callable cb_exit = callable_mp(this, &BulletVolleyDebugger2D::remove_debug_multimesh_for_node);
-		if (container_to_debug->is_connected("child_exiting_tree", cb_exit)) {
-			container_to_debug->disconnect("child_exiting_tree", cb_exit);
+		if (container->is_connected("child_exiting_tree", cb_exit)) {
+			container->disconnect("child_exiting_tree", cb_exit);
 		}
 	}
 
-	for (int i = 0; i < debugger_multimeshes.size(); ++i) {
-		if (debugger_multimeshes[i] != nullptr) {
-			if (debugger_multimeshes[i]->get_parent() != nullptr) {
-				debugger_multimeshes[i]->get_parent()->remove_child(debugger_multimeshes[i]);
+	for (size_t i = 0; i < debugger_multimeshes.size(); ++i) {
+		if (MultiMeshInstance2D *mesh = debugger_multimeshes[i].get()) {
+			if (mesh->get_parent() != nullptr) {
+				mesh->get_parent()->remove_child(mesh);
 			}
-			memdelete(debugger_multimeshes[i]);
+			memdelete(mesh);
 		}
 	}
 
@@ -162,36 +163,41 @@ void BulletVolleyDebugger2D::remove_debug_multimesh_for_node(Node *node_exiting_
 	}
 
 	for (int i = (int)debug_data_providers.size() - 1; i >= 0; --i) {
-		if (debug_data_providers[i] != exiting_provider) {
-			continue;
+		if (debug_data_providers[i] == exiting_provider) {
+			erase_debug_entry(i);
 		}
-		// Free this entry's debug mesh and erase it from all four parallel arrays.
-		// Order-preserving erase keeps every array aligned at the same index.
-		if (i < (int)debugger_multimeshes.size() && debugger_multimeshes[i] != nullptr) {
-			if (debugger_multimeshes[i]->get_parent() != nullptr) {
-				debugger_multimeshes[i]->get_parent()->remove_child(debugger_multimeshes[i]);
+	}
+}
+
+void BulletVolleyDebugger2D::erase_debug_entry(int i) {
+	// Free this entry's debug mesh and erase it from every parallel array.
+	// Order-preserving erase keeps every array aligned at the same index.
+	if (i < (int)debugger_multimeshes.size()) {
+		if (MultiMeshInstance2D *mesh = debugger_multimeshes[i].get()) {
+			if (mesh->get_parent() != nullptr) {
+				mesh->get_parent()->remove_child(mesh);
 			}
-			memdelete(debugger_multimeshes[i]);
+			memdelete(mesh);
 		}
-		debug_data_providers.erase(debug_data_providers.begin() + i);
-		if (i < (int)debug_data_provider_ids.size()) {
-			debug_data_provider_ids.erase(debug_data_provider_ids.begin() + i);
-		}
-		if (i < (int)debug_data_provider_nodes.size()) {
-			debug_data_provider_nodes.erase(debug_data_provider_nodes.begin() + i);
-		}
-		if (i < (int)debugger_multimeshes.size()) {
-			debugger_multimeshes.erase(debugger_multimeshes.begin() + i);
-		}
-		if (i < (int)debugger_mesh_types.size()) {
-			debugger_mesh_types.erase(debugger_mesh_types.begin() + i);
-		}
-		if (i < (int)debugger_mesh_sizes.size()) {
-			debugger_mesh_sizes.erase(debugger_mesh_sizes.begin() + i);
-		}
-		if (i < (int)debugger_last_active_states.size()) {
-			debugger_last_active_states.erase(debugger_last_active_states.begin() + i);
-		}
+	}
+	debug_data_providers.erase(debug_data_providers.begin() + i);
+	if (i < (int)debug_data_provider_ids.size()) {
+		debug_data_provider_ids.erase(debug_data_provider_ids.begin() + i);
+	}
+	if (i < (int)debug_data_provider_nodes.size()) {
+		debug_data_provider_nodes.erase(debug_data_provider_nodes.begin() + i);
+	}
+	if (i < (int)debugger_multimeshes.size()) {
+		debugger_multimeshes.erase(debugger_multimeshes.begin() + i);
+	}
+	if (i < (int)debugger_mesh_types.size()) {
+		debugger_mesh_types.erase(debugger_mesh_types.begin() + i);
+	}
+	if (i < (int)debugger_mesh_sizes.size()) {
+		debugger_mesh_sizes.erase(debugger_mesh_sizes.begin() + i);
+	}
+	if (i < (int)debugger_last_active_states.size()) {
+		debugger_last_active_states.erase(debugger_last_active_states.begin() + i);
 	}
 }
 
@@ -439,10 +445,11 @@ void BulletVolleyDebugger2D::change_debug_multimeshes_color(const Color &new_mul
 
 	// For each debug multimesh
 	for (int i = 0; i < amount_debug_multimeshes; ++i) {
-		if (debugger_multimeshes[i] == nullptr) {
+		MultiMeshInstance2D *mesh = debugger_multimeshes[i].get();
+		if (mesh == nullptr) {
 			continue;
 		}
-		Ref<MultiMesh> multi = debugger_multimeshes[i]->get_multimesh();
+		Ref<MultiMesh> multi = mesh->get_multimesh();
 		if (!multi.is_valid()) {
 			continue;
 		}
@@ -472,13 +479,21 @@ void BulletVolleyDebugger2D::_physics_process(double delta) {
 		return;
 	}
 	int drawn_providers = 0;
+	lost_entries_scratch.clear();
 	for (int i = 0; i < (int)debug_data_providers.size(); ++i) {
 		BulletVolley2D *provider = debug_data_providers[i];
 
-		if (debugger_multimeshes[i] == nullptr || debugger_multimeshes[i]->is_queued_for_deletion()) {
+		// The debug node is an ordinary child: a script may have freed it or
+		// cleared its multimesh. Rebuilt after the loop, never touched here.
+		MultiMeshInstance2D *mesh = debugger_multimeshes[i].get();
+		if (mesh == nullptr || !mesh->get_multimesh().is_valid()) {
+			lost_entries_scratch.push_back(i);
 			continue;
 		}
-		MultiMeshInstance2D &mesh_instance = *debugger_multimeshes[i];
+		if (mesh->is_queued_for_deletion()) {
+			continue;
+		}
+		MultiMeshInstance2D &mesh_instance = *mesh;
 
 		// Providers are raw pointers: the multimesh may be freed while pooled
 		// or during factory teardown (parent PREDELETE lands before children).
@@ -536,6 +551,17 @@ void BulletVolleyDebugger2D::_physics_process(double delta) {
 		if (provider_active || debugger_last_active_states[i]) {
 			update_debug_multimesh_transforms_to_match_data_provider_collision_shape_transforms(mesh_instance, *provider);
 			debugger_last_active_states[i] = provider_active;
+		}
+	}
+	// Lost debug nodes: drop the entry and draw the provider again when it
+	// still lives (back to front: erasing keeps the earlier indexes valid).
+	for (int k = (int)lost_entries_scratch.size() - 1; k >= 0; --k) {
+		const int i = lost_entries_scratch[k];
+		Node *live = Object::cast_to<Node>(ObjectDB::get_instance(ObjectID(debug_data_provider_ids[i])));
+		const bool provider_alive = live != nullptr && live == debug_data_provider_nodes[i] && !live->is_queued_for_deletion();
+		erase_debug_entry(i);
+		if (provider_alive) {
+			generate_debug_multimesh(live);
 		}
 	}
 }

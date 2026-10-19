@@ -7,6 +7,7 @@
 #include "core/cached_string_names2d.hpp"
 #include "core/collision_shape_helper2d.hpp"
 #include "core/dynamic_sparse_set.hpp"
+#include "core/owned_node2d.hpp"
 #include "core/reentrancy_guard2d.hpp"
 #include "core/transform_math2d.hpp"
 #include "core/variant_enum_cast2d.hpp"
@@ -714,7 +715,8 @@ public:
 		// Rebuilt wherever secs is assigned.
 		std::vector<double> frame_starts;
 		double total = 0.0;
-		std::vector<MultiMeshInstance2D *> shards;
+		// Ordinary children a script may free: read through get().
+		std::vector<OwnedNode2D<MultiMeshInstance2D>> shards;
 		// Parallel to shards: each shard's MultiMesh, cached so the per-bullet
 		// trail writes skip a get_multimesh() extension call (and Ref churn).
 		std::vector<Ref<MultiMesh>> shard_multimeshes;
@@ -745,7 +747,11 @@ public:
 			if (shard_index >= 0 && shard_index < (int)shard_multimeshes.size() && shard_multimeshes[shard_index].is_valid()) {
 				return shard_multimeshes[shard_index].ptr();
 			}
-			const Ref<MultiMesh> owned_by_node = shards[shard_index]->get_multimesh();
+			MultiMeshInstance2D *node = shards[shard_index].get();
+			if (node == nullptr) {
+				return nullptr;
+			}
+			const Ref<MultiMesh> owned_by_node = node->get_multimesh();
 			return owned_by_node.ptr();
 		}
 	};

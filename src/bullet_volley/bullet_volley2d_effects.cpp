@@ -84,9 +84,9 @@ void BulletVolley2D::fx_rebuild_trail_layers(const TypedArray<BulletEffectLayerD
 void BulletVolley2D::fx_clear_trail_layers() {
 	for (size_t b = 0; b < fx_trail_bakes.size(); ++b) {
 		for (size_t s = 0; s < fx_trail_bakes[b].shards.size(); ++s) {
-			MultiMeshInstance2D *shard = fx_trail_bakes[b].shards[s];
+			MultiMeshInstance2D *shard = fx_trail_bakes[b].shards[s].get();
 			if (shard == nullptr) {
-				continue;
+				continue; // never made, or freed by a script
 			}
 			// Zero first: a queued-free node still renders this frame.
 			Ref<MultiMesh> mm = shard->get_multimesh();
@@ -124,9 +124,10 @@ bool BulletVolley2D::fx_layers_match_seeded(const TypedArray<BulletEffectLayerDa
 		if (bake.layer.is_null() || bake.shards.empty() || bake.animation_override) {
 			return false;
 		}
-		for (MultiMeshInstance2D *shard : bake.shards) {
+		for (const OwnedNode2D<MultiMeshInstance2D> &handle : bake.shards) {
+			const MultiMeshInstance2D *shard = handle.get();
 			if (shard == nullptr || shard->is_queued_for_deletion()) {
-				return false;
+				return false; // freed by a script: rebuild
 			}
 		}
 		if ((int)bake.bullet_shard.size() != amount_bullets) {
@@ -140,13 +141,14 @@ void BulletVolley2D::fx_soft_reset_trail_layers() {
 	for (FXTrailBake &bake : fx_trail_bakes) {
 		for (int i = 0; i < (int)bake.bullet_shard.size(); ++i) {
 			const int shard_index = bake.bullet_shard[i];
-			if (shard_index >= 0 && shard_index < (int)bake.shards.size() && bake.shards[shard_index] != nullptr) {
+			if (shard_index >= 0 && shard_index < (int)bake.shards.size() && bake.shards[shard_index].ptr != nullptr) {
 				bake.shard_multimesh(shard_index)->set_instance_transform_2d(i, zero_transform);
 			}
 		}
 		for (size_t s = 0; s < bake.shards.size(); ++s) {
-			if (bake.shards[s] != nullptr && s < bake.shard_visible.size() && bake.shard_visible[s]) {
-				bake.shards[s]->set_visible(false);
+			MultiMeshInstance2D *node = bake.shards[s].get();
+			if (node != nullptr && s < bake.shard_visible.size() && bake.shard_visible[s]) {
+				node->set_visible(false);
 			}
 		}
 		bake.shard_visible.assign(bake.shards.size(), 0);
@@ -318,15 +320,15 @@ bool BulletVolley2D::play_effect_animation(int layer_index, const StringName &an
 			return false;
 		}
 		for (size_t s = 0; s < bake.shards.size(); ++s) {
-			if (bake.shards[s] != nullptr) {
+			if (MultiMeshInstance2D *shard = bake.shards[s].get()) {
 				// Zero first: a queued-free node still renders this frame.
-				Ref<MultiMesh> mm = bake.shards[s]->get_multimesh();
+				Ref<MultiMesh> mm = shard->get_multimesh();
 				if (mm.is_valid()) {
 					for (int i = 0; i < mm->get_instance_count(); ++i) {
 						mm->set_instance_transform_2d(i, zero_transform);
 					}
 				}
-				bake.shards[s]->queue_free();
+				shard->queue_free();
 			}
 		}
 		bake.shards.clear();

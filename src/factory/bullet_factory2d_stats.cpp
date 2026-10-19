@@ -402,53 +402,47 @@ Dictionary BulletFactory2D::debug_assert_no_dangling() {
 	return d;
 }
 
+// The cached values are always current (written before the debugger), so a
+// debugger recreated after a script freed it gets the latest settings. A live
+// debugger is read through its id: never during teardown, never freed.
 Color BulletFactory2D::get_debugger_color() const {
-	if (!is_ready) {
-		return debugger_color_cached_before_ready;
-	}
-
-	return volley_debugger->get_debugger_color();
+	const BulletVolleyDebugger2D *debugger = is_ready && !is_tearing_down ? volley_debugger.get() : nullptr;
+	return debugger != nullptr ? debugger->get_debugger_color() : debugger_color_cached_before_ready;
 }
 
 void BulletFactory2D::set_debugger_color(const Color &new_color) {
-	if (!is_ready) {
-		debugger_color_cached_before_ready = new_color;
+	debugger_color_cached_before_ready = new_color;
+	if (!is_ready || is_tearing_down) {
 		return;
 	}
-
-	volley_debugger->set_debugger_color(new_color);
+	heal_owned_children();
+	if (BulletVolleyDebugger2D *debugger = volley_debugger.get()) {
+		debugger->set_debugger_color(new_color);
+	}
 }
 
 bool BulletFactory2D::get_is_debugger_enabled() const {
 	if (!is_ready || is_tearing_down) {
 		return is_debugger_enabled_cached_before_ready;
 	}
-
-	if (volley_debugger == nullptr) {
-		return false;
-	}
-
-	return volley_debugger->get_is_debugger_enabled();
+	const BulletVolleyDebugger2D *debugger = volley_debugger.get();
+	return debugger != nullptr ? debugger->get_is_debugger_enabled() : is_debugger_enabled_cached_before_ready;
 }
 
 void BulletFactory2D::set_is_debugger_enabled(bool new_is_enabled) {
+	is_debugger_enabled_cached_before_ready = new_is_enabled;
 	if (!is_ready || is_tearing_down) {
-		is_debugger_enabled_cached_before_ready = new_is_enabled;
 		return;
 	}
-
-	if (volley_debugger == nullptr) {
-		return;
+	heal_owned_children();
+	if (BulletVolleyDebugger2D *debugger = volley_debugger.get()) {
+		debugger->set_is_debugger_enabled(new_is_enabled);
 	}
-
-	volley_debugger->set_is_debugger_enabled(new_is_enabled);
 }
 
 int BulletFactory2D::get_debugger_max_providers() const {
-	if (!is_ready || volley_debugger == nullptr) {
-		return debugger_max_providers_cached_before_ready;
-	}
-	return volley_debugger->get_max_debug_providers();
+	const BulletVolleyDebugger2D *debugger = is_ready && !is_tearing_down ? volley_debugger.get() : nullptr;
+	return debugger != nullptr ? debugger->get_max_debug_providers() : debugger_max_providers_cached_before_ready;
 }
 
 void BulletFactory2D::set_debugger_max_providers(int v) {
@@ -457,16 +451,15 @@ void BulletFactory2D::set_debugger_max_providers(int v) {
 	if (!is_ready || is_tearing_down) {
 		return;
 	}
-	if (volley_debugger != nullptr) {
-		volley_debugger->set_max_debug_providers(clamped);
+	heal_owned_children();
+	if (BulletVolleyDebugger2D *debugger = volley_debugger.get()) {
+		debugger->set_max_debug_providers(clamped);
 	}
 }
 
 bool BulletFactory2D::get_debugger_draw_inactive() const {
-	if (!is_ready || volley_debugger == nullptr) {
-		return debugger_draw_inactive_cached_before_ready;
-	}
-	return volley_debugger->get_draw_inactive_shapes();
+	const BulletVolleyDebugger2D *debugger = is_ready && !is_tearing_down ? volley_debugger.get() : nullptr;
+	return debugger != nullptr ? debugger->get_draw_inactive_shapes() : debugger_draw_inactive_cached_before_ready;
 }
 
 void BulletFactory2D::set_debugger_draw_inactive(bool v) {
@@ -474,8 +467,9 @@ void BulletFactory2D::set_debugger_draw_inactive(bool v) {
 	if (!is_ready || is_tearing_down) {
 		return;
 	}
-	if (volley_debugger != nullptr) {
-		volley_debugger->set_draw_inactive_shapes(v);
+	heal_owned_children();
+	if (BulletVolleyDebugger2D *debugger = volley_debugger.get()) {
+		debugger->set_draw_inactive_shapes(v);
 	}
 }
 
@@ -507,10 +501,11 @@ Dictionary BulletFactory2D::debug_get_bullets_pool_info() {
 }
 
 int BulletFactory2D::debug_get_total_attachments_amount() {
-	if (bullet_attachments_container == nullptr) {
+	const Node *container = bullet_attachments_container.get();
+	if (container == nullptr) {
 		return 0;
 	}
-	return bullet_attachments_container->get_child_count();
+	return container->get_child_count();
 }
 
 int BulletFactory2D::debug_get_active_attachments_amount() {

@@ -155,10 +155,14 @@ bool BulletFactory2D::validate_spawn_request(const char *caller_name, const Ref<
 void BulletFactory2D::populate_pool_bucket(const PoolKey &key, const Ref<BulletVolleyData2D> &spawn_data, int instance_count) {
 	all_volleys.reserve(all_volleys.size() + instance_count);
 	for (int i = 0; i < instance_count; ++i) {
+		heal_owned_children(); // a script may have freed the container (an earlier callback too)
+		if (volley_container.get() == nullptr) {
+			return;
+		}
 		BulletVolley2D *volley = memnew(BulletVolley2D);
 		// The index is claimed now so a later pop() + activate_data() reuses a
 		// stable slot. Disabled volleys stay out of volley_set's dense list.
-		volley->spawn(*spawn_data.ptr(), &volley_pool, this, volley_container, Vector2(0, 0), (int)all_volleys.size(), true);
+		volley->spawn(*spawn_data.ptr(), &volley_pool, this, volley_container.get(), Vector2(0, 0), (int)all_volleys.size(), true);
 #ifdef DEV_ENABLED
 		ERR_FAIL_COND(!(volley->get_pool_key() == key));
 #else
@@ -177,6 +181,12 @@ BulletVolley2D *BulletFactory2D::spawn_volley_internal(const Ref<BulletVolleyDat
 	const PhysicsServer2D::ShapeType shape_type = CollisionShapeHelper2D::get_effective_type(spawn_data->collision_shape, false);
 	const int bullet_count = transforms_ptr != nullptr ? transforms_count : (int)spawn_data->transforms.size();
 	const PoolKey key{ bullet_count, shape_type };
+	// A script may have freed the volley container (or the others).
+	heal_owned_children();
+	if (volley_container.get() == nullptr) {
+		UtilityFunctions::push_error("spawn_volley: BulletFactory2D has no volley container (not ready or being freed). Ignoring the request.");
+		return nullptr;
+	}
 
 	// The attachment callbacks of a spawn are user code: they may free the
 	// volley being set up, or this factory (then nothing is returned).
@@ -246,7 +256,7 @@ BulletVolley2D *BulletFactory2D::spawn_volley_internal(const Ref<BulletVolleyDat
 	volley->spawn_transforms_ptr = transforms_ptr;
 	volley->spawn_transforms_count = bullet_count;
 	const uint64_t fresh_volley_id = volley->get_instance_id();
-	volley->spawn(*spawn_data.ptr(), &volley_pool, this, volley_container, new_inherited_velocity_offset, (int)all_volleys.size(), false, spawner_id);
+	volley->spawn(*spawn_data.ptr(), &volley_pool, this, volley_container.get(), new_inherited_velocity_offset, (int)all_volleys.size(), false, spawner_id);
 	if (watch.died()) {
 		return nullptr;
 	}
@@ -353,7 +363,8 @@ void BulletFactory2D::populate_attachments_pool(const Ref<PackedScene> attachmen
 		return;
 	}
 
-	if (bullet_attachments_container == nullptr) {
+	heal_owned_children();
+	if (bullet_attachments_container.get() == nullptr) {
 		UtilityFunctions::push_error("populate_attachments_pool: factory is not ready yet (no attachments container).");
 		return;
 	}
@@ -417,7 +428,16 @@ void BulletFactory2D::populate_attachments_pool(const Ref<PackedScene> attachmen
 		if (!a_alive) {
 			return true; // it freed itself: nothing to pool
 		}
-		bullet_attachments_container->add_child(a);
+		Node *container = bullet_attachments_container.get();
+		if (container == nullptr) {
+			heal_owned_children(); // the callback above freed it
+			container = bullet_attachments_container.get();
+		}
+		if (container == nullptr) {
+			a->queue_free(); // teardown: nothing can own it
+			return false;
+		}
+		container->add_child(a);
 		bullet_attachments_pool.push(a, key);
 		return true;
 	};

@@ -296,13 +296,14 @@ Dictionary BulletVolley2D::debug_get_effect_layers_info() const {
 		e["layer_index"] = bake.layer_index;
 		e["frames"] = (int)bake.frames.size();
 		e["shards"] = (int)bake.shards.size();
-		if (!bake.shards.empty() && bake.shards[0] != nullptr) {
-			e["z_index"] = bake.shards[0]->get_z_index();
-			e["z_as_relative"] = bake.shards[0]->is_z_relative();
-			e["modulate"] = bake.shards[0]->get_modulate();
-			e["shard_texture_valid"] = bake.shards[0]->get_texture().is_valid();
-			e["visibility_layer"] = bake.shards[0]->get_visibility_layer();
-			e["light_mask"] = bake.shards[0]->get_light_mask();
+		const MultiMeshInstance2D *first = bake.shards.empty() ? nullptr : bake.shards[0].get();
+		if (first != nullptr) {
+			e["z_index"] = first->get_z_index();
+			e["z_as_relative"] = first->is_z_relative();
+			e["modulate"] = first->get_modulate();
+			e["shard_texture_valid"] = first->get_texture().is_valid();
+			e["visibility_layer"] = first->get_visibility_layer();
+			e["light_mask"] = first->get_light_mask();
 		}
 		int shown = 0;
 		for (size_t s = 0; s < bake.shard_visible.size(); ++s) {
@@ -349,7 +350,7 @@ Transform2D BulletVolley2D::debug_get_trail_transform(int layer_index, int bulle
 			return Transform2D();
 		}
 		const int frame = bake.bullet_shard[bullet_index];
-		if (frame < 0 || frame >= (int)bake.shards.size() || bake.shards[frame] == nullptr) {
+		if (frame < 0 || frame >= (int)bake.shards.size() || bake.shards[frame].ptr == nullptr) {
 			return Transform2D();
 		}
 		if (bullet_index < 0 || bullet_index >= (int)bake.bullet_trail_transf.size()) {

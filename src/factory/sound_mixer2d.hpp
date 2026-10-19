@@ -129,7 +129,9 @@ private:
 		uint64_t camera_id = 0;
 	};
 	struct Voice {
+		// An ordinary child a script may free: read through live_player().
 		AudioStreamPlayer2D *player = nullptr;
+		uint64_t player_id = 0;
 		bool busy = false;
 		uint64_t sound_id = 0;
 		int priority = 0;
@@ -226,10 +228,24 @@ private:
 	static double voice_fade_len(uint64_t sound_id);
 	static bool voice_begin_fade(Voice &voice, double clock, double fade_len);
 	void ensure_voices_container(BulletFactory2D &factory);
+	// The voice's player, or null when a script freed it (never dereferences
+	// a dead pointer: the id goes through ObjectDB).
+	static AudioStreamPlayer2D *live_player(const Voice &voice);
+	// Gives a voice slot a new player under the container (the old one was
+	// freed by a script). add_child runs user code (child_entered_tree).
+	AudioStreamPlayer2D *make_voice_player(Voice &voice, size_t index);
+	Node2D *live_voices_container() const;
 
 	std::unordered_map<uint64_t, Channel> channels;
+	// Bumped by clear(): a flush that ran user code (a new voice's
+	// add_child) stops when its channels were dropped meanwhile.
+	uint64_t channels_epoch = 0;
+	// Channel ids of the current flush (the map may grow while user code
+	// runs inside it, which would invalidate a live iterator).
+	std::vector<uint64_t> flush_channel_ids;
 	std::vector<Voice> voices;
 	Node2D *voices_container = nullptr;
+	uint64_t voices_container_id = 0;
 	uint64_t offer_order = 0;
 	uint64_t plays_total = 0;
 	uint64_t dropped_total = 0;

@@ -162,3 +162,47 @@ func test_streams_emptied_mid_flight_warns_once_and_recovers() -> void:
 	step_factory(3)
 	expect_no_errors()
 	assert_gt(busy_voices().size(), 0, "voices keep playing with the restored streams")
+
+
+## Creating a voice is user code (add_child emits child_entered_tree inside
+## the flush): a handler that offers NEW sounds (the channel table grows
+## while the flush walks it) or frees an earlier voice never makes the flush
+## touch freed or moved memory. (Freeing the node being added, or an
+## ancestor emitting the signal, crashes inside Godot itself: not testable.)
+func test_user_code_inside_a_new_voice_never_breaks_the_flush(action: String = use_parameters(["offer_new_sounds", "free_an_earlier_voice"])) -> void:
+	godot_listener_at(Vector2.ZERO)
+	var played: Array = []
+	var f := factory
+	var extra: Array = []
+	for k in 24: # enough new channels to force a rehash of the table
+		extra.append(H.make_sound(BulletSoundData2D.SOUND_ON_HIT))
+	var on_voice := func(voice: Node) -> void:
+		played.append(voice.name)
+		if action == "offer_new_sounds":
+			for s in extra:
+				f.play_sound(s, Vector2(played.size(), 0))
+		else:
+			var first: Node = voice.get_parent().get_child(0, true)
+			if first != voice:
+				first.free()
+	var on_child := func(node: Node) -> void:
+		if node.name == "SoundVoices":
+			node.child_entered_tree.connect(on_voice)
+	f.child_entered_tree.connect(on_child)
+	var shots: Array = [] # held: a channel keeps only the resource id
+	for k in 4:
+		shots.append(H.make_sound(BulletSoundData2D.SOUND_ON_HIT))
+		f.play_sound(shots[k], Vector2(k, 0))
+	for k in 4:
+		await physics(1)
+		if not is_instance_valid(f):
+			break
+	assert_gt(played.size(), 0, "the handler ran")
+	if is_instance_valid(f):
+		var busy := 0
+		for e in f.debug_get_sound_voices():
+			if e.get("busy", false):
+				busy += 1
+		assert_lte(busy, f.get_sound_max_voices(), "no slot beyond the cap")
+		assert_true(f.play_sound(shots[0], Vector2.ZERO), "the mixer still takes offers")
+		await physics(2)

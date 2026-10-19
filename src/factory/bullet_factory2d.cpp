@@ -312,11 +312,7 @@ void BulletFactory2D::_ready() {
 	add_bullet_containers();
 	add_bullet_attachment_container();
 	add_debuggers();
-
-	volley_debugger->set_debugger_color(debugger_color_cached_before_ready);
-	volley_debugger->set_is_debugger_enabled(is_debugger_enabled_cached_before_ready);
-	volley_debugger->set_max_debug_providers(debugger_max_providers_cached_before_ready);
-	volley_debugger->set_draw_inactive_shapes(debugger_draw_inactive_cached_before_ready);
+	apply_debugger_settings(*volley_debugger.ptr);
 
 	use_physics_interpolation = use_physics_interpolation_cached_before_ready;
 	update_process_state();
@@ -350,7 +346,7 @@ bool BulletFactory2D::ensure_factory_initialized() {
 	}
 	// Containers already exist (native _ready ran): just mark ready. This
 	// keeps the normal path allocation-free.
-	if (volley_container != nullptr && bullet_attachments_container != nullptr && volley_debugger != nullptr) {
+	if (volley_container.ptr != nullptr && bullet_attachments_container.ptr != nullptr && volley_debugger.ptr != nullptr) {
 		is_ready = true;
 		return true;
 	}
@@ -367,22 +363,17 @@ bool BulletFactory2D::ensure_factory_initialized() {
 		all_volleys.reserve(2048);
 		volley_set.resize(2048);
 	}
-	if (volley_container == nullptr) {
+	if (volley_container.get() == nullptr) {
 		add_bullet_containers();
 	}
-	if (bullet_attachments_container == nullptr) {
+	if (bullet_attachments_container.get() == nullptr) {
 		add_bullet_attachment_container();
 	}
 	fx_ensure_effects_container();
-	if (volley_debugger == nullptr) {
+	if (volley_debugger.get() == nullptr) {
 		add_debuggers();
 	}
-	if (volley_debugger != nullptr) {
-		volley_debugger->set_debugger_color(debugger_color_cached_before_ready);
-		volley_debugger->set_is_debugger_enabled(is_debugger_enabled_cached_before_ready);
-		volley_debugger->set_max_debug_providers(debugger_max_providers_cached_before_ready);
-		volley_debugger->set_draw_inactive_shapes(debugger_draw_inactive_cached_before_ready);
-	}
+	apply_debugger_settings(*volley_debugger.ptr);
 	use_physics_interpolation = use_physics_interpolation_cached_before_ready;
 	update_process_state();
 	is_ready = true;
@@ -439,23 +430,55 @@ void BulletFactory2D::set_use_physics_interpolation_editor(bool new_use_physics_
 
 void BulletFactory2D::add_bullet_containers() {
 	// Create BulletVolleysContainer Node and add it as a child to factory
-	volley_container = memnew(Node);
-	volley_container->set_name("BulletVolleysContainer");
-	add_child(volley_container);
+	Node *container = memnew(Node);
+	volley_container.set(container);
+	container->set_name("BulletVolleysContainer");
+	add_child(container);
 }
 
 void BulletFactory2D::add_bullet_attachment_container() {
 	// Create BulletAttachmentContainer Node and add it as a child to factory
-	bullet_attachments_container = memnew(Node);
-	bullet_attachments_container->set_name("BulletAttachmentsContainer");
-	add_child(bullet_attachments_container);
+	Node *container = memnew(Node);
+	bullet_attachments_container.set(container);
+	container->set_name("BulletAttachmentsContainer");
+	add_child(container);
 }
 
 void BulletFactory2D::add_debuggers() {
 	// Configure BulletVolley2D debugger and add it as a child to factory
-	volley_debugger = memnew(BulletVolleyDebugger2D);
-	volley_debugger->configure(volley_container, "BulletVolleysDebugger", debugger_color_cached_before_ready);
-	add_child(volley_debugger);
+	BulletVolleyDebugger2D *debugger = memnew(BulletVolleyDebugger2D);
+	volley_debugger.set(debugger);
+	debugger->configure(volley_container.get(), "BulletVolleysDebugger", debugger_color_cached_before_ready);
+	add_child(debugger);
+}
+
+void BulletFactory2D::apply_debugger_settings(BulletVolleyDebugger2D &debugger) const {
+	debugger.set_debugger_color(debugger_color_cached_before_ready);
+	debugger.set_is_debugger_enabled(is_debugger_enabled_cached_before_ready);
+	debugger.set_max_debug_providers(debugger_max_providers_cached_before_ready);
+	debugger.set_draw_inactive_shapes(debugger_draw_inactive_cached_before_ready);
+}
+
+void BulletFactory2D::heal_owned_children() {
+	if (!is_ready || is_tearing_down) {
+		return;
+	}
+	const bool volleys_lost = volley_container.get() == nullptr;
+	if (volleys_lost) {
+		add_bullet_containers(); // its volleys died with it (their PREDELETE untracked them)
+	}
+	if (bullet_attachments_container.get() == nullptr) {
+		add_bullet_attachment_container();
+	}
+	BulletVolleyDebugger2D *debugger = volley_debugger.get();
+	if (debugger == nullptr) {
+		add_debuggers();
+		apply_debugger_settings(*volley_debugger.ptr);
+	} else if (volleys_lost) {
+		// configure() switches it off; on again watches the new container.
+		debugger->configure(volley_container.get(), "BulletVolleysDebugger", debugger->get_debugger_color());
+		debugger->set_is_debugger_enabled(is_debugger_enabled_cached_before_ready);
+	}
 }
 
 bool BulletFactory2D::get_is_factory_busy() const {

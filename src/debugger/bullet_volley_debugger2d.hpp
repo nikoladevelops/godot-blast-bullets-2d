@@ -4,6 +4,8 @@
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/physics_server2d.hpp>
 
+#include "core/owned_node2d.hpp"
+
 #include <vector>
 
 namespace godot {
@@ -82,8 +84,9 @@ private:
 	// never dereferenced - so id reuse by an unrelated object can't pass.
 	std::vector<Node *> debug_data_provider_nodes;
 
-	// Stores pointers to the spawned debug multimeshes
-	std::vector<MultiMeshInstance2D *> debugger_multimeshes;
+	// The spawned debug multimesh nodes: ordinary children a script may free
+	// (or empty), so every read goes through get().
+	std::vector<OwnedNode2D<MultiMeshInstance2D>> debugger_multimeshes;
 
 	// Tracks mesh type/size per debugger entry so pool reuse with different sizes recreates correct true-shape mesh
 	std::vector<PhysicsServer2D::ShapeType> debugger_mesh_types;
@@ -94,8 +97,12 @@ private:
 	// cannot change, while still drawing them (one final sync on the transition).
 	std::vector<bool> debugger_last_active_states;
 
-	// The container whose volley children get debugged
-	Node *container_to_debug = nullptr;
+	// Entries whose debug node was lost this tick (reused, no per-tick alloc).
+	std::vector<int> lost_entries_scratch;
+
+	// The container whose volley children get debugged (the factory
+	// re-points it when a script freed the container and it was recreated).
+	OwnedNode2D<Node> container_to_debug;
 
 	// A pointer to the physics server
 	PhysicsServer2D *physics_server = nullptr;
@@ -106,6 +113,10 @@ private:
 
 	// Generates a debug multimesh for a volley that entered the container
 	void generate_debug_multimesh(Node *node_entered_container_to_debug);
+
+	// Erases entry i from every parallel array, deleting its debug node when
+	// it is still alive.
+	void erase_debug_entry(int i);
 
 	// Drops the provider + its debug mesh when the multimesh exits the container's
 	// subtree (manual free/reparent/scene teardown). Without this the raw provider

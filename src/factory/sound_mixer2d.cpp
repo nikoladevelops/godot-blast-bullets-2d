@@ -490,35 +490,63 @@ bool SoundMixer2D::offer(BulletFactory2D &factory, const Ref<BulletSoundData2D> 
 	return false;
 }
 
+AudioStreamPlayer2D *SoundMixer2D::live_player(const Voice &voice) {
+	if (voice.player == nullptr || voice.player_id == 0) {
+		return nullptr;
+	}
+	return ObjectDB::get_instance(ObjectID(voice.player_id)) == voice.player ? voice.player : nullptr;
+}
+
+Node2D *SoundMixer2D::live_voices_container() const {
+	if (voices_container == nullptr || voices_container_id == 0) {
+		return nullptr;
+	}
+	return ObjectDB::get_instance(ObjectID(voices_container_id)) == voices_container ? voices_container : nullptr;
+}
+
 void SoundMixer2D::ensure_voices_container(BulletFactory2D &factory) {
-	if (voices_container != nullptr && ObjectDB::get_instance(ObjectID(voices_container->get_instance_id())) == voices_container) {
+	if (live_voices_container() != nullptr) {
 		return;
 	}
+	// First play, or a script freed the container (its voices with it).
 	voices.clear();
 	voices_container = memnew(Node2D);
+	voices_container_id = voices_container->get_instance_id();
 	voices_container->set_name("SoundVoices");
 	// Voices are positioned explicitly every play/follow: never interpolated.
 	voices_container->set_physics_interpolation_mode(Node::PHYSICS_INTERPOLATION_MODE_OFF);
 	factory.add_child(voices_container);
 }
 
+AudioStreamPlayer2D *SoundMixer2D::make_voice_player(Voice &voice, size_t index) {
+	AudioStreamPlayer2D *player = memnew(AudioStreamPlayer2D);
+	player->set_name("SoundVoice_" + String::num_int64((int64_t)index));
+	player->set_max_polyphony(1);
+	player->set_physics_interpolation_mode(Node::PHYSICS_INTERPOLATION_MODE_OFF);
+	voice.player = player;
+	voice.player_id = player->get_instance_id();
+	// Filed BEFORE add_child: its child_entered_tree handlers are user code.
+	if (Node2D *container = live_voices_container()) {
+		container->add_child(player);
+	}
+	return player;
+}
+
 AudioStreamPlayer2D *SoundMixer2D::alloc_voice(BulletFactory2D &factory, int priority) {
 	ensure_voices_container(factory);
 	for (size_t i = 0; i < voices.size(); ++i) {
-		if (!voices[i].busy && voices[i].player != nullptr && ObjectDB::get_instance(ObjectID(voices[i].player->get_instance_id())) == voices[i].player) {
-			return voices[i].player;
+		if (voices[i].busy) {
+			continue;
 		}
+		if (AudioStreamPlayer2D *player = live_player(voices[i])) {
+			return player;
+		}
+		return make_voice_player(voices[i], i); // its player was freed by a script
 	}
 	if ((int)voices.size() < max_voices_total) {
-		AudioStreamPlayer2D *player = memnew(AudioStreamPlayer2D);
-		player->set_name("SoundVoice_" + String::num_int64((int64_t)voices.size()));
-		player->set_max_polyphony(1);
-		player->set_physics_interpolation_mode(Node::PHYSICS_INTERPOLATION_MODE_OFF);
-		voices_container->add_child(player);
-		Voice voice;
-		voice.player = player;
-		voices.push_back(voice);
-		return player;
+		voices.push_back(Voice());
+		const size_t index = voices.size() - 1;
+		return make_voice_player(voices[index], index);
 	}
 	// Steal at equal or lower priority, never above. A voice already fading
 	// out goes first (its tail is cheap to cut). Otherwise the oldest live
@@ -544,9 +572,13 @@ AudioStreamPlayer2D *SoundMixer2D::alloc_voice(BulletFactory2D &factory, int pri
 			return nullptr; // fading out now: this play waits for the next sweep
 		}
 	}
-	voices[oldest].player->stop();
+	if (AudioStreamPlayer2D *player = live_player(voices[oldest])) {
+		player->stop();
+		release_voice(voices[oldest]);
+		return player;
+	}
 	release_voice(voices[oldest]);
-	return voices[oldest].player;
+	return make_voice_player(voices[oldest], oldest);
 }
 
 double SoundMixer2D::voice_fade_len(uint64_t sound_id) {
@@ -562,7 +594,7 @@ bool SoundMixer2D::voice_begin_fade(Voice &voice, double clock, double fade_len)
 	if (voice.fading) {
 		return true; // already on its way out: the fade is never restarted
 	}
-	if (!(fade_len > 0.0) || !Math::is_finite(fade_len) || voice.player == nullptr || ObjectDB::get_instance(ObjectID(voice.player->get_instance_id())) != voice.player || !voice.player->is_playing()) {
+	if (!(fade_len > 0.0) || !Math::is_finite(fade_len) || live_player(voice) == nullptr || !voice.player->is_playing()) {
 		return false;
 	}
 	voice.fading = true;
@@ -631,10 +663,11 @@ void SoundMixer2D::release_voice(Voice &voice) {
 	voice.time_paused = false;
 	voice.base_pitch = 1.0f;
 	voice.time_factor = 1.0;
-	if (was_time_paused && voice.player != nullptr && ObjectDB::get_instance(ObjectID(voice.player->get_instance_id())) == voice.player) {
-		voice.player->set_stream_paused(paused); // the pool slot never keeps a time pause
+	AudioStreamPlayer2D *player = live_player(voice);
+	if (was_time_paused && player != nullptr) {
+		player->set_stream_paused(paused); // the pool slot never keeps a time pause
 	}
-	if (voice.player != nullptr && ObjectDB::get_instance(ObjectID(voice.player->get_instance_id())) == voice.player) {
+	if (player != nullptr) {
 		// No resource retention: a finished voice holds no stream Ref.
 		voice.player->set_stream(Ref<AudioStream>());
 	}
@@ -705,9 +738,10 @@ void SoundMixer2D::flush(BulletFactory2D &factory) {
 		}
 		return;
 	}
-	if (voices_container != nullptr && ObjectDB::get_instance(ObjectID(voices_container->get_instance_id())) != voices_container) {
+	if (voices_container != nullptr && live_voices_container() == nullptr) {
 		voices.clear();
 		voices_container = nullptr;
+		voices_container_id = 0;
 	}
 	const double clock = factory.get_graze_clock();
 	// Poll: finished voices release, loopers obey max_duration, node
@@ -715,7 +749,11 @@ void SoundMixer2D::flush(BulletFactory2D &factory) {
 	bool any_busy = false;
 	for (size_t i = 0; i < voices.size(); ++i) {
 		Voice &voice = voices[i];
-		if (!voice.busy || voice.player == nullptr || ObjectDB::get_instance(ObjectID(voice.player->get_instance_id())) != voice.player) {
+		if (!voice.busy) {
+			continue;
+		}
+		if (live_player(voice) == nullptr) {
+			release_voice(voice); // a script freed its player: the slot is free again
 			continue;
 		}
 		if (!voice.player->is_playing() && !voice.time_paused) {
@@ -786,7 +824,7 @@ void SoundMixer2D::flush(BulletFactory2D &factory) {
 		duck_scratch.clear();
 		for (size_t i = 0; i < voices.size(); ++i) {
 			const Voice &voice = voices[i];
-			if (!voice.busy || voice.fading || voice.player == nullptr || ObjectDB::get_instance(ObjectID(voice.player->get_instance_id())) != voice.player) {
+			if (!voice.busy || voice.fading || live_player(voice) == nullptr) {
 				continue;
 			}
 			DuckEntry entry;
@@ -841,8 +879,25 @@ void SoundMixer2D::flush(BulletFactory2D &factory) {
 	if (!any_pending) {
 		return;
 	}
-	for (auto &entry : channels) {
-		Channel &channel = entry.second;
+	// A new voice's add_child runs user code (child_entered_tree): it may
+	// offer a NEW sound (the map grows: a live iterator would be invalid),
+	// free the factory (this mixer with it), reset the channels, or free a
+	// player, a camera or the last Ref of a sound. So: walk a snapshot of
+	// ids, hold the sound, and re-check after every allocation.
+	flush_channel_ids.clear();
+	for (const auto &entry : channels) {
+		if (!entry.second.candidates.empty()) {
+			flush_channel_ids.push_back(entry.first);
+		}
+	}
+	const BulletFactory2D::LifeWatch watch = factory.watch_life();
+	const uint64_t epoch = channels_epoch;
+	for (const uint64_t channel_key : flush_channel_ids) {
+		const auto found = channels.find(channel_key);
+		if (found == channels.end()) {
+			continue;
+		}
+		Channel &channel = found->second; // element references survive a rehash
 		if (channel.candidates.empty()) {
 			continue;
 		}
@@ -852,6 +907,7 @@ void SoundMixer2D::flush(BulletFactory2D &factory) {
 			channel.candidates.clear();
 			continue;
 		}
+		const Ref<BulletSoundData2D> sound_hold(sound);
 		if (!sound->enabled || !sound_has_audio(sound)) {
 			channel.candidates.clear();
 			continue;
@@ -947,11 +1003,16 @@ void SoundMixer2D::flush(BulletFactory2D &factory) {
 					}
 				}
 				if (!voice_begin_fade(voices[victim], clock, voice_fade_len(channel.sound_id))) {
-					voices[victim].player->stop();
+					if (AudioStreamPlayer2D *victim_player = live_player(voices[victim])) {
+						victim_player->stop();
+					}
 					release_voice(voices[victim]);
 				}
 			}
 			AudioStreamPlayer2D *player = alloc_voice(factory, sound->priority);
+			if (watch.died() || channels_epoch != epoch) {
+				return; // user code freed the factory or reset the channels
+			}
 			if (player == nullptr) {
 				++dropped_total;
 				continue;
@@ -963,6 +1024,11 @@ void SoundMixer2D::flush(BulletFactory2D &factory) {
 					break;
 				}
 			}
+			if (slot == voices.size() || live_player(voices[slot]) != player || !player->is_inside_tree()) {
+				++dropped_total; // freed (or detached) by user code before it could play
+				continue;
+			}
+			camera = resolve_entry_camera(factory, sound, channel); // user code may have freed it
 			// Placement: Godot listener -> the event position (Godot does
 			// falloff/panning); a node listener L of event P -> G + (P - L)
 			// so the engine measures from L; point listeners are fixed.
@@ -1120,9 +1186,9 @@ void SoundMixer2D::preview_play(BulletSoundData2D *sound, const Vector2 &global_
 void SoundMixer2D::set_paused(bool p_paused) {
 	paused = p_paused;
 	for (size_t i = 0; i < voices.size(); ++i) {
-		if (voices[i].busy && voices[i].player != nullptr && ObjectDB::get_instance(ObjectID(voices[i].player->get_instance_id())) == voices[i].player) {
+		if (AudioStreamPlayer2D *player = voices[i].busy ? live_player(voices[i]) : nullptr) {
 			// A voice the time scale paused stays paused when a hit-stop ends.
-			voices[i].player->set_stream_paused(p_paused || voices[i].time_paused);
+			player->set_stream_paused(p_paused || voices[i].time_paused);
 		}
 	}
 	if (p_paused) {
@@ -1135,8 +1201,8 @@ void SoundMixer2D::set_paused(bool p_paused) {
 
 void SoundMixer2D::stop_all() {
 	for (size_t i = 0; i < voices.size(); ++i) {
-		if (voices[i].busy && voices[i].player != nullptr && ObjectDB::get_instance(ObjectID(voices[i].player->get_instance_id())) == voices[i].player) {
-			voices[i].player->stop();
+		if (AudioStreamPlayer2D *player = voices[i].busy ? live_player(voices[i]) : nullptr) {
+			player->stop();
 		}
 		release_voice(voices[i]);
 	}
@@ -1145,6 +1211,7 @@ void SoundMixer2D::stop_all() {
 void SoundMixer2D::clear() {
 	stop_all();
 	channels.clear();
+	++channels_epoch;
 }
 
 void SoundMixer2D::set_log_enabled(bool enabled) {
@@ -1278,7 +1345,7 @@ Array SoundMixer2D::debug_voices() const {
 		d["time_pitch"] = voice.time_pitch;
 		d["time_paused"] = voice.time_paused;
 		d["time_factor"] = voice.time_factor;
-		if (voice.player != nullptr && ObjectDB::get_instance(ObjectID(voice.player->get_instance_id())) == voice.player) {
+		if (live_player(voice) != nullptr) {
 			d["position"] = voice.player->get_global_position();
 			d["volume_db"] = voice.player->get_volume_db();
 			d["pitch_scale"] = voice.player->get_pitch_scale();
