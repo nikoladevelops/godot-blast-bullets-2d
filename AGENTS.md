@@ -977,7 +977,7 @@ deduped, cancelled by REMOVED) and replayed once on resume.
 ### 15.1 Running
 
 ```sh
-python3 tools/run_benchmarks.py                     # 30 headless scenarios x5 (median)
+python3 tools/run_benchmarks.py                     # 31 headless scenarios x5 (median)
 python3 tools/run_benchmarks.py --scenario spawner_ # substring filter (repeatable)
 python3 tools/run_benchmarks.py --gate              # exit 1 on regression vs log/baseline.json
 python3 tools/run_benchmarks.py --update-baseline   # ONLY for an accepted change; say so in the commit
@@ -1005,6 +1005,10 @@ project's `.so`). For quick numeric comparisons load two
 ### 15.3 Lessons (measured on Ryzen 7 8840HS, debug build)
 
 - 10k bullets in flight ≈ 0.26 ms factory tick (`volley_10k_flight`).
+- The target scene (`multi_spawner_pooled_8x`: 8 auto-firing spawners with
+  spin, homing, split and graze into one warm pool, ~10k live bullets):
+  tick p50 ≈ 0.43 ms, frame p50 ≈ 0.87 ms / p99 ≈ 2 ms, `objects_growth` 0
+  in steady state (every pool miss happens in the warmup).
 - Tick code rules: no per-bullet engine-boundary crossings (hoist sin/cos,
   inverses, StringNames via `CachedStringNames2D`), O(1) amortized per
   bullet, no per-bullet allocation (reuse scratch, `reserve()`), batched
