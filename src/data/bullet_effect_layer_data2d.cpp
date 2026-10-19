@@ -128,6 +128,7 @@ bool BulletEffectLayerData2D::get_enabled() const {
 }
 void BulletEffectLayerData2D::set_enabled(bool value) {
 	enabled = value;
+	emit_changed();
 }
 
 int BulletEffectLayerData2D::get_trigger() const {
@@ -139,6 +140,7 @@ void BulletEffectLayerData2D::set_trigger(int value) {
 		return;
 	}
 	trigger = value;
+	emit_changed();
 }
 
 Ref<SpriteFrames> BulletEffectLayerData2D::get_sprite_frames() const {
@@ -147,6 +149,7 @@ Ref<SpriteFrames> BulletEffectLayerData2D::get_sprite_frames() const {
 void BulletEffectLayerData2D::set_sprite_frames(const Ref<SpriteFrames> &new_frames) {
 	sprite_frames = new_frames;
 	invalidate_bake();
+	emit_changed();
 }
 
 StringName BulletEffectLayerData2D::get_animation() const {
@@ -155,6 +158,7 @@ StringName BulletEffectLayerData2D::get_animation() const {
 void BulletEffectLayerData2D::set_animation(const StringName &new_animation) {
 	animation = new_animation;
 	invalidate_bake();
+	emit_changed();
 }
 
 Ref<Material> BulletEffectLayerData2D::get_material() const {
@@ -162,6 +166,7 @@ Ref<Material> BulletEffectLayerData2D::get_material() const {
 }
 void BulletEffectLayerData2D::set_material(const Ref<Material> &new_material) {
 	material = new_material;
+	emit_changed();
 }
 
 Color BulletEffectLayerData2D::get_self_modulate() const {
@@ -178,6 +183,7 @@ void BulletEffectLayerData2D::set_self_modulate(const Color &new_color) {
 		return;
 	}
 	self_modulate = new_color;
+	emit_changed();
 }
 
 Ref<Gradient> BulletEffectLayerData2D::get_color_ramp() const {
@@ -185,13 +191,20 @@ Ref<Gradient> BulletEffectLayerData2D::get_color_ramp() const {
 }
 void BulletEffectLayerData2D::set_color_ramp(const Ref<Gradient> &new_ramp) {
 	color_ramp = new_ramp;
+	emit_changed();
 }
 
 int BulletEffectLayerData2D::get_z_index() const {
 	return z_index;
 }
 void BulletEffectLayerData2D::set_z_index(int value) {
+	// The CanvasItem range: Godot refuses anything else on every effect node.
+	if (value < -4096 || value > 4096) {
+		UtilityFunctions::push_error("BulletEffectLayerData2D: z_index must be between -4096 and 4096, keeping the old value.");
+		return;
+	}
 	z_index = value;
+	emit_changed();
 }
 
 bool BulletEffectLayerData2D::get_z_as_relative() const {
@@ -199,6 +212,7 @@ bool BulletEffectLayerData2D::get_z_as_relative() const {
 }
 void BulletEffectLayerData2D::set_z_as_relative(bool value) {
 	z_as_relative = value;
+	emit_changed();
 }
 
 int BulletEffectLayerData2D::get_visibility_layer() const {
@@ -206,6 +220,7 @@ int BulletEffectLayerData2D::get_visibility_layer() const {
 }
 void BulletEffectLayerData2D::set_visibility_layer(int value) {
 	visibility_layer = value;
+	emit_changed();
 }
 
 int BulletEffectLayerData2D::get_light_mask() const {
@@ -213,6 +228,7 @@ int BulletEffectLayerData2D::get_light_mask() const {
 }
 void BulletEffectLayerData2D::set_light_mask(int value) {
 	light_mask = value;
+	emit_changed();
 }
 
 Vector2 BulletEffectLayerData2D::get_offset() const {
@@ -224,6 +240,7 @@ void BulletEffectLayerData2D::set_offset(const Vector2 &new_offset) {
 		return;
 	}
 	offset = new_offset;
+	emit_changed();
 }
 
 double BulletEffectLayerData2D::get_rotation_degrees() const {
@@ -235,6 +252,7 @@ void BulletEffectLayerData2D::set_rotation_degrees(double value) {
 		return;
 	}
 	rotation_degrees = value;
+	emit_changed();
 }
 
 double BulletEffectLayerData2D::get_spin_degrees_per_sec() const {
@@ -246,6 +264,7 @@ void BulletEffectLayerData2D::set_spin_degrees_per_sec(double value) {
 		return;
 	}
 	spin_degrees_per_sec = value;
+	emit_changed();
 }
 
 Vector2 BulletEffectLayerData2D::get_scale() const {
@@ -257,6 +276,7 @@ void BulletEffectLayerData2D::set_scale(const Vector2 &new_scale) {
 		return;
 	}
 	scale = new_scale;
+	emit_changed();
 }
 
 bool BulletEffectLayerData2D::get_random_start_frame() const {
@@ -264,6 +284,7 @@ bool BulletEffectLayerData2D::get_random_start_frame() const {
 }
 void BulletEffectLayerData2D::set_random_start_frame(bool value) {
 	random_start_frame = value;
+	emit_changed();
 }
 
 bool BulletEffectLayerData2D::get_randomize_rotation() const {
@@ -271,6 +292,7 @@ bool BulletEffectLayerData2D::get_randomize_rotation() const {
 }
 void BulletEffectLayerData2D::set_randomize_rotation(bool value) {
 	randomize_rotation = value;
+	emit_changed();
 }
 
 real_t BulletEffectLayerData2D::get_random_scale_min() const {
@@ -287,6 +309,7 @@ void BulletEffectLayerData2D::set_random_scale_min(real_t value) {
 	if (random_scale_max < value) {
 		random_scale_max = value;
 	}
+	emit_changed();
 }
 
 real_t BulletEffectLayerData2D::get_random_scale_max() const {
@@ -302,6 +325,7 @@ void BulletEffectLayerData2D::set_random_scale_max(real_t value) {
 	if (random_scale_min > value) {
 		random_scale_min = value;
 	}
+	emit_changed();
 }
 
 real_t BulletEffectLayerData2D::get_trigger_chance() const {
@@ -313,6 +337,7 @@ void BulletEffectLayerData2D::set_trigger_chance(real_t value) {
 		return;
 	}
 	trigger_chance = value;
+	emit_changed();
 }
 
 int BulletEffectLayerData2D::get_max_instances() const {
@@ -326,6 +351,7 @@ void BulletEffectLayerData2D::set_max_instances(int value) {
 		return;
 	}
 	max_instances = value;
+	emit_changed();
 }
 
 double BulletEffectLayerData2D::get_fade_in_sec() const {
@@ -337,6 +363,7 @@ void BulletEffectLayerData2D::set_fade_in_sec(double value) {
 		return;
 	}
 	fade_in_sec = value;
+	emit_changed();
 }
 double BulletEffectLayerData2D::get_fade_out_sec() const {
 	return fade_out_sec;
@@ -347,6 +374,7 @@ void BulletEffectLayerData2D::set_fade_out_sec(double value) {
 		return;
 	}
 	fade_out_sec = value;
+	emit_changed();
 }
 bool BulletEffectLayerData2D::get_override_frame_color() const {
 	return override_frame_color;
@@ -359,6 +387,7 @@ void BulletEffectLayerData2D::set_override_frame_color(bool value) {
 	// Whitening changes the baked textures themselves, so consumers
 	// holding baked output must rebake (bumps the manual-hatch version).
 	invalidate_bake();
+	emit_changed();
 }
 
 // Whiten override cap: per-pixel loop over huge sheets would stall the
@@ -486,7 +515,7 @@ void BulletEffectLayerData2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_z_index"), &BulletEffectLayerData2D::get_z_index);
 	ClassDB::bind_method(D_METHOD("set_z_index", "value"), &BulletEffectLayerData2D::set_z_index);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "z_index"), "set_z_index", "get_z_index");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "z_index", PROPERTY_HINT_RANGE, "-4096,4096,1"), "set_z_index", "get_z_index");
 
 	ClassDB::bind_method(D_METHOD("get_z_as_relative"), &BulletEffectLayerData2D::get_z_as_relative);
 	ClassDB::bind_method(D_METHOD("set_z_as_relative", "value"), &BulletEffectLayerData2D::set_z_as_relative);

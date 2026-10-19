@@ -99,3 +99,73 @@ func test_every_data_setter_rejects_bad_values_loudly_and_keeps_the_old_one() ->
 					problems.append("%s: value changed %s -> %s" % [label, before, after])
 	assert_gt(probed, 100, "the sweep reached the data classes (%d probes)" % probed)
 	assert_eq("\n".join(problems), "", "every data setter rejects loudly with the standard wording and keeps the old value")
+
+
+## A different valid value for `p`, or null when none is known (objects,
+## arrays, dictionaries: their own suites cover them).
+func _other_value(p: Dictionary, current: Variant) -> Variant:
+	var hint := int(p.get("hint", 0))
+	var hs := str(p.get("hint_string", ""))
+	match int(p["type"]):
+		TYPE_BOOL:
+			return not current
+		TYPE_INT:
+			if hint == PROPERTY_HINT_ENUM and hs != "":
+				var next := 0
+				for opt in hs.split(","):
+					var parts := opt.split(":")
+					var id := int(parts[1]) if parts.size() > 1 else next
+					next = id + 1
+					if id != int(current):
+						return id
+				return null
+			if hint == PROPERTY_HINT_RANGE:
+				var parts := hs.split(",")
+				if parts.size() >= 2 and int(current) + 1 > int(parts[1]):
+					return int(current) - 1
+			return int(current) + 1
+		TYPE_FLOAT:
+			return float(current) + 0.25
+		TYPE_VECTOR2:
+			return Vector2(current) + Vector2(0.25, 0.25)
+		TYPE_COLOR:
+			return Color(0.5, 0.25, 0.75, 1.0) if Color(current) != Color(0.5, 0.25, 0.75, 1.0) else Color(1, 1, 1, 1)
+	return null
+
+
+var _changed_count := 0
+
+
+func _on_changed() -> void:
+	_changed_count += 1
+
+
+## Every accepted edit of a data resource emits `changed` exactly once (the
+## spawner, the volleys in flight and the editor listen to it); a rejected or
+## same-value edit is skipped by this sweep.
+func test_every_accepted_data_edit_emits_changed_once() -> void:
+	var problems: Array = []
+	var probed := 0
+	for cls in CLASSES:
+		var obj: Resource = ClassDB.instantiate(cls)
+		obj.changed.connect(_on_changed)
+		for p in _own_props(cls):
+			var name := str(p["name"])
+			var before: Variant = obj.get(name)
+			var value: Variant = _other_value(p, before)
+			if value == null:
+				continue
+			_changed_count = 0
+			obj.set(name, value)
+			var rejected := false
+			for err in get_errors():
+				if not err.handled:
+					err.handled = true
+					rejected = true
+			if rejected or _same(obj.get(name), before):
+				continue
+			probed += 1
+			if _changed_count != 1:
+				problems.append("%s.%s = %s: changed emitted %d times" % [cls, name, value, _changed_count])
+	assert_gt(probed, 100, "the sweep reached the data classes (%d edits)" % probed)
+	assert_eq("\n".join(problems), "", "every accepted edit emits changed once")

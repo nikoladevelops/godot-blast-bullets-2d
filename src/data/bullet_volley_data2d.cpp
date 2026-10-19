@@ -266,6 +266,11 @@ int BulletVolleyData2D::get_z_index() const {
 }
 
 void BulletVolleyData2D::set_z_index(int new_z_index) {
+	// The CanvasItem range: Godot refuses anything else on every spawn.
+	if (new_z_index < -4096 || new_z_index > 4096) {
+		UtilityFunctions::push_error("BulletVolleyData2D: z_index must be between -4096 and 4096, keeping the old value.");
+		return;
+	}
 	z_index = new_z_index;
 	emit_changed();
 }
@@ -942,7 +947,7 @@ void BulletVolleyData2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_z_index"), &BulletVolleyData2D::get_z_index);
 	ClassDB::bind_method(D_METHOD("set_z_index", "new_z_index"), &BulletVolleyData2D::set_z_index);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "z_index"), "set_z_index", "get_z_index");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "z_index", PROPERTY_HINT_RANGE, "-4096,4096,1"), "set_z_index", "get_z_index");
 
 	ClassDB::bind_method(D_METHOD("get_light_mask"), &BulletVolleyData2D::get_light_mask);
 	ClassDB::bind_method(D_METHOD("set_light_mask", "new_light_mask"), &BulletVolleyData2D::set_light_mask);

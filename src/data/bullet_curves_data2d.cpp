@@ -17,6 +17,7 @@ void BulletCurvesData2D::set_movement_speed_curve(const Ref<Curve> &curve) {
 	}
 
 	movement_speed_curve = curve;
+	emit_changed();
 }
 
 Ref<Curve> BulletCurvesData2D::get_rotation_speed_curve() const {
@@ -28,6 +29,7 @@ void BulletCurvesData2D::set_rotation_speed_curve(const Ref<Curve> &curve) {
 	}
 
 	rotation_speed_curve = curve;
+	emit_changed();
 }
 
 Ref<Curve> BulletCurvesData2D::get_x_direction_curve() const {
@@ -39,6 +41,7 @@ void BulletCurvesData2D::set_x_direction_curve(const Ref<Curve> &curve) {
 	}
 
 	x_direction_curve = curve;
+	emit_changed();
 }
 
 bool BulletCurvesData2D::get_movement_use_unit_curve() const {
@@ -46,6 +49,7 @@ bool BulletCurvesData2D::get_movement_use_unit_curve() const {
 }
 void BulletCurvesData2D::set_movement_use_unit_curve(bool value) {
 	movement_use_unit_curve = value;
+	emit_changed();
 }
 
 bool BulletCurvesData2D::get_rotation_use_unit_curve() const {
@@ -53,6 +57,7 @@ bool BulletCurvesData2D::get_rotation_use_unit_curve() const {
 }
 void BulletCurvesData2D::set_rotation_use_unit_curve(bool value) {
 	rotation_use_unit_curve = value;
+	emit_changed();
 }
 
 bool BulletCurvesData2D::get_x_direction_use_unit_curve() const {
@@ -61,6 +66,7 @@ bool BulletCurvesData2D::get_x_direction_use_unit_curve() const {
 
 void BulletCurvesData2D::set_x_direction_use_unit_curve(bool value) {
 	x_direction_use_unit_curve = value;
+	emit_changed();
 }
 
 real_t BulletCurvesData2D::get_x_direction_curve_strength() const {
@@ -73,6 +79,7 @@ void BulletCurvesData2D::set_x_direction_curve_strength(real_t value) {
 		return;
 	}
 	x_direction_curve_strength = value;
+	emit_changed();
 }
 
 DirectionCurveMode BulletCurvesData2D::get_x_direction_curve_mode() const {
@@ -85,6 +92,7 @@ void BulletCurvesData2D::set_x_direction_curve_mode(DirectionCurveMode mode) {
 		return;
 	}
 	x_direction_curve_mode = mode;
+	emit_changed();
 }
 
 bool BulletCurvesData2D::get_rotate_towards_adjusted_direction() const {
@@ -92,6 +100,7 @@ bool BulletCurvesData2D::get_rotate_towards_adjusted_direction() const {
 }
 void BulletCurvesData2D::set_rotate_towards_adjusted_direction(bool value) {
 	rotate_towards_adjusted_direction = value;
+	emit_changed();
 }
 
 real_t BulletCurvesData2D::get_direction_curve_rotation_speed() const {
@@ -103,6 +112,7 @@ void BulletCurvesData2D::set_direction_curve_rotation_speed(real_t value) {
 		return;
 	}
 	direction_curve_rotation_speed = value;
+	emit_changed();
 }
 
 Ref<Curve> BulletCurvesData2D::get_y_direction_curve() const {
@@ -114,6 +124,7 @@ void BulletCurvesData2D::set_y_direction_curve(const Ref<Curve> &curve) {
 	}
 
 	y_direction_curve = curve;
+	emit_changed();
 }
 
 bool BulletCurvesData2D::get_y_direction_use_unit_curve() const {
@@ -121,6 +132,7 @@ bool BulletCurvesData2D::get_y_direction_use_unit_curve() const {
 }
 void BulletCurvesData2D::set_y_direction_use_unit_curve(bool value) {
 	y_direction_use_unit_curve = value;
+	emit_changed();
 }
 
 real_t BulletCurvesData2D::get_y_direction_curve_strength() const {
@@ -132,6 +144,7 @@ void BulletCurvesData2D::set_y_direction_curve_strength(real_t value) {
 		return;
 	}
 	y_direction_curve_strength = value;
+	emit_changed();
 }
 
 DirectionCurveMode BulletCurvesData2D::get_y_direction_curve_mode() const {
@@ -143,6 +156,7 @@ void BulletCurvesData2D::set_y_direction_curve_mode(DirectionCurveMode mode) {
 		return;
 	}
 	y_direction_curve_mode = mode;
+	emit_changed();
 }
 
 Ref<Curve> BulletCurvesData2D::get_gravity_strength_curve() const {
@@ -154,6 +168,7 @@ void BulletCurvesData2D::set_gravity_strength_curve(const Ref<Curve> &curve) {
 	}
 
 	gravity_strength_curve = curve;
+	emit_changed();
 }
 
 bool BulletCurvesData2D::get_gravity_use_unit_curve() const {
@@ -161,6 +176,7 @@ bool BulletCurvesData2D::get_gravity_use_unit_curve() const {
 }
 void BulletCurvesData2D::set_gravity_use_unit_curve(bool value) {
 	gravity_use_unit_curve = value;
+	emit_changed();
 }
 
 void BulletCurvesData2D::_bind_methods() {

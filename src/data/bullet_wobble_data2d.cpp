@@ -46,7 +46,10 @@ TypedArray<BulletWobbleData2D> BulletWobbleData2D::generate_random_data(
 }
 
 bool BulletWobbleData2D::get_enabled() const { return enabled; }
-void BulletWobbleData2D::set_enabled(bool value) { enabled = value; }
+void BulletWobbleData2D::set_enabled(bool value) {
+	enabled = value;
+	emit_changed();
+}
 
 BulletWobbleData2D::WobbleMode BulletWobbleData2D::get_mode() const { return mode; }
 void BulletWobbleData2D::set_mode(WobbleMode value) {
@@ -55,6 +58,7 @@ void BulletWobbleData2D::set_mode(WobbleMode value) {
 		return;
 	}
 	mode = value;
+	emit_changed();
 }
 
 BulletWobbleData2D::WobbleWaveform BulletWobbleData2D::get_waveform() const { return waveform; }
@@ -64,6 +68,7 @@ void BulletWobbleData2D::set_waveform(WobbleWaveform value) {
 		return;
 	}
 	waveform = value;
+	emit_changed();
 }
 
 real_t BulletWobbleData2D::get_amplitude() const { return amplitude; }
@@ -73,6 +78,7 @@ void BulletWobbleData2D::set_amplitude(real_t value) {
 		return;
 	}
 	amplitude = value;
+	emit_changed();
 }
 
 real_t BulletWobbleData2D::get_frequency_hz() const { return frequency_hz; }
@@ -82,6 +88,7 @@ void BulletWobbleData2D::set_frequency_hz(real_t value) {
 		return;
 	}
 	frequency_hz = value;
+	emit_changed();
 }
 
 real_t BulletWobbleData2D::get_phase_rad() const { return phase_rad; }
@@ -91,6 +98,7 @@ void BulletWobbleData2D::set_phase_rad(real_t value) {
 		return;
 	}
 	phase_rad = value;
+	emit_changed();
 }
 
 real_t BulletWobbleData2D::get_phase_step_per_bullet() const { return phase_step_per_bullet; }
@@ -100,10 +108,14 @@ void BulletWobbleData2D::set_phase_step_per_bullet(real_t value) {
 		return;
 	}
 	phase_step_per_bullet = value;
+	emit_changed();
 }
 
 bool BulletWobbleData2D::get_distance_phased() const { return distance_phased; }
-void BulletWobbleData2D::set_distance_phased(bool value) { distance_phased = value; }
+void BulletWobbleData2D::set_distance_phased(bool value) {
+	distance_phased = value;
+	emit_changed();
+}
 
 real_t BulletWobbleData2D::get_damping_per_sec() const { return damping_per_sec; }
 void BulletWobbleData2D::set_damping_per_sec(real_t value) {
@@ -112,6 +124,7 @@ void BulletWobbleData2D::set_damping_per_sec(real_t value) {
 		return;
 	}
 	damping_per_sec = value;
+	emit_changed();
 }
 
 real_t BulletWobbleData2D::get_delay_sec() const { return delay_sec; }
@@ -121,6 +134,7 @@ void BulletWobbleData2D::set_delay_sec(real_t value) {
 		return;
 	}
 	delay_sec = value;
+	emit_changed();
 }
 
 real_t BulletWobbleData2D::get_duration_sec() const { return duration_sec; }
@@ -130,10 +144,14 @@ void BulletWobbleData2D::set_duration_sec(real_t value) {
 		return;
 	}
 	duration_sec = value;
+	emit_changed();
 }
 
 bool BulletWobbleData2D::get_face_movement_direction() const { return face_movement_direction; }
-void BulletWobbleData2D::set_face_movement_direction(bool value) { face_movement_direction = value; }
+void BulletWobbleData2D::set_face_movement_direction(bool value) {
+	face_movement_direction = value;
+	emit_changed();
+}
 
 real_t BulletWobbleData2D::get_face_rotation_speed() const { return face_rotation_speed; }
 void BulletWobbleData2D::set_face_rotation_speed(real_t value) {
@@ -142,6 +160,7 @@ void BulletWobbleData2D::set_face_rotation_speed(real_t value) {
 		return;
 	}
 	face_rotation_speed = value;
+	emit_changed();
 }
 
 void BulletWobbleData2D::_bind_methods() {

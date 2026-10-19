@@ -59,6 +59,7 @@ void BulletRotationData2D::set_rotation_speed(real_t new_rotation_speed) {
 		return;
 	}
 	rotation_speed = new_rotation_speed;
+	emit_changed();
 }
 
 real_t BulletRotationData2D::get_max_rotation_speed() {
@@ -70,6 +71,7 @@ void BulletRotationData2D::set_max_rotation_speed(real_t new_max_rotation_speed)
 		return;
 	}
 	max_rotation_speed = new_max_rotation_speed;
+	emit_changed();
 }
 
 real_t BulletRotationData2D::get_rotation_acceleration() {
@@ -81,6 +83,7 @@ void BulletRotationData2D::set_rotation_acceleration(real_t new_rotation_acceler
 		return;
 	}
 	rotation_acceleration = new_rotation_acceleration;
+	emit_changed();
 }
 
 void BulletRotationData2D::_bind_methods() {

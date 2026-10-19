@@ -57,6 +57,7 @@ void BulletSpeedData2D::set_speed(real_t new_speed) {
 		return;
 	}
 	speed = new_speed;
+	emit_changed();
 }
 
 real_t BulletSpeedData2D::get_max_speed() {
@@ -68,6 +69,7 @@ void BulletSpeedData2D::set_max_speed(real_t new_max_speed) {
 		return;
 	}
 	max_speed = new_max_speed;
+	emit_changed();
 }
 
 real_t BulletSpeedData2D::get_acceleration() {
@@ -79,6 +81,7 @@ void BulletSpeedData2D::set_acceleration(real_t new_acceleration) {
 		return;
 	}
 	acceleration = new_acceleration;
+	emit_changed();
 }
 
 void BulletSpeedData2D::_bind_methods() {

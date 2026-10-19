@@ -242,7 +242,10 @@ public:
 	void set_monitorable(bool new_monitorable);
 
 	bool get_emit_collision_signals() const { return emit_collision_signals; }
-	void set_emit_collision_signals(bool value) { emit_collision_signals = value; }
+	void set_emit_collision_signals(bool value) {
+		emit_collision_signals = value;
+		emit_changed();
+	}
 
 	Ref<Resource> get_shared_bullets_custom_data() const;
 	void set_shared_bullets_custom_data(const Ref<Resource> &new_shared_bullets_custom_data);
