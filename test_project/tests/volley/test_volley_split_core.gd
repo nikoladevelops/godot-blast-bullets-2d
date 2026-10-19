@@ -449,3 +449,90 @@ func test_a_manual_split_that_cannot_split_keeps_the_bullet() -> void:
 	var coin: BulletVolley2D = pickup[0]
 	assert_false(coin.split_set_data(_chain([_stage()]), data), "pickups never split")
 	expect_error_sequence(["split_set_data: pickups never split, nothing changed."])
+
+
+## inherit_parent_velocity hands the parent volley's inherited momentum to the
+## children; off, the children start from their own speed alone.
+func test_children_inherit_the_parent_momentum_only_when_asked() -> void:
+	for inherit in [true, false]:
+		splits.clear()
+		var s := _stage(2)
+		s.speed_mode = BulletSplitStage2D.SPEED_FIXED
+		s.fixed_speed = 0.0
+		s.inherit_parent_velocity = inherit
+		var data := H.make_volley_data(1, 0.0, 5.0)
+		var v := factory.spawn_volley(data, Vector2(40, -30))
+		v.split_set_data(_chain([s]), H.make_volley_data(1, 0.0, 5.0))
+		v.split_bullet(0)
+		factory.debug_advance_time(DT)
+		assert_eq(splits.size(), 1, "split")
+		var children: BulletVolley2D = splits[0][2]
+		var want := Vector2(40, -30) if inherit else Vector2.ZERO
+		for i in children.get_amount_bullets():
+			assert_almost_eq(children.get_bullet_velocity(i).distance_to(want), 0.0, 0.001, "inherit %s: child %d velocity" % [inherit, i])
+
+
+## Splits recorded before a hit-stop (processing off) or a frozen bullet
+## world (time_scale 0) are never lost or doubled: each spawns exactly once,
+## and the books stay balanced throughout.
+func test_queued_splits_survive_a_pause_and_a_frozen_world() -> void:
+	for freeze in ["pause", "time_scale"]:
+		splits.clear()
+		var v := _armed([_stage(2)], 3, 0.0, 5.0)
+		v.all_bullets_split()
+		if freeze == "pause":
+			factory.set_is_factory_processing_bullets(false)
+		else:
+			factory.time_scale = 0.0
+		for i in 3:
+			factory.debug_advance_time(DT)
+			assert_true(factory.debug_assert_no_dangling()["ok"], "%s: balanced books while frozen" % freeze)
+		var while_frozen := splits.size()
+		factory.set_is_factory_processing_bullets(true)
+		factory.time_scale = 1.0
+		for i in 3:
+			factory.debug_advance_time(DT)
+		assert_lte(while_frozen, 3, "%s: never more than the three splits" % freeze)
+		assert_eq(splits.size(), 3, "%s: each queued split spawned exactly once" % freeze)
+		assert_eq(factory.get_pending_split_count(), 0, "%s: nothing left waiting" % freeze)
+
+
+## Huge (but valid) stage values never put a non-finite child on the physics
+## server: an overflowing pose falls back to the parent's, an overflowing
+## speed keeps the spawn data's.
+func test_huge_stage_values_keep_children_finite() -> void:
+	var s := _stage(4)
+	s.spawn_offset_px = 1e30
+	s.scale_multiplier = 1e30
+	s.speed_mode = BulletSplitStage2D.SPEED_FIXED
+	s.fixed_speed = 1e30
+	var v := _armed([s], 1, 50.0, 5.0)
+	v.split_bullet(0)
+	for i in 3:
+		factory.debug_advance_time(DT)
+	assert_eq(splits.size(), 1, "split")
+	var children: BulletVolley2D = splits[0][2]
+	assert_eq(broken_bullets(children), [], "finite, sane children")
+	expect_no_errors("no engine error for the overflowing settings")
+
+
+## A parent's own per-bullet curves and wobble (its entries, or per-bullet
+## writes) reach every child that copies the parent's data.
+func test_children_carry_the_parent_bullet_curves_and_wobble() -> void:
+	var data := H.make_volley_data(2, 60.0, 5.0)
+	var v := factory.spawn_volley(data)
+	v.split_set_data(_chain([_stage(3)]), data) # the parent's own data: children copy the parent
+	var curves := BulletCurvesData2D.new()
+	curves.movement_speed_curve = H.make_flat_curve(90.0)
+	var wobble := BulletWobbleData2D.new()
+	wobble.enabled = true
+	wobble.amplitude = 12.0
+	v.bullet_set_curves_data(1, curves)
+	v.bullet_set_wobble_data(1, wobble)
+	v.split_bullet(1)
+	factory.debug_advance_time(DT)
+	assert_eq(splits.size(), 1, "bullet 1 split")
+	var children: BulletVolley2D = splits[0][2]
+	for i in children.get_amount_bullets():
+		assert_eq(children.bullet_get_curves_data(i), curves, "child %d flies the parent's curves" % i)
+		assert_eq(children.bullet_get_wobble_data(i), wobble, "child %d wobbles like the parent" % i)
