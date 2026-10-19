@@ -141,3 +141,35 @@ func test_telegraph_payload_matches_the_shot_and_warns_once_per_chain() -> void:
 	for i in aim.size():
 		assert_almost_eq((aim[i] as Transform2D).origin.distance_to(shot.get_bullet_transform(i).origin), 0.0, 0.01, "bullet %d spawns where it was telegraphed" % i)
 	sp.set_shooting_enabled(false)
+
+
+## Every way a running chain ends reports burst_finished exactly once:
+## burst_count shrunk to the shots already fired, reset_shooting(), and a
+## fresh begin_burst() over a running chain (which then runs its own chain
+## and reports that one too). The next chain starts clean (indexes 1..n).
+func test_every_chain_end_reports_once(how: String = use_parameters(["shrink_to_fired", "reset_shooting", "begin_over_running"])) -> void:
+	var sp := _spawner(5)
+	sp.begin_burst()
+	await _until(sp, "burst_shot_fired", 2)
+	assert_eq(get_signal_emit_count(sp, "burst_finished"), 0, "still running")
+	match how:
+		"shrink_to_fired":
+			sp.burst_count = 2
+		"reset_shooting":
+			sp.reset_shooting()
+		"begin_over_running":
+			sp.begin_burst()
+	assert_eq(get_signal_emit_count(sp, "burst_finished"), 1, "%s: the running chain reports its end at once" % how)
+	if how == "begin_over_running":
+		await _until(sp, "burst_finished", 2)
+		assert_eq(get_signal_emit_count(sp, "burst_finished"), 2, "the new chain reports its own end")
+		assert_eq(get_signal_parameters(sp, "burst_shot_fired", 2)[0], 1, "the new chain counts from 1")
+	else:
+		assert_eq(sp.get_burst_shots_left(), 0, "%s: nothing left" % how)
+		await idle(20)
+		assert_eq(get_signal_emit_count(sp, "burst_finished"), 1, "%s: no late report" % how)
+		sp.burst_count = 2
+		sp.begin_burst()
+		await _until(sp, "burst_finished", 2)
+		var last: int = get_signal_emit_count(sp, "burst_shot_fired") - 1
+		assert_eq(get_signal_parameters(sp, "burst_shot_fired", last)[0], 2, "%s: the next chain counts 1..n" % how)

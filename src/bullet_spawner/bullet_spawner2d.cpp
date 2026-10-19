@@ -420,10 +420,14 @@ void BulletSpawner2D::set_burst_count(int value) {
 	}
 	burst_count = value;
 	// A running chain never exceeds the new count (shot indexes stay 1..n).
+	// Shrunk to the shots already fired, the chain ends with its report
+	// (cancel_burst_chain must still see it running).
 	if (burst_shots_left > 0) {
-		burst_shots_left = MAX(0, MIN(burst_shots_left, burst_count - burst_shots_fired));
-		if (burst_shots_left == 0) {
+		const int left = MAX(0, MIN(burst_shots_left, burst_count - burst_shots_fired));
+		if (left == 0) {
 			cancel_burst_chain();
+		} else {
+			burst_shots_left = left;
 		}
 	}
 }
@@ -522,12 +526,9 @@ void BulletSpawner2D::reset_shooting() {
 	shoot_time_left = shoot_initial_delay_sec;
 	arm_retarget_countdown();
 	// Burst/telegraph chains never survive a restart: a stale mid-burst
-	// countdown firing into a reset wave would double-fire volleys.
-	burst_shots_left = 0;
-	burst_consecutive_failures = 0;
-	burst_time_left = 0.0;
-	burst_mirror_next = false;
-	burst_telegraph_done = false;
+	// countdown firing into a reset wave would double-fire volleys. A
+	// running chain ends with its burst_finished report.
+	cancel_burst_chain();
 	telegraph_pending = false;
 	telegraph_time_left = 0.0;
 	// Pattern-list sequencers clear with the rest: resuming a stale queue
@@ -1423,6 +1424,14 @@ void BulletSpawner2D::begin_burst() {
 }
 
 void BulletSpawner2D::begin_burst_chain(bool auto_started) {
+	// A chain still running ends first, with its burst_finished report. A
+	// handler of that report that started its own chain wins.
+	if (burst_shots_left > 0) {
+		cancel_burst_chain();
+		if (burst_shots_left > 0) {
+			return;
+		}
+	}
 	// A fresh trigger always owns the phrasing: stale telegraphs from an
 	// interrupted trigger never fire into the new burst. Plain-burst mode
 	// with count 1 collapses to a single immediate shot (no chain to drain).
