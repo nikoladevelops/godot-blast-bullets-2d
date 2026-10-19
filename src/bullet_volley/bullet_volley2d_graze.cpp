@@ -327,14 +327,18 @@ bool BulletVolley2D::dispatch_graze_events() {
 	graze_dispatch_scratch.swap(graze_events);
 	const uint64_t self_id = get_instance_id();
 	const CachedStringNames2D &names = CachedStringNames2D::get();
+	// An earlier handler (or the spawner's handler of this very event)
+	// re-armed or cleared the zones, or disabled / woke the bullet (epoch
+	// moved): the event belongs to a past state.
+	auto event_current = [this](const GrazeEvent2D &e) {
+		if (e.generation != graze_generation || e.zone >= graze_zone_slots || graze_zones[e.zone].is_null()) {
+			return false;
+		}
+		return e.bullet_index >= 0 && e.bullet_index < amount_bullets && all_bullets_enabled_set.contains(e.bullet_index) && collision_epoch_for_bullet(e.bullet_index) == e.epoch;
+	};
 	for (size_t k = 0; k < graze_dispatch_scratch.size(); ++k) {
 		const GrazeEvent2D ev = graze_dispatch_scratch[k];
-		// An earlier handler re-armed or cleared the zones, or disabled /
-		// woke this bullet (epoch moved): the event belongs to a past state.
-		if (ev.generation != graze_generation || ev.zone >= graze_zone_slots || graze_zones[ev.zone].is_null()) {
-			continue;
-		}
-		if (ev.bullet_index < 0 || ev.bullet_index >= amount_bullets || !all_bullets_enabled_set.contains(ev.bullet_index) || collision_epoch_for_bullet(ev.bullet_index) != ev.epoch) {
+		if (!event_current(ev)) {
 			continue;
 		}
 		// A target freed (or queued for deletion) since the move is no
@@ -366,6 +370,11 @@ bool BulletVolley2D::dispatch_graze_events() {
 			if (is_queued_for_deletion()) {
 				graze_dispatch_scratch.clear();
 				return true;
+			}
+			// The handler may have ended this graze (disabled the bullet,
+			// cleared the zones): the factory hears live grazes only.
+			if (!event_current(ev)) {
+				continue;
 			}
 			// The handler may have freed the target: the factory's
 			// handler gets a live one or nothing.

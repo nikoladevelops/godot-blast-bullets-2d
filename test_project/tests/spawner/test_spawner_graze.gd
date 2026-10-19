@@ -297,3 +297,21 @@ func test_an_array_mutated_in_place_still_arms_its_usable_zones_and_warns_once()
 	assert_eq(v.get_graze_zones().size(), 4, "the first four arm")
 	step_factory()
 	assert_eq(log.size(), 2, "both volleys graze with the first zone")
+
+
+## Every graze handler sees a live bullet of the arming it grazed with: when
+## the spawner's handler disables the bullet (or clears the zones), the
+## factory's handler never receives that event afterwards.
+func test_the_factory_never_hears_a_graze_the_spawner_handler_ended(how: String = use_parameters(["disable_bullet", "graze_clear"])) -> void:
+	make_graze_target(Vector2(10, 0))
+	var sp := _spawner([H.make_graze_zone([20.0])])
+	var factory_heard: Array = []
+	sp.bullet_grazed.connect(func(_t, v: BulletVolley2D, i: int, _z, _r) -> void:
+		if how == "disable_bullet":
+			v.disable_bullet(i)
+		else:
+			v.graze_clear())
+	factory.bullet_grazed.connect(func(_t, v: BulletVolley2D, i: int, _z, _r) -> void: factory_heard.append(v.is_bullet_status_enabled(i)))
+	_shoot(sp)
+	step_factory(3)
+	assert_eq(factory_heard, [], "%s: the factory never hears the ended graze" % how)
