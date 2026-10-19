@@ -910,6 +910,13 @@ bool BulletSpawner2D::shoot_once() {
 	// (Latch/depth were already taken at entry; no re-take here.)
 	const uint64_t volley_id = bullets->get_instance_id();
 	const uint64_t self_id = get_instance_id();
+	// Graze, sound, flock and split arm BEFORE the first signal (no user code
+	// runs here): every handler, pre_shoot included, sees an armed volley,
+	// and what a pre_shoot handler arms instead sticks.
+	apply_volley_graze(bullets);
+	apply_volley_sound(bullets);
+	apply_volley_flock(bullets);
+	apply_volley_split(bullets, volley_data);
 	// Last-chance hook on the freshly spawned, stamped volley (before the
 	// muzzle offset, homing and orbit are configured): handlers may tweak the
 	// live instance (speeds, custom data) or drop it via queue_free().
@@ -938,12 +945,6 @@ bool BulletSpawner2D::shoot_once() {
 	if (spawn_position_offset != Vector2(0, 0)) {
 		bullets->teleport_shift_all_bullets(resolve_spawn_offset_global());
 	}
-	// Graze zones arm before the homing signals (no user code runs here),
-	// so every handler from here on sees an armed volley.
-	apply_volley_graze(bullets);
-	apply_volley_sound(bullets);
-	apply_volley_flock(bullets);
-	apply_volley_split(bullets, volley_data);
 	apply_volley_homing_and_orbiting(bullets, arc_resolved ? &arc_targets : nullptr);
 	// Re-validate: handlers of homing_targets_resolved/volley_homing_configured
 	// ran above and may have freed this volley or handed it to another owner.

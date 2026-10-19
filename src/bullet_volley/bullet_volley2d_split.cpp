@@ -78,9 +78,10 @@ int BulletVolley2D::split_capture(int bullet_index, int cause, const Transform2D
 		return 0;
 	}
 	// A bullet that already split max_splits_per_bullet times (it survived
-	// its earlier splits) splits no more; manual splits ignore the limit
-	// and the odds (the script decided).
-	if (cause != SPLIT_CAUSE_MANUAL && stage->max_splits_per_bullet > 0 && bullet_index < (int)split_counts.size() && (int)split_counts[bullet_index] >= stage->max_splits_per_bullet) {
+	// its earlier splits) splits no more; the limit only counts surviving
+	// parents (a bullet that died splitting and was revived splits again).
+	// Manual splits ignore the limit and the odds (the script decided).
+	if (cause != SPLIT_CAUSE_MANUAL && stage->parent_survives && stage->max_splits_per_bullet > 0 && bullet_index < (int)split_counts.size() && (int)split_counts[bullet_index] >= stage->max_splits_per_bullet) {
 		return 0;
 	}
 	if (cause != SPLIT_CAUSE_MANUAL && stage->chance < 1.0) {
@@ -343,7 +344,9 @@ bool BulletVolley2D::split_set_data(const Ref<BulletSplitData2D> &split, const R
 	}
 	std::shared_ptr<SplitConfig2D> config(new SplitConfig2D());
 	config->split = split;
-	split_arm(config, data, split_depth);
+	// A script call starts a fresh chain: generation 0 (children re-armed
+	// this way split by the chain's first stage).
+	split_arm(config, data, 0);
 	return true;
 }
 

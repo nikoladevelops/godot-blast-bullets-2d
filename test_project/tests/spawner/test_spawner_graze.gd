@@ -91,7 +91,7 @@ func test_every_shot_arms_its_volley_before_any_shot_signal() -> void:
 	sp.volley_fired.connect(func(v: BulletVolley2D, _n: int) -> void: seen.append(["volley_fired", v.is_graze_armed(), v.get_graze_zones()]))
 	sp.shoot_once()
 	expect_warning_sequence(["homing"]) # the empty homing group is reported once
-	assert_eq(seen[0], ["pre_shoot", false], "pre_shoot sees the bare volley (it may still change it)")
+	assert_eq(seen[0], ["pre_shoot", true], "pre_shoot sees the armed volley (its own arming would stick)")
 	assert_eq(seen[1], ["homing_targets_resolved", true], "armed before the homing signals")
 	assert_eq(seen[2], ["volley_fired", true, [null, z]], "armed with the spawner's zones, nulls in place")
 

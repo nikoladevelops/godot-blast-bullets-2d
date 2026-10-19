@@ -77,7 +77,7 @@
 			When on, the children keep their parent's sound effects.
 		</member>
 		<member name="max_splits_per_bullet" type="int" setter="set_max_splits_per_bullet" getter="get_max_splits_per_bullet" default="1">
-			How many times one bullet may split in one life, counted over every trigger (0 = no limit; the spawner warns about an unlimited survivor). Only matters with [member parent_survives]. Manual splits ignore it. Hidden while [member parent_survives] is off.
+			How many times one bullet may split in one life, counted over every trigger (0 = no limit; the spawner warns about an unlimited survivor). Only matters with [member parent_survives]: a bullet that left splitting and was woken again ([method BulletVolley2D.enable_bullet]) splits again. Manual splits ignore it. Hidden while [member parent_survives] is off.
 		</member>
 		<member name="parent_survives" type="bool" setter="set_parent_survives" getter="get_parent_survives" default="false">
 			When on, a split that does not kill the bullet (bounce, survived hit, homing reached, graze, the [member split_after_sec] timer, a manual split) adds the children and the parent keeps flying, splitting again on later triggers up to [member max_splits_per_bullet]. Deaths (killing hit, lifetime, despawn, clear) always take the parent. Off: the children replace the parent (it leaves without death effects of its own; On Split fires).

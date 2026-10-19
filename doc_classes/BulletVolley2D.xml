@@ -2326,7 +2326,7 @@
 			<param index="0" name="split" type="BulletSplitData2D" />
 			<param index="1" name="child_spawn_data" type="BulletVolleyData2D" default="null" />
 			<description>
-				Arms this volley to split by [param split] (for factory volleys, or to override a spawner volley until its next life). Children spawn from [param child_spawn_data]; [code]null[/code] keeps the data this volley was armed with (a spawner volley: its spawner's data). Refused (with an error, nothing changed) for a null chain, a pickup volley, or a volley without any spawn data to copy.
+				Arms this volley to split by [param split] (for factory volleys, or to override a spawner volley until its next life). Children spawn from [param child_spawn_data]; [code]null[/code] keeps the data this volley was armed with (a spawner volley: its spawner's data). The chain starts at generation 0 (its first stage), even on a volley of children. Refused (with an error, nothing changed) for a null chain, a pickup volley, or a volley without any spawn data to copy.
 			</description>
 		</method>
 		<method name="stop_sprite_animation">

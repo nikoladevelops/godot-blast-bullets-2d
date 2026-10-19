@@ -381,3 +381,35 @@ func test_orphan_policies_reach_every_queued_split() -> void:
 			factory.free_active_bullets()
 			await idle(1)
 	assert_eq("\n".join(problems), "", "every policy at every moment")
+
+
+
+## Graze, sound, flock and split are armed BEFORE pre_shoot: its handler sees
+## an armed volley, and what the handler sets instead sticks (the spawner's
+## arming never overwrites it afterwards).
+func test_pre_shoot_sees_the_arming_and_its_own_arming_sticks() -> void:
+	var sp := _split_spawner(_chain(2), 1, 5.0)
+	sp.flock_enabled = true
+	sp.flock = H.make_flock(1.0)
+	sp.graze_enabled = true
+	sp.graze_zones = [H.make_graze_zone([20.0])]
+	sp.graze_node_group = &"pre_shoot_grazers"
+	sp.sound_enabled = true
+	sp.sound_effects = [H.make_sound(BulletSoundData2D.SOUND_ON_HIT)]
+	var mine_chain := _chain(3)
+	var mine_flock := H.make_flock(2.0)
+	var mine_sound := H.make_sound(BulletSoundData2D.SOUND_ON_CLEAR)
+	var seen: Array = []
+	sp.pre_shoot.connect(func(v: BulletVolley2D, _n: int) -> void:
+		seen.append([v.split_get_data() == sp.split_data, v.flock_get() == sp.flock, int(v.debug_get_graze_info()["zone_slots"]), v.sound_get_effects().size()])
+		v.split_set_data(mine_chain, H.make_volley_data(1, 0.0, 5.0))
+		v.flock_join(mine_flock)
+		v.graze_set_zones([H.make_graze_zone([10.0]), H.make_graze_zone([30.0])], &"mine")
+		v.sound_set_effects([mine_sound]))
+	var v := _fire(sp)
+	expect_no_errors()
+	assert_eq(seen, [[true, true, 1, 1]], "pre_shoot sees every feature armed")
+	assert_eq(v.split_get_data(), mine_chain, "the handler's chain stuck")
+	assert_eq(v.flock_get(), mine_flock, "the handler's flock stuck")
+	assert_eq(int(v.debug_get_graze_info()["zone_slots"]), 2, "the handler's zones stuck")
+	assert_eq(v.sound_get_effects(), [mine_sound], "the handler's sounds stuck")

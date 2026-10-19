@@ -193,3 +193,46 @@ func test_reset_and_free_drop_the_cached_templates() -> void:
 		assert_eq(int(factory.debug_get_split_stats()["templates"]), 1, "%s: cached" % op)
 		factory.call(op)
 		assert_eq(int(factory.debug_get_split_stats()["templates"]), 0, "%s: dropped" % op)
+
+
+## A parked volley woken after its expiry gets a fresh life clock, and its
+## split timer runs again with it (it fired once per volley before).
+func test_a_woken_expired_volley_fires_its_split_timer_again() -> void:
+	var s := BulletSplitStage2D.new()
+	s.count = 2
+	s.split_on_lifetime_over = false
+	s.split_after_sec = 0.05
+	s.parent_survives = true
+	s.max_splits_per_bullet = 0 # no cap: only the timer decides
+	var chain := BulletSplitData2D.new()
+	chain.stages = [s]
+	var v := factory.spawn_volley(H.make_volley_data(1, 0.0, 0.1))
+	v.set_is_auto_pooling_enabled(false)
+	v.split_set_data(chain, H.make_volley_data(1, 0.0, 5.0))
+	for i in 9:
+		factory.debug_advance_time(DT)
+	assert_eq(splits.size(), 1, "the timer split once")
+	assert_true(v.is_parked(), "expired and parked")
+	v.enable_bullet(0)
+	for i in 5:
+		factory.debug_advance_time(DT)
+	assert_eq(splits.size(), 2, "the fresh life's timer split again")
+
+
+## max_splits_per_bullet counts the splits a SURVIVING parent made; a bullet
+## that died splitting and was revived splits again.
+func test_max_splits_only_limits_surviving_parents() -> void:
+	var s := BulletSplitStage2D.new()
+	s.count = 2
+	s.split_on_clear = true
+	s.max_splits_per_bullet = 1
+	var chain := BulletSplitData2D.new()
+	chain.stages = [s]
+	var v := factory.spawn_volley(H.make_volley_data(2, 0.0, 5.0))
+	v.set_is_auto_pooling_enabled(false)
+	v.split_set_data(chain, H.make_volley_data(1, 0.0, 5.0))
+	v.clear_bullet(0)
+	v.enable_bullet(0)
+	v.clear_bullet(0)
+	factory.debug_advance_time(DT)
+	assert_eq(splits.size(), 2, "the revived bullet split again (the parent never survived)")

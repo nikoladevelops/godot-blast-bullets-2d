@@ -164,3 +164,17 @@ func test_children_of_per_bullet_data_take_their_parents_values_without_warnings
 	assert_eq(int(factory.debug_get_split_stats()["templates"]), 1, "one cached template for the parent data")
 	data.max_life_time = DT * 0.25 # an edit drops the cached template
 	assert_eq(int(factory.debug_get_split_stats()["templates"]), 0, "dropped on changed")
+
+
+## split_set_data starts a fresh chain at generation 0, even on a volley of
+## children (it used to keep the old generation and never split again).
+func test_split_set_data_on_children_starts_a_fresh_chain() -> void:
+	_armed(_chain([_stage(2)]))
+	_run(1)
+	assert_eq(splits.size(), 1, "the parent split")
+	var children: BulletVolley2D = splits[0][2]
+	assert_eq(children.split_get_depth(), 1, "children are generation 1")
+	var data := H.make_volley_data(1, 0.0, 5.0)
+	assert_true(children.split_set_data(_chain([_stage(3)]), data), "re-armed")
+	assert_eq(children.split_get_depth(), 0, "a script call starts at generation 0")
+	assert_true(children.split_bullet(0), "and the stage for generation 0 splits it")

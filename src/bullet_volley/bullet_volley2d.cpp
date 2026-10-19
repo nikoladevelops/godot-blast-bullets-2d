@@ -712,6 +712,7 @@ void BulletVolley2D::enable_bullet(int bullet_index, int collision_amount, bool 
 		if (!is_life_time_infinite && current_life_time <= 0.0) {
 			current_life_time = max_life_time;
 			curves_elapsed_time = 0.0;
+			split_timer_fired = false; // the split timer runs on that clock
 		}
 		is_active = true;
 		set_visible(true);

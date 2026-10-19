@@ -1821,7 +1821,7 @@
 			<param index="0" name="volley" type="BulletVolley2D" />
 			<param index="1" name="volley_index" type="int" />
 			<description>
-				Last-chance hook fired after the volley has spawned and been stamped, but before homing/orbiting is configured and before volley_fired. Handlers may tweak the live volley through its API (speed ramp, difficulty scale); the spawn data has already been consumed at this point. Same handler contract as volley_fired: never call shoot_once from here (use shoot_once_deferred).
+				Last-chance hook fired after the volley has spawned, been stamped and armed with this spawner's graze, sound, flocking and splitting settings, but before the muzzle offset, homing and orbiting are configured and before volley_fired. What a handler arms instead (graze_set_zones, sound_set_effects, flock_join, split_set_data) is kept. Handlers may tweak the live volley through its API (speed ramp, difficulty scale); the spawn data has already been consumed at this point. Same handler contract as volley_fired: never call shoot_once from here (use shoot_once_deferred).
 			</description>
 		</signal>
 		<signal name="retarget_applied">
