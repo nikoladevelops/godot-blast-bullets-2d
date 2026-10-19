@@ -56,7 +56,7 @@ for the rest: the sections are written to be looked up, not read once.
 
 ```sh
 GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py   # build (exit 1 = failed; never raw scons, never edit SConstruct)
-python3 tools/run_tests.py                                       # 197 files / 1744 tests, ~10 s, leak-checked
+python3 tools/run_tests.py                                       # 196 files / 1774 tests, ~10 s, leak-checked
 python3 tools/run_tests.py --suite <substring> --full            # one area, every failure message unclipped
 python3 tools/run_tests.py --self-test                           # proves the harness still catches failures/leaks
 python3 tools/run_editor_smoke.py                                # headless EDITOR run of tests/editor_smoke/ (editor-only paths)
