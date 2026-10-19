@@ -128,7 +128,7 @@ double BulletSoundData2D::get_volume_db() const { return volume_db; }
 void BulletSoundData2D::set_volume_db(double value) {
 	// The player turns dB into a linear gain: 1e30 dB is an infinite gain
 	// and a huge pair (base + trim) sums to NaN.
-	if (!Math::is_finite(value) || value < -80.0 || value > 80.0) {
+	if (!is_finite_real2d(value) || value < -80.0 || value > 80.0) {
 		UtilityFunctions::push_error("BulletSoundData2D: volume_db must be finite and between -80 and 80, keeping the old value.");
 		return;
 	}
@@ -141,7 +141,7 @@ void BulletSoundData2D::set_volume_db(double value) {
 
 double BulletSoundData2D::get_pitch_scale() const { return pitch_scale; }
 void BulletSoundData2D::set_pitch_scale(double value) {
-	if (!Math::is_finite(value) || value < 0.01 || value > SOUND_PITCH_CEILING) {
+	if (!is_finite_real2d(value) || value < 0.01 || value > SOUND_PITCH_CEILING) {
 		UtilityFunctions::push_error("BulletSoundData2D: pitch_scale must be finite and between 0.01 and 1000, keeping the old value.");
 		return;
 	}
@@ -154,7 +154,7 @@ void BulletSoundData2D::set_pitch_scale(double value) {
 
 double BulletSoundData2D::get_random_pitch() const { return random_pitch; }
 void BulletSoundData2D::set_random_pitch(double value) {
-	if (!Math::is_finite(value) || value < 1.0 || value > 16.0) {
+	if (!is_finite_real2d(value) || value < 1.0 || value > 16.0) {
 		UtilityFunctions::push_error("BulletSoundData2D: random_pitch must be finite and between 1 and 16, keeping the old value.");
 		return;
 	}
@@ -167,7 +167,7 @@ void BulletSoundData2D::set_random_pitch(double value) {
 
 double BulletSoundData2D::get_random_volume_offset_db() const { return random_volume_offset_db; }
 void BulletSoundData2D::set_random_volume_offset_db(double value) {
-	if (!Math::is_finite(value) || value < 0.0 || value > 40.0) {
+	if (!is_finite_real2d(value) || value < 0.0 || value > 40.0) {
 		UtilityFunctions::push_error("BulletSoundData2D: random_volume_offset_db must be finite and between 0 and 40, keeping the old value.");
 		return;
 	}
@@ -180,7 +180,7 @@ void BulletSoundData2D::set_random_volume_offset_db(double value) {
 
 double BulletSoundData2D::get_random_volume_min_db() const { return random_volume_min_db; }
 void BulletSoundData2D::set_random_volume_min_db(double value) {
-	if (!Math::is_finite(value) || value < -40.0 || value > 40.0) {
+	if (!is_finite_real2d(value) || value < -40.0 || value > 40.0) {
 		UtilityFunctions::push_error("BulletSoundData2D: random_volume_min_db must be finite and between -40 and 40, keeping the old value.");
 		return;
 	}
@@ -193,7 +193,7 @@ void BulletSoundData2D::set_random_volume_min_db(double value) {
 
 double BulletSoundData2D::get_random_volume_max_db() const { return random_volume_max_db; }
 void BulletSoundData2D::set_random_volume_max_db(double value) {
-	if (!Math::is_finite(value) || value < -40.0 || value > 40.0) {
+	if (!is_finite_real2d(value) || value < -40.0 || value > 40.0) {
 		UtilityFunctions::push_error("BulletSoundData2D: random_volume_max_db must be finite and between -40 and 40, keeping the old value.");
 		return;
 	}
@@ -206,7 +206,7 @@ void BulletSoundData2D::set_random_volume_max_db(double value) {
 
 double BulletSoundData2D::get_random_pitch_min() const { return random_pitch_min; }
 void BulletSoundData2D::set_random_pitch_min(double value) {
-	if (!Math::is_finite(value) || value < 0.01 || value > 16.0) {
+	if (!is_finite_real2d(value) || value < 0.01 || value > 16.0) {
 		UtilityFunctions::push_error("BulletSoundData2D: random_pitch_min must be finite and between 0.01 and 16, keeping the old value.");
 		return;
 	}
@@ -219,7 +219,7 @@ void BulletSoundData2D::set_random_pitch_min(double value) {
 
 double BulletSoundData2D::get_random_pitch_max() const { return random_pitch_max; }
 void BulletSoundData2D::set_random_pitch_max(double value) {
-	if (!Math::is_finite(value) || value < 0.01 || value > 16.0) {
+	if (!is_finite_real2d(value) || value < 0.01 || value > 16.0) {
 		UtilityFunctions::push_error("BulletSoundData2D: random_pitch_max must be finite and between 0.01 and 16, keeping the old value.");
 		return;
 	}
@@ -232,7 +232,7 @@ void BulletSoundData2D::set_random_pitch_max(double value) {
 
 double BulletSoundData2D::get_random_pan() const { return random_pan; }
 void BulletSoundData2D::set_random_pan(double value) {
-	if (!Math::is_finite(value) || value < 0.0 || value > 1.0) {
+	if (!is_finite_real2d(value) || value < 0.0 || value > 1.0) {
 		UtilityFunctions::push_error("BulletSoundData2D: random_pan must be finite and between 0 and 1, keeping the old value.");
 		return;
 	}
@@ -245,7 +245,7 @@ void BulletSoundData2D::set_random_pan(double value) {
 
 double BulletSoundData2D::get_trigger_chance() const { return trigger_chance; }
 void BulletSoundData2D::set_trigger_chance(double value) {
-	if (!Math::is_finite(value) || value < 0.0 || value > 1.0) {
+	if (!is_finite_real2d(value) || value < 0.0 || value > 1.0) {
 		UtilityFunctions::push_error("BulletSoundData2D: trigger_chance must be finite and between 0 and 1, keeping the old value.");
 		return;
 	}
@@ -358,7 +358,7 @@ void BulletSoundData2D::set_camera_path(const NodePath &value) {
 
 double BulletSoundData2D::get_camera_margin_px() const { return camera_margin_px; }
 void BulletSoundData2D::set_camera_margin_px(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSoundData2D: camera_margin_px must be finite and >= 0, keeping the old value.");
 		return;
 	}
@@ -380,7 +380,7 @@ void BulletSoundData2D::set_zoom_scales_distance(bool value) {
 
 double BulletSoundData2D::get_zoom_gain_db() const { return zoom_gain_db; }
 void BulletSoundData2D::set_zoom_gain_db(double value) {
-	if (!Math::is_finite(value) || value < -24.0 || value > 24.0) {
+	if (!is_finite_real2d(value) || value < -24.0 || value > 24.0) {
 		UtilityFunctions::push_error("BulletSoundData2D: zoom_gain_db must be finite and between -24 and 24, keeping the old value.");
 		return;
 	}
@@ -431,7 +431,7 @@ void BulletSoundData2D::set_occlusion_bus(const StringName &value) {
 
 double BulletSoundData2D::get_min_interval_sec() const { return min_interval_sec; }
 void BulletSoundData2D::set_min_interval_sec(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSoundData2D: min_interval_sec must be finite and >= 0, keeping the old value.");
 		return;
 	}
@@ -496,7 +496,7 @@ void BulletSoundData2D::set_steal_mode(int value) {
 
 double BulletSoundData2D::get_max_duration_sec() const { return max_duration_sec; }
 void BulletSoundData2D::set_max_duration_sec(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSoundData2D: max_duration_sec must be finite and >= 0, keeping the old value.");
 		return;
 	}
@@ -535,7 +535,7 @@ void BulletSoundData2D::set_max_volley_amount(int value) {
 
 double BulletSoundData2D::get_amount_gain_db() const { return amount_gain_db; }
 void BulletSoundData2D::set_amount_gain_db(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSoundData2D: amount_gain_db must be finite and >= 0, keeping the old value.");
 		return;
 	}
@@ -550,7 +550,7 @@ double BulletSoundData2D::get_volume_min_db() const { return volume_min_db; }
 void BulletSoundData2D::set_volume_min_db(double value) {
 	// The player turns dB into a linear gain: 1e30 dB is an infinite gain
 	// and a huge pair (base + trim) sums to NaN.
-	if (!Math::is_finite(value) || value < -80.0 || value > 80.0) {
+	if (!is_finite_real2d(value) || value < -80.0 || value > 80.0) {
 		UtilityFunctions::push_error("BulletSoundData2D: volume_min_db must be finite and between -80 and 80, keeping the old value.");
 		return;
 	}
@@ -565,7 +565,7 @@ double BulletSoundData2D::get_volume_max_db() const { return volume_max_db; }
 void BulletSoundData2D::set_volume_max_db(double value) {
 	// The player turns dB into a linear gain: 1e30 dB is an infinite gain
 	// and a huge pair (base + trim) sums to NaN.
-	if (!Math::is_finite(value) || value < -80.0 || value > 80.0) {
+	if (!is_finite_real2d(value) || value < -80.0 || value > 80.0) {
 		UtilityFunctions::push_error("BulletSoundData2D: volume_max_db must be finite and between -80 and 80, keeping the old value.");
 		return;
 	}
@@ -578,7 +578,7 @@ void BulletSoundData2D::set_volume_max_db(double value) {
 
 double BulletSoundData2D::get_pitch_min() const { return pitch_min; }
 void BulletSoundData2D::set_pitch_min(double value) {
-	if (!Math::is_finite(value) || value < 0.01 || value > SOUND_PITCH_CEILING) {
+	if (!is_finite_real2d(value) || value < 0.01 || value > SOUND_PITCH_CEILING) {
 		UtilityFunctions::push_error("BulletSoundData2D: pitch_min must be finite and between 0.01 and 1000, keeping the old value.");
 		return;
 	}
@@ -591,7 +591,7 @@ void BulletSoundData2D::set_pitch_min(double value) {
 
 double BulletSoundData2D::get_pitch_max() const { return pitch_max; }
 void BulletSoundData2D::set_pitch_max(double value) {
-	if (!Math::is_finite(value) || value < 0.01 || value > SOUND_PITCH_CEILING) {
+	if (!is_finite_real2d(value) || value < 0.01 || value > SOUND_PITCH_CEILING) {
 		UtilityFunctions::push_error("BulletSoundData2D: pitch_max must be finite and between 0.01 and 1000, keeping the old value.");
 		return;
 	}
@@ -604,7 +604,7 @@ void BulletSoundData2D::set_pitch_max(double value) {
 
 double BulletSoundData2D::get_fade_out_sec() const { return fade_out_sec; }
 void BulletSoundData2D::set_fade_out_sec(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSoundData2D: fade_out_sec must be finite and >= 0, keeping the old value.");
 		return;
 	}

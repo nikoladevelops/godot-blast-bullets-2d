@@ -6,6 +6,7 @@
 
 #include "bullet_spawner/bullet_spawner2d_internal.hpp"
 #include "core/graze_targets2d.hpp"
+#include "core/transform_math2d.hpp"
 
 using namespace godot;
 
@@ -81,7 +82,7 @@ double BulletSpawner2D::get_graze_preview_line_width() const {
 }
 
 void BulletSpawner2D::set_graze_preview_line_width(double value) {
-	if (!Math::is_finite(value) || value <= 0.0) {
+	if (!is_finite_real2d(value) || value <= 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: graze_preview_line_width must be finite and > 0, keeping the old value.");
 		return;
 	}
@@ -202,7 +203,7 @@ double BulletSpawner2D::get_graze_update_interval() const {
 }
 
 void BulletSpawner2D::set_graze_update_interval(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: graze_update_interval must be finite and >= 0 (0 scans every tick), keeping the old value.");
 		return;
 	}

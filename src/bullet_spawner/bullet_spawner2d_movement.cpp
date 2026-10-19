@@ -4,6 +4,7 @@
 
 #include "bullet_spawner/bullet_spawner2d_internal.hpp"
 #include "core/emit_on2d.hpp"
+#include "core/transform_math2d.hpp"
 
 using namespace godot;
 
@@ -118,7 +119,7 @@ void BulletSpawner2D::set_movement_timing(int value) {
 double BulletSpawner2D::get_movement_duration_sec() const { return movement_duration_sec; }
 
 void BulletSpawner2D::set_movement_duration_sec(double value) {
-	if (movement_reject(!Math::is_finite(value) || value <= 0.0, "BulletSpawner2D: movement_duration_sec must be finite and > 0, keeping the old value.")) {
+	if (movement_reject(!is_finite_real2d(value) || value <= 0.0, "BulletSpawner2D: movement_duration_sec must be finite and > 0, keeping the old value.")) {
 		return;
 	}
 	movement_duration_sec = value;
@@ -127,7 +128,7 @@ void BulletSpawner2D::set_movement_duration_sec(double value) {
 double BulletSpawner2D::get_movement_speed() const { return movement_speed; }
 
 void BulletSpawner2D::set_movement_speed(double value) {
-	if (movement_reject(!Math::is_finite(value) || value <= 0.0, "BulletSpawner2D: movement_speed must be finite and > 0, keeping the old value.")) {
+	if (movement_reject(!is_finite_real2d(value) || value <= 0.0, "BulletSpawner2D: movement_speed must be finite and > 0, keeping the old value.")) {
 		return;
 	}
 	movement_speed = value;
@@ -161,7 +162,7 @@ void BulletSpawner2D::set_movement_progress_curve(const Ref<Curve> &value) {
 double BulletSpawner2D::get_movement_start_ratio() const { return movement_start_ratio; }
 
 void BulletSpawner2D::set_movement_start_ratio(double value) {
-	if (movement_reject(!Math::is_finite(value) || value < 0.0 || value > 1.0, "BulletSpawner2D: movement_start_ratio must be in [0, 1], keeping the old value.")) {
+	if (movement_reject(!is_finite_real2d(value) || value < 0.0 || value > 1.0, "BulletSpawner2D: movement_start_ratio must be in [0, 1], keeping the old value.")) {
 		return;
 	}
 	movement_start_ratio = value;
@@ -170,7 +171,7 @@ void BulletSpawner2D::set_movement_start_ratio(double value) {
 double BulletSpawner2D::get_movement_start_delay_sec() const { return movement_start_delay_sec; }
 
 void BulletSpawner2D::set_movement_start_delay_sec(double value) {
-	if (movement_reject(!Math::is_finite(value) || value < 0.0, "BulletSpawner2D: movement_start_delay_sec must be finite and >= 0, keeping the old value.")) {
+	if (movement_reject(!is_finite_real2d(value) || value < 0.0, "BulletSpawner2D: movement_start_delay_sec must be finite and >= 0, keeping the old value.")) {
 		return;
 	}
 	movement_start_delay_sec = value;
@@ -179,7 +180,7 @@ void BulletSpawner2D::set_movement_start_delay_sec(double value) {
 double BulletSpawner2D::get_movement_endpoint_pause_sec() const { return movement_endpoint_pause_sec; }
 
 void BulletSpawner2D::set_movement_endpoint_pause_sec(double value) {
-	if (movement_reject(!Math::is_finite(value) || value < 0.0, "BulletSpawner2D: movement_endpoint_pause_sec must be finite and >= 0, keeping the old value.")) {
+	if (movement_reject(!is_finite_real2d(value) || value < 0.0, "BulletSpawner2D: movement_endpoint_pause_sec must be finite and >= 0, keeping the old value.")) {
 		return;
 	}
 	movement_endpoint_pause_sec = value;
@@ -195,7 +196,7 @@ void BulletSpawner2D::set_movement_rotate_with_path(bool value) {
 double BulletSpawner2D::get_movement_rotation_offset_deg() const { return movement_rotation_offset_deg; }
 
 void BulletSpawner2D::set_movement_rotation_offset_deg(double value) {
-	if (movement_reject(!Math::is_finite(value), "BulletSpawner2D: movement_rotation_offset_deg must be finite, keeping the old value.")) {
+	if (movement_reject(!is_finite_real2d(value), "BulletSpawner2D: movement_rotation_offset_deg must be finite, keeping the old value.")) {
 		return;
 	}
 	movement_rotation_offset_deg = value;
@@ -219,7 +220,7 @@ void BulletSpawner2D::set_inherit_movement_velocity(bool value) {
 double BulletSpawner2D::get_movement_velocity_inherit_factor() const { return movement_velocity_inherit_factor; }
 
 void BulletSpawner2D::set_movement_velocity_inherit_factor(double value) {
-	if (movement_reject(!Math::is_finite(value), "BulletSpawner2D: movement_velocity_inherit_factor must be finite, keeping the old value.")) {
+	if (movement_reject(!is_finite_real2d(value), "BulletSpawner2D: movement_velocity_inherit_factor must be finite, keeping the old value.")) {
 		return;
 	}
 	movement_velocity_inherit_factor = value;

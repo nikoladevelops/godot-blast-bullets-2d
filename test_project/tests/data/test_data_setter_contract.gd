@@ -37,7 +37,8 @@ func _bad_values(p: Dictionary) -> Array:
 	var out: Array = []
 	match int(p["type"]):
 		TYPE_FLOAT:
-			out.append_array([NAN, INF, -INF])
+			# +-1e39: finite as a double, INF as a float (real_t math, engine floats)
+			out.append_array([NAN, INF, -INF, 1e39, -1e39])
 		TYPE_VECTOR2:
 			out.append(Vector2(NAN, 0.0))
 		TYPE_COLOR:

@@ -1,4 +1,5 @@
 #include "data/bullet_effect_layer_data2d.hpp"
+#include "core/transform_math2d.hpp"
 #include "core/variant_enum_cast2d.hpp"
 
 #include <godot_cpp/classes/atlas_texture.hpp>
@@ -247,7 +248,7 @@ double BulletEffectLayerData2D::get_rotation_degrees() const {
 	return rotation_degrees;
 }
 void BulletEffectLayerData2D::set_rotation_degrees(double value) {
-	if (!Math::is_finite(value)) {
+	if (!is_finite_real2d(value)) {
 		UtilityFunctions::push_error("BulletEffectLayerData2D: rotation_degrees must be finite, keeping the old value.");
 		return;
 	}
@@ -259,7 +260,7 @@ double BulletEffectLayerData2D::get_spin_degrees_per_sec() const {
 	return spin_degrees_per_sec;
 }
 void BulletEffectLayerData2D::set_spin_degrees_per_sec(double value) {
-	if (!Math::is_finite(value)) {
+	if (!is_finite_real2d(value)) {
 		UtilityFunctions::push_error("BulletEffectLayerData2D: spin_degrees_per_sec must be finite, keeping the old value.");
 		return;
 	}
@@ -358,7 +359,7 @@ double BulletEffectLayerData2D::get_fade_in_sec() const {
 	return fade_in_sec;
 }
 void BulletEffectLayerData2D::set_fade_in_sec(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletEffectLayerData2D: fade_in_sec must be finite and >= 0, keeping the old value.");
 		return;
 	}
@@ -369,7 +370,7 @@ double BulletEffectLayerData2D::get_fade_out_sec() const {
 	return fade_out_sec;
 }
 void BulletEffectLayerData2D::set_fade_out_sec(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletEffectLayerData2D: fade_out_sec must be finite and >= 0, keeping the old value.");
 		return;
 	}

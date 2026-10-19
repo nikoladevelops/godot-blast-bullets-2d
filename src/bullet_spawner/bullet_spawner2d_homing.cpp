@@ -69,7 +69,7 @@ void BulletSpawner2D::set_homing_lose_range_px(double value) {
 double BulletSpawner2D::get_homing_fire_arc_deg() const { return homing_fire_arc_deg; }
 
 void BulletSpawner2D::set_homing_fire_arc_deg(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: homing_fire_arc_deg must be finite and >= 0 (0 = omnidirectional), keeping the old value.");
 		return;
 	}
@@ -93,7 +93,7 @@ double BulletSpawner2D::get_homing_retarget_phase() const {
 }
 
 void BulletSpawner2D::set_homing_retarget_phase(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: homing_retarget_phase must be finite and >= 0, keeping the old value.");
 		return;
 	}
@@ -196,7 +196,7 @@ double BulletSpawner2D::get_homing_max_detection_range() const {
 }
 
 void BulletSpawner2D::set_homing_max_detection_range(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: homing_max_detection_range must be finite and >= 0 (0 is unlimited), keeping the old value.");
 		return;
 	}
@@ -395,7 +395,7 @@ double BulletSpawner2D::get_homing_retarget_interval_sec() const {
 }
 
 void BulletSpawner2D::set_homing_retarget_interval_sec(double value) {
-	if (!Math::is_finite(value) || !(value > 0.0)) {
+	if (!is_finite_real2d(value) || !(value > 0.0)) {
 		UtilityFunctions::push_error("BulletSpawner2D: homing_retarget_interval_sec must be finite and > 0, keeping the old value.");
 		return;
 	}

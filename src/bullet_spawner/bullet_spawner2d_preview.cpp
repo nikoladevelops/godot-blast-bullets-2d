@@ -3,6 +3,7 @@
 // detection and the debug_* coincidence bindings used by tests.
 
 #include "bullet_spawner/bullet_spawner2d_internal.hpp"
+#include "core/transform_math2d.hpp"
 
 using namespace godot;
 
@@ -113,7 +114,7 @@ double BulletSpawner2D::get_preview_path_width() const {
 }
 
 void BulletSpawner2D::set_preview_path_width(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: preview_path_width must be finite and >= 0 (0 hides the track), keeping the old value.");
 		return;
 	}
@@ -126,7 +127,7 @@ double BulletSpawner2D::get_preview_dot_radius() const {
 }
 
 void BulletSpawner2D::set_preview_dot_radius(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: preview_dot_radius must be finite and >= 0, keeping the old value.");
 		return;
 	}
@@ -139,7 +140,7 @@ double BulletSpawner2D::get_preview_arrow_gap() const {
 }
 
 void BulletSpawner2D::set_preview_arrow_gap(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: preview_arrow_gap must be finite and >= 0, keeping the old value.");
 		return;
 	}
@@ -152,7 +153,7 @@ double BulletSpawner2D::get_preview_arrow_length() const {
 }
 
 void BulletSpawner2D::set_preview_arrow_length(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: preview_arrow_length must be finite and >= 0, keeping the old value.");
 		return;
 	}
@@ -165,7 +166,7 @@ double BulletSpawner2D::get_preview_arrow_width() const {
 }
 
 void BulletSpawner2D::set_preview_arrow_width(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: preview_arrow_width must be finite and >= 0, keeping the old value.");
 		return;
 	}
@@ -178,7 +179,7 @@ double BulletSpawner2D::get_preview_arrow_head_length() const {
 }
 
 void BulletSpawner2D::set_preview_arrow_head_length(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: preview_arrow_head_length must be finite and >= 0, keeping the old value.");
 		return;
 	}
@@ -191,7 +192,7 @@ double BulletSpawner2D::get_preview_arrow_head_width() const {
 }
 
 void BulletSpawner2D::set_preview_arrow_head_width(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: preview_arrow_head_width must be finite and >= 0, keeping the old value.");
 		return;
 	}
@@ -225,7 +226,7 @@ double BulletSpawner2D::get_preview_collision_ring_width() const {
 }
 
 void BulletSpawner2D::set_preview_collision_ring_width(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: preview_collision_ring_width must be finite and >= 0, keeping the old value.");
 		return;
 	}
@@ -407,7 +408,7 @@ bool BulletSpawner2D::preview_active() const {
 // and the flag is only set around the firing path), so the plain angle is
 // correct for the gizmo.
 void BulletSpawner2D::set_preview_pose(double spin_angle_degrees) {
-	if (!Math::is_finite(spin_angle_degrees)) {
+	if (!is_finite_real2d(spin_angle_degrees)) {
 		return;
 	}
 	// Keep the snapshot in step so a later rebuild reproduces the same pose

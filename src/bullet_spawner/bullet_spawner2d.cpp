@@ -1,5 +1,6 @@
 #include "bullet_spawner/bullet_spawner2d_internal.hpp"
 #include "core/emit_on2d.hpp"
+#include "core/transform_math2d.hpp"
 
 // Wiring (factory/generator/spawn data), shooting cadence, spin, bursts,
 // telegraph, pattern lists, lifecycle (_ready/_notification/_process) and
@@ -213,7 +214,7 @@ double BulletSpawner2D::get_shoot_interval_sec() const {
 }
 
 void BulletSpawner2D::set_shoot_interval_sec(double value) {
-	if (!Math::is_finite(value) || !(value > 0.0)) {
+	if (!is_finite_real2d(value) || !(value > 0.0)) {
 		UtilityFunctions::push_error("BulletSpawner2D: shoot_interval_sec must be finite and > 0, keeping the old value.");
 		return;
 	}
@@ -230,7 +231,7 @@ double BulletSpawner2D::get_shoot_initial_delay_sec() const {
 }
 
 void BulletSpawner2D::set_shoot_initial_delay_sec(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: shoot_initial_delay_sec must be finite and >= 0, keeping the old value.");
 		return;
 	}
@@ -308,7 +309,7 @@ double BulletSpawner2D::get_spin_speed_deg_per_sec() const {
 }
 
 void BulletSpawner2D::set_spin_speed_deg_per_sec(double value) {
-	if (!Math::is_finite(value)) {
+	if (!is_finite_real2d(value)) {
 		UtilityFunctions::push_error("BulletSpawner2D: spin_speed_deg_per_sec must be finite, keeping the old value.");
 		return;
 	}
@@ -333,7 +334,7 @@ double BulletSpawner2D::get_spin_amplitude_deg() const {
 }
 
 void BulletSpawner2D::set_spin_amplitude_deg(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: spin_amplitude_deg must be finite and >= 0, keeping the old value.");
 		return;
 	}
@@ -345,7 +346,7 @@ double BulletSpawner2D::get_spin_frequency_hz() const {
 }
 
 void BulletSpawner2D::set_spin_frequency_hz(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: spin_frequency_hz must be finite and >= 0, keeping the old value.");
 		return;
 	}
@@ -394,7 +395,7 @@ void BulletSpawner2D::advance_spin(double delta) {
 double BulletSpawner2D::get_reload_jitter_sec() const { return reload_jitter_sec; }
 
 void BulletSpawner2D::set_reload_jitter_sec(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: reload_jitter_sec must be finite and >= 0, keeping the old value.");
 		return;
 	}
@@ -448,7 +449,7 @@ double BulletSpawner2D::get_burst_interval_sec() const {
 }
 
 void BulletSpawner2D::set_burst_interval_sec(double value) {
-	if (!Math::is_finite(value) || !(value > 0.0)) {
+	if (!is_finite_real2d(value) || !(value > 0.0)) {
 		UtilityFunctions::push_error("BulletSpawner2D: burst_interval_sec must be finite and > 0, keeping the old value.");
 		return;
 	}
@@ -483,7 +484,7 @@ double BulletSpawner2D::get_telegraph_sec() const {
 }
 
 void BulletSpawner2D::set_telegraph_sec(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: telegraph_sec must be finite and >= 0, keeping the old value.");
 		return;
 	}
@@ -1229,6 +1230,7 @@ void BulletSpawner2D::arm_retarget_countdown() {
 }
 
 void BulletSpawner2D::set_time_scale(double value) {
+	// Any finite scale (the volley tick caps the bullet time it covers).
 	if (!Math::is_finite(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: time_scale must be finite and >= 0, keeping the old value.");
 		return;

@@ -1,4 +1,5 @@
 #include "data/bullet_volley_data2d.hpp"
+#include "core/transform_math2d.hpp"
 #include "godot_cpp/core/class_db.hpp"
 #include <godot_cpp/variant/utility_functions.hpp>
 
@@ -201,7 +202,7 @@ double BulletVolleyData2D::get_max_life_time() const {
 	return max_life_time;
 }
 void BulletVolleyData2D::set_max_life_time(double new_max_life_time) {
-	if (!Math::is_finite(new_max_life_time)) {
+	if (!is_finite_real2d(new_max_life_time)) {
 		UtilityFunctions::push_error("BulletVolleyData2D: max_life_time must be finite, keeping the old value.");
 		return;
 	}
@@ -332,7 +333,7 @@ double BulletVolleyData2D::get_fade_in_sec() const {
 	return fade_in_sec;
 }
 void BulletVolleyData2D::set_fade_in_sec(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletVolleyData2D: fade_in_sec must be finite and >= 0, keeping the old value.");
 		return;
 	}
@@ -343,7 +344,7 @@ double BulletVolleyData2D::get_fade_out_sec() const {
 	return fade_out_sec;
 }
 void BulletVolleyData2D::set_fade_out_sec(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletVolleyData2D: fade_out_sec must be finite and >= 0, keeping the old value.");
 		return;
 	}
@@ -564,7 +565,7 @@ double BulletVolleyData2D::get_homing_smoothing() const {
 	return homing_smoothing;
 }
 void BulletVolleyData2D::set_homing_smoothing(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletVolleyData2D: homing_smoothing must be finite and >= 0 (0 snaps instantly), keeping the old value.");
 		return;
 	}
@@ -576,7 +577,7 @@ double BulletVolleyData2D::get_homing_update_interval() const {
 	return homing_update_interval;
 }
 void BulletVolleyData2D::set_homing_update_interval(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletVolleyData2D: homing_update_interval must be finite and >= 0 (0 refreshes every tick), keeping the old value.");
 		return;
 	}
@@ -588,7 +589,7 @@ double BulletVolleyData2D::get_homing_distance_before_reached() const {
 	return homing_distance_before_reached;
 }
 void BulletVolleyData2D::set_homing_distance_before_reached(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletVolleyData2D: homing_distance_before_reached must be finite and >= 0, keeping the old value.");
 		return;
 	}
@@ -684,7 +685,7 @@ double BulletVolleyData2D::get_gravity_delay_sec() const {
 	return gravity_delay_sec;
 }
 void BulletVolleyData2D::set_gravity_delay_sec(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletVolleyData2D: gravity_delay_sec must be finite and >= 0, keeping the old value.");
 		return;
 	}
@@ -696,7 +697,7 @@ double BulletVolleyData2D::get_gravity_duration_sec() const {
 	return gravity_duration_sec;
 }
 void BulletVolleyData2D::set_gravity_duration_sec(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletVolleyData2D: gravity_duration_sec must be finite and >= 0 (0 = infinite), keeping the old value.");
 		return;
 	}
@@ -708,7 +709,7 @@ double BulletVolleyData2D::get_linear_drag() const {
 	return linear_drag;
 }
 void BulletVolleyData2D::set_linear_drag(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletVolleyData2D: linear_drag must be finite and >= 0, keeping the old value.");
 		return;
 	}
@@ -720,7 +721,7 @@ double BulletVolleyData2D::get_homing_delay_sec() const {
 	return homing_delay_sec;
 }
 void BulletVolleyData2D::set_homing_delay_sec(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletVolleyData2D: homing_delay_sec must be finite and >= 0, keeping the old value.");
 		return;
 	}
@@ -732,7 +733,7 @@ double BulletVolleyData2D::get_homing_duration_sec() const {
 	return homing_duration_sec;
 }
 void BulletVolleyData2D::set_homing_duration_sec(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletVolleyData2D: homing_duration_sec must be finite and >= 0 (0 = infinite), keeping the old value.");
 		return;
 	}
@@ -744,7 +745,7 @@ double BulletVolleyData2D::get_homing_lose_range_px() const {
 	return homing_lose_range_px;
 }
 void BulletVolleyData2D::set_homing_lose_range_px(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletVolleyData2D: homing_lose_range_px must be finite and >= 0 (0 = unlimited), keeping the old value.");
 		return;
 	}
@@ -786,7 +787,7 @@ double BulletVolleyData2D::get_bounce_strength() const {
 	return bounce_strength;
 }
 void BulletVolleyData2D::set_bounce_strength(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletVolleyData2D: bounce_strength must be finite and >= 0 (1 = elastic), keeping the old value.");
 		return;
 	}
@@ -854,7 +855,7 @@ double BulletVolleyData2D::get_bounce_rotation_smooth() const {
 	return bounce_rotation_smooth;
 }
 void BulletVolleyData2D::set_bounce_rotation_smooth(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletVolleyData2D: bounce_rotation_smooth must be finite and >= 0 (0 = instant snap), keeping the old value.");
 		return;
 	}
@@ -866,7 +867,7 @@ double BulletVolleyData2D::get_bounce_randomness_deg() const {
 	return bounce_randomness_deg;
 }
 void BulletVolleyData2D::set_bounce_randomness_deg(double value) {
-	if (!Math::is_finite(value) || value < 0.0 || value > 180.0) {
+	if (!is_finite_real2d(value) || value < 0.0 || value > 180.0) {
 		UtilityFunctions::push_error("BulletVolleyData2D: bounce_randomness_deg must be finite in [0, 180], keeping the old value.");
 		return;
 	}
@@ -878,7 +879,7 @@ double BulletVolleyData2D::get_bounce_cooldown_sec() const {
 	return bounce_cooldown_sec;
 }
 void BulletVolleyData2D::set_bounce_cooldown_sec(double value) {
-	if (!Math::is_finite(value) || value < 0.0 || value > 1.0) {
+	if (!is_finite_real2d(value) || value < 0.0 || value > 1.0) {
 		UtilityFunctions::push_error("BulletVolleyData2D: bounce_cooldown_sec must be finite in [0, 1], keeping the old value.");
 		return;
 	}
@@ -890,7 +891,7 @@ double BulletVolleyData2D::get_bounce_debounce_sec() const {
 	return bounce_debounce_sec;
 }
 void BulletVolleyData2D::set_bounce_debounce_sec(double value) {
-	if (!Math::is_finite(value) || value < 0.0) {
+	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletVolleyData2D: bounce_debounce_sec must be finite and >= 0 (0 = off), keeping the old value.");
 		return;
 	}

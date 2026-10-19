@@ -56,9 +56,11 @@ BLAST_RANDOM_SETTER(bullet_position_jitter_min, value >= 0.0, ">= 0")
 BLAST_RANDOM_SETTER(bullet_position_jitter_max, value >= 0.0, ">= 0")
 BLAST_RANDOM_SETTER(bullet_speed_scale_min, value >= 0.0, ">= 0")
 BLAST_RANDOM_SETTER(bullet_speed_scale_max, value >= 0.0, ">= 0")
-BLAST_RANDOM_SETTER(shoot_interval_max_sec, value >= 0.0, ">= 0 (0 = off)")
-BLAST_RANDOM_SETTER(burst_interval_max_sec, value >= 0.0, ">= 0 (0 = off)")
-BLAST_RANDOM_SETTER(telegraph_max_sec, value >= 0.0, ">= 0 (0 = off)")
+// Timing maxima feed RandomNumberGenerator.randf_range, which takes floats:
+// past FLT_MAX the wait became INF and the spawner stalled for good.
+BLAST_RANDOM_SETTER(shoot_interval_max_sec, is_finite_real2d(value) && value >= 0.0, ">= 0 (0 = off)")
+BLAST_RANDOM_SETTER(burst_interval_max_sec, is_finite_real2d(value) && value >= 0.0, ">= 0 (0 = off)")
+BLAST_RANDOM_SETTER(telegraph_max_sec, is_finite_real2d(value) && value >= 0.0, ">= 0 (0 = off)")
 
 #undef BLAST_RANDOM_SETTER
 

@@ -2,6 +2,7 @@
 
 #include "core/emit_on2d.hpp"
 #include "core/node_scan2d.hpp"
+#include "core/transform_math2d.hpp"
 #include "factory/bullet_factory2d_internal.hpp"
 
 using namespace godot;
@@ -13,6 +14,7 @@ static constexpr const char *DESPAWN_PREVIEW_NAME = "~BlastBulletsDespawnPreview
 static constexpr int DESPAWN_PREVIEW_Z_INDEX = 4000;
 
 void BulletFactory2D::set_time_scale(double value) {
+	// Any finite scale: one volley tick covers at most MAX_VOLLEY_TICK_DELTA.
 	if (!Math::is_finite(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletFactory2D: time_scale must be a finite number >= 0, keeping the old value.");
 		return;

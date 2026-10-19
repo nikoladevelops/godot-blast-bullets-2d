@@ -1,4 +1,5 @@
 #include "data/bullet_pickup_data2d.hpp"
+#include "core/transform_math2d.hpp"
 
 #include <godot_cpp/classes/circle_shape2d.hpp>
 #include <godot_cpp/classes/image.hpp>
@@ -20,7 +21,7 @@ void BulletPickupData2D::accepted_change() {
 
 #define BLAST_PICKUP_DOUBLE_SETTER(NAME, CONDITION, TEXT)                                                                      \
 	void BulletPickupData2D::set_##NAME(double p_value) {                                                                      \
-		if (!Math::is_finite(p_value) || !(CONDITION)) {                                                                       \
+		if (!is_finite_real2d(p_value) || !(CONDITION)) {                                                                      \
 			UtilityFunctions::push_error("BulletPickupData2D: " #NAME " must be finite and " TEXT ", keeping the old value."); \
 			return;                                                                                                            \
 		}                                                                                                                      \

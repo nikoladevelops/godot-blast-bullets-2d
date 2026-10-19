@@ -517,3 +517,17 @@ func test_telegraph_range_draws_each_warning_between_base_and_max() -> void:
 	var mm := _min_max(gaps)
 	assert_gt(mm.y - mm.x, 6, "the warning lengths vary")
 	assert_lte(mm.y, 30 + 6, "no warning past the maximum (plus the wait)")
+
+
+## The timing maxima feed a float random range: past FLT_MAX the next wait
+## became INF and the spawner never fired again. They refuse such a value
+## (the other randomization ranges are handled at the shot and stay open).
+func test_timing_maxima_refuse_values_past_float_range() -> void:
+	var sp := make_spawner()
+	for prop in ["shoot_interval_max_sec", "burst_interval_max_sec", "telegraph_max_sec"]:
+		var before: float = sp.get(prop)
+		sp.set(prop, 1e39)
+		expect_error_sequence(["BulletSpawner2D: %s must be finite and >= 0 (0 = off), keeping the old value." % prop])
+		assert_eq(sp.get(prop), before, "%s kept" % prop)
+		sp.set(prop, 1e30)
+		assert_eq(sp.get(prop), 1e30, "%s: a large float-range value is fine" % prop)
