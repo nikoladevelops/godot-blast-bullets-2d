@@ -759,3 +759,19 @@ func test_freeing_inside_visibility_changed_of_a_freed_attachment() -> void:
 	await idle(2)
 	assert_false(is_instance_valid(att), "the attachment is gone")
 	expect_no_errors()
+
+
+## The scene's _init takes the bullet being attached out (a clear pools the
+## volley): nothing is attached to the pooled volley.
+func test_an_attachment_init_that_clears_its_volley_attaches_nothing() -> void:
+	var scene := _hostile_scene()
+	var v: BulletVolley2D = factory.spawn_volley(H.make_still_data(3))
+	Engine.set_meta(&"bb_hostile_init", func() -> void: v.clear_all_bullets())
+	v.bullet_set_attachment(1, scene)
+	_clear_hostile_meta()
+	assert_true(v.is_pooled(), "the clear pooled the volley")
+	assert_eq(v.get_amount_active_attachments(), 0, "nothing attached to a pooled volley")
+	var books: Dictionary = factory.debug_assert_no_dangling()
+	assert_true(books["ok"], str(books["error"]))
+	await idle(2)
+	expect_no_errors()

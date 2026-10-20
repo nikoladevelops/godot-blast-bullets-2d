@@ -697,10 +697,13 @@ _ALWAYS_INLINE_ bool BulletVolley2D::attach_bullet_attachment_internal(int bulle
 
 	if (!attachment_instance) {
 		// Instantiating runs the scene's scripts (_init): user code that may
-		// free this volley or the factory (its pool with it).
+		// free this volley or the factory (its pool with it), or take this
+		// bullet out (a clear pools the volley): then nothing is attached.
 		const uint64_t instantiating_id = get_instance_id();
+		const int instantiating_life = volley_generation;
+		const uint64_t instantiating_epoch = collision_epoch_for_bullet(bullet_index);
 		Node *fresh_inst = attachment_scene->instantiate();
-		if (!survived_user_code(instantiating_id)) {
+		if (!survived_user_code(instantiating_id) || volley_generation != instantiating_life || collision_epoch_for_bullet(bullet_index) != instantiating_epoch) {
 			if (fresh_inst != nullptr && !fresh_inst->is_queued_for_deletion()) {
 				fresh_inst->queue_free(); // nothing owns it any more
 			}

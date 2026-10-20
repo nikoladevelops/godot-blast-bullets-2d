@@ -88,3 +88,27 @@ func test_bullets_cleared_inside_the_flush_stop_colliding() -> void:
 		await physics(1)
 	assert_eq(seen.size(), 0, "nothing collides with the cleared bullets")
 	expect_no_errors()
+
+
+## A game area clears volleys whose own monitor callbacks are still to come
+## in the same flush (their shapes stay until it ends): those callbacks
+## record nothing for the cleared bullets.
+func test_volleys_cleared_inside_the_flush_record_no_hits() -> void:
+	var hurtbox := make_area(Vector2.ZERO, Vector2(200, 200), 4)
+	hurtbox.collision_mask = 0xFFFFFFFF
+	var cleared: Array = []
+	for k in 6:
+		var d := _pair_at(-40.0 + 16.0 * k, true)
+		cleared.append(factory.spawn_volley(d))
+	var fired: Array = []
+	hurtbox.area_shape_entered.connect(func(_rid: RID, _a: Area2D, _s: int, _l: int) -> void:
+		if fired.is_empty():
+			fired.append(true)
+			for v in cleared:
+				if not v.is_pooled():
+					v.clear_all_bullets())
+	await _wait_for(fired)
+	await physics(2)
+	var books: Dictionary = factory.debug_assert_no_dangling()
+	assert_true(books["ok"], str(books["error"]))
+	expect_no_errors()

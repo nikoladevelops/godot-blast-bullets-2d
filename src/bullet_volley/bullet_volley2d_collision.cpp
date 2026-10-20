@@ -183,7 +183,9 @@ void BulletVolley2D::area_entered_func(PhysicsServer2D::AreaBodyStatus status, R
 		return;
 	}
 	if (status == PhysicsServer2D::AREA_BODY_ADDED) {
-		if (bullet_shape_index < 0 || bullet_shape_index >= amount_bullets) {
+		// A bullet taken out earlier in this physics flush keeps its shape
+		// until the flush ends (core/physics_flush2d.hpp): it hits nothing.
+		if (bullet_shape_index < 0 || bullet_shape_index >= amount_bullets || !all_bullets_enabled_set.contains(bullet_shape_index)) {
 			return;
 		}
 		// Object-level dedup: a multi-shape target (or body+area pair on
@@ -224,7 +226,9 @@ void BulletVolley2D::body_entered_func(PhysicsServer2D::AreaBodyStatus status, R
 		return;
 	}
 	if (status == PhysicsServer2D::AREA_BODY_ADDED) {
-		if (bullet_shape_index < 0 || bullet_shape_index >= amount_bullets) {
+		// A bullet taken out earlier in this physics flush keeps its shape
+		// until the flush ends (core/physics_flush2d.hpp): it hits nothing.
+		if (bullet_shape_index < 0 || bullet_shape_index >= amount_bullets || !all_bullets_enabled_set.contains(bullet_shape_index)) {
 			return;
 		}
 		// Same object-level dedup as the area path above.
@@ -824,8 +828,8 @@ void BulletVolley2D::handle_bullet_collision(const BulletCollisionData2D &record
 	if (bounce_decision == 1) {
 		return;
 	}
-	if (bounce_decision == 2 && !same_live_bullet()) {
-		return; // the bounce handler disabled/cleared/freed it
+	if (!same_live_bullet()) {
+		return; // the bounce handler or a target getter disabled/cleared/freed it
 	}
 	// The bounce read the target's properties (a script _get) and ran its
 	// handler: either may have freed the target. Look it up again; a gone

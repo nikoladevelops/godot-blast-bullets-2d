@@ -86,6 +86,7 @@ func _target_cases() -> Array:
 		for victim in ["volley", "factory", "spawner"]:
 			for how in ["free", "release"]:
 				out.append([r[0], r[1], r[2], victim, how])
+		out.append([r[0], r[1], r[2], "clear", "free"]) # takes the reading bullet out
 	return out
 
 
@@ -108,6 +109,13 @@ func test_a_hit_target_getter_that_frees(p: Array = use_parameters(_target_cases
 		volley = factory.spawn_volley(_bounce_data(1))
 	var f := factory
 	var fired: Array = []
+	var hits_after: Array = [] # hits reported once the getter ran
+	var on_hit := func(_t, _v, i) -> void:
+		if not fired.is_empty():
+			hits_after.append(i)
+	var hit_emitter: Object = spawner if spawner != null else factory
+	hit_emitter.area_entered.connect(on_hit)
+	hit_emitter.body_entered.connect(on_hit)
 	target.action = func() -> void:
 		fired.append(true)
 		match victim:
@@ -117,6 +125,8 @@ func test_a_hit_target_getter_that_frees(p: Array = use_parameters(_target_cases
 				_free_now(f, how)
 			"spawner":
 				_free_now(spawner, how)
+			"clear":
+				volley.clear_all_bullets()
 	for k in 30:
 		if not fired.is_empty():
 			break
@@ -127,6 +137,9 @@ func test_a_hit_target_getter_that_frees(p: Array = use_parameters(_target_cases
 		assert_false(is_instance_valid(f), "the factory is gone")
 	elif victim == "spawner":
 		assert_false(is_instance_valid(spawner), "the spawner is gone")
+	elif victim == "clear":
+		assert_true(volley.is_pooled(), "the cleared volley is back in the pool")
+		assert_eq(hits_after, [], "a bullet the getter took out reports no hit")
 	elif volley != null:
 		assert_false(is_instance_valid(volley), "the volley is gone")
 	expect_no_errors()
