@@ -636,3 +636,126 @@ func test_freeing_the_spawner_inside_a_graze_split_never_touches_freed_memory() 
 		if err.is_push_warning():
 			err.handled = true
 	assert_eq(_claim_errors(), [], "no error")
+
+
+## An attachment scene whose script runs a hook from _init (the scene is
+## instantiated) and from on_time_scale_changed. Hooks live in Engine meta,
+## armed per test and consumed once.
+const HOSTILE_ATTACHMENT := """
+extends BulletAttachment2D
+func _run(key: StringName) -> void:
+	var cb: Callable = Engine.get_meta(key, Callable())
+	if cb.is_valid():
+		Engine.remove_meta(key)
+		cb.call()
+func _init() -> void:
+	_run(&"bb_hostile_init")
+func on_time_scale_changed(_scale: float) -> void:
+	_run(&"bb_hostile_scale")
+"""
+
+
+func _hostile_scene() -> PackedScene:
+	var script := GDScript.new()
+	script.source_code = HOSTILE_ATTACHMENT
+	assert_eq(script.reload(), OK, "the hostile attachment compiles")
+	var node: Node = BulletAttachment2D.new()
+	node.set_script(script)
+	var scene := PackedScene.new()
+	assert_eq(scene.pack(node), OK, "packs")
+	node.free()
+	return scene
+
+
+func _clear_hostile_meta() -> void:
+	for key in [&"bb_hostile_init", &"bb_hostile_scale"]:
+		if Engine.has_meta(key):
+			Engine.remove_meta(key)
+
+
+func _free_victim(victim: String, v: BulletVolley2D) -> Callable:
+	if victim == "factory":
+		check_factory_after = false
+	var f := factory
+	return func() -> void:
+		var target: Object = v if victim == "volley" else f
+		if is_instance_valid(target):
+			target.free()
+
+
+## The scene's _init runs inside the attach (a fresh instantiate): at a
+## spawn (shared attachment; the factory is the only handle there) and from
+## bullet_set_attachment.
+func test_freeing_inside_an_attachment_init_never_touches_freed_memory(p: Array = use_parameters([["spawn", "factory"], ["set", "volley"], ["set", "factory"]])) -> void:
+	var scene := _hostile_scene()
+	var v: BulletVolley2D = null
+	if p[0] == "set":
+		v = factory.spawn_volley(H.make_still_data(3))
+	Engine.set_meta(&"bb_hostile_init", _free_victim(p[1], v))
+	if p[0] == "spawn":
+		var d := H.make_still_data(3)
+		d.shared_bullet_attachment = scene
+		assert_null(factory.spawn_volley(d), "a spawn whose factory died returns nothing")
+	else:
+		v.bullet_set_attachment(1, scene)
+	_clear_hostile_meta()
+	await idle(2)
+	if p[1] == "factory":
+		assert_false(is_instance_valid(factory), "the factory is gone")
+	else:
+		assert_false(is_instance_valid(v), "the volley is gone")
+	expect_no_errors()
+
+
+## A slowed volley hands its time scale to a new attachment
+## (on_time_scale_changed, user code) inside bullet_set_attachment.
+func test_freeing_inside_a_time_scale_handoff_never_touches_freed_memory(victim: String = use_parameters(["volley", "factory"])) -> void:
+	var scene := _hostile_scene()
+	var v: BulletVolley2D = factory.spawn_volley(H.make_still_data(3))
+	factory.time_scale = 0.5
+	await idle(2) # the factory pushes the volley's scale
+	Engine.set_meta(&"bb_hostile_scale", _free_victim(victim, v))
+	v.bullet_set_attachment(0, scene)
+	_clear_hostile_meta()
+	await idle(2)
+	assert_false(is_instance_valid(v), "the volley is gone")
+	expect_no_errors()
+
+
+## all_bullets_set_attachment attaches bullet by bullet: a callback that
+## frees the volley ends the loop.
+func test_freeing_inside_all_bullets_set_attachment_stops_the_loop() -> void:
+	var v: BulletVolley2D = factory.spawn_volley(H.make_still_data(3))
+	AttachmentHookProbe2D.hook_on = ["spawn"]
+	AttachmentHookProbe2D.hook = func() -> void:
+		if is_instance_valid(v):
+			v.free()
+	v.all_bullets_set_attachment(probe_scene, Vector2.ZERO)
+	assert_eq(AttachmentHookProbe2D.fired, 1, "the first attach freed the volley")
+	assert_false(is_instance_valid(v), "the volley is gone")
+	await idle(2)
+	expect_no_errors()
+
+
+## bullet_free_attachment hides the attachment first: its visibility_changed
+## handlers run there and may free the volley. (Freeing the attachment or the
+## factory holding it there deletes Godot's own emitter mid-emit: an engine
+## crash the plugin cannot guard, AGENTS.md §14.)
+func test_freeing_inside_visibility_changed_of_a_freed_attachment() -> void:
+	var victim := "volley"
+	var d := H.make_still_data(2)
+	d.shared_bullet_attachment = probe_scene
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	var att: Node2D = v.bullet_get_attachment(0)
+	assert_not_null(att, "bullet 0 carries an attachment")
+	if victim == "factory":
+		check_factory_after = false
+	var f := factory
+	att.visibility_changed.connect(func() -> void:
+		var target: Object = f if victim == "factory" else v
+		if is_instance_valid(target):
+			BulletFactory2D.debug_free_like_release(target))
+	v.bullet_free_attachment(0)
+	await idle(2)
+	assert_false(is_instance_valid(att), "the attachment is gone")
+	expect_no_errors()

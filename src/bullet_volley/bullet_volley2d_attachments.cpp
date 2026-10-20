@@ -93,7 +93,16 @@ TypedArray<BulletAttachment2D> BulletVolley2D::all_bullets_set_attachment_to_nul
 }
 
 void BulletVolley2D::all_bullets_set_attachment(const Ref<PackedScene> &attachment_scene, const Vector2 &bullet_attachment_offset, bool stick_relative_to_bullet, int bullet_index_start, int bullet_index_end_inclusive) {
-	for_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_attachment", [&](int i) { bullet_set_attachment(i, attachment_scene, bullet_attachment_offset, stick_relative_to_bullet); });
+	// Each attach runs attachment callbacks (user code): a freed volley or
+	// factory ends the loop.
+	const uint64_t self_id = get_instance_id();
+	bool alive = true;
+	for_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_attachment", [&](int i) {
+		if (alive) {
+			bullet_set_attachment(i, attachment_scene, bullet_attachment_offset, stick_relative_to_bullet);
+			alive = survived_user_code(self_id);
+		}
+	});
 }
 
 void BulletVolley2D::bullet_set_attachment(int bullet_index, const Ref<PackedScene> &attachment_scene, const Vector2 &bullet_attachment_offset, bool stick_relative_to_bullet) {
@@ -129,8 +138,11 @@ void BulletVolley2D::bullet_free_attachment(int bullet_index) {
 	// node is fully detached from this volley; hide it so the frame
 	// until the flush shows nothing.
 	if (!temp->is_queued_for_deletion()) {
-		temp->set_visible(false);
-		temp->queue_free();
+		const uint64_t temp_id = temp->get_instance_id();
+		temp->set_visible(false); // visibility_changed handlers (user code) may free it
+		if (ObjectDB::get_instance(ObjectID(temp_id)) == temp && !temp->is_queued_for_deletion()) {
+			temp->queue_free();
+		}
 	}
 }
 

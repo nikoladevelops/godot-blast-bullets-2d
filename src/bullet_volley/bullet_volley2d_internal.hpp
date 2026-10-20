@@ -696,7 +696,16 @@ _ALWAYS_INLINE_ bool BulletVolley2D::attach_bullet_attachment_internal(int bulle
 	}
 
 	if (!attachment_instance) {
+		// Instantiating runs the scene's scripts (_init): user code that may
+		// free this volley or the factory (its pool with it).
+		const uint64_t instantiating_id = get_instance_id();
 		Node *fresh_inst = attachment_scene->instantiate();
+		if (!survived_user_code(instantiating_id)) {
+			if (fresh_inst != nullptr && !fresh_inst->is_queued_for_deletion()) {
+				fresh_inst->queue_free(); // nothing owns it any more
+			}
+			return false;
+		}
 		attachment_instance = Object::cast_to<BulletAttachment2D>(fresh_inst);
 
 		if (!attachment_instance) {
@@ -801,8 +810,8 @@ _ALWAYS_INLINE_ bool BulletVolley2D::attach_bullet_attachment_internal(int bulle
 
 	// A volley running slowed (or sped up) hands its scale to the newcomer.
 	if (attachment_time_scale != 1.0) {
-		attachment_instance->set_time_scale_factor(attachment_time_scale);
-		if (ObjectDB::get_instance(ObjectID(setup_instance_id)) == nullptr) {
+		attachment_instance->set_time_scale_factor(attachment_time_scale); // on_time_scale_changed: user code
+		if (!survived_user_code(self_id) || ObjectDB::get_instance(ObjectID(setup_instance_id)) == nullptr) {
 			return false;
 		}
 	}
