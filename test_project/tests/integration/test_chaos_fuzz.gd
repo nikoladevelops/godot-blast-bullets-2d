@@ -95,7 +95,7 @@ func before_each() -> void:
 	zones.clear()
 	skipped_ops = Array(OS.get_environment("CHAOS_SKIP").split(",", false)).map(func(x): return int(x))
 	passive_handlers = OS.get_environment("CHAOS_SKIP_HANDLERS") == "1"
-	stats = {"shots": 0, "frees": 0, "reparents": 0, "clears": 0, "resets": 0, "pickups": 0, "handler_actions": 0, "max_live": 0, "splits": 0, "grazes": 0, "hostile_actions": 0}
+	stats = {"shots": 0, "frees": 0, "reparents": 0, "clears": 0, "resets": 0, "pickups": 0, "handler_actions": 0, "max_live": 0, "splits": 0, "grazes": 0, "hostile_actions": 0, "cadence_actions": 0}
 
 
 ## A spawn data template: `n` bullets of a random shape, features on by roll.
@@ -121,6 +121,16 @@ func _data(n: int) -> BulletVolleyData2D:
 	d.bullet_max_collision_count = rng.randi_range(0, 3)
 	if rng.randf() < 0.4:
 		d.set_bounce_mask_from_array([4])
+		d.bounce_mode = rng.randi() % 2
+		d.bounce_rotate_texture = rng.randf() < 0.7
+		d.bounce_rotation_smooth = [0.0, 0.0, 0.2][rng.randi() % 3]
+	if rng.randf() < 0.15:
+		# Direction curves mirror with every bounce (BounceFrame2D).
+		var curves := BulletCurvesData2D.new()
+		curves.x_direction_curve = H.make_flat_curve(rng.randf_range(-1.0, 1.0))
+		curves.x_direction_use_unit_curve = false
+		curves.x_direction_curve_mode = rng.randi() % 2
+		d.shared_bullet_curves_data = curves
 		d.bounce_max_count = rng.randi_range(0, 4)
 	if rng.randf() < 0.3:
 		d.gravity = Vector2(0, rng.randf_range(-200.0, 200.0))
@@ -280,7 +290,10 @@ func _connect_handlers(emitter: Object) -> void:
 		stats["grazes"] += 1
 		_handler(v, i))
 	if emitter.has_signal("volley_fired"):
-		emitter.connect("volley_fired", func(v, _n) -> void: volleys.append(v))
+		emitter.connect("volley_fired", func(v, _n) -> void:
+			volleys.append(v)
+			_cadence_handler(emitter))
+		emitter.connect("burst_shot_fired", func(_n, _m) -> void: _cadence_handler(emitter))
 
 
 func _handler(v: Object, i: int) -> void:
@@ -329,6 +342,27 @@ func _handler(v: Object, i: int) -> void:
 			if i >= 0 and i < volley.get_amount_bullets():
 				volley.set_bullet_direction(i, Vector2(1e20, rng.randf_range(-1e20, 1e20)))
 				volley.bullet_set_gravity(i, Vector2(0, 3e38))
+
+
+## Inside a running shot or burst: handlers own the chain and the cadence.
+func _cadence_handler(sp: BulletSpawner2D) -> void:
+	if passive_handlers or not is_instance_valid(sp) or rng.randf() > 0.05:
+		return
+	stats["cadence_actions"] += 1
+	match rng.randi() % 5:
+		0:
+			sp.burst_enabled = not sp.burst_enabled
+		1:
+			# A real chain only: in single-shot mode begin_burst fires at once,
+			# a nested shot the docs say to defer (refused loudly).
+			if sp.burst_enabled and sp.burst_count > 1:
+				sp.begin_burst()
+		2:
+			sp.fire_n_volleys(rng.randi_range(1, 3))
+		3:
+			sp.reset_shooting()
+		4:
+			sp.burst_count = rng.randi_range(1, 4)
 
 
 func _move_handler(sp: BulletSpawner2D) -> void:
