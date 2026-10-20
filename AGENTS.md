@@ -26,6 +26,7 @@ for the rest: the sections are written to be looked up, not read once.
 |  |  | 22 | World controls (time scale, despawn bounds, randomization, pickups) |
 |  |  | 23 | Flocking (BulletFlock2D, flock pass, step_flock, spawner group) |
 |  |  | 24 | Splitting (BulletSplitData2D, capture, flush, spawner group) |
+|  |  | 25 | Feature mixing (MixLedger, FeatureMix catalog, cover suites) |
 
 ## 0. Golden rules
 
@@ -56,7 +57,7 @@ for the rest: the sections are written to be looked up, not read once.
 
 ```sh
 GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py   # build (exit 1 = failed; never raw scons, never edit SConstruct)
-python3 tools/run_tests.py                                       # 207 files / 1856 tests, ~10 s, leak-checked
+python3 tools/run_tests.py                                       # 216 files / 1896 tests, ~15 s, leak-checked
 python3 tools/run_tests.py --suite <substring> --full            # one area, every failure message unclipped
 python3 tools/run_tests.py --self-test                           # proves the harness still catches failures/leaks
 python3 tools/run_editor_smoke.py                                # headless EDITOR run of tests/editor_smoke/ (editor-only paths)
@@ -469,8 +470,8 @@ func test_<behavior>_<expectation>() -> void:
 - Chaos: `integration/test_chaos_fuzz.gd` runs a seeded battlefield (up to 8
   spawners sharing flock/graze/sound/split Resources, real physics, frees,
   reparents, resets, pickups, live edits, handlers acting inside the sweep)
-  and demands zero errors, balanced books and finite bullets after every
-  step. A failure names its seed: rerun it alone with `CHAOS_SEEDS=<seed>,`,
+  and demands zero errors, balanced books, finite bullets and a clean
+  MixLedger (§25) after every step. A failure names its seed: rerun it alone with `CHAOS_SEEDS=<seed>,`,
   bisect with `CHAOS_SKIP=<op ids>` / `CHAOS_SKIP_HANDLERS=1`, soak with
   `CHAOS_SEEDS=200`. New operations go into `_operate` (idle point) or
   `_handler` (inside the sweep: only what is legal there). In DEBUG builds
@@ -963,6 +964,9 @@ deduped, cancelled by REMOVED) and replayed once on resume.
 | A fading sound voice is never restarted or stolen again; a pool of fading tails never starves new plays | `sound/test_sound_mixer_unit` |
 | A followed bullet keeps one hum voice per sound entry | `sound/test_sound_flight` |
 | Cosmetic sound and effect rolls never consume Godot's global RNG (seeded gameplay is unchanged) | `sound/test_sound_rng_isolation` |
+| Teleports and transform setters move trail layers with the bullet at once (also on a paused factory) and restart the interpolation history | `integration/test_mix_teleport` |
+| The tick that locks an orbit (a first lock, or RelockAlways re-acquiring the ring after every retarget pass) moves a full step: onto the ring, then along it | `spawner/test_spawner_homing_orbit` |
+| Every way a bullet leaves fires exactly its own sound and effect trigger once (a manual split leaves like a clear) | `integration/test_mix_trigger_ledger` |
 
 - Edge cases to test everywhere: NaN/Inf scalars and vectors; null array
   entries; empty arrays; short vs oversized arrays; OOB indices (-1/99);
@@ -1602,4 +1606,40 @@ reset/free drop queued splits; a handler freeing anything mid-flush is
 survived. ASan found two use-after-frees while this was built (a member read
 after the `life_time_over` handler; a drop after free_active's callbacks):
 read nothing of `this` after user code before the liveness check.
+
+## 25. Feature mixing (`MixLedger`, `FeatureMix`, cover suites)
+
+Every feature crossed with every other one through the real spawner path,
+checked by an oracle instead of hand-picked expectations.
+
+| Piece | Where | Notes |
+|---|---|---|
+| Debug logs | `factory/bullet_factory2d_effects.cpp`, `_sound.cpp` | `debug_set_bullet_event_log_enabled` (every life start, wake and disable with its cause: hit, lifetime, despawn, clear, split, split_manual, pickup, collect, manual), `debug_set_sound_offer_log_enabled` (every `sound_offer` BEFORE audibility and limits), the effect log (now with `life`). One bool check each while off. A new disable path passes its cause to `disable_bullet_core` / `disable_bullets_bulk` |
+| Oracle | `tests/common/mix_ledger.gd` | Bullet life intervals from the event log; rules: one death per life, every offer / effect names a live bullet of its life (closed that frame at the latest), death triggers match the death cause, signals see live bullets (it connects FIRST: attach before any test handler), `bullets_cleared` / `bullets_despawned` name bullets that left that way in the life they name. `per_frame_limits` off where `debug_advance_time` ticks inside a physics frame |
+| Catalog | `tests/common/feature_mix.gd` | 44 features (`FEATURES`), each = setup in `_configure`, timeline actions in `_act` (teleports 9-27, freeze 12/22, clear 24, pickups 36, orphan 50, park wake 100), proof in `_evidence`. A run checks the ledger, books, finiteness and what is drawn every frame, then winds down (every bullet out, every volley pooled / parked / freed); `run_twice` repeats it on the warm pool (no new volleys, the same deaths) |
+| Suites | `integration/test_feature_mix_solo.gd`, `test_feature_mix_cover_{a,b,c}.gd`, `test_mix_{teleport,interpolation,animation,speed_curves,trigger_ledger}.gd` | Solo: each feature alone + evidence. Cover: a seeded greedy covering array (every pair, 8 features a mix) + the kitchen sink, sliced over 3 files. The `test_mix_*` suites pin the exact contracts of the named crosses |
+
+Knobs: `MIX_SEEDS=<n>` soaks n cover seeds (~10 s per seed per file),
+`MIX_ONLY=<seed>:<index>` reruns one mix, `MIX_SKIP=<f,g>` bisects. To find
+where two runs part ways set `record_trace = true` on both and diff the
+traces (a divergence is usually something keyed by instance id, e.g. the
+default retarget stagger: mixes fix `homing_retarget_phase`).
+
+Add a feature: a `FEATURES` entry (+ `NEEDS`), its setup, actions and
+evidence; run the solo suite (the evidence must hold alone), then the cover
+with `MIX_SEEDS=30`. A legit documented warning goes into `WARNING_OK` with
+its reason.
+
+Facts learned building it (each pinned):
+- The headless renderer keeps whole-buffer uploads only: per-instance
+  writes (teleports, wakes, a spawner's muzzle shift) are invisible to
+  `multimesh.buffer` until the next upload. Compare drawn poses only after a
+  volley ticked (its flush) or after the interpolation pass.
+- A tick moves at the speed it sampled from the curves at its start; the
+  curve clock advances after the move (`test_mix_speed_curves`).
+- A Godot `Curve.add_point` without tangents eases in and out: use
+  `TANGENT_LINEAR` points where a test computes speeds.
+- Static bodies are hit only with `monitorable` on (documented).
+- A manual split leaves like a clear (On Clear), a split by a non-lethal
+  trigger silently (the children replace the parent).
 
