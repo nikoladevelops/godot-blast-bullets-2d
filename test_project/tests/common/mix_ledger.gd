@@ -272,7 +272,13 @@ func _check_report(label: String, trigger: int, sound: bool, volley: int, life: 
 		if int(_per_life[k]) > entry_limit:
 			_problem("%s fired %d times for one death of bullet %d of volley %d" % [label, int(_per_life[k]), bullet, volley])
 	elif not sound and trigger == _EFFECT_ON_SPAWN:
-		if int(iv[0]) != frame or int(iv[3]) >= 0:
+		# The life-start interval of that frame (a freeze and a wake later
+		# in the same frame open another interval after it).
+		var start = null
+		for other in _intervals.get(_key(volley, bullet), []):
+			if int(other[2]) == life and int(other[0]) == frame and int(other[3]) < 0:
+				start = other
+		if start == null:
 			_problem("%s for bullet %d of volley %d outside its life start" % [label, bullet, volley])
 	elif sound and per_frame_limits and (trigger == S_FLIGHT or trigger == S_BOUNCE):
 		var k := "%s:%d:%d:%d" % [_key(volley, bullet), life, frame, trigger]
