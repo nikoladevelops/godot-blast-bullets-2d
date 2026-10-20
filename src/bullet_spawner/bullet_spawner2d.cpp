@@ -533,6 +533,7 @@ int BulletSpawner2D::get_active_live_bullet_count() const {
 
 void BulletSpawner2D::reset_shooting() {
 	const bool was_active = auto_shooting_active();
+	++cadence_serial;
 	volleys_fired = 0;
 	shooting_paused = false;
 	oneshot_volleys_left = -1;
@@ -566,6 +567,7 @@ void BulletSpawner2D::fire_n_volleys(int n) {
 	// spawner stays unlimited. Replaces any previous budget. Unpauses: an
 	// explicit fire request resumes a paused wave (the budget pauses it again
 	// when spent). Armed while disabled too: volleys fire once re-enabled.
+	++cadence_serial;
 	oneshot_volleys_left = n;
 	const bool was_active = auto_shooting_active();
 	shooting_paused = false;
@@ -1013,7 +1015,11 @@ bool BulletSpawner2D::shoot_once() {
 	// return while the guard is either unset or already cleared.
 	// Read before the emit: a volley_fired handler may free the volley.
 	const int fired_amount = bullets->get_amount_bullets();
+	const uint32_t cadence = cadence_serial;
 	emit_on2d(this, "volley_fired", bullets, volleys_fired);
+	// A handler that reset the wave or armed a new budget owns the cadence:
+	// this shot neither spends that budget nor reports a stale cap.
+	const bool cadence_replaced = cadence != cadence_serial;
 	// The shot succeeded (no drop path follows): spawner-only entries fire
 	// at the spawner's global position.
 	fire_spawner_sound(BulletSoundData2D::SOUND_ON_SHOT, fired_amount);
@@ -1021,7 +1027,7 @@ bool BulletSpawner2D::shoot_once() {
 	// touching max_volleys. Spent budget pauses via the standard path, so
 	// transitions stay consistent; placed after volley_fired so the last
 	// volley's signal precedes the stop.
-	if (oneshot_volleys_left > 0 && --oneshot_volleys_left == 0) {
+	if (!cadence_replaced && oneshot_volleys_left > 0 && --oneshot_volleys_left == 0) {
 		// Spent: the budget clears itself (volleys_remaining and a later
 		// resume_shooting() behave like an unlimited spawner again).
 		oneshot_volleys_left = -1;
@@ -1031,7 +1037,7 @@ bool BulletSpawner2D::shoot_once() {
 	// not re-emit, and the setter path reports its own transition.
 	// NOTE: a shooting_finished handler runs while the latch is still up, so
 	// a nested shoot_once() from there is rejected the same way.
-	if (max_volleys >= 0 && volleys_fired == max_volleys) {
+	if (!cadence_replaced && max_volleys >= 0 && volleys_fired == max_volleys) {
 		// Stop shooting, but stay awake while spinning, retargeting, bursting,
 		// telegraphing, sequencing, or previewing (same keep-awake set as everywhere else).
 		set_process(needs_process_besides_shooting());
@@ -1473,14 +1479,21 @@ void BulletSpawner2D::_process(double delta) {
 		// Telegraph inserts the warning first (fire happens on countdown).
 		// Burst/telegraph arming owns the rest of the tick: their chains run
 		// on their own timers, so the catch-up loop stops here.
+		// A handler inside the pull that reset the wave or armed a budget
+		// owns the cadence: its restarted delay is never rearmed over.
+		const uint32_t cadence = cadence_serial;
 		if (burst_enabled && burst_count > 1) {
 			begin_burst_chain(true);
-			shoot_time_left += next_shoot_interval_sec();
+			if (cadence == cadence_serial && !shot_owner_dying()) {
+				shoot_time_left += next_shoot_interval_sec();
+			}
 			break;
 		}
 		if (telegraph_enabled && telegraph_sec > 0.0 && !telegraph_pending) {
 			begin_telegraph(true);
-			shoot_time_left += next_shoot_interval_sec();
+			if (cadence == cadence_serial && !shot_owner_dying()) {
+				shoot_time_left += next_shoot_interval_sec();
+			}
 			break;
 		}
 		// Plain pull. Errors, if any, are per-attempt (interval-gated, no
@@ -1491,6 +1504,9 @@ void BulletSpawner2D::_process(double delta) {
 		auto_fire_in_progress = true;
 		const bool fired = shoot_once();
 		auto_fire_in_progress = false;
+		if (cadence != cadence_serial || shot_owner_dying()) {
+			break;
+		}
 		// Throttle-on-pull: the interval rearms even when the pull skipped,
 		// failed, or dropped its volley. Throttle-on-success instead would
 		// hot-loop a persistently failing shot (busy factory, over budget)

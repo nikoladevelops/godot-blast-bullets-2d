@@ -1608,6 +1608,10 @@ private:
 	// handler that cancels, restarts or resets the chain owns it (the running
 	// shot touches no counter after its emits once this moved).
 	uint32_t burst_serial = 0;
+	// Bumped by reset_shooting and fire_n_volleys: a shot handler calling
+	// them owns the cadence (the reporting shot neither spends the new budget
+	// nor rearms the interval over the restarted delay).
+	uint32_t cadence_serial = 0;
 	// Shots fired in the current chain (shot index and mirror rhythm).
 	int burst_shots_fired = 0;
 	// True when the auto loop started the chain: it then follows the

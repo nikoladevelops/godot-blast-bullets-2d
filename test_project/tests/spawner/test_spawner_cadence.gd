@@ -330,3 +330,42 @@ func test_burst_and_pattern_list_steps_keep_their_rate() -> void:
 	await idle(1)
 	assert_lte(get_signal_emit_count(sp, "volley_fired") - fired_before, 2, "interval 0: one entry per frame")
 	await _frames_until(sp, "pattern_list_finished", 2)
+
+
+## fire_n_volleys(n) from a volley_fired handler is a fresh budget: the shot
+## that is reporting never counts against it (n more volleys fire).
+func test_fire_n_volleys_from_volley_fired_fires_n_more() -> void:
+	var sp := make_spawner(H.make_volley_data(1, 50.0, 30.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
+	sp.shoot_interval_sec = 0.05
+	var armed: Array = []
+	sp.volley_fired.connect(func(_v, _n) -> void:
+		if armed.is_empty():
+			armed.append(true)
+			sp.fire_n_volleys(3))
+	sp.set_shooting_enabled(true)
+	for k in 90:
+		await idle(1)
+	assert_eq(sp.get_volleys_fired(), 4, "the first volley, then exactly 3 from the new budget")
+	assert_true(sp.is_shooting_paused(), "the spent budget paused the wave")
+
+
+## reset_shooting() from a volley_fired handler restarts the cadence from
+## shoot_initial_delay_sec: the reporting pull never adds its interval on top.
+func test_reset_shooting_from_volley_fired_restarts_the_delay() -> void:
+	var sp := make_spawner(H.make_volley_data(1, 50.0, 30.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
+	sp.shoot_interval_sec = 0.05
+	var frames: Array = []
+	var frame := [0]
+	sp.volley_fired.connect(func(_v, n) -> void:
+		frames.append(frame[0])
+		if n == 1:
+			sp.shoot_initial_delay_sec = 0.5
+			sp.reset_shooting())
+	sp.set_shooting_enabled(true)
+	for k in 60:
+		await idle(1)
+		frame[0] += 1
+		if frames.size() >= 2:
+			break
+	assert_eq(frames.size(), 2, "the cadence resumed")
+	assert_almost_eq(frames[1] - frames[0], 30, 1, "the next volley comes shoot_initial_delay_sec (30 frames) later")
