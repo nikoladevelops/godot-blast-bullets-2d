@@ -11,13 +11,38 @@
 
 namespace BlastBullets2D {
 
+// Typed emitters (the call sites pass `this` or a typed pointer) skip the
+// class lookup; the Object overload below serves the rest.
+template <typename... Args>
+void emit_on2d(BulletVolley2D *emitter, const godot::StringName &signal, const Args &...args) {
+	if (emitter != nullptr) {
+		emit_guarded2d(emitter, emitter->emit_guard, signal, args...);
+	}
+}
+
+template <typename... Args>
+void emit_on2d(BulletFactory2D *emitter, const godot::StringName &signal, const Args &...args) {
+	if (emitter != nullptr) {
+		emit_guarded2d(emitter, emitter->emit_guard, signal, args...);
+	}
+}
+
+template <typename... Args>
+void emit_on2d(BulletSpawner2D *emitter, const godot::StringName &signal, const Args &...args) {
+	if (emitter != nullptr) {
+		emit_guarded2d(emitter, emitter->emit_guard, signal, args...);
+	}
+}
+
 template <typename... Args>
 void emit_on2d(godot::Object *emitter, const godot::StringName &signal, const Args &...args) {
-	if (BulletSpawner2D *spawner = godot::Object::cast_to<BulletSpawner2D>(emitter)) {
+	// C++ RTTI on the plugin's own instances: Object::cast_to would cross
+	// into the engine twice per try (this runs for every hit and expiry).
+	if (BulletSpawner2D *spawner = dynamic_cast<BulletSpawner2D *>(emitter)) {
 		emit_guarded2d(spawner, spawner->emit_guard, signal, args...);
-	} else if (BulletFactory2D *factory = godot::Object::cast_to<BulletFactory2D>(emitter)) {
+	} else if (BulletFactory2D *factory = dynamic_cast<BulletFactory2D *>(emitter)) {
 		emit_guarded2d(factory, factory->emit_guard, signal, args...);
-	} else if (BulletVolley2D *volley = godot::Object::cast_to<BulletVolley2D>(emitter)) {
+	} else if (BulletVolley2D *volley = dynamic_cast<BulletVolley2D *>(emitter)) {
 		emit_guarded2d(volley, volley->emit_guard, signal, args...);
 	} else if (emitter != nullptr) {
 		emitter->emit_signal(signal, args...);
