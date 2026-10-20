@@ -91,3 +91,68 @@ func test_retarget_stagger_differs_per_spawner() -> void:
 	assert_between(cd1, 0.0, 0.5, "countdown within the interval")
 	assert_between(cd2, 0.0, 0.5, "countdown within the interval")
 	assert_ne(cd1, cd2, "distinct spawners stagger apart")
+
+
+## A ring of `n` bullets 10 px around the origin homing onto a lone target
+## at (120, 0) and orbiting it at radius 40 (circle speed 160 px/s).
+func _orbiter(policy: int, n := 4) -> Array:
+	var target := make_graze_target(Vector2(120, 0), &"orbit_lone")
+	var s := make_spawner(H.make_volley_data(n, 160.0, 10.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, n)
+	s.helper_ring_radius = 10.0
+	s.homing_node_group = &"orbit_lone"
+	s.homing_smoothing = 6.0
+	s.homing_take_control_of_texture_rotation = true
+	s.homing_retarget_interval_sec = 1000.0 # retargets only when the test asks
+	s.set_homing_enabled(true)
+	s.orbiting_radius = 40.0
+	s.orbiting_lock_policy = policy
+	s.orbiting_enabled = true
+	var got: Array = []
+	s.volley_fired.connect(func(v, _n) -> void: got.append(v), CONNECT_ONE_SHOT)
+	assert_true(s.shoot_once(), "fires")
+	return [s, got[0], target]
+
+
+func test_a_retarget_onto_the_same_target_never_stalls_an_orbit(policy: int = use_parameters([BulletVolley2D.RelockAlways, BulletVolley2D.RelockOnTargetChange, BulletVolley2D.StayLocked])) -> void:
+	# RelockAlways re-acquires the radius on every retarget (documented):
+	# the bullet relocks right on the ring and keeps circling at its speed
+	# (it used to stand still for the relock tick, every retarget interval).
+	var o: Array = _orbiter(policy)
+	var s: BulletSpawner2D = o[0]
+	var v: BulletVolley2D = o[1]
+	for f in 120:
+		await physics(1)
+	assert_true(v.bullet_is_orbiting_locked(0), "circling before the retarget")
+	var step := 160.0 / 60.0
+	var steps: Array = []
+	var last: Vector2 = v.get_bullet_transform(0).origin
+	for f in 6:
+		if f == 2:
+			assert_eq(s.retarget_live_volleys(), 1, "the pass reached the volley")
+		await physics(1)
+		var now: Vector2 = v.get_bullet_transform(0).origin
+		steps.append(snappedf(now.distance_to(last), 0.01))
+		last = now
+	for d in steps:
+		assert_almost_eq(float(d), step, step * 0.05, "policy %d: every tick moves a full step around the ring %s" % [policy, steps])
+	assert_true(v.bullet_is_orbiting_locked(0), "circling after the retarget")
+
+
+func test_the_lock_tick_moves_a_full_step() -> void:
+	# Arriving at the ring: the tick that locks moves the bullet as far as
+	# any other tick (onto the ring, then along it), never only the last
+	# sliver of the approach.
+	var o: Array = _orbiter(BulletVolley2D.RelockAlways, 1)
+	var v: BulletVolley2D = o[1]
+	var step := 160.0 / 60.0
+	var last: Vector2 = v.get_bullet_transform(0).origin
+	var lock_step := -1.0
+	for f in 120:
+		await physics(1)
+		var now: Vector2 = v.get_bullet_transform(0).origin
+		if v.bullet_is_orbiting_locked(0):
+			lock_step = now.distance_to(last)
+			break
+		last = now
+	assert_gt(lock_step, 0.0, "the bullet locked")
+	assert_almost_eq(lock_step, step, step * 0.05, "the lock tick moved a full step")

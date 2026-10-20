@@ -933,7 +933,18 @@ _ALWAYS_INLINE_ void BulletVolley2D::step_orbit(const MoveTick2D &t, BulletStep2
 		// here too; zero-delta ticks never lock.
 		o.angle = to_center.angle();
 		orbit_stamp_lock(o, center, *b.steering_deque);
-		b.velocity_delta = clamp_step(ring_slot() - origin, speed * (real_t)delta);
+		// The lock tick spends the whole step: onto the ring, then along it
+		// (the radial gap and the arc are the two legs of the step). Only
+		// the gap was moved before, so a relock right on the ring
+		// (RelockAlways after every retarget pass) stood still a tick.
+		const real_t step = speed * (real_t)delta;
+		const real_t gap = Math::abs(current_dist - o.radius);
+		const real_t dir_multiplier = (o.direction == OrbitRight) ? 1.0 : (o.direction == OrbitLeft ? -1.0 : 0.0);
+		if (dir_multiplier != 0.0 && can_move && step > gap) {
+			const real_t safe_radius = o.radius < 0.01 ? (real_t)0.01 : o.radius;
+			advance_orbit_angle(o.angle, (Math::sqrt(step * step - gap * gap) / safe_radius) * dir_multiplier);
+		}
+		b.velocity_delta = clamp_step(ring_slot() - origin, step);
 		on_ring = true;
 	} else if (current_dist < o.radius) {
 		// Spawned inside the ring: push outward (not orbiting yet).
