@@ -56,7 +56,7 @@ for the rest: the sections are written to be looked up, not read once.
 
 ```sh
 GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py   # build (exit 1 = failed; never raw scons, never edit SConstruct)
-python3 tools/run_tests.py                                       # 199 files / 1828 tests, ~10 s, leak-checked
+python3 tools/run_tests.py                                       # 201 files / 1843 tests, ~10 s, leak-checked
 python3 tools/run_tests.py --suite <substring> --full            # one area, every failure message unclipped
 python3 tools/run_tests.py --self-test                           # proves the harness still catches failures/leaks
 python3 tools/run_editor_smoke.py                                # headless EDITOR run of tests/editor_smoke/ (editor-only paths)
@@ -853,7 +853,21 @@ src/
   the release path with `BulletFactory2D.debug_free_like_release(object)`
   (C++ `memdelete`, no lock check): `integration/test_release_free_matrix`
   frees the emitter from EVERY signal of the three classes (ClassDB-driven).
-  A handler may also stop, replace or restart what emitted (movement
+  The same guard covers user code the plugin runs OUTSIDE a signal where the
+  caller must outlive it (`guarded_user_call2d`: the aimed target's
+  `get_velocity`, a hit target's `_get` read inside the physics flush).
+- User code outside signals and callbacks is still user code: `Object::get`
+  runs a script `_get` or property getter (the bounce reads the hit target's
+  `collision_layer` / velocity), `call("get_velocity")` runs a script method
+  (aimed prediction, read ONCE per collect), `PackedScene::instantiate()`
+  runs `_init` (attachments), `set_visible` runs `visibility_changed`
+  handlers. Every such site re-checks by id afterwards: the volley
+  (`survived_user_code`), the target (looked up again), the bullet's life
+  (`volley_generation` + bullet epoch: a clear inside may have pooled the
+  volley), and a raw factory pointer (re-resolved). Pinned by
+  `integration/test_target_script_free_matrix` and the hostile scripts in
+  the chaos fuzz.
+- A handler may also stop, replace or restart what emitted (movement
   playback, pattern lists): the emitting code re-checks an epoch/serial
   (`movement_epoch`, `pattern_list_serial`) after the emit and leaves the
   rest to the handler.
@@ -1031,7 +1045,23 @@ deduped, cancelled by REMOVED) and replayed once on resume.
   shot ends (`refused_free_during_shot`), like the factory and volleys.
 - A node freed inside its OWN `add_child` (a `child_entered_tree` handler
   freeing the node being added or the emitting parent) crashes inside Godot
-  itself; the plugin cannot guard that, so tests never do it.
+  itself; the plugin cannot guard that, so tests never do it. Same boundary:
+  freeing (the release way) the emitter of a GODOT signal or its ancestor
+  inside that emit (an attachment's own `visibility_changed`), user code in
+  notifications the user opts into (`NOTIFICATION_LOCAL_TRANSFORM_CHANGED`),
+  and scripted engine resources (a GDScript `AudioStream` or `Texture2D`).
+- Every `area_entered` / `body_entered` callback of EVERY node (a game's
+  hurtbox too) runs inside Godot's physics query flush, where the server
+  refuses `area_set_shape_disabled` and `area_set_monitorable`. Volleys write
+  both through `write_shape_disabled` / `write_monitorable`
+  (`core/physics_flush2d.hpp`): inside the flush they mark the volley and
+  the factory applies the whole state right after it (next sweep start, or a
+  deferred call while paused), before the physics step. Flush detection: in
+  a physics frame whose SceneTree `physics_frame` has not fired yet (each
+  factory records it); the factory sweep never defers (`sweep_depth`). A
+  bullet taken out inside the flush keeps its shape until it ends, so the
+  monitor callbacks drop records of disabled bullets. Pinned by
+  `integration/test_physics_flush_contract`.
 
 ## 15. Benchmarks and performance lessons
 
