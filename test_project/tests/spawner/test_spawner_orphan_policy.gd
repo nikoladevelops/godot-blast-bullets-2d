@@ -287,3 +287,97 @@ func test_orphaned_volleys_enum_is_locked() -> void:
 	sp.orphaned_volleys = 9
 	expect_error_sequence(["BulletSpawner2D: orphaned_volleys out of range, keeping the old value."])
 	assert_eq(sp.orphaned_volleys, 0, "old value kept")
+
+
+## [policy, state, how]: every policy, freed in the middle of every running
+## chain, the debug way and the release way.
+func _mid_chain_cases() -> Array:
+	var out: Array = []
+	for policy in [BulletSpawner2D.ORPHANED_VOLLEYS_KEEP_FLYING, BulletSpawner2D.ORPHANED_VOLLEYS_HAND_TO_FACTORY, BulletSpawner2D.ORPHANED_VOLLEYS_CLEAR, BulletSpawner2D.ORPHANED_VOLLEYS_REMOVE]:
+		for state in ["burst", "telegraph", "pattern_list", "movement", "homing_orbit_split_sound"]:
+			for how in ["queue_free", "free_like_release"]:
+				out.append([policy, state, how])
+	return out
+
+
+func test_freed_in_the_middle_of_any_chain_under_any_policy(c: Array = use_parameters(_mid_chain_cases())) -> void:
+	var policy: int = c[0]
+	var state: String = c[1]
+	var label := "policy %d, %s, %s" % c
+	var ledger := MixLedger.new()
+	ledger.attach(factory)
+	var d := _data(1.0, 0)
+	d.effect_layers = []
+	var sp := _spawner(policy, d)
+	ledger.watch_spawner(sp)
+	sp.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_RING
+	sp.helper_bullets_amount = 4
+	var t := make_graze_target(Vector2(200, 0), &"orphan_chain")
+	var path := Path2D.new()
+	path.curve = Curve2D.new()
+	path.curve.add_point(Vector2(0, 0))
+	path.curve.add_point(Vector2(80, 0))
+	add(path)
+	var fired := [0]
+	sp.volley_fired.connect(func(_v, _n) -> void: fired[0] += 1)
+	match state:
+		"burst":
+			sp.burst_count = 6
+			sp.burst_interval_sec = 0.05
+			sp.burst_enabled = true
+			sp.begin_burst()
+		"telegraph":
+			sp.telegraph_sec = 0.3
+			sp.telegraph_enabled = true
+			sp.shoot_interval_sec = 0.1
+			sp.shooting_enabled = true
+		"pattern_list":
+			sp.spawn_pattern_list([{}, {"helper_bullets_amount": 3}, {}, {}], false, 0.05)
+		"movement":
+			sp.set_movement_path_node(path)
+			sp.movement_duration_sec = 0.2
+			sp.movement_loop_mode = BulletSpawner2D.MOVEMENT_LOOP_PING_PONG
+			sp.movement_enabled = true
+			sp.movement_play()
+			sp.shoot_interval_sec = 0.05
+			sp.shooting_enabled = true
+		"homing_orbit_split_sound":
+			sp.homing_node_group = &"orphan_chain"
+			sp.homing_take_control_of_texture_rotation = true
+			sp.homing_retarget_interval_sec = 0.05
+			sp.set_homing_enabled(true)
+			sp.orbiting_radius = 30.0
+			sp.orbiting_enabled = true
+			var stage := BulletSplitStage2D.new()
+			stage.count = 2
+			stage.split_after_sec = 0.1
+			var chain := BulletSplitData2D.new()
+			chain.stages = [stage]
+			sp.split_data = chain
+			sp.split_enabled = true
+			sp.sound_effects = [H.make_sound(BulletSoundData2D.SOUND_ON_FLIGHT), H.make_sound(BulletSoundData2D.SOUND_ON_SPLIT)]
+			sp.sound_enabled = true
+			sp.shoot_interval_sec = 0.05
+			sp.shooting_enabled = true
+	for f in 6:
+		await physics(1)
+		ledger.pull()
+	var fired_before: int = fired[0]
+	if c[2] == "queue_free":
+		sp.queue_free()
+	else:
+		BulletFactory2D.debug_free_like_release(sp)
+	for f in 90:
+		await physics(1)
+		ledger.pull()
+	await idle(2)
+	assert_eq(fired[0], fired_before, "%s: nothing fires after the free" % label)
+	if policy == BulletSpawner2D.ORPHANED_VOLLEYS_CLEAR:
+		assert_eq(int(ledger.counts.get("disable:lifetime", 0)), 0, "%s: cleared, nothing left to expire" % label)
+	assert_eq("\n".join(ledger.problems()), "", label)
+	assert_true(factory.debug_assert_no_dangling()["ok"], "%s: balanced books" % label)
+	ledger.detach()
+	for err in get_errors():
+		if not err.handled and err.is_push_warning() and (err.contains_text(ORPHAN_HIT) or err.contains_text(ORPHAN_EXPIRY)):
+			err.handled = true # Keep Flying explains lost hits and expiries once (by contract)
+	expect_no_errors(label)

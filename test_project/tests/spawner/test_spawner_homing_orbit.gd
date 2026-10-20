@@ -156,3 +156,33 @@ func test_the_lock_tick_moves_a_full_step() -> void:
 		last = now
 	assert_gt(lock_step, 0.0, "the bullet locked")
 	assert_almost_eq(lock_step, step, step * 0.05, "the lock tick moved a full step")
+
+
+func test_the_live_bullet_budget_counts_split_children_never_frozen_bullets_or_pickups() -> void:
+	var s := make_spawner(H.make_volley_data(2, 50.0, 5.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 2)
+	var stage := BulletSplitStage2D.new()
+	stage.count = 3
+	stage.split_after_sec = 0.05
+	stage.parent_survives = true
+	var chain := BulletSplitData2D.new()
+	chain.stages = [stage]
+	s.split_data = chain
+	s.split_enabled = true
+	var got: Array = []
+	s.volley_fired.connect(func(v, _n) -> void: got.append(v), CONNECT_ONE_SHOT)
+	assert_true(s.shoot_once(), "fires")
+	for f in 8:
+		await physics(1)
+	assert_eq(s.get_active_live_bullet_count(), 8, "2 parents + 6 children: the children are the spawner's")
+	var v: BulletVolley2D = got[0]
+	v.set_is_auto_pooling_enabled(false)
+	v.disable_bullet(0)
+	assert_eq(s.get_active_live_bullet_count(), 7, "a frozen bullet is not live")
+	s.max_live_bullets = 7
+	watch_signals(s)
+	assert_false(s.shoot_once(), "the budget is full")
+	assert_signal_emitted_with_parameters(s, "volley_skipped", [&"over_budget"])
+	await idle(1)
+	factory.convert_all_bullets_to_pickups(BulletPickupData2D.new(), Vector2(900, 0))
+	assert_eq(s.get_active_live_bullet_count(), 0, "pickups belong to the factory")
+	assert_true(s.shoot_once(), "the budget is free again")

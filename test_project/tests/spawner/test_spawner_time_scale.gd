@@ -309,3 +309,30 @@ func test_spin_angle_stays_finite_at_a_huge_time_scale() -> void:
 		assert_true(is_finite(sp.get_spin_angle_deg()), "mode %d: the spin angle stays finite" % mode)
 		sp.time_scale = 1.0
 		assert_true(sp.shoot_once(), "mode %d: shots still work" % mode)
+
+
+func test_scale_zero_freezes_pattern_lists_and_the_retarget_countdown() -> void:
+	var sp := _shooter(10.0)
+	var t := make_graze_target(Vector2(300, 0), &"scaled_targets")
+	sp.homing_node_group = &"scaled_targets"
+	sp.homing_take_control_of_texture_rotation = true
+	sp.homing_retarget_interval_sec = 0.2
+	sp.homing_retarget_phase = 0.2
+	sp.set_homing_enabled(true)
+	var retargets := [0]
+	sp.retarget_applied.connect(func(_n) -> void: retargets[0] += 1)
+	sp.spawn_pattern_list([{}, {}, {}, {}], false, 0.2)
+	await idle(2)
+	assert_eq(fired.size(), 1, "the list's first entry fires at once")
+	sp.time_scale = 0.0
+	var list_before := fired.size()
+	var retarget_before: int = retargets[0]
+	await idle(120) # 2 s frozen
+	assert_eq(fired.size(), list_before, "frozen: no list entry")
+	assert_eq(retargets[0], retarget_before, "frozen: no retarget pass")
+	assert_true(sp.is_pattern_list_active(), "the list waits")
+	sp.time_scale = 1.0
+	await idle(60) # 1 s: the remaining 3 entries at 0.2 s
+	assert_eq(fired.size(), 4, "the list finished on the resumed clock")
+	assert_gt(retargets[0], retarget_before, "retargeting resumed")
+	assert_false(sp.is_pattern_list_active(), "done")
