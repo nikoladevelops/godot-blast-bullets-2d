@@ -1951,6 +1951,11 @@ protected:
 	};
 	std::vector<BounceFrame2D> all_bounce_frame;
 	bool bounce_frames_active = false;
+	// Out of line: keeps the per-bullet loop of volleys that never bounced
+	// as small as before (an inlined frame apply cost split_storm ~15%).
+	_NO_INLINE_ Vector2 bounce_frame_drift(int bullet_index) const { return bullet_drift(bullet_index); }
+	_NO_INLINE_ Vector2 bounce_frame_apply(int bullet_index, const Vector2 &v) const { return all_bounce_frame[bullet_index].apply(v); }
+	_NO_INLINE_ Vector2 bounce_frame_unapply(int bullet_index, const Vector2 &v) const { return all_bounce_frame[bullet_index].unapply(v); }
 	// The bullet's share of the inherited momentum (mirrored by its bounces).
 	_ALWAYS_INLINE_ Vector2 bullet_drift(int bullet_index) const {
 		if (!bounce_frames_active || bullet_index < 0 || bullet_index >= (int)all_bounce_frame.size()) {

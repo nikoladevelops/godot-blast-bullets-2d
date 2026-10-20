@@ -646,14 +646,11 @@ _ALWAYS_INLINE_ void BulletVolley2D::step_flock(const MoveTick2D &t, BulletStep2
 _ALWAYS_INLINE_ void BulletVolley2D::step_direction_curves(const MoveTick2D &t, BulletStep2D &b) {
 	const bool own_x = b.curves != nullptr && b.curves->x_direction_curve.is_valid();
 	const bool own_y = b.curves != nullptr && b.curves->y_direction_curve.is_valid();
-	if (!own_x && !own_y && !t.shared_x && !t.shared_y) {
-		return;
-	}
 	// A bounced bullet flies its curve mirrored off the wall: the curve
-	// works in the bullet's mirror frame.
-	const BounceFrame2D *frame = t.bounce_frames != nullptr ? &t.bounce_frames[b.i] : nullptr;
-	if (frame != nullptr) {
-		*b.direction = frame->unapply(*b.direction);
+	// works in the bullet's mirror frame (out of line: the slow path).
+	const bool framed = t.bounce_frames != nullptr && (own_x || own_y || t.shared_x || t.shared_y);
+	if (framed) {
+		*b.direction = bounce_frame_unapply(b.i, *b.direction);
 	}
 	const BulletCurvesData2D *texture_source = nullptr;
 	if (own_x) {
@@ -672,8 +669,8 @@ _ALWAYS_INLINE_ void BulletVolley2D::step_direction_curves(const MoveTick2D &t, 
 		apply_direction_axis2d(*b.direction, 1, t.shared_y_mode, t.shared_y_offset, t.shared_y_strength);
 		texture_source = t.shared_curves;
 	}
-	if (frame != nullptr) {
-		*b.direction = frame->apply(*b.direction);
+	if (framed) {
+		*b.direction = bounce_frame_apply(b.i, *b.direction);
 	}
 	if (texture_source != nullptr) {
 		apply_direction_curve_texture_rotation_if_needed(*b.direction, *b.transf, t.delta, texture_source);
@@ -825,7 +822,11 @@ _ALWAYS_INLINE_ void BulletVolley2D::step_pattern_and_forces(const MoveTick2D &t
 			}
 		}
 	}
-	b.velocity_delta += (t.bounce_frames != nullptr ? t.bounce_frames[i].apply(inherited_velocity_offset) : inherited_velocity_offset) * (real_t)delta;
+	if (t.bounce_frames == nullptr) {
+		b.velocity_delta += inherited_velocity_offset * (real_t)delta;
+	} else {
+		b.velocity_delta += bounce_frame_drift(i) * (real_t)delta; // slow path: a bounced volley
+	}
 	if (gravity_active && t.gravity_window && i < (int)all_gravity.size() && i < (int)all_gravity_velocity.size()) {
 		const Vector2 base_g = all_gravity[i];
 		if (base_g.length_squared() > 0.0) {
