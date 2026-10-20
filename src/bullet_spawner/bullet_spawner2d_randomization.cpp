@@ -190,6 +190,7 @@ double BulletSpawner2D::roll_timing_range(double base, double max_value, uint64_
 		// channel folded in so the ranges never replay each other's stream.
 		uint64_t h = (uint64_t)reload_jitter_seed * 0x9E3779B97F4A7C15ull + (uint64_t)volleys_fired + channel * 0x632BE59BD9B4E019ull;
 		rng->set_seed(mix64(h));
+		jitter_rng_randomized = false; // seed 0 later must not continue this stream
 	} else if (!jitter_rng_randomized) {
 		rng->randomize();
 		jitter_rng_randomized = true;

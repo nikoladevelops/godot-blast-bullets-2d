@@ -1676,6 +1676,7 @@ double BulletSpawner2D::next_shoot_interval_sec() const {
 		h = (h ^ (h >> 30)) * 0xBF58476D1CE4E5B9ull;
 		h = (h ^ (h >> 27)) * 0x94D049BB133111EBull;
 		rng->set_seed(h ^ (h >> 31));
+		jitter_rng_randomized = false; // seed 0 later must not continue this stream
 	} else if (!jitter_rng_randomized) {
 		rng->randomize();
 		jitter_rng_randomized = true;

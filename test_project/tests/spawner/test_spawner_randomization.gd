@@ -531,3 +531,41 @@ func test_timing_maxima_refuse_values_past_float_range() -> void:
 		assert_eq(sp.get(prop), before, "%s kept" % prop)
 		sp.set(prop, 1e30)
 		assert_eq(sp.get(prop), 1e30, "%s: a large float-range value is fine" % prop)
+
+
+## reload_jitter_seed 0 is non-deterministic even after a seeded run: two
+## spawners with the same seeded history then roll their timing ranges
+## independently (no shared stream continues from the last seeded roll).
+func test_jitter_seed_zero_randomizes_again_after_a_seeded_run() -> void:
+	var gaps := [[], []]
+	var last := [0, 0]
+	var frame := [0]
+	var sps: Array = []
+	for k in 2:
+		var sp := make_spawner(H.make_volley_data(1, 50.0, 30.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
+		sp.shoot_interval_sec = 0.02
+		sp.shoot_interval_max_sec = 0.4
+		sp.volley_fired.connect(func(_v, _n) -> void:
+			gaps[k].append(frame[0] - last[k])
+			last[k] = frame[0])
+		sps.append(sp)
+	var run := func(frames: int) -> void:
+		for i in frames:
+			await idle(1)
+			frame[0] += 1
+	for sp in sps: # seed 0 first: each rolls its own stream
+		sp.set_shooting_enabled(true)
+	await run.call(30)
+	for k in 2: # then the same seeded history (shot counts aligned)
+		sps[k].reload_jitter_seed = 5
+		sps[k].reset_shooting()
+		last[k] = frame[0]
+		gaps[k] = []
+	await run.call(60)
+	assert_eq(gaps[0], gaps[1], "the same seed rolls the same timing")
+	for k in 2:
+		sps[k].reload_jitter_seed = 0
+		gaps[k] = []
+	await run.call(200)
+	assert_gt(gaps[0].size(), 6, "both kept firing")
+	assert_ne(gaps[0].slice(0, 6), gaps[1].slice(0, 6), "seed 0 rolls independently")

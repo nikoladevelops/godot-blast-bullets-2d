@@ -86,6 +86,9 @@ void BulletSpawner2D::set_homing_random_seed(int value) {
 		return;
 	}
 	homing_random_seed = value;
+	// A new seed restarts the picks (the same seed replays them); 0 is
+	// non-deterministic again even after a seeded run.
+	homing_rng = Ref<RandomNumberGenerator>();
 }
 
 double BulletSpawner2D::get_homing_retarget_phase() const {

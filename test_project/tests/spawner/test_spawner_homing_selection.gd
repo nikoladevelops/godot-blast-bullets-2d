@@ -156,3 +156,32 @@ func test_mouse_source_resolves_no_nodes() -> void:
 	sp.set_homing_enabled(true)
 	sp.set_homing_target_source(BulletSpawner2D.HOMING_SOURCE_MOUSE)
 	assert_eq(sp.resolve_homing_targets(true, false), [], "the mouse is not a node target")
+
+
+## Setting homing_random_seed restarts its picks (the same seed replays them)
+## and 0 is non-deterministic again even after a seeded run: two spawners
+## with the same seeded history then pick independently.
+func test_reseeding_replays_and_seed_zero_randomizes_again() -> void:
+	var a := _spawner(BulletSpawner2D.HOMING_SELECT_RANDOM, 1)
+	var b := _spawner(BulletSpawner2D.HOMING_SELECT_RANDOM, 1)
+	a.set_homing_random_seed(7)
+	b.set_homing_random_seed(7)
+	var first: Array = []
+	for i in 12:
+		first.append(a.resolve_homing_targets(true)[0])
+		b.resolve_homing_targets(true)
+	a.set_homing_random_seed(7)
+	var again: Array = []
+	for i in 12:
+		again.append(a.resolve_homing_targets(true)[0])
+	assert_eq(again, first, "setting the seed again replays its picks")
+	for i in 12:
+		b.resolve_homing_targets(true) # same history as a
+	a.set_homing_random_seed(0)
+	b.set_homing_random_seed(0)
+	var ra: Array = []
+	var rb: Array = []
+	for i in 24:
+		ra.append(a.resolve_homing_targets(true)[0])
+		rb.append(b.resolve_homing_targets(true)[0])
+	assert_ne(ra, rb, "seed 0 is non-deterministic: no shared stream continues")
