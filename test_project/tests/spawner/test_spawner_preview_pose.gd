@@ -266,6 +266,27 @@ func test_spawners_sharing_a_generator_own_separate_previews() -> void:
 		assert_almost_eq(angle_difference(layer.rotation, deg_to_rad(b.get_spin_angle_deg())), 0.0, 0.0001, "B keeps posing its live layer")
 
 
+## A spawner without a runtime preview that enters the tree on a generator
+## another spawner already previews never deletes that live holder (its
+## stray cleanup only takes holders that are its own or nobody's).
+func test_a_late_spawner_never_deletes_another_spawners_holder() -> void:
+	var gen: Node2D = add(Node2D.new())
+	var b := _spinning_preview(BulletSpawner2D.PATTERN_FROM_HELPER_RING, 6)
+	b.set_transforms_generator(gen)
+	await idle(4)
+	var holder: Node = gen.get_node_or_null(HOLDER)
+	assert_not_null(holder, "B's holder takes the plain name")
+	var holder_id := holder.get_instance_id()
+	var a := BulletSpawner2D.new()
+	a.set_shooting_enabled(false)
+	a.set_spawn_data(H.make_volley_data(1))
+	a.set_transforms_generator_path(gen.get_path())
+	add(a) # A's _ready runs its stray cleanup on the shared generator
+	assert_true(is_instance_id_valid(holder_id), "B's live holder survives A's _ready")
+	await idle(2)
+	assert_eq(b.debug_get_preview_dot_points().size(), 6, "B still draws")
+
+
 ## A script that clears the external generator's children (the Children
 ## marker source invites it) frees the runtime preview holder with them: the
 ## spinning spawner and a muzzle-offset edit never touch the freed nodes,

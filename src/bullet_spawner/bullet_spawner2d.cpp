@@ -1084,18 +1084,21 @@ void BulletSpawner2D::_ready() {
 	// runtime is never affected.
 	if (!preview_active()) {
 		set_preview_nodes(nullptr, nullptr, nullptr);
-		Node *stray = get_node_or_null(NodePath(PREVIEW_HOLDER_NAME));
-		if (stray != nullptr) {
-			remove_child(stray);
+		// Only this spawner's holder or an ownerless leftover is a stray: a
+		// generator shared with another spawner holds ITS live preview too.
+		const int64_t self_id = (int64_t)get_instance_id();
+		auto drop_stray = [self_id](Node *parent) {
+			Node *stray = parent->get_node_or_null(NodePath(PREVIEW_HOLDER_NAME));
+			if (stray == nullptr || (stray->has_meta(PREVIEW_OWNER_META_KEY) && (int64_t)stray->get_meta(PREVIEW_OWNER_META_KEY) != self_id)) {
+				return;
+			}
+			parent->remove_child(stray);
 			memdelete(stray);
-		}
+		};
+		drop_stray(this);
 		Node2D *base = get_effective_generator();
 		if (base != nullptr && base != this) {
-			Node *stray_base = base->get_node_or_null(NodePath(PREVIEW_HOLDER_NAME));
-			if (stray_base != nullptr) {
-				base->remove_child(stray_base);
-				memdelete(stray_base);
-			}
+			drop_stray(base);
 		}
 	} else {
 		rebuild_preview();
