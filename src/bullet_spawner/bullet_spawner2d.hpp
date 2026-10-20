@@ -1432,6 +1432,13 @@ public:
 	void movement_seek(double ratio);
 	// Flips the current leg's direction in place (keeps the position).
 	void movement_reverse();
+	// Moves the spawner to a global position without travel: no velocity
+	// for the jump (nothing to inherit), and a playing or paused movement
+	// goes on from the new spot with the same path shape (Relative To
+	// Start shifts its anchor, Attach shifts the path; a stop back to the
+	// start or a fresh play drops that shift). carry_live_bullets moves this
+	// spawner's flying bullets by the same jump.
+	void teleport(const Vector2 &new_global_position, bool carry_live_bullets = false);
 	bool is_movement_playing() const;
 	// Distance ratio along the path, 0 = path start, 1 = path end.
 	double get_movement_progress() const;
@@ -1826,6 +1833,9 @@ private:
 	// measured from it, so a position written by hand in between is never
 	// motion a shot inherits.
 	Vector2 movement_last_pose;
+	// teleport() jumps an Attach path along (Relative To Start moves its
+	// anchor instead); movement_reset_state drops it.
+	Vector2 movement_teleport_offset;
 	// Bumped by every playback control (play, pause, stop, seek, reverse,
 	// enable): a movement signal handler that used one owns what happens next.
 	uint32_t movement_epoch = 0;

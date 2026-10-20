@@ -1015,6 +1015,7 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("movement_stop", "reset_to_start"), &BulletSpawner2D::movement_stop, DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("movement_seek", "ratio"), &BulletSpawner2D::movement_seek);
 	ClassDB::bind_method(D_METHOD("movement_reverse"), &BulletSpawner2D::movement_reverse);
+	ClassDB::bind_method(D_METHOD("teleport", "global_position", "carry_live_bullets"), &BulletSpawner2D::teleport, DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("is_movement_playing"), &BulletSpawner2D::is_movement_playing);
 	ClassDB::bind_method(D_METHOD("get_movement_progress"), &BulletSpawner2D::get_movement_progress);
 	ClassDB::bind_method(D_METHOD("get_movement_leg"), &BulletSpawner2D::get_movement_leg);

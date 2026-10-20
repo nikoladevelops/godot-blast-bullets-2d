@@ -367,3 +367,64 @@ func test_a_position_written_by_hand_is_never_inherited_as_velocity() -> void:
 	assert_lt(v.get_inherited_velocity_offset().length(), 1000.0, "the shot inherits no jump (%s)" % v.get_inherited_velocity_offset())
 	await idle(2)
 	assert_almost_eq(sp.get_movement_velocity().x, 300.0, 15.0, "then the path speed again")
+
+
+func test_teleport_moves_an_idle_spawner_without_rebuilding_its_preview() -> void:
+	var sp := make_preview_spawner(BulletSpawner2D.PATTERN_FROM_HELPER_RING, 6)
+	await idle(6)
+	var rebuilds: int = sp.debug_get_preview_stats()["rebuilds"]
+	sp.teleport(Vector2(640, -120))
+	assert_eq(sp.global_position, Vector2(640, -120), "moved")
+	await idle(6)
+	assert_eq(int(sp.debug_get_preview_stats()["rebuilds"]), rebuilds, "the preview follows as a node move (0 rebuilds)")
+	var pts: Array = sp.collect_spawn_transforms()
+	assert_almost_eq(((pts[0] as Transform2D).origin - Vector2(640, -120)).length(), sp.helper_ring_radius, 0.5, "and the pattern is centered there")
+
+
+func test_teleport_keeps_the_path_shape(space: int = use_parameters([BulletSpawner2D.MOVEMENT_SPACE_ATTACH, BulletSpawner2D.MOVEMENT_SPACE_RELATIVE_TO_START])) -> void:
+	var sp := _mover(path, func(s):
+		s.movement_space = space
+		s.inherit_movement_velocity = true)
+	await idle(15) # a quarter of the way: x = 75
+	var before: Vector2 = sp.global_position
+	sp.teleport(before + Vector2(500, 200))
+	assert_eq(sp.global_position, before + Vector2(500, 200), "space %d: moved at once" % space)
+	await idle(15) # another quarter: x + 75 along the path, shifted by the jump
+	assert_almost_eq(sp.global_position, before + Vector2(500 + 75, 200), Vector2(6, 0.5), "space %d: the path goes on from the new spot" % space)
+	assert_almost_eq(sp.get_movement_velocity().x, 300.0, 15.0, "space %d: the path speed, no jump" % space)
+	watch_signals(sp)
+	assert_true(sp.shoot_once(), "fires")
+	var v: BulletVolley2D = get_signal_parameters(sp, "volley_fired", 0)[0]
+	assert_almost_eq(v.get_inherited_velocity_offset().x, 300.0, 15.0, "space %d: the shot inherits the path velocity" % space)
+	sp.movement_stop(true)
+	await idle(1)
+	if space == BulletSpawner2D.MOVEMENT_SPACE_ATTACH:
+		assert_almost_eq(sp.global_position, Vector2.ZERO, Vector2(0.5, 0.5), "Attach: a stop back to the start returns to the path itself")
+
+
+func test_teleport_carries_this_spawners_bullets_on_request(carry: bool = use_parameters([true, false])) -> void:
+	var sp := make_spawner(H.make_volley_data(3, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 3)
+	var other := make_spawner(H.make_volley_data(3, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 3)
+	watch_signals(sp)
+	watch_signals(other)
+	assert_true(sp.shoot_once() and other.shoot_once(), "both fire")
+	var mine: BulletVolley2D = get_signal_parameters(sp, "volley_fired", 0)[0]
+	var theirs: BulletVolley2D = get_signal_parameters(other, "volley_fired", 0)[0]
+	var mine_at: Vector2 = mine.get_bullet_transform(0).origin
+	var theirs_at: Vector2 = theirs.get_bullet_transform(0).origin
+	sp.teleport(Vector2(300, 100), carry)
+	var want: Vector2 = mine_at + (Vector2(300, 100) if carry else Vector2.ZERO)
+	assert_almost_eq(mine.get_bullet_transform(0).origin, want, Vector2(0.01, 0.01), "carry %s: its bullets" % carry)
+	assert_eq(theirs.get_bullet_transform(0).origin, theirs_at, "another spawner's bullets never move")
+
+
+func test_teleport_refuses_a_bad_position_or_a_spawner_outside_the_tree() -> void:
+	var sp := make_spawner(H.make_volley_data(2), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 2)
+	sp.global_position = Vector2(10, 20)
+	sp.teleport(Vector2(NAN, 0))
+	expect_error_sequence(["BulletSpawner2D::teleport: global_position must be finite, the spawner stays where it is."])
+	assert_eq(sp.global_position, Vector2(10, 20), "kept")
+	var loose := BulletSpawner2D.new()
+	loose.teleport(Vector2(1, 1))
+	expect_error_sequence(["BulletSpawner2D::teleport: the spawner is outside the scene tree, it stays where it is."])
+	loose.free()

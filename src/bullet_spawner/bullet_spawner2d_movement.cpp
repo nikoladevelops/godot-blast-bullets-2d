@@ -245,6 +245,7 @@ void BulletSpawner2D::movement_reset_state() {
 	movement_velocity = Vector2();
 	movement_leg_elapsed = 0.0;
 	movement_progress = movement_leg_forward ? 0.0 : 1.0;
+	movement_teleport_offset = Vector2();
 }
 
 double BulletSpawner2D::movement_eased(double leg_ratio) const {
@@ -285,6 +286,8 @@ bool BulletSpawner2D::apply_movement_pose(double delta) {
 	if (movement_space == MOVEMENT_SPACE_RELATIVE_TO_START) {
 		const Vector2 path_start = path_global.xform(curve->sample_baked(0.0, movement_cubic_sampling));
 		target = movement_start_origin + (target - path_start);
+	} else {
+		target += movement_teleport_offset;
 	}
 	if (!target.is_finite()) {
 		return false;
@@ -469,6 +472,54 @@ void BulletSpawner2D::movement_stop(bool reset_to_start) {
 	}
 	if (is_inside_tree()) {
 		refresh_process_state();
+	}
+}
+
+void BulletSpawner2D::teleport(const Vector2 &new_global_position, bool carry_live_bullets) {
+	if (!new_global_position.is_finite()) {
+		UtilityFunctions::push_error("BulletSpawner2D::teleport: global_position must be finite, the spawner stays where it is.");
+		return;
+	}
+	if (!is_inside_tree()) {
+		UtilityFunctions::push_error("BulletSpawner2D::teleport: the spawner is outside the scene tree, it stays where it is.");
+		return;
+	}
+	const Vector2 jump = new_global_position - get_global_position();
+	if (!jump.is_finite()) {
+		UtilityFunctions::push_error("BulletSpawner2D::teleport: global_position must be finite, the spawner stays where it is.");
+		return;
+	}
+	set_global_position(new_global_position);
+	// The movement's own pose jumps with the spawner: the next step measures
+	// only the path's motion, and the path goes on from here.
+	if (movement_space == MOVEMENT_SPACE_RELATIVE_TO_START) {
+		movement_start_origin += jump;
+	} else {
+		movement_teleport_offset += jump;
+	}
+	movement_last_pose += jump;
+	if (!carry_live_bullets) {
+		return;
+	}
+	BulletFactory2D *factory = get_bullet_factory();
+	if (factory == nullptr) {
+		return;
+	}
+	std::vector<BulletVolley2D *> owned;
+	factory->collect_volleys_owned_by(get_instance_id(), owned);
+	// Ids first: a shift moves attachments, whose node callbacks are user code.
+	std::vector<uint64_t> ids;
+	ids.reserve(owned.size());
+	for (BulletVolley2D *volley : owned) {
+		ids.push_back(volley->get_instance_id());
+	}
+	const uint64_t self_id = get_instance_id();
+	for (size_t k = 0; k < owned.size(); ++k) {
+		BulletVolley2D *volley = owned[k];
+		if (ObjectDB::get_instance(ObjectID(ids[k])) != volley || volley->is_queued_for_deletion() || volley->owner_spawner_id != self_id || volley->is_pooled()) {
+			continue;
+		}
+		volley->teleport_shift_all_bullets(jump);
 	}
 }
 
