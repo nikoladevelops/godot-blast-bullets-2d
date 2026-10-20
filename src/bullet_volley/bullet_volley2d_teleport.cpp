@@ -32,10 +32,10 @@ _ALWAYS_INLINE_ void BulletVolley2D::orbit_reflect_teleport(int bullet_index) {
 	if (offset.length_squared() < 0.00000001 || !offset.is_finite()) {
 		return;
 	}
+	// The ring slot re-aims at the new angle (a move along the ring holds);
+	// the radius is the setting, so a move off the ring is pulled back onto
+	// it on the next tick.
 	o.angle = offset.angle();
-	// Radius follows an explicit user move: without this a teleport far
-	// off-ring pulls the bullet back on the next tick. The stored radius
-	// setting is left alone; only the live slot re-aims.
 	o.locked_center = center;
 }
 

@@ -185,10 +185,9 @@ func test_a_locked_orbit_holds_a_teleport_along_its_ring() -> void:
 	assert_true(v.bullet_is_orbiting_locked(0), "still locked")
 
 
-## Pinned pending decision (asked in the stability pass 6 report): a teleport
-## off the ring is pulled back onto the ring radius on the next tick (only
-## the angle re-aims; the code comment in teleport_bullet_to says the radius
-## would follow the move).
+## A teleport off the ring is pulled back onto the ring radius on the next
+## tick: the angle re-aims, the radius is the orbit's setting (user decision,
+## stability pass 6).
 func test_a_locked_orbit_pulls_a_radial_teleport_back_onto_its_ring() -> void:
 	var target := make_graze_target(Vector2(120, 0), &"orbit_radial")
 	var sp := make_spawner(H.make_volley_data(1, 160.0, 10.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 1)

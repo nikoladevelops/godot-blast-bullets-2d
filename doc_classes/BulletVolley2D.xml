@@ -2346,7 +2346,7 @@
 			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="new_global_pos" type="Vector2" />
 			<description>
-				Teleports the specified bullet to a new global position.
+				Teleports the specified bullet to a new global position, without travel: nothing is hit or grazed on the way, its trail layers, attachment and interpolation history move with it at once. A bullet locked on an orbit keeps circling from its new angle; its radius is the orbit's setting, so a jump off the ring is pulled back onto the ring on the next tick.
 			</description>
 		</method>
 		<method name="teleport_shift_all_bullets">

@@ -2330,7 +2330,8 @@ public:
 
 	// Teleport bookkeeping for locked orbits: re-aim the ring slot from the
 	// bullet's new offset around the current ring center, so the next tick
-	// holds the teleported position instead of snapping back. Unlocked or
+	// holds a move along the ring instead of snapping back (the radius stays
+	// the setting: a move off the ring is pulled back onto it). Unlocked or
 	// non-orbiting bullets are untouched. The shift delta is unused for the
 	// angle itself (the new absolute offset decides it) but keeps the
 	// signature symmetric with the teleport paths.
@@ -2339,8 +2340,9 @@ public:
 
 	// Teleports a bullet to a new global position. A locked orbit re-aims
 	// its ring slot from the new offset (same angle convention as the lock
-	// moment) instead of snapping the bullet back next tick: teleporting is
-	// an explicit user move, not target motion.
+	// moment) instead of snapping the bullet back to its old slot next tick
+	// (teleporting is an explicit user move, not target motion); the radius
+	// is the setting, so the next tick puts the bullet on the ring.
 	void teleport_bullet(int bullet_index, const Vector2 &new_global_pos);
 
 	// Shifts a bullet's position by a certain amount. Same locked-ring
