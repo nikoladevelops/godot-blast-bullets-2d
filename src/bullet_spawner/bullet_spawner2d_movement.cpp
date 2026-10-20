@@ -20,6 +20,7 @@ void BulletSpawner2D::set_movement_enabled(bool value) {
 		return;
 	}
 	movement_enabled = value;
+	++movement_epoch;
 	notify_property_list_changed();
 	if (Engine::get_singleton()->is_editor_hint() || !is_inside_tree()) {
 		return;
@@ -302,7 +303,7 @@ bool BulletSpawner2D::apply_movement_pose(double delta) {
 			set_global_rotation(rot);
 		}
 	}
-	if (delta > 0.0 && movement_has_last_position) {
+	if (delta > 0.0 && movement_has_last_position && !movement_jumped) {
 		movement_velocity = (target - before) / (real_t)delta;
 		if (!movement_velocity.is_finite()) {
 			movement_velocity = Vector2();
@@ -311,6 +312,7 @@ bool BulletSpawner2D::apply_movement_pose(double delta) {
 		movement_velocity = Vector2();
 	}
 	movement_has_last_position = true;
+	movement_jumped = false;
 	return true;
 }
 
@@ -323,6 +325,10 @@ bool BulletSpawner2D::advance_movement(double delta) {
 	const double length = curve.is_valid() ? (double)curve->get_baked_length() : 0.0;
 	const uint64_t self_id = get_instance_id();
 	auto alive = [&]() { return ObjectDB::get_instance(ObjectID(self_id)) == this; };
+	// A handler that stopped, sought, reversed or restarted the movement
+	// owns it: the rest of this leg's bookkeeping must not overwrite that.
+	const uint32_t epoch = movement_epoch;
+	auto handler_took_over = [&]() { return movement_epoch != epoch; };
 	double remaining = delta;
 	if (movement_delay_left > 0.0) {
 		const double used = MIN(remaining, movement_delay_left);
@@ -368,6 +374,9 @@ bool BulletSpawner2D::advance_movement(double delta) {
 		if (!alive()) {
 			return false;
 		}
+		if (handler_took_over()) {
+			return true;
+		}
 		const bool finite_run = movement_loop_mode == MOVEMENT_LOOP_ONCE || (movement_loops > 0 && movement_legs_completed >= movement_loops);
 		if (finite_run) {
 			movement_playing = false;
@@ -377,12 +386,18 @@ bool BulletSpawner2D::advance_movement(double delta) {
 			if (!alive()) {
 				return false;
 			}
+			if (handler_took_over()) {
+				return true;
+			}
 			refresh_process_state();
 			return true;
 		}
 		emit_on2d(this, "movement_loop_completed", movement_legs_completed - 1);
 		if (!alive()) {
 			return false;
+		}
+		if (handler_took_over()) {
+			return true;
 		}
 		if (movement_loop_mode == MOVEMENT_LOOP_PING_PONG) {
 			movement_leg_forward = !movement_leg_forward;
@@ -401,6 +416,7 @@ void BulletSpawner2D::movement_play() {
 	if (Engine::get_singleton()->is_editor_hint()) {
 		return;
 	}
+	++movement_epoch;
 	if (!movement_playing && (movement_finished || !movement_has_last_position)) {
 		const bool fresh = !movement_has_last_position && !movement_finished && movement_legs_completed == 0 && movement_leg_elapsed == 0.0;
 		movement_reset_state();
@@ -429,6 +445,7 @@ void BulletSpawner2D::movement_play() {
 }
 
 void BulletSpawner2D::movement_pause() {
+	++movement_epoch;
 	movement_playing = false;
 	movement_velocity = Vector2();
 	if (is_inside_tree()) {
@@ -437,6 +454,7 @@ void BulletSpawner2D::movement_pause() {
 }
 
 void BulletSpawner2D::movement_stop(bool reset_to_start) {
+	++movement_epoch;
 	movement_playing = false;
 	movement_velocity = Vector2();
 	if (reset_to_start) {
@@ -458,6 +476,7 @@ void BulletSpawner2D::movement_seek(double ratio) {
 		UtilityFunctions::push_error("BulletSpawner2D::movement_seek: ratio must be in [0, 1], ignoring.");
 		return;
 	}
+	++movement_epoch;
 	Path2D *path = get_movement_path_node();
 	Ref<Curve2D> curve = path != nullptr ? path->get_curve() : Ref<Curve2D>();
 	const double duration = movement_leg_duration(curve.is_valid() ? (double)curve->get_baked_length() : 0.0);
@@ -471,6 +490,7 @@ void BulletSpawner2D::movement_seek(double ratio) {
 }
 
 void BulletSpawner2D::movement_reverse() {
+	++movement_epoch;
 	// Keep the current position: mirror the elapsed time within the leg so
 	// the eased progress continues from here in the other direction.
 	Path2D *path = get_movement_path_node();

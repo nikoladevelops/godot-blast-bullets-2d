@@ -1195,6 +1195,10 @@ void BulletSpawner2D::_notification(int p_what) {
 		homing_candidates_scratch.clear();
 		homing_pool_scratch.clear();
 		homing_scan_stack.clear();
+		// The next pose after re-entry is a jump, not motion: report no
+		// velocity for it (shots would inherit it).
+		movement_jumped = true;
+		movement_velocity = Vector2();
 	}
 }
 

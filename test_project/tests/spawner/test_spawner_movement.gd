@@ -299,3 +299,54 @@ func test_process_sleeps_when_movement_ends() -> void:
 	await idle(70)
 	assert_false(sp.is_movement_playing())
 	assert_false(sp.is_processing(), "nothing left to do: _process sleeps")
+
+
+## A movement handler owns the movement: stop / seek called from
+## movement_endpoint_reached is what the spawner does next (the leg code that
+## ran after the emit used to emit movement_loop_completed(-1) after a stop
+## and snap a seek back to the leg start).
+func test_handlers_that_stop_or_seek_win() -> void:
+	var sp := _mover(path, func(s): s.movement_loop_mode = BulletSpawner2D.MOVEMENT_LOOP_LOOP)
+	watch_signals(sp)
+	sp.movement_endpoint_reached.connect(func(_at_end): sp.movement_stop(), CONNECT_ONE_SHOT)
+	await idle(70)
+	assert_false(sp.is_movement_playing(), "stopped by the handler")
+	assert_signal_emit_count(sp, "movement_loop_completed", 0, "no loop after the handler stopped it")
+	assert_almost_eq(sp.global_position, Vector2(0, 0), Vector2(0.5, 0.5), "stop(reset) left it at the start")
+	var sp2 := _mover(path, func(s): s.movement_loop_mode = BulletSpawner2D.MOVEMENT_LOOP_LOOP)
+	watch_signals(sp2)
+	var seen: Array = []
+	sp2.movement_endpoint_reached.connect(func(_at_end):
+		sp2.movement_seek(0.5)
+		seen.append(sp2.global_position.x), CONNECT_ONE_SHOT)
+	for k in 70:
+		await idle(1)
+		if not seen.is_empty():
+			break
+	assert_eq(seen.size(), 1, "the endpoint was reached")
+	assert_almost_eq(sp2.global_position.x, 150.0, 1.0, "the seek stands after the handler")
+	await idle(1)
+	assert_between(sp2.global_position.x, 150.0, 160.0, "and the run continues from there")
+	assert_true(sp2.is_movement_playing(), "still playing")
+	assert_signal_emit_count(sp2, "movement_loop_completed", 0, "the seek replaced the loop restart")
+
+
+## Re-entering the tree somewhere else is a jump, not motion: the first frame
+## after it reports no velocity (shots would inherit thousands of px/s).
+func test_reentering_the_tree_reports_no_jump_velocity() -> void:
+	var sp := _mover(path)
+	await idle(10)
+	var elsewhere := Node2D.new()
+	elsewhere.position = Vector2(5000, 5000)
+	add(elsewhere)
+	sp.reparent(elsewhere, false) # local position kept: the global one jumps by 5000
+	await idle(1)
+	assert_lt(sp.get_movement_velocity().length(), 1000.0, "no jump velocity on re-entry (%s)" % sp.get_movement_velocity())
+	await idle(2)
+	assert_almost_eq(sp.get_movement_velocity().x, 300.0, 15.0, "then the path speed again")
+	sp.movement_pause()
+	var progress := sp.get_movement_progress()
+	sp.reparent(self, false)
+	await idle(1)
+	sp.movement_play()
+	assert_almost_eq(sp.get_movement_progress(), progress, 0.001, "a paused run resumes where it was after a reparent")

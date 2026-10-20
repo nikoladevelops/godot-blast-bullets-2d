@@ -1809,6 +1809,11 @@ private:
 	double movement_progress = 0.0; // distance ratio along the path
 	Vector2 movement_start_origin; // RELATIVE_TO_START anchor (global)
 	bool movement_has_last_position = false;
+	// Bumped by every playback control (play, pause, stop, seek, reverse,
+	// enable): a movement signal handler that used one owns what happens next.
+	uint32_t movement_epoch = 0;
+	// Set on EXIT_TREE: the first pose after re-entry is a jump (no velocity).
+	bool movement_jumped = false;
 	Vector2 movement_velocity;
 	bool movement_warned_unusable_path = false;
 	// Advances playback by delta and moves the node. Returns false when
