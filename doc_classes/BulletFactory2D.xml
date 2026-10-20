@@ -152,6 +152,13 @@
 				Diagnosis for one entry at one pose: which gate would drop the play, with the measured numbers. Returns {audible, blocked_by (none/paused/disabled/streamless/chance_zero/amount_gate/distance/camera_view), distance, effective_max_distance, zoom, camera (pinned/viewport/none), in_camera_view, interval_open, trigger_chance, chance (always/never/rolling), listener, occluded, volume_base (deterministic mix without the random rolls), volley_amount}. Read-only except reusing the resolve paths (a bad camera_path fires its one warning); never queues candidates. When a sound stays silent, ask here first.
 			</description>
 		</method>
+		<method name="debug_free_like_release" qualifiers="static">
+			<return type="void" />
+			<param index="0" name="object" type="Object" />
+			<description>
+				Test helper: deletes [param object] the way an exported release game frees it. Godot refuses [method Object.free] on an object that is emitting a signal only in debug builds; this skips that check, so tests can prove the plugin survives a handler that frees its emitter in a release build (the plugin then defers the free to the end of the emit).
+			</description>
+		</method>
 		<method name="debug_get_active_attachments_amount">
 			<return type="int" />
 			<description>
@@ -272,7 +279,7 @@
 		<method name="debug_get_split_stats" qualifiers="const">
 			<return type="Dictionary" />
 			<description>
-				Splitting counters: [code]pending[/code] (splits waiting for the next flush), [code]flushed_last[/code] / [code]children_last[/code] / [code]carried_over_last[/code] (the last flush: parents handled, children spawned, splits that waited because of [member split_max_children_per_sweep]), [code]flushed_total[/code], [code]children_total[/code] and [code]templates[/code] (cached spawn data copies without per-bullet arrays).
+				Splitting counters: [code]pending[/code] (splits waiting for the next flush), [code]flushed_last[/code] / [code]children_last[/code] / [code]carried_over_last[/code] (the last flush: parents handled, children spawned, splits that waited because of [member split_max_children_per_sweep]), [code]flushed_total[/code], [code]children_total[/code], [code]dropped_total[/code] (splits refused by [member split_max_pending]) and [code]templates[/code] (cached spawn data copies without per-bullet arrays).
 			</description>
 		</method>
 		<method name="debug_get_total_attachments_amount">
@@ -643,6 +650,9 @@
 		</member>
 		<member name="split_max_children_per_sweep" type="int" setter="set_split_max_children_per_sweep" getter="get_split_max_children_per_sweep" default="0">
 			The most children one sweep spawns (0 = no cap, the default). Splits over the cap wait for the next sweep in order and are never dropped; a first split larger than the cap still spawns. Use it to spread a mass split over a few frames.
+		</member>
+		<member name="split_max_pending" type="int" setter="set_split_max_pending" getter="get_split_max_pending" default="100000">
+			The most splits waiting to spawn (0 = no cap). Past it a new split is dropped: the bullet dies, or survives, as if it had not split, the drop is counted in [code]dropped_total[/code] of [method debug_get_split_stats], and one warning reports each overflow. It bounds runaway chains (a stage that splits every generation into many children grows exponentially) and backlogs carried over by [member split_max_children_per_sweep]. Must be 0 or more.
 		</member>
 		<member name="time_scale" type="float" setter="set_time_scale" getter="get_time_scale" default="1.0">
 			Speed of the bullet world. Every volley tick, one-shot effect and bullet timer advances by delta times this value: 1 is real time, 0.25 is slow motion, 0 freezes bullets while the factory keeps processing (collisions already in flight still resolve). Spawners that use this factory run on it too (their cadence, bursts, telegraph, spin and movement, multiplied by their own [member BulletSpawner2D.time_scale]), and so do the bullets they fired. The rescan interval of graze targets and sound fades and intervals stay in real time. Must be finite and 0 or more; any such value is accepted, but one volley tick never covers more than 10 s of bullet time (a huge scale slows down there instead of turning bullets into INF). This is not [member Engine.time_scale].

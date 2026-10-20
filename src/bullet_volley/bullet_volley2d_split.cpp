@@ -95,6 +95,9 @@ int BulletVolley2D::split_capture(int bullet_index, int cause, const Transform2D
 			return 0;
 		}
 	}
+	if (!bullet_factory->split_has_room()) {
+		return 0; // the queue is full: no split (counted and warned once)
+	}
 	SplitRequest2D request;
 	request.config = split_config;
 	request.stage = stage;

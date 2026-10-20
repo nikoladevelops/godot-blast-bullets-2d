@@ -675,10 +675,18 @@ public:
 	// split larger than the cap still spawns when it comes first.
 	int get_split_max_children_per_sweep() const { return split_max_children_per_sweep; }
 	void set_split_max_children_per_sweep(int value);
+	// Splits waiting at most (0 = no cap; default 100000): past it a new
+	// split is dropped (the bullet dies or survives as if it never split),
+	// counted in debug_get_split_stats().dropped_total, one warning per
+	// overflow. Bounds exponential chains and carried-over backlogs.
+	int get_split_max_pending() const { return split_max_pending; }
+	void set_split_max_pending(int value);
+	// False (and the drop counted) when the queue is full.
+	bool split_has_room();
 	int get_pending_split_count() const { return (int)pending_splits.size(); }
 	// Every split ever recorded (monotonic: a manual split counts its own).
 	uint64_t get_split_recorded_total() const { return split_recorded_total; }
-	// {pending, flushed_last, children_last, carried_over_last, flushed_total, children_total}.
+	// {pending, flushed_last, children_last, carried_over_last, flushed_total, children_total, dropped_total, templates}.
 	Dictionary debug_get_split_stats() const;
 
 	// ---- Sound triggers (sound_mixer2d.*) ----
@@ -862,6 +870,9 @@ private:
 	std::vector<Vector2> split_direction_scratch;
 	std::vector<real_t> split_speed_scratch;
 	int split_max_children_per_sweep = 0;
+	int split_max_pending = 100000;
+	uint64_t split_dropped_total = 0;
+	bool split_full_warned = false; // one warning per overflow
 	uint64_t split_recorded_total = 0;
 	bool split_flush_running = false;
 	// The request the running flush is spawning (split_flush_scratch index).

@@ -33,6 +33,27 @@ void BulletFactory2D::set_split_max_children_per_sweep(int value) {
 	split_max_children_per_sweep = value;
 }
 
+void BulletFactory2D::set_split_max_pending(int value) {
+	if (value < 0) {
+		UtilityFunctions::push_error("BulletFactory2D: split_max_pending must be >= 0 (0 = no cap), keeping the old value.");
+		return;
+	}
+	split_max_pending = value;
+}
+
+bool BulletFactory2D::split_has_room() {
+	if (split_max_pending <= 0 || pending_splits.size() < (size_t)split_max_pending) {
+		split_full_warned = false;
+		return true;
+	}
+	++split_dropped_total;
+	if (!split_full_warned) {
+		split_full_warned = true;
+		UtilityFunctions::push_warning(vformat("BulletFactory2D: split_max_pending (%d) reached, new splits are dropped until the queue drains (raise it, or 0 = no cap).", split_max_pending));
+	}
+	return false;
+}
+
 void BulletFactory2D::drop_pending_splits() {
 	pending_splits.clear();
 	// The cached child templates go too: they keep the sources' sub-resources
@@ -144,6 +165,7 @@ Dictionary BulletFactory2D::debug_get_split_stats() const {
 	out["carried_over_last"] = split_stats_carried_last;
 	out["flushed_total"] = (int64_t)split_stats_flushed_total;
 	out["children_total"] = (int64_t)split_stats_children_total;
+	out["dropped_total"] = (int64_t)split_dropped_total;
 	out["templates"] = (int64_t)split_templates.size();
 	return out;
 }

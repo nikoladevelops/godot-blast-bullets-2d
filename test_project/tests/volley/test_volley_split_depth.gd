@@ -178,3 +178,30 @@ func test_split_set_data_on_children_starts_a_fresh_chain() -> void:
 	assert_true(children.split_set_data(_chain([_stage(3)]), data), "re-armed")
 	assert_eq(children.split_get_depth(), 0, "a script call starts at generation 0")
 	assert_true(children.split_bullet(0), "and the stage for generation 0 splits it")
+
+
+## split_max_pending bounds the queue (exponential chains, carried-over
+## backlogs): past it a new split is dropped (the bullet dies or survives as
+## if it never split), counted in dropped_total, with one warning per
+## overflow. 0 = no cap. The setter rejects negatives and keeps the old value.
+func test_the_pending_cap_drops_new_splits_with_one_warning() -> void:
+	assert_eq(factory.split_max_pending, 100000, "default")
+	factory.split_max_pending = -1
+	expect_error_sequence(["BulletFactory2D: split_max_pending must be >= 0 (0 = no cap), keeping the old value."])
+	assert_eq(factory.split_max_pending, 100000, "kept")
+	factory.split_max_pending = 3
+	_armed(_chain([_stage(2)]), 10) # ten parents expire in one sweep
+	_run(1)
+	expect_warning_sequence(["BulletFactory2D: split_max_pending (3) reached, new splits are dropped until the queue drains (raise it, or 0 = no cap)."])
+	assert_eq(int(factory.debug_get_split_stats()["dropped_total"]), 7, "seven of ten dropped")
+	_run(2)
+	assert_eq(_depths(), [1, 1, 1], "the three queued splits spawned")
+	_armed(_chain([_stage(2)]), 5) # the queue drained: a new overflow warns again
+	_run(2)
+	expect_warning_sequence(["BulletFactory2D: split_max_pending (3) reached, new splits are dropped until the queue drains (raise it, or 0 = no cap)."])
+	assert_eq(int(factory.debug_get_split_stats()["dropped_total"]), 9, "two more dropped")
+	factory.split_max_pending = 0
+	_armed(_chain([_stage(2)]), 10)
+	_run(2)
+	assert_eq(int(factory.debug_get_split_stats()["dropped_total"]), 9, "0 = no cap: nothing dropped")
+	assert_eq(splits.size(), 3 + 3 + 10, "every accepted split spawned")

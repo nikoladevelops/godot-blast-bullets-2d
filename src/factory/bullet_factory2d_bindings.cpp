@@ -196,10 +196,13 @@ void BulletFactory2D::_bind_methods() {
 	// (factory volleys here; spawner volleys on their spawner).
 	ClassDB::bind_method(D_METHOD("get_split_max_children_per_sweep"), &BulletFactory2D::get_split_max_children_per_sweep);
 	ClassDB::bind_method(D_METHOD("set_split_max_children_per_sweep", "value"), &BulletFactory2D::set_split_max_children_per_sweep);
+	ClassDB::bind_method(D_METHOD("get_split_max_pending"), &BulletFactory2D::get_split_max_pending);
+	ClassDB::bind_method(D_METHOD("set_split_max_pending", "value"), &BulletFactory2D::set_split_max_pending);
 	ClassDB::bind_method(D_METHOD("get_pending_split_count"), &BulletFactory2D::get_pending_split_count);
 	ClassDB::bind_method(D_METHOD("debug_get_split_stats"), &BulletFactory2D::debug_get_split_stats);
 	ADD_GROUP("Splitting", "split_");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "split_max_children_per_sweep", PROPERTY_HINT_RANGE, "0,10000,1,or_greater"), "set_split_max_children_per_sweep", "get_split_max_children_per_sweep");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "split_max_pending", PROPERTY_HINT_RANGE, "0,1000000,1,or_greater"), "set_split_max_pending", "get_split_max_pending");
 	ADD_SIGNAL(MethodInfo("bullet_split",
 			PropertyInfo(Variant::VECTOR2, "position"),
 			PropertyInfo(Variant::INT, "cause"),

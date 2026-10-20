@@ -113,7 +113,7 @@ func test_stats_dictionaries_have_exact_keys() -> void:
 	assert_eq(state_keys, ["attachments_pooled", "is_busy", "is_iterating", "is_ready", "is_tearing_down", "processing", "volleys_pooled", "volleys_total"], "factory state keys")
 	var split_keys: Array = factory.debug_get_split_stats().keys()
 	split_keys.sort()
-	assert_eq(split_keys, ["carried_over_last", "children_last", "children_total", "flushed_last", "flushed_total", "pending", "templates"], "split stats keys")
+	assert_eq(split_keys, ["carried_over_last", "children_last", "children_total", "dropped_total", "flushed_last", "flushed_total", "pending", "templates"], "split stats keys")
 
 
 func test_factory_owns_one_volley_container_and_one_debugger() -> void:
