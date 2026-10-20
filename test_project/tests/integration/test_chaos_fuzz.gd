@@ -208,7 +208,8 @@ func _hostile() -> void:
 			if not live.is_empty():
 				BulletFactory2D.debug_free_like_release(live[rng.randi() % live.size()])
 		2:
-			factory.spawn_volley(datas[rng.randi() % datas.size()])
+			if not datas.is_empty():
+				factory.spawn_volley(datas[rng.randi() % datas.size()])
 		3:
 			var sp = _live_spawner()
 			if sp != null and spawners.size() >= 3:
@@ -551,9 +552,15 @@ func _operate() -> void:
 		33:
 			# Aimed with prediction: every collect reads the target's script
 			# get_velocity (which may free, spawn or clear).
+			# Its own target (never freed: a freed aimed target is a loud,
+			# legitimate misconfiguration, not what this op is about).
 			var sp = _live_spawner()
-			var t = _live_target()
-			if sp != null and t != null:
+			if sp != null:
+				var t := Node2D.new()
+				t.set_script(_script(HOSTILE_TARGET))
+				t.action = _hostile
+				t.position = Vector2(rng.randf_range(-300, 300), rng.randf_range(-300, 300))
+				world.add_child(t)
 				sp.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_AIMED
 				sp.set_helper_aimed_target(t)
 				sp.helper_aimed_prediction = rng.randf()
@@ -609,8 +616,8 @@ func test_chaos_battlefield_never_breaks(chaos_seed: int = use_parameters(_seeds
 	seed(chaos_seed)
 	factory.debug_seed_cosmetic_rng(chaos_seed)
 	_connect_handlers(factory)
-	Engine.set_meta(&"bb_chaos_init", _hostile)
 	_build_world()
+	Engine.set_meta(&"bb_chaos_init", _hostile)
 	for k in 6:
 		_add_spawner()
 	await idle(1)
