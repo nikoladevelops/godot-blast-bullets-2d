@@ -350,3 +350,20 @@ func test_reentering_the_tree_reports_no_jump_velocity() -> void:
 	await idle(1)
 	sp.movement_play()
 	assert_almost_eq(sp.get_movement_progress(), progress, 0.001, "a paused run resumes where it was after a reparent")
+
+
+func test_a_position_written_by_hand_is_never_inherited_as_velocity() -> void:
+	# The path re-applies its pose on the next frame; the jump between the
+	# hand-written spot and that pose is not motion a shot may inherit.
+	var sp := _mover(path, func(s):
+		s.inherit_movement_velocity = true)
+	await idle(10)
+	sp.global_position = Vector2(2000, 900)
+	await idle(1)
+	assert_lt(sp.get_movement_velocity().length(), 1000.0, "no jump velocity (%s)" % sp.get_movement_velocity())
+	watch_signals(sp)
+	assert_true(sp.shoot_once(), "fires")
+	var v: BulletVolley2D = get_signal_parameters(sp, "volley_fired", 0)[0]
+	assert_lt(v.get_inherited_velocity_offset().length(), 1000.0, "the shot inherits no jump (%s)" % v.get_inherited_velocity_offset())
+	await idle(2)
+	assert_almost_eq(sp.get_movement_velocity().x, 300.0, 15.0, "then the path speed again")

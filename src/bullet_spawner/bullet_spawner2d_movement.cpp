@@ -289,8 +289,9 @@ bool BulletSpawner2D::apply_movement_pose(double delta) {
 	if (!target.is_finite()) {
 		return false;
 	}
-	const Vector2 before = get_global_position();
+	const Vector2 before = movement_has_last_position ? movement_last_pose : get_global_position();
 	set_global_position(target);
+	movement_last_pose = target;
 	if (movement_rotate_with_path) {
 		// Face the direction of travel: the baked tangent points along
 		// increasing distance, so a backward leg turns around.

@@ -1822,6 +1822,10 @@ private:
 	double movement_progress = 0.0; // distance ratio along the path
 	Vector2 movement_start_origin; // RELATIVE_TO_START anchor (global)
 	bool movement_has_last_position = false;
+	// The global position the movement itself last applied: velocity is
+	// measured from it, so a position written by hand in between is never
+	// motion a shot inherits.
+	Vector2 movement_last_pose;
 	// Bumped by every playback control (play, pause, stop, seek, reverse,
 	// enable): a movement signal handler that used one owns what happens next.
 	uint32_t movement_epoch = 0;
