@@ -1415,9 +1415,10 @@ void BulletSpawner2D::_process(double delta) {
 				break;
 			}
 			const double overshoot = pattern_list_time_left;
+			const uint32_t serial = pattern_list_serial;
 			fire_pattern_list_entry();
-			if (!pattern_list_active) {
-				break;
+			if (!pattern_list_active || serial != pattern_list_serial) {
+				break; // finished, stopped, or replaced (the new list keeps its own clock)
 			}
 			if (!(pattern_list_interval_sec > 0.0)) {
 				pattern_list_time_left = 0.0;
@@ -1653,33 +1654,39 @@ int BulletSpawner2D::spawn_pattern_list(const Array &entries, bool simultaneous,
 		UtilityFunctions::push_error("BulletSpawner2D::spawn_pattern_list: spawner is outside the scene tree.");
 		return 0;
 	}
+	// A new list replaces the running one (which never reports finished).
+	++pattern_list_serial;
+	if (simultaneous) {
+		// One tick, N shots: each entry overrides the spawner temporarily,
+		// fires through the guarded shoot_once() path (homing/orbit/signals
+		// consistent), then everything it changed is restored. A bad entry
+		// skips with an error, never aborts. It walks its own copy: a list a
+		// handler starts meanwhile runs on its own.
+		pattern_list_active = false;
+		pattern_list_entries.clear();
+		pattern_list_cursor = 0;
+		pattern_list_time_left = 0.0;
+		const Array list = entries.duplicate();
+		int fired = 0;
+		for (int i = 0; i < list.size(); ++i) {
+			if (fire_pattern_list_override(list[i])) {
+				++fired;
+			}
+		}
+		emit_on2d(this, "pattern_list_finished");
+		return fired;
+	}
 	pattern_list_entries = entries.duplicate();
 	pattern_list_interval_sec = interval_sec;
 	pattern_list_cursor = 0;
 	pattern_list_time_left = 0.0;
 	pattern_list_active = true;
-	if (simultaneous) {
-		// One tick, N shots: each entry overrides the spawner temporarily,
-		// fires through the guarded shoot_once() path (homing/orbit/signals
-		// consistent), then everything it changed is restored. A bad entry
-		// skips with an error, never aborts.
-		int fired = 0;
-		for (int i = 0; i < pattern_list_entries.size(); ++i) {
-			if (fire_pattern_list_override(pattern_list_entries[i])) {
-				++fired;
-			}
-		}
-		pattern_list_active = false;
-		pattern_list_entries.clear();
-		pattern_list_cursor = 0;
-		emit_on2d(this, "pattern_list_finished");
-		return fired;
-	}
 	set_process(true);
 	return pattern_list_entries.size();
 }
 
 void BulletSpawner2D::stop_pattern_list() {
+	++pattern_list_serial;
 	pattern_list_active = false;
 	pattern_list_entries.clear();
 	pattern_list_cursor = 0;
@@ -1787,7 +1794,11 @@ void BulletSpawner2D::fire_pattern_list_entry() {
 	// Every entry is a temporary override (same rule as simultaneous mode).
 	const Variant entry = pattern_list_entries[pattern_list_cursor];
 	++pattern_list_cursor;
+	const uint32_t serial = pattern_list_serial;
 	fire_pattern_list_override(entry);
+	if (serial != pattern_list_serial) {
+		return; // a handler stopped this list or started another one
+	}
 	if (pattern_list_cursor >= pattern_list_entries.size()) {
 		stop_pattern_list();
 		emit_on2d(this, "pattern_list_finished");

@@ -87,3 +87,37 @@ func test_bad_inputs_fail_loud() -> void:
 		"entry 'pattern_source' out of range",
 		"entry 'helper_bullets_amount' must be an int",
 	])
+
+
+## A list started from a handler during a simultaneous list runs on its own:
+## the outer list neither iterates the new entries nor drops them.
+func test_a_list_started_inside_a_simultaneous_list_runs() -> void:
+	var sp := _spawner()
+	sp.volley_fired.connect(func(_v, _n): sp.spawn_pattern_list([{"helper_bullets_amount": 6}, {"helper_bullets_amount": 7}], false, 0.0), CONNECT_ONE_SHOT)
+	assert_eq(sp.spawn_pattern_list([{"helper_bullets_amount": 2}, {"helper_bullets_amount": 3}], true), 2, "the outer list fired both entries")
+	assert_signal_emit_count(sp, "pattern_list_finished", 1, "the outer list finished")
+	assert_true(sp.is_pattern_list_active(), "the nested sequential list is queued")
+	for i in 30:
+		await idle(1)
+		if not sp.is_pattern_list_active():
+			break
+	assert_eq(_volley_sizes(sp), [2, 3, 6, 7], "outer entries, then the nested list")
+	assert_signal_emit_count(sp, "pattern_list_finished", 2, "each list finished once")
+
+
+## A handler that stops or replaces the running sequential list owns it: the
+## old list fires nothing more and never reports finished.
+func test_a_handler_stopping_or_replacing_a_sequential_list() -> void:
+	var sp := _spawner()
+	sp.volley_fired.connect(func(_v, _n): sp.stop_pattern_list(), CONNECT_ONE_SHOT)
+	sp.spawn_pattern_list([{"helper_bullets_amount": 2}, {"helper_bullets_amount": 3}], false, 0.0)
+	await idle(6)
+	assert_eq(_volley_sizes(sp), [2], "stopped after the first entry")
+	assert_signal_emit_count(sp, "pattern_list_finished", 0, "a stopped list never finishes")
+	var sp2 := _spawner()
+	sp2.volley_fired.connect(func(_v, _n): sp2.spawn_pattern_list([{"helper_bullets_amount": 9}], false, 0.0), CONNECT_ONE_SHOT)
+	sp2.spawn_pattern_list([{"helper_bullets_amount": 2}, {"helper_bullets_amount": 3}], false, 0.0)
+	await idle(6)
+	assert_eq(_volley_sizes(sp2), [2, 9], "the replacement fired; the old list's rest was dropped")
+	assert_signal_emit_count(sp2, "pattern_list_finished", 1, "only the replacement finished")
+	assert_false(sp2.is_pattern_list_active(), "nothing left")

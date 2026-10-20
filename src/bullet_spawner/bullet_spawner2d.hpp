@@ -1642,6 +1642,9 @@ private:
 	int pattern_list_cursor = 0;
 	double pattern_list_time_left = 0.0;
 	bool pattern_list_active = false;
+	// Bumped by every spawn_pattern_list / stop_pattern_list call: a handler
+	// that started or stopped a list inside an entry's shot owns what follows.
+	uint32_t pattern_list_serial = 0;
 	// Preview source tracking: dirty-check state for the live-refresh loop.
 	// Only instance ids + global transforms are stored - never assumed
 	// alive. Every access goes through is_tracked_node_alive() first, so
