@@ -3,6 +3,7 @@
 // and attachments.
 
 #include "factory/bullet_factory2d_internal.hpp"
+#include "patterns/pattern_inputs2d.hpp"
 
 using namespace godot;
 
@@ -40,6 +41,13 @@ bool validate_spawn_transform_span(const Transform2D *transforms, int count, con
 bool validate_spawn_data_fields(const Ref<BulletVolleyData2D> &spawn_data, int bullet_count, const char *caller_name) {
 	if (spawn_data.is_null() || bullet_count <= 0) {
 		UtilityFunctions::push_error(String("Error when trying to spawn bullets in ") + caller_name + ". No spawn_data or no transforms were provided. Ignoring the request");
+		return false;
+	}
+	// One volley is one physics area with a shape per bullet: Godot's
+	// broadphase aborts the game past ~35k clustered shapes. The developer-set
+	// pattern limit bounds every way of making a volley, not only generators.
+	if (bullet_count > pattern_max_bullets()) {
+		UtilityFunctions::push_error(String(caller_name) + ": a volley holds at most " + String::num_int64(pattern_max_bullets()) + " bullets (got " + String::num_int64(bullet_count) + "). Raise blastbullets2d/patterns/max_bullets_per_pattern (BulletPatterns2D.max_bullets_per_pattern) for more. Nothing was spawned.");
 		return false;
 	}
 	// Unified tiling rule: every per-bullet array tiles modulo, so any size

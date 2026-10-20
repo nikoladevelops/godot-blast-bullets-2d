@@ -140,3 +140,28 @@ func test_sane_marker_unaffected() -> void:
 	var ring_ok = BulletPatterns2D.helper_generate_transforms_ring(12, Transform2D(0.3, Vector2(100, 50)), 60.0, 0.0, TAU, true, false, true)
 	assert_eq(ring_ok.size(), 12)
 	assert_true(H.finite_volley(ring_ok), "ring slots finite")
+
+
+## One volley is one physics area: past the developer-set
+## max_bullets_per_pattern (Godot's broadphase aborts on ~35k clustered
+## shapes) every way of making a volley refuses, not only the generators.
+func _over_limit_error(caller: String, count: int) -> String:
+	return "%s: a volley holds at most 8 bullets (got %d). Raise blastbullets2d/patterns/max_bullets_per_pattern (BulletPatterns2D.max_bullets_per_pattern) for more. Nothing was spawned." % [caller, count]
+
+
+func test_every_volley_path_refuses_past_the_bullet_limit() -> void:
+	BulletPatterns2D.set_max_bullets_per_pattern(8)
+	assert_not_null(factory.spawn_volley(H.make_still_data(8)), "the limit itself spawns")
+	assert_null(factory.spawn_volley(H.make_still_data(9)), "limit + 1 is refused")
+	expect_error_sequence([_over_limit_error("spawn_volley", 9)])
+	factory.populate_bullets_pool(VolleyPoolKey2D.make(9, PhysicsServer2D.SHAPE_CIRCLE), H.make_still_data(9), 1)
+	expect_error_sequence([_over_limit_error("populate_bullets_pool", 9)])
+	var sp := make_spawner(H.make_still_data(1), BulletSpawner2D.PATTERN_FROM_CHILDREN, 1)
+	for i in 9:
+		var marker := Marker2D.new()
+		marker.position = Vector2(10 * i, 0)
+		sp.add_child(marker)
+	watch_signals(sp)
+	assert_false(sp.shoot_once(), "nine children are one bullet too many")
+	expect_error_sequence([_over_limit_error("spawn_volley", 9)])
+	assert_signal_emitted_with_parameters(sp, "volley_skipped", [&"factory_refused"])

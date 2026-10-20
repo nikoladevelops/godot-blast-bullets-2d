@@ -618,7 +618,8 @@ Pinned by `spawner/test_spawner_pattern_counts.gd`,
    is the developer-set limit `BulletPatterns2D.max_bullets_per_pattern`
    (project setting `blastbullets2d/patterns/max_bullets_per_pattern`,
    default 20000; `pattern_max_bullets()` in `pattern_inputs2d.hpp`, never a
-   constant). Why 20000: a volley is ONE physics area with a shape per
+   constant). The same limit bounds every volley (`validate_spawn_data_fields`:
+   `spawn_volley`, the spawner's span path, `populate_bullets_pool`). Why 20000: a volley is ONE physics area with a shape per
    bullet and Godot's broadphase BVH hitches for seconds on thousands of
    clustered shapes and aborts the game past ~35k (measured on 4.7.2; spread
    out, 100k works). Tests reset the limit in `BlastTest.before_each`.
