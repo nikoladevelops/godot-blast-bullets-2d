@@ -51,6 +51,15 @@ func test_64bit_key_has_no_birthday_collision() -> void:
 	assert_false(found.get("collided", true), "no key collision in 300k probes")
 
 
+## The probe allocates one key per probe: a huge count is refused instead of
+## running the game out of memory (std::bad_alloc would end the process).
+func test_a_huge_probe_count_is_refused() -> void:
+	var found: Dictionary = v.debug_dedup_find_collision(2147483647)
+	expect_error_sequence(["debug_dedup_find_collision: probe_count must be at most 1000000, nothing probed."])
+	assert_eq(found, {"collided": false, "probes": 0}, "nothing probed")
+	assert_false(v.debug_dedup_find_collision(1000000).get("collided", true), "the limit itself runs")
+
+
 func test_cold_shrinks_hot_keeps_capacity() -> void:
 	v.debug_dedup_reset()
 	for i in 5000:

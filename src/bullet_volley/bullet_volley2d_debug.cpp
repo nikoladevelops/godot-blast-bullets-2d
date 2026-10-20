@@ -30,6 +30,12 @@ Dictionary BulletVolley2D::debug_dedup_find_collision(int probe_count) const {
 	if (probe_count <= 1) {
 		return d;
 	}
+	// One key per probe: a huge count would run the game out of memory
+	// (std::bad_alloc escaping into Godot ends the process).
+	if (probe_count > 1000000) {
+		UtilityFunctions::push_error("debug_dedup_find_collision: probe_count must be at most 1000000, nothing probed.");
+		return d;
+	}
 	std::vector<uint64_t> keys;
 	keys.reserve((size_t)probe_count);
 	for (int i = 0; i < probe_count; ++i) {
