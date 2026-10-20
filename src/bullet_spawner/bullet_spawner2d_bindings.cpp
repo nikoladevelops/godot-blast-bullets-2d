@@ -501,6 +501,7 @@ void BulletSpawner2D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "spin_random_start_phase"), "set_spin_random_start_phase", "get_spin_random_start_phase");
 
 	ClassDB::bind_method(D_METHOD("get_spin_angle_deg"), &BulletSpawner2D::get_spin_angle_deg);
+	ClassDB::bind_method(D_METHOD("set_spin_angle_deg", "degrees"), &BulletSpawner2D::set_spin_angle_deg);
 	ClassDB::bind_method(D_METHOD("reset_spin_angle"), &BulletSpawner2D::reset_spin_angle);
 
 	ClassDB::bind_method(D_METHOD("apply_pattern_preset", "preset"), &BulletSpawner2D::apply_pattern_preset);

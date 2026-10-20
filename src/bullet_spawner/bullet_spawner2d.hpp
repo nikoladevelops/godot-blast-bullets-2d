@@ -392,6 +392,10 @@ public:
 	void set_spin_frequency_hz(double value);
 	// Current spin angle in degrees (runtime state, not stored).
 	double get_spin_angle_deg() const;
+	// Sets the angle the pattern is turned by (Continuous mode; wrapped to
+	// 0..360). Shots and the preview use it at once, spin on or off. In
+	// Oscillate mode the angle follows the swing: refused.
+	void set_spin_angle_deg(double degrees);
 	void reset_spin_angle();
 
 	// TRANSFORMS SOURCE + HELPER GENERATORS

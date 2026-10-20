@@ -128,3 +128,31 @@ func test_10k_spin_collect_budget() -> void:
 		await idle(1)
 	print("BENCH worst 10k spin collect usec=", worst)
 	assert_lt(worst, 25000, "10k spin collect stays in the millisecond class")
+
+
+func test_set_spin_angle_turns_the_next_shot_spin_on_or_off() -> void:
+	var sp := _line_spawner()
+	sp.reset_spin_angle()
+	var plain = sp.collect_spawn_transforms()
+	sp.set_spin_angle_deg(450.0)
+	assert_almost_eq(sp.get_spin_angle_deg(), 90.0, 1e-9, "wrapped to 0..360")
+	var turned = sp.collect_spawn_transforms()
+	for i in plain.size():
+		assert_almost_eq((turned[i] as Transform2D).get_origin(), (plain[i] as Transform2D).get_origin().rotated(PI / 2.0), Vector2(0.01, 0.01), "slot %d turned 90 deg with spin off" % i)
+	sp.set_spin_angle_deg(NAN)
+	expect_error_sequence(["BulletSpawner2D::set_spin_angle_deg: degrees must be finite, keeping the old angle."])
+	sp.spin_mode = BulletSpawner2D.SPIN_OSCILLATE
+	sp.set_spin_angle_deg(10.0)
+	expect_error_sequence(["BulletSpawner2D::set_spin_angle_deg: in Oscillate mode the angle follows spin_amplitude_deg and spin_frequency_hz; use reset_spin_angle() to restart the swing. Keeping the old angle."])
+	assert_almost_eq(sp.get_spin_angle_deg(), 90.0, 1e-9, "kept")
+
+
+func test_set_spin_angle_poses_the_preview_without_a_rebuild() -> void:
+	var sp := make_preview_spawner(BulletSpawner2D.PATTERN_FROM_HELPER_LINE, 3)
+	await idle(6)
+	var stats: Dictionary = sp.debug_get_preview_stats()
+	sp.set_spin_angle_deg(45.0)
+	await idle(3)
+	assert_eq(int(sp.debug_get_preview_stats()["rebuilds"]), int(stats["rebuilds"]), "posed, not rebuilt")
+	var dots: Node2D = sp.get_node("~BlastBulletsPatternPreview").get_node("Dots")
+	assert_almost_eq(angle_difference(dots.rotation, deg_to_rad(45.0)), 0.0, 0.0001, "the preview layer is posed at the new angle")

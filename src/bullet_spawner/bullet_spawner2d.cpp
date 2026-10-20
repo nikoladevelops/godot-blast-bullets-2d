@@ -357,6 +357,21 @@ double BulletSpawner2D::get_spin_angle_deg() const {
 	return spin_angle_deg;
 }
 
+void BulletSpawner2D::set_spin_angle_deg(double degrees) {
+	if (!is_finite_real2d(degrees)) {
+		UtilityFunctions::push_error("BulletSpawner2D::set_spin_angle_deg: degrees must be finite, keeping the old angle.");
+		return;
+	}
+	if (spin_mode == SPIN_OSCILLATE) {
+		UtilityFunctions::push_error("BulletSpawner2D::set_spin_angle_deg: in Oscillate mode the angle follows spin_amplitude_deg and spin_frequency_hz; use reset_spin_angle() to restart the swing. Keeping the old angle.");
+		return;
+	}
+	spin_angle_deg = Math::fposmod(degrees, 360.0);
+	if (preview_active()) {
+		set_preview_pose(spin_angle_deg);
+	}
+}
+
 void BulletSpawner2D::reset_spin_angle() {
 	spin_angle_deg = 0.0;
 	spin_time_sec = 0.0;
