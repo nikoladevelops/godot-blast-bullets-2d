@@ -25,13 +25,13 @@
 	</methods>
 	<members>
 		<member name="max_rotation_speed" type="float" setter="set_max_rotation_speed" getter="get_max_rotation_speed" default="0.0">
-			The maximum rotation speed that the bullets can have.
+			Top rotation speed in radians per second for [member rotation_acceleration]: the rotation speed is clamped to the range from -max to max. 0 (the default) means no top speed. Must be finite and 0 or more.
 		</member>
 		<member name="rotation_acceleration" type="float" setter="set_rotation_acceleration" getter="get_rotation_acceleration" default="0.0">
-			The amount by which the rotation speeds up every frame until reaching max_rotation_speed.
+			Change of the rotation speed in radians per second per second. It stops at [member max_rotation_speed]; with 0 there it has no limit and holds its last finite value instead of overflowing.
 		</member>
 		<member name="rotation_speed" type="float" setter="set_rotation_speed" getter="get_rotation_speed" default="0.0">
-			The actual current rotation speed.
+			Starting rotation speed in radians per second (positive turns clockwise on screen).
 		</member>
 	</members>
 </class>

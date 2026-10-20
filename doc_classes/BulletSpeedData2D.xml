@@ -26,13 +26,13 @@
 	</methods>
 	<members>
 		<member name="acceleration" type="float" setter="set_acceleration" getter="get_acceleration" default="0.0">
-			The amount by which the speed increases every frame until reaching max_speed.
+			Change of the speed in px/s per second (negative slows down, and keeps going into negative speeds, which fly backwards). The speed stops growing at [member max_speed] in either direction; with [member max_speed] 0 it has no limit and holds its last finite value instead of overflowing.
 		</member>
 		<member name="max_speed" type="float" setter="set_max_speed" getter="get_max_speed" default="0.0">
-			The max possible speed that the bullets can have.
+			Top speed in px/s for [member acceleration]: the speed is clamped to the range from -max_speed to max_speed. 0 (the default) means no top speed.
 		</member>
 		<member name="speed" type="float" setter="set_speed" getter="get_speed" default="0.0">
-			The current speed that the bullets have.
+			Starting speed in px/s along the bullet's direction.
 		</member>
 	</members>
 </class>
