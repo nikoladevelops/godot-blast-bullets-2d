@@ -866,6 +866,11 @@ bool BulletSpawner2D::shoot_once() {
 	// Native shot buffer: no TypedArray / Variant per bullet anywhere between
 	// the pattern bake and the volley setup (spawn_volley_span).
 	collect_spawn_transforms_native(false, shot_transforms);
+	if (shot_owner_dying()) {
+		// The aimed target's get_velocity (user code) freed this spawner:
+		// the free waits for the shot, which reports nothing.
+		return fail_early(nullptr, StringName("dropped"), false);
+	}
 	if (shot_transforms.empty()) {
 		// Fail loud with the mode name: the generic factory "no transforms"
 		// error alone never says which source misfired (unset aimed target,
@@ -913,6 +918,12 @@ bool BulletSpawner2D::shoot_once() {
 		if (!inherited_velocity.is_finite()) {
 			inherited_velocity = Vector2();
 		}
+	}
+	// The collect ran the aimed target's get_velocity (user code), which
+	// may have freed the factory: look it up again.
+	factory = get_bullet_factory();
+	if (factory == nullptr) {
+		return fail_early("BulletSpawner2D::shoot_once: no BulletFactory2D assigned (bullet_factory_path).", StringName("no_factory"), true);
 	}
 	BulletVolley2D *bullets = factory->spawn_volley_span(volley_data, shot_transforms.data(), (int)shot_transforms.size(), inherited_velocity, get_instance_id());
 	if (bullets == nullptr) {
@@ -1540,6 +1551,9 @@ void BulletSpawner2D::begin_telegraph(bool auto_started) {
 	// Snapshot the aim for the warning signal; the actual fire re-collects,
 	// so this is advisory (preview/telegraph visuals), never stale logic.
 	TypedArray<Transform2D> aim = collect_spawn_transforms_impl(true);
+	if (shot_owner_dying()) {
+		return; // the aimed target's get_velocity freed this spawner
+	}
 	telegraph_pending = true;
 	telegraph_from_auto = auto_started;
 	telegraph_time_left = next_telegraph_sec();

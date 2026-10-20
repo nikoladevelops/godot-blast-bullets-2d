@@ -162,3 +162,57 @@ func test_a_game_area_handler_inside_the_flush_frees(p: Array = use_parameters([
 	await idle(2)
 	assert_false(is_instance_valid(f if victim == "factory" else volley), "the %s is gone" % victim)
 	expect_no_errors()
+
+
+## [route, victim, free kind]: every way the aimed pattern reads its target.
+func _aim_cases() -> Array:
+	var out: Array = []
+	for route in ["collect", "shot", "telegraph", "preview"]:
+		for victim in ["spawner", "factory"]:
+			for how in ["free", "release"]:
+				out.append([route, victim, how])
+	return out
+
+
+func test_an_aimed_target_velocity_that_frees(p: Array = use_parameters(_aim_cases())) -> void:
+	var route: String = p[0]
+	var victim: String = p[1]
+	var how: String = p[2]
+	if victim == "factory":
+		check_factory_after = false
+	var target := Node2D.new()
+	target.set_script(_script(HOSTILE_VELOCITY))
+	target.position = Vector2(200, 0)
+	add(target)
+	var sp: BulletSpawner2D
+	if route == "preview":
+		sp = make_preview_spawner(BulletSpawner2D.PATTERN_FROM_HELPER_AIMED, 3)
+	else:
+		sp = make_spawner(H.make_volley_data(3, 100.0, 5.0), BulletSpawner2D.PATTERN_FROM_HELPER_AIMED, 3)
+	sp.orphaned_volleys = BulletSpawner2D.ORPHANED_VOLLEYS_REMOVE
+	sp.helper_aimed_prediction = 1.0
+	sp.helper_aimed_prediction_time = 0.5
+	var f := factory
+	target.action = func() -> void: _free_now(sp if victim == "spawner" else f, how)
+	sp.set_helper_aimed_target(target)
+	match route:
+		"collect":
+			sp.collect_spawn_transforms()
+		"shot":
+			sp.shoot_once()
+		"telegraph":
+			sp.telegraph_enabled = true
+			sp.telegraph_sec = 0.05
+			sp.shoot_interval_sec = 0.1
+			sp.set_shooting_enabled(true)
+	for k in 30:
+		if target.calls > 0:
+			break
+		await idle(1)
+	assert_gt(target.calls, 0, "%s read the target's velocity" % route)
+	await idle(2)
+	assert_false(is_instance_valid(sp if victim == "spawner" else f), "the %s is gone" % victim)
+	for err in get_errors(): # a shot whose factory vanished reports why
+		if not err.handled and str(err.code).contains("no BulletFactory2D assigned"):
+			err.handled = true
+	expect_no_errors()

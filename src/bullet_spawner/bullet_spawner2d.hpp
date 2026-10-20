@@ -168,8 +168,10 @@ class BulletSpawner2D : public Node2D, public PatternKnobs2D {
 	}
 
 public:
-	// Refuses a release-build free() while this node emits (core/emit_guard2d.hpp).
-	EmitGuardState2D emit_guard;
+	// Refuses a release-build free() while this node emits, and any free()
+	// while it runs user code outside a signal (core/emit_guard2d.hpp).
+	// Mutable: the const pattern collect runs the aimed target's script.
+	mutable EmitGuardState2D emit_guard;
 
 	// Where volley transforms come from. Children/Self read the scene
 	// tree; the helper modes call the BulletFactory2D static generators
@@ -1919,7 +1921,15 @@ private:
 	void apply_steering_to_volley(BulletVolley2D *volley) const;
 	// Predictive lead for the aimed target, shared by the aimed volley
 	// and its preview cone so both agree on where the target will be.
+	// Uses the velocity snapshot of the current collect (no user code).
 	Vector2 predict_target_pos(Node2D *target) const;
+	// Reads the aimed target's get_velocity() ONCE per collect: a script
+	// method is user code that may free this spawner (refused while it runs
+	// and finished with queue_free(), core/emit_guard2d.hpp), the factory or
+	// the target. Returns false when this spawner is dying after it.
+	bool snapshot_aim_velocity() const;
+	mutable Vector2 aim_velocity_snapshot;
+	mutable bool aim_velocity_snapshot_valid = false;
 	// Corridor aim resolution, shared by the corridor volley and its
 	// preview wall: live aimed target when usable, else the fallback.
 	Vector2 resolve_corridor_aim(const Vector2 &fallback, const Vector2 &origin) const;

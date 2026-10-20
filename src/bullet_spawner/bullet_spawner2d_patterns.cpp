@@ -4,6 +4,7 @@
 // native span collect used by shoot_once and the cache verifier.
 
 #include "bullet_spawner/bullet_spawner2d_internal.hpp"
+#include "core/emit_guard2d.hpp"
 #include "patterns/pattern_pose2d.hpp"
 #include "patterns/patterns_internal.hpp"
 
@@ -93,21 +94,35 @@ static_assert((int)BulletSpawner2D::PATH2D_FACING_ALONG_PATH == (int)BulletPatte
 // somewhere the volley never flies.
 Vector2 BulletSpawner2D::predict_target_pos(Node2D *target) const {
 	Vector2 aim_pos = target->get_global_transform().get_origin();
-	if (helper_aimed_prediction > 0.0 && helper_aimed_prediction_time > 0.0) {
-		Vector2 target_vel = Vector2(0, 0);
-		bool has_vel = false;
-		if (target->has_method("get_velocity")) {
-			Variant v = target->call("get_velocity");
-			if (v.get_type() == Variant::VECTOR2) {
-				target_vel = v;
-				has_vel = target_vel.is_finite();
-			}
-		}
-		if (has_vel) {
-			aim_pos += target_vel * (real_t)(helper_aimed_prediction_time * helper_aimed_prediction);
-		}
+	if (helper_aimed_prediction > 0.0 && helper_aimed_prediction_time > 0.0 && aim_velocity_snapshot_valid) {
+		aim_pos += aim_velocity_snapshot * (real_t)(helper_aimed_prediction_time * helper_aimed_prediction);
 	}
 	return aim_pos;
+}
+
+bool BulletSpawner2D::snapshot_aim_velocity() const {
+	aim_velocity_snapshot_valid = false;
+	if (pattern_source != PATTERN_FROM_HELPER_AIMED || !(helper_aimed_prediction > 0.0 && helper_aimed_prediction_time > 0.0)) {
+		return true;
+	}
+	Node2D *target = get_helper_aimed_target();
+	if (target == nullptr || !target->has_method("get_velocity")) {
+		return true;
+	}
+	BulletSpawner2D *self = const_cast<BulletSpawner2D *>(this); // the guard state is bookkeeping
+	Variant v;
+	guarded_user_call2d(self, emit_guard, [&]() { v = target->call("get_velocity"); });
+	if (shot_owner_dying()) {
+		return false;
+	}
+	if (v.get_type() == Variant::VECTOR2) {
+		const Vector2 vel = v;
+		if (vel.is_finite()) {
+			aim_velocity_snapshot = vel;
+			aim_velocity_snapshot_valid = true;
+		}
+	}
+	return true;
 }
 
 // Corridor aim resolution shared by the corridor volley and its preview
@@ -337,6 +352,10 @@ bool BulletSpawner2D::debug_get_pattern_cache_verify() {
 
 void BulletSpawner2D::collect_spawn_transforms_native(bool quiet, std::vector<Transform2D> &r_out) const {
 	r_out.clear();
+	// The one user-code point of a collect, before any node is resolved.
+	if (!snapshot_aim_velocity()) {
+		return; // its script freed this spawner
+	}
 	Node2D *base = get_effective_generator();
 	if (base == nullptr || !base->is_inside_tree()) {
 		// Outside the tree there is no valid global transform; report loudly

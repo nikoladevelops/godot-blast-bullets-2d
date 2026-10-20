@@ -767,6 +767,12 @@ void BulletSpawner2D::rebuild_preview() {
 	preview_suppress_spin = true;
 	const TypedArray<Transform2D> transforms = collect_spawn_transforms_impl(true);
 	preview_suppress_spin = false;
+	// The aimed target's get_velocity (user code) may have freed this
+	// spawner or the nodes holding the preview: rebuild next time.
+	if (shot_owner_dying() || preview_nodes_lost()) {
+		preview_rebuild_in_progress = false;
+		return;
+	}
 	const Transform2D holder_global = preview_holder->get_global_transform();
 	if (!holder_global.is_finite()) {
 		preview_rebuild_in_progress = false;
