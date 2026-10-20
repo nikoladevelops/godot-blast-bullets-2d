@@ -183,3 +183,31 @@ func test_a_locked_orbit_holds_a_teleport_along_its_ring() -> void:
 	await physics(1)
 	assert_almost_eq(v.get_bullet_transform(0).origin.distance_to(to), 160.0 / 60.0, 0.05, "one circling step on from the new slot")
 	assert_true(v.bullet_is_orbiting_locked(0), "still locked")
+
+
+## Pinned pending decision (asked in the stability pass 6 report): a teleport
+## off the ring is pulled back onto the ring radius on the next tick (only
+## the angle re-aims; the code comment in teleport_bullet_to says the radius
+## would follow the move).
+func test_a_locked_orbit_pulls_a_radial_teleport_back_onto_its_ring() -> void:
+	var target := make_graze_target(Vector2(120, 0), &"orbit_radial")
+	var sp := make_spawner(H.make_volley_data(1, 160.0, 10.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 1)
+	sp.helper_ring_radius = 10.0
+	sp.homing_node_group = &"orbit_radial"
+	sp.homing_smoothing = 6.0
+	sp.homing_take_control_of_texture_rotation = true
+	sp.homing_retarget_interval_sec = 1000.0
+	sp.set_homing_enabled(true)
+	sp.orbiting_radius = 40.0
+	sp.orbiting_enabled = true
+	var got: Array = []
+	sp.volley_fired.connect(func(v, _n) -> void: got.append(v), CONNECT_ONE_SHOT)
+	assert_true(sp.shoot_once(), "fires")
+	var v: BulletVolley2D = got[0]
+	for f in 120:
+		await physics(1)
+	var radial: Vector2 = (v.get_bullet_transform(0).origin - target.global_position).normalized()
+	v.teleport_bullet(0, target.global_position + radial * 70.0)
+	await physics(1)
+	assert_almost_eq(v.get_bullet_transform(0).origin.distance_to(target.global_position), 40.0, 0.05, "back on the 40 px ring")
+	assert_true(v.bullet_is_orbiting_locked(0), "still locked")

@@ -121,3 +121,17 @@ func test_a_handler_stopping_or_replacing_a_sequential_list() -> void:
 	assert_eq(_volley_sizes(sp2), [2, 9], "the replacement fired; the old list's rest was dropped")
 	assert_signal_emit_count(sp2, "pattern_list_finished", 1, "only the replacement finished")
 	assert_false(sp2.is_pattern_list_active(), "nothing left")
+
+
+## Pinned pending decision (asked in the stability pass 6 report): an entry
+## restores the spawner's whole pattern configuration, so a shot handler's
+## own edit made while an entry fires is reverted with it.
+func test_an_entry_restore_also_reverts_a_shot_handlers_edit() -> void:
+	var sp := make_spawner(H.make_volley_data(4), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
+	sp.helper_ring_radius = 20.0
+	sp.volley_fired.connect(func(_v, _n) -> void: sp.helper_ring_radius += 10.0)
+	assert_eq(sp.spawn_pattern_list([{"helper_bullets_amount": 6}, {"helper_bullets_amount": 8}], true, 0.0), 2, "both entries fired")
+	assert_eq(sp.helper_ring_radius, 20.0, "the handler's two edits were reverted with the entries")
+	assert_eq(sp.helper_bullets_amount, 4, "the entries' own override too")
+	assert_true(sp.shoot_once(), "a normal shot")
+	assert_eq(sp.helper_ring_radius, 30.0, "outside a list the handler's edit sticks")
