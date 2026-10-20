@@ -173,3 +173,52 @@ func test_every_chain_end_reports_once(how: String = use_parameters(["shrink_to_
 		await _until(sp, "burst_finished", 2)
 		var last: int = get_signal_emit_count(sp, "burst_shot_fired") - 1
 		assert_eq(get_signal_parameters(sp, "burst_shot_fired", last)[0], 2, "%s: the next chain counts 1..n" % how)
+
+
+## A handler of volley_fired or burst_shot_fired (inside the running burst
+## shot) that cancels, restarts or resets the chain owns it: the counters
+## never go negative, every chain reports burst_finished exactly once, no
+## burst_shot_fired follows a cancel, and a chain started there fires all
+## its shots.
+func test_handlers_that_cancel_or_restart_a_burst_own_the_chain(p: Array = use_parameters([
+		["volley_fired", "cancel"], ["volley_fired", "reset_shooting"], ["volley_fired", "begin_burst"],
+		["burst_shot_fired", "cancel"], ["burst_shot_fired", "reset_shooting"], ["burst_shot_fired", "begin_burst"]])) -> void:
+	var sig: String = p[0]
+	var action: String = p[1]
+	var sp := _spawner(3, 0.02)
+	var log: Array = []
+	var acted: Array = []
+	sp.burst_shot_fired.connect(func(_n, _m) -> void: log.append("shot"))
+	sp.burst_finished.connect(func() -> void: log.append("finished"))
+	var handler := func() -> void:
+		if acted.is_empty():
+			acted.append(true)
+			match action:
+				"cancel":
+					sp.burst_enabled = false
+					sp.burst_enabled = true
+				"reset_shooting":
+					sp.reset_shooting()
+				"begin_burst":
+					sp.begin_burst()
+	if sig == "volley_fired":
+		sp.volley_fired.connect(func(_v, _n) -> void: handler.call())
+	else:
+		sp.burst_shot_fired.connect(func(_n, _m) -> void: handler.call())
+	sp.begin_burst()
+	var min_left := 0
+	for k in 60:
+		await idle(1)
+		min_left = mini(min_left, sp.get_burst_shots_left())
+	assert_eq(min_left, 0, "burst_shots_left never goes negative")
+	var expected: Array
+	match [sig, action]:
+		["volley_fired", "begin_burst"]:
+			expected = ["finished", "shot", "shot", "shot", "finished"] # the new chain fires all 3
+		["burst_shot_fired", "begin_burst"]:
+			expected = ["shot", "finished", "shot", "shot", "shot", "finished"]
+		["volley_fired", _]:
+			expected = ["finished"] # cancelled inside the shot: no shot report after it
+		_:
+			expected = ["shot", "finished"]
+	assert_eq(log, expected, "%s from %s" % [action, sig])

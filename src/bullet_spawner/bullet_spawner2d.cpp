@@ -1395,11 +1395,15 @@ void BulletSpawner2D::_process(double delta) {
 			}
 			const double overshoot = burst_time_left;
 			const int left_before = burst_shots_left;
+			const uint32_t serial = burst_serial;
 			// Auto chains report a misconfiguration once (like plain auto
 			// shots); manual chains report every attempt.
 			auto_fire_in_progress = burst_from_auto;
 			fire_burst_volley();
 			auto_fire_in_progress = false;
+			if (serial != burst_serial || shot_owner_dying()) {
+				break; // a handler ended or replaced the chain (a new one keeps its own clock)
+			}
 			if (burst_shots_left <= 0) {
 				break;
 			}
@@ -1514,6 +1518,7 @@ void BulletSpawner2D::begin_burst_chain(bool auto_started) {
 	// A fresh trigger always owns the phrasing: stale telegraphs from an
 	// interrupted trigger never fire into the new burst. Plain-burst mode
 	// with count 1 collapses to a single immediate shot (no chain to drain).
+	++burst_serial;
 	telegraph_pending = false;
 	telegraph_time_left = 0.0;
 	burst_telegraph_done = false;
@@ -1564,6 +1569,7 @@ void BulletSpawner2D::begin_telegraph(bool auto_started) {
 
 void BulletSpawner2D::cancel_burst_chain() {
 	const bool was_running = burst_shots_left > 0;
+	++burst_serial;
 	burst_shots_left = 0;
 	burst_shots_fired = 0;
 	burst_consecutive_failures = 0;
@@ -1588,13 +1594,20 @@ void BulletSpawner2D::fire_burst_volley() {
 		// (plain, mirrored, plain, ...) for any burst_count.
 		const bool mirrored = burst_alternate_mirror && (burst_shots_fired % 2 == 1);
 		burst_mirror_next = mirrored;
+		const uint32_t serial = burst_serial;
 		const bool fired = shoot_once();
 		burst_mirror_next = false;
+		if (serial != burst_serial || shot_owner_dying()) {
+			return; // a shot handler cancelled, restarted or reset the chain: it owns it
+		}
 		if (fired) {
 			++burst_shots_fired;
 			--burst_shots_left;
 			burst_consecutive_failures = 0;
 			emit_on2d(this, "burst_shot_fired", burst_shots_fired, mirrored);
+			if (serial != burst_serial || shot_owner_dying()) {
+				return; // its handler owns the chain now
+			}
 		} else if (++burst_consecutive_failures >= burst_count) {
 			// Persistent failure (bad config, permanent over-budget): end the
 			// chain instead of retrying forever. Each attempt already reported

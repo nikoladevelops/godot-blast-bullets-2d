@@ -1604,6 +1604,10 @@ private:
 	// countdown to the next burst shot, telegraph countdown, and the
 	// mirror flag for the next burst volley.
 	int burst_shots_left = 0;
+	// Bumped when a chain starts or ends: a burst_shot_fired / volley_fired
+	// handler that cancels, restarts or resets the chain owns it (the running
+	// shot touches no counter after its emits once this moved).
+	uint32_t burst_serial = 0;
 	// Shots fired in the current chain (shot index and mirror rhythm).
 	int burst_shots_fired = 0;
 	// True when the auto loop started the chain: it then follows the
