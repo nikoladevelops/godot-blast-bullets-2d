@@ -1434,6 +1434,13 @@ _ALWAYS_INLINE_ bool BulletVolley2D::advance_movement_pattern(const Ref<Curve2D>
 	}
 	const real_t prev_dist = distance_traveled;
 	const real_t advance_dist = velocity_delta.length();
+	// A step whose length overflows float range (finite components near
+	// 1e19 square past FLT_MAX) holds the pattern where it is, like every
+	// other integrated value: an INF distance would feed fmod NaN into
+	// sample_baked on every later tick.
+	if (!std::isfinite(advance_dist) || !std::isfinite(prev_dist + advance_dist)) {
+		return true;
+	}
 	distance_traveled += advance_dist;
 	// Non-repeating patterns stop exactly at the end: clamp into the
 	// final tile instead of wrapping once past it and snapping back.

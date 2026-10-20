@@ -163,9 +163,9 @@ func test_huge_directions_keep_their_heading(how: String = use_parameters(["sett
 ## a huge gravity, a teleport shift past float range and a fast orbit on a
 ## tiny radius. Every bullet stays finite (an INF pose reached the physics
 ## server and the MultiMesh; a NaN one stuck forever).
-func test_extreme_motion_stays_finite(how: String = use_parameters(["speed", "spin", "gravity", "teleport", "orbit"])) -> void:
+func test_extreme_motion_stays_finite(how: String = use_parameters(["speed", "spin", "gravity", "teleport", "orbit", "movement_pattern"])) -> void:
 	var d := H.make_volley_data(2, 100.0, 60.0)
-	if how == "speed":
+	if how == "speed" or how == "movement_pattern":
 		d.all_bullet_speed_data = [H.make_speed(100.0, 0.0, 3e38), H.make_speed(100.0, 0.0, 3e38)]
 	elif how == "spin":
 		d.all_bullet_rotation_data = [H.make_rotation(1.0, 0.0, 3e38), H.make_rotation(1.0, 0.0, 3e38)]
@@ -182,6 +182,13 @@ func test_extreme_motion_stays_finite(how: String = use_parameters(["speed", "sp
 			v.shared_homing_deque_push_back_global_position_target(Vector2(50, 0))
 			v.bullet_enable_orbiting(0, 0.5)
 			v.set_bullet_speed_data(0, H.make_speed(3e38, 0.0, 0.0))
+		"movement_pattern":
+			# A step whose length overflows float range (|v dt| of ~1e36
+			# components is INF in float32) must not walk the pattern to INF.
+			var c := Curve2D.new()
+			for p in [Vector2(0, 0), Vector2(30, 10), Vector2(60, -10), Vector2(90, 0)]:
+				c.add_point(p)
+			v.set_shared_movement_pattern_curve(c)
 	for k in 120:
 		factory.debug_advance_time(1.0 / 60.0)
 	var bad := ""
