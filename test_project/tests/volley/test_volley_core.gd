@@ -126,3 +126,68 @@ func test_direction_setters_under_a_direction_curve_refuse_with_direction_wordin
 		assert_eq(v.get_bullet_direction(0), before, "%s curve: the direction was left to the curve" % owner)
 		v.clear_all_bullets()
 		await idle(1)
+
+
+## A direction whose square overflows a float (1e20 px) still normalizes to
+## its direction (normalized() of such a vector used to return (0, 0) and the
+## bullet stalled for good), through the setter, a direction curve with a
+## huge strength and a huge lateral wobble.
+func test_huge_directions_keep_their_heading(how: String = use_parameters(["setter", "curve", "wobble"])) -> void:
+	var d := H.make_volley_data(1, 100.0, 30.0)
+	if how == "curve":
+		var c := BulletCurvesData2D.new()
+		c.x_direction_curve = H.make_flat_curve(1.0)
+		c.x_direction_curve_strength = 1e20
+		d.shared_bullet_curves_data = c
+	elif how == "wobble":
+		var w := BulletWobbleData2D.new()
+		w.enabled = true
+		w.mode = BulletWobbleData2D.WOBBLE_LATERAL
+		w.amplitude = 1e22
+		w.frequency_hz = 2.0
+		d.shared_bullet_wobble_data = w
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	if how == "setter":
+		v.set_bullet_direction(0, Vector2(1e20, 0))
+		assert_almost_eq(v.get_bullet_direction(0), Vector2(1, 0), Vector2(0.0001, 0.0001), "normalized, not zeroed")
+	var start: Vector2 = v.get_bullet_transform(0).origin
+	for k in 6:
+		factory.debug_advance_time(1.0 / 60.0)
+	var dir: Vector2 = v.get_bullet_direction(0)
+	assert_true(dir.is_finite() and dir.length() > 0.99, "%s: a unit heading (%s)" % [how, dir])
+	assert_gt(v.get_bullet_transform(0).origin.distance_to(start), 1.0, "%s: the bullet keeps moving" % how)
+
+
+## Integrated motion never overflows into INF/NaN poses: speed with an
+## extreme acceleration and no top speed (0 = unlimited), spin the same way,
+## a huge gravity, a teleport shift past float range and a fast orbit on a
+## tiny radius. Every bullet stays finite (an INF pose reached the physics
+## server and the MultiMesh; a NaN one stuck forever).
+func test_extreme_motion_stays_finite(how: String = use_parameters(["speed", "spin", "gravity", "teleport", "orbit"])) -> void:
+	var d := H.make_volley_data(2, 100.0, 60.0)
+	if how == "speed":
+		d.all_bullet_speed_data = [H.make_speed(100.0, 0.0, 3e38), H.make_speed(100.0, 0.0, 3e38)]
+	elif how == "spin":
+		d.all_bullet_rotation_data = [H.make_rotation(1.0, 0.0, 3e38), H.make_rotation(1.0, 0.0, 3e38)]
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	match how:
+		"gravity":
+			v.all_bullets_set_gravity(Vector2(3e38, 0))
+		"teleport":
+			v.teleport_bullet(0, Vector2(3e38, 0))
+			v.teleport_shift_bullet(0, Vector2(3e38, 0))
+			expect_error_sequence(["teleport_shift_bullet: the shifted position must be finite (it overflows float range), the bullet stays where it is."])
+			assert_eq(v.get_bullet_transform(0).origin, Vector2(3e38, 0), "the refused shift kept the bullet")
+		"orbit":
+			v.shared_homing_deque_push_back_global_position_target(Vector2(50, 0))
+			v.bullet_enable_orbiting(0, 0.5)
+			v.set_bullet_speed_data(0, H.make_speed(3e38, 0.0, 0.0))
+	for k in 120:
+		factory.debug_advance_time(1.0 / 60.0)
+	var bad := ""
+	for i in 2:
+		if not v.get_bullet_transform(i).is_finite():
+			bad += "bullet %d pose %s; " % [i, v.get_bullet_transform(i)]
+		if not v.get_bullet_velocity(i).is_finite():
+			bad += "bullet %d velocity %s; " % [i, v.get_bullet_velocity(i)]
+	assert_eq(bad, "", "%s: every pose and velocity stays finite" % how)

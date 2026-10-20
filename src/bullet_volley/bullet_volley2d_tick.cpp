@@ -212,6 +212,16 @@ static _ALWAYS_INLINE_ void wrap_orbit_angle(real_t &angle) {
 	}
 }
 
+// Advances the orbit angle, holding the last finite value when the step
+// overflows (an INF angle would make every later pose NaN).
+static _ALWAYS_INLINE_ void advance_orbit_angle(real_t &angle, real_t step) {
+	const real_t next = angle + step;
+	if (std::isfinite(next)) {
+		angle = next;
+	}
+	wrap_orbit_angle(angle);
+}
+
 void BulletVolley2D::move_bullets(double delta) {
 	if (amount_bullets <= 0 || physics_server == nullptr || !area.is_valid()) {
 		return;
@@ -706,14 +716,14 @@ _ALWAYS_INLINE_ void BulletVolley2D::step_wobble(const MoveTick2D &t, BulletStep
 	Vector2 &dir = *b.direction;
 	if (w.mode == 1) {
 		dir = dir.rotated(Math::deg_to_rad(frame_delta));
-		dir = dir.length_squared() < 0.00000001 ? Vector2(1, 0) : dir.normalized();
+		dir = dir.length_squared() < 0.00000001 ? Vector2(1, 0) : safe_normalized2d(dir);
 	} else if (dir.length_squared() > 0.00000001) {
 		const Vector2 perp = Vector2(-dir.y, dir.x).normalized();
 		const Vector2 steered = dir + perp * (frame_delta * 0.01);
 		// A pathological frame_delta (~100x amplitude) could cancel the
 		// heading; hold the old heading instead of snapping to angle 0.
 		if (steered.length_squared() > 0.00000001) {
-			dir = steered.normalized();
+			dir = safe_normalized2d(steered);
 		}
 	}
 	b.direction_updated = true;
@@ -805,7 +815,12 @@ _ALWAYS_INLINE_ void BulletVolley2D::step_pattern_and_forces(const MoveTick2D &t
 			const Vector2 g = base_g * gravity_strength_scale_for_bullet(t.shared_curves, b.curves);
 			if (g.is_finite()) {
 				Vector2 &gv = all_gravity_velocity[i];
-				gv += g * (real_t)delta;
+				// The fall speed holds its last finite value (an overflow
+				// would make the pose INF, then NaN).
+				const Vector2 next_gv = gv + g * (real_t)delta;
+				if (std::isfinite(next_gv.x) && std::isfinite(next_gv.y)) {
+					gv = next_gv;
+				}
 				b.velocity_delta += gv * (real_t)delta;
 			}
 		}
@@ -881,15 +896,11 @@ _ALWAYS_INLINE_ void BulletVolley2D::step_orbit(const MoveTick2D &t, BulletStep2
 			// without it the angle advances but the step is clamped to
 			// speed * delta (cheap drift look).
 			if (o.rigid_follow) {
-				if (delta > 0.0) {
-					o.angle += (speed / safe_radius) * dir_multiplier * (real_t)delta;
-				}
-				wrap_orbit_angle(o.angle);
+				advance_orbit_angle(o.angle, delta > 0.0 ? (speed / safe_radius) * dir_multiplier * (real_t)delta : (real_t)0.0);
 				b.velocity_delta = ring_slot() - origin;
 			} else if (can_move) {
 				const real_t angular_speed = (speed / safe_radius) * dir_multiplier;
-				o.angle += angular_speed * delta;
-				wrap_orbit_angle(o.angle);
+				advance_orbit_angle(o.angle, angular_speed * delta);
 				b.velocity_delta = clamp_step(ring_slot() - origin, speed * (real_t)delta);
 			} else {
 				b.velocity_delta = Vector2(0, 0);
@@ -952,7 +963,15 @@ _ALWAYS_INLINE_ void BulletVolley2D::step_place(const MoveTick2D &t, BulletStep2
 	const int i = b.i;
 	Vector2 &origin = all_cached_instance_origin[i];
 	const Vector2 pre_move_origin = origin;
-	origin += b.velocity_delta;
+	// Safety net: a step that overflows float32 keeps the bullet where it is
+	// (a non-finite origin would poison the instance, the shape and the
+	// physics server for good).
+	const Vector2 moved = origin + b.velocity_delta;
+	if (std::isfinite(moved.x) && std::isfinite(moved.y)) {
+		origin = moved;
+	} else {
+		b.velocity_delta = Vector2(0, 0);
+	}
 	b.transf->set_origin(origin);
 
 	Transform2D &shape = all_cached_shape_transforms[i];
@@ -1306,7 +1325,10 @@ _ALWAYS_INLINE_ void BulletVolley2D::bullet_accelerate_speed(int bullet_index, d
 	if (curr_max_bullet_speed > 0.0) {
 		new_speed = Math::clamp(new_speed, -curr_max_bullet_speed, curr_max_bullet_speed);
 	}
-	curr_bullet_speed = new_speed;
+	// Unlimited acceleration holds the last finite speed.
+	if (std::isfinite(new_speed)) {
+		curr_bullet_speed = new_speed;
+	}
 
 	refresh_cached_velocity(bullet_index);
 }
@@ -1331,7 +1353,9 @@ _ALWAYS_INLINE_ void BulletVolley2D::bullet_accelerate_rotation_speed(int bullet
 	if (curr_max_rotation_speed > 0.0) {
 		new_speed = Math::clamp(new_speed, -curr_max_rotation_speed, curr_max_rotation_speed);
 	}
-	curr_bullet_rotation_speed = new_speed;
+	if (std::isfinite(new_speed)) {
+		curr_bullet_rotation_speed = new_speed;
+	}
 }
 
 _ALWAYS_INLINE_ void BulletVolley2D::bullet_accelerate_rotation_speed_using_curve(int bullet_index, double delta, const BulletCurvesData2D *curves_data) {
@@ -1518,7 +1542,7 @@ _ALWAYS_INLINE_ void BulletVolley2D::update_homing(HomingTargetDeque &homing_deq
 	// If rotation is controlled via movement pattern (per-bullet or shared)
 	// or rotation data, just set direction directly toward target
 	if (check_exists_bullet_movement_pattern_data(bullet_index) || shared_movement_pattern_curve.is_valid() || is_rotation_data_active) {
-		current_direction = aim.normalized();
+		current_direction = safe_normalized2d(aim);
 	} else { // Otherwise use smoothing to rotate toward target
 		// Rotate toward target with smoothing
 		rotate_to_target(bullet_index, aim, max_turn);

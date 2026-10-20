@@ -484,7 +484,7 @@ void BulletVolley2D::set_bullet_direction(int bullet_index, const Vector2 &new_d
 	if (bullet_index < 0 || bullet_index >= (int)all_cached_direction.size() || bullet_index >= (int)all_cached_velocity.size() || bullet_index >= (int)all_cached_speed.size()) {
 		return;
 	}
-	all_cached_direction[bullet_index] = new_direction.normalized();
+	all_cached_direction[bullet_index] = safe_normalized2d(new_direction);
 	refresh_cached_velocity(bullet_index);
 }
 
@@ -679,7 +679,7 @@ void BulletVolley2D::set_bullet_transform(int bullet_index, const Transform2D &n
 			// direction must not.
 			Vector2 new_direction = Vector2(1, 0).rotated(curr_bullet_transf.get_rotation() - cache_texture_rotation_radians);
 			if (bullet_index >= 0 && bullet_index < (int)all_cached_direction.size() && bullet_index < (int)all_cached_velocity.size() && bullet_index < (int)all_cached_speed.size()) {
-				all_cached_direction[bullet_index] = new_direction.normalized();
+				all_cached_direction[bullet_index] = safe_normalized2d(new_direction);
 				refresh_cached_velocity(bullet_index);
 			}
 		}
@@ -715,7 +715,7 @@ void BulletVolley2D::set_bullet_direction_towards_position(int bullet_index, con
 		UtilityFunctions::push_error("set_bullet_direction_towards_position: bullet is already at the target position, keeping the old direction.");
 		return;
 	}
-	all_cached_direction[bullet_index] = to_target.normalized();
+	all_cached_direction[bullet_index] = safe_normalized2d(to_target);
 	refresh_cached_velocity(bullet_index);
 }
 
@@ -749,7 +749,7 @@ void BulletVolley2D::set_bullet_direction_towards_node2d(int bullet_index, const
 		UtilityFunctions::push_error("set_bullet_direction_towards_node2d: bullet is already at the target position, keeping the old direction.");
 		return;
 	}
-	all_cached_direction[bullet_index] = to_node.normalized();
+	all_cached_direction[bullet_index] = safe_normalized2d(to_node);
 	refresh_cached_velocity(bullet_index);
 }
 
@@ -787,7 +787,7 @@ void BulletVolley2D::set_bullet_texture_rotation_towards_position(int bullet_ind
 		UtilityFunctions::push_error("set_bullet_texture_rotation_towards_position: bullet is already at the target position, keeping the old rotation.");
 		return;
 	}
-	Vector2 dir = to_target.normalized();
+	Vector2 dir = safe_normalized2d(to_target);
 	real_t angle = Math::atan2(dir.y, dir.x);
 
 	// Compose with the volley-wide texture offset like the spawn path does

@@ -278,7 +278,7 @@ _ALWAYS_INLINE_ void BulletVolley2D::write_trail_from_global(int bullet_index, c
 		if (bake.layer->spin_degrees_per_sec != 0.0 && Math::is_finite(bake.layer->spin_degrees_per_sec) && Math::is_finite(raw_age)) {
 			extra_rot += bake.layer->spin_degrees_per_sec * Math::PI / 180.0 * raw_age;
 		}
-		if (extra_rot != 0.0) {
+		if (extra_rot != 0.0 && Math::is_finite(extra_rot)) {
 			trail_transf = trail_transf.rotated_local(Math::fposmod(extra_rot, Math::TAU));
 		}
 		const Transform2D local = to_local_for_multimesh(trail_transf);
@@ -552,7 +552,7 @@ static _ALWAYS_INLINE_ void apply_direction_axis2d(Vector2 &direction, int axis,
 	} else {
 		direction[axis] = offset * strength;
 	}
-	direction = direction.length_squared() < 0.00000001 ? before : direction.normalized();
+	direction = direction.length_squared() < 0.00000001 ? before : safe_normalized2d(direction);
 }
 
 _ALWAYS_INLINE_ void BulletVolley2D::apply_x_direction_curve(Vector2 &direction_vector, const BulletCurvesData2D *curves_data) const {

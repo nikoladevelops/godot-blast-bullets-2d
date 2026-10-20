@@ -100,7 +100,12 @@ void BulletVolley2D::teleport_shift_bullet(int bullet_index, const Vector2 &shif
 	if (bullet_index >= (int)all_cached_instance_transforms.size() || bullet_index >= (int)all_cached_instance_origin.size()) {
 		return;
 	}
-	teleport_bullet_to(bullet_index, all_cached_instance_origin[bullet_index] + shift_amount, shift_amount);
+	const Vector2 shifted = all_cached_instance_origin[bullet_index] + shift_amount;
+	if (!shifted.is_finite()) {
+		UtilityFunctions::push_error("teleport_shift_bullet: the shifted position must be finite (it overflows float range), the bullet stays where it is.");
+		return;
+	}
+	teleport_bullet_to(bullet_index, shifted, shift_amount);
 }
 
 void BulletVolley2D::teleport_shift_all_bullets(const Vector2 &shift_amount, int bullet_index_start, int bullet_index_end_inclusive) {

@@ -56,6 +56,23 @@ inline double wrap_angle_pi2d(double angle) {
 	return Math::fposmod(angle + Math::PI, Math::TAU) - Math::PI;
 }
 
+// v.normalized() that survives a vector whose squared length overflows a
+// float (|v| ~1e20: normalized() divides by sqrt(INF) and returns (0, 0), a
+// bullet then stalls for good). Ordinary vectors take exactly normalized()
+// (bit-identical); only the overflowing ones are scaled down first. Zero or
+// non-finite in, (0, 0) out.
+inline Vector2 safe_normalized2d(const Vector2 &v) {
+	const real_t l2 = v.x * v.x + v.y * v.y;
+	if (Math::is_finite(l2)) {
+		return l2 > (real_t)0.0 ? v.normalized() : Vector2();
+	}
+	const real_t big = MAX(Math::abs(v.x), Math::abs(v.y));
+	if (!Math::is_finite(big) || !(big > (real_t)0.0)) {
+		return Vector2();
+	}
+	return Vector2(v.x / big, v.y / big).normalized();
+}
+
 inline bool is_transform_invertible_safe2d(const Transform2D &t) {
 	if (!t.is_finite()) {
 		return false;
