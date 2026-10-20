@@ -1,6 +1,6 @@
 # BlastBullets2D benchmark: latest run
 
-- run: `2026-10-20T12-51-48Z` commit `f62e6d5`
+- run: `2026-10-20T16-50-20Z` commit `5de793e`
 - machine: AMD Ryzen 7 8840HS w/ Radeon 780M Graphics (16 threads), Linux-7.2.10-1-cachyos-x86_64-with-glibc2.44
 - godot: 4.7.2-stable (arch_linux), debug build: True, repeats: 5 (median)
 - baseline: `1249ed9` (2026-10-20T10-45-08Z)
@@ -11,48 +11,48 @@ Times are milliseconds of CPU per frame (simulated time, `--fixed-fps 60`).
 
 | scenario | frame p50 | frame p95 | frame p99 | frame max | step max | engine max | tick p50 | tick p99 | bullets | mem peak MB | objects +/- | vs baseline |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| attachments_500 | 0.047 | 0.052 | 0.156 | 0.360 | 0.233 | 0.156 | 0.027 | 0.098 | 453 | 34.3 | +0 | frame p50 +0%, tick p50 +0% |
-| bounce_box_2k | 0.123 | 0.131 | 0.138 | 0.402 | 0.001 | 0.401 | 0.059 | 0.064 | 2000 | 31.1 | +0 | frame p50 +1%, tick p50 +4% |
-| cold_spawn_scaling | 0.004 | 0.004 | 0.005 | 0.005 | 0.001 | 0.004 | 0.000 | 0.001 | 0 | 52.6 | +0 | frame p50 +0%, tick p50 +0% |
-| collision_storm | 0.795 | 1.064 | 2.136 | 2.562 | 0.267 | 2.422 | 0.179 | 0.301 | 1400 | 31.9 | +0 | frame p50 +9%, tick p50 +2% |
-| debugger_10k_flight | 0.610 | 0.640 | 0.718 | 2.285 | 0.002 | 2.285 | 0.289 | 0.309 | 10000 | 34.3 | +0 | frame p50 +2%, tick p50 +4% |
-| factory_warm_spawn_5k | 12.760 | 17.060 | 18.553 | 19.277 | 4.474 | 16.537 | 3.332 | 5.683 | 90000 | 66.3 | +0 | frame p50 +0%, tick p50 +2% |
-| flock_10k_flight | 4.811 | 5.206 | 6.732 | 6.874 | 0.007 | 6.873 | 4.415 | 6.282 | 10000 | 33.7 | +0 | frame p50 +0%, tick p50 -0% |
-| flock_10k_interval | 2.657 | 2.777 | 4.425 | 4.529 | 0.007 | 4.527 | 2.265 | 3.966 | 10000 | 33.7 | +0 | frame p50 +0%, tick p50 +1% |
-| flock_2k_swarm | 0.893 | 0.978 | 1.019 | 2.586 | 0.011 | 2.584 | 0.808 | 0.930 | 2000 | 31.1 | +0 | frame p50 +0%, tick p50 +0% |
-| flock_5k_stacked | 2.601 | 2.676 | 4.286 | 4.434 | 0.007 | 4.433 | 2.387 | 4.031 | 5000 | 45.5 | +0 | frame p50 -0%, tick p50 -0% |
-| flock_homing_bursts | 1.167 | 1.283 | 2.650 | 2.966 | 0.163 | 2.952 | 1.099 | 1.886 | 1466 | 31.0 | -4 | frame p50 +1%, tick p50 +2% |
-| graze_10k_flight | 0.611 | 0.642 | 0.662 | 2.267 | 0.004 | 2.266 | 0.318 | 0.345 | 10000 | 33.7 | +0 | frame p50 -0%, tick p50 +0% |
-| graze_64_targets | 0.693 | 0.747 | 0.796 | 2.364 | 0.037 | 2.352 | 0.386 | 0.438 | 10000 | 33.8 | +0 | frame p50 +0%, tick p50 +1% |
-| graze_storm | 0.979 | 5.444 | 8.227 | 10.780 | 1.218 | 10.779 | 0.275 | 1.444 | 7867 | 39.5 | +0 | frame p50 -1%, tick p50 +1% |
-| hit_handlers_2k | 1.343 | 1.817 | 2.856 | 3.312 | 0.425 | 3.084 | 0.389 | 0.670 | 1870 | 37.2 | +318 | frame p50 -0%, tick p50 +4% |
-| homing_2k_moving_targets | 0.152 | 0.160 | 0.173 | 0.318 | 0.003 | 0.317 | 0.086 | 0.098 | 2000 | 31.1 | +0 | frame p50 -13%, tick p50 -21% |
-| kitchen_sink | 0.501 | 0.641 | 0.937 | 2.227 | 0.006 | 2.227 | 0.305 | 0.380 | 7488 | 34.2 | +171 | frame p50 +2%, tick p50 +5% |
-| lifetime_signal_10k | 0.601 | 0.789 | 4.425 | 5.199 | 2.672 | 2.614 | 0.283 | 2.205 | 7375 | 39.7 | +0 | frame p50 +0%, tick p50 +2% |
-| mass_expiry_10k | 0.599 | 0.790 | 4.154 | 4.637 | 2.757 | 2.452 | 0.282 | 0.794 | 7375 | 39.7 | +0 | frame p50 +1%, tick p50 +1% |
-| multi_spawner_pooled_8x | 0.891 | 1.278 | 1.527 | 2.881 | 0.004 | 2.879 | 0.463 | 0.817 | 10157 | 38.7 | +0 | frame p50 -1%, tick p50 +4% |
-| pickup_convert_5k | 0.810 | 1.565 | 5.061 | 7.386 | 4.315 | 3.844 | 0.228 | 1.212 | 3353 | 41.5 | +0 | frame p50 +7%, tick p50 +1% |
-| pool_churn | 0.796 | 0.868 | 0.976 | 2.504 | 0.460 | 2.426 | 0.290 | 0.332 | 9000 | 34.8 | +0 | frame p50 +2%, tick p50 +3% |
-| sound_flight_10k | 1.499 | 1.543 | 2.520 | 3.238 | 0.002 | 3.238 | 1.208 | 1.430 | 10000 | 33.8 | +0 | frame p50 +0%, tick p50 +1% |
-| sound_hit_storm | 0.738 | 1.070 | 1.103 | 2.586 | 0.127 | 2.497 | 0.177 | 0.304 | 1400 | 31.9 | +0 | frame p50 -6%, tick p50 +1% |
-| spawner_aimed_regen_2k | 2.741 | 3.339 | 4.622 | 4.886 | 0.749 | 4.436 | 1.242 | 2.187 | 36000 | 42.9 | +0 | frame p50 +0%, tick p50 +1% |
-| spawner_moving_preview_1500 | 0.588 | 1.260 | 2.327 | 3.825 | 0.005 | 3.824 | 0.343 | 0.499 | 11550 | 35.7 | +15 | frame p50 +1%, tick p50 +3% |
-| spawner_path_move_1500 | 0.894 | 1.688 | 2.939 | 3.827 | 0.002 | 3.827 | 0.516 | 0.700 | 17780 | 38.1 | +15 | frame p50 +2%, tick p50 +3% |
-| spawner_spin_preview_1500 | 0.606 | 1.480 | 4.207 | 8.522 | 0.001 | 8.522 | 0.339 | 0.526 | 11550 | 40.5 | +15 | frame p50 -0%, tick p50 +0% |
-| spawner_warm_shot_5k | 13.368 | 18.434 | 21.110 | 21.905 | 3.525 | 19.957 | 3.582 | 6.007 | 90000 | 159.9 | +0 | frame p50 +0%, tick p50 +2% |
-| split_storm | 0.232 | 1.622 | 8.123 | 18.910 | 0.246 | 18.909 | 0.170 | 7.295 | 1675 | 59.3 | +0 | frame p50 +10%, tick p50 +16% |
-| trails_fx_2k | 0.355 | 0.626 | 3.584 | 3.837 | 3.158 | 2.037 | 0.286 | 0.567 | 1967 | 32.3 | +0 | frame p50 -1%, tick p50 -1% |
-| volley_10k_flight | 0.596 | 0.650 | 0.717 | 2.307 | 0.002 | 2.307 | 0.297 | 0.351 | 10000 | 33.7 | +0 | frame p50 +4%, tick p50 +5% |
+| attachments_500 | 0.048 | 0.055 | 0.159 | 0.393 | 0.259 | 0.159 | 0.028 | 0.105 | 453 | 34.4 | +0 | frame p50 +2%, tick p50 +4% |
+| bounce_box_2k | 0.124 | 0.134 | 0.152 | 0.164 | 0.002 | 0.164 | 0.059 | 0.070 | 2000 | 31.1 | +0 | frame p50 +2%, tick p50 +4% |
+| cold_spawn_scaling | 0.004 | 0.004 | 0.005 | 0.005 | 0.001 | 0.004 | 0.000 | 0.000 | 0 | 52.7 | +0 | frame p50 +0%, tick p50 +0% |
+| collision_storm | 0.758 | 1.069 | 1.658 | 2.594 | 0.218 | 2.508 | 0.183 | 0.297 | 1400 | 31.9 | +0 | frame p50 +4%, tick p50 +5% |
+| debugger_10k_flight | 0.612 | 0.636 | 0.660 | 2.288 | 0.001 | 2.287 | 0.286 | 0.310 | 10000 | 34.3 | +0 | frame p50 +2%, tick p50 +3% |
+| factory_warm_spawn_5k | 12.771 | 17.049 | 18.459 | 19.657 | 5.097 | 17.004 | 3.341 | 5.569 | 90000 | 66.3 | +0 | frame p50 +0%, tick p50 +2% |
+| flock_10k_flight | 4.838 | 5.147 | 6.695 | 6.984 | 0.015 | 6.982 | 4.448 | 6.208 | 10000 | 33.7 | +0 | frame p50 +1%, tick p50 +1% |
+| flock_10k_interval | 2.669 | 2.784 | 4.407 | 4.526 | 0.012 | 4.524 | 2.275 | 3.940 | 10000 | 33.7 | +0 | frame p50 +1%, tick p50 +1% |
+| flock_2k_swarm | 0.891 | 0.977 | 1.208 | 2.667 | 0.007 | 2.665 | 0.805 | 1.035 | 2000 | 31.1 | +0 | frame p50 +0%, tick p50 +0% |
+| flock_5k_stacked | 2.614 | 2.681 | 4.313 | 4.390 | 0.005 | 4.389 | 2.401 | 4.052 | 5000 | 45.6 | +0 | frame p50 +0%, tick p50 +1% |
+| flock_homing_bursts | 1.167 | 1.285 | 1.579 | 2.967 | 0.151 | 2.909 | 1.098 | 1.406 | 1466 | 31.0 | -4 | frame p50 +1%, tick p50 +2% |
+| graze_10k_flight | 0.613 | 0.639 | 0.661 | 2.299 | 0.002 | 2.299 | 0.319 | 0.343 | 10000 | 33.7 | +0 | frame p50 +0%, tick p50 +1% |
+| graze_64_targets | 0.693 | 0.744 | 0.790 | 2.410 | 0.050 | 2.388 | 0.387 | 0.447 | 10000 | 33.8 | +0 | frame p50 +0%, tick p50 +2% |
+| graze_storm | 0.985 | 5.202 | 8.135 | 11.123 | 1.292 | 11.121 | 0.274 | 1.467 | 7867 | 39.5 | +0 | frame p50 -1%, tick p50 +1% |
+| hit_handlers_2k | 1.339 | 1.832 | 3.023 | 3.399 | 0.373 | 3.251 | 0.376 | 0.589 | 1870 | 37.2 | +318 | frame p50 -1%, tick p50 +1% |
+| homing_2k_moving_targets | 0.154 | 0.162 | 0.177 | 0.203 | 0.005 | 0.202 | 0.086 | 0.098 | 2000 | 31.1 | +0 | frame p50 -12%, tick p50 -21% |
+| kitchen_sink | 0.502 | 0.643 | 0.917 | 2.199 | 0.003 | 2.198 | 0.305 | 0.368 | 7488 | 34.2 | +171 | frame p50 +3%, tick p50 +5% |
+| lifetime_signal_10k | 0.606 | 0.815 | 4.521 | 7.465 | 4.710 | 2.523 | 0.284 | 2.229 | 7375 | 39.8 | +0 | frame p50 +1%, tick p50 +2% |
+| mass_expiry_10k | 0.602 | 0.790 | 4.148 | 5.999 | 2.595 | 2.607 | 0.282 | 0.790 | 7375 | 39.7 | +0 | frame p50 +1%, tick p50 +1% |
+| multi_spawner_pooled_8x | 0.893 | 1.278 | 1.888 | 2.893 | 0.008 | 2.891 | 0.452 | 0.834 | 10157 | 38.7 | +0 | frame p50 -1%, tick p50 +2% |
+| pickup_convert_5k | 0.813 | 1.581 | 5.069 | 5.969 | 2.911 | 3.408 | 0.228 | 1.237 | 3352 | 41.5 | +0 | frame p50 +8%, tick p50 +1% |
+| pool_churn | 0.792 | 0.886 | 1.080 | 2.563 | 0.318 | 2.474 | 0.288 | 0.331 | 9000 | 34.8 | +0 | frame p50 +1%, tick p50 +2% |
+| sound_flight_10k | 1.506 | 1.546 | 3.142 | 3.255 | 0.001 | 3.255 | 1.210 | 2.098 | 10000 | 33.8 | -1 | frame p50 +1%, tick p50 +1% |
+| sound_hit_storm | 0.709 | 1.074 | 1.111 | 2.469 | 0.484 | 2.379 | 0.176 | 0.301 | 1400 | 31.9 | +0 | frame p50 -9%, tick p50 +0% |
+| spawner_aimed_regen_2k | 2.788 | 3.484 | 4.793 | 5.667 | 1.641 | 5.138 | 1.269 | 2.359 | 36000 | 42.9 | +0 | frame p50 +2%, tick p50 +3% |
+| spawner_moving_preview_1500 | 0.593 | 1.265 | 2.311 | 3.159 | 0.004 | 3.159 | 0.343 | 0.509 | 11550 | 35.7 | +15 | frame p50 +2%, tick p50 +3% |
+| spawner_path_move_1500 | 0.894 | 1.667 | 3.160 | 3.784 | 0.002 | 3.784 | 0.512 | 0.714 | 17780 | 38.1 | +15 | frame p50 +2%, tick p50 +2% |
+| spawner_spin_preview_1500 | 0.608 | 1.507 | 4.183 | 8.947 | 0.001 | 8.947 | 0.340 | 0.526 | 11550 | 40.5 | +15 | frame p50 +0%, tick p50 +1% |
+| spawner_warm_shot_5k | 13.370 | 18.268 | 20.360 | 22.712 | 3.573 | 19.632 | 3.569 | 5.845 | 90000 | 159.9 | +0 | frame p50 +0%, tick p50 +1% |
+| split_storm | 0.217 | 1.677 | 7.296 | 20.488 | 0.193 | 20.488 | 0.153 | 6.400 | 1675 | 59.4 | +0 | frame p50 +3%, tick p50 +4% |
+| trails_fx_2k | 0.360 | 0.635 | 3.609 | 4.174 | 3.230 | 1.923 | 0.290 | 0.575 | 1967 | 32.3 | +0 | frame p50 +0%, tick p50 +0% |
+| volley_10k_flight | 0.579 | 0.603 | 0.633 | 2.264 | 0.001 | 2.264 | 0.287 | 0.313 | 10000 | 33.7 | +0 | frame p50 +1%, tick p50 +1% |
 
 ## Scenario extras
 
-- **cold_spawn_scaling**: cold_1000_ms=0.537, cold_2000_ms=1.247, cold_4000_ms=3.225, cold_8000_ms=10.089, scaling_8k_over_1k=18.964
+- **cold_spawn_scaling**: cold_1000_ms=0.556, cold_2000_ms=1.258, cold_4000_ms=3.277, cold_8000_ms=9.821, scaling_8k_over_1k=17.709
 - **collision_storm**: records_per_frame=200.000
-- **flock_10k_flight**: flock_pass_usec=3415, neighbor_checks=327819
-- **flock_10k_interval**: flock_pass_usec=1486, neighbor_checks=108825, queried_members=3330
-- **flock_2k_swarm**: flock_pass_usec=745, neighbor_checks=82784
-- **flock_5k_stacked**: flock_pass_usec=2010, neighbor_checks=160598
-- **flock_homing_bursts**: flock_pass_usec=674, neighbor_checks=51321
+- **flock_10k_flight**: flock_pass_usec=3441, neighbor_checks=327819
+- **flock_10k_interval**: flock_pass_usec=1485, neighbor_checks=108825, queried_members=3330
+- **flock_2k_swarm**: flock_pass_usec=741, neighbor_checks=82784
+- **flock_5k_stacked**: flock_pass_usec=2020, neighbor_checks=160598
+- **flock_homing_bursts**: flock_pass_usec=664, neighbor_checks=51321
 - **graze_10k_flight**: grazes=500
 - **graze_64_targets**: grazes=7178
 - **graze_storm**: events=142000
