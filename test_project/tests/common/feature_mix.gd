@@ -59,7 +59,8 @@ const T2_POS := Vector2(-110, -50)
 ## Warnings a mix may legitimately print (documented setup hints).
 const WARNING_OK := [
 	"direction curve",
-	# orphaned_volleys Keep Flying: the freed spawner's connections died with it (warned once, by contract).
+	# orphaned_volleys Keep Flying: the freed spawner's connections died with
+	# it, so expiries and hits of its bullets warn once (by contract).
 	"after that spawner was freed",
 ]
 

@@ -46,7 +46,7 @@ var _intervals := {} # "volley:bullet" -> Array of [open_frame, close_frame (-1 
 var _watched := {} # volley id -> true (volley-level signals connected)
 var _per_life := {} # "volley:bullet:life:open_frame:trigger" -> count (death and spawn triggers)
 var _per_frame := {} # "volley:bullet:frame:trigger" -> count (flight, bounce)
-var _pending_out := [] # [frame, volley id, indexes, cause]: bullets_cleared / despawned reports
+var _pending_out := [] # [frame, volley id, indexes, cause, life]: bullets_cleared / despawned reports
 var _links: Array = [] # [object, signal, callable]: every connection, cut by detach()
 
 
@@ -135,7 +135,7 @@ func _on_split(pos: Vector2, children: Object) -> void:
 func _note_out(name: String, v: Object, idx: Array) -> void:
 	_count("signal:" + name)
 	if is_instance_valid(v):
-		_pending_out.append([Engine.get_physics_frames(), v.get_instance_id(), idx.duplicate(), "despawn" if name == "bullets_despawned" else "clear"])
+		_pending_out.append([Engine.get_physics_frames(), v.get_instance_id(), idx.duplicate(), "despawn" if name == "bullets_despawned" else "clear", v.get_life_id()])
 
 
 func _count(key: String, n := 1) -> void:
@@ -171,10 +171,15 @@ func pull() -> void:
 		_count("effect:%d" % int(f["trigger"]))
 		_check_report("effect trigger %d" % int(f["trigger"]), int(f["trigger"]), false, int(f["volley"]), int(f["life"]), int(f["bullet"]), int(f["frame"]))
 	for out in _pending_out:
+		# The payload names the life that just lost these bullets (the
+		# volley may be pooled by then, or even reused later that frame).
 		for i in out[2]:
-			var iv = _last(int(out[1]), int(i))
-			if iv == null or int(iv[1]) < 0 or String(iv[4]) != out[3] or int(iv[1]) > int(out[0]):
-				_problem("bullets_%s names bullet %d of volley %d, which did not leave that way (%s)" % ["despawned" if out[3] == "despawn" else "cleared", int(i), int(out[1]), str(iv)])
+			var left = null
+			for iv in _intervals.get(_key(int(out[1]), int(i)), []):
+				if int(iv[2]) == int(out[4]) and int(iv[1]) >= 0 and int(iv[1]) <= int(out[0]) and String(iv[4]) == out[3]:
+					left = iv
+			if left == null:
+				_problem("bullets_%s names bullet %d of volley %d life %d, which did not leave that way (%s)" % ["despawned" if out[3] == "despawn" else "cleared", int(i), int(out[1]), int(out[4]), str(_intervals.get(_key(int(out[1]), int(i)), []))])
 	_pending_out.clear()
 
 
