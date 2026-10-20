@@ -85,7 +85,7 @@ bool BulletVolley2D::collect_pickup_bullet(int bullet_index, Node2D *collector) 
 	bullet_factory->note_user_code();
 	const Variant collector_variant = collector != nullptr ? Variant(collector) : Variant();
 	emit_on2d(bullet_factory, "pickup_collected", collector_variant, position, this, bullet_index, pickup->value);
-	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+	if (!survived_user_code(self_id)) {
 		return false;
 	}
 	// A handler that took the bullet out (disabled it, converted it) owns the
@@ -104,7 +104,7 @@ bool BulletVolley2D::collect_pickup_bullet(int bullet_index, Node2D *collector) 
 		args.push_back(bullet_index);
 		args.push_back(pickup->value);
 		pickup->collect_callback.callv(args);
-		if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+		if (!survived_user_code(self_id)) {
 			return false;
 		}
 		if (!still_ours()) {
