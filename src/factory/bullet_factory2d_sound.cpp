@@ -53,6 +53,7 @@ void BulletFactory2D::set_sound_max_voices(int value) {
 		return;
 	}
 	sound_mixer.max_voices_total = value;
+	sound_mixer.enforce_voice_cap(*this);
 }
 
 void BulletFactory2D::debug_seed_cosmetic_rng(int64_t seed) {

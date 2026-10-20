@@ -551,19 +551,21 @@ AudioStreamPlayer2D *SoundMixer2D::alloc_voice(BulletFactory2D &factory, int pri
 		const size_t index = voices.size() - 1;
 		return make_voice_player(voices[index], index);
 	}
-	// Steal at equal or lower priority, never above. A voice already fading
-	// out goes first (its tail is cheap to cut). Otherwise the oldest live
-	// voice starts its fade and this play waits for the next sweep, so a
-	// fade is never restarted and a looper's tail always runs out.
+	// Steal at equal or lower priority, never above, and only under the cap
+	// (voices past a lowered cap are on their way out). A voice already
+	// fading out goes first (its tail is cheap to cut). Otherwise the oldest
+	// live voice starts its fade and this play waits for the next sweep, so
+	// a fade is never restarted and a looper's tail always runs out.
 	const double clock = factory.get_graze_clock();
+	const size_t stealable = Math::min(usable, voices.size());
 	size_t oldest = voices.size();
-	for (size_t i = 0; i < voices.size(); ++i) {
+	for (size_t i = 0; i < stealable; ++i) {
 		if (voices[i].busy && voices[i].fading && voices[i].priority <= priority && (oldest == voices.size() || voices[i].use_order < voices[oldest].use_order)) {
 			oldest = i;
 		}
 	}
 	if (oldest == voices.size()) {
-		for (size_t i = 0; i < voices.size(); ++i) {
+		for (size_t i = 0; i < stealable; ++i) {
 			if (voices[i].busy && !voices[i].fading && voices[i].priority <= priority && (oldest == voices.size() || voices[i].use_order < voices[oldest].use_order)) {
 				oldest = i;
 			}
@@ -582,6 +584,21 @@ AudioStreamPlayer2D *SoundMixer2D::alloc_voice(BulletFactory2D &factory, int pri
 	}
 	release_voice(voices[oldest]);
 	return make_voice_player(voices[oldest], oldest);
+}
+
+void SoundMixer2D::enforce_voice_cap(BulletFactory2D &factory) {
+	const size_t usable = (size_t)Math::max(0, max_voices_total);
+	const double clock = factory.get_graze_clock();
+	for (size_t i = usable; i < voices.size(); ++i) {
+		Voice &voice = voices[i];
+		if (!voice.busy || voice_begin_fade(voice, clock, voice_fade_len(voice.sound_id))) {
+			continue;
+		}
+		if (AudioStreamPlayer2D *player = live_player(voice)) {
+			player->stop();
+		}
+		release_voice(voice);
+	}
 }
 
 double SoundMixer2D::voice_fade_len(uint64_t sound_id) {

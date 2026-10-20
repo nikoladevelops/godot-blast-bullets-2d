@@ -50,6 +50,9 @@ public:
 	// The whole pool (BulletFactory2D.sound_max_voices): voices are created on
 	// demand under an internal SoundVoices container (interpolation OFF).
 	int max_voices_total = 32;
+	// A lowered max_voices_total holds at once: busy voices past it fade out
+	// (or stop when their sound has no fade); alloc_voice never reuses them.
+	void enforce_voice_cap(BulletFactory2D &factory);
 
 	// One event offer. False = dropped (paused, editor, disabled, streamless,
 	// chance, amount gate). True = queued for this sweep's flush (or the next
