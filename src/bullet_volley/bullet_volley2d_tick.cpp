@@ -1543,7 +1543,27 @@ _ALWAYS_INLINE_ void BulletVolley2D::update_homing(HomingTargetDeque &homing_deq
 	// or rotation data, just set direction directly toward target
 	if (check_exists_bullet_movement_pattern_data(bullet_index) || shared_movement_pattern_curve.is_valid() || is_rotation_data_active) {
 		current_direction = safe_normalized2d(aim);
+	} else if (!homing_take_control_of_texture_rotation) {
+		// This homing steers through the facing, which it may not touch: it
+		// steers nothing, and must not reset a heading something else set
+		// (a bounce, a flock turn, wobble, a direction setter).
+		return;
 	} else { // Otherwise use smoothing to rotate toward target
+		// The heading may have left the facing (a bounce without texture
+		// rotation or with a smooth visual, a flock turn without face_heading,
+		// angular wobble, a direction setter): turn the facing onto it first,
+		// so homing steers on from the heading instead of undoing it. Aligned
+		// bullets (the usual case) skip this.
+		const Vector2 facing = curr_transf[0].rotated(-cache_texture_rotation_radians);
+		const real_t facing_len_sq = facing.x * facing.x + facing.y * facing.y;
+		if (facing_len_sq > (real_t)0.00000001) {
+			const real_t inv_len = (real_t)1.0 / Math::sqrt(facing_len_sq);
+			const real_t cross = (facing.x * current_direction.y - facing.y * current_direction.x) * inv_len;
+			const real_t dot = (facing.x * current_direction.x + facing.y * current_direction.y) * inv_len;
+			if (dot < (real_t)0.0 || Math::abs(cross) > (real_t)0.0001) {
+				rotate_to_target(bullet_index, current_direction, (real_t)Math::TAU); // full turn, interpolation kept
+			}
+		}
 		// Rotate toward target with smoothing
 		rotate_to_target(bullet_index, aim, max_turn);
 
