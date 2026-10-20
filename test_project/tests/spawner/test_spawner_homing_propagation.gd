@@ -198,6 +198,25 @@ func test_volley_freed_by_homing_targets_resolved_is_dropped() -> void:
 	assert_eq(configured.size(), 1, "and is configured")
 
 
+## A homing_targets_resolved handler that frees the spawner (the release way:
+## the free waits for the shot) ends the shot's reports: no
+## volley_homing_configured and no volley_fired from a dying spawner.
+func test_spawner_freed_by_homing_targets_resolved_reports_nothing_more() -> void:
+	var sp := make_spawner(H.make_volley_data(3, 50.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 3)
+	sp.set_homing_enabled(true)
+	sp.set_homing_target_source(BulletSpawner2D.HOMING_SOURCE_NODE_PATH)
+	sp.set_homing_target_path(sp.get_path_to(target))
+	sp.orphaned_volleys = BulletSpawner2D.ORPHANED_VOLLEYS_REMOVE
+	var after: Array = []
+	sp.homing_targets_resolved.connect(func(_v, _t) -> void: BulletFactory2D.debug_free_like_release(sp))
+	sp.volley_homing_configured.connect(func(_v, _n) -> void: after.append("volley_homing_configured"))
+	sp.volley_fired.connect(func(_v, _n) -> void: after.append("volley_fired"))
+	assert_false(sp.shoot_once(), "the dying spawner's shot reports false")
+	assert_eq(after, [], "a dying spawner reports nothing more")
+	await idle(2)
+	assert_false(is_instance_valid(sp), "and is gone")
+
+
 ## homing_retarget_phase 0 means "stagger per spawner automatically", also
 ## when a script sets it at runtime: the first pass lands at the spawner's
 ## own offset into the interval, never on the very next frame for everyone.

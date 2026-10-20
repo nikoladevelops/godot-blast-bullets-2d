@@ -1270,7 +1270,9 @@ void BulletSpawner2D::apply_volley_homing_and_orbiting(BulletVolley2D *bullets, 
 	emit_on2d(this, "homing_targets_resolved", bullets, resolved_targets);
 	// The handler may have freed the volley: a Variant built from the freed
 	// pointer would read freed memory. The caller revalidates and drops it.
-	if (ObjectDB::get_instance(ObjectID(volley_id)) != bullets) {
+	// A handler that freed the spawner (refused until the shot ends) ends the
+	// shot's reports, like every other emit of the shot.
+	if (ObjectDB::get_instance(ObjectID(volley_id)) != bullets || shot_owner_dying()) {
 		return;
 	}
 	// volleys_fired still holds the previous count here (shoot_once bumps it
