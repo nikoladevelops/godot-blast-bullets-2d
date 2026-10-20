@@ -112,7 +112,7 @@
 			Seconds of burst before the pull to the target begins (steering and acceleration both start then). 0 pulls at once. Must be finite and 0 or more.
 		</member>
 		<member name="magnet_max_speed" type="float" setter="set_magnet_max_speed" getter="get_magnet_max_speed" default="900.0">
-			Top speed of the pull in px/s (never below the speed the pickup already has). Must be finite and 0 or more.
+			Top speed of the pull in px/s (never below the speed the pickup already has). 0 means no top speed (like [member BulletSpeedData2D.max_speed]). Must be finite and 0 or more.
 		</member>
 		<member name="magnet_smoothing" type="float" setter="set_magnet_smoothing" getter="get_magnet_smoothing" default="0.0">
 			Cap on how fast a pickup may turn towards its target (radians per second per unit; the volley homing smoothing). 0 steers straight at the target at once. A small positive value limits the turning, so pickups swing around in arcs before settling on the target; large values behave like 0. Must be finite and 0 or more.

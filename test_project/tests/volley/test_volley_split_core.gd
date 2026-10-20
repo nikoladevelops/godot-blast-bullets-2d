@@ -536,3 +536,23 @@ func test_children_carry_the_parent_bullet_curves_and_wobble() -> void:
 	for i in children.get_amount_bullets():
 		assert_eq(children.bullet_get_curves_data(i), curves, "child %d flies the parent's curves" % i)
 		assert_eq(children.bullet_get_wobble_data(i), wobble, "child %d wobbles like the parent" % i)
+
+
+## Fixed-speed children of a parent whose top speed is 0 (no cap) keep
+## accelerating like the parent would (they used to be capped at the fixed
+## speed).
+func test_fixed_speed_children_keep_an_unlimited_top_speed() -> void:
+	var s := _stage(1)
+	s.speed_mode = BulletSplitStage2D.SPEED_FIXED
+	s.fixed_speed = 40.0
+	var data := H.make_volley_data(1, 100.0, 0.1)
+	data.all_bullet_speed_data = []
+	data.shared_bullet_speed_data = H.make_speed(100.0, 0.0, 600.0) # max 0 = no cap
+	var v := factory.spawn_volley(data)
+	assert_true(v.split_set_data(_chain([s]), data), "armed")
+	_step_until_split()
+	assert_eq(splits.size(), 1, "split")
+	var c: BulletVolley2D = splits[0][2]
+	for i in 4: # the children live 0.1 s like their parent
+		factory.debug_advance_time(DT)
+	assert_gt(c.get_bullet_velocity(0).length(), 70.0, "40 px/s + 600 px/s^2 x 4 ticks, no cap at 40")

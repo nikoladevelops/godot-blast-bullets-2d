@@ -34,7 +34,8 @@ void BulletVolley2D::seed_pickups(const Ref<BulletPickupData2D> &pickup, const P
 			all_cached_acceleration[i] = 0.0f;
 		} else if (mode == BulletPickupData2D::MOTION_KEEP_BULLET_MOTION) {
 			all_cached_speed[i] = speed;
-			all_cached_max_speed[i] = Math::max(seeds[i].max_speed, speed);
+			// A top speed of 0 means no cap: keep it unlimited.
+			all_cached_max_speed[i] = seeds[i].max_speed > 0.0f ? Math::max(seeds[i].max_speed, speed) : 0.0f;
 			all_cached_acceleration[i] = seeds[i].acceleration;
 		}
 		// MOTION_CUSTOM: speed, top speed and acceleration stay what the
@@ -67,7 +68,8 @@ void BulletVolley2D::maybe_begin_pickup_magnet() {
 			continue;
 		}
 		all_cached_acceleration[i] = acceleration;
-		all_cached_max_speed[i] = Math::max(all_cached_speed[i], top_speed);
+		// magnet_max_speed 0 = no cap (the max_speed convention).
+		all_cached_max_speed[i] = top_speed > 0.0f ? Math::max(all_cached_speed[i], top_speed) : 0.0f;
 	}
 }
 

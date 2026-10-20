@@ -282,3 +282,27 @@ func test_a_mode_edit_reaches_the_next_conversion_not_the_flying_pickups() -> vo
 	await idle(30)
 	assert_almost_eq(first.get_bullet_velocity(0).length(), 100.0, 0.5, "the pickup made before the edit keeps flying at the kept speed")
 	assert_lt(second.get_bullet_velocity(0).length(), 60.0, "the one made after the edit drags")
+
+
+## A top speed of 0 means "no cap" everywhere: the magnet's
+## magnet_max_speed, and a Keep Bullet Motion pickup made from a bullet with
+## an unlimited top speed (it used to be capped at the speed it had).
+func test_a_zero_top_speed_never_caps_a_pickup() -> void:
+	_moving(1, 100.0, 0.0, 600.0)
+	var keep := P.coin()
+	keep.motion_mode = BulletPickupData2D.MOTION_KEEP_BULLET_MOTION
+	keep.magnet_delay_sec = 5.0
+	var kv: BulletVolley2D = factory.convert_all_bullets_to_pickups(keep, _target(Vector2(0, 90000)))[0]
+	var k0 := kv.get_bullet_velocity(0).length()
+	await idle(60)
+	assert_gt(kv.get_bullet_velocity(0).length(), k0 + 400.0, "keep mode: the unlimited bullet keeps accelerating")
+	_moving(1, 100.0, 100.0, 0.0)
+	var coin := P.coin()
+	coin.initial_velocity_scale = 1.0
+	coin.drag = 0.0
+	coin.magnet_delay_sec = 0.0
+	coin.magnet_acceleration = 2000.0
+	coin.magnet_max_speed = 0.0
+	var mv: BulletVolley2D = factory.convert_all_bullets_to_pickups(coin, _target(Vector2(0, 900000)))[0]
+	await idle(60)
+	assert_gt(mv.get_bullet_velocity(0).length(), 1000.0, "magnet_max_speed 0: the pull has no top speed")

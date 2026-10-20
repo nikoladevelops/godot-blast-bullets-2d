@@ -262,7 +262,10 @@ void BulletVolley2D::split_seed_children(const SplitRequest2D &request, const Ve
 				break;
 			case BulletSplitStage2D::SPEED_FIXED:
 				speed = stage->fixed_speed * m;
-				max_speed = Math::max(max_speed, speed);
+				// A top speed of 0 means no cap: keep it unlimited.
+				if (max_speed > 0.0f) {
+					max_speed = Math::max(max_speed, speed);
+				}
 				break;
 			case BulletSplitStage2D::SPEED_FROM_SPAWN_DATA:
 			default:
