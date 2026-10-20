@@ -1856,13 +1856,24 @@ bool BulletSpawner2D::fire_pattern_list_override(const Variant &entry) {
 	// Apply, fire, restore inside one pattern batch: the preview rebuilds
 	// once at the end, and the restored knobs bump the pattern version so the
 	// next normal shot rebakes from the spawner's own configuration.
+	// Only what the entry changed goes back: a shot handler's own edits to
+	// other knobs stick.
 	begin_pattern_batch();
 	const Dictionary saved = snapshot_pattern_state();
 	bool fired = false;
 	if (apply_pattern_list_entry(entry)) {
+		const Dictionary applied = snapshot_pattern_state();
+		Dictionary changed;
+		const Array keys = saved.keys();
+		for (int i = 0; i < keys.size(); ++i) {
+			const Variant key = keys[i];
+			if (applied[key] != saved[key]) {
+				changed[key] = saved[key];
+			}
+		}
 		fired = shoot_once();
+		restore_pattern_state(changed);
 	}
-	restore_pattern_state(saved);
 	end_pattern_batch();
 	return fired;
 }

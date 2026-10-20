@@ -922,7 +922,7 @@ deduped, cancelled by REMOVED) and replayed once on resume.
 | Every helper draws exactly `helper_bullets_amount` bullets at distinct spots; flower FAN splits the amount over petals | `test_spawner_pattern_counts` |
 | Every shape generator reports amount and NaN-marker errors in one wording | `test_factory_helper_edges` |
 | Presets are clean (pattern knobs + spin reset; Transform subgroup and node wiring kept) | `test_spawner_presets` |
-| Pattern-list entries are temporary overrides; `pattern_list_finished` in both modes | `test_spawner_pattern_lists` |
+| Pattern-list entries are temporary overrides (only what an entry changed goes back: a shot handler's edits of other knobs stick); `pattern_list_finished` in both modes | `test_spawner_pattern_lists` |
 | Auto bursts clamp to `volleys_remaining`, cancel when auto-fire turns off | `test_spawner_burst_telegraph` |
 | Controls before the tree survive `_ready`; `shooting_*` signals are auto-fire only | `test_spawner_cadence` |
 | Every failed shot emits `volley_skipped(reason)` | `test_spawner_cadence` |
