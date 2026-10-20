@@ -290,6 +290,22 @@ bool BulletFactory2D::flush_splits(const bool &alive) {
 				}
 			}
 			if (!aimed) {
+				// Children of the parent's data home like the parent did (its
+				// spawner's steering never reached that data); authored
+				// child_data is used exactly.
+				if (r.has_steering && !r.stage_data) {
+					const SplitRequest2D::HomingSteering &s = r.steering;
+					child->set_homing_smoothing(s.smoothing);
+					child->set_homing_update_interval(s.update_interval);
+					child->set_homing_distance_before_reached(s.distance_before_reached);
+					child->set_homing_reach_counts_bullet_size(s.reach_counts_bullet_size);
+					child->set_homing_take_control_of_texture_rotation(s.take_control);
+					child->set_shared_homing_deque_auto_pop_after_target_reached(s.auto_pop_shared);
+					child->set_bullet_homing_auto_pop_after_target_reached(s.auto_pop_bullet);
+					child->set_homing_delay_sec(s.delay_sec);
+					child->set_homing_duration_sec(s.duration_sec);
+					child->set_homing_lose_range_px(s.lose_range_px);
+				}
 				switch (r.homing.type) {
 					case HomingType::GlobalPositionTarget:
 						child->shared_homing_deque_replace_homing_targets_with_new_target(Variant(r.homing.global_position_target));

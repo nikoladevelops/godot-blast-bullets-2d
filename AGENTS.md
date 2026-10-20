@@ -967,6 +967,7 @@ deduped, cancelled by REMOVED) and replayed once on resume.
 | Teleports and transform setters move trail layers with the bullet at once (also on a paused factory) and restart the interpolation history | `integration/test_mix_teleport` |
 | The tick that locks an orbit (a first lock, or RelockAlways re-acquiring the ring after every retarget pass) moves a full step: onto the ring, then along it | `spawner/test_spawner_homing_orbit` |
 | Every way a bullet leaves fires exactly its own sound and effect trigger once (a manual split leaves like a clear) | `integration/test_mix_trigger_ledger` |
+| keep_homing children of the parent's data home like the parent (its target AND its steering: texture control, smoothing, reach, auto pop, delay/duration/lose range) when no live owner spawner aims them; authored child_data is used exactly | `spawner/test_spawner_split` |
 
 - Edge cases to test everywhere: NaN/Inf scalars and vectors; null array
   entries; empty arrays; short vs oversized arrays; OOB indices (-1/99);

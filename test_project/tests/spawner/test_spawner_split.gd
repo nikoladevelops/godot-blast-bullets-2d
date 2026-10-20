@@ -479,3 +479,44 @@ func test_stage_edits_reach_the_chain_and_the_spawner() -> void:
 	assert_eq(chain.changed.get_connections().filter(func(c): return c["callable"].get_object() == sp).size(), 1, "the spawner listens to its chain")
 	sp.split_data = _chain(2)
 	assert_eq(chain.changed.get_connections().filter(func(c): return c["callable"].get_object() == sp).size(), 0, "and lets a replaced one go")
+
+
+func test_orphaned_children_home_like_their_parent() -> void:
+	# The spawner set its volleys' homing steering (texture control,
+	# smoothing, reach); a split after the spawner is gone hands the
+	# children the parent's target AND that steering (they used to get the
+	# spawn data's defaults: homing that cannot steer, plus a warning).
+	var target := Node2D.new()
+	target.position = Vector2(0, 300)
+	add(target)
+	target.add_to_group(&"orphan_split_targets")
+	var chain := _chain(2, false)
+	(chain.stages[0] as BulletSplitStage2D).split_after_sec = 0.2
+	var sp := _split_spawner(chain, 1, 5.0)
+	sp.helper_ring_radius = 0.0
+	(sp.spawn_data as BulletVolleyData2D).shared_bullet_speed_data = H.make_speed(120.0)
+	(sp.spawn_data as BulletVolleyData2D).all_bullet_speed_data = []
+	sp.orphaned_volleys = BulletSpawner2D.ORPHANED_VOLLEYS_HAND_TO_FACTORY
+	sp.homing_node_group = &"orphan_split_targets"
+	sp.homing_take_control_of_texture_rotation = true
+	sp.homing_smoothing = 7.0
+	sp.homing_distance_before_reached = 9.0
+	sp.homing_retarget_interval_sec = 1000.0
+	sp.set_homing_enabled(true)
+	var parent := _fire(sp)
+	assert_true(parent.homing_take_control_of_texture_rotation, "the spawner steers its volley")
+	step_factory(2)
+	sp.free() # orphaned before the split
+	for k in 15:
+		factory.debug_advance_time(DT)
+	assert_eq(factory_splits.size(), 1, "the orphan split (handed to the factory)")
+	var c: BulletVolley2D = factory_splits[0][2]
+	assert_eq(c.shared_homing_deque_get_current_homing_target(), target, "the children chase the parent's target")
+	assert_true(c.homing_take_control_of_texture_rotation, "with the parent's texture control")
+	assert_almost_eq(c.get_homing_smoothing(), 7.0, 1e-5, "its smoothing")
+	assert_almost_eq(c.get_homing_distance_before_reached(), 9.0, 1e-5, "its reach")
+	var before: Vector2 = c.get_bullet_direction(0)
+	for k in 10:
+		factory.debug_advance_time(DT)
+	assert_gt(absf(angle_difference(before.angle(), c.get_bullet_direction(0).angle())), 0.05, "and they really turn toward it")
+	expect_no_errors("no inert-homing warning")

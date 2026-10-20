@@ -132,6 +132,18 @@ int BulletVolley2D::split_capture(int bullet_index, int cause, const Transform2D
 		} else if (!shared_homing_deque.empty()) {
 			request.homing = shared_homing_deque.front();
 		}
+		SplitRequest2D::HomingSteering &s = request.steering;
+		s.smoothing = (use_per_bullet_homing_smoothing && bullet_index < (int)all_bullet_homing_smoothing.size()) ? all_bullet_homing_smoothing[bullet_index] : homing_smoothing;
+		s.update_interval = homing_update_interval;
+		s.distance_before_reached = homing_distance_before_reached;
+		s.delay_sec = homing_delay_sec;
+		s.duration_sec = homing_duration_sec;
+		s.lose_range_px = homing_lose_range_px;
+		s.reach_counts_bullet_size = homing_reach_counts_bullet_size;
+		s.take_control = homing_take_control_of_texture_rotation;
+		s.auto_pop_shared = shared_homing_deque_auto_pop_after_target_reached;
+		s.auto_pop_bullet = bullet_homing_auto_pop_after_target_reached;
+		request.has_steering = true;
 	}
 	// The parent's own per-bullet settings (its entries of per-bullet arrays
 	// or per-bullet writes), for every child that copies the parent's data.

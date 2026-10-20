@@ -91,6 +91,22 @@ struct SplitRequest2D {
 	std::shared_ptr<const SplitArming2D> arming;
 	Ref<Resource> custom_data; // only when the stage keeps it
 	HomingTarget homing; // the parent's front target (keep_homing)
+	// How the parent homed (its live steering, set by its spawner or a
+	// script): children of the parent's data home like it when no live
+	// owner spawner aims them (keep_homing).
+	struct HomingSteering {
+		real_t smoothing = 0.0;
+		real_t update_interval = 0.0;
+		real_t distance_before_reached = 5.0;
+		real_t delay_sec = 0.0;
+		real_t duration_sec = 0.0;
+		real_t lose_range_px = 0.0;
+		bool reach_counts_bullet_size = false;
+		bool take_control = false;
+		bool auto_pop_shared = false;
+		bool auto_pop_bullet = false;
+	} steering;
+	bool has_steering = false;
 	// The parent's own per-bullet settings (entry i of the parent volley's
 	// per-bullet arrays means nothing to child i): every child gets them.
 	Ref<BulletCurvesData2D> curves;
