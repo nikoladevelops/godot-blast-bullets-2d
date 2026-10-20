@@ -56,7 +56,7 @@ for the rest: the sections are written to be looked up, not read once.
 
 ```sh
 GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py   # build (exit 1 = failed; never raw scons, never edit SConstruct)
-python3 tools/run_tests.py                                       # 201 files / 1843 tests, ~10 s, leak-checked
+python3 tools/run_tests.py                                       # 207 files / 1856 tests, ~10 s, leak-checked
 python3 tools/run_tests.py --suite <substring> --full            # one area, every failure message unclipped
 python3 tools/run_tests.py --self-test                           # proves the harness still catches failures/leaks
 python3 tools/run_editor_smoke.py                                # headless EDITOR run of tests/editor_smoke/ (editor-only paths)
@@ -1027,6 +1027,22 @@ deduped, cancelled by REMOVED) and replayed once on resume.
   a bullet whose step overflows where it is; angles wrap through
   `wrap_angle_pi2d` (a `while (a > PI) a -= TAU` loop never ends at 1e30).
   Pinned by `volley/test_volley_core` (huge directions, extreme motion).
+- Feature mixing (pinned by `integration/test_feature_mix_*`: bounce, homing,
+  flock, orbit, graze, pickups crossed with every heading/force source).
+  The heading and the sprite facing are separate: only homing WITH
+  `homing_take_control_of_texture_rotation` steers through the facing, and
+  it first re-aligns the facing to the heading when something else moved
+  the heading (bounce, flock, wobble, setters); without the control it
+  never touches the heading. A bounce reflects the own heading and composes
+  the same reflection into the bullet's `BounceFrame2D` (own storage, not the
+  bounce ledger; reset per life and per bullet reset): the bullet's share of
+  the inherited drift (`bullet_drift(i)`, used by EVERY velocity composition)
+  and its direction curves go through that frame, and split children inherit
+  it (`SplitRequest2D::framed`). The frame paths are out of line
+  (`bounce_frame_*`): inlined they cost split_storm ~15%. Flat walls need
+  `bounce_mode` Precise (radial is for round targets). Shot handlers own
+  what they change: `burst_serial` (chains) and `cadence_serial`
+  (reset_shooting / fire_n_volleys) are re-checked after every shot emit.
 - A pooled volley is a stale handle: every mutator refuses it
   (`reject_pooled_handle`); `volley/test_volley_pooled_handle_writes` calls
   EVERY bound method on a pooled handle (ClassDB-driven) and demands that the
