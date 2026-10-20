@@ -46,6 +46,35 @@ var probe_scene: PackedScene
 var stats := {}
 var skipped_ops: Array = []
 var passive_handlers := false
+var hostile_scene: PackedScene # an attachment whose _init runs _hostile()
+
+## User code the plugin runs outside its signals: a bouncing wall's _get
+## (read in the physics flush and in the drain), a target's get_velocity
+## (read by aimed patterns), an attachment scene's _init (read at every
+## instantiate). Each calls `action`, which is _hostile().
+const HOSTILE_WALL := """
+extends StaticBody2D
+var action: Callable
+func _get(property: StringName) -> Variant:
+	if action.is_valid() and (property == &"linear_velocity" or property == &"collision_layer"):
+		action.call()
+	return null
+"""
+const HOSTILE_TARGET := """
+extends Node2D
+var action: Callable
+func get_velocity() -> Vector2:
+	if action.is_valid():
+		action.call()
+	return Vector2(40, -20)
+"""
+const HOSTILE_ATTACHMENT := """
+extends BulletAttachment2D
+func _init() -> void:
+	var cb: Callable = Engine.get_meta(&"bb_chaos_init", Callable())
+	if cb.is_valid():
+		cb.call()
+"""
 
 
 func _seeds() -> Array:
@@ -66,7 +95,7 @@ func before_each() -> void:
 	zones.clear()
 	skipped_ops = Array(OS.get_environment("CHAOS_SKIP").split(",", false)).map(func(x): return int(x))
 	passive_handlers = OS.get_environment("CHAOS_SKIP_HANDLERS") == "1"
-	stats = {"shots": 0, "frees": 0, "reparents": 0, "clears": 0, "resets": 0, "pickups": 0, "handler_actions": 0, "max_live": 0, "splits": 0, "grazes": 0}
+	stats = {"shots": 0, "frees": 0, "reparents": 0, "clears": 0, "resets": 0, "pickups": 0, "handler_actions": 0, "max_live": 0, "splits": 0, "grazes": 0, "hostile_actions": 0}
 
 
 ## A spawn data template: `n` bullets of a random shape, features on by roll.
@@ -104,7 +133,7 @@ func _data(n: int) -> BulletVolleyData2D:
 	if rng.randf() < 0.3:
 		d.effect_layers = [H.make_effect_layer([BulletEffectLayerData2D.EFFECT_ON_HIT, BulletEffectLayerData2D.EFFECT_ON_DESTROY, BulletEffectLayerData2D.EFFECT_ON_SPLIT, BulletEffectLayerData2D.EFFECT_ON_CLEAR][rng.randi() % 4])]
 	if rng.randf() < 0.25:
-		d.shared_bullet_attachment = make_probe_scene()
+		d.shared_bullet_attachment = make_probe_scene() if rng.randf() < 0.5 or hostile_scene == null else hostile_scene
 	d.is_life_time_over_signal_enabled = rng.randf() < 0.5
 	return d
 
@@ -115,9 +144,13 @@ func _build_world() -> void:
 	other_parent = Node2D.new()
 	add(other_parent)
 	# Killing walls (layer 3 = value 4) and bouncing walls (layer 4 = value 8) around the arena.
+	hostile_scene = _hostile_attachment_scene()
 	for k in 4:
 		var angle := TAU * k / 4.0
-		make_wall(Vector2.from_angle(angle) * 380.0, Vector2(40, 900), 4 if k % 2 == 0 else 8, 2)
+		var wall := make_wall(Vector2.from_angle(angle) * 380.0, Vector2(40, 900), 4 if k % 2 == 0 else 8, 2)
+		if k % 2 == 1: # the bouncing walls: their properties are read for the bounce
+			wall.set_script(_script(HOSTILE_WALL))
+			wall.action = _hostile
 	for k in 6:
 		_add_target()
 	flock = H.make_flock(rng.randf_range(0.0, 10.0), rng.randf_range(0.0, 2.0), rng.randf_range(0.0, 2.0))
@@ -144,8 +177,53 @@ func _build_world() -> void:
 	factory.split_max_children_per_sweep = [0, 32, 256][rng.randi() % 3]
 
 
+func _script(source: String) -> GDScript:
+	var script := GDScript.new()
+	script.source_code = source
+	assert_eq(script.reload(), OK, "a hostile chaos script compiles")
+	return script
+
+
+func _hostile_attachment_scene() -> PackedScene:
+	var node: Node = BulletAttachment2D.new()
+	node.set_script(_script(HOSTILE_ATTACHMENT))
+	var scene := PackedScene.new()
+	scene.pack(node)
+	node.free()
+	return scene
+
+
+## Runs inside user code the plugin calls outside its signals (see the
+## HOSTILE_* scripts): frees, spawns or clears, rarely.
+func _hostile() -> void:
+	if passive_handlers or rng.randf() > 0.05:
+		return
+	stats["hostile_actions"] += 1
+	var live := volleys.filter(func(v): return is_instance_valid(v) and not v.is_queued_for_deletion())
+	match rng.randi() % 5:
+		0:
+			if not live.is_empty():
+				live[rng.randi() % live.size()].queue_free()
+		1:
+			if not live.is_empty():
+				BulletFactory2D.debug_free_like_release(live[rng.randi() % live.size()])
+		2:
+			factory.spawn_volley(datas[rng.randi() % datas.size()])
+		3:
+			var sp = _live_spawner()
+			if sp != null and spawners.size() >= 3:
+				BulletFactory2D.debug_free_like_release(sp)
+		4:
+			if not live.is_empty():
+				var v: BulletVolley2D = live[rng.randi() % live.size()]
+				if not v.is_pooled():
+					v.clear_all_bullets()
+
+
 func _add_target() -> void:
 	var t := Node2D.new()
+	t.set_script(_script(HOSTILE_TARGET))
+	t.action = _hostile
 	t.position = Vector2(rng.randf_range(-400, 400), rng.randf_range(-400, 400))
 	world.add_child(t)
 	t.add_to_group(TARGET_GROUP)
@@ -280,8 +358,8 @@ func _live_target():
 
 ## One operation from an idle point (structural calls allowed).
 func _operate() -> void:
-	var roll := rng.randi() % 66
-	if roll >= 33:
+	var roll := rng.randi() % 68
+	if roll >= 34:
 		roll = 0 # half of all operations are shots
 	if skipped_ops.has(roll):
 		return
@@ -470,6 +548,16 @@ func _operate() -> void:
 				sp.movement_loop_completed.connect(func(_loop) -> void: _move_handler(sp))
 				sp.movement_finished.connect(func() -> void: _move_handler(sp))
 				sp.movement_enabled = true
+		33:
+			# Aimed with prediction: every collect reads the target's script
+			# get_velocity (which may free, spawn or clear).
+			var sp = _live_spawner()
+			var t = _live_target()
+			if sp != null and t != null:
+				sp.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_AIMED
+				sp.set_helper_aimed_target(t)
+				sp.helper_aimed_prediction = rng.randf()
+				sp.helper_aimed_prediction_time = rng.randf_range(0.0, 0.5)
 
 
 func _shape_type(d: BulletVolleyData2D) -> int:
@@ -521,6 +609,7 @@ func test_chaos_battlefield_never_breaks(chaos_seed: int = use_parameters(_seeds
 	seed(chaos_seed)
 	factory.debug_seed_cosmetic_rng(chaos_seed)
 	_connect_handlers(factory)
+	Engine.set_meta(&"bb_chaos_init", _hostile)
 	_build_world()
 	for k in 6:
 		_add_spawner()
@@ -551,6 +640,7 @@ func test_chaos_battlefield_never_breaks(chaos_seed: int = use_parameters(_seeds
 	factory.reset()
 	await idle(2)
 	problems.append_array(_check("seed %d wind-down" % chaos_seed))
+	Engine.remove_meta(&"bb_chaos_init")
 	gut.p("chaos seed %d: %s" % [chaos_seed, stats])
 	assert_eq("\n".join(problems), "", "seed %d: no error, balanced books, finite bullets" % chaos_seed)
 	assert_gt(stats["shots"], 50, "the battlefield fired (%s)" % [stats])
