@@ -95,6 +95,7 @@ void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(
 			D_METHOD("debug_get_attachments_pool_info"),
 			&BulletFactory2D::debug_get_attachments_pool_info);
+	ClassDB::bind_method(D_METHOD("debug_get_attachment_scene_memory_count"), &BulletFactory2D::debug_get_attachment_scene_memory_count);
 
 	ClassDB::bind_method(D_METHOD("debug_get_factory_state"), &BulletFactory2D::debug_get_factory_state);
 	ClassDB::bind_method(D_METHOD("debug_get_pool_hit_stats"), &BulletFactory2D::debug_get_pool_hit_stats);

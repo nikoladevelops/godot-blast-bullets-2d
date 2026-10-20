@@ -171,6 +171,12 @@
 				Returns how many volleys are active (flying, not pooled and not queued for deletion). Counts volleys, not bullets: see [method get_active_bullet_count] for bullets.
 			</description>
 		</method>
+		<method name="debug_get_attachment_scene_memory_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				How many attachment scenes the pool remembers as validated (their debug labels in [method debug_get_attachments_pool_info]). Scenes loaded from a file stay remembered; in-memory scenes (made with [method PackedScene.pack]) are forgotten once they no longer exist, so packing a fresh scene per shot never grows this without bound.
+			</description>
+		</method>
 		<method name="debug_get_attachments_pool_amount">
 			<return type="int" />
 			<description>

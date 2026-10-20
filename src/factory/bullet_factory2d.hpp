@@ -524,6 +524,9 @@ public:
 	int debug_get_attachments_pool_amount();
 
 	Dictionary debug_get_attachments_pool_info();
+	// Scenes the attachment pool remembers as validated (dead in-memory
+	// scenes are forgotten).
+	int debug_get_attachment_scene_memory_count() const { return bullet_attachments_pool.get_scene_memory_count(); }
 
 	// ---- Stability / observability debug API (bound, const where possible) ----
 	// Snapshot of factory lifecycle state. Keys: is_ready, is_busy,

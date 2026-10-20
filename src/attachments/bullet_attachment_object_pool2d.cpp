@@ -45,13 +45,30 @@ String BulletAttachmentObjectPool2D::make_key_label_for_scene(const Ref<PackedSc
 	return path.is_empty() ? String("<in-memory>") : path;
 }
 
-void BulletAttachmentObjectPool2D::note_key_label(uint32_t pooling_id, const String &label) {
-	if (pooling_id == 0 || label.is_empty()) {
+void BulletAttachmentObjectPool2D::note_scene(uint32_t pooling_id, const Ref<PackedScene> &scene) {
+	if (pooling_id == 0 || key_labels.find(pooling_id) != key_labels.end()) {
 		return;
 	}
-	if (key_labels.find(pooling_id) == key_labels.end()) {
-		key_labels[pooling_id] = label;
+	key_labels[pooling_id] = make_key_label_for_scene(scene);
+	if (scene.is_valid() && scene->get_path().is_empty()) {
+		in_memory_scene_ids[pooling_id] = (uint64_t)scene->get_instance_id();
+		if (in_memory_scene_ids.size() >= in_memory_prune_at) {
+			prune_dead_in_memory_scenes();
+		}
 	}
+}
+
+void BulletAttachmentObjectPool2D::prune_dead_in_memory_scenes() {
+	for (auto it = in_memory_scene_ids.begin(); it != in_memory_scene_ids.end();) {
+		if (ObjectDB::get_instance(ObjectID(it->second)) == nullptr) {
+			key_labels.erase(it->first);
+			it = in_memory_scene_ids.erase(it);
+		} else {
+			++it;
+		}
+	}
+	// Next prune after the live set doubles: amortized O(1) per new scene.
+	in_memory_prune_at = MAX((size_t)64, in_memory_scene_ids.size() * 2);
 }
 
 bool BulletAttachmentObjectPool2D::is_key_recognized(uint32_t pooling_id) const {

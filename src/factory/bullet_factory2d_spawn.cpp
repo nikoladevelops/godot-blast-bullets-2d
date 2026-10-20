@@ -406,7 +406,7 @@ void BulletFactory2D::populate_attachments_pool(const Ref<PackedScene> attachmen
 		}
 		return;
 	}
-	bullet_attachments_pool.note_key_label(pooling_key, BulletAttachmentObjectPool2D::make_key_label_for_scene(attachment_scene));
+	bullet_attachments_pool.note_scene(pooling_key, attachment_scene);
 
 	// on_spawn_in_pool is user code: it may free the attachment or this factory.
 	const LifeWatch watch = watch_life();

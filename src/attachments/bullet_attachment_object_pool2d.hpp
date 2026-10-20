@@ -27,8 +27,11 @@ public:
 	// Null scenes map to DEFAULT_BUCKET_KEY. Never returns 0. Not bound.
 	static uint32_t make_pooling_key_for_scene(const Ref<PackedScene> &scene);
 
-	// Records a key as recognized (validated). First label wins. Not bound.
-	void note_key_label(uint32_t pooling_id, const String &label);
+	// Records a scene's key as recognized (validated). First label wins.
+	// In-memory scenes are forgotten once they no longer exist (pruned in
+	// amortized O(1)): a game packing a scene per shot must not grow this.
+	// Not bound.
+	void note_scene(uint32_t pooling_id, const Ref<PackedScene> &scene);
 
 	// Builds the debug label for a scene without recording anything. Not bound.
 	static String make_key_label_for_scene(const Ref<PackedScene> &scene);
@@ -40,6 +43,9 @@ public:
 
 	// Human-readable label for a key (scene path or "<in-memory>"), "" if unknown. Not bound.
 	String get_key_label(uint32_t pooling_id) const;
+
+	// How many scenes are remembered (debug readout).
+	int get_scene_memory_count() const { return (int)key_labels.size(); }
 
 	// Add a new bullet attachment to the pool
 	void push(BulletAttachment2D *bullet_attachment, uint32_t pooling_id);
@@ -75,5 +81,10 @@ private:
 	std::unordered_map<uint32_t, std::queue<BulletAttachment2D *>> pool;
 	// Human-readable label per key (scene path), for debug output only.
 	std::unordered_map<uint32_t, String> key_labels;
+	// The in-memory scenes among them (key -> scene instance id), pruned of
+	// dead scenes whenever their count reaches in_memory_prune_at.
+	std::unordered_map<uint32_t, uint64_t> in_memory_scene_ids;
+	size_t in_memory_prune_at = 64;
+	void prune_dead_in_memory_scenes();
 };
 } //namespace BlastBullets2D

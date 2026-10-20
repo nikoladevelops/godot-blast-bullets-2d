@@ -102,3 +102,18 @@ func test_scoped_free_with_live_attachments() -> void:
 	factory.free_attachments_pool_for_scene(ps)
 	assert_true(factory.debug_assert_no_dangling().get("ok", false), "no dangling after a scene-scoped free")
 	assert_eq(v.get_amount_active_attachments(), 2, "live attachments untouched by the pool free")
+
+
+## The pool remembers each scene it validated (for its debug labels and error
+## wording). In-memory scenes get a key per PackedScene: a game that packs a
+## fresh scene per shot must not grow that memory without bound, so scenes
+## that no longer exist are forgotten.
+func test_dead_in_memory_scenes_are_forgotten() -> void:
+	for k in 300:
+		var scene := make_probe_scene()
+		factory.populate_attachments_pool(scene, 1)
+		factory.free_attachments_pool_for_scene(scene)
+		await idle(1) # the queued frees run: nothing holds the scene any more
+	assert_lte(factory.debug_get_attachment_scene_memory_count(), 128, "bounded by the live scenes, not every scene ever seen")
+	factory.populate_attachments_pool(ps, 2)
+	assert_eq(factory.debug_get_attachments_pool_amount(), 2, "the live scene still pools")

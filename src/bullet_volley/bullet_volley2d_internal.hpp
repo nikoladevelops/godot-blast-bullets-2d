@@ -711,7 +711,7 @@ _ALWAYS_INLINE_ bool BulletVolley2D::attach_bullet_attachment_internal(int bulle
 			return false;
 		}
 
-		pool.note_key_label(pooling_key, BulletAttachmentObjectPool2D::make_key_label_for_scene(attachment_scene));
+		pool.note_scene(pooling_key, attachment_scene);
 		created_brand_new_instance = true;
 	}
 
