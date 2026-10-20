@@ -436,10 +436,15 @@ func test_interpolation_agreement() -> void:
 	assert_true(v11.debug_get_trail_transform(0, 0).origin.distance_to(Vector2(200, 0)) < 0.01, "interp pass tracks teleports")
 	assert_true(v11.debug_get_trail_transform(0, 0).is_finite(), "interp trail finite")
 	factory.use_physics_interpolation = false
-	var v11b: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 0.0, [_make_layer(0, 1)], false))
+	var v11b: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2(50, 0), 0.0, [_make_layer(0, 1)], false))
 	v11b.set_bullet_transform(0, Transform2D(0.0, Vector2(100, 0)))
+	assert_true(v11b.debug_get_trail_transform(0, 0).origin.distance_to(Vector2(100, 0)) < 0.01, "the setter moves the trail with the bullet")
 	v11b.debug_run_interpolation_pass()
-	assert_true(v11b.debug_get_trail_transform(0, 0) == Transform2D(), "interp pass gated off when disabled")
+	# The pass uploads the whole buffer (from a history interpolation never
+	# kept here); gated off, the buffer keeps the spawn upload at (50, 0)
+	# (the headless renderer keeps whole-buffer uploads only).
+	var buf: PackedFloat32Array = v11b.multimesh.buffer
+	assert_eq(Vector2(buf[3], buf[7]), Vector2(50, 0), "interp pass gated off when disabled")
 
 
 func test_ramp_tints_over_life() -> void:

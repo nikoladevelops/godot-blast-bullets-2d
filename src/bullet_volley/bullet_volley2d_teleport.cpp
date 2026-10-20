@@ -52,6 +52,9 @@ void BulletVolley2D::teleport_bullet_to(int bullet_index, const Vector2 &new_ori
 	if (all_bullets_enabled_set.contains(bullet_index)) {
 		multi->set_instance_transform_2d(bullet_index, to_local_for_multimesh(curr_bullet_transf));
 	}
+	// Trail layers ride the bullet now, not on the next tick (a paused
+	// factory has none): no-op without trail layers.
+	write_trail_instances(bullet_index);
 
 	if (bullet_index < (int)attachments.size() && bullet_index < (int)attachment_transforms.size() && bullet_index < (int)attachment_stick_relative_to_bullet.size() && attachments[bullet_index]) {
 		BulletAttachment2D *attachment_instance = attachments[bullet_index];

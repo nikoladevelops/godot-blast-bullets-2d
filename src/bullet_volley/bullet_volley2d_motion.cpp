@@ -18,6 +18,7 @@ void BulletVolley2D::present_bullet_transform(int bullet_index, const Vector2 &a
 	if (all_bullets_enabled_set.contains(bullet_index)) {
 		multi->set_instance_transform_2d(bullet_index, to_local_for_multimesh(transf));
 	}
+	write_trail_instances(bullet_index); // trails ride the new pose at once (see teleport_bullet_to)
 	carry_attachment_with_transform(bullet_index, transf, attachment_delta);
 	update_bullet_previous_transform_for_interpolation(bullet_index);
 }
