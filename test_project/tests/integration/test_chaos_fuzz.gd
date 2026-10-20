@@ -12,7 +12,14 @@ extends BlastTest
 ## flight; spawners travel paths whose movement handlers stop, seek, reverse
 ## and restart them). Every operation is legal: the run
 ## must print no error at all, and after every step the books balance
-## (debug_assert_no_dangling) and every live bullet is finite.
+## (debug_assert_no_dangling), every live bullet is finite and every
+## MixLedger rule holds (common/mix_ledger.gd: one death per bullet life,
+## every sound offer, effect and signal names a live bullet of its life).
+## The bullets also carry speed / rotation / direction curves, rotation
+## data, multi-frame animations, every effect trigger and trails; spawners
+## telegraph, spin, randomize and offset their muzzle; operations teleport
+## bullets, run pattern lists, give flying volleys movement patterns, wake
+## parked volleys and retarget.
 ## A failure names its seed and step; CHAOS_SEEDS=<n> (environment) runs n
 ## seeds instead of the default set (CHAOS_SEEDS=<a>,<b> runs exactly
 ## those), CHAOS_SKIP=<id,id,...> skips those
@@ -47,6 +54,9 @@ var stats := {}
 var skipped_ops: Array = []
 var passive_handlers := false
 var hostile_scene: PackedScene # an attachment whose _init runs _hostile()
+var ledger: MixLedger
+var extra_sounds: Array = []
+var watched_animations := {} # volley id -> true (sprite_animation_finished connected)
 
 ## User code the plugin runs outside its signals: a bouncing wall's _get
 ## (read in the physics flush and in the drain), a target's get_velocity
@@ -140,8 +150,32 @@ func _data(n: int) -> BulletVolleyData2D:
 		w.amplitude = rng.randf_range(1.0, 40.0)
 		w.frequency_hz = rng.randf_range(0.5, 6.0)
 		d.shared_bullet_wobble_data = w
-	if rng.randf() < 0.3:
-		d.effect_layers = [H.make_effect_layer([BulletEffectLayerData2D.EFFECT_ON_HIT, BulletEffectLayerData2D.EFFECT_ON_DESTROY, BulletEffectLayerData2D.EFFECT_ON_SPLIT, BulletEffectLayerData2D.EFFECT_ON_CLEAR][rng.randi() % 4])]
+	if rng.randf() < 0.4:
+		# Any one-shot trigger, and trails (trigger 0).
+		var layers: Array = []
+		for k in rng.randi_range(1, 3):
+			layers.append(H.make_effect_layer(rng.randi() % 9))
+		d.effect_layers = layers
+	if rng.randf() < 0.2:
+		var curves: BulletCurvesData2D = d.shared_bullet_curves_data if d.shared_bullet_curves_data != null else BulletCurvesData2D.new()
+		var speed_curve := Curve.new()
+		speed_curve.min_value = 0.0
+		speed_curve.max_value = 1000.0
+		speed_curve.add_point(Vector2(0, rng.randf_range(20.0, 300.0)))
+		speed_curve.add_point(Vector2(1, rng.randf_range(20.0, 600.0)))
+		curves.movement_speed_curve = speed_curve
+		curves.movement_use_unit_curve = rng.randf() < 0.5
+		if rng.randf() < 0.5:
+			curves.rotation_speed_curve = H.make_flat_curve(rng.randf_range(-6.0, 6.0))
+			curves.rotation_use_unit_curve = false
+		d.shared_bullet_curves_data = curves
+	if rng.randf() < 0.2:
+		d.shared_bullet_rotation_data = H.make_rotation(rng.randf_range(-6.0, 6.0), 8.0)
+		d.adjust_direction_based_on_rotation = rng.randf() < 0.5
+	if rng.randf() < 0.2:
+		d.sprite_frames = H.make_effect_frames(rng.randi_range(2, 5), rng.randf_range(8.0, 30.0)) # plays once, then finishes
+	if rng.randf() < 0.15:
+		d.texture_rotation_radians = rng.randf_range(-PI, PI)
 	if rng.randf() < 0.25:
 		d.shared_bullet_attachment = make_probe_scene() if rng.randf() < 0.5 or hostile_scene == null else hostile_scene
 	d.is_life_time_over_signal_enabled = rng.randf() < 0.5
@@ -166,6 +200,12 @@ func _build_world() -> void:
 	flock = H.make_flock(rng.randf_range(0.0, 10.0), rng.randf_range(0.0, 2.0), rng.randf_range(0.0, 2.0))
 	zones = [H.make_graze_zone([rng.randf_range(10.0, 60.0), rng.randf_range(60.0, 120.0)])]
 	sound = H.make_sound([BulletSoundData2D.SOUND_ON_HIT, BulletSoundData2D.SOUND_ON_SPLIT, BulletSoundData2D.SOUND_ON_CLEAR, BulletSoundData2D.SOUND_ON_GRAZE][rng.randi() % 4], rng.randi_range(1, 6))
+	# More entries on other triggers (any of the 13, the flight hum followed).
+	extra_sounds.clear()
+	for k in rng.randi_range(0, 3):
+		var s := H.make_sound(rng.randi() % 13, rng.randi_range(1, 4))
+		s.follow_bullet = s.trigger == BulletSoundData2D.SOUND_ON_FLIGHT and rng.randf() < 0.5
+		extra_sounds.append(s)
 	var stage := BulletSplitStage2D.new()
 	stage.count = rng.randi_range(1, 4)
 	stage.split_on_hit = true
@@ -261,7 +301,7 @@ func _add_spawner() -> void:
 		sp.graze_node_group = TARGET_GROUP
 	if rng.randf() < 0.3:
 		sp.sound_enabled = true
-		sp.sound_effects = [sound]
+		sp.sound_effects = [sound] + extra_sounds
 	if rng.randf() < 0.7:
 		sp.split_enabled = true
 		sp.split_data = chain
@@ -271,11 +311,36 @@ func _add_spawner() -> void:
 		sp.burst_enabled = true
 		sp.burst_count = rng.randi_range(2, 4)
 		sp.burst_interval_sec = 0.02
+	if rng.randf() < 0.2:
+		sp.telegraph_sec = rng.randf_range(0.0, 0.2)
+		sp.telegraph_enabled = true
+	if rng.randf() < 0.2:
+		sp.spin_speed_deg_per_sec = rng.randf_range(-400.0, 400.0)
+		sp.spin_enabled = true
+	if rng.randf() < 0.2:
+		_randomize(sp)
+	if rng.randf() < 0.15:
+		sp.spawn_position_offset = Vector2(rng.randf_range(-20, 20), rng.randf_range(-20, 20))
+		sp.spawn_position_offset_space = rng.randi() % 2
 	if rng.randf() < 0.3:
 		sp.shoot_interval_sec = rng.randf_range(0.03, 0.3)
 		sp.shooting_enabled = true
+	ledger.watch_spawner(sp) # first: before the chaos handlers
 	_connect_handlers(sp)
 	spawners.append(sp)
+
+
+## The Randomization group, seeded or not.
+func _randomize(sp: BulletSpawner2D) -> void:
+	sp.bullet_scale_mode = rng.randi() % 3
+	sp.bullet_scale_min = rng.randf_range(0.3, 1.0)
+	sp.bullet_scale_max = rng.randf_range(1.0, 2.5)
+	sp.bullet_rotation_min_degrees = rng.randf_range(-45.0, 0.0)
+	sp.bullet_rotation_max_degrees = rng.randf_range(0.0, 45.0)
+	sp.bullet_position_jitter_max = rng.randf_range(0.0, 10.0)
+	sp.bullet_speed_scale_min = rng.randf_range(0.5, 1.0)
+	sp.bullet_speed_scale_max = rng.randf_range(1.0, 1.8)
+	sp.bullet_random_seed = rng.randi_range(0, 3)
 
 
 ## Handlers run INSIDE the sweep: they only use what is legal there.
@@ -292,8 +357,17 @@ func _connect_handlers(emitter: Object) -> void:
 	if emitter.has_signal("volley_fired"):
 		emitter.connect("volley_fired", func(v, _n) -> void:
 			volleys.append(v)
+			_watch_animation(v)
 			_cadence_handler(emitter))
 		emitter.connect("burst_shot_fired", func(_n, _m) -> void: _cadence_handler(emitter))
+
+
+## A finished sprite animation acts like any other live event.
+func _watch_animation(v: Object) -> void:
+	if not is_instance_valid(v) or watched_animations.has(v.get_instance_id()):
+		return
+	watched_animations[v.get_instance_id()] = true
+	v.connect("sprite_animation_finished", func(vv) -> void: _handler(vv, -1))
 
 
 func _handler(v: Object, i: int) -> void:
@@ -304,7 +378,11 @@ func _handler(v: Object, i: int) -> void:
 		return
 	stats["handler_actions"] += 1
 	var volley := v as BulletVolley2D
-	match rng.randi() % 12:
+	match rng.randi() % 13:
+		12:
+			# A teleport from inside the sweep (no travel, no swept segment).
+			if i >= 0 and i < volley.get_amount_bullets() and volley.is_bullet_status_enabled(i):
+				volley.teleport_bullet(i, Vector2(rng.randf_range(-300, 300), rng.randf_range(-300, 300)))
 		0:
 			if i >= 0 and i < volley.get_amount_bullets():
 				volley.disable_bullet(i)
@@ -393,8 +471,8 @@ func _live_target():
 
 ## One operation from an idle point (structural calls allowed).
 func _operate() -> void:
-	var roll := rng.randi() % 68
-	if roll >= 34:
+	var roll := rng.randi() % 82
+	if roll >= 41:
 		roll = 0 # half of all operations are shots
 	if skipped_ops.has(roll):
 		return
@@ -563,7 +641,9 @@ func _operate() -> void:
 			if not live.is_empty():
 				var v: BulletVolley2D = live[rng.randi() % live.size()]
 				var i := rng.randi() % v.get_amount_bullets()
-				if v.is_bullet_status_enabled(i):
+				# A speed curve owns the speed (a direct set is a documented error).
+				var curves = v.get_shared_bullet_curves_data()
+				if v.is_bullet_status_enabled(i) and (curves == null or curves.movement_speed_curve == null):
 					v.set_bullet_speed_data(i, H.make_speed(rng.randf_range(0.0, 300.0), 0.0, [3e38, -3e38, 1e6][rng.randi() % 3]))
 		32:
 			# A spawner travels a path; its movement handlers stop, seek,
@@ -599,6 +679,68 @@ func _operate() -> void:
 				sp.set_helper_aimed_target(t)
 				sp.helper_aimed_prediction = rng.randf()
 				sp.helper_aimed_prediction_time = rng.randf_range(0.0, 0.5)
+		34:
+			# Teleports of every kind on flying bullets.
+			var live := volleys.filter(func(v): return is_instance_valid(v) and v.debug_get_life_state() == "active")
+			if not live.is_empty():
+				var v: BulletVolley2D = live[rng.randi() % live.size()]
+				var i := rng.randi() % v.get_amount_bullets()
+				match rng.randi() % 4:
+					0:
+						v.teleport_bullet(i, Vector2(rng.randf_range(-350, 350), rng.randf_range(-350, 350)))
+					1:
+						v.teleport_shift_all_bullets(Vector2(rng.randf_range(-40, 40), rng.randf_range(-40, 40)))
+					2:
+						v.set_bullet_transform(i, Transform2D(rng.randf_range(-PI, PI), Vector2(rng.randf_range(-300, 300), rng.randf_range(-300, 300))), rng.randf() < 0.5)
+					3:
+						factory.teleport_shift_all_bullets(Vector2(rng.randf_range(-20, 20), rng.randf_range(-20, 20)))
+		35:
+			var sp = _live_spawner()
+			if sp != null:
+				var entries: Array = []
+				for k in rng.randi_range(1, 4):
+					entries.append({"helper_bullets_amount": rng.randi_range(1, 24)} if rng.randf() < 0.7 else {"spawn_data": datas[rng.randi() % datas.size()]})
+				sp.spawn_pattern_list(entries, rng.randf() < 0.3, rng.randf_range(0.0, 0.1))
+		36:
+			var sp = _live_spawner()
+			if sp != null:
+				match rng.randi() % 4:
+					0:
+						sp.telegraph_enabled = not sp.telegraph_enabled
+					1:
+						sp.spin_enabled = not sp.spin_enabled
+					2:
+						_randomize(sp)
+					3:
+						sp.spawn_position_offset = Vector2(rng.randf_range(-20, 20), rng.randf_range(-20, 20))
+		37:
+			# A movement pattern on a flying volley.
+			var live := volleys.filter(func(v): return is_instance_valid(v) and v.debug_get_life_state() == "active")
+			if not live.is_empty():
+				var c := Curve2D.new()
+				for k in 4:
+					c.add_point(Vector2(30.0 * k, rng.randf_range(-15.0, 15.0)))
+				(live[rng.randi() % live.size()] as BulletVolley2D).set_shared_movement_pattern_curve(c)
+		38:
+			# Wake parked volleys (an expired one starts a fresh lifetime).
+			for v in volleys:
+				if is_instance_valid(v) and v.is_parked():
+					v.enable_bullet(rng.randi() % v.get_amount_bullets())
+					break
+		39:
+			var sp = _live_spawner()
+			if sp != null:
+				sp.retarget_live_volleys()
+		40:
+			var sp = _live_spawner()
+			if sp != null:
+				match rng.randi() % 3:
+					0:
+						sp.fire_n_volleys(rng.randi_range(1, 3))
+					1:
+						sp.reset_shooting()
+					2:
+						sp.begin_burst()
 
 
 func _shape_type(d: BulletVolleyData2D) -> int:
@@ -640,6 +782,11 @@ func _check(where: String) -> Array:
 					problems.append("%s: volley %d bullet %d is not finite" % [where, v.get_instance_id(), i])
 					return problems
 	stats["max_live"] = maxi(stats["max_live"], factory.get_active_bullet_count())
+	if ledger != null:
+		ledger.pull()
+		if ledger.problem_count > 0:
+			for p in ledger.problems():
+				problems.append("%s: ledger: %s" % [where, p])
 	for e in _step_errors():
 		problems.append("%s: error: %s" % [where, e])
 	return problems
@@ -649,6 +796,10 @@ func test_chaos_battlefield_never_breaks(chaos_seed: int = use_parameters(_seeds
 	rng.seed = chaos_seed
 	seed(chaos_seed)
 	factory.debug_seed_cosmetic_rng(chaos_seed)
+	ledger = MixLedger.new()
+	ledger.per_frame_limits = false # debug_advance_time ticks inside physics frames
+	ledger.entry_limit = 8 # several entries may share a trigger
+	ledger.attach(factory) # first: before the chaos handlers
 	_connect_handlers(factory)
 	_build_world()
 	Engine.set_meta(&"bb_chaos_init", _hostile)
@@ -682,6 +833,7 @@ func test_chaos_battlefield_never_breaks(chaos_seed: int = use_parameters(_seeds
 	await idle(2)
 	problems.append_array(_check("seed %d wind-down" % chaos_seed))
 	Engine.remove_meta(&"bb_chaos_init")
+	ledger.detach()
 	gut.p("chaos seed %d: %s" % [chaos_seed, stats])
 	assert_eq("\n".join(problems), "", "seed %d: no error, balanced books, finite bullets" % chaos_seed)
 	assert_gt(stats["shots"], 50, "the battlefield fired (%s)" % [stats])

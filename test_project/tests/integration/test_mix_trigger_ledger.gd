@@ -63,7 +63,7 @@ func _expect(label: String, want: Dictionary) -> void:
 	var problems: Array = ledger.problems()
 	var death_sounds := [BulletSoundData2D.SOUND_ON_DESTROY, BulletSoundData2D.SOUND_ON_LIFETIME_OVER, BulletSoundData2D.SOUND_ON_CLEAR, BulletSoundData2D.SOUND_ON_DESPAWN, BulletSoundData2D.SOUND_ON_HIT, BulletSoundData2D.SOUND_ON_BOUNCE, BulletSoundData2D.SOUND_ON_SPLIT, BulletSoundData2D.SOUND_ON_HOMING_TARGET_REACHED]
 	var death_effects := [BulletEffectLayerData2D.EFFECT_ON_DESTROY, BulletEffectLayerData2D.EFFECT_ON_LIFETIME_OVER, BulletEffectLayerData2D.EFFECT_ON_CLEAR, BulletEffectLayerData2D.EFFECT_ON_DESPAWN, BulletEffectLayerData2D.EFFECT_ON_HIT, BulletEffectLayerData2D.EFFECT_ON_BOUNCE, BulletEffectLayerData2D.EFFECT_ON_SPLIT]
-	var causes := ["hit", "lifetime", "despawn", "clear", "split", "pickup", "collect", "manual"]
+	var causes := ["hit", "lifetime", "despawn", "clear", "split", "split_manual", "pickup", "collect", "manual"]
 	for t in death_sounds:
 		var got := _count("offer:%d" % t)
 		var exp := int(want.get("s%d" % t, 0))
@@ -166,6 +166,19 @@ func test_a_split_death(death_effects: bool = use_parameters([true, false])) -> 
 		want["s%d" % BulletSoundData2D.SOUND_ON_LIFETIME_OVER] = N
 		want["e%d" % BulletEffectLayerData2D.EFFECT_ON_LIFETIME_OVER] = N
 	_expect("split at the expiry (fire_death_effects %s)" % death_effects, want)
+
+
+func test_a_manual_split_leaves_like_a_clear() -> void:
+	var v := _volley()
+	var stage := BulletSplitStage2D.new()
+	stage.count = 2
+	var chain := BulletSplitData2D.new()
+	chain.stages = [stage]
+	v.split_set_data(chain, H.make_volley_data(2, 0.0, 30.0))
+	step_factory(2)
+	assert_eq(v.all_bullets_split(), N, "every bullet split")
+	await physics(2)
+	_expect("manual split", {"s%d" % BulletSoundData2D.SOUND_ON_SPLIT: N, "e%d" % BulletEffectLayerData2D.EFFECT_ON_SPLIT: N, "s%d" % BulletSoundData2D.SOUND_ON_CLEAR: N, "e%d" % BulletEffectLayerData2D.EFFECT_ON_CLEAR: N, "dsplit_manual": N})
 
 
 func test_silent_ways_out(how: String = use_parameters(["disable_bullet", "free_active_bullets", "reset", "queue_free"])) -> void:

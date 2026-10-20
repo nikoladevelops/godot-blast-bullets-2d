@@ -34,6 +34,9 @@ const S_TELEGRAPH := 9
 
 ## Offers per life and trigger allowed (one sound entry per trigger).
 var entry_limit := 1
+## On Flight / On Bounce at most `entry_limit` per bullet per physics frame.
+## Off where extra ticks run inside one physics frame (debug_advance_time).
+var per_frame_limits := true
 ## Problems found so far (first 32 kept, `problem_count` counts all).
 var problem_list: Array[String] = []
 var problem_count := 0
@@ -249,8 +252,9 @@ func _alive_at(volley: int, bullet: int, life: int, frame: int) -> Variant:
 	return null
 
 
-const _DEATH_SOUND := {2: ["hit"], 4: ["lifetime"], 5: ["clear", "pickup"], 11: ["despawn"]}
-const _DEATH_EFFECT := {3: ["hit"], 5: ["lifetime"], 6: ["clear", "pickup"], 7: ["despawn"]}
+# A manual split leaves like a clear (documented: all_bullets_split).
+const _DEATH_SOUND := {2: ["hit"], 4: ["lifetime"], 5: ["clear", "pickup", "split_manual"], 11: ["despawn"]}
+const _DEATH_EFFECT := {3: ["hit"], 5: ["lifetime"], 6: ["clear", "pickup", "split_manual"], 7: ["despawn"]}
 const _EFFECT_ON_SPAWN := 1
 
 
@@ -270,7 +274,7 @@ func _check_report(label: String, trigger: int, sound: bool, volley: int, life: 
 	elif not sound and trigger == _EFFECT_ON_SPAWN:
 		if int(iv[0]) != frame or int(iv[3]) >= 0:
 			_problem("%s for bullet %d of volley %d outside its life start" % [label, bullet, volley])
-	elif sound and (trigger == S_FLIGHT or trigger == S_BOUNCE):
+	elif sound and per_frame_limits and (trigger == S_FLIGHT or trigger == S_BOUNCE):
 		var k := "%s:%d:%d:%d" % [_key(volley, bullet), life, frame, trigger]
 		_per_frame[k] = int(_per_frame.get(k, 0)) + 1
 		if int(_per_frame[k]) > entry_limit:

@@ -461,8 +461,9 @@ public:
 	// change of every volley while enabled, as {kind, cause, volley, life,
 	// bullet, epoch, frame}. kind "life": a new active life enabled every
 	// bullet (bullet = amount, cause and epoch unused); "wake": enable_bullet;
-	// "disable": cause hit, lifetime, despawn, clear, split, pickup, collect
-	// or manual (a script's disable_bullet). Off by default: one bool check
+	// "disable": cause hit, lifetime, despawn, clear, split, split_manual (a
+	// manual split, leaving like a clear), pickup, collect or manual (a
+	// script's disable_bullet). Off by default: one bool check
 	// per state change. Bounded: past 65536 entries the oldest are dropped
 	// and counted (debug_get_bullet_event_log_dropped).
 	bool debug_bullet_event_log_enabled = false;
