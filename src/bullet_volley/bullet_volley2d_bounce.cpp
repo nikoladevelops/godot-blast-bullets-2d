@@ -348,10 +348,32 @@ int BulletVolley2D::try_handle_bounce(CollisionType collision_type, int bullet_i
 	if (hit_target == nullptr) {
 		return 0;
 	}
+	// Object::get runs a script _get or property getter: user code that may
+	// free the target, this volley or the factory. Every read looks the
+	// target up again; a dead volley touches nothing (BOUNCE_VOLLEY_GONE).
+	const uint64_t self_id = get_instance_id();
+	bool volley_gone = false;
+	auto read_target = [&](const StringName &name) -> Variant {
+		note_user_code();
+		const Variant v = hit_target->get(name);
+		if (!survived_user_code(self_id)) {
+			volley_gone = true;
+			hit_target = nullptr;
+			return Variant();
+		}
+		hit_target = ObjectDB::get_instance(entered_instance_id);
+		return v;
+	};
 	// Bounce eligibility reads the TARGET's layer (Area2D/PhysicsBody2D both
 	// expose collision_layer; anything else can never match).
 	int target_layer = 0;
-	const Variant layer_v = hit_target->get(CachedStringNames2D::get().collision_layer);
+	const Variant layer_v = read_target(CachedStringNames2D::get().collision_layer);
+	if (volley_gone) {
+		return BOUNCE_VOLLEY_GONE;
+	}
+	if (hit_target == nullptr) {
+		return 0; // freed by its own getter: nothing to bounce off
+	}
 	if (layer_v.get_type() == Variant::INT) {
 		target_layer = (int)layer_v;
 	}
@@ -444,24 +466,21 @@ int BulletVolley2D::try_handle_bounce(CollisionType collision_type, int bullet_i
 		target_v = queued_target_velocity;
 	} else {
 		bool has_velocity_property = false;
-		const Variant linear_v = hit_target->get(prop_linear_velocity);
-		if (linear_v.get_type() == Variant::VECTOR2) {
-			target_v = (Vector2)linear_v;
-			has_velocity_property = true;
-		} else {
-			const Variant vel_v = hit_target->get(prop_velocity);
-			if (vel_v.get_type() == Variant::VECTOR2) {
-				target_v = (Vector2)vel_v;
+		// AnimatableBody2D platforms expose neither of the first two: their
+		// motion lives in constant_linear_velocity (same fallback as the
+		// queue-time reader).
+		for (const StringName *name : { &prop_linear_velocity, &prop_velocity, &prop_constant_linear_velocity }) {
+			const Variant v = read_target(*name);
+			if (volley_gone) {
+				return BOUNCE_VOLLEY_GONE;
+			}
+			if (hit_target == nullptr) {
+				return 0; // freed by its own getter: nothing to bounce off
+			}
+			if (v.get_type() == Variant::VECTOR2) {
+				target_v = (Vector2)v;
 				has_velocity_property = true;
-			} else {
-				// AnimatableBody2D platforms expose neither of the above:
-				// their motion lives in constant_linear_velocity (same
-				// fallback as the queue-time reader above).
-				const Variant const_v = hit_target->get(prop_constant_linear_velocity);
-				if (const_v.get_type() == Variant::VECTOR2) {
-					target_v = (Vector2)const_v;
-					has_velocity_property = true;
-				}
+				break;
 			}
 		}
 		if (!target_v.is_finite()) {
@@ -730,7 +749,6 @@ int BulletVolley2D::try_handle_bounce(CollisionType collision_type, int bullet_i
 	// emitter first (a consumed hit below may pool the volley), guard the
 	// post-emit with the self-liveness token like the normal path.
 	Object *emitter = emit_collision_signals ? resolve_hit_emitter_checked() : nullptr;
-	const uint64_t self_id = get_instance_id();
 	if (emitter != nullptr) {
 		note_user_code();
 		if (collision_type == CollisionType::AREA) {

@@ -4,6 +4,7 @@
 // Spawning: bullet_factory2d_spawn.cpp. Freeing/resetting: bullet_factory2d_structural.cpp.
 
 #include "bullet_spawner/bullet_spawner2d.hpp"
+#include "core/physics_flush2d.hpp"
 #include "factory/bullet_factory2d_internal.hpp"
 
 using namespace godot;
@@ -187,9 +188,46 @@ bool node_in_bullet_factory2d(Node *node) {
 	return false;
 }
 
+void BulletFactory2D::queue_physics_sync(BulletVolley2D *volley) {
+	VolleyIterationEntry entry;
+	entry.id = volley->get_instance_id();
+	entry.volley = volley;
+	physics_sync_queue.push_back(entry);
+	if (!physics_sync_call_queued) {
+		physics_sync_call_queued = true;
+		callable_mp(this, &BulletFactory2D::flush_physics_sync).call_deferred();
+	}
+}
+
+void BulletFactory2D::flush_physics_sync() {
+	physics_sync_call_queued = false;
+	if (physics_sync_queue.empty()) {
+		return;
+	}
+	std::vector<VolleyIterationEntry> batch;
+	batch.swap(physics_sync_queue);
+	for (const VolleyIterationEntry &entry : batch) {
+		if (ObjectDB::get_instance(ObjectID(entry.id)) == entry.volley) {
+			entry.volley->apply_physics_sync(); // no user code
+		}
+	}
+}
+
+void BulletFactory2D::on_scene_physics_frame() {
+	PhysicsFlush2D::note_scene_physics_frame();
+}
+
 void BulletFactory2D::_notification(int p_what) {
 	if (p_what == NOTIFICATION_ENTER_TREE) {
 		factories_in_tree.push_back(this);
+		// The physics flush runs before the SceneTree's physics_frame
+		// (core/physics_flush2d.hpp): runtime only, the editor has no flush.
+		if (!Engine::get_singleton()->is_editor_hint()) {
+			const Callable on_frame = callable_mp(this, &BulletFactory2D::on_scene_physics_frame);
+			if (!get_tree()->is_connected("physics_frame", on_frame)) {
+				get_tree()->connect("physics_frame", on_frame);
+			}
+		}
 		// Not _ready: the factory skips it in the editor, and the preview is
 		// the one thing it draws there.
 		refresh_despawn_bounds_preview();
@@ -201,6 +239,10 @@ void BulletFactory2D::_notification(int p_what) {
 	}
 	if (p_what == NOTIFICATION_EXIT_TREE) {
 		factories_in_tree.erase(std::remove(factories_in_tree.begin(), factories_in_tree.end(), this), factories_in_tree.end());
+		const Callable on_frame = callable_mp(this, &BulletFactory2D::on_scene_physics_frame);
+		if (get_tree()->is_connected("physics_frame", on_frame)) {
+			get_tree()->disconnect("physics_frame", on_frame);
+		}
 		if (owns_performance_monitors) {
 			unregister_monitors();
 			hand_monitors_to_another_factory();
@@ -510,10 +552,18 @@ void BulletFactory2D::set_is_factory_processing_bullets(bool is_processing_enabl
 
 	// Overlaps that started during the pause were parked by the volleys;
 	// queue them now so the next tick drains them (exactly once).
+	// The replay reads target properties for the bounce math (a script _get
+	// is user code: it may free volleys or this factory), so walk a snapshot.
 	if (resuming) {
-		for (BulletVolley2D *volley : all_volleys) {
-			if (volley != nullptr && volley->is_active) {
-				volley->replay_paused_overlaps();
+		const LifeWatch watch = watch_life();
+		for (const VolleyIterationEntry &entry : snapshot_volley_entries()) {
+			BulletVolley2D *volley = entry.volley;
+			if (ObjectDB::get_instance(ObjectID(entry.id)) != volley || !volley->is_active) {
+				continue;
+			}
+			volley->replay_paused_overlaps();
+			if (watch.died()) {
+				return;
 			}
 		}
 	}
@@ -530,6 +580,14 @@ void BulletFactory2D::update_process_state() {
 }
 
 void BulletFactory2D::_physics_process(double delta) {
+	// After the physics flush: shape writes deferred from it apply now, and
+	// none of the sweep's own writes is ever deferred (core/physics_flush2d.hpp).
+	PhysicsFlush2D::note_scene_physics_frame();
+	flush_physics_sync();
+	struct SweepScope {
+		SweepScope() { ++PhysicsFlush2D::sweep_depth; }
+		~SweepScope() { --PhysicsFlush2D::sweep_depth; }
+	} sweep_scope;
 	const uint64_t stats_t0 = Time::get_singleton()->get_ticks_usec();
 	stats_tick_volleys = 0;
 	stats_tick_bullets = 0;

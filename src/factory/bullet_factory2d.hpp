@@ -499,6 +499,16 @@ public:
 		BulletVolley2D *volley = nullptr;
 	};
 
+	// Volleys whose shape / monitorable writes landed inside the physics
+	// server's query flush (core/physics_flush2d.hpp): applied at the start
+	// of the next sweep, or by a deferred call (a paused factory does not
+	// sweep). Both run after the flush and before the physics step.
+	void queue_physics_sync(BulletVolley2D *volley);
+	void flush_physics_sync();
+	void on_scene_physics_frame();
+	std::vector<VolleyIterationEntry> physics_sync_queue;
+	bool physics_sync_call_queued = false;
+
 	// Debugger provider budget passthrough (applies to both debuggers).
 	// max_providers 0 = unlimited (default, preserves always-draw behavior).
 	int get_debugger_max_providers() const;

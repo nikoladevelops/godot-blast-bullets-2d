@@ -501,6 +501,9 @@ public:
 	// that frees the factory then must not get this volley deleted under
 	// Godot's emit: the factory teardown detaches it and queue_frees it.
 	int self_emit_depth = 0;
+	// Applies the shape / monitorable state deferred from the physics flush
+	// (see write_shape_disabled). No user code.
+	void apply_physics_sync();
 	// Optional spawner owner (ObjectID, 0 = none), mirroring owner_volley_id
 	// on attachments. When a live BulletSpawner2D is tagged, collision and
 	// lifetime signals are possessed by it; otherwise they stay on the factory.
@@ -1416,9 +1419,11 @@ public:
 	// Queue-time target velocity for the bounce math (see the record
 	// above): same read as the drain path (RigidBody2D linear_velocity,
 	// CharacterBody2D velocity, AnimatableBody2D constant_linear_velocity),
-	// false when the target exposes none or is already gone (the drain
-	// then falls back to its live read).
-	static bool read_queued_target_velocity(int64_t entered_instance_id, Vector2 &out_velocity);
+	// out_valid false when the target exposes none or is already gone (the
+	// drain then falls back to its live read). Object::get runs a script
+	// _get or property getter (user code): returns false when this volley
+	// did not survive it (touch nothing after).
+	bool read_queued_target_velocity(int64_t entered_instance_id, uint64_t self_id, Vector2 &out_velocity, bool &out_valid);
 
 	// Queue-time target pose for the velocity-less estimate. Unconditional
 	// (cheap: one cast + one position read); the drain uses it only when
@@ -1528,6 +1533,16 @@ protected:
 	// Detaches every shape from the area and frees volley_shape.
 	void release_volley_shape();
 	void set_all_physics_shapes_enabled_for_area(bool enable);
+	// Shape-disabled and monitorable writes (core/physics_flush2d.hpp):
+	// inside the physics server's query flush the server refuses them, so
+	// the volley is marked and the factory applies the whole state right
+	// after the flush (apply_physics_sync: shape i disabled exactly when
+	// bullet i is not enabled, plus monitorable). A sync reads the state at
+	// apply time, so later writes in between never fight it.
+	void write_shape_disabled(int bullet_index, bool disabled);
+	void write_monitorable();
+	void request_physics_sync();
+	bool physics_sync_pending = false;
 	void generate_multimesh();
 	void set_up_multimesh(int new_instance_count, const Ref<Mesh> &new_mesh, Vector2 new_texture_size);
 	void set_up_bullet_instances(const BulletVolleyData2D &data);
@@ -2372,11 +2387,14 @@ public:
 	// handle_bullet_collision() BEFORE the hit counter increments.
 	// Returns 0 = not a bounce (take the normal path), 1 = bounced and the
 	// record is fully handled (return), 2 = bounced but the hit is consumed
-	// too (fall through into normal counting/signals). Implemented in the
+	// too (fall through into normal counting/signals), BOUNCE_VOLLEY_GONE =
+	// a target property read (user code) freed this volley or the factory:
+	// touch nothing. Implemented in the
 	// .cpp (needs scene-tree + shape classes).
 	// Queue-time target motion is only needed while bouncing is armed (a
 	// later arm falls back to the drain's live read).
 	bool wants_queued_target_motion() const { return bounce_enabled(); }
+	static constexpr int BOUNCE_VOLLEY_GONE = -1;
 	int try_handle_bounce(CollisionType collision_type, int bullet_index, int64_t entered_instance_id, Vector2 queued_target_velocity, bool queued_velocity_valid, Vector2 queued_target_position, bool queue_position_valid);
 
 	// Seeds the speed/direction/velocity SoA from a per-bullet array (shared

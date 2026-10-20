@@ -5,6 +5,7 @@
 
 #include "bullet_volley/bullet_volley2d_internal.hpp"
 #include "core/emit_on2d.hpp"
+#include "core/physics_flush2d.hpp"
 
 using namespace godot;
 
@@ -52,46 +53,46 @@ void BulletVolley2D::set_collision_dedup_by_object(bool value) {
 	clear_collision_dedup_keys();
 }
 
-bool BulletVolley2D::read_queued_target_velocity(int64_t entered_instance_id, Vector2 &out_velocity) {
+bool BulletVolley2D::read_queued_target_velocity(int64_t entered_instance_id, uint64_t self_id, Vector2 &out_velocity, bool &out_valid) {
 	// Cached once (same rationale as the bounce drain below).
-	const StringName &prop_linear_velocity = CachedStringNames2D::get().linear_velocity;
-	const StringName &prop_velocity = CachedStringNames2D::get().velocity;
-	const StringName &prop_constant_linear_velocity = CachedStringNames2D::get().constant_linear_velocity;
+	const StringName *names[3] = {
+		&CachedStringNames2D::get().linear_velocity,
+		&CachedStringNames2D::get().velocity,
+		// AnimatableBody2D platforms expose neither of the first two: their
+		// motion lives in constant_linear_velocity (with sync_to_physics).
+		// Without it a ramming crusher reads as standing still.
+		&CachedStringNames2D::get().constant_linear_velocity,
+	};
 	out_velocity = Vector2(0, 0);
-	Object *hit_target = ObjectDB::get_instance(entered_instance_id);
-	if (hit_target == nullptr) {
-		return false;
-	}
-	const Variant linear_v = hit_target->get(prop_linear_velocity);
-	if (linear_v.get_type() == Variant::VECTOR2) {
-		const Vector2 v = (Vector2)linear_v;
-		if (v.is_finite()) {
-			out_velocity = v;
-			return true;
+	out_valid = false;
+	bool survived = true;
+	// This runs inside the physics server's query flush (this area's own
+	// monitor callback, or the resume replay): a free of this volley from the
+	// getter would delete the area while the server still iterates it. The
+	// guard refuses that free; it finishes with queue_free() after.
+	guarded_user_call2d(this, emit_guard, [&]() {
+		for (const StringName *name : names) {
+			// Looked up again before every read: a script _get may free it.
+			Object *hit_target = ObjectDB::get_instance(entered_instance_id);
+			if (hit_target == nullptr) {
+				return;
+			}
+			const Variant v = hit_target->get(*name);
+			if (!survived_user_code(self_id)) {
+				survived = false;
+				return;
+			}
+			if (v.get_type() == Variant::VECTOR2) {
+				const Vector2 vel = (Vector2)v;
+				if (vel.is_finite()) {
+					out_velocity = vel;
+					out_valid = true;
+				}
+				return;
+			}
 		}
-		return false;
-	}
-	const Variant vel_v = hit_target->get(prop_velocity);
-	if (vel_v.get_type() == Variant::VECTOR2) {
-		const Vector2 v = (Vector2)vel_v;
-		if (v.is_finite()) {
-			out_velocity = v;
-			return true;
-		}
-		return false;
-	}
-	// AnimatableBody2D platforms expose neither of the above: their
-	// motion lives in constant_linear_velocity (with sync_to_physics).
-	// Without this a ramming crusher reads as standing still.
-	const Variant const_v = hit_target->get(prop_constant_linear_velocity);
-	if (const_v.get_type() == Variant::VECTOR2) {
-		const Vector2 v = (Vector2)const_v;
-		if (v.is_finite()) {
-			out_velocity = v;
-			return true;
-		}
-	}
-	return false;
+	});
+	return survived && survived_user_code(self_id) && !is_queued_for_deletion();
 }
 
 void BulletVolley2D::read_queued_target_pose(int64_t entered_instance_id, Vector2 &out_position, bool &out_valid) {
@@ -141,6 +142,7 @@ int BulletVolley2D::replay_paused_overlaps() {
 	int queued = 0;
 	std::vector<PausedOverlap2D> pending;
 	pending.swap(paused_overlaps);
+	const uint64_t self_id = get_instance_id();
 	for (const PausedOverlap2D &p : pending) {
 		if (p.bullet_index < 0 || p.bullet_index >= amount_bullets || !all_bullets_enabled_set.contains(p.bullet_index)) {
 			continue;
@@ -157,7 +159,12 @@ int BulletVolley2D::replay_paused_overlaps() {
 		BulletCollisionData2D record(p.bullet_index, p.target_id, p.type);
 		record.queue_bullet_epoch = p.epoch;
 		if (wants_queued_target_motion()) {
-			record.queue_target_velocity_valid = read_queued_target_velocity(p.target_id, record.queue_target_velocity);
+			if (!read_queued_target_velocity(p.target_id, self_id, record.queue_target_velocity, record.queue_target_velocity_valid)) {
+				return queued; // a target getter freed this volley or the factory
+			}
+			if (!all_bullets_enabled_set.contains(p.bullet_index) || collision_epoch_for_bullet(p.bullet_index) != p.epoch) {
+				continue; // the getter disabled, cleared or pooled the bullet
+			}
 			read_queued_target_pose(p.target_id, record.queue_target_position, record.queue_target_position_valid);
 		}
 		all_collided_bullets.push_back(record);
@@ -197,7 +204,12 @@ void BulletVolley2D::area_entered_func(PhysicsServer2D::AreaBodyStatus status, R
 		// lookups (up to 3 Object::get per record, which can run user
 		// _get) on volleys that never bounce.
 		if (wants_queued_target_motion()) {
-			record.queue_target_velocity_valid = read_queued_target_velocity(entered_instance_id, record.queue_target_velocity);
+			if (!read_queued_target_velocity(entered_instance_id, get_instance_id(), record.queue_target_velocity, record.queue_target_velocity_valid)) {
+				return; // a target getter freed this volley or the factory
+			}
+			if (!all_bullets_enabled_set.contains(bullet_shape_index) || collision_epoch_for_bullet(bullet_shape_index) != record.queue_bullet_epoch) {
+				return; // the getter disabled, cleared or pooled the bullet
+			}
 			read_queued_target_pose(entered_instance_id, record.queue_target_position, record.queue_target_position_valid);
 		}
 		all_collided_bullets.push_back(record);
@@ -228,7 +240,12 @@ void BulletVolley2D::body_entered_func(PhysicsServer2D::AreaBodyStatus status, R
 		// lookups (up to 3 Object::get per record, which can run user
 		// _get) on volleys that never bounce.
 		if (wants_queued_target_motion()) {
-			record.queue_target_velocity_valid = read_queued_target_velocity(entered_instance_id, record.queue_target_velocity);
+			if (!read_queued_target_velocity(entered_instance_id, get_instance_id(), record.queue_target_velocity, record.queue_target_velocity_valid)) {
+				return; // a target getter freed this volley or the factory
+			}
+			if (!all_bullets_enabled_set.contains(bullet_shape_index) || collision_epoch_for_bullet(bullet_shape_index) != record.queue_bullet_epoch) {
+				return; // the getter disabled, cleared or pooled the bullet
+			}
 			read_queued_target_pose(entered_instance_id, record.queue_target_position, record.queue_target_position_valid);
 		}
 		all_collided_bullets.push_back(record);
@@ -346,7 +363,7 @@ void BulletVolley2D::set_up_area(const int collision_layer, const int collision_
 		return;
 	}
 	physics_server->area_set_space(area, space_to_use);
-	physics_server->area_set_monitorable(area, monitorable);
+	write_monitorable();
 	physics_server->area_set_area_monitor_callback(area, callable_mp(this, &BulletVolley2D::area_entered_func));
 	physics_server->area_set_monitor_callback(area, callable_mp(this, &BulletVolley2D::body_entered_func));
 	physics_server->area_set_collision_layer(area, collision_layer);
@@ -420,9 +437,53 @@ void BulletVolley2D::generate_physics_shapes_for_area(int amount) {
 }
 
 void BulletVolley2D::set_all_physics_shapes_enabled_for_area(bool enable) {
+	if (PhysicsFlush2D::flushing()) {
+		request_physics_sync();
+		return;
+	}
 	for (int i = 0; i < amount_bullets; ++i) {
 		physics_server->area_set_shape_disabled(area, i, !enable);
 	}
+}
+
+void BulletVolley2D::write_shape_disabled(int bullet_index, bool disabled) {
+	if (PhysicsFlush2D::flushing()) {
+		request_physics_sync();
+		return;
+	}
+	physics_server->area_set_shape_disabled(area, bullet_index, disabled);
+}
+
+void BulletVolley2D::write_monitorable() {
+	if (PhysicsFlush2D::flushing()) {
+		request_physics_sync();
+		return;
+	}
+	physics_server->area_set_monitorable(area, monitorable);
+}
+
+void BulletVolley2D::request_physics_sync() {
+	if (physics_sync_pending) {
+		return;
+	}
+	physics_sync_pending = true;
+	if (bullet_factory != nullptr && factory_alive()) {
+		bullet_factory->queue_physics_sync(this);
+	}
+}
+
+void BulletVolley2D::apply_physics_sync() {
+	if (!physics_sync_pending) {
+		return;
+	}
+	physics_sync_pending = false;
+	if (physics_server == nullptr || !area.is_valid()) {
+		return;
+	}
+	for (int i = 0; i < amount_bullets && i < area_shape_count; ++i) {
+		physics_server->area_set_shape_disabled(area, i, !all_bullets_enabled_set.contains(i));
+	}
+	physics_server->area_set_monitorable(area, monitorable);
 }
 
 // The area accessors need a volley spawned through BulletFactory2D (a bare
@@ -488,7 +549,7 @@ void BulletVolley2D::set_monitorable(bool value) {
 		return;
 	}
 	monitorable = value;
-	physics_server->area_set_monitorable(area, monitorable);
+	write_monitorable();
 }
 
 void BulletVolley2D::set_collision_shape_runtime(const Ref<Shape2D> &new_shape) {
@@ -531,7 +592,7 @@ void BulletVolley2D::set_collision_shape_runtime(const Ref<Shape2D> &new_shape) 
 		// Fresh RIDs from a type change come enabled; restore per-bullet disabled state
 		// so individually disabled bullets don't become collidable again.
 		if (!all_bullets_enabled_set.contains(i)) {
-			physics_server->area_set_shape_disabled(area, i, true);
+			write_shape_disabled(i, true);
 		}
 		update_bullet_previous_transform_for_interpolation(i);
 	}
@@ -749,6 +810,9 @@ void BulletVolley2D::handle_bullet_collision(const BulletCollisionData2D &record
 	// signal) and never reaches the counter below, unless the volley asked
 	// to consume the hit too (decision 2).
 	const int bounce_decision = try_handle_bounce(record.collision_type, bullet_index, record.collided_instance_id, record.queue_target_velocity, record.queue_target_velocity_valid, record.queue_target_position, record.queue_target_position_valid);
+	if (bounce_decision == BOUNCE_VOLLEY_GONE) {
+		return; // a target property read (user code) freed this volley or the factory
+	}
 	// Split on bounce: after the bounce handler, at the bounced pose (the
 	// children fan around the NEW heading), only for the same live bullet.
 	// A parent that leaves ends the record (its hit is never counted).
@@ -762,6 +826,13 @@ void BulletVolley2D::handle_bullet_collision(const BulletCollisionData2D &record
 	}
 	if (bounce_decision == 2 && !same_live_bullet()) {
 		return; // the bounce handler disabled/cleared/freed it
+	}
+	// The bounce read the target's properties (a script _get) and ran its
+	// handler: either may have freed the target. Look it up again; a gone
+	// target drops the record like above.
+	hit_target = ObjectDB::get_instance(record.collided_instance_id);
+	if (hit_target == nullptr) {
+		return;
 	}
 
 	// Count the hit BEFORE the signal: handlers read the hit that just landed

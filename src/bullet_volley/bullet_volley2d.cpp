@@ -3,6 +3,7 @@
 // a volley's life; the per-frame motion lives in bullet_volley2d_tick.cpp.
 
 #include "bullet_volley/bullet_volley2d_internal.hpp"
+#include "core/physics_flush2d.hpp"
 
 using namespace godot;
 
@@ -441,8 +442,13 @@ void BulletVolley2D::predelete_teardown() {
 		// drop the slot: re-pooling into (or queue_freeing from) a dying factory is
 		// pointless, the engine destroys the whole subtree anyway.
 		bool factory_is_dying = bullet_factory == nullptr || !factory_alive() || bullet_factory->get_is_tearing_down();
+		// Inside the physics flush the server refuses the writes; the area is
+		// freed below anyway (allowed there), so skip them.
+		const bool flushing = PhysicsFlush2D::flushing();
 		for (int i = 0; i < amount_bullets && i < area_shape_count; ++i) {
-			physics_server->area_set_shape_disabled(area, i, true);
+			if (!flushing) {
+				physics_server->area_set_shape_disabled(area, i, true);
+			}
 
 			if (i >= 0 && i < (int)attachments.size() && attachments[i] != nullptr) {
 				// A callback of an earlier slot may have freed the
@@ -707,7 +713,7 @@ void BulletVolley2D::enable_bullet(int bullet_index, int collision_amount, bool 
 
 	multi->set_instance_transform_2d(bullet_index, to_local_for_multimesh(all_cached_instance_transforms[bullet_index])); // Start rendering the instance
 	write_trail_instances(bullet_index); // Wake resumes the trail with the bullet
-	physics_server->area_set_shape_disabled(area, bullet_index, false);
+	write_shape_disabled(bullet_index, false);
 	// Woken bullets must not lerp from a stale pre-disable position.
 	update_bullet_previous_transform_for_interpolation(bullet_index);
 
@@ -791,7 +797,7 @@ void BulletVolley2D::disable_bullet(int bullet_index, bool release_attachment, b
 
 	multi->set_instance_transform_2d(bullet_index, zero_transform); // Stops rendering the instance
 	hide_trail_instances(bullet_index); // Trail dies with its bullet, same frame
-	physics_server->area_set_shape_disabled(area, bullet_index, true);
+	write_shape_disabled(bullet_index, true);
 
 	const uint64_t self_id = get_instance_id();
 	if (release_attachment) {
@@ -829,6 +835,12 @@ int BulletVolley2D::disable_bullets_bulk(const std::vector<int> &indexes, int fx
 	}
 	const uint64_t self_id = get_instance_id();
 	int disabled_count = 0;
+	// Inside the physics flush the shapes sync right after it (one check
+	// for the batch, not one per bullet).
+	const bool defer_shapes = PhysicsFlush2D::flushing();
+	if (defer_shapes) {
+		request_physics_sync();
+	}
 	{
 		ReentrancyGuard bullet_disable_guard(_bullet_enable_depth, this);
 		for (size_t k = 0; k < indexes.size(); ++k) {
@@ -866,7 +878,9 @@ int BulletVolley2D::disable_bullets_bulk(const std::vector<int> &indexes, int fx
 			bump_collision_epoch_for_bullet(i);
 			++disabled_count;
 			hide_trail_instances(i);
-			physics_server->area_set_shape_disabled(area, i, true);
+			if (!defer_shapes) {
+				physics_server->area_set_shape_disabled(area, i, true);
+			}
 			if (i < (int)attachments.size() && attachments[i] != nullptr) {
 				bullet_disable_attachment(i); // user callback (on_bullet_disable)
 				if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
