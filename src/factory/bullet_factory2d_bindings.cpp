@@ -25,6 +25,10 @@ void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("debug_set_effect_log_enabled", "enabled"), &BulletFactory2D::debug_set_effect_log_enabled);
 	ClassDB::bind_method(D_METHOD("debug_get_effect_log"), &BulletFactory2D::debug_get_effect_log);
 	ClassDB::bind_method(D_METHOD("debug_clear_effect_log"), &BulletFactory2D::debug_clear_effect_log);
+	ClassDB::bind_method(D_METHOD("debug_set_bullet_event_log_enabled", "enabled"), &BulletFactory2D::debug_set_bullet_event_log_enabled);
+	ClassDB::bind_method(D_METHOD("debug_get_bullet_event_log"), &BulletFactory2D::debug_get_bullet_event_log);
+	ClassDB::bind_method(D_METHOD("debug_clear_bullet_event_log"), &BulletFactory2D::debug_clear_bullet_event_log);
+	ClassDB::bind_method(D_METHOD("debug_get_bullet_event_log_dropped"), &BulletFactory2D::debug_get_bullet_event_log_dropped);
 
 	ClassDB::bind_method(D_METHOD("get_is_factory_busy"), &BulletFactory2D::get_is_factory_busy);
 
@@ -288,6 +292,9 @@ void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("debug_seed_cosmetic_rng", "seed"), &BulletFactory2D::debug_seed_cosmetic_rng);
 	ClassDB::bind_method(D_METHOD("debug_get_sound_log"), &BulletFactory2D::debug_get_sound_log);
 	ClassDB::bind_method(D_METHOD("debug_clear_sound_log"), &BulletFactory2D::debug_clear_sound_log);
+	ClassDB::bind_method(D_METHOD("debug_set_sound_offer_log_enabled", "enabled"), &BulletFactory2D::debug_set_sound_offer_log_enabled);
+	ClassDB::bind_method(D_METHOD("debug_get_sound_offer_log"), &BulletFactory2D::debug_get_sound_offer_log);
+	ClassDB::bind_method(D_METHOD("debug_clear_sound_offer_log"), &BulletFactory2D::debug_clear_sound_offer_log);
 	ClassDB::bind_method(D_METHOD("debug_get_sound_voices"), &BulletFactory2D::debug_get_sound_voices);
 	ClassDB::bind_method(D_METHOD("debug_get_sound_stats"), &BulletFactory2D::debug_get_sound_stats);
 	ClassDB::bind_method(D_METHOD("debug_stop_sound_voices"), &BulletFactory2D::debug_stop_sound_voices);

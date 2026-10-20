@@ -614,7 +614,7 @@ void BulletFactory2D::debug_set_effect_log_enabled(bool enabled) {
 	}
 }
 
-void BulletFactory2D::debug_log_effect(int trigger, uint64_t volley_id, int bullet_index, const Vector2 &position) {
+void BulletFactory2D::debug_log_effect(int trigger, uint64_t volley_id, int life_id, int bullet_index, const Vector2 &position) {
 	if (!debug_effect_log_enabled) {
 		return;
 	}
@@ -624,10 +624,38 @@ void BulletFactory2D::debug_log_effect(int trigger, uint64_t volley_id, int bull
 	Dictionary e;
 	e["trigger"] = trigger;
 	e["volley"] = (int64_t)volley_id;
+	e["life"] = life_id;
 	e["bullet"] = bullet_index;
 	e["position"] = position;
 	e["frame"] = (int64_t)Engine::get_singleton()->get_physics_frames();
 	debug_effect_log.push_back(e);
+}
+
+void BulletFactory2D::debug_set_bullet_event_log_enabled(bool enabled) {
+	debug_bullet_event_log_enabled = enabled;
+	if (!enabled) {
+		debug_bullet_event_log.clear();
+		debug_bullet_event_log_dropped = 0;
+	}
+}
+
+void BulletFactory2D::debug_log_bullet_event(const char *kind, const char *cause, uint64_t volley_id, int life_id, int bullet_index, uint64_t epoch) {
+	if (!debug_bullet_event_log_enabled) {
+		return;
+	}
+	if (debug_bullet_event_log.size() >= 65536) {
+		debug_bullet_event_log.remove_at(0);
+		++debug_bullet_event_log_dropped;
+	}
+	Dictionary e;
+	e["kind"] = String(kind);
+	e["cause"] = String(cause != nullptr ? cause : "");
+	e["volley"] = (int64_t)volley_id;
+	e["life"] = life_id;
+	e["bullet"] = bullet_index;
+	e["epoch"] = (int64_t)epoch;
+	e["frame"] = (int64_t)Engine::get_singleton()->get_physics_frames();
+	debug_bullet_event_log.push_back(e);
 }
 
 Dictionary BulletFactory2D::debug_get_effect_state() const {

@@ -249,7 +249,7 @@ void BulletVolley2D::fx_fire_oneshot(int trigger, int bullet_index, const Transf
 		fired = true;
 	}
 	if (fired && bullet_factory->debug_effect_log_enabled) {
-		bullet_factory->debug_log_effect(trigger, get_instance_id(), bullet_index, at.get_origin());
+		bullet_factory->debug_log_effect(trigger, get_instance_id(), get_life_id(), bullet_index, at.get_origin());
 	}
 }
 

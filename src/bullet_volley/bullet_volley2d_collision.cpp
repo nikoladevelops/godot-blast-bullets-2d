@@ -888,7 +888,7 @@ void BulletVolley2D::handle_bullet_collision(const BulletCollisionData2D &record
 		// gets one visual, at the impact pose. The attachment goes back to
 		// the pool with the bullet (the handler already saw it).
 		const uint64_t self_id = get_instance_id();
-		disable_bullet(bullet_index, true);
+		disable_bullet_core(bullet_index, true, false, "hit");
 		if (!survived_user_code(self_id)) {
 			return; // on_bullet_disable freed this volley or the factory
 		}

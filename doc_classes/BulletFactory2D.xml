@@ -123,6 +123,12 @@
 				Interpolation agreement check: factory_enabled, project_enabled_2d, mismatch, hint. Enable both the factory flag and ProjectSettings physics/common/physics_interpolation for smooth high-refresh bullets.
 			</description>
 		</method>
+		<method name="debug_clear_bullet_event_log">
+			<return type="void" />
+			<description>
+				Test helper: empties the bullet event log ([method debug_get_bullet_event_log]) and keeps it enabled.
+			</description>
+		</method>
 		<method name="debug_clear_effect_log">
 			<return type="void" />
 			<description>
@@ -133,6 +139,12 @@
 			<return type="void" />
 			<description>
 				Debug/test helper: empties the sound log (recording stays on).
+			</description>
+		</method>
+		<method name="debug_clear_sound_offer_log">
+			<return type="void" />
+			<description>
+				Test helper: empties the sound offer log ([method debug_get_sound_offer_log]) and keeps it enabled.
 			</description>
 		</method>
 		<method name="debug_expected_pool_key" qualifiers="static">
@@ -189,6 +201,18 @@
 				Get the whole information about the attachment object pool. Returns a [Dictionary] containing the scene path (or [code]"&lt;in-memory&gt;"[/code] for unsaved scenes) as the KEY and the amount of pooled attachments from that scene as the VALUE.
 			</description>
 		</method>
+		<method name="debug_get_bullet_event_log" qualifiers="const">
+			<return type="Array" />
+			<description>
+				Test helper: every bullet state change of every volley since logging was enabled ([method debug_set_bullet_event_log_enabled]), oldest first, as [code]{kind, cause, volley, life, bullet, epoch, frame}[/code]. [code]kind[/code] is [code]"life"[/code] (a new active life enabled every bullet; [code]bullet[/code] holds the bullet count), [code]"wake"[/code] ([method BulletVolley2D.enable_bullet]) or [code]"disable"[/code], with [code]cause[/code] [code]"hit"[/code], [code]"lifetime"[/code], [code]"despawn"[/code], [code]"clear"[/code], [code]"split"[/code], [code]"pickup"[/code] (converted), [code]"collect"[/code] (a pickup collected) or [code]"manual"[/code] (a script's [method BulletVolley2D.disable_bullet]). [code]volley[/code] is the instance id, [code]life[/code] [method BulletVolley2D.get_life_id], [code]epoch[/code] the bullet's wake counter, [code]frame[/code] the physics frame. Read it once per frame: past 65536 entries the oldest are dropped ([method debug_get_bullet_event_log_dropped]).
+			</description>
+		</method>
+		<method name="debug_get_bullet_event_log_dropped" qualifiers="const">
+			<return type="int" />
+			<description>
+				Test helper: how many entries the bullet event log dropped since it was enabled (it keeps the newest 65536).
+			</description>
+		</method>
 		<method name="debug_get_bullets_pool_amount">
 			<return type="int" />
 			<description>
@@ -210,7 +234,7 @@
 		<method name="debug_get_effect_log" qualifiers="const">
 			<return type="Array" />
 			<description>
-				Debug/test helper: the effects recorded since [method debug_set_effect_log_enabled] was turned on, oldest first, one Dictionary per effect: [code]trigger[/code] (BulletEffectLayerData2D trigger), [code]volley[/code] (instance id), [code]bullet[/code] (index), [code]position[/code] and [code]frame[/code] (physics frame).
+				Debug/test helper: the effects recorded since [method debug_set_effect_log_enabled] was turned on, oldest first, one Dictionary per effect: [code]trigger[/code] (BulletEffectLayerData2D trigger), [code]volley[/code] (instance id), [code]life[/code] ([method BulletVolley2D.get_life_id]), [code]bullet[/code] (index), [code]position[/code] and [code]frame[/code] (physics frame).
 			</description>
 		</method>
 		<method name="debug_get_effect_state" qualifiers="const">
@@ -270,6 +294,12 @@
 				Test helper: every sound the mixer played while recording was on, as {sound, position, frame} dicts (oldest dropped past 4096 entries).
 			</description>
 		</method>
+		<method name="debug_get_sound_offer_log" qualifiers="const">
+			<return type="Array" />
+			<description>
+				Test helper: every sound offer since logging was enabled ([method debug_set_sound_offer_log_enabled]), recorded BEFORE audibility, chance and voice limits decide what plays, as [code]{trigger, volley, life, bullet, frame}[/code] ([code]trigger[/code] is the entry's [member BulletSoundData2D.trigger]; spawner triggers and [method play_sound] have [code]volley[/code] 0 and [code]bullet[/code] -1). Keeps the newest 65536 entries. What actually played is [method debug_get_sound_log].
+			</description>
+		</method>
 		<method name="debug_get_sound_stats" qualifiers="const">
 			<return type="Dictionary" />
 			<description>
@@ -313,6 +343,13 @@
 				Test helper: reseeds the plugin's cosmetic generator, which draws sound mix rolls (volume, pitch, pan, stream picks, chance) and effect layer starts, scales and rotations. Godot's [method @GlobalScope.seed] does not reach these rolls, so gameplay randomness stays the same whatever the audio does.
 			</description>
 		</method>
+		<method name="debug_set_bullet_event_log_enabled">
+			<return type="void" />
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Test helper: turns the bullet event log ([method debug_get_bullet_event_log]) on or off. Turning it off clears it. Off by default; while off, a bullet state change costs one check.
+			</description>
+		</method>
 		<method name="debug_set_effect_log_enabled">
 			<return type="void" />
 			<param index="0" name="enabled" type="bool" />
@@ -332,6 +369,13 @@
 			<param index="0" name="enabled" type="bool" />
 			<description>
 				Test helper: records every played sound while on (cleared when switched off). One bool check per play.
+			</description>
+		</method>
+		<method name="debug_set_sound_offer_log_enabled">
+			<return type="void" />
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Test helper: turns the sound offer log ([method debug_get_sound_offer_log]) on or off. Turning it off clears it. Off by default; while off, an offer costs one check.
 			</description>
 		</method>
 		<method name="debug_stop_sound_voices">

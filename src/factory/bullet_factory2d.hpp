@@ -448,7 +448,7 @@ public:
 	void clear_sprite_effects();
 	Dictionary debug_get_effect_state() const;
 	// Trigger log for tests: every volley one-shot trigger that actually
-	// fired (layer matched) is recorded as {trigger, volley, bullet,
+	// fired (layer matched) is recorded as {trigger, volley, life, bullet,
 	// position, frame} while enabled. Off by default: one bool check per
 	// fire. Bounded (oldest dropped past 4096 entries).
 	bool debug_effect_log_enabled = false;
@@ -456,7 +456,23 @@ public:
 	void debug_set_effect_log_enabled(bool enabled);
 	Array debug_get_effect_log() const { return debug_effect_log.duplicate(); }
 	void debug_clear_effect_log() { debug_effect_log.clear(); }
-	void debug_log_effect(int trigger, uint64_t volley_id, int bullet_index, const Vector2 &position);
+	void debug_log_effect(int trigger, uint64_t volley_id, int life_id, int bullet_index, const Vector2 &position);
+	// Bullet event log for tests (the feature-mix ledger): every bullet state
+	// change of every volley while enabled, as {kind, cause, volley, life,
+	// bullet, epoch, frame}. kind "life": a new active life enabled every
+	// bullet (bullet = amount, cause and epoch unused); "wake": enable_bullet;
+	// "disable": cause hit, lifetime, despawn, clear, split, pickup, collect
+	// or manual (a script's disable_bullet). Off by default: one bool check
+	// per state change. Bounded: past 65536 entries the oldest are dropped
+	// and counted (debug_get_bullet_event_log_dropped).
+	bool debug_bullet_event_log_enabled = false;
+	Array debug_bullet_event_log;
+	int64_t debug_bullet_event_log_dropped = 0;
+	void debug_set_bullet_event_log_enabled(bool enabled);
+	Array debug_get_bullet_event_log() const { return debug_bullet_event_log.duplicate(); }
+	void debug_clear_bullet_event_log() { debug_bullet_event_log.clear(); }
+	int64_t debug_get_bullet_event_log_dropped() const { return debug_bullet_event_log_dropped; }
+	void debug_log_bullet_event(const char *kind, const char *cause, uint64_t volley_id, int life_id, int bullet_index, uint64_t epoch);
 
 	//
 
@@ -720,6 +736,16 @@ public:
 	int get_sound_max_voices() const;
 	void set_sound_max_voices(int value);
 	void debug_set_sound_log_enabled(bool enabled);
+	// Offer log for tests (the feature-mix ledger): every sound_offer while
+	// enabled, BEFORE audibility, limits and chance, as {trigger, volley,
+	// life, bullet, frame} (spawner and manual offers: volley 0, bullet -1).
+	// Off by default: one bool check per offer. Bounded like the bullet
+	// event log (oldest dropped past 65536 entries).
+	bool debug_sound_offer_log_enabled = false;
+	Array debug_sound_offer_log;
+	void debug_set_sound_offer_log_enabled(bool enabled);
+	Array debug_get_sound_offer_log() const { return debug_sound_offer_log.duplicate(); }
+	void debug_clear_sound_offer_log() { debug_sound_offer_log.clear(); }
 	// Test helper: reseeds the plugin's cosmetic generator (sound mix, effect
 	// layer starts). Godot's global seed() does not reach these rolls.
 	void debug_seed_cosmetic_rng(int64_t seed);

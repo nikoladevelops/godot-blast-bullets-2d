@@ -13,6 +13,18 @@ bool BulletFactory2D::sound_offer(const Ref<BulletSoundData2D> &sound, const Vec
 	if (is_tearing_down) {
 		return false;
 	}
+	if (debug_sound_offer_log_enabled && sound.is_valid()) {
+		if (debug_sound_offer_log.size() >= 65536) {
+			debug_sound_offer_log.remove_at(0);
+		}
+		Dictionary e;
+		e["trigger"] = sound->get_trigger();
+		e["volley"] = (int64_t)follow_volley_id;
+		e["life"] = follow_life_id;
+		e["bullet"] = follow_bullet;
+		e["frame"] = (int64_t)Engine::get_singleton()->get_physics_frames();
+		debug_sound_offer_log.push_back(e);
+	}
 	return sound_mixer.offer(*this, sound, event_pos, volume_offset_db, listener, volley_amount, follow_volley_id, follow_life_id, follow_bullet);
 }
 
@@ -62,6 +74,13 @@ void BulletFactory2D::debug_seed_cosmetic_rng(int64_t seed) {
 
 void BulletFactory2D::debug_set_sound_log_enabled(bool enabled) {
 	sound_mixer.set_log_enabled(enabled);
+}
+
+void BulletFactory2D::debug_set_sound_offer_log_enabled(bool enabled) {
+	debug_sound_offer_log_enabled = enabled;
+	if (!enabled) {
+		debug_sound_offer_log.clear();
+	}
 }
 
 Array BulletFactory2D::debug_get_sound_log() const {

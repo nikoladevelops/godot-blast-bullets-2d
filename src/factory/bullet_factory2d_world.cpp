@@ -195,7 +195,7 @@ int BulletFactory2D::clear_bullets_in_area(const char *function_name, bool circl
 		for (size_t k = 0; k < record.indexes.size(); ++k) {
 			record.positions[(int64_t)k] = volley->all_cached_instance_transforms[record.indexes[k]].columns[2];
 		}
-		const int done = volley->disable_bullets_bulk(record.indexes, EFFECT_ON_CLEAR, nullptr, SPLIT_CAUSE_CLEAR);
+		const int done = volley->disable_bullets_bulk(record.indexes, EFFECT_ON_CLEAR, nullptr, SPLIT_CAUSE_CLEAR, false, "clear");
 		cleared += done;
 		if (!*life) {
 			return cleared; // a callback freed this factory

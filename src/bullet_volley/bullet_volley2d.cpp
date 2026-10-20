@@ -538,6 +538,9 @@ void BulletVolley2D::spawn(const BulletVolleyData2D &data, VolleyPool *pool, Bul
 	}
 	all_bullets_enabled_set.activate_all_data();
 	is_active = true;
+	if (factory != nullptr && factory->debug_bullet_event_log_enabled) {
+		factory->debug_log_bullet_event("life", "", get_instance_id(), get_life_id(), amount_bullets, 0);
+	}
 	bullets_container->add_child(this);
 	// Effect layers first (trail shards rebuilt, factory one-shot bakes
 	// registered, spawn flashes at every bullet): an attachment callback
@@ -629,6 +632,9 @@ bool BulletVolley2D::enable_volley(const BulletVolleyData2D &data, const Vector2
 	set_visible(true);
 	all_bullets_enabled_set.activate_all_data();
 	is_active = true;
+	if (bullet_factory != nullptr && bullet_factory->debug_bullet_event_log_enabled) {
+		bullet_factory->debug_log_bullet_event("life", "", get_instance_id(), get_life_id(), amount_bullets, 0);
+	}
 	move_to_front(); // Pooled instances render behind newer ones without this; moving to front emulates fresh spawn order.
 	// Previous life's bakes die here, trail shards rebuild, spawn flashes
 	// fire: BEFORE the attachment callbacks, so a clear from one of them
@@ -708,6 +714,9 @@ void BulletVolley2D::enable_bullet(int bullet_index, int collision_amount, bool 
 	// A wake is a new slot life: records queued before the disable must not
 	// fire now (same-overlap double count).
 	bump_collision_epoch_for_bullet(bullet_index);
+	if (bullet_factory != nullptr && bullet_factory->debug_bullet_event_log_enabled) {
+		bullet_factory->debug_log_bullet_event("wake", "", get_instance_id(), get_life_id(), bullet_index, collision_epoch_for_bullet(bullet_index));
+	}
 	// The freeze ended any graze visit: a fresh one starts (no exit fires
 	// for a visit that ended frozen).
 	graze_end_visits_of_bullet(bullet_index);
@@ -755,6 +764,10 @@ void BulletVolley2D::enable_bullet(int bullet_index, int collision_amount, bool 
 }
 
 void BulletVolley2D::disable_bullet(int bullet_index, bool release_attachment, bool reset_state) {
+	disable_bullet_core(bullet_index, release_attachment, reset_state, "manual");
+}
+
+void BulletVolley2D::disable_bullet_core(int bullet_index, bool release_attachment, bool reset_state, const char *cause) {
 	// Disable = FREEZE: the bullet stops rendering, colliding and moving, and
 	// keeps every runtime value for enable_bullet() to resume. reset_state
 	// clears its runtime ledgers (see bullet_reset_state). The attachment is
@@ -790,6 +803,9 @@ void BulletVolley2D::disable_bullet(int bullet_index, bool release_attachment, b
 	if (active_bullets_counter < 0) {
 		active_bullets_counter = 0;
 	}
+	if (bullet_factory != nullptr && bullet_factory->debug_bullet_event_log_enabled) {
+		bullet_factory->debug_log_bullet_event("disable", cause, get_instance_id(), get_life_id(), bullet_index, collision_epoch_for_bullet(bullet_index));
+	}
 	// Records queued before this disable must not fire after a re-enable.
 	bump_collision_epoch_for_bullet(bullet_index);
 	if (reset_state) {
@@ -815,7 +831,7 @@ void BulletVolley2D::disable_bullet(int bullet_index, bool release_attachment, b
 	}
 }
 
-int BulletVolley2D::disable_bullets_bulk(const std::vector<int> &indexes, int fx_trigger, const std::vector<uint64_t> *expected_epochs, int split_cause, bool only_split) {
+int BulletVolley2D::disable_bullets_bulk(const std::vector<int> &indexes, int fx_trigger, const std::vector<uint64_t> *expected_epochs, int split_cause, bool only_split, const char *cause) {
 	// Same per-bullet contract as disable_bullet(i, true) (freeze, epoch
 	// bump, trail hidden, shape off, attachment released), but the render
 	// side is batched: the per-instance zero writes are collected into ONE
@@ -836,6 +852,9 @@ int BulletVolley2D::disable_bullets_bulk(const std::vector<int> &indexes, int fx
 	}
 	const uint64_t self_id = get_instance_id();
 	int disabled_count = 0;
+	// Tests' bullet event log: one check per batch, not per bullet (a
+	// callback inside cannot free the factory without this batch stopping).
+	const bool log_events = bullet_factory != nullptr && bullet_factory->debug_bullet_event_log_enabled;
 	// Inside the physics flush the shapes sync right after it (one check
 	// for the batch, not one per bullet).
 	const bool defer_shapes = PhysicsFlush2D::flushing();
@@ -875,6 +894,9 @@ int BulletVolley2D::disable_bullets_bulk(const std::vector<int> &indexes, int fx
 			--active_bullets_counter;
 			if (active_bullets_counter < 0) {
 				active_bullets_counter = 0;
+			}
+			if (log_events) {
+				bullet_factory->debug_log_bullet_event("disable", cause, get_instance_id(), get_life_id(), i, collision_epoch_for_bullet(i));
 			}
 			bump_collision_epoch_for_bullet(i);
 			++disabled_count;
@@ -998,7 +1020,7 @@ bool BulletVolley2D::clear_bullet(int bullet_index) {
 	// disable_bullet reports it, and nothing is recorded for a bullet that
 	// does not die (no split, no On Clear sound or flash).
 	if (_bullet_enable_depth > 0) {
-		disable_bullet(bullet_index, true);
+		disable_bullet_core(bullet_index, true, false, "clear");
 		return false;
 	}
 	// Pose captured before the disable below (disable never moves the
@@ -1017,7 +1039,7 @@ bool BulletVolley2D::clear_bullet(int bullet_index) {
 		}
 	}
 	const uint64_t self_id = get_instance_id();
-	disable_bullet(bullet_index, true);
+	disable_bullet_core(bullet_index, true, false, "clear");
 	// The attachment callback inside ran user code: it may have freed this
 	// volley or the factory.
 	if (!survived_user_code(self_id)) {
@@ -1036,7 +1058,7 @@ int BulletVolley2D::clear_all_bullets() {
 	// clear_all_bullets() (rejected by the latch inside, but it must not
 	// rewrite the list this batch is walking).
 	const std::vector<int> live = all_bullets_enabled_set.get_active_indexes();
-	return disable_bullets_bulk(live, EFFECT_ON_CLEAR, nullptr, SPLIT_CAUSE_CLEAR);
+	return disable_bullets_bulk(live, EFFECT_ON_CLEAR, nullptr, SPLIT_CAUSE_CLEAR, false, "clear");
 }
 
 BulletVolley2D::~BulletVolley2D() {

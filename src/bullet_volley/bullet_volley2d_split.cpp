@@ -205,7 +205,7 @@ bool BulletVolley2D::split_on_event(int bullet_index, int cause, const Transform
 	}
 	// The children replace it: no death effect of its own (it did not die),
 	// On Split already fired. Attachment callbacks run inside.
-	disable_bullet(bullet_index, true);
+	disable_bullet_core(bullet_index, true, false, "split");
 	return true;
 }
 
@@ -224,7 +224,7 @@ int BulletVolley2D::split_live_bullets(const std::vector<int> &indexes, int caus
 	}
 	// Only the bullets that split leave (a lost roll, a reached
 	// max_splits_per_bullet or a missing child data keeps the bullet).
-	disable_bullets_bulk(indexes, death_trigger, nullptr, cause, true);
+	disable_bullets_bulk(indexes, death_trigger, nullptr, cause, true, "split");
 	return -1; // the caller counts through the factory (the batch may free things)
 }
 

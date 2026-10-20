@@ -120,7 +120,7 @@ bool BulletVolley2D::collect_pickup_bullet(int bullet_index, Node2D *collector) 
 	// A handler may have disabled or recycled the bullet: only a still-live,
 	// same-life bullet is taken out now.
 	if (all_bullets_enabled_set.contains(bullet_index) && collision_epoch_for_bullet(bullet_index) == epoch) {
-		disable_bullet(bullet_index, true);
+		disable_bullet_core(bullet_index, true, false, "collect");
 	}
 	return ObjectDB::get_instance(ObjectID(self_id)) == this;
 }

@@ -435,7 +435,7 @@ int BulletFactory2D::clear_bullets_owned_by(uint64_t owner_spawner_id, bool fire
 		}
 		if (volley->is_active) {
 			const std::vector<int> live = volley->all_bullets_enabled_set.get_active_indexes();
-			cleared += volley->disable_bullets_bulk(live, fire_clear_effects ? (int)EFFECT_ON_CLEAR : -1, nullptr, split_cause);
+			cleared += volley->disable_bullets_bulk(live, fire_clear_effects ? (int)EFFECT_ON_CLEAR : -1, nullptr, split_cause, false, "clear");
 			if (!*life) {
 				return cleared; // a callback freed this factory
 			}

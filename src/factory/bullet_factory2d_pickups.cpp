@@ -372,7 +372,7 @@ Array BulletFactory2D::convert_to_pickups_impl(const char *function_name, const 
 		if (ObjectDB::get_instance(ObjectID(record.id)) != record.volley || !record.volley->is_active) {
 			continue; // freed by an earlier callback
 		}
-		record.volley->disable_bullets_bulk(record.indexes, pickup->fire_clear_effects ? (int)EFFECT_ON_CLEAR : -1, &record.epochs);
+		record.volley->disable_bullets_bulk(record.indexes, pickup->fire_clear_effects ? (int)EFFECT_ON_CLEAR : -1, &record.epochs, -1, false, "pickup");
 		if (watch.died()) {
 			return result;
 		}

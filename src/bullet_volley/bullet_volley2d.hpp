@@ -1308,6 +1308,9 @@ public:
 	// purpose — silently re-popping a pooled slot here could hand a foreign
 	// scene's node to a volley whose pooling id changed since.
 	void disable_bullet(int bullet_index, bool release_attachment = true, bool reset_state = false);
+	// The same with the reason it leaves (the factory's bullet event log:
+	// hit, collect, clear, split; a script's disable_bullet is "manual").
+	void disable_bullet_core(int bullet_index, bool release_attachment, bool reset_state, const char *cause);
 	// Clears one bullet's runtime ledgers (hit count, bounce ledger, homing
 	// queue, orbit, fall speed, wobble/pattern progress); kinematics,
 	// configuration, custom data and the attachment stay. Works on live and
@@ -1322,7 +1325,8 @@ public:
 	// semantics per bullet with one render upload for a drained volley.
 	// Returns how many bullets it disabled.
 	// split_cause >= 0 (SplitCause2D) records each bullet's split first.
-	int disable_bullets_bulk(const std::vector<int> &indexes, int fx_trigger = -1, const std::vector<uint64_t> *expected_epochs = nullptr, int split_cause = -1, bool only_split = false);
+	// cause names the reason in the factory's bullet event log.
+	int disable_bullets_bulk(const std::vector<int> &indexes, int fx_trigger = -1, const std::vector<uint64_t> *expected_epochs = nullptr, int split_cause = -1, bool only_split = false, const char *cause = "manual");
 	// Manual clear with visuals: captures the death pose, runs the silent
 	// disable_bullet() above, then fires EFFECT_ON_CLEAR one-shots. Use
 	// this instead of disable_bullet() when the disappearance should read
