@@ -7,7 +7,10 @@ extends BlastTest
 ## flight, clears, resets and frees bullets, converts them to pickups,
 ## pre-populates the pool, pauses the factory and frees targets, and the
 ## signal handlers do the same from INSIDE the sweep (queue_free, the
-## *_deferred twins, disables, spawns). Every operation is legal: the run
+## *_deferred twins, disables, spawns, release-build frees of the emitter
+## through debug_free_like_release, hostile but legal values on bullets in
+## flight; spawners travel paths whose movement handlers stop, seek, reverse
+## and restart them). Every operation is legal: the run
 ## must print no error at all, and after every step the books balance
 ## (debug_assert_no_dangling) and every live bullet is finite.
 ## A failure names its seed and step; CHAOS_SEEDS=<n> (environment) runs n
@@ -24,7 +27,7 @@ const TARGET_GROUP := &"chaos_targets"
 ## Warnings the run may legally cause (each is a documented one-time
 ## explanation, never a failure): orphaned hits nobody hears, empty homing
 ## or graze sources while targets are freed, the per-sweep children cap.
-const WARNING_OK := ["no one", "orphan", "homing", "graze", "target", "split", "sound", "listener", "flock"]
+const WARNING_OK := ["no one", "orphan", "homing", "graze", "target", "split", "sound", "listener", "flock", "direction curve"]
 
 var rng := RandomNumberGenerator.new()
 var spawners: Array = []
@@ -209,7 +212,7 @@ func _handler(v: Object, i: int) -> void:
 		return
 	stats["handler_actions"] += 1
 	var volley := v as BulletVolley2D
-	match rng.randi() % 9:
+	match rng.randi() % 12:
 		0:
 			if i >= 0 and i < volley.get_amount_bullets():
 				volley.disable_bullet(i)
@@ -234,6 +237,35 @@ func _handler(v: Object, i: int) -> void:
 		8:
 			if i >= 0 and i < volley.get_amount_bullets() and volley.is_bullet_status_enabled(i):
 				volley.split_bullet(i)
+		9:
+			# What free() does in an exported release game (no debug lock):
+			# the volley may be the one emitting.
+			BulletFactory2D.debug_free_like_release(volley)
+		10:
+			var sp = _live_spawner()
+			if sp != null and spawners.size() >= 3: # keep the battlefield firing
+				BulletFactory2D.debug_free_like_release(sp)
+		11:
+			# Hostile but legal values on a bullet in flight: it stays finite.
+			if i >= 0 and i < volley.get_amount_bullets():
+				volley.set_bullet_direction(i, Vector2(1e20, rng.randf_range(-1e20, 1e20)))
+				volley.bullet_set_gravity(i, Vector2(0, 3e38))
+
+
+func _move_handler(sp: BulletSpawner2D) -> void:
+	if not is_instance_valid(sp) or rng.randf() > 0.3:
+		return
+	match rng.randi() % 5:
+		0:
+			sp.movement_stop(rng.randf() < 0.5)
+		1:
+			sp.movement_seek(rng.randf())
+		2:
+			sp.movement_reverse()
+		3:
+			sp.movement_play()
+		4:
+			sp.movement_pause()
 
 
 func _live_spawner():
@@ -248,8 +280,8 @@ func _live_target():
 
 ## One operation from an idle point (structural calls allowed).
 func _operate() -> void:
-	var roll := rng.randi() % 62
-	if roll >= 31:
+	var roll := rng.randi() % 66
+	if roll >= 33:
 		roll = 0 # half of all operations are shots
 	if skipped_ops.has(roll):
 		return
@@ -412,6 +444,32 @@ func _operate() -> void:
 					sp.show_preview_during_runtime = true
 					sp.show_pattern_preview = true
 				a.show_pattern_preview = rng.randf() < 0.5
+		31:
+			# Unlimited acceleration (top speed 0) on a volley in flight.
+			var live := volleys.filter(func(v): return is_instance_valid(v) and v.debug_get_life_state() == "active")
+			if not live.is_empty():
+				var v: BulletVolley2D = live[rng.randi() % live.size()]
+				var i := rng.randi() % v.get_amount_bullets()
+				if v.is_bullet_status_enabled(i):
+					v.set_bullet_speed_data(i, H.make_speed(rng.randf_range(0.0, 300.0), 0.0, [3e38, -3e38, 1e6][rng.randi() % 3]))
+		32:
+			# A spawner travels a path; its movement handlers stop, seek,
+			# reverse or restart it.
+			var sp = _live_spawner()
+			if sp != null and not sp.has_meta(&"chaos_moves"):
+				sp.set_meta(&"chaos_moves", true)
+				var path := Path2D.new()
+				path.curve = Curve2D.new()
+				path.curve.add_point(Vector2(rng.randf_range(-200, 200), rng.randf_range(-200, 200)))
+				path.curve.add_point(Vector2(rng.randf_range(-200, 200), rng.randf_range(-200, 200)))
+				world.add_child(path)
+				sp.set_movement_path_node(path)
+				sp.movement_loop_mode = rng.randi() % 3
+				sp.movement_duration_sec = rng.randf_range(0.05, 0.5)
+				sp.movement_endpoint_reached.connect(func(_at_end) -> void: _move_handler(sp))
+				sp.movement_loop_completed.connect(func(_loop) -> void: _move_handler(sp))
+				sp.movement_finished.connect(func() -> void: _move_handler(sp))
+				sp.movement_enabled = true
 
 
 func _shape_type(d: BulletVolleyData2D) -> int:

@@ -56,7 +56,7 @@ for the rest: the sections are written to be looked up, not read once.
 
 ```sh
 GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py   # build (exit 1 = failed; never raw scons, never edit SConstruct)
-python3 tools/run_tests.py                                       # 197 files / 1804 tests, ~10 s, leak-checked
+python3 tools/run_tests.py                                       # 199 files / 1828 tests, ~10 s, leak-checked
 python3 tools/run_tests.py --suite <substring> --full            # one area, every failure message unclipped
 python3 tools/run_tests.py --self-test                           # proves the harness still catches failures/leaks
 python3 tools/run_editor_smoke.py                                # headless EDITOR run of tests/editor_smoke/ (editor-only paths)
@@ -473,8 +473,10 @@ func test_<behavior>_<expectation>() -> void:
   step. A failure names its seed: rerun it alone with `CHAOS_SEEDS=<seed>,`,
   bisect with `CHAOS_SKIP=<op ids>` / `CHAOS_SKIP_HANDLERS=1`, soak with
   `CHAOS_SEEDS=200`. New operations go into `_operate` (idle point) or
-  `_handler` (inside the sweep: only what is legal there). Godot REFUSES `free()` on an object that is
-  emitting; handlers must `queue_free()` the emitter.
+  `_handler` (inside the sweep: only what is legal there). In DEBUG builds
+  Godot refuses `free()` on an object that is emitting, so a plain handler
+  `queue_free()`s the emitter; the run also takes the RELEASE path through
+  `BulletFactory2D.debug_free_like_release` (§12.4, emit guard).
 - Feature crosses: combine 2–4 systems; assert each system's signature, full
   finiteness and pool-reuse neutrality. Pairwise beats exhaustive.
 - Preview tests: `make_preview_spawner`, `await idle(6)` for rebuilds,
@@ -840,6 +842,20 @@ src/
   `integration/test_callback_free_matrix`, `test_signal_free_matrix` (run them under
   `tools/run_sanitizer_tests.py --sanitizer address` after touching any of
   this: a write into freed memory passes every assert).
+- Emit guard (`core/emit_guard2d.hpp`, `core/emit_on2d.hpp`): Godot refuses
+  `free()` on an emitting object ONLY in debug builds (`Object::callp`'s lock
+  check is `DEBUG_ENABLED`); an exported release game deletes it in the middle
+  of the plugin's code. EVERY plugin emit goes through `emit_on2d(emitter,
+  ...)` (never a bare `emit_signal`): spawner, factory and volley keep an
+  `EmitGuardState2D`, PREDELETE refuses a free while one is emitting
+  (`cancel_free()`) and the outermost emit then `queue_free()`s it. Tests take
+  the release path with `BulletFactory2D.debug_free_like_release(object)`
+  (C++ `memdelete`, no lock check): `integration/test_release_free_matrix`
+  frees the emitter from EVERY signal of the three classes (ClassDB-driven).
+  A handler may also stop, replace or restart what emitted (movement
+  playback, pattern lists): the emitting code re-checks an epoch/serial
+  (`movement_epoch`, `pattern_list_serial`) after the emit and leaves the
+  rest to the handler.
 - Pinned by `volley/test_volley_hit_contract`, `test_volley_lifetime_contract`,
   `test_volley_signal_timing`, `test_volley_bounce_signals`,
   `test_volley_homing_mixed_deques`, `spawner/test_spawner_orphan_policy`.
@@ -982,6 +998,24 @@ deduped, cancelled by REMOVED) and replayed once on resume.
   - A finite double above FLT_MAX is INF as `real_t`/`float`: setters that
     feed real_t math check `is_finite_real2d`, values handed to the engine as
     floats (sound) `is_finite_float2d` (`core/transform_math2d.hpp`).
+- Every plugin MultiMesh (volley, debugger, effect and trail shards) carries
+  the fixed custom AABB `never_culled_aabb2d()` (`core/transform_math2d.hpp`):
+  a 2D canvas item culls by bounds the renderer does NOT recompute when
+  instances move, so without it bullets that flew away from where the bounds
+  were taken vanish (the collision debugger once drew no split children).
+  The headless dummy renderer never culls: prove a culling fix in a real
+  windowed run (a throwaway `zz_*` scene, deleted after).
+- Bullet math never turns INF/NaN from finite input: `safe_normalized2d`
+  normalizes vectors whose square overflows (`normalized()` returns (0, 0)
+  there and the bullet stalls); integrated values (speed, rotation speed,
+  fall speed, orbit angle) hold their last finite value; `step_place` keeps
+  a bullet whose step overflows where it is; angles wrap through
+  `wrap_angle_pi2d` (a `while (a > PI) a -= TAU` loop never ends at 1e30).
+  Pinned by `volley/test_volley_core` (huge directions, extreme motion).
+- A pooled volley is a stale handle: every mutator refuses it
+  (`reject_pooled_handle`); `volley/test_volley_pooled_handle_writes` calls
+  EVERY bound method on a pooled handle (ClassDB-driven) and demands that the
+  next life starts exactly like the one before.
 - Plugin-created nodes (containers, debugger and its multimesh nodes, sound
   voices, effect and trail shards, preview holders) are ordinary children a
   script can `free()`. Cache them as `OwnedNode2D<T>` (`core/owned_node2d.hpp`)
@@ -1510,7 +1544,7 @@ A dying bullet bursts into `count` children: ONE new volley of exactly
 | Resources | `data/bullet_split_stage2d.*`, `data/bullet_split_data2d.*` | triggers (deaths: killing hit, lifetime, despawn, clear; non-lethal: bounce, survived hit, homing reached, graze; plus the `split_after_sec` timer; despawn, clear and the non-lethal ones off by default), `parent_survives` + `max_splits_per_bullet` (per-life `split_counts`; deaths always take the parent), count/chance/seed, direction (Fan 0 / Ring 1 / Random In Spread 2), speed (Multiply Parent 0 / Fixed 1 / From Spawn Data 2; Ramp/Random), offset, scale, `child_data`, keep flags, `fire_death_effects`; enum ids serialized; `EFFECT_ON_SPLIT` 8 / `SOUND_ON_SPLIT` 12 appended |
 | Shared types | `factory/split_queue2d.hpp` | `SplitConfig2D` (chain + switch, shared like `FlockConfig2D`), `SplitArming2D` (graze/sound/flock snapshot, one per arming change of a life), `SplitRequest2D` (POD: never a volley pointer), `SplitCause2D` (signal ids, serialized), seeded rolls = SplitMix64 of (seed, generation, parent index, child, channel) |
 | Capture | `bullet_volley/bullet_volley2d_split.cpp` | `split_capture` runs no user code and is called BEFORE every disable (the last disable pools the volley): lethal hit (after the handler), `disable_bullets_bulk(..., split_cause)` (lifetime, despawn, clears, timer, manual), `clear_bullet`; the non-lethal triggers go through `split_on_event` AFTER their handler (bounce and survived hit in `handle_bullet_collision`, homing reached and graze in their dispatchers) and re-check liveness after it (the parent's disable runs attachment callbacks). `split_arm` is THE choke point (`release_life` disarms). Pickup conversion, reset and free pass no cause |
-| Flush | `factory/bullet_factory2d_split.cpp` | `_physics_process` after the timers, before the sound flush; works on a swapped-out batch (splits recorded meanwhile wait: one generation per sweep, never an endless chain); `split_drop_epoch` cancels the rest when a handler resets; `split_max_children_per_sweep` carries over in order; children of the parent's data spawn from `split_child_template` (per-bullet arrays removed, cached per source until `changed`) and get the parent bullet's own spin/gravity/curves/wobble; `child_data` is used exactly |
+| Flush | `factory/bullet_factory2d_split.cpp` | `_physics_process` after the timers, before the sound flush; works on a swapped-out batch (splits recorded meanwhile wait: one generation per sweep, never an endless chain); `split_drop_epoch` cancels the rest when a handler resets; `split_max_children_per_sweep` carries over in order; `split_max_pending` (default 100000, 0 = no cap) bounds the queue: `split_has_room()` in `split_capture` drops a new split past it (one warning per overflow, `dropped_total`); children of the parent's data spawn from `split_child_template` (per-bullet arrays removed, cached per source until `changed`) and get the parent bullet's own spin/gravity/curves/wobble; `child_data` is used exactly |
 | Spawner | `bullet_spawner/bullet_spawner2d_split.cpp` | Splitting group after Flocking; armed in `shoot_once` next to flock, before `pre_shoot` (the first signal), with the shot's spawn data; `split_configure_child_homing` re-aims children like a fresh shot |
 
 Contract (the `*split*` suites, `integration/test_*_free_matrix`): exact
