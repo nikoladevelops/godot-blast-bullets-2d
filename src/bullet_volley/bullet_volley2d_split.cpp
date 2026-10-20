@@ -83,7 +83,7 @@ int BulletVolley2D::split_capture(int bullet_index, int cause, const Transform2D
 	// its earlier splits) splits no more; the limit only counts surviving
 	// parents (a bullet that died splitting and was revived splits again).
 	// Manual splits ignore the limit and the odds (the script decided).
-	if (cause != SPLIT_CAUSE_MANUAL && stage->parent_survives && stage->max_splits_per_bullet > 0 && bullet_index < (int)split_counts.size() && (int)split_counts[bullet_index] >= stage->max_splits_per_bullet) {
+	if (cause != SPLIT_CAUSE_MANUAL && stage->parent_survives && stage->max_splits_per_bullet > 0 && bullet_index < (int)split_counts.size() && (int64_t)split_counts[bullet_index] >= (int64_t)stage->max_splits_per_bullet) {
 		return 0;
 	}
 	if (cause != SPLIT_CAUSE_MANUAL && stage->chance < 1.0) {
@@ -175,7 +175,8 @@ int BulletVolley2D::split_capture(int bullet_index, int cause, const Transform2D
 	if ((int)split_counts.size() != amount_bullets) {
 		split_counts.assign(amount_bullets, 0);
 	}
-	if (split_counts[bullet_index] < UINT16_MAX) {
+	static_assert(sizeof(split_counts[0]) >= sizeof(int32_t), "a split count holds every max_splits_per_bullet");
+	if (split_counts[bullet_index] < (uint32_t)INT32_MAX) {
 		++split_counts[bullet_index];
 	}
 	// The split's own report, at the parent's pose (no user code: offers and

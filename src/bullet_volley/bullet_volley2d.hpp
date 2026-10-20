@@ -2869,7 +2869,9 @@ public:
 	// Per bullet: how many times it split this life (a parent that survives
 	// its splits stops at BulletSplitStage2D.max_splits_per_bullet). Sized on
 	// the first recorded split.
-	std::vector<uint16_t> split_counts;
+	// Saturates at INT32_MAX, the largest max_splits_per_bullet (an int), so
+	// the cap always holds (a uint16_t once saturated below caps > 65535).
+	std::vector<uint32_t> split_counts;
 	// The arming snapshot shared by this life's requests, rebuilt when an
 	// arming choke point (graze_arm/release, sound arm/release,
 	// flock_set_config) bumped split_arming_serial.
