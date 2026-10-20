@@ -132,13 +132,12 @@ func test_finish_handlers_may_free_pool_clear_or_spawn(action: String = use_para
 	_extra.clear()
 	var v: BulletVolley2D = factory.spawn_volley(_data())
 	v.sprite_animation_finished.connect(_on_finished)
-	var extra := _extra
 	for f in 20:
 		await physics(1)
 	await idle(2)
 	assert_true(factory.debug_assert_no_dangling()["ok"], "%s: balanced books" % action)
 	if action == "spawn":
-		assert_eq(extra.size(), 1, "the handler spawned exactly once")
+		assert_eq(_extra.size(), 1, "the handler spawned exactly once")
 	expect_no_errors(action)
 
 
