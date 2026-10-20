@@ -52,7 +52,7 @@ using namespace godot;
 // The documented velocity composition: direction x speed + inherited
 // offset + the integrated fall speed (zero while gravity never acted).
 _ALWAYS_INLINE_ void BulletVolley2D::refresh_cached_velocity(int bullet_index) {
-	all_cached_velocity[bullet_index] = all_cached_direction[bullet_index] * all_cached_speed[bullet_index] + inherited_velocity_offset + ((bullet_index < (int)all_gravity_velocity.size()) ? all_gravity_velocity[bullet_index] : Vector2(0, 0));
+	all_cached_velocity[bullet_index] = all_cached_direction[bullet_index] * all_cached_speed[bullet_index] + bullet_drift(bullet_index) + ((bullet_index < (int)all_gravity_velocity.size()) ? all_gravity_velocity[bullet_index] : Vector2(0, 0));
 }
 
 // "<Class> '<path>'" for an emitter node: names the spawner or factory in

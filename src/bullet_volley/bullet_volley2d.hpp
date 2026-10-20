@@ -1931,6 +1931,33 @@ protected:
 	// on the very next frame. The multiplier re-applies below so an uncapped
 	// strength persists (1.0 = untouched). Reset on every new life/wake.
 	std::vector<real_t> all_bounce_speed_multiplier;
+	// Per-bullet mirror frame: every bounce composes its reflection into it.
+	// What the bullet does not steer itself follows it, so a bounce mirrors
+	// that too: its share of the inherited spawner momentum (the world motion
+	// reflects as a whole, the own speed is untouched) and its direction
+	// curves (the curve keeps its shape, mirrored off the wall). Identity
+	// until a bullet bounces; bounce_frames_active gates every reader.
+	struct BounceFrame2D {
+		Vector2 x_axis = Vector2(1, 0);
+		Vector2 y_axis = Vector2(0, 1);
+		_ALWAYS_INLINE_ Vector2 apply(const Vector2 &v) const { return Vector2(x_axis.x * v.x + y_axis.x * v.y, x_axis.y * v.x + y_axis.y * v.y); }
+		_ALWAYS_INLINE_ Vector2 unapply(const Vector2 &v) const { return Vector2(x_axis.x * v.x + x_axis.y * v.y, y_axis.x * v.x + y_axis.y * v.y); }
+		_ALWAYS_INLINE_ BounceFrame2D reflected(const Vector2 &n) const {
+			BounceFrame2D f;
+			f.x_axis = x_axis - n * ((real_t)2.0 * (x_axis.x * n.x + x_axis.y * n.y));
+			f.y_axis = y_axis - n * ((real_t)2.0 * (y_axis.x * n.x + y_axis.y * n.y));
+			return f;
+		}
+	};
+	std::vector<BounceFrame2D> all_bounce_frame;
+	bool bounce_frames_active = false;
+	// The bullet's share of the inherited momentum (mirrored by its bounces).
+	_ALWAYS_INLINE_ Vector2 bullet_drift(int bullet_index) const {
+		if (!bounce_frames_active || bullet_index < 0 || bullet_index >= (int)all_bounce_frame.size()) {
+			return inherited_velocity_offset;
+		}
+		return all_bounce_frame[bullet_index].apply(inherited_velocity_offset);
+	}
 	// Volley latch: true once any bullet carries a multiplier != 1. Sticky
 	// on purpose (per-bullet exact check does the real work); cleared on
 	// new life, teardown and disarm.
@@ -1962,12 +1989,15 @@ protected:
 		f(bounce_visual_pending, 0);
 		f(bounce_visual_target, Vector2(1, 0));
 		f(all_bounce_speed_multiplier, 1.0);
+		f(all_bounce_frame, BounceFrame2D());
 	}
 	void bounce_ledger_clear() {
 		visit_bounce_ledger([](auto &v, auto) { v.clear(); });
+		bounce_frames_active = false;
 	}
 	void bounce_ledger_assign() {
 		visit_bounce_ledger([&](auto &v, auto empty) { v.assign(amount_bullets, empty); });
+		bounce_frames_active = false;
 	}
 	// Sizes (or clears) the bounce ledger to match amount_bullets. Sized only
 	// while bouncing is armed; cleared when disarmed so disabled features

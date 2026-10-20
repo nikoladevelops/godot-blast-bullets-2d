@@ -117,6 +117,8 @@ struct BulletVolley2D::MoveTick2D {
 	bool per_bullet_homing = false; // some bullet holds its own targets
 	bool orbiting = false; // some bullet orbits
 	bool bounce = false; // bouncing is armed
+	// Per-bullet mirror frames (BounceFrame2D), null until a bullet bounced.
+	const BulletVolley2D::BounceFrame2D *bounce_frames = nullptr;
 	// Every always-sized per-bullet array covers [0, core_limit).
 	int core_limit = 0;
 	// Shared curve channels, sampled once (the same for every bullet).
@@ -238,6 +240,9 @@ void BulletVolley2D::move_bullets(double delta) {
 	const MoveTick2D t = [&]() {
 		MoveTick2D t;
 		t.delta = delta;
+		if (bounce_frames_active && (int)all_bounce_frame.size() >= amount_bullets) {
+			t.bounce_frames = all_bounce_frame.data();
+		}
 		// Unified precedence: a bullet's own deque wins; the shared deque is the
 		// broadcast fallback for bullets whose own deque is empty.
 		t.shared_homing = !shared_homing_deque.empty();
@@ -641,6 +646,15 @@ _ALWAYS_INLINE_ void BulletVolley2D::step_flock(const MoveTick2D &t, BulletStep2
 _ALWAYS_INLINE_ void BulletVolley2D::step_direction_curves(const MoveTick2D &t, BulletStep2D &b) {
 	const bool own_x = b.curves != nullptr && b.curves->x_direction_curve.is_valid();
 	const bool own_y = b.curves != nullptr && b.curves->y_direction_curve.is_valid();
+	if (!own_x && !own_y && !t.shared_x && !t.shared_y) {
+		return;
+	}
+	// A bounced bullet flies its curve mirrored off the wall: the curve
+	// works in the bullet's mirror frame.
+	const BounceFrame2D *frame = t.bounce_frames != nullptr ? &t.bounce_frames[b.i] : nullptr;
+	if (frame != nullptr) {
+		*b.direction = frame->unapply(*b.direction);
+	}
 	const BulletCurvesData2D *texture_source = nullptr;
 	if (own_x) {
 		apply_x_direction_curve(*b.direction, b.curves);
@@ -657,6 +671,9 @@ _ALWAYS_INLINE_ void BulletVolley2D::step_direction_curves(const MoveTick2D &t, 
 	} else if (t.shared_y) {
 		apply_direction_axis2d(*b.direction, 1, t.shared_y_mode, t.shared_y_offset, t.shared_y_strength);
 		texture_source = t.shared_curves;
+	}
+	if (frame != nullptr) {
+		*b.direction = frame->apply(*b.direction);
 	}
 	if (texture_source != nullptr) {
 		apply_direction_curve_texture_rotation_if_needed(*b.direction, *b.transf, t.delta, texture_source);
@@ -808,7 +825,7 @@ _ALWAYS_INLINE_ void BulletVolley2D::step_pattern_and_forces(const MoveTick2D &t
 			}
 		}
 	}
-	b.velocity_delta += inherited_velocity_offset * (real_t)delta;
+	b.velocity_delta += (t.bounce_frames != nullptr ? t.bounce_frames[i].apply(inherited_velocity_offset) : inherited_velocity_offset) * (real_t)delta;
 	if (gravity_active && t.gravity_window && i < (int)all_gravity.size() && i < (int)all_gravity_velocity.size()) {
 		const Vector2 base_g = all_gravity[i];
 		if (base_g.length_squared() > 0.0) {
@@ -1538,7 +1555,7 @@ _ALWAYS_INLINE_ void BulletVolley2D::update_homing(HomingTargetDeque &homing_deq
 	// bullet for its whole life): steering the own heading straight at the
 	// target let the drift carry the bullet past it.
 	const real_t own_speed = bullet_index < (int)all_cached_speed.size() ? all_cached_speed[bullet_index] : (real_t)0.0;
-	const Vector2 aim = homing_aim_through_drift(diff, inherited_velocity_offset, own_speed);
+	const Vector2 aim = homing_aim_through_drift(diff, bullet_drift(bullet_index), own_speed);
 	// If rotation is controlled via movement pattern (per-bullet or shared)
 	// or rotation data, just set direction directly toward target
 	if (check_exists_bullet_movement_pattern_data(bullet_index) || shared_movement_pattern_curve.is_valid() || is_rotation_data_active) {

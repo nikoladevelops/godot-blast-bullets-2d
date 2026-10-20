@@ -410,7 +410,7 @@ int BulletVolley2D::try_handle_bounce(CollisionType collision_type, int bullet_i
 	if (!dir.is_finite() || dir.length_squared() < 0.00000001) {
 		// Zero heading (unseeded ballistics): recover from velocity, else
 		// there is nothing meaningful to reflect.
-		Vector2 v0 = all_cached_velocity[bullet_index] - inherited_velocity_offset;
+		Vector2 v0 = all_cached_velocity[bullet_index] - bullet_drift(bullet_index);
 		if (v0.is_finite() && v0.length_squared() > 0.00000001) {
 			dir = v0.normalized();
 		} else {
@@ -638,9 +638,20 @@ int BulletVolley2D::try_handle_bounce(CollisionType collision_type, int bullet_i
 			commit_gravity = gv;
 		}
 	}
-	const Vector2 commit_velocity = new_dir * new_speed + inherited_velocity_offset + commit_gravity;
-	if (!commit_velocity.is_finite()) {
+	// The bullet's mirror frame takes this reflection too: its share of the
+	// inherited momentum (and its direction curves) reflect with it.
+	BounceFrame2D new_frame;
+	if (bullet_index < (int)all_bounce_frame.size()) {
+		new_frame = all_bounce_frame[bullet_index].reflected(surface_n);
+	}
+	const Vector2 commit_drift = new_frame.apply(inherited_velocity_offset);
+	const Vector2 commit_velocity = new_dir * new_speed + commit_drift + commit_gravity;
+	if (!commit_velocity.is_finite() || !new_frame.x_axis.is_finite() || !new_frame.y_axis.is_finite()) {
 		return 0;
+	}
+	if (bullet_index < (int)all_bounce_frame.size()) {
+		all_bounce_frame[bullet_index] = new_frame;
+		bounce_frames_active = true;
 	}
 	all_cached_direction[bullet_index] = new_dir;
 	all_cached_speed[bullet_index] = new_speed;

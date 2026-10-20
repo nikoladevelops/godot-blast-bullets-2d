@@ -108,7 +108,7 @@ int BulletVolley2D::split_capture(int bullet_index, int cause, const Transform2D
 	request.speed = all_cached_speed[bullet_index];
 	request.max_speed = bullet_index < (int)all_cached_max_speed.size() ? all_cached_max_speed[bullet_index] : request.speed;
 	request.acceleration = bullet_index < (int)all_cached_acceleration.size() ? all_cached_acceleration[bullet_index] : 0.0f;
-	request.inherited_velocity = inherited_velocity_offset;
+	request.inherited_velocity = bullet_drift(bullet_index); // mirrored by its bounces
 	request.owner_id = owner_spawner_id;
 	request.shot_salt = split_shot_salt;
 	request.roll_salt = split_roll_salt(split_shot_salt, split_count_of(bullet_index));

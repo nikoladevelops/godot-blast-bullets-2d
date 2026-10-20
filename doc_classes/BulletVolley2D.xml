@@ -2492,7 +2492,7 @@
 			How often it should cache the position of the targets so that they can be re-used instead of fetching them every frame. Increase if you want to boost performance.
 		</member>
 		<member name="inherited_velocity_offset" type="Vector2" setter="set_inherited_velocity_offset" getter="get_inherited_velocity_offset" default="Vector2(0, 0)">
-			Velocity added to every bullet for its whole life, e.g. the emitter's momentum ([member BulletSpawner2D.inherit_movement_velocity]). Homing bullets aim through it: they cancel its part across the line of sight to the target, as long as their own speed is larger than that part.
+			Velocity added to every bullet for its whole life, e.g. the emitter's momentum ([member BulletSpawner2D.inherit_movement_velocity]). Homing bullets aim through it: they cancel its part across the line of sight to the target, as long as their own speed is larger than that part. A bouncing bullet mirrors its own share at every bounce, so its whole world motion reflects off the wall while its own speed stays unchanged (a fast ship's bullets bounce back instead of drifting into the wall); [method get_bullet_velocity] includes the mirrored share.
 		</member>
 		<member name="is_attachments_auto_pooling_enabled" type="bool" setter="set_is_attachments_auto_pooling_enabled" getter="get_is_attachments_auto_pooling_enabled" default="true">
 			Whether the attachments auto pooling is enabled or not.
