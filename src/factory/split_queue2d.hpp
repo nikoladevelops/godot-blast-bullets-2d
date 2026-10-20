@@ -103,7 +103,12 @@ struct SplitRequest2D {
 	bool has_rotation = false;
 	Transform2D pose;
 	Vector2 direction;
-	Vector2 inherited_velocity;
+	Vector2 inherited_velocity; // the volley's drift, unmirrored (the frame mirrors it)
+	// The parent bullet's bounce mirror frame (BulletVolley2D::BounceFrame2D):
+	// its children fly their drift and direction curves mirrored the same way.
+	bool framed = false;
+	Vector2 frame_x = Vector2(1, 0);
+	Vector2 frame_y = Vector2(0, 1);
 	real_t speed = 0.0;
 	real_t max_speed = 0.0;
 	real_t acceleration = 0.0;

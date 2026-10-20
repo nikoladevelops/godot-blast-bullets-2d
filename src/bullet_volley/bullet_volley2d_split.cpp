@@ -108,7 +108,12 @@ int BulletVolley2D::split_capture(int bullet_index, int cause, const Transform2D
 	request.speed = all_cached_speed[bullet_index];
 	request.max_speed = bullet_index < (int)all_cached_max_speed.size() ? all_cached_max_speed[bullet_index] : request.speed;
 	request.acceleration = bullet_index < (int)all_cached_acceleration.size() ? all_cached_acceleration[bullet_index] : 0.0f;
-	request.inherited_velocity = bullet_drift(bullet_index); // mirrored by its bounces
+	request.inherited_velocity = inherited_velocity_offset;
+	if (bounce_frames_active && bullet_index < (int)all_bounce_frame.size()) {
+		request.framed = true;
+		request.frame_x = all_bounce_frame[bullet_index].x_axis;
+		request.frame_y = all_bounce_frame[bullet_index].y_axis;
+	}
 	request.owner_id = owner_spawner_id;
 	request.shot_salt = split_shot_salt;
 	request.roll_salt = split_roll_salt(split_shot_salt, split_count_of(bullet_index));
@@ -252,6 +257,18 @@ void BulletVolley2D::split_seed_children(const SplitRequest2D &request, const Ve
 	const BulletSplitStage2D *stage = request.stage.ptr();
 	if (stage == nullptr) {
 		return;
+	}
+	// A bounced parent hands its mirror frame on (before the velocities below
+	// compose the mirrored drift).
+	if (request.framed) {
+		ensure_bounce_frames();
+		BounceFrame2D frame;
+		frame.x_axis = request.frame_x;
+		frame.y_axis = request.frame_y;
+		for (int i = 0; i < Math::min(count, (int)all_bounce_frame.size()); ++i) {
+			all_bounce_frame[i] = frame;
+		}
+		bounce_frames_active = true;
 	}
 	const int limit = Math::min(count, Math::min(amount_bullets, Math::min((int)all_cached_speed.size(), (int)all_cached_direction.size())));
 	const bool has_max = (int)all_cached_max_speed.size() >= limit;

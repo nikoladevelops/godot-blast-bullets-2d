@@ -640,15 +640,13 @@ int BulletVolley2D::try_handle_bounce(CollisionType collision_type, int bullet_i
 	}
 	// The bullet's mirror frame takes this reflection too: its share of the
 	// inherited momentum (and its direction curves) reflect with it.
-	BounceFrame2D new_frame;
-	if (bullet_index < (int)all_bounce_frame.size()) {
-		new_frame = all_bounce_frame[bullet_index].reflected(surface_n);
-	}
+	BounceFrame2D new_frame = (bullet_index < (int)all_bounce_frame.size() ? all_bounce_frame[bullet_index] : BounceFrame2D()).reflected(surface_n);
 	const Vector2 commit_drift = new_frame.apply(inherited_velocity_offset);
 	const Vector2 commit_velocity = new_dir * new_speed + commit_drift + commit_gravity;
 	if (!commit_velocity.is_finite() || !new_frame.x_axis.is_finite() || !new_frame.y_axis.is_finite()) {
 		return 0;
 	}
+	ensure_bounce_frames();
 	if (bullet_index < (int)all_bounce_frame.size()) {
 		all_bounce_frame[bullet_index] = new_frame;
 		bounce_frames_active = true;

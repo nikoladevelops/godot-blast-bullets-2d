@@ -334,6 +334,7 @@ void BulletVolley2D::begin_life(const BulletVolleyData2D &data, uint64_t new_own
 	owner_spawner_id = new_owner_spawner_id;
 	orphaned_spawner_path = String();
 	inherited_velocity_offset = new_inherited_velocity_offset;
+	reset_bounce_frames();
 	// Runtime-only knobs spawn data never seeds start from their defaults.
 	reset_pooling_flags_to_default();
 	collision_dedup_by_object = true;
@@ -945,6 +946,9 @@ void BulletVolley2D::reset_bullet_runtime_state(int bullet_index) {
 			v[bullet_index] = empty;
 		}
 	});
+	if (bullet_index < (int)all_bounce_frame.size()) {
+		all_bounce_frame[bullet_index] = BounceFrame2D();
+	}
 	if (bullet_index < (int)all_gravity_velocity.size()) {
 		all_gravity_velocity[bullet_index] = Vector2(0, 0);
 	}

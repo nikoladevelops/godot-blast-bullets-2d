@@ -1949,8 +1949,20 @@ protected:
 			return f;
 		}
 	};
+	// Own storage (not the bounce ledger): split children of a bounced bullet
+	// carry its frame without bouncing themselves. Sized on first use, reset
+	// per life (begin_life) and per bullet reset.
 	std::vector<BounceFrame2D> all_bounce_frame;
 	bool bounce_frames_active = false;
+	void reset_bounce_frames() {
+		all_bounce_frame.clear();
+		bounce_frames_active = false;
+	}
+	void ensure_bounce_frames() {
+		if ((int)all_bounce_frame.size() != amount_bullets) {
+			all_bounce_frame.assign((size_t)MAX(amount_bullets, 0), BounceFrame2D());
+		}
+	}
 	// Out of line: keeps the per-bullet loop of volleys that never bounced
 	// as small as before (an inlined frame apply cost split_storm ~15%).
 	_NO_INLINE_ Vector2 bounce_frame_drift(int bullet_index) const { return bullet_drift(bullet_index); }
@@ -1994,15 +2006,12 @@ protected:
 		f(bounce_visual_pending, 0);
 		f(bounce_visual_target, Vector2(1, 0));
 		f(all_bounce_speed_multiplier, 1.0);
-		f(all_bounce_frame, BounceFrame2D());
 	}
 	void bounce_ledger_clear() {
 		visit_bounce_ledger([](auto &v, auto) { v.clear(); });
-		bounce_frames_active = false;
 	}
 	void bounce_ledger_assign() {
 		visit_bounce_ledger([&](auto &v, auto empty) { v.assign(amount_bullets, empty); });
-		bounce_frames_active = false;
 	}
 	// Sizes (or clears) the bounce ledger to match amount_bullets. Sized only
 	// while bouncing is armed; cleared when disarmed so disabled features

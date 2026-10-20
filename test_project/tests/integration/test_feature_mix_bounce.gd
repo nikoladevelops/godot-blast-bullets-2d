@@ -15,6 +15,8 @@ var bounces: Dictionary = {} # bullet index -> physics frame of its first bounce
 var bounce_count := 0
 var frame := 0
 var split_children: Array = []
+var spawned_data: BulletVolleyData2D
+var parent: BulletVolley2D
 
 
 func _flat_curve(value: float) -> Curve:
@@ -53,7 +55,7 @@ const CASES := ["plain", "rotate_texture_off", "smooth_visual",
 	"texture_rotation", "speed_curve", "direction_curve_override", "direction_curve_additive",
 	"movement_pattern", "time_scale_half",
 	"homing_flock", "homing_wobble_angular", "homing_gravity", "homing_inherited", "homing_direction_curve",
-	"flock_wobble", "split_children", "speed_curve_inherited"]
+	"flock_wobble", "split_children", "speed_curve_inherited", "split_children_direction_curve"]
 
 
 func _configure(name: String, d: BulletVolleyData2D) -> void:
@@ -84,7 +86,7 @@ func _configure(name: String, d: BulletVolleyData2D) -> void:
 			w.amplitude = 0.3
 			w.frequency_hz = 3.0
 			d.shared_bullet_wobble_data = w
-		"homing_direction_curve":
+		"homing_direction_curve", "split_children_direction_curve":
 			var c := BulletCurvesData2D.new()
 			c.x_direction_curve = _flat_curve(1.0)
 			c.x_direction_use_unit_curve = false
@@ -110,7 +112,7 @@ func _after(name: String, v: BulletVolley2D) -> void:
 	if name.begins_with("homing"):
 		v.shared_homing_deque_push_back_global_position_target(Vector2(100, -500))
 	match name:
-		"split_children":
+		"split_children", "split_children_direction_curve":
 			var stage := BulletSplitStage2D.new()
 			stage.count = 2
 			stage.split_on_bounce = true
@@ -121,7 +123,11 @@ func _after(name: String, v: BulletVolley2D) -> void:
 			stage.spread_degrees = 40.0
 			var chain := BulletSplitData2D.new()
 			chain.stages = [stage]
-			var child := _data(2, 300.0)
+			var child: BulletVolleyData2D = _data(2, 300.0)
+			if name == "split_children_direction_curve":
+				child.shared_bullet_curves_data = spawned_data.shared_bullet_curves_data # the parent's direction curve
+				child.set_collision_mask_from_array([])
+				child.set_bounce_mask_from_array([])
 			v.split_set_data(chain, child)
 			factory.bullet_split.connect(func(_p, _c, children, _d) -> void: split_children.append(children))
 		"flock_face", "flock_no_face", "homing_flock", "flock_wobble":
@@ -141,7 +147,9 @@ func inherited_case(name: String) -> bool:
 	return name.ends_with("inherited") or name == "inherited_velocity"
 
 
-func _on_bounce(_t: Object, _v: BulletVolley2D, i: int) -> void:
+func _on_bounce(_t: Object, v: BulletVolley2D, i: int) -> void:
+	if v != parent:
+		return
 	bounce_count += 1
 	if not bounces.has(i):
 		bounces[i] = frame
@@ -157,8 +165,10 @@ func test_every_bullet_leaves_the_wall_after_its_bounce(name: String = use_param
 	var n := 3 if name.contains("flock") else 1
 	var d := _data(n, 150.0 if inherited_case(name) else 300.0)
 	_configure(name, d)
+	spawned_data = d
 	var inherited := Vector2(400, 0) if name.ends_with("inherited") or name == "inherited_velocity" else Vector2.ZERO
 	var v: BulletVolley2D = factory.spawn_volley(d, inherited)
+	parent = v
 	_after(name, v)
 	var xs: Dictionary = {} # bullet -> [x per frame after its bounce]
 	for k in 240:
@@ -186,7 +196,8 @@ func test_every_bullet_leaves_the_wall_after_its_bounce(name: String = use_param
 	assert_eq(bounce_count, n, "%s: one bounce per bullet (no re-hits)" % name)
 	for i in n:
 		assert_true(v.get_bullet_transform(i).is_finite() and v.get_bullet_velocity(i).is_finite(), "%s: finite" % name)
-	if name == "split_children":
+	if name.begins_with("split_children"):
+		await physics(3) # the children fly a few ticks with their curves
 		assert_gt(split_children.size(), 0, "the bounce split")
 		for children in split_children:
 			if is_instance_valid(children):
