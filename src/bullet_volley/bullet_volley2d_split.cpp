@@ -169,6 +169,9 @@ int BulletVolley2D::split_capture(int bullet_index, int cause, const Transform2D
 		request.arming = split_arming_cache;
 	}
 	bullet_factory->split_enqueue(std::move(request));
+	if (cause == SPLIT_CAUSE_MANUAL && split_manual_tally != nullptr) {
+		++*split_manual_tally;
+	}
 	if ((int)split_counts.size() != amount_bullets) {
 		split_counts.assign(amount_bullets, 0);
 	}
@@ -413,17 +416,24 @@ int BulletVolley2D::all_bullets_split(int bullet_index_start, int bullet_index_e
 	if (picked.empty() || !split_possible_now()) {
 		return 0;
 	}
-	BulletFactory2D *factory = bullet_factory;
 	const std::shared_ptr<bool> life = factory_life;
-	const uint64_t recorded_before = factory->get_split_recorded_total();
+	// Counts this call's own splits: attachment callbacks inside the batch
+	// may split other bullets (which are theirs to count).
+	int tally = 0;
+	int *const outer_tally = split_manual_tally;
+	split_manual_tally = &tally;
+	const uint64_t self_id = get_instance_id();
 	const int kept = split_live_bullets(picked, SPLIT_CAUSE_MANUAL, EFFECT_ON_CLEAR);
+	if (ObjectDB::get_instance(ObjectID(self_id)) == this) {
+		split_manual_tally = outer_tally;
+	}
 	if (kept >= 0) {
 		return kept; // the parents stayed: no user code ran
 	}
 	if (life != nullptr && !*life) {
 		return 0; // a callback freed the factory
 	}
-	return (int)(factory->get_split_recorded_total() - recorded_before);
+	return tally;
 }
 
 bool BulletVolley2D::split_possible_now() const {

@@ -2858,6 +2858,9 @@ public:
 	std::shared_ptr<const SplitArming2D> split_arming_cache;
 	uint32_t split_arming_serial = 1;
 	uint32_t split_arming_cache_serial = 0;
+	// The running all_bullets_split's count of its own manual splits (a
+	// stack local; nested calls save and restore it).
+	int *split_manual_tally = nullptr;
 	// THE one place that arms or disarms splitting (spawner arming, the
 	// factory flush, split_set_data/split_clear, release_life).
 	void split_arm(const std::shared_ptr<SplitConfig2D> &config, const Ref<BulletVolleyData2D> &spawn_data, int depth, uint64_t shot_salt = 0);

@@ -556,3 +556,26 @@ func test_fixed_speed_children_keep_an_unlimited_top_speed() -> void:
 	for i in 4: # the children live 0.1 s like their parent
 		factory.debug_advance_time(DT)
 	assert_gt(c.get_bullet_velocity(0).length(), 70.0, "40 px/s + 600 px/s^2 x 4 ticks, no cap at 40")
+
+
+## all_bullets_split counts the splits of its own bullets: an attachment
+## callback that splits another volley's bullets meanwhile is not counted.
+func test_all_bullets_split_counts_only_its_own_splits() -> void:
+	AttachmentHookProbe2D.clear_hook()
+	var probe: Node = AttachmentHookProbe2D.new()
+	var scene := PackedScene.new()
+	assert_eq(scene.pack(probe), OK, "probe scene packs")
+	probe.free()
+	var other := quick_volley(4, 0.0, 5.0)
+	other.split_set_data(_chain([_stage(2)]), H.make_volley_data(1, 0.0, 5.0))
+	var data := H.make_volley_data(2, 0.0, 5.0)
+	data.shared_bullet_attachment = scene
+	var v := factory.spawn_volley(data)
+	v.split_set_data(_chain([_stage(2)]), H.make_volley_data(1, 0.0, 5.0))
+	AttachmentHookProbe2D.hook_on = ["disable"]
+	AttachmentHookProbe2D.hook = func() -> void: other.all_bullets_split()
+	assert_eq(v.all_bullets_split(), 2, "two own bullets split (the other volley's four are not counted)")
+	assert_eq(AttachmentHookProbe2D.fired, 1, "the callback split the other volley")
+	AttachmentHookProbe2D.clear_hook()
+	factory.debug_advance_time(DT)
+	assert_eq(splits.size(), 6, "every split happened")
