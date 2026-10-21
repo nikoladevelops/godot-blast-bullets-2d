@@ -372,7 +372,7 @@ void PatternSpawner2D::set_burst_enabled(bool value) {
 		telegraph_pending = false;
 		telegraph_time_left = 0.0;
 	} else if (is_inside_tree() && !Engine::get_singleton()->is_editor_hint()) {
-		set_process(true);
+		set_loop_active(true);
 	}
 }
 
@@ -430,7 +430,7 @@ void PatternSpawner2D::set_telegraph_enabled(bool value) {
 		telegraph_pending = false;
 		telegraph_time_left = 0.0;
 	} else if (is_inside_tree() && !Engine::get_singleton()->is_editor_hint()) {
-		set_process(true);
+		set_loop_active(true);
 	}
 }
 
@@ -588,12 +588,12 @@ void PatternSpawner2D::refresh_process_state() {
 		update_preview_process_state();
 		return;
 	}
-	set_process(needs_process());
+	set_loop_active(needs_process());
 }
 
 void PatternSpawner2D::refresh_process_state_editor_guarded() {
 	if (!Engine::get_singleton()->is_editor_hint() && is_inside_tree()) {
-		set_process(needs_process());
+		set_loop_active(needs_process());
 	}
 }
 
@@ -791,7 +791,7 @@ bool PatternSpawner2D::shoot_once() {
 	if (!cadence_replaced && max_volleys >= 0 && volleys_fired == max_volleys) {
 		// Stop shooting, but stay awake while spinning, retargeting, bursting,
 		// telegraphing, sequencing, or previewing (same keep-awake set as everywhere else).
-		set_process(needs_process_besides_shooting());
+		set_loop_active(needs_process_besides_shooting());
 		// shooting_* signals track auto-fire: manual shots on a spawner with
 		// auto-shooting off never report a finish.
 		if (shooting_enabled && reports_shooting_transitions(this)) {
@@ -892,7 +892,7 @@ void PatternSpawner2D::_ready() {
 		movement_play();
 	}
 	if (preview_active()) {
-		set_process(true);
+		set_loop_active(true);
 	} else {
 		refresh_process_state();
 	}
@@ -1044,6 +1044,62 @@ void PatternSpawner2D::_process(double delta) {
 		}
 		return;
 	}
+	if (process_callback == PROCESS_IDLE) {
+		run_frame(delta);
+	}
+}
+
+void PatternSpawner2D::_physics_process(double delta) {
+	if (process_callback == PROCESS_PHYSICS && !Engine::get_singleton()->is_editor_hint()) {
+		run_frame(delta);
+	}
+}
+
+void PatternSpawner2D::set_loop_active(bool active) {
+	if (Engine::get_singleton()->is_editor_hint() || process_callback == PROCESS_IDLE) {
+		set_process(active);
+		set_physics_process(false);
+	} else {
+		set_physics_process(active);
+		set_process(false);
+	}
+}
+
+bool PatternSpawner2D::is_loop_active() const {
+	if (!Engine::get_singleton()->is_editor_hint() && process_callback == PROCESS_PHYSICS) {
+		return is_physics_processing();
+	}
+	return is_processing();
+}
+
+void PatternSpawner2D::set_process_callback(SpawnerProcessCallback value) {
+	if (value != PROCESS_IDLE && value != PROCESS_PHYSICS) {
+		UtilityFunctions::push_error(String(get_class()) + ": process_callback must be 0 (Idle) or 1 (Physics), keeping the old value.");
+		return;
+	}
+	if (value == process_callback) {
+		return;
+	}
+	const bool was_active = is_inside_tree() && is_loop_active();
+	process_callback = value;
+	if (is_inside_tree() && !Engine::get_singleton()->is_editor_hint()) {
+		set_loop_active(was_active || needs_process());
+	}
+}
+
+void PatternSpawner2D::set_volley_time_scale(double value) {
+	if (!Math::is_finite(value) || value < 0.0) {
+		UtilityFunctions::push_error(String(get_class()) + ": volley_time_scale must be finite and >= 0 (0 freezes what this spawner fired), keeping the old value.");
+		return;
+	}
+	volley_time_scale = value;
+}
+
+double PatternSpawner2D::get_fired_time_factor() const {
+	return (time_scale_affects_volleys ? time_scale : 1.0) * volley_time_scale;
+}
+
+void PatternSpawner2D::run_frame(double delta) {
 	bool delta_ok = Math::is_finite(delta) && delta > 0.0;
 	if (delta_ok && delta > 0.5) {
 		delta = 0.5; // clamp hitch spikes so one stall can't fast-forward volleys
@@ -1113,8 +1169,8 @@ void PatternSpawner2D::_process(double delta) {
 			auto_fire_in_progress = false;
 		}
 		// Telegraph never sleeps the loop: the countdown owns it.
-		if (!is_processing()) {
-			set_process(true);
+		if (!is_loop_active()) {
+			set_loop_active(true);
 		}
 		return;
 	}
@@ -1152,8 +1208,8 @@ void PatternSpawner2D::_process(double delta) {
 			}
 			burst_time_left += overshoot; // fire_burst_volley set the next wait
 		}
-		if (!is_processing()) {
-			set_process(true);
+		if (!is_loop_active()) {
+			set_loop_active(true);
 		}
 		return;
 	}
@@ -1181,8 +1237,8 @@ void PatternSpawner2D::_process(double delta) {
 			}
 			pattern_list_time_left = pattern_list_interval_sec + overshoot;
 		}
-		if (!is_processing()) {
-			set_process(true);
+		if (!is_loop_active()) {
+			set_loop_active(true);
 		}
 		return;
 	}
@@ -1190,7 +1246,7 @@ void PatternSpawner2D::_process(double delta) {
 		// Sleep when there is nothing to do, but stay awake while spinning,
 		// retargeting, bursting, telegraphing, sequencing, or while the
 		// runtime preview loop must keep refreshing.
-		set_process(needs_process_besides_shooting());
+		set_loop_active(needs_process_besides_shooting());
 		return;
 	}
 	// Main shooting timer: accumulator with catch-up. Overshoot carries into
@@ -1293,7 +1349,7 @@ void PatternSpawner2D::begin_burst_chain(bool auto_started) {
 	}
 	burst_shots_left = length;
 	burst_time_left = 0.0;
-	set_process(true);
+	set_loop_active(true);
 }
 
 void PatternSpawner2D::begin_telegraph(bool auto_started) {
@@ -1314,7 +1370,7 @@ void PatternSpawner2D::begin_telegraph(bool auto_started) {
 	telegraph_time_left = next_telegraph_sec();
 	emit_on2d(this, "volley_telegraphed", aim);
 	fire_spawner_sound(BulletSoundData2D::SOUND_ON_TELEGRAPH);
-	set_process(true);
+	set_loop_active(true);
 }
 
 void PatternSpawner2D::cancel_burst_chain() {
@@ -1374,7 +1430,7 @@ void PatternSpawner2D::fire_burst_volley() {
 			burst_shots_fired = 0;
 			emit_on2d(this, "burst_finished");
 		}
-		set_process(true);
+		set_loop_active(true);
 		return;
 	}
 	// Plain telegraphed shot (also the manual-begin_burst escape hatch when
@@ -1459,7 +1515,7 @@ int PatternSpawner2D::spawn_pattern_list(const Array &entries, bool simultaneous
 	pattern_list_cursor = 0;
 	pattern_list_time_left = 0.0;
 	pattern_list_active = true;
-	set_process(true);
+	set_loop_active(true);
 	return pattern_list_entries.size();
 }
 

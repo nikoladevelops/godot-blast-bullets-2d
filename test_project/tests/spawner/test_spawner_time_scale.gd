@@ -2,7 +2,9 @@ extends BlastTest
 ## Time scale on spawners: a spawner runs on factory.time_scale x its own
 ## time_scale (cadence, initial delay, bursts, telegraph, spin, movement),
 ## and its volleys follow the same product unless
-## time_affects_volleys is off. Scale 0 freezes and resumes with the exact
+## time_affects_volleys is off; volley_time_scale scales only what the
+## spawner fired (0 = time stop for its bullets while it keeps firing).
+## Scale 0 freezes and resumes with the exact
 ## remaining time; huge scales stay bounded; orphans fall back to the factory
 ## scale; nothing leaks into pooled volleys. One idle frame = 1/60 s.
 
@@ -47,9 +49,10 @@ func test_defaults_and_group() -> void:
 	for p in sp.get_property_list():
 		if p["usage"] & PROPERTY_USAGE_GROUP:
 			group = p["name"]
-		elif p["name"] in ["time_scale", "time_scale_affects_volleys"]:
+		elif p["name"] in ["time_scale", "time_scale_affects_volleys", "volley_time_scale", "process_callback"]:
 			found[p["name"]] = group
-	assert_eq(found, { "time_scale": "Time", "time_scale_affects_volleys": "Time" }, "both live in the Time group")
+	assert_eq(found, { "time_scale": "Time", "time_scale_affects_volleys": "Time", "volley_time_scale": "Time", "process_callback": "Time" }, "all live in the Time group")
+	assert_eq(sp.volley_time_scale, 1.0, "fired bullets at real time by default")
 
 
 func test_setter_rejects_bad_values_and_keeps_the_old_one() -> void:
@@ -336,3 +339,54 @@ func test_scale_zero_freezes_pattern_lists_and_the_retarget_countdown() -> void:
 	assert_eq(fired.size(), 4, "the list finished on the resumed clock")
 	assert_gt(retargets[0], retarget_before, "retargeting resumed")
 	assert_false(sp.is_pattern_list_active(), "done")
+
+
+func test_volley_time_scale_scales_only_what_the_spawner_fired() -> void:
+	var sp := _shooter(0.1, 120.0)
+	sp.volley_time_scale = 0.5
+	_start(sp)
+	await idle(1)
+	var v: BulletVolley2D = fired[0]
+	var x0: float = v.get_bullet_transform(0).origin.x
+	var shots := await _shots_over(60)
+	assert_between(shots, 9, 11, "the spawner keeps its own cadence (10 shots a second)")
+	assert_almost_eq(v.get_bullet_transform(0).origin.x - x0, 60.0, 2.5, "its bullets fly at half speed (60 of 120 px in a second)")
+
+
+func test_volley_time_scale_zero_is_a_time_stop_for_its_bullets() -> void:
+	var sp := _shooter(0.1, 120.0)
+	sp.time_scale_affects_volleys = false # applies regardless of this switch
+	_start(sp)
+	await idle(3)
+	sp.volley_time_scale = 0.0
+	var v: BulletVolley2D = fired[0]
+	var x0: float = v.get_bullet_transform(0).origin.x
+	var shots := await _shots_over(30)
+	assert_gt(shots, 0, "the spawner keeps firing")
+	assert_eq(v.get_bullet_transform(0).origin.x, x0, "its bullets hold still")
+	for w in fired:
+		assert_true(is_instance_valid(w) and not w.is_pooled(), "frozen bullets never expire")
+	sp.volley_time_scale = 1.0
+	await idle(2)
+	assert_gt(v.get_bullet_transform(0).origin.x, x0, "and fly on when time resumes")
+
+
+func test_volley_time_scale_rejects_and_keeps() -> void:
+	var sp := make_spawner()
+	sp.volley_time_scale = 2.0
+	for bad in [NAN, INF, -0.5]:
+		sp.volley_time_scale = bad
+		expect_error_sequence(["BulletSpawner2D: volley_time_scale must be finite and >= 0 (0 freezes what this spawner fired), keeping the old value."])
+	assert_eq(sp.volley_time_scale, 2.0, "kept")
+
+
+func test_orphans_leave_the_time_stop() -> void:
+	var sp := _shooter(10.0, 120.0)
+	sp.volley_time_scale = 0.0
+	_start(sp)
+	await idle(1)
+	var v: BulletVolley2D = fired[0]
+	var x0: float = v.get_bullet_transform(0).origin.x
+	sp.free()
+	await idle(10)
+	assert_gt(v.get_bullet_transform(0).origin.x, x0, "an orphan runs on the factory scale alone")

@@ -164,7 +164,12 @@ void PatternSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_transforms_generator", "generator"), &PatternSpawner2D::set_transforms_generator);
 	ClassDB::bind_method(D_METHOD("get_effective_generator"), &PatternSpawner2D::get_effective_generator);
 
-	ADD_GROUP("Time", "time_");
+	ADD_GROUP("Time", "");
+	ClassDB::bind_method(D_METHOD("get_process_callback"), &PatternSpawner2D::get_process_callback);
+	ClassDB::bind_method(D_METHOD("set_process_callback", "value"), &PatternSpawner2D::set_process_callback);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "process_callback", PROPERTY_HINT_ENUM, "Idle,Physics"), "set_process_callback", "get_process_callback");
+	BIND_ENUM_CONSTANT(PROCESS_IDLE);
+	BIND_ENUM_CONSTANT(PROCESS_PHYSICS);
 	ClassDB::bind_method(D_METHOD("get_time_scale"), &PatternSpawner2D::get_time_scale);
 	ClassDB::bind_method(D_METHOD("set_time_scale", "value"), &PatternSpawner2D::set_time_scale);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "time_scale", PROPERTY_HINT_RANGE, "0,4,0.01,or_greater"), "set_time_scale", "get_time_scale");
@@ -172,6 +177,9 @@ void PatternSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_time_scale_affects_volleys", "value"), &PatternSpawner2D::set_time_scale_affects_volleys);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "time_scale_affects_volleys"), "set_time_scale_affects_volleys", "get_time_scale_affects_volleys");
 	ClassDB::bind_method(D_METHOD("get_process_time_scale"), &PatternSpawner2D::get_process_time_scale);
+	ClassDB::bind_method(D_METHOD("get_volley_time_scale"), &PatternSpawner2D::get_volley_time_scale);
+	ClassDB::bind_method(D_METHOD("set_volley_time_scale", "value"), &PatternSpawner2D::set_volley_time_scale);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "volley_time_scale", PROPERTY_HINT_RANGE, "0,4,0.01,or_greater"), "set_volley_time_scale", "get_volley_time_scale");
 
 	ADD_GROUP("Bullet Patterns", "");
 	// Hand-written accessors of the group (PATTERN_PROPERTY rows); the

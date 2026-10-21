@@ -734,6 +734,20 @@ public:
 
 	double time_scale = 1.0;
 	bool time_scale_affects_volleys = true;
+	// Everything this spawner fired runs on this too (the spawner itself does
+	// not): 0 freezes its bullets in place while it keeps moving and firing.
+	double volley_time_scale = 1.0;
+	// Which callback runs the runtime loop (movement, spin, countdowns, shots).
+	// SERIALIZED ids: never renumber.
+	enum SpawnerProcessCallback : int {
+		// Every rendered frame (smooth motion without project interpolation).
+		PROCESS_IDLE = 0,
+		// Every physics tick: shots line up with the bullets' ticks, so streams
+		// are evenly spaced at any frame rate (pair with physics interpolation
+		// for smooth spawner motion).
+		PROCESS_PHYSICS = 1
+	};
+	SpawnerProcessCallback process_callback = PROCESS_IDLE;
 	// False (default): a muzzle outside the factory's despawn bounds (while they
 	// are enabled) does not shoot, the bullets would be culled at once.
 	bool shoot_outside_despawn_bounds = false;
@@ -773,6 +787,19 @@ public:
 	void set_time_scale(double value);
 	bool get_time_scale_affects_volleys() const { return time_scale_affects_volleys; }
 	void set_time_scale_affects_volleys(bool value) { time_scale_affects_volleys = value; }
+	double get_volley_time_scale() const { return volley_time_scale; }
+	void set_volley_time_scale(double value);
+	// time_scale (while it affects volleys) x volley_time_scale: what the
+	// factory multiplies into the ticks of everything this spawner fired.
+	double get_fired_time_factor() const;
+	SpawnerProcessCallback get_process_callback() const { return process_callback; }
+	void set_process_callback(SpawnerProcessCallback value);
+	// The runtime loop's switch: _process (Idle) or _physics_process
+	// (Physics); the editor preview always uses _process.
+	void set_loop_active(bool active);
+	bool is_loop_active() const;
+	// One step of the runtime loop (either callback).
+	void run_frame(double delta);
 	// spawner scale x factory scale, 0 when either is not finite and positive.
 	double get_process_time_scale() const;
 	bool get_shoot_outside_despawn_bounds() const { return shoot_outside_despawn_bounds; }
@@ -1130,6 +1157,7 @@ public:
 
 	virtual void _ready() override;
 	virtual void _process(double delta) override;
+	virtual void _physics_process(double delta) override;
 	// Plain name (no override): godot-cpp routes notifications to this
 	// method through the binding machinery, same as BulletFactory2D.
 	void _notification(int p_what);
@@ -1628,3 +1656,4 @@ BLAST_VARIANT_ENUM_CAST(BlastBullets2D::PatternSpawner2D::MovementLoopMode);
 BLAST_VARIANT_ENUM_CAST(BlastBullets2D::PatternSpawner2D::MovementDirection);
 BLAST_VARIANT_ENUM_CAST(BlastBullets2D::PatternSpawner2D::MovementTiming);
 BLAST_VARIANT_ENUM_CAST(BlastBullets2D::PatternSpawner2D::SpawnOffsetSpace);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::PatternSpawner2D::SpawnerProcessCallback);

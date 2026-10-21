@@ -415,3 +415,60 @@ func test_burst_telegraph_and_pattern_list_countdowns() -> void:
 	assert_almost_eq(sp.get_pattern_list_time_left(), 0.3 - 1.0 / 60.0, 0.03, "the next entry")
 	sp.stop_pattern_list()
 	assert_eq(sp.get_pattern_list_time_left(), 0.0, "stopped")
+
+
+## process_callback: the loop (cadence, movement, spin, shots) runs in idle
+## frames (Idle, the default) or in physics ticks (Physics).
+func test_process_callback_runs_the_loop_in_the_chosen_callback() -> void:
+	assert_eq([BulletSpawner2D.PROCESS_IDLE, BulletSpawner2D.PROCESS_PHYSICS], [0, 1], "serialized ids")
+	for mode in [BulletSpawner2D.PROCESS_IDLE, BulletSpawner2D.PROCESS_PHYSICS]:
+		var sp := make_spawner(H.make_volley_data(1, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
+		assert_eq(sp.process_callback, BulletSpawner2D.PROCESS_IDLE, "idle by default")
+		sp.process_callback = mode
+		sp.shoot_interval_sec = 0.1
+		sp.shoot_initial_delay_sec = 0.0
+		var in_physics: Array = []
+		sp.volley_fired.connect(func(_v, _n) -> void: in_physics.append(Engine.is_in_physics_frame()))
+		sp.set_shooting_enabled(true)
+		await idle(31)
+		var physics_mode: bool = mode == BulletSpawner2D.PROCESS_PHYSICS
+		assert_between(in_physics.size(), 5, 6, "mode %d: 10 shots a second" % mode)
+		assert_true(in_physics.all(func(x): return x == physics_mode), "mode %d: every shot in the chosen callback" % mode)
+		assert_eq(sp.is_physics_processing(), physics_mode, "mode %d: physics processing" % mode)
+		assert_eq(sp.is_processing(), not physics_mode, "mode %d: idle processing" % mode)
+
+
+func test_switching_process_callback_keeps_the_cadence() -> void:
+	var sp := make_spawner(H.make_volley_data(1, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
+	sp.shoot_interval_sec = 0.1
+	sp.shoot_initial_delay_sec = 0.0
+	var shots := [0]
+	sp.volley_fired.connect(func(_v, _n) -> void: shots[0] += 1)
+	sp.set_shooting_enabled(true)
+	await idle(30)
+	sp.process_callback = BulletSpawner2D.PROCESS_PHYSICS
+	await idle(30)
+	sp.process_callback = BulletSpawner2D.PROCESS_IDLE
+	await idle(30)
+	assert_between(shots[0], 14, 16, "a second and a half at 10 shots a second, across two switches")
+	sp.process_callback = 5
+	expect_error_sequence(["BulletSpawner2D: process_callback must be 0 (Idle) or 1 (Physics), keeping the old value."])
+
+
+func test_physics_streams_are_evenly_spaced() -> void:
+	# Physics mode: every shot happens on a tick, so a moving stream's
+	# bullets sit exactly speed x interval apart.
+	var sp := make_spawner(H.make_volley_data(1, 300.0, 30.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
+	sp.process_callback = BulletSpawner2D.PROCESS_PHYSICS
+	sp.shoot_interval_sec = 0.05
+	sp.shoot_initial_delay_sec = 0.0
+	var volleys: Array = []
+	sp.volley_fired.connect(func(v, _n) -> void: volleys.append(v))
+	sp.set_shooting_enabled(true)
+	await physics(20)
+	assert_gte(volleys.size(), 5, "a stream")
+	var gaps: Array = []
+	for k in range(1, volleys.size()):
+		gaps.append(snappedf((volleys[k - 1] as BulletVolley2D).get_bullet_transform(0).origin.x - (volleys[k] as BulletVolley2D).get_bullet_transform(0).origin.x, 0.01))
+	for g in gaps:
+		assert_almost_eq(g, 15.0, 0.01, "300 px/s x 0.05 s apart: %s" % [gaps])

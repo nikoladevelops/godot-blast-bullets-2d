@@ -54,9 +54,9 @@ double BulletFactory2D::volley_time_factor(const BulletVolley2D &volley) const {
 	double factor = time_scale;
 	const uint64_t scale_owner = volley.owner_spawner_id != 0 ? volley.owner_spawner_id : volley.pickup_time_scale_owner_id;
 	if (scale_owner != 0) {
-		const BulletSpawner2D *spawner = Object::cast_to<BulletSpawner2D>(ObjectDB::get_instance(ObjectID(scale_owner)));
-		if (spawner != nullptr && spawner->get_time_scale_affects_volleys()) {
-			factor *= spawner->get_time_scale();
+		const PatternSpawner2D *spawner = Object::cast_to<PatternSpawner2D>(ObjectDB::get_instance(ObjectID(scale_owner)));
+		if (spawner != nullptr) {
+			factor *= spawner->get_fired_time_factor();
 		}
 	}
 	return Math::is_finite(factor) && factor > 0.0 ? factor : 0.0;

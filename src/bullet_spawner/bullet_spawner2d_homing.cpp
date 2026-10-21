@@ -564,7 +564,7 @@ void BulletSpawner2D::update_homing_process_state(bool reset_countdown) {
 		if (reset_countdown) {
 			arm_retarget_countdown();
 		}
-		set_process(true);
+		set_loop_active(true);
 	} else {
 		// Sleep when nothing needs the loop. Mirrors the shooting setters so
 		// disabling retarget can actually stop _process.

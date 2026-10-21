@@ -1352,6 +1352,9 @@
 		<member name="preview_path_width" type="float" setter="set_preview_path_width" getter="get_preview_path_width" default="2.0">
 			Track underlay line width in pixels (multiplied by nothing: absolute screen-ish size). 0 hides the track. Must be finite and 0 or more.
 		</member>
+		<member name="process_callback" type="int" setter="set_process_callback" getter="get_process_callback" enum="PatternSpawner2D.SpawnerProcessCallback" default="0">
+			Which callback runs the spawner at runtime: movement, spin, countdowns and shots. [constant PROCESS_IDLE] (the default) runs every rendered frame. [constant PROCESS_PHYSICS] runs every physics tick: shots line up with the bullets' own ticks, so a stream's bullets sit exactly [code]speed x interval[/code] apart at any frame rate (with Idle, a shot between two ticks still moves a full step on the next one). Pair Physics with Godot's physics interpolation for smooth spawner motion. The editor preview always refreshes per frame.
+		</member>
 		<member name="reload_jitter_sec" type="float" setter="set_reload_jitter_sec" getter="get_reload_jitter_sec" default="0.0">
 			Reload jitter in seconds: each auto volley waits shoot_interval_sec +/- uniform jitter (seeded by [member reload_jitter_seed], floored at 0.001s so fast intervals keep working with jitter on). 0 is exact. Must be finite and 0 or more.
 		</member>
@@ -1466,6 +1469,9 @@
 		<member name="transforms_scale" type="float" setter="set_transforms_scale" getter="get_transforms_scale" default="1.0">
 			Per-bullet size scale: multiplies each spawn transform's local basis (texture size) without moving its position. 1.0 keeps sizes as generated, 0 hides bullets in place, negatives mirror them. Must be finite.
 		</member>
+		<member name="volley_time_scale" type="float" setter="set_volley_time_scale" getter="get_volley_time_scale" default="1.0">
+			A time scale for everything this spawner fired, never for the spawner itself: [code]0.0[/code] freezes its bullets in place (the classic time stop) while it keeps moving and firing, [code]0.5[/code] halves their speed, animations, timers and lifetimes. Multiplies the factory's [member BulletFactory2D.time_scale] and, while [member time_scale_affects_volleys] is on, [member time_scale]. Orphans (the spawner freed) leave it. Must be finite and [code]&gt;= 0[/code].
+		</member>
 	</members>
 	<signals>
 		<signal name="burst_finished">
@@ -1536,6 +1542,12 @@
 		</signal>
 	</signals>
 	<constants>
+		<constant name="PROCESS_IDLE" value="0" enum="SpawnerProcessCallback">
+			The spawner runs every rendered frame.
+		</constant>
+		<constant name="PROCESS_PHYSICS" value="1" enum="SpawnerProcessCallback">
+			The spawner runs every physics tick (evenly spaced streams at any frame rate).
+		</constant>
 		<constant name="SPAWN_OFFSET_GLOBAL" value="0" enum="SpawnOffsetSpace">
 			World-space offset (default).
 		</constant>
