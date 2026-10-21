@@ -1441,6 +1441,7 @@ func _snap_lasers(section: String) -> void:
 	for c in ClassDB.class_get_integer_constant_list("LaserSpawner2D"):
 		if not String(c).begins_with("PATTERN_FROM_"):
 			continue
+		seed(4242) # random sources with seed 0 use the global RNG
 		var sp := LaserSpawner2D.new()
 		sp.set_shooting_enabled(false)
 		sp.laser_data = data
