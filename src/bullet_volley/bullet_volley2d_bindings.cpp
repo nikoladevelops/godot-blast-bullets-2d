@@ -72,6 +72,7 @@ void BulletVolley2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_sprite_animation"), &BulletVolley2D::get_sprite_animation);
 	ClassDB::bind_method(D_METHOD("get_sprite_frames"), &BulletVolley2D::get_sprite_frames);
 	ClassDB::bind_method(D_METHOD("get_sprite_frame"), &BulletVolley2D::get_sprite_frame);
+	ClassDB::bind_method(D_METHOD("set_sprite_frame", "frame"), &BulletVolley2D::set_sprite_frame);
 	ClassDB::bind_method(D_METHOD("get_sprite_frame_count"), &BulletVolley2D::get_sprite_frame_count);
 
 	ClassDB::bind_method(D_METHOD("disable_bullet", "bullet_index", "release_attachment", "reset_state"), &BulletVolley2D::disable_bullet, DEFVAL(true), DEFVAL(false));

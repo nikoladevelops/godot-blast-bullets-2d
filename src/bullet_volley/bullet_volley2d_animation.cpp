@@ -398,6 +398,22 @@ bool BulletVolley2D::restart_sprite_animation() {
 	return true;
 }
 
+bool BulletVolley2D::set_sprite_frame(int frame) {
+	if (anim_frames.empty()) {
+		UtilityFunctions::push_error("BulletVolley2D set_sprite_frame: no baked animation to seek.");
+		return false;
+	}
+	if (frame < 0 || frame >= (int)anim_frames.size()) {
+		UtilityFunctions::push_error("BulletVolley2D set_sprite_frame: frame " + String::num_int64(frame) + " is outside 0.." + String::num_int64((int64_t)anim_frames.size() - 1) + ", keeping frame " + String::num_int64(anim_frame_index) + ".");
+		return false;
+	}
+	anim_frame_index = frame;
+	anim_frame_time_left = anim_frame_secs[frame];
+	anim_finished = false;
+	set_texture(anim_frames[frame]);
+	return true;
+}
+
 Vector2 BulletVolley2D::resolve_quad_size(const Ref<SpriteFrames> &p_sprite_frames, const StringName &p_animation, Vector2 override_size) {
 	if (override_size.is_finite() && override_size.x > 0.0f && override_size.y > 0.0f) {
 		return override_size;

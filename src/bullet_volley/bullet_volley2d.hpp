@@ -335,6 +335,11 @@ public:
 	StringName get_sprite_animation() const { return anim_name; }
 	Ref<SpriteFrames> get_sprite_frames() const { return anim_source; }
 	int get_sprite_frame() const { return anim_frame_index; }
+	// Seek within the current animation (AnimatedSprite2D.frame): shows the
+	// frame for its full duration and plays on from there, keeping the
+	// paused state; a finished animation plays again (and finishes again).
+	// Out of range or no animation: error, false, nothing changes.
+	bool set_sprite_frame(int frame);
 	int get_sprite_frame_count() const { return (int)anim_frames.size(); }
 
 	// Bullet Speed Data

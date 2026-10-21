@@ -4,8 +4,8 @@ extends BlastTest
 ## scale, pauses, splitting, pickups and handlers that act on the finish:
 ## every life plays from frame 0 and finishes exactly once (never for a life
 ## that ended first), its clock is the volley's (scaled, frozen while
-## paused or parked), and whatever a finish handler does leaves the books
-## balanced.
+## paused or parked), whatever a finish handler does leaves the books
+## balanced, and set_sprite_frame seeks like AnimatedSprite2D.frame.
 
 const DT := 1.0 / 60.0
 const FPS := 20.0 # 4 frames: finished after 0.2 s of volley time
@@ -166,3 +166,54 @@ func test_split_children_and_pickups_start_their_own_animation() -> void:
 	assert_gt(made.size(), 0, "converted")
 	for p in made:
 		assert_eq(_frame(p), 0, "a pickup starts its own look at frame 0")
+
+
+func test_set_sprite_frame_seeks_and_plays_on_from_there() -> void:
+	assert_true(ClassDB.class_has_method("BulletVolley2D", "set_sprite_frame"), "bound")
+	var finished: Array = []
+	var d := _data()
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	_watch(v, finished)
+	assert_true(v.set_sprite_frame(2), "seek")
+	assert_eq(_frame(v), 2, "on frame 2")
+	assert_eq(v.texture, d.sprite_frames.get_frame_texture("default", 2), "drawing frame 2 at once")
+	step_factory(4) # 0.067 s: one 0.05 s frame on
+	assert_eq(_frame(v), 3, "played on")
+	assert_eq(finished.size(), 0, "the last frame shows its full duration first")
+	step_factory(4)
+	assert_eq(finished.size(), 1, "then the animation finishes")
+	assert_true(v.set_sprite_frame(1), "a finished animation can be sought")
+	assert_false(v.is_sprite_animation_finished(), "and plays again")
+	step_factory(10)
+	assert_eq(finished.size(), 2, "and finishes again")
+
+
+func test_set_sprite_frame_keeps_a_stopped_animation_stopped() -> void:
+	var v: BulletVolley2D = factory.spawn_volley(_data())
+	v.stop_sprite_animation()
+	assert_true(v.set_sprite_frame(3), "seek while stopped")
+	step_factory(20)
+	assert_eq(_frame(v), 3, "held: a stopped animation shows the chosen frame")
+	assert_false(v.is_sprite_animation_finished(), "never finished while stopped")
+	v.resume_sprite_animation()
+	step_factory(4)
+	assert_true(v.is_sprite_animation_finished(), "resumed: the last frame ran out")
+
+
+func test_set_sprite_frame_rejects_and_keeps_the_frame() -> void:
+	var v: BulletVolley2D = factory.spawn_volley(_data(0.1))
+	assert_true(v.set_sprite_frame(1), "seek")
+	for bad in [4, -1]:
+		assert_false(v.set_sprite_frame(bad), "%d refused" % bad)
+		expect_error_sequence(["BulletVolley2D set_sprite_frame: frame %d is outside 0..3, keeping frame 1." % bad])
+	assert_eq(_frame(v), 1, "kept")
+	var blank := BulletVolley2D.new()
+	assert_false(blank.set_sprite_frame(0), "a volley without an animation")
+	expect_error_sequence(["BulletVolley2D set_sprite_frame: no baked animation to seek."])
+	blank.free()
+	assert_true(v.set_sprite_frame(3), "seek to the end")
+	step_factory(10)
+	assert_true(v.is_pooled(), "expired")
+	var again: BulletVolley2D = factory.spawn_volley(_data(0.1))
+	assert_eq(again, v, "reused")
+	assert_eq(_frame(again), 0, "the next life starts at frame 0")
