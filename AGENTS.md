@@ -733,16 +733,23 @@ src/
   factory/bullet_factory2d_flock.cpp      the per-sweep flock pass over the volley snapshot + debug_get_flock_stats (§23)
   factory/flock_solver2d.cpp              FlockSolver2D: gather, exact spatial hash grid, one steering vector per bullet; FlockConfig2D, FlockView2D
   factory/bullet_factory2d_bindings.cpp   _bind_methods
-  bullet_spawner/bullet_spawner2d.cpp     wiring, cadence, spin, bursts/telegraph, pattern lists, shoot_once
-  bullet_spawner/bullet_spawner2d_pattern_properties.cpp  hand-written pattern accessors + presets
-  bullet_spawner/bullet_spawner2d_patterns.cpp   scene inputs -> generate_raw, bake cache use
-  bullet_spawner/bullet_spawner2d_homing.cpp     homing/orbiting, target resolution, live steering
-  bullet_spawner/bullet_spawner2d_preview.cpp    preview snapshot/rebuild, pose, debug_* geometry
-  bullet_spawner/bullet_spawner2d_preview_layer.cpp  PatternPreviewLayer2D (draw_multimesh)
-  bullet_spawner/bullet_spawner2d_movement.cpp   Path2D movement
-  bullet_spawner/bullet_spawner2d_graze.cpp      Graze group: target sources + detector, arming at shot, refresh/resolve_graze_targets, ring preview (GrazePreviewLayer2D)
+  bullet_spawner/pattern_spawner2d.hpp    PatternSpawner2D (abstract base: WHERE/WHEN to fire) + PatternPreviewLayer2D; the hooks a spawner type implements (shot_preflight/shot_prepare/fire_shot, process_owned, restart_owned_clocks, ...)
+  bullet_spawner/pattern_spawner2d.cpp    wiring, cadence, spin, bursts/telegraph, pattern lists, the shoot_once skeleton, lifecycle
+  bullet_spawner/pattern_spawner2d_pattern_properties.cpp  hand-written pattern accessors + presets
+  bullet_spawner/pattern_spawner2d_patterns.cpp   scene inputs -> generate_raw, bake cache use
+  bullet_spawner/pattern_spawner2d_preview.cpp    preview snapshot/rebuild, pose, debug_* geometry
+  bullet_spawner/pattern_spawner2d_preview_layer.cpp  PatternPreviewLayer2D (draw_multimesh)
+  bullet_spawner/pattern_spawner2d_movement.cpp   Path2D movement, teleport
+  bullet_spawner/pattern_spawner2d_randomization.cpp  placement rolls (scale/rotation/position), timing ranges
+  bullet_spawner/pattern_spawner2d_graze.cpp      Graze group: target sources + detector, refresh/resolve_graze_targets, ring preview (GrazePreviewLayer2D)
+  bullet_spawner/pattern_spawner2d_sound.cpp      Sound group: entries + listener sources, On Shot / On Telegraph
+  bullet_spawner/pattern_spawner2d_bindings.cpp   the base's _bind_methods + _validate_property
+  bullet_spawner/bullet_spawner2d.hpp     BulletSpawner2D: what a shot fires as bullets
+  bullet_spawner/bullet_spawner2d.cpp     shot hooks (spawn data, fire_shot), graze/sound arming + live re-arm, speed roll, lifecycle hooks
+  bullet_spawner/bullet_spawner2d_homing.cpp     homing/orbiting, target resolution, live steering, orphan policy, live-volley API
   bullet_spawner/bullet_spawner2d_flock.cpp      Flocking group: flock_enabled/flock/flock_scope, the shared FlockConfig2D, arming at shot
-  bullet_spawner/bullet_spawner2d_bindings.cpp   _bind_methods (groups/subgroups) + _validate_property
+  bullet_spawner/bullet_spawner2d_split.cpp      Splitting group
+  bullet_spawner/bullet_spawner2d_bindings.cpp   the bullet groups' _bind_methods + _validate_property
   data/        inspector Resources: BulletVolleyData2D, BulletSpeed/Rotation/Curves/Wobble/EffectLayerData2D, BulletGrazeZone2D, BulletFlock2D,
                BulletSoundData2D, BulletPickupData2D, BulletSplitStage2D, BulletSplitData2D (every accepted edit emits `changed` once:
                `data/test_data_setter_contract.gd` sweeps it)
@@ -1305,7 +1312,7 @@ rings the same targets.
 | Target lists | `factory/graze_detector2d.*` | `GrazeDetector2D`: the factory owns one (a list per group, every tick) for factory volleys; each spawner owns one (`std::shared_ptr`, shared with every volley it armed) and hands out the factory's list while it is Node Group + no filter + interval 0. `GrazeTargetList2D`: growable, stable slots (`slot_of` hash, free-slot reuse, per-slot change serials), membership rescanned per `update_interval` (factory `graze_clock`), positions once per sweep, re-validated within a sweep when the factory's user-code epoch moved, x-sorted test view past 8 targets |
 | Arming + dispatch | `bullet_volley/bullet_volley2d_graze.cpp` | `graze_set_zones(zones, group)` (factory volleys; empty group refused), `graze_arm_from_spawner` (C++), `graze_target_list()`, `prepare_graze_tick` (reads the list in place; copies only <= 8 targets inline or a view without its owner spawner), `dispatch_graze_events` |
 | Per-bullet stage | `bullet_volley2d_tick.cpp` | `step_graze`: the swept distance to the targets once per bullet (inline loop, or a binary-searched x slab), then each active zone's outer radius; `graze_visit` (`_NO_INLINE_` slow path) per zone |
-| Spawner | `bullet_spawner/bullet_spawner2d_graze.cpp` | Graze group: `graze_target_source` (Node Group / Node Path / Node Name / Node Children / Mouse / Global Positions, serialized 0..5) + `graze_node_group`, `graze_global_positions` and the other knobs (homing's name matching via `core/node_scan2d.hpp`), `graze_update_interval`, `refresh_graze_targets`, `resolve_graze_targets()`, arming in `shoot_once` before `pre_shoot` (with sound, flock, split; a `pre_shoot` handler's own arming sticks), ring preview (`GrazePreviewLayer2D`: top-level, internal, owner-less, tagged) |
+| Spawner | `bullet_spawner/pattern_spawner2d_graze.cpp` (sources), `bullet_spawner2d.cpp` (arming) | Graze group: `graze_target_source` (Node Group / Node Path / Node Name / Node Children / Mouse / Global Positions, serialized 0..5) + `graze_node_group`, `graze_global_positions` and the other knobs (homing's name matching via `core/node_scan2d.hpp`), `graze_update_interval`, `refresh_graze_targets`, `resolve_graze_targets()`, arming in `shoot_once` before `pre_shoot` (with sound, flock, split; a `pre_shoot` handler's own arming sticks), ring preview (`GrazePreviewLayer2D`: top-level, internal, owner-less, tagged) |
 
 ### 20.2 Contract (pinned by the `*graze*` suites)
 
@@ -1402,7 +1409,7 @@ emits `GRAZE_POINT_TARGET_BIT | index` ids and belongs in
 | Volley arming | `bullet_volley/bullet_volley2d_sound.cpp` | `sound_set_effects` (factory volleys), `sound_arm_from_spawner` (spawner volleys); trigger sites call `sound_fire`, On Flight calls `sound_fire_flight` from the tick |
 | Factory hatch | `factory/bullet_factory2d_sound.cpp` | `sound_offer` (volleys and spawner), `play_sound` (manual), debug readouts |
 | Mixer | `factory/sound_mixer2d.*` | Channels per resource (shared by every spawner using it), bounded per-sweep candidates (nearest wins), voice pool (one AudioStreamPlayer2D per voice, polyphony 1), `flush` at the end of the factory sweep |
-| Spawner | `bullet_spawner/bullet_spawner2d_sound.cpp` | Sound group: `sound_effects`, `sound_volume_db`, listener source (reuses `GrazeDetector2D`, THE target filter), On Shot / On Telegraph |
+| Spawner | `bullet_spawner/pattern_spawner2d_sound.cpp` (entries, listeners), `bullet_spawner2d.cpp` (arming) | Sound group: `sound_effects`, `sound_volume_db`, listener source (reuses `GrazeDetector2D`, THE target filter), On Shot / On Telegraph |
 | Cosmetic RNG | `core/cosmetic_rng2d.hpp` | PCG32 for mix and effect-layer rolls only; gameplay keeps Godot's global RNG |
 
 ### 21.2 Contract
