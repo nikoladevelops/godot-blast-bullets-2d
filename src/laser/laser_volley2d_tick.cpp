@@ -517,6 +517,8 @@ bool LaserVolley2D::update_contacts(int beam_index, uint64_t self_id, uint32_t l
 		for (int h = 0; h < hits.size(); ++h) {
 			const Dictionary hit = hits[h];
 			const uint64_t id = (uint64_t)(int64_t)hit["collider_id"];
+			// A bullet volley's area carries no instance (collider null): bullets
+			// are never laser targets (pinned in test_laser_pierce).
 			Node2D *node = Object::cast_to<Node2D>(ObjectDB::get_instance(ObjectID(id)));
 			if (node == nullptr || node->is_queued_for_deletion()) {
 				continue;

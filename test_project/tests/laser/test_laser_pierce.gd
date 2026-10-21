@@ -160,3 +160,22 @@ func test_two_beams_hit_on_their_own_index() -> void:
 		if e[1] == "hit":
 			by_beam[e[2]] = e[3]
 	assert_eq(by_beam, {"A": 0, "B": 0, "U": 1}, "each target on the beam that touched it")
+
+
+func test_bullets_and_other_plugin_nodes_are_never_laser_targets() -> void:
+	# Bullets on the laser's mask (value 4), between A, B and C: a volley is one
+	# physics area inside the factory, never a target (the one target filter).
+	var data := H.make_volley_data(2, 0.0, 30.0)
+	data.collision_layer = 4
+	data.monitorable = true
+	data.transforms = [Transform2D(0.0, Vector2(150, 0)), Transform2D(0.0, Vector2(250, 0))]
+	var v := factory.spawn_volley(data)
+	await idle(2) # the volley's area joins the space
+	var l := _fire(H.make_laser(0.0, 0.0, 0.0, 0.0))
+	_step(1)
+	assert_eq(_kinds(), ["start:A", "hit:A", "start:B", "hit:B", "start:C", "hit:C"], "only the game's nodes")
+	var names: Array = []
+	for t in l.get_pierced_targets(0):
+		names.append(str(t.name))
+	assert_eq(names, ["A", "B", "C"], "and only they are pierced")
+	assert_true(v.is_bullet_status_enabled(0), "the bullets are untouched")
