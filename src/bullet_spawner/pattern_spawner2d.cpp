@@ -852,6 +852,19 @@ bool PatternSpawner2D::emit_shot_from(const Transform2D &global_transform, doubl
 	return fired;
 }
 
+Transform2D PatternSpawner2D::get_shot_frame() const {
+	const Transform2D marker = shot_marker();
+	const real_t spin = Math::deg_to_rad((real_t)(spin_angle_deg + (shot_pose_active ? shot_pose_extra_spin_deg : 0.0)));
+	if (!Math::is_finite(spin) || spin == (real_t)0.0) {
+		return marker;
+	}
+	const Transform2D turn(spin, Vector2());
+	Transform2D out = marker;
+	out.columns[0] = turn.basis_xform(marker.columns[0]);
+	out.columns[1] = turn.basis_xform(marker.columns[1]);
+	return out;
+}
+
 Transform2D PatternSpawner2D::shot_marker() const {
 	if (shot_pose_active) {
 		return shot_pose;

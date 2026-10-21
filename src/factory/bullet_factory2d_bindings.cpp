@@ -3,6 +3,7 @@
 // bullet_factory2d_patterns_bindings.cpp.
 
 #include "factory/bullet_factory2d_internal.hpp"
+#include "laser/laser_volley2d.hpp"
 
 using namespace godot;
 
@@ -210,6 +211,38 @@ void BulletFactory2D::_bind_methods() {
 	ADD_GROUP("Splitting", "split_");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "split_max_children_per_sweep", PROPERTY_HINT_RANGE, "0,10000,1,or_greater"), "set_split_max_children_per_sweep", "get_split_max_children_per_sweep");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "split_max_pending", PROPERTY_HINT_RANGE, "0,1000000,1,or_greater"), "set_split_max_pending", "get_split_max_pending");
+	// Lasers (bullet_factory2d_lasers.cpp): factory-owned lasers signal here;
+	// a LaserSpawner2D's lasers signal on that spawner (the same signals).
+	ClassDB::bind_method(D_METHOD("spawn_laser", "data", "transforms", "anchor"), &BulletFactory2D::spawn_laser, DEFVAL(Variant()));
+	ClassDB::bind_method(D_METHOD("get_active_lasers"), &BulletFactory2D::get_active_lasers);
+	ClassDB::bind_method(D_METHOD("get_active_laser_count"), &BulletFactory2D::get_active_laser_count);
+	ClassDB::bind_method(D_METHOD("clear_active_lasers", "fade"), &BulletFactory2D::clear_active_lasers, DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("debug_get_laser_pool_amount"), &BulletFactory2D::debug_get_laser_pool_amount);
+	ADD_SIGNAL(MethodInfo("laser_phase_changed",
+			PropertyInfo(Variant::OBJECT, "laser", PROPERTY_HINT_RESOURCE_TYPE, "LaserVolley2D"),
+			PropertyInfo(Variant::INT, "phase")));
+	ADD_SIGNAL(MethodInfo("laser_pierce_started",
+			PropertyInfo(Variant::OBJECT, "target"),
+			PropertyInfo(Variant::OBJECT, "laser", PROPERTY_HINT_RESOURCE_TYPE, "LaserVolley2D"),
+			PropertyInfo(Variant::INT, "beam_index"),
+			PropertyInfo(Variant::VECTOR2, "position")));
+	ADD_SIGNAL(MethodInfo("laser_pierce_ended",
+			PropertyInfo(Variant::OBJECT, "target"),
+			PropertyInfo(Variant::OBJECT, "laser", PROPERTY_HINT_RESOURCE_TYPE, "LaserVolley2D"),
+			PropertyInfo(Variant::INT, "beam_index")));
+	ADD_SIGNAL(MethodInfo("laser_hit",
+			PropertyInfo(Variant::OBJECT, "target"),
+			PropertyInfo(Variant::OBJECT, "laser", PROPERTY_HINT_RESOURCE_TYPE, "LaserVolley2D"),
+			PropertyInfo(Variant::INT, "beam_index"),
+			PropertyInfo(Variant::VECTOR2, "position")));
+	ADD_SIGNAL(MethodInfo("laser_wall_hit",
+			PropertyInfo(Variant::OBJECT, "laser", PROPERTY_HINT_RESOURCE_TYPE, "LaserVolley2D"),
+			PropertyInfo(Variant::INT, "beam_index"),
+			PropertyInfo(Variant::VECTOR2, "position"),
+			PropertyInfo(Variant::VECTOR2, "normal")));
+	ADD_SIGNAL(MethodInfo("laser_finished",
+			PropertyInfo(Variant::OBJECT, "laser", PROPERTY_HINT_RESOURCE_TYPE, "LaserVolley2D")));
+
 	// Emitter bullets (bullet_factory2d_emitter.cpp): shots recorded during a
 	// sweep fire through their template spawners right after the splits.
 	ClassDB::bind_method(D_METHOD("get_emitter_max_shots_per_sweep"), &BulletFactory2D::get_emitter_max_shots_per_sweep);

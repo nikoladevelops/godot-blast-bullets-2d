@@ -279,6 +279,7 @@ void BulletFactory2D::_notification(int p_what) {
 		is_tearing_down = true;
 		drop_pending_splits(); // destroyed bullets never split; their Refs go now
 		drop_pending_emits(); // nor fire
+		detach_lasers_for_teardown(); // the children die with the tree; never call back
 		// Pooled attachments outlive this call as engine children; drop their pool
 		// tracking now so their later PREDELETEs never touch this pool object again.
 		bullet_attachments_pool.detach_all();
@@ -567,6 +568,9 @@ void BulletFactory2D::update_process_state() {
 }
 
 void BulletFactory2D::_physics_process(double delta) {
+	if (is_queued_for_deletion()) {
+		return; // dying (a refused free queued it, or a script did): no more sweeps
+	}
 	// After the physics flush: shape writes deferred from it apply now, and
 	// none of the sweep's own writes is ever deferred (core/physics_flush2d.hpp).
 	PhysicsFlush2D::note_scene_physics_frame();
@@ -589,7 +593,18 @@ void BulletFactory2D::_physics_process(double delta) {
 	// factory: the copy outlives it and every step after user code tests it.
 	const std::shared_ptr<bool> life = alive_flag;
 	const bool &alive = *life;
-	if (!tick_volleys(delta, alive)) {
+	// Every way out of the sweep (a step stopped by user code included)
+	// leaves the iteration flag down while this factory lives.
+	struct IterationScope {
+		BulletFactory2D *factory;
+		std::shared_ptr<bool> life;
+		~IterationScope() {
+			if (life != nullptr && *life) {
+				factory->is_iterating_bullets = false;
+			}
+		}
+	} iteration_scope{ this, life };
+	if (!tick_volleys(delta, alive) || !sweep_may_continue(alive)) {
 		return;
 	}
 	// One-shot sprite effects age on the same clock as bullets (pausing the
@@ -619,21 +634,25 @@ void BulletFactory2D::_physics_process(double delta) {
 		}
 		volley->sweep_timer_stamp = sweep_counter;
 		volley->run_custom_timers(capped_volley_delta(delta, volley_time_factor(*volley)));
-		if (!alive) {
+		if (!sweep_may_continue(alive)) {
 			return;
 		}
+	}
+	// Lasers after the volleys (their signals are live: user code inside).
+	if (!tick_lasers(delta, alive)) { // each laser scales it by its own time factor
+		return;
 	}
 	is_iterating_bullets = false;
 
 	// Splits recorded this sweep (and before it) spawn now, at the poses
 	// their parents died at; the children tick from the next sweep. User
 	// code runs inside (spawn callbacks, homing and bullet_split signals).
-	if (!flush_splits(alive)) {
+	if (!flush_splits(alive) || !sweep_may_continue(alive)) {
 		return;
 	}
 	// Emitter bullets fire their due shots through their templates (user
 	// code: the templates' shot signals); the new volleys tick next sweep.
-	if (!flush_emits(alive)) {
+	if (!flush_emits(alive) || !sweep_may_continue(alive)) {
 		return;
 	}
 
@@ -659,6 +678,7 @@ void BulletFactory2D::_process(double delta) {
 		const uint64_t stats_t0 = Time::get_singleton()->get_ticks_usec();
 		is_iterating_bullets = true;
 		interpolate_volleys();
+		redraw_lasers();
 		is_iterating_bullets = false;
 		stats_last_render_usec = Time::get_singleton()->get_ticks_usec() - stats_t0;
 	}

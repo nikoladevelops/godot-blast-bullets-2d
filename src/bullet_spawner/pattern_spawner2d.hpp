@@ -1152,6 +1152,9 @@ public:
 	// with the auto-fire error latch, so a misconfigured template reports
 	// once instead of once per shot.
 	bool emit_shot_from(const Transform2D &global_transform, double extra_spin_deg, const Vector2 &inherited_velocity);
+	// The frame a shot is posed in now: the marker turned by the spin (what
+	// a following laser's muzzles ride). Needs the tree.
+	Transform2D get_shot_frame() const;
 	// The transform the current shot is posed at: the shoot_from pose, else
 	// the effective generator's (the spawner when none; inside the tree).
 	Transform2D shot_marker() const;

@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="LaserData2D" inherits="Resource" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		What a laser is: its type, size, phases, aim, walls, hits and looks.
+	</brief_description>
+	<description>
+		A laser resource for [LaserSpawner2D] (one [LaserVolley2D] per shot, a beam per pattern slot) or [method BulletFactory2D.spawn_laser]. Three types: a [constant LASER_BEAM] stays on its muzzle and reaches [member length] (or the first wall), a [constant LASER_BOLT] is a [member length] segment flying away at [member speed], a [constant LASER_CURVY] laser is a snake whose head flies (tracking, waving) while its body follows the path the head took.
+		Every laser runs the same phases: charging (a warning line, no hits), growing (its width grows), active ([member active_sec], 0 = until ended), fading, finished (pooled). While it hits, each beam queries the physics space along its length every tick: targets on [member collision_mask] get [signal BulletFactory2D.laser_pierce_started] and [signal BulletFactory2D.laser_hit] (repeated every [member hit_interval_sec]), then [signal BulletFactory2D.laser_pierce_ended]; bodies on [member wall_mask] stop or reflect it. The signals fire on the owner spawner, or the factory for factory lasers.
+		Lasers read the resource every tick, so edits reach lasers that are firing. Every accepted change emits [signal Resource.changed]. Pick a [member preset] for a ready-made behavior.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="create_preset" qualifiers="static">
+			<return type="LaserData2D" />
+			<param index="0" name="preset" type="int" enum="LaserData2D.Preset" />
+			<description>
+				Returns a new laser with the behavior of [param preset] (see [member preset]).
+			</description>
+		</method>
+		<method name="get_matching_preset" qualifiers="const">
+			<return type="int" enum="LaserData2D.Preset" />
+			<description>
+				Returns the preset whose behavior knobs these knobs match exactly, else [constant PRESET_CUSTOM].
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="active_sec" type="float" setter="set_active_sec" getter="get_active_sec" default="1.0">
+			Seconds of the active phase (full width, hitting). 0 keeps the laser firing until [method LaserVolley2D.end_laser] (or a bolt or curvy laser that is spent). Must be finite and &gt;= 0.
+		</member>
+		<member name="aim" type="int" setter="set_aim" getter="get_aim" enum="LaserData2D.LaserAim" default="0">
+			How each beam aims (see [enum LaserAim]). Track and Lock On need targets: [method LaserVolley2D.set_targets], or the spawner's targeting.
+		</member>
+		<member name="body_frames" type="SpriteFrames" setter="set_body_frames" getter="get_body_frames">
+			The body texture (its first animation, [code]default[/code] when it has one), playing from the growing start. Empty draws a solid body in [member modulate].
+		</member>
+		<member name="body_mode" type="int" setter="set_body_mode" getter="get_body_mode" enum="LaserData2D.BodyMode" default="0">
+			How the body frame covers the beam (see [enum BodyMode]).
+		</member>
+		<member name="body_scroll_speed" type="float" setter="set_body_scroll_speed" getter="get_body_scroll_speed" default="0.0">
+			Tile mode: how fast the tiled body scrolls along the beam, in px/s (positive flows away from the muzzle).
+		</member>
+		<member name="charge_frames" type="SpriteFrames" setter="set_charge_frames" getter="get_charge_frames">
+			An animation at the muzzle while charging (from the shot on).
+		</member>
+		<member name="charge_sec" type="float" setter="set_charge_sec" getter="get_charge_sec" default="0.5">
+			Seconds of the charging phase: the warning line shows the whole path, nothing is hit. 0 fires at once. Must be finite and &gt;= 0.
+		</member>
+		<member name="collide_with_areas" type="bool" setter="set_collide_with_areas" getter="get_collide_with_areas" default="true">
+			Whether [Area2D] targets (monitorable) are hit.
+		</member>
+		<member name="collide_with_bodies" type="bool" setter="set_collide_with_bodies" getter="get_collide_with_bodies" default="true">
+			Whether physics bodies are hit (bodies on [member wall_mask] are walls, never targets).
+		</member>
+		<member name="collision_mask" type="int" setter="set_collision_mask" getter="get_collision_mask" default="1">
+			The physics layers whose bodies and areas the laser hits.
+		</member>
+		<member name="color_ramp" type="Gradient" setter="set_color_ramp" getter="get_color_ramp">
+			Tints the body along its length (multiplied with [member modulate]): its start at the muzzle (the tail of a bolt), its end at the tip.
+		</member>
+		<member name="effects_scale" type="float" setter="set_effects_scale" getter="get_effects_scale" default="1.0">
+			Scale of the point animations (charge, muzzle, tip, pierce, wall impact). Must be finite and &gt; 0.
+		</member>
+		<member name="extend_speed" type="float" setter="set_extend_speed" getter="get_extend_speed" default="0.0">
+			Beams: how fast the beam grows out of its muzzle into its full length, in px/s (the warning line already shows the whole path). 0 = full length at once. Must be finite and &gt;= 0.
+		</member>
+		<member name="fade_sec" type="float" setter="set_fade_sec" getter="get_fade_sec" default="0.2">
+			Seconds of the fading phase: the width shrinks to 0, nothing is hit. Must be finite and &gt;= 0.
+		</member>
+		<member name="follow_spawner" type="bool" setter="set_follow_spawner" getter="get_follow_spawner" default="true">
+			Whether the muzzles ride their spawner (its moves, spin and teleports) or anchor; off, a beam stays where it was fired. Bolts and curvy lasers leave the muzzle when they launch.
+		</member>
+		<member name="grow_sec" type="float" setter="set_grow_sec" getter="get_grow_sec" default="0.1">
+			Seconds of the growing phase: the width grows from 0 to [member width]. It hits while growing when [member hit_while_growing] is on. Must be finite and &gt;= 0.
+		</member>
+		<member name="hit_interval_sec" type="float" setter="set_hit_interval_sec" getter="get_hit_interval_sec" default="0.0">
+			0 (default) sends one [signal BulletFactory2D.laser_hit] per contact (when it starts). &gt; 0 repeats it every this many seconds while the target stays in the beam (damage ticks); after a hitch the next hit simply comes, never a burst of missed ones.
+		</member>
+		<member name="hit_while_growing" type="bool" setter="set_hit_while_growing" getter="get_hit_while_growing" default="true">
+			Whether the growing phase already hits (default on). Off, only the active phase hits.
+		</member>
+		<member name="keep_tracking_when_active" type="bool" setter="set_keep_tracking_when_active" getter="get_keep_tracking_when_active" default="true">
+			Track and Lock On: whether the beam keeps following its target while active. Off, it aims while charging and growing, then holds that direction ("charge, lock, fire").
+		</member>
+		<member name="length" type="float" setter="set_length" getter="get_length" default="600.0">
+			The beam's length (a beam reaching out of its muzzle, a bolt's segment, a curvy laser's body), in px. Must be finite and &gt; 0.
+		</member>
+		<member name="material" type="Material" setter="set_material" getter="get_material">
+			The canvas material of the laser (for example a [CanvasItemMaterial] with additive blending, or a [ShaderMaterial]).
+		</member>
+		<member name="max_hits_per_beam" type="int" setter="set_max_hits_per_beam" getter="get_max_hits_per_beam" default="32">
+			The most targets one physics query of a beam segment reports (1 to 4096). Raise it when more targets than this can stand in one beam.
+		</member>
+		<member name="modulate" type="Color" setter="set_modulate" getter="get_modulate" default="Color(1, 1, 1, 1)">
+			The laser's color (multiplied with its textures and [member color_ramp]). Must be finite.
+		</member>
+		<member name="muzzle_frames" type="SpriteFrames" setter="set_muzzle_frames" getter="get_muzzle_frames">
+			An animation at the muzzle of a beam while it fires (from the growing start).
+		</member>
+		<member name="pierce_frames" type="SpriteFrames" setter="set_pierce_frames" getter="get_pierce_frames">
+			An animation at every target the beam pierces (from that contact's start, at the target projected onto the beam).
+		</member>
+		<member name="pierce_limit" type="int" setter="set_pierce_limit" getter="get_pierce_limit" default="0">
+			0 (default): passes through every target. A beam with N hits its N nearest targets and stops at the last one (the drawn and damaging length is cut there). A bolt or curvy laser hits N targets over its flight, then it is spent (gone).
+		</member>
+		<member name="preset" type="int" setter="apply_preset" getter="get_preset" enum="LaserData2D.Preset" default="0">
+			Editor only (never saved): picking a preset writes the behavior knobs (type, size, phases, aim, sweep, walls, pierce, hit interval), never the looks. Shows the preset the knobs match, else Custom.
+		</member>
+		<member name="reflections" type="int" setter="set_reflections" getter="get_reflections" default="0">
+			How many walls a beam (or a bolt or curvy head) reflects off before the next wall stops it. Each one is a ray per tick. 0 to 256.
+		</member>
+		<member name="speed" type="float" setter="set_speed" getter="get_speed" default="600.0">
+			Bolts and curvy lasers: how fast the head flies, in px/s. Must be finite and &gt;= 0.
+		</member>
+		<member name="sweep_arc_degrees" type="float" setter="set_sweep_arc_degrees" getter="get_sweep_arc_degrees" default="0.0">
+			Beams: 0 keeps the sweep turning; &gt; 0 swings it back and forth inside this arc around its aim.
+		</member>
+		<member name="sweep_speed_degrees" type="float" setter="set_sweep_speed_degrees" getter="get_sweep_speed_degrees" default="0.0">
+			Beams: how fast the beam turns around its muzzle, in degrees per second (negative turns the other way). 0 = no sweep.
+		</member>
+		<member name="tip_frames" type="SpriteFrames" setter="set_tip_frames" getter="get_tip_frames">
+			An animation at the tip of the beam (the head of a bolt or curvy laser).
+		</member>
+		<member name="turn_rate_degrees" type="float" setter="set_turn_rate_degrees" getter="get_turn_rate_degrees" default="90.0">
+			Track (and tracking bolt and curvy heads): how fast it turns toward its target, in degrees per second. 0 snaps onto it.
+		</member>
+		<member name="type" type="int" setter="set_type" getter="get_type" enum="LaserData2D.LaserType" default="0">
+			The kind of laser (see [enum LaserType]).
+		</member>
+		<member name="wall_impact_frames" type="SpriteFrames" setter="set_wall_impact_frames" getter="get_wall_impact_frames">
+			An animation where the beam meets a wall (where it stops and where it reflects), from the moment it got blocked.
+		</member>
+		<member name="wall_mask" type="int" setter="set_wall_mask" getter="get_wall_mask" default="0">
+			The physics layers whose bodies are walls: a beam stops at the first one (or reflects, see [member reflections]) and never counts it as a target. 0 = passes through walls.
+		</member>
+		<member name="warning_color" type="Color" setter="set_warning_color" getter="get_warning_color" default="Color(1, 0.3, 0.3, 0.6)">
+			The color of the charging warning line.
+		</member>
+		<member name="warning_width" type="float" setter="set_warning_width" getter="get_warning_width" default="2.0">
+			The width of the charging warning line, in px (0 = no warning line).
+		</member>
+		<member name="wave_amplitude" type="float" setter="set_wave_amplitude" getter="get_wave_amplitude" default="0.0">
+			Curvy lasers: how far the head waves sideways, in px (0 = flies straight or tracks).
+		</member>
+		<member name="wave_frequency" type="float" setter="set_wave_frequency" getter="get_wave_frequency" default="2.0">
+			Curvy lasers: waves per second.
+		</member>
+		<member name="width" type="float" setter="set_width" getter="get_width" default="12.0">
+			The full width of the beam, drawn and hitting, in px. Must be finite and &gt; 0.
+		</member>
+		<member name="z_index" type="int" setter="set_z_index" getter="get_z_index" default="0">
+			The laser's draw order (-4096 to 4096).
+		</member>
+	</members>
+	<constants>
+		<constant name="LASER_BEAM" value="0" enum="LaserType">
+			A beam fixed at its muzzle, reaching [member length] (or the first wall).
+		</constant>
+		<constant name="LASER_BOLT" value="1" enum="LaserType">
+			A [member length] segment flying away at [member speed] (a fast "laser shot").
+		</constant>
+		<constant name="LASER_CURVY" value="2" enum="LaserType">
+			A snake: the head flies (and tracks or waves), the body follows the path it took.
+		</constant>
+		<constant name="LASER_AIM_PATTERN" value="0" enum="LaserAim">
+			Each beam points along its pattern slot (plus the sweep).
+		</constant>
+		<constant name="LASER_AIM_TRACK" value="1" enum="LaserAim">
+			Each beam turns toward its target at [member turn_rate_degrees].
+		</constant>
+		<constant name="LASER_AIM_LOCK_ON" value="2" enum="LaserAim">
+			Each beam ends right on its target (its length is the distance, capped at [member length]).
+		</constant>
+		<constant name="BODY_STRETCH" value="0" enum="BodyMode">
+			One body frame stretched over the whole beam.
+		</constant>
+		<constant name="BODY_TILE" value="1" enum="BodyMode">
+			The body frame repeats every texture width (and scrolls with [member body_scroll_speed]).
+		</constant>
+		<constant name="PRESET_CUSTOM" value="0" enum="Preset">
+			Knobs that match no preset.
+		</constant>
+		<constant name="PRESET_INSTANT_BEAM" value="1" enum="Preset">
+			Fires at once and hits on its first tick, for half a second.
+		</constant>
+		<constant name="PRESET_CHARGED_SWEEP" value="2" enum="Preset">
+			A one-second warning, then a beam swinging through 90 degrees.
+		</constant>
+		<constant name="PRESET_WALL_BEAM" value="3" enum="Preset">
+			Grows out of the muzzle and stops at walls on layer 1.
+		</constant>
+		<constant name="PRESET_REFLECTING_BEAM" value="4" enum="Preset">
+			Like the wall beam, reflecting off three walls.
+		</constant>
+		<constant name="PRESET_BOLT" value="5" enum="Preset">
+			A short fast segment that stops at the first target it hits.
+		</constant>
+		<constant name="PRESET_HOMING_CURVY" value="6" enum="Preset">
+			A curvy laser chasing its target.
+		</constant>
+		<constant name="PRESET_LOCK_ON" value="7" enum="Preset">
+			Warns, then ends right on its target.
+		</constant>
+	</constants>
+</class>

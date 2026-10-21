@@ -1,0 +1,526 @@
+// LaserVolley2D lifecycle (begin_life / release_life, PREDELETE), the
+// script API and the baked animations. The per-tick beam work lives in
+// laser_volley2d_tick.cpp, drawing in laser_volley2d_render.cpp; the factory
+// side (spawn, tick, pool, signals) in factory/bullet_factory2d_lasers.cpp.
+
+#include "laser/laser_volley2d.hpp"
+
+#include "bullet_spawner/pattern_spawner2d.hpp"
+#include "core/cached_string_names2d.hpp"
+#include "core/transform_math2d.hpp"
+#include "factory/bullet_factory2d.hpp"
+
+#include <godot_cpp/classes/physics_server2d.hpp>
+#include <godot_cpp/core/class_db.hpp>
+#include <godot_cpp/variant/utility_functions.hpp>
+
+using namespace godot;
+
+namespace BlastBullets2D {
+
+// ---- LaserAnim2D ----------------------------------------------------------------------
+
+void LaserAnim2D::clear() {
+	frames.clear();
+	secs.clear();
+	total = 0.0;
+	loop = true;
+}
+
+void LaserAnim2D::bake(const Ref<SpriteFrames> &sprite_frames) {
+	clear();
+	if (sprite_frames.is_null()) {
+		return;
+	}
+	StringName anim = CachedStringNames2D::get().default_animation;
+	if (!sprite_frames->has_animation(anim)) {
+		const PackedStringArray names = sprite_frames->get_animation_names();
+		if (names.is_empty()) {
+			return;
+		}
+		anim = StringName(names[0]);
+	}
+	const int count = sprite_frames->get_frame_count(anim);
+	const double fps = sprite_frames->get_animation_speed(anim);
+	loop = sprite_frames->get_animation_loop(anim);
+	for (int i = 0; i < count; ++i) {
+		const Ref<Texture2D> tex = sprite_frames->get_frame_texture(anim, i);
+		if (tex.is_null()) {
+			continue;
+		}
+		const double duration = sprite_frames->get_frame_duration(anim, i);
+		const double sec = (fps > 0.0 && Math::is_finite(fps) && Math::is_finite(duration) && duration > 0.0) ? duration / fps : 0.0;
+		frames.push_back(tex);
+		secs.push_back(sec);
+		total += sec;
+	}
+}
+
+Texture2D *LaserAnim2D::at(double t) const {
+	if (frames.empty()) {
+		return nullptr;
+	}
+	if (!(total > 0.0) || !Math::is_finite(t) || t <= 0.0) {
+		return frames[0].ptr();
+	}
+	double local = t;
+	if (loop) {
+		local = Math::fmod(t, total);
+	} else if (t >= total) {
+		return frames.back().ptr();
+	}
+	for (size_t i = 0; i < frames.size(); ++i) {
+		if (local < secs[i]) {
+			return frames[i].ptr();
+		}
+		local -= secs[i];
+	}
+	return frames.back().ptr();
+}
+
+// ---- Life -----------------------------------------------------------------------------------
+
+void LaserVolley2D::begin_life(BulletFactory2D *p_factory, const Ref<LaserData2D> &p_data, const Transform2D *slots, int count, uint64_t owner_id, uint64_t p_anchor_id, const Transform2D &anchor_frame) {
+	factory = p_factory;
+	factory_life = p_factory != nullptr ? p_factory->life_token() : std::shared_ptr<bool>();
+	data = p_data;
+	owner_spawner_id = owner_id;
+	signals_to_factory = false;
+	++life_id;
+	active = true;
+	pooled = false;
+	phase = PHASE_CHARGING;
+	phase_time = 0.0;
+	clock = 0.0;
+	grow_started = 0.0;
+	active_override = -1.0;
+	announce_phase = false;
+	anchor_id = p_anchor_id;
+	const LaserData2D *d = p_data.ptr();
+	following = p_anchor_id != 0 && d != nullptr && d->follow_spawner;
+	// A life begun mid-sweep (a handler firing) ticks from the next step.
+	sweep_tick_stamp = p_factory != nullptr ? p_factory->get_sweep_counter() : 0;
+	const Transform2D frame_inv = following ? anchor_frame.affine_inverse() : Transform2D();
+	beams.resize((size_t)count);
+	for (int i = 0; i < count; ++i) {
+		Beam &b = beams[i];
+		b = Beam();
+		const Transform2D &pose = slots[i];
+		b.slot = following ? frame_inv * pose : pose;
+		b.muzzle = pose.columns[2];
+		b.aim = (real_t)pose.columns[0].angle();
+		b.angle = b.aim;
+		b.head = b.muzzle;
+		b.heading = b.aim;
+		b.prev_muzzle = b.muzzle;
+		b.prev_angle = b.angle;
+	}
+	if (d != nullptr) {
+		anim_body.bake(d->body_frames);
+		anim_charge.bake(d->charge_frames);
+		anim_muzzle.bake(d->muzzle_frames);
+		anim_tip.bake(d->tip_frames);
+		anim_pierce.bake(d->pierce_frames);
+		anim_wall.bake(d->wall_impact_frames);
+		set_material(d->material);
+		set_z_index(d->z_index);
+		set_texture_repeat(d->body_mode == LaserData2D::BODY_TILE ? TEXTURE_REPEAT_ENABLED : TEXTURE_REPEAT_PARENT_NODE);
+	}
+	// The first frame (before the first tick) already shows where it aims.
+	for (Beam &b : beams) {
+		update_beam_geometry(b, 0.0);
+		b.prev_points = b.points;
+		b.prev_length = b.length_now;
+	}
+	set_visible(true);
+	queue_redraw();
+}
+
+void LaserVolley2D::release_life() {
+	active = false;
+	pooled = true;
+	phase = PHASE_FINISHED;
+	beams.clear();
+	data.unref();
+	owner_spawner_id = 0;
+	signals_to_factory = false;
+	anchor_id = 0;
+	following = false;
+	anim_body.clear();
+	anim_charge.clear();
+	anim_muzzle.clear();
+	anim_tip.clear();
+	anim_pierce.clear();
+	anim_wall.clear();
+	set_material(Ref<Material>());
+	set_visible(false);
+	queue_redraw();
+}
+
+void LaserVolley2D::_notification(int p_what) {
+	if (p_what == NOTIFICATION_PREDELETE) {
+		if (query_shape.is_valid()) {
+			PhysicsServer2D::get_singleton()->free_rid(query_shape);
+			query_shape = RID();
+		}
+		// Untracked by its factory (when it still lives): a free from user
+		// code never leaves a dangling pointer in the factory's lists.
+		if (factory != nullptr && factory_life != nullptr && *factory_life) {
+			factory->laser_forget(this);
+		}
+		factory = nullptr;
+	}
+}
+
+// ---- Helpers ------------------------------------------------------------------------------
+
+bool LaserVolley2D::alive_after_user_code(uint64_t self_id, uint32_t life) const {
+	if (ObjectDB::get_instance(ObjectID(self_id)) != (const Object *)this) {
+		return false;
+	}
+	if (factory_life == nullptr || !*factory_life) {
+		return false;
+	}
+	return active && life_id == life && !is_queued_for_deletion();
+}
+
+Object *LaserVolley2D::resolve_emitter() const {
+	if (owner_spawner_id != 0) {
+		Object *owner = ObjectDB::get_instance(ObjectID(owner_spawner_id));
+		if (owner != nullptr) {
+			return owner;
+		}
+		if (!signals_to_factory) {
+			return nullptr; // an orphan keeps firing silently
+		}
+	}
+	return factory != nullptr && factory_life != nullptr && *factory_life ? (Object *)factory : nullptr;
+}
+
+bool LaserVolley2D::resolve_anchor_frame(Transform2D &r_frame) const {
+	if (anchor_id == 0) {
+		return false;
+	}
+	Object *obj = ObjectDB::get_instance(ObjectID(anchor_id));
+	if (const PatternSpawner2D *sp = Object::cast_to<PatternSpawner2D>(obj)) {
+		if (!sp->is_inside_tree() || sp->is_queued_for_deletion()) {
+			return false;
+		}
+		r_frame = sp->get_shot_frame();
+		return transform_is_sane2d(r_frame);
+	}
+	const Node2D *node = Object::cast_to<Node2D>(obj);
+	if (node == nullptr || !node->is_inside_tree() || node->is_queued_for_deletion()) {
+		return false;
+	}
+	r_frame = node->get_global_transform();
+	return transform_is_sane2d(r_frame);
+}
+
+bool LaserVolley2D::target_position(const Beam &b, Vector2 &r_pos) const {
+	if (!b.has_target) {
+		return false;
+	}
+	if (b.target_is_point) {
+		r_pos = b.target_point;
+		return true;
+	}
+	const Node2D *node = Object::cast_to<Node2D>(ObjectDB::get_instance(ObjectID(b.target_id)));
+	if (node == nullptr || !node->is_inside_tree() || node->is_queued_for_deletion()) {
+		return false;
+	}
+	r_pos = node->get_global_position();
+	return r_pos.is_finite();
+}
+
+double LaserVolley2D::phase_length(LaserPhase p) const {
+	const LaserData2D *d = data.ptr();
+	if (d == nullptr) {
+		return 0.0;
+	}
+	switch (p) {
+		case PHASE_CHARGING:
+			return d->charge_sec;
+		case PHASE_GROWING:
+			return d->grow_sec;
+		case PHASE_ACTIVE:
+			return active_override >= 0.0 ? active_override : d->active_sec;
+		case PHASE_FADING:
+			return d->fade_sec;
+		default:
+			return 0.0;
+	}
+}
+
+bool LaserVolley2D::hitting_phase() const {
+	const LaserData2D *d = data.ptr();
+	return phase == PHASE_ACTIVE || (phase == PHASE_GROWING && d != nullptr && d->hit_while_growing);
+}
+
+// ---- Script API -------------------------------------------------------------------------
+
+#define LASER_BEAM_INDEX_OR(FN, FALLBACK)                                                                                                                                           \
+	if (beam_index < 0 || beam_index >= (int)beams.size()) {                                                                                                                        \
+		UtilityFunctions::push_error(String("Invalid beam index in " FN ": ") + String::num_int64(beam_index) + " (beam count: " + String::num_int64((int64_t)beams.size()) + ")"); \
+		return FALLBACK;                                                                                                                                                            \
+	}
+
+Object *LaserVolley2D::get_owner_spawner() const {
+	return owner_spawner_id != 0 ? ObjectDB::get_instance(ObjectID(owner_spawner_id)) : nullptr;
+}
+
+Vector2 LaserVolley2D::get_beam_start(int beam_index) const {
+	LASER_BEAM_INDEX_OR("get_beam_start", Vector2())
+	const Beam &b = beams[beam_index];
+	return b.points.empty() ? b.muzzle : b.points.front();
+}
+
+Vector2 LaserVolley2D::get_beam_end(int beam_index) const {
+	LASER_BEAM_INDEX_OR("get_beam_end", Vector2())
+	const Beam &b = beams[beam_index];
+	return b.points.empty() ? b.muzzle : b.points.back();
+}
+
+PackedVector2Array LaserVolley2D::get_beam_points(int beam_index) const {
+	PackedVector2Array out;
+	LASER_BEAM_INDEX_OR("get_beam_points", out)
+	for (const Vector2 &p : beams[beam_index].points) {
+		out.push_back(p);
+	}
+	return out;
+}
+
+real_t LaserVolley2D::get_beam_length(int beam_index) const {
+	LASER_BEAM_INDEX_OR("get_beam_length", 0.0)
+	return beams[beam_index].length_now;
+}
+
+real_t LaserVolley2D::get_beam_angle(int beam_index) const {
+	LASER_BEAM_INDEX_OR("get_beam_angle", 0.0)
+	const Beam &b = beams[beam_index];
+	const LaserData2D *d = data.ptr();
+	return d != nullptr && d->type != LaserData2D::LASER_BEAM ? b.heading : b.angle;
+}
+
+bool LaserVolley2D::is_beam_blocked(int beam_index) const {
+	LASER_BEAM_INDEX_OR("is_beam_blocked", false)
+	return beams[beam_index].blocked;
+}
+
+Vector2 LaserVolley2D::get_beam_wall_point(int beam_index) const {
+	LASER_BEAM_INDEX_OR("get_beam_wall_point", Vector2())
+	return beams[beam_index].wall_point;
+}
+
+Vector2 LaserVolley2D::get_beam_wall_normal(int beam_index) const {
+	LASER_BEAM_INDEX_OR("get_beam_wall_normal", Vector2())
+	return beams[beam_index].wall_normal;
+}
+
+Array LaserVolley2D::get_pierced_targets(int beam_index) const {
+	Array out;
+	LASER_BEAM_INDEX_OR("get_pierced_targets", out)
+	for (const Contact &c : beams[beam_index].contacts) {
+		Object *target = ObjectDB::get_instance(ObjectID(c.id));
+		if (target != nullptr) {
+			out.push_back(target);
+		}
+	}
+	return out;
+}
+
+real_t LaserVolley2D::get_current_width() const {
+	const LaserData2D *d = data.ptr();
+	if (d == nullptr || !active) {
+		return 0.0;
+	}
+	const double len = phase_length(phase);
+	switch (phase) {
+		case PHASE_CHARGING:
+			return (real_t)d->warning_width;
+		case PHASE_GROWING:
+			return (real_t)(d->width * (len > 0.0 ? Math::clamp(phase_time / len, 0.0, 1.0) : 1.0));
+		case PHASE_ACTIVE:
+			return (real_t)d->width;
+		case PHASE_FADING:
+			return (real_t)(d->width * (len > 0.0 ? Math::clamp(1.0 - phase_time / len, 0.0, 1.0) : 0.0));
+		default:
+			return 0.0;
+	}
+}
+
+void LaserVolley2D::set_beam_angle(int beam_index, real_t radians) {
+	LASER_BEAM_INDEX_OR("set_beam_angle", )
+	if (!is_finite_real2d(radians)) {
+		UtilityFunctions::push_error("set_beam_angle: radians must be finite, keeping the old angle.");
+		return;
+	}
+	Beam &b = beams[beam_index];
+	const real_t turn = radians - b.aim;
+	b.aim = radians;
+	b.heading = radians;
+	// The slot turns too, so a pattern aim keeps the new direction.
+	const Transform2D rotate(turn, Vector2());
+	b.slot.columns[0] = rotate.basis_xform(b.slot.columns[0]);
+	b.slot.columns[1] = rotate.basis_xform(b.slot.columns[1]);
+}
+
+void LaserVolley2D::set_beam_target(int beam_index, const Variant &target) {
+	LASER_BEAM_INDEX_OR("set_beam_target", )
+	Beam &b = beams[beam_index];
+	b.has_target = false;
+	b.target_is_point = false;
+	b.target_id = 0;
+	if (target.get_type() == Variant::VECTOR2) {
+		const Vector2 p = target;
+		if (!p.is_finite()) {
+			UtilityFunctions::push_error("set_beam_target: a Vector2 target must be finite, the beam has no target now.");
+			return;
+		}
+		b.target_point = p;
+		b.target_is_point = true;
+		b.has_target = true;
+	} else if (Node2D *node = Object::cast_to<Node2D>(target)) {
+		b.target_id = node->get_instance_id();
+		b.has_target = true;
+	} else if (target.get_type() != Variant::NIL) {
+		UtilityFunctions::push_error("set_beam_target: target must be a Node2D, a Vector2 or null, the beam has no target now.");
+	}
+}
+
+void LaserVolley2D::set_targets(const Array &targets) {
+	const int n = targets.size();
+	for (int i = 0; i < (int)beams.size(); ++i) {
+		set_beam_target(i, n > 0 ? targets[i % n] : Variant());
+	}
+}
+
+void LaserVolley2D::set_anchor(Node2D *anchor) {
+	// The beams keep their current pose; from now on they ride `anchor`.
+	Transform2D frame;
+	for (Beam &b : beams) {
+		Transform2D now(b.angle, b.muzzle);
+		b.slot = now;
+	}
+	anchor_id = anchor != nullptr ? anchor->get_instance_id() : 0;
+	following = false;
+	if (anchor_id != 0 && resolve_anchor_frame(frame)) {
+		const Transform2D inv = frame.affine_inverse();
+		for (Beam &b : beams) {
+			b.slot = inv * b.slot;
+			b.sweep = 0.0;
+		}
+		following = true;
+	}
+}
+
+Node2D *LaserVolley2D::get_anchor() const {
+	return anchor_id != 0 ? Object::cast_to<Node2D>(ObjectDB::get_instance(ObjectID(anchor_id))) : nullptr;
+}
+
+void LaserVolley2D::end_laser(bool fade) {
+	if (!active || phase == PHASE_FINISHED) {
+		return;
+	}
+	// No user code here: the next tick announces the phase and ends the contacts.
+	if (fade && phase != PHASE_FADING) {
+		set_phase(PHASE_FADING);
+		announce_phase = true;
+	} else if (!fade) {
+		set_phase(PHASE_FINISHED);
+		announce_phase = true;
+	}
+}
+
+double LaserVolley2D::get_active_time_left() const {
+	if (!active) {
+		return 0.0;
+	}
+	const double len = phase_length(PHASE_ACTIVE);
+	if (phase < PHASE_ACTIVE) {
+		return len;
+	}
+	if (phase == PHASE_ACTIVE) {
+		return len > 0.0 ? Math::max(0.0, len - phase_time) : 0.0;
+	}
+	return 0.0;
+}
+
+void LaserVolley2D::set_active_time_left(double seconds) {
+	if (!Math::is_finite(seconds) || seconds < 0.0) {
+		UtilityFunctions::push_error("set_active_time_left: seconds must be finite and >= 0 (0 = until ended), keeping the old value.");
+		return;
+	}
+	if (phase == PHASE_ACTIVE) {
+		active_override = seconds > 0.0 ? phase_time + seconds : 0.0;
+	} else {
+		active_override = seconds;
+	}
+}
+
+String LaserVolley2D::debug_check_invariants() const {
+	if (pooled) {
+		if (active || !beams.empty() || data.is_valid() || owner_spawner_id != 0 || anchor_id != 0) {
+			return "pooled laser still holds its life";
+		}
+		return String();
+	}
+	if (!active) {
+		return String();
+	}
+	if (data.is_null()) {
+		return "active laser without data";
+	}
+	for (const Beam &b : beams) {
+		if (b.points.empty() || !b.muzzle.is_finite() || !Math::is_finite(b.angle) || !Math::is_finite(b.length_now)) {
+			return "a beam has no finite geometry";
+		}
+		for (const Vector2 &p : b.points) {
+			if (!p.is_finite()) {
+				return "a beam point is not finite";
+			}
+		}
+	}
+	return String();
+}
+
+#undef LASER_BEAM_INDEX_OR
+
+void LaserVolley2D::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("get_beam_count"), &LaserVolley2D::get_beam_count);
+	ClassDB::bind_method(D_METHOD("get_phase"), &LaserVolley2D::get_phase);
+	ClassDB::bind_method(D_METHOD("get_phase_time"), &LaserVolley2D::get_phase_time);
+	ClassDB::bind_method(D_METHOD("get_laser_data"), &LaserVolley2D::get_laser_data);
+	ClassDB::bind_method(D_METHOD("get_life_id"), &LaserVolley2D::get_life_id);
+	ClassDB::bind_method(D_METHOD("is_laser_active"), &LaserVolley2D::is_laser_active);
+	ClassDB::bind_method(D_METHOD("is_pooled"), &LaserVolley2D::is_pooled);
+	ClassDB::bind_method(D_METHOD("get_owner_spawner"), &LaserVolley2D::get_owner_spawner);
+	ClassDB::bind_method(D_METHOD("get_beam_start", "beam_index"), &LaserVolley2D::get_beam_start);
+	ClassDB::bind_method(D_METHOD("get_beam_end", "beam_index"), &LaserVolley2D::get_beam_end);
+	ClassDB::bind_method(D_METHOD("get_beam_points", "beam_index"), &LaserVolley2D::get_beam_points);
+	ClassDB::bind_method(D_METHOD("get_beam_length", "beam_index"), &LaserVolley2D::get_beam_length);
+	ClassDB::bind_method(D_METHOD("get_beam_angle", "beam_index"), &LaserVolley2D::get_beam_angle);
+	ClassDB::bind_method(D_METHOD("is_beam_blocked", "beam_index"), &LaserVolley2D::is_beam_blocked);
+	ClassDB::bind_method(D_METHOD("get_beam_wall_point", "beam_index"), &LaserVolley2D::get_beam_wall_point);
+	ClassDB::bind_method(D_METHOD("get_beam_wall_normal", "beam_index"), &LaserVolley2D::get_beam_wall_normal);
+	ClassDB::bind_method(D_METHOD("get_pierced_targets", "beam_index"), &LaserVolley2D::get_pierced_targets);
+	ClassDB::bind_method(D_METHOD("get_current_width"), &LaserVolley2D::get_current_width);
+	ClassDB::bind_method(D_METHOD("set_beam_angle", "beam_index", "radians"), &LaserVolley2D::set_beam_angle);
+	ClassDB::bind_method(D_METHOD("set_targets", "targets"), &LaserVolley2D::set_targets);
+	ClassDB::bind_method(D_METHOD("set_beam_target", "beam_index", "target"), &LaserVolley2D::set_beam_target);
+	ClassDB::bind_method(D_METHOD("set_anchor", "anchor"), &LaserVolley2D::set_anchor);
+	ClassDB::bind_method(D_METHOD("get_anchor"), &LaserVolley2D::get_anchor);
+	ClassDB::bind_method(D_METHOD("end_laser", "fade"), &LaserVolley2D::end_laser, DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("get_active_time_left"), &LaserVolley2D::get_active_time_left);
+	ClassDB::bind_method(D_METHOD("set_active_time_left", "seconds"), &LaserVolley2D::set_active_time_left);
+	ClassDB::bind_method(D_METHOD("debug_get_draw_state", "fraction"), &LaserVolley2D::debug_get_draw_state, DEFVAL(-1.0));
+	ClassDB::bind_method(D_METHOD("debug_check_invariants"), &LaserVolley2D::debug_check_invariants);
+
+	BIND_ENUM_CONSTANT(PHASE_CHARGING);
+	BIND_ENUM_CONSTANT(PHASE_GROWING);
+	BIND_ENUM_CONSTANT(PHASE_ACTIVE);
+	BIND_ENUM_CONSTANT(PHASE_FADING);
+	BIND_ENUM_CONSTANT(PHASE_FINISHED);
+}
+
+} // namespace BlastBullets2D

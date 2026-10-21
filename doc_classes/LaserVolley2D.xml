@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="LaserVolley2D" inherits="Node2D" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		One laser shot: a beam per pattern slot, ticked, drawn and pooled by the factory.
+	</brief_description>
+	<description>
+		Created by [LaserSpawner2D] and [method BulletFactory2D.spawn_laser] (never instantiate it yourself). Every beam follows its [LaserData2D] (read every tick: edits reach it) through the phases, aims, sweeps, stops or reflects at walls and hits what it touches. Its signals fire on its owner spawner while that lives, else on the [BulletFactory2D] (never both). A finished laser goes back to the factory's pool (by beam count) and comes back with a clean life; [method get_life_id] tells lives apart. Drawing is interpolated while the factory's physics interpolation is active.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="debug_check_invariants" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns an empty String when the laser's state is consistent (a pooled laser holds nothing, every beam has finite geometry), else what is wrong.
+			</description>
+		</method>
+		<method name="debug_get_draw_state" qualifiers="const">
+			<return type="Array" />
+			<param index="0" name="fraction" type="float" default="-1.0" />
+			<description>
+				Returns, per beam, exactly what the next draw uses at [param fraction] (-1 = the interpolation fraction now, 1 = this tick): [code]points[/code], [code]width[/code], [code]color[/code], [code]warning[/code], the [code]charge[/code] / [code]body[/code] / [code]muzzle[/code] / [code]tip[/code] frames, [code]pierces[/code] and [code]impacts[/code] ([position, frame] pairs) and [code]spent[/code].
+			</description>
+		</method>
+		<method name="end_laser">
+			<return type="void" />
+			<param index="0" name="fade" type="bool" default="true" />
+			<description>
+				Ends the laser: fading ([param fade]) or at once. Its contacts end and the phase is announced on the next tick. Safe from handlers.
+			</description>
+		</method>
+		<method name="get_active_time_left" qualifiers="const">
+			<return type="float" />
+			<description>
+				Seconds of the active phase left (its whole length before it started, 0 when it lasts until ended or is over).
+			</description>
+		</method>
+		<method name="get_anchor" qualifiers="const">
+			<return type="Node2D" />
+			<description>
+				Returns the node the muzzles follow, or [code]null[/code].
+			</description>
+		</method>
+		<method name="get_beam_angle" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="beam_index" type="int" />
+			<description>
+				Returns where beam [param beam_index] points now, in radians (a bolt's or curvy laser's heading).
+			</description>
+		</method>
+		<method name="get_beam_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns how many beams this laser has (0 while pooled).
+			</description>
+		</method>
+		<method name="get_beam_end" qualifiers="const">
+			<return type="Vector2" />
+			<param index="0" name="beam_index" type="int" />
+			<description>
+				Returns the end of beam [param beam_index]: the tip of a beam, the head of a bolt or curvy laser.
+			</description>
+		</method>
+		<method name="get_beam_length" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="beam_index" type="int" />
+			<description>
+				Returns the drawn and damaging length of beam [param beam_index] now (cut by walls and [member LaserData2D.pierce_limit]).
+			</description>
+		</method>
+		<method name="get_beam_points" qualifiers="const">
+			<return type="PackedVector2Array" />
+			<param index="0" name="beam_index" type="int" />
+			<description>
+				Returns the beam's polyline: from its start to its end, reflection points in between (a curvy body's path).
+			</description>
+		</method>
+		<method name="get_beam_start" qualifiers="const">
+			<return type="Vector2" />
+			<param index="0" name="beam_index" type="int" />
+			<description>
+				Returns the start of beam [param beam_index]: the muzzle of a beam, the tail of a bolt or curvy laser.
+			</description>
+		</method>
+		<method name="get_beam_wall_normal" qualifiers="const">
+			<return type="Vector2" />
+			<param index="0" name="beam_index" type="int" />
+			<description>
+				Returns the normal of the wall beam [param beam_index] last stopped at.
+			</description>
+		</method>
+		<method name="get_beam_wall_point" qualifiers="const">
+			<return type="Vector2" />
+			<param index="0" name="beam_index" type="int" />
+			<description>
+				Returns where beam [param beam_index] last stopped at a wall.
+			</description>
+		</method>
+		<method name="get_current_width" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the width drawn now: the warning width while charging, else [member LaserData2D.width] scaled by the growing or fading phase.
+			</description>
+		</method>
+		<method name="get_laser_data" qualifiers="const">
+			<return type="LaserData2D" />
+			<description>
+				Returns the laser's data.
+			</description>
+		</method>
+		<method name="get_life_id" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the id of this life (it changes every time the pool hands the laser out again).
+			</description>
+		</method>
+		<method name="get_owner_spawner" qualifiers="const">
+			<return type="Object" />
+			<description>
+				Returns the spawner that fired the laser, or [code]null[/code] (a factory laser, or its spawner is gone).
+			</description>
+		</method>
+		<method name="get_phase" qualifiers="const">
+			<return type="int" enum="LaserVolley2D.LaserPhase" />
+			<description>
+				Returns the phase now (see [enum LaserPhase]).
+			</description>
+		</method>
+		<method name="get_phase_time" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the seconds spent in the current phase.
+			</description>
+		</method>
+		<method name="get_pierced_targets" qualifiers="const">
+			<return type="Array" />
+			<param index="0" name="beam_index" type="int" />
+			<description>
+				Returns the targets beam [param beam_index] touches now, nearest first.
+			</description>
+		</method>
+		<method name="is_beam_blocked" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="beam_index" type="int" />
+			<description>
+				Returns [code]true[/code] while beam [param beam_index] is stopped by a wall.
+			</description>
+		</method>
+		<method name="is_laser_active" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] while the laser fires (from the shot until it finishes).
+			</description>
+		</method>
+		<method name="is_pooled" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] while the laser waits in the factory's pool (a stale handle).
+			</description>
+		</method>
+		<method name="set_active_time_left">
+			<return type="void" />
+			<param index="0" name="seconds" type="float" />
+			<description>
+				Sets the seconds of the active phase left (before it started: its length). 0 = until ended. Must be finite and &gt;= 0.
+			</description>
+		</method>
+		<method name="set_anchor">
+			<return type="void" />
+			<param index="0" name="anchor" type="Node2D" />
+			<description>
+				Makes the muzzles follow [param anchor] from where they are now ([code]null[/code] = stay).
+			</description>
+		</method>
+		<method name="set_beam_angle">
+			<return type="void" />
+			<param index="0" name="beam_index" type="int" />
+			<param index="1" name="radians" type="float" />
+			<description>
+				Turns beam [param beam_index] so it points along [param radians] now (its pattern aim; a sweep goes on from there).
+			</description>
+		</method>
+		<method name="set_beam_target">
+			<return type="void" />
+			<param index="0" name="beam_index" type="int" />
+			<param index="1" name="target" type="Variant" />
+			<description>
+				Sets the target of beam [param beam_index] for Track and Lock On: a [Node2D], a [Vector2] position, or [code]null[/code] (no target).
+			</description>
+		</method>
+		<method name="set_targets">
+			<return type="void" />
+			<param index="0" name="targets" type="Array" />
+			<description>
+				Sets every beam's target: beam [code]i[/code] takes [code]targets[i % size][/code] (a [Node2D] or a [Vector2]). An empty array clears them.
+			</description>
+		</method>
+	</methods>
+	<constants>
+		<constant name="PHASE_CHARGING" value="0" enum="LaserPhase">
+			The warning line: no hits.
+		</constant>
+		<constant name="PHASE_GROWING" value="1" enum="LaserPhase">
+			The width grows from 0 (hits with [member LaserData2D.hit_while_growing]).
+		</constant>
+		<constant name="PHASE_ACTIVE" value="2" enum="LaserPhase">
+			Full width, hitting.
+		</constant>
+		<constant name="PHASE_FADING" value="3" enum="LaserPhase">
+			The width shrinks to 0, no hits.
+		</constant>
+		<constant name="PHASE_FINISHED" value="4" enum="LaserPhase">
+			Over: the laser is pooled right after [signal BulletFactory2D.laser_finished].
+		</constant>
+	</constants>
+</class>

@@ -3,7 +3,8 @@ extends BlastTest
 ## builds (the lock check of Object::callp is DEBUG_ENABLED): in an exported
 ## release game a handler that frees the emitter deletes it in the middle of
 ## the plugin's code. BulletFactory2D.debug_free_like_release() frees the
-## release way. For every signal of BulletSpawner2D and BulletFactory2D
+## release way. For every signal of BulletSpawner2D and BulletFactory2D (the
+## laser signals too)
 ## (read from ClassDB, so new signals are covered), a handler frees its
 ## emitter on the first emission: the plugin never touches freed memory
 ## (tools/run_sanitizer_tests.py runs this under AddressSanitizer), the
@@ -181,6 +182,13 @@ func test_freeing_the_factory_from_its_own_signal(sig: String = use_parameters(_
 	var v: BulletVolley2D = f.spawn_volley(d)
 	v.split_set_data(_split_chain(), H.make_volley_data(2, 100.0, 0.3))
 	v.graze_set_zones([H.make_graze_zone([50.0])], &"rf_graze")
+	# A laser raises every laser signal: +X pierces the layer-4 wall, -X is
+	# blocked by the layer-16 wall; short phases end it within the scenario.
+	var laser := H.make_laser(0.05, 0.05, 0.3, 0.05, 300.0)
+	laser.wall_mask = 16
+	laser.hit_interval_sec = 0.05
+	var beams: Array[Transform2D] = [Transform2D(0.0, Vector2.ZERO), Transform2D(PI, Vector2.ZERO)]
+	f.spawn_laser(laser, beams)
 	var pickup := BulletPickupData2D.new()
 	for k in 200:
 		if not fired.is_empty() or not is_instance_valid(f):

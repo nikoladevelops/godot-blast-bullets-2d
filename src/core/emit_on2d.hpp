@@ -38,7 +38,7 @@ template <typename... Args>
 void emit_on2d(godot::Object *emitter, const godot::StringName &signal, const Args &...args) {
 	// C++ RTTI on the plugin's own instances: Object::cast_to would cross
 	// into the engine twice per try (this runs for every hit and expiry).
-	if (BulletSpawner2D *spawner = dynamic_cast<BulletSpawner2D *>(emitter)) {
+	if (PatternSpawner2D *spawner = dynamic_cast<PatternSpawner2D *>(emitter)) { // any spawner type
 		emit_guarded2d(spawner, spawner->emit_guard, signal, args...);
 	} else if (BulletFactory2D *factory = dynamic_cast<BulletFactory2D *>(emitter)) {
 		emit_guarded2d(factory, factory->emit_guard, signal, args...);

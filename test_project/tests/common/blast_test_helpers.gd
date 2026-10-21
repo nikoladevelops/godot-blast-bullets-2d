@@ -194,3 +194,16 @@ static func make_sound(trigger: int, max_voices := 4) -> BulletSoundData2D:
 	s.min_interval_sec = 0.0
 	s.max_voices = max_voices
 	return s
+
+
+## A laser that hits layer value 4 (make_wall / make_area) with the given
+## phase lengths (seconds; active 0 = until ended), no walls.
+static func make_laser(charge := 0.0, grow := 0.0, active := 1.0, fade := 0.0, length := 400.0) -> LaserData2D:
+	var d := LaserData2D.new()
+	d.charge_sec = charge
+	d.grow_sec = grow
+	d.active_sec = active
+	d.fade_sec = fade
+	d.length = length
+	d.collision_mask = 4
+	return d

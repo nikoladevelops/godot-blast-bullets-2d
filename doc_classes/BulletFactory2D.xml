@@ -33,6 +33,13 @@
 				Deferred [method clear_active_bullets]: safe from any callback.
 			</description>
 		</method>
+		<method name="clear_active_lasers">
+			<return type="int" />
+			<param index="0" name="fade" type="bool" default="true" />
+			<description>
+				Ends every firing laser, fading ([param fade]) or at once. Safe from handlers. Returns how many it ended.
+			</description>
+		</method>
 		<method name="clear_bullets_in_circle">
 			<return type="int" />
 			<param index="0" name="center" type="Vector2" />
@@ -274,6 +281,12 @@
 				The graze targets of [param group] exactly as the next volley tick of this physics step tests them: an Array of {id, position} (every live [Node2D] member in tree order, in this factory's World2D; no cap).
 			</description>
 		</method>
+		<method name="debug_get_laser_pool_amount" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns how many finished lasers wait in the pool.
+			</description>
+		</method>
 		<method name="debug_get_live_volley_ids">
 			<return type="PackedInt64Array" />
 			<param index="0" name="owner_spawner_id" type="int" />
@@ -491,6 +504,18 @@
 				Total live one-shot effect slots across all bakes (plus the manual hatch).
 			</description>
 		</method>
+		<method name="get_active_laser_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns how many lasers fire now.
+			</description>
+		</method>
+		<method name="get_active_lasers" qualifiers="const">
+			<return type="Array" />
+			<description>
+				Returns every firing [LaserVolley2D].
+			</description>
+		</method>
 		<method name="get_active_volleys" qualifiers="const">
 			<return type="BulletVolley2D[]" />
 			<description>
@@ -656,6 +681,15 @@
 			<param index="0" name="new_physics_space" type="RID" />
 			<description>
 				Sets the world physics space that the bullets interact in. Set it before spawning: it applies to subsequently spawned bullets, already spawned areas stay in their space. Invalid RIDs are rejected with an error.
+			</description>
+		</method>
+		<method name="spawn_laser">
+			<return type="LaserVolley2D" />
+			<param index="0" name="data" type="LaserData2D" />
+			<param index="1" name="transforms" type="Transform2D[]" />
+			<param index="2" name="anchor" type="Node2D" default="null" />
+			<description>
+				Fires one [LaserVolley2D]: a beam per transform in [param transforms] (its origin is the muzzle, its x axis the direction). With [param anchor], the muzzles follow that node while [member LaserData2D.follow_spawner] is on. Factory lasers signal on this factory. Returns [code]null[/code] (with an error) for null data, no transforms, a transform that is not finite and invertible, or more beams than [method BulletPatterns2D.get_max_bullets_per_pattern].
 			</description>
 		</method>
 		<method name="spawn_layer_effect">
@@ -836,6 +870,54 @@
 			<param index="2" name="bullet_indexes" type="int[]" />
 			<description>
 				Emitted once per volley and tick for the bullets that just left through the despawn bounds (see [member despawn_bounds_enabled]), after their On Despawn effects and sounds. [param positions] holds the pose each bullet left from, parallel to [param bullet_indexes]. It runs live inside the sweep: spawn from it (an item where a bullet fell off the screen), but do not free the volley. Nothing is captured while no handler is connected.
+			</description>
+		</signal>
+		<signal name="laser_finished">
+			<param index="0" name="laser" type="LaserVolley2D" />
+			<description>
+				A laser finished (its fade ended, [method LaserVolley2D.end_laser] without fade, or every bolt / curvy beam was spent). It is pooled right after this signal.
+			</description>
+		</signal>
+		<signal name="laser_hit">
+			<param index="0" name="target" type="Object" />
+			<param index="1" name="laser" type="LaserVolley2D" />
+			<param index="2" name="beam_index" type="int" />
+			<param index="3" name="position" type="Vector2" />
+			<description>
+				Beam [param beam_index] of [param laser] hit [param target] at [param position] (the target projected onto the beam): when the contact starts, then every [member LaserData2D.hit_interval_sec].
+			</description>
+		</signal>
+		<signal name="laser_phase_changed">
+			<param index="0" name="laser" type="LaserVolley2D" />
+			<param index="1" name="phase" type="int" />
+			<description>
+				[param laser] entered [param phase] (see [enum LaserVolley2D.LaserPhase]).
+			</description>
+		</signal>
+		<signal name="laser_pierce_ended">
+			<param index="0" name="target" type="Object" />
+			<param index="1" name="laser" type="LaserVolley2D" />
+			<param index="2" name="beam_index" type="int" />
+			<description>
+				Beam [param beam_index] of [param laser] stopped touching [param target] (it left, the beam moved away or was cut, the laser stopped hitting). A freed target ends silently.
+			</description>
+		</signal>
+		<signal name="laser_pierce_started">
+			<param index="0" name="target" type="Object" />
+			<param index="1" name="laser" type="LaserVolley2D" />
+			<param index="2" name="beam_index" type="int" />
+			<param index="3" name="position" type="Vector2" />
+			<description>
+				Beam [param beam_index] of [param laser] started touching [param target] at [param position]. Always followed by its first [signal laser_hit].
+			</description>
+		</signal>
+		<signal name="laser_wall_hit">
+			<param index="0" name="laser" type="LaserVolley2D" />
+			<param index="1" name="beam_index" type="int" />
+			<param index="2" name="position" type="Vector2" />
+			<param index="3" name="normal" type="Vector2" />
+			<description>
+				Beam [param beam_index] of [param laser] got blocked by a wall at [param position] with [param normal] (once per block; a bolt or curvy head that meets a wall it cannot reflect off is spent after it).
 			</description>
 		</signal>
 		<signal name="life_time_over">

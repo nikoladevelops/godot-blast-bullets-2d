@@ -414,6 +414,10 @@ Dictionary BulletFactory2D::debug_assert_no_dangling() {
 	if (emit_flush_running) {
 		return fail("an emitter flush never finished");
 	}
+	const String laser_error = debug_check_lasers();
+	if (!laser_error.is_empty()) {
+		return fail("lasers: " + laser_error);
+	}
 	for (const SplitRequest2D &r : pending_splits) {
 		if (r.stage.is_null() || r.data.is_null() || r.config == nullptr || r.child_depth < 1) {
 			return fail("a queued split is incomplete");
@@ -614,6 +618,10 @@ bool BulletFactory2D::debug_advance_time(double delta) {
 		// Not set up yet, or inside its own teardown (an attachment callback
 		// of a dying volley): a sweep would tick volleys being destroyed.
 		UtilityFunctions::push_error("BulletFactory2D::debug_advance_time: the factory is not in the scene tree or is being freed, nothing advanced.");
+		return false;
+	}
+	if (is_queued_for_deletion()) {
+		UtilityFunctions::push_error("BulletFactory2D::debug_advance_time: the factory is queued for deletion, nothing advanced.");
 		return false;
 	}
 	if (is_iterating_bullets) {

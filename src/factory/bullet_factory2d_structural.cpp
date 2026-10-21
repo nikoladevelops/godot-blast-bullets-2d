@@ -230,6 +230,9 @@ void BulletFactory2D::reset_factory_state(const PoolKey *key) {
 
 	// Free all BulletVolley2D, their attachments and the object pool
 	const LifeWatch watch = watch_life();
+	if (key == nullptr) {
+		free_all_lasers(); // a full reset takes the lasers too (no user code)
+	}
 	free_all_volleys(key);
 	if (watch.died()) {
 		return; // an attachment callback freed this factory

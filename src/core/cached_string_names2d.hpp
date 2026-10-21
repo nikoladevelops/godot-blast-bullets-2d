@@ -29,6 +29,15 @@ struct CachedStringNames2D {
 	const StringName volley_bullet_homing_target_reached = StringName("volley_bullet_homing_target_reached");
 	const StringName bullet_grazed = StringName("bullet_grazed");
 	const StringName bullet_graze_exited = StringName("bullet_graze_exited");
+	// Laser signals (laser/laser_volley2d_tick.cpp: per contact and per hit).
+	const StringName laser_fired = StringName("laser_fired");
+	const StringName laser_phase_changed = StringName("laser_phase_changed");
+	const StringName laser_pierce_started = StringName("laser_pierce_started");
+	const StringName laser_pierce_ended = StringName("laser_pierce_ended");
+	const StringName laser_hit = StringName("laser_hit");
+	const StringName laser_wall_hit = StringName("laser_wall_hit");
+	const StringName laser_finished = StringName("laser_finished");
+	const StringName default_animation = StringName("default");
 	// node_scan2d.hpp PREVIEW_META_KEY: checked per target candidate.
 	const StringName preview_meta = StringName("blastbullets_pattern_preview");
 

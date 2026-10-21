@@ -27,6 +27,7 @@
 #include "data/bullet_effect_layer_data2d.hpp"
 #include "data/bullet_pickup_data2d.hpp"
 #include "data/bullet_volley_data2d.hpp"
+#include "data/laser_data2d.hpp"
 #include "debugger/despawn_bounds_preview_layer2d.hpp"
 #include "factory/emit_queue2d.hpp"
 #include "factory/flock_solver2d.hpp"
@@ -48,6 +49,7 @@ using namespace godot;
 class BulletVolleyData2D;
 class BulletVolleyDebugger2D;
 class BulletVolley2D;
+class LaserVolley2D;
 
 // Validates spawn data before any pool pop or memnew happens, so a bad resource can
 // never leave a half-set-up multimesh behind. Returns false with an error when invalid.
@@ -105,6 +107,27 @@ public:
 	// (a colored volley even when the data has none; the spawner's Bullet
 	// Colors group, split children wearing their parent's color).
 	BulletVolley2D *spawn_volley_span(const Ref<BulletVolleyData2D> &spawn_data, const Transform2D *transforms, int count, const Vector2 &new_inherited_velocity_offset = Vector2(0, 0), uint64_t spawner_id = 0, const Color *colors = nullptr);
+
+	// ---- Lasers (bullet_factory2d_lasers.cpp) ----
+	// One LaserVolley2D per call: a beam per transform (its origin is the
+	// muzzle, its x axis the direction), following `anchor` while
+	// LaserData2D.follow_spawner is on. Factory-owned: its signals fire here.
+	LaserVolley2D *spawn_laser(const Ref<LaserData2D> &data, const TypedArray<Transform2D> &transforms, Node2D *anchor = nullptr);
+	// C++ path (LaserSpawner2D): native transforms, the owner spawner, the
+	// anchor and its frame at fire time. Validated like spawn_laser.
+	LaserVolley2D *spawn_laser_span(const Ref<LaserData2D> &data, const Transform2D *transforms, int count, uint64_t owner_id, uint64_t anchor_id, const Transform2D &anchor_frame, const char *caller);
+	Array get_active_lasers() const;
+	int get_active_laser_count() const;
+	// Ends every firing laser (fading, or at once). Safe from handlers.
+	// Returns how many it ended.
+	int clear_active_lasers(bool fade = true);
+	int debug_get_laser_pool_amount() const;
+	void collect_lasers_owned_by(uint64_t owner_id, std::vector<LaserVolley2D *> &r_out) const;
+	// Factory time scale x the owner spawner's fired time factor.
+	double laser_time_factor(const LaserVolley2D &laser) const;
+	// LaserVolley2D hooks: a freed laser leaves the lists; a finished one pools.
+	void laser_forget(LaserVolley2D *laser);
+	void laser_finished_now(LaserVolley2D *laser);
 
 	// Resets the factory. Null key frees everything (all bullets, pools, and the full
 	// attachment pool). Exact key frees only that bucket; unrelated pooled attachments
@@ -1144,6 +1167,23 @@ private:
 
 	// Parent node of every volley in the scene tree.
 	OwnedNode2D<Node> volley_container;
+	// Lasers: every tracked laser (firing and pooled), the pool by beam
+	// count, the sweep snapshot, and a bump per freed laser.
+	OwnedNode2D<Node> laser_container;
+	std::vector<LaserVolley2D *> all_lasers;
+	std::unordered_map<int, std::vector<LaserVolley2D *>> laser_pool;
+	std::vector<std::pair<LaserVolley2D *, uint64_t>> laser_iteration_scratch;
+	uint64_t laser_free_epoch = 0;
+	void add_laser_container();
+	bool tick_lasers(double delta, const bool &alive);
+	// The sweep goes on after user code: this factory still exists AND was
+	// not queued for deletion (a free refused under its emit guard queues it
+	// and Godot already took it out of the tree: nothing may spawn anymore).
+	bool sweep_may_continue(const bool &alive) const { return alive && !is_queued_for_deletion(); }
+	void redraw_lasers();
+	void free_all_lasers();
+	void detach_lasers_for_teardown();
+	String debug_check_lasers() const;
 
 	// DEBUGGER RELATED
 

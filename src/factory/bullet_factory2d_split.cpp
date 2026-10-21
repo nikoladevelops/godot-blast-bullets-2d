@@ -197,6 +197,20 @@ bool BulletFactory2D::flush_splits(const bool &alive) {
 	batch.clear();
 	batch.swap(pending_splits);
 	split_flush_running = true;
+	// After user code: a freed factory stops at once; one queued for deletion
+	// (a free refused under its emit guard) closes the flush and spawns no more.
+	auto stopped = [&]() {
+		if (!alive) {
+			return true;
+		}
+		if (!is_queued_for_deletion()) {
+			return false;
+		}
+		batch.clear();
+		pending_splits.clear();
+		split_flush_running = false;
+		return true;
+	};
 	const uint64_t drop_epoch = split_drop_epoch;
 	const int cap = split_max_children_per_sweep;
 	int children_this_flush = 0;
@@ -261,7 +275,7 @@ bool BulletFactory2D::flush_splits(const bool &alive) {
 			child_colors = split_color_scratch.data();
 		}
 		BulletVolley2D *child = spawn_volley_span(r.stage_data ? r.data : split_child_template(r.data), split_pose_scratch.data(), count, inherited, r.owner_id, child_colors);
-		if (!alive) {
+		if (stopped()) {
 			return false;
 		}
 		++split_stats_flushed_last;
@@ -289,7 +303,7 @@ bool BulletFactory2D::flush_splits(const bool &alive) {
 			bool aimed = false;
 			if (owner != nullptr && !owner->is_queued_for_deletion()) {
 				aimed = owner->split_configure_child_homing(child);
-				if (!alive) {
+				if (stopped()) {
 					return false;
 				}
 				if (!child_alive()) {
@@ -345,7 +359,7 @@ bool BulletFactory2D::flush_splits(const bool &alive) {
 		if (emitter != nullptr) {
 			note_user_code();
 			emit_on2d(emitter, "bullet_split", r.pose.columns[2], r.cause, child, r.child_depth);
-			if (!alive) {
+			if (stopped()) {
 				return false;
 			}
 		}
