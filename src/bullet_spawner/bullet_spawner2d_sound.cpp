@@ -271,6 +271,43 @@ void BulletSpawner2D::apply_volley_sound(BulletVolley2D *volley) {
 	if (volley == nullptr || !sound_enabled || sound_effects.is_empty()) {
 		return;
 	}
+	bool any = false;
+	const Array entries = spawner_sound_entries(any);
+	if (any) {
+		// Shared: listener edits and refresh_sound_listeners() reach it in
+		// flight.
+		std::shared_ptr<GrazeDetector2D> detector = sound_detector_ref();
+		volley->sound_arm_from_spawner(entries, detector, (float)sound_volume_db);
+	}
+}
+
+int BulletSpawner2D::sound_live_volleys() {
+	BulletFactory2D *factory = get_bullet_factory();
+	if (factory == nullptr) {
+		return 0;
+	}
+	bool any = false;
+	const Array entries = sound_enabled ? spawner_sound_entries(any) : Array();
+	const std::shared_ptr<GrazeDetector2D> detector = any ? sound_detector_ref() : nullptr;
+	// Arming runs no user code: the list stays valid while it is walked.
+	std::vector<BulletVolley2D *> owned;
+	factory->collect_volleys_owned_by(get_instance_id(), owned);
+	int changed = 0;
+	for (BulletVolley2D *volley : owned) {
+		if (!any) {
+			if (!volley->sound_effects.empty()) {
+				volley->sound_release();
+				++changed;
+			}
+		} else if (!volley->sound_armed_with(entries, detector, (float)sound_volume_db)) {
+			volley->sound_arm_from_spawner(entries, detector, (float)sound_volume_db);
+			++changed;
+		}
+	}
+	return changed;
+}
+
+Array BulletSpawner2D::spawner_sound_entries(bool &r_any) {
 	// The setter guarantees sound entries or nulls; a script that mutated
 	// the array in place is caught here: the usable entries arm, the rest
 	// is reported once.
@@ -290,12 +327,8 @@ void BulletSpawner2D::apply_volley_sound(BulletVolley2D *volley) {
 		sound_effects_misuse_warned = true;
 		UtilityFunctions::push_warning("BulletSpawner2D: sound_effects was changed in place and holds entries that are not BulletSoundData2D; only sounds are used. Assign the whole array instead (sound_effects = [...]).");
 	}
-	if (any) {
-		// Shared: listener edits and refresh_sound_listeners() reach it in
-		// flight.
-		std::shared_ptr<GrazeDetector2D> detector = sound_detector_ref();
-		volley->sound_arm_from_spawner(entries, detector, (float)sound_volume_db);
-	}
+	r_any = any;
+	return entries;
 }
 
 void BulletSpawner2D::fire_spawner_sound(int trigger, int volley_amount) {

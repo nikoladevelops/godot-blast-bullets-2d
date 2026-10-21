@@ -60,6 +60,24 @@ bool BulletVolley2D::graze_arm_from_spawner(const Array &zones, const std::share
 	return true;
 }
 
+bool BulletVolley2D::graze_armed_with(const Array &zones, const std::shared_ptr<GrazeDetector2D> &detector) const {
+	if (graze_detector != detector || !graze_target_group.is_empty() || zones.size() > MAX_GRAZE_ZONES) {
+		return false;
+	}
+	int slots = 0;
+	for (int i = 0; i < zones.size(); ++i) {
+		const Variant &entry = zones[i];
+		const Object *zone = entry.get_type() == Variant::OBJECT ? (Object *)entry : nullptr;
+		if (zone != nullptr) {
+			slots = i + 1;
+		}
+		if ((const Object *)graze_zones[i].ptr() != zone) {
+			return false;
+		}
+	}
+	return slots == graze_zone_slots;
+}
+
 void BulletVolley2D::graze_arm(const Ref<BulletGrazeZone2D> *armed, int slots, const std::shared_ptr<GrazeDetector2D> &detector, const StringName &target_group) {
 	graze_release();
 	if (slots == 0) {

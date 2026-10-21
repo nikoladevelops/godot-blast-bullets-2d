@@ -327,6 +327,44 @@ void BulletSpawner2D::apply_volley_graze(BulletVolley2D *volley) {
 	if (volley == nullptr || !graze_enabled || graze_zones.is_empty()) {
 		return;
 	}
+	bool any = false;
+	const Array zones = spawner_graze_zones(any);
+	if (any) {
+		// Shared: setting edits and refresh_graze_targets() reach it in flight.
+		graze_detector_ref();
+		volley->graze_arm_from_spawner(zones, graze_detector);
+	}
+}
+
+int BulletSpawner2D::graze_live_volleys() {
+	BulletFactory2D *factory = get_bullet_factory();
+	if (factory == nullptr) {
+		return 0;
+	}
+	bool any = false;
+	const Array zones = graze_enabled ? spawner_graze_zones(any) : Array();
+	if (any) {
+		graze_detector_ref();
+	}
+	// Arming runs no user code: the list stays valid while it is walked.
+	std::vector<BulletVolley2D *> owned;
+	factory->collect_volleys_owned_by(get_instance_id(), owned);
+	int changed = 0;
+	for (BulletVolley2D *volley : owned) {
+		if (!any) {
+			if (volley->graze_zone_slots > 0) {
+				volley->graze_release();
+				++changed;
+			}
+		} else if (!volley->graze_armed_with(zones, graze_detector)) {
+			volley->graze_arm_from_spawner(zones, graze_detector);
+			++changed;
+		}
+	}
+	return changed;
+}
+
+Array BulletSpawner2D::spawner_graze_zones(bool &r_any) {
 	// The setter guarantees at most 4 zones or nulls; a script that mutated
 	// the array in place (append) is caught here: the usable entries arm,
 	// the rest is reported once.
@@ -346,11 +384,8 @@ void BulletSpawner2D::apply_volley_graze(BulletVolley2D *volley) {
 		graze_zones_misuse_warned = true;
 		UtilityFunctions::push_warning("BulletSpawner2D: graze_zones was changed in place and holds more than 4 zones or entries that are not BulletGrazeZone2D; only the first 4 zones are used. Assign the whole array instead (graze_zones = [...]).");
 	}
-	if (any) {
-		// Shared: setting edits and refresh_graze_targets() reach it in flight.
-		graze_detector_ref();
-		volley->graze_arm_from_spawner(zones, graze_detector);
-	}
+	r_any = any;
+	return zones;
 }
 
 Array BulletSpawner2D::resolve_graze_targets() const {

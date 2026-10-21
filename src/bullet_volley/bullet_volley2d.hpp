@@ -2671,6 +2671,9 @@ public:
 	// C++ only: zones (already validated by the spawner's setter) found by
 	// the spawner's detector, shared with every volley it armed.
 	bool graze_arm_from_spawner(const Array &zones, const std::shared_ptr<GrazeDetector2D> &detector);
+	// C++ only: armed with exactly these zones (the same Resources in the
+	// same slots) by this detector (BulletSpawner2D::graze_live_volleys).
+	bool graze_armed_with(const Array &zones, const std::shared_ptr<GrazeDetector2D> &detector) const;
 	// The target list this volley tests this sweep (its spawner's detector,
 	// or graze_target_group through the factory's); nullptr when there is
 	// none.
@@ -2863,6 +2866,9 @@ public:
 	// the spawner's listener detector, shared with every volley it armed,
 	// plus the spawner's volume offset added to every entry.
 	bool sound_arm_from_spawner(const Array &effects, const std::shared_ptr<GrazeDetector2D> &detector, float volume_offset_db);
+	// C++ only: armed with exactly these entries, this detector and offset
+	// (BulletSpawner2D::sound_live_volleys).
+	bool sound_armed_with(const Array &effects, const std::shared_ptr<GrazeDetector2D> &detector, float volume_offset_db) const;
 	// The armed entries, nulls in place.
 	Array sound_get_effects() const;
 	StringName sound_get_listener_group() const;

@@ -841,6 +841,7 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_graze_update_interval"), &BulletSpawner2D::get_graze_update_interval);
 	ClassDB::bind_method(D_METHOD("set_graze_update_interval", "value"), &BulletSpawner2D::set_graze_update_interval);
 	ClassDB::bind_method(D_METHOD("refresh_graze_targets"), &BulletSpawner2D::refresh_graze_targets);
+	ClassDB::bind_method(D_METHOD("graze_live_volleys"), &BulletSpawner2D::graze_live_volleys);
 	ClassDB::bind_method(D_METHOD("resolve_graze_targets"), &BulletSpawner2D::resolve_graze_targets);
 	ClassDB::bind_method(D_METHOD("debug_get_graze_preview_circles"), &BulletSpawner2D::debug_get_graze_preview_circles);
 	ClassDB::bind_method(D_METHOD("debug_get_graze_preview_stats"), &BulletSpawner2D::debug_get_graze_preview_stats);
@@ -878,6 +879,7 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_sound_listener_update_interval"), &BulletSpawner2D::get_sound_listener_update_interval);
 	ClassDB::bind_method(D_METHOD("set_sound_listener_update_interval", "value"), &BulletSpawner2D::set_sound_listener_update_interval);
 	ClassDB::bind_method(D_METHOD("refresh_sound_listeners"), &BulletSpawner2D::refresh_sound_listeners);
+	ClassDB::bind_method(D_METHOD("sound_live_volleys"), &BulletSpawner2D::sound_live_volleys);
 	ClassDB::bind_method(D_METHOD("resolve_sound_listeners"), &BulletSpawner2D::resolve_sound_listeners);
 	ClassDB::bind_method(D_METHOD("preview_sound_effect", "index"), &BulletSpawner2D::preview_sound_effect);
 	ClassDB::bind_method(D_METHOD("debug_get_sound_detector_stats"), &BulletSpawner2D::debug_get_sound_detector_stats);

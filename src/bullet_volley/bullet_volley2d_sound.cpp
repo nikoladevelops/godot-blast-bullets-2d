@@ -70,6 +70,20 @@ bool BulletVolley2D::sound_arm_from_spawner(const Array &effects, const std::sha
 	return true;
 }
 
+bool BulletVolley2D::sound_armed_with(const Array &effects, const std::shared_ptr<GrazeDetector2D> &detector, float volume_offset_db) const {
+	if (sound_detector != detector || !sound_listener_group.is_empty() || sound_volume_offset_db != volume_offset_db || (int64_t)sound_effects.size() != effects.size()) {
+		return false;
+	}
+	for (int i = 0; i < effects.size(); ++i) {
+		const Variant &entry = effects[i];
+		const Object *sound = entry.get_type() == Variant::OBJECT ? (Object *)entry : nullptr;
+		if ((const Object *)sound_effects[i].ptr() != sound) {
+			return false;
+		}
+	}
+	return true;
+}
+
 Array BulletVolley2D::sound_get_effects() const {
 	Array out;
 	for (const Ref<BulletSoundData2D> &entry : sound_effects) {

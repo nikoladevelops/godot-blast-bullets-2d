@@ -817,6 +817,13 @@ public:
 	// the bullets this spawner fired test the nodes found from their next
 	// tick on. Returns how many targets it has now.
 	int refresh_graze_targets();
+	// Applies the Graze group as it stands now to every live (or parked)
+	// volley this spawner owns: arms the ones not armed with the current
+	// zones (fired while graze was off, before a graze_zones change, or
+	// re-armed by a script) and disarms every one while graze is off or no
+	// zone is set. A volley already armed with these zones keeps its graze
+	// state (rings spent, open visits). Returns how many volleys changed.
+	int graze_live_volleys();
 	// The graze target finder this spawner shares with every volley it
 	// armed (created on first use). C++ only: the factory's runtime ring
 	// preview draws around its lists.
@@ -969,6 +976,11 @@ public:
 	// says): the bullets this spawner fired measure from the nodes found
 	// from their next tick on. Returns how many listeners it has now.
 	int refresh_sound_listeners();
+	// The Sound group as it stands now for every live (or parked) volley
+	// this spawner owns: arms the ones not armed with the current entries
+	// and sound_volume_db, disarms every one while sound is off or no entry
+	// is set. Returns how many volleys changed.
+	int sound_live_volleys();
 	// The listener finder this spawner shares with every volley it armed
 	// (created on first use). C++ only.
 	std::shared_ptr<GrazeDetector2D> sound_detector_ref() const;
@@ -2005,6 +2017,9 @@ private:
 	// Arms a freshly fired volley with graze_zones (shoot_once, before the
 	// homing signals). Runs no user code.
 	void apply_volley_graze(BulletVolley2D *volley);
+	// graze_zones as volleys arm them (the first 4 slots, nulls in place;
+	// in-place misuse warned once). r_any: at least one zone.
+	Array spawner_graze_zones(bool &r_any);
 	// The Flocking settings shared with every volley this spawner armed
 	// (created on first arm). Setters push into it (serial bump), so edits
 	// reach bullets in flight; orphans keep it.
@@ -2042,6 +2057,9 @@ private:
 	// Arms a freshly fired volley with sound_effects (shoot_once, beside the
 	// graze arming). Runs no user code.
 	void apply_volley_sound(BulletVolley2D *volley);
+	// sound_effects as volleys arm them (nulls in place; in-place misuse
+	// warned once). r_any: at least one entry.
+	Array spawner_sound_entries(bool &r_any);
 	// sound_effects mutated in place (non-sound entries): warned once per
 	// assignment, the usable entries still arm.
 	bool sound_effects_misuse_warned = false;
