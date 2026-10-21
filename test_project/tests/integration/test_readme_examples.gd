@@ -178,3 +178,21 @@ func test_the_colors_lifetimes_and_scale_in_example() -> void:
 	var plain := factory.spawn_volley(H.make_volley_data(2, 0.0, 4.0))
 	plain.set_bullet_color(0, Color.GOLD)
 	expect_error_sequence(["set_bullet_color: this volley has no per-bullet colors (spawn it with BulletVolleyData2D.use_bullet_colors on), keeping the old color."])
+
+
+func test_the_laser_helpers_example() -> void:
+	var laser := LaserData2D.create_preset(LaserData2D.PRESET_INSTANT_BEAM)
+	assert_eq(factory.populate_lasers_pool(12, 4), 4, "4 lasers of 12 beams pre-warmed")
+	var beams: Array[Transform2D] = [Transform2D(0.0, Vector2.ZERO)]
+	var beam := factory.spawn_laser(laser, beams)
+	beam.set_custom_data({"damage": 3}) # read it in any laser signal; the pool clears it
+	assert_eq(beam.get_custom_data()["damage"], 3, "custom data")
+	step_factory(1, DT)
+	var bomb_position := Vector2(200, 60)
+	assert_eq(factory.end_lasers_in_circle(bomb_position, 150.0), 1, "the bomb crosses the beam")
+	var boss_lasers := _laser_spawner(laser)
+	assert_true(boss_lasers.shoot_once(), "fires")
+	boss_lasers.graze_zones = [H.make_graze_zone([40.0])]
+	boss_lasers.graze_node_group = &"player"
+	boss_lasers.graze_enabled = true
+	assert_eq(boss_lasers.apply_to_live_lasers(), 1, "settings changed mid-fight reach the laser in flight")
