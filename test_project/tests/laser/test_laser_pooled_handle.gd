@@ -149,3 +149,22 @@ func test_a_laser_that_was_never_fired_refuses_writes() -> void:
 	assert_eq("\n".join(problems), "", "one refusal per write")
 	assert_eq([l.get_beam_count(), l.is_laser_active(), l.debug_check_invariants()], [0, false, ""], "still empty and consistent")
 	await idle(1) # its draw runs with nothing to draw
+
+
+func test_the_pool_drops_what_a_script_added_to_the_laser() -> void:
+	var data := _data()
+	var l := _fire(data)
+	l.set_meta(&"damage", 5)
+	l.add_to_group(&"enemy_lasers")
+	l.modulate = Color(1, 0, 0)
+	l.position = Vector2(30, 40)
+	l.process_mode = Node.PROCESS_MODE_DISABLED
+	l.top_level = true
+	l.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	step_factory(1, DT)
+	l.end_laser(false)
+	step_factory(1, DT)
+	var again := _fire(data)
+	assert_eq(again, l, "the same laser from the pool")
+	assert_eq([again.get_meta_list().size(), again.is_in_group(&"enemy_lasers"), again.modulate, again.position, again.process_mode, again.top_level, again.texture_filter],
+		[0, false, Color.WHITE, Vector2.ZERO, Node.PROCESS_MODE_INHERIT, false, CanvasItem.TEXTURE_FILTER_PARENT_NODE], "a neutral node, like a fresh laser")

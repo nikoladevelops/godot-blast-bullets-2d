@@ -1353,9 +1353,6 @@ public:
 	// resources, user groups/metadata/modulate). Values are reseeded by
 	// begin_life, never reset twice.
 	void release_life();
-	// Restores the Node/CanvasItem/Node2D settings spawn data never seeds
-	// (modulate, transform, top_level, filtering, sorting, process mode...).
-	void restore_node_baseline();
 	// The single new-life path shared by spawn() and enable_volley().
 	void begin_life(const BulletVolleyData2D &data, uint64_t new_owner_spawner_id, const Vector2 &new_inherited_velocity_offset);
 

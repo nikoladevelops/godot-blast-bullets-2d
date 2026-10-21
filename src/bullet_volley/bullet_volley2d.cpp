@@ -4,6 +4,7 @@
 
 #include "bullet_spawner/bullet_spawner2d.hpp"
 #include "bullet_volley/bullet_volley2d_internal.hpp"
+#include "core/node_baseline2d.hpp"
 #include "core/physics_flush2d.hpp"
 
 using namespace godot;
@@ -253,75 +254,11 @@ void BulletVolley2D::release_life() {
 		instance_shader_parameters.clear();
 		set_material(Ref<Material>());
 	}
-	// Node-level decorations a previous owner may have added: user groups
-	// (engine-internal groups start with '_'), metadata and the CanvasItem
-	// modulate. The next owner starts from a neutral node.
-	const TypedArray<StringName> groups = get_groups();
-	for (int g = 0; g < groups.size(); ++g) {
-		const StringName group = groups[g];
-		if (!String(group).begins_with("_")) {
-			remove_from_group(group);
-		}
-	}
-	const TypedArray<StringName> meta_keys = get_meta_list();
-	for (int m = 0; m < meta_keys.size(); ++m) {
-		remove_meta(meta_keys[m]);
-	}
-	restore_node_baseline();
+	// Node-level decorations a previous owner may have added: the next owner
+	// starts from a neutral node (core/node_baseline2d.hpp).
+	strip_user_decorations2d(this);
+	restore_node_baseline2d(this);
 	life_released = true;
-}
-
-void BulletVolley2D::restore_node_baseline() {
-	// Node/CanvasItem/Node2D settings spawn data never seeds: a previous
-	// owner's change (moved node, top_level, filtering, sorting, process
-	// mode...) must not leak into the next life. Each setter runs only when
-	// the value actually changed (the common pooled release costs reads).
-	if (get_modulate() != Color(1, 1, 1, 1)) {
-		set_modulate(Color(1, 1, 1, 1));
-	}
-	if (get_process_mode() != Node::PROCESS_MODE_INHERIT) {
-		set_process_mode(Node::PROCESS_MODE_INHERIT);
-	}
-	if (get_process_priority() != 0) {
-		set_process_priority(0);
-	}
-	if (get_physics_process_priority() != 0) {
-		set_physics_process_priority(0);
-	}
-	if (is_draw_behind_parent_enabled()) {
-		set_draw_behind_parent(false);
-	}
-	if (is_set_as_top_level()) {
-		set_as_top_level(false);
-	}
-	if (get_clip_children_mode() != CanvasItem::CLIP_CHILDREN_DISABLED) {
-		set_clip_children_mode(CanvasItem::CLIP_CHILDREN_DISABLED);
-	}
-	if (!is_z_relative()) {
-		set_z_as_relative(true);
-	}
-	if (is_y_sort_enabled()) {
-		set_y_sort_enabled(false);
-	}
-	if (get_texture_filter() != CanvasItem::TEXTURE_FILTER_PARENT_NODE) {
-		set_texture_filter(CanvasItem::TEXTURE_FILTER_PARENT_NODE);
-	}
-	if (get_texture_repeat() != CanvasItem::TEXTURE_REPEAT_PARENT_NODE) {
-		set_texture_repeat(CanvasItem::TEXTURE_REPEAT_PARENT_NODE);
-	}
-	if (get_use_parent_material()) {
-		set_use_parent_material(false);
-	}
-	if (get_transform() != Transform2D()) {
-		set_transform(Transform2D());
-	}
-	// Newer engines add CanvasItem.oversampling_with_scale: restore it when
-	// the running engine has it (absent properties read as nil).
-	const StringName &oversampling_name = CachedStringNames2D::get().oversampling_with_scale;
-	const Variant oversampling = get(oversampling_name);
-	if (oversampling.get_type() == Variant::INT && (int64_t)oversampling != 0) {
-		set(oversampling_name, 0);
-	}
 }
 
 void BulletVolley2D::begin_life(const BulletVolleyData2D &data, uint64_t new_owner_spawner_id, const Vector2 &new_inherited_velocity_offset) {

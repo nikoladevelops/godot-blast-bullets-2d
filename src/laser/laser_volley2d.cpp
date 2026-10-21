@@ -7,6 +7,7 @@
 
 #include "bullet_spawner/pattern_spawner2d.hpp"
 #include "core/cached_string_names2d.hpp"
+#include "core/node_baseline2d.hpp"
 #include "core/transform_math2d.hpp"
 #include "factory/bullet_factory2d.hpp"
 #include "factory/graze_detector2d.hpp"
@@ -162,6 +163,9 @@ void LaserVolley2D::release_life() {
 	sound_listeners.reset();
 	sound_listener_group = StringName();
 	set_material(Ref<Material>());
+	// What a script added to the node: the next owner gets a neutral laser.
+	strip_user_decorations2d(this);
+	restore_node_baseline2d(this);
 	set_visible(false);
 	queue_redraw();
 }
