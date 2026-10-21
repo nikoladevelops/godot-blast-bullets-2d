@@ -488,3 +488,186 @@ func test_random_spawner_and_factory_storm_keeps_every_invariant() -> void:
 		await idle(1)
 		fired.clear()
 	assert_gt(calls, 1500, "the storm made %d calls" % calls)
+
+
+# ---- Laser storm ------------------------------------------------------------------
+# The same storm over lasers: every bound LaserVolley2D method, every
+# LaserSpawner2D (+ PatternSpawner2D) method, every LaserData2D setter (edits
+# reach lasers in flight: type switches, reflections, lengths, phases) and the
+# factory's laser methods, on live beams, bolts and curvy lasers among
+# targets and walls. Contract: never crash, every live laser finite and
+# consistent (debug_check_invariants), the books always balance.
+
+const LASER_STORM_STEPS := 150
+
+
+func _laser_storm_data() -> LaserData2D:
+	var d := LaserData2D.create_preset(1 + storm_rng.randi() % 7)
+	d.collision_mask = 4
+	d.wall_mask = 16 if storm_rng.randf() < 0.5 else 0
+	d.charge_sec = [0.0, 0.0625, 0.25][storm_rng.randi() % 3]
+	d.active_sec = [0.0, 0.25, 1.0][storm_rng.randi() % 3]
+	return d
+
+
+func _laser_storm_arg(a: Dictionary, beams: int, data: Array) -> Variant:
+	var n := String(a["name"])
+	match int(a["type"]):
+		TYPE_INT:
+			return [0, 1, beams - 1, -1, beams, 99, storm_rng.randi_range(0, 8)][storm_rng.randi() % 7]
+		TYPE_ARRAY:
+			if n == "zones":
+				return [H.make_graze_zone([storm_rng.randf_range(5, 60)])] if storm_rng.randf() < 0.8 else []
+			if n == "effects":
+				return [H.make_sound(BulletSoundData2D.SOUND_ON_HIT)]
+			if n == "transforms":
+				var t: Array[Transform2D] = []
+				for i in storm_rng.randi_range(0, 4):
+					t.append(Transform2D(storm_rng.randf_range(-PI, PI), Vector2(storm_rng.randf_range(-100, 300), storm_rng.randf_range(-100, 300))))
+				return t
+			return [storm_target, Vector2(storm_rng.randf_range(-200, 200), 50)]
+		TYPE_OBJECT:
+			match String(a["class_name"]):
+				"LaserData2D":
+					return data[storm_rng.randi() % data.size()]
+				"Node2D", "Node":
+					return storm_target if storm_rng.randf() < 0.8 else null
+				"SpriteFrames":
+					return H.make_sprite_frames()
+				"Gradient":
+					return Gradient.new()
+			return _storm_object(String(a["class_name"]))
+		TYPE_NIL:
+			return [storm_target, Vector2(40, 40), null, 7][storm_rng.randi() % 4]
+		TYPE_FLOAT:
+			return [0.0, 0.0625, 0.5, 1.0, 30.0, 600.0, -1.0, storm_rng.randf_range(-10, 10), NAN, INF, 1e30][storm_rng.randi() % 11]
+		TYPE_BOOL:
+			return storm_rng.randf() < 0.5
+		TYPE_VECTOR2:
+			return Vector2(NAN, 0) if storm_rng.randf() < 0.05 else Vector2(storm_rng.randf_range(-300, 300), storm_rng.randf_range(-300, 300))
+		TYPE_TRANSFORM2D:
+			return Transform2D(storm_rng.randf_range(-PI, PI), Vector2(storm_rng.randf_range(-300, 300), storm_rng.randf_range(-300, 300)))
+		TYPE_RECT2:
+			return Rect2(storm_rng.randf_range(-200, 200), storm_rng.randf_range(-200, 200), storm_rng.randf_range(-100, 300), storm_rng.randf_range(-100, 300))
+		TYPE_COLOR:
+			return Color(storm_rng.randf(), storm_rng.randf(), storm_rng.randf(), storm_rng.randf())
+		TYPE_STRING, TYPE_STRING_NAME:
+			return ["", "graze_targets", "Storm"][storm_rng.randi() % 3]
+		TYPE_NODE_PATH:
+			return NodePath() if storm_rng.randf() < 0.5 else NodePath("..")
+		TYPE_DICTIONARY:
+			return {}
+		TYPE_CALLABLE:
+			return func(_a = null, _b = null, _c = null) -> void: storm_calls += 1
+		TYPE_PACKED_VECTOR2_ARRAY:
+			return PackedVector2Array([Vector2(storm_rng.randf_range(-200, 200), 0)])
+	return null
+
+
+func _laser_finite(l: LaserVolley2D) -> String:
+	if l.is_pooled():
+		return ""
+	var why := l.debug_check_invariants()
+	if why != "":
+		return why
+	for i in l.get_beam_count():
+		for p in l.get_beam_points(i):
+			if not p.is_finite():
+				return "beam %d has a non-finite point" % i
+	return ""
+
+
+func test_random_laser_storm_keeps_every_invariant() -> void:
+	storm_target = make_graze_target(Vector2(120, 80))
+	storm_scene = make_probe_scene()
+	make_area(Vector2(160, 0), Vector2(20, 300))
+	make_wall(Vector2(320, 0), Vector2(20, 600), 16)
+	await idle(2)
+	var targets: Array = [] # [kind, method]
+	for m in ClassDB.class_get_method_list("LaserVolley2D", true):
+		targets.append(["laser", m])
+	for cls in ["PatternSpawner2D", "LaserSpawner2D"]:
+		for m in ClassDB.class_get_method_list(cls, true):
+			targets.append(["spawner", m])
+	for m in ClassDB.class_get_method_list("LaserData2D", true):
+		if String(m["name"]).begins_with("set_") or String(m["name"]) == "apply_preset":
+			targets.append(["data", m])
+	for m in ClassDB.class_get_method_list("BulletFactory2D", true):
+		if String(m["name"]).contains("laser"):
+			targets.append(["factory", m])
+	targets = targets.filter(func(t): return not String(t[1]["name"]).begins_with("_") and not (t[1]["args"] as Array).any(func(a): return int(a["type"]) == TYPE_RID))
+	var calls := 0
+	for sd in STORM_SEEDS:
+		storm_rng.seed = sd
+		seed(sd)
+		var data: Array = [_laser_storm_data(), _laser_storm_data(), _laser_storm_data()]
+		var spawners: Array = []
+		var lasers: Array = []
+		for k in 2:
+			var sp := LaserSpawner2D.new()
+			sp.set_shooting_enabled(false)
+			sp.laser_data = data[k]
+			sp.pattern_source = LaserSpawner2D.PATTERN_FROM_HELPER_RING
+			sp.helper_bullets_amount = storm_rng.randi_range(1, 6)
+			sp.helper_ring_radius = 20.0
+			sp.laser_target_source = LaserSpawner2D.LASER_TARGET_NODE_GROUP
+			sp.laser_target_group = &"graze_targets"
+			add(sp)
+			sp.set_bullet_factory(factory)
+			sp.laser_fired.connect(func(l: LaserVolley2D, _n: int) -> void: lasers.append(l))
+			spawners.append(sp)
+		for step in LASER_STORM_STEPS:
+			for sp in spawners:
+				if is_instance_valid(sp) and storm_rng.randf() < 0.25:
+					sp.shoot_once()
+			lasers = lasers.filter(func(l): return is_instance_valid(l))
+			for c in 3:
+				var pick: Array = targets[storm_rng.randi() % targets.size()]
+				var obj: Object = factory
+				var beams := 1
+				match pick[0]:
+					"laser":
+						if lasers.is_empty():
+							continue
+						obj = lasers[storm_rng.randi() % lasers.size()]
+						beams = (obj as LaserVolley2D).get_beam_count()
+					"spawner":
+						spawners = spawners.filter(func(s): return is_instance_valid(s))
+						if spawners.is_empty():
+							continue
+						obj = spawners[storm_rng.randi() % spawners.size()]
+					"data":
+						obj = data[storm_rng.randi() % data.size()]
+				var args: Array = []
+				for a in pick[1]["args"]:
+					args.append(_laser_storm_arg(a, beams, data))
+				obj.callv(String(pick[1]["name"]), args)
+				calls += 1
+			if not factory.is_inside_tree():
+				break
+			if storm_rng.randf() < 0.2:
+				await physics(1)
+				await idle(1)
+			else:
+				factory.debug_advance_time([0.0, 1.0 / 60.0, 1.0 / 16.0, 0.25][storm_rng.randi() % 4])
+			swallow_errors()
+			var where := "seed %d step %d" % [sd, step]
+			for l in lasers.filter(func(x): return is_instance_valid(x)):
+				var why := _laser_finite(l)
+				if why != "":
+					assert_true(false, "laser consistent, %s: %s" % [where, why])
+					return
+			var books: Dictionary = factory.debug_assert_no_dangling()
+			if not books["ok"]:
+				assert_true(false, "books balance, %s: %s" % [where, books["error"]])
+				return
+		factory.set_is_factory_processing_bullets(true)
+		factory.time_scale = 1.0
+		factory.reset()
+		await idle(2)
+		swallow_errors()
+		for sp in spawners:
+			if is_instance_valid(sp):
+				sp.queue_free()
+		await idle(1)
+	assert_gt(calls, 1200, "the storm made %d calls" % calls)
