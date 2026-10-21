@@ -19,6 +19,10 @@ void BulletVolley2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("clear_bullet_rotation_data"), &BulletVolley2D::clear_bullet_rotation_data);
 	ClassDB::bind_method(D_METHOD("all_bullets_get_speed_data", "bullet_index_start", "bullet_index_end_inclusive"), &BulletVolley2D::all_bullets_get_speed_data, DEFVAL(0), DEFVAL(-1));
 	ClassDB::bind_method(D_METHOD("all_bullets_set_speed_data", "new_bullet_speed_data", "bullet_index_start", "bullet_index_end_inclusive"), &BulletVolley2D::all_bullets_set_speed_data, DEFVAL(0), DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("get_bullet_speed", "bullet_index"), &BulletVolley2D::get_bullet_speed);
+	ClassDB::bind_method(D_METHOD("set_bullet_speed", "bullet_index", "new_speed"), &BulletVolley2D::set_bullet_speed);
+	ClassDB::bind_method(D_METHOD("all_bullets_get_speed", "bullet_index_start", "bullet_index_end_inclusive"), &BulletVolley2D::all_bullets_get_speed, DEFVAL(0), DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("all_bullets_set_speed", "new_speed", "bullet_index_start", "bullet_index_end_inclusive"), &BulletVolley2D::all_bullets_set_speed, DEFVAL(0), DEFVAL(-1));
 
 	ClassDB::bind_method(D_METHOD("get_bullet_direction", "bullet_index"), &BulletVolley2D::get_bullet_direction);
 	ClassDB::bind_method(D_METHOD("set_bullet_direction", "bullet_index", "new_direction"), &BulletVolley2D::set_bullet_direction);

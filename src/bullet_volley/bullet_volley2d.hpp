@@ -343,6 +343,15 @@ public:
 	TypedArray<BulletSpeedData2D> all_bullets_get_speed_data(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) const;
 	void all_bullets_set_speed_data(const Ref<BulletSpeedData2D> &new_bullet_speed_data, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 
+	// Bullet Speed: the signed speed along the bullet's direction (the
+	// inherited drift and the fall speed are not part of it). A write keeps
+	// acceleration and max_speed; a capped max_speed below the new speed
+	// rises to it so the next tick does not clamp the write away.
+	real_t get_bullet_speed(int bullet_index) const;
+	void set_bullet_speed(int bullet_index, real_t new_speed);
+	TypedArray<real_t> all_bullets_get_speed(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) const;
+	void all_bullets_set_speed(real_t new_speed, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
+
 	// Bullet Direction
 
 	Vector2 get_bullet_direction(int bullet_index) const;
@@ -1097,6 +1106,9 @@ public:
 	_ALWAYS_INLINE_ void carry_attachment_with_transform(int bullet_index, const Transform2D &new_transform, const Vector2 &origin_delta);
 	void present_bullet_transform(int bullet_index, const Vector2 &attachment_delta);
 	bool direction_curve_owns_direction(int bullet_index);
+	// Same for a movement speed curve: warns once naming `what` ("velocity",
+	// "speed data", "speed") and returns true when a curve owns the speed.
+	bool speed_curve_owns_speed(int bullet_index, const char *what) const;
 
 	// CURVES RELATED
 	inline void populate_shared_curves_related_data(const Ref<BulletCurvesData2D> &new_curves_data);

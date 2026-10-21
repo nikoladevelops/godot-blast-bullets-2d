@@ -77,15 +77,7 @@ void BulletVolley2D::bullet_set_velocity(int bullet_index, const Vector2 &new_ve
 		return;
 	}
 
-	if (shared_bullet_curves_data.is_valid() && shared_bullet_curves_data->movement_speed_curve.is_valid()) {
-		UtilityFunctions::push_warning("You are trying to set bullet velocity directly while having a movement speed curve assigned to the shared curves data. The curve will override any direct velocity changes. Set the curve to null first if you want to set velocity directly.");
-		return;
-	}
-
-	BulletCurvesData2D *curves_data = find_bullet_curves_data_ptr(bullet_index);
-
-	if (curves_data != nullptr && curves_data->movement_speed_curve.is_valid()) {
-		UtilityFunctions::push_warning("You are trying to set bullet velocity directly while having a movement speed curve assigned as an individual bullet curves data. The curve will override any direct velocity changes. Set the curve to null first if you want to set velocity directly.");
+	if (speed_curve_owns_speed(bullet_index, "velocity")) {
 		return;
 	}
 
@@ -381,15 +373,7 @@ void BulletVolley2D::set_bullet_speed_data(int bullet_index, const Ref<BulletSpe
 		return;
 	}
 
-	if (shared_bullet_curves_data.is_valid() && shared_bullet_curves_data->movement_speed_curve.is_valid()) {
-		UtilityFunctions::push_warning("You are trying to set bullet speed data directly while having a movement speed curve assigned to the shared curves data. The curve will override any direct speed data changes. Set the curve to null first if you want to set speed data directly.");
-		return;
-	}
-
-	BulletCurvesData2D *curves_data = find_bullet_curves_data_ptr(bullet_index);
-
-	if (curves_data != nullptr && curves_data->movement_speed_curve.is_valid()) {
-		UtilityFunctions::push_warning("You are trying to set bullet speed data directly while having a movement speed curve assigned as an individual bullet curves data. The curve will override any direct speed data changes. Set the curve to null first if you want to set speed data directly.");
+	if (speed_curve_owns_speed(bullet_index, "speed data")) {
 		return;
 	}
 
@@ -409,6 +393,62 @@ void BulletVolley2D::set_bullet_speed_data(int bullet_index, const Ref<BulletSpe
 	// A direct per-bullet write is as authoritative as a seeded entry: the
 	// shared fallback must never overwrite it, including an all-zero "freeze".
 	mark_per_bullet_speed_presence(bullet_index, true);
+}
+
+bool BulletVolley2D::speed_curve_owns_speed(int bullet_index, const char *what) const {
+	const char *owner = nullptr;
+	if (shared_bullet_curves_data.is_valid() && shared_bullet_curves_data->movement_speed_curve.is_valid()) {
+		owner = "to the shared curves data";
+	} else {
+		const BulletCurvesData2D *own = find_bullet_curves_data_ptr(bullet_index);
+		if (own != nullptr && own->movement_speed_curve.is_valid()) {
+			owner = "as an individual bullet curves data";
+		}
+	}
+	if (owner == nullptr) {
+		return false;
+	}
+	UtilityFunctions::push_warning(String("You are trying to set bullet ") + what + " directly while having a movement speed curve assigned " + owner + ". The curve will override any direct " + what + " changes. Set the curve to null first if you want to set " + what + " directly.");
+	return true;
+}
+
+real_t BulletVolley2D::get_bullet_speed(int bullet_index) const {
+	if (!validate_bullet_index(bullet_index, "get_bullet_speed") || bullet_index >= (int)all_cached_speed.size()) {
+		return 0.0;
+	}
+	return all_cached_speed[bullet_index];
+}
+
+void BulletVolley2D::set_bullet_speed(int bullet_index, real_t new_speed) {
+	if (!validate_bullet_index(bullet_index, "set_bullet_speed")) {
+		return;
+	}
+	if (!Math::is_finite(new_speed)) {
+		UtilityFunctions::push_error("set_bullet_speed: new_speed must be finite, keeping the old speed.");
+		return;
+	}
+	if (speed_curve_owns_speed(bullet_index, "speed")) {
+		return;
+	}
+	if (bullet_index >= (int)all_cached_speed.size() || bullet_index >= (int)all_cached_max_speed.size() || bullet_index >= (int)all_cached_velocity.size() || bullet_index >= (int)all_cached_direction.size()) {
+		return;
+	}
+	all_cached_speed[bullet_index] = new_speed;
+	// A cap below the new speed rises to it (bullet_set_velocity's rule); a
+	// negative speed flies along -direction, so its magnitude counts.
+	const real_t magnitude = Math::abs(new_speed);
+	if (all_cached_max_speed[bullet_index] > 0.0 && all_cached_max_speed[bullet_index] < magnitude) {
+		all_cached_max_speed[bullet_index] = magnitude;
+	}
+	refresh_cached_velocity(bullet_index);
+}
+
+TypedArray<real_t> BulletVolley2D::all_bullets_get_speed(int bullet_index_start, int bullet_index_end_inclusive) const {
+	return collect_range<TypedArray<real_t>>(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_speed", [&](int i) { return get_bullet_speed(i); });
+}
+
+void BulletVolley2D::all_bullets_set_speed(real_t new_speed, int bullet_index_start, int bullet_index_end_inclusive) {
+	for_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_speed", [&](int i) { set_bullet_speed(i, new_speed); });
 }
 
 TypedArray<BulletSpeedData2D> BulletVolley2D::all_bullets_get_speed_data(int bullet_index_start, int bullet_index_end_inclusive) const {
