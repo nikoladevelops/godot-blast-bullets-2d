@@ -705,7 +705,7 @@ void LaserVolley2D::set_active_time_left(double seconds) {
 
 String LaserVolley2D::debug_check_invariants() const {
 	if (pooled) {
-		if (active || !beams.empty() || data.is_valid() || owner_spawner_id != 0 || anchor_id != 0 || !graze_zones.empty() || graze_detector != nullptr || !sound_effects.empty()) {
+		if (active || !beams.empty() || data.is_valid() || owner_spawner_id != 0 || anchor_id != 0 || !graze_zones.empty() || graze_detector != nullptr || !sound_effects.empty() || custom_data.get_type() != Variant::NIL) {
 			return "pooled laser still holds its life";
 		}
 		return String();
