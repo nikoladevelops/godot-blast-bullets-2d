@@ -162,6 +162,16 @@ public:
 	// every spawn/enable, so pool reuse never leaks the previous tint.
 	Color self_modulate = Color(1, 1, 1, 1);
 
+	// Per-bullet colors: entry i tints bullet i (multiplied with the art,
+	// self_modulate and modulate_ramp, so a ramp still shades every color).
+	// On while use_bullet_colors is set or bullet_colors has an entry; off
+	// costs nothing (the MultiMesh then carries no color data). Strict
+	// indexing (uncovered bullets white) unless tile_bullet_colors wraps.
+	bool use_bullet_colors = false;
+	PackedColorArray bullet_colors;
+	bool tile_bullet_colors = false;
+	bool wants_bullet_colors() const { return use_bullet_colors || !bullet_colors.is_empty(); }
+
 	// Bullet whiten override (shares the animation rebuild below). When true, bullet frames bake
 	// whitened (alpha preserved), so self_modulate tints bullets to the
 	// exact dialed color instead of multiplying the source art. Same
@@ -302,6 +312,12 @@ public:
 
 	Color get_self_modulate() const;
 	void set_self_modulate(const Color &new_self_modulate);
+	bool get_use_bullet_colors() const { return use_bullet_colors; }
+	void set_use_bullet_colors(bool value);
+	PackedColorArray get_bullet_colors() const { return bullet_colors; }
+	void set_bullet_colors(const PackedColorArray &value);
+	bool get_tile_bullet_colors() const { return tile_bullet_colors; }
+	void set_tile_bullet_colors(bool value);
 
 	bool get_override_frame_color() const;
 	void set_override_frame_color(bool value);

@@ -567,7 +567,7 @@ void BulletVolley2D::set_collision_shape_runtime(const Ref<Shape2D> &new_shape) 
 		return;
 	}
 	PhysicsServer2D::ShapeType old_effective = cached_effective_shape_type;
-	const PoolKey old_key{ amount_bullets, old_effective };
+	const PoolKey old_key{ amount_bullets, old_effective, colors_enabled };
 	cache_collision_shape_typed(new_shape);
 	// Typed cache already printed error once + fallback if needed.
 	if (cached_effective_shape_type != old_effective) {

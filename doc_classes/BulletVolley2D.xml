@@ -123,6 +123,14 @@
 				Bounce counts over a bullet range (mirrors [method bullet_get_bounce_count]). Inverted ranges are rejected.
 			</description>
 		</method>
+		<method name="all_bullets_get_color" qualifiers="const">
+			<return type="PackedColorArray" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Returns the color of every bullet in the range (see [method get_bullet_color]). The default range covers the whole volley.
+			</description>
+		</method>
 		<method name="all_bullets_get_curves_data">
 			<return type="BulletCurvesData2D[]" />
 			<param index="0" name="bullet_index_start" type="int" default="0" />
@@ -446,6 +454,23 @@
 				Removes the attachments of all bullets in the specified range by setting them to null. Returns an array of the removed [BulletAttachment2D] attachments, which can be useful if you want to reuse them as they are not freed, just detached from the bullets.
 
 				Warning: You have to take care of the returned attachments yourself.
+			</description>
+		</method>
+		<method name="all_bullets_set_color">
+			<return type="void" />
+			<param index="0" name="new_color" type="Color" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Tints every bullet in the range with [param new_color] (see [method set_bullet_color]). An invalid range or a volley without per-bullet colors is refused once for the whole call.
+			</description>
+		</method>
+		<method name="all_bullets_set_colors">
+			<return type="void" />
+			<param index="0" name="new_colors" type="PackedColorArray" />
+			<param index="1" name="tile" type="bool" default="false" />
+			<description>
+				Writes one color per bullet: entry [code]i[/code] tints bullet [code]i[/code]. A short array leaves the remaining bullets unchanged, or wraps around when [param tile] is [code]true[/code]. Refused (nothing changes) on a volley without per-bullet colors or when any entry is not finite.
 			</description>
 		</method>
 		<method name="all_bullets_set_curves_data">
@@ -1600,6 +1625,13 @@
 				Get how many times a specific bullet has collided so far. See [method set_bullet_collision_count] for writing it.
 			</description>
 		</method>
+		<method name="get_bullet_color" qualifiers="const">
+			<return type="Color" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Returns the bullet's own color (multiplied with the art, [member CanvasItem.self_modulate] and [member modulate_ramp] when drawn). A volley spawned without per-bullet colors reads white for every bullet.
+			</description>
+		</method>
 		<method name="get_bullet_direction" qualifiers="const">
 			<return type="Vector2" />
 			<param index="0" name="bullet_index" type="int" />
@@ -1899,6 +1931,12 @@
 				True when active, unpaused, unfinished, with more than one baked frame.
 			</description>
 		</method>
+		<method name="is_using_bullet_colors" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] when this volley draws per-bullet colors (its spawn data had [member BulletVolleyData2D.use_bullet_colors] on or a [member BulletVolleyData2D.bullet_colors] entry). The format is part of the pool key, so it stays the same for the volley's whole life.
+			</description>
+		</method>
 		<method name="play_effect_animation">
 			<return type="bool" />
 			<param index="0" name="layer_index" type="int" />
@@ -1992,6 +2030,14 @@
 			<param index="1" name="value" type="int" />
 			<description>
 				Set how many times a specific bullet has collided so far. Negative values become 0, values at or above [member bullet_max_collision_count] become max - 1 (exactly one hit remaining, when the max is above 0). Same clamp as [method enable_bullet]'s wake top-up. See [method get_bullet_collision_count] for reading it.
+			</description>
+		</method>
+		<method name="set_bullet_color">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_color" type="Color" />
+			<description>
+				Tints one bullet. The color shows at once, even on a paused factory, and stays until the volley's life ends (a parked wake keeps it). Refused with an error on a volley spawned without per-bullet colors or for a non-finite color.
 			</description>
 		</method>
 		<method name="set_bullet_direction">

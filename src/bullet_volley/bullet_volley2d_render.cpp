@@ -18,7 +18,8 @@ void BulletVolley2D::interpolate_bullet_visuals(double fraction_override) {
 	if ((int)all_cached_instance_transforms.size() != amount_bullets || (int)all_previous_instance_transf.size() != amount_bullets) {
 		return;
 	}
-	if ((int)batch_buffer.size() != amount_bullets * 8) {
+	const int stride = buffer_stride;
+	if ((int)batch_buffer.size() != amount_bullets * stride) {
 		return;
 	}
 	double fraction = fraction_override >= 0.0 ? Math::min(fraction_override, 1.0) : Engine::get_singleton()->get_physics_interpolation_fraction();
@@ -38,7 +39,7 @@ void BulletVolley2D::interpolate_bullet_visuals(double fraction_override) {
 		} else {
 			t = zero_transform;
 		}
-		write_multimesh_transform2d(w + i * 8, t);
+		write_multimesh_transform2d(w + i * stride, t);
 	}
 	multi->set_buffer(batch_buffer);
 	const auto &active_bullet_indexes = all_bullets_enabled_set.get_active_indexes();

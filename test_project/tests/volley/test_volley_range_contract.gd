@@ -31,6 +31,8 @@ func _arg_for(arg: Dictionary) -> Variant:
 			return Vector2(1, 0)
 		TYPE_TRANSFORM2D:
 			return Transform2D(0.0, Vector2(5, 5))
+		TYPE_COLOR:
+			return Color.RED
 	return null
 
 

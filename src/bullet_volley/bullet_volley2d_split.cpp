@@ -164,6 +164,10 @@ int BulletVolley2D::split_capture(int bullet_index, int cause, const Transform2D
 			request.rotation_acceleration = all_rotation_acceleration[bullet_index];
 			request.has_rotation = true;
 		}
+		if (colors_enabled) {
+			request.color = get_bullet_color(bullet_index);
+			request.has_color = true;
+		}
 	}
 	if (stage->keep_graze || stage->keep_sound || stage->keep_flock) {
 		// One snapshot per arming change of this life, shared by its requests.
@@ -346,6 +350,11 @@ void BulletVolley2D::split_seed_children(const SplitRequest2D &request, const Ve
 			if (rotation.is_valid()) {
 				set_bullet_rotation_data(i, rotation);
 			}
+		}
+	}
+	if (request.has_color && colors_enabled) {
+		for (int i = 0; i < limit; ++i) {
+			set_bullet_color(i, request.color);
 		}
 	}
 	if (stage->keep_collision_count && request.collision_count > 0) {

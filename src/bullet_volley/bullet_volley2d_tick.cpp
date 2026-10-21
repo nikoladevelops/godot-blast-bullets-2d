@@ -1301,7 +1301,8 @@ _ALWAYS_INLINE_ void BulletVolley2D::batch_flush_instance_transforms() {
 	if (!multi.is_valid() || amount_bullets != multi->get_instance_count()) {
 		return;
 	}
-	if ((int)all_cached_instance_transforms.size() != amount_bullets || (int)batch_buffer.size() != amount_bullets * 8) {
+	const int stride = buffer_stride;
+	if ((int)all_cached_instance_transforms.size() != amount_bullets || (int)batch_buffer.size() != amount_bullets * stride) {
 		return;
 	}
 	float *w = batch_buffer.ptrw();
@@ -1317,7 +1318,7 @@ _ALWAYS_INLINE_ void BulletVolley2D::batch_flush_instance_transforms() {
 		if (all_bullets_enabled_set.contains(i)) {
 			t = multimesh_inv * all_cached_instance_transforms[i];
 		}
-		write_multimesh_transform2d(w + i * 8, t);
+		write_multimesh_transform2d(w + i * stride, t);
 	}
 
 	multi->set_buffer(batch_buffer);

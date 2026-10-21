@@ -117,6 +117,10 @@ struct SplitRequest2D {
 	real_t rotation_acceleration = 0.0;
 	bool has_gravity = false;
 	bool has_rotation = false;
+	// The parent bullet's own color (its volley drew per-bullet colors): every
+	// child wears it, so a red bullet bursts into red children.
+	Color color = Color(1, 1, 1, 1);
+	bool has_color = false;
 	Transform2D pose;
 	Vector2 direction;
 	Vector2 inherited_velocity; // the volley's drift, unmirrored (the frame mirrors it)

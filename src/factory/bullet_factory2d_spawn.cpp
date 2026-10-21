@@ -188,7 +188,7 @@ BulletVolley2D *BulletFactory2D::spawn_volley_internal(const Ref<BulletVolleyDat
 	// use the effective type (fallback included) to match the area's shape.
 	const PhysicsServer2D::ShapeType shape_type = CollisionShapeHelper2D::get_effective_type(spawn_data->collision_shape, false);
 	const int bullet_count = transforms_ptr != nullptr ? transforms_count : (int)spawn_data->transforms.size();
-	const PoolKey key{ bullet_count, shape_type };
+	const PoolKey key{ bullet_count, shape_type, spawn_data->wants_bullet_colors() };
 	// A script may have freed the volley container (or the others).
 	heal_owned_children();
 	if (volley_container.get() == nullptr) {

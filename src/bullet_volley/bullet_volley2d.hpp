@@ -412,6 +412,16 @@ public:
 	void set_bullet_scale(int bullet_index, const Vector2 &new_scale);
 	TypedArray<Vector2> all_bullets_get_scale(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) const;
 	void all_bullets_set_scale(const Vector2 &new_scale, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
+	// Per-bullet colors (bullet_volley2d_colors.cpp). A volley spawned without
+	// use_bullet_colors reads white everywhere and refuses the setters.
+	bool is_using_bullet_colors() const { return colors_enabled; }
+	Color get_bullet_color(int bullet_index) const;
+	void set_bullet_color(int bullet_index, const Color &new_color);
+	PackedColorArray all_bullets_get_color(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) const;
+	void all_bullets_set_color(const Color &new_color, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
+	// Writes every bullet's color from an array (entry i = bullet i; short
+	// arrays wrap when tile is on, else uncovered bullets keep their color).
+	void all_bullets_set_colors(const PackedColorArray &new_colors, bool tile = false);
 	real_t get_curves_elapsed_time() const;
 	void set_curves_elapsed_time(real_t new_time);
 
@@ -481,7 +491,7 @@ public:
 	// Idle-frame twin for handlers: queues set_collision_shape_runtime on the
 	// factory's structural queue (next process frame, outside physics).
 	void set_collision_shape_runtime_deferred(const Ref<Shape2D> &new_shape);
-	PoolKey get_pool_key() const { return PoolKey{ amount_bullets, cached_effective_shape_type }; }
+	PoolKey get_pool_key() const { return PoolKey{ amount_bullets, cached_effective_shape_type, colors_enabled }; }
 
 	void _notification(int p_what);
 	bool is_auto_pooling_enabled = true;
@@ -879,6 +889,20 @@ public:
 
 	// Scratch space for uploading all transforms at once (no per-frame allocations)
 	mutable PackedFloat32Array batch_buffer;
+	// Per-bullet colors (spawn data use_bullet_colors): the MultiMesh then
+	// carries one Color per instance after its 8 transform floats, so the
+	// buffer stride is 12 instead of 8. The colors live in batch_buffer (the
+	// transform passes rewrite only the first 8 floats of each instance).
+	bool colors_enabled = false;
+	int buffer_stride = 8;
+	// Switches the MultiMesh format when the incoming data wants the other
+	// one (Godot refuses the switch while instances exist, so the count is
+	// dropped first). Factory spawns pop a volley of the right format by
+	// pool key; only a direct enable_volley() ever switches.
+	void set_up_colors_format(bool use_colors);
+	// Seeds every instance's color from the data (strict or tiled; white
+	// where no entry covers a bullet) into the batch buffer.
+	void seed_bullet_colors(const BulletVolleyData2D &data, float *w);
 
 	// The user can pass any custom data they desire and have access to it in the area_entered and body_entered function callbacks.
 	// Per-bullet overrides via all_bullets_custom_data; strictly separate from
@@ -1565,7 +1589,7 @@ protected:
 	void request_physics_sync();
 	bool physics_sync_pending = false;
 	void generate_multimesh();
-	void set_up_multimesh(int new_instance_count, const Ref<Mesh> &new_mesh, Vector2 new_texture_size);
+	void set_up_multimesh(int new_instance_count, const Ref<Mesh> &new_mesh, Vector2 new_texture_size, bool use_colors);
 	void set_up_bullet_instances(const BulletVolleyData2D &data);
 	void set_up_life_time_timer(double new_max_life_time, double new_current_life_time);
 

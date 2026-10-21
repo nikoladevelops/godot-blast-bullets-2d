@@ -82,8 +82,9 @@ void BulletVolley2D::set_up_bullet_instances(const BulletVolleyData2D &data) {
 		span = nullptr; // defensive: never index past the span
 	}
 	// One upload for every instance (see generate_texture_transform).
-	if ((int)batch_buffer.size() != amount_bullets * 8) {
-		batch_buffer.resize(amount_bullets * 8);
+	const int stride = buffer_stride;
+	if ((int)batch_buffer.size() != amount_bullets * stride) {
+		batch_buffer.resize(amount_bullets * stride);
 	}
 	const bool batch_ok = multi.is_valid() && multi->get_instance_count() == amount_bullets;
 	float *batch_w = batch_ok ? batch_buffer.ptrw() : nullptr;
@@ -97,7 +98,7 @@ void BulletVolley2D::set_up_bullet_instances(const BulletVolleyData2D &data) {
 		const Transform2D &texture_transf = generate_texture_transform(curr_data_transf, data.is_texture_rotation_permanent, cache_texture_rotation_radians);
 
 		if (batch_ok) {
-			write_multimesh_transform2d(batch_w + i * 8, to_local_for_multimesh(texture_transf));
+			write_multimesh_transform2d(batch_w + i * stride, to_local_for_multimesh(texture_transf));
 		}
 
 		// Cache bullet transforms and origin vectors
@@ -107,6 +108,9 @@ void BulletVolley2D::set_up_bullet_instances(const BulletVolleyData2D &data) {
 		all_cached_shape_transforms.emplace_back(shape_transf);
 	}
 	if (batch_ok) {
+		if (colors_enabled) {
+			seed_bullet_colors(data, batch_w);
+		}
 		multi->set_buffer(batch_buffer);
 	} else if (multi.is_valid()) {
 		// Instance count not set up yet (never expected): per-instance
@@ -127,7 +131,8 @@ void BulletVolley2D::generate_multimesh() {
 	set_multimesh(multi);
 }
 
-void BulletVolley2D::set_up_multimesh(int new_instance_count, const Ref<Mesh> &new_mesh, Vector2 new_texture_size) {
+void BulletVolley2D::set_up_multimesh(int new_instance_count, const Ref<Mesh> &new_mesh, Vector2 new_texture_size, bool use_colors) {
+	set_up_colors_format(use_colors);
 	if (new_mesh.is_valid()) {
 		if (multi->get_mesh() != new_mesh) {
 			multi->set_mesh(new_mesh);
@@ -158,8 +163,8 @@ void BulletVolley2D::set_up_multimesh(int new_instance_count, const Ref<Mesh> &n
 	if (multi->get_instance_count() != new_instance_count) {
 		multi->set_instance_count(new_instance_count);
 	}
-	if ((int)batch_buffer.size() != new_instance_count * 8) {
-		batch_buffer.resize(new_instance_count * 8);
+	if ((int)batch_buffer.size() != new_instance_count * buffer_stride) {
+		batch_buffer.resize(new_instance_count * buffer_stride);
 	}
 }
 

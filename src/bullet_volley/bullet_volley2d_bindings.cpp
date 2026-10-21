@@ -60,6 +60,12 @@ void BulletVolley2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_bullet_scale", "bullet_index", "new_scale"), &BulletVolley2D::set_bullet_scale);
 	ClassDB::bind_method(D_METHOD("all_bullets_get_scale", "bullet_index_start", "bullet_index_end_inclusive"), &BulletVolley2D::all_bullets_get_scale, DEFVAL(0), DEFVAL(-1));
 	ClassDB::bind_method(D_METHOD("all_bullets_set_scale", "new_scale", "bullet_index_start", "bullet_index_end_inclusive"), &BulletVolley2D::all_bullets_set_scale, DEFVAL(0), DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("is_using_bullet_colors"), &BulletVolley2D::is_using_bullet_colors);
+	ClassDB::bind_method(D_METHOD("get_bullet_color", "bullet_index"), &BulletVolley2D::get_bullet_color);
+	ClassDB::bind_method(D_METHOD("set_bullet_color", "bullet_index", "new_color"), &BulletVolley2D::set_bullet_color);
+	ClassDB::bind_method(D_METHOD("all_bullets_get_color", "bullet_index_start", "bullet_index_end_inclusive"), &BulletVolley2D::all_bullets_get_color, DEFVAL(0), DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("all_bullets_set_color", "new_color", "bullet_index_start", "bullet_index_end_inclusive"), &BulletVolley2D::all_bullets_set_color, DEFVAL(0), DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("all_bullets_set_colors", "new_colors", "tile"), &BulletVolley2D::all_bullets_set_colors, DEFVAL(false));
 
 	ClassDB::bind_method(D_METHOD("play_sprite_animation", "sprite_frames", "animation"), &BulletVolley2D::play_sprite_animation, DEFVAL(StringName("default")));
 	ClassDB::bind_method(D_METHOD("play_sprite_animation_name", "animation"), &BulletVolley2D::play_sprite_animation_name);

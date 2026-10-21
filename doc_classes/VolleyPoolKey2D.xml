@@ -24,8 +24,9 @@
 			<return type="VolleyPoolKey2D" />
 			<param index="0" name="amount_bullets" type="int" />
 			<param index="1" name="shape_type" type="int" enum="PhysicsServer2D.ShapeType" />
+			<param index="2" name="use_bullet_colors" type="bool" default="false" />
 			<description>
-				Creates a key for the exact bucket with [code]amount_bullets[/code] bullets per volley and PhysicsServer2D shape type. Returns null (with an error) when amount_bullets is negative or shape_type is not Circle/Rectangle/Capsule - never a default bucket.
+				Creates a key for the exact bucket with [code]amount_bullets[/code] bullets per volley, PhysicsServer2D shape type and color format ([param use_bullet_colors]). Returns null (with an error) when amount_bullets is negative or shape_type is not Circle/Rectangle/Capsule - never a default bucket.
 			</description>
 		</method>
 	</methods>
@@ -35,6 +36,9 @@
 		</member>
 		<member name="shape_type" type="int" setter="set_shape_type" getter="get_shape_type" enum="PhysicsServer2D.ShapeType" default="3">
 			PhysicsServer2D shape type for this bucket. Use PhysicsServer2D.SHAPE_* (Circle=3, Rectangle=4, Capsule=5).
+		</member>
+		<member name="use_bullet_colors" type="bool" setter="set_use_bullet_colors" getter="get_use_bullet_colors" default="false">
+			Whether the volleys of this bucket draw per-bullet colors ([member BulletVolleyData2D.use_bullet_colors]). Godot cannot change a MultiMesh's color format while it has instances, so colored and plain volleys never share a bucket.
 		</member>
 	</members>
 </class>

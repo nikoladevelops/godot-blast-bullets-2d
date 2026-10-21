@@ -306,6 +306,28 @@ void BulletVolleyData2D::set_visibility_layer_from_array(const TypedArray<int> &
 	emit_changed();
 }
 
+void BulletVolleyData2D::set_use_bullet_colors(bool value) {
+	use_bullet_colors = value;
+	emit_changed();
+}
+
+void BulletVolleyData2D::set_bullet_colors(const PackedColorArray &value) {
+	for (int i = 0; i < value.size(); ++i) {
+		const Color c = value[i];
+		if (!Math::is_finite(c.r) || !Math::is_finite(c.g) || !Math::is_finite(c.b) || !Math::is_finite(c.a)) {
+			UtilityFunctions::push_error("BulletVolleyData2D: bullet_colors must hold finite colors, keeping the old value.");
+			return;
+		}
+	}
+	bullet_colors = value;
+	emit_changed();
+}
+
+void BulletVolleyData2D::set_tile_bullet_colors(bool value) {
+	tile_bullet_colors = value;
+	emit_changed();
+}
+
 Color BulletVolleyData2D::get_self_modulate() const {
 	return self_modulate;
 }
@@ -963,6 +985,15 @@ void BulletVolleyData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_self_modulate"), &BulletVolleyData2D::get_self_modulate);
 	ClassDB::bind_method(D_METHOD("set_self_modulate", "new_self_modulate"), &BulletVolleyData2D::set_self_modulate);
 	ADD_PROPERTY(PropertyInfo(Variant::COLOR, "self_modulate"), "set_self_modulate", "get_self_modulate");
+	ClassDB::bind_method(D_METHOD("get_use_bullet_colors"), &BulletVolleyData2D::get_use_bullet_colors);
+	ClassDB::bind_method(D_METHOD("set_use_bullet_colors", "value"), &BulletVolleyData2D::set_use_bullet_colors);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_bullet_colors"), "set_use_bullet_colors", "get_use_bullet_colors");
+	ClassDB::bind_method(D_METHOD("get_bullet_colors"), &BulletVolleyData2D::get_bullet_colors);
+	ClassDB::bind_method(D_METHOD("set_bullet_colors", "value"), &BulletVolleyData2D::set_bullet_colors);
+	ADD_PROPERTY(PropertyInfo(Variant::PACKED_COLOR_ARRAY, "bullet_colors"), "set_bullet_colors", "get_bullet_colors");
+	ClassDB::bind_method(D_METHOD("get_tile_bullet_colors"), &BulletVolleyData2D::get_tile_bullet_colors);
+	ClassDB::bind_method(D_METHOD("set_tile_bullet_colors", "value"), &BulletVolleyData2D::set_tile_bullet_colors);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "tile_bullet_colors"), "set_tile_bullet_colors", "get_tile_bullet_colors");
 
 	ClassDB::bind_method(D_METHOD("get_override_frame_color"), &BulletVolleyData2D::get_override_frame_color);
 	ClassDB::bind_method(D_METHOD("set_override_frame_color", "value"), &BulletVolleyData2D::set_override_frame_color);

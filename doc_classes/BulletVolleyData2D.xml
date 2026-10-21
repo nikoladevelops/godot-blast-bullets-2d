@@ -135,6 +135,9 @@
 		<member name="bounce_tilemap_layers" type="bool" setter="set_bounce_tilemap_layers" getter="get_bounce_tilemap_layers" default="false">
 			Bounce off TileMapLayer walls. Tilemaps report no collision_layer (their physics bodies are internal), so they never match [member bounce_mask] and take the normal path by default. True opts them in: any non-zero bounce_mask then bounces off tilemap cells with a head-on reflection (the exact cell surface is unknowable from the record, so the radial normal would misread far cells). False (default) keeps them lethal.
 		</member>
+		<member name="bullet_colors" type="PackedColorArray" setter="set_bullet_colors" getter="get_bullet_colors" default="PackedColorArray()">
+			Per-bullet colors: entry [code]i[/code] tints bullet [code]i[/code] (multiplied with the art, [member self_modulate] and [member modulate_ramp]). Bullets without an entry are white, unless [member tile_bullet_colors] wraps a short array. Any entry turns per-bullet colors on, like [member use_bullet_colors]. Entries must be finite. Split children of this data wear their parent bullet's color.
+		</member>
 		<member name="bullet_homing_auto_pop_after_target_reached" type="bool" setter="set_bullet_homing_auto_pop_after_target_reached" getter="get_bullet_homing_auto_pop_after_target_reached" default="false">
 			Per-bullet queue: pop the front target when the owning bullet reaches it. Pooled reuse re-seeds this from the spawn data, so direct [BulletFactory2D] spawns keep it without a spawner.
 		</member>
@@ -344,6 +347,9 @@
 		<member name="tile_all_bullets_custom_data" type="bool" setter="set_tile_all_bullets_custom_data" getter="get_tile_all_bullets_custom_data" default="false">
 			When on, a short [member all_bullets_custom_data] wraps around the volley instead of leaving the tail bullets at null. Off by default.
 		</member>
+		<member name="tile_bullet_colors" type="bool" setter="set_tile_bullet_colors" getter="get_tile_bullet_colors" default="false">
+			When [code]true[/code], a [member bullet_colors] array shorter than the volley wraps around (bullet [code]i[/code] takes entry [code]i % size[/code]), e.g. two colors alternate over a whole ring.
+		</member>
 		<member name="tile_bullets_current_collision_count" type="bool" setter="set_tile_bullets_current_collision_count" getter="get_tile_bullets_current_collision_count" default="false">
 			When on, a short [member bullets_current_collision_count] wraps around the volley instead of starting the tail bullets at 0. Off by default.
 		</member>
@@ -353,6 +359,9 @@
 
 			Tip: place [Marker2D] nodes in your scene and read their global transforms each time you spawn.
 			Note: There is a helper static function that can generate a grid pattern of [Transform2D] that you can use: [method BulletFactory2D.helper_generate_transforms_grid]. You might want to implement your own custom pattern generation logic in C++ for maximum performance.
+		</member>
+		<member name="use_bullet_colors" type="bool" setter="set_use_bullet_colors" getter="get_use_bullet_colors" default="false">
+			Turns per-bullet colors on even without [member bullet_colors] entries (every bullet starts white), so scripts can tint bullets later with [method BulletVolley2D.set_bullet_color]. Off (and with no entries) the volley's MultiMesh carries no color data at all, so the feature costs nothing. Colored and plain volleys pool separately ([member VolleyPoolKey2D.use_bullet_colors]).
 		</member>
 		<member name="visibility_layer" type="int" setter="set_visibility_layer" getter="get_visibility_layer" default="1">
 			The bitmask for the visibility layer.

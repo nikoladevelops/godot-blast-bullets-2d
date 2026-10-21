@@ -250,6 +250,7 @@ Dictionary BulletVolley2D::debug_get_volley_info() const {
 	const PoolKey k = get_pool_key();
 	d["pool_amount"] = k.amount_bullets;
 	d["pool_shape"] = (int)k.shape_type;
+	d["pool_colors"] = k.colors;
 	d["auto_pool_volley"] = is_auto_pooling_enabled;
 	d["auto_pool_attachments"] = is_attachments_auto_pooling_enabled;
 	d["self_modulate"] = get_self_modulate();
@@ -549,6 +550,9 @@ String BulletVolley2D::debug_check_invariants() const {
 		}
 		if (all_bullets_enabled_set.size() > amount_bullets) {
 			return "more live bullets than bullets";
+		}
+		if (multi.is_valid() && (multi->is_using_colors() != colors_enabled || buffer_stride != (colors_enabled ? 12 : 8) || batch_buffer.size() != (int64_t)amount_bullets * buffer_stride)) {
+			return "the MultiMesh color format does not match the batch buffer";
 		}
 	}
 	int orbiting = 0;

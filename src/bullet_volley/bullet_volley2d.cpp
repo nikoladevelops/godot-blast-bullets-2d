@@ -364,7 +364,7 @@ void BulletVolley2D::begin_life(const BulletVolleyData2D &data, uint64_t new_own
 	anim_finished_event_pending = false;
 
 	set_up_life_time_timer(data.max_life_time, data.max_life_time);
-	set_up_multimesh(amount_bullets, data.mesh, resolve_quad_size(data.sprite_frames, data.animation, data.texture_size));
+	set_up_multimesh(amount_bullets, data.mesh, resolve_quad_size(data.sprite_frames, data.animation, data.texture_size), data.wants_bullet_colors());
 	set_up_bullet_instances(data);
 	reset_attachment_state_for_reuse();
 	set_rotation_data(data.all_bullet_rotation_data, data.rotate_only_textures, data.tile_all_bullet_rotation_data);
@@ -521,8 +521,7 @@ void BulletVolley2D::spawn(const BulletVolleyData2D &data, VolleyPool *pool, Bul
 	// Allocation (once per instance; pool reuse keeps all of it).
 	all_bullets_enabled_set.resize(amount_bullets);
 	bullet_collision_epochs.assign(amount_bullets, 0);
-	batch_buffer.resize(amount_bullets * 8);
-	generate_multimesh();
+	generate_multimesh(); // the format and batch buffer come with begin_life (set_up_multimesh)
 	area = physics_server->area_create();
 	generate_physics_shapes_for_area(amount_bullets);
 	// A fresh instance has nothing to release.
@@ -932,8 +931,16 @@ int BulletVolley2D::disable_bullets_bulk(const std::vector<int> &indexes, int fx
 	}
 	// Render: zero every dead instance. A drained volley uploads one zero
 	// buffer; a partial batch writes only the bullets it disabled.
-	if (active_bullets_counter <= 0 && (int)batch_buffer.size() == amount_bullets * 8 && multi->get_instance_count() == amount_bullets) {
-		batch_buffer.fill(0.0f);
+	if (active_bullets_counter <= 0 && (int)batch_buffer.size() == amount_bullets * buffer_stride && multi->get_instance_count() == amount_bullets) {
+		if (colors_enabled) {
+			// Zero only the transforms: a parked volley woken later keeps its colors.
+			float *w = batch_buffer.ptrw();
+			for (int i = 0; i < amount_bullets; ++i) {
+				std::fill(w + i * 12, w + i * 12 + 8, 0.0f);
+			}
+		} else {
+			batch_buffer.fill(0.0f);
+		}
 		multi->set_buffer(batch_buffer);
 	} else {
 		for (int i : indexes) {

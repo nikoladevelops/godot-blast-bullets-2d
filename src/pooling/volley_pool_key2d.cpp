@@ -23,7 +23,7 @@ void VolleyPoolKey2D::set_shape_type(PhysicsServer2D::ShapeType p_shape_type) {
 	shape_type = p_shape_type;
 }
 
-Ref<VolleyPoolKey2D> VolleyPoolKey2D::make(int p_amount_bullets, PhysicsServer2D::ShapeType p_shape_type) {
+Ref<VolleyPoolKey2D> VolleyPoolKey2D::make(int p_amount_bullets, PhysicsServer2D::ShapeType p_shape_type, bool p_use_bullet_colors) {
 	if (p_amount_bullets < 0) {
 		UtilityFunctions::push_error("VolleyPoolKey2D.make: amount_bullets must be >= 0, returning null.");
 		return Ref<VolleyPoolKey2D>();
@@ -35,6 +35,7 @@ Ref<VolleyPoolKey2D> VolleyPoolKey2D::make(int p_amount_bullets, PhysicsServer2D
 	Ref<VolleyPoolKey2D> key = memnew(VolleyPoolKey2D);
 	key->set_amount_bullets(p_amount_bullets);
 	key->set_shape_type(p_shape_type);
+	key->use_bullet_colors = p_use_bullet_colors;
 	return key;
 }
 
@@ -42,11 +43,12 @@ Ref<VolleyPoolKey2D> VolleyPoolKey2D::from_internal(const PoolKey &key) {
 	Ref<VolleyPoolKey2D> res = memnew(VolleyPoolKey2D);
 	res->amount_bullets = key.amount_bullets;
 	res->shape_type = static_cast<int>(key.shape_type);
+	res->use_bullet_colors = key.colors;
 	return res;
 }
 
 bool VolleyPoolKey2D::equals(const Ref<VolleyPoolKey2D> &other) const {
-	return other.is_valid() && other->amount_bullets == amount_bullets && other->shape_type == shape_type;
+	return other.is_valid() && other->amount_bullets == amount_bullets && other->shape_type == shape_type && other->use_bullet_colors == use_bullet_colors;
 }
 
 void VolleyPoolKey2D::_bind_methods() {
@@ -58,7 +60,11 @@ void VolleyPoolKey2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_shape_type", "shape_type"), &VolleyPoolKey2D::set_shape_type);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "shape_type", PROPERTY_HINT_ENUM, "Circle:3,Rectangle:4,Capsule:5"), "set_shape_type", "get_shape_type");
 
-	ClassDB::bind_static_method("VolleyPoolKey2D", D_METHOD("make", "amount_bullets", "shape_type"), &VolleyPoolKey2D::make);
+	ClassDB::bind_method(D_METHOD("get_use_bullet_colors"), &VolleyPoolKey2D::get_use_bullet_colors);
+	ClassDB::bind_method(D_METHOD("set_use_bullet_colors", "value"), &VolleyPoolKey2D::set_use_bullet_colors);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_bullet_colors"), "set_use_bullet_colors", "get_use_bullet_colors");
+
+	ClassDB::bind_static_method("VolleyPoolKey2D", D_METHOD("make", "amount_bullets", "shape_type", "use_bullet_colors"), &VolleyPoolKey2D::make, DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("equals", "other"), &VolleyPoolKey2D::equals);
 }
 

@@ -275,6 +275,7 @@ Ref<VolleyPoolKey2D> BulletFactory2D::debug_expected_pool_key(const Ref<BulletVo
 	out.instantiate();
 	out->set_amount_bullets((int)spawn_data->transforms.size());
 	out->set_shape_type(effective);
+	out->set_use_bullet_colors(spawn_data->wants_bullet_colors());
 	return out;
 }
 
@@ -288,6 +289,7 @@ Ref<VolleyPoolKey2D> BulletFactory2D::debug_get_pool_bucket(BulletVolley2D *voll
 	out.instantiate();
 	out->set_amount_bullets(k.amount_bullets);
 	out->set_shape_type(k.shape_type);
+	out->set_use_bullet_colors(k.colors);
 	return out;
 }
 

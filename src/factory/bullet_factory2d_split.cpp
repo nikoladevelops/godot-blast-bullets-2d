@@ -117,7 +117,7 @@ void BulletFactory2D::orphan_pending_splits(uint64_t owner_spawner_id, int polic
 
 Ref<BulletVolleyData2D> BulletFactory2D::split_child_template(const Ref<BulletVolleyData2D> &source) {
 	const BulletVolleyData2D &d = **source;
-	const bool per_bullet = !d.bullets_current_collision_count.is_empty() || !d.all_bullets_custom_data.is_empty() || !d.all_bullet_speed_data.is_empty() || !d.all_bullet_rotation_data.is_empty() || !d.all_bullet_curves_data.is_empty() || !d.all_bullet_movement_pattern_paths.is_empty() || !d.all_bullet_movement_pattern_face_movement_directions.is_empty() || !d.all_bullet_movement_pattern_repeats.is_empty() || !d.all_bullet_wobble_data.is_empty() || !d.all_bullet_gravity.is_empty();
+	const bool per_bullet = !d.bullets_current_collision_count.is_empty() || !d.all_bullets_custom_data.is_empty() || !d.all_bullet_speed_data.is_empty() || !d.all_bullet_rotation_data.is_empty() || !d.all_bullet_curves_data.is_empty() || !d.all_bullet_movement_pattern_paths.is_empty() || !d.all_bullet_movement_pattern_face_movement_directions.is_empty() || !d.all_bullet_movement_pattern_repeats.is_empty() || !d.all_bullet_wobble_data.is_empty() || !d.all_bullet_gravity.is_empty() || !d.bullet_colors.is_empty();
 	if (!per_bullet) {
 		return source;
 	}
@@ -145,6 +145,9 @@ Ref<BulletVolleyData2D> BulletFactory2D::split_child_template(const Ref<BulletVo
 	copy->all_bullet_movement_pattern_repeats.clear();
 	copy->all_bullet_wobble_data.clear();
 	copy->all_bullet_gravity.clear();
+	// The children keep the color format and wear the parent bullet's color.
+	copy->use_bullet_colors = d.wants_bullet_colors();
+	copy->bullet_colors.clear();
 	const Callable on_changed = callable_mp(this, &BulletFactory2D::split_source_changed).bind(id);
 	if (!source->is_connected("changed", on_changed)) {
 		source->connect("changed", on_changed);
