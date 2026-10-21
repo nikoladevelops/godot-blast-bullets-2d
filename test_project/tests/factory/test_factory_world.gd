@@ -81,6 +81,44 @@ func test_hostile_query_input_fails_loud_and_returns_empty() -> void:
 	assert_eq(_alive(v), [0], "the bullet survived every refused call")
 
 
+func test_factory_queries_list_what_the_counts_count() -> void:
+	for m in ["get_bullets_in_circle", "get_bullets_in_rect", "get_active_volleys"]:
+		assert_true(factory.has_method(m), "factory has " + m)
+	var a := _volley_at([Vector2(0, 0), Vector2(100, 0), Vector2(20, 0)])
+	var b := _volley_at([Vector2(5, 5), Vector2(200, 0), Vector2(6, 6)])
+	var c := _volley_at([Vector2(1, 1)])
+	b.disable_bullet(2) # a frozen bullet is not listed
+	var parked := _volley_at([Vector2(2, 2)])
+	parked.set_is_auto_pooling_enabled(false)
+	parked.disable_bullet(0)
+	var pooled := _volley_at([Vector2(3, 3)])
+	pooled.clear_all_bullets()
+	await idle(1)
+	assert_true(parked.is_parked() and pooled.is_pooled(), "one parked, one pooled")
+	assert_eq(factory.get_active_volleys(), [a, b, c], "the active volleys in factory order")
+	var circle: Array = factory.get_bullets_in_circle(Vector2.ZERO, 20.0)
+	assert_eq(circle.size(), 3, "one entry per volley with bullets inside")
+	assert_eq(circle[0]["volley"], a, "factory order")
+	assert_eq(Array(circle[0]["bullet_indexes"]), [0, 2], "a: the edge counts")
+	assert_eq(Array(circle[0]["positions"]), [Vector2(0, 0), Vector2(20, 0)], "a: parallel positions")
+	assert_eq(Array(circle[1]["bullet_indexes"]), [0], "b: the frozen one is left out")
+	assert_eq(circle[2]["volley"], c, "c")
+	var listed := 0
+	for e in circle:
+		listed += e["bullet_indexes"].size()
+	assert_eq(listed, factory.count_bullets_in_circle(Vector2.ZERO, 20.0), "the query lists what the count counts")
+	var rect: Array = factory.get_bullets_in_rect(Rect2(10, 10, -20, -20))
+	assert_eq(rect.size(), 3, "a negative rect is normalized")
+	assert_eq(Array(rect[1]["positions"]), [Vector2(5, 5)], "b in the rect")
+	c.queue_free()
+	assert_eq(factory.get_active_volleys(), [a, b], "a volley queued for deletion is left out")
+	assert_eq(factory.get_bullets_in_circle(Vector2.ZERO, 20.0).size(), 2, "by the query too")
+	assert_eq(factory.get_bullets_in_circle(Vector2(NAN, 0), 1.0), [], "a bad circle")
+	expect_error_sequence(["get_bullets_in_circle: center must be finite and radius a finite number >= 0."])
+	assert_eq(factory.get_bullets_in_rect(Rect2(0, 0, INF, 1)), [], "a bad rect")
+	expect_error_sequence(["get_bullets_in_rect: rect must be finite."])
+
+
 # --- area clears -------------------------------------------------------------
 
 func test_volley_clear_in_circle_and_rect() -> void:

@@ -253,6 +253,67 @@ int BulletFactory2D::count_bullets_in_circle(const Vector2 &center, real_t radiu
 	return total;
 }
 
+namespace {
+TypedArray<Dictionary> bullets_in_area(const std::vector<BulletVolley2D *> &volleys, bool circle, const Vector2 &center, real_t radius, const Rect2 &normalized) {
+	TypedArray<Dictionary> out;
+	std::vector<int> found;
+	for (BulletVolley2D *volley : volleys) {
+		if (volley == nullptr || !volley->is_active || volley->is_queued_for_deletion()) {
+			continue;
+		}
+		found.clear();
+		if (circle) {
+			volley->collect_indexes_in_circle(center, radius, found);
+		} else {
+			volley->collect_indexes_in_rect(normalized, found);
+		}
+		if (found.empty()) {
+			continue;
+		}
+		PackedInt32Array indexes;
+		PackedVector2Array positions;
+		indexes.resize((int64_t)found.size());
+		positions.resize((int64_t)found.size());
+		for (size_t k = 0; k < found.size(); ++k) {
+			indexes[(int64_t)k] = found[k];
+			positions[(int64_t)k] = volley->get_bullet_transform(found[k]).columns[2];
+		}
+		Dictionary entry;
+		entry["volley"] = volley;
+		entry["bullet_indexes"] = indexes;
+		entry["positions"] = positions;
+		out.push_back(entry);
+	}
+	return out;
+}
+} // namespace
+
+TypedArray<Dictionary> BulletFactory2D::get_bullets_in_circle(const Vector2 &center, real_t radius) const {
+	Rect2 unused;
+	if (!area_args_valid("get_bullets_in_circle", true, center, radius, Rect2(), unused)) {
+		return TypedArray<Dictionary>();
+	}
+	return bullets_in_area(all_volleys, true, center, radius, Rect2());
+}
+
+TypedArray<Dictionary> BulletFactory2D::get_bullets_in_rect(const Rect2 &rect) const {
+	Rect2 normalized;
+	if (!area_args_valid("get_bullets_in_rect", false, Vector2(), 0.0, rect, normalized)) {
+		return TypedArray<Dictionary>();
+	}
+	return bullets_in_area(all_volleys, false, Vector2(), 0.0, normalized);
+}
+
+TypedArray<BulletVolley2D> BulletFactory2D::get_active_volleys() const {
+	TypedArray<BulletVolley2D> out;
+	for (BulletVolley2D *volley : all_volleys) {
+		if (volley != nullptr && volley->is_active && !volley->is_queued_for_deletion()) {
+			out.push_back(volley);
+		}
+	}
+	return out;
+}
+
 int BulletFactory2D::count_bullets_in_rect(const Rect2 &rect) const {
 	Rect2 normalized;
 	if (!area_args_valid("count_bullets_in_rect", false, Vector2(), 0.0, rect, normalized)) {

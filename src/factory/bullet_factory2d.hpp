@@ -160,6 +160,16 @@ public:
 	int clear_bullets_in_circle(const Vector2 &center, real_t radius);
 	int clear_bullets_in_rect(const Rect2 &rect);
 	int count_bullets_in_circle(const Vector2 &center, real_t radius) const;
+	// The live bullets inside the area (edge-inclusive like the clears, rect
+	// normalized), one Dictionary per volley that has any: {"volley",
+	// "bullet_indexes" (PackedInt32Array), "positions" (PackedVector2Array)},
+	// in factory order. Volleys queued for deletion are skipped. Read-only:
+	// safe anywhere, O(live bullets) per call.
+	TypedArray<Dictionary> get_bullets_in_circle(const Vector2 &center, real_t radius) const;
+	TypedArray<Dictionary> get_bullets_in_rect(const Rect2 &rect) const;
+	// Every ACTIVE volley (not pooled, parked or queued for deletion), in
+	// factory order (the sweep's order).
+	TypedArray<BulletVolley2D> get_active_volleys() const;
 
 	// ---- Pickups (bullet_factory2d_pickups.cpp) ----
 	// Turns live bullets into one pickup volley per call (split by the pattern
