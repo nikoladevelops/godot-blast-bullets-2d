@@ -148,3 +148,58 @@ func test_the_laser_container_survives_a_script_freeing_it() -> void:
 	container.free()
 	assert_eq(factory.get_active_laser_count(), 0, "its lasers died with it and were forgotten")
 	assert_not_null(_fire(H.make_laser()), "a new container for the next laser")
+
+
+func test_custom_data_is_readable_in_signals_and_dropped_by_the_pool() -> void:
+	await _scene()
+	var l := _fire(H.make_laser(0.0, 0.0, 0.125, 0.0))
+	l.set_custom_data({"damage": 3, "team": "boss"})
+	var seen: Array = []
+	factory.laser_hit.connect(func(_t, laser: LaserVolley2D, _b, _p) -> void: seen.append(laser.get_custom_data()))
+	step_factory(1, DT)
+	assert_eq(seen, [{"damage": 3, "team": "boss"}], "the hit handler reads it")
+	step_factory(4, DT)
+	assert_true(l.is_pooled(), "finished")
+	assert_eq(l.get_custom_data(), null, "the pool dropped it")
+	var again := _fire(H.make_laser(0.0, 0.0, 0.125, 0.0))
+	assert_eq(again, l, "reused")
+	assert_eq(again.get_custom_data(), null, "a new life starts without it")
+
+
+func test_populate_lasers_pool_prewarms_and_free_lasers_pool_empties_it() -> void:
+	assert_eq(factory.populate_lasers_pool(3, 4), 4, "four lasers of 3 beams")
+	assert_eq(factory.debug_get_laser_pool_amount(), 4, "waiting in the pool")
+	assert_eq(factory.get_active_laser_count(), 0, "none fires")
+	var data := H.make_laser(0.0, 0.0, 0.125, 0.0)
+	var objects := Performance.get_monitor(Performance.OBJECT_COUNT)
+	var l := _fire(data, 3)
+	assert_eq(factory.debug_get_laser_pool_amount(), 3, "the shot took a pre-warmed one")
+	assert_eq(Performance.get_monitor(Performance.OBJECT_COUNT), objects, "no new object for the first shot")
+	step_factory(1, DT)
+	assert_eq(l.get_beam_count(), 3, "a normal life")
+	factory.populate_lasers_pool(5, 2)
+	assert_eq(factory.free_lasers_pool(3), 3, "one bucket")
+	assert_eq(factory.debug_get_laser_pool_amount(), 2, "the other bucket stays")
+	assert_true(is_instance_valid(l), "a firing laser is never freed")
+	assert_eq(factory.free_lasers_pool(), 2, "every bucket")
+	assert_eq(factory.debug_get_laser_pool_amount(), 0, "empty")
+	step_factory(4, DT)
+	assert_true(l.is_pooled(), "the firing one pools when it finishes")
+
+
+func test_pool_calls_refuse_bad_requests_and_physics_frames() -> void:
+	factory.populate_lasers_pool(0, 2)
+	expect_error_sequence(["populate_lasers_pool: beam_count must be between 1 and BulletPatterns2D.max_bullets_per_pattern (20000), nothing was created."])
+	factory.populate_lasers_pool(2, 0)
+	expect_error_sequence(["populate_lasers_pool: amount must be > 0, nothing was created."])
+	factory.free_lasers_pool(0)
+	expect_error_sequence(["free_lasers_pool: beam_count must be -1 (every bucket) or > 0, nothing was freed."])
+	await physics(1)
+	factory.populate_lasers_pool(2, 2)
+	expect_errors_containing("BulletFactory2D::populate_lasers_pool cannot run inside a physics frame", 1)
+	factory.populate_lasers_pool_deferred(2, 2)
+	factory.free_lasers_pool_deferred(-1)
+	factory.populate_lasers_pool_deferred(4, 1)
+	await idle(2)
+	expect_no_errors()
+	assert_eq(factory.debug_get_laser_pool_amount(), 1, "the deferred calls ran in order: 2 added, all freed, 1 added")

@@ -121,6 +121,18 @@ public:
 	// Ends every firing laser (fading, or at once). Safe from handlers.
 	// Returns how many it ended.
 	int clear_active_lasers(bool fade = true);
+	// Ends every laser whose live body touches the area (edges included,
+	// negative rects normalized). No user code: safe inside handlers.
+	int end_lasers_in_circle(const Vector2 &center, real_t radius, bool fade = true);
+	int end_lasers_in_rect(const Rect2 &rect, bool fade = true);
+	int end_lasers_in_area(const char *function_name, bool circle, const Vector2 &center, real_t radius, const Rect2 &rect, bool fade);
+	// Pre-warms `amount` pooled lasers of `beam_count` beams (no first-shot
+	// allocation); frees pooled lasers (every bucket, or one beam count).
+	// Idle only: their _deferred twins queue from anywhere.
+	int populate_lasers_pool(int beam_count, int amount);
+	void populate_lasers_pool_deferred(int beam_count, int amount);
+	int free_lasers_pool(int beam_count = -1);
+	void free_lasers_pool_deferred(int beam_count = -1);
 	int debug_get_laser_pool_amount() const;
 	void collect_lasers_owned_by(uint64_t owner_id, std::vector<LaserVolley2D *> &r_out) const;
 	// Factory time scale x the owner spawner's fired time factor.

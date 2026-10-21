@@ -101,6 +101,106 @@ LaserVolley2D *BulletFactory2D::spawn_laser_span(const Ref<LaserData2D> &data, c
 	return laser;
 }
 
+namespace {
+
+bool laser_pool_args_valid(const char *fn, int beam_count, int amount) {
+	if (beam_count <= 0 || beam_count > pattern_max_bullets()) {
+		UtilityFunctions::push_error(String(fn) + ": beam_count must be between 1 and BulletPatterns2D.max_bullets_per_pattern (" + String::num_int64(pattern_max_bullets()) + "), nothing was created.");
+		return false;
+	}
+	if (amount <= 0) {
+		UtilityFunctions::push_error(String(fn) + ": amount must be > 0, nothing was created.");
+		return false;
+	}
+	return true;
+}
+
+bool laser_free_args_valid(const char *fn, int beam_count) {
+	if (beam_count == 0 || beam_count < -1) {
+		UtilityFunctions::push_error(String(fn) + ": beam_count must be -1 (every bucket) or > 0, nothing was freed.");
+		return false;
+	}
+	return true;
+}
+
+} // namespace
+
+int BulletFactory2D::populate_lasers_pool(int beam_count, int amount) {
+	if (is_factory_busy) {
+		UtilityFunctions::push_error("populate_lasers_pool: BulletFactory2D is currently busy. Ignoring the request.");
+		return 0;
+	}
+	if (!is_ready) {
+		ensure_factory_initialized();
+	}
+	if (!is_ready || is_tearing_down || !is_inside_tree()) {
+		UtilityFunctions::push_error("populate_lasers_pool: BulletFactory2D is not in the scene tree (or is being freed). Ignoring the request.");
+		return 0;
+	}
+	if (reject_when_iterating("populate_lasers_pool") || !laser_pool_args_valid("populate_lasers_pool", beam_count, amount)) {
+		return 0;
+	}
+	heal_owned_children();
+	if (laser_container.get() == nullptr) {
+		add_laser_container();
+	}
+	std::vector<LaserVolley2D *> &bucket = laser_pool[beam_count];
+	for (int k = 0; k < amount; ++k) {
+		LaserVolley2D *laser = memnew(LaserVolley2D);
+		laser->pool_key = beam_count;
+		laser->set_name("LaserVolley2D");
+		laser_container.get()->add_child(laser);
+		all_lasers.push_back(laser);
+		laser->enter_pool_unfired(this);
+		bucket.push_back(laser);
+	}
+	return amount;
+}
+
+void BulletFactory2D::populate_lasers_pool_deferred(int beam_count, int amount) {
+	if (is_tearing_down) {
+		UtilityFunctions::push_error("populate_lasers_pool_deferred: BulletFactory2D is being freed. Ignoring the request.");
+		return;
+	}
+	if (!laser_pool_args_valid("populate_lasers_pool_deferred", beam_count, amount)) {
+		return;
+	}
+	queue_structural_call([this, beam_count, amount]() { populate_lasers_pool(beam_count, amount); });
+}
+
+int BulletFactory2D::free_lasers_pool(int beam_count) {
+	if (is_factory_busy) {
+		UtilityFunctions::push_error("free_lasers_pool: BulletFactory2D is currently busy. Ignoring the request.");
+		return 0;
+	}
+	if (reject_when_iterating("free_lasers_pool") || !laser_free_args_valid("free_lasers_pool", beam_count)) {
+		return 0;
+	}
+	std::vector<LaserVolley2D *> doomed;
+	for (auto &bucket : laser_pool) {
+		if (beam_count == -1 || bucket.first == beam_count) {
+			doomed.insert(doomed.end(), bucket.second.begin(), bucket.second.end());
+			bucket.second.clear();
+		}
+	}
+	// Pooled lasers run no user code: each PREDELETE forgets itself.
+	for (LaserVolley2D *laser : doomed) {
+		memdelete(laser);
+	}
+	return (int)doomed.size();
+}
+
+void BulletFactory2D::free_lasers_pool_deferred(int beam_count) {
+	if (is_tearing_down) {
+		UtilityFunctions::push_error("free_lasers_pool_deferred: BulletFactory2D is being freed. Ignoring the request.");
+		return;
+	}
+	if (!laser_free_args_valid("free_lasers_pool_deferred", beam_count)) {
+		return;
+	}
+	queue_structural_call([this, beam_count]() { free_lasers_pool(beam_count); });
+}
+
 void BulletFactory2D::laser_forget(LaserVolley2D *laser) {
 	for (size_t i = 0; i < all_lasers.size(); ++i) {
 		if (all_lasers[i] == laser) {

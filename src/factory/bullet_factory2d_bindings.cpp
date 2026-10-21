@@ -217,6 +217,12 @@ void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_active_lasers"), &BulletFactory2D::get_active_lasers);
 	ClassDB::bind_method(D_METHOD("get_active_laser_count"), &BulletFactory2D::get_active_laser_count);
 	ClassDB::bind_method(D_METHOD("clear_active_lasers", "fade"), &BulletFactory2D::clear_active_lasers, DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("end_lasers_in_circle", "center", "radius", "fade"), &BulletFactory2D::end_lasers_in_circle, DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("end_lasers_in_rect", "rect", "fade"), &BulletFactory2D::end_lasers_in_rect, DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("populate_lasers_pool", "beam_count", "amount"), &BulletFactory2D::populate_lasers_pool);
+	ClassDB::bind_method(D_METHOD("populate_lasers_pool_deferred", "beam_count", "amount"), &BulletFactory2D::populate_lasers_pool_deferred);
+	ClassDB::bind_method(D_METHOD("free_lasers_pool", "beam_count"), &BulletFactory2D::free_lasers_pool, DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("free_lasers_pool_deferred", "beam_count"), &BulletFactory2D::free_lasers_pool_deferred, DEFVAL(-1));
 	ClassDB::bind_method(D_METHOD("debug_get_laser_pool_amount"), &BulletFactory2D::debug_get_laser_pool_amount);
 	ADD_SIGNAL(MethodInfo("laser_phase_changed",
 			PropertyInfo(Variant::OBJECT, "laser", PROPERTY_HINT_RESOURCE_TYPE, "LaserVolley2D"),

@@ -109,6 +109,12 @@
 				Returns the width drawn now: the warning width while charging, else [member LaserData2D.width] scaled by the growing or fading phase.
 			</description>
 		</method>
+		<method name="get_custom_data" qualifiers="const">
+			<return type="Variant" />
+			<description>
+				The game data stored with [method set_custom_data] (null when none). Readable in every laser signal handler.
+			</description>
+		</method>
 		<method name="get_graze_zones" qualifiers="const">
 			<return type="Array" />
 			<description>
@@ -225,6 +231,13 @@
 			<param index="1" name="target" type="Variant" />
 			<description>
 				Sets the target of beam [param beam_index] for Track and Lock On: a [Node2D], a [Vector2] position, or [code]null[/code] (no target).
+			</description>
+		</method>
+		<method name="set_custom_data">
+			<return type="void" />
+			<param index="0" name="value" type="Variant" />
+			<description>
+				Stores any value with this laser (damage, team, an owner dictionary...) for signal handlers to read. The pool drops it when the laser finishes, together with metadata and groups a script added; a finished laser refuses it (a stale handle).
 			</description>
 		</method>
 		<method name="set_targets">

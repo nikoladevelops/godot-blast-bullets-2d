@@ -4,6 +4,7 @@
 #include "core/node_scan2d.hpp"
 #include "core/transform_math2d.hpp"
 #include "factory/bullet_factory2d_internal.hpp"
+#include "laser/laser_volley2d.hpp"
 
 using namespace godot;
 
@@ -233,6 +234,30 @@ int BulletFactory2D::clear_bullets_in_circle(const Vector2 &center, real_t radiu
 
 int BulletFactory2D::clear_bullets_in_rect(const Rect2 &rect) {
 	return clear_bullets_in_area("clear_bullets_in_rect", false, Vector2(), 0.0, rect);
+}
+
+int BulletFactory2D::end_lasers_in_circle(const Vector2 &center, real_t radius, bool fade) {
+	return end_lasers_in_area("end_lasers_in_circle", true, center, radius, Rect2(), fade);
+}
+
+int BulletFactory2D::end_lasers_in_rect(const Rect2 &rect, bool fade) {
+	return end_lasers_in_area("end_lasers_in_rect", false, Vector2(), 0.0, rect, fade);
+}
+
+int BulletFactory2D::end_lasers_in_area(const char *function_name, bool circle, const Vector2 &center, real_t radius, const Rect2 &rect, bool fade) {
+	Rect2 normalized;
+	if (!area_args_valid(function_name, circle, center, radius, rect, normalized)) {
+		return 0;
+	}
+	// end_laser runs no user code (the next tick announces and signals).
+	int n = 0;
+	for (LaserVolley2D *laser : all_lasers) {
+		if (laser != nullptr && laser->touches_area(circle, center, radius, normalized)) {
+			laser->end_laser(fade);
+			++n;
+		}
+	}
+	return n;
 }
 
 int BulletFactory2D::count_bullets_in_circle(const Vector2 &center, real_t radius) const {

@@ -410,6 +410,23 @@
 				Non-mutating validation: {ok, error, warning}. Never spawns, never touches the pool. The warning fires for invisible bullets (no sprite_frames/mesh/texture_size); art must face Vector2.RIGHT (cannot be auto-detected).
 			</description>
 		</method>
+		<method name="end_lasers_in_circle">
+			<return type="int" />
+			<param index="0" name="center" type="Vector2" />
+			<param index="1" name="radius" type="float" />
+			<param index="2" name="fade" type="bool" default="true" />
+			<description>
+				Ends every laser whose live body touches the circle: the distance from [param center] to a beam's polyline is at most [param radius] plus half the beam's current width (edges included; a charging laser's warning line counts, spent bolt or curvy beams never). With [param fade] the lasers fade out, else they end on the next tick. Runs no user code, so a signal handler may call it (a bomb). Refuses a non-finite center or a negative radius with the same error as [method clear_bullets_in_circle]. Returns how many lasers it ended (or that were already fading).
+			</description>
+		</method>
+		<method name="end_lasers_in_rect">
+			<return type="int" />
+			<param index="0" name="rect" type="Rect2" />
+			<param index="1" name="fade" type="bool" default="true" />
+			<description>
+				Ends every laser whose live body touches [param rect] (edges included, a negative size is normalized, half the beam's width counted), fading with [param fade]. Same rules as [method end_lasers_in_circle]. Returns how many lasers it ended.
+			</description>
+		</method>
 		<method name="ensure_factory_initialized">
 			<return type="bool" />
 			<description>
@@ -483,6 +500,20 @@
 			<param index="0" name="key" type="VolleyPoolKey2D" default="null" />
 			<description>
 				Deferred [method free_disabled_bullets]: safe from any callback.
+			</description>
+		</method>
+		<method name="free_lasers_pool">
+			<return type="int" />
+			<param index="0" name="beam_count" type="int" default="-1" />
+			<description>
+				Frees the pooled (finished) lasers: every bucket with -1, or only those of [param beam_count] beams. Lasers that still fire are never touched. Idle frames only (inside a physics frame it is refused: use [method free_lasers_pool_deferred]). Returns how many lasers it freed.
+			</description>
+		</method>
+		<method name="free_lasers_pool_deferred">
+			<return type="void" />
+			<param index="0" name="beam_count" type="int" default="-1" />
+			<description>
+				Queues [method free_lasers_pool] for the next idle frame: safe from anywhere, signal handlers included.
 			</description>
 		</method>
 		<method name="free_volley_deferred">
@@ -627,6 +658,22 @@
 			<param index="2" name="instance_count" type="int" />
 			<description>
 				Deferred [method populate_bullets_pool]: safe from any callback. Null key, null data and instance_count &lt;= 0 are rejected immediately without queuing.
+			</description>
+		</method>
+		<method name="populate_lasers_pool">
+			<return type="int" />
+			<param index="0" name="beam_count" type="int" />
+			<param index="1" name="amount" type="int" />
+			<description>
+				Pre-warms [param amount] pooled lasers of [param beam_count] beams, so the first shots of that size allocate nothing (the pool is keyed by beam count: a [LaserSpawner2D] fires one beam per pattern slot). [param beam_count] must be between 1 and [member BulletPatterns2D.max_bullets_per_pattern], [param amount] above 0. Idle frames only: use [method populate_lasers_pool_deferred] from a physics frame or a handler. Returns how many lasers it created.
+			</description>
+		</method>
+		<method name="populate_lasers_pool_deferred">
+			<return type="void" />
+			<param index="0" name="beam_count" type="int" />
+			<param index="1" name="amount" type="int" />
+			<description>
+				Queues [method populate_lasers_pool] for the next idle frame (arguments checked now): safe from anywhere.
 			</description>
 		</method>
 		<method name="populate_pickup_pool">

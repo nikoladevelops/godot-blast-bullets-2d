@@ -139,6 +139,18 @@ public:
 	void set_beam_target(int beam_index, const Variant &target);
 	// Muzzles follow `anchor` (null = stay where they are now).
 	void set_anchor(Node2D *anchor);
+	// Game data for this laser (damage, team...), readable in every laser
+	// signal; cleared when the laser is pooled.
+	Variant get_custom_data() const { return custom_data; }
+	void set_custom_data(const Variant &value);
+	// Whether a live beam's body (half its current width included) touches
+	// the circle or the (normalized) rect, edges included.
+	bool touches_area(bool circle, const Vector2 &center, real_t radius, const Rect2 &rect) const;
+	// Armed exactly like this already (apply_to_live_lasers leaves it alone).
+	bool graze_armed_alike(const Array &zones, const std::shared_ptr<GrazeDetector2D> &detector) const;
+	bool sound_armed_alike(const Array &entries, const std::shared_ptr<GrazeDetector2D> &listeners, float volume_db) const;
+	// A laser made to wait in the pool before its first shot (populate).
+	void enter_pool_unfired(BulletFactory2D *factory);
 	// Its spawner teleported by `jump`: beams riding it (and heads not yet
 	// launched) move with it, and with `carry` every beam does (muzzle,
 	// path, head, trail, impacts). A moved beam's draw history restarts, so
@@ -239,6 +251,7 @@ private:
 	// Bumped by every arming change: a dispatch stops when a handler re-armed
 	// or cleared the zones (its queued events name the old ones).
 	uint32_t graze_generation = 0;
+	Variant custom_data;
 	std::vector<Ref<BulletSoundData2D>> sound_effects;
 	std::shared_ptr<GrazeDetector2D> sound_listeners;
 	StringName sound_listener_group;

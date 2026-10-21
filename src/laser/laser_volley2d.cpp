@@ -4,6 +4,7 @@
 // side (spawn, tick, pool, signals) in factory/bullet_factory2d_lasers.cpp.
 
 #include "laser/laser_volley2d.hpp"
+#include "laser/laser_geometry2d.hpp"
 
 #include "bullet_spawner/pattern_spawner2d.hpp"
 #include "core/cached_string_names2d.hpp"
@@ -163,6 +164,7 @@ void LaserVolley2D::release_life() {
 	sound_listeners.reset();
 	sound_listener_group = StringName();
 	set_material(Ref<Material>());
+	custom_data = Variant();
 	// What a script added to the node: the next owner gets a neutral laser.
 	strip_user_decorations2d(this);
 	restore_node_baseline2d(this);
@@ -573,6 +575,83 @@ void LaserVolley2D::shift_with_owner(const Vector2 &jump, bool carry) {
 	}
 }
 
+void LaserVolley2D::set_custom_data(const Variant &value) {
+	if (reject_stale_handle("set_custom_data")) {
+		return;
+	}
+	custom_data = value;
+}
+
+bool LaserVolley2D::touches_area(bool circle, const Vector2 &center, real_t radius, const Rect2 &rect) const {
+	if (!active || phase == PHASE_FINISHED) {
+		return false;
+	}
+	const real_t half = get_current_width() * (real_t)0.5;
+	const Rect2 grown = rect.grow(half);
+	for (const Beam &b : beams) {
+		if (b.spent || b.points.size() < 2) {
+			continue;
+		}
+		if (circle) {
+			if (distance_to_polyline2d(center, b.points) <= radius + half) {
+				return true;
+			}
+			continue;
+		}
+		for (size_t k = 1; k < b.points.size(); ++k) {
+			if (segment_touches_rect2d(b.points[k - 1], b.points[k], grown)) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+bool LaserVolley2D::graze_armed_alike(const Array &zones, const std::shared_ptr<GrazeDetector2D> &detector) const {
+	if (graze_detector != detector || !graze_target_group.is_empty()) {
+		return false;
+	}
+	size_t k = 0;
+	for (int i = 0; i < zones.size() && k < 4; ++i) {
+		const Ref<BulletGrazeZone2D> zone = zones[i];
+		if (zone.is_null()) {
+			continue;
+		}
+		if (k >= graze_zones.size() || graze_zones[k] != zone) {
+			return false;
+		}
+		++k;
+	}
+	return k == graze_zones.size();
+}
+
+bool LaserVolley2D::sound_armed_alike(const Array &entries, const std::shared_ptr<GrazeDetector2D> &listeners, float volume_db) const {
+	if (sound_listeners != listeners || !sound_listener_group.is_empty() || sound_volume_db != volume_db) {
+		return false;
+	}
+	size_t k = 0;
+	for (int i = 0; i < entries.size(); ++i) {
+		const Ref<BulletSoundData2D> entry = entries[i];
+		if (entry.is_null()) {
+			continue;
+		}
+		if (k >= sound_effects.size() || sound_effects[k] != entry) {
+			return false;
+		}
+		++k;
+	}
+	return k == sound_effects.size();
+}
+
+void LaserVolley2D::enter_pool_unfired(BulletFactory2D *p_factory) {
+	factory = p_factory;
+	factory_life = p_factory != nullptr ? p_factory->life_token() : std::shared_ptr<bool>();
+	active = false;
+	pooled = true;
+	phase = PHASE_FINISHED;
+	set_visible(false);
+}
+
 Node2D *LaserVolley2D::get_anchor() const {
 	return anchor_id != 0 ? Object::cast_to<Node2D>(ObjectDB::get_instance(ObjectID(anchor_id))) : nullptr;
 }
@@ -678,6 +757,8 @@ void LaserVolley2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_beam_target", "beam_index", "target"), &LaserVolley2D::set_beam_target);
 	ClassDB::bind_method(D_METHOD("set_anchor", "anchor"), &LaserVolley2D::set_anchor);
 	ClassDB::bind_method(D_METHOD("get_anchor"), &LaserVolley2D::get_anchor);
+	ClassDB::bind_method(D_METHOD("get_custom_data"), &LaserVolley2D::get_custom_data);
+	ClassDB::bind_method(D_METHOD("set_custom_data", "value"), &LaserVolley2D::set_custom_data);
 	ClassDB::bind_method(D_METHOD("end_laser", "fade"), &LaserVolley2D::end_laser, DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("get_active_time_left"), &LaserVolley2D::get_active_time_left);
 	ClassDB::bind_method(D_METHOD("set_active_time_left", "seconds"), &LaserVolley2D::set_active_time_left);

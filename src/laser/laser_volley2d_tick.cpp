@@ -5,6 +5,7 @@
 // through the emit guard; after every one the laser re-checks itself and its
 // factory and stops touching anything that went away.
 
+#include "laser/laser_geometry2d.hpp"
 #include "laser/laser_volley2d.hpp"
 
 #include "bullet_spawner/pattern_spawner2d.hpp"
@@ -708,24 +709,6 @@ void LaserVolley2D::sound_fire(int trigger, const Vector2 &pos, int ring, int zo
 		factory->sound_offer(entry, pos, sound_volume_db, spec); // no user code (the mixer plays after the sweep)
 	}
 }
-
-namespace {
-
-real_t distance_to_polyline2d(const Vector2 &p, const std::vector<Vector2> &pts) {
-	real_t best = Math::INF;
-	for (size_t k = 1; k < pts.size(); ++k) {
-		const Vector2 a = pts[k - 1];
-		const Vector2 ab = pts[k] - a;
-		const real_t len2 = ab.x * ab.x + ab.y * ab.y;
-		real_t t = len2 > (real_t)0.0 ? ((p - a).x * ab.x + (p - a).y * ab.y) / len2 : (real_t)0.0;
-		t = Math::clamp(t, (real_t)0.0, (real_t)1.0);
-		const Vector2 q = a + ab * t;
-		best = Math::min(best, p.distance_to(q));
-	}
-	return best;
-}
-
-} // namespace
 
 bool LaserVolley2D::update_graze(uint64_t self_id, uint32_t life) {
 	if (graze_zones.empty() || factory == nullptr || (graze_detector == nullptr && graze_target_group.is_empty())) {
