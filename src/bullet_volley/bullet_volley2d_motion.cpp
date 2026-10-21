@@ -448,6 +448,14 @@ TypedArray<real_t> BulletVolley2D::all_bullets_get_speed(int bullet_index_start,
 }
 
 void BulletVolley2D::all_bullets_set_speed(real_t new_speed, int bullet_index_start, int bullet_index_end_inclusive) {
+	// A shared speed curve owns every bullet: one warning, not one per bullet.
+	if (shared_bullet_curves_data.is_valid() && shared_bullet_curves_data->movement_speed_curve.is_valid()) {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_speed");
+		if (bullet_index_start <= bullet_index_end_inclusive) {
+			speed_curve_owns_speed(bullet_index_start, "speed");
+		}
+		return;
+	}
 	for_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_speed", [&](int i) { set_bullet_speed(i, new_speed); });
 }
 

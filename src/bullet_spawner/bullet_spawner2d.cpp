@@ -120,34 +120,6 @@ void BulletSpawner2D::apply_volley_graze(BulletVolley2D *volley) {
 	}
 }
 
-int BulletSpawner2D::graze_live_volleys() {
-	BulletFactory2D *factory = get_bullet_factory();
-	if (factory == nullptr) {
-		return 0;
-	}
-	bool any = false;
-	const Array zones = graze_enabled ? spawner_graze_zones(any) : Array();
-	if (any) {
-		graze_detector_ref();
-	}
-	// Arming runs no user code: the list stays valid while it is walked.
-	std::vector<BulletVolley2D *> owned;
-	factory->collect_volleys_owned_by(get_instance_id(), owned);
-	int changed = 0;
-	for (BulletVolley2D *volley : owned) {
-		if (!any) {
-			if (volley->graze_zone_slots > 0) {
-				volley->graze_release();
-				++changed;
-			}
-		} else if (!volley->graze_armed_with(zones, graze_detector)) {
-			volley->graze_arm_from_spawner(zones, graze_detector);
-			++changed;
-		}
-	}
-	return changed;
-}
-
 void BulletSpawner2D::apply_volley_sound(BulletVolley2D *volley) {
 	if (volley == nullptr || !sound_enabled || sound_effects.is_empty()) {
 		return;
@@ -160,32 +132,6 @@ void BulletSpawner2D::apply_volley_sound(BulletVolley2D *volley) {
 		std::shared_ptr<GrazeDetector2D> detector = sound_detector_ref();
 		volley->sound_arm_from_spawner(entries, detector, (float)sound_volume_db);
 	}
-}
-
-int BulletSpawner2D::sound_live_volleys() {
-	BulletFactory2D *factory = get_bullet_factory();
-	if (factory == nullptr) {
-		return 0;
-	}
-	bool any = false;
-	const Array entries = sound_enabled ? spawner_sound_entries(any) : Array();
-	const std::shared_ptr<GrazeDetector2D> detector = any ? sound_detector_ref() : nullptr;
-	// Arming runs no user code: the list stays valid while it is walked.
-	std::vector<BulletVolley2D *> owned;
-	factory->collect_volleys_owned_by(get_instance_id(), owned);
-	int changed = 0;
-	for (BulletVolley2D *volley : owned) {
-		if (!any) {
-			if (!volley->sound_effects.empty()) {
-				volley->sound_release();
-				++changed;
-			}
-		} else if (!volley->sound_armed_with(entries, detector, (float)sound_volume_db)) {
-			volley->sound_arm_from_spawner(entries, detector, (float)sound_volume_db);
-			++changed;
-		}
-	}
-	return changed;
 }
 
 Array BulletSpawner2D::convert_live_bullets_to_pickups(const Ref<BulletPickupData2D> &pickup, const Variant &target) {

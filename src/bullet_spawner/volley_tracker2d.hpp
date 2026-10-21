@@ -90,6 +90,11 @@ public:
 		return live_ids.is_empty();
 	}
 
+	// Whether a volley id is tracked (prune first when it must be live).
+	bool contains(int64_t id) const {
+		return member_ids.count(id) != 0;
+	}
+
 	// Pruned id snapshot for index-based passes (e.g. newest-only retarget).
 	// Resolve each id with resolve_live() before touching the volley.
 	PackedInt64Array snapshot(uint64_t owner_spawner_id) const {

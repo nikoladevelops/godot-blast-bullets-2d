@@ -327,6 +327,11 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("adopt_live_volley", "volley"), &BulletSpawner2D::adopt_live_volley);
 	ClassDB::bind_method(D_METHOD("clear_live_volleys_homing"), &BulletSpawner2D::clear_live_volleys_homing);
 	ClassDB::bind_method(D_METHOD("override_live_volleys_velocity", "new_velocity"), &BulletSpawner2D::override_live_volleys_velocity);
+	ClassDB::bind_method(D_METHOD("apply_to_live_volleys", "groups"), &BulletSpawner2D::apply_to_live_volleys, DEFVAL(LIVE_ALL));
+	ClassDB::bind_method(D_METHOD("home_live_volleys_to", "target"), &BulletSpawner2D::home_live_volleys_to);
+	ClassDB::bind_method(D_METHOD("aim_live_volleys_at", "position"), &BulletSpawner2D::aim_live_volleys_at);
+	ClassDB::bind_method(D_METHOD("set_live_volleys_speed", "speed"), &BulletSpawner2D::set_live_volleys_speed);
+	ClassDB::bind_method(D_METHOD("scale_live_volleys_speed", "factor"), &BulletSpawner2D::scale_live_volleys_speed);
 	// Need this in order to expose the enum constants to Godot Engine
 	BIND_ENUM_CONSTANT(HOMING_SHARED);
 	BIND_ENUM_CONSTANT(HOMING_PER_BULLET);
@@ -350,7 +355,6 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_flock", "value"), &BulletSpawner2D::set_flock);
 	ClassDB::bind_method(D_METHOD("get_flock_scope"), &BulletSpawner2D::get_flock_scope);
 	ClassDB::bind_method(D_METHOD("set_flock_scope", "value"), &BulletSpawner2D::set_flock_scope);
-	ClassDB::bind_method(D_METHOD("flock_live_volleys"), &BulletSpawner2D::flock_live_volleys);
 	ADD_GROUP("Flocking", "");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "flock_enabled"), "set_flock_enabled", "get_flock_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "flock", PROPERTY_HINT_RESOURCE_TYPE, "BulletFlock2D"), "set_flock", "get_flock");
@@ -386,8 +390,6 @@ void BulletSpawner2D::_bind_methods() {
 			PropertyInfo(Variant::INT, "bullet_index"),
 			PropertyInfo(Variant::OBJECT, "zone", PROPERTY_HINT_RESOURCE_TYPE, "BulletGrazeZone2D"),
 			PropertyInfo(Variant::INT, "deepest_ring_index")));
-	ClassDB::bind_method(D_METHOD("graze_live_volleys"), &BulletSpawner2D::graze_live_volleys);
-	ClassDB::bind_method(D_METHOD("sound_live_volleys"), &BulletSpawner2D::sound_live_volleys);
 	ClassDB::bind_method(D_METHOD("debug_explain_features"), &BulletSpawner2D::debug_explain_features);
 	BIND_ENUM_CONSTANT(ORPHANED_VOLLEYS_KEEP_FLYING);
 	BIND_ENUM_CONSTANT(ORPHANED_VOLLEYS_HAND_TO_FACTORY);

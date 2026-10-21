@@ -1556,6 +1556,24 @@
 		<constant name="PROCESS_PHYSICS" value="1" enum="SpawnerProcessCallback">
 			The spawner runs every physics tick (evenly spaced streams at any frame rate).
 		</constant>
+		<constant name="LIVE_HOMING" value="1" enum="LiveVolleyGroup" is_bitfield="true">
+			Homing (and orbiting) of what the spawner fired.
+		</constant>
+		<constant name="LIVE_GRAZE" value="2" enum="LiveVolleyGroup" is_bitfield="true">
+			The Graze group's zones.
+		</constant>
+		<constant name="LIVE_SOUND" value="4" enum="LiveVolleyGroup" is_bitfield="true">
+			The Sound group's entries and volume.
+		</constant>
+		<constant name="LIVE_FLOCK" value="8" enum="LiveVolleyGroup" is_bitfield="true">
+			Flocking.
+		</constant>
+		<constant name="LIVE_SPLIT" value="16" enum="LiveVolleyGroup" is_bitfield="true">
+			Splitting.
+		</constant>
+		<constant name="LIVE_ALL" value="2147483647" enum="LiveVolleyGroup" is_bitfield="true">
+			Every group, including groups added in later versions.
+		</constant>
 		<constant name="SPAWN_OFFSET_GLOBAL" value="0" enum="SpawnOffsetSpace">
 			World-space offset (default).
 		</constant>

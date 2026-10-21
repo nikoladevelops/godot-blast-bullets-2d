@@ -224,7 +224,7 @@ func _flight_offers(ticks: int) -> int:
 
 
 func test_sound_live_volleys_applies_the_group_to_flying_volleys() -> void:
-	assert_true(ClassDB.class_has_method("BulletSpawner2D", "sound_live_volleys"), "bound")
+	assert_true(ClassDB.class_has_method("BulletSpawner2D", "apply_to_live_volleys"), "bound")
 	var sp := make_spawner(H.make_volley_data(2, 100.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 2)
 	var off: BulletVolley2D = _shot_volley(sp)
 	sp.sound_enabled = true
@@ -233,14 +233,14 @@ func test_sound_live_volleys_applies_the_group_to_flying_volleys() -> void:
 	var on: BulletVolley2D = _shot_volley(sp)
 	factory.debug_set_sound_offer_log_enabled(true)
 	assert_eq(_flight_offers(1), 2, "only the armed volley's two bullets offer")
-	assert_eq(sp.sound_live_volleys(), 1, "only the volley fired while off changed")
+	assert_eq(sp.apply_to_live_volleys(BulletSpawner2D.LIVE_SOUND), 1, "only the volley fired while off changed")
 	assert_eq(off.sound_get_effects(), [hum], "armed now")
-	assert_eq(sp.sound_live_volleys(), 0, "idempotent")
+	assert_eq(sp.apply_to_live_volleys(BulletSpawner2D.LIVE_SOUND), 0, "idempotent")
 	assert_eq(_flight_offers(1), 4, "every flying bullet offers")
 	sp.sound_volume_db = -6.0
-	assert_eq(sp.sound_live_volleys(), 2, "a new volume offset re-arms both")
+	assert_eq(sp.apply_to_live_volleys(BulletSpawner2D.LIVE_SOUND), 2, "a new volume offset re-arms both")
 	sp.sound_enabled = false
-	assert_eq(sp.sound_live_volleys(), 2, "sound off disarms both")
+	assert_eq(sp.apply_to_live_volleys(BulletSpawner2D.LIVE_SOUND), 2, "sound off disarms both")
 	assert_false(on.is_sound_armed(), "disarmed")
 	assert_eq(_flight_offers(1), 0, "nothing offers")
 	factory.debug_set_sound_offer_log_enabled(false)

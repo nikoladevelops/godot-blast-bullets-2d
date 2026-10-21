@@ -748,6 +748,17 @@ public:
 		PROCESS_PHYSICS = 1
 	};
 	SpawnerProcessCallback process_callback = PROCESS_IDLE;
+	// Groups a spawner re-applies to what it already fired
+	// (BulletSpawner2D.apply_to_live_volleys). LIVE_ALL also covers groups
+	// added later. Bit flags: never renumber.
+	enum LiveVolleyGroup : int {
+		LIVE_HOMING = 1,
+		LIVE_GRAZE = 2,
+		LIVE_SOUND = 4,
+		LIVE_FLOCK = 8,
+		LIVE_SPLIT = 16,
+		LIVE_ALL = 0x7FFFFFFF
+	};
 	// False (default): a muzzle outside the factory's despawn bounds (while they
 	// are enabled) does not shoot, the bullets would be culled at once.
 	bool shoot_outside_despawn_bounds = false;
@@ -1675,3 +1686,4 @@ BLAST_VARIANT_ENUM_CAST(BlastBullets2D::PatternSpawner2D::MovementDirection);
 BLAST_VARIANT_ENUM_CAST(BlastBullets2D::PatternSpawner2D::MovementTiming);
 BLAST_VARIANT_ENUM_CAST(BlastBullets2D::PatternSpawner2D::SpawnOffsetSpace);
 BLAST_VARIANT_ENUM_CAST(BlastBullets2D::PatternSpawner2D::SpawnerProcessCallback);
+VARIANT_BITFIELD_CAST(BlastBullets2D::PatternSpawner2D::LiveVolleyGroup);

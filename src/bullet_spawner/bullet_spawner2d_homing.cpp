@@ -972,28 +972,6 @@ int BulletSpawner2D::clear_live_volleys_homing() {
 	return done;
 }
 
-int BulletSpawner2D::override_live_volleys_velocity(const Vector2 &new_velocity) {
-	if (!new_velocity.is_finite()) {
-		UtilityFunctions::push_error("BulletSpawner2D::override_live_volleys_velocity: velocity must be finite.");
-		return 0;
-	}
-	const PackedInt64Array ids = volley_tracker.snapshot(get_instance_id());
-	int done = 0;
-	const uint64_t self_id = get_instance_id();
-	for (int i = 0; i < ids.size(); ++i) {
-		BulletVolley2D *volley = VolleyTracker2D::resolve_live(ids[i], self_id);
-		if (volley == nullptr) {
-			continue;
-		}
-		// Engine-owned semantics: a speed curve overrides direct velocity
-		// (warns per bullet and no-ops), so this visibly works only for
-		// curve-free volleys.
-		volley->all_bullets_set_velocity(new_velocity);
-		++done;
-	}
-	return done;
-}
-
 int BulletSpawner2D::retarget_live_volleys() {
 	// Snapshot prunes first; resolve is the expensive part (group poll /
 	// scene scan), so skip it when no live volley could consume the result.

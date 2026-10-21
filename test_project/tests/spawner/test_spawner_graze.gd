@@ -318,7 +318,7 @@ func test_the_factory_never_hears_a_graze_the_spawner_handler_ended(how: String 
 
 
 func test_graze_live_volleys_applies_the_group_to_flying_volleys() -> void:
-	assert_true(ClassDB.class_has_method("BulletSpawner2D", "graze_live_volleys"), "bound")
+	assert_true(ClassDB.class_has_method("BulletSpawner2D", "apply_to_live_volleys"), "bound")
 	make_graze_target(Vector2(100, 0))
 	var near := H.make_graze_zone([20.0])
 	var wide := H.make_graze_zone([120.0])
@@ -329,21 +329,21 @@ func test_graze_live_volleys_applies_the_group_to_flying_volleys() -> void:
 	var on := _shoot(sp)
 	var other := _shoot(_spawner([near])) # another spawner's volley is never touched
 	assert_false(off.is_graze_armed(), "fired while graze was off")
-	assert_eq(sp.graze_live_volleys(), 1, "only the volley fired while off changed")
+	assert_eq(sp.apply_to_live_volleys(BulletSpawner2D.LIVE_GRAZE), 1, "only the volley fired while off changed")
 	assert_eq(off.get_graze_zones(), [near], "armed with the current zones")
-	assert_eq(sp.graze_live_volleys(), 0, "idempotent")
+	assert_eq(sp.apply_to_live_volleys(BulletSpawner2D.LIVE_GRAZE), 0, "idempotent")
 	var log := H.record_graze(factory)
 	sp.graze_zones = [wide]
-	assert_eq(sp.graze_live_volleys(), 2, "a new zone list re-arms both")
+	assert_eq(sp.apply_to_live_volleys(BulletSpawner2D.LIVE_GRAZE), 2, "a new zone list re-arms both")
 	assert_eq(on.get_graze_zones(), [wide], "with the new zones")
 	assert_eq(other.get_graze_zones(), [near], "the other spawner's volley kept its own")
 	step_factory()
 	assert_eq(H.graze_kinds(log), ["enter:0:0", "enter:0:0"], "both graze the wide ring")
-	assert_eq(sp.graze_live_volleys(), 0, "armed alike: the spent rings stay spent")
+	assert_eq(sp.apply_to_live_volleys(BulletSpawner2D.LIVE_GRAZE), 0, "armed alike: the spent rings stay spent")
 	step_factory(3)
 	assert_eq(log.size(), 2, "no second graze of a Once ring")
 	sp.graze_enabled = false
-	assert_eq(sp.graze_live_volleys(), 2, "graze off disarms both")
+	assert_eq(sp.apply_to_live_volleys(BulletSpawner2D.LIVE_GRAZE), 2, "graze off disarms both")
 	assert_false(on.is_graze_armed(), "disarmed")
-	assert_eq(sp.graze_live_volleys(), 0, "nothing left to disarm")
+	assert_eq(sp.apply_to_live_volleys(BulletSpawner2D.LIVE_GRAZE), 0, "nothing left to disarm")
 	assert_true(other.is_graze_armed(), "still not the other spawner's")

@@ -390,7 +390,10 @@ boss.set_spin_angle_deg(90.0)                     # Continuous spin: aim the pat
 boss.shoot_once_with({"pattern_source": BulletSpawner2D.PATTERN_FROM_HELPER_FAN, "helper_bullets_amount": 12})  # one shot, settings restored after
 var next_shot := boss.get_shoot_time_left()       # also get_burst_time_left, get_telegraph_time_left, get_pattern_list_time_left
 boss.graze_zones = [wide_zone]
-boss.graze_live_volleys()                         # bullets in flight take the new zones (sound_live_volleys, flock_live_volleys)
+boss.apply_to_live_volleys(BulletSpawner2D.LIVE_GRAZE)  # bullets in flight take the new zones (LIVE_ALL: every group)
+boss.home_live_volleys_to(player)                 # every bullet of this boss chases the player now (Node2D, Vector2, group, null = mouse)
+boss.volley_time_scale = 0.0                      # time stop for its bullets; the boss keeps moving
+boss.shoot_from(weak_point.global_transform)      # the whole pattern from any transform
 
 volley.set_bullet_speed(i, 50.0)                  # get_bullet_speed, all_bullets_set_speed
 volley.set_bullet_scale(i, Vector2(2, 2))         # the hitbox grows with the bullet

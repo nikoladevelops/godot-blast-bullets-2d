@@ -33,6 +33,20 @@
 				Takes ownership of a manually-woken volley (manual wake detaches the previous owner): stamps it, replaces the previous spawner's reached forwarder with its own, and tracks it for retargeting. Queues are left alone. Handlers you connected directly on the volley are kept; only spawner forwarders are replaced. Returns false for null or non-live instances.
 			</description>
 		</method>
+		<method name="aim_live_volleys_at">
+			<return type="int" />
+			<param index="0" name="position" type="Vector2" />
+			<description>
+				Every bullet this spawner fired turns to fly toward [param position] (a direction curve keeps steering its bullets, with one warning). Returns how many volleys changed.
+			</description>
+		</method>
+		<method name="apply_to_live_volleys">
+			<return type="int" />
+			<param index="0" name="groups" type="int" enum="PatternSpawner2D.LiveVolleyGroup" is_bitfield="true" default="2147483647" />
+			<description>
+				Applies the chosen groups ([constant PatternSpawner2D.LIVE_ALL] by default) as they stand now to every volley this spawner owns (live or parked): change a setting mid-fight, then call this and the bullets already flying follow. Graze and sound arm the volleys not armed with the current settings and disarm them while their group is off; flocking and splitting arm the volleys fired while off (turning them off already reaches flying bullets); homing arms the volleys fired without it (targets resolved now, with [signal homing_targets_resolved] and [signal volley_homing_configured]) and clears every chase while off. A volley already armed alike is left alone, so spent graze rings stay spent. Returns how many volleys changed.
+			</description>
+		</method>
 		<method name="clear_active_bullets">
 			<return type="int" />
 			<param index="0" name="fire_clear_effects" type="bool" default="true" />
@@ -71,12 +85,6 @@
 				Seconds until the next interval retarget pass. Deterministically staggered per spawner so N spawners never group-scan on the same tick.
 			</description>
 		</method>
-		<method name="flock_live_volleys">
-			<return type="int" />
-			<description>
-				Arms every live (or parked) volley this spawner owns that does not fly in its [member flock] yet, and returns how many it armed: bullets fired while [member flock_enabled] was off (a boss phase where everything already on screen starts to swarm), or volleys a script moved to another flock with [method BulletVolley2D.flock_join]. They flock from the next physics tick, with this spawner's settings (edits reach them like any other shot). Returns 0 and changes nothing while flocking is off or no flock is set.
-			</description>
-		</method>
 		<method name="forget_tracked_volleys">
 			<return type="void" />
 			<description>
@@ -107,17 +115,18 @@
 				How many volleys are on the retarget list (every live homing volley this spawner fired or adopted; no cap).
 			</description>
 		</method>
-		<method name="graze_live_volleys">
+		<method name="home_live_volleys_to">
 			<return type="int" />
+			<param index="0" name="target" type="Variant" />
 			<description>
-				Applies the Graze group as it stands now to every live (or parked) volley this spawner owns, and returns how many volleys changed. Volleys not armed with the current [member graze_zones] (fired while graze was off, fired before the zone list changed, or re-armed by a script) are armed with them, starting a fresh graze state; while [member graze_enabled] is off or no zone is set, every armed volley is disarmed instead. A volley already armed with these exact zones is left alone, so its spent rings stay spent and calling this twice changes nothing. Edits inside a zone resource and the target settings already reach bullets in flight without this call.
+				Every bullet this spawner fired chases [param target] now: a [Node2D], a [Vector2], a group name (each bullet the nearest member, filtered like every homing target) or [code]null[/code] (the mouse), with the Homing group's steering even when they were fired without homing. A retarget pass of the Homing group may replace it later (set [member homing_retarget_mode] to Off to keep it). Anything else errors and changes nothing. Returns how many volleys changed.
 			</description>
 		</method>
 		<method name="override_live_volleys_velocity">
 			<return type="int" />
 			<param index="0" name="new_velocity" type="Vector2" />
 			<description>
-				Overwrites velocity on every tracked live volley (wind, knockback). A speed curve overrides direct velocity, so this visibly works only for curve-free volleys. Returns how many volleys were touched. Must be finite.
+				Sets the exact velocity of every bullet this spawner fired (live or parked, homing or not). A speed curve overrides direct velocity: the engine warns and keeps the curve's for those bullets. Must be finite. Returns how many volleys changed.
 			</description>
 		</method>
 		<method name="resolve_homing_targets" qualifiers="const">
@@ -134,10 +143,18 @@
 				Homing's refresh (the counterpart of [method refresh_graze_targets]): call it after spawning enemies so flying volleys chase them too, whatever [member homing_retarget_mode] says. Re-resolves targets and replaces the queues of every still-active volley owned by this spawner (expired or pooled volleys are skipped), and re-applies steering and orbiting tuning so runtime changes reach flying volleys. Random and round-robin selections resolve per volley. Volleys with no resolvable targets are skipped quietly and keep their old queues. Volleys whose bullets are all disabled are skipped too: the tick never moves disabled slots, so pushing targets there would only inflate counters. Returns how many volleys were retargeted. Also runs automatically when [member homing_retarget_mode] is On Interval. Only the newest volley is touched when [member homing_retarget_previous_volleys] is off. Locked orbit rings survive the replace per the lock policy ([member orbiting_lock_policy]) instead of always re-locking.
 			</description>
 		</method>
-		<method name="sound_live_volleys">
+		<method name="scale_live_volleys_speed">
 			<return type="int" />
+			<param index="0" name="factor" type="float" />
 			<description>
-				Applies the Sound group as it stands now to every live (or parked) volley this spawner owns, and returns how many volleys changed. Volleys not armed with the current [member sound_effects] and [member sound_volume_db] (fired while sound was off, or before those changed) are armed with them; while [member sound_enabled] is off or no entry is set, every armed volley is disarmed instead. A volley already armed alike is left alone. Edits inside an entry and the listener settings already reach bullets in flight without this call.
+				Speed, top speed and acceleration of every bullet this spawner fired times [param factor] ([code]0[/code] stops them; must be finite and [code]&gt;= 0[/code]). Speed curves keep theirs. Returns how many volleys changed.
+			</description>
+		</method>
+		<method name="set_live_volleys_speed">
+			<return type="int" />
+			<param index="0" name="speed" type="float" />
+			<description>
+				Every bullet this spawner fired flies at [param speed] along its direction (see [method BulletVolley2D.set_bullet_speed]: a capped [member BulletSpeedData2D.max_speed] rises, speed curves keep theirs with a warning). Returns how many volleys changed.
 			</description>
 		</method>
 	</methods>

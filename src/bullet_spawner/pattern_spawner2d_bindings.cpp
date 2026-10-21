@@ -170,6 +170,12 @@ void PatternSpawner2D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "process_callback", PROPERTY_HINT_ENUM, "Idle,Physics"), "set_process_callback", "get_process_callback");
 	BIND_ENUM_CONSTANT(PROCESS_IDLE);
 	BIND_ENUM_CONSTANT(PROCESS_PHYSICS);
+	BIND_BITFIELD_FLAG(LIVE_HOMING);
+	BIND_BITFIELD_FLAG(LIVE_GRAZE);
+	BIND_BITFIELD_FLAG(LIVE_SOUND);
+	BIND_BITFIELD_FLAG(LIVE_FLOCK);
+	BIND_BITFIELD_FLAG(LIVE_SPLIT);
+	BIND_BITFIELD_FLAG(LIVE_ALL);
 	ClassDB::bind_method(D_METHOD("get_time_scale"), &PatternSpawner2D::get_time_scale);
 	ClassDB::bind_method(D_METHOD("set_time_scale", "value"), &PatternSpawner2D::set_time_scale);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "time_scale", PROPERTY_HINT_RANGE, "0,4,0.01,or_greater"), "set_time_scale", "get_time_scale");

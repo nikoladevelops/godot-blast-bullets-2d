@@ -5,7 +5,7 @@ extends BlastTest
 ## holder, factories freed and recreated while their spawners and bullets
 ## fly, auto-fire with bursts and telegraphs, Path2D movement, live
 ## previews, pattern lists, pause/resume/reset, flocking toggled with
-## flock_live_volleys, clears/resets/frees. Every step: only the documented
+## apply_to_live_volleys(LIVE_FLOCK), clears/resets/frees. Every step: only the documented
 ## refusals (a detached or factory-less spawner cannot shoot), finite
 ## bullets, every live factory's books balanced; no leak at exit.
 
@@ -142,7 +142,7 @@ func _op() -> void:
 		12:
 			if sp != null:
 				sp.flock_enabled = not sp.flock_enabled
-				sp.flock_live_volleys()
+				sp.apply_to_live_volleys(BulletSpawner2D.LIVE_FLOCK)
 		13:
 			var fs := _live_factories()
 			if not fs.is_empty():

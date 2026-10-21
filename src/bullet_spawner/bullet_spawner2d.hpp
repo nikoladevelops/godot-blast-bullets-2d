@@ -3,6 +3,8 @@
 #include "bullet_spawner/pattern_spawner2d.hpp"
 #include "bullet_spawner/volley_tracker2d.hpp"
 
+#include <unordered_set>
+
 namespace BlastBullets2D {
 using namespace godot;
 
@@ -315,14 +317,6 @@ public:
 	bool get_orbiting_rigid_follow() const;
 	void set_orbiting_rigid_follow(bool value);
 
-	// Applies the Graze group as it stands now to every live (or parked)
-	// volley this spawner owns: arms the ones not armed with the current
-	// zones (fired while graze was off, before a graze_zones change, or
-	// re-armed by a script) and disarms every one while graze is off or no
-	// zone is set. A volley already armed with these zones keeps its graze
-	// state (rings spent, open visits). Returns how many volleys changed.
-	int graze_live_volleys();
-
 	// FLOCKING (bullet_spawner2d_flock.cpp). Every volley fired while
 	// flock_enabled is on (and flock is set) flies as a boids flock by the
 	// rules in flock (BulletFlock2D: separation, alignment, cohesion,
@@ -343,11 +337,6 @@ public:
 	void set_flock(const Ref<BulletFlock2D> &value);
 	BulletFlock2D::Scope get_flock_scope() const;
 	void set_flock_scope(BulletFlock2D::Scope value);
-	// Arms every live (or parked) volley this spawner owns that does not fly
-	// in its flock yet: bullets fired while flocking was off, or taken over
-	// by a script's flock_join. Returns how many volleys were armed; 0 while
-	// flocking is off or no flock is set.
-	int flock_live_volleys();
 
 	// SPLITTING (bullet_spawner2d_split.cpp). Every volley fired while
 	// split_enabled is on (and split_data is set) splits by split_data: a
@@ -370,12 +359,6 @@ public:
 	// spawner (homing and orbiting, with their signals). False while homing
 	// is off: the children then chase their parent's target.
 	bool split_configure_child_homing(BulletVolley2D *child);
-
-	// The Sound group as it stands now for every live (or parked) volley
-	// this spawner owns: arms the ones not armed with the current entries
-	// and sound_volume_db, disarms every one while sound is off or no entry
-	// is set. Returns how many volleys changed.
-	int sound_live_volleys();
 
 	int get_homing_random_seed() const;
 	void set_homing_random_seed(int value);
@@ -459,10 +442,36 @@ public:
 	// how many volleys were touched. Retargeting will re-arm them while
 	// homing stays on; turn homing off (or clear tracking) to keep them dumb.
 	int clear_live_volleys_homing();
-	// Overwrites velocity on every tracked live volley through the engine
-	// setter (curves override direct velocity: the engine warns and
-	// no-ops per bullet when a speed curve is assigned). Returns how many
-	// volleys were touched. Must be finite.
+	// LIVE CONTROL (bullet_spawner2d_live.cpp): what this spawner changes on
+	// the bullets it already fired (every volley it owns, live or parked,
+	// homing or not). Each returns how many volleys it changed.
+	//
+	// Applies the chosen groups as they stand now: graze and sound arm the
+	// volleys not armed with the current settings (fired while off, before
+	// an edit, or re-armed by a script) and disarm them while off; flocking
+	// and splitting arm the volleys fired while off (off already reaches
+	// flying bullets); homing arms the volleys fired while off (resolving
+	// targets now, with its signals) and clears every chase while off. A
+	// volley already armed alike is left alone (spent graze rings stay spent).
+	int apply_to_live_volleys(BitField<LiveVolleyGroup> groups = LIVE_ALL);
+	// Every bullet chases `target` now: a Node2D, a Vector2, a group name
+	// (each bullet the nearest member) or null (the mouse), with the Homing
+	// group's steering even if they were fired without homing. A retarget
+	// pass of the Homing group may later replace it (turn retargeting off to
+	// keep it). Bad targets error and change nothing.
+	int home_live_volleys_to(const Variant &target);
+	// Every bullet turns to fly toward `position` (direction curves keep
+	// theirs, with one warning per volley).
+	int aim_live_volleys_at(const Vector2 &position);
+	// Every bullet's speed along its direction (a capped max_speed rises;
+	// speed curves keep theirs with a warning). Must be finite.
+	int set_live_volleys_speed(double speed);
+	// Speed, top speed and acceleration of every bullet times `factor`
+	// (>= 0; 0 stops them). Speed curves keep theirs.
+	int scale_live_volleys_speed(double factor);
+	// Every bullet's exact velocity (curves override direct velocity: the
+	// engine warns and no-ops per bullet when a speed curve is assigned).
+	// Must be finite.
 	int override_live_volleys_velocity(const Vector2 &new_velocity);
 
 	// One plain sentence per steering group (homing, orbiting, flocking,
@@ -499,6 +508,14 @@ protected:
 	// spawn_data whose transforms each shot overwrites.
 	Ref<BulletVolleyData2D> shot_volley_data;
 	bool speed_roll_active() const;
+	// apply_to_live_volleys, one group each (ids of the volleys changed).
+	void graze_live_volleys(std::unordered_set<uint64_t> &r_changed);
+	void sound_live_volleys(std::unordered_set<uint64_t> &r_changed);
+	void flock_live_volleys(std::unordered_set<uint64_t> &r_changed);
+	void split_live_volleys(std::unordered_set<uint64_t> &r_changed);
+	void homing_live_volleys(std::unordered_set<uint64_t> &r_changed);
+	static bool volley_has_own_homing_targets(BulletVolley2D *volley);
+	static void clear_volley_homing(BulletVolley2D *volley);
 
 	// Homing/orbiting runtime state (never stored).
 	// Tracked-volley registry for interval retargeting. VolleyTracker2D
