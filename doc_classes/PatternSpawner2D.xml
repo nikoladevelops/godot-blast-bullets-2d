@@ -398,6 +398,14 @@
 				Assigns the generator directly. Pass null to use this spawner instead. Takes effect right away, in the editor and at runtime.
 			</description>
 		</method>
+		<method name="shoot_from">
+			<return type="bool" />
+			<param index="0" name="global_transform" type="Transform2D" />
+			<param index="1" name="extra_spin_deg" type="float" default="0.0" />
+			<description>
+				Fires one shot like [method shoot_once], posed at [param global_transform] instead of the generator's transform, turned by [param extra_spin_deg] on top of the current spin: the whole pattern, as if the generator stood there (Children markers, a Path2D drawn at its node and a local [member spawn_position_offset] move and turn with the pose; homing range, nearest-target picks and the fire arc measure from it). Fire a boss pattern from a weak point, from a bullet (emitter bullets use it) or anywhere a script decides. It counts as a shot (signals, [member max_volleys], budgets), is never telegraphed and inherits none of the spawner's own movement velocity. A non-finite or singular transform is refused with an error, and like [method shoot_once] it is refused from inside this spawner's shot signals (use call_deferred).
+			</description>
+		</method>
 		<method name="shoot_once">
 			<return type="bool" />
 			<description>

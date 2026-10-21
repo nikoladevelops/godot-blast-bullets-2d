@@ -177,3 +177,76 @@ func test_shoot_once_with_from_a_shot_handler_is_refused_and_restores() -> void:
 	assert_false(nested[0], "the nested one is refused")
 	expect_errors_containing("re-entrant call from inside a spawner signal handler", 1, "the nesting rule of shoot_once")
 	assert_eq(sp.helper_bullets_amount, 4, "and its override went back")
+
+
+func _origins(v: BulletVolley2D) -> Array:
+	var out: Array = []
+	for i in v.get_amount_bullets():
+		out.append(v.get_bullet_transform(i).origin.snapped(Vector2(0.01, 0.01)))
+	return out
+
+
+func test_shoot_from_fires_the_pattern_posed_at_the_transform() -> void:
+	var sp := make_spawner(H.make_volley_data(4, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
+	sp.helper_ring_radius = 20.0
+	var got: Array = []
+	sp.volley_fired.connect(func(v, _n) -> void: got.append(v))
+	var pose := Transform2D(PI / 2.0, Vector2(300, 100))
+	assert_true(sp.shoot_from(pose), "fires")
+	assert_eq(_origins(got[0]), [Vector2(300, 120), Vector2(280, 100), Vector2(300, 80), Vector2(320, 100)], "the ring around the pose, turned with it")
+	assert_true(sp.shoot_from(Transform2D(0.0, Vector2(0, 0)), 90.0), "with extra spin")
+	assert_eq(_origins(got[1]), [Vector2(0, 20), Vector2(-20, 0), Vector2(0, -20), Vector2(20, 0)], "turned by the extra 90 degrees")
+	assert_eq(sp.get_volleys_fired(), 2, "counted like any shot")
+	assert_true(sp.shoot_once(), "a normal shot after it")
+	assert_eq(_origins(got[2]), [Vector2(20, 0), Vector2(0, 20), Vector2(-20, 0), Vector2(0, -20)], "back at the generator: the pose was for one shot only")
+
+
+func test_shoot_from_moves_children_and_the_local_offset_with_the_pose() -> void:
+	var sp := make_spawner(H.make_volley_data(2, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_CHILDREN, 2)
+	for p in [Vector2(10, 0), Vector2(0, 10)]:
+		var m := Marker2D.new()
+		m.position = p
+		sp.add_child(m)
+	sp.spawn_position_offset = Vector2(5, 0)
+	sp.spawn_position_offset_space = BulletSpawner2D.SPAWN_OFFSET_LOCAL
+	var got: Array = []
+	sp.volley_fired.connect(func(v, _n) -> void: got.append(v))
+	assert_true(sp.shoot_from(Transform2D(PI, Vector2(100, 0))), "fires")
+	assert_eq(_origins(got[0]), [Vector2(85, 0), Vector2(95, -10)], "markers and the muzzle offset turned with the pose")
+
+
+func test_shoot_from_refuses_bad_poses_and_nesting() -> void:
+	var sp := make_spawner(H.make_volley_data(1, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
+	for bad in [Transform2D(0.0, Vector2(NAN, 0)), Transform2D(Vector2.ZERO, Vector2.ZERO, Vector2.ZERO)]:
+		assert_false(sp.shoot_from(bad), "refused")
+		expect_error_sequence(["BulletSpawner2D::shoot_from: global_transform must be finite and invertible (and the spin finite), nothing fired."])
+	var nested := [true]
+	var poses: Array = []
+	sp.volley_fired.connect(func(v, _n) -> void:
+		poses.append(v.get_bullet_transform(0).origin)
+		nested[0] = sp.shoot_from(Transform2D(0.0, Vector2(999, 999))), CONNECT_ONE_SHOT)
+	assert_true(sp.shoot_from(Transform2D(0.0, Vector2(50, 50))), "the outer shot fires")
+	assert_false(nested[0], "a shoot_from inside the shot is refused")
+	expect_errors_containing("re-entrant call from inside a spawner signal handler", 1, "with shoot_once's nesting error")
+	assert_eq(poses, [Vector2(50, 50)], "and never moved the outer shot")
+
+
+func test_shoot_from_inherits_no_spawner_motion() -> void:
+	var sp := make_spawner(H.make_volley_data(1, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
+	var path := Path2D.new()
+	var c := Curve2D.new()
+	c.add_point(Vector2(0, 0))
+	c.add_point(Vector2(400, 0))
+	path.curve = c
+	add(path)
+	sp.movement_path = sp.get_path_to(path)
+	sp.movement_duration_sec = 1.0
+	sp.inherit_movement_velocity = true
+	sp.movement_enabled = true
+	sp.movement_play()
+	await idle(10)
+	assert_gt(sp.get_movement_velocity().length(), 100.0, "the spawner moves")
+	var got: Array = []
+	sp.volley_fired.connect(func(v, _n) -> void: got.append(v))
+	assert_true(sp.shoot_from(Transform2D(0.0, Vector2(0, 300))), "fires")
+	assert_eq(got[0].get_bullet_velocity(0), Vector2.ZERO, "a posed shot keeps none of the spawner's motion")

@@ -1126,6 +1126,19 @@ public:
 	// homing_targets_resolved, volley_fired): nested calls are rejected;
 	// use shoot_once_deferred() there instead.
 	bool shoot_once();
+	// Fires one shot (like shoot_once) posed at global_transform instead of
+	// the generator's transform, plus extra_spin_deg on top of the spin: the
+	// whole pattern, as if the generator stood there (Children markers and a
+	// Path2D drawn at its node move along with it). Never telegraphed; the
+	// spawner's own movement velocity is not inherited. Emitter bullets fire
+	// through it. Refused (false) for a non-finite or singular transform and,
+	// like shoot_once, from inside this spawner's shot signals.
+	bool shoot_from(const Transform2D &global_transform, double extra_spin_deg = 0.0);
+	// C++: the same with the velocity the shot's bullets inherit.
+	bool shoot_from_with_velocity(const Transform2D &global_transform, double extra_spin_deg, const Vector2 &inherited_velocity);
+	// The transform the current shot is posed at: the shoot_from pose, else
+	// the effective generator's (the spawner when none; inside the tree).
+	Transform2D shot_marker() const;
 	// Deferred variant for signal handlers / colliding contexts: queues a
 	// shoot_once() with call_deferred() and returns true when queued.
 	// Rejected (false) when the spawner is not in the tree.
@@ -1213,6 +1226,11 @@ protected:
 	static void _bind_methods();
 
 	// Shot, cadence, preview and movement state (the derived spawners read it).
+	// shoot_from: set only for the duration of that one shot.
+	bool shot_pose_active = false;
+	Transform2D shot_pose;
+	double shot_pose_extra_spin_deg = 0.0;
+	Vector2 shot_pose_velocity;
 	// Countdown to the next volley; volleys fired since (re)arming.
 	double shoot_time_left = 0.0;
 	int volleys_fired = 0;

@@ -370,6 +370,7 @@ void PatternSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("apply_pattern_preset", "preset"), &PatternSpawner2D::apply_pattern_preset);
 	ClassDB::bind_method(D_METHOD("spawn_pattern_list", "entries", "simultaneous", "interval_sec"), &PatternSpawner2D::spawn_pattern_list, DEFVAL(false), DEFVAL(0.25));
 	ClassDB::bind_method(D_METHOD("shoot_once_with", "overrides"), &PatternSpawner2D::shoot_once_with);
+	ClassDB::bind_method(D_METHOD("shoot_from", "global_transform", "extra_spin_deg"), &PatternSpawner2D::shoot_from, DEFVAL(0.0));
 	ClassDB::bind_method(D_METHOD("stop_pattern_list"), &PatternSpawner2D::stop_pattern_list);
 	ClassDB::bind_method(D_METHOD("is_pattern_list_active"), &PatternSpawner2D::is_pattern_list_active);
 	ClassDB::bind_method(D_METHOD("get_burst_shots_left"), &PatternSpawner2D::get_burst_shots_left);

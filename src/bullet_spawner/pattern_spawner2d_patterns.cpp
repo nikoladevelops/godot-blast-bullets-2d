@@ -155,6 +155,10 @@ PatternSlots2D PatternSpawner2D::generate_raw_pattern(Node2D *base, const Transf
 	in.owner_class = get_class();
 	std::vector<Transform2D> children;
 	PackedVector2Array path_pts;
+	// shoot_from: the markers move with the pose, as if the generator stood
+	// there (identity for a normal shot).
+	const bool reposed = shot_pose_active && BulletVolley2D::is_transform_invertible_safe(base->get_global_transform());
+	const Transform2D repose = reposed ? shot_pose * base->get_global_transform().affine_inverse() : Transform2D();
 	switch (pattern_source) {
 		case PATTERN_FROM_CHILDREN:
 			for (int i = 0; i < base->get_child_count(); ++i) {
@@ -162,7 +166,7 @@ PatternSlots2D PatternSpawner2D::generate_raw_pattern(Node2D *base, const Transf
 				// The editor preview holder is a Node2D child too, but it is
 				// visualization only and must never become a spawn marker.
 				if (as_2d != nullptr && !as_2d->has_meta(PREVIEW_META_KEY)) {
-					children.push_back(as_2d->get_global_transform());
+					children.push_back(reposed ? repose * as_2d->get_global_transform() : as_2d->get_global_transform());
 				}
 			}
 			in.children = &children;
@@ -366,8 +370,9 @@ void PatternSpawner2D::collect_spawn_transforms_native(bool quiet, std::vector<T
 		}
 		return;
 	}
-	const Vector2 base_origin = base->get_global_transform().get_origin();
-	const Transform2D marker = base->get_global_transform();
+	// The generator's transform, or the shoot_from pose for that one shot.
+	const Transform2D marker = shot_marker();
+	const Vector2 base_origin = marker.get_origin();
 	// Burst mirror sign, applied to the generators' WINDING (angle_step) as
 	// well as the emitter spin below. -1 reverses a spiral/multispiral/
 	// counter-spiral so the arms sweep the other way, which is what
@@ -394,7 +399,7 @@ void PatternSpawner2D::collect_spawn_transforms_native(bool quiet, std::vector<T
 	// full 10k-element rebuild per frame.
 	real_t spin_radians = 0.0;
 	if (!preview_suppress_spin) {
-		spin_radians = Math::deg_to_rad((real_t)spin_angle_deg);
+		spin_radians = Math::deg_to_rad((real_t)(spin_angle_deg + (shot_pose_active ? shot_pose_extra_spin_deg : 0.0)));
 		if (mirrored_shot) {
 			spin_radians = -spin_radians;
 		}

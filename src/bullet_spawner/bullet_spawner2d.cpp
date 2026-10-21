@@ -289,8 +289,10 @@ ShotResult2D BulletSpawner2D::fire_shot(std::vector<Transform2D> &transforms) {
 	// as belt-and-braces for any path that could not carry the id through.
 	// Moving spawners can hand their velocity to the volley (bullets keep the
 	// turret's momentum). Zero unless inherit_movement_velocity is on.
-	Vector2 inherited_velocity;
-	if (inherit_movement_velocity && movement_enabled) {
+	// A shoot_from shot inherits what its caller passed (an emitter: its
+	// bullet's velocity), never the spawner's own motion.
+	Vector2 inherited_velocity = shot_pose_active ? shot_pose_velocity : Vector2();
+	if (!shot_pose_active && inherit_movement_velocity && movement_enabled) {
 		inherited_velocity = movement_velocity * (real_t)movement_velocity_inherit_factor;
 		if (!inherited_velocity.is_finite()) {
 			inherited_velocity = Vector2();

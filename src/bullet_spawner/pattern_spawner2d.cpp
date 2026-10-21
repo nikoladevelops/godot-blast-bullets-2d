@@ -221,8 +221,8 @@ Vector2 PatternSpawner2D::resolve_spawn_offset_global() const {
 	}
 	if (spawn_position_offset_space == SPAWN_OFFSET_LOCAL) {
 		Node2D *base = is_inside_tree() ? get_effective_generator() : nullptr;
-		if (base != nullptr) {
-			const Vector2 v = base->get_global_transform().basis_xform(spawn_position_offset);
+		if (base != nullptr || shot_pose_active) {
+			const Vector2 v = shot_marker().basis_xform(spawn_position_offset);
 			if (v.is_finite()) {
 				return v;
 			}
@@ -811,6 +811,44 @@ ShotResult2D PatternSpawner2D::fire_shot(std::vector<Transform2D> &transforms) {
 	return result;
 }
 
+bool PatternSpawner2D::shoot_from(const Transform2D &global_transform, double extra_spin_deg) {
+	return shoot_from_with_velocity(global_transform, extra_spin_deg, Vector2());
+}
+
+bool PatternSpawner2D::shoot_from_with_velocity(const Transform2D &global_transform, double extra_spin_deg, const Vector2 &inherited_velocity) {
+	if (shoot_once_reentrant_guard || g_shoot_once_nesting_depth > 0) {
+		return shoot_once(); // refused with shoot_once's nesting error, before the pose is touched
+	}
+	if (!global_transform.is_finite() || !BulletVolley2D::is_transform_invertible_safe(global_transform) || !Math::is_finite(extra_spin_deg) || !inherited_velocity.is_finite()) {
+		UtilityFunctions::push_error(String(get_class()) + "::shoot_from: global_transform must be finite and invertible (and the spin finite), nothing fired.");
+		return false;
+	}
+	struct PoseScope {
+		PatternSpawner2D *self;
+		uint64_t id;
+		~PoseScope() {
+			// A handler of the shot may have freed this spawner (refused and
+			// queued): touch it only while it lives.
+			if (ObjectDB::get_instance(ObjectID(id)) == self) {
+				self->shot_pose_active = false;
+			}
+		}
+	} scope{ this, get_instance_id() };
+	shot_pose_active = true;
+	shot_pose = global_transform;
+	shot_pose_extra_spin_deg = extra_spin_deg;
+	shot_pose_velocity = inherited_velocity;
+	return shoot_once();
+}
+
+Transform2D PatternSpawner2D::shot_marker() const {
+	if (shot_pose_active) {
+		return shot_pose;
+	}
+	const Node2D *base = is_inside_tree() ? get_effective_generator() : nullptr;
+	return base != nullptr ? base->get_global_transform() : get_global_transform();
+}
+
 // Deferred variant for signal handlers / physics callbacks: queues the shot
 // so it runs after the current emission / physics step instead of nesting.
 bool PatternSpawner2D::shoot_once_deferred() {
@@ -1017,8 +1055,7 @@ bool PatternSpawner2D::muzzle_outside_despawn_bounds(const BulletFactory2D *fact
 	const Rect2 bounds = factory->get_despawn_bounds_rect();
 	// Bullets are born at the effective generator (the transforms generator
 	// when set), so that is where the muzzle sits.
-	const Node2D *base = is_inside_tree() ? get_effective_generator() : nullptr;
-	const Vector2 muzzle = (base != nullptr ? base->get_global_position() : get_global_position()) + resolve_spawn_offset_global();
+	const Vector2 muzzle = shot_marker().get_origin() + resolve_spawn_offset_global();
 	return muzzle.x < bounds.position.x || muzzle.y < bounds.position.y || muzzle.x > bounds.position.x + bounds.size.x || muzzle.y > bounds.position.y + bounds.size.y;
 }
 

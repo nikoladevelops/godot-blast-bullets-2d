@@ -753,8 +753,7 @@ Array BulletSpawner2D::resolve_homing_targets(bool quiet, bool advance_round_rob
 	// actual muzzle), same as the fire-arc gate: with an external
 	// transforms_generator the spawner node can sit far from where bullets
 	// spawn.
-	Node2D *muzzle = get_effective_generator();
-	const Vector2 muzzle_origin = muzzle != nullptr ? muzzle->get_global_position() : get_global_position();
+	const Vector2 muzzle_origin = shot_marker().get_origin();
 	if (homing_max_detection_range > 0.0 && !candidates.is_empty()) {
 		const Vector2 origin = muzzle_origin;
 		const real_t max_dist_sq = (real_t)(homing_max_detection_range * homing_max_detection_range);
@@ -1295,14 +1294,16 @@ bool BulletSpawner2D::fire_arc_covers_targets(const Array &targets) const {
 	if (base == nullptr || !is_inside_tree()) {
 		return false;
 	}
-	const Vector2 origin = base->get_global_position();
+	// The generator's pose, or the shoot_from pose for that one shot.
+	const Transform2D marker = shot_marker();
+	const Vector2 origin = marker.get_origin();
 	// The volley's actual facing: generator rotation plus the emitter spin
 	// (negated on a mirrored burst shot, like the pattern itself).
-	real_t spin = Math::deg_to_rad((real_t)spin_angle_deg);
+	real_t spin = Math::deg_to_rad((real_t)(spin_angle_deg + (shot_pose_active ? shot_pose_extra_spin_deg : 0.0)));
 	if (burst_alternate_mirror && burst_mirror_next) {
 		spin = -spin;
 	}
-	const real_t facing = base->get_global_rotation() + spin;
+	const real_t facing = marker.get_rotation() + spin;
 	const real_t half_arc = Math::deg_to_rad((real_t)homing_fire_arc_deg) * 0.5;
 	for (int i = 0; i < targets.size(); ++i) {
 		Vector2 pos = Vector2(0, 0);
