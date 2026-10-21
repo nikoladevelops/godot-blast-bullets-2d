@@ -9,11 +9,11 @@ using namespace godot;
 
 namespace BlastBullets2D {
 
-bool BulletSpawner2D::get_flock_enabled() const {
+bool PatternSpawner2D::get_flock_enabled() const {
 	return flock_enabled;
 }
 
-void BulletSpawner2D::set_flock_enabled(bool value) {
+void PatternSpawner2D::set_flock_enabled(bool value) {
 	if (flock_enabled == value) {
 		return;
 	}
@@ -23,11 +23,11 @@ void BulletSpawner2D::set_flock_enabled(bool value) {
 	notify_property_list_changed();
 }
 
-Ref<BulletFlock2D> BulletSpawner2D::get_flock() const {
+Ref<BulletFlock2D> PatternSpawner2D::get_flock() const {
 	return flock;
 }
 
-void BulletSpawner2D::set_flock(const Ref<BulletFlock2D> &value) {
+void PatternSpawner2D::set_flock(const Ref<BulletFlock2D> &value) {
 	if (flock == value) {
 		return;
 	}
@@ -36,11 +36,11 @@ void BulletSpawner2D::set_flock(const Ref<BulletFlock2D> &value) {
 	on_config_changed();
 }
 
-BulletFlock2D::Scope BulletSpawner2D::get_flock_scope() const {
+BulletFlock2D::Scope PatternSpawner2D::get_flock_scope() const {
 	return flock_scope;
 }
 
-void BulletSpawner2D::set_flock_scope(BulletFlock2D::Scope value) {
+void PatternSpawner2D::set_flock_scope(BulletFlock2D::Scope value) {
 	if (value < BulletFlock2D::SCOPE_PER_SPAWNER || value > BulletFlock2D::SCOPE_PER_VOLLEY) {
 		UtilityFunctions::push_error("BulletSpawner2D: flock_scope must be 0 (Per Spawner), 1 (Shared) or 2 (Per Volley), keeping the old value.");
 		return;
@@ -53,7 +53,7 @@ void BulletSpawner2D::set_flock_scope(BulletFlock2D::Scope value) {
 	on_config_changed();
 }
 
-Ref<BulletFlock2D> BulletSpawner2D::effective_flock() const {
+Ref<BulletFlock2D> PatternSpawner2D::effective_flock() const {
 	if (flock.is_valid()) {
 		return flock;
 	}
@@ -62,7 +62,7 @@ Ref<BulletFlock2D> BulletSpawner2D::effective_flock() const {
 	return factory != nullptr ? factory->get_default_flock() : Ref<BulletFlock2D>();
 }
 
-void BulletSpawner2D::apply_flock_config() {
+void PatternSpawner2D::apply_flock_config() {
 	if (flock_shared == nullptr) {
 		return; // nothing armed yet: the first arm copies the settings
 	}
@@ -72,7 +72,7 @@ void BulletSpawner2D::apply_flock_config() {
 	++flock_shared->serial;
 }
 
-void BulletSpawner2D::apply_volley_flock(BulletVolley2D *volley) {
+void PatternSpawner2D::apply_volley_flock(BulletVolley2D *volley) {
 	if (volley == nullptr || !flock_enabled) {
 		return;
 	}
@@ -89,7 +89,7 @@ void BulletSpawner2D::apply_volley_flock(BulletVolley2D *volley) {
 	volley->flock_set_config(flock_shared);
 }
 
-int BulletSpawner2D::flock_live_volleys() {
+int PatternSpawner2D::flock_live_volleys() {
 	BulletFactory2D *factory = get_bullet_factory();
 	if (factory == nullptr || !flock_enabled) {
 		return 0;

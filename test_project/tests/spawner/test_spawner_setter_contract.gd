@@ -17,12 +17,14 @@ const ANY_VALUE_OK := {
 }
 
 
-## Properties BulletSpawner2D declares itself (inherited Node2D ones are the
-## engine's business), as seen on a live instance (usage flags applied).
+## Properties BulletSpawner2D and its plugin base declare (inherited Node2D
+## ones are the engine's business), as seen on a live instance (usage flags
+## applied).
 func _editor_props(obj: Object) -> Array:
 	var own := {}
-	for p in ClassDB.class_get_property_list("BulletSpawner2D", true):
-		own[str(p.name)] = true
+	for cls in ["PatternSpawner2D", "BulletSpawner2D"]:
+		for p in ClassDB.class_get_property_list(cls, true):
+			own[str(p.name)] = true
 	var out: Array = []
 	for p in obj.get_property_list():
 		if not own.has(str(p.name)):

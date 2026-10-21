@@ -12,9 +12,9 @@ namespace BlastBullets2D {
 
 // ---- Movement along a Path2D -------------------------------------------------
 
-bool BulletSpawner2D::get_movement_enabled() const { return movement_enabled; }
+bool PatternSpawner2D::get_movement_enabled() const { return movement_enabled; }
 
-void BulletSpawner2D::set_movement_enabled(bool value) {
+void PatternSpawner2D::set_movement_enabled(bool value) {
 	on_config_changed();
 	if (movement_enabled == value) {
 		return;
@@ -34,9 +34,9 @@ void BulletSpawner2D::set_movement_enabled(bool value) {
 	refresh_process_state();
 }
 
-NodePath BulletSpawner2D::get_movement_path() const { return movement_path; }
+NodePath PatternSpawner2D::get_movement_path() const { return movement_path; }
 
-void BulletSpawner2D::set_movement_path(const NodePath &p_path) {
+void PatternSpawner2D::set_movement_path(const NodePath &p_path) {
 	if (!node_path_type_ok<Path2D>(this, p_path, "movement_path", "Path2D")) {
 		return;
 	}
@@ -51,11 +51,11 @@ void BulletSpawner2D::set_movement_path(const NodePath &p_path) {
 	}
 }
 
-Path2D *BulletSpawner2D::get_movement_path_node() const {
+Path2D *PatternSpawner2D::get_movement_path_node() const {
 	return validate_cached_node(this, movement_path, movement_path_cache, movement_path_id);
 }
 
-void BulletSpawner2D::set_movement_path_node(Path2D *node) {
+void PatternSpawner2D::set_movement_path_node(Path2D *node) {
 	on_config_changed();
 	assign_node_to_path(this, node, movement_path, movement_path_cache);
 	movement_path_id = node != nullptr ? node->get_instance_id() : 0;
@@ -70,18 +70,18 @@ static bool movement_reject(bool bad, const char *message) {
 	return bad;
 }
 
-BulletSpawner2D::MovementSpace BulletSpawner2D::get_movement_space() const { return static_cast<MovementSpace>(movement_space); }
+PatternSpawner2D::MovementSpace PatternSpawner2D::get_movement_space() const { return static_cast<MovementSpace>(movement_space); }
 
-void BulletSpawner2D::set_movement_space(MovementSpace value) {
+void PatternSpawner2D::set_movement_space(MovementSpace value) {
 	if (movement_reject(value < MOVEMENT_SPACE_ATTACH || value > MOVEMENT_SPACE_RELATIVE_TO_START, "BulletSpawner2D: movement_space must be 0 (Attach) or 1 (Relative To Start), keeping the old value.")) {
 		return;
 	}
 	movement_space = value;
 }
 
-BulletSpawner2D::MovementLoopMode BulletSpawner2D::get_movement_loop_mode() const { return static_cast<MovementLoopMode>(movement_loop_mode); }
+PatternSpawner2D::MovementLoopMode PatternSpawner2D::get_movement_loop_mode() const { return static_cast<MovementLoopMode>(movement_loop_mode); }
 
-void BulletSpawner2D::set_movement_loop_mode(MovementLoopMode value) {
+void PatternSpawner2D::set_movement_loop_mode(MovementLoopMode value) {
 	if (movement_reject(value < MOVEMENT_LOOP_ONCE || value > MOVEMENT_LOOP_PING_PONG, "BulletSpawner2D: movement_loop_mode must be 0 (Once), 1 (Loop) or 2 (Ping Pong), keeping the old value.")) {
 		return;
 	}
@@ -89,27 +89,27 @@ void BulletSpawner2D::set_movement_loop_mode(MovementLoopMode value) {
 	notify_property_list_changed();
 }
 
-BulletSpawner2D::MovementDirection BulletSpawner2D::get_movement_direction() const { return static_cast<MovementDirection>(movement_direction); }
+PatternSpawner2D::MovementDirection PatternSpawner2D::get_movement_direction() const { return static_cast<MovementDirection>(movement_direction); }
 
-void BulletSpawner2D::set_movement_direction(MovementDirection value) {
+void PatternSpawner2D::set_movement_direction(MovementDirection value) {
 	if (movement_reject(value < MOVEMENT_DIRECTION_FORWARD || value > MOVEMENT_DIRECTION_REVERSE, "BulletSpawner2D: movement_direction must be 0 (Forward) or 1 (Reverse), keeping the old value.")) {
 		return;
 	}
 	movement_direction = value;
 }
 
-int BulletSpawner2D::get_movement_loops() const { return movement_loops; }
+int PatternSpawner2D::get_movement_loops() const { return movement_loops; }
 
-void BulletSpawner2D::set_movement_loops(int value) {
+void PatternSpawner2D::set_movement_loops(int value) {
 	if (movement_reject(value < 0, "BulletSpawner2D: movement_loops must be >= 0 (0 = forever), keeping the old value.")) {
 		return;
 	}
 	movement_loops = value;
 }
 
-BulletSpawner2D::MovementTiming BulletSpawner2D::get_movement_timing() const { return static_cast<MovementTiming>(movement_timing); }
+PatternSpawner2D::MovementTiming PatternSpawner2D::get_movement_timing() const { return static_cast<MovementTiming>(movement_timing); }
 
-void BulletSpawner2D::set_movement_timing(MovementTiming value) {
+void PatternSpawner2D::set_movement_timing(MovementTiming value) {
 	if (movement_reject(value < MOVEMENT_TIMING_DURATION || value > MOVEMENT_TIMING_SPEED, "BulletSpawner2D: movement_timing must be 0 (Duration) or 1 (Speed), keeping the old value.")) {
 		return;
 	}
@@ -117,125 +117,125 @@ void BulletSpawner2D::set_movement_timing(MovementTiming value) {
 	notify_property_list_changed();
 }
 
-double BulletSpawner2D::get_movement_duration_sec() const { return movement_duration_sec; }
+double PatternSpawner2D::get_movement_duration_sec() const { return movement_duration_sec; }
 
-void BulletSpawner2D::set_movement_duration_sec(double value) {
+void PatternSpawner2D::set_movement_duration_sec(double value) {
 	if (movement_reject(!is_finite_real2d(value) || value <= 0.0, "BulletSpawner2D: movement_duration_sec must be finite and > 0, keeping the old value.")) {
 		return;
 	}
 	movement_duration_sec = value;
 }
 
-double BulletSpawner2D::get_movement_speed() const { return movement_speed; }
+double PatternSpawner2D::get_movement_speed() const { return movement_speed; }
 
-void BulletSpawner2D::set_movement_speed(double value) {
+void PatternSpawner2D::set_movement_speed(double value) {
 	if (movement_reject(!is_finite_real2d(value) || value <= 0.0, "BulletSpawner2D: movement_speed must be finite and > 0, keeping the old value.")) {
 		return;
 	}
 	movement_speed = value;
 }
 
-Tween::TransitionType BulletSpawner2D::get_movement_transition() const { return static_cast<Tween::TransitionType>(movement_transition); }
+Tween::TransitionType PatternSpawner2D::get_movement_transition() const { return static_cast<Tween::TransitionType>(movement_transition); }
 
-void BulletSpawner2D::set_movement_transition(Tween::TransitionType value) {
+void PatternSpawner2D::set_movement_transition(Tween::TransitionType value) {
 	if (movement_reject(value < 0 || value >= Easing2D::TRANS_COUNT, "BulletSpawner2D: movement_transition must be a Tween.TransitionType (0..11), keeping the old value.")) {
 		return;
 	}
 	movement_transition = value;
 }
 
-Tween::EaseType BulletSpawner2D::get_movement_ease() const { return static_cast<Tween::EaseType>(movement_ease); }
+Tween::EaseType PatternSpawner2D::get_movement_ease() const { return static_cast<Tween::EaseType>(movement_ease); }
 
-void BulletSpawner2D::set_movement_ease(Tween::EaseType value) {
+void PatternSpawner2D::set_movement_ease(Tween::EaseType value) {
 	if (movement_reject(value < 0 || value >= Easing2D::EASE_COUNT, "BulletSpawner2D: movement_ease must be a Tween.EaseType (0..3), keeping the old value.")) {
 		return;
 	}
 	movement_ease = value;
 }
 
-Ref<Curve> BulletSpawner2D::get_movement_progress_curve() const { return movement_progress_curve; }
+Ref<Curve> PatternSpawner2D::get_movement_progress_curve() const { return movement_progress_curve; }
 
-void BulletSpawner2D::set_movement_progress_curve(const Ref<Curve> &value) {
+void PatternSpawner2D::set_movement_progress_curve(const Ref<Curve> &value) {
 	movement_progress_curve = value;
 	notify_property_list_changed();
 }
 
-double BulletSpawner2D::get_movement_start_ratio() const { return movement_start_ratio; }
+double PatternSpawner2D::get_movement_start_ratio() const { return movement_start_ratio; }
 
-void BulletSpawner2D::set_movement_start_ratio(double value) {
+void PatternSpawner2D::set_movement_start_ratio(double value) {
 	if (movement_reject(!is_finite_real2d(value) || value < 0.0 || value > 1.0, "BulletSpawner2D: movement_start_ratio must be in [0, 1], keeping the old value.")) {
 		return;
 	}
 	movement_start_ratio = value;
 }
 
-double BulletSpawner2D::get_movement_start_delay_sec() const { return movement_start_delay_sec; }
+double PatternSpawner2D::get_movement_start_delay_sec() const { return movement_start_delay_sec; }
 
-void BulletSpawner2D::set_movement_start_delay_sec(double value) {
+void PatternSpawner2D::set_movement_start_delay_sec(double value) {
 	if (movement_reject(!is_finite_real2d(value) || value < 0.0, "BulletSpawner2D: movement_start_delay_sec must be finite and >= 0, keeping the old value.")) {
 		return;
 	}
 	movement_start_delay_sec = value;
 }
 
-double BulletSpawner2D::get_movement_endpoint_pause_sec() const { return movement_endpoint_pause_sec; }
+double PatternSpawner2D::get_movement_endpoint_pause_sec() const { return movement_endpoint_pause_sec; }
 
-void BulletSpawner2D::set_movement_endpoint_pause_sec(double value) {
+void PatternSpawner2D::set_movement_endpoint_pause_sec(double value) {
 	if (movement_reject(!is_finite_real2d(value) || value < 0.0, "BulletSpawner2D: movement_endpoint_pause_sec must be finite and >= 0, keeping the old value.")) {
 		return;
 	}
 	movement_endpoint_pause_sec = value;
 }
 
-bool BulletSpawner2D::get_movement_rotate_with_path() const { return movement_rotate_with_path; }
+bool PatternSpawner2D::get_movement_rotate_with_path() const { return movement_rotate_with_path; }
 
-void BulletSpawner2D::set_movement_rotate_with_path(bool value) {
+void PatternSpawner2D::set_movement_rotate_with_path(bool value) {
 	movement_rotate_with_path = value;
 	notify_property_list_changed();
 }
 
-double BulletSpawner2D::get_movement_rotation_offset_deg() const { return movement_rotation_offset_deg; }
+double PatternSpawner2D::get_movement_rotation_offset_deg() const { return movement_rotation_offset_deg; }
 
-void BulletSpawner2D::set_movement_rotation_offset_deg(double value) {
+void PatternSpawner2D::set_movement_rotation_offset_deg(double value) {
 	if (movement_reject(!is_finite_real2d(value), "BulletSpawner2D: movement_rotation_offset_deg must be finite, keeping the old value.")) {
 		return;
 	}
 	movement_rotation_offset_deg = value;
 }
 
-bool BulletSpawner2D::get_movement_cubic_sampling() const { return movement_cubic_sampling; }
+bool PatternSpawner2D::get_movement_cubic_sampling() const { return movement_cubic_sampling; }
 
-void BulletSpawner2D::set_movement_cubic_sampling(bool value) { movement_cubic_sampling = value; }
+void PatternSpawner2D::set_movement_cubic_sampling(bool value) { movement_cubic_sampling = value; }
 
-bool BulletSpawner2D::get_movement_autostart() const { return movement_autostart; }
+bool PatternSpawner2D::get_movement_autostart() const { return movement_autostart; }
 
-void BulletSpawner2D::set_movement_autostart(bool value) { movement_autostart = value; }
+void PatternSpawner2D::set_movement_autostart(bool value) { movement_autostart = value; }
 
-bool BulletSpawner2D::get_inherit_movement_velocity() const { return inherit_movement_velocity; }
+bool PatternSpawner2D::get_inherit_movement_velocity() const { return inherit_movement_velocity; }
 
-void BulletSpawner2D::set_inherit_movement_velocity(bool value) {
+void PatternSpawner2D::set_inherit_movement_velocity(bool value) {
 	inherit_movement_velocity = value;
 	notify_property_list_changed();
 }
 
-double BulletSpawner2D::get_movement_velocity_inherit_factor() const { return movement_velocity_inherit_factor; }
+double PatternSpawner2D::get_movement_velocity_inherit_factor() const { return movement_velocity_inherit_factor; }
 
-void BulletSpawner2D::set_movement_velocity_inherit_factor(double value) {
+void PatternSpawner2D::set_movement_velocity_inherit_factor(double value) {
 	if (movement_reject(!is_finite_real2d(value), "BulletSpawner2D: movement_velocity_inherit_factor must be finite, keeping the old value.")) {
 		return;
 	}
 	movement_velocity_inherit_factor = value;
 }
 
-double BulletSpawner2D::debug_ease(double t, int transition, int ease) {
+double PatternSpawner2D::debug_ease(double t, int transition, int ease) {
 	return Easing2D::ease(t, transition, ease);
 }
 
-bool BulletSpawner2D::movement_active() const {
+bool PatternSpawner2D::movement_active() const {
 	return movement_enabled && movement_playing && is_inside_tree() && !Engine::get_singleton()->is_editor_hint();
 }
 
-void BulletSpawner2D::movement_reset_state() {
+void PatternSpawner2D::movement_reset_state() {
 	movement_finished = false;
 	movement_legs_completed = 0;
 	movement_leg_forward = movement_direction == MOVEMENT_DIRECTION_FORWARD;
@@ -248,7 +248,7 @@ void BulletSpawner2D::movement_reset_state() {
 	movement_teleport_offset = Vector2();
 }
 
-double BulletSpawner2D::movement_eased(double leg_ratio) const {
+double PatternSpawner2D::movement_eased(double leg_ratio) const {
 	if (movement_progress_curve.is_valid()) {
 		const double v = (double)movement_progress_curve->sample((real_t)CLAMP(leg_ratio, 0.0, 1.0));
 		return Math::is_finite(v) ? v : leg_ratio;
@@ -256,14 +256,14 @@ double BulletSpawner2D::movement_eased(double leg_ratio) const {
 	return Easing2D::ease(leg_ratio, movement_transition, movement_ease);
 }
 
-double BulletSpawner2D::movement_leg_duration(double path_length) const {
+double PatternSpawner2D::movement_leg_duration(double path_length) const {
 	if (movement_timing == MOVEMENT_TIMING_SPEED) {
 		return (movement_speed > 0.0 && path_length > 0.0) ? path_length / movement_speed : 0.0;
 	}
 	return movement_duration_sec;
 }
 
-bool BulletSpawner2D::apply_movement_pose(double delta) {
+bool PatternSpawner2D::apply_movement_pose(double delta) {
 	Path2D *path = get_movement_path_node();
 	Ref<Curve2D> curve = path != nullptr ? path->get_curve() : Ref<Curve2D>();
 	const double length = curve.is_valid() ? (double)curve->get_baked_length() : 0.0;
@@ -320,7 +320,7 @@ bool BulletSpawner2D::apply_movement_pose(double delta) {
 	return true;
 }
 
-bool BulletSpawner2D::advance_movement(double delta) {
+bool PatternSpawner2D::advance_movement(double delta) {
 	if (!movement_active() || !Math::is_finite(delta) || delta <= 0.0) {
 		return true;
 	}
@@ -416,7 +416,7 @@ bool BulletSpawner2D::advance_movement(double delta) {
 	return true;
 }
 
-void BulletSpawner2D::movement_play() {
+void PatternSpawner2D::movement_play() {
 	if (Engine::get_singleton()->is_editor_hint()) {
 		return;
 	}
@@ -448,7 +448,7 @@ void BulletSpawner2D::movement_play() {
 	}
 }
 
-void BulletSpawner2D::movement_pause() {
+void PatternSpawner2D::movement_pause() {
 	++movement_epoch;
 	movement_playing = false;
 	movement_velocity = Vector2();
@@ -457,7 +457,7 @@ void BulletSpawner2D::movement_pause() {
 	}
 }
 
-void BulletSpawner2D::movement_stop(bool reset_to_start) {
+void PatternSpawner2D::movement_stop(bool reset_to_start) {
 	++movement_epoch;
 	movement_playing = false;
 	movement_velocity = Vector2();
@@ -475,7 +475,7 @@ void BulletSpawner2D::movement_stop(bool reset_to_start) {
 	}
 }
 
-void BulletSpawner2D::teleport(const Vector2 &new_global_position, bool carry_live_bullets) {
+void PatternSpawner2D::teleport(const Vector2 &new_global_position, bool carry_live_bullets) {
 	if (!new_global_position.is_finite()) {
 		UtilityFunctions::push_error("BulletSpawner2D::teleport: global_position must be finite, the spawner stays where it is.");
 		return;
@@ -523,7 +523,7 @@ void BulletSpawner2D::teleport(const Vector2 &new_global_position, bool carry_li
 	}
 }
 
-void BulletSpawner2D::movement_seek(double ratio) {
+void PatternSpawner2D::movement_seek(double ratio) {
 	if (!Math::is_finite(ratio) || ratio < 0.0 || ratio > 1.0) {
 		UtilityFunctions::push_error("BulletSpawner2D::movement_seek: ratio must be in [0, 1], ignoring.");
 		return;
@@ -541,7 +541,7 @@ void BulletSpawner2D::movement_seek(double ratio) {
 	}
 }
 
-void BulletSpawner2D::movement_reverse() {
+void PatternSpawner2D::movement_reverse() {
 	++movement_epoch;
 	// Keep the current position: mirror the elapsed time within the leg so
 	// the eased progress continues from here in the other direction.
@@ -567,12 +567,12 @@ void BulletSpawner2D::movement_reverse() {
 	}
 }
 
-bool BulletSpawner2D::is_movement_playing() const { return movement_playing; }
+bool PatternSpawner2D::is_movement_playing() const { return movement_playing; }
 
-double BulletSpawner2D::get_movement_progress() const { return movement_progress; }
+double PatternSpawner2D::get_movement_progress() const { return movement_progress; }
 
-int BulletSpawner2D::get_movement_leg() const { return movement_legs_completed; }
+int PatternSpawner2D::get_movement_leg() const { return movement_legs_completed; }
 
-Vector2 BulletSpawner2D::get_movement_velocity() const { return movement_velocity; }
+Vector2 PatternSpawner2D::get_movement_velocity() const { return movement_velocity; }
 
 } // namespace BlastBullets2D

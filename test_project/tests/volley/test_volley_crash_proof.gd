@@ -425,8 +425,9 @@ func test_random_spawner_and_factory_storm_keeps_every_invariant() -> void:
 			sp.volley_fired.connect(func(v: BulletVolley2D, _n: int) -> void: fired.append(v))
 			spawners.append(sp)
 		var targets: Array = [] # [object, method dict]
-		for m in ClassDB.class_get_method_list("BulletSpawner2D", true):
-			targets.append(["spawner", m])
+		for cls in ["PatternSpawner2D", "BulletSpawner2D"]: # the spawner and its plugin base
+			for m in ClassDB.class_get_method_list(cls, true):
+				targets.append(["spawner", m])
 		for m in ClassDB.class_get_method_list("BulletFactory2D", true):
 			targets.append(["factory", m])
 		targets = targets.filter(func(t): return not str(t[1]["name"]).begins_with("_") and not (t[1]["args"] as Array).any(func(a): return int(a["type"]) == TYPE_RID))

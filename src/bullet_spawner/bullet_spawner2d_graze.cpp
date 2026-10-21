@@ -12,11 +12,11 @@ using namespace godot;
 
 namespace BlastBullets2D {
 
-bool BulletSpawner2D::get_graze_enabled() const {
+bool PatternSpawner2D::get_graze_enabled() const {
 	return graze_enabled;
 }
 
-void BulletSpawner2D::set_graze_enabled(bool value) {
+void PatternSpawner2D::set_graze_enabled(bool value) {
 	graze_enabled = value;
 	on_config_changed();
 	notify_property_list_changed();
@@ -24,11 +24,11 @@ void BulletSpawner2D::set_graze_enabled(bool value) {
 	refresh_process_state();
 }
 
-TypedArray<BulletGrazeZone2D> BulletSpawner2D::get_graze_zones() const {
+TypedArray<BulletGrazeZone2D> PatternSpawner2D::get_graze_zones() const {
 	return graze_zones;
 }
 
-void BulletSpawner2D::set_graze_zones(const Array &value) {
+void PatternSpawner2D::set_graze_zones(const Array &value) {
 	if (value.size() > BulletVolley2D::MAX_GRAZE_ZONES) {
 		UtilityFunctions::push_error("BulletSpawner2D: graze_zones holds at most 4 zones, keeping the old value.");
 		return;
@@ -55,33 +55,33 @@ void BulletSpawner2D::set_graze_zones(const Array &value) {
 	refresh_graze_preview();
 }
 
-bool BulletSpawner2D::get_graze_show_preview() const {
+bool PatternSpawner2D::get_graze_show_preview() const {
 	return graze_show_preview;
 }
 
-void BulletSpawner2D::set_graze_show_preview(bool value) {
+void PatternSpawner2D::set_graze_show_preview(bool value) {
 	graze_show_preview = value;
 	notify_property_list_changed();
 	refresh_graze_preview();
 	refresh_process_state();
 }
 
-bool BulletSpawner2D::get_graze_preview_during_runtime() const {
+bool PatternSpawner2D::get_graze_preview_during_runtime() const {
 	return graze_preview_during_runtime;
 }
 
-void BulletSpawner2D::set_graze_preview_during_runtime(bool value) {
+void PatternSpawner2D::set_graze_preview_during_runtime(bool value) {
 	graze_preview_during_runtime = value;
 	notify_property_list_changed();
 	refresh_graze_preview();
 	refresh_process_state();
 }
 
-double BulletSpawner2D::get_graze_preview_line_width() const {
+double PatternSpawner2D::get_graze_preview_line_width() const {
 	return graze_preview_line_width;
 }
 
-void BulletSpawner2D::set_graze_preview_line_width(double value) {
+void PatternSpawner2D::set_graze_preview_line_width(double value) {
 	if (!is_finite_real2d(value) || value <= 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: graze_preview_line_width must be finite and > 0, keeping the old value.");
 		return;
@@ -90,11 +90,11 @@ void BulletSpawner2D::set_graze_preview_line_width(double value) {
 	refresh_graze_preview();
 }
 
-BulletSpawner2D::GrazeTargetSource BulletSpawner2D::get_graze_target_source() const {
+PatternSpawner2D::GrazeTargetSource PatternSpawner2D::get_graze_target_source() const {
 	return graze_target_source;
 }
 
-void BulletSpawner2D::set_graze_target_source(GrazeTargetSource value) {
+void PatternSpawner2D::set_graze_target_source(GrazeTargetSource value) {
 	if (value < GRAZE_SOURCE_NODE_GROUP || value > GRAZE_SOURCE_GLOBAL_POSITIONS) {
 		UtilityFunctions::push_error("BulletSpawner2D: invalid graze_target_source, keeping the old value.");
 		return;
@@ -104,29 +104,29 @@ void BulletSpawner2D::set_graze_target_source(GrazeTargetSource value) {
 	apply_graze_detector_config();
 }
 
-StringName BulletSpawner2D::get_graze_node_group() const {
+StringName PatternSpawner2D::get_graze_node_group() const {
 	return graze_node_group;
 }
 
-void BulletSpawner2D::set_graze_node_group(const StringName &value) {
+void PatternSpawner2D::set_graze_node_group(const StringName &value) {
 	graze_node_group = value;
 	apply_graze_detector_config();
 }
 
-StringName BulletSpawner2D::get_graze_filter_group() const {
+StringName PatternSpawner2D::get_graze_filter_group() const {
 	return graze_filter_group;
 }
 
-void BulletSpawner2D::set_graze_filter_group(const StringName &value) {
+void PatternSpawner2D::set_graze_filter_group(const StringName &value) {
 	graze_filter_group = value;
 	apply_graze_detector_config();
 }
 
-NodePath BulletSpawner2D::get_graze_target_path() const {
+NodePath PatternSpawner2D::get_graze_target_path() const {
 	return graze_target_path;
 }
 
-void BulletSpawner2D::set_graze_target_path(const NodePath &p_path) {
+void PatternSpawner2D::set_graze_target_path(const NodePath &p_path) {
 	if (!node_path_type_ok<Node2D>(this, p_path, "graze_target_path", "Node2D")) {
 		return;
 	}
@@ -134,20 +134,20 @@ void BulletSpawner2D::set_graze_target_path(const NodePath &p_path) {
 	apply_graze_detector_config();
 }
 
-String BulletSpawner2D::get_graze_node_name() const {
+String PatternSpawner2D::get_graze_node_name() const {
 	return graze_node_name;
 }
 
-void BulletSpawner2D::set_graze_node_name(const String &value) {
+void PatternSpawner2D::set_graze_node_name(const String &value) {
 	graze_node_name = value;
 	apply_graze_detector_config();
 }
 
-BulletSpawner2D::HomingNodeNameMatch BulletSpawner2D::get_graze_node_name_match_mode() const {
+PatternSpawner2D::HomingNodeNameMatch PatternSpawner2D::get_graze_node_name_match_mode() const {
 	return graze_node_name_match_mode;
 }
 
-void BulletSpawner2D::set_graze_node_name_match_mode(HomingNodeNameMatch value) {
+void PatternSpawner2D::set_graze_node_name_match_mode(HomingNodeNameMatch value) {
 	if (value < HOMING_NAME_MATCH_EXACT || value > HOMING_NAME_MATCH_ENDS_WITH) {
 		UtilityFunctions::push_error("BulletSpawner2D: invalid graze_node_name_match_mode, keeping the old value.");
 		return;
@@ -156,38 +156,38 @@ void BulletSpawner2D::set_graze_node_name_match_mode(HomingNodeNameMatch value) 
 	apply_graze_detector_config();
 }
 
-bool BulletSpawner2D::get_graze_node_name_case_sensitive() const {
+bool PatternSpawner2D::get_graze_node_name_case_sensitive() const {
 	return graze_node_name_case_sensitive;
 }
 
-void BulletSpawner2D::set_graze_node_name_case_sensitive(bool value) {
+void PatternSpawner2D::set_graze_node_name_case_sensitive(bool value) {
 	graze_node_name_case_sensitive = value;
 	apply_graze_detector_config();
 }
 
-NodePath BulletSpawner2D::get_graze_children_parent_path() const {
+NodePath PatternSpawner2D::get_graze_children_parent_path() const {
 	return graze_children_parent_path;
 }
 
-void BulletSpawner2D::set_graze_children_parent_path(const NodePath &p_path) {
+void PatternSpawner2D::set_graze_children_parent_path(const NodePath &p_path) {
 	graze_children_parent_path = p_path;
 	apply_graze_detector_config();
 }
 
-bool BulletSpawner2D::get_graze_children_recursive() const {
+bool PatternSpawner2D::get_graze_children_recursive() const {
 	return graze_children_recursive;
 }
 
-void BulletSpawner2D::set_graze_children_recursive(bool value) {
+void PatternSpawner2D::set_graze_children_recursive(bool value) {
 	graze_children_recursive = value;
 	apply_graze_detector_config();
 }
 
-PackedVector2Array BulletSpawner2D::get_graze_global_positions() const {
+PackedVector2Array PatternSpawner2D::get_graze_global_positions() const {
 	return graze_global_positions;
 }
 
-void BulletSpawner2D::set_graze_global_positions(const PackedVector2Array &value) {
+void PatternSpawner2D::set_graze_global_positions(const PackedVector2Array &value) {
 	for (int i = 0; i < value.size(); ++i) {
 		if (!value[i].is_finite()) {
 			UtilityFunctions::push_error("BulletSpawner2D: graze_global_positions must hold finite positions only, keeping the old value.");
@@ -198,11 +198,11 @@ void BulletSpawner2D::set_graze_global_positions(const PackedVector2Array &value
 	apply_graze_detector_config();
 }
 
-double BulletSpawner2D::get_graze_update_interval() const {
+double PatternSpawner2D::get_graze_update_interval() const {
 	return graze_update_interval;
 }
 
-void BulletSpawner2D::set_graze_update_interval(double value) {
+void PatternSpawner2D::set_graze_update_interval(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: graze_update_interval must be finite and >= 0 (0 scans every tick), keeping the old value.");
 		return;
@@ -211,7 +211,7 @@ void BulletSpawner2D::set_graze_update_interval(double value) {
 	apply_graze_detector_config();
 }
 
-GrazeDetector2D &BulletSpawner2D::graze_detector_ref() const {
+GrazeDetector2D &PatternSpawner2D::graze_detector_ref() const {
 	if (graze_detector == nullptr) {
 		// Plain creation: callers may be mid preview refresh, so nothing
 		// else may run from here. Never std::make_shared: its type tag is a
@@ -223,7 +223,7 @@ GrazeDetector2D &BulletSpawner2D::graze_detector_ref() const {
 	return *graze_detector;
 }
 
-GrazeDetector2D::Config BulletSpawner2D::graze_detector_config() const {
+GrazeDetector2D::Config PatternSpawner2D::graze_detector_config() const {
 	GrazeDetector2D::Config config;
 	config.source = (int)graze_target_source;
 	config.node_group = graze_node_group;
@@ -239,13 +239,13 @@ GrazeDetector2D::Config BulletSpawner2D::graze_detector_config() const {
 	return config;
 }
 
-void BulletSpawner2D::apply_graze_detector_config() {
+void PatternSpawner2D::apply_graze_detector_config() {
 	graze_detector_ref().set_config(graze_detector_config());
 	on_config_changed();
 	refresh_graze_preview();
 }
 
-void BulletSpawner2D::collect_graze_targets(std::vector<GrazeTarget2D> &r_targets) const {
+void PatternSpawner2D::collect_graze_targets(std::vector<GrazeTarget2D> &r_targets) const {
 	r_targets.clear();
 	if (!is_inside_tree()) {
 		return;
@@ -281,7 +281,7 @@ void BulletSpawner2D::collect_graze_targets(std::vector<GrazeTarget2D> &r_target
 	detector.collect_now(get_tree(), world.ptr(), mouse_space, r_targets);
 }
 
-int BulletSpawner2D::refresh_graze_targets() {
+int PatternSpawner2D::refresh_graze_targets() {
 	if (!is_inside_tree()) {
 		UtilityFunctions::push_error("BulletSpawner2D.refresh_graze_targets: spawner is outside the scene tree, nothing refreshed.");
 		return 0;
@@ -301,8 +301,8 @@ int BulletSpawner2D::refresh_graze_targets() {
 	return found;
 }
 
-void BulletSpawner2D::connect_graze_zones(bool connect) {
-	const Callable on_changed = callable_mp(this, &BulletSpawner2D::_on_graze_zone_changed);
+void PatternSpawner2D::connect_graze_zones(bool connect) {
+	const Callable on_changed = callable_mp(this, &PatternSpawner2D::_on_graze_zone_changed);
 	const StringName changed("changed");
 	for (int i = 0; i < graze_zones.size(); ++i) {
 		Ref<BulletGrazeZone2D> zone = graze_zones[i];
@@ -318,12 +318,12 @@ void BulletSpawner2D::connect_graze_zones(bool connect) {
 	}
 }
 
-void BulletSpawner2D::_on_graze_zone_changed() {
+void PatternSpawner2D::_on_graze_zone_changed() {
 	on_config_changed();
 	refresh_graze_preview();
 }
 
-void BulletSpawner2D::apply_volley_graze(BulletVolley2D *volley) {
+void PatternSpawner2D::apply_volley_graze(BulletVolley2D *volley) {
 	if (volley == nullptr || !graze_enabled || graze_zones.is_empty()) {
 		return;
 	}
@@ -336,7 +336,7 @@ void BulletSpawner2D::apply_volley_graze(BulletVolley2D *volley) {
 	}
 }
 
-int BulletSpawner2D::graze_live_volleys() {
+int PatternSpawner2D::graze_live_volleys() {
 	BulletFactory2D *factory = get_bullet_factory();
 	if (factory == nullptr) {
 		return 0;
@@ -364,7 +364,7 @@ int BulletSpawner2D::graze_live_volleys() {
 	return changed;
 }
 
-Array BulletSpawner2D::spawner_graze_zones(bool &r_any) {
+Array PatternSpawner2D::spawner_graze_zones(bool &r_any) {
 	// The setter guarantees at most 4 zones or nulls; a script that mutated
 	// the array in place (append) is caught here: the usable entries arm,
 	// the rest is reported once.
@@ -388,7 +388,7 @@ Array BulletSpawner2D::spawner_graze_zones(bool &r_any) {
 	return zones;
 }
 
-Array BulletSpawner2D::resolve_graze_targets() const {
+Array PatternSpawner2D::resolve_graze_targets() const {
 	Array out;
 	collect_graze_targets(graze_targets_scratch);
 	for (const GrazeTarget2D &target : graze_targets_scratch) {
@@ -400,14 +400,14 @@ Array BulletSpawner2D::resolve_graze_targets() const {
 
 // ---- Ring preview --------------------------------------------------------
 
-bool BulletSpawner2D::graze_preview_active() const {
+bool PatternSpawner2D::graze_preview_active() const {
 	if (!graze_enabled || !graze_show_preview || !is_inside_tree()) {
 		return false;
 	}
 	return Engine::get_singleton()->is_editor_hint() || graze_preview_during_runtime;
 }
 
-GrazePreviewLayer2D *BulletSpawner2D::resolve_graze_preview_layer(bool create) {
+GrazePreviewLayer2D *PatternSpawner2D::resolve_graze_preview_layer(bool create) {
 	if (is_tracked_node_alive(graze_preview_layer, graze_preview_layer_id) && graze_preview_layer->get_parent() == this) {
 		return graze_preview_layer;
 	}
@@ -441,7 +441,7 @@ GrazePreviewLayer2D *BulletSpawner2D::resolve_graze_preview_layer(bool create) {
 	return layer;
 }
 
-void BulletSpawner2D::refresh_graze_preview() {
+void PatternSpawner2D::refresh_graze_preview() {
 	if (!is_inside_tree()) {
 		return;
 	}
@@ -474,7 +474,7 @@ void BulletSpawner2D::refresh_graze_preview() {
 	layer->set_circles(graze_preview_scratch, (float)graze_preview_line_width);
 }
 
-Array BulletSpawner2D::debug_get_graze_preview_circles() const {
+Array PatternSpawner2D::debug_get_graze_preview_circles() const {
 	Array out;
 	if (!is_tracked_node_alive(graze_preview_layer, graze_preview_layer_id) || !graze_preview_layer->is_visible()) {
 		return out;
@@ -492,7 +492,7 @@ Array BulletSpawner2D::debug_get_graze_preview_circles() const {
 	return out;
 }
 
-Dictionary BulletSpawner2D::debug_get_graze_preview_stats() const {
+Dictionary PatternSpawner2D::debug_get_graze_preview_stats() const {
 	const bool alive = is_tracked_node_alive(graze_preview_layer, graze_preview_layer_id);
 	Dictionary d;
 	d["active"] = graze_preview_active();
@@ -502,7 +502,7 @@ Dictionary BulletSpawner2D::debug_get_graze_preview_stats() const {
 	return d;
 }
 
-Dictionary BulletSpawner2D::debug_get_graze_detector_stats() const {
+Dictionary PatternSpawner2D::debug_get_graze_detector_stats() const {
 	const GrazeDetector2D &detector = graze_detector_ref();
 	Dictionary d;
 	d["scans"] = (int64_t)detector.scans;

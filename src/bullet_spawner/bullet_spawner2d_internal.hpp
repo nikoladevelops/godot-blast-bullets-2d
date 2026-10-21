@@ -134,7 +134,7 @@ static constexpr float kFirstDotRadiusScale = 1.6f; // bullet-0 emphasis marker
 // (patterns/pattern_registry2d.hpp): names, ids, knob prefixes and shape
 // capabilities come from that one table. These wrappers keep the spawner's
 // historical call sites typed on its enum.
-static inline const char *pattern_source_name(BulletSpawner2D::PatternSource source) {
+static inline const char *pattern_source_name(PatternSpawner2D::PatternSource source) {
 	return pattern_shape_name2d((int)source);
 }
 
@@ -145,7 +145,7 @@ static inline String pattern_source_hint() {
 // Corner-anchored polygon loops: the only shapes with shared corner dots
 // (rectangle, square, polygon, triangle, trapezoid, diamond, star). Corner
 // priority/mode/margin/facing knobs show for these only.
-static inline bool supports_corner_layout(BulletSpawner2D::PatternSource source) {
+static inline bool supports_corner_layout(PatternSpawner2D::PatternSource source) {
 	return pattern_shape_supports_corners2d((int)source);
 }
 

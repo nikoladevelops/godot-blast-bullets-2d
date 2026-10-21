@@ -39,10 +39,14 @@ func before_each() -> void:
 	make_area(Vector2(0, -30), Vector2(60, 10), 16) # area bounces
 
 
+## The signals a plugin class and its plugin bases declare.
 func _signal_names(cls: String) -> Array:
 	var out: Array = []
-	for s in ClassDB.class_get_signal_list(cls, true):
-		out.append(str(s.name))
+	var c := StringName(cls)
+	while c != &"" and ClassDB.class_get_api_type(c) == ClassDB.API_EXTENSION:
+		for s in ClassDB.class_get_signal_list(c, true):
+			out.append(str(s.name))
+		c = ClassDB.get_parent_class(c)
 	out.sort()
 	return out
 

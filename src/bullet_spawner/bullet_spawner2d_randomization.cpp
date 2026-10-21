@@ -40,7 +40,7 @@ inline double lerp_range(double a, double b, double t) {
 // ---- Setters: finite / range only, never against the other end of a pair ----
 
 #define BLAST_RANDOM_SETTER(NAME, CONDITION, TEXT)                                                                          \
-	void BulletSpawner2D::set_##NAME(double value) {                                                                        \
+	void PatternSpawner2D::set_##NAME(double value) {                                                                       \
 		if (!Math::is_finite(value) || !(CONDITION)) {                                                                      \
 			UtilityFunctions::push_error("BulletSpawner2D: " #NAME " must be finite and " TEXT ", keeping the old value."); \
 			return;                                                                                                         \
@@ -64,7 +64,7 @@ BLAST_RANDOM_SETTER(telegraph_max_sec, is_finite_real2d(value) && value >= 0.0, 
 
 #undef BLAST_RANDOM_SETTER
 
-void BulletSpawner2D::set_bullet_scale_mode(BulletScaleMode value) {
+void PatternSpawner2D::set_bullet_scale_mode(BulletScaleMode value) {
 	if (value < BULLET_SCALE_OFF || value > BULLET_SCALE_PER_AXIS) {
 		UtilityFunctions::push_error("BulletSpawner2D: bullet_scale_mode must be 0 (Off), 1 (Uniform) or 2 (Per Axis), keeping the old value.");
 		return;
@@ -77,7 +77,7 @@ static bool scale_xy_ok(const Vector2 &v) {
 	return Math::is_finite(v.x) && Math::is_finite(v.y) && v.x > 0.0 && v.y > 0.0;
 }
 
-void BulletSpawner2D::set_bullet_scale_min_xy(const Vector2 &value) {
+void PatternSpawner2D::set_bullet_scale_min_xy(const Vector2 &value) {
 	if (!scale_xy_ok(value)) {
 		UtilityFunctions::push_error("BulletSpawner2D: bullet_scale_min_xy must be finite with both components > 0, keeping the old value.");
 		return;
@@ -85,7 +85,7 @@ void BulletSpawner2D::set_bullet_scale_min_xy(const Vector2 &value) {
 	bullet_scale_min_xy = value;
 }
 
-void BulletSpawner2D::set_bullet_scale_max_xy(const Vector2 &value) {
+void PatternSpawner2D::set_bullet_scale_max_xy(const Vector2 &value) {
 	if (!scale_xy_ok(value)) {
 		UtilityFunctions::push_error("BulletSpawner2D: bullet_scale_max_xy must be finite with both components > 0, keeping the old value.");
 		return;
@@ -93,7 +93,7 @@ void BulletSpawner2D::set_bullet_scale_max_xy(const Vector2 &value) {
 	bullet_scale_max_xy = value;
 }
 
-Array BulletSpawner2D::convert_live_bullets_to_pickups(const Ref<BulletPickupData2D> &pickup, const Variant &target) {
+Array PatternSpawner2D::convert_live_bullets_to_pickups(const Ref<BulletPickupData2D> &pickup, const Variant &target) {
 	BulletFactory2D *factory = get_bullet_factory();
 	if (factory == nullptr) {
 		UtilityFunctions::push_error("BulletSpawner2D.convert_live_bullets_to_pickups: the spawner has no BulletFactory2D, nothing converted.");
@@ -110,7 +110,7 @@ Array BulletSpawner2D::convert_live_bullets_to_pickups(const Ref<BulletPickupDat
 // [0, 1). Seeded: a pure function of (seed, shots fired, channel, index), no
 // state and no allocation. Unseeded: Godot's global RNG, so a game's seed()
 // still reproduces it.
-double BulletSpawner2D::roll_unit(uint32_t channel, uint64_t index) const {
+double PatternSpawner2D::roll_unit(uint32_t channel, uint64_t index) const {
 	if (bullet_random_seed == 0) {
 		return UtilityFunctions::randf();
 	}
@@ -120,11 +120,11 @@ double BulletSpawner2D::roll_unit(uint32_t channel, uint64_t index) const {
 	return (double)(h >> 11) * (1.0 / 9007199254740992.0);
 }
 
-bool BulletSpawner2D::randomization_active() const {
+bool PatternSpawner2D::randomization_active() const {
 	return bullet_scale_mode != BULLET_SCALE_OFF || bullet_rotation_min_degrees != 0.0 || bullet_rotation_max_degrees != 0.0 || bullet_position_jitter_max > 0.0 || bullet_position_jitter_min > 0.0 || bullet_speed_scale_min != 1.0 || bullet_speed_scale_max != 1.0;
 }
 
-void BulletSpawner2D::randomize_shot_transforms(std::vector<Transform2D> &transforms) {
+void PatternSpawner2D::randomize_shot_transforms(std::vector<Transform2D> &transforms) {
 	const bool scale_uniform = bullet_scale_mode == BULLET_SCALE_UNIFORM;
 	const bool scale_axes = bullet_scale_mode == BULLET_SCALE_PER_AXIS;
 	const bool rotate = bullet_rotation_min_degrees != 0.0 || bullet_rotation_max_degrees != 0.0;
@@ -163,7 +163,7 @@ void BulletSpawner2D::randomize_shot_transforms(std::vector<Transform2D> &transf
 	}
 }
 
-void BulletSpawner2D::roll_speed_factors(size_t count) {
+void PatternSpawner2D::roll_speed_factors(size_t count) {
 	shot_speed_factors.clear();
 	if (bullet_speed_scale_min == 1.0 && bullet_speed_scale_max == 1.0) {
 		return;
@@ -176,7 +176,7 @@ void BulletSpawner2D::roll_speed_factors(size_t count) {
 
 // ---- Timing ranges --------------------------------------------------------------------
 
-double BulletSpawner2D::roll_timing_range(double base, double max_value, uint64_t channel) const {
+double PatternSpawner2D::roll_timing_range(double base, double max_value, uint64_t channel) const {
 	if (!Math::is_finite(max_value) || !(max_value > base)) {
 		return base;
 	}
@@ -198,17 +198,17 @@ double BulletSpawner2D::roll_timing_range(double base, double max_value, uint64_
 	return rng->randf_range(base, max_value);
 }
 
-double BulletSpawner2D::next_burst_interval_sec() const {
+double PatternSpawner2D::next_burst_interval_sec() const {
 	return roll_timing_range(burst_interval_sec, burst_interval_max_sec, 2);
 }
 
-double BulletSpawner2D::next_telegraph_sec() const {
+double PatternSpawner2D::next_telegraph_sec() const {
 	return roll_timing_range(telegraph_sec, telegraph_max_sec, 3);
 }
 
 // ---- Spin start phase -----------------------------------------------------------------
 
-void BulletSpawner2D::roll_spin_start_phase() {
+void PatternSpawner2D::roll_spin_start_phase() {
 	const double unit = roll_unit(CHANNEL_SPIN, 0);
 	if (spin_mode == SPIN_OSCILLATE) {
 		if (spin_frequency_hz > 0.0 && Math::is_finite(spin_frequency_hz)) {

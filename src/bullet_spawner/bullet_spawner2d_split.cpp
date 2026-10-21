@@ -10,11 +10,11 @@ using namespace godot;
 
 namespace BlastBullets2D {
 
-bool BulletSpawner2D::get_split_enabled() const {
+bool PatternSpawner2D::get_split_enabled() const {
 	return split_enabled;
 }
 
-void BulletSpawner2D::set_split_enabled(bool value) {
+void PatternSpawner2D::set_split_enabled(bool value) {
 	if (split_enabled == value) {
 		return;
 	}
@@ -24,11 +24,11 @@ void BulletSpawner2D::set_split_enabled(bool value) {
 	notify_property_list_changed();
 }
 
-Ref<BulletSplitData2D> BulletSpawner2D::get_split_data() const {
+Ref<BulletSplitData2D> PatternSpawner2D::get_split_data() const {
 	return split_data;
 }
 
-void BulletSpawner2D::set_split_data(const Ref<BulletSplitData2D> &value) {
+void PatternSpawner2D::set_split_data(const Ref<BulletSplitData2D> &value) {
 	if (split_data == value) {
 		return;
 	}
@@ -39,11 +39,11 @@ void BulletSpawner2D::set_split_data(const Ref<BulletSplitData2D> &value) {
 	on_config_changed();
 }
 
-void BulletSpawner2D::connect_split_data(bool connect) {
+void PatternSpawner2D::connect_split_data(bool connect) {
 	if (split_data.is_null()) {
 		return;
 	}
-	const Callable on_changed = callable_mp(this, &BulletSpawner2D::_on_split_data_changed);
+	const Callable on_changed = callable_mp(this, &PatternSpawner2D::_on_split_data_changed);
 	const StringName changed("changed");
 	const bool connected = split_data->is_connected(changed, on_changed);
 	if (connect && !connected) {
@@ -53,11 +53,11 @@ void BulletSpawner2D::connect_split_data(bool connect) {
 	}
 }
 
-void BulletSpawner2D::_on_split_data_changed() {
+void PatternSpawner2D::_on_split_data_changed() {
 	on_config_changed();
 }
 
-void BulletSpawner2D::apply_split_config() {
+void PatternSpawner2D::apply_split_config() {
 	if (split_shared == nullptr) {
 		return; // nothing armed yet: the first arm copies the settings
 	}
@@ -65,7 +65,7 @@ void BulletSpawner2D::apply_split_config() {
 	split_shared->enabled = split_enabled;
 }
 
-void BulletSpawner2D::apply_volley_split(BulletVolley2D *volley, const Ref<BulletVolleyData2D> &spawn_data) {
+void PatternSpawner2D::apply_volley_split(BulletVolley2D *volley, const Ref<BulletVolleyData2D> &spawn_data) {
 	if (volley == nullptr || !split_enabled || split_data.is_null() || spawn_data.is_null()) {
 		return;
 	}
@@ -77,7 +77,7 @@ void BulletSpawner2D::apply_volley_split(BulletVolley2D *volley, const Ref<Bulle
 	volley->split_arm(split_shared, spawn_data, 0, (uint64_t)volleys_fired + 1);
 }
 
-bool BulletSpawner2D::split_configure_child_homing(BulletVolley2D *child) {
+bool PatternSpawner2D::split_configure_child_homing(BulletVolley2D *child) {
 	if (child == nullptr || !homing_enabled) {
 		return false;
 	}

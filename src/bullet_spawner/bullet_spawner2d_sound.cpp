@@ -12,21 +12,21 @@ using namespace godot;
 
 namespace BlastBullets2D {
 
-bool BulletSpawner2D::get_sound_enabled() const {
+bool PatternSpawner2D::get_sound_enabled() const {
 	return sound_enabled;
 }
 
-void BulletSpawner2D::set_sound_enabled(bool value) {
+void PatternSpawner2D::set_sound_enabled(bool value) {
 	sound_enabled = value;
 	on_config_changed();
 	notify_property_list_changed();
 }
 
-Array BulletSpawner2D::get_sound_effects() const {
+Array PatternSpawner2D::get_sound_effects() const {
 	return sound_effects;
 }
 
-void BulletSpawner2D::set_sound_effects(const Array &value) {
+void PatternSpawner2D::set_sound_effects(const Array &value) {
 	for (int i = 0; i < value.size(); ++i) {
 		const Variant &entry = value[i];
 		if (entry.get_type() == Variant::NIL) {
@@ -42,11 +42,11 @@ void BulletSpawner2D::set_sound_effects(const Array &value) {
 	on_config_changed();
 }
 
-double BulletSpawner2D::get_sound_volume_db() const {
+double PatternSpawner2D::get_sound_volume_db() const {
 	return sound_volume_db;
 }
 
-void BulletSpawner2D::set_sound_volume_db(double value) {
+void PatternSpawner2D::set_sound_volume_db(double value) {
 	if (!is_finite_real2d(value) || value < -80.0 || value > 24.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: sound_volume_db must be finite and between -80 and 24, keeping the old value.");
 		return;
@@ -55,11 +55,11 @@ void BulletSpawner2D::set_sound_volume_db(double value) {
 	on_config_changed();
 }
 
-BulletSpawner2D::SoundListenerSource BulletSpawner2D::get_sound_listener_source() const {
+PatternSpawner2D::SoundListenerSource PatternSpawner2D::get_sound_listener_source() const {
 	return sound_listener_source;
 }
 
-void BulletSpawner2D::set_sound_listener_source(SoundListenerSource value) {
+void PatternSpawner2D::set_sound_listener_source(SoundListenerSource value) {
 	if (value < SOUND_LISTENER_GODOT_LISTENER || value > SOUND_LISTENER_GLOBAL_POSITIONS) {
 		UtilityFunctions::push_error("BulletSpawner2D: invalid sound_listener_source, keeping the old value.");
 		return;
@@ -69,29 +69,29 @@ void BulletSpawner2D::set_sound_listener_source(SoundListenerSource value) {
 	apply_sound_detector_config();
 }
 
-StringName BulletSpawner2D::get_sound_listener_node_group() const {
+StringName PatternSpawner2D::get_sound_listener_node_group() const {
 	return sound_listener_node_group;
 }
 
-void BulletSpawner2D::set_sound_listener_node_group(const StringName &value) {
+void PatternSpawner2D::set_sound_listener_node_group(const StringName &value) {
 	sound_listener_node_group = value;
 	apply_sound_detector_config();
 }
 
-StringName BulletSpawner2D::get_sound_listener_filter_group() const {
+StringName PatternSpawner2D::get_sound_listener_filter_group() const {
 	return sound_listener_filter_group;
 }
 
-void BulletSpawner2D::set_sound_listener_filter_group(const StringName &value) {
+void PatternSpawner2D::set_sound_listener_filter_group(const StringName &value) {
 	sound_listener_filter_group = value;
 	apply_sound_detector_config();
 }
 
-NodePath BulletSpawner2D::get_sound_listener_path() const {
+NodePath PatternSpawner2D::get_sound_listener_path() const {
 	return sound_listener_path;
 }
 
-void BulletSpawner2D::set_sound_listener_path(const NodePath &p_path) {
+void PatternSpawner2D::set_sound_listener_path(const NodePath &p_path) {
 	if (!node_path_type_ok<Node2D>(this, p_path, "sound_listener_path", "Node2D")) {
 		return;
 	}
@@ -99,20 +99,20 @@ void BulletSpawner2D::set_sound_listener_path(const NodePath &p_path) {
 	apply_sound_detector_config();
 }
 
-String BulletSpawner2D::get_sound_listener_node_name() const {
+String PatternSpawner2D::get_sound_listener_node_name() const {
 	return sound_listener_node_name;
 }
 
-void BulletSpawner2D::set_sound_listener_node_name(const String &value) {
+void PatternSpawner2D::set_sound_listener_node_name(const String &value) {
 	sound_listener_node_name = value;
 	apply_sound_detector_config();
 }
 
-BulletSpawner2D::HomingNodeNameMatch BulletSpawner2D::get_sound_listener_node_name_match_mode() const {
+PatternSpawner2D::HomingNodeNameMatch PatternSpawner2D::get_sound_listener_node_name_match_mode() const {
 	return sound_listener_node_name_match_mode;
 }
 
-void BulletSpawner2D::set_sound_listener_node_name_match_mode(HomingNodeNameMatch value) {
+void PatternSpawner2D::set_sound_listener_node_name_match_mode(HomingNodeNameMatch value) {
 	if (value < HOMING_NAME_MATCH_EXACT || value > HOMING_NAME_MATCH_ENDS_WITH) {
 		UtilityFunctions::push_error("BulletSpawner2D: invalid sound_listener_node_name_match_mode, keeping the old value.");
 		return;
@@ -121,38 +121,38 @@ void BulletSpawner2D::set_sound_listener_node_name_match_mode(HomingNodeNameMatc
 	apply_sound_detector_config();
 }
 
-bool BulletSpawner2D::get_sound_listener_node_name_case_sensitive() const {
+bool PatternSpawner2D::get_sound_listener_node_name_case_sensitive() const {
 	return sound_listener_node_name_case_sensitive;
 }
 
-void BulletSpawner2D::set_sound_listener_node_name_case_sensitive(bool value) {
+void PatternSpawner2D::set_sound_listener_node_name_case_sensitive(bool value) {
 	sound_listener_node_name_case_sensitive = value;
 	apply_sound_detector_config();
 }
 
-NodePath BulletSpawner2D::get_sound_listener_children_parent_path() const {
+NodePath PatternSpawner2D::get_sound_listener_children_parent_path() const {
 	return sound_listener_children_parent_path;
 }
 
-void BulletSpawner2D::set_sound_listener_children_parent_path(const NodePath &p_path) {
+void PatternSpawner2D::set_sound_listener_children_parent_path(const NodePath &p_path) {
 	sound_listener_children_parent_path = p_path;
 	apply_sound_detector_config();
 }
 
-bool BulletSpawner2D::get_sound_listener_children_recursive() const {
+bool PatternSpawner2D::get_sound_listener_children_recursive() const {
 	return sound_listener_children_recursive;
 }
 
-void BulletSpawner2D::set_sound_listener_children_recursive(bool value) {
+void PatternSpawner2D::set_sound_listener_children_recursive(bool value) {
 	sound_listener_children_recursive = value;
 	apply_sound_detector_config();
 }
 
-PackedVector2Array BulletSpawner2D::get_sound_listener_global_positions() const {
+PackedVector2Array PatternSpawner2D::get_sound_listener_global_positions() const {
 	return sound_listener_global_positions;
 }
 
-void BulletSpawner2D::set_sound_listener_global_positions(const PackedVector2Array &value) {
+void PatternSpawner2D::set_sound_listener_global_positions(const PackedVector2Array &value) {
 	for (int i = 0; i < value.size(); ++i) {
 		if (!value[i].is_finite()) {
 			UtilityFunctions::push_error("BulletSpawner2D: sound_listener_global_positions must hold finite positions only, keeping the old value.");
@@ -163,11 +163,11 @@ void BulletSpawner2D::set_sound_listener_global_positions(const PackedVector2Arr
 	apply_sound_detector_config();
 }
 
-double BulletSpawner2D::get_sound_listener_update_interval() const {
+double PatternSpawner2D::get_sound_listener_update_interval() const {
 	return sound_listener_update_interval;
 }
 
-void BulletSpawner2D::set_sound_listener_update_interval(double value) {
+void PatternSpawner2D::set_sound_listener_update_interval(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: sound_listener_update_interval must be finite and >= 0 (0 scans every tick), keeping the old value.");
 		return;
@@ -176,7 +176,7 @@ void BulletSpawner2D::set_sound_listener_update_interval(double value) {
 	apply_sound_detector_config();
 }
 
-std::shared_ptr<GrazeDetector2D> BulletSpawner2D::sound_detector_ref() const {
+std::shared_ptr<GrazeDetector2D> PatternSpawner2D::sound_detector_ref() const {
 	if (sound_detector == nullptr) {
 		// Plain creation: callers may be mid shot, so nothing else may run
 		// from here. Never std::make_shared (GNU unique symbol pins the
@@ -187,7 +187,7 @@ std::shared_ptr<GrazeDetector2D> BulletSpawner2D::sound_detector_ref() const {
 	return sound_detector;
 }
 
-GrazeDetector2D::Config BulletSpawner2D::sound_detector_config() const {
+GrazeDetector2D::Config PatternSpawner2D::sound_detector_config() const {
 	GrazeDetector2D::Config config;
 	// Godot's own listener needs no scan: an empty node group finds nobody
 	// and the mixer falls back to Godot's listener.
@@ -209,12 +209,12 @@ GrazeDetector2D::Config BulletSpawner2D::sound_detector_config() const {
 	return config;
 }
 
-void BulletSpawner2D::apply_sound_detector_config() {
+void PatternSpawner2D::apply_sound_detector_config() {
 	sound_detector_ref()->set_config(sound_detector_config());
 	on_config_changed();
 }
 
-void BulletSpawner2D::collect_sound_listeners(std::vector<GrazeTarget2D> &r_targets) const {
+void PatternSpawner2D::collect_sound_listeners(std::vector<GrazeTarget2D> &r_targets) const {
 	r_targets.clear();
 	if (!is_inside_tree()) {
 		return;
@@ -251,7 +251,7 @@ void BulletSpawner2D::collect_sound_listeners(std::vector<GrazeTarget2D> &r_targ
 	detector->collect_now(get_tree(), world.ptr(), mouse_space, r_targets);
 }
 
-int BulletSpawner2D::refresh_sound_listeners() {
+int PatternSpawner2D::refresh_sound_listeners() {
 	if (!is_inside_tree()) {
 		UtilityFunctions::push_error("BulletSpawner2D.refresh_sound_listeners: spawner is outside the scene tree, nothing refreshed.");
 		return 0;
@@ -267,7 +267,7 @@ int BulletSpawner2D::refresh_sound_listeners() {
 	return (int)sound_listeners_scratch.size();
 }
 
-void BulletSpawner2D::apply_volley_sound(BulletVolley2D *volley) {
+void PatternSpawner2D::apply_volley_sound(BulletVolley2D *volley) {
 	if (volley == nullptr || !sound_enabled || sound_effects.is_empty()) {
 		return;
 	}
@@ -281,7 +281,7 @@ void BulletSpawner2D::apply_volley_sound(BulletVolley2D *volley) {
 	}
 }
 
-int BulletSpawner2D::sound_live_volleys() {
+int PatternSpawner2D::sound_live_volleys() {
 	BulletFactory2D *factory = get_bullet_factory();
 	if (factory == nullptr) {
 		return 0;
@@ -307,7 +307,7 @@ int BulletSpawner2D::sound_live_volleys() {
 	return changed;
 }
 
-Array BulletSpawner2D::spawner_sound_entries(bool &r_any) {
+Array PatternSpawner2D::spawner_sound_entries(bool &r_any) {
 	// The setter guarantees sound entries or nulls; a script that mutated
 	// the array in place is caught here: the usable entries arm, the rest
 	// is reported once.
@@ -331,7 +331,7 @@ Array BulletSpawner2D::spawner_sound_entries(bool &r_any) {
 	return entries;
 }
 
-void BulletSpawner2D::fire_spawner_sound(int trigger, int volley_amount) {
+void PatternSpawner2D::fire_spawner_sound(int trigger, int volley_amount) {
 	if (!sound_enabled || sound_effects.is_empty()) {
 		return;
 	}
@@ -355,7 +355,7 @@ void BulletSpawner2D::fire_spawner_sound(int trigger, int volley_amount) {
 	}
 }
 
-Array BulletSpawner2D::resolve_sound_listeners() const {
+Array PatternSpawner2D::resolve_sound_listeners() const {
 	Array out;
 	collect_sound_listeners(sound_listeners_scratch);
 	for (const GrazeTarget2D &target : sound_listeners_scratch) {
@@ -365,7 +365,7 @@ Array BulletSpawner2D::resolve_sound_listeners() const {
 	return out;
 }
 
-Dictionary BulletSpawner2D::debug_get_sound_detector_stats() const {
+Dictionary PatternSpawner2D::debug_get_sound_detector_stats() const {
 	std::shared_ptr<GrazeDetector2D> detector = sound_detector_ref();
 	Dictionary d;
 	d["scans"] = (int64_t)detector->scans;
@@ -374,7 +374,7 @@ Dictionary BulletSpawner2D::debug_get_sound_detector_stats() const {
 	return d;
 }
 
-void BulletSpawner2D::preview_sound_effect(int index) {
+void PatternSpawner2D::preview_sound_effect(int index) {
 	if (index < 0 || index >= sound_effects.size()) {
 		UtilityFunctions::push_error("BulletSpawner2D.preview_sound_effect: index " + String::num_int64(index) + " out of range (sound_effects holds " + String::num_int64(sound_effects.size()) + "), nothing plays.");
 		return;

@@ -36,9 +36,9 @@ struct HomingCandidatePass {
 	HomingCandidatePass &operator=(const HomingCandidatePass &) = delete;
 };
 
-double BulletSpawner2D::get_homing_delay_sec() const { return homing_delay_sec; }
+double PatternSpawner2D::get_homing_delay_sec() const { return homing_delay_sec; }
 
-void BulletSpawner2D::set_homing_delay_sec(double value) {
+void PatternSpawner2D::set_homing_delay_sec(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: homing_delay_sec must be finite and >= 0, keeping the old value.");
 		return;
@@ -46,9 +46,9 @@ void BulletSpawner2D::set_homing_delay_sec(double value) {
 	homing_delay_sec = value;
 }
 
-double BulletSpawner2D::get_homing_duration_sec() const { return homing_duration_sec; }
+double PatternSpawner2D::get_homing_duration_sec() const { return homing_duration_sec; }
 
-void BulletSpawner2D::set_homing_duration_sec(double value) {
+void PatternSpawner2D::set_homing_duration_sec(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: homing_duration_sec must be finite and >= 0 (0 = infinite), keeping the old value.");
 		return;
@@ -56,9 +56,9 @@ void BulletSpawner2D::set_homing_duration_sec(double value) {
 	homing_duration_sec = value;
 }
 
-double BulletSpawner2D::get_homing_lose_range_px() const { return homing_lose_range_px; }
+double PatternSpawner2D::get_homing_lose_range_px() const { return homing_lose_range_px; }
 
-void BulletSpawner2D::set_homing_lose_range_px(double value) {
+void PatternSpawner2D::set_homing_lose_range_px(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: homing_lose_range_px must be finite and >= 0 (0 = unlimited), keeping the old value.");
 		return;
@@ -66,9 +66,9 @@ void BulletSpawner2D::set_homing_lose_range_px(double value) {
 	homing_lose_range_px = value;
 }
 
-double BulletSpawner2D::get_homing_fire_arc_deg() const { return homing_fire_arc_deg; }
+double PatternSpawner2D::get_homing_fire_arc_deg() const { return homing_fire_arc_deg; }
 
-void BulletSpawner2D::set_homing_fire_arc_deg(double value) {
+void PatternSpawner2D::set_homing_fire_arc_deg(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: homing_fire_arc_deg must be finite and >= 0 (0 = omnidirectional), keeping the old value.");
 		return;
@@ -76,11 +76,11 @@ void BulletSpawner2D::set_homing_fire_arc_deg(double value) {
 	homing_fire_arc_deg = value;
 }
 
-int BulletSpawner2D::get_homing_random_seed() const {
+int PatternSpawner2D::get_homing_random_seed() const {
 	return homing_random_seed;
 }
 
-void BulletSpawner2D::set_homing_random_seed(int value) {
+void PatternSpawner2D::set_homing_random_seed(int value) {
 	if (value < 0) {
 		UtilityFunctions::push_error("BulletSpawner2D: homing_random_seed must be >= 0 (0 = non-deterministic), keeping the old value.");
 		return;
@@ -91,11 +91,11 @@ void BulletSpawner2D::set_homing_random_seed(int value) {
 	homing_rng = Ref<RandomNumberGenerator>();
 }
 
-double BulletSpawner2D::get_homing_retarget_phase() const {
+double PatternSpawner2D::get_homing_retarget_phase() const {
 	return homing_retarget_phase;
 }
 
-void BulletSpawner2D::set_homing_retarget_phase(double value) {
+void PatternSpawner2D::set_homing_retarget_phase(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: homing_retarget_phase must be finite and >= 0, keeping the old value.");
 		return;
@@ -110,11 +110,11 @@ void BulletSpawner2D::set_homing_retarget_phase(double value) {
 
 // HOMING + ORBITING (EASY API)
 
-bool BulletSpawner2D::get_homing_enabled() const {
+bool PatternSpawner2D::get_homing_enabled() const {
 	return homing_enabled;
 }
 
-void BulletSpawner2D::set_homing_enabled(bool value) {
+void PatternSpawner2D::set_homing_enabled(bool value) {
 	on_config_changed();
 	const bool was_active = homing_retarget_active();
 	homing_enabled = value;
@@ -122,11 +122,11 @@ void BulletSpawner2D::set_homing_enabled(bool value) {
 	update_homing_process_state(!was_active);
 }
 
-BulletSpawner2D::HomingMode BulletSpawner2D::get_homing_mode() const {
+PatternSpawner2D::HomingMode PatternSpawner2D::get_homing_mode() const {
 	return homing_mode;
 }
 
-void BulletSpawner2D::set_homing_mode(HomingMode value) {
+void PatternSpawner2D::set_homing_mode(HomingMode value) {
 	if (value != HOMING_SHARED && value != HOMING_PER_BULLET) {
 		UtilityFunctions::push_error("BulletSpawner2D: invalid homing_mode, keeping the old value.");
 		return;
@@ -135,11 +135,11 @@ void BulletSpawner2D::set_homing_mode(HomingMode value) {
 	notify_property_list_changed();
 }
 
-BulletSpawner2D::HomingTargetSource BulletSpawner2D::get_homing_target_source() const {
+PatternSpawner2D::HomingTargetSource PatternSpawner2D::get_homing_target_source() const {
 	return homing_target_source;
 }
 
-void BulletSpawner2D::set_homing_target_source(HomingTargetSource value) {
+void PatternSpawner2D::set_homing_target_source(HomingTargetSource value) {
 	if (value < HOMING_SOURCE_NODE_GROUP || value > HOMING_SOURCE_NODE_CHILDREN) {
 		UtilityFunctions::push_error("BulletSpawner2D: invalid homing_target_source, keeping the old value.");
 		return;
@@ -150,30 +150,30 @@ void BulletSpawner2D::set_homing_target_source(HomingTargetSource value) {
 	notify_property_list_changed();
 }
 
-StringName BulletSpawner2D::get_homing_node_group() const {
+StringName PatternSpawner2D::get_homing_node_group() const {
 	return homing_node_group;
 }
 
-void BulletSpawner2D::set_homing_node_group(const StringName &value) {
+void PatternSpawner2D::set_homing_node_group(const StringName &value) {
 	homing_node_group = value;
 	clear_empty_homing_targets_warning();
 	on_config_changed();
 }
 
-StringName BulletSpawner2D::get_homing_filter_group() const {
+StringName PatternSpawner2D::get_homing_filter_group() const {
 	return homing_filter_group;
 }
 
-void BulletSpawner2D::set_homing_filter_group(const StringName &value) {
+void PatternSpawner2D::set_homing_filter_group(const StringName &value) {
 	homing_filter_group = value;
 	clear_empty_homing_targets_warning();
 }
 
-BulletSpawner2D::HomingTargetSelection BulletSpawner2D::get_homing_target_selection() const {
+PatternSpawner2D::HomingTargetSelection PatternSpawner2D::get_homing_target_selection() const {
 	return homing_target_selection;
 }
 
-void BulletSpawner2D::set_homing_target_selection(HomingTargetSelection value) {
+void PatternSpawner2D::set_homing_target_selection(HomingTargetSelection value) {
 	if (value < HOMING_SELECT_NEAREST || value > HOMING_SELECT_DISTRIBUTE) {
 		UtilityFunctions::push_error("BulletSpawner2D: invalid homing_target_selection, keeping the old value.");
 		return;
@@ -182,11 +182,11 @@ void BulletSpawner2D::set_homing_target_selection(HomingTargetSelection value) {
 	notify_property_list_changed();
 }
 
-int BulletSpawner2D::get_homing_max_targets() const {
+int PatternSpawner2D::get_homing_max_targets() const {
 	return homing_max_targets;
 }
 
-void BulletSpawner2D::set_homing_max_targets(int value) {
+void PatternSpawner2D::set_homing_max_targets(int value) {
 	if (value < 1) {
 		UtilityFunctions::push_error("BulletSpawner2D: homing_max_targets must be >= 1, keeping the old value.");
 		return;
@@ -194,11 +194,11 @@ void BulletSpawner2D::set_homing_max_targets(int value) {
 	homing_max_targets = value;
 }
 
-double BulletSpawner2D::get_homing_max_detection_range() const {
+double PatternSpawner2D::get_homing_max_detection_range() const {
 	return homing_max_detection_range;
 }
 
-void BulletSpawner2D::set_homing_max_detection_range(double value) {
+void PatternSpawner2D::set_homing_max_detection_range(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: homing_max_detection_range must be finite and >= 0 (0 is unlimited), keeping the old value.");
 		return;
@@ -207,11 +207,11 @@ void BulletSpawner2D::set_homing_max_detection_range(double value) {
 	clear_empty_homing_targets_warning();
 }
 
-Vector2 BulletSpawner2D::get_homing_global_position() const {
+Vector2 PatternSpawner2D::get_homing_global_position() const {
 	return homing_global_position;
 }
 
-void BulletSpawner2D::set_homing_global_position(const Vector2 &value) {
+void PatternSpawner2D::set_homing_global_position(const Vector2 &value) {
 	if (!value.is_finite()) {
 		UtilityFunctions::push_error("BulletSpawner2D: homing_global_position must be finite (NaN/Inf would poison homing), keeping the old value.");
 		return;
@@ -219,11 +219,11 @@ void BulletSpawner2D::set_homing_global_position(const Vector2 &value) {
 	homing_global_position = value;
 }
 
-NodePath BulletSpawner2D::get_homing_target_path() const {
+NodePath PatternSpawner2D::get_homing_target_path() const {
 	return homing_target_path;
 }
 
-void BulletSpawner2D::set_homing_target_path(const NodePath &p_path) {
+void PatternSpawner2D::set_homing_target_path(const NodePath &p_path) {
 	if (!node_path_type_ok<Node2D>(this, p_path, "homing_target_path", "Node2D")) {
 		return;
 	}
@@ -232,21 +232,21 @@ void BulletSpawner2D::set_homing_target_path(const NodePath &p_path) {
 	on_config_changed();
 }
 
-String BulletSpawner2D::get_homing_node_name() const {
+String PatternSpawner2D::get_homing_node_name() const {
 	return homing_node_name;
 }
 
-void BulletSpawner2D::set_homing_node_name(const String &value) {
+void PatternSpawner2D::set_homing_node_name(const String &value) {
 	homing_node_name = value;
 	clear_empty_homing_targets_warning();
 	on_config_changed();
 }
 
-BulletSpawner2D::HomingNodeNameMatch BulletSpawner2D::get_homing_node_name_match_mode() const {
+PatternSpawner2D::HomingNodeNameMatch PatternSpawner2D::get_homing_node_name_match_mode() const {
 	return homing_node_name_match_mode;
 }
 
-void BulletSpawner2D::set_homing_node_name_match_mode(HomingNodeNameMatch value) {
+void PatternSpawner2D::set_homing_node_name_match_mode(HomingNodeNameMatch value) {
 	if (value < HOMING_NAME_MATCH_EXACT || value > HOMING_NAME_MATCH_ENDS_WITH) {
 		UtilityFunctions::push_error("BulletSpawner2D: invalid homing_node_name_match_mode, keeping the old value.");
 		return;
@@ -255,39 +255,39 @@ void BulletSpawner2D::set_homing_node_name_match_mode(HomingNodeNameMatch value)
 	clear_empty_homing_targets_warning();
 }
 
-bool BulletSpawner2D::get_homing_node_name_case_sensitive() const {
+bool PatternSpawner2D::get_homing_node_name_case_sensitive() const {
 	return homing_node_name_case_sensitive;
 }
 
-void BulletSpawner2D::set_homing_node_name_case_sensitive(bool value) {
+void PatternSpawner2D::set_homing_node_name_case_sensitive(bool value) {
 	homing_node_name_case_sensitive = value;
 	clear_empty_homing_targets_warning();
 }
 
-NodePath BulletSpawner2D::get_homing_children_parent_path() const {
+NodePath PatternSpawner2D::get_homing_children_parent_path() const {
 	return homing_children_parent_path;
 }
 
-void BulletSpawner2D::set_homing_children_parent_path(const NodePath &p_path) {
+void PatternSpawner2D::set_homing_children_parent_path(const NodePath &p_path) {
 	homing_children_parent_path = p_path;
 	clear_empty_homing_targets_warning();
 	on_config_changed();
 }
 
-bool BulletSpawner2D::get_homing_children_recursive() const {
+bool PatternSpawner2D::get_homing_children_recursive() const {
 	return homing_children_recursive;
 }
 
-void BulletSpawner2D::set_homing_children_recursive(bool value) {
+void PatternSpawner2D::set_homing_children_recursive(bool value) {
 	homing_children_recursive = value;
 	clear_empty_homing_targets_warning();
 }
 
-double BulletSpawner2D::get_homing_smoothing() const {
+double PatternSpawner2D::get_homing_smoothing() const {
 	return homing_smoothing;
 }
 
-void BulletSpawner2D::set_homing_smoothing(double value) {
+void PatternSpawner2D::set_homing_smoothing(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: homing_smoothing must be finite and >= 0 (0 snaps instantly), keeping the old value.");
 		return;
@@ -295,11 +295,11 @@ void BulletSpawner2D::set_homing_smoothing(double value) {
 	homing_smoothing = value;
 }
 
-double BulletSpawner2D::get_homing_update_interval() const {
+double PatternSpawner2D::get_homing_update_interval() const {
 	return homing_update_interval;
 }
 
-void BulletSpawner2D::set_homing_update_interval(double value) {
+void PatternSpawner2D::set_homing_update_interval(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: homing_update_interval must be finite and >= 0 (0 refreshes every tick), keeping the old value.");
 		return;
@@ -307,11 +307,11 @@ void BulletSpawner2D::set_homing_update_interval(double value) {
 	homing_update_interval = value;
 }
 
-double BulletSpawner2D::get_homing_distance_before_reached() const {
+double PatternSpawner2D::get_homing_distance_before_reached() const {
 	return homing_distance_before_reached;
 }
 
-void BulletSpawner2D::set_homing_distance_before_reached(double value) {
+void PatternSpawner2D::set_homing_distance_before_reached(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: homing_distance_before_reached must be finite and >= 0, keeping the old value.");
 		return;
@@ -319,44 +319,44 @@ void BulletSpawner2D::set_homing_distance_before_reached(double value) {
 	homing_distance_before_reached = value;
 }
 
-bool BulletSpawner2D::get_homing_reach_counts_bullet_size() const {
+bool PatternSpawner2D::get_homing_reach_counts_bullet_size() const {
 	return homing_reach_counts_bullet_size;
 }
 
-void BulletSpawner2D::set_homing_reach_counts_bullet_size(bool value) {
+void PatternSpawner2D::set_homing_reach_counts_bullet_size(bool value) {
 	homing_reach_counts_bullet_size = value;
 }
 
-bool BulletSpawner2D::get_homing_take_control_of_texture_rotation() const {
+bool PatternSpawner2D::get_homing_take_control_of_texture_rotation() const {
 	return homing_take_control_of_texture_rotation;
 }
 
-void BulletSpawner2D::set_homing_take_control_of_texture_rotation(bool value) {
+void PatternSpawner2D::set_homing_take_control_of_texture_rotation(bool value) {
 	homing_take_control_of_texture_rotation = value;
 }
 
-bool BulletSpawner2D::get_homing_auto_pop_after_target_reached() const {
+bool PatternSpawner2D::get_homing_auto_pop_after_target_reached() const {
 	return homing_auto_pop_after_target_reached;
 }
 
-void BulletSpawner2D::set_homing_auto_pop_after_target_reached(bool value) {
+void PatternSpawner2D::set_homing_auto_pop_after_target_reached(bool value) {
 	homing_auto_pop_after_target_reached = value;
 }
 
-bool BulletSpawner2D::get_homing_per_bullet_smoothing_enabled() const {
+bool PatternSpawner2D::get_homing_per_bullet_smoothing_enabled() const {
 	return homing_per_bullet_smoothing_enabled;
 }
 
-void BulletSpawner2D::set_homing_per_bullet_smoothing_enabled(bool value) {
+void PatternSpawner2D::set_homing_per_bullet_smoothing_enabled(bool value) {
 	homing_per_bullet_smoothing_enabled = value;
 	notify_property_list_changed();
 }
 
-double BulletSpawner2D::get_homing_smoothing_start() const {
+double PatternSpawner2D::get_homing_smoothing_start() const {
 	return homing_smoothing_start;
 }
 
-void BulletSpawner2D::set_homing_smoothing_start(double value) {
+void PatternSpawner2D::set_homing_smoothing_start(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: homing_smoothing_start must be finite and >= 0, keeping the old value.");
 		return;
@@ -364,11 +364,11 @@ void BulletSpawner2D::set_homing_smoothing_start(double value) {
 	homing_smoothing_start = value;
 }
 
-double BulletSpawner2D::get_homing_smoothing_step() const {
+double PatternSpawner2D::get_homing_smoothing_step() const {
 	return homing_smoothing_step;
 }
 
-void BulletSpawner2D::set_homing_smoothing_step(double value) {
+void PatternSpawner2D::set_homing_smoothing_step(double value) {
 	// Any finite step is allowed (even negative): per-bullet results are
 	// clamped at 0 when applied, so a downward fan can never poison steering.
 	if (!is_finite_real2d(value)) {
@@ -378,11 +378,11 @@ void BulletSpawner2D::set_homing_smoothing_step(double value) {
 	homing_smoothing_step = value;
 }
 
-BulletSpawner2D::HomingRetargetMode BulletSpawner2D::get_homing_retarget_mode() const {
+PatternSpawner2D::HomingRetargetMode PatternSpawner2D::get_homing_retarget_mode() const {
 	return homing_retarget_mode;
 }
 
-void BulletSpawner2D::set_homing_retarget_mode(HomingRetargetMode value) {
+void PatternSpawner2D::set_homing_retarget_mode(HomingRetargetMode value) {
 	if (value != HOMING_RETARGET_OFF && value != HOMING_RETARGET_ON_INTERVAL) {
 		UtilityFunctions::push_error("BulletSpawner2D: invalid homing_retarget_mode, keeping the old value.");
 		return;
@@ -393,11 +393,11 @@ void BulletSpawner2D::set_homing_retarget_mode(HomingRetargetMode value) {
 	update_homing_process_state(!was_active);
 }
 
-double BulletSpawner2D::get_homing_retarget_interval_sec() const {
+double PatternSpawner2D::get_homing_retarget_interval_sec() const {
 	return homing_retarget_interval_sec;
 }
 
-void BulletSpawner2D::set_homing_retarget_interval_sec(double value) {
+void PatternSpawner2D::set_homing_retarget_interval_sec(double value) {
 	if (!is_finite_real2d(value) || !(value > 0.0)) {
 		UtilityFunctions::push_error("BulletSpawner2D: homing_retarget_interval_sec must be finite and > 0, keeping the old value.");
 		return;
@@ -412,19 +412,19 @@ void BulletSpawner2D::set_homing_retarget_interval_sec(double value) {
 	}
 }
 
-bool BulletSpawner2D::get_homing_retarget_previous_volleys() const {
+bool PatternSpawner2D::get_homing_retarget_previous_volleys() const {
 	return homing_retarget_previous_volleys;
 }
 
-void BulletSpawner2D::set_homing_retarget_previous_volleys(bool value) {
+void PatternSpawner2D::set_homing_retarget_previous_volleys(bool value) {
 	homing_retarget_previous_volleys = value;
 }
 
-bool BulletSpawner2D::get_orbiting_enabled() const {
+bool PatternSpawner2D::get_orbiting_enabled() const {
 	return orbiting_enabled;
 }
 
-void BulletSpawner2D::set_orbiting_enabled(bool value) {
+void PatternSpawner2D::set_orbiting_enabled(bool value) {
 	on_config_changed();
 	orbiting_enabled = value;
 	notify_property_list_changed();
@@ -435,11 +435,11 @@ void BulletSpawner2D::set_orbiting_enabled(bool value) {
 	}
 }
 
-double BulletSpawner2D::get_orbiting_radius() const {
+double PatternSpawner2D::get_orbiting_radius() const {
 	return orbiting_radius;
 }
 
-void BulletSpawner2D::set_orbiting_radius(double value) {
+void PatternSpawner2D::set_orbiting_radius(double value) {
 	if (!is_finite_real2d(value) || value < 0.01) {
 		UtilityFunctions::push_error("BulletSpawner2D: orbiting_radius must be finite and >= 0.01, keeping the old value.");
 		return;
@@ -447,11 +447,11 @@ void BulletSpawner2D::set_orbiting_radius(double value) {
 	orbiting_radius = value;
 }
 
-BulletVolley2D::OrbitingDirection BulletSpawner2D::get_orbiting_direction() const {
+BulletVolley2D::OrbitingDirection PatternSpawner2D::get_orbiting_direction() const {
 	return orbiting_direction;
 }
 
-void BulletSpawner2D::set_orbiting_direction(BulletVolley2D::OrbitingDirection value) {
+void PatternSpawner2D::set_orbiting_direction(BulletVolley2D::OrbitingDirection value) {
 	if (value != BulletVolley2D::DontMove && value != BulletVolley2D::OrbitLeft && value != BulletVolley2D::OrbitRight && value != BulletVolley2D::OrbitRandom) {
 		UtilityFunctions::push_error("BulletSpawner2D: invalid orbiting_direction, keeping the old value.");
 		return;
@@ -459,11 +459,11 @@ void BulletSpawner2D::set_orbiting_direction(BulletVolley2D::OrbitingDirection v
 	orbiting_direction = value;
 }
 
-BulletVolley2D::OrbitingTextureRotation BulletSpawner2D::get_orbiting_texture_rotation() const {
+BulletVolley2D::OrbitingTextureRotation PatternSpawner2D::get_orbiting_texture_rotation() const {
 	return orbiting_texture_rotation;
 }
 
-void BulletSpawner2D::set_orbiting_texture_rotation(BulletVolley2D::OrbitingTextureRotation value) {
+void PatternSpawner2D::set_orbiting_texture_rotation(BulletVolley2D::OrbitingTextureRotation value) {
 	if (value < BulletVolley2D::FaceTarget || value > BulletVolley2D::FaceOppositeOrbitingDirection) {
 		UtilityFunctions::push_error("BulletSpawner2D: invalid orbiting_texture_rotation, keeping the old value.");
 		return;
@@ -471,20 +471,20 @@ void BulletSpawner2D::set_orbiting_texture_rotation(BulletVolley2D::OrbitingText
 	orbiting_texture_rotation = value;
 }
 
-bool BulletSpawner2D::get_orbiting_radius_linear_enabled() const {
+bool PatternSpawner2D::get_orbiting_radius_linear_enabled() const {
 	return orbiting_radius_linear_enabled;
 }
 
-void BulletSpawner2D::set_orbiting_radius_linear_enabled(bool value) {
+void PatternSpawner2D::set_orbiting_radius_linear_enabled(bool value) {
 	orbiting_radius_linear_enabled = value;
 	notify_property_list_changed();
 }
 
-double BulletSpawner2D::get_orbiting_radius_start() const {
+double PatternSpawner2D::get_orbiting_radius_start() const {
 	return orbiting_radius_start;
 }
 
-void BulletSpawner2D::set_orbiting_radius_start(double value) {
+void PatternSpawner2D::set_orbiting_radius_start(double value) {
 	if (!is_finite_real2d(value) || value < 0.01) {
 		UtilityFunctions::push_error("BulletSpawner2D: orbiting_radius_start must be finite and >= 0.01, keeping the old value.");
 		return;
@@ -492,11 +492,11 @@ void BulletSpawner2D::set_orbiting_radius_start(double value) {
 	orbiting_radius_start = value;
 }
 
-double BulletSpawner2D::get_orbiting_radius_step() const {
+double PatternSpawner2D::get_orbiting_radius_step() const {
 	return orbiting_radius_step;
 }
 
-void BulletSpawner2D::set_orbiting_radius_step(double value) {
+void PatternSpawner2D::set_orbiting_radius_step(double value) {
 	// Any finite step is allowed (even negative): per-bullet results are
 	// clamped at 0.01 when applied, so a shrinking fan stays valid.
 	if (!is_finite_real2d(value)) {
@@ -506,11 +506,11 @@ void BulletSpawner2D::set_orbiting_radius_step(double value) {
 	orbiting_radius_step = value;
 }
 
-BulletVolley2D::OrbitingFollowMode BulletSpawner2D::get_orbiting_follow_mode() const {
+BulletVolley2D::OrbitingFollowMode PatternSpawner2D::get_orbiting_follow_mode() const {
 	return orbiting_follow_mode;
 }
 
-void BulletSpawner2D::set_orbiting_follow_mode(BulletVolley2D::OrbitingFollowMode value) {
+void PatternSpawner2D::set_orbiting_follow_mode(BulletVolley2D::OrbitingFollowMode value) {
 	if (value != BulletVolley2D::FollowTarget && value != BulletVolley2D::FollowDeadzone && value != BulletVolley2D::Anchored) {
 		UtilityFunctions::push_error("BulletSpawner2D: invalid orbiting_follow_mode, keeping the old value.");
 		return;
@@ -519,11 +519,11 @@ void BulletSpawner2D::set_orbiting_follow_mode(BulletVolley2D::OrbitingFollowMod
 	notify_property_list_changed();
 }
 
-double BulletSpawner2D::get_orbiting_follow_deadzone() const {
+double PatternSpawner2D::get_orbiting_follow_deadzone() const {
 	return orbiting_follow_deadzone;
 }
 
-void BulletSpawner2D::set_orbiting_follow_deadzone(double value) {
+void PatternSpawner2D::set_orbiting_follow_deadzone(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: orbiting_follow_deadzone must be finite and >= 0, keeping the old value.");
 		return;
@@ -531,11 +531,11 @@ void BulletSpawner2D::set_orbiting_follow_deadzone(double value) {
 	orbiting_follow_deadzone = value;
 }
 
-BulletVolley2D::OrbitingLockPolicy BulletSpawner2D::get_orbiting_lock_policy() const {
+BulletVolley2D::OrbitingLockPolicy PatternSpawner2D::get_orbiting_lock_policy() const {
 	return orbiting_lock_policy;
 }
 
-void BulletSpawner2D::set_orbiting_lock_policy(BulletVolley2D::OrbitingLockPolicy value) {
+void PatternSpawner2D::set_orbiting_lock_policy(BulletVolley2D::OrbitingLockPolicy value) {
 	if (value != BulletVolley2D::RelockAlways && value != BulletVolley2D::StayLocked && value != BulletVolley2D::RelockOnTargetChange) {
 		UtilityFunctions::push_error("BulletSpawner2D: invalid orbiting_lock_policy, keeping the old value.");
 		return;
@@ -543,19 +543,19 @@ void BulletSpawner2D::set_orbiting_lock_policy(BulletVolley2D::OrbitingLockPolic
 	orbiting_lock_policy = value;
 }
 
-bool BulletSpawner2D::get_orbiting_rigid_follow() const {
+bool PatternSpawner2D::get_orbiting_rigid_follow() const {
 	return orbiting_rigid_follow;
 }
 
-void BulletSpawner2D::set_orbiting_rigid_follow(bool value) {
+void PatternSpawner2D::set_orbiting_rigid_follow(bool value) {
 	orbiting_rigid_follow = value;
 }
 
-bool BulletSpawner2D::homing_retarget_active() const {
+bool PatternSpawner2D::homing_retarget_active() const {
 	return homing_enabled && homing_retarget_mode == HOMING_RETARGET_ON_INTERVAL && !Engine::get_singleton()->is_editor_hint() && is_inside_tree();
 }
 
-void BulletSpawner2D::update_homing_process_state(bool reset_countdown) {
+void PatternSpawner2D::update_homing_process_state(bool reset_countdown) {
 	if (homing_retarget_active()) {
 		// Phase-stagger the first pass so N spawners don't scene-scan together;
 		// zero phase stays due-now for immediate refresh. Reset only when
@@ -572,7 +572,7 @@ void BulletSpawner2D::update_homing_process_state(bool reset_countdown) {
 	}
 }
 
-const World2D *BulletSpawner2D::homing_target_world() const {
+const World2D *PatternSpawner2D::homing_target_world() const {
 	// Volleys fly in their factory's world: a node of another world (a
 	// SubViewport) has coordinates they can never reach.
 	BulletFactory2D *factory = get_bullet_factory();
@@ -580,7 +580,7 @@ const World2D *BulletSpawner2D::homing_target_world() const {
 	return world.ptr();
 }
 
-void BulletSpawner2D::collect_homing_candidates_by_name(Node *p_node, Array &r_candidates) const {
+void PatternSpawner2D::collect_homing_candidates_by_name(Node *p_node, Array &r_candidates) const {
 	// Shared node-name scan (core/node_scan2d.hpp): never a bullet factory's
 	// subtree (its containers hold every volley, attachment and effect
 	// shard: thousands of nodes, none a target), never this spawner or its
@@ -598,7 +598,7 @@ void BulletSpawner2D::collect_homing_candidates_by_name(Node *p_node, Array &r_c
 			});
 }
 
-void BulletSpawner2D::collect_homing_candidates_from_children(Node *p_parent, bool recursive, Array &r_candidates) const {
+void PatternSpawner2D::collect_homing_candidates_from_children(Node *p_parent, bool recursive, Array &r_candidates) const {
 	// Shared children scan: never this spawner or anything under it (a
 	// parent pointing at our own node would make the volley chase its
 	// emitter or its markers), never a bullet factory or the bullets inside
@@ -618,7 +618,7 @@ void BulletSpawner2D::collect_homing_candidates_from_children(Node *p_parent, bo
 			});
 }
 
-void BulletSpawner2D::warn_empty_homing_targets_once(const String &message, bool quiet) const {
+void PatternSpawner2D::warn_empty_homing_targets_once(const String &message, bool quiet) const {
 	if (quiet || homing_empty_targets_warned) {
 		return;
 	}
@@ -626,11 +626,11 @@ void BulletSpawner2D::warn_empty_homing_targets_once(const String &message, bool
 	UtilityFunctions::push_warning(message);
 }
 
-void BulletSpawner2D::clear_empty_homing_targets_warning() const {
+void PatternSpawner2D::clear_empty_homing_targets_warning() const {
 	homing_empty_targets_warned = false;
 }
 
-Array BulletSpawner2D::resolve_homing_targets(bool quiet, bool advance_round_robin) const {
+Array PatternSpawner2D::resolve_homing_targets(bool quiet, bool advance_round_robin) const {
 	Array targets;
 	if (!is_inside_tree()) {
 		if (!quiet) {
@@ -879,25 +879,25 @@ Array BulletSpawner2D::resolve_homing_targets(bool quiet, bool advance_round_rob
 	return targets;
 }
 
-void BulletSpawner2D::track_live_volley(BulletVolley2D *bullets) {
+void PatternSpawner2D::track_live_volley(BulletVolley2D *bullets) {
 	volley_tracker.track(bullets, get_instance_id());
 }
 
-int BulletSpawner2D::get_live_volley_count() const {
+int PatternSpawner2D::get_live_volley_count() const {
 	BulletFactory2D *factory = get_bullet_factory();
 	return factory != nullptr ? factory->count_active_volleys_owned_by(get_instance_id()) : 0;
 }
 
-Array BulletSpawner2D::get_live_volleys() const {
+Array PatternSpawner2D::get_live_volleys() const {
 	BulletFactory2D *factory = get_bullet_factory();
 	return factory != nullptr ? factory->get_active_volleys_owned_by(get_instance_id()) : Array();
 }
 
-int BulletSpawner2D::get_tracked_volley_count() const {
+int PatternSpawner2D::get_tracked_volley_count() const {
 	return volley_tracker.count(get_instance_id());
 }
 
-void BulletSpawner2D::forget_tracked_volleys() {
+void PatternSpawner2D::forget_tracked_volleys() {
 	volley_tracker.clear();
 	// Forget targeting rotation too: a manual forget means "start over", so
 	// the next wave restarts round-robin from the top instead of resuming
@@ -905,7 +905,7 @@ void BulletSpawner2D::forget_tracked_volleys() {
 	homing_round_robin_cursor = 0;
 }
 
-int BulletSpawner2D::clear_active_bullets(bool fire_clear_effects) {
+int PatternSpawner2D::clear_active_bullets(bool fire_clear_effects) {
 	BulletFactory2D *factory = get_bullet_factory();
 	if (factory == nullptr) {
 		UtilityFunctions::push_error("BulletSpawner2D::clear_active_bullets: no BulletFactory2D assigned (bullet_factory_path).");
@@ -914,7 +914,7 @@ int BulletSpawner2D::clear_active_bullets(bool fire_clear_effects) {
 	return factory->clear_bullets_owned_by(get_instance_id(), fire_clear_effects);
 }
 
-void BulletSpawner2D::set_orphaned_volleys(OrphanedVolleys value) {
+void PatternSpawner2D::set_orphaned_volleys(OrphanedVolleys value) {
 	if (value < ORPHANED_VOLLEYS_KEEP_FLYING || value > ORPHANED_VOLLEYS_REMOVE) {
 		UtilityFunctions::push_error("BulletSpawner2D: orphaned_volleys out of range, keeping the old value.");
 		return;
@@ -922,7 +922,7 @@ void BulletSpawner2D::set_orphaned_volleys(OrphanedVolleys value) {
 	orphaned_volleys = value;
 }
 
-bool BulletSpawner2D::adopt_live_volley(BulletVolley2D *bullets) {
+bool PatternSpawner2D::adopt_live_volley(BulletVolley2D *bullets) {
 	if (bullets == nullptr) {
 		UtilityFunctions::push_error("BulletSpawner2D::adopt_live_volley: instance is null.");
 		return false;
@@ -948,7 +948,7 @@ bool BulletSpawner2D::adopt_live_volley(BulletVolley2D *bullets) {
 	return true;
 }
 
-int BulletSpawner2D::clear_live_volleys_homing() {
+int PatternSpawner2D::clear_live_volleys_homing() {
 	const PackedInt64Array ids = volley_tracker.snapshot(get_instance_id());
 	int done = 0;
 	const uint64_t self_id = get_instance_id();
@@ -973,7 +973,7 @@ int BulletSpawner2D::clear_live_volleys_homing() {
 	return done;
 }
 
-int BulletSpawner2D::override_live_volleys_velocity(const Vector2 &new_velocity) {
+int PatternSpawner2D::override_live_volleys_velocity(const Vector2 &new_velocity) {
 	if (!new_velocity.is_finite()) {
 		UtilityFunctions::push_error("BulletSpawner2D::override_live_volleys_velocity: velocity must be finite.");
 		return 0;
@@ -995,7 +995,7 @@ int BulletSpawner2D::override_live_volleys_velocity(const Vector2 &new_velocity)
 	return done;
 }
 
-int BulletSpawner2D::retarget_live_volleys() {
+int PatternSpawner2D::retarget_live_volleys() {
 	// Snapshot prunes first; resolve is the expensive part (group poll /
 	// scene scan), so skip it when no live volley could consume the result.
 	const PackedInt64Array tracked_ids = volley_tracker.snapshot(get_instance_id());
@@ -1123,7 +1123,7 @@ int BulletSpawner2D::retarget_live_volleys() {
 	return done;
 }
 
-void BulletSpawner2D::apply_steering_to_volley(BulletVolley2D *volley) const {
+void PatternSpawner2D::apply_steering_to_volley(BulletVolley2D *volley) const {
 	volley->set_homing_smoothing((real_t)homing_smoothing);
 	volley->set_homing_update_interval((real_t)homing_update_interval);
 	volley->set_homing_distance_before_reached((real_t)homing_distance_before_reached);
@@ -1147,7 +1147,7 @@ void BulletSpawner2D::apply_steering_to_volley(BulletVolley2D *volley) const {
 	}
 }
 
-void BulletSpawner2D::apply_orbiting_to_volley(BulletVolley2D *volley) const {
+void PatternSpawner2D::apply_orbiting_to_volley(BulletVolley2D *volley) const {
 	// No direction is skipped: DontMove = escort (fixed ring slot, follows the
 	// target without circling), armed through the same engine path below.
 	// Disabled bullets are skipped: they own no orbit state (disable clears
@@ -1191,7 +1191,7 @@ void BulletSpawner2D::apply_orbiting_to_volley(BulletVolley2D *volley) const {
 	}
 }
 
-void BulletSpawner2D::apply_volley_homing_and_orbiting(BulletVolley2D *bullets, const Array *pre_resolved) {
+void PatternSpawner2D::apply_volley_homing_and_orbiting(BulletVolley2D *bullets, const Array *pre_resolved) {
 	if (bullets == nullptr) {
 		return;
 	}
@@ -1280,7 +1280,7 @@ void BulletSpawner2D::apply_volley_homing_and_orbiting(BulletVolley2D *bullets, 
 	emit_on2d(this, "volley_homing_configured", bullets, volleys_fired + 1);
 }
 
-bool BulletSpawner2D::fire_arc_covers_targets(const Array &targets) const {
+bool PatternSpawner2D::fire_arc_covers_targets(const Array &targets) const {
 	if (homing_fire_arc_deg <= 0.0 || !Math::is_finite(homing_fire_arc_deg)) {
 		return true;
 	}

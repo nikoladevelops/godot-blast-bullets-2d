@@ -8,7 +8,7 @@ using namespace godot;
 
 namespace BlastBullets2D {
 
-void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
+void PatternSpawner2D::_validate_property(PropertyInfo &p_property) const {
 	const String property_name = p_property.name;
 	// Spin: knobs hide while spin is off; CONTINUOUS reads only the speed,
 	// OSCILLATE only amplitude + frequency (advance_spin).
@@ -215,7 +215,7 @@ void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
 	}
 }
 
-void BulletSpawner2D::_bind_methods() {
+void PatternSpawner2D::_bind_methods() {
 	// Inspector layout: Setup (wiring) -> Bullet Patterns (source, amount,
 	// Transform subgroup, one subgroup per shape with its helper_<shape>_
 	// prefix stripped, Outline Layers last) -> Shooting -> Spin -> Homing ->
@@ -224,82 +224,82 @@ void BulletSpawner2D::_bind_methods() {
 	// headers do. ADD_PROPERTY must follow its bind_method calls, otherwise
 	// ClassDB silently drops the property (the test runner flags that).
 	ADD_GROUP("Setup", "");
-	ClassDB::bind_method(D_METHOD("get_bullet_factory_path"), &BulletSpawner2D::get_bullet_factory_path);
-	ClassDB::bind_method(D_METHOD("set_bullet_factory_path", "path"), &BulletSpawner2D::set_bullet_factory_path);
+	ClassDB::bind_method(D_METHOD("get_bullet_factory_path"), &PatternSpawner2D::get_bullet_factory_path);
+	ClassDB::bind_method(D_METHOD("set_bullet_factory_path", "path"), &PatternSpawner2D::set_bullet_factory_path);
 	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "bullet_factory_path", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "BulletFactory2D"), "set_bullet_factory_path", "get_bullet_factory_path");
 
-	ClassDB::bind_method(D_METHOD("get_bullet_factory"), &BulletSpawner2D::get_bullet_factory);
-	ClassDB::bind_method(D_METHOD("set_bullet_factory", "factory"), &BulletSpawner2D::set_bullet_factory);
+	ClassDB::bind_method(D_METHOD("get_bullet_factory"), &PatternSpawner2D::get_bullet_factory);
+	ClassDB::bind_method(D_METHOD("set_bullet_factory", "factory"), &PatternSpawner2D::set_bullet_factory);
 
-	ClassDB::bind_method(D_METHOD("get_transforms_generator_path"), &BulletSpawner2D::get_transforms_generator_path);
-	ClassDB::bind_method(D_METHOD("set_transforms_generator_path", "path"), &BulletSpawner2D::set_transforms_generator_path);
+	ClassDB::bind_method(D_METHOD("get_transforms_generator_path"), &PatternSpawner2D::get_transforms_generator_path);
+	ClassDB::bind_method(D_METHOD("set_transforms_generator_path", "path"), &PatternSpawner2D::set_transforms_generator_path);
 	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "transforms_generator", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "Node2D"), "set_transforms_generator_path", "get_transforms_generator_path");
 
-	ClassDB::bind_method(D_METHOD("get_transforms_generator"), &BulletSpawner2D::get_transforms_generator);
-	ClassDB::bind_method(D_METHOD("set_transforms_generator", "generator"), &BulletSpawner2D::set_transforms_generator);
-	ClassDB::bind_method(D_METHOD("get_effective_generator"), &BulletSpawner2D::get_effective_generator);
+	ClassDB::bind_method(D_METHOD("get_transforms_generator"), &PatternSpawner2D::get_transforms_generator);
+	ClassDB::bind_method(D_METHOD("set_transforms_generator", "generator"), &PatternSpawner2D::set_transforms_generator);
+	ClassDB::bind_method(D_METHOD("get_effective_generator"), &PatternSpawner2D::get_effective_generator);
 
-	ClassDB::bind_method(D_METHOD("get_spawn_data"), &BulletSpawner2D::get_spawn_data);
-	ClassDB::bind_method(D_METHOD("set_spawn_data", "new_spawn_data"), &BulletSpawner2D::set_spawn_data);
+	ClassDB::bind_method(D_METHOD("get_spawn_data"), &PatternSpawner2D::get_spawn_data);
+	ClassDB::bind_method(D_METHOD("set_spawn_data", "new_spawn_data"), &PatternSpawner2D::set_spawn_data);
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "spawn_data", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolleyData2D"), "set_spawn_data", "get_spawn_data");
 
-	ClassDB::bind_method(D_METHOD("get_orphaned_volleys"), &BulletSpawner2D::get_orphaned_volleys);
-	ClassDB::bind_method(D_METHOD("set_orphaned_volleys", "value"), &BulletSpawner2D::set_orphaned_volleys);
+	ClassDB::bind_method(D_METHOD("get_orphaned_volleys"), &PatternSpawner2D::get_orphaned_volleys);
+	ClassDB::bind_method(D_METHOD("set_orphaned_volleys", "value"), &PatternSpawner2D::set_orphaned_volleys);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "orphaned_volleys", PROPERTY_HINT_ENUM, "Keep Flying,Hand To Factory,Clear,Remove"), "set_orphaned_volleys", "get_orphaned_volleys");
 
 	ADD_GROUP("Time", "time_");
-	ClassDB::bind_method(D_METHOD("get_time_scale"), &BulletSpawner2D::get_time_scale);
-	ClassDB::bind_method(D_METHOD("set_time_scale", "value"), &BulletSpawner2D::set_time_scale);
+	ClassDB::bind_method(D_METHOD("get_time_scale"), &PatternSpawner2D::get_time_scale);
+	ClassDB::bind_method(D_METHOD("set_time_scale", "value"), &PatternSpawner2D::set_time_scale);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "time_scale", PROPERTY_HINT_RANGE, "0,4,0.01,or_greater"), "set_time_scale", "get_time_scale");
-	ClassDB::bind_method(D_METHOD("get_time_scale_affects_volleys"), &BulletSpawner2D::get_time_scale_affects_volleys);
-	ClassDB::bind_method(D_METHOD("set_time_scale_affects_volleys", "value"), &BulletSpawner2D::set_time_scale_affects_volleys);
+	ClassDB::bind_method(D_METHOD("get_time_scale_affects_volleys"), &PatternSpawner2D::get_time_scale_affects_volleys);
+	ClassDB::bind_method(D_METHOD("set_time_scale_affects_volleys", "value"), &PatternSpawner2D::set_time_scale_affects_volleys);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "time_scale_affects_volleys"), "set_time_scale_affects_volleys", "get_time_scale_affects_volleys");
-	ClassDB::bind_method(D_METHOD("get_process_time_scale"), &BulletSpawner2D::get_process_time_scale);
-	ClassDB::bind_method(D_METHOD("convert_live_bullets_to_pickups", "pickup", "target"), &BulletSpawner2D::convert_live_bullets_to_pickups);
+	ClassDB::bind_method(D_METHOD("get_process_time_scale"), &PatternSpawner2D::get_process_time_scale);
+	ClassDB::bind_method(D_METHOD("convert_live_bullets_to_pickups", "pickup", "target"), &PatternSpawner2D::convert_live_bullets_to_pickups);
 
 	ADD_GROUP("Bullet Patterns", "");
 	// Hand-written accessors of the group (PATTERN_PROPERTY rows); the
 	// table-driven knobs bind themselves in the expansion below.
-	ClassDB::bind_method(D_METHOD("get_pattern_source"), &BulletSpawner2D::get_pattern_source);
-	ClassDB::bind_method(D_METHOD("set_pattern_source", "value"), &BulletSpawner2D::set_pattern_source);
-	ClassDB::bind_method(D_METHOD("get_pattern_scale"), &BulletSpawner2D::get_pattern_scale);
-	ClassDB::bind_method(D_METHOD("set_pattern_scale", "value"), &BulletSpawner2D::set_pattern_scale);
-	ClassDB::bind_method(D_METHOD("get_transforms_scale"), &BulletSpawner2D::get_transforms_scale);
-	ClassDB::bind_method(D_METHOD("set_transforms_scale", "value"), &BulletSpawner2D::set_transforms_scale);
-	ClassDB::bind_method(D_METHOD("get_spawn_position_offset"), &BulletSpawner2D::get_spawn_position_offset);
-	ClassDB::bind_method(D_METHOD("set_spawn_position_offset", "value"), &BulletSpawner2D::set_spawn_position_offset);
-	ClassDB::bind_method(D_METHOD("get_spawn_position_offset_space"), &BulletSpawner2D::get_spawn_position_offset_space);
-	ClassDB::bind_method(D_METHOD("set_spawn_position_offset_space", "value"), &BulletSpawner2D::set_spawn_position_offset_space);
+	ClassDB::bind_method(D_METHOD("get_pattern_source"), &PatternSpawner2D::get_pattern_source);
+	ClassDB::bind_method(D_METHOD("set_pattern_source", "value"), &PatternSpawner2D::set_pattern_source);
+	ClassDB::bind_method(D_METHOD("get_pattern_scale"), &PatternSpawner2D::get_pattern_scale);
+	ClassDB::bind_method(D_METHOD("set_pattern_scale", "value"), &PatternSpawner2D::set_pattern_scale);
+	ClassDB::bind_method(D_METHOD("get_transforms_scale"), &PatternSpawner2D::get_transforms_scale);
+	ClassDB::bind_method(D_METHOD("set_transforms_scale", "value"), &PatternSpawner2D::set_transforms_scale);
+	ClassDB::bind_method(D_METHOD("get_spawn_position_offset"), &PatternSpawner2D::get_spawn_position_offset);
+	ClassDB::bind_method(D_METHOD("set_spawn_position_offset", "value"), &PatternSpawner2D::set_spawn_position_offset);
+	ClassDB::bind_method(D_METHOD("get_spawn_position_offset_space"), &PatternSpawner2D::get_spawn_position_offset_space);
+	ClassDB::bind_method(D_METHOD("set_spawn_position_offset_space", "value"), &PatternSpawner2D::set_spawn_position_offset_space);
 	BIND_ENUM_CONSTANT(SPAWN_OFFSET_GLOBAL);
 	BIND_ENUM_CONSTANT(SPAWN_OFFSET_LOCAL);
-	ClassDB::bind_method(D_METHOD("get_helper_aimed_target_path"), &BulletSpawner2D::get_helper_aimed_target_path);
-	ClassDB::bind_method(D_METHOD("set_helper_aimed_target_path", "path"), &BulletSpawner2D::set_helper_aimed_target_path);
-	ClassDB::bind_method(D_METHOD("get_helper_aimed_target"), &BulletSpawner2D::get_helper_aimed_target);
-	ClassDB::bind_method(D_METHOD("set_helper_aimed_target", "target"), &BulletSpawner2D::set_helper_aimed_target);
-	ClassDB::bind_method(D_METHOD("get_helper_custom_transforms"), &BulletSpawner2D::get_helper_custom_transforms);
-	ClassDB::bind_method(D_METHOD("set_helper_custom_transforms", "value"), &BulletSpawner2D::set_helper_custom_transforms);
-	ClassDB::bind_method(D_METHOD("get_helper_path2d_path"), &BulletSpawner2D::get_helper_path2d_path);
-	ClassDB::bind_method(D_METHOD("set_helper_path2d_path", "path"), &BulletSpawner2D::set_helper_path2d_path);
-	ClassDB::bind_method(D_METHOD("get_helper_path2d_node"), &BulletSpawner2D::get_helper_path2d_node);
-	ClassDB::bind_method(D_METHOD("set_helper_path2d_node", "node"), &BulletSpawner2D::set_helper_path2d_node);
-	ClassDB::bind_method(D_METHOD("get_helper_path2d_space"), &BulletSpawner2D::get_helper_path2d_space);
-	ClassDB::bind_method(D_METHOD("set_helper_path2d_space", "value"), &BulletSpawner2D::set_helper_path2d_space);
-	ClassDB::bind_method(D_METHOD("get_helper_path2d_distribution"), &BulletSpawner2D::get_helper_path2d_distribution);
-	ClassDB::bind_method(D_METHOD("set_helper_path2d_distribution", "value"), &BulletSpawner2D::set_helper_path2d_distribution);
-	ClassDB::bind_method(D_METHOD("get_helper_path2d_overflow"), &BulletSpawner2D::get_helper_path2d_overflow);
-	ClassDB::bind_method(D_METHOD("set_helper_path2d_overflow", "value"), &BulletSpawner2D::set_helper_path2d_overflow);
-	ClassDB::bind_method(D_METHOD("get_helper_path2d_anchor"), &BulletSpawner2D::get_helper_path2d_anchor);
-	ClassDB::bind_method(D_METHOD("set_helper_path2d_anchor", "value"), &BulletSpawner2D::set_helper_path2d_anchor);
-	ClassDB::bind_method(D_METHOD("get_helper_path2d_facing"), &BulletSpawner2D::get_helper_path2d_facing);
-	ClassDB::bind_method(D_METHOD("set_helper_path2d_facing", "value"), &BulletSpawner2D::set_helper_path2d_facing);
-	ClassDB::bind_method(D_METHOD("get_helper_outline_layer_scales"), &BulletSpawner2D::get_helper_outline_layer_scales);
-	ClassDB::bind_method(D_METHOD("set_helper_outline_layer_scales", "value"), &BulletSpawner2D::set_helper_outline_layer_scales);
+	ClassDB::bind_method(D_METHOD("get_helper_aimed_target_path"), &PatternSpawner2D::get_helper_aimed_target_path);
+	ClassDB::bind_method(D_METHOD("set_helper_aimed_target_path", "path"), &PatternSpawner2D::set_helper_aimed_target_path);
+	ClassDB::bind_method(D_METHOD("get_helper_aimed_target"), &PatternSpawner2D::get_helper_aimed_target);
+	ClassDB::bind_method(D_METHOD("set_helper_aimed_target", "target"), &PatternSpawner2D::set_helper_aimed_target);
+	ClassDB::bind_method(D_METHOD("get_helper_custom_transforms"), &PatternSpawner2D::get_helper_custom_transforms);
+	ClassDB::bind_method(D_METHOD("set_helper_custom_transforms", "value"), &PatternSpawner2D::set_helper_custom_transforms);
+	ClassDB::bind_method(D_METHOD("get_helper_path2d_path"), &PatternSpawner2D::get_helper_path2d_path);
+	ClassDB::bind_method(D_METHOD("set_helper_path2d_path", "path"), &PatternSpawner2D::set_helper_path2d_path);
+	ClassDB::bind_method(D_METHOD("get_helper_path2d_node"), &PatternSpawner2D::get_helper_path2d_node);
+	ClassDB::bind_method(D_METHOD("set_helper_path2d_node", "node"), &PatternSpawner2D::set_helper_path2d_node);
+	ClassDB::bind_method(D_METHOD("get_helper_path2d_space"), &PatternSpawner2D::get_helper_path2d_space);
+	ClassDB::bind_method(D_METHOD("set_helper_path2d_space", "value"), &PatternSpawner2D::set_helper_path2d_space);
+	ClassDB::bind_method(D_METHOD("get_helper_path2d_distribution"), &PatternSpawner2D::get_helper_path2d_distribution);
+	ClassDB::bind_method(D_METHOD("set_helper_path2d_distribution", "value"), &PatternSpawner2D::set_helper_path2d_distribution);
+	ClassDB::bind_method(D_METHOD("get_helper_path2d_overflow"), &PatternSpawner2D::get_helper_path2d_overflow);
+	ClassDB::bind_method(D_METHOD("set_helper_path2d_overflow", "value"), &PatternSpawner2D::set_helper_path2d_overflow);
+	ClassDB::bind_method(D_METHOD("get_helper_path2d_anchor"), &PatternSpawner2D::get_helper_path2d_anchor);
+	ClassDB::bind_method(D_METHOD("set_helper_path2d_anchor", "value"), &PatternSpawner2D::set_helper_path2d_anchor);
+	ClassDB::bind_method(D_METHOD("get_helper_path2d_facing"), &PatternSpawner2D::get_helper_path2d_facing);
+	ClassDB::bind_method(D_METHOD("set_helper_path2d_facing", "value"), &PatternSpawner2D::set_helper_path2d_facing);
+	ClassDB::bind_method(D_METHOD("get_helper_outline_layer_scales"), &PatternSpawner2D::get_helper_outline_layer_scales);
+	ClassDB::bind_method(D_METHOD("set_helper_outline_layer_scales", "value"), &PatternSpawner2D::set_helper_outline_layer_scales);
 
 	// Every property of the group, in inspector order, from the knob table.
 #define PATTERN_SUBGROUP(TITLE, PREFIX) ADD_SUBGROUP(TITLE, PREFIX);
 #define PATTERN_KNOB(PTYPE, CTYPE, VTYPE, NAME, C1, A1, B1, M1, C2, A2, B2, M2, NOTIFY, HINT, HINT_STRING) \
-	ClassDB::bind_method(D_METHOD("get_" #NAME), &BulletSpawner2D::get_##NAME);                            \
-	ClassDB::bind_method(D_METHOD("set_" #NAME, "value"), &BulletSpawner2D::set_##NAME);                   \
+	ClassDB::bind_method(D_METHOD("get_" #NAME), &PatternSpawner2D::get_##NAME);                           \
+	ClassDB::bind_method(D_METHOD("set_" #NAME, "value"), &PatternSpawner2D::set_##NAME);                  \
 	ADD_PROPERTY(PropertyInfo(Variant::VTYPE, #NAME, HINT, HINT_STRING), "set_" #NAME, "get_" #NAME);
 #define PATTERN_PROPERTY(VTYPE, NAME, HINT, HINT_STRING, SETTER, GETTER) \
 	ADD_PROPERTY(PropertyInfo(Variant::VTYPE, #NAME, HINT, HINT_STRING), #SETTER, #GETTER);
@@ -372,146 +372,146 @@ void BulletSpawner2D::_bind_methods() {
 			PropertyInfo(Variant::OBJECT, "hit_target_body"),
 			PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
 			PropertyInfo(Variant::INT, "bullet_index")));
-	ClassDB::bind_method(D_METHOD("get_shooting_enabled"), &BulletSpawner2D::get_shooting_enabled);
-	ClassDB::bind_method(D_METHOD("set_shooting_enabled", "value"), &BulletSpawner2D::set_shooting_enabled);
+	ClassDB::bind_method(D_METHOD("get_shooting_enabled"), &PatternSpawner2D::get_shooting_enabled);
+	ClassDB::bind_method(D_METHOD("set_shooting_enabled", "value"), &PatternSpawner2D::set_shooting_enabled);
 	ADD_GROUP("Shooting", "");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "shooting_enabled"), "set_shooting_enabled", "get_shooting_enabled");
-	ClassDB::bind_method(D_METHOD("is_shooting_active"), &BulletSpawner2D::is_shooting_active);
+	ClassDB::bind_method(D_METHOD("is_shooting_active"), &PatternSpawner2D::is_shooting_active);
 
-	ClassDB::bind_method(D_METHOD("get_shoot_interval_sec"), &BulletSpawner2D::get_shoot_interval_sec);
-	ClassDB::bind_method(D_METHOD("set_shoot_interval_sec", "value"), &BulletSpawner2D::set_shoot_interval_sec);
+	ClassDB::bind_method(D_METHOD("get_shoot_interval_sec"), &PatternSpawner2D::get_shoot_interval_sec);
+	ClassDB::bind_method(D_METHOD("set_shoot_interval_sec", "value"), &PatternSpawner2D::set_shoot_interval_sec);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "shoot_interval_sec", PROPERTY_HINT_RANGE, "0.005,30,0.001,or_greater"), "set_shoot_interval_sec", "get_shoot_interval_sec");
-	ClassDB::bind_method(D_METHOD("get_shoot_interval_max_sec"), &BulletSpawner2D::get_shoot_interval_max_sec);
-	ClassDB::bind_method(D_METHOD("set_shoot_interval_max_sec", "value"), &BulletSpawner2D::set_shoot_interval_max_sec);
+	ClassDB::bind_method(D_METHOD("get_shoot_interval_max_sec"), &PatternSpawner2D::get_shoot_interval_max_sec);
+	ClassDB::bind_method(D_METHOD("set_shoot_interval_max_sec", "value"), &PatternSpawner2D::set_shoot_interval_max_sec);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "shoot_interval_max_sec", PROPERTY_HINT_RANGE, "0,30,0.001,or_greater,suffix:s"), "set_shoot_interval_max_sec", "get_shoot_interval_max_sec");
 
-	ClassDB::bind_method(D_METHOD("get_shoot_outside_despawn_bounds"), &BulletSpawner2D::get_shoot_outside_despawn_bounds);
-	ClassDB::bind_method(D_METHOD("set_shoot_outside_despawn_bounds", "value"), &BulletSpawner2D::set_shoot_outside_despawn_bounds);
+	ClassDB::bind_method(D_METHOD("get_shoot_outside_despawn_bounds"), &PatternSpawner2D::get_shoot_outside_despawn_bounds);
+	ClassDB::bind_method(D_METHOD("set_shoot_outside_despawn_bounds", "value"), &PatternSpawner2D::set_shoot_outside_despawn_bounds);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "shoot_outside_despawn_bounds"), "set_shoot_outside_despawn_bounds", "get_shoot_outside_despawn_bounds");
 
-	ClassDB::bind_method(D_METHOD("get_shoot_initial_delay_sec"), &BulletSpawner2D::get_shoot_initial_delay_sec);
-	ClassDB::bind_method(D_METHOD("set_shoot_initial_delay_sec", "value"), &BulletSpawner2D::set_shoot_initial_delay_sec);
+	ClassDB::bind_method(D_METHOD("get_shoot_initial_delay_sec"), &PatternSpawner2D::get_shoot_initial_delay_sec);
+	ClassDB::bind_method(D_METHOD("set_shoot_initial_delay_sec", "value"), &PatternSpawner2D::set_shoot_initial_delay_sec);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "shoot_initial_delay_sec"), "set_shoot_initial_delay_sec", "get_shoot_initial_delay_sec");
 
-	ClassDB::bind_method(D_METHOD("get_max_volleys"), &BulletSpawner2D::get_max_volleys);
-	ClassDB::bind_method(D_METHOD("set_max_volleys", "value"), &BulletSpawner2D::set_max_volleys);
+	ClassDB::bind_method(D_METHOD("get_max_volleys"), &PatternSpawner2D::get_max_volleys);
+	ClassDB::bind_method(D_METHOD("set_max_volleys", "value"), &PatternSpawner2D::set_max_volleys);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "max_volleys"), "set_max_volleys", "get_max_volleys");
 
-	ClassDB::bind_method(D_METHOD("get_reload_jitter_sec"), &BulletSpawner2D::get_reload_jitter_sec);
-	ClassDB::bind_method(D_METHOD("set_reload_jitter_sec", "value"), &BulletSpawner2D::set_reload_jitter_sec);
+	ClassDB::bind_method(D_METHOD("get_reload_jitter_sec"), &PatternSpawner2D::get_reload_jitter_sec);
+	ClassDB::bind_method(D_METHOD("set_reload_jitter_sec", "value"), &PatternSpawner2D::set_reload_jitter_sec);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "reload_jitter_sec"), "set_reload_jitter_sec", "get_reload_jitter_sec");
 	// Seed lives directly under its jitter amount so the pair reads as one feature.
-	ClassDB::bind_method(D_METHOD("get_reload_jitter_seed"), &BulletSpawner2D::get_reload_jitter_seed);
-	ClassDB::bind_method(D_METHOD("set_reload_jitter_seed", "value"), &BulletSpawner2D::set_reload_jitter_seed);
+	ClassDB::bind_method(D_METHOD("get_reload_jitter_seed"), &PatternSpawner2D::get_reload_jitter_seed);
+	ClassDB::bind_method(D_METHOD("set_reload_jitter_seed", "value"), &PatternSpawner2D::set_reload_jitter_seed);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "reload_jitter_seed"), "set_reload_jitter_seed", "get_reload_jitter_seed");
 
-	ClassDB::bind_method(D_METHOD("get_max_live_bullets"), &BulletSpawner2D::get_max_live_bullets);
-	ClassDB::bind_method(D_METHOD("set_max_live_bullets", "value"), &BulletSpawner2D::set_max_live_bullets);
+	ClassDB::bind_method(D_METHOD("get_max_live_bullets"), &PatternSpawner2D::get_max_live_bullets);
+	ClassDB::bind_method(D_METHOD("set_max_live_bullets", "value"), &PatternSpawner2D::set_max_live_bullets);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "max_live_bullets"), "set_max_live_bullets", "get_max_live_bullets");
-	ClassDB::bind_method(D_METHOD("get_burst_enabled"), &BulletSpawner2D::get_burst_enabled);
-	ClassDB::bind_method(D_METHOD("set_burst_enabled", "value"), &BulletSpawner2D::set_burst_enabled);
+	ClassDB::bind_method(D_METHOD("get_burst_enabled"), &PatternSpawner2D::get_burst_enabled);
+	ClassDB::bind_method(D_METHOD("set_burst_enabled", "value"), &PatternSpawner2D::set_burst_enabled);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "burst_enabled"), "set_burst_enabled", "get_burst_enabled");
 
-	ClassDB::bind_method(D_METHOD("get_burst_count"), &BulletSpawner2D::get_burst_count);
-	ClassDB::bind_method(D_METHOD("set_burst_count", "value"), &BulletSpawner2D::set_burst_count);
+	ClassDB::bind_method(D_METHOD("get_burst_count"), &PatternSpawner2D::get_burst_count);
+	ClassDB::bind_method(D_METHOD("set_burst_count", "value"), &PatternSpawner2D::set_burst_count);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "burst_count"), "set_burst_count", "get_burst_count");
 
-	ClassDB::bind_method(D_METHOD("get_burst_interval_sec"), &BulletSpawner2D::get_burst_interval_sec);
-	ClassDB::bind_method(D_METHOD("set_burst_interval_sec", "value"), &BulletSpawner2D::set_burst_interval_sec);
+	ClassDB::bind_method(D_METHOD("get_burst_interval_sec"), &PatternSpawner2D::get_burst_interval_sec);
+	ClassDB::bind_method(D_METHOD("set_burst_interval_sec", "value"), &PatternSpawner2D::set_burst_interval_sec);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "burst_interval_sec"), "set_burst_interval_sec", "get_burst_interval_sec");
-	ClassDB::bind_method(D_METHOD("get_burst_interval_max_sec"), &BulletSpawner2D::get_burst_interval_max_sec);
-	ClassDB::bind_method(D_METHOD("set_burst_interval_max_sec", "value"), &BulletSpawner2D::set_burst_interval_max_sec);
+	ClassDB::bind_method(D_METHOD("get_burst_interval_max_sec"), &PatternSpawner2D::get_burst_interval_max_sec);
+	ClassDB::bind_method(D_METHOD("set_burst_interval_max_sec", "value"), &PatternSpawner2D::set_burst_interval_max_sec);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "burst_interval_max_sec", PROPERTY_HINT_RANGE, "0,30,0.001,or_greater,suffix:s"), "set_burst_interval_max_sec", "get_burst_interval_max_sec");
 
-	ClassDB::bind_method(D_METHOD("get_burst_alternate_mirror"), &BulletSpawner2D::get_burst_alternate_mirror);
-	ClassDB::bind_method(D_METHOD("set_burst_alternate_mirror", "value"), &BulletSpawner2D::set_burst_alternate_mirror);
+	ClassDB::bind_method(D_METHOD("get_burst_alternate_mirror"), &PatternSpawner2D::get_burst_alternate_mirror);
+	ClassDB::bind_method(D_METHOD("set_burst_alternate_mirror", "value"), &PatternSpawner2D::set_burst_alternate_mirror);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "burst_alternate_mirror"), "set_burst_alternate_mirror", "get_burst_alternate_mirror");
 
-	ClassDB::bind_method(D_METHOD("get_telegraph_enabled"), &BulletSpawner2D::get_telegraph_enabled);
-	ClassDB::bind_method(D_METHOD("set_telegraph_enabled", "value"), &BulletSpawner2D::set_telegraph_enabled);
+	ClassDB::bind_method(D_METHOD("get_telegraph_enabled"), &PatternSpawner2D::get_telegraph_enabled);
+	ClassDB::bind_method(D_METHOD("set_telegraph_enabled", "value"), &PatternSpawner2D::set_telegraph_enabled);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "telegraph_enabled"), "set_telegraph_enabled", "get_telegraph_enabled");
 
-	ClassDB::bind_method(D_METHOD("get_telegraph_sec"), &BulletSpawner2D::get_telegraph_sec);
-	ClassDB::bind_method(D_METHOD("set_telegraph_sec", "value"), &BulletSpawner2D::set_telegraph_sec);
+	ClassDB::bind_method(D_METHOD("get_telegraph_sec"), &PatternSpawner2D::get_telegraph_sec);
+	ClassDB::bind_method(D_METHOD("set_telegraph_sec", "value"), &PatternSpawner2D::set_telegraph_sec);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "telegraph_sec"), "set_telegraph_sec", "get_telegraph_sec");
-	ClassDB::bind_method(D_METHOD("get_telegraph_max_sec"), &BulletSpawner2D::get_telegraph_max_sec);
-	ClassDB::bind_method(D_METHOD("set_telegraph_max_sec", "value"), &BulletSpawner2D::set_telegraph_max_sec);
+	ClassDB::bind_method(D_METHOD("get_telegraph_max_sec"), &PatternSpawner2D::get_telegraph_max_sec);
+	ClassDB::bind_method(D_METHOD("set_telegraph_max_sec", "value"), &PatternSpawner2D::set_telegraph_max_sec);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "telegraph_max_sec", PROPERTY_HINT_RANGE, "0,30,0.001,or_greater,suffix:s"), "set_telegraph_max_sec", "get_telegraph_max_sec");
 
 	ADD_GROUP("Randomization", "bullet_");
-	ClassDB::bind_method(D_METHOD("get_bullet_scale_mode"), &BulletSpawner2D::get_bullet_scale_mode);
-	ClassDB::bind_method(D_METHOD("set_bullet_scale_mode", "value"), &BulletSpawner2D::set_bullet_scale_mode);
+	ClassDB::bind_method(D_METHOD("get_bullet_scale_mode"), &PatternSpawner2D::get_bullet_scale_mode);
+	ClassDB::bind_method(D_METHOD("set_bullet_scale_mode", "value"), &PatternSpawner2D::set_bullet_scale_mode);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "bullet_scale_mode", PROPERTY_HINT_ENUM, "Off,Uniform,Per Axis"), "set_bullet_scale_mode", "get_bullet_scale_mode");
-	ClassDB::bind_method(D_METHOD("get_bullet_scale_min"), &BulletSpawner2D::get_bullet_scale_min);
-	ClassDB::bind_method(D_METHOD("set_bullet_scale_min", "value"), &BulletSpawner2D::set_bullet_scale_min);
+	ClassDB::bind_method(D_METHOD("get_bullet_scale_min"), &PatternSpawner2D::get_bullet_scale_min);
+	ClassDB::bind_method(D_METHOD("set_bullet_scale_min", "value"), &PatternSpawner2D::set_bullet_scale_min);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bullet_scale_min", PROPERTY_HINT_RANGE, "0.01,10,0.01,or_greater"), "set_bullet_scale_min", "get_bullet_scale_min");
-	ClassDB::bind_method(D_METHOD("get_bullet_scale_max"), &BulletSpawner2D::get_bullet_scale_max);
-	ClassDB::bind_method(D_METHOD("set_bullet_scale_max", "value"), &BulletSpawner2D::set_bullet_scale_max);
+	ClassDB::bind_method(D_METHOD("get_bullet_scale_max"), &PatternSpawner2D::get_bullet_scale_max);
+	ClassDB::bind_method(D_METHOD("set_bullet_scale_max", "value"), &PatternSpawner2D::set_bullet_scale_max);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bullet_scale_max", PROPERTY_HINT_RANGE, "0.01,10,0.01,or_greater"), "set_bullet_scale_max", "get_bullet_scale_max");
-	ClassDB::bind_method(D_METHOD("get_bullet_scale_min_xy"), &BulletSpawner2D::get_bullet_scale_min_xy);
-	ClassDB::bind_method(D_METHOD("set_bullet_scale_min_xy", "value"), &BulletSpawner2D::set_bullet_scale_min_xy);
+	ClassDB::bind_method(D_METHOD("get_bullet_scale_min_xy"), &PatternSpawner2D::get_bullet_scale_min_xy);
+	ClassDB::bind_method(D_METHOD("set_bullet_scale_min_xy", "value"), &PatternSpawner2D::set_bullet_scale_min_xy);
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "bullet_scale_min_xy"), "set_bullet_scale_min_xy", "get_bullet_scale_min_xy");
-	ClassDB::bind_method(D_METHOD("get_bullet_scale_max_xy"), &BulletSpawner2D::get_bullet_scale_max_xy);
-	ClassDB::bind_method(D_METHOD("set_bullet_scale_max_xy", "value"), &BulletSpawner2D::set_bullet_scale_max_xy);
+	ClassDB::bind_method(D_METHOD("get_bullet_scale_max_xy"), &PatternSpawner2D::get_bullet_scale_max_xy);
+	ClassDB::bind_method(D_METHOD("set_bullet_scale_max_xy", "value"), &PatternSpawner2D::set_bullet_scale_max_xy);
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "bullet_scale_max_xy"), "set_bullet_scale_max_xy", "get_bullet_scale_max_xy");
-	ClassDB::bind_method(D_METHOD("get_bullet_rotation_min_degrees"), &BulletSpawner2D::get_bullet_rotation_min_degrees);
-	ClassDB::bind_method(D_METHOD("set_bullet_rotation_min_degrees", "value"), &BulletSpawner2D::set_bullet_rotation_min_degrees);
+	ClassDB::bind_method(D_METHOD("get_bullet_rotation_min_degrees"), &PatternSpawner2D::get_bullet_rotation_min_degrees);
+	ClassDB::bind_method(D_METHOD("set_bullet_rotation_min_degrees", "value"), &PatternSpawner2D::set_bullet_rotation_min_degrees);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bullet_rotation_min_degrees", PROPERTY_HINT_RANGE, "-360,360,0.1,or_less,or_greater,suffix:deg"), "set_bullet_rotation_min_degrees", "get_bullet_rotation_min_degrees");
-	ClassDB::bind_method(D_METHOD("get_bullet_rotation_max_degrees"), &BulletSpawner2D::get_bullet_rotation_max_degrees);
-	ClassDB::bind_method(D_METHOD("set_bullet_rotation_max_degrees", "value"), &BulletSpawner2D::set_bullet_rotation_max_degrees);
+	ClassDB::bind_method(D_METHOD("get_bullet_rotation_max_degrees"), &PatternSpawner2D::get_bullet_rotation_max_degrees);
+	ClassDB::bind_method(D_METHOD("set_bullet_rotation_max_degrees", "value"), &PatternSpawner2D::set_bullet_rotation_max_degrees);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bullet_rotation_max_degrees", PROPERTY_HINT_RANGE, "-360,360,0.1,or_less,or_greater,suffix:deg"), "set_bullet_rotation_max_degrees", "get_bullet_rotation_max_degrees");
-	ClassDB::bind_method(D_METHOD("get_bullet_position_jitter_min"), &BulletSpawner2D::get_bullet_position_jitter_min);
-	ClassDB::bind_method(D_METHOD("set_bullet_position_jitter_min", "value"), &BulletSpawner2D::set_bullet_position_jitter_min);
+	ClassDB::bind_method(D_METHOD("get_bullet_position_jitter_min"), &PatternSpawner2D::get_bullet_position_jitter_min);
+	ClassDB::bind_method(D_METHOD("set_bullet_position_jitter_min", "value"), &PatternSpawner2D::set_bullet_position_jitter_min);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bullet_position_jitter_min", PROPERTY_HINT_RANGE, "0,200,0.1,or_greater,suffix:px"), "set_bullet_position_jitter_min", "get_bullet_position_jitter_min");
-	ClassDB::bind_method(D_METHOD("get_bullet_position_jitter_max"), &BulletSpawner2D::get_bullet_position_jitter_max);
-	ClassDB::bind_method(D_METHOD("set_bullet_position_jitter_max", "value"), &BulletSpawner2D::set_bullet_position_jitter_max);
+	ClassDB::bind_method(D_METHOD("get_bullet_position_jitter_max"), &PatternSpawner2D::get_bullet_position_jitter_max);
+	ClassDB::bind_method(D_METHOD("set_bullet_position_jitter_max", "value"), &PatternSpawner2D::set_bullet_position_jitter_max);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bullet_position_jitter_max", PROPERTY_HINT_RANGE, "0,200,0.1,or_greater,suffix:px"), "set_bullet_position_jitter_max", "get_bullet_position_jitter_max");
-	ClassDB::bind_method(D_METHOD("get_bullet_speed_scale_min"), &BulletSpawner2D::get_bullet_speed_scale_min);
-	ClassDB::bind_method(D_METHOD("set_bullet_speed_scale_min", "value"), &BulletSpawner2D::set_bullet_speed_scale_min);
+	ClassDB::bind_method(D_METHOD("get_bullet_speed_scale_min"), &PatternSpawner2D::get_bullet_speed_scale_min);
+	ClassDB::bind_method(D_METHOD("set_bullet_speed_scale_min", "value"), &PatternSpawner2D::set_bullet_speed_scale_min);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bullet_speed_scale_min", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater"), "set_bullet_speed_scale_min", "get_bullet_speed_scale_min");
-	ClassDB::bind_method(D_METHOD("get_bullet_speed_scale_max"), &BulletSpawner2D::get_bullet_speed_scale_max);
-	ClassDB::bind_method(D_METHOD("set_bullet_speed_scale_max", "value"), &BulletSpawner2D::set_bullet_speed_scale_max);
+	ClassDB::bind_method(D_METHOD("get_bullet_speed_scale_max"), &PatternSpawner2D::get_bullet_speed_scale_max);
+	ClassDB::bind_method(D_METHOD("set_bullet_speed_scale_max", "value"), &PatternSpawner2D::set_bullet_speed_scale_max);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bullet_speed_scale_max", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater"), "set_bullet_speed_scale_max", "get_bullet_speed_scale_max");
-	ClassDB::bind_method(D_METHOD("get_bullet_random_seed"), &BulletSpawner2D::get_bullet_random_seed);
-	ClassDB::bind_method(D_METHOD("set_bullet_random_seed", "value"), &BulletSpawner2D::set_bullet_random_seed);
+	ClassDB::bind_method(D_METHOD("get_bullet_random_seed"), &PatternSpawner2D::get_bullet_random_seed);
+	ClassDB::bind_method(D_METHOD("set_bullet_random_seed", "value"), &PatternSpawner2D::set_bullet_random_seed);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "bullet_random_seed"), "set_bullet_random_seed", "get_bullet_random_seed");
 
-	ClassDB::bind_method(D_METHOD("get_spin_enabled"), &BulletSpawner2D::get_spin_enabled);
-	ClassDB::bind_method(D_METHOD("set_spin_enabled", "value"), &BulletSpawner2D::set_spin_enabled);
+	ClassDB::bind_method(D_METHOD("get_spin_enabled"), &PatternSpawner2D::get_spin_enabled);
+	ClassDB::bind_method(D_METHOD("set_spin_enabled", "value"), &PatternSpawner2D::set_spin_enabled);
 	ADD_GROUP("Spin", "");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "spin_enabled"), "set_spin_enabled", "get_spin_enabled");
 
-	ClassDB::bind_method(D_METHOD("get_spin_mode"), &BulletSpawner2D::get_spin_mode);
-	ClassDB::bind_method(D_METHOD("set_spin_mode", "value"), &BulletSpawner2D::set_spin_mode);
+	ClassDB::bind_method(D_METHOD("get_spin_mode"), &PatternSpawner2D::get_spin_mode);
+	ClassDB::bind_method(D_METHOD("set_spin_mode", "value"), &PatternSpawner2D::set_spin_mode);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "spin_mode", PROPERTY_HINT_ENUM, "Continuous,Oscillate"), "set_spin_mode", "get_spin_mode");
-	ClassDB::bind_method(D_METHOD("get_spin_speed_deg_per_sec"), &BulletSpawner2D::get_spin_speed_deg_per_sec);
-	ClassDB::bind_method(D_METHOD("set_spin_speed_deg_per_sec", "value"), &BulletSpawner2D::set_spin_speed_deg_per_sec);
+	ClassDB::bind_method(D_METHOD("get_spin_speed_deg_per_sec"), &PatternSpawner2D::get_spin_speed_deg_per_sec);
+	ClassDB::bind_method(D_METHOD("set_spin_speed_deg_per_sec", "value"), &PatternSpawner2D::set_spin_speed_deg_per_sec);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "spin_speed_deg_per_sec"), "set_spin_speed_deg_per_sec", "get_spin_speed_deg_per_sec");
 
-	ClassDB::bind_method(D_METHOD("get_spin_amplitude_deg"), &BulletSpawner2D::get_spin_amplitude_deg);
-	ClassDB::bind_method(D_METHOD("set_spin_amplitude_deg", "value"), &BulletSpawner2D::set_spin_amplitude_deg);
+	ClassDB::bind_method(D_METHOD("get_spin_amplitude_deg"), &PatternSpawner2D::get_spin_amplitude_deg);
+	ClassDB::bind_method(D_METHOD("set_spin_amplitude_deg", "value"), &PatternSpawner2D::set_spin_amplitude_deg);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "spin_amplitude_deg"), "set_spin_amplitude_deg", "get_spin_amplitude_deg");
 
-	ClassDB::bind_method(D_METHOD("get_spin_frequency_hz"), &BulletSpawner2D::get_spin_frequency_hz);
-	ClassDB::bind_method(D_METHOD("set_spin_frequency_hz", "value"), &BulletSpawner2D::set_spin_frequency_hz);
+	ClassDB::bind_method(D_METHOD("get_spin_frequency_hz"), &PatternSpawner2D::get_spin_frequency_hz);
+	ClassDB::bind_method(D_METHOD("set_spin_frequency_hz", "value"), &PatternSpawner2D::set_spin_frequency_hz);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "spin_frequency_hz"), "set_spin_frequency_hz", "get_spin_frequency_hz");
 
-	ClassDB::bind_method(D_METHOD("get_spin_random_start_phase"), &BulletSpawner2D::get_spin_random_start_phase);
-	ClassDB::bind_method(D_METHOD("set_spin_random_start_phase", "value"), &BulletSpawner2D::set_spin_random_start_phase);
+	ClassDB::bind_method(D_METHOD("get_spin_random_start_phase"), &PatternSpawner2D::get_spin_random_start_phase);
+	ClassDB::bind_method(D_METHOD("set_spin_random_start_phase", "value"), &PatternSpawner2D::set_spin_random_start_phase);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "spin_random_start_phase"), "set_spin_random_start_phase", "get_spin_random_start_phase");
 
-	ClassDB::bind_method(D_METHOD("get_spin_angle_deg"), &BulletSpawner2D::get_spin_angle_deg);
-	ClassDB::bind_method(D_METHOD("set_spin_angle_deg", "degrees"), &BulletSpawner2D::set_spin_angle_deg);
-	ClassDB::bind_method(D_METHOD("reset_spin_angle"), &BulletSpawner2D::reset_spin_angle);
+	ClassDB::bind_method(D_METHOD("get_spin_angle_deg"), &PatternSpawner2D::get_spin_angle_deg);
+	ClassDB::bind_method(D_METHOD("set_spin_angle_deg", "degrees"), &PatternSpawner2D::set_spin_angle_deg);
+	ClassDB::bind_method(D_METHOD("reset_spin_angle"), &PatternSpawner2D::reset_spin_angle);
 
-	ClassDB::bind_method(D_METHOD("apply_pattern_preset", "preset"), &BulletSpawner2D::apply_pattern_preset);
-	ClassDB::bind_method(D_METHOD("spawn_pattern_list", "entries", "simultaneous", "interval_sec"), &BulletSpawner2D::spawn_pattern_list, DEFVAL(false), DEFVAL(0.25));
-	ClassDB::bind_method(D_METHOD("shoot_once_with", "overrides"), &BulletSpawner2D::shoot_once_with);
-	ClassDB::bind_method(D_METHOD("stop_pattern_list"), &BulletSpawner2D::stop_pattern_list);
-	ClassDB::bind_method(D_METHOD("is_pattern_list_active"), &BulletSpawner2D::is_pattern_list_active);
-	ClassDB::bind_method(D_METHOD("get_burst_shots_left"), &BulletSpawner2D::get_burst_shots_left);
-	ClassDB::bind_method(D_METHOD("get_active_live_bullet_count"), &BulletSpawner2D::get_active_live_bullet_count);
-	ClassDB::bind_method(D_METHOD("begin_burst"), &BulletSpawner2D::begin_burst);
+	ClassDB::bind_method(D_METHOD("apply_pattern_preset", "preset"), &PatternSpawner2D::apply_pattern_preset);
+	ClassDB::bind_method(D_METHOD("spawn_pattern_list", "entries", "simultaneous", "interval_sec"), &PatternSpawner2D::spawn_pattern_list, DEFVAL(false), DEFVAL(0.25));
+	ClassDB::bind_method(D_METHOD("shoot_once_with", "overrides"), &PatternSpawner2D::shoot_once_with);
+	ClassDB::bind_method(D_METHOD("stop_pattern_list"), &PatternSpawner2D::stop_pattern_list);
+	ClassDB::bind_method(D_METHOD("is_pattern_list_active"), &PatternSpawner2D::is_pattern_list_active);
+	ClassDB::bind_method(D_METHOD("get_burst_shots_left"), &PatternSpawner2D::get_burst_shots_left);
+	ClassDB::bind_method(D_METHOD("get_active_live_bullet_count"), &PatternSpawner2D::get_active_live_bullet_count);
+	ClassDB::bind_method(D_METHOD("begin_burst"), &PatternSpawner2D::begin_burst);
 
 	// Homing + orbiting signals. Same slim payload shape and handler contract
 	// as the spawner lifecycle signals above: volley_homing_configured and
@@ -534,200 +534,200 @@ void BulletSpawner2D::_bind_methods() {
 			PropertyInfo(Variant::OBJECT, "target", PROPERTY_HINT_RESOURCE_TYPE, "Node2D"),
 			PropertyInfo(Variant::VECTOR2, "target_global_position")));
 
-	ClassDB::bind_method(D_METHOD("get_homing_enabled"), &BulletSpawner2D::get_homing_enabled);
-	ClassDB::bind_method(D_METHOD("set_homing_enabled", "value"), &BulletSpawner2D::set_homing_enabled);
+	ClassDB::bind_method(D_METHOD("get_homing_enabled"), &PatternSpawner2D::get_homing_enabled);
+	ClassDB::bind_method(D_METHOD("set_homing_enabled", "value"), &PatternSpawner2D::set_homing_enabled);
 	ADD_GROUP("Homing", "");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "homing_enabled"), "set_homing_enabled", "get_homing_enabled");
 
-	ClassDB::bind_method(D_METHOD("get_homing_mode"), &BulletSpawner2D::get_homing_mode);
-	ClassDB::bind_method(D_METHOD("set_homing_mode", "value"), &BulletSpawner2D::set_homing_mode);
+	ClassDB::bind_method(D_METHOD("get_homing_mode"), &PatternSpawner2D::get_homing_mode);
+	ClassDB::bind_method(D_METHOD("set_homing_mode", "value"), &PatternSpawner2D::set_homing_mode);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "homing_mode", PROPERTY_HINT_ENUM, "Shared,Per Bullet"), "set_homing_mode", "get_homing_mode");
 
-	ClassDB::bind_method(D_METHOD("get_homing_target_source"), &BulletSpawner2D::get_homing_target_source);
-	ClassDB::bind_method(D_METHOD("set_homing_target_source", "value"), &BulletSpawner2D::set_homing_target_source);
+	ClassDB::bind_method(D_METHOD("get_homing_target_source"), &PatternSpawner2D::get_homing_target_source);
+	ClassDB::bind_method(D_METHOD("set_homing_target_source", "value"), &PatternSpawner2D::set_homing_target_source);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "homing_target_source", PROPERTY_HINT_ENUM, "Node Group,Mouse,Global Position,Node Path,Node Name,Node Children"), "set_homing_target_source", "get_homing_target_source");
 
-	ClassDB::bind_method(D_METHOD("get_homing_node_group"), &BulletSpawner2D::get_homing_node_group);
-	ClassDB::bind_method(D_METHOD("set_homing_node_group", "value"), &BulletSpawner2D::set_homing_node_group);
+	ClassDB::bind_method(D_METHOD("get_homing_node_group"), &PatternSpawner2D::get_homing_node_group);
+	ClassDB::bind_method(D_METHOD("set_homing_node_group", "value"), &PatternSpawner2D::set_homing_node_group);
 	ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "homing_node_group"), "set_homing_node_group", "get_homing_node_group");
 
-	ClassDB::bind_method(D_METHOD("get_homing_filter_group"), &BulletSpawner2D::get_homing_filter_group);
-	ClassDB::bind_method(D_METHOD("set_homing_filter_group", "value"), &BulletSpawner2D::set_homing_filter_group);
+	ClassDB::bind_method(D_METHOD("get_homing_filter_group"), &PatternSpawner2D::get_homing_filter_group);
+	ClassDB::bind_method(D_METHOD("set_homing_filter_group", "value"), &PatternSpawner2D::set_homing_filter_group);
 	ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "homing_filter_group"), "set_homing_filter_group", "get_homing_filter_group");
 
-	ClassDB::bind_method(D_METHOD("get_homing_target_selection"), &BulletSpawner2D::get_homing_target_selection);
-	ClassDB::bind_method(D_METHOD("set_homing_target_selection", "value"), &BulletSpawner2D::set_homing_target_selection);
+	ClassDB::bind_method(D_METHOD("get_homing_target_selection"), &PatternSpawner2D::get_homing_target_selection);
+	ClassDB::bind_method(D_METHOD("set_homing_target_selection", "value"), &PatternSpawner2D::set_homing_target_selection);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "homing_target_selection", PROPERTY_HINT_ENUM, "Nearest,Random,First,Round Robin,Distribute"), "set_homing_target_selection", "get_homing_target_selection");
 	// Seed lives directly under its selection mode; only shown for Random (see _validate_property).
-	ClassDB::bind_method(D_METHOD("get_homing_random_seed"), &BulletSpawner2D::get_homing_random_seed);
-	ClassDB::bind_method(D_METHOD("set_homing_random_seed", "value"), &BulletSpawner2D::set_homing_random_seed);
+	ClassDB::bind_method(D_METHOD("get_homing_random_seed"), &PatternSpawner2D::get_homing_random_seed);
+	ClassDB::bind_method(D_METHOD("set_homing_random_seed", "value"), &PatternSpawner2D::set_homing_random_seed);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "homing_random_seed"), "set_homing_random_seed", "get_homing_random_seed");
 
-	ClassDB::bind_method(D_METHOD("get_homing_max_targets"), &BulletSpawner2D::get_homing_max_targets);
-	ClassDB::bind_method(D_METHOD("set_homing_max_targets", "value"), &BulletSpawner2D::set_homing_max_targets);
+	ClassDB::bind_method(D_METHOD("get_homing_max_targets"), &PatternSpawner2D::get_homing_max_targets);
+	ClassDB::bind_method(D_METHOD("set_homing_max_targets", "value"), &PatternSpawner2D::set_homing_max_targets);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "homing_max_targets"), "set_homing_max_targets", "get_homing_max_targets");
 
-	ClassDB::bind_method(D_METHOD("get_homing_max_detection_range"), &BulletSpawner2D::get_homing_max_detection_range);
-	ClassDB::bind_method(D_METHOD("set_homing_max_detection_range", "value"), &BulletSpawner2D::set_homing_max_detection_range);
+	ClassDB::bind_method(D_METHOD("get_homing_max_detection_range"), &PatternSpawner2D::get_homing_max_detection_range);
+	ClassDB::bind_method(D_METHOD("set_homing_max_detection_range", "value"), &PatternSpawner2D::set_homing_max_detection_range);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_max_detection_range"), "set_homing_max_detection_range", "get_homing_max_detection_range");
 
-	ClassDB::bind_method(D_METHOD("get_homing_global_position"), &BulletSpawner2D::get_homing_global_position);
-	ClassDB::bind_method(D_METHOD("set_homing_global_position", "value"), &BulletSpawner2D::set_homing_global_position);
+	ClassDB::bind_method(D_METHOD("get_homing_global_position"), &PatternSpawner2D::get_homing_global_position);
+	ClassDB::bind_method(D_METHOD("set_homing_global_position", "value"), &PatternSpawner2D::set_homing_global_position);
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "homing_global_position"), "set_homing_global_position", "get_homing_global_position");
 
-	ClassDB::bind_method(D_METHOD("get_homing_target_path"), &BulletSpawner2D::get_homing_target_path);
-	ClassDB::bind_method(D_METHOD("set_homing_target_path", "path"), &BulletSpawner2D::set_homing_target_path);
+	ClassDB::bind_method(D_METHOD("get_homing_target_path"), &PatternSpawner2D::get_homing_target_path);
+	ClassDB::bind_method(D_METHOD("set_homing_target_path", "path"), &PatternSpawner2D::set_homing_target_path);
 	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "homing_target_path", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "Node2D"), "set_homing_target_path", "get_homing_target_path");
 
-	ClassDB::bind_method(D_METHOD("get_homing_node_name"), &BulletSpawner2D::get_homing_node_name);
-	ClassDB::bind_method(D_METHOD("set_homing_node_name", "value"), &BulletSpawner2D::set_homing_node_name);
+	ClassDB::bind_method(D_METHOD("get_homing_node_name"), &PatternSpawner2D::get_homing_node_name);
+	ClassDB::bind_method(D_METHOD("set_homing_node_name", "value"), &PatternSpawner2D::set_homing_node_name);
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "homing_node_name"), "set_homing_node_name", "get_homing_node_name");
 
-	ClassDB::bind_method(D_METHOD("get_homing_node_name_match_mode"), &BulletSpawner2D::get_homing_node_name_match_mode);
-	ClassDB::bind_method(D_METHOD("set_homing_node_name_match_mode", "value"), &BulletSpawner2D::set_homing_node_name_match_mode);
+	ClassDB::bind_method(D_METHOD("get_homing_node_name_match_mode"), &PatternSpawner2D::get_homing_node_name_match_mode);
+	ClassDB::bind_method(D_METHOD("set_homing_node_name_match_mode", "value"), &PatternSpawner2D::set_homing_node_name_match_mode);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "homing_node_name_match_mode", PROPERTY_HINT_ENUM, "Exact,Contains,Starts With,Ends With"), "set_homing_node_name_match_mode", "get_homing_node_name_match_mode");
 
-	ClassDB::bind_method(D_METHOD("get_homing_node_name_case_sensitive"), &BulletSpawner2D::get_homing_node_name_case_sensitive);
-	ClassDB::bind_method(D_METHOD("set_homing_node_name_case_sensitive", "value"), &BulletSpawner2D::set_homing_node_name_case_sensitive);
+	ClassDB::bind_method(D_METHOD("get_homing_node_name_case_sensitive"), &PatternSpawner2D::get_homing_node_name_case_sensitive);
+	ClassDB::bind_method(D_METHOD("set_homing_node_name_case_sensitive", "value"), &PatternSpawner2D::set_homing_node_name_case_sensitive);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "homing_node_name_case_sensitive"), "set_homing_node_name_case_sensitive", "get_homing_node_name_case_sensitive");
 
-	ClassDB::bind_method(D_METHOD("get_homing_children_parent_path"), &BulletSpawner2D::get_homing_children_parent_path);
-	ClassDB::bind_method(D_METHOD("set_homing_children_parent_path", "path"), &BulletSpawner2D::set_homing_children_parent_path);
+	ClassDB::bind_method(D_METHOD("get_homing_children_parent_path"), &PatternSpawner2D::get_homing_children_parent_path);
+	ClassDB::bind_method(D_METHOD("set_homing_children_parent_path", "path"), &PatternSpawner2D::set_homing_children_parent_path);
 	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "homing_children_parent_path"), "set_homing_children_parent_path", "get_homing_children_parent_path");
 
-	ClassDB::bind_method(D_METHOD("get_homing_children_recursive"), &BulletSpawner2D::get_homing_children_recursive);
-	ClassDB::bind_method(D_METHOD("set_homing_children_recursive", "value"), &BulletSpawner2D::set_homing_children_recursive);
+	ClassDB::bind_method(D_METHOD("get_homing_children_recursive"), &PatternSpawner2D::get_homing_children_recursive);
+	ClassDB::bind_method(D_METHOD("set_homing_children_recursive", "value"), &PatternSpawner2D::set_homing_children_recursive);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "homing_children_recursive"), "set_homing_children_recursive", "get_homing_children_recursive");
 
-	ClassDB::bind_method(D_METHOD("get_homing_smoothing"), &BulletSpawner2D::get_homing_smoothing);
-	ClassDB::bind_method(D_METHOD("set_homing_smoothing", "value"), &BulletSpawner2D::set_homing_smoothing);
+	ClassDB::bind_method(D_METHOD("get_homing_smoothing"), &PatternSpawner2D::get_homing_smoothing);
+	ClassDB::bind_method(D_METHOD("set_homing_smoothing", "value"), &PatternSpawner2D::set_homing_smoothing);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_smoothing"), "set_homing_smoothing", "get_homing_smoothing");
 
-	ClassDB::bind_method(D_METHOD("get_homing_update_interval"), &BulletSpawner2D::get_homing_update_interval);
-	ClassDB::bind_method(D_METHOD("set_homing_update_interval", "value"), &BulletSpawner2D::set_homing_update_interval);
+	ClassDB::bind_method(D_METHOD("get_homing_update_interval"), &PatternSpawner2D::get_homing_update_interval);
+	ClassDB::bind_method(D_METHOD("set_homing_update_interval", "value"), &PatternSpawner2D::set_homing_update_interval);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_update_interval"), "set_homing_update_interval", "get_homing_update_interval");
 
-	ClassDB::bind_method(D_METHOD("get_homing_distance_before_reached"), &BulletSpawner2D::get_homing_distance_before_reached);
-	ClassDB::bind_method(D_METHOD("set_homing_distance_before_reached", "value"), &BulletSpawner2D::set_homing_distance_before_reached);
+	ClassDB::bind_method(D_METHOD("get_homing_distance_before_reached"), &PatternSpawner2D::get_homing_distance_before_reached);
+	ClassDB::bind_method(D_METHOD("set_homing_distance_before_reached", "value"), &PatternSpawner2D::set_homing_distance_before_reached);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_distance_before_reached"), "set_homing_distance_before_reached", "get_homing_distance_before_reached");
 
-	ClassDB::bind_method(D_METHOD("get_homing_reach_counts_bullet_size"), &BulletSpawner2D::get_homing_reach_counts_bullet_size);
-	ClassDB::bind_method(D_METHOD("set_homing_reach_counts_bullet_size", "value"), &BulletSpawner2D::set_homing_reach_counts_bullet_size);
+	ClassDB::bind_method(D_METHOD("get_homing_reach_counts_bullet_size"), &PatternSpawner2D::get_homing_reach_counts_bullet_size);
+	ClassDB::bind_method(D_METHOD("set_homing_reach_counts_bullet_size", "value"), &PatternSpawner2D::set_homing_reach_counts_bullet_size);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "homing_reach_counts_bullet_size"), "set_homing_reach_counts_bullet_size", "get_homing_reach_counts_bullet_size");
 
-	ClassDB::bind_method(D_METHOD("get_homing_take_control_of_texture_rotation"), &BulletSpawner2D::get_homing_take_control_of_texture_rotation);
-	ClassDB::bind_method(D_METHOD("set_homing_take_control_of_texture_rotation", "value"), &BulletSpawner2D::set_homing_take_control_of_texture_rotation);
+	ClassDB::bind_method(D_METHOD("get_homing_take_control_of_texture_rotation"), &PatternSpawner2D::get_homing_take_control_of_texture_rotation);
+	ClassDB::bind_method(D_METHOD("set_homing_take_control_of_texture_rotation", "value"), &PatternSpawner2D::set_homing_take_control_of_texture_rotation);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "homing_take_control_of_texture_rotation"), "set_homing_take_control_of_texture_rotation", "get_homing_take_control_of_texture_rotation");
 
-	ClassDB::bind_method(D_METHOD("get_homing_auto_pop_after_target_reached"), &BulletSpawner2D::get_homing_auto_pop_after_target_reached);
-	ClassDB::bind_method(D_METHOD("set_homing_auto_pop_after_target_reached", "value"), &BulletSpawner2D::set_homing_auto_pop_after_target_reached);
+	ClassDB::bind_method(D_METHOD("get_homing_auto_pop_after_target_reached"), &PatternSpawner2D::get_homing_auto_pop_after_target_reached);
+	ClassDB::bind_method(D_METHOD("set_homing_auto_pop_after_target_reached", "value"), &PatternSpawner2D::set_homing_auto_pop_after_target_reached);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "homing_auto_pop_after_target_reached"), "set_homing_auto_pop_after_target_reached", "get_homing_auto_pop_after_target_reached");
 
-	ClassDB::bind_method(D_METHOD("get_homing_per_bullet_smoothing_enabled"), &BulletSpawner2D::get_homing_per_bullet_smoothing_enabled);
-	ClassDB::bind_method(D_METHOD("set_homing_per_bullet_smoothing_enabled", "value"), &BulletSpawner2D::set_homing_per_bullet_smoothing_enabled);
+	ClassDB::bind_method(D_METHOD("get_homing_per_bullet_smoothing_enabled"), &PatternSpawner2D::get_homing_per_bullet_smoothing_enabled);
+	ClassDB::bind_method(D_METHOD("set_homing_per_bullet_smoothing_enabled", "value"), &PatternSpawner2D::set_homing_per_bullet_smoothing_enabled);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "homing_per_bullet_smoothing_enabled"), "set_homing_per_bullet_smoothing_enabled", "get_homing_per_bullet_smoothing_enabled");
 
-	ClassDB::bind_method(D_METHOD("get_homing_smoothing_start"), &BulletSpawner2D::get_homing_smoothing_start);
-	ClassDB::bind_method(D_METHOD("set_homing_smoothing_start", "value"), &BulletSpawner2D::set_homing_smoothing_start);
+	ClassDB::bind_method(D_METHOD("get_homing_smoothing_start"), &PatternSpawner2D::get_homing_smoothing_start);
+	ClassDB::bind_method(D_METHOD("set_homing_smoothing_start", "value"), &PatternSpawner2D::set_homing_smoothing_start);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_smoothing_start"), "set_homing_smoothing_start", "get_homing_smoothing_start");
 
-	ClassDB::bind_method(D_METHOD("get_homing_smoothing_step"), &BulletSpawner2D::get_homing_smoothing_step);
-	ClassDB::bind_method(D_METHOD("set_homing_smoothing_step", "value"), &BulletSpawner2D::set_homing_smoothing_step);
+	ClassDB::bind_method(D_METHOD("get_homing_smoothing_step"), &PatternSpawner2D::get_homing_smoothing_step);
+	ClassDB::bind_method(D_METHOD("set_homing_smoothing_step", "value"), &PatternSpawner2D::set_homing_smoothing_step);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_smoothing_step"), "set_homing_smoothing_step", "get_homing_smoothing_step");
 
-	ClassDB::bind_method(D_METHOD("get_homing_retarget_mode"), &BulletSpawner2D::get_homing_retarget_mode);
-	ClassDB::bind_method(D_METHOD("set_homing_retarget_mode", "value"), &BulletSpawner2D::set_homing_retarget_mode);
+	ClassDB::bind_method(D_METHOD("get_homing_retarget_mode"), &PatternSpawner2D::get_homing_retarget_mode);
+	ClassDB::bind_method(D_METHOD("set_homing_retarget_mode", "value"), &PatternSpawner2D::set_homing_retarget_mode);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "homing_retarget_mode", PROPERTY_HINT_ENUM, "Off,On Interval"), "set_homing_retarget_mode", "get_homing_retarget_mode");
 
-	ClassDB::bind_method(D_METHOD("get_homing_retarget_interval_sec"), &BulletSpawner2D::get_homing_retarget_interval_sec);
-	ClassDB::bind_method(D_METHOD("set_homing_retarget_interval_sec", "value"), &BulletSpawner2D::set_homing_retarget_interval_sec);
+	ClassDB::bind_method(D_METHOD("get_homing_retarget_interval_sec"), &PatternSpawner2D::get_homing_retarget_interval_sec);
+	ClassDB::bind_method(D_METHOD("set_homing_retarget_interval_sec", "value"), &PatternSpawner2D::set_homing_retarget_interval_sec);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_retarget_interval_sec"), "set_homing_retarget_interval_sec", "get_homing_retarget_interval_sec");
 
-	ClassDB::bind_method(D_METHOD("get_homing_retarget_phase"), &BulletSpawner2D::get_homing_retarget_phase);
-	ClassDB::bind_method(D_METHOD("set_homing_retarget_phase", "value"), &BulletSpawner2D::set_homing_retarget_phase);
+	ClassDB::bind_method(D_METHOD("get_homing_retarget_phase"), &PatternSpawner2D::get_homing_retarget_phase);
+	ClassDB::bind_method(D_METHOD("set_homing_retarget_phase", "value"), &PatternSpawner2D::set_homing_retarget_phase);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_retarget_phase"), "set_homing_retarget_phase", "get_homing_retarget_phase");
 
-	ClassDB::bind_method(D_METHOD("get_homing_retarget_previous_volleys"), &BulletSpawner2D::get_homing_retarget_previous_volleys);
-	ClassDB::bind_method(D_METHOD("set_homing_retarget_previous_volleys", "value"), &BulletSpawner2D::set_homing_retarget_previous_volleys);
+	ClassDB::bind_method(D_METHOD("get_homing_retarget_previous_volleys"), &PatternSpawner2D::get_homing_retarget_previous_volleys);
+	ClassDB::bind_method(D_METHOD("set_homing_retarget_previous_volleys", "value"), &PatternSpawner2D::set_homing_retarget_previous_volleys);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "homing_retarget_previous_volleys"), "set_homing_retarget_previous_volleys", "get_homing_retarget_previous_volleys");
 
-	ClassDB::bind_method(D_METHOD("get_homing_delay_sec"), &BulletSpawner2D::get_homing_delay_sec);
-	ClassDB::bind_method(D_METHOD("set_homing_delay_sec", "value"), &BulletSpawner2D::set_homing_delay_sec);
+	ClassDB::bind_method(D_METHOD("get_homing_delay_sec"), &PatternSpawner2D::get_homing_delay_sec);
+	ClassDB::bind_method(D_METHOD("set_homing_delay_sec", "value"), &PatternSpawner2D::set_homing_delay_sec);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_delay_sec"), "set_homing_delay_sec", "get_homing_delay_sec");
 
-	ClassDB::bind_method(D_METHOD("get_homing_duration_sec"), &BulletSpawner2D::get_homing_duration_sec);
-	ClassDB::bind_method(D_METHOD("set_homing_duration_sec", "value"), &BulletSpawner2D::set_homing_duration_sec);
+	ClassDB::bind_method(D_METHOD("get_homing_duration_sec"), &PatternSpawner2D::get_homing_duration_sec);
+	ClassDB::bind_method(D_METHOD("set_homing_duration_sec", "value"), &PatternSpawner2D::set_homing_duration_sec);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_duration_sec"), "set_homing_duration_sec", "get_homing_duration_sec");
 
-	ClassDB::bind_method(D_METHOD("get_homing_lose_range_px"), &BulletSpawner2D::get_homing_lose_range_px);
-	ClassDB::bind_method(D_METHOD("set_homing_lose_range_px", "value"), &BulletSpawner2D::set_homing_lose_range_px);
+	ClassDB::bind_method(D_METHOD("get_homing_lose_range_px"), &PatternSpawner2D::get_homing_lose_range_px);
+	ClassDB::bind_method(D_METHOD("set_homing_lose_range_px", "value"), &PatternSpawner2D::set_homing_lose_range_px);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_lose_range_px"), "set_homing_lose_range_px", "get_homing_lose_range_px");
 
-	ClassDB::bind_method(D_METHOD("get_homing_fire_arc_deg"), &BulletSpawner2D::get_homing_fire_arc_deg);
-	ClassDB::bind_method(D_METHOD("set_homing_fire_arc_deg", "value"), &BulletSpawner2D::set_homing_fire_arc_deg);
+	ClassDB::bind_method(D_METHOD("get_homing_fire_arc_deg"), &PatternSpawner2D::get_homing_fire_arc_deg);
+	ClassDB::bind_method(D_METHOD("set_homing_fire_arc_deg", "value"), &PatternSpawner2D::set_homing_fire_arc_deg);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_fire_arc_deg"), "set_homing_fire_arc_deg", "get_homing_fire_arc_deg");
 
-	ClassDB::bind_method(D_METHOD("get_orbiting_enabled"), &BulletSpawner2D::get_orbiting_enabled);
-	ClassDB::bind_method(D_METHOD("set_orbiting_enabled", "value"), &BulletSpawner2D::set_orbiting_enabled);
+	ClassDB::bind_method(D_METHOD("get_orbiting_enabled"), &PatternSpawner2D::get_orbiting_enabled);
+	ClassDB::bind_method(D_METHOD("set_orbiting_enabled", "value"), &PatternSpawner2D::set_orbiting_enabled);
 	ADD_GROUP("Orbiting", "");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "orbiting_enabled"), "set_orbiting_enabled", "get_orbiting_enabled");
 
-	ClassDB::bind_method(D_METHOD("get_orbiting_radius"), &BulletSpawner2D::get_orbiting_radius);
-	ClassDB::bind_method(D_METHOD("set_orbiting_radius", "value"), &BulletSpawner2D::set_orbiting_radius);
+	ClassDB::bind_method(D_METHOD("get_orbiting_radius"), &PatternSpawner2D::get_orbiting_radius);
+	ClassDB::bind_method(D_METHOD("set_orbiting_radius", "value"), &PatternSpawner2D::set_orbiting_radius);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "orbiting_radius"), "set_orbiting_radius", "get_orbiting_radius");
 
-	ClassDB::bind_method(D_METHOD("get_orbiting_direction"), &BulletSpawner2D::get_orbiting_direction);
-	ClassDB::bind_method(D_METHOD("set_orbiting_direction", "value"), &BulletSpawner2D::set_orbiting_direction);
+	ClassDB::bind_method(D_METHOD("get_orbiting_direction"), &PatternSpawner2D::get_orbiting_direction);
+	ClassDB::bind_method(D_METHOD("set_orbiting_direction", "value"), &PatternSpawner2D::set_orbiting_direction);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "orbiting_direction", PROPERTY_HINT_ENUM, "Dont Move,Orbit Left,Orbit Right,Orbit Random"), "set_orbiting_direction", "get_orbiting_direction");
 
-	ClassDB::bind_method(D_METHOD("get_orbiting_texture_rotation"), &BulletSpawner2D::get_orbiting_texture_rotation);
-	ClassDB::bind_method(D_METHOD("set_orbiting_texture_rotation", "value"), &BulletSpawner2D::set_orbiting_texture_rotation);
+	ClassDB::bind_method(D_METHOD("get_orbiting_texture_rotation"), &PatternSpawner2D::get_orbiting_texture_rotation);
+	ClassDB::bind_method(D_METHOD("set_orbiting_texture_rotation", "value"), &PatternSpawner2D::set_orbiting_texture_rotation);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "orbiting_texture_rotation", PROPERTY_HINT_ENUM, "Face Target,Face Opposite Target,Face Orbiting Direction,Face Opposite Orbiting Direction"), "set_orbiting_texture_rotation", "get_orbiting_texture_rotation");
 
-	ClassDB::bind_method(D_METHOD("get_orbiting_radius_linear_enabled"), &BulletSpawner2D::get_orbiting_radius_linear_enabled);
-	ClassDB::bind_method(D_METHOD("set_orbiting_radius_linear_enabled", "value"), &BulletSpawner2D::set_orbiting_radius_linear_enabled);
+	ClassDB::bind_method(D_METHOD("get_orbiting_radius_linear_enabled"), &PatternSpawner2D::get_orbiting_radius_linear_enabled);
+	ClassDB::bind_method(D_METHOD("set_orbiting_radius_linear_enabled", "value"), &PatternSpawner2D::set_orbiting_radius_linear_enabled);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "orbiting_radius_linear_enabled"), "set_orbiting_radius_linear_enabled", "get_orbiting_radius_linear_enabled");
 
-	ClassDB::bind_method(D_METHOD("get_orbiting_radius_start"), &BulletSpawner2D::get_orbiting_radius_start);
-	ClassDB::bind_method(D_METHOD("set_orbiting_radius_start", "value"), &BulletSpawner2D::set_orbiting_radius_start);
+	ClassDB::bind_method(D_METHOD("get_orbiting_radius_start"), &PatternSpawner2D::get_orbiting_radius_start);
+	ClassDB::bind_method(D_METHOD("set_orbiting_radius_start", "value"), &PatternSpawner2D::set_orbiting_radius_start);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "orbiting_radius_start"), "set_orbiting_radius_start", "get_orbiting_radius_start");
 
-	ClassDB::bind_method(D_METHOD("get_orbiting_radius_step"), &BulletSpawner2D::get_orbiting_radius_step);
-	ClassDB::bind_method(D_METHOD("set_orbiting_radius_step", "value"), &BulletSpawner2D::set_orbiting_radius_step);
+	ClassDB::bind_method(D_METHOD("get_orbiting_radius_step"), &PatternSpawner2D::get_orbiting_radius_step);
+	ClassDB::bind_method(D_METHOD("set_orbiting_radius_step", "value"), &PatternSpawner2D::set_orbiting_radius_step);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "orbiting_radius_step"), "set_orbiting_radius_step", "get_orbiting_radius_step");
 
-	ClassDB::bind_method(D_METHOD("get_orbiting_follow_mode"), &BulletSpawner2D::get_orbiting_follow_mode);
-	ClassDB::bind_method(D_METHOD("set_orbiting_follow_mode", "value"), &BulletSpawner2D::set_orbiting_follow_mode);
+	ClassDB::bind_method(D_METHOD("get_orbiting_follow_mode"), &PatternSpawner2D::get_orbiting_follow_mode);
+	ClassDB::bind_method(D_METHOD("set_orbiting_follow_mode", "value"), &PatternSpawner2D::set_orbiting_follow_mode);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "orbiting_follow_mode", PROPERTY_HINT_ENUM, "Follow Target,Follow Deadzone,Anchored"), "set_orbiting_follow_mode", "get_orbiting_follow_mode");
 
-	ClassDB::bind_method(D_METHOD("get_orbiting_follow_deadzone"), &BulletSpawner2D::get_orbiting_follow_deadzone);
-	ClassDB::bind_method(D_METHOD("set_orbiting_follow_deadzone", "value"), &BulletSpawner2D::set_orbiting_follow_deadzone);
+	ClassDB::bind_method(D_METHOD("get_orbiting_follow_deadzone"), &PatternSpawner2D::get_orbiting_follow_deadzone);
+	ClassDB::bind_method(D_METHOD("set_orbiting_follow_deadzone", "value"), &PatternSpawner2D::set_orbiting_follow_deadzone);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "orbiting_follow_deadzone"), "set_orbiting_follow_deadzone", "get_orbiting_follow_deadzone");
 
-	ClassDB::bind_method(D_METHOD("get_orbiting_lock_policy"), &BulletSpawner2D::get_orbiting_lock_policy);
-	ClassDB::bind_method(D_METHOD("set_orbiting_lock_policy", "value"), &BulletSpawner2D::set_orbiting_lock_policy);
+	ClassDB::bind_method(D_METHOD("get_orbiting_lock_policy"), &PatternSpawner2D::get_orbiting_lock_policy);
+	ClassDB::bind_method(D_METHOD("set_orbiting_lock_policy", "value"), &PatternSpawner2D::set_orbiting_lock_policy);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "orbiting_lock_policy", PROPERTY_HINT_ENUM, "Relock Always,Stay Locked,Relock On Target Change"), "set_orbiting_lock_policy", "get_orbiting_lock_policy");
 
-	ClassDB::bind_method(D_METHOD("get_orbiting_rigid_follow"), &BulletSpawner2D::get_orbiting_rigid_follow);
-	ClassDB::bind_method(D_METHOD("set_orbiting_rigid_follow", "value"), &BulletSpawner2D::set_orbiting_rigid_follow);
+	ClassDB::bind_method(D_METHOD("get_orbiting_rigid_follow"), &PatternSpawner2D::get_orbiting_rigid_follow);
+	ClassDB::bind_method(D_METHOD("set_orbiting_rigid_follow", "value"), &PatternSpawner2D::set_orbiting_rigid_follow);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "orbiting_rigid_follow"), "set_orbiting_rigid_follow", "get_orbiting_rigid_follow");
 
-	ClassDB::bind_method(D_METHOD("resolve_homing_targets", "quiet", "advance_round_robin"), &BulletSpawner2D::resolve_homing_targets, DEFVAL(false), DEFVAL(true));
-	ClassDB::bind_method(D_METHOD("retarget_live_volleys"), &BulletSpawner2D::retarget_live_volleys);
-	ClassDB::bind_method(D_METHOD("get_live_volley_count"), &BulletSpawner2D::get_live_volley_count);
-	ClassDB::bind_method(D_METHOD("get_live_volleys"), &BulletSpawner2D::get_live_volleys);
-	ClassDB::bind_method(D_METHOD("get_tracked_volley_count"), &BulletSpawner2D::get_tracked_volley_count);
-	ClassDB::bind_method(D_METHOD("forget_tracked_volleys"), &BulletSpawner2D::forget_tracked_volleys);
-	ClassDB::bind_method(D_METHOD("clear_active_bullets", "fire_clear_effects"), &BulletSpawner2D::clear_active_bullets, DEFVAL(true));
-	ClassDB::bind_method(D_METHOD("debug_get_layer_rings"), &BulletSpawner2D::debug_get_layer_rings);
-	ClassDB::bind_method(D_METHOD("debug_get_preview_dot_points"), &BulletSpawner2D::debug_get_preview_dot_points);
-	ClassDB::bind_method(D_METHOD("debug_get_preview_track_points"), &BulletSpawner2D::debug_get_preview_track_points);
-	ClassDB::bind_method(D_METHOD("debug_get_preview_track_closed"), &BulletSpawner2D::debug_get_preview_track_closed);
-	ClassDB::bind_method(D_METHOD("debug_check_layer_coincidence", "tolerance_px"), &BulletSpawner2D::debug_check_layer_coincidence, DEFVAL(1.0));
-	ClassDB::bind_method(D_METHOD("debug_get_retarget_countdown"), &BulletSpawner2D::debug_get_retarget_countdown);
-	ClassDB::bind_method(D_METHOD("adopt_live_volley", "volley"), &BulletSpawner2D::adopt_live_volley);
-	ClassDB::bind_method(D_METHOD("clear_live_volleys_homing"), &BulletSpawner2D::clear_live_volleys_homing);
-	ClassDB::bind_method(D_METHOD("override_live_volleys_velocity", "new_velocity"), &BulletSpawner2D::override_live_volleys_velocity);
+	ClassDB::bind_method(D_METHOD("resolve_homing_targets", "quiet", "advance_round_robin"), &PatternSpawner2D::resolve_homing_targets, DEFVAL(false), DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("retarget_live_volleys"), &PatternSpawner2D::retarget_live_volleys);
+	ClassDB::bind_method(D_METHOD("get_live_volley_count"), &PatternSpawner2D::get_live_volley_count);
+	ClassDB::bind_method(D_METHOD("get_live_volleys"), &PatternSpawner2D::get_live_volleys);
+	ClassDB::bind_method(D_METHOD("get_tracked_volley_count"), &PatternSpawner2D::get_tracked_volley_count);
+	ClassDB::bind_method(D_METHOD("forget_tracked_volleys"), &PatternSpawner2D::forget_tracked_volleys);
+	ClassDB::bind_method(D_METHOD("clear_active_bullets", "fire_clear_effects"), &PatternSpawner2D::clear_active_bullets, DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("debug_get_layer_rings"), &PatternSpawner2D::debug_get_layer_rings);
+	ClassDB::bind_method(D_METHOD("debug_get_preview_dot_points"), &PatternSpawner2D::debug_get_preview_dot_points);
+	ClassDB::bind_method(D_METHOD("debug_get_preview_track_points"), &PatternSpawner2D::debug_get_preview_track_points);
+	ClassDB::bind_method(D_METHOD("debug_get_preview_track_closed"), &PatternSpawner2D::debug_get_preview_track_closed);
+	ClassDB::bind_method(D_METHOD("debug_check_layer_coincidence", "tolerance_px"), &PatternSpawner2D::debug_check_layer_coincidence, DEFVAL(1.0));
+	ClassDB::bind_method(D_METHOD("debug_get_retarget_countdown"), &PatternSpawner2D::debug_get_retarget_countdown);
+	ClassDB::bind_method(D_METHOD("adopt_live_volley", "volley"), &PatternSpawner2D::adopt_live_volley);
+	ClassDB::bind_method(D_METHOD("clear_live_volleys_homing"), &PatternSpawner2D::clear_live_volleys_homing);
+	ClassDB::bind_method(D_METHOD("override_live_volleys_velocity", "new_velocity"), &PatternSpawner2D::override_live_volleys_velocity);
 
 	// Need this in order to expose the enum constants to Godot Engine
 	BIND_ENUM_CONSTANT(HOMING_SHARED);
@@ -764,13 +764,13 @@ void BulletSpawner2D::_bind_methods() {
 	BIND_ENUM_CONSTANT(SOUND_LISTENER_GLOBAL_POSITIONS);
 
 	// Flocking (bullet_spawner2d_flock.cpp): fired volleys join flock.
-	ClassDB::bind_method(D_METHOD("get_flock_enabled"), &BulletSpawner2D::get_flock_enabled);
-	ClassDB::bind_method(D_METHOD("set_flock_enabled", "value"), &BulletSpawner2D::set_flock_enabled);
-	ClassDB::bind_method(D_METHOD("get_flock"), &BulletSpawner2D::get_flock);
-	ClassDB::bind_method(D_METHOD("set_flock", "value"), &BulletSpawner2D::set_flock);
-	ClassDB::bind_method(D_METHOD("get_flock_scope"), &BulletSpawner2D::get_flock_scope);
-	ClassDB::bind_method(D_METHOD("set_flock_scope", "value"), &BulletSpawner2D::set_flock_scope);
-	ClassDB::bind_method(D_METHOD("flock_live_volleys"), &BulletSpawner2D::flock_live_volleys);
+	ClassDB::bind_method(D_METHOD("get_flock_enabled"), &PatternSpawner2D::get_flock_enabled);
+	ClassDB::bind_method(D_METHOD("set_flock_enabled", "value"), &PatternSpawner2D::set_flock_enabled);
+	ClassDB::bind_method(D_METHOD("get_flock"), &PatternSpawner2D::get_flock);
+	ClassDB::bind_method(D_METHOD("set_flock", "value"), &PatternSpawner2D::set_flock);
+	ClassDB::bind_method(D_METHOD("get_flock_scope"), &PatternSpawner2D::get_flock_scope);
+	ClassDB::bind_method(D_METHOD("set_flock_scope", "value"), &PatternSpawner2D::set_flock_scope);
+	ClassDB::bind_method(D_METHOD("flock_live_volleys"), &PatternSpawner2D::flock_live_volleys);
 	ADD_GROUP("Flocking", "");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "flock_enabled"), "set_flock_enabled", "get_flock_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "flock", PROPERTY_HINT_RESOURCE_TYPE, "BulletFlock2D"), "set_flock", "get_flock");
@@ -779,10 +779,10 @@ void BulletSpawner2D::_bind_methods() {
 	// Splitting (bullet_spawner2d_split.cpp): fired volleys split by
 	// split_data. bullet_split fires here once per parent that split, after
 	// its children spawned (same payload on the factory for factory volleys).
-	ClassDB::bind_method(D_METHOD("get_split_enabled"), &BulletSpawner2D::get_split_enabled);
-	ClassDB::bind_method(D_METHOD("set_split_enabled", "value"), &BulletSpawner2D::set_split_enabled);
-	ClassDB::bind_method(D_METHOD("get_split_data"), &BulletSpawner2D::get_split_data);
-	ClassDB::bind_method(D_METHOD("set_split_data", "value"), &BulletSpawner2D::set_split_data);
+	ClassDB::bind_method(D_METHOD("get_split_enabled"), &PatternSpawner2D::get_split_enabled);
+	ClassDB::bind_method(D_METHOD("set_split_enabled", "value"), &PatternSpawner2D::set_split_enabled);
+	ClassDB::bind_method(D_METHOD("get_split_data"), &PatternSpawner2D::get_split_data);
+	ClassDB::bind_method(D_METHOD("set_split_data", "value"), &PatternSpawner2D::set_split_data);
 	ADD_GROUP("Splitting", "");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "split_enabled"), "set_split_enabled", "get_split_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "split_data", PROPERTY_HINT_RESOURCE_TYPE, "BulletSplitData2D"), "set_split_data", "get_split_data");
@@ -808,81 +808,81 @@ void BulletSpawner2D::_bind_methods() {
 			PropertyInfo(Variant::INT, "bullet_index"),
 			PropertyInfo(Variant::OBJECT, "zone", PROPERTY_HINT_RESOURCE_TYPE, "BulletGrazeZone2D"),
 			PropertyInfo(Variant::INT, "deepest_ring_index")));
-	ClassDB::bind_method(D_METHOD("get_graze_enabled"), &BulletSpawner2D::get_graze_enabled);
-	ClassDB::bind_method(D_METHOD("set_graze_enabled", "value"), &BulletSpawner2D::set_graze_enabled);
-	ClassDB::bind_method(D_METHOD("get_graze_zones"), &BulletSpawner2D::get_graze_zones);
-	ClassDB::bind_method(D_METHOD("set_graze_zones", "value"), &BulletSpawner2D::set_graze_zones);
-	ClassDB::bind_method(D_METHOD("get_graze_show_preview"), &BulletSpawner2D::get_graze_show_preview);
-	ClassDB::bind_method(D_METHOD("set_graze_show_preview", "value"), &BulletSpawner2D::set_graze_show_preview);
-	ClassDB::bind_method(D_METHOD("get_graze_preview_during_runtime"), &BulletSpawner2D::get_graze_preview_during_runtime);
-	ClassDB::bind_method(D_METHOD("set_graze_preview_during_runtime", "value"), &BulletSpawner2D::set_graze_preview_during_runtime);
-	ClassDB::bind_method(D_METHOD("get_graze_preview_line_width"), &BulletSpawner2D::get_graze_preview_line_width);
-	ClassDB::bind_method(D_METHOD("set_graze_preview_line_width", "value"), &BulletSpawner2D::set_graze_preview_line_width);
-	ClassDB::bind_method(D_METHOD("get_graze_target_source"), &BulletSpawner2D::get_graze_target_source);
-	ClassDB::bind_method(D_METHOD("set_graze_target_source", "value"), &BulletSpawner2D::set_graze_target_source);
-	ClassDB::bind_method(D_METHOD("get_graze_node_group"), &BulletSpawner2D::get_graze_node_group);
-	ClassDB::bind_method(D_METHOD("set_graze_node_group", "value"), &BulletSpawner2D::set_graze_node_group);
-	ClassDB::bind_method(D_METHOD("get_graze_filter_group"), &BulletSpawner2D::get_graze_filter_group);
-	ClassDB::bind_method(D_METHOD("set_graze_filter_group", "value"), &BulletSpawner2D::set_graze_filter_group);
-	ClassDB::bind_method(D_METHOD("get_graze_target_path"), &BulletSpawner2D::get_graze_target_path);
-	ClassDB::bind_method(D_METHOD("set_graze_target_path", "path"), &BulletSpawner2D::set_graze_target_path);
-	ClassDB::bind_method(D_METHOD("get_graze_node_name"), &BulletSpawner2D::get_graze_node_name);
-	ClassDB::bind_method(D_METHOD("set_graze_node_name", "value"), &BulletSpawner2D::set_graze_node_name);
-	ClassDB::bind_method(D_METHOD("get_graze_node_name_match_mode"), &BulletSpawner2D::get_graze_node_name_match_mode);
-	ClassDB::bind_method(D_METHOD("set_graze_node_name_match_mode", "value"), &BulletSpawner2D::set_graze_node_name_match_mode);
-	ClassDB::bind_method(D_METHOD("get_graze_node_name_case_sensitive"), &BulletSpawner2D::get_graze_node_name_case_sensitive);
-	ClassDB::bind_method(D_METHOD("set_graze_node_name_case_sensitive", "value"), &BulletSpawner2D::set_graze_node_name_case_sensitive);
-	ClassDB::bind_method(D_METHOD("get_graze_children_parent_path"), &BulletSpawner2D::get_graze_children_parent_path);
-	ClassDB::bind_method(D_METHOD("set_graze_children_parent_path", "path"), &BulletSpawner2D::set_graze_children_parent_path);
-	ClassDB::bind_method(D_METHOD("get_graze_children_recursive"), &BulletSpawner2D::get_graze_children_recursive);
-	ClassDB::bind_method(D_METHOD("set_graze_children_recursive", "value"), &BulletSpawner2D::set_graze_children_recursive);
-	ClassDB::bind_method(D_METHOD("get_graze_global_positions"), &BulletSpawner2D::get_graze_global_positions);
-	ClassDB::bind_method(D_METHOD("set_graze_global_positions", "value"), &BulletSpawner2D::set_graze_global_positions);
-	ClassDB::bind_method(D_METHOD("get_graze_update_interval"), &BulletSpawner2D::get_graze_update_interval);
-	ClassDB::bind_method(D_METHOD("set_graze_update_interval", "value"), &BulletSpawner2D::set_graze_update_interval);
-	ClassDB::bind_method(D_METHOD("refresh_graze_targets"), &BulletSpawner2D::refresh_graze_targets);
-	ClassDB::bind_method(D_METHOD("graze_live_volleys"), &BulletSpawner2D::graze_live_volleys);
-	ClassDB::bind_method(D_METHOD("resolve_graze_targets"), &BulletSpawner2D::resolve_graze_targets);
-	ClassDB::bind_method(D_METHOD("debug_get_graze_preview_circles"), &BulletSpawner2D::debug_get_graze_preview_circles);
-	ClassDB::bind_method(D_METHOD("debug_get_graze_preview_stats"), &BulletSpawner2D::debug_get_graze_preview_stats);
-	ClassDB::bind_method(D_METHOD("debug_get_graze_detector_stats"), &BulletSpawner2D::debug_get_graze_detector_stats);
+	ClassDB::bind_method(D_METHOD("get_graze_enabled"), &PatternSpawner2D::get_graze_enabled);
+	ClassDB::bind_method(D_METHOD("set_graze_enabled", "value"), &PatternSpawner2D::set_graze_enabled);
+	ClassDB::bind_method(D_METHOD("get_graze_zones"), &PatternSpawner2D::get_graze_zones);
+	ClassDB::bind_method(D_METHOD("set_graze_zones", "value"), &PatternSpawner2D::set_graze_zones);
+	ClassDB::bind_method(D_METHOD("get_graze_show_preview"), &PatternSpawner2D::get_graze_show_preview);
+	ClassDB::bind_method(D_METHOD("set_graze_show_preview", "value"), &PatternSpawner2D::set_graze_show_preview);
+	ClassDB::bind_method(D_METHOD("get_graze_preview_during_runtime"), &PatternSpawner2D::get_graze_preview_during_runtime);
+	ClassDB::bind_method(D_METHOD("set_graze_preview_during_runtime", "value"), &PatternSpawner2D::set_graze_preview_during_runtime);
+	ClassDB::bind_method(D_METHOD("get_graze_preview_line_width"), &PatternSpawner2D::get_graze_preview_line_width);
+	ClassDB::bind_method(D_METHOD("set_graze_preview_line_width", "value"), &PatternSpawner2D::set_graze_preview_line_width);
+	ClassDB::bind_method(D_METHOD("get_graze_target_source"), &PatternSpawner2D::get_graze_target_source);
+	ClassDB::bind_method(D_METHOD("set_graze_target_source", "value"), &PatternSpawner2D::set_graze_target_source);
+	ClassDB::bind_method(D_METHOD("get_graze_node_group"), &PatternSpawner2D::get_graze_node_group);
+	ClassDB::bind_method(D_METHOD("set_graze_node_group", "value"), &PatternSpawner2D::set_graze_node_group);
+	ClassDB::bind_method(D_METHOD("get_graze_filter_group"), &PatternSpawner2D::get_graze_filter_group);
+	ClassDB::bind_method(D_METHOD("set_graze_filter_group", "value"), &PatternSpawner2D::set_graze_filter_group);
+	ClassDB::bind_method(D_METHOD("get_graze_target_path"), &PatternSpawner2D::get_graze_target_path);
+	ClassDB::bind_method(D_METHOD("set_graze_target_path", "path"), &PatternSpawner2D::set_graze_target_path);
+	ClassDB::bind_method(D_METHOD("get_graze_node_name"), &PatternSpawner2D::get_graze_node_name);
+	ClassDB::bind_method(D_METHOD("set_graze_node_name", "value"), &PatternSpawner2D::set_graze_node_name);
+	ClassDB::bind_method(D_METHOD("get_graze_node_name_match_mode"), &PatternSpawner2D::get_graze_node_name_match_mode);
+	ClassDB::bind_method(D_METHOD("set_graze_node_name_match_mode", "value"), &PatternSpawner2D::set_graze_node_name_match_mode);
+	ClassDB::bind_method(D_METHOD("get_graze_node_name_case_sensitive"), &PatternSpawner2D::get_graze_node_name_case_sensitive);
+	ClassDB::bind_method(D_METHOD("set_graze_node_name_case_sensitive", "value"), &PatternSpawner2D::set_graze_node_name_case_sensitive);
+	ClassDB::bind_method(D_METHOD("get_graze_children_parent_path"), &PatternSpawner2D::get_graze_children_parent_path);
+	ClassDB::bind_method(D_METHOD("set_graze_children_parent_path", "path"), &PatternSpawner2D::set_graze_children_parent_path);
+	ClassDB::bind_method(D_METHOD("get_graze_children_recursive"), &PatternSpawner2D::get_graze_children_recursive);
+	ClassDB::bind_method(D_METHOD("set_graze_children_recursive", "value"), &PatternSpawner2D::set_graze_children_recursive);
+	ClassDB::bind_method(D_METHOD("get_graze_global_positions"), &PatternSpawner2D::get_graze_global_positions);
+	ClassDB::bind_method(D_METHOD("set_graze_global_positions", "value"), &PatternSpawner2D::set_graze_global_positions);
+	ClassDB::bind_method(D_METHOD("get_graze_update_interval"), &PatternSpawner2D::get_graze_update_interval);
+	ClassDB::bind_method(D_METHOD("set_graze_update_interval", "value"), &PatternSpawner2D::set_graze_update_interval);
+	ClassDB::bind_method(D_METHOD("refresh_graze_targets"), &PatternSpawner2D::refresh_graze_targets);
+	ClassDB::bind_method(D_METHOD("graze_live_volleys"), &PatternSpawner2D::graze_live_volleys);
+	ClassDB::bind_method(D_METHOD("resolve_graze_targets"), &PatternSpawner2D::resolve_graze_targets);
+	ClassDB::bind_method(D_METHOD("debug_get_graze_preview_circles"), &PatternSpawner2D::debug_get_graze_preview_circles);
+	ClassDB::bind_method(D_METHOD("debug_get_graze_preview_stats"), &PatternSpawner2D::debug_get_graze_preview_stats);
+	ClassDB::bind_method(D_METHOD("debug_get_graze_detector_stats"), &PatternSpawner2D::debug_get_graze_detector_stats);
 
 	// Sound (bullet_spawner2d_sound.cpp). Every fired volley carries
 	// sound_effects; spawner-only entries (On Shot, On Telegraph) offer
 	// directly from the spawner at its global position.
-	ClassDB::bind_method(D_METHOD("get_sound_enabled"), &BulletSpawner2D::get_sound_enabled);
-	ClassDB::bind_method(D_METHOD("set_sound_enabled", "value"), &BulletSpawner2D::set_sound_enabled);
-	ClassDB::bind_method(D_METHOD("get_sound_effects"), &BulletSpawner2D::get_sound_effects);
-	ClassDB::bind_method(D_METHOD("set_sound_effects", "value"), &BulletSpawner2D::set_sound_effects);
-	ClassDB::bind_method(D_METHOD("get_sound_volume_db"), &BulletSpawner2D::get_sound_volume_db);
-	ClassDB::bind_method(D_METHOD("set_sound_volume_db", "value"), &BulletSpawner2D::set_sound_volume_db);
-	ClassDB::bind_method(D_METHOD("get_sound_listener_source"), &BulletSpawner2D::get_sound_listener_source);
-	ClassDB::bind_method(D_METHOD("set_sound_listener_source", "value"), &BulletSpawner2D::set_sound_listener_source);
-	ClassDB::bind_method(D_METHOD("get_sound_listener_node_group"), &BulletSpawner2D::get_sound_listener_node_group);
-	ClassDB::bind_method(D_METHOD("set_sound_listener_node_group", "value"), &BulletSpawner2D::set_sound_listener_node_group);
-	ClassDB::bind_method(D_METHOD("get_sound_listener_filter_group"), &BulletSpawner2D::get_sound_listener_filter_group);
-	ClassDB::bind_method(D_METHOD("set_sound_listener_filter_group", "value"), &BulletSpawner2D::set_sound_listener_filter_group);
-	ClassDB::bind_method(D_METHOD("get_sound_listener_path"), &BulletSpawner2D::get_sound_listener_path);
-	ClassDB::bind_method(D_METHOD("set_sound_listener_path", "path"), &BulletSpawner2D::set_sound_listener_path);
-	ClassDB::bind_method(D_METHOD("get_sound_listener_node_name"), &BulletSpawner2D::get_sound_listener_node_name);
-	ClassDB::bind_method(D_METHOD("set_sound_listener_node_name", "value"), &BulletSpawner2D::set_sound_listener_node_name);
-	ClassDB::bind_method(D_METHOD("get_sound_listener_node_name_match_mode"), &BulletSpawner2D::get_sound_listener_node_name_match_mode);
-	ClassDB::bind_method(D_METHOD("set_sound_listener_node_name_match_mode", "value"), &BulletSpawner2D::set_sound_listener_node_name_match_mode);
-	ClassDB::bind_method(D_METHOD("get_sound_listener_node_name_case_sensitive"), &BulletSpawner2D::get_sound_listener_node_name_case_sensitive);
-	ClassDB::bind_method(D_METHOD("set_sound_listener_node_name_case_sensitive", "value"), &BulletSpawner2D::set_sound_listener_node_name_case_sensitive);
-	ClassDB::bind_method(D_METHOD("get_sound_listener_children_parent_path"), &BulletSpawner2D::get_sound_listener_children_parent_path);
-	ClassDB::bind_method(D_METHOD("set_sound_listener_children_parent_path", "path"), &BulletSpawner2D::set_sound_listener_children_parent_path);
-	ClassDB::bind_method(D_METHOD("get_sound_listener_children_recursive"), &BulletSpawner2D::get_sound_listener_children_recursive);
-	ClassDB::bind_method(D_METHOD("set_sound_listener_children_recursive", "value"), &BulletSpawner2D::set_sound_listener_children_recursive);
-	ClassDB::bind_method(D_METHOD("get_sound_listener_global_positions"), &BulletSpawner2D::get_sound_listener_global_positions);
-	ClassDB::bind_method(D_METHOD("set_sound_listener_global_positions", "value"), &BulletSpawner2D::set_sound_listener_global_positions);
-	ClassDB::bind_method(D_METHOD("get_sound_listener_update_interval"), &BulletSpawner2D::get_sound_listener_update_interval);
-	ClassDB::bind_method(D_METHOD("set_sound_listener_update_interval", "value"), &BulletSpawner2D::set_sound_listener_update_interval);
-	ClassDB::bind_method(D_METHOD("refresh_sound_listeners"), &BulletSpawner2D::refresh_sound_listeners);
-	ClassDB::bind_method(D_METHOD("sound_live_volleys"), &BulletSpawner2D::sound_live_volleys);
-	ClassDB::bind_method(D_METHOD("resolve_sound_listeners"), &BulletSpawner2D::resolve_sound_listeners);
-	ClassDB::bind_method(D_METHOD("preview_sound_effect", "index"), &BulletSpawner2D::preview_sound_effect);
-	ClassDB::bind_method(D_METHOD("debug_get_sound_detector_stats"), &BulletSpawner2D::debug_get_sound_detector_stats);
+	ClassDB::bind_method(D_METHOD("get_sound_enabled"), &PatternSpawner2D::get_sound_enabled);
+	ClassDB::bind_method(D_METHOD("set_sound_enabled", "value"), &PatternSpawner2D::set_sound_enabled);
+	ClassDB::bind_method(D_METHOD("get_sound_effects"), &PatternSpawner2D::get_sound_effects);
+	ClassDB::bind_method(D_METHOD("set_sound_effects", "value"), &PatternSpawner2D::set_sound_effects);
+	ClassDB::bind_method(D_METHOD("get_sound_volume_db"), &PatternSpawner2D::get_sound_volume_db);
+	ClassDB::bind_method(D_METHOD("set_sound_volume_db", "value"), &PatternSpawner2D::set_sound_volume_db);
+	ClassDB::bind_method(D_METHOD("get_sound_listener_source"), &PatternSpawner2D::get_sound_listener_source);
+	ClassDB::bind_method(D_METHOD("set_sound_listener_source", "value"), &PatternSpawner2D::set_sound_listener_source);
+	ClassDB::bind_method(D_METHOD("get_sound_listener_node_group"), &PatternSpawner2D::get_sound_listener_node_group);
+	ClassDB::bind_method(D_METHOD("set_sound_listener_node_group", "value"), &PatternSpawner2D::set_sound_listener_node_group);
+	ClassDB::bind_method(D_METHOD("get_sound_listener_filter_group"), &PatternSpawner2D::get_sound_listener_filter_group);
+	ClassDB::bind_method(D_METHOD("set_sound_listener_filter_group", "value"), &PatternSpawner2D::set_sound_listener_filter_group);
+	ClassDB::bind_method(D_METHOD("get_sound_listener_path"), &PatternSpawner2D::get_sound_listener_path);
+	ClassDB::bind_method(D_METHOD("set_sound_listener_path", "path"), &PatternSpawner2D::set_sound_listener_path);
+	ClassDB::bind_method(D_METHOD("get_sound_listener_node_name"), &PatternSpawner2D::get_sound_listener_node_name);
+	ClassDB::bind_method(D_METHOD("set_sound_listener_node_name", "value"), &PatternSpawner2D::set_sound_listener_node_name);
+	ClassDB::bind_method(D_METHOD("get_sound_listener_node_name_match_mode"), &PatternSpawner2D::get_sound_listener_node_name_match_mode);
+	ClassDB::bind_method(D_METHOD("set_sound_listener_node_name_match_mode", "value"), &PatternSpawner2D::set_sound_listener_node_name_match_mode);
+	ClassDB::bind_method(D_METHOD("get_sound_listener_node_name_case_sensitive"), &PatternSpawner2D::get_sound_listener_node_name_case_sensitive);
+	ClassDB::bind_method(D_METHOD("set_sound_listener_node_name_case_sensitive", "value"), &PatternSpawner2D::set_sound_listener_node_name_case_sensitive);
+	ClassDB::bind_method(D_METHOD("get_sound_listener_children_parent_path"), &PatternSpawner2D::get_sound_listener_children_parent_path);
+	ClassDB::bind_method(D_METHOD("set_sound_listener_children_parent_path", "path"), &PatternSpawner2D::set_sound_listener_children_parent_path);
+	ClassDB::bind_method(D_METHOD("get_sound_listener_children_recursive"), &PatternSpawner2D::get_sound_listener_children_recursive);
+	ClassDB::bind_method(D_METHOD("set_sound_listener_children_recursive", "value"), &PatternSpawner2D::set_sound_listener_children_recursive);
+	ClassDB::bind_method(D_METHOD("get_sound_listener_global_positions"), &PatternSpawner2D::get_sound_listener_global_positions);
+	ClassDB::bind_method(D_METHOD("set_sound_listener_global_positions", "value"), &PatternSpawner2D::set_sound_listener_global_positions);
+	ClassDB::bind_method(D_METHOD("get_sound_listener_update_interval"), &PatternSpawner2D::get_sound_listener_update_interval);
+	ClassDB::bind_method(D_METHOD("set_sound_listener_update_interval", "value"), &PatternSpawner2D::set_sound_listener_update_interval);
+	ClassDB::bind_method(D_METHOD("refresh_sound_listeners"), &PatternSpawner2D::refresh_sound_listeners);
+	ClassDB::bind_method(D_METHOD("sound_live_volleys"), &PatternSpawner2D::sound_live_volleys);
+	ClassDB::bind_method(D_METHOD("resolve_sound_listeners"), &PatternSpawner2D::resolve_sound_listeners);
+	ClassDB::bind_method(D_METHOD("preview_sound_effect", "index"), &PatternSpawner2D::preview_sound_effect);
+	ClassDB::bind_method(D_METHOD("debug_get_sound_detector_stats"), &PatternSpawner2D::debug_get_sound_detector_stats);
 	ADD_GROUP("Graze", "");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "graze_enabled"), "set_graze_enabled", "get_graze_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "graze_zones", PROPERTY_HINT_ARRAY_TYPE, "BulletGrazeZone2D"), "set_graze_zones", "get_graze_zones");
@@ -901,8 +901,8 @@ void BulletSpawner2D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "graze_preview_during_runtime"), "set_graze_preview_during_runtime", "get_graze_preview_during_runtime");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "graze_preview_line_width", PROPERTY_HINT_RANGE, "0.5,16,0.5,or_greater"), "set_graze_preview_line_width", "get_graze_preview_line_width");
 
-	ClassDB::bind_method(D_METHOD("get_show_pattern_preview"), &BulletSpawner2D::get_show_pattern_preview);
-	ClassDB::bind_method(D_METHOD("set_show_pattern_preview", "value"), &BulletSpawner2D::set_show_pattern_preview);
+	ClassDB::bind_method(D_METHOD("get_show_pattern_preview"), &PatternSpawner2D::get_show_pattern_preview);
+	ClassDB::bind_method(D_METHOD("set_show_pattern_preview", "value"), &PatternSpawner2D::set_show_pattern_preview);
 	ADD_GROUP("Sound", "");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "sound_enabled"), "set_sound_enabled", "get_sound_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "sound_effects", PROPERTY_HINT_ARRAY_TYPE, "BulletSoundData2D"), "set_sound_effects", "get_sound_effects");
@@ -922,72 +922,72 @@ void BulletSpawner2D::_bind_methods() {
 	ADD_GROUP("Preview", "");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "show_pattern_preview"), "set_show_pattern_preview", "get_show_pattern_preview");
 
-	ClassDB::bind_method(D_METHOD("get_show_preview_during_runtime"), &BulletSpawner2D::get_show_preview_during_runtime);
-	ClassDB::bind_method(D_METHOD("set_show_preview_during_runtime", "value"), &BulletSpawner2D::set_show_preview_during_runtime);
+	ClassDB::bind_method(D_METHOD("get_show_preview_during_runtime"), &PatternSpawner2D::get_show_preview_during_runtime);
+	ClassDB::bind_method(D_METHOD("set_show_preview_during_runtime", "value"), &PatternSpawner2D::set_show_preview_during_runtime);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "show_preview_during_runtime"), "set_show_preview_during_runtime", "get_show_preview_during_runtime");
 
-	ClassDB::bind_method(D_METHOD("get_preview_dot_color"), &BulletSpawner2D::get_preview_dot_color);
-	ClassDB::bind_method(D_METHOD("set_preview_dot_color", "value"), &BulletSpawner2D::set_preview_dot_color);
+	ClassDB::bind_method(D_METHOD("get_preview_dot_color"), &PatternSpawner2D::get_preview_dot_color);
+	ClassDB::bind_method(D_METHOD("set_preview_dot_color", "value"), &PatternSpawner2D::set_preview_dot_color);
 	ADD_PROPERTY(PropertyInfo(Variant::COLOR, "preview_dot_color"), "set_preview_dot_color", "get_preview_dot_color");
 
-	ClassDB::bind_method(D_METHOD("get_preview_arrow_color"), &BulletSpawner2D::get_preview_arrow_color);
-	ClassDB::bind_method(D_METHOD("set_preview_arrow_color", "value"), &BulletSpawner2D::set_preview_arrow_color);
+	ClassDB::bind_method(D_METHOD("get_preview_arrow_color"), &PatternSpawner2D::get_preview_arrow_color);
+	ClassDB::bind_method(D_METHOD("set_preview_arrow_color", "value"), &PatternSpawner2D::set_preview_arrow_color);
 	ADD_PROPERTY(PropertyInfo(Variant::COLOR, "preview_arrow_color"), "set_preview_arrow_color", "get_preview_arrow_color");
 
-	ClassDB::bind_method(D_METHOD("get_preview_first_dot_color"), &BulletSpawner2D::get_preview_first_dot_color);
-	ClassDB::bind_method(D_METHOD("set_preview_first_dot_color", "value"), &BulletSpawner2D::set_preview_first_dot_color);
+	ClassDB::bind_method(D_METHOD("get_preview_first_dot_color"), &PatternSpawner2D::get_preview_first_dot_color);
+	ClassDB::bind_method(D_METHOD("set_preview_first_dot_color", "value"), &PatternSpawner2D::set_preview_first_dot_color);
 	ADD_PROPERTY(PropertyInfo(Variant::COLOR, "preview_first_dot_color"), "set_preview_first_dot_color", "get_preview_first_dot_color");
 
-	ClassDB::bind_method(D_METHOD("get_preview_path_color"), &BulletSpawner2D::get_preview_path_color);
-	ClassDB::bind_method(D_METHOD("set_preview_path_color", "value"), &BulletSpawner2D::set_preview_path_color);
+	ClassDB::bind_method(D_METHOD("get_preview_path_color"), &PatternSpawner2D::get_preview_path_color);
+	ClassDB::bind_method(D_METHOD("set_preview_path_color", "value"), &PatternSpawner2D::set_preview_path_color);
 	ADD_PROPERTY(PropertyInfo(Variant::COLOR, "preview_path_color"), "set_preview_path_color", "get_preview_path_color");
 
-	ClassDB::bind_method(D_METHOD("get_preview_layer_path_color"), &BulletSpawner2D::get_preview_layer_path_color);
-	ClassDB::bind_method(D_METHOD("set_preview_layer_path_color", "value"), &BulletSpawner2D::set_preview_layer_path_color);
+	ClassDB::bind_method(D_METHOD("get_preview_layer_path_color"), &PatternSpawner2D::get_preview_layer_path_color);
+	ClassDB::bind_method(D_METHOD("set_preview_layer_path_color", "value"), &PatternSpawner2D::set_preview_layer_path_color);
 	ADD_PROPERTY(PropertyInfo(Variant::COLOR, "preview_layer_path_color"), "set_preview_layer_path_color", "get_preview_layer_path_color");
 
-	ClassDB::bind_method(D_METHOD("get_preview_path_width"), &BulletSpawner2D::get_preview_path_width);
-	ClassDB::bind_method(D_METHOD("set_preview_path_width", "value"), &BulletSpawner2D::set_preview_path_width);
+	ClassDB::bind_method(D_METHOD("get_preview_path_width"), &PatternSpawner2D::get_preview_path_width);
+	ClassDB::bind_method(D_METHOD("set_preview_path_width", "value"), &PatternSpawner2D::set_preview_path_width);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "preview_path_width"), "set_preview_path_width", "get_preview_path_width");
 
-	ClassDB::bind_method(D_METHOD("get_preview_dot_radius"), &BulletSpawner2D::get_preview_dot_radius);
-	ClassDB::bind_method(D_METHOD("set_preview_dot_radius", "value"), &BulletSpawner2D::set_preview_dot_radius);
+	ClassDB::bind_method(D_METHOD("get_preview_dot_radius"), &PatternSpawner2D::get_preview_dot_radius);
+	ClassDB::bind_method(D_METHOD("set_preview_dot_radius", "value"), &PatternSpawner2D::set_preview_dot_radius);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "preview_dot_radius"), "set_preview_dot_radius", "get_preview_dot_radius");
 
-	ClassDB::bind_method(D_METHOD("get_preview_arrow_gap"), &BulletSpawner2D::get_preview_arrow_gap);
-	ClassDB::bind_method(D_METHOD("set_preview_arrow_gap", "value"), &BulletSpawner2D::set_preview_arrow_gap);
+	ClassDB::bind_method(D_METHOD("get_preview_arrow_gap"), &PatternSpawner2D::get_preview_arrow_gap);
+	ClassDB::bind_method(D_METHOD("set_preview_arrow_gap", "value"), &PatternSpawner2D::set_preview_arrow_gap);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "preview_arrow_gap"), "set_preview_arrow_gap", "get_preview_arrow_gap");
 
-	ClassDB::bind_method(D_METHOD("get_preview_arrow_length"), &BulletSpawner2D::get_preview_arrow_length);
-	ClassDB::bind_method(D_METHOD("set_preview_arrow_length", "value"), &BulletSpawner2D::set_preview_arrow_length);
+	ClassDB::bind_method(D_METHOD("get_preview_arrow_length"), &PatternSpawner2D::get_preview_arrow_length);
+	ClassDB::bind_method(D_METHOD("set_preview_arrow_length", "value"), &PatternSpawner2D::set_preview_arrow_length);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "preview_arrow_length"), "set_preview_arrow_length", "get_preview_arrow_length");
 
-	ClassDB::bind_method(D_METHOD("get_preview_arrow_width"), &BulletSpawner2D::get_preview_arrow_width);
-	ClassDB::bind_method(D_METHOD("set_preview_arrow_width", "value"), &BulletSpawner2D::set_preview_arrow_width);
+	ClassDB::bind_method(D_METHOD("get_preview_arrow_width"), &PatternSpawner2D::get_preview_arrow_width);
+	ClassDB::bind_method(D_METHOD("set_preview_arrow_width", "value"), &PatternSpawner2D::set_preview_arrow_width);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "preview_arrow_width"), "set_preview_arrow_width", "get_preview_arrow_width");
 
-	ClassDB::bind_method(D_METHOD("get_preview_arrow_head_length"), &BulletSpawner2D::get_preview_arrow_head_length);
-	ClassDB::bind_method(D_METHOD("set_preview_arrow_head_length", "value"), &BulletSpawner2D::set_preview_arrow_head_length);
+	ClassDB::bind_method(D_METHOD("get_preview_arrow_head_length"), &PatternSpawner2D::get_preview_arrow_head_length);
+	ClassDB::bind_method(D_METHOD("set_preview_arrow_head_length", "value"), &PatternSpawner2D::set_preview_arrow_head_length);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "preview_arrow_head_length"), "set_preview_arrow_head_length", "get_preview_arrow_head_length");
 
-	ClassDB::bind_method(D_METHOD("get_preview_arrow_head_width"), &BulletSpawner2D::get_preview_arrow_head_width);
-	ClassDB::bind_method(D_METHOD("set_preview_arrow_head_width", "value"), &BulletSpawner2D::set_preview_arrow_head_width);
+	ClassDB::bind_method(D_METHOD("get_preview_arrow_head_width"), &PatternSpawner2D::get_preview_arrow_head_width);
+	ClassDB::bind_method(D_METHOD("set_preview_arrow_head_width", "value"), &PatternSpawner2D::set_preview_arrow_head_width);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "preview_arrow_head_width"), "set_preview_arrow_head_width", "get_preview_arrow_head_width");
 
-	ClassDB::bind_method(D_METHOD("get_preview_draw_collision_rings"), &BulletSpawner2D::get_preview_draw_collision_rings);
-	ClassDB::bind_method(D_METHOD("set_preview_draw_collision_rings", "value"), &BulletSpawner2D::set_preview_draw_collision_rings);
+	ClassDB::bind_method(D_METHOD("get_preview_draw_collision_rings"), &PatternSpawner2D::get_preview_draw_collision_rings);
+	ClassDB::bind_method(D_METHOD("set_preview_draw_collision_rings", "value"), &PatternSpawner2D::set_preview_draw_collision_rings);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "preview_draw_collision_rings"), "set_preview_draw_collision_rings", "get_preview_draw_collision_rings");
-	ClassDB::bind_method(D_METHOD("get_preview_collision_ring_color"), &BulletSpawner2D::get_preview_collision_ring_color);
-	ClassDB::bind_method(D_METHOD("set_preview_collision_ring_color", "value"), &BulletSpawner2D::set_preview_collision_ring_color);
+	ClassDB::bind_method(D_METHOD("get_preview_collision_ring_color"), &PatternSpawner2D::get_preview_collision_ring_color);
+	ClassDB::bind_method(D_METHOD("set_preview_collision_ring_color", "value"), &PatternSpawner2D::set_preview_collision_ring_color);
 	ADD_PROPERTY(PropertyInfo(Variant::COLOR, "preview_collision_ring_color"), "set_preview_collision_ring_color", "get_preview_collision_ring_color");
-	ClassDB::bind_method(D_METHOD("get_preview_collision_ring_width"), &BulletSpawner2D::get_preview_collision_ring_width);
-	ClassDB::bind_method(D_METHOD("set_preview_collision_ring_width", "value"), &BulletSpawner2D::set_preview_collision_ring_width);
+	ClassDB::bind_method(D_METHOD("get_preview_collision_ring_width"), &PatternSpawner2D::get_preview_collision_ring_width);
+	ClassDB::bind_method(D_METHOD("set_preview_collision_ring_width", "value"), &PatternSpawner2D::set_preview_collision_ring_width);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "preview_collision_ring_width"), "set_preview_collision_ring_width", "get_preview_collision_ring_width");
 
 	// ---- Movement ----
-#define BS_BIND_PROP(m_name)                                                        \
-	ClassDB::bind_method(D_METHOD("get_" #m_name), &BulletSpawner2D::get_##m_name); \
-	ClassDB::bind_method(D_METHOD("set_" #m_name, "value"), &BulletSpawner2D::set_##m_name);
+#define BS_BIND_PROP(m_name)                                                         \
+	ClassDB::bind_method(D_METHOD("get_" #m_name), &PatternSpawner2D::get_##m_name); \
+	ClassDB::bind_method(D_METHOD("set_" #m_name, "value"), &PatternSpawner2D::set_##m_name);
 	BS_BIND_PROP(movement_enabled)
 	BS_BIND_PROP(movement_path)
 	BS_BIND_PROP(movement_space)
@@ -1010,21 +1010,21 @@ void BulletSpawner2D::_bind_methods() {
 	BS_BIND_PROP(inherit_movement_velocity)
 	BS_BIND_PROP(movement_velocity_inherit_factor)
 #undef BS_BIND_PROP
-	ClassDB::bind_method(D_METHOD("get_movement_path_node"), &BulletSpawner2D::get_movement_path_node);
-	ClassDB::bind_method(D_METHOD("set_movement_path_node", "node"), &BulletSpawner2D::set_movement_path_node);
-	ClassDB::bind_method(D_METHOD("get_setup_warnings"), &BulletSpawner2D::get_setup_warnings);
-	ClassDB::bind_method(D_METHOD("debug_explain_features"), &BulletSpawner2D::debug_explain_features);
-	ClassDB::bind_method(D_METHOD("movement_play"), &BulletSpawner2D::movement_play);
-	ClassDB::bind_method(D_METHOD("movement_pause"), &BulletSpawner2D::movement_pause);
-	ClassDB::bind_method(D_METHOD("movement_stop", "reset_to_start"), &BulletSpawner2D::movement_stop, DEFVAL(true));
-	ClassDB::bind_method(D_METHOD("movement_seek", "ratio"), &BulletSpawner2D::movement_seek);
-	ClassDB::bind_method(D_METHOD("movement_reverse"), &BulletSpawner2D::movement_reverse);
-	ClassDB::bind_method(D_METHOD("teleport", "global_position", "carry_live_bullets"), &BulletSpawner2D::teleport, DEFVAL(false));
-	ClassDB::bind_method(D_METHOD("is_movement_playing"), &BulletSpawner2D::is_movement_playing);
-	ClassDB::bind_method(D_METHOD("get_movement_progress"), &BulletSpawner2D::get_movement_progress);
-	ClassDB::bind_method(D_METHOD("get_movement_leg"), &BulletSpawner2D::get_movement_leg);
-	ClassDB::bind_method(D_METHOD("get_movement_velocity"), &BulletSpawner2D::get_movement_velocity);
-	ClassDB::bind_static_method("BulletSpawner2D", D_METHOD("debug_ease", "t", "transition", "ease"), &BulletSpawner2D::debug_ease);
+	ClassDB::bind_method(D_METHOD("get_movement_path_node"), &PatternSpawner2D::get_movement_path_node);
+	ClassDB::bind_method(D_METHOD("set_movement_path_node", "node"), &PatternSpawner2D::set_movement_path_node);
+	ClassDB::bind_method(D_METHOD("get_setup_warnings"), &PatternSpawner2D::get_setup_warnings);
+	ClassDB::bind_method(D_METHOD("debug_explain_features"), &PatternSpawner2D::debug_explain_features);
+	ClassDB::bind_method(D_METHOD("movement_play"), &PatternSpawner2D::movement_play);
+	ClassDB::bind_method(D_METHOD("movement_pause"), &PatternSpawner2D::movement_pause);
+	ClassDB::bind_method(D_METHOD("movement_stop", "reset_to_start"), &PatternSpawner2D::movement_stop, DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("movement_seek", "ratio"), &PatternSpawner2D::movement_seek);
+	ClassDB::bind_method(D_METHOD("movement_reverse"), &PatternSpawner2D::movement_reverse);
+	ClassDB::bind_method(D_METHOD("teleport", "global_position", "carry_live_bullets"), &PatternSpawner2D::teleport, DEFVAL(false));
+	ClassDB::bind_method(D_METHOD("is_movement_playing"), &PatternSpawner2D::is_movement_playing);
+	ClassDB::bind_method(D_METHOD("get_movement_progress"), &PatternSpawner2D::get_movement_progress);
+	ClassDB::bind_method(D_METHOD("get_movement_leg"), &PatternSpawner2D::get_movement_leg);
+	ClassDB::bind_method(D_METHOD("get_movement_velocity"), &PatternSpawner2D::get_movement_velocity);
+	ClassDB::bind_static_method(get_class_static(), D_METHOD("debug_ease", "t", "transition", "ease"), &PatternSpawner2D::debug_ease);
 	BIND_ENUM_CONSTANT(MOVEMENT_SPACE_ATTACH);
 	BIND_ENUM_CONSTANT(MOVEMENT_SPACE_RELATIVE_TO_START);
 	BIND_ENUM_CONSTANT(MOVEMENT_LOOP_ONCE);
@@ -1061,8 +1061,8 @@ void BulletSpawner2D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "inherit_movement_velocity"), "set_inherit_movement_velocity", "get_inherit_movement_velocity");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "movement_velocity_inherit_factor", PROPERTY_HINT_RANGE, "-2,2,0.01,or_less,or_greater"), "set_movement_velocity_inherit_factor", "get_movement_velocity_inherit_factor");
 
-	ClassDB::bind_method(D_METHOD("get_pattern_cache_mode"), &BulletSpawner2D::get_pattern_cache_mode);
-	ClassDB::bind_method(D_METHOD("set_pattern_cache_mode", "value"), &BulletSpawner2D::set_pattern_cache_mode);
+	ClassDB::bind_method(D_METHOD("get_pattern_cache_mode"), &PatternSpawner2D::get_pattern_cache_mode);
+	ClassDB::bind_method(D_METHOD("set_pattern_cache_mode", "value"), &PatternSpawner2D::set_pattern_cache_mode);
 	ADD_GROUP("Performance", "");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "pattern_cache_mode", PROPERTY_HINT_ENUM, "Auto:0,Off:1"), "set_pattern_cache_mode", "get_pattern_cache_mode");
 
@@ -1126,28 +1126,28 @@ void BulletSpawner2D::_bind_methods() {
 	BIND_ENUM_CONSTANT(ORPHANED_VOLLEYS_CLEAR);
 	BIND_ENUM_CONSTANT(ORPHANED_VOLLEYS_REMOVE);
 
-	ClassDB::bind_method(D_METHOD("get_volleys_fired"), &BulletSpawner2D::get_volleys_fired);
-	ClassDB::bind_method(D_METHOD("collect_spawn_transforms"), &BulletSpawner2D::collect_spawn_transforms);
-	ClassDB::bind_method(D_METHOD("debug_collect_spawn_transforms_uncached"), &BulletSpawner2D::debug_collect_spawn_transforms_uncached);
-	ClassDB::bind_method(D_METHOD("debug_get_pattern_cache_info"), &BulletSpawner2D::debug_get_pattern_cache_info);
-	ClassDB::bind_method(D_METHOD("debug_get_preview_stats"), &BulletSpawner2D::debug_get_preview_stats);
-	ClassDB::bind_static_method("BulletSpawner2D", D_METHOD("debug_set_pattern_cache_verify", "enabled"), &BulletSpawner2D::debug_set_pattern_cache_verify);
-	ClassDB::bind_static_method("BulletSpawner2D", D_METHOD("debug_get_pattern_cache_verify"), &BulletSpawner2D::debug_get_pattern_cache_verify);
+	ClassDB::bind_method(D_METHOD("get_volleys_fired"), &PatternSpawner2D::get_volleys_fired);
+	ClassDB::bind_method(D_METHOD("collect_spawn_transforms"), &PatternSpawner2D::collect_spawn_transforms);
+	ClassDB::bind_method(D_METHOD("debug_collect_spawn_transforms_uncached"), &PatternSpawner2D::debug_collect_spawn_transforms_uncached);
+	ClassDB::bind_method(D_METHOD("debug_get_pattern_cache_info"), &PatternSpawner2D::debug_get_pattern_cache_info);
+	ClassDB::bind_method(D_METHOD("debug_get_preview_stats"), &PatternSpawner2D::debug_get_preview_stats);
+	ClassDB::bind_static_method(get_class_static(), D_METHOD("debug_set_pattern_cache_verify", "enabled"), &PatternSpawner2D::debug_set_pattern_cache_verify);
+	ClassDB::bind_static_method(get_class_static(), D_METHOD("debug_get_pattern_cache_verify"), &PatternSpawner2D::debug_get_pattern_cache_verify);
 	BIND_ENUM_CONSTANT(PATTERN_CACHE_AUTO);
 	BIND_ENUM_CONSTANT(PATTERN_CACHE_OFF);
-	ClassDB::bind_method(D_METHOD("shoot_once"), &BulletSpawner2D::shoot_once);
-	ClassDB::bind_method(D_METHOD("shoot_once_deferred"), &BulletSpawner2D::shoot_once_deferred);
-	ClassDB::bind_method(D_METHOD("reset_shooting"), &BulletSpawner2D::reset_shooting);
-	ClassDB::bind_method(D_METHOD("fire_n_volleys", "n"), &BulletSpawner2D::fire_n_volleys);
-	ClassDB::bind_method(D_METHOD("pause_shooting"), &BulletSpawner2D::pause_shooting);
-	ClassDB::bind_method(D_METHOD("resume_shooting"), &BulletSpawner2D::resume_shooting);
-	ClassDB::bind_method(D_METHOD("is_shooting_paused"), &BulletSpawner2D::is_shooting_paused);
-	ClassDB::bind_method(D_METHOD("get_shoot_time_left"), &BulletSpawner2D::get_shoot_time_left);
-	ClassDB::bind_method(D_METHOD("get_burst_time_left"), &BulletSpawner2D::get_burst_time_left);
-	ClassDB::bind_method(D_METHOD("is_telegraph_pending"), &BulletSpawner2D::is_telegraph_pending);
-	ClassDB::bind_method(D_METHOD("get_telegraph_time_left"), &BulletSpawner2D::get_telegraph_time_left);
-	ClassDB::bind_method(D_METHOD("get_pattern_list_time_left"), &BulletSpawner2D::get_pattern_list_time_left);
-	ClassDB::bind_method(D_METHOD("volleys_remaining"), &BulletSpawner2D::volleys_remaining);
+	ClassDB::bind_method(D_METHOD("shoot_once"), &PatternSpawner2D::shoot_once);
+	ClassDB::bind_method(D_METHOD("shoot_once_deferred"), &PatternSpawner2D::shoot_once_deferred);
+	ClassDB::bind_method(D_METHOD("reset_shooting"), &PatternSpawner2D::reset_shooting);
+	ClassDB::bind_method(D_METHOD("fire_n_volleys", "n"), &PatternSpawner2D::fire_n_volleys);
+	ClassDB::bind_method(D_METHOD("pause_shooting"), &PatternSpawner2D::pause_shooting);
+	ClassDB::bind_method(D_METHOD("resume_shooting"), &PatternSpawner2D::resume_shooting);
+	ClassDB::bind_method(D_METHOD("is_shooting_paused"), &PatternSpawner2D::is_shooting_paused);
+	ClassDB::bind_method(D_METHOD("get_shoot_time_left"), &PatternSpawner2D::get_shoot_time_left);
+	ClassDB::bind_method(D_METHOD("get_burst_time_left"), &PatternSpawner2D::get_burst_time_left);
+	ClassDB::bind_method(D_METHOD("is_telegraph_pending"), &PatternSpawner2D::is_telegraph_pending);
+	ClassDB::bind_method(D_METHOD("get_telegraph_time_left"), &PatternSpawner2D::get_telegraph_time_left);
+	ClassDB::bind_method(D_METHOD("get_pattern_list_time_left"), &PatternSpawner2D::get_pattern_list_time_left);
+	ClassDB::bind_method(D_METHOD("volleys_remaining"), &PatternSpawner2D::volleys_remaining);
 }
 
 } // namespace BlastBullets2D

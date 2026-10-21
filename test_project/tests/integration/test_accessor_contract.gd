@@ -36,8 +36,11 @@ func before_each() -> void:
 ## Every one-argument setter of the class itself with its getter twin.
 func _pairs(cls: String) -> Array:
 	var methods := {}
-	for m in ClassDB.class_get_method_list(cls, true):
-		methods[str(m["name"])] = m
+	var c := StringName(cls)
+	while c != &"" and ClassDB.class_get_api_type(c) == ClassDB.API_EXTENSION: # the class and its plugin bases
+		for m in ClassDB.class_get_method_list(c, true):
+			methods[str(m["name"])] = m
+		c = ClassDB.get_parent_class(c)
 	var out: Array = []
 	for name in methods:
 		if not name.begins_with("set_"):

@@ -134,40 +134,61 @@ func _prop_info(p: Dictionary) -> String:
 			p.get("hint", 0), p.get("hint_string", ""), p.get("usage", 0)]
 
 
+## The class and its plugin ancestors (an abstract plugin base such as
+## PatternSpawner2D): moving a member between them is not a surface change.
+func _plugin_chain(cls: StringName) -> Array:
+	var chain: Array = [cls]
+	var parent := ClassDB.get_parent_class(cls)
+	while parent != &"" and ClassDB.class_get_api_type(parent) == ClassDB.API_EXTENSION:
+		chain.append(parent)
+		parent = ClassDB.get_parent_class(parent)
+	return chain
+
+
 func _snap_surface(section: String) -> void:
 	for cls in PLUGIN_CLASSES:
+		var chain := _plugin_chain(cls)
 		var methods := {}
-		for m in ClassDB.class_get_method_list(cls, true):
-			var args := PackedStringArray()
-			for a in m.get("args", []):
-				args.append(_prop_info(a))
-			var defs := PackedStringArray()
-			for d in m.get("default_args", []):
-				defs.append("%s=%s" % [type_string(typeof(d)), var_to_str(d)])
-			methods[m["name"]] = {"args": args, "defaults": defs, "flags": m.get("flags", 0),
-					"return": _prop_info(m.get("return", {}))}
+		for owner in chain:
+			for m in ClassDB.class_get_method_list(owner, true):
+				var args := PackedStringArray()
+				for a in m.get("args", []):
+					args.append(_prop_info(a))
+				var defs := PackedStringArray()
+				for d in m.get("default_args", []):
+					defs.append("%s=%s" % [type_string(typeof(d)), var_to_str(d)])
+				methods[m["name"]] = {"args": args, "defaults": defs, "flags": m.get("flags", 0),
+						"return": _prop_info(m.get("return", {}))}
 		var names := methods.keys()
 		names.sort()
 		for n in names:
 			_rec(section, "%s.method.%s" % [cls, n], methods[n])
+		# Sorted: the inspector order is locked by the group-order suites.
 		var props := PackedStringArray()
-		for p in ClassDB.class_get_property_list(cls, true):
-			props.append(_prop_info(p))
+		for owner in chain:
+			for p in ClassDB.class_get_property_list(owner, true):
+				if int(p.get("usage", 0)) & (PROPERTY_USAGE_GROUP | PROPERTY_USAGE_SUBGROUP | PROPERTY_USAGE_CATEGORY):
+					continue
+				props.append(_prop_info(p))
+		props.sort()
 		_rec(section, "%s.properties" % cls, props)
 		var sigs := PackedStringArray()
-		for s in ClassDB.class_get_signal_list(cls, true):
-			var args := PackedStringArray()
-			for a in s.get("args", []):
-				args.append(_prop_info(a))
-			sigs.append("%s(%s)" % [s["name"], ", ".join(args)])
+		for owner in chain:
+			for s in ClassDB.class_get_signal_list(owner, true):
+				var args := PackedStringArray()
+				for a in s.get("args", []):
+					args.append(_prop_info(a))
+				sigs.append("%s(%s)" % [s["name"], ", ".join(args)])
 		sigs.sort()
 		_rec(section, "%s.signals" % cls, sigs)
 		var consts := PackedStringArray()
-		for c in ClassDB.class_get_integer_constant_list(cls, true):
-			consts.append("%s=%d enum=%s" % [c, ClassDB.class_get_integer_constant(cls, c),
-					ClassDB.class_get_integer_constant_enum(cls, c, true)])
+		for owner in chain:
+			for c in ClassDB.class_get_integer_constant_list(owner, true):
+				consts.append("%s=%d enum=%s" % [c, ClassDB.class_get_integer_constant(owner, c),
+						ClassDB.class_get_integer_constant_enum(owner, c, true)])
+		consts.sort()
 		_rec(section, "%s.constants" % cls, consts)
-		_rec(section, "%s.parent" % cls, ClassDB.get_parent_class(cls))
+		_rec(section, "%s.parent" % cls, ClassDB.get_parent_class(chain[-1]))
 
 
 # ---- 2. Static BulletPatterns2D helpers ---------------------------------------

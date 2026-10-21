@@ -33,7 +33,7 @@ const char *flock_scope_name2d(int scope) {
 
 } // namespace
 
-PackedStringArray BulletSpawner2D::debug_explain_features() const {
+PackedStringArray PatternSpawner2D::debug_explain_features() const {
 	PackedStringArray out;
 	const bool rotation_data = spawn_data.is_valid() && (spawn_data->shared_bullet_rotation_data.is_valid() || !spawn_data->all_bullet_rotation_data.is_empty());
 	const bool random_size = bullet_scale_mode != BULLET_SCALE_OFF;

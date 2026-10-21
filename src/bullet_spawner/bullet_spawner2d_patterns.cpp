@@ -12,11 +12,11 @@ using namespace godot;
 
 namespace BlastBullets2D {
 
-bool BulletSpawner2D::supports_outline_layout(PatternSource source) {
+bool PatternSpawner2D::supports_outline_layout(PatternSource source) {
 	return pattern_shape_supports_outline2d((int)source);
 }
 
-PackedVector2Array BulletSpawner2D::sample_path2d_polyline(bool quiet) const {
+PackedVector2Array PatternSpawner2D::sample_path2d_polyline(bool quiet) const {
 	Node *node = get_helper_path2d_node();
 	if (node == nullptr) {
 		if (!quiet)
@@ -82,17 +82,17 @@ PackedVector2Array BulletSpawner2D::sample_path2d_polyline(bool quiet) const {
 	return pts;
 }
 
-static_assert((int)BulletSpawner2D::PATH2D_DISTRIBUTION_FIXED_SPACING == (int)BulletPatterns2D::POLYLINE_DISTRIBUTION_FIXED_SPACING && (int)BulletSpawner2D::PATH2D_DISTRIBUTION_EVEN == (int)BulletPatterns2D::POLYLINE_DISTRIBUTION_EVEN, "Path2D distribution ids mirror the polyline layout");
-static_assert((int)BulletSpawner2D::PATH2D_OVERFLOW_CLAMP == (int)BulletPatterns2D::POLYLINE_OVERFLOW_CLAMP && (int)BulletSpawner2D::PATH2D_OVERFLOW_WRAP == (int)BulletPatterns2D::POLYLINE_OVERFLOW_WRAP && (int)BulletSpawner2D::PATH2D_OVERFLOW_SHRINK_TO_FIT == (int)BulletPatterns2D::POLYLINE_OVERFLOW_SHRINK_TO_FIT, "Path2D overflow ids mirror the polyline layout");
-static_assert((int)BulletSpawner2D::PATH2D_ANCHOR_START == (int)BulletPatterns2D::POLYLINE_ANCHOR_START && (int)BulletSpawner2D::PATH2D_ANCHOR_CENTER == (int)BulletPatterns2D::POLYLINE_ANCHOR_CENTER && (int)BulletSpawner2D::PATH2D_ANCHOR_END == (int)BulletPatterns2D::POLYLINE_ANCHOR_END, "Path2D anchor ids mirror the polyline layout");
-static_assert((int)BulletSpawner2D::PATH2D_FACING_ALONG_PATH == (int)BulletPatterns2D::POLYLINE_FACING_ALONG_PATH && (int)BulletSpawner2D::PATH2D_FACING_NORMAL_P90 == (int)BulletPatterns2D::POLYLINE_FACING_NORMAL_P90 && (int)BulletSpawner2D::PATH2D_FACING_NORMAL_M90 == (int)BulletPatterns2D::POLYLINE_FACING_NORMAL_M90, "Path2D facing ids mirror the polyline layout");
+static_assert((int)PatternSpawner2D::PATH2D_DISTRIBUTION_FIXED_SPACING == (int)BulletPatterns2D::POLYLINE_DISTRIBUTION_FIXED_SPACING && (int)PatternSpawner2D::PATH2D_DISTRIBUTION_EVEN == (int)BulletPatterns2D::POLYLINE_DISTRIBUTION_EVEN, "Path2D distribution ids mirror the polyline layout");
+static_assert((int)PatternSpawner2D::PATH2D_OVERFLOW_CLAMP == (int)BulletPatterns2D::POLYLINE_OVERFLOW_CLAMP && (int)PatternSpawner2D::PATH2D_OVERFLOW_WRAP == (int)BulletPatterns2D::POLYLINE_OVERFLOW_WRAP && (int)PatternSpawner2D::PATH2D_OVERFLOW_SHRINK_TO_FIT == (int)BulletPatterns2D::POLYLINE_OVERFLOW_SHRINK_TO_FIT, "Path2D overflow ids mirror the polyline layout");
+static_assert((int)PatternSpawner2D::PATH2D_ANCHOR_START == (int)BulletPatterns2D::POLYLINE_ANCHOR_START && (int)PatternSpawner2D::PATH2D_ANCHOR_CENTER == (int)BulletPatterns2D::POLYLINE_ANCHOR_CENTER && (int)PatternSpawner2D::PATH2D_ANCHOR_END == (int)BulletPatterns2D::POLYLINE_ANCHOR_END, "Path2D anchor ids mirror the polyline layout");
+static_assert((int)PatternSpawner2D::PATH2D_FACING_ALONG_PATH == (int)BulletPatterns2D::POLYLINE_FACING_ALONG_PATH && (int)PatternSpawner2D::PATH2D_FACING_NORMAL_P90 == (int)BulletPatterns2D::POLYLINE_FACING_NORMAL_P90 && (int)PatternSpawner2D::PATH2D_FACING_NORMAL_M90 == (int)BulletPatterns2D::POLYLINE_FACING_NORMAL_M90, "Path2D facing ids mirror the polyline layout");
 
 // Predictive lead shared by the aimed volley and its preview cone: blends
 // the live position toward where the target will be after prediction_time at
 // its current velocity (CharacterBody2D-style get_velocity; anything else
 // aims live). Both paths must agree or the preview cone would point
 // somewhere the volley never flies.
-Vector2 BulletSpawner2D::predict_target_pos(Node2D *target) const {
+Vector2 PatternSpawner2D::predict_target_pos(Node2D *target) const {
 	Vector2 aim_pos = target->get_global_transform().get_origin();
 	if (helper_aimed_prediction > 0.0 && helper_aimed_prediction_time > 0.0 && aim_velocity_snapshot_valid) {
 		aim_pos += aim_velocity_snapshot * (real_t)(helper_aimed_prediction_time * helper_aimed_prediction);
@@ -100,7 +100,7 @@ Vector2 BulletSpawner2D::predict_target_pos(Node2D *target) const {
 	return aim_pos;
 }
 
-bool BulletSpawner2D::snapshot_aim_velocity() const {
+bool PatternSpawner2D::snapshot_aim_velocity() const {
 	aim_velocity_snapshot_valid = false;
 	if (pattern_source != PATTERN_FROM_HELPER_AIMED || !(helper_aimed_prediction > 0.0 && helper_aimed_prediction_time > 0.0)) {
 		return true;
@@ -109,7 +109,7 @@ bool BulletSpawner2D::snapshot_aim_velocity() const {
 	if (target == nullptr || !target->has_method("get_velocity")) {
 		return true;
 	}
-	BulletSpawner2D *self = const_cast<BulletSpawner2D *>(this); // the guard state is bookkeeping
+	PatternSpawner2D *self = const_cast<PatternSpawner2D *>(this); // the guard state is bookkeeping
 	Variant v;
 	guarded_user_call2d(self, emit_guard, [&]() { v = target->call("get_velocity"); });
 	if (shot_owner_dying()) {
@@ -129,7 +129,7 @@ bool BulletSpawner2D::snapshot_aim_velocity() const {
 // wall: prefers the live aimed target (like the Aimed case), falls back to
 // the static aim direction when no target is assigned. Callers validate the
 // fallback themselves, exactly as before.
-Vector2 BulletSpawner2D::resolve_corridor_aim(const Vector2 &fallback, const Vector2 &origin) const {
+Vector2 PatternSpawner2D::resolve_corridor_aim(const Vector2 &fallback, const Vector2 &origin) const {
 	if (Node2D *target = get_helper_aimed_target()) {
 		const Vector2 to_target = target->get_global_transform().get_origin() - origin;
 		if (to_target.is_finite() && to_target.length_squared() > 0.0) {
@@ -139,11 +139,11 @@ Vector2 BulletSpawner2D::resolve_corridor_aim(const Vector2 &fallback, const Vec
 	return fallback;
 }
 
-TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms() const {
+TypedArray<Transform2D> PatternSpawner2D::collect_spawn_transforms() const {
 	return collect_spawn_transforms_impl(false);
 }
 
-PatternSlots2D BulletSpawner2D::generate_raw_pattern(Node2D *base, const Transform2D &marker, real_t mirror_sign, bool quiet) const {
+PatternSlots2D PatternSpawner2D::generate_raw_pattern(Node2D *base, const Transform2D &marker, real_t mirror_sign, bool quiet) const {
 	// Resolve the scene-tree inputs the source reads, then hand generation
 	// to the patterns module (pattern_dispatch2d.cpp).
 	PatternInputs2D in;
@@ -190,11 +190,11 @@ PatternSlots2D BulletSpawner2D::generate_raw_pattern(Node2D *base, const Transfo
 
 // ---- Pattern bake cache ----------------------------------------------------
 
-void BulletSpawner2D::mark_pattern_dirty() {
+void PatternSpawner2D::mark_pattern_dirty() {
 	++pattern_version;
 }
 
-void BulletSpawner2D::on_pattern_changed() {
+void PatternSpawner2D::on_pattern_changed() {
 	mark_pattern_dirty();
 	if (pattern_batch_depth > 0) {
 		pattern_batch_dirty = true;
@@ -203,11 +203,11 @@ void BulletSpawner2D::on_pattern_changed() {
 	rebuild_preview();
 }
 
-void BulletSpawner2D::begin_pattern_batch() {
+void PatternSpawner2D::begin_pattern_batch() {
 	++pattern_batch_depth;
 }
 
-void BulletSpawner2D::end_pattern_batch() {
+void PatternSpawner2D::end_pattern_batch() {
 	if (pattern_batch_depth > 0 && --pattern_batch_depth == 0 && pattern_batch_dirty) {
 		pattern_batch_dirty = false;
 		rebuild_preview();
@@ -216,10 +216,15 @@ void BulletSpawner2D::end_pattern_batch() {
 
 // Own properties a pattern-list entry or preset may touch: helper_*, spin_*,
 // pattern_source (+ spawn_data for entries). Read from ClassDB so new knobs
-// are covered without a hand-kept list.
-static void pattern_state_property_names(bool include_spawn_data, bool reset_only, std::vector<StringName> &r_names) {
+// are covered without a hand-kept list: the spawner's class and its plugin
+// bases (the walk stops at the engine's Node2D).
+static void pattern_state_property_names(const StringName &cls, bool include_spawn_data, bool reset_only, std::vector<StringName> &r_names) {
 	r_names.clear();
-	const TypedArray<Dictionary> props = ClassDBSingleton::get_singleton()->class_get_property_list("BulletSpawner2D", true);
+	ClassDBSingleton *class_db = ClassDBSingleton::get_singleton();
+	TypedArray<Dictionary> props;
+	for (StringName c = cls; !c.is_empty() && c != Node2D::get_class_static(); c = class_db->get_parent_class(c)) {
+		props.append_array(class_db->class_get_property_list(c, true));
+	}
 	for (int i = 0; i < props.size(); ++i) {
 		const Dictionary p = props[i];
 		const String name = p.get("name", String());
@@ -243,9 +248,9 @@ static void pattern_state_property_names(bool include_spawn_data, bool reset_onl
 	}
 }
 
-Dictionary BulletSpawner2D::snapshot_pattern_state() const {
+Dictionary PatternSpawner2D::snapshot_pattern_state() const {
 	std::vector<StringName> names;
-	pattern_state_property_names(true, false, names);
+	pattern_state_property_names(get_class(), true, false, names);
 	Dictionary out;
 	for (const StringName &name : names) {
 		out[name] = get(name);
@@ -253,7 +258,7 @@ Dictionary BulletSpawner2D::snapshot_pattern_state() const {
 	return out;
 }
 
-void BulletSpawner2D::restore_pattern_state(const Dictionary &snapshot) {
+void PatternSpawner2D::restore_pattern_state(const Dictionary &snapshot) {
 	begin_pattern_batch();
 	const Array keys = snapshot.keys();
 	for (int i = 0; i < keys.size(); ++i) {
@@ -266,13 +271,13 @@ void BulletSpawner2D::restore_pattern_state(const Dictionary &snapshot) {
 	end_pattern_batch();
 }
 
-void BulletSpawner2D::reset_pattern_knobs_to_defaults() {
+void PatternSpawner2D::reset_pattern_knobs_to_defaults() {
 	std::vector<StringName> names;
-	pattern_state_property_names(false, true, names);
+	pattern_state_property_names(get_class(), false, true, names);
 	ClassDBSingleton *class_db = ClassDBSingleton::get_singleton();
 	begin_pattern_batch();
 	for (const StringName &name : names) {
-		const Variant def = class_db->class_get_property_default_value("BulletSpawner2D", name);
+		const Variant def = class_db->class_get_property_default_value(get_class(), name);
 		if (def.get_type() != Variant::NIL && get(name) != def) {
 			set(name, def);
 		}
@@ -289,7 +294,7 @@ static bool pattern_source_reads_external_state(int source) {
 	return pattern_shape_reads_external_state2d(source);
 }
 
-void BulletSpawner2D::resolve_raw_pattern(Node2D *base, const Transform2D &marker, real_t mirror_sign, bool quiet, std::vector<Transform2D> &r_raw) const {
+void PatternSpawner2D::resolve_raw_pattern(Node2D *base, const Transform2D &marker, real_t mirror_sign, bool quiet, std::vector<Transform2D> &r_raw) const {
 	const bool cache_on = pattern_cache_mode == PATTERN_CACHE_AUTO && !pattern_cache_bypass;
 	// The mirror picks the bake (a mirrored telegraph aim shares the mirrored
 	// shot's): a channel never mixes windings.
@@ -302,15 +307,15 @@ void BulletSpawner2D::resolve_raw_pattern(Node2D *base, const Transform2D &marke
 	pattern_cache.resolve(channel, pattern_cache_version2d(pattern_version), cache_on, pattern_source_reads_external_state(pattern_source), marker, quiet, generate, r_raw, String("BulletSpawner2D: pattern cache mismatch (pattern_source ") + itos(pattern_source));
 }
 
-bool BulletSpawner2D::preview_survives_marker_move(const Transform2D &old_marker, const Transform2D &new_marker) const {
+bool PatternSpawner2D::preview_survives_marker_move(const Transform2D &old_marker, const Transform2D &new_marker) const {
 	return pattern_cache.survives_marker_move(pattern_cache_version2d(pattern_version), pattern_cache_mode == PATTERN_CACHE_AUTO, old_marker, new_marker);
 }
 
-BulletSpawner2D::PatternCacheMode BulletSpawner2D::get_pattern_cache_mode() const {
+PatternSpawner2D::PatternCacheMode PatternSpawner2D::get_pattern_cache_mode() const {
 	return static_cast<PatternCacheMode>(pattern_cache_mode);
 }
 
-void BulletSpawner2D::set_pattern_cache_mode(PatternCacheMode value) {
+void PatternSpawner2D::set_pattern_cache_mode(PatternCacheMode value) {
 	if (value < PATTERN_CACHE_AUTO || value > PATTERN_CACHE_OFF) {
 		UtilityFunctions::push_error("BulletSpawner2D: pattern_cache_mode must be 0 (Auto) or 1 (Off), keeping the old value.");
 		return;
@@ -319,7 +324,7 @@ void BulletSpawner2D::set_pattern_cache_mode(PatternCacheMode value) {
 	mark_pattern_dirty();
 }
 
-Dictionary BulletSpawner2D::debug_get_pattern_cache_info() const {
+Dictionary PatternSpawner2D::debug_get_pattern_cache_info() const {
 	Dictionary d;
 	d["hits"] = (int64_t)pattern_cache.hits;
 	d["misses"] = (int64_t)pattern_cache.misses;
@@ -335,22 +340,22 @@ Dictionary BulletSpawner2D::debug_get_pattern_cache_info() const {
 	return d;
 }
 
-TypedArray<Transform2D> BulletSpawner2D::debug_collect_spawn_transforms_uncached() const {
+TypedArray<Transform2D> PatternSpawner2D::debug_collect_spawn_transforms_uncached() const {
 	pattern_cache_bypass = true;
 	const TypedArray<Transform2D> out = collect_spawn_transforms_impl(false);
 	pattern_cache_bypass = false;
 	return out;
 }
 
-void BulletSpawner2D::debug_set_pattern_cache_verify(bool enabled) {
+void PatternSpawner2D::debug_set_pattern_cache_verify(bool enabled) {
 	PatternBakeCache2D::verify = enabled;
 }
 
-bool BulletSpawner2D::debug_get_pattern_cache_verify() {
+bool PatternSpawner2D::debug_get_pattern_cache_verify() {
 	return PatternBakeCache2D::verify;
 }
 
-void BulletSpawner2D::collect_spawn_transforms_native(bool quiet, std::vector<Transform2D> &r_out) const {
+void PatternSpawner2D::collect_spawn_transforms_native(bool quiet, std::vector<Transform2D> &r_out) const {
 	r_out.clear();
 	// The one user-code point of a collect, before any node is resolved.
 	if (!snapshot_aim_velocity()) {
@@ -429,7 +434,7 @@ void BulletSpawner2D::collect_spawn_transforms_native(bool quiet, std::vector<Tr
 	PatternPose2D::pose(raw, spin_scale_mx, use_spin_scale_mx, any_skip ? &skip_mask_scratch : nullptr, local_factor, r_out);
 }
 
-TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms_impl(bool quiet) const {
+TypedArray<Transform2D> PatternSpawner2D::collect_spawn_transforms_impl(bool quiet) const {
 	// Script-facing form: one boxing pass at the very end (the shot path uses
 	// collect_spawn_transforms_native directly and never boxes).
 	collect_spawn_transforms_native(quiet, collect_scratch);

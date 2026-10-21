@@ -40,7 +40,7 @@ static BulletVolley2D *revalidate_configured_volley(uint64_t volley_id, BulletVo
 	return live_volley;
 }
 
-void BulletSpawner2D::clear_shoot_once_latch() {
+void PatternSpawner2D::clear_shoot_once_latch() {
 	shoot_once_reentrant_guard = false;
 	--g_shoot_once_nesting_depth;
 	if (g_shoot_once_nesting_depth < 0) {
@@ -54,11 +54,11 @@ void BulletSpawner2D::clear_shoot_once_latch() {
 	}
 }
 
-NodePath BulletSpawner2D::get_bullet_factory_path() const {
+NodePath PatternSpawner2D::get_bullet_factory_path() const {
 	return bullet_factory_path;
 }
 
-void BulletSpawner2D::set_bullet_factory_path(const NodePath &p_path) {
+void PatternSpawner2D::set_bullet_factory_path(const NodePath &p_path) {
 	if (!node_path_type_ok<BulletFactory2D>(this, p_path, "bullet_factory_path", "BulletFactory2D")) {
 		return;
 	}
@@ -74,14 +74,14 @@ void BulletSpawner2D::set_bullet_factory_path(const NodePath &p_path) {
 	}
 }
 
-BulletFactory2D *BulletSpawner2D::get_bullet_factory() const {
+BulletFactory2D *PatternSpawner2D::get_bullet_factory() const {
 	// Validate the stale cache BEFORE touching it: with an empty path or
 	// outside the tree, resolve_node_path() returns the pointer untouched
 	// and it may dangle after the node was freed.
 	return validate_cached_node(this, bullet_factory_path, bullet_factory, bullet_factory_id);
 }
 
-void BulletSpawner2D::set_bullet_factory(BulletFactory2D *factory) {
+void PatternSpawner2D::set_bullet_factory(BulletFactory2D *factory) {
 	on_config_changed();
 	assign_node_to_path(this, factory, bullet_factory_path, bullet_factory);
 	bullet_factory_id = factory != nullptr ? factory->get_instance_id() : 0;
@@ -89,11 +89,11 @@ void BulletSpawner2D::set_bullet_factory(BulletFactory2D *factory) {
 		bullet_factory = nullptr;
 }
 
-NodePath BulletSpawner2D::get_transforms_generator_path() const {
+NodePath PatternSpawner2D::get_transforms_generator_path() const {
 	return transforms_generator_path;
 }
 
-void BulletSpawner2D::set_transforms_generator_path(const NodePath &p_path) {
+void PatternSpawner2D::set_transforms_generator_path(const NodePath &p_path) {
 	if (!node_path_type_ok<Node2D>(this, p_path, "transforms_generator", "Node2D")) {
 		return;
 	}
@@ -109,11 +109,11 @@ void BulletSpawner2D::set_transforms_generator_path(const NodePath &p_path) {
 	on_pattern_changed();
 }
 
-Node2D *BulletSpawner2D::get_transforms_generator() const {
+Node2D *PatternSpawner2D::get_transforms_generator() const {
 	return validate_cached_node(this, transforms_generator_path, transforms_generator, transforms_generator_id);
 }
 
-void BulletSpawner2D::set_transforms_generator(Node2D *generator) {
+void PatternSpawner2D::set_transforms_generator(Node2D *generator) {
 	assign_node_to_path(this, generator, transforms_generator_path, transforms_generator);
 	transforms_generator_id = generator != nullptr ? generator->get_instance_id() : 0;
 	if (generator == nullptr)
@@ -125,27 +125,27 @@ void BulletSpawner2D::set_transforms_generator(Node2D *generator) {
 // to the spawner itself. A generator outside the tree is ignored while the
 // spawner is inside it (its global transform is invalid), so callers can
 // always use the result for global-space work when inside the tree.
-Node2D *BulletSpawner2D::get_effective_generator() const {
+Node2D *PatternSpawner2D::get_effective_generator() const {
 	Node2D *base = get_transforms_generator();
 	if (base == nullptr) {
-		return const_cast<BulletSpawner2D *>(this);
+		return const_cast<PatternSpawner2D *>(this);
 	}
 	if (is_inside_tree() && !base->is_inside_tree()) {
-		return const_cast<BulletSpawner2D *>(this);
+		return const_cast<PatternSpawner2D *>(this);
 	}
 	return base;
 }
 
-Ref<BulletVolleyData2D> BulletSpawner2D::get_spawn_data() const {
+Ref<BulletVolleyData2D> PatternSpawner2D::get_spawn_data() const {
 	return spawn_data;
 }
 
-void BulletSpawner2D::set_spawn_data(const Ref<BulletVolleyData2D> &new_data) {
+void PatternSpawner2D::set_spawn_data(const Ref<BulletVolleyData2D> &new_data) {
 	on_config_changed();
 	if (new_data == spawn_data) {
 		return; // same resource: keep the duplicate template and connection
 	}
-	const Callable on_changed = callable_mp(this, &BulletSpawner2D::_on_spawn_data_changed);
+	const Callable on_changed = callable_mp(this, &PatternSpawner2D::_on_spawn_data_changed);
 	if (spawn_data.is_valid() && spawn_data->is_connected("changed", on_changed)) {
 		spawn_data->disconnect("changed", on_changed);
 	}
@@ -163,7 +163,7 @@ void BulletSpawner2D::set_spawn_data(const Ref<BulletVolleyData2D> &new_data) {
 	}
 }
 
-void BulletSpawner2D::_on_spawn_data_changed() {
+void PatternSpawner2D::_on_spawn_data_changed() {
 	// In-place edit of the user's resource: drop the cached duplicate so the
 	// next shoot_once() re-duplicates fresh data instead of stale template.
 	cached_volley_template.unref();
@@ -180,19 +180,19 @@ static bool reports_shooting_transitions(const Node *self) {
 	return self->is_inside_tree() && !Engine::get_singleton()->is_editor_hint();
 }
 
-bool BulletSpawner2D::auto_shooting_active() const {
+bool PatternSpawner2D::auto_shooting_active() const {
 	return shooting_enabled && !shooting_paused && (max_volleys < 0 || volleys_fired < max_volleys);
 }
 
-bool BulletSpawner2D::get_shooting_enabled() const {
+bool PatternSpawner2D::get_shooting_enabled() const {
 	return shooting_enabled;
 }
 
-bool BulletSpawner2D::is_shooting_active() const {
+bool PatternSpawner2D::is_shooting_active() const {
 	return auto_shooting_active();
 }
 
-void BulletSpawner2D::set_shooting_enabled(bool value) {
+void PatternSpawner2D::set_shooting_enabled(bool value) {
 	const bool was_active = auto_shooting_active();
 	shooting_enabled = value;
 	const bool now_active = auto_shooting_active();
@@ -209,11 +209,11 @@ void BulletSpawner2D::set_shooting_enabled(bool value) {
 	}
 }
 
-double BulletSpawner2D::get_shoot_interval_sec() const {
+double PatternSpawner2D::get_shoot_interval_sec() const {
 	return shoot_interval_sec;
 }
 
-void BulletSpawner2D::set_shoot_interval_sec(double value) {
+void PatternSpawner2D::set_shoot_interval_sec(double value) {
 	if (!is_finite_real2d(value) || !(value > 0.0)) {
 		UtilityFunctions::push_error("BulletSpawner2D: shoot_interval_sec must be finite and > 0, keeping the old value.");
 		return;
@@ -226,11 +226,11 @@ void BulletSpawner2D::set_shoot_interval_sec(double value) {
 	}
 }
 
-double BulletSpawner2D::get_shoot_initial_delay_sec() const {
+double PatternSpawner2D::get_shoot_initial_delay_sec() const {
 	return shoot_initial_delay_sec;
 }
 
-void BulletSpawner2D::set_shoot_initial_delay_sec(double value) {
+void PatternSpawner2D::set_shoot_initial_delay_sec(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: shoot_initial_delay_sec must be finite and >= 0, keeping the old value.");
 		return;
@@ -238,11 +238,11 @@ void BulletSpawner2D::set_shoot_initial_delay_sec(double value) {
 	shoot_initial_delay_sec = value;
 }
 
-int BulletSpawner2D::get_max_volleys() const {
+int PatternSpawner2D::get_max_volleys() const {
 	return max_volleys;
 }
 
-void BulletSpawner2D::set_max_volleys(int value) {
+void PatternSpawner2D::set_max_volleys(int value) {
 	if (value < -1) {
 		UtilityFunctions::push_error("BulletSpawner2D: max_volleys must be -1 (infinite) or >= 0, keeping the old value.");
 		return;
@@ -271,11 +271,11 @@ void BulletSpawner2D::set_max_volleys(int value) {
 	}
 }
 
-int BulletSpawner2D::get_volleys_fired() const {
+int PatternSpawner2D::get_volleys_fired() const {
 	return volleys_fired;
 }
 
-Vector2 BulletSpawner2D::resolve_spawn_offset_global() const {
+Vector2 PatternSpawner2D::resolve_spawn_offset_global() const {
 	if (spawn_position_offset == Vector2(0, 0)) {
 		return Vector2();
 	}
@@ -291,11 +291,11 @@ Vector2 BulletSpawner2D::resolve_spawn_offset_global() const {
 	return spawn_position_offset;
 }
 
-bool BulletSpawner2D::get_spin_enabled() const {
+bool PatternSpawner2D::get_spin_enabled() const {
 	return spin_enabled;
 }
 
-void BulletSpawner2D::set_spin_enabled(bool value) {
+void PatternSpawner2D::set_spin_enabled(bool value) {
 	spin_enabled = value;
 	notify_property_list_changed(); // spin knobs gate on it (_validate_property)
 	if (!Engine::get_singleton()->is_editor_hint() && is_inside_tree()) {
@@ -304,11 +304,11 @@ void BulletSpawner2D::set_spin_enabled(bool value) {
 	}
 }
 
-double BulletSpawner2D::get_spin_speed_deg_per_sec() const {
+double PatternSpawner2D::get_spin_speed_deg_per_sec() const {
 	return spin_speed_deg_per_sec;
 }
 
-void BulletSpawner2D::set_spin_speed_deg_per_sec(double value) {
+void PatternSpawner2D::set_spin_speed_deg_per_sec(double value) {
 	if (!is_finite_real2d(value)) {
 		UtilityFunctions::push_error("BulletSpawner2D: spin_speed_deg_per_sec must be finite, keeping the old value.");
 		return;
@@ -316,11 +316,11 @@ void BulletSpawner2D::set_spin_speed_deg_per_sec(double value) {
 	spin_speed_deg_per_sec = value;
 }
 
-BulletSpawner2D::SpinMode BulletSpawner2D::get_spin_mode() const {
+PatternSpawner2D::SpinMode PatternSpawner2D::get_spin_mode() const {
 	return spin_mode;
 }
 
-void BulletSpawner2D::set_spin_mode(SpinMode value) {
+void PatternSpawner2D::set_spin_mode(SpinMode value) {
 	if (value < SPIN_CONTINUOUS || value > SPIN_OSCILLATE) {
 		UtilityFunctions::push_error("BulletSpawner2D: invalid spin_mode, keeping the old value.");
 		return;
@@ -329,11 +329,11 @@ void BulletSpawner2D::set_spin_mode(SpinMode value) {
 	notify_property_list_changed(); // speed vs amplitude/frequency per mode
 }
 
-double BulletSpawner2D::get_spin_amplitude_deg() const {
+double PatternSpawner2D::get_spin_amplitude_deg() const {
 	return spin_amplitude_deg;
 }
 
-void BulletSpawner2D::set_spin_amplitude_deg(double value) {
+void PatternSpawner2D::set_spin_amplitude_deg(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: spin_amplitude_deg must be finite and >= 0, keeping the old value.");
 		return;
@@ -341,11 +341,11 @@ void BulletSpawner2D::set_spin_amplitude_deg(double value) {
 	spin_amplitude_deg = value;
 }
 
-double BulletSpawner2D::get_spin_frequency_hz() const {
+double PatternSpawner2D::get_spin_frequency_hz() const {
 	return spin_frequency_hz;
 }
 
-void BulletSpawner2D::set_spin_frequency_hz(double value) {
+void PatternSpawner2D::set_spin_frequency_hz(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: spin_frequency_hz must be finite and >= 0, keeping the old value.");
 		return;
@@ -353,11 +353,11 @@ void BulletSpawner2D::set_spin_frequency_hz(double value) {
 	spin_frequency_hz = value;
 }
 
-double BulletSpawner2D::get_spin_angle_deg() const {
+double PatternSpawner2D::get_spin_angle_deg() const {
 	return spin_angle_deg;
 }
 
-void BulletSpawner2D::set_spin_angle_deg(double degrees) {
+void PatternSpawner2D::set_spin_angle_deg(double degrees) {
 	if (!is_finite_real2d(degrees)) {
 		UtilityFunctions::push_error("BulletSpawner2D::set_spin_angle_deg: degrees must be finite, keeping the old angle.");
 		return;
@@ -372,7 +372,7 @@ void BulletSpawner2D::set_spin_angle_deg(double degrees) {
 	}
 }
 
-void BulletSpawner2D::reset_spin_angle() {
+void PatternSpawner2D::reset_spin_angle() {
 	spin_angle_deg = 0.0;
 	spin_time_sec = 0.0;
 	if (spin_random_start_phase) {
@@ -380,7 +380,7 @@ void BulletSpawner2D::reset_spin_angle() {
 	}
 }
 
-void BulletSpawner2D::advance_spin(double delta) {
+void PatternSpawner2D::advance_spin(double delta) {
 	if (spin_mode == SPIN_OSCILLATE) {
 		// Wrap the phase clock modulo the oscillation period: an unbounded
 		// float clock loses sin() precision after ~12h of spinning (visible
@@ -407,9 +407,9 @@ void BulletSpawner2D::advance_spin(double delta) {
 	}
 }
 
-double BulletSpawner2D::get_reload_jitter_sec() const { return reload_jitter_sec; }
+double PatternSpawner2D::get_reload_jitter_sec() const { return reload_jitter_sec; }
 
-void BulletSpawner2D::set_reload_jitter_sec(double value) {
+void PatternSpawner2D::set_reload_jitter_sec(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: reload_jitter_sec must be finite and >= 0, keeping the old value.");
 		return;
@@ -420,11 +420,11 @@ void BulletSpawner2D::set_reload_jitter_sec(double value) {
 // Burst / telegraph / targeting / perf setters: same reject-and-keep
 // contract as every other spawner knob (validated setters never leave a
 // half-applied value behind).
-bool BulletSpawner2D::get_burst_enabled() const {
+bool PatternSpawner2D::get_burst_enabled() const {
 	return burst_enabled;
 }
 
-void BulletSpawner2D::set_burst_enabled(bool value) {
+void PatternSpawner2D::set_burst_enabled(bool value) {
 	burst_enabled = value;
 	notify_property_list_changed(); // burst_* knobs gate on it
 	if (!value) {
@@ -436,11 +436,11 @@ void BulletSpawner2D::set_burst_enabled(bool value) {
 	}
 }
 
-int BulletSpawner2D::get_burst_count() const {
+int PatternSpawner2D::get_burst_count() const {
 	return burst_count;
 }
 
-void BulletSpawner2D::set_burst_count(int value) {
+void PatternSpawner2D::set_burst_count(int value) {
 	if (value < 1 || value > kMaxBurstCount) {
 		UtilityFunctions::push_error("BulletSpawner2D: burst_count must be between 1 and " + itos(kMaxBurstCount) + ", keeping the old value.");
 		return;
@@ -459,11 +459,11 @@ void BulletSpawner2D::set_burst_count(int value) {
 	}
 }
 
-double BulletSpawner2D::get_burst_interval_sec() const {
+double PatternSpawner2D::get_burst_interval_sec() const {
 	return burst_interval_sec;
 }
 
-void BulletSpawner2D::set_burst_interval_sec(double value) {
+void PatternSpawner2D::set_burst_interval_sec(double value) {
 	if (!is_finite_real2d(value) || !(value > 0.0)) {
 		UtilityFunctions::push_error("BulletSpawner2D: burst_interval_sec must be finite and > 0, keeping the old value.");
 		return;
@@ -471,19 +471,19 @@ void BulletSpawner2D::set_burst_interval_sec(double value) {
 	burst_interval_sec = value;
 }
 
-bool BulletSpawner2D::get_burst_alternate_mirror() const {
+bool PatternSpawner2D::get_burst_alternate_mirror() const {
 	return burst_alternate_mirror;
 }
 
-void BulletSpawner2D::set_burst_alternate_mirror(bool value) {
+void PatternSpawner2D::set_burst_alternate_mirror(bool value) {
 	burst_alternate_mirror = value;
 }
 
-bool BulletSpawner2D::get_telegraph_enabled() const {
+bool PatternSpawner2D::get_telegraph_enabled() const {
 	return telegraph_enabled;
 }
 
-void BulletSpawner2D::set_telegraph_enabled(bool value) {
+void PatternSpawner2D::set_telegraph_enabled(bool value) {
 	telegraph_enabled = value;
 	notify_property_list_changed(); // telegraph_sec gates on it
 	if (!value) {
@@ -494,11 +494,11 @@ void BulletSpawner2D::set_telegraph_enabled(bool value) {
 	}
 }
 
-double BulletSpawner2D::get_telegraph_sec() const {
+double PatternSpawner2D::get_telegraph_sec() const {
 	return telegraph_sec;
 }
 
-void BulletSpawner2D::set_telegraph_sec(double value) {
+void PatternSpawner2D::set_telegraph_sec(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: telegraph_sec must be finite and >= 0, keeping the old value.");
 		return;
@@ -506,11 +506,11 @@ void BulletSpawner2D::set_telegraph_sec(double value) {
 	telegraph_sec = value;
 }
 
-int BulletSpawner2D::get_reload_jitter_seed() const {
+int PatternSpawner2D::get_reload_jitter_seed() const {
 	return reload_jitter_seed;
 }
 
-void BulletSpawner2D::set_reload_jitter_seed(int value) {
+void PatternSpawner2D::set_reload_jitter_seed(int value) {
 	if (value < 0) {
 		UtilityFunctions::push_error("BulletSpawner2D: reload_jitter_seed must be >= 0 (0 = non-deterministic), keeping the old value.");
 		return;
@@ -518,11 +518,11 @@ void BulletSpawner2D::set_reload_jitter_seed(int value) {
 	reload_jitter_seed = value;
 }
 
-int BulletSpawner2D::get_max_live_bullets() const {
+int PatternSpawner2D::get_max_live_bullets() const {
 	return max_live_bullets;
 }
 
-void BulletSpawner2D::set_max_live_bullets(int value) {
+void PatternSpawner2D::set_max_live_bullets(int value) {
 	if (value < 0) {
 		UtilityFunctions::push_error("BulletSpawner2D: max_live_bullets must be >= 0 (0 = unlimited), keeping the old value.");
 		return;
@@ -530,11 +530,11 @@ void BulletSpawner2D::set_max_live_bullets(int value) {
 	max_live_bullets = value;
 }
 
-int BulletSpawner2D::get_burst_shots_left() const {
+int PatternSpawner2D::get_burst_shots_left() const {
 	return burst_shots_left;
 }
 
-int BulletSpawner2D::get_active_live_bullet_count() const {
+int PatternSpawner2D::get_active_live_bullet_count() const {
 	BulletFactory2D *factory = get_bullet_factory();
 	if (factory == nullptr) {
 		return 0;
@@ -546,7 +546,7 @@ int BulletSpawner2D::get_active_live_bullet_count() const {
 	return factory->count_active_bullets_owned_by(get_instance_id());
 }
 
-void BulletSpawner2D::reset_shooting() {
+void PatternSpawner2D::reset_shooting() {
 	const bool was_active = auto_shooting_active();
 	++cadence_serial;
 	volleys_fired = 0;
@@ -573,7 +573,7 @@ void BulletSpawner2D::reset_shooting() {
 	}
 }
 
-void BulletSpawner2D::fire_n_volleys(int n) {
+void PatternSpawner2D::fire_n_volleys(int n) {
 	if (n <= 0) {
 		UtilityFunctions::push_error("BulletSpawner2D::fire_n_volleys: n must be > 0.");
 		return;
@@ -594,7 +594,7 @@ void BulletSpawner2D::fire_n_volleys(int n) {
 	}
 }
 
-void BulletSpawner2D::pause_shooting() {
+void PatternSpawner2D::pause_shooting() {
 	const bool was_active = auto_shooting_active();
 	shooting_paused = true;
 	if (is_inside_tree()) {
@@ -605,7 +605,7 @@ void BulletSpawner2D::pause_shooting() {
 	}
 }
 
-void BulletSpawner2D::resume_shooting() {
+void PatternSpawner2D::resume_shooting() {
 	const bool was_active = auto_shooting_active();
 	shooting_paused = false;
 	if (is_inside_tree()) {
@@ -616,31 +616,31 @@ void BulletSpawner2D::resume_shooting() {
 	}
 }
 
-bool BulletSpawner2D::is_shooting_paused() const {
+bool PatternSpawner2D::is_shooting_paused() const {
 	return shooting_paused;
 }
 
-double BulletSpawner2D::get_shoot_time_left() const {
+double PatternSpawner2D::get_shoot_time_left() const {
 	return auto_shooting_active() ? Math::max(shoot_time_left, 0.0) : 0.0;
 }
 
-double BulletSpawner2D::get_burst_time_left() const {
+double PatternSpawner2D::get_burst_time_left() const {
 	return burst_shots_left > 0 ? Math::max(burst_time_left, 0.0) : 0.0;
 }
 
-bool BulletSpawner2D::is_telegraph_pending() const {
+bool PatternSpawner2D::is_telegraph_pending() const {
 	return telegraph_pending;
 }
 
-double BulletSpawner2D::get_telegraph_time_left() const {
+double PatternSpawner2D::get_telegraph_time_left() const {
 	return telegraph_pending ? Math::max(telegraph_time_left, 0.0) : 0.0;
 }
 
-double BulletSpawner2D::get_pattern_list_time_left() const {
+double PatternSpawner2D::get_pattern_list_time_left() const {
 	return pattern_list_active ? Math::max(pattern_list_time_left, 0.0) : 0.0;
 }
 
-int BulletSpawner2D::volleys_remaining() const {
+int PatternSpawner2D::volleys_remaining() const {
 	int remaining = -1;
 	if (max_volleys >= 0) {
 		remaining = MAX(0, max_volleys - volleys_fired);
@@ -655,15 +655,15 @@ int BulletSpawner2D::volleys_remaining() const {
 // source of truth for the keep-awake set: needs_process() and the two
 // "auto-shooting stopped" sleep paths in _process/shoot_once all use it, so a
 // new subsystem (e.g. movement) is added in exactly one place.
-bool BulletSpawner2D::needs_process_besides_shooting() const {
+bool PatternSpawner2D::needs_process_besides_shooting() const {
 	return spin_enabled || homing_retarget_active() || preview_active() || graze_preview_active() || burst_shots_left > 0 || telegraph_pending || pattern_list_active || movement_active();
 }
 
-bool BulletSpawner2D::needs_process() const {
+bool PatternSpawner2D::needs_process() const {
 	return auto_shooting_active() || needs_process_besides_shooting();
 }
 
-void BulletSpawner2D::refresh_process_state() {
+void PatternSpawner2D::refresh_process_state() {
 	if (!is_inside_tree()) {
 		return;
 	}
@@ -675,7 +675,7 @@ void BulletSpawner2D::refresh_process_state() {
 	set_process(needs_process());
 }
 
-void BulletSpawner2D::refresh_process_state_editor_guarded() {
+void PatternSpawner2D::refresh_process_state_editor_guarded() {
 	if (!Engine::get_singleton()->is_editor_hint() && is_inside_tree()) {
 		set_process(needs_process());
 	}
@@ -683,7 +683,7 @@ void BulletSpawner2D::refresh_process_state_editor_guarded() {
 
 // Any configuration change: the auto-fire error latch re-arms (a new
 // misconfiguration reports again) and the editor's warning triangle updates.
-void BulletSpawner2D::on_config_changed() {
+void PatternSpawner2D::on_config_changed() {
 	shoot_error_latch = 0;
 	orbit_without_homing_warned = false;
 	if (Engine::get_singleton()->is_editor_hint() && is_inside_tree()) {
@@ -695,7 +695,7 @@ void BulletSpawner2D::on_config_changed() {
 // The yellow triangle in the scene dock: every misconfiguration that would
 // make a shot fail (or the spawner silently do nothing) is listed here, so
 // non-programmers see the problem before pressing play.
-PackedStringArray BulletSpawner2D::_get_configuration_warnings() const {
+PackedStringArray PatternSpawner2D::_get_configuration_warnings() const {
 	PackedStringArray out;
 	if (bullet_factory_path.is_empty() && bullet_factory == nullptr) {
 		out.push_back("No BulletFactory2D assigned: set bullet_factory_path, or nothing can be fired.");
@@ -830,7 +830,7 @@ PackedStringArray BulletSpawner2D::_get_configuration_warnings() const {
 	return out;
 }
 
-bool BulletSpawner2D::shoot_once() {
+bool PatternSpawner2D::shoot_once() {
 	if (shot_owner_dying()) {
 		return false; // freed from a handler (the free finishes this frame): never shoots again
 	}
@@ -1089,7 +1089,7 @@ bool BulletSpawner2D::shoot_once() {
 
 // Deferred variant for signal handlers / physics callbacks: queues the shot
 // so it runs after the current emission / physics step instead of nesting.
-bool BulletSpawner2D::shoot_once_deferred() {
+bool PatternSpawner2D::shoot_once_deferred() {
 	if (!is_inside_tree()) {
 		UtilityFunctions::push_error("BulletSpawner2D::shoot_once_deferred: spawner is not inside the tree, shot dropped.");
 		return false;
@@ -1098,7 +1098,7 @@ bool BulletSpawner2D::shoot_once_deferred() {
 	return true;
 }
 
-void BulletSpawner2D::_ready() {
+void PatternSpawner2D::_ready() {
 	// Same contract as BulletFactory2D::_ready: never arm shooting in the
 	// editor. Extension nodes still get _ready/_process there, and without
 	// this the shoot timer would fire against a factory that is deliberately
@@ -1178,7 +1178,7 @@ void BulletSpawner2D::_ready() {
 	}
 }
 
-void BulletSpawner2D::_notification(int p_what) {
+void PatternSpawner2D::_notification(int p_what) {
 	if (p_what == NOTIFICATION_CHILD_ORDER_CHANGED) {
 		// Instant refresh for marker changes under this spawner. Markers under
 		// an external generator are picked up by the _process dirty-check
@@ -1257,7 +1257,7 @@ void BulletSpawner2D::_notification(int p_what) {
 	}
 }
 
-void BulletSpawner2D::fill_assigned_node_paths() {
+void PatternSpawner2D::fill_assigned_node_paths() {
 	// Paths are relative to the spawner: after a runtime reparent (or a
 	// pointer assignment made out of the tree) the stored path is rewritten
 	// from the live node it already points at, so saving the scene keeps
@@ -1278,7 +1278,7 @@ void BulletSpawner2D::fill_assigned_node_paths() {
 	fill(movement_path_cache, movement_path_id, movement_path);
 }
 
-void BulletSpawner2D::arm_retarget_countdown() {
+void PatternSpawner2D::arm_retarget_countdown() {
 	if (homing_retarget_phase > 0.0) {
 		homing_retarget_time_left = homing_retarget_phase;
 	} else if (homing_retarget_interval_sec > 0.0) {
@@ -1288,7 +1288,7 @@ void BulletSpawner2D::arm_retarget_countdown() {
 	}
 }
 
-void BulletSpawner2D::set_time_scale(double value) {
+void PatternSpawner2D::set_time_scale(double value) {
 	// Any finite scale (the volley tick caps the bullet time it covers).
 	if (!Math::is_finite(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: time_scale must be finite and >= 0, keeping the old value.");
@@ -1297,7 +1297,7 @@ void BulletSpawner2D::set_time_scale(double value) {
 	time_scale = value;
 }
 
-bool BulletSpawner2D::muzzle_outside_despawn_bounds(const BulletFactory2D *factory) const {
+bool PatternSpawner2D::muzzle_outside_despawn_bounds(const BulletFactory2D *factory) const {
 	if (shoot_outside_despawn_bounds || factory == nullptr || !factory->get_despawn_bounds_enabled()) {
 		return false;
 	}
@@ -1314,7 +1314,7 @@ bool BulletSpawner2D::muzzle_outside_despawn_bounds(const BulletFactory2D *facto
 	return muzzle.x < bounds.position.x || muzzle.y < bounds.position.y || muzzle.x > bounds.position.x + bounds.size.x || muzzle.y > bounds.position.y + bounds.size.y;
 }
 
-double BulletSpawner2D::get_process_time_scale() const {
+double PatternSpawner2D::get_process_time_scale() const {
 	double scale = time_scale;
 	const BulletFactory2D *factory = get_bullet_factory();
 	if (factory != nullptr) {
@@ -1323,7 +1323,7 @@ double BulletSpawner2D::get_process_time_scale() const {
 	return (Math::is_finite(scale) && scale > 0.0) ? scale : 0.0;
 }
 
-void BulletSpawner2D::_process(double delta) {
+void PatternSpawner2D::_process(double delta) {
 	// Self-healing: even if processing gets enabled in the editor somehow
 	// (e.g. set_shooting_enabled(true) from an editor dock), never shoot.
 	// The editor only runs the preview live-refresh loop.
@@ -1556,11 +1556,11 @@ void BulletSpawner2D::_process(double delta) {
 	}
 }
 
-void BulletSpawner2D::begin_burst() {
+void PatternSpawner2D::begin_burst() {
 	begin_burst_chain(false);
 }
 
-void BulletSpawner2D::begin_burst_chain(bool auto_started) {
+void PatternSpawner2D::begin_burst_chain(bool auto_started) {
 	// A chain still running ends first, with its burst_finished report. A
 	// handler of that report that started its own chain wins.
 	if (burst_shots_left > 0) {
@@ -1600,7 +1600,7 @@ void BulletSpawner2D::begin_burst_chain(bool auto_started) {
 	set_process(true);
 }
 
-void BulletSpawner2D::begin_telegraph(bool auto_started) {
+void PatternSpawner2D::begin_telegraph(bool auto_started) {
 	// No warning for a shot that cannot happen (the muzzle is outside the
 	// despawn bounds): report the skip, the pull rearms the interval.
 	if (muzzle_outside_despawn_bounds(get_bullet_factory())) {
@@ -1621,7 +1621,7 @@ void BulletSpawner2D::begin_telegraph(bool auto_started) {
 	set_process(true);
 }
 
-void BulletSpawner2D::cancel_burst_chain() {
+void PatternSpawner2D::cancel_burst_chain() {
 	const bool was_running = burst_shots_left > 0;
 	++burst_serial;
 	burst_shots_left = 0;
@@ -1635,7 +1635,7 @@ void BulletSpawner2D::cancel_burst_chain() {
 	}
 }
 
-void BulletSpawner2D::fire_burst_volley() {
+void PatternSpawner2D::fire_burst_volley() {
 	if (burst_enabled && burst_shots_left > 0) {
 		if (telegraph_enabled && telegraph_sec > 0.0 && !telegraph_pending && !burst_telegraph_done && burst_shots_fired == 0) {
 			// First burst shot warns once; done-flag stops the expiry from
@@ -1692,7 +1692,7 @@ void BulletSpawner2D::fire_burst_volley() {
 	refresh_process_state();
 }
 
-double BulletSpawner2D::next_shoot_interval_sec() const {
+double PatternSpawner2D::next_shoot_interval_sec() const {
 	// Reload jitter: +/- uniform jitter around the base interval (seeded by
 	// reload_jitter_seed for replays; non-deterministic at 0). Floored so a huge
 	// jitter can never invert or stall the timer; the floor sits at 1ms so
@@ -1723,7 +1723,7 @@ double BulletSpawner2D::next_shoot_interval_sec() const {
 	return Math::max(0.001, base_interval + jitter);
 }
 
-int BulletSpawner2D::spawn_pattern_list(const Array &entries, bool simultaneous, double interval_sec) {
+int PatternSpawner2D::spawn_pattern_list(const Array &entries, bool simultaneous, double interval_sec) {
 	if (entries.is_empty()) {
 		UtilityFunctions::push_error("BulletSpawner2D::spawn_pattern_list: entries is empty, nothing queued.");
 		return 0;
@@ -1767,7 +1767,7 @@ int BulletSpawner2D::spawn_pattern_list(const Array &entries, bool simultaneous,
 	return pattern_list_entries.size();
 }
 
-void BulletSpawner2D::stop_pattern_list() {
+void PatternSpawner2D::stop_pattern_list() {
 	++pattern_list_serial;
 	pattern_list_active = false;
 	pattern_list_entries.clear();
@@ -1776,11 +1776,11 @@ void BulletSpawner2D::stop_pattern_list() {
 	refresh_process_state();
 }
 
-bool BulletSpawner2D::is_pattern_list_active() const {
+bool PatternSpawner2D::is_pattern_list_active() const {
 	return pattern_list_active;
 }
 
-bool BulletSpawner2D::apply_pattern_list_entry(const Variant &entry, const char *caller) {
+bool PatternSpawner2D::apply_pattern_list_entry(const Variant &entry, const char *caller) {
 	if (entry.get_type() != Variant::DICTIONARY) {
 		UtilityFunctions::push_error(String(caller) + ": every entry must be a Dictionary, skipping one.");
 		return false;
@@ -1868,7 +1868,7 @@ bool BulletSpawner2D::apply_pattern_list_entry(const Variant &entry, const char 
 	return true;
 }
 
-void BulletSpawner2D::fire_pattern_list_entry() {
+void PatternSpawner2D::fire_pattern_list_entry() {
 	if (!pattern_list_active || pattern_list_cursor < 0 || pattern_list_cursor >= pattern_list_entries.size()) {
 		stop_pattern_list();
 		return;
@@ -1887,11 +1887,11 @@ void BulletSpawner2D::fire_pattern_list_entry() {
 	}
 }
 
-bool BulletSpawner2D::shoot_once_with(const Dictionary &overrides) {
+bool PatternSpawner2D::shoot_once_with(const Dictionary &overrides) {
 	return fire_pattern_list_override(overrides, "BulletSpawner2D::shoot_once_with");
 }
 
-bool BulletSpawner2D::fire_pattern_list_override(const Variant &entry, const char *caller) {
+bool PatternSpawner2D::fire_pattern_list_override(const Variant &entry, const char *caller) {
 	// Apply, fire, restore inside one pattern batch: the preview rebuilds
 	// once at the end, and the restored knobs bump the pattern version so the
 	// next normal shot rebakes from the spawner's own configuration.

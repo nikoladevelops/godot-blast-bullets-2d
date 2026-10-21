@@ -147,8 +147,8 @@ protected:
 	static void _bind_methods();
 };
 
-class BulletSpawner2D : public Node2D, public PatternKnobs2D {
-	GDCLASS(BulletSpawner2D, Node2D)
+class PatternSpawner2D : public Node2D, public PatternKnobs2D {
+	GDCLASS(PatternSpawner2D, Node2D)
 
 	// Crash-safety for preview source tracking: a raw Node* cached across
 	// frames may dangle after the node is freed (stale object id: the memory
@@ -2109,28 +2109,36 @@ private:
 	// curves are excluded: without a loop there is no inside.
 	static bool supports_outline_layout(PatternSource source);
 };
+
+// Fires bullets (BulletVolley2D) along the patterns of PatternSpawner2D.
+class BulletSpawner2D : public PatternSpawner2D {
+	GDCLASS(BulletSpawner2D, PatternSpawner2D)
+
+protected:
+	static void _bind_methods() {}
+};
 } // namespace BlastBullets2D
 
 // Need this in order to expose the enum to Godot Engine
-BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::PatternSource);
-BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::Path2DDistribution);
-BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::Path2DOverflow);
-BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::Path2DAnchor);
-BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::Path2DFacing);
-BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::Path2DSpace);
-BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::SpinMode);
-BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::OrphanedVolleys);
-BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::BulletScaleMode);
-BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingMode);
-BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingTargetSource);
-BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingNodeNameMatch);
-BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingTargetSelection);
-BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingRetargetMode);
-BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::GrazeTargetSource);
-BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::SoundListenerSource);
-BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::PatternCacheMode);
-BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::MovementSpace);
-BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::MovementLoopMode);
-BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::MovementDirection);
-BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::MovementTiming);
-BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::SpawnOffsetSpace);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::PatternSpawner2D::PatternSource);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::PatternSpawner2D::Path2DDistribution);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::PatternSpawner2D::Path2DOverflow);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::PatternSpawner2D::Path2DAnchor);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::PatternSpawner2D::Path2DFacing);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::PatternSpawner2D::Path2DSpace);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::PatternSpawner2D::SpinMode);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::PatternSpawner2D::OrphanedVolleys);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::PatternSpawner2D::BulletScaleMode);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::PatternSpawner2D::HomingMode);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::PatternSpawner2D::HomingTargetSource);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::PatternSpawner2D::HomingNodeNameMatch);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::PatternSpawner2D::HomingTargetSelection);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::PatternSpawner2D::HomingRetargetMode);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::PatternSpawner2D::GrazeTargetSource);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::PatternSpawner2D::SoundListenerSource);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::PatternSpawner2D::PatternCacheMode);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::PatternSpawner2D::MovementSpace);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::PatternSpawner2D::MovementLoopMode);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::PatternSpawner2D::MovementDirection);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::PatternSpawner2D::MovementTiming);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::PatternSpawner2D::SpawnOffsetSpace);

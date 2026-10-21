@@ -69,6 +69,10 @@ func test_reaching_the_target_is_forwarded_once_per_bullet() -> void:
 	var sp := _homing_spawner(1, 400.0)
 	sp.pattern_source = BulletSpawner2D.PATTERN_FROM_SELF
 	sp.set_homing_distance_before_reached(20.0)
+	# No retarget pass: a pass replaces the queue and re-arms the reach (a
+	# legit second event), and when one lands here depends on the default
+	# stagger, which is seeded from the instance id.
+	sp.set_homing_retarget_mode(BulletSpawner2D.HOMING_RETARGET_OFF)
 	assert_true(sp.shoot_once(), "shot")
 	for i in 60:
 		await physics()

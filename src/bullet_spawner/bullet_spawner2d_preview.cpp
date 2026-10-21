@@ -9,11 +9,11 @@ using namespace godot;
 
 namespace BlastBullets2D {
 
-bool BulletSpawner2D::get_show_pattern_preview() const {
+bool PatternSpawner2D::get_show_pattern_preview() const {
 	return show_pattern_preview;
 }
 
-void BulletSpawner2D::set_show_pattern_preview(bool value) {
+void PatternSpawner2D::set_show_pattern_preview(bool value) {
 	show_pattern_preview = value;
 	// _validate_property hides preview_* knobs while both toggles are off.
 	notify_property_list_changed();
@@ -21,11 +21,11 @@ void BulletSpawner2D::set_show_pattern_preview(bool value) {
 	on_pattern_changed();
 }
 
-bool BulletSpawner2D::get_show_preview_during_runtime() const {
+bool PatternSpawner2D::get_show_preview_during_runtime() const {
 	return show_preview_during_runtime;
 }
 
-void BulletSpawner2D::set_show_preview_during_runtime(bool value) {
+void PatternSpawner2D::set_show_preview_during_runtime(bool value) {
 	show_preview_during_runtime = value;
 	notify_property_list_changed();
 	// Runtime preview piggy-backs the shooting/spin/retarget loop: enabling
@@ -49,11 +49,11 @@ static bool preview_color_ok(const Color &value, const char *name) {
 	return false;
 }
 
-Color BulletSpawner2D::get_preview_dot_color() const {
+Color PatternSpawner2D::get_preview_dot_color() const {
 	return preview_dot_color;
 }
 
-void BulletSpawner2D::set_preview_dot_color(const Color &value) {
+void PatternSpawner2D::set_preview_dot_color(const Color &value) {
 	if (!preview_color_ok(value, "preview_dot_color")) {
 		return;
 	}
@@ -61,11 +61,11 @@ void BulletSpawner2D::set_preview_dot_color(const Color &value) {
 	rebuild_preview(); // appearance only: the pattern bake stays valid
 }
 
-Color BulletSpawner2D::get_preview_arrow_color() const {
+Color PatternSpawner2D::get_preview_arrow_color() const {
 	return preview_arrow_color;
 }
 
-void BulletSpawner2D::set_preview_arrow_color(const Color &value) {
+void PatternSpawner2D::set_preview_arrow_color(const Color &value) {
 	if (!preview_color_ok(value, "preview_arrow_color")) {
 		return;
 	}
@@ -73,11 +73,11 @@ void BulletSpawner2D::set_preview_arrow_color(const Color &value) {
 	rebuild_preview(); // appearance only: the pattern bake stays valid
 }
 
-Color BulletSpawner2D::get_preview_first_dot_color() const {
+Color PatternSpawner2D::get_preview_first_dot_color() const {
 	return preview_first_dot_color;
 }
 
-void BulletSpawner2D::set_preview_first_dot_color(const Color &value) {
+void PatternSpawner2D::set_preview_first_dot_color(const Color &value) {
 	if (!preview_color_ok(value, "preview_first_dot_color")) {
 		return;
 	}
@@ -85,11 +85,11 @@ void BulletSpawner2D::set_preview_first_dot_color(const Color &value) {
 	rebuild_preview(); // appearance only: the pattern bake stays valid
 }
 
-Color BulletSpawner2D::get_preview_path_color() const {
+Color PatternSpawner2D::get_preview_path_color() const {
 	return preview_path_color;
 }
 
-void BulletSpawner2D::set_preview_path_color(const Color &value) {
+void PatternSpawner2D::set_preview_path_color(const Color &value) {
 	if (!preview_color_ok(value, "preview_path_color")) {
 		return;
 	}
@@ -97,11 +97,11 @@ void BulletSpawner2D::set_preview_path_color(const Color &value) {
 	rebuild_preview(); // appearance only: the pattern bake stays valid
 }
 
-Color BulletSpawner2D::get_preview_layer_path_color() const {
+Color PatternSpawner2D::get_preview_layer_path_color() const {
 	return preview_layer_path_color;
 }
 
-void BulletSpawner2D::set_preview_layer_path_color(const Color &value) {
+void PatternSpawner2D::set_preview_layer_path_color(const Color &value) {
 	if (!preview_color_ok(value, "preview_layer_path_color")) {
 		return;
 	}
@@ -109,11 +109,11 @@ void BulletSpawner2D::set_preview_layer_path_color(const Color &value) {
 	rebuild_preview(); // appearance only: the pattern bake stays valid
 }
 
-double BulletSpawner2D::get_preview_path_width() const {
+double PatternSpawner2D::get_preview_path_width() const {
 	return preview_path_width;
 }
 
-void BulletSpawner2D::set_preview_path_width(double value) {
+void PatternSpawner2D::set_preview_path_width(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: preview_path_width must be finite and >= 0 (0 hides the track), keeping the old value.");
 		return;
@@ -122,11 +122,11 @@ void BulletSpawner2D::set_preview_path_width(double value) {
 	on_pattern_changed();
 }
 
-double BulletSpawner2D::get_preview_dot_radius() const {
+double PatternSpawner2D::get_preview_dot_radius() const {
 	return preview_dot_radius;
 }
 
-void BulletSpawner2D::set_preview_dot_radius(double value) {
+void PatternSpawner2D::set_preview_dot_radius(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: preview_dot_radius must be finite and >= 0, keeping the old value.");
 		return;
@@ -135,11 +135,11 @@ void BulletSpawner2D::set_preview_dot_radius(double value) {
 	on_pattern_changed();
 }
 
-double BulletSpawner2D::get_preview_arrow_gap() const {
+double PatternSpawner2D::get_preview_arrow_gap() const {
 	return preview_arrow_gap;
 }
 
-void BulletSpawner2D::set_preview_arrow_gap(double value) {
+void PatternSpawner2D::set_preview_arrow_gap(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: preview_arrow_gap must be finite and >= 0, keeping the old value.");
 		return;
@@ -148,11 +148,11 @@ void BulletSpawner2D::set_preview_arrow_gap(double value) {
 	on_pattern_changed();
 }
 
-double BulletSpawner2D::get_preview_arrow_length() const {
+double PatternSpawner2D::get_preview_arrow_length() const {
 	return preview_arrow_length;
 }
 
-void BulletSpawner2D::set_preview_arrow_length(double value) {
+void PatternSpawner2D::set_preview_arrow_length(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: preview_arrow_length must be finite and >= 0, keeping the old value.");
 		return;
@@ -161,11 +161,11 @@ void BulletSpawner2D::set_preview_arrow_length(double value) {
 	on_pattern_changed();
 }
 
-double BulletSpawner2D::get_preview_arrow_width() const {
+double PatternSpawner2D::get_preview_arrow_width() const {
 	return preview_arrow_width;
 }
 
-void BulletSpawner2D::set_preview_arrow_width(double value) {
+void PatternSpawner2D::set_preview_arrow_width(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: preview_arrow_width must be finite and >= 0, keeping the old value.");
 		return;
@@ -174,11 +174,11 @@ void BulletSpawner2D::set_preview_arrow_width(double value) {
 	on_pattern_changed();
 }
 
-double BulletSpawner2D::get_preview_arrow_head_length() const {
+double PatternSpawner2D::get_preview_arrow_head_length() const {
 	return preview_arrow_head_length;
 }
 
-void BulletSpawner2D::set_preview_arrow_head_length(double value) {
+void PatternSpawner2D::set_preview_arrow_head_length(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: preview_arrow_head_length must be finite and >= 0, keeping the old value.");
 		return;
@@ -187,11 +187,11 @@ void BulletSpawner2D::set_preview_arrow_head_length(double value) {
 	on_pattern_changed();
 }
 
-double BulletSpawner2D::get_preview_arrow_head_width() const {
+double PatternSpawner2D::get_preview_arrow_head_width() const {
 	return preview_arrow_head_width;
 }
 
-void BulletSpawner2D::set_preview_arrow_head_width(double value) {
+void PatternSpawner2D::set_preview_arrow_head_width(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: preview_arrow_head_width must be finite and >= 0, keeping the old value.");
 		return;
@@ -200,20 +200,20 @@ void BulletSpawner2D::set_preview_arrow_head_width(double value) {
 	on_pattern_changed();
 }
 
-bool BulletSpawner2D::get_preview_draw_collision_rings() const {
+bool PatternSpawner2D::get_preview_draw_collision_rings() const {
 	return preview_draw_collision_rings;
 }
 
-void BulletSpawner2D::set_preview_draw_collision_rings(bool value) {
+void PatternSpawner2D::set_preview_draw_collision_rings(bool value) {
 	preview_draw_collision_rings = value;
 	on_pattern_changed();
 }
 
-Color BulletSpawner2D::get_preview_collision_ring_color() const {
+Color PatternSpawner2D::get_preview_collision_ring_color() const {
 	return preview_collision_ring_color;
 }
 
-void BulletSpawner2D::set_preview_collision_ring_color(const Color &value) {
+void PatternSpawner2D::set_preview_collision_ring_color(const Color &value) {
 	if (!preview_color_ok(value, "preview_collision_ring_color")) {
 		return;
 	}
@@ -221,11 +221,11 @@ void BulletSpawner2D::set_preview_collision_ring_color(const Color &value) {
 	rebuild_preview(); // appearance only: the pattern bake stays valid
 }
 
-double BulletSpawner2D::get_preview_collision_ring_width() const {
+double PatternSpawner2D::get_preview_collision_ring_width() const {
 	return preview_collision_ring_width;
 }
 
-void BulletSpawner2D::set_preview_collision_ring_width(double value) {
+void PatternSpawner2D::set_preview_collision_ring_width(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletSpawner2D: preview_collision_ring_width must be finite and >= 0, keeping the old value.");
 		return;
@@ -234,11 +234,11 @@ void BulletSpawner2D::set_preview_collision_ring_width(double value) {
 	on_pattern_changed();
 }
 
-Array BulletSpawner2D::debug_get_layer_rings() const {
+Array PatternSpawner2D::debug_get_layer_rings() const {
 	return preview_last_layer_rings.duplicate();
 }
 
-void BulletSpawner2D::set_preview_nodes(Node2D *holder, PatternPreviewLayer2D *dots, PatternPreviewLayer2D *arrows) {
+void PatternSpawner2D::set_preview_nodes(Node2D *holder, PatternPreviewLayer2D *dots, PatternPreviewLayer2D *arrows) {
 	preview_holder = holder;
 	preview_dots_layer = dots;
 	preview_arrows_layer = arrows;
@@ -247,7 +247,7 @@ void BulletSpawner2D::set_preview_nodes(Node2D *holder, PatternPreviewLayer2D *d
 	preview_arrows_layer_id = arrows != nullptr ? arrows->get_instance_id() : 0;
 }
 
-PackedVector2Array BulletSpawner2D::debug_get_preview_dot_points() const {
+PackedVector2Array PatternSpawner2D::debug_get_preview_dot_points() const {
 	const PatternPreviewLayer2D *dots = live_preview_dots();
 	if (dots == nullptr) {
 		return PackedVector2Array();
@@ -255,7 +255,7 @@ PackedVector2Array BulletSpawner2D::debug_get_preview_dot_points() const {
 	return dots->dots;
 }
 
-PackedVector2Array BulletSpawner2D::debug_get_preview_track_points() const {
+PackedVector2Array PatternSpawner2D::debug_get_preview_track_points() const {
 	const PatternPreviewLayer2D *dots = live_preview_dots();
 	if (dots == nullptr) {
 		return PackedVector2Array();
@@ -263,7 +263,7 @@ PackedVector2Array BulletSpawner2D::debug_get_preview_track_points() const {
 	return dots->path_points;
 }
 
-bool BulletSpawner2D::debug_get_preview_track_closed() const {
+bool PatternSpawner2D::debug_get_preview_track_closed() const {
 	const PatternPreviewLayer2D *dots = live_preview_dots();
 	return dots != nullptr && dots->path_closed;
 }
@@ -274,7 +274,7 @@ bool BulletSpawner2D::debug_get_preview_track_closed() const {
 // sharp shapes, sub-pixel on dense sweeps. Because pairing is purely
 // geometric, twist, caps and fill deals can never confuse it. Large
 // deviation = factory/preview disagree (stale snapshot).
-Dictionary BulletSpawner2D::debug_check_layer_coincidence(double tolerance_px) const {
+Dictionary PatternSpawner2D::debug_check_layer_coincidence(double tolerance_px) const {
 	Dictionary out;
 	out["checked"] = false;
 	out["layers"] = 0;
@@ -378,7 +378,7 @@ Dictionary BulletSpawner2D::debug_check_layer_coincidence(double tolerance_px) c
 	return out;
 }
 
-Dictionary BulletSpawner2D::debug_get_preview_stats() const {
+Dictionary PatternSpawner2D::debug_get_preview_stats() const {
 	Dictionary d;
 	d["rebuilds"] = (int64_t)preview_rebuild_count;
 	d["last_rebuild_usec"] = (int64_t)preview_last_rebuild_usec;
@@ -387,7 +387,7 @@ Dictionary BulletSpawner2D::debug_get_preview_stats() const {
 	return d;
 }
 
-bool BulletSpawner2D::preview_allowed_here() const {
+bool PatternSpawner2D::preview_allowed_here() const {
 	if (!is_inside_tree()) {
 		return false;
 	}
@@ -397,7 +397,7 @@ bool BulletSpawner2D::preview_allowed_here() const {
 	return show_preview_during_runtime;
 }
 
-bool BulletSpawner2D::preview_active() const {
+bool PatternSpawner2D::preview_active() const {
 	return show_pattern_preview && preview_allowed_here();
 }
 
@@ -407,7 +407,7 @@ bool BulletSpawner2D::preview_active() const {
 // redraw. Burst mirror never reaches here (a mirrored volley is a real shot,
 // and the flag is only set around the firing path), so the plain angle is
 // correct for the gizmo.
-void BulletSpawner2D::set_preview_pose(double spin_angle_degrees) {
+void PatternSpawner2D::set_preview_pose(double spin_angle_degrees) {
 	if (!is_finite_real2d(spin_angle_degrees)) {
 		return;
 	}
@@ -474,7 +474,7 @@ void BulletSpawner2D::set_preview_pose(double spin_angle_degrees) {
 // pointer: everything is freshly resolved from paths here.
 // Deferred flush for editor-coalesced rebuilds (see rebuild_preview): runs
 // the build synchronously exactly once, bypassing re-queue.
-void BulletSpawner2D::_do_queued_preview_rebuild() {
+void PatternSpawner2D::_do_queued_preview_rebuild() {
 	preview_rebuild_queued = false;
 	if (!preview_allowed_here()) {
 		return;
@@ -484,7 +484,7 @@ void BulletSpawner2D::_do_queued_preview_rebuild() {
 	preview_sync_rebuild = false;
 }
 
-void BulletSpawner2D::snapshot_preview_sources() {
+void PatternSpawner2D::snapshot_preview_sources() {
 	tracked_has_self = true;
 	tracked_base = get_effective_generator();
 	if (tracked_base == nullptr) {
@@ -569,7 +569,7 @@ void BulletSpawner2D::snapshot_preview_sources() {
 	}
 }
 
-void BulletSpawner2D::rebuild_preview() {
+void PatternSpawner2D::rebuild_preview() {
 	// Preview may exist in the editor (toggle decides) and at runtime only
 	// when the user opted in via show_preview_during_runtime. Never before
 	// the node is inside the tree (scene load sets properties first).
@@ -585,7 +585,7 @@ void BulletSpawner2D::rebuild_preview() {
 	if (Engine::get_singleton()->is_editor_hint() && is_inside_tree() && !preview_rebuild_in_progress && !preview_sync_rebuild) {
 		if (!preview_rebuild_queued) {
 			preview_rebuild_queued = true;
-			callable_mp(this, &BulletSpawner2D::_do_queued_preview_rebuild).call_deferred();
+			callable_mp(this, &PatternSpawner2D::_do_queued_preview_rebuild).call_deferred();
 		}
 		return;
 	}
@@ -609,7 +609,7 @@ void BulletSpawner2D::rebuild_preview() {
 	// under a node the volleys ignore.
 	Node2D *effective_base = is_inside_tree() ? get_effective_generator() : nullptr;
 	if (effective_base == nullptr) {
-		effective_base = const_cast<BulletSpawner2D *>(this);
+		effective_base = const_cast<PatternSpawner2D *>(this);
 	}
 	if (effective_base == nullptr) {
 		preview_rebuild_in_progress = false;
@@ -666,7 +666,7 @@ void BulletSpawner2D::rebuild_preview() {
 				if (owner_id == self_id) {
 					continue;
 				}
-				const BulletSpawner2D *owner_spawner = Object::cast_to<BulletSpawner2D>(ObjectDB::get_instance(ObjectID(owner_id)));
+				const PatternSpawner2D *owner_spawner = Object::cast_to<PatternSpawner2D>(ObjectDB::get_instance(ObjectID(owner_id)));
 				if (owner_spawner != nullptr && owner_spawner->preview_holder == child) {
 					continue;
 				}
@@ -1147,7 +1147,7 @@ void BulletSpawner2D::rebuild_preview() {
 // ids only participate in integer comparisons. A freed node (or a slot
 // reused by an unrelated object, caught via the id check) reports dirty and
 // the rebuild re-resolves - never a touch of garbage memory.
-bool BulletSpawner2D::preview_sources_dirty() {
+bool PatternSpawner2D::preview_sources_dirty() {
 	// No snapshot yet (first frames): dirty so the loop rebuilds + snaps.
 	if (!tracked_has_self) {
 		return true;
@@ -1313,7 +1313,7 @@ bool BulletSpawner2D::preview_sources_dirty() {
 	return false;
 }
 
-void BulletSpawner2D::update_preview_process_state() {
+void PatternSpawner2D::update_preview_process_state() {
 	// Editor: processing runs only while the preview is on, so inspector
 	// rotations, gizmo drags, and add/remove marker refresh live.
 	// Runtime: never touched here - shooting/spinning own _process, and the
