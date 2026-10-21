@@ -35,7 +35,7 @@ func setup() -> void:
 func _on_hit(_body: Node, v: BulletVolley2D, i: int) -> void:
 	_hits += 1
 	var custom: Resource = v.bullet_get_custom_data(i)
-	var pos: Vector2 = v.get_bullet_global_transform(i).origin
+	var pos: Vector2 = v.get_bullet_transform(i).origin
 	var vel: Vector2 = v.get_bullet_velocity(i)
 	if custom == _tag and pos.is_finite() and vel.is_finite() and _hits % 8 == 0:
 		v.set_bullet_collision_count(i, 0) # heal: the plugin keeps it alive

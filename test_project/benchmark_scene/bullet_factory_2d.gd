@@ -46,8 +46,8 @@ func _on_life_time_over(_volley: BulletVolley2D, _bullet_indexes: Array[int]) ->
 	# Only if is_life_time_over_signal_enabled is set inside the bullets multimesh data
 	#print(volley)
 	#print(bullet_indexes)
-	# Just a small example that you can spawn particles or other things in the same exact position where the bullet got disabled (its life time got to 0). Transforms are one instance call away via get_bullet_global_transform().
+	# Just a small example that you can spawn particles or other things in the same exact position where the bullet got disabled (its life time got to 0). Transforms are one instance call away via get_bullet_transform().
 	#for i in _bullet_indexes:
 		#var instance:Node2D = particle_scn.instantiate()
-		#instance.global_transform = _volley.get_bullet_global_transform(i)
+		#instance.global_transform = _volley.get_bullet_transform(i)
 		#get_tree().root.add_child(instance)
