@@ -132,3 +132,64 @@ func test_nothing_of_the_window_survives_the_pool() -> void:
 	assert_eq(_scales(again), [1.0, 1.0], "a plain life spawns full size")
 	step_factory(4, DT)
 	assert_eq(_scales(again), [1.0, 1.0], "and never grows")
+
+
+func test_a_bullet_split_while_growing_gives_full_size_children() -> void:
+	var d := _data(1, 1.0, 0.2) # a 1 s window: 40 % grown at 0.25 s
+	var stage := BulletSplitStage2D.new()
+	stage.split_on_lifetime_over = false
+	stage.split_after_sec = 0.25
+	stage.count = 2
+	var chain := BulletSplitData2D.new()
+	chain.stages = [stage]
+	var children: Array = []
+	factory.bullet_split.connect(func(_pos, _cause, child: BulletVolley2D, _depth) -> void: children.append(child))
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	v.split_set_data(chain, d)
+	step_factory(6, DT)
+	assert_eq(children.size(), 1, "split once")
+	step_factory(20, DT) # past the children's own 1 s window
+	assert_eq(_scales(children[0]), [1.0, 1.0], "full size (x scale_multiplier 1), not the parent's 40 %")
+
+
+func test_set_bullet_scale_while_growing_sets_the_full_grown_size() -> void:
+	var v: BulletVolley2D = factory.spawn_volley(_data(1, 0.25, 0.2))
+	step_factory(2, DT) # half way: 60 %
+	v.set_bullet_scale(0, Vector2(2, 2))
+	assert_eq(_scales(v), [1.2], "drawn at 2 x the growth so far")
+	assert_almost_eq(v.get_bullet_scale(0).x, 1.2, 0.0001, "get_bullet_scale reports the drawn size")
+	step_factory(4, DT)
+	assert_eq(_scales(v), [2.0], "lands on the size it was given")
+	v.set_bullet_scale(0, Vector2(3, 3))
+	assert_eq(_scales(v), [3.0], "after the window a set is plain")
+
+
+func test_set_bullet_transform_while_growing_sets_the_full_grown_size() -> void:
+	var v: BulletVolley2D = factory.spawn_volley(_data(1, 0.25, 0.2))
+	step_factory(2, DT)
+	v.set_bullet_transform(0, Transform2D(0.5, Vector2(3, 3), 0.0, Vector2(40, 10)))
+	assert_eq(_scales(v), [1.8], "drawn at 3 x the growth so far (60 %)")
+	step_factory(4, DT)
+	var t := v.get_bullet_transform(0)
+	assert_eq([snappedf(t.x.length(), 0.0001), snappedf(t.get_rotation(), 0.0001)], [3.0, 0.5], "lands on the given scale, turned as given")
+
+
+func test_the_hitbox_of_a_bullet_scaled_while_growing_matches_it(rotate_only: bool = use_parameters([false, true])) -> void:
+	var d := _data(1, 0.25, 0.2)
+	d.rotate_only_textures = rotate_only
+	d.collision_shape = H.make_circle_shape(10.0)
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	step_factory(2, DT)
+	v.set_bullet_scale(0, Vector2(2, 2))
+	step_factory(4, DT)
+	assert_almost_eq(v.debug_get_bullet_shape_transform(0).x.length(), 2.0, 0.0001, "the hitbox lands on 2 x too")
+
+
+func test_a_bullet_converted_while_growing_becomes_a_full_size_pickup() -> void:
+	var v: BulletVolley2D = factory.spawn_volley(_data(1, 1.0, 0.2))
+	step_factory(4, DT) # 25 % into the window: drawn at 40 %
+	var pickup := BulletPickupData2D.new() # scale_multiplier 1
+	factory.convert_all_bullets_to_pickups(pickup, Vector2(0, 500))
+	var pickups: Array = factory.get_active_volleys().filter(func(x: BulletVolley2D) -> bool: return x != v and not x.is_pooled())
+	assert_eq(pickups.size(), 1, "one pickup volley")
+	assert_almost_eq(pickups[0].get_bullet_transform(0).x.length(), 1.0, 0.0001, "the pickup is full size, not 40 % of it")

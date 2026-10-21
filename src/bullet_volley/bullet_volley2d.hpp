@@ -922,6 +922,22 @@ public:
 	double scale_in_applied = 1.0;
 	bool scale_in_active = false;
 	void step_scale_in(double delta);
+	// A bullet's drawn pose at full size: the basis without the growth still
+	// to come (split children and pickups are born full size; setters write
+	// full-grown sizes times the growth so far).
+	_ALWAYS_INLINE_ real_t scale_in_growth() const {
+		return scale_in_active && scale_in_applied > 0.0 ? (real_t)scale_in_applied : (real_t)1.0;
+	}
+	_ALWAYS_INLINE_ Transform2D full_grown2d(const Transform2D &t) const {
+		const real_t growth = scale_in_growth();
+		if (growth == (real_t)1.0) {
+			return t;
+		}
+		Transform2D out = t;
+		out.columns[0] /= growth;
+		out.columns[1] /= growth;
+		return out;
+	}
 	// Switches the MultiMesh format when the incoming data wants the other
 	// one (Godot refuses the switch while instances exist, so the count is
 	// dropped first). Factory spawns pop a volley of the right format by
@@ -1376,6 +1392,8 @@ public:
 	// capsule_radius, capsule_height, rid_count}. For tests asserting
 	// set_collision_shape_runtime same-type vs type-change paths.
 	Dictionary debug_get_shape_state() const;
+	// The transform the physics server holds for bullet i's shape (its hitbox).
+	Transform2D debug_get_bullet_shape_transform(int bullet_index) const;
 	// Attachment slot introspection: {has_attachment, pooling_id,
 	// owner_match}. owner_match verifies the attachment's owner ids point
 	// back at this volley + index (stale ownership after reuse fails here).

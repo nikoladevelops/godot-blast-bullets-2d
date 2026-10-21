@@ -242,7 +242,7 @@ Array BulletFactory2D::convert_to_pickups_impl(const char *function_name, const 
 			owners_differ = true;
 		}
 		for (const int i : record.indexes) {
-			Transform2D pose = volley->all_cached_instance_transforms[i];
+			Transform2D pose = volley->full_grown2d(volley->all_cached_instance_transforms[i]); // full size, even while growing in
 			real_t pose_scale = scale;
 			if (scale_random) {
 				const double lo = Math::min(pickup->scale_random_min, pickup->scale_random_max);

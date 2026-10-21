@@ -103,7 +103,7 @@ int BulletVolley2D::split_capture(int bullet_index, int cause, const Transform2D
 	request.stage = stage;
 	request.data = data;
 	request.stage_data = stage->child_data.is_valid();
-	request.pose = pose;
+	request.pose = full_grown2d(pose); // a parent still growing in: full-size children
 	request.direction = all_cached_direction[bullet_index];
 	request.speed = all_cached_speed[bullet_index];
 	request.max_speed = bullet_index < (int)all_cached_max_speed.size() ? all_cached_max_speed[bullet_index] : request.speed;

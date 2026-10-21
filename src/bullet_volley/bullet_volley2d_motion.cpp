@@ -696,9 +696,17 @@ void BulletVolley2D::set_bullet_transform(int bullet_index, const Transform2D &n
 
 	const Vector2 origin_delta = new_transform.get_origin() - curr_bullet_origin;
 
-	curr_bullet_transf = new_transform;
+	// Inside the scale-in window the basis is the full-grown size (drawn at
+	// the growth so far).
+	Transform2D drawn = new_transform;
+	const real_t growth = scale_in_growth();
+	if (growth != (real_t)1.0) {
+		drawn.columns[0] *= growth;
+		drawn.columns[1] *= growth;
+	}
+	curr_bullet_transf = drawn;
 	curr_bullet_origin = new_transform.get_origin();
-	note_bullet_basis_grew(new_transform);
+	note_bullet_basis_grew(drawn);
 
 	// The attachment shifts by the jump (stick-relative ones recompute).
 	present_bullet_transform(bullet_index, origin_delta);
@@ -787,11 +795,14 @@ void BulletVolley2D::set_bullet_scale(int bullet_index, const Vector2 &new_scale
 	}
 	// Each column keeps its heading; get_scale() reports y signed by the
 	// determinant, so the same sign brings get()/set() back to identity.
+	// Inside the scale-in window new_scale is the full-grown size: drawn at
+	// the growth so far, the window carries it the rest of the way.
+	const real_t growth = scale_in_growth();
 	auto rescaled = [&](const Transform2D &t) {
 		const real_t det_sign = t.determinant() < 0.0 ? (real_t)-1.0 : (real_t)1.0;
 		Transform2D out = t;
-		out.columns[0] = safe_normalized2d(t.columns[0]) * new_scale.x;
-		out.columns[1] = safe_normalized2d(t.columns[1]) * (new_scale.y * det_sign);
+		out.columns[0] = safe_normalized2d(t.columns[0]) * (new_scale.x * growth);
+		out.columns[1] = safe_normalized2d(t.columns[1]) * (new_scale.y * det_sign * growth);
 		return out;
 	};
 	const Transform2D scaled = rescaled(all_cached_instance_transforms[bullet_index]);

@@ -107,6 +107,7 @@ void BulletVolley2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("debug_dedup_find_collision", "probe_count"), &BulletVolley2D::debug_dedup_find_collision);
 	ClassDB::bind_method(D_METHOD("debug_get_timer_count"), &BulletVolley2D::debug_get_timer_count);
 	ClassDB::bind_method(D_METHOD("debug_get_shape_state"), &BulletVolley2D::debug_get_shape_state);
+	ClassDB::bind_method(D_METHOD("debug_get_bullet_shape_transform", "bullet_index"), &BulletVolley2D::debug_get_bullet_shape_transform);
 	ClassDB::bind_method(D_METHOD("debug_get_attachment_info", "bullet_index"), &BulletVolley2D::debug_get_attachment_info);
 	ClassDB::bind_method(D_METHOD("debug_run_interpolation_pass", "fraction"), &BulletVolley2D::debug_run_interpolation_pass, DEFVAL(-1.0));
 	ClassDB::bind_method(D_METHOD("bullet_free_attachment", "bullet_index"), &BulletVolley2D::bullet_free_attachment);

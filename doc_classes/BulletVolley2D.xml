@@ -1447,6 +1447,13 @@
 				Full per-bullet steering snapshot: {index, valid, active, direction, velocity, speed, gravity, fall_speed, wobble_active, wobble_amplitude, has_homing_targets, homing_targets_amount, homing_smoothing, orbiting_enabled, orbiting_locked, pattern, shared_pattern_active, rotation_speed}. Never mutates; invalid index returns valid=false with zeroed fields.
 			</description>
 		</method>
+		<method name="debug_get_bullet_shape_transform" qualifiers="const">
+			<return type="Transform2D" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				The transform the physics server holds for this bullet's collision shape: its hitbox as it is tested now (identity for an invalid index or a volley without an area). Scale, rotation and growth (scale-in) included.
+			</description>
+		</method>
 		<method name="debug_get_clocks" qualifiers="const">
 			<return type="Dictionary" />
 			<description>

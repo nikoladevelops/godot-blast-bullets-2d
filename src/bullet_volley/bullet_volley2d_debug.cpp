@@ -257,6 +257,13 @@ Dictionary BulletVolley2D::debug_get_volley_info() const {
 	return d;
 }
 
+Transform2D BulletVolley2D::debug_get_bullet_shape_transform(int bullet_index) const {
+	if (!validate_bullet_index(bullet_index, "debug_get_bullet_shape_transform") || physics_server == nullptr || !area.is_valid() || bullet_index >= area_shape_count) {
+		return Transform2D();
+	}
+	return physics_server->area_get_shape_transform(area, bullet_index);
+}
+
 Dictionary BulletVolley2D::debug_get_shape_state() const {
 	Dictionary d;
 	d["valid"] = physics_server != nullptr && area.is_valid() && volley_shape.is_valid() && area_shape_count == amount_bullets;
