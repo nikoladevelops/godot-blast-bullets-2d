@@ -211,6 +211,22 @@
 				Rotation triples over a range (live values, mirrors [method all_bullets_get_speed_data]).
 			</description>
 		</method>
+		<method name="all_bullets_get_scale" qualifiers="const">
+			<return type="Vector2[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				The scale of every bullet in the range (see [method get_bullet_scale]).
+			</description>
+		</method>
+		<method name="all_bullets_get_speed" qualifiers="const">
+			<return type="float[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				The speed of every bullet in the range (see [method get_bullet_speed]).
+			</description>
+		</method>
 		<method name="all_bullets_get_speed_data" qualifiers="const">
 			<return type="BulletSpeedData2D[]" />
 			<param index="0" name="bullet_index_start" type="int" default="0" />
@@ -606,6 +622,24 @@
 				Fans one rotation triple over a range (null and non-finite values rejected). Mirrors [method all_bullets_set_speed_data].
 			</description>
 		</method>
+		<method name="all_bullets_set_scale">
+			<return type="void" />
+			<param index="0" name="new_scale" type="Vector2" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Sets the scale of every bullet in the range (see [method set_bullet_scale]).
+			</description>
+		</method>
+		<method name="all_bullets_set_speed">
+			<return type="void" />
+			<param index="0" name="new_speed" type="float" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Sets the speed of every bullet in the range (see [method set_bullet_speed]).
+			</description>
+		</method>
 		<method name="all_bullets_set_speed_data">
 			<return type="void" />
 			<param index="0" name="new_bullet_speed_data" type="BulletSpeedData2D" />
@@ -683,7 +717,7 @@
 			<param index="1" name="bullet_index_start" type="int" default="0" />
 			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
-				Sets the exact velocity of all bullets in the range (wind, knockback, slow fields). Decomposes into direction and speed so the integrator keeps producing it. Non-finite input is rejected.
+				Sets the exact velocity of all bullets in the range (wind, knockback, slow fields). Decomposes into direction and speed so the integrator keeps producing it; a capped [member BulletSpeedData2D.max_speed] below the new speed rises to it, while 0 stays unlimited. Non-finite input is rejected.
 			</description>
 		</method>
 		<method name="all_bullets_set_wobble_data">
@@ -1616,6 +1650,20 @@
 				Live rotation triple of a specific bullet (rotation/max/accel). Read, tweak, and write back with [method set_bullet_rotation_data]. Out-of-range reads return a zeroed resource.
 			</description>
 		</method>
+		<method name="get_bullet_scale" qualifiers="const">
+			<return type="Vector2" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				The bullet's scale: the scale of its transform's basis ([method Transform2D.get_scale], so a mirrored bullet reads a negative y).
+			</description>
+		</method>
+		<method name="get_bullet_speed" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				The bullet's speed along its direction in px/s (negative flies backwards). The inherited drift and the gravity fall speed are not part of it; [method get_bullet_velocity] gives the composed total.
+			</description>
+		</method>
 		<method name="get_bullet_speed_data" qualifiers="const">
 			<return type="BulletSpeedData2D" />
 			<param index="0" name="bullet_index" type="int" />
@@ -1703,6 +1751,12 @@
 			<return type="bool" />
 			<description>
 				Check if the multimesh is monitorable.
+			</description>
+		</method>
+		<method name="get_owner_spawner" qualifiers="const">
+			<return type="BulletSpawner2D" />
+			<description>
+				The [BulletSpawner2D] that fired this volley (or adopted it with [method BulletSpawner2D.adopt_live_volley]) while that spawner is alive, else null: volleys the factory spawned directly, orphans (a freed or queued spawner, or one that handed them to the factory), and pooled volleys. Handy in factory-level signal handlers to tell who fired a bullet.
 			</description>
 		</method>
 		<method name="get_sprite_animation" qualifiers="const">
@@ -2014,6 +2068,22 @@
 				Live per-bullet rotation write (null and non-finite values rejected). Mirrors [method set_bullet_speed_data].
 			</description>
 		</method>
+		<method name="set_bullet_scale">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_scale" type="Vector2" />
+			<description>
+				Sets the bullet's scale while keeping its position, rotation and direction. The bullet is shown at once with its hitbox, trails and attachment (like [method set_bullet_transform]); the hitbox scales with it in both [member BulletVolleyData2D.rotate_only_textures] modes, like the spawn transform's scale. Graze rings and flock spacing use the new size. A non-finite or zero component is refused with an error and the old scale is kept.
+			</description>
+		</method>
+		<method name="set_bullet_speed">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_speed" type="float" />
+			<description>
+				Sets the bullet's speed along its direction in px/s (negative flies backwards). Its direction, acceleration and inherited drift are kept and the next tick flies the new speed; a capped [member BulletSpeedData2D.max_speed] below the new speed rises to it, while 0 stays unlimited. Refused with a warning while a movement speed curve (shared or the bullet's own) drives the speed, and with an error for a non-finite speed; the old speed is kept.
+			</description>
+		</method>
 		<method name="set_bullet_speed_data">
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
@@ -2128,6 +2198,13 @@
 			<param index="0" name="value" type="bool" />
 			<description>
 				Sets whether the multimesh is monitorable or not.
+			</description>
+		</method>
+		<method name="set_sprite_frame">
+			<return type="bool" />
+			<param index="0" name="frame" type="int" />
+			<description>
+				Seeks the sprite animation to [param frame] like [member AnimatedSprite2D.frame]: the frame shows at once for its full duration and the animation plays on from there. A stopped animation stays stopped on the chosen frame; a finished one plays again and emits [signal sprite_animation_finished] again when it ends. Out of range, or no animation baked, is refused with an error and returns false.
 			</description>
 		</method>
 		<method name="shared_homing_deque_check_current_target_type" qualifiers="const">

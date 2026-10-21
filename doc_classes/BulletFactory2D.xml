@@ -485,6 +485,27 @@
 				Total live one-shot effect slots across all bakes (plus the manual hatch).
 			</description>
 		</method>
+		<method name="get_active_volleys" qualifiers="const">
+			<return type="BulletVolley2D[]" />
+			<description>
+				Every active volley (bullets in flight; not pooled, parked or queued for deletion), in the order the factory ticks them. A fresh array per call.
+			</description>
+		</method>
+		<method name="get_bullets_in_circle" qualifiers="const">
+			<return type="Dictionary[]" />
+			<param index="0" name="center" type="Vector2" />
+			<param index="1" name="radius" type="float" />
+			<description>
+				The live bullets within [param radius] of [param center] (edge included, like [method clear_bullets_in_circle]): one Dictionary per volley that has any, in factory order, with [code]"volley"[/code] (the [BulletVolley2D]), [code]"bullet_indexes"[/code] ([PackedInt32Array]) and [code]"positions"[/code] ([PackedVector2Array], parallel to the indexes). Frozen bullets and volleys queued for deletion are left out. Read-only and safe anywhere (handlers included); O(live bullets). A non-finite center or a negative radius fails loud and returns an empty array.
+			</description>
+		</method>
+		<method name="get_bullets_in_rect" qualifiers="const">
+			<return type="Dictionary[]" />
+			<param index="0" name="rect" type="Rect2" />
+			<description>
+				Same as [method get_bullets_in_circle] for a rectangle (all four edges included; a negative size is normalized). A non-finite rect fails loud and returns an empty array.
+			</description>
+		</method>
 		<method name="get_default_flock">
 			<return type="BulletFlock2D" />
 			<description>

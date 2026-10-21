@@ -57,7 +57,7 @@ for the rest: the sections are written to be looked up, not read once.
 
 ```sh
 GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py   # build (exit 1 = failed; never raw scons, never edit SConstruct)
-python3 tools/run_tests.py                                       # 216 files / 1903 tests, ~15 s, leak-checked
+python3 tools/run_tests.py                                       # 216 files / 1931 tests, ~15 s, leak-checked
 python3 tools/run_tests.py --suite <substring> --full            # one area, every failure message unclipped
 python3 tools/run_tests.py --self-test                           # proves the harness still catches failures/leaks
 python3 tools/run_editor_smoke.py                                # headless EDITOR run of tests/editor_smoke/ (editor-only paths)
@@ -968,6 +968,11 @@ deduped, cancelled by REMOVED) and replayed once on resume.
 | The tick that locks an orbit (a first lock, or RelockAlways re-acquiring the ring after every retarget pass) moves a full step: onto the ring, then along it | `spawner/test_spawner_homing_orbit` |
 | Every way a bullet leaves fires exactly its own sound and effect trigger once (a manual split leaves like a clear) | `integration/test_mix_trigger_ledger` |
 | keep_homing children of the parent's data home like the parent (its target AND its steering: texture control, smoothing, reach, auto pop, delay/duration/lose range) when no live owner spawner aims them; authored child_data is used exactly | `spawner/test_spawner_split` |
+| `BulletSpawner2D.teleport` jumps without a velocity kick (a position written by hand is never inherited either), a playing path keeps its shape from the new spot, `carry_live_bullets` shifts the owned volleys | `spawner/test_spawner_movement` |
+| `shoot_once_with` is one counted shot with pattern-list entry overrides, restored afterwards (only what it changed), never a list report | `spawner/test_spawner_pattern_lists` |
+| A speed or velocity write raises only a capped `max_speed`: 0 stays unlimited | `volley/test_volley_velocity_composition` |
+| `set_bullet_scale` keeps pose and direction and rescales the hitbox in both `rotate_only_textures` modes | `volley/test_volley_core` |
+| `graze_live_volleys` / `sound_live_volleys` / `flock_live_volleys` apply the group to flying volleys; a volley armed alike is untouched (spent rings stay spent) | `spawner/test_spawner_graze`, `sound/test_sound_spawner_contract`, the flock suites |
 
 - Edge cases to test everywhere: NaN/Inf scalars and vectors; null array
   entries; empty arrays; short vs oversized arrays; OOB indices (-1/99);

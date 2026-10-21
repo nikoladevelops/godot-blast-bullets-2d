@@ -222,6 +222,12 @@
 				Shots left in the current burst chain (0 when idle). Waves and HUD can poll this to sequence phases.
 			</description>
 		</method>
+		<method name="get_burst_time_left" qualifiers="const">
+			<return type="float" />
+			<description>
+				Seconds until the next shot of the running burst chain, on the spawner's own clock ([member time_scale] applies). 0 when no chain runs.
+			</description>
+		</method>
 		<method name="get_effective_generator" qualifiers="const">
 			<return type="Node2D" />
 			<description>
@@ -276,6 +282,12 @@
 				Velocity of the last movement step in px/s; zero while paused, stopped, waiting (start delay, endpoint pause) or not moving. This is the velocity [member inherit_movement_velocity] adds to bullets.
 			</description>
 		</method>
+		<method name="get_pattern_list_time_left" qualifiers="const">
+			<return type="float" />
+			<description>
+				Seconds until the next entry of the running pattern list ([method spawn_pattern_list]), on the spawner's own clock. 0 when no list runs.
+			</description>
+		</method>
 		<method name="get_process_time_scale" qualifiers="const">
 			<return type="float" />
 			<description>
@@ -288,10 +300,22 @@
 				The same list as the editor's configuration warning icon: no factory, factory path not pointing to a [BulletFactory2D], no spawn data or invisible spawn data, Aimed/Corridor without a target, Path2D pattern without a path, empty Custom pattern, movement on without a path, orbiting without homing. Empty when nothing is misconfigured. Callable from scripts for debug UIs and CI scene checks.
 			</description>
 		</method>
+		<method name="get_shoot_time_left" qualifiers="const">
+			<return type="float" />
+			<description>
+				Seconds until the next automatic trigger pull, on the spawner's own clock ([member time_scale] applies). 0 while auto-fire is off, paused or spent.
+			</description>
+		</method>
 		<method name="get_spin_angle_deg" qualifiers="const">
 			<return type="float" />
 			<description>
 				Current spin angle in degrees. Only advances at runtime while [member spin_enabled] is on.
+			</description>
+		</method>
+		<method name="get_telegraph_time_left" qualifiers="const">
+			<return type="float" />
+			<description>
+				Seconds until the telegraphed shot fires, on the spawner's own clock. 0 when no warning is in progress (see [method is_telegraph_pending]).
 			</description>
 		</method>
 		<method name="get_tracked_volley_count" qualifiers="const">
@@ -310,6 +334,12 @@
 			<return type="int" />
 			<description>
 				Volleys fired since the last (re)arm. Reset with [method reset_shooting].
+			</description>
+		</method>
+		<method name="graze_live_volleys">
+			<return type="int" />
+			<description>
+				Applies the Graze group as it stands now to every live (or parked) volley this spawner owns, and returns how many volleys changed. Volleys not armed with the current [member graze_zones] (fired while graze was off, fired before the zone list changed, or re-armed by a script) are armed with them, starting a fresh graze state; while [member graze_enabled] is off or no zone is set, every armed volley is disarmed instead. A volley already armed with these exact zones is left alone, so its spent rings stay spent and calling this twice changes nothing. Edits inside a zone resource and the target settings already reach bullets in flight without this call.
 			</description>
 		</method>
 		<method name="is_movement_playing" qualifiers="const">
@@ -334,6 +364,12 @@
 			<return type="bool" />
 			<description>
 				Whether [method pause_shooting] is latched. While set, no volley is created (burst, telegraph, pattern-list and timer chains freeze); spin, retargeting and preview keep running.
+			</description>
+		</method>
+		<method name="is_telegraph_pending" qualifiers="const">
+			<return type="bool" />
+			<description>
+				True while a telegraph warning is counting down to its shot (see [member telegraph_sec]).
 			</description>
 		</method>
 		<method name="movement_pause">
@@ -472,6 +508,13 @@
 				Assigns the [Path2D] to move along and stores its path in [member movement_path].
 			</description>
 		</method>
+		<method name="set_spin_angle_deg">
+			<return type="void" />
+			<param index="0" name="degrees" type="float" />
+			<description>
+				Sets the current spin angle in degrees (wrapped to 0..360) in Continuous spin mode: the next shot and the editor preview use it at once, and the spin carries on from there. A non-finite angle is refused with an error and the angle is kept. In Oscillate mode the angle follows [member spin_amplitude_deg] and [member spin_frequency_hz], so the call is refused with an error naming [method reset_spin_angle].
+			</description>
+		</method>
 		<method name="set_transforms_generator">
 			<return type="void" />
 			<param index="0" name="generator" type="Node2D" />
@@ -491,6 +534,19 @@
 				Queues a [method shoot_once] with call_deferred so it runs after the current emission / physics step instead of nesting. Use this from spawner signal handlers or colliding contexts. Returns true once queued (the shot itself reports through volley_fired or volley_skipped); false when the spawner is not inside the tree.
 			</description>
 		</method>
+		<method name="shoot_once_with">
+			<return type="bool" />
+			<param index="0" name="overrides" type="Dictionary" />
+			<description>
+				Fires one volley like [method shoot_once] with temporary overrides: [param overrides] takes the keys of a [method spawn_pattern_list] entry ([code]"preset"[/code], [code]"pattern_source"[/code], [code]"helper_bullets_amount"[/code], [code]"spawn_data"[/code]) with the same checks and errors (an unknown key names the closest valid one and is skipped). After the shot, every setting the overrides changed returns to the spawner's own value; edits a shot handler makes to other settings stick. Counts as a normal shot ([signal volley_fired], [member max_volleys], [method fire_n_volleys] budgets, the nested-call refusal of [method shoot_once]) and never emits [signal pattern_list_finished]. Returns true when the volley fired.
+			</description>
+		</method>
+		<method name="sound_live_volleys">
+			<return type="int" />
+			<description>
+				Applies the Sound group as it stands now to every live (or parked) volley this spawner owns, and returns how many volleys changed. Volleys not armed with the current [member sound_effects] and [member sound_volume_db] (fired while sound was off, or before those changed) are armed with them; while [member sound_enabled] is off or no entry is set, every armed volley is disarmed instead. A volley already armed alike is left alone. Edits inside an entry and the listener settings already reach bullets in flight without this call.
+			</description>
+		</method>
 		<method name="spawn_pattern_list">
 			<return type="int" />
 			<param index="0" name="entries" type="Array" />
@@ -504,6 +560,14 @@
 			<return type="void" />
 			<description>
 				Cancels the active pattern list (queued entries are dropped, fired volleys keep flying).
+			</description>
+		</method>
+		<method name="teleport">
+			<return type="void" />
+			<param index="0" name="global_position" type="Vector2" />
+			<param index="1" name="carry_live_bullets" type="bool" default="false" />
+			<description>
+				Moves the spawner to [param new_global_position] without travel: the jump is never reported as movement velocity, so [member inherit_movement_velocity] gives the next shot no kick. A playing Path2D movement continues from the new spot with the same path shape (Relative To Start shifts its start, Attach shifts the path by the jump until the movement is stopped or played from the start). With [param carry_live_bullets], every live or parked volley this spawner owns moves by the same jump ([method BulletVolley2D.teleport_shift_all_bullets]: no hits, grazes or homing reach along the way). The preview follows without a rebuild. A non-finite position, or a spawner outside the scene tree, is refused with an error and nothing moves.
 			</description>
 		</method>
 		<method name="volleys_remaining" qualifiers="const">
@@ -586,7 +650,7 @@
 			Node Children source: also every [Node2D] below the children (depth-first, tree order), walking through plain [Node]s.
 		</member>
 		<member name="graze_enabled" type="bool" setter="set_graze_enabled" getter="get_graze_enabled" default="false">
-			Master switch: every volley this spawner fires is armed with [member graze_zones]. Changes apply to the next shots; volleys already flying keep their zones.
+			Master switch: every volley this spawner fires is armed with [member graze_zones]. Changes apply to the next shots; volleys already flying keep their zones until [method graze_live_volleys] applies the current settings to them.
 		</member>
 		<member name="graze_filter_group" type="StringName" setter="set_graze_filter_group" getter="get_graze_filter_group" default="&amp;&quot;&quot;">
 			Allow-list for every node [member graze_target_source]: only nodes also in this group are graze targets. Empty = everything the source finds. The point sources (Mouse, Global Positions) have no nodes and ignore it.
@@ -1609,7 +1673,7 @@
 			Stacked [BulletSoundData2D] entries (nulls allowed, skipped). Each entry plays one of its [member BulletSoundData2D.streams] when its trigger fires, subject to its own limits. On Shot and On Telegraph entries offer from the spawner itself; the rest fire from the volley.
 		</member>
 		<member name="sound_enabled" type="bool" setter="set_sound_enabled" getter="get_sound_enabled" default="false">
-			Master switch: every volley this spawner fires is armed with [member sound_effects]. Changes apply to the next shots; volleys already flying keep their entries.
+			Master switch: every volley this spawner fires is armed with [member sound_effects]. Changes apply to the next shots; volleys already flying keep their entries until [method sound_live_volleys] applies the current settings to them.
 		</member>
 		<member name="sound_listener_children_parent_path" type="NodePath" setter="set_sound_listener_children_parent_path" getter="get_sound_listener_children_parent_path" default="NodePath(&quot;&quot;)">
 			Node Children source: Node2D children of this parent.

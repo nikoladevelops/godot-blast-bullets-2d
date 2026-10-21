@@ -383,6 +383,24 @@ boss.convert_live_bullets_to_pickups(coin, player)          # only one spawner's
 ```
 `motion_mode` picks how pickups move (Burst And Magnet, Keep Bullet Motion, Custom with your own `speed_data`). Pickups obey the despawn bounds unless `obey_despawn_bounds` is off. Call the `*_deferred` twins from signal handlers, and pre-warm with `factory.populate_pickup_pool(coin, bullet_count, n)`.
 
+#### Runtime control and readouts<br>
+```gdscript
+boss.teleport(Vector2(640, 120), true)            # jump without a velocity kick (a playing Path2D keeps its shape); true carries its live bullets
+boss.set_spin_angle_deg(90.0)                     # Continuous spin: aim the pattern now
+boss.shoot_once_with({"pattern_source": BulletSpawner2D.PATTERN_FROM_HELPER_FAN, "helper_bullets_amount": 12})  # one shot, settings restored after
+var next_shot := boss.get_shoot_time_left()       # also get_burst_time_left, get_telegraph_time_left, get_pattern_list_time_left
+boss.graze_zones = [wide_zone]
+boss.graze_live_volleys()                         # bullets in flight take the new zones (sound_live_volleys, flock_live_volleys)
+
+volley.set_bullet_speed(i, 50.0)                  # get_bullet_speed, all_bullets_set_speed
+volley.set_bullet_scale(i, Vector2(2, 2))         # the hitbox grows with the bullet
+volley.set_sprite_frame(0)                        # seek like AnimatedSprite2D.frame
+var shooter := volley.get_owner_spawner()         # null for factory bullets, orphans and pooled volleys
+for found in factory.get_bullets_in_circle(bomb_position, 120.0):  # also get_bullets_in_rect, get_active_volleys
+	for i in found["bullet_indexes"]:
+		found["volley"].set_bullet_speed(i, 20.0)
+```
+
 #### Accessing advanced features
 
 ```
