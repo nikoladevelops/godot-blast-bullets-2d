@@ -388,3 +388,124 @@ func test_teleport_carry_moves_flying_bolts() -> void:
 	assert_true(l.get_beam_end(0).is_equal_approx(head + Vector2(0, 60)), "carry moves it")
 	step_factory(1, DT)
 	assert_true(l.get_beam_end(0).is_equal_approx(head + Vector2(20, 60)), "and it flies on from there")
+
+
+func test_apply_to_live_lasers_arms_disarms_and_retargets() -> void:
+	var t := Node2D.new()
+	t.position = Vector2(100, 40)
+	t.add_to_group(&"laser_grazers")
+	add(t)
+	var d := _laser()
+	var sp := _spawner(d, 2)
+	var l := _fire(sp)
+	assert_false(l.is_graze_armed(), "fired unarmed")
+	sp.graze_zones = [H.make_graze_zone([50.0])]
+	sp.graze_node_group = &"laser_grazers"
+	sp.graze_enabled = true
+	assert_false(l.is_graze_armed(), "spawner settings alone never reach a laser in flight")
+	assert_eq(sp.apply_to_live_lasers(LaserSpawner2D.LIVE_GRAZE), 1, "armed now")
+	assert_true(l.is_graze_armed(), "armed")
+	assert_eq(sp.apply_to_live_lasers(LaserSpawner2D.LIVE_GRAZE), 0, "armed alike: untouched")
+	var grazes: Array = []
+	sp.laser_grazed.connect(func(_t, _l, b: int, _z, _r) -> void: grazes.append(b))
+	step_factory(1, DT)
+	assert_eq(grazes, [0], "and it grazes")
+	sp.sound_enabled = true
+	sp.sound_effects = [H.make_sound(BulletSoundData2D.SOUND_ON_HIT)]
+	assert_eq(sp.apply_to_live_lasers(LaserSpawner2D.LIVE_SOUND), 1, "sound armed")
+	assert_true(l.is_sound_armed(), "sound armed")
+	sp.graze_enabled = false
+	assert_eq(sp.apply_to_live_lasers(), 1, "LIVE_ALL: graze disarmed, sound already alike")
+	assert_eq([l.is_graze_armed(), l.is_sound_armed()], [false, true], "only graze changed")
+	d.aim = LaserData2D.LASER_AIM_LOCK_ON
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_GLOBAL_POSITION
+	sp.laser_target_position = Vector2(0, 300)
+	assert_eq(sp.apply_to_live_lasers(LaserSpawner2D.LIVE_HOMING), 1, "retargeted")
+	step_factory(1, DT)
+	var off := angle_difference((Vector2(0, 300) - l.get_beam_start(0)).angle(), l.get_beam_angle(0))
+	assert_almost_eq(off, 0.0, 0.0001, "the lock-on beam aims at the new target")
+	l.end_laser(false)
+	step_factory(1, DT)
+	assert_eq(sp.apply_to_live_lasers(), 0, "no live laser: nothing to apply")
+
+
+func _named(n: String, pos: Vector2, parent: Node = null) -> Node2D:
+	var node := Node2D.new()
+	node.name = n
+	node.position = pos
+	if parent != null:
+		parent.add_child(node)
+	else:
+		add(node)
+	return node
+
+
+## Two beams (+X from (20, 0), -X from (-20, 0)), Lock On, 1000 px.
+func _lock_on_spawner() -> LaserSpawner2D:
+	var d := _laser()
+	d.length = 1000.0
+	d.aim = LaserData2D.LASER_AIM_LOCK_ON
+	return _spawner(d, 2)
+
+
+func test_the_node_name_source_aims_each_beam_at_the_nearest_named_node() -> void:
+	var a := _named("EnemyA", Vector2(300, 0))
+	var b := _named("EnemyB", Vector2(0, 300))
+	_named("Other", Vector2(25, 0))
+	var sp := _lock_on_spawner()
+	_named("EnemyMarker", Vector2(-20, 5), sp) # under the spawner: never a target
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_NODE_NAME
+	sp.laser_target_node_name = "enemy" # Contains, case-insensitive (the defaults)
+	assert_eq(sp.resolve_laser_targets(), [a, b], "the named nodes, in tree order")
+	var l := _fire(sp)
+	step_factory(1, DT)
+	assert_true(l.get_beam_end(0).distance_to(a.position) < 0.01 and l.get_beam_end(1).distance_to(b.position) < 0.01, "each beam ends on its nearest: %s" % [[l.get_beam_end(0), l.get_beam_end(1)]])
+	sp.laser_target_name_case_sensitive = true
+	assert_eq(sp.resolve_laser_targets(), [], "case-sensitive: \"enemy\" matches nothing")
+	sp.laser_target_name_match_mode = PatternSpawner2D.HOMING_NAME_MATCH_EXACT
+	sp.laser_target_name_case_sensitive = false
+	sp.laser_target_node_name = "enemya"
+	assert_eq(sp.resolve_laser_targets(), [a], "Exact")
+	sp.laser_target_name_match_mode = 9
+	expect_error_sequence(["LaserSpawner2D: invalid laser_target_name_match_mode, keeping the old value."])
+	assert_eq(sp.laser_target_name_match_mode, PatternSpawner2D.HOMING_NAME_MATCH_EXACT, "kept")
+
+
+func test_the_node_children_source_aims_at_the_nearest_child() -> void:
+	var squad := _named("Squad", Vector2(0, 0))
+	var a := _named("A", Vector2(300, 0), squad)
+	var b := _named("B", Vector2(0, 300), squad)
+	var deep := _named("Deep", Vector2(0, 30), a) # a grandchild: (300, 30)
+	var sp := _lock_on_spawner()
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_NODE_CHILDREN
+	sp.laser_target_children_parent_path = sp.get_path_to(squad)
+	assert_eq(sp.resolve_laser_targets(), [a, b], "the direct children")
+	sp.laser_target_children_recursive = true
+	assert_eq(sp.resolve_laser_targets(), [a, deep, b], "recursive: depth-first, tree order")
+	var l := _fire(sp)
+	step_factory(1, DT)
+	assert_true(l.get_beam_end(0).distance_to(a.position) < 0.01, "the nearest child")
+	sp.laser_target_children_parent_path = NodePath(".")
+	assert_eq(sp.resolve_laser_targets(), [], "the spawner itself as the parent: nothing")
+	deep.add_to_group(&"laser_squad")
+	sp.laser_target_children_parent_path = sp.get_path_to(squad)
+	sp.laser_target_filter_group = &"laser_squad"
+	assert_eq(sp.resolve_laser_targets(), [deep], "the filter group applies")
+
+
+func test_the_new_sources_gate_their_knobs_and_warn_when_empty() -> void:
+	var sp := _lock_on_spawner()
+	var shown := func() -> Array:
+		var out: Array = []
+		for n in [&"laser_target_node_name", &"laser_target_name_match_mode", &"laser_target_name_case_sensitive", &"laser_target_children_parent_path", &"laser_target_children_recursive", &"laser_target_filter_group", &"laser_retarget_interval_sec"]:
+			out.append(is_editor_visible(sp, n))
+		return out
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_NODE_NAME
+	assert_eq(shown.call(), [true, true, true, false, false, true, true], "Node Name")
+	assert_true("laser_target_source is Node Name but laser_target_node_name is empty: the lasers have no target." in sp.get_setup_warnings(), "empty name")
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_NODE_CHILDREN
+	assert_eq(shown.call(), [false, false, false, true, true, true, true], "Node Children")
+	assert_true("laser_target_source is Node Children but laser_target_children_parent_path is empty: the lasers have no target." in sp.get_setup_warnings(), "empty parent")
+	assert_eq([LaserSpawner2D.LASER_TARGET_NODE_NAME, LaserSpawner2D.LASER_TARGET_NODE_CHILDREN], [5, 6], "serialized ids appended")
+	sp.laser_target_source = 7
+	expect_error_sequence(["LaserSpawner2D: laser_target_source must be 0 (None), 1 (Node Group), 2 (Node Path), 3 (Mouse), 4 (Global Position), 5 (Node Name) or 6 (Node Children), keeping the old value."])

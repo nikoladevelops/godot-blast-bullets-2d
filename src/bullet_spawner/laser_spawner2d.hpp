@@ -32,7 +32,9 @@ public:
 		LASER_TARGET_NODE_GROUP = 1, // each beam: the nearest member of laser_target_group
 		LASER_TARGET_NODE_PATH = 2, // every beam: the Node2D at laser_target_path
 		LASER_TARGET_MOUSE = 3, // the cursor (read every frame)
-		LASER_TARGET_GLOBAL_POSITION = 4 // laser_target_position
+		LASER_TARGET_GLOBAL_POSITION = 4, // laser_target_position
+		LASER_TARGET_NODE_NAME = 5, // each beam: the nearest Node2D named like laser_target_node_name
+		LASER_TARGET_NODE_CHILDREN = 6 // each beam: the nearest Node2D child of laser_target_children_parent_path
 	};
 
 	Ref<LaserData2D> laser_data;
@@ -44,6 +46,11 @@ public:
 	NodePath laser_target_path;
 	Vector2 laser_target_position;
 	double laser_retarget_interval_sec = 0.0;
+	String laser_target_node_name;
+	HomingNodeNameMatch laser_target_name_match_mode = HOMING_NAME_MATCH_CONTAINS;
+	bool laser_target_name_case_sensitive = false;
+	NodePath laser_target_children_parent_path;
+	bool laser_target_children_recursive = false;
 
 	Ref<LaserData2D> get_laser_data() const { return laser_data; }
 	void set_laser_data(const Ref<LaserData2D> &value);
@@ -63,6 +70,16 @@ public:
 	void set_laser_target_position(const Vector2 &value);
 	double get_laser_retarget_interval_sec() const { return laser_retarget_interval_sec; }
 	void set_laser_retarget_interval_sec(double value);
+	String get_laser_target_node_name() const { return laser_target_node_name; }
+	void set_laser_target_node_name(const String &value);
+	HomingNodeNameMatch get_laser_target_name_match_mode() const { return laser_target_name_match_mode; }
+	void set_laser_target_name_match_mode(HomingNodeNameMatch value);
+	bool get_laser_target_name_case_sensitive() const { return laser_target_name_case_sensitive; }
+	void set_laser_target_name_case_sensitive(bool value);
+	NodePath get_laser_target_children_parent_path() const { return laser_target_children_parent_path; }
+	void set_laser_target_children_parent_path(const NodePath &value);
+	bool get_laser_target_children_recursive() const { return laser_target_children_recursive; }
+	void set_laser_target_children_recursive(bool value);
 
 	// Every laser this spawner fired that still fires.
 	Array get_live_lasers() const;
@@ -72,6 +89,11 @@ public:
 	// Gives every live Track / Lock On laser the targets resolved now.
 	// Returns how many lasers it retargeted.
 	int retarget_live_lasers();
+	// Re-applies the spawner's settings to the lasers it fired: LIVE_GRAZE and
+	// LIVE_SOUND arm or disarm them as the spawner stands now (a laser armed
+	// alike is untouched), LIVE_HOMING retargets Track / Lock On lasers.
+	// Returns how many lasers changed.
+	int apply_to_live_lasers(BitField<LiveVolleyGroup> groups = LIVE_ALL);
 	// The targets the Laser Targeting group finds now: Node2Ds, or one
 	// Vector2 for the point sources.
 	Array resolve_laser_targets() const;

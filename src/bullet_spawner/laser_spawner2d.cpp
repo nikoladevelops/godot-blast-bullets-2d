@@ -65,8 +65,8 @@ void LaserSpawner2D::set_max_live_lasers(int value) {
 }
 
 void LaserSpawner2D::set_laser_target_source(LaserTargetSource value) {
-	if (value < LASER_TARGET_NONE || value > LASER_TARGET_GLOBAL_POSITION) {
-		UtilityFunctions::push_error("LaserSpawner2D: laser_target_source must be 0 (None), 1 (Node Group), 2 (Node Path), 3 (Mouse) or 4 (Global Position), keeping the old value.");
+	if (value < LASER_TARGET_NONE || value > LASER_TARGET_NODE_CHILDREN) {
+		UtilityFunctions::push_error("LaserSpawner2D: laser_target_source must be 0 (None), 1 (Node Group), 2 (Node Path), 3 (Mouse), 4 (Global Position), 5 (Node Name) or 6 (Node Children), keeping the old value.");
 		return;
 	}
 	laser_target_source = value;
@@ -105,6 +105,35 @@ void LaserSpawner2D::set_laser_retarget_interval_sec(double value) {
 	laser_retarget_interval_sec = value;
 	retarget_time_left = value;
 	refresh_process_state();
+}
+
+void LaserSpawner2D::set_laser_target_node_name(const String &value) {
+	laser_target_node_name = value;
+	on_config_changed();
+}
+
+void LaserSpawner2D::set_laser_target_name_match_mode(HomingNodeNameMatch value) {
+	if (value < HOMING_NAME_MATCH_EXACT || value > HOMING_NAME_MATCH_ENDS_WITH) {
+		UtilityFunctions::push_error("LaserSpawner2D: invalid laser_target_name_match_mode, keeping the old value.");
+		return;
+	}
+	laser_target_name_match_mode = value;
+	on_config_changed();
+}
+
+void LaserSpawner2D::set_laser_target_name_case_sensitive(bool value) {
+	laser_target_name_case_sensitive = value;
+	on_config_changed();
+}
+
+void LaserSpawner2D::set_laser_target_children_parent_path(const NodePath &value) {
+	laser_target_children_parent_path = value;
+	on_config_changed();
+}
+
+void LaserSpawner2D::set_laser_target_children_recursive(bool value) {
+	laser_target_children_recursive = value;
+	on_config_changed();
 }
 
 bool LaserSpawner2D::apply_payload_override(const Variant &value) {
@@ -206,6 +235,37 @@ Array LaserSpawner2D::resolve_laser_targets() const {
 		case LASER_TARGET_GLOBAL_POSITION:
 			out.push_back(laser_target_position);
 			break;
+		case LASER_TARGET_NODE_NAME:
+		case LASER_TARGET_NODE_CHILDREN: {
+			// The scans of homing and graze: never into this spawner or a
+			// bullet factory, THE target filter on every node found.
+			const World2D *world = get_world_2d().ptr();
+			Array stack;
+			auto skip = [this](Node *node) { return node == this || Object::cast_to<BulletFactory2D>(node) != nullptr; };
+			auto visit = [&](Node2D *node) {
+				Vector2 at;
+				if (node != this && !is_ancestor_of(node) && target_node_usable2d(node, world, at)) {
+					out.push_back(node);
+				}
+			};
+			if (laser_target_source == LASER_TARGET_NODE_NAME) {
+				if (laser_target_node_name.is_empty()) {
+					break;
+				}
+				// Same root as the homing name scan: current_scene may be null.
+				Node *root = get_tree()->get_current_scene();
+				if (root == nullptr) {
+					root = get_tree()->get_root();
+				}
+				scan_node2ds_by_name(root, laser_target_node_name, (int)laser_target_name_match_mode, laser_target_name_case_sensitive, laser_target_filter_group, stack, skip, visit);
+				break;
+			}
+			Node *parent = laser_target_children_parent_path.is_empty() ? nullptr : get_node_or_null(laser_target_children_parent_path);
+			if (parent == nullptr || parent == this || is_ancestor_of(parent) || node_in_bullet_factory2d(parent)) {
+				break; // inside this spawner or a factory: nothing a scan may find
+			}
+			scan_node2d_children(parent, laser_target_children_recursive, laser_target_filter_group, stack, skip, visit);
+		} break;
 		default:
 			break;
 	}
@@ -252,6 +312,65 @@ int LaserSpawner2D::retarget_live_lasers() {
 		assign_targets(laser, targets);
 	}
 	return (int)owned.size();
+}
+
+int LaserSpawner2D::apply_to_live_lasers(BitField<LiveVolleyGroup> groups) {
+	std::vector<LaserVolley2D *> owned;
+	collect_owned(owned);
+	if (owned.empty()) {
+		return 0;
+	}
+	const bool graze_group = groups.has_flag(LIVE_GRAZE);
+	const bool sound_group = groups.has_flag(LIVE_SOUND);
+	Array zones;
+	bool graze_on = false;
+	if (graze_group && graze_enabled && !graze_zones.is_empty()) {
+		zones = spawner_graze_zones(graze_on);
+		if (graze_on) {
+			graze_detector_ref();
+		}
+	}
+	Array entries;
+	bool sound_on = false;
+	if (sound_group && sound_enabled && !sound_effects.is_empty()) {
+		entries = spawner_sound_entries(sound_on);
+	}
+	const std::shared_ptr<GrazeDetector2D> listeners = sound_on ? sound_detector_ref() : nullptr;
+	const bool retarget = groups.has_flag(LIVE_HOMING) && aims_at_targets();
+	const Array targets = retarget ? resolve_laser_targets() : Array();
+	// No user code below: arming and targets only.
+	int changed = 0;
+	for (LaserVolley2D *laser : owned) {
+		bool touched = false;
+		if (graze_group) {
+			if (graze_on) {
+				if (!laser->graze_armed_alike(zones, graze_detector)) {
+					laser->graze_arm(zones, graze_detector);
+					touched = true;
+				}
+			} else if (laser->is_graze_armed()) {
+				laser->graze_clear();
+				touched = true;
+			}
+		}
+		if (sound_group) {
+			if (sound_on) {
+				if (!laser->sound_armed_alike(entries, listeners, (float)sound_volume_db)) {
+					laser->sound_arm(entries, listeners, (float)sound_volume_db);
+					touched = true;
+				}
+			} else if (laser->is_sound_armed()) {
+				laser->sound_arm(Array(), nullptr, 0.0f);
+				touched = true;
+			}
+		}
+		if (retarget) {
+			assign_targets(laser, targets);
+			touched = true;
+		}
+		changed += touched ? 1 : 0;
+	}
+	return changed;
 }
 
 // ---- Hooks ------------------------------------------------------------------------------------
@@ -392,6 +511,12 @@ void LaserSpawner2D::append_setup_warnings(PackedStringArray &r_warnings) const 
 	if (laser_target_source == LASER_TARGET_NODE_PATH && laser_target_path.is_empty()) {
 		r_warnings.push_back("laser_target_source is Node Path but laser_target_path is empty: the lasers have no target.");
 	}
+	if (laser_target_source == LASER_TARGET_NODE_NAME && laser_target_node_name.is_empty()) {
+		r_warnings.push_back("laser_target_source is Node Name but laser_target_node_name is empty: the lasers have no target.");
+	}
+	if (laser_target_source == LASER_TARGET_NODE_CHILDREN && laser_target_children_parent_path.is_empty()) {
+		r_warnings.push_back("laser_target_source is Node Children but laser_target_children_parent_path is empty: the lasers have no target.");
+	}
 	if (!aims && laser_target_source != LASER_TARGET_NONE) {
 		r_warnings.push_back("laser_target_source is set but laser_data aims along the pattern: set its aim to Track or Lock On to use the targets.");
 	}
@@ -422,7 +547,7 @@ PackedStringArray LaserSpawner2D::debug_explain_features() const {
 		} else if (laser_target_source == LASER_TARGET_NONE) {
 			out.push_back("Laser Targeting: Track or Lock On without a target source: the beams point along the pattern.");
 		} else {
-			static const char *const sources[] = { "", "the nearest member of the target group", "the node at laser_target_path", "the mouse", "laser_target_position" };
+			static const char *const sources[] = { "", "the nearest member of the target group", "the node at laser_target_path", "the mouse", "laser_target_position", "the nearest node named like laser_target_node_name", "the nearest child of laser_target_children_parent_path" };
 			out.push_back(String("Laser Targeting: each beam ") + (d->aim == LaserData2D::LASER_AIM_LOCK_ON ? "ends on " : "turns toward ") + sources[(int)laser_target_source] + (laser_retarget_interval_sec > 0.0 ? String(", re-picked every ") + String::num(laser_retarget_interval_sec, 2) + " s." : String(".")));
 		}
 	}
@@ -437,14 +562,19 @@ void LaserSpawner2D::_validate_property(PropertyInfo &p_property) const {
 		return;
 	}
 	bool show = laser_target_source != LASER_TARGET_NONE;
+	const bool node_source = laser_target_source == LASER_TARGET_NODE_GROUP || laser_target_source == LASER_TARGET_NODE_PATH || laser_target_source == LASER_TARGET_NODE_NAME || laser_target_source == LASER_TARGET_NODE_CHILDREN;
 	if (name == "laser_retarget_interval_sec") {
 		// Nodes move and come and go: re-picking them is worth it; the point
 		// sources are read live (the mouse) or never change (a position).
-		show = laser_target_source == LASER_TARGET_NODE_GROUP || laser_target_source == LASER_TARGET_NODE_PATH;
+		show = node_source;
 	} else if (name == "laser_target_group") {
 		show = laser_target_source == LASER_TARGET_NODE_GROUP;
 	} else if (name == "laser_target_filter_group") {
-		show = laser_target_source == LASER_TARGET_NODE_GROUP || laser_target_source == LASER_TARGET_NODE_PATH;
+		show = node_source;
+	} else if (name == "laser_target_node_name" || name == "laser_target_name_match_mode" || name == "laser_target_name_case_sensitive") {
+		show = laser_target_source == LASER_TARGET_NODE_NAME;
+	} else if (name == "laser_target_children_parent_path" || name == "laser_target_children_recursive") {
+		show = laser_target_source == LASER_TARGET_NODE_CHILDREN;
 	} else if (name == "laser_target_path") {
 		show = laser_target_source == LASER_TARGET_NODE_PATH;
 	} else if (name == "laser_target_position") {
@@ -466,17 +596,23 @@ void LaserSpawner2D::_bind_methods() {
 	LASER_SPAWNER_BIND(orphaned_lasers, INT, PROPERTY_HINT_ENUM, "Fade Out,Keep Firing,Hand To Factory,Remove")
 	LASER_SPAWNER_BIND(max_live_lasers, INT, PROPERTY_HINT_RANGE, "0,64,1,or_greater")
 	ADD_GROUP("Laser Targeting", "");
-	LASER_SPAWNER_BIND(laser_target_source, INT, PROPERTY_HINT_ENUM, "None,Node Group,Node Path,Mouse,Global Position")
+	LASER_SPAWNER_BIND(laser_target_source, INT, PROPERTY_HINT_ENUM, "None,Node Group,Node Path,Mouse,Global Position,Node Name,Node Children")
 	LASER_SPAWNER_BIND(laser_target_group, STRING_NAME)
 	LASER_SPAWNER_BIND(laser_target_filter_group, STRING_NAME)
 	LASER_SPAWNER_BIND(laser_target_path, NODE_PATH, PROPERTY_HINT_NODE_PATH_VALID_TYPES, "Node2D")
 	LASER_SPAWNER_BIND(laser_target_position, VECTOR2)
+	LASER_SPAWNER_BIND(laser_target_node_name, STRING)
+	LASER_SPAWNER_BIND(laser_target_name_match_mode, INT, PROPERTY_HINT_ENUM, "Exact,Contains,Starts With,Ends With")
+	LASER_SPAWNER_BIND(laser_target_name_case_sensitive, BOOL)
+	LASER_SPAWNER_BIND(laser_target_children_parent_path, NODE_PATH)
+	LASER_SPAWNER_BIND(laser_target_children_recursive, BOOL)
 	LASER_SPAWNER_BIND(laser_retarget_interval_sec, FLOAT, PROPERTY_HINT_RANGE, "0,5,0.01,or_greater,suffix:s")
 
 	ClassDB::bind_method(D_METHOD("get_live_lasers"), &LaserSpawner2D::get_live_lasers);
 	ClassDB::bind_method(D_METHOD("get_live_laser_count"), &LaserSpawner2D::get_live_laser_count);
 	ClassDB::bind_method(D_METHOD("end_live_lasers", "fade"), &LaserSpawner2D::end_live_lasers, DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("retarget_live_lasers"), &LaserSpawner2D::retarget_live_lasers);
+	ClassDB::bind_method(D_METHOD("apply_to_live_lasers", "groups"), &LaserSpawner2D::apply_to_live_lasers, DEFVAL(LIVE_ALL));
 	ClassDB::bind_method(D_METHOD("resolve_laser_targets"), &LaserSpawner2D::resolve_laser_targets);
 	ClassDB::bind_method(D_METHOD("debug_explain_features"), &LaserSpawner2D::debug_explain_features);
 
@@ -531,6 +667,8 @@ void LaserSpawner2D::_bind_methods() {
 	BIND_ENUM_CONSTANT(LASER_TARGET_NODE_PATH);
 	BIND_ENUM_CONSTANT(LASER_TARGET_MOUSE);
 	BIND_ENUM_CONSTANT(LASER_TARGET_GLOBAL_POSITION);
+	BIND_ENUM_CONSTANT(LASER_TARGET_NODE_NAME);
+	BIND_ENUM_CONSTANT(LASER_TARGET_NODE_CHILDREN);
 }
 
 #undef LASER_SPAWNER_BIND

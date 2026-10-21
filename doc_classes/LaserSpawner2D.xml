@@ -11,6 +11,13 @@
 	<tutorials>
 	</tutorials>
 	<methods>
+		<method name="apply_to_live_lasers">
+			<return type="int" />
+			<param index="0" name="groups" type="int" enum="PatternSpawner2D.LiveVolleyGroup" is_bitfield="true" default="2147483647" />
+			<description>
+				Re-applies this spawner's settings to the lasers it already fired: [constant PatternSpawner2D.LIVE_GRAZE] and [constant PatternSpawner2D.LIVE_SOUND] arm or disarm their graze zones and sound entries as the spawner stands now (a laser armed alike is left alone), [constant PatternSpawner2D.LIVE_HOMING] gives Track and Lock On lasers the targets the Laser Targeting group finds now. Spawner settings never reach lasers in flight on their own. Runs no user code. Returns how many lasers changed.
+			</description>
+		</method>
 		<method name="debug_explain_features" qualifiers="const">
 			<return type="PackedStringArray" />
 			<description>
@@ -56,11 +63,26 @@
 		<member name="laser_retarget_interval_sec" type="float" setter="set_laser_retarget_interval_sec" getter="get_laser_retarget_interval_sec" default="0.0">
 			Node Group and Node Path: how often the live Track / Lock On lasers pick their targets again (each beam the nearest), in seconds. 0 = only when fired.
 		</member>
+		<member name="laser_target_children_parent_path" type="NodePath" setter="set_laser_target_children_parent_path" getter="get_laser_target_children_parent_path" default="NodePath(&quot;&quot;)">
+			Node Children source: the node whose Node2D children are the targets (only direct children unless [member laser_target_children_recursive]). A parent inside this spawner or a bullet factory gives no targets.
+		</member>
+		<member name="laser_target_children_recursive" type="bool" setter="set_laser_target_children_recursive" getter="get_laser_target_children_recursive" default="false">
+			Node Children source: also every deeper descendant (depth-first, tree order).
+		</member>
 		<member name="laser_target_filter_group" type="StringName" setter="set_laser_target_filter_group" getter="get_laser_target_filter_group" default="&amp;&quot;&quot;">
 			Node Group and Node Path: only targets also in this group count (empty = no filter).
 		</member>
 		<member name="laser_target_group" type="StringName" setter="set_laser_target_group" getter="get_laser_target_group" default="&amp;&quot;&quot;">
 			Node Group: the group whose members the beams aim at (each beam its nearest member). Members pass the same target filter as homing and graze, never this spawner or its children.
+		</member>
+		<member name="laser_target_name_case_sensitive" type="bool" setter="set_laser_target_name_case_sensitive" getter="get_laser_target_name_case_sensitive" default="false">
+			Node Name source: compare names case-sensitively.
+		</member>
+		<member name="laser_target_name_match_mode" type="int" setter="set_laser_target_name_match_mode" getter="get_laser_target_name_match_mode" enum="PatternSpawner2D.HomingNodeNameMatch" default="1">
+			Node Name source: how a node's name must match [member laser_target_node_name] (Exact, Contains, Starts With, Ends With; homing's values).
+		</member>
+		<member name="laser_target_node_name" type="String" setter="set_laser_target_node_name" getter="get_laser_target_node_name" default="&quot;&quot;">
+			Node Name source: the targets are the Node2Ds of the scene named like this (see [member laser_target_name_match_mode]); never this spawner's own nodes or a bullet factory's. Each beam takes the nearest one.
 		</member>
 		<member name="laser_target_path" type="NodePath" setter="set_laser_target_path" getter="get_laser_target_path" default="NodePath(&quot;&quot;)">
 			Node Path: the [Node2D] every beam aims at.
@@ -182,6 +204,12 @@
 		</constant>
 		<constant name="LASER_TARGET_GLOBAL_POSITION" value="4" enum="LaserTargetSource">
 			Every beam aims at [member laser_target_position].
+		</constant>
+		<constant name="LASER_TARGET_NODE_NAME" value="5" enum="LaserTargetSource">
+			Each beam aims at the nearest Node2D named like [member laser_target_node_name] (a scene scan, like homing's Node Name source).
+		</constant>
+		<constant name="LASER_TARGET_NODE_CHILDREN" value="6" enum="LaserTargetSource">
+			Each beam aims at the nearest Node2D child of [member laser_target_children_parent_path].
 		</constant>
 	</constants>
 </class>
