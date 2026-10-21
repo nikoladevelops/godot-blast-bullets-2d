@@ -59,6 +59,7 @@ var ledger: MixLedger
 var extra_sounds: Array = []
 var watched_animations := {} # volley id -> true (sprite_animation_finished connected)
 var laser_spawners: Array = []
+var lasers_seen: Array = [] # every laser fired (for the stale-handle writes)
 var emitter_template: BulletSpawner2D # never emits itself: no emitter chain can loop
 var laser_datas: Array = []
 
@@ -191,6 +192,7 @@ func _data(n: int) -> BulletVolleyData2D:
 func _build_lasers() -> void:
 	laser_datas.clear()
 	laser_spawners.clear()
+	lasers_seen.clear()
 	for preset in [LaserData2D.PRESET_INSTANT_BEAM, LaserData2D.PRESET_CHARGED_SWEEP, LaserData2D.PRESET_WALL_BEAM, LaserData2D.PRESET_REFLECTING_BEAM, LaserData2D.PRESET_BOLT, LaserData2D.PRESET_HOMING_CURVY, LaserData2D.PRESET_LOCK_ON]:
 		var d := LaserData2D.create_preset(preset)
 		d.collision_mask = 4
@@ -490,8 +492,16 @@ func _add_laser_spawner() -> void:
 	ls.helper_bullets_amount = rng.randi_range(1, 6)
 	ls.position = Vector2(rng.randf_range(-300, 300), rng.randf_range(-300, 300))
 	ls.orphaned_lasers = rng.randi() % 4
-	ls.laser_target_source = LaserSpawner2D.LASER_TARGET_NODE_GROUP
-	ls.laser_target_group = TARGET_GROUP
+	match rng.randi() % 3:
+		0:
+			ls.laser_target_source = LaserSpawner2D.LASER_TARGET_NODE_GROUP
+			ls.laser_target_group = TARGET_GROUP
+		1:
+			ls.laser_target_source = LaserSpawner2D.LASER_TARGET_NODE_NAME
+			ls.laser_target_node_name = "a"
+		2:
+			ls.laser_target_source = LaserSpawner2D.LASER_TARGET_NODE_CHILDREN
+			ls.laser_target_children_recursive = true
 	ls.laser_retarget_interval_sec = rng.randf_range(0.0, 0.3)
 	if rng.randf() < 0.4:
 		ls.graze_enabled = true
@@ -501,7 +511,10 @@ func _add_laser_spawner() -> void:
 		ls.sound_enabled = true
 		ls.sound_effects = [sound]
 	add(ls)
+	if ls.laser_target_source == LaserSpawner2D.LASER_TARGET_NODE_CHILDREN:
+		ls.laser_target_children_parent_path = ls.get_path_to(world)
 	ls.set_bullet_factory(factory)
+	ls.laser_fired.connect(func(l, _n) -> void: lasers_seen.append(l))
 	_connect_laser_handlers(ls)
 	ls.set_shooting_enabled(rng.randf() < 0.5)
 	laser_spawners.append(ls)
@@ -512,6 +525,9 @@ func _connect_laser_handlers(emitter: Object) -> void:
 	emitter.connect("laser_hit", func(_t, l, _i, _p) -> void: _laser_handler(l))
 	emitter.connect("laser_wall_hit", func(l, _i, _p, _n) -> void: _laser_handler(l))
 	emitter.connect("laser_phase_changed", func(l, _p) -> void: _laser_handler(l))
+	emitter.connect("laser_grazed", func(_t, l, _i, _z, _r) -> void: _laser_handler(l))
+	emitter.connect("laser_pierce_started", func(_t, l, _i, _p) -> void: _laser_handler(l))
+	emitter.connect("laser_finished", func(l) -> void: _laser_handler(l))
 
 
 func _laser_handler(l: Object) -> void:
@@ -520,7 +536,9 @@ func _laser_handler(l: Object) -> void:
 		return
 	stats["handler_actions"] += 1
 	var laser := l as LaserVolley2D
-	match rng.randi() % 6:
+	if laser.is_pooled():
+		return
+	match rng.randi() % 14:
 		0:
 			laser.end_laser(rng.randf() < 0.5)
 		1:
@@ -534,6 +552,37 @@ func _laser_handler(l: Object) -> void:
 			laser.set_beam_angle(0, rng.randf() * TAU) if laser.get_beam_count() > 0 else null
 		5:
 			factory.spawn_volley(datas[rng.randi() % datas.size()])
+		6:
+			laser.graze_clear()
+		7:
+			laser.graze_set_zones(zones, TARGET_GROUP)
+		8:
+			factory.end_lasers_in_circle(Vector2(rng.randf_range(-300, 300), rng.randf_range(-300, 300)), rng.randf_range(10, 200), rng.randf() < 0.5)
+		9:
+			laser.set_custom_data({"hits": rng.randi()})
+		10:
+			var owner = laser.get_owner_spawner()
+			if owner != null:
+				owner.teleport(Vector2(rng.randf_range(-300, 300), rng.randf_range(-300, 300)), rng.randf() < 0.5)
+		11:
+			var owner = laser.get_owner_spawner()
+			if owner is LaserSpawner2D:
+				owner.graze_enabled = rng.randf() < 0.5
+				owner.apply_to_live_lasers()
+		12:
+			if rng.randf() < 0.5:
+				factory.populate_lasers_pool_deferred(rng.randi_range(1, 6), 2)
+			else:
+				factory.free_lasers_pool_deferred()
+		13:
+			var d: LaserData2D = laser.get_laser_data()
+			match rng.randi() % 3:
+				0:
+					d.reflections = rng.randi_range(0, 4)
+				1:
+					d.length = rng.randf_range(5.0, 900.0)
+				2:
+					d.hit_interval_sec = rng.randf_range(0.0, 0.2)
 
 
 func _live_spawner():
@@ -548,8 +597,8 @@ func _live_target():
 
 ## One operation from an idle point (structural calls allowed).
 func _operate() -> void:
-	var roll := rng.randi() % 92
-	if roll >= 46:
+	var roll := rng.randi() % 94
+	if roll >= 47:
 		roll = 0 # half of all operations are shots
 	if skipped_ops.has(roll):
 		return
@@ -838,6 +887,7 @@ func _operate() -> void:
 			var l := factory.spawn_laser(laser_datas[rng.randi() % laser_datas.size()], beams, anchor)
 			if l != null:
 				stats["lasers"] += 1
+				lasers_seen.append(l)
 				if rng.randf() < 0.3:
 					l.graze_set_zones(zones, TARGET_GROUP)
 				if rng.randf() < 0.5:
@@ -906,6 +956,23 @@ func _operate() -> void:
 			if sp != null:
 				sp.bullet_color_mode = rng.randi() % 4
 				sp.bullet_life_time_scale_max = rng.randf_range(0.5, 2.0)
+		46:
+			# A write through a stale (pooled) laser handle: refused with its
+			# one stale-handle error, which is claimed here; nothing else.
+			lasers_seen = lasers_seen.filter(func(x): return is_instance_valid(x))
+			var stale := lasers_seen.filter(func(x): return x.is_pooled())
+			if not stale.is_empty():
+				var l: LaserVolley2D = stale[rng.randi() % stale.size()]
+				var call: Array = [["end_laser", [true]], ["set_custom_data", [1]], ["set_targets", [[Vector2.ZERO]]], ["set_beam_angle", [0, 1.0]], ["graze_clear", []], ["set_anchor", [null]]][rng.randi() % 6]
+				l.callv(call[0], call[1])
+				for err in get_errors():
+					if not err.handled and err.contains_text("%s: this laser finished (it waits in the pool), so this handle is stale." % call[0]):
+						err.handled = true
+						break
+			if rng.randf() < 0.3:
+				factory.populate_lasers_pool(rng.randi_range(1, 4), rng.randi_range(1, 3))
+			elif rng.randf() < 0.3:
+				factory.free_lasers_pool(-1 if rng.randf() < 0.5 else rng.randi_range(1, 4))
 
 
 func _shape_type(d: BulletVolleyData2D) -> int:
