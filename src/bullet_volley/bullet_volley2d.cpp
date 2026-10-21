@@ -214,6 +214,7 @@ void BulletVolley2D::release_life() {
 	graze_detector.reset(); // the arming spawner's target settings
 	flock_set_config(nullptr); // the flock (and the factory's armed count)
 	split_arm(nullptr, Ref<BulletVolleyData2D>(), 0); // the chain and the spawn data copy
+	emitter_arm(nullptr); // the timing resource and the template
 	// Volley-level listeners belong to the life that connected them.
 	disconnect_sprite_animation_connections();
 	for (const Dictionary &connection : get_signal_connection_list(CachedStringNames2D::get().bullet_homing_target_reached)) {
@@ -739,6 +740,7 @@ void BulletVolley2D::enable_bullet(int bullet_index, int collision_amount, bool 
 	// for a visit that ended frozen).
 	graze_end_visits_of_bullet(bullet_index);
 	own_life_on_wake(bullet_index);
+	emitter_on_wake(bullet_index);
 
 	multi->set_instance_transform_2d(bullet_index, to_local_for_multimesh(all_cached_instance_transforms[bullet_index])); // Start rendering the instance
 	write_trail_instances(bullet_index); // Wake resumes the trail with the bullet

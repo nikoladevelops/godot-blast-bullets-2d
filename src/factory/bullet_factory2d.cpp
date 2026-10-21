@@ -278,6 +278,7 @@ void BulletFactory2D::_notification(int p_what) {
 		// pointer (debuggers, containers) may be touched by teardown paths.
 		is_tearing_down = true;
 		drop_pending_splits(); // destroyed bullets never split; their Refs go now
+		drop_pending_emits(); // nor fire
 		// Pooled attachments outlive this call as engine children; drop their pool
 		// tracking now so their later PREDELETEs never touch this pool object again.
 		bullet_attachments_pool.detach_all();
@@ -628,6 +629,11 @@ void BulletFactory2D::_physics_process(double delta) {
 	// their parents died at; the children tick from the next sweep. User
 	// code runs inside (spawn callbacks, homing and bullet_split signals).
 	if (!flush_splits(alive)) {
+		return;
+	}
+	// Emitter bullets fire their due shots through their templates (user
+	// code: the templates' shot signals); the new volleys tick next sweep.
+	if (!flush_emits(alive)) {
 		return;
 	}
 

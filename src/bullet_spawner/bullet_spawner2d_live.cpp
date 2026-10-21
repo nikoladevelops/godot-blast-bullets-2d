@@ -64,6 +64,9 @@ int BulletSpawner2D::apply_to_live_volleys(BitField<LiveVolleyGroup> groups) {
 	if (groups.has_flag(LIVE_SPLIT)) {
 		split_live_volleys(changed);
 	}
+	if (groups.has_flag(LIVE_EMITTER)) {
+		emitter_live_volleys(changed);
+	}
 	// Last: arming homing emits homing_targets_resolved and
 	// volley_homing_configured (user code).
 	if (groups.has_flag(LIVE_HOMING)) {

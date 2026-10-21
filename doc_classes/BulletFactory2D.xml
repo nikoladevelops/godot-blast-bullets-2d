@@ -243,6 +243,12 @@
 				One-shot manager state: effect clock, bake count, total active slots, manual-bake actives and bake count, container validity, and per-bake volley/layer/active/slots/z/visibility/light/shards_busy/live_slots rows.
 			</description>
 		</method>
+		<method name="debug_get_emitter_stats" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Returns the emitter-bullet queue counters: [code]pending[/code], [code]fired_last[/code] and [code]carried_over_last[/code] (the last sweep), [code]fired_total[/code], [code]recorded_total[/code], [code]dropped_total[/code].
+			</description>
+		</method>
 		<method name="debug_get_factory_state">
 			<return type="Dictionary" />
 			<description>
@@ -531,6 +537,12 @@
 				Returns true once the factory started destroying itself. While true, teardown paths stop touching child nodes and most factory operations report an error instead of running.
 			</description>
 		</method>
+		<method name="get_pending_emit_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns how many emitter-bullet shots wait for the next flush.
+			</description>
+		</method>
 		<method name="get_pending_split_count" qualifiers="const">
 			<return type="int" />
 			<description>
@@ -704,6 +716,12 @@
 		</member>
 		<member name="despawn_bounds_rect" type="Rect2" setter="set_despawn_bounds_rect" getter="get_despawn_bounds_rect" default="Rect2(0, 0, 1152, 648)">
 			The play field for [member despawn_bounds_enabled], in global space. "Not heading back in" means that along every axis where the bullet is outside, its velocity does not point towards the rectangle. Defaults to Godot's default viewport. Must be finite; a negative size is normalized.
+		</member>
+		<member name="emitter_max_pending" type="int" setter="set_emitter_max_pending" getter="get_emitter_max_pending" default="100000">
+			Emitter-bullet shots that may wait at most (0 = no cap; default 100000). Past it a new shot is dropped (counted in [method debug_get_emitter_stats], one warning per overflow). Bounds runaway chains of emitters.
+		</member>
+		<member name="emitter_max_shots_per_sweep" type="int" setter="set_emitter_max_shots_per_sweep" getter="get_emitter_max_shots_per_sweep" default="0">
+			Emitter-bullet shots fired per physics step at most (0 = no cap, the default). The rest wait for the next step in order and are never dropped, so a wall of emitters spreads its shots over a few frames instead of one heavy frame.
 		</member>
 		<member name="is_debugger_enabled" type="bool" setter="set_is_debugger_enabled" getter="get_is_debugger_enabled" default="false">
 			Whether the debugger of the collision shapes is enabled or not.

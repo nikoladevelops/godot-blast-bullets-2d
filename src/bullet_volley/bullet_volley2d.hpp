@@ -3075,6 +3075,43 @@ public:
 	// generation, spawn data to copy, not a pickup).
 	bool split_possible_now() const;
 
+	// EMITTER BULLETS (bullet_volley2d_emitter.cpp; the shots are the
+	// factory's flush_emits). An armed volley holds an EmitterConfig2D (the
+	// timing resource + the template spawner + the switch: its spawner's,
+	// shared like the split config, or its own from emitter_set). Each live
+	// bullet fires when the life clock reaches its own next time; a shot is
+	// recorded as an EmitRequest2D, never fired inside the sweep.
+	std::shared_ptr<EmitterConfig2D> emitter_config;
+	// Per bullet (sized while armed): the life_age at which it fires next,
+	// and how many shots it fired this life.
+	std::vector<double> emit_next_at;
+	std::vector<int32_t> emit_shots;
+	// The earliest emit_next_at of a live bullet that still fires: one
+	// compare per tick until a bullet is due.
+	double emit_next_min = Math::INF;
+	uint64_t emit_rules_seen = 0; // BulletEmitterData2D::rules_epoch at the last scan
+	// Salts the seeded chance rolls: the spawner's shot number, or the life
+	// id for emitter_set (successive shots roll differently).
+	uint64_t emit_salt = 0;
+	// THE one place that arms or disarms emitting (spawner arming, live
+	// re-arming, emitter_set/emitter_clear, release_life). Arming starts
+	// every bullet's clock at life_age + start delay + index x stagger;
+	// re-arming with the same config keeps the clocks.
+	void emitter_arm(const std::shared_ptr<EmitterConfig2D> &config, uint64_t salt = 0);
+	// The timer pass (tick, after the split timer): records the due shots.
+	void emitter_tick();
+	// A woken bullet takes part in the gate again.
+	void emitter_on_wake(int bullet_index);
+	// Script API (factory volleys, or an override of a spawner volley until
+	// its next life): fire `template_spawner`'s pattern from every flying
+	// bullet as `emitter` times it. Refused (nothing changed) for a null
+	// emitter, a template that is not a PatternSpawner2D, a pooled volley.
+	bool emitter_set(const Ref<BulletEmitterData2D> &emitter, Node *template_spawner);
+	void emitter_clear();
+	Ref<BulletEmitterData2D> emitter_get_data() const;
+	bool is_emitter_armed() const { return emitter_config != nullptr; }
+	int get_bullet_emitter_shots(int bullet_index) const;
+
 protected:
 	// Updates homing behavior for a bullet. Zero-delta ticks steer nothing:
 	// with no time passing any direction or texture change would be motion

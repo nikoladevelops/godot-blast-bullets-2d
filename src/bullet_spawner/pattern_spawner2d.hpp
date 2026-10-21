@@ -757,6 +757,7 @@ public:
 		LIVE_SOUND = 4,
 		LIVE_FLOCK = 8,
 		LIVE_SPLIT = 16,
+		LIVE_EMITTER = 32,
 		LIVE_ALL = 0x7FFFFFFF
 	};
 	// False (default): a muzzle outside the factory's despawn bounds (while they
@@ -1147,6 +1148,10 @@ public:
 	bool shoot_from(const Transform2D &global_transform, double extra_spin_deg = 0.0);
 	// C++: the same with the velocity the shot's bullets inherit.
 	bool shoot_from_with_velocity(const Transform2D &global_transform, double extra_spin_deg, const Vector2 &inherited_velocity);
+	// An emitter bullet's shot (BulletFactory2D::flush_emits): shoot_from
+	// with the auto-fire error latch, so a misconfigured template reports
+	// once instead of once per shot.
+	bool emit_shot_from(const Transform2D &global_transform, double extra_spin_deg, const Vector2 &inherited_velocity);
 	// The transform the current shot is posed at: the shoot_from pose, else
 	// the effective generator's (the spawner when none; inside the tree).
 	Transform2D shot_marker() const;

@@ -408,6 +408,12 @@ Dictionary BulletFactory2D::debug_assert_no_dangling() {
 	if (split_flush_running) {
 		return fail("a split flush never finished");
 	}
+	if (is_tearing_down && !pending_emits.empty()) {
+		return fail("pending emitter shots survive the teardown");
+	}
+	if (emit_flush_running) {
+		return fail("an emitter flush never finished");
+	}
 	for (const SplitRequest2D &r : pending_splits) {
 		if (r.stage.is_null() || r.data.is_null() || r.config == nullptr || r.child_depth < 1) {
 			return fail("a queued split is incomplete");

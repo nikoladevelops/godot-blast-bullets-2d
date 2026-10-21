@@ -294,6 +294,7 @@ ShotResult2D BulletSpawner2D::fire_shot(std::vector<Transform2D> &transforms) {
 	apply_volley_sound(bullets);
 	apply_volley_flock(bullets);
 	apply_volley_split(bullets, volley_data);
+	apply_volley_emitter(bullets);
 	// Last-chance hook on the freshly spawned, stamped volley (before the
 	// muzzle offset, homing and orbit are configured): handlers may tweak the
 	// live instance (speeds, custom data) or drop it via queue_free().
@@ -533,6 +534,20 @@ void BulletSpawner2D::append_setup_warnings(PackedStringArray &out) const {
 				const String amount = total > 1e12 ? String("more than 1000000000000") : String::num_int64((int64_t)total);
 				out.push_back("split_data can turn one fired bullet into " + amount + " bullets over its generations (more than five full patterns): expect heavy frames. Lower the stage counts or max_depth, or spread the spawns with BulletFactory2D.split_max_children_per_sweep.");
 			}
+		}
+	}
+	if (emitter_enabled) {
+		const PatternSpawner2D *tpl = get_emitter_template();
+		if (emitter_spawner_path.is_empty()) {
+			out.push_back("emitter_enabled is on but emitter_spawner_path is empty: the bullets have no pattern to fire. Point it at a BulletSpawner2D (or LaserSpawner2D) with its shooting off.");
+		} else if (tpl == nullptr) {
+			if (is_inside_tree()) {
+				out.push_back("emitter_spawner_path does not point at a BulletSpawner2D or LaserSpawner2D: the bullets have no pattern to fire.");
+			}
+		} else if (emitter_leads_back()) {
+			out.push_back("emitter_spawner_path leads back to this spawner (an emitter cycle): its bullets do not emit.");
+		} else if (tpl->get_shooting_enabled()) {
+			out.push_back("The emitter template " + String(tpl->get_name()) + " also shoots on its own: turn its shooting off if it should only fire from the bullets.");
 		}
 	}
 }

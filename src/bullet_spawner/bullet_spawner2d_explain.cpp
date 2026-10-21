@@ -140,6 +140,29 @@ PackedStringArray BulletSpawner2D::debug_explain_features() const {
 		out.push_back(line);
 	}
 
+	// Emitter bullets.
+	if (!emitter_enabled) {
+		out.push_back("Emitter Bullets: off.");
+	} else {
+		const PatternSpawner2D *tpl = get_emitter_template();
+		const Ref<BulletEmitterData2D> e = get_effective_emitter();
+		if (tpl == nullptr) {
+			out.push_back("Emitter Bullets: on, no template spawner: the bullets fire nothing.");
+		} else if (emitter_leads_back()) {
+			out.push_back("Emitter Bullets: on, but the template chain leads back to this spawner: the bullets fire nothing.");
+		} else {
+			String line = String("Emitter Bullets: every bullet fires ") + String(tpl->get_name()) + "'s pattern every " + String::num(e->interval_sec, 2) + " s";
+			if (e->start_delay_sec > 0.0) {
+				line += String(", first after ") + String::num(e->start_delay_sec, 2) + " s";
+			}
+			if (e->max_shots > 0) {
+				line += String(", ") + String::num_int64(e->max_shots) + " time(s) at most";
+			}
+			line += e->aim == BulletEmitterData2D::EMITTER_AIM_HEADING ? String(", turned to its flight heading.") : (e->aim == BulletEmitterData2D::EMITTER_AIM_WORLD ? String(", unrotated.") : String(", turned like the template."));
+			out.push_back(line);
+		}
+	}
+
 	// Graze.
 	if (!graze_enabled) {
 		out.push_back("Graze: off.");

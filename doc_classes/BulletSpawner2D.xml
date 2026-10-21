@@ -104,6 +104,18 @@
 				Total live bullets across ALL volleys owned by this spawner (counted via the factory by ownership - plain non-homing volleys count exactly like tracked homing volleys). Budget governors and wave gates read this alongside max_live_bullets.
 			</description>
 		</method>
+		<method name="get_effective_emitter" qualifiers="const">
+			<return type="BulletEmitterData2D" />
+			<description>
+				Returns the timing in use: [member emitter], or a default [BulletEmitterData2D] (every 0.5 s, along the flight heading) while it is empty.
+			</description>
+		</method>
+		<method name="get_emitter_template" qualifiers="const">
+			<return type="PatternSpawner2D" />
+			<description>
+				Returns the template spawner [member emitter_spawner_path] names now, or [code]null[/code] when it is empty, missing or not a [PatternSpawner2D].
+			</description>
+		</method>
 		<method name="get_live_volley_count" qualifiers="const">
 			<return type="int" />
 			<description>
@@ -196,6 +208,15 @@
 		</member>
 		<member name="bullet_speed_scale_min" type="float" setter="set_bullet_speed_scale_min" getter="get_bullet_speed_scale_min" default="1.0">
 			Random speed multiplier per bullet, from this to [member bullet_speed_scale_max] (an inverted pair swaps). It is applied once when the volley spawns to the bullet's speed, max speed and acceleration, so a faster bullet also accelerates and tops out proportionally; curves and later setters act on the result. Must be finite and 0 or more. 1 and 1 (default) is off. Costs nothing per tick. It has no effect while a speed curve of the spawn data drives the speed (the curve rewrites the speed every tick).
+		</member>
+		<member name="emitter" type="BulletEmitterData2D" setter="set_emitter" getter="get_emitter">
+			The timing of the emitter bullets (see [BulletEmitterData2D]). Empty uses a default timing ([method get_effective_emitter]). Edits reach bullets in flight.
+		</member>
+		<member name="emitter_enabled" type="bool" setter="set_emitter_enabled" getter="get_emitter_enabled" default="false">
+			Emitter bullets: every volley fired while this is on fires the pattern of the spawner at [member emitter_spawner_path] from each flying bullet, timed by [member emitter]. The template fires its whole setup and emits its own signals ([signal volley_fired] on the template). Turning it off stops bullets in flight, on resumes them; bullets fired while it was off never emit unless re-armed with [method apply_to_live_volleys] ([constant PatternSpawner2D.LIVE_EMITTER]). Orphaned bullets keep firing through the template (the Clear and Remove [member orphaned_volleys] policies drop their queued shots). A template chain that leads back to this spawner is refused with one error.
+		</member>
+		<member name="emitter_spawner_path" type="NodePath" setter="set_emitter_spawner_path" getter="get_emitter_spawner_path" default="NodePath(&quot;&quot;)">
+			The template spawner (a [BulletSpawner2D] or [LaserSpawner2D], normally with its shooting off) whose pattern the bullets fire. Another emitter spawner works too (emitters of emitters); a chain back to this spawner does not. A new template reaches bullets in flight.
 		</member>
 		<member name="flock" type="BulletFlock2D" setter="set_flock" getter="get_flock">
 			The flock rules ([BulletFlock2D]) this spawner's bullets fly by while [member flock_enabled] is on. Example: [code]flock = BulletFlock2D.new()[/code]; raise [member BulletFlock2D.separation_range] for a wider swarm. A new flock, and every edit of this one, reaches bullets already in flight. Empty (the default) flies the default rules: the factory's [method BulletFactory2D.get_default_flock], shared by every empty slot of that factory. Pick a [member BulletFlock2D.preset] to start from Swarm, Fly Together, Keep Distance or Tight Group. Shown while [member flock_enabled] is on.

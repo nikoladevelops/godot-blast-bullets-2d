@@ -360,6 +360,31 @@ public:
 	// is off: the children then chase their parent's target.
 	bool split_configure_child_homing(BulletVolley2D *child);
 
+	// EMITTER BULLETS (bullet_spawner2d_emitter.cpp). Every volley fired
+	// while emitter_enabled is on fires the pattern of the spawner at
+	// emitter_spawner_path (any PatternSpawner2D, normally with its own
+	// shooting off) from each flying bullet, timed by `emitter` (empty = a
+	// default BulletEmitterData2D: every 0.5 s along the heading). The
+	// template fires its whole setup (pattern, spawn data, homing, sound,
+	// graze, splits, its own emitters) and its own signals. Turning it off
+	// stops bullets in flight (on resumes them), a new template or edits to
+	// `emitter` reach them too; orphans keep the last settings. A template
+	// chain that leads back to this spawner is refused (one error).
+	bool emitter_enabled = false;
+	Ref<BulletEmitterData2D> emitter;
+	NodePath emitter_spawner_path;
+	bool get_emitter_enabled() const { return emitter_enabled; }
+	void set_emitter_enabled(bool value);
+	Ref<BulletEmitterData2D> get_emitter() const { return emitter; }
+	void set_emitter(const Ref<BulletEmitterData2D> &value);
+	NodePath get_emitter_spawner_path() const { return emitter_spawner_path; }
+	void set_emitter_spawner_path(const NodePath &value);
+	// The template the path names now (null when empty, missing or not a
+	// PatternSpawner2D).
+	PatternSpawner2D *get_emitter_template() const;
+	// The emitter in use: `emitter`, else the spawner's default one.
+	Ref<BulletEmitterData2D> get_effective_emitter() const;
+
 	int get_homing_random_seed() const;
 	void set_homing_random_seed(int value);
 	int get_max_live_bullets() const;
@@ -690,6 +715,19 @@ protected:
 	// (created on first arm); setters push into it.
 	std::shared_ptr<SplitConfig2D> split_shared;
 	void apply_split_config();
+	// Emitter Bullets: the config shared with every volley armed by this
+	// spawner, the default timing, the cycle latch (one error per config).
+	std::shared_ptr<EmitterConfig2D> emitter_shared;
+	mutable Ref<BulletEmitterData2D> default_emitter;
+	bool emitter_cycle_reported = false;
+	// True when the template chain (each template's own emitter template, up
+	// to 16 steps) leads back to this spawner.
+	bool emitter_leads_back() const;
+	// Copies the settings into the shared config (template re-resolved).
+	void apply_emitter_config();
+	// Arms a freshly fired volley (or a live one) with emitter_shared.
+	void apply_volley_emitter(BulletVolley2D *volley);
+	void emitter_live_volleys(std::unordered_set<uint64_t> &r_changed);
 	// Arms a freshly fired volley with split_data; its children copy
 	// spawn_data (the shot's data). Runs no user code.
 	void apply_volley_split(BulletVolley2D *volley, const Ref<BulletVolleyData2D> &spawn_data);

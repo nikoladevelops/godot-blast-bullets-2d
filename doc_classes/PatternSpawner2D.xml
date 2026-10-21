@@ -1571,6 +1571,9 @@
 		<constant name="LIVE_SPLIT" value="16" enum="LiveVolleyGroup" is_bitfield="true">
 			Splitting.
 		</constant>
+		<constant name="LIVE_EMITTER" value="32" enum="LiveVolleyGroup" is_bitfield="true">
+			Emitter bullets: arms the volleys fired while [member BulletSpawner2D.emitter_enabled] was off (or taken over by a script) with the spawner's emitter settings.
+		</constant>
 		<constant name="LIVE_ALL" value="2147483647" enum="LiveVolleyGroup" is_bitfield="true">
 			Every group, including groups added in later versions.
 		</constant>

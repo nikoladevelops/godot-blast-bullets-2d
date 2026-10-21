@@ -540,6 +540,9 @@ String BulletVolley2D::debug_check_invariants() const {
 		if (!custom_timers.empty()) {
 			return "pooled volley still holds timers";
 		}
+		if (emitter_config != nullptr) {
+			return "pooled volley still emits";
+		}
 	}
 	// Per-bullet storage covers every bullet (the tick indexes it without
 	// bounds checks up to MoveTick2D::core_limit).
@@ -563,6 +566,9 @@ String BulletVolley2D::debug_check_invariants() const {
 		}
 		if (own != own_life_count) {
 			return "the per-bullet lifetime count drifted";
+		}
+		if (emitter_config != nullptr && (emit_next_at.size() != n || emit_shots.size() != n)) {
+			return "emitter clocks do not cover the bullets";
 		}
 	}
 	int orbiting = 0;

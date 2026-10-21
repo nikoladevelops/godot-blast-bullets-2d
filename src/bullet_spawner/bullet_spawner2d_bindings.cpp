@@ -34,6 +34,14 @@ void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
 		return;
 	}
 
+	// Emitter Bullets: the timing and the template hide while it is off.
+	if (property_name == "emitter" || property_name == "emitter_spawner_path") {
+		if (!emitter_enabled) {
+			p_property.usage &= ~PROPERTY_USAGE_EDITOR;
+		}
+		return;
+	}
+
 	// Splitting: the chain hides while splitting is off.
 	if (property_name == "split_data") {
 		if (!split_enabled) {
@@ -413,6 +421,20 @@ void BulletSpawner2D::_bind_methods() {
 	ADD_GROUP("Splitting", "");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "split_enabled"), "set_split_enabled", "get_split_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "split_data", PROPERTY_HINT_RESOURCE_TYPE, "BulletSplitData2D"), "set_split_data", "get_split_data");
+	// Emitter Bullets (bullet_spawner2d_emitter.cpp): flying bullets fire a
+	// template spawner's pattern; the timing and the template hide while off.
+	ClassDB::bind_method(D_METHOD("get_emitter_enabled"), &BulletSpawner2D::get_emitter_enabled);
+	ClassDB::bind_method(D_METHOD("set_emitter_enabled", "value"), &BulletSpawner2D::set_emitter_enabled);
+	ClassDB::bind_method(D_METHOD("get_emitter"), &BulletSpawner2D::get_emitter);
+	ClassDB::bind_method(D_METHOD("set_emitter", "value"), &BulletSpawner2D::set_emitter);
+	ClassDB::bind_method(D_METHOD("get_emitter_spawner_path"), &BulletSpawner2D::get_emitter_spawner_path);
+	ClassDB::bind_method(D_METHOD("set_emitter_spawner_path", "value"), &BulletSpawner2D::set_emitter_spawner_path);
+	ClassDB::bind_method(D_METHOD("get_emitter_template"), &BulletSpawner2D::get_emitter_template);
+	ClassDB::bind_method(D_METHOD("get_effective_emitter"), &BulletSpawner2D::get_effective_emitter);
+	ADD_GROUP("Emitter Bullets", "");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "emitter_enabled"), "set_emitter_enabled", "get_emitter_enabled");
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "emitter", PROPERTY_HINT_RESOURCE_TYPE, "BulletEmitterData2D"), "set_emitter", "get_emitter");
+	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "emitter_spawner_path", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "PatternSpawner2D"), "set_emitter_spawner_path", "get_emitter_spawner_path");
 	ADD_SIGNAL(MethodInfo("bullet_split",
 			PropertyInfo(Variant::VECTOR2, "position"),
 			PropertyInfo(Variant::INT, "cause"),

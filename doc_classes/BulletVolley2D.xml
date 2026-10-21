@@ -1572,6 +1572,26 @@
 				When the last bullet goes, the volley returns to the pool if [member is_auto_pooling_enabled] is on, otherwise it parks (frozen and still yours).
 			</description>
 		</method>
+		<method name="emitter_clear">
+			<return type="void" />
+			<description>
+				Stops this volley's bullets from firing (see [method emitter_set]).
+			</description>
+		</method>
+		<method name="emitter_get_data" qualifiers="const">
+			<return type="BulletEmitterData2D" />
+			<description>
+				Returns the timing this volley emits with, or [code]null[/code] while it does not emit.
+			</description>
+		</method>
+		<method name="emitter_set">
+			<return type="bool" />
+			<param index="0" name="emitter" type="BulletEmitterData2D" />
+			<param index="1" name="template_spawner" type="Node" />
+			<description>
+				Makes every flying bullet of this volley fire [param template_spawner]'s pattern, timed by [param emitter] (factory volleys, or an override of a spawner volley until its next life). The clocks start now: each bullet's first shot comes after the start delay plus its stagger. Returns [code]false[/code] (nothing changed) for a null [param emitter], a [param template_spawner] that is not a [PatternSpawner2D], or a pooled volley.
+			</description>
+		</method>
 		<method name="enable_bullet">
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
@@ -1654,6 +1674,13 @@
 			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Get the direction of a specific bullet. Returns a [Vector2] direction.
+			</description>
+		</method>
+		<method name="get_bullet_emitter_shots" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Returns how many shots bullet [param bullet_index] fired this life (chance misses included).
 			</description>
 		</method>
 		<method name="get_bullet_grazed_rings" qualifiers="const">
@@ -1905,6 +1932,12 @@
 			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Check the status of a specific bullet - whether it is enabled (active and visible on screen) or disabled (inactive and invisible)
+			</description>
+		</method>
+		<method name="is_emitter_armed" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] while this volley's bullets emit (a spawner's Emitter Bullets group or [method emitter_set]).
 			</description>
 		</method>
 		<method name="is_graze_armed" qualifiers="const">

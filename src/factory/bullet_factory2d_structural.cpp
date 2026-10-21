@@ -276,6 +276,7 @@ void BulletFactory2D::reset(const Ref<VolleyPoolKey2D> &key) {
 		reset_factory_state(key_ptr);
 		if (!watch.died()) {
 			drop_pending_splits_for(key_ptr); // reset bullets never split
+			drop_pending_emits_for(key_ptr); // nor fire
 		}
 	}
 	if (watch.died()) {
@@ -312,6 +313,7 @@ void BulletFactory2D::free_active_bullets(const Ref<VolleyPoolKey2D> &key) {
 	// Before the free: its attachment callbacks may free this factory (a
 	// free never records splits, so nothing new can arrive meanwhile).
 	drop_pending_splits_for(key_ptr); // freed bullets never split
+	drop_pending_emits_for(key_ptr); // nor fire
 	free_active_volleys(key_ptr);
 }
 
@@ -463,6 +465,7 @@ void BulletFactory2D::apply_orphan_policy(uint64_t owner_spawner_id, int policy,
 	// Policy ids mirror BulletSpawner2D::OrphanedVolleys. The queued splits
 	// follow first (dropping or re-owning a request runs no user code).
 	orphan_pending_splits(owner_spawner_id, policy);
+	orphan_pending_emits(owner_spawner_id, policy);
 	if (policy == 2 || policy == 3) {
 		if (!is_factory_busy) {
 			// The cleanup never splits: the spawner asked for its bullets to go.

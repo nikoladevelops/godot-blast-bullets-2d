@@ -9,6 +9,7 @@
 #include "core/cached_string_names2d.hpp"
 #include "data/bullet_curves_data2d.hpp"
 #include "data/bullet_effect_layer_data2d.hpp"
+#include "data/bullet_emitter_data2d.hpp"
 #include "data/bullet_flock2d.hpp"
 #include "data/bullet_graze_zone2d.hpp"
 #include "data/bullet_pickup_data2d.hpp"
@@ -69,6 +70,7 @@ void initialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(BulletFlock2D)
 	GDREGISTER_CLASS(BulletSplitStage2D)
 	GDREGISTER_CLASS(BulletSplitData2D)
+	GDREGISTER_CLASS(BulletEmitterData2D)
 	GDREGISTER_CLASS(BulletSoundData2D)
 	GDREGISTER_CLASS(BulletPickupData2D)
 	GDREGISTER_CLASS(VolleyPoolKey2D)

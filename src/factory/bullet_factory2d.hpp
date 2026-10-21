@@ -28,6 +28,7 @@
 #include "data/bullet_pickup_data2d.hpp"
 #include "data/bullet_volley_data2d.hpp"
 #include "debugger/despawn_bounds_preview_layer2d.hpp"
+#include "factory/emit_queue2d.hpp"
 #include "factory/flock_solver2d.hpp"
 #include "factory/graze_detector2d.hpp"
 #include "factory/sound_mixer2d.hpp"
@@ -752,6 +753,27 @@ public:
 	// {pending, flushed_last, children_last, carried_over_last, flushed_total, children_total, dropped_total, templates}.
 	Dictionary debug_get_split_stats() const;
 
+	// ---- Emitter bullets (emit_queue2d.hpp, bullet_factory2d_emitter.cpp) ----
+	// Volleys record the shots of their emitter bullets here (C++ only, no
+	// user code); flush_emits fires them through their template spawners once
+	// per sweep, right after the splits. Reset/free_active_bullets/teardown
+	// drop them.
+	void emit_enqueue(EmitRequest2D &&request);
+	// Shots fired per sweep at most (0 = no cap, the default): the rest wait
+	// for the next sweep in order, never dropped.
+	int get_emitter_max_shots_per_sweep() const { return emitter_max_shots_per_sweep; }
+	void set_emitter_max_shots_per_sweep(int value);
+	// Shots waiting at most (0 = no cap; default 100000): past it a new shot
+	// is dropped, counted in debug_get_emitter_stats().dropped_total, one
+	// warning per overflow. Bounds runaway chains (emitters of emitters).
+	int get_emitter_max_pending() const { return emitter_max_pending; }
+	void set_emitter_max_pending(int value);
+	// False (and the drop counted) when the queue is full.
+	bool emit_has_room();
+	int get_pending_emit_count() const { return (int)pending_emits.size(); }
+	// {pending, fired_last, carried_over_last, fired_total, recorded_total, dropped_total}.
+	Dictionary debug_get_emitter_stats() const;
+
 	// ---- Sound triggers (sound_mixer2d.*) ----
 	// Fire-and-forget audio: trigger sites offer (volley, spawner, user) and
 	// the mixer plays the sweep's winners at the end of _physics_process.
@@ -984,6 +1006,28 @@ private:
 			drop_pending_splits_for_key(*key);
 		}
 	}
+	// Emitter shots (same shape as the split queue above).
+	std::vector<EmitRequest2D> pending_emits;
+	std::vector<EmitRequest2D> emit_flush_scratch;
+	int emitter_max_shots_per_sweep = 0;
+	int emitter_max_pending = 100000;
+	bool emit_full_warned = false;
+	bool emit_flush_running = false;
+	size_t emit_flush_next = 0;
+	uint64_t emit_drop_epoch = 0;
+	uint64_t emit_recorded_total = 0;
+	uint64_t emit_dropped_total = 0;
+	uint64_t emit_fired_total = 0;
+	int emit_stats_fired_last = 0;
+	int emit_stats_carried_last = 0;
+	// Fires every pending shot (bullet_factory2d_emitter.cpp). False when
+	// user code inside freed this factory.
+	bool flush_emits(const bool &alive);
+	void drop_pending_emits();
+	void drop_pending_emits_for(const PoolKey *key);
+	// A freed spawner's queued shots follow its orphaned_volleys policy
+	// (Clear / Remove drop them; the others keep firing).
+	void orphan_pending_emits(uint64_t owner_spawner_id, int policy);
 	uint64_t stats_last_flock_usec = 0;
 	// Bullet time of the flock passes (BulletFlock2D.update_interval).
 	double flock_clock = 0.0;

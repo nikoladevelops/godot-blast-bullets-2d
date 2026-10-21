@@ -112,6 +112,10 @@ void BulletVolley2D::tick(double delta) {
 	if (split_config != nullptr && is_active) {
 		split_check_timer();
 	}
+	// 7. Emitter bullets: records the shots that are due (no user code).
+	if (emitter_config != nullptr && is_active && tick_may_continue(self_id)) {
+		emitter_tick();
+	}
 }
 
 // Values move_bullets computes once per tick, before the bullet loop.

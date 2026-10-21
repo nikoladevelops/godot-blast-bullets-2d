@@ -663,6 +663,11 @@ void BulletVolley2D::_bind_methods() {
 	// Splitting (bullet_volley2d_split.cpp; the spawns are the factory's).
 	ClassDB::bind_method(D_METHOD("split_set_data", "split", "child_spawn_data"), &BulletVolley2D::split_set_data, DEFVAL(Ref<BulletVolleyData2D>()));
 	ClassDB::bind_method(D_METHOD("split_clear"), &BulletVolley2D::split_clear);
+	ClassDB::bind_method(D_METHOD("emitter_set", "emitter", "template_spawner"), &BulletVolley2D::emitter_set);
+	ClassDB::bind_method(D_METHOD("emitter_clear"), &BulletVolley2D::emitter_clear);
+	ClassDB::bind_method(D_METHOD("emitter_get_data"), &BulletVolley2D::emitter_get_data);
+	ClassDB::bind_method(D_METHOD("is_emitter_armed"), &BulletVolley2D::is_emitter_armed);
+	ClassDB::bind_method(D_METHOD("get_bullet_emitter_shots", "bullet_index"), &BulletVolley2D::get_bullet_emitter_shots);
 	ClassDB::bind_method(D_METHOD("split_get_data"), &BulletVolley2D::split_get_data);
 	ClassDB::bind_method(D_METHOD("split_get_depth"), &BulletVolley2D::split_get_depth);
 	ClassDB::bind_method(D_METHOD("split_bullet", "bullet_index"), &BulletVolley2D::split_bullet);

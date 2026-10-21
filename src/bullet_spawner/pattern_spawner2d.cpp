@@ -841,6 +841,17 @@ bool PatternSpawner2D::shoot_from_with_velocity(const Transform2D &global_transf
 	return shoot_once();
 }
 
+bool PatternSpawner2D::emit_shot_from(const Transform2D &global_transform, double extra_spin_deg, const Vector2 &inherited_velocity) {
+	const uint64_t self_id = get_instance_id();
+	const bool was_auto = auto_fire_in_progress;
+	auto_fire_in_progress = true;
+	const bool fired = shoot_from_with_velocity(global_transform, extra_spin_deg, inherited_velocity);
+	if (ObjectDB::get_instance(ObjectID(self_id)) == this) {
+		auto_fire_in_progress = was_auto; // a handler may have freed this spawner
+	}
+	return fired;
+}
+
 Transform2D PatternSpawner2D::shot_marker() const {
 	if (shot_pose_active) {
 		return shot_pose;

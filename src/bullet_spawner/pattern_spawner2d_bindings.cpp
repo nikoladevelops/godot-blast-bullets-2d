@@ -175,6 +175,7 @@ void PatternSpawner2D::_bind_methods() {
 	BIND_BITFIELD_FLAG(LIVE_SOUND);
 	BIND_BITFIELD_FLAG(LIVE_FLOCK);
 	BIND_BITFIELD_FLAG(LIVE_SPLIT);
+	BIND_BITFIELD_FLAG(LIVE_EMITTER);
 	BIND_BITFIELD_FLAG(LIVE_ALL);
 	ClassDB::bind_method(D_METHOD("get_time_scale"), &PatternSpawner2D::get_time_scale);
 	ClassDB::bind_method(D_METHOD("set_time_scale", "value"), &PatternSpawner2D::set_time_scale);
