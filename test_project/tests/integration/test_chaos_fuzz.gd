@@ -33,8 +33,9 @@ const MAX_SPAWNERS := 8
 const TARGET_GROUP := &"chaos_targets"
 ## Warnings the run may legally cause (each is a documented one-time
 ## explanation, never a failure): orphaned hits nobody hears, empty homing
-## or graze sources while targets are freed, the per-sweep children cap.
-const WARNING_OK := ["no one", "orphan", "homing", "graze", "target", "split", "sound", "listener", "flock", "direction curve"]
+## or graze sources while targets are freed, the per-sweep children cap, the
+## emitter queue cap (a storm of emitter bullets: the documented drop).
+const WARNING_OK := ["no one", "orphan", "homing", "graze", "target", "split", "sound", "listener", "flock", "direction curve", "emitter_max_pending"]
 
 var rng := RandomNumberGenerator.new()
 var spawners: Array = []
@@ -57,6 +58,9 @@ var hostile_scene: PackedScene # an attachment whose _init runs _hostile()
 var ledger: MixLedger
 var extra_sounds: Array = []
 var watched_animations := {} # volley id -> true (sprite_animation_finished connected)
+var laser_spawners: Array = []
+var emitter_template: BulletSpawner2D # never emits itself: no emitter chain can loop
+var laser_datas: Array = []
 
 ## User code the plugin runs outside its signals: a bouncing wall's _get
 ## (read in the physics flush and in the drain), a target's get_velocity
@@ -105,7 +109,7 @@ func before_each() -> void:
 	zones.clear()
 	skipped_ops = Array(OS.get_environment("CHAOS_SKIP").split(",", false)).map(func(x): return int(x))
 	passive_handlers = OS.get_environment("CHAOS_SKIP_HANDLERS") == "1"
-	stats = {"shots": 0, "frees": 0, "reparents": 0, "clears": 0, "resets": 0, "pickups": 0, "handler_actions": 0, "max_live": 0, "splits": 0, "grazes": 0, "hostile_actions": 0, "cadence_actions": 0}
+	stats = {"shots": 0, "frees": 0, "reparents": 0, "clears": 0, "resets": 0, "pickups": 0, "handler_actions": 0, "max_live": 0, "splits": 0, "grazes": 0, "hostile_actions": 0, "cadence_actions": 0, "lasers": 0, "laser_hits": 0, "emitters": 0}
 
 
 ## A spawn data template: `n` bullets of a random shape, features on by roll.
@@ -180,6 +184,25 @@ func _data(n: int) -> BulletVolleyData2D:
 		d.shared_bullet_attachment = make_probe_scene() if rng.randf() < 0.5 or hostile_scene == null else hostile_scene
 	d.is_life_time_over_signal_enabled = rng.randf() < 0.5
 	return d
+
+
+## Laser data of every type (walls on the bouncing layer, targets on the
+## killing walls) and the emitter template (never an emitter itself).
+func _build_lasers() -> void:
+	laser_datas.clear()
+	laser_spawners.clear()
+	for preset in [LaserData2D.PRESET_INSTANT_BEAM, LaserData2D.PRESET_CHARGED_SWEEP, LaserData2D.PRESET_WALL_BEAM, LaserData2D.PRESET_REFLECTING_BEAM, LaserData2D.PRESET_BOLT, LaserData2D.PRESET_HOMING_CURVY, LaserData2D.PRESET_LOCK_ON]:
+		var d := LaserData2D.create_preset(preset)
+		d.collision_mask = 4
+		if d.wall_mask != 0:
+			d.wall_mask = 8
+		d.active_sec = minf(d.active_sec, 0.6)
+		d.hit_interval_sec = 0.1 if d.type == LaserData2D.LASER_BEAM else d.hit_interval_sec
+		laser_datas.append(d)
+	emitter_template = make_spawner(_data(3), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 3)
+	emitter_template.name = "ChaosEmitterTemplate"
+	_connect_handlers(emitter_template)
+	factory.emitter_max_pending = 512 # bounded: a battlefield of emitters stays fast
 
 
 func _build_world() -> void:
@@ -459,6 +482,60 @@ func _move_handler(sp: BulletSpawner2D) -> void:
 			sp.movement_pause()
 
 
+func _add_laser_spawner() -> void:
+	var ls := LaserSpawner2D.new()
+	ls.set_shooting_enabled(false)
+	ls.laser_data = laser_datas[rng.randi() % laser_datas.size()]
+	ls.pattern_source = LaserSpawner2D.PATTERN_FROM_HELPER_RING
+	ls.helper_bullets_amount = rng.randi_range(1, 6)
+	ls.position = Vector2(rng.randf_range(-300, 300), rng.randf_range(-300, 300))
+	ls.orphaned_lasers = rng.randi() % 4
+	ls.laser_target_source = LaserSpawner2D.LASER_TARGET_NODE_GROUP
+	ls.laser_target_group = TARGET_GROUP
+	ls.laser_retarget_interval_sec = rng.randf_range(0.0, 0.3)
+	if rng.randf() < 0.4:
+		ls.graze_enabled = true
+		ls.graze_zones = zones
+		ls.graze_node_group = TARGET_GROUP
+	if rng.randf() < 0.3:
+		ls.sound_enabled = true
+		ls.sound_effects = [sound]
+	add(ls)
+	ls.set_bullet_factory(factory)
+	_connect_laser_handlers(ls)
+	ls.set_shooting_enabled(rng.randf() < 0.5)
+	laser_spawners.append(ls)
+
+
+## Laser signals act inside the sweep too (only what is legal there).
+func _connect_laser_handlers(emitter: Object) -> void:
+	emitter.connect("laser_hit", func(_t, l, _i, _p) -> void: _laser_handler(l))
+	emitter.connect("laser_wall_hit", func(l, _i, _p, _n) -> void: _laser_handler(l))
+	emitter.connect("laser_phase_changed", func(l, _p) -> void: _laser_handler(l))
+
+
+func _laser_handler(l: Object) -> void:
+	stats["laser_hits"] += 1
+	if passive_handlers or rng.randf() > 0.05 or not is_instance_valid(l):
+		return
+	stats["handler_actions"] += 1
+	var laser := l as LaserVolley2D
+	match rng.randi() % 6:
+		0:
+			laser.end_laser(rng.randf() < 0.5)
+		1:
+			laser.queue_free()
+		2:
+			factory.clear_active_lasers()
+		3:
+			var beams: Array[Transform2D] = [Transform2D(rng.randf() * TAU, Vector2(rng.randf_range(-200, 200), rng.randf_range(-200, 200)))]
+			factory.spawn_laser(laser_datas[rng.randi() % laser_datas.size()], beams)
+		4:
+			laser.set_beam_angle(0, rng.randf() * TAU) if laser.get_beam_count() > 0 else null
+		5:
+			factory.spawn_volley(datas[rng.randi() % datas.size()])
+
+
 func _live_spawner():
 	spawners = spawners.filter(func(s): return is_instance_valid(s) and not s.is_queued_for_deletion())
 	return null if spawners.is_empty() else spawners[rng.randi() % spawners.size()]
@@ -471,8 +548,8 @@ func _live_target():
 
 ## One operation from an idle point (structural calls allowed).
 func _operate() -> void:
-	var roll := rng.randi() % 82
-	if roll >= 41:
+	var roll := rng.randi() % 92
+	if roll >= 46:
 		roll = 0 # half of all operations are shots
 	if skipped_ops.has(roll):
 		return
@@ -480,6 +557,9 @@ func _operate() -> void:
 		0, 1, 2, 3, 4, 5:
 			for k in rng.randi_range(1, 4):
 				var sp = _live_spawner()
+				if sp == null:
+					_add_spawner() # handlers freed them all: the battlefield fills up again
+					sp = _live_spawner()
 				if sp != null:
 					sp.shoot_once()
 					stats["shots"] += 1
@@ -630,11 +710,18 @@ func _operate() -> void:
 				if shared_generator == null or not is_instance_valid(shared_generator):
 					shared_generator = add(Node2D.new())
 				shared_generator.position = Vector2(rng.randf_range(0, 800), rng.randf_range(0, 600))
+				# A preview rebuild runs user code (the aimed target's
+				# get_velocity: a hostile one frees nodes), so each spawner is
+				# checked again before every call.
 				for sp in [a, b]:
-					sp.set_transforms_generator(shared_generator)
-					sp.show_preview_during_runtime = true
-					sp.show_pattern_preview = true
-				a.show_pattern_preview = rng.randf() < 0.5
+					if is_instance_valid(sp) and is_instance_valid(shared_generator):
+						sp.set_transforms_generator(shared_generator)
+					if is_instance_valid(sp):
+						sp.show_preview_during_runtime = true
+					if is_instance_valid(sp):
+						sp.show_pattern_preview = true
+				if is_instance_valid(a):
+					a.show_pattern_preview = rng.randf() < 0.5
 		31:
 			# Unlimited acceleration (top speed 0) on a volley in flight.
 			var live := volleys.filter(func(v): return is_instance_valid(v) and v.debug_get_life_state() == "active")
@@ -741,6 +828,84 @@ func _operate() -> void:
 						sp.reset_shooting()
 					2:
 						sp.begin_burst()
+		41:
+			# A factory laser, sometimes following a spawner, sometimes grazing.
+			var beams: Array[Transform2D] = []
+			var at := Vector2(rng.randf_range(-300, 300), rng.randf_range(-300, 300))
+			for k in rng.randi_range(1, 4):
+				beams.append(Transform2D(rng.randf() * TAU, at))
+			var anchor = _live_spawner() if rng.randf() < 0.5 else null
+			var l := factory.spawn_laser(laser_datas[rng.randi() % laser_datas.size()], beams, anchor)
+			if l != null:
+				stats["lasers"] += 1
+				if rng.randf() < 0.3:
+					l.graze_set_zones(zones, TARGET_GROUP)
+				if rng.randf() < 0.5:
+					var t = _live_target()
+					l.set_targets([t] if t != null else [Vector2(rng.randf_range(-200, 200), rng.randf_range(-200, 200))])
+		42:
+			# A laser spawner: add one (at most 3) or fire one.
+			laser_spawners = laser_spawners.filter(func(s): return is_instance_valid(s) and not s.is_queued_for_deletion())
+			if laser_spawners.size() < 3 and rng.randf() < 0.4:
+				_add_laser_spawner()
+			elif not laser_spawners.is_empty():
+				var ls: LaserSpawner2D = laser_spawners[rng.randi() % laser_spawners.size()]
+				if ls.shoot_once():
+					stats["lasers"] += 1
+		43:
+			var live: Array = factory.get_active_lasers()
+			match rng.randi() % 5:
+				0:
+					factory.clear_active_lasers(rng.randf() < 0.5)
+				1, 2:
+					if not live.is_empty():
+						(live[rng.randi() % live.size()] as LaserVolley2D).end_laser(rng.randf() < 0.5)
+				3:
+					if not live.is_empty():
+						var doomed: LaserVolley2D = live[rng.randi() % live.size()]
+						if rng.randf() < 0.5:
+							doomed.free()
+						else:
+							doomed.queue_free()
+				4:
+					laser_spawners = laser_spawners.filter(func(s): return is_instance_valid(s) and not s.is_queued_for_deletion())
+					if not laser_spawners.is_empty():
+						var ls: LaserSpawner2D = laser_spawners[rng.randi() % laser_spawners.size()]
+						ls.orphaned_lasers = rng.randi() % 4
+						ls.free()
+		44:
+			# Emitter bullets: a spawner (or a flying factory volley) fires the
+			# template's pattern, or a laser spawner's.
+			stats["emitters"] += 1
+			var timing := BulletEmitterData2D.new()
+			timing.interval_sec = rng.randf_range(0.15, 0.6)
+			timing.max_shots = rng.randi_range(1, 3)
+			timing.aim = rng.randi() % 3
+			timing.spin_per_shot_degrees = rng.randf_range(-40, 40)
+			laser_spawners = laser_spawners.filter(func(s): return is_instance_valid(s) and not s.is_queued_for_deletion())
+			var tpl: Node = emitter_template if laser_spawners.is_empty() or rng.randf() < 0.6 else laser_spawners[rng.randi() % laser_spawners.size()]
+			var sp = _live_spawner()
+			if rng.randf() < 0.6 and sp != null:
+				sp.emitter_enabled = rng.randf() < 0.8
+				sp.emitter = timing
+				sp.emitter_spawner_path = sp.get_path_to(tpl)
+			else:
+				var live := volleys.filter(func(v): return is_instance_valid(v) and v.debug_get_life_state() == "active")
+				if not live.is_empty():
+					(live[rng.randi() % live.size()] as BulletVolley2D).emitter_set(timing, tpl)
+		45:
+			# Live colors and lifetimes on flying volleys, spawner color modes.
+			var live := volleys.filter(func(v): return is_instance_valid(v) and v.debug_get_life_state() == "active")
+			if not live.is_empty():
+				var v: BulletVolley2D = live[rng.randi() % live.size()]
+				if v.is_using_bullet_colors():
+					v.all_bullets_set_color(Color(rng.randf(), rng.randf(), rng.randf()))
+				var i := rng.randi() % v.get_amount_bullets()
+				v.set_bullet_life_time_left(i, rng.randf_range(0.05, 1.0))
+			var sp = _live_spawner()
+			if sp != null:
+				sp.bullet_color_mode = rng.randi() % 4
+				sp.bullet_life_time_scale_max = rng.randf_range(0.5, 2.0)
 
 
 func _shape_type(d: BulletVolleyData2D) -> int:
@@ -801,7 +966,9 @@ func test_chaos_battlefield_never_breaks(chaos_seed: int = use_parameters(_seeds
 	ledger.entry_limit = 8 # several entries may share a trigger
 	ledger.attach(factory) # first: before the chaos handlers
 	_connect_handlers(factory)
+	_connect_laser_handlers(factory)
 	_build_world()
+	_build_lasers()
 	Engine.set_meta(&"bb_chaos_init", _hostile)
 	for k in 6:
 		_add_spawner()
@@ -828,6 +995,11 @@ func test_chaos_battlefield_never_breaks(chaos_seed: int = use_parameters(_seeds
 	for sp in spawners:
 		if is_instance_valid(sp):
 			sp.free()
+	for ls in laser_spawners:
+		if is_instance_valid(ls):
+			ls.free()
+	if is_instance_valid(emitter_template):
+		emitter_template.free()
 	await idle(2)
 	factory.reset()
 	await idle(2)
