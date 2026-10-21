@@ -74,6 +74,7 @@ func _ready() -> void:
 		"sound": _snap_sound,
 		"flock": _snap_flock,
 		"split": _snap_split,
+		"lasers": _snap_lasers,
 	}
 	for name in sections:
 		if only != "" and not (name in only.split(",")):
@@ -1296,5 +1297,171 @@ func _snap_split(section: String) -> void:
 		_rec(section, label + "#end", last)
 		factory.free_active_bullets()
 		await get_tree().process_frame
+	factory.queue_free()
+	await get_tree().process_frame
+
+
+# ---- 12. Lasers --------------------------------------------------------------
+
+const LASER_STEP := 1.0 / 16.0 # exact binary ticks: phases and intervals land on their ticks
+
+
+func _laser_state(l: LaserVolley2D) -> Array:
+	var rows: Array = [l.get_phase(), snappedf(l.get_current_width(), 0.0001)]
+	for i in l.get_beam_count():
+		var names: Array = []
+		for t in l.get_pierced_targets(i):
+			names.append(str(t.name))
+		rows.append([l.get_beam_points(i), l.get_beam_length(i), l.get_beam_angle(i), l.is_beam_blocked(i), names])
+	return rows
+
+
+func _snap_laser(kind: int, length: float, setup: Callable = Callable()) -> LaserData2D:
+	var d := H.make_laser(0.0, 0.0, 1.5, 0.125, length)
+	d.type = kind
+	d.speed = 480.0 # 30 px per tick
+	if setup.is_valid():
+		setup.call(d)
+	return d
+
+
+func _snap_lasers(section: String) -> void:
+	var factory := BulletFactory2D.new()
+	add_child(factory)
+	var world := Node2D.new()
+	add_child(world)
+	# Walls (layer 16): right at x = 410 (face), top and bottom at y = -250 / 250.
+	for spec in [[Vector2(420, 0), Vector2(20, 600)], [Vector2(0, -260), Vector2(1200, 20)], [Vector2(0, 260), Vector2(1200, 20)]]:
+		var wall := StaticBody2D.new()
+		wall.collision_layer = 16
+		wall.collision_mask = 0
+		var cs := CollisionShape2D.new()
+		var box := RectangleShape2D.new()
+		box.size = spec[1]
+		cs.shape = box
+		wall.add_child(cs)
+		wall.position = spec[0]
+		world.add_child(wall)
+	# Targets (layer 4) on the x axis, a graze target above it.
+	for k in 4:
+		var a := Area2D.new()
+		a.name = "T%d" % k
+		a.collision_layer = 4
+		a.monitorable = true
+		var cs := CollisionShape2D.new()
+		var box := RectangleShape2D.new()
+		box.size = Vector2(20, 60)
+		cs.shape = box
+		a.add_child(cs)
+		a.position = Vector2(90 + 80 * k, 0)
+		world.add_child(a)
+	var grazer := Node2D.new()
+	grazer.name = "G"
+	grazer.position = Vector2(200, 45)
+	world.add_child(grazer)
+	grazer.add_to_group(&"snap_laser_graze")
+	for i in 3:
+		await get_tree().physics_frame
+	var log: Array = []
+	var tick := [0]
+	factory.laser_phase_changed.connect(func(_l, p: int) -> void: log.append([tick[0], "phase", p]))
+	factory.laser_pierce_started.connect(func(t: Object, _l, i: int, p: Vector2) -> void: log.append([tick[0], "start", str(t.name), i, p]))
+	factory.laser_hit.connect(func(t: Object, _l, i: int, p: Vector2) -> void: log.append([tick[0], "hit", str(t.name), i, p]))
+	factory.laser_pierce_ended.connect(func(t: Object, _l, i: int) -> void: log.append([tick[0], "end", str(t.name), i]))
+	factory.laser_wall_hit.connect(func(_l, i: int, p: Vector2, n: Vector2) -> void: log.append([tick[0], "wall", i, p, n]))
+	factory.laser_finished.connect(func(_l) -> void: log.append([tick[0], "finished"]))
+	factory.laser_grazed.connect(func(t: Object, _l, i: int, _z, r: int) -> void: log.append([tick[0], "graze", str(t.name) if t != null else "", i, r]))
+	factory.laser_graze_exited.connect(func(t: Object, _l, i: int, _z, r: int) -> void: log.append([tick[0], "graze_exit", str(t.name) if t != null else "", i, r]))
+	var beam := LaserData2D.LASER_BEAM
+	var bolt := LaserData2D.LASER_BOLT
+	var curvy := LaserData2D.LASER_CURVY
+	var origin := [Transform2D(0.0, Vector2.ZERO)]
+	var fan := [Transform2D(-0.3, Vector2.ZERO), Transform2D(0.0, Vector2.ZERO), Transform2D(0.4, Vector2(0, 20))]
+	var cases := {
+		"beam_pierce_all": [_snap_laser(beam, 300.0), origin, Callable()],
+		"beam_phases": [_snap_laser(beam, 300.0, func(d: LaserData2D) -> void:
+			d.charge_sec = 0.25
+			d.grow_sec = 0.125
+			d.hit_while_growing = false), origin, Callable()],
+		"beam_hit_interval": [_snap_laser(beam, 300.0, func(d: LaserData2D) -> void: d.hit_interval_sec = 0.1875), origin, Callable()],
+		"beam_pierce_limit_cut": [_snap_laser(beam, 300.0, func(d: LaserData2D) -> void: d.pierce_limit = 2), origin, Callable()],
+		"beam_wall_stop": [_snap_laser(beam, 900.0, func(d: LaserData2D) -> void: d.wall_mask = 16), fan, Callable()],
+		"beam_reflections": [_snap_laser(beam, 1400.0, func(d: LaserData2D) -> void:
+			d.wall_mask = 16
+			d.reflections = 3), [Transform2D(0.5, Vector2.ZERO)], Callable()],
+		"beam_extend": [_snap_laser(beam, 600.0, func(d: LaserData2D) -> void:
+			d.extend_speed = 640.0
+			d.wall_mask = 16), origin, Callable()],
+		"beam_sweep_arc": [_snap_laser(beam, 300.0, func(d: LaserData2D) -> void:
+			d.sweep_speed_degrees = 120.0
+			d.sweep_arc_degrees = 60.0), fan, Callable()],
+		"beam_sweep_free": [_snap_laser(beam, 300.0, func(d: LaserData2D) -> void: d.sweep_speed_degrees = -200.0), origin, Callable()],
+		"beam_track": [_snap_laser(beam, 300.0, func(d: LaserData2D) -> void:
+			d.aim = LaserData2D.LASER_AIM_TRACK
+			d.turn_rate_degrees = 90.0), origin, func(l: LaserVolley2D) -> void: l.set_targets([Vector2(0, 300)])],
+		"beam_lock_on": [_snap_laser(beam, 500.0, func(d: LaserData2D) -> void: d.aim = LaserData2D.LASER_AIM_LOCK_ON), fan, func(l: LaserVolley2D) -> void: l.set_targets([grazer])],
+		"beam_graze": [_snap_laser(beam, 300.0), origin, func(l: LaserVolley2D) -> void: l.graze_set_zones([_graze_zone([30.0, 60.0], BulletGrazeZone2D.REGRAZE_ONCE, true)], &"snap_laser_graze")],
+		"bolt_pierce": [_snap_laser(bolt, 60.0), origin, Callable()],
+		"bolt_pierce_limit": [_snap_laser(bolt, 60.0, func(d: LaserData2D) -> void: d.pierce_limit = 2), origin, Callable()],
+		"bolt_reflect": [_snap_laser(bolt, 60.0, func(d: LaserData2D) -> void:
+			d.wall_mask = 16
+			d.reflections = 2), [Transform2D(0.7, Vector2.ZERO)], Callable()],
+		"bolt_track": [_snap_laser(bolt, 60.0, func(d: LaserData2D) -> void:
+			d.aim = LaserData2D.LASER_AIM_TRACK
+			d.turn_rate_degrees = 180.0), fan, func(l: LaserVolley2D) -> void: l.set_targets([Vector2(-200, 200)])],
+		"curvy_wave": [_snap_laser(curvy, 200.0, func(d: LaserData2D) -> void:
+			d.wave_amplitude = 30.0
+			d.wave_frequency = 1.5), fan, Callable()],
+		"curvy_track_wall": [_snap_laser(curvy, 200.0, func(d: LaserData2D) -> void:
+			d.aim = LaserData2D.LASER_AIM_TRACK
+			d.turn_rate_degrees = 120.0
+			d.wall_mask = 16), origin, func(l: LaserVolley2D) -> void: l.set_targets([Vector2(400, -240)])],
+	}
+	for label in cases:
+		var c: Array = cases[label]
+		log.clear()
+		tick[0] = 0
+		var poses: Array[Transform2D] = []
+		for p in c[1]:
+			poses.append(p)
+		var l: LaserVolley2D = factory.spawn_laser(c[0], poses)
+		if (c[2] as Callable).is_valid():
+			(c[2] as Callable).call(l)
+		for t in 40:
+			tick[0] += 1
+			factory.debug_advance_time(LASER_STEP)
+			_rec(section, "%s#%02d" % [label, t], _laser_state(l))
+			if l.is_pooled():
+				break
+		_rec(section, label + "#signals", log.duplicate(true))
+		factory.clear_active_lasers(false)
+		factory.debug_advance_time(LASER_STEP)
+	# LaserSpawner2D: one shot per pattern source, a beam per slot.
+	var data := _snap_laser(beam, 120.0)
+	for c in ClassDB.class_get_integer_constant_list("LaserSpawner2D"):
+		if not String(c).begins_with("PATTERN_FROM_"):
+			continue
+		var sp := LaserSpawner2D.new()
+		sp.set_shooting_enabled(false)
+		sp.laser_data = data
+		sp.pattern_source = ClassDB.class_get_integer_constant("LaserSpawner2D", c)
+		sp.helper_bullets_amount = 5
+		sp.position = Vector2(-100, 30)
+		world.add_child(sp)
+		sp.set_bullet_factory(factory)
+		var fired: Array = []
+		sp.laser_fired.connect(func(l: LaserVolley2D, _n: int) -> void: fired.append(l))
+		sp.shoot_once()
+		var row: Array = [fired.size()]
+		if not fired.is_empty():
+			var l: LaserVolley2D = fired[0]
+			factory.debug_advance_time(LASER_STEP)
+			for i in l.get_beam_count():
+				row.append([l.get_beam_start(i), l.get_beam_angle(i), l.get_beam_end(i)])
+		_rec(section, "spawner_" + String(c), row)
+		sp.free()
+		factory.clear_active_lasers(false)
+		factory.debug_advance_time(LASER_STEP)
+	world.queue_free()
 	factory.queue_free()
 	await get_tree().process_frame
