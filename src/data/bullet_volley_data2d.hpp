@@ -110,6 +110,11 @@ public:
 	// cost too). Never colliding at all is collision_mask = 0 instead.
 	bool emit_collision_signals = true;
 
+	// One logical hit per (bullet, target) per physics step (default): a
+	// target with several shapes counts once. False delivers one hit per
+	// SHAPE pair (a 3-shape target counts three).
+	bool collision_dedup_by_object = true;
+
 	// Available inside the area_entered / body_entered callbacks inside factory.
 	Ref<Resource> shared_bullets_custom_data;
 
@@ -178,6 +183,15 @@ public:
 	// fallback contract as the effect-layer override: unreadable frames
 	// keep the original art with one warning, never a blank.
 	bool override_frame_color = false;
+
+	// Scale-in: bullets spawn at scale_in_from of their size and grow to full
+	// size (linearly) over scale_in_sec; the hitbox grows with them. 0 = off.
+	double scale_in_sec = 0.0;
+	double scale_in_from = 0.1;
+	double get_scale_in_sec() const { return scale_in_sec; }
+	void set_scale_in_sec(double value);
+	double get_scale_in_from() const { return scale_in_from; }
+	void set_scale_in_from(double value);
 
 	// Fade-in seconds after spawn. 0 (default) disables it.
 	double fade_in_sec = 0.0;
@@ -264,6 +278,11 @@ public:
 	bool get_emit_collision_signals() const { return emit_collision_signals; }
 	void set_emit_collision_signals(bool value) {
 		emit_collision_signals = value;
+		emit_changed();
+	}
+	bool get_collision_dedup_by_object() const { return collision_dedup_by_object; }
+	void set_collision_dedup_by_object(bool value) {
+		collision_dedup_by_object = value;
 		emit_changed();
 	}
 

@@ -367,6 +367,24 @@ void BulletVolleyData2D::set_override_frame_color(bool value) {
 	override_frame_color = value;
 	emit_changed();
 }
+void BulletVolleyData2D::set_scale_in_sec(double value) {
+	if (!is_finite_real2d(value) || value < 0.0) {
+		UtilityFunctions::push_error("BulletVolleyData2D: scale_in_sec must be finite and >= 0, keeping the old value.");
+		return;
+	}
+	scale_in_sec = value;
+	emit_changed();
+}
+
+void BulletVolleyData2D::set_scale_in_from(double value) {
+	if (!Math::is_finite(value) || value < 0.01 || value > 1.0) {
+		UtilityFunctions::push_error("BulletVolleyData2D: scale_in_from must be between 0.01 and 1, keeping the old value.");
+		return;
+	}
+	scale_in_from = value;
+	emit_changed();
+}
+
 double BulletVolleyData2D::get_fade_in_sec() const {
 	return fade_in_sec;
 }
@@ -1022,6 +1040,13 @@ void BulletVolleyData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_override_frame_color", "value"), &BulletVolleyData2D::set_override_frame_color);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "override_frame_color"), "set_override_frame_color", "get_override_frame_color");
 
+	ClassDB::bind_method(D_METHOD("get_scale_in_sec"), &BulletVolleyData2D::get_scale_in_sec);
+	ClassDB::bind_method(D_METHOD("set_scale_in_sec", "value"), &BulletVolleyData2D::set_scale_in_sec);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "scale_in_sec", PROPERTY_HINT_RANGE, "0,2,0.01,or_greater"), "set_scale_in_sec", "get_scale_in_sec");
+	ClassDB::bind_method(D_METHOD("get_scale_in_from"), &BulletVolleyData2D::get_scale_in_from);
+	ClassDB::bind_method(D_METHOD("set_scale_in_from", "value"), &BulletVolleyData2D::set_scale_in_from);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "scale_in_from", PROPERTY_HINT_RANGE, "0.01,1,0.01"), "set_scale_in_from", "get_scale_in_from");
+
 	ClassDB::bind_method(D_METHOD("get_fade_in_sec"), &BulletVolleyData2D::get_fade_in_sec);
 	ClassDB::bind_method(D_METHOD("set_fade_in_sec", "value"), &BulletVolleyData2D::set_fade_in_sec);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "fade_in_sec", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater"), "set_fade_in_sec", "get_fade_in_sec");
@@ -1279,6 +1304,9 @@ void BulletVolleyData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_emit_collision_signals"), &BulletVolleyData2D::get_emit_collision_signals);
 	ClassDB::bind_method(D_METHOD("set_emit_collision_signals", "value"), &BulletVolleyData2D::set_emit_collision_signals);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "emit_collision_signals"), "set_emit_collision_signals", "get_emit_collision_signals");
+	ClassDB::bind_method(D_METHOD("get_collision_dedup_by_object"), &BulletVolleyData2D::get_collision_dedup_by_object);
+	ClassDB::bind_method(D_METHOD("set_collision_dedup_by_object", "value"), &BulletVolleyData2D::set_collision_dedup_by_object);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "collision_dedup_by_object"), "set_collision_dedup_by_object", "get_collision_dedup_by_object");
 
 	ClassDB::bind_method(D_METHOD("get_bullet_max_collision_count"), &BulletVolleyData2D::get_bullet_max_collision_count);
 	ClassDB::bind_method(D_METHOD("set_bullet_max_collision_count", "value"), &BulletVolleyData2D::set_bullet_max_collision_count);

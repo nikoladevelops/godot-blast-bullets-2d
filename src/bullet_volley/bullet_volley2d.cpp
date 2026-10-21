@@ -349,7 +349,12 @@ void BulletVolley2D::begin_life(const BulletVolleyData2D &data, uint64_t new_own
 	reset_bounce_frames();
 	// Runtime-only knobs spawn data never seeds start from their defaults.
 	reset_pooling_flags_to_default();
-	collision_dedup_by_object = true;
+	set_collision_dedup_by_object(data.collision_dedup_by_object);
+	// Scale-in: set before the instances are set up (they spawn shrunk).
+	scale_in_sec = data.scale_in_sec;
+	scale_in_from = data.scale_in_from;
+	scale_in_active = Math::is_finite(scale_in_sec) && scale_in_sec > 0.0 && scale_in_from > 0.0 && scale_in_from < 1.0;
+	scale_in_applied = scale_in_active ? scale_in_from : 1.0;
 	curves_elapsed_time = 0.0;
 	split_timer_fired = false;
 	split_counts.clear();

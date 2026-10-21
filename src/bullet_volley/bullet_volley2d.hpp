@@ -913,6 +913,15 @@ public:
 	// transform passes rewrite only the first 8 floats of each instance).
 	bool colors_enabled = false;
 	int buffer_stride = 8;
+	// Scale-in (spawn data scale_in_sec / scale_in_from): bullets spawn at
+	// scale_in_from of their size and every tick of the window multiplies
+	// each bullet's basis by the growth since the last tick (shape included),
+	// landing on full size. scale_in_applied = the factor shown now.
+	double scale_in_sec = 0.0;
+	double scale_in_from = 1.0;
+	double scale_in_applied = 1.0;
+	bool scale_in_active = false;
+	void step_scale_in(double delta);
 	// Switches the MultiMesh format when the incoming data wants the other
 	// one (Godot refuses the switch while instances exist, so the count is
 	// dropped first). Factory spawns pop a volley of the right format by
@@ -2862,8 +2871,11 @@ public:
 	std::vector<uint32_t> graze_anchor;
 	// Bumped by every arm/clear/release: stale events are dropped.
 	uint32_t graze_generation = 0;
-	// Largest bullet basis scale at arming time (bullet size scaling).
+	// Largest bullet basis scale (bullet size scaling): measured at arming,
+	// raised by every write that grows a bullet (note_bullet_basis_grew,
+	// scale-in), so it stays an upper bound for the fast reject.
 	real_t graze_bullet_scale = 1.0;
+	void note_bullet_basis_grew(const Transform2D &pose);
 	// The shape's bounding radius at scale 1, read once per tick.
 	real_t graze_tick_shape_radius = 0.0;
 	std::vector<uint16_t> graze_state;

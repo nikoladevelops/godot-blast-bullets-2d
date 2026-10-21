@@ -91,7 +91,12 @@ void BulletVolley2D::set_up_bullet_instances(const BulletVolleyData2D &data) {
 	const bool batch_ok = multi.is_valid() && multi->get_instance_count() == amount_bullets;
 	float *batch_w = batch_ok ? batch_buffer.ptrw() : nullptr;
 	for (int i = 0; i < amount_bullets; ++i) {
-		const Transform2D curr_data_transf = span != nullptr ? span[i] : (Transform2D)data.transforms[i];
+		Transform2D curr_data_transf = span != nullptr ? span[i] : (Transform2D)data.transforms[i];
+		if (scale_in_active) {
+			// Spawned shrunk (the hitbox too); step_scale_in grows it.
+			curr_data_transf.columns[0] *= (real_t)scale_in_from;
+			curr_data_transf.columns[1] *= (real_t)scale_in_from;
+		}
 
 		// Generates a collision shape transform for a particular bullet and attaches it to the area
 		Transform2D shape_transf = generate_collision_shape_transform_for_area(curr_data_transf, data.collision_shape_offset, i);

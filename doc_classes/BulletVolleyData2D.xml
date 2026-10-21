@@ -150,6 +150,9 @@
 		<member name="bullets_current_collision_count" type="int[]" setter="set_bullets_current_collision_count" getter="get_bullets_current_collision_count" default="[]">
 			Starting hit count for each bullet. Entry [code]i[/code] belongs to bullet [code]i[/code]; bullets without an entry start at 0. Leave empty to start every bullet fresh. Values are clamped into range (negatives become 0, values at or above [member bullet_max_collision_count] become max - 1, exactly one hit remaining, when the max is above 0).
 		</member>
+		<member name="collision_dedup_by_object" type="bool" setter="set_collision_dedup_by_object" getter="get_collision_dedup_by_object" default="true">
+			When on (default), a bullet reports each target object at most once per physics step, even when the target has several shapes. Off delivers one hit per shape pair (a 3-shape body counts three hits). Seeds [member BulletVolley2D.collision_dedup_by_object] on every spawn.
+		</member>
 		<member name="collision_layer" type="int" setter="set_collision_layer" getter="get_collision_layer" default="1">
 			The bitmask for the collision layer.
 
@@ -269,6 +272,12 @@
 			If you set this to [code]false[/code], then the collision shapes will also rotate along with the bullet's texture.
 
 			Note: You can enable the [BulletFactory2D]'s debugger to make collision shapes visible.
+		</member>
+		<member name="scale_in_from" type="float" setter="set_scale_in_from" getter="get_scale_in_from" default="0.1">
+			The size bullets spawn at while [member scale_in_sec] is on, as a fraction of their full size (0.01 to 1).
+		</member>
+		<member name="scale_in_sec" type="float" setter="set_scale_in_sec" getter="get_scale_in_sec" default="0.0">
+			Spawn scale-in: bullets appear at [member scale_in_from] of their size and grow linearly to full size over this many seconds of the volley's clock (time scales apply). The hitbox and graze rings grow with them, and a rotated or scaled bullet keeps its shape. 0 (default) turns it off. Pairs well with [member fade_in_sec].
 		</member>
 		<member name="self_modulate" type="Color" setter="set_self_modulate" getter="get_self_modulate" default="Color(1, 1, 1, 1)">
 			Whole-volley tint, exactly like CanvasItem self_modulate (multiplies every bullet instance). White (default) renders untouched. Spawn one volley per color for different-colored bullets; reseeded from data on every spawn and enable, so pool reuse never leaks the previous tint. Live volleys also accept the engine set_self_modulate directly.

@@ -50,6 +50,11 @@ void BulletVolley2D::tick(double delta) {
 	if (pickup_data.is_valid() && !pickup_magnet_started) {
 		maybe_begin_pickup_magnet();
 	}
+	// 1c. Scale-in window: every bullet grows by this tick's step before it
+	// moves (the placement below carries the new size to shape and buffer).
+	if (scale_in_active) {
+		step_scale_in(delta);
+	}
 	// 2. Integration (no user code runs inside; homing reaches and grazes
 	// are queued).
 	move_bullets(delta);
@@ -1130,8 +1135,8 @@ _NO_INLINE_ void BulletVolley2D::graze_visit(int z, int bullet_index, const Vect
 	const GrazeTickZone2D &zone = graze_tick_zones[z];
 	const size_t at = (size_t)bullet_index * (size_t)graze_zone_slots + (size_t)z;
 	// The bullet's own size (count_bullet_size): its largest basis scale,
-	// at most the volley's largest measured at arming (the fast reject in
-	// step_graze used that one, so it stays a superset).
+	// at most the volley's largest (the fast reject in step_graze used that
+	// one; every write that grows a bullet raises it, so it is an upper bound).
 	real_t ring_r2[BulletGrazeZone2D::MAX_RINGS];
 	if (zone.sized && bullet_index < (int)all_cached_instance_transforms.size()) {
 		const Transform2D &pose = all_cached_instance_transforms[bullet_index];

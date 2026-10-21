@@ -2,7 +2,8 @@ extends BlastTest
 ## collision_dedup_by_object (default true) collapses the per-SHAPE overlap
 ## records of one target into one logical hit per (bullet, target) per drain
 ## window; legacy shape mode reports every shape; the window resets between
-## drains and volleys; different bullets each count.
+## drains and volleys; different bullets each count. The spawn data seeds the
+## mode per life (BulletVolleyData2D.collision_dedup_by_object).
 
 var hits := 0
 
@@ -108,3 +109,18 @@ func test_property_runtime_round_trip() -> void:
 	assert_false(v.get_collision_dedup_by_object(), "setter applies")
 	v.set_collision_dedup_by_object(true)
 	assert_true(v.get_collision_dedup_by_object(), "setter applies back")
+
+
+func test_the_spawn_data_seeds_the_mode_every_life() -> void:
+	var d := _bodied_data()
+	assert_true(d.collision_dedup_by_object, "the data defaults to object mode")
+	d.collision_dedup_by_object = false
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	assert_false(v.get_collision_dedup_by_object(), "a shape-mode life from the data")
+	await _wait(func(): return hits >= 3)
+	assert_gte(hits, 3, "and it reports every shape")
+	v.clear_all_bullets()
+	await idle(1)
+	var again: BulletVolley2D = factory.spawn_volley(_bodied_data())
+	assert_eq(again, v, "the same volley, a new life")
+	assert_true(again.get_collision_dedup_by_object(), "object mode again from the next data")

@@ -103,6 +103,16 @@ void BulletVolley2D::graze_arm(const Ref<BulletGrazeZone2D> *armed, int slots, c
 	graze_bullet_scale = (Math::is_finite(scale) && scale > 0.0) ? scale : (real_t)1.0;
 }
 
+void BulletVolley2D::note_bullet_basis_grew(const Transform2D &pose) {
+	if (graze_zone_slots <= 0) {
+		return; // measured at arming
+	}
+	const real_t s = MAX(pose.columns[0].length(), pose.columns[1].length());
+	if (Math::is_finite(s) && s > graze_bullet_scale) {
+		graze_bullet_scale = s;
+	}
+}
+
 void BulletVolley2D::graze_clear() {
 	if (reject_pooled_handle("graze_clear")) {
 		return;

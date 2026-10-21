@@ -698,6 +698,7 @@ void BulletVolley2D::set_bullet_transform(int bullet_index, const Transform2D &n
 
 	curr_bullet_transf = new_transform;
 	curr_bullet_origin = new_transform.get_origin();
+	note_bullet_basis_grew(new_transform);
 
 	// The attachment shifts by the jump (stick-relative ones recompute).
 	present_bullet_transform(bullet_index, origin_delta);
@@ -740,6 +741,39 @@ Vector2 BulletVolley2D::get_bullet_scale(int bullet_index) const {
 	return all_cached_instance_transforms[bullet_index].get_scale();
 }
 
+// Scale-in: one uniform factor per volley (its bullets spawned together), so
+// each tick of the window multiplies every bullet's basis by the growth since
+// the last tick: a rotated, mirrored or randomized bullet keeps its shape, and
+// the shape (hitbox) follows through the placement in move_bullets.
+void BulletVolley2D::step_scale_in(double delta) {
+	const double progress = scale_in_sec > 0.0 ? Math::min((life_age + delta) / scale_in_sec, 1.0) : 1.0;
+	const double target = scale_in_from + (1.0 - scale_in_from) * progress;
+	const real_t k = (real_t)(target / scale_in_applied);
+	scale_in_applied = target;
+	if (progress >= 1.0) {
+		scale_in_active = false;
+	}
+	if (!Math::is_finite(k) || k == (real_t)1.0) {
+		return;
+	}
+	const int n = MIN(amount_bullets, (int)all_cached_instance_transforms.size());
+	// rotate_only_textures keeps the shape's own (frozen) basis: scaled too.
+	const bool own_shape_basis = rotate_only_textures && (int)all_cached_shape_transforms.size() >= n;
+	for (int i = 0; i < n; ++i) {
+		Transform2D &t = all_cached_instance_transforms[i];
+		t.columns[0] *= k;
+		t.columns[1] *= k;
+		if (own_shape_basis) {
+			Transform2D &s = all_cached_shape_transforms[i];
+			s.columns[0] *= k;
+			s.columns[1] *= k;
+		}
+	}
+	if (graze_zone_slots > 0) {
+		graze_bullet_scale *= k; // every bullet grew by k: the bound grows with them
+	}
+}
+
 void BulletVolley2D::set_bullet_scale(int bullet_index, const Vector2 &new_scale) {
 	if (!validate_bullet_index(bullet_index, "set_bullet_scale")) {
 		return;
@@ -770,6 +804,7 @@ void BulletVolley2D::set_bullet_scale(int bullet_index, const Vector2 &new_scale
 		return;
 	}
 	all_cached_instance_transforms[bullet_index] = scaled;
+	note_bullet_basis_grew(scaled);
 	if (own_shape_basis) {
 		all_cached_shape_transforms[bullet_index] = shape_scaled;
 	}

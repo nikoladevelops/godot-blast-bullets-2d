@@ -118,6 +118,22 @@ func test_each_bullet_counts_its_own_size() -> void:
 	assert_false(v.is_bullet_inside_graze(1, 0), "the small one is not")
 
 
+func test_a_bullet_grown_after_arming_grazes_at_its_new_size() -> void:
+	# Armed at 1x (circle r4: ring 20 + 4 = 24 px, short of the target 30 px
+	# away), then scaled to 3x (20 + 12 = 32 px): the next tick must graze.
+	# The volley's largest scale was measured once at arming and capped every
+	# bullet to it, so a bullet grown later grazed at its old size.
+	make_graze_target(Vector2(30, 0))
+	var log := H.record_graze(factory)
+	var v := graze_volley([Transform2D(0.0, Vector2.ZERO)], 0.0)
+	v.graze_set_zones([H.make_graze_zone([20.0], true)], &"graze_targets")
+	step_factory()
+	assert_eq(H.graze_kinds(log), [], "1x: out of reach")
+	v.set_bullet_scale(0, Vector2(3, 3))
+	step_factory()
+	assert_eq(H.graze_kinds(log), ["enter:0:0"], "3x: the grown bullet reaches the target")
+
+
 func _rect(size: Vector2) -> RectangleShape2D:
 	var r := RectangleShape2D.new()
 	r.size = size

@@ -2579,7 +2579,7 @@
 			You can use this property to keep track of how many times each bullet has collided, and you can also set it to update the collision counts as needed.
 		</member>
 		<member name="collision_dedup_by_object" type="bool" setter="set_collision_dedup_by_object" getter="get_collision_dedup_by_object" default="true">
-			When on (default), a bullet reports each target object at most once per drain window, even when the physics server reports several shape pairs for one overlap (multi-shape bodies and areas). Off restores legacy shape-level delivery: every shape record counts, signals and bounces separately.
+			When on (default), a bullet reports each target object at most once per drain window, even when the physics server reports several shape pairs for one overlap (multi-shape bodies and areas). Off restores legacy shape-level delivery: every shape record counts, signals and bounces separately. Seeded from [member BulletVolleyData2D.collision_dedup_by_object] on every spawn.
 		</member>
 		<member name="curves_elapsed_time" type="float" setter="set_curves_elapsed_time" getter="get_curves_elapsed_time" default="0.0">
 			The elapsed time used for the bullets' curves. This is the time that gets passed to the curves assigned to the bullets, you can manipulate it freely.
