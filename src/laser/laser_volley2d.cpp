@@ -196,8 +196,7 @@ void LaserVolley2D::graze_arm(const Array &zones, const std::shared_ptr<GrazeDet
 }
 
 bool LaserVolley2D::graze_set_zones(const Array &zones, const StringName &target_group) {
-	if (pooled || !active) {
-		UtilityFunctions::push_error("graze_set_zones: this laser finished (it waits in the pool), so this handle is stale. Fire a new laser instead.");
+	if (reject_stale_handle("graze_set_zones")) {
 		return false;
 	}
 	if (target_group.is_empty()) {
@@ -223,6 +222,9 @@ bool LaserVolley2D::graze_set_zones(const Array &zones, const StringName &target
 }
 
 void LaserVolley2D::graze_clear() {
+	if (reject_stale_handle("graze_clear")) {
+		return;
+	}
 	++graze_generation;
 	graze_zones.clear();
 	graze_detector.reset();
@@ -239,8 +241,7 @@ Array LaserVolley2D::get_graze_zones() const {
 }
 
 bool LaserVolley2D::sound_set_effects(const Array &effects, const StringName &listener_group) {
-	if (pooled || !active) {
-		UtilityFunctions::push_error("sound_set_effects: this laser finished (it waits in the pool), so this handle is stale. Fire a new laser instead.");
+	if (reject_stale_handle("sound_set_effects")) {
 		return false;
 	}
 	sound_arm(effects, nullptr, 0.0f);
@@ -262,6 +263,18 @@ void LaserVolley2D::sound_arm(const Array &entries, const std::shared_ptr<GrazeD
 }
 
 // ---- Helpers ------------------------------------------------------------------------------
+
+bool LaserVolley2D::reject_stale_handle(const char *fn) const {
+	if (pooled || (!active && life_id != 0)) {
+		UtilityFunctions::push_error(String(fn) + ": this laser finished (it waits in the pool), so this handle is stale. Fire a new laser instead.");
+		return true;
+	}
+	if (!active) {
+		UtilityFunctions::push_error(String(fn) + ": this laser was never fired (BulletFactory2D.spawn_laser or a LaserSpawner2D fires lasers), nothing changed.");
+		return true;
+	}
+	return false;
+}
 
 bool LaserVolley2D::alive_after_user_code(uint64_t self_id, uint32_t life) const {
 	if (ObjectDB::get_instance(ObjectID(self_id)) != (const Object *)this) {
@@ -439,6 +452,9 @@ real_t LaserVolley2D::get_current_width() const {
 }
 
 void LaserVolley2D::set_beam_angle(int beam_index, real_t radians) {
+	if (reject_stale_handle("set_beam_angle")) {
+		return;
+	}
 	LASER_BEAM_INDEX_OR("set_beam_angle", )
 	if (!is_finite_real2d(radians)) {
 		UtilityFunctions::push_error("set_beam_angle: radians must be finite, keeping the old angle.");
@@ -455,6 +471,9 @@ void LaserVolley2D::set_beam_angle(int beam_index, real_t radians) {
 }
 
 void LaserVolley2D::set_beam_target(int beam_index, const Variant &target) {
+	if (reject_stale_handle("set_beam_target")) {
+		return;
+	}
 	LASER_BEAM_INDEX_OR("set_beam_target", )
 	Beam &b = beams[beam_index];
 	b.has_target = false;
@@ -478,6 +497,9 @@ void LaserVolley2D::set_beam_target(int beam_index, const Variant &target) {
 }
 
 void LaserVolley2D::set_targets(const Array &targets) {
+	if (reject_stale_handle("set_targets")) {
+		return;
+	}
 	const int n = targets.size();
 	for (int i = 0; i < (int)beams.size(); ++i) {
 		set_beam_target(i, n > 0 ? targets[i % n] : Variant());
@@ -485,6 +507,9 @@ void LaserVolley2D::set_targets(const Array &targets) {
 }
 
 void LaserVolley2D::set_anchor(Node2D *anchor) {
+	if (reject_stale_handle("set_anchor")) {
+		return;
+	}
 	// The beams keep their current pose; from now on they ride `anchor`.
 	Transform2D frame;
 	for (Beam &b : beams) {
@@ -508,8 +533,11 @@ Node2D *LaserVolley2D::get_anchor() const {
 }
 
 void LaserVolley2D::end_laser(bool fade) {
-	if (!active || phase == PHASE_FINISHED) {
+	if (reject_stale_handle("end_laser")) {
 		return;
+	}
+	if (phase == PHASE_FINISHED) {
+		return; // already over (its laser_finished handler)
 	}
 	// No user code here: the next tick announces the phase and ends the contacts.
 	if (fade && phase != PHASE_FADING) {
@@ -536,6 +564,9 @@ double LaserVolley2D::get_active_time_left() const {
 }
 
 void LaserVolley2D::set_active_time_left(double seconds) {
+	if (reject_stale_handle("set_active_time_left")) {
+		return;
+	}
 	if (!Math::is_finite(seconds) || seconds < 0.0) {
 		UtilityFunctions::push_error("set_active_time_left: seconds must be finite and >= 0 (0 = until ended), keeping the old value.");
 		return;

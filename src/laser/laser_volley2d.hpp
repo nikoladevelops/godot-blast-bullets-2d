@@ -245,6 +245,9 @@ private:
 	Ref<PhysicsRayQueryParameters2D> ray_query;
 
 	bool alive_after_user_code(uint64_t self_id, uint32_t life) const;
+	// A pooled laser (or one never fired): pushes the stale-handle error for
+	// `fn` and returns true.
+	bool reject_stale_handle(const char *fn) const;
 	Object *resolve_emitter() const;
 	bool resolve_anchor_frame(Transform2D &r_frame) const;
 	bool target_position(const Beam &b, Vector2 &r_pos) const;

@@ -99,7 +99,8 @@ func test_end_laser_without_fade_finishes_next_tick() -> void:
 	_step(1)
 	assert_eq(log.slice(-2), [[2, "phase", 4], [2, "finished"]], "finished on the next tick, no fade")
 	assert_true(l.is_pooled(), "pooled")
-	l.end_laser() # a pooled laser: nothing happens, no error
+	l.end_laser() # a pooled laser is a stale handle: refused, nothing happens
+	expect_error_sequence(["end_laser: this laser finished (it waits in the pool), so this handle is stale. Fire a new laser instead."])
 
 
 func test_set_active_time_left_moves_the_end() -> void:
