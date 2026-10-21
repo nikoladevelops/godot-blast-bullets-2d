@@ -306,7 +306,7 @@ func _configure() -> void:
 	if has("orphan"):
 		sp.orphaned_volleys = rng.randi_range(0, 3)
 	if has("interpolation"):
-		factory.use_physics_interpolation = true
+		factory.physics_interpolation = BulletFactory2D.INTERPOLATION_ON
 	if has("animation"):
 		d.sprite_frames = B.make_effect_frames(4, 20.0) # 0.2 s, no loop
 	if has("effects"):
@@ -566,7 +566,7 @@ static func _instance(buf: PackedFloat32Array, i: int) -> Transform2D:
 ## renderer keeps whole-buffer uploads only (per-instance writes such as a
 ## spawner's muzzle-offset shift are dropped until the next upload).
 func _check_drawn(where: String) -> void:
-	var interp := factory.use_physics_interpolation
+	var interp := factory.is_physics_interpolation_active()
 	for v in _live():
 		var clock: float = v.debug_get_clocks()["curves_elapsed_time"]
 		var last: Array = _last_clock.get(v.get_instance_id(), [-1, -1.0])
@@ -599,7 +599,7 @@ func _check_drawn(where: String) -> void:
 ## streak (the interpolation history starts at the new pose) and the trail
 ## moved with the bullet.
 func _check_moved_now(where: String, moved: Array) -> void:
-	var interp := factory.use_physics_interpolation
+	var interp := factory.is_physics_interpolation_active()
 	for m in moved:
 		var v = m[0]
 		var i: int = m[1]
@@ -752,7 +752,7 @@ func run() -> Array[String]:
 	await t.idle(2)
 	factory.time_scale = 1.0
 	factory.despawn_bounds_enabled = false
-	factory.use_physics_interpolation = false
+	factory.physics_interpolation = BulletFactory2D.INTERPOLATION_OFF
 	return problem_list
 
 

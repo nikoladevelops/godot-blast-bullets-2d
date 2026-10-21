@@ -34,7 +34,7 @@ func _walk(v: BulletVolley2D, frames: int, step: float, label: String) -> void:
 
 
 func _flyer() -> BulletVolley2D:
-	factory.use_physics_interpolation = true
+	factory.physics_interpolation = BulletFactory2D.INTERPOLATION_ON
 	return factory.spawn_volley(H.make_volley_data(1, SPEED, 60.0))
 
 
@@ -65,7 +65,7 @@ func test_scale_zero_settles_exactly_and_stays_put() -> void:
 
 
 func test_spawner_scale_keeps_the_drawn_pose_smooth() -> void:
-	factory.use_physics_interpolation = true
+	factory.physics_interpolation = BulletFactory2D.INTERPOLATION_ON
 	var sp := make_spawner(H.make_volley_data(1, SPEED, 60.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 1)
 	watch_signals(sp)
 	assert_true(sp.shoot_once(), "shot")
@@ -82,9 +82,9 @@ func test_interpolation_toggle_mid_slow_motion_stays_consistent() -> void:
 	var v := _flyer()
 	factory.time_scale = 0.25
 	await idle(5)
-	factory.use_physics_interpolation = false
+	factory.physics_interpolation = BulletFactory2D.INTERPOLATION_OFF
 	await idle(2)
 	assert_almost_eq(_drawn_x(v), _sim_x(v), 0.5, "interpolation off: drawn at the simulated pose")
-	factory.use_physics_interpolation = true
+	factory.physics_interpolation = BulletFactory2D.INTERPOLATION_ON
 	await idle(1)
 	await _walk(v, 8, SPEED * 0.25 / FPS, "after turning it back on")

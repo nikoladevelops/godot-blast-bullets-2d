@@ -573,7 +573,7 @@ func _operate() -> void:
 			factory.despawn_bounds_rect = Rect2(rng.randf_range(-600, -200), rng.randf_range(-600, -200), rng.randf_range(400, 1200), rng.randf_range(400, 1200))
 			factory.despawn_bounds_enabled = rng.randf() < 0.6
 		21:
-			factory.use_physics_interpolation = not factory.use_physics_interpolation
+			factory.physics_interpolation = BulletFactory2D.INTERPOLATION_OFF if factory.is_physics_interpolation_active() else BulletFactory2D.INTERPOLATION_ON
 		22:
 			var sp = _live_spawner()
 			if sp != null:

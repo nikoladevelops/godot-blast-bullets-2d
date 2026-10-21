@@ -490,6 +490,8 @@ void PatternSpawner2D::teleport(const Vector2 &new_global_position, bool carry_l
 		return;
 	}
 	set_global_position(new_global_position);
+	// Godot's own interpolation of this node must not draw the jump as travel.
+	reset_physics_interpolation();
 	// The movement's own pose jumps with the spawner: the next step measures
 	// only the path's motion, and the path goes on from here.
 	if (movement_space == MOVEMENT_SPACE_RELATIVE_TO_START) {

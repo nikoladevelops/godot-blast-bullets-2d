@@ -363,20 +363,16 @@ void BulletFactory2D::_ready() {
 	add_debuggers();
 	apply_debugger_settings(*volley_debugger.ptr);
 
-	use_physics_interpolation = use_physics_interpolation_cached_before_ready;
 	update_process_state();
 
 	is_ready = true;
 	register_monitors();
+	resolve_physics_interpolation();
 
-	// Interpolation mismatch warning: warn when the factory flag disagrees with the project setting.
-	// Bullets look steppy on >60Hz displays when project interpolation is off
-	// but the factory flag is on, and vice versa wastes previous-frame memory.
-	if (use_physics_interpolation) {
-		bool project_interp = ProjectSettings::get_singleton()->get_setting("physics/common/physics_interpolation", false);
-		if (!project_interp) {
-			UtilityFunctions::push_warning("BulletFactory2D: use_physics_interpolation is enabled on the factory but ProjectSettings physics/common/physics_interpolation is OFF. Enable it in Project Settings for smooth bullets on high-refresh displays. See debug_check_interpolation_status().");
-		}
+	// On while Godot's own interpolation is off: bullets are smooth but every
+	// other node (the player, the camera) steps, which reads as bullet jitter.
+	if (physics_interpolation == INTERPOLATION_ON && !ProjectSettings::get_singleton()->get_setting("physics/common/physics_interpolation", false)) {
+		UtilityFunctions::push_warning("BulletFactory2D: physics_interpolation is On but ProjectSettings physics/common/physics_interpolation is OFF, so the rest of the scene is not interpolated. Enable it in Project Settings (or use Follow Project). See debug_check_interpolation_status().");
 	}
 }
 
@@ -423,9 +419,9 @@ bool BulletFactory2D::ensure_factory_initialized() {
 		add_debuggers();
 	}
 	apply_debugger_settings(*volley_debugger.ptr);
-	use_physics_interpolation = use_physics_interpolation_cached_before_ready;
 	update_process_state();
 	is_ready = true;
+	resolve_physics_interpolation();
 	if (!ready_missing_super_warned) {
 		ready_missing_super_warned = true;
 		UtilityFunctions::push_warning("BulletFactory2D: factory was used before native _ready() ran (likely a GDScript _ready() without super._ready()). Containers were recovered automatically, but call super._ready() in your script to avoid this. See WARNING in README.");
@@ -433,48 +429,38 @@ bool BulletFactory2D::ensure_factory_initialized() {
 	return true;
 }
 
-bool BulletFactory2D::get_use_physics_interpolation() const {
-	if (!is_ready) {
-		return use_physics_interpolation_cached_before_ready;
+void BulletFactory2D::set_physics_interpolation(PhysicsInterpolation value) {
+	if (value < INTERPOLATION_OFF || value > INTERPOLATION_FOLLOW_PROJECT) {
+		UtilityFunctions::push_error("BulletFactory2D: physics_interpolation must be 0 (Off), 1 (On) or 2 (Follow Project), keeping the old value.");
+		return;
 	}
-
-	return use_physics_interpolation;
+	physics_interpolation = value;
+	resolve_physics_interpolation();
 }
 
-void BulletFactory2D::set_use_physics_interpolation_runtime(bool new_use_physics_interpolation) {
-	if (!is_ready || is_tearing_down) {
-		UtilityFunctions::push_error("set_use_physics_interpolation_runtime: BulletFactory2D is not in the scene tree yet (or is being destroyed). Set the use_physics_interpolation property instead.");
-		return;
+void BulletFactory2D::resolve_physics_interpolation() {
+	bool want = physics_interpolation == INTERPOLATION_ON;
+	if (physics_interpolation == INTERPOLATION_FOLLOW_PROJECT) {
+		const SceneTree *tree = is_inside_tree() ? get_tree() : nullptr;
+		want = tree != nullptr && tree->is_physics_interpolation_enabled();
 	}
-	if (is_factory_busy) {
-		UtilityFunctions::push_error("Error when trying to set physics interpolation. BulletFactory2D is currently busy. Ignoring the request");
-		return;
+	if (want == use_physics_interpolation || !is_ready || is_tearing_down || is_factory_busy || is_iterating_bullets) {
+		return; // nothing to do, or the next physics frame applies it
 	}
-
-	// No debuggers here: this op only flips interpolation state, it never
-	// rebuilds vectors.
-	FactoryOperationGuard op(this, false);
-
-	use_physics_interpolation = new_use_physics_interpolation;
-
+	// A flag flip and a copy of poses: no user code runs and no vector is
+	// rebuilt, so no operation guard (pausing the factory for it would pause
+	// its sound voices too).
+	use_physics_interpolation = want;
 	// Turning it on mid-game needs previous-frame data to exist, so seed it here.
 	// Without this the first interpolated frames would lerp from stale transforms.
 	if (use_physics_interpolation) {
-		int amount_multimesh_instances = static_cast<int>(all_volleys.size());
-		for (int i = 0; i < amount_multimesh_instances; ++i) {
-			BulletVolley2D *bullets_multi = all_volleys[i];
-			if (bullets_multi != nullptr) {
-				bullets_multi->update_all_previous_transforms_for_interpolation();
+		for (BulletVolley2D *volley : all_volleys) {
+			if (volley != nullptr) {
+				volley->update_all_previous_transforms_for_interpolation();
 			}
 		}
 	}
-}
-
-void BulletFactory2D::set_use_physics_interpolation_editor(bool new_use_physics_interpolation) {
-	use_physics_interpolation_cached_before_ready = new_use_physics_interpolation;
-	if (is_ready && !is_factory_busy) {
-		set_use_physics_interpolation_runtime(new_use_physics_interpolation);
-	}
+	update_process_state();
 }
 
 void BulletFactory2D::add_bullet_containers() {
@@ -584,6 +570,7 @@ void BulletFactory2D::_physics_process(double delta) {
 	// none of the sweep's own writes is ever deferred (core/physics_flush2d.hpp).
 	PhysicsFlush2D::note_scene_physics_frame();
 	flush_physics_sync();
+	resolve_physics_interpolation();
 	struct SweepScope {
 		SweepScope() { ++PhysicsFlush2D::sweep_depth; }
 		~SweepScope() { --PhysicsFlush2D::sweep_depth; }

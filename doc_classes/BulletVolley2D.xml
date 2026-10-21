@@ -1499,8 +1499,9 @@
 		</method>
 		<method name="debug_run_interpolation_pass">
 			<return type="void" />
+			<param index="0" name="fraction" type="float" default="-1.0" />
 			<description>
-				Runs the render interpolation pass on demand (same code the factory _process drives): lets tests prove trail shards follow the lerped bullet pose with zero physics ticks in between. No-op unless the factory has use_physics_interpolation on.
+				Runs the render interpolation pass on demand (same code the factory _process drives) at [param fraction] between the last two physics poses (below 0: the engine's fraction, which is 0 headless): lets tests check mid-frame poses and prove trail shards follow the lerped bullet pose. No-op unless [method BulletFactory2D.is_physics_interpolation_active].
 			</description>
 		</method>
 		<method name="detach_all_time_based_functions">

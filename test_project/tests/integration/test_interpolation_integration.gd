@@ -8,14 +8,14 @@ func test_interpolation_status_and_toggle() -> void:
 	var st: Dictionary = factory.debug_check_interpolation_status()
 	assert_has(st, "mismatch")
 	assert_has(st, "hint")
-	factory.set_use_physics_interpolation_editor(true)
+	factory.physics_interpolation = BulletFactory2D.INTERPOLATION_ON
 	await idle(1)
 	assert_true(factory.debug_check_interpolation_status().get("factory_enabled", false), "factory flag on")
 	var v: BulletVolley2D = factory.spawn_volley(H.make_volley_data(2, 200.0))
 	await physics(5)
 	assert_true(v.get_bullet_transform(0).is_finite(), "volley ticks with interpolation on")
 	await idle(1)
-	factory.set_use_physics_interpolation_editor(false)
+	factory.physics_interpolation = BulletFactory2D.INTERPOLATION_OFF
 	assert_false(factory.debug_check_interpolation_status().get("factory_enabled", true), "factory flag off")
 
 
@@ -52,3 +52,38 @@ func test_two_factories_are_independent() -> void:
 	assert_eq(f2.debug_get_total_bullets_amount(), 1, "second factory holds its own volley")
 	assert_eq(factory.debug_get_total_bullets_amount(), 0, "first factory untouched")
 	f2.reset()
+
+
+func test_turning_interpolation_on_at_runtime_starts_the_render_pass() -> void:
+	# The factory started with interpolation off (its render pass asleep):
+	# switching it on mid-game must wake the pass, or bullets stay drawn at
+	# their physics poses.
+	assert_false(factory.is_processing(), "the render pass sleeps while interpolation is off")
+	factory.physics_interpolation = BulletFactory2D.INTERPOLATION_ON
+	assert_true(factory.is_processing(), "switched on: the render pass runs")
+
+
+func test_follow_project_tracks_the_scene_tree_at_runtime() -> void:
+	assert_eq(factory.physics_interpolation, BulletFactory2D.INTERPOLATION_FOLLOW_PROJECT, "the default follows the project")
+	assert_eq([BulletFactory2D.INTERPOLATION_OFF, BulletFactory2D.INTERPOLATION_ON, BulletFactory2D.INTERPOLATION_FOLLOW_PROJECT], [0, 1, 2], "serialized ids")
+	var tree := get_tree()
+	var was: bool = tree.physics_interpolation
+	tree.physics_interpolation = false
+	await physics(1)
+	assert_false(factory.is_physics_interpolation_active(), "the tree is off: so are the bullets")
+	var v: BulletVolley2D = factory.spawn_volley(H.make_volley_data(1, 600.0))
+	await physics(3)
+	tree.physics_interpolation = true
+	await physics(1)
+	assert_true(factory.is_physics_interpolation_active(), "switched on in the tree: the factory follows within a frame")
+	assert_true(factory.is_processing(), "and its render pass runs")
+	assert_lt(v.debug_get_previous_origin(0).distance_to(v.get_bullet_transform(0).origin), 600.0 / 60.0 + 0.01, "the previous pose was seeded (no lerp from the spawn point)")
+	factory.physics_interpolation = BulletFactory2D.INTERPOLATION_OFF
+	assert_false(factory.is_physics_interpolation_active(), "Off wins over the tree")
+	tree.physics_interpolation = false
+	factory.physics_interpolation = BulletFactory2D.INTERPOLATION_ON
+	assert_true(factory.is_physics_interpolation_active(), "On wins over the tree")
+	factory.physics_interpolation = 7
+	expect_error_sequence(["BulletFactory2D: physics_interpolation must be 0 (Off), 1 (On) or 2 (Follow Project), keeping the old value."])
+	assert_eq(factory.physics_interpolation, BulletFactory2D.INTERPOLATION_ON, "kept")
+	tree.physics_interpolation = was

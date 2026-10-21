@@ -543,6 +543,12 @@
 				Get the physics world space in which the bullets interact.
 			</description>
 		</method>
+		<method name="is_physics_interpolation_active" qualifiers="const">
+			<return type="bool" />
+			<description>
+				True while bullets are drawn between their last two physics poses this frame: [member physics_interpolation] resolved (On, Off, or the scene tree's [member SceneTree.physics_interpolation] for Follow Project).
+			</description>
+		</method>
 		<method name="play_sound">
 			<return type="bool" />
 			<param index="0" name="sound" type="BulletSoundData2D" />
@@ -640,13 +646,6 @@
 				Sets the world physics space that the bullets interact in. Set it before spawning: it applies to subsequently spawned bullets, already spawned areas stay in their space. Invalid RIDs are rejected with an error.
 			</description>
 		</method>
-		<method name="set_use_physics_interpolation_runtime">
-			<return type="void" />
-			<param index="0" name="enable" type="bool" />
-			<description>
-				Controls whether physics interpolation is enabled or not for all bullets controlled by the [b]BulletFactory2D[/b]. This method is supposed to be called during runtime, while the [method set_use_physics_interpolation_editor] method is supposed to be called in the editor.
-			</description>
-		</method>
 		<method name="spawn_layer_effect">
 			<return type="int" />
 			<param index="0" name="layer" type="BulletEffectLayerData2D" />
@@ -713,6 +712,9 @@
 			Use this if you want to pause processing of bullets - being able to stop bullets in place. Always use this instead of [code]set_process[/code]/[code]set_physics_process[/code]. While paused nothing is drained. Overlaps that START during the pause are parked per volley (bounded at 4096 records, deduplicated, cancelled when the overlap ends before resume) and replayed exactly once on resume. Overlaps counted before the pause are never re-reported, and nothing piles up into a resume hitch.
 			Warning (shared factories): pausing stops EVERY spawner's bullets at once - there is no per-spawner pause.
 		</member>
+		<member name="physics_interpolation" type="int" setter="set_physics_interpolation" getter="get_physics_interpolation" enum="BulletFactory2D.PhysicsInterpolation" default="2">
+			How bullets are drawn between physics ticks. [constant INTERPOLATION_FOLLOW_PROJECT] (the default) follows [member SceneTree.physics_interpolation], so enabling Godot's physics interpolation in Project Settings (or toggling it from a script at runtime) smooths bullets, their attachments and trails with no second switch; the factory checks it every physics frame. [constant INTERPOLATION_ON] and [constant INTERPOLATION_OFF] decide regardless of the project. Turning it on mid-game seeds every bullet's previous pose (no lerp from an old spot). See [method debug_check_interpolation_status].
+		</member>
 		<member name="register_performance_monitors" type="bool" setter="set_register_performance_monitors" getter="get_register_performance_monitors" default="true">
 			When on (default), the factory registers custom monitors on ready, graphed while the game runs in the editor's Debugger &gt; Monitors tab: BlastBullets2D/Active Bullets, Active Volleys, Pooled Volleys, Physics Tick (ms), Peak Physics Tick (ms), Interpolation (ms), Active Effects and Active Attachments. Use them to spot which frames are heavy and what causes it. One factory owns the monitor ids at a time (the first to become ready; others skip silently, and a freed owner's ids are reclaimed). Runtime only, never in the editor; removed when the factory leaves the tree.
 		</member>
@@ -727,11 +729,6 @@
 		</member>
 		<member name="time_scale" type="float" setter="set_time_scale" getter="get_time_scale" default="1.0">
 			Speed of the bullet world. Every volley tick, one-shot effect and bullet timer advances by delta times this value: 1 is real time, 0.25 is slow motion, 0 freezes bullets while the factory keeps processing (collisions already in flight still resolve). Spawners that use this factory run on it too (their cadence, bursts, telegraph, spin and movement, multiplied by their own [member BulletSpawner2D.time_scale]), and so do the bullets they fired. The rescan interval of graze targets and sound fades and intervals stay in real time. Must be finite and 0 or more; any such value is accepted, but one volley tick never covers more than 10 s of bullet time (a huge scale slows down there instead of turning bullets into INF). This is not [member Engine.time_scale].
-		</member>
-		<member name="use_physics_interpolation" type="bool" setter="set_use_physics_interpolation_editor" getter="get_use_physics_interpolation" default="false">
-			Determines whether physics interpolation is enabled or not. The setter is for the editor only.
-
-			Instead always use [method set_use_physics_interpolation_runtime] if you are doing changes during runtime.
 		</member>
 	</members>
 	<signals>
@@ -846,4 +843,15 @@
 			</description>
 		</signal>
 	</signals>
+	<constants>
+		<constant name="INTERPOLATION_OFF" value="0" enum="PhysicsInterpolation">
+			Bullets are drawn at their physics poses.
+		</constant>
+		<constant name="INTERPOLATION_ON" value="1" enum="PhysicsInterpolation">
+			Bullets are always drawn between their last two physics poses (pair it with the project setting so the rest of the scene is interpolated too).
+		</constant>
+		<constant name="INTERPOLATION_FOLLOW_PROJECT" value="2" enum="PhysicsInterpolation">
+			Follow [member SceneTree.physics_interpolation] (the project setting, or a script toggling it at runtime).
+		</constant>
+	</constants>
 </class>

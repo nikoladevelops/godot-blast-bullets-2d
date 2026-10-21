@@ -235,18 +235,20 @@ Dictionary BulletFactory2D::debug_validate_spawn_data(const Ref<BulletVolleyData
 
 Dictionary BulletFactory2D::debug_check_interpolation_status() {
 	Dictionary d;
-	const bool factory_enabled = is_ready ? use_physics_interpolation : use_physics_interpolation_cached_before_ready;
 	bool project_enabled = false;
 	if (ProjectSettings::get_singleton()->has_setting("physics/common/physics_interpolation")) {
 		project_enabled = (bool)ProjectSettings::get_singleton()->get_setting("physics/common/physics_interpolation", false);
 	}
-	d["factory_enabled"] = factory_enabled;
+	d["mode"] = (int)physics_interpolation;
+	d["factory_enabled"] = use_physics_interpolation;
 	d["project_enabled_2d"] = project_enabled;
-	d["mismatch"] = factory_enabled != project_enabled;
-	if (factory_enabled && !project_enabled) {
-		d["hint"] = "Factory interpolation is ON but ProjectSettings physics/common/physics_interpolation is OFF: bullets will look steppy on high-refresh displays. Enable the project setting.";
-	} else if (!factory_enabled && project_enabled) {
-		d["hint"] = "Project interpolation is ON but the factory flag is OFF: factory bullets skip the previous-frame seeding pass. Enable use_physics_interpolation on the factory for smooth bullets.";
+	const bool on_alone = physics_interpolation == INTERPOLATION_ON && !project_enabled;
+	const bool off_alone = physics_interpolation == INTERPOLATION_OFF && project_enabled;
+	d["mismatch"] = on_alone || off_alone;
+	if (on_alone) {
+		d["hint"] = "physics_interpolation is On but ProjectSettings physics/common/physics_interpolation is OFF: bullets are smooth, the rest of the scene steps. Enable the project setting or use Follow Project.";
+	} else if (off_alone) {
+		d["hint"] = "Project interpolation is ON but physics_interpolation is Off: bullets are drawn at their physics poses. Use Follow Project (the default) or On.";
 	} else {
 		d["hint"] = "Interpolation flags agree.";
 	}

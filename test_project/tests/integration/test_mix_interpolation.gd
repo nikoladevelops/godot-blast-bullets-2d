@@ -58,7 +58,7 @@ func _moved(d: BulletVolleyData2D, by: Vector2) -> BulletVolleyData2D:
 
 
 func test_every_new_or_moved_bullet_is_drawn_where_it_is(event: String = use_parameters(EVENTS)) -> void:
-	factory.use_physics_interpolation = true
+	factory.physics_interpolation = BulletFactory2D.INTERPOLATION_ON
 	var problems: Array = []
 	match event:
 		"cold_spawn":
@@ -128,7 +128,7 @@ func test_every_new_or_moved_bullet_is_drawn_where_it_is(event: String = use_par
 func test_a_bounce_is_drawn_on_its_side_of_the_wall() -> void:
 	# The bounce tick keeps the drawn path continuous: what is drawn after a
 	# bounce never sits behind the wall face.
-	factory.use_physics_interpolation = true
+	factory.physics_interpolation = BulletFactory2D.INTERPOLATION_ON
 	make_wall(Vector2(220, 0), Vector2(20, 400), 8)
 	var d := H.make_volley_data(1, 600.0, 5.0)
 	d.transforms = [Transform2D(0.0, Vector2.ZERO)]
@@ -149,3 +149,17 @@ func test_a_bounce_is_drawn_on_its_side_of_the_wall() -> void:
 			worst = maxf(worst, _drawn(v, 0).origin.x)
 	assert_true(bounced, "it bounced")
 	assert_lt(worst, 210.0 + 0.01, "never drawn inside or behind the wall face (x 210)")
+
+
+func test_the_pass_draws_between_the_last_two_poses() -> void:
+	factory.physics_interpolation = BulletFactory2D.INTERPOLATION_ON
+	var d := H.make_volley_data(1, 600.0, 30.0)
+	d.transforms = [Transform2D(0.0, Vector2(0, 0))]
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	step_factory(2)
+	var prev: Vector2 = v.debug_get_previous_origin(0)
+	var cur: Vector2 = v.get_bullet_transform(0).origin
+	assert_gt(prev.distance_to(cur), 5.0, "it moved this tick")
+	for f in [0.0, 0.5, 1.0]:
+		v.debug_run_interpolation_pass(f)
+		assert_almost_eq(_drawn(v, 0).origin, prev.lerp(cur, f), Vector2(0.01, 0.01), "fraction %s" % f)

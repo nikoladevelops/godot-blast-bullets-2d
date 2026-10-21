@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core/variant_enum_cast2d.hpp"
+
 #include <functional>
 #include <memory>
 #include <unordered_map>
@@ -488,9 +490,27 @@ public:
 	//
 
 	// PHYSICS INTERPOLATION
-
-	// Toggle physics interpolation on/off
+	//
+	// Bullets are drawn between their last two physics poses each rendered
+	// frame (smooth on high-refresh displays). SERIALIZED ids: never renumber.
+	enum PhysicsInterpolation : int {
+		INTERPOLATION_OFF = 0,
+		INTERPOLATION_ON = 1,
+		// Follows SceneTree.physics_interpolation (the project setting, or a
+		// script toggling it at runtime): checked every physics frame.
+		INTERPOLATION_FOLLOW_PROJECT = 2
+	};
+	PhysicsInterpolation physics_interpolation = INTERPOLATION_FOLLOW_PROJECT;
+	// The effective state the volleys read (hot paths): physics_interpolation
+	// resolved by resolve_physics_interpolation().
 	bool use_physics_interpolation = false;
+	PhysicsInterpolation get_physics_interpolation() const { return physics_interpolation; }
+	void set_physics_interpolation(PhysicsInterpolation value);
+	bool is_physics_interpolation_active() const { return use_physics_interpolation; }
+	// Applies the mode now when allowed (ready, not busy, not tearing down;
+	// otherwise the next physics frame does), seeding the previous poses when
+	// it turns on and waking or sleeping the render pass.
+	void resolve_physics_interpolation();
 
 	//
 
@@ -1102,18 +1122,9 @@ private:
 	Color get_debugger_color() const;
 	void set_debugger_color(const Color &new_color);
 
-	// PHYSICS INTERPOLATION RELATED
-
-	// Cache the setting before the factory is ready in the scene tree. / Whenever you see something similar, just know I am doing this to avoid bugs with the editor - keeps state consistent
-	bool use_physics_interpolation_cached_before_ready = false;
-
 	// Budget caches before ready (same pattern as debugger enabled flag).
 	int debugger_max_providers_cached_before_ready = 0;
 	bool debugger_draw_inactive_cached_before_ready = true;
-
-	bool get_use_physics_interpolation() const;
-	void set_use_physics_interpolation_runtime(bool new_use_physics_interpolation);
-	void set_use_physics_interpolation_editor(bool new_use_physics_interpolation);
 
 	// FACTORY CHILDREN
 
@@ -1184,3 +1195,5 @@ private:
 	void interpolate_volleys();
 };
 } //namespace BlastBullets2D
+
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::PhysicsInterpolation);

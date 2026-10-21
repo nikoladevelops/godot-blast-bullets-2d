@@ -244,7 +244,8 @@ public:
 	_ALWAYS_INLINE_ Transform2D to_local_for_multimesh(const Transform2D &global_transf) const;
 
 	// Use this method when you want to use physics interpolation - smooth rendering of textures despite physics ticks per second
-	void interpolate_bullet_visuals();
+	// fraction_override < 0: the engine's physics interpolation fraction.
+	void interpolate_bullet_visuals(double fraction_override = -1.0);
 	_ALWAYS_INLINE_ void batch_flush_instance_transforms();
 	void update_all_previous_transforms_for_interpolation();
 
@@ -1313,7 +1314,9 @@ public:
 	// _process drives): lets tests prove trail shards follow the lerped
 	// bullet pose with zero physics ticks in between. No-op unless the
 	// factory has use_physics_interpolation on.
-	void debug_run_interpolation_pass();
+	// The interpolation pass at `fraction` (< 0: the engine's), so tests can
+	// check mid-frame poses headless (where the engine fraction is 0).
+	void debug_run_interpolation_pass(double fraction = -1.0);
 
 	// Disables a single bullet: removes it from the live set, hides the visual,
 	// disables its physics shape, and (unless told otherwise) returns its

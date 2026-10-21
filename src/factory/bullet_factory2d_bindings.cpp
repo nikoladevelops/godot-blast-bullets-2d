@@ -43,11 +43,13 @@ void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_is_factory_processing_bullets", "is_processing_enabled"), &BulletFactory2D::set_is_factory_processing_bullets);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_factory_processing_bullets"), "set_is_factory_processing_bullets", "get_is_factory_processing_bullets");
 
-	ClassDB::bind_method(D_METHOD("get_use_physics_interpolation"), &BulletFactory2D::get_use_physics_interpolation);
-	ClassDB::bind_method(D_METHOD("set_use_physics_interpolation_editor", "enable"), &BulletFactory2D::set_use_physics_interpolation_editor);
-	ClassDB::bind_method(D_METHOD("set_use_physics_interpolation_runtime", "enable"), &BulletFactory2D::set_use_physics_interpolation_runtime);
-
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_physics_interpolation"), "set_use_physics_interpolation_editor", "get_use_physics_interpolation");
+	ClassDB::bind_method(D_METHOD("get_physics_interpolation"), &BulletFactory2D::get_physics_interpolation);
+	ClassDB::bind_method(D_METHOD("set_physics_interpolation", "value"), &BulletFactory2D::set_physics_interpolation);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "physics_interpolation", PROPERTY_HINT_ENUM, "Off,On,Follow Project"), "set_physics_interpolation", "get_physics_interpolation");
+	ClassDB::bind_method(D_METHOD("is_physics_interpolation_active"), &BulletFactory2D::is_physics_interpolation_active);
+	BIND_ENUM_CONSTANT(INTERPOLATION_OFF);
+	BIND_ENUM_CONSTANT(INTERPOLATION_ON);
+	BIND_ENUM_CONSTANT(INTERPOLATION_FOLLOW_PROJECT);
 
 	ClassDB::bind_method(D_METHOD("spawn_volley", "spawn_data", "inherited_velocity_offset", "spawner_id"), &BulletFactory2D::spawn_volley, DEFVAL(Vector2(0, 0)), DEFVAL(0));
 

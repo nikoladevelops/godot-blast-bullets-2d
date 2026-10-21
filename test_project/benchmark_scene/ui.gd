@@ -466,11 +466,11 @@ func _on_physics_interpolation_check_box_pressed() -> void:
 	if physics_interpolation_check_box.button_pressed:
 		get_tree().physics_interpolation = true # This is the engine's own implementation
 		Engine.physics_jitter_fix = 0
-		BENCHMARK_GLOBALS.FACTORY.set_use_physics_interpolation_runtime(true) # This is for the bullets
+		BENCHMARK_GLOBALS.FACTORY.physics_interpolation = BulletFactory2D.INTERPOLATION_ON # This is for the bullets
 	else:
 		get_tree().physics_interpolation = false
 		Engine.physics_jitter_fix = 0.5
-		BENCHMARK_GLOBALS.FACTORY.set_use_physics_interpolation_runtime(false)
+		BENCHMARK_GLOBALS.FACTORY.physics_interpolation = BulletFactory2D.INTERPOLATION_OFF
 
 
 func _on_v_sync_check_box_pressed() -> void:

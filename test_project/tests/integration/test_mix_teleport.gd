@@ -47,7 +47,7 @@ func test_the_trail_moves_with_the_teleport(how: String = use_parameters(MOVES))
 	var problems: Array = []
 	for paused in [false, true]:
 		for interpolation in [false, true]:
-			factory.use_physics_interpolation = interpolation
+			factory.physics_interpolation = BulletFactory2D.INTERPOLATION_ON if interpolation else BulletFactory2D.INTERPOLATION_OFF
 			var v: BulletVolley2D = factory.spawn_volley(_trail_data())
 			await physics(3)
 			await idle(1)

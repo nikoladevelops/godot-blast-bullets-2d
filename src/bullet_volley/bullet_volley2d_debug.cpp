@@ -53,7 +53,7 @@ Dictionary BulletVolley2D::debug_dedup_find_collision(int probe_count) const {
 	return d;
 }
 
-void BulletVolley2D::debug_run_interpolation_pass() { interpolate_bullet_visuals(); }
+void BulletVolley2D::debug_run_interpolation_pass(double fraction) { interpolate_bullet_visuals(fraction); }
 
 Dictionary BulletVolley2D::debug_get_orbiting_info(int bullet_index) const {
 	Dictionary d;

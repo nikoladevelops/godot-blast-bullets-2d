@@ -8,7 +8,7 @@ using namespace godot;
 
 namespace BlastBullets2D {
 
-void BulletVolley2D::interpolate_bullet_visuals() {
+void BulletVolley2D::interpolate_bullet_visuals(double fraction_override) {
 	if (!bullet_factory || !bullet_factory->use_physics_interpolation) {
 		return;
 	}
@@ -21,7 +21,7 @@ void BulletVolley2D::interpolate_bullet_visuals() {
 	if ((int)batch_buffer.size() != amount_bullets * 8) {
 		return;
 	}
-	double fraction = Engine::get_singleton()->get_physics_interpolation_fraction();
+	double fraction = fraction_override >= 0.0 ? Math::min(fraction_override, 1.0) : Engine::get_singleton()->get_physics_interpolation_fraction();
 	// Degenerate node global (zero scale) has no inverse: skip the frame
 	// instead of writing a non-finite buffer (see to_local_for_multimesh).
 	const Transform2D node_global = get_global_transform();

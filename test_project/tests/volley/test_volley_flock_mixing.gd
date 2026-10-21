@@ -243,7 +243,7 @@ func test_a_frozen_bullet_world_turns_nothing() -> void:
 
 
 func test_interpolated_flocks_stay_finite() -> void:
-	factory.use_physics_interpolation = true
+	factory.physics_interpolation = BulletFactory2D.INTERPOLATION_ON
 	var tr := _stream(12, 4)
 	var v := _volley(H.make_flight_data(tr, 150.0, 1000.0), BulletFlock2D.new())
 	for frame in 30:

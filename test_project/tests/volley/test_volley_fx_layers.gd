@@ -426,7 +426,7 @@ func test_interpolation_agreement() -> void:
 	await _preamble()
 	# FX T11 interpolation agreement
 	await _settle(factory)
-	factory.use_physics_interpolation = true
+	factory.physics_interpolation = BulletFactory2D.INTERPOLATION_ON
 	var v11: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 0.0, [_make_layer(0, 1)], false))
 	v11.set_bullet_transform(0, Transform2D(0.0, Vector2(100, 0)))
 	v11.debug_run_interpolation_pass()
@@ -435,7 +435,7 @@ func test_interpolation_agreement() -> void:
 	v11.debug_run_interpolation_pass()
 	assert_true(v11.debug_get_trail_transform(0, 0).origin.distance_to(Vector2(200, 0)) < 0.01, "interp pass tracks teleports")
 	assert_true(v11.debug_get_trail_transform(0, 0).is_finite(), "interp trail finite")
-	factory.use_physics_interpolation = false
+	factory.physics_interpolation = BulletFactory2D.INTERPOLATION_OFF
 	var v11b: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2(50, 0), 0.0, [_make_layer(0, 1)], false))
 	v11b.set_bullet_transform(0, Transform2D(0.0, Vector2(100, 0)))
 	assert_true(v11b.debug_get_trail_transform(0, 0).origin.distance_to(Vector2(100, 0)) < 0.01, "the setter moves the trail with the bullet")
@@ -850,7 +850,7 @@ func test_interp_teleports_scale_paused_manual_hatch() -> void:
 	await _preamble()
 	# FX T21 interp teleports, scale, paused manual hatch
 	await _settle(factory)
-	factory.set_use_physics_interpolation_runtime(true)
+	factory.physics_interpolation = BulletFactory2D.INTERPOLATION_ON
 	var big21 := _make_layer(0, 1)
 	big21.scale = Vector2(2, 2)
 	var v21: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 0.0, [big21], false))
@@ -858,7 +858,7 @@ func test_interp_teleports_scale_paused_manual_hatch() -> void:
 	v21.debug_run_interpolation_pass()
 	assert_true(v21.debug_get_trail_transform(0, 0).origin.distance_to(Vector2(100, 0)) < 0.01, "interp trail glued after teleport")
 	assert_true(v21.debug_get_trail_transform(0, 0).get_scale().distance_to(Vector2(2, 2)) < 0.01, "trail carries layer scale")
-	factory.set_use_physics_interpolation_runtime(false)
+	factory.physics_interpolation = BulletFactory2D.INTERPOLATION_OFF
 	await _settle(factory)
 	var held := _make_layer(3, 4)
 	factory.set_is_factory_processing_bullets(false)

@@ -604,7 +604,7 @@ func test_t13_snap_keeps_render_position_continuous() -> void:
 	# BOUNCE T13 snap keeps render position continuous
 	await _arena()
 	await _settle(factory)
-	factory.set_use_physics_interpolation_runtime(true)
+	factory.physics_interpolation = BulletFactory2D.INTERPOLATION_ON
 	factory.bounce_body_entered.connect(_on_bounce_capture)
 	var v13: BulletVolley2D = factory.spawn_volley(_bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4]))
 	for i in 5:
@@ -625,7 +625,7 @@ func test_t13_snap_keeps_render_position_continuous() -> void:
 		# about -3px. Zero would mean the snap overwrote prev with current.
 		assert_true(cap_gap < -0.5 and cap_gap > -8.0, "prev origin preserved across snap (render lerps)")
 		assert_true(cap_prev.is_finite() and cap_cur.is_finite(), "prev/current finite")
-	factory.set_use_physics_interpolation_runtime(false)
+	factory.physics_interpolation = BulletFactory2D.INTERPOLATION_OFF
 
 
 func test_t14_precise_mode_on_capsule_wall_uses_cap_normal() -> void:
@@ -2245,7 +2245,7 @@ func test_teleport_matrix_interpolation_mixing() -> void:
 	_connect_signals()
 	# BOUNCE T34 teleport matrix + interpolation mixing
 	await _settle(factory)
-	factory.set_use_physics_interpolation_runtime(false)
+	factory.physics_interpolation = BulletFactory2D.INTERPOLATION_OFF
 	var wall34 := _make_wall(Vector2(200, 0), 8)
 	var d34 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
 	var v34: BulletVolley2D = factory.spawn_volley(d34)
@@ -2262,7 +2262,7 @@ func test_teleport_matrix_interpolation_mixing() -> void:
 			break
 	assert_true(v34.bullet_get_bounce_count(0) >= 1, "resume bounces the teleported overlap")
 	await _settle(factory)
-	factory.set_use_physics_interpolation_runtime(true)
+	factory.physics_interpolation = BulletFactory2D.INTERPOLATION_ON
 	var hunter34 := Node2D.new()
 	hunter34.position = Vector2(400, 0)
 	add(hunter34)
@@ -2294,7 +2294,7 @@ func test_teleport_matrix_interpolation_mixing() -> void:
 		v34c.set_bullet_transform(0, Transform2D(0.3 * i, Vector2(20 * i, 0)))
 		v34c.debug_run_interpolation_pass()
 		assert_true(v34c.get_bullet_transform(0).is_finite(), "teleport storm stays finite with interp")
-	factory.set_use_physics_interpolation_runtime(false)
+	factory.physics_interpolation = BulletFactory2D.INTERPOLATION_OFF
 
 
 func test_paused_steady_overlap_registers_once_on_resume() -> void:
@@ -2304,7 +2304,7 @@ func test_paused_steady_overlap_registers_once_on_resume() -> void:
 	# new ADDED event). Volleys now park it and the factory replays it on
 	# resume: exactly one bounce.
 	await _settle(factory)
-	factory.set_use_physics_interpolation_runtime(false)
+	factory.physics_interpolation = BulletFactory2D.INTERPOLATION_OFF
 	_make_wall(Vector2(100, 0), 8)
 	var dp := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
 	var vp: BulletVolley2D = factory.spawn_volley(dp)
@@ -2321,7 +2321,7 @@ func test_paused_steady_overlap_registers_once_on_resume() -> void:
 	assert_eq(vp.bullet_get_bounce_count(0), 1, "the paused overlap bounces exactly once after resume")
 	assert_true(_finite_volley(vp), "volley finite after the replay")
 	await _settle(factory)
-	factory.set_use_physics_interpolation_runtime(true)
+	factory.physics_interpolation = BulletFactory2D.INTERPOLATION_ON
 
 
 func test_orbit_endurance_census_telegraph_zero_helper_hostility() -> void:
