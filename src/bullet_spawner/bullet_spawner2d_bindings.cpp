@@ -175,6 +175,12 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_bullet_speed_scale_max"), &BulletSpawner2D::get_bullet_speed_scale_max);
 	ClassDB::bind_method(D_METHOD("set_bullet_speed_scale_max", "value"), &BulletSpawner2D::set_bullet_speed_scale_max);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bullet_speed_scale_max", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater"), "set_bullet_speed_scale_max", "get_bullet_speed_scale_max");
+	ClassDB::bind_method(D_METHOD("get_bullet_life_time_scale_min"), &BulletSpawner2D::get_bullet_life_time_scale_min);
+	ClassDB::bind_method(D_METHOD("set_bullet_life_time_scale_min", "value"), &BulletSpawner2D::set_bullet_life_time_scale_min);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bullet_life_time_scale_min", PROPERTY_HINT_RANGE, "0.01,10,0.01,or_greater"), "set_bullet_life_time_scale_min", "get_bullet_life_time_scale_min");
+	ClassDB::bind_method(D_METHOD("get_bullet_life_time_scale_max"), &BulletSpawner2D::get_bullet_life_time_scale_max);
+	ClassDB::bind_method(D_METHOD("set_bullet_life_time_scale_max", "value"), &BulletSpawner2D::set_bullet_life_time_scale_max);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bullet_life_time_scale_max", PROPERTY_HINT_RANGE, "0.01,10,0.01,or_greater"), "set_bullet_life_time_scale_max", "get_bullet_life_time_scale_max");
 	ClassDB::bind_method(D_METHOD("get_active_live_bullet_count"), &BulletSpawner2D::get_active_live_bullet_count);
 
 	// Bullet Colors (bullet_spawner2d_colors.cpp): per-bullet colors picked at

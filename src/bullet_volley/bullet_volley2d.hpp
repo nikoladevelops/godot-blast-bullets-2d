@@ -279,6 +279,20 @@ public:
 	double get_life_time_left() const;
 	void set_life_time_left(double seconds);
 
+	// Per-bullet lifetimes (spawn data all_bullet_life_times, the spawner's
+	// lifetime scale, or set_bullet_life_time_left). A bullet with its own
+	// lifetime ignores the volley timer: it expires when its own runs out
+	// (life_time_over names exactly the bullets expiring together; a handler
+	// that gives one more time keeps it). The volley clock (curves, fades)
+	// is unchanged.
+	double get_bullet_life_time_left(int bullet_index) const;
+	void set_bullet_life_time_left(int bullet_index, double seconds);
+	PackedFloat64Array all_bullets_get_life_time_left(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) const;
+	void all_bullets_set_life_time_left(double seconds, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
+	// C++ (spawner randomization): bullet i's lifetime (its own, else the
+	// volley's finite lifetime) times factors[i]. Right after the spawn.
+	void apply_life_time_factors(const real_t *factors, int count);
+
 	// Advances the SpriteFrames animation baked in anim_frames/anim_frame_secs.
 	// Hot path: plain countdown + index + one set_texture. No SpriteFrames calls here.
 	// Texture swaps are interpolation-exempt (interpolation only lerps transforms).
@@ -929,6 +943,27 @@ public:
 
 	// The current life time being processed
 	double current_life_time = 0.0;
+
+	// Per-bullet lifetimes (bullet_volley2d_lifetime.cpp). life_age: seconds
+	// this life has been ticked (the clock of the deadlines; scripts never
+	// set it). own_life_span[i] < 0: bullet i follows the volley timer, else
+	// its own lifetime, due at own_life_deadline[i] (life_age units). Both
+	// empty while no bullet has one; next_own_deadline (the earliest live
+	// deadline) keeps the per-tick cost at one compare until one is due.
+	double life_age = 0.0;
+	std::vector<double> own_life_span;
+	std::vector<double> own_life_deadline;
+	double next_own_deadline = Math::INF;
+	int own_life_count = 0; // bullets with their own lifetime
+	std::vector<int> own_expiry_scratch;
+	std::vector<uint64_t> own_expiry_epochs_scratch;
+	void reset_bullet_life_times();
+	void seed_bullet_life_times(const BulletVolleyData2D &data);
+	void give_bullet_own_life(int bullet_index, double span, double remaining);
+	void own_life_on_wake(int bullet_index);
+	// Expires the live bullets whose own lifetime ran out (life_time_over
+	// with exactly those, then the bulk disable of the ones still due).
+	void expire_own_life_bullets();
 
 	// Elapsed time from multimesh activation, used for curves
 	double curves_elapsed_time = 0.0;

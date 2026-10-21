@@ -412,8 +412,14 @@ public:
 
 	double bullet_speed_scale_min = 1.0;
 	double bullet_speed_scale_max = 1.0;
+	// Per-bullet lifetime multiplier, rolled per bullet like the speed scale
+	// (bullet_random_seed): each bullet lives its lifetime (the data's own
+	// entry, else max_life_time) times its roll. 1..1 (default) = off.
+	double bullet_life_time_scale_min = 1.0;
+	double bullet_life_time_scale_max = 1.0;
 
 	std::vector<real_t> shot_speed_factors;
+	std::vector<real_t> shot_life_factors;
 	OrphanedVolleys get_orphaned_volleys() const { return static_cast<OrphanedVolleys>(orphaned_volleys); }
 	void set_orphaned_volleys(OrphanedVolleys value);
 
@@ -427,6 +433,12 @@ public:
 	void set_bullet_speed_scale_max(double value);
 
 	void roll_speed_factors(size_t count);
+	double get_bullet_life_time_scale_min() const { return bullet_life_time_scale_min; }
+	void set_bullet_life_time_scale_min(double value);
+	double get_bullet_life_time_scale_max() const { return bullet_life_time_scale_max; }
+	void set_bullet_life_time_scale_max(double value);
+	bool life_time_roll_active() const { return bullet_life_time_scale_min != 1.0 || bullet_life_time_scale_max != 1.0; }
+	void roll_life_time_factors(size_t count);
 
 	// BULLET COLORS (bullet_spawner2d_colors.cpp). Each shot picks one color
 	// per bullet from bullet_color_gradient (empty = a rainbow) and hands them

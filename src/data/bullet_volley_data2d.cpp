@@ -214,6 +214,22 @@ void BulletVolleyData2D::set_max_life_time(double new_max_life_time) {
 	emit_changed();
 }
 
+void BulletVolleyData2D::set_all_bullet_life_times(const PackedFloat64Array &value) {
+	for (int64_t i = 0; i < value.size(); ++i) {
+		if (!is_finite_real2d(value[i]) || !(value[i] > 0.0)) {
+			UtilityFunctions::push_error("BulletVolleyData2D: all_bullet_life_times must hold finite seconds > 0, keeping the old value.");
+			return;
+		}
+	}
+	all_bullet_life_times = value;
+	emit_changed();
+}
+
+void BulletVolleyData2D::set_tile_all_bullet_life_times(bool value) {
+	tile_all_bullet_life_times = value;
+	emit_changed();
+}
+
 Ref<Material> BulletVolleyData2D::get_material() const {
 	return material;
 }
@@ -969,6 +985,13 @@ void BulletVolleyData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_is_life_time_infinite"), &BulletVolleyData2D::get_is_life_time_infinite);
 	ClassDB::bind_method(D_METHOD("set_is_life_time_infinite", "value"), &BulletVolleyData2D::set_is_life_time_infinite);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_life_time_infinite"), "set_is_life_time_infinite", "get_is_life_time_infinite");
+
+	ClassDB::bind_method(D_METHOD("get_all_bullet_life_times"), &BulletVolleyData2D::get_all_bullet_life_times);
+	ClassDB::bind_method(D_METHOD("set_all_bullet_life_times", "value"), &BulletVolleyData2D::set_all_bullet_life_times);
+	ADD_PROPERTY(PropertyInfo(Variant::PACKED_FLOAT64_ARRAY, "all_bullet_life_times"), "set_all_bullet_life_times", "get_all_bullet_life_times");
+	ClassDB::bind_method(D_METHOD("get_tile_all_bullet_life_times"), &BulletVolleyData2D::get_tile_all_bullet_life_times);
+	ClassDB::bind_method(D_METHOD("set_tile_all_bullet_life_times", "value"), &BulletVolleyData2D::set_tile_all_bullet_life_times);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "tile_all_bullet_life_times"), "set_tile_all_bullet_life_times", "get_tile_all_bullet_life_times");
 
 	ClassDB::bind_method(D_METHOD("get_z_index"), &BulletVolleyData2D::get_z_index);
 	ClassDB::bind_method(D_METHOD("set_z_index", "new_z_index"), &BulletVolleyData2D::set_z_index);

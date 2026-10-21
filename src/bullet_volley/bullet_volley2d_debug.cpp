@@ -554,6 +554,16 @@ String BulletVolley2D::debug_check_invariants() const {
 		if (multi.is_valid() && (multi->is_using_colors() != colors_enabled || buffer_stride != (colors_enabled ? 12 : 8) || batch_buffer.size() != (int64_t)amount_bullets * buffer_stride)) {
 			return "the MultiMesh color format does not match the batch buffer";
 		}
+		if (!own_life_span.empty() && (own_life_span.size() != n || own_life_deadline.size() != n)) {
+			return "per-bullet lifetimes do not cover the bullets";
+		}
+		int own = 0;
+		for (const double span : own_life_span) {
+			own += span >= 0.0 ? 1 : 0;
+		}
+		if (own != own_life_count) {
+			return "the per-bullet lifetime count drifted";
+		}
 	}
 	int orbiting = 0;
 	for (const uint8_t status : all_orbiting_status) {

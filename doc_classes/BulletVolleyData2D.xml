@@ -67,6 +67,9 @@
 		<member name="all_bullet_gravity" type="Vector2[]" setter="set_all_bullet_gravity" getter="get_all_bullet_gravity" default="[]">
 			Gravity for each bullet. Entry [code]i[/code] pulls bullet [code]i[/code] only. Empty (default) means every bullet uses [member gravity]. A non-finite entry reads as (0, 0) for that bullet only.
 		</member>
+		<member name="all_bullet_life_times" type="PackedFloat64Array" setter="set_all_bullet_life_times" getter="get_all_bullet_life_times" default="PackedFloat64Array()">
+			Per-bullet lifetimes in seconds (finite, &gt; 0): entry [code]i[/code] is bullet [code]i[/code]'s own lifetime. A bullet with its own lifetime ignores [member max_life_time] and [member is_life_time_infinite] and expires on its own; [signal BulletFactory2D.life_time_over] names exactly the bullets expiring together. Uncovered bullets use [member max_life_time] (or live forever with [member is_life_time_infinite]), unless [member tile_all_bullet_life_times] wraps a short array. The volley clock (curves, fades, [member modulate_ramp]) still follows [member max_life_time].
+		</member>
 		<member name="all_bullet_movement_pattern_face_movement_directions" type="bool[]" setter="set_all_bullet_movement_pattern_face_movement_directions" getter="get_all_bullet_movement_pattern_face_movement_directions" default="[]">
 			Face flag for each bullet's own pattern. Entry [code]i[/code] belongs to bullet [code]i[/code]; bullets without an entry use [member shared_movement_pattern_face_movement_direction]. Has its own [member tile_all_bullet_movement_pattern_face_movement_directions] checkbox.
 		</member>
@@ -325,6 +328,9 @@
 		</member>
 		<member name="tile_all_bullet_gravity" type="bool" setter="set_tile_all_bullet_gravity" getter="get_tile_all_bullet_gravity" default="false">
 			When on, a short [member all_bullet_gravity] wraps around the volley instead of leaving the tail bullets on [member gravity]. Off by default.
+		</member>
+		<member name="tile_all_bullet_life_times" type="bool" setter="set_tile_all_bullet_life_times" getter="get_tile_all_bullet_life_times" default="false">
+			When [code]true[/code], an [member all_bullet_life_times] array shorter than the volley wraps around (bullet [code]i[/code] takes entry [code]i % size[/code]).
 		</member>
 		<member name="tile_all_bullet_movement_pattern_face_movement_directions" type="bool" setter="set_tile_all_bullet_movement_pattern_face_movement_directions" getter="get_tile_all_bullet_movement_pattern_face_movement_directions" default="false">
 			When on, a short face-flag array wraps around the volley instead of leaving the tail bullets on the shared flag. Off by default.

@@ -506,6 +506,10 @@ void BulletVolley2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_is_life_time_infinite", "value"), &BulletVolley2D::set_is_life_time_infinite);
 	ClassDB::bind_method(D_METHOD("get_life_time_left"), &BulletVolley2D::get_life_time_left);
 	ClassDB::bind_method(D_METHOD("set_life_time_left", "seconds"), &BulletVolley2D::set_life_time_left);
+	ClassDB::bind_method(D_METHOD("get_bullet_life_time_left", "bullet_index"), &BulletVolley2D::get_bullet_life_time_left);
+	ClassDB::bind_method(D_METHOD("set_bullet_life_time_left", "bullet_index", "seconds"), &BulletVolley2D::set_bullet_life_time_left);
+	ClassDB::bind_method(D_METHOD("all_bullets_get_life_time_left", "bullet_index_start", "bullet_index_end_inclusive"), &BulletVolley2D::all_bullets_get_life_time_left, DEFVAL(0), DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("all_bullets_set_life_time_left", "seconds", "bullet_index_start", "bullet_index_end_inclusive"), &BulletVolley2D::all_bullets_set_life_time_left, DEFVAL(0), DEFVAL(-1));
 	ADD_GROUP("Lifetime", "");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_life_time_infinite"), "set_is_life_time_infinite", "get_is_life_time_infinite");
 

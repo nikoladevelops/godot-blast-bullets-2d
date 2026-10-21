@@ -574,3 +574,68 @@ func test_jitter_seed_zero_randomizes_again_after_a_seeded_run() -> void:
 func test_bullet_scale_mode_constants_are_bound() -> void:
 	for c in ["BULLET_SCALE_OFF", "BULLET_SCALE_UNIFORM", "BULLET_SCALE_PER_AXIS"]:
 		assert_true(ClassDB.class_has_integer_constant("BulletSpawner2D", c), c + " is usable from scripts (the README uses it)")
+
+
+# --- lifetime scale ---------------------------------------------------------------------
+
+func _life_left(v: BulletVolley2D) -> Array:
+	return Array(v.all_bullets_get_life_time_left())
+
+
+func test_life_time_scale_multiplies_every_bullets_lifetime() -> void:
+	var sp := make_spawner(H.make_volley_data(4, 0.0, 0.1), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
+	sp.volley_fired.connect(_on_fired)
+	assert_eq([sp.bullet_life_time_scale_min, sp.bullet_life_time_scale_max], [1.0, 1.0], "off by default")
+	sp.bullet_life_time_scale_min = 2.0
+	sp.bullet_life_time_scale_max = 2.0
+	var v := _shoot(sp)
+	for left in _life_left(v):
+		assert_almost_eq(left, 0.2, 1e-6, "0.1 s x2")
+	step_factory(9) # 0.15 s: past the data's lifetime, inside the scaled one
+	assert_eq(Array(v.get_all_bullets_status()), [true, true, true, true], "every bullet outlives max_life_time")
+	step_factory(4) # 0.2167 s
+	assert_eq(Array(v.get_all_bullets_status()), [false, false, false, false], "and expires at its own 0.2 s")
+
+
+func test_life_time_range_stays_in_bounds_seeds_and_rolls_its_own_numbers() -> void:
+	var a := _spawner(N)
+	var b := _spawner(N)
+	for sp in [a, b]:
+		sp.bullet_random_seed = 5
+		sp.bullet_life_time_scale_min = 0.5
+		sp.bullet_life_time_scale_max = 2.0
+	b.bullet_speed_scale_min = 0.25 # another channel: never moves the lifetime rolls
+	b.bullet_speed_scale_max = 4.0
+	var lives := _life_left(_shoot(a))
+	var mm := _min_max(lives)
+	assert_gte(mm.x, 15.0 - 1e-6, "low: 30 s x 0.5")
+	assert_lte(mm.y, 60.0 + 1e-6, "high: 30 s x 2")
+	assert_gt(mm.y - mm.x, 20.0, "varies")
+	assert_eq(_life_left(_shoot(b)), lives, "same seed, same lifetimes, whatever the speed knobs roll")
+	assert_ne(_life_left(_shoot(a)), lives, "the next shot rolls new lifetimes")
+
+
+func test_life_time_scale_multiplies_data_entries_and_spares_endless_bullets() -> void:
+	var data := H.make_volley_data(2, 0.0, 1.0)
+	data.is_life_time_infinite = true
+	data.all_bullet_life_times = PackedFloat64Array([0.5])
+	var sp := make_spawner(data, BulletSpawner2D.PATTERN_FROM_HELPER_RING, 2)
+	sp.volley_fired.connect(_on_fired)
+	sp.bullet_life_time_scale_min = 3.0
+	sp.bullet_life_time_scale_max = 3.0
+	var v := _shoot(sp)
+	expect_warning_sequence(["BulletVolley2D: all_bullet_life_times size (1) != bullets (2); uncovered bullets use max_life_time (check tile_all_bullet_life_times to wrap, or provide one entry per bullet)."])
+	assert_almost_eq(v.get_bullet_life_time_left(0), 1.5, 1e-6, "its own 0.5 s x3")
+	assert_eq(v.get_bullet_life_time_left(1), 0.0, "an endless bullet stays endless (0 = never)")
+
+
+func test_life_time_scale_setters_reject_and_keep() -> void:
+	var sp := _spawner(4)
+	sp.bullet_life_time_scale_min = 0.75
+	sp.bullet_life_time_scale_min = 0.0
+	expect_error_sequence(["BulletSpawner2D: bullet_life_time_scale_min must be finite and > 0, keeping the old value."])
+	sp.bullet_life_time_scale_max = NAN
+	expect_error_sequence(["BulletSpawner2D: bullet_life_time_scale_max must be finite and > 0, keeping the old value."])
+	sp.bullet_life_time_scale_max = 1e300 # past float range: a lifetime would overflow
+	expect_error_sequence(["BulletSpawner2D: bullet_life_time_scale_max must be finite and > 0, keeping the old value."])
+	assert_eq([sp.bullet_life_time_scale_min, sp.bullet_life_time_scale_max], [0.75, 1.0], "old values kept")

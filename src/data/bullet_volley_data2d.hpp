@@ -198,6 +198,16 @@ public:
 	// Whether the lifetime is infinite
 	bool is_life_time_infinite = false;
 
+	// Per-bullet lifetimes: entry i (seconds, finite, > 0) is bullet i's own
+	// lifetime; uncovered bullets use max_life_time (or live forever with
+	// is_life_time_infinite). Strict indexing unless tile wraps the array.
+	PackedFloat64Array all_bullet_life_times;
+	bool tile_all_bullet_life_times = false;
+	PackedFloat64Array get_all_bullet_life_times() const { return all_bullet_life_times; }
+	void set_all_bullet_life_times(const PackedFloat64Array &value);
+	bool get_tile_all_bullet_life_times() const { return tile_all_bullet_life_times; }
+	void set_tile_all_bullet_life_times(bool value);
+
 	// You can assign a custom material that uses a shader. Note that you may also want to provide a custom mesh as well, but if you do so, then the texture_size property won't be used, instead handle scaling in the shader as well.
 	Ref<Material> material;
 

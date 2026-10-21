@@ -187,6 +187,14 @@
 				Returns the per-bullet homing queue depth of each bullet in the range (shared deque excluded; read it via [method shared_homing_deque_check_homing_targets_amount]). Example: after [method all_bullets_push_back_homing_target], depths are 1 per bullet.
 			</description>
 		</method>
+		<method name="all_bullets_get_life_time_left" qualifiers="const">
+			<return type="PackedFloat64Array" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Returns the time left of every bullet in the range (see [method get_bullet_life_time_left]). The default range covers the whole volley.
+			</description>
+		</method>
 		<method name="all_bullets_get_orbiting_angle">
 			<return type="PackedFloat32Array" />
 			<param index="0" name="bullet_index_start" type="int" default="0" />
@@ -534,6 +542,15 @@
 			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
 				Sets the homing turn agility for each bullet in the range. Setting any per-bullet value enables per-bullet mode, after which the shared [member homing_smoothing] is ignored. Useful for mixed volleys with fast and drifting homers.
+			</description>
+		</method>
+		<method name="all_bullets_set_life_time_left">
+			<return type="void" />
+			<param index="0" name="seconds" type="float" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Gives every bullet in the range [param seconds] to live (see [method set_bullet_life_time_left]). An invalid range or a non-finite / non-positive time is refused once for the whole call.
 			</description>
 		</method>
 		<method name="all_bullets_set_movement_pattern_from_curve">
@@ -1662,6 +1679,13 @@
 				Like [method get_bullet_indexes_in_circle] for a rectangle. A negative size is accepted.
 			</description>
 		</method>
+		<method name="get_bullet_life_time_left" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Returns how many seconds bullet [param bullet_index] has left. A bullet with its own lifetime ([member BulletVolleyData2D.all_bullet_life_times], the spawner's [member BulletSpawner2D.bullet_life_time_scale_min], or [method set_bullet_life_time_left]) reads its own time; any other bullet reads the volley timer ([method get_life_time_left]: 0 while the lifetime is infinite).
+			</description>
+		</method>
 		<method name="get_bullet_movement_pattern_curve" qualifiers="const">
 			<return type="Curve2D" />
 			<param index="0" name="bullet_index" type="int" />
@@ -2062,6 +2086,14 @@
 			<param index="1" name="target_position" type="Vector2" />
 			<description>
 				Set the direction of a specific bullet towards a target global position. The direction gets normalized automatically.
+			</description>
+		</method>
+		<method name="set_bullet_life_time_left">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="seconds" type="float" />
+			<description>
+				Gives bullet [param bullet_index] [param seconds] to live (finite, &gt; 0). From then on it ignores the volley timer and expires on its own, even in an infinite volley. A bullet woken after its own lifetime ran out starts it again; a frozen bullet keeps its time. Inside a [signal BulletFactory2D.life_time_over] handler this keeps a listed bullet alive.
 			</description>
 		</method>
 		<method name="set_bullet_movement_pattern_from_curve">

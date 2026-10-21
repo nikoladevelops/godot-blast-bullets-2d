@@ -210,6 +210,11 @@ ShotResult2D BulletSpawner2D::fire_shot(std::vector<Transform2D> &transforms) {
 	} else if (!shot_speed_factors.empty()) {
 		shot_speed_factors.clear();
 	}
+	if (life_time_roll_active()) {
+		roll_life_time_factors(transforms.size());
+	} else if (!shot_life_factors.empty()) {
+		shot_life_factors.clear();
+	}
 	// Bullet Colors: one per bullet, carried to the factory with the transforms.
 	roll_shot_colors(transforms.size());
 	// Fire-cone gate (homing only): no target inside half the fire arc means
@@ -272,6 +277,9 @@ ShotResult2D BulletSpawner2D::fire_shot(std::vector<Transform2D> &transforms) {
 	bullets->owner_spawner_id = get_instance_id();
 	if (!shot_speed_factors.empty()) {
 		bullets->apply_speed_factors(shot_speed_factors.data(), (int)shot_speed_factors.size());
+	}
+	if (!shot_life_factors.empty()) {
+		bullets->apply_life_time_factors(shot_life_factors.data(), (int)shot_life_factors.size());
 	}
 	// Capture the id BEFORE user code runs: the configuring signals below
 	// execute handlers synchronously, and a handler may free or re-home this
@@ -347,6 +355,29 @@ ShotResult2D BulletSpawner2D::fire_shot(std::vector<Transform2D> &transforms) {
 	result.cadence_replaced = cadence != cadence_serial;
 	result.amount = fired_amount;
 	return result;
+}
+
+void BulletSpawner2D::set_bullet_life_time_scale_min(double value) {
+	if (!is_finite_real2d(value) || !(value > 0.0)) {
+		UtilityFunctions::push_error("BulletSpawner2D: bullet_life_time_scale_min must be finite and > 0, keeping the old value.");
+		return;
+	}
+	bullet_life_time_scale_min = value;
+}
+
+void BulletSpawner2D::set_bullet_life_time_scale_max(double value) {
+	if (!is_finite_real2d(value) || !(value > 0.0)) {
+		UtilityFunctions::push_error("BulletSpawner2D: bullet_life_time_scale_max must be finite and > 0, keeping the old value.");
+		return;
+	}
+	bullet_life_time_scale_max = value;
+}
+
+void BulletSpawner2D::roll_life_time_factors(size_t count) {
+	shot_life_factors.resize(count);
+	for (size_t i = 0; i < count; ++i) {
+		shot_life_factors[i] = (real_t)lerp_range(bullet_life_time_scale_min, bullet_life_time_scale_max, roll_unit(CHANNEL_LIFE_TIME, (uint64_t)i));
+	}
 }
 
 void BulletSpawner2D::set_bullet_speed_scale_min(double value) {

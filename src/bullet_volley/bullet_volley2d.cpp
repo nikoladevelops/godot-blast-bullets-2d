@@ -364,6 +364,8 @@ void BulletVolley2D::begin_life(const BulletVolleyData2D &data, uint64_t new_own
 	anim_finished_event_pending = false;
 
 	set_up_life_time_timer(data.max_life_time, data.max_life_time);
+	reset_bullet_life_times();
+	seed_bullet_life_times(data);
 	set_up_multimesh(amount_bullets, data.mesh, resolve_quad_size(data.sprite_frames, data.animation, data.texture_size), data.wants_bullet_colors() || spawn_colors_ptr != nullptr);
 	set_up_bullet_instances(data);
 	reset_attachment_state_for_reuse();
@@ -731,6 +733,7 @@ void BulletVolley2D::enable_bullet(int bullet_index, int collision_amount, bool 
 	// The freeze ended any graze visit: a fresh one starts (no exit fires
 	// for a visit that ended frozen).
 	graze_end_visits_of_bullet(bullet_index);
+	own_life_on_wake(bullet_index);
 
 	multi->set_instance_transform_2d(bullet_index, to_local_for_multimesh(all_cached_instance_transforms[bullet_index])); // Start rendering the instance
 	write_trail_instances(bullet_index); // Wake resumes the trail with the bullet
