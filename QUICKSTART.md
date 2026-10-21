@@ -90,6 +90,23 @@ factory.time_scale = 0.3                               # slow motion for everyth
 spawner.bullet_scale_mode = BulletSpawner2D.BULLET_SCALE_UNIFORM
 spawner.bullet_scale_min = 0.7
 spawner.bullet_scale_max = 1.6
+spawner.bullet_color_mode = BulletSpawner2D.COLOR_MODE_GRADIENT_ACROSS_PATTERN  # a rainbow ring
+```
+
+## Lasers and bullets that shoot
+
+A `LaserSpawner2D` takes the same pattern, cadence and movement settings as a
+`BulletSpawner2D` and fires a beam per pattern slot:
+
+```gdscript
+$BossLasers.laser_data = LaserData2D.create_preset(LaserData2D.PRESET_CHARGED_SWEEP)
+$BossLasers.laser_data.collision_mask = 2        # the player's layer
+$BossLasers.laser_hit.connect(func(target, laser, beam, pos): target.hurt())
+
+# Bullets that fire while flying: every bullet of $Boss fires $Sparks's pattern.
+$Sparks.shooting_enabled = false
+$Boss.emitter_spawner_path = $Boss.get_path_to($Sparks)  # a LaserSpawner2D works too
+$Boss.emitter_enabled = true                             # timing: $Boss.emitter (BulletEmitterData2D)
 ```
 
 

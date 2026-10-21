@@ -27,6 +27,10 @@ for the rest: the sections are written to be looked up, not read once.
 |  |  | 23 | Flocking (BulletFlock2D, flock pass, step_flock, spawner group) |
 |  |  | 24 | Splitting (BulletSplitData2D, capture, flush, spawner group) |
 |  |  | 25 | Feature mixing (MixLedger, FeatureMix catalog, cover suites) |
+|  |  | 26 | Spawner architecture (PatternSpawner2D, BulletSpawner2D, LaserSpawner2D) |
+|  |  | 27 | Lasers (LaserData2D, LaserVolley2D, factory lasers, LaserSpawner2D) |
+|  |  | 28 | Emitter bullets (BulletEmitterData2D, emit queue, flush) |
+|  |  | 29 | Runtime control, colors, per-bullet lifetimes, scale-in, interpolation |
 
 ## 0. Golden rules
 
@@ -57,7 +61,7 @@ for the rest: the sections are written to be looked up, not read once.
 
 ```sh
 GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py   # build (exit 1 = failed; never raw scons, never edit SConstruct)
-python3 tools/run_tests.py                                       # 216 files / 1931 tests, ~15 s, leak-checked
+python3 tools/run_tests.py                                       # 230 files / 2124 tests, ~20 s, leak-checked
 python3 tools/run_tests.py --suite <substring> --full            # one area, every failure message unclipped
 python3 tools/run_tests.py --self-test                           # proves the harness still catches failures/leaks
 python3 tools/run_editor_smoke.py                                # headless EDITOR run of tests/editor_smoke/ (editor-only paths)
@@ -653,6 +657,8 @@ bullet_volley2d_{bounce,homing,orbit,motion,curves,wobble,gravity,lifetime,timer
                                  (area: circle/rect queries + clears, cull_outside_bounds)
 bullet_volley2d_graze.cpp      graze arming, per-tick zone snapshot (prepare_graze_tick), live dispatch (§20)
 bullet_volley2d_flock.cpp      flock arming (flock_set_config = THE choke point), join/leave/get, readouts (§23)
+bullet_volley2d_colors.cpp     per-bullet colors: the 12-float MultiMesh format, seeding, get/set color API (§29)
+bullet_volley2d_emitter.cpp    emitter arming (emitter_arm = THE choke point), the timer pass, emitter_set (§28)
 homing_target_deque.hpp        per-bullet/shared target queue (RingDeque2D: allocates nothing while empty)
 ```
 
@@ -732,6 +738,8 @@ src/
   factory/graze_detector2d.cpp            GrazeDetector2D: graze target lists (stable slots, scans on the update interval, x-sorted slab order)
   factory/bullet_factory2d_flock.cpp      the per-sweep flock pass over the volley snapshot + debug_get_flock_stats (§23)
   factory/flock_solver2d.cpp              FlockSolver2D: gather, exact spatial hash grid, one steering vector per bullet; FlockConfig2D, FlockView2D
+  factory/bullet_factory2d_lasers.cpp     spawn_laser(+_span), the laser list and pool, tick_lasers, redraws, clears (§27)
+  factory/bullet_factory2d_emitter.cpp    the emitter-bullet queue and flush_emits (§28); factory/emit_queue2d.hpp its plain data
   factory/bullet_factory2d_bindings.cpp   _bind_methods
   bullet_spawner/pattern_spawner2d.hpp    PatternSpawner2D (abstract base: WHERE/WHEN to fire) + PatternPreviewLayer2D; the hooks a spawner type implements (shot_preflight/shot_prepare/fire_shot, process_owned, restart_owned_clocks, ...)
   bullet_spawner/pattern_spawner2d.cpp    wiring, cadence, spin, bursts/telegraph, pattern lists, the shoot_once skeleton, lifecycle
@@ -750,6 +758,11 @@ src/
   bullet_spawner/bullet_spawner2d_flock.cpp      Flocking group: flock_enabled/flock/flock_scope, the shared FlockConfig2D, arming at shot
   bullet_spawner/bullet_spawner2d_split.cpp      Splitting group
   bullet_spawner/bullet_spawner2d_bindings.cpp   the bullet groups' _bind_methods + _validate_property
+  bullet_spawner/bullet_spawner2d_colors.cpp     Bullet Colors group (colors handed to spawn_volley_span next to the transforms)
+  bullet_spawner/bullet_spawner2d_emitter.cpp    Emitter Bullets group (the shared EmitterConfig2D, cycle refusal)
+  bullet_spawner/bullet_spawner2d_live.cpp       apply_to_live_volleys(LiveVolleyGroup flags), home/aim/speed of live volleys
+  bullet_spawner/laser_spawner2d.*               LaserSpawner2D: Lasers + Laser Targeting groups, laser arming, orphan policy (§27)
+  laser/       LaserVolley2D (laser_volley2d.cpp lifecycle + API, _tick.cpp phases/geometry/walls/contacts/graze/sound, _render.cpp draw + interpolation)
   data/        inspector Resources: BulletVolleyData2D, BulletSpeed/Rotation/Curves/Wobble/EffectLayerData2D, BulletGrazeZone2D, BulletFlock2D,
                BulletSoundData2D, BulletPickupData2D, BulletSplitStage2D, BulletSplitData2D (every accepted edit emits `changed` once:
                `data/test_data_setter_contract.gd` sweeps it)
@@ -979,7 +992,13 @@ deduped, cancelled by REMOVED) and replayed once on resume.
 | `shoot_once_with` is one counted shot with pattern-list entry overrides, restored afterwards (only what it changed), never a list report | `spawner/test_spawner_pattern_lists` |
 | A speed or velocity write raises only a capped `max_speed`: 0 stays unlimited | `volley/test_volley_velocity_composition` |
 | `set_bullet_scale` keeps pose and direction and rescales the hitbox in both `rotate_only_textures` modes | `volley/test_volley_core` |
-| `apply_to_live_volleys(groups)` applies homing / graze / sound / flock / split to flying volleys; a volley armed alike is untouched (spent rings stay spent) | `spawner/test_spawner_graze`, `sound/test_sound_spawner_contract`, the flock suites |
+| `apply_to_live_volleys(groups)` applies homing / graze / sound / flock / split / emitter to flying volleys; a volley armed alike is untouched (spent rings stay spent) | `spawner/test_spawner_graze`, `sound/test_sound_spawner_contract`, the flock suites, `spawner/test_spawner_emitters` |
+| Per-bullet colors: 12-float MultiMesh format only while used, part of the pool key; colors survive every upload, the interpolation pass and a parked wake; split children wear their parent's color | `volley/test_volley_colors`, `spawner/test_spawner_colors` |
+| Per-bullet lifetimes: an own lifetime ignores the volley timer (also in an infinite volley), a handler extending it keeps the bullet, a wake after expiry restarts it | `volley/test_volley_lifetime` |
+| Scale-in grows bullets (hitbox and graze rings too) to full size exactly; graze's size bound grows with any bullet scaled after arming | `volley/test_volley_scale_in`, `volley/test_volley_graze_core` |
+| Emitter bullets: one shot per bullet per tick (no catch-up burst), fired after the sweep through the template (auto-fire error latch), caps carry over / drop with one warning, a chain back to the spawner refused once | `spawner/test_spawner_emitters` |
+| Lasers: phases announced once each inside the tick, contacts end only after they started, pierce_limit cuts beams and spends bolts, a wall stops (once per block) or reflects, interpolation keeps a sweeping beam on its muzzle | the `laser/` suites |
+| A factory queued for deletion (a free refused under its emit guard) stops its sweep: no spawn outside the tree, `debug_advance_time` refuses it | `integration/test_release_free_matrix` |
 
 - Edge cases to test everywhere: NaN/Inf scalars and vectors; null array
   entries; empty arrays; short vs oversized arrays; OOB indices (-1/99);
@@ -1101,7 +1120,7 @@ deduped, cancelled by REMOVED) and replayed once on resume.
 ### 15.1 Running
 
 ```sh
-python3 tools/run_benchmarks.py                     # 32 headless scenarios x5 (median)
+python3 tools/run_benchmarks.py                     # 36 headless scenarios x5 (median)
 python3 tools/run_benchmarks.py --scenario spawner_ # substring filter (repeatable)
 python3 tools/run_benchmarks.py --gate              # exit 1 on regression vs log/baseline.json
 python3 tools/run_benchmarks.py --update-baseline   # ONLY for an accepted change; say so in the commit
@@ -1205,12 +1224,28 @@ project's `.so`). For quick numeric comparisons load two
   Prototype in a standalone harness (the solver compiles against a tiny
   Godot shim) before touching the plugin: a full build per experiment is
   slow, and perf/valgrind are not installed here.
+- Lasers: one `draw_polygon` per body segment (the engine triangulates each)
+  made `curvy_lasers_256` (256 tracking snakes of ~36 segments) cost 4.7 ms
+  per frame; one triangle array per laser: 0.65 ms. One `intersect_shape`
+  per segment was 1.77 ms of tick; testing groups of 8 segments with one box
+  first (exact: the box holds every segment's rectangle): 0.29 ms.
+  `laser_beams_256` (sweeping beams, walls, graze, 24 pierce targets):
+  0.34 ms tick. Prove a draw change in a real window (a throwaway
+  `--script` probe outside the project that saves a screenshot, counting
+  PHYSICS frames: a window renders far faster than 60 fps).
+- Many tiny volleys: `emitter_storm` (256 emitters, ~1500 live 8-bullet
+  child volleys) ticks ~1.7 ms, about 1 us per volley per tick on top of the
+  per-bullet cost; a few big volleys (`volley_10k_flight`) are far cheaper
+  per bullet. `colors_10k_flight` (stride 12) ticks like `volley_10k_flight`.
 
 ## 16. Inspector groups and serialization locks
 
-- Spawner groups, in order (locked by `test_volley_bounce.gd`): Setup, Time,
-  Bullet Patterns, Shooting, Randomization, Spin, Homing, Orbiting, Flocking,
-  Splitting, Graze, Sound, Preview, Movement, Performance. Spawn data (`BulletVolleyData2D`): Bullets, Appearance,
+- BulletSpawner2D groups, in order (locked by `test_volley_bounce.gd`): its
+  own section first (Bullets, Bullet Colors, Homing, Orbiting, Flocking,
+  Splitting, Emitter Bullets), then PatternSpawner2D's (Setup, Time, Bullet
+  Patterns, Shooting, Randomization, Spin, Graze, Sound, Preview, Movement,
+  Performance). LaserSpawner2D: Lasers, Laser Targeting, then the base's
+  (`laser/test_laser_spawner.gd`). Spawn data (`BulletVolleyData2D`): Bullets, Appearance,
   Movement Speed, Bullet Rotation, Wobble, Gravity, Bounce and Ricochet,
   Movement Pattern Paths, Homing, Collision, Attachments, Sprite Effects,
   Rendering and Material. No duplicate titles, no ungrouped property
@@ -1656,3 +1691,100 @@ Facts learned building it (each pinned):
 - A manual split leaves like a clear (On Clear), a split by a non-lethal
   trigger silently (the children replace the parent).
 
+
+## 26. Spawner architecture (PatternSpawner2D, BulletSpawner2D, LaserSpawner2D)
+
+`PatternSpawner2D` (abstract, `bullet_spawner/pattern_spawner2d*`) owns WHERE
+and WHEN to fire: pattern sources and preview, the Transform subgroup,
+cadence (auto fire, budgets, bursts, telegraph, pattern lists,
+`shoot_once_with`, `shoot_from`), spin, Path2D movement and `teleport`, time
+scale, `process_callback`, placement randomization, countdowns, and the Graze
+and Sound target settings. A derived spawner decides WHAT a shot fires through
+the hooks (`shot_preflight`, `shot_prepare`, `fire_shot`, `needs_process_owned`
+/ `process_owned`, `on_predelete_owned`, `append_*_warnings`, `payload_key`,
+`preview_beam_length`, ...). `fire_shot` counts the shot (`volleys_fired`) and
+emits the class's own fired signal; the skeleton then plays On Shot and
+handles budgets and caps.
+
+- Base errors name `get_class()` (BulletSpawner2D texts stay byte-identical).
+- Register a derived class AFTER `PatternSpawner2D` in `register_types.cpp`
+  (an extension class with a not-yet-registered parent makes every class
+  after it fail to bind).
+- `emit_on2d(Object*)` casts to `PatternSpawner2D` (the emit guard lives on
+  the base), so every spawner type emits through its guard.
+- A virtual declared in the base and never defined links fine and crashes
+  at extension LOAD: after every build `nm -D -u -C <library> | grep -i
+  blastbullets2d::` must print nothing.
+
+## 27. Lasers (`LaserData2D`, `LaserVolley2D`, factory lasers, `LaserSpawner2D`)
+
+A laser is its own system (its data, runtime, signals and spawner), sharing
+only what bullets share too (factory sweep, pause, time scale, graze target
+lists, the sound mixer, the target filter, the emit guard).
+
+| Piece | Where | Notes |
+|---|---|---|
+| Data | `data/laser_data2d.*` | type (Beam / Bolt / Curvy), size, phases (charge, grow, active (0 = until ended), fade), aim (Pattern / Track / Lock On), follow, sweep (+ arc), speed and wave, walls (`wall_mask`, `reflections`), hits (`collision_mask`, bodies / areas, `pierce_limit`, `hit_interval_sec`, `max_hits_per_beam`), looks (modulate, color ramp, body frames stretch / tile + scroll, charge / muzzle / tip / pierce / wall-impact frames), presets (editor-only `preset`); gating per type / aim / walls / body mode |
+| Runtime | `laser/laser_volley2d*.cpp` | one node per shot, a `Beam` per slot; `begin_life` / `release_life` (pooled by beam count); the tick: phases (zero-length phases pass in one tick, one `laser_phase_changed` per phase, `end_laser` announced at the next tick start) -> geometry (anchor frame = `PatternSpawner2D::get_shot_frame()` while following, aim, sweep, extension, a wall ray per segment) -> contacts (a rectangle `intersect_shape` per segment; a polyline tests groups of 8 segments with one box (their points' bounds + the half width) first and queries a group's segments only when that box touches something, walls (bodies on `wall_mask`) never targets, nearest first, `pierce_limit` cuts a beam / spends a bolt) -> graze -> wall reports -> finish. Bolts and curvy lasers share a head + trail model (the body is the newest `length` px of the head's path, tail to head); a head that cannot reflect off a wall, used up its pierce limit or left the despawn bounds is spent; all spent = finished |
+| Signals | factory + `LaserSpawner2D` | `laser_phase_changed`, `laser_pierce_started` (always followed by its first `laser_hit`), `laser_hit` (repeats every `hit_interval_sec`, no burst after a hitch), `laser_pierce_ended` (only after a start; a freed target ends silently), `laser_wall_hit` (once per block), `laser_finished` (then pooled), `laser_grazed` / `laser_graze_exited` (owner spawner first, then the factory always). A spawner laser signals on its spawner, a factory laser on the factory, never both |
+| Draw | `laser_volley2d_render.cpp` | every body of a laser is ONE triangle array (`canvas_item_add_triangle_array`: a strip of left/right pairs per beam, mitered up to 90 degree turns, split at sharper ones, 8 color-ramp pieces over the length; `debug_get_body_mesh(fraction)` reports it), the point animations on their own clocks drawn over the bodies; interpolation lerps muzzle / angle / length for a straight beam (a sweep stays on its muzzle), point by point for a polyline; `debug_get_draw_state(fraction)` reports exactly what `_draw` uses |
+| Factory | `factory/bullet_factory2d_lasers.cpp` | `spawn_laser` (script) / `spawn_laser_span` (C++), `tick_lasers` after the volley timers (each laser with its own time factor), `redraw_lasers` in the interpolation pass, `clear_active_lasers`, `reset()` frees lasers, teardown detaches them; `debug_check_lasers` in `debug_assert_no_dangling` |
+| Spawner | `bullet_spawner/laser_spawner2d.*` | Lasers (`laser_data`, `orphaned_lasers` Fade Out / Keep Firing / Hand To Factory / Remove, `max_live_lasers`), Laser Targeting (None / Node Group (nearest per beam) / Node Path / Mouse (every frame) / Global Position, filter group, retarget interval); arms graze and sound at the shot; a `shoot_from` shot never follows the template |
+
+Engine facts behind it (pinned in `integration/test_engine_facts.gd` and the
+laser suites): `intersect_ray` / `intersect_shape` work inside the factory
+tick; a body added to the tree is found by queries after one physics step
+(tests `await idle(2)` after building targets); exact binary ticks (1/16 s)
+make phase and interval tests land on their ticks (six 1/60 s steps sum to
+0.0999...).
+
+## 28. Emitter bullets (`BulletEmitterData2D`, emit queue, flush)
+
+A flying bullet fires a template spawner's whole pattern (any
+`PatternSpawner2D`: bullets or lasers) on its own schedule.
+
+- `EmitterConfig2D` (`factory/emit_queue2d.hpp`): {data, template id, enabled},
+  owned by the spawner and shared with its volleys (edits, a new template and
+  the switch reach bullets in flight; orphans keep it); `emitter_set` gives a
+  factory volley its own. `emitter_arm` is THE choke point (`release_life`
+  disarms).
+- The volley pass (`emitter_tick`, after the split timer): an O(1) gate on
+  the earliest due time (and `BulletEmitterData2D::rules_epoch`, so a raised
+  `max_shots` re-opens it); per live bullet at most one shot per tick, the
+  schedule moves on after a hitch (no burst); a parked volley's clock holds;
+  a wake re-enters the gate (`emitter_on_wake`). A shot is an `EmitRequest2D`
+  (plain data: template id, pose with the aim, spin, velocity).
+- `flush_emits` (after `flush_splits`): templates by id (freed ones skipped),
+  `emit_shot_from` = `shoot_from` with the auto-fire error latch (a broken
+  template reports once), `emitter_max_shots_per_sweep` carries over in
+  order, `emitter_max_pending` drops with one warning; reset / free / teardown
+  / orphan Clear-Remove drop queued shots.
+- A spawner's template chain is walked (16 steps, a visited set) before
+  arming: a way back to the spawner is refused with one error.
+
+## 29. Runtime control, colors, per-bullet lifetimes, scale-in, interpolation
+
+- `BulletSpawner2D.apply_to_live_volleys(LiveVolleyGroup flags)` re-applies
+  homing / graze / sound / flock / split / emitter to what it already fired;
+  `home_live_volleys_to`, `aim_live_volleys_at`, `set/scale_live_volleys_speed`.
+- Per-bullet colors: `BulletVolleyData2D.use_bullet_colors` / `bullet_colors`
+  (+ tile) switch the MultiMesh to 12 floats per instance (colors live in the
+  batch buffer after the transform; transform passes write only their 8
+  floats; the drained zero-fill keeps the colors). The format is part of the
+  pool key (`VolleyPoolKey2D.use_bullet_colors`, `populate_bullets_pool` with
+  a colors key pre-warms colored volleys). The spawner's Bullet Colors group
+  hands one color per bullet to `spawn_volley_span` next to the transforms
+  (spawn data untouched).
+- Per-bullet lifetimes: `all_bullet_life_times` (+ tile), `set_bullet_life_time_left`,
+  the spawner's `bullet_life_time_scale_min/max`. Deadlines run on a per-life
+  `life_age` clock; one compare per tick until one is due.
+- Scale-in: `scale_in_sec` / `scale_in_from`: spawned shrunk in
+  `set_up_bullet_instances`, `step_scale_in` before `move_bullets` multiplies
+  every basis by the growth (the own shape basis with `rotate_only_textures`).
+  Graze's size bound (`graze_bullet_scale`) grows with it and with every
+  setter that grows a bullet (`note_bullet_basis_grew`).
+- Interpolation: `BulletFactory2D.physics_interpolation` Off / On / Follow
+  Project (default); lasers redraw every frame while it is active.
+- GDScript facts that bit the tests: a lambda captures locals by value
+  (collect through an Array); a preview rebuild can run user code (the aimed
+  target's `get_velocity`): re-check every node after it.

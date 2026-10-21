@@ -62,6 +62,9 @@ The main advantages to using this custom built plugin:
 - **Flocking (Boids)** - Bullets that swarm like birds: a `BulletFlock2D` resource holds the rules (separation, alignment, cohesion, neighbor and separation ranges measured between bullet edges so the defaults fit any sprite size, a turn-rate cap to keep swarms fair to dodge, a neighbor cap that bounds the cost of dense swarms). Switch on the spawner's Flocking group and its bullets fly as one flock (per spawner, shared between spawners, or one per shot); no resource needed, an empty slot flies the default rules, and presets (Swarm, Fly Together, Keep Distance, Tight Group) give one-click starting points. Bullets turn in smooth, capped arcs (never a snap, even in a burst stacked at the muzzle; new shots ease in), and every bullet counts its own size, random sizes included. Edit the resource at runtime and every bullet in flight follows. Turn on homing as well and the defaults show a swarm that chases the player while keeping its bullets apart. `BulletSpawner2D.debug_explain_features()` explains in plain sentences what homing, orbiting, flocking and graze will do with the current settings. Factory volleys join with `volley.flock_join(flock)`.
 - **World controls** - `BulletFactory2D.time_scale` slows everything (spawners, bullets, particles and animations on attachments, effects); each spawner has its own `time_scale` (and `time_scale_affects_volleys`). The factory draws the despawn rectangle (translucent red) in the editor, culled bullets fire an On Despawn effect/sound trigger and the `bullets_despawned` signal, and a spawner outside the rectangle does not shoot.
 - **Randomization** - Per spawner: random bullet scale (uniform or per axis), rotation and position jitter, speed multiplier, random spin start, and random shoot/burst/telegraph intervals, all with an optional `bullet_random_seed`. Flocking, graze rings and homing reach count each bullet's own size.
+- **Lasers And Beams** - A `LaserSpawner2D` fires lasers along the same patterns, bursts, spin and movement as bullets: straight beams (charge warning, grow, fire, fade; sweeping, extending, stopping at walls or reflecting off them, piercing a set number of targets), fast bolts, and curvy lasers that snake after their target. Lock-on beams end right on the target, tracking beams turn toward it. Every laser has its own signals (`laser_pierce_started`, `laser_hit` repeating like damage ticks, `laser_pierce_ended`, `laser_wall_hit`, `laser_grazed`...), charge / muzzle / tip / pierce / wall-impact animations, a body texture that stretches or tiles and scrolls, a color ramp, and stays smooth with physics interpolation. Presets (Instant Beam, Charged Sweep, Wall Beam, Reflecting Beam, Bolt, Homing Curvy, Lock On) give one-click starting points.
+- **Emitter Bullets** - Bullets that fire while they fly: point a spawner's Emitter Bullets group at any other spawner (bullets or lasers) and every flying bullet fires its whole pattern on its own schedule (interval, delay, stagger, shot limit, chance, spin per shot for spirals, along its heading or unrotated). Emitters of emitters work; a loop back to the spawner is refused.
+- **Per-Bullet Colors, Lifetimes And Scale-In** - Rainbow rings with one knob (`bullet_color_mode`), colors per bullet from the data or at runtime (`set_bullet_color`), a lifetime per bullet (`all_bullet_life_times`, a random lifetime spread on the spawner), and bullets that pop in from small to full size (`scale_in_sec`) with their hitbox.
 - **Pickups (coins and gems)** - `BulletPickupData2D` turns bullets into animated (SpriteFrames) collectibles that burst out, get pulled to a target and report `pickup_collected`, in one call for a volley, a spawner's bullets, an area or every bullet on screen.
 
 - **Bouncing Bullets (Ricochet)** - Pick bounce layers and bullets reflect off those targets automatically with configurable strength (elastic, damped, dead-stop, super-elastic), optional hit consumption, bounce budgets, radial or shape-accurate normals, instant or smooth visual turn, scatter randomness and overlap cooldown. Full signals (`bounce_area_entered` / `bounce_body_entered`, on the factory or on the spawner that fired the volley) included.
@@ -95,7 +98,7 @@ relative to their direction (allows zig zag patterns and any other creative patt
 
 - **Bullet Attachments** - Seamlessly attach GPUParticles2D, CPUParticles2D or custom sprites that follow the bullet's transform with optional offsets. The use of **modern GDExtension features** like virtual methods allow you to override what happens when attachments are spawned/disabled/pooled. These custom methods get called *inside C++* to set up your bullet attachment as necessary. Example - Spawn attachments with visible particles but when they collide you have to disable the emitting and even disable visibility of extra nodes you might've attached. Super flexible and easy to use.
 
-- **Automatic Object Pooling** - Volleys and attachments are automatically pooled and reused. Pool buckets are exact `(amount of bullets, collision shape type)` pairs identified by `VolleyPoolKey2D` (for example `VolleyPoolKey2D.make(200, PhysicsServer2D.SHAPE_CIRCLE)`). You can manually populate (`populate_bullets_pool(key, data, instance_count)`) or free (`free_bullets_pool()`, `free_active_bullets()`, `free_disabled_bullets()`, `reset()`; pass `null` for everything or a key for one bucket), or disable the system to use your own custom logic. Every pre-populated instance is verified against its key and fully initialized before it enters the bucket, so pooled instances are always safe to reuse and safe for the debugger to visualize. You can choose the easy way of using the plugin without any care (because performance is handled for you already) OR you can delve deeper. Example: disable auto pooling, which will allow you to save your volleys into an array without fear of problems. Reuse them whenever you want with runtime functions such as `enable_bullet()`/`disable_bullet()`.
+- **Automatic Object Pooling** - Volleys and attachments are automatically pooled and reused. Pool buckets are exact `(amount of bullets, collision shape type, per-bullet colors)` triples identified by `VolleyPoolKey2D` (for example `VolleyPoolKey2D.make(200, PhysicsServer2D.SHAPE_CIRCLE)`, or `make(200, PhysicsServer2D.SHAPE_CIRCLE, true)` for colored volleys). You can manually populate (`populate_bullets_pool(key, data, instance_count)`) or free (`free_bullets_pool()`, `free_active_bullets()`, `free_disabled_bullets()`, `reset()`; pass `null` for everything or a key for one bucket), or disable the system to use your own custom logic. Every pre-populated instance is verified against its key and fully initialized before it enters the bucket, so pooled instances are always safe to reuse and safe for the debugger to visualize. You can choose the easy way of using the plugin without any care (because performance is handled for you already) OR you can delve deeper. Example: disable auto pooling, which will allow you to save your volleys into an array without fear of problems. Reuse them whenever you want with runtime functions such as `enable_bullet()`/`disable_bullet()`.
 
 - **Dynamic Sparse Set** - The plugin uses custom made data structure that is used internally for precise tracking and looping over ONLY ACTIVE volleys and ONLY THE ACTIVE bullets inside them. This reduces branching and improves performance (a pattern used in ECS engines that could be further improved in future versions of BlastBullets2D).
 
@@ -402,6 +405,53 @@ var shooter := volley.get_owner_spawner()         # null for factory bullets, or
 for found in factory.get_bullets_in_circle(bomb_position, 120.0):  # also get_bullets_in_rect, get_active_volleys
 	for i in found["bullet_indexes"]:
 		found["volley"].set_bullet_speed(i, 20.0)
+```
+
+#### Lasers<br>
+Add a `LaserSpawner2D` (it has every pattern, cadence, spin and movement setting of `BulletSpawner2D`) and give it a `LaserData2D`, or pick a preset in the inspector:
+```gdscript
+var laser := LaserData2D.create_preset(LaserData2D.PRESET_CHARGED_SWEEP)
+laser.collision_mask = 2                          # what it hits (bodies and areas)
+laser.wall_mask = 1                               # what stops it (reflections = 2 bounces it off two walls first)
+laser.hit_interval_sec = 0.1                      # laser_hit repeats while a target stays in the beam
+$BossLasers.laser_data = laser
+$BossLasers.laser_hit.connect(func(target, beam_laser, beam_index, position): target.take_damage(2))
+$BossLasers.laser_pierce_started.connect(func(target, beam_laser, beam_index, position): target.start_burning())
+$BossLasers.laser_pierce_ended.connect(func(target, beam_laser, beam_index): target.stop_burning())
+
+# Lock-on lasers end right on the player (PRESET_HOMING_CURVY: snakes that chase it).
+$Snipers.laser_data = LaserData2D.create_preset(LaserData2D.PRESET_LOCK_ON)
+$Snipers.laser_target_source = LaserSpawner2D.LASER_TARGET_NODE_GROUP
+$Snipers.laser_target_group = &"player"       # each beam aims at the nearest member
+
+# From a script: one beam per transform, following an anchor node.
+var beams: Array[Transform2D] = [Transform2D(0.0, muzzle.global_position)]
+var beam := factory.spawn_laser(laser, beams, muzzle)
+beam.end_laser()                                  # fade out now (end_laser(false): at once)
+```
+
+#### Emitter bullets<br>
+```gdscript
+# Every bullet of $Boss fires $Sparks's whole pattern every 0.3 s, twice, along its flight.
+$Sparks.shooting_enabled = false                  # the template only fires from the bullets
+var timing := BulletEmitterData2D.new()
+timing.interval_sec = 0.3
+timing.max_shots = 2
+timing.spin_per_shot_degrees = 15.0               # each shot turns a little further: spirals
+$Boss.emitter = timing
+$Boss.emitter_spawner_path = $Boss.get_path_to($Sparks)   # a LaserSpawner2D works too: bullets that fire lasers
+$Boss.emitter_enabled = true
+```
+
+#### Colors, lifetimes and scale-in<br>
+```gdscript
+$Boss.bullet_color_mode = BulletSpawner2D.COLOR_MODE_GRADIENT_ACROSS_PATTERN  # a rainbow ring (empty gradient = rainbow)
+$Boss.bullet_color_shift_per_shot = 0.1                                         # and it turns from shot to shot
+$Boss.bullet_life_time_scale_min = 0.5                                          # every bullet lives 0.5x .. 1.5x max_life_time
+$Boss.bullet_life_time_scale_max = 1.5
+data.scale_in_sec = 0.15                                                        # bullets pop in from 10 % of their size
+volley.set_bullet_color(i, Color.GOLD)                                          # needs data.use_bullet_colors (or a color mode)
+volley.set_bullet_life_time_left(i, 2.0)                                        # this bullet lives 2 more seconds
 ```
 
 #### Accessing advanced features
