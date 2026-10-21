@@ -428,6 +428,43 @@ public:
 
 	void roll_speed_factors(size_t count);
 
+	// BULLET COLORS (bullet_spawner2d_colors.cpp). Each shot picks one color
+	// per bullet from bullet_color_gradient (empty = a rainbow) and hands them
+	// to the factory with the transforms: the volley draws per-bullet colors
+	// (BulletVolley2D.get_bullet_color) while spawn_data stays untouched.
+	// Serialized ids: never renumber.
+	enum BulletColorMode : int {
+		COLOR_MODE_OFF = 0, // the spawn data's own colors (or none)
+		COLOR_MODE_GRADIENT_ACROSS_PATTERN = 1, // bullet i of n samples i / (n - 1): a rainbow ring
+		COLOR_MODE_RANDOM_FROM_GRADIENT = 2, // every bullet samples a random point (bullet_random_seed)
+		COLOR_MODE_GRADIENT_PER_SHOT = 3 // the whole shot wears one color, stepping every shot
+	};
+	BulletColorMode bullet_color_mode = COLOR_MODE_OFF;
+	Ref<Gradient> bullet_color_gradient;
+	// Across Pattern: how far along the gradient the colors move per shot
+	// (0 = still; any other value wraps the gradient around: bullet i samples
+	// i / n + shots x shift).
+	double bullet_color_shift_per_shot = 0.0;
+	// Per Shot: shots per trip along the gradient (shot k samples
+	// (k % cycle) / (cycle - 1)).
+	int bullet_color_cycle_shots = 6;
+	std::vector<Color> shot_colors;
+	BulletColorMode get_bullet_color_mode() const { return bullet_color_mode; }
+	void set_bullet_color_mode(BulletColorMode value);
+	Ref<Gradient> get_bullet_color_gradient() const { return bullet_color_gradient; }
+	void set_bullet_color_gradient(const Ref<Gradient> &value);
+	double get_bullet_color_shift_per_shot() const { return bullet_color_shift_per_shot; }
+	void set_bullet_color_shift_per_shot(double value);
+	int get_bullet_color_cycle_shots() const { return bullet_color_cycle_shots; }
+	void set_bullet_color_cycle_shots(int value);
+	// The color at t (0..1) of the gradient, or of the rainbow while it is empty.
+	Color sample_bullet_color(double t) const;
+	// The colors the next shot of `count` bullets wears (empty while off):
+	// the same rolls shoot_once uses, without firing.
+	PackedColorArray collect_shot_colors(int count) const;
+	// Fills shot_colors for a shot (cleared while off).
+	void roll_shot_colors(size_t count);
+
 	// Current retarget countdown in seconds (time until the next interval
 	// pass). For tests asserting deterministic stagger across spawners.
 	double debug_get_retarget_countdown() const { return homing_retarget_time_left; }
@@ -669,3 +706,4 @@ BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingMode);
 BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingTargetSource);
 BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingTargetSelection);
 BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingRetargetMode);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::BulletColorMode);

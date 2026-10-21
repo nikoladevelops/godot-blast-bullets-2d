@@ -100,7 +100,10 @@ public:
 	// C++-only fast path (BulletSpawner2D): transforms come from a native
 	// buffer (no TypedArray, no Variant per bullet). Same validation as the
 	// script path: every transform finite and invertible, data fields sane.
-	BulletVolley2D *spawn_volley_span(const Ref<BulletVolleyData2D> &spawn_data, const Transform2D *transforms, int count, const Vector2 &new_inherited_velocity_offset = Vector2(0, 0), uint64_t spawner_id = 0);
+	// colors (count entries, finite): per-bullet colors for this volley only
+	// (a colored volley even when the data has none; the spawner's Bullet
+	// Colors group, split children wearing their parent's color).
+	BulletVolley2D *spawn_volley_span(const Ref<BulletVolleyData2D> &spawn_data, const Transform2D *transforms, int count, const Vector2 &new_inherited_velocity_offset = Vector2(0, 0), uint64_t spawner_id = 0, const Color *colors = nullptr);
 
 	// Resets the factory. Null key frees everything (all bullets, pools, and the full
 	// attachment pool). Exact key frees only that bucket; unrelated pooled attachments
@@ -937,6 +940,7 @@ private:
 	std::vector<SplitRequest2D> pending_splits;
 	std::vector<SplitRequest2D> split_flush_scratch;
 	std::vector<Transform2D> split_pose_scratch;
+	std::vector<Color> split_color_scratch; // the parent's color per child (a colored parent)
 	std::vector<Vector2> split_direction_scratch;
 	std::vector<real_t> split_speed_scratch;
 	int split_max_children_per_sweep = 0;
@@ -1180,7 +1184,8 @@ private:
 	// spawner_id is stamped inside spawn()/enable_volley() BEFORE any
 	// physics/tree activation (configure-then-attach): 0 = factory-owned.
 	// transforms_ptr/transforms_count: native span path (no Variant boxing).
-	BulletVolley2D *spawn_volley_internal(const Ref<BulletVolleyData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset, uint64_t spawner_id = 0, const Transform2D *transforms_ptr = nullptr, int transforms_count = -1);
+	// colors_ptr: transforms_count colors (span path only; see spawn_volley_span).
+	BulletVolley2D *spawn_volley_internal(const Ref<BulletVolleyData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset, uint64_t spawner_id = 0, const Transform2D *transforms_ptr = nullptr, int transforms_count = -1, const Color *colors_ptr = nullptr);
 
 	// Copies the active volley indexes AND their occupants into
 	// iteration_scratch, so the sweeps below survive re-entrant frees.

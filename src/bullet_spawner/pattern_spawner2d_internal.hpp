@@ -188,6 +188,7 @@ enum RollChannel : uint32_t {
 	CHANNEL_POSITION_RADIUS = 5,
 	CHANNEL_SPEED = 6,
 	CHANNEL_SPIN = 7,
+	CHANNEL_COLOR = 8,
 };
 
 inline uint64_t mix64(uint64_t x) {

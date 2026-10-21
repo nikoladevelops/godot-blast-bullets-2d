@@ -162,12 +162,18 @@ bool BulletFactory2D::validate_spawn_request(const char *caller_name, const Ref<
 
 void BulletFactory2D::populate_pool_bucket(const PoolKey &key, const Ref<BulletVolleyData2D> &spawn_data, int instance_count) {
 	all_volleys.reserve(all_volleys.size() + instance_count);
+	// A colors key on plain data: the volleys take the colors format (white).
+	std::vector<Color> whites;
+	if (key.colors && !spawn_data->wants_bullet_colors()) {
+		whites.assign((size_t)spawn_data->transforms.size(), Color(1, 1, 1, 1));
+	}
 	for (int i = 0; i < instance_count; ++i) {
 		heal_owned_children(); // a script may have freed the container (an earlier callback too)
 		if (volley_container.get() == nullptr) {
 			return;
 		}
 		BulletVolley2D *volley = memnew(BulletVolley2D);
+		volley->spawn_colors_ptr = whites.empty() ? nullptr : whites.data(); // consumed by the spawn
 		// The index is claimed now so a later pop() + activate_data() reuses a
 		// stable slot. Disabled volleys stay out of volley_set's dense list.
 		volley->spawn(*spawn_data.ptr(), &volley_pool, this, volley_container.get(), Vector2(0, 0), (int)all_volleys.size(), true);
@@ -183,12 +189,12 @@ void BulletFactory2D::populate_pool_bucket(const PoolKey &key, const Ref<BulletV
 	}
 }
 
-BulletVolley2D *BulletFactory2D::spawn_volley_internal(const Ref<BulletVolleyData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset, uint64_t spawner_id, const Transform2D *transforms_ptr, int transforms_count) {
+BulletVolley2D *BulletFactory2D::spawn_volley_internal(const Ref<BulletVolleyData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset, uint64_t spawner_id, const Transform2D *transforms_ptr, int transforms_count, const Color *colors_ptr) {
 	// Quiet: creation prints the shape error once per spawn. The pool key must
 	// use the effective type (fallback included) to match the area's shape.
 	const PhysicsServer2D::ShapeType shape_type = CollisionShapeHelper2D::get_effective_type(spawn_data->collision_shape, false);
 	const int bullet_count = transforms_ptr != nullptr ? transforms_count : (int)spawn_data->transforms.size();
-	const PoolKey key{ bullet_count, shape_type, spawn_data->wants_bullet_colors() };
+	const PoolKey key{ bullet_count, shape_type, spawn_data->wants_bullet_colors() || colors_ptr != nullptr };
 	// A script may have freed the volley container (or the others).
 	heal_owned_children();
 	if (volley_container.get() == nullptr) {
@@ -203,6 +209,7 @@ BulletVolley2D *BulletFactory2D::spawn_volley_internal(const Ref<BulletVolleyDat
 	if (volley != nullptr) {
 		volley->spawn_transforms_ptr = transforms_ptr;
 		volley->spawn_transforms_count = bullet_count;
+		volley->spawn_colors_ptr = colors_ptr;
 		const uint64_t reuse_volley_id = volley->get_instance_id();
 		const bool enabled = volley->enable_volley(*spawn_data.ptr(), new_inherited_velocity_offset, spawner_id);
 		if (watch.died()) {
@@ -214,6 +221,7 @@ BulletVolley2D *BulletFactory2D::spawn_volley_internal(const Ref<BulletVolleyDat
 			volley = nullptr;
 		} else {
 			volley->spawn_transforms_ptr = nullptr;
+			volley->spawn_colors_ptr = nullptr;
 		}
 		if (volley != nullptr && !enabled) {
 			// enable_volley rolls its own mutations back on failure, so the
@@ -263,6 +271,7 @@ BulletVolley2D *BulletFactory2D::spawn_volley_internal(const Ref<BulletVolleyDat
 	volley = memnew(BulletVolley2D);
 	volley->spawn_transforms_ptr = transforms_ptr;
 	volley->spawn_transforms_count = bullet_count;
+	volley->spawn_colors_ptr = colors_ptr;
 	const uint64_t fresh_volley_id = volley->get_instance_id();
 	volley->spawn(*spawn_data.ptr(), &volley_pool, this, volley_container.get(), new_inherited_velocity_offset, (int)all_volleys.size(), false, spawner_id);
 	if (watch.died()) {
@@ -272,6 +281,7 @@ BulletVolley2D *BulletFactory2D::spawn_volley_internal(const Ref<BulletVolleyDat
 		return nullptr; // its own attachment callback freed it mid-spawn: never tracked
 	}
 	volley->spawn_transforms_ptr = nullptr;
+	volley->spawn_colors_ptr = nullptr;
 	const bool drained = !volley->is_active; // a callback cleared it: pooled already
 	// The slot is taken AFTER the spawn: its on_bullet_spawn callbacks may
 	// have spawned or freed other volleys, which moves the list's end.
@@ -286,7 +296,7 @@ BulletVolley2D *BulletFactory2D::spawn_volley_internal(const Ref<BulletVolleyDat
 	return volley;
 }
 
-BulletVolley2D *BulletFactory2D::spawn_volley_span(const Ref<BulletVolleyData2D> &spawn_data, const Transform2D *transforms, int count, const Vector2 &new_inherited_velocity_offset, uint64_t spawner_id) {
+BulletVolley2D *BulletFactory2D::spawn_volley_span(const Ref<BulletVolleyData2D> &spawn_data, const Transform2D *transforms, int count, const Vector2 &new_inherited_velocity_offset, uint64_t spawner_id, const Color *colors) {
 	// Same order as the script path: request + data fields, transforms, then
 	// the invisibility heads-up.
 	if (!validate_spawn_request("spawn_volley", spawn_data, new_inherited_velocity_offset, MAX(count, 0))) {
@@ -296,7 +306,7 @@ BulletVolley2D *BulletFactory2D::spawn_volley_span(const Ref<BulletVolleyData2D>
 		return nullptr;
 	}
 	warn_if_spawn_invisible(spawn_data, "spawn_volley");
-	return spawn_volley_internal(spawn_data, new_inherited_velocity_offset, spawner_id, transforms, count);
+	return spawn_volley_internal(spawn_data, new_inherited_velocity_offset, spawner_id, transforms, count, colors);
 }
 
 BulletVolley2D *BulletFactory2D::spawn_volley(const Ref<BulletVolleyData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset, uint64_t spawner_id) {
@@ -355,7 +365,13 @@ void BulletFactory2D::populate_bullets_pool(const Ref<VolleyPoolKey2D> &key, con
 	// instance_count is orthogonal: how many multimesh instances to pre-create in that bucket.
 	const PoolKey requested = key->to_internal();
 	const PhysicsServer2D::ShapeType effective = CollisionShapeHelper2D::get_effective_type(spawn_data->collision_shape, false);
-	const PoolKey expected{ (int)spawn_data->transforms.size(), effective };
+	// A colors key with plain data pre-warms colored volleys (what a spawner's
+	// Bullet Colors mode fires); data drawing colors needs a colors key.
+	const PoolKey expected{ (int)spawn_data->transforms.size(), effective, requested.colors };
+	if (spawn_data->wants_bullet_colors() && !requested.colors) {
+		UtilityFunctions::push_error("populate_bullets_pool key mismatch: the spawn data draws per-bullet colors but the key has use_bullet_colors off. No instances were created.");
+		return;
+	}
 	if (!(requested == expected)) {
 		UtilityFunctions::push_error(vformat("populate_bullets_pool key mismatch: key is (amount_bullets=%d, shape=%d) but spawn data derives (amount_bullets=%d, shape=%d). No instances were created.", requested.amount_bullets, (int)requested.shape_type, expected.amount_bullets, (int)expected.shape_type));
 		return;

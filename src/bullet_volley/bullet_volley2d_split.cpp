@@ -352,11 +352,6 @@ void BulletVolley2D::split_seed_children(const SplitRequest2D &request, const Ve
 			}
 		}
 	}
-	if (request.has_color && colors_enabled) {
-		for (int i = 0; i < limit; ++i) {
-			set_bullet_color(i, request.color);
-		}
-	}
 	if (stage->keep_collision_count && request.collision_count > 0) {
 		const int n = Math::min(limit, (int)bullets_current_collision_count.size());
 		for (int i = 0; i < n; ++i) {

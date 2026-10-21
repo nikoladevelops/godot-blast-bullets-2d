@@ -210,6 +210,8 @@ ShotResult2D BulletSpawner2D::fire_shot(std::vector<Transform2D> &transforms) {
 	} else if (!shot_speed_factors.empty()) {
 		shot_speed_factors.clear();
 	}
+	// Bullet Colors: one per bullet, carried to the factory with the transforms.
+	roll_shot_colors(transforms.size());
 	// Fire-cone gate (homing only): no target inside half the fire arc means
 	// this volley would chase nothing it can see, so the shot is skipped
 	// BEFORE spawning (never a half-built volley to tear down). Empty
@@ -250,7 +252,7 @@ ShotResult2D BulletSpawner2D::fire_shot(std::vector<Transform2D> &transforms) {
 	if (factory == nullptr) {
 		return refuse_shot("BulletSpawner2D::shoot_once: no BulletFactory2D assigned (bullet_factory_path).", StringName("no_factory"), true);
 	}
-	BulletVolley2D *bullets = factory->spawn_volley_span(volley_data, transforms.data(), (int)transforms.size(), inherited_velocity, get_instance_id());
+	BulletVolley2D *bullets = factory->spawn_volley_span(volley_data, transforms.data(), (int)transforms.size(), inherited_velocity, get_instance_id(), shot_colors.empty() ? nullptr : shot_colors.data());
 	if (bullets == nullptr) {
 		// The factory already reported why (busy, teardown, bad data).
 		return refuse_shot(String(), StringName("factory_refused"), !refused_free_during_shot);

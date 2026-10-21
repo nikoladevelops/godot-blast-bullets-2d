@@ -76,8 +76,10 @@ void BulletVolley2D::set_up_bullet_instances(const BulletVolleyData2D &data) {
 	// later re-entrant spawn can never read a stale pointer.
 	const Transform2D *span = spawn_transforms_ptr;
 	const int span_count = spawn_transforms_count;
+	const Color *colors_span = spawn_colors_ptr;
 	spawn_transforms_ptr = nullptr;
 	spawn_transforms_count = 0;
+	spawn_colors_ptr = nullptr;
 	if (span != nullptr && span_count != amount_bullets) {
 		span = nullptr; // defensive: never index past the span
 	}
@@ -109,7 +111,7 @@ void BulletVolley2D::set_up_bullet_instances(const BulletVolleyData2D &data) {
 	}
 	if (batch_ok) {
 		if (colors_enabled) {
-			seed_bullet_colors(data, batch_w);
+			seed_bullet_colors(data, colors_span, batch_w);
 		}
 		multi->set_buffer(batch_buffer);
 	} else if (multi.is_valid()) {

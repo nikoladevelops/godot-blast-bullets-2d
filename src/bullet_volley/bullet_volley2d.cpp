@@ -364,7 +364,7 @@ void BulletVolley2D::begin_life(const BulletVolleyData2D &data, uint64_t new_own
 	anim_finished_event_pending = false;
 
 	set_up_life_time_timer(data.max_life_time, data.max_life_time);
-	set_up_multimesh(amount_bullets, data.mesh, resolve_quad_size(data.sprite_frames, data.animation, data.texture_size), data.wants_bullet_colors());
+	set_up_multimesh(amount_bullets, data.mesh, resolve_quad_size(data.sprite_frames, data.animation, data.texture_size), data.wants_bullet_colors() || spawn_colors_ptr != nullptr);
 	set_up_bullet_instances(data);
 	reset_attachment_state_for_reuse();
 	set_rotation_data(data.all_bullet_rotation_data, data.rotate_only_textures, data.tile_all_bullet_rotation_data);

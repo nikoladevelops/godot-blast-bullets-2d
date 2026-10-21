@@ -19,6 +19,21 @@ void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
 		return;
 	}
 
+	// Bullet Colors: everything but the mode hides while it is Off; the
+	// shift belongs to Across Pattern, the cycle to Per Shot.
+	if (property_name.begins_with("bullet_color_") && property_name != "bullet_color_mode") {
+		bool show = bullet_color_mode != COLOR_MODE_OFF;
+		if (property_name == "bullet_color_shift_per_shot") {
+			show = bullet_color_mode == COLOR_MODE_GRADIENT_ACROSS_PATTERN;
+		} else if (property_name == "bullet_color_cycle_shots") {
+			show = bullet_color_mode == COLOR_MODE_GRADIENT_PER_SHOT;
+		}
+		if (!show) {
+			p_property.usage &= ~PROPERTY_USAGE_EDITOR;
+		}
+		return;
+	}
+
 	// Splitting: the chain hides while splitting is off.
 	if (property_name == "split_data") {
 		if (!split_enabled) {
@@ -161,6 +176,29 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_bullet_speed_scale_max", "value"), &BulletSpawner2D::set_bullet_speed_scale_max);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bullet_speed_scale_max", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater"), "set_bullet_speed_scale_max", "get_bullet_speed_scale_max");
 	ClassDB::bind_method(D_METHOD("get_active_live_bullet_count"), &BulletSpawner2D::get_active_live_bullet_count);
+
+	// Bullet Colors (bullet_spawner2d_colors.cpp): per-bullet colors picked at
+	// shot time; the gradient and the mode knobs hide while the mode is Off.
+	ADD_GROUP("Bullet Colors", "");
+	ClassDB::bind_method(D_METHOD("get_bullet_color_mode"), &BulletSpawner2D::get_bullet_color_mode);
+	ClassDB::bind_method(D_METHOD("set_bullet_color_mode", "value"), &BulletSpawner2D::set_bullet_color_mode);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "bullet_color_mode", PROPERTY_HINT_ENUM, "Off,Gradient Across Pattern,Random From Gradient,Gradient Per Shot"), "set_bullet_color_mode", "get_bullet_color_mode");
+	ClassDB::bind_method(D_METHOD("get_bullet_color_gradient"), &BulletSpawner2D::get_bullet_color_gradient);
+	ClassDB::bind_method(D_METHOD("set_bullet_color_gradient", "value"), &BulletSpawner2D::set_bullet_color_gradient);
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "bullet_color_gradient", PROPERTY_HINT_RESOURCE_TYPE, "Gradient"), "set_bullet_color_gradient", "get_bullet_color_gradient");
+	ClassDB::bind_method(D_METHOD("get_bullet_color_shift_per_shot"), &BulletSpawner2D::get_bullet_color_shift_per_shot);
+	ClassDB::bind_method(D_METHOD("set_bullet_color_shift_per_shot", "value"), &BulletSpawner2D::set_bullet_color_shift_per_shot);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bullet_color_shift_per_shot", PROPERTY_HINT_RANGE, "-1,1,0.001,or_less,or_greater"), "set_bullet_color_shift_per_shot", "get_bullet_color_shift_per_shot");
+	ClassDB::bind_method(D_METHOD("get_bullet_color_cycle_shots"), &BulletSpawner2D::get_bullet_color_cycle_shots);
+	ClassDB::bind_method(D_METHOD("set_bullet_color_cycle_shots", "value"), &BulletSpawner2D::set_bullet_color_cycle_shots);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "bullet_color_cycle_shots", PROPERTY_HINT_RANGE, "1,64,1,or_greater"), "set_bullet_color_cycle_shots", "get_bullet_color_cycle_shots");
+	ClassDB::bind_method(D_METHOD("sample_bullet_color", "t"), &BulletSpawner2D::sample_bullet_color);
+	ClassDB::bind_method(D_METHOD("collect_shot_colors", "count"), &BulletSpawner2D::collect_shot_colors);
+	BIND_ENUM_CONSTANT(COLOR_MODE_OFF);
+	BIND_ENUM_CONSTANT(COLOR_MODE_GRADIENT_ACROSS_PATTERN);
+	BIND_ENUM_CONSTANT(COLOR_MODE_RANDOM_FROM_GRADIENT);
+	BIND_ENUM_CONSTANT(COLOR_MODE_GRADIENT_PER_SHOT);
+
 	// Homing + orbiting signals. Same slim payload shape and handler contract
 	// as the spawner lifecycle signals above: volley_homing_configured and
 	// homing_targets_resolved fire synchronously inside shoot_once() (after

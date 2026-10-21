@@ -145,9 +145,7 @@ Ref<BulletVolleyData2D> BulletFactory2D::split_child_template(const Ref<BulletVo
 	copy->all_bullet_movement_pattern_repeats.clear();
 	copy->all_bullet_wobble_data.clear();
 	copy->all_bullet_gravity.clear();
-	// The children keep the color format and wear the parent bullet's color.
-	copy->use_bullet_colors = d.wants_bullet_colors();
-	copy->bullet_colors.clear();
+	copy->bullet_colors.clear(); // the children wear their parent bullet's color (SplitRequest2D::color)
 	const Callable on_changed = callable_mp(this, &BulletFactory2D::split_source_changed).bind(id);
 	if (!source->is_connected("changed", on_changed)) {
 		source->connect("changed", on_changed);
@@ -256,7 +254,12 @@ bool BulletFactory2D::flush_splits(const bool &alive) {
 
 		// ---- Spawn (user code: attachment callbacks of the children). ----
 		const Vector2 inherited = stage->inherit_parent_velocity && r.inherited_velocity.is_finite() ? r.inherited_velocity : Vector2();
-		BulletVolley2D *child = spawn_volley_span(r.stage_data ? r.data : split_child_template(r.data), split_pose_scratch.data(), count, inherited, r.owner_id);
+		const Color *child_colors = nullptr;
+		if (r.has_color) {
+			split_color_scratch.assign((size_t)count, r.color);
+			child_colors = split_color_scratch.data();
+		}
+		BulletVolley2D *child = spawn_volley_span(r.stage_data ? r.data : split_child_template(r.data), split_pose_scratch.data(), count, inherited, r.owner_id, child_colors);
 		if (!alive) {
 			return false;
 		}

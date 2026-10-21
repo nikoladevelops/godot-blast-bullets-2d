@@ -60,6 +60,13 @@
 				Kill-switch: clears homing queues and stops orbiting on every tracked live volley, through engine clears that keep all counters exact. Returns how many volleys were touched. Retargeting re-arms them while homing stays on; turn homing off (or clear tracking) to keep them flying straight.
 			</description>
 		</method>
+		<method name="collect_shot_colors" qualifiers="const">
+			<return type="PackedColorArray" />
+			<param index="0" name="count" type="int" />
+			<description>
+				Returns the colors the next shot of [param count] bullets would wear, without firing (empty while [member bullet_color_mode] is Off). With a [member PatternSpawner2D.bullet_random_seed] the Random mode returns exactly the next shot's colors; unseeded it draws fresh numbers.
+			</description>
+		</method>
 		<method name="convert_live_bullets_to_pickups">
 			<return type="Array" />
 			<param index="0" name="pickup" type="BulletPickupData2D" />
@@ -143,6 +150,13 @@
 				Homing's refresh (the counterpart of [method refresh_graze_targets]): call it after spawning enemies so flying volleys chase them too, whatever [member homing_retarget_mode] says. Re-resolves targets and replaces the queues of every still-active volley owned by this spawner (expired or pooled volleys are skipped), and re-applies steering and orbiting tuning so runtime changes reach flying volleys. Random and round-robin selections resolve per volley. Volleys with no resolvable targets are skipped quietly and keep their old queues. Volleys whose bullets are all disabled are skipped too: the tick never moves disabled slots, so pushing targets there would only inflate counters. Returns how many volleys were retargeted. Also runs automatically when [member homing_retarget_mode] is On Interval. Only the newest volley is touched when [member homing_retarget_previous_volleys] is off. Locked orbit rings survive the replace per the lock policy ([member orbiting_lock_policy]) instead of always re-locking.
 			</description>
 		</method>
+		<method name="sample_bullet_color" qualifiers="const">
+			<return type="Color" />
+			<param index="0" name="t" type="float" />
+			<description>
+				Returns the color at [param t] (clamped to 0..1) of [member bullet_color_gradient], or of the built-in red-to-magenta rainbow while it is empty.
+			</description>
+		</method>
 		<method name="scale_live_volleys_speed">
 			<return type="int" />
 			<param index="0" name="factor" type="float" />
@@ -159,6 +173,18 @@
 		</method>
 	</methods>
 	<members>
+		<member name="bullet_color_cycle_shots" type="int" setter="set_bullet_color_cycle_shots" getter="get_bullet_color_cycle_shots" default="6">
+			Gradient Per Shot: how many shots one trip along the gradient takes. Shot [code]k[/code] samples [code](k % cycle) / (cycle - 1)[/code], so the first shot wears the gradient's start and shot [code]cycle - 1[/code] its end. Must be at least 1 (1 holds the start).
+		</member>
+		<member name="bullet_color_gradient" type="Gradient" setter="set_bullet_color_gradient" getter="get_bullet_color_gradient">
+			The colors the bullets are picked from. Empty uses a built-in rainbow from red to magenta. Edits apply from the next shot.
+		</member>
+		<member name="bullet_color_mode" type="int" setter="set_bullet_color_mode" getter="get_bullet_color_mode" enum="BulletSpawner2D.BulletColorMode" default="0">
+			Gives every fired bullet its own color (see [enum BulletColorMode]). The colors are handed to the factory with the shot, so [member spawn_data] is never changed; a mode beats the data's own [member BulletVolleyData2D.bullet_colors], and Off fires the data's colors (or none). Colored volleys pool separately: pre-warm them with [code]populate_bullets_pool(VolleyPoolKey2D.make(n, shape, true), data, count)[/code]. Split children wear their parent bullet's color. Change a bullet's color later with [method BulletVolley2D.set_bullet_color].
+		</member>
+		<member name="bullet_color_shift_per_shot" type="float" setter="set_bullet_color_shift_per_shot" getter="get_bullet_color_shift_per_shot" default="0.0">
+			Gradient Across Pattern: how far along the gradient the colors move each shot. 0 keeps every shot alike (bullet [code]i[/code] of [code]n[/code] samples [code]i / (n - 1)[/code]); any other value wraps the gradient around (bullet [code]i[/code] samples [code]i / n + shots * shift[/code]), so a ring's rainbow turns from shot to shot. Must be finite.
+		</member>
 		<member name="bullet_speed_scale_max" type="float" setter="set_bullet_speed_scale_max" getter="get_bullet_speed_scale_max" default="1.0">
 			Upper end of the random speed multiplier. See [member bullet_speed_scale_min].
 		</member>
@@ -443,6 +469,18 @@
 		</signal>
 	</signals>
 	<constants>
+		<constant name="COLOR_MODE_OFF" value="0" enum="BulletColorMode">
+			No spawner colors: the volleys draw the spawn data's own colors, or none.
+		</constant>
+		<constant name="COLOR_MODE_GRADIENT_ACROSS_PATTERN" value="1" enum="BulletColorMode">
+			Bullet [code]i[/code] of [code]n[/code] samples the gradient at [code]i / (n - 1)[/code] (from its start to its end across the pattern): a rainbow ring in one setting. [member bullet_color_shift_per_shot] scrolls it.
+		</constant>
+		<constant name="COLOR_MODE_RANDOM_FROM_GRADIENT" value="2" enum="BulletColorMode">
+			Every bullet samples a random point of the gradient, seeded by [member PatternSpawner2D.bullet_random_seed] (0 uses Godot's global random generator).
+		</constant>
+		<constant name="COLOR_MODE_GRADIENT_PER_SHOT" value="3" enum="BulletColorMode">
+			The whole shot wears one color, stepping along the gradient every shot (see [member bullet_color_cycle_shots]).
+		</constant>
 		<constant name="HOMING_SHARED" value="0" enum="HomingMode">
 			One homing queue shared by every bullet of the volley.
 		</constant>

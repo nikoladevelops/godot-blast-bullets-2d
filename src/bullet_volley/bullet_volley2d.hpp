@@ -187,6 +187,10 @@ public:
 	// around the call; set_up_bullet_instances consumes and clears it.
 	const Transform2D *spawn_transforms_ptr = nullptr;
 	int spawn_transforms_count = 0;
+	// Native colors for the NEXT spawn()/enable_volley() (one per bullet,
+	// finite): the volley takes the colors format even when the data draws
+	// none. Set and cleared by the factory like the transforms span.
+	const Color *spawn_colors_ptr = nullptr;
 	_ALWAYS_INLINE_ int spawn_transform_count(const BulletVolleyData2D &data) const {
 		return spawn_transforms_ptr != nullptr ? spawn_transforms_count : (int)data.transforms.size();
 	}
@@ -900,9 +904,10 @@ public:
 	// dropped first). Factory spawns pop a volley of the right format by
 	// pool key; only a direct enable_volley() ever switches.
 	void set_up_colors_format(bool use_colors);
-	// Seeds every instance's color from the data (strict or tiled; white
-	// where no entry covers a bullet) into the batch buffer.
-	void seed_bullet_colors(const BulletVolleyData2D &data, float *w);
+	// Seeds every instance's color into the batch buffer: from the span when
+	// the factory passed one, else from the data (strict or tiled; white
+	// where no entry covers a bullet).
+	void seed_bullet_colors(const BulletVolleyData2D &data, const Color *span, float *w);
 
 	// The user can pass any custom data they desire and have access to it in the area_entered and body_entered function callbacks.
 	// Per-bullet overrides via all_bullets_custom_data; strictly separate from

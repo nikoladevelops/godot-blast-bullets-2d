@@ -979,7 +979,7 @@ func test_t20_inspector_groups_stay_coherent() -> void:
 	assert_true(groups_found.has("Splitting"), "spawner Splitting group present")
 	# BulletSpawner2D's own section first (what it fires and how bullets
 	# steer), then its PatternSpawner2D section (where and when it fires).
-	assert_eq(spawner_group_order.slice(0, 16), ["Bullets", "Homing", "Orbiting", "Flocking", "Splitting", "Setup", "Time", "Bullet Patterns", "Shooting", "Randomization", "Spin", "Graze", "Sound", "Preview", "Movement", "Performance"], "spawner group order")
+	assert_eq(spawner_group_order.slice(0, 17), ["Bullets", "Bullet Colors", "Homing", "Orbiting", "Flocking", "Splitting", "Setup", "Time", "Bullet Patterns", "Shooting", "Randomization", "Spin", "Graze", "Sound", "Preview", "Movement", "Performance"], "spawner group order")
 	spawner20.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_GRID
 	await idle(1)
 	var ring_visible_grid := false

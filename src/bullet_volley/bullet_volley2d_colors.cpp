@@ -39,7 +39,13 @@ void BulletVolley2D::set_up_colors_format(bool use_colors) {
 	buffer_stride = use_colors ? 12 : 8;
 }
 
-void BulletVolley2D::seed_bullet_colors(const BulletVolleyData2D &data, float *w) {
+void BulletVolley2D::seed_bullet_colors(const BulletVolleyData2D &data, const Color *span, float *w) {
+	if (span != nullptr) {
+		for (int i = 0; i < amount_bullets; ++i) {
+			write_color2d(w + i * 12 + 8, span[i]);
+		}
+		return;
+	}
 	const PackedColorArray &colors = data.bullet_colors;
 	const int size = colors.size();
 	const bool tile = data.tile_bullet_colors;
