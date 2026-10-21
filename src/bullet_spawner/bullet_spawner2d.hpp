@@ -1509,6 +1509,15 @@ public:
 	// Volleys left before max_volleys trips or the one-shot budget runs
 	// out, whichever is smaller. -1 = infinite (no cap, no budget).
 	int volleys_remaining() const;
+	// Countdowns in seconds of the spawner's own clock (time_scale applies),
+	// 0 when nothing counts down: the next automatic trigger pull, the next
+	// burst shot of a running chain, the warning in progress, the next
+	// pattern-list entry.
+	double get_shoot_time_left() const;
+	double get_burst_time_left() const;
+	bool is_telegraph_pending() const;
+	double get_telegraph_time_left() const;
+	double get_pattern_list_time_left() const;
 
 	virtual void _ready() override;
 	virtual void _process(double delta) override;

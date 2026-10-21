@@ -620,6 +620,26 @@ bool BulletSpawner2D::is_shooting_paused() const {
 	return shooting_paused;
 }
 
+double BulletSpawner2D::get_shoot_time_left() const {
+	return auto_shooting_active() ? Math::max(shoot_time_left, 0.0) : 0.0;
+}
+
+double BulletSpawner2D::get_burst_time_left() const {
+	return burst_shots_left > 0 ? Math::max(burst_time_left, 0.0) : 0.0;
+}
+
+bool BulletSpawner2D::is_telegraph_pending() const {
+	return telegraph_pending;
+}
+
+double BulletSpawner2D::get_telegraph_time_left() const {
+	return telegraph_pending ? Math::max(telegraph_time_left, 0.0) : 0.0;
+}
+
+double BulletSpawner2D::get_pattern_list_time_left() const {
+	return pattern_list_active ? Math::max(pattern_list_time_left, 0.0) : 0.0;
+}
+
 int BulletSpawner2D::volleys_remaining() const {
 	int remaining = -1;
 	if (max_volleys >= 0) {

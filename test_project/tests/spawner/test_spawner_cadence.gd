@@ -369,3 +369,49 @@ func test_reset_shooting_from_volley_fired_restarts_the_delay() -> void:
 			break
 	assert_eq(frames.size(), 2, "the cadence resumed")
 	assert_almost_eq(frames[1] - frames[0], 30, 1, "the next volley comes shoot_initial_delay_sec (30 frames) later")
+
+
+func test_countdowns_read_the_spawners_clock() -> void:
+	var sp := _spawner()
+	assert_eq(sp.get_shoot_time_left(), 0.0, "idle: nothing counts down")
+	sp.set_shoot_interval_sec(1.0)
+	sp.set_shooting_enabled(true)
+	await idle(2) # the first shot is immediate, then the 1 s wait
+	assert_almost_eq(sp.get_shoot_time_left(), 1.0 - 1.0 / 60.0, 0.02, "the wait right after a shot")
+	await idle(30)
+	assert_almost_eq(sp.get_shoot_time_left(), 0.5 - 1.0 / 60.0, 0.02, "half of it left")
+	sp.time_scale = 0.5
+	await idle(30) # 0.25 s of spawner time
+	assert_almost_eq(sp.get_shoot_time_left(), 0.25 - 1.0 / 60.0, 0.02, "on the scaled clock")
+	sp.pause_shooting()
+	assert_eq(sp.get_shoot_time_left(), 0.0, "paused: no automatic pull ahead")
+
+
+func test_burst_telegraph_and_pattern_list_countdowns() -> void:
+	var sp := _spawner()
+	sp.set_shoot_interval_sec(10.0)
+	sp.burst_count = 3
+	sp.burst_interval_sec = 0.5
+	sp.burst_enabled = true
+	sp.telegraph_sec = 0.4
+	sp.telegraph_enabled = true
+	sp.set_shooting_enabled(true)
+	await idle(2)
+	assert_true(sp.is_telegraph_pending(), "the first burst shot warns")
+	assert_almost_eq(sp.get_telegraph_time_left(), 0.4 - 1.0 / 60.0, 0.03, "the warning counts down")
+	for f in 40:
+		await idle(1)
+		if not sp.is_telegraph_pending():
+			break
+	assert_false(sp.is_telegraph_pending(), "warned and fired")
+	assert_eq(sp.get_telegraph_time_left(), 0.0, "no warning left")
+	assert_gt(sp.get_burst_shots_left(), 0, "the chain runs")
+	assert_almost_eq(sp.get_burst_time_left(), 0.5, 0.05, "the next burst shot in about 0.5 s")
+	sp.set_shooting_enabled(false)
+	await idle(2)
+	assert_eq(sp.get_burst_time_left(), 0.0, "an auto chain ends with auto-fire")
+	sp.spawn_pattern_list([{}, {}], false, 0.3)
+	await idle(2)
+	assert_almost_eq(sp.get_pattern_list_time_left(), 0.3 - 1.0 / 60.0, 0.03, "the next entry")
+	sp.stop_pattern_list()
+	assert_eq(sp.get_pattern_list_time_left(), 0.0, "stopped")

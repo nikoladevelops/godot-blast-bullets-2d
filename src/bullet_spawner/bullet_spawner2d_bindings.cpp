@@ -1136,6 +1136,11 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("pause_shooting"), &BulletSpawner2D::pause_shooting);
 	ClassDB::bind_method(D_METHOD("resume_shooting"), &BulletSpawner2D::resume_shooting);
 	ClassDB::bind_method(D_METHOD("is_shooting_paused"), &BulletSpawner2D::is_shooting_paused);
+	ClassDB::bind_method(D_METHOD("get_shoot_time_left"), &BulletSpawner2D::get_shoot_time_left);
+	ClassDB::bind_method(D_METHOD("get_burst_time_left"), &BulletSpawner2D::get_burst_time_left);
+	ClassDB::bind_method(D_METHOD("is_telegraph_pending"), &BulletSpawner2D::is_telegraph_pending);
+	ClassDB::bind_method(D_METHOD("get_telegraph_time_left"), &BulletSpawner2D::get_telegraph_time_left);
+	ClassDB::bind_method(D_METHOD("get_pattern_list_time_left"), &BulletSpawner2D::get_pattern_list_time_left);
 	ClassDB::bind_method(D_METHOD("volleys_remaining"), &BulletSpawner2D::volleys_remaining);
 }
 
