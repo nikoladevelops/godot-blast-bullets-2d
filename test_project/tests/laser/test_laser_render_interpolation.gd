@@ -7,6 +7,11 @@ extends BlastTest
 ## muzzle and tip frames play from the growing start, each pierce from its own
 ## start, each wall impact from its block; one-shot animations hold their last
 ## frame. Every look draws headless without an error, interpolation on too.
+## The bodies of a laser are ONE triangle array (debug_get_body_mesh reports
+## exactly what _draw hands over): a strip of left/right vertex pairs along
+## each beam, mitered where it turns by at most 90 degrees and split where it
+## turns sharper, covering the beam's width and nothing beyond it; 8 color
+## ramp pieces over the length; tiled UVs run along the length.
 
 const DT := 0.0625
 
@@ -156,3 +161,178 @@ func test_every_look_draws_headless_with_interpolation_on() -> void:
 	assert_true(factory.is_physics_interpolation_active(), "interpolation on")
 	assert_eq(l.debug_check_invariants(), "", "finite geometry")
 	assert_eq(l.get_texture_repeat(), CanvasItem.TEXTURE_REPEAT_ENABLED, "a tiled body repeats its texture")
+
+
+func _in_triangle(p: Vector2, a: Vector2, b: Vector2, c: Vector2) -> bool:
+	var d1 := (p - b).cross(a - b)
+	var d2 := (p - c).cross(b - c)
+	var d3 := (p - a).cross(c - a)
+	var neg := d1 < -1e-3 or d2 < -1e-3 or d3 < -1e-3
+	var pos := d1 > 1e-3 or d2 > 1e-3 or d3 > 1e-3
+	return not (neg and pos)
+
+
+func _covered(mesh: Dictionary, p: Vector2) -> bool:
+	var pts: PackedVector2Array = mesh["points"]
+	var idx: PackedInt32Array = mesh["indices"]
+	for t in range(0, idx.size(), 3):
+		if _in_triangle(p, pts[idx[t]], pts[idx[t + 1]], pts[idx[t + 2]]):
+			return true
+	return false
+
+
+## Every point of the beam's width is drawn (samples across each segment) and
+## nothing past it (beside each segment's middle). Returns the misses.
+func _coverage_misses(mesh: Dictionary, beam: PackedVector2Array, half: float) -> Array:
+	var misses: Array = []
+	for k in range(1, beam.size()):
+		var a := beam[k - 1]
+		var c := beam[k]
+		var n := (c - a).normalized().orthogonal()
+		for q in range(1, 10):
+			var at := a.lerp(c, q / 10.0)
+			for side in [-0.9, 0.0, 0.9]:
+				if not _covered(mesh, at + n * half * side):
+					misses.append(["uncovered", k, q, side])
+		var mid := a.lerp(c, 0.5)
+		for side in [-1.3, 1.3]:
+			if _covered(mesh, mid + n * half * side):
+				misses.append(["drawn beyond the width", k, side])
+	return misses
+
+
+func _corridor_beam() -> LaserVolley2D:
+	make_wall(Vector2(400, -50), Vector2(1200, 20), 16)
+	make_wall(Vector2(400, 50), Vector2(1200, 20), 16)
+	await idle(2)
+	var d := H.make_laser(0.0, 0.0, 0.0, 0.0, 2000.0)
+	d.wall_mask = 16
+	d.reflections = 8
+	var l := _fire(d, Transform2D(deg_to_rad(45.0), Vector2.ZERO))
+	step_factory(1, DT)
+	return l
+
+
+func test_a_straight_body_is_one_quad_of_the_beam_width() -> void:
+	var l := _fire(H.make_laser(0.0, 0.0, 0.0, 0.0, 200.0), Transform2D(0.0, Vector2(50, 50)))
+	step_factory(1, DT)
+	var mesh: Dictionary = l.debug_get_body_mesh(1.0)
+	assert_eq(Array(mesh["points"]), [Vector2(50, 56), Vector2(50, 44), Vector2(250, 56), Vector2(250, 44)], "left/right at the muzzle and the end, half the width (12) off the beam")
+	assert_eq(Array(mesh["indices"]), [0, 1, 2, 1, 3, 2], "two triangles")
+	assert_eq(Array(mesh["uvs"]), [Vector2(0, 0), Vector2(0, 1), Vector2(1, 0), Vector2(1, 1)], "stretched: u along the length, v across")
+	assert_eq(Array(mesh["colors"]), [Color.WHITE, Color.WHITE, Color.WHITE, Color.WHITE], "the modulate")
+
+
+func test_a_color_ramp_samples_the_body_in_eight_pieces() -> void:
+	var d := H.make_laser(0.0, 0.0, 0.0, 0.0, 200.0)
+	d.color_ramp = Gradient.new() # black -> white
+	d.modulate = Color(1.0, 0.5, 0.25)
+	var l := _fire(d)
+	step_factory(1, DT)
+	var mesh: Dictionary = l.debug_get_body_mesh(1.0)
+	var colors: PackedColorArray = mesh["colors"]
+	var uvs: PackedVector2Array = mesh["uvs"]
+	assert_eq(colors.size(), 18, "9 vertex pairs: 8 pieces")
+	var bad: Array = []
+	for q in 9:
+		var want := d.modulate * d.color_ramp.sample(q / 8.0)
+		if not colors[2 * q].is_equal_approx(want) or not colors[2 * q + 1].is_equal_approx(want) or not is_equal_approx(uvs[2 * q].x, q / 8.0):
+			bad.append(q)
+	assert_eq(bad, [], "piece q: modulate x ramp(q / 8) on both sides, u = q / 8")
+
+
+func test_a_reflected_body_joins_at_miters_and_covers_exactly_the_beam() -> void:
+	var l: LaserVolley2D = await _corridor_beam()
+	var beam := l.get_beam_points(0)
+	assert_eq(beam.size(), 10, "8 reflections (90 deg turns)")
+	var mesh: Dictionary = l.debug_get_body_mesh(1.0)
+	assert_eq([(mesh["points"] as PackedVector2Array).size(), (mesh["indices"] as PackedInt32Array).size()], [20, 54], "one pair per point (mitered, never split), two triangles per segment")
+	var pts: PackedVector2Array = mesh["points"]
+	var off: Array = []
+	for k in range(1, 9):
+		for v in [pts[2 * k], pts[2 * k + 1]]:
+			for seg in [[beam[k - 1], beam[k]], [beam[k], beam[k + 1]]]:
+				var axis: Vector2 = (seg[1] - seg[0]).normalized()
+				var dist := absf(axis.cross(v - seg[0]))
+				if not is_equal_approx(dist, 6.0):
+					off.append([k, dist])
+	assert_eq(off, [], "a miter vertex sits half the width from both segments")
+	assert_eq(_coverage_misses(mesh, beam, 6.0), [], "the whole width drawn, nothing beyond it")
+
+
+func test_a_sharp_reflection_splits_the_strip() -> void:
+	make_wall(Vector2(200, 0), Vector2(20, 600), 16)
+	await idle(2)
+	var d := H.make_laser(0.0, 0.0, 0.0, 0.0)
+	d.wall_mask = 16
+	d.reflections = 1
+	var l := _fire(d, Transform2D(deg_to_rad(30.0), Vector2.ZERO))
+	step_factory(1, DT)
+	var beam := l.get_beam_points(0)
+	assert_eq(beam.size(), 3, "one reflection: a 120 deg turn")
+	var mesh: Dictionary = l.debug_get_body_mesh(1.0)
+	assert_eq(Array(mesh["indices"]), [0, 1, 2, 1, 3, 2, 4, 5, 6, 5, 7, 6], "two quads, no triangle across the split")
+	var pts: PackedVector2Array = mesh["points"]
+	assert_eq([pts[2].distance_to(beam[1]), pts[4].distance_to(beam[1])].map(func(x: float) -> float: return snappedf(x, 0.001)), [6.0, 6.0], "both ends at the corner, each square to its own segment")
+	assert_eq(_coverage_misses(mesh, beam, 6.0), [], "the whole width drawn, nothing beyond it")
+
+
+func test_a_curvy_body_is_one_smooth_strip() -> void:
+	var d := H.make_laser(0.0, 0.0, 0.0, 0.0, 300.0)
+	d.type = LaserData2D.LASER_CURVY
+	d.speed = 800.0
+	d.wave_amplitude = 40.0
+	d.wave_frequency = 1.0
+	var l := _fire(d)
+	step_factory(10, DT)
+	var beam := l.get_beam_points(0)
+	assert_gt(beam.size(), 5, "a bent body")
+	var mesh: Dictionary = l.debug_get_body_mesh(1.0)
+	assert_eq([(mesh["points"] as PackedVector2Array).size(), (mesh["indices"] as PackedInt32Array).size()], [beam.size() * 2, (beam.size() - 1) * 6], "gentle bends are mitered: one pair per point")
+	assert_eq(_coverage_misses(mesh, beam, 6.0), [], "the whole width drawn, nothing beyond it")
+
+
+func test_a_tiled_body_runs_its_texture_along_the_length() -> void:
+	var d := H.make_laser(0.0, 0.0, 0.0, 0.0, 200.0)
+	var sf := SpriteFrames.new()
+	sf.add_frame(&"default", ImageTexture.create_from_image(Image.create(16, 4, false, Image.FORMAT_RGBA8)))
+	d.body_frames = sf
+	d.body_mode = LaserData2D.BODY_TILE
+	d.body_scroll_speed = 32.0
+	var l := _fire(d)
+	step_factory(1, DT)
+	var uvs: PackedVector2Array = l.debug_get_body_mesh(1.0)["uvs"]
+	assert_almost_eq(uvs[2].x - uvs[0].x, 200.0 / 16.0, 0.0001, "one texture repeat per 16 px")
+	var first := uvs[0].x
+	step_factory(1, DT)
+	uvs = l.debug_get_body_mesh(1.0)["uvs"]
+	assert_almost_eq(uvs[0].x - first, -32.0 * DT / 16.0, 0.0001, "scrolling 32 px/s")
+
+
+func test_no_body_while_charging_or_for_a_spent_beam() -> void:
+	var d := H.make_laser(0.25, 0.0, 0.0, 0.0, 200.0)
+	var l := _fire(d)
+	step_factory(1, DT)
+	assert_eq((l.debug_get_body_mesh(1.0)["indices"] as PackedInt32Array).size(), 0, "charging draws the warning line only")
+	factory.despawn_bounds_rect = Rect2(-50, -50, 300, 100)
+	factory.despawn_bounds_enabled = true
+	var b := H.make_laser(0.0, 0.0, 0.0, 0.0, 80.0)
+	b.type = LaserData2D.LASER_BOLT
+	b.speed = 1600.0
+	var poses: Array[Transform2D] = [Transform2D(0.0, Vector2.ZERO), Transform2D(PI / 2.0, Vector2.ZERO)]
+	var bolts := factory.spawn_laser(b, poses)
+	step_factory(2, DT)
+	var state: Array = bolts.debug_get_draw_state(1.0)
+	assert_eq([state[0]["spent"], state[1]["spent"]], [false, true], "the downward bolt left the bounds")
+	assert_eq((bolts.debug_get_body_mesh(1.0)["points"] as PackedVector2Array).size(), 4, "only the live bolt's quad")
+
+
+func test_the_body_follows_the_interpolated_beam() -> void:
+	var d := H.make_laser(0.0, 0.0, 0.0, 0.0, 200.0)
+	d.sweep_speed_degrees = 160.0 # 10 deg per tick
+	var l := _fire(d, Transform2D(0.0, Vector2(50, 50)))
+	step_factory(2, DT)
+	var mid := _pts(l, 0.5)
+	var pts: PackedVector2Array = l.debug_get_body_mesh(0.5)["points"]
+	assert_true(((pts[0] + pts[1]) * 0.5).is_equal_approx(mid[0]), "the first pair centers on the muzzle")
+	assert_true(((pts[2] + pts[3]) * 0.5).is_equal_approx(mid[1]), "the last on the lerped end (15 deg)")

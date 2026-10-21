@@ -41,6 +41,9 @@ struct LaserAnim2D {
 // by BulletFactory2D (bullet_factory2d_lasers.cpp). Its signals fire on its
 // owner LaserSpawner2D while that lives, else on the factory (never both).
 // Lasers read their LaserData2D every tick: edits reach lasers firing now.
+struct LaserBodyMesh2D;
+struct LaserBeamMarks2D;
+
 class LaserVolley2D : public Node2D {
 	GDCLASS(LaserVolley2D, Node2D)
 	friend class BulletFactory2D;
@@ -145,6 +148,9 @@ public:
 	// body, muzzle, tip, pierces, impacts} at `fraction` (-1 = the
 	// interpolation fraction now, 1 = this tick).
 	Array debug_get_draw_state(double fraction = -1.0) const;
+	// The bodies as _draw hands them to the renderer (one triangle array):
+	// points, uvs, colors, indices.
+	Dictionary debug_get_body_mesh(double fraction = -1.0) const;
 	String debug_check_invariants() const;
 
 	// ---- C++ (factory) ----
@@ -256,6 +262,9 @@ private:
 	// pins at walls) and the body is the newest `length` px of its path.
 	void step_head(Beam &b, double delta);
 	void interpolated_points(const Beam &b, double fraction, std::vector<Vector2> &r_points) const;
+	// Every unspent beam's body strip (none while charging or at width 0) and,
+	// when asked, what its point animations need.
+	void build_body_mesh(double fraction, LaserBodyMesh2D &r_mesh, std::vector<LaserBeamMarks2D> *r_marks) const;
 	double draw_fraction() const;
 };
 

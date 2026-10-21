@@ -468,7 +468,42 @@ bool LaserVolley2D::update_contacts(int beam_index, uint64_t self_id, uint32_t l
 	};
 	std::vector<Found> found;
 	real_t offset = 0.0;
-	for (size_t k = 1; k < b.points.size(); ++k) {
+	// A polyline (reflections, a bolt or curvy body) tests its segments in
+	// groups of 8 with one box first (the group's point bounds + the half
+	// width: it holds every segment's box) and queries the segments of a group
+	// only when that box touches something. Exact, and 8x fewer queries
+	// wherever the beam crosses empty space.
+	constexpr size_t group_segments = 8;
+	const size_t point_count = b.points.size();
+	const bool grouped = point_count > 3;
+	size_t group_end = 0; // the segments before it passed their group box
+	for (size_t k = 1; k < point_count; ++k) {
+		if (grouped && k >= group_end) {
+			const size_t last = Math::min(k + group_segments - 1, point_count - 1);
+			Vector2 lo = b.points[k - 1];
+			Vector2 hi = lo;
+			for (size_t q = k; q <= last; ++q) {
+				const Vector2 &p = b.points[q];
+				lo = Vector2(Math::min(lo.x, p.x), Math::min(lo.y, p.y));
+				hi = Vector2(Math::max(hi.x, p.x), Math::max(hi.y, p.y));
+			}
+			group_end = last + 1;
+			if (Math::is_finite(lo.x) && Math::is_finite(lo.y) && Math::is_finite(hi.x) && Math::is_finite(hi.y)) {
+				const real_t pad = half_width + (real_t)1.0; // 1 px more: a touch at the edge is never lost
+				ps->shape_set_data(query_shape, (hi - lo) * (real_t)0.5 + Vector2(pad, pad));
+				shape_query->set_transform(Transform2D(0.0, (lo + hi) * (real_t)0.5));
+				if (space->intersect_shape(shape_query, 1).is_empty()) {
+					for (size_t q = k; q <= last; ++q) {
+						const real_t seg = b.points[q - 1].distance_to(b.points[q]);
+						if (seg > (real_t)0.0) {
+							offset += seg;
+						}
+					}
+					k = last;
+					continue;
+				}
+			}
+		}
 		const Vector2 a = b.points[k - 1];
 		const Vector2 c = b.points[k];
 		const real_t seg = a.distance_to(c);

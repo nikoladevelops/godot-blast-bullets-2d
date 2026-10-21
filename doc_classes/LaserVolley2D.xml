@@ -15,6 +15,13 @@
 				Returns an empty String when the laser's state is consistent (a pooled laser holds nothing, every beam has finite geometry), else what is wrong.
 			</description>
 		</method>
+		<method name="debug_get_body_mesh" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="fraction" type="float" default="-1.0" />
+			<description>
+				The bodies exactly as [code]_draw[/code] hands them to the renderer: one triangle array for every unspent beam of the laser ([code]points[/code], [code]uvs[/code], [code]colors[/code] and [code]indices[/code], three per triangle). Each beam is a strip of left/right vertex pairs (v = 0 left, 1 right) half the width off its points, mitered where it turns by at most 90 degrees and split where it turns sharper (a reflection); a [member LaserData2D.color_ramp] cuts it into 8 pieces over the length. Empty while charging or at width 0. [param fraction] is the interpolation fraction (-1 = the current one).
+			</description>
+		</method>
 		<method name="debug_get_draw_state" qualifiers="const">
 			<return type="Array" />
 			<param index="0" name="fraction" type="float" default="-1.0" />

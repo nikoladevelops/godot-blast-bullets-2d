@@ -124,3 +124,68 @@ func test_a_growing_beam_grows_up_to_the_wall() -> void:
 		lengths.append(snappedf(l.get_beam_length(0), 0.01))
 	assert_eq(lengths, [100.0, 200.0, 240.0, 240.0], "grows 100 px per tick, then the wall stops it")
 	assert_eq(walls.size(), 1, "one block when it reached the wall")
+
+
+func test_a_reflected_beam_pierces_targets_on_every_segment() -> void:
+	# A corridor (faces at y = -40 and 40): a 45 deg beam reflects at x = 40,
+	# 120, ..., 600 and stops at x = 680, so its 9 segments cross y = 0 at
+	# x = 80, 160, ..., 640. One small target sits on each crossing (segments
+	# 2..9, past the first group of 8), a decoy 45 px off the beam.
+	make_wall(Vector2(400, -50), Vector2(1200, 20), 16)
+	make_wall(Vector2(400, 50), Vector2(1200, 20), 16)
+	var expected: Array = []
+	for j in range(1, 9):
+		var t := make_area(Vector2(80 * j, 0), Vector2(8, 8))
+		t.name = "T%d" % j
+		expected.append(str(t.name))
+	var decoy := make_area(Vector2(40, -30), Vector2(8, 8))
+	decoy.name = "D"
+	await idle(2)
+	var starts: Array = []
+	factory.laser_pierce_started.connect(func(t: Object, _l, _i, p: Vector2) -> void: starts.append([str(t.name), p.round()]))
+	var d := _walled()
+	d.length = 2000.0
+	d.reflections = 8
+	var l := _fire(d, deg_to_rad(45.0))
+	_step(1)
+	var pts := l.get_beam_points(0)
+	assert_eq(pts.size(), 10, "muzzle, 8 reflections, the stop")
+	assert_true(l.is_beam_blocked(0), "the ninth wall stops it")
+	assert_almost_eq(pts[9].x, 680.0, 0.05, "at x = 680")
+	var names: Array = []
+	for t in l.get_pierced_targets(0):
+		names.append(str(t.name))
+	assert_eq(names, expected, "every crossing target, nearest along the beam first, never the decoy")
+	var want: Array = []
+	for j in range(1, 9):
+		want.append(["T%d" % j, Vector2(80 * j, 0)])
+	assert_eq(starts, want, "each started where it sits on the beam")
+
+
+func test_a_long_curvy_body_pierces_targets_along_its_whole_length() -> void:
+	# A straight curvy body (no wave) 300 px long at 25 px per tick: 12
+	# segments. After 16 ticks it spans x = 100..400 and covers A near its
+	# tail, B and C near its head (the second group of segments).
+	var names := ["A", "B", "C"]
+	var xs := [120.0, 310.0, 390.0]
+	for k in 3:
+		var t := make_area(Vector2(xs[k], 0), Vector2(8, 8))
+		t.name = names[k]
+	await idle(2)
+	var d := H.make_laser(0.0, 0.0, 0.0, 0.0, 300.0)
+	d.type = LaserData2D.LASER_CURVY
+	d.speed = 400.0
+	var l := _fire(d)
+	_step(16)
+	assert_gt(l.get_beam_points(0).size(), 9, "more than one group of segments")
+	assert_almost_eq(l.get_beam_start(0).x, 100.0, 0.05, "the tail")
+	assert_almost_eq(l.get_beam_end(0).x, 400.0, 0.05, "the head")
+	var got: Array = []
+	for t in l.get_pierced_targets(0):
+		got.append(str(t.name))
+	assert_eq(got, names, "all three, from the tail to the head")
+	_step(2)
+	got.clear()
+	for t in l.get_pierced_targets(0):
+		got.append(str(t.name))
+	assert_eq(got, ["B", "C"], "the tail passed A (x = 150 now)")

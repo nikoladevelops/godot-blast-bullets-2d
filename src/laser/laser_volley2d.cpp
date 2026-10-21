@@ -599,6 +599,7 @@ void LaserVolley2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_active_time_left"), &LaserVolley2D::get_active_time_left);
 	ClassDB::bind_method(D_METHOD("set_active_time_left", "seconds"), &LaserVolley2D::set_active_time_left);
 	ClassDB::bind_method(D_METHOD("debug_get_draw_state", "fraction"), &LaserVolley2D::debug_get_draw_state, DEFVAL(-1.0));
+	ClassDB::bind_method(D_METHOD("debug_get_body_mesh", "fraction"), &LaserVolley2D::debug_get_body_mesh, DEFVAL(-1.0));
 	ClassDB::bind_method(D_METHOD("debug_check_invariants"), &LaserVolley2D::debug_check_invariants);
 	ClassDB::bind_method(D_METHOD("graze_set_zones", "zones", "target_group"), &LaserVolley2D::graze_set_zones);
 	ClassDB::bind_method(D_METHOD("graze_clear"), &LaserVolley2D::graze_clear);
