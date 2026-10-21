@@ -164,6 +164,7 @@ static constexpr int kMaxBurstCount = 1024;
 // loading assigns properties before the spawner enters the tree).
 template <typename T>
 static inline bool node_path_type_ok(const Node *self, const NodePath &p_path, const char *prop, const char *type_name) {
+	// self is the spawner: its class names it in the error.
 	if (p_path.is_empty() || !self->is_inside_tree()) {
 		return true;
 	}
@@ -171,7 +172,7 @@ static inline bool node_path_type_ok(const Node *self, const NodePath &p_path, c
 	if (node == nullptr || Object::cast_to<T>(node) != nullptr) {
 		return true;
 	}
-	UtilityFunctions::push_error(String("BulletSpawner2D: ") + prop + " must point to a " + type_name + ", keeping the old value.");
+	UtilityFunctions::push_error(String(self->get_class()) + ": " + prop + " must point to a " + type_name + ", keeping the old value.");
 	return false;
 }
 

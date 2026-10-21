@@ -41,11 +41,11 @@ void PatternSpawner2D::set_show_preview_during_runtime(bool value) {
 // Preview colours: a NaN channel would poison the draw (reject-and-keep
 // like every other knob). Colours never touch geometry, so their setters
 // rebuild the preview without bumping the pattern version (bake kept).
-static bool preview_color_ok(const Color &value, const char *name) {
+static bool preview_color_ok(const Object *self, const Color &value, const char *name) {
 	if (Math::is_finite(value.r) && Math::is_finite(value.g) && Math::is_finite(value.b) && Math::is_finite(value.a)) {
 		return true;
 	}
-	UtilityFunctions::push_error(String("BulletSpawner2D: ") + name + " must be a finite colour, keeping the old value.");
+	UtilityFunctions::push_error(String(self->get_class()) + ": " + name + " must be a finite colour, keeping the old value.");
 	return false;
 }
 
@@ -54,7 +54,7 @@ Color PatternSpawner2D::get_preview_dot_color() const {
 }
 
 void PatternSpawner2D::set_preview_dot_color(const Color &value) {
-	if (!preview_color_ok(value, "preview_dot_color")) {
+	if (!preview_color_ok(this, value, "preview_dot_color")) {
 		return;
 	}
 	preview_dot_color = value;
@@ -66,7 +66,7 @@ Color PatternSpawner2D::get_preview_arrow_color() const {
 }
 
 void PatternSpawner2D::set_preview_arrow_color(const Color &value) {
-	if (!preview_color_ok(value, "preview_arrow_color")) {
+	if (!preview_color_ok(this, value, "preview_arrow_color")) {
 		return;
 	}
 	preview_arrow_color = value;
@@ -78,7 +78,7 @@ Color PatternSpawner2D::get_preview_first_dot_color() const {
 }
 
 void PatternSpawner2D::set_preview_first_dot_color(const Color &value) {
-	if (!preview_color_ok(value, "preview_first_dot_color")) {
+	if (!preview_color_ok(this, value, "preview_first_dot_color")) {
 		return;
 	}
 	preview_first_dot_color = value;
@@ -90,7 +90,7 @@ Color PatternSpawner2D::get_preview_path_color() const {
 }
 
 void PatternSpawner2D::set_preview_path_color(const Color &value) {
-	if (!preview_color_ok(value, "preview_path_color")) {
+	if (!preview_color_ok(this, value, "preview_path_color")) {
 		return;
 	}
 	preview_path_color = value;
@@ -102,7 +102,7 @@ Color PatternSpawner2D::get_preview_layer_path_color() const {
 }
 
 void PatternSpawner2D::set_preview_layer_path_color(const Color &value) {
-	if (!preview_color_ok(value, "preview_layer_path_color")) {
+	if (!preview_color_ok(this, value, "preview_layer_path_color")) {
 		return;
 	}
 	preview_layer_path_color = value;
@@ -115,7 +115,7 @@ double PatternSpawner2D::get_preview_path_width() const {
 
 void PatternSpawner2D::set_preview_path_width(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
-		UtilityFunctions::push_error("BulletSpawner2D: preview_path_width must be finite and >= 0 (0 hides the track), keeping the old value.");
+		UtilityFunctions::push_error((String(get_class()) + ": preview_path_width must be finite and >= 0 (0 hides the track), keeping the old value."));
 		return;
 	}
 	preview_path_width = value;
@@ -128,7 +128,7 @@ double PatternSpawner2D::get_preview_dot_radius() const {
 
 void PatternSpawner2D::set_preview_dot_radius(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
-		UtilityFunctions::push_error("BulletSpawner2D: preview_dot_radius must be finite and >= 0, keeping the old value.");
+		UtilityFunctions::push_error((String(get_class()) + ": preview_dot_radius must be finite and >= 0, keeping the old value."));
 		return;
 	}
 	preview_dot_radius = value;
@@ -141,7 +141,7 @@ double PatternSpawner2D::get_preview_arrow_gap() const {
 
 void PatternSpawner2D::set_preview_arrow_gap(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
-		UtilityFunctions::push_error("BulletSpawner2D: preview_arrow_gap must be finite and >= 0, keeping the old value.");
+		UtilityFunctions::push_error((String(get_class()) + ": preview_arrow_gap must be finite and >= 0, keeping the old value."));
 		return;
 	}
 	preview_arrow_gap = value;
@@ -154,7 +154,7 @@ double PatternSpawner2D::get_preview_arrow_length() const {
 
 void PatternSpawner2D::set_preview_arrow_length(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
-		UtilityFunctions::push_error("BulletSpawner2D: preview_arrow_length must be finite and >= 0, keeping the old value.");
+		UtilityFunctions::push_error((String(get_class()) + ": preview_arrow_length must be finite and >= 0, keeping the old value."));
 		return;
 	}
 	preview_arrow_length = value;
@@ -167,7 +167,7 @@ double PatternSpawner2D::get_preview_arrow_width() const {
 
 void PatternSpawner2D::set_preview_arrow_width(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
-		UtilityFunctions::push_error("BulletSpawner2D: preview_arrow_width must be finite and >= 0, keeping the old value.");
+		UtilityFunctions::push_error((String(get_class()) + ": preview_arrow_width must be finite and >= 0, keeping the old value."));
 		return;
 	}
 	preview_arrow_width = value;
@@ -180,7 +180,7 @@ double PatternSpawner2D::get_preview_arrow_head_length() const {
 
 void PatternSpawner2D::set_preview_arrow_head_length(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
-		UtilityFunctions::push_error("BulletSpawner2D: preview_arrow_head_length must be finite and >= 0, keeping the old value.");
+		UtilityFunctions::push_error((String(get_class()) + ": preview_arrow_head_length must be finite and >= 0, keeping the old value."));
 		return;
 	}
 	preview_arrow_head_length = value;
@@ -193,7 +193,7 @@ double PatternSpawner2D::get_preview_arrow_head_width() const {
 
 void PatternSpawner2D::set_preview_arrow_head_width(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
-		UtilityFunctions::push_error("BulletSpawner2D: preview_arrow_head_width must be finite and >= 0, keeping the old value.");
+		UtilityFunctions::push_error((String(get_class()) + ": preview_arrow_head_width must be finite and >= 0, keeping the old value."));
 		return;
 	}
 	preview_arrow_head_width = value;
@@ -214,7 +214,7 @@ Color PatternSpawner2D::get_preview_collision_ring_color() const {
 }
 
 void PatternSpawner2D::set_preview_collision_ring_color(const Color &value) {
-	if (!preview_color_ok(value, "preview_collision_ring_color")) {
+	if (!preview_color_ok(this, value, "preview_collision_ring_color")) {
 		return;
 	}
 	preview_collision_ring_color = value;
@@ -227,7 +227,7 @@ double PatternSpawner2D::get_preview_collision_ring_width() const {
 
 void PatternSpawner2D::set_preview_collision_ring_width(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
-		UtilityFunctions::push_error("BulletSpawner2D: preview_collision_ring_width must be finite and >= 0, keeping the old value.");
+		UtilityFunctions::push_error((String(get_class()) + ": preview_collision_ring_width must be finite and >= 0, keeping the old value."));
 		return;
 	}
 	preview_collision_ring_width = value;

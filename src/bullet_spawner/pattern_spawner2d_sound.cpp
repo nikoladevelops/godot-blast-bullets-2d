@@ -33,7 +33,7 @@ void PatternSpawner2D::set_sound_effects(const Array &value) {
 			continue;
 		}
 		if (Object::cast_to<BulletSoundData2D>(entry.get_type() == Variant::OBJECT ? (Object *)entry : nullptr) == nullptr) {
-			UtilityFunctions::push_error("BulletSpawner2D: sound_effects entries must be BulletSoundData2D or null, keeping the old value.");
+			UtilityFunctions::push_error((String(get_class()) + ": sound_effects entries must be BulletSoundData2D or null, keeping the old value."));
 			return;
 		}
 	}
@@ -48,7 +48,7 @@ double PatternSpawner2D::get_sound_volume_db() const {
 
 void PatternSpawner2D::set_sound_volume_db(double value) {
 	if (!is_finite_real2d(value) || value < -80.0 || value > 24.0) {
-		UtilityFunctions::push_error("BulletSpawner2D: sound_volume_db must be finite and between -80 and 24, keeping the old value.");
+		UtilityFunctions::push_error((String(get_class()) + ": sound_volume_db must be finite and between -80 and 24, keeping the old value."));
 		return;
 	}
 	sound_volume_db = value;
@@ -61,7 +61,7 @@ PatternSpawner2D::SoundListenerSource PatternSpawner2D::get_sound_listener_sourc
 
 void PatternSpawner2D::set_sound_listener_source(SoundListenerSource value) {
 	if (value < SOUND_LISTENER_GODOT_LISTENER || value > SOUND_LISTENER_GLOBAL_POSITIONS) {
-		UtilityFunctions::push_error("BulletSpawner2D: invalid sound_listener_source, keeping the old value.");
+		UtilityFunctions::push_error((String(get_class()) + ": invalid sound_listener_source, keeping the old value."));
 		return;
 	}
 	sound_listener_source = value;
@@ -114,7 +114,7 @@ PatternSpawner2D::HomingNodeNameMatch PatternSpawner2D::get_sound_listener_node_
 
 void PatternSpawner2D::set_sound_listener_node_name_match_mode(HomingNodeNameMatch value) {
 	if (value < HOMING_NAME_MATCH_EXACT || value > HOMING_NAME_MATCH_ENDS_WITH) {
-		UtilityFunctions::push_error("BulletSpawner2D: invalid sound_listener_node_name_match_mode, keeping the old value.");
+		UtilityFunctions::push_error((String(get_class()) + ": invalid sound_listener_node_name_match_mode, keeping the old value."));
 		return;
 	}
 	sound_listener_node_name_match_mode = value;
@@ -155,7 +155,7 @@ PackedVector2Array PatternSpawner2D::get_sound_listener_global_positions() const
 void PatternSpawner2D::set_sound_listener_global_positions(const PackedVector2Array &value) {
 	for (int i = 0; i < value.size(); ++i) {
 		if (!value[i].is_finite()) {
-			UtilityFunctions::push_error("BulletSpawner2D: sound_listener_global_positions must hold finite positions only, keeping the old value.");
+			UtilityFunctions::push_error((String(get_class()) + ": sound_listener_global_positions must hold finite positions only, keeping the old value."));
 			return;
 		}
 	}
@@ -169,7 +169,7 @@ double PatternSpawner2D::get_sound_listener_update_interval() const {
 
 void PatternSpawner2D::set_sound_listener_update_interval(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
-		UtilityFunctions::push_error("BulletSpawner2D: sound_listener_update_interval must be finite and >= 0 (0 scans every tick), keeping the old value.");
+		UtilityFunctions::push_error((String(get_class()) + ": sound_listener_update_interval must be finite and >= 0 (0 scans every tick), keeping the old value."));
 		return;
 	}
 	sound_listener_update_interval = value;
@@ -253,7 +253,7 @@ void PatternSpawner2D::collect_sound_listeners(std::vector<GrazeTarget2D> &r_tar
 
 int PatternSpawner2D::refresh_sound_listeners() {
 	if (!is_inside_tree()) {
-		UtilityFunctions::push_error("BulletSpawner2D.refresh_sound_listeners: spawner is outside the scene tree, nothing refreshed.");
+		UtilityFunctions::push_error((String(get_class()) + ".refresh_sound_listeners: spawner is outside the scene tree, nothing refreshed."));
 		return 0;
 	}
 	std::shared_ptr<GrazeDetector2D> detector = sound_detector_ref();
@@ -285,7 +285,7 @@ Array PatternSpawner2D::spawner_sound_entries(bool &r_any) {
 	}
 	if (misuse && !sound_effects_misuse_warned) {
 		sound_effects_misuse_warned = true;
-		UtilityFunctions::push_warning("BulletSpawner2D: sound_effects was changed in place and holds entries that are not BulletSoundData2D; only sounds are used. Assign the whole array instead (sound_effects = [...]).");
+		UtilityFunctions::push_warning((String(get_class()) + ": sound_effects was changed in place and holds entries that are not BulletSoundData2D; only sounds are used. Assign the whole array instead (sound_effects = [...])."));
 	}
 	r_any = any;
 	return entries;
@@ -336,13 +336,13 @@ Dictionary PatternSpawner2D::debug_get_sound_detector_stats() const {
 
 void PatternSpawner2D::preview_sound_effect(int index) {
 	if (index < 0 || index >= sound_effects.size()) {
-		UtilityFunctions::push_error("BulletSpawner2D.preview_sound_effect: index " + String::num_int64(index) + " out of range (sound_effects holds " + String::num_int64(sound_effects.size()) + "), nothing plays.");
+		UtilityFunctions::push_error((String(get_class()) + ".preview_sound_effect: index ") + String::num_int64(index) + " out of range (sound_effects holds " + String::num_int64(sound_effects.size()) + "), nothing plays.");
 		return;
 	}
 	const Variant entry = sound_effects[index];
 	BulletSoundData2D *sound = entry.get_type() == Variant::OBJECT ? Object::cast_to<BulletSoundData2D>((Object *)entry) : nullptr;
 	if (sound == nullptr) {
-		UtilityFunctions::push_warning("BulletSpawner2D.preview_sound_effect: entry " + String::num_int64(index) + " is null, nothing plays.");
+		UtilityFunctions::push_warning((String(get_class()) + ".preview_sound_effect: entry ") + String::num_int64(index) + " is null, nothing plays.");
 		return;
 	}
 	// Disabled/streamless entries take the entry's usual warning path.

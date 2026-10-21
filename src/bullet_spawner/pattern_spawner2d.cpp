@@ -155,7 +155,7 @@ double PatternSpawner2D::get_shoot_interval_sec() const {
 
 void PatternSpawner2D::set_shoot_interval_sec(double value) {
 	if (!is_finite_real2d(value) || !(value > 0.0)) {
-		UtilityFunctions::push_error("BulletSpawner2D: shoot_interval_sec must be finite and > 0, keeping the old value.");
+		UtilityFunctions::push_error((String(get_class()) + ": shoot_interval_sec must be finite and > 0, keeping the old value."));
 		return;
 	}
 	shoot_interval_sec = value;
@@ -172,7 +172,7 @@ double PatternSpawner2D::get_shoot_initial_delay_sec() const {
 
 void PatternSpawner2D::set_shoot_initial_delay_sec(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
-		UtilityFunctions::push_error("BulletSpawner2D: shoot_initial_delay_sec must be finite and >= 0, keeping the old value.");
+		UtilityFunctions::push_error((String(get_class()) + ": shoot_initial_delay_sec must be finite and >= 0, keeping the old value."));
 		return;
 	}
 	shoot_initial_delay_sec = value;
@@ -184,7 +184,7 @@ int PatternSpawner2D::get_max_volleys() const {
 
 void PatternSpawner2D::set_max_volleys(int value) {
 	if (value < -1) {
-		UtilityFunctions::push_error("BulletSpawner2D: max_volleys must be -1 (infinite) or >= 0, keeping the old value.");
+		UtilityFunctions::push_error((String(get_class()) + ": max_volleys must be -1 (infinite) or >= 0, keeping the old value."));
 		return;
 	}
 	// Raising the cap resumes a stopped spawner; lowering it below the count
@@ -250,7 +250,7 @@ double PatternSpawner2D::get_spin_speed_deg_per_sec() const {
 
 void PatternSpawner2D::set_spin_speed_deg_per_sec(double value) {
 	if (!is_finite_real2d(value)) {
-		UtilityFunctions::push_error("BulletSpawner2D: spin_speed_deg_per_sec must be finite, keeping the old value.");
+		UtilityFunctions::push_error((String(get_class()) + ": spin_speed_deg_per_sec must be finite, keeping the old value."));
 		return;
 	}
 	spin_speed_deg_per_sec = value;
@@ -262,7 +262,7 @@ PatternSpawner2D::SpinMode PatternSpawner2D::get_spin_mode() const {
 
 void PatternSpawner2D::set_spin_mode(SpinMode value) {
 	if (value < SPIN_CONTINUOUS || value > SPIN_OSCILLATE) {
-		UtilityFunctions::push_error("BulletSpawner2D: invalid spin_mode, keeping the old value.");
+		UtilityFunctions::push_error((String(get_class()) + ": invalid spin_mode, keeping the old value."));
 		return;
 	}
 	spin_mode = value;
@@ -275,7 +275,7 @@ double PatternSpawner2D::get_spin_amplitude_deg() const {
 
 void PatternSpawner2D::set_spin_amplitude_deg(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
-		UtilityFunctions::push_error("BulletSpawner2D: spin_amplitude_deg must be finite and >= 0, keeping the old value.");
+		UtilityFunctions::push_error((String(get_class()) + ": spin_amplitude_deg must be finite and >= 0, keeping the old value."));
 		return;
 	}
 	spin_amplitude_deg = value;
@@ -287,7 +287,7 @@ double PatternSpawner2D::get_spin_frequency_hz() const {
 
 void PatternSpawner2D::set_spin_frequency_hz(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
-		UtilityFunctions::push_error("BulletSpawner2D: spin_frequency_hz must be finite and >= 0, keeping the old value.");
+		UtilityFunctions::push_error((String(get_class()) + ": spin_frequency_hz must be finite and >= 0, keeping the old value."));
 		return;
 	}
 	spin_frequency_hz = value;
@@ -299,11 +299,11 @@ double PatternSpawner2D::get_spin_angle_deg() const {
 
 void PatternSpawner2D::set_spin_angle_deg(double degrees) {
 	if (!is_finite_real2d(degrees)) {
-		UtilityFunctions::push_error("BulletSpawner2D::set_spin_angle_deg: degrees must be finite, keeping the old angle.");
+		UtilityFunctions::push_error((String(get_class()) + "::set_spin_angle_deg: degrees must be finite, keeping the old angle."));
 		return;
 	}
 	if (spin_mode == SPIN_OSCILLATE) {
-		UtilityFunctions::push_error("BulletSpawner2D::set_spin_angle_deg: in Oscillate mode the angle follows spin_amplitude_deg and spin_frequency_hz; use reset_spin_angle() to restart the swing. Keeping the old angle.");
+		UtilityFunctions::push_error((String(get_class()) + "::set_spin_angle_deg: in Oscillate mode the angle follows spin_amplitude_deg and spin_frequency_hz; use reset_spin_angle() to restart the swing. Keeping the old angle."));
 		return;
 	}
 	spin_angle_deg = Math::fposmod(degrees, 360.0);
@@ -351,7 +351,7 @@ double PatternSpawner2D::get_reload_jitter_sec() const { return reload_jitter_se
 
 void PatternSpawner2D::set_reload_jitter_sec(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
-		UtilityFunctions::push_error("BulletSpawner2D: reload_jitter_sec must be finite and >= 0, keeping the old value.");
+		UtilityFunctions::push_error((String(get_class()) + ": reload_jitter_sec must be finite and >= 0, keeping the old value."));
 		return;
 	}
 	reload_jitter_sec = value;
@@ -382,7 +382,7 @@ int PatternSpawner2D::get_burst_count() const {
 
 void PatternSpawner2D::set_burst_count(int value) {
 	if (value < 1 || value > kMaxBurstCount) {
-		UtilityFunctions::push_error("BulletSpawner2D: burst_count must be between 1 and " + itos(kMaxBurstCount) + ", keeping the old value.");
+		UtilityFunctions::push_error((String(get_class()) + ": burst_count must be between 1 and ") + itos(kMaxBurstCount) + ", keeping the old value.");
 		return;
 	}
 	burst_count = value;
@@ -405,7 +405,7 @@ double PatternSpawner2D::get_burst_interval_sec() const {
 
 void PatternSpawner2D::set_burst_interval_sec(double value) {
 	if (!is_finite_real2d(value) || !(value > 0.0)) {
-		UtilityFunctions::push_error("BulletSpawner2D: burst_interval_sec must be finite and > 0, keeping the old value.");
+		UtilityFunctions::push_error((String(get_class()) + ": burst_interval_sec must be finite and > 0, keeping the old value."));
 		return;
 	}
 	burst_interval_sec = value;
@@ -440,7 +440,7 @@ double PatternSpawner2D::get_telegraph_sec() const {
 
 void PatternSpawner2D::set_telegraph_sec(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
-		UtilityFunctions::push_error("BulletSpawner2D: telegraph_sec must be finite and >= 0, keeping the old value.");
+		UtilityFunctions::push_error((String(get_class()) + ": telegraph_sec must be finite and >= 0, keeping the old value."));
 		return;
 	}
 	telegraph_sec = value;
@@ -452,7 +452,7 @@ int PatternSpawner2D::get_reload_jitter_seed() const {
 
 void PatternSpawner2D::set_reload_jitter_seed(int value) {
 	if (value < 0) {
-		UtilityFunctions::push_error("BulletSpawner2D: reload_jitter_seed must be >= 0 (0 = non-deterministic), keeping the old value.");
+		UtilityFunctions::push_error((String(get_class()) + ": reload_jitter_seed must be >= 0 (0 = non-deterministic), keeping the old value."));
 		return;
 	}
 	reload_jitter_seed = value;
@@ -491,7 +491,7 @@ void PatternSpawner2D::reset_shooting() {
 
 void PatternSpawner2D::fire_n_volleys(int n) {
 	if (n <= 0) {
-		UtilityFunctions::push_error("BulletSpawner2D::fire_n_volleys: n must be > 0.");
+		UtilityFunctions::push_error((String(get_class()) + "::fire_n_volleys: n must be > 0."));
 		return;
 	}
 	// One-shot budget only: max_volleys is never touched, so an unlimited
@@ -695,7 +695,7 @@ bool PatternSpawner2D::shoot_once() {
 	// nested shoot_once() would recurse past the volley cap. Per-spawner latch
 	// stops self-recursion; global depth stops cross-spawner A->B->A ping-pong.
 	if (shoot_once_reentrant_guard || g_shoot_once_nesting_depth > 0) {
-		UtilityFunctions::push_error("BulletSpawner2D::shoot_once: re-entrant call from inside a spawner signal handler is not allowed (pre_shoot, homing_targets_resolved, volley_homing_configured, volley_fired, volley_skipped). Use call_deferred(\"shoot_once\") instead.");
+		UtilityFunctions::push_error((String(get_class()) + "::shoot_once: re-entrant call from inside a spawner signal handler is not allowed (pre_shoot, homing_targets_resolved, volley_homing_configured, volley_fired, volley_skipped). Use call_deferred(\"shoot_once\") instead."));
 		return false;
 	}
 	// Latch held for the whole body; every return below goes through
@@ -723,7 +723,7 @@ bool PatternSpawner2D::shoot_once() {
 	};
 	BulletFactory2D *factory = get_bullet_factory();
 	if (factory == nullptr) {
-		return fail_early("BulletSpawner2D::shoot_once: no BulletFactory2D assigned (bullet_factory_path).", StringName("no_factory"), true);
+		return fail_early((String(get_class()) + "::shoot_once: no BulletFactory2D assigned (bullet_factory_path)."), StringName("no_factory"), true);
 	}
 	{
 		const ShotRefusal2D refusal = shot_preflight(factory);
@@ -757,7 +757,7 @@ bool PatternSpawner2D::shoot_once() {
 		// rejected helper input, ...). The cause was already reported above.
 		// Reported as a skipped volley (not just an error) so games can fall
 		// back instead of log-diving.
-		return fail_early(String(String("BulletSpawner2D::shoot_once: pattern_source ") + pattern_source_name(pattern_source) + " produced no transforms, volley skipped.").utf8().get_data(), StringName("no_transforms"), true);
+		return fail_early(String(String((String(get_class()) + "::shoot_once: pattern_source ")) + pattern_source_name(pattern_source) + " produced no transforms, volley skipped.").utf8().get_data(), StringName("no_transforms"), true);
 	}
 	// Randomization: per-bullet scale / rotation / position rolls on top of
 	// the pattern (all off = untouched shot, nothing drawn). What the shot
@@ -815,7 +815,7 @@ ShotResult2D PatternSpawner2D::fire_shot(std::vector<Transform2D> &transforms) {
 // so it runs after the current emission / physics step instead of nesting.
 bool PatternSpawner2D::shoot_once_deferred() {
 	if (!is_inside_tree()) {
-		UtilityFunctions::push_error("BulletSpawner2D::shoot_once_deferred: spawner is not inside the tree, shot dropped.");
+		UtilityFunctions::push_error((String(get_class()) + "::shoot_once_deferred: spawner is not inside the tree, shot dropped."));
 		return false;
 	}
 	call_deferred("shoot_once");
@@ -999,7 +999,7 @@ void PatternSpawner2D::fill_assigned_node_paths() {
 void PatternSpawner2D::set_time_scale(double value) {
 	// Any finite scale (the volley tick caps the bullet time it covers).
 	if (!Math::is_finite(value) || value < 0.0) {
-		UtilityFunctions::push_error("BulletSpawner2D: time_scale must be finite and >= 0, keeping the old value.");
+		UtilityFunctions::push_error((String(get_class()) + ": time_scale must be finite and >= 0, keeping the old value."));
 		return;
 	}
 	time_scale = value;
@@ -1421,15 +1421,15 @@ double PatternSpawner2D::next_shoot_interval_sec() const {
 
 int PatternSpawner2D::spawn_pattern_list(const Array &entries, bool simultaneous, double interval_sec) {
 	if (entries.is_empty()) {
-		UtilityFunctions::push_error("BulletSpawner2D::spawn_pattern_list: entries is empty, nothing queued.");
+		UtilityFunctions::push_error((String(get_class()) + "::spawn_pattern_list: entries is empty, nothing queued."));
 		return 0;
 	}
 	if (!Math::is_finite(interval_sec) || interval_sec < 0.0) {
-		UtilityFunctions::push_error("BulletSpawner2D::spawn_pattern_list: interval_sec must be finite and >= 0; using 0 (one entry per frame).");
+		UtilityFunctions::push_error((String(get_class()) + "::spawn_pattern_list: interval_sec must be finite and >= 0; using 0 (one entry per frame)."));
 		interval_sec = 0.0;
 	}
 	if (!is_inside_tree()) {
-		UtilityFunctions::push_error("BulletSpawner2D::spawn_pattern_list: spawner is outside the scene tree.");
+		UtilityFunctions::push_error((String(get_class()) + "::spawn_pattern_list: spawner is outside the scene tree."));
 		return 0;
 	}
 	// A new list replaces the running one (which never reports finished).
@@ -1476,7 +1476,8 @@ bool PatternSpawner2D::is_pattern_list_active() const {
 	return pattern_list_active;
 }
 
-bool PatternSpawner2D::apply_pattern_list_entry(const Variant &entry, const char *caller) {
+bool PatternSpawner2D::apply_pattern_list_entry(const Variant &entry, const String &p_caller) {
+	const String caller = p_caller.is_empty() ? String(get_class()) + "::spawn_pattern_list" : p_caller;
 	if (entry.get_type() != Variant::DICTIONARY) {
 		UtilityFunctions::push_error(String(caller) + ": every entry must be a Dictionary, skipping one.");
 		return false;
@@ -1580,10 +1581,10 @@ void PatternSpawner2D::fire_pattern_list_entry() {
 }
 
 bool PatternSpawner2D::shoot_once_with(const Dictionary &overrides) {
-	return fire_pattern_list_override(overrides, "BulletSpawner2D::shoot_once_with");
+	return fire_pattern_list_override(overrides, (String(get_class()) + "::shoot_once_with"));
 }
 
-bool PatternSpawner2D::fire_pattern_list_override(const Variant &entry, const char *caller) {
+bool PatternSpawner2D::fire_pattern_list_override(const Variant &entry, const String &caller) {
 	// Apply, fire, restore inside one pattern batch: the preview rebuilds
 	// once at the end, and the restored knobs bump the pattern version so the
 	// next normal shot rebakes from the spawner's own configuration.

@@ -16,7 +16,7 @@ double PatternSpawner2D::get_pattern_scale() const {
 
 void PatternSpawner2D::set_pattern_scale(double value) {
 	if (!is_finite_real2d(value)) {
-		UtilityFunctions::push_error("BulletSpawner2D: pattern_scale must be finite, keeping the old value.");
+		UtilityFunctions::push_error((String(get_class()) + ": pattern_scale must be finite, keeping the old value."));
 		return;
 	}
 	pattern_scale = value;
@@ -29,7 +29,7 @@ double PatternSpawner2D::get_transforms_scale() const {
 
 void PatternSpawner2D::set_transforms_scale(double value) {
 	if (!is_finite_real2d(value)) {
-		UtilityFunctions::push_error("BulletSpawner2D: transforms_scale must be finite, keeping the old value.");
+		UtilityFunctions::push_error((String(get_class()) + ": transforms_scale must be finite, keeping the old value."));
 		return;
 	}
 	transforms_scale = value;
@@ -42,7 +42,7 @@ Vector2 PatternSpawner2D::get_spawn_position_offset() const {
 
 void PatternSpawner2D::set_spawn_position_offset(const Vector2 &value) {
 	if (!value.is_finite()) {
-		UtilityFunctions::push_error("BulletSpawner2D: spawn_position_offset must be finite (NaN/Inf would poison bullet movement), keeping the old value.");
+		UtilityFunctions::push_error((String(get_class()) + ": spawn_position_offset must be finite (NaN/Inf would poison bullet movement), keeping the old value."));
 		return;
 	}
 	spawn_position_offset = value;
@@ -54,7 +54,7 @@ PatternSpawner2D::SpawnOffsetSpace PatternSpawner2D::get_spawn_position_offset_s
 
 void PatternSpawner2D::set_spawn_position_offset_space(SpawnOffsetSpace value) {
 	if (value < SPAWN_OFFSET_GLOBAL || value > SPAWN_OFFSET_LOCAL) {
-		UtilityFunctions::push_error("BulletSpawner2D: spawn_position_offset_space must be 0 (Global) or 1 (Local), keeping the old value.");
+		UtilityFunctions::push_error((String(get_class()) + ": spawn_position_offset_space must be 0 (Global) or 1 (Local), keeping the old value."));
 		return;
 	}
 	spawn_position_offset_space = value;
@@ -68,7 +68,7 @@ PatternSpawner2D::PatternSource PatternSpawner2D::get_pattern_source() const {
 void PatternSpawner2D::set_pattern_source(PatternSource value) {
 	on_config_changed();
 	if (value < PATTERN_FROM_CHILDREN || value >= PATTERN_FROM_LAST) {
-		UtilityFunctions::push_error("BulletSpawner2D: invalid pattern_source, keeping the old value.");
+		UtilityFunctions::push_error((String(get_class()) + ": invalid pattern_source, keeping the old value."));
 		return;
 	}
 	pattern_source = value;
@@ -124,7 +124,7 @@ void PatternSpawner2D::set_helper_custom_transforms(const TypedArray<Transform2D
 	// same freeze/OOM rationale as helper_bullets_amount caps it at the
 	// developer-set pattern limit.
 	if (const String problem = pattern_custom_transforms_problem2d(value, pattern_max_bullets()); !problem.is_empty()) {
-		pattern_knob_reject2d("helper_custom_transforms", problem);
+		pattern_knob_reject2d("helper_custom_transforms", problem, get_class());
 		return;
 	}
 	helper_custom_transforms = value;
@@ -135,7 +135,7 @@ PackedFloat32Array PatternSpawner2D::get_helper_outline_layer_scales() const { r
 
 void PatternSpawner2D::set_helper_outline_layer_scales(const PackedFloat32Array &value) {
 	if (const char *problem = pattern_layer_scales_problem2d(value, kMaxOutlineLayers)) {
-		pattern_knob_reject2d("helper_outline_layer_scales", problem);
+		pattern_knob_reject2d("helper_outline_layer_scales", problem, get_class());
 		return;
 	}
 	helper_outline_layer_scales = value;
@@ -168,7 +168,7 @@ PatternSpawner2D::Path2DSpace PatternSpawner2D::get_helper_path2d_space() const 
 
 void PatternSpawner2D::set_helper_path2d_space(Path2DSpace value) {
 	if (value < PATH2D_SPACE_FOLLOW_GENERATOR || value > PATH2D_SPACE_AT_PATH2D) {
-		UtilityFunctions::push_error("BulletSpawner2D: invalid helper_path2d_space, keeping the old value.");
+		UtilityFunctions::push_error((String(get_class()) + ": invalid helper_path2d_space, keeping the old value."));
 		return;
 	}
 	helper_path2d_space = (int)value;
@@ -194,7 +194,7 @@ PatternSpawner2D::Path2DDistribution PatternSpawner2D::get_helper_path2d_distrib
 
 void PatternSpawner2D::set_helper_path2d_distribution(Path2DDistribution value) {
 	if (value < PATH2D_DISTRIBUTION_FIXED_SPACING || value > PATH2D_DISTRIBUTION_EVEN) {
-		UtilityFunctions::push_error("BulletSpawner2D: invalid helper_path2d_distribution, keeping the old value.");
+		UtilityFunctions::push_error((String(get_class()) + ": invalid helper_path2d_distribution, keeping the old value."));
 		return;
 	}
 	helper_path2d_distribution = (int)value;
@@ -207,7 +207,7 @@ PatternSpawner2D::Path2DOverflow PatternSpawner2D::get_helper_path2d_overflow() 
 
 void PatternSpawner2D::set_helper_path2d_overflow(Path2DOverflow value) {
 	if (value < PATH2D_OVERFLOW_CLAMP || value > PATH2D_OVERFLOW_SHRINK_TO_FIT) {
-		UtilityFunctions::push_error("BulletSpawner2D: invalid helper_path2d_overflow, keeping the old value.");
+		UtilityFunctions::push_error((String(get_class()) + ": invalid helper_path2d_overflow, keeping the old value."));
 		return;
 	}
 	helper_path2d_overflow = (int)value;
@@ -218,7 +218,7 @@ PatternSpawner2D::Path2DAnchor PatternSpawner2D::get_helper_path2d_anchor() cons
 
 void PatternSpawner2D::set_helper_path2d_anchor(Path2DAnchor value) {
 	if (value < PATH2D_ANCHOR_START || value > PATH2D_ANCHOR_END) {
-		UtilityFunctions::push_error("BulletSpawner2D: invalid helper_path2d_anchor, keeping the old value.");
+		UtilityFunctions::push_error((String(get_class()) + ": invalid helper_path2d_anchor, keeping the old value."));
 		return;
 	}
 	helper_path2d_anchor = (int)value;
@@ -229,7 +229,7 @@ PatternSpawner2D::Path2DFacing PatternSpawner2D::get_helper_path2d_facing() cons
 
 void PatternSpawner2D::set_helper_path2d_facing(Path2DFacing value) {
 	if (value < PATH2D_FACING_ALONG_PATH || value > PATH2D_FACING_NORMAL_M90) {
-		UtilityFunctions::push_error("BulletSpawner2D: invalid helper_path2d_facing, keeping the old value.");
+		UtilityFunctions::push_error((String(get_class()) + ": invalid helper_path2d_facing, keeping the old value."));
 		return;
 	}
 	helper_path2d_facing = (int)value;
@@ -240,7 +240,7 @@ void PatternSpawner2D::apply_pattern_preset(int preset) {
 	// Out-of-range presets used to fall into `default:` and silently no-op.
 	// Fail loud instead so a typo'd sequence entry is visible immediately.
 	if (preset < (int)BulletPatterns2D::PATTERN_PRESET_CUSTOM || preset > (int)BulletPatterns2D::PATTERN_PRESET_TERRAIN_CREST) {
-		UtilityFunctions::push_error("BulletSpawner2D::apply_pattern_preset: preset out of range, nothing applied.");
+		UtilityFunctions::push_error((String(get_class()) + "::apply_pattern_preset: preset out of range, nothing applied."));
 		return;
 	}
 	if (preset == (int)BulletPatterns2D::PATTERN_PRESET_CUSTOM) {
@@ -285,15 +285,15 @@ void PatternSpawner2D::apply_pattern_preset(int preset) {
 	}                                                                                                      \
 	void PatternSpawner2D::set_##NAME(PTYPE value) {                                                       \
 		if (!PatternKnobCheck2D::FITS(value, NAME)) {                                                      \
-			pattern_knob_reject2d(#NAME, PatternKnobCheck2D::FITS_INT_MESSAGE);                            \
+			pattern_knob_reject2d(#NAME, PatternKnobCheck2D::FITS_INT_MESSAGE, get_class());               \
 			return;                                                                                        \
 		}                                                                                                  \
 		if (PatternKnobCheck2D::C1(value, A1, B1)) {                                                       \
-			pattern_knob_reject2d(#NAME, M1);                                                              \
+			pattern_knob_reject2d(#NAME, M1, get_class());                                                 \
 			return;                                                                                        \
 		}                                                                                                  \
 		if (PatternKnobCheck2D::C2(value, A2, B2)) {                                                       \
-			pattern_knob_reject2d(#NAME, M2);                                                              \
+			pattern_knob_reject2d(#NAME, M2, get_class());                                                 \
 			return;                                                                                        \
 		}                                                                                                  \
 		NAME = (CTYPE)value;                                                                               \

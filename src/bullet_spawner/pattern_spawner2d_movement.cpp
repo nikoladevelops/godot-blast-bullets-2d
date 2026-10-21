@@ -63,7 +63,7 @@ void PatternSpawner2D::set_movement_path_node(Path2D *node) {
 }
 
 // Small reject-and-keep helpers for the movement setters.
-static bool movement_reject(bool bad, const char *message) {
+static bool movement_reject(bool bad, const String &message) {
 	if (bad) {
 		UtilityFunctions::push_error(message);
 	}
@@ -73,7 +73,7 @@ static bool movement_reject(bool bad, const char *message) {
 PatternSpawner2D::MovementSpace PatternSpawner2D::get_movement_space() const { return static_cast<MovementSpace>(movement_space); }
 
 void PatternSpawner2D::set_movement_space(MovementSpace value) {
-	if (movement_reject(value < MOVEMENT_SPACE_ATTACH || value > MOVEMENT_SPACE_RELATIVE_TO_START, "BulletSpawner2D: movement_space must be 0 (Attach) or 1 (Relative To Start), keeping the old value.")) {
+	if (movement_reject(value < MOVEMENT_SPACE_ATTACH || value > MOVEMENT_SPACE_RELATIVE_TO_START, (String(get_class()) + ": movement_space must be 0 (Attach) or 1 (Relative To Start), keeping the old value."))) {
 		return;
 	}
 	movement_space = value;
@@ -82,7 +82,7 @@ void PatternSpawner2D::set_movement_space(MovementSpace value) {
 PatternSpawner2D::MovementLoopMode PatternSpawner2D::get_movement_loop_mode() const { return static_cast<MovementLoopMode>(movement_loop_mode); }
 
 void PatternSpawner2D::set_movement_loop_mode(MovementLoopMode value) {
-	if (movement_reject(value < MOVEMENT_LOOP_ONCE || value > MOVEMENT_LOOP_PING_PONG, "BulletSpawner2D: movement_loop_mode must be 0 (Once), 1 (Loop) or 2 (Ping Pong), keeping the old value.")) {
+	if (movement_reject(value < MOVEMENT_LOOP_ONCE || value > MOVEMENT_LOOP_PING_PONG, (String(get_class()) + ": movement_loop_mode must be 0 (Once), 1 (Loop) or 2 (Ping Pong), keeping the old value."))) {
 		return;
 	}
 	movement_loop_mode = value;
@@ -92,7 +92,7 @@ void PatternSpawner2D::set_movement_loop_mode(MovementLoopMode value) {
 PatternSpawner2D::MovementDirection PatternSpawner2D::get_movement_direction() const { return static_cast<MovementDirection>(movement_direction); }
 
 void PatternSpawner2D::set_movement_direction(MovementDirection value) {
-	if (movement_reject(value < MOVEMENT_DIRECTION_FORWARD || value > MOVEMENT_DIRECTION_REVERSE, "BulletSpawner2D: movement_direction must be 0 (Forward) or 1 (Reverse), keeping the old value.")) {
+	if (movement_reject(value < MOVEMENT_DIRECTION_FORWARD || value > MOVEMENT_DIRECTION_REVERSE, (String(get_class()) + ": movement_direction must be 0 (Forward) or 1 (Reverse), keeping the old value."))) {
 		return;
 	}
 	movement_direction = value;
@@ -101,7 +101,7 @@ void PatternSpawner2D::set_movement_direction(MovementDirection value) {
 int PatternSpawner2D::get_movement_loops() const { return movement_loops; }
 
 void PatternSpawner2D::set_movement_loops(int value) {
-	if (movement_reject(value < 0, "BulletSpawner2D: movement_loops must be >= 0 (0 = forever), keeping the old value.")) {
+	if (movement_reject(value < 0, (String(get_class()) + ": movement_loops must be >= 0 (0 = forever), keeping the old value."))) {
 		return;
 	}
 	movement_loops = value;
@@ -110,7 +110,7 @@ void PatternSpawner2D::set_movement_loops(int value) {
 PatternSpawner2D::MovementTiming PatternSpawner2D::get_movement_timing() const { return static_cast<MovementTiming>(movement_timing); }
 
 void PatternSpawner2D::set_movement_timing(MovementTiming value) {
-	if (movement_reject(value < MOVEMENT_TIMING_DURATION || value > MOVEMENT_TIMING_SPEED, "BulletSpawner2D: movement_timing must be 0 (Duration) or 1 (Speed), keeping the old value.")) {
+	if (movement_reject(value < MOVEMENT_TIMING_DURATION || value > MOVEMENT_TIMING_SPEED, (String(get_class()) + ": movement_timing must be 0 (Duration) or 1 (Speed), keeping the old value."))) {
 		return;
 	}
 	movement_timing = value;
@@ -120,7 +120,7 @@ void PatternSpawner2D::set_movement_timing(MovementTiming value) {
 double PatternSpawner2D::get_movement_duration_sec() const { return movement_duration_sec; }
 
 void PatternSpawner2D::set_movement_duration_sec(double value) {
-	if (movement_reject(!is_finite_real2d(value) || value <= 0.0, "BulletSpawner2D: movement_duration_sec must be finite and > 0, keeping the old value.")) {
+	if (movement_reject(!is_finite_real2d(value) || value <= 0.0, (String(get_class()) + ": movement_duration_sec must be finite and > 0, keeping the old value."))) {
 		return;
 	}
 	movement_duration_sec = value;
@@ -129,7 +129,7 @@ void PatternSpawner2D::set_movement_duration_sec(double value) {
 double PatternSpawner2D::get_movement_speed() const { return movement_speed; }
 
 void PatternSpawner2D::set_movement_speed(double value) {
-	if (movement_reject(!is_finite_real2d(value) || value <= 0.0, "BulletSpawner2D: movement_speed must be finite and > 0, keeping the old value.")) {
+	if (movement_reject(!is_finite_real2d(value) || value <= 0.0, (String(get_class()) + ": movement_speed must be finite and > 0, keeping the old value."))) {
 		return;
 	}
 	movement_speed = value;
@@ -138,7 +138,7 @@ void PatternSpawner2D::set_movement_speed(double value) {
 Tween::TransitionType PatternSpawner2D::get_movement_transition() const { return static_cast<Tween::TransitionType>(movement_transition); }
 
 void PatternSpawner2D::set_movement_transition(Tween::TransitionType value) {
-	if (movement_reject(value < 0 || value >= Easing2D::TRANS_COUNT, "BulletSpawner2D: movement_transition must be a Tween.TransitionType (0..11), keeping the old value.")) {
+	if (movement_reject(value < 0 || value >= Easing2D::TRANS_COUNT, (String(get_class()) + ": movement_transition must be a Tween.TransitionType (0..11), keeping the old value."))) {
 		return;
 	}
 	movement_transition = value;
@@ -147,7 +147,7 @@ void PatternSpawner2D::set_movement_transition(Tween::TransitionType value) {
 Tween::EaseType PatternSpawner2D::get_movement_ease() const { return static_cast<Tween::EaseType>(movement_ease); }
 
 void PatternSpawner2D::set_movement_ease(Tween::EaseType value) {
-	if (movement_reject(value < 0 || value >= Easing2D::EASE_COUNT, "BulletSpawner2D: movement_ease must be a Tween.EaseType (0..3), keeping the old value.")) {
+	if (movement_reject(value < 0 || value >= Easing2D::EASE_COUNT, (String(get_class()) + ": movement_ease must be a Tween.EaseType (0..3), keeping the old value."))) {
 		return;
 	}
 	movement_ease = value;
@@ -163,7 +163,7 @@ void PatternSpawner2D::set_movement_progress_curve(const Ref<Curve> &value) {
 double PatternSpawner2D::get_movement_start_ratio() const { return movement_start_ratio; }
 
 void PatternSpawner2D::set_movement_start_ratio(double value) {
-	if (movement_reject(!is_finite_real2d(value) || value < 0.0 || value > 1.0, "BulletSpawner2D: movement_start_ratio must be in [0, 1], keeping the old value.")) {
+	if (movement_reject(!is_finite_real2d(value) || value < 0.0 || value > 1.0, (String(get_class()) + ": movement_start_ratio must be in [0, 1], keeping the old value."))) {
 		return;
 	}
 	movement_start_ratio = value;
@@ -172,7 +172,7 @@ void PatternSpawner2D::set_movement_start_ratio(double value) {
 double PatternSpawner2D::get_movement_start_delay_sec() const { return movement_start_delay_sec; }
 
 void PatternSpawner2D::set_movement_start_delay_sec(double value) {
-	if (movement_reject(!is_finite_real2d(value) || value < 0.0, "BulletSpawner2D: movement_start_delay_sec must be finite and >= 0, keeping the old value.")) {
+	if (movement_reject(!is_finite_real2d(value) || value < 0.0, (String(get_class()) + ": movement_start_delay_sec must be finite and >= 0, keeping the old value."))) {
 		return;
 	}
 	movement_start_delay_sec = value;
@@ -181,7 +181,7 @@ void PatternSpawner2D::set_movement_start_delay_sec(double value) {
 double PatternSpawner2D::get_movement_endpoint_pause_sec() const { return movement_endpoint_pause_sec; }
 
 void PatternSpawner2D::set_movement_endpoint_pause_sec(double value) {
-	if (movement_reject(!is_finite_real2d(value) || value < 0.0, "BulletSpawner2D: movement_endpoint_pause_sec must be finite and >= 0, keeping the old value.")) {
+	if (movement_reject(!is_finite_real2d(value) || value < 0.0, (String(get_class()) + ": movement_endpoint_pause_sec must be finite and >= 0, keeping the old value."))) {
 		return;
 	}
 	movement_endpoint_pause_sec = value;
@@ -197,7 +197,7 @@ void PatternSpawner2D::set_movement_rotate_with_path(bool value) {
 double PatternSpawner2D::get_movement_rotation_offset_deg() const { return movement_rotation_offset_deg; }
 
 void PatternSpawner2D::set_movement_rotation_offset_deg(double value) {
-	if (movement_reject(!is_finite_real2d(value), "BulletSpawner2D: movement_rotation_offset_deg must be finite, keeping the old value.")) {
+	if (movement_reject(!is_finite_real2d(value), (String(get_class()) + ": movement_rotation_offset_deg must be finite, keeping the old value."))) {
 		return;
 	}
 	movement_rotation_offset_deg = value;
@@ -221,7 +221,7 @@ void PatternSpawner2D::set_inherit_movement_velocity(bool value) {
 double PatternSpawner2D::get_movement_velocity_inherit_factor() const { return movement_velocity_inherit_factor; }
 
 void PatternSpawner2D::set_movement_velocity_inherit_factor(double value) {
-	if (movement_reject(!is_finite_real2d(value), "BulletSpawner2D: movement_velocity_inherit_factor must be finite, keeping the old value.")) {
+	if (movement_reject(!is_finite_real2d(value), (String(get_class()) + ": movement_velocity_inherit_factor must be finite, keeping the old value."))) {
 		return;
 	}
 	movement_velocity_inherit_factor = value;
@@ -270,7 +270,7 @@ bool PatternSpawner2D::apply_movement_pose(double delta) {
 	if (path == nullptr || !path->is_inside_tree() || curve.is_null() || !(length > 0.0) || !Math::is_finite(length)) {
 		if (!movement_warned_unusable_path) {
 			movement_warned_unusable_path = true;
-			UtilityFunctions::push_warning("BulletSpawner2D: movement_path is not a Path2D with a non-empty curve in the tree; the spawner stays where it is.");
+			UtilityFunctions::push_warning((String(get_class()) + ": movement_path is not a Path2D with a non-empty curve in the tree; the spawner stays where it is."));
 		}
 		movement_velocity = Vector2();
 		return false;
@@ -477,16 +477,16 @@ void PatternSpawner2D::movement_stop(bool reset_to_start) {
 
 void PatternSpawner2D::teleport(const Vector2 &new_global_position, bool carry_live_bullets) {
 	if (!new_global_position.is_finite()) {
-		UtilityFunctions::push_error("BulletSpawner2D::teleport: global_position must be finite, the spawner stays where it is.");
+		UtilityFunctions::push_error((String(get_class()) + "::teleport: global_position must be finite, the spawner stays where it is."));
 		return;
 	}
 	if (!is_inside_tree()) {
-		UtilityFunctions::push_error("BulletSpawner2D::teleport: the spawner is outside the scene tree, it stays where it is.");
+		UtilityFunctions::push_error((String(get_class()) + "::teleport: the spawner is outside the scene tree, it stays where it is."));
 		return;
 	}
 	const Vector2 jump = new_global_position - get_global_position();
 	if (!jump.is_finite()) {
-		UtilityFunctions::push_error("BulletSpawner2D::teleport: global_position must be finite, the spawner stays where it is.");
+		UtilityFunctions::push_error((String(get_class()) + "::teleport: global_position must be finite, the spawner stays where it is."));
 		return;
 	}
 	set_global_position(new_global_position);
@@ -506,7 +506,7 @@ void PatternSpawner2D::teleport(const Vector2 &new_global_position, bool carry_l
 
 void PatternSpawner2D::movement_seek(double ratio) {
 	if (!Math::is_finite(ratio) || ratio < 0.0 || ratio > 1.0) {
-		UtilityFunctions::push_error("BulletSpawner2D::movement_seek: ratio must be in [0, 1], ignoring.");
+		UtilityFunctions::push_error((String(get_class()) + "::movement_seek: ratio must be in [0, 1], ignoring."));
 		return;
 	}
 	++movement_epoch;

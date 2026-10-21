@@ -20,19 +20,19 @@ PackedVector2Array PatternSpawner2D::sample_path2d_polyline(bool quiet) const {
 	Node *node = get_helper_path2d_node();
 	if (node == nullptr) {
 		if (!quiet)
-			UtilityFunctions::push_error("BulletSpawner2D::collect_spawn_transforms: Path2D mode has no node assigned (helper_path2d_path).");
+			UtilityFunctions::push_error((String(get_class()) + "::collect_spawn_transforms: Path2D mode has no node assigned (helper_path2d_path)."));
 		return PackedVector2Array();
 	}
 	Path2D *path = Object::cast_to<Path2D>(node);
 	if (path == nullptr) {
 		if (!quiet)
-			UtilityFunctions::push_error("BulletSpawner2D: Path2D mode needs a Path2D node.");
+			UtilityFunctions::push_error((String(get_class()) + ": Path2D mode needs a Path2D node."));
 		return PackedVector2Array();
 	}
 	Ref<Curve2D> curve = path->get_curve();
 	if (curve.is_null()) {
 		if (!quiet)
-			UtilityFunctions::push_warning("BulletSpawner2D: Path2D mode curve has no Curve2D.");
+			UtilityFunctions::push_warning((String(get_class()) + ": Path2D mode curve has no Curve2D."));
 		return PackedVector2Array();
 	}
 	PackedVector2Array pts = curve->get_baked_points();
@@ -42,13 +42,13 @@ PackedVector2Array PatternSpawner2D::sample_path2d_polyline(bool quiet) const {
 	for (int i = 0; i < pts.size(); ++i) {
 		if (!pts[i].is_finite()) {
 			if (!quiet)
-				UtilityFunctions::push_warning("BulletSpawner2D: Path2D curve contains non-finite points; volley skipped.");
+				UtilityFunctions::push_warning((String(get_class()) + ": Path2D curve contains non-finite points; volley skipped."));
 			return PackedVector2Array();
 		}
 	}
 	if (pts.size() < 2) {
 		if (!quiet)
-			UtilityFunctions::push_warning("BulletSpawner2D: Path2D curve needs at least 2 baked points.");
+			UtilityFunctions::push_warning((String(get_class()) + ": Path2D curve needs at least 2 baked points."));
 		return PackedVector2Array();
 	}
 	// Follow Generator (default): the curve SHAPE is copied onto the
@@ -152,6 +152,7 @@ PatternSlots2D PatternSpawner2D::generate_raw_pattern(Node2D *base, const Transf
 	in.mirror_sign = mirror_sign;
 	in.quiet = quiet;
 	in.warn_owner_id = get_instance_id();
+	in.owner_class = get_class();
 	std::vector<Transform2D> children;
 	PackedVector2Array path_pts;
 	switch (pattern_source) {
@@ -304,7 +305,7 @@ void PatternSpawner2D::resolve_raw_pattern(Node2D *base, const Transform2D &mark
 		// and the bake cache.
 		r_out = generate_raw_pattern(base, m, mirror_sign, q);
 	};
-	pattern_cache.resolve(channel, pattern_cache_version2d(pattern_version), cache_on, pattern_source_reads_external_state(pattern_source), marker, quiet, generate, r_raw, String("BulletSpawner2D: pattern cache mismatch (pattern_source ") + itos(pattern_source));
+	pattern_cache.resolve(channel, pattern_cache_version2d(pattern_version), cache_on, pattern_source_reads_external_state(pattern_source), marker, quiet, generate, r_raw, String((String(get_class()) + ": pattern cache mismatch (pattern_source ")) + itos(pattern_source));
 }
 
 bool PatternSpawner2D::preview_survives_marker_move(const Transform2D &old_marker, const Transform2D &new_marker) const {
@@ -317,7 +318,7 @@ PatternSpawner2D::PatternCacheMode PatternSpawner2D::get_pattern_cache_mode() co
 
 void PatternSpawner2D::set_pattern_cache_mode(PatternCacheMode value) {
 	if (value < PATTERN_CACHE_AUTO || value > PATTERN_CACHE_OFF) {
-		UtilityFunctions::push_error("BulletSpawner2D: pattern_cache_mode must be 0 (Auto) or 1 (Off), keeping the old value.");
+		UtilityFunctions::push_error((String(get_class()) + ": pattern_cache_mode must be 0 (Auto) or 1 (Off), keeping the old value."));
 		return;
 	}
 	pattern_cache_mode = value;
@@ -361,7 +362,7 @@ void PatternSpawner2D::collect_spawn_transforms_native(bool quiet, std::vector<T
 		// Outside the tree there is no valid global transform; report loudly
 		// for real shots, stay silent for the preview.
 		if (!quiet) {
-			UtilityFunctions::push_error("BulletSpawner2D::collect_spawn_transforms: spawner is outside the scene tree.");
+			UtilityFunctions::push_error((String(get_class()) + "::collect_spawn_transforms: spawner is outside the scene tree."));
 		}
 		return;
 	}
@@ -423,7 +424,7 @@ void PatternSpawner2D::collect_spawn_transforms_native(bool quiet, std::vector<T
 		// the shot path would otherwise warn every volley.
 		if (out_of_range && !quiet) {
 			WarnOnce2D::warn(get_instance_id(), kWarnSkipIndexOutOfRange, (int64_t)pattern_version, raw_count,
-					"BulletSpawner2D: helper_skip_indices holds an index outside 0.." + itos(raw_count - 1) + "; it is ignored.");
+					(String(get_class()) + ": helper_skip_indices holds an index outside 0..") + itos(raw_count - 1) + "; it is ignored.");
 		}
 	}
 	PatternPose2D::pose(raw, spin_scale_mx, use_spin_scale_mx, any_skip ? &skip_mask_scratch : nullptr, local_factor, r_out);

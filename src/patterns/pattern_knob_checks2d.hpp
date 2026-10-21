@@ -55,8 +55,8 @@ static inline bool VEC_FINITE_SIDES_GE0(const Vector2 &v, double, double) { retu
 
 // "<owner>: <knob> <message>, keeping the old value." (the one wording every
 // knob rejection uses).
-static inline void pattern_knob_reject2d(const char *knob, const String &message, const char *owner = "BulletSpawner2D") {
-	UtilityFunctions::push_error(String(owner) + ": " + knob + " " + message + ", keeping the old value.");
+static inline void pattern_knob_reject2d(const char *knob, const String &message, const String &owner) {
+	UtilityFunctions::push_error(owner + String(": ") + knob + " " + message + ", keeping the old value.");
 }
 
 // Array knobs with hand-written accessors: an empty String when the value is

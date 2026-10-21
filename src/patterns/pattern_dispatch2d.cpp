@@ -173,7 +173,7 @@ PatternSlots2D PatternKnobs2D::generate_raw(const PatternInputs2D &in) const {
 		case PATTERN_SHAPE_AIMED: {
 			if (!in.has_aim_target) {
 				if (!quiet) {
-					UtilityFunctions::push_error("BulletSpawner2D::collect_spawn_transforms: no aimed target assigned (helper_aimed_target_path).");
+					UtilityFunctions::push_error(String(in.owner_class) + "::collect_spawn_transforms: no aimed target assigned (helper_aimed_target_path).");
 				}
 				break;
 			}
@@ -323,7 +323,7 @@ PatternSlots2D PatternKnobs2D::generate_raw(const PatternInputs2D &in) const {
 			// (load order) with one warning, then the shot has no slots.
 			if ((int64_t)helper_waterfall_columns * (int64_t)helper_waterfall_rows > (int64_t)pattern_max_grid_slots()) {
 				if (!quiet) {
-					WarnOnce2D::warn(in.warn_owner_id, kPatternWarnGridTooLarge, helper_waterfall_columns, helper_waterfall_rows, String("BulletSpawner2D: helper_waterfall_columns * helper_waterfall_rows exceeds ") + itos(pattern_max_grid_slots()) + " slots; lower them.");
+					WarnOnce2D::warn(in.warn_owner_id, kPatternWarnGridTooLarge, helper_waterfall_columns, helper_waterfall_rows, in.owner_class + String(": helper_waterfall_columns * helper_waterfall_rows exceeds ") + itos(pattern_max_grid_slots()) + " slots; lower them.");
 				}
 				break;
 			}
@@ -346,7 +346,7 @@ PatternSlots2D PatternKnobs2D::generate_raw(const PatternInputs2D &in) const {
 			// (load order) with one warning, then the shot has no slots.
 			if ((int64_t)helper_lattice_columns * (int64_t)helper_lattice_rows > (int64_t)pattern_max_grid_slots()) {
 				if (!quiet) {
-					WarnOnce2D::warn(in.warn_owner_id, kPatternWarnGridTooLarge, helper_lattice_columns, helper_lattice_rows, String("BulletSpawner2D: helper_lattice_columns * helper_lattice_rows exceeds ") + itos(pattern_max_grid_slots()) + " slots; lower them.");
+					WarnOnce2D::warn(in.warn_owner_id, kPatternWarnGridTooLarge, helper_lattice_columns, helper_lattice_rows, in.owner_class + String(": helper_lattice_columns * helper_lattice_rows exceeds ") + itos(pattern_max_grid_slots()) + " slots; lower them.");
 				}
 				break;
 			}
@@ -399,7 +399,7 @@ PatternSlots2D PatternKnobs2D::generate_raw(const PatternInputs2D &in) const {
 			if (helper_corridor_gap_width >= helper_corridor_width) {
 				if (!quiet) {
 					WarnOnce2D::warn(in.warn_owner_id, kPatternWarnCorridorGap, WarnOnce2D::key_of(helper_corridor_gap_width * 1000.0), WarnOnce2D::key_of(helper_corridor_width * 1000.0),
-							"BulletSpawner2D: helper_corridor_gap_width must be smaller than helper_corridor_width; using half the width for the door.");
+							String(in.owner_class) + ": helper_corridor_gap_width must be smaller than helper_corridor_width; using half the width for the door.");
 				}
 			}
 			{
@@ -437,12 +437,12 @@ PatternSlots2D PatternKnobs2D::generate_raw(const PatternInputs2D &in) const {
 			const int cn = helper_custom_transforms.size();
 			if (cn <= 0) {
 				if (!quiet)
-					UtilityFunctions::push_error("BulletSpawner2D::collect_spawn_transforms: helper_custom_transforms is empty.");
+					UtilityFunctions::push_error(String(in.owner_class) + "::collect_spawn_transforms: helper_custom_transforms is empty.");
 				break;
 			}
 			if (!marker.is_finite()) {
 				if (!quiet)
-					UtilityFunctions::push_error("BulletSpawner2D::collect_spawn_transforms: Custom mode marker transform is not finite.");
+					UtilityFunctions::push_error(String(in.owner_class) + "::collect_spawn_transforms: Custom mode marker transform is not finite.");
 				break;
 			}
 			const int custom_sel = (helper_custom_facing >= 0 && helper_custom_facing <= 4) ? helper_custom_facing : 0;
@@ -571,14 +571,14 @@ PatternSlots2D PatternKnobs2D::generate_raw(const PatternInputs2D &in) const {
 			if (in.path_points == nullptr || in.path_points->is_empty()) {
 				break; // the sampler already reported the exact cause
 			}
-			raw = layout_path2d(marker, *in.path_points, helper_bullets_amount, quiet);
+			raw = layout_path2d(marker, *in.path_points, helper_bullets_amount, quiet, in.owner_class);
 			break;
 		}
 		default: {
 			// Unknown source (corrupt scene int, version skew): fail loud so
 			// a dead mode can never hide as Children behavior again.
 			if (!quiet) {
-				UtilityFunctions::push_error(String("BulletSpawner2D::collect_spawn_transforms: unknown pattern_source ") + itos(in.source) + ", falling back to the generator itself.");
+				UtilityFunctions::push_error(in.owner_class + String("::collect_spawn_transforms: unknown pattern_source ") + itos(in.source) + ", falling back to the generator itself.");
 			}
 			raw.push_back(marker);
 			break;
@@ -590,7 +590,7 @@ PatternSlots2D PatternKnobs2D::generate_raw(const PatternInputs2D &in) const {
 // Path2D mode: the shared polyline layout (patterns/patterns_polyline.cpp)
 // fed with the helper_path2d_* knobs (ids mirror BulletPatterns2D's
 // Polyline* enums, locked by test).
-PatternSlots2D PatternKnobs2D::layout_path2d(const Transform2D &marker, const PackedVector2Array &path_pts, int count, bool quiet) const {
+PatternSlots2D PatternKnobs2D::layout_path2d(const Transform2D &marker, const PackedVector2Array &path_pts, int count, bool quiet, const String &owner_class) const {
 	PolylineLayout2D p;
 	p.closed = helper_path2d_closed;
 	p.distribution = helper_path2d_distribution;
@@ -601,7 +601,8 @@ PatternSlots2D PatternKnobs2D::layout_path2d(const Transform2D &marker, const Pa
 	p.reverse = helper_path2d_reverse;
 	p.facing = helper_path2d_facing;
 	p.facing_offset_deg = helper_path2d_facing_offset_deg;
-	return polyline_layout2d(marker, path_pts, count, p, quiet, "BulletSpawner2D::collect_spawn_transforms");
+	const CharString caller = (String(owner_class) + "::collect_spawn_transforms").utf8();
+	return polyline_layout2d(marker, path_pts, count, p, quiet, caller.get_data());
 }
 
 } //namespace BlastBullets2D

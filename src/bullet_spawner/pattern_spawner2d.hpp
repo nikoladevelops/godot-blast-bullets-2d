@@ -846,7 +846,8 @@ public:
 	// Internal chain machinery (the auto loop drives these).
 	void begin_burst_chain(bool auto_started);
 	// One pattern-list entry: apply, fire, restore. True when it fired.
-	bool fire_pattern_list_override(const Variant &entry, const char *caller = "BulletSpawner2D::spawn_pattern_list");
+	// caller names the API in errors (empty = "<class>::spawn_pattern_list").
+	bool fire_pattern_list_override(const Variant &entry, const String &caller = String());
 	void begin_telegraph(bool auto_started);
 	void fire_burst_volley();
 	// Ends a running chain early (auto-fire off, burst mode off, count
@@ -1595,7 +1596,7 @@ protected:
 	// Sequencer internals: validates one Dictionary entry (preset /
 	// source / amount / spawn_data overrides) and fires the next queued
 	// entry for the _process driver.
-	bool apply_pattern_list_entry(const Variant &entry, const char *caller = "BulletSpawner2D::spawn_pattern_list");
+	bool apply_pattern_list_entry(const Variant &entry, const String &caller = String());
 	void fire_pattern_list_entry();
 	// Live Path2D outline in generator-local pixels. Empty when unusable;
 	// quiet suppresses warnings (preview).

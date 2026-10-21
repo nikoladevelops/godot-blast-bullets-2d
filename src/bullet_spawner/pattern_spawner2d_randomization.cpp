@@ -12,13 +12,13 @@ namespace BlastBullets2D {
 
 // ---- Setters: finite / range only, never against the other end of a pair ----
 
-#define BLAST_RANDOM_SETTER(NAME, CONDITION, TEXT)                                                                          \
-	void PatternSpawner2D::set_##NAME(double value) {                                                                       \
-		if (!Math::is_finite(value) || !(CONDITION)) {                                                                      \
-			UtilityFunctions::push_error("BulletSpawner2D: " #NAME " must be finite and " TEXT ", keeping the old value."); \
-			return;                                                                                                         \
-		}                                                                                                                   \
-		NAME = value;                                                                                                       \
+#define BLAST_RANDOM_SETTER(NAME, CONDITION, TEXT)                                                                                 \
+	void PatternSpawner2D::set_##NAME(double value) {                                                                              \
+		if (!Math::is_finite(value) || !(CONDITION)) {                                                                             \
+			UtilityFunctions::push_error(String(get_class()) + ": " #NAME " must be finite and " TEXT ", keeping the old value."); \
+			return;                                                                                                                \
+		}                                                                                                                          \
+		NAME = value;                                                                                                              \
 	}
 
 BLAST_RANDOM_SETTER(bullet_scale_min, value > 0.0, "> 0")
@@ -37,7 +37,7 @@ BLAST_RANDOM_SETTER(telegraph_max_sec, is_finite_real2d(value) && value >= 0.0, 
 
 void PatternSpawner2D::set_bullet_scale_mode(BulletScaleMode value) {
 	if (value < BULLET_SCALE_OFF || value > BULLET_SCALE_PER_AXIS) {
-		UtilityFunctions::push_error("BulletSpawner2D: bullet_scale_mode must be 0 (Off), 1 (Uniform) or 2 (Per Axis), keeping the old value.");
+		UtilityFunctions::push_error((String(get_class()) + ": bullet_scale_mode must be 0 (Off), 1 (Uniform) or 2 (Per Axis), keeping the old value."));
 		return;
 	}
 	bullet_scale_mode = value;
@@ -50,7 +50,7 @@ static bool scale_xy_ok(const Vector2 &v) {
 
 void PatternSpawner2D::set_bullet_scale_min_xy(const Vector2 &value) {
 	if (!scale_xy_ok(value)) {
-		UtilityFunctions::push_error("BulletSpawner2D: bullet_scale_min_xy must be finite with both components > 0, keeping the old value.");
+		UtilityFunctions::push_error((String(get_class()) + ": bullet_scale_min_xy must be finite with both components > 0, keeping the old value."));
 		return;
 	}
 	bullet_scale_min_xy = value;
@@ -58,7 +58,7 @@ void PatternSpawner2D::set_bullet_scale_min_xy(const Vector2 &value) {
 
 void PatternSpawner2D::set_bullet_scale_max_xy(const Vector2 &value) {
 	if (!scale_xy_ok(value)) {
-		UtilityFunctions::push_error("BulletSpawner2D: bullet_scale_max_xy must be finite with both components > 0, keeping the old value.");
+		UtilityFunctions::push_error((String(get_class()) + ": bullet_scale_max_xy must be finite with both components > 0, keeping the old value."));
 		return;
 	}
 	bullet_scale_max_xy = value;

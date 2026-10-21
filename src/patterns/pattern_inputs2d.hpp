@@ -48,6 +48,9 @@ struct PatternInputs2D {
 	real_t mirror_sign = 1.0; // -1 winds spirals the other way
 	bool quiet = false; // preview/probe: never report
 	uint64_t warn_owner_id = 0; // WarnOnce2D owner (the spawner)
+	// The spawner's class, naming it in the messages below (BulletPatterns2D
+	// .generate keeps the default).
+	String owner_class = "BulletSpawner2D";
 	// CHILDREN: the global transforms of the marker's Node2D children
 	// (empty or null: the marker itself).
 	const std::vector<Transform2D> *children = nullptr;
