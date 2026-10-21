@@ -109,7 +109,8 @@ void BulletVolley2D::bullet_set_velocity(int bullet_index, const Vector2 &new_ve
 	}
 
 	all_cached_speed[bullet_index] = new_speed;
-	if (all_cached_max_speed[bullet_index] < new_speed) {
+	// max_speed <= 0 is unlimited (bullet_accelerate_speed): only a cap rises.
+	if (all_cached_max_speed[bullet_index] > 0.0 && all_cached_max_speed[bullet_index] < new_speed) {
 		all_cached_max_speed[bullet_index] = new_speed;
 	}
 	refresh_cached_velocity(bullet_index);

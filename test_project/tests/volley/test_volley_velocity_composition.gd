@@ -106,3 +106,20 @@ func test_setters_keep_the_fall_speed_in_the_reported_velocity(setter_index: int
 	factory.debug_advance_time(DT)
 	var moved: Vector2 = (v.get_bullet_global_transform(0).origin - p0) / DT
 	assert_almost_eq(moved, reported + Vector2(0, 400) * DT, Vector2(0.05, 0.05), "%s: the next tick flies the reported velocity (+ g dt)" % setter)
+
+
+## max_speed 0 means unlimited: a velocity write keeps it unlimited (the
+## bullet keeps accelerating past the speed that was set), while a capped
+## bullet's cap rises to the written speed so the write sticks.
+func test_a_velocity_write_keeps_an_unlimited_max_speed_unlimited() -> void:
+	var d := H.make_volley_data(2, 100.0, 30.0)
+	d.all_bullet_speed_data = [H.make_speed(100.0, 0.0, 60.0), H.make_speed(100.0, 150.0, 0.0)]
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	await idle(1)
+	v.bullet_set_velocity(0, Vector2(200, 0))
+	v.bullet_set_velocity(1, Vector2(200, 0))
+	for i in 60:
+		factory.debug_advance_time(DT)
+	assert_eq(v.get_bullet_speed_data(0).max_speed, 0.0, "still unlimited")
+	assert_almost_eq(v.get_bullet_velocity(0).length(), 260.0, 0.5, "one second at 60 px/s² on top of the 200 that was set")
+	assert_almost_eq(v.get_bullet_velocity(1).length(), 200.0, 0.01, "the 150 cap rose to the written 200")

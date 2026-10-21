@@ -2353,8 +2353,9 @@ public:
 	// Sets a bullet's velocity directly (wind, knockback, split inheritance).
 	// Decomposes into direction + speed so the per-tick integrator
 	// (velocity = direction * speed + inherited offset) keeps producing exactly
-	// this velocity. max_speed is raised when below the new speed so the next
-	// tick doesn't snap it back down. Non-finite input is rejected.
+	// this velocity. A capped max_speed is raised when below the new speed so
+	// the next tick doesn't snap it back down (0 stays unlimited). Non-finite
+	// input is rejected.
 	void bullet_set_velocity(int bullet_index, const Vector2 &new_velocity);
 	void all_bullets_set_velocity(const Vector2 &new_velocity, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 	TypedArray<Vector2> all_bullets_get_velocity(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) const;
