@@ -337,6 +337,10 @@ Sections:
 - `flock`: seeded flock flights (each rule alone, defaults, cap, turn cap,
   face_heading off, wide separation, a parting stack, Shared vs Per Volley,
   a homing swarm): poses, headings, steering vectors and neighbor counts.
+- `lasers`: deterministic laser flights at 1/16 s ticks (every type x aim,
+  walls, reflections, extension, sweeps, pierce limits, hit intervals,
+  graze) among fixed targets: per-tick geometry and every laser signal; plus
+  one LaserSpawner2D shot per pattern source (every `*_seed` knob set).
 
 Unseeded randomness is detected (each call runs twice) and recorded by size
 only. `save` refuses a stale build. `diff a b` exits 1 on any difference and
@@ -613,7 +617,8 @@ Pinned by `spawner/test_spawner_pattern_counts.gd`,
    (watch retraces: odd roses, shared-factor Lissajous, multi-revolution
    spirographs); self-crossing curves use `resample_loop_even_distinct`.
 3. Pure function of its inputs (the bake cache relies on it; random
-   patterns take a seed; seed 0 = the global RNG).
+   patterns take a seed; seed 0 = a fresh seed from the clock, so tests and
+   snapshots always set one).
 4. The preview track draws the curve the bullets sit on, for EVERY source
    (dots within 1.5 px x pattern_scale). Formulas both sides need live in
    `patterns_internal.hpp` / `pattern_curves2d.hpp`.
@@ -999,6 +1004,11 @@ deduped, cancelled by REMOVED) and replayed once on resume.
 | Emitter bullets: one shot per bullet per tick (no catch-up burst), fired after the sweep through the template (auto-fire error latch), caps carry over / drop with one warning, a chain back to the spawner refused once | `spawner/test_spawner_emitters` |
 | Lasers: phases announced once each inside the tick, contacts end only after they started, pierce_limit cuts beams and spends bolts, a wall stops (once per block) or reflects, interpolation keeps a sweeping beam on its muzzle | the `laser/` suites |
 | A factory queued for deletion (a free refused under its emit guard) stops its sweep: no spawn outside the tree, `debug_advance_time` refuses it | `integration/test_release_free_matrix` |
+| A pooled or never-fired laser refuses every write once; the pool strips custom data, metadata, groups and node settings | `laser/test_laser_pooled_handle` |
+| Inside every laser signal a handler may end, re-arm, retarget, edit the shared data, spawn, teleport, re-apply or queue structural calls: no error, balanced books | `laser/test_laser_handler_matrix` |
+| Every pattern source fires one beam per slot, on its slot | `laser/test_laser_patterns` |
+| A bullet spawner and a laser spawner give the same where/when timeline for the same settings | `spawner/test_spawner_base_parity` |
+| Warm laser, emitter and colored shots retain no object (headless audio frees stopped playbacks in real time: drain before counting) | `integration/test_steady_state_memory` |
 
 - Edge cases to test everywhere: NaN/Inf scalars and vectors; null array
   entries; empty arrays; short vs oversized arrays; OOB indices (-1/99);
@@ -1701,7 +1711,8 @@ cadence (auto fire, budgets, bursts, telegraph, pattern lists,
 scale, `process_callback`, placement randomization, countdowns, and the Graze
 and Sound target settings. A derived spawner decides WHAT a shot fires through
 the hooks (`shot_preflight`, `shot_prepare`, `fire_shot`, `needs_process_owned`
-/ `process_owned`, `on_predelete_owned`, `append_*_warnings`, `payload_key`,
+/ `process_owned`, `on_predelete_owned`, `on_teleported_owned` (every teleport:
+riding lasers snap, carry shifts the rest), `append_*_warnings`, `payload_key`,
 `preview_beam_length`, ...). `fire_shot` counts the shot (`volleys_fired`) and
 emits the class's own fired signal; the skeleton then plays On Shot and
 handles budgets and caps.
@@ -1728,8 +1739,9 @@ lists, the sound mixer, the target filter, the emit guard).
 | Runtime | `laser/laser_volley2d*.cpp` | one node per shot, a `Beam` per slot; `begin_life` / `release_life` (pooled by beam count); the tick: phases (zero-length phases pass in one tick, one `laser_phase_changed` per phase, `end_laser` announced at the next tick start) -> geometry (anchor frame = `PatternSpawner2D::get_shot_frame()` while following, aim, sweep, extension, a wall ray per segment) -> contacts (a rectangle `intersect_shape` per segment; a polyline tests groups of 8 segments with one box (their points' bounds + the half width) first and queries a group's segments only when that box touches something, walls (bodies on `wall_mask`) never targets, nearest first, `pierce_limit` cuts a beam / spends a bolt) -> graze -> wall reports -> finish. Bolts and curvy lasers share a head + trail model (the body is the newest `length` px of the head's path, tail to head); a head that cannot reflect off a wall, used up its pierce limit or left the despawn bounds is spent; all spent = finished |
 | Signals | factory + `LaserSpawner2D` | `laser_phase_changed`, `laser_pierce_started` (always followed by its first `laser_hit`), `laser_hit` (repeats every `hit_interval_sec`, no burst after a hitch), `laser_pierce_ended` (only after a start; a freed target ends silently), `laser_wall_hit` (once per block), `laser_finished` (then pooled), `laser_grazed` / `laser_graze_exited` (owner spawner first, then the factory always). A spawner laser signals on its spawner, a factory laser on the factory, never both |
 | Draw | `laser_volley2d_render.cpp` | every body of a laser is ONE triangle array (`canvas_item_add_triangle_array`: a strip of left/right pairs per beam, mitered up to 90 degree turns, split at sharper ones, 8 color-ramp pieces over the length; `debug_get_body_mesh(fraction)` reports it), the point animations on their own clocks drawn over the bodies; interpolation lerps muzzle / angle / length for a straight beam (a sweep stays on its muzzle), point by point for a polyline; `debug_get_draw_state(fraction)` reports exactly what `_draw` uses |
-| Factory | `factory/bullet_factory2d_lasers.cpp` | `spawn_laser` (script) / `spawn_laser_span` (C++), `tick_lasers` after the volley timers (each laser with its own time factor), `redraw_lasers` in the interpolation pass, `clear_active_lasers`, `reset()` frees lasers, teardown detaches them; `debug_check_lasers` in `debug_assert_no_dangling` |
-| Spawner | `bullet_spawner/laser_spawner2d.*` | Lasers (`laser_data`, `orphaned_lasers` Fade Out / Keep Firing / Hand To Factory / Remove, `max_live_lasers`), Laser Targeting (None / Node Group (nearest per beam) / Node Path / Mouse (every frame) / Global Position, filter group, retarget interval); arms graze and sound at the shot; a `shoot_from` shot never follows the template; the preview draws each slot as its beam (arrows at `LaserData2D.length`, redrawn on every `changed`: `debug_get_preview_arrows`, editor probe `laser_preview_smoke.tscn`) |
+| Factory | `factory/bullet_factory2d_lasers.cpp`, `_world.cpp` | `spawn_laser` (script) / `spawn_laser_span` (C++), `tick_lasers` after the volley timers (each laser with its own time factor), `redraw_lasers` in the interpolation pass, `clear_active_lasers`, `end_lasers_in_circle` / `_rect` (bombs: the body, half its width included, touches the area; no user code, legal in handlers), `populate_lasers_pool` / `free_lasers_pool` (+ `_deferred`; idle only), `reset()` frees lasers, teardown detaches them; `debug_check_lasers` in `debug_assert_no_dangling` |
+| Handles | `laser_volley2d.cpp` | a pooled (or never fired) laser refuses EVERY write with one stale-handle error (`reject_stale_handle`, ClassDB-swept by `laser/test_laser_pooled_handle.gd`); the pool strips what a script added (`core/node_baseline2d.hpp`, shared with volleys: groups, metadata, node settings) and `custom_data`; graze dispatch stops when a handler re-arms or clears the zones (`graze_generation`); a vanished graze target hands its visit to another one inside; `set_beam_angle` restarts the draw history; bullet volleys are never laser targets (their areas carry no instance) |
+| Spawner | `bullet_spawner/laser_spawner2d.*` | Lasers (`laser_data`, `orphaned_lasers` Fade Out / Keep Firing / Hand To Factory / Remove, `max_live_lasers`), Laser Targeting (None / Node Group (nearest per beam) / Node Path / Mouse (every frame) / Global Position / Node Name / Node Children (the homing and graze scans, THE target filter), filter group, retarget interval); arms graze and sound at the shot, `apply_to_live_lasers(LIVE_GRAZE / LIVE_SOUND / LIVE_HOMING)` re-applies them to lasers in flight (armed alike = untouched); a teleport moves riding beams (and, with carry, the others); a `shoot_from` shot never follows the template; the preview draws each slot as its beam (arrows at `LaserData2D.length`, redrawn on every `changed`: `debug_get_preview_arrows`, editor probe `laser_preview_smoke.tscn`) |
 
 Engine facts behind it (pinned in `integration/test_engine_facts.gd` and the
 laser suites): `intersect_ray` / `intersect_shape` work inside the factory
@@ -1782,7 +1794,10 @@ A flying bullet fires a template spawner's whole pattern (any
   `set_up_bullet_instances`, `step_scale_in` before `move_bullets` multiplies
   every basis by the growth (the own shape basis with `rotate_only_textures`).
   Graze's size bound (`graze_bullet_scale`) grows with it and with every
-  setter that grows a bullet (`note_bullet_basis_grew`).
+  setter that grows a bullet (`note_bullet_basis_grew`). Inside the window
+  `set_bullet_scale` / `set_bullet_transform` set the FULL-GROWN size (drawn
+  at the growth so far; readers report the drawn size), and split children
+  and pickups are born full size (`full_grown2d`).
 - Interpolation: `BulletFactory2D.physics_interpolation` Off / On / Follow
   Project (default); lasers redraw every frame while it is active.
 - GDScript facts that bit the tests: a lambda captures locals by value
