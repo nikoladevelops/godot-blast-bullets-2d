@@ -71,6 +71,7 @@ namespace BlastBullets2D {
 using namespace godot;
 
 class VolleyPool;
+class BulletSpawner2D;
 
 // One volley: N bullets drawn by a single MultiMeshInstance2D, collided by
 // one physics area (one shared shape) and moved by one per-bullet loop
@@ -1252,6 +1253,10 @@ public:
 	// auto-pooling on: released, only a new life revives it).
 	bool is_pooled() const;
 	bool is_parked() const;
+	// The live BulletSpawner2D that fired this volley (or adopted it), else
+	// null: factory volleys, orphans (a freed or queued spawner, a hand-over),
+	// pooled volleys.
+	BulletSpawner2D *get_owner_spawner() const;
 	// "active", "parked", "pooled", "fresh" or "dying" (tests/support).
 	String debug_get_life_state() const;
 	// Internal consistency of this volley: "" when every invariant holds,

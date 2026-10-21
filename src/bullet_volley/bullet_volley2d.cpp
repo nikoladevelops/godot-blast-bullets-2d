@@ -2,6 +2,7 @@
 // enable/disable/clear, the clean-disabled reset and teardown. Start here to follow
 // a volley's life; the per-frame motion lives in bullet_volley2d_tick.cpp.
 
+#include "bullet_spawner/bullet_spawner2d.hpp"
 #include "bullet_volley/bullet_volley2d_internal.hpp"
 #include "core/physics_flush2d.hpp"
 
@@ -83,6 +84,17 @@ _ALWAYS_INLINE_ void BulletVolley2D::apply_shared_bullet_attachment_from_data(co
 
 bool BulletVolley2D::is_pooled() const {
 	return is_pooled_in_pool;
+}
+
+BulletSpawner2D *BulletVolley2D::get_owner_spawner() const {
+	if (owner_spawner_id == 0 || is_pooled_in_pool) {
+		return nullptr;
+	}
+	BulletSpawner2D *spawner = Object::cast_to<BulletSpawner2D>(ObjectDB::get_instance(ObjectID(owner_spawner_id)));
+	if (spawner == nullptr || spawner->is_queued_for_deletion()) {
+		return nullptr;
+	}
+	return spawner;
 }
 
 bool BulletVolley2D::is_parked() const {

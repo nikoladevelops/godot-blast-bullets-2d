@@ -1,6 +1,7 @@
 // Godot bindings: every bound method, property (inspector groups, in workflow
 // order), signal and enum constant of BulletVolley2D.
 
+#include "bullet_spawner/bullet_spawner2d.hpp"
 #include "bullet_volley/bullet_volley2d_internal.hpp"
 
 using namespace godot;
@@ -77,6 +78,7 @@ void BulletVolley2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("bullet_reset_state", "bullet_index"), &BulletVolley2D::bullet_reset_state);
 	ClassDB::bind_method(D_METHOD("all_bullets_reset_state", "bullet_index_start", "bullet_index_end_inclusive"), &BulletVolley2D::all_bullets_reset_state, DEFVAL(0), DEFVAL(-1));
 	ClassDB::bind_method(D_METHOD("is_pooled"), &BulletVolley2D::is_pooled);
+	ClassDB::bind_method(D_METHOD("get_owner_spawner"), &BulletVolley2D::get_owner_spawner);
 	ClassDB::bind_method(D_METHOD("is_parked"), &BulletVolley2D::is_parked);
 	ClassDB::bind_method(D_METHOD("get_life_id"), &BulletVolley2D::get_life_id);
 	ClassDB::bind_method(D_METHOD("debug_get_life_state"), &BulletVolley2D::debug_get_life_state);
