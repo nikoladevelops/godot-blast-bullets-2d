@@ -230,6 +230,9 @@ private:
 	std::shared_ptr<GrazeDetector2D> graze_detector;
 	StringName graze_target_group; // the factory's lists (graze_set_zones), when no detector
 	std::vector<GrazeState> graze_state; // beams x zones
+	// Bumped by every arming change: a dispatch stops when a handler re-armed
+	// or cleared the zones (its queued events name the old ones).
+	uint32_t graze_generation = 0;
 	std::vector<Ref<BulletSoundData2D>> sound_effects;
 	std::shared_ptr<GrazeDetector2D> sound_listeners;
 	StringName sound_listener_group;

@@ -745,6 +745,18 @@ bool LaserVolley2D::update_graze(uint64_t self_id, uint32_t life) {
 	};
 	std::vector<Event> events;
 	const real_t half_width = get_current_width() * (real_t)0.5;
+	// A visit's target is gone (freed, queued, left the list): the visit
+	// moves to the target the beam is nearest now, like bullet grazes.
+	auto anchor_live = [&](uint64_t id) {
+		if (id == 0 || list == nullptr || !list->contains(id)) {
+			return false;
+		}
+		if (graze_is_point_target2d(id)) {
+			return true;
+		}
+		const Node *node = Object::cast_to<Node>(ObjectDB::get_instance(ObjectID(id)));
+		return node != nullptr && node->is_inside_tree() && !node->is_queued_for_deletion();
+	};
 	for (size_t i = 0; i < beams.size(); ++i) {
 		const Beam &b = beams[i];
 		real_t best = Math::INF;
@@ -782,6 +794,9 @@ bool LaserVolley2D::update_graze(uint64_t self_id, uint32_t life) {
 			}
 			const bool inside_now = best_id != 0 && best <= outer + inflate;
 			if (inside_now) {
+				if (g.inside && g.fired && g.anchor != best_id && !anchor_live(g.anchor)) {
+					g.anchor = best_id;
+				}
 				for (int k = 0; k < rings; ++k) {
 					const int r = order[k];
 					if (best <= zone->get_ring_radius(r) + inflate && !(g.rings & (1u << r))) {
@@ -808,11 +823,18 @@ bool LaserVolley2D::update_graze(uint64_t self_id, uint32_t life) {
 		}
 	}
 	const CachedStringNames2D &names = CachedStringNames2D::get();
+	const uint32_t generation = graze_generation;
 	for (const Event &e : events) {
+		if (graze_generation != generation || (size_t)e.zone >= graze_zones.size()) {
+			return true; // a handler re-armed or cleared the zones: the rest name the old ones
+		}
 		const Ref<BulletGrazeZone2D> zone = graze_zones[(size_t)e.zone];
 		Object *target = graze_is_point_target2d(e.target) ? nullptr : ObjectDB::get_instance(ObjectID(e.target));
-		if (!graze_is_point_target2d(e.target) && target == nullptr) {
-			continue; // freed by an earlier handler: dropped
+		if (!graze_is_point_target2d(e.target)) {
+			const Node *node = Object::cast_to<Node>(target);
+			if (node == nullptr || node->is_queued_for_deletion()) {
+				continue; // freed or queued by an earlier handler: dropped
+			}
 		}
 		sound_fire(e.exit ? BulletSoundData2D::SOUND_ON_GRAZE_EXIT : BulletSoundData2D::SOUND_ON_GRAZE, e.at, e.ring, e.zone);
 		const StringName &sig = e.exit ? names.laser_graze_exited : names.laser_grazed;

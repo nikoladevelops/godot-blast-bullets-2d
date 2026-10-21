@@ -153,6 +153,7 @@ void LaserVolley2D::release_life() {
 	anim_tip.clear();
 	anim_pierce.clear();
 	anim_wall.clear();
+	++graze_generation;
 	graze_zones.clear();
 	graze_detector.reset();
 	graze_target_group = StringName();
@@ -181,6 +182,7 @@ void LaserVolley2D::_notification(int p_what) {
 }
 
 void LaserVolley2D::graze_arm(const Array &zones, const std::shared_ptr<GrazeDetector2D> &detector) {
+	++graze_generation;
 	graze_zones.clear();
 	for (int i = 0; i < zones.size() && (int)graze_zones.size() < 4; ++i) {
 		const Ref<BulletGrazeZone2D> zone = zones[i];
@@ -202,6 +204,10 @@ bool LaserVolley2D::graze_set_zones(const Array &zones, const StringName &target
 		UtilityFunctions::push_error("graze_set_zones: target_group is empty (name the group whose nodes graze this laser), nothing changed.");
 		return false;
 	}
+	if (zones.size() > 4) {
+		UtilityFunctions::push_error("graze_set_zones: at most 4 zones (got " + String::num_int64(zones.size()) + "), nothing changed.");
+		return false;
+	}
 	int valid = 0;
 	for (int i = 0; i < zones.size(); ++i) {
 		const Ref<BulletGrazeZone2D> zone = zones[i];
@@ -217,6 +223,7 @@ bool LaserVolley2D::graze_set_zones(const Array &zones, const StringName &target
 }
 
 void LaserVolley2D::graze_clear() {
+	++graze_generation;
 	graze_zones.clear();
 	graze_detector.reset();
 	graze_target_group = StringName();
