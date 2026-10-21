@@ -1231,6 +1231,9 @@ public:
 	virtual void append_setup_warnings(PackedStringArray &r_warnings) const {}
 	// The editor preview's hitbox ring radius (0 = none).
 	virtual real_t preview_collision_ring_radius() const { return 0.0; }
+	// >= 0: the preview's direction arrows are this long (a laser spawner
+	// previews its beams); < 0 uses preview_arrow_length.
+	virtual real_t preview_beam_length() const { return -1.0; }
 	// True when what this spawner fires never culls at the despawn bounds
 	// (the muzzle check then never refuses a shot).
 	virtual bool shots_ignore_despawn_bounds() const { return false; }

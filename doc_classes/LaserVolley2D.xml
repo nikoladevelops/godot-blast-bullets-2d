@@ -102,6 +102,12 @@
 				Returns the width drawn now: the warning width while charging, else [member LaserData2D.width] scaled by the growing or fading phase.
 			</description>
 		</method>
+		<method name="get_graze_zones" qualifiers="const">
+			<return type="Array" />
+			<description>
+				Returns the zones this laser grazes with.
+			</description>
+		</method>
 		<method name="get_laser_data" qualifiers="const">
 			<return type="LaserData2D" />
 			<description>
@@ -139,11 +145,31 @@
 				Returns the targets beam [param beam_index] touches now, nearest first.
 			</description>
 		</method>
+		<method name="graze_clear">
+			<return type="void" />
+			<description>
+				Stops this laser from grazing.
+			</description>
+		</method>
+		<method name="graze_set_zones">
+			<return type="bool" />
+			<param index="0" name="zones" type="Array" />
+			<param index="1" name="target_group" type="StringName" />
+			<description>
+				Makes the beams graze the members of [param target_group] with up to 4 [param zones] (factory lasers, or an override until the next life). Returns [code]false[/code] (nothing changed) for an empty group, no zone, or a finished laser.
+			</description>
+		</method>
 		<method name="is_beam_blocked" qualifiers="const">
 			<return type="bool" />
 			<param index="0" name="beam_index" type="int" />
 			<description>
 				Returns [code]true[/code] while beam [param beam_index] is stopped by a wall.
+			</description>
+		</method>
+		<method name="is_graze_armed" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] while the laser grazes (a spawner's Graze group or [method graze_set_zones]).
 			</description>
 		</method>
 		<method name="is_laser_active" qualifiers="const">
@@ -156,6 +182,12 @@
 			<return type="bool" />
 			<description>
 				Returns [code]true[/code] while the laser waits in the factory's pool (a stale handle).
+			</description>
+		</method>
+		<method name="is_sound_armed" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] while the laser has sound entries.
 			</description>
 		</method>
 		<method name="set_active_time_left">
@@ -193,6 +225,14 @@
 			<param index="0" name="targets" type="Array" />
 			<description>
 				Sets every beam's target: beam [code]i[/code] takes [code]targets[i % size][/code] (a [Node2D] or a [Vector2]). An empty array clears them.
+			</description>
+		</method>
+		<method name="sound_set_effects">
+			<return type="bool" />
+			<param index="0" name="effects" type="Array" />
+			<param index="1" name="listener_group" type="StringName" default="&amp;&quot;&quot;" />
+			<description>
+				Arms the laser's sound triggers with [param effects] ([BulletSoundData2D] entries), heard by the members of [param listener_group] (empty = Godot's listener). An empty array disarms. Returns [code]false[/code] for a finished laser.
 			</description>
 		</method>
 	</methods>

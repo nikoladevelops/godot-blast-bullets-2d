@@ -10,8 +10,10 @@
 #include "bullet_spawner/pattern_spawner2d.hpp"
 #include "core/cached_string_names2d.hpp"
 #include "core/emit_on2d.hpp"
+#include "core/graze_targets2d.hpp"
 #include "core/transform_math2d.hpp"
 #include "factory/bullet_factory2d.hpp"
+#include "factory/graze_detector2d.hpp"
 
 #include <godot_cpp/classes/area2d.hpp>
 #include <godot_cpp/classes/collision_object2d.hpp>
@@ -631,6 +633,7 @@ bool LaserVolley2D::update_contacts(int beam_index, uint64_t self_id, uint32_t l
 				continue;
 			}
 		}
+		sound_fire(BulletSoundData2D::SOUND_ON_HIT, c.position);
 		factory->note_user_code();
 		emit_on2d(emitter, names.laser_hit, target, this, beam_index, c.position);
 		if (!alive_after_user_code(self_id, life) || !hitting_phase() || k >= beams[beam_index].contacts.size()) {
@@ -638,6 +641,159 @@ bool LaserVolley2D::update_contacts(int beam_index, uint64_t self_id, uint32_t l
 		}
 		if (beams[beam_index].spent) {
 			return drop_unstarted(); // used up its pierce_limit: the rest of this tick's targets never start
+		}
+	}
+	return true;
+}
+
+// ---- Graze and sound ----------------------------------------------------------------------
+
+void LaserVolley2D::sound_fire(int trigger, const Vector2 &pos, int ring, int zone) {
+	if (sound_effects.empty() || factory == nullptr || !pos.is_finite()) {
+		return;
+	}
+	SoundListenerSpec2D spec;
+	if (sound_listeners != nullptr) {
+		spec.kind = SoundListenerSpec2D::DETECTOR;
+		spec.detector = sound_listeners;
+	} else if (!sound_listener_group.is_empty()) {
+		spec.kind = SoundListenerSpec2D::NODE_GROUP;
+		spec.group = sound_listener_group;
+	}
+	const bool graze_trigger = trigger == BulletSoundData2D::SOUND_ON_GRAZE || trigger == BulletSoundData2D::SOUND_ON_GRAZE_EXIT;
+	for (const Ref<BulletSoundData2D> &entry : sound_effects) {
+		if (entry.is_null() || !entry->enabled || entry->get_trigger() != trigger) {
+			continue;
+		}
+		if (graze_trigger && ((entry->get_ring_index() >= 0 && entry->get_ring_index() != ring) || (entry->get_zone_index() >= 0 && entry->get_zone_index() != zone))) {
+			continue;
+		}
+		factory->sound_offer(entry, pos, sound_volume_db, spec); // no user code (the mixer plays after the sweep)
+	}
+}
+
+namespace {
+
+real_t distance_to_polyline2d(const Vector2 &p, const std::vector<Vector2> &pts) {
+	real_t best = Math::INF;
+	for (size_t k = 1; k < pts.size(); ++k) {
+		const Vector2 a = pts[k - 1];
+		const Vector2 ab = pts[k] - a;
+		const real_t len2 = ab.x * ab.x + ab.y * ab.y;
+		real_t t = len2 > (real_t)0.0 ? ((p - a).x * ab.x + (p - a).y * ab.y) / len2 : (real_t)0.0;
+		t = Math::clamp(t, (real_t)0.0, (real_t)1.0);
+		const Vector2 q = a + ab * t;
+		best = Math::min(best, p.distance_to(q));
+	}
+	return best;
+}
+
+} // namespace
+
+bool LaserVolley2D::update_graze(uint64_t self_id, uint32_t life) {
+	if (graze_zones.empty() || factory == nullptr || (graze_detector == nullptr && graze_target_group.is_empty())) {
+		return true;
+	}
+	GrazeTargetList2D *list = graze_detector != nullptr ? graze_detector->list(*factory) : factory->get_graze_default_detector().list_for_group(graze_target_group, *factory);
+	const size_t zones = graze_zones.size();
+	if (graze_state.size() != beams.size() * zones) {
+		graze_state.assign(beams.size() * zones, GrazeState());
+	}
+	// Measure everything first (no user code), then signal in order.
+	struct Event {
+		bool exit;
+		uint64_t target;
+		int beam;
+		int zone;
+		int ring;
+		Vector2 at;
+	};
+	std::vector<Event> events;
+	const real_t half_width = get_current_width() * (real_t)0.5;
+	for (size_t i = 0; i < beams.size(); ++i) {
+		const Beam &b = beams[i];
+		real_t best = Math::INF;
+		uint64_t best_id = 0;
+		Vector2 best_at;
+		if (list != nullptr && !b.spent && b.points.size() >= 2) {
+			for (const GrazeTarget2D &t : list->targets) {
+				const real_t d = distance_to_polyline2d(t.position, b.points);
+				if (d < best) {
+					best = d;
+					best_id = t.id;
+					best_at = t.position;
+				}
+			}
+		}
+		for (size_t z = 0; z < zones; ++z) {
+			const BulletGrazeZone2D *zone = graze_zones[z].ptr();
+			GrazeState &g = graze_state[i * zones + z];
+			if (zone == nullptr) {
+				continue;
+			}
+			const real_t inflate = zone->get_count_bullet_size() ? half_width : (real_t)0.0;
+			const int rings = Math::clamp(zone->get_ring_count(), 1, (int)BulletGrazeZone2D::MAX_RINGS);
+			// Rings by radius, largest first (equal radii by index).
+			int order[BulletGrazeZone2D::MAX_RINGS];
+			real_t outer = 0.0;
+			for (int r = 0; r < rings; ++r) {
+				order[r] = r;
+				outer = Math::max(outer, zone->get_ring_radius(r));
+			}
+			for (int x = 1; x < rings; ++x) {
+				for (int y = x; y > 0 && zone->get_ring_radius(order[y]) > zone->get_ring_radius(order[y - 1]); --y) {
+					std::swap(order[y], order[y - 1]);
+				}
+			}
+			const bool inside_now = best_id != 0 && best <= outer + inflate;
+			if (inside_now) {
+				for (int k = 0; k < rings; ++k) {
+					const int r = order[k];
+					if (best <= zone->get_ring_radius(r) + inflate && !(g.rings & (1u << r))) {
+						g.rings |= (uint8_t)(1u << r);
+						g.fired = true;
+						g.anchor = best_id;
+						if (g.deepest < 0 || zone->get_ring_radius(r) < zone->get_ring_radius(g.deepest)) {
+							g.deepest = (int8_t)r;
+						}
+						events.push_back({ false, best_id, (int)i, (int)z, r, best_at });
+					}
+				}
+			} else if (g.inside) {
+				if (g.fired) {
+					events.push_back({ true, g.anchor, (int)i, (int)z, (int)g.deepest, best_at });
+				}
+				if (zone->get_regraze() == BulletGrazeZone2D::REGRAZE_AFTER_EXIT) {
+					g.rings = 0;
+				}
+				g.fired = false;
+				g.deepest = -1;
+			}
+			g.inside = inside_now;
+		}
+	}
+	const CachedStringNames2D &names = CachedStringNames2D::get();
+	for (const Event &e : events) {
+		const Ref<BulletGrazeZone2D> zone = graze_zones[(size_t)e.zone];
+		Object *target = graze_is_point_target2d(e.target) ? nullptr : ObjectDB::get_instance(ObjectID(e.target));
+		if (!graze_is_point_target2d(e.target) && target == nullptr) {
+			continue; // freed by an earlier handler: dropped
+		}
+		sound_fire(e.exit ? BulletSoundData2D::SOUND_ON_GRAZE_EXIT : BulletSoundData2D::SOUND_ON_GRAZE, e.at, e.ring, e.zone);
+		const StringName &sig = e.exit ? names.laser_graze_exited : names.laser_grazed;
+		// Owner spawner first (while it lives), then the factory always.
+		Object *owner = owner_spawner_id != 0 ? ObjectDB::get_instance(ObjectID(owner_spawner_id)) : nullptr;
+		if (owner != nullptr) {
+			factory->note_user_code();
+			emit_on2d(owner, sig, Variant(target), this, e.beam, zone, e.ring);
+			if (!alive_after_user_code(self_id, life)) {
+				return false;
+			}
+		}
+		factory->note_user_code();
+		emit_on2d(factory, sig, Variant(target), this, e.beam, zone, e.ring);
+		if (!alive_after_user_code(self_id, life)) {
+			return false;
 		}
 	}
 	return true;
@@ -700,6 +856,13 @@ void LaserVolley2D::tick(double delta) {
 	}
 	// Hits while the phase hits; every contact ends when it stops.
 	if (hitting_phase()) {
+		if (!sound_effects.empty()) {
+			for (const Beam &b : beams) {
+				if (!b.spent && !b.points.empty()) {
+					sound_fire(BulletSoundData2D::SOUND_ON_FLIGHT, b.points.back());
+				}
+			}
+		}
 		for (int i = 0; i < (int)beams.size(); ++i) {
 			if (!update_contacts(i, self_id, life)) {
 				return;
@@ -707,6 +870,9 @@ void LaserVolley2D::tick(double delta) {
 			if (!hitting_phase()) {
 				break; // a handler ended the laser: the rest end below
 			}
+		}
+		if (hitting_phase() && !update_graze(self_id, life)) {
+			return;
 		}
 	}
 	if (!end_contacts(self_id, life, hitting_phase())) {
@@ -726,6 +892,7 @@ void LaserVolley2D::tick(double delta) {
 		if (b.pinned) {
 			b.spent = true; // a bolt or curvy head that met a wall is gone after it
 		}
+		sound_fire(BulletSoundData2D::SOUND_ON_BOUNCE, b.wall_point);
 		Object *emitter = resolve_emitter();
 		if (emitter == nullptr) {
 			continue;
@@ -758,6 +925,9 @@ void LaserVolley2D::tick(double delta) {
 		}
 	}
 	if (phase == PHASE_FINISHED) {
+		if (!beams.empty()) {
+			sound_fire(BulletSoundData2D::SOUND_ON_LIFETIME_OVER, beams[0].points.empty() ? beams[0].muzzle : beams[0].points.back());
+		}
 		Object *emitter = resolve_emitter();
 		if (emitter != nullptr) {
 			factory->note_user_code();

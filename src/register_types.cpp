@@ -6,6 +6,7 @@
 
 // Shared
 #include "attachments/bullet_attachment2d.hpp"
+#include "bullet_spawner/laser_spawner2d.hpp"
 #include "core/cached_string_names2d.hpp"
 #include "data/bullet_curves_data2d.hpp"
 #include "data/bullet_effect_layer_data2d.hpp"
@@ -100,6 +101,7 @@ void initialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
 	// Bullet Spawner
 	GDREGISTER_ABSTRACT_CLASS(PatternSpawner2D)
 	GDREGISTER_CLASS(BulletSpawner2D)
+	GDREGISTER_CLASS(LaserSpawner2D)
 	GDREGISTER_CLASS(PatternPreviewLayer2D)
 	GDREGISTER_CLASS(GrazePreviewLayer2D)
 	GDREGISTER_CLASS(DespawnBoundsPreviewLayer2D)

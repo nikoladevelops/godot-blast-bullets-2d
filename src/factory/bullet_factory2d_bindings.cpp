@@ -242,6 +242,20 @@ void BulletFactory2D::_bind_methods() {
 			PropertyInfo(Variant::VECTOR2, "normal")));
 	ADD_SIGNAL(MethodInfo("laser_finished",
 			PropertyInfo(Variant::OBJECT, "laser", PROPERTY_HINT_RESOURCE_TYPE, "LaserVolley2D")));
+	// Laser grazes bubble like bullet grazes: the owner spawner first, then
+	// always here.
+	ADD_SIGNAL(MethodInfo("laser_grazed",
+			PropertyInfo(Variant::OBJECT, "target"),
+			PropertyInfo(Variant::OBJECT, "laser", PROPERTY_HINT_RESOURCE_TYPE, "LaserVolley2D"),
+			PropertyInfo(Variant::INT, "beam_index"),
+			PropertyInfo(Variant::OBJECT, "zone", PROPERTY_HINT_RESOURCE_TYPE, "BulletGrazeZone2D"),
+			PropertyInfo(Variant::INT, "ring_index")));
+	ADD_SIGNAL(MethodInfo("laser_graze_exited",
+			PropertyInfo(Variant::OBJECT, "target"),
+			PropertyInfo(Variant::OBJECT, "laser", PROPERTY_HINT_RESOURCE_TYPE, "LaserVolley2D"),
+			PropertyInfo(Variant::INT, "beam_index"),
+			PropertyInfo(Variant::OBJECT, "zone", PROPERTY_HINT_RESOURCE_TYPE, "BulletGrazeZone2D"),
+			PropertyInfo(Variant::INT, "deepest_ring_index")));
 
 	// Emitter bullets (bullet_factory2d_emitter.cpp): shots recorded during a
 	// sweep fire through their template spawners right after the splits.

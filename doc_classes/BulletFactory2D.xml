@@ -878,6 +878,26 @@
 				A laser finished (its fade ended, [method LaserVolley2D.end_laser] without fade, or every bolt / curvy beam was spent). It is pooled right after this signal.
 			</description>
 		</signal>
+		<signal name="laser_graze_exited">
+			<param index="0" name="target" type="Object" />
+			<param index="1" name="laser" type="LaserVolley2D" />
+			<param index="2" name="beam_index" type="int" />
+			<param index="3" name="zone" type="BulletGrazeZone2D" />
+			<param index="4" name="deepest_ring_index" type="int" />
+			<description>
+				Beam [param beam_index] of [param laser] left the zone [param zone] of [param target] after grazing it ([param deepest_ring_index] = the innermost ring it touched; [param target] is [code]null[/code] for a point target). Every laser graze exit lands here, after the owner spawner's.
+			</description>
+		</signal>
+		<signal name="laser_grazed">
+			<param index="0" name="target" type="Object" />
+			<param index="1" name="laser" type="LaserVolley2D" />
+			<param index="2" name="beam_index" type="int" />
+			<param index="3" name="zone" type="BulletGrazeZone2D" />
+			<param index="4" name="ring_index" type="int" />
+			<description>
+				Beam [param beam_index] of [param laser] grazed ring [param ring_index] of [param zone] around [param target] ([code]null[/code] for a point target). Every laser graze lands here, after the owner spawner's.
+			</description>
+		</signal>
 		<signal name="laser_hit">
 			<param index="0" name="target" type="Object" />
 			<param index="1" name="laser" type="LaserVolley2D" />

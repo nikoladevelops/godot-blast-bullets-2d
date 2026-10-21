@@ -1,6 +1,8 @@
 #pragma once
 
 #include "core/variant_enum_cast2d.hpp"
+#include "data/bullet_graze_zone2d.hpp"
+#include "data/bullet_sound_data2d.hpp"
 #include "data/laser_data2d.hpp"
 
 #include <godot_cpp/classes/node2d.hpp>
@@ -17,6 +19,7 @@ namespace BlastBullets2D {
 using namespace godot;
 
 class BulletFactory2D;
+class GrazeDetector2D;
 class PatternSpawner2D;
 
 // One baked SpriteFrames animation (its first animation, "default" when it
@@ -159,6 +162,35 @@ public:
 	void _notification(int p_what);
 	void _draw() override;
 
+	// ---- Graze and sound (armed by the spawner's Graze / Sound groups) ----
+	// Beams graze the detector's targets by their distance to the beam
+	// (each zone's rings, plus half the width with count_bullet_size): one
+	// visit state per beam and zone. laser_grazed / laser_graze_exited
+	// bubble owner spawner -> factory, like bullet grazes.
+	struct GrazeState {
+		uint8_t rings = 0; // grazed this visit (Once: this life)
+		bool inside = false;
+		bool fired = false;
+		int8_t deepest = -1;
+		uint64_t anchor = 0;
+	};
+	void graze_arm(const Array &zones, const std::shared_ptr<GrazeDetector2D> &detector);
+	// Sound triggers: On Hit (laser_hit), On Bounce (a wall stop), On Graze /
+	// On Graze Exit, On Lifetime Over (finished), On Flight (the tip, every
+	// hitting tick).
+	void sound_arm(const Array &entries, const std::shared_ptr<GrazeDetector2D> &listeners, float volume_db);
+	bool is_graze_armed() const { return !graze_zones.empty(); }
+	// Script API (factory lasers, or an override until the next life):
+	// up to 4 zones, grazed by the members of target_group (refused: empty
+	// group, no zone, a pooled laser). graze_clear disarms.
+	bool graze_set_zones(const Array &zones, const StringName &target_group);
+	void graze_clear();
+	Array get_graze_zones() const;
+	// Sound entries for the laser triggers, heard by listener_group's
+	// members (empty = Godot's listener). An empty array disarms.
+	bool sound_set_effects(const Array &effects, const StringName &listener_group = StringName());
+	bool is_sound_armed() const { return !sound_effects.empty(); }
+
 	BulletFactory2D *factory = nullptr;
 	std::shared_ptr<bool> factory_life;
 	uint64_t owner_spawner_id = 0;
@@ -188,6 +220,16 @@ private:
 	bool following = false;
 	// Baked looks (per life).
 	LaserAnim2D anim_body, anim_charge, anim_muzzle, anim_tip, anim_pierce, anim_wall;
+	std::vector<Ref<BulletGrazeZone2D>> graze_zones;
+	std::shared_ptr<GrazeDetector2D> graze_detector;
+	StringName graze_target_group; // the factory's lists (graze_set_zones), when no detector
+	std::vector<GrazeState> graze_state; // beams x zones
+	std::vector<Ref<BulletSoundData2D>> sound_effects;
+	std::shared_ptr<GrazeDetector2D> sound_listeners;
+	StringName sound_listener_group;
+	float sound_volume_db = 0.0f;
+	bool update_graze(uint64_t self_id, uint32_t life);
+	void sound_fire(int trigger, const Vector2 &pos, int ring = -1, int zone = -1);
 	// Physics queries (one shape, reused every tick).
 	RID query_shape;
 	Ref<PhysicsShapeQueryParameters2D> shape_query;

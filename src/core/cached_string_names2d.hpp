@@ -37,6 +37,8 @@ struct CachedStringNames2D {
 	const StringName laser_hit = StringName("laser_hit");
 	const StringName laser_wall_hit = StringName("laser_wall_hit");
 	const StringName laser_finished = StringName("laser_finished");
+	const StringName laser_grazed = StringName("laser_grazed");
+	const StringName laser_graze_exited = StringName("laser_graze_exited");
 	const StringName default_animation = StringName("default");
 	// node_scan2d.hpp PREVIEW_META_KEY: checked per target candidate.
 	const StringName preview_meta = StringName("blastbullets_pattern_preview");

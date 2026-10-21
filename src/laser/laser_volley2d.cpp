@@ -9,6 +9,7 @@
 #include "core/cached_string_names2d.hpp"
 #include "core/transform_math2d.hpp"
 #include "factory/bullet_factory2d.hpp"
+#include "factory/graze_detector2d.hpp"
 
 #include <godot_cpp/classes/physics_server2d.hpp>
 #include <godot_cpp/core/class_db.hpp>
@@ -152,6 +153,13 @@ void LaserVolley2D::release_life() {
 	anim_tip.clear();
 	anim_pierce.clear();
 	anim_wall.clear();
+	graze_zones.clear();
+	graze_detector.reset();
+	graze_target_group = StringName();
+	graze_state.clear();
+	sound_effects.clear();
+	sound_listeners.reset();
+	sound_listener_group = StringName();
 	set_material(Ref<Material>());
 	set_visible(false);
 	queue_redraw();
@@ -170,6 +178,80 @@ void LaserVolley2D::_notification(int p_what) {
 		}
 		factory = nullptr;
 	}
+}
+
+void LaserVolley2D::graze_arm(const Array &zones, const std::shared_ptr<GrazeDetector2D> &detector) {
+	graze_zones.clear();
+	for (int i = 0; i < zones.size() && (int)graze_zones.size() < 4; ++i) {
+		const Ref<BulletGrazeZone2D> zone = zones[i];
+		if (zone.is_valid()) {
+			graze_zones.push_back(zone);
+		}
+	}
+	graze_detector = graze_zones.empty() ? nullptr : detector;
+	graze_target_group = StringName();
+	graze_state.assign(beams.size() * graze_zones.size(), GrazeState());
+}
+
+bool LaserVolley2D::graze_set_zones(const Array &zones, const StringName &target_group) {
+	if (pooled || !active) {
+		UtilityFunctions::push_error("graze_set_zones: this laser finished (it waits in the pool), so this handle is stale. Fire a new laser instead.");
+		return false;
+	}
+	if (target_group.is_empty()) {
+		UtilityFunctions::push_error("graze_set_zones: target_group is empty (name the group whose nodes graze this laser), nothing changed.");
+		return false;
+	}
+	int valid = 0;
+	for (int i = 0; i < zones.size(); ++i) {
+		const Ref<BulletGrazeZone2D> zone = zones[i];
+		valid += zone.is_valid() ? 1 : 0;
+	}
+	if (valid == 0) {
+		UtilityFunctions::push_error("graze_set_zones: zones holds no BulletGrazeZone2D, nothing changed.");
+		return false;
+	}
+	graze_arm(zones, nullptr);
+	graze_target_group = target_group;
+	return true;
+}
+
+void LaserVolley2D::graze_clear() {
+	graze_zones.clear();
+	graze_detector.reset();
+	graze_target_group = StringName();
+	graze_state.clear();
+}
+
+Array LaserVolley2D::get_graze_zones() const {
+	Array out;
+	for (const Ref<BulletGrazeZone2D> &zone : graze_zones) {
+		out.push_back(zone);
+	}
+	return out;
+}
+
+bool LaserVolley2D::sound_set_effects(const Array &effects, const StringName &listener_group) {
+	if (pooled || !active) {
+		UtilityFunctions::push_error("sound_set_effects: this laser finished (it waits in the pool), so this handle is stale. Fire a new laser instead.");
+		return false;
+	}
+	sound_arm(effects, nullptr, 0.0f);
+	sound_listener_group = listener_group;
+	return true;
+}
+
+void LaserVolley2D::sound_arm(const Array &entries, const std::shared_ptr<GrazeDetector2D> &listeners, float volume_db) {
+	sound_effects.clear();
+	for (int i = 0; i < entries.size(); ++i) {
+		const Ref<BulletSoundData2D> entry = entries[i];
+		if (entry.is_valid()) {
+			sound_effects.push_back(entry);
+		}
+	}
+	sound_listeners = sound_effects.empty() ? nullptr : listeners;
+	sound_listener_group = StringName();
+	sound_volume_db = volume_db;
 }
 
 // ---- Helpers ------------------------------------------------------------------------------
@@ -460,7 +542,7 @@ void LaserVolley2D::set_active_time_left(double seconds) {
 
 String LaserVolley2D::debug_check_invariants() const {
 	if (pooled) {
-		if (active || !beams.empty() || data.is_valid() || owner_spawner_id != 0 || anchor_id != 0) {
+		if (active || !beams.empty() || data.is_valid() || owner_spawner_id != 0 || anchor_id != 0 || !graze_zones.empty() || graze_detector != nullptr || !sound_effects.empty()) {
 			return "pooled laser still holds its life";
 		}
 		return String();
@@ -470,6 +552,9 @@ String LaserVolley2D::debug_check_invariants() const {
 	}
 	if (data.is_null()) {
 		return "active laser without data";
+	}
+	if (graze_state.size() != beams.size() * graze_zones.size()) {
+		return "graze states do not cover the beams";
 	}
 	for (const Beam &b : beams) {
 		if (b.points.empty() || !b.muzzle.is_finite() || !Math::is_finite(b.angle) || !Math::is_finite(b.length_now)) {
@@ -515,6 +600,12 @@ void LaserVolley2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_active_time_left", "seconds"), &LaserVolley2D::set_active_time_left);
 	ClassDB::bind_method(D_METHOD("debug_get_draw_state", "fraction"), &LaserVolley2D::debug_get_draw_state, DEFVAL(-1.0));
 	ClassDB::bind_method(D_METHOD("debug_check_invariants"), &LaserVolley2D::debug_check_invariants);
+	ClassDB::bind_method(D_METHOD("graze_set_zones", "zones", "target_group"), &LaserVolley2D::graze_set_zones);
+	ClassDB::bind_method(D_METHOD("graze_clear"), &LaserVolley2D::graze_clear);
+	ClassDB::bind_method(D_METHOD("get_graze_zones"), &LaserVolley2D::get_graze_zones);
+	ClassDB::bind_method(D_METHOD("is_graze_armed"), &LaserVolley2D::is_graze_armed);
+	ClassDB::bind_method(D_METHOD("is_sound_armed"), &LaserVolley2D::is_sound_armed);
+	ClassDB::bind_method(D_METHOD("sound_set_effects", "effects", "listener_group"), &LaserVolley2D::sound_set_effects, DEFVAL(StringName()));
 
 	BIND_ENUM_CONSTANT(PHASE_CHARGING);
 	BIND_ENUM_CONSTANT(PHASE_GROWING);

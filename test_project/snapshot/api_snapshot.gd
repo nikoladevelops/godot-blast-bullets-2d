@@ -17,7 +17,7 @@ const PLUGIN_CLASSES: Array[StringName] = [
 	&"BulletFactory2D", &"BulletVolleyDebugger2D", &"BulletVolleyData2D", &"BulletVolley2D",
 	&"BulletSpawner2D", &"PatternPreviewLayer2D", &"BulletGrazeZone2D", &"GrazePreviewLayer2D",
 	&"BulletSoundData2D", &"BulletPickupData2D", &"DespawnBoundsPreviewLayer2D", &"BulletFlock2D",
-	&"BulletSplitStage2D", &"BulletSplitData2D", &"BulletEmitterData2D", &"LaserData2D", &"LaserVolley2D",
+	&"BulletSplitStage2D", &"BulletSplitData2D", &"BulletEmitterData2D", &"LaserData2D", &"LaserVolley2D", &"LaserSpawner2D",
 ]
 const AMOUNTS := [-1, 0, 1, 2, 7, 24, 10001]
 const TRACE_STEP := 1.0 / 60.0

@@ -802,7 +802,8 @@ void PatternSpawner2D::rebuild_preview() {
 	}
 	const real_t dot_radius = (real_t)(preview_dot_radius * glyph_scale);
 	const real_t arrow_gap = (real_t)(preview_arrow_gap * glyph_scale);
-	const real_t arrow_length = (real_t)(preview_arrow_length * glyph_scale);
+	const real_t beam_length = preview_beam_length();
+	const real_t arrow_length = beam_length >= (real_t)0.0 ? beam_length : (real_t)(preview_arrow_length * glyph_scale);
 	const real_t arrow_width = (real_t)(preview_arrow_width * glyph_scale);
 	const real_t arrow_head_length = (real_t)(preview_arrow_head_length * glyph_scale);
 	const real_t arrow_head_width = (real_t)(preview_arrow_head_width * glyph_scale);

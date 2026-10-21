@@ -3,8 +3,8 @@ extends BlastTest
 ## builds (the lock check of Object::callp is DEBUG_ENABLED): in an exported
 ## release game a handler that frees the emitter deletes it in the middle of
 ## the plugin's code. BulletFactory2D.debug_free_like_release() frees the
-## release way. For every signal of BulletSpawner2D and BulletFactory2D (the
-## laser signals too)
+## release way. For every signal of BulletSpawner2D, LaserSpawner2D and
+## BulletFactory2D (the laser signals too)
 ## (read from ClassDB, so new signals are covered), a handler frees its
 ## emitter on the first emission: the plugin never touches freed memory
 ## (tools/run_sanitizer_tests.py runs this under AddressSanitizer), the
@@ -171,6 +171,65 @@ func test_freeing_the_spawner_from_its_own_signal(sig: String = use_parameters(_
 	assert_true(books["ok"], "%s: %s" % [sig, books["error"]])
 
 
+func test_freeing_the_laser_spawner_from_its_own_signal(sig: String = use_parameters(_signal_names("LaserSpawner2D"))) -> void:
+	if UNREACHED_OK.has(sig):
+		pass_test("not raised by this scenario: " + UNREACHED_OK[sig])
+		return
+	godot_listener_at(Vector2.ZERO)
+	var sp := LaserSpawner2D.new()
+	sp.set_shooting_enabled(false)
+	# Short phases, a sweep across the graze target, the layer-4 wall pierced
+	# and the layer-16 wall blocking: every laser signal within the run.
+	var laser := H.make_laser(0.02, 0.02, 0.3, 0.02, 300.0)
+	laser.wall_mask = 16
+	laser.hit_interval_sec = 0.05
+	laser.sweep_speed_degrees = 720.0
+	sp.laser_data = laser
+	sp.pattern_source = LaserSpawner2D.PATTERN_FROM_HELPER_RING
+	sp.helper_bullets_amount = 2
+	sp.helper_ring_radius = 10.0
+	add(sp)
+	sp.set_bullet_factory(factory)
+	sp.burst_enabled = true
+	sp.burst_count = 2
+	sp.burst_interval_sec = 0.05
+	sp.telegraph_enabled = true
+	sp.telegraph_sec = 0.05
+	sp.shoot_interval_sec = 0.1
+	sp.max_volleys = 4
+	sp.graze_enabled = true
+	sp.graze_zones = [H.make_graze_zone([15.0])] # the muzzles sit 20 px off the target: a sweep leaves the ring
+	sp.graze_node_group = &"rf_graze"
+	sp.sound_enabled = true
+	sp.sound_effects = [H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)]
+	sp.set_movement_path_node(path)
+	sp.movement_loop_mode = LaserSpawner2D.MOVEMENT_LOOP_LOOP
+	sp.movement_duration_sec = 0.1
+	if sig == "volley_skipped":
+		sp.max_live_lasers = 1 # the second pull skips ("over_budget")
+	_handle_all(sp)
+	sp.orphaned_lasers = LaserSpawner2D.ORPHANED_LASERS_REMOVE
+	var fired: Array = []
+	_arm(sp, sig, fired)
+	sp.movement_enabled = true
+	if fired.is_empty():
+		sp.set_shooting_enabled(true)
+	if fired.is_empty():
+		sp.spawn_pattern_list([{"helper_bullets_amount": 2}, {"helper_bullets_amount": 2}], false, 0.05)
+	for k in 180:
+		if not fired.is_empty() or not is_instance_valid(sp):
+			break
+		if k == 10 and sig == "shooting_stopped" and fired.is_empty():
+			sp.pause_shooting()
+		await physics(1)
+	assert_false(fired.is_empty(), "%s was raised by the scenario" % sig)
+	await idle(2)
+	assert_false(is_instance_valid(sp), "%s: the freed spawner is gone" % sig)
+	assert_eq(_errors(), [], "%s: freeing the emitter reported nothing" % sig)
+	var books: Dictionary = factory.debug_assert_no_dangling()
+	assert_true(books["ok"], "%s: %s" % [sig, books["error"]])
+
+
 func test_freeing_the_factory_from_its_own_signal(sig: String = use_parameters(_signal_names("BulletFactory2D"))) -> void:
 	godot_listener_at(Vector2.ZERO)
 	check_factory_after = false
@@ -184,11 +243,14 @@ func test_freeing_the_factory_from_its_own_signal(sig: String = use_parameters(_
 	v.graze_set_zones([H.make_graze_zone([50.0])], &"rf_graze")
 	# A laser raises every laser signal: +X pierces the layer-4 wall, -X is
 	# blocked by the layer-16 wall; short phases end it within the scenario.
-	var laser := H.make_laser(0.05, 0.05, 0.3, 0.05, 300.0)
+	# Sweeping (720 deg/s) it also enters and leaves the graze target.
+	var laser := H.make_laser(0.05, 0.05, 0.6, 0.05, 300.0)
 	laser.wall_mask = 16
 	laser.hit_interval_sec = 0.05
+	laser.sweep_speed_degrees = 720.0
 	var beams: Array[Transform2D] = [Transform2D(0.0, Vector2.ZERO), Transform2D(PI, Vector2.ZERO)]
-	f.spawn_laser(laser, beams)
+	var lv := f.spawn_laser(laser, beams)
+	lv.graze_set_zones([H.make_graze_zone([20.0])], &"rf_graze")
 	var pickup := BulletPickupData2D.new()
 	for k in 200:
 		if not fired.is_empty() or not is_instance_valid(f):
