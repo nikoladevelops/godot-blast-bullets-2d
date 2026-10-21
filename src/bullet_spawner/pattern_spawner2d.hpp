@@ -869,6 +869,9 @@ public:
 	// preview is off. Lets tests prove dots sit on the track (rotation
 	// parity between volley geometry and gizmo) without an editor.
 	PackedVector2Array debug_get_preview_dot_points() const;
+	// The facing arrows as drawn (holder space): tails, unit directions and
+	// the shaft length (a laser spawner draws its laser's length).
+	Dictionary debug_get_preview_arrows() const;
 	PackedVector2Array debug_get_preview_track_points() const;
 	// Whether the drawn base track closes its last point back to the first.
 	bool debug_get_preview_track_closed() const;

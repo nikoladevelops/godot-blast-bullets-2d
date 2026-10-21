@@ -308,3 +308,35 @@ func test_emitter_bullets_fire_lasers() -> void:
 	assert_eq(lasers.size(), 1, "the flying bullet fired the laser spawner's pattern")
 	assert_almost_eq(lasers[0].get_beam_start(0).distance_to(v.get_bullet_transform(0).origin), 20.0, 0.5, "around the bullet, not the template")
 	assert_null(lasers[0].get_anchor(), "an emitter shot never follows the template")
+
+
+func test_the_preview_draws_each_slot_as_its_beam() -> void:
+	var d := _laser() # 200 px
+	var sp := _spawner(d, 4)
+	sp.show_pattern_preview = true
+	sp.show_preview_during_runtime = true
+	await idle(6) # the deferred preview rebuild
+	var arrows: Dictionary = sp.debug_get_preview_arrows()
+	assert_eq((arrows["tails"] as PackedVector2Array).size(), 4, "one beam per slot")
+	assert_almost_eq(float(arrows["length"]), 200.0, 0.001, "drawn at the laser's length")
+	var l := _fire(sp)
+	step_factory(1, DT)
+	var dots := sp.debug_get_preview_dot_points()
+	var dirs: PackedVector2Array = arrows["dirs"]
+	var off: Array = []
+	for i in 4:
+		if not dots[i].is_equal_approx(l.get_beam_start(i)) or not is_equal_approx(angle_difference(dirs[i].angle(), l.get_beam_angle(i)), 0.0):
+			off.append(i)
+	assert_eq(off, [], "every preview beam starts and points where its beam fires")
+	d.length = 350.0
+	await idle(6)
+	assert_almost_eq(float(sp.debug_get_preview_arrows()["length"]), 350.0, 0.001, "a laser_data edit redraws")
+	sp.laser_data = LaserData2D.create_preset(LaserData2D.PRESET_WALL_BEAM)
+	await idle(6)
+	assert_almost_eq(float(sp.debug_get_preview_arrows()["length"]), 1200.0, 0.001, "a new laser_data redraws")
+	sp.laser_data = null
+	await idle(6)
+	assert_almost_eq(float(sp.debug_get_preview_arrows()["length"]), sp.preview_arrow_length, 0.001, "no laser: the plain facing arrows")
+	var bullets := make_preview_spawner(BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
+	await idle(6)
+	assert_almost_eq(float(bullets.debug_get_preview_arrows()["length"]), bullets.preview_arrow_length, 0.001, "bullet spawners keep preview_arrow_length")

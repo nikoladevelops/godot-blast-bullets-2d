@@ -61,7 +61,7 @@ for the rest: the sections are written to be looked up, not read once.
 
 ```sh
 GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py   # build (exit 1 = failed; never raw scons, never edit SConstruct)
-python3 tools/run_tests.py                                       # 230 files / 2124 tests, ~20 s, leak-checked
+python3 tools/run_tests.py                                       # 230 files / 2125 tests, ~20 s, leak-checked
 python3 tools/run_tests.py --suite <substring> --full            # one area, every failure message unclipped
 python3 tools/run_tests.py --self-test                           # proves the harness still catches failures/leaks
 python3 tools/run_editor_smoke.py                                # headless EDITOR run of tests/editor_smoke/ (editor-only paths)
@@ -1729,7 +1729,7 @@ lists, the sound mixer, the target filter, the emit guard).
 | Signals | factory + `LaserSpawner2D` | `laser_phase_changed`, `laser_pierce_started` (always followed by its first `laser_hit`), `laser_hit` (repeats every `hit_interval_sec`, no burst after a hitch), `laser_pierce_ended` (only after a start; a freed target ends silently), `laser_wall_hit` (once per block), `laser_finished` (then pooled), `laser_grazed` / `laser_graze_exited` (owner spawner first, then the factory always). A spawner laser signals on its spawner, a factory laser on the factory, never both |
 | Draw | `laser_volley2d_render.cpp` | every body of a laser is ONE triangle array (`canvas_item_add_triangle_array`: a strip of left/right pairs per beam, mitered up to 90 degree turns, split at sharper ones, 8 color-ramp pieces over the length; `debug_get_body_mesh(fraction)` reports it), the point animations on their own clocks drawn over the bodies; interpolation lerps muzzle / angle / length for a straight beam (a sweep stays on its muzzle), point by point for a polyline; `debug_get_draw_state(fraction)` reports exactly what `_draw` uses |
 | Factory | `factory/bullet_factory2d_lasers.cpp` | `spawn_laser` (script) / `spawn_laser_span` (C++), `tick_lasers` after the volley timers (each laser with its own time factor), `redraw_lasers` in the interpolation pass, `clear_active_lasers`, `reset()` frees lasers, teardown detaches them; `debug_check_lasers` in `debug_assert_no_dangling` |
-| Spawner | `bullet_spawner/laser_spawner2d.*` | Lasers (`laser_data`, `orphaned_lasers` Fade Out / Keep Firing / Hand To Factory / Remove, `max_live_lasers`), Laser Targeting (None / Node Group (nearest per beam) / Node Path / Mouse (every frame) / Global Position, filter group, retarget interval); arms graze and sound at the shot; a `shoot_from` shot never follows the template |
+| Spawner | `bullet_spawner/laser_spawner2d.*` | Lasers (`laser_data`, `orphaned_lasers` Fade Out / Keep Firing / Hand To Factory / Remove, `max_live_lasers`), Laser Targeting (None / Node Group (nearest per beam) / Node Path / Mouse (every frame) / Global Position, filter group, retarget interval); arms graze and sound at the shot; a `shoot_from` shot never follows the template; the preview draws each slot as its beam (arrows at `LaserData2D.length`, redrawn on every `changed`: `debug_get_preview_arrows`, editor probe `laser_preview_smoke.tscn`) |
 
 Engine facts behind it (pinned in `integration/test_engine_facts.gd` and the
 laser suites): `intersect_ray` / `intersect_shape` work inside the factory

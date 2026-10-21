@@ -87,6 +87,12 @@
 				Whether the static cache verifier is on (see [method debug_set_pattern_cache_verify]).
 			</description>
 		</method>
+		<method name="debug_get_preview_arrows" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				The facing arrows of the pattern preview as drawn, in the preview holder's space: [code]tails[/code] (where each shaft starts, just past its dot), [code]dirs[/code] (unit directions) and [code]length[/code] (the shaft length: [member preview_arrow_length] for bullets, the laser's [member LaserData2D.length] for a [LaserSpawner2D] with laser data). Empty while no preview is drawn.
+			</description>
+		</method>
 		<method name="debug_get_preview_dot_points" qualifiers="const">
 			<return type="PackedVector2Array" />
 			<description>

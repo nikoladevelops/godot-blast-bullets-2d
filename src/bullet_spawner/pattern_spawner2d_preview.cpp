@@ -255,6 +255,15 @@ PackedVector2Array PatternSpawner2D::debug_get_preview_dot_points() const {
 	return dots->dots;
 }
 
+Dictionary PatternSpawner2D::debug_get_preview_arrows() const {
+	Dictionary out;
+	const PatternPreviewLayer2D *arrows = live_preview_arrows();
+	out["tails"] = arrows != nullptr ? arrows->arrow_tails : PackedVector2Array();
+	out["dirs"] = arrows != nullptr ? arrows->arrow_dirs : PackedVector2Array();
+	out["length"] = arrows != nullptr ? (double)arrows->arrow_length : 0.0;
+	return out;
+}
+
 PackedVector2Array PatternSpawner2D::debug_get_preview_track_points() const {
 	const PatternPreviewLayer2D *dots = live_preview_dots();
 	if (dots == nullptr) {
