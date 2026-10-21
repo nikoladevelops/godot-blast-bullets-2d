@@ -336,3 +336,29 @@ func test_the_body_follows_the_interpolated_beam() -> void:
 	var pts: PackedVector2Array = l.debug_get_body_mesh(0.5)["points"]
 	assert_true(((pts[0] + pts[1]) * 0.5).is_equal_approx(mid[0]), "the first pair centers on the muzzle")
 	assert_true(((pts[2] + pts[3]) * 0.5).is_equal_approx(mid[1]), "the last on the lerped end (15 deg)")
+
+
+func test_set_beam_angle_jumps_without_a_sweep() -> void:
+	var l := _fire(H.make_laser(0.0, 0.0, 0.0, 0.0, 200.0))
+	step_factory(2, DT)
+	l.set_beam_angle(0, 1.0)
+	step_factory(1, DT)
+	var mid := _pts(l, 0.5)
+	assert_almost_eq((mid[1] - mid[0]).angle(), 1.0, 0.0001, "drawn at the new angle mid-frame, like a bullet transform setter")
+	step_factory(1, DT)
+	mid = _pts(l, 0.5)
+	assert_almost_eq((mid[1] - mid[0]).angle(), 1.0, 0.0001, "and it stays there")
+
+
+func test_a_reused_laser_never_lerps_from_its_last_life() -> void:
+	var d := H.make_laser(0.0, 0.0, 0.0, 0.0, 200.0)
+	var l := _fire(d, Transform2D(0.0, Vector2(0, 0)))
+	step_factory(2, DT)
+	l.end_laser(false)
+	step_factory(1, DT)
+	var again := _fire(d, Transform2D(1.5, Vector2(500, 300)))
+	assert_eq(again, l, "the same laser")
+	assert_eq(_pts(again, 0.5)[0], Vector2(500, 300), "drawn at its new muzzle before its first tick")
+	step_factory(1, DT)
+	assert_eq(_pts(again, 0.5)[0], Vector2(500, 300), "and after it (no slide from the old life)")
+	assert_almost_eq((_pts(again, 0.5)[1] - _pts(again, 0.5)[0]).angle(), 1.5, 0.0001, "nor a turn")

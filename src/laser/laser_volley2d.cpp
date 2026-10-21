@@ -470,6 +470,7 @@ void LaserVolley2D::set_beam_angle(int beam_index, real_t radians) {
 	const real_t turn = radians - b.aim;
 	b.aim = radians;
 	b.heading = radians;
+	b.snap_history = true;
 	// The slot turns too, so a pattern aim keeps the new direction.
 	const Transform2D rotate(turn, Vector2());
 	b.slot.columns[0] = rotate.basis_xform(b.slot.columns[0]);

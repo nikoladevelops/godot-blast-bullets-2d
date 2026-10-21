@@ -886,6 +886,14 @@ void LaserVolley2D::tick(double delta) {
 		} else {
 			update_beam_geometry(b, delta);
 		}
+		if (b.snap_history) {
+			// A scripted jump is never drawn as travel (like bullet setters).
+			b.snap_history = false;
+			b.prev_points = b.points;
+			b.prev_muzzle = b.points.empty() ? b.muzzle : b.points.front();
+			b.prev_angle = b.angle;
+			b.prev_length = b.length_now;
+		}
 	}
 	// Bolts and curvy lasers fully outside the despawn bounds are spent (silently).
 	if (d->type != LaserData2D::LASER_BEAM && factory->get_despawn_bounds_enabled()) {

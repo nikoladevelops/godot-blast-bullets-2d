@@ -91,6 +91,7 @@ public:
 		real_t prev_angle = 0.0;
 		real_t prev_length = 0.0;
 		std::vector<Vector2> prev_points;
+		bool snap_history = false; // a script jumped it (set_beam_angle): the next tick draws no sweep
 		// TRACK / LOCK_ON target: a node by id, or a point.
 		uint64_t target_id = 0;
 		Vector2 target_point;
