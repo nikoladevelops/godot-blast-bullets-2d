@@ -3,7 +3,7 @@
 // knobs and every helper_<shape>_* accessor (validate -> store ->
 // on_pattern_changed), plus apply_pattern_preset (batched raw writes).
 
-#include "bullet_spawner/bullet_spawner2d_internal.hpp"
+#include "bullet_spawner/pattern_spawner2d_internal.hpp"
 #include "patterns/pattern_knob_checks2d.hpp"
 
 using namespace godot;

@@ -2,7 +2,7 @@
 // Spawner movement along a Path2D: properties, easing, legs/loops,
 // pose application and the play/pause/stop/seek/reverse API.
 
-#include "bullet_spawner/bullet_spawner2d_internal.hpp"
+#include "bullet_spawner/pattern_spawner2d_internal.hpp"
 #include "core/emit_on2d.hpp"
 #include "core/transform_math2d.hpp"
 
@@ -501,26 +501,7 @@ void PatternSpawner2D::teleport(const Vector2 &new_global_position, bool carry_l
 	if (!carry_live_bullets) {
 		return;
 	}
-	BulletFactory2D *factory = get_bullet_factory();
-	if (factory == nullptr) {
-		return;
-	}
-	std::vector<BulletVolley2D *> owned;
-	factory->collect_volleys_owned_by(get_instance_id(), owned);
-	// Ids first: a shift moves attachments, whose node callbacks are user code.
-	std::vector<uint64_t> ids;
-	ids.reserve(owned.size());
-	for (BulletVolley2D *volley : owned) {
-		ids.push_back(volley->get_instance_id());
-	}
-	const uint64_t self_id = get_instance_id();
-	for (size_t k = 0; k < owned.size(); ++k) {
-		BulletVolley2D *volley = owned[k];
-		if (ObjectDB::get_instance(ObjectID(ids[k])) != volley || volley->is_queued_for_deletion() || volley->owner_spawner_id != self_id || volley->is_pooled()) {
-			continue;
-		}
-		volley->teleport_shift_all_bullets(jump);
-	}
+	shift_owned_shots(jump);
 }
 
 void PatternSpawner2D::movement_seek(double ratio) {

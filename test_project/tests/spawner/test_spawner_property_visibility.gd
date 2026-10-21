@@ -115,8 +115,10 @@ func test_every_helper_shape_property_sits_in_a_shape_subgroup() -> void:
 func test_setup_transform_and_outline_placement() -> void:
 	var lay := _layout(sp)
 	var where: Dictionary = lay["where"]
-	for prop_name in ["bullet_factory_path", "transforms_generator", "spawn_data"]:
+	for prop_name in ["bullet_factory_path", "transforms_generator"]:
 		assert_eq(where[prop_name][0], "Setup", prop_name + " in Setup")
+	for prop_name in ["spawn_data", "orphaned_volleys", "max_live_bullets", "bullet_speed_scale_min", "bullet_speed_scale_max"]:
+		assert_eq(where[prop_name][0], "Bullets", prop_name + " in Bullets (BulletSpawner2D's own section)")
 	for prop_name in ["pattern_source", "helper_bullets_amount"]:
 		assert_eq(where[prop_name].slice(0, 2), ["Bullet Patterns", ""], prop_name + " heads Bullet Patterns")
 	for prop_name in ["pattern_scale", "transforms_scale", "spawn_position_offset", "spawn_position_offset_space", "helper_skip_indices"]:

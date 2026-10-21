@@ -977,7 +977,9 @@ func test_t20_inspector_groups_stay_coherent() -> void:
 	assert_true(groups_found.has("Sound"), "spawner Sound group present")
 	assert_true(groups_found.has("Flocking"), "spawner Flocking group present")
 	assert_true(groups_found.has("Splitting"), "spawner Splitting group present")
-	assert_eq(spawner_group_order.slice(0, 15), ["Setup", "Time", "Bullet Patterns", "Shooting", "Randomization", "Spin", "Homing", "Orbiting", "Flocking", "Splitting", "Graze", "Sound", "Preview", "Movement", "Performance"], "spawner group order")
+	# BulletSpawner2D's own section first (what it fires and how bullets
+	# steer), then its PatternSpawner2D section (where and when it fires).
+	assert_eq(spawner_group_order.slice(0, 16), ["Bullets", "Homing", "Orbiting", "Flocking", "Splitting", "Setup", "Time", "Bullet Patterns", "Shooting", "Randomization", "Spin", "Graze", "Sound", "Preview", "Movement", "Performance"], "spawner group order")
 	spawner20.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_GRID
 	await idle(1)
 	var ring_visible_grid := false
@@ -1017,7 +1019,7 @@ func test_t20_inspector_groups_stay_coherent() -> void:
 	assert_true(prop_group.get("shooting_enabled", "") == "Shooting", "shooting master grouped")
 	assert_true(prop_group.get("reload_jitter_sec", "") == "Shooting", "reload jitter moved to Shooting")
 	assert_true(prop_group.get("reload_jitter_seed", "") == "Shooting", "reload seed moved to Shooting")
-	assert_true(prop_group.get("max_live_bullets", "") == "Shooting", "max_live_bullets moved to Shooting")
+	assert_true(prop_group.get("max_live_bullets", "") == "Bullets", "max_live_bullets sits with the spawn data (Bullets)")
 	assert_true(prop_group.get("spin_enabled", "") == "Spin", "spin master grouped")
 	assert_true(prop_group.get("homing_delay_sec", "") == "Homing", "homing gates moved to Homing")
 	assert_true(prop_group.get("homing_duration_sec", "") == "Homing", "homing duration moved to Homing")
@@ -1039,7 +1041,7 @@ func test_t20_inspector_groups_stay_coherent() -> void:
 			stray_homing.append(pname)
 		if pname.begins_with("reload_jitter") and gname != "Shooting":
 			stray_homing.append(pname)
-		if pname == "max_live_bullets" and gname != "Shooting":
+		if pname == "max_live_bullets" and gname != "Bullets":
 			stray_homing.append(pname)
 	assert_true(stray_homing.is_empty(), "no homing/reload/budget prop leaks into Spin or Burst")
 	spawner20.queue_free()

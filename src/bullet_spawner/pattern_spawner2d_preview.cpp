@@ -2,7 +2,7 @@
 // Pattern preview: snapshot + rebuild, zero-cost spin/move pose, dirty
 // detection and the debug_* coincidence bindings used by tests.
 
-#include "bullet_spawner/bullet_spawner2d_internal.hpp"
+#include "bullet_spawner/pattern_spawner2d_internal.hpp"
 #include "core/transform_math2d.hpp"
 
 using namespace godot;
@@ -840,28 +840,13 @@ void PatternSpawner2D::rebuild_preview() {
 	// to the current angle here (otherwise a rebuild during spin would snap
 	// back to 0 until the next advance_spin).
 	set_preview_pose(spin_angle_deg);
-	// Collision-ring overlay: bounding radius from the volley's shape so
-	// the editor shows hitbox vs visual. Off by default; invalid shapes hide.
+	// Collision-ring overlay: bounding radius of what the shot fires (the
+	// derived spawner's shape) so the editor shows hitbox vs visual. Off by
+	// default; invalid shapes hide.
 	{
 		float ring_r = 0.0f;
-		if (preview_draw_collision_rings && spawn_data.is_valid() && spawn_data->collision_shape.is_valid()) {
-			if (const CircleShape2D *c = Object::cast_to<CircleShape2D>(spawn_data->collision_shape.ptr())) {
-				const float r = c->get_radius();
-				if (r > 0.0f && Math::is_finite(r)) {
-					ring_r = r;
-				}
-			} else if (const RectangleShape2D *rc = Object::cast_to<RectangleShape2D>(spawn_data->collision_shape.ptr())) {
-				const Vector2 s = rc->get_size();
-				if (s.x > 0.0f && s.y > 0.0f && s.is_finite()) {
-					ring_r = 0.5f * (float)Math::min(s.x, s.y);
-				}
-			} else if (const CapsuleShape2D *cap = Object::cast_to<CapsuleShape2D>(spawn_data->collision_shape.ptr())) {
-				const float h = cap->get_height();
-				if (h > 0.0f && Math::is_finite(h)) {
-					ring_r = 0.5f * h;
-				}
-			}
-			ring_r = (float)(ring_r * glyph_scale);
+		if (preview_draw_collision_rings) {
+			ring_r = (float)(preview_collision_ring_radius() * glyph_scale);
 			if (!(ring_r > 0.0f) || !Math::is_finite(ring_r)) {
 				ring_r = 0.0f;
 			}

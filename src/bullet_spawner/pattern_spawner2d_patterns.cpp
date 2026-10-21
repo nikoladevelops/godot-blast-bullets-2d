@@ -3,7 +3,7 @@
 // motion classification (RIGID/TRANSLATION/NONE), cached re-posing, the
 // native span collect used by shoot_once and the cache verifier.
 
-#include "bullet_spawner/bullet_spawner2d_internal.hpp"
+#include "bullet_spawner/pattern_spawner2d_internal.hpp"
 #include "core/emit_guard2d.hpp"
 #include "patterns/pattern_pose2d.hpp"
 #include "patterns/patterns_internal.hpp"
@@ -215,10 +215,10 @@ void PatternSpawner2D::end_pattern_batch() {
 }
 
 // Own properties a pattern-list entry or preset may touch: helper_*, spin_*,
-// pattern_source (+ spawn_data for entries). Read from ClassDB so new knobs
+// pattern_source (+ the payload key for entries: spawn_data for bullets). Read from ClassDB so new knobs
 // are covered without a hand-kept list: the spawner's class and its plugin
 // bases (the walk stops at the engine's Node2D).
-static void pattern_state_property_names(const StringName &cls, bool include_spawn_data, bool reset_only, std::vector<StringName> &r_names) {
+static void pattern_state_property_names(const StringName &cls, const String &payload, bool reset_only, std::vector<StringName> &r_names) {
 	r_names.clear();
 	ClassDBSingleton *class_db = ClassDBSingleton::get_singleton();
 	TypedArray<Dictionary> props;
@@ -233,7 +233,7 @@ static void pattern_state_property_names(const StringName &cls, bool include_spa
 			continue;
 		}
 		const bool knob = name.begins_with("helper_") || name.begins_with("spin_") || name == "pattern_source";
-		if (!knob && !(include_spawn_data && name == "spawn_data")) {
+		if (!knob && !(!payload.is_empty() && name == payload)) {
 			continue;
 		}
 		if (reset_only) {
@@ -250,7 +250,7 @@ static void pattern_state_property_names(const StringName &cls, bool include_spa
 
 Dictionary PatternSpawner2D::snapshot_pattern_state() const {
 	std::vector<StringName> names;
-	pattern_state_property_names(get_class(), true, false, names);
+	pattern_state_property_names(get_class(), String(payload_key()), false, names);
 	Dictionary out;
 	for (const StringName &name : names) {
 		out[name] = get(name);
@@ -273,7 +273,7 @@ void PatternSpawner2D::restore_pattern_state(const Dictionary &snapshot) {
 
 void PatternSpawner2D::reset_pattern_knobs_to_defaults() {
 	std::vector<StringName> names;
-	pattern_state_property_names(get_class(), false, true, names);
+	pattern_state_property_names(get_class(), String(), true, names);
 	ClassDBSingleton *class_db = ClassDBSingleton::get_singleton();
 	begin_pattern_batch();
 	for (const StringName &name : names) {
@@ -332,11 +332,6 @@ Dictionary PatternSpawner2D::debug_get_pattern_cache_info() const {
 	d["version"] = (int64_t)pattern_version;
 	d["shot_class"] = pattern_cache.motion_class(PatternBakeCache2D::CHANNEL_SHOT, pattern_cache_version2d(pattern_version));
 	d["preview_class"] = pattern_cache.motion_class(PatternBakeCache2D::CHANNEL_PREVIEW, pattern_cache_version2d(pattern_version));
-	// Spawn-data duplicate cache (shoot_once reuses one spawner-owned copy;
-	// resource swaps and in-place edits invalidate it).
-	d["template_valid"] = cached_volley_template.is_valid();
-	const uint64_t live_id = spawn_data.is_valid() ? spawn_data->get_instance_id() : 0;
-	d["spawn_id_match"] = cached_volley_template.is_valid() && cached_spawn_data_id == live_id && live_id != 0;
 	return d;
 }
 

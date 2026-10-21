@@ -4,7 +4,7 @@
 // refreshes listeners for scripts, and fires the spawner-only entries (On
 // Shot after a successful shot, On Telegraph with volley_telegraphed).
 
-#include "bullet_spawner/bullet_spawner2d_internal.hpp"
+#include "bullet_spawner/pattern_spawner2d_internal.hpp"
 #include "core/graze_targets2d.hpp"
 #include "core/transform_math2d.hpp"
 
@@ -265,46 +265,6 @@ int PatternSpawner2D::refresh_sound_listeners() {
 	// Rescan through the same path the runtime measures from.
 	collect_sound_listeners(sound_listeners_scratch);
 	return (int)sound_listeners_scratch.size();
-}
-
-void PatternSpawner2D::apply_volley_sound(BulletVolley2D *volley) {
-	if (volley == nullptr || !sound_enabled || sound_effects.is_empty()) {
-		return;
-	}
-	bool any = false;
-	const Array entries = spawner_sound_entries(any);
-	if (any) {
-		// Shared: listener edits and refresh_sound_listeners() reach it in
-		// flight.
-		std::shared_ptr<GrazeDetector2D> detector = sound_detector_ref();
-		volley->sound_arm_from_spawner(entries, detector, (float)sound_volume_db);
-	}
-}
-
-int PatternSpawner2D::sound_live_volleys() {
-	BulletFactory2D *factory = get_bullet_factory();
-	if (factory == nullptr) {
-		return 0;
-	}
-	bool any = false;
-	const Array entries = sound_enabled ? spawner_sound_entries(any) : Array();
-	const std::shared_ptr<GrazeDetector2D> detector = any ? sound_detector_ref() : nullptr;
-	// Arming runs no user code: the list stays valid while it is walked.
-	std::vector<BulletVolley2D *> owned;
-	factory->collect_volleys_owned_by(get_instance_id(), owned);
-	int changed = 0;
-	for (BulletVolley2D *volley : owned) {
-		if (!any) {
-			if (!volley->sound_effects.empty()) {
-				volley->sound_release();
-				++changed;
-			}
-		} else if (!volley->sound_armed_with(entries, detector, (float)sound_volume_db)) {
-			volley->sound_arm_from_spawner(entries, detector, (float)sound_volume_db);
-			++changed;
-		}
-	}
-	return changed;
 }
 
 Array PatternSpawner2D::spawner_sound_entries(bool &r_any) {

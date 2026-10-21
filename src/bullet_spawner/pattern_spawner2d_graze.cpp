@@ -4,7 +4,7 @@
 // tick), resolves and refreshes targets for scripts, and keeps the zone
 // resources' `changed` hooked up.
 
-#include "bullet_spawner/bullet_spawner2d_internal.hpp"
+#include "bullet_spawner/pattern_spawner2d_internal.hpp"
 #include "core/graze_targets2d.hpp"
 #include "core/transform_math2d.hpp"
 
@@ -321,47 +321,6 @@ void PatternSpawner2D::connect_graze_zones(bool connect) {
 void PatternSpawner2D::_on_graze_zone_changed() {
 	on_config_changed();
 	refresh_graze_preview();
-}
-
-void PatternSpawner2D::apply_volley_graze(BulletVolley2D *volley) {
-	if (volley == nullptr || !graze_enabled || graze_zones.is_empty()) {
-		return;
-	}
-	bool any = false;
-	const Array zones = spawner_graze_zones(any);
-	if (any) {
-		// Shared: setting edits and refresh_graze_targets() reach it in flight.
-		graze_detector_ref();
-		volley->graze_arm_from_spawner(zones, graze_detector);
-	}
-}
-
-int PatternSpawner2D::graze_live_volleys() {
-	BulletFactory2D *factory = get_bullet_factory();
-	if (factory == nullptr) {
-		return 0;
-	}
-	bool any = false;
-	const Array zones = graze_enabled ? spawner_graze_zones(any) : Array();
-	if (any) {
-		graze_detector_ref();
-	}
-	// Arming runs no user code: the list stays valid while it is walked.
-	std::vector<BulletVolley2D *> owned;
-	factory->collect_volleys_owned_by(get_instance_id(), owned);
-	int changed = 0;
-	for (BulletVolley2D *volley : owned) {
-		if (!any) {
-			if (volley->graze_zone_slots > 0) {
-				volley->graze_release();
-				++changed;
-			}
-		} else if (!volley->graze_armed_with(zones, graze_detector)) {
-			volley->graze_arm_from_spawner(zones, graze_detector);
-			++changed;
-		}
-	}
-	return changed;
 }
 
 Array PatternSpawner2D::spawner_graze_zones(bool &r_any) {

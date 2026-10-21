@@ -3,39 +3,12 @@
 // burst interval, telegraph). Rolls never touch the pattern layer: the preview,
 // the bake cache and collect_spawn_transforms() stay deterministic.
 
-#include "bullet_spawner/bullet_spawner2d_internal.hpp"
+#include "bullet_spawner/pattern_spawner2d_internal.hpp"
 #include "core/transform_math2d.hpp"
 
 using namespace godot;
 
 namespace BlastBullets2D {
-
-namespace {
-// Roll channels: each knob draws from its own stream, so switching one on
-// never shifts what another rolls for the same seed.
-enum RollChannel : uint32_t {
-	CHANNEL_SCALE_X = 1,
-	CHANNEL_SCALE_Y = 2,
-	CHANNEL_ROTATION = 3,
-	CHANNEL_POSITION_ANGLE = 4,
-	CHANNEL_POSITION_RADIUS = 5,
-	CHANNEL_SPEED = 6,
-	CHANNEL_SPIN = 7,
-};
-
-inline uint64_t mix64(uint64_t x) {
-	x += 0x9E3779B97F4A7C15ull;
-	x = (x ^ (x >> 30)) * 0xBF58476D1CE4E5B9ull;
-	x = (x ^ (x >> 27)) * 0x94D049BB133111EBull;
-	return x ^ (x >> 31);
-}
-
-inline double lerp_range(double a, double b, double t) {
-	const double lo = a < b ? a : b;
-	const double hi = a < b ? b : a;
-	return lo + (hi - lo) * t;
-}
-} // namespace
 
 // ---- Setters: finite / range only, never against the other end of a pair ----
 
@@ -54,8 +27,6 @@ BLAST_RANDOM_SETTER(bullet_rotation_min_degrees, true, "a number")
 BLAST_RANDOM_SETTER(bullet_rotation_max_degrees, true, "a number")
 BLAST_RANDOM_SETTER(bullet_position_jitter_min, value >= 0.0, ">= 0")
 BLAST_RANDOM_SETTER(bullet_position_jitter_max, value >= 0.0, ">= 0")
-BLAST_RANDOM_SETTER(bullet_speed_scale_min, value >= 0.0, ">= 0")
-BLAST_RANDOM_SETTER(bullet_speed_scale_max, value >= 0.0, ">= 0")
 // Timing maxima feed RandomNumberGenerator.randf_range, which takes floats:
 // past FLT_MAX the wait became INF and the spawner stalled for good.
 BLAST_RANDOM_SETTER(shoot_interval_max_sec, is_finite_real2d(value) && value >= 0.0, ">= 0 (0 = off)")
@@ -93,18 +64,6 @@ void PatternSpawner2D::set_bullet_scale_max_xy(const Vector2 &value) {
 	bullet_scale_max_xy = value;
 }
 
-Array PatternSpawner2D::convert_live_bullets_to_pickups(const Ref<BulletPickupData2D> &pickup, const Variant &target) {
-	BulletFactory2D *factory = get_bullet_factory();
-	if (factory == nullptr) {
-		UtilityFunctions::push_error("BulletSpawner2D.convert_live_bullets_to_pickups: the spawner has no BulletFactory2D, nothing converted.");
-		return Array();
-	}
-	BulletFactory2D::PickupSelection selection;
-	selection.kind = BulletFactory2D::PickupSelection::OWNER;
-	selection.owner_spawner_id = get_instance_id();
-	return factory->convert_to_pickups_impl("BulletSpawner2D.convert_live_bullets_to_pickups", pickup, target, selection);
-}
-
 // ---- Rolls ----------------------------------------------------------------------------
 
 // [0, 1). Seeded: a pure function of (seed, shots fired, channel, index), no
@@ -121,7 +80,7 @@ double PatternSpawner2D::roll_unit(uint32_t channel, uint64_t index) const {
 }
 
 bool PatternSpawner2D::randomization_active() const {
-	return bullet_scale_mode != BULLET_SCALE_OFF || bullet_rotation_min_degrees != 0.0 || bullet_rotation_max_degrees != 0.0 || bullet_position_jitter_max > 0.0 || bullet_position_jitter_min > 0.0 || bullet_speed_scale_min != 1.0 || bullet_speed_scale_max != 1.0;
+	return bullet_scale_mode != BULLET_SCALE_OFF || bullet_rotation_min_degrees != 0.0 || bullet_rotation_max_degrees != 0.0 || bullet_position_jitter_max > 0.0 || bullet_position_jitter_min > 0.0;
 }
 
 void PatternSpawner2D::randomize_shot_transforms(std::vector<Transform2D> &transforms) {
@@ -160,17 +119,6 @@ void PatternSpawner2D::randomize_shot_transforms(std::vector<Transform2D> &trans
 		if (!transform_is_sane2d(t)) {
 			t = before_rolls;
 		}
-	}
-}
-
-void PatternSpawner2D::roll_speed_factors(size_t count) {
-	shot_speed_factors.clear();
-	if (bullet_speed_scale_min == 1.0 && bullet_speed_scale_max == 1.0) {
-		return;
-	}
-	shot_speed_factors.resize(count);
-	for (size_t i = 0; i < count; ++i) {
-		shot_speed_factors[i] = (real_t)lerp_range(bullet_speed_scale_min, bullet_speed_scale_max, roll_unit(CHANNEL_SPEED, (uint64_t)i));
 	}
 }
 

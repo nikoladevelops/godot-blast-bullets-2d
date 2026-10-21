@@ -175,4 +175,32 @@ static inline bool node_path_type_ok(const Node *self, const NodePath &p_path, c
 	return false;
 }
 
+// Seeded shot rolls (PatternSpawner2D placement, BulletSpawner2D speed).
+namespace {
+// Roll channels: each knob draws from its own stream, so switching one on
+// never shifts what another rolls for the same seed.
+enum RollChannel : uint32_t {
+	CHANNEL_SCALE_X = 1,
+	CHANNEL_SCALE_Y = 2,
+	CHANNEL_ROTATION = 3,
+	CHANNEL_POSITION_ANGLE = 4,
+	CHANNEL_POSITION_RADIUS = 5,
+	CHANNEL_SPEED = 6,
+	CHANNEL_SPIN = 7,
+};
+
+inline uint64_t mix64(uint64_t x) {
+	x += 0x9E3779B97F4A7C15ull;
+	x = (x ^ (x >> 30)) * 0xBF58476D1CE4E5B9ull;
+	x = (x ^ (x >> 27)) * 0x94D049BB133111EBull;
+	return x ^ (x >> 31);
+}
+
+inline double lerp_range(double a, double b, double t) {
+	const double lo = a < b ? a : b;
+	const double hi = a < b ? b : a;
+	return lo + (hi - lo) * t;
+}
+} // namespace
+
 } // namespace BlastBullets2D

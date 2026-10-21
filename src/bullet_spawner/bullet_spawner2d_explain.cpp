@@ -3,7 +3,7 @@
 // do with the current settings, why it would do nothing, which features
 // fight), then the setup warnings. Debug only: nothing here runs per frame.
 
-#include "bullet_spawner/bullet_spawner2d_internal.hpp"
+#include "bullet_spawner/pattern_spawner2d_internal.hpp"
 
 using namespace godot;
 
@@ -33,7 +33,7 @@ const char *flock_scope_name2d(int scope) {
 
 } // namespace
 
-PackedStringArray PatternSpawner2D::debug_explain_features() const {
+PackedStringArray BulletSpawner2D::debug_explain_features() const {
 	PackedStringArray out;
 	const bool rotation_data = spawn_data.is_valid() && (spawn_data->shared_bullet_rotation_data.is_valid() || !spawn_data->all_bullet_rotation_data.is_empty());
 	const bool random_size = bullet_scale_mode != BULLET_SCALE_OFF;
