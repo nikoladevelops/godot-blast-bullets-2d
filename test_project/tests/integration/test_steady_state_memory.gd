@@ -10,16 +10,25 @@ func _objs() -> int:
 	return int(Performance.get_monitor(Performance.OBJECT_COUNT))
 
 
-func _steady(f: Callable, warm := 30, measured := 200) -> int:
+## `audio`: the shots play sounds. Headless audio frees a stopped playback
+## on its own real-time mix cycles (tests run faster than real time), so
+## both counts wait for it first.
+func _steady(f: Callable, warm := 30, measured := 200, audio := false) -> int:
 	for i in warm:
 		f.call()
 		await physics()
 	await idle(4)
+	if audio:
+		OS.delay_msec(700)
+		await idle(2)
 	var before := _objs()
 	for i in measured:
 		f.call()
 		await physics()
 	await idle(4)
+	if audio:
+		OS.delay_msec(700)
+		await idle(2)
 	return _objs() - before
 
 
@@ -110,3 +119,63 @@ func test_joined_factory_spawns_and_swapped_flocks_retain_nothing() -> void:
 		v.flock_join(H.make_flock(1.0, 1.0, 1.0), BulletFlock2D.SCOPE_PER_VOLLEY))
 	assert_eq(grown, 0, "200 warm joined spawns with fresh flocks: zero retained objects")
 	assert_true(factory.debug_assert_no_dangling()["ok"], "consistent")
+
+
+## A LaserSpawner2D of `type` firing short lasers through a target and a
+## wall, graze and sound armed: every life recycles through the laser pool.
+func _laser_spawner(type: int) -> LaserSpawner2D:
+	var d := H.make_laser(0.0, 0.0, 0.05, 0.0, 200.0)
+	d.type = type
+	d.speed = 1200.0
+	d.wall_mask = 16
+	d.hit_interval_sec = 0.02
+	var sp := LaserSpawner2D.new()
+	sp.set_shooting_enabled(false)
+	sp.laser_data = d
+	sp.pattern_source = LaserSpawner2D.PATTERN_FROM_HELPER_RING
+	sp.helper_bullets_amount = 6
+	sp.helper_ring_radius = 10.0
+	sp.graze_zones = [H.make_graze_zone([60.0])]
+	sp.graze_enabled = true
+	sp.graze_node_group = &"graze_targets"
+	sp.sound_effects = [H.make_sound(BulletSoundData2D.SOUND_ON_HIT)]
+	sp.sound_enabled = true
+	add(sp)
+	sp.set_bullet_factory(factory)
+	return sp
+
+
+func test_laser_shots_retain_nothing(type: int = use_parameters([LaserData2D.LASER_BEAM, LaserData2D.LASER_BOLT, LaserData2D.LASER_CURVY])) -> void:
+	make_area(Vector2(60, 0), Vector2(20, 400))
+	make_wall(Vector2(150, 0), Vector2(20, 400), 16)
+	make_graze_target(Vector2(40, 30))
+	await idle(2)
+	var sp := _laser_spawner(type)
+	var hits := [0]
+	sp.laser_hit.connect(func(_t, _l, _b, _p) -> void: hits[0] += 1)
+	var grown: int = await _steady(func():
+		sp.rotation += 0.05
+		sp.shoot_once(), 30, 200, true)
+	assert_gt(hits[0], 100, "the lasers really hit (%d)" % hits[0])
+	assert_eq(grown, 0, "200 warm laser shots: zero retained objects")
+	assert_lt(factory.debug_get_laser_pool_amount() + factory.get_active_laser_count(), 12, "a bounded laser pool")
+
+
+func test_emitter_colored_lifetime_shots_retain_nothing() -> void:
+	var tpl := make_spawner(H.make_volley_data(3, 200.0, 0.05), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 3)
+	var d := H.make_volley_data(4, 150.0, 0.12)
+	d.all_bullet_life_times = PackedFloat64Array([0.05, 0.08, 0.1, 0.12])
+	d.scale_in_sec = 0.04
+	var sp := make_spawner(d, BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
+	sp.bullet_color_mode = BulletSpawner2D.COLOR_MODE_GRADIENT_ACROSS_PATTERN
+	var e := BulletEmitterData2D.new()
+	e.interval_sec = 0.03
+	sp.emitter = e
+	sp.emitter_spawner_path = sp.get_path_to(tpl)
+	sp.emitter_enabled = true
+	var children := [0]
+	tpl.volley_fired.connect(func(_v, _n) -> void: children[0] += 1)
+	# The drain also lets an earlier test's sounds finish freeing first.
+	var grown: int = await _steady(func(): sp.shoot_once(), 30, 200, true)
+	assert_gt(children[0], 100, "the bullets really emitted (%d)" % children[0])
+	assert_eq(grown, 0, "200 warm emitter / colored / per-bullet-lifetime shots: zero retained objects")
