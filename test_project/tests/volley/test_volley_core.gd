@@ -1,7 +1,7 @@
 extends BlastTest
 ## Volley core API: speed / direction / transform / velocity / texture
-## rotation get-set, per-bullet and all_bullets_ variants, NaN / zero / null /
-## OOB rejects keep the old value, derive-direction from a transform,
+## rotation / scale get-set, per-bullet and all_bullets_ variants, NaN / zero /
+## null / OOB rejects keep the old value, derive-direction from a transform,
 ## teleport carry, shape state, default max_speed 0 = unlimited.
 
 var v: BulletVolley2D
@@ -198,3 +198,81 @@ func test_extreme_motion_stays_finite(how: String = use_parameters(["speed", "sp
 		if not v.get_bullet_velocity(i).is_finite():
 			bad += "bullet %d velocity %s; " % [i, v.get_bullet_velocity(i)]
 	assert_eq(bad, "", "%s: every pose and velocity stays finite" % how)
+
+
+func test_bullet_scale_keeps_the_pose_and_round_trips() -> void:
+	assert_true(ClassDB.class_has_method("BulletVolley2D", "set_bullet_scale"), "bound")
+	v.set_bullet_transform(1, Transform2D(0.7, Vector2(2, 1), 0.0, Vector2(50, 60)))
+	v.set_bullet_transform(2, Transform2D(0.3, Vector2(1, -1), 0.0, Vector2(80, 60))) # mirrored
+	var before: Array = v.all_bullets_get_transforms()
+	var dir: Vector2 = v.get_bullet_direction(1)
+	assert_almost_eq(v.get_bullet_scale(1), Vector2(2, 1), Vector2(0.001, 0.001), "read")
+	assert_almost_eq(v.get_bullet_scale(2), Vector2(1, -1), Vector2(0.001, 0.001), "a mirrored bullet reads a negative y")
+	for b in 3:
+		v.set_bullet_scale(b, v.get_bullet_scale(b))
+	var problems: Array = []
+	for b in 3:
+		var t: Transform2D = v.get_bullet_transform(b)
+		if not t.is_equal_approx(before[b]):
+			problems.append("bullet %d: %s became %s" % [b, before[b], t])
+	assert_eq("\n".join(problems), "", "set(get()) is the identity")
+	v.set_bullet_scale(1, Vector2(3, 0.5))
+	var t1: Transform2D = v.get_bullet_transform(1)
+	assert_almost_eq(t1.get_scale(), Vector2(3, 0.5), Vector2(0.001, 0.001), "scaled")
+	assert_almost_eq(t1.get_rotation(), 0.7, 0.001, "the rotation is kept")
+	assert_eq(t1.origin, Vector2(50, 60), "the origin is kept")
+	assert_eq(v.get_bullet_direction(1), dir, "the direction is kept")
+	v.all_bullets_set_scale(Vector2(0.5, 0.5), 0, 1)
+	for s in v.all_bullets_get_scale(0, 1):
+		assert_almost_eq(s, Vector2(0.5, 0.5), Vector2(0.001, 0.001), "a range")
+	assert_almost_eq(v.get_bullet_scale(2), Vector2(1, -1), Vector2(0.001, 0.001), "outside the range untouched")
+
+
+func test_bullet_scale_rejects_and_keeps_the_old_scale() -> void:
+	v.set_bullet_scale(0, Vector2(2, 2))
+	for bad in [Vector2(NAN, 1), Vector2(1, INF), Vector2(0, 1), Vector2(1, 0.00001), Vector2(1e39, 1)]:
+		v.set_bullet_scale(0, bad)
+		expect_error_sequence(["set_bullet_scale: new_scale must be finite and non-zero on both axes, keeping the old scale."])
+	assert_almost_eq(v.get_bullet_scale(0), Vector2(2, 2), Vector2(0.001, 0.001), "kept")
+	v.set_bullet_scale(3, Vector2(2, 2))
+	expect_error_sequence(["Invalid bullet index in set_bullet_scale: 3 (amount_bullets: 3)"])
+	v.all_bullets_set_scale(Vector2(2, 2), 2, 1)
+	expect_error_sequence(["Invalid index range in all_bullets_set_scale (start > end). Nothing was applied."])
+
+
+func test_a_scaled_bullet_keeps_its_scale_in_flight_and_its_hitbox_scales(rotate_only_textures: bool = use_parameters([true, false])) -> void:
+	var d := H.make_still_data(2)
+	d.rotate_only_textures = rotate_only_textures
+	d.transforms = [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 100))]
+	d.monitorable = true # static bodies need it
+	d.all_bullet_rotation_data = [H.make_rotation(4.0, 60.0), H.make_rotation(4.0, 60.0)]
+	make_wall(Vector2(40, 0), Vector2(20, 20)) # its left edge at x = 30: out of the r6 circle's reach
+	var hits := [0]
+	factory.body_entered.connect(func(_b, _v, i) -> void:
+		if i == 0:
+			hits[0] += 1)
+	var w: BulletVolley2D = factory.spawn_volley(d)
+	await physics(4)
+	assert_eq(hits[0], 0, "rotate_only_textures %s: out of reach unscaled" % rotate_only_textures)
+	w.set_bullet_scale(0, Vector2(6, 6)) # r36 reaches past x = 30
+	for f in 30:
+		await physics(1)
+		if hits[0] > 0:
+			break
+	assert_eq(hits[0], 1, "rotate_only_textures %s: the hitbox scaled with the bullet" % rotate_only_textures)
+	assert_almost_eq(w.get_bullet_scale(0), Vector2(6, 6), Vector2(0.001, 0.001), "spinning keeps the scale")
+	assert_gt(absf(w.get_bullet_transform(0).get_rotation()), 0.01, "it did spin")
+
+
+func test_a_written_scale_never_reaches_the_next_life() -> void:
+	var d := H.make_volley_data(2, 100.0, 0.1)
+	var w: BulletVolley2D = factory.spawn_volley(d)
+	await idle(1)
+	w.all_bullets_set_scale(Vector2(4, 3))
+	for f in 20:
+		factory.debug_advance_time(1.0 / 60.0)
+	await idle(1)
+	assert_true(w.is_pooled(), "expired into the pool")
+	var again: BulletVolley2D = factory.spawn_volley(d)
+	assert_eq(again, w, "reused")
+	assert_eq(Array(again.all_bullets_get_scale()), [Vector2(1, 1), Vector2(1, 1)], "the spawn data's scale")

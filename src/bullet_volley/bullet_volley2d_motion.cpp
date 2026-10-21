@@ -736,6 +736,57 @@ void BulletVolley2D::all_bullets_set_transforms(const Transform2D &new_transform
 	for_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_transforms", [&](int i) { set_bullet_transform(i, new_transform, set_direction_based_on_transform); });
 }
 
+Vector2 BulletVolley2D::get_bullet_scale(int bullet_index) const {
+	if (!validate_bullet_index(bullet_index, "get_bullet_scale") || bullet_index >= (int)all_cached_instance_transforms.size()) {
+		return Vector2(1, 1);
+	}
+	return all_cached_instance_transforms[bullet_index].get_scale();
+}
+
+void BulletVolley2D::set_bullet_scale(int bullet_index, const Vector2 &new_scale) {
+	if (!validate_bullet_index(bullet_index, "set_bullet_scale")) {
+		return;
+	}
+	if (!is_finite_real2d(new_scale.x) || !is_finite_real2d(new_scale.y) || Math::abs(new_scale.x) < (real_t)0.0001 || Math::abs(new_scale.y) < (real_t)0.0001) {
+		UtilityFunctions::push_error("set_bullet_scale: new_scale must be finite and non-zero on both axes, keeping the old scale.");
+		return;
+	}
+	if (bullet_index >= (int)all_cached_instance_transforms.size()) {
+		return;
+	}
+	// Each column keeps its heading; get_scale() reports y signed by the
+	// determinant, so the same sign brings get()/set() back to identity.
+	auto rescaled = [&](const Transform2D &t) {
+		const real_t det_sign = t.determinant() < 0.0 ? (real_t)-1.0 : (real_t)1.0;
+		Transform2D out = t;
+		out.columns[0] = safe_normalized2d(t.columns[0]) * new_scale.x;
+		out.columns[1] = safe_normalized2d(t.columns[1]) * (new_scale.y * det_sign);
+		return out;
+	};
+	const Transform2D scaled = rescaled(all_cached_instance_transforms[bullet_index]);
+	// The spawn scale sizes the hitbox in both modes; with rotate_only_textures
+	// the shape keeps its own (frozen) rotation, so it is rescaled separately.
+	const bool own_shape_basis = rotate_only_textures && bullet_index < (int)all_cached_shape_transforms.size();
+	const Transform2D shape_scaled = own_shape_basis ? rescaled(all_cached_shape_transforms[bullet_index]) : Transform2D();
+	if (!is_transform_invertible_safe(scaled) || (own_shape_basis && !is_transform_invertible_safe(shape_scaled))) {
+		UtilityFunctions::push_error("set_bullet_scale: the scaled transform would be singular, keeping the old scale.");
+		return;
+	}
+	all_cached_instance_transforms[bullet_index] = scaled;
+	if (own_shape_basis) {
+		all_cached_shape_transforms[bullet_index] = shape_scaled;
+	}
+	present_bullet_transform(bullet_index, Vector2(0, 0));
+}
+
+TypedArray<Vector2> BulletVolley2D::all_bullets_get_scale(int bullet_index_start, int bullet_index_end_inclusive) const {
+	return collect_range<TypedArray<Vector2>>(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_scale", [&](int i) { return get_bullet_scale(i); });
+}
+
+void BulletVolley2D::all_bullets_set_scale(const Vector2 &new_scale, int bullet_index_start, int bullet_index_end_inclusive) {
+	for_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_scale", [&](int i) { set_bullet_scale(i, new_scale); });
+}
+
 void BulletVolley2D::set_bullet_direction_towards_position(int bullet_index, const Vector2 &target_position) {
 	if (!validate_bullet_index(bullet_index, "set_bullet_direction_towards_position")) {
 		return;

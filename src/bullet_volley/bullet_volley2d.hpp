@@ -401,6 +401,16 @@ public:
 	Vector2 get_bullet_velocity(int bullet_index) const;
 	TypedArray<Transform2D> all_bullets_get_transforms(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) const;
 	void all_bullets_set_transforms(const Transform2D &new_transform, bool set_direction_based_on_transform = false, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
+
+	// Bullet Scale: the instance basis scale (Transform2D::get_scale, a
+	// mirrored bullet reads a negative y). A write keeps the origin, the
+	// rotation and the direction and presents the bullet at once like a
+	// transform write (shape, trails, attachment). The hitbox scales with it
+	// in both rotate_only_textures modes (like the spawn transform's scale).
+	Vector2 get_bullet_scale(int bullet_index) const;
+	void set_bullet_scale(int bullet_index, const Vector2 &new_scale);
+	TypedArray<Vector2> all_bullets_get_scale(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) const;
+	void all_bullets_set_scale(const Vector2 &new_scale, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 	real_t get_curves_elapsed_time() const;
 	void set_curves_elapsed_time(real_t new_time);
 
