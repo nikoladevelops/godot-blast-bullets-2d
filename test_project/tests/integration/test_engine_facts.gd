@@ -15,6 +15,12 @@ extends BlastTest
 ##   tree physics_interpolation on it reports interpolated-and-enabled, and
 ##   PHYSICS_INTERPOLATION_MODE_OFF opts it back out (the shard opt-out
 ##   relies on exactly this).
+## - an area shape transform scales its rectangle or capsule non-uniformly
+##   (laser beams stretch one unit shape per beam);
+## - a MultiMesh refuses a use_colors change while it has instances (a volley
+##   switching color format must empty it first: the pool keys apart);
+## - Node2D.reset_physics_interpolation() exists (teleports call it);
+## - intersect_ray answers inside the physics frame (beams stop at walls).
 
 
 class DeferredProbe extends Node:
@@ -124,3 +130,60 @@ func test_multimesh_instance_follows_node_interpolation() -> void:
 	mmi.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	assert_false(mmi.is_physics_interpolated_and_enabled(), "PHYSICS_INTERPOLATION_MODE_OFF opts it back out")
 	get_tree().physics_interpolation = false
+
+
+## An area with one shape of half extents (5, 5) / a capsule r5 h10 at the
+## origin, its transform scaled by `scale`; counts AREA_BODY_ADDED.
+func _scaled_area(kind: String, scale: Vector2) -> Array:
+	var ps := PhysicsServer2D
+	var area := ps.area_create()
+	ps.area_set_space(area, factory.get_world_2d().space)
+	var shape := ps.rectangle_shape_create() if kind == "rect" else ps.capsule_shape_create()
+	ps.shape_set_data(shape, Vector2(5, 5) if kind == "rect" else Vector2(5, 10))
+	ps.area_add_shape(area, shape, Transform2D(0.0, scale, 0.0, Vector2.ZERO))
+	ps.area_set_collision_mask(area, 4) # make_wall's layer
+	ps.area_set_monitorable(area, true)
+	var hits := [0]
+	ps.area_set_monitor_callback(area, func(status, _rid, _id, _shape, _self_shape) -> void:
+		if status == PhysicsServer2D.AREA_BODY_ADDED:
+			hits[0] += 1)
+	return [area, shape, hits]
+
+
+func test_area_shapes_scale_non_uniformly() -> void:
+	make_wall(Vector2(40, 0), Vector2(2, 2)) # inside a 10x stretch only
+	make_wall(Vector2(0, 30), Vector2(2, 2)) # outside both: y is not stretched
+	var got: Array = []
+	for kind in ["rect", "capsule"]:
+		for sc in [Vector2(1, 1), Vector2(10, 1)]:
+			var a: Array = _scaled_area(kind, sc)
+			await physics(4)
+			got.append("%s %s: %d" % [kind, sc, a[2][0]])
+			PhysicsServer2D.free_rid(a[0])
+			PhysicsServer2D.free_rid(a[1])
+	assert_eq(got, ["rect (1.0, 1.0): 0", "rect (10.0, 1.0): 1", "capsule (1.0, 1.0): 0", "capsule (10.0, 1.0): 1"], "the scale stretches x only")
+
+
+func test_multimesh_refuses_a_color_format_change_with_instances() -> void:
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_2D
+	mm.instance_count = 4
+	mm.use_colors = true
+	expect_errors_containing('Condition "instance_count > 0" is true.', 1)
+	assert_false(mm.use_colors, "refused while instances exist")
+	mm.instance_count = 0
+	mm.use_colors = true
+	mm.instance_count = 4
+	assert_true(mm.use_colors, "accepted on an empty MultiMesh")
+
+
+func test_reset_physics_interpolation_exists() -> void:
+	assert_true(ClassDB.class_has_method("Node", "reset_physics_interpolation"), "Node.reset_physics_interpolation")
+
+
+func test_intersect_ray_answers_inside_the_physics_frame() -> void:
+	make_wall(Vector2(40, 0), Vector2(2, 2))
+	await physics(2)
+	assert_true(Engine.is_in_physics_frame(), "inside the physics step")
+	var hit := factory.get_world_2d().direct_space_state.intersect_ray(PhysicsRayQueryParameters2D.create(Vector2(-100, 0), Vector2(100, 0), 4))
+	assert_eq(hit.get("position"), Vector2(39, 0), "the near face of the 2 px box")
