@@ -362,3 +362,33 @@ func test_a_reused_laser_never_lerps_from_its_last_life() -> void:
 	step_factory(1, DT)
 	assert_eq(_pts(again, 0.5)[0], Vector2(500, 300), "and after it (no slide from the old life)")
 	assert_almost_eq((_pts(again, 0.5)[1] - _pts(again, 0.5)[0]).angle(), 1.5, 0.0001, "nor a turn")
+
+
+func test_looks_are_taken_at_fire_time_and_geometry_is_read_live() -> void:
+	var d := H.make_laser(0.0, 0.0, 0.0, 0.0, 200.0)
+	d.body_frames = _frames(1)
+	var l := _fire(d)
+	step_factory(1, DT)
+	var body: Texture2D = l.debug_get_draw_state(1.0)[0]["body"]
+	d.body_frames = _frames(2)
+	d.length = 120.0
+	step_factory(1, DT)
+	assert_eq(l.debug_get_draw_state(1.0)[0]["body"], body, "a firing laser keeps the frames it was fired with")
+	assert_almost_eq(l.get_beam_length(0), 120.0, 0.001, "its geometry follows the data at once")
+	var next := _fire(d)
+	step_factory(1, DT)
+	assert_ne(next.debug_get_draw_state(1.0)[0]["body"], body, "the next laser takes the new frames")
+
+
+func test_an_anchor_outside_the_tree_leaves_the_beam_where_it_was_fired() -> void:
+	var loose := Node2D.new()
+	loose.position = Vector2(300, 300)
+	var poses: Array[Transform2D] = [Transform2D(0.5, Vector2(20, 10))]
+	var l := factory.spawn_laser(H.make_laser(0.0, 0.0, 0.0, 0.0, 100.0), poses, loose)
+	step_factory(2, DT)
+	expect_no_errors()
+	assert_eq(l.get_beam_start(0), Vector2(20, 10), "at its fire pose")
+	assert_almost_eq(l.get_beam_angle(0), 0.5, 0.0001, "facing as fired")
+	loose.free()
+	step_factory(1, DT)
+	assert_eq(l.get_beam_start(0), Vector2(20, 10), "a freed anchor changes nothing")
