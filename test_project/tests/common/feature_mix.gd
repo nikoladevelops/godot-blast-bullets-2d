@@ -81,6 +81,7 @@ var t2: Node2D
 var path: Path2D
 var pickup: BulletPickupData2D
 var volleys: Array = [] # every volley seen (fired, split, converted)
+var lasers: Array = [] # every laser the emitter feature fired
 var parked: Array = []
 var frozen: Array = [] # [volley, life id, bullet]
 var extended := {} # "volley:life" -> expiries seen
@@ -353,6 +354,27 @@ func _configure() -> void:
 		sp.emitter_enabled = true
 		sp.emitter = e
 		sp.emitter_spawner_path = sp.get_path_to(tpl)
+		# The template's bullets emit too, through a LaserSpawner2D: emitters of
+		# emitters, and short lasers crossing every other feature of the mix.
+		var lsp := LaserSpawner2D.new()
+		lsp.set_shooting_enabled(false)
+		lsp.pattern_source = LaserSpawner2D.PATTERN_FROM_HELPER_RING
+		lsp.helper_bullets_amount = 1
+		lsp.helper_ring_radius = 0.0
+		var ld := B.make_laser(0.0, 0.0, 0.2, 0.05, 60.0)
+		ld.hit_interval_sec = 0.1
+		lsp.laser_data = ld
+		t.add(lsp)
+		lsp.set_bullet_factory(factory)
+		lsp.laser_fired.connect(func(l, _n) -> void:
+			_stat("lasers")
+			lasers.append(l))
+		var le := BulletEmitterData2D.new()
+		le.interval_sec = 0.2
+		le.max_shots = 1
+		tpl.emitter = le
+		tpl.emitter_spawner_path = tpl.get_path_to(lsp)
+		tpl.emitter_enabled = true
 	if has("random_jitter"):
 		sp.bullet_rotation_min_degrees = -15.0
 		sp.bullet_rotation_max_degrees = 15.0
@@ -575,7 +597,7 @@ func _evidence(f: String) -> String:
 		"scale_in":
 			ok = int(stats.get("scale_in_seen", 0)) > 0
 		"emitter":
-			ok = int(stats.get("emitted", 0)) > 0
+			ok = int(stats.get("emitted", 0)) > 0 and int(stats.get("lasers", 0)) > 0
 		"sound":
 			ok = int(c.get("offer:0", 0)) > 0 and int(c.get("offer:10", 0)) > 0
 		"burst":
@@ -776,7 +798,7 @@ func run() -> Array[String]:
 		ledger.pull()
 		_check_errors("wind-down %d" % frame)
 		left = factory.get_active_bullet_count()
-		if left == 0 and factory.get_pending_split_count() == 0:
+		if left == 0 and factory.get_pending_split_count() == 0 and factory.get_active_laser_count() == 0 and int(factory.debug_get_emitter_stats()["pending"]) == 0:
 			break
 	await t.idle(2)
 	ledger.pull()
@@ -789,6 +811,13 @@ func run() -> Array[String]:
 	for v in volleys:
 		if is_instance_valid(v) and not v.is_pooled() and not v.is_parked() and not v.is_queued_for_deletion():
 			_problem("volley %d is neither pooled, parked nor freed: %s" % [v.get_instance_id(), v.debug_get_life_state()])
+	if factory.get_active_laser_count() != 0:
+		_problem("%d lasers still firing after the wind-down" % factory.get_active_laser_count())
+	for l in lasers:
+		if is_instance_valid(l) and not l.is_pooled():
+			_problem("laser %d is not pooled after the wind-down" % l.get_instance_id())
+	if int(factory.debug_get_emitter_stats()["pending"]) != 0:
+		_problem("%d emitter shots still queued" % int(factory.debug_get_emitter_stats()["pending"]))
 	if probe.nonfinite > 0:
 		_problem("%d non-finite poses" % probe.nonfinite)
 	for p in ledger.problems():
