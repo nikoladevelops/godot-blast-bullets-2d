@@ -143,3 +143,37 @@ func test_a_handler_edit_of_a_knob_the_entry_set_goes_back_with_it() -> void:
 	sp.volley_fired.connect(func(_v, _n) -> void: sp.helper_bullets_amount = 12)
 	sp.spawn_pattern_list([{"helper_bullets_amount": 6}], true, 0.0)
 	assert_eq(sp.helper_bullets_amount, 4, "the entry's knob is restored to the spawner's own value")
+
+
+func test_shoot_once_with_is_one_shot_with_temporary_overrides() -> void:
+	var sp := make_spawner(H.make_volley_data(4), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
+	watch_signals(sp)
+	sp.helper_ring_radius = 20.0
+	sp.volley_fired.connect(func(_v, _n) -> void: sp.helper_ring_radius += 10.0)
+	assert_true(sp.shoot_once_with({"helper_bullets_amount": 6, "pattern_source": BulletSpawner2D.PATTERN_FROM_HELPER_FAN}), "fires")
+	var v: BulletVolley2D = get_signal_parameters(sp, "volley_fired", 0)[0]
+	assert_eq(v.get_amount_bullets(), 6, "with the overrides")
+	assert_eq(sp.helper_bullets_amount, 4, "the amount went back")
+	assert_eq(sp.pattern_source, BulletSpawner2D.PATTERN_FROM_HELPER_RING, "the source went back")
+	assert_eq(sp.helper_ring_radius, 30.0, "the handler's own edit stuck")
+	assert_eq(sp.get_volleys_fired(), 1, "a normal shot: counted")
+	assert_signal_emit_count(sp, "pattern_list_finished", 0, "no list report")
+
+
+func test_shoot_once_with_names_itself_in_its_errors() -> void:
+	var sp := make_spawner(H.make_volley_data(4), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
+	assert_true(sp.shoot_once_with({"helper_bulets_amount": 6}), "a bad key is skipped, the shot fires")
+	expect_error_sequence(["BulletSpawner2D::shoot_once_with: unknown entry key 'helper_bulets_amount' (did you mean 'helper_bullets_amount'?); valid keys: preset, pattern_source, helper_bullets_amount, spawn_data. Ignoring it."])
+	sp.shoot_once_with({"pattern_source": 9999})
+	expect_error_sequence(["BulletSpawner2D::shoot_once_with: entry 'pattern_source' out of range, keeping current."])
+	assert_eq(sp.helper_bullets_amount, 4, "untouched")
+
+
+func test_shoot_once_with_from_a_shot_handler_is_refused_and_restores() -> void:
+	var sp := make_spawner(H.make_volley_data(4), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
+	var nested := [true]
+	sp.volley_fired.connect(func(_v, _n) -> void: nested[0] = sp.shoot_once_with({"helper_bullets_amount": 9}), CONNECT_ONE_SHOT)
+	assert_true(sp.shoot_once(), "the outer shot fires")
+	assert_false(nested[0], "the nested one is refused")
+	expect_errors_containing("re-entrant call from inside a spawner signal handler", 1, "the nesting rule of shoot_once")
+	assert_eq(sp.helper_bullets_amount, 4, "and its override went back")

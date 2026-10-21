@@ -1780,9 +1780,9 @@ bool BulletSpawner2D::is_pattern_list_active() const {
 	return pattern_list_active;
 }
 
-bool BulletSpawner2D::apply_pattern_list_entry(const Variant &entry) {
+bool BulletSpawner2D::apply_pattern_list_entry(const Variant &entry, const char *caller) {
 	if (entry.get_type() != Variant::DICTIONARY) {
-		UtilityFunctions::push_error("BulletSpawner2D::spawn_pattern_list: every entry must be a Dictionary, skipping one.");
+		UtilityFunctions::push_error(String(caller) + ": every entry must be a Dictionary, skipping one.");
 		return false;
 	}
 	const Dictionary dict = entry;
@@ -1815,7 +1815,7 @@ bool BulletSpawner2D::apply_pattern_list_entry(const Variant &entry) {
 			} else if (best_score >= 0.5) {
 				hint = String(" (did you mean '") + best + "'?)";
 			}
-			UtilityFunctions::push_error(String("BulletSpawner2D::spawn_pattern_list: unknown entry key '") + key + "'" + hint + "; valid keys: preset, pattern_source, helper_bullets_amount, spawn_data. Ignoring it.");
+			UtilityFunctions::push_error(String(caller) + ": unknown entry key '" + key + "'" + hint + "; valid keys: preset, pattern_source, helper_bullets_amount, spawn_data. Ignoring it.");
 		}
 	}
 	if (dict.has("preset")) {
@@ -1826,7 +1826,7 @@ bool BulletSpawner2D::apply_pattern_list_entry(const Variant &entry) {
 			const int64_t preset = v;
 			apply_pattern_preset(preset >= (int64_t)INT32_MIN && preset <= (int64_t)INT32_MAX ? (int)preset : INT32_MAX);
 		} else {
-			UtilityFunctions::push_error("BulletSpawner2D::spawn_pattern_list: entry 'preset' must be an int, skipping preset.");
+			UtilityFunctions::push_error(String(caller) + ": entry 'preset' must be an int, skipping preset.");
 		}
 	}
 	const StringName source_key = "pattern_source";
@@ -1835,12 +1835,12 @@ bool BulletSpawner2D::apply_pattern_list_entry(const Variant &entry) {
 		if (v.get_type() == Variant::INT) {
 			const int64_t src = v; // the whole 64-bit int: never wrapped into range
 			if (src < (int64_t)PATTERN_FROM_CHILDREN || src >= (int64_t)PATTERN_FROM_LAST) {
-				UtilityFunctions::push_error("BulletSpawner2D::spawn_pattern_list: entry 'pattern_source' out of range, keeping current.");
+				UtilityFunctions::push_error(String(caller) + ": entry 'pattern_source' out of range, keeping current.");
 			} else {
 				set_pattern_source((PatternSource)src);
 			}
 		} else {
-			UtilityFunctions::push_error("BulletSpawner2D::spawn_pattern_list: entry 'pattern_source' must be an int, keeping current.");
+			UtilityFunctions::push_error(String(caller) + ": entry 'pattern_source' must be an int, keeping current.");
 		}
 	}
 	if (dict.has("helper_bullets_amount")) {
@@ -1848,7 +1848,7 @@ bool BulletSpawner2D::apply_pattern_list_entry(const Variant &entry) {
 		if (v.get_type() == Variant::INT) {
 			set_helper_bullets_amount((int64_t)v); // the knob refuses what an int cannot hold
 		} else {
-			UtilityFunctions::push_error("BulletSpawner2D::spawn_pattern_list: entry 'helper_bullets_amount' must be an int, keeping current.");
+			UtilityFunctions::push_error(String(caller) + ": entry 'helper_bullets_amount' must be an int, keeping current.");
 		}
 	}
 	if (dict.has("spawn_data")) {
@@ -1862,7 +1862,7 @@ bool BulletSpawner2D::apply_pattern_list_entry(const Variant &entry) {
 			// override with NO connection (so its runtime edits were invisible).
 			set_spawn_data(override_data);
 		} else {
-			UtilityFunctions::push_error("BulletSpawner2D::spawn_pattern_list: entry 'spawn_data' must be a BulletVolleyData2D, keeping current.");
+			UtilityFunctions::push_error(String(caller) + ": entry 'spawn_data' must be a BulletVolleyData2D, keeping current.");
 		}
 	}
 	return true;
@@ -1887,7 +1887,11 @@ void BulletSpawner2D::fire_pattern_list_entry() {
 	}
 }
 
-bool BulletSpawner2D::fire_pattern_list_override(const Variant &entry) {
+bool BulletSpawner2D::shoot_once_with(const Dictionary &overrides) {
+	return fire_pattern_list_override(overrides, "BulletSpawner2D::shoot_once_with");
+}
+
+bool BulletSpawner2D::fire_pattern_list_override(const Variant &entry, const char *caller) {
 	// Apply, fire, restore inside one pattern batch: the preview rebuilds
 	// once at the end, and the restored knobs bump the pattern version so the
 	// next normal shot rebakes from the spawner's own configuration.
@@ -1896,7 +1900,7 @@ bool BulletSpawner2D::fire_pattern_list_override(const Variant &entry) {
 	begin_pattern_batch();
 	const Dictionary saved = snapshot_pattern_state();
 	bool fired = false;
-	if (apply_pattern_list_entry(entry)) {
+	if (apply_pattern_list_entry(entry, caller)) {
 		const Dictionary applied = snapshot_pattern_state();
 		Dictionary changed;
 		const Array keys = saved.keys();

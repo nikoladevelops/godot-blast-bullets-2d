@@ -1050,6 +1050,12 @@ public:
 	// Sequencer: queue pattern entries, then fire them in order
 	// (interval apart) or all at once. Returns entries queued.
 	int spawn_pattern_list(const Array &entries, bool simultaneous = false, double interval_sec = 0.25);
+	// One shot with pattern-list entry overrides (preset, pattern_source,
+	// helper_bullets_amount, spawn_data): what the overrides changed goes
+	// back after the shot, a shot handler's edits of other knobs stick.
+	// A normal shot otherwise (volley_fired, max_volleys, the nesting
+	// rule); no pattern_list_finished. True when it fired.
+	bool shoot_once_with(const Dictionary &overrides);
 	void stop_pattern_list();
 	bool is_pattern_list_active() const;
 	// Next auto-shot interval with reload jitter applied.
@@ -1219,7 +1225,7 @@ public:
 	// Internal chain machinery (the auto loop drives these).
 	void begin_burst_chain(bool auto_started);
 	// One pattern-list entry: apply, fire, restore. True when it fired.
-	bool fire_pattern_list_override(const Variant &entry);
+	bool fire_pattern_list_override(const Variant &entry, const char *caller = "BulletSpawner2D::spawn_pattern_list");
 	void begin_telegraph(bool auto_started);
 	void fire_burst_volley();
 	// Ends a running chain early (auto-fire off, burst mode off, count
@@ -2070,7 +2076,7 @@ private:
 	// Sequencer internals: validates one Dictionary entry (preset /
 	// source / amount / spawn_data overrides) and fires the next queued
 	// entry for the _process driver.
-	bool apply_pattern_list_entry(const Variant &entry);
+	bool apply_pattern_list_entry(const Variant &entry, const char *caller = "BulletSpawner2D::spawn_pattern_list");
 	void fire_pattern_list_entry();
 	// Fire cone check: true when any resolved target sits within half
 	// the fire arc of the spawner's facing. 0 arc = omnidirectional.
