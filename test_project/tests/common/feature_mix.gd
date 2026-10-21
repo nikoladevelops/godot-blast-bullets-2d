@@ -35,9 +35,9 @@ const FEATURES := [
 	"bounce", "hits", "graze",
 	# lifecycle
 	"lifetime_short", "lifetime_handler", "split", "despawn_bounds", "area_clear", "teleport",
-	"freeze_wake", "park", "pickups", "timers", "orphan",
+	"freeze_wake", "park", "pickups", "timers", "orphan", "life_times", "emitter",
 	# visual
-	"interpolation", "animation", "effects", "attachments", "random_scale", "random_jitter",
+	"interpolation", "animation", "effects", "attachments", "random_scale", "random_jitter", "colors", "scale_in",
 	# audio
 	"sound",
 	# spawner
@@ -321,6 +321,38 @@ func _configure() -> void:
 		sp.bullet_scale_min = 0.6
 		sp.bullet_scale_max = 1.6
 		sp.bullet_random_seed = seed_value + 11
+	if has("colors"):
+		sp.bullet_color_mode = rng.randi_range(1, 3)
+		var g := Gradient.new()
+		g.colors = PackedColorArray([Color(1.0, 0.2, 0.2), Color(0.2, 0.4, 1.0)])
+		sp.bullet_color_gradient = g if rng.randf() < 0.5 else null # null: the rainbow
+	if has("life_times"):
+		sp.bullet_life_time_scale_min = 0.6
+		sp.bullet_life_time_scale_max = 1.4
+		if sp.bullet_random_seed == 0:
+			sp.bullet_random_seed = seed_value + 29
+	if has("scale_in"):
+		d.scale_in_sec = 0.2
+		d.scale_in_from = 0.3
+	if has("emitter"):
+		# Every flying bullet fires a small template's ring twice.
+		var tpl := BulletSpawner2D.new()
+		tpl.set_shooting_enabled(false)
+		tpl.set_homing_enabled(false)
+		tpl.set_spawn_data(B.make_volley_data(2, 120.0, 0.4))
+		tpl.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_RING
+		tpl.helper_bullets_amount = 2
+		t.add(tpl)
+		tpl.set_bullet_factory(factory)
+		tpl.volley_fired.connect(func(v, _n) -> void:
+			_stat("emitted")
+			volleys.append(v))
+		var e := BulletEmitterData2D.new()
+		e.interval_sec = 0.3
+		e.max_shots = 2
+		sp.emitter_enabled = true
+		sp.emitter = e
+		sp.emitter_spawner_path = sp.get_path_to(tpl)
 	if has("random_jitter"):
 		sp.bullet_rotation_min_degrees = -15.0
 		sp.bullet_rotation_max_degrees = 15.0
@@ -536,6 +568,14 @@ func _evidence(f: String) -> String:
 			ok = int(stats.get("attachments_seen", 0)) > 0
 		"random_scale":
 			ok = float(_samples.get("scale_max", 0.0)) > float(_samples.get("scale_min", INF)) + 0.1
+		"colors":
+			ok = int(stats.get("colored", 0)) > 0
+		"life_times":
+			ok = float(_samples.get("life_spread", 0.0)) > 0.05
+		"scale_in":
+			ok = int(stats.get("scale_in_seen", 0)) > 0
+		"emitter":
+			ok = int(stats.get("emitted", 0)) > 0
 		"sound":
 			ok = int(c.get("offer:0", 0)) > 0 and int(c.get("offer:10", 0)) > 0
 		"burst":
@@ -555,8 +595,8 @@ func _evidence(f: String) -> String:
 
 # ---------------------------------------------------------------- the checks
 
-static func _instance(buf: PackedFloat32Array, i: int) -> Transform2D:
-	var b := i * 8
+static func _instance(buf: PackedFloat32Array, i: int, stride := 8) -> Transform2D:
+	var b := i * stride # 12 with per-bullet colors (the color follows the 2D transform)
 	return Transform2D(Vector2(buf[b], buf[b + 4]), Vector2(buf[b + 1], buf[b + 5]), Vector2(buf[b + 3], buf[b + 7]))
 
 
@@ -574,7 +614,8 @@ func _check_drawn(where: String) -> void:
 		if int(last[0]) != v.get_life_id() or not (clock > float(last[1])):
 			continue
 		var buf: PackedFloat32Array = v.multimesh.buffer
-		if buf.size() != v.get_amount_bullets() * 8:
+		var stride := 12 if v.is_using_bullet_colors() else 8
+		if buf.size() != v.get_amount_bullets() * stride:
 			continue
 		var inv: Transform2D = v.get_global_transform().affine_inverse()
 		var trails: bool = v.has_trail_effects()
@@ -582,7 +623,7 @@ func _check_drawn(where: String) -> void:
 			if not v.is_bullet_status_enabled(i):
 				continue
 			var want: Vector2 = (inv * v.get_bullet_transform(i)).origin if not interp else (inv * v.debug_get_previous_origin(i))
-			var got := _instance(buf, i).origin
+			var got := _instance(buf, i, stride).origin
 			if got.distance_to(want) > 0.05:
 				_problem("%s: bullet %d of volley %d drawn at %s, expected %s (interpolation %s)" % [where, i, v.get_instance_id(), got, want, interp])
 				return
@@ -637,9 +678,16 @@ func _check_errors(where: String) -> void:
 
 func _sample() -> void:
 	for v in _live():
+		var life_lo := INF
+		var life_hi := -INF
 		for i in v.get_amount_bullets():
 			if not v.is_bullet_status_enabled(i):
 				continue
+			if v.is_using_bullet_colors() and v.get_bullet_color(i) != Color(1, 1, 1, 1):
+				_stat("colored")
+			var left: float = v.get_bullet_life_time_left(i)
+			life_lo = minf(life_lo, left)
+			life_hi = maxf(life_hi, left)
 			var speed: float = v.get_bullet_velocity(i).length()
 			_samples["speed_max"] = maxf(float(_samples.get("speed_max", 0.0)), speed)
 			_samples["speed_min"] = minf(float(_samples.get("speed_min", INF)), speed)
@@ -647,6 +695,8 @@ func _sample() -> void:
 			var sc := tr.get_scale().x
 			_samples["scale_max"] = maxf(float(_samples.get("scale_max", 0.0)), sc)
 			_samples["scale_min"] = minf(float(_samples.get("scale_min", INF)), sc)
+			if has("scale_in") and sc < 0.5:
+				_stat("scale_in_seen") # spawned at 30 % of its size
 			var dir: Vector2 = v.get_bullet_direction(i)
 			var okey := "%d:%d:%d" % [v.get_instance_id(), v.get_life_id(), i]
 			if _last_origin.has(okey):
@@ -660,6 +710,8 @@ func _sample() -> void:
 				_stat("orbit_locked")
 			if v.bullet_get_attachment(i) != null:
 				_stat("attachments_seen")
+		if life_hi > life_lo:
+			_samples["life_spread"] = maxf(float(_samples.get("life_spread", 0.0)), life_hi - life_lo)
 	var turned := probe.turn_sum_deg
 	_samples["turn"] = turned
 	if is_instance_valid(spawner):
