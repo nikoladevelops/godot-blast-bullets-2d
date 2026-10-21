@@ -831,10 +831,10 @@ void BulletVolleyData2D::set_bounce_max_count(int value) {
 	emit_changed();
 }
 
-int BulletVolleyData2D::get_bounce_mode() const {
-	return bounce_mode;
+BulletVolleyData2D::BounceMode BulletVolleyData2D::get_bounce_mode() const {
+	return static_cast<BounceMode>(bounce_mode);
 }
-void BulletVolleyData2D::set_bounce_mode(int value) {
+void BulletVolleyData2D::set_bounce_mode(BounceMode value) {
 	if (value != BOUNCE_SIMPLE_RADIAL && value != BOUNCE_PRECISE_SHAPE) {
 		UtilityFunctions::push_error("BulletVolleyData2D: bounce_mode must be 0 (radial) or 1 (precise shape), keeping the old value.");
 		return;

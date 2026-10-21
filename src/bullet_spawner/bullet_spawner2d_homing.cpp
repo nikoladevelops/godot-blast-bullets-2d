@@ -914,7 +914,7 @@ int BulletSpawner2D::clear_active_bullets(bool fire_clear_effects) {
 	return factory->clear_bullets_owned_by(get_instance_id(), fire_clear_effects);
 }
 
-void BulletSpawner2D::set_orphaned_volleys(int value) {
+void BulletSpawner2D::set_orphaned_volleys(OrphanedVolleys value) {
 	if (value < ORPHANED_VOLLEYS_KEEP_FLYING || value > ORPHANED_VOLLEYS_REMOVE) {
 		UtilityFunctions::push_error("BulletSpawner2D: orphaned_volleys out of range, keeping the old value.");
 		return;

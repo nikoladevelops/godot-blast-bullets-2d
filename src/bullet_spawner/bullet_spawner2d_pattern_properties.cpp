@@ -50,9 +50,9 @@ void BulletSpawner2D::set_spawn_position_offset(const Vector2 &value) {
 	set_preview_pose(spin_angle_deg);
 }
 
-int BulletSpawner2D::get_spawn_position_offset_space() const { return spawn_position_offset_space; }
+BulletSpawner2D::SpawnOffsetSpace BulletSpawner2D::get_spawn_position_offset_space() const { return static_cast<SpawnOffsetSpace>(spawn_position_offset_space); }
 
-void BulletSpawner2D::set_spawn_position_offset_space(int value) {
+void BulletSpawner2D::set_spawn_position_offset_space(SpawnOffsetSpace value) {
 	if (value < SPAWN_OFFSET_GLOBAL || value > SPAWN_OFFSET_LOCAL) {
 		UtilityFunctions::push_error("BulletSpawner2D: spawn_position_offset_space must be 0 (Global) or 1 (Local), keeping the old value.");
 		return;
@@ -281,7 +281,7 @@ void BulletSpawner2D::apply_pattern_preset(int preset) {
 #define PATTERN_PROPERTY(VTYPE, NAME, HINT, HINT_STRING, SETTER, GETTER)
 #define PATTERN_KNOB(PTYPE, CTYPE, VTYPE, NAME, C1, A1, B1, M1, C2, A2, B2, M2, NOTIFY, HINT, HINT_STRING) \
 	CTYPE BulletSpawner2D::get_##NAME() const {                                                            \
-		return NAME;                                                                                       \
+		return static_cast<CTYPE>(NAME);                                                                   \
 	}                                                                                                      \
 	void BulletSpawner2D::set_##NAME(PTYPE value) {                                                        \
 		if (!PatternKnobCheck2D::FITS(value, NAME)) {                                                      \

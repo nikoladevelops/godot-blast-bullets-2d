@@ -148,6 +148,20 @@ public:
 	// continuous rhodonea sweep; PHYLLOTAXIS is a Vogel golden-angle disc;
 	// SPIROGRAPH is a hypotrochoid lacy bloom; SUPERFORMULA is a simplified
 	// Gielis curve (lobes m + fullness exponent).
+	// helper_line_facing: how line bullets face (SERIALIZED ids).
+	enum LineFacing : int {
+		LINE_FACING_ALONG = 0,
+		LINE_FACING_PLUS_90 = 1,
+		LINE_FACING_MINUS_90 = 2
+	};
+	// helper_custom_facing: how custom-array bullets face (SERIALIZED ids).
+	enum CustomFacing : int {
+		CUSTOM_FACING_AS_STORED = 0,
+		CUSTOM_FACING_OUTWARD = 1,
+		CUSTOM_FACING_INWARD = 2,
+		CUSTOM_FACING_PLUS_90 = 3,
+		CUSTOM_FACING_MINUS_90 = 4
+	};
 	enum FlowerBloom : int {
 		FLOWER_FAN = 0,
 		FLOWER_RHODONEA = 1,
@@ -526,6 +540,8 @@ protected:
 } //namespace BlastBullets2D
 
 BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::Alignment);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::LineFacing);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::CustomFacing);
 BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::SpiralFacingMode);
 BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::ScatterFacingMode);
 BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletPatterns2D::LineAnchor);

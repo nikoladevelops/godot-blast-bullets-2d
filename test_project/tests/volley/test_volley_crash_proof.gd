@@ -88,7 +88,7 @@ func test_degenerate_transforms_rejected() -> void:
 	v.teleport_shift_bullet(0, Vector2(NAN, NAN))
 	expect_any_error("NaN shift fails loud")
 	assert_eq(v.get_bullet_transform(0).origin, good, "NaN shift rejected")
-	v.set_bullet_direction_towards_position(0, v.get_bullet_global_transform(0).origin)
+	v.set_bullet_direction_towards_position(0, v.get_bullet_transform(0).origin)
 	swallow_errors()
 	assert_true(v.get_bullet_direction(0).is_normalized(), "coincident aim keeps a normalized heading")
 
@@ -122,7 +122,7 @@ func test_disable_teleport_storm() -> void:
 		v.disable_bullet(k % 4)
 		v.teleport_shift_bullet((k + 1) % 4, Vector2(3, -2))
 		await physics()
-		v.wake_bullet(k % 4)
+		v.enable_bullet(k % 4)
 	swallow_errors()
 	assert_true(_finite_volley(v), "volley finite after disable/teleport storm")
 	assert_true(factory.debug_assert_no_dangling().get("ok", false), "no dangling after storm")

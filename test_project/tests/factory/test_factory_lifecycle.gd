@@ -100,8 +100,8 @@ func test_pooling_flags_reset_on_new_life() -> void:
 func test_wake_alias_and_free_volley_deferred() -> void:
 	var v3: BulletVolley2D = factory.spawn_volley(_data(2))
 	v3.disable_bullet(0)
-	v3.wake_bullet(0)
-	assert_true(v3.is_bullet_status_enabled(0), "wake_bullet revives slot")
+	v3.enable_bullet(0)
+	assert_true(v3.is_bullet_status_enabled(0), "enable_bullet revives slot")
 	factory.free_volley_deferred(v3)
 	assert_true(v3.is_queued_for_deletion(), "volley queued for deletion")
 	await idle()

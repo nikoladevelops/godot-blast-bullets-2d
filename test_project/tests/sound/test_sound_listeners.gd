@@ -113,7 +113,7 @@ func test_orphan_measures_from_spawner_settings() -> void:
 	var v: BulletVolley2D = get_signal_parameters(sp, "volley_fired", 0)[0] as BulletVolley2D
 	sp.queue_free()
 	await idle(1)
-	var p: Vector2 = v.get_bullet_global_transform(0).origin
+	var p: Vector2 = v.get_bullet_transform(0).origin
 	assert_true(v.clear_bullet(0), "orphan clears")
 	await physics(2)
 	assert_eq(busy_voices().size(), 1, "orphan still sounds")
@@ -132,7 +132,7 @@ func test_flying_volley_sees_new_listeners() -> void:
 	var v: BulletVolley2D = get_signal_parameters(sp, "volley_fired", 0)[0] as BulletVolley2D
 	make_listener(Vector2(100, 0))
 	assert_eq(sp.refresh_sound_listeners(), 1, "newcomer counts")
-	var p: Vector2 = v.get_bullet_global_transform(0).origin
+	var p: Vector2 = v.get_bullet_transform(0).origin
 	assert_true(v.clear_bullet(0), "clears")
 	await physics(2)
 	assert_almost_eq((busy_voices()[0] as Dictionary)["position"], p - Vector2(100, 0), Vector2(0.5, 0.5), "flying volley measures from the newcomer")

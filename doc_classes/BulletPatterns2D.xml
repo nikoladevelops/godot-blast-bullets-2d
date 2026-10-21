@@ -1395,6 +1395,30 @@
 		<constant name="OUTLINE_FACING_ALONG_M90" value="2" enum="OutlineFacing">
 			Loop-generator facings turn -90 degrees toward the loop tangent.
 		</constant>
+		<constant name="LINE_FACING_ALONG" value="0" enum="LineFacing">
+			Line bullets face along the line.
+		</constant>
+		<constant name="LINE_FACING_PLUS_90" value="1" enum="LineFacing">
+			Line bullets face 90 degrees counter-clockwise from the line (+90).
+		</constant>
+		<constant name="LINE_FACING_MINUS_90" value="2" enum="LineFacing">
+			Line bullets face 90 degrees clockwise from the line (-90).
+		</constant>
+		<constant name="CUSTOM_FACING_AS_STORED" value="0" enum="CustomFacing">
+			Custom-array bullets keep the rotation stored in each transform.
+		</constant>
+		<constant name="CUSTOM_FACING_OUTWARD" value="1" enum="CustomFacing">
+			Custom-array bullets face away from the marker.
+		</constant>
+		<constant name="CUSTOM_FACING_INWARD" value="2" enum="CustomFacing">
+			Custom-array bullets face toward the marker.
+		</constant>
+		<constant name="CUSTOM_FACING_PLUS_90" value="3" enum="CustomFacing">
+			Custom-array bullets face 90 degrees counter-clockwise from outward.
+		</constant>
+		<constant name="CUSTOM_FACING_MINUS_90" value="4" enum="CustomFacing">
+			Custom-array bullets face 90 degrees clockwise from outward.
+		</constant>
 		<constant name="TOP_LEFT" value="0" enum="Alignment">
 			Grid anchor used by helper_generate_transforms_grid(), the grid grows right and down starting at the marker.
 		</constant>

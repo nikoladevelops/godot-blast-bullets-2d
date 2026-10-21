@@ -20,31 +20,32 @@ using namespace godot;
 // Two behaviors: TRAIL_FOLLOW sticks to its bullet every tick, the ON_*
 // triggers fire one-shot visuals (spawn flash, hit sparks, destroy
 // explosion, bounce sparks) that play once and die by age.
-enum EffectTrigger : int {
-	EFFECT_TRAIL_FOLLOW,
-	EFFECT_ON_SPAWN,
-	EFFECT_ON_HIT,
-	EFFECT_ON_DESTROY,
-	EFFECT_ON_BOUNCE,
-	EFFECT_ON_LIFETIME_OVER,
-	// Manual-clear visuals: fired by clear_bullet()/clear_all_bullets()
-	// only. Collision kills fire On Destroy, timeouts fire On Lifetime
-	// Over, teardown (reset/free) stays silent, so a clear layer never
-	// doubles another trigger and never spawns effects while dying.
-	EFFECT_ON_CLEAR,
-	// Fired where a bullet leaves through the factory's despawn bounds
-	// (BulletFactory2D.despawn_bounds_*), nowhere else. Appended last: the
-	// ids are serialized.
-	EFFECT_ON_DESPAWN,
-	// Fired where a bullet splits into children (BulletSplitStage2D), at
-	// the parent's pose, whatever made it split. Appended last.
-	EFFECT_ON_SPLIT
-};
 
 class BulletEffectLayerData2D : public Resource {
 	GDCLASS(BulletEffectLayerData2D, Resource)
 
 public:
+	enum EffectTrigger : int {
+		EFFECT_TRAIL_FOLLOW,
+		EFFECT_ON_SPAWN,
+		EFFECT_ON_HIT,
+		EFFECT_ON_DESTROY,
+		EFFECT_ON_BOUNCE,
+		EFFECT_ON_LIFETIME_OVER,
+		// Manual-clear visuals: fired by clear_bullet()/clear_all_bullets()
+		// only. Collision kills fire On Destroy, timeouts fire On Lifetime
+		// Over, teardown (reset/free) stays silent, so a clear layer never
+		// doubles another trigger and never spawns effects while dying.
+		EFFECT_ON_CLEAR,
+		// Fired where a bullet leaves through the factory's despawn bounds
+		// (BulletFactory2D.despawn_bounds_*), nowhere else. Appended last: the
+		// ids are serialized.
+		EFFECT_ON_DESPAWN,
+		// Fired where a bullet splits into children (BulletSplitStage2D), at
+		// the parent's pose, whatever made it split. Appended last.
+		EFFECT_ON_SPLIT
+	};
+
 	// Master switch: lets users toggle a layer without removing it.
 	bool enabled = true;
 
@@ -162,8 +163,8 @@ public:
 	bool get_enabled() const;
 	void set_enabled(bool value);
 
-	int get_trigger() const;
-	void set_trigger(int value);
+	EffectTrigger get_trigger() const;
+	void set_trigger(EffectTrigger value);
 
 	Ref<SpriteFrames> get_sprite_frames() const;
 	void set_sprite_frames(const Ref<SpriteFrames> &new_frames);
@@ -254,4 +255,17 @@ private:
 	mutable double bake_total = 0.0;
 	void invalidate_bake() const;
 };
+
+// The trigger ids under their old namespace-level names (used across the
+// volley and factory sources).
+using EffectTrigger = BulletEffectLayerData2D::EffectTrigger;
+inline constexpr EffectTrigger EFFECT_TRAIL_FOLLOW = BulletEffectLayerData2D::EFFECT_TRAIL_FOLLOW;
+inline constexpr EffectTrigger EFFECT_ON_SPAWN = BulletEffectLayerData2D::EFFECT_ON_SPAWN;
+inline constexpr EffectTrigger EFFECT_ON_HIT = BulletEffectLayerData2D::EFFECT_ON_HIT;
+inline constexpr EffectTrigger EFFECT_ON_DESTROY = BulletEffectLayerData2D::EFFECT_ON_DESTROY;
+inline constexpr EffectTrigger EFFECT_ON_BOUNCE = BulletEffectLayerData2D::EFFECT_ON_BOUNCE;
+inline constexpr EffectTrigger EFFECT_ON_LIFETIME_OVER = BulletEffectLayerData2D::EFFECT_ON_LIFETIME_OVER;
+inline constexpr EffectTrigger EFFECT_ON_CLEAR = BulletEffectLayerData2D::EFFECT_ON_CLEAR;
+inline constexpr EffectTrigger EFFECT_ON_DESPAWN = BulletEffectLayerData2D::EFFECT_ON_DESPAWN;
+inline constexpr EffectTrigger EFFECT_ON_SPLIT = BulletEffectLayerData2D::EFFECT_ON_SPLIT;
 } //namespace BlastBullets2D

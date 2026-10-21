@@ -51,7 +51,7 @@ func _record(body: Object, volley: BulletVolley2D, idx: int, kind: String) -> vo
 		"attached": att != null,
 		"active": bool(volley.debug_get_volley_info().get("is_active", false)),
 		"pooled": bool(volley.debug_get_volley_info().get("is_pooled", true)),
-		"origin": volley.get_bullet_global_transform(idx).origin,
+		"origin": volley.get_bullet_transform(idx).origin,
 		"frame": Engine.get_physics_frames(),
 	})
 	if on_hit.is_valid():
@@ -93,7 +93,7 @@ func _wait_hits(count: int, frames := 90) -> void:
 		if watched != null and is_instance_valid(watched):
 			var poses := {}
 			for b in watched.get_amount_bullets():
-				poses[b] = watched.get_bullet_global_transform(b).origin
+				poses[b] = watched.get_bullet_transform(b).origin
 			start_pose[Engine.get_physics_frames()] = poses
 		if hits.size() >= count:
 			break
@@ -278,9 +278,9 @@ func test_pause_from_handler_parks_the_rest_and_replays_once() -> void:
 	await _wait_hits(1)
 	await physics(5)
 	assert_eq(hits.size(), 1, "paused: the second same-frame record waits")
-	var paused_pose: Vector2 = v.get_bullet_global_transform(1).origin
+	var paused_pose: Vector2 = v.get_bullet_transform(1).origin
 	await physics(3)
-	assert_eq(v.get_bullet_global_transform(1).origin, paused_pose, "paused volley does not move")
+	assert_eq(v.get_bullet_transform(1).origin, paused_pose, "paused volley does not move")
 	factory.set_is_factory_processing_bullets(true)
 	await physics(3)
 	assert_eq(hits.size(), 2, "the parked record replays exactly once on resume")

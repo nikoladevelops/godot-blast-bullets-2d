@@ -113,7 +113,7 @@
 		<member name="bounce_max_count" type="int" setter="set_bounce_max_count" getter="get_bounce_max_count" default="0">
 			How many times a single bullet may bounce before bounces stop working for it (further hits take the normal collision path). 0 (default) = unlimited (lifetime still bounds it). Stops wall-to-wall ping-pong from living forever.
 		</member>
-		<member name="bounce_mode" type="int" setter="set_bounce_mode" getter="get_bounce_mode" default="0">
+		<member name="bounce_mode" type="int" setter="set_bounce_mode" getter="get_bounce_mode" enum="BulletVolleyData2D.BounceMode" default="0">
 			Which surface normal to reflect across: 0 Simple Radial (cheap default, reflects across bullet-minus-target-center, right for round targets), 1 Precise Shape (resolves the target's CollisionShape2D and reflects across the analytic face normal, so flat walls bounce flat; supports rectangle, circle, capsule, segment slopes and world-boundary planes, falls back to radial for convex polygons and targets with no usable shape).
 		</member>
 		<member name="bounce_push_assist" type="bool" setter="set_bounce_push_assist" getter="get_bounce_push_assist" default="true">

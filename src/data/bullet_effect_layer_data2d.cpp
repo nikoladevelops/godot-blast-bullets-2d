@@ -132,10 +132,10 @@ void BulletEffectLayerData2D::set_enabled(bool value) {
 	emit_changed();
 }
 
-int BulletEffectLayerData2D::get_trigger() const {
-	return trigger;
+BulletEffectLayerData2D::EffectTrigger BulletEffectLayerData2D::get_trigger() const {
+	return static_cast<EffectTrigger>(trigger);
 }
-void BulletEffectLayerData2D::set_trigger(int value) {
+void BulletEffectLayerData2D::set_trigger(EffectTrigger value) {
 	if (value != EFFECT_TRAIL_FOLLOW && value != EFFECT_ON_SPAWN && value != EFFECT_ON_HIT && value != EFFECT_ON_DESTROY && value != EFFECT_ON_BOUNCE && value != EFFECT_ON_LIFETIME_OVER && value != EFFECT_ON_CLEAR && value != EFFECT_ON_DESPAWN && value != EFFECT_ON_SPLIT) {
 		UtilityFunctions::push_error("BulletEffectLayerData2D: trigger must be 0 (Trail Follow), 1 (On Spawn), 2 (On Hit), 3 (On Destroy), 4 (On Bounce), 5 (On Lifetime Over), 6 (On Clear), 7 (On Despawn) or 8 (On Split), keeping the old value.");
 		return;
@@ -584,4 +584,4 @@ void BulletEffectLayerData2D::_bind_methods() {
 }
 } //namespace BlastBullets2D
 
-BLAST_VARIANT_ENUM_CAST(BlastBullets2D::EffectTrigger);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletEffectLayerData2D::EffectTrigger);

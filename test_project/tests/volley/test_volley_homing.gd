@@ -52,7 +52,7 @@ func test_steering_converges() -> void:
 	v.set_homing_take_control_of_texture_rotation(true)
 	v.all_bullets_push_back_homing_target(target)
 	var to_target := func() -> float:
-		return absf(v.get_bullet_direction(0).angle_to((target.global_position - v.get_bullet_global_transform(0).origin).normalized()))
+		return absf(v.get_bullet_direction(0).angle_to((target.global_position - v.get_bullet_transform(0).origin).normalized()))
 	var before: float = to_target.call()
 	await physics(20)
 	assert_lte(to_target.call(), before + 0.05, "direction converged toward the target")

@@ -232,8 +232,8 @@ public:
 	bool get_enabled() const;
 	void set_enabled(bool value);
 
-	int get_trigger() const;
-	void set_trigger(int value);
+	SoundTrigger get_trigger() const;
+	void set_trigger(SoundTrigger value);
 
 	int get_ring_index() const;
 	void set_ring_index(int value);
@@ -244,8 +244,8 @@ public:
 	Array get_streams() const;
 	void set_streams(const Array &value);
 
-	int get_stream_mode() const;
-	void set_stream_mode(int value);
+	StreamMode get_stream_mode() const;
+	void set_stream_mode(StreamMode value);
 
 	PackedFloat32Array get_stream_weights() const;
 	void set_stream_weights(const PackedFloat32Array &value);
@@ -298,8 +298,8 @@ public:
 	int get_area_mask() const;
 	void set_area_mask(int value);
 
-	int get_audibility_mode() const;
-	void set_audibility_mode(int value);
+	AudibilityMode get_audibility_mode() const;
+	void set_audibility_mode(AudibilityMode value);
 
 	NodePath get_camera_path() const;
 	void set_camera_path(const NodePath &value);
@@ -328,11 +328,11 @@ public:
 	int get_max_voices() const;
 	void set_max_voices(int value);
 
-	int get_when_limit_reached() const;
-	void set_when_limit_reached(int value);
+	SoundLimitMode get_when_limit_reached() const;
+	void set_when_limit_reached(SoundLimitMode value);
 
-	int get_steal_mode() const;
-	void set_steal_mode(int value);
+	StealMode get_steal_mode() const;
+	void set_steal_mode(StealMode value);
 
 	int get_priority() const;
 	void set_priority(int value);

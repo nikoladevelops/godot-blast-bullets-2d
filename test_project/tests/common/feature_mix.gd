@@ -581,7 +581,7 @@ func _check_drawn(where: String) -> void:
 		for i in v.get_amount_bullets():
 			if not v.is_bullet_status_enabled(i):
 				continue
-			var want: Vector2 = (inv * v.get_bullet_global_transform(i)).origin if not interp else (inv * v.debug_get_previous_origin(i))
+			var want: Vector2 = (inv * v.get_bullet_transform(i)).origin if not interp else (inv * v.debug_get_previous_origin(i))
 			var got := _instance(buf, i).origin
 			if got.distance_to(want) > 0.05:
 				_problem("%s: bullet %d of volley %d drawn at %s, expected %s (interpolation %s)" % [where, i, v.get_instance_id(), got, want, interp])

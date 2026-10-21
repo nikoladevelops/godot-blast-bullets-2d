@@ -43,7 +43,7 @@ func test_homing_snakes() -> void:
 	await physics(60)
 	assert_true(_finite(v), "homing snakes finite")
 	assert_gt(absf(v.get_bullet_texture_rotation_radians(0) - yaw0), 0.05, "snake texture follows path")
-	var to_target := (tgt.global_position - v.get_bullet_global_transform(0).origin).normalized()
+	var to_target := (tgt.global_position - v.get_bullet_transform(0).origin).normalized()
 	assert_lt(absf(v.get_bullet_direction(0).angle_to(to_target)), 0.6, "snakes still converge while weaving")
 
 
@@ -66,11 +66,11 @@ func test_gravity_drag_speed_curve() -> void:
 	d.linear_drag = 0.35
 	d.shared_bullet_curves_data = _curve_move()
 	var v: BulletVolley2D = factory.spawn_volley(d)
-	var p0: Vector2 = v.get_bullet_global_transform(0).origin
+	var p0: Vector2 = v.get_bullet_transform(0).origin
 	var s0: float = v.get_bullet_speed_data(0).speed
 	await physics(60)
 	assert_true(_finite(v), "gravity/drag/curve finite")
-	assert_gt(v.get_bullet_global_transform(0).origin.y, p0.y + 150.0, "arc drops under gravity")
+	assert_gt(v.get_bullet_transform(0).origin.y, p0.y + 150.0, "arc drops under gravity")
 	assert_lt(v.get_bullet_speed_data(0).speed, s0 + 400.0, "drag+curve bound speed growth")
 	assert_gt(v.bullet_get_fall_speed(0), 20.0, "fall accumulates under curve")
 

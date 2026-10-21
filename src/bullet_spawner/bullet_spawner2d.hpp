@@ -22,6 +22,7 @@
 #include "godot_cpp/classes/node2d.hpp"
 #include "godot_cpp/classes/path2d.hpp"
 #include "godot_cpp/classes/random_number_generator.hpp"
+#include "godot_cpp/classes/tween.hpp"
 #include "godot_cpp/classes/wrapped.hpp"
 #include "godot_cpp/core/object.hpp"
 #include "godot_cpp/core/property_info.hpp"
@@ -1118,7 +1119,7 @@ public:
 	// preview, the bake cache or collect_spawn_transforms()). Min/max pairs
 	// are NOT checked against each other: they are normalized at use, so
 	// assignment order never matters (scene load sets min before max).
-	enum BulletScaleMode {
+	enum BulletScaleMode : int {
 		BULLET_SCALE_OFF = 0,
 		BULLET_SCALE_UNIFORM,
 		BULLET_SCALE_PER_AXIS
@@ -1140,8 +1141,8 @@ public:
 	double burst_interval_max_sec = 0.0;
 	double telegraph_max_sec = 0.0;
 	std::vector<real_t> shot_speed_factors;
-	int get_orphaned_volleys() const { return orphaned_volleys; }
-	void set_orphaned_volleys(int value);
+	OrphanedVolleys get_orphaned_volleys() const { return static_cast<OrphanedVolleys>(orphaned_volleys); }
+	void set_orphaned_volleys(OrphanedVolleys value);
 
 	// ---- Time (the spawner's own clock) ----
 	// The spawner's cadence, initial delay, telegraph, bursts, pattern list,
@@ -1164,8 +1165,8 @@ public:
 	// (see BulletFactory2D.convert_all_bullets_to_pickups). Returns the pickup volleys.
 	Array convert_live_bullets_to_pickups(const Ref<BulletPickupData2D> &pickup, const Variant &target);
 
-	int get_bullet_scale_mode() const { return bullet_scale_mode; }
-	void set_bullet_scale_mode(int value);
+	BulletScaleMode get_bullet_scale_mode() const { return static_cast<BulletScaleMode>(bullet_scale_mode); }
+	void set_bullet_scale_mode(BulletScaleMode value);
 	Vector2 get_bullet_scale_min_xy() const { return bullet_scale_min_xy; }
 	void set_bullet_scale_min_xy(const Vector2 &value);
 	Vector2 get_bullet_scale_max_xy() const { return bullet_scale_max_xy; }
@@ -1359,8 +1360,8 @@ public:
 		SPAWN_OFFSET_GLOBAL = 0,
 		SPAWN_OFFSET_LOCAL = 1,
 	};
-	int get_spawn_position_offset_space() const;
-	void set_spawn_position_offset_space(int value);
+	SpawnOffsetSpace get_spawn_position_offset_space() const;
+	void set_spawn_position_offset_space(SpawnOffsetSpace value);
 	// The world-space shift a shot applies right now (space resolved).
 	Vector2 resolve_spawn_offset_global() const;
 
@@ -1405,24 +1406,24 @@ public:
 	void set_movement_path(const NodePath &p_path);
 	Path2D *get_movement_path_node() const;
 	void set_movement_path_node(Path2D *node);
-	int get_movement_space() const;
-	void set_movement_space(int value);
-	int get_movement_loop_mode() const;
-	void set_movement_loop_mode(int value);
-	int get_movement_direction() const;
-	void set_movement_direction(int value);
+	MovementSpace get_movement_space() const;
+	void set_movement_space(MovementSpace value);
+	MovementLoopMode get_movement_loop_mode() const;
+	void set_movement_loop_mode(MovementLoopMode value);
+	MovementDirection get_movement_direction() const;
+	void set_movement_direction(MovementDirection value);
 	int get_movement_loops() const;
 	void set_movement_loops(int value);
-	int get_movement_timing() const;
-	void set_movement_timing(int value);
+	MovementTiming get_movement_timing() const;
+	void set_movement_timing(MovementTiming value);
 	double get_movement_duration_sec() const;
 	void set_movement_duration_sec(double value);
 	double get_movement_speed() const;
 	void set_movement_speed(double value);
-	int get_movement_transition() const;
-	void set_movement_transition(int value);
-	int get_movement_ease() const;
-	void set_movement_ease(int value);
+	Tween::TransitionType get_movement_transition() const;
+	void set_movement_transition(Tween::TransitionType value);
+	Tween::EaseType get_movement_ease() const;
+	void set_movement_ease(Tween::EaseType value);
 	Ref<Curve> get_movement_progress_curve() const;
 	void set_movement_progress_curve(const Ref<Curve> &value);
 	double get_movement_start_ratio() const;
@@ -1487,8 +1488,8 @@ public:
 		PATTERN_CACHE_AUTO = 0,
 		PATTERN_CACHE_OFF = 1,
 	};
-	int get_pattern_cache_mode() const;
-	void set_pattern_cache_mode(int value);
+	PatternCacheMode get_pattern_cache_mode() const;
+	void set_pattern_cache_mode(PatternCacheMode value);
 	// {hits, misses, bakes, version, shot_class, preview_class}
 	// (class: 0 none, 1 translation, 2 rigid, -1 not baked yet).
 	Dictionary debug_get_pattern_cache_info() const;
@@ -2119,6 +2120,7 @@ BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::Path2DFacing);
 BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::Path2DSpace);
 BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::SpinMode);
 BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::OrphanedVolleys);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::BulletScaleMode);
 BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingMode);
 BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingTargetSource);
 BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingNodeNameMatch);

@@ -15,7 +15,7 @@ func _first_bullet(sp: BulletSpawner2D) -> Vector2:
 	watch_signals(sp)
 	assert_true(sp.shoot_once(), "shot fires")
 	var v: BulletVolley2D = get_signal_parameters(sp, "volley_fired", get_signal_emit_count(sp, "volley_fired") - 1)[0]
-	return v.get_bullet_global_transform(0).origin
+	return v.get_bullet_transform(0).origin
 
 
 func test_offset_space_global_vs_local() -> void:
@@ -47,7 +47,7 @@ func test_preview_draws_the_offset(space: int = use_parameters([0, 1])) -> void:
 	assert_true(sp.shoot_once())
 	var v: BulletVolley2D = get_signal_parameters(sp, "volley_fired", 0)[0]
 	for i in dots.size():
-		assert_almost_eq(layer.get_global_transform() * dots[i], v.get_bullet_global_transform(i).origin, Vector2(0.05, 0.05), "space %d: dot %d drawn where bullet %d spawned" % [space, i, i])
+		assert_almost_eq(layer.get_global_transform() * dots[i], v.get_bullet_transform(i).origin, Vector2(0.05, 0.05), "space %d: dot %d drawn where bullet %d spawned" % [space, i, i])
 
 
 func test_configuration_warnings() -> void:

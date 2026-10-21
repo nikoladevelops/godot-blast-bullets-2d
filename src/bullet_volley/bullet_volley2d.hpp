@@ -389,16 +389,10 @@ public:
 
 	// Bullet Transforms
 
-	// Bullet transform in the same global space as the movement caches.
-	// get_bullet_global_transform() is the explicit-world alias; set_bullet_transform
-	// accepts the same space so get()/set() round-trip without a node-transform shift.
+	// Bullet transform in global space (the caches hold global transforms);
+	// set_bullet_transform accepts the same space so get()/set() round-trip.
 	Transform2D get_bullet_transform(int bullet_index) const;
 	void set_bullet_transform(int bullet_index, const Transform2D &new_transform, bool set_direction_based_on_transform = false);
-
-	// Instance transform in global space. The caches already hold global-space
-	// transforms, so this returns the cache directly.
-	// Use this for gameplay logic such as spawning child bullets at a bullet's position.
-	Transform2D get_bullet_global_transform(int bullet_index) const;
 
 	// Logical velocity of a bullet (direction x speed + inherited offset).
 	// Excludes per-tick pattern/orbit displacement: those steer the movement
@@ -1295,16 +1289,6 @@ public:
 	// hit count; 0+ sets it. Refused on a pooled volley (stale handle).
 	void enable_bullet(int bullet_index, int collision_amount = -1, bool should_enable_attachment = true);
 
-	// Clearly-named alias: wake_bullet() revives ONE pooled or
-	// manually-disabled slot with its current appearance/ballistics intact
-	// (same-owner re-enable). Cross-owner reuse must go through
-	// spawn_*()/enable_volley() which reseed appearance, custom data,
-	// speeds and patterns. Calling wake on a foreign pooled volley warns (see
-	// enable_bullet) instead of silently driving stale state.
-	void wake_bullet(int bullet_index, int collision_amount = -1, bool should_enable_attachment = true) {
-		enable_bullet(bullet_index, collision_amount, should_enable_attachment);
-	}
-
 	// Stability introspection for tests and support (bound below).
 	// Keys: amount_bullets, active_bullets, generation, owner_spawner_id,
 	// is_active, is_pooled, pool_amount, pool_shape, auto_pool_volley,
@@ -1519,14 +1503,12 @@ public:
 	// the next hit, unlike an equivalent wake.
 	void set_bullet_collision_count(int bullet_index, int value);
 	TypedArray<int> get_bullets_current_collision_count() const;
-	bool set_bullets_current_collision_count(const TypedArray<int> &arr, bool tile_short_arrays = false);
-
-	// Void wrapper for the editor property (property setters must return void).
-	// Strict indexing (uncovered bullets start at 0); the data resource
-	// threads its own tile box through the spawn path instead.
-	void set_bullets_current_collision_count_no_return(const TypedArray<int> &arr) {
-		(void)set_bullets_current_collision_count(arr);
+	// Strict indexing (uncovered bullets start at 0); the spawn path seeds
+	// with the data resource's tile box instead.
+	void set_bullets_current_collision_count(const TypedArray<int> &arr) {
+		seed_bullets_current_collision_count(arr, false);
 	}
+	void seed_bullets_current_collision_count(const TypedArray<int> &arr, bool tile_short_arrays);
 
 protected:
 	// Internal setup helpers (spawn/enable seed shared spawn data through
@@ -2441,8 +2423,8 @@ public:
 	void set_bounce_hit_consumed(bool value) { bounce_hit_consumed = value; }
 	int get_bounce_max_count() const { return bounce_max_count; }
 	void set_bounce_max_count(int value);
-	int get_bounce_mode() const { return bounce_mode; }
-	void set_bounce_mode(int value);
+	BulletVolleyData2D::BounceMode get_bounce_mode() const { return static_cast<BulletVolleyData2D::BounceMode>(bounce_mode); }
+	void set_bounce_mode(BulletVolleyData2D::BounceMode value);
 	bool get_bounce_rotate_texture() const { return bounce_rotate_texture; }
 	void set_bounce_rotate_texture(bool value) { bounce_rotate_texture = value; }
 	real_t get_bounce_rotation_smooth() const { return bounce_rotation_smooth; }

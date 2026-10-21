@@ -48,9 +48,9 @@ func test_aim_helpers_turn_direction_and_texture_toward_a_point_or_node() -> voi
 	assert_almost_eq(float(degs[2]), 45.0, EPS, "ranged degrees: bullet 2")
 	assert_almost_eq(float(degs[0]), rad_to_deg(Vector2(16, 200).angle()), EPS, "bullet 0 kept its texture")
 	v.all_bullets_set_transforms(Transform2D(0.5, Vector2(100, 50)), true, 0, 1)
-	assert_almost_eq(v.get_bullet_global_transform(0).origin, Vector2(100, 50), Vector2(EPS, EPS), "moved to the new transform")
+	assert_almost_eq(v.get_bullet_transform(0).origin, Vector2(100, 50), Vector2(EPS, EPS), "moved to the new transform")
 	assert_almost_eq(v.get_bullet_direction(1), Vector2.from_angle(0.5), Vector2(EPS, EPS), "direction follows the transform when asked")
-	assert_almost_eq(v.get_bullet_global_transform(2).origin, Vector2(32, 0), Vector2(EPS, EPS), "bullet 2 outside the range stays")
+	assert_almost_eq(v.get_bullet_transform(2).origin, Vector2(32, 0), Vector2(EPS, EPS), "bullet 2 outside the range stays")
 
 
 func test_every_homing_push_and_replace_variant() -> void:
@@ -196,7 +196,7 @@ func test_sprite_animation_queries_stop_resume_and_one_finished_signal() -> void
 
 func test_ranged_reset_state_clears_only_the_requested_ledgers() -> void:
 	var v := _still()
-	v.set_bullets_current_collision_count_no_return([2, 1, 3])
+	v.set_bullets_current_collision_count([2, 1, 3])
 	assert_eq(Array(v.get_bullets_current_collision_count()), [2, 1, 3], "hit counts written")
 	v.all_bullets_reset_state(1, 2)
 	assert_eq(Array(v.get_bullets_current_collision_count()), [2, 0, 0], "only bullets 1 and 2 reset")

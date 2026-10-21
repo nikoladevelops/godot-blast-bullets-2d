@@ -34,8 +34,8 @@ void BulletSoundData2D::set_enabled(bool value) {
 	emit_changed();
 }
 
-int BulletSoundData2D::get_trigger() const { return trigger; }
-void BulletSoundData2D::set_trigger(int value) {
+BulletSoundData2D::SoundTrigger BulletSoundData2D::get_trigger() const { return static_cast<SoundTrigger>(trigger); }
+void BulletSoundData2D::set_trigger(SoundTrigger value) {
 	if (value < SOUND_ON_SHOT || value > SOUND_ON_SPLIT) {
 		UtilityFunctions::push_error("BulletSoundData2D: trigger must be 0 (On Shot), 1 (On Hit), 2 (On Destroy), 3 (On Bounce), 4 (On Lifetime Over), 5 (On Clear), 6 (On Homing Target Reached), 7 (On Graze), 8 (On Graze Exit), 9 (On Telegraph), 10 (On Flight), 11 (On Despawn) or 12 (On Split), keeping the old value.");
 		return;
@@ -95,8 +95,8 @@ void BulletSoundData2D::set_streams(const Array &value) {
 	emit_changed();
 }
 
-int BulletSoundData2D::get_stream_mode() const { return stream_mode; }
-void BulletSoundData2D::set_stream_mode(int value) {
+BulletSoundData2D::StreamMode BulletSoundData2D::get_stream_mode() const { return static_cast<StreamMode>(stream_mode); }
+void BulletSoundData2D::set_stream_mode(StreamMode value) {
 	if (value < STREAM_RANDOM || value > STREAM_SHUFFLE) {
 		UtilityFunctions::push_error("BulletSoundData2D: stream_mode must be 0 (Random), 1 (Weighted), 2 (Sequence) or 3 (Shuffle), keeping the old value.");
 		return;
@@ -331,8 +331,8 @@ void BulletSoundData2D::set_area_mask(int value) {
 	emit_changed();
 }
 
-int BulletSoundData2D::get_audibility_mode() const { return audibility_mode; }
-void BulletSoundData2D::set_audibility_mode(int value) {
+BulletSoundData2D::AudibilityMode BulletSoundData2D::get_audibility_mode() const { return static_cast<AudibilityMode>(audibility_mode); }
+void BulletSoundData2D::set_audibility_mode(AudibilityMode value) {
 	if (value < SOUND_AUDIBILITY_DISTANCE || value > SOUND_AUDIBILITY_DISTANCE_AND_CAMERA) {
 		UtilityFunctions::push_error("BulletSoundData2D: audibility_mode must be 0 (Distance), 1 (Camera) or 2 (Distance and Camera), keeping the old value.");
 		return;
@@ -455,8 +455,8 @@ void BulletSoundData2D::set_max_voices(int value) {
 	emit_changed();
 }
 
-int BulletSoundData2D::get_when_limit_reached() const { return when_limit_reached; }
-void BulletSoundData2D::set_when_limit_reached(int value) {
+BulletSoundData2D::SoundLimitMode BulletSoundData2D::get_when_limit_reached() const { return static_cast<SoundLimitMode>(when_limit_reached); }
+void BulletSoundData2D::set_when_limit_reached(SoundLimitMode value) {
 	if (value != SOUND_LIMIT_REPLACE_OLDEST && value != SOUND_LIMIT_SKIP_NEW) {
 		UtilityFunctions::push_error("BulletSoundData2D: when_limit_reached must be 0 (Replace Oldest) or 1 (Skip New), keeping the old value.");
 		return;
@@ -481,8 +481,8 @@ void BulletSoundData2D::set_priority(int value) {
 	emit_changed();
 }
 
-int BulletSoundData2D::get_steal_mode() const { return steal_mode; }
-void BulletSoundData2D::set_steal_mode(int value) {
+BulletSoundData2D::StealMode BulletSoundData2D::get_steal_mode() const { return static_cast<StealMode>(steal_mode); }
+void BulletSoundData2D::set_steal_mode(StealMode value) {
 	if (value != STEAL_OLDEST && value != STEAL_QUIETEST) {
 		UtilityFunctions::push_error("BulletSoundData2D: steal_mode must be 0 (Oldest) or 1 (Quietest), keeping the old value.");
 		return;

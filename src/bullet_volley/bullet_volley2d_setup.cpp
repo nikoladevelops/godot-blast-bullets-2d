@@ -18,7 +18,7 @@ void BulletVolley2D::set_up_bullet_instances(const BulletVolleyData2D &data) {
 		bullets_current_collision_count.resize(amount_bullets, 0);
 	} else {
 		// Always succeeds (fills + warns); uncovered bullets start at 0.
-		set_bullets_current_collision_count(data.bullets_current_collision_count, data.tile_bullets_current_collision_count);
+		seed_bullets_current_collision_count(data.bullets_current_collision_count, data.tile_bullets_current_collision_count);
 	}
 
 	// Per-bullet custom data (strict indexing; strictly separate from

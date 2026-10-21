@@ -39,7 +39,7 @@ func test_pooled_wake_is_refused_and_a_parked_wake_resumes() -> void:
 		v.disable_bullet(i)
 	await idle()
 	assert_true(v.is_pooled(), "drained with pooling on: pooled")
-	v.wake_bullet(0)
+	v.enable_bullet(0)
 	expect_error_sequence(["enable_bullet: this volley went back to the pool when its last bullet died (is_auto_pooling_enabled was on), so this handle is stale. Spawn a new volley, or set is_auto_pooling_enabled = false before the last bullet dies to keep (park) the volley."])
 	assert_false(v.is_bullet_status_enabled(0), "refused: the slot stays dead")
 	assert_true(v.is_pooled(), "still pooled")
@@ -51,12 +51,12 @@ func test_pooled_wake_is_refused_and_a_parked_wake_resumes() -> void:
 		p.disable_bullet(i)
 	await idle()
 	assert_true(p.is_parked(), "drained with pooling off: parked")
-	p.wake_bullet(0)
+	p.enable_bullet(0)
 	assert_true(p.is_bullet_status_enabled(0), "parked wake revives the slot")
 	assert_almost_eq(p.get_bullet_speed_data(0).speed, 200.0, 0.01, "frozen ballistics resume")
-	var p0: Vector2 = p.get_bullet_global_transform(0).origin
+	var p0: Vector2 = p.get_bullet_transform(0).origin
 	await physics(5)
-	assert_gt(p.get_bullet_global_transform(0).origin.distance_to(p0), 1.0, "the woken bullet actually moves")
+	assert_gt(p.get_bullet_transform(0).origin.distance_to(p0), 1.0, "the woken bullet actually moves")
 	for i in 2:
 		p.disable_bullet(i)
 	await idle()

@@ -221,3 +221,27 @@ func test_enums_work_in_typed_scripts() -> void:
 	assert_eq(kind, BulletVolley2D.GlobalPositionTarget, "a typed HomingType compares with the named constants")
 	var scope: BulletFlock2D.Scope = BulletFlock2D.SCOPE_PER_VOLLEY
 	assert_true(v.flock_join(BulletFlock2D.new(), scope), "typed Scope arguments")
+
+
+func test_every_enum_property_is_typed_with_its_enum() -> void:
+	# An int property that picks from a list (PROPERTY_HINT_ENUM) reads back
+	# as its enum: typed GDScript, docs (enum=) and autocompletion then know
+	# the named constants. Found by API type, so new properties are covered.
+	var untyped: Array = []
+	var seen := 0
+	for cls in ClassDB.get_class_list():
+		if ClassDB.class_get_api_type(cls) != ClassDB.API_EXTENSION:
+			continue
+		var returns := {}
+		for m in ClassDB.class_get_method_list(cls, true):
+			returns[str(m["name"])] = m["return"]
+		for p in ClassDB.class_get_property_list(cls, true):
+			if int(p["type"]) != TYPE_INT or int(p["hint"]) != PROPERTY_HINT_ENUM:
+				continue
+			seen += 1
+			var getter := str(ClassDB.class_get_property_getter(cls, p["name"]))
+			var ret: Dictionary = returns.get(getter, {})
+			if ret.is_empty() or not (int(ret["usage"]) & PROPERTY_USAGE_CLASS_IS_ENUM):
+				untyped.append("%s.%s" % [cls, p["name"]])
+	assert_gte(seen, 30, "enum properties found")
+	assert_eq("\n".join(untyped), "", "every enum property reads back as its enum")

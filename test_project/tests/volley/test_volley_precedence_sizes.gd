@@ -196,14 +196,14 @@ func test_homing_per_bullet_deque_wins_per_bullet_shared_is_fallback() -> void:
 	v9.set_homing_take_control_of_texture_rotation(true)
 	v9.bullet_homing_push_back_global_position_target(0, Vector2(-2000, 200))
 	v9.shared_homing_deque_push_back_global_position_target(Vector2(2000, 200))
-	var d0_before: float = absf(v9.get_bullet_direction(0).angle_to((Vector2(-2000, 200) - v9.get_bullet_global_transform(0).origin).normalized()))
-	var d1_before: float = absf(v9.get_bullet_direction(1).angle_to((Vector2(2000, 200) - v9.get_bullet_global_transform(1).origin).normalized()))
+	var d0_before: float = absf(v9.get_bullet_direction(0).angle_to((Vector2(-2000, 200) - v9.get_bullet_transform(0).origin).normalized()))
+	var d1_before: float = absf(v9.get_bullet_direction(1).angle_to((Vector2(2000, 200) - v9.get_bullet_transform(1).origin).normalized()))
 	assert_true(v9.bullet_check_has_homing_targets(0), "bullet 0 owns a target")
 	assert_true(not v9.bullet_check_has_homing_targets(1), "bullet 1 has no own target")
 	for i in 30:
 		await physics()
-	var d0_after: float = absf(v9.get_bullet_direction(0).angle_to((Vector2(-2000, 200) - v9.get_bullet_global_transform(0).origin).normalized()))
-	var d1_after: float = absf(v9.get_bullet_direction(1).angle_to((Vector2(2000, 200) - v9.get_bullet_global_transform(1).origin).normalized()))
+	var d0_after: float = absf(v9.get_bullet_direction(0).angle_to((Vector2(-2000, 200) - v9.get_bullet_transform(0).origin).normalized()))
+	var d1_after: float = absf(v9.get_bullet_direction(1).angle_to((Vector2(2000, 200) - v9.get_bullet_transform(1).origin).normalized()))
 	assert_true(d0_after < d0_before + 0.05, "bullet 0 converged on own target (%.3f -> %.3f)" % [d0_before, d0_after])
 	assert_true(d1_after < d1_before + 0.05, "bullet 1 converged on shared target (%.3f -> %.3f)" % [d1_before, d1_after])
 
@@ -284,12 +284,12 @@ func test_negative_speed_flies_backwards_symmetric_max_clamp() -> void:
 	d13.all_bullet_speed_data = [neg, pos]
 	var v13: BulletVolley2D = factory.spawn_volley(d13)
 	assert_true(absf(v13.get_bullet_speed_data(0).speed + 250.0) < 0.01, "negative speed seeds")
-	var p0: Vector2 = v13.get_bullet_global_transform(0).origin
-	var p1: Vector2 = v13.get_bullet_global_transform(1).origin
+	var p0: Vector2 = v13.get_bullet_transform(0).origin
+	var p1: Vector2 = v13.get_bullet_transform(1).origin
 	for i in 20:
 		await physics()
-	var q0: Vector2 = v13.get_bullet_global_transform(0).origin
-	var q1: Vector2 = v13.get_bullet_global_transform(1).origin
+	var q0: Vector2 = v13.get_bullet_transform(0).origin
+	var q1: Vector2 = v13.get_bullet_transform(1).origin
 	assert_true(q0.x < p0.x - 20.0, "negative-speed bullet retreats (%.1f px)" % (p0.x - q0.x))
 	assert_true(q1.x > p1.x + 20.0, "positive-speed bullet advances")
 	assert_true(v13.get_bullet_transform(0).is_finite() and v13.get_bullet_transform(1).is_finite(), "reverse flight stays finite")
@@ -312,10 +312,10 @@ func test_negative_curve_sample_flies_backwards() -> void:
 	gc.movement_use_unit_curve = false
 	d14.shared_bullet_curves_data = gc
 	var v14: BulletVolley2D = factory.spawn_volley(d14)
-	var r0: Vector2 = v14.get_bullet_global_transform(0).origin
+	var r0: Vector2 = v14.get_bullet_transform(0).origin
 	for i in 20:
 		await physics()
-	var r1p: Vector2 = v14.get_bullet_global_transform(0).origin
+	var r1p: Vector2 = v14.get_bullet_transform(0).origin
 	assert_true(r1p.x < r0.x - 10.0, "negative curve sample retreats")
 	assert_true(v14.get_bullet_transform(0).is_finite(), "curve reverse flight finite")
 

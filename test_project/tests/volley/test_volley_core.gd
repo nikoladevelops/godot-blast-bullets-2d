@@ -46,7 +46,7 @@ func test_direction() -> void:
 func test_transforms_and_teleport() -> void:
 	var t0: Transform2D = v.get_bullet_transform(0)
 	assert_true(t0.is_finite())
-	assert_eq(v.get_bullet_global_transform(0), t0, "global transform round-trips the cache")
+	assert_eq(v.get_bullet_transform(0), t0, "global transform round-trips the cache")
 	v.set_bullet_transform(0, Transform2D(0.0, Vector2(300, 400)), true)
 	assert_almost_eq(v.get_bullet_transform(0).origin, Vector2(300, 400), Vector2(0.01, 0.01), "set transform moves")
 	assert_almost_eq(v.get_bullet_direction(0), Vector2(1, 0), Vector2(0.5, 0.5), "derive-direction follows the transform")
@@ -71,9 +71,9 @@ func test_default_max_speed_is_unlimited() -> void:
 	sp.speed = 300.0 # max_speed left at 0 = unlimited, not a brake
 	d.all_bullet_speed_data = [sp]
 	var pv: BulletVolley2D = factory.spawn_volley(d)
-	var x0: float = pv.get_bullet_global_transform(0).origin.x
+	var x0: float = pv.get_bullet_transform(0).origin.x
 	await physics(10)
-	assert_gt(pv.get_bullet_global_transform(0).origin.x, x0 + 20.0, "default max_speed flies")
+	assert_gt(pv.get_bullet_transform(0).origin.x, x0 + 20.0, "default max_speed flies")
 
 
 func test_texture_rotation() -> void:

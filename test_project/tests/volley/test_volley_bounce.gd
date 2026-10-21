@@ -48,7 +48,7 @@ func _on_factory_bounce(_t: Object, _v: BulletVolley2D, _i: int) -> void:
 var _bounce_capture: Array = []
 
 func _on_bounce_capture(_body: Object, volley: BulletVolley2D, idx: int) -> void:
-	_bounce_capture.append([volley.debug_get_previous_origin(idx), volley.get_bullet_global_transform(idx).origin])
+	_bounce_capture.append([volley.debug_get_previous_origin(idx), volley.get_bullet_transform(idx).origin])
 
 func _finite_volley(v: BulletVolley2D) -> bool:
 	for i in v.get_amount_bullets():
@@ -697,7 +697,7 @@ func test_t16_attachment_rides_the_escape_nudge() -> void:
 	var att16: BulletAttachment2D = v16.bullet_get_attachment(0) as BulletAttachment2D
 	assert_true(att16 != null, "attachment present after bounce")
 	if att16 != null:
-		var miss16: float = att16.global_position.distance_to(v16.get_bullet_global_transform(0).origin)
+		var miss16: float = att16.global_position.distance_to(v16.get_bullet_transform(0).origin)
 		assert_true(miss16 < 5.0, "attachment tracks nudged bullet")
 
 

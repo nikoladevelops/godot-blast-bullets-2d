@@ -379,7 +379,7 @@ func test_attachments_ride_their_flocking_bullets() -> void:
 		var att: Node2D = v.bullet_get_attachment(i)
 		assert_not_null(att, "bullet %d keeps its attachment" % i)
 		if att != null:
-			assert_almost_eq(att.global_position, v.get_bullet_global_transform(i).origin, Vector2(0.01, 0.01), "attachment %d sits on its turned bullet" % i)
+			assert_almost_eq(att.global_position, v.get_bullet_transform(i).origin, Vector2(0.01, 0.01), "attachment %d sits on its turned bullet" % i)
 	assert_eq(_broken(v), [], "finite, unit, consistent")
 
 

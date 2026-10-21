@@ -31,19 +31,19 @@ func test_a_frozen_bullet_keeps_every_runtime_value() -> void:
 	v.bullet_homing_push_back_global_position_target(0, Vector2(500, 300))
 	await physics(10)
 	var before := _info(v, 0)
-	var pose: Transform2D = v.get_bullet_global_transform(0)
+	var pose: Transform2D = v.get_bullet_transform(0)
 	v.disable_bullet(0)
 	await physics(10)
 	assert_false(v.is_bullet_status_enabled(0), "frozen")
 	assert_eq(_info(v, 0), before, "every runtime value is kept while frozen")
-	assert_eq(v.get_bullet_global_transform(0), pose, "a frozen bullet does not move")
+	assert_eq(v.get_bullet_transform(0), pose, "a frozen bullet does not move")
 	assert_eq(v.get_bullet_collision_count(0), 2, "hit count kept")
 	assert_same(v.bullet_get_custom_data(0), c0, "custom data kept")
 	v.enable_bullet(0)
 	assert_eq(_info(v, 0), before, "the wake resumes every value")
 	assert_eq(v.get_bullet_collision_count(0), 2, "wake keeps the hit count (collision_amount -1)")
 	await physics(2)
-	assert_gt(v.get_bullet_global_transform(0).origin.distance_to(pose.origin), 1.0, "it flies on from the frozen pose")
+	assert_gt(v.get_bullet_transform(0).origin.distance_to(pose.origin), 1.0, "it flies on from the frozen pose")
 
 
 func test_a_frozen_bullet_never_collides_and_a_wake_reports_the_overlap_once() -> void:

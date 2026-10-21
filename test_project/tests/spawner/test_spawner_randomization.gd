@@ -569,3 +569,8 @@ func test_jitter_seed_zero_randomizes_again_after_a_seeded_run() -> void:
 	await run.call(200)
 	assert_gt(gaps[0].size(), 6, "both kept firing")
 	assert_ne(gaps[0].slice(0, 6), gaps[1].slice(0, 6), "seed 0 rolls independently")
+
+
+func test_bullet_scale_mode_constants_are_bound() -> void:
+	for c in ["BULLET_SCALE_OFF", "BULLET_SCALE_UNIFORM", "BULLET_SCALE_PER_AXIS"]:
+		assert_true(ClassDB.class_has_integer_constant("BulletSpawner2D", c), c + " is usable from scripts (the README uses it)")

@@ -46,7 +46,7 @@
 		<member name="attenuation" type="float" setter="set_attenuation" getter="get_attenuation" default="1.0">
 			Distance falloff curve exponent (Godot's own volume math). Hidden while [member positional] is off.
 		</member>
-		<member name="audibility_mode" type="int" setter="set_audibility_mode" getter="get_audibility_mode" default="0">
+		<member name="audibility_mode" type="int" setter="set_audibility_mode" getter="get_audibility_mode" enum="BulletSoundData2D.AudibilityMode" default="0">
 			Which audibility rule drops events: Distance (only [member max_distance]), Camera (only the camera view), or both. Distance is the default: existing scenes behave as before. Silence remedy ladder (zoomed-in views shrink both the view and the scaled range): widen [member camera_margin_px], switch to Distance and Camera, fall back to Distance, and finally Godot's listener always measures something. [method BulletFactory2D.debug_explain_sound] names the exact gate dropping an event.
 		</member>
 		<member name="bus" type="StringName" setter="set_bus" getter="get_bus" default="&amp;&quot;Master&quot;">
@@ -142,10 +142,10 @@
 		<member name="ring_index" type="int" setter="set_ring_index" getter="get_ring_index" default="-1">
 			Which graze ring this entry listens to: -1 means any ring, 0..3 means exactly that ring. A zone with fewer rings never matches (silent, no warning). Ignored by every non-graze trigger; hidden in the inspector unless [member trigger] is On Graze or On Graze Exit.
 		</member>
-		<member name="steal_mode" type="int" setter="set_steal_mode" getter="get_steal_mode" default="0">
+		<member name="steal_mode" type="int" setter="set_steal_mode" getter="get_steal_mode" enum="BulletSoundData2D.StealMode" default="0">
 			Which voice Replace Oldest stops past [member max_voices]: the oldest (machine-gun rotation: every shot gets its turn), or the quietest (layered booms: the loud body survives, tails die; both rank the lowest played volume, ties go to the oldest, before ducking). The factory pool steal keeps its own rule (priority, then oldest).
 		</member>
-		<member name="stream_mode" type="int" setter="set_stream_mode" getter="get_stream_mode" default="0">
+		<member name="stream_mode" type="int" setter="set_stream_mode" getter="get_stream_mode" enum="BulletSoundData2D.StreamMode" default="0">
 			How [member streams] is picked: Random (uniform), Weighted (reads [member stream_weights]), Sequence (round-robin), Shuffle (every entry once per cycle). The cursors live in the shared channel, like the limits.
 		</member>
 		<member name="stream_weights" type="PackedFloat32Array" setter="set_stream_weights" getter="get_stream_weights" default="PackedFloat32Array()">
@@ -154,7 +154,7 @@
 		<member name="streams" type="Array" setter="set_streams" getter="get_streams" default="[]">
 			What plays: each play picks one entry per [member stream_mode] (nulls skipped). Put one WAV for a single sound or five hit variations without building an [AudioStreamRandomizer]; an empty or all-null list plays nothing (warns once).
 		</member>
-		<member name="trigger" type="int" setter="set_trigger" getter="get_trigger" default="0">
+		<member name="trigger" type="int" setter="set_trigger" getter="get_trigger" enum="BulletSoundData2D.SoundTrigger" default="0">
 			Which event plays this sound. On Shot and On Telegraph are spawner-only: a factory volley never fires them. On Despawn plays where a bullet leaves through the factory's despawn bounds ([member BulletFactory2D.despawn_bounds_enabled]) and nowhere else.
 		</member>
 		<member name="trigger_chance" type="float" setter="set_trigger_chance" getter="get_trigger_chance" default="1.0">
@@ -169,7 +169,7 @@
 		<member name="volume_min_db" type="float" setter="set_volume_min_db" getter="get_volume_min_db" default="-80.0">
 			Final mixed volume floor in dB (applied after the trim, the randoms and the amount gain). Inverted bounds sort themselves. Wide open by default (between -80 and 80).
 		</member>
-		<member name="when_limit_reached" type="int" setter="set_when_limit_reached" getter="get_when_limit_reached" default="0">
+		<member name="when_limit_reached" type="int" setter="set_when_limit_reached" getter="get_when_limit_reached" enum="BulletSoundData2D.SoundLimitMode" default="0">
 			What happens past [member max_voices]: stop this sound's oldest voice and reuse it, or drop the new event.
 		</member>
 		<member name="zone_index" type="int" setter="set_zone_index" getter="get_zone_index" default="-1">

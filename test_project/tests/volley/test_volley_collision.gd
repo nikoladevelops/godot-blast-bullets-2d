@@ -65,6 +65,6 @@ func test_disable_wake_same_life() -> void:
 	v.set_is_auto_pooling_enabled(false) # a drained 1-bullet volley parks instead of pooling
 	v.disable_bullet(0)
 	assert_false(v.is_bullet_status_enabled(0), "manual disable holds")
-	v.wake_bullet(0)
+	v.enable_bullet(0)
 	assert_true(v.is_bullet_status_enabled(0), "wake revives")
 	assert_true(factory.debug_assert_no_dangling().get("ok", false), "no dangling after wake")

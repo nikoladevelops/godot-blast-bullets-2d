@@ -31,7 +31,7 @@ func _drawn_problems(v: BulletVolley2D, label: String, only: Array = []) -> Arra
 			continue
 		var got := _drawn(v, i)
 		if v.is_bullet_status_enabled(i):
-			var want: Vector2 = (inv * v.get_bullet_global_transform(i)).origin
+			var want: Vector2 = (inv * v.get_bullet_transform(i)).origin
 			if got.origin.distance_to(want) > 0.01:
 				out.append("%s: bullet %d drawn at %s, it is at %s (previous pose %s)" % [label, i, got.origin, want, v.debug_get_previous_origin(i)])
 		elif got.x != Vector2.ZERO or got.y != Vector2.ZERO:

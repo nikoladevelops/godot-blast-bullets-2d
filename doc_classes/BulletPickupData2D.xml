@@ -120,7 +120,7 @@
 		<member name="material" type="Material" setter="set_material" getter="get_material">
 			Material of the pickup volley (an additive glow shader, for example).
 		</member>
-		<member name="motion_mode" type="int" setter="set_motion_mode" getter="get_motion_mode" default="0">
+		<member name="motion_mode" type="int" setter="set_motion_mode" getter="get_motion_mode" enum="BulletPickupData2D.MotionMode" default="0">
 			How the pickups move: 0 Burst And Magnet (built-in coin physics), 1 Keep Bullet Motion (each pickup keeps its bullet's speed, top speed and acceleration, only the pull is added), 2 Custom (your [member speed_data] / [member curves_data] decide the speed). The knobs a mode does not read are hidden in the inspector. A new mode applies to the next conversion.
 		</member>
 		<member name="obey_despawn_bounds" type="bool" setter="set_obey_despawn_bounds" getter="get_obey_despawn_bounds" default="true">

@@ -75,10 +75,10 @@ func test_gravity_accelerates_px_per_s2() -> void:
 	var g: BulletVolley2D = quick_volley(1, 0.0)
 	g.set_gravity(Vector2(0, 2000))
 	g.set_linear_drag(0.0)
-	var p0: Vector2 = g.get_bullet_global_transform(0).origin
+	var p0: Vector2 = g.get_bullet_transform(0).origin
 	await physics(60)
 	# Semi-implicit Euler: dy ~= g*dt^2*n(n+1)/2 ~= 1050 px.
-	assert_between(g.get_bullet_global_transform(0).origin.y - p0.y, 700.0, 1400.0, "gravity falls")
+	assert_between(g.get_bullet_transform(0).origin.y - p0.y, 700.0, 1400.0, "gravity falls")
 	assert_gt(g.get_bullet_velocity(0).y, 1500.0, "reported velocity integrates fall speed")
 	assert_eq(g.get_gravity(), Vector2(0, 2000), "gravity getter round-trips")
 	g.set_gravity(Vector2(NAN, 0))
@@ -204,8 +204,8 @@ func test_negative_speed_under_gravity() -> void:
 	d.all_bullet_speed_data = [nsp]
 	d.all_bullet_gravity = [Vector2(0, 400)]
 	var v: BulletVolley2D = factory.spawn_volley(d)
-	var p0: Vector2 = v.get_bullet_global_transform(0).origin
+	var p0: Vector2 = v.get_bullet_transform(0).origin
 	await physics(30)
 	assert_true(v.get_bullet_transform(0).is_finite(), "reverse gravity flight finite")
-	assert_lt(v.get_bullet_global_transform(0).origin.x, p0.x - 10.0, "reverse flight retreats")
+	assert_lt(v.get_bullet_transform(0).origin.x, p0.x - 10.0, "reverse flight retreats")
 	assert_gt(v.bullet_get_fall_speed(0), 1.0, "gravity still integrates in reverse")

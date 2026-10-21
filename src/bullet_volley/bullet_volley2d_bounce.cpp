@@ -221,7 +221,7 @@ void BulletVolley2D::set_bounce_max_count(int value) {
 	bounce_max_count = value;
 }
 
-void BulletVolley2D::set_bounce_mode(int value) {
+void BulletVolley2D::set_bounce_mode(BulletVolleyData2D::BounceMode value) {
 	if (value != 0 && value != 1) {
 		UtilityFunctions::push_error("BulletVolley2D.set_bounce_mode: value must be 0 (radial) or 1 (precise shape), keeping the old value.");
 		return;

@@ -22,13 +22,13 @@ func test_interpolation_status_and_toggle() -> void:
 func test_pause_freezes_motion() -> void:
 	var v: BulletVolley2D = factory.spawn_volley(H.make_volley_data(2, 200.0))
 	await physics(2)
-	var p0: Vector2 = v.get_bullet_global_transform(0).origin
+	var p0: Vector2 = v.get_bullet_transform(0).origin
 	factory.set_is_factory_processing_bullets(false)
 	await physics(10)
-	assert_almost_eq(v.get_bullet_global_transform(0).origin, p0, Vector2(0.5, 0.5), "paused volley frozen")
+	assert_almost_eq(v.get_bullet_transform(0).origin, p0, Vector2(0.5, 0.5), "paused volley frozen")
 	factory.set_is_factory_processing_bullets(true)
 	await physics(2)
-	assert_gt(v.get_bullet_global_transform(0).origin.x, p0.x, "resumed volley moves again")
+	assert_gt(v.get_bullet_transform(0).origin.x, p0.x, "resumed volley moves again")
 
 
 func test_spawner_freed_with_tracked_volleys() -> void:

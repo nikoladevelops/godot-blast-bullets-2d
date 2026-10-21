@@ -342,7 +342,7 @@ func test_rotation_ranges_texture_rotation_round_trip() -> void:
 	v2.disable_bullet(0)
 	v2.disable_bullet(0)
 	v2.enable_bullet(0)
-	v2.wake_bullet(1)
+	v2.enable_bullet(1)
 	v2.disable_bullet(-1)
 	v2.disable_bullet(99)
 	v2.enable_bullet(-1)

@@ -136,7 +136,7 @@ void BulletPickupData2D::set_z_index(int p_value) {
 	accepted_change();
 }
 
-void BulletPickupData2D::set_motion_mode(int p_value) {
+void BulletPickupData2D::set_motion_mode(MotionMode p_value) {
 	if (p_value < MOTION_BURST_AND_MAGNET || p_value > MOTION_CUSTOM) {
 		UtilityFunctions::push_error("BulletPickupData2D: motion_mode must be 0 (Burst And Magnet), 1 (Keep Bullet Motion) or 2 (Custom), keeping the old value.");
 		return;

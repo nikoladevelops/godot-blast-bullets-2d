@@ -27,7 +27,7 @@ func test_attach_disable_wake_sequence() -> void:
 	assert_true(v.debug_get_attachment_info(0).get("has_attachment", false), "keep-slot disable preserves the slot")
 	assert_eq(probe.get("disable_calls"), 1, "a kept (suspended) attachment is told its bullet is gone")
 	assert_same(v.bullet_get_attachment(0), probe, "the same node stays in the slot")
-	v.wake_bullet(0)
+	v.enable_bullet(0)
 	await idle(1)
 	assert_eq(probe.get("enable_calls"), 1, "on_bullet_enable fired on wake (symmetric resume)")
 	assert_true(v.debug_get_attachment_info(0).get("owner_match", false), "owner still matches after wake")

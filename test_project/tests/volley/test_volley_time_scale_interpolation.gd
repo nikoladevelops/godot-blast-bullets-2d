@@ -17,7 +17,7 @@ func _drawn_x(v: BulletVolley2D) -> float:
 
 
 func _sim_x(v: BulletVolley2D) -> float:
-	return v.get_bullet_global_transform(0).origin.x
+	return v.get_bullet_transform(0).origin.x
 
 
 ## Runs `frames` frames and asserts the invariants against `step` px per tick.

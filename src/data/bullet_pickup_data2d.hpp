@@ -128,7 +128,8 @@ public:
 	BLAST_PICKUP_ACCESSORS(Ref<PackedScene>, attachment)
 	BLAST_PICKUP_ACCESSORS(Vector2, attachment_offset)
 	BLAST_PICKUP_ACCESSORS(TypedArray<BulletEffectLayerData2D>, effect_layers)
-	BLAST_PICKUP_ACCESSORS(int, motion_mode)
+	MotionMode get_motion_mode() const { return static_cast<MotionMode>(motion_mode); }
+	void set_motion_mode(MotionMode p_value);
 	BLAST_PICKUP_ACCESSORS(Ref<BulletSpeedData2D>, speed_data)
 	BLAST_PICKUP_ACCESSORS(Ref<BulletCurvesData2D>, curves_data)
 	BLAST_PICKUP_ACCESSORS(Ref<BulletRotationData2D>, rotation_data)

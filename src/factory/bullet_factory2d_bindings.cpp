@@ -134,7 +134,7 @@ void BulletFactory2D::_bind_methods() {
 	// no casts, and only structural factory calls (reset/free_*/populate_*)
 	// must be deferred - the error message says so when it happens.
 	// Slim payloads: custom data and transforms are one instance call away
-	// (bullet_get_custom_data(), get_bullet_global_transform()).
+	// (bullet_get_custom_data(), get_bullet_transform()).
 	// NOTE: signal args use PROPERTY_HINT_RESOURCE_TYPE (not NODE_TYPE) so the
 	// class name reaches ClassDB and --doctool; with NODE_TYPE the class_name
 	// stays empty and docs downgrade the params to Object. This mirrors how

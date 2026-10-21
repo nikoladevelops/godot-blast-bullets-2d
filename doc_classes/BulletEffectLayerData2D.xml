@@ -78,7 +78,7 @@
 		<member name="sprite_frames" type="SpriteFrames" setter="set_sprite_frames" getter="get_sprite_frames">
 			Frames to play (required: null frames leave the layer inert with a single bake-time warning, never a crash).
 		</member>
-		<member name="trigger" type="int" setter="set_trigger" getter="get_trigger" default="0">
+		<member name="trigger" type="int" setter="set_trigger" getter="get_trigger" enum="BulletEffectLayerData2D.EffectTrigger" default="0">
 			What this layer does: 0 Trail Follow (sticks to its bullet every tick, and follows physics interpolation exactly like the bullet), 1 On Spawn (muzzle flash at every bullet's spawn pose), 2 On Hit (sparks on counted hits), 3 On Destroy (explosion on collision-kill only, never on lifetime expiry or manual disable), 4 On Bounce (sparks on ricochet; a consumed bounce fires this once, not the hit spark), 5 On Lifetime Over (fizzle at expiry, on both the silent and the signalled expiry path), 6 On Clear (dismissal puff fired by clear_bullet()/clear_all_bullets() and BulletFactory2D.clear_active_bullets() only; kills, timeouts, free_active_bullets and reset never fire it, teardown stays silent), 7 On Despawn (a bullet that leaves through the factory's despawn bounds, see [member BulletFactory2D.despawn_bounds_enabled]; nothing else fires it).
 		</member>
 		<member name="trigger_chance" type="float" setter="set_trigger_chance" getter="get_trigger_chance" default="1.0">

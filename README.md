@@ -182,7 +182,7 @@ It is recommended to watch these tutorials if you are struggling with the docume
 
 Here is how the basic setup goes:
 1. Add a `BulletFactory2D` node to your scene tree. The BulletFactory's job is to spawn bullets and manage plugin related options (debugger, physics interpolations and so on..).
-2. The `BulletFactory2D` node has the typed signals `area_entered`, `body_entered`, `life_time_over` (plus `bounce_area_entered` / `bounce_body_entered`), and each volley emits `sprite_animation_finished` when a non-looping animation ends. A `BulletSpawner2D` declares the same signals for the volleys it fires. The instance argument is already typed (`BulletVolley2D`), so handlers need no casts - custom data and transforms are one instance call away (`bullet_get_custom_data()`, `get_bullet_global_transform()`). Collision signals fire synchronously in the physics tick; only structural factory calls (`reset()`/`free_*()`/`populate_*()`) must be deferred, and the error message tells you when that happens. You should handle them in your script and write custom logic for your game.
+2. The `BulletFactory2D` node has the typed signals `area_entered`, `body_entered`, `life_time_over` (plus `bounce_area_entered` / `bounce_body_entered`), and each volley emits `sprite_animation_finished` when a non-looping animation ends. A `BulletSpawner2D` declares the same signals for the volleys it fires. The instance argument is already typed (`BulletVolley2D`), so handlers need no casts - custom data and transforms are one instance call away (`bullet_get_custom_data()`, `get_bullet_transform()`). Collision signals fire synchronously in the physics tick; only structural factory calls (`reset()`/`free_*()`/`populate_*()`) must be deferred, and the error message tells you when that happens. You should handle them in your script and write custom logic for your game.
 
 Keep a reference to the factory globally, so you can access it in any other script(enemies/player). There's two ways of doing this.
 
@@ -348,7 +348,7 @@ Make one `BulletGrazeZone2D` resource (`ring_count`, `ring_1_radius`...), then o
 func _on_bullet_grazed(target: Node2D, volley: BulletVolley2D, bullet_index: int, zone: BulletGrazeZone2D, ring_index: int) -> void:
 	score += 10 if ring_index == 0 else 50 # ring 1 is the tight one in this zone
 	# The bullet is alive here: read or change it through the volley.
-	var hit_pos := volley.get_bullet_global_transform(bullet_index).origin
+	var hit_pos := volley.get_bullet_transform(bullet_index).origin
 	spawn_graze_spark(hit_pos)
 
 # Optional: the bullet left the zone alive (deepest_ring_index = closest ring it reached).
@@ -488,7 +488,7 @@ tick the checkbox inside the inspector in `BulletFactory2D`. That's all, enjoy t
 - If you attach a script with `_ready()` to `BulletFactory2D`, call `super._ready()` first. The factory now recovers automatically (`ensure_factory_initialized()`) and warns once, but without super the first spawns would previously hit a dead factory.
 - Use `queue_free()` when you delete a volley or a bullet attachment yourself, never `free()`. Especially never call `free()` on a volley from inside one of its own collision or attachment callbacks (for example inside `area_entered` or `on_bullet_disable`). `queue_free()` is always safe in those situations. From any callback prefer `factory.free_volley_deferred(volley)`.
 - Structural factory calls (`reset()`/`free_*()`/`populate_*()`) reject inside physics frames/sweeps. From handlers use the deferred variants: `reset_deferred()`, `free_active_bullets_deferred()`, `free_disabled_bullets_deferred()`, `free_bullets_pool_deferred()`, `populate_bullets_pool_deferred()`, `free_attachments_pool(_for_scene)_deferred()`.
-- Cross-owner reuse must go through `spawn_*()` / `enable_volley()` (which re-seed appearance, custom data, speeds and patterns). `enable_bullet()` (alias `wake_bullet()`) wakes a pooled instance with its current appearance/custom-data intact - intended for same-owner re-enable, not for handing a volley to a new owner.
+- Cross-owner reuse must go through `spawn_*()` / `enable_volley()` (which re-seed appearance, custom data, speeds and patterns). `enable_bullet()` wakes a pooled instance with its current appearance/custom-data intact - intended for same-owner re-enable, not for handing a volley to a new owner.
 - Pooling flags reset to defaults on every new life (`spawn`/`enable_volley`). Set `is_auto_pooling_enabled` / `is_attachments_auto_pooling_enabled` explicitly after each spawn when you want manual ownership. Same-owner `enable_bullet()` wakes keep flags by design.
 - Pool buckets are exact `(amount_bullets, shape)` pairs. Use `BulletFactory2D.debug_expected_pool_key(data)` and `debug_get_pool_hit_stats()` / `debug_get_bullets_pool_info()` to diagnose 0% pool hits (e.g. `helper_skip_indices` shrank transforms after `populate`). `validate` first with `BulletFactory2D.debug_validate_spawn_data(data)`.
 - Smooth bullets need BOTH the factory `use_physics_interpolation` flag AND ProjectSettings `physics/common/physics_interpolation`. Check `factory.debug_check_interpolation_status()` when motion looks steppy. Art must face `Vector2.RIGHT`; invisible bullets (no `sprite_frames`/`mesh`/`texture_size`) now warn via `debug_validate_spawn_data()`.

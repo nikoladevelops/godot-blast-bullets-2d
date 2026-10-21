@@ -10,7 +10,7 @@ func _still(n: int = 1) -> BulletVolleyData2D:
 
 
 func _y(v: BulletVolley2D, i: int) -> Vector2:
-	return v.get_bullet_global_transform(i).origin
+	return v.get_bullet_transform(i).origin
 
 
 func test_default_off_flies_straight() -> void:

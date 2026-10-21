@@ -70,18 +70,18 @@ static bool movement_reject(bool bad, const char *message) {
 	return bad;
 }
 
-int BulletSpawner2D::get_movement_space() const { return movement_space; }
+BulletSpawner2D::MovementSpace BulletSpawner2D::get_movement_space() const { return static_cast<MovementSpace>(movement_space); }
 
-void BulletSpawner2D::set_movement_space(int value) {
+void BulletSpawner2D::set_movement_space(MovementSpace value) {
 	if (movement_reject(value < MOVEMENT_SPACE_ATTACH || value > MOVEMENT_SPACE_RELATIVE_TO_START, "BulletSpawner2D: movement_space must be 0 (Attach) or 1 (Relative To Start), keeping the old value.")) {
 		return;
 	}
 	movement_space = value;
 }
 
-int BulletSpawner2D::get_movement_loop_mode() const { return movement_loop_mode; }
+BulletSpawner2D::MovementLoopMode BulletSpawner2D::get_movement_loop_mode() const { return static_cast<MovementLoopMode>(movement_loop_mode); }
 
-void BulletSpawner2D::set_movement_loop_mode(int value) {
+void BulletSpawner2D::set_movement_loop_mode(MovementLoopMode value) {
 	if (movement_reject(value < MOVEMENT_LOOP_ONCE || value > MOVEMENT_LOOP_PING_PONG, "BulletSpawner2D: movement_loop_mode must be 0 (Once), 1 (Loop) or 2 (Ping Pong), keeping the old value.")) {
 		return;
 	}
@@ -89,9 +89,9 @@ void BulletSpawner2D::set_movement_loop_mode(int value) {
 	notify_property_list_changed();
 }
 
-int BulletSpawner2D::get_movement_direction() const { return movement_direction; }
+BulletSpawner2D::MovementDirection BulletSpawner2D::get_movement_direction() const { return static_cast<MovementDirection>(movement_direction); }
 
-void BulletSpawner2D::set_movement_direction(int value) {
+void BulletSpawner2D::set_movement_direction(MovementDirection value) {
 	if (movement_reject(value < MOVEMENT_DIRECTION_FORWARD || value > MOVEMENT_DIRECTION_REVERSE, "BulletSpawner2D: movement_direction must be 0 (Forward) or 1 (Reverse), keeping the old value.")) {
 		return;
 	}
@@ -107,9 +107,9 @@ void BulletSpawner2D::set_movement_loops(int value) {
 	movement_loops = value;
 }
 
-int BulletSpawner2D::get_movement_timing() const { return movement_timing; }
+BulletSpawner2D::MovementTiming BulletSpawner2D::get_movement_timing() const { return static_cast<MovementTiming>(movement_timing); }
 
-void BulletSpawner2D::set_movement_timing(int value) {
+void BulletSpawner2D::set_movement_timing(MovementTiming value) {
 	if (movement_reject(value < MOVEMENT_TIMING_DURATION || value > MOVEMENT_TIMING_SPEED, "BulletSpawner2D: movement_timing must be 0 (Duration) or 1 (Speed), keeping the old value.")) {
 		return;
 	}
@@ -135,18 +135,18 @@ void BulletSpawner2D::set_movement_speed(double value) {
 	movement_speed = value;
 }
 
-int BulletSpawner2D::get_movement_transition() const { return movement_transition; }
+Tween::TransitionType BulletSpawner2D::get_movement_transition() const { return static_cast<Tween::TransitionType>(movement_transition); }
 
-void BulletSpawner2D::set_movement_transition(int value) {
+void BulletSpawner2D::set_movement_transition(Tween::TransitionType value) {
 	if (movement_reject(value < 0 || value >= Easing2D::TRANS_COUNT, "BulletSpawner2D: movement_transition must be a Tween.TransitionType (0..11), keeping the old value.")) {
 		return;
 	}
 	movement_transition = value;
 }
 
-int BulletSpawner2D::get_movement_ease() const { return movement_ease; }
+Tween::EaseType BulletSpawner2D::get_movement_ease() const { return static_cast<Tween::EaseType>(movement_ease); }
 
-void BulletSpawner2D::set_movement_ease(int value) {
+void BulletSpawner2D::set_movement_ease(Tween::EaseType value) {
 	if (movement_reject(value < 0 || value >= Easing2D::EASE_COUNT, "BulletSpawner2D: movement_ease must be a Tween.EaseType (0..3), keeping the old value.")) {
 		return;
 	}

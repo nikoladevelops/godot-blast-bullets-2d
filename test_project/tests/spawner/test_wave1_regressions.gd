@@ -41,7 +41,7 @@ func test_rotation_presence_survives_same_owner_wake() -> void:
 	assert_almost_eq(float(v.debug_get_bullet_info(0)["rotation_speed"]), 77.0, 0.5, "authored 77 kept")
 	v.disable_bullet(0)
 	await physics()
-	v.wake_bullet(0)
+	v.enable_bullet(0)
 	await physics()
 	v.set_shared_bullet_rotation_data(_rot(555.0))
 	assert_almost_eq(float(v.debug_get_bullet_info(0)["rotation_speed"]), 77.0, 1.0, "wake preserves the authored entry")

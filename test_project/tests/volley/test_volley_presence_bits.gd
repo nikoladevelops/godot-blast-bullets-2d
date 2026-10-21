@@ -231,7 +231,7 @@ func test_same_owner_wake_keeps_decisions() -> void:
 	await idle(1)
 	assert_eq(factory.debug_get_bullets_pool_amount(), 0, "unpooled disable parks nothing")
 	for i in 3:
-		v.wake_bullet(i)
+		v.enable_bullet(i)
 	v.set_shared_bullet_rotation_data(H.make_rotation(7.0))
 	assert_almost_eq(v.bullet_get_rotation_speed(0), 0.0, 0.01, "authored zero survives wake + shared")
 	assert_almost_eq(v.bullet_get_rotation_speed(1), 9.0, 0.01, "authored spin survives wake + shared")

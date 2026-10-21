@@ -647,18 +647,7 @@ Transform2D BulletVolley2D::get_bullet_transform(int bullet_index) const {
 	}
 
 	// Caches are global; return the cache directly so get()/set() round-trip in
-	// the same space. Use get_bullet_global_transform() for an explicit world read.
-	return all_cached_instance_transforms[bullet_index];
-}
-
-Transform2D BulletVolley2D::get_bullet_global_transform(int bullet_index) const {
-	if (!validate_bullet_index(bullet_index, "get_bullet_global_transform")) {
-		return Transform2D();
-	}
-	if (bullet_index >= (int)all_cached_instance_transforms.size()) {
-		return Transform2D();
-	}
-
+	// the same space.
 	return all_cached_instance_transforms[bullet_index];
 }
 

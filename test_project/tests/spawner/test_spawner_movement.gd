@@ -275,7 +275,7 @@ func test_shooting_while_moving_follows_and_inherits() -> void:
 	var v: BulletVolley2D = get_signal_parameters(sp, "volley_fired", 0)[0]
 	assert_almost_eq(v.get_inherited_velocity_offset(), sp.get_movement_velocity() * 0.5, Vector2(1, 1), "volley inherits half the spawner velocity")
 	var expected: Array = sp.collect_spawn_transforms()
-	assert_almost_eq(v.get_bullet_global_transform(0).origin, (expected[0] as Transform2D).origin, Vector2(0.5, 0.5), "pattern centered on the moving spawner")
+	assert_almost_eq(v.get_bullet_transform(0).origin, (expected[0] as Transform2D).origin, Vector2(0.5, 0.5), "pattern centered on the moving spawner")
 
 
 func test_moving_spawner_hits_the_bake_and_never_rebuilds_preview() -> void:

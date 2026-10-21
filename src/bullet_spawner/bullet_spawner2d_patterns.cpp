@@ -306,11 +306,11 @@ bool BulletSpawner2D::preview_survives_marker_move(const Transform2D &old_marker
 	return pattern_cache.survives_marker_move(pattern_cache_version2d(pattern_version), pattern_cache_mode == PATTERN_CACHE_AUTO, old_marker, new_marker);
 }
 
-int BulletSpawner2D::get_pattern_cache_mode() const {
-	return pattern_cache_mode;
+BulletSpawner2D::PatternCacheMode BulletSpawner2D::get_pattern_cache_mode() const {
+	return static_cast<PatternCacheMode>(pattern_cache_mode);
 }
 
-void BulletSpawner2D::set_pattern_cache_mode(int value) {
+void BulletSpawner2D::set_pattern_cache_mode(PatternCacheMode value) {
 	if (value < PATTERN_CACHE_AUTO || value > PATTERN_CACHE_OFF) {
 		UtilityFunctions::push_error("BulletSpawner2D: pattern_cache_mode must be 0 (Auto) or 1 (Off), keeping the old value.");
 		return;

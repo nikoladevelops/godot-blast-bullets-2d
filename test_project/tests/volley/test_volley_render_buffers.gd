@@ -24,7 +24,7 @@ func _assert_buffer_matches(v: BulletVolley2D, label: String) -> void:
 	var inv := v.get_global_transform().affine_inverse()
 	var bad := -1
 	for i in v.get_amount_bullets():
-		var want: Transform2D = inv * v.get_bullet_global_transform(i)
+		var want: Transform2D = inv * v.get_bullet_transform(i)
 		var got: Transform2D = _instance(buf, i)
 		if got.origin.distance_to(want.origin) > 0.01 or got.x.distance_to(want.x) > 0.001:
 			bad = i
@@ -79,4 +79,4 @@ func test_spawner_native_shot_buffer() -> void:
 	_assert_buffer_matches(v, "spawner native shot")
 	var expected: Array = sp.collect_spawn_transforms()
 	for i in v.get_amount_bullets():
-		assert_almost_eq(v.get_bullet_global_transform(i).origin, (expected[i] as Transform2D).origin, Vector2(0.01, 0.01), "bullet %d spawned at its pattern slot" % i)
+		assert_almost_eq(v.get_bullet_transform(i).origin, (expected[i] as Transform2D).origin, Vector2(0.01, 0.01), "bullet %d spawned at its pattern slot" % i)

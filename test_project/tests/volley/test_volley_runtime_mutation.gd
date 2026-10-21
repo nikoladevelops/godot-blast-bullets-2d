@@ -86,7 +86,7 @@ func test_single_bullet_enable_disable() -> void:
 	v.disable_bullet(0)
 	assert_false(v.is_bullet_status_enabled(0), "disable holds")
 	assert_true(v.is_bullet_status_enabled(1), "sibling stays live")
-	v.wake_bullet(0)
+	v.enable_bullet(0)
 	assert_true(v.is_bullet_status_enabled(0), "wake revives")
 	v.disable_bullet(0)
 	v.disable_bullet(0)

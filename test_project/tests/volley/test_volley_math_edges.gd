@@ -43,9 +43,9 @@ func test_wobble_lateral_bounded() -> void:
 	var max_dev := 0.0
 	for i in 60:
 		await physics()
-		max_dev = maxf(max_dev, absf(w.get_bullet_global_transform(0).origin.y))
+		max_dev = maxf(max_dev, absf(w.get_bullet_transform(0).origin.y))
 	assert_lt(max_dev, 120.0, "lateral wobble bounded")
-	assert_gt(w.get_bullet_global_transform(0).origin.x, 200.0, "forward progress kept")
+	assert_gt(w.get_bullet_transform(0).origin.x, 200.0, "forward progress kept")
 
 
 func test_per_bullet_smoothing_clamps() -> void:

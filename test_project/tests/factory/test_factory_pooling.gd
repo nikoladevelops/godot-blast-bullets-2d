@@ -114,7 +114,7 @@ func test_debugger_draws_every_shape_where_it_is() -> void:
 		for i in 5:
 			var b := i * 12
 			var got := Vector2(buf[b + 3], buf[b + 7])
-			var want: Vector2 = v.get_bullet_global_transform(i).origin
+			var want: Vector2 = v.get_bullet_transform(i).origin
 			if got.distance_to(want) > 0.01:
 				bad += "shape %d at %s, bullet at %s; " % [i, got, want]
 			if Color(buf[b + 8], buf[b + 9], buf[b + 10], buf[b + 11]) != Color(1, 0, 0, 0.5):

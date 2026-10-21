@@ -56,10 +56,10 @@ func test_reported_velocity_matches_the_next_tick_displacement(case_index: int =
 		factory.debug_advance_time(DT)
 	var problems := PackedStringArray()
 	for b in v.get_amount_bullets():
-		var p0: Vector2 = v.get_bullet_global_transform(b).origin
+		var p0: Vector2 = v.get_bullet_transform(b).origin
 		var reported: Vector2 = v.get_bullet_velocity(b)
 		factory.debug_advance_time(DT)
-		var moved: Vector2 = (v.get_bullet_global_transform(b).origin - p0) / DT
+		var moved: Vector2 = (v.get_bullet_transform(b).origin - p0) / DT
 		var expected: Vector2 = reported + v.bullet_get_gravity(b) * DT
 		if expected.distance_to(moved) > 0.05:
 			problems.append("%s bullet %d: reported %s (+g dt = %s), moved %s (fall %.2f)" % [case_name, b, reported, expected, moved, v.debug_get_gravity_info(b)["fall_speed"]])
@@ -104,9 +104,9 @@ func test_setters_keep_the_fall_speed_in_the_reported_velocity(setter_index: int
 	else:
 		var own: Vector2 = v.get_bullet_direction(0) * v.debug_get_bullet_info(0)["speed"]
 		assert_almost_eq(reported, own + fall, Vector2(0.05, 0.05), "%s: direction x speed + the current fall speed" % setter)
-	var p0: Vector2 = v.get_bullet_global_transform(0).origin
+	var p0: Vector2 = v.get_bullet_transform(0).origin
 	factory.debug_advance_time(DT)
-	var moved: Vector2 = (v.get_bullet_global_transform(0).origin - p0) / DT
+	var moved: Vector2 = (v.get_bullet_transform(0).origin - p0) / DT
 	assert_almost_eq(moved, reported + Vector2(0, 400) * DT, Vector2(0.05, 0.05), "%s: the next tick flies the reported velocity (+ g dt)" % setter)
 
 
@@ -147,11 +147,11 @@ func test_set_bullet_speed_is_the_speed_the_next_tick_flies() -> void:
 	assert_eq(v.get_bullet_direction(2), Vector2(1, 0), "the direction is kept")
 	var p0: Array = []
 	for b in 3:
-		p0.append(v.get_bullet_global_transform(b).origin)
+		p0.append(v.get_bullet_transform(b).origin)
 	factory.debug_advance_time(DT)
 	var moved: Array = []
 	for b in 3:
-		moved.append((v.get_bullet_global_transform(b).origin - p0[b]) / DT)
+		moved.append((v.get_bullet_transform(b).origin - p0[b]) / DT)
 	assert_almost_eq(moved[0], Vector2(250, 30), Vector2(0.05, 0.05), "the written speed + the drift")
 	assert_almost_eq(moved[2], Vector2(-50, 30), Vector2(0.05, 0.05), "a negative speed flies backwards")
 	assert_almost_eq(v.get_bullet_speed(1), 12.0, 0.001, "the acceleration applies from the written speed")

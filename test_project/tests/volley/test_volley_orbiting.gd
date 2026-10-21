@@ -36,7 +36,7 @@ func test_targetless_arm_then_setters() -> void:
 	lone.bullet_enable_orbiting(0, 64.0, 2, 0)
 	assert_true(lone.bullet_is_orbiting_enabled(0), "orbit arms even targetless")
 	await physics(10)
-	assert_true(lone.get_bullet_global_transform(0).is_finite(), "targetless orbit never NaNs")
+	assert_true(lone.get_bullet_transform(0).is_finite(), "targetless orbit never NaNs")
 	assert_false(lone.bullet_is_orbiting_locked(0), "targetless orbit never locks")
 	lone.bullet_homing_push_back_node2d_target(0, target)
 	await physics(20)

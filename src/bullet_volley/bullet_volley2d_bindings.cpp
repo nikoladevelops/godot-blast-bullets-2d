@@ -52,7 +52,6 @@ void BulletVolley2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("all_bullets_set_texture_rotation_towards_node2d", "target_node", "bullet_index_start", "bullet_index_end_inclusive"), &BulletVolley2D::all_bullets_set_texture_rotation_towards_node2d, DEFVAL(0), DEFVAL(-1));
 
 	ClassDB::bind_method(D_METHOD("get_bullet_transform", "bullet_index"), &BulletVolley2D::get_bullet_transform);
-	ClassDB::bind_method(D_METHOD("get_bullet_global_transform", "bullet_index"), &BulletVolley2D::get_bullet_global_transform);
 	ClassDB::bind_method(D_METHOD("get_bullet_velocity", "bullet_index"), &BulletVolley2D::get_bullet_velocity);
 	ClassDB::bind_method(D_METHOD("set_bullet_transform", "bullet_index", "new_transform", "set_direction_based_on_transform"), &BulletVolley2D::set_bullet_transform, DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("all_bullets_get_transforms", "bullet_index_start", "bullet_index_end_inclusive"), &BulletVolley2D::all_bullets_get_transforms, DEFVAL(0), DEFVAL(-1));
@@ -94,7 +93,6 @@ void BulletVolley2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("convert_to_pickups", "pickup", "target", "bullet_indexes"), &BulletVolley2D::convert_to_pickups, DEFVAL(PackedInt32Array()));
 	ClassDB::bind_method(D_METHOD("is_pickup_volley"), &BulletVolley2D::is_pickup_volley);
 	ClassDB::bind_method(D_METHOD("enable_bullet", "bullet_index", "collision_amount", "enable_attachment"), &BulletVolley2D::enable_bullet, DEFVAL(-1), DEFVAL(true));
-	ClassDB::bind_method(D_METHOD("wake_bullet", "bullet_index", "collision_amount", "enable_attachment"), &BulletVolley2D::wake_bullet, DEFVAL(-1), DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("debug_get_volley_info"), &BulletVolley2D::debug_get_volley_info);
 	ClassDB::bind_method(D_METHOD("debug_dedup_reset"), &BulletVolley2D::debug_dedup_reset);
 	ClassDB::bind_method(D_METHOD("debug_dedup_probe", "bullet_index", "target_instance_id"), &BulletVolley2D::debug_dedup_probe);
@@ -538,8 +536,8 @@ void BulletVolley2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_bullet_collision_count", "bullet_index"), &BulletVolley2D::get_bullet_collision_count);
 	ClassDB::bind_method(D_METHOD("set_bullet_collision_count", "bullet_index", "value"), &BulletVolley2D::set_bullet_collision_count);
 	ClassDB::bind_method(D_METHOD("get_bullets_current_collision_count"), &BulletVolley2D::get_bullets_current_collision_count);
-	ClassDB::bind_method(D_METHOD("set_bullets_current_collision_count_no_return", "arr"), &BulletVolley2D::set_bullets_current_collision_count_no_return);
-	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "bullets_current_collision_count", PROPERTY_HINT_ARRAY_TYPE, "int"), "set_bullets_current_collision_count_no_return", "get_bullets_current_collision_count");
+	ClassDB::bind_method(D_METHOD("set_bullets_current_collision_count", "arr"), &BulletVolley2D::set_bullets_current_collision_count);
+	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "bullets_current_collision_count", PROPERTY_HINT_ARRAY_TYPE, "int"), "set_bullets_current_collision_count", "get_bullets_current_collision_count");
 
 	ClassDB::bind_method(D_METHOD("is_rotation_data_active"), &BulletVolley2D::get_is_rotation_data_active);
 	ClassDB::bind_method(D_METHOD("bullet_get_rotation_speed", "bullet_index"), &BulletVolley2D::bullet_get_rotation_speed);

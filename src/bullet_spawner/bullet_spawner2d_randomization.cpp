@@ -64,7 +64,7 @@ BLAST_RANDOM_SETTER(telegraph_max_sec, is_finite_real2d(value) && value >= 0.0, 
 
 #undef BLAST_RANDOM_SETTER
 
-void BulletSpawner2D::set_bullet_scale_mode(int value) {
+void BulletSpawner2D::set_bullet_scale_mode(BulletScaleMode value) {
 	if (value < BULLET_SCALE_OFF || value > BULLET_SCALE_PER_AXIS) {
 		UtilityFunctions::push_error("BulletSpawner2D: bullet_scale_mode must be 0 (Off), 1 (Uniform) or 2 (Per Axis), keeping the old value.");
 		return;

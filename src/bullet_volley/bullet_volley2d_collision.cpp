@@ -287,13 +287,13 @@ TypedArray<int> BulletVolley2D::get_bullets_current_collision_count() const {
 	return arr;
 }
 
-bool BulletVolley2D::set_bullets_current_collision_count(const TypedArray<int> &arr, bool tile_short_arrays) {
+void BulletVolley2D::seed_bullets_current_collision_count(const TypedArray<int> &arr, bool tile_short_arrays) {
 	int arr_size = arr.size();
 
 	if (arr_size <= 0) {
 		bullets_current_collision_count.clear();
 		bullets_current_collision_count.resize(amount_bullets, 0);
-		return true;
+		return;
 	}
 	if (arr_size != amount_bullets) {
 		WarnOnce2D::warn(warn_data_id, 1u, arr_size, amount_bullets, "BulletVolley2D: bullets_current_collision_count size (" + String::num_int64(arr_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets start at 0" + String(tile_short_arrays ? " (tiling on: wrapping short array)." : " (check tile_bullets_current_collision_count to wrap, or provide one entry per bullet)."));
@@ -319,8 +319,6 @@ bool BulletVolley2D::set_bullets_current_collision_count(const TypedArray<int> &
 
 		bullets_current_collision_count.push_back((int)Math::min(collision_count, (int64_t)INT32_MAX));
 	}
-
-	return true;
 }
 
 void BulletVolley2D::mark_shape_data_applied() {

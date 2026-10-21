@@ -106,11 +106,11 @@ func test_full_stack_composes() -> void:
 func test_tick_safety_edges() -> void:
 	var v: BulletVolley2D = quick_volley(1, 200.0)
 	var yaw: float = v.get_bullet_texture_rotation_radians(0)
-	v.set_bullet_texture_rotation_towards_position(0, v.get_bullet_global_transform(0).origin)
+	v.set_bullet_texture_rotation_towards_position(0, v.get_bullet_transform(0).origin)
 	expect_error("already at the target position")
 	assert_almost_eq(v.get_bullet_texture_rotation_radians(0), yaw, 0.0001, "coincident texture aim keeps rotation")
 	var orb: Node2D = add(Node2D.new())
-	orb.position = v.get_bullet_global_transform(0).origin
+	orb.position = v.get_bullet_transform(0).origin
 	await idle(1)
 	v.set_homing_smoothing(6.0)
 	v.bullet_homing_push_back_node2d_target(0, orb)

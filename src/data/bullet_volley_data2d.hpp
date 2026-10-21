@@ -754,8 +754,8 @@ public:
 	int get_bounce_max_count() const;
 	void set_bounce_max_count(int value);
 
-	int get_bounce_mode() const;
-	void set_bounce_mode(int value);
+	BounceMode get_bounce_mode() const;
+	void set_bounce_mode(BounceMode value);
 
 	bool get_bounce_rotate_texture() const;
 	void set_bounce_rotate_texture(bool value);

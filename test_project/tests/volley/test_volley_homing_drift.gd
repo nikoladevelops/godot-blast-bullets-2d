@@ -26,7 +26,7 @@ func _homing_data(speed: float, n := 1) -> BulletVolleyData2D:
 
 ## Degrees between the bullet's ground velocity and the line to the target.
 func _ground_error_deg(v: BulletVolley2D, i: int, target: Vector2) -> float:
-	var p: Vector2 = v.get_bullet_global_transform(i).origin
+	var p: Vector2 = v.get_bullet_transform(i).origin
 	return absf(rad_to_deg(v.get_bullet_velocity(i).angle_to(target - p)))
 
 

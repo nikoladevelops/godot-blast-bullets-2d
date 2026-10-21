@@ -1606,13 +1606,6 @@
 				Get the direction of a specific bullet. Returns a [Vector2] direction.
 			</description>
 		</method>
-		<method name="get_bullet_global_transform" qualifiers="const">
-			<return type="Transform2D" />
-			<param index="0" name="bullet_index" type="int" />
-			<description>
-				Get a specific bullet's transform in global space (the caches already hold global-space transforms). Use this when you need world coordinates, for example to spawn child bullets exactly where a bullet died. [method get_bullet_transform] returns the same transform instead.
-			</description>
-		</method>
 		<method name="get_bullet_grazed_rings" qualifiers="const">
 			<return type="int" />
 			<param index="0" name="bullet_index" type="int" />
@@ -2443,15 +2436,6 @@
 				Shifts the position of the specified bullet by the given offset.
 			</description>
 		</method>
-		<method name="wake_bullet">
-			<return type="void" />
-			<param index="0" name="bullet_index" type="int" />
-			<param index="1" name="collision_amount" type="int" default="-1" />
-			<param index="2" name="enable_attachment" type="bool" default="true" />
-			<description>
-				Alias for [method enable_bullet] with unambiguous naming: revives one pooled or manually-disabled slot with its current appearance/ballistics intact (same-owner re-enable). Cross-owner reuse must go through the factory spawn methods or enable_volley(), which reseed appearance, custom data, speeds and patterns.
-			</description>
-		</method>
 	</methods>
 	<members>
 		<member name="adjust_direction_based_on_rotation" type="bool" setter="set_adjust_direction_based_on_rotation" getter="get_adjust_direction_based_on_rotation" default="false">
@@ -2475,7 +2459,7 @@
 		<member name="bounce_max_count" type="int" setter="set_bounce_max_count" getter="get_bounce_max_count" default="0">
 			How many times a single bullet may bounce before bounces stop for it, set live. 0 (default) = unlimited. Read per-bullet progress with [method bullet_get_bounce_count].
 		</member>
-		<member name="bounce_mode" type="int" setter="set_bounce_mode" getter="get_bounce_mode" default="0">
+		<member name="bounce_mode" type="int" setter="set_bounce_mode" getter="get_bounce_mode" enum="BulletVolleyData2D.BounceMode" default="0">
 			Which surface normal to reflect across, set live: 0 Simple Radial, 1 Precise Shape (rectangle, circle, capsule, segment, world boundary; falls back to radial for convex polygons or without a usable target shape).
 		</member>
 		<member name="bounce_push_assist" type="bool" setter="set_bounce_push_assist" getter="get_bounce_push_assist" default="true">
@@ -2508,7 +2492,7 @@
 		<member name="bullet_max_collision_count" type="int" setter="set_bullet_max_collision_count" getter="get_bullet_max_collision_count" default="1">
 			How many times a bullet can collide before it gets disabled. If you set to 0, then the bullet will NEVER get disabled due to collisions.
 		</member>
-		<member name="bullets_current_collision_count" type="int[]" setter="set_bullets_current_collision_count_no_return" getter="get_bullets_current_collision_count" default="[]">
+		<member name="bullets_current_collision_count" type="int[]" setter="set_bullets_current_collision_count" getter="get_bullets_current_collision_count" default="[]">
 			An array of integers representing the current collision count for each bullet. The index of each integer in the array corresponds to the bullet index it is meant to represent.
 
 			For example, if you have 3 bullets and their current collision counts are 1, 2 and 3 respectively, then this array would be [1, 2, 3].
