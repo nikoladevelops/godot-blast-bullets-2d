@@ -1227,6 +1227,13 @@ public:
 	virtual void on_config_changed_owned() {}
 	// teleport(..., carry_live_bullets = true): move what this spawner fired.
 	virtual void shift_owned_shots(const Vector2 &jump) {}
+	// After every teleport: what this spawner fired keeps up with the jump.
+	// The default moves it only with carry (shift_owned_shots).
+	virtual void on_teleported_owned(const Vector2 &jump, bool carry) {
+		if (carry) {
+			shift_owned_shots(jump);
+		}
+	}
 	// Setup warnings of the derived class, in the base's order: what fires
 	// (right after the factory checks), then its steering groups (after
 	// movement, before graze and sound).

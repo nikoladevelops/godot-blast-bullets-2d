@@ -532,6 +532,47 @@ void LaserVolley2D::set_anchor(Node2D *anchor) {
 	}
 }
 
+void LaserVolley2D::shift_with_owner(const Vector2 &jump, bool carry) {
+	const LaserData2D *d = data.ptr();
+	if (!active || d == nullptr || !jump.is_finite()) {
+		return;
+	}
+	const bool is_beam = d->type == LaserData2D::LASER_BEAM;
+	bool moved = false;
+	for (Beam &b : beams) {
+		const bool rides = following && (is_beam || !b.launched);
+		if (!rides && !carry) {
+			continue;
+		}
+		if (!following) {
+			b.slot.columns[2] += jump; // a global fire pose
+		}
+		b.muzzle += jump;
+		b.head += jump;
+		b.wall_point += jump;
+		for (Vector2 &p : b.points) {
+			p += jump;
+		}
+		for (Vector2 &p : b.impacts) {
+			p += jump;
+		}
+		for (Vector2 &p : b.trail) {
+			p += jump;
+		}
+		for (Contact &c : b.contacts) {
+			c.position += jump;
+		}
+		b.prev_points = b.points;
+		b.prev_muzzle = b.points.empty() ? b.muzzle : b.points.front();
+		b.prev_angle = b.angle;
+		b.prev_length = b.length_now;
+		moved = true;
+	}
+	if (moved) {
+		queue_redraw();
+	}
+}
+
 Node2D *LaserVolley2D::get_anchor() const {
 	return anchor_id != 0 ? Object::cast_to<Node2D>(ObjectDB::get_instance(ObjectID(anchor_id))) : nullptr;
 }

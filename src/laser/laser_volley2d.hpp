@@ -139,6 +139,12 @@ public:
 	void set_beam_target(int beam_index, const Variant &target);
 	// Muzzles follow `anchor` (null = stay where they are now).
 	void set_anchor(Node2D *anchor);
+	// Its spawner teleported by `jump`: beams riding it (and heads not yet
+	// launched) move with it, and with `carry` every beam does (muzzle,
+	// path, head, trail, impacts). A moved beam's draw history restarts, so
+	// the jump is never drawn as travel. No physics queries (a teleport may
+	// run inside a physics callback): walls and contacts update next tick.
+	void shift_with_owner(const Vector2 &jump, bool carry);
 	Node2D *get_anchor() const;
 	// Fade out now (fade) or finish at once.
 	void end_laser(bool fade = true);

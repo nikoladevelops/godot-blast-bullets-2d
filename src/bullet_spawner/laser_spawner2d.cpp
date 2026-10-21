@@ -126,6 +126,16 @@ void LaserSpawner2D::collect_owned(std::vector<LaserVolley2D *> &r_out) const {
 	}
 }
 
+void LaserSpawner2D::on_teleported_owned(const Vector2 &jump, bool carry) {
+	// Beams riding this spawner jump with it; with carry, every laser it
+	// fired moves too. No user code runs (geometry only).
+	std::vector<LaserVolley2D *> owned;
+	collect_owned(owned);
+	for (LaserVolley2D *laser : owned) {
+		laser->shift_with_owner(jump, carry);
+	}
+}
+
 Array LaserSpawner2D::get_live_lasers() const {
 	std::vector<LaserVolley2D *> owned;
 	collect_owned(owned);

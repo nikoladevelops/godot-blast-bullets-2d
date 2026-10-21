@@ -340,3 +340,51 @@ func test_the_preview_draws_each_slot_as_its_beam() -> void:
 	var bullets := make_preview_spawner(BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
 	await idle(6)
 	assert_almost_eq(float(bullets.debug_get_preview_arrows()["length"]), bullets.preview_arrow_length, 0.001, "bullet spawners keep preview_arrow_length")
+
+
+func test_a_teleport_snaps_following_beams_without_a_slide() -> void:
+	var sp := _spawner(_laser(), 1)
+	var l := _fire(sp)
+	step_factory(2, DT)
+	var start := l.get_beam_start(0)
+	sp.teleport(Vector2(500, 300))
+	var jump := Vector2(500, 300)
+	var now: PackedVector2Array = l.debug_get_draw_state(0.5)[0]["points"]
+	assert_true(now[0].is_equal_approx(start + jump), "drawn at the new spot at once (mid-frame too)")
+	step_factory(1, DT)
+	var mid: PackedVector2Array = l.debug_get_draw_state(0.5)[0]["points"]
+	assert_true(mid[0].is_equal_approx(start + jump), "the next tick never lerps across the jump")
+
+
+func test_teleport_carry_moves_lasers_that_do_not_follow() -> void:
+	var d := _laser()
+	d.follow_spawner = false
+	var sp := _spawner(d, 1)
+	var l := _fire(sp)
+	step_factory(1, DT)
+	var start := l.get_beam_start(0)
+	sp.teleport(Vector2(100, 0))
+	step_factory(1, DT)
+	assert_eq(l.get_beam_start(0), start, "without carry a laser that does not follow stays")
+	sp.teleport(Vector2(100, 50), true)
+	assert_true(l.get_beam_start(0).is_equal_approx(start + Vector2(0, 50)), "carried at once")
+	step_factory(1, DT)
+	assert_true(l.get_beam_start(0).is_equal_approx(start + Vector2(0, 50)), "and it stays carried")
+	var mid: PackedVector2Array = l.debug_get_draw_state(0.5)[0]["points"]
+	assert_true(mid[0].is_equal_approx(start + Vector2(0, 50)), "no slide")
+
+
+func test_teleport_carry_moves_flying_bolts() -> void:
+	var d := _laser()
+	d.type = LaserData2D.LASER_BOLT
+	d.speed = 320.0 # 20 px per tick
+	var sp := _spawner(d, 1)
+	var l := _fire(sp)
+	step_factory(3, DT)
+	var head := l.get_beam_end(0)
+	sp.teleport(Vector2(0, 200))
+	assert_eq(l.get_beam_end(0), head, "a flying bolt does not follow a teleport")
+	sp.teleport(Vector2(0, 260), true)
+	assert_true(l.get_beam_end(0).is_equal_approx(head + Vector2(0, 60)), "carry moves it")
+	step_factory(1, DT)
+	assert_true(l.get_beam_end(0).is_equal_approx(head + Vector2(20, 60)), "and it flies on from there")

@@ -85,6 +85,7 @@ public:
 	bool process_owned(double delta) override;
 	void restart_owned_clocks() override;
 	void on_predelete_owned(BulletFactory2D *factory) override;
+	void on_teleported_owned(const Vector2 &jump, bool carry) override;
 	void append_payload_warnings(PackedStringArray &r_warnings) const override;
 	void append_setup_warnings(PackedStringArray &r_warnings) const override;
 	real_t preview_beam_length() const override;

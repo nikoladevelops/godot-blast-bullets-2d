@@ -500,10 +500,7 @@ void PatternSpawner2D::teleport(const Vector2 &new_global_position, bool carry_l
 		movement_teleport_offset += jump;
 	}
 	movement_last_pose += jump;
-	if (!carry_live_bullets) {
-		return;
-	}
-	shift_owned_shots(jump);
+	on_teleported_owned(jump, carry_live_bullets);
 }
 
 void PatternSpawner2D::movement_seek(double ratio) {
