@@ -1441,12 +1441,14 @@ func _snap_lasers(section: String) -> void:
 	for c in ClassDB.class_get_integer_constant_list("LaserSpawner2D"):
 		if not String(c).begins_with("PATTERN_FROM_"):
 			continue
-		seed(4242) # random sources with seed 0 use the global RNG
 		var sp := LaserSpawner2D.new()
 		sp.set_shooting_enabled(false)
 		sp.laser_data = data
 		sp.pattern_source = ClassDB.class_get_integer_constant("LaserSpawner2D", c)
 		sp.helper_bullets_amount = 5
+		for p in sp.get_property_list():
+			if String(p["name"]).ends_with("_seed") and int(p["type"]) == TYPE_INT:
+				sp.set(p["name"], 77) # seed 0 randomizes from the clock
 		sp.position = Vector2(-100, 30)
 		world.add_child(sp)
 		sp.set_bullet_factory(factory)
