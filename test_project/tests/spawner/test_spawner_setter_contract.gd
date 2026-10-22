@@ -400,3 +400,35 @@ func test_pattern_ints_never_wrap_from_64_bits() -> void:
 	sp.spawn_pattern_list([{"preset": WIDE}], true)
 	expect_errors_containing("preset out of range", 1)
 	assert_eq([sp.pattern_source, sp.helper_bullets_amount], [before_source, before_amount], "nothing applied")
+
+
+## Setting shoot_interval_sec (even to its own value) never cuts a wait the
+## settings may roll (shoot_interval_max_sec, reload jitter) or the initial
+## delay; a shorter interval still shortens the running wait (above).
+func test_the_interval_setter_keeps_rolled_waits_and_the_initial_delay() -> void:
+	var sp := make_spawner()
+	sp.shoot_interval_sec = 0.1
+	sp.shoot_interval_max_sec = 10.0
+	sp.reload_jitter_seed = 3
+	watch_signals(sp)
+	sp.set_shooting_enabled(true)
+	for i in 5:
+		await idle(1)
+		if get_signal_emit_count(sp, "volley_fired") > 0:
+			break
+	var left := sp.get_shoot_time_left()
+	assert_gt(left, 0.2, "a rolled wait above the minimum")
+	sp.shoot_interval_sec = 0.1
+	assert_almost_eq(sp.get_shoot_time_left(), left, 0.000001, "the same interval keeps the rolled wait")
+	sp.shoot_interval_sec = 0.05
+	assert_almost_eq(sp.get_shoot_time_left(), left, 0.000001, "a wait the new range can still roll is kept")
+	sp.shoot_interval_max_sec = 0.0
+	sp.shoot_interval_sec = 0.05
+	assert_almost_eq(sp.get_shoot_time_left(), 0.05, 0.000001, "a wait the settings can no longer roll shrinks")
+	var late := make_spawner()
+	late.shoot_initial_delay_sec = 5.0
+	late.shoot_interval_sec = 1.0
+	late.reset_shooting()
+	late.set_shooting_enabled(true)
+	late.shoot_interval_sec = 0.5
+	assert_almost_eq(late.get_shoot_time_left(), 5.0, 0.000001, "the initial delay is not an interval")

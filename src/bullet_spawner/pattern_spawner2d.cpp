@@ -160,9 +160,13 @@ void PatternSpawner2D::set_shoot_interval_sec(double value) {
 	}
 	shoot_interval_sec = value;
 	// A shorter interval applies to the wait already running (otherwise the
-	// old, longer interval would still be waited out once).
-	if (shoot_time_left > shoot_interval_sec) {
-		shoot_time_left = shoot_interval_sec;
+	// old, longer interval would still be waited out once), down to the
+	// longest wait the settings can still roll (shoot_interval_max_sec, the
+	// reload jitter): the same value never cuts a rolled wait. The initial
+	// delay is not an interval.
+	const double longest = Math::max(shoot_interval_sec, shoot_interval_max_sec) + Math::max(reload_jitter_sec, 0.0);
+	if (!shoot_initial_wait && shoot_time_left > longest) {
+		shoot_time_left = longest;
 	}
 }
 
@@ -474,6 +478,7 @@ void PatternSpawner2D::reset_shooting() {
 	shooting_paused = false;
 	oneshot_volleys_left = -1;
 	shoot_time_left = shoot_initial_delay_sec;
+	shoot_initial_wait = true;
 	restart_owned_clocks();
 	// Burst/telegraph chains never survive a restart: a stale mid-burst
 	// countdown firing into a reset wave would double-fire volleys. A
@@ -949,6 +954,7 @@ void PatternSpawner2D::_ready() {
 	// Controls called before the tree (pause, fire_n_volleys, ...) are kept:
 	// only the timer arms here.
 	shoot_time_left = shoot_initial_delay_sec;
+	shoot_initial_wait = true;
 	// The derived spawner's clocks (bullets: the retarget stagger).
 	restart_owned_clocks();
 	// Movement autostart: the spawner's pose when it enters play is the
@@ -1327,6 +1333,7 @@ void PatternSpawner2D::run_frame(double delta) {
 	shoot_time_left -= delta;
 	int pulls = 0;
 	while (auto_shooting_active() && shoot_time_left <= 0.0) {
+		shoot_initial_wait = false;
 		if (++pulls > 8) {
 			// Anti-spiral: resync the timer instead of repaying a huge hitch
 			// backlog in one tick (which would melt signal handlers/physics).

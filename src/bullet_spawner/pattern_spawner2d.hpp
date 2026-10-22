@@ -1268,6 +1268,9 @@ protected:
 	Vector2 shot_pose_velocity;
 	// Countdown to the next volley; volleys fired since (re)arming.
 	double shoot_time_left = 0.0;
+	// True while shoot_time_left counts the initial delay (until the first
+	// pull): an interval change never cuts it.
+	bool shoot_initial_wait = false;
 	int volleys_fired = 0;
 	// Pause latch (pause_shooting/resume_shooting): auto_shooting_active()
 	// stays false while set, but volleys_fired/max_volleys are preserved
