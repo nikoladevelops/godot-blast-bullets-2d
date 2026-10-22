@@ -118,6 +118,9 @@ void BulletSpawner2D::apply_volley_emitter(BulletVolley2D *volley) {
 		}
 		return;
 	}
+	// No cycle now (also when another spawner of the chain fixed it): a
+	// cycle made again later reports again.
+	emitter_cycle_reported = false;
 	if (emitter_shared == nullptr) {
 		emitter_shared = std::shared_ptr<EmitterConfig2D>(new EmitterConfig2D());
 	}

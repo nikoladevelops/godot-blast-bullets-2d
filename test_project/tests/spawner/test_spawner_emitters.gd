@@ -508,3 +508,25 @@ func test_setup_warnings_and_explain_name_the_emitter() -> void:
 	tpl.set_shooting_enabled(false)
 	var lines: PackedStringArray = sp.debug_explain_features()
 	assert_true("Emitter Bullets: every bullet fires Template's pattern every 0.5 s, turned to its flight heading." in lines, "explain: %s" % str(lines))
+
+
+## The cycle error re-arms whenever a shot finds no cycle: fixed through the
+## template's own path and made again later, the cycle reports again instead
+## of silently stopping the emission.
+func test_a_cycle_made_again_through_the_template_reports_again() -> void:
+	const CYCLE := "BulletSpawner2D: emitter_spawner_path leads back to this spawner (an emitter cycle), its bullets do not emit."
+	var a := make_spawner(H.make_volley_data(1, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 1)
+	var b := make_spawner(H.make_volley_data(1, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 1)
+	a.emitter_enabled = true
+	a.emitter_spawner_path = a.get_path_to(b)
+	b.emitter_enabled = true
+	b.emitter_spawner_path = b.get_path_to(a) # A -> B -> A
+	_fire(a)
+	expect_error_sequence([CYCLE])
+	b.emitter_spawner_path = NodePath() # fixed through the template alone
+	var v := _fire(a)
+	expect_no_errors("no cycle now")
+	assert_true(v.is_emitter_armed(), "it emits again")
+	b.emitter_spawner_path = b.get_path_to(a) # the cycle is back
+	_fire(a)
+	expect_error_sequence([CYCLE])
