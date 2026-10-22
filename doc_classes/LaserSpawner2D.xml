@@ -85,7 +85,7 @@
 			Node Name source: the targets are the Node2Ds of the scene named like this (see [member laser_target_name_match_mode]); never this spawner's own nodes or a bullet factory's. Each beam takes the nearest one.
 		</member>
 		<member name="laser_target_path" type="NodePath" setter="set_laser_target_path" getter="get_laser_target_path" default="NodePath(&quot;&quot;)">
-			Node Path: the [Node2D] every beam aims at.
+			Node Path: the [Node2D] every beam aims at. A path that resolves to a node that is not a [Node2D] is refused with an error (the old value is kept); a path that does not resolve yet is accepted.
 		</member>
 		<member name="laser_target_position" type="Vector2" setter="set_laser_target_position" getter="get_laser_target_position" default="Vector2(0, 0)">
 			Global Position: the point every beam aims at. Must be finite.

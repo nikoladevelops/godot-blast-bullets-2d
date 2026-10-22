@@ -88,6 +88,9 @@ void LaserSpawner2D::set_laser_target_filter_group(const StringName &value) {
 }
 
 void LaserSpawner2D::set_laser_target_path(const NodePath &value) {
+	if (!node_path_type_ok<Node2D>(this, value, "laser_target_path", "Node2D")) {
+		return;
+	}
 	laser_target_path = value;
 	on_config_changed();
 }

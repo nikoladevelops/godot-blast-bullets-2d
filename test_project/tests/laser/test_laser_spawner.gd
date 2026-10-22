@@ -597,6 +597,20 @@ func test_none_and_a_pattern_data_swap_reach_live_lasers() -> void:
 	assert_almost_eq(aim_at.call(Vector2(0, -300)), 0.0, 0.0001, "locked on the new position")
 
 
+## laser_target_path refuses a node that is not a Node2D (like homing and
+## graze) and keeps the old value; a path that does not resolve yet is fine.
+func test_laser_target_path_refuses_a_non_node2d() -> void:
+	var sp := _spawner()
+	var plain: Node = add(Node.new())
+	var ok_target: Node2D = add(Node2D.new())
+	sp.laser_target_path = sp.get_path_to(ok_target)
+	sp.laser_target_path = sp.get_path_to(plain)
+	expect_error_sequence(["LaserSpawner2D: laser_target_path must point to a Node2D, keeping the old value."])
+	assert_eq(sp.laser_target_path, sp.get_path_to(ok_target), "kept")
+	sp.laser_target_path = NodePath("NotThereYet")
+	expect_no_errors("an unresolved path is accepted (the node may come later)")
+
+
 ## Targets are found in the factory's world, where the beams fire (like
 ## homing): a laser spawner inside a SubViewport whose factory is in the main
 ## world aims at main-world nodes, never at its own viewport's.
