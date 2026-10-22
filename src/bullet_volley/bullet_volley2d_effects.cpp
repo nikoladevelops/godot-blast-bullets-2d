@@ -46,31 +46,23 @@ void BulletVolley2D::fx_rebuild_trail_layers(const TypedArray<BulletEffectLayerD
 			continue;
 		}
 		FXTrailBake bake;
-		if (!layer->bake_effect_frames(layer->animation, bake.frames, bake.secs, bake.total)) {
+		if (!layer->bake_effect_animation(layer->animation, frame_cache(), bake.anim)) {
 			continue;
-		}
-		bake.frame_starts.clear();
-		bake.frame_starts.reserve(bake.secs.size());
-		{
-			double acc = 0.0;
-			for (double s : bake.secs) {
-				acc += s;
-				bake.frame_starts.push_back(acc);
-			}
 		}
 		bake.layer = layer;
 		bake.layer_index = li;
-		for (size_t f = 0; f < bake.frames.size(); ++f) {
-			MultiMeshInstance2D *shard = BulletFactory2D::fx_create_shard(this, bake.frames[f], BulletFactory2D::fx_quad_size_for_texture(bake.frames[f]), layer->material, layer->self_modulate, layer->z_index, layer->z_as_relative, layer->visibility_layer, layer->light_mask, amount_bullets, true);
+		for (size_t f = 0; f < bake.anim.frames.size(); ++f) {
+			const Ref<Texture2D> &frame = bake.anim.frames[f];
+			MultiMeshInstance2D *shard = BulletFactory2D::fx_create_shard(this, frame, BulletFactory2D::fx_quad_size_for_texture(frame), layer->material, layer->self_modulate, layer->z_index, layer->z_as_relative, layer->visibility_layer, layer->light_mask, amount_bullets, true);
 			bake.shards.push_back(shard);
 			bake.shard_multimeshes.push_back(shard != nullptr ? shard->get_multimesh() : Ref<MultiMesh>());
 		}
 		bake.shard_visible.assign(bake.shards.size(), 0);
 		bake.shard_refcount.assign(bake.shards.size(), 0);
 		bake.phase.assign(amount_bullets, 0.0);
-		if (layer->random_start_frame && bake.total > 0.0) {
+		if (layer->random_start_frame && bake.anim.total > 0.0) {
 			for (int i = 0; i < amount_bullets; ++i) {
-				bake.phase[i] = (double)CosmeticRng2D::randf_range(0.0f, (float)bake.total);
+				bake.phase[i] = (double)CosmeticRng2D::randf_range(0.0f, (float)bake.anim.total);
 			}
 		}
 		bake.bullet_on.assign(amount_bullets, 1);
@@ -158,9 +150,9 @@ void BulletVolley2D::fx_soft_reset_trail_layers() {
 		bake.bullet_trail_transf.assign(amount_bullets, Transform2D());
 		bake.bullet_trail_tint.assign(amount_bullets, Color(1, 1, 1, 1));
 		bake.phase.assign(amount_bullets, 0.0);
-		if (bake.layer->random_start_frame && bake.total > 0.0) {
+		if (bake.layer->random_start_frame && bake.anim.total > 0.0) {
 			for (int i = 0; i < amount_bullets; ++i) {
-				bake.phase[i] = (double)CosmeticRng2D::randf_range(0.0f, (float)bake.total);
+				bake.phase[i] = (double)CosmeticRng2D::randf_range(0.0f, (float)bake.anim.total);
 			}
 		}
 	}
@@ -313,10 +305,8 @@ bool BulletVolley2D::play_effect_animation(int layer_index, const StringName &an
 		if (bake.layer_index != layer_index || bake.layer.is_null()) {
 			continue;
 		}
-		std::vector<Ref<Texture2D>> frames;
-		std::vector<double> secs;
-		double total = 0.0;
-		if (!bake.layer->bake_effect_frames(animation, frames, secs, total)) {
+		SpriteAnim2D baked;
+		if (!bake.layer->bake_effect_animation(animation, frame_cache(), baked)) {
 			return false;
 		}
 		for (size_t s = 0; s < bake.shards.size(); ++s) {
@@ -335,19 +325,9 @@ bool BulletVolley2D::play_effect_animation(int layer_index, const StringName &an
 		bake.shard_multimeshes.clear();
 		bake.shard_visible.clear();
 		bake.shard_refcount.clear();
-		bake.frames = frames;
-		bake.secs = secs;
-		bake.frame_starts.clear();
-		bake.frame_starts.reserve(secs.size());
-		{
-			double acc = 0.0;
-			for (double s : secs) {
-				acc += s;
-				bake.frame_starts.push_back(acc);
-			}
-		}
-		bake.total = total;
+		bake.anim = std::move(baked);
 		bake.animation_override = true;
+		const std::vector<Ref<Texture2D>> &frames = bake.anim.frames;
 		for (size_t f = 0; f < frames.size(); ++f) {
 			MultiMeshInstance2D *shard = BulletFactory2D::fx_create_shard(this, frames[f], BulletFactory2D::fx_quad_size_for_texture(frames[f]), bake.layer->material, bake.layer->self_modulate, bake.layer->z_index, bake.layer->z_as_relative, bake.layer->visibility_layer, bake.layer->light_mask, amount_bullets, true);
 			bake.shards.push_back(shard);

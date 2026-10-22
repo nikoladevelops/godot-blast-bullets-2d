@@ -310,9 +310,12 @@ func test_per_bullet_toggles_animation_switch() -> void:
 	var v7b: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 200.0, [custom]))
 	assert_true(v7b.has_trail_effects(), "custom frames bake as trail")
 	assert_true(v7b.play_effect_animation(0, "b"), "animation switch accepted")
-	assert_true(not v7b.play_effect_animation(0, "nope"), "unknown animation rejected")
+	expect_no_errors("a known animation switches silently")
+	# A wrong name falls back to the first animation with frames, like the
+	# bullets do (one error; the empty "default" never counts).
+	assert_true(v7b.play_effect_animation(0, "nope"), "unknown animation falls back")
+	expect_error_sequence(["BulletEffectLayerData2D: missing animation 'nope', falling back to 'a'."])
 	assert_true(not v7b.play_effect_animation(9, "b"), "unknown layer rejected")
-	expect_errors_containing("missing animation", 1, "unknown animation fails loud")
 
 
 func test_pool_reuse_reseeds_caps_hold_explicit_auto() -> void:
@@ -835,15 +838,15 @@ func test_hostile_configs_never_crash() -> void:
 	wronganim.trigger = 1
 	wronganim.sprite_frames = _make_frames(2)
 	wronganim.animation = &"nope"
-	assert_true(factory.spawn_layer_effect(wronganim, Transform2D.IDENTITY) == -1, "wrong animation name inert, no crash")
+	assert_true(factory.spawn_layer_effect(wronganim, Transform2D.IDENTITY) >= 0, "a wrong animation name falls back to the first animation with frames")
+	expect_error_sequence(["BulletEffectLayerData2D: sprite_frames has no animation with frames.", "BulletEffectLayerData2D: missing animation 'nope', falling back to 'default'."])
+	factory.clear_sprite_effects()
 	var dup_a := _make_layer(0, 1)
 	var v20: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 200.0, [dup_a, dup_a], false))
 	for i in 5:
 		await physics()
 	assert_true(v20.debug_get_trail_transform(0, 0).origin.distance_to(v20.get_bullet_transform(0).origin) < 0.01, "duplicate layer refs both follow")
 	assert_true(factory.get_active_effect_count() == 0, "no stray one-shots from trail-only volley")
-	expect_errors_containing("has no animation with frames", 1, "frameless layer fails loud")
-	expect_errors_containing("missing animation", 1, "wrong animation fails loud")
 
 
 func test_interp_teleports_scale_paused_manual_hatch() -> void:

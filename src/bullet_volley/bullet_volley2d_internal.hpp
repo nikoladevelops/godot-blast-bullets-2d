@@ -229,7 +229,7 @@ _ALWAYS_INLINE_ void BulletVolley2D::write_trail_from_global(int bullet_index, c
 		return;
 	}
 	for (auto &bake : fx_trail_bakes) {
-		if (bake.layer.is_null() || bake.frames.empty() || bake.shards.empty()) {
+		if (bake.layer.is_null() || bake.anim.empty() || bake.shards.empty()) {
 			continue;
 		}
 		if (bullet_index >= (int)bake.bullet_on.size() || bullet_index >= (int)bake.phase.size() || bullet_index >= (int)bake.bullet_shard.size()) {
@@ -238,26 +238,20 @@ _ALWAYS_INLINE_ void BulletVolley2D::write_trail_from_global(int bullet_index, c
 		if (!bake.bullet_on[bullet_index]) {
 			continue;
 		}
-		if (!(bake.total > 0.0) || !Math::is_finite(curves_elapsed_time)) {
+		if (!Math::is_finite(curves_elapsed_time)) {
 			continue;
 		}
-		double age = curves_elapsed_time + bake.phase[bullet_index];
-		age = age - Math::floor(age / bake.total) * bake.total;
-		// First frame whose end boundary passes age (prefix sums make this
-		// O(log F) instead of re-accumulating per bullet per tick).
+		// The loop phase (0 for a held animation: its first frame shows).
+		double age = 0.0;
 		int frame = 0;
-		if (!bake.frame_starts.empty()) {
-			size_t lo = 0;
-			size_t hi = bake.frame_starts.size();
-			while (lo < hi) {
-				const size_t mid = lo + (hi - lo) / 2;
-				if (age < bake.frame_starts[mid]) {
-					hi = mid;
-				} else {
-					lo = mid + 1;
-				}
-			}
-			frame = (lo < bake.frame_starts.size()) ? (int)lo : (int)bake.frame_starts.size() - 1;
+		const double total = bake.anim.total;
+		if (total > 0.0) {
+			age = curves_elapsed_time + bake.phase[bullet_index];
+			age = age - Math::floor(age / total) * total;
+			// First frame whose end boundary passes age (O(log F)).
+			frame = bake.anim.frame_for_local(age);
+		} else if (!bake.anim.held) {
+			continue;
 		}
 		if (frame < 0 || frame >= (int)bake.shards.size()) {
 			continue;
@@ -326,7 +320,7 @@ _ALWAYS_INLINE_ void BulletVolley2D::write_trail_from_global(int bullet_index, c
 		if (bake.layer->color_ramp.is_valid() || trail_has_fade) {
 			Color tint(1, 1, 1, 1);
 			if (bake.layer->color_ramp.is_valid()) {
-				tint = bake.layer->color_ramp->sample((float)(age / bake.total));
+				tint = bake.layer->color_ramp->sample(total > 0.0 ? (float)(age / total) : 0.0f);
 			}
 			if (trail_has_fade) {
 				double alpha = 1.0;

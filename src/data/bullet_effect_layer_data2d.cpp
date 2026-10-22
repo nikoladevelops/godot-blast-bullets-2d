@@ -16,106 +16,65 @@ void BulletEffectLayerData2D::invalidate_bake() const {
 	bake_valid = false;
 	bake_anim = StringName();
 	++bake_version;
-	bake_frames.clear();
-	bake_secs.clear();
-	bake_total = 0.0;
+	bake_cache.clear();
 }
 
-bool BulletEffectLayerData2D::bake_effect_frames(const StringName &anim, std::vector<Ref<Texture2D>> &out_frames, std::vector<double> &out_secs, double &out_total) const {
+bool BulletEffectLayerData2D::bake_effect_animation(const StringName &anim, FrameTextureCache2D *cache, SpriteAnim2D &out) const {
 	if (bake_valid && bake_anim == anim) {
-		out_frames = bake_frames;
-		out_secs = bake_secs;
-		out_total = bake_total;
-		return !bake_frames.empty() && bake_total > 0.0;
+		out = bake_cache;
+		return true;
 	}
-	const Ref<SpriteFrames> frames = sprite_frames;
-	if (frames.is_null()) {
-		UtilityFunctions::push_error("BulletEffectLayerData2D: sprite_frames is null, layer renders nothing. Assign frames to use this layer.");
-		return false;
-	}
-	// Resolve the animation (same rules as the bullet animation: "default"
-	// or empty auto-resolves, explicit wrong names fall back once loudly).
-	StringName use_anim = anim;
-	const PackedStringArray names = frames->get_animation_names();
-	if (names.is_empty() || (String(use_anim).is_empty() || use_anim == StringName("default"))) {
-		if (frames->has_animation(StringName("default")) && frames->get_frame_count(StringName("default")) > 0) {
-			use_anim = StringName("default");
-		} else {
-			StringName fallback;
-			for (int i = 0; i < names.size(); ++i) {
-				if (frames->get_frame_count(names[i]) > 0) {
-					fallback = names[i];
-					break;
-				}
-			}
-			if (String(fallback).is_empty()) {
-				UtilityFunctions::push_error("BulletEffectLayerData2D: sprite_frames has no animation with frames.");
-				return false;
-			}
-			use_anim = fallback;
-		}
-	} else if (!frames->has_animation(use_anim) || frames->get_frame_count(use_anim) <= 0) {
-		UtilityFunctions::push_error("BulletEffectLayerData2D: missing animation '" + String(use_anim) + "', layer renders nothing.");
-		return false;
-	}
-	const int count = frames->get_frame_count(use_anim);
-	double fps = frames->get_animation_speed(use_anim);
-	if (fps <= 0.0) {
-		fps = 1.0;
+	const SpriteAnimChoice2D choice = resolve_sprite_animation2d(sprite_frames, anim);
+	switch (choice.pick) {
+		case SpriteAnimPick2D::NULL_FRAMES:
+			UtilityFunctions::push_error("BulletEffectLayerData2D: sprite_frames is null, layer renders nothing. Assign frames to use this layer.");
+			return false;
+		case SpriteAnimPick2D::NO_ANIMATIONS:
+		case SpriteAnimPick2D::NO_FRAMES_ANYWHERE:
+			UtilityFunctions::push_error("BulletEffectLayerData2D: sprite_frames has no animation with frames.");
+			return false;
+		case SpriteAnimPick2D::FELL_BACK:
+			UtilityFunctions::push_error("BulletEffectLayerData2D: missing animation '" + String(anim) + "', falling back to '" + String(choice.anim) + "'.");
+			break;
+		case SpriteAnimPick2D::RESOLVED:
+			break;
 	}
 	// Every frame bakes (one shard node each): the developer decides the
-	// cost by the animation's length.
-	const int kept = count;
-	bool whiten_warned = false;
-	std::vector<Ref<Texture2D>> out_f;
-	std::vector<double> out_s;
-	out_f.reserve(kept);
-	out_s.reserve(kept);
-	double total = 0.0;
-	for (int i = 0; i < kept; ++i) {
-		Ref<Texture2D> tex = frames->get_frame_texture(use_anim, i);
-		if (tex.is_null()) {
-			UtilityFunctions::push_error("BulletEffectLayerData2D: animation '" + String(use_anim) + "' frame " + String::num_int64(i) + " has null texture.");
-			return false;
-		}
-		const float dur = frames->get_frame_duration(use_anim, i);
-		const double sec = (dur <= 0.0f ? 0.0 : (double)dur / fps);
-		if (override_frame_color) {
-			// Exact-color mode: whitened copy (alpha preserved) so the
-			// layer tint reads exactly. Unreadable frames fall back to
-			// the original with one warning per bake, never a blank.
-			Ref<Image> pixels = read_frame_image(tex);
-			Ref<Image> white = whiten_image_copy(pixels);
-			if (white.is_valid()) {
-				Ref<ImageTexture> white_tex;
-				white_tex.instantiate();
-				white_tex->set_image(white);
-				out_f.push_back(white_tex);
-			} else {
-				if (!whiten_warned) {
-					whiten_warned = true;
-					UtilityFunctions::push_warning("BulletEffectLayerData2D: override_frame_color could not read a frame of '" + String(use_anim) + "', keeping the original art for unreadable frames.");
-				}
-				out_f.push_back(tex);
-			}
-		} else {
-			out_f.push_back(tex);
-		}
-		out_s.push_back(sec);
-		total += sec;
+	// cost by the animation's length. Exact-color mode bakes whitened copies
+	// (alpha kept) so the layer tint reads exactly; unreadable frames keep
+	// the original art with one warning per bake, never a blank.
+	SpriteAnimBakeOptions2D options;
+	options.whiten = override_frame_color;
+	options.cache = cache;
+	SpriteAnimBakeReport2D report;
+	SpriteAnim2D baked;
+	const bool baked_ok = bake_sprite_animation2d(sprite_frames, choice.anim, options, baked, report);
+	String anim_text = "BulletEffectLayerData2D: animation '" + String(choice.anim) + "'";
+	if (report.bad_speed) {
+		UtilityFunctions::push_error(anim_text + " has invalid speed, using 1 fps.");
 	}
-	if (out_f.empty() || total <= 0.0) {
+	for (int frame : report.bad_duration_frames) {
+		UtilityFunctions::push_error(anim_text + " frame " + String::num_int64(frame) + " has non-finite duration, using 0.");
+	}
+	if (report.null_frame >= 0) {
+		UtilityFunctions::push_error(anim_text + " frame " + String::num_int64(report.null_frame) + " has null texture.");
+	}
+	if (report.whiten_unreadable) {
+		UtilityFunctions::push_warning("BulletEffectLayerData2D: override_frame_color could not read a frame of '" + String(choice.anim) + "', keeping the original art for unreadable frames.");
+	}
+	if (!baked_ok) {
+		return false;
+	}
+	// A one-shot lives one pass of its animation: without playable time it
+	// has nothing to show. A held trail (speed 0) shows its first frame.
+	if (!(baked.total > 0.0) && !(baked.held && trigger == EFFECT_TRAIL_FOLLOW)) {
 		UtilityFunctions::push_error("BulletEffectLayerData2D: baked zero playable time, layer renders nothing.");
 		return false;
 	}
-	bake_frames = out_f;
-	bake_secs = out_s;
-	bake_total = total;
+	bake_cache = baked;
 	bake_anim = anim;
 	bake_valid = true;
-	out_frames = out_f;
-	out_secs = out_s;
-	out_total = total;
+	out = std::move(baked);
 	return true;
 }
 
@@ -136,6 +95,9 @@ void BulletEffectLayerData2D::set_trigger(EffectTrigger value) {
 		return;
 	}
 	trigger = value;
+	// A bake's validity depends on the trigger (a held trail draws, a held
+	// one-shot cannot).
+	invalidate_bake();
 	emit_changed();
 }
 

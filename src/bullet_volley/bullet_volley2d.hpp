@@ -768,13 +768,9 @@ public:
 		// Set by play_effect_animation: the shards hold another animation's
 		// frames, so a reuse must rebuild from the layer instead.
 		bool animation_override = false;
-		std::vector<Ref<Texture2D>> frames;
-		std::vector<double> secs;
-		// Prefix sums of secs (see FXOneShotBake::frame_starts): the per-tick
-		// frame lookup binary searches this instead of re-accumulating.
-		// Rebuilt wherever secs is assigned.
-		std::vector<double> frame_starts;
-		double total = 0.0;
+		// The baked animation; the per-tick frame lookup binary searches its
+		// end boundaries. A held animation (speed 0) shows its first frame.
+		SpriteAnim2D anim;
 		// Ordinary children a script may free: read through get().
 		std::vector<OwnedNode2D<MultiMeshInstance2D>> shards;
 		// Parallel to shards: each shard's MultiMesh, cached so the per-bullet
@@ -870,6 +866,8 @@ public:
 	// Rebuilds trail shards from a layer list (spawn/enable/live set).
 	// One-shot layers in the same list register at the factory instead.
 	void fx_rebuild_trail_layers(const TypedArray<BulletEffectLayerData2D> &layers);
+	// The factory's frame textures (null without a factory: bakes build uncached).
+	FrameTextureCache2D *frame_cache() const { return bullet_factory != nullptr ? &bullet_factory->frame_cache : nullptr; }
 	// Frees trail shard nodes and drops trail state (reset/teardown).
 	void fx_clear_trail_layers();
 	// Routes one trigger event for one bullet to the factory one-shot bakes.

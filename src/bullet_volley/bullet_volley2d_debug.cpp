@@ -309,7 +309,7 @@ Dictionary BulletVolley2D::debug_get_effect_layers_info() const {
 		const FXTrailBake &bake = fx_trail_bakes[b];
 		Dictionary e;
 		e["layer_index"] = bake.layer_index;
-		e["frames"] = (int)bake.frames.size();
+		e["frames"] = bake.anim.size();
 		e["shards"] = (int)bake.shards.size();
 		const MultiMeshInstance2D *first = bake.shards.empty() ? nullptr : bake.shards[0].get();
 		if (first != nullptr) {

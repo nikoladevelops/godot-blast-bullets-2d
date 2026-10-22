@@ -10,6 +10,8 @@
 
 #include <vector>
 
+#include "sprite/sprite_anim2d.hpp"
+
 namespace BlastBullets2D {
 using namespace godot;
 
@@ -149,10 +151,12 @@ public:
 	// zero config (manual hatch without a volley falls back to 64).
 	int max_instances = 0;
 
-	// Bakes frames/secs/total for animation. Cached on the layer (keyed by
-	// animation); setters clear the cache. Returns false (with one error)
-	// when the layer can never render.
-	bool bake_effect_frames(const StringName &anim, std::vector<Ref<Texture2D>> &out_frames, std::vector<double> &out_secs, double &out_total) const;
+	// Bakes `anim` under the shared SpriteFrames rules (sprite/sprite_anim2d.hpp),
+	// whitened copies coming from `cache` (the factory's; null builds them
+	// uncached). Cached on the layer (keyed by animation); setters clear the
+	// cache. Returns false (with one error) when the layer cannot render: a
+	// one-shot needs playable time, a trail at speed 0 shows its first frame.
+	bool bake_effect_animation(const StringName &anim, FrameTextureCache2D *cache, SpriteAnim2D &out) const;
 	// Content generation, bumped on every invalidation: consumers holding
 	// baked output detect layer edits through it.
 	uint64_t get_bake_version() const { return bake_version; }
@@ -246,13 +250,11 @@ private:
 	// its life (play_effect_animation), so a stale animation never serves.
 	mutable bool bake_valid = false;
 	mutable StringName bake_anim;
+	mutable SpriteAnim2D bake_cache;
 	// Content generation: bumped on every invalidation so consumers holding
 	// baked output (manual hatch) can detect layer edits and rebake instead
 	// of serving stale frames.
 	mutable uint64_t bake_version = 0;
-	mutable std::vector<Ref<Texture2D>> bake_frames;
-	mutable std::vector<double> bake_secs;
-	mutable double bake_total = 0.0;
 	void invalidate_bake() const;
 };
 

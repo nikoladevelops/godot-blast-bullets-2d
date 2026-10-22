@@ -74,8 +74,8 @@ static void fx_refresh_slot_color(BulletFactory2D::FXOneShotBake &bake, int slot
 	if (bake.layer.is_null()) {
 		return;
 	}
-	const bool has_ramp = !bake.layer->color_ramp.is_null() && bake.total > 0.0;
-	const bool has_fade = (bake.layer->fade_in_sec > 0.0 || bake.layer->fade_out_sec > 0.0) && Math::is_finite(age) && bake.total > 0.0;
+	const bool has_ramp = !bake.layer->color_ramp.is_null() && bake.anim.total > 0.0;
+	const bool has_fade = (bake.layer->fade_in_sec > 0.0 || bake.layer->fade_out_sec > 0.0) && Math::is_finite(age) && bake.anim.total > 0.0;
 	if (!has_ramp && !has_fade) {
 		return;
 	}
@@ -88,14 +88,14 @@ static void fx_refresh_slot_color(BulletFactory2D::FXOneShotBake &bake, int slot
 	}
 	Color tint(1, 1, 1, 1);
 	if (has_ramp) {
-		tint = bake.layer->color_ramp->sample((float)fx_clamp01(age / bake.total));
+		tint = bake.layer->color_ramp->sample((float)fx_clamp01(age / bake.anim.total));
 	}
 	if (has_fade) {
 		double alpha = 1.0;
 		if (bake.layer->fade_in_sec > 0.0 && age < bake.layer->fade_in_sec) {
 			alpha = age / bake.layer->fade_in_sec;
 		}
-		const double remaining = bake.total - age;
+		const double remaining = bake.anim.total - age;
 		if (bake.layer->fade_out_sec > 0.0 && remaining < bake.layer->fade_out_sec) {
 			const double out_alpha = remaining / bake.layer->fade_out_sec;
 			if (out_alpha < alpha) {
@@ -165,29 +165,6 @@ MultiMeshInstance2D *BulletFactory2D::fx_create_shard(Node *parent, const Ref<Te
 	return shard;
 }
 
-int BulletFactory2D::fx_frame_for_age(const std::vector<double> &starts, double total, double age) {
-	if (starts.empty() || !(total > 0.0) || !Math::is_finite(age)) {
-		return 0;
-	}
-	const double t = age - Math::floor(age / total) * total;
-	// First frame whose end boundary passes t (bit-identical to the old
-	// linear accumulation); past the end (float error) holds the last frame.
-	size_t lo = 0;
-	size_t hi = starts.size();
-	while (lo < hi) {
-		const size_t mid = lo + (hi - lo) / 2;
-		if (t < starts[mid]) {
-			hi = mid;
-		} else {
-			lo = mid + 1;
-		}
-	}
-	if (lo >= starts.size()) {
-		return (int)starts.size() - 1;
-	}
-	return (int)lo;
-}
-
 void BulletFactory2D::fx_ensure_effects_container() {
 	if (sprite_effects_container.get() != nullptr) {
 		return;
@@ -225,9 +202,7 @@ void BulletFactory2D::fx_erase_bake(FXOneShotBake &bake) {
 	bake.shards.clear();
 	bake.shard_multimeshes.clear();
 	bake.slots.clear();
-	bake.frames.clear();
-	bake.secs.clear();
-	bake.frame_starts.clear();
+	bake.anim.clear();
 	bake.active_count = 0;
 	bake.ring_cursor = 0;
 }
@@ -245,22 +220,16 @@ bool BulletFactory2D::fx_register_volley_bake(uint64_t volley_id, int layer_inde
 		UtilityFunctions::push_error("BulletFactory2D: sprite effects container missing, one-shot layer not registered.");
 		return false;
 	}
-	std::vector<Ref<Texture2D>> frames;
-	std::vector<double> secs;
-	double total = 0.0;
-	if (!layer->bake_effect_frames(layer->animation, frames, secs, total)) {
+	FXOneShotBake bake;
+	if (!layer->bake_effect_animation(layer->animation, &frame_cache, bake.anim)) {
 		return false;
 	}
-	FXOneShotBake bake;
 	bake.volley_id = volley_id;
 	bake.layer_index = layer_index;
 	bake.layer = layer;
-	bake.frames = frames;
-	bake.secs = secs;
-	bake.frame_starts = fx_prefix_sums(secs);
-	bake.total = total;
 	const int ring = fx_ring_size_for_layer(layer, amount_bullets);
 	bake.slots.assign(ring, FXOneShotSlot());
+	const std::vector<Ref<Texture2D>> &frames = bake.anim.frames;
 	for (size_t f = 0; f < frames.size(); ++f) {
 		MultiMeshInstance2D *shard = fx_create_shard(sprite_effects_container.ptr, frames[f], fx_quad_size_for_texture(frames[f]), layer->material, layer->self_modulate, layer->z_index, layer->z_as_relative, layer->visibility_layer, layer->light_mask, ring, true);
 		bake.add_shard(shard);
@@ -300,7 +269,7 @@ void BulletFactory2D::fx_unregister_all_bakes() {
 // ring allocate (recycling the oldest slot), pose compose with layer
 // offset plus randomization, first-frame write. Returns the slot index.
 int BulletFactory2D::fx_fire_into_bake(FXOneShotBake &bake, const Transform2D &at) {
-	if (bake.layer.is_null() || bake.frames.empty() || bake.shards.empty() || bake.slots.empty() || !(bake.total > 0.0)) {
+	if (bake.layer.is_null() || bake.anim.empty() || bake.shards.empty() || bake.slots.empty() || !(bake.anim.total > 0.0)) {
 		return -1;
 	}
 	if (!at.get_origin().is_finite() || !Math::is_finite(at.get_rotation())) {
@@ -344,10 +313,10 @@ int BulletFactory2D::fx_fire_into_bake(FXOneShotBake &bake, const Transform2D &a
 	slot.birth = fx_clock;
 	slot.birth_sweep = sweep_counter;
 	slot.birth_needs_rebase = (fx_aged_sweep != sweep_counter);
-	slot.duration = bake.total;
-	slot.start_age = (layer->random_start_frame && bake.total > 0.0) ? (double)CosmeticRng2D::randf_range(0.0f, (float)bake.total) : 0.0;
+	slot.duration = bake.anim.total;
+	slot.start_age = (layer->random_start_frame && bake.anim.total > 0.0) ? (double)CosmeticRng2D::randf_range(0.0f, (float)bake.anim.total) : 0.0;
 	slot.active = true;
-	const int frame = fx_frame_for_age(bake.frame_starts, bake.total, slot.start_age);
+	const int frame = bake.anim.frame_at_looped(slot.start_age);
 	slot.last_shard = frame;
 	// Spin starts at the slot's own age (usually 0): the written pose is
 	// the base spun forward, and last_angle mirrors it for debug.
@@ -448,7 +417,7 @@ void BulletFactory2D::age_fx_bake(FXOneShotBake &bake) {
 		}
 		fx_refresh_slot_color(bake, (int)s, age);
 		fx_apply_slot_spin(bake, (int)s, age, container);
-		const int frame = fx_frame_for_age(bake.frame_starts, bake.total, age);
+		const int frame = bake.anim.frame_at_looped(age);
 		if (frame != slot.last_shard && frame >= 0 && frame < (int)bake.shards.size()) {
 			if (slot.last_shard >= 0 && slot.last_shard < (int)bake.shards.size() && bake.shards[slot.last_shard].ptr != nullptr) {
 				bake.shard_multimesh(slot.last_shard)->set_instance_transform_2d((int)s, FX_HIDDEN_TRANSF);
@@ -529,23 +498,17 @@ int BulletFactory2D::spawn_layer_effect(const Ref<BulletEffectLayerData2D> &laye
 		UtilityFunctions::push_error("BulletFactory2D: sprite effects container missing, manual effect not spawned.");
 		return -1;
 	}
-	std::vector<Ref<Texture2D>> frames;
-	std::vector<double> secs;
-	double total = 0.0;
-	if (!layer->bake_effect_frames(layer->animation, frames, secs, total)) {
+	FXOneShotBake bake;
+	if (!layer->bake_effect_animation(layer->animation, &frame_cache, bake.anim)) {
 		return -1;
 	}
-	FXOneShotBake bake;
 	bake.volley_id = 0;
 	bake.layer_index = -1;
 	bake.layer = layer;
 	bake.layer_version = layer->get_bake_version();
-	bake.frames = frames;
-	bake.secs = secs;
-	bake.frame_starts = fx_prefix_sums(secs);
-	bake.total = total;
 	const int ring = fx_ring_size_for_layer(layer, 32);
 	bake.slots.assign(ring, FXOneShotSlot());
+	const std::vector<Ref<Texture2D>> &frames = bake.anim.frames;
 	for (size_t f = 0; f < frames.size(); ++f) {
 		bake.add_shard(fx_create_shard(sprite_effects_container.ptr, frames[f], fx_quad_size_for_texture(frames[f]), layer->material, layer->self_modulate, layer->z_index, layer->z_as_relative, layer->visibility_layer, layer->light_mask, ring, true));
 	}
@@ -643,7 +606,7 @@ Dictionary BulletFactory2D::debug_get_effect_state() const {
 	int manual_frames = 0;
 	for (size_t i = 0; i < fx_manual_bakes.size(); ++i) {
 		manual_active += fx_manual_bakes[i].active_count;
-		manual_frames += (int)fx_manual_bakes[i].frames.size();
+		manual_frames += fx_manual_bakes[i].anim.size();
 	}
 	d["manual_active"] = manual_active;
 	d["manual_frames"] = manual_frames;

@@ -74,7 +74,14 @@ struct SpriteAnim2D {
 		if (ends.empty() || !(total > 0.0) || !std::isfinite(t)) {
 			return 0;
 		}
-		const double local = t - std::floor(t / total) * total;
+		return frame_for_local(t - std::floor(t / total) * total);
+	}
+	// The frame whose end boundary first passes `local` (already within one
+	// pass); the last frame past the end.
+	_ALWAYS_INLINE_ int frame_for_local(double local) const {
+		if (ends.empty()) {
+			return 0;
+		}
 		size_t lo = 0;
 		size_t hi = ends.size();
 		while (lo < hi) {

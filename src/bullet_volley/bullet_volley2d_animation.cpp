@@ -268,7 +268,7 @@ bool BulletVolley2D::rebuild_sprite_animation(const Ref<SpriteFrames> &p_sprite_
 	// original art with one warning per rebuild, never a blank.
 	SpriteAnimBakeOptions2D options;
 	options.whiten = anim_override_frame_color;
-	options.cache = bullet_factory != nullptr ? &bullet_factory->frame_cache : nullptr;
+	options.cache = frame_cache();
 	SpriteAnimBakeReport2D report;
 	SpriteAnim2D baked;
 	const bool baked_ok = bake_sprite_animation2d(p_sprite_frames, name, options, baked, report);
