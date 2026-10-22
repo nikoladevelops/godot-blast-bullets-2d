@@ -354,7 +354,7 @@ func test_pool_reuse_reseeds_caps_hold_explicit_auto() -> void:
 	var baked_frames := -1
 	for bake in v8d.debug_get_effect_layers_info().get("trail_bakes", []):
 		baked_frames = int(bake.get("frames", -1))
-	assert_true(baked_frames == 24, "30-frame anim truncates to the 24-frame bake cap")
+	assert_eq(baked_frames, 30, "no frame cap: a 30-frame trail bakes every frame")
 
 
 func test_styling_z_tint_texture_visibility_light_bounce() -> void:
@@ -1230,6 +1230,20 @@ func test_whiten_reads_an_atlas_region_only_inside_its_atlas() -> void:
 	assert_almost_eq(img.get_pixel(0, 0).a, 0.5, 0.01, "pixel (1, 1) of the atlas, whitened")
 	assert_eq(img.get_pixel(1, 2), Color(1, 1, 1, 1), "an opaque pixel, whitened")
 	expect_no_errors("a readable region bakes silently")
+
+
+func test_every_frame_of_a_long_animation_bakes() -> void:
+	# No frame cap: a 30-frame layer bakes all 30 frames (one shard node each),
+	# as a trail and as a one-shot, with nothing truncated or warned.
+	var layer := _make_layer(1, 30)
+	assert_true(factory.spawn_layer_effect(layer, Transform2D.IDENTITY) >= 0, "fires")
+	assert_eq(factory.debug_get_effect_state()["manual_frames"], 30, "every frame baked")
+	var trail := _make_layer(0, 30)
+	var v: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 0.0, [trail], false))
+	var shards := v.get_children().filter(func(c): return c is MultiMeshInstance2D)
+	assert_eq(shards.size(), 30, "one trail shard per frame")
+	expect_no_errors("no error")
+	expect_warning_sequence([], "no truncation warning")
 
 
 func test_scale_range_is_order_independent_and_survives_a_round_trip() -> void:

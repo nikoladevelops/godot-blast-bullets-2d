@@ -12,10 +12,6 @@ using namespace godot;
 
 namespace BlastBullets2D {
 
-// Max animation frames per bake: bounds shard nodes (one per frame) and the
-// age-to-frame scan. Longer anims truncate with a warning, never a crash.
-static const int EFFECT_MAX_BAKE_FRAMES = 24;
-
 void BulletEffectLayerData2D::invalidate_bake() const {
 	bake_valid = false;
 	bake_anim = StringName();
@@ -67,10 +63,9 @@ bool BulletEffectLayerData2D::bake_effect_frames(const StringName &anim, std::ve
 	if (fps <= 0.0) {
 		fps = 1.0;
 	}
-	const int kept = Math::min(count, EFFECT_MAX_BAKE_FRAMES);
-	if (count > EFFECT_MAX_BAKE_FRAMES) {
-		UtilityFunctions::push_warning("BulletEffectLayerData2D: animation '" + String(use_anim) + "' has " + String::num_int64(count) + " frames, baking the first 24 (one shard node per frame).");
-	}
+	// Every frame bakes (one shard node each): the developer decides the
+	// cost by the animation's length.
+	const int kept = count;
 	bool whiten_warned = false;
 	std::vector<Ref<Texture2D>> out_f;
 	std::vector<double> out_s;
