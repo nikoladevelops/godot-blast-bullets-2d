@@ -241,3 +241,13 @@ func test_a_burst_warning_refused_outside_is_given_once_inside() -> void:
 		if log.size() >= 2:
 			break
 	assert_eq(log.slice(0, 2), ["telegraph", "shot"], "the first burst shot is warned before it fires")
+
+
+## A spawner outside the scene tree is refused with its own documented
+## errors, never with Godot's !is_inside_tree() error from the bounds test.
+func test_a_detached_spawner_is_refused_without_an_engine_error() -> void:
+	var sp := _spawner(Vector2(100, 100))
+	sp.get_parent().remove_child(sp)
+	assert_false(sp.shoot_once(), "refused")
+	expect_error_sequence(["BulletSpawner2D::collect_spawn_transforms: spawner is outside the scene tree.", "BulletSpawner2D::shoot_once: pattern_source Ring produced no transforms, volley skipped."])
+	add(sp)
