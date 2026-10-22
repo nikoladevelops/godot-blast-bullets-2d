@@ -51,17 +51,30 @@ public:
 		member_ids.clear();
 	}
 
+	// Forgets one volley (its homing was cleared: it is no longer armed).
+	void untrack(int64_t id) {
+		if (member_ids.erase(id) == 0) {
+			return;
+		}
+		for (int i = 0; i < live_ids.size(); ++i) {
+			if (live_ids[i] == id) {
+				live_ids.remove_at(i);
+				break;
+			}
+		}
+	}
+
 	// Drops freed instances (teardown), volleys re-owned by another spawner
-	// (owner tag changed, e.g. adopt_live_volley), and fully-disabled
-	// instances (a new enable wipes homing anyway). Never touches survivors.
-	// The is_active gate matters: disable keeps owner_spawner_id, so without
-	// it retargets would arm dead queues and inflate homing counters.
+	// (owner tag changed, e.g. adopt_live_volley), pooled and dying ones.
+	// A PARKED volley stays: a wake resumes its homing queue (freeze
+	// contract), and retargeting must reach it again then. Passes still touch
+	// only active volleys (resolve_live): frozen bullets take no targets.
 	void prune(uint64_t owner_spawner_id) const {
 		// Fast path: the common steady state (nothing died) allocates and
 		// copies nothing. Only a real death pays for compaction, in place.
 		bool any_dead = false;
 		for (int i = 0; i < live_ids.size(); ++i) {
-			if (resolve_live(live_ids[i], owner_spawner_id) == nullptr) {
+			if (resolve_tracked(live_ids[i], owner_spawner_id) == nullptr) {
 				any_dead = true;
 				break;
 			}
@@ -71,7 +84,7 @@ public:
 		}
 		int write = 0;
 		for (int i = 0; i < live_ids.size(); ++i) {
-			if (resolve_live(live_ids[i], owner_spawner_id) != nullptr) {
+			if (resolve_tracked(live_ids[i], owner_spawner_id) != nullptr) {
 				live_ids[write++] = live_ids[i];
 			} else {
 				member_ids.erase(live_ids[i]);
@@ -109,9 +122,16 @@ public:
 	// Every touch of a tracked volley must go through here (or prune + an
 	// equivalent check): never dereference a stored id blindly.
 	static BulletVolley2D *resolve_live(int64_t id, uint64_t owner_spawner_id) {
+		BulletVolley2D *volley = resolve_tracked(id, owner_spawner_id);
+		return volley != nullptr && volley->is_active ? volley : nullptr;
+	}
+
+	// The tracked volley, live or parked (never freed, pooled, dying or
+	// another owner's).
+	static BulletVolley2D *resolve_tracked(int64_t id, uint64_t owner_spawner_id) {
 		Object *obj = ObjectDB::get_instance(ObjectID((uint64_t)id));
 		BulletVolley2D *volley = Object::cast_to<BulletVolley2D>(obj);
-		if (volley == nullptr || volley->owner_spawner_id != owner_spawner_id || !volley->is_active || volley->is_queued_for_deletion()) {
+		if (volley == nullptr || volley->owner_spawner_id != owner_spawner_id || volley->is_pooled() || volley->is_queued_for_deletion()) {
 			return nullptr;
 		}
 		return volley;

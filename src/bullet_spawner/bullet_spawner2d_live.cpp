@@ -167,19 +167,31 @@ void BulletSpawner2D::homing_live_volleys(std::unordered_set<uint64_t> &r_change
 	const std::vector<OwnedVolley2D> owned = snapshot_owned2d(factory, self_id);
 	for (const OwnedVolley2D &entry : owned) {
 		BulletVolley2D *volley = still_owned2d(entry, self_id);
-		if (volley == nullptr || !volley->is_active) {
+		if (volley == nullptr) {
 			continue;
 		}
 		if (!homing_enabled) {
-			// Off: the volleys stop chasing (queues and orbits cleared).
-			if (volley->shared_homing_deque_check_has_homing_targets() || volley_has_own_homing_targets(volley)) {
+			// Off: the volleys stop chasing (queues and orbits cleared), parked
+			// ones too (a wake would resume the chase), and leave the
+			// retarget list: turned on again, they are armed again.
+			const bool waiting = volley->homing_wake_owner_id != 0;
+			volley->homing_wake_owner_id = 0;
+			volley_tracker.untrack((int64_t)entry.id);
+			if (waiting || volley->shared_homing_deque_check_has_homing_targets() || volley_has_own_homing_targets(volley)) {
 				clear_volley_homing(volley);
 				r_changed.insert(entry.id);
 			}
 			continue;
 		}
-		if (volley_tracker.contains((int64_t)entry.id)) {
+		if (volley_tracker.contains((int64_t)entry.id) || volley->homing_wake_owner_id == self_id) {
 			continue; // armed alike: a homing shot (or adopted) already tracked
+		}
+		if (!volley->is_active) {
+			// Parked: frozen bullets take no targets. Armed when it wakes
+			// (arm_homing_after_wake), like a fresh shot.
+			volley->homing_wake_owner_id = self_id;
+			r_changed.insert(entry.id);
+			continue;
 		}
 		apply_volley_homing_and_orbiting(volley);
 		r_changed.insert(entry.id);
@@ -187,6 +199,15 @@ void BulletSpawner2D::homing_live_volleys(std::unordered_set<uint64_t> &r_change
 			return; // a homing handler freed this spawner
 		}
 	}
+}
+
+void BulletSpawner2D::arm_homing_after_wake(BulletVolley2D *volley) {
+	// The volley just woke (BulletVolley2D::enable_bullet): still this
+	// spawner's, homing still on, not armed meanwhile.
+	if (volley == nullptr || !homing_enabled || volley->owner_spawner_id != get_instance_id() || !volley->is_active || volley_tracker.contains((int64_t)volley->get_instance_id())) {
+		return;
+	}
+	apply_volley_homing_and_orbiting(volley);
 }
 
 bool BulletSpawner2D::volley_has_own_homing_targets(BulletVolley2D *volley) {

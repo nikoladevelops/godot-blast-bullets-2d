@@ -166,3 +166,97 @@ func test_aim_and_speed_reach_every_live_bullet() -> void:
 	expect_error_sequence(["BulletSpawner2D::set_live_volleys_speed: speed must be finite, nothing changed."])
 	assert_eq(sp.scale_live_volleys_speed(-1.0), 0, "bad factor")
 	expect_error_sequence(["BulletSpawner2D::scale_live_volleys_speed: factor must be finite and >= 0, nothing changed."])
+
+
+func _park(v: BulletVolley2D) -> void:
+	v.set_is_auto_pooling_enabled(false)
+	for i in v.get_amount_bullets():
+		v.disable_bullet(i)
+	assert_true(v.is_parked(), "parked")
+
+
+func _chases(v: BulletVolley2D) -> bool:
+	if v.shared_homing_deque_check_has_homing_targets():
+		return true
+	for amount in v.all_bullets_get_homing_targets_amount():
+		if amount > 0:
+			return true
+	return false
+
+
+## A parked homing volley (auto pooling off, every bullet out) stays on the
+## retarget list: woken, it is retargeted again like any live volley.
+func test_a_woken_parked_volley_is_still_retargeted() -> void:
+	var sp := _homing_spawner()
+	var v := _shoot(sp)
+	assert_eq(sp.get_tracked_volley_count(), 1, "tracked")
+	_park(v)
+	assert_eq(sp.get_tracked_volley_count(), 1, "a parked volley stays on the list (a retarget pass prunes it like this)")
+	assert_eq(sp.retarget_live_volleys(), 0, "but a pass never touches it while parked")
+	v.enable_bullet(0)
+	assert_eq(sp.get_tracked_volley_count(), 1, "still on the retarget list once woken")
+	var other: Node2D = add(Node2D.new())
+	other.position = Vector2(0, 400)
+	sp.set_homing_target_path(sp.get_path_to(other))
+	assert_eq(sp.retarget_live_volleys(), 1, "the woken volley is retargeted")
+	assert_eq(v.shared_homing_deque_get_current_homing_target(), other, "chasing the new target")
+
+
+## apply_to_live_volleys(LIVE_HOMING) reaches parked volleys (documented:
+## live or parked): homing off clears their chase, which would otherwise
+## resume on a wake; homing on arms them when they wake, like a fresh shot
+## (Shared and Per Bullet, with the shot's homing signals).
+func test_apply_homing_reaches_parked_volleys(mode: int = use_parameters([0, 1])) -> void:
+	var sp := _homing_spawner()
+	sp.set_homing_mode(mode)
+	var v := _shoot(sp)
+	assert_true(_chases(v), "fired chasing")
+	_park(v)
+	sp.set_homing_enabled(false)
+	assert_eq(sp.apply_to_live_volleys(BulletSpawner2D.LIVE_HOMING), 1, "off: the parked chase is cleared")
+	v.enable_bullet(0)
+	assert_false(_chases(v), "woken, it flies straight")
+	v.disable_bullet(0)
+	assert_true(v.is_parked(), "parked again")
+	sp.set_homing_enabled(true)
+	watch_signals(sp)
+	assert_eq(sp.apply_to_live_volleys(BulletSpawner2D.LIVE_HOMING), 1, "on: the parked volley is armed for its wake")
+	assert_signal_emit_count(sp, "volley_homing_configured", 0, "nothing configures while it is parked")
+	v.enable_bullet(1)
+	assert_signal_emit_count(sp, "volley_homing_configured", 1, "armed at the wake")
+	assert_true(_chases(v), "it chases once woken")
+	assert_eq(sp.apply_to_live_volleys(BulletSpawner2D.LIVE_HOMING), 0, "armed alike now")
+
+
+## Off then on again re-arms what the off cleared: a cleared volley leaves
+## the retarget list, so it never counts as "armed alike" afterwards.
+func test_apply_homing_off_then_on_rearms_the_cleared_volleys() -> void:
+	var sp := _homing_spawner()
+	var v := _shoot(sp)
+	sp.set_homing_enabled(false)
+	assert_eq(sp.apply_to_live_volleys(BulletSpawner2D.LIVE_HOMING), 1, "off: cleared")
+	assert_false(_chases(v), "flies straight")
+	assert_eq(sp.get_tracked_volley_count(), 0, "and leaves the retarget list")
+	sp.set_homing_enabled(true)
+	assert_eq(sp.apply_to_live_volleys(BulletSpawner2D.LIVE_HOMING), 1, "on again: re-armed")
+	assert_true(_chases(v), "it chases again")
+
+
+## The wake arming runs the homing signals (user code): a handler that frees
+## the volley it is arming ends the arming, nothing touches the volley again.
+func test_a_wake_arming_handler_may_free_the_volley() -> void:
+	var sp := _plain_spawner()
+	var v := _shoot(sp)
+	_park(v)
+	sp.set_homing_target_source(BulletSpawner2D.HOMING_SOURCE_NODE_PATH)
+	sp.set_homing_target_path(sp.get_path_to(target))
+	sp.set_homing_enabled(true)
+	assert_eq(sp.apply_to_live_volleys(BulletSpawner2D.LIVE_HOMING), 1, "marked for its wake")
+	var configured: Array = []
+	sp.homing_targets_resolved.connect(func(vol: BulletVolley2D, _t) -> void: vol.free(), CONNECT_ONE_SHOT)
+	sp.volley_homing_configured.connect(func(_vol, _n) -> void: configured.append(true))
+	v.enable_bullet(0)
+	assert_false(is_instance_valid(v), "freed by the handler")
+	assert_eq(configured, [], "the arming stops with the volley")
+	expect_no_errors("no error, no touch of the freed volley")
+	assert_eq(sp.get_tracked_volley_count(), 0, "nothing left on the list")

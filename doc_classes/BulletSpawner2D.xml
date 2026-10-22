@@ -44,7 +44,7 @@
 			<return type="int" />
 			<param index="0" name="groups" type="int" enum="PatternSpawner2D.LiveVolleyGroup" is_bitfield="true" default="2147483647" />
 			<description>
-				Applies the chosen groups ([constant PatternSpawner2D.LIVE_ALL] by default) as they stand now to every volley this spawner owns (live or parked): change a setting mid-fight, then call this and the bullets already flying follow. Graze and sound arm the volleys not armed with the current settings and disarm them while their group is off; flocking and splitting arm the volleys fired while off (turning them off already reaches flying bullets); homing arms the volleys fired without it (targets resolved now, with [signal homing_targets_resolved] and [signal volley_homing_configured]) and clears every chase while off. A volley already armed alike is left alone, so spent graze rings stay spent. Returns how many volleys changed.
+				Applies the chosen groups ([constant PatternSpawner2D.LIVE_ALL] by default) as they stand now to every volley this spawner owns (live or parked): change a setting mid-fight, then call this and the bullets already flying follow. Graze and sound arm the volleys not armed with the current settings and disarm them while their group is off; flocking and splitting arm the volleys fired while off (turning them off already reaches flying bullets); homing arms the volleys fired without it (targets resolved now, with [signal homing_targets_resolved] and [signal volley_homing_configured]; a parked volley, whose frozen bullets take no targets, is armed the same way when it wakes) and clears every chase while off, parked volleys included (a cleared volley leaves the retarget list, so turning homing on again arms it again). A volley already armed alike is left alone, so spent graze rings stay spent. Returns how many volleys changed.
 			</description>
 		</method>
 		<method name="clear_active_bullets">
@@ -131,7 +131,7 @@
 		<method name="get_tracked_volley_count" qualifiers="const">
 			<return type="int" />
 			<description>
-				How many volleys are on the retarget list (every live homing volley this spawner fired or adopted; no cap).
+				How many volleys are on the retarget list (every live or parked homing volley this spawner fired or adopted; no cap). A parked volley stays on it and is retargeted again once woken.
 			</description>
 		</method>
 		<method name="home_live_volleys_to">

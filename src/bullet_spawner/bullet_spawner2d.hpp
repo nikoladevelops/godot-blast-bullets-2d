@@ -525,9 +525,13 @@ public:
 	// an edit, or re-armed by a script) and disarm them while off; flocking
 	// and splitting arm the volleys fired while off (off already reaches
 	// flying bullets); homing arms the volleys fired while off (resolving
-	// targets now, with its signals) and clears every chase while off. A
-	// volley already armed alike is left alone (spent graze rings stay spent).
+	// targets now, with its signals; a parked volley when it wakes) and
+	// clears every chase while off, parked volleys included. A volley already
+	// armed alike is left alone (spent graze rings stay spent).
 	int apply_to_live_volleys(BitField<LiveVolleyGroup> groups = LIVE_ALL);
+	// BulletVolley2D::enable_bullet: a parked volley marked by
+	// apply_to_live_volleys(LIVE_HOMING) woke; arm it like a fresh shot.
+	void arm_homing_after_wake(BulletVolley2D *volley);
 	// Every bullet chases `target` now: a Node2D, a Vector2, a group name
 	// (each bullet the nearest member) or null (the mouse), with the Homing
 	// group's steering even if they were fired without homing. A retarget

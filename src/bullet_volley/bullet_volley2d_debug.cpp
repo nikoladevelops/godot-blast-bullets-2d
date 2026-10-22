@@ -550,6 +550,9 @@ String BulletVolley2D::debug_check_invariants() const {
 		if (emitter_config != nullptr) {
 			return "pooled volley still emits";
 		}
+		if (homing_wake_owner_id != 0) {
+			return "pooled volley still waits to be armed for homing";
+		}
 	}
 	// Per-bullet storage covers every bullet (the tick indexes it without
 	// bounds checks up to MoveTick2D::core_limit).

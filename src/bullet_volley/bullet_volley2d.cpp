@@ -223,6 +223,7 @@ void BulletVolley2D::release_life() {
 		disconnect(CachedStringNames2D::get().bullet_homing_target_reached, callable);
 	}
 	owner_spawner_id = 0;
+	homing_wake_owner_id = 0;
 	orphaned_spawner_path = String();
 	// User resources: a pooled volley must not keep them alive.
 	shared_bullets_custom_data.unref();
@@ -616,6 +617,23 @@ bool BulletVolley2D::enable_volley(const BulletVolleyData2D &data, const Vector2
 }
 
 void BulletVolley2D::enable_bullet(int bullet_index, int collision_amount, bool should_enable_attachment) {
+	const uint64_t self_id = get_instance_id();
+	const bool was_active = is_active;
+	enable_bullet_core(bullet_index, collision_amount, should_enable_attachment);
+	// A parked volley armed for homing while frozen: its owner spawner arms it
+	// now, like a fresh shot (user code: its homing signals). After the
+	// re-entrancy guard, so its handlers may wake or freeze bullets.
+	if (!was_active && ObjectDB::get_instance(ObjectID(self_id)) == this && is_active && homing_wake_owner_id != 0) {
+		const uint64_t owner = homing_wake_owner_id;
+		homing_wake_owner_id = 0;
+		BulletSpawner2D *spawner = owner == owner_spawner_id ? Object::cast_to<BulletSpawner2D>(ObjectDB::get_instance(ObjectID(owner))) : nullptr;
+		if (spawner != nullptr && !spawner->is_queued_for_deletion()) {
+			spawner->arm_homing_after_wake(this);
+		}
+	}
+}
+
+void BulletVolley2D::enable_bullet_core(int bullet_index, int collision_amount, bool should_enable_attachment) {
 	// Wake = RESUME (freeze contract): the bullet continues exactly where
 	// disable_bullet() froze it (ballistics, hit count, bounce ledger, homing
 	// queue, orbit, wobble, gravity, pattern progress, custom data). Waking

@@ -559,6 +559,10 @@ public:
 	// spawn()/enable_volley() so pooled reuse never inherits a stale owner;
 	// stamped by BulletSpawner2D::shoot_once() after every spawn it performs.
 	uint64_t owner_spawner_id = 0;
+	// A parked volley its owner spawner armed for homing while it was frozen
+	// (apply_to_live_volleys: frozen bullets take no targets): the spawner
+	// arms it like a fresh shot when it wakes. 0 = none; release_life clears it.
+	uint64_t homing_wake_owner_id = 0;
 	VolleyPool *bullets_pool = nullptr;
 	PhysicsServer2D *physics_server = nullptr;
 
@@ -1375,6 +1379,7 @@ public:
 	// Wake = resume (freeze contract). collision_amount -1 keeps the frozen
 	// hit count; 0+ sets it. Refused on a pooled volley (stale handle).
 	void enable_bullet(int bullet_index, int collision_amount = -1, bool should_enable_attachment = true);
+	void enable_bullet_core(int bullet_index, int collision_amount, bool should_enable_attachment);
 
 	// Stability introspection for tests and support (bound below).
 	// Keys: amount_bullets, active_bullets, generation, owner_spawner_id,
