@@ -341,7 +341,7 @@
 		<method name="reset_spin_angle">
 			<return type="void" />
 			<description>
-				Resets the spin angle to zero.
+				Resets the spin angle to zero (a random phase with [member spin_random_start_phase]); the next shot and the preview use it at once.
 			</description>
 		</method>
 		<method name="resolve_graze_targets" qualifiers="const">

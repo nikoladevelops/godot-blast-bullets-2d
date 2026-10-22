@@ -307,3 +307,27 @@ func test_clearing_the_generator_children_never_touches_a_freed_preview() -> voi
 	assert_eq(sp.debug_get_preview_dot_points().size(), 10, "spinning rebuilt the lost preview")
 	var stats: Dictionary = sp.debug_get_preview_stats()
 	assert_gt(int(stats["dots_draws"]), 0, "stats read live layers")
+
+
+## reset_spin_angle() re-poses the preview at once, like set_spin_angle_deg
+## (a script reading the gizmo right after the call sees the new pose).
+func test_reset_spin_angle_reposes_the_preview_at_once() -> void:
+	var sp := make_preview_spawner()
+	await idle(6)
+	sp.set_spin_angle_deg(90.0)
+	assert_almost_eq((_layers(sp)[0] as Node2D).rotation, PI / 2.0, 0.0001, "posed at 90 degrees")
+	sp.reset_spin_angle()
+	assert_almost_eq((_layers(sp)[0] as Node2D).rotation, 0.0, 0.0001, "back at 0 at once")
+
+
+## show_pattern_preview switched on at runtime (runtime preview allowed)
+## wakes the loop like show_preview_during_runtime does: marker moves keep
+## refreshing the gizmo.
+func test_show_pattern_preview_at_runtime_wakes_the_loop() -> void:
+	var sp := make_spawner(H.make_volley_data(1, 0.0, 60.0))
+	sp.show_pattern_preview = false
+	sp.show_preview_during_runtime = true
+	await idle(2)
+	assert_false(sp.is_processing(), "nothing to do: asleep")
+	sp.show_pattern_preview = true
+	assert_true(sp.is_processing(), "the preview wakes the loop")

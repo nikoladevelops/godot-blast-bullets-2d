@@ -17,6 +17,11 @@ void PatternSpawner2D::set_show_pattern_preview(bool value) {
 	show_pattern_preview = value;
 	// _validate_property hides preview_* knobs while both toggles are off.
 	notify_property_list_changed();
+	// Same as the runtime toggle below: a runtime preview switched on while
+	// the loop sleeps must wake it (marker moves refresh it there).
+	if (!Engine::get_singleton()->is_editor_hint() && is_inside_tree()) {
+		refresh_process_state();
+	}
 	update_preview_process_state();
 	on_pattern_changed();
 }

@@ -322,6 +322,9 @@ void PatternSpawner2D::reset_spin_angle() {
 	if (spin_random_start_phase) {
 		roll_spin_start_phase();
 	}
+	if (preview_active()) {
+		set_preview_pose(spin_angle_deg); // like set_spin_angle_deg: the gizmo follows at once
+	}
 }
 
 void PatternSpawner2D::advance_spin(double delta) {
