@@ -835,7 +835,15 @@ void PatternSpawner2D::rebuild_preview() {
 	}
 	const real_t dot_radius = (real_t)(preview_dot_radius * glyph_scale);
 	const real_t arrow_gap = (real_t)(preview_arrow_gap * glyph_scale);
-	const real_t beam_length = preview_beam_length();
+	// A laser's beams are world lengths: drawn in holder space, they divide by
+	// the holder's scale (exact for uniform scale, rotation and mirroring).
+	real_t beam_length = preview_beam_length();
+	if (beam_length > (real_t)0.0) {
+		const real_t holder_scale = Math::sqrt(Math::abs(holder_global.determinant()));
+		if (holder_scale > (real_t)0.0 && Math::is_finite(holder_scale)) {
+			beam_length /= holder_scale;
+		}
+	}
 	const real_t arrow_length = beam_length >= (real_t)0.0 ? beam_length : (real_t)(preview_arrow_length * glyph_scale);
 	const real_t arrow_width = (real_t)(preview_arrow_width * glyph_scale);
 	const real_t arrow_head_length = (real_t)(preview_arrow_head_length * glyph_scale);

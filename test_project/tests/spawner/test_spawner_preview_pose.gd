@@ -366,3 +366,22 @@ func test_leaving_the_tree_takes_the_preview_off_an_external_generator(how: Stri
 		sp.free()
 		await idle(1)
 		assert_eq(_layers(gen), [], "taken down with the spawner")
+
+
+## A laser spawner's preview beams are as long in the world as its beams,
+## under a scaled generator too (they used to be scaled with the holder).
+func test_laser_preview_beams_keep_their_world_length_under_a_scaled_generator() -> void:
+	var gen: Node2D = add(Node2D.new())
+	gen.scale = Vector2(2, 2)
+	var sp := LaserSpawner2D.new()
+	sp.set_shooting_enabled(false)
+	sp.laser_data = H.make_laser(0.0, 0.0, 0.0, 0.0, 200.0)
+	sp.pattern_source = LaserSpawner2D.PATTERN_FROM_HELPER_RING
+	sp.helper_bullets_amount = 4
+	sp.show_pattern_preview = true
+	sp.show_preview_during_runtime = true
+	add(sp)
+	sp.set_transforms_generator(gen)
+	await idle(6)
+	var arrows: Dictionary = sp.debug_get_preview_arrows()
+	assert_almost_eq(float(arrows["length"]) * 2.0, 200.0, 0.001, "holder-local length x the generator scale = the beam's 200 px")
