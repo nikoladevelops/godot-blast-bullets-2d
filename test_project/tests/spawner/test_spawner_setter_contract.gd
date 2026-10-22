@@ -17,14 +17,30 @@ const ANY_VALUE_OK := {
 }
 
 
-## Properties BulletSpawner2D and its plugin base declare (inherited Node2D
-## ones are the engine's business), as seen on a live instance (usage flags
-## applied).
+## A spawner of `kind` ("bullet" / "laser"), shooting off, in the tree.
+func _make(kind: String) -> PatternSpawner2D:
+	if kind == "bullet":
+		return make_spawner()
+	var sp := LaserSpawner2D.new()
+	sp.set_shooting_enabled(false)
+	sp.laser_data = H.make_laser()
+	sp.pattern_source = LaserSpawner2D.PATTERN_FROM_HELPER_RING
+	sp.helper_bullets_amount = 4
+	add(sp)
+	sp.set_bullet_factory(factory)
+	return sp
+
+
+## Properties the spawner's class and its plugin bases declare (inherited
+## Node2D ones are the engine's business), as seen on a live instance (usage
+## flags applied).
 func _editor_props(obj: Object) -> Array:
 	var own := {}
-	for cls in ["PatternSpawner2D", "BulletSpawner2D"]:
+	var cls := StringName(obj.get_class())
+	while cls != &"" and ClassDB.class_get_api_type(cls) == ClassDB.API_EXTENSION:
 		for p in ClassDB.class_get_property_list(cls, true):
 			own[str(p.name)] = true
+		cls = ClassDB.get_parent_class(cls)
 	var out: Array = []
 	for p in obj.get_property_list():
 		if not own.has(str(p.name)):
@@ -40,7 +56,7 @@ func _editor_props(obj: Object) -> Array:
 
 ## Sets `value` and returns a problem string, or "" when the property
 ## rejected it loudly (one KEEP_TEXT error) and kept the old value.
-func _probe(sp: BulletSpawner2D, prop: String, value: Variant) -> String:
+func _probe(sp: PatternSpawner2D, prop: String, value: Variant) -> String:
 	var before: Variant = sp.get(prop)
 	expect_no_errors("clean before probing " + prop)
 	sp.set(prop, value)
@@ -66,8 +82,8 @@ func _assert_none(bad: Array, what: String) -> void:
 	assert_true(bad.is_empty(), "%s - %d problem(s):\n  %s" % [what, bad.size(), "\n  ".join(bad)])
 
 
-func test_float_properties_reject_nan_and_inf() -> void:
-	var sp := make_spawner()
+func test_float_properties_reject_nan_and_inf(kind: String = use_parameters(["bullet", "laser"])) -> void:
+	var sp := _make(kind)
 	var bad: Array = []
 	var probed := 0
 	for p in _editor_props(sp):
@@ -83,8 +99,8 @@ func test_float_properties_reject_nan_and_inf() -> void:
 	_assert_none(bad, "float setters reject NaN/Inf and keep the old value")
 
 
-func test_vector_properties_reject_nan() -> void:
-	var sp := make_spawner()
+func test_vector_properties_reject_nan(kind: String = use_parameters(["bullet", "laser"])) -> void:
+	var sp := _make(kind)
 	var bad: Array = []
 	var probed := 0
 	for p in _editor_props(sp):
@@ -99,8 +115,8 @@ func test_vector_properties_reject_nan() -> void:
 	_assert_none(bad, "vector setters reject NaN and keep the old value")
 
 
-func test_point_list_properties_reject_non_finite_entries() -> void:
-	var sp := make_spawner()
+func test_point_list_properties_reject_non_finite_entries(kind: String = use_parameters(["bullet", "laser"])) -> void:
+	var sp := _make(kind)
 	var bad: Array = []
 	var probed := 0
 	for p in _editor_props(sp):
@@ -117,8 +133,8 @@ func test_point_list_properties_reject_non_finite_entries() -> void:
 	_assert_none(bad, "point lists reject non-finite entries and keep the old value")
 
 
-func test_color_properties_reject_nan() -> void:
-	var sp := make_spawner()
+func test_color_properties_reject_nan(kind: String = use_parameters(["bullet", "laser"])) -> void:
+	var sp := _make(kind)
 	var bad: Array = []
 	var probed := 0
 	for p in _editor_props(sp):
@@ -132,8 +148,8 @@ func test_color_properties_reject_nan() -> void:
 	_assert_none(bad, "colour setters reject NaN and keep the old value")
 
 
-func test_enum_properties_reject_unknown_ids() -> void:
-	var sp := make_spawner()
+func test_enum_properties_reject_unknown_ids(kind: String = use_parameters(["bullet", "laser"])) -> void:
+	var sp := _make(kind)
 	var bad: Array = []
 	var probed := 0
 	for p in _editor_props(sp):
@@ -294,8 +310,8 @@ const RANGE_IS_A_SLIDER := {
 }
 
 
-func test_range_hints_are_enforced() -> void:
-	var sp := make_spawner()
+func test_range_hints_are_enforced(kind: String = use_parameters(["bullet", "laser"])) -> void:
+	var sp := _make(kind)
 	var bad: Array = []
 	var probed := 0
 	for p in _editor_props(sp):
@@ -328,19 +344,28 @@ func test_range_hints_are_enforced() -> void:
 ## would turn into INF in the pattern, homing or orbit math. Every float
 ## property either refuses it loudly (and keeps the old value) or takes it
 ## and still fires a clean volley: no error at the shot, every bullet finite.
-func test_float_properties_never_overflow_real_t() -> void:
+func test_float_properties_never_overflow_real_t(kind: String = use_parameters(["bullet", "laser"])) -> void:
 	var target: Node2D = add(Node2D.new())
 	target.position = Vector2(300, 0)
 	var bad: Array = []
-	for p in _editor_props(make_spawner()):
+	for p in _editor_props(_make(kind)):
 		if int(p.type) != TYPE_FLOAT:
 			continue
 		var prop := str(p.name)
-		var sp := make_spawner(H.make_volley_data(4, 50.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
-		sp.set_homing_enabled(true)
-		sp.set_homing_target_source(BulletSpawner2D.HOMING_SOURCE_NODE_PATH)
-		sp.set_homing_target_path(sp.get_path_to(target))
-		sp.orbiting_enabled = true
+		var sp: PatternSpawner2D
+		if kind == "bullet":
+			var bs := make_spawner(H.make_volley_data(4, 50.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
+			bs.set_homing_enabled(true)
+			bs.set_homing_target_source(BulletSpawner2D.HOMING_SOURCE_NODE_PATH)
+			bs.set_homing_target_path(bs.get_path_to(target))
+			bs.orbiting_enabled = true
+			sp = bs
+		else:
+			var ls := _make("laser") as LaserSpawner2D
+			ls.laser_data.aim = LaserData2D.LASER_AIM_LOCK_ON
+			ls.laser_target_source = LaserSpawner2D.LASER_TARGET_NODE_PATH
+			ls.laser_target_path = ls.get_path_to(target)
+			sp = ls
 		var before: Variant = sp.get(prop)
 		sp.set(prop, 1e39)
 		var refused := 0
@@ -358,11 +383,19 @@ func test_float_properties_never_overflow_real_t() -> void:
 			continue
 		if not sp.shoot_once():
 			bad.append("%s = 1e39: accepted, then the shot failed" % prop)
-		for v in sp.get_live_volleys():
-			for i in v.get_amount_bullets():
-				if not v.get_bullet_transform(i).origin.is_finite():
-					bad.append("%s = 1e39: accepted, bullet %d not finite" % [prop, i])
-					break
+		if sp is BulletSpawner2D:
+			for v in (sp as BulletSpawner2D).get_live_volleys():
+				for i in v.get_amount_bullets():
+					if not v.get_bullet_transform(i).origin.is_finite():
+						bad.append("%s = 1e39: accepted, bullet %d not finite" % [prop, i])
+						break
+		else:
+			factory.debug_advance_time(1.0 / 60.0)
+			for l in (sp as LaserSpawner2D).get_live_lasers():
+				for i in l.get_beam_count():
+					if not (l.get_beam_start(i).is_finite() and l.get_beam_end(i).is_finite()):
+						bad.append("%s = 1e39: accepted, beam %d not finite" % [prop, i])
+						break
 		for err in get_errors():
 			if not err.handled:
 				err.handled = true
