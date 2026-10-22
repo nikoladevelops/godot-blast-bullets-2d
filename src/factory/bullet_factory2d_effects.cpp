@@ -188,30 +188,6 @@ int BulletFactory2D::fx_frame_for_age(const std::vector<double> &starts, double 
 	return (int)lo;
 }
 
-Ref<Texture2D> BulletFactory2D::get_whitened_frame(const Ref<Texture2D> &source) {
-	if (source.is_null()) {
-		return Ref<Texture2D>();
-	}
-	const uint64_t key = (uint64_t)source->get_instance_id();
-	auto it = whitened_frame_cache.find(key);
-	if (it != whitened_frame_cache.end()) {
-		return it->second;
-	}
-	if (whitened_frame_cache.size() >= 4096) {
-		whitened_frame_cache.clear();
-	}
-	Ref<Texture2D> result;
-	Ref<Image> white = BulletEffectLayerData2D::whiten_image_copy(BulletEffectLayerData2D::read_frame_image(source));
-	if (white.is_valid()) {
-		Ref<ImageTexture> white_tex;
-		white_tex.instantiate();
-		white_tex->set_image(white);
-		result = white_tex;
-	}
-	whitened_frame_cache[key] = result;
-	return result;
-}
-
 void BulletFactory2D::fx_ensure_effects_container() {
 	if (sprite_effects_container.get() != nullptr) {
 		return;

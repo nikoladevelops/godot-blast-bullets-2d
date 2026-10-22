@@ -7,70 +7,37 @@ using namespace godot;
 
 namespace BlastBullets2D {
 
+// The shared name rule (sprite/sprite_anim2d.hpp) in the volley's wording.
 static bool resolve_sprite_animation_impl(const Ref<SpriteFrames> &p_sprite_frames, const StringName &p_requested, StringName &out_anim, bool silent) {
-	if (p_sprite_frames.is_null()) {
-		if (!silent) {
-			UtilityFunctions::push_error("BulletVolley2D: sprite_frames is null. Assign a SpriteFrames resource.");
-		}
-		return false;
-	}
-	const PackedStringArray names = p_sprite_frames->get_animation_names();
-	if (names.is_empty()) {
-		if (!silent) {
-			UtilityFunctions::push_error("BulletVolley2D: sprite_frames has no animations.");
-		}
-		return false;
-	}
-	const String requested_str = String(p_requested);
-	const bool is_auto = requested_str.is_empty() || p_requested == StringName("default");
-	// Picks the first animation that actually has frames. An empty "default" (fresh
-	// SpriteFrames resources always contain one) must not shadow a populated animation.
-	auto first_with_frames = [&]() -> StringName {
-		for (int i = 0; i < names.size(); ++i) {
-			if (p_sprite_frames->get_frame_count(names[i]) > 0) {
-				return names[i];
-			}
-		}
-		return StringName();
-	};
-	if (is_auto) {
-		// Unselected animation: play "default" silently when usable, else first animation
-		// with frames, silently.
-		if (p_sprite_frames->has_animation(StringName("default")) && p_sprite_frames->get_frame_count(StringName("default")) > 0) {
-			out_anim = StringName("default");
-			return true;
-		}
-		const StringName fallback = first_with_frames();
-		if (String(fallback).is_empty()) {
-			if (!silent) {
-				UtilityFunctions::push_error("BulletVolley2D: sprite_frames has no animation with frames.");
-			}
-			return false;
-		}
-		out_anim = fallback;
-		return true;
-	}
-	if (p_sprite_frames->has_animation(p_requested) && p_sprite_frames->get_frame_count(p_requested) > 0) {
-		out_anim = p_requested;
-		return true;
-	}
-	const StringName fallback = first_with_frames();
-	if (String(fallback).is_empty()) {
-		if (!silent) {
-			UtilityFunctions::push_error("BulletVolley2D: sprite_frames has no animation with frames.");
-		}
-		return false;
-	}
+	const SpriteAnimChoice2D choice = resolve_sprite_animation2d(p_sprite_frames, p_requested);
 	if (!silent) {
-		UtilityFunctions::push_error("BulletVolley2D: missing animation '" + requested_str + "', falling back to '" + String(fallback) + "'.");
+		switch (choice.pick) {
+			case SpriteAnimPick2D::NULL_FRAMES:
+				UtilityFunctions::push_error("BulletVolley2D: sprite_frames is null. Assign a SpriteFrames resource.");
+				break;
+			case SpriteAnimPick2D::NO_ANIMATIONS:
+				UtilityFunctions::push_error("BulletVolley2D: sprite_frames has no animations.");
+				break;
+			case SpriteAnimPick2D::NO_FRAMES_ANYWHERE:
+				UtilityFunctions::push_error("BulletVolley2D: sprite_frames has no animation with frames.");
+				break;
+			case SpriteAnimPick2D::FELL_BACK:
+				UtilityFunctions::push_error("BulletVolley2D: missing animation '" + String(p_requested) + "', falling back to '" + String(choice.anim) + "'.");
+				break;
+			case SpriteAnimPick2D::RESOLVED:
+				break;
+		}
 	}
-	out_anim = fallback;
+	if (!choice.usable()) {
+		return false;
+	}
+	out_anim = choice.anim;
 	return true;
 }
 
 void BulletVolley2D::advance_sprite_animation(double delta) {
-	const int64_t frame_count = (int64_t)anim_frames.size();
-	if (frame_count <= 1 || !is_active || anim_paused || anim_finished) {
+	const int64_t frame_count = (int64_t)anim.frames.size();
+	if (frame_count <= 1 || !is_active || anim_paused || anim_finished || anim.held) {
 		return;
 	}
 	if (!Math::is_finite(delta) || delta <= 0.0) {
@@ -84,12 +51,12 @@ void BulletVolley2D::advance_sprite_animation(double delta) {
 	while (anim_frame_time_left <= 0.0) {
 		if (++strides > 8) {
 			// Anti-spiral: resync timer to current frame instead of looping forever.
-			anim_frame_time_left = anim_frame_secs[anim_frame_index] > 0.0 ? anim_frame_secs[anim_frame_index] : 0.0;
+			anim_frame_time_left = anim.secs[anim_frame_index] > 0.0 ? anim.secs[anim_frame_index] : 0.0;
 			break;
 		}
 		int next = anim_frame_index + 1;
 		if (next >= frame_count) {
-			if (anim_loop) {
+			if (anim.loop) {
 				next = 0;
 			} else {
 				anim_frame_index = (int)frame_count - 1;
@@ -104,10 +71,10 @@ void BulletVolley2D::advance_sprite_animation(double delta) {
 			}
 		}
 		anim_frame_index = next;
-		set_texture(anim_frames[anim_frame_index]);
-		anim_frame_time_left += anim_frame_secs[anim_frame_index];
+		set_texture(anim.frames[anim_frame_index]);
+		anim_frame_time_left += anim.secs[anim_frame_index];
 		// Guard against zero-length frames looping forever in one tick.
-		if (anim_frame_secs[anim_frame_index] <= 0.0) {
+		if (anim.secs[anim_frame_index] <= 0.0) {
 			break;
 		}
 	}
@@ -291,78 +258,44 @@ bool BulletVolley2D::resolve_sprite_animation_quiet(const Ref<SpriteFrames> &p_s
 }
 
 bool BulletVolley2D::rebuild_sprite_animation(const Ref<SpriteFrames> &p_sprite_frames, const StringName &p_animation) {
-	StringName anim;
-	if (!resolve_sprite_animation(p_sprite_frames, p_animation, anim)) {
+	StringName name;
+	if (!resolve_sprite_animation(p_sprite_frames, p_animation, name)) {
 		return false; // error already reported, previous animation untouched
 	}
-	const int count = p_sprite_frames->get_frame_count(anim);
-	if (count <= 0) {
-		UtilityFunctions::push_error("BulletVolley2D: animation '" + String(anim) + "' has no frames.");
-		return false;
+	// Exact-color bullets (override_frame_color) get whitened copies (alpha
+	// kept) so the volley tint reads exactly: factory-cached, since a
+	// whiten reads pixels back from the GPU. Unreadable frames keep the
+	// original art with one warning per rebuild, never a blank.
+	SpriteAnimBakeOptions2D options;
+	options.whiten = anim_override_frame_color;
+	options.cache = bullet_factory != nullptr ? &bullet_factory->frame_cache : nullptr;
+	SpriteAnimBakeReport2D report;
+	SpriteAnim2D baked;
+	const bool baked_ok = bake_sprite_animation2d(p_sprite_frames, name, options, baked, report);
+	String anim_text = "BulletVolley2D: animation '" + String(name) + "'";
+	if (report.bad_speed) {
+		UtilityFunctions::push_error(anim_text + " has invalid speed, using 1 fps.");
 	}
-	double fps = p_sprite_frames->get_animation_speed(anim);
-	if (!Math::is_finite(fps) || fps <= 0.0) {
-		UtilityFunctions::push_error("BulletVolley2D: animation '" + String(anim) + "' has invalid speed, using 1 fps.");
-		fps = 1.0;
+	for (int frame : report.bad_duration_frames) {
+		UtilityFunctions::push_error(anim_text + " frame " + String::num_int64(frame) + " has non-finite duration, using 0.");
 	}
-	std::vector<Ref<Texture2D>> frames;
-	std::vector<double> secs;
-	frames.reserve(count);
-	secs.reserve(count);
-	bool whiten_warned = false;
-	for (int i = 0; i < count; ++i) {
-		Ref<Texture2D> tex = p_sprite_frames->get_frame_texture(anim, i);
-		if (tex.is_null()) {
-			UtilityFunctions::push_error("BulletVolley2D: animation '" + String(anim) + "' frame " + String::num_int64(i) + " has null texture.");
-			return false; // previous cache untouched (swap only on success below)
-		}
-		const float dur = p_sprite_frames->get_frame_duration(anim, i);
-		if (!Math::is_finite((double)dur)) {
-			UtilityFunctions::push_error("BulletVolley2D: animation '" + String(anim) + "' frame " + String::num_int64(i) + " has non-finite duration, using 0.");
-		}
-		if (anim_override_frame_color) {
-			// Exact-color bullets: whitened copy (alpha preserved) so the
-			// volley tint reads exactly. Same fallback contract as the
-			// effect-layer override: unreadable frames keep the original
-			// art with one warning per rebuild, never a blank.
-			// Factory-cached: the whiten reads pixels back from the GPU, so
-			// rebuilding it on every spawn/pool reuse was a per-frame stall.
-			Ref<Texture2D> white_tex;
-			if (bullet_factory != nullptr) {
-				white_tex = bullet_factory->get_whitened_frame(tex);
-			} else {
-				Ref<Image> white = BulletEffectLayerData2D::whiten_image_copy(BulletEffectLayerData2D::read_frame_image(tex));
-				if (white.is_valid()) {
-					Ref<ImageTexture> fresh;
-					fresh.instantiate();
-					fresh->set_image(white);
-					white_tex = fresh;
-				}
-			}
-			if (white_tex.is_valid()) {
-				frames.push_back(white_tex);
-			} else {
-				if (!whiten_warned) {
-					whiten_warned = true;
-					UtilityFunctions::push_warning("BulletVolley2D: override_frame_color could not read a frame of '" + String(anim) + "', keeping the original art for unreadable frames.");
-				}
-				frames.push_back(tex);
-			}
-		} else {
-			frames.push_back(tex);
-		}
-		secs.push_back((!Math::is_finite((double)dur) || dur <= 0.0f) ? 0.0 : (double)dur / fps);
+	if (report.null_frame >= 0) {
+		UtilityFunctions::push_error(anim_text + " frame " + String::num_int64(report.null_frame) + " has null texture.");
+	}
+	if (report.whiten_unreadable) {
+		UtilityFunctions::push_warning("BulletVolley2D: override_frame_color could not read a frame of '" + String(name) + "', keeping the original art for unreadable frames.");
+	}
+	if (!baked_ok) {
+		return false; // previous animation untouched
 	}
 	anim_source = p_sprite_frames;
-	anim_name = anim;
-	anim_frames.swap(frames);
-	anim_frame_secs.swap(secs);
-	anim_loop = p_sprite_frames->get_animation_loop(anim);
+	anim_name = name;
+	anim = std::move(baked);
 	anim_paused = false;
 	anim_finished = false;
 	anim_frame_index = 0;
-	anim_frame_time_left = anim_frame_secs[0];
-	set_texture(anim_frames[0]);
+	anim_frame_time_left = anim.secs[0];
+	set_texture(anim.frames[0]);
 	return true;
 }
 
@@ -386,31 +319,31 @@ bool BulletVolley2D::play_sprite_animation_name(const StringName &p_animation) {
 }
 
 bool BulletVolley2D::restart_sprite_animation() {
-	if (anim_frames.empty()) {
+	if (anim.empty()) {
 		UtilityFunctions::push_error("BulletVolley2D restart_sprite_animation: no baked animation to restart.");
 		return false;
 	}
 	anim_frame_index = 0;
-	anim_frame_time_left = anim_frame_secs[0];
+	anim_frame_time_left = anim.secs[0];
 	anim_paused = false;
 	anim_finished = false;
-	set_texture(anim_frames[0]);
+	set_texture(anim.frames[0]);
 	return true;
 }
 
 bool BulletVolley2D::set_sprite_frame(int frame) {
-	if (anim_frames.empty()) {
+	if (anim.empty()) {
 		UtilityFunctions::push_error("BulletVolley2D set_sprite_frame: no baked animation to seek.");
 		return false;
 	}
-	if (frame < 0 || frame >= (int)anim_frames.size()) {
-		UtilityFunctions::push_error("BulletVolley2D set_sprite_frame: frame " + String::num_int64(frame) + " is outside 0.." + String::num_int64((int64_t)anim_frames.size() - 1) + ", keeping frame " + String::num_int64(anim_frame_index) + ".");
+	if (frame < 0 || frame >= anim.size()) {
+		UtilityFunctions::push_error("BulletVolley2D set_sprite_frame: frame " + String::num_int64(frame) + " is outside 0.." + String::num_int64((int64_t)anim.size() - 1) + ", keeping frame " + String::num_int64(anim_frame_index) + ".");
 		return false;
 	}
 	anim_frame_index = frame;
-	anim_frame_time_left = anim_frame_secs[frame];
+	anim_frame_time_left = anim.secs[frame];
 	anim_finished = false;
-	set_texture(anim_frames[frame]);
+	set_texture(anim.frames[frame]);
 	return true;
 }
 

@@ -245,8 +245,7 @@ void BulletVolley2D::release_life() {
 		r.unref();
 	}
 	anim_source.unref();
-	anim_frames.clear();
-	anim_frame_secs.clear();
+	anim.clear();
 	set_texture(Ref<Texture2D>());
 	// The material (and its instance parameter values, which may hold
 	// textures) belongs to the spawn data: the next life sets its own.

@@ -243,8 +243,8 @@ void BulletFactory2D::reset_factory_state(const PoolKey *key) {
 	// preserve living volleys' bakes, or their triggers would go silent.
 	if (key == nullptr) {
 		fx_unregister_all_bakes();
-		// Full reset: also drop whitened frames so edited art re-bakes.
-		clear_whitened_frame_cache();
+		// Full reset: also drop the frame textures so edited art re-bakes.
+		frame_cache.clear();
 	}
 
 	// Attachments of freed multis are already handled per-multi via force_delete ->

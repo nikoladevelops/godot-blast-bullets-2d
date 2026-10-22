@@ -41,6 +41,7 @@
 #include "godot_cpp/variant/utility_functions.hpp"
 #include "godot_cpp/variant/vector2.hpp"
 #include "pooling/volley_pool2d.hpp"
+#include "sprite/frame_texture_cache2d.hpp"
 
 namespace BlastBullets2D {
 using namespace godot;
@@ -441,18 +442,10 @@ public:
 	bool structural_flush_connected = false;
 	void queue_structural_call(std::function<void()> call);
 
-	// Whitened bullet frames (override_frame_color), keyed by the source
-	// texture's instance id (ids are never reused within a session). The
-	// whiten reads pixels back from the GPU: without the cache every
-	// spawn/pool reuse of such a volley paid that readback per frame.
-	// A null entry remembers an unreadable frame (the caller keeps the
-	// original art). Bounded: cleared wholesale past the cap.
-	std::unordered_map<uint64_t, Ref<Texture2D>> whitened_frame_cache;
-
-	// Returns the cached whitened copy of a bullet frame, building it once.
-	// Null when the frame's pixels cannot be read (caller keeps the original).
-	Ref<Texture2D> get_whitened_frame(const Ref<Texture2D> &source);
-	void clear_whitened_frame_cache() { whitened_frame_cache.clear(); }
+	// Textures made from SpriteFrames frames (sprite/frame_texture_cache2d.hpp),
+	// shared by this factory's volleys, effect layers and lasers. A full
+	// reset() clears it so edited art re-bakes.
+	FrameTextureCache2D frame_cache;
 
 	// Contains all one-shot effect shard nodes in the scene tree.
 	OwnedNode2D<Node2D> sprite_effects_container;

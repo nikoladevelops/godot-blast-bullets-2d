@@ -50,6 +50,7 @@
 #include "godot_cpp/variant/variant.hpp"
 #include "godot_cpp/variant/vector2.hpp"
 #include "pooling/volley_pool_key2d.hpp"
+#include "sprite/sprite_anim2d.hpp"
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -293,7 +294,7 @@ public:
 	// volley's finite lifetime) times factors[i]. Right after the spawn.
 	void apply_life_time_factors(const real_t *factors, int count);
 
-	// Advances the SpriteFrames animation baked in anim_frames/anim_frame_secs.
+	// Advances the SpriteFrames animation baked in anim.
 	// Hot path: plain countdown + index + one set_texture. No SpriteFrames calls here.
 	// Texture swaps are interpolation-exempt (interpolation only lerps transforms).
 	void advance_sprite_animation(double delta);
@@ -348,7 +349,7 @@ public:
 	bool restart_sprite_animation();
 	void stop_sprite_animation() { anim_paused = true; }
 	void resume_sprite_animation() { anim_paused = false; }
-	bool is_sprite_animation_playing() const { return is_active && !anim_paused && !anim_finished && anim_frames.size() > 1; }
+	bool is_sprite_animation_playing() const { return is_active && !anim_paused && !anim_finished && anim.frames.size() > 1; }
 	bool is_sprite_animation_finished() const { return anim_finished; }
 
 	StringName get_sprite_animation() const { return anim_name; }
@@ -359,7 +360,7 @@ public:
 	// paused state; a finished animation plays again (and finishes again).
 	// Out of range or no animation: error, false, nothing changes.
 	bool set_sprite_frame(int frame);
-	int get_sprite_frame_count() const { return (int)anim_frames.size(); }
+	int get_sprite_frame_count() const { return anim.size(); }
 
 	// Bullet Speed Data
 
@@ -1005,15 +1006,14 @@ public:
 
 	// TEXTURE / ANIMATION RELATED
 
-	// Baked SpriteFrames animation. Rebuilt at spawn/enable/play only; the per-tick
-	// advance_sprite_animation() touches just these vectors + set_texture.
-	// Texture swaps are interpolation-exempt: physics interpolation only lerps transform
-	// buffers, so play/rebuild must never touch all_previous_* caches (and doesn't).
+	// Baked SpriteFrames animation (sprite/sprite_anim2d.hpp). Rebuilt at
+	// spawn/enable/play only; the per-tick advance_sprite_animation() touches
+	// just anim + set_texture. Texture swaps are interpolation-exempt: physics
+	// interpolation only lerps transform buffers, so play/rebuild must never
+	// touch all_previous_* caches (and doesn't).
 	Ref<SpriteFrames> anim_source;
 	StringName anim_name = "default";
-	std::vector<Ref<Texture2D>> anim_frames;
-	std::vector<double> anim_frame_secs;
-	bool anim_loop = true;
+	SpriteAnim2D anim;
 	bool anim_paused = false;
 	bool anim_finished = false;
 	// Set by advance_sprite_animation when the last frame finished; the tick
