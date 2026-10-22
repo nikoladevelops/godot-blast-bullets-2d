@@ -483,11 +483,6 @@ void PatternSpawner2D::set_preview_pose(double spin_angle_degrees) {
 	}
 }
 
-// Snapshots the effective generator (same fallback as the collect path) plus
-// the aimed target, storing ids and global transforms. Never assumes an old
-// pointer: everything is freshly resolved from paths here.
-// Deferred flush for editor-coalesced rebuilds (see rebuild_preview): runs
-// the build synchronously exactly once, bypassing re-queue.
 // Holders are found by OWNER, never by name: spawners sharing one generator
 // each keep their own holder under it, and one turning its preview off
 // deletes only its own (a name lookup deleted the other's holder under its
@@ -538,6 +533,11 @@ void PatternSpawner2D::remove_own_preview_holders() {
 	set_preview_nodes(nullptr, nullptr, nullptr);
 }
 
+// Snapshots the effective generator (same fallback as the collect path) plus
+// the aimed target, storing ids and global transforms. Never assumes an old
+// pointer: everything is freshly resolved from paths here.
+// Deferred flush for editor-coalesced rebuilds (see rebuild_preview): runs
+// the build synchronously exactly once, bypassing re-queue.
 void PatternSpawner2D::_do_queued_preview_rebuild() {
 	preview_rebuild_queued = false;
 	if (!preview_allowed_here()) {
@@ -684,15 +684,10 @@ void PatternSpawner2D::rebuild_preview() {
 		return;
 	}
 	const uint64_t self_id = get_instance_id();
-	auto own_holder_under = [&](Node *parent) { return own_preview_holder_under(parent); };
-	auto delete_holder = [](Node *holder) { delete_preview_holder(holder); };
-	auto remove_holder_from = [&](Node *parent) -> bool {
-		Node2D *live = own_holder_under(parent);
-		if (live == nullptr) {
-			return false;
+	auto remove_holder_from = [&](Node *parent) {
+		if (Node2D *live = own_preview_holder_under(parent)) {
+			delete_preview_holder(live);
 		}
-		delete_holder(live);
-		return true;
 	};
 	// Strays: a holder whose owner is gone or no longer uses it (a spawner
 	// freed or retargeted while out of the tree, a duplicated subtree, an
@@ -714,7 +709,7 @@ void PatternSpawner2D::rebuild_preview() {
 					continue;
 				}
 			}
-			delete_holder(child);
+			delete_preview_holder(child);
 		}
 	};
 	if (!show_pattern_preview) {
@@ -726,7 +721,7 @@ void PatternSpawner2D::rebuild_preview() {
 	// they spawn. Heal from the tree every rebuild: never trust cached
 	// pointers (undo/redo, duplication, scene reload can drop nodes).
 	prune_stray_holders(effective_base);
-	preview_holder = own_holder_under(effective_base);
+	preview_holder = own_preview_holder_under(effective_base);
 	if (preview_holder == nullptr) {
 		// Generator was retargeted: drop the stale holder under the spawner
 		// (or under the previously tracked base) so only one preview exists.
