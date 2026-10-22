@@ -312,17 +312,22 @@ func test_burst_off_keeps_a_plain_telegraph() -> void:
 
 ## An auto chain stops where the cap or the budget stops, also when either is
 ## set mid-chain (the clamp at the chain's start alone fired past it).
-func test_an_auto_burst_stops_at_a_cap_set_mid_chain(kind: String = use_parameters(["max_volleys", "fire_n_volleys"])) -> void:
+func test_an_auto_burst_stops_at_a_cap_set_mid_chain(kind: String = use_parameters(["max_volleys", "max_volleys_reached", "fire_n_volleys"])) -> void:
 	var sp := _spawner(5)
 	sp.set_shooting_enabled(true)
 	await _until(sp, "burst_shot_fired", 1)
-	if kind == "max_volleys":
-		sp.max_volleys = 2
-	else:
-		sp.fire_n_volleys(1)
+	var want := 2
+	match kind:
+		"max_volleys":
+			sp.max_volleys = 2
+		"max_volleys_reached":
+			sp.max_volleys = 1 # already reached: no further chain shot
+			want = 1
+		_:
+			sp.fire_n_volleys(1)
 	await _until(sp, "burst_finished", 1)
 	await idle(10)
-	assert_eq(sp.get_volleys_fired(), 2, "the chain ends at the new limit")
+	assert_eq(sp.get_volleys_fired(), want, "the chain ends at the new limit")
 	assert_eq(sp.get_burst_shots_left(), 0, "nothing left to resume")
 	sp.resume_shooting()
 	await idle(10)

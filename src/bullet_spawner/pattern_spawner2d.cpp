@@ -1533,6 +1533,10 @@ void PatternSpawner2D::fire_burst_volley() {
 			}
 			// Refused (the muzzle outside the despawn bounds): a failed
 			// attempt, retried a burst interval out, warning first again.
+		} else if (burst_from_auto && volleys_remaining() == 0) {
+			// The cap or the budget was lowered onto the shots already
+			// fired: the auto chain ends without another shot.
+			burst_shots_left = 0;
 		} else {
 			// Mirror rhythm: the first shot is plain, then shots alternate
 			// (plain, mirrored, plain, ...) for any burst_count.
