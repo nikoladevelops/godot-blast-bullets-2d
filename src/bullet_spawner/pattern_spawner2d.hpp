@@ -1544,6 +1544,9 @@ protected:
 	// Set on EXIT_TREE and by a new path or space: the next pose is a jump
 	// (no velocity).
 	bool movement_jumped = false;
+	// movement_enabled turned on (autostart) while out of the tree after the
+	// first _ready: plays on the next entry (_ready only runs once).
+	bool movement_autostart_pending = false;
 	Vector2 movement_velocity;
 	bool movement_warned_unusable_path = false;
 	// Advances playback by delta and moves the node. Returns false when

@@ -22,6 +22,9 @@ void PatternSpawner2D::set_movement_enabled(bool value) {
 	movement_enabled = value;
 	++movement_epoch;
 	notify_property_list_changed();
+	// Out of the tree after the first _ready: autostart waits for the next
+	// entry (POST_ENTER_TREE); before it, _ready starts it.
+	movement_autostart_pending = value && movement_autostart && !is_inside_tree();
 	if (Engine::get_singleton()->is_editor_hint() || !is_inside_tree()) {
 		return;
 	}

@@ -464,3 +464,21 @@ func test_switching_the_path_or_space_mid_play_is_not_travel(kind: String = use_
 		peak = maxf(peak, sp.get_movement_velocity().length())
 	assert_lt(peak, 400.0, "no jump-sized velocity (the leg runs at 300 px/s)")
 	assert_true(sp.is_movement_playing(), "it keeps playing")
+
+
+## Movement switched on while the spawner is out of the tree after its first
+## _ready (a pooled enemy, a reparent) starts with autostart once it is back.
+func test_movement_enabled_while_detached_autostarts_on_reentry() -> void:
+	var sp := make_spawner(H.make_volley_data(4, 200.0, 2.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 8)
+	sp.movement_transition = 0
+	sp.movement_ease = 0
+	sp.movement_duration_sec = 1.0
+	sp.set_movement_path_node(path)
+	await idle(1)
+	var parent := sp.get_parent()
+	parent.remove_child(sp)
+	sp.movement_enabled = true
+	parent.add_child(sp)
+	assert_true(sp.is_movement_playing(), "autostart plays on the way back in")
+	await idle(10)
+	assert_gt(sp.global_position.x, 10.0, "and it moves")

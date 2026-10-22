@@ -959,6 +959,7 @@ void PatternSpawner2D::_ready() {
 	restart_owned_clocks();
 	// Movement autostart: the spawner's pose when it enters play is the
 	// RELATIVE_TO_START anchor.
+	movement_autostart_pending = false;
 	if (movement_enabled && movement_autostart && !movement_playing) {
 		movement_has_last_position = false;
 		movement_finished = false;
@@ -1012,6 +1013,15 @@ void PatternSpawner2D::_notification(int p_what) {
 			return;
 		}
 		on_predelete_owned(factory);
+	} else if (p_what == NOTIFICATION_POST_ENTER_TREE) {
+		// Movement switched on while out of the tree after the first _ready
+		// (a pooled enemy, a reparent): autostart now (_ready never runs again).
+		if (movement_autostart_pending && is_node_ready() && !Engine::get_singleton()->is_editor_hint()) {
+			movement_autostart_pending = false;
+			if (movement_enabled && movement_autostart && !movement_playing) {
+				movement_play();
+			}
+		}
 	} else if (p_what == NOTIFICATION_ENTER_TREE) {
 		fill_assigned_node_paths();
 		// Setters only refresh the process flag inside the tree: settings changed
