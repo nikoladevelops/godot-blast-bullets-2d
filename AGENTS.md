@@ -61,7 +61,7 @@ for the rest: the sections are written to be looked up, not read once.
 
 ```sh
 GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py   # build (exit 1 = failed; never raw scons, never edit SConstruct)
-python3 tools/run_tests.py                                       # 236 files / 2184 tests, ~25 s, leak-checked
+python3 tools/run_tests.py                                       # 237 files / 2223 tests, ~25 s, leak-checked
 python3 tools/run_tests.py --suite <substring> --full            # one area, every failure message unclipped
 python3 tools/run_tests.py --self-test                           # proves the harness still catches failures/leaks
 python3 tools/run_editor_smoke.py                                # headless EDITOR run of tests/editor_smoke/ (editor-only paths)
@@ -774,7 +774,7 @@ src/
   pooling/     VolleyPool (parked volleys per key), VolleyPoolKey2D
   attachments/ BulletAttachment2D + its object pool
   debugger/    BulletVolleyDebugger2D (collision-shape overlay)
-  core/        header-only: warn_once2d, cached_string_names2d, easing2d (Tween port), dynamic_sparse_set,
+  core/        header-only: warn_once2d, cached_string_names2d, easing2d (Tween port), dynamic_sparse_set, live_object2d (script Variant -> live Object by id),
                collision_shape_helper2d, reentrancy_guard2d, transform_math2d, graze_targets2d (graze target lists' helpers, point target ids),
                node_scan2d (THE target filter of homing and graze, their node-name / children scans, PREVIEW_META_KEY)
 ```
@@ -1009,6 +1009,13 @@ deduped, cancelled by REMOVED) and replayed once on resume.
 | Every pattern source fires one beam per slot, on its slot | `laser/test_laser_patterns` |
 | A bullet spawner and a laser spawner give the same where/when timeline for the same settings | `spawner/test_spawner_base_parity` |
 | Warm laser, emitter and colored shots retain no object (headless audio frees stopped playbacks in real time: drain before counting) | `integration/test_steady_state_memory` |
+| A following laser reads its anchor once per tick: a lost anchor (freed, queued) leaves EVERY beam where it is, an anchor out of the tree holds the beams and they ride it again without a slide; the spawn offset rides on top of the spun frame (never turned by the spin) | `laser/test_laser_spawner` |
+| Laser retargets use each laser's own aim; None leaves the beams without a target; targets come from the factory's world | `laser/test_laser_spawner`, `spawner/test_spawner_target_filter` |
+| A parked homing volley stays on the retarget list (woken, it is retargeted); `LIVE_HOMING` clears parked chases and arms a parked volley when it wakes; a cleared volley leaves the list | `spawner/test_spawner_live_volleys` |
+| A Variant a script hands in is read by id (`core/live_object2d.hpp`), never through its pointer: a freed node is refused like any non-target | `spawner/test_spawner_live_volleys`, `laser/test_laser_spawner` |
+| Orphan policies apply in every factory the spawner fired into; Clear / Remove freed inside a busy factory operation run right after it (structural queue) | `spawner/test_spawner_orphan_policy` |
+| A telegraph refused at the bounds retries a burst interval later (warning first); get_velocity user code that cancels the wave, burst or telegraph wins; telegraph_sec 0 with a max still warns; auto chains end at a cap or budget set mid-chain | `spawner/test_spawner_burst_telegraph`, `factory/test_factory_despawn_triggers` |
+| Movement velocity is measured over the time each step took (endpoint frames, Loop wraps); a new path or space is a jump | `spawner/test_spawner_movement` |
 
 - Edge cases to test everywhere: NaN/Inf scalars and vectors; null array
   entries; empty arrays; short vs oversized arrays; OOB indices (-1/99);
@@ -1093,6 +1100,11 @@ deduped, cancelled by REMOVED) and replayed once on resume.
   (`reject_pooled_handle`); `volley/test_volley_pooled_handle_writes` calls
   EVERY bound method on a pooled handle (ClassDB-driven) and demands that the
   next life starts exactly like the one before.
+- Never convert a script-given Variant to `Object *` through godot-cpp's
+  operator (it reads the object's instance binding: a freed node passed from
+  GDScript is a use-after-free, and a raw-Variant target Array carried across
+  user code is the same bug): `live_object2d<T>(variant)` reads the id and
+  resolves it through ObjectDB.
 - Plugin-created nodes (containers, debugger and its multimesh nodes, sound
   voices, effect and trail shards, preview holders) are ordinary children a
   script can `free()`. Cache them as `OwnedNode2D<T>` (`core/owned_node2d.hpp`)
