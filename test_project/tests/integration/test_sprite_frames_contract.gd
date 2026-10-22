@@ -8,6 +8,7 @@ extends BlastTest
 
 const BULLET := "bullet"
 const PLAY := "play_sprite_animation"
+const PICKUP := "pickup"
 const TRAIL := "trail layer"
 const ONE_SHOT := "one-shot layer"
 const MANUAL := "spawn_layer_effect"
@@ -19,9 +20,10 @@ const LASER_PIERCE := "laser pierce_frames"
 const LASER_WALL := "laser wall_impact_frames"
 
 ## Every consumer: built from a SpriteFrames, its frame-0 texture read back.
-const CONSUMERS := [BULLET, PLAY, TRAIL, ONE_SHOT, MANUAL, LASER_BODY, LASER_CHARGE, LASER_MUZZLE, LASER_TIP, LASER_PIERCE, LASER_WALL]
-## Consumers that take an animation name (lasers play "default", else the
-## first animation with frames).
+const CONSUMERS := [BULLET, PLAY, PICKUP, TRAIL, ONE_SHOT, MANUAL, LASER_BODY, LASER_CHARGE, LASER_MUZZLE, LASER_TIP, LASER_PIERCE, LASER_WALL]
+## Consumers that take an animation name and report a wrong one as an error
+## (pickups warn: their own test; lasers play "default", else the first
+## animation with frames).
 const NAMED := [BULLET, PLAY, TRAIL, ONE_SHOT, MANUAL]
 ## Consumers that play an animation once and need playable time.
 const ONE_SHOTS := [ONE_SHOT, MANUAL]
@@ -41,6 +43,7 @@ const DT := 0.0625
 const PREFIXES := {
 	BULLET: "BulletVolley2D",
 	PLAY: "BulletVolley2D",
+	PICKUP: "BulletVolley2D",
 	TRAIL: "BulletEffectLayerData2D",
 	ONE_SHOT: "BulletEffectLayerData2D",
 	MANUAL: "BulletEffectLayerData2D",
@@ -132,6 +135,13 @@ func _build(kind: String, sf: SpriteFrames, anim: StringName) -> Dictionary:
 		PLAY:
 			out.volley = factory.spawn_volley(_volley_data(H.make_sprite_frames(), &""))
 			out.volley.play_sprite_animation(sf, anim)
+		PICKUP:
+			var pickup := BulletPickupData2D.new()
+			pickup.sprite_frames = sf
+			pickup.animation = anim
+			var d := pickup.get_volley_data()
+			d.transforms = [Transform2D.IDENTITY]
+			out.volley = factory.spawn_volley(d)
 		TRAIL:
 			var d := _volley_data(H.make_sprite_frames(), &"")
 			d.effect_layers = [_layer(BulletEffectLayerData2D.EFFECT_TRAIL_FOLLOW, sf, anim)]
@@ -161,7 +171,7 @@ func _build(kind: String, sf: SpriteFrames, anim: StringName) -> Dictionary:
 ## The texture `built` (from _build) draws now: the volley's texture, the
 ## first effect shard's, or the laser's (the first pierce or impact).
 func _drawn(kind: String, built: Dictionary) -> Texture2D:
-	if kind in [BULLET, PLAY]:
+	if kind in [BULLET, PLAY, PICKUP]:
 		return (built.volley as BulletVolley2D).get_texture()
 	if kind in LASER_KEYS:
 		var state: Dictionary = (built.laser as LaserVolley2D).debug_get_draw_state(1.0)[0]
@@ -199,10 +209,36 @@ func test_a_wrong_name_falls_back_to_the_first_animation_with_frames_with_one_er
 	assert_eq("\n".join(problems), "", "the first animation with frames plays")
 
 
+func test_a_pickup_with_a_wrong_name_plays_the_first_animation_with_frames() -> void:
+	# Pickups warn (a pickup always shows something): an unknown name plays
+	# the first animation WITH frames, never the empty "default".
+	var fire := _tex(5, 3, Color.RED)
+	var built := await _build(PICKUP, _sf({"empty": [], "fire": [fire]}), &"nope")
+	expect_warning_sequence(["BulletPickupData2D: animation \"nope\" does not exist in sprite_frames, playing the first animation."])
+	assert_eq(_drawn(PICKUP, built), fire, "the first animation with frames")
+	expect_no_errors()
+	# An animation chosen by name but empty keeps the documented placeholder.
+	built = await _build(PICKUP, _sf({"fire": [fire]}), &"default")
+	assert_eq(_drawn(PICKUP, built), fire, "an unselected name skips the empty default silently")
+	built = await _build(PICKUP, _sf({"empty": [], "fire": [fire]}), &"empty")
+	expect_warning_sequence(["BulletPickupData2D: animation \"empty\" of sprite_frames has no frames, using the texture or the placeholder."])
+	assert_ne(_drawn(PICKUP, built), fire, "the placeholder")
+	# No frames anywhere: the placeholder, named after what was looked up.
+	built = await _build(PICKUP, _sf({"empty": []}), &"nope")
+	expect_warning_sequence([
+		"BulletPickupData2D: animation \"nope\" does not exist in sprite_frames, playing the first animation.",
+		"BulletPickupData2D: animation \"default\" of sprite_frames has no frames, using the texture or the placeholder.",
+	])
+	assert_not_null(_drawn(PICKUP, built), "the placeholder draws")
+	expect_no_errors()
+
+
 func test_a_frameless_sprite_frames_draws_nothing_with_one_error() -> void:
 	for kind in CONSUMERS:
+		if kind == PICKUP:
+			continue # the placeholder (test above)
 		var built := await _build(kind, _sf({"empty": []}), &"")
-		if kind not in [BULLET, PLAY]:
+		if kind not in [BULLET, PLAY, PICKUP]:
 			assert_null(_drawn(kind, built), "%s draws nothing" % kind)
 		expect_error_sequence([PREFIXES[kind] + ": sprite_frames has no animation with frames."], kind)
 
@@ -320,7 +356,7 @@ func test_a_null_frame_refuses_the_animation_with_one_error() -> void:
 		var sf := _sf({"default": [_tex(4, 4)]})
 		sf.add_frame(&"default", null)
 		var built := await _build(kind, sf, &"")
-		if kind not in [BULLET, PLAY] and _drawn(kind, built) != null:
+		if kind not in [BULLET, PLAY, PICKUP] and _drawn(kind, built) != null:
 			problems.append("%s still draws %s" % [kind, _drawn(kind, built)])
 		expect_error_sequence([PREFIXES[kind] + ": animation 'default' frame 1 has null texture."], kind)
 	assert_eq("\n".join(problems), "", "a refused animation draws nothing")

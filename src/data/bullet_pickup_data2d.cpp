@@ -1,5 +1,7 @@
 #include "data/bullet_pickup_data2d.hpp"
+#include "core/cached_string_names2d.hpp"
 #include "core/transform_math2d.hpp"
+#include "sprite/sprite_anim2d.hpp"
 
 #include <godot_cpp/classes/circle_shape2d.hpp>
 #include <godot_cpp/classes/image.hpp>
@@ -175,22 +177,27 @@ Ref<BulletVolleyData2D> BulletPickupData2D::get_volley_data() {
 	Vector2 size = texture_size;
 	bool usable = false;
 	if (frames.is_valid() && !frames->get_animation_names().is_empty()) {
-		StringName resolved = played;
-		if (resolved.is_empty() || !frames->has_animation(resolved)) {
-			if (!resolved.is_empty() && resolved != StringName("default")) {
-				UtilityFunctions::push_warning(String("BulletPickupData2D: animation \"") + String(resolved) + String("\" does not exist in sprite_frames, playing the first animation."));
-			}
-			resolved = frames->has_animation(StringName("default")) ? StringName("default") : StringName(frames->get_animation_names()[0]);
+		// The shared name rule (sprite/sprite_anim2d.hpp), in warnings: a
+		// pickup always shows something. An animation chosen by name that
+		// exists without frames keeps the placeholder.
+		const StringName &default_name = CachedStringNames2D::get().default_animation;
+		const bool is_auto = played.is_empty() || played == default_name;
+		const bool missing = !is_auto && !frames->has_animation(played);
+		if (missing) {
+			UtilityFunctions::push_warning(String("BulletPickupData2D: animation \"") + String(played) + String("\" does not exist in sprite_frames, playing the first animation."));
 		}
-		if (frames->get_frame_count(resolved) > 0) {
+		const SpriteAnimChoice2D choice = resolve_sprite_animation2d(frames, played);
+		const bool chosen_empty = !is_auto && !missing && frames->get_frame_count(played) == 0;
+		if (!chosen_empty && choice.usable()) {
 			usable = true;
-			played = resolved;
+			played = choice.anim;
 			if (size.x <= 0.0 || size.y <= 0.0) {
-				Ref<Texture2D> first = frames->get_frame_texture(resolved, 0);
+				Ref<Texture2D> first = frames->get_frame_texture(played, 0);
 				size = first.is_valid() ? first->get_size() : Vector2(16, 16);
 			}
 		} else {
-			UtilityFunctions::push_warning(String("BulletPickupData2D: animation \"") + String(resolved) + String("\" of sprite_frames has no frames, using the texture or the placeholder."));
+			const StringName shown = chosen_empty ? played : (frames->has_animation(default_name) ? default_name : StringName(frames->get_animation_names()[0]));
+			UtilityFunctions::push_warning(String("BulletPickupData2D: animation \"") + String(shown) + String("\" of sprite_frames has no frames, using the texture or the placeholder."));
 		}
 	}
 	if (!usable) {
