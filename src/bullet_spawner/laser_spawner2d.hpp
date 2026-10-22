@@ -86,8 +86,9 @@ public:
 	int get_live_laser_count() const;
 	// Ends them all (fading, or at once). Returns how many.
 	int end_live_lasers(bool fade = true);
-	// Gives every live Track / Lock On laser the targets resolved now.
-	// Returns how many lasers it retargeted.
+	// Gives every live Track / Lock On laser (by the data it was fired with)
+	// the targets resolved now; None leaves them none. Returns how many
+	// lasers it retargeted.
 	int retarget_live_lasers();
 	// Re-applies the spawner's settings to the lasers it fired: LIVE_GRAZE and
 	// LIVE_SOUND arm or disarm them as the spawner stands now (a laser armed
@@ -123,6 +124,8 @@ protected:
 private:
 	double retarget_time_left = 0.0;
 	bool aims_at_targets() const;
+	// What a retarget hands the live Track / Lock On lasers (None: nothing).
+	Array live_laser_targets() const;
 	void assign_targets(LaserVolley2D *laser, const Array &targets) const;
 	void collect_owned(std::vector<LaserVolley2D *> &r_out) const;
 	void _on_laser_data_changed();

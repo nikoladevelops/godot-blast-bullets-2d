@@ -301,20 +301,37 @@ void LaserSpawner2D::assign_targets(LaserVolley2D *laser, const Array &targets) 
 	}
 }
 
+// A laser aims at targets by the data it was fired with: swapping the
+// spawner's laser_data never changes how the lasers in flight aim.
+static bool laser_aims_at_targets2d(const LaserVolley2D *laser) {
+	const Ref<LaserData2D> data = laser->get_laser_data();
+	return data.is_valid() && data->aim != LaserData2D::LASER_AIM_PATTERN;
+}
+
+Array LaserSpawner2D::live_laser_targets() const {
+	// None finds nothing: every beam is left without a target, exactly like a
+	// source that finds nobody (Track and Lock On fall back to the pattern).
+	return laser_target_source == LASER_TARGET_NONE ? Array() : resolve_laser_targets();
+}
+
 int LaserSpawner2D::retarget_live_lasers() {
-	if (!aims_at_targets()) {
-		return 0;
-	}
 	std::vector<LaserVolley2D *> owned;
 	collect_owned(owned);
-	if (owned.empty()) {
-		return 0;
-	}
-	const Array targets = resolve_laser_targets();
+	Array targets;
+	bool resolved = false;
+	int done = 0;
 	for (LaserVolley2D *laser : owned) {
+		if (!laser_aims_at_targets2d(laser)) {
+			continue;
+		}
+		if (!resolved) {
+			targets = live_laser_targets(); // no user code: the loop's pointers stay valid
+			resolved = true;
+		}
 		assign_targets(laser, targets);
+		++done;
 	}
-	return (int)owned.size();
+	return done;
 }
 
 int LaserSpawner2D::apply_to_live_lasers(BitField<LiveVolleyGroup> groups) {
@@ -339,8 +356,8 @@ int LaserSpawner2D::apply_to_live_lasers(BitField<LiveVolleyGroup> groups) {
 		entries = spawner_sound_entries(sound_on);
 	}
 	const std::shared_ptr<GrazeDetector2D> listeners = sound_on ? sound_detector_ref() : nullptr;
-	const bool retarget = groups.has_flag(LIVE_HOMING) && aims_at_targets();
-	const Array targets = retarget ? resolve_laser_targets() : Array();
+	const bool retarget = groups.has_flag(LIVE_HOMING);
+	const Array targets = retarget ? live_laser_targets() : Array();
 	// No user code below: arming and targets only.
 	int changed = 0;
 	for (LaserVolley2D *laser : owned) {
@@ -367,7 +384,7 @@ int LaserSpawner2D::apply_to_live_lasers(BitField<LiveVolleyGroup> groups) {
 				touched = true;
 			}
 		}
-		if (retarget) {
+		if (retarget && laser_aims_at_targets2d(laser)) {
 			assign_targets(laser, targets);
 			touched = true;
 		}

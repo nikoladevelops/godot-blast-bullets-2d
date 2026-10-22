@@ -559,3 +559,39 @@ func test_a_live_target_source_wakes_an_idle_spawner() -> void:
 	assert_false(sp2.is_processing(), "back to pattern: asleep again")
 	sp2.laser_data = d
 	assert_true(sp2.is_processing(), "a Lock On laser_data wakes it")
+
+
+## None leaves the beams no target: retarget_live_lasers and
+## apply_to_live_lasers(LIVE_HOMING) clear them like a source that finds
+## nothing (Lock On falls back to the pattern direction). A laser keeps the
+## aim of the data it was fired with: swapping the spawner's laser_data to a
+## pattern-aim one never stops it from being retargeted.
+func test_none_and_a_pattern_data_swap_reach_live_lasers() -> void:
+	var d := _laser()
+	d.aim = LaserData2D.LASER_AIM_LOCK_ON
+	var sp := _spawner(d, 1) # slot 0 at (20, 0) pointing +X
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_GLOBAL_POSITION
+	sp.laser_target_position = Vector2(0, 300)
+	var l := _fire(sp)
+	step_factory(1, DT)
+	var aim_at := func(p: Vector2) -> float:
+		return absf(angle_difference((p - l.get_beam_start(0)).angle(), l.get_beam_angle(0)))
+	assert_almost_eq(aim_at.call(Vector2(0, 300)), 0.0, 0.0001, "locked on the position")
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_NONE
+	assert_eq(sp.retarget_live_lasers(), 1, "None: the beams lose their target")
+	step_factory(1, DT)
+	assert_almost_eq(l.get_beam_angle(0), 0.0, 0.0001, "back to the pattern direction")
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_GLOBAL_POSITION
+	assert_eq(sp.apply_to_live_lasers(LaserSpawner2D.LIVE_HOMING), 1, "retargeted")
+	step_factory(1, DT)
+	assert_almost_eq(aim_at.call(Vector2(0, 300)), 0.0, 0.0001, "locked on again")
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_NONE
+	assert_eq(sp.apply_to_live_lasers(LaserSpawner2D.LIVE_HOMING), 1, "LIVE_HOMING with None clears too")
+	step_factory(1, DT)
+	assert_almost_eq(l.get_beam_angle(0), 0.0, 0.0001, "pattern direction")
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_GLOBAL_POSITION
+	sp.laser_data = _laser() # the next shots aim along the pattern
+	sp.laser_target_position = Vector2(0, -300)
+	assert_eq(sp.retarget_live_lasers(), 1, "the Lock On laser in flight still retargets")
+	step_factory(1, DT)
+	assert_almost_eq(aim_at.call(Vector2(0, -300)), 0.0, 0.0001, "locked on the new position")
