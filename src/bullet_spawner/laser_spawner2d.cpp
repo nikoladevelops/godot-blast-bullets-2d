@@ -108,8 +108,13 @@ void LaserSpawner2D::set_laser_retarget_interval_sec(double value) {
 		UtilityFunctions::push_error("LaserSpawner2D: laser_retarget_interval_sec must be finite and >= 0 (0 = only when fired), keeping the old value.");
 		return;
 	}
+	const double old = laser_retarget_interval_sec;
 	laser_retarget_interval_sec = value;
-	retarget_time_left = value;
+	// A new period starts its countdown; the same one (a script writing its
+	// config every frame) never restarts it, a shorter one cuts a longer wait.
+	if (!(old > 0.0) || retarget_time_left > value) {
+		retarget_time_left = value;
+	}
 	refresh_process_state();
 }
 

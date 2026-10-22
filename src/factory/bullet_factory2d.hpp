@@ -137,7 +137,10 @@ public:
 	int free_lasers_pool(int beam_count = -1);
 	void free_lasers_pool_deferred(int beam_count = -1);
 	int debug_get_laser_pool_amount() const;
+	// The lasers `owner_id` fired that still fire (never ended, never queued).
 	void collect_lasers_owned_by(uint64_t owner_id, std::vector<LaserVolley2D *> &r_out) const;
+	// A laser the factory lists, counts and ticks: active, not queued for deletion.
+	static bool laser_listed(const LaserVolley2D *laser);
 	// Factory time scale x the owner spawner's fired time factor.
 	double laser_time_factor(const LaserVolley2D &laser) const;
 	// LaserVolley2D hooks: a freed laser leaves the lists; a finished one pools.

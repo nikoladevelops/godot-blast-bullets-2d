@@ -754,3 +754,43 @@ func test_explain_names_how_each_target_source_is_read() -> void:
 	assert_eq(line.call(), "Laser Targeting: each beam turns toward the mouse, read every frame.", "the mouse")
 	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_GLOBAL_POSITION
 	assert_eq(line.call(), "Laser Targeting: each beam turns toward laser_target_position.", "a position")
+
+
+## Re-applying the same laser_retarget_interval_sec (a script that writes its
+## config every frame) never restarts the countdown: the lasers still retarget.
+func test_reapplying_the_retarget_interval_keeps_the_countdown() -> void:
+	var foe := Node2D.new()
+	foe.position = Vector2(100, 0)
+	foe.add_to_group(&"laser_foes")
+	add(foe)
+	var d := _laser()
+	d.aim = LaserData2D.LASER_AIM_LOCK_ON
+	var sp := _spawner(d, 1)
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_NODE_GROUP
+	sp.laser_target_group = &"laser_foes"
+	sp.laser_retarget_interval_sec = 0.1
+	var l := _fire(sp)
+	var other := Node2D.new()
+	other.position = Vector2(0, 30)
+	other.add_to_group(&"laser_foes")
+	add(other)
+	for i in 12: # 0.2 s: two intervals
+		sp.laser_retarget_interval_sec = 0.1
+		await idle(1)
+	assert_almost_eq(l.get_beam_end(0).distance_to(Vector2(0, 30)), 0.0, 0.5, "re-picked on the interval")
+
+
+## max_live_lasers counts the lasers that still fire: one ended at once (it
+## finishes on the next tick) never holds the next shot back.
+func test_an_ended_laser_never_counts_against_max_live_lasers() -> void:
+	var sp := _spawner(_laser(), 1)
+	sp.max_live_lasers = 1
+	watch_signals(sp)
+	assert_true(sp.shoot_once(), "the first fires")
+	assert_eq(sp.end_live_lasers(false), 1, "ended at once")
+	assert_eq(sp.get_live_laser_count(), 0, "it fires no more")
+	assert_eq(sp.get_live_lasers(), [], "nor is it listed")
+	assert_true(sp.shoot_once(), "the next shot fires")
+	assert_signal_emit_count(sp, "volley_skipped", 0, "nothing skipped")
+	step_factory(2, DT)
+	assert_eq(sp.get_live_laser_count(), 1, "one fires")

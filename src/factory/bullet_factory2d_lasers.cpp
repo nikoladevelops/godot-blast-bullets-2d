@@ -87,10 +87,20 @@ LaserVolley2D *BulletFactory2D::spawn_laser_span(const Ref<LaserData2D> &data, c
 	}
 	LaserVolley2D *laser = nullptr;
 	auto bucket = laser_pool.find(count);
-	if (bucket != laser_pool.end() && !bucket->second.empty()) {
-		laser = bucket->second.back();
-		bucket->second.pop_back();
-	} else {
+	if (bucket != laser_pool.end()) {
+		// A laser a script queued for deletion while it waited is never
+		// handed out (its deletion would end the new life): dropped here,
+		// its PREDELETE forgets the rest.
+		std::vector<LaserVolley2D *> &list = bucket->second;
+		while (!list.empty() && laser == nullptr) {
+			LaserVolley2D *candidate = list.back();
+			list.pop_back();
+			if (candidate != nullptr && !candidate->is_queued_for_deletion()) {
+				laser = candidate;
+			}
+		}
+	}
+	if (laser == nullptr) {
 		laser = memnew(LaserVolley2D);
 		laser->pool_key = count;
 		laser->set_name("LaserVolley2D");
@@ -222,7 +232,9 @@ void BulletFactory2D::laser_finished_now(LaserVolley2D *laser) {
 		return;
 	}
 	laser->release_life();
-	laser_pool[laser->pool_key].push_back(laser);
+	if (!laser->is_queued_for_deletion()) {
+		laser_pool[laser->pool_key].push_back(laser); // a queued laser is gone at the next idle frame
+	}
 }
 
 bool BulletFactory2D::tick_lasers(double delta, const bool &alive) {
@@ -232,7 +244,7 @@ bool BulletFactory2D::tick_lasers(double delta, const bool &alive) {
 	// (pointer, id) pairs: a handler may free any laser, or this factory.
 	laser_iteration_scratch.clear();
 	for (LaserVolley2D *laser : all_lasers) {
-		if (laser != nullptr && laser->active) {
+		if (laser != nullptr && laser->active && !laser->is_queued_for_deletion()) {
 			laser_iteration_scratch.push_back({ laser, (uint64_t)laser->get_instance_id() });
 		}
 	}
@@ -242,8 +254,8 @@ bool BulletFactory2D::tick_lasers(double delta, const bool &alive) {
 		if (laser_free_epoch != snapshot_epoch && ObjectDB::get_instance(ObjectID(entry.second)) != (Object *)laser) {
 			continue;
 		}
-		if (!laser->active || laser->sweep_tick_stamp == sweep_counter) {
-			continue; // finished by a handler, or begun during this sweep
+		if (!laser->active || laser->sweep_tick_stamp == sweep_counter || laser->is_queued_for_deletion()) {
+			continue; // finished or queued by a handler, or begun during this sweep
 		}
 		laser->sweep_tick_stamp = sweep_counter;
 		laser->tick(capped_volley_delta(delta, laser_time_factor(*laser)));
@@ -252,6 +264,12 @@ bool BulletFactory2D::tick_lasers(double delta, const bool &alive) {
 		}
 	}
 	return true;
+}
+
+bool BulletFactory2D::laser_listed(const LaserVolley2D *laser) {
+	// Firing and not queued for deletion (a queued laser is gone, like a
+	// queued volley).
+	return laser != nullptr && laser->active && !laser->is_queued_for_deletion();
 }
 
 void BulletFactory2D::redraw_lasers() {
@@ -265,7 +283,7 @@ void BulletFactory2D::redraw_lasers() {
 Array BulletFactory2D::get_active_lasers() const {
 	Array out;
 	for (LaserVolley2D *laser : all_lasers) {
-		if (laser != nullptr && laser->active) {
+		if (laser_listed(laser)) {
 			out.push_back(laser);
 		}
 	}
@@ -275,7 +293,7 @@ Array BulletFactory2D::get_active_lasers() const {
 int BulletFactory2D::get_active_laser_count() const {
 	int n = 0;
 	for (LaserVolley2D *laser : all_lasers) {
-		n += laser != nullptr && laser->active ? 1 : 0;
+		n += laser_listed(laser) ? 1 : 0;
 	}
 	return n;
 }
@@ -291,7 +309,7 @@ int BulletFactory2D::debug_get_laser_pool_amount() const {
 int BulletFactory2D::clear_active_lasers(bool fade) {
 	int n = 0;
 	for (LaserVolley2D *laser : all_lasers) {
-		if (laser != nullptr && laser->active && laser->phase != LaserVolley2D::PHASE_FINISHED) {
+		if (laser_listed(laser) && laser->phase != LaserVolley2D::PHASE_FINISHED) {
 			laser->end_laser(fade);
 			++n;
 		}
@@ -302,7 +320,9 @@ int BulletFactory2D::clear_active_lasers(bool fade) {
 void BulletFactory2D::collect_lasers_owned_by(uint64_t owner_id, std::vector<LaserVolley2D *> &r_out) const {
 	r_out.clear();
 	for (LaserVolley2D *laser : all_lasers) {
-		if (laser != nullptr && laser->active && laser->owner_spawner_id == owner_id) {
+		// Still firing: an ended laser (finished, pooled on the next tick) is
+		// no longer its spawner's.
+		if (laser_listed(laser) && laser->owner_spawner_id == owner_id && laser->phase != LaserVolley2D::PHASE_FINISHED) {
 			r_out.push_back(laser);
 		}
 	}

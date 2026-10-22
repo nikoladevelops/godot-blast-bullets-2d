@@ -203,3 +203,60 @@ func test_pool_calls_refuse_bad_requests_and_physics_frames() -> void:
 	await idle(2)
 	expect_no_errors()
 	assert_eq(factory.debug_get_laser_pool_amount(), 1, "the deferred calls ran in order: 2 added, all freed, 1 added")
+
+
+## A laser queued for deletion while it waits in the pool is never handed
+## out again: the next spawn gets a fresh laser, which outlives the deletion.
+func test_a_queued_pooled_laser_is_never_reused() -> void:
+	var a := _fire(H.make_laser(0.0, 0.0, 0.0625, 0.0))
+	step_factory(2, DT)
+	assert_true(a.is_pooled(), "finished into the pool")
+	a.queue_free()
+	var b := _fire(H.make_laser(0.0, 0.0, 1.0, 0.0))
+	assert_ne(b, a, "the queued laser is never reused")
+	await idle(1)
+	assert_true(is_instance_valid(b), "the new laser outlives the deletion")
+	assert_true(b.is_laser_active(), "and still fires")
+	step_factory(1, DT)
+	assert_eq(factory.get_active_lasers(), [b], "listed")
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "consistent books")
+
+
+## A laser_finished handler that queue_frees its laser: the laser never
+## comes back from the pool, even to a spawn later in the same sweep.
+func test_a_laser_queued_by_its_finished_handler_never_comes_back() -> void:
+	var a := _fire(H.make_laser(0.0, 0.0, 0.0625, 0.0))
+	var b := _fire(H.make_laser(0.0, 0.0, 0.0625, 0.0))
+	var spawned: Array = []
+	factory.laser_finished.connect(func(l: LaserVolley2D) -> void:
+		if l == a:
+			a.queue_free()
+		elif l == b:
+			spawned.append(_fire(H.make_laser(0.0, 0.0, 1.0, 0.0))))
+	step_factory(2, DT)
+	assert_eq(spawned.size(), 1, "the second handler spawned")
+	assert_ne(spawned[0], a, "never the queued laser")
+	await idle(1)
+	assert_true(is_instance_valid(spawned[0]) and spawned[0].is_laser_active(), "the new laser survives the deletion")
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "consistent books")
+
+
+## A laser queued for deletion (a script's queue_free) is gone for the
+## factory at once, like a queued volley: never listed, counted, ticked or
+## ended again.
+func test_a_queued_laser_is_never_listed_counted_or_ticked() -> void:
+	var l := _fire(H.make_laser(0.0, 0.0, 0.0, 0.0))
+	var heard: Array = []
+	factory.laser_phase_changed.connect(func(_l, p: int) -> void: heard.append(p))
+	step_factory(1, DT)
+	heard.clear()
+	l.queue_free()
+	assert_eq(factory.get_active_lasers(), [], "not listed")
+	assert_eq(factory.get_active_laser_count(), 0, "not counted")
+	assert_eq(factory.clear_active_lasers(), 0, "not ended again")
+	l.end_laser(false)
+	step_factory(2, DT)
+	assert_eq(heard, [], "a queued laser never signals again")
+	await idle(1)
+	assert_false(is_instance_valid(l), "deleted")
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "consistent books")
