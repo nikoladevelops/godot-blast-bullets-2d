@@ -295,7 +295,9 @@ void LaserSpawner2D::assign_targets(LaserVolley2D *laser, const Array &targets) 
 				continue;
 			}
 			const real_t d = muzzle.distance_squared_to(at);
-			if (d < best_d) {
+			// The first usable candidate always beats none: past ~1.8e19 px a
+			// squared distance overflows to INF, which never compares below.
+			if (best.get_type() == Variant::NIL || d < best_d) {
 				best_d = d;
 				best = t;
 			}

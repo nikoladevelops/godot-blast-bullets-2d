@@ -630,3 +630,16 @@ func test_targets_come_from_the_factory_world() -> void:
 	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_NODE_GROUP
 	sp.laser_target_group = &"world_foes"
 	assert_eq(sp.resolve_laser_targets(), [main_foe], "the factory's world only")
+
+
+## Picking the nearest target never overflows into "no target": a lone
+## target farther than a float square can hold is still every beam's target.
+func test_a_far_target_is_still_picked() -> void:
+	var d := _laser()
+	d.aim = LaserData2D.LASER_AIM_LOCK_ON
+	var sp := _spawner(d, 1) # slot 0 at (20, 0) pointing +X
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_GLOBAL_POSITION
+	sp.laser_target_position = Vector2(0, 1e20)
+	var l := _fire(sp)
+	step_factory(1, DT)
+	assert_almost_eq(l.get_beam_angle(0), PI / 2.0, 0.001, "locked on the far target (down)")
