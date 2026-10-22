@@ -184,7 +184,7 @@
 	</members>
 	<constants>
 		<constant name="SOUND_ON_SHOT" value="0" enum="SoundTrigger">
-			Plays after a successful spawner shot, at the spawner's position. Spawner-only.
+			Plays after a successful spawner shot, at the spawner's position (a [method PatternSpawner2D.shoot_from] shot, such as an emitter bullet's: where it fired). Spawner-only.
 		</constant>
 		<constant name="SOUND_ON_HIT" value="1" enum="SoundTrigger">
 			Plays on a counted, survived, non-consumed-bounce hit, at the impact pose.

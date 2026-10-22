@@ -305,10 +305,12 @@ void PatternSpawner2D::fire_spawner_sound(int trigger, int volley_amount) {
 		spec.kind = SoundListenerSpec2D::DETECTOR;
 		spec.detector = sound_detector_ref();
 	}
-	const Vector2 at = get_global_position();
+	// Where the shot fired: the spawner, or the pose of a shoot_from shot (an
+	// emitter bullet's; its template usually sits off screen).
+	const Vector2 at = shot_pose_active ? shot_pose.get_origin() : get_global_position();
 	for (int i = 0; i < sound_effects.size(); ++i) {
 		const Variant entry = sound_effects[i];
-		BulletSoundData2D *sound = entry.get_type() == Variant::OBJECT ? Object::cast_to<BulletSoundData2D>((Object *)entry) : nullptr;
+		BulletSoundData2D *sound = live_object2d<BulletSoundData2D>(entry);
 		if (sound == nullptr || !sound->get_enabled() || sound->get_trigger() != trigger) {
 			continue;
 		}

@@ -232,3 +232,21 @@ func test_reused_volley_never_plays_a_previous_life() -> void:
 	assert_true(w.clear_bullet(0), "cleared")
 	await physics(2)
 	assert_eq(_logged(old.get_instance_id()).size(), 1, "previous life stays silent")
+
+
+## A shoot_from shot (an emitter bullet firing its template) plays On Shot
+## where it fires, never at the template spawner (which usually sits off
+## screen with its shooting off).
+func test_on_shot_of_a_shoot_from_shot_plays_where_it_fires() -> void:
+	factory.debug_set_sound_log_enabled(true)
+	var sp := make_spawner(H.make_volley_data(1, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
+	sp.position = Vector2(900, 900)
+	sp.sound_enabled = true
+	var s := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+	sp.sound_effects = [s]
+	assert_true(sp.shoot_from(Transform2D(0.0, Vector2(50, 60))), "fires from the pose")
+	await physics(2)
+	var log := _logged(s.get_instance_id())
+	assert_eq(log.size(), 1, "exactly one shot sound")
+	if log.size() == 1:
+		assert_almost_eq((log[0] as Dictionary)["position"], Vector2(50, 60), Vector2(0.5, 0.5), "at the shot pose")
