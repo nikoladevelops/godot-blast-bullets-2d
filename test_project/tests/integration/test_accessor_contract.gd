@@ -26,7 +26,14 @@ func before_each() -> void:
 	probes.append(["BulletVolley2D", v])
 	probes.append(["BulletFactory2D", factory])
 	probes.append(["BulletSpawner2D", make_spawner(H.make_volley_data(2))])
-	for cls in ["BulletVolleyData2D", "BulletSpeedData2D", "BulletRotationData2D", "BulletCurvesData2D", "BulletWobbleData2D", "BulletEffectLayerData2D", "BulletGrazeZone2D", "BulletFlock2D", "BulletPickupData2D", "BulletSoundData2D", "VolleyPoolKey2D"]:
+	var lasers := LaserSpawner2D.new()
+	lasers.set_shooting_enabled(false)
+	lasers.laser_data = H.make_laser()
+	add(lasers)
+	lasers.set_bullet_factory(factory)
+	probes.append(["LaserSpawner2D", lasers])
+	probes.append(["LaserVolley2D", factory.spawn_laser(H.make_laser(), [Transform2D()])])
+	for cls in ["BulletVolleyData2D", "BulletSpeedData2D", "BulletRotationData2D", "BulletCurvesData2D", "BulletWobbleData2D", "BulletEffectLayerData2D", "BulletGrazeZone2D", "BulletFlock2D", "BulletPickupData2D", "BulletSoundData2D", "VolleyPoolKey2D", "LaserData2D", "BulletEmitterData2D", "BulletSplitData2D", "BulletSplitStage2D"]:
 		probes.append([cls, ClassDB.instantiate(cls)])
 	var att: BulletAttachment2D = BulletAttachment2D.new()
 	add(att)
