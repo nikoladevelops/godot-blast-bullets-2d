@@ -428,3 +428,39 @@ func test_teleport_refuses_a_bad_position_or_a_spawner_outside_the_tree() -> voi
 	loose.teleport(Vector2(1, 1))
 	expect_error_sequence(["BulletSpawner2D::teleport: the spawner is outside the scene tree, it stays where it is."])
 	loose.free()
+
+
+## The reported velocity is the motion of the last step on every frame, also
+## on the frame that completes a leg (it used to divide only the bit after
+## the endpoint by the whole frame: about zero on an exact landing) and on a
+## Loop's wrap back to the start (a jump, but the motion goes on).
+func test_velocity_stays_exact_through_the_endpoints(mode: int = use_parameters([BulletSpawner2D.MOVEMENT_LOOP_PING_PONG, BulletSpawner2D.MOVEMENT_LOOP_LOOP])) -> void:
+	var sp := _mover(path, func(s): s.movement_loop_mode = mode)
+	var off: Array = []
+	for i in 150:
+		await idle(1)
+		var vx := absf(sp.get_movement_velocity().x)
+		if absf(vx - 300.0) > 1.0:
+			off.append([i, vx])
+	assert_eq(off, [], "300 px/s on every frame, the endpoint frames too")
+
+
+## A new movement_path (by path or node) or movement_space mid-play is a jump,
+## never travel: no shot inherits a jump-sized kick from it.
+func test_switching_the_path_or_space_mid_play_is_not_travel(kind: String = use_parameters(["path", "node", "space"])) -> void:
+	var sp := _mover(path, func(s): s.position = Vector2(500, 0))
+	await idle(10)
+	var far := _line_path(Vector2(5000, 0), Vector2(5300, 0))
+	match kind:
+		"path":
+			sp.movement_path = sp.get_path_to(far)
+		"node":
+			sp.set_movement_path_node(far)
+		"space":
+			sp.movement_space = BulletSpawner2D.MOVEMENT_SPACE_RELATIVE_TO_START
+	var peak := 0.0
+	for i in 4:
+		await idle(1)
+		peak = maxf(peak, sp.get_movement_velocity().length())
+	assert_lt(peak, 400.0, "no jump-sized velocity (the leg runs at 300 px/s)")
+	assert_true(sp.is_movement_playing(), "it keeps playing")

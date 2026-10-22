@@ -41,6 +41,7 @@ void PatternSpawner2D::set_movement_path(const NodePath &p_path) {
 		return;
 	}
 	on_config_changed();
+	movement_jumped = movement_jumped || p_path != movement_path; // a new path is a jump, never travel
 	movement_path = p_path;
 	movement_path_cache = nullptr;
 	movement_path_id = 0;
@@ -57,6 +58,7 @@ Path2D *PatternSpawner2D::get_movement_path_node() const {
 
 void PatternSpawner2D::set_movement_path_node(Path2D *node) {
 	on_config_changed();
+	movement_jumped = movement_jumped || node != get_movement_path_node(); // a new path is a jump, never travel
 	assign_node_to_path(this, node, movement_path, movement_path_cache);
 	movement_path_id = node != nullptr ? node->get_instance_id() : 0;
 	movement_warned_unusable_path = false;
@@ -76,6 +78,7 @@ void PatternSpawner2D::set_movement_space(MovementSpace value) {
 	if (movement_reject(value < MOVEMENT_SPACE_ATTACH || value > MOVEMENT_SPACE_RELATIVE_TO_START, (String(get_class()) + ": movement_space must be 0 (Attach) or 1 (Relative To Start), keeping the old value."))) {
 		return;
 	}
+	movement_jumped = movement_jumped || value != movement_space; // the path moves: a jump, never travel
 	movement_space = value;
 }
 
@@ -263,7 +266,7 @@ double PatternSpawner2D::movement_leg_duration(double path_length) const {
 	return movement_duration_sec;
 }
 
-bool PatternSpawner2D::apply_movement_pose(double delta) {
+bool PatternSpawner2D::apply_movement_pose(double delta, bool keep_velocity) {
 	Path2D *path = get_movement_path_node();
 	Ref<Curve2D> curve = path != nullptr ? path->get_curve() : Ref<Curve2D>();
 	const double length = curve.is_valid() ? (double)curve->get_baked_length() : 0.0;
@@ -307,6 +310,10 @@ bool PatternSpawner2D::apply_movement_pose(double delta) {
 			set_global_rotation(rot);
 		}
 	}
+	if (keep_velocity) {
+		movement_has_last_position = true;
+		return true;
+	}
 	if (delta > 0.0 && movement_has_last_position && !movement_jumped) {
 		movement_velocity = (target - before) / (real_t)delta;
 		if (!movement_velocity.is_finite()) {
@@ -343,6 +350,16 @@ bool PatternSpawner2D::advance_movement(double delta) {
 			return true;
 		}
 	}
+	// The velocity is measured over the time each applied pose covers: a frame
+	// that completes a leg applies the endpoint (the time to it), then the
+	// rest of the frame. A slice too short to measure (an exact landing)
+	// keeps the last velocity instead of dividing ~0 by ~0.
+	double pose_time = delta - remaining;
+	auto apply_step = [&]() {
+		const double slice = (delta - remaining) - pose_time;
+		pose_time = delta - remaining;
+		apply_movement_pose(slice, !(slice > 1e-6));
+	};
 	// Bounded catch-up: a hitch spanning many legs advances at most this many
 	// leg transitions per frame (tiny durations can never spin forever).
 	for (int guard = 0; guard < 64 && remaining > 0.0 && movement_playing; ++guard) {
@@ -373,7 +390,7 @@ bool PatternSpawner2D::advance_movement(double delta) {
 		movement_progress = movement_leg_forward ? movement_eased(1.0) : 1.0 - movement_eased(1.0);
 		const bool at_end = movement_leg_forward;
 		++movement_legs_completed;
-		apply_movement_pose(delta);
+		apply_step();
 		emit_on2d(this, "movement_endpoint_reached", at_end);
 		if (!alive()) {
 			return false;
@@ -406,13 +423,14 @@ bool PatternSpawner2D::advance_movement(double delta) {
 		if (movement_loop_mode == MOVEMENT_LOOP_PING_PONG) {
 			movement_leg_forward = !movement_leg_forward;
 		} else {
-			// LOOP: jump back to the leg's start (no interpolated sweep back).
+			// LOOP: jump back to the leg's start (no interpolated sweep back):
+			// a pose only, the motion (and its velocity) goes on from there.
 			movement_progress = movement_leg_forward ? 0.0 : 1.0;
-			movement_has_last_position = false;
+			apply_movement_pose(0.0, true);
 		}
 		movement_pause_left = movement_endpoint_pause_sec;
 	}
-	apply_movement_pose(delta);
+	apply_step();
 	return true;
 }
 

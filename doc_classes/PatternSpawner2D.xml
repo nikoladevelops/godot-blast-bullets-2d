@@ -194,7 +194,7 @@
 		<method name="get_movement_velocity" qualifiers="const">
 			<return type="Vector2" />
 			<description>
-				Velocity of the last movement step in px/s; zero while paused, stopped, waiting (start delay, endpoint pause) or not moving. This is the velocity [member inherit_movement_velocity] adds to bullets.
+				Velocity of the last movement step in px/s, measured over the time the step took (a frame that reaches an endpoint or wraps a Loop reports the motion it ends with); zero while paused, stopped, waiting (start delay, endpoint pause) or not moving. A new [member movement_path] or [member movement_space] mid-play is a jump, never travel: zero for that frame. This is the velocity [member inherit_movement_velocity] adds to bullets.
 			</description>
 		</method>
 		<method name="get_pattern_list_time_left" qualifiers="const">

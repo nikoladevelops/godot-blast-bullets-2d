@@ -1541,16 +1541,18 @@ protected:
 	// Bumped by every playback control (play, pause, stop, seek, reverse,
 	// enable): a movement signal handler that used one owns what happens next.
 	uint32_t movement_epoch = 0;
-	// Set on EXIT_TREE: the first pose after re-entry is a jump (no velocity).
+	// Set on EXIT_TREE and by a new path or space: the next pose is a jump
+	// (no velocity).
 	bool movement_jumped = false;
 	Vector2 movement_velocity;
 	bool movement_warned_unusable_path = false;
 	// Advances playback by delta and moves the node. Returns false when
 	// a signal handler freed this spawner (caller must stop touching it).
 	bool advance_movement(double delta);
-	// Moves the node to the pose at the current progress. Returns false
-	// when the path is unusable.
-	bool apply_movement_pose(double delta);
+	// Moves the node to the pose at the current progress; the velocity is the
+	// move over `delta`, the time it took (keep_velocity: a pose only, the
+	// velocity stays). Returns false when the path is unusable.
+	bool apply_movement_pose(double delta, bool keep_velocity = false);
 	double movement_leg_duration(double path_length) const;
 	double movement_eased(double leg_ratio) const;
 	bool movement_active() const;
