@@ -497,6 +497,8 @@ func test_an_unreadable_atlas_frame_reads_null() -> void:
 			problems.append("%s: %s" % [name, shown])
 	assert_eq(problems, [], "every unreadable frame reads null")
 	expect_no_errors("unreadable is not an error here: the consumers report it")
+	assert_null(factory.debug_read_frame(null), "no texture")
+	expect_error_sequence(["BulletFactory2D.debug_read_frame: texture is null."])
 
 
 func test_the_frame_cache_reads_a_sheet_once_and_follows_edits() -> void:
@@ -661,4 +663,18 @@ func test_a_tiled_laser_body_repeats_its_region_not_its_sheet() -> void:
 	assert_false(body is AtlasTexture, "a texture of its own: repeat wraps it, not the sheet")
 	var sheet := _sheet_image()
 	assert_eq(_pixel_misses(body.get_image(), Vector2i(4, 2), func(x, y): return sheet.get_pixel(x, y)), [], "the region's pixels")
+	expect_no_errors()
+
+
+func test_a_pickup_texture_shortcut_draws_an_atlas_region() -> void:
+	# The `texture` shortcut (no SpriteFrames) takes the same path.
+	var pickup := BulletPickupData2D.new()
+	pickup.texture = _atlas(ImageTexture.create_from_image(_sheet_image()), Rect2(2, 2, 3, 2), Rect2(1, 1, 2, 2))
+	var d := pickup.get_volley_data()
+	assert_eq(d.texture_size, Vector2(5, 4), "sized as drawn: region plus margin")
+	d.transforms = [Transform2D.IDENTITY]
+	var shown := factory.spawn_volley(d).get_texture()
+	assert_false(shown is AtlasTexture, "the baked frame")
+	var in_box := func(x, y): return Color.RED if x >= 1 and x < 4 and y >= 1 and y < 3 else Color(0, 0, 0, 0)
+	assert_eq(_pixel_misses(shown.get_image(), Vector2i(5, 4), in_box), [], "the region in its margin box")
 	expect_no_errors()
