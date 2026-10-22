@@ -403,3 +403,150 @@ func test_a_volley_without_sprite_frames_spawns_silently() -> void:
 	assert_eq([again.get_texture() == null, again.get_sprite_frame_count(), again.get_sprite_frames() == null], [true, 0, true], "the previous life's frames are gone")
 	expect_no_errors()
 
+
+
+# ---- Reading frames as Godot draws them (frame cache) --------------------------------
+
+## An 8x8 sheet: blue, a red 3x2 block at (2, 2), a green pixel at (0, 0).
+func _sheet_image() -> Image:
+	var img := Image.create_empty(8, 8, false, Image.FORMAT_RGBA8)
+	img.fill(Color.BLUE)
+	img.fill_rect(Rect2i(2, 2, 3, 2), Color.RED)
+	img.set_pixel(0, 0, Color.GREEN)
+	return img
+
+
+func _atlas(sheet: Texture2D, region: Rect2, margin := Rect2()) -> AtlasTexture:
+	var a := AtlasTexture.new()
+	a.atlas = sheet
+	a.region = region
+	a.margin = margin
+	return a
+
+
+## The pixels of `img` that differ from `expect(x, y)`, as "x,y: got want".
+func _pixel_misses(img: Image, size: Vector2i, expect: Callable) -> Array:
+	if img == null:
+		return ["no image"]
+	if img.get_size() != size:
+		return ["size %s instead of %s" % [img.get_size(), size]]
+	var misses: Array = []
+	for y in size.y:
+		for x in size.x:
+			var want: Color = expect.call(x, y)
+			if not img.get_pixel(x, y).is_equal_approx(want):
+				misses.append("%d,%d: %s %s" % [x, y, img.get_pixel(x, y), want])
+	return misses
+
+
+func test_an_atlas_frame_reads_exactly_its_region() -> void:
+	var sheet := ImageTexture.create_from_image(_sheet_image())
+	var red := func(_x, _y): return Color.RED
+	var shown := factory.debug_read_frame(_atlas(sheet, Rect2(2, 2, 3, 2)))
+	assert_eq(_pixel_misses(shown.get_image(), Vector2i(3, 2), red), [], "the red block only")
+	# The margin box: the region at margin.position, transparent around it.
+	var boxed := factory.debug_read_frame(_atlas(sheet, Rect2(2, 2, 3, 2), Rect2(1, 2, 4, 5)))
+	var in_box := func(x, y): return Color.RED if x >= 1 and x < 4 and y >= 2 and y < 4 else Color(0, 0, 0, 0)
+	assert_eq(_pixel_misses(boxed.get_image(), Vector2i(7, 7), in_box), [], "region + margin box, region at the margin's offset")
+	assert_eq(boxed.get_size(), _atlas(sheet, Rect2(2, 2, 3, 2), Rect2(1, 2, 4, 5)).get_size(), "the size Godot draws it at")
+	# A zero region size is the whole atlas (per axis, like Godot).
+	var whole := factory.debug_read_frame(_atlas(sheet, Rect2()))
+	var sheet_px := func(x, y): return _sheet_image().get_pixel(x, y)
+	assert_eq(_pixel_misses(whole.get_image(), Vector2i(8, 8), sheet_px), [], "the whole sheet")
+	var rows := factory.debug_read_frame(_atlas(sheet, Rect2(0, 2, 0, 2)))
+	assert_eq(_pixel_misses(rows.get_image(), Vector2i(8, 2), func(x, y): return _sheet_image().get_pixel(x, y + 2)), [], "full width, two rows")
+	# An atlas of an atlas reads the inner one as drawn (its margin box too).
+	var inner := _atlas(sheet, Rect2(1, 1, 4, 4), Rect2(1, 0, 2, 0))
+	var nested := factory.debug_read_frame(_atlas(inner, Rect2(2, 1, 3, 2)))
+	assert_eq(_pixel_misses(nested.get_image(), Vector2i(3, 2), red), [], "the red block through two atlases")
+	expect_no_errors()
+
+
+func test_a_compressed_or_mipmapped_sheet_reads_its_region() -> void:
+	var packed := _sheet_image()
+	packed.compress(Image.COMPRESS_S3TC)
+	assert_true(packed.is_compressed(), "a VRAM-compressed sheet")
+	var shown := factory.debug_read_frame(_atlas(ImageTexture.create_from_image(packed), Rect2(4, 4, 4, 4)))
+	assert_eq(_pixel_misses(shown.get_image(), Vector2i(4, 4), func(_x, _y): return Color.BLUE), [], "decompressed (S3TC keeps solid colors exact)")
+	var mipped := _sheet_image()
+	mipped.generate_mipmaps()
+	var with_mips := factory.debug_read_frame(_atlas(ImageTexture.create_from_image(mipped), Rect2(2, 2, 3, 2)))
+	assert_true(with_mips.get_image().has_mipmaps(), "mipmaps when the sheet has them")
+	expect_no_errors()
+
+
+func test_an_unreadable_atlas_frame_reads_null() -> void:
+	var sheet := ImageTexture.create_from_image(_sheet_image())
+	var bad := {
+		"no atlas": AtlasTexture.new(),
+		"NaN region": _atlas(sheet, Rect2(NAN, 0, 4, 4)),
+		"INF size": _atlas(sheet, Rect2(0, 0, INF, 4)),
+		"partly outside": _atlas(sheet, Rect2(6, 6, 4, 4)),
+		"negative position": _atlas(sheet, Rect2(-1, 0, 4, 4)),
+		"int overflow": _atlas(sheet, Rect2(2147483520, 0, 256, 4)),
+		"negative size": _atlas(sheet, Rect2(0, 0, -4, 4)),
+		"NaN margin": _atlas(sheet, Rect2(0, 0, 4, 4), Rect2(0, 0, NAN, 0)),
+		"empty box": _atlas(sheet, Rect2(0, 0, 4, 4), Rect2(0, 0, -4, 0)),
+		"huge margin": _atlas(sheet, Rect2(0, 0, 4, 4), Rect2(0, 0, 1e9, 0)),
+		"empty sheet": _atlas(ImageTexture.new(), Rect2(0, 0, 4, 4)),
+	}
+	var problems: Array = []
+	for name in bad:
+		var shown := factory.debug_read_frame(bad[name])
+		if shown != null:
+			problems.append("%s: %s" % [name, shown])
+	assert_eq(problems, [], "every unreadable frame reads null")
+	expect_no_errors("unreadable is not an error here: the consumers report it")
+
+
+func test_the_frame_cache_reads_a_sheet_once_and_follows_edits() -> void:
+	var sheet := ImageTexture.create_from_image(_sheet_image())
+	var frames: Array = []
+	for i in 4:
+		frames.append(_atlas(sheet, Rect2(i * 2, 0, 2, 2)))
+	var stats: Dictionary = factory.debug_get_frame_cache_stats()
+	var d := _volley_data(_sf({"default": frames}), &"")
+	d.override_frame_color = true
+	factory.spawn_volley(d)
+	var after: Dictionary = factory.debug_get_frame_cache_stats()
+	assert_eq(after.sheet_reads - stats.sheet_reads, 1, "four regions of one sheet: one readback")
+	assert_eq(after.builds - stats.builds, 4, "one whitened frame per region")
+	factory.spawn_volley(d)
+	var again: Dictionary = factory.debug_get_frame_cache_stats()
+	assert_eq([again.sheet_reads, again.builds, again.hits - after.hits], [after.sheet_reads, after.builds, 4], "a second spawn reads nothing")
+	# An edited region rebuilds (the old frame never serves).
+	frames[0].region = Rect2(2, 2, 2, 2)
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	assert_eq(factory.debug_get_frame_cache_stats().builds - again.builds, 1, "only the edited frame rebuilds")
+	assert_eq(v.get_texture().get_image().get_size(), Vector2i(2, 2), "the edited region")
+	# A full reset drops every cached frame (art repainted in place re-bakes).
+	factory.reset()
+	await idle(2)
+	assert_eq(factory.debug_get_frame_cache_stats().entries, 0, "reset clears the cache")
+	expect_no_errors()
+
+
+func test_whitened_frames_honor_the_margin_and_the_compressed_sheet() -> void:
+	var packed := _sheet_image()
+	packed.compress(Image.COMPRESS_S3TC)
+	# [frame, size as drawn, a pixel that is white and opaque, one that is clear (or none)]
+	var cases := {
+		"margin": [_atlas(ImageTexture.create_from_image(_sheet_image()), Rect2(2, 2, 3, 2), Rect2(1, 1, 2, 2)), Vector2i(5, 4), Vector2i(1, 1), Vector2i(0, 0)],
+		"zero region": [_atlas(ImageTexture.create_from_image(_sheet_image()), Rect2()), Vector2i(8, 8), Vector2i(7, 7), null],
+		"compressed": [_atlas(ImageTexture.create_from_image(packed), Rect2(4, 4, 4, 4)), Vector2i(4, 4), Vector2i(3, 3), null],
+	}
+	var problems: Array = []
+	for name in cases:
+		var c: Array = cases[name]
+		var d := _volley_data(_sf({"default": [c[0]]}), &"")
+		d.override_frame_color = true
+		var img: Image = factory.spawn_volley(d).get_texture().get_image()
+		if img.get_size() != c[1]:
+			problems.append("%s: size %s" % [name, img.get_size()])
+			continue
+		if not img.get_pixelv(c[2]).is_equal_approx(Color.WHITE):
+			problems.append("%s: %s at %s, not opaque white" % [name, img.get_pixelv(c[2]), c[2]])
+		if c[3] != null and img.get_pixelv(c[3]).a != 0.0:
+			problems.append("%s: %s at %s, not clear" % [name, img.get_pixelv(c[3]), c[3]])
+	assert_eq(problems, [], "whitened as drawn")
+	expect_no_errors()

@@ -161,7 +161,8 @@ public:
 	// baked output detect layer edits through it.
 	uint64_t get_bake_version() const { return bake_version; }
 	// Pure pixel step of the whiten override (test seam): white RGB, same
-	// alpha. Null/empty/oversized input returns null with one error.
+	// alpha, any size (compressed input is decompressed). Null or empty input
+	// returns null with one error.
 	static Ref<Image> whiten_image_copy(const Ref<Image> &src);
 
 	bool get_enabled() const;
@@ -232,10 +233,6 @@ public:
 
 	real_t get_trigger_chance() const;
 	void set_trigger_chance(real_t value);
-
-	// Reads frame pixels for the whiten override (atlas-aware). Null when
-	// unreachable; the caller falls back to the original frame.
-	static Ref<Image> read_frame_image(const Ref<Texture2D> &tex);
 
 	int get_max_instances() const;
 	void set_max_instances(int value);

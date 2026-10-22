@@ -107,6 +107,8 @@ bool bake_sprite_animation2d(const Ref<SpriteFrames> &frames, const StringName &
 	}
 	const int count = frames->get_frame_count(anim);
 	const double fps = sprite_anim_fps2d(frames->get_animation_speed(anim), report.bad_speed);
+	// One reader per bake: a sheet shared by every frame is read back once.
+	FrameImageReader2D reader;
 	SpriteAnim2D baked;
 	baked.name = anim;
 	baked.loop = frames->get_animation_loop(anim);
@@ -128,7 +130,7 @@ bool bake_sprite_animation2d(const Ref<SpriteFrames> &frames, const StringName &
 			baked.frames.push_back(tex);
 			continue;
 		}
-		const Ref<Texture2D> white = options.cache != nullptr ? options.cache->whitened(tex) : FrameTextureCache2D::build_whitened(tex);
+		const Ref<Texture2D> white = options.cache != nullptr ? options.cache->whitened(tex, reader) : FrameTextureCache2D::build_whitened(tex, reader);
 		if (white.is_valid()) {
 			baked.frames.push_back(white);
 		} else {

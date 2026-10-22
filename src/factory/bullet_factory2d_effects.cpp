@@ -165,6 +165,15 @@ MultiMeshInstance2D *BulletFactory2D::fx_create_shard(Node *parent, const Ref<Te
 	return shard;
 }
 
+Ref<Texture2D> BulletFactory2D::debug_read_frame(const Ref<Texture2D> &texture, bool whiten) {
+	if (texture.is_null()) {
+		UtilityFunctions::push_error("BulletFactory2D.debug_read_frame: texture is null.");
+		return Ref<Texture2D>();
+	}
+	FrameImageReader2D reader;
+	return whiten ? frame_cache.whitened(texture, reader) : frame_cache.drawable(texture, reader);
+}
+
 void BulletFactory2D::fx_ensure_effects_container() {
 	if (sprite_effects_container.get() != nullptr) {
 		return;

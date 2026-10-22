@@ -1115,7 +1115,15 @@ func test_whiten_override_pixels_rebake_fallback() -> void:
 	assert_true(white != null and white.get_pixel(0, 0) == Color(1, 1, 1, 1), "red bakes to white")
 	assert_true(white != null and absf(white.get_pixel(1, 1).a - 0.5) < 0.01 and white.get_pixel(1, 1).r > 0.9, "alpha preserved under white")
 	assert_true(BulletEffectLayerData2D.whiten_image_copy(Image.new()) == null, "empty image refused")
-	assert_true(BulletEffectLayerData2D.whiten_image_copy(Image.create_empty(600, 8, false, Image.FORMAT_RGBA8)) == null, "oversized image refused")
+	# No size cap (one byte loop, cached per frame by the factory).
+	var wide: Image = BulletEffectLayerData2D.whiten_image_copy(Image.create_empty(600, 8, false, Image.FORMAT_RGBA8))
+	assert_true(wide != null and wide.get_size() == Vector2i(600, 8) and wide.get_pixel(599, 7) == Color(1, 1, 1, 0), "a 600 px image whitens")
+	# A compressed image is decompressed first.
+	var packed := Image.create_empty(8, 8, false, Image.FORMAT_RGBA8)
+	packed.fill(Color(1, 0, 0, 1))
+	packed.compress(Image.COMPRESS_S3TC)
+	var unpacked: Image = BulletEffectLayerData2D.whiten_image_copy(packed)
+	assert_true(unpacked != null and unpacked.get_pixel(3, 3).is_equal_approx(Color(1, 1, 1, 1)), "a compressed image whitens")
 	await _settle(factory)
 	var d27 := _fx_data(Vector2.ZERO, 0.0, [], false)
 	var lwhite := _make_layer(1, 4)
@@ -1151,7 +1159,6 @@ func test_whiten_override_pixels_rebake_fallback() -> void:
 	for i in 30:
 		await physics()
 	expect_errors_containing("source image is null or empty", 2, "empty whiten image fails loud")
-	expect_errors_containing("exceeds 512px", 1, "oversize whiten image fails loud")
 
 
 func test_bullet_whiten_override_exact_tint_toggle_reuse() -> void:

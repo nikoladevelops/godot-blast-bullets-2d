@@ -2,7 +2,6 @@
 #include "core/transform_math2d.hpp"
 #include "core/variant_enum_cast2d.hpp"
 
-#include <godot_cpp/classes/atlas_texture.hpp>
 #include <godot_cpp/classes/image.hpp>
 #include <godot_cpp/classes/image_texture.hpp>
 #include <godot_cpp/core/math.hpp>
@@ -348,23 +347,19 @@ void BulletEffectLayerData2D::set_override_frame_color(bool value) {
 	emit_changed();
 }
 
-// Whiten override cap: per-pixel loop over huge sheets would stall the
-// baking frame. Over the cap the original frame is kept with one warning.
-static const int EFFECT_WHITEN_MAX_SIDE = 512;
-
 Ref<Image> BulletEffectLayerData2D::whiten_image_copy(const Ref<Image> &src) {
 	Ref<Image> out;
 	if (src.is_null() || src->is_empty()) {
 		UtilityFunctions::push_error("BulletEffectLayerData2D.whiten_image_copy: source image is null or empty.");
 		return out;
 	}
-	if (src->get_width() > EFFECT_WHITEN_MAX_SIDE || src->get_height() > EFFECT_WHITEN_MAX_SIDE) {
-		UtilityFunctions::push_error("BulletEffectLayerData2D.whiten_image_copy: image exceeds 512px per side, refusing.");
-		return out;
-	}
 	Ref<Image> rgba = src->duplicate();
 	if (rgba.is_null()) {
 		UtilityFunctions::push_error("BulletEffectLayerData2D.whiten_image_copy: could not duplicate source image.");
+		return out;
+	}
+	if (rgba->is_compressed() && (rgba->decompress() != OK || rgba->is_compressed())) {
+		UtilityFunctions::push_error("BulletEffectLayerData2D.whiten_image_copy: source image is compressed in a format that cannot be decompressed.");
 		return out;
 	}
 	rgba->convert(Image::FORMAT_RGBA8);
@@ -381,53 +376,6 @@ Ref<Image> BulletEffectLayerData2D::whiten_image_copy(const Ref<Image> &src) {
 	}
 	rgba->set_data(rgba->get_width(), rgba->get_height(), rgba->has_mipmaps(), Image::FORMAT_RGBA8, data);
 	return rgba;
-}
-
-// Reads frame pixels for the whiten override: plain textures directly,
-// atlas frames through the base image plus region blit. Returns null when
-// the pixels are unreachable (caller falls back to the original frame).
-Ref<Image> BulletEffectLayerData2D::read_frame_image(const Ref<Texture2D> &tex) {
-	Ref<Image> out;
-	if (tex.is_null()) {
-		return out;
-	}
-	if (const Ref<AtlasTexture> atlas = tex; atlas.is_valid()) {
-		const Ref<Texture2D> base = atlas->get_atlas();
-		if (base.is_null()) {
-			return out;
-		}
-		Ref<Image> base_img = base->get_image();
-		if (base_img.is_null() || base_img->is_empty()) {
-			return out;
-		}
-		// Bounds in double BEFORE any int cast: a huge or non-finite region
-		// overflows the cast or x + w and slipped past an int check (a blank
-		// frame instead of the original art). NaN fails every comparison.
-		const Rect2 region = atlas->get_region();
-		const double rx = Math::round((double)region.position.x);
-		const double ry = Math::round((double)region.position.y);
-		const double rw = Math::round((double)region.size.x);
-		const double rh = Math::round((double)region.size.y);
-		if (!(rw > 0.0) || !(rh > 0.0) || !(rx >= 0.0) || !(ry >= 0.0) || !(rx + rw <= (double)base_img->get_width()) || !(ry + rh <= (double)base_img->get_height())) {
-			return out;
-		}
-		const int x = (int)rx;
-		const int y = (int)ry;
-		const int w = (int)rw;
-		const int h = (int)rh;
-		base_img = base_img->duplicate();
-		if (base_img.is_null()) {
-			return out;
-		}
-		base_img->convert(Image::FORMAT_RGBA8);
-		Ref<Image> clip = Image::create_empty(w, h, false, Image::FORMAT_RGBA8);
-		if (clip.is_null()) {
-			return out;
-		}
-		clip->blit_rect(base_img, Rect2i(x, y, w, h), Vector2i(0, 0));
-		return clip;
-	}
-	return tex->get_image();
 }
 
 void BulletEffectLayerData2D::_bind_methods() {

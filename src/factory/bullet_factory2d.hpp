@@ -474,6 +474,11 @@ public:
 	// bake is dropped entirely).
 	void clear_sprite_effects();
 	Dictionary debug_get_effect_state() const;
+	// The frame cache's counters: {entries, builds, hits, sheet_reads, unreadable}.
+	Dictionary debug_get_frame_cache_stats() const { return frame_cache.debug_stats(); }
+	// What a mesh draw shows for `texture` (whiten: its whitened copy), through
+	// the frame cache. Null when its pixels cannot be read.
+	Ref<Texture2D> debug_read_frame(const Ref<Texture2D> &texture, bool whiten);
 	// Trigger log for tests: every volley one-shot trigger that actually
 	// fired (layer matched) is recorded as {trigger, volley, life, bullet,
 	// position, frame} while enabled. Off by default: one bool check per
