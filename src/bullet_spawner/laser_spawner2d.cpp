@@ -35,6 +35,7 @@ void LaserSpawner2D::connect_laser_data(bool connect) {
 void LaserSpawner2D::_on_laser_data_changed() {
 	on_config_changed();
 	rebuild_preview(); // the preview beams are the laser's length
+	refresh_process_state(); // Track / Lock On may need the retarget loop now
 }
 
 void LaserSpawner2D::set_laser_data(const Ref<LaserData2D> &value) {
@@ -46,6 +47,7 @@ void LaserSpawner2D::set_laser_data(const Ref<LaserData2D> &value) {
 	connect_laser_data(true);
 	on_config_changed();
 	rebuild_preview();
+	refresh_process_state();
 }
 
 void LaserSpawner2D::set_orphaned_lasers(OrphanedLasers value) {
@@ -72,6 +74,7 @@ void LaserSpawner2D::set_laser_target_source(LaserTargetSource value) {
 	laser_target_source = value;
 	notify_property_list_changed();
 	on_config_changed();
+	refresh_process_state(); // the Mouse source reads the cursor every frame
 }
 
 void LaserSpawner2D::set_laser_target_group(const StringName &value) {

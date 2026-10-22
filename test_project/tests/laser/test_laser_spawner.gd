@@ -530,3 +530,32 @@ func test_every_beam_keeps_its_pose_when_the_spawner_is_freed(policy: int = use_
 		if l.get_beam_start(i).distance_to(before[i]) > 0.01:
 			moved.append([i, before[i], l.get_beam_start(i)])
 	assert_eq(moved, [], "policy %d: every beam stays on its muzzle" % policy)
+
+
+## A live target source wakes an idle spawner (auto fire off, nothing else
+## processing): Mouse beams follow the cursor every frame whether the source
+## or the Track / Lock On data comes last.
+func test_a_live_target_source_wakes_an_idle_spawner() -> void:
+	var d := _laser()
+	d.aim = LaserData2D.LASER_AIM_LOCK_ON
+	var sp := _spawner(d, 1)
+	var l := _fire(sp)
+	await idle(2)
+	assert_false(sp.is_processing(), "an idle spawner sleeps")
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_MOUSE
+	assert_true(sp.is_processing(), "the mouse source wakes the loop")
+	mouse_to(Vector2(0, -120))
+	await idle(2)
+	assert_almost_eq(l.get_beam_end(0).distance_to(Vector2(0, -120)), 0.0, 0.5, "the beam follows the cursor")
+	var d2 := _laser()
+	var sp2 := _spawner(d2, 1)
+	sp2.laser_target_source = LaserSpawner2D.LASER_TARGET_MOUSE
+	await idle(2)
+	assert_false(sp2.is_processing(), "pattern aim: nothing to retarget, asleep")
+	d2.aim = LaserData2D.LASER_AIM_TRACK
+	assert_true(sp2.is_processing(), "the data turning to Track wakes it")
+	d2.aim = LaserData2D.LASER_AIM_PATTERN
+	await idle(2)
+	assert_false(sp2.is_processing(), "back to pattern: asleep again")
+	sp2.laser_data = d
+	assert_true(sp2.is_processing(), "a Lock On laser_data wakes it")
