@@ -733,3 +733,24 @@ func test_live_aiming_lasers_keep_following_after_a_pattern_data_swap() -> void:
 	l.end_laser(false)
 	await idle(3)
 	assert_false(sp.is_processing(), "asleep once no live laser aims")
+
+
+## The explain line names how each source is read: the mouse every frame,
+## a position as it is set, node sources re-picked on the interval (the
+## interval only shows for them, and only they use it).
+func test_explain_names_how_each_target_source_is_read() -> void:
+	var d := _laser()
+	d.aim = LaserData2D.LASER_AIM_TRACK
+	var sp := _spawner(d, 1)
+	sp.laser_retarget_interval_sec = 0.5
+	var line := func() -> String:
+		for l in sp.debug_explain_features():
+			if l.begins_with("Laser Targeting"):
+				return l
+		return ""
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_NODE_GROUP
+	assert_eq(line.call(), "Laser Targeting: each beam turns toward the nearest member of the target group, re-picked every 0.5 s.", "node source")
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_MOUSE
+	assert_eq(line.call(), "Laser Targeting: each beam turns toward the mouse, read every frame.", "the mouse")
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_GLOBAL_POSITION
+	assert_eq(line.call(), "Laser Targeting: each beam turns toward laser_target_position.", "a position")

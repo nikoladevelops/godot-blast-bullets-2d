@@ -592,7 +592,15 @@ PackedStringArray LaserSpawner2D::debug_explain_features() const {
 			out.push_back("Laser Targeting: Track or Lock On without a target source: the beams point along the pattern.");
 		} else {
 			static const char *const sources[] = { "", "the nearest member of the target group", "the node at laser_target_path", "the mouse", "laser_target_position", "the nearest node named like laser_target_node_name", "the nearest child of laser_target_children_parent_path" };
-			out.push_back(String("Laser Targeting: each beam ") + (d->aim == LaserData2D::LASER_AIM_LOCK_ON ? "ends on " : "turns toward ") + sources[(int)laser_target_source] + (laser_retarget_interval_sec > 0.0 ? String(", re-picked every ") + String::num(laser_retarget_interval_sec, 2) + " s." : String(".")));
+			// How the source is read: the mouse every frame, a position as it is
+			// set, node sources at the shot and on the retarget interval.
+			String read = ".";
+			if (laser_target_source == LASER_TARGET_MOUSE) {
+				read = ", read every frame.";
+			} else if (laser_target_source != LASER_TARGET_GLOBAL_POSITION && laser_retarget_interval_sec > 0.0) {
+				read = String(", re-picked every ") + String::num(laser_retarget_interval_sec, 2) + " s.";
+			}
+			out.push_back(String("Laser Targeting: each beam ") + (d->aim == LaserData2D::LASER_AIM_LOCK_ON ? "ends on " : "turns toward ") + sources[(int)laser_target_source] + read);
 		}
 	}
 	out.push_back(graze_enabled ? String("Graze: on, the beams graze by their distance to the targets.") : String("Graze: off."));
