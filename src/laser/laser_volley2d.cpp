@@ -4,6 +4,7 @@
 // side (spawn, tick, pool, signals) in factory/bullet_factory2d_lasers.cpp.
 
 #include "laser/laser_volley2d.hpp"
+#include "core/live_object2d.hpp"
 #include "laser/laser_geometry2d.hpp"
 
 #include "bullet_spawner/pattern_spawner2d.hpp"
@@ -537,7 +538,7 @@ void LaserVolley2D::set_beam_target(int beam_index, const Variant &target) {
 		b.target_point = p;
 		b.target_is_point = true;
 		b.has_target = true;
-	} else if (Node2D *node = Object::cast_to<Node2D>(target)) {
+	} else if (Node2D *node = live_object2d<Node2D>(target)) {
 		b.target_id = node->get_instance_id();
 		b.has_target = true;
 	} else if (target.get_type() != Variant::NIL) {

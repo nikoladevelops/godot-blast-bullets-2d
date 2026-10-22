@@ -7,6 +7,7 @@
 
 #include "bullet_spawner/bullet_spawner2d.hpp"
 #include "core/emit_on2d.hpp"
+#include "core/live_object2d.hpp"
 #include "core/node_scan2d.hpp"
 #include "core/transform_math2d.hpp"
 #include "factory/bullet_factory2d_internal.hpp"
@@ -69,7 +70,7 @@ bool resolve_target(BulletFactory2D &factory, const String &fn, const Variant &t
 			return true;
 		}
 		case Variant::OBJECT: {
-			Node2D *node = Object::cast_to<Node2D>((Object *)target);
+			Node2D *node = live_object2d<Node2D>(target);
 			if (node == nullptr) {
 				break;
 			}

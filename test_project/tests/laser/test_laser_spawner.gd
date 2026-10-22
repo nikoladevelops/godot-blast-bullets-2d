@@ -700,3 +700,16 @@ func test_orphaned_lasers_reach_every_factory_it_fired_into() -> void:
 	sp.free()
 	await idle(3) # both factories tick: an ended laser is pooled on its next tick
 	assert_eq([in_first.is_pooled(), in_second.is_pooled()], [true, true], "both lasers ended")
+
+
+## A freed node handed to set_beam_target / set_targets is refused like any
+## other non-target (it used to be read through its dangling pointer).
+func test_a_freed_node_is_no_beam_target() -> void:
+	var l := _fire(_spawner(_laser(), 2))
+	var gone := Node2D.new()
+	add_child(gone)
+	gone.free()
+	l.set_beam_target(0, gone)
+	expect_error_sequence(["set_beam_target: target must be a Node2D, a Vector2 or null, the beam has no target now."])
+	l.set_targets([gone])
+	expect_error_sequence(["set_beam_target: target must be a Node2D, a Vector2 or null, the beam has no target now.", "set_beam_target: target must be a Node2D, a Vector2 or null, the beam has no target now."])

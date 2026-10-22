@@ -6,6 +6,7 @@
 
 #include "bullet_volley/bullet_volley2d_internal.hpp"
 #include "core/emit_on2d.hpp"
+#include "core/live_object2d.hpp"
 
 using namespace godot;
 
@@ -22,7 +23,7 @@ bool BulletVolley2D::graze_collect_zones(const Array &zones, Ref<BulletGrazeZone
 		if (entry.get_type() == Variant::NIL) {
 			continue;
 		}
-		BulletGrazeZone2D *zone = Object::cast_to<BulletGrazeZone2D>(entry.get_type() == Variant::OBJECT ? (Object *)entry : nullptr);
+		BulletGrazeZone2D *zone = live_object2d<BulletGrazeZone2D>(entry);
 		if (zone == nullptr) {
 			UtilityFunctions::push_error("graze_set_zones: entry " + String::num_int64(i) + " is not a BulletGrazeZone2D, nothing changed.");
 			return false;
@@ -67,7 +68,7 @@ bool BulletVolley2D::graze_armed_with(const Array &zones, const std::shared_ptr<
 	int slots = 0;
 	for (int i = 0; i < zones.size(); ++i) {
 		const Variant &entry = zones[i];
-		const Object *zone = entry.get_type() == Variant::OBJECT ? (Object *)entry : nullptr;
+		const Object *zone = live_object2d(entry);
 		if (zone != nullptr) {
 			slots = i + 1;
 		}

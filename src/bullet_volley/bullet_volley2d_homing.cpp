@@ -4,6 +4,7 @@
 
 #include "bullet_volley/bullet_volley2d_internal.hpp"
 #include "core/emit_on2d.hpp"
+#include "core/live_object2d.hpp"
 
 using namespace godot;
 
@@ -134,7 +135,7 @@ bool BulletVolley2D::bullet_homing_push_back_homing_target(int bullet_index, con
 	if (!validate_bullet_index(bullet_index, "bullet_homing_push_back_homing_target")) {
 		return false;
 	}
-	if (Node2D *node = Object::cast_to<Node2D>(node2d_or_global_position)) {
+	if (Node2D *node = live_object2d<Node2D>(node2d_or_global_position)) {
 		return bullet_homing_push_back_node2d_target(bullet_index, node);
 	} else if (node2d_or_global_position.get_type() == Variant::VECTOR2) {
 		return bullet_homing_push_back_global_position_target(bullet_index, node2d_or_global_position);
@@ -147,7 +148,7 @@ bool BulletVolley2D::bullet_homing_push_front_homing_target(int bullet_index, co
 	if (!validate_bullet_index(bullet_index, "bullet_homing_push_front_homing_target")) {
 		return false;
 	}
-	if (Node2D *node = Object::cast_to<Node2D>(node2d_or_global_position)) {
+	if (Node2D *node = live_object2d<Node2D>(node2d_or_global_position)) {
 		return bullet_homing_push_front_node2d_target(bullet_index, node);
 	} else if (node2d_or_global_position.get_type() == Variant::VECTOR2) {
 		return bullet_homing_push_front_global_position_target(bullet_index, node2d_or_global_position);
@@ -214,7 +215,7 @@ void BulletVolley2D::all_bullets_push_back_homing_target(const Variant &node2d_o
 		UtilityFunctions::push_error("Non-finite homing target in all_bullets_push_back_homing_target. Nothing was pushed.");
 		return;
 	}
-	if (Node2D *node = Object::cast_to<Node2D>(node2d_or_global_position)) {
+	if (Node2D *node = live_object2d<Node2D>(node2d_or_global_position)) {
 		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
 			if (orbit_skip_disabled_in_bulk(i)) {
 				continue;
@@ -240,7 +241,7 @@ void BulletVolley2D::all_bullets_push_front_homing_target(const Variant &node2d_
 		UtilityFunctions::push_error("Non-finite homing target in all_bullets_push_front_homing_target. Nothing was pushed.");
 		return;
 	}
-	if (Node2D *node = Object::cast_to<Node2D>(node2d_or_global_position)) {
+	if (Node2D *node = live_object2d<Node2D>(node2d_or_global_position)) {
 		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
 			if (orbit_skip_disabled_in_bulk(i)) {
 				continue;
@@ -281,7 +282,7 @@ bool BulletVolley2D::bullet_replace_homing_targets_with_new_target(int bullet_in
 	if (bullet_index >= amount_bullets || !all_bullets_enabled_set.contains(bullet_index)) {
 		return false;
 	}
-	Node2D *node = Object::cast_to<Node2D>(node2d_or_global_position);
+	Node2D *node = live_object2d<Node2D>(node2d_or_global_position);
 	const bool is_vec = node2d_or_global_position.get_type() == Variant::VECTOR2;
 	if (node == nullptr && !is_vec) {
 		UtilityFunctions::push_error("Invalid homing target type in bullet_replace_homing_targets_with_new_target. Use a Node2D or Vector2. Nothing was changed.");
@@ -302,7 +303,7 @@ void BulletVolley2D::all_bullets_replace_homing_targets_with_new_target(const Va
 	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_replace_homing_targets_with_new_target");
 
 	// Validate BEFORE clearing: an invalid target must not wipe the user's targets.
-	const bool is_node2d = Object::cast_to<Node2D>(node2d_or_global_position) != nullptr;
+	const bool is_node2d = live_object2d<Node2D>(node2d_or_global_position) != nullptr;
 	if (!is_node2d && node2d_or_global_position.get_type() != Variant::VECTOR2) {
 		UtilityFunctions::push_error("Invalid homing target type in all_bullets_replace_homing_targets_with_new_target. Use a Node2D or Vector2. Nothing was changed.");
 		return;
@@ -324,7 +325,7 @@ void BulletVolley2D::all_bullets_replace_homing_targets_with_new_target_array(co
 	// targets (all-or-nothing replace).
 	for (int k = 0; k < node2ds_or_global_positions_array.size(); ++k) {
 		const Variant &target = node2ds_or_global_positions_array[k];
-		if (Object::cast_to<Node2D>(target) == nullptr && target.get_type() != Variant::VECTOR2) {
+		if (live_object2d<Node2D>(target) == nullptr && target.get_type() != Variant::VECTOR2) {
 			UtilityFunctions::push_error("Invalid homing target type in all_bullets_replace_homing_targets_with_new_target_array at array index " + String::num_int64(k) + ". Use Node2D or Vector2 entries. Nothing was changed.");
 			return;
 		}
@@ -379,7 +380,7 @@ void BulletVolley2D::all_bullets_assign_homing_targets_array(const Array &node2d
 	// Validate every element first so a bad entry can't leave a half-assigned range behind.
 	for (int k = 0; k < range_size; ++k) {
 		const Variant &target = node2ds_or_global_positions_array[k];
-		if (Object::cast_to<Node2D>(target) == nullptr && target.get_type() != Variant::VECTOR2) {
+		if (live_object2d<Node2D>(target) == nullptr && target.get_type() != Variant::VECTOR2) {
 			UtilityFunctions::push_error("Invalid homing target type in all_bullets_assign_homing_targets_array at array index " + String::num_int64(k) + ". Use Node2D or Vector2 entries. Nothing pushed.");
 			return;
 		}
@@ -489,7 +490,7 @@ void BulletVolley2D::shared_homing_deque_push_back_global_position_target(const 
 
 void BulletVolley2D::shared_homing_deque_push_back_homing_targets_array(const Array &node2ds_or_global_positions_array) {
 	for (const Variant &target : node2ds_or_global_positions_array) {
-		Node2D *node2d_target = Object::cast_to<Node2D>(target);
+		Node2D *node2d_target = live_object2d<Node2D>(target);
 
 		if (node2d_target) {
 			shared_homing_deque_push_back_node2d_target(node2d_target);
@@ -503,7 +504,7 @@ void BulletVolley2D::shared_homing_deque_push_back_homing_targets_array(const Ar
 
 void BulletVolley2D::shared_homing_deque_push_front_homing_targets_array(const Array &node2ds_or_global_positions_array) {
 	for (const Variant &target : node2ds_or_global_positions_array) {
-		Node2D *node2d_target = Object::cast_to<Node2D>(target);
+		Node2D *node2d_target = live_object2d<Node2D>(target);
 
 		if (node2d_target) {
 			shared_homing_deque_push_front_node2d_target(node2d_target);
@@ -525,7 +526,7 @@ void BulletVolley2D::shared_homing_deque_clear_homing_targets() {
 }
 
 void BulletVolley2D::shared_homing_deque_replace_homing_targets_with_new_target(const Variant &node2d_or_global_position) {
-	Node2D *node2d_target = Object::cast_to<Node2D>(node2d_or_global_position);
+	Node2D *node2d_target = live_object2d<Node2D>(node2d_or_global_position);
 
 	if (node2d_target) {
 		shared_homing_deque.clear_homing_targets(cached_mouse_global_position);
@@ -548,7 +549,7 @@ void BulletVolley2D::shared_homing_deque_replace_homing_targets_with_new_target(
 
 void BulletVolley2D::shared_homing_deque_replace_homing_targets_with_new_target_array(const Array &node2ds_or_global_positions_array) {
 	for (auto &target : node2ds_or_global_positions_array) {
-		if (Object::cast_to<Node2D>(target) == nullptr && target.get_type() != Variant::VECTOR2) {
+		if (live_object2d<Node2D>(target) == nullptr && target.get_type() != Variant::VECTOR2) {
 			UtilityFunctions::push_error("Invalid type passed to shared_homing_deque_replace_homing_targets_with_new_target_array. Nothing was changed.");
 			return;
 		}
@@ -561,7 +562,7 @@ void BulletVolley2D::shared_homing_deque_replace_homing_targets_with_new_target_
 	reset_shared_homing_reached_state();
 
 	for (auto &target : node2ds_or_global_positions_array) {
-		Node2D *node2d_target = Object::cast_to<Node2D>(target);
+		Node2D *node2d_target = live_object2d<Node2D>(target);
 
 		if (node2d_target) {
 			shared_homing_deque_push_back_node2d_target(node2d_target);

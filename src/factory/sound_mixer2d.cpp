@@ -1,4 +1,5 @@
 #include "factory/sound_mixer2d.hpp"
+#include "core/live_object2d.hpp"
 
 #include "bullet_volley/bullet_volley2d.hpp"
 #include "core/cosmetic_rng2d.hpp"
@@ -43,7 +44,7 @@ static double sound_dist2(const Vector2 &a, const Vector2 &b) {
 static bool sound_has_audio(const BulletSoundData2D *sound) {
 	for (int i = 0; i < sound->streams.size(); ++i) {
 		const Variant entry = sound->streams[i];
-		if (entry.get_type() == Variant::OBJECT && Object::cast_to<AudioStream>((Object *)entry) != nullptr) {
+		if (live_object2d<AudioStream>(entry) != nullptr) {
 			return true;
 		}
 	}
@@ -104,7 +105,7 @@ Ref<AudioStream> SoundMixer2D::pick_stream(const BulletSoundData2D *sound, Chann
 	usable.reserve((size_t)sound->streams.size());
 	for (int i = 0; i < sound->streams.size(); ++i) {
 		const Variant entry = sound->streams[i];
-		AudioStream *s = entry.get_type() == Variant::OBJECT ? Object::cast_to<AudioStream>((Object *)entry) : nullptr;
+		AudioStream *s = live_object2d<AudioStream>(entry);
 		if (s != nullptr) {
 			usable.push_back(Ref<AudioStream>(s));
 		}
@@ -139,7 +140,7 @@ Ref<AudioStream> SoundMixer2D::pick_stream(const BulletSoundData2D *sound, Chann
 		double total = 0.0;
 		for (int i = 0; i < sound->streams.size(); ++i) {
 			const Variant entry = sound->streams[i];
-			if (entry.get_type() == Variant::OBJECT && Object::cast_to<AudioStream>((Object *)entry) != nullptr && sound->stream_weights[i] > 0.0f) {
+			if (live_object2d<AudioStream>(entry) != nullptr && sound->stream_weights[i] > 0.0f) {
 				total += (double)sound->stream_weights[i];
 			}
 		}
@@ -147,7 +148,7 @@ Ref<AudioStream> SoundMixer2D::pick_stream(const BulletSoundData2D *sound, Chann
 			double roll = CosmeticRng2D::randf() * total;
 			for (int i = 0; i < sound->streams.size(); ++i) {
 				const Variant entry = sound->streams[i];
-				AudioStream *s = entry.get_type() == Variant::OBJECT ? Object::cast_to<AudioStream>((Object *)entry) : nullptr;
+				AudioStream *s = live_object2d<AudioStream>(entry);
 				if (s == nullptr || sound->stream_weights[i] <= 0.0f) {
 					continue;
 				}

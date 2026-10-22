@@ -1,5 +1,6 @@
 #include "bullet_spawner/pattern_spawner2d_internal.hpp"
 #include "core/emit_on2d.hpp"
+#include "core/live_object2d.hpp"
 #include "core/transform_math2d.hpp"
 #include <algorithm>
 
@@ -656,7 +657,7 @@ PackedStringArray PatternSpawner2D::_get_configuration_warnings() const {
 		bool any_zone = false;
 		for (int i = 0; i < graze_zones.size(); ++i) {
 			const Variant entry = graze_zones[i];
-			const BulletGrazeZone2D *zone = entry.get_type() == Variant::OBJECT ? Object::cast_to<BulletGrazeZone2D>((Object *)entry) : nullptr;
+			const BulletGrazeZone2D *zone = live_object2d<BulletGrazeZone2D>(entry);
 			if (zone == nullptr) {
 				out.push_back("graze_zones[" + String::num_int64(i) + "] is empty.");
 				continue;
@@ -682,7 +683,7 @@ PackedStringArray PatternSpawner2D::_get_configuration_warnings() const {
 		bool any_sound = false;
 		for (int i = 0; i < sound_effects.size(); ++i) {
 			const Variant entry = sound_effects[i];
-			const BulletSoundData2D *sound = entry.get_type() == Variant::OBJECT ? Object::cast_to<BulletSoundData2D>((Object *)entry) : nullptr;
+			const BulletSoundData2D *sound = live_object2d<BulletSoundData2D>(entry);
 			if (sound == nullptr) {
 				out.push_back("sound_effects[" + String::num_int64(i) + "] is empty.");
 				continue;

@@ -6,6 +6,7 @@
 
 #include "bullet_spawner/pattern_spawner2d_internal.hpp"
 #include "core/graze_targets2d.hpp"
+#include "core/live_object2d.hpp"
 #include "core/transform_math2d.hpp"
 
 using namespace godot;
@@ -40,7 +41,7 @@ void PatternSpawner2D::set_graze_zones(const Array &value) {
 			zones.push_back(Variant());
 			continue;
 		}
-		BulletGrazeZone2D *zone = entry.get_type() == Variant::OBJECT ? Object::cast_to<BulletGrazeZone2D>((Object *)entry) : nullptr;
+		BulletGrazeZone2D *zone = live_object2d<BulletGrazeZone2D>(entry);
 		if (zone == nullptr) {
 			UtilityFunctions::push_error((String(get_class()) + ": graze_zones entries must be BulletGrazeZone2D or null, keeping the old value."));
 			return;
@@ -332,7 +333,7 @@ Array PatternSpawner2D::spawner_graze_zones(bool &r_any) {
 	bool misuse = graze_zones.size() > BulletVolley2D::MAX_GRAZE_ZONES;
 	for (int i = 0; i < graze_zones.size() && i < BulletVolley2D::MAX_GRAZE_ZONES; ++i) {
 		const Variant entry = graze_zones[i];
-		BulletGrazeZone2D *zone = entry.get_type() == Variant::OBJECT ? Object::cast_to<BulletGrazeZone2D>((Object *)entry) : nullptr;
+		BulletGrazeZone2D *zone = live_object2d<BulletGrazeZone2D>(entry);
 		if (zone == nullptr && entry.get_type() != Variant::NIL) {
 			misuse = true;
 		}
@@ -424,7 +425,7 @@ void PatternSpawner2D::refresh_graze_preview() {
 	collect_graze_targets(graze_targets_scratch);
 	for (int z = 0; z < graze_zones.size() && z < BulletVolley2D::MAX_GRAZE_ZONES; ++z) {
 		const Variant entry = graze_zones[z];
-		const BulletGrazeZone2D *zone = entry.get_type() == Variant::OBJECT ? Object::cast_to<BulletGrazeZone2D>((Object *)entry) : nullptr;
+		const BulletGrazeZone2D *zone = live_object2d<BulletGrazeZone2D>(entry);
 		if (zone == nullptr || !zone->enabled) {
 			continue;
 		}

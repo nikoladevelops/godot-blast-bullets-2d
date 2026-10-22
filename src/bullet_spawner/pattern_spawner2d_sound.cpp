@@ -6,6 +6,7 @@
 
 #include "bullet_spawner/pattern_spawner2d_internal.hpp"
 #include "core/graze_targets2d.hpp"
+#include "core/live_object2d.hpp"
 #include "core/transform_math2d.hpp"
 
 using namespace godot;
@@ -32,7 +33,7 @@ void PatternSpawner2D::set_sound_effects(const Array &value) {
 		if (entry.get_type() == Variant::NIL) {
 			continue;
 		}
-		if (Object::cast_to<BulletSoundData2D>(entry.get_type() == Variant::OBJECT ? (Object *)entry : nullptr) == nullptr) {
+		if (live_object2d<BulletSoundData2D>(entry) == nullptr) {
 			UtilityFunctions::push_error((String(get_class()) + ": sound_effects entries must be BulletSoundData2D or null, keeping the old value."));
 			return;
 		}
@@ -276,7 +277,7 @@ Array PatternSpawner2D::spawner_sound_entries(bool &r_any) {
 	bool misuse = false;
 	for (int i = 0; i < sound_effects.size(); ++i) {
 		const Variant entry = sound_effects[i];
-		BulletSoundData2D *sound = entry.get_type() == Variant::OBJECT ? Object::cast_to<BulletSoundData2D>((Object *)entry) : nullptr;
+		BulletSoundData2D *sound = live_object2d<BulletSoundData2D>(entry);
 		if (sound == nullptr && entry.get_type() != Variant::NIL) {
 			misuse = true;
 		}
@@ -340,7 +341,7 @@ void PatternSpawner2D::preview_sound_effect(int index) {
 		return;
 	}
 	const Variant entry = sound_effects[index];
-	BulletSoundData2D *sound = entry.get_type() == Variant::OBJECT ? Object::cast_to<BulletSoundData2D>((Object *)entry) : nullptr;
+	BulletSoundData2D *sound = live_object2d<BulletSoundData2D>(entry);
 	if (sound == nullptr) {
 		UtilityFunctions::push_warning((String(get_class()) + ".preview_sound_effect: entry ") + String::num_int64(index) + " is null, nothing plays.");
 		return;

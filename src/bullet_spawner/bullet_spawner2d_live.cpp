@@ -7,6 +7,7 @@
 // each touch: homing signals run user code that may free anything.
 
 #include "bullet_spawner/pattern_spawner2d_internal.hpp"
+#include "core/live_object2d.hpp"
 #include "core/node_scan2d.hpp"
 
 #include <unordered_set>
@@ -244,7 +245,7 @@ int BulletSpawner2D::home_live_volleys_to(const Variant &target) {
 	if (type == Variant::NIL) {
 		// The mouse.
 	} else if (type == Variant::OBJECT) {
-		node = Object::cast_to<Node2D>((Object *)target);
+		node = live_object2d<Node2D>(target);
 		ok = node != nullptr && node->is_inside_tree() && !node->is_queued_for_deletion() && node->get_global_position().is_finite();
 	} else if (type == Variant::VECTOR2) {
 		point = target;

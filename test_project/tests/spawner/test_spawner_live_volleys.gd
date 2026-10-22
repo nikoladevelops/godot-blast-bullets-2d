@@ -260,3 +260,26 @@ func test_a_wake_arming_handler_may_free_the_volley() -> void:
 	assert_eq(configured, [], "the arming stops with the volley")
 	expect_no_errors("no error, no touch of the freed volley")
 	assert_eq(sp.get_tracked_volley_count(), 0, "nothing left on the list")
+
+
+## A freed node handed to the spawner's API (a script variable that outlived
+## its node) is refused with the standard error. It used to be read through
+## its dangling pointer: home_live_volleys_to crashed the engine.
+func test_freed_nodes_handed_to_the_api_are_refused() -> void:
+	var sp := _plain_spawner()
+	var v := _shoot(sp)
+	var gone := Node2D.new()
+	add_child(gone)
+	gone.free()
+	assert_eq(sp.home_live_volleys_to(gone), 0, "nothing changed")
+	expect_error_sequence(["home_live_volleys_to: target must be a Node2D in the tree, a finite Vector2, a group name or null (the mouse), nothing changed."])
+	var bad: Array = [gone] # untyped: a script can pass anything
+	sp.set_graze_zones(bad)
+	expect_error_sequence(["BulletSpawner2D: graze_zones entries must be BulletGrazeZone2D or null, keeping the old value."])
+	sp.sound_effects = [gone]
+	expect_error_sequence(["BulletSpawner2D: sound_effects entries must be BulletSoundData2D or null, keeping the old value."])
+	v.shared_homing_deque_replace_homing_targets_with_new_target_array([gone])
+	expect_error_sequence(["Invalid type passed to shared_homing_deque_replace_homing_targets_with_new_target_array. Nothing was changed."])
+	v.all_bullets_replace_homing_targets_with_new_target(gone)
+	expect_error_sequence(["Invalid homing target type in all_bullets_replace_homing_targets_with_new_target. Use a Node2D or Vector2. Nothing was changed."])
+	assert_false(_chases(v), "no target was taken")

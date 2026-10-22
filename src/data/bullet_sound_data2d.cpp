@@ -1,4 +1,5 @@
 #include "data/bullet_sound_data2d.hpp"
+#include "core/live_object2d.hpp"
 
 #include "core/transform_math2d.hpp"
 #include "factory/sound_mixer2d.hpp"
@@ -82,7 +83,7 @@ void BulletSoundData2D::set_streams(const Array &value) {
 		if (entry.get_type() == Variant::NIL) {
 			continue;
 		}
-		if (Object::cast_to<AudioStream>(entry.get_type() == Variant::OBJECT ? (Object *)entry : nullptr) == nullptr) {
+		if (live_object2d<AudioStream>(entry) == nullptr) {
 			UtilityFunctions::push_error("BulletSoundData2D: streams entries must be AudioStream or null, keeping the old value.");
 			return;
 		}
@@ -686,7 +687,7 @@ void BulletSoundData2D::_validate_property(PropertyInfo &p_property) const {
 		}
 		for (int i = 0; i < streams.size(); ++i) {
 			const Variant entry = streams[i];
-			if (entry.get_type() == Variant::OBJECT && Object::cast_to<AudioStream>((Object *)entry) != nullptr) {
+			if (live_object2d<AudioStream>(entry) != nullptr) {
 				return;
 			}
 		}

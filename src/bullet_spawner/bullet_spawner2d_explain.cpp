@@ -4,6 +4,7 @@
 // fight), then the setup warnings. Debug only: nothing here runs per frame.
 
 #include "bullet_spawner/pattern_spawner2d_internal.hpp"
+#include "core/live_object2d.hpp"
 
 using namespace godot;
 
@@ -171,7 +172,7 @@ PackedStringArray BulletSpawner2D::debug_explain_features() const {
 		bool sized = false;
 		for (int i = 0; i < graze_zones.size(); ++i) {
 			const Variant entry = graze_zones[i];
-			const BulletGrazeZone2D *zone = entry.get_type() == Variant::OBJECT ? Object::cast_to<BulletGrazeZone2D>((Object *)entry) : nullptr;
+			const BulletGrazeZone2D *zone = live_object2d<BulletGrazeZone2D>(entry);
 			if (zone != nullptr) {
 				++zones;
 				sized = sized || zone->count_bullet_size;

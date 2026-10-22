@@ -4,6 +4,7 @@
 // offer through sound_fire in bullet_volley2d_sound.cpp's second half.
 
 #include "bullet_volley/bullet_volley2d_internal.hpp"
+#include "core/live_object2d.hpp"
 
 using namespace godot;
 
@@ -18,7 +19,7 @@ static bool sound_collect_entries(const Array &effects, std::vector<Ref<BulletSo
 			r_entries.push_back(Ref<BulletSoundData2D>());
 			continue;
 		}
-		BulletSoundData2D *sound = Object::cast_to<BulletSoundData2D>(entry.get_type() == Variant::OBJECT ? (Object *)entry : nullptr);
+		BulletSoundData2D *sound = live_object2d<BulletSoundData2D>(entry);
 		if (sound == nullptr) {
 			UtilityFunctions::push_error(String(caller) + ": entry " + String::num_int64(i) + " is not a BulletSoundData2D, nothing changed.");
 			return false;
@@ -76,7 +77,7 @@ bool BulletVolley2D::sound_armed_with(const Array &effects, const std::shared_pt
 	}
 	for (int i = 0; i < effects.size(); ++i) {
 		const Variant &entry = effects[i];
-		const Object *sound = entry.get_type() == Variant::OBJECT ? (Object *)entry : nullptr;
+		const Object *sound = live_object2d(entry);
 		if ((const Object *)sound_effects[i].ptr() != sound) {
 			return false;
 		}
