@@ -78,7 +78,7 @@
 		<method name="debug_explain_features" qualifiers="const">
 			<return type="PackedStringArray" />
 			<description>
-				Explains the spawner's steering features in plain sentences, one per group: Homing (its source, how many targets it finds right now, its turn rate and reach), Orbiting, Flocking (which flock and preset, the scope, the turn cap and blend-in, how it mixes with homing and orbiting), Graze (zones, source, targets found now, whether rings count bullet size) and Randomization (when sizes vary), followed by the setup warnings. Use it when a feature seems to do nothing:
+				Explains the spawner's steering features in plain sentences, one per group: Homing (its source, how many targets it finds right now, its turn rate and reach), Orbiting, Flocking (which flock and preset, the scope, the turn cap and blend-in, how it mixes with homing and orbiting), Graze (zones, source, targets found now, whether rings count bullet size) and Randomization (when sizes vary), followed by the setup warnings. A readout that changes nothing: the seeded random and round-robin homing picks of the next shots stay the same. Use it when a feature seems to do nothing:
 				[codeblock]
 				for line in $BulletSpawner2D.debug_explain_features():
 				    print(line)

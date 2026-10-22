@@ -44,7 +44,19 @@ PackedStringArray BulletSpawner2D::debug_explain_features() const {
 	if (!homing_enabled) {
 		out.push_back("Homing: off.");
 	} else {
+		// A readout: the resolve must not consume the seeded random picks or
+		// the round-robin state the next shots use.
+		const Ref<RandomNumberGenerator> rng = homing_rng;
+		const uint64_t rng_state = rng.is_valid() ? rng->get_state() : 0;
+		const int round_robin_count = homing_round_robin_last_count;
+		const bool distribute_warned = homing_distribute_degenerate_warned;
 		homing_targets = resolve_homing_targets(true, false).size();
+		if (rng.is_valid()) {
+			rng->set_state(rng_state);
+		}
+		homing_rng = rng; // created by the resolve: seeded afresh on the first real pick
+		homing_round_robin_last_count = round_robin_count;
+		homing_distribute_degenerate_warned = distribute_warned;
 		String line = String("Homing: on, source ") + homing_source_name2d(homing_target_source) + ", " + itos(homing_targets) + " target(s) found now. ";
 		if (homing_targets == 0) {
 			line += "Bullets fly straight until a target appears (check the source's setting: an empty group, name or path finds nothing). ";

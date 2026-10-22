@@ -185,3 +185,22 @@ func test_reseeding_replays_and_seed_zero_randomizes_again() -> void:
 		ra.append(a.resolve_homing_targets(true)[0])
 		rb.append(b.resolve_homing_targets(true)[0])
 	assert_ne(ra, rb, "seed 0 is non-deterministic: no shared stream continues")
+
+
+## debug_explain_features() is a readout: it never draws from the seeded
+## random selection nor moves the round-robin cursor, so explaining a spawner
+## never changes the targets its next shots pick.
+func test_explaining_never_changes_the_next_picks(selection: int = use_parameters([BulletSpawner2D.HOMING_SELECT_RANDOM, BulletSpawner2D.HOMING_SELECT_ROUND_ROBIN])) -> void:
+	var a := _spawner(selection, 2)
+	var b := _spawner(selection, 2)
+	a.set_homing_random_seed(9)
+	b.set_homing_random_seed(9)
+	a.resolve_homing_targets(true, true)
+	b.resolve_homing_targets(true, true)
+	a.debug_explain_features()
+	var picks_a: Array = []
+	var picks_b: Array = []
+	for i in 5:
+		picks_a.append(a.resolve_homing_targets(true, true))
+		picks_b.append(b.resolve_homing_targets(true, true))
+	assert_eq(picks_a, picks_b, "the same picks as a spawner never explained")
