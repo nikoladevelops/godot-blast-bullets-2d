@@ -11,6 +11,7 @@
 #include "core/cached_string_names2d.hpp"
 #include "core/node_baseline2d.hpp"
 #include "core/transform_math2d.hpp"
+#include "core/warn_once2d.hpp"
 #include "factory/bullet_factory2d.hpp"
 #include "factory/graze_detector2d.hpp"
 
@@ -22,64 +23,50 @@ using namespace godot;
 
 namespace BlastBullets2D {
 
-// ---- LaserAnim2D ----------------------------------------------------------------------
+// ---- Baked animations ---------------------------------------------------------------
 
-void LaserAnim2D::clear() {
-	frames.clear();
-	secs.clear();
-	total = 0.0;
-	loop = true;
-}
-
-void LaserAnim2D::bake(const Ref<SpriteFrames> &sprite_frames) {
-	clear();
+// One LaserData2D animation property under the shared SpriteFrames rules
+// (sprite/sprite_anim2d.hpp): its "default" animation, else the first one
+// with frames (lasers have no animation name to pick). Frames are optional:
+// none assigned draws nothing. A laser bakes per shot, so each problem of a
+// SpriteFrames is reported once per resource and property.
+static void bake_laser_animation(const Ref<SpriteFrames> &sprite_frames, int slot, const char *property, FrameTextureCache2D *cache, SpriteAnim2D &out) {
+	out.clear();
 	if (sprite_frames.is_null()) {
 		return;
 	}
-	StringName anim = CachedStringNames2D::get().default_animation;
-	if (!sprite_frames->has_animation(anim)) {
-		const PackedStringArray names = sprite_frames->get_animation_names();
-		if (names.is_empty()) {
-			return;
+	const uint64_t id = (uint64_t)sprite_frames->get_instance_id();
+	String prefix = String("LaserData2D.") + property;
+	// Kind in the high bits, frame in the low ones: one report per problem.
+	auto first_report = [&](int64_t kind, int64_t frame) {
+		return WarnOnce2D::first(id, 26u, slot, kind * 65536 + frame);
+	};
+	const SpriteAnimChoice2D choice = resolve_sprite_animation2d(sprite_frames, StringName());
+	if (!choice.usable()) {
+		if (first_report(0, 0)) {
+			UtilityFunctions::push_error(prefix + ": sprite_frames has no animation with frames.");
 		}
-		anim = StringName(names[0]);
+		return;
 	}
-	const int count = sprite_frames->get_frame_count(anim);
-	const double fps = sprite_frames->get_animation_speed(anim);
-	loop = sprite_frames->get_animation_loop(anim);
-	for (int i = 0; i < count; ++i) {
-		const Ref<Texture2D> tex = sprite_frames->get_frame_texture(anim, i);
-		if (tex.is_null()) {
-			continue;
+	SpriteAnimBakeOptions2D options;
+	options.cache = cache;
+	SpriteAnimBakeReport2D report;
+	const bool baked_ok = bake_sprite_animation2d(sprite_frames, choice.anim, options, out, report);
+	String anim_text = prefix + ": animation '" + String(choice.anim) + "'";
+	if (report.bad_speed && first_report(1, 0)) {
+		UtilityFunctions::push_error(anim_text + " has invalid speed, using 1 fps.");
+	}
+	for (int frame : report.bad_duration_frames) {
+		if (first_report(2, frame)) {
+			UtilityFunctions::push_error(anim_text + " frame " + String::num_int64(frame) + " has non-finite duration, using 0.");
 		}
-		const double duration = sprite_frames->get_frame_duration(anim, i);
-		const double sec = (fps > 0.0 && Math::is_finite(fps) && Math::is_finite(duration) && duration > 0.0) ? duration / fps : 0.0;
-		frames.push_back(tex);
-		secs.push_back(sec);
-		total += sec;
 	}
-}
-
-Texture2D *LaserAnim2D::at(double t) const {
-	if (frames.empty()) {
-		return nullptr;
+	if (report.null_frame >= 0 && first_report(3, report.null_frame)) {
+		UtilityFunctions::push_error(anim_text + " frame " + String::num_int64(report.null_frame) + " has null texture.");
 	}
-	if (!(total > 0.0) || !Math::is_finite(t) || t <= 0.0) {
-		return frames[0].ptr();
+	if (!baked_ok) {
+		out.clear();
 	}
-	double local = t;
-	if (loop) {
-		local = Math::fmod(t, total);
-	} else if (t >= total) {
-		return frames.back().ptr();
-	}
-	for (size_t i = 0; i < frames.size(); ++i) {
-		if (local < secs[i]) {
-			return frames[i].ptr();
-		}
-		local -= secs[i];
-	}
-	return frames.back().ptr();
 }
 
 // ---- Life -----------------------------------------------------------------------------------
@@ -122,12 +109,13 @@ void LaserVolley2D::begin_life(BulletFactory2D *p_factory, const Ref<LaserData2D
 		b.prev_angle = b.angle;
 	}
 	if (d != nullptr) {
-		anim_body.bake(d->body_frames);
-		anim_charge.bake(d->charge_frames);
-		anim_muzzle.bake(d->muzzle_frames);
-		anim_tip.bake(d->tip_frames);
-		anim_pierce.bake(d->pierce_frames);
-		anim_wall.bake(d->wall_impact_frames);
+		FrameTextureCache2D *cache = p_factory != nullptr ? &p_factory->frame_cache : nullptr;
+		bake_laser_animation(d->body_frames, 0, "body_frames", cache, anim_body);
+		bake_laser_animation(d->charge_frames, 1, "charge_frames", cache, anim_charge);
+		bake_laser_animation(d->muzzle_frames, 2, "muzzle_frames", cache, anim_muzzle);
+		bake_laser_animation(d->tip_frames, 3, "tip_frames", cache, anim_tip);
+		bake_laser_animation(d->pierce_frames, 4, "pierce_frames", cache, anim_pierce);
+		bake_laser_animation(d->wall_impact_frames, 5, "wall_impact_frames", cache, anim_wall);
 		set_material(d->material);
 		set_z_index(d->z_index);
 		set_texture_repeat(d->body_mode == LaserData2D::BODY_TILE ? TEXTURE_REPEAT_ENABLED : TEXTURE_REPEAT_PARENT_NODE);

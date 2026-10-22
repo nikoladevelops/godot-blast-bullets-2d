@@ -197,7 +197,7 @@ void LaserVolley2D::build_body_mesh(double fraction, LaserBodyMesh2D &r_mesh, st
 		return;
 	}
 	const real_t width = get_current_width();
-	Texture2D *body = anim_body.at(clock - grow_started);
+	Texture2D *body = anim_body.texture_at(clock - grow_started);
 	BodyStyle2D style;
 	style.data = d;
 	style.half = width * (real_t)0.5;
@@ -246,7 +246,7 @@ void LaserVolley2D::_draw() {
 				std::memcpy(line.ptrw(), pts.data(), pts.size() * sizeof(Vector2));
 				draw_polyline(line, d->warning_color, (real_t)d->warning_width);
 			}
-			draw_point_frame(this, anim_charge.at(clock), pts[0], (real_t)(pts[1] - pts[0]).angle(), effects, d->modulate);
+			draw_point_frame(this, anim_charge.texture_at(clock), pts[0], (real_t)(pts[1] - pts[0]).angle(), effects, d->modulate);
 		}
 		return;
 	}
@@ -266,20 +266,20 @@ void LaserVolley2D::_draw() {
 		std::memcpy(points.ptrw(), mesh.points.data(), mesh.points.size() * sizeof(Vector2));
 		std::memcpy(colors.ptrw(), mesh.colors.data(), mesh.colors.size() * sizeof(Color));
 		std::memcpy(uvs.ptrw(), mesh.uvs.data(), mesh.uvs.size() * sizeof(Vector2));
-		Texture2D *body = anim_body.at(clock - grow_started);
+		Texture2D *body = anim_body.texture_at(clock - grow_started);
 		RenderingServer::get_singleton()->canvas_item_add_triangle_array(get_canvas_item(), indices, points, colors, uvs, PackedInt32Array(), PackedFloat32Array(), body != nullptr ? body->get_rid() : RID());
 	}
 	for (const LaserBeamMarks2D &mk : marks) {
 		const Beam &b = *mk.beam;
 		if (d->type == LaserData2D::LASER_BEAM) {
-			draw_point_frame(this, anim_muzzle.at(clock - grow_started), mk.front, mk.angle, effects, d->modulate);
+			draw_point_frame(this, anim_muzzle.texture_at(clock - grow_started), mk.front, mk.angle, effects, d->modulate);
 		}
-		draw_point_frame(this, anim_tip.at(clock - grow_started), mk.back, mk.tip_angle, effects, d->modulate);
+		draw_point_frame(this, anim_tip.texture_at(clock - grow_started), mk.back, mk.tip_angle, effects, d->modulate);
 		for (const Contact &c : b.contacts) {
-			draw_point_frame(this, anim_pierce.at(clock - c.started), c.position, mk.angle, effects, d->modulate);
+			draw_point_frame(this, anim_pierce.texture_at(clock - c.started), c.position, mk.angle, effects, d->modulate);
 		}
 		for (const Vector2 &impact : b.impacts) {
-			draw_point_frame(this, anim_wall.at(clock - b.blocked_since), impact, mk.angle, effects, d->modulate);
+			draw_point_frame(this, anim_wall.texture_at(clock - b.blocked_since), impact, mk.angle, effects, d->modulate);
 		}
 	}
 	mesh.clear();
@@ -334,15 +334,15 @@ Array LaserVolley2D::debug_get_draw_state(double fraction) const {
 		s["warning"] = charging && d->charge_sec > 0.0 && d->warning_width > 0.0;
 		s["width"] = charging ? (real_t)0.0 : get_current_width();
 		s["color"] = d->modulate;
-		s["charge"] = charging ? Variant(anim_charge.at(clock)) : Variant();
-		s["body"] = !charging ? Variant(anim_body.at(clock - grow_started)) : Variant();
-		s["muzzle"] = !charging ? Variant(anim_muzzle.at(clock - grow_started)) : Variant();
-		s["tip"] = !charging ? Variant(anim_tip.at(clock - grow_started)) : Variant();
+		s["charge"] = charging ? Variant(anim_charge.texture_at(clock)) : Variant();
+		s["body"] = !charging ? Variant(anim_body.texture_at(clock - grow_started)) : Variant();
+		s["muzzle"] = !charging ? Variant(anim_muzzle.texture_at(clock - grow_started)) : Variant();
+		s["tip"] = !charging ? Variant(anim_tip.texture_at(clock - grow_started)) : Variant();
 		Array pierces;
 		for (const Contact &c : b.contacts) {
 			Array entry;
 			entry.push_back(c.position);
-			entry.push_back(Variant(anim_pierce.at(clock - c.started)));
+			entry.push_back(Variant(anim_pierce.texture_at(clock - c.started)));
 			pierces.push_back(entry);
 		}
 		s["pierces"] = pierces;
@@ -350,7 +350,7 @@ Array LaserVolley2D::debug_get_draw_state(double fraction) const {
 		for (const Vector2 &impact : b.impacts) {
 			Array entry;
 			entry.push_back(impact);
-			entry.push_back(Variant(anim_wall.at(clock - b.blocked_since)));
+			entry.push_back(Variant(anim_wall.texture_at(clock - b.blocked_since)));
 			impacts.push_back(entry);
 		}
 		s["impacts"] = impacts;

@@ -4,6 +4,7 @@
 #include "data/bullet_graze_zone2d.hpp"
 #include "data/bullet_sound_data2d.hpp"
 #include "data/laser_data2d.hpp"
+#include "sprite/sprite_anim2d.hpp"
 
 #include <godot_cpp/classes/node2d.hpp>
 #include <godot_cpp/classes/physics_ray_query_parameters2d.hpp>
@@ -21,21 +22,6 @@ using namespace godot;
 class BulletFactory2D;
 class GrazeDetector2D;
 class PatternSpawner2D;
-
-// One baked SpriteFrames animation (its first animation, "default" when it
-// has one): the frames and their seconds, sampled on the laser's own clocks.
-struct LaserAnim2D {
-	std::vector<Ref<Texture2D>> frames;
-	std::vector<double> secs;
-	double total = 0.0;
-	bool loop = true;
-	void bake(const Ref<SpriteFrames> &sprite_frames);
-	void clear();
-	bool empty() const { return frames.empty(); }
-	// The frame shown `t` seconds after the animation started (the last
-	// frame once a one-shot animation is over).
-	Texture2D *at(double t) const;
-};
 
 // One laser shot: a beam per pattern slot, created, ticked, drawn and pooled
 // by BulletFactory2D (bullet_factory2d_lasers.cpp). Its signals fire on its
@@ -249,7 +235,9 @@ private:
 	Vector2 anchor_offset_now;
 	bool anchor_holding = false;
 	// Baked looks (per life).
-	LaserAnim2D anim_body, anim_charge, anim_muzzle, anim_tip, anim_pierce, anim_wall;
+	// The LaserData2D animations, baked per shot under the shared SpriteFrames
+	// rules (sprite/sprite_anim2d.hpp) and sampled on the laser's own clocks.
+	SpriteAnim2D anim_body, anim_charge, anim_muzzle, anim_tip, anim_pierce, anim_wall;
 	std::vector<Ref<BulletGrazeZone2D>> graze_zones;
 	std::shared_ptr<GrazeDetector2D> graze_detector;
 	StringName graze_target_group; // the factory's lists (graze_set_zones), when no detector
