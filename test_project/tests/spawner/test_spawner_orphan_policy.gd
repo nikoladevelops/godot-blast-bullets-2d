@@ -438,3 +438,18 @@ func test_a_spawner_freed_inside_a_factory_operation_still_applies_its_policy(po
 			break
 	assert_false(owned.is_bullet_status_enabled(0), "its bullets still go, right after the operation")
 	AttachmentHookProbe2D.clear_hook()
+
+
+## The policy reaches every factory the spawner fired into, not only the one
+## it points at when it is freed (set_bullet_factory may have switched).
+func test_the_policy_reaches_every_factory_the_spawner_fired_into() -> void:
+	var sp := _spawner(BulletSpawner2D.ORPHANED_VOLLEYS_REMOVE)
+	var in_first := _shoot(sp)
+	var second := BulletFactory2D.new()
+	add(second)
+	await idle(1)
+	sp.set_bullet_factory(second)
+	var in_second := _shoot(sp)
+	sp.free()
+	assert_false(in_first.is_bullet_status_enabled(0), "the first factory's volley is removed too")
+	assert_false(in_second.is_bullet_status_enabled(0), "the current factory's volley is removed")

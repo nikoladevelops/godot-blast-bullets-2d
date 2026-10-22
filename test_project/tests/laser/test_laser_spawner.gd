@@ -684,3 +684,19 @@ func test_the_muzzle_offset_never_turns_with_the_spin(space: int = use_parameter
 	step_factory(1, DT)
 	var want := Vector2(0, 70) if space == 0 else Vector2(-50, 20)
 	assert_true(l.get_beam_start(0).is_equal_approx(want), "a turned spawner turns a Local offset only: %s" % l.get_beam_start(0))
+
+
+## orphaned_lasers reaches every factory the spawner fired into, not only the
+## one it points at when it is freed.
+func test_orphaned_lasers_reach_every_factory_it_fired_into() -> void:
+	var sp := _spawner(_laser(), 1)
+	sp.orphaned_lasers = LaserSpawner2D.ORPHANED_LASERS_REMOVE
+	var in_first := _fire(sp)
+	var second := BulletFactory2D.new()
+	add(second)
+	await idle(1)
+	sp.set_bullet_factory(second)
+	var in_second := _fire(sp)
+	sp.free()
+	await idle(3) # both factories tick: an ended laser is pooled on its next tick
+	assert_eq([in_first.is_pooled(), in_second.is_pooled()], [true, true], "both lasers ended")

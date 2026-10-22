@@ -97,7 +97,7 @@
 			Soft cap: while this many of its lasers fire, shots are skipped ([signal PatternSpawner2D.volley_skipped] with [code]over_budget[/code]). 0 = no limit.
 		</member>
 		<member name="orphaned_lasers" type="int" setter="set_orphaned_lasers" getter="get_orphaned_lasers" enum="LaserSpawner2D.OrphanedLasers" default="0">
-			What the lasers of this spawner do when it is freed (see [enum OrphanedLasers]).
+			What the lasers of this spawner do when it is freed (see [enum OrphanedLasers]), in every factory it fired into.
 		</member>
 	</members>
 	<signals>

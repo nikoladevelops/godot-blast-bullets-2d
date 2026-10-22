@@ -1,6 +1,7 @@
 #include "bullet_spawner/pattern_spawner2d_internal.hpp"
 #include "core/emit_on2d.hpp"
 #include "core/transform_math2d.hpp"
+#include <algorithm>
 
 // Wiring (factory/generator/spawn data), shooting cadence, spin, bursts,
 // telegraph, pattern lists, lifecycle (_ready/_notification/_process) and
@@ -1010,18 +1011,29 @@ void PatternSpawner2D::_notification(int p_what) {
 			refused_free_during_shot = true;
 			return;
 		}
-		// Freed for good (a reparent never gets here): apply the
-		// orphaned_volleys policy to every volley this spawner still owns.
-		// Teardown-safe: the factory is resolved by its cached id only (no
-		// tree lookups), and a factory that is itself dying is skipped.
-		if (Engine::get_singleton()->is_editor_hint() || bullet_factory_id == 0) {
+		// Freed for good (a reparent never gets here): apply the orphan
+		// policy to everything this spawner still owns, in EVERY factory it
+		// may have fired into (set_bullet_factory may have switched since):
+		// the factories in the tree plus its own by cached id. Teardown-safe:
+		// no tree lookups, factories resolved by id before each use (the
+		// policy runs user code), dying factories skipped.
+		if (Engine::get_singleton()->is_editor_hint()) {
 			return;
 		}
-		BulletFactory2D *factory = Object::cast_to<BulletFactory2D>(ObjectDB::get_instance(ObjectID(bullet_factory_id)));
-		if (factory == nullptr || factory->get_is_tearing_down()) {
-			return;
+		std::vector<uint64_t> factory_ids;
+		for (const BulletFactory2D *in_tree : BulletFactory2D::factories_in_tree) {
+			factory_ids.push_back(in_tree->get_instance_id());
 		}
-		on_predelete_owned(factory);
+		if (bullet_factory_id != 0 && std::find(factory_ids.begin(), factory_ids.end(), bullet_factory_id) == factory_ids.end()) {
+			factory_ids.push_back(bullet_factory_id);
+		}
+		for (const uint64_t id : factory_ids) {
+			BulletFactory2D *factory = Object::cast_to<BulletFactory2D>(ObjectDB::get_instance(ObjectID(id)));
+			if (factory == nullptr || factory->get_is_tearing_down()) {
+				continue;
+			}
+			on_predelete_owned(factory);
+		}
 	} else if (p_what == NOTIFICATION_POST_ENTER_TREE) {
 		// Movement switched on while out of the tree after the first _ready
 		// (a pooled enemy, a reparent): autostart now (_ready never runs again).
