@@ -182,6 +182,11 @@ Node *PatternSpawner2D::get_helper_path2d_node() const {
 }
 
 void PatternSpawner2D::set_helper_path2d_node(Node *node) {
+	// The same rule (and wording) as helper_path2d_path: only a Path2D.
+	if (node != nullptr && Object::cast_to<Path2D>(node) == nullptr) {
+		UtilityFunctions::push_error(String(get_class()) + ": helper_path2d_path must point to a Path2D, keeping the old value.");
+		return;
+	}
 	on_config_changed();
 	assign_node_to_path(this, node, helper_path2d_path, helper_path2d_cache);
 	helper_path2d_id = node != nullptr ? node->get_instance_id() : 0;

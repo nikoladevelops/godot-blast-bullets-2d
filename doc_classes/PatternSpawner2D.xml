@@ -380,7 +380,7 @@
 			<return type="void" />
 			<param index="0" name="node" type="Node" />
 			<description>
-				Assigns the Path2D node used by the Path2D pattern layout. Updates [member helper_path2d_path] to point at it and refreshes the editor preview. Pass null to clear it.
+				Assigns the Path2D node used by the Path2D pattern layout. Updates [member helper_path2d_path] to point at it and refreshes the editor preview. Pass null to clear it. A node that is not a [Path2D] is refused with an error (the old one is kept), like [member helper_path2d_path].
 			</description>
 		</method>
 		<method name="set_movement_path_node">

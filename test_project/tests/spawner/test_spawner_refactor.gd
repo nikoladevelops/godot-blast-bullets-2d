@@ -85,14 +85,17 @@ func test_freed_nodes() -> void:
 	var target := Node2D.new()
 	target.name = "Target"
 	add(target)
+	var path_node := Path2D.new()
+	path_node.name = "Path"
+	add(path_node)
 	s.set_bullet_factory(local_factory)
 	s.set_transforms_generator(marker)
 	s.set_helper_aimed_target(target)
-	s.set_helper_path2d_node(target)
+	s.set_helper_path2d_node(path_node)
 	assert_true(s.get_bullet_factory() == local_factory, "factory resolves")
 	assert_true(s.get_transforms_generator() == marker, "generator resolves")
 	assert_true(s.get_helper_aimed_target() == target, "aimed target resolves")
-	assert_true(s.get_helper_path2d_node() == target, "path2d node resolves")
+	assert_true(s.get_helper_path2d_node() == path_node, "path2d node resolves")
 	local_factory.free()
 	assert_true(s.get_bullet_factory() == null, "freed factory reports null")
 	marker.free()
@@ -101,6 +104,7 @@ func test_freed_nodes() -> void:
 	assert_true(s.get_effective_generator() == s, "effective generator falls back to self")
 	target.free()
 	assert_true(s.get_helper_aimed_target() == null, "freed aimed target reports null")
+	path_node.free()
 	assert_true(s.get_helper_path2d_node() == null, "freed path2d node reports null")
 
 func test_corridor_door() -> void:

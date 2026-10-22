@@ -432,3 +432,18 @@ func test_the_interval_setter_keeps_rolled_waits_and_the_initial_delay() -> void
 	late.set_shooting_enabled(true)
 	late.shoot_interval_sec = 0.5
 	assert_almost_eq(late.get_shoot_time_left(), 5.0, 0.000001, "the initial delay is not an interval")
+
+
+## set_helper_path2d_node refuses a node that is not a Path2D (the error and
+## the kept value of the helper_path2d_path setter); null clears it.
+func test_helper_path2d_node_refuses_a_non_path2d() -> void:
+	var sp := make_spawner()
+	var good := Path2D.new()
+	add(good)
+	sp.set_helper_path2d_node(good)
+	var plain: Node2D = add(Node2D.new())
+	sp.set_helper_path2d_node(plain)
+	expect_error_sequence(["BulletSpawner2D: helper_path2d_path must point to a Path2D, keeping the old value."])
+	assert_eq(sp.get_helper_path2d_node(), good, "kept")
+	sp.set_helper_path2d_node(null)
+	assert_null(sp.get_helper_path2d_node(), "null clears it")
