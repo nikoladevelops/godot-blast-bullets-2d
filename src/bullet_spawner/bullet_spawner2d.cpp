@@ -36,6 +36,28 @@ static BulletVolley2D *revalidate_configured_volley(uint64_t volley_id, BulletVo
 	return live_volley;
 }
 
+// Targets resolved before user code ran (the fire-arc gate): keeps the
+// points and the nodes that still pass THE target filter. Each node is read
+// back by id, never through the Variant's pointer (it may hold a freed node).
+static void keep_live_targets2d(Array &r_targets, const World2D *world) {
+	Array live;
+	for (int i = 0; i < r_targets.size(); ++i) {
+		const Variant &target = r_targets[i];
+		if (target.get_type() != Variant::OBJECT) {
+			live.push_back(target);
+			continue;
+		}
+		Node2D *node = Object::cast_to<Node2D>(ObjectDB::get_instance(ObjectID(target)));
+		Vector2 position;
+		if (node != nullptr && target_node_usable2d(node, world, position)) {
+			live.push_back(node);
+		}
+	}
+	if (live.size() != r_targets.size()) {
+		r_targets = live;
+	}
+}
+
 Ref<BulletVolleyData2D> BulletSpawner2D::get_spawn_data() const {
 	return spawn_data;
 }
@@ -325,6 +347,11 @@ ShotResult2D BulletSpawner2D::fire_shot(std::vector<Transform2D> &transforms) {
 	// positions instead of re-converging on the first tick.
 	if (spawn_position_offset != Vector2(0, 0)) {
 		bullets->teleport_shift_all_bullets(resolve_spawn_offset_global());
+	}
+	if (arc_resolved) {
+		// The gate's targets crossed the spawn's attachment callbacks and
+		// pre_shoot: a handler may have freed one of them.
+		keep_live_targets2d(arc_targets, homing_target_world());
 	}
 	apply_volley_homing_and_orbiting(bullets, arc_resolved ? &arc_targets : nullptr);
 	// Re-validate: handlers of homing_targets_resolved/volley_homing_configured
