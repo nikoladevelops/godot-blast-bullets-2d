@@ -206,6 +206,7 @@ void LaserData2D::set_color_ramp(const Ref<Gradient> &value) {
 #define LASER_FRAMES_SETTER(NAME)                                  \
 	void LaserData2D::set_##NAME(const Ref<SpriteFrames> &value) { \
 		NAME = value;                                              \
+		++looks_serial;                                            \
 		emit_changed();                                            \
 	}
 

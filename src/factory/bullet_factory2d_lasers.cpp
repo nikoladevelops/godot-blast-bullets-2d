@@ -43,11 +43,14 @@ LaserVolley2D *BulletFactory2D::spawn_laser(const Ref<LaserData2D> &data, const 
 		slots.push_back((Transform2D)entry);
 	}
 	const uint64_t anchor_id = anchor != nullptr ? anchor->get_instance_id() : 0;
-	const Transform2D frame = anchor != nullptr && anchor->is_inside_tree() ? anchor->get_global_transform() : Transform2D();
-	return spawn_laser_span(data, slots.data(), (int)slots.size(), 0, anchor_id, frame, "spawn_laser");
+	const bool in_tree = anchor != nullptr && anchor->is_inside_tree();
+	const Transform2D frame = in_tree ? anchor->get_global_transform() : Transform2D();
+	// An anchor outside the tree: the beams fire from their global poses and
+	// ride it once it enters (no jump by its transform).
+	return spawn_laser_span(data, slots.data(), (int)slots.size(), 0, anchor_id, frame, "spawn_laser", Vector2(), anchor != nullptr && !in_tree);
 }
 
-LaserVolley2D *BulletFactory2D::spawn_laser_span(const Ref<LaserData2D> &data, const Transform2D *transforms, int count, uint64_t owner_id, uint64_t anchor_id, const Transform2D &anchor_frame, const char *caller, const Vector2 &anchor_offset) {
+LaserVolley2D *BulletFactory2D::spawn_laser_span(const Ref<LaserData2D> &data, const Transform2D *transforms, int count, uint64_t owner_id, uint64_t anchor_id, const Transform2D &anchor_frame, const char *caller, const Vector2 &anchor_offset, bool anchor_frame_pending) {
 	if (is_factory_busy) {
 		UtilityFunctions::push_error(String(caller) + ": BulletFactory2D is currently busy. Ignoring the request.");
 		return nullptr;
@@ -107,7 +110,7 @@ LaserVolley2D *BulletFactory2D::spawn_laser_span(const Ref<LaserData2D> &data, c
 		laser_container.get()->add_child(laser);
 		all_lasers.push_back(laser);
 	}
-	laser->begin_life(this, data, transforms, count, owner_id, anchor_id, anchor_frame, anchor_offset.is_finite() ? anchor_offset : Vector2());
+	laser->begin_life(this, data, transforms, count, owner_id, anchor_id, anchor_frame, anchor_offset.is_finite() ? anchor_offset : Vector2(), anchor_frame_pending);
 	return laser;
 }
 

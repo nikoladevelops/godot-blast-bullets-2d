@@ -161,7 +161,9 @@ public:
 	// ---- C++ (factory) ----
 	// The single new-life path: beams at `slots` (count), following
 	// `anchor_id` (0 = none) from `anchor_frame`. No user code.
-	void begin_life(BulletFactory2D *factory, const Ref<LaserData2D> &data, const Transform2D *slots, int count, uint64_t owner_id, uint64_t anchor_id, const Transform2D &anchor_frame, const Vector2 &anchor_offset = Vector2());
+	// anchor_frame_pending: the anchor is outside the tree (no frame yet),
+	// the slots are global poses until it enters.
+	void begin_life(BulletFactory2D *factory, const Ref<LaserData2D> &data, const Transform2D *slots, int count, uint64_t owner_id, uint64_t anchor_id, const Transform2D &anchor_frame, const Vector2 &anchor_offset = Vector2(), bool anchor_frame_pending = false);
 	// Drops everything a life brought (targets, owner, contacts, looks).
 	void release_life();
 	// One factory step. Signals run live inside (user code): the laser
@@ -222,8 +224,12 @@ private:
 	double grow_started = 0.0; // clock of the GROWING start (body, muzzle, tip animations)
 	double active_override = -1.0; // set_active_time_left (seconds of ACTIVE), -1 = the data's
 	// end_laser changed the phase outside a tick: announced at the next tick
-	// start (every signal fires inside the tick).
+	// start (every signal fires inside the tick), or earlier in the same tick
+	// when the phase is left or the laser finishes first.
 	bool announce_phase = false;
+	// Emits the pending end_laser phase (if any). False when user code took
+	// the laser away.
+	bool announce_pending_phase(uint64_t self_id, uint32_t life);
 	bool active = false;
 	bool pooled = false;
 	uint32_t life_id = 0;
@@ -234,6 +240,16 @@ private:
 	Transform2D anchor_frame_now;
 	Vector2 anchor_offset_now;
 	bool anchor_holding = false;
+	// Following an anchor that has no frame yet (outside the tree): the slots
+	// are global poses until its first frame (sync_anchor_frame).
+	bool anchor_frame_pending = false;
+	// The looks last taken from the data (apply_looks): edits reach the laser
+	// in flight, a script's own node settings stay until the data's change.
+	Ref<Material> applied_material;
+	int applied_z_index = 0;
+	int applied_body_mode = 0;
+	uint64_t applied_looks_serial = 0;
+	void apply_looks(const LaserData2D &d, bool force);
 	// Baked looks (per life).
 	// The LaserData2D animations, baked per shot under the shared SpriteFrames
 	// rules (sprite/sprite_anim2d.hpp) and sampled on the laser's own clocks.

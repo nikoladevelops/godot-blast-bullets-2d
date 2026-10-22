@@ -72,9 +72,39 @@ static void bake_laser_animation(const Ref<SpriteFrames> &sprite_frames, int slo
 	}
 }
 
+// The looks of `d` on this laser: the six animations (baked again only when
+// a frame property changed: LaserData2D::looks_serial), the material, the
+// draw order and the body's texture repeat. Applied at begin_life and on
+// every tick (O(1) when nothing changed), so data edits reach a laser in
+// flight; a script's own material on the node stays until the data's changes.
+void LaserVolley2D::apply_looks(const LaserData2D &d, bool force) {
+	if (force || applied_looks_serial != d.looks_serial) {
+		applied_looks_serial = d.looks_serial;
+		FrameTextureCache2D *cache = factory != nullptr && factory_life != nullptr && *factory_life ? &factory->frame_cache : nullptr;
+		bake_laser_animation(d.body_frames, 0, "body_frames", cache, anim_body);
+		bake_laser_animation(d.charge_frames, 1, "charge_frames", cache, anim_charge);
+		bake_laser_animation(d.muzzle_frames, 2, "muzzle_frames", cache, anim_muzzle);
+		bake_laser_animation(d.tip_frames, 3, "tip_frames", cache, anim_tip);
+		bake_laser_animation(d.pierce_frames, 4, "pierce_frames", cache, anim_pierce);
+		bake_laser_animation(d.wall_impact_frames, 5, "wall_impact_frames", cache, anim_wall);
+	}
+	if (force || applied_material != d.material) {
+		applied_material = d.material;
+		set_material(d.material);
+	}
+	if (force || applied_z_index != d.z_index) {
+		applied_z_index = d.z_index;
+		set_z_index(d.z_index);
+	}
+	if (force || applied_body_mode != (int)d.body_mode) {
+		applied_body_mode = (int)d.body_mode;
+		set_texture_repeat(d.body_mode == LaserData2D::BODY_TILE ? TEXTURE_REPEAT_ENABLED : TEXTURE_REPEAT_PARENT_NODE);
+	}
+}
+
 // ---- Life -----------------------------------------------------------------------------------
 
-void LaserVolley2D::begin_life(BulletFactory2D *p_factory, const Ref<LaserData2D> &p_data, const Transform2D *slots, int count, uint64_t owner_id, uint64_t p_anchor_id, const Transform2D &anchor_frame, const Vector2 &anchor_offset) {
+void LaserVolley2D::begin_life(BulletFactory2D *p_factory, const Ref<LaserData2D> &p_data, const Transform2D *slots, int count, uint64_t owner_id, uint64_t p_anchor_id, const Transform2D &anchor_frame, const Vector2 &anchor_offset, bool p_anchor_frame_pending) {
 	factory = p_factory;
 	factory_life = p_factory != nullptr ? p_factory->life_token() : std::shared_ptr<bool>();
 	data = p_data;
@@ -92,17 +122,21 @@ void LaserVolley2D::begin_life(BulletFactory2D *p_factory, const Ref<LaserData2D
 	anchor_id = p_anchor_id;
 	const LaserData2D *d = p_data.ptr();
 	following = p_anchor_id != 0 && d != nullptr && d->follow_spawner;
+	// An anchor outside the tree has no frame yet: the slots stay global
+	// poses until it enters (sync_anchor_frame takes them onto its frame then).
+	anchor_frame_pending = following && p_anchor_frame_pending;
 	// A life begun mid-sweep (a handler firing) ticks from the next step.
 	sweep_tick_stamp = p_factory != nullptr ? p_factory->get_sweep_counter() : 0;
-	const Transform2D frame_inv = following ? anchor_frame.affine_inverse() : Transform2D();
-	anchor_offset_now = following ? anchor_offset : Vector2();
+	const bool relative = following && !anchor_frame_pending;
+	const Transform2D frame_inv = relative ? anchor_frame.affine_inverse() : Transform2D();
+	anchor_offset_now = relative ? anchor_offset : Vector2();
 	anchor_holding = false;
 	beams.resize((size_t)count);
 	for (int i = 0; i < count; ++i) {
 		Beam &b = beams[i];
 		b = Beam();
 		const Transform2D &pose = slots[i];
-		b.slot = following ? frame_inv * Transform2D(pose.columns[0], pose.columns[1], pose.columns[2] - anchor_offset_now) : pose;
+		b.slot = relative ? frame_inv * Transform2D(pose.columns[0], pose.columns[1], pose.columns[2] - anchor_offset_now) : pose;
 		b.muzzle = pose.columns[2];
 		b.aim = (real_t)pose.columns[0].angle();
 		b.angle = b.aim;
@@ -113,17 +147,9 @@ void LaserVolley2D::begin_life(BulletFactory2D *p_factory, const Ref<LaserData2D
 	}
 	if (d != nullptr) {
 		FrameTextureCache2D *cache = p_factory != nullptr ? &p_factory->frame_cache : nullptr;
-		bake_laser_animation(d->body_frames, 0, "body_frames", cache, anim_body);
-		bake_laser_animation(d->charge_frames, 1, "charge_frames", cache, anim_charge);
-		bake_laser_animation(d->muzzle_frames, 2, "muzzle_frames", cache, anim_muzzle);
-		bake_laser_animation(d->tip_frames, 3, "tip_frames", cache, anim_tip);
-		bake_laser_animation(d->pierce_frames, 4, "pierce_frames", cache, anim_pierce);
-		bake_laser_animation(d->wall_impact_frames, 5, "wall_impact_frames", cache, anim_wall);
-		set_material(d->material);
-		set_z_index(d->z_index);
-		set_texture_repeat(d->body_mode == LaserData2D::BODY_TILE ? TEXTURE_REPEAT_ENABLED : TEXTURE_REPEAT_PARENT_NODE);
+		apply_looks(*d, true);
 	}
-	anchor_frame_now = following ? anchor_frame : Transform2D();
+	anchor_frame_now = relative ? anchor_frame : Transform2D();
 	// The first frame (before the first tick) already shows where it aims.
 	for (Beam &b : beams) {
 		update_beam_geometry(b, 0.0);
@@ -144,6 +170,8 @@ void LaserVolley2D::release_life() {
 	signals_to_factory = false;
 	anchor_id = 0;
 	following = false;
+	anchor_frame_pending = false;
+	applied_material.unref();
 	anim_body.clear();
 	anim_charge.clear();
 	anim_muzzle.clear();
@@ -333,7 +361,15 @@ void LaserVolley2D::sync_anchor_frame() {
 	Vector2 offset;
 	switch (read_anchor(frame, offset)) {
 		case ANCHOR_FOLLOW:
-			if (anchor_holding) {
+			if (anchor_frame_pending) {
+				// First frame of an anchor that was outside the tree: the
+				// beams ride it from where they are now (no jump).
+				anchor_frame_pending = false;
+				const Transform2D inv = frame.affine_inverse();
+				for (Beam &b : beams) {
+					b.slot = inv * Transform2D(b.slot.columns[0], b.slot.columns[1], b.slot.columns[2] - offset);
+				}
+			} else if (anchor_holding) {
 				// Back from a hold: the jump to the anchor's new pose is never
 				// drawn as travel.
 				anchor_holding = false;
@@ -356,6 +392,7 @@ void LaserVolley2D::sync_anchor_frame() {
 	}
 	following = false;
 	anchor_holding = false;
+	anchor_frame_pending = false;
 	anchor_offset_now = Vector2();
 }
 
@@ -502,8 +539,12 @@ void LaserVolley2D::set_beam_angle(int beam_index, real_t radians) {
 	}
 	Beam &b = beams[beam_index];
 	const real_t turn = radians - b.aim;
+	const LaserData2D *d = data.ptr();
+	const bool is_beam = d == nullptr || d->type == LaserData2D::LASER_BEAM;
 	b.aim = radians;
 	b.heading = radians;
+	// Read back at once (get_beam_angle); points and walls follow next tick.
+	b.angle = is_beam ? radians + b.sweep : radians;
 	b.snap_history = true;
 	// The slot turns too, so a pattern aim keeps the new direction.
 	const Transform2D rotate(turn, Vector2());
@@ -542,6 +583,16 @@ void LaserVolley2D::set_targets(const Array &targets) {
 		return;
 	}
 	const int n = targets.size();
+	// The whole array first: one bad entry changes no beam.
+	for (int k = 0; k < n; ++k) {
+		const Variant entry = targets[k];
+		const Variant::Type type = entry.get_type();
+		const bool ok = type == Variant::NIL || (type == Variant::VECTOR2 && ((Vector2)entry).is_finite()) || live_object2d<Node2D>(entry) != nullptr;
+		if (!ok) {
+			UtilityFunctions::push_error("set_targets: every entry must be a Node2D, a finite Vector2 or null, nothing changed.");
+			return;
+		}
+	}
 	for (int i = 0; i < (int)beams.size(); ++i) {
 		set_beam_target(i, n > 0 ? targets[i % n] : Variant());
 	}
@@ -552,25 +603,33 @@ void LaserVolley2D::set_anchor(Node2D *anchor) {
 		return;
 	}
 	// The beams keep their current pose; from now on they ride `anchor`.
+	// The slot holds the aim, never the sweep: a running sweep goes on
+	// exactly as before (its arc stays centered on the pattern direction).
 	Transform2D frame;
 	Vector2 offset;
 	for (Beam &b : beams) {
-		Transform2D now(b.angle, b.muzzle);
-		b.slot = now;
+		b.slot = Transform2D(b.aim, b.muzzle);
 	}
 	anchor_id = anchor != nullptr ? anchor->get_instance_id() : 0;
 	following = false;
 	anchor_holding = false;
+	anchor_frame_pending = false;
 	anchor_offset_now = Vector2();
-	if (anchor_id != 0 && read_anchor(frame, offset) == ANCHOR_FOLLOW) {
+	const AnchorState state = anchor_id != 0 ? read_anchor(frame, offset) : ANCHOR_LOST;
+	if (state == ANCHOR_FOLLOW) {
 		const Transform2D inv = frame.affine_inverse();
 		for (Beam &b : beams) {
 			b.slot = inv * Transform2D(b.slot.columns[0], b.slot.columns[1], b.slot.columns[2] - offset);
-			b.sweep = 0.0;
 		}
 		anchor_frame_now = frame;
 		anchor_offset_now = offset;
 		following = true;
+	} else if (state == ANCHOR_HOLD) {
+		// Outside the tree (or a degenerate pose) for now: ridden from where
+		// the beams are once it has a frame.
+		anchor_frame_now = Transform2D();
+		following = true;
+		anchor_frame_pending = true;
 	}
 }
 
@@ -580,10 +639,15 @@ void LaserVolley2D::shift_with_owner(const Vector2 &jump, bool carry) {
 		return;
 	}
 	const bool is_beam = d->type == LaserData2D::LASER_BEAM;
+	// A following beam rides its own anchor: it jumped only when that anchor
+	// is the owner spawner or inside it (set_anchor may name another node).
+	const Node *owner = owner_spawner_id != 0 ? Object::cast_to<Node>(ObjectDB::get_instance(ObjectID(owner_spawner_id))) : nullptr;
+	Node *anchor = following && anchor_id != 0 ? Object::cast_to<Node>(ObjectDB::get_instance(ObjectID(anchor_id))) : nullptr;
+	const bool anchor_jumped = owner != nullptr && anchor != nullptr && (anchor == owner || owner->is_ancestor_of(anchor));
 	bool moved = false;
 	for (Beam &b : beams) {
-		const bool rides = following && (is_beam || !b.launched);
-		if (!rides && !carry) {
+		const bool attached = following && (is_beam || !b.launched);
+		if (attached ? !anchor_jumped || anchor_frame_pending : !carry) {
 			continue;
 		}
 		if (!following) {

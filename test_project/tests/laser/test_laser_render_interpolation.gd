@@ -364,20 +364,38 @@ func test_a_reused_laser_never_lerps_from_its_last_life() -> void:
 	assert_almost_eq((_pts(again, 0.5)[1] - _pts(again, 0.5)[0]).angle(), 1.5, 0.0001, "nor a turn")
 
 
-func test_looks_are_taken_at_fire_time_and_geometry_is_read_live() -> void:
+## Every LaserData2D edit reaches a laser in flight from its next tick: the
+## frames (re-baked once), the material, the draw order and the body mode's
+## texture repeat, like its geometry.
+func test_look_edits_reach_a_laser_in_flight() -> void:
 	var d := H.make_laser(0.0, 0.0, 0.0, 0.0, 200.0)
 	d.body_frames = _frames(1)
 	var l := _fire(d)
 	step_factory(1, DT)
 	var body: Texture2D = l.debug_get_draw_state(1.0)[0]["body"]
-	d.body_frames = _frames(2)
+	var fresh := _frames(1)
+	d.body_frames = fresh
 	d.length = 120.0
+	var mat := CanvasItemMaterial.new()
+	d.material = mat
+	d.z_index = 7
+	d.body_mode = LaserData2D.BODY_TILE
 	step_factory(1, DT)
-	assert_eq(l.debug_get_draw_state(1.0)[0]["body"], body, "a firing laser keeps the frames it was fired with")
+	assert_ne(l.debug_get_draw_state(1.0)[0]["body"], body, "the new frames reach the firing laser")
+	assert_eq(l.debug_get_draw_state(1.0)[0]["body"], fresh.get_frame_texture(&"default", 0), "drawn with the new frame")
 	assert_almost_eq(l.get_beam_length(0), 120.0, 0.001, "its geometry follows the data at once")
-	var next := _fire(d)
+	assert_eq([l.material, l.z_index, l.texture_repeat], [mat, 7, CanvasItem.TEXTURE_REPEAT_ENABLED], "material, draw order and the tiled body's repeat")
+	d.body_mode = LaserData2D.BODY_STRETCH
+	d.material = null
+	d.body_frames = null
 	step_factory(1, DT)
-	assert_ne(next.debug_get_draw_state(1.0)[0]["body"], body, "the next laser takes the new frames")
+	assert_null(l.material, "the material goes with the data's")
+	assert_eq(l.texture_repeat, CanvasItem.TEXTURE_REPEAT_PARENT_NODE, "a stretched body repeats nothing")
+	assert_null(l.debug_get_draw_state(1.0)[0]["body"], "no frames: a solid body")
+	l.material = CanvasItemMaterial.new() # a script's own material on the node is left alone
+	var own: Material = l.material
+	step_factory(2, DT)
+	assert_eq(l.material, own, "only data edits are applied")
 
 
 func test_an_anchor_outside_the_tree_leaves_the_beam_where_it_was_fired() -> void:

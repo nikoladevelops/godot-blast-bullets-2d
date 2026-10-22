@@ -186,3 +186,35 @@ func test_a_pooled_laser_is_disarmed_and_its_next_life_starts_unarmed() -> void:
 	var again := factory.spawn_laser(H.make_laser(0.0, 0.0, 0.0, 0.0, 300.0), poses)
 	assert_eq(again, l, "the same laser from the pool")
 	assert_false(again.is_graze_armed(), "unarmed")
+
+
+## A target that leaves the graze group while a beam is inside it ends the
+## visit silently (like a freed target, like bullet grazes).
+func test_a_target_leaving_the_group_ends_the_visit_silently() -> void:
+	var a := _target("A", Vector2(100, 10))
+	_laser([H.make_graze_zone([30.0])])
+	step_factory(1, DT)
+	assert_eq(log, [["graze", "A", 0, 0, 0]], "grazed")
+	a.remove_from_group(GROUP)
+	step_factory(3, DT)
+	assert_eq(log, [["graze", "A", 0, 0, 0]], "no exit for a target that left the group")
+
+
+## A bolt that is spent (here: it left the despawn bounds) while grazing ends
+## its visit silently: a spent beam is gone, like a killed bullet.
+func test_a_spent_bolt_ends_its_visit_silently() -> void:
+	var d := H.make_laser(0.0, 0.0, 0.0, 0.0, 40.0)
+	d.type = LaserData2D.LASER_BOLT
+	d.speed = 320.0 # 20 px per tick
+	factory.despawn_bounds_enabled = true
+	factory.despawn_bounds_rect = Rect2(-20, -20, 60, 40) # x up to 40: the bolt leaves soon
+	_target("A", Vector2(40, 10))
+	_laser([H.make_graze_zone([30.0])], 40.0, d)
+	var spent := false
+	for i in 10:
+		step_factory(1, DT)
+		if factory.get_active_laser_count() == 0:
+			spent = true
+			break
+	assert_true(spent, "the bolt was spent and the laser finished")
+	assert_eq(log, [["graze", "A", 0, 0, 0]], "grazed, then no exit for the spent bolt")

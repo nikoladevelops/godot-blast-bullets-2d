@@ -160,3 +160,52 @@ func test_spawn_refusals() -> void:
 	assert_null(factory.spawn_laser(H.make_laser(), many), "over the limit")
 	expect_error_sequence(["spawn_laser: 3 beams is more than BulletPatterns2D.max_bullets_per_pattern (2), nothing fired."])
 	assert_eq(factory.get_active_laser_count(), 0, "every refusal fired nothing")
+
+
+## end_laser from a live handler inside the tick: every phase it entered is
+## announced exactly once, before laser_finished (the laser finishes in the
+## same tick, so "the next tick" never comes).
+func test_end_laser_from_a_live_handler_announces_every_phase(source: String = use_parameters(["hit", "wall", "phase"])) -> void:
+	var d := H.make_laser(0.0, 0.0, 0.0, 0.25)
+	match source:
+		"hit":
+			make_area(Vector2(200, 100), Vector2(20, 60))
+		"wall":
+			d.wall_mask = 16
+			make_wall(Vector2(200, 100), Vector2(20, 200), 16)
+	await idle(2)
+	var l := _fire(d)
+	var ended := [false]
+	var end_now := func() -> void:
+		if not ended[0]:
+			ended[0] = true
+			l.end_laser(false)
+	match source:
+		"hit":
+			factory.laser_hit.connect(func(_t, _l, _b, _p) -> void: end_now.call())
+		"wall":
+			factory.laser_wall_hit.connect(func(_l, _b, _p, _n) -> void: end_now.call())
+		"phase":
+			factory.laser_phase_changed.connect(func(_l, p: int) -> void:
+				if p == LaserVolley2D.PHASE_ACTIVE:
+					end_now.call())
+	_step(2)
+	assert_true(ended[0], "the handler ran")
+	var kinds: Array = []
+	for e in log:
+		kinds.append(e.slice(1))
+	assert_eq(kinds.count(["phase", LaserVolley2D.PHASE_FINISHED]), 1, "FINISHED announced exactly once (%s)" % [log])
+	assert_eq(kinds.back(), ["finished"], "laser_finished last (%s)" % [log])
+	assert_lt(kinds.find(["phase", LaserVolley2D.PHASE_FINISHED]), kinds.find(["finished"]), "the phase before the finish")
+	assert_true(l.is_pooled(), "pooled")
+
+
+## end_laser(true) from a phase handler with no fade: FADING is announced
+## before FINISHED.
+func test_a_zero_fade_ended_in_a_phase_handler_announces_fading() -> void:
+	var l := _fire(H.make_laser(0.0, 0.0, 1.0, 0.0))
+	factory.laser_phase_changed.connect(func(_l, p: int) -> void:
+		if p == LaserVolley2D.PHASE_ACTIVE:
+			l.end_laser(true))
+	_step(1)
+	assert_eq(log, [[1, "phase", 1], [1, "phase", 2], [1, "phase", 3], [1, "phase", 4], [1, "finished"]], "every phase once, in order")

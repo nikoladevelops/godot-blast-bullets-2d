@@ -712,7 +712,7 @@ func test_a_freed_node_is_no_beam_target() -> void:
 	l.set_beam_target(0, gone)
 	expect_error_sequence(["set_beam_target: target must be a Node2D, a Vector2 or null, the beam has no target now."])
 	l.set_targets([gone])
-	expect_error_sequence(["set_beam_target: target must be a Node2D, a Vector2 or null, the beam has no target now.", "set_beam_target: target must be a Node2D, a Vector2 or null, the beam has no target now."])
+	expect_error_sequence(["set_targets: every entry must be a Node2D, a finite Vector2 or null, nothing changed."]) # once, not once per beam
 
 
 ## Mouse and interval retargeting keep following every live Track / Lock On
@@ -754,6 +754,37 @@ func test_explain_names_how_each_target_source_is_read() -> void:
 	assert_eq(line.call(), "Laser Targeting: each beam turns toward the mouse, read every frame.", "the mouse")
 	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_GLOBAL_POSITION
 	assert_eq(line.call(), "Laser Targeting: each beam turns toward laser_target_position.", "a position")
+
+
+## A beam re-anchored to another node (set_anchor) rides that node: its
+## spawner's teleport never moves it, with carry or without. A beam anchored
+## to a child of the spawner jumps with it (the child jumped too).
+func test_a_teleport_moves_beams_by_their_own_anchor() -> void:
+	var sp := _spawner(_laser(), 1)
+	var l := _fire(sp)
+	var other := Node2D.new()
+	other.position = Vector2(-200, 50)
+	add(other)
+	l.set_anchor(other)
+	step_factory(1, DT)
+	var start := l.get_beam_start(0)
+	for carry in [false, true]:
+		sp.teleport(sp.global_position + Vector2(500, 300), carry)
+		assert_true(l.get_beam_start(0).is_equal_approx(start), "stays on its own anchor at once (carry %s)" % carry)
+		var drawn: PackedVector2Array = l.debug_get_draw_state(0.5)[0]["points"]
+		assert_true(drawn[0].is_equal_approx(start), "drawn there too (carry %s)" % carry)
+		step_factory(1, DT)
+		assert_true(l.get_beam_start(0).is_equal_approx(start), "and after a tick (carry %s)" % carry)
+	var child := Node2D.new()
+	child.position = Vector2(30, 0)
+	sp.add_child(child)
+	l.set_anchor(child)
+	step_factory(1, DT)
+	var on_child := l.get_beam_start(0)
+	sp.teleport(sp.global_position + Vector2(40, 0))
+	assert_true(l.get_beam_start(0).is_equal_approx(on_child + Vector2(40, 0)), "a child anchor jumped with the spawner")
+	step_factory(1, DT)
+	assert_true(l.get_beam_start(0).is_equal_approx(on_child + Vector2(40, 0)), "and stays on it")
 
 
 ## Re-applying the same laser_retarget_interval_sec (a script that writes its

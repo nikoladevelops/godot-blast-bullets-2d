@@ -93,6 +93,9 @@ public:
 	double effects_scale = 1.0;
 	Ref<Material> material;
 	int z_index = 0;
+	// Bumped by every frame property setter: lasers in flight re-bake their
+	// looks once (LaserVolley2D::apply_looks).
+	uint64_t looks_serial = 0;
 
 	LaserType get_type() const { return type; }
 	void set_type(LaserType value);

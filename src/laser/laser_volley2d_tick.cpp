@@ -57,17 +57,40 @@ void LaserVolley2D::set_phase(LaserPhase p) {
 	}
 }
 
+bool LaserVolley2D::announce_pending_phase(uint64_t self_id, uint32_t life) {
+	if (!announce_phase) {
+		return true;
+	}
+	announce_phase = false;
+	Object *emitter = resolve_emitter();
+	if (emitter == nullptr) {
+		return true;
+	}
+	if (factory != nullptr) {
+		factory->note_user_code();
+	}
+	emit_on2d(emitter, CachedStringNames2D::get().laser_phase_changed, this, (int)phase);
+	return alive_after_user_code(self_id, life);
+}
+
 bool LaserVolley2D::advance_phases(double delta) {
 	const uint64_t self_id = get_instance_id();
 	const uint32_t life = life_id;
 	phase_time += delta;
 	// Zero-length phases pass in the same tick (an instant beam hits on its
-	// first tick); one laser_phase_changed per phase it entered.
-	for (int guard = 0; guard < 5 && phase != PHASE_FINISHED; ++guard) {
+	// first tick); one laser_phase_changed per phase it entered. A phase an
+	// end_laser handler entered is announced before it is left.
+	for (int guard = 0; guard < 8 && phase != PHASE_FINISHED; ++guard) {
 		const double len = phase_length(phase);
 		const bool endless = phase == PHASE_ACTIVE && !(len > 0.0);
 		if (endless || phase_time < len) {
 			break;
+		}
+		if (announce_phase) {
+			if (!announce_pending_phase(self_id, life)) {
+				return false;
+			}
+			continue; // its handler may have moved the phase again
 		}
 		const double carry = phase_time - len;
 		const LaserPhase next = (LaserPhase)(phase + 1);
@@ -789,7 +812,9 @@ bool LaserVolley2D::update_graze(uint64_t self_id, uint32_t life) {
 					}
 				}
 			} else if (g.inside) {
-				if (g.fired) {
+				// A spent beam (gone) or a target that left the list ends
+				// its visit silently, like a killed bullet or a vanished target.
+				if (g.fired && !b.spent && anchor_live(g.anchor)) {
 					events.push_back({ true, g.anchor, (int)i, (int)z, (int)g.deepest, best_at });
 				}
 				if (zone->get_regraze() == BulletGrazeZone2D::REGRAZE_AFTER_EXIT) {
@@ -851,16 +876,8 @@ void LaserVolley2D::tick(double delta) {
 		b.prev_points = b.points;
 	}
 	clock += delta;
-	if (announce_phase) {
-		announce_phase = false;
-		Object *emitter = resolve_emitter();
-		if (emitter != nullptr) {
-			factory->note_user_code();
-			emit_on2d(emitter, CachedStringNames2D::get().laser_phase_changed, this, (int)phase);
-			if (!alive_after_user_code(self_id, life)) {
-				return;
-			}
-		}
+	if (!announce_pending_phase(self_id, life)) {
+		return;
 	}
 	if (phase != PHASE_FINISHED && !advance_phases(delta)) {
 		return;
@@ -869,6 +886,8 @@ void LaserVolley2D::tick(double delta) {
 	if (d == nullptr) {
 		return;
 	}
+	// Data edits of the looks reach the laser in flight (O(1) unchanged).
+	apply_looks(*d, false);
 	// Geometry (no user code).
 	sync_anchor_frame();
 	const bool moving = d->type != LaserData2D::LASER_BEAM && phase >= PHASE_GROWING && phase <= PHASE_FADING;
@@ -920,6 +939,11 @@ void LaserVolley2D::tick(double delta) {
 			return;
 		}
 	}
+	// A hit handler that ended the laser at once: FINISHED is announced
+	// before its contacts end, like a phase that ran out.
+	if (phase == PHASE_FINISHED && !announce_pending_phase(self_id, life)) {
+		return;
+	}
 	if (!end_contacts(self_id, life, hitting_phase())) {
 		return; // every contact when the hits stopped, else the spent beams'
 	}
@@ -958,6 +982,9 @@ void LaserVolley2D::tick(double delta) {
 			all_spent = all_spent && b.spent;
 		}
 		if (all_spent) {
+			if (!announce_pending_phase(self_id, life)) {
+				return; // a handler's FADING first
+			}
 			set_phase(PHASE_FINISHED);
 			Object *emitter = resolve_emitter();
 			if (emitter != nullptr) {
@@ -970,6 +997,10 @@ void LaserVolley2D::tick(double delta) {
 		}
 	}
 	if (phase == PHASE_FINISHED) {
+		// end_laser(false) from a handler in this tick: announced before the finish.
+		if (!announce_pending_phase(self_id, life)) {
+			return;
+		}
 		if (!beams.empty()) {
 			sound_fire(BulletSoundData2D::SOUND_ON_LIFETIME_OVER, beams[0].points.empty() ? beams[0].muzzle : beams[0].points.back());
 		}

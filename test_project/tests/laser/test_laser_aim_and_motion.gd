@@ -174,3 +174,113 @@ func test_setters_reject_and_keep() -> void:
 	expect_error_sequence(["set_beam_target: a Vector2 target must be finite, the beam has no target now."])
 	l.get_beam_end(-1)
 	expect_error_sequence(["Invalid beam index in get_beam_end: -1 (beam count: 1)"])
+
+
+func _sweeper(arc := 0.0) -> LaserData2D:
+	var d := _endless()
+	d.sweep_speed_degrees = 90.0
+	d.sweep_arc_degrees = arc
+	return d
+
+
+func _same_angle(a: float, b: float) -> bool:
+	return absf(angle_difference(a, b)) < 0.0001
+
+
+## set_anchor keeps a running sweep exactly where it is (null = stay, a node
+## = ride it): the beam goes on sweeping like a beam that was never re-anchored,
+## and its arc stays centered on the pattern direction.
+func test_set_anchor_keeps_the_sweep_phase(arc: float = use_parameters([0.0, 60.0])) -> void:
+	var control := _fire(_sweeper(arc))
+	var l := _fire(_sweeper(arc))
+	step_factory(3, DT)
+	l.set_anchor(null)
+	assert_true(_same_angle(l.get_beam_angle(0), control.get_beam_angle(0)), "unchanged at once")
+	for i in 5:
+		step_factory(1, DT)
+		assert_true(_same_angle(l.get_beam_angle(0), control.get_beam_angle(0)), "null: the sweep goes on (tick %d)" % i)
+	var anchor := Node2D.new()
+	add(anchor)
+	l.set_anchor(anchor)
+	for i in 12:
+		step_factory(1, DT)
+		assert_true(_same_angle(l.get_beam_angle(0), control.get_beam_angle(0)), "riding a still anchor: the same sweep (tick %d)" % i)
+
+
+## set_beam_angle reads back at once (a sweep's offset rides on top) and the
+## next tick goes on from there.
+func test_set_beam_angle_reads_back_at_once() -> void:
+	var l := _fire(_endless())
+	step_factory(1, DT)
+	l.set_beam_angle(0, 1.0)
+	assert_almost_eq(l.get_beam_angle(0), 1.0, 0.0001, "now")
+	step_factory(1, DT)
+	assert_almost_eq(l.get_beam_angle(0), 1.0, 0.0001, "and after a tick")
+	var s := _fire(_sweeper())
+	step_factory(2, DT)
+	var before := s.get_beam_angle(0)
+	var offset := before # pattern aim 0: the angle is the sweep's offset
+	s.set_beam_angle(0, 1.0)
+	assert_almost_eq(s.get_beam_angle(0), 1.0 + offset, 0.0001, "a sweeping beam: the new aim plus its sweep")
+	step_factory(1, DT)
+	assert_almost_eq(s.get_beam_angle(0), 1.0 + offset + deg_to_rad(90.0) * DT, 0.0001, "the sweep goes on from there")
+
+
+## set_targets validates the whole array first: one bad entry is one error
+## and changes no beam.
+func test_set_targets_refuses_a_bad_entry_and_changes_nothing() -> void:
+	var d := _endless()
+	d.aim = LaserData2D.LASER_AIM_TRACK
+	d.turn_rate_degrees = 0.0
+	var t: Array[Transform2D] = [Transform2D(0.0, Vector2.ZERO), Transform2D(0.0, Vector2.ZERO), Transform2D(0.0, Vector2.ZERO)]
+	var l := factory.spawn_laser(d, t)
+	l.set_targets([Vector2(0, 100)])
+	step_factory(1, DT)
+	assert_eq([_deg(l), snappedf(rad_to_deg(l.get_beam_angle(2)), 0.001)], [90.0, 90.0], "every beam aims at the target")
+	var gone := Node2D.new()
+	add_child(gone)
+	gone.free()
+	for bad in [[Vector2(100, 0), Vector2(NAN, 0)], [Vector2(100, 0), gone], [Vector2(100, 0), 7]]:
+		l.set_targets(bad)
+		expect_error_sequence(["set_targets: every entry must be a Node2D, a finite Vector2 or null, nothing changed."])
+		step_factory(1, DT)
+		assert_eq([_deg(l), snappedf(rad_to_deg(l.get_beam_angle(1)), 0.001)], [90.0, 90.0], "no beam changed (%s)" % [bad])
+	l.set_targets([Vector2(100, 0), null])
+	step_factory(1, DT)
+	assert_eq(_deg(l), 0.0, "a good array applies (null: no target)")
+
+
+## spawn_laser with an anchor outside the tree fires from its global poses
+## and starts riding the anchor once it enters, from where it is then (no
+## jump by the anchor's own transform).
+func test_an_anchor_entering_the_tree_after_the_shot_is_ridden_without_a_jump() -> void:
+	var loose := Node2D.new()
+	loose.position = Vector2(100, 0)
+	var l := _fire(_endless(), Transform2D(0.0, Vector2(50, 50)), loose)
+	step_factory(1, DT)
+	assert_eq(l.get_beam_start(0), Vector2(50, 50), "at its fire pose")
+	add(loose)
+	step_factory(1, DT)
+	assert_eq(l.get_beam_start(0), Vector2(50, 50), "entering the tree is no jump")
+	loose.position = Vector2(110, 0)
+	step_factory(1, DT)
+	assert_almost_eq(l.get_beam_start(0).distance_to(Vector2(60, 50)), 0.0, 0.001, "then it rides the anchor")
+
+
+## set_anchor on a node outside the tree: the beam stays, then rides the node
+## once it is in the tree (from where it is then).
+func test_set_anchor_on_a_node_outside_the_tree_rides_it_once_it_enters() -> void:
+	var l := _fire(_endless(), Transform2D(0.0, Vector2(20, 0)))
+	step_factory(1, DT)
+	var loose := Node2D.new()
+	loose.position = Vector2(300, 0)
+	l.set_anchor(loose)
+	assert_eq(l.get_anchor(), loose, "anchored")
+	step_factory(1, DT)
+	assert_eq(l.get_beam_start(0), Vector2(20, 0), "stays while the node is out of the tree")
+	add(loose)
+	step_factory(1, DT)
+	assert_eq(l.get_beam_start(0), Vector2(20, 0), "no jump when it enters")
+	loose.position = Vector2(330, 0)
+	step_factory(1, DT)
+	assert_almost_eq(l.get_beam_start(0).distance_to(Vector2(50, 0)), 0.0, 0.001, "rides it")
