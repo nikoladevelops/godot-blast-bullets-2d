@@ -4,7 +4,8 @@
 		One stackable sprite-effect layer for a bullet volley: a trail that follows bullets, or a one-shot visual (spawn flash, hit sparks, destroy explosion, bounce sparks).
 	</brief_description>
 	<description>
-		Put layers in [member BulletVolleyData2D.effect_layers] — as many as you want. Each layer renders through its own per-frame shards (one extra draw call per animation frame while anything is visible, zero when idle), so layers never fight each other and every instance can show a different animation frame.
+		Put layers in [member BulletVolleyData2D.effect_layers] — as many as you want. Each layer renders through its own per-frame shards (one extra draw call per animation frame while anything is visible, zero when idle), so layers never fight each other and every instance can show a different animation frame. Every frame of the animation bakes (one shard node each): the animation's length decides the cost.
+		The animation follows the same rules as bullets ([member BulletVolleyData2D.animation]): name resolution, speed (a trail at speed 0 shows its first frame; a one-shot plays one pass of its animation, so speed 0 leaves it no playable time and it is refused with one error), durations, and [AtlasTexture] frames drawn as their region.
 		Upload [member sprite_frames] per layer (a layer with null frames is inert). Use [BulletAttachment2D] scenes instead when you need particles or scripted nodes; use layers for plain sprites.
 		One texture per layer is shared by all its instances (the performance bargain), so per-bullet different textures are not supported — vary instances with [member random_start_frame], [member randomize_rotation], [member random_scale_min]/[member random_scale_max] and [member trigger_chance] instead. Tint with [member self_modulate], or over life with [member color_ramp].
 		Bakes are snapshots: editing a layer's frames mid-life does not refresh live volleys or factory bakes — call [method BulletVolley2D.set_effect_layers] (or [method BulletVolley2D.play_effect_animation] for trails) to apply edits.
@@ -16,13 +17,13 @@
 			<return type="Image" />
 			<param index="0" name="src" type="Image" />
 			<description>
-				Pure pixel step of [member override_frame_color]: returns a copy with white RGB and identical alpha. Null, empty, or over-512px input returns null with one error.
+				Pure pixel step of [member override_frame_color]: returns a copy with white RGB and identical alpha, at any size (a compressed image is decompressed first). Null or empty input returns null with one error.
 			</description>
 		</method>
 	</methods>
 	<members>
 		<member name="animation" type="StringName" setter="set_animation" getter="get_animation" default="&amp;&quot;default&quot;">
-			Which animation to play. Empty or "default" auto-resolves silently: "default" if present, else the first animation with frames. Switch a live trail layer with [method BulletVolley2D.play_effect_animation].
+			Which animation to play. Empty or "default" auto-resolves silently: "default" when it has frames, else the first animation with frames. An explicit name that is missing or has no frames falls back to the first animation with frames with one error (like bullets). Switch a live trail layer with [method BulletVolley2D.play_effect_animation].
 		</member>
 		<member name="color_ramp" type="Gradient" setter="set_color_ramp" getter="get_color_ramp">
 			Tint-over-life ramp, sampled per instance by animation age (one-shots) or loop phase (trails), exactly like particle color ramps. Multiplies with [member self_modulate]. Null (default) keeps every instance solid. Example: white-to-transparent red ramp on a destroy layer fades each explosion out individually.
@@ -49,7 +50,7 @@
 			Trail follow offset from the bullet origin, rotated with the bullet. One-shots add it (rotated by the event orientation) to the event pose.
 		</member>
 		<member name="override_frame_color" type="bool" setter="set_override_frame_color" getter="get_override_frame_color" default="false">
-			Exact-color mode: the bake replaces every frame's RGB with white (alpha preserved), so [member self_modulate] and [member color_ramp] produce the exact dialed color instead of multiplying the source art. Atlas frames are clipped from the base image; unreadable frames fall back to the original art with one warning. Costs roughly double texture memory for the layer while on. Toggling rebakes (manual-hatch outputs refresh through the layer version).
+			Exact-color mode: the bake replaces every frame's RGB with white (alpha preserved), so [member self_modulate] and [member color_ramp] produce the exact dialed color instead of multiplying the source art. Frames are read as they draw (an AtlasTexture's region in its margin box, VRAM-compressed sheets decompressed); unreadable frames fall back to the original art with one warning. Costs roughly double texture memory for the layer while on. Toggling rebakes (manual-hatch outputs refresh through the layer version).
 		</member>
 		<member name="random_scale_max" type="float" setter="set_random_scale_max" getter="get_random_scale_max" default="1.0">
 			Upper end of the random uniform scale range per fired one-shot slot. Must be finite and 0 or more. Setting it below [member random_scale_min] pulls the minimum down to it.
@@ -76,7 +77,7 @@
 			Continuous spin in degrees per second (pinwheels, rotating sparks, shimmering trails). 0 (default) disables it. Signed: negative spins counter-clockwise. Derived from the running clock, so pooled reuse never desyncs it. Example: spin_degrees_per_sec 180 turns a trail glow one half-turn per second.
 		</member>
 		<member name="sprite_frames" type="SpriteFrames" setter="set_sprite_frames" getter="get_sprite_frames">
-			Frames to play (required: null frames leave the layer inert with a single bake-time warning, never a crash).
+			Frames to play (required: null frames leave the layer inert with a single bake-time error, never a crash). Plain textures or [AtlasTexture] regions of a sprite sheet (each drawn exactly as a [Sprite2D] would show it).
 		</member>
 		<member name="trigger" type="int" setter="set_trigger" getter="get_trigger" enum="BulletEffectLayerData2D.EffectTrigger" default="0">
 			What this layer does: 0 Trail Follow (sticks to its bullet every tick, and follows physics interpolation exactly like the bullet), 1 On Spawn (muzzle flash at every bullet's spawn pose), 2 On Hit (sparks on counted hits), 3 On Destroy (explosion on collision-kill only, never on lifetime expiry or manual disable), 4 On Bounce (sparks on ricochet; a consumed bounce fires this once, not the hit spark), 5 On Lifetime Over (fizzle at expiry, on both the silent and the signalled expiry path), 6 On Clear (dismissal puff fired by clear_bullet()/clear_all_bullets() and BulletFactory2D.clear_active_bullets() only; kills, timeouts, free_active_bullets and reset never fire it, teardown stays silent), 7 On Despawn (a bullet that leaves through the factory's despawn bounds, see [member BulletFactory2D.despawn_bounds_enabled]; nothing else fires it).

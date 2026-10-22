@@ -268,6 +268,12 @@
 				The last flock pass: [code]flocks[/code] (distinct flocks), [code]members[/code] (bullets of every flocking volley), [code]grid_members[/code] (live, finite bullets in the grid), [code]neighbor_checks[/code] (flockmates distance-tested), [code]capped_members[/code] (bullets that stopped at [member BulletFlock2D.max_neighbors]), [code]queried_members[/code] (bullets whose steering was recomputed, see [member BulletFlock2D.update_interval]), [code]pass_usec[/code], plus [code]armed_volleys[/code] (volleys holding a flock). The pass runs once per physics tick before any volley moves, and is skipped (zero cost) while no volley flocks.
 			</description>
 		</method>
+		<method name="debug_get_frame_cache_stats" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				The frame cache's counters (textures this factory baked from SpriteFrames frames: [AtlasTexture] regions and [member BulletVolleyData2D.override_frame_color] copies): [code]entries[/code], [code]builds[/code], [code]hits[/code], [code]sheet_reads[/code] (GPU readbacks) and [code]unreadable[/code]. For tests and profiling: a warm shot builds nothing and reads nothing.
+			</description>
+		</method>
 		<method name="debug_get_graze_stats" qualifiers="const">
 			<return type="Dictionary" />
 			<description>
@@ -347,6 +353,14 @@
 			<return type="int" />
 			<description>
 				Returns how many volleys the factory tracks (active and pooled).
+			</description>
+		</method>
+		<method name="debug_read_frame">
+			<return type="Texture2D" />
+			<param index="0" name="texture" type="Texture2D" />
+			<param index="1" name="whiten" type="bool" default="false" />
+			<description>
+				What a mesh draw shows for [param texture], through this factory's frame cache: the texture itself, or for an [AtlasTexture] a texture of exactly what it draws (its region inside its margin box); with [param whiten], the [member BulletVolleyData2D.override_frame_color] copy. Returns null when the pixels cannot be read (a region outside its atlas, non-finite values, an undecodable format). For tests.
 			</description>
 		</method>
 		<method name="debug_reset_pool_stats">
@@ -705,7 +719,7 @@
 			<return type="void" />
 			<param index="0" name="key" type="VolleyPoolKey2D" default="null" />
 			<description>
-				Resets the factory. Pass [code]null[/code] (default) for a full reset (all bullets, pools, and the full attachment pool). Pass a [VolleyPoolKey2D] to reset only that exact amount_bullets+shape bucket; unrelated pooled attachments are preserved. Refused during the physics step; call it deferred then.
+				Resets the factory. Pass [code]null[/code] (default) for a full reset (all bullets, pools, the full attachment pool, and the frame textures baked from SpriteFrames, so art repainted in place re-bakes). Pass a [VolleyPoolKey2D] to reset only that exact amount_bullets+shape bucket; unrelated pooled attachments are preserved. Refused during the physics step; call it deferred then.
 				Warning (shared factories): this kills live volleys from EVERY spawner using this factory (or every spawner sharing the bucket, when keyed) - not just yours. Spawner trackers prune the dead ids on next read.
 				Emits the [signal reset_finished] signal when complete.
 			</description>

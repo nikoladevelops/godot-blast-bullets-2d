@@ -43,7 +43,7 @@
 	</methods>
 	<members>
 		<member name="animation" type="StringName" setter="set_animation" getter="get_animation" default="&amp;&quot;default&quot;">
-			Which animation of [member sprite_frames] plays. Empty or "default" resolves silently to the first animation of the list when there is no "default"; an unknown name plays the first animation and pushes one warning. An animation without frames falls back to [member texture] or the placeholder disc (also one warning). Looping and speed come from the SpriteFrames animation.
+			Which animation of [member sprite_frames] plays. Empty or "default" resolves silently to "default" when it has frames, else to the first animation with frames; an unknown name plays the first animation with frames and pushes one warning. An animation chosen by name that has no frames, or a SpriteFrames without any frames, falls back to [member texture] or the placeholder disc (also one warning). Looping and speed come from the SpriteFrames animation (the bullet rules: [member BulletVolleyData2D.animation]).
 		</member>
 		<member name="attachment" type="PackedScene" setter="set_attachment" getter="get_attachment">
 			A [BulletAttachment2D] scene carried by every pickup (a glow, a sparkle trail, a light). It is pooled and released with the pickup like any bullet attachment and follows [member BulletFactory2D.time_scale] (see [member BulletAttachment2D.apply_time_scale]).
@@ -154,7 +154,7 @@
 			Custom motion only: the [BulletSpeedData2D] (speed, top speed, acceleration) shared by the pickups. Without it a custom pickup has speed 0 and stays where it is until it expires.
 		</member>
 		<member name="sprite_frames" type="SpriteFrames" setter="set_sprite_frames" getter="get_sprite_frames">
-			The pickup's image and animation: a [SpriteFrames] resource (the animation named by [member animation] plays, its speed and looping come from the resource). Wins over [member texture]. Set this for animated coins and gems.
+			The pickup's image and animation: a [SpriteFrames] resource (the animation named by [member animation] plays, its speed and looping come from the resource). Wins over [member texture]. Set this for animated coins and gems. Plain textures or [AtlasTexture] regions of a sprite sheet (drawn as their region, sized as drawn: region plus margin).
 		</member>
 		<member name="texture" type="Texture2D" setter="set_texture" getter="get_texture">
 			Shortcut for a single static image, used only when [member sprite_frames] is empty. With neither, a small white disc is used so a pickup is never invisible.

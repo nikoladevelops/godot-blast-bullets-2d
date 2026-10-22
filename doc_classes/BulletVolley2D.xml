@@ -2014,7 +2014,7 @@
 			<param index="0" name="sprite_frames" type="SpriteFrames" />
 			<param index="1" name="animation" type="StringName" default="&amp;&quot;default&quot;" />
 			<description>
-				Switches this multimesh to a SpriteFrames animation (bakes frames, per-frame seconds from fps-relative durations, loop flag; AtlasTexture frames supported). Empty or missing "default" auto-resolves silently to the first animation; explicit wrong names fall back with one error. Returns false on null/empty/missing with previous animation untouched. Note: pooled reuse re-bakes from spawn data and disconnects these handlers, so reconnect after reuse if needed.
+				Switches this multimesh to a SpriteFrames animation (bakes frames, per-frame seconds from fps-relative durations, loop flag; AtlasTexture frames draw as their region). Same rules as [member BulletVolleyData2D.animation]: empty or "default" auto-resolves silently to "default" or the first animation with frames; explicit wrong names fall back with one error. Returns false on null/empty/missing with previous animation untouched. Note: pooled reuse re-bakes from spawn data and disconnects these handlers, so reconnect after reuse if needed.
 			</description>
 		</method>
 		<method name="play_sprite_animation_name">
@@ -2697,7 +2697,7 @@
 			Live tint-over-life gradient, sampled by lifetime fraction and multiplied with the fade base and fades. Reseeded from spawn data on every spawn/enable. Null disables it.
 		</member>
 		<member name="override_frame_color" type="bool" setter="set_override_frame_color" getter="get_override_frame_color" default="false">
-			Live bullet whiten override: toggling rebuilds the cached animation frames whitened (alpha preserved) or restores the art. Reseeded from spawn data on every spawn/enable.
+			Live bullet whiten override: toggling re-bakes the animation frames whitened (alpha preserved) or restores the art, in place: the animation keeps its frame, remaining time, paused and finished state (a finished one-shot never finishes again). Reseeded from spawn data on every spawn/enable.
 		</member>
 		<member name="shared_bullet_curves_data" type="BulletCurvesData2D" setter="set_shared_bullet_curves_data" getter="get_shared_bullet_curves_data">
 			A shared [BulletCurvesData2D] resource that can be assigned to all bullets in the volley. This is useful for saving memory if you have a lot of bullets that share the same curves data, since you can assign the same resource to all of them instead of creating a new one for each bullet. Values are copied at set time: editing the resource in place afterwards changes nothing until you set it again. Direction channels never park the direction at zero: an Override result near zero keeps the incoming direction.

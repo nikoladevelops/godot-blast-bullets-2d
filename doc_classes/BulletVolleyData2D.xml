@@ -96,7 +96,7 @@
 			Custom data carried per bullet, readable in the factory collision callbacks through [method BulletVolley2D.bullet_get_custom_data]. Entry [code]i[/code] belongs to bullet [code]i[/code] and nobody else; bullets without an entry read null. Stays strictly separate from [member shared_bullets_custom_data]: per-bullet data never falls back to shared. Example: tag bullet 0 with a fire resource and bullet 2 with ice → bullet 1 reads null.
 		</member>
 		<member name="animation" type="StringName" setter="set_animation" getter="get_animation" default="&amp;&quot;default&quot;">
-			Which SpriteFrames animation to play. Empty or "default" auto-resolves silently ("default" if present, else first animation). Explicit wrong names fall back to the first animation with one error. The whole volley shares one frame at a time; timing uses animation speed (fps), per-frame durations, and loop flag.
+			Which SpriteFrames animation to play. Empty or "default" auto-resolves silently: "default" when it has frames, else the first animation with frames (the empty "default" every new SpriteFrames has never hides your frames). An explicit name that is missing or has no frames falls back to the first animation with frames with one error. The whole volley shares one frame at a time; timing uses the animation speed (fps; 0 holds the first frame like [AnimatedSprite2D], a NaN or INF speed plays at 1 fps with one error), per-frame durations (a non-finite one counts 0 with one error) and the loop flag. Every plugin system that plays SpriteFrames (bullets, effect layers, lasers, pickups) follows these same rules.
 		</member>
 		<member name="bounce_charge_amplify" type="bool" setter="set_bounce_charge_amplify" getter="get_bounce_charge_amplify" default="true">
 			Whether an oncoming target amplifies the rebound through relative reflection. True (default) enables the extra kick; false reflects absolutely, so bounce_strength alone decides head-on outcomes.
@@ -266,7 +266,7 @@
 			Note: This is at the cost of performance, so a better workaround is to attach an [Area2D] to those static bodies and detect that instead.
 		</member>
 		<member name="override_frame_color" type="bool" setter="set_override_frame_color" getter="get_override_frame_color" default="false">
-			Bullet whiten override (both bullet types share the animation rebuild): bullet frames bake whitened (alpha preserved), so [member self_modulate] tints bullets to the exact dialed color instead of multiplying the source art. Unreadable frames keep the original art with one warning per rebuild, never a blank.
+			Bullet whiten override: bullet frames bake whitened (alpha preserved), so [member self_modulate] tints bullets to the exact dialed color instead of multiplying the source art. Frames are read as they draw (an AtlasTexture's region in its margin box, VRAM-compressed sheets decompressed), at any size, once per frame for the whole factory. Unreadable frames keep the original art with one warning per rebuild, never a blank.
 		</member>
 		<member name="rotate_only_textures" type="bool" setter="set_rotate_only_textures" getter="get_rotate_only_textures" default="true">
 			If you set this to [code]false[/code], then the collision shapes will also rotate along with the bullet's texture.
@@ -321,7 +321,7 @@
 			Fallback repeat flag for bullets without their own entry in [member all_bullet_movement_pattern_repeats]. Whether those bullets loop the pattern instead of stopping at the end of the curve.
 		</member>
 		<member name="sprite_frames" type="SpriteFrames" setter="set_sprite_frames" getter="get_sprite_frames">
-			SpriteFrames holding all animations. Each frame is a Texture2D (plain or AtlasTexture region). The batch shares one frame; per-frame duration and loop come from the animation.
+			SpriteFrames holding all animations. Each frame is a Texture2D: a plain texture, or an [AtlasTexture] region of a sprite sheet. An atlas frame draws exactly as a [Sprite2D] would show it (its region, inside its margin box): it is baked once into a texture of its own, shared by every volley of the factory (the first bake reads the sheet back from the GPU once; [method BulletFactory2D.populate_bullets_pool] does that before the first shot). A region that cannot be read (outside its atlas, non-finite) draws the frame as it is with one warning. The batch shares one frame; per-frame duration and loop come from the animation. Null draws [member mesh] untextured, silently (the spawn warns once when nothing would draw).
 		</member>
 		<member name="stop_rotation_when_max_reached" type="bool" setter="set_stop_rotation_when_max_reached" getter="get_stop_rotation_when_max_reached" default="false">
 			Set this to true if you want for the bullets to stop rotating when they reach the maximum rotation speed.
@@ -330,7 +330,7 @@
 			If your texture is not rotated properly, you can use this property to rotate it more.
 		</member>
 		<member name="texture_size" type="Vector2" setter="set_texture_size" getter="get_texture_size" default="Vector2(0, 0)">
-			QuadMesh size override, used only when no mesh is provided. If x/y &lt;= 0 the size auto-derives from the first frame (AtlasTexture region, else texture size).
+			QuadMesh size override, used only when no mesh is provided. If x/y &lt;= 0 the size auto-derives from the first frame as it draws ([method Texture2D.get_size]: an AtlasTexture's region plus its margin).
 		</member>
 		<member name="tile_all_bullet_curves_data" type="bool" setter="set_tile_all_bullet_curves_data" getter="get_tile_all_bullet_curves_data" default="false">
 			When on, a short [member all_bullet_curves_data] wraps around the volley (bullet [code]i[/code] reads entry [code]i % size[/code]) instead of leaving the tail bullets on the fallback. Off by default. Example: 2 entries across 10 bullets fan as A,B,A,B...

@@ -31,6 +31,7 @@ for the rest: the sections are written to be looked up, not read once.
 |  |  | 27 | Lasers (LaserData2D, LaserVolley2D, factory lasers, LaserSpawner2D) |
 |  |  | 28 | Emitter bullets (BulletEmitterData2D, emit queue, flush) |
 |  |  | 29 | Runtime control, colors, per-bullet lifetimes, scale-in, interpolation |
+|  |  | 30 | Sprite animations (src/sprite/: SpriteFrames rules, frame reader, frame cache) |
 
 ## 0. Golden rules
 
@@ -61,7 +62,7 @@ for the rest: the sections are written to be looked up, not read once.
 
 ```sh
 GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py   # build (exit 1 = failed; never raw scons, never edit SConstruct)
-python3 tools/run_tests.py                                       # 237 files / 2227 tests, ~25 s, leak-checked
+python3 tools/run_tests.py                                       # 238 files / 2258 tests, ~25 s, leak-checked
 python3 tools/run_tests.py --suite <substring> --full            # one area, every failure message unclipped
 python3 tools/run_tests.py --self-test                           # proves the harness still catches failures/leaks
 python3 tools/run_editor_smoke.py                                # headless EDITOR run of tests/editor_smoke/ (editor-only paths)
@@ -774,6 +775,8 @@ src/
   pooling/     VolleyPool (parked volleys per key), VolleyPoolKey2D
   attachments/ BulletAttachment2D + its object pool
   debugger/    BulletVolleyDebugger2D (collision-shape overlay)
+  sprite/      sprite_anim2d (THE SpriteFrames rules: resolver, timing, bake loop, SpriteAnim2D, frame_draw_size2d),
+               frame_image2d (pixels as Godot draws a frame), frame_texture_cache2d (the factory's frame textures) (§30)
   core/        header-only: warn_once2d, cached_string_names2d, easing2d (Tween port), dynamic_sparse_set, live_object2d (script Variant -> live Object by id),
                collision_shape_helper2d, reentrancy_guard2d, transform_math2d, graze_targets2d (graze target lists' helpers, point target ids),
                node_scan2d (THE target filter of homing and graze, their node-name / children scans, PREVIEW_META_KEY)
@@ -1016,6 +1019,8 @@ deduped, cancelled by REMOVED) and replayed once on resume.
 | Orphan policies apply in every factory the spawner fired into; Clear / Remove freed inside a busy factory operation run right after it (structural queue) | `spawner/test_spawner_orphan_policy` |
 | A telegraph refused at the bounds retries a burst interval later (warning first); get_velocity user code that cancels the wave, burst or telegraph wins; telegraph_sec 0 with a max still warns; auto chains end at a cap or budget set mid-chain | `spawner/test_spawner_burst_telegraph`, `factory/test_factory_despawn_triggers` |
 | Movement velocity is measured over the time each step took (endpoint frames, Loop wraps); a new path or space is a jump | `spawner/test_spawner_movement` |
+| Every system that plays SpriteFrames (bullets, `play_sprite_animation`, pickups, trails, one-shots, `spawn_layer_effect`, the six laser looks) picks, times and draws a frame by the same rules; an AtlasTexture frame draws its region (margin box, zero region = whole atlas, nested, compressed), never its sheet | `integration/test_sprite_frames_contract` |
+| `override_frame_color` toggled live keeps the animation's frame, time, paused and finished state | `volley/test_volley_fx_layers` |
 
 - Edge cases to test everywhere: NaN/Inf scalars and vectors; null array
   entries; empty arrays; short vs oversized arrays; OOB indices (-1/99);
@@ -1815,3 +1820,42 @@ A flying bullet fires a template spawner's whole pattern (any
 - GDScript facts that bit the tests: a lambda captures locals by value
   (collect through an Array); a preview rebuild can run user code (the aimed
   target's `get_velocity`): re-check every node after it.
+
+## 30. Sprite animations (`src/sprite/`)
+
+Every system that plays a [SpriteFrames] goes through this module: bullet
+volleys (spawn and `play_sprite_animation`), pickups (they spawn a volley),
+effect layers (trails, one-shots, `spawn_layer_effect`) and the six laser
+looks. A new consumer uses it too; never read `get_frame_texture` and hand
+the texture to a draw yourself.
+
+| Piece | Where | Notes |
+|---|---|---|
+| Name rule | `resolve_sprite_animation2d` | pure: NULL_FRAMES / NO_ANIMATIONS / NO_FRAMES_ANYWHERE / RESOLVED / FELL_BACK. Empty or "default" = "default" when it has frames, else the first animation with frames (silent: the empty "default" of a fresh SpriteFrames never hides frames); a missing or empty explicit name falls back to the first animation with frames (the caller errors). Callers print their own class-prefixed texts (`BulletVolley2D:`, `BulletEffectLayerData2D:`, `LaserData2D.<property>:`; pickups warn) |
+| Timing rule | `sprite_anim_fps2d`, `sprite_frame_sec2d` | speed 0 = held (frame 0, never finishes; a one-shot effect has no playable time and is refused), NaN/INF/negative = 1 fps + one error; a non-finite duration = 0 s + one error (SpriteFrames stores NaN and INF as given) |
+| Bake loop | `bake_sprite_animation2d` | THE frame loop: timing, null frames (refuse), every frame through `FrameTextureCache2D` (DRAWABLE, or WHITENED for `override_frame_color`); a `SpriteAnimBakeReport2D` carries what went wrong for the caller's texts. One `FrameImageReader2D` per bake |
+| `SpriteAnim2D` | `sprite_anim2d.hpp` | frames, secs, ends (prefix sums), total, loop, held; `frame_at_looped` / `frame_for_local` (O(log F), the trail tick inlines them), `frame_at` / `texture_at` (lasers: loop or hold the last frame) |
+| Size rule | `frame_draw_size2d` | `Texture2D::get_size()` (region + margin; zero region = the atlas) for the bullet quad, effect shards, pickups, laser point frames |
+| Reader | `frame_image2d.*` | `FrameImageReader2D::read`: RGBA8 pixels as Godot draws the frame: rounded region (zero size = whole atlas per axis) at `margin.position` inside a `region + margin` box (cut at the box), nested atlases (depth 16), compressed images decompressed, mipmaps regenerated when the sheet had them; null when unreadable (non-finite / outside / overflowing region, non-finite or empty or > 16384 px box, undecodable format). A sheet is decoded once per reader (per bake) |
+| Cache | `frame_texture_cache2d.*` | owned by `BulletFactory2D` (`frame_cache`; volleys reach it through `frame_cache()`, effect layers through their caller, lasers through `factory`). DRAWABLE: a plain texture is itself (no entry, identity kept); an AtlasTexture is baked into an ImageTexture of what it draws, because a mesh draw (MultiMesh, triangle array) hands the engine `get_rid()` and an AtlasTexture's RID is its whole atlas drawn with 0..1 UVs. WHITENED: `whiten_image_copy` of the drawn pixels. Keyed by source instance id, validated by `frame_signature2d` (atlas ids, regions, margins, base size: an edited region rebuilds), null entry = unreadable, wholesale clear past 4096 per kind, full `reset()` clears. Readouts: `debug_get_frame_cache_stats()`, `debug_read_frame(texture, whiten)` |
+
+Contract (pinned by `integration/test_sprite_frames_contract.gd`, one table
+of consumers; whiten cases in `volley/test_volley_fx_layers.gd`):
+- A consumer row covers every rule at once: add a new system as a row of
+  `CONSUMERS` (+ `PREFIXES`, `_build`, `_drawn`).
+- An unreadable atlas frame draws the original texture with one warning per
+  SpriteFrames and frame (`WarnOnce2D`, code 27: the data, not the spawn).
+  Lasers bake per shot and latch every report per SpriteFrames and property
+  (code 26).
+- Bakes run at spawn / play / pool reuse; the tick never touches SpriteFrames.
+  Per spawn: one resolve, one cast + one signature (atlas frames) + one hash
+  lookup per frame. A miss costs one GPU readback per sheet per bake (and per
+  region an O(region) blit): `populate_bullets_pool` takes it before the first
+  shot.
+- A texture repainted in place (same size) keeps its cached copy until a full
+  `reset()`; a region, margin, atlas or size edit rebuilds on the next bake.
+- Effect layers cache their bake on the layer (`bake_cache`, keyed by
+  animation; setters invalidate, `set_trigger` too: a held trail draws, a held
+  one-shot cannot). Edits inside the SpriteFrames itself are not seen by a
+  cached layer bake (call `set_effect_layers` / reassign the frames).
+
