@@ -1447,6 +1447,12 @@ void PatternSpawner2D::begin_burst_chain(bool auto_started) {
 	burst_from_auto = auto_started;
 	if (!burst_enabled || burst_count <= 1) {
 		burst_shots_left = 0;
+		// One shot, warned first like an auto pull (the expiry fires it
+		// through fire_burst_volley; outside the bounds the warning refuses).
+		if (telegraph_wanted()) {
+			begin_telegraph(auto_started);
+			return;
+		}
 		fire_burst_volley();
 		return;
 	}

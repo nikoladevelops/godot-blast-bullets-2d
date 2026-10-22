@@ -328,3 +328,18 @@ func test_an_auto_burst_stops_at_a_cap_set_mid_chain(kind: String = use_paramete
 	await idle(10)
 	if kind == "fire_n_volleys":
 		assert_signal_emit_count(sp, "burst_finished", 1, "a resume never finishes the old chain")
+
+
+## begin_burst warns first when telegraph_enabled (documented), a one-shot
+## chain too (burst_count 1, or burst mode off): it used to fire at once.
+func test_a_one_shot_manual_burst_is_warned_first(burst_on: bool = use_parameters([true, false])) -> void:
+	var sp := _spawner(1)
+	sp.burst_enabled = burst_on
+	sp.telegraph_enabled = true
+	sp.telegraph_sec = 0.1
+	sp.begin_burst()
+	assert_eq(sp.get_volleys_fired(), 0, "nothing fired at once")
+	assert_true(sp.is_telegraph_pending(), "warning first")
+	await _until(sp, "volley_fired", 1, 30)
+	assert_signal_emit_count(sp, "volley_telegraphed", 1, "one warning")
+	assert_eq(sp.get_volleys_fired(), 1, "then the one shot")
