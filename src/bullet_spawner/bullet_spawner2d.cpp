@@ -351,7 +351,7 @@ ShotResult2D BulletSpawner2D::fire_shot(std::vector<Transform2D> &transforms) {
 	if (arc_resolved) {
 		// The gate's targets crossed the spawn's attachment callbacks and
 		// pre_shoot: a handler may have freed one of them.
-		keep_live_targets2d(arc_targets, homing_target_world());
+		keep_live_targets2d(arc_targets, target_world());
 	}
 	apply_volley_homing_and_orbiting(bullets, arc_resolved ? &arc_targets : nullptr);
 	// Re-validate: handlers of homing_targets_resolved/volley_homing_configured

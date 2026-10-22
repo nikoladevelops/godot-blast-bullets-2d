@@ -595,3 +595,24 @@ func test_none_and_a_pattern_data_swap_reach_live_lasers() -> void:
 	assert_eq(sp.retarget_live_lasers(), 1, "the Lock On laser in flight still retargets")
 	step_factory(1, DT)
 	assert_almost_eq(aim_at.call(Vector2(0, -300)), 0.0, 0.0001, "locked on the new position")
+
+
+## Targets are found in the factory's world, where the beams fire (like
+## homing): a laser spawner inside a SubViewport whose factory is in the main
+## world aims at main-world nodes, never at its own viewport's.
+func test_targets_come_from_the_factory_world() -> void:
+	var viewport := SubViewport.new()
+	add(viewport)
+	var sp := LaserSpawner2D.new()
+	sp.set_shooting_enabled(false)
+	sp.laser_data = _laser()
+	viewport.add_child(sp)
+	sp.set_bullet_factory(factory)
+	var main_foe: Node2D = add(Node2D.new())
+	main_foe.add_to_group(&"world_foes")
+	var viewport_foe := Node2D.new()
+	viewport_foe.add_to_group(&"world_foes")
+	viewport.add_child(viewport_foe)
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_NODE_GROUP
+	sp.laser_target_group = &"world_foes"
+	assert_eq(sp.resolve_laser_targets(), [main_foe], "the factory's world only")

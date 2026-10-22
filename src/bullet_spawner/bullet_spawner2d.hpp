@@ -661,7 +661,6 @@ protected:
 	void track_live_volley(BulletVolley2D *bullets);
 	// The World2D homing targets must live in: the factory's (where the
 	// volleys fly), else this spawner's.
-	const World2D *homing_target_world() const;
 	// Scene scan for the node-name source: collects usable Node2Ds under
 	// p_node whose name matches homing_node_name per
 	// homing_node_name_match_mode and homing_node_name_case_sensitive,

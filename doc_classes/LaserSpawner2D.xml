@@ -70,10 +70,10 @@
 			Node Children source: also every deeper descendant (depth-first, tree order).
 		</member>
 		<member name="laser_target_filter_group" type="StringName" setter="set_laser_target_filter_group" getter="get_laser_target_filter_group" default="&amp;&quot;&quot;">
-			Node Group and Node Path: only targets also in this group count (empty = no filter).
+			Every node source (Node Group, Node Path, Node Name, Node Children): only targets also in this group count (empty = no filter).
 		</member>
 		<member name="laser_target_group" type="StringName" setter="set_laser_target_group" getter="get_laser_target_group" default="&amp;&quot;&quot;">
-			Node Group: the group whose members the beams aim at (each beam its nearest member). Members pass the same target filter as homing and graze, never this spawner or its children.
+			Node Group: the group whose members the beams aim at (each beam its nearest member). Members pass the same target filter as homing and graze, never this spawner or its children. Like homing, targets are found in the world of the spawner's [BulletFactory2D] (where the beams fire).
 		</member>
 		<member name="laser_target_name_case_sensitive" type="bool" setter="set_laser_target_name_case_sensitive" getter="get_laser_target_name_case_sensitive" default="false">
 			Node Name source: compare names case-sensitively.

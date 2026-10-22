@@ -207,7 +207,7 @@ Array LaserSpawner2D::resolve_laser_targets() const {
 			if (laser_target_group.is_empty()) {
 				break;
 			}
-			const World2D *world = get_world_2d().ptr();
+			const World2D *world = target_world();
 			const TypedArray<Node> members = get_tree()->get_nodes_in_group(laser_target_group);
 			for (int i = 0; i < members.size(); ++i) {
 				Node2D *node = Object::cast_to<Node2D>(members[i]);
@@ -225,7 +225,7 @@ Array LaserSpawner2D::resolve_laser_targets() const {
 		case LASER_TARGET_NODE_PATH: {
 			Node2D *node = laser_target_path.is_empty() ? nullptr : Object::cast_to<Node2D>(get_node_or_null(laser_target_path));
 			Vector2 at;
-			if (node != nullptr && node != this && target_node_usable2d(node, get_world_2d().ptr(), at) && (laser_target_filter_group.is_empty() || node->is_in_group(laser_target_filter_group))) {
+			if (node != nullptr && node != this && target_node_usable2d(node, target_world(), at) && (laser_target_filter_group.is_empty() || node->is_in_group(laser_target_filter_group))) {
 				out.push_back(node);
 			}
 		} break;
@@ -242,7 +242,7 @@ Array LaserSpawner2D::resolve_laser_targets() const {
 		case LASER_TARGET_NODE_CHILDREN: {
 			// The scans of homing and graze: never into this spawner or a
 			// bullet factory, THE target filter on every node found.
-			const World2D *world = get_world_2d().ptr();
+			const World2D *world = target_world();
 			Array stack;
 			auto skip = [this](Node *node) { return node == this || Object::cast_to<BulletFactory2D>(node) != nullptr; };
 			auto visit = [&](Node2D *node) {

@@ -235,6 +235,12 @@ Vector2 PatternSpawner2D::resolve_spawn_offset_global() const {
 	return spawn_position_offset;
 }
 
+const World2D *PatternSpawner2D::target_world() const {
+	BulletFactory2D *factory = get_bullet_factory();
+	const Ref<World2D> world = factory != nullptr && factory->is_inside_tree() ? factory->get_world_2d() : get_world_2d();
+	return world.ptr();
+}
+
 bool PatternSpawner2D::get_spin_enabled() const {
 	return spin_enabled;
 }

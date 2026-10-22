@@ -266,7 +266,7 @@ int BulletSpawner2D::home_live_volleys_to(const Variant &target) {
 	// Group members, filtered like every node target (never the spawner).
 	std::vector<std::pair<Node2D *, Vector2>> members;
 	if (!group.is_empty()) {
-		const World2D *world = homing_target_world();
+		const World2D *world = target_world();
 		const TypedArray<Node> nodes = get_tree()->get_nodes_in_group(group);
 		for (int i = 0; i < nodes.size(); ++i) {
 			Node2D *member = Object::cast_to<Node2D>((Object *)nodes[i]);

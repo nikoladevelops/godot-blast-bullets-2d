@@ -1003,6 +1003,10 @@ public:
 	void set_spawn_position_offset_space(SpawnOffsetSpace value);
 	// The world-space shift a shot applies right now (space resolved).
 	Vector2 resolve_spawn_offset_global() const;
+	// The world node targets are found in (homing, lasers): the factory's,
+	// where the shots fly (a node of another world, e.g. a SubViewport, has
+	// coordinates they can never reach); the spawner's without a factory.
+	const World2D *target_world() const;
 
 	PatternSource get_pattern_source() const;
 	void set_pattern_source(PatternSource value);
