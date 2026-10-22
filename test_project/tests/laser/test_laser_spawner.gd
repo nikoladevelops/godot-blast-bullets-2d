@@ -713,3 +713,23 @@ func test_a_freed_node_is_no_beam_target() -> void:
 	expect_error_sequence(["set_beam_target: target must be a Node2D, a Vector2 or null, the beam has no target now."])
 	l.set_targets([gone])
 	expect_error_sequence(["set_beam_target: target must be a Node2D, a Vector2 or null, the beam has no target now.", "set_beam_target: target must be a Node2D, a Vector2 or null, the beam has no target now."])
+
+
+## Mouse and interval retargeting keep following every live Track / Lock On
+## laser, also after the spawner's laser_data turned to a pattern aim (the
+## lasers in flight keep the aim they were fired with); the loop sleeps once
+## no live laser aims.
+func test_live_aiming_lasers_keep_following_after_a_pattern_data_swap() -> void:
+	var d := _laser()
+	d.aim = LaserData2D.LASER_AIM_LOCK_ON
+	var sp := _spawner(d, 1)
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_MOUSE
+	var l := _fire(sp)
+	sp.laser_data = _laser() # the next shots aim along the pattern
+	assert_true(sp.is_processing(), "awake while a live laser aims")
+	mouse_to(Vector2(0, -120))
+	await idle(3)
+	assert_almost_eq(l.get_beam_end(0).distance_to(Vector2(0, -120)), 0.0, 0.5, "still following the cursor")
+	l.end_laser(false)
+	await idle(3)
+	assert_false(sp.is_processing(), "asleep once no live laser aims")

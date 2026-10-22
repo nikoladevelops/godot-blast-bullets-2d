@@ -58,7 +58,7 @@
 	</methods>
 	<members>
 		<member name="laser_data" type="LaserData2D" setter="set_laser_data" getter="get_laser_data">
-			What a shot fires (see [LaserData2D]). Edits reach the lasers that are firing; the preview beams follow its [member LaserData2D.length].
+			What a shot fires (see [LaserData2D]). Edits reach the lasers that are firing; the preview beams follow its [member LaserData2D.length]. A new resource only changes the next shots: the lasers in flight keep theirs (a Track / Lock On laser keeps following the Laser Targeting group, the mouse every frame and the retarget interval included).
 		</member>
 		<member name="laser_retarget_interval_sec" type="float" setter="set_laser_retarget_interval_sec" getter="get_laser_retarget_interval_sec" default="0.0">
 			Node Group and Node Path: how often the live Track / Lock On lasers pick their targets again (each beam the nearest), in seconds. 0 = only when fired.

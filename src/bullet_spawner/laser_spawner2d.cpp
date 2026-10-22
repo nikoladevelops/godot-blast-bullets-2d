@@ -466,11 +466,28 @@ ShotResult2D LaserSpawner2D::fire_shot(std::vector<Transform2D> &transforms) {
 }
 
 bool LaserSpawner2D::needs_process_owned() const {
-	return aims_at_targets() && (laser_target_source == LASER_TARGET_MOUSE || laser_retarget_interval_sec > 0.0);
+	if (laser_target_source == LASER_TARGET_NONE || !(laser_target_source == LASER_TARGET_MOUSE || laser_retarget_interval_sec > 0.0)) {
+		return false;
+	}
+	if (aims_at_targets()) {
+		return true;
+	}
+	// The lasers in flight keep the aim they were fired with: a Track /
+	// Lock On one keeps the loop awake after laser_data turned to the pattern.
+	std::vector<LaserVolley2D *> owned;
+	collect_owned(owned);
+	for (const LaserVolley2D *laser : owned) {
+		if (laser_aims_at_targets2d(laser)) {
+			return true;
+		}
+	}
+	return false;
 }
 
 bool LaserSpawner2D::process_owned(double delta) {
-	if (!aims_at_targets()) {
+	// retarget_live_lasers picks the aiming lasers by their own data (and
+	// resolves nothing while none aims).
+	if (laser_target_source == LASER_TARGET_NONE) {
 		return true;
 	}
 	if (laser_target_source == LASER_TARGET_MOUSE) {
