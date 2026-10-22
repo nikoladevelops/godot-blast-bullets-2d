@@ -1184,6 +1184,36 @@ func test_bullet_whiten_override_exact_tint_toggle_reuse() -> void:
 	await idle(1)
 
 
+func test_toggling_override_frame_color_keeps_the_animation_where_it_is() -> void:
+	# A cosmetic switch: the shown frame, its remaining time, the paused and
+	# finished states stay; a finished one-shot never finishes again.
+	var d := _fx_data(Vector2.ZERO, 0.0, [], false)
+	d.sprite_frames = _make_frames(4, ["default"], Color(1, 0, 0, 1)) # 10 fps, one-shot
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	watch_signals(v)
+	for i in 5:
+		factory.debug_advance_time(0.05) # 0.25 s: frame 2, 0.05 s left
+	assert_eq(v.get_sprite_frame(), 2, "frame 2")
+	v.set_override_frame_color(true)
+	assert_eq(v.get_sprite_frame(), 2, "the toggle keeps the frame")
+	assert_true(v.get_texture().get_image().get_pixel(0, 0).g > 0.9, "frame 2, whitened")
+	factory.debug_advance_time(0.05)
+	assert_eq(v.get_sprite_frame(), 3, "the frame's remaining time is kept")
+	for i in 4:
+		factory.debug_advance_time(0.05)
+	assert_signal_emit_count(v, "sprite_animation_finished", 1, "finished once")
+	v.set_override_frame_color(false)
+	for i in 4:
+		factory.debug_advance_time(0.05)
+	assert_eq([v.get_sprite_frame(), v.is_sprite_animation_finished()], [3, true], "still finished on the last frame")
+	assert_signal_emit_count(v, "sprite_animation_finished", 1, "never finishes twice")
+	assert_true(v.get_texture().get_image().get_pixel(0, 0).g < 0.1, "the original art again")
+	v.stop_sprite_animation()
+	v.set_sprite_frame(1)
+	v.set_override_frame_color(true)
+	assert_eq([v.get_sprite_frame(), v.is_sprite_animation_playing()], [1, false], "a stopped animation stays stopped")
+
+
 ## An AtlasTexture frame on a 4x4 base: red, pixel (1, 1) half transparent.
 func _atlas_frames(region: Rect2) -> SpriteFrames:
 	var img := Image.create_empty(4, 4, false, Image.FORMAT_RGBA8)

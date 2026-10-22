@@ -1662,7 +1662,9 @@ protected:
 
 	// Bakes frames + per-frame seconds from SpriteFrames (fps-relative durations) and
 	// applies frame 0. Returns false on null/empty/missing (previous animation kept).
-	bool rebuild_sprite_animation(const Ref<SpriteFrames> &p_sprite_frames, const StringName &p_animation);
+	// keep_position re-bakes the same animation in place (a cosmetic switch such as
+	// override_frame_color): the frame, its remaining time, paused and finished stay.
+	bool rebuild_sprite_animation(const Ref<SpriteFrames> &p_sprite_frames, const StringName &p_animation, bool keep_position = false);
 
 	// Silent auto-resolution shared by rebuild + quad sizing: empty or missing "default"
 	// resolves to first animation without error; explicit wrong names error once here.

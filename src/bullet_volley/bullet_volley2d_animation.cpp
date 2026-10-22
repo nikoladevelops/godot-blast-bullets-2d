@@ -183,11 +183,12 @@ void BulletVolley2D::set_override_frame_color(bool value) {
 		return;
 	}
 	anim_override_frame_color = value;
-	// Live toggle rebuilds the cached frames from the stored source (same
-	// path as play_sprite_animation_name). No source yet means nothing to
-	// rebuild: the next spawn/enable applies it through the snapshot.
+	// Live toggle re-bakes the frames from the stored source in place: the
+	// animation keeps its frame, remaining time, paused and finished state.
+	// No source yet means nothing to rebuild: the next spawn/enable applies
+	// it through the snapshot.
 	if (!anim_source.is_null()) {
-		rebuild_sprite_animation(anim_source, anim_name);
+		rebuild_sprite_animation(anim_source, anim_name, true);
 	}
 }
 
@@ -257,7 +258,7 @@ bool BulletVolley2D::resolve_sprite_animation_quiet(const Ref<SpriteFrames> &p_s
 	return resolve_sprite_animation_impl(p_sprite_frames, p_requested, out_anim, true);
 }
 
-bool BulletVolley2D::rebuild_sprite_animation(const Ref<SpriteFrames> &p_sprite_frames, const StringName &p_animation) {
+bool BulletVolley2D::rebuild_sprite_animation(const Ref<SpriteFrames> &p_sprite_frames, const StringName &p_animation, bool keep_position) {
 	StringName name;
 	if (!resolve_sprite_animation(p_sprite_frames, p_animation, name)) {
 		return false; // error already reported, previous animation untouched
@@ -288,9 +289,15 @@ bool BulletVolley2D::rebuild_sprite_animation(const Ref<SpriteFrames> &p_sprite_
 	if (!baked_ok) {
 		return false; // previous animation untouched
 	}
+	// The same frames again (an edited SpriteFrames restarts instead).
+	keep_position = keep_position && baked.size() == anim.size() && anim_frame_index >= 0 && anim_frame_index < baked.size();
 	anim_source = p_sprite_frames;
 	anim_name = name;
 	anim = std::move(baked);
+	if (keep_position) {
+		set_texture(anim.frames[anim_frame_index]);
+		return true;
+	}
 	anim_paused = false;
 	anim_finished = false;
 	anim_frame_index = 0;
