@@ -944,7 +944,8 @@ int BulletSpawner2D::clear_live_volleys_homing() {
 	int done = 0;
 	const uint64_t self_id = get_instance_id();
 	for (int i = 0; i < ids.size(); ++i) {
-		BulletVolley2D *volley = VolleyTracker2D::resolve_live(ids[i], self_id);
+		// Parked volleys too: a wake would resume the chase.
+		BulletVolley2D *volley = VolleyTracker2D::resolve_tracked(ids[i], self_id);
 		if (volley == nullptr) {
 			continue;
 		}

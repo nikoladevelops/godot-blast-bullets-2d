@@ -283,3 +283,14 @@ func test_freed_nodes_handed_to_the_api_are_refused() -> void:
 	v.all_bullets_replace_homing_targets_with_new_target(gone)
 	expect_error_sequence(["Invalid homing target type in all_bullets_replace_homing_targets_with_new_target. Use a Node2D or Vector2. Nothing was changed."])
 	assert_false(_chases(v), "no target was taken")
+
+
+## The kill switch reaches parked volleys too: woken, they no longer resume
+## the chase it cleared.
+func test_clear_live_volleys_homing_reaches_parked_volleys() -> void:
+	var sp := _homing_spawner()
+	var v := _shoot(sp)
+	_park(v)
+	assert_eq(sp.clear_live_volleys_homing(), 1, "the parked volley is cleared")
+	v.enable_bullet(0)
+	assert_false(_chases(v), "woken, it flies straight")

@@ -57,7 +57,7 @@
 		<method name="clear_live_volleys_homing">
 			<return type="int" />
 			<description>
-				Kill-switch: clears homing queues and stops orbiting on every tracked live volley, through engine clears that keep all counters exact. Returns how many volleys were touched. Retargeting re-arms them while homing stays on; turn homing off (or clear tracking) to keep them flying straight.
+				Kill-switch: clears homing queues and stops orbiting on every tracked volley (live or parked: a wake never resumes the chase), through engine clears that keep all counters exact. Returns how many volleys were touched. Retargeting re-arms them while homing stays on; turn homing off (or clear tracking) to keep them flying straight.
 			</description>
 		</method>
 		<method name="collect_shot_colors" qualifiers="const">
