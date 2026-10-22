@@ -643,3 +643,44 @@ func test_a_far_target_is_still_picked() -> void:
 	var l := _fire(sp)
 	step_factory(1, DT)
 	assert_almost_eq(l.get_beam_angle(0), PI / 2.0, 0.001, "locked on the far target (down)")
+
+
+## A spawner outside the tree for a few ticks (a reparent across frames)
+## never ends its lasers' follow: they hold their pose while it is out and
+## ride it again, without a slide, once it is back.
+func test_following_beams_hold_while_the_spawner_is_out_of_the_tree() -> void:
+	var sp := _spawner(_laser(), 2)
+	var l := _fire(sp)
+	step_factory(1, DT)
+	var held := [l.get_beam_start(0), l.get_beam_start(1)]
+	var parent := sp.get_parent()
+	parent.remove_child(sp)
+	step_factory(3, DT)
+	assert_eq([l.get_beam_start(0), l.get_beam_start(1)], held, "held while out of the tree")
+	var holder: Node2D = add(Node2D.new())
+	holder.position = Vector2(100, 0)
+	holder.add_child(sp)
+	step_factory(1, DT)
+	assert_true(l.get_beam_start(0).is_equal_approx(held[0] + Vector2(100, 0)) and l.get_beam_start(1).is_equal_approx(held[1] + Vector2(100, 0)), "every beam rides the spawner again: %s" % [[l.get_beam_start(0), l.get_beam_start(1)]])
+	var mid: PackedVector2Array = l.debug_get_draw_state(0.5)[0]["points"]
+	assert_true(mid[0].is_equal_approx(held[0] + Vector2(100, 0)), "no slide across the jump")
+
+
+## A following laser's muzzle offset stays what the shot made it: Global a
+## world vector, Local in the generator's frame; the spin never turns it
+## (bullets and the preview add it after the spin).
+func test_the_muzzle_offset_never_turns_with_the_spin(space: int = use_parameters([0, 1])) -> void:
+	var sp := _spawner(_laser(), 1) # slot 0 at (20, 0) pointing +X
+	sp.spawn_position_offset = Vector2(0, 50)
+	sp.spawn_position_offset_space = space
+	var l := _fire(sp)
+	step_factory(1, DT)
+	assert_true(l.get_beam_start(0).is_equal_approx(Vector2(20, 50)), "fired at the slot plus the offset: %s" % l.get_beam_start(0))
+	sp.set_spin_angle_deg(90.0)
+	step_factory(1, DT)
+	assert_true(l.get_beam_start(0).is_equal_approx(Vector2(0, 70)), "the slot turned with the spin, the offset did not: %s" % l.get_beam_start(0))
+	sp.set_spin_angle_deg(0.0)
+	sp.rotation = PI / 2.0
+	step_factory(1, DT)
+	var want := Vector2(0, 70) if space == 0 else Vector2(-50, 20)
+	assert_true(l.get_beam_start(0).is_equal_approx(want), "a turned spawner turns a Local offset only: %s" % l.get_beam_start(0))

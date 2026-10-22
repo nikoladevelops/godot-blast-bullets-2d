@@ -47,7 +47,7 @@ LaserVolley2D *BulletFactory2D::spawn_laser(const Ref<LaserData2D> &data, const 
 	return spawn_laser_span(data, slots.data(), (int)slots.size(), 0, anchor_id, frame, "spawn_laser");
 }
 
-LaserVolley2D *BulletFactory2D::spawn_laser_span(const Ref<LaserData2D> &data, const Transform2D *transforms, int count, uint64_t owner_id, uint64_t anchor_id, const Transform2D &anchor_frame, const char *caller) {
+LaserVolley2D *BulletFactory2D::spawn_laser_span(const Ref<LaserData2D> &data, const Transform2D *transforms, int count, uint64_t owner_id, uint64_t anchor_id, const Transform2D &anchor_frame, const char *caller, const Vector2 &anchor_offset) {
 	if (is_factory_busy) {
 		UtilityFunctions::push_error(String(caller) + ": BulletFactory2D is currently busy. Ignoring the request.");
 		return nullptr;
@@ -97,7 +97,7 @@ LaserVolley2D *BulletFactory2D::spawn_laser_span(const Ref<LaserData2D> &data, c
 		laser_container.get()->add_child(laser);
 		all_lasers.push_back(laser);
 	}
-	laser->begin_life(this, data, transforms, count, owner_id, anchor_id, anchor_frame);
+	laser->begin_life(this, data, transforms, count, owner_id, anchor_id, anchor_frame, anchor_offset.is_finite() ? anchor_offset : Vector2());
 	return laser;
 }
 

@@ -115,7 +115,9 @@ public:
 	LaserVolley2D *spawn_laser(const Ref<LaserData2D> &data, const TypedArray<Transform2D> &transforms, Node2D *anchor = nullptr);
 	// C++ path (LaserSpawner2D): native transforms, the owner spawner, the
 	// anchor and its frame at fire time. Validated like spawn_laser.
-	LaserVolley2D *spawn_laser_span(const Ref<LaserData2D> &data, const Transform2D *transforms, int count, uint64_t owner_id, uint64_t anchor_id, const Transform2D &anchor_frame, const char *caller);
+	// anchor_offset: a world shift already in `transforms` that a following
+	// laser keeps apart from its anchor-local slots (the spawn offset).
+	LaserVolley2D *spawn_laser_span(const Ref<LaserData2D> &data, const Transform2D *transforms, int count, uint64_t owner_id, uint64_t anchor_id, const Transform2D &anchor_frame, const char *caller, const Vector2 &anchor_offset = Vector2());
 	Array get_active_lasers() const;
 	int get_active_laser_count() const;
 	// Ends every firing laser (fading, or at once). Safe from handlers.

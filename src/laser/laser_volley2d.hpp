@@ -175,7 +175,7 @@ public:
 	// ---- C++ (factory) ----
 	// The single new-life path: beams at `slots` (count), following
 	// `anchor_id` (0 = none) from `anchor_frame`. No user code.
-	void begin_life(BulletFactory2D *factory, const Ref<LaserData2D> &data, const Transform2D *slots, int count, uint64_t owner_id, uint64_t anchor_id, const Transform2D &anchor_frame);
+	void begin_life(BulletFactory2D *factory, const Ref<LaserData2D> &data, const Transform2D *slots, int count, uint64_t owner_id, uint64_t anchor_id, const Transform2D &anchor_frame, const Vector2 &anchor_offset = Vector2());
 	// Drops everything a life brought (targets, owner, contacts, looks).
 	void release_life();
 	// One factory step. Signals run live inside (user code): the laser
@@ -243,8 +243,11 @@ private:
 	uint32_t life_id = 0;
 	uint64_t anchor_id = 0;
 	bool following = false;
-	// The anchor's frame for this tick (sync_anchor_frame, once per tick).
+	// The anchor's frame and world muzzle offset for this tick
+	// (sync_anchor_frame, once per tick); held while the anchor is out of the tree.
 	Transform2D anchor_frame_now;
+	Vector2 anchor_offset_now;
+	bool anchor_holding = false;
 	// Baked looks (per life).
 	LaserAnim2D anim_body, anim_charge, anim_muzzle, anim_tip, anim_pierce, anim_wall;
 	std::vector<Ref<BulletGrazeZone2D>> graze_zones;
@@ -271,9 +274,17 @@ private:
 	// `fn` and returns true.
 	bool reject_stale_handle(const char *fn) const;
 	Object *resolve_emitter() const;
-	bool resolve_anchor_frame(Transform2D &r_frame) const;
-	// Reads the anchor's frame once for every beam of this tick. A lost
-	// anchor turns EVERY beam's slot into its world pose and ends the follow.
+	enum AnchorState {
+		ANCHOR_FOLLOW, // in the tree: ride its frame
+		ANCHOR_HOLD, // alive but out of the tree (a reparent): keep the last frame
+		ANCHOR_LOST, // freed or dying: the follow ends
+	};
+	// The anchor's frame (a spawner: its shot frame) and the world muzzle
+	// offset that rides on top of it (a spawner's spawn offset, never spun).
+	AnchorState read_anchor(Transform2D &r_frame, Vector2 &r_offset) const;
+	// Reads the anchor once for every beam of this tick. A lost anchor turns
+	// EVERY beam's slot into its world pose and ends the follow; a held one
+	// keeps the last frame and resumes without a slide.
 	void sync_anchor_frame();
 	bool target_position(const Beam &b, Vector2 &r_pos) const;
 	bool hitting_phase() const;

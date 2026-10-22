@@ -419,8 +419,10 @@ ShotResult2D LaserSpawner2D::fire_shot(std::vector<Transform2D> &transforms) {
 		return result;
 	}
 	// The muzzle offset moves every muzzle (like the bullets' spawn offset).
-	if (spawn_position_offset != Vector2(0, 0)) {
-		const Vector2 offset = resolve_spawn_offset_global();
+	// A following laser keeps it apart from its spawner-local slots: the spin
+	// never turns it (bullets and the preview add it after the spin).
+	const Vector2 offset = spawn_position_offset != Vector2(0, 0) ? resolve_spawn_offset_global() : Vector2();
+	if (offset != Vector2(0, 0)) {
 		for (Transform2D &t : transforms) {
 			t.columns[2] += offset;
 		}
@@ -430,7 +432,7 @@ ShotResult2D LaserSpawner2D::fire_shot(std::vector<Transform2D> &transforms) {
 	const uint64_t self_id = get_instance_id();
 	const uint64_t anchor = shot_pose_active ? 0 : self_id;
 	const Transform2D frame = get_shot_frame();
-	LaserVolley2D *laser = factory->spawn_laser_span(laser_data, transforms.data(), (int)transforms.size(), self_id, anchor, frame, "LaserSpawner2D::shoot_once");
+	LaserVolley2D *laser = factory->spawn_laser_span(laser_data, transforms.data(), (int)transforms.size(), self_id, anchor, frame, "LaserSpawner2D::shoot_once", offset);
 	if (laser == nullptr) {
 		result.refusal = ShotRefusal2D::refuse(String(), StringName("factory_refused"), true);
 		return result;

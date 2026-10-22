@@ -83,7 +83,7 @@ Texture2D *LaserAnim2D::at(double t) const {
 
 // ---- Life -----------------------------------------------------------------------------------
 
-void LaserVolley2D::begin_life(BulletFactory2D *p_factory, const Ref<LaserData2D> &p_data, const Transform2D *slots, int count, uint64_t owner_id, uint64_t p_anchor_id, const Transform2D &anchor_frame) {
+void LaserVolley2D::begin_life(BulletFactory2D *p_factory, const Ref<LaserData2D> &p_data, const Transform2D *slots, int count, uint64_t owner_id, uint64_t p_anchor_id, const Transform2D &anchor_frame, const Vector2 &anchor_offset) {
 	factory = p_factory;
 	factory_life = p_factory != nullptr ? p_factory->life_token() : std::shared_ptr<bool>();
 	data = p_data;
@@ -104,12 +104,14 @@ void LaserVolley2D::begin_life(BulletFactory2D *p_factory, const Ref<LaserData2D
 	// A life begun mid-sweep (a handler firing) ticks from the next step.
 	sweep_tick_stamp = p_factory != nullptr ? p_factory->get_sweep_counter() : 0;
 	const Transform2D frame_inv = following ? anchor_frame.affine_inverse() : Transform2D();
+	anchor_offset_now = following ? anchor_offset : Vector2();
+	anchor_holding = false;
 	beams.resize((size_t)count);
 	for (int i = 0; i < count; ++i) {
 		Beam &b = beams[i];
 		b = Beam();
 		const Transform2D &pose = slots[i];
-		b.slot = following ? frame_inv * pose : pose;
+		b.slot = following ? frame_inv * Transform2D(pose.columns[0], pose.columns[1], pose.columns[2] - anchor_offset_now) : pose;
 		b.muzzle = pose.columns[2];
 		b.aim = (real_t)pose.columns[0].angle();
 		b.angle = b.aim;
@@ -306,24 +308,29 @@ Object *LaserVolley2D::resolve_emitter() const {
 	return factory != nullptr && factory_life != nullptr && *factory_life ? (Object *)factory : nullptr;
 }
 
-bool LaserVolley2D::resolve_anchor_frame(Transform2D &r_frame) const {
+LaserVolley2D::AnchorState LaserVolley2D::read_anchor(Transform2D &r_frame, Vector2 &r_offset) const {
+	r_offset = Vector2();
 	if (anchor_id == 0) {
-		return false;
+		return ANCHOR_LOST;
 	}
 	Object *obj = ObjectDB::get_instance(ObjectID(anchor_id));
-	if (const PatternSpawner2D *sp = Object::cast_to<PatternSpawner2D>(obj)) {
-		if (!sp->is_inside_tree() || sp->is_queued_for_deletion()) {
-			return false;
-		}
-		r_frame = sp->get_shot_frame();
-		return transform_is_sane2d(r_frame);
-	}
 	const Node2D *node = Object::cast_to<Node2D>(obj);
-	if (node == nullptr || !node->is_inside_tree() || node->is_queued_for_deletion()) {
-		return false;
+	if (node == nullptr || node->is_queued_for_deletion()) {
+		return ANCHOR_LOST;
 	}
-	r_frame = node->get_global_transform();
-	return transform_is_sane2d(r_frame);
+	if (!node->is_inside_tree()) {
+		return ANCHOR_HOLD; // a reparent across frames: ride it again once it is back
+	}
+	if (const PatternSpawner2D *sp = Object::cast_to<PatternSpawner2D>(obj)) {
+		r_frame = sp->get_shot_frame();
+		r_offset = sp->resolve_spawn_offset_global();
+	} else {
+		r_frame = node->get_global_transform();
+	}
+	if (!transform_is_sane2d(r_frame) || !BulletVolley2D::is_transform_invertible_safe(r_frame) || !r_offset.is_finite()) {
+		return ANCHOR_HOLD; // a degenerate pose for now (zero scale): keep the last one
+	}
+	return ANCHOR_FOLLOW;
 }
 
 void LaserVolley2D::sync_anchor_frame() {
@@ -331,15 +338,33 @@ void LaserVolley2D::sync_anchor_frame() {
 		return;
 	}
 	Transform2D frame;
-	if (resolve_anchor_frame(frame)) {
-		anchor_frame_now = frame;
-		return;
+	Vector2 offset;
+	switch (read_anchor(frame, offset)) {
+		case ANCHOR_FOLLOW:
+			if (anchor_holding) {
+				// Back from a hold: the jump to the anchor's new pose is never
+				// drawn as travel.
+				anchor_holding = false;
+				for (Beam &b : beams) {
+					b.snap_history = true;
+				}
+			}
+			anchor_frame_now = frame;
+			anchor_offset_now = offset;
+			return;
+		case ANCHOR_HOLD:
+			anchor_holding = true; // the beams keep the last frame
+			return;
+		case ANCHOR_LOST:
+			break;
 	}
 	// Lost: every beam stays where it is now, fired from there.
 	for (Beam &b : beams) {
 		b.slot = Transform2D(b.aim, b.muzzle);
 	}
 	following = false;
+	anchor_holding = false;
+	anchor_offset_now = Vector2();
 }
 
 bool LaserVolley2D::target_position(const Beam &b, Vector2 &r_pos) const {
@@ -536,19 +561,23 @@ void LaserVolley2D::set_anchor(Node2D *anchor) {
 	}
 	// The beams keep their current pose; from now on they ride `anchor`.
 	Transform2D frame;
+	Vector2 offset;
 	for (Beam &b : beams) {
 		Transform2D now(b.angle, b.muzzle);
 		b.slot = now;
 	}
 	anchor_id = anchor != nullptr ? anchor->get_instance_id() : 0;
 	following = false;
-	if (anchor_id != 0 && resolve_anchor_frame(frame)) {
+	anchor_holding = false;
+	anchor_offset_now = Vector2();
+	if (anchor_id != 0 && read_anchor(frame, offset) == ANCHOR_FOLLOW) {
 		const Transform2D inv = frame.affine_inverse();
 		for (Beam &b : beams) {
-			b.slot = inv * b.slot;
+			b.slot = inv * Transform2D(b.slot.columns[0], b.slot.columns[1], b.slot.columns[2] - offset);
 			b.sweep = 0.0;
 		}
 		anchor_frame_now = frame;
+		anchor_offset_now = offset;
 		following = true;
 	}
 }

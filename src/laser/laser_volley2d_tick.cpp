@@ -190,7 +190,11 @@ void LaserVolley2D::update_beam_geometry(Beam &b, double delta) {
 	// The muzzle (and the pattern direction): the slot on the anchor's frame
 	// (read once per tick: sync_anchor_frame) while following, else where it
 	// was fired.
-	const Transform2D pose = following ? anchor_frame_now * b.slot : b.slot;
+	Transform2D pose = b.slot;
+	if (following) {
+		pose = anchor_frame_now * b.slot;
+		pose.columns[2] += anchor_offset_now;
+	}
 	const real_t pattern_angle = (real_t)pose.columns[0].angle();
 	const bool is_beam = d->type == LaserData2D::LASER_BEAM;
 	if (is_beam || !b.launched) {
