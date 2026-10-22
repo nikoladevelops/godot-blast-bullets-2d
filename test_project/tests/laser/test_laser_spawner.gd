@@ -509,3 +509,24 @@ func test_the_new_sources_gate_their_knobs_and_warn_when_empty() -> void:
 	assert_eq([LaserSpawner2D.LASER_TARGET_NODE_NAME, LaserSpawner2D.LASER_TARGET_NODE_CHILDREN], [5, 6], "serialized ids appended")
 	sp.laser_target_source = 7
 	expect_error_sequence(["LaserSpawner2D: laser_target_source must be 0 (None), 1 (Node Group), 2 (Node Path), 3 (Mouse), 4 (Global Position), 5 (Node Name) or 6 (Node Children), keeping the old value."])
+
+
+## Every beam stays where it fired when the spawner it rode is gone: a lost
+## anchor converts EVERY beam to its world pose, never only the first (the
+## others used to fall back to their spawner-local slot, near the origin).
+func test_every_beam_keeps_its_pose_when_the_spawner_is_freed(policy: int = use_parameters([0, 1, 2])) -> void:
+	var sp := _spawner(H.make_laser(0.0, 0.0, 0.0, 0.5, 200.0), 4)
+	sp.position = Vector2(300, 300)
+	sp.orphaned_lasers = policy
+	var l := _fire(sp)
+	step_factory(1, DT)
+	var before: Array = []
+	for i in 4:
+		before.append(l.get_beam_start(i))
+	sp.free()
+	step_factory(2, DT)
+	var moved: Array = []
+	for i in 4:
+		if l.get_beam_start(i).distance_to(before[i]) > 0.01:
+			moved.append([i, before[i], l.get_beam_start(i)])
+	assert_eq(moved, [], "policy %d: every beam stays on its muzzle" % policy)

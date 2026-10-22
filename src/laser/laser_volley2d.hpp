@@ -243,6 +243,8 @@ private:
 	uint32_t life_id = 0;
 	uint64_t anchor_id = 0;
 	bool following = false;
+	// The anchor's frame for this tick (sync_anchor_frame, once per tick).
+	Transform2D anchor_frame_now;
 	// Baked looks (per life).
 	LaserAnim2D anim_body, anim_charge, anim_muzzle, anim_tip, anim_pierce, anim_wall;
 	std::vector<Ref<BulletGrazeZone2D>> graze_zones;
@@ -270,6 +272,9 @@ private:
 	bool reject_stale_handle(const char *fn) const;
 	Object *resolve_emitter() const;
 	bool resolve_anchor_frame(Transform2D &r_frame) const;
+	// Reads the anchor's frame once for every beam of this tick. A lost
+	// anchor turns EVERY beam's slot into its world pose and ends the follow.
+	void sync_anchor_frame();
 	bool target_position(const Beam &b, Vector2 &r_pos) const;
 	bool hitting_phase() const;
 	double phase_length(LaserPhase p) const;

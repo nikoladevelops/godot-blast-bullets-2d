@@ -188,19 +188,9 @@ void LaserVolley2D::update_beam_geometry(Beam &b, double delta) {
 		return;
 	}
 	// The muzzle (and the pattern direction): the slot on the anchor's frame
-	// while following, else where it was fired. A lost anchor leaves the
-	// beam where it was.
-	Transform2D pose = b.slot;
-	if (following) {
-		Transform2D frame;
-		if (resolve_anchor_frame(frame)) {
-			pose = frame * b.slot;
-		} else {
-			b.slot = Transform2D(b.aim, b.muzzle);
-			pose = b.slot;
-			following = false;
-		}
-	}
+	// (read once per tick: sync_anchor_frame) while following, else where it
+	// was fired.
+	const Transform2D pose = following ? anchor_frame_now * b.slot : b.slot;
 	const real_t pattern_angle = (real_t)pose.columns[0].angle();
 	const bool is_beam = d->type == LaserData2D::LASER_BEAM;
 	if (is_beam || !b.launched) {
@@ -876,6 +866,7 @@ void LaserVolley2D::tick(double delta) {
 		return;
 	}
 	// Geometry (no user code).
+	sync_anchor_frame();
 	const bool moving = d->type != LaserData2D::LASER_BEAM && phase >= PHASE_GROWING && phase <= PHASE_FADING;
 	for (Beam &b : beams) {
 		if (moving) {

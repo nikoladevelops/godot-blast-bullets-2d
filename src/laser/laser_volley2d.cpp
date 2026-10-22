@@ -129,6 +129,7 @@ void LaserVolley2D::begin_life(BulletFactory2D *p_factory, const Ref<LaserData2D
 		set_z_index(d->z_index);
 		set_texture_repeat(d->body_mode == LaserData2D::BODY_TILE ? TEXTURE_REPEAT_ENABLED : TEXTURE_REPEAT_PARENT_NODE);
 	}
+	anchor_frame_now = following ? anchor_frame : Transform2D();
 	// The first frame (before the first tick) already shows where it aims.
 	for (Beam &b : beams) {
 		update_beam_geometry(b, 0.0);
@@ -323,6 +324,22 @@ bool LaserVolley2D::resolve_anchor_frame(Transform2D &r_frame) const {
 	}
 	r_frame = node->get_global_transform();
 	return transform_is_sane2d(r_frame);
+}
+
+void LaserVolley2D::sync_anchor_frame() {
+	if (!following) {
+		return;
+	}
+	Transform2D frame;
+	if (resolve_anchor_frame(frame)) {
+		anchor_frame_now = frame;
+		return;
+	}
+	// Lost: every beam stays where it is now, fired from there.
+	for (Beam &b : beams) {
+		b.slot = Transform2D(b.aim, b.muzzle);
+	}
+	following = false;
 }
 
 bool LaserVolley2D::target_position(const Beam &b, Vector2 &r_pos) const {
@@ -531,6 +548,7 @@ void LaserVolley2D::set_anchor(Node2D *anchor) {
 			b.slot = inv * b.slot;
 			b.sweep = 0.0;
 		}
+		anchor_frame_now = frame;
 		following = true;
 	}
 }
