@@ -48,6 +48,11 @@ double sprite_anim_fps2d(double fps, bool &r_bad);
 // a non-finite duration counts 0 and sets r_bad; <= 0 counts 0.
 double sprite_frame_sec2d(double duration, double fps, bool &r_bad);
 
+// The size a frame draws at (Texture2D::get_size(): an AtlasTexture's region
+// plus its margin, a zero region its atlas's), or `fallback` when that is not
+// a finite positive size. Every system sizes its quads by this one rule.
+Vector2 frame_draw_size2d(const Ref<Texture2D> &tex, const Vector2 &fallback);
+
 // One baked animation: drawable frames and their seconds.
 struct SpriteAnim2D {
 	StringName name;
@@ -104,6 +109,8 @@ struct SpriteAnim2D {
 
 struct SpriteAnimBakeOptions2D {
 	// override_frame_color: whitened copies (alpha kept) of every frame.
+	// Otherwise every frame is what a mesh draw shows for it: the texture
+	// itself, an AtlasTexture's baked region (sprite/frame_texture_cache2d.hpp).
 	bool whiten = false;
 	// The factory's frame cache (null: build uncached).
 	FrameTextureCache2D *cache = nullptr;
@@ -115,11 +122,13 @@ struct SpriteAnimBakeReport2D {
 	std::vector<int> bad_duration_frames; // non-finite durations (counted 0), in order
 	int null_frame = -1; // the first frame without a texture: the bake failed there
 	bool whiten_unreadable = false; // a frame kept its original art under whiten
+	int atlas_unreadable_frame = -1; // the first AtlasTexture whose region cannot be read (drawn whole)
 };
 
 // The one frame loop: bakes animation `anim` (already resolved) of `frames`
 // into `out` under the timing rule, mapping every frame through the frame
-// cache. False when a frame has no texture (`out` untouched).
+// cache (an unreadable frame keeps its original texture). False when a frame
+// has no texture (`out` untouched).
 bool bake_sprite_animation2d(const Ref<SpriteFrames> &frames, const StringName &anim, const SpriteAnimBakeOptions2D &options, SpriteAnim2D &out, SpriteAnimBakeReport2D &report);
 
 } // namespace BlastBullets2D

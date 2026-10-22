@@ -109,19 +109,7 @@ static void fx_refresh_slot_color(BulletFactory2D::FXOneShotBake &bake, int slot
 }
 
 Vector2 BulletFactory2D::fx_quad_size_for_texture(const Ref<Texture2D> &tex) {
-	if (tex.is_valid()) {
-		if (const Ref<AtlasTexture> atlas = tex; atlas.is_valid()) {
-			const Vector2 region = atlas->get_region().size;
-			if (region.x > 0.0f && region.y > 0.0f) {
-				return region;
-			}
-		}
-		const Vector2 size = tex->get_size();
-		if (size.x > 0.0f && size.y > 0.0f) {
-			return size;
-		}
-	}
-	return Vector2(32, 32);
+	return frame_draw_size2d(tex, Vector2(32, 32));
 }
 
 MultiMeshInstance2D *BulletFactory2D::fx_create_shard(Node *parent, const Ref<Texture2D> &tex, const Vector2 &quad_size, const Ref<Material> &mat, const Color &col, int z, bool z_rel, int vis, int light, int instance_count, bool with_colors) {

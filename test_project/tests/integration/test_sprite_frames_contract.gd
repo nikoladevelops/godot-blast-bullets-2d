@@ -550,3 +550,115 @@ func test_whitened_frames_honor_the_margin_and_the_compressed_sheet() -> void:
 			problems.append("%s: %s at %s, not clear" % [name, img.get_pixelv(c[3]), c[3]])
 	assert_eq(problems, [], "whitened as drawn")
 	expect_no_errors()
+
+
+# ---- Drawing AtlasTexture frames (every consumer) --------------------------------------
+
+func test_every_consumer_draws_an_atlas_frame_as_its_region() -> void:
+	# A mesh draw hands the engine texture.get_rid(), and an AtlasTexture's
+	# RID is its whole atlas: every consumer draws the baked region instead.
+	var problems: Array = []
+	for kind in CONSUMERS:
+		var sheet := ImageTexture.create_from_image(_sheet_image())
+		var frame := _atlas(sheet, Rect2(2, 2, 3, 2))
+		var built := await _build(kind, _sf({"default": [frame]}), &"")
+		var shown := _drawn(kind, built)
+		if shown == null or shown == frame or shown == sheet:
+			problems.append("%s draws %s" % [kind, shown])
+			continue
+		var misses := _pixel_misses(shown.get_image(), Vector2i(3, 2), func(_x, _y): return Color.RED)
+		if not misses.is_empty():
+			problems.append("%s: %s" % [kind, misses])
+	assert_eq("\n".join(problems), "", "the red block, nothing else of the sheet")
+	expect_no_errors()
+
+
+func test_two_regions_of_one_sheet_animate_from_one_readback() -> void:
+	var sheet := ImageTexture.create_from_image(_sheet_image())
+	var stats: Dictionary = factory.debug_get_frame_cache_stats()
+	var d := _volley_data(_sf({"default": [_atlas(sheet, Rect2(2, 2, 3, 2)), _atlas(sheet, Rect2(5, 5, 3, 3))]}), &"")
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	assert_eq(factory.debug_get_frame_cache_stats().sheet_reads - stats.sheet_reads, 1, "one readback for both regions")
+	assert_eq(_pixel_misses(v.get_texture().get_image(), Vector2i(3, 2), func(_x, _y): return Color.RED), [], "frame 0: the red block")
+	factory.debug_advance_time(0.25) # 4 fps
+	assert_eq(_pixel_misses(v.get_texture().get_image(), Vector2i(3, 3), func(_x, _y): return Color.BLUE), [], "frame 1: a blue corner")
+	factory.debug_advance_time(0.25)
+	assert_eq(v.get_texture().get_image().get_size(), Vector2i(3, 2), "looping back to frame 0")
+	expect_no_errors()
+
+
+func test_a_frame_with_a_margin_sizes_the_quad_as_drawn() -> void:
+	# Trimmed sheets: the quad is the frame's whole box (Sprite2D's size),
+	# the region sits at its margin offset inside it.
+	var frame := _atlas(ImageTexture.create_from_image(_sheet_image()), Rect2(2, 2, 3, 2), Rect2(1, 2, 4, 5))
+	var d := _volley_data(_sf({"default": [frame]}), &"")
+	d.texture_size = Vector2.ZERO # derive it from the first frame
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	assert_eq((v.multimesh.mesh as QuadMesh).size, Vector2(7, 7), "the bullet quad")
+	assert_eq(v.get_texture().get_size(), Vector2(7, 7), "the baked box")
+	var built := await _build(MANUAL, _sf({"default": [frame]}), &"")
+	var shard: MultiMeshInstance2D = built.shards[0]
+	assert_eq((shard.multimesh.mesh as QuadMesh).size, Vector2(7, 7), "an effect shard's quad")
+	var pickup := BulletPickupData2D.new()
+	pickup.sprite_frames = _sf({"default": [frame]})
+	assert_eq(pickup.get_volley_data().texture_size, Vector2(7, 7), "a pickup's size")
+	expect_no_errors()
+
+
+func test_an_unreadable_atlas_frame_draws_its_original_with_one_warning() -> void:
+	# The region is outside its atlas: nothing to bake; the frame draws as it
+	# is (its whole atlas), and the data is reported once, never per spawn.
+	var problems: Array = []
+	for kind in CONSUMERS:
+		var frame := _atlas(ImageTexture.create_from_image(_sheet_image()), Rect2(6, 6, 4, 4))
+		var sf := _sf({"default": [frame]})
+		for shot in 2:
+			var built := await _build(kind, sf, &"")
+			if _drawn(kind, built) != frame:
+				problems.append("%s draws %s" % [kind, _drawn(kind, built)])
+		expect_warning_sequence([PREFIXES[kind] + ": animation 'default' frame 0 is an AtlasTexture whose region cannot be read, drawing its whole atlas."], kind)
+	assert_eq("\n".join(problems), "", "the original frame")
+	expect_no_errors()
+
+
+func test_a_pooled_volley_never_keeps_a_previous_life_frames() -> void:
+	var plain := _tex(4, 4, Color.GREEN)
+	var atlas_data := _volley_data(_sf({"default": [_atlas(ImageTexture.create_from_image(_sheet_image()), Rect2(2, 2, 3, 2))]}), &"")
+	var v: BulletVolley2D = factory.spawn_volley(atlas_data)
+	var baked := v.get_texture()
+	v.disable_bullet(0)
+	await idle(1)
+	var again: BulletVolley2D = factory.spawn_volley(_volley_data(_sf({"default": [plain]}), &""))
+	assert_eq(again, v, "the pooled volley is reused")
+	assert_eq(again.get_texture(), plain, "the plain frame draws itself (identity kept)")
+	again.disable_bullet(0)
+	await idle(1)
+	var third: BulletVolley2D = factory.spawn_volley(atlas_data)
+	assert_eq(third.get_texture(), baked, "the cached region again, no rebuild")
+	expect_no_errors()
+
+
+func test_populating_the_pool_reads_the_frames_ahead_of_the_first_shot() -> void:
+	var d := _volley_data(_sf({"default": [_atlas(ImageTexture.create_from_image(_sheet_image()), Rect2(2, 2, 3, 2))]}), &"")
+	factory.populate_bullets_pool(VolleyPoolKey2D.make(1, PhysicsServer2D.SHAPE_CIRCLE), d, 1) # H data: a circle shape
+	var warm: Dictionary = factory.debug_get_frame_cache_stats()
+	assert_eq(warm.builds, 1, "the region baked while populating")
+	factory.spawn_volley(d)
+	assert_eq(factory.debug_get_frame_cache_stats().sheet_reads, warm.sheet_reads, "the first shot reads nothing")
+	expect_no_errors()
+
+
+func test_a_tiled_laser_body_repeats_its_region_not_its_sheet() -> void:
+	var d := H.make_laser(0.0, 0.0, 0.0, 0.0, 200.0)
+	d.body_frames = _sf({"default": [_atlas(ImageTexture.create_from_image(_sheet_image()), Rect2(0, 0, 4, 2))]})
+	d.body_mode = LaserData2D.BODY_TILE
+	var t: Array[Transform2D] = [Transform2D.IDENTITY]
+	var l := factory.spawn_laser(d, t)
+	step_factory(1, DT)
+	var uvs: PackedVector2Array = l.debug_get_body_mesh(1.0)["uvs"]
+	assert_almost_eq(uvs[2].x - uvs[0].x, 200.0 / 4.0, 0.0001, "one repeat per 4 px region (the sheet is 8 px wide)")
+	var body: Texture2D = l.debug_get_draw_state(1.0)[0]["body"]
+	assert_false(body is AtlasTexture, "a texture of its own: repeat wraps it, not the sheet")
+	var sheet := _sheet_image()
+	assert_eq(_pixel_misses(body.get_image(), Vector2i(4, 2), func(x, y): return sheet.get_pixel(x, y)), [], "the region's pixels")
+	expect_no_errors()

@@ -1,6 +1,7 @@
 #include "data/bullet_effect_layer_data2d.hpp"
 #include "core/transform_math2d.hpp"
 #include "core/variant_enum_cast2d.hpp"
+#include "core/warn_once2d.hpp"
 
 #include <godot_cpp/classes/image.hpp>
 #include <godot_cpp/classes/image_texture.hpp>
@@ -60,6 +61,9 @@ bool BulletEffectLayerData2D::bake_effect_animation(const StringName &anim, Fram
 	}
 	if (report.whiten_unreadable) {
 		UtilityFunctions::push_warning("BulletEffectLayerData2D: override_frame_color could not read a frame of '" + String(choice.anim) + "', keeping the original art for unreadable frames.");
+	}
+	if (report.atlas_unreadable_frame >= 0) {
+		WarnOnce2D::warn(sprite_frames->get_instance_id(), 27u, report.atlas_unreadable_frame, 1, anim_text + " frame " + String::num_int64(report.atlas_unreadable_frame) + " is an AtlasTexture whose region cannot be read, drawing its whole atlas.");
 	}
 	if (!baked_ok) {
 		return false;

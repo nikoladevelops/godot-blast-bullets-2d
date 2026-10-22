@@ -192,8 +192,7 @@ Ref<BulletVolleyData2D> BulletPickupData2D::get_volley_data() {
 			usable = true;
 			played = choice.anim;
 			if (size.x <= 0.0 || size.y <= 0.0) {
-				Ref<Texture2D> first = frames->get_frame_texture(played, 0);
-				size = first.is_valid() ? first->get_size() : Vector2(16, 16);
+				size = frame_draw_size2d(frames->get_frame_texture(played, 0), Vector2(16, 16));
 			}
 		} else {
 			const StringName shown = chosen_empty ? played : (frames->has_animation(default_name) ? default_name : StringName(frames->get_animation_names()[0]));

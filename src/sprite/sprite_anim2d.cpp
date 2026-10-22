@@ -63,6 +63,16 @@ double sprite_frame_sec2d(double duration, double fps, bool &r_bad) {
 	return duration / fps;
 }
 
+Vector2 frame_draw_size2d(const Ref<Texture2D> &tex, const Vector2 &fallback) {
+	if (tex.is_valid()) {
+		const Vector2 size = tex->get_size();
+		if (size.is_finite() && size.x > 0.0f && size.y > 0.0f) {
+			return size;
+		}
+	}
+	return fallback;
+}
+
 void SpriteAnim2D::clear() {
 	name = StringName();
 	frames.clear();
@@ -127,7 +137,15 @@ bool bake_sprite_animation2d(const Ref<SpriteFrames> &frames, const StringName &
 			report.bad_duration_frames.push_back(i);
 		}
 		if (!options.whiten) {
-			baked.frames.push_back(tex);
+			const Ref<Texture2D> shown = options.cache != nullptr ? options.cache->drawable(tex, reader) : FrameTextureCache2D::build_drawable(tex, reader);
+			if (shown.is_valid()) {
+				baked.frames.push_back(shown);
+			} else {
+				if (report.atlas_unreadable_frame < 0) {
+					report.atlas_unreadable_frame = i;
+				}
+				baked.frames.push_back(tex);
+			}
 			continue;
 		}
 		const Ref<Texture2D> white = options.cache != nullptr ? options.cache->whitened(tex, reader) : FrameTextureCache2D::build_whitened(tex, reader);

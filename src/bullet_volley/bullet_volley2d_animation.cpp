@@ -286,6 +286,10 @@ bool BulletVolley2D::rebuild_sprite_animation(const Ref<SpriteFrames> &p_sprite_
 	if (report.whiten_unreadable) {
 		UtilityFunctions::push_warning("BulletVolley2D: override_frame_color could not read a frame of '" + String(name) + "', keeping the original art for unreadable frames.");
 	}
+	if (report.atlas_unreadable_frame >= 0) {
+		// The data, not the spawn: once per SpriteFrames and frame.
+		WarnOnce2D::warn(p_sprite_frames->get_instance_id(), 27u, report.atlas_unreadable_frame, 0, anim_text + " frame " + String::num_int64(report.atlas_unreadable_frame) + " is an AtlasTexture whose region cannot be read, drawing its whole atlas.");
+	}
 	if (!baked_ok) {
 		return false; // previous animation untouched
 	}
@@ -367,21 +371,8 @@ Vector2 BulletVolley2D::resolve_quad_size(const Ref<SpriteFrames> &p_sprite_fram
 	if (!resolve_sprite_animation_quiet(p_sprite_frames, p_animation, anim)) {
 		return Vector2(32, 32);
 	}
-	if (p_sprite_frames->get_frame_count(anim) > 0) {
-		if (const Ref<Texture2D> tex = p_sprite_frames->get_frame_texture(anim, 0); tex.is_valid()) {
-			if (const Ref<AtlasTexture> atlas = tex; atlas.is_valid()) {
-				const Vector2 region = atlas->get_region().size;
-				if (region.is_finite() && region.x > 0.0f && region.y > 0.0f) {
-					return region;
-				}
-			}
-			const Vector2 size = tex->get_size();
-			if (size.is_finite() && size.x > 0.0f && size.y > 0.0f) {
-				return size;
-			}
-		}
-	}
-	return Vector2(32, 32);
+	// The first frame's size as drawn (an AtlasTexture's region plus margin).
+	return frame_draw_size2d(p_sprite_frames->get_frame_texture(anim, 0), Vector2(32, 32));
 }
 
 } // namespace BlastBullets2D

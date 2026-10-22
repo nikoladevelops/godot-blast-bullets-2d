@@ -64,6 +64,9 @@ static void bake_laser_animation(const Ref<SpriteFrames> &sprite_frames, int slo
 	if (report.null_frame >= 0 && first_report(3, report.null_frame)) {
 		UtilityFunctions::push_error(anim_text + " frame " + String::num_int64(report.null_frame) + " has null texture.");
 	}
+	if (report.atlas_unreadable_frame >= 0 && first_report(4, report.atlas_unreadable_frame)) {
+		UtilityFunctions::push_warning(anim_text + " frame " + String::num_int64(report.atlas_unreadable_frame) + " is an AtlasTexture whose region cannot be read, drawing its whole atlas.");
+	}
 	if (!baked_ok) {
 		out.clear();
 	}
