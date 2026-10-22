@@ -378,3 +378,28 @@ func test_a_laser_reports_a_sprite_frames_problem_once() -> void:
 		"LaserData2D.tip_frames: animation 'default' has invalid speed, using 1 fps.",
 		"LaserData2D.tip_frames: animation 'default' frame 1 has null texture.",
 	], "another property reports its own")
+
+
+func test_a_volley_without_sprite_frames_spawns_silently() -> void:
+	# Frames are optional (a mesh or a shader draws): the spawn validation
+	# warns once when nothing draws; the spawn itself never errors.
+	var d := H.make_volley_data(1, 0.0, 30.0)
+	d.sprite_frames = null
+	d.mesh = QuadMesh.new()
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	expect_no_errors("no animation, no error")
+	assert_eq([v.get_texture() == null, v.get_sprite_frame_count(), v.get_sprite_frames() == null], [true, 0, true], "nothing baked")
+	# Pool neutrality both ways: a framed life, then a frameless one.
+	var a := _tex(4, 4, Color.RED)
+	var framed := _volley_data(_sf({"default": [a]}), &"")
+	factory.free_active_bullets()
+	await idle(1)
+	v = factory.spawn_volley(framed)
+	assert_eq(v.get_texture(), a, "a framed life draws its frame")
+	v.disable_bullet(0) # the last bullet out pools the volley
+	await idle(1)
+	var again: BulletVolley2D = factory.spawn_volley(d)
+	assert_eq(again, v, "the pooled volley is reused")
+	assert_eq([again.get_texture() == null, again.get_sprite_frame_count(), again.get_sprite_frames() == null], [true, 0, true], "the previous life's frames are gone")
+	expect_no_errors()
+

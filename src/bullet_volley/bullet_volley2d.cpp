@@ -328,7 +328,15 @@ void BulletVolley2D::begin_life(const BulletVolleyData2D &data, uint64_t new_own
 	// cause. Appearance snapshot first: the rebuild whitens frames when the
 	// data asks for it, and the fade half starts transparent when fading in.
 	snapshot_appearance_from_data(data);
-	rebuild_sprite_animation(data.sprite_frames, data.animation);
+	if (data.sprite_frames.is_valid()) {
+		rebuild_sprite_animation(data.sprite_frames, data.animation);
+	} else {
+		// Frames are optional (a mesh or a material draws): the volley draws
+		// untextured, silently (the spawn validation warns when nothing draws).
+		anim_source.unref();
+		anim.clear();
+		set_texture(Ref<Texture2D>());
+	}
 	seed_motion_features(data);
 	life_released = false;
 }
