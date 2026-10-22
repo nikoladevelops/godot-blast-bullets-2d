@@ -331,3 +331,38 @@ func test_show_pattern_preview_at_runtime_wakes_the_loop() -> void:
 	assert_false(sp.is_processing(), "nothing to do: asleep")
 	sp.show_pattern_preview = true
 	assert_true(sp.is_processing(), "the preview wakes the loop")
+
+
+## show_preview_during_runtime switched off at runtime takes the preview down
+## (the rebuild used to bail out before removing it: it stayed drawn).
+func test_runtime_preview_off_takes_the_preview_down() -> void:
+	var sp := make_preview_spawner()
+	await idle(6)
+	assert_eq(_layers(sp).size(), 2, "drawn")
+	sp.show_preview_during_runtime = false
+	assert_eq(_layers(sp), [], "gone at once")
+	assert_eq(sp.debug_get_preview_dot_points().size(), 0, "no dots left to read")
+
+
+## A spawner that leaves the tree takes its preview off an external
+## generator (the holder under the generator stayed drawn); back in the tree
+## it rebuilds it.
+func test_leaving_the_tree_takes_the_preview_off_an_external_generator(how: String = use_parameters(["remove", "free"])) -> void:
+	var gen: Node2D = add(Node2D.new())
+	gen.position = Vector2(200, 0)
+	var sp := make_preview_spawner()
+	sp.set_transforms_generator(gen)
+	await idle(6)
+	assert_eq(_layers(gen).size(), 2, "drawn under the generator")
+	if how == "remove":
+		var parent := sp.get_parent()
+		parent.remove_child(sp)
+		await idle(1)
+		assert_eq(_layers(gen), [], "taken down with the spawner")
+		parent.add_child(sp)
+		await idle(6)
+		assert_eq(_layers(gen).size(), 2, "back in the tree: drawn again")
+	else:
+		sp.free()
+		await idle(1)
+		assert_eq(_layers(gen), [], "taken down with the spawner")

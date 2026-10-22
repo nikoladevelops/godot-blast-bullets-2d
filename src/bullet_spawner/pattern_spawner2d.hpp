@@ -1405,6 +1405,12 @@ protected:
 	uint64_t preview_dots_layer_id = 0;
 	uint64_t preview_arrows_layer_id = 0;
 	void set_preview_nodes(Node2D *holder, PatternPreviewLayer2D *dots, PatternPreviewLayer2D *arrows);
+	// This spawner's preview holder under `parent` (found by owner meta), or null.
+	Node2D *own_preview_holder_under(Node *parent) const;
+	static void delete_preview_holder(Node *holder);
+	// Deletes every holder this spawner owns (itself, its generator, the
+	// previously tracked base) and forgets the layers.
+	void remove_own_preview_holders();
 	PatternPreviewLayer2D *live_preview_dots() const {
 		return is_tracked_node_alive(preview_dots_layer, preview_dots_layer_id) ? preview_dots_layer : nullptr;
 	}

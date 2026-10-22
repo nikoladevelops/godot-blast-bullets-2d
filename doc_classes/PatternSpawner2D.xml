@@ -1394,7 +1394,7 @@
 			Shows one dot and facing arrow per bullet in the editor. Follows the generator live. Never saved to the scene.
 		</member>
 		<member name="show_preview_during_runtime" type="bool" setter="set_show_preview_during_runtime" getter="get_show_preview_during_runtime" default="false">
-			Also shows the preview while the game runs. Off by default.
+			Also shows the preview while the game runs. Off by default. Switched off at runtime, the preview goes down at once; a spawner that leaves the tree takes its preview off an external [member transforms_generator] too (rebuilt when it enters again).
 		</member>
 		<member name="sound_effects" type="Array" setter="set_sound_effects" getter="get_sound_effects" default="[]">
 			Stacked [BulletSoundData2D] entries (nulls allowed, skipped). Each entry plays one of its [member BulletSoundData2D.streams] when its trigger fires, subject to its own limits. On Shot and On Telegraph entries offer from the spawner itself; the rest fire from the volley.

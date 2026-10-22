@@ -1036,7 +1036,14 @@ void PatternSpawner2D::_notification(int p_what) {
 		// volleys, burst chains, telegraphs and pattern lists are KEPT: they
 		// pause with _process and resume on re-entry. Only the preview gizmo
 		// is dropped (the holder is a child and frees itself; only null the
-		// pointers, never memdelete detached nodes here).
+		// pointers, never memdelete detached nodes here). A holder under an
+		// external generator stays in the tree, though: hide it now and free
+		// it at the end of the frame (its parent may be busy removing
+		// children); a re-entry builds a new one.
+		if (preview_holder != nullptr && is_tracked_node_alive(preview_holder, preview_holder_id) && !is_ancestor_of(preview_holder) && !preview_holder->is_queued_for_deletion()) {
+			preview_holder->set_visible(false);
+			preview_holder->queue_free();
+		}
 		set_preview_nodes(nullptr, nullptr, nullptr);
 		graze_preview_layer = nullptr;
 		graze_preview_layer_id = 0;

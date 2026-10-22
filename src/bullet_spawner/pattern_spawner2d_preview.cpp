@@ -488,6 +488,56 @@ void PatternSpawner2D::set_preview_pose(double spin_angle_degrees) {
 // pointer: everything is freshly resolved from paths here.
 // Deferred flush for editor-coalesced rebuilds (see rebuild_preview): runs
 // the build synchronously exactly once, bypassing re-queue.
+// Holders are found by OWNER, never by name: spawners sharing one generator
+// each keep their own holder under it, and one turning its preview off
+// deletes only its own (a name lookup deleted the other's holder under its
+// live pointers). A holder already queued for deletion (taken down on
+// EXIT_TREE) is never reused.
+Node2D *PatternSpawner2D::own_preview_holder_under(Node *parent) const {
+	if (parent == nullptr) {
+		return nullptr;
+	}
+	const uint64_t self_id = get_instance_id();
+	for (int64_t i = 0, n = parent->get_child_count(true); i < n; ++i) {
+		Node2D *child = Object::cast_to<Node2D>(parent->get_child(i, true));
+		if (child != nullptr && !child->is_queued_for_deletion() && child->has_meta(PREVIEW_OWNER_META_KEY) && (uint64_t)(int64_t)child->get_meta(PREVIEW_OWNER_META_KEY) == self_id) {
+			return child;
+		}
+	}
+	return nullptr;
+}
+
+// memdelete (not queue_free) is REQUIRED on the rebuild path: the caller
+// recreates the holder immediately, and a queued node would still be found
+// until the flush. Preview paths only (never physics bodies), so immediate
+// deletion is safe.
+void PatternSpawner2D::delete_preview_holder(Node *holder) {
+	if (Node *parent = holder->get_parent()) {
+		parent->remove_child(holder);
+	}
+	memdelete(holder);
+}
+
+void PatternSpawner2D::remove_own_preview_holders() {
+	Node2D *effective_base = is_inside_tree() ? get_effective_generator() : nullptr;
+	auto remove_from = [&](Node *parent) {
+		if (Node2D *live = own_preview_holder_under(parent)) {
+			delete_preview_holder(live);
+		}
+	};
+	remove_from(this);
+	if (effective_base != nullptr && effective_base != this) {
+		remove_from(effective_base);
+	}
+	// The generator may have been retargeted earlier: also clear a holder
+	// left under the previously tracked base.
+	if (tracked_base != nullptr && tracked_base != this && tracked_base != effective_base &&
+			is_tracked_node_alive(tracked_base, tracked_base_id)) {
+		remove_from(tracked_base);
+	}
+	set_preview_nodes(nullptr, nullptr, nullptr);
+}
+
 void PatternSpawner2D::_do_queued_preview_rebuild() {
 	preview_rebuild_queued = false;
 	if (!preview_allowed_here()) {
@@ -586,8 +636,12 @@ void PatternSpawner2D::snapshot_preview_sources() {
 void PatternSpawner2D::rebuild_preview() {
 	// Preview may exist in the editor (toggle decides) and at runtime only
 	// when the user opted in via show_preview_during_runtime. Never before
-	// the node is inside the tree (scene load sets properties first).
+	// the node is inside the tree (scene load sets properties first). A
+	// runtime preview switched off goes down (it used to stay drawn).
 	if (!preview_allowed_here()) {
+		if (is_inside_tree() && !preview_rebuild_in_progress) {
+			remove_own_preview_holders();
+		}
 		return;
 	}
 	// Editor coalescing: slider drags and scene-load restoration fire dozens
@@ -629,34 +683,9 @@ void PatternSpawner2D::rebuild_preview() {
 		preview_rebuild_in_progress = false;
 		return;
 	}
-	// Holders are found by OWNER, never by name: spawners sharing one
-	// generator each keep their own holder under it, and one turning its
-	// preview off deletes only its own (a name lookup deleted the other's
-	// holder under its live pointers).
 	const uint64_t self_id = get_instance_id();
-	auto own_holder_under = [&](Node *parent) -> Node2D * {
-		if (parent == nullptr) {
-			return nullptr;
-		}
-		for (int64_t i = 0, n = parent->get_child_count(true); i < n; ++i) {
-			Node2D *child = Object::cast_to<Node2D>(parent->get_child(i, true));
-			if (child != nullptr && child->has_meta(PREVIEW_OWNER_META_KEY) && (uint64_t)(int64_t)child->get_meta(PREVIEW_OWNER_META_KEY) == self_id) {
-				return child;
-			}
-		}
-		return nullptr;
-	};
-	// memdelete (not queue_free) is REQUIRED here: the caller recreates the
-	// holder immediately below, and a queued node would still be found until
-	// the flush. This runs on the preview path only (never physics
-	// callbacks), so immediate deletion is safe.
-	auto delete_holder = [](Node *holder) {
-		if (Node *parent = holder->get_parent()) {
-			parent->remove_child(holder);
-		}
-		memdelete(holder);
-	};
-	// Returns true when something was removed.
+	auto own_holder_under = [&](Node *parent) { return own_preview_holder_under(parent); };
+	auto delete_holder = [](Node *holder) { delete_preview_holder(holder); };
 	auto remove_holder_from = [&](Node *parent) -> bool {
 		Node2D *live = own_holder_under(parent);
 		if (live == nullptr) {
@@ -689,18 +718,8 @@ void PatternSpawner2D::rebuild_preview() {
 		}
 	};
 	if (!show_pattern_preview) {
-		remove_holder_from(this);
-		if (effective_base != this) {
-			remove_holder_from(effective_base);
-		}
-		// The generator may have been retargeted earlier: also clear a holder
-		// left under the previously tracked base.
-		if (tracked_base != nullptr && tracked_base != this && tracked_base != effective_base &&
-				is_tracked_node_alive(tracked_base, tracked_base_id)) {
-			remove_holder_from(tracked_base);
-		}
-		set_preview_nodes(nullptr, nullptr, nullptr);
 		preview_rebuild_in_progress = false;
+		remove_own_preview_holders();
 		return;
 	}
 	// Preview lives under the effective generator so patterns are drawn where
