@@ -491,7 +491,7 @@
 			<param index="0" name="volley" type="BulletVolley2D" />
 			<param index="1" name="volley_index" type="int" />
 			<description>
-				Fired for every homing/orbiting volley right after it is configured, before [signal volley_fired]. Only fires when homing or orbiting is enabled.
+				Fired for every homing/orbiting volley right after it is configured: in a shot before [signal volley_fired] ([param volley_index] = that shot's number), and when homing configures a volley outside a shot (split children, [method apply_to_live_volleys], a parked volley's wake), where [param volley_index] is the number the next shot will get. Only fires when homing or orbiting is enabled.
 			</description>
 		</signal>
 	</signals>
