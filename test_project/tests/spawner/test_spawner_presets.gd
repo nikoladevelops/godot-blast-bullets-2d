@@ -115,3 +115,27 @@ func test_custom_is_a_no_op_and_out_of_range_fails_loud() -> void:
 		sp.apply_pattern_preset(bad)
 		expect_error_sequence(["BulletSpawner2D::apply_pattern_preset: preset out of range, nothing applied."])
 	assert_eq([sp.pattern_source, sp.helper_bullets_amount, sp.helper_star_points], [BulletSpawner2D.PATTERN_FROM_HELPER_STAR, 7, 6], "a rejected preset applies nothing")
+
+
+## A preset is clean: the spin angle an earlier spin left goes back to 0 too,
+## so the same preset always fires the same pattern. A pattern-list entry
+## with a preset stays a temporary override: it fires clean and the
+## spawner's own spin angle comes back afterwards.
+func test_a_preset_resets_the_spin_angle_and_list_entries_restore_it() -> void:
+	var fresh := make_spawner()
+	fresh.apply_pattern_preset(BulletPatterns2D.PATTERN_PRESET_RADIAL_DENSE)
+	var clean: Array = fresh.collect_spawn_transforms()
+	var sp := make_spawner()
+	sp.set_spin_angle_deg(137.0)
+	sp.apply_pattern_preset(BulletPatterns2D.PATTERN_PRESET_RADIAL_DENSE)
+	assert_eq(sp.get_spin_angle_deg(), 0.0, "the angle is reset")
+	assert_eq(sp.collect_spawn_transforms(), clean, "the same pattern as a fresh spawner's")
+	sp.apply_pattern_preset(BulletPatterns2D.PATTERN_PRESET_RADIAL_SPARSE)
+	sp.set_spin_angle_deg(45.0)
+	var fired: Array = []
+	sp.volley_fired.connect(func(v: BulletVolley2D, _n: int) -> void: fired.append(v.get_bullet_transform(0).origin), CONNECT_ONE_SHOT)
+	assert_true(sp.shoot_once_with({"preset": BulletPatterns2D.PATTERN_PRESET_RADIAL_DENSE}), "an entry with a preset fires")
+	assert_eq(fired.size(), 1, "one volley")
+	if fired.size() == 1:
+		assert_true((fired[0] as Vector2).is_equal_approx((clean[0] as Transform2D).origin), "fired clean: %s vs %s" % [fired[0], (clean[0] as Transform2D).origin])
+	assert_eq(sp.get_spin_angle_deg(), 45.0, "the spawner's own angle is back")

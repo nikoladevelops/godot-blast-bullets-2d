@@ -256,6 +256,10 @@ void PatternSpawner2D::apply_pattern_preset(int preset) {
 	// preset always gives the same pattern. One preview rebuild at the end.
 	begin_pattern_batch();
 	reset_pattern_knobs_to_defaults();
+	// Clean includes where an earlier spin left the pattern: the same preset
+	// always fires the same pattern.
+	spin_angle_deg = 0.0;
+	spin_time_sec = 0.0;
 	// The preset table lives in the patterns module (pattern_presets2d.cpp);
 	// ids are range-checked above, so every remaining id writes.
 	PatternPresetResult2D applied;

@@ -1789,8 +1789,13 @@ bool PatternSpawner2D::fire_pattern_list_override(const Variant &entry, const St
 	// other knobs stick.
 	begin_pattern_batch();
 	const Dictionary saved = snapshot_pattern_state();
+	// The spin angle is state a preset entry resets: it comes back too.
+	const double saved_angle = spin_angle_deg;
+	const double saved_spin_time = spin_time_sec;
 	bool fired = false;
 	if (apply_pattern_list_entry(entry, caller)) {
+		const double applied_angle = spin_angle_deg;
+		const double applied_spin_time = spin_time_sec;
 		const Dictionary applied = snapshot_pattern_state();
 		Dictionary changed;
 		const Array keys = saved.keys();
@@ -1802,6 +1807,13 @@ bool PatternSpawner2D::fire_pattern_list_override(const Variant &entry, const St
 		}
 		fired = shoot_once();
 		restore_pattern_state(changed);
+		// Only what the entry changed goes back (a handler's own edit sticks).
+		if (applied_angle != saved_angle && spin_angle_deg == applied_angle) {
+			spin_angle_deg = saved_angle;
+		}
+		if (applied_spin_time != saved_spin_time && spin_time_sec == applied_spin_time) {
+			spin_time_sec = saved_spin_time;
+		}
 	}
 	end_pattern_batch();
 	return fired;
