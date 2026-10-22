@@ -408,3 +408,33 @@ func test_get_owner_spawner_names_only_a_live_owner() -> void:
 	assert_true(pooled.is_pooled(), "pooled")
 	assert_null(pooled.get_owner_spawner(), "a pooled volley has none")
 	adopter.free()
+
+
+## Freed from user code inside a factory operation (an attachment callback of
+## an area clear), a spawner's Clear / Remove policy still applies, right
+## after the operation (it used to fall back to Keep Flying while busy).
+func test_a_spawner_freed_inside_a_factory_operation_still_applies_its_policy(policy: int = use_parameters([BulletSpawner2D.ORPHANED_VOLLEYS_CLEAR, BulletSpawner2D.ORPHANED_VOLLEYS_REMOVE])) -> void:
+	AttachmentHookProbe2D.clear_hook()
+	var probe := AttachmentHookProbe2D.new()
+	var scene := PackedScene.new()
+	assert_eq(scene.pack(probe), OK, "probe scene packs")
+	probe.free()
+	var doomed := _spawner(policy)
+	var owned := _shoot(doomed)
+	owned.teleport_bullet(0, Vector2(0, 300)) # outside the clear below
+	var trigger_data := H.make_volley_data(1, 0.0, 30.0)
+	trigger_data.shared_bullet_attachment = scene
+	factory.spawn_volley(trigger_data) # at the origin, inside the clear
+	await idle(1)
+	AttachmentHookProbe2D.hook_on = ["disable"]
+	AttachmentHookProbe2D.hook = func() -> void:
+		if is_instance_valid(doomed):
+			doomed.free()
+	factory.clear_bullets_in_circle(Vector2.ZERO, 20.0)
+	assert_false(is_instance_valid(doomed), "freed inside the clear")
+	for i in 5:
+		await idle(1)
+		if not owned.is_bullet_status_enabled(0):
+			break
+	assert_false(owned.is_bullet_status_enabled(0), "its bullets still go, right after the operation")
+	AttachmentHookProbe2D.clear_hook()

@@ -475,8 +475,13 @@ void BulletFactory2D::apply_orphan_policy(uint64_t owner_spawner_id, int policy,
 			clear_bullets_owned_by(owner_spawner_id, policy == 2, SPLIT_CAUSE_NONE);
 			return;
 		}
-		// Busy (freed from inside a sweep callback): fall back to keeping
-		// them flying, so the orphan warning still explains what happened.
+		// Busy (freed from user code inside a factory operation): the
+		// cleanup runs right after it, on the structural queue. Until then
+		// they are silent orphans (the warning names the spawner).
+		const bool fire_clear_effects = policy == 2;
+		queue_structural_call([this, owner_spawner_id, fire_clear_effects]() {
+			clear_bullets_owned_by(owner_spawner_id, fire_clear_effects, SPLIT_CAUSE_NONE);
+		});
 		policy = 0;
 	}
 	for (BulletVolley2D *volley : all_volleys) {
