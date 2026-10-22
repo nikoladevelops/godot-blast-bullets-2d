@@ -857,6 +857,9 @@ public:
 	double roll_timing_range(double base, double max_value, uint64_t channel) const;
 	double next_burst_interval_sec() const;
 	double next_telegraph_sec() const;
+	// A shot warns first: telegraph on and a warning longer than 0 can be
+	// rolled (telegraph_sec, or a telegraph_max_sec above it).
+	bool telegraph_wanted() const;
 	void roll_spin_start_phase();
 	double roll_unit(uint32_t channel, uint64_t index) const;
 	// Debug readout of the yellow preview rings: one PackedVector2Array
@@ -1330,6 +1333,9 @@ protected:
 	// chain aborts with burst_finished instead of retrying forever.
 	// Reset on every success and every new chain.
 	int burst_consecutive_failures = 0;
+	// Set by shoot_once() when its shot spent the fire_n_volleys budget: an
+	// auto chain belongs to that budget and ends with it.
+	bool last_shot_spent_budget = false;
 	// True once the current burst chain has shown its telegraph: stops
 	// the expiry re-firing the warning in a loop instead of firing.
 	bool burst_telegraph_done = false;

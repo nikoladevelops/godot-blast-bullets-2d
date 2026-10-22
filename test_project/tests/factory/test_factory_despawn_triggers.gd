@@ -213,3 +213,31 @@ func test_trigger_ids_are_stable_and_validated() -> void:
 	assert_eq(sound.trigger, 12, "On Split (12) is accepted")
 	sound.trigger = 13
 	expect_errors_containing("BulletSoundData2D: trigger must be", 1, "13 is out of range")
+
+
+## A burst whose first-shot warning is refused (the muzzle outside) never
+## loses that warning: back inside, the first shot is telegraphed before it
+## fires, and the refused attempt waits a burst interval instead of retrying
+## on the very next frame.
+func test_a_burst_warning_refused_outside_is_given_once_inside() -> void:
+	var sp := _spawner(Vector2(900, 100))
+	sp.burst_enabled = true
+	sp.burst_count = 3
+	sp.burst_interval_sec = 0.1
+	sp.telegraph_enabled = true
+	sp.telegraph_sec = 0.1
+	var log: Array = []
+	sp.volley_telegraphed.connect(func(_aim) -> void: log.append("telegraph"))
+	sp.volley_fired.connect(func(_v, _n) -> void: log.append("shot"))
+	sp.begin_burst()
+	for i in 10:
+		await idle(1)
+		if not skipped.is_empty():
+			break
+	assert_eq(skipped, [&"outside_despawn_bounds"], "the warning is refused outside")
+	sp.position = Vector2(100, 100)
+	for i in 60:
+		await idle(1)
+		if log.size() >= 2:
+			break
+	assert_eq(log.slice(0, 2), ["telegraph", "shot"], "the first burst shot is warned before it fires")

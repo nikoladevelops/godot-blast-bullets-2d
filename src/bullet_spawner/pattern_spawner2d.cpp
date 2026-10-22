@@ -368,9 +368,14 @@ void PatternSpawner2D::set_burst_enabled(bool value) {
 	burst_enabled = value;
 	notify_property_list_changed(); // burst_* knobs gate on it
 	if (!value) {
+		// A running chain ends with its first-shot warning; a plain
+		// telegraphed shot (no chain) is not a burst's and keeps its warning.
+		const bool chain_warning = telegraph_pending && burst_shots_left > 0;
 		cancel_burst_chain();
-		telegraph_pending = false;
-		telegraph_time_left = 0.0;
+		if (chain_warning) {
+			telegraph_pending = false;
+			telegraph_time_left = 0.0;
+		}
 	} else if (is_inside_tree() && !Engine::get_singleton()->is_editor_hint()) {
 		set_loop_active(true);
 	}
@@ -702,6 +707,7 @@ bool PatternSpawner2D::shoot_once() {
 	// fail_early or the single clear-point, never a bare return.
 	shoot_once_reentrant_guard = true;
 	++g_shoot_once_nesting_depth;
+	last_shot_spent_budget = false;
 	auto fail_early = [&](const String &message, const StringName &skip_reason, bool with_signal) -> bool {
 		// Auto-fire repeats the same misconfiguration every interval: report
 		// it once until the configuration changes or a shot succeeds (manual
@@ -782,6 +788,7 @@ bool PatternSpawner2D::shoot_once() {
 		// Spent: the budget clears itself (volleys_remaining and a later
 		// resume_shooting() behave like an unlimited spawner again).
 		oneshot_volleys_left = -1;
+		last_shot_spent_budget = true;
 		pause_shooting();
 	}
 	// Exact-equality = transition only: further manual shots past the cap do
@@ -1340,7 +1347,7 @@ void PatternSpawner2D::run_frame(double delta) {
 			}
 			break;
 		}
-		if (telegraph_enabled && telegraph_sec > 0.0 && !telegraph_pending) {
+		if (telegraph_wanted() && !telegraph_pending) {
 			begin_telegraph(true);
 			if (cadence == cadence_serial && !shot_owner_dying()) {
 				shoot_time_left += next_shoot_interval_sec();
@@ -1422,9 +1429,17 @@ void PatternSpawner2D::begin_telegraph(bool auto_started) {
 	}
 	// Snapshot the aim for the warning signal; the actual fire re-collects,
 	// so this is advisory (preview/telegraph visuals), never stale logic.
+	// The collect runs the aimed target's get_velocity (user code): a script
+	// there that reset the wave, ended the burst or turned telegraphs off
+	// owns the cadence, and the warning it interrupted never starts.
+	const uint32_t cadence = cadence_serial;
+	const uint32_t burst = burst_serial;
 	TypedArray<Transform2D> aim = collect_spawn_transforms_impl(true);
 	if (shot_owner_dying()) {
 		return; // the aimed target's get_velocity freed this spawner
+	}
+	if (cadence != cadence_serial || burst != burst_serial || !telegraph_wanted()) {
+		return;
 	}
 	telegraph_pending = true;
 	telegraph_from_auto = auto_started;
@@ -1450,27 +1465,42 @@ void PatternSpawner2D::cancel_burst_chain() {
 
 void PatternSpawner2D::fire_burst_volley() {
 	if (burst_enabled && burst_shots_left > 0) {
-		if (telegraph_enabled && telegraph_sec > 0.0 && !telegraph_pending && !burst_telegraph_done && burst_shots_fired == 0) {
+		const uint32_t serial = burst_serial;
+		bool fired = false;
+		bool mirrored = false;
+		if (telegraph_wanted() && !telegraph_pending && !burst_telegraph_done && burst_shots_fired == 0) {
 			// First burst shot warns once; done-flag stops the expiry from
 			// re-firing the warning in a loop instead of firing the shot.
-			burst_telegraph_done = true;
 			begin_telegraph(burst_from_auto);
-			return;
-		}
-		// Mirror rhythm: the first shot is plain, then shots alternate
-		// (plain, mirrored, plain, ...) for any burst_count.
-		const bool mirrored = burst_alternate_mirror && (burst_shots_fired % 2 == 1);
-		burst_mirror_next = mirrored;
-		const uint32_t serial = burst_serial;
-		const bool fired = shoot_once();
-		burst_mirror_next = false;
-		if (serial != burst_serial || shot_owner_dying()) {
-			return; // a shot handler cancelled, restarted or reset the chain: it owns it
+			if (serial != burst_serial || shot_owner_dying()) {
+				return; // a handler of the warning took the chain over
+			}
+			if (telegraph_pending) {
+				burst_telegraph_done = true;
+				return;
+			}
+			// Refused (the muzzle outside the despawn bounds): a failed
+			// attempt, retried a burst interval out, warning first again.
+		} else {
+			// Mirror rhythm: the first shot is plain, then shots alternate
+			// (plain, mirrored, plain, ...) for any burst_count.
+			mirrored = burst_alternate_mirror && (burst_shots_fired % 2 == 1);
+			burst_mirror_next = mirrored;
+			fired = shoot_once();
+			burst_mirror_next = false;
+			if (serial != burst_serial || shot_owner_dying()) {
+				return; // a shot handler cancelled, restarted or reset the chain: it owns it
+			}
 		}
 		if (fired) {
 			++burst_shots_fired;
 			--burst_shots_left;
 			burst_consecutive_failures = 0;
+			// An auto chain never fires past the cap or the budget, also when
+			// either changed after the chain started.
+			if (burst_from_auto && (volleys_remaining() == 0 || last_shot_spent_budget)) {
+				burst_shots_left = 0;
+			}
 			emit_on2d(this, "burst_shot_fired", burst_shots_fired, mirrored);
 			if (serial != burst_serial || shot_owner_dying()) {
 				return; // its handler owns the chain now
@@ -1503,6 +1533,10 @@ void PatternSpawner2D::fire_burst_volley() {
 	burst_mirror_next = false;
 	shoot_once();
 	refresh_process_state();
+}
+
+bool PatternSpawner2D::telegraph_wanted() const {
+	return telegraph_enabled && (telegraph_sec > 0.0 || telegraph_max_sec > telegraph_sec);
 }
 
 double PatternSpawner2D::next_shoot_interval_sec() const {

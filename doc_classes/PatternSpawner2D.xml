@@ -20,7 +20,7 @@
 		<method name="begin_burst">
 			<return type="void" />
 			<description>
-				Starts a burst chain by hand (waves and boss phases): [member burst_count] shots, [member burst_interval_sec] apart, telegraphed first when [member telegraph_enabled]. Clears any pending telegraph first. Manual chains run whether auto-shooting is on or not; chains started by the auto loop are clamped to [method volleys_remaining] and cancelled when auto-shooting is switched off.
+				Starts a burst chain by hand (waves and boss phases): [member burst_count] shots, [member burst_interval_sec] apart, telegraphed first when [member telegraph_enabled]. Clears any pending telegraph first. Manual chains run whether auto-shooting is on or not; chains started by the auto loop are clamped to [method volleys_remaining] (also when [member max_volleys] or a [method fire_n_volleys] budget changes mid-chain: the chain ends where they end) and cancelled when auto-shooting is switched off.
 			</description>
 		</method>
 		<method name="collect_spawn_transforms" qualifiers="const">
@@ -502,7 +502,7 @@
 			Shots per burst trigger. Must be between 1 and 1024. Shrinking it during a chain ends the chain at the new count.
 		</member>
 		<member name="burst_enabled" type="bool" setter="set_burst_enabled" getter="get_burst_enabled" default="false">
-			Fire multi-volley bursts per trigger: each interval pulls the trigger for burst_count shots spaced burst_interval_sec apart. Mid-burst shots ignore the main interval.
+			Fire multi-volley bursts per trigger: each interval pulls the trigger for burst_count shots spaced burst_interval_sec apart. Mid-burst shots ignore the main interval. Switching it off ends a running chain (with [signal burst_finished]) and its first-shot warning; a plain telegraphed shot keeps its warning.
 		</member>
 		<member name="burst_interval_max_sec" type="float" setter="set_burst_interval_max_sec" getter="get_burst_interval_max_sec" default="0.0">
 			When above [member burst_interval_sec], every gap between the shots of a burst is drawn between the two (seeded by [member reload_jitter_seed]). 0 (default) keeps it fixed. Must be finite and 0 or more.
@@ -1463,7 +1463,7 @@
 			Spin speed in continuous mode. Positive is clockwise.
 		</member>
 		<member name="telegraph_enabled" type="bool" setter="set_telegraph_enabled" getter="get_telegraph_enabled" default="false">
-			Warn before firing: emits volley_telegraphed with the current aim, then fires after telegraph_sec. Transforms re-collect at fire time.
+			Warn before firing: emits volley_telegraphed with the current aim, then fires after telegraph_sec (or a random time up to [member telegraph_max_sec]; with both at 0 nothing warns). Transforms re-collect at fire time. The aim snapshot runs the aimed target's [code]get_velocity[/code]: a script there that resets the wave, ends the burst or turns telegraphs off cancels the warning it interrupted. A burst whose first-shot warning cannot start (the muzzle outside the despawn bounds) retries a burst interval later, warning first again.
 		</member>
 		<member name="telegraph_max_sec" type="float" setter="set_telegraph_max_sec" getter="get_telegraph_max_sec" default="0.0">
 			When above [member telegraph_sec], every warning lasts a random time between the two (seeded by [member reload_jitter_seed]). 0 (default) keeps it fixed. Must be finite and 0 or more.

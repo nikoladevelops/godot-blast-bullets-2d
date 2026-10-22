@@ -222,3 +222,109 @@ func test_handlers_that_cancel_or_restart_a_burst_own_the_chain(p: Array = use_p
 		_:
 			expected = ["shot", "finished"]
 	assert_eq(log, expected, "%s from %s" % [action, sig])
+
+
+## Reports a velocity and runs `action` on its first call.
+const ACT_IN_VELOCITY := """
+extends Node2D
+var action: Callable
+var calls := 0
+func get_velocity() -> Vector2:
+	calls += 1
+	if calls == 1 and action.is_valid():
+		action.call()
+	return Vector2.ZERO
+"""
+
+
+## The warning's aim snapshot runs the aimed target's get_velocity (user
+## code). A script there that turns telegraphs off, ends burst mode or resets
+## the wave owns the cadence: the warning it interrupted never starts, so no
+## stale telegraph fires a shot into the new state.
+func test_a_velocity_script_that_cancels_the_warning_wins(action: String = use_parameters(["telegraph_off", "burst_off", "reset_shooting"])) -> void:
+	var s := GDScript.new()
+	s.source_code = ACT_IN_VELOCITY
+	assert_eq(s.reload(), OK, "the script compiles")
+	var target := Node2D.new()
+	target.set_script(s)
+	target.position = Vector2(200, 0)
+	add(target)
+	var sp := make_spawner(H.make_volley_data(1, 50.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_AIMED, 1)
+	sp.helper_aimed_prediction = 1.0
+	sp.helper_aimed_prediction_time = 0.5
+	sp.set_helper_aimed_target(target)
+	sp.telegraph_enabled = true
+	sp.telegraph_sec = 0.1
+	sp.shoot_interval_sec = 10.0
+	if action == "burst_off":
+		sp.burst_enabled = true
+		sp.burst_count = 3
+		sp.burst_interval_sec = 0.05
+	watch_signals(sp)
+	target.action = func() -> void:
+		match action:
+			"telegraph_off":
+				sp.telegraph_enabled = false
+			"burst_off":
+				sp.burst_enabled = false
+			"reset_shooting":
+				sp.reset_shooting()
+	sp.set_shooting_enabled(true)
+	await idle(30)
+	var warned: int = get_signal_emit_count(sp, "volley_telegraphed")
+	if action == "reset_shooting":
+		# The reset wave pulls again at once: one clean warning, one shot.
+		assert_eq([warned, sp.get_volleys_fired()], [1, 1], "only the reset wave's own warning and shot")
+	else:
+		assert_eq([warned, sp.get_volleys_fired()], [0, 0], "the interrupted warning never starts and fires nothing")
+
+
+## telegraph_sec 0 with telegraph_max_sec above it: every warning lasts a
+## random time between the two (documented), plain shots and bursts alike.
+func test_a_zero_telegraph_with_a_max_still_warns(burst: bool = use_parameters([false, true])) -> void:
+	var sp := _spawner(3 if burst else 1)
+	sp.burst_enabled = burst
+	sp.telegraph_enabled = true
+	sp.telegraph_sec = 0.0
+	sp.telegraph_max_sec = 0.3
+	sp.reload_jitter_seed = 7
+	sp.set_shooting_enabled(true)
+	await _until(sp, "volley_fired", 1, 60)
+	assert_signal_emit_count(sp, "volley_telegraphed", 1, "warned before the first shot")
+	assert_eq(sp.get_volleys_fired(), 1, "then it fires")
+
+
+## Switching bursts off ends a running chain and its first-shot warning,
+## never a plain telegraphed shot that is not part of one.
+func test_burst_off_keeps_a_plain_telegraph() -> void:
+	var sp := _spawner(1)
+	sp.burst_enabled = false
+	sp.telegraph_enabled = true
+	sp.telegraph_sec = 0.1
+	sp.set_shooting_enabled(true)
+	await _until(sp, "volley_telegraphed", 1, 30)
+	assert_true(sp.is_telegraph_pending(), "warning")
+	sp.burst_enabled = false
+	assert_true(sp.is_telegraph_pending(), "a plain warning is not a burst's")
+	await _until(sp, "volley_fired", 1, 30)
+	assert_eq(sp.get_volleys_fired(), 1, "the warned shot fires")
+
+
+## An auto chain stops where the cap or the budget stops, also when either is
+## set mid-chain (the clamp at the chain's start alone fired past it).
+func test_an_auto_burst_stops_at_a_cap_set_mid_chain(kind: String = use_parameters(["max_volleys", "fire_n_volleys"])) -> void:
+	var sp := _spawner(5)
+	sp.set_shooting_enabled(true)
+	await _until(sp, "burst_shot_fired", 1)
+	if kind == "max_volleys":
+		sp.max_volleys = 2
+	else:
+		sp.fire_n_volleys(1)
+	await _until(sp, "burst_finished", 1)
+	await idle(10)
+	assert_eq(sp.get_volleys_fired(), 2, "the chain ends at the new limit")
+	assert_eq(sp.get_burst_shots_left(), 0, "nothing left to resume")
+	sp.resume_shooting()
+	await idle(10)
+	if kind == "fire_n_volleys":
+		assert_signal_emit_count(sp, "burst_finished", 1, "a resume never finishes the old chain")
