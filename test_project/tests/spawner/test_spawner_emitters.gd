@@ -530,3 +530,24 @@ func test_a_cycle_made_again_through_the_template_reports_again() -> void:
 	b.emitter_spawner_path = b.get_path_to(a) # the cycle is back
 	_fire(a)
 	expect_error_sequence([CYCLE])
+
+
+## A new emitter resource reaches bullets in flight: bullets that used up
+## the old one's max_shots fire again under a resource without a cap.
+func test_a_swapped_emitter_resource_reaches_bullets_in_flight() -> void:
+	var tpl := _template()
+	var capped := _timing(0.25, 0.0, 0.0, 1)
+	var free := _timing(0.25, 0.0, 0.0, 0) # made up front, like a preloaded resource
+	var sp := _emitting(tpl, capped)
+	_fire(sp)
+	_step(8)
+	assert_eq(shots.size(), 1, "max_shots 1: one shot")
+	sp.emitter = free
+	_step(8)
+	assert_gt(shots.size(), 1, "the new resource (no cap) fires again")
+	var before := shots.size()
+	sp.emitter = capped
+	_step(8)
+	sp.emitter = null # the factory's default resource (no cap)
+	_step(8)
+	assert_gt(shots.size(), before, "back to no cap through the default resource")

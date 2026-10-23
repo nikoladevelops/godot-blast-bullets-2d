@@ -91,7 +91,10 @@ void BulletSpawner2D::apply_emitter_config() {
 	if (emitter_shared == nullptr) {
 		return; // nothing armed yet: the first arm copies the settings
 	}
-	emitter_shared->data = get_effective_emitter();
+	const Ref<BulletEmitterData2D> data = get_effective_emitter();
+	const uint64_t template_before = emitter_shared->template_id;
+	const bool changed = emitter_shared->data != data || emitter_shared->enabled != emitter_enabled;
+	emitter_shared->data = data;
 	emitter_shared->enabled = emitter_enabled;
 	// A template that cannot be resolved right now (outside the tree, a
 	// path being edited) keeps the last one: flying bullets never lose it.
@@ -100,6 +103,11 @@ void BulletSpawner2D::apply_emitter_config() {
 		emitter_shared->template_id = tpl->get_instance_id();
 	} else if (emitter_spawner_path.is_empty()) {
 		emitter_shared->template_id = 0;
+	}
+	if (changed || emitter_shared->template_id != template_before) {
+		// Flying bullets re-open their schedule gate (another resource may
+		// lift a max_shots they used up), like an edit of the resource.
+		++BulletEmitterData2D::rules_epoch;
 	}
 }
 
