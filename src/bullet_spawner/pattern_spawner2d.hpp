@@ -339,6 +339,13 @@ public:
 
 	BulletFactory2D *get_bullet_factory() const;
 	void set_bullet_factory(BulletFactory2D *factory);
+	// Script entries of the setters taking a node (bound): the Variant is read
+	// by id, a freed or wrong object is refused (core/live_object2d.hpp).
+	void set_bullet_factory_script(const Variant &factory);
+	void set_transforms_generator_script(const Variant &generator);
+	void set_helper_aimed_target_script(const Variant &target);
+	void set_helper_path2d_node_script(const Variant &node);
+	void set_movement_path_node_script(const Variant &node);
 
 	NodePath get_transforms_generator_path() const;
 	void set_transforms_generator_path(const NodePath &p_path);

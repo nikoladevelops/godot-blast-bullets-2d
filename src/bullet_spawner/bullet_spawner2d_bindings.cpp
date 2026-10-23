@@ -4,6 +4,7 @@
 // (pattern_spawner2d_bindings.cpp).
 
 #include "bullet_spawner/pattern_spawner2d_internal.hpp"
+#include "core/live_object2d.hpp"
 
 using namespace godot;
 
@@ -111,6 +112,12 @@ void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
 		}
 		return;
 	}
+}
+
+
+bool BulletSpawner2D::adopt_live_volley_script(const Variant &volley) {
+	BulletVolley2D *v = nullptr;
+	return live_argument2d<BulletVolley2D>(volley, "adopt_live_volley", "volley", "BulletVolley2D", v) && adopt_live_volley(v);
 }
 
 void BulletSpawner2D::_bind_methods() {
@@ -376,7 +383,7 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("forget_tracked_volleys"), &BulletSpawner2D::forget_tracked_volleys);
 	ClassDB::bind_method(D_METHOD("clear_active_bullets", "fire_clear_effects"), &BulletSpawner2D::clear_active_bullets, DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("debug_get_retarget_countdown"), &BulletSpawner2D::debug_get_retarget_countdown);
-	ClassDB::bind_method(D_METHOD("adopt_live_volley", "volley"), &BulletSpawner2D::adopt_live_volley);
+	ClassDB::bind_method(D_METHOD("adopt_live_volley", "volley"), &BulletSpawner2D::adopt_live_volley_script);
 	ClassDB::bind_method(D_METHOD("clear_live_volleys_homing"), &BulletSpawner2D::clear_live_volleys_homing);
 	ClassDB::bind_method(D_METHOD("override_live_volleys_velocity", "new_velocity"), &BulletSpawner2D::override_live_volleys_velocity);
 	ClassDB::bind_method(D_METHOD("apply_to_live_volleys", "groups"), &BulletSpawner2D::apply_to_live_volleys, DEFVAL(LIVE_ALL));

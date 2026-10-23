@@ -633,6 +633,16 @@ void LaserVolley2D::set_anchor(Node2D *anchor) {
 	}
 }
 
+void LaserVolley2D::set_anchor_script(const Variant &anchor) {
+	if (reject_stale_handle("set_anchor")) {
+		return; // a stale handle is refused first, whatever it is handed
+	}
+	Node2D *node = nullptr;
+	if (live_argument2d<Node2D>(anchor, "set_anchor", "anchor", "Node2D", node)) {
+		set_anchor(node);
+	}
+}
+
 void LaserVolley2D::shift_with_owner(const Vector2 &jump, bool carry) {
 	const LaserData2D *d = data.ptr();
 	if (!active || d == nullptr || !jump.is_finite()) {
@@ -859,7 +869,7 @@ void LaserVolley2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_beam_angle", "beam_index", "radians"), &LaserVolley2D::set_beam_angle);
 	ClassDB::bind_method(D_METHOD("set_targets", "targets"), &LaserVolley2D::set_targets);
 	ClassDB::bind_method(D_METHOD("set_beam_target", "beam_index", "target"), &LaserVolley2D::set_beam_target);
-	ClassDB::bind_method(D_METHOD("set_anchor", "anchor"), &LaserVolley2D::set_anchor);
+	ClassDB::bind_method(D_METHOD("set_anchor", "anchor"), &LaserVolley2D::set_anchor_script);
 	ClassDB::bind_method(D_METHOD("get_anchor"), &LaserVolley2D::get_anchor);
 	ClassDB::bind_method(D_METHOD("get_custom_data"), &LaserVolley2D::get_custom_data);
 	ClassDB::bind_method(D_METHOD("set_custom_data", "value"), &LaserVolley2D::set_custom_data);

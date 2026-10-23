@@ -276,3 +276,81 @@ func test_inspector_texts_have_no_mojibake() -> void:
 		if str(prop["name"]) == "magnet_acceleration":
 			accel = str(prop["hint_string"])
 	assert_eq(accel, "0,10000,1,or_greater,suffix:px/s²", "the acceleration suffix reads px/s²")
+
+
+## No bound method of a plugin class takes a typed (non-Resource) object:
+## godot-cpp converts such an argument through the object's raw pointer
+## before the plugin can check it, so a freed node a script still holds was
+## read after free (a crash). Object arguments are Variants read by id.
+func test_no_bound_method_takes_a_typed_node_or_object() -> void:
+	var typed: Array = []
+	for cls in ["BulletFactory2D", "BulletVolley2D", "BulletSpawner2D", "LaserSpawner2D", "PatternSpawner2D", "LaserVolley2D", "BulletAttachment2D", "BulletPatterns2D"]:
+		for m in ClassDB.class_get_method_list(cls, true):
+			for a in m["args"]:
+				if int(a["type"]) == TYPE_OBJECT:
+					var cn := str(a["class_name"])
+					if cn == "" or not ClassDB.is_parent_class(cn, "RefCounted"):
+						typed.append("%s.%s(%s: %s)" % [cls, m["name"], a["name"], cn])
+	assert_eq(typed, [], "object arguments are Variants")
+
+
+## Every former node argument refuses a freed object with one error naming
+## it, and changes nothing.
+func test_a_freed_object_is_refused_by_every_object_argument() -> void:
+	var gone := Node2D.new()
+	add_child(gone)
+	gone.free()
+	var volley: BulletVolley2D = probes[0][1]
+	var spawner: BulletSpawner2D = probes[2][1]
+	var laser: LaserVolley2D = probes[4][1]
+	var t: Array[Transform2D] = [Transform2D()]
+	var calls := [
+		[factory, "reactivate_volley", [gone], "volley"],
+		[factory, "free_volley_deferred", [gone], "volley"],
+		[factory, "debug_get_pool_bucket", [gone], "volley"],
+		[factory, "spawn_laser", [H.make_laser(), t, gone], "anchor"],
+		[volley, "set_bullet_direction_towards_node2d", [0, gone], "target_node"],
+		[volley, "all_bullets_set_direction_towards_node2d", [gone], "target_node"],
+		[volley, "set_bullet_texture_rotation_towards_node2d", [0, gone], "target_node"],
+		[volley, "all_bullets_set_texture_rotation_towards_node2d", [gone], "target_node"],
+		[volley, "bullet_homing_push_front_node2d_target", [0, gone], "new_homing_target"],
+		[volley, "bullet_homing_push_back_node2d_target", [0, gone], "new_homing_target"],
+		[volley, "shared_homing_deque_push_front_node2d_target", [gone], "new_homing_target"],
+		[volley, "shared_homing_deque_push_back_node2d_target", [gone], "new_homing_target"],
+		[volley, "set_bullet_movement_pattern_from_path", [0, gone], "path_holding_pattern"],
+		[volley, "all_bullets_set_movement_pattern_from_path", [gone], "path_holding_pattern"],
+		[volley, "emitter_set", [BulletEmitterData2D.new(), gone], "template_spawner"],
+		[spawner, "adopt_live_volley", [gone], "volley"],
+		[spawner, "set_bullet_factory", [gone], "factory"],
+		[spawner, "set_transforms_generator", [gone], "generator"],
+		[spawner, "set_helper_aimed_target", [gone], "target"],
+		[spawner, "set_helper_path2d_node", [gone], "node"],
+		[spawner, "set_movement_path_node", [gone], "node"],
+		[laser, "set_anchor", [gone], "anchor"],
+	]
+	var problems: Array = []
+	for c in calls:
+		(c[0] as Object).callv(c[1], c[2])
+		var hits := 0
+		var others: Array = []
+		for err in get_errors():
+			if err.handled:
+				continue
+			err.handled = true
+			if err.contains_text("%s: %s must be a " % [c[1], c[3]]) and err.contains_text("(a freed object is neither), nothing changed."):
+				hits += 1
+			else:
+				others.append(err.code)
+		if hits != 1 or not others.is_empty():
+			problems.append("%s: %d refusals, other errors %s" % [c[1], hits, others])
+	BulletFactory2D.debug_free_like_release(gone)
+	var release_hits := 0
+	for err in get_errors():
+		if not err.handled:
+			err.handled = true
+			release_hits += 1 if err.contains_text("debug_free_like_release: object must be a Object or null") else 0
+	if release_hits != 1:
+		problems.append("debug_free_like_release: %d refusals" % release_hits)
+	assert_eq(problems, [], "one refusal each, nothing else")
+	assert_eq(spawner.get_bullet_factory(), factory, "the spawner kept its factory")
+	assert_true(laser.is_laser_active(), "the laser fires on")

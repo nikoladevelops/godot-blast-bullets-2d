@@ -511,6 +511,8 @@ public:
 	// forwarder, and tracks it for retargeting. Queues are left alone.
 	// Returns false for null or non-live (pooled/outside-tree) instances.
 	bool adopt_live_volley(BulletVolley2D *bullets);
+	// Script entry (bound): the Variant is read by id, a freed volley is refused.
+	bool adopt_live_volley_script(const Variant &volley);
 	// Kill-switch: clears homing queues and disables orbiting on every
 	// tracked live volley (engine clears, counters stay exact). Returns
 	// how many volleys were touched. Retargeting will re-arm them while

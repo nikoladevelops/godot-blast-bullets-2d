@@ -400,6 +400,20 @@ public:
 	void set_bullet_texture_rotation_towards_node2d(int bullet_index, const Node2D *target_node);
 	void all_bullets_set_texture_rotation_towards_node2d(const Node2D *target_node, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 
+	// Script entries of the methods taking a node (bound): the Variant is read
+	// by id, a freed or wrong object is refused (core/live_object2d.hpp).
+	void set_bullet_direction_towards_node2d_script(int bullet_index, const Variant &target_node);
+	void all_bullets_set_direction_towards_node2d_script(const Variant &target_node, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
+	void set_bullet_texture_rotation_towards_node2d_script(int bullet_index, const Variant &target_node);
+	void all_bullets_set_texture_rotation_towards_node2d_script(const Variant &target_node, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
+	bool bullet_homing_push_front_node2d_target_script(int bullet_index, const Variant &new_homing_target);
+	bool bullet_homing_push_back_node2d_target_script(int bullet_index, const Variant &new_homing_target);
+	void shared_homing_deque_push_front_node2d_target_script(const Variant &new_homing_target);
+	void shared_homing_deque_push_back_node2d_target_script(const Variant &new_homing_target);
+	void set_bullet_movement_pattern_from_path_script(int bullet_index, const Variant &path_holding_pattern, bool face_movement_direction = false, bool repeat_pattern = true);
+	void all_bullets_set_movement_pattern_from_path_script(const Variant &path_holding_pattern, bool face_movement_direction = false, bool repeat_pattern = true, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
+	bool emitter_set_script(const Ref<BulletEmitterData2D> &emitter, const Variant &template_spawner);
+
 	// Bullet Texture Rotation (Degrees)
 
 	real_t get_bullet_texture_rotation_degrees(int bullet_index) const;

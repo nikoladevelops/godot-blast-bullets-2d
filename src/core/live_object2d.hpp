@@ -1,6 +1,7 @@
 #pragma once
 
 #include <godot_cpp/core/object.hpp>
+#include <godot_cpp/variant/utility_functions.hpp>
 #include <godot_cpp/variant/variant.hpp>
 
 namespace BlastBullets2D {
@@ -23,6 +24,25 @@ inline Object *live_object2d(const Variant &value) {
 template <typename T>
 inline T *live_object2d(const Variant &value) {
 	return Object::cast_to<T>(live_object2d(value));
+}
+
+// A script argument that must be a live T or null (the bound methods take a
+// Variant: a typed Object* parameter is converted by godot-cpp before any
+// check can run). True with r_out = the object, or null for a null argument;
+// false (one error naming `fn`, `param` and `type`) for anything else,
+// a freed object included.
+template <typename T>
+inline bool live_argument2d(const Variant &value, const char *fn, const char *param, const char *type, T *&r_out) {
+	r_out = nullptr;
+	if (value.get_type() == Variant::NIL) {
+		return true;
+	}
+	r_out = live_object2d<T>(value);
+	if (r_out == nullptr) {
+		UtilityFunctions::push_error(String(fn) + ": " + param + " must be a " + type + " or null (a freed object is neither), nothing changed.");
+		return false;
+	}
+	return true;
 }
 
 } // namespace BlastBullets2D

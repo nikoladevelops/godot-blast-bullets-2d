@@ -3,6 +3,7 @@
 // The bullet groups are BulletSpawner2D's (bullet_spawner2d_bindings.cpp).
 
 #include "bullet_spawner/pattern_spawner2d_internal.hpp"
+#include "core/live_object2d.hpp"
 
 using namespace godot;
 
@@ -140,6 +141,44 @@ void PatternSpawner2D::_validate_property(PropertyInfo &p_property) const {
 	}
 }
 
+
+// ---- Script entries of the setters taking a node: read by id ----
+
+void PatternSpawner2D::set_bullet_factory_script(const Variant &factory) {
+	BulletFactory2D *f = nullptr;
+	if (live_argument2d<BulletFactory2D>(factory, "set_bullet_factory", "factory", "BulletFactory2D", f)) {
+		set_bullet_factory(f);
+	}
+}
+
+void PatternSpawner2D::set_transforms_generator_script(const Variant &generator) {
+	Node2D *node = nullptr;
+	if (live_argument2d<Node2D>(generator, "set_transforms_generator", "generator", "Node2D", node)) {
+		set_transforms_generator(node);
+	}
+}
+
+void PatternSpawner2D::set_helper_aimed_target_script(const Variant &target) {
+	Node2D *node = nullptr;
+	if (live_argument2d<Node2D>(target, "set_helper_aimed_target", "target", "Node2D", node)) {
+		set_helper_aimed_target(node);
+	}
+}
+
+void PatternSpawner2D::set_helper_path2d_node_script(const Variant &node) {
+	Node *n = nullptr;
+	if (live_argument2d<Node>(node, "set_helper_path2d_node", "node", "Node", n)) {
+		set_helper_path2d_node(n);
+	}
+}
+
+void PatternSpawner2D::set_movement_path_node_script(const Variant &node) {
+	Path2D *path = nullptr;
+	if (live_argument2d<Path2D>(node, "set_movement_path_node", "node", "Path2D", path)) {
+		set_movement_path_node(path);
+	}
+}
+
 void PatternSpawner2D::_bind_methods() {
 	// Inspector layout: Setup (wiring) -> Bullet Patterns (source, amount,
 	// Transform subgroup, one subgroup per shape with its helper_<shape>_
@@ -154,14 +193,14 @@ void PatternSpawner2D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "bullet_factory_path", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "BulletFactory2D"), "set_bullet_factory_path", "get_bullet_factory_path");
 
 	ClassDB::bind_method(D_METHOD("get_bullet_factory"), &PatternSpawner2D::get_bullet_factory);
-	ClassDB::bind_method(D_METHOD("set_bullet_factory", "factory"), &PatternSpawner2D::set_bullet_factory);
+	ClassDB::bind_method(D_METHOD("set_bullet_factory", "factory"), &PatternSpawner2D::set_bullet_factory_script);
 
 	ClassDB::bind_method(D_METHOD("get_transforms_generator_path"), &PatternSpawner2D::get_transforms_generator_path);
 	ClassDB::bind_method(D_METHOD("set_transforms_generator_path", "path"), &PatternSpawner2D::set_transforms_generator_path);
 	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "transforms_generator", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "Node2D"), "set_transforms_generator_path", "get_transforms_generator_path");
 
 	ClassDB::bind_method(D_METHOD("get_transforms_generator"), &PatternSpawner2D::get_transforms_generator);
-	ClassDB::bind_method(D_METHOD("set_transforms_generator", "generator"), &PatternSpawner2D::set_transforms_generator);
+	ClassDB::bind_method(D_METHOD("set_transforms_generator", "generator"), &PatternSpawner2D::set_transforms_generator_script);
 	ClassDB::bind_method(D_METHOD("get_effective_generator"), &PatternSpawner2D::get_effective_generator);
 
 	ADD_GROUP("Time", "");
@@ -206,13 +245,13 @@ void PatternSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_helper_aimed_target_path"), &PatternSpawner2D::get_helper_aimed_target_path);
 	ClassDB::bind_method(D_METHOD("set_helper_aimed_target_path", "path"), &PatternSpawner2D::set_helper_aimed_target_path);
 	ClassDB::bind_method(D_METHOD("get_helper_aimed_target"), &PatternSpawner2D::get_helper_aimed_target);
-	ClassDB::bind_method(D_METHOD("set_helper_aimed_target", "target"), &PatternSpawner2D::set_helper_aimed_target);
+	ClassDB::bind_method(D_METHOD("set_helper_aimed_target", "target"), &PatternSpawner2D::set_helper_aimed_target_script);
 	ClassDB::bind_method(D_METHOD("get_helper_custom_transforms"), &PatternSpawner2D::get_helper_custom_transforms);
 	ClassDB::bind_method(D_METHOD("set_helper_custom_transforms", "value"), &PatternSpawner2D::set_helper_custom_transforms);
 	ClassDB::bind_method(D_METHOD("get_helper_path2d_path"), &PatternSpawner2D::get_helper_path2d_path);
 	ClassDB::bind_method(D_METHOD("set_helper_path2d_path", "path"), &PatternSpawner2D::set_helper_path2d_path);
 	ClassDB::bind_method(D_METHOD("get_helper_path2d_node"), &PatternSpawner2D::get_helper_path2d_node);
-	ClassDB::bind_method(D_METHOD("set_helper_path2d_node", "node"), &PatternSpawner2D::set_helper_path2d_node);
+	ClassDB::bind_method(D_METHOD("set_helper_path2d_node", "node"), &PatternSpawner2D::set_helper_path2d_node_script);
 	ClassDB::bind_method(D_METHOD("get_helper_path2d_space"), &PatternSpawner2D::get_helper_path2d_space);
 	ClassDB::bind_method(D_METHOD("set_helper_path2d_space", "value"), &PatternSpawner2D::set_helper_path2d_space);
 	ClassDB::bind_method(D_METHOD("get_helper_path2d_distribution"), &PatternSpawner2D::get_helper_path2d_distribution);
@@ -610,7 +649,7 @@ void PatternSpawner2D::_bind_methods() {
 	BS_BIND_PROP(movement_velocity_inherit_factor)
 #undef BS_BIND_PROP
 	ClassDB::bind_method(D_METHOD("get_movement_path_node"), &PatternSpawner2D::get_movement_path_node);
-	ClassDB::bind_method(D_METHOD("set_movement_path_node", "node"), &PatternSpawner2D::set_movement_path_node);
+	ClassDB::bind_method(D_METHOD("set_movement_path_node", "node"), &PatternSpawner2D::set_movement_path_node_script);
 	ClassDB::bind_method(D_METHOD("get_setup_warnings"), &PatternSpawner2D::get_setup_warnings);
 	ClassDB::bind_method(D_METHOD("movement_play"), &PatternSpawner2D::movement_play);
 	ClassDB::bind_method(D_METHOD("movement_pause"), &PatternSpawner2D::movement_pause);

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core/live_object2d.hpp"
+
 #include "core/variant_enum_cast2d.hpp"
 
 #include <functional>
@@ -114,6 +116,12 @@ public:
 	// muzzle, its x axis the direction), following `anchor` while
 	// LaserData2D.follow_spawner is on. Factory-owned: its signals fire here.
 	LaserVolley2D *spawn_laser(const Ref<LaserData2D> &data, const TypedArray<Transform2D> &transforms, Node2D *anchor = nullptr);
+	// Script entries of the methods taking an object (bound): the Variant is
+	// read by id, a freed or wrong object is refused (core/live_object2d.hpp).
+	LaserVolley2D *spawn_laser_script(const Ref<LaserData2D> &data, const TypedArray<Transform2D> &transforms, const Variant &anchor);
+	void free_volley_deferred_script(const Variant &volley);
+	static void debug_free_like_release_script(const Variant &object);
+	Ref<VolleyPoolKey2D> debug_get_pool_bucket_script(const Variant &volley);
 	// C++ path (LaserSpawner2D): native transforms, the owner spawner, the
 	// anchor and its frame at fire time. Validated like spawn_laser.
 	// anchor_offset: a world shift already in `transforms` that a following
@@ -853,13 +861,7 @@ public:
 
 	// GDScript entry for the same: enable_bullet() wake from script can't pass a
 	// C++ reference, so this validates the node first. Unbound C++ path stays.
-	void reactivate_volley_for_script(BulletVolley2D *bullet_multi) {
-		if (bullet_multi == nullptr) {
-			UtilityFunctions::push_error("track_volley_active: volley is null.");
-			return;
-		}
-		track_volley_active(*bullet_multi);
-	}
+	void reactivate_volley_for_script(const Variant &volley);
 
 	void _notification(int p_what);
 	// Every BulletFactory2D inside a SceneTree (ENTER_TREE / EXIT_TREE). The

@@ -3,10 +3,85 @@
 
 #include "bullet_spawner/bullet_spawner2d.hpp"
 #include "bullet_volley/bullet_volley2d_internal.hpp"
+#include "core/live_object2d.hpp"
 
 using namespace godot;
 
 namespace BlastBullets2D {
+
+
+// ---- Script entries of the methods taking a node: read by id ----
+
+void BulletVolley2D::set_bullet_direction_towards_node2d_script(int bullet_index, const Variant &target_node) {
+	Node2D *node = nullptr;
+	if (live_argument2d<Node2D>(target_node, "set_bullet_direction_towards_node2d", "target_node", "Node2D", node)) {
+		set_bullet_direction_towards_node2d(bullet_index, node);
+	}
+}
+
+void BulletVolley2D::all_bullets_set_direction_towards_node2d_script(const Variant &target_node, int bullet_index_start, int bullet_index_end_inclusive) {
+	Node2D *node = nullptr;
+	if (live_argument2d<Node2D>(target_node, "all_bullets_set_direction_towards_node2d", "target_node", "Node2D", node)) {
+		all_bullets_set_direction_towards_node2d(node, bullet_index_start, bullet_index_end_inclusive);
+	}
+}
+
+void BulletVolley2D::set_bullet_texture_rotation_towards_node2d_script(int bullet_index, const Variant &target_node) {
+	Node2D *node = nullptr;
+	if (live_argument2d<Node2D>(target_node, "set_bullet_texture_rotation_towards_node2d", "target_node", "Node2D", node)) {
+		set_bullet_texture_rotation_towards_node2d(bullet_index, node);
+	}
+}
+
+void BulletVolley2D::all_bullets_set_texture_rotation_towards_node2d_script(const Variant &target_node, int bullet_index_start, int bullet_index_end_inclusive) {
+	Node2D *node = nullptr;
+	if (live_argument2d<Node2D>(target_node, "all_bullets_set_texture_rotation_towards_node2d", "target_node", "Node2D", node)) {
+		all_bullets_set_texture_rotation_towards_node2d(node, bullet_index_start, bullet_index_end_inclusive);
+	}
+}
+
+bool BulletVolley2D::bullet_homing_push_front_node2d_target_script(int bullet_index, const Variant &new_homing_target) {
+	Node2D *node = nullptr;
+	return live_argument2d<Node2D>(new_homing_target, "bullet_homing_push_front_node2d_target", "new_homing_target", "Node2D", node) && bullet_homing_push_front_node2d_target(bullet_index, node);
+}
+
+bool BulletVolley2D::bullet_homing_push_back_node2d_target_script(int bullet_index, const Variant &new_homing_target) {
+	Node2D *node = nullptr;
+	return live_argument2d<Node2D>(new_homing_target, "bullet_homing_push_back_node2d_target", "new_homing_target", "Node2D", node) && bullet_homing_push_back_node2d_target(bullet_index, node);
+}
+
+void BulletVolley2D::shared_homing_deque_push_front_node2d_target_script(const Variant &new_homing_target) {
+	Node2D *node = nullptr;
+	if (live_argument2d<Node2D>(new_homing_target, "shared_homing_deque_push_front_node2d_target", "new_homing_target", "Node2D", node)) {
+		shared_homing_deque_push_front_node2d_target(node);
+	}
+}
+
+void BulletVolley2D::shared_homing_deque_push_back_node2d_target_script(const Variant &new_homing_target) {
+	Node2D *node = nullptr;
+	if (live_argument2d<Node2D>(new_homing_target, "shared_homing_deque_push_back_node2d_target", "new_homing_target", "Node2D", node)) {
+		shared_homing_deque_push_back_node2d_target(node);
+	}
+}
+
+void BulletVolley2D::set_bullet_movement_pattern_from_path_script(int bullet_index, const Variant &path_holding_pattern, bool face_movement_direction, bool repeat_pattern) {
+	Path2D *path = nullptr;
+	if (live_argument2d<Path2D>(path_holding_pattern, "set_bullet_movement_pattern_from_path", "path_holding_pattern", "Path2D", path)) {
+		set_bullet_movement_pattern_from_path(bullet_index, path, face_movement_direction, repeat_pattern);
+	}
+}
+
+void BulletVolley2D::all_bullets_set_movement_pattern_from_path_script(const Variant &path_holding_pattern, bool face_movement_direction, bool repeat_pattern, int bullet_index_start, int bullet_index_end_inclusive) {
+	Path2D *path = nullptr;
+	if (live_argument2d<Path2D>(path_holding_pattern, "all_bullets_set_movement_pattern_from_path", "path_holding_pattern", "Path2D", path)) {
+		all_bullets_set_movement_pattern_from_path(path, face_movement_direction, repeat_pattern, bullet_index_start, bullet_index_end_inclusive);
+	}
+}
+
+bool BulletVolley2D::emitter_set_script(const Ref<BulletEmitterData2D> &emitter, const Variant &template_spawner) {
+	Node *node = nullptr;
+	return live_argument2d<Node>(template_spawner, "emitter_set", "template_spawner", "Node", node) && emitter_set(emitter, node);
+}
 
 void BulletVolley2D::_bind_methods() {
 	// Methods without an inspector row first (every ADD_PROPERTY below needs
@@ -33,8 +108,8 @@ void BulletVolley2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_bullet_direction_towards_position", "bullet_index", "target_position"), &BulletVolley2D::set_bullet_direction_towards_position);
 	ClassDB::bind_method(D_METHOD("all_bullets_set_direction_towards_position", "target_position", "bullet_index_start", "bullet_index_end_inclusive"), &BulletVolley2D::all_bullets_set_direction_towards_position, DEFVAL(0), DEFVAL(-1));
 
-	ClassDB::bind_method(D_METHOD("set_bullet_direction_towards_node2d", "bullet_index", "target_node"), &BulletVolley2D::set_bullet_direction_towards_node2d);
-	ClassDB::bind_method(D_METHOD("all_bullets_set_direction_towards_node2d", "target_node", "bullet_index_start", "bullet_index_end_inclusive"), &BulletVolley2D::all_bullets_set_direction_towards_node2d, DEFVAL(0), DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("set_bullet_direction_towards_node2d", "bullet_index", "target_node"), &BulletVolley2D::set_bullet_direction_towards_node2d_script);
+	ClassDB::bind_method(D_METHOD("all_bullets_set_direction_towards_node2d", "target_node", "bullet_index_start", "bullet_index_end_inclusive"), &BulletVolley2D::all_bullets_set_direction_towards_node2d_script, DEFVAL(0), DEFVAL(-1));
 
 	ClassDB::bind_method(D_METHOD("get_bullet_texture_rotation_radians", "bullet_index"), &BulletVolley2D::get_bullet_texture_rotation_radians);
 	ClassDB::bind_method(D_METHOD("set_bullet_texture_rotation_radians", "bullet_index", "new_rotation_radians"), &BulletVolley2D::set_bullet_texture_rotation_radians);
@@ -48,8 +123,8 @@ void BulletVolley2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("set_bullet_texture_rotation_towards_position", "bullet_index", "target_position"), &BulletVolley2D::set_bullet_texture_rotation_towards_position);
 	ClassDB::bind_method(D_METHOD("all_bullets_set_texture_rotation_towards_position", "target_position", "bullet_index_start", "bullet_index_end_inclusive"), &BulletVolley2D::all_bullets_set_texture_rotation_towards_position, DEFVAL(0), DEFVAL(-1));
-	ClassDB::bind_method(D_METHOD("set_bullet_texture_rotation_towards_node2d", "bullet_index", "target_node"), &BulletVolley2D::set_bullet_texture_rotation_towards_node2d);
-	ClassDB::bind_method(D_METHOD("all_bullets_set_texture_rotation_towards_node2d", "target_node", "bullet_index_start", "bullet_index_end_inclusive"), &BulletVolley2D::all_bullets_set_texture_rotation_towards_node2d, DEFVAL(0), DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("set_bullet_texture_rotation_towards_node2d", "bullet_index", "target_node"), &BulletVolley2D::set_bullet_texture_rotation_towards_node2d_script);
+	ClassDB::bind_method(D_METHOD("all_bullets_set_texture_rotation_towards_node2d", "target_node", "bullet_index_start", "bullet_index_end_inclusive"), &BulletVolley2D::all_bullets_set_texture_rotation_towards_node2d_script, DEFVAL(0), DEFVAL(-1));
 
 	ClassDB::bind_method(D_METHOD("get_bullet_transform", "bullet_index"), &BulletVolley2D::get_bullet_transform);
 	ClassDB::bind_method(D_METHOD("get_bullet_velocity", "bullet_index"), &BulletVolley2D::get_bullet_velocity);
@@ -133,11 +208,11 @@ void BulletVolley2D::_bind_methods() {
 
 	// PER BULLET HOMING DEQUE PUSH METHODS
 	ClassDB::bind_method(D_METHOD("bullet_homing_push_front_mouse_position_target", "bullet_index"), &BulletVolley2D::bullet_homing_push_front_mouse_position_target);
-	ClassDB::bind_method(D_METHOD("bullet_homing_push_front_node2d_target", "bullet_index", "new_homing_target"), &BulletVolley2D::bullet_homing_push_front_node2d_target);
+	ClassDB::bind_method(D_METHOD("bullet_homing_push_front_node2d_target", "bullet_index", "new_homing_target"), &BulletVolley2D::bullet_homing_push_front_node2d_target_script);
 	ClassDB::bind_method(D_METHOD("bullet_homing_push_front_global_position_target", "bullet_index", "global_position"), &BulletVolley2D::bullet_homing_push_front_global_position_target);
 
 	ClassDB::bind_method(D_METHOD("bullet_homing_push_back_mouse_position_target", "bullet_index"), &BulletVolley2D::bullet_homing_push_back_mouse_position_target);
-	ClassDB::bind_method(D_METHOD("bullet_homing_push_back_node2d_target", "bullet_index", "new_homing_target"), &BulletVolley2D::bullet_homing_push_back_node2d_target);
+	ClassDB::bind_method(D_METHOD("bullet_homing_push_back_node2d_target", "bullet_index", "new_homing_target"), &BulletVolley2D::bullet_homing_push_back_node2d_target_script);
 	ClassDB::bind_method(D_METHOD("bullet_homing_push_back_global_position_target", "bullet_index", "global_position"), &BulletVolley2D::bullet_homing_push_back_global_position_target);
 	ClassDB::bind_method(D_METHOD("bullet_homing_push_back_homing_target", "bullet_index", "node2d_or_global_position"), &BulletVolley2D::bullet_homing_push_back_homing_target);
 	ClassDB::bind_method(D_METHOD("bullet_homing_push_front_homing_target", "bullet_index", "node2d_or_global_position"), &BulletVolley2D::bullet_homing_push_front_homing_target);
@@ -372,11 +447,11 @@ void BulletVolley2D::_bind_methods() {
 
 	// SHARED HOMING DEQUE PUSH METHODS
 	ClassDB::bind_method(D_METHOD("shared_homing_deque_push_front_mouse_position_target"), &BulletVolley2D::shared_homing_deque_push_front_mouse_position_target);
-	ClassDB::bind_method(D_METHOD("shared_homing_deque_push_front_node2d_target", "new_homing_target"), &BulletVolley2D::shared_homing_deque_push_front_node2d_target);
+	ClassDB::bind_method(D_METHOD("shared_homing_deque_push_front_node2d_target", "new_homing_target"), &BulletVolley2D::shared_homing_deque_push_front_node2d_target_script);
 	ClassDB::bind_method(D_METHOD("shared_homing_deque_push_front_global_position_target", "global_position"), &BulletVolley2D::shared_homing_deque_push_front_global_position_target);
 
 	ClassDB::bind_method(D_METHOD("shared_homing_deque_push_back_mouse_position_target"), &BulletVolley2D::shared_homing_deque_push_back_mouse_position_target);
-	ClassDB::bind_method(D_METHOD("shared_homing_deque_push_back_node2d_target", "new_homing_target"), &BulletVolley2D::shared_homing_deque_push_back_node2d_target);
+	ClassDB::bind_method(D_METHOD("shared_homing_deque_push_back_node2d_target", "new_homing_target"), &BulletVolley2D::shared_homing_deque_push_back_node2d_target_script);
 	ClassDB::bind_method(D_METHOD("shared_homing_deque_push_back_global_position_target", "global_position"), &BulletVolley2D::shared_homing_deque_push_back_global_position_target);
 
 	// SHARED HOMING DEQUE HELPERS
@@ -611,8 +686,8 @@ void BulletVolley2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_bullet_movement_pattern_curve", "bullet_index"), &BulletVolley2D::get_bullet_movement_pattern_curve);
 
-	ClassDB::bind_method(D_METHOD("set_bullet_movement_pattern_from_path", "bullet_index", "path_holding_pattern", "face_movement_direction", "repeat_pattern"), &BulletVolley2D::set_bullet_movement_pattern_from_path, DEFVAL(false), DEFVAL(true));
-	ClassDB::bind_method(D_METHOD("all_bullets_set_movement_pattern_from_path", "path_holding_pattern", "face_movement_direction", "repeat_pattern", "bullet_index_start", "bullet_index_end_inclusive"), &BulletVolley2D::all_bullets_set_movement_pattern_from_path, DEFVAL(false), DEFVAL(true), DEFVAL(0), DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("set_bullet_movement_pattern_from_path", "bullet_index", "path_holding_pattern", "face_movement_direction", "repeat_pattern"), &BulletVolley2D::set_bullet_movement_pattern_from_path_script, DEFVAL(false), DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("all_bullets_set_movement_pattern_from_path", "path_holding_pattern", "face_movement_direction", "repeat_pattern", "bullet_index_start", "bullet_index_end_inclusive"), &BulletVolley2D::all_bullets_set_movement_pattern_from_path_script, DEFVAL(false), DEFVAL(true), DEFVAL(0), DEFVAL(-1));
 
 	ClassDB::bind_method(D_METHOD("set_bullet_movement_pattern_from_curve", "bullet_index", "curve_pattern", "face_movement_direction", "repeat_pattern"), &BulletVolley2D::set_bullet_movement_pattern_from_curve, DEFVAL(false), DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("all_bullets_set_movement_pattern_from_curve", "curve_pattern", "face_movement_direction", "repeat_pattern", "bullet_index_start", "bullet_index_end_inclusive"), &BulletVolley2D::all_bullets_set_movement_pattern_from_curve, DEFVAL(false), DEFVAL(true), DEFVAL(0), DEFVAL(-1));
@@ -664,7 +739,7 @@ void BulletVolley2D::_bind_methods() {
 	// Splitting (bullet_volley2d_split.cpp; the spawns are the factory's).
 	ClassDB::bind_method(D_METHOD("split_set_data", "split", "child_spawn_data"), &BulletVolley2D::split_set_data, DEFVAL(Ref<BulletVolleyData2D>()));
 	ClassDB::bind_method(D_METHOD("split_clear"), &BulletVolley2D::split_clear);
-	ClassDB::bind_method(D_METHOD("emitter_set", "emitter", "template_spawner"), &BulletVolley2D::emitter_set);
+	ClassDB::bind_method(D_METHOD("emitter_set", "emitter", "template_spawner"), &BulletVolley2D::emitter_set_script);
 	ClassDB::bind_method(D_METHOD("emitter_clear"), &BulletVolley2D::emitter_clear);
 	ClassDB::bind_method(D_METHOD("emitter_get_data"), &BulletVolley2D::emitter_get_data);
 	ClassDB::bind_method(D_METHOD("is_emitter_armed"), &BulletVolley2D::is_emitter_armed);

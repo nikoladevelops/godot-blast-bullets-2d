@@ -9,6 +9,49 @@ using namespace godot;
 
 namespace BlastBullets2D {
 
+
+void BulletFactory2D::reactivate_volley_for_script(const Variant &volley) {
+	BulletVolley2D *bullet_multi = nullptr;
+	if (!live_argument2d<BulletVolley2D>(volley, "reactivate_volley", "volley", "BulletVolley2D", bullet_multi)) {
+		return;
+	}
+	if (bullet_multi == nullptr) {
+		UtilityFunctions::push_error("track_volley_active: volley is null.");
+		return;
+	}
+	track_volley_active(*bullet_multi);
+}
+
+LaserVolley2D *BulletFactory2D::spawn_laser_script(const Ref<LaserData2D> &data, const TypedArray<Transform2D> &transforms, const Variant &anchor) {
+	Node2D *node = nullptr;
+	if (!live_argument2d<Node2D>(anchor, "spawn_laser", "anchor", "Node2D", node)) {
+		return nullptr;
+	}
+	return spawn_laser(data, transforms, node);
+}
+
+void BulletFactory2D::free_volley_deferred_script(const Variant &volley) {
+	Node *node = nullptr;
+	if (live_argument2d<Node>(volley, "free_volley_deferred", "volley", "Node", node)) {
+		free_volley_deferred(node);
+	}
+}
+
+void BulletFactory2D::debug_free_like_release_script(const Variant &object) {
+	Object *obj = nullptr;
+	if (live_argument2d<Object>(object, "debug_free_like_release", "object", "Object", obj)) {
+		debug_free_like_release(obj);
+	}
+}
+
+Ref<VolleyPoolKey2D> BulletFactory2D::debug_get_pool_bucket_script(const Variant &volley) {
+	BulletVolley2D *v = nullptr;
+	if (!live_argument2d<BulletVolley2D>(volley, "debug_get_pool_bucket", "volley", "BulletVolley2D", v)) {
+		return Ref<VolleyPoolKey2D>();
+	}
+	return debug_get_pool_bucket(v);
+}
+
 void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_is_tearing_down"), &BulletFactory2D::get_is_tearing_down);
 
@@ -84,7 +127,7 @@ void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("free_attachments_pool_deferred"), &BulletFactory2D::free_attachments_pool_deferred);
 	ClassDB::bind_method(D_METHOD("populate_attachments_pool_deferred", "attachment_scene", "amount_attachments"), &BulletFactory2D::populate_attachments_pool_deferred);
 	ClassDB::bind_method(D_METHOD("free_attachments_pool_for_scene_deferred", "attachment_scene"), &BulletFactory2D::free_attachments_pool_for_scene_deferred);
-	ClassDB::bind_method(D_METHOD("free_volley_deferred", "volley"), &BulletFactory2D::free_volley_deferred);
+	ClassDB::bind_method(D_METHOD("free_volley_deferred", "volley"), &BulletFactory2D::free_volley_deferred_script);
 	ClassDB::bind_method(D_METHOD("ensure_factory_initialized"), &BulletFactory2D::ensure_factory_initialized);
 
 	// Additional debug methods related
@@ -116,13 +159,13 @@ void BulletFactory2D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "register_performance_monitors"), "set_register_performance_monitors", "get_register_performance_monitors");
 	ClassDB::bind_method(D_METHOD("debug_reset_pool_stats"), &BulletFactory2D::debug_reset_pool_stats);
 	ClassDB::bind_static_method("BulletFactory2D", D_METHOD("debug_validate_spawn_data", "spawn_data"), &BulletFactory2D::debug_validate_spawn_data);
-	ClassDB::bind_static_method("BulletFactory2D", D_METHOD("debug_free_like_release", "object"), &BulletFactory2D::debug_free_like_release);
+	ClassDB::bind_static_method("BulletFactory2D", D_METHOD("debug_free_like_release", "object"), &BulletFactory2D::debug_free_like_release_script);
 	ClassDB::bind_method(D_METHOD("debug_check_interpolation_status"), &BulletFactory2D::debug_check_interpolation_status);
 	ClassDB::bind_method(D_METHOD("debug_get_live_volley_ids", "owner_spawner_id"), &BulletFactory2D::debug_get_live_volley_ids);
 	ClassDB::bind_static_method("BulletFactory2D", D_METHOD("debug_expected_pool_key", "spawn_data"), &BulletFactory2D::debug_expected_pool_key);
 	ClassDB::bind_method(D_METHOD("debug_assert_no_dangling"), &BulletFactory2D::debug_assert_no_dangling);
 	ClassDB::bind_method(D_METHOD("debug_advance_time", "delta"), &BulletFactory2D::debug_advance_time);
-	ClassDB::bind_method(D_METHOD("debug_get_pool_bucket", "volley"), &BulletFactory2D::debug_get_pool_bucket);
+	ClassDB::bind_method(D_METHOD("debug_get_pool_bucket", "volley"), &BulletFactory2D::debug_get_pool_bucket_script);
 
 	ClassDB::bind_method(D_METHOD("get_debugger_max_providers"), &BulletFactory2D::get_debugger_max_providers);
 	ClassDB::bind_method(D_METHOD("set_debugger_max_providers", "max_providers"), &BulletFactory2D::set_debugger_max_providers);
@@ -215,7 +258,7 @@ void BulletFactory2D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "split_max_pending", PROPERTY_HINT_RANGE, "0,1000000,1,or_greater"), "set_split_max_pending", "get_split_max_pending");
 	// Lasers (bullet_factory2d_lasers.cpp): factory-owned lasers signal here;
 	// a LaserSpawner2D's lasers signal on that spawner (the same signals).
-	ClassDB::bind_method(D_METHOD("spawn_laser", "data", "transforms", "anchor"), &BulletFactory2D::spawn_laser, DEFVAL(Variant()));
+	ClassDB::bind_method(D_METHOD("spawn_laser", "data", "transforms", "anchor"), &BulletFactory2D::spawn_laser_script, DEFVAL(Variant()));
 	ClassDB::bind_method(D_METHOD("get_active_lasers"), &BulletFactory2D::get_active_lasers);
 	ClassDB::bind_method(D_METHOD("get_active_laser_count"), &BulletFactory2D::get_active_laser_count);
 	ClassDB::bind_method(D_METHOD("clear_active_lasers", "fade"), &BulletFactory2D::clear_active_lasers, DEFVAL(true));

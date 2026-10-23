@@ -126,6 +126,8 @@ public:
 	void set_beam_target(int beam_index, const Variant &target);
 	// Muzzles follow `anchor` (null = stay where they are now).
 	void set_anchor(Node2D *anchor);
+	// Script entry (bound): the Variant is read by id, a freed node is refused.
+	void set_anchor_script(const Variant &anchor);
 	// Game data for this laser (damage, team...), readable in every laser
 	// signal; cleared when the laser is pooled.
 	Variant get_custom_data() const { return custom_data; }
