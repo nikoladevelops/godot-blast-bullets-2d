@@ -477,6 +477,21 @@ int BulletFactory2D::get_active_effect_count() const {
 	return total;
 }
 
+// Everything a manual bake froze into its shards (the volley path compares
+// the same snapshot, BulletVolley2D::FXLayerSnapshot): an edit of any of it
+// since the bake rebuilds the bake.
+static bool fx_shards_match_layer(const BulletFactory2D::FXOneShotBake &bake, const Ref<BulletEffectLayerData2D> &layer) {
+	if ((int)bake.slots.size() != fx_ring_size_for_layer(layer, 32)) {
+		return false;
+	}
+	for (const OwnedNode2D<MultiMeshInstance2D> &shard : bake.shards) {
+		if (const MultiMeshInstance2D *node = shard.get()) {
+			return node->get_material() == layer->material && node->get_modulate() == layer->self_modulate && node->get_z_index() == layer->z_index && node->is_z_relative() == layer->z_as_relative && node->get_visibility_layer() == (uint32_t)layer->visibility_layer && node->get_light_mask() == layer->light_mask;
+		}
+	}
+	return true;
+}
+
 int BulletFactory2D::spawn_layer_effect(const Ref<BulletEffectLayerData2D> &layer, const Transform2D &at) {
 	if (layer.is_null() || !layer->enabled) {
 		UtilityFunctions::push_error("BulletFactory2D.spawn_layer_effect: layer is null or disabled.");
@@ -486,7 +501,7 @@ int BulletFactory2D::spawn_layer_effect(const Ref<BulletEffectLayerData2D> &laye
 		// Same resource, edited content: the stored generation trails the
 		// layer's, so drop the stale bake and rebuild below. Same when a
 		// script freed its shards (or the whole effects container).
-		if (fx_manual_bakes[i].layer == layer && (fx_manual_bakes[i].layer_version != layer->get_bake_version() || fx_manual_bakes[i].any_shard_lost())) {
+		if (fx_manual_bakes[i].layer == layer && (fx_manual_bakes[i].layer_version != layer->get_bake_version() || fx_manual_bakes[i].any_shard_lost() || !fx_shards_match_layer(fx_manual_bakes[i], layer))) {
 			fx_erase_bake(fx_manual_bakes[i]);
 			fx_manual_bakes.erase(fx_manual_bakes.begin() + i);
 			break;

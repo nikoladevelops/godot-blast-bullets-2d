@@ -1360,3 +1360,31 @@ func _manual_tint() -> Color:
 		if not live.is_empty():
 			return live[0].get("tint", Color(-1, -1, -1, -1))
 	return Color(-1, -1, -1, -1)
+
+
+## The manual hatch (spawn_layer_effect) rebuilds its shards when the layer's
+## look changed since: material, tint, draw order and ring size.
+func test_manual_hatch_rebuilds_on_look_edits() -> void:
+	await _preamble()
+	await _settle(factory)
+	var layer := _make_layer(3, 2)
+	assert_true(factory.spawn_layer_effect(layer, Transform2D(0.0, Vector2(60, 0))) >= 0, "fires")
+	var container: Node = null
+	for c in factory.get_children(true):
+		if c.name == "SpriteEffectsContainer":
+			container = c
+	assert_not_null(container, "the effects container")
+	layer.self_modulate = Color(1, 0, 0, 1)
+	layer.z_index = 9
+	var mat := CanvasItemMaterial.new()
+	layer.material = mat
+	layer.max_instances = 7
+	assert_true(factory.spawn_layer_effect(layer, Transform2D(0.0, Vector2(60, 0))) >= 0, "fires again")
+	await idle(1)
+	var looks: Array = []
+	for c in container.get_children():
+		if c is MultiMeshInstance2D and is_instance_valid(c) and not c.is_queued_for_deletion():
+			looks.append([c.modulate, c.z_index, c.material == mat, (c as MultiMeshInstance2D).multimesh.instance_count])
+	assert_gt(looks.size(), 0, "shards exist")
+	for l in looks:
+		assert_eq(l, [Color(1, 0, 0, 1), 9, true, 7], "every shard carries the new look")
