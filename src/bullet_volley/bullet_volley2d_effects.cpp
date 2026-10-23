@@ -126,6 +126,11 @@ bool BulletVolley2D::fx_layers_match_seeded(const TypedArray<BulletEffectLayerDa
 			return false;
 		}
 	}
+	// The factory's one-shot bakes too: shards a script freed (or the whole
+	// effects container) are rebuilt, never fired into unseen.
+	if (fx_oneshot_trigger_mask != 0 && bullet_factory != nullptr && !bullet_factory->fx_volley_bakes_intact(get_instance_id())) {
+		return false;
+	}
 	return true;
 }
 

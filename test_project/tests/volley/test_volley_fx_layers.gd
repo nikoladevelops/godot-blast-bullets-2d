@@ -1405,3 +1405,35 @@ func test_a_full_reset_re_bakes_effect_layer_art() -> void:
 	factory.reset()
 	assert_true(factory.spawn_layer_effect(layer, Transform2D(0.0, Vector2(40, 0))) >= 0, "fires after the reset")
 	assert_gt(int(factory.debug_get_frame_cache_stats()["builds"]), builds_before, "the layer re-baked from the cleared cache (its whitened frame built again)")
+
+
+func _visible_effect_shards() -> int:
+	var n := 0
+	for c in factory.get_children(true):
+		if c.name == "SpriteEffectsContainer" and not c.is_queued_for_deletion():
+			for s in c.get_children():
+				if s is MultiMeshInstance2D and s.visible:
+					n += 1
+	return n
+
+
+## A script freed the effects container (and every one-shot shard in it): a
+## pooled volley reused afterwards draws its one-shots again (its bakes are
+## rebuilt, never fired into the freed shards).
+func test_a_reused_volley_draws_its_one_shots_after_the_container_was_freed() -> void:
+	await _preamble()
+	await _settle(factory)
+	var d := H.make_volley_data(2, 0.0, 5.0)
+	d.effect_layers = [H.make_effect_layer(BulletEffectLayerData2D.EFFECT_ON_CLEAR, 2)]
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	v.clear_all_bullets()
+	assert_gt(_visible_effect_shards(), 0, "the clear effect draws")
+	await idle(2)
+	for c in factory.get_children(true):
+		if c.name == "SpriteEffectsContainer":
+			c.free()
+	await idle(1)
+	var again: BulletVolley2D = factory.spawn_volley(d)
+	assert_eq(again, v, "the pooled volley is reused")
+	again.clear_all_bullets()
+	assert_gt(_visible_effect_shards(), 0, "its clear effect draws again")

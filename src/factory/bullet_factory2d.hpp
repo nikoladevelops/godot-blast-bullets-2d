@@ -458,6 +458,9 @@ public:
 	// auto (0). False when the layer is inert (disabled, trail trigger,
 	// null, frames missing, zero playable time): warn-once happens inside.
 	bool fx_register_volley_bake(uint64_t volley_id, int layer_index, const Ref<BulletEffectLayerData2D> &layer, int amount_bullets);
+	// Every one-shot bake of `volley_id` still has its shard nodes (a script
+	// may free them, or the whole effects container). Cold: a reuse check.
+	bool fx_volley_bakes_intact(uint64_t volley_id) const;
 	// Erases every bake of one volley (teardown, data reseed). In-flight
 	// visuals of that volley stop; other volleys are untouched.
 	void fx_unregister_volley(uint64_t volley_id);

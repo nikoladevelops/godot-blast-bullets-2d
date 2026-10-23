@@ -462,6 +462,15 @@ void BulletFactory2D::age_fx_bake(FXOneShotBake &bake) {
 	}
 }
 
+bool BulletFactory2D::fx_volley_bakes_intact(uint64_t volley_id) const {
+	for (const FXOneShotBake &bake : fx_bakes) {
+		if (bake.volley_id == volley_id && bake.any_shard_lost()) {
+			return false;
+		}
+	}
+	return true;
+}
+
 int BulletFactory2D::get_active_effect_count() const {
 	int total = 0;
 	for (size_t i = 0; i < fx_bakes.size(); ++i) {
