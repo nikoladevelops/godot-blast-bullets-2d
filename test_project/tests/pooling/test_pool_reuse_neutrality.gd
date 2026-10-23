@@ -473,3 +473,25 @@ func test_a_frameless_life_starts_with_a_clean_animation_state() -> void:
 	assert_eq(reused, v, "the pooled instance is reused")
 	var cold: BulletVolley2D = factory.spawn_volley(plain)
 	assert_eq(_sprite_state(reused), _sprite_state(cold), "the animation state of a cold frameless volley")
+
+
+## A pooled handle refuses new frames and effect layers: nothing a script
+## hands it is kept alive while it waits in the pool.
+func test_a_pooled_handle_keeps_no_frames_or_layers() -> void:
+	var v: BulletVolley2D = factory.spawn_volley(_plain())
+	v.clear_all_bullets()
+	await idle(2)
+	assert_true(v.is_pooled(), "pooled")
+	var sf := SpriteFrames.new()
+	sf.add_frame(&"default", ImageTexture.create_from_image(Image.create_empty(4, 4, false, Image.FORMAT_RGBA8)))
+	var layer := H.make_effect_layer(BulletEffectLayerData2D.EFFECT_TRAIL_FOLLOW, 2)
+	var refs := [weakref(sf), weakref(layer)]
+	assert_false(v.play_sprite_animation(sf), "refused")
+	expect_error_sequence(["play_sprite_animation: this volley is in the pool (its last bullet died), so this handle is stale. Spawn a new volley instead."])
+	var layers: Array[BulletEffectLayerData2D] = [layer]
+	v.set_effect_layers(layers)
+	expect_error_sequence(["set_effect_layers: this volley is in the pool (its last bullet died), so this handle is stale. Spawn a new volley instead."])
+	sf = null
+	layer = null
+	layers.clear()
+	assert_eq([refs[0].get_ref(), refs[1].get_ref()], [null, null], "nothing kept alive by the pooled volley")

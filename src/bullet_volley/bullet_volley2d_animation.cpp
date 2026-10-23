@@ -313,6 +313,11 @@ bool BulletVolley2D::rebuild_sprite_animation(const Ref<SpriteFrames> &p_sprite_
 }
 
 bool BulletVolley2D::play_sprite_animation(const Ref<SpriteFrames> &p_sprite_frames, const StringName &p_animation) {
+	// A pooled handle keeps nothing a script hands it (the frames would stay
+	// alive in the pool until the next life).
+	if (reject_pooled_handle("play_sprite_animation")) {
+		return false;
+	}
 	if (p_sprite_frames.is_null()) {
 		UtilityFunctions::push_error("BulletVolley2D play_sprite_animation: sprite_frames is null.");
 		return false;

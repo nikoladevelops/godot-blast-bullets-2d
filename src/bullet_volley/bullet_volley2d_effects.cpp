@@ -356,6 +356,9 @@ TypedArray<BulletEffectLayerData2D> BulletVolley2D::get_effect_layers() const {
 }
 
 void BulletVolley2D::set_effect_layers(const TypedArray<BulletEffectLayerData2D> &new_layers) {
+	if (reject_pooled_handle("set_effect_layers")) {
+		return; // a pooled handle keeps no layers (nor their baked frames)
+	}
 	// Live rebake without a spawn flash (edits must not detonate): trigger
 	// routing, trail shards and factory bakes all follow the new list.
 	fx_reseed_from_data(new_layers, false);
