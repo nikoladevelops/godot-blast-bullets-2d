@@ -1272,6 +1272,8 @@ protected:
 	Vector2 shot_pose_velocity;
 	// Countdown to the next volley; volleys fired since (re)arming.
 	double shoot_time_left = 0.0;
+	// Cuts the running wait to the longest the timing settings can roll now.
+	void clamp_shoot_wait_to_settings();
 	// True while shoot_time_left counts the initial delay (until the first
 	// pull): an interval change never cuts it.
 	bool shoot_initial_wait = false;

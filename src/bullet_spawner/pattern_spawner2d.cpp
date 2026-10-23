@@ -161,11 +161,15 @@ void PatternSpawner2D::set_shoot_interval_sec(double value) {
 		return;
 	}
 	shoot_interval_sec = value;
-	// A shorter interval applies to the wait already running (otherwise the
-	// old, longer interval would still be waited out once), down to the
-	// longest wait the settings can still roll (shoot_interval_max_sec, the
-	// reload jitter): the same value never cuts a rolled wait. The initial
-	// delay is not an interval.
+	clamp_shoot_wait_to_settings();
+}
+
+void PatternSpawner2D::clamp_shoot_wait_to_settings() {
+	// Shorter settings apply to the wait already running (otherwise the old,
+	// longer one would still be waited out once), down to the longest wait
+	// the settings can still roll (shoot_interval_sec, shoot_interval_max_sec,
+	// the reload jitter): the same values never cut a rolled wait. The
+	// initial delay is not an interval.
 	const double longest = Math::max(shoot_interval_sec, shoot_interval_max_sec) + Math::max(reload_jitter_sec, 0.0);
 	if (!shoot_initial_wait && shoot_time_left > longest) {
 		shoot_time_left = longest;
@@ -370,6 +374,7 @@ void PatternSpawner2D::set_reload_jitter_sec(double value) {
 		return;
 	}
 	reload_jitter_sec = value;
+	clamp_shoot_wait_to_settings();
 }
 
 // Burst / telegraph / targeting / perf setters: same reject-and-keep

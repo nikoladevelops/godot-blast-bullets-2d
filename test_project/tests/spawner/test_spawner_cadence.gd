@@ -472,3 +472,24 @@ func test_physics_streams_are_evenly_spaced() -> void:
 		gaps.append(snappedf((volleys[k - 1] as BulletVolley2D).get_bullet_transform(0).origin.x - (volleys[k] as BulletVolley2D).get_bullet_transform(0).origin.x, 0.01))
 	for g in gaps:
 		assert_almost_eq(g, 15.0, 0.01, "300 px/s x 0.05 s apart: %s" % [gaps])
+
+
+## Lowering what a wait was rolled from (shoot_interval_max_sec, the reload
+## jitter) cuts a running wait down to the longest the new settings can roll,
+## like a shorter shoot_interval_sec does.
+func test_lowering_the_interval_range_cuts_the_running_wait(knob: String = use_parameters(["shoot_interval_max_sec", "reload_jitter_sec"])) -> void:
+	var sp := make_spawner(H.make_volley_data(1, 50.0, 30.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
+	sp.shoot_interval_sec = 0.1
+	sp.bullet_random_seed = 7
+	sp.reload_jitter_seed = 7
+	sp.set(knob, 9.0)
+	assert_eq(sp.get(knob), 9.0, "%s set" % knob)
+	sp.set_shooting_enabled(true)
+	for i in 30:
+		await idle(1)
+		if sp.get_volleys_fired() > 0:
+			break
+	await idle(1)
+	assert_gt(sp.get_shoot_time_left(), 0.5, "a long wait was rolled")
+	sp.set(knob, 0.0)
+	assert_lte(sp.get_shoot_time_left(), 0.1 + 0.0001, "%s lowered: the wait is cut to the interval" % knob)

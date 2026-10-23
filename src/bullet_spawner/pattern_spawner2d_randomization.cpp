@@ -29,11 +29,19 @@ BLAST_RANDOM_SETTER(bullet_position_jitter_min, value >= 0.0, ">= 0")
 BLAST_RANDOM_SETTER(bullet_position_jitter_max, value >= 0.0, ">= 0")
 // Timing maxima feed RandomNumberGenerator.randf_range, which takes floats:
 // past FLT_MAX the wait became INF and the spawner stalled for good.
-BLAST_RANDOM_SETTER(shoot_interval_max_sec, is_finite_real2d(value) && value >= 0.0, ">= 0 (0 = off)")
 BLAST_RANDOM_SETTER(burst_interval_max_sec, is_finite_real2d(value) && value >= 0.0, ">= 0 (0 = off)")
 BLAST_RANDOM_SETTER(telegraph_max_sec, is_finite_real2d(value) && value >= 0.0, ">= 0 (0 = off)")
 
 #undef BLAST_RANDOM_SETTER
+
+void PatternSpawner2D::set_shoot_interval_max_sec(double value) {
+	if (!is_finite_real2d(value) || value < 0.0) {
+		UtilityFunctions::push_error(String(get_class()) + ": shoot_interval_max_sec must be finite and >= 0 (0 = off), keeping the old value.");
+		return;
+	}
+	shoot_interval_max_sec = value;
+	clamp_shoot_wait_to_settings(); // a lower maximum cuts a longer rolled wait
+}
 
 void PatternSpawner2D::set_bullet_scale_mode(BulletScaleMode value) {
 	if (value < BULLET_SCALE_OFF || value > BULLET_SCALE_PER_AXIS) {
