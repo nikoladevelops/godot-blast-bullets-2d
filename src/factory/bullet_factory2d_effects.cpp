@@ -519,6 +519,16 @@ int BulletFactory2D::spawn_layer_effect(const Ref<BulletEffectLayerData2D> &laye
 			return fx_fire_into_bake(fx_manual_bakes[i], at);
 		}
 	}
+	// Baked first: a layer that cannot play once never builds shards nor
+	// drops another manual bake.
+	FXOneShotBake bake;
+	if (!layer->bake_effect_animation(layer->animation, &frame_cache, bake.anim)) {
+		return -1;
+	}
+	if (!(bake.anim.total > 0.0)) {
+		UtilityFunctions::push_error("BulletFactory2D.spawn_layer_effect: the layer's animation has no playable time (speed 0 holds its frame), nothing spawned.");
+		return -1;
+	}
 	// New distinct layer: cap the manual set, oldest bake drops (with its
 	// live visuals) so mixed hatches coexist without unbounded growth.
 	if (fx_manual_bakes.size() >= 8) {
@@ -528,10 +538,6 @@ int BulletFactory2D::spawn_layer_effect(const Ref<BulletEffectLayerData2D> &laye
 	fx_ensure_effects_container();
 	if (sprite_effects_container.get() == nullptr) {
 		UtilityFunctions::push_error("BulletFactory2D: sprite effects container missing, manual effect not spawned.");
-		return -1;
-	}
-	FXOneShotBake bake;
-	if (!layer->bake_effect_animation(layer->animation, &frame_cache, bake.anim)) {
 		return -1;
 	}
 	bake.volley_id = 0;

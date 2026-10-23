@@ -1437,3 +1437,17 @@ func test_a_reused_volley_draws_its_one_shots_after_the_container_was_freed() ->
 	assert_eq(again, v, "the pooled volley is reused")
 	again.clear_all_bullets()
 	assert_gt(_visible_effect_shards(), 0, "its clear effect draws again")
+
+
+## spawn_layer_effect on a layer whose animation never ends (a held Trail
+## Follow layer, speed 0) has nothing to play once: refused with one error,
+## before any shard is built or another manual bake is dropped.
+func test_spawn_layer_effect_refuses_an_animation_without_playable_time() -> void:
+	await _preamble()
+	await _settle(factory)
+	var held := _make_layer(BulletEffectLayerData2D.EFFECT_TRAIL_FOLLOW, 2)
+	held.sprite_frames.set_animation_speed(&"default", 0.0)
+	var manual_before := int(factory.debug_get_effect_state()["manual_bakes"])
+	assert_eq(factory.spawn_layer_effect(held, Transform2D(0.0, Vector2(40, 0))), -1, "refused")
+	expect_error_sequence(["BulletFactory2D.spawn_layer_effect: the layer's animation has no playable time (speed 0 holds its frame), nothing spawned."])
+	assert_eq(int(factory.debug_get_effect_state()["manual_bakes"]), manual_before, "no bake built or dropped")
