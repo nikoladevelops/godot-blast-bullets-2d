@@ -1353,15 +1353,6 @@ func test_an_effect_without_a_ramp_never_keeps_an_old_tint() -> void:
 	assert_eq(_manual_tint(), Color(1, 1, 1, 1), "plain white, not the old tint")
 
 
-## The tint of the manual hatch's first live slot (Color(-1...) when none).
-func _manual_tint() -> Color:
-	for b in factory.debug_get_effect_state().get("manual", []):
-		var live: Array = b.get("live_slots", [])
-		if not live.is_empty():
-			return live[0].get("tint", Color(-1, -1, -1, -1))
-	return Color(-1, -1, -1, -1)
-
-
 ## The manual hatch (spawn_layer_effect) rebuilds its shards when the layer's
 ## look changed since: material, tint, draw order and ring size.
 func test_manual_hatch_rebuilds_on_look_edits() -> void:
@@ -1388,3 +1379,29 @@ func test_manual_hatch_rebuilds_on_look_edits() -> void:
 	assert_gt(looks.size(), 0, "shards exist")
 	for l in looks:
 		assert_eq(l, [Color(1, 0, 0, 1), 9, true, 7], "every shard carries the new look")
+
+
+## The tint of the manual hatch's first live slot (Color(-1...) when none).
+func _manual_tint() -> Color:
+	for b in factory.debug_get_effect_state().get("manual", []):
+		var live: Array = b.get("live_slots", [])
+		if not live.is_empty():
+			return live[0].get("tint", Color(-1, -1, -1, -1))
+	return Color(-1, -1, -1, -1)
+
+
+## A full reset drops the frame textures so art repainted in place re-bakes:
+## an effect layer's own bake follows it (it is built again from the sheet).
+func test_a_full_reset_re_bakes_effect_layer_art() -> void:
+	await _preamble()
+	await _settle(factory)
+	var layer := _make_layer(3, 1)
+	layer.override_frame_color = true # a whitened copy: built from the pixels
+	assert_true(factory.spawn_layer_effect(layer, Transform2D(0.0, Vector2(40, 0))) >= 0, "fires")
+	var builds_before := int(factory.debug_get_frame_cache_stats()["builds"])
+	assert_true(factory.spawn_layer_effect(layer, Transform2D(0.0, Vector2(40, 0))) >= 0, "fires again")
+	assert_eq(int(factory.debug_get_frame_cache_stats()["builds"]), builds_before, "a second effect reuses the bake")
+	await idle(1) # reset is idle-only
+	factory.reset()
+	assert_true(factory.spawn_layer_effect(layer, Transform2D(0.0, Vector2(40, 0))) >= 0, "fires after the reset")
+	assert_gt(int(factory.debug_get_frame_cache_stats()["builds"]), builds_before, "the layer re-baked from the cleared cache (its whitened frame built again)")

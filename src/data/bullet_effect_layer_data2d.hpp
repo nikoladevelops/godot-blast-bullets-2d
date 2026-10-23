@@ -248,6 +248,7 @@ private:
 	mutable bool bake_valid = false;
 	mutable StringName bake_anim;
 	mutable SpriteAnim2D bake_cache;
+	mutable uint64_t bake_cache_epoch = 0; // FrameTextureCache2D::clear_epoch of bake_cache
 	// Content generation: bumped on every invalidation so consumers holding
 	// baked output (manual hatch) can detect layer edits and rebake instead
 	// of serving stale frames.

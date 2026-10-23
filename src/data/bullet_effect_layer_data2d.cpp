@@ -1,4 +1,5 @@
 #include "data/bullet_effect_layer_data2d.hpp"
+#include "sprite/frame_texture_cache2d.hpp"
 #include "core/transform_math2d.hpp"
 #include "core/variant_enum_cast2d.hpp"
 #include "core/warn_once2d.hpp"
@@ -20,7 +21,8 @@ void BulletEffectLayerData2D::invalidate_bake() const {
 }
 
 bool BulletEffectLayerData2D::bake_effect_animation(const StringName &anim, FrameTextureCache2D *cache, SpriteAnim2D &out) const {
-	if (bake_valid && bake_anim == anim) {
+	// A full factory reset dropped the frame textures: re-bake from them.
+	if (bake_valid && bake_anim == anim && bake_cache_epoch == FrameTextureCache2D::clear_epoch) {
 		out = bake_cache;
 		return true;
 	}
@@ -77,6 +79,7 @@ bool BulletEffectLayerData2D::bake_effect_animation(const StringName &anim, Fram
 	bake_cache = baked;
 	bake_anim = anim;
 	bake_valid = true;
+	bake_cache_epoch = FrameTextureCache2D::clear_epoch;
 	out = std::move(baked);
 	return true;
 }

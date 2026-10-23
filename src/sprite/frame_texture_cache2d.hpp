@@ -39,7 +39,11 @@ public:
 	static Ref<Texture2D> build_drawable(const Ref<Texture2D> &source, FrameImageReader2D &reader);
 	static Ref<Texture2D> build_whitened(const Ref<Texture2D> &source, FrameImageReader2D &reader);
 
+	// Drops every texture (a full BulletFactory2D.reset()): art repainted in
+	// place re-bakes. Bumps clear_epoch, so bakes cached elsewhere (effect
+	// layers) re-bake too.
 	void clear();
+	static inline uint64_t clear_epoch = 0;
 	// {entries, builds, hits, sheet_reads, unreadable}
 	Dictionary debug_stats() const;
 

@@ -73,6 +73,7 @@ Ref<Texture2D> FrameTextureCache2D::whitened(const Ref<Texture2D> &source, Frame
 void FrameTextureCache2D::clear() {
 	drawable_entries.clear();
 	whitened_entries.clear();
+	++clear_epoch;
 }
 
 Dictionary FrameTextureCache2D::debug_stats() const {
