@@ -53,8 +53,8 @@ for the rest: the sections are written to be looked up, not read once.
    unless the change is the point (then pin the new text in a test).
 9. **Ask the user** before changing a contract (public behavior, wording,
    defaults); fix plain bugs without asking but list them in the report.
-10. **Finish green:** full suite + `--self-test` + format check + snapshot
-    diff + benchmark gate (+ `run_editor_smoke.py` when editor/preview code
+10. **Finish green:** full suite + `--self-test` + format check +
+    `check_portability.py` + snapshot diff + benchmark gate (+ `run_editor_smoke.py` when editor/preview code
     changed, + `run_sanitizer_tests.py` when casts, enums, integer math,
     lifetimes or user-callback paths changed), then report with Big-O and a ratings table (§19).
 
@@ -62,7 +62,7 @@ for the rest: the sections are written to be looked up, not read once.
 
 ```sh
 GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py   # build (exit 1 = failed; never raw scons, never edit SConstruct)
-python3 tools/run_tests.py                                       # 238 files / 2258 tests, ~25 s, leak-checked
+python3 tools/run_tests.py                                       # 238 files / 2306 tests, ~25 s, leak-checked
 python3 tools/run_tests.py --suite <substring> --full            # one area, every failure message unclipped
 python3 tools/run_tests.py --self-test                           # proves the harness still catches failures/leaks
 python3 tools/run_editor_smoke.py                                # headless EDITOR run of tests/editor_smoke/ (editor-only paths)
@@ -70,6 +70,7 @@ python3 tools/run_sanitizer_tests.py [--sanitizer address|undefined] [--suite <x
 python3 tools/api_snapshot.py save <label>                       # behavior snapshot (~10 s, §7.4)
 python3 tools/api_snapshot.py diff <label_a> <label_b>           # must print IDENTICAL for a refactor
 python3 tools/format_code.py [--check] [files or dirs]           # clang-format (repo .clang-format)
+python3 tools/check_portability.py                               # what only MSVC / Clang reject (pedantic, narrowing, std includes, non-ASCII literals)
 python3 tools/run_benchmarks.py [--scenario <name>] [--gate]     # performance (§15)
 GODOTPP_NONINTERACTIVE=1 python3 tools/generate_xml_docs.py      # regenerate doc_classes (§17)
 ```
@@ -1021,6 +1022,17 @@ deduped, cancelled by REMOVED) and replayed once on resume.
 | Movement velocity is measured over the time each step took (endpoint frames, Loop wraps); a new path or space is a jump | `spawner/test_spawner_movement` |
 | Every system that plays SpriteFrames (bullets, `play_sprite_animation`, pickups, trails, one-shots, `spawn_layer_effect`, the six laser looks) picks, times and draws a frame by the same rules; an AtlasTexture frame draws its region (margin box, zero region = whole atlas, nested, compressed), never its sheet | `integration/test_sprite_frames_contract` |
 | `override_frame_color` toggled live keeps the animation's frame, time, paused and finished state | `volley/test_volley_fx_layers` |
+| A rejected range applies NOTHING, also through a nested all_bullets_* call (callers return on `!ensure_indexes_match_amount_bullets_range`: the emptied (0, -1) reads as the whole volley); every range method names its args `bullet_index_start` / `bullet_index_end_inclusive` | `volley/test_volley_range_contract` (state-checked sweep) |
+| Gravity setters and state resets report the velocity without the dropped fall speed at once | `volley/test_volley_velocity_composition` |
+| A laser queued for deletion is never pooled, popped, listed, counted or ticked; an ended laser no longer counts for max_live_lasers | `laser/test_laser_pool_and_lifecycle`, `laser/test_laser_spawner` |
+| set_anchor keeps a running sweep; an anchor outside the tree (spawn_laser, set_anchor) is ridden once it enters, without a jump; a teleport moves a beam only when its own anchor jumped | `laser/test_laser_aim_and_motion`, `laser/test_laser_spawner` |
+| end_laser from a live handler announces every phase it entered before laser_finished | `laser/test_laser_beam_phases` |
+| A spent beam and a target that left the graze list end a laser graze visit silently (like bullets) | `laser/test_laser_graze` |
+| LaserData2D look edits (frames: `looks_serial`, material, z_index, body mode repeat) reach lasers in flight | `laser/test_laser_render_interpolation` |
+| No bound method takes a typed (non-Resource) object: object arguments are Variants read by id (`live_argument2d`), a freed or wrong object is refused with one error | `integration/test_accessor_contract` |
+| One-shot frame changes write tint and spin to the shown frame's shard; a fresh instance without ramp or fade is white; the manual hatch rebuilds on look edits; a full reset re-bakes effect-layer art (`FrameTextureCache2D::clear_epoch`) | `volley/test_volley_fx_layers` |
+| A one-frame non-looping animation finishes after its frame's time (AnimatedSprite2D); a zero region axis is the whole atlas WITHOUT the margin's size | `volley/test_volley_signal_timing`, `integration/test_sprite_frames_contract` |
+| A burst chain taken over at its last shot still reports burst_finished; an auto warning never fires past a cap reached during it; the capping shot reports shooting_finished even when its handler hands out a budget; one runtime step per frame across a process_callback switch | `spawner/test_spawner_burst_telegraph`, `spawner/test_spawner_cadence` |
 
 - Edge cases to test everywhere: NaN/Inf scalars and vectors; null array
   entries; empty arrays; short vs oversized arrays; OOB indices (-1/99);
@@ -1030,6 +1042,19 @@ deduped, cancelled by REMOVED) and replayed once on resume.
   finite-but-overflowing values (1e30 velocity: its square is INF in float32);
   maxed timers (64); huge target/queue counts; same-frame expiry+respawn; deferred calls from
   collision handlers; zero-delta ticks; mixed shared + per-bullet features.
+- Every compiler, not just GCC (the release builds include MSVC; GCC
+  accepts extensions MSVC refuses, and libstdc++ includes more than MSVC's
+  STL): never `, ##__VA_ARGS__` with an empty argument list (a bind macro
+  takes its hint and hint string explicitly: `PROPERTY_HINT_NONE, ""`),
+  include the standard header of every `std::` name you use, never narrow
+  inside braces, and build non-ASCII text with `String::utf8(...)`
+  (godot-cpp's `String(const char *)` reads Latin-1: "px/s²" showed as
+  "px/sÂ²"). `tools/check_portability.py` checks all of it on Linux.
+- Never bind a typed Node/Object pointer parameter: godot-cpp converts the
+  argument through the object's raw pointer before the plugin runs, so a
+  freed node a script still holds is read after free (it crashed in
+  `Object::get_gdtype`; ASan cannot see it, the read is in engine code).
+  Bind a `const Variant &` and resolve it with `live_argument2d<T>`.
 - Godot facts that bit us: GDExtension virtuals
   (`_get_configuration_warnings`) are not script-callable (expose a public
   twin); NEVER open the real test_project in an editor with a scene argument
@@ -1319,6 +1344,9 @@ project's `.so`). For quick numeric comparisons load two
   / `edit_build_profile.py` / `change_lto_mode.py` / `toggle_editor_target.py`
   / `toggle_debug_symbols.py` / `toggle_reloadable.py`.
 - Verification: `run_tests.py`, `lint_tests.py`, `api_snapshot.py` (§7.4),
+  `check_portability.py` (GCC -Wpedantic -Wnarrowing syntax pass over every
+  src TU, std:: names without their own header include, non-ASCII literals
+  outside String::utf8: the Windows-only failures, caught on Linux),
   `test_inventory.py` (save/diff every test name with its assert count:
   proves a suite merge or helper move lost nothing; §8.8),
   `format_code.py`, `run_benchmarks.py`, `run_editor_smoke.py` (headless
