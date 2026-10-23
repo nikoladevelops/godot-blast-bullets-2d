@@ -562,7 +562,11 @@ double PatternSpawner2D::get_shoot_time_left() const {
 }
 
 double PatternSpawner2D::get_burst_time_left() const {
-	return burst_shots_left > 0 ? Math::max(burst_time_left, 0.0) : 0.0;
+	if (burst_shots_left <= 0) {
+		return 0.0;
+	}
+	// The chain's first shot waits behind its warning.
+	return Math::max(telegraph_pending ? telegraph_time_left : burst_time_left, 0.0);
 }
 
 bool PatternSpawner2D::is_telegraph_pending() const {

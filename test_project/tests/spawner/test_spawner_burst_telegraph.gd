@@ -421,3 +421,20 @@ func test_a_new_budget_from_the_capping_shot_still_reports_the_finish() -> void:
 			break
 	assert_eq(sp.get_volleys_fired(), 2, "capped")
 	assert_signal_emit_count(sp, "shooting_finished", 1, "the cap is reported")
+
+
+## During a chain's first-shot warning the next burst shot is the warning's
+## time away: get_burst_time_left reads it (never 0).
+func test_burst_time_left_counts_the_first_shot_warning() -> void:
+	var sp := _spawner(3, 0.05)
+	sp.telegraph_enabled = true
+	sp.telegraph_sec = 0.5
+	sp.begin_burst()
+	for i in 5:
+		await idle(1)
+		if sp.is_telegraph_pending():
+			break
+	assert_true(sp.is_telegraph_pending(), "warned first")
+	await idle(3)
+	assert_gt(sp.get_burst_time_left(), 0.3, "the warning's time is left before the first shot")
+	assert_almost_eq(sp.get_burst_time_left(), sp.get_telegraph_time_left(), 0.0001, "the same clock")
