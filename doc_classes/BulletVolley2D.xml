@@ -399,8 +399,8 @@
 		</method>
 		<method name="all_bullets_remove_movement_pattern">
 			<return type="void" />
-			<param index="0" name="start_index" type="int" default="0" />
-			<param index="1" name="end_index_inclusive" type="int" default="-1" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
 				Removes the movement pattern from all bullets in the specified range, making them lose any [Path2D] or [Curve2D] drawn pattern they had and move solely based on their direction and speed data.
 			</description>
@@ -510,7 +510,7 @@
 		</method>
 		<method name="all_bullets_set_direction_towards_node2d">
 			<return type="void" />
-			<param index="0" name="target_node" type="Node2D" />
+			<param index="0" name="target_node" type="Variant" />
 			<param index="1" name="bullet_index_start" type="int" default="0" />
 			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
@@ -558,8 +558,8 @@
 			<param index="0" name="curve_pattern" type="Curve2D" />
 			<param index="1" name="face_movement_direction" type="bool" default="false" />
 			<param index="2" name="repeat_pattern" type="bool" default="true" />
-			<param index="3" name="start_index" type="int" default="0" />
-			<param index="4" name="end_index_inclusive" type="int" default="-1" />
+			<param index="3" name="bullet_index_start" type="int" default="0" />
+			<param index="4" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
 				Sets a [Curve2D] drawn movement pattern to all bullets in the specified range. The bullets will follow the shape of the curve as they move.
 
@@ -570,11 +570,11 @@
 		</method>
 		<method name="all_bullets_set_movement_pattern_from_path">
 			<return type="void" />
-			<param index="0" name="path_holding_pattern" type="Path2D" />
+			<param index="0" name="path_holding_pattern" type="Variant" />
 			<param index="1" name="face_movement_direction" type="bool" default="false" />
 			<param index="2" name="repeat_pattern" type="bool" default="true" />
-			<param index="3" name="start_index" type="int" default="0" />
-			<param index="4" name="end_index_inclusive" type="int" default="-1" />
+			<param index="3" name="bullet_index_start" type="int" default="0" />
+			<param index="4" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
 				Sets a [Path2D] drawn movement pattern to all bullets in the specified range. The bullets will follow the shape of the path as they move.
 
@@ -711,7 +711,7 @@
 		</method>
 		<method name="all_bullets_set_texture_rotation_towards_node2d">
 			<return type="void" />
-			<param index="0" name="target_node" type="Node2D" />
+			<param index="0" name="target_node" type="Variant" />
 			<param index="1" name="bullet_index_start" type="int" default="0" />
 			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
@@ -1084,7 +1084,7 @@
 		<method name="bullet_homing_push_back_node2d_target">
 			<return type="bool" />
 			<param index="0" name="bullet_index" type="int" />
-			<param index="1" name="new_homing_target" type="Node2D" />
+			<param index="1" name="new_homing_target" type="Variant" />
 			<description>
 				Pushes a Node2D target to the back of the specified bullet's per-bullet deque. Returns true on success (bullet enabled/valid index/target).
 
@@ -1121,7 +1121,7 @@
 		<method name="bullet_homing_push_front_node2d_target">
 			<return type="bool" />
 			<param index="0" name="bullet_index" type="int" />
-			<param index="1" name="new_homing_target" type="Node2D" />
+			<param index="1" name="new_homing_target" type="Variant" />
 			<description>
 				Pushes a Node2D target to the front of the specified bullet's per-bullet deque. Returns true on success (bullet enabled/valid index/target).
 
@@ -1594,7 +1594,7 @@
 		<method name="emitter_set">
 			<return type="bool" />
 			<param index="0" name="emitter" type="BulletEmitterData2D" />
-			<param index="1" name="template_spawner" type="Node" />
+			<param index="1" name="template_spawner" type="Variant" />
 			<description>
 				Makes every flying bullet of this volley fire [param template_spawner]'s pattern, timed by [param emitter] (factory volleys, or an override of a spawner volley until its next life). The clocks start now: each bullet's first shot comes after the start delay plus its stagger. Returns [code]false[/code] (nothing changed) for a null [param emitter], a [param template_spawner] that is not a [PatternSpawner2D], or a pooled volley.
 			</description>
@@ -2115,7 +2115,7 @@
 		<method name="set_bullet_direction_towards_node2d">
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
-			<param index="1" name="target_node" type="Node2D" />
+			<param index="1" name="target_node" type="Variant" />
 			<description>
 				Set the direction of a specific bullet towards a target [Node2D]. The direction gets normalized automatically.
 			</description>
@@ -2156,7 +2156,7 @@
 		<method name="set_bullet_movement_pattern_from_path">
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
-			<param index="1" name="path_holding_pattern" type="Path2D" />
+			<param index="1" name="path_holding_pattern" type="Variant" />
 			<param index="2" name="face_movement_direction" type="bool" default="false" />
 			<param index="3" name="repeat_pattern" type="bool" default="true" />
 			<description>
@@ -2223,7 +2223,7 @@
 		<method name="set_bullet_texture_rotation_towards_node2d">
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
-			<param index="1" name="target_node" type="Node2D" />
+			<param index="1" name="target_node" type="Variant" />
 			<description>
 				Set the texture rotation of a specific bullet towards a target [Node2D].
 				The rotation will be set so that the bullet's texture faces towards the target node. Composes with the volley-wide texture offset (physics shape stays logical). Stick-relative attachments follow immediately.
@@ -2403,7 +2403,7 @@
 		</method>
 		<method name="shared_homing_deque_push_back_node2d_target">
 			<return type="void" />
-			<param index="0" name="new_homing_target" type="Node2D" />
+			<param index="0" name="new_homing_target" type="Variant" />
 			<description>
 				Pushes a Node2D target to the back of the shared deque.
 
@@ -2444,7 +2444,7 @@
 		</method>
 		<method name="shared_homing_deque_push_front_node2d_target">
 			<return type="void" />
-			<param index="0" name="new_homing_target" type="Node2D" />
+			<param index="0" name="new_homing_target" type="Variant" />
 			<description>
 				Pushes a Node2D target to the front of the shared deque.
 

@@ -173,7 +173,7 @@
 		</method>
 		<method name="debug_free_like_release" qualifiers="static">
 			<return type="void" />
-			<param index="0" name="object" type="Object" />
+			<param index="0" name="object" type="Variant" />
 			<description>
 				Test helper: deletes [param object] the way an exported release game frees it. Godot refuses [method Object.free] on an object that is emitting a signal only in debug builds; this skips that check, so tests can prove the plugin survives a handler that frees its emitter in a release build (the plugin then defers the free to the end of the emit).
 			</description>
@@ -247,7 +247,7 @@
 		<method name="debug_get_effect_state" qualifiers="const">
 			<return type="Dictionary" />
 			<description>
-				One-shot manager state: effect clock, bake count, total active slots, manual-bake actives and bake count, container validity, and per-bake volley/layer/active/slots/z/visibility/light/shards_busy/live_slots rows.
+				One-shot manager state: effect clock, bake count, total active slots, manual-bake actives and bake count, container validity, and per-bake volley/layer/active/slots/z/visibility/light/shards_busy/live_slots rows ([code]bakes[/code] for the volleys' bakes, [code]manual[/code] for [method spawn_layer_effect]'s). A live slot row carries its shard, tint and rotation plus the shards those two were written to ([code]tint_shard[/code], [code]rotation_shard[/code]).
 			</description>
 		</method>
 		<method name="debug_get_emitter_stats" qualifiers="const">
@@ -302,7 +302,7 @@
 		</method>
 		<method name="debug_get_pool_bucket">
 			<return type="VolleyPoolKey2D" />
-			<param index="0" name="volley" type="BulletVolley2D" />
+			<param index="0" name="volley" type="Variant" />
 			<description>
 				Live pool bucket (amount + shape) of one volley, for per-bucket free/reset assertions in multi-spawner tests. Returns null on null input.
 			</description>
@@ -532,7 +532,7 @@
 		</method>
 		<method name="free_volley_deferred">
 			<return type="void" />
-			<param index="0" name="volley" type="Node" />
+			<param index="0" name="volley" type="Variant" />
 			<description>
 				Safe single-volley free from any callback: uses queue_free(), never free()/force_delete(). Use this inside area_entered and other handlers instead of freeing the volley directly. Only bullet volleys ([BulletVolley2D]) are accepted; any other node is rejected with an error and left alone.
 			</description>
@@ -710,7 +710,7 @@
 		</method>
 		<method name="reactivate_volley">
 			<return type="void" />
-			<param index="0" name="volley" type="BulletVolley2D" />
+			<param index="0" name="volley" type="Variant" />
 			<description>
 				Puts a pooled volley back into the set of volleys the factory moves every tick, after one of its bullets was woken with [method BulletVolley2D.enable_bullet] outside of a normal spawn. Does nothing when the volley is already active, when the factory is busy, or when the factory is tearing down. You normally never call this yourself: [method BulletVolley2D.enable_bullet] already does it.
 			</description>
@@ -748,9 +748,9 @@
 			<return type="LaserVolley2D" />
 			<param index="0" name="data" type="LaserData2D" />
 			<param index="1" name="transforms" type="Transform2D[]" />
-			<param index="2" name="anchor" type="Node2D" default="null" />
+			<param index="2" name="anchor" type="Variant" default="null" />
 			<description>
-				Fires one [LaserVolley2D]: a beam per transform in [param transforms] (its origin is the muzzle, its x axis the direction). With [param anchor], the muzzles follow that node while [member LaserData2D.follow_spawner] is on. Factory lasers signal on this factory. Returns [code]null[/code] (with an error) for null data, no transforms, a transform that is not finite and invertible, or more beams than [method BulletPatterns2D.get_max_bullets_per_pattern].
+				Fires one [LaserVolley2D]: a beam per transform in [param transforms] (its origin is the muzzle, its x axis the direction). With [param anchor], the muzzles follow that node while [member LaserData2D.follow_spawner] is on (an anchor outside the tree is ridden once it enters, from where the beams are then; a freed node is refused). Factory lasers signal on this factory. Returns [code]null[/code] (with an error) for null data, no transforms, a transform that is not finite and invertible, or more beams than [method BulletPatterns2D.get_max_bullets_per_pattern].
 			</description>
 		</method>
 		<method name="spawn_layer_effect">

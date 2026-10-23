@@ -33,7 +33,7 @@
 			<return type="void" />
 			<param index="0" name="fade" type="bool" default="true" />
 			<description>
-				Ends the laser: fading ([param fade]) or at once. Its contacts end and the phase is announced on the next tick. Safe from handlers.
+				Ends the laser: fading ([param fade]) or at once. Its contacts end and the phase is announced on the next tick (at once when the laser finishes inside the current tick: every phase it entered is announced before [signal BulletFactory2D.laser_finished]). Safe from handlers.
 			</description>
 		</method>
 		<method name="get_active_time_left" qualifiers="const">
@@ -212,9 +212,9 @@
 		</method>
 		<method name="set_anchor">
 			<return type="void" />
-			<param index="0" name="anchor" type="Node2D" />
+			<param index="0" name="anchor" type="Variant" />
 			<description>
-				Makes the muzzles follow [param anchor] from where they are now ([code]null[/code] = stay).
+				Makes the muzzles follow [param anchor] from where they are now ([code]null[/code] = stay); a running sweep goes on unchanged. An anchor outside the tree is ridden once it enters, from where the beams are then. A freed node is refused with an error.
 			</description>
 		</method>
 		<method name="set_beam_angle">

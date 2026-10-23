@@ -117,6 +117,12 @@
 				Preview base track polyline exactly as drawn (holder-local, INF-separated runs). Empty when the preview is off. Lets tests prove the track rotates with the marker like the volley does.
 			</description>
 		</method>
+		<method name="debug_get_run_frame_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Debug: how many steps the runtime loop ran (one per frame in either [member process_callback], also across a switch made inside the physics step).
+			</description>
+		</method>
 		<method name="debug_get_sound_detector_stats" qualifiers="const">
 			<return type="Dictionary" />
 			<description>
@@ -364,28 +370,28 @@
 		</method>
 		<method name="set_bullet_factory">
 			<return type="void" />
-			<param index="0" name="factory" type="BulletFactory2D" />
+			<param index="0" name="factory" type="Variant" />
 			<description>
 				Assigns the factory directly. Pass null to clear it.
 			</description>
 		</method>
 		<method name="set_helper_aimed_target">
 			<return type="void" />
-			<param index="0" name="target" type="Node2D" />
+			<param index="0" name="target" type="Variant" />
 			<description>
 				Assigns the shared aimed target (Aimed cone and Corridor wall) directly. Pass null to clear it.
 			</description>
 		</method>
 		<method name="set_helper_path2d_node">
 			<return type="void" />
-			<param index="0" name="node" type="Node" />
+			<param index="0" name="node" type="Variant" />
 			<description>
 				Assigns the Path2D node used by the Path2D pattern layout. Updates [member helper_path2d_path] to point at it and refreshes the editor preview. Pass null to clear it. A node that is not a [Path2D] is refused with an error (the old one is kept), like [member helper_path2d_path].
 			</description>
 		</method>
 		<method name="set_movement_path_node">
 			<return type="void" />
-			<param index="0" name="node" type="Path2D" />
+			<param index="0" name="node" type="Variant" />
 			<description>
 				Assigns the [Path2D] to move along and stores its path in [member movement_path].
 			</description>
@@ -399,7 +405,7 @@
 		</method>
 		<method name="set_transforms_generator">
 			<return type="void" />
-			<param index="0" name="generator" type="Node2D" />
+			<param index="0" name="generator" type="Variant" />
 			<description>
 				Assigns the generator directly. Pass null to use this spawner instead. Takes effect right away, in the editor and at runtime.
 			</description>

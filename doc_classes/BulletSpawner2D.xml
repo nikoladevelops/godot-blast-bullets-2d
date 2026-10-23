@@ -28,7 +28,7 @@
 	<methods>
 		<method name="adopt_live_volley">
 			<return type="bool" />
-			<param index="0" name="volley" type="BulletVolley2D" />
+			<param index="0" name="volley" type="Variant" />
 			<description>
 				Takes ownership of a manually-woken volley (manual wake detaches the previous owner): stamps it, replaces the previous spawner's reached forwarder with its own, and tracks it for retargeting. Queues are left alone. Handlers you connected directly on the volley are kept; only spawner forwarders are replaced. Returns false for null or non-live instances.
 			</description>
