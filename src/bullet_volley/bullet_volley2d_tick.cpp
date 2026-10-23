@@ -113,7 +113,9 @@ void BulletVolley2D::tick(double delta) {
 		split_check_timer();
 	}
 	// 7. Emitter bullets: records the shots that are due (no user code).
-	if (emitter_config != nullptr && is_active && tick_may_continue(self_id)) {
+	// Liveness FIRST: the split timer's batch disable runs attachment
+	// callbacks that may free this volley.
+	if (tick_may_continue(self_id) && emitter_config != nullptr && is_active) {
 		emitter_tick();
 	}
 }

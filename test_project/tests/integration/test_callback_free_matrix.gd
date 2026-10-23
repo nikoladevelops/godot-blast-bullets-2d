@@ -355,6 +355,33 @@ func test_freeing_inside_a_split_never_touches_freed_memory() -> void:
 	assert_eq("\n".join(problems), "", "a split survives a free from any callback inside it")
 
 
+## The split timer's batch (split_after_sec) takes the parents out with
+## their on_bullet_disable callbacks: freeing the volley or the factory from
+## there ends the tick without reading the freed volley (ASan-pinned).
+func test_freeing_inside_the_split_timer_never_touches_freed_memory() -> void:
+	var problems: Array = []
+	for victim in VICTIMS:
+		await _new_case()
+		var where := "split timer / %s" % victim
+		var stage := BulletSplitStage2D.new()
+		stage.count = 2
+		stage.split_after_sec = 0.05
+		var chain := BulletSplitData2D.new()
+		chain.stages = [stage]
+		var plain := _data(false)
+		plain.shared_bullet_attachment = null
+		var v: BulletVolley2D = factory.spawn_volley(_data(false))
+		v.split_set_data(chain, plain)
+		var other: BulletVolley2D = factory.spawn_volley(_data(false))
+		other.split_set_data(chain, plain)
+		await idle(1)
+		_arm(["disable"], victim, v, other)
+		await _await_hook(30)
+		problems.append_array(await _settle_and_check(where))
+		problems.append_array(_claim_errors().map(func(e): return "%s error: %s" % [where, e]))
+	assert_eq("\n".join(problems), "", "the split timer survives a free from its callbacks")
+
+
 func test_freeing_inside_a_non_lethal_split_never_touches_freed_memory() -> void:
 	# The parent leaves through disable_bullet inside the bounce drain, the
 	# hit drain, the homing dispatch and the graze dispatch: its
