@@ -715,6 +715,15 @@ void BulletVolley2D::set_bullet_transform(int bullet_index, const Transform2D &n
 	curr_bullet_transf = drawn;
 	curr_bullet_origin = new_transform.get_origin();
 	note_bullet_basis_grew(drawn);
+	// rotate_only_textures keeps the hitbox's own (frozen) rotation: it takes
+	// the new scale like set_bullet_scale gives it (handedness kept).
+	if (rotate_only_textures && bullet_index < (int)all_cached_shape_transforms.size()) {
+		Transform2D &shape = all_cached_shape_transforms[bullet_index];
+		const Vector2 scale = drawn.get_scale();
+		const real_t det_sign = shape.determinant() < 0.0 ? (real_t)-1.0 : (real_t)1.0;
+		shape.columns[0] = safe_normalized2d(shape.columns[0]) * scale.x;
+		shape.columns[1] = safe_normalized2d(shape.columns[1]) * (Math::abs(scale.y) * det_sign);
+	}
 
 	// The attachment shifts by the jump (stick-relative ones recompute).
 	present_bullet_transform(bullet_index, origin_delta);

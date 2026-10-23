@@ -264,6 +264,25 @@ func test_a_scaled_bullet_keeps_its_scale_in_flight_and_its_hitbox_scales(rotate
 	assert_gt(absf(w.get_bullet_transform(0).get_rotation()), 0.01, "it did spin")
 
 
+## set_bullet_transform with a new scale sizes the hitbox like
+## set_bullet_scale, in both rotate_only_textures modes (with it, the hitbox
+## keeps its own frozen rotation).
+func test_set_bullet_transform_rescales_the_hitbox(rotate_only_textures: bool = use_parameters([true, false])) -> void:
+	var d := H.make_still_data(1)
+	d.rotate_only_textures = rotate_only_textures
+	d.transforms = [Transform2D(0.3, Vector2(10, 20))]
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	var shape_before: Transform2D = v.debug_get_bullet_shape_transform(0)
+	v.set_bullet_transform(0, Transform2D(0.3, Vector2(3, 3), 0.0, Vector2(40, 20)))
+	var shape: Transform2D = v.debug_get_bullet_shape_transform(0)
+	assert_almost_eq(shape.get_scale(), Vector2(3, 3), Vector2(0.001, 0.001), "rotate_only_textures %s: the hitbox took the new scale" % rotate_only_textures)
+	assert_almost_eq(shape.origin, Vector2(40, 20), Vector2(0.001, 0.001), "at the new position")
+	if rotate_only_textures:
+		assert_almost_eq(shape.get_rotation(), shape_before.get_rotation(), 0.0001, "its frozen rotation kept")
+	v.set_bullet_transform(0, Transform2D(0.3, Vector2(0.5, 0.5), 0.0, Vector2(40, 20)))
+	assert_almost_eq(v.debug_get_bullet_shape_transform(0).get_scale(), Vector2(0.5, 0.5), Vector2(0.001, 0.001), "and shrinks it again")
+
+
 func test_a_written_scale_never_reaches_the_next_life() -> void:
 	var d := H.make_volley_data(2, 100.0, 0.1)
 	var w: BulletVolley2D = factory.spawn_volley(d)
