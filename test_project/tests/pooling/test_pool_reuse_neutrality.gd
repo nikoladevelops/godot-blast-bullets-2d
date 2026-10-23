@@ -443,3 +443,33 @@ func test_enable_callback_on_pooled_reuse_sees_enabled_bullets() -> void:
 	assert_same(reused, cold, "the pooled volley was reused")
 	assert_eq(AttachmentStatusProbe2D.enable_seen.size(), 2, "one on_bullet_enable per pooled attachment")
 	assert_eq(str(AttachmentStatusProbe2D.enable_seen), "[true, true]", "bullet 0 already reads enabled inside the callback")
+
+
+func _sprite_state(v: BulletVolley2D) -> Array:
+	return [v.get_sprite_animation(), v.get_sprite_frame(), v.get_sprite_frame_count(), v.is_sprite_animation_finished(), v.is_sprite_animation_playing(), v.get_sprite_frames()]
+
+
+## A life without frames starts with a clean animation state, also when the
+## pooled volley's last life played (and finished, stopped, sought) another.
+func test_a_frameless_life_starts_with_a_clean_animation_state() -> void:
+	var d := H.make_volley_data(2, 0.0, 5.0)
+	var sf := SpriteFrames.new()
+	sf.add_animation(&"walk")
+	sf.set_animation_loop(&"walk", false)
+	sf.set_animation_speed(&"walk", 30.0)
+	for i in 3:
+		sf.add_frame(&"walk", ImageTexture.create_from_image(Image.create_empty(4, 4, false, Image.FORMAT_RGBA8)))
+	d.sprite_frames = sf
+	d.animation = &"walk"
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	await physics(20)
+	assert_true(v.is_sprite_animation_finished(), "the walk finished")
+	v.stop_sprite_animation()
+	v.clear_all_bullets()
+	await idle(2)
+	var plain := H.make_volley_data(2, 0.0, 5.0)
+	plain.sprite_frames = null # drawn by texture_size
+	var reused: BulletVolley2D = factory.spawn_volley(plain)
+	assert_eq(reused, v, "the pooled instance is reused")
+	var cold: BulletVolley2D = factory.spawn_volley(plain)
+	assert_eq(_sprite_state(reused), _sprite_state(cold), "the animation state of a cold frameless volley")

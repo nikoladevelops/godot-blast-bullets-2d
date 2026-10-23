@@ -246,6 +246,7 @@ void BulletVolley2D::release_life() {
 	}
 	anim_source.unref();
 	anim.clear();
+	anim_name = StringName("default"); // a frameless next life reads like a cold volley
 	set_texture(Ref<Texture2D>());
 	// The material (and its instance parameter values, which may hold
 	// textures) belongs to the spawn data: the next life sets its own.
