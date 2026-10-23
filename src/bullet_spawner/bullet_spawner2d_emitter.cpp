@@ -100,7 +100,9 @@ void BulletSpawner2D::apply_emitter_config() {
 	// path being edited) keeps the last one: flying bullets never lose it.
 	const PatternSpawner2D *tpl = get_emitter_template();
 	if (tpl != nullptr) {
-		emitter_shared->template_id = tpl->get_instance_id();
+		// A way back to this spawner (made while bullets fly): they stop
+		// firing at once; the next shot reports the cycle (apply_volley_emitter).
+		emitter_shared->template_id = emitter_enabled && emitter_leads_back() ? 0 : tpl->get_instance_id();
 	} else if (emitter_spawner_path.is_empty()) {
 		emitter_shared->template_id = 0;
 	}

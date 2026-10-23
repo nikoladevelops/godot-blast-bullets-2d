@@ -551,3 +551,25 @@ func test_a_swapped_emitter_resource_reaches_bullets_in_flight() -> void:
 	sp.emitter = null # the factory's default resource (no cap)
 	_step(8)
 	assert_gt(shots.size(), before, "back to no cap through the default resource")
+
+
+## A cycle made while bullets fly (the path now leads back to the spawner):
+## the bullets in flight stop firing at once, never the spawner's own pattern
+## (the next shot reports the cycle, once).
+func test_a_cycle_made_in_flight_stops_the_flying_bullets() -> void:
+	var tpl := _template()
+	var sp := _emitting(tpl, _timing(0.25))
+	var own: Array = []
+	sp.volley_fired.connect(func(v: BulletVolley2D, _n: int) -> void: own.append(v))
+	_fire(sp)
+	_step(2)
+	var fired := shots.size()
+	assert_gt(fired, 0, "the bullets fire the template")
+	own.clear()
+	sp.emitter_spawner_path = NodePath(".")
+	_step(8)
+	expect_no_errors()
+	assert_eq(own.size(), 0, "they never fire the spawner's own pattern")
+	assert_eq(shots.size(), fired, "nor the old template")
+	_fire(sp)
+	expect_error_sequence(["BulletSpawner2D: emitter_spawner_path leads back to this spawner (an emitter cycle), its bullets do not emit."])
