@@ -66,3 +66,23 @@ func test_shared_reach_still_pops_the_shared_deque_next_to_a_per_bullet_bullet()
 	assert_eq(events[0][0], 1, "the reach belongs to the shared-steered bullet")
 	assert_eq(v.shared_homing_deque_check_homing_targets_amount(), 1, "one shared pop for bullet 1's reach")
 	assert_eq(v.bullet_homing_check_targets_amount(0), 1, "bullet 0's own far target stays")
+
+
+## A reach handler that freezes and wakes its bullet (a fresh life of that
+## bullet): the auto-pop of the old reach never takes the woken bullet's
+## target (like the drop of its later events).
+func test_a_bullet_woken_by_its_reach_handler_keeps_its_target() -> void:
+	var v: BulletVolley2D = factory.spawn_volley(_data(2, true, false)) # two: freezing one never drains the volley
+	v.bullet_homing_target_reached.connect(func(vol: BulletVolley2D, idx: int, _t, _p) -> void:
+		events.append(idx)
+		if events.size() == 1:
+			vol.disable_bullet(idx)
+			vol.enable_bullet(idx))
+	v.bullet_homing_push_back_global_position_target(0, Vector2(5, 0))
+	await idle(1)
+	for i in 10:
+		factory.debug_advance_time(1.0 / 60.0)
+		if events.size() > 0:
+			break
+	assert_eq(events.size(), 1, "reached once")
+	assert_eq(v.bullet_homing_check_targets_amount(0), 1, "the woken bullet keeps its own front")

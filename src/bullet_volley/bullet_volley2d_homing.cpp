@@ -827,9 +827,10 @@ bool BulletVolley2D::dispatch_homing_events() {
 			homing_dispatch_scratch.clear();
 			return true;
 		}
-		// Per-bullet auto-pop: only while the reached target is still this
-		// bullet's front (a target the handler pushed in front is spared).
-		if (ev.auto_pop && ev.bullet_index < (int)all_bullet_homing_targets.size() && all_bullets_enabled_set.contains(ev.bullet_index)) {
+		// Per-bullet auto-pop: only for the same bullet life (a handler that
+		// froze and woke it started a new one) and while the reached target is
+		// still its front (a target the handler pushed in front is spared).
+		if (ev.auto_pop && ev.bullet_index < (int)all_bullet_homing_targets.size() && all_bullets_enabled_set.contains(ev.bullet_index) && collision_epoch_for_bullet(ev.bullet_index) == ev.epoch) {
 			HomingTargetDeque &deque = all_bullet_homing_targets[ev.bullet_index];
 			if (!deque.empty() && orbit_target_identity(deque) == ev.front_identity) {
 				bullet_homing_pop_front_target(ev.bullet_index);
