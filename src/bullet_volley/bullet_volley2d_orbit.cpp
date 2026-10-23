@@ -235,7 +235,9 @@ void BulletVolley2D::all_bullets_enable_orbiting(real_t orbiting_radius, Orbitin
 }
 
 void BulletVolley2D::all_bullets_enable_orbiting_linear(real_t radius_start, real_t radius_step, OrbitingDirection orbiting_direction, OrbitingTextureRotation orbiting_texture_rotation, int bullet_index_start, int bullet_index_end_inclusive, OrbitingFollowMode orbiting_follow_mode, real_t orbiting_follow_deadzone, OrbitingLockPolicy orbiting_lock_policy, bool orbiting_rigid_follow) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_enable_orbiting_linear");
+	if (!ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_enable_orbiting_linear")) {
+		return;
+	}
 
 	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
 		const real_t want_radius = radius_start + radius_step * (real_t)(i - bullet_index_start);

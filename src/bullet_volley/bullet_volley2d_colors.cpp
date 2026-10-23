@@ -98,7 +98,9 @@ PackedColorArray BulletVolley2D::all_bullets_get_color(int bullet_index_start, i
 void BulletVolley2D::all_bullets_set_color(const Color &new_color, int bullet_index_start, int bullet_index_end_inclusive) {
 	// The range contract first (like every all_bullets_* method), then one
 	// refusal for the whole call, not one per bullet.
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_color");
+	if (!ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_color")) {
+		return;
+	}
 	if (bullet_index_start > bullet_index_end_inclusive) {
 		return;
 	}

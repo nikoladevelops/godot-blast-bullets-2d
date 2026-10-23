@@ -69,7 +69,9 @@ void BulletVolley2D::_do_drop_attachment_slot_if_matches(int bullet_index, Bulle
 }
 
 TypedArray<BulletAttachment2D> BulletVolley2D::all_bullets_get_attachments(int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_attachments");
+	if (!ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_attachments")) {
+		return {};
+	}
 
 	TypedArray<BulletAttachment2D> arr;
 
@@ -81,7 +83,9 @@ TypedArray<BulletAttachment2D> BulletVolley2D::all_bullets_get_attachments(int b
 }
 
 TypedArray<BulletAttachment2D> BulletVolley2D::all_bullets_set_attachment_to_null(int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_attachment_to_null");
+	if (!ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_attachment_to_null")) {
+		return {};
+	}
 
 	TypedArray<BulletAttachment2D> arr;
 

@@ -489,11 +489,11 @@ public:
 
 	Ref<Curve2D> get_bullet_movement_pattern_curve(int bullet_index) const;
 	void set_bullet_movement_pattern_from_path(int bullet_index, Path2D *path_holding_pattern, bool face_movement_direction = false, bool repeat_pattern = true);
-	void all_bullets_set_movement_pattern_from_path(Path2D *path_holding_pattern, bool face_movement_direction = false, bool repeat_pattern = true, int start_index = 0, int end_index_inclusive = -1);
+	void all_bullets_set_movement_pattern_from_path(Path2D *path_holding_pattern, bool face_movement_direction = false, bool repeat_pattern = true, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 	void set_bullet_movement_pattern_from_curve(int bullet_index, const Ref<Curve2D> &curve_pattern, bool face_movement_direction = false, bool repeat_pattern = true);
-	void all_bullets_set_movement_pattern_from_curve(const Ref<Curve2D> &curve_pattern, bool face_movement_direction = false, bool repeat_pattern = true, int start_index = 0, int end_index_inclusive = -1);
+	void all_bullets_set_movement_pattern_from_curve(const Ref<Curve2D> &curve_pattern, bool face_movement_direction = false, bool repeat_pattern = true, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 	void remove_bullet_movement_pattern(int bullet_index);
-	void all_bullets_remove_movement_pattern(int start_index = 0, int end_index_inclusive = -1);
+	void all_bullets_remove_movement_pattern(int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 	int get_collision_layer() const;
 	void set_collision_layer(int new_collision_layer);
 	void set_collision_layer_from_array(const TypedArray<int> &numbers);
@@ -1170,8 +1170,9 @@ public:
 	// last bullet" (the documented default); any other out-of-range or
 	// inverted index FAILS LOUD and applies NOTHING. (It used to clamp silently
 	// to the whole volley, so a typo like (99, 99) on a 10-bullet volley
-	// rewrote every bullet.) On rejection the range is left empty
-	// (start > end) so callers' loops do nothing and getters return [].
+	// rewrote every bullet.) Callers return at once on false: the emptied
+	// range is (0, -1), which a nested all_bullets_* call reads as "every
+	// bullet" (that once applied rejected ranges to the whole volley).
 	_ALWAYS_INLINE_ bool ensure_indexes_match_amount_bullets_range(int &bullet_index_start, int &bullet_index_end_inclusive, const char *function_name) const;
 	// The all_bullets_* skeletons: validate the range once (as above), then
 	// run fn(i) per bullet / collect fn(i) per bullet into an Arr.

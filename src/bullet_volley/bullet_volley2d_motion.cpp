@@ -113,7 +113,9 @@ void BulletVolley2D::all_bullets_set_velocity(const Vector2 &new_velocity, int b
 }
 
 TypedArray<Vector2> BulletVolley2D::all_bullets_get_velocity(int bullet_index_start, int bullet_index_end_inclusive) const {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_velocity");
+	if (!ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_velocity")) {
+		return {};
+	}
 
 	TypedArray<Vector2> arr;
 	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
@@ -325,7 +327,9 @@ TypedArray<BulletRotationData2D> BulletVolley2D::all_bullets_get_rotation_data(i
 }
 
 void BulletVolley2D::all_bullets_set_rotation_data(const Ref<BulletRotationData2D> &new_bullet_rotation_data, int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_rotation_data");
+	if (!ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_rotation_data")) {
+		return;
+	}
 
 	if (new_bullet_rotation_data.is_null()) {
 		UtilityFunctions::push_error("all_bullets_set_rotation_data: new_bullet_rotation_data is null.");
@@ -450,7 +454,9 @@ TypedArray<real_t> BulletVolley2D::all_bullets_get_speed(int bullet_index_start,
 void BulletVolley2D::all_bullets_set_speed(real_t new_speed, int bullet_index_start, int bullet_index_end_inclusive) {
 	// A shared speed curve owns every bullet: one warning, not one per bullet.
 	if (shared_bullet_curves_data.is_valid() && shared_bullet_curves_data->movement_speed_curve.is_valid()) {
-		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_speed");
+		if (!ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_speed")) {
+			return;
+		}
 		if (bullet_index_start <= bullet_index_end_inclusive) {
 			speed_curve_owns_speed(bullet_index_start, "speed");
 		}
@@ -464,7 +470,9 @@ TypedArray<BulletSpeedData2D> BulletVolley2D::all_bullets_get_speed_data(int bul
 }
 
 void BulletVolley2D::all_bullets_set_speed_data(const Ref<BulletSpeedData2D> &new_bullet_speed_data, int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_speed_data");
+	if (!ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_speed_data")) {
+		return;
+	}
 
 	if (new_bullet_speed_data.is_null()) {
 		UtilityFunctions::push_error("all_bullets_set_speed_data: new_bullet_speed_data is null.");
@@ -890,7 +898,9 @@ void BulletVolley2D::set_bullet_direction_towards_node2d(int bullet_index, const
 }
 
 void BulletVolley2D::all_bullets_set_direction_towards_node2d(const Node2D *target_node, int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_direction_towards_node2d");
+	if (!ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_direction_towards_node2d")) {
+		return;
+	}
 
 	if (target_node == nullptr) {
 		UtilityFunctions::push_error("The target_node provided to all_bullets_set_direction_towards_node2d is null. Cannot set direction towards a null node.");
@@ -955,7 +965,9 @@ void BulletVolley2D::set_bullet_texture_rotation_towards_node2d(int bullet_index
 }
 
 void BulletVolley2D::all_bullets_set_texture_rotation_towards_node2d(const Node2D *target_node, int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_texture_rotation_towards_node2d");
+	if (!ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_texture_rotation_towards_node2d")) {
+		return;
+	}
 
 	if (target_node == nullptr) {
 		UtilityFunctions::push_error("The target_node provided to all_bullets_set_texture_rotation_towards_node2d is null. Cannot set texture rotation towards a null node.");

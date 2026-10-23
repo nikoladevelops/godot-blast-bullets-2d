@@ -284,7 +284,9 @@ void BulletVolley2D::bullet_set_trail_enabled(int layer_index, int bullet_index,
 }
 
 void BulletVolley2D::all_bullets_set_trail_enabled(int layer_index, bool trail_on, int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_trail_enabled");
+	if (!ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_trail_enabled")) {
+		return;
+	}
 	// Single error for the whole range instead of one per bullet below.
 	if (!fx_has_trail_layer(layer_index)) {
 		UtilityFunctions::push_error("all_bullets_set_trail_enabled: no baked trail layer " + String::num_int64(layer_index) + " on this volley.");

@@ -612,13 +612,13 @@ void BulletVolley2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_bullet_movement_pattern_curve", "bullet_index"), &BulletVolley2D::get_bullet_movement_pattern_curve);
 
 	ClassDB::bind_method(D_METHOD("set_bullet_movement_pattern_from_path", "bullet_index", "path_holding_pattern", "face_movement_direction", "repeat_pattern"), &BulletVolley2D::set_bullet_movement_pattern_from_path, DEFVAL(false), DEFVAL(true));
-	ClassDB::bind_method(D_METHOD("all_bullets_set_movement_pattern_from_path", "path_holding_pattern", "face_movement_direction", "repeat_pattern", "start_index", "end_index_inclusive"), &BulletVolley2D::all_bullets_set_movement_pattern_from_path, DEFVAL(false), DEFVAL(true), DEFVAL(0), DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("all_bullets_set_movement_pattern_from_path", "path_holding_pattern", "face_movement_direction", "repeat_pattern", "bullet_index_start", "bullet_index_end_inclusive"), &BulletVolley2D::all_bullets_set_movement_pattern_from_path, DEFVAL(false), DEFVAL(true), DEFVAL(0), DEFVAL(-1));
 
 	ClassDB::bind_method(D_METHOD("set_bullet_movement_pattern_from_curve", "bullet_index", "curve_pattern", "face_movement_direction", "repeat_pattern"), &BulletVolley2D::set_bullet_movement_pattern_from_curve, DEFVAL(false), DEFVAL(true));
-	ClassDB::bind_method(D_METHOD("all_bullets_set_movement_pattern_from_curve", "curve_pattern", "face_movement_direction", "repeat_pattern", "start_index", "end_index_inclusive"), &BulletVolley2D::all_bullets_set_movement_pattern_from_curve, DEFVAL(false), DEFVAL(true), DEFVAL(0), DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("all_bullets_set_movement_pattern_from_curve", "curve_pattern", "face_movement_direction", "repeat_pattern", "bullet_index_start", "bullet_index_end_inclusive"), &BulletVolley2D::all_bullets_set_movement_pattern_from_curve, DEFVAL(false), DEFVAL(true), DEFVAL(0), DEFVAL(-1));
 
 	ClassDB::bind_method(D_METHOD("remove_bullet_movement_pattern", "bullet_index"), &BulletVolley2D::remove_bullet_movement_pattern);
-	ClassDB::bind_method(D_METHOD("all_bullets_remove_movement_pattern", "start_index", "end_index_inclusive"), &BulletVolley2D::all_bullets_remove_movement_pattern, DEFVAL(0), DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("all_bullets_remove_movement_pattern", "bullet_index_start", "bullet_index_end_inclusive"), &BulletVolley2D::all_bullets_remove_movement_pattern, DEFVAL(0), DEFVAL(-1));
 
 	ClassDB::bind_method(D_METHOD("has_bullet_movement_pattern", "bullet_index"), &BulletVolley2D::check_exists_bullet_movement_pattern_data);
 

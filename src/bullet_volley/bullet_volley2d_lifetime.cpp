@@ -135,7 +135,9 @@ PackedFloat64Array BulletVolley2D::all_bullets_get_life_time_left(int bullet_ind
 }
 
 void BulletVolley2D::all_bullets_set_life_time_left(double seconds, int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_life_time_left");
+	if (!ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_life_time_left")) {
+		return;
+	}
 	if (bullet_index_start > bullet_index_end_inclusive) {
 		return;
 	}

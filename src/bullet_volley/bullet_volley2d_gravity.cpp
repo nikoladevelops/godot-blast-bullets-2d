@@ -105,7 +105,9 @@ void BulletVolley2D::bullet_set_gravity(int bullet_index, const Vector2 &value) 
 }
 
 void BulletVolley2D::all_bullets_set_gravity(const Vector2 &value, int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_gravity");
+	if (!ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_gravity")) {
+		return;
+	}
 	if (!value.is_finite()) {
 		UtilityFunctions::push_error("BulletVolley2D.all_bullets_set_gravity: value must be finite, keeping old values.");
 		return;

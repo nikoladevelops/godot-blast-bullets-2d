@@ -168,7 +168,9 @@ void BulletVolley2D::bullet_clear_homing_targets(int bullet_index) {
 }
 
 Array BulletVolley2D::all_bullets_pop_front_target(int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_pop_front_target");
+	if (!ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_pop_front_target")) {
+		return {};
+	}
 	Array popped_targets;
 
 	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
@@ -179,7 +181,9 @@ Array BulletVolley2D::all_bullets_pop_front_target(int bullet_index_start, int b
 }
 
 Array BulletVolley2D::all_bullets_pop_back_target(int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_pop_back_target");
+	if (!ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_pop_back_target")) {
+		return {};
+	}
 	Array popped_targets;
 
 	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
@@ -190,7 +194,9 @@ Array BulletVolley2D::all_bullets_pop_back_target(int bullet_index_start, int bu
 }
 
 void BulletVolley2D::all_bullets_push_back_mouse_position_target(int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_push_back_mouse_position_target");
+	if (!ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_push_back_mouse_position_target")) {
+		return;
+	}
 	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
 		if (orbit_skip_disabled_in_bulk(i)) {
 			continue;
@@ -200,7 +206,9 @@ void BulletVolley2D::all_bullets_push_back_mouse_position_target(int bullet_inde
 }
 
 void BulletVolley2D::all_bullets_push_front_mouse_position_target(int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_push_front_mouse_position_target");
+	if (!ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_push_front_mouse_position_target")) {
+		return;
+	}
 	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
 		if (orbit_skip_disabled_in_bulk(i)) {
 			continue;
@@ -210,7 +218,9 @@ void BulletVolley2D::all_bullets_push_front_mouse_position_target(int bullet_ind
 }
 
 void BulletVolley2D::all_bullets_push_back_homing_target(const Variant &node2d_or_global_position, int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_push_back_homing_target");
+	if (!ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_push_back_homing_target")) {
+		return;
+	}
 	if (node2d_or_global_position.get_type() == Variant::VECTOR2 && !Vector2(node2d_or_global_position).is_finite()) {
 		UtilityFunctions::push_error("Non-finite homing target in all_bullets_push_back_homing_target. Nothing was pushed.");
 		return;
@@ -236,7 +246,9 @@ void BulletVolley2D::all_bullets_push_back_homing_target(const Variant &node2d_o
 }
 
 void BulletVolley2D::all_bullets_push_front_homing_target(const Variant &node2d_or_global_position, int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_push_front_homing_target");
+	if (!ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_push_front_homing_target")) {
+		return;
+	}
 	if (node2d_or_global_position.get_type() == Variant::VECTOR2 && !Vector2(node2d_or_global_position).is_finite()) {
 		UtilityFunctions::push_error("Non-finite homing target in all_bullets_push_front_homing_target. Nothing was pushed.");
 		return;
@@ -262,14 +274,18 @@ void BulletVolley2D::all_bullets_push_front_homing_target(const Variant &node2d_
 }
 
 void BulletVolley2D::all_bullets_push_back_homing_targets_array(const Array &node2ds_or_global_positions_array, int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_push_back_homing_targets_array");
+	if (!ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_push_back_homing_targets_array")) {
+		return;
+	}
 	for (const Variant &target : node2ds_or_global_positions_array) {
 		all_bullets_push_back_homing_target(target, bullet_index_start, bullet_index_end_inclusive);
 	}
 }
 
 void BulletVolley2D::all_bullets_push_front_homing_targets_array(const Array &node2ds_or_global_positions_array, int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_push_front_homing_targets_array");
+	if (!ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_push_front_homing_targets_array")) {
+		return;
+	}
 	for (const Variant &target : node2ds_or_global_positions_array) {
 		all_bullets_push_front_homing_target(target, bullet_index_start, bullet_index_end_inclusive);
 	}
@@ -300,7 +316,9 @@ bool BulletVolley2D::bullet_replace_homing_targets_with_new_target(int bullet_in
 }
 
 void BulletVolley2D::all_bullets_replace_homing_targets_with_new_target(const Variant &node2d_or_global_position, int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_replace_homing_targets_with_new_target");
+	if (!ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_replace_homing_targets_with_new_target")) {
+		return;
+	}
 
 	// Validate BEFORE clearing: an invalid target must not wipe the user's targets.
 	const bool is_node2d = live_object2d<Node2D>(node2d_or_global_position) != nullptr;
@@ -319,7 +337,9 @@ void BulletVolley2D::all_bullets_replace_homing_targets_with_new_target(const Va
 }
 
 void BulletVolley2D::all_bullets_replace_homing_targets_with_new_target_array(const Array &node2ds_or_global_positions_array, int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_replace_homing_targets_with_new_target_array");
+	if (!ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_replace_homing_targets_with_new_target_array")) {
+		return;
+	}
 
 	// Validate every entry BEFORE clearing so a bad entry can't wipe the user's
 	// targets (all-or-nothing replace).
@@ -349,7 +369,9 @@ void BulletVolley2D::all_bullets_replace_homing_targets_with_new_target_array(co
 }
 
 void BulletVolley2D::all_bullets_replace_homing_targets_with_mouse(int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_replace_homing_targets_with_mouse");
+	if (!ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_replace_homing_targets_with_mouse")) {
+		return;
+	}
 
 	// Cache once for the whole loop
 	cached_mouse_global_position = get_global_mouse_position();
@@ -369,7 +391,9 @@ void BulletVolley2D::all_bullets_replace_homing_targets_with_mouse(int bullet_in
 }
 
 void BulletVolley2D::all_bullets_assign_homing_targets_array(const Array &node2ds_or_global_positions_array, int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_assign_homing_targets_array");
+	if (!ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_assign_homing_targets_array")) {
+		return;
+	}
 
 	const int range_size = bullet_index_end_inclusive - bullet_index_start + 1;
 	if (node2ds_or_global_positions_array.size() != range_size) {
@@ -631,7 +655,9 @@ void BulletVolley2D::bullet_set_homing_smoothing(int bullet_index, real_t value)
 }
 
 void BulletVolley2D::all_bullets_set_homing_smoothing(real_t value, int bullet_index_start, int bullet_index_end_inclusive) {
-	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_homing_smoothing");
+	if (!ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_homing_smoothing")) {
+		return;
+	}
 	if (!Math::is_finite(value) || value < 0.0) {
 		UtilityFunctions::push_error("all_bullets_set_homing_smoothing: value must be finite and >= 0 (0 snaps instantly).");
 		return;
