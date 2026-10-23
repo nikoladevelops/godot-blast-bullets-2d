@@ -409,7 +409,16 @@ void BulletFactory2D::populate_attachments_pool(const Ref<PackedScene> attachmen
 
 	FactoryOperationGuard op(this);
 
+	// instantiate() runs the scene's _init (user code): it may free this
+	// factory, so the watch is taken before the first one.
+	const LifeWatch watch = watch_life();
 	Node *inst = attachment_scene->instantiate();
+	if (watch.died()) {
+		if (inst != nullptr && !inst->is_queued_for_deletion()) {
+			inst->queue_free(); // never joined the tree, nothing owns it
+		}
+		return;
+	}
 	BulletAttachment2D *first_attachment = Object::cast_to<BulletAttachment2D>(inst);
 
 	// Validate by instantiation (a PackedScene's contents are unknowable any
@@ -432,8 +441,7 @@ void BulletFactory2D::populate_attachments_pool(const Ref<PackedScene> attachmen
 	}
 	bullet_attachments_pool.note_scene(pooling_key, attachment_scene);
 
-	// on_spawn_in_pool is user code: it may free the attachment or this factory.
-	const LifeWatch watch = watch_life();
+	// on_spawn_in_pool is user code too: it may free the attachment or this factory.
 	auto setup_attachment = [&](BulletAttachment2D *a, uint32_t key) -> bool {
 		a->set_physics_interpolation_mode(Node::PHYSICS_INTERPOLATION_MODE_OFF);
 		// Stamp the source scene like the attach path does: the pop guard
@@ -472,6 +480,12 @@ void BulletFactory2D::populate_attachments_pool(const Ref<PackedScene> attachmen
 
 	for (int i = 1; i < amount_instances; ++i) {
 		Node *later_inst = attachment_scene->instantiate();
+		if (watch.died()) {
+			if (later_inst != nullptr && !later_inst->is_queued_for_deletion()) {
+				later_inst->queue_free();
+			}
+			return;
+		}
 		BulletAttachment2D *a = Object::cast_to<BulletAttachment2D>(later_inst);
 		if (a == nullptr) {
 			UtilityFunctions::push_error("PackedScene stopped producing BulletAttachment2D during populate_attachments_pool. Keeping what was created so far.");

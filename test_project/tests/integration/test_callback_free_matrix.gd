@@ -734,6 +734,19 @@ func test_freeing_inside_an_attachment_init_never_touches_freed_memory(p: Array 
 	expect_no_errors()
 
 
+## The scene's _init runs inside populate_attachments_pool too (every
+## instance it builds): freeing the factory from the first one ends the
+## populate without touching the freed factory (ASan-pinned).
+func test_freeing_the_factory_inside_a_pool_populate_init_never_touches_freed_memory() -> void:
+	var scene := _hostile_scene()
+	Engine.set_meta(&"bb_hostile_init", _free_victim("factory", null))
+	factory.populate_attachments_pool(scene, 3)
+	_clear_hostile_meta()
+	await idle(2)
+	assert_false(is_instance_valid(factory), "the factory is gone")
+	expect_no_errors()
+
+
 ## A slowed volley hands its time scale to a new attachment
 ## (on_time_scale_changed, user code) inside bullet_set_attachment.
 func test_freeing_inside_a_time_scale_handoff_never_touches_freed_memory(victim: String = use_parameters(["volley", "factory"])) -> void:
