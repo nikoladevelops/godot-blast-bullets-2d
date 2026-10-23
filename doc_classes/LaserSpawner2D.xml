@@ -61,7 +61,7 @@
 			What a shot fires (see [LaserData2D]). Edits reach the lasers that are firing; the preview beams follow its [member LaserData2D.length]. A new resource only changes the next shots: the lasers in flight keep theirs (a Track / Lock On laser keeps following the Laser Targeting group, the mouse every frame and the retarget interval included).
 		</member>
 		<member name="laser_retarget_interval_sec" type="float" setter="set_laser_retarget_interval_sec" getter="get_laser_retarget_interval_sec" default="0.0">
-			Node Group and Node Path: how often the live Track / Lock On lasers pick their targets again (each beam the nearest), in seconds. 0 = only when fired.
+			Node Group, Node Path, Node Name and Node Children: how often the live Track / Lock On lasers pick their targets again (each beam the nearest), in seconds. 0 = only when fired. The mouse is read every frame; a global position never needs re-picking.
 		</member>
 		<member name="laser_target_children_parent_path" type="NodePath" setter="set_laser_target_children_parent_path" getter="get_laser_target_children_parent_path" default="NodePath(&quot;&quot;)">
 			Node Children source: the node whose Node2D children are the targets (only direct children unless [member laser_target_children_recursive]). A parent inside this spawner or a bullet factory gives no targets.

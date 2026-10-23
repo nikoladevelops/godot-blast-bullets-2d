@@ -1539,7 +1539,7 @@
 		</signal>
 		<signal name="shooting_stopped">
 			<description>
-				Fired when automatic shooting turns off via [member shooting_enabled].
+				Fired when automatic shooting turns off: [member shooting_enabled] switched off, [method pause_shooting] (also when a [method fire_n_volleys] budget is spent), or [member max_volleys] lowered onto the volleys already fired. Reaching the cap reports [signal shooting_finished] instead.
 			</description>
 		</signal>
 		<signal name="volley_skipped">
