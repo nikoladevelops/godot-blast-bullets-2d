@@ -2006,7 +2006,7 @@
 			<param index="0" name="layer_index" type="int" />
 			<param index="1" name="animation" type="StringName" />
 			<description>
-				Switches one trail layer to another baked animation (shard nodes rebuild; per-bullet phase and toggles survive). One-shot layers switch through their layer resource plus [method set_effect_layers]. Returns false when the layer or animation is missing.
+				Switches one trail layer to another baked animation (shard nodes rebuild; per-bullet phase and toggles survive). One-shot layers switch through their layer resource plus [method set_effect_layers]. A missing animation falls back to the first animation with frames (one error, like the bullets' animations). Returns [code]false[/code] when no trail layer has [param layer_index] or its frames cannot be baked.
 			</description>
 		</method>
 		<method name="play_sprite_animation">
