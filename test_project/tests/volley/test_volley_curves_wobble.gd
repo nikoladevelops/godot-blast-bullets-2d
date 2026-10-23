@@ -86,8 +86,9 @@ func test_gravity_accelerates_px_per_s2() -> void:
 	assert_eq(g.get_gravity(), Vector2(0, 2000), "NaN gravity rejected")
 	g.set_gravity(Vector2.ZERO)
 	var vb: Vector2 = g.get_bullet_velocity(0)
+	assert_almost_eq(vb.y, 0.0, 0.001, "the fall speed is gone at once (reported right after the setter)")
 	await physics()
-	assert_lt(g.get_bullet_velocity(0).y, vb.y, "zeroing gravity stops accelerating")
+	assert_almost_eq(g.get_bullet_velocity(0).y, vb.y, 0.001, "zeroing gravity stops accelerating")
 
 
 func test_shared_speed_rotation_fallback() -> void:

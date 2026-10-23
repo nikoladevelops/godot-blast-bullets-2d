@@ -996,6 +996,8 @@ void BulletVolley2D::reset_bullet_runtime_state(int bullet_index) {
 	if (bullet_index < (int)split_counts.size()) {
 		split_counts[bullet_index] = 0;
 	}
+	// The fall speed and the bounce frame (drift) are gone: report it at once.
+	refresh_velocity_if_cached(bullet_index);
 }
 
 bool BulletVolley2D::clear_bullet(int bullet_index) {

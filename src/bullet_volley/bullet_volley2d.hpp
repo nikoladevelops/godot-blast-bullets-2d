@@ -2181,6 +2181,8 @@ public:
 	_ALWAYS_INLINE_ void step_speed(const MoveTick2D &t, BulletStep2D &b);
 	// velocity = direction x speed + inherited offset + fall speed.
 	_ALWAYS_INLINE_ void refresh_cached_velocity(int bullet_index);
+	// The same, for a bullet whose caches may be unsized (setters, resets).
+	_ALWAYS_INLINE_ void refresh_velocity_if_cached(int bullet_index);
 
 	// Fingerprint of the current front target, so the ring knows when the target actually changed.
 	// bullet locked onto last. Node2D = instance id, Vector2 = bit hash of

@@ -55,6 +55,12 @@ _ALWAYS_INLINE_ void BulletVolley2D::refresh_cached_velocity(int bullet_index) {
 	all_cached_velocity[bullet_index] = all_cached_direction[bullet_index] * all_cached_speed[bullet_index] + bullet_drift(bullet_index) + ((bullet_index < (int)all_gravity_velocity.size()) ? all_gravity_velocity[bullet_index] : Vector2(0, 0));
 }
 
+_ALWAYS_INLINE_ void BulletVolley2D::refresh_velocity_if_cached(int bullet_index) {
+	if (bullet_index >= 0 && bullet_index < (int)all_cached_velocity.size() && bullet_index < (int)all_cached_direction.size() && bullet_index < (int)all_cached_speed.size()) {
+		refresh_cached_velocity(bullet_index);
+	}
+}
+
 // "<Class> '<path>'" for an emitter node: names the spawner or factory in
 // the unhandled-signal warnings.
 static inline String describe_emitter2d(Object *emitter) {

@@ -66,6 +66,7 @@ void BulletVolley2D::set_gravity(const Vector2 &value) {
 		}
 		if (all_gravity[i] != value) {
 			all_gravity_velocity[i] = Vector2(0, 0);
+			refresh_velocity_if_cached(i); // the reported velocity drops the fall speed at once
 		}
 		all_gravity[i] = value;
 	}
@@ -95,6 +96,7 @@ void BulletVolley2D::bullet_set_gravity(int bullet_index, const Vector2 &value) 
 	}
 	all_gravity[bullet_index] = value;
 	all_gravity_velocity[bullet_index] = Vector2(0, 0);
+	refresh_velocity_if_cached(bullet_index);
 	// A direct per-bullet write claims presence like a seeded entry, so
 	// a later set_gravity() cannot silently undo it.
 	if ((int)has_per_bullet_gravity.size() != amount_bullets) {
