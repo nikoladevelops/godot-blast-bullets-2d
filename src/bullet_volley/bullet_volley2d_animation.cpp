@@ -37,7 +37,9 @@ static bool resolve_sprite_animation_impl(const Ref<SpriteFrames> &p_sprite_fram
 
 void BulletVolley2D::advance_sprite_animation(double delta) {
 	const int64_t frame_count = (int64_t)anim.frames.size();
-	if (frame_count <= 1 || !is_active || anim_paused || anim_finished || anim.held) {
+	// One looping frame never changes; one frame without loop finishes after
+	// its time, like AnimatedSprite2D.
+	if (frame_count < 1 || (frame_count == 1 && anim.loop) || !is_active || anim_paused || anim_finished || anim.held) {
 		return;
 	}
 	if (!Math::is_finite(delta) || delta <= 0.0) {

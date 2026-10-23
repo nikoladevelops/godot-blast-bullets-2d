@@ -160,6 +160,19 @@ func test_sprite_animation_finished_fires_live_once() -> void:
 	assert_eq(events, [true, true], "a restart re-arms the signal once")
 
 
+## A one-frame animation follows AnimatedSprite2D: without loop it finishes
+## once after its frame's time (1/30 s here); with loop it never does.
+func test_a_one_frame_animation_finishes_like_animated_sprite(loop: bool = use_parameters([false, true])) -> void:
+	var d := _anim_data(loop)
+	d.sprite_frames.remove_frame("default", 1)
+	assert_eq(d.sprite_frames.get_frame_count("default"), 1, "one frame")
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	v.sprite_animation_finished.connect(func(_vol = null): events.append(1))
+	await physics(20)
+	assert_eq(events.size(), 0 if loop else 1, "loop %s: finished %s" % [loop, "never" if loop else "once"])
+	assert_eq(v.is_sprite_animation_finished(), not loop, "the finished state agrees")
+
+
 func test_looping_animation_never_finishes() -> void:
 	var v: BulletVolley2D = factory.spawn_volley(_anim_data(true))
 	v.sprite_animation_finished.connect(func(_vol = null): events.append(1))
