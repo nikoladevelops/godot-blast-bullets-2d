@@ -83,8 +83,10 @@ Ref<Image> FrameImageReader2D::read_atlas(const Ref<Texture2D> &tex, int depth) 
 	if (!(rw > 0.0) || !(rh > 0.0) || !(rx >= 0.0) || !(ry >= 0.0) || !(rx + rw <= sheet_w) || !(ry + rh <= sheet_h)) {
 		return Ref<Image>();
 	}
-	const double box_w = rw + mw;
-	const double box_h = rh + mh;
+	// The box Godot sizes it at (AtlasTexture::get_width / get_height): a zero
+	// region axis is the atlas's whole one, WITHOUT the margin's size.
+	const double box_w = region.size.x == 0.0f ? rw : rw + mw;
+	const double box_h = region.size.y == 0.0f ? rh : rh + mh;
 	if (!(box_w >= 1.0) || !(box_h >= 1.0) || !(box_w <= side) || !(box_h <= side)) {
 		return Ref<Image>();
 	}
