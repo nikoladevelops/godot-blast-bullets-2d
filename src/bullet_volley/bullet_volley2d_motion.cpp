@@ -249,9 +249,9 @@ void BulletVolley2D::set_rotation_data(const TypedArray<BulletRotationData2D> &r
 		const int src = tile_short_arrays ? (i % amount_rotation_data) : i;
 		BulletRotationData2D *entry = (src >= 0 && src < amount_rotation_data) ? Object::cast_to<BulletRotationData2D>(rotation_data[src]) : nullptr;
 		if (entry == nullptr || !Math::is_finite(entry->rotation_speed) || !Math::is_finite(entry->max_rotation_speed) || !Math::is_finite(entry->rotation_acceleration)) {
-			all_rotation_speed.emplace_back(0.0);
-			all_max_rotation_speed.emplace_back(0.0);
-			all_rotation_acceleration.emplace_back(0.0);
+			all_rotation_speed.emplace_back(0.0f);
+			all_max_rotation_speed.emplace_back(0.0f);
+			all_rotation_acceleration.emplace_back(0.0f);
 			// Out-of-range slot (no entry covers it) or an invalid entry: a
 			// genuine gap, so the shared fallback may fill it.
 			mark_per_bullet_rotation_presence(i, false);

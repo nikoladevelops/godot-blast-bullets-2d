@@ -7,6 +7,7 @@
 
 #include "bullet_spawner/pattern_spawner2d_internal.hpp"
 #include "core/emit_on2d.hpp"
+#include "core/live_object2d.hpp"
 #include "core/transform_math2d.hpp"
 
 using namespace godot;
@@ -47,7 +48,7 @@ static void keep_live_targets2d(Array &r_targets, const World2D *world) {
 			live.push_back(target);
 			continue;
 		}
-		Node2D *node = Object::cast_to<Node2D>(ObjectDB::get_instance(ObjectID(target)));
+		Node2D *node = live_object2d<Node2D>(target);
 		Vector2 position;
 		if (node != nullptr && target_node_usable2d(node, world, position)) {
 			live.push_back(node);
