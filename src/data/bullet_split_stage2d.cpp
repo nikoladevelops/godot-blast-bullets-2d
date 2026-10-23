@@ -197,32 +197,32 @@ void BulletSplitStage2D::_validate_property(PropertyInfo &p_property) const {
 }
 
 void BulletSplitStage2D::_bind_methods() {
-#define SPLIT_BIND(NAME, VARIANT, ...)                                                      \
+#define SPLIT_BIND(NAME, VARIANT, HINT, HINT_STRING)                                                      \
 	ClassDB::bind_method(D_METHOD("get_" #NAME), &BulletSplitStage2D::get_##NAME);          \
 	ClassDB::bind_method(D_METHOD("set_" #NAME, "value"), &BulletSplitStage2D::set_##NAME); \
-	ADD_PROPERTY(PropertyInfo(Variant::VARIANT, #NAME, ##__VA_ARGS__), "set_" #NAME, "get_" #NAME);
+	ADD_PROPERTY(PropertyInfo(Variant::VARIANT, #NAME, HINT, HINT_STRING), "set_" #NAME, "get_" #NAME);
 
 	ADD_GROUP("Triggers", "");
-	SPLIT_BIND(split_on_hit, BOOL)
-	SPLIT_BIND(split_on_lifetime_over, BOOL)
+	SPLIT_BIND(split_on_hit, BOOL, PROPERTY_HINT_NONE, "")
+	SPLIT_BIND(split_on_lifetime_over, BOOL, PROPERTY_HINT_NONE, "")
 	SPLIT_BIND(split_after_sec, FLOAT, PROPERTY_HINT_RANGE, "0,10,0.01,or_greater,suffix:s")
-	SPLIT_BIND(split_on_despawn, BOOL)
-	SPLIT_BIND(split_on_clear, BOOL)
-	SPLIT_BIND(split_on_bounce, BOOL)
-	SPLIT_BIND(split_on_non_lethal_hit, BOOL)
-	SPLIT_BIND(split_on_homing_reached, BOOL)
-	SPLIT_BIND(split_on_graze, BOOL)
+	SPLIT_BIND(split_on_despawn, BOOL, PROPERTY_HINT_NONE, "")
+	SPLIT_BIND(split_on_clear, BOOL, PROPERTY_HINT_NONE, "")
+	SPLIT_BIND(split_on_bounce, BOOL, PROPERTY_HINT_NONE, "")
+	SPLIT_BIND(split_on_non_lethal_hit, BOOL, PROPERTY_HINT_NONE, "")
+	SPLIT_BIND(split_on_homing_reached, BOOL, PROPERTY_HINT_NONE, "")
+	SPLIT_BIND(split_on_graze, BOOL, PROPERTY_HINT_NONE, "")
 
 	ADD_GROUP("Children", "");
 	SPLIT_BIND(count, INT, PROPERTY_HINT_RANGE, "1,64,1,or_greater")
 	SPLIT_BIND(chance, FLOAT, PROPERTY_HINT_RANGE, "0,1,0.01")
-	SPLIT_BIND(seed, INT)
+	SPLIT_BIND(seed, INT, PROPERTY_HINT_NONE, "")
 
 	ADD_GROUP("Direction", "");
 	SPLIT_BIND(direction_mode, INT, PROPERTY_HINT_ENUM, "Fan:0,Ring:1,Random In Spread:2")
 	SPLIT_BIND(spread_degrees, FLOAT, PROPERTY_HINT_RANGE, "0,360,0.1,degrees")
 	SPLIT_BIND(angle_offset_degrees, FLOAT, PROPERTY_HINT_RANGE, "-180,180,0.1,or_less,or_greater,degrees")
-	SPLIT_BIND(relative_to_parent_heading, BOOL)
+	SPLIT_BIND(relative_to_parent_heading, BOOL, PROPERTY_HINT_NONE, "")
 	SPLIT_BIND(angle_jitter_degrees, FLOAT, PROPERTY_HINT_RANGE, "0,360,0.1,degrees")
 
 	ADD_GROUP("Speed", "");
@@ -238,17 +238,17 @@ void BulletSplitStage2D::_bind_methods() {
 	SPLIT_BIND(child_data, OBJECT, PROPERTY_HINT_RESOURCE_TYPE, "BulletVolleyData2D")
 
 	ADD_GROUP("Keep", "");
-	SPLIT_BIND(keep_custom_data, BOOL)
-	SPLIT_BIND(keep_collision_count, BOOL)
-	SPLIT_BIND(keep_homing, BOOL)
-	SPLIT_BIND(keep_graze, BOOL)
-	SPLIT_BIND(keep_sound, BOOL)
-	SPLIT_BIND(keep_flock, BOOL)
-	SPLIT_BIND(inherit_parent_velocity, BOOL)
+	SPLIT_BIND(keep_custom_data, BOOL, PROPERTY_HINT_NONE, "")
+	SPLIT_BIND(keep_collision_count, BOOL, PROPERTY_HINT_NONE, "")
+	SPLIT_BIND(keep_homing, BOOL, PROPERTY_HINT_NONE, "")
+	SPLIT_BIND(keep_graze, BOOL, PROPERTY_HINT_NONE, "")
+	SPLIT_BIND(keep_sound, BOOL, PROPERTY_HINT_NONE, "")
+	SPLIT_BIND(keep_flock, BOOL, PROPERTY_HINT_NONE, "")
+	SPLIT_BIND(inherit_parent_velocity, BOOL, PROPERTY_HINT_NONE, "")
 
 	ADD_GROUP("Parent", "");
-	SPLIT_BIND(fire_death_effects, BOOL)
-	SPLIT_BIND(parent_survives, BOOL)
+	SPLIT_BIND(fire_death_effects, BOOL, PROPERTY_HINT_NONE, "")
+	SPLIT_BIND(parent_survives, BOOL, PROPERTY_HINT_NONE, "")
 	SPLIT_BIND(max_splits_per_bullet, INT, PROPERTY_HINT_RANGE, "0,16,1,or_greater")
 #undef SPLIT_BIND
 

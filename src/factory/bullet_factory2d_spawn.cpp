@@ -92,7 +92,7 @@ bool validate_spawn_data_fields(const Ref<BulletVolleyData2D> &spawn_data, int b
 // the bullets will be invisible. (Sprite art should face Vector2.RIGHT.)
 void warn_if_spawn_invisible(const Ref<BulletVolleyData2D> &spawn_data, const char *caller_name) {
 	if (spawn_data.is_valid() && spawn_data->sprite_frames.is_null() && spawn_data->mesh.is_null() && spawn_data->texture_size == Vector2(0, 0)) {
-		WarnOnce2D::warn(spawn_data->get_instance_id(), 13u, 0, 0, String("Warning in ") + caller_name + ": no sprite_frames/mesh/texture_size — bullets will be invisible. Assign SpriteFrames with art facing Vector2.RIGHT, or set texture_size/mesh.");
+		WarnOnce2D::warn(spawn_data->get_instance_id(), 13u, 0, 0, String("Warning in ") + caller_name + ": no sprite_frames/mesh/texture_size, bullets will be invisible. Assign SpriteFrames with art facing Vector2.RIGHT, or set texture_size/mesh.");
 	}
 }
 

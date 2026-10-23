@@ -140,3 +140,15 @@ func test_debugger_color_round_trips_before_and_after_ready() -> void:
 	assert_eq(early.debugger_color, Color(1, 0, 0, 1), "runtime writes reach the debugger")
 	early.queue_free()
 	await idle(1)
+
+
+## Spawn data with no art at all warns once, in plain text (no garbled
+## characters).
+func test_invisible_bullets_warn_once_in_plain_text() -> void:
+	var d := H.make_volley_data(2, 0.0, 5.0)
+	d.sprite_frames = null
+	d.texture_size = Vector2.ZERO
+	assert_not_null(factory.spawn_volley(d), "spawns")
+	expect_warning_sequence(["Warning in spawn_volley: no sprite_frames/mesh/texture_size, bullets will be invisible. Assign SpriteFrames with art facing Vector2.RIGHT, or set texture_size/mesh."])
+	factory.spawn_volley(d)
+	expect_no_errors()

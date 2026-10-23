@@ -642,10 +642,10 @@ void LaserSpawner2D::_validate_property(PropertyInfo &p_property) const {
 	}
 }
 
-#define LASER_SPAWNER_BIND(NAME, VARIANT, ...)                                          \
+#define LASER_SPAWNER_BIND(NAME, VARIANT, HINT, HINT_STRING)                                          \
 	ClassDB::bind_method(D_METHOD("get_" #NAME), &LaserSpawner2D::get_##NAME);          \
 	ClassDB::bind_method(D_METHOD("set_" #NAME, "value"), &LaserSpawner2D::set_##NAME); \
-	ADD_PROPERTY(PropertyInfo(Variant::VARIANT, #NAME, ##__VA_ARGS__), "set_" #NAME, "get_" #NAME);
+	ADD_PROPERTY(PropertyInfo(Variant::VARIANT, #NAME, HINT, HINT_STRING), "set_" #NAME, "get_" #NAME);
 
 void LaserSpawner2D::_bind_methods() {
 	ADD_GROUP("Lasers", "");
@@ -654,15 +654,15 @@ void LaserSpawner2D::_bind_methods() {
 	LASER_SPAWNER_BIND(max_live_lasers, INT, PROPERTY_HINT_RANGE, "0,64,1,or_greater")
 	ADD_GROUP("Laser Targeting", "");
 	LASER_SPAWNER_BIND(laser_target_source, INT, PROPERTY_HINT_ENUM, "None,Node Group,Node Path,Mouse,Global Position,Node Name,Node Children")
-	LASER_SPAWNER_BIND(laser_target_group, STRING_NAME)
-	LASER_SPAWNER_BIND(laser_target_filter_group, STRING_NAME)
+	LASER_SPAWNER_BIND(laser_target_group, STRING_NAME, PROPERTY_HINT_NONE, "")
+	LASER_SPAWNER_BIND(laser_target_filter_group, STRING_NAME, PROPERTY_HINT_NONE, "")
 	LASER_SPAWNER_BIND(laser_target_path, NODE_PATH, PROPERTY_HINT_NODE_PATH_VALID_TYPES, "Node2D")
-	LASER_SPAWNER_BIND(laser_target_position, VECTOR2)
-	LASER_SPAWNER_BIND(laser_target_node_name, STRING)
+	LASER_SPAWNER_BIND(laser_target_position, VECTOR2, PROPERTY_HINT_NONE, "")
+	LASER_SPAWNER_BIND(laser_target_node_name, STRING, PROPERTY_HINT_NONE, "")
 	LASER_SPAWNER_BIND(laser_target_name_match_mode, INT, PROPERTY_HINT_ENUM, "Exact,Contains,Starts With,Ends With")
-	LASER_SPAWNER_BIND(laser_target_name_case_sensitive, BOOL)
-	LASER_SPAWNER_BIND(laser_target_children_parent_path, NODE_PATH)
-	LASER_SPAWNER_BIND(laser_target_children_recursive, BOOL)
+	LASER_SPAWNER_BIND(laser_target_name_case_sensitive, BOOL, PROPERTY_HINT_NONE, "")
+	LASER_SPAWNER_BIND(laser_target_children_parent_path, NODE_PATH, PROPERTY_HINT_NONE, "")
+	LASER_SPAWNER_BIND(laser_target_children_recursive, BOOL, PROPERTY_HINT_NONE, "")
 	LASER_SPAWNER_BIND(laser_retarget_interval_sec, FLOAT, PROPERTY_HINT_RANGE, "0,5,0.01,or_greater,suffix:s")
 
 	ClassDB::bind_method(D_METHOD("get_live_lasers"), &LaserSpawner2D::get_live_lasers);

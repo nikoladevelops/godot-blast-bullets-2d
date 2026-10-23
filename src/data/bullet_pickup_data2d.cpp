@@ -390,7 +390,7 @@ void BulletPickupData2D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "magnet_delay_sec", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater,suffix:s"), "set_magnet_delay_sec", "get_magnet_delay_sec");
 	ClassDB::bind_method(D_METHOD("get_magnet_acceleration"), &BulletPickupData2D::get_magnet_acceleration);
 	ClassDB::bind_method(D_METHOD("set_magnet_acceleration", "value"), &BulletPickupData2D::set_magnet_acceleration);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "magnet_acceleration", PROPERTY_HINT_RANGE, "0,10000,1,or_greater,suffix:px/s²"), "set_magnet_acceleration", "get_magnet_acceleration");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "magnet_acceleration", PROPERTY_HINT_RANGE, String::utf8("0,10000,1,or_greater,suffix:px/s²")), "set_magnet_acceleration", "get_magnet_acceleration");
 	ClassDB::bind_method(D_METHOD("get_magnet_max_speed"), &BulletPickupData2D::get_magnet_max_speed);
 	ClassDB::bind_method(D_METHOD("set_magnet_max_speed", "value"), &BulletPickupData2D::set_magnet_max_speed);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "magnet_max_speed", PROPERTY_HINT_RANGE, "0,10000,1,or_greater,suffix:px/s"), "set_magnet_max_speed", "get_magnet_max_speed");

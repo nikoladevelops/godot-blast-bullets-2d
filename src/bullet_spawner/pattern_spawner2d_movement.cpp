@@ -144,7 +144,7 @@ void PatternSpawner2D::set_movement_speed(double value) {
 Tween::TransitionType PatternSpawner2D::get_movement_transition() const { return static_cast<Tween::TransitionType>(movement_transition); }
 
 void PatternSpawner2D::set_movement_transition(Tween::TransitionType value) {
-	if (movement_reject(value < 0 || value >= Easing2D::TRANS_COUNT, (String(get_class()) + ": movement_transition must be a Tween.TransitionType (0..11), keeping the old value."))) {
+	if (movement_reject((int)value < 0 || (int)value >= (int)Easing2D::TRANS_COUNT, (String(get_class()) + ": movement_transition must be a Tween.TransitionType (0..11), keeping the old value."))) {
 		return;
 	}
 	movement_transition = value;
@@ -153,7 +153,7 @@ void PatternSpawner2D::set_movement_transition(Tween::TransitionType value) {
 Tween::EaseType PatternSpawner2D::get_movement_ease() const { return static_cast<Tween::EaseType>(movement_ease); }
 
 void PatternSpawner2D::set_movement_ease(Tween::EaseType value) {
-	if (movement_reject(value < 0 || value >= Easing2D::EASE_COUNT, (String(get_class()) + ": movement_ease must be a Tween.EaseType (0..3), keeping the old value."))) {
+	if (movement_reject((int)value < 0 || (int)value >= (int)Easing2D::EASE_COUNT, (String(get_class()) + ": movement_ease must be a Tween.EaseType (0..3), keeping the old value."))) {
 		return;
 	}
 	movement_ease = value;

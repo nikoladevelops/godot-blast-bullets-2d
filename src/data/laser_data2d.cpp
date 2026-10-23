@@ -304,10 +304,10 @@ void LaserData2D::_validate_property(PropertyInfo &p_property) const {
 	}
 }
 
-#define LASER_BIND(NAME, VARIANT, ...)                                               \
+#define LASER_BIND(NAME, VARIANT, HINT, HINT_STRING)                                               \
 	ClassDB::bind_method(D_METHOD("get_" #NAME), &LaserData2D::get_##NAME);          \
 	ClassDB::bind_method(D_METHOD("set_" #NAME, "value"), &LaserData2D::set_##NAME); \
-	ADD_PROPERTY(PropertyInfo(Variant::VARIANT, #NAME, ##__VA_ARGS__), "set_" #NAME, "get_" #NAME);
+	ADD_PROPERTY(PropertyInfo(Variant::VARIANT, #NAME, HINT, HINT_STRING), "set_" #NAME, "get_" #NAME);
 
 void LaserData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("apply_preset", "preset"), &LaserData2D::apply_preset);
@@ -332,31 +332,31 @@ void LaserData2D::_bind_methods() {
 	LASER_BIND(active_sec, FLOAT, PROPERTY_HINT_RANGE, "0,10,0.01,or_greater,suffix:s")
 	LASER_BIND(fade_sec, FLOAT, PROPERTY_HINT_RANGE, "0,2,0.01,or_greater,suffix:s")
 	LASER_BIND(warning_width, FLOAT, PROPERTY_HINT_RANGE, "0,20,0.5,or_greater,suffix:px")
-	LASER_BIND(warning_color, COLOR)
-	LASER_BIND(hit_while_growing, BOOL)
+	LASER_BIND(warning_color, COLOR, PROPERTY_HINT_NONE, "")
+	LASER_BIND(hit_while_growing, BOOL, PROPERTY_HINT_NONE, "")
 
 	ADD_GROUP("Aim and Motion", "");
 	LASER_BIND(aim, INT, PROPERTY_HINT_ENUM, "Pattern,Track,Lock On")
 	LASER_BIND(turn_rate_degrees, FLOAT, PROPERTY_HINT_RANGE, "0,1440,1,or_greater,suffix:deg/s")
-	LASER_BIND(keep_tracking_when_active, BOOL)
-	LASER_BIND(follow_spawner, BOOL)
+	LASER_BIND(keep_tracking_when_active, BOOL, PROPERTY_HINT_NONE, "")
+	LASER_BIND(follow_spawner, BOOL, PROPERTY_HINT_NONE, "")
 	LASER_BIND(sweep_speed_degrees, FLOAT, PROPERTY_HINT_RANGE, "-720,720,1,or_less,or_greater,suffix:deg/s")
 	LASER_BIND(sweep_arc_degrees, FLOAT, PROPERTY_HINT_RANGE, "0,360,1,or_greater,suffix:deg")
 
 	ADD_GROUP("Walls", "");
-	LASER_BIND(wall_mask, INT, PROPERTY_HINT_LAYERS_2D_PHYSICS)
+	LASER_BIND(wall_mask, INT, PROPERTY_HINT_LAYERS_2D_PHYSICS, "")
 	LASER_BIND(reflections, INT, PROPERTY_HINT_RANGE, "0,16,1,or_greater")
 
 	ADD_GROUP("Hits", "");
-	LASER_BIND(collision_mask, INT, PROPERTY_HINT_LAYERS_2D_PHYSICS)
-	LASER_BIND(collide_with_bodies, BOOL)
-	LASER_BIND(collide_with_areas, BOOL)
+	LASER_BIND(collision_mask, INT, PROPERTY_HINT_LAYERS_2D_PHYSICS, "")
+	LASER_BIND(collide_with_bodies, BOOL, PROPERTY_HINT_NONE, "")
+	LASER_BIND(collide_with_areas, BOOL, PROPERTY_HINT_NONE, "")
 	LASER_BIND(pierce_limit, INT, PROPERTY_HINT_RANGE, "0,16,1,or_greater")
 	LASER_BIND(hit_interval_sec, FLOAT, PROPERTY_HINT_RANGE, "0,2,0.01,or_greater,suffix:s")
 	LASER_BIND(max_hits_per_beam, INT, PROPERTY_HINT_RANGE, "1,256,1,or_greater")
 
 	ADD_GROUP("Looks", "");
-	LASER_BIND(modulate, COLOR)
+	LASER_BIND(modulate, COLOR, PROPERTY_HINT_NONE, "")
 	LASER_BIND(color_ramp, OBJECT, PROPERTY_HINT_RESOURCE_TYPE, "Gradient")
 	LASER_BIND(body_frames, OBJECT, PROPERTY_HINT_RESOURCE_TYPE, "SpriteFrames")
 	LASER_BIND(body_mode, INT, PROPERTY_HINT_ENUM, "Stretch,Tile")

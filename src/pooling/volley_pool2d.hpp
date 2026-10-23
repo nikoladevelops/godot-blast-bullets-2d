@@ -5,6 +5,7 @@
 #include <godot_cpp/core/class_db.hpp>
 #include <queue>
 #include <unordered_map>
+#include <vector>
 
 #include <map>
 

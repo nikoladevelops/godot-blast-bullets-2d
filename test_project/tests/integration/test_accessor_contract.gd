@@ -255,3 +255,24 @@ func test_every_enum_property_is_typed_with_its_enum() -> void:
 				untyped.append("%s.%s" % [cls, p["name"]])
 	assert_gte(seen, 30, "enum properties found")
 	assert_eq("\n".join(untyped), "", "every enum property reads back as its enum")
+
+
+## Every inspector text of every plugin class (property hint strings and
+## names) reads as written: a UTF-8 character handed to godot-cpp's
+## String(const char *) is decoded as Latin-1 and shows as mojibake ("Â²",
+## "â€”"). Non-ASCII text must be built with String::utf8.
+func test_inspector_texts_have_no_mojibake() -> void:
+	var bad: Array = []
+	for p in probes:
+		for prop in (p[1] as Object).get_property_list():
+			for field in ["name", "hint_string", "class_name"]:
+				var text := str(prop[field])
+				for marker in ["Â", "Ã", "â€"]:
+					if marker in text:
+						bad.append("%s.%s %s: %s" % [p[0], prop["name"], field, text])
+	assert_eq(bad, [], "no Latin-1 decoded UTF-8 in any property text")
+	var accel := ""
+	for prop in BulletPickupData2D.new().get_property_list():
+		if str(prop["name"]) == "magnet_acceleration":
+			accel = str(prop["hint_string"])
+	assert_eq(accel, "0,10000,1,or_greater,suffix:px/s²", "the acceleration suffix reads px/s²")
