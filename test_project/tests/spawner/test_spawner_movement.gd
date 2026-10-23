@@ -482,3 +482,19 @@ func test_movement_enabled_while_detached_autostarts_on_reentry() -> void:
 	assert_true(sp.is_movement_playing(), "autostart plays on the way back in")
 	await idle(10)
 	assert_gt(sp.global_position.x, 10.0, "and it moves")
+
+
+## movement_play while movement_enabled is off moves nothing: one warning, the
+## spawner stays where it is and reports no start (it would never advance).
+func test_movement_play_while_disabled_is_refused_with_a_warning() -> void:
+	var sp := make_spawner(H.make_volley_data(4, 200.0, 2.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 8)
+	sp.set_movement_path_node(_line_path(Vector2(100, 100), Vector2(400, 100)))
+	sp.global_position = Vector2(-50, -50)
+	watch_signals(sp)
+	sp.movement_play()
+	expect_warning_sequence(["BulletSpawner2D::movement_play: movement_enabled is off, nothing moves (turn it on to play the path)."])
+	assert_false(sp.is_movement_playing(), "not playing")
+	assert_eq(sp.global_position, Vector2(-50, -50), "never snapped onto the path")
+	assert_signal_emit_count(sp, "movement_started", 0, "no start reported")
+	sp.movement_enabled = true
+	assert_true(sp.is_movement_playing(), "turned on: it plays (autostart)")

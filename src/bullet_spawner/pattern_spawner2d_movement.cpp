@@ -441,6 +441,11 @@ void PatternSpawner2D::movement_play() {
 	if (Engine::get_singleton()->is_editor_hint()) {
 		return;
 	}
+	if (!movement_enabled) {
+		// It would snap onto the path, report a start and never advance.
+		UtilityFunctions::push_warning(String(get_class()) + "::movement_play: movement_enabled is off, nothing moves (turn it on to play the path).");
+		return;
+	}
 	++movement_epoch;
 	if (!movement_playing && (movement_finished || !movement_has_last_position)) {
 		const bool fresh = !movement_has_last_position && !movement_finished && movement_legs_completed == 0 && movement_leg_elapsed == 0.0;
