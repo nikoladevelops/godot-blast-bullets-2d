@@ -1510,6 +1510,11 @@ void PatternSpawner2D::begin_telegraph(bool auto_started) {
 	telegraph_from_auto = auto_started;
 	telegraph_time_left = next_telegraph_sec();
 	emit_on2d(this, "volley_telegraphed", aim);
+	// A handler that cancelled the warning (or freed this spawner) silences
+	// it; one that started another warning there already played its own.
+	if (shot_owner_dying() || !telegraph_pending || cadence != cadence_serial || burst != burst_serial) {
+		return;
+	}
 	fire_spawner_sound(BulletSoundData2D::SOUND_ON_TELEGRAPH);
 	set_loop_active(true);
 }

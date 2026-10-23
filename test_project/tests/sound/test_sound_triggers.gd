@@ -62,6 +62,35 @@ func test_on_telegraph_fires_with_the_warning() -> void:
 	assert_eq(_logged(s.get_instance_id()).size(), 1, "exactly one telegraph sound")
 
 
+## A volley_telegraphed handler that cancels the warning (reset_shooting,
+## telegraphs off) silences it: no On Telegraph sound for a warning that
+## never stands.
+func test_a_cancelled_warning_plays_no_telegraph_sound(action: String = use_parameters(["reset_shooting", "telegraph_off"])) -> void:
+	factory.debug_set_sound_log_enabled(true)
+	var sp := make_spawner(H.make_volley_data(5, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 5)
+	sp.telegraph_enabled = true
+	sp.telegraph_sec = 0.2
+	sp.shoot_interval_sec = 10.0
+	sp.sound_enabled = true
+	var s := H.make_sound(BulletSoundData2D.SOUND_ON_TELEGRAPH)
+	sp.sound_effects = [s]
+	watch_signals(sp)
+	sp.volley_telegraphed.connect(func(_aim) -> void:
+		if action == "reset_shooting":
+			sp.reset_shooting()
+		else:
+			sp.telegraph_enabled = false)
+	sp.set_shooting_enabled(true)
+	for i in 60:
+		await physics(1)
+		if get_signal_emit_count(sp, "volley_telegraphed") > 0:
+			break
+	sp.set_shooting_enabled(false)
+	assert_signal_emit_count(sp, "volley_telegraphed", 1, "the warning was announced")
+	await physics(2)
+	assert_eq(_logged(s.get_instance_id()).size(), 0, "%s: no telegraph sound" % action)
+
+
 func test_destroy_kill_only_hit_survived_only() -> void:
 	factory.debug_set_sound_log_enabled(true)
 	make_wall(Vector2(200, 0))
