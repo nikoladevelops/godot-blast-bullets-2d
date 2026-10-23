@@ -376,3 +376,28 @@ func test_a_handler_of_the_last_burst_shot_still_finishes_the_chain(action: Stri
 	if action == "begin_burst":
 		expected += ["shot 1", "shot 2", "shot 3", "finished"]
 	assert_eq(log, expected, "%s from the last shot" % action)
+
+
+## An auto shot waiting behind its warning never fires past the cap: a cap
+## lowered onto the shots already fired, or a budget spent meanwhile, cancels
+## the warned shot (like the burst path).
+func test_an_auto_warning_never_fires_past_a_cap_set_during_it(kind: String = use_parameters(["lowered", "manual_shot"])) -> void:
+	var sp := make_spawner(H.make_volley_data(1, 50.0, 30.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
+	sp.telegraph_enabled = true
+	sp.telegraph_sec = 0.2
+	sp.shoot_interval_sec = 0.05
+	sp.max_volleys = 5 if kind == "lowered" else 3
+	sp.set_shooting_enabled(true)
+	var warned := false
+	for i in 240:
+		await idle(1)
+		if sp.get_volleys_fired() == 2 and sp.is_telegraph_pending():
+			warned = true
+			break
+	assert_true(warned, "the third shot is being warned")
+	if kind == "lowered":
+		sp.max_volleys = 2
+	else:
+		assert_true(sp.shoot_once(), "a manual shot reaches the cap of 3")
+	await idle(40)
+	assert_eq(sp.get_volleys_fired(), 2 if kind == "lowered" else 3, "%s: the warned shot never fired past the cap" % kind)

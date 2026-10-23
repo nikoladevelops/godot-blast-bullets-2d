@@ -1590,6 +1590,12 @@ void PatternSpawner2D::fire_burst_volley() {
 	burst_shots_left = 0;
 	burst_telegraph_done = false;
 	burst_mirror_next = false;
+	if (auto_fire_in_progress && volleys_remaining() == 0) {
+		// The cap or the budget was reached during the warning (lowered, or a
+		// manual shot): the auto shot never fires past it.
+		refresh_process_state();
+		return;
+	}
 	shoot_once();
 	refresh_process_state();
 }
