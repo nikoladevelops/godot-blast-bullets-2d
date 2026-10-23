@@ -283,3 +283,18 @@ func test_a_pickup_that_leaves_the_despawn_bounds_fires_its_on_despawn_layer() -
 	var fired := factory.debug_get_effect_log().filter(func(e): return int(e["trigger"]) == BulletEffectLayerData2D.EFFECT_ON_DESPAWN)
 	assert_eq(fired.size(), 1, "pickups obey the bounds like any bullet and fire On Despawn")
 	assert_eq(collected.size(), 0, "and are not collected")
+
+
+## An animation holding a null frame cannot be drawn (the bullet bake refuses
+## it): the pickup falls back to the texture or the placeholder with one
+## warning, like an animation without frames.
+func test_an_animation_with_a_null_frame_falls_back_with_a_warning() -> void:
+	var coin := BulletPickupData2D.new()
+	var sf := SpriteFrames.new()
+	sf.add_frame(&"default", ImageTexture.create_from_image(Image.create_empty(4, 4, false, Image.FORMAT_RGBA8)))
+	sf.add_frame(&"default", null)
+	coin.sprite_frames = sf
+	var pv := _convert(coin)
+	expect_warning_sequence(["BulletPickupData2D: animation \"default\" of sprite_frames has a null frame, using the texture or the placeholder."])
+	assert_not_null(pv.get_sprite_frames(), "the placeholder stands in")
+	assert_ne(pv.get_sprite_frames(), sf, "never the broken frames")

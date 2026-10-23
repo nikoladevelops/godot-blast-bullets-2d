@@ -188,7 +188,18 @@ Ref<BulletVolleyData2D> BulletPickupData2D::get_volley_data() {
 		}
 		const SpriteAnimChoice2D choice = resolve_sprite_animation2d(frames, played);
 		const bool chosen_empty = !is_auto && !missing && frames->get_frame_count(played) == 0;
+		// A null frame cannot be drawn (the bullet bake refuses the whole
+		// animation): the texture or the placeholder stands in.
+		bool null_frame = false;
 		if (!chosen_empty && choice.usable()) {
+			const int count = frames->get_frame_count(choice.anim);
+			for (int f = 0; f < count && !null_frame; ++f) {
+				null_frame = frames->get_frame_texture(choice.anim, f).is_null();
+			}
+		}
+		if (null_frame) {
+			UtilityFunctions::push_warning(String("BulletPickupData2D: animation \"") + String(choice.anim) + String("\" of sprite_frames has a null frame, using the texture or the placeholder."));
+		} else if (!chosen_empty && choice.usable()) {
 			usable = true;
 			played = choice.anim;
 			if (size.x <= 0.0 || size.y <= 0.0) {
