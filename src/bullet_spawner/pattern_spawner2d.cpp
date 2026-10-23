@@ -787,6 +787,7 @@ bool PatternSpawner2D::shoot_once() {
 	if (randomization_active()) {
 		randomize_shot_transforms(shot_transforms);
 	}
+	const int fired_before = volleys_fired;
 	const ShotResult2D result = fire_shot(shot_transforms);
 	if (result.refusal.refused) {
 		return fail_early(result.refusal.message, result.refusal.reason, result.refusal.with_signal);
@@ -811,7 +812,10 @@ bool PatternSpawner2D::shoot_once() {
 	// not re-emit, and the setter path reports its own transition.
 	// NOTE: a shooting_finished handler runs while the latch is still up, so
 	// a nested shoot_once() from there is rejected the same way.
-	if (!cadence_replaced && max_volleys >= 0 && volleys_fired == max_volleys) {
+	// The shot that tripped the cap reports it: a handler's new budget
+	// (fire_n_volleys) never lifts max_volleys; a reset (the count went back)
+	// leaves nothing to report.
+	if (max_volleys >= 0 && volleys_fired == fired_before + 1 && volleys_fired == max_volleys) {
 		// Stop shooting, but stay awake while spinning, retargeting, bursting,
 		// telegraphing, sequencing, or previewing (same keep-awake set as everywhere else).
 		set_loop_active(needs_process_besides_shooting());

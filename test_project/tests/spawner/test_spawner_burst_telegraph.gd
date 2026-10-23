@@ -401,3 +401,23 @@ func test_an_auto_warning_never_fires_past_a_cap_set_during_it(kind: String = us
 		assert_true(sp.shoot_once(), "a manual shot reaches the cap of 3")
 	await idle(40)
 	assert_eq(sp.get_volleys_fired(), 2 if kind == "lowered" else 3, "%s: the warned shot never fired past the cap" % kind)
+
+
+## The volley_fired handler of the shot that reached max_volleys hands out a
+## new budget (fire_n_volleys): the cap is still reached, so shooting_finished
+## still reports it.
+func test_a_new_budget_from_the_capping_shot_still_reports_the_finish() -> void:
+	var sp := make_spawner(H.make_volley_data(1, 50.0, 30.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
+	sp.shoot_interval_sec = 0.05
+	sp.max_volleys = 2
+	watch_signals(sp)
+	sp.volley_fired.connect(func(_v, n: int) -> void:
+		if n == 2:
+			sp.fire_n_volleys(3))
+	sp.set_shooting_enabled(true)
+	for i in 120:
+		await idle(1)
+		if get_signal_emit_count(sp, "shooting_finished") > 0:
+			break
+	assert_eq(sp.get_volleys_fired(), 2, "capped")
+	assert_signal_emit_count(sp, "shooting_finished", 1, "the cap is reported")
