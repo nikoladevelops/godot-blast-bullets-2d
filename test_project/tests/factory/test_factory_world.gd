@@ -320,3 +320,17 @@ func test_a_cleared_handler_of_clear_active_bullets_may_spawn_pickups() -> void:
 	factory.clear_active_bullets()
 	assert_eq(made.size(), 2, "the busy latch is down when the signal fires")
 	assert_eq(factory.get_active_bullet_count(), 2, "only the spawned replacements live")
+
+
+## A volley queued for deletion is gone for every area query alike: the
+## counts agree with get_bullets_in_circle / rect and the clears.
+func test_area_counts_skip_volleys_queued_for_deletion() -> void:
+	var d := H.make_still_data(2)
+	d.transforms = [Transform2D(0.0, Vector2(10, 10)), Transform2D(0.0, Vector2(20, 10))]
+	var keep: BulletVolley2D = factory.spawn_volley(d)
+	var gone: BulletVolley2D = factory.spawn_volley(d)
+	gone.queue_free()
+	assert_eq(factory.get_bullets_in_circle(Vector2(15, 10), 50.0).size(), 1, "one volley listed")
+	assert_eq(factory.count_bullets_in_circle(Vector2(15, 10), 50.0), 2, "its two bullets counted (circle)")
+	assert_eq(factory.count_bullets_in_rect(Rect2(0, 0, 40, 40)), 2, "its two bullets counted (rect)")
+	assert_not_null(keep, "kept")

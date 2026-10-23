@@ -268,8 +268,8 @@ int BulletFactory2D::count_bullets_in_circle(const Vector2 &center, real_t radiu
 	std::vector<int> found;
 	int total = 0;
 	for (BulletVolley2D *volley : all_volleys) {
-		if (volley == nullptr || !volley->is_active) {
-			continue;
+		if (volley == nullptr || !volley->is_active || volley->is_queued_for_deletion()) {
+			continue; // like get_bullets_in_* and the clears
 		}
 		found.clear();
 		volley->collect_indexes_in_circle(center, radius, found);
@@ -347,8 +347,8 @@ int BulletFactory2D::count_bullets_in_rect(const Rect2 &rect) const {
 	std::vector<int> found;
 	int total = 0;
 	for (BulletVolley2D *volley : all_volleys) {
-		if (volley == nullptr || !volley->is_active) {
-			continue;
+		if (volley == nullptr || !volley->is_active || volley->is_queued_for_deletion()) {
+			continue; // like get_bullets_in_* and the clears
 		}
 		found.clear();
 		volley->collect_indexes_in_rect(normalized, found);
