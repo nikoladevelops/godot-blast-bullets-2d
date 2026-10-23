@@ -384,6 +384,7 @@ void PatternSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("begin_burst"), &PatternSpawner2D::begin_burst);
 
 	ClassDB::bind_method(D_METHOD("debug_get_layer_rings"), &PatternSpawner2D::debug_get_layer_rings);
+	ClassDB::bind_method(D_METHOD("debug_get_run_frame_count"), &PatternSpawner2D::debug_get_run_frame_count);
 	ClassDB::bind_method(D_METHOD("debug_get_preview_dot_points"), &PatternSpawner2D::debug_get_preview_dot_points);
 	ClassDB::bind_method(D_METHOD("debug_get_preview_arrows"), &PatternSpawner2D::debug_get_preview_arrows);
 	ClassDB::bind_method(D_METHOD("debug_get_preview_track_points"), &PatternSpawner2D::debug_get_preview_track_points);

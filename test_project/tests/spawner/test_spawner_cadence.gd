@@ -493,3 +493,32 @@ func test_lowering_the_interval_range_cuts_the_running_wait(knob: String = use_p
 	assert_gt(sp.get_shoot_time_left(), 0.5, "a long wait was rolled")
 	sp.set(knob, 0.0)
 	assert_lte(sp.get_shoot_time_left(), 0.1 + 0.0001, "%s lowered: the wait is cut to the interval" % knob)
+
+
+## A handler inside the spawner's physics frame (its own volley_fired) that
+## switches process_callback to Idle never makes the spawner step twice that
+## frame (its idle step of the same frame is skipped).
+func test_switching_to_idle_inside_a_physics_frame_steps_once_that_frame() -> void:
+	var sp := make_spawner(H.make_volley_data(1, 50.0, 30.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
+	sp.process_callback = BulletSpawner2D.PROCESS_PHYSICS
+	sp.shoot_interval_sec = 0.05
+	var switched := [false]
+	sp.volley_fired.connect(func(_v, _n) -> void:
+		if not switched[0]:
+			switched[0] = true
+			sp.process_callback = BulletSpawner2D.PROCESS_IDLE)
+	await idle(1)
+	var f0 := Engine.get_process_frames()
+	var r0 := sp.debug_get_run_frame_count()
+	sp.set_shooting_enabled(true)
+	for i in 30:
+		await idle(1)
+		if switched[0]:
+			break
+	await idle(5)
+	assert_true(switched[0], "the handler switched to Idle")
+	var frames := Engine.get_process_frames() - f0
+	var runs := sp.debug_get_run_frame_count() - r0
+	# Window: from this frame's idle step to the last frame's physics step
+	# (Idle by then): one step per frame in between.
+	assert_eq(runs, frames - 1, "one step per frame across the switch (%d steps, %d frames)" % [runs, frames])

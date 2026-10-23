@@ -1170,7 +1170,9 @@ void PatternSpawner2D::_process(double delta) {
 		}
 		return;
 	}
-	if (process_callback == PROCESS_IDLE) {
+	// Idle steps once per frame: a handler that switched from Physics inside
+	// this frame's physics step already stepped it.
+	if (process_callback == PROCESS_IDLE && last_run_process_frame != Engine::get_singleton()->get_process_frames()) {
 		run_frame(delta);
 	}
 }
@@ -1226,6 +1228,8 @@ double PatternSpawner2D::get_fired_time_factor() const {
 }
 
 void PatternSpawner2D::run_frame(double delta) {
+	++run_frame_count;
+	last_run_process_frame = Engine::get_singleton()->get_process_frames();
 	bool delta_ok = Math::is_finite(delta) && delta > 0.0;
 	if (delta_ok && delta > 0.5) {
 		delta = 0.5; // clamp hitch spikes so one stall can't fast-forward volleys

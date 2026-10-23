@@ -812,6 +812,8 @@ public:
 	bool is_loop_active() const;
 	// One step of the runtime loop (either callback).
 	void run_frame(double delta);
+	// How many runtime loop steps ran (debug: one per frame, either callback).
+	int64_t debug_get_run_frame_count() const { return (int64_t)run_frame_count; }
 	// spawner scale x factory scale, 0 when either is not finite and positive.
 	double get_process_time_scale() const;
 	bool get_shoot_outside_despawn_bounds() const { return shoot_outside_despawn_bounds; }
@@ -1577,6 +1579,10 @@ protected:
 	void movement_reset_state();
 	// Auto-fire error latch (see shoot_once fail_early).
 	bool auto_fire_in_progress = false;
+	uint64_t run_frame_count = 0;
+	// Engine process frame of the last runtime step: a switch from Physics to
+	// Idle inside a physics frame never steps twice in that frame.
+	uint64_t last_run_process_frame = UINT64_MAX;
 	uint32_t shoot_error_latch = 0;
 	void on_config_changed();
 	// Bypass flag for debug_collect_spawn_transforms_uncached / verify.
