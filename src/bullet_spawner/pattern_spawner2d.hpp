@@ -1314,6 +1314,9 @@ protected:
 	// countdown to the next burst shot, telegraph countdown, and the
 	// mirror flag for the next burst volley.
 	int burst_shots_left = 0;
+	// The chain's last shot is being reported (burst_shot_fired): it still
+	// runs for a handler that takes it over (that handler's cancel reports it).
+	bool burst_chain_closing = false;
 	// Bumped when a chain starts or ends: a burst_shot_fired / volley_fired
 	// handler that cancels, restarts or resets the chain owns it (the running
 	// shot touches no counter after its emits once this moved).

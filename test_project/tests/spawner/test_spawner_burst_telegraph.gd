@@ -348,3 +348,31 @@ func test_a_one_shot_manual_burst_is_warned_first(burst_on: bool = use_parameter
 	await _until(sp, "volley_fired", 1, 30)
 	assert_signal_emit_count(sp, "volley_telegraphed", 1, "one warning")
 	assert_eq(sp.get_volleys_fired(), 1, "then the one shot")
+
+
+## A handler of the chain's LAST burst_shot_fired that takes the chain over
+## (cancels it, resets shooting or starts a new chain): the old chain still
+## reports burst_finished exactly once, before anything of the new one.
+func test_a_handler_of_the_last_burst_shot_still_finishes_the_chain(action: String = use_parameters(["cancel", "reset_shooting", "begin_burst"])) -> void:
+	var sp := _spawner(3, 0.02)
+	var log: Array = []
+	var acted: Array = []
+	sp.burst_finished.connect(func() -> void: log.append("finished"))
+	sp.burst_shot_fired.connect(func(n: int, _m) -> void:
+		log.append("shot %d" % n)
+		if n == 3 and acted.is_empty():
+			acted.append(true)
+			if action == "cancel":
+				sp.burst_enabled = false
+				sp.burst_enabled = true
+			elif action == "reset_shooting":
+				sp.reset_shooting()
+			else:
+				sp.begin_burst())
+	sp.begin_burst()
+	for k in 60:
+		await idle(1)
+	var expected := ["shot 1", "shot 2", "shot 3", "finished"]
+	if action == "begin_burst":
+		expected += ["shot 1", "shot 2", "shot 3", "finished"]
+	assert_eq(log, expected, "%s from the last shot" % action)

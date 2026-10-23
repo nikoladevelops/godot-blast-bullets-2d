@@ -1429,7 +1429,7 @@ void PatternSpawner2D::begin_burst() {
 void PatternSpawner2D::begin_burst_chain(bool auto_started) {
 	// A chain still running ends first, with its burst_finished report. A
 	// handler of that report that started its own chain wins.
-	if (burst_shots_left > 0) {
+	if (burst_shots_left > 0 || burst_chain_closing) {
 		cancel_burst_chain();
 		if (burst_shots_left > 0) {
 			return;
@@ -1502,7 +1502,8 @@ void PatternSpawner2D::begin_telegraph(bool auto_started) {
 }
 
 void PatternSpawner2D::cancel_burst_chain() {
-	const bool was_running = burst_shots_left > 0;
+	const bool was_running = burst_shots_left > 0 || burst_chain_closing;
+	burst_chain_closing = false;
 	++burst_serial;
 	burst_shots_left = 0;
 	burst_shots_fired = 0;
@@ -1557,10 +1558,12 @@ void PatternSpawner2D::fire_burst_volley() {
 			if (burst_from_auto && (volleys_remaining() == 0 || last_shot_spent_budget)) {
 				burst_shots_left = 0;
 			}
+			burst_chain_closing = burst_shots_left <= 0;
 			emit_on2d(this, "burst_shot_fired", burst_shots_fired, mirrored);
 			if (serial != burst_serial || shot_owner_dying()) {
-				return; // its handler owns the chain now
+				return; // its handler owns the chain now (its cancel reported the old one)
 			}
+			burst_chain_closing = false;
 		} else if (++burst_consecutive_failures >= burst_count) {
 			// Persistent failure (bad config, permanent over-budget): end the
 			// chain instead of retrying forever. Each attempt already reported
