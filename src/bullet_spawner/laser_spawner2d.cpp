@@ -642,7 +642,7 @@ void LaserSpawner2D::_validate_property(PropertyInfo &p_property) const {
 	}
 }
 
-#define LASER_SPAWNER_BIND(NAME, VARIANT, HINT, HINT_STRING)                                          \
+#define LASER_SPAWNER_BIND(NAME, VARIANT, HINT, HINT_STRING)                            \
 	ClassDB::bind_method(D_METHOD("get_" #NAME), &LaserSpawner2D::get_##NAME);          \
 	ClassDB::bind_method(D_METHOD("set_" #NAME, "value"), &LaserSpawner2D::set_##NAME); \
 	ADD_PROPERTY(PropertyInfo(Variant::VARIANT, #NAME, HINT, HINT_STRING), "set_" #NAME, "get_" #NAME);

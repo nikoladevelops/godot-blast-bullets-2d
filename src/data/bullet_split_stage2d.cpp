@@ -197,7 +197,7 @@ void BulletSplitStage2D::_validate_property(PropertyInfo &p_property) const {
 }
 
 void BulletSplitStage2D::_bind_methods() {
-#define SPLIT_BIND(NAME, VARIANT, HINT, HINT_STRING)                                                      \
+#define SPLIT_BIND(NAME, VARIANT, HINT, HINT_STRING)                                        \
 	ClassDB::bind_method(D_METHOD("get_" #NAME), &BulletSplitStage2D::get_##NAME);          \
 	ClassDB::bind_method(D_METHOD("set_" #NAME, "value"), &BulletSplitStage2D::set_##NAME); \
 	ADD_PROPERTY(PropertyInfo(Variant::VARIANT, #NAME, HINT, HINT_STRING), "set_" #NAME, "get_" #NAME);

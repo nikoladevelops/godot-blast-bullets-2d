@@ -9,7 +9,6 @@ using namespace godot;
 
 namespace BlastBullets2D {
 
-
 void BulletFactory2D::reactivate_volley_for_script(const Variant &volley) {
 	BulletVolley2D *bullet_multi = nullptr;
 	if (!live_argument2d<BulletVolley2D>(volley, "reactivate_volley", "volley", "BulletVolley2D", bullet_multi)) {

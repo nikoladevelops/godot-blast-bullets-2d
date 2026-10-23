@@ -114,7 +114,6 @@ void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
 	}
 }
 
-
 bool BulletSpawner2D::adopt_live_volley_script(const Variant &volley) {
 	BulletVolley2D *v = nullptr;
 	return live_argument2d<BulletVolley2D>(volley, "adopt_live_volley", "volley", "BulletVolley2D", v) && adopt_live_volley(v);

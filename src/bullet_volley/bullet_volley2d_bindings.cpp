@@ -9,7 +9,6 @@ using namespace godot;
 
 namespace BlastBullets2D {
 
-
 // ---- Script entries of the methods taking a node: read by id ----
 
 void BulletVolley2D::set_bullet_direction_towards_node2d_script(int bullet_index, const Variant &target_node) {

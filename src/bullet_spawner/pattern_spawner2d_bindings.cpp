@@ -141,7 +141,6 @@ void PatternSpawner2D::_validate_property(PropertyInfo &p_property) const {
 	}
 }
 
-
 // ---- Script entries of the setters taking a node: read by id ----
 
 void PatternSpawner2D::set_bullet_factory_script(const Variant &factory) {
