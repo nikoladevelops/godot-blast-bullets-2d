@@ -103,7 +103,13 @@ int BulletVolley2D::split_capture(int bullet_index, int cause, const Transform2D
 	request.stage = stage;
 	request.data = data;
 	request.stage_data = stage->child_data.is_valid();
-	request.pose = full_grown2d(pose); // a parent still growing in: full-size children
+	// A parent still growing in: full-size children. The drawn pose carries
+	// the parent's texture rotation (cosmetic): stripped, so the children's
+	// spawn applies a texture rotation once (like the tick's own strip).
+	request.pose = full_grown2d(pose);
+	if (cache_texture_rotation_radians != 0.0) {
+		request.pose = request.pose.rotated_local(-cache_texture_rotation_radians);
+	}
 	request.direction = all_cached_direction[bullet_index];
 	request.speed = all_cached_speed[bullet_index];
 	request.max_speed = bullet_index < (int)all_cached_max_speed.size() ? all_cached_max_speed[bullet_index] : request.speed;

@@ -579,3 +579,31 @@ func test_all_bullets_split_counts_only_its_own_splits() -> void:
 	AttachmentHookProbe2D.clear_hook()
 	factory.debug_advance_time(DT)
 	assert_eq(splits.size(), 6, "every split happened")
+
+
+## A parent's texture rotation is cosmetic: its children wear it once (drawn
+## at heading + texture rotation, never twice) and their hitboxes face their
+## heading, exactly like a bullet spawned at that heading.
+func test_children_wear_the_texture_rotation_once() -> void:
+	var s := _stage(3)
+	s.spread_degrees = 90.0
+	var data := H.make_volley_data(1, 100.0, 0.1)
+	data.texture_rotation_radians = PI / 2.0
+	var v := factory.spawn_volley(data)
+	assert_true(v.split_set_data(_chain([s]), data), "armed")
+	_step_until_split()
+	var children: BulletVolley2D = splits[0][2]
+	var off: Array = []
+	for c in 3:
+		var heading := children.get_bullet_direction(c).angle()
+		var drawn := angle_difference(children.get_bullet_transform(c).get_rotation(), heading + PI / 2.0)
+		var hitbox := angle_difference(children.debug_get_bullet_shape_transform(c).get_rotation(), heading)
+		if absf(drawn) > 0.001 or absf(hitbox) > 0.001:
+			off.append([c, snappedf(drawn, 0.001), snappedf(hitbox, 0.001)])
+	assert_eq(off, [], "every child: drawn at heading + texture rotation, hitbox at its heading")
+	factory.debug_advance_time(DT)
+	var after: Array = []
+	for c in 3:
+		if absf(angle_difference(children.debug_get_bullet_shape_transform(c).get_rotation(), children.get_bullet_direction(c).angle())) > 0.001:
+			after.append(c)
+	assert_eq(after, [], "and after a tick")
