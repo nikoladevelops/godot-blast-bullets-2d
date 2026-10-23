@@ -63,20 +63,23 @@ static void fx_apply_slot_spin(BulletFactory2D::FXOneShotBake &bake, int slot_in
 	}
 	bake.shard_multimesh(slot.last_shard)->set_instance_transform_2d(slot_index, local);
 	slot.last_angle = spun.get_rotation();
+	slot.angle_shard = slot.last_shard;
 }
 
 // Per-instance ramp sampling plus fade envelope (no-op without either):
 // tint-over-life for one-shots, loop-phase tint for trails. Shard
 // self_modulate multiplies on top, exactly like CanvasItem modulate chains.
 // Trails never reach here with fades (their layers ignore the knobs, so a
-// trail tick stays the pure ramp path it always was).
-static void fx_refresh_slot_color(BulletFactory2D::FXOneShotBake &bake, int slot_index, double age) {
+// trail tick stays the pure ramp path it always was). `fresh`: the slot just
+// started on its shard (a fire, a frame change): without a ramp or fade it
+// is written white, never the tint an earlier effect left in that instance.
+static void fx_refresh_slot_color(BulletFactory2D::FXOneShotBake &bake, int slot_index, double age, bool fresh = false) {
 	if (bake.layer.is_null()) {
 		return;
 	}
 	const bool has_ramp = !bake.layer->color_ramp.is_null() && bake.anim.total > 0.0;
 	const bool has_fade = (bake.layer->fade_in_sec > 0.0 || bake.layer->fade_out_sec > 0.0) && Math::is_finite(age) && bake.anim.total > 0.0;
-	if (!has_ramp && !has_fade) {
+	if (!has_ramp && !has_fade && !fresh) {
 		return;
 	}
 	if (slot_index < 0 || slot_index >= (int)bake.slots.size()) {
@@ -106,6 +109,7 @@ static void fx_refresh_slot_color(BulletFactory2D::FXOneShotBake &bake, int slot
 	}
 	bake.shard_multimesh(slot.last_shard)->set_instance_color(slot_index, tint);
 	slot.tint = tint;
+	slot.tint_shard = slot.last_shard;
 }
 
 Vector2 BulletFactory2D::fx_quad_size_for_texture(const Ref<Texture2D> &tex) {
@@ -337,10 +341,11 @@ int BulletFactory2D::fx_fire_into_bake(FXOneShotBake &bake, const Transform2D &a
 		}
 		if (local.get_origin().is_finite()) {
 			bake.shard_multimesh(frame)->set_instance_transform_2d(slot_index, local);
+			slot.angle_shard = frame;
 			if (MultiMeshInstance2D *node = bake.shards[frame].get()) {
 				node->set_visible(true);
 			}
-			fx_refresh_slot_color(bake, slot_index, slot.start_age);
+			fx_refresh_slot_color(bake, slot_index, slot.start_age, true);
 		}
 	}
 	return slot_index;
@@ -412,10 +417,13 @@ void BulletFactory2D::age_fx_bake(FXOneShotBake &bake) {
 		if (age < 0.0) {
 			continue;
 		}
-		fx_refresh_slot_color(bake, (int)s, age);
-		fx_apply_slot_spin(bake, (int)s, age, container);
+		// The frame first: the tint and the spin below land on the shard
+		// the slot shows now (a frame change once wrote them to the old one
+		// and left the new instance unspun and with a stale tint).
 		const int frame = bake.anim.frame_at_looped(age);
+		bool fresh = false;
 		if (frame != slot.last_shard && frame >= 0 && frame < (int)bake.shards.size()) {
+			fresh = true;
 			if (slot.last_shard >= 0 && slot.last_shard < (int)bake.shards.size() && bake.shards[slot.last_shard].ptr != nullptr) {
 				bake.shard_multimesh(slot.last_shard)->set_instance_transform_2d((int)s, FX_HIDDEN_TRANSF);
 			}
@@ -430,12 +438,15 @@ void BulletFactory2D::age_fx_bake(FXOneShotBake &bake) {
 				}
 				if (local.get_origin().is_finite()) {
 					bake.shard_multimesh(frame)->set_instance_transform_2d((int)s, local);
+					slot.angle_shard = frame;
 					if (MultiMeshInstance2D *node = bake.shards[frame].get()) {
 						node->set_visible(true);
 					}
 				}
 			}
 		}
+		fx_refresh_slot_color(bake, (int)s, age, fresh);
+		fx_apply_slot_spin(bake, (int)s, age, container);
 	}
 	fx_occupancy_scratch.assign(bake.shards.size(), 0);
 	std::vector<int> &occupancy = fx_occupancy_scratch;
@@ -609,9 +620,8 @@ Dictionary BulletFactory2D::debug_get_effect_state() const {
 	d["manual_frames"] = manual_frames;
 	d["manual_bakes"] = (int)fx_manual_bakes.size();
 	d["container_valid"] = sprite_effects_container.get() != nullptr;
-	Array bakes;
-	for (size_t i = 0; i < fx_bakes.size(); ++i) {
-		const FXOneShotBake &bake = fx_bakes[i];
+	// One row per bake: the volley bakes, then (under "manual") the manual hatch's.
+	auto describe = [](const FXOneShotBake &bake) {
 		Dictionary e;
 		e["volley"] = (int64_t)bake.volley_id;
 		e["layer"] = bake.layer_index;
@@ -642,12 +652,23 @@ Dictionary BulletFactory2D::debug_get_effect_state() const {
 			row["shard"] = bake.slots[s].last_shard;
 			row["tint"] = bake.slots[s].tint;
 			row["rotation"] = bake.slots[s].last_angle;
+			row["tint_shard"] = bake.slots[s].tint_shard;
+			row["rotation_shard"] = bake.slots[s].angle_shard;
 			live.push_back(row);
 		}
 		e["live_slots"] = live;
-		bakes.push_back(e);
+		return e;
+	};
+	Array bakes;
+	for (const FXOneShotBake &bake : fx_bakes) {
+		bakes.push_back(describe(bake));
 	}
 	d["bakes"] = bakes;
+	Array manual;
+	for (const FXOneShotBake &bake : fx_manual_bakes) {
+		manual.push_back(describe(bake));
+	}
+	d["manual"] = manual;
 	return d;
 }
 

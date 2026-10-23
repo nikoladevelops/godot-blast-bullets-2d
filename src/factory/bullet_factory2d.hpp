@@ -352,6 +352,10 @@ public:
 		// Last written rotation in radians (base pose plus spin at the
 		// slot's age): debug mirror for spin verification.
 		float last_angle = 0.0f;
+		// The shards those two writes went to (debug: they must be the one
+		// the slot shows, last_shard).
+		int tint_shard = -1;
+		int angle_shard = -1;
 	};
 	struct FXOneShotBake {
 		uint64_t volley_id = 0;

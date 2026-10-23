@@ -1306,3 +1306,57 @@ func test_scale_range_is_order_independent_and_survives_a_round_trip() -> void:
 	l.random_scale_max = INF
 	expect_error_sequence(["BulletEffectLayerData2D: random_scale_max must be finite and >= 0, keeping the old value."])
 	assert_eq([l.random_scale_min, l.random_scale_max], [0.5, 0.5], "rejected values keep the old pair")
+
+
+## A one-shot that changes frames keeps its spin and its tint on the frame it
+## shows: both are written to the shard of the current frame, never to the
+## one it left (that left the new frame unspun and with a stale tint).
+func test_a_frame_change_keeps_the_spin_and_tint_on_the_shown_frame() -> void:
+	await _preamble()
+	await _settle(factory)
+	var layer := _make_layer(3, 4) # 4 frames at 10 fps
+	layer.spin_degrees_per_sec = 90.0
+	var ramp := Gradient.new()
+	ramp.set_color(0, Color(1, 0, 0, 1))
+	ramp.set_color(1, Color(0, 0, 1, 1))
+	layer.color_ramp = ramp
+	assert_true(factory.spawn_layer_effect(layer, Transform2D(0.0, Vector2(40, 0))) >= 0, "fires")
+	var problems: Array = []
+	var shards_seen := {}
+	for i in 30:
+		await physics()
+		for b in factory.debug_get_effect_state().get("manual", []):
+			for row in b.get("live_slots", []):
+				shards_seen[int(row["shard"])] = true
+				if int(row["tint_shard"]) != int(row["shard"]) or int(row["rotation_shard"]) != int(row["shard"]):
+					problems.append([i, row["shard"], row["tint_shard"], row["rotation_shard"]])
+	assert_gt(shards_seen.size(), 1, "it changed frames")
+	assert_eq(problems, [], "tint and spin always on the shown frame's shard")
+
+
+## A layer whose ramp was removed fires plain white: the instance never keeps
+## the tint an earlier effect left in it.
+func test_an_effect_without_a_ramp_never_keeps_an_old_tint() -> void:
+	await _preamble()
+	await _settle(factory)
+	var layer := _make_layer(3, 1)
+	layer.max_instances = 1 # one slot: the next effect reuses it
+	var ramp := Gradient.new()
+	ramp.set_color(0, Color(0, 1, 0, 0.2))
+	ramp.set_color(1, Color(0, 1, 0, 0.2))
+	layer.color_ramp = ramp
+	assert_true(factory.spawn_layer_effect(layer, Transform2D(0.0, Vector2(40, 0))) >= 0, "fires tinted")
+	await physics(2)
+	assert_almost_eq(_manual_tint().a, 0.2, 0.01, "tinted by the ramp")
+	layer.color_ramp = null
+	assert_true(factory.spawn_layer_effect(layer, Transform2D(0.0, Vector2(80, 0))) >= 0, "fires plain")
+	assert_eq(_manual_tint(), Color(1, 1, 1, 1), "plain white, not the old tint")
+
+
+## The tint of the manual hatch's first live slot (Color(-1...) when none).
+func _manual_tint() -> Color:
+	for b in factory.debug_get_effect_state().get("manual", []):
+		var live: Array = b.get("live_slots", [])
+		if not live.is_empty():
+			return live[0].get("tint", Color(-1, -1, -1, -1))
+	return Color(-1, -1, -1, -1)
