@@ -985,13 +985,16 @@ void LaserVolley2D::tick(double delta) {
 			if (!announce_pending_phase(self_id, life)) {
 				return; // a handler's FADING first
 			}
-			set_phase(PHASE_FINISHED);
-			Object *emitter = resolve_emitter();
-			if (emitter != nullptr) {
-				factory->note_user_code();
-				emit_on2d(emitter, CachedStringNames2D::get().laser_phase_changed, this, (int)PHASE_FINISHED);
-				if (!alive_after_user_code(self_id, life)) {
-					return;
+			// Its handler may have ended the laser already (announced below).
+			if (phase != PHASE_FINISHED) {
+				set_phase(PHASE_FINISHED);
+				Object *emitter = resolve_emitter();
+				if (emitter != nullptr) {
+					factory->note_user_code();
+					emit_on2d(emitter, CachedStringNames2D::get().laser_phase_changed, this, (int)PHASE_FINISHED);
+					if (!alive_after_user_code(self_id, life)) {
+						return;
+					}
 				}
 			}
 		}

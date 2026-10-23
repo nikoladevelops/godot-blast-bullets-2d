@@ -209,3 +209,29 @@ func test_a_zero_fade_ended_in_a_phase_handler_announces_fading() -> void:
 			l.end_laser(true))
 	_step(1)
 	assert_eq(log, [[1, "phase", 1], [1, "phase", 2], [1, "phase", 3], [1, "phase", 4], [1, "finished"]], "every phase once, in order")
+
+
+## A bolt spent in the tick a hit handler faded it, whose FADING handler then
+## ends it at once: FINISHED is announced exactly once.
+func test_a_spent_bolt_ended_from_its_fading_handler_finishes_once() -> void:
+	var d := H.make_laser(0.0, 0.0, 0.0, 0.25, 40.0)
+	d.type = LaserData2D.LASER_BOLT
+	d.speed = 320.0
+	d.pierce_limit = 1 # spent by its first hit
+	make_area(Vector2(160, 100), Vector2(20, 60))
+	await idle(2)
+	var l := _fire(d)
+	factory.laser_hit.connect(func(_t, laser, _b, _p) -> void: laser.end_laser(true))
+	factory.laser_phase_changed.connect(func(laser, p: int) -> void:
+		if p == LaserVolley2D.PHASE_FADING:
+			laser.end_laser(false))
+	for i in 20:
+		_step(1)
+		if l.is_pooled():
+			break
+	var kinds: Array = []
+	for e in log:
+		kinds.append(e.slice(1))
+	assert_true(l.is_pooled(), "finished")
+	assert_eq(kinds.count(["phase", LaserVolley2D.PHASE_FINISHED]), 1, "FINISHED announced once (%s)" % [log])
+	assert_eq(kinds.count(["finished"]), 1, "one laser_finished")

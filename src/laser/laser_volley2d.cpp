@@ -365,6 +365,7 @@ void LaserVolley2D::sync_anchor_frame() {
 				// First frame of an anchor that was outside the tree: the
 				// beams ride it from where they are now (no jump).
 				anchor_frame_pending = false;
+				anchor_holding = false;
 				const Transform2D inv = frame.affine_inverse();
 				for (Beam &b : beams) {
 					b.slot = inv * Transform2D(b.slot.columns[0], b.slot.columns[1], b.slot.columns[2] - offset);
