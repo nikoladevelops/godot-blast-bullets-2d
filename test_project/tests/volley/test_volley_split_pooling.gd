@@ -236,3 +236,26 @@ func test_max_splits_only_limits_surviving_parents() -> void:
 	v.clear_bullet(0)
 	factory.debug_advance_time(DT)
 	assert_eq(splits.size(), 2, "the revived bullet split again (the parent never survived)")
+
+
+## With parent_survives, max_splits_per_bullet counts one life of the bullet:
+## a bullet that left (here: cleared, splitting) and was woken again splits
+## again (BulletSplitStage2D.max_splits_per_bullet).
+func test_a_woken_survivor_splits_again() -> void:
+	var s := BulletSplitStage2D.new()
+	s.count = 2
+	s.split_on_clear = true
+	s.parent_survives = true
+	s.max_splits_per_bullet = 1
+	var chain := BulletSplitData2D.new()
+	chain.stages = [s]
+	var v := factory.spawn_volley(H.make_volley_data(2, 0.0, 5.0))
+	v.set_is_auto_pooling_enabled(false)
+	v.split_set_data(chain, H.make_volley_data(1, 0.0, 5.0))
+	v.clear_bullet(0)
+	factory.debug_advance_time(DT)
+	assert_eq(splits.size(), 1, "the clear split it")
+	v.enable_bullet(0)
+	v.clear_bullet(0)
+	factory.debug_advance_time(DT)
+	assert_eq(splits.size(), 2, "woken, it splits again")

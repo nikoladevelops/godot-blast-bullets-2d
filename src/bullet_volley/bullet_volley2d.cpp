@@ -703,6 +703,10 @@ void BulletVolley2D::enable_bullet_core(int bullet_index, int collision_amount, 
 	graze_end_visits_of_bullet(bullet_index);
 	own_life_on_wake(bullet_index);
 	emitter_on_wake(bullet_index);
+	// A woken bullet splits again (max_splits_per_bullet counts one life).
+	if (bullet_index < (int)split_counts.size()) {
+		split_counts[bullet_index] = 0;
+	}
 
 	multi->set_instance_transform_2d(bullet_index, to_local_for_multimesh(all_cached_instance_transforms[bullet_index])); // Start rendering the instance
 	write_trail_instances(bullet_index); // Wake resumes the trail with the bullet
