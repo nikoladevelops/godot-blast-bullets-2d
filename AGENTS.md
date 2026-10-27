@@ -62,7 +62,7 @@ for the rest: the sections are written to be looked up, not read once.
 
 ```sh
 GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py   # build (exit 1 = failed; never raw scons, never edit SConstruct)
-python3 tools/run_tests.py                                       # 238 files / 2306 tests, ~25 s, leak-checked
+python3 tools/run_tests.py                                       # 246 files / ~2400 tests, ~30 s, leak-checked
 python3 tools/run_tests.py --suite <substring> --full            # one area, every failure message unclipped
 python3 tools/run_tests.py --self-test                           # proves the harness still catches failures/leaks
 python3 tools/run_editor_smoke.py                                # headless EDITOR run of tests/editor_smoke/ (editor-only paths)
@@ -593,7 +593,7 @@ entry (positional calls); the Params struct default must match the row.
 
 ### 10.3 Spawner knobs (`pattern_knob_table2d.inc`)
 
-ONE row per spawner "Bullet Patterns" property in inspector (and `.tscn`)
+ONE row per spawner "Patterns" property in inspector (and `.tscn`)
 order, expanded into the spawner getters/setters (validation via
 `pattern_knob_checks2d.hpp`, message "BulletSpawner2D: <knob> <text>,
 keeping the old value."), their declarations and binds, and the by-name
@@ -928,6 +928,12 @@ deduped, cancelled by REMOVED) and replayed once on resume.
   `test_spawner_pattern_bake` perturbs EVERY pattern property, and every
   shape knob under its OWN shape. `pattern_cache_mode = Off` exists for
   debugging.
+- A bake is reused only where float32 can re-pose it inside the verifier's
+  tolerance (`repose_is_exact_enough`: about four epsilons of the largest
+  coordinate involved vs `1e-3 + 1e-5 * |marker|`): a bake taken at a huge,
+  finite position (the chaos fuzz's hostile moves, 8e35 px) re-posed near the
+  origin cancelled the offset to 0. Such a shot regenerates and re-anchors;
+  ordinary coordinates keep hitting (`test_a_bake_far_away_is_never_reposed_near_the_origin`).
 
 ## 14. Contracts and pitfalls catalog (pinned by tests — do not "fix" back)
 
@@ -1034,6 +1040,15 @@ deduped, cancelled by REMOVED) and replayed once on resume.
 | One-shot frame changes write tint and spin to the shown frame's shard; a fresh instance without ramp or fade is white; the manual hatch rebuilds on look edits; a full reset re-bakes effect-layer art (`FrameTextureCache2D::clear_epoch`) | `volley/test_volley_fx_layers` |
 | A one-frame non-looping animation finishes after its frame's time (AnimatedSprite2D); a zero region axis is the whole atlas WITHOUT the margin's size | `volley/test_volley_signal_timing`, `integration/test_sprite_frames_contract` |
 | A burst chain taken over at its last shot still reports burst_finished; an auto warning never fires past a cap reached during it; the capping shot reports shooting_finished even when its handler hands out a budget; one runtime step per frame across a process_callback switch | `spawner/test_spawner_burst_telegraph`, `spawner/test_spawner_cadence` |
+| A new volley's area joins the physics space only after layer, mask, monitorable and every shape are posed (`set_up_area` configures, `attach_area_to_space` at the end of `set_up_bullet_instances`): joined first under the default layer/mask 1, 40 cold 64-bullet volleys cost a 3 s stall in the next step; Godot refuses `area_set_monitorable` inside the query flush only for areas IN a space, and its BVH never re-pairs a resting area that turns monitorable after joining | `integration/test_cold_spawn_stall` |
+| Monitor callbacks of a volley whose factory is gone do nothing (`factory_alive()` first; a queue-freed volley's area still fires inside the same frame) | `integration/test_signal_free_matrix` |
+| Circle and Ellipse turn with their aim once (`helper_ellipse_rotate_with_marker`, on by default): a turned marker moves every bullet around it AND turns it by the same angle, like ring/star/polygons; both bake as RIGID. Heart, rose, flower and Lissajous stay world-fixed by design | `spawner/test_spawner_preview_rotation`, `spawner/test_spawner_pattern_bake` |
+| Pattern-list and `shoot_once_with` overrides snapshot natively (`PatternStateSnapshot2D`: the knob struct + the hand-written properties) and restore only what changed; a knob setter given its current value bumps no pattern version | `spawner/test_spawner_pattern_lists` |
+| Every data-resource setter skips a same-value write (`core/assign_if_changed2d.hpp`: no `changed`); an Array or Dictionary write always counts (in-place edits) | `data/test_data_setter_contract` (same-value sweep) |
+| One frame repays at most `max_shots_per_frame` (default 8, >= 1) late shots, bursts and list entries, then resyncs | `spawner/test_spawner_cadence` |
+| `spawn_volley` / `enable_volley` refuse a `spawner_id` that is not 0 or a live BulletSpawner2D (nothing spawned); `get_active_bullet_count` skips pooled and queued volleys; the volley counter is `debug_get_active_volleys_amount` | `factory/test_factory_api_surface` |
+| Every preview takes its z order from a property (`preview_z_index` / `preview_z_as_relative` on spawners, `despawn_bounds_preview_z_index`, `debugger_z_index`; defaults 4000 / 999) | `integration/test_preview_z_order` |
+| Every drawn part of a laser interpolates (body points, width, muzzle, tip, pierce and wall frames each on their own segment angle and clock); a head spent at a wall still plays its impact; laser preview arrows draw at the beam's width | `laser/test_laser_render_interpolation` |
 
 - Edge cases to test everywhere: NaN/Inf scalars and vectors; null array
   entries; empty arrays; short vs oversized arrays; OOB indices (-1/99);
@@ -1173,7 +1188,7 @@ deduped, cancelled by REMOVED) and replayed once on resume.
 ### 15.1 Running
 
 ```sh
-python3 tools/run_benchmarks.py                     # 36 headless scenarios x5 (median)
+python3 tools/run_benchmarks.py                     # 39 headless scenarios x5 (median)
 python3 tools/run_benchmarks.py --scenario spawner_ # substring filter (repeatable)
 python3 tools/run_benchmarks.py --gate              # exit 1 on regression vs log/baseline.json
 python3 tools/run_benchmarks.py --update-baseline   # ONLY for an accepted change; say so in the commit
@@ -1277,6 +1292,12 @@ project's `.so`). For quick numeric comparisons load two
   Prototype in a standalone harness (the solver compiles against a tiny
   Godot shim) before touching the plugin: a full build per experiment is
   slow, and perf/valgrind are not installed here.
+- Override shots (`spawner_override_shots`): a ClassDB walk + ~460 Variant reads per
+  shot took 940 us; the native snapshot 25 us (one knob changed: 65 us). Cold volleys
+  from a physics callback (`cold_volleys_in_physics`): 3083 ms -> 2.4 ms next tick once
+  areas join the space fully posed. Laser looks on child canvas items
+  (`laser_looks_256`): 0.268 -> 0.249 ms frame (one transform + rect per frame instead
+  of a set / draw / reset triple).
 - Lasers: one `draw_polygon` per body segment (the engine triangulates each)
   made `curvy_lasers_256` (256 tracking snakes of ~36 segments) cost 4.7 ms
   per frame; one triangle array per laser: 0.65 ms. One `intersect_shape`
@@ -1293,17 +1314,25 @@ project's `.so`). For quick numeric comparisons load two
 
 ## 16. Inspector groups and serialization locks
 
-- BulletSpawner2D groups, in order (locked by `test_volley_bounce.gd`): its
-  own section first (Bullets, Bullet Colors, Homing, Orbiting, Flocking,
-  Splitting, Emitter Bullets), then PatternSpawner2D's (Setup, Time, Bullet
-  Patterns, Shooting, Randomization, Spin, Graze, Sound, Preview, Movement,
-  Performance). LaserSpawner2D: Lasers, Laser Targeting, then the base's
-  (`laser/test_laser_spawner.gd`). Spawn data (`BulletVolleyData2D`): Bullets, Appearance,
+- Each spawner lays out its own inspector (locked by
+  `spawner/test_spawner_inspector_layout.gd`): PatternSpawner2D binds the
+  shared accessors but registers NO property; every concrete class calls
+  `bind_spawner_group(cls, group, skip, sound_entry_class)` per shared group
+  (`spawner_property_binder2d.hpp`) in its own order. BulletSpawner2D: Setup,
+  Bullets, Patterns, Shooting, Time, Spin, Randomization, Bullet Colors,
+  Homing, Orbiting, Flocking, Splitting, Emitter Bullets, Graze, Sound,
+  Preview, Movement, Performance. LaserSpawner2D: Setup, Lasers, Patterns,
+  Shooting, Time, Spin, Randomization, Laser Targeting, Graze, Sound,
+  Preview, Movement, Performance (it leaves out the collision ring and the
+  bullet scale knobs). A shared property carries the same group, type and
+  hint on both (sound_effects excepted: each names its own sound class). Docs
+  describe members on the concrete classes (`[member BulletSpawner2D.x]`,
+  never `PatternSpawner2D.x`). Spawn data (`BulletVolleyData2D`): Bullets, Appearance,
   Movement Speed, Bullet Rotation, Wobble, Gravity, Bounce and Ricochet,
   Movement Pattern Paths, Homing, Collision, Attachments, Sprite Effects,
   Rendering and Material. No duplicate titles, no ungrouped property
   (`volley/test_volley_data_inspector.gd`).
-- Bullet Patterns: `pattern_source` + `helper_bullets_amount`, then a
+- Patterns: `pattern_source` + `helper_bullets_amount`, then a
   `Transform` subgroup, one `ADD_SUBGROUP("Ring", "helper_ring_")` per shape
   (prefix stripped in the inspector), `Outline Layers` last. The inspector
   EJECTS a property whose name lacks the subgroup prefix
@@ -1874,8 +1903,8 @@ A flying bullet fires a template spawner's whole pattern (any
 
 Every system that plays a [SpriteFrames] goes through this module: bullet
 volleys (spawn and `play_sprite_animation`), pickups (they spawn a volley),
-effect layers (trails, one-shots, `spawn_layer_effect`) and the six laser
-looks. A new consumer uses it too; never read `get_frame_texture` and hand
+effect layers (trails, one-shots, `spawn_layer_effect`), the laser body and
+the five `LaserSpriteLook2D` slots (each names its animation). A new consumer uses it too; never read `get_frame_texture` and hand
 the texture to a draw yourself.
 
 | Piece | Where | Notes |

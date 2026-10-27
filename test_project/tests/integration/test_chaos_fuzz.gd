@@ -201,11 +201,35 @@ func _build_lasers() -> void:
 			d.wall_mask = 8
 		d.active_sec = minf(d.active_sec, 0.6)
 		d.hit_interval_sec = 0.1 if d.type == LaserData2D.LASER_BEAM else d.hit_interval_sec
+		# Looks on their own canvas items, one-shot effects on laser events,
+		# bolts that may ignore the despawn bounds.
+		for slot in 5:
+			if rng.randf() < 0.5:
+				d.set_look(slot, _chaos_look())
+		var effects: Array = []
+		for k in rng.randi_range(0, 2):
+			var e := LaserEffectData2D.new()
+			e.trigger = rng.randi_range(LaserEffectData2D.LASER_EFFECT_ON_CHARGE, LaserEffectData2D.LASER_EFFECT_ON_DESPAWN)
+			e.at = rng.randi() % 3
+			e.effect = H.make_effect_layer(BulletEffectLayerData2D.EFFECT_ON_HIT, rng.randi_range(1, 3))
+			effects.append(e)
+		d.effects = effects
+		d.ignore_despawn_bounds = rng.randf() < 0.2
 		laser_datas.append(d)
 	emitter_template = make_spawner(_data(3), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 3)
 	emitter_template.name = "ChaosEmitterTemplate"
 	_connect_handlers(emitter_template)
 	factory.emitter_max_pending = 512 # bounded: a battlefield of emitters stays fast
+
+
+func _chaos_look() -> LaserSpriteLook2D:
+	var look := LaserSpriteLook2D.new()
+	look.frames = H.make_effect_frames(rng.randi_range(1, 3))
+	look.z_index = rng.randi_range(-3, 3)
+	look.scale = Vector2(rng.randf_range(0.5, 2.0), rng.randf_range(0.5, 2.0))
+	look.offset = Vector2(rng.randf_range(-8, 8), rng.randf_range(-8, 8))
+	look.speed_scale = rng.randf_range(0.0, 2.0)
+	return look
 
 
 func _build_world() -> void:
@@ -495,6 +519,7 @@ func _add_laser_spawner() -> void:
 	ls.helper_bullets_amount = rng.randi_range(1, 6)
 	ls.position = Vector2(rng.randf_range(-300, 300), rng.randf_range(-300, 300))
 	ls.orphaned_lasers = rng.randi() % 4
+	ls.inherit_movement_velocity = rng.randf() < 0.5
 	match rng.randi() % 3:
 		0:
 			ls.laser_target_source = LaserSpawner2D.LASER_TARGET_NODE_GROUP
@@ -531,6 +556,7 @@ func _connect_laser_handlers(emitter: Object) -> void:
 	emitter.connect("laser_grazed", func(_t, l, _i, _z, _r) -> void: _laser_handler(l))
 	emitter.connect("laser_pierce_started", func(_t, l, _i, _p) -> void: _laser_handler(l))
 	emitter.connect("laser_finished", func(l) -> void: _laser_handler(l))
+	emitter.connect("laser_despawned", func(l, _i, _p) -> void: _laser_handler(l))
 
 
 func _laser_handler(l: Object) -> void:
@@ -541,7 +567,28 @@ func _laser_handler(l: Object) -> void:
 	var laser := l as LaserVolley2D
 	if laser.is_pooled():
 		return
-	match rng.randi() % 14:
+	match rng.randi() % 20:
+		14:
+			laser.detach_from_spawner()
+		15:
+			laser.set_time_scale(rng.randf_range(0.0, 3.0))
+		16:
+			laser.track(BulletTargets2D.from_group(TARGET_GROUP) if rng.randf() < 0.7 else null, rng.randf_range(0.0, 0.3))
+		17:
+			laser_spawners = laser_spawners.filter(func(x): return is_instance_valid(x) and not x.is_queued_for_deletion())
+			if not laser_spawners.is_empty():
+				laser_spawners[rng.randi() % laser_spawners.size()].adopt_live_laser(laser)
+		18:
+			var look: LaserSpriteLook2D = laser.get_laser_data().get_look(rng.randi() % 5)
+			if look != null:
+				look.z_index = rng.randi_range(-5, 5)
+				look.visible = rng.randf() < 0.8
+			else:
+				laser.get_laser_data().set_look(rng.randi() % 5, _chaos_look())
+		19:
+			var d: LaserData2D = laser.get_laser_data()
+			if not d.effects.is_empty():
+				(d.effects[0] as LaserEffectData2D).trigger = rng.randi_range(LaserEffectData2D.LASER_EFFECT_ON_CHARGE, LaserEffectData2D.LASER_EFFECT_ON_DESPAWN)
 		0:
 			laser.end_laser(rng.randf() < 0.5)
 		1:
