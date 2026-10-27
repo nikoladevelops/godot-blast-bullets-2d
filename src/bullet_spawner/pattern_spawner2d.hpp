@@ -373,6 +373,11 @@ public:
 	double shoot_initial_delay_sec = 0.0;
 	// Volleys after which auto-shooting stops. -1 = infinite, 0 = never.
 	int max_volleys = -1;
+	// The most shots ONE timer (auto-fire, a burst chain, a pattern list)
+	// fires in one frame: sub-frame intervals and a late frame repay up to
+	// this many, then the timer resyncs and drops the rest of the backlog.
+	// 1 = never repay a hitch. Bounds an overloaded game's spiral.
+	int max_shots_per_frame = 8;
 	// Uniform scale applied to every generated transform, relative to the
 	// transforms generator (spread radius and bullet size grow together).
 	// 1.0 = identity. Must stay finite (setter rejects the rest); 0
@@ -1000,6 +1005,8 @@ public:
 	void set_shoot_initial_delay_sec(double value);
 	int get_max_volleys() const;
 	void set_max_volleys(int value);
+	int get_max_shots_per_frame() const { return max_shots_per_frame; }
+	void set_max_shots_per_frame(int value);
 	int get_volleys_fired() const;
 	double get_pattern_scale() const;
 	void set_pattern_scale(double value);

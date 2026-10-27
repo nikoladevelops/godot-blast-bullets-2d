@@ -314,6 +314,10 @@ void PatternSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_max_volleys", "value"), &PatternSpawner2D::set_max_volleys);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "max_volleys"), "set_max_volleys", "get_max_volleys");
 
+	ClassDB::bind_method(D_METHOD("get_max_shots_per_frame"), &PatternSpawner2D::get_max_shots_per_frame);
+	ClassDB::bind_method(D_METHOD("set_max_shots_per_frame", "value"), &PatternSpawner2D::set_max_shots_per_frame);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "max_shots_per_frame", PROPERTY_HINT_RANGE, "1,64,1,or_greater"), "set_max_shots_per_frame", "get_max_shots_per_frame");
+
 	ClassDB::bind_method(D_METHOD("get_reload_jitter_sec"), &PatternSpawner2D::get_reload_jitter_sec);
 	ClassDB::bind_method(D_METHOD("set_reload_jitter_sec", "value"), &PatternSpawner2D::set_reload_jitter_sec);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "reload_jitter_sec"), "set_reload_jitter_sec", "get_reload_jitter_sec");

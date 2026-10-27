@@ -522,3 +522,54 @@ func test_switching_to_idle_inside_a_physics_frame_steps_once_that_frame() -> vo
 	# Window: from this frame's idle step to the last frame's physics step
 	# (Idle by then): one step per frame in between.
 	assert_eq(runs, frames - 1, "one step per frame across the switch (%d steps, %d frames)" % [runs, frames])
+
+
+## max_shots_per_frame bounds every timer (auto-fire, a burst chain, a
+## pattern list): a 0.002 s interval is ~8.3 shots per 60 fps frame, so each
+## frame fires exactly min(cap, due) and the timer resyncs (no growing
+## backlog). 1 = never repay a hitch; 8 is the default.
+func _shots_per_frame(sp: BulletSpawner2D, frames: int) -> Array:
+	var out: Array = []
+	for i in frames:
+		var before: int = get_signal_emit_count(sp, "volley_fired")
+		await idle(1)
+		out.append(get_signal_emit_count(sp, "volley_fired") - before)
+	return out
+
+
+func test_max_shots_per_frame_bounds_every_timer(cap: int = use_parameters([1, 3, 8])) -> void:
+	var sp := make_spawner(H.make_volley_data(1, 0.0, 0.02))
+	watch_signals(sp)
+	assert_eq(sp.max_shots_per_frame, 8, "default")
+	sp.max_shots_per_frame = cap
+	sp.shoot_interval_sec = 0.002
+	sp.set_shooting_enabled(true)
+	await idle(2)
+	var auto: Array = await _shots_per_frame(sp, 6)
+	assert_eq(auto, [cap, cap, cap, cap, cap, cap], "auto-fire: %d per frame" % cap)
+	sp.set_shooting_enabled(false)
+	sp.shoot_interval_sec = 100.0
+	sp.burst_enabled = true
+	sp.burst_count = 200
+	sp.burst_interval_sec = 0.002
+	sp.begin_burst()
+	await idle(1)
+	var burst: Array = await _shots_per_frame(sp, 4)
+	assert_eq(burst, [cap, cap, cap, cap], "a burst chain: %d per frame" % cap)
+	sp.burst_enabled = false
+	await idle(1)
+	var entries: Array = []
+	for i in 100:
+		entries.append({"helper_bullets_amount": 1})
+	sp.spawn_pattern_list(entries, false, 0.002)
+	await idle(1)
+	var listed: Array = await _shots_per_frame(sp, 4)
+	assert_eq(listed, [cap, cap, cap, cap], "a pattern list: %d per frame" % cap)
+	sp.stop_pattern_list()
+
+
+func test_max_shots_per_frame_rejects_below_one() -> void:
+	var sp := make_spawner()
+	sp.max_shots_per_frame = 0
+	expect_error_sequence(["BulletSpawner2D: max_shots_per_frame must be >= 1, keeping the old value."])
+	assert_eq(sp.max_shots_per_frame, 8, "kept")

@@ -192,6 +192,14 @@ int PatternSpawner2D::get_max_volleys() const {
 	return max_volleys;
 }
 
+void PatternSpawner2D::set_max_shots_per_frame(int value) {
+	if (value < 1) {
+		UtilityFunctions::push_error(String(get_class()) + ": max_shots_per_frame must be >= 1, keeping the old value.");
+		return;
+	}
+	max_shots_per_frame = value;
+}
+
 void PatternSpawner2D::set_max_volleys(int value) {
 	if (value < -1) {
 		UtilityFunctions::push_error((String(get_class()) + ": max_volleys must be -1 (infinite) or >= 0, keeping the old value."));
@@ -1315,7 +1323,7 @@ void PatternSpawner2D::run_frame(double delta) {
 		// so sub-frame intervals keep their average rate; bounded catch-up.
 		int pulls = 0;
 		while (burst_shots_left > 0 && !shooting_paused && burst_time_left <= 0.0) {
-			if (++pulls > 8) {
+			if (++pulls > max_shots_per_frame) {
 				burst_time_left = next_burst_interval_sec(); // anti-spiral resync
 				break;
 			}
@@ -1351,7 +1359,7 @@ void PatternSpawner2D::run_frame(double delta) {
 		// entry per frame.
 		int pulls = 0;
 		while (pattern_list_active && !shooting_paused && pattern_list_time_left <= 0.0) {
-			if (++pulls > 8) {
+			if (++pulls > max_shots_per_frame) {
 				pattern_list_time_left = pattern_list_interval_sec; // anti-spiral resync
 				break;
 			}
@@ -1390,7 +1398,7 @@ void PatternSpawner2D::run_frame(double delta) {
 	int pulls = 0;
 	while (auto_shooting_active() && shoot_time_left <= 0.0) {
 		shoot_initial_wait = false;
-		if (++pulls > 8) {
+		if (++pulls > max_shots_per_frame) {
 			// Anti-spiral: resync the timer instead of repaying a huge hitch
 			// backlog in one tick (which would melt signal handlers/physics).
 			shoot_time_left = next_shoot_interval_sec();
