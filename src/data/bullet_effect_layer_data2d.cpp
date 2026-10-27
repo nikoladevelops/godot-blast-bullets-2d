@@ -4,6 +4,7 @@
 #include "core/warn_once2d.hpp"
 #include "sprite/frame_texture_cache2d.hpp"
 
+#include "core/assign_if_changed2d.hpp"
 #include <godot_cpp/classes/image.hpp>
 #include <godot_cpp/classes/image_texture.hpp>
 #include <godot_cpp/core/math.hpp>
@@ -88,7 +89,9 @@ bool BulletEffectLayerData2D::get_enabled() const {
 	return enabled;
 }
 void BulletEffectLayerData2D::set_enabled(bool value) {
-	enabled = value;
+	if (!assign_if_changed2d(enabled, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -100,7 +103,9 @@ void BulletEffectLayerData2D::set_trigger(EffectTrigger value) {
 		UtilityFunctions::push_error("BulletEffectLayerData2D: trigger must be 0 (Trail Follow), 1 (On Spawn), 2 (On Hit), 3 (On Destroy), 4 (On Bounce), 5 (On Lifetime Over), 6 (On Clear), 7 (On Despawn) or 8 (On Split), keeping the old value.");
 		return;
 	}
-	trigger = value;
+	if (!assign_if_changed2d(trigger, value)) {
+		return;
+	}
 	// A bake's validity depends on the trigger (a held trail draws, a held
 	// one-shot cannot).
 	invalidate_bake();
@@ -111,7 +116,9 @@ Ref<SpriteFrames> BulletEffectLayerData2D::get_sprite_frames() const {
 	return sprite_frames;
 }
 void BulletEffectLayerData2D::set_sprite_frames(const Ref<SpriteFrames> &new_frames) {
-	sprite_frames = new_frames;
+	if (!assign_if_changed2d(sprite_frames, new_frames)) {
+		return;
+	}
 	invalidate_bake();
 	emit_changed();
 }
@@ -120,7 +127,9 @@ StringName BulletEffectLayerData2D::get_animation() const {
 	return animation;
 }
 void BulletEffectLayerData2D::set_animation(const StringName &new_animation) {
-	animation = new_animation;
+	if (!assign_if_changed2d(animation, new_animation)) {
+		return;
+	}
 	invalidate_bake();
 	emit_changed();
 }
@@ -129,7 +138,9 @@ Ref<Material> BulletEffectLayerData2D::get_material() const {
 	return material;
 }
 void BulletEffectLayerData2D::set_material(const Ref<Material> &new_material) {
-	material = new_material;
+	if (!assign_if_changed2d(material, new_material)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -146,7 +157,9 @@ void BulletEffectLayerData2D::set_self_modulate(const Color &new_color) {
 		UtilityFunctions::push_error("BulletEffectLayerData2D: self_modulate must be finite, keeping the old value.");
 		return;
 	}
-	self_modulate = new_color;
+	if (!assign_if_changed2d(self_modulate, new_color)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -154,7 +167,9 @@ Ref<Gradient> BulletEffectLayerData2D::get_color_ramp() const {
 	return color_ramp;
 }
 void BulletEffectLayerData2D::set_color_ramp(const Ref<Gradient> &new_ramp) {
-	color_ramp = new_ramp;
+	if (!assign_if_changed2d(color_ramp, new_ramp)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -167,7 +182,9 @@ void BulletEffectLayerData2D::set_z_index(int value) {
 		UtilityFunctions::push_error("BulletEffectLayerData2D: z_index must be between -4096 and 4096, keeping the old value.");
 		return;
 	}
-	z_index = value;
+	if (!assign_if_changed2d(z_index, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -175,7 +192,9 @@ bool BulletEffectLayerData2D::get_z_as_relative() const {
 	return z_as_relative;
 }
 void BulletEffectLayerData2D::set_z_as_relative(bool value) {
-	z_as_relative = value;
+	if (!assign_if_changed2d(z_as_relative, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -183,7 +202,9 @@ int BulletEffectLayerData2D::get_visibility_layer() const {
 	return visibility_layer;
 }
 void BulletEffectLayerData2D::set_visibility_layer(int value) {
-	visibility_layer = value;
+	if (!assign_if_changed2d(visibility_layer, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -191,7 +212,9 @@ int BulletEffectLayerData2D::get_light_mask() const {
 	return light_mask;
 }
 void BulletEffectLayerData2D::set_light_mask(int value) {
-	light_mask = value;
+	if (!assign_if_changed2d(light_mask, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -203,7 +226,9 @@ void BulletEffectLayerData2D::set_offset(const Vector2 &new_offset) {
 		UtilityFunctions::push_error("BulletEffectLayerData2D: offset must be finite, keeping the old value.");
 		return;
 	}
-	offset = new_offset;
+	if (!assign_if_changed2d(offset, new_offset)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -215,7 +240,9 @@ void BulletEffectLayerData2D::set_rotation_degrees(double value) {
 		UtilityFunctions::push_error("BulletEffectLayerData2D: rotation_degrees must be finite, keeping the old value.");
 		return;
 	}
-	rotation_degrees = value;
+	if (!assign_if_changed2d(rotation_degrees, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -227,7 +254,9 @@ void BulletEffectLayerData2D::set_spin_degrees_per_sec(double value) {
 		UtilityFunctions::push_error("BulletEffectLayerData2D: spin_degrees_per_sec must be finite, keeping the old value.");
 		return;
 	}
-	spin_degrees_per_sec = value;
+	if (!assign_if_changed2d(spin_degrees_per_sec, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -239,7 +268,9 @@ void BulletEffectLayerData2D::set_scale(const Vector2 &new_scale) {
 		UtilityFunctions::push_error("BulletEffectLayerData2D: scale must be finite, keeping the old value.");
 		return;
 	}
-	scale = new_scale;
+	if (!assign_if_changed2d(scale, new_scale)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -247,7 +278,9 @@ bool BulletEffectLayerData2D::get_random_start_frame() const {
 	return random_start_frame;
 }
 void BulletEffectLayerData2D::set_random_start_frame(bool value) {
-	random_start_frame = value;
+	if (!assign_if_changed2d(random_start_frame, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -255,7 +288,9 @@ bool BulletEffectLayerData2D::get_randomize_rotation() const {
 	return randomize_rotation;
 }
 void BulletEffectLayerData2D::set_randomize_rotation(bool value) {
-	randomize_rotation = value;
+	if (!assign_if_changed2d(randomize_rotation, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -265,6 +300,9 @@ real_t BulletEffectLayerData2D::get_random_scale_min() const {
 void BulletEffectLayerData2D::set_random_scale_min(real_t value) {
 	if (!Math::is_finite(value) || value < 0.0) {
 		UtilityFunctions::push_error("BulletEffectLayerData2D: random_scale_min must be finite and >= 0, keeping the old value.");
+		return;
+	}
+	if (random_scale_min == value && random_scale_max >= value) {
 		return;
 	}
 	random_scale_min = value;
@@ -284,6 +322,9 @@ void BulletEffectLayerData2D::set_random_scale_max(real_t value) {
 		UtilityFunctions::push_error("BulletEffectLayerData2D: random_scale_max must be finite and >= 0, keeping the old value.");
 		return;
 	}
+	if (random_scale_max == value && random_scale_min <= value) {
+		return;
+	}
 	random_scale_max = value;
 	// A maximum below the minimum pulls the minimum down (see random_scale_min).
 	if (random_scale_min > value) {
@@ -300,7 +341,9 @@ void BulletEffectLayerData2D::set_trigger_chance(real_t value) {
 		UtilityFunctions::push_error("BulletEffectLayerData2D: trigger_chance must be finite in [0, 1], keeping the old value.");
 		return;
 	}
-	trigger_chance = value;
+	if (!assign_if_changed2d(trigger_chance, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -314,7 +357,9 @@ void BulletEffectLayerData2D::set_max_instances(int value) {
 		UtilityFunctions::push_error("BulletEffectLayerData2D: max_instances must be in [0, 4096] (0 = auto), keeping the old value.");
 		return;
 	}
-	max_instances = value;
+	if (!assign_if_changed2d(max_instances, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -326,7 +371,9 @@ void BulletEffectLayerData2D::set_fade_in_sec(double value) {
 		UtilityFunctions::push_error("BulletEffectLayerData2D: fade_in_sec must be finite and >= 0, keeping the old value.");
 		return;
 	}
-	fade_in_sec = value;
+	if (!assign_if_changed2d(fade_in_sec, value)) {
+		return;
+	}
 	emit_changed();
 }
 double BulletEffectLayerData2D::get_fade_out_sec() const {
@@ -337,7 +384,9 @@ void BulletEffectLayerData2D::set_fade_out_sec(double value) {
 		UtilityFunctions::push_error("BulletEffectLayerData2D: fade_out_sec must be finite and >= 0, keeping the old value.");
 		return;
 	}
-	fade_out_sec = value;
+	if (!assign_if_changed2d(fade_out_sec, value)) {
+		return;
+	}
 	emit_changed();
 }
 bool BulletEffectLayerData2D::get_override_frame_color() const {

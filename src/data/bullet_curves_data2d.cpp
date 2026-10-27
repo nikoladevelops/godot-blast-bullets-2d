@@ -1,5 +1,6 @@
 #include "data/bullet_curves_data2d.hpp"
 
+#include "core/assign_if_changed2d.hpp"
 #include <godot_cpp/core/math.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
@@ -16,7 +17,9 @@ void BulletCurvesData2D::set_movement_speed_curve(const Ref<Curve> &curve) {
 		curve->bake();
 	}
 
-	movement_speed_curve = curve;
+	if (!assign_if_changed2d(movement_speed_curve, curve)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -28,7 +31,9 @@ void BulletCurvesData2D::set_rotation_speed_curve(const Ref<Curve> &curve) {
 		curve->bake();
 	}
 
-	rotation_speed_curve = curve;
+	if (!assign_if_changed2d(rotation_speed_curve, curve)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -40,7 +45,9 @@ void BulletCurvesData2D::set_x_direction_curve(const Ref<Curve> &curve) {
 		curve->bake();
 	}
 
-	x_direction_curve = curve;
+	if (!assign_if_changed2d(x_direction_curve, curve)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -48,7 +55,9 @@ bool BulletCurvesData2D::get_movement_use_unit_curve() const {
 	return movement_use_unit_curve;
 }
 void BulletCurvesData2D::set_movement_use_unit_curve(bool value) {
-	movement_use_unit_curve = value;
+	if (!assign_if_changed2d(movement_use_unit_curve, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -56,7 +65,9 @@ bool BulletCurvesData2D::get_rotation_use_unit_curve() const {
 	return rotation_use_unit_curve;
 }
 void BulletCurvesData2D::set_rotation_use_unit_curve(bool value) {
-	rotation_use_unit_curve = value;
+	if (!assign_if_changed2d(rotation_use_unit_curve, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -65,7 +76,9 @@ bool BulletCurvesData2D::get_x_direction_use_unit_curve() const {
 }
 
 void BulletCurvesData2D::set_x_direction_use_unit_curve(bool value) {
-	x_direction_use_unit_curve = value;
+	if (!assign_if_changed2d(x_direction_use_unit_curve, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -78,7 +91,9 @@ void BulletCurvesData2D::set_x_direction_curve_strength(real_t value) {
 		UtilityFunctions::push_error("BulletCurvesData2D: x_direction_curve_strength must be finite, keeping the old value.");
 		return;
 	}
-	x_direction_curve_strength = value;
+	if (!assign_if_changed2d(x_direction_curve_strength, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -91,7 +106,9 @@ void BulletCurvesData2D::set_x_direction_curve_mode(DirectionCurveMode mode) {
 		UtilityFunctions::push_error("BulletCurvesData2D: x_direction_curve_mode must be 0 (Additive) or 1 (Override), keeping the old value.");
 		return;
 	}
-	x_direction_curve_mode = mode;
+	if (!assign_if_changed2d(x_direction_curve_mode, mode)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -99,7 +116,9 @@ bool BulletCurvesData2D::get_rotate_towards_adjusted_direction() const {
 	return rotate_towards_adjusted_direction;
 }
 void BulletCurvesData2D::set_rotate_towards_adjusted_direction(bool value) {
-	rotate_towards_adjusted_direction = value;
+	if (!assign_if_changed2d(rotate_towards_adjusted_direction, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -111,7 +130,9 @@ void BulletCurvesData2D::set_direction_curve_rotation_speed(real_t value) {
 		UtilityFunctions::push_error("BulletCurvesData2D: direction_curve_rotation_speed must be finite, keeping the old value.");
 		return;
 	}
-	direction_curve_rotation_speed = value;
+	if (!assign_if_changed2d(direction_curve_rotation_speed, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -123,7 +144,9 @@ void BulletCurvesData2D::set_y_direction_curve(const Ref<Curve> &curve) {
 		curve->bake();
 	}
 
-	y_direction_curve = curve;
+	if (!assign_if_changed2d(y_direction_curve, curve)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -131,7 +154,9 @@ bool BulletCurvesData2D::get_y_direction_use_unit_curve() const {
 	return y_direction_use_unit_curve;
 }
 void BulletCurvesData2D::set_y_direction_use_unit_curve(bool value) {
-	y_direction_use_unit_curve = value;
+	if (!assign_if_changed2d(y_direction_use_unit_curve, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -143,7 +168,9 @@ void BulletCurvesData2D::set_y_direction_curve_strength(real_t value) {
 		UtilityFunctions::push_error("BulletCurvesData2D: y_direction_curve_strength must be finite, keeping the old value.");
 		return;
 	}
-	y_direction_curve_strength = value;
+	if (!assign_if_changed2d(y_direction_curve_strength, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -155,7 +182,9 @@ void BulletCurvesData2D::set_y_direction_curve_mode(DirectionCurveMode mode) {
 		UtilityFunctions::push_error("BulletCurvesData2D: y_direction_curve_mode must be 0 (Additive) or 1 (Override), keeping the old value.");
 		return;
 	}
-	y_direction_curve_mode = mode;
+	if (!assign_if_changed2d(y_direction_curve_mode, mode)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -167,7 +196,9 @@ void BulletCurvesData2D::set_gravity_strength_curve(const Ref<Curve> &curve) {
 		curve->bake();
 	}
 
-	gravity_strength_curve = curve;
+	if (!assign_if_changed2d(gravity_strength_curve, curve)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -175,7 +206,9 @@ bool BulletCurvesData2D::get_gravity_use_unit_curve() const {
 	return gravity_use_unit_curve;
 }
 void BulletCurvesData2D::set_gravity_use_unit_curve(bool value) {
-	gravity_use_unit_curve = value;
+	if (!assign_if_changed2d(gravity_use_unit_curve, value)) {
+		return;
+	}
 	emit_changed();
 }
 

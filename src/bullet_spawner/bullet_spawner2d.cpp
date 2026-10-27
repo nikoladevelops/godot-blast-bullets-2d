@@ -193,12 +193,17 @@ ShotRefusal2D BulletSpawner2D::shot_preflight(BulletFactory2D *factory) {
 }
 
 ShotRefusal2D BulletSpawner2D::shot_prepare() {
-	// Duplicate per volley: the user's resource must never be mutated (its
-	// transforms get overwritten below), so shared .tres files stay safe.
-	// Duplicate cache: first shot with a resource duplicates once into the
-	// spawner-owned template; later shots reuse it (transforms overwritten
-	// below). In-place edits invalidate via _on_spawn_data_changed, resource
-	// swaps via set_spawn_data, so reuse is always fresh.
+	// A spawn reads the data once (the transforms ride the span) and never
+	// writes it, so the user's resource goes straight to the factory. Only a
+	// split chain keeps the data for later (the children of every split): a
+	// splitting shot arms it with a spawner-owned copy, so an edit made after
+	// the shot never reaches bullets already flying. The copy is cached until
+	// an in-place edit (_on_spawn_data_changed) or a swap (set_spawn_data):
+	// duplicating cost ~30 us per shot after every edit.
+	if (!split_enabled || split_data.is_null()) {
+		shot_volley_data = spawn_data;
+		return ShotRefusal2D();
+	}
 	Ref<BulletVolleyData2D> volley_data;
 	const uint64_t spawn_id = spawn_data->get_instance_id();
 	if (cached_volley_template.is_valid() && cached_spawn_data_id == spawn_id) {

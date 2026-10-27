@@ -1,5 +1,6 @@
 #include "data/bullet_wobble_data2d.hpp"
 
+#include "core/assign_if_changed2d.hpp"
 #include <godot_cpp/classes/random_number_generator.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
@@ -47,7 +48,9 @@ TypedArray<BulletWobbleData2D> BulletWobbleData2D::generate_random_data(
 
 bool BulletWobbleData2D::get_enabled() const { return enabled; }
 void BulletWobbleData2D::set_enabled(bool value) {
-	enabled = value;
+	if (!assign_if_changed2d(enabled, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -57,7 +60,9 @@ void BulletWobbleData2D::set_mode(WobbleMode value) {
 		UtilityFunctions::push_error("BulletWobbleData2D: mode must be 0 (Lateral) or 1 (Angular), keeping the old value.");
 		return;
 	}
-	mode = value;
+	if (!assign_if_changed2d(mode, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -67,7 +72,9 @@ void BulletWobbleData2D::set_waveform(WobbleWaveform value) {
 		UtilityFunctions::push_error("BulletWobbleData2D: waveform must be 0 (Sine) or 1 (Cosine), keeping the old value.");
 		return;
 	}
-	waveform = value;
+	if (!assign_if_changed2d(waveform, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -77,7 +84,9 @@ void BulletWobbleData2D::set_amplitude(real_t value) {
 		UtilityFunctions::push_error("BulletWobbleData2D: amplitude must be finite and >= 0, keeping the old value.");
 		return;
 	}
-	amplitude = value;
+	if (!assign_if_changed2d(amplitude, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -87,7 +96,9 @@ void BulletWobbleData2D::set_frequency_hz(real_t value) {
 		UtilityFunctions::push_error("BulletWobbleData2D: frequency_hz must be finite and >= 0, keeping the old value.");
 		return;
 	}
-	frequency_hz = value;
+	if (!assign_if_changed2d(frequency_hz, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -97,7 +108,9 @@ void BulletWobbleData2D::set_phase_rad(real_t value) {
 		UtilityFunctions::push_error("BulletWobbleData2D: phase_rad must be finite, keeping the old value.");
 		return;
 	}
-	phase_rad = value;
+	if (!assign_if_changed2d(phase_rad, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -107,13 +120,17 @@ void BulletWobbleData2D::set_phase_step_per_bullet(real_t value) {
 		UtilityFunctions::push_error("BulletWobbleData2D: phase_step_per_bullet must be finite, keeping the old value.");
 		return;
 	}
-	phase_step_per_bullet = value;
+	if (!assign_if_changed2d(phase_step_per_bullet, value)) {
+		return;
+	}
 	emit_changed();
 }
 
 bool BulletWobbleData2D::get_distance_phased() const { return distance_phased; }
 void BulletWobbleData2D::set_distance_phased(bool value) {
-	distance_phased = value;
+	if (!assign_if_changed2d(distance_phased, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -123,7 +140,9 @@ void BulletWobbleData2D::set_damping_per_sec(real_t value) {
 		UtilityFunctions::push_error("BulletWobbleData2D: damping_per_sec must be finite and >= 0, keeping the old value.");
 		return;
 	}
-	damping_per_sec = value;
+	if (!assign_if_changed2d(damping_per_sec, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -133,7 +152,9 @@ void BulletWobbleData2D::set_delay_sec(real_t value) {
 		UtilityFunctions::push_error("BulletWobbleData2D: delay_sec must be finite and >= 0, keeping the old value.");
 		return;
 	}
-	delay_sec = value;
+	if (!assign_if_changed2d(delay_sec, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -143,13 +164,17 @@ void BulletWobbleData2D::set_duration_sec(real_t value) {
 		UtilityFunctions::push_error("BulletWobbleData2D: duration_sec must be finite and >= 0 (0 = infinite), keeping the old value.");
 		return;
 	}
-	duration_sec = value;
+	if (!assign_if_changed2d(duration_sec, value)) {
+		return;
+	}
 	emit_changed();
 }
 
 bool BulletWobbleData2D::get_face_movement_direction() const { return face_movement_direction; }
 void BulletWobbleData2D::set_face_movement_direction(bool value) {
-	face_movement_direction = value;
+	if (!assign_if_changed2d(face_movement_direction, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -159,7 +184,9 @@ void BulletWobbleData2D::set_face_rotation_speed(real_t value) {
 		UtilityFunctions::push_error("BulletWobbleData2D: face_rotation_speed must be finite and >= 0 (0 = snap instantly), keeping the old value.");
 		return;
 	}
-	face_rotation_speed = value;
+	if (!assign_if_changed2d(face_rotation_speed, value)) {
+		return;
+	}
 	emit_changed();
 }
 

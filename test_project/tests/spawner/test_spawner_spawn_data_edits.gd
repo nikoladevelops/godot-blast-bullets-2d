@@ -38,7 +38,7 @@ func test_accepted_setters_emit_changed_and_rejected_ones_do_not() -> void:
 	data.is_life_time_infinite = true # bool
 	data.z_index = 3 # int
 	data.shared_bullet_attachment_offset = Vector2(1, 2) # Vector2
-	data.material = null # Resource
+	data.material = CanvasItemMaterial.new() # Resource
 	assert_signal_emit_count(data, "changed", 5, "one changed per accepted edit")
 	data.shared_bullet_attachment_offset = Vector2(NAN, 0)
 	expect_error_sequence(["BulletVolleyData2D: shared_bullet_attachment_offset must be finite, keeping the old value."])

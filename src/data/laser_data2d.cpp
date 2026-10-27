@@ -2,6 +2,7 @@
 
 #include "core/transform_math2d.hpp"
 
+#include "core/assign_if_changed2d.hpp"
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
@@ -45,7 +46,9 @@ const LaserPresetRow LASER_PRESETS[] = {
 } // namespace
 
 void LaserData2D::store(double &field, double value) {
-	field = value;
+	if (!assign_if_changed2d(field, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -84,7 +87,9 @@ void LaserData2D::set_type(LaserType value) {
 		UtilityFunctions::push_error("LaserData2D: type must be 0 (Beam), 1 (Bolt) or 2 (Curvy), keeping the old value.");
 		return;
 	}
-	type = value;
+	if (!assign_if_changed2d(type, value)) {
+		return;
+	}
 	notify_property_list_changed();
 	emit_changed();
 }
@@ -94,7 +99,9 @@ void LaserData2D::set_aim(LaserAim value) {
 		UtilityFunctions::push_error("LaserData2D: aim must be 0 (Pattern), 1 (Track) or 2 (Lock On), keeping the old value.");
 		return;
 	}
-	aim = value;
+	if (!assign_if_changed2d(aim, value)) {
+		return;
+	}
 	notify_property_list_changed();
 	emit_changed();
 }
@@ -104,7 +111,9 @@ void LaserData2D::set_body_mode(BodyMode value) {
 		UtilityFunctions::push_error("LaserData2D: body_mode must be 0 (Stretch) or 1 (Tile), keeping the old value.");
 		return;
 	}
-	body_mode = value;
+	if (!assign_if_changed2d(body_mode, value)) {
+		return;
+	}
 	notify_property_list_changed();
 	emit_changed();
 }
@@ -114,7 +123,9 @@ void LaserData2D::set_warning_color(const Color &value) {
 		UtilityFunctions::push_error("LaserData2D: warning_color must be finite, keeping the old value.");
 		return;
 	}
-	warning_color = value;
+	if (!assign_if_changed2d(warning_color, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -123,22 +134,30 @@ void LaserData2D::set_modulate(const Color &value) {
 		UtilityFunctions::push_error("LaserData2D: modulate must be finite, keeping the old value.");
 		return;
 	}
-	modulate = value;
+	if (!assign_if_changed2d(modulate, value)) {
+		return;
+	}
 	emit_changed();
 }
 
 void LaserData2D::set_hit_while_growing(bool value) {
-	hit_while_growing = value;
+	if (!assign_if_changed2d(hit_while_growing, value)) {
+		return;
+	}
 	emit_changed();
 }
 
 void LaserData2D::set_keep_tracking_when_active(bool value) {
-	keep_tracking_when_active = value;
+	if (!assign_if_changed2d(keep_tracking_when_active, value)) {
+		return;
+	}
 	emit_changed();
 }
 
 void LaserData2D::set_follow_spawner(bool value) {
-	follow_spawner = value;
+	if (!assign_if_changed2d(follow_spawner, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -147,7 +166,9 @@ void LaserData2D::set_wall_mask(int64_t value) {
 		UtilityFunctions::push_error("LaserData2D: wall_mask must be a 32-bit layer mask (0 = no walls), keeping the old value.");
 		return;
 	}
-	wall_mask = value;
+	if (!assign_if_changed2d(wall_mask, value)) {
+		return;
+	}
 	notify_property_list_changed(); // reflections gate on it
 	emit_changed();
 }
@@ -157,7 +178,9 @@ void LaserData2D::set_reflections(int value) {
 		UtilityFunctions::push_error("LaserData2D: reflections must be between 0 and 256 (each one is a ray per tick), keeping the old value.");
 		return;
 	}
-	reflections = value;
+	if (!assign_if_changed2d(reflections, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -166,17 +189,23 @@ void LaserData2D::set_collision_mask(int64_t value) {
 		UtilityFunctions::push_error("LaserData2D: collision_mask must be a 32-bit layer mask, keeping the old value.");
 		return;
 	}
-	collision_mask = value;
+	if (!assign_if_changed2d(collision_mask, value)) {
+		return;
+	}
 	emit_changed();
 }
 
 void LaserData2D::set_collide_with_bodies(bool value) {
-	collide_with_bodies = value;
+	if (!assign_if_changed2d(collide_with_bodies, value)) {
+		return;
+	}
 	emit_changed();
 }
 
 void LaserData2D::set_collide_with_areas(bool value) {
-	collide_with_areas = value;
+	if (!assign_if_changed2d(collide_with_areas, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -185,7 +214,9 @@ void LaserData2D::set_pierce_limit(int value) {
 		UtilityFunctions::push_error("LaserData2D: pierce_limit must be >= 0 (0 = passes through every target), keeping the old value.");
 		return;
 	}
-	pierce_limit = value;
+	if (!assign_if_changed2d(pierce_limit, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -194,18 +225,24 @@ void LaserData2D::set_max_hits_per_beam(int value) {
 		UtilityFunctions::push_error("LaserData2D: max_hits_per_beam must be between 1 and 4096, keeping the old value.");
 		return;
 	}
-	max_hits_per_beam = value;
+	if (!assign_if_changed2d(max_hits_per_beam, value)) {
+		return;
+	}
 	emit_changed();
 }
 
 void LaserData2D::set_color_ramp(const Ref<Gradient> &value) {
-	color_ramp = value;
+	if (!assign_if_changed2d(color_ramp, value)) {
+		return;
+	}
 	emit_changed();
 }
 
 #define LASER_FRAMES_SETTER(NAME)                                  \
 	void LaserData2D::set_##NAME(const Ref<SpriteFrames> &value) { \
-		NAME = value;                                              \
+		if (!assign_if_changed2d(NAME, value)) {                   \
+			return;                                                \
+		}                                                          \
 		++looks_serial;                                            \
 		emit_changed();                                            \
 	}
@@ -220,7 +257,9 @@ LASER_FRAMES_SETTER(wall_impact_frames)
 #undef LASER_FRAMES_SETTER
 
 void LaserData2D::set_material(const Ref<Material> &value) {
-	material = value;
+	if (!assign_if_changed2d(material, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -229,7 +268,9 @@ void LaserData2D::set_z_index(int value) {
 		UtilityFunctions::push_error("LaserData2D: z_index must be between -4096 and 4096, keeping the old value.");
 		return;
 	}
-	z_index = value;
+	if (!assign_if_changed2d(z_index, value)) {
+		return;
+	}
 	emit_changed();
 }
 

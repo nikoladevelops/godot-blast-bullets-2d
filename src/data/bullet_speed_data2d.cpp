@@ -1,5 +1,6 @@
 #include "data/bullet_speed_data2d.hpp"
 
+#include "core/assign_if_changed2d.hpp"
 #include <godot_cpp/classes/random_number_generator.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
@@ -56,7 +57,9 @@ void BulletSpeedData2D::set_speed(real_t new_speed) {
 		UtilityFunctions::push_error("BulletSpeedData2D: speed must be finite (NaN/Inf would poison bullet movement), keeping the old value.");
 		return;
 	}
-	speed = new_speed;
+	if (!assign_if_changed2d(speed, new_speed)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -68,7 +71,9 @@ void BulletSpeedData2D::set_max_speed(real_t new_max_speed) {
 		UtilityFunctions::push_error("BulletSpeedData2D: max_speed must be finite and >= 0, keeping the old value.");
 		return;
 	}
-	max_speed = new_max_speed;
+	if (!assign_if_changed2d(max_speed, new_max_speed)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -80,7 +85,9 @@ void BulletSpeedData2D::set_acceleration(real_t new_acceleration) {
 		UtilityFunctions::push_error("BulletSpeedData2D: acceleration must be finite, keeping the old value.");
 		return;
 	}
-	acceleration = new_acceleration;
+	if (!assign_if_changed2d(acceleration, new_acceleration)) {
+		return;
+	}
 	emit_changed();
 }
 

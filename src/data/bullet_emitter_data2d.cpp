@@ -2,6 +2,7 @@
 
 #include "core/transform_math2d.hpp"
 
+#include "core/assign_if_changed2d.hpp"
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
@@ -21,7 +22,9 @@ void BulletEmitterData2D::set_interval_sec(double value) {
 	if (!accept_seconds(value, "interval_sec", true)) {
 		return;
 	}
-	interval_sec = value;
+	if (!assign_if_changed2d(interval_sec, value)) {
+		return;
+	}
 	++rules_epoch;
 	emit_changed();
 }
@@ -30,7 +33,9 @@ void BulletEmitterData2D::set_start_delay_sec(double value) {
 	if (!accept_seconds(value, "start_delay_sec", false)) {
 		return;
 	}
-	start_delay_sec = value;
+	if (!assign_if_changed2d(start_delay_sec, value)) {
+		return;
+	}
 	++rules_epoch;
 	emit_changed();
 }
@@ -39,7 +44,9 @@ void BulletEmitterData2D::set_stagger_sec(double value) {
 	if (!accept_seconds(value, "stagger_sec", false)) {
 		return;
 	}
-	stagger_sec = value;
+	if (!assign_if_changed2d(stagger_sec, value)) {
+		return;
+	}
 	++rules_epoch;
 	emit_changed();
 }
@@ -49,7 +56,9 @@ void BulletEmitterData2D::set_max_shots(int value) {
 		UtilityFunctions::push_error("BulletEmitterData2D: max_shots must be >= 0 (0 = no limit), keeping the old value.");
 		return;
 	}
-	max_shots = value;
+	if (!assign_if_changed2d(max_shots, value)) {
+		return;
+	}
 	++rules_epoch;
 	emit_changed();
 }
@@ -59,13 +68,17 @@ void BulletEmitterData2D::set_chance(double value) {
 		UtilityFunctions::push_error("BulletEmitterData2D: chance must be between 0 and 1, keeping the old value.");
 		return;
 	}
-	chance = value;
+	if (!assign_if_changed2d(chance, value)) {
+		return;
+	}
 	++rules_epoch;
 	emit_changed();
 }
 
 void BulletEmitterData2D::set_seed(int64_t value) {
-	seed = value;
+	if (!assign_if_changed2d(seed, value)) {
+		return;
+	}
 	++rules_epoch;
 	emit_changed();
 }
@@ -75,7 +88,9 @@ void BulletEmitterData2D::set_aim(EmitterAim value) {
 		UtilityFunctions::push_error("BulletEmitterData2D: aim must be 0 (Heading), 1 (World) or 2 (Template), keeping the old value.");
 		return;
 	}
-	aim = value;
+	if (!assign_if_changed2d(aim, value)) {
+		return;
+	}
 	++rules_epoch;
 	emit_changed();
 }
@@ -85,13 +100,17 @@ void BulletEmitterData2D::set_spin_per_shot_degrees(double value) {
 		UtilityFunctions::push_error("BulletEmitterData2D: spin_per_shot_degrees must be finite, keeping the old value.");
 		return;
 	}
-	spin_per_shot_degrees = value;
+	if (!assign_if_changed2d(spin_per_shot_degrees, value)) {
+		return;
+	}
 	++rules_epoch;
 	emit_changed();
 }
 
 void BulletEmitterData2D::set_inherit_bullet_velocity(bool value) {
-	inherit_bullet_velocity = value;
+	if (!assign_if_changed2d(inherit_bullet_velocity, value)) {
+		return;
+	}
 	++rules_epoch;
 	emit_changed();
 }

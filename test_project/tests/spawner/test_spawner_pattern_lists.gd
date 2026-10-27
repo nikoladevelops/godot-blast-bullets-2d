@@ -68,6 +68,8 @@ func test_preset_entries_are_undone_after_the_entry() -> void:
 
 func test_reusing_the_same_spawn_data_keeps_the_template() -> void:
 	var sp := _spawner()
+	sp.split_data = BulletSplitData2D.create_preset(BulletSplitData2D.PRESET_BURST_RING)
+	sp.split_enabled = true # only a split chain keeps a copy of the spawn data
 	assert_true(sp.shoot_once(), "prime the duplicate cache")
 	sp.spawn_pattern_list([{"spawn_data": sp.get_spawn_data()}], true)
 	var info: Dictionary = sp.debug_get_pattern_cache_info()

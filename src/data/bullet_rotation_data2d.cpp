@@ -1,5 +1,6 @@
 #include "data/bullet_rotation_data2d.hpp"
 
+#include "core/assign_if_changed2d.hpp"
 #include <godot_cpp/classes/random_number_generator.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
@@ -58,7 +59,9 @@ void BulletRotationData2D::set_rotation_speed(real_t new_rotation_speed) {
 		UtilityFunctions::push_error("BulletRotationData2D: rotation_speed must be finite (NaN/Inf would poison bullet rotation), keeping the old value.");
 		return;
 	}
-	rotation_speed = new_rotation_speed;
+	if (!assign_if_changed2d(rotation_speed, new_rotation_speed)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -70,7 +73,9 @@ void BulletRotationData2D::set_max_rotation_speed(real_t new_max_rotation_speed)
 		UtilityFunctions::push_error("BulletRotationData2D: max_rotation_speed must be finite and >= 0, keeping the old value.");
 		return;
 	}
-	max_rotation_speed = new_max_rotation_speed;
+	if (!assign_if_changed2d(max_rotation_speed, new_max_rotation_speed)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -82,7 +87,9 @@ void BulletRotationData2D::set_rotation_acceleration(real_t new_rotation_acceler
 		UtilityFunctions::push_error("BulletRotationData2D: rotation_acceleration must be finite, keeping the old value.");
 		return;
 	}
-	rotation_acceleration = new_rotation_acceleration;
+	if (!assign_if_changed2d(rotation_acceleration, new_rotation_acceleration)) {
+		return;
+	}
 	emit_changed();
 }
 

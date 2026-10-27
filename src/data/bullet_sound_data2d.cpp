@@ -4,6 +4,7 @@
 #include "core/transform_math2d.hpp"
 #include "factory/sound_mixer2d.hpp"
 
+#include "core/assign_if_changed2d.hpp"
 #include <godot_cpp/classes/audio_server.hpp>
 #include <godot_cpp/classes/audio_stream_player2d.hpp>
 #include <godot_cpp/classes/engine.hpp>
@@ -59,7 +60,9 @@ void BulletSoundData2D::set_ring_index(int value) {
 	if (ring_index == value) {
 		return;
 	}
-	ring_index = value;
+	if (!assign_if_changed2d(ring_index, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -72,7 +75,9 @@ void BulletSoundData2D::set_zone_index(int value) {
 	if (zone_index == value) {
 		return;
 	}
-	zone_index = value;
+	if (!assign_if_changed2d(zone_index, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -121,7 +126,9 @@ void BulletSoundData2D::set_stream_weights(const PackedFloat32Array &value) {
 	if (stream_weights == value) {
 		return;
 	}
-	stream_weights = value;
+	if (!assign_if_changed2d(stream_weights, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -136,7 +143,9 @@ void BulletSoundData2D::set_volume_db(double value) {
 	if (volume_db == value) {
 		return;
 	}
-	volume_db = value;
+	if (!assign_if_changed2d(volume_db, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -149,7 +158,9 @@ void BulletSoundData2D::set_pitch_scale(double value) {
 	if (pitch_scale == value) {
 		return;
 	}
-	pitch_scale = value;
+	if (!assign_if_changed2d(pitch_scale, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -162,7 +173,9 @@ void BulletSoundData2D::set_random_pitch(double value) {
 	if (random_pitch == value) {
 		return;
 	}
-	random_pitch = value;
+	if (!assign_if_changed2d(random_pitch, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -175,7 +188,9 @@ void BulletSoundData2D::set_random_volume_offset_db(double value) {
 	if (random_volume_offset_db == value) {
 		return;
 	}
-	random_volume_offset_db = value;
+	if (!assign_if_changed2d(random_volume_offset_db, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -188,7 +203,9 @@ void BulletSoundData2D::set_random_volume_min_db(double value) {
 	if (random_volume_min_db == value) {
 		return;
 	}
-	random_volume_min_db = value;
+	if (!assign_if_changed2d(random_volume_min_db, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -201,7 +218,9 @@ void BulletSoundData2D::set_random_volume_max_db(double value) {
 	if (random_volume_max_db == value) {
 		return;
 	}
-	random_volume_max_db = value;
+	if (!assign_if_changed2d(random_volume_max_db, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -214,7 +233,9 @@ void BulletSoundData2D::set_random_pitch_min(double value) {
 	if (random_pitch_min == value) {
 		return;
 	}
-	random_pitch_min = value;
+	if (!assign_if_changed2d(random_pitch_min, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -227,7 +248,9 @@ void BulletSoundData2D::set_random_pitch_max(double value) {
 	if (random_pitch_max == value) {
 		return;
 	}
-	random_pitch_max = value;
+	if (!assign_if_changed2d(random_pitch_max, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -240,7 +263,9 @@ void BulletSoundData2D::set_random_pan(double value) {
 	if (random_pan == value) {
 		return;
 	}
-	random_pan = value;
+	if (!assign_if_changed2d(random_pan, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -253,7 +278,9 @@ void BulletSoundData2D::set_trigger_chance(double value) {
 	if (trigger_chance == value) {
 		return;
 	}
-	trigger_chance = value;
+	if (!assign_if_changed2d(trigger_chance, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -266,7 +293,9 @@ void BulletSoundData2D::set_bus(const StringName &value) {
 	if (bus == value) {
 		return;
 	}
-	bus = value;
+	if (!assign_if_changed2d(bus, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -289,7 +318,9 @@ void BulletSoundData2D::set_max_distance(double value) {
 	if (max_distance == value) {
 		return;
 	}
-	max_distance = value;
+	if (!assign_if_changed2d(max_distance, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -302,7 +333,9 @@ void BulletSoundData2D::set_attenuation(double value) {
 	if (attenuation == value) {
 		return;
 	}
-	attenuation = value;
+	if (!assign_if_changed2d(attenuation, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -315,7 +348,9 @@ void BulletSoundData2D::set_panning_strength(double value) {
 	if (panning_strength == value) {
 		return;
 	}
-	panning_strength = value;
+	if (!assign_if_changed2d(panning_strength, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -328,7 +363,9 @@ void BulletSoundData2D::set_area_mask(int value) {
 	if (area_mask == value) {
 		return;
 	}
-	area_mask = value;
+	if (!assign_if_changed2d(area_mask, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -353,7 +390,9 @@ void BulletSoundData2D::set_camera_path(const NodePath &value) {
 	if (camera_path == value) {
 		return;
 	}
-	camera_path = value;
+	if (!assign_if_changed2d(camera_path, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -366,7 +405,9 @@ void BulletSoundData2D::set_camera_margin_px(double value) {
 	if (camera_margin_px == value) {
 		return;
 	}
-	camera_margin_px = value;
+	if (!assign_if_changed2d(camera_margin_px, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -375,7 +416,9 @@ void BulletSoundData2D::set_zoom_scales_distance(bool value) {
 	if (zoom_scales_distance == value) {
 		return;
 	}
-	zoom_scales_distance = value;
+	if (!assign_if_changed2d(zoom_scales_distance, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -388,7 +431,9 @@ void BulletSoundData2D::set_zoom_gain_db(double value) {
 	if (zoom_gain_db == value) {
 		return;
 	}
-	zoom_gain_db = value;
+	if (!assign_if_changed2d(zoom_gain_db, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -415,7 +460,9 @@ void BulletSoundData2D::set_occlusion_db(double value) {
 	if (occlusion_db == value) {
 		return;
 	}
-	occlusion_db = value;
+	if (!assign_if_changed2d(occlusion_db, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -426,7 +473,9 @@ void BulletSoundData2D::set_occlusion_bus(const StringName &value) {
 	if (occlusion_bus == value) {
 		return;
 	}
-	occlusion_bus = value;
+	if (!assign_if_changed2d(occlusion_bus, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -439,7 +488,9 @@ void BulletSoundData2D::set_min_interval_sec(double value) {
 	if (min_interval_sec == value) {
 		return;
 	}
-	min_interval_sec = value;
+	if (!assign_if_changed2d(min_interval_sec, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -452,7 +503,9 @@ void BulletSoundData2D::set_max_voices(int value) {
 	if (max_voices == value) {
 		return;
 	}
-	max_voices = value;
+	if (!assign_if_changed2d(max_voices, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -465,7 +518,9 @@ void BulletSoundData2D::set_when_limit_reached(SoundLimitMode value) {
 	if (when_limit_reached == value) {
 		return;
 	}
-	when_limit_reached = value;
+	if (!assign_if_changed2d(when_limit_reached, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -478,7 +533,9 @@ void BulletSoundData2D::set_priority(int value) {
 	if (priority == value) {
 		return;
 	}
-	priority = value;
+	if (!assign_if_changed2d(priority, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -491,7 +548,9 @@ void BulletSoundData2D::set_steal_mode(StealMode value) {
 	if (steal_mode == value) {
 		return;
 	}
-	steal_mode = value;
+	if (!assign_if_changed2d(steal_mode, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -504,7 +563,9 @@ void BulletSoundData2D::set_max_duration_sec(double value) {
 	if (max_duration_sec == value) {
 		return;
 	}
-	max_duration_sec = value;
+	if (!assign_if_changed2d(max_duration_sec, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -517,7 +578,9 @@ void BulletSoundData2D::set_min_volley_amount(int value) {
 	if (min_volley_amount == value) {
 		return;
 	}
-	min_volley_amount = value;
+	if (!assign_if_changed2d(min_volley_amount, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -530,7 +593,9 @@ void BulletSoundData2D::set_max_volley_amount(int value) {
 	if (max_volley_amount == value) {
 		return;
 	}
-	max_volley_amount = value;
+	if (!assign_if_changed2d(max_volley_amount, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -543,7 +608,9 @@ void BulletSoundData2D::set_amount_gain_db(double value) {
 	if (amount_gain_db == value) {
 		return;
 	}
-	amount_gain_db = value;
+	if (!assign_if_changed2d(amount_gain_db, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -558,7 +625,9 @@ void BulletSoundData2D::set_volume_min_db(double value) {
 	if (volume_min_db == value) {
 		return;
 	}
-	volume_min_db = value;
+	if (!assign_if_changed2d(volume_min_db, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -573,7 +642,9 @@ void BulletSoundData2D::set_volume_max_db(double value) {
 	if (volume_max_db == value) {
 		return;
 	}
-	volume_max_db = value;
+	if (!assign_if_changed2d(volume_max_db, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -586,7 +657,9 @@ void BulletSoundData2D::set_pitch_min(double value) {
 	if (pitch_min == value) {
 		return;
 	}
-	pitch_min = value;
+	if (!assign_if_changed2d(pitch_min, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -599,7 +672,9 @@ void BulletSoundData2D::set_pitch_max(double value) {
 	if (pitch_max == value) {
 		return;
 	}
-	pitch_max = value;
+	if (!assign_if_changed2d(pitch_max, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -612,7 +687,9 @@ void BulletSoundData2D::set_fade_out_sec(double value) {
 	if (fade_out_sec == value) {
 		return;
 	}
-	fade_out_sec = value;
+	if (!assign_if_changed2d(fade_out_sec, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -625,7 +702,9 @@ void BulletSoundData2D::set_duck_amount_db(double value) {
 	if (duck_amount_db == value) {
 		return;
 	}
-	duck_amount_db = value;
+	if (!assign_if_changed2d(duck_amount_db, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -635,7 +714,9 @@ void BulletSoundData2D::set_pitch_follows_time_scale(bool value) {
 	if (pitch_follows_time_scale == value) {
 		return;
 	}
-	pitch_follows_time_scale = value;
+	if (!assign_if_changed2d(pitch_follows_time_scale, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -643,7 +724,9 @@ void BulletSoundData2D::set_follow_bullet(bool value) {
 	if (follow_bullet == value) {
 		return;
 	}
-	follow_bullet = value;
+	if (!assign_if_changed2d(follow_bullet, value)) {
+		return;
+	}
 	emit_changed();
 }
 

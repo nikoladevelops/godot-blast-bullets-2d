@@ -31,11 +31,41 @@ func test_removed_members_stay_removed() -> void:
 
 func test_cache_info_reports_the_spawn_data_template() -> void:
 	var sp := make_spawner()
-	assert_false(sp.debug_get_pattern_cache_info()["template_valid"], "no template before the first shot")
+	assert_true(sp.shoot_once(), "shot fires")
+	assert_false(sp.debug_get_pattern_cache_info()["template_valid"], "a spawner without a split chain never copies its data")
+	sp.split_data = BulletSplitData2D.create_preset(BulletSplitData2D.PRESET_BURST_RING)
+	sp.split_enabled = true
+	assert_false(sp.debug_get_pattern_cache_info()["template_valid"], "no template before the first splitting shot")
 	assert_true(sp.shoot_once(), "shot fires")
 	var info: Dictionary = sp.debug_get_pattern_cache_info()
-	assert_true(info["template_valid"], "first shot primes the template")
+	assert_true(info["template_valid"], "the first splitting shot primes the template")
 	assert_true(info["spawn_id_match"], "template matches the live resource")
+
+
+## The split chain keeps the shot's data for its children: an edit made after
+## the shot reaches the next shot, never the children of bullets in flight.
+## A spawner without a split chain hands its own resource to the factory (a
+## spawn reads it once and never writes it).
+func test_spawn_data_edits_reach_only_later_shots() -> void:
+	var sp := make_spawner(H.make_volley_data(2, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 2)
+	sp.split_data = BulletSplitData2D.create_preset(BulletSplitData2D.PRESET_BURST_RING)
+	sp.split_enabled = true
+	watch_signals(sp)
+	assert_true(sp.shoot_once(), "splitting shot fires")
+	var first: BulletVolley2D = get_signal_parameters(sp, "volley_fired", 0)[0]
+	var data: BulletVolleyData2D = sp.spawn_data
+	var transforms_before: Array = data.transforms.duplicate()
+	data.max_life_time = 3.0
+	assert_true(sp.shoot_once(), "the next shot fires")
+	assert_eq(data.transforms, transforms_before, "a shot never writes the user's resource")
+	watch_signals(factory)
+	first.all_bullets_split()
+	await idle(3)
+	var children: BulletVolley2D = null
+	for i in get_signal_emit_count(sp, "bullet_split"):
+		children = get_signal_parameters(sp, "bullet_split", i)[2]
+	assert_not_null(children, "the first volley split")
+	assert_almost_eq(children.get_bullet_life_time_left(0), 30.0, 0.5, "its children kept the shot's 30 s lifetime")
 
 
 func test_legacy_transforms_source_key_is_an_unknown_key() -> void:

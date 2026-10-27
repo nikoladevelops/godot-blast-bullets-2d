@@ -1,4 +1,5 @@
 #include "data/bullet_volley_data2d.hpp"
+#include "core/assign_if_changed2d.hpp"
 #include "core/transform_math2d.hpp"
 #include "godot_cpp/core/class_db.hpp"
 #include <godot_cpp/variant/utility_functions.hpp>
@@ -28,7 +29,9 @@ TypedArray<Transform2D> BulletVolleyData2D::get_transforms() const {
 	return transforms;
 }
 void BulletVolleyData2D::set_transforms(const TypedArray<Transform2D> &new_transforms) {
-	transforms = new_transforms;
+	if (!assign_if_changed2d(transforms, new_transforms)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -36,7 +39,9 @@ Ref<SpriteFrames> BulletVolleyData2D::get_sprite_frames() const {
 	return sprite_frames;
 }
 void BulletVolleyData2D::set_sprite_frames(const Ref<SpriteFrames> &new_sprite_frames) {
-	sprite_frames = new_sprite_frames;
+	if (!assign_if_changed2d(sprite_frames, new_sprite_frames)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -44,7 +49,9 @@ StringName BulletVolleyData2D::get_animation() const {
 	return animation;
 }
 void BulletVolleyData2D::set_animation(const StringName &new_animation) {
-	animation = new_animation;
+	if (!assign_if_changed2d(animation, new_animation)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -59,7 +66,9 @@ void BulletVolleyData2D::set_texture_size(Vector2 new_texture_size) {
 		UtilityFunctions::push_error("BulletVolleyData2D: texture_size must be finite and >= 0, keeping the old value.");
 		return;
 	}
-	texture_size = new_texture_size;
+	if (!assign_if_changed2d(texture_size, new_texture_size)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -75,7 +84,9 @@ void BulletVolleyData2D::set_texture_rotation_radians(real_t new_texture_rotatio
 		UtilityFunctions::push_error("BulletVolleyData2D: texture_rotation_radians must be finite, keeping the old value.");
 		return;
 	}
-	texture_rotation_radians = new_texture_rotation_radians;
+	if (!assign_if_changed2d(texture_rotation_radians, new_texture_rotation_radians)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -83,13 +94,17 @@ int BulletVolleyData2D::get_collision_layer() const {
 	return collision_layer;
 }
 void BulletVolleyData2D::set_collision_layer(int new_collision_layer) {
-	collision_layer = new_collision_layer;
+	if (!assign_if_changed2d(collision_layer, new_collision_layer)) {
+		return;
+	}
 	emit_changed();
 }
 
 void BulletVolleyData2D::set_collision_layer_from_array(const TypedArray<int> &numbers) {
 	int bitmask = calculate_bitmask(numbers);
-	collision_layer = bitmask;
+	if (!assign_if_changed2d(collision_layer, bitmask)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -97,13 +112,17 @@ int BulletVolleyData2D::get_collision_mask() const {
 	return collision_mask;
 }
 void BulletVolleyData2D::set_collision_mask(int new_collision_mask) {
-	collision_mask = new_collision_mask;
+	if (!assign_if_changed2d(collision_mask, new_collision_mask)) {
+		return;
+	}
 	emit_changed();
 }
 
 void BulletVolleyData2D::set_collision_mask_from_array(const TypedArray<int> &numbers) {
 	int bitmask = calculate_bitmask(numbers);
-	collision_mask = bitmask;
+	if (!assign_if_changed2d(collision_mask, bitmask)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -111,7 +130,9 @@ Ref<Shape2D> BulletVolleyData2D::get_collision_shape() const {
 	return collision_shape;
 }
 void BulletVolleyData2D::set_collision_shape(const Ref<Shape2D> &new_shape) {
-	collision_shape = new_shape;
+	if (!assign_if_changed2d(collision_shape, new_shape)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -126,7 +147,9 @@ void BulletVolleyData2D::set_collision_shape_offset(const Vector2 &new_collision
 		UtilityFunctions::push_error("BulletVolleyData2D: collision_shape_offset must be finite, keeping the old value.");
 		return;
 	}
-	collision_shape_offset = new_collision_shape_offset;
+	if (!assign_if_changed2d(collision_shape_offset, new_collision_shape_offset)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -134,7 +157,9 @@ bool BulletVolleyData2D::get_monitorable() const {
 	return monitorable;
 }
 void BulletVolleyData2D::set_monitorable(bool new_monitorable) {
-	monitorable = new_monitorable;
+	if (!assign_if_changed2d(monitorable, new_monitorable)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -142,7 +167,9 @@ Ref<Resource> BulletVolleyData2D::get_shared_bullets_custom_data() const {
 	return shared_bullets_custom_data;
 }
 void BulletVolleyData2D::set_shared_bullets_custom_data(const Ref<Resource> &new_shared_bullets_custom_data) {
-	shared_bullets_custom_data = new_shared_bullets_custom_data;
+	if (!assign_if_changed2d(shared_bullets_custom_data, new_shared_bullets_custom_data)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -150,7 +177,9 @@ TypedArray<Resource> BulletVolleyData2D::get_all_bullets_custom_data() const {
 	return all_bullets_custom_data;
 }
 void BulletVolleyData2D::set_all_bullets_custom_data(const TypedArray<Resource> &new_custom_data) {
-	all_bullets_custom_data = new_custom_data;
+	if (!assign_if_changed2d(all_bullets_custom_data, new_custom_data)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -158,7 +187,9 @@ bool BulletVolleyData2D::get_tile_all_bullets_custom_data() const {
 	return tile_all_bullets_custom_data;
 }
 void BulletVolleyData2D::set_tile_all_bullets_custom_data(bool value) {
-	tile_all_bullets_custom_data = value;
+	if (!assign_if_changed2d(tile_all_bullets_custom_data, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -166,7 +197,9 @@ Ref<PackedScene> BulletVolleyData2D::get_shared_bullet_attachment() const {
 	return shared_bullet_attachment;
 }
 void BulletVolleyData2D::set_shared_bullet_attachment(const Ref<PackedScene> &new_attachment) {
-	shared_bullet_attachment = new_attachment;
+	if (!assign_if_changed2d(shared_bullet_attachment, new_attachment)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -178,7 +211,9 @@ void BulletVolleyData2D::set_shared_bullet_attachment_offset(const Vector2 &new_
 		UtilityFunctions::push_error("BulletVolleyData2D: shared_bullet_attachment_offset must be finite, keeping the old value.");
 		return;
 	}
-	shared_bullet_attachment_offset = new_offset;
+	if (!assign_if_changed2d(shared_bullet_attachment_offset, new_offset)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -186,7 +221,9 @@ bool BulletVolleyData2D::get_shared_bullet_attachment_stick_relative_to_bullet()
 	return shared_bullet_attachment_stick_relative_to_bullet;
 }
 void BulletVolleyData2D::set_shared_bullet_attachment_stick_relative_to_bullet(bool value) {
-	shared_bullet_attachment_stick_relative_to_bullet = value;
+	if (!assign_if_changed2d(shared_bullet_attachment_stick_relative_to_bullet, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -194,7 +231,9 @@ TypedArray<BulletEffectLayerData2D> BulletVolleyData2D::get_effect_layers() cons
 	return effect_layers;
 }
 void BulletVolleyData2D::set_effect_layers(const TypedArray<BulletEffectLayerData2D> &new_layers) {
-	effect_layers = new_layers;
+	if (!assign_if_changed2d(effect_layers, new_layers)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -210,7 +249,9 @@ void BulletVolleyData2D::set_max_life_time(double new_max_life_time) {
 		UtilityFunctions::push_error("BulletVolleyData2D: max_life_time must be > 0 when the lifetime is not infinite (or enable is_life_time_infinite), keeping the old value.");
 		return;
 	}
-	max_life_time = new_max_life_time;
+	if (!assign_if_changed2d(max_life_time, new_max_life_time)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -221,12 +262,16 @@ void BulletVolleyData2D::set_all_bullet_life_times(const PackedFloat64Array &val
 			return;
 		}
 	}
-	all_bullet_life_times = value;
+	if (!assign_if_changed2d(all_bullet_life_times, value)) {
+		return;
+	}
 	emit_changed();
 }
 
 void BulletVolleyData2D::set_tile_all_bullet_life_times(bool value) {
-	tile_all_bullet_life_times = value;
+	if (!assign_if_changed2d(tile_all_bullet_life_times, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -234,7 +279,9 @@ Ref<Material> BulletVolleyData2D::get_material() const {
 	return material;
 }
 void BulletVolleyData2D::set_material(const Ref<Material> &new_material) {
-	material = new_material;
+	if (!assign_if_changed2d(material, new_material)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -242,7 +289,9 @@ Ref<Mesh> BulletVolleyData2D::get_mesh() const {
 	return mesh;
 }
 void BulletVolleyData2D::set_mesh(const Ref<Mesh> &new_mesh) {
-	mesh = new_mesh;
+	if (!assign_if_changed2d(mesh, new_mesh)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -250,7 +299,9 @@ TypedArray<BulletRotationData2D> BulletVolleyData2D::get_all_bullet_rotation_dat
 	return all_bullet_rotation_data;
 }
 void BulletVolleyData2D::set_all_bullet_rotation_data(const TypedArray<BulletRotationData2D> &new_bullet_rotation_data) {
-	all_bullet_rotation_data = new_bullet_rotation_data;
+	if (!assign_if_changed2d(all_bullet_rotation_data, new_bullet_rotation_data)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -258,7 +309,9 @@ bool BulletVolleyData2D::get_tile_all_bullet_rotation_data() const {
 	return tile_all_bullet_rotation_data;
 }
 void BulletVolleyData2D::set_tile_all_bullet_rotation_data(bool value) {
-	tile_all_bullet_rotation_data = value;
+	if (!assign_if_changed2d(tile_all_bullet_rotation_data, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -266,7 +319,9 @@ bool BulletVolleyData2D::get_rotate_only_textures() const {
 	return rotate_only_textures;
 }
 void BulletVolleyData2D::set_rotate_only_textures(bool new_rotate_only_textures) {
-	rotate_only_textures = new_rotate_only_textures;
+	if (!assign_if_changed2d(rotate_only_textures, new_rotate_only_textures)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -274,7 +329,9 @@ bool BulletVolleyData2D::get_is_texture_rotation_permanent() const {
 	return is_texture_rotation_permanent;
 }
 void BulletVolleyData2D::set_is_texture_rotation_permanent(bool new_is_texture_rotation_permanent) {
-	is_texture_rotation_permanent = new_is_texture_rotation_permanent;
+	if (!assign_if_changed2d(is_texture_rotation_permanent, new_is_texture_rotation_permanent)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -288,7 +345,9 @@ void BulletVolleyData2D::set_z_index(int new_z_index) {
 		UtilityFunctions::push_error("BulletVolleyData2D: z_index must be between -4096 and 4096, keeping the old value.");
 		return;
 	}
-	z_index = new_z_index;
+	if (!assign_if_changed2d(z_index, new_z_index)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -297,13 +356,17 @@ int BulletVolleyData2D::get_light_mask() const {
 }
 
 void BulletVolleyData2D::set_light_mask(int new_light_mask) {
-	light_mask = new_light_mask;
+	if (!assign_if_changed2d(light_mask, new_light_mask)) {
+		return;
+	}
 	emit_changed();
 }
 
 void BulletVolleyData2D::set_light_mask_from_array(const TypedArray<int> &numbers) {
 	int bitmask = calculate_bitmask(numbers);
-	light_mask = bitmask;
+	if (!assign_if_changed2d(light_mask, bitmask)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -312,18 +375,24 @@ int BulletVolleyData2D::get_visibility_layer() const {
 }
 
 void BulletVolleyData2D::set_visibility_layer(int new_visibility_layer) {
-	visibility_layer = new_visibility_layer;
+	if (!assign_if_changed2d(visibility_layer, new_visibility_layer)) {
+		return;
+	}
 	emit_changed();
 }
 
 void BulletVolleyData2D::set_visibility_layer_from_array(const TypedArray<int> &numbers) {
 	int bitmask = calculate_bitmask(numbers);
-	visibility_layer = bitmask;
+	if (!assign_if_changed2d(visibility_layer, bitmask)) {
+		return;
+	}
 	emit_changed();
 }
 
 void BulletVolleyData2D::set_use_bullet_colors(bool value) {
-	use_bullet_colors = value;
+	if (!assign_if_changed2d(use_bullet_colors, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -335,12 +404,16 @@ void BulletVolleyData2D::set_bullet_colors(const PackedColorArray &value) {
 			return;
 		}
 	}
-	bullet_colors = value;
+	if (!assign_if_changed2d(bullet_colors, value)) {
+		return;
+	}
 	emit_changed();
 }
 
 void BulletVolleyData2D::set_tile_bullet_colors(bool value) {
-	tile_bullet_colors = value;
+	if (!assign_if_changed2d(tile_bullet_colors, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -357,14 +430,18 @@ void BulletVolleyData2D::set_self_modulate(const Color &new_self_modulate) {
 		UtilityFunctions::push_error("BulletVolleyData2D: self_modulate must be finite, keeping the old value.");
 		return;
 	}
-	self_modulate = new_self_modulate;
+	if (!assign_if_changed2d(self_modulate, new_self_modulate)) {
+		return;
+	}
 	emit_changed();
 }
 bool BulletVolleyData2D::get_override_frame_color() const {
 	return override_frame_color;
 }
 void BulletVolleyData2D::set_override_frame_color(bool value) {
-	override_frame_color = value;
+	if (!assign_if_changed2d(override_frame_color, value)) {
+		return;
+	}
 	emit_changed();
 }
 void BulletVolleyData2D::set_scale_in_sec(double value) {
@@ -372,7 +449,9 @@ void BulletVolleyData2D::set_scale_in_sec(double value) {
 		UtilityFunctions::push_error("BulletVolleyData2D: scale_in_sec must be finite and >= 0, keeping the old value.");
 		return;
 	}
-	scale_in_sec = value;
+	if (!assign_if_changed2d(scale_in_sec, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -381,7 +460,9 @@ void BulletVolleyData2D::set_scale_in_from(double value) {
 		UtilityFunctions::push_error("BulletVolleyData2D: scale_in_from must be between 0.01 and 1, keeping the old value.");
 		return;
 	}
-	scale_in_from = value;
+	if (!assign_if_changed2d(scale_in_from, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -393,7 +474,9 @@ void BulletVolleyData2D::set_fade_in_sec(double value) {
 		UtilityFunctions::push_error("BulletVolleyData2D: fade_in_sec must be finite and >= 0, keeping the old value.");
 		return;
 	}
-	fade_in_sec = value;
+	if (!assign_if_changed2d(fade_in_sec, value)) {
+		return;
+	}
 	emit_changed();
 }
 double BulletVolleyData2D::get_fade_out_sec() const {
@@ -404,14 +487,18 @@ void BulletVolleyData2D::set_fade_out_sec(double value) {
 		UtilityFunctions::push_error("BulletVolleyData2D: fade_out_sec must be finite and >= 0, keeping the old value.");
 		return;
 	}
-	fade_out_sec = value;
+	if (!assign_if_changed2d(fade_out_sec, value)) {
+		return;
+	}
 	emit_changed();
 }
 Ref<Gradient> BulletVolleyData2D::get_modulate_ramp() const {
 	return modulate_ramp;
 }
 void BulletVolleyData2D::set_modulate_ramp(const Ref<Gradient> &value) {
-	modulate_ramp = value;
+	if (!assign_if_changed2d(modulate_ramp, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -420,7 +507,9 @@ Dictionary BulletVolleyData2D::get_instance_shader_parameters() const {
 }
 
 void BulletVolleyData2D::set_instance_shader_parameters(const Dictionary &new_instance_shader_parameters) {
-	instance_shader_parameters = new_instance_shader_parameters;
+	if (!assign_if_changed2d(instance_shader_parameters, new_instance_shader_parameters)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -429,7 +518,9 @@ bool BulletVolleyData2D::get_is_life_time_over_signal_enabled() const {
 }
 
 void BulletVolleyData2D::set_is_life_time_over_signal_enabled(bool new_is_life_time_over_signal_enabled) {
-	is_life_time_over_signal_enabled = new_is_life_time_over_signal_enabled;
+	if (!assign_if_changed2d(is_life_time_over_signal_enabled, new_is_life_time_over_signal_enabled)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -438,7 +529,9 @@ bool BulletVolleyData2D::get_stop_rotation_when_max_reached() const {
 }
 
 void BulletVolleyData2D::set_stop_rotation_when_max_reached(bool new_stop_rotation_when_max_reached) {
-	stop_rotation_when_max_reached = new_stop_rotation_when_max_reached;
+	if (!assign_if_changed2d(stop_rotation_when_max_reached, new_stop_rotation_when_max_reached)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -451,7 +544,9 @@ void BulletVolleyData2D::set_bullet_max_collision_count(int new_max_collision_am
 		UtilityFunctions::push_error("BulletVolleyData2D: bullet_max_collision_count must be >= 0 (0 = infinite collisions), keeping the old value.");
 		return;
 	}
-	bullet_max_collision_count = new_max_collision_amount;
+	if (!assign_if_changed2d(bullet_max_collision_count, new_max_collision_amount)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -459,7 +554,9 @@ bool BulletVolleyData2D::get_is_life_time_infinite() const {
 	return is_life_time_infinite;
 }
 void BulletVolleyData2D::set_is_life_time_infinite(bool value) {
-	is_life_time_infinite = value;
+	if (!assign_if_changed2d(is_life_time_infinite, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -468,7 +565,9 @@ TypedArray<int> BulletVolleyData2D::get_bullets_current_collision_count() const 
 }
 
 void BulletVolleyData2D::set_bullets_current_collision_count(const TypedArray<int> &arr) {
-	bullets_current_collision_count = arr;
+	if (!assign_if_changed2d(bullets_current_collision_count, arr)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -476,7 +575,9 @@ bool BulletVolleyData2D::get_tile_bullets_current_collision_count() const {
 	return tile_bullets_current_collision_count;
 }
 void BulletVolleyData2D::set_tile_bullets_current_collision_count(bool value) {
-	tile_bullets_current_collision_count = value;
+	if (!assign_if_changed2d(tile_bullets_current_collision_count, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -484,7 +585,9 @@ TypedArray<BulletSpeedData2D> BulletVolleyData2D::get_all_bullet_speed_data() co
 	return all_bullet_speed_data;
 }
 void BulletVolleyData2D::set_all_bullet_speed_data(const TypedArray<BulletSpeedData2D> &new_data) {
-	all_bullet_speed_data = new_data;
+	if (!assign_if_changed2d(all_bullet_speed_data, new_data)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -492,7 +595,9 @@ bool BulletVolleyData2D::get_tile_all_bullet_speed_data() const {
 	return tile_all_bullet_speed_data;
 }
 void BulletVolleyData2D::set_tile_all_bullet_speed_data(bool value) {
-	tile_all_bullet_speed_data = value;
+	if (!assign_if_changed2d(tile_all_bullet_speed_data, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -501,7 +606,9 @@ bool BulletVolleyData2D::get_adjust_direction_based_on_rotation() const {
 }
 
 void BulletVolleyData2D::set_adjust_direction_based_on_rotation(bool new_adjust_direction_based_on_rotation) {
-	adjust_direction_based_on_rotation = new_adjust_direction_based_on_rotation;
+	if (!assign_if_changed2d(adjust_direction_based_on_rotation, new_adjust_direction_based_on_rotation)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -509,7 +616,9 @@ Ref<BulletSpeedData2D> BulletVolleyData2D::get_shared_bullet_speed_data() const 
 	return shared_bullet_speed_data;
 }
 void BulletVolleyData2D::set_shared_bullet_speed_data(const Ref<BulletSpeedData2D> &new_speed_data) {
-	shared_bullet_speed_data = new_speed_data;
+	if (!assign_if_changed2d(shared_bullet_speed_data, new_speed_data)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -517,7 +626,9 @@ Ref<BulletRotationData2D> BulletVolleyData2D::get_shared_bullet_rotation_data() 
 	return shared_bullet_rotation_data;
 }
 void BulletVolleyData2D::set_shared_bullet_rotation_data(const Ref<BulletRotationData2D> &new_rotation_data) {
-	shared_bullet_rotation_data = new_rotation_data;
+	if (!assign_if_changed2d(shared_bullet_rotation_data, new_rotation_data)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -525,7 +636,9 @@ Ref<BulletCurvesData2D> BulletVolleyData2D::get_shared_bullet_curves_data() cons
 	return shared_bullet_curves_data;
 }
 void BulletVolleyData2D::set_shared_bullet_curves_data(const Ref<BulletCurvesData2D> &new_curves_data) {
-	shared_bullet_curves_data = new_curves_data;
+	if (!assign_if_changed2d(shared_bullet_curves_data, new_curves_data)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -533,7 +646,9 @@ NodePath BulletVolleyData2D::get_shared_movement_pattern_path() const {
 	return shared_movement_pattern_path;
 }
 void BulletVolleyData2D::set_shared_movement_pattern_path(const NodePath &new_path) {
-	shared_movement_pattern_path = new_path;
+	if (!assign_if_changed2d(shared_movement_pattern_path, new_path)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -541,7 +656,9 @@ bool BulletVolleyData2D::get_shared_movement_pattern_face_movement_direction() c
 	return shared_movement_pattern_face_movement_direction;
 }
 void BulletVolleyData2D::set_shared_movement_pattern_face_movement_direction(bool value) {
-	shared_movement_pattern_face_movement_direction = value;
+	if (!assign_if_changed2d(shared_movement_pattern_face_movement_direction, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -549,7 +666,9 @@ bool BulletVolleyData2D::get_shared_movement_pattern_repeat() const {
 	return shared_movement_pattern_repeat;
 }
 void BulletVolleyData2D::set_shared_movement_pattern_repeat(bool value) {
-	shared_movement_pattern_repeat = value;
+	if (!assign_if_changed2d(shared_movement_pattern_repeat, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -557,7 +676,9 @@ TypedArray<BulletCurvesData2D> BulletVolleyData2D::get_all_bullet_curves_data() 
 	return all_bullet_curves_data;
 }
 void BulletVolleyData2D::set_all_bullet_curves_data(const TypedArray<BulletCurvesData2D> &new_data) {
-	all_bullet_curves_data = new_data;
+	if (!assign_if_changed2d(all_bullet_curves_data, new_data)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -565,7 +686,9 @@ bool BulletVolleyData2D::get_tile_all_bullet_curves_data() const {
 	return tile_all_bullet_curves_data;
 }
 void BulletVolleyData2D::set_tile_all_bullet_curves_data(bool value) {
-	tile_all_bullet_curves_data = value;
+	if (!assign_if_changed2d(tile_all_bullet_curves_data, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -573,7 +696,9 @@ TypedArray<NodePath> BulletVolleyData2D::get_all_bullet_movement_pattern_paths()
 	return all_bullet_movement_pattern_paths;
 }
 void BulletVolleyData2D::set_all_bullet_movement_pattern_paths(const TypedArray<NodePath> &new_paths) {
-	all_bullet_movement_pattern_paths = new_paths;
+	if (!assign_if_changed2d(all_bullet_movement_pattern_paths, new_paths)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -581,7 +706,9 @@ bool BulletVolleyData2D::get_tile_all_bullet_movement_pattern_paths() const {
 	return tile_all_bullet_movement_pattern_paths;
 }
 void BulletVolleyData2D::set_tile_all_bullet_movement_pattern_paths(bool value) {
-	tile_all_bullet_movement_pattern_paths = value;
+	if (!assign_if_changed2d(tile_all_bullet_movement_pattern_paths, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -589,7 +716,9 @@ TypedArray<bool> BulletVolleyData2D::get_all_bullet_movement_pattern_face_moveme
 	return all_bullet_movement_pattern_face_movement_directions;
 }
 void BulletVolleyData2D::set_all_bullet_movement_pattern_face_movement_directions(const TypedArray<bool> &new_flags) {
-	all_bullet_movement_pattern_face_movement_directions = new_flags;
+	if (!assign_if_changed2d(all_bullet_movement_pattern_face_movement_directions, new_flags)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -597,7 +726,9 @@ bool BulletVolleyData2D::get_tile_all_bullet_movement_pattern_face_movement_dire
 	return tile_all_bullet_movement_pattern_face_movement_directions;
 }
 void BulletVolleyData2D::set_tile_all_bullet_movement_pattern_face_movement_directions(bool value) {
-	tile_all_bullet_movement_pattern_face_movement_directions = value;
+	if (!assign_if_changed2d(tile_all_bullet_movement_pattern_face_movement_directions, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -605,7 +736,9 @@ TypedArray<bool> BulletVolleyData2D::get_all_bullet_movement_pattern_repeats() c
 	return all_bullet_movement_pattern_repeats;
 }
 void BulletVolleyData2D::set_all_bullet_movement_pattern_repeats(const TypedArray<bool> &new_flags) {
-	all_bullet_movement_pattern_repeats = new_flags;
+	if (!assign_if_changed2d(all_bullet_movement_pattern_repeats, new_flags)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -613,7 +746,9 @@ bool BulletVolleyData2D::get_tile_all_bullet_movement_pattern_repeats() const {
 	return tile_all_bullet_movement_pattern_repeats;
 }
 void BulletVolleyData2D::set_tile_all_bullet_movement_pattern_repeats(bool value) {
-	tile_all_bullet_movement_pattern_repeats = value;
+	if (!assign_if_changed2d(tile_all_bullet_movement_pattern_repeats, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -625,7 +760,9 @@ void BulletVolleyData2D::set_homing_smoothing(double value) {
 		UtilityFunctions::push_error("BulletVolleyData2D: homing_smoothing must be finite and >= 0 (0 snaps instantly), keeping the old value.");
 		return;
 	}
-	homing_smoothing = value;
+	if (!assign_if_changed2d(homing_smoothing, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -637,7 +774,9 @@ void BulletVolleyData2D::set_homing_update_interval(double value) {
 		UtilityFunctions::push_error("BulletVolleyData2D: homing_update_interval must be finite and >= 0 (0 refreshes every tick), keeping the old value.");
 		return;
 	}
-	homing_update_interval = value;
+	if (!assign_if_changed2d(homing_update_interval, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -649,7 +788,9 @@ void BulletVolleyData2D::set_homing_distance_before_reached(double value) {
 		UtilityFunctions::push_error("BulletVolleyData2D: homing_distance_before_reached must be finite and >= 0, keeping the old value.");
 		return;
 	}
-	homing_distance_before_reached = value;
+	if (!assign_if_changed2d(homing_distance_before_reached, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -657,7 +798,9 @@ bool BulletVolleyData2D::get_homing_reach_counts_bullet_size() const {
 	return homing_reach_counts_bullet_size;
 }
 void BulletVolleyData2D::set_homing_reach_counts_bullet_size(bool value) {
-	homing_reach_counts_bullet_size = value;
+	if (!assign_if_changed2d(homing_reach_counts_bullet_size, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -665,7 +808,9 @@ bool BulletVolleyData2D::get_homing_take_control_of_texture_rotation() const {
 	return homing_take_control_of_texture_rotation;
 }
 void BulletVolleyData2D::set_homing_take_control_of_texture_rotation(bool value) {
-	homing_take_control_of_texture_rotation = value;
+	if (!assign_if_changed2d(homing_take_control_of_texture_rotation, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -673,7 +818,9 @@ bool BulletVolleyData2D::get_bullet_homing_auto_pop_after_target_reached() const
 	return bullet_homing_auto_pop_after_target_reached;
 }
 void BulletVolleyData2D::set_bullet_homing_auto_pop_after_target_reached(bool value) {
-	bullet_homing_auto_pop_after_target_reached = value;
+	if (!assign_if_changed2d(bullet_homing_auto_pop_after_target_reached, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -681,7 +828,9 @@ bool BulletVolleyData2D::get_shared_homing_deque_auto_pop_after_target_reached()
 	return shared_homing_deque_auto_pop_after_target_reached;
 }
 void BulletVolleyData2D::set_shared_homing_deque_auto_pop_after_target_reached(bool value) {
-	shared_homing_deque_auto_pop_after_target_reached = value;
+	if (!assign_if_changed2d(shared_homing_deque_auto_pop_after_target_reached, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -689,7 +838,9 @@ Ref<BulletWobbleData2D> BulletVolleyData2D::get_shared_bullet_wobble_data() cons
 	return shared_bullet_wobble_data;
 }
 void BulletVolleyData2D::set_shared_bullet_wobble_data(const Ref<BulletWobbleData2D> &new_wobble_data) {
-	shared_bullet_wobble_data = new_wobble_data;
+	if (!assign_if_changed2d(shared_bullet_wobble_data, new_wobble_data)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -697,7 +848,9 @@ TypedArray<BulletWobbleData2D> BulletVolleyData2D::get_all_bullet_wobble_data() 
 	return all_bullet_wobble_data;
 }
 void BulletVolleyData2D::set_all_bullet_wobble_data(const TypedArray<BulletWobbleData2D> &new_data) {
-	all_bullet_wobble_data = new_data;
+	if (!assign_if_changed2d(all_bullet_wobble_data, new_data)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -705,7 +858,9 @@ bool BulletVolleyData2D::get_tile_all_bullet_wobble_data() const {
 	return tile_all_bullet_wobble_data;
 }
 void BulletVolleyData2D::set_tile_all_bullet_wobble_data(bool value) {
-	tile_all_bullet_wobble_data = value;
+	if (!assign_if_changed2d(tile_all_bullet_wobble_data, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -717,7 +872,9 @@ void BulletVolleyData2D::set_gravity(const Vector2 &value) {
 		UtilityFunctions::push_error("BulletVolleyData2D: gravity must be finite, keeping the old value.");
 		return;
 	}
-	gravity = value;
+	if (!assign_if_changed2d(gravity, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -725,7 +882,9 @@ TypedArray<Vector2> BulletVolleyData2D::get_all_bullet_gravity() const {
 	return all_bullet_gravity;
 }
 void BulletVolleyData2D::set_all_bullet_gravity(const TypedArray<Vector2> &new_data) {
-	all_bullet_gravity = new_data;
+	if (!assign_if_changed2d(all_bullet_gravity, new_data)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -733,7 +892,9 @@ bool BulletVolleyData2D::get_tile_all_bullet_gravity() const {
 	return tile_all_bullet_gravity;
 }
 void BulletVolleyData2D::set_tile_all_bullet_gravity(bool value) {
-	tile_all_bullet_gravity = value;
+	if (!assign_if_changed2d(tile_all_bullet_gravity, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -745,7 +906,9 @@ void BulletVolleyData2D::set_gravity_delay_sec(double value) {
 		UtilityFunctions::push_error("BulletVolleyData2D: gravity_delay_sec must be finite and >= 0, keeping the old value.");
 		return;
 	}
-	gravity_delay_sec = value;
+	if (!assign_if_changed2d(gravity_delay_sec, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -757,7 +920,9 @@ void BulletVolleyData2D::set_gravity_duration_sec(double value) {
 		UtilityFunctions::push_error("BulletVolleyData2D: gravity_duration_sec must be finite and >= 0 (0 = infinite), keeping the old value.");
 		return;
 	}
-	gravity_duration_sec = value;
+	if (!assign_if_changed2d(gravity_duration_sec, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -769,7 +934,9 @@ void BulletVolleyData2D::set_linear_drag(double value) {
 		UtilityFunctions::push_error("BulletVolleyData2D: linear_drag must be finite and >= 0, keeping the old value.");
 		return;
 	}
-	linear_drag = value;
+	if (!assign_if_changed2d(linear_drag, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -781,7 +948,9 @@ void BulletVolleyData2D::set_homing_delay_sec(double value) {
 		UtilityFunctions::push_error("BulletVolleyData2D: homing_delay_sec must be finite and >= 0, keeping the old value.");
 		return;
 	}
-	homing_delay_sec = value;
+	if (!assign_if_changed2d(homing_delay_sec, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -793,7 +962,9 @@ void BulletVolleyData2D::set_homing_duration_sec(double value) {
 		UtilityFunctions::push_error("BulletVolleyData2D: homing_duration_sec must be finite and >= 0 (0 = infinite), keeping the old value.");
 		return;
 	}
-	homing_duration_sec = value;
+	if (!assign_if_changed2d(homing_duration_sec, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -805,7 +976,9 @@ void BulletVolleyData2D::set_homing_lose_range_px(double value) {
 		UtilityFunctions::push_error("BulletVolleyData2D: homing_lose_range_px must be finite and >= 0 (0 = unlimited), keeping the old value.");
 		return;
 	}
-	homing_lose_range_px = value;
+	if (!assign_if_changed2d(homing_lose_range_px, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -821,13 +994,17 @@ void BulletVolleyData2D::set_bounce_mask(int64_t value) {
 		UtilityFunctions::push_error("BulletVolleyData2D: bounce_mask must be at most 4294967295 (layers 1..32), keeping the old value.");
 		return;
 	}
-	bounce_mask = (int)(uint32_t)value;
+	if (!assign_if_changed2d(bounce_mask, (int)(uint32_t)value)) {
+		return;
+	}
 	emit_changed();
 }
 void BulletVolleyData2D::set_bounce_mask_from_array(const TypedArray<int> &numbers) {
 	// Layer 32 is the sign bit of the 32-bit mask: a negative value is a
 	// valid mask here (bad entries were already reported and skipped).
-	bounce_mask = BulletVolleyData2D::calculate_bitmask(numbers);
+	if (!assign_if_changed2d(bounce_mask, BulletVolleyData2D::calculate_bitmask(numbers))) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -835,7 +1012,9 @@ bool BulletVolleyData2D::get_bounce_tilemap_layers() const {
 	return bounce_tilemap_layers;
 }
 void BulletVolleyData2D::set_bounce_tilemap_layers(bool value) {
-	bounce_tilemap_layers = value;
+	if (!assign_if_changed2d(bounce_tilemap_layers, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -847,7 +1026,9 @@ void BulletVolleyData2D::set_bounce_strength(double value) {
 		UtilityFunctions::push_error("BulletVolleyData2D: bounce_strength must be finite and >= 0 (1 = elastic), keeping the old value.");
 		return;
 	}
-	bounce_strength = value;
+	if (!assign_if_changed2d(bounce_strength, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -855,7 +1036,9 @@ bool BulletVolleyData2D::get_bounce_push_assist() const {
 	return bounce_push_assist;
 }
 void BulletVolleyData2D::set_bounce_push_assist(bool value) {
-	bounce_push_assist = value;
+	if (!assign_if_changed2d(bounce_push_assist, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -863,7 +1046,9 @@ bool BulletVolleyData2D::get_bounce_charge_amplify() const {
 	return bounce_charge_amplify;
 }
 void BulletVolleyData2D::set_bounce_charge_amplify(bool value) {
-	bounce_charge_amplify = value;
+	if (!assign_if_changed2d(bounce_charge_amplify, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -871,7 +1056,9 @@ bool BulletVolleyData2D::get_bounce_hit_consumed() const {
 	return bounce_hit_consumed;
 }
 void BulletVolleyData2D::set_bounce_hit_consumed(bool value) {
-	bounce_hit_consumed = value;
+	if (!assign_if_changed2d(bounce_hit_consumed, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -883,7 +1070,9 @@ void BulletVolleyData2D::set_bounce_max_count(int value) {
 		UtilityFunctions::push_error("BulletVolleyData2D: bounce_max_count must be >= 0 (0 = unlimited), keeping the old value.");
 		return;
 	}
-	bounce_max_count = value;
+	if (!assign_if_changed2d(bounce_max_count, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -895,7 +1084,9 @@ void BulletVolleyData2D::set_bounce_mode(BounceMode value) {
 		UtilityFunctions::push_error("BulletVolleyData2D: bounce_mode must be 0 (radial) or 1 (precise shape), keeping the old value.");
 		return;
 	}
-	bounce_mode = value;
+	if (!assign_if_changed2d(bounce_mode, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -903,7 +1094,9 @@ bool BulletVolleyData2D::get_bounce_rotate_texture() const {
 	return bounce_rotate_texture;
 }
 void BulletVolleyData2D::set_bounce_rotate_texture(bool value) {
-	bounce_rotate_texture = value;
+	if (!assign_if_changed2d(bounce_rotate_texture, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -915,7 +1108,9 @@ void BulletVolleyData2D::set_bounce_rotation_smooth(double value) {
 		UtilityFunctions::push_error("BulletVolleyData2D: bounce_rotation_smooth must be finite and >= 0 (0 = instant snap), keeping the old value.");
 		return;
 	}
-	bounce_rotation_smooth = value;
+	if (!assign_if_changed2d(bounce_rotation_smooth, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -927,7 +1122,9 @@ void BulletVolleyData2D::set_bounce_randomness_deg(double value) {
 		UtilityFunctions::push_error("BulletVolleyData2D: bounce_randomness_deg must be finite in [0, 180], keeping the old value.");
 		return;
 	}
-	bounce_randomness_deg = value;
+	if (!assign_if_changed2d(bounce_randomness_deg, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -939,7 +1136,9 @@ void BulletVolleyData2D::set_bounce_cooldown_sec(double value) {
 		UtilityFunctions::push_error("BulletVolleyData2D: bounce_cooldown_sec must be finite in [0, 1], keeping the old value.");
 		return;
 	}
-	bounce_cooldown_sec = value;
+	if (!assign_if_changed2d(bounce_cooldown_sec, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -951,7 +1150,9 @@ void BulletVolleyData2D::set_bounce_debounce_sec(double value) {
 		UtilityFunctions::push_error("BulletVolleyData2D: bounce_debounce_sec must be finite and >= 0 (0 = off), keeping the old value.");
 		return;
 	}
-	bounce_debounce_sec = value;
+	if (!assign_if_changed2d(bounce_debounce_sec, value)) {
+		return;
+	}
 	emit_changed();
 }
 

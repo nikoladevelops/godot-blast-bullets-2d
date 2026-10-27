@@ -170,3 +170,42 @@ func test_every_accepted_data_edit_emits_changed_once() -> void:
 				problems.append("%s.%s = %s: changed emitted %d times" % [cls, name, value, _changed_count])
 	assert_gt(probed, 100, "the sweep reached the data classes (%d edits)" % probed)
 	assert_eq("\n".join(problems), "", "every accepted edit emits changed once")
+
+
+## Writing a property's current value is not an edit: no `changed` (a spawner
+## would otherwise re-duplicate its spawn data on the next shot, ~85 us).
+## Covers every stored property of every data class, read back from ClassDB.
+## Array and Dictionary values are references a script may have edited in
+## place before handing the same object back: those still count as a change.
+func test_writing_the_current_value_emits_nothing() -> void:
+	var problems: Array = []
+	var probed := 0
+	for cls in CLASSES:
+		var obj: Resource = ClassDB.instantiate(cls)
+		obj.changed.connect(_on_changed)
+		for p in _own_props(cls):
+			var name := str(p["name"])
+			var type := int(p["type"])
+			if type == TYPE_ARRAY or type == TYPE_DICTIONARY:
+				continue
+			var value: Variant = _other_value(p, obj.get(name))
+			if value != null:
+				obj.set(name, value) # a non-default current value where one is valid
+				for err in get_errors():
+					err.handled = true
+			_changed_count = 0
+			obj.set(name, obj.get(name))
+			probed += 1
+			if _changed_count != 0:
+				problems.append("%s.%s: a same-value write emitted changed %d times" % [cls, name, _changed_count])
+	assert_gt(probed, 200, "the sweep reached the data classes (%d writes)" % probed)
+	assert_eq("\n".join(problems), "", "same-value writes emit nothing")
+
+
+func test_an_array_written_back_after_an_in_place_edit_still_counts() -> void:
+	var data := H.make_volley_data(2)
+	watch_signals(data)
+	var transforms: Array = data.transforms
+	transforms.append(Transform2D(0.0, Vector2(99, 0)))
+	data.transforms = transforms # the same Array, edited in place
+	assert_signal_emit_count(data, "changed", 1, "the spawner hears about the new transform")

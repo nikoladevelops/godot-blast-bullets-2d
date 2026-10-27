@@ -44,6 +44,8 @@ func test_sources_resolve() -> void:
 
 
 func test_fire_track_and_cache() -> void:
+	sp.split_data = BulletSplitData2D.create_preset(BulletSplitData2D.PRESET_BURST_RING)
+	sp.split_enabled = true # only a split chain keeps a copy of the spawn data
 	assert_true(sp.shoot_once(), "homing shot fires")
 	assert_eq(sp.get_live_volley_count(), 1, "volley tracked")
 	var cache: Dictionary = sp.debug_get_pattern_cache_info()

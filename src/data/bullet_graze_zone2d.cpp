@@ -1,5 +1,6 @@
 #include "data/bullet_graze_zone2d.hpp"
 
+#include "core/assign_if_changed2d.hpp"
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
@@ -11,7 +12,9 @@ void BulletGrazeZone2D::set_enabled(bool value) {
 	if (enabled == value) {
 		return;
 	}
-	enabled = value;
+	if (!assign_if_changed2d(enabled, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -37,7 +40,9 @@ void BulletGrazeZone2D::store_ring_radius(int index, real_t value, const char *p
 	if (ring_radii[index] == value) {
 		return;
 	}
-	ring_radii[index] = value;
+	if (!assign_if_changed2d(ring_radii[index], value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -72,7 +77,9 @@ void BulletGrazeZone2D::set_count_bullet_size(bool value) {
 	if (count_bullet_size == value) {
 		return;
 	}
-	count_bullet_size = value;
+	if (!assign_if_changed2d(count_bullet_size, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -85,7 +92,9 @@ void BulletGrazeZone2D::set_regraze(Regraze value) {
 	if (regraze == value) {
 		return;
 	}
-	regraze = value;
+	if (!assign_if_changed2d(regraze, value)) {
+		return;
+	}
 	emit_changed();
 }
 
@@ -98,7 +107,9 @@ void BulletGrazeZone2D::set_preview_color(const Color &value) {
 	if (preview_color == value) {
 		return;
 	}
-	preview_color = value;
+	if (!assign_if_changed2d(preview_color, value)) {
+		return;
+	}
 	emit_changed();
 }
 

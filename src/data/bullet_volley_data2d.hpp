@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/assign_if_changed2d.hpp"
 #include "core/variant_enum_cast2d.hpp"
 #include "data/bullet_curves_data2d.hpp"
 #include "data/bullet_effect_layer_data2d.hpp"
@@ -277,12 +278,16 @@ public:
 
 	bool get_emit_collision_signals() const { return emit_collision_signals; }
 	void set_emit_collision_signals(bool value) {
-		emit_collision_signals = value;
+		if (!assign_if_changed2d(emit_collision_signals, value)) {
+			return;
+		}
 		emit_changed();
 	}
 	bool get_collision_dedup_by_object() const { return collision_dedup_by_object; }
 	void set_collision_dedup_by_object(bool value) {
-		collision_dedup_by_object = value;
+		if (!assign_if_changed2d(collision_dedup_by_object, value)) {
+			return;
+		}
 		emit_changed();
 	}
 
@@ -376,7 +381,9 @@ public:
 	bool get_is_life_time_over_signal_enabled() const;
 	bool get_ignore_despawn_bounds() const { return ignore_despawn_bounds; }
 	void set_ignore_despawn_bounds(bool value) {
-		ignore_despawn_bounds = value;
+		if (!assign_if_changed2d(ignore_despawn_bounds, value)) {
+			return;
+		}
 		emit_changed();
 	}
 	void set_is_life_time_over_signal_enabled(bool new_is_life_time_over_signal_enabled);

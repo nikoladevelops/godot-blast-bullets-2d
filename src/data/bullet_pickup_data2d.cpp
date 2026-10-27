@@ -3,6 +3,7 @@
 #include "core/transform_math2d.hpp"
 #include "sprite/sprite_anim2d.hpp"
 
+#include "core/assign_if_changed2d.hpp"
 #include <godot_cpp/classes/circle_shape2d.hpp>
 #include <godot_cpp/classes/image.hpp>
 #include <godot_cpp/classes/image_texture.hpp>
@@ -56,8 +57,9 @@ BLAST_PICKUP_DOUBLE_SETTER(rotation_random_max_degrees, true, "a number")
 
 #define BLAST_PICKUP_PLAIN_SETTER(TYPE, NAME)           \
 	void BulletPickupData2D::set_##NAME(TYPE p_value) { \
-		NAME = p_value;                                 \
-		accepted_change();                              \
+		if (assign_if_changed2d(NAME, p_value)) {       \
+			accepted_change();                          \
+		}                                               \
 	}
 BLAST_PICKUP_PLAIN_SETTER(Ref<SpriteFrames>, sprite_frames)
 BLAST_PICKUP_PLAIN_SETTER(StringName, animation)
@@ -89,8 +91,9 @@ void BulletPickupData2D::set_attachment_offset(Vector2 p_value) {
 		UtilityFunctions::push_error("BulletPickupData2D: attachment_offset must be finite, keeping the old value.");
 		return;
 	}
-	attachment_offset = p_value;
-	accepted_change();
+	if (assign_if_changed2d(attachment_offset, p_value)) {
+		accepted_change();
+	}
 }
 
 void BulletPickupData2D::set_texture_size(Vector2 p_value) {
@@ -98,8 +101,9 @@ void BulletPickupData2D::set_texture_size(Vector2 p_value) {
 		UtilityFunctions::push_error("BulletPickupData2D: texture_size must be finite with both components >= 0, keeping the old value.");
 		return;
 	}
-	texture_size = p_value;
-	accepted_change();
+	if (assign_if_changed2d(texture_size, p_value)) {
+		accepted_change();
+	}
 }
 
 void BulletPickupData2D::set_tint(Color p_value) {
@@ -107,8 +111,9 @@ void BulletPickupData2D::set_tint(Color p_value) {
 		UtilityFunctions::push_error("BulletPickupData2D: tint must be finite, keeping the old value.");
 		return;
 	}
-	tint = p_value;
-	accepted_change();
+	if (assign_if_changed2d(tint, p_value)) {
+		accepted_change();
+	}
 }
 
 void BulletPickupData2D::set_collision_layer(int p_value) {
@@ -116,8 +121,9 @@ void BulletPickupData2D::set_collision_layer(int p_value) {
 		UtilityFunctions::push_error("BulletPickupData2D: collision_layer must be >= 0, keeping the old value.");
 		return;
 	}
-	collision_layer = p_value;
-	accepted_change();
+	if (assign_if_changed2d(collision_layer, p_value)) {
+		accepted_change();
+	}
 }
 
 void BulletPickupData2D::set_collision_mask(int p_value) {
@@ -125,8 +131,9 @@ void BulletPickupData2D::set_collision_mask(int p_value) {
 		UtilityFunctions::push_error("BulletPickupData2D: collision_mask must be >= 0, keeping the old value.");
 		return;
 	}
-	collision_mask = p_value;
-	accepted_change();
+	if (assign_if_changed2d(collision_mask, p_value)) {
+		accepted_change();
+	}
 }
 
 void BulletPickupData2D::set_z_index(int p_value) {
@@ -134,8 +141,9 @@ void BulletPickupData2D::set_z_index(int p_value) {
 		UtilityFunctions::push_error("BulletPickupData2D: z_index must be between -4096 and 4096, keeping the old value.");
 		return;
 	}
-	z_index = p_value;
-	accepted_change();
+	if (assign_if_changed2d(z_index, p_value)) {
+		accepted_change();
+	}
 }
 
 void BulletPickupData2D::set_motion_mode(MotionMode p_value) {
@@ -143,7 +151,9 @@ void BulletPickupData2D::set_motion_mode(MotionMode p_value) {
 		UtilityFunctions::push_error("BulletPickupData2D: motion_mode must be 0 (Burst And Magnet), 1 (Keep Bullet Motion) or 2 (Custom), keeping the old value.");
 		return;
 	}
-	motion_mode = p_value;
+	if (!assign_if_changed2d(motion_mode, p_value)) {
+		return;
+	}
 	notify_property_list_changed(); // the burst and custom knobs gate on it
 	accepted_change();
 }
