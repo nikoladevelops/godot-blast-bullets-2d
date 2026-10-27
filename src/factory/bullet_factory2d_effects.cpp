@@ -379,8 +379,16 @@ void BulletFactory2D::age_fx_effects(double delta) {
 		// across calls): aging never grows the vector itself.
 		age_fx_bake(fx_bakes[b]);
 	}
-	for (size_t m = 0; m < fx_manual_bakes.size(); ++m) {
-		age_fx_bake(fx_manual_bakes[m]);
+	for (size_t m = 0; m < fx_manual_bakes.size();) {
+		FXOneShotBake &bake = fx_manual_bakes[m];
+		age_fx_bake(bake);
+		// Idle and held only by this bake: the layer is gone from the game.
+		if (bake.active_count <= 0 && bake.layer.is_valid() && bake.layer->get_reference_count() == 1) {
+			fx_erase_bake(bake);
+			fx_manual_bakes.erase(fx_manual_bakes.begin() + (int64_t)m);
+			continue;
+		}
+		++m;
 	}
 }
 
@@ -529,12 +537,9 @@ int BulletFactory2D::spawn_layer_effect(const Ref<BulletEffectLayerData2D> &laye
 		UtilityFunctions::push_error("BulletFactory2D.spawn_layer_effect: the layer's animation has no playable time (speed 0 holds its frame), nothing spawned.");
 		return -1;
 	}
-	// New distinct layer: cap the manual set, oldest bake drops (with its
-	// live visuals) so mixed hatches coexist without unbounded growth.
-	if (fx_manual_bakes.size() >= 8) {
-		fx_erase_bake(fx_manual_bakes[0]);
-		fx_manual_bakes.erase(fx_manual_bakes.begin());
-	}
+	// No cap on distinct layers: an idle bake whose layer nothing else holds
+	// any more is released by age_fx_effects, so the set stays as large as
+	// the layers the game still uses.
 	fx_ensure_effects_container();
 	if (sprite_effects_container.get() == nullptr) {
 		UtilityFunctions::push_error("BulletFactory2D: sprite effects container missing, manual effect not spawned.");

@@ -761,12 +761,25 @@ func test_hostile_zero_frames_ring_caps_shared_refs_teardown() -> void:
 		await physics()
 	assert_true(factory.get_active_effect_count() <= 2, "huge spin never crashes the ager")
 	await _settle(factory)
-	for i in 9:
+	# No cap on distinct manual layers: twelve play side by side, and an idle
+	# bake is released once its layer is dropped.
+	var held_layers: Array = []
+	for i in 12:
 		var ml := _make_layer(1, 2, ["default", "alt%d" % i])
 		if not ml.sprite_frames.has_animation("alt%d" % i):
 			ml.sprite_frames.add_animation("alt%d" % i)
+		held_layers.append(ml)
 		factory.spawn_layer_effect(ml, Transform2D.IDENTITY)
-	assert_true(factory.debug_get_effect_state().get("manual_bakes", 99) <= 8, "manual hatch capped at 8 bakes")
+	assert_eq(factory.debug_get_effect_state().get("manual_bakes", -1), 12, "every distinct layer keeps its bake")
+	assert_eq(factory.debug_get_effect_state().get("manual_active", -1), 12, "and its live visual")
+	var dropped: WeakRef = weakref(held_layers[0])
+	held_layers.clear()
+	for i in 240: # the effects play out on their own (no clear)
+		await physics()
+		if int(factory.debug_get_effect_state().get("manual_bakes", -1)) == 0:
+			break
+	assert_eq(factory.debug_get_effect_state().get("manual_bakes", -1), 0, "idle bakes of dropped layers are released")
+	assert_null(dropped.get_ref(), "the factory keeps no dropped layer alive")
 	# T18i: collision kills never fizzle; infinite life never fizzles.
 	await _settle(factory)
 	var kill18 := _fx_data(Vector2.ZERO, 300.0, [_make_layer(5, 4)], false)

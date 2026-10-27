@@ -758,7 +758,7 @@
 			<param index="0" name="layer" type="BulletEffectLayerData2D" />
 			<param index="1" name="at" type="Transform2D" />
 			<description>
-				Manual one-shot hatch: plays any layer once at a global pose, owned by the factory (survives volleys). Distinct layers coexist (up to 8 manual bakes, oldest dropped). Returns the slot index, or -1 when the layer is inert.
+				Manual one-shot hatch: plays any layer once at a global pose, owned by the factory (survives volleys). Distinct layers coexist without a cap; a layer's bake is released once its effects have played out and nothing else holds the layer. Returns the slot index, or -1 when the layer is inert.
 			</description>
 		</method>
 		<method name="spawn_volley">
