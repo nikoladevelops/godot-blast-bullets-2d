@@ -33,8 +33,8 @@ void PatternSpawner2D::set_sound_effects(const Array &value) {
 		if (entry.get_type() == Variant::NIL) {
 			continue;
 		}
-		if (live_object2d<BulletSoundData2D>(entry) == nullptr) {
-			UtilityFunctions::push_error((String(get_class()) + ": sound_effects entries must be BulletSoundData2D or null, keeping the old value."));
+		if (sound_entry_of(entry) == nullptr) {
+			UtilityFunctions::push_error(String(get_class()) + ": sound_effects entries must be " + sound_entry_class() + " or null, keeping the old value.");
 			return;
 		}
 	}
@@ -220,22 +220,22 @@ Array PatternSpawner2D::spawner_sound_entries(bool &r_any) {
 	bool misuse = false;
 	for (int i = 0; i < sound_effects.size(); ++i) {
 		const Variant entry = sound_effects[i];
-		BulletSoundData2D *sound = live_object2d<BulletSoundData2D>(entry);
+		SoundMix2D *sound = sound_entry_of(entry);
 		if (sound == nullptr && entry.get_type() != Variant::NIL) {
 			misuse = true;
 		}
-		entries.push_back(sound != nullptr ? Variant(Ref<BulletSoundData2D>(sound)) : Variant());
+		entries.push_back(sound != nullptr ? Variant(Ref<Resource>(sound->sound_resource())) : Variant());
 		any = any || sound != nullptr;
 	}
 	if (misuse && !sound_effects_misuse_warned) {
 		sound_effects_misuse_warned = true;
-		UtilityFunctions::push_warning((String(get_class()) + ": sound_effects was changed in place and holds entries that are not BulletSoundData2D; only sounds are used. Assign the whole array instead (sound_effects = [...])."));
+		UtilityFunctions::push_warning(String(get_class()) + ": sound_effects was changed in place and holds entries that are not " + sound_entry_class() + "; only sounds are used. Assign the whole array instead (sound_effects = [...]).");
 	}
 	r_any = any;
 	return entries;
 }
 
-void PatternSpawner2D::fire_spawner_sound(int trigger, int volley_amount) {
+void PatternSpawner2D::fire_spawner_sound(SpawnerSoundEvent2D event, int volley_amount) {
 	if (!sound_enabled || sound_effects.is_empty()) {
 		return;
 	}
@@ -251,10 +251,11 @@ void PatternSpawner2D::fire_spawner_sound(int trigger, int volley_amount) {
 	// Where the shot fired: the spawner, or the pose of a shoot_from shot (an
 	// emitter bullet's; its template usually sits off screen).
 	const Vector2 at = shot_pose_active ? shot_pose.get_origin() : get_global_position();
+	const int trigger = spawner_sound_trigger(event);
 	for (int i = 0; i < sound_effects.size(); ++i) {
 		const Variant entry = sound_effects[i];
-		BulletSoundData2D *sound = live_object2d<BulletSoundData2D>(entry);
-		if (sound == nullptr || !sound->get_enabled() || sound->get_trigger() != trigger) {
+		const SoundMix2D *sound = sound_entry_of(entry);
+		if (sound == nullptr || !sound->enabled || sound->sound_trigger() != trigger) {
 			continue;
 		}
 		factory->sound_offer(sound, at, (float)sound_volume_db, spec, volley_amount);
@@ -286,7 +287,7 @@ void PatternSpawner2D::preview_sound_effect(int index) {
 		return;
 	}
 	const Variant entry = sound_effects[index];
-	BulletSoundData2D *sound = live_object2d<BulletSoundData2D>(entry);
+	SoundMix2D *sound = sound_entry_of(entry);
 	if (sound == nullptr) {
 		UtilityFunctions::push_warning((String(get_class()) + ".preview_sound_effect: entry ") + String::num_int64(index) + " is null, nothing plays.");
 		return;

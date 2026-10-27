@@ -577,6 +577,12 @@ public:
 	String shot_signal_names() const override { return "pre_shoot, homing_targets_resolved, volley_homing_configured, volley_fired, volley_skipped"; }
 	const char *payload_key() const override { return "spawn_data"; }
 	String payload_class_name() const override { return "BulletVolleyData2D"; }
+	const char *sound_entry_class() const override { return "BulletSoundData2D"; }
+	SoundMix2D *sound_entry_of(const Variant &entry) const override { return live_object2d<BulletSoundData2D>(entry); }
+	int spawner_sound_trigger(SpawnerSoundEvent2D event) const override {
+		return event == SPAWNER_SOUND_TELEGRAPH ? BulletSoundData2D::SOUND_ON_TELEGRAPH : BulletSoundData2D::SOUND_ON_SHOT;
+	}
+	const char *shot_noun() const override { return "bullet"; }
 	bool apply_payload_override(const Variant &value) override;
 	Dictionary debug_get_pattern_cache_info() const override;
 

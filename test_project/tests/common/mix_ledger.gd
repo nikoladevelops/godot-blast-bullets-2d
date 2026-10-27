@@ -167,6 +167,10 @@ func pull() -> void:
 	for e in events:
 		_apply_event(e)
 	for o in offers:
+		if String(o.get("sound_class", "")) == "LaserSoundData2D":
+			# Laser triggers have their own ids (LaserSoundTrigger).
+			_count("laser_offer:%d" % int(o["trigger"]))
+			continue
 		_count("offer:%d" % int(o["trigger"]))
 		if int(o["volley"]) != 0 and int(o["bullet"]) >= 0:
 			_check_report("sound trigger %d" % int(o["trigger"]), int(o["trigger"]), true, int(o["volley"]), int(o["life"]), int(o["bullet"]), int(o["frame"]))

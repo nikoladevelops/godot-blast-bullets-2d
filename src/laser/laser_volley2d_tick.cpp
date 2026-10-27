@@ -96,6 +96,9 @@ bool LaserVolley2D::advance_phases(double delta) {
 		const LaserPhase next = (LaserPhase)(phase + 1);
 		set_phase(next);
 		phase_time = carry;
+		if (next == PHASE_GROWING && !beams.empty()) {
+			sound_fire(LaserSoundData2D::LASER_SOUND_ON_FIRE, beams[0].points.empty() ? beams[0].muzzle : beams[0].points.front());
+		}
 		if (next == PHASE_GROWING) {
 			grow_started = clock - carry; // the looks' clock counts the time carried into the phase
 		}
@@ -433,6 +436,7 @@ bool LaserVolley2D::end_contacts(uint64_t self_id, uint32_t life, bool only_spen
 			if (target == nullptr || emitter == nullptr) {
 				continue; // a vanished target ends silently
 			}
+			sound_fire(LaserSoundData2D::LASER_SOUND_ON_PIERCE_END, c.position, i);
 			if (factory != nullptr) {
 				factory->note_user_code();
 			}
@@ -601,7 +605,7 @@ bool LaserVolley2D::update_contacts(int beam_index, uint64_t self_id, uint32_t l
 		c.seen = true;
 		next.push_back(c);
 	}
-	std::vector<uint64_t> ended;
+	std::vector<Contact> ended;
 	for (const Contact &old : b.contacts) {
 		bool still = false;
 		for (const Contact &c : next) {
@@ -611,17 +615,19 @@ bool LaserVolley2D::update_contacts(int beam_index, uint64_t self_id, uint32_t l
 			}
 		}
 		if (!still) {
-			ended.push_back(old.id);
+			ended.push_back(old);
 		}
 	}
 	b.contacts = next;
 	const CachedStringNames2D &names = CachedStringNames2D::get();
-	for (const uint64_t id : ended) {
+	for (const Contact &gone : ended) {
+		const uint64_t id = gone.id;
 		Object *target = ObjectDB::get_instance(ObjectID(id));
 		Object *emitter = resolve_emitter();
 		if (target == nullptr || emitter == nullptr) {
 			continue;
 		}
+		sound_fire(LaserSoundData2D::LASER_SOUND_ON_PIERCE_END, gone.position, beam_index);
 		factory->note_user_code();
 		emit_on2d(emitter, names.laser_pierce_ended, target, this, beam_index);
 		if (!alive_after_user_code(self_id, life)) {
@@ -672,6 +678,7 @@ bool LaserVolley2D::update_contacts(int beam_index, uint64_t self_id, uint32_t l
 			}
 		}
 		if (fresh) {
+			sound_fire(LaserSoundData2D::LASER_SOUND_ON_PIERCE_START, c.position, beam_index);
 			factory->note_user_code();
 			emit_on2d(emitter, names.laser_pierce_started, target, this, beam_index, c.position);
 			if (!alive_after_user_code(self_id, life) || !hitting_phase() || k >= beams[beam_index].contacts.size()) {
@@ -683,7 +690,7 @@ bool LaserVolley2D::update_contacts(int beam_index, uint64_t self_id, uint32_t l
 				continue;
 			}
 		}
-		sound_fire(BulletSoundData2D::SOUND_ON_HIT, c.position);
+		sound_fire(LaserSoundData2D::LASER_SOUND_ON_HIT, c.position, beam_index);
 		factory->note_user_code();
 		emit_on2d(emitter, names.laser_hit, target, this, beam_index, c.position);
 		if (!alive_after_user_code(self_id, life) || !hitting_phase() || k >= beams[beam_index].contacts.size()) {
@@ -698,7 +705,15 @@ bool LaserVolley2D::update_contacts(int beam_index, uint64_t self_id, uint32_t l
 
 // ---- Graze and sound ----------------------------------------------------------------------
 
-void LaserVolley2D::sound_fire(int trigger, const Vector2 &pos, int ring, int zone) {
+Vector2 LaserVolley2D::sound_beam_point(const LaserSoundData2D &entry, int beam) const {
+	const Beam &b = beams[(size_t)beam];
+	if (b.points.empty()) {
+		return b.muzzle;
+	}
+	return entry.follow_point == LaserSoundData2D::FOLLOW_MUZZLE ? b.points.front() : b.points.back();
+}
+
+void LaserVolley2D::sound_fire(int trigger, const Vector2 &pos, int beam, int ring, int zone) {
 	if (sound_effects.empty() || factory == nullptr || !pos.is_finite()) {
 		return;
 	}
@@ -710,15 +725,22 @@ void LaserVolley2D::sound_fire(int trigger, const Vector2 &pos, int ring, int zo
 		spec.kind = SoundListenerSpec2D::NODE_GROUP;
 		spec.group = sound_listener_group;
 	}
-	const bool graze_trigger = trigger == BulletSoundData2D::SOUND_ON_GRAZE || trigger == BulletSoundData2D::SOUND_ON_GRAZE_EXIT;
-	for (const Ref<BulletSoundData2D> &entry : sound_effects) {
-		if (entry.is_null() || !entry->enabled || entry->get_trigger() != trigger) {
+	const bool graze_trigger = trigger == LaserSoundData2D::LASER_SOUND_ON_GRAZE || trigger == LaserSoundData2D::LASER_SOUND_ON_GRAZE_EXIT;
+	const bool has_beam = beam >= 0 && beam < (int)beams.size();
+	for (const Ref<LaserSoundData2D> &entry : sound_effects) {
+		if (entry.is_null() || !entry->enabled || entry->trigger != trigger) {
 			continue;
 		}
-		if (graze_trigger && ((entry->get_ring_index() >= 0 && entry->get_ring_index() != ring) || (entry->get_zone_index() >= 0 && entry->get_zone_index() != zone))) {
+		if (graze_trigger && ((entry->ring_index >= 0 && entry->ring_index != ring) || (entry->zone_index >= 0 && entry->zone_index != zone))) {
 			continue;
 		}
-		factory->sound_offer(entry.ptr(), pos, sound_volume_db, spec); // no user code (the mixer plays after the sweep)
+		// The beam-wide hum plays where the entry says; an event keeps its spot.
+		const Vector2 at = has_beam && trigger == LaserSoundData2D::LASER_SOUND_ON_ACTIVE ? sound_beam_point(**entry, beam) : pos;
+		if (!at.is_finite()) {
+			continue;
+		}
+		const int follow_kind = entry->follow_point == LaserSoundData2D::FOLLOW_MUZZLE ? SOUND_FOLLOW_LASER_MUZZLE : SOUND_FOLLOW_LASER_TIP;
+		factory->sound_offer(entry.ptr(), at, sound_volume_db, spec, 1, get_instance_id(), (int)life_id, has_beam ? beam : -1, follow_kind);
 	}
 }
 
@@ -835,7 +857,7 @@ bool LaserVolley2D::update_graze(uint64_t self_id, uint32_t life) {
 				continue; // freed or queued by an earlier handler: dropped
 			}
 		}
-		sound_fire(e.exit ? BulletSoundData2D::SOUND_ON_GRAZE_EXIT : BulletSoundData2D::SOUND_ON_GRAZE, e.at, e.ring, e.zone);
+		sound_fire(e.exit ? LaserSoundData2D::LASER_SOUND_ON_GRAZE_EXIT : LaserSoundData2D::LASER_SOUND_ON_GRAZE, e.at, e.beam, e.ring, e.zone);
 		const StringName &sig = e.exit ? names.laser_graze_exited : names.laser_grazed;
 		// Owner spawner first (while it lives), then the factory always.
 		Object *owner = owner_spawner_id != 0 ? ObjectDB::get_instance(ObjectID(owner_spawner_id)) : nullptr;
@@ -867,6 +889,14 @@ void LaserVolley2D::tick(double delta) {
 	prev_width = get_current_width();
 	for (Beam &b : beams) {
 		snap_beam_history(b);
+	}
+	if (!charge_sounded) {
+		// On Charge: the first tick of a laser that charges (the arming of a
+		// shot happens after the spawn, so never at begin_life).
+		charge_sounded = true;
+		if (phase == PHASE_CHARGING && phase_length(PHASE_CHARGING) > 0.0 && !beams.empty()) {
+			sound_fire(LaserSoundData2D::LASER_SOUND_ON_CHARGE, beams[0].muzzle);
+		}
 	}
 	clock += delta;
 	last_tick_delta = delta;
@@ -903,21 +933,24 @@ void LaserVolley2D::tick(double delta) {
 			snap_beam_history(b);
 		}
 	}
-	// Bolts and curvy lasers fully outside the despawn bounds are spent (silently).
+	// Bolts and curvy lasers fully outside the despawn bounds are spent.
 	if (d->type != LaserData2D::LASER_BEAM && factory->get_despawn_bounds_enabled()) {
 		const Rect2 bounds = factory->get_despawn_bounds_rect();
-		for (Beam &b : beams) {
+		for (int i = 0; i < (int)beams.size(); ++i) {
+			Beam &b = beams[i];
 			if (!b.spent && b.launched && !b.points.empty() && !bounds.has_point(b.points.front()) && !bounds.has_point(b.points.back())) {
 				b.spent = true;
+				sound_fire(LaserSoundData2D::LASER_SOUND_ON_DESPAWN, b.points.back(), i);
 			}
 		}
 	}
 	// Hits while the phase hits; every contact ends when it stops.
 	if (hitting_phase()) {
 		if (!sound_effects.empty()) {
-			for (const Beam &b : beams) {
+			for (int i = 0; i < (int)beams.size(); ++i) {
+				const Beam &b = beams[i];
 				if (!b.spent && !b.points.empty()) {
-					sound_fire(BulletSoundData2D::SOUND_ON_FLIGHT, b.points.back());
+					sound_fire(LaserSoundData2D::LASER_SOUND_ON_ACTIVE, b.points.back(), i);
 				}
 			}
 		}
@@ -955,7 +988,7 @@ void LaserVolley2D::tick(double delta) {
 		if (b.pinned) {
 			b.spent = true; // a bolt or curvy head that met a wall is gone after it
 		}
-		sound_fire(BulletSoundData2D::SOUND_ON_BOUNCE, b.wall_point);
+		sound_fire(LaserSoundData2D::LASER_SOUND_ON_WALL_HIT, b.wall_point, i);
 		Object *emitter = resolve_emitter();
 		if (emitter == nullptr) {
 			continue;
@@ -999,7 +1032,7 @@ void LaserVolley2D::tick(double delta) {
 			return;
 		}
 		if (!beams.empty()) {
-			sound_fire(BulletSoundData2D::SOUND_ON_LIFETIME_OVER, beams[0].points.empty() ? beams[0].muzzle : beams[0].points.back());
+			sound_fire(ended_early ? LaserSoundData2D::LASER_SOUND_ON_ENDED_EARLY : LaserSoundData2D::LASER_SOUND_ON_FINISH, beams[0].points.empty() ? beams[0].muzzle : beams[0].points.back());
 		}
 		Object *emitter = resolve_emitter();
 		if (emitter != nullptr) {

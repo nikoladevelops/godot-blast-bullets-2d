@@ -95,7 +95,7 @@
 	// (the spawner's preview path). Editor only like preview(), but also
 	// allowed at runtime, where it bypasses the mixer (no interval, voice
 	// cap, priority, distance, camera or occlusion rules).
-	void preview_at(const Vector2 &global_position, float volume_offset_db, bool use_position);
+	void preview_at(const Vector2 &global_position, float volume_offset_db, bool use_position) override;
 	// This entry's live preview player, or null (tests and the smoke probe
 	// read mix state through it).
 	AudioStreamPlayer2D *debug_get_preview_player() const;

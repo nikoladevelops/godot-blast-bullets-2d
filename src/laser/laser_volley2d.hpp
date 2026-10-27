@@ -1,9 +1,9 @@
 #pragma once
 
 #include "core/variant_enum_cast2d.hpp"
-#include "data/bullet_sound_data2d.hpp"
 #include "data/graze_zone2d.hpp"
 #include "data/laser_data2d.hpp"
+#include "data/laser_sound_data2d.hpp"
 #include "sprite/sprite_anim2d.hpp"
 
 #include <godot_cpp/classes/node2d.hpp>
@@ -290,12 +290,22 @@ private:
 	// or cleared the zones (its queued events name the old ones).
 	uint32_t graze_generation = 0;
 	Variant custom_data;
-	std::vector<Ref<BulletSoundData2D>> sound_effects;
+	std::vector<Ref<LaserSoundData2D>> sound_effects;
 	std::shared_ptr<GrazeDetector2D> sound_listeners;
 	StringName sound_listener_group;
 	float sound_volume_db = 0.0f;
 	bool update_graze(uint64_t self_id, uint32_t life);
-	void sound_fire(int trigger, const Vector2 &pos, int ring = -1, int zone = -1);
+	// Offers every entry on `trigger` (LaserSoundData2D::LaserSoundTrigger)
+	// at `pos`; a beam event names its beam (a following voice rides it, and
+	// a beam-wide trigger plays at the tip or muzzle the entry picks). No user
+	// code: the mixer plays after the sweep.
+	void sound_fire(int trigger, const Vector2 &pos, int beam = -1, int ring = -1, int zone = -1);
+	// The point of beam `beam` an entry's follow_point names.
+	Vector2 sound_beam_point(const LaserSoundData2D &entry, int beam) const;
+	// The laser-wide sounds already played this life: On Charge once, and
+	// whether end_laser cut it short (On Ended Early instead of On Finish).
+	bool charge_sounded = false;
+	bool ended_early = false;
 	// Physics queries (one shape, reused every tick).
 	RID query_shape;
 	Ref<PhysicsShapeQueryParameters2D> shape_query;

@@ -454,7 +454,7 @@ void BulletSpawner2D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "emitter", PROPERTY_HINT_RESOURCE_TYPE, "BulletEmitterData2D"), "set_emitter", "get_emitter");
 	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "emitter_spawner_path", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "PatternSpawner2D"), "set_emitter_spawner_path", "get_emitter_spawner_path");
 	bind_spawner_group(cls, SPAWNER_GROUP_GRAZE);
-	bind_spawner_group(cls, SPAWNER_GROUP_SOUND);
+	bind_spawner_group(cls, SPAWNER_GROUP_SOUND, SpawnerPropertyFilter2D(), "BulletSoundData2D");
 	bind_spawner_group(cls, SPAWNER_GROUP_PREVIEW);
 	bind_spawner_group(cls, SPAWNER_GROUP_MOVEMENT);
 	bind_spawner_group(cls, SPAWNER_GROUP_PERFORMANCE);

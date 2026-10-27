@@ -163,12 +163,12 @@
 		</method>
 		<method name="debug_explain_sound">
 			<return type="Dictionary" />
-			<param index="0" name="sound" type="BulletSoundData2D" />
+			<param index="0" name="sound" type="Resource" />
 			<param index="1" name="global_position" type="Vector2" />
 			<param index="2" name="listener_group" type="StringName" default="&amp;&quot;&quot;" />
 			<param index="3" name="volley_amount" type="int" default="1" />
 			<description>
-				Diagnosis for one entry at one pose: which gate would drop the play, with the measured numbers. Returns {audible, blocked_by (none/paused/disabled/streamless/chance_zero/amount_gate/distance/camera_view), distance, effective_max_distance, zoom, camera (pinned/viewport/none), in_camera_view, interval_open, trigger_chance, chance (always/never/rolling), listener, occluded, volume_base (deterministic mix without the random rolls), volley_amount}. Read-only except reusing the resolve paths (a bad camera_path fires its one warning); never queues candidates. When a sound stays silent, ask here first.
+				Diagnosis for one entry (a [BulletSoundData2D] or a [LaserSoundData2D]) at one pose: which gate would drop the play, with the measured numbers. Returns {audible, blocked_by (none/paused/disabled/streamless/chance_zero/amount_gate/distance/camera_view), distance, effective_max_distance, zoom, camera (pinned/viewport/none), in_camera_view, interval_open, trigger_chance, chance (always/never/rolling), listener, occluded, volume_base (deterministic mix without the random rolls), volley_amount}. Read-only except reusing the resolve paths (a bad camera_path fires its one warning); never queues candidates. When a sound stays silent, ask here first.
 			</description>
 		</method>
 		<method name="debug_free_like_release" qualifiers="static">
@@ -322,7 +322,7 @@
 		<method name="debug_get_sound_offer_log" qualifiers="const">
 			<return type="Array" />
 			<description>
-				Test helper: every sound offer since logging was enabled ([method debug_set_sound_offer_log_enabled]), recorded BEFORE audibility, chance and voice limits decide what plays, as [code]{trigger, volley, life, bullet, frame}[/code] ([code]trigger[/code] is the entry's [member BulletSoundData2D.trigger]; spawner triggers and [method play_sound] have [code]volley[/code] 0 and [code]bullet[/code] -1). Keeps the newest 65536 entries. What actually played is [method debug_get_sound_log].
+				Test helper: every sound offer since logging was enabled ([method debug_set_sound_offer_log_enabled]), recorded BEFORE audibility, chance and voice limits decide what plays, as [code]{trigger, sound_class, position, volley, life, bullet, frame}[/code] ([code]trigger[/code] is the entry's own trigger id: [member BulletSoundData2D.trigger] or [member LaserSoundData2D.trigger], told apart by [code]sound_class[/code]; [code]position[/code] is where the event happened; spawner triggers and [method play_sound] have [code]volley[/code] 0 and [code]bullet[/code] -1; a laser's offers have [code]volley[/code] 0, [code]bullet[/code] -1 and add [code]laser[/code] (its instance id) and [code]beam[/code] (-1 for laser-wide events)). Keeps the newest 65536 entries. What actually played is [method debug_get_sound_log].
 			</description>
 		</method>
 		<method name="debug_get_sound_stats" qualifiers="const">
@@ -633,11 +633,11 @@
 		</method>
 		<method name="play_sound">
 			<return type="bool" />
-			<param index="0" name="sound" type="BulletSoundData2D" />
+			<param index="0" name="sound" type="Resource" />
 			<param index="1" name="global_position" type="Vector2" />
 			<param index="2" name="listener_group" type="StringName" default="&amp;&quot;&quot;" />
 			<description>
-				Manual sound hatch: plays [param sound] at [param global_position] at the end of the next sweep (Godot listener, or the nearest member of [param listener_group]). Returns false when refused (null, disabled, outside the tree, paused, editor): offers made during a sweep play at the end of that sweep.
+				Manual sound hatch: plays [param sound] (a [BulletSoundData2D] or a [LaserSoundData2D]; anything else is refused with one error) at [param global_position] at the end of the next sweep (Godot listener, or the nearest member of [param listener_group]). Returns false when refused (null, disabled, outside the tree, paused, editor): offers made during a sweep play at the end of that sweep.
 			</description>
 		</method>
 		<method name="populate_attachments_pool">

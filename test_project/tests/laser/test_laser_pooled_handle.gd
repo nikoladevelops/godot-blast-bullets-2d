@@ -48,7 +48,7 @@ func _args(m: Dictionary) -> Array:
 				if n == "zones":
 					out.append([H.make_graze_zone([30.0])])
 				elif n == "effects":
-					out.append([H.make_sound(BulletSoundData2D.SOUND_ON_HIT)])
+					out.append([H.make_laser_sound(LaserSoundData2D.LASER_SOUND_ON_HIT)])
 				else:
 					out.append([Vector2(100, 100)])
 			TYPE_OBJECT:

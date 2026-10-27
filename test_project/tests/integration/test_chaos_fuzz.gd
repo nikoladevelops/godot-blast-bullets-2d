@@ -46,6 +46,7 @@ var other_parent: Node2D
 var flock: BulletFlock2D
 var zones: Array = []
 var sound: BulletSoundData2D
+var laser_sound: LaserSoundData2D
 var chain: BulletSplitData2D
 var datas: Array = []
 var pickup: BulletPickupData2D
@@ -225,6 +226,8 @@ func _build_world() -> void:
 	flock = H.make_flock(rng.randf_range(0.0, 10.0), rng.randf_range(0.0, 2.0), rng.randf_range(0.0, 2.0))
 	zones = [H.make_graze_zone([rng.randf_range(10.0, 60.0), rng.randf_range(60.0, 120.0)])]
 	sound = H.make_sound([BulletSoundData2D.SOUND_ON_HIT, BulletSoundData2D.SOUND_ON_SPLIT, BulletSoundData2D.SOUND_ON_CLEAR, BulletSoundData2D.SOUND_ON_GRAZE][rng.randi() % 4], rng.randi_range(1, 6))
+	laser_sound = H.make_laser_sound(rng.randi() % 14, rng.randi_range(1, 6))
+	laser_sound.follow_beam = laser_sound.trigger == LaserSoundData2D.LASER_SOUND_ON_ACTIVE and rng.randf() < 0.5
 	# More entries on other triggers (any of the 13, the flight hum followed).
 	extra_sounds.clear()
 	for k in rng.randi_range(0, 3):
@@ -509,7 +512,7 @@ func _add_laser_spawner() -> void:
 		ls.graze_node_group = TARGET_GROUP
 	if rng.randf() < 0.3:
 		ls.sound_enabled = true
-		ls.sound_effects = [sound]
+		ls.sound_effects = [laser_sound]
 	add(ls)
 	if ls.laser_target_source == LaserSpawner2D.LASER_TARGET_NODE_CHILDREN:
 		ls.laser_target_children_parent_path = ls.get_path_to(world)

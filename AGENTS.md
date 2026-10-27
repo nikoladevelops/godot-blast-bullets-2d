@@ -1489,17 +1489,19 @@ emits `GRAZE_POINT_TARGET_BIT | index` ids and belongs in
 (the per-source contract) or `test_spawner_graze_point_sources`, then docs
 (§17).
 
-## 21. Sound (`BulletSoundData2D`, mixer, spawner Sound group)
+## 21. Sound (`SoundMix2D`, `BulletSoundData2D`, `LaserSoundData2D`, mixer, spawner Sound group)
 
 ### 21.1 Pieces
 
 | Piece | Where | Notes |
 |---|---|---|
-| Entry resource | `data/bullet_sound_data2d.*` | One list entry per sound: triggers (13 SOUND_ON_* ids, serialized), streams + stream mode, mix (volume, pitch, randoms, bus), spatial, limits, fades, ducking, follow_bullet |
+| Mix part | `data/sound_mix2d.*`, `sound_mix_{declarations,accessors,binds}2d.inc` | `SoundMix2D`: HOW a sound plays (streams + stream mode, mix, spatial, audibility, limits, fades, ducking, priority, `follow`), a plain C++ base every sound resource inherits next to `Resource`; the `.inc` files generate its declarations, validated accessors (texts name `SOUND_DATA_NAME`) and binds in each class (hooks `SOUND_MIX_TRIGGER_BINDS()` / `SOUND_MIX_LIMIT_BINDS()` keep the inspector order). The mixer reads only `SoundMix2D` (`sound_resource()`, `sound_trigger()`, `sound_mix_of2d(obj)`) |
+| Entry resources | `data/bullet_sound_data2d.*`, `data/laser_sound_data2d.*` | WHEN it plays: `BulletSoundData2D` (13 SOUND_ON_* ids, ring/zone filters, volley-amount gate, `follow_bullet`); `LaserSoundData2D` (14 LASER_SOUND_ON_* ids: Shot 0, Telegraph 1, Charge 2, Fire 3, Active 4, Hit 5, Pierce Start 6, Pierce End 7, Wall Hit 8, Graze 9, Graze Exit 10, Finish 11, Ended Early 12, Despawn 13; ring/zone filters, `follow_beam`, `follow_point` Tip/Muzzle; the mix enums bound on it too). Both serialized: never renumber |
+| Laser arming | `laser/laser_volley2d.cpp`, `_tick.cpp` | `sound_set_effects` / `sound_arm` take `LaserSoundData2D` only; `sound_fire(trigger, pos, beam, ring, zone)` at every event site (before the event's signal); On Active once per live beam per hitting tick at `sound_beam_point`; `charge_sounded` / `ended_early` reset in `begin_life`; a followed voice rides `beam_point` while `beam_sounds` (SoundFollowKind2D LASER_TIP / LASER_MUZZLE) |
 | Volley arming | `bullet_volley/bullet_volley2d_sound.cpp` | `sound_set_effects` (factory volleys), `sound_arm_from_spawner` (spawner volleys); trigger sites call `sound_fire`, On Flight calls `sound_fire_flight` from the tick |
 | Factory hatch | `factory/bullet_factory2d_sound.cpp` | `sound_offer` (volleys and spawner), `play_sound` (manual), debug readouts |
 | Mixer | `factory/sound_mixer2d.*` | Channels per resource (shared by every spawner using it), bounded per-sweep candidates (nearest wins), voice pool (one AudioStreamPlayer2D per voice, polyphony 1), `flush` at the end of the factory sweep |
-| Spawner | `bullet_spawner/pattern_spawner2d_sound.cpp` (entries, listeners), `bullet_spawner2d.cpp` (arming) | Sound group: `sound_effects`, `sound_volume_db`, listener source (reuses `GrazeDetector2D`, THE target filter), On Shot / On Telegraph |
+| Spawner | `bullet_spawner/pattern_spawner2d_sound.cpp` (entries, listeners), `bullet_spawner2d.cpp` / `laser_spawner2d.cpp` (arming) | Sound group: `sound_effects`, `sound_volume_db`, listener source (`TargetSource2D`, THE target filter), On Shot / On Telegraph. Each spawner type names its entry class through hooks (`sound_entry_class`, `sound_entry_of`, `spawner_sound_trigger(SpawnerSoundEvent2D)`, `shot_noun` for the warnings) and `bind_spawner_group(..., sound_entry_class)` types the array hint: a spawner refuses the other class |
 | Cosmetic RNG | `core/cosmetic_rng2d.hpp` | PCG32 for mix and effect-layer rolls only; gameplay keeps Godot's global RNG |
 
 ### 21.2 Contract
@@ -1510,7 +1512,8 @@ emits `GRAZE_POINT_TARGET_BIT | index` ids and belongs in
 - A channel's `min_interval_sec` and `max_voices` are shared by every spawner and volley using the resource. Nearest wins each sweep.
 - Fading voices hold their pool slot but never count toward `max_voices` and are never restarted. A full pool steals the oldest fading voice first, then starts the oldest live voice's fade (that one play waits one sweep).
 - `pitch_scale` / `pitch_min` / `pitch_max` stop at 1000: Godot's audio mixer never finishes a looping stream at ~1e8x speed (plain AudioStreamPlayer2D nodes too), a typo like 1e9 froze the game for tens of seconds (pinned in `test_sound_data_contract`).
-- `follow_bullet`: one live voice per bullet and entry; the voice rides the bullet and fades when the bullet ends.
+- `follow_bullet`: one live voice per bullet and entry; the voice rides the bullet and fades when the bullet ends. `follow_beam` (lasers): one voice per beam and entry, riding its tip or muzzle; it fades when the beam is spent or the laser ends.
+- Every laser event offers its trigger once (`sound/test_sound_laser.gd` compares offers with the signals); On Finish and On Ended Early exclude each other; the offer log names the class (`sound_class`) and the event `position`, and the MixLedger counts laser offers as `laser_offer:<id>`.
 - Cosmetic rolls (volume, pitch, pan, chance, stream picks, effect starts) draw from `CosmeticRng2D`. Tests reseed it with `BulletFactory2D.debug_seed_cosmetic_rng`.
 
 ### 21.3 Cost and open work
@@ -1521,7 +1524,7 @@ emits `GRAZE_POINT_TARGET_BIT | index` ids and belongs in
 
 ### 21.4 Tests
 
-`test_project/tests/sound/` (16 suites, `test_sound_rng_isolation` among them; `test_sound_reentrancy` pins user code inside the sweep). Mixer rules live in `test_sound_mixer_unit`, flight and hum rules in `test_sound_flight`, spatial and camera in `test_sound_spatial_limits` and `test_sound_camera`.
+`test_project/tests/sound/` (17 suites, `test_sound_laser` for the laser triggers, `test_sound_rng_isolation` among them; `test_sound_reentrancy` pins user code inside the sweep). Mixer rules live in `test_sound_mixer_unit`, flight and hum rules in `test_sound_flight`, spatial and camera in `test_sound_spatial_limits` and `test_sound_camera`.
 
 ## 22. World controls (time scale, despawn bounds, randomization, pickups)
 

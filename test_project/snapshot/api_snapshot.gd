@@ -16,7 +16,7 @@ const PLUGIN_CLASSES: Array[StringName] = [
 	&"BulletWobbleData2D", &"VolleyPoolKey2D", &"BulletAttachment2D", &"BulletPatterns2D",
 	&"BulletFactory2D", &"BulletVolleyDebugger2D", &"BulletVolleyData2D", &"BulletVolley2D",
 	&"BulletSpawner2D", &"PatternPreviewLayer2D", &"GrazeZone2D", &"GrazePreviewLayer2D",
-	&"BulletSoundData2D", &"BulletPickupData2D", &"DespawnBoundsPreviewLayer2D", &"BulletFlock2D",
+	&"BulletSoundData2D", &"LaserSoundData2D", &"BulletPickupData2D", &"DespawnBoundsPreviewLayer2D", &"BulletFlock2D",
 	&"BulletSplitStage2D", &"BulletSplitData2D", &"BulletEmitterData2D", &"LaserData2D", &"LaserVolley2D", &"LaserSpawner2D",
 ]
 const AMOUNTS := [-1, 0, 1, 2, 7, 24, 10001]
@@ -1126,6 +1126,48 @@ func _snap_sound(section: String) -> void:
 		v.sound_set_effects([on_clear, on_expire])
 		v.clear_bullet(1)
 		v.clear_bullet(3))
+
+
+	# A two-beam laser: a followed On Active hum per beam (tip and muzzle) and
+	# its On Charge / On Fire / On Finish events.
+	var laser_hum := _laser_sound_entry(LaserSoundData2D.LASER_SOUND_ON_ACTIVE, func(s):
+		s.follow_beam = true
+		s.max_voices = 8)
+	var laser_muzzle := _laser_sound_entry(LaserSoundData2D.LASER_SOUND_ON_ACTIVE, func(s):
+		s.follow_beam = true
+		s.follow_point = LaserSoundData2D.FOLLOW_MUZZLE)
+	var laser_events: Array = []
+	for trigger in [LaserSoundData2D.LASER_SOUND_ON_CHARGE, LaserSoundData2D.LASER_SOUND_ON_FIRE, LaserSoundData2D.LASER_SOUND_ON_FINISH]:
+		laser_events.append(_laser_sound_entry(trigger))
+	await _laser_sound_run(section, "laser_hum", [laser_hum, laser_muzzle] + laser_events, 30)
+
+
+func _laser_sound_entry(trigger: int, setup: Callable = Callable()) -> LaserSoundData2D:
+	var s := H.make_laser_sound(trigger)
+	if setup.is_valid():
+		setup.call(s)
+	return s
+
+
+func _laser_sound_run(section: String, label: String, sounds: Array, steps: int) -> void:
+	var factory := BulletFactory2D.new()
+	add_child(factory)
+	await get_tree().process_frame
+	factory.debug_seed_cosmetic_rng(1234)
+	factory.debug_set_sound_log_enabled(true)
+	var d := H.make_laser(0.1, 0.05, 0.2, 0.1, 150.0)
+	d.sweep_speed_degrees = 90.0
+	var poses: Array[Transform2D] = [Transform2D(0.0, Vector2(20, 0)), Transform2D(PI, Vector2(-20, 0))]
+	var l := factory.spawn_laser(d, poses)
+	_rec(section, label + "#armed", l.sound_set_effects(sounds))
+	for step in steps:
+		factory.debug_advance_time(TRACE_STEP)
+		if step % 10 == 9 or step == steps - 1:
+			_rec(section, "%s#t%d" % [label, step + 1], _sound_state(factory, sounds))
+	factory.debug_stop_sound_voices()
+	factory.free()
+	await get_tree().process_frame
+	cap.take()
 
 
 # ---- 10. Flocking ---------------------------------------------------------------

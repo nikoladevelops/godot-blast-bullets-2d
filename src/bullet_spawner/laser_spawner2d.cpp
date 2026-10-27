@@ -716,7 +716,7 @@ void LaserSpawner2D::_bind_methods() {
 	LASER_SPAWNER_BIND(laser_target_children_recursive, BOOL, PROPERTY_HINT_NONE, "")
 	LASER_SPAWNER_BIND(laser_retarget_interval_sec, FLOAT, PROPERTY_HINT_RANGE, "0,5,0.01,or_greater,suffix:s")
 	bind_spawner_group(cls, SPAWNER_GROUP_GRAZE);
-	bind_spawner_group(cls, SPAWNER_GROUP_SOUND);
+	bind_spawner_group(cls, SPAWNER_GROUP_SOUND, SpawnerPropertyFilter2D(), "LaserSoundData2D");
 	bind_spawner_group(cls, SPAWNER_GROUP_PREVIEW, laser_skip);
 	bind_spawner_group(cls, SPAWNER_GROUP_MOVEMENT);
 	bind_spawner_group(cls, SPAWNER_GROUP_PERFORMANCE);

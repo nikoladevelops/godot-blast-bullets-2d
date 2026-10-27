@@ -663,7 +663,7 @@ void PatternSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("volleys_remaining"), &PatternSpawner2D::volleys_remaining);
 }
 
-void PatternSpawner2D::bind_spawner_group(const StringName &cls, SpawnerGroup2D group, const SpawnerPropertyFilter2D &skip) {
+void PatternSpawner2D::bind_spawner_group(const StringName &cls, SpawnerGroup2D group, const SpawnerPropertyFilter2D &skip, const char *sound_entry_class) {
 	// The properties of one shared inspector group, registered on the
 	// concrete spawner class (their accessors are bound on PatternSpawner2D
 	// above): each spawner lays its groups out in its own order and leaves
@@ -758,7 +758,8 @@ void PatternSpawner2D::bind_spawner_group(const StringName &cls, SpawnerGroup2D 
 		case SPAWNER_GROUP_SOUND:
 			b.group("Sound", "");
 			b.property(PropertyInfo(Variant::BOOL, "sound_enabled"), "set_sound_enabled", "get_sound_enabled");
-			b.property(PropertyInfo(Variant::ARRAY, "sound_effects", PROPERTY_HINT_ARRAY_TYPE, "BulletSoundData2D"), "set_sound_effects", "get_sound_effects");
+			ERR_FAIL_NULL_MSG(sound_entry_class, "bind_spawner_group: the Sound group needs the sound entry class.");
+			b.property(PropertyInfo(Variant::ARRAY, "sound_effects", PROPERTY_HINT_ARRAY_TYPE, sound_entry_class), "set_sound_effects", "get_sound_effects");
 			b.property(PropertyInfo(Variant::FLOAT, "sound_volume_db", PROPERTY_HINT_RANGE, "-80,24,0.1,suffix:dB"), "set_sound_volume_db", "get_sound_volume_db");
 			b.property(PropertyInfo(Variant::INT, "sound_listener_source", PROPERTY_HINT_ENUM, "Godot Listener,Node Group,Node Path,Node Name,Node Children,Mouse,Global Positions"), "set_sound_listener_source", "get_sound_listener_source");
 			b.property(PropertyInfo(Variant::STRING_NAME, "sound_listener_node_group"), "set_sound_listener_node_group", "get_sound_listener_node_group");

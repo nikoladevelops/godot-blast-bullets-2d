@@ -682,7 +682,7 @@ PackedStringArray PatternSpawner2D::_get_configuration_warnings() const {
 			any_zone = true;
 		}
 		if (!any_zone) {
-			out.push_back("Graze is enabled but graze_zones is empty: no bullet of this spawner can be grazed.");
+			out.push_back(String("Graze is enabled but graze_zones is empty: no ") + shot_noun() + " of this spawner can be grazed.");
 		}
 		if (graze_target_source == GRAZE_SOURCE_NODE_GROUP && graze_targets.config.node_group.is_empty()) {
 			out.push_back("graze_target_source is Node Group but graze_node_group is empty: no graze target is found.");
@@ -700,15 +700,14 @@ PackedStringArray PatternSpawner2D::_get_configuration_warnings() const {
 		bool any_sound = false;
 		for (int i = 0; i < sound_effects.size(); ++i) {
 			const Variant entry = sound_effects[i];
-			const BulletSoundData2D *sound = live_object2d<BulletSoundData2D>(entry);
-			if (sound == nullptr) {
+			if (sound_entry_of(entry) == nullptr) {
 				out.push_back("sound_effects[" + String::num_int64(i) + "] is empty.");
 				continue;
 			}
 			any_sound = true;
 		}
 		if (!any_sound) {
-			out.push_back("Sound is enabled but sound_effects is empty: no bullet of this spawner plays sounds.");
+			out.push_back(String("Sound is enabled but sound_effects is empty: no ") + shot_noun() + " of this spawner plays sounds.");
 		}
 		if (sound_listener_source == SOUND_LISTENER_NODE_GROUP && sound_targets.config.node_group.is_empty()) {
 			out.push_back("sound_listener_source is Node Group but sound_listener_node_group is empty: sounds measure from Godot's listener.");
@@ -813,7 +812,7 @@ bool PatternSpawner2D::shoot_once() {
 	const bool cadence_replaced = result.cadence_replaced;
 	// The shot succeeded (no drop path follows): spawner-only entries fire
 	// at the spawner's global position.
-	fire_spawner_sound(BulletSoundData2D::SOUND_ON_SHOT, fired_amount);
+	fire_spawner_sound(SPAWNER_SOUND_SHOT, fired_amount);
 	// One-shot budget counts every fired volley (auto or manual) without
 	// touching max_volleys. Spent budget pauses via the standard path, so
 	// transitions stay consistent; placed after volley_fired so the last
@@ -1527,7 +1526,7 @@ void PatternSpawner2D::begin_telegraph(bool auto_started) {
 	if (shot_owner_dying() || !telegraph_pending || cadence != cadence_serial || burst != burst_serial) {
 		return;
 	}
-	fire_spawner_sound(BulletSoundData2D::SOUND_ON_TELEGRAPH);
+	fire_spawner_sound(SPAWNER_SOUND_TELEGRAPH);
 	set_loop_active(true);
 }
 

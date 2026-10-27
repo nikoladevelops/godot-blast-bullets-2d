@@ -19,6 +19,8 @@ bool BulletFactory2D::sound_offer(const SoundMix2D *sound, const Vector2 &event_
 		}
 		Dictionary e;
 		e["trigger"] = sound->sound_trigger();
+		e["sound_class"] = sound->sound_class();
+		e["position"] = event_pos;
 		const bool laser = follow_kind != SOUND_FOLLOW_BULLET;
 		e["volley"] = laser ? (int64_t)0 : (int64_t)follow_volley_id;
 		e["life"] = follow_life_id;

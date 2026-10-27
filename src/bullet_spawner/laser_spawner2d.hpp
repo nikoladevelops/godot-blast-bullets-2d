@@ -116,6 +116,12 @@ public:
 	String shot_signal_names() const override { return "laser_fired, volley_skipped"; }
 	const char *payload_key() const override { return "laser_data"; }
 	String payload_class_name() const override { return "LaserData2D"; }
+	const char *sound_entry_class() const override { return "LaserSoundData2D"; }
+	SoundMix2D *sound_entry_of(const Variant &entry) const override { return live_object2d<LaserSoundData2D>(entry); }
+	int spawner_sound_trigger(SpawnerSoundEvent2D event) const override {
+		return event == SPAWNER_SOUND_TELEGRAPH ? LaserSoundData2D::LASER_SOUND_ON_TELEGRAPH : LaserSoundData2D::LASER_SOUND_ON_SHOT;
+	}
+	const char *shot_noun() const override { return "laser"; }
 	bool apply_payload_override(const Variant &value) override;
 
 	void _validate_property(PropertyInfo &p_property) const;

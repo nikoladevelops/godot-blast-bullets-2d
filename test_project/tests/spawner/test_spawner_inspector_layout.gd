@@ -62,10 +62,13 @@ func test_every_property_sits_in_one_group_and_the_shared_ones_match() -> void:
 		if not lasers.has(name):
 			if not LASER_LEAVES_OUT.has(name):
 				missing.append(name)
-		elif lasers[name] != bullets[name]:
+		elif lasers[name] != bullets[name] and name != "sound_effects":
 			mismatched.append("%s: %s vs %s" % [name, bullets[name], lasers[name]])
 	assert_eq(missing, [], "every shared property exists on both (except what a laser leaves out)")
 	assert_eq(mismatched, [], "and with the same group, type and hint")
+	# Each spawner arms its own sound class (same group, type and hint kind).
+	assert_eq(bullets["sound_effects"], ["Sound", TYPE_ARRAY, PROPERTY_HINT_ARRAY_TYPE, "BulletSoundData2D"], "bullet sounds")
+	assert_eq(lasers["sound_effects"], ["Sound", TYPE_ARRAY, PROPERTY_HINT_ARRAY_TYPE, "LaserSoundData2D"], "laser sounds")
 	for name in LASER_LEAVES_OUT:
 		assert_true(bullets.has(name), "%s stays on the bullet spawner" % name)
 		assert_false(lasers.has(name), "%s is left out of the laser spawner" % name)

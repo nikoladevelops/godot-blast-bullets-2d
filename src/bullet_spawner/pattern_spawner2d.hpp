@@ -15,9 +15,12 @@
 #include <memory>
 #include <vector>
 
+#include "core/live_object2d.hpp"
 #include "data/bullet_sound_data2d.hpp"
 #include "data/bullet_volley_data2d.hpp"
 #include "data/graze_zone2d.hpp"
+#include "data/laser_sound_data2d.hpp"
+#include "data/sound_mix2d.hpp"
 #include "godot_cpp/classes/array_mesh.hpp"
 #include "godot_cpp/classes/curve.hpp"
 #include "godot_cpp/classes/multi_mesh.hpp"
@@ -192,6 +195,13 @@ struct ShotResult2D {
 // fire, budgets, bursts, telegraph, pattern lists), spin, Path2D movement,
 // time scale, placement randomization, and the graze and sound target
 // settings. WHAT fires is the derived class's (BulletSpawner2D: bullets).
+// The spawner's own sound events (each spawner type maps them onto its
+// sound resource's trigger ids).
+enum SpawnerSoundEvent2D : int {
+	SPAWNER_SOUND_SHOT,
+	SPAWNER_SOUND_TELEGRAPH,
+};
+
 class PatternSpawner2D : public Node2D, public PatternKnobs2D {
 	GDCLASS(PatternSpawner2D, Node2D)
 
@@ -1285,13 +1295,22 @@ public:
 	virtual String shot_signal_names() const { return "volley_skipped"; }
 	virtual String payload_class_name() const { return String(); }
 	virtual bool apply_payload_override(const Variant &value) { return false; }
+	// The sound entries this spawner type arms: sound_effects' element class
+	// (named in its texts), the entry a Variant holds (null = not one), the
+	// trigger id of each spawner event and what the spawner fires (named in
+	// the setup warnings: "bullet", "laser").
+	virtual const char *sound_entry_class() const = 0;
+	virtual SoundMix2D *sound_entry_of(const Variant &entry) const = 0;
+	virtual int spawner_sound_trigger(SpawnerSoundEvent2D event) const = 0;
+	virtual const char *shot_noun() const = 0;
 
 protected:
 	static void _bind_methods();
 	// Registers the properties of one shared inspector group on `cls` (a
 	// concrete spawner's _bind_methods calls these in its own layout),
 	// leaving out the names in `skip`.
-	static void bind_spawner_group(const StringName &cls, SpawnerGroup2D group, const SpawnerPropertyFilter2D &skip = SpawnerPropertyFilter2D());
+	// `sound_entry_class` names the element type of sound_effects (Sound group only).
+	static void bind_spawner_group(const StringName &cls, SpawnerGroup2D group, const SpawnerPropertyFilter2D &skip = SpawnerPropertyFilter2D(), const char *sound_entry_class = nullptr);
 
 	// Shot, cadence, preview and movement state (the derived spawners read it).
 	// shoot_from: set only for the duration of that one shot.
@@ -1714,7 +1733,7 @@ protected:
 	// Telegraph with volley_telegraphed) at the spawner's global position.
 	// volley_amount is the fired volley's size for the amount gates (1 when
 	// unknown, e.g. telegraphs). Runs no user code.
-	void fire_spawner_sound(int trigger, int volley_amount = 1);
+	void fire_spawner_sound(SpawnerSoundEvent2D event, int volley_amount = 1);
 	// Zone resources' `changed` -> ring preview refresh.
 	void connect_graze_zones(bool connect);
 	void _on_graze_zone_changed();

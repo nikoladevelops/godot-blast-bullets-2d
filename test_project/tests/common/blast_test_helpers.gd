@@ -195,6 +195,16 @@ static func make_sound(trigger: int, max_voices := 4) -> BulletSoundData2D:
 	s.max_voices = max_voices
 	return s
 
+## LaserSoundData2D on a laser `trigger` (LaserSoundTrigger), same stream and
+## limits as make_sound.
+static func make_laser_sound(trigger: int, max_voices := 4) -> LaserSoundData2D:
+	var s := LaserSoundData2D.new()
+	s.trigger = trigger
+	s.streams = [make_sound_stream()]
+	s.min_interval_sec = 0.0
+	s.max_voices = max_voices
+	return s
+
 
 ## A laser that hits layer value 4 (make_wall / make_area) with the given
 ## phase lengths (seconds; active 0 = until ended), no walls.

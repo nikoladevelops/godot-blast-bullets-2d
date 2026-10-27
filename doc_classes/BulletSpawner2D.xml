@@ -1319,7 +1319,7 @@
 			Also shows the preview while the game runs. Off by default. Switched off at runtime, the preview goes down at once; a spawner that leaves the tree takes its preview off an external [member transforms_generator] too (rebuilt when it enters again).
 		</member>
 		<member name="sound_effects" type="Array" setter="set_sound_effects" getter="get_sound_effects" default="[]">
-			Stacked [BulletSoundData2D] entries (nulls allowed, skipped). Each entry plays one of its [member BulletSoundData2D.streams] when its trigger fires, subject to its own limits. On Shot and On Telegraph entries offer from the spawner itself; the rest fire from the volley.
+			Stacked [BulletSoundData2D] entries (nulls allowed, skipped; a [LaserSoundData2D] is refused with one error, keeping the old value). Each entry plays one of its [member BulletSoundData2D.streams] when its trigger fires, subject to its own limits. On Shot and On Telegraph entries offer from the spawner itself; the rest fire from the volley.
 		</member>
 		<member name="sound_enabled" type="bool" setter="set_sound_enabled" getter="get_sound_enabled" default="false">
 			Master switch: every volley this spawner fires is armed with [member sound_effects]. Changes apply to the next shots; volleys already flying keep their entries until [method sound_live_volleys] applies the current settings to them.

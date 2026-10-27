@@ -1,0 +1,258 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="LaserSoundData2D" inherits="Resource" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		One stackable sound entry of a laser: when it plays (a laser event) and how (the shared mix settings).
+	</brief_description>
+	<description>
+		A [LaserSpawner2D] carries an array of these in [member LaserSpawner2D.sound_effects]; a laser fired by the factory gets its own through [method LaserVolley2D.sound_set_effects]. WHEN it plays is [member trigger] (a laser event, [enum LaserSoundTrigger]); HOW is the same set of streams, mix, spatial, audibility, limit, fade and ducking settings as a [BulletSoundData2D], played by the same factory mixer: the voices, [member min_interval_sec] and [member max_voices] of one resource are shared by every spawner and laser using it, and the nearest offer wins each sweep.
+		A spawner arms only its own sound class: a [LaserSpawner2D] refuses a [BulletSoundData2D] and a [BulletSpawner2D] a [LaserSoundData2D]. The shared mix enums are spelled on this class too ([constant STREAM_RANDOM], ...), with the same values as on [BulletSoundData2D].
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="debug_get_preview_player" qualifiers="const">
+			<return type="AudioStreamPlayer2D" />
+			<description>
+				This entry's live preview player, or null when no preview is playing. Tests and the editor smoke probe read the mixed volume, pitch, bus and pose through it.
+			</description>
+		</method>
+		<method name="preview">
+			<return type="void" />
+			<description>
+				Editor tool: plays the picked stream with this entry's mix applied (volume and pitch with their randoms and clamps, bus, centered), so edits are audible without running the game. Methods are not inspector buttons in GDExtension: audition from any tool script with [code]entry.preview()[/code] (centered) or [code]entry.preview_at(get_global_mouse_position(), 0.0, true)[/code] (positional). Editor only, else an error. A second call stops the first; one-shots free themselves on finished, looping WAV/OGG/MP3 entries stop after 10 s.
+			</description>
+		</method>
+		<method name="preview_at">
+			<return type="void" />
+			<param index="0" name="global_position" type="Vector2" />
+			<param index="1" name="volume_offset_db" type="float" />
+			<param index="2" name="use_position" type="bool" />
+			<description>
+				Editor tool: same as [method preview], at a global pose with a volume offset and positioning honored (the spawner's preview path). Each call plays the next stream of a Sequence or Shuffle list, and an unknown [member bus] is named in a warning. Allowed at runtime too, but it bypasses the factory mixer: no [member min_interval_sec], [member max_voices], priority, distance, camera or occlusion rules apply, and its player lives under the scene root.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="area_mask" type="int" setter="set_area_mask" getter="get_area_mask" default="1">
+			Physics layers whose [Area2D] audio bus overrides apply to this sound. Setup: (1) an Area2D with a shape on layer 2 covering the cave, (2) its inspector Audio section bus override set to a reverb bus, (3) this entry [member positional] on with [member area_mask] = 2. Arena shots stay dry, cave shots echo. Hidden while [member positional] is off. Hidden while [member positional] is off. Reverb-zone example: an [Area2D] with an audio bus override (a reverb bus) on layer 2 plus [code]area_mask = 2[/code] makes cave shots echo while arena shots stay dry.
+		</member>
+		<member name="attenuation" type="float" setter="set_attenuation" getter="get_attenuation" default="1.0">
+			Distance falloff curve exponent (Godot's own volume math). Hidden while [member positional] is off.
+		</member>
+		<member name="audibility_mode" type="int" setter="set_audibility_mode" getter="get_audibility_mode" enum="BulletSoundData2D.AudibilityMode" default="0">
+			Which audibility rule drops events: Distance (only [member max_distance]), Camera (only the camera view), or both. Distance is the default: existing scenes behave as before. Silence remedy ladder (zoomed-in views shrink both the view and the scaled range): widen [member camera_margin_px], switch to Distance and Camera, fall back to Distance, and finally Godot's listener always measures something. [method BulletFactory2D.debug_explain_sound] names the exact gate dropping an event.
+		</member>
+		<member name="bus" type="StringName" setter="set_bus" getter="get_bus" default="&amp;&quot;Master&quot;">
+			Mixer bus this sound plays on. Unknown names play on Master with one warning per name.
+		</member>
+		<member name="camera_margin_px" type="float" setter="set_camera_margin_px" getter="get_camera_margin_px" default="200.0">
+			The camera view rect grows by this many screen pixels on every side before an event counts as outside (zoom-independent). Rescues near-outside events from the cull. Hidden unless [member audibility_mode] includes the camera.
+		</member>
+		<member name="camera_path" type="NodePath" setter="set_camera_path" getter="get_camera_path" default="NodePath(&quot;&quot;)">
+			The camera the view test and the zoom scaling measure from, resolved against the factory (absolute paths work from anywhere). Empty follows the viewport's current camera; a path that names no live Camera2D in the same viewport falls back to it with one warning per resource, shared across every factory using it. Pin the gameplay camera while a cutscene camera is current, or fix the camera a test measures from. Hidden unless [member audibility_mode] includes the camera.
+		</member>
+		<member name="duck_amount_db" type="float" setter="set_duck_amount_db" getter="get_duck_amount_db" default="0.0">
+			Ducking: while a voice of this entry is busy, every busy voice of strictly lower [member priority] is dipped by this many dB (strongest dip wins per victim; ties never dip). 0 never dips. Fading voices sit out both ways; the dip applies and releases every sweep, even with no new offers.
+		</member>
+		<member name="enabled" type="bool" setter="set_enabled" getter="get_enabled" default="true">
+			Master switch: toggle a sound without removing it. Disabled entries play nothing.
+		</member>
+		<member name="fade_out_sec" type="float" setter="set_fade_out_sec" getter="get_fade_out_sec" default="0.0">
+			Fade-out before a voice stops on duration expiry or voice stealing: ramps to silence over this long instead of cutting, so loopers never click. 0 stops instantly, like before. stop_sounds(), reset() and pause stay instant either way; a fading voice still counts busy until it releases.
+		</member>
+		<member name="follow_beam" type="bool" setter="set_follow_beam" getter="get_follow_beam" default="false">
+			When on, the voice rides the beam it played for: every sweep it moves to that beam's [member follow_point], and it fades out (through [member fade_out_sec]) once the beam is spent or the laser ends, finishes or is pooled. Meant for a [constant LASER_SOUND_ON_ACTIVE] hum: the entry then keeps one voice per beam instead of starting a new one each tick. Off (default): the voice stays where it started.
+		</member>
+		<member name="follow_point" type="int" setter="set_follow_point" getter="get_follow_point" enum="LaserSoundData2D.FollowPoint" default="0">
+			Where a beam's [constant LASER_SOUND_ON_ACTIVE] sound plays and which point a followed voice rides ([member follow_beam]): the tip (the end of a beam, the head of a bolt or curvy laser; default) or the muzzle. Event triggers (hits, walls, grazes) always play where the event happened.
+		</member>
+		<member name="max_distance" type="float" setter="set_max_distance" getter="get_max_distance" default="2000.0">
+			Past this distance from the listener the play is dropped: inaudible events never take a voice. Hidden while [member positional] is off.
+		</member>
+		<member name="max_duration_sec" type="float" setter="set_max_duration_sec" getter="get_max_duration_sec" default="0.0">
+			Stops a voice after this long (looping streams). 0 plays the whole stream.
+		</member>
+		<member name="max_voices" type="int" setter="set_max_voices" getter="get_max_voices" default="4">
+			Simultaneous voices of this sound across the whole factory. Past this, [member when_limit_reached] decides.
+		</member>
+		<member name="min_interval_sec" type="float" setter="set_min_interval_sec" getter="get_min_interval_sec" default="0.05">
+			At most one play per interval across the whole factory; the nearest event wins each sweep. 0 plays up to [member max_voices] per sweep instead.
+		</member>
+		<member name="occlusion_bus" type="StringName" setter="set_occlusion_bus" getter="get_occlusion_bus" default="&amp;&quot;&quot;">
+			Muffle bus for occluded plays: when the ray hits, the voice routes here instead of [member bus] (put reverb/lowpass on it as Godot effects), together with the [member occlusion_db] dip. Empty keeps [member bus]. Unknown names reuse the Master fallback. Hidden unless [member occlusion_mask] is set; editor preview skips occlusion.
+		</member>
+		<member name="occlusion_db" type="float" setter="set_occlusion_db" getter="get_occlusion_db" default="0.0">
+			Occlusion dip in dB on a raycast hit (see [member occlusion_mask]). 0 disables the penalty. Moving walls re-evaluated per play: nothing is cached.
+		</member>
+		<member name="occlusion_mask" type="int" setter="set_occlusion_mask" getter="get_occlusion_mask" default="0">
+			Occlusion raycast layers (bodies only): each winning play raycasts listener to event against this mask, and any hit dips the volume by [member occlusion_db] before the clamp (and routes to [member occlusion_bus] when set). Worked setup: a StaticBody2D wall on layer 4 between listener and event, mask 4, dip 6. Keep the mask disjoint from characters (a listener inside a body starts the ray inside it); moving walls are re-evaluated per play, nothing is cached. 0 never raycasts. Positional plays only; keep the mask disjoint from characters. Editor preview skips occlusion.
+		</member>
+		<member name="panning_strength" type="float" setter="set_panning_strength" getter="get_panning_strength" default="1.0">
+			Stereo spread (Godot's own panning math). Hidden while [member positional] is off.
+		</member>
+		<member name="pitch_follows_time_scale" type="bool" setter="set_pitch_follows_time_scale" getter="get_pitch_follows_time_scale" default="false">
+			When on, the sound plays at its pitch times the time scale of what it belongs to: [member BulletFactory2D.time_scale] for plain sounds, and the scale of the followed laser (so its spawner's [member LaserSpawner2D.time_scale] counts) for a [member follow_beam] hum. The voice pauses while the scale is below 0.01 and resumes when it rises; the pitch never exceeds 1000. Fades and minimum intervals always run in real time. Off by default.
+		</member>
+		<member name="pitch_max" type="float" setter="set_pitch_max" getter="get_pitch_max" default="16.0">
+			Final pitch ceiling (linear multiplier, applied after every random). Inverted bounds sort themselves. Caps the final pitch at 16 by default (raise it for a wilder mix). Must be finite and between 0.01 and 1000.
+		</member>
+		<member name="pitch_min" type="float" setter="set_pitch_min" getter="get_pitch_min" default="0.01">
+			Final pitch floor (linear multiplier, applied after every random). Inverted bounds sort themselves. Wide open by default. Must be finite and between 0.01 and 1000.
+		</member>
+		<member name="pitch_scale" type="float" setter="set_pitch_scale" getter="get_pitch_scale" default="1.0">
+			Base pitch multiplier, multiplied by the [member random_pitch] and [member random_pitch_min]/[member random_pitch_max] rolls of each play, clamped into [member pitch_min]..[member pitch_max]. Must be finite and between 0.01 and 1000: Godot's audio mixer never finishes a looping stream played at around 1e8 times speed, so the setter refuses typos like 1e9.
+		</member>
+		<member name="positional" type="bool" setter="set_positional" getter="get_positional" default="true">
+			Off means constant volume, centered (a UI sting). On means Godot's distance falloff and panning from the listener.
+		</member>
+		<member name="priority" type="int" setter="set_priority" getter="get_priority" default="0">
+			Voice-stealing rank for the factory-wide pool: a full pool yields its oldest voice of equal or lower priority, never a more important one.
+		</member>
+		<member name="random_pan" type="float" setter="set_random_pan" getter="get_random_pan" default="0.0">
+			Random placement spread (fraction of the listener distance): each positional play is offset perpendicular to the listener direction by a uniform roll in [code]-v..+v[/code] times the distance, so repeated shots spread across the stereo field. 0 disables it; centered voices stay centered.
+		</member>
+		<member name="random_pitch" type="float" setter="set_random_pitch" getter="get_random_pitch" default="1.0">
+			Random pitch range ([AudioStreamRandomizer] math): each play multiplies [member pitch_scale] by a log-uniform roll in [code]1/r..r[/code]. 1 disables it.
+		</member>
+		<member name="random_pitch_max" type="float" setter="set_random_pitch_max" getter="get_random_pitch_max" default="1.0">
+			Random pitch upper bound (linear multiplier): each play multiplies by a uniform roll in [code]min..max[/code] (sorted when inverted). 1/1 disables it; min == max multiplies without burning RNG.
+		</member>
+		<member name="random_pitch_min" type="float" setter="set_random_pitch_min" getter="get_random_pitch_min" default="1.0">
+			Random pitch lower bound (linear multiplier): each play multiplies by a uniform roll in [code]min..max[/code] (sorted when inverted). 1/1 disables it; min == max multiplies without burning RNG.
+		</member>
+		<member name="random_volume_max_db" type="float" setter="set_random_volume_max_db" getter="get_random_volume_max_db" default="0.0">
+			Random loudness upper bound in dB: each play adds a uniform offset in [code]min..max[/code] (sorted when inverted). 0/0 disables it; min == max adds without burning RNG.
+		</member>
+		<member name="random_volume_min_db" type="float" setter="set_random_volume_min_db" getter="get_random_volume_min_db" default="0.0">
+			Random loudness lower bound in dB: each play adds a uniform offset in [code]min..max[/code] (sorted when inverted). 0/0 disables it; min == max adds without burning RNG.
+		</member>
+		<member name="random_volume_offset_db" type="float" setter="set_random_volume_offset_db" getter="get_random_volume_offset_db" default="0.0">
+			Random loudness range in dB: each play adds a uniform offset in [code]-v..+v[/code]. 0 disables it.
+		</member>
+		<member name="ring_index" type="int" setter="set_ring_index" getter="get_ring_index" default="-1">
+			For [constant LASER_SOUND_ON_GRAZE] and [constant LASER_SOUND_ON_GRAZE_EXIT] only: the graze ring this entry listens to (0..3), or -1 for any ring. Hidden in the inspector for the other triggers.
+		</member>
+		<member name="steal_mode" type="int" setter="set_steal_mode" getter="get_steal_mode" enum="BulletSoundData2D.StealMode" default="0">
+			Which voice Replace Oldest stops past [member max_voices]: the oldest (machine-gun rotation: every shot gets its turn), or the quietest (layered booms: the loud body survives, tails die; both rank the lowest played volume, ties go to the oldest, before ducking). The factory pool steal keeps its own rule (priority, then oldest).
+		</member>
+		<member name="stream_mode" type="int" setter="set_stream_mode" getter="get_stream_mode" enum="BulletSoundData2D.StreamMode" default="0">
+			How [member streams] is picked: Random (uniform), Weighted (reads [member stream_weights]), Sequence (round-robin), Shuffle (every entry once per cycle). The cursors live in the shared channel, like the limits.
+		</member>
+		<member name="stream_weights" type="PackedFloat32Array" setter="set_stream_weights" getter="get_stream_weights" default="PackedFloat32Array()">
+			Per-entry weight for Weighted mode, parallel to [member streams]. All-zero, empty or size-mismatched means uniform. Swapping the array mid-fight works: the next play re-reads it. Hidden in the inspector unless [member stream_mode] is Weighted and [member streams] holds a playable entry.
+		</member>
+		<member name="streams" type="Array" setter="set_streams" getter="get_streams" default="[]">
+			What plays: each play picks one entry per [member stream_mode] (nulls skipped). Put one WAV for a single sound or five hit variations without building an [AudioStreamRandomizer]; an empty or all-null list plays nothing (warns once).
+		</member>
+		<member name="trigger" type="int" setter="set_trigger" getter="get_trigger" enum="LaserSoundData2D.LaserSoundTrigger" default="5">
+			Which laser event plays this sound ([enum LaserSoundTrigger]). [constant LASER_SOUND_ON_SHOT] and [constant LASER_SOUND_ON_TELEGRAPH] play from the [LaserSpawner2D]; every other trigger plays from the laser where the event happened. Serialized: the ids never change.
+		</member>
+		<member name="trigger_chance" type="float" setter="set_trigger_chance" getter="get_trigger_chance" default="1.0">
+			Play probability per event. 0 never plays, 1 always plays.
+		</member>
+		<member name="volume_db" type="float" setter="set_volume_db" getter="get_volume_db" default="0.0">
+			Base loudness in dB. The spawner's sound volume offset is added on top, plus the [member random_volume_offset_db] and [member random_volume_min_db]/[member random_volume_max_db] rolls of each play, clamped into [member volume_min_db]..[member volume_max_db]. Playing voices snapshot the mix at play: editing the entry afterwards affects new plays only. Must be finite and between -80 and 80.
+		</member>
+		<member name="volume_max_db" type="float" setter="set_volume_max_db" getter="get_volume_max_db" default="80.0">
+			Final mixed volume ceiling in dB (applied after the trim, the randoms and the amount gain). Inverted bounds sort themselves. Wide open by default (between -80 and 80).
+		</member>
+		<member name="volume_min_db" type="float" setter="set_volume_min_db" getter="get_volume_min_db" default="-80.0">
+			Final mixed volume floor in dB (applied after the trim, the randoms and the amount gain). Inverted bounds sort themselves. Wide open by default (between -80 and 80).
+		</member>
+		<member name="when_limit_reached" type="int" setter="set_when_limit_reached" getter="get_when_limit_reached" enum="BulletSoundData2D.SoundLimitMode" default="0">
+			What happens past [member max_voices]: stop this sound's oldest voice and reuse it, or drop the new event.
+		</member>
+		<member name="zone_index" type="int" setter="set_zone_index" getter="get_zone_index" default="-1">
+			For [constant LASER_SOUND_ON_GRAZE] and [constant LASER_SOUND_ON_GRAZE_EXIT] only: the zone slot (the index in the laser's graze zones) this entry listens to (0..3), or -1 for any zone. Hidden in the inspector for the other triggers.
+		</member>
+		<member name="zoom_gain_db" type="float" setter="set_zoom_gain_db" getter="get_zoom_gain_db" default="0.0">
+			Loudness added per zoom octave: k times log2 of the camera's minimum zoom, so k = 3 adds +3 dB at zoom 2 and -3 dB at zoom 0.5 (zoom 1 adds nothing, no camera adds nothing). Negative inverts it. 0 disables it. Applied with the trim and the other gains, before the volume clamp.
+		</member>
+		<member name="zoom_scales_distance" type="bool" setter="set_zoom_scales_distance" getter="get_zoom_scales_distance" default="false">
+			When true, the effective [member max_distance] is divided by the camera's minimum zoom: zoomed in hears less, pulled back hears more. No camera means zoom 1. Range only — [member zoom_gain_db] scales loudness instead.
+		</member>
+	</members>
+	<constants>
+		<constant name="LASER_SOUND_ON_SHOT" value="0" enum="LaserSoundTrigger">
+			Plays from the [LaserSpawner2D] when a shot fires (at the spawner, or at the pose of a [method PatternSpawner2D.shoot_from] shot).
+		</constant>
+		<constant name="LASER_SOUND_ON_TELEGRAPH" value="1" enum="LaserSoundTrigger">
+			Plays from the [LaserSpawner2D] when a telegraph begins ([signal PatternSpawner2D.volley_telegraphed]).
+		</constant>
+		<constant name="LASER_SOUND_ON_CHARGE" value="2" enum="LaserSoundTrigger">
+			Once per laser, on its first tick, when it charges ([member LaserData2D.charge_sec] &gt; 0), at its first beam's muzzle.
+		</constant>
+		<constant name="LASER_SOUND_ON_FIRE" value="3" enum="LaserSoundTrigger">
+			Once per laser when its beams start (the Growing phase begins), at its first beam's muzzle. A laser ended while charging never fires.
+		</constant>
+		<constant name="LASER_SOUND_ON_ACTIVE" value="4" enum="LaserSoundTrigger">
+			Every tick the laser hits, once per live beam, at the beam's [member follow_point]. With [member follow_beam] it is a hum: one voice per beam that rides it.
+		</constant>
+		<constant name="LASER_SOUND_ON_HIT" value="5" enum="LaserSoundTrigger">
+			Once per [signal BulletFactory2D.laser_hit] (repeats with [member LaserData2D.hit_interval_sec] included), at the contact.
+		</constant>
+		<constant name="LASER_SOUND_ON_PIERCE_START" value="6" enum="LaserSoundTrigger">
+			Once per [signal BulletFactory2D.laser_pierce_started], at the contact.
+		</constant>
+		<constant name="LASER_SOUND_ON_PIERCE_END" value="7" enum="LaserSoundTrigger">
+			Once per [signal BulletFactory2D.laser_pierce_ended], where the contact was last. A freed target ends silently.
+		</constant>
+		<constant name="LASER_SOUND_ON_WALL_HIT" value="8" enum="LaserSoundTrigger">
+			Once per [signal BulletFactory2D.laser_wall_hit] (once per block), at the wall point.
+		</constant>
+		<constant name="LASER_SOUND_ON_GRAZE" value="9" enum="LaserSoundTrigger">
+			Once per [signal BulletFactory2D.laser_grazed], where the beam passed the target ([member ring_index] and [member zone_index] filter).
+		</constant>
+		<constant name="LASER_SOUND_ON_GRAZE_EXIT" value="10" enum="LaserSoundTrigger">
+			Once per [signal BulletFactory2D.laser_graze_exited] ([member ring_index] matches the deepest ring of the visit).
+		</constant>
+		<constant name="LASER_SOUND_ON_FINISH" value="11" enum="LaserSoundTrigger">
+			Once when the laser runs its phases out (or every bolt or curvy head is spent), at its first beam's tip.
+		</constant>
+		<constant name="LASER_SOUND_ON_ENDED_EARLY" value="12" enum="LaserSoundTrigger">
+			Instead of [constant LASER_SOUND_ON_FINISH] when something cut the laser short: [method LaserVolley2D.end_laser], a clear, an area end or an orphan policy.
+		</constant>
+		<constant name="LASER_SOUND_ON_DESPAWN" value="13" enum="LaserSoundTrigger">
+			Once per bolt or curvy head that leaves the despawn bounds ([member BulletFactory2D.despawn_bounds_enabled]), where it left.
+		</constant>
+		<constant name="FOLLOW_TIP" value="0" enum="FollowPoint">
+			The end of a beam, the head of a bolt or curvy laser.
+		</constant>
+		<constant name="FOLLOW_MUZZLE" value="1" enum="FollowPoint">
+			Where the beam starts.
+		</constant>
+		<constant name="SOUND_LIMIT_REPLACE_OLDEST" value="0" enum="SoundLimitMode">
+			Past max_voices, stop this sound's oldest voice and reuse it.
+		</constant>
+		<constant name="SOUND_LIMIT_SKIP_NEW" value="1" enum="SoundLimitMode">
+			Past max_voices, drop the new event.
+		</constant>
+		<constant name="STEAL_OLDEST" value="0" enum="StealMode">
+			Past max_voices with Replace Oldest, stop this sound's oldest voice.
+		</constant>
+		<constant name="STEAL_QUIETEST" value="1" enum="StealMode">
+			Past max_voices with Replace Oldest, stop this sound's quietest voice (lowest played volume, ties go to the oldest).
+		</constant>
+		<constant name="STREAM_RANDOM" value="0" enum="StreamMode">
+			Pick uniformly from [member streams].
+		</constant>
+		<constant name="STREAM_WEIGHTED" value="1" enum="StreamMode">
+			Pick from [member streams] proportionally to [member stream_weights].
+		</constant>
+		<constant name="STREAM_SEQUENCE" value="2" enum="StreamMode">
+			Round-robin through [member streams] in order.
+		</constant>
+		<constant name="STREAM_SHUFFLE" value="3" enum="StreamMode">
+			Deal every entry of [member streams] once per cycle, in shuffled order.
+		</constant>
+		<constant name="SOUND_AUDIBILITY_DISTANCE" value="0" enum="AudibilityMode">
+			Only [member max_distance] drops events (the default).
+		</constant>
+		<constant name="SOUND_AUDIBILITY_CAMERA" value="1" enum="AudibilityMode">
+			Only the camera view drops events (no camera means no culling).
+		</constant>
+		<constant name="SOUND_AUDIBILITY_DISTANCE_AND_CAMERA" value="2" enum="AudibilityMode">
+			Both rules drop events.
+		</constant>
+	</constants>
+</class>

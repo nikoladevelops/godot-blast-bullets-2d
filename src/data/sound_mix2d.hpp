@@ -202,6 +202,8 @@ struct SoundMix2D {
 	// The resource's trigger id (its own trigger enum: bullet or laser).
 	virtual int sound_trigger() const = 0;
 	String sound_class() const { return sound_resource()->get_class(); }
+	// Plays this entry once outside the mixer (the spawner's preview path).
+	virtual void preview_at(const Vector2 &global_position, float volume_offset_db, bool use_position) = 0;
 
 	virtual ~SoundMix2D() = default;
 };

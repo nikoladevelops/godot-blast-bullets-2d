@@ -231,12 +231,12 @@ func test_sound_entries_offer_on_hits() -> void:
 	factory.debug_set_sound_offer_log_enabled(true)
 	var sp := _spawner(_laser(), 1)
 	sp.sound_enabled = true
-	sp.sound_effects = [H.make_sound(BulletSoundData2D.SOUND_ON_HIT)]
+	sp.sound_effects = [H.make_laser_sound(LaserSoundData2D.LASER_SOUND_ON_HIT)]
 	_fire(sp)
 	step_factory(1, DT)
 	var offers: Array = factory.debug_get_sound_offer_log()
 	assert_eq(offers.size(), 1, "one offer for the pierce")
-	assert_eq(offers[0]["trigger"], BulletSoundData2D.SOUND_ON_HIT, "On Hit")
+	assert_eq(offers[0]["trigger"], LaserSoundData2D.LASER_SOUND_ON_HIT, "On Hit")
 
 
 func test_pattern_lists_swap_the_laser_data() -> void:
@@ -423,7 +423,7 @@ func test_apply_to_live_lasers_arms_disarms_and_retargets() -> void:
 	step_factory(1, DT)
 	assert_eq(grazes, [0], "and it grazes")
 	sp.sound_enabled = true
-	sp.sound_effects = [H.make_sound(BulletSoundData2D.SOUND_ON_HIT)]
+	sp.sound_effects = [H.make_laser_sound(LaserSoundData2D.LASER_SOUND_ON_HIT)]
 	assert_eq(sp.apply_to_live_lasers(LaserSpawner2D.LIVE_SOUND), 1, "sound armed")
 	assert_true(l.is_sound_armed(), "sound armed")
 	sp.graze_enabled = false

@@ -111,6 +111,8 @@ void LaserVolley2D::begin_life(BulletFactory2D *p_factory, const Ref<LaserData2D
 	owner_spawner_id = owner_id;
 	signals_to_factory = false;
 	pattern_target_warned = false;
+	charge_sounded = false;
+	ended_early = false;
 	++life_id;
 	active = true;
 	pooled = false;
@@ -278,6 +280,14 @@ bool LaserVolley2D::sound_set_effects(const Array &effects, const StringName &li
 	if (reject_stale_handle("sound_set_effects")) {
 		return false;
 	}
+	// The whole array first: one bad entry changes nothing.
+	for (int i = 0; i < effects.size(); ++i) {
+		const Variant entry = effects[i];
+		if (entry.get_type() != Variant::NIL && live_object2d<LaserSoundData2D>(entry) == nullptr) {
+			UtilityFunctions::push_error("sound_set_effects: every entry must be a LaserSoundData2D or null, nothing changed.");
+			return false;
+		}
+	}
 	sound_arm(effects, nullptr, 0.0f);
 	sound_listener_group = listener_group;
 	return true;
@@ -286,9 +296,9 @@ bool LaserVolley2D::sound_set_effects(const Array &effects, const StringName &li
 void LaserVolley2D::sound_arm(const Array &entries, const std::shared_ptr<GrazeDetector2D> &listeners, float volume_db) {
 	sound_effects.clear();
 	for (int i = 0; i < entries.size(); ++i) {
-		const Ref<BulletSoundData2D> entry = entries[i];
-		if (entry.is_valid()) {
-			sound_effects.push_back(entry);
+		LaserSoundData2D *entry = live_object2d<LaserSoundData2D>(entries[i]);
+		if (entry != nullptr) {
+			sound_effects.push_back(Ref<LaserSoundData2D>(entry));
 		}
 	}
 	sound_listeners = sound_effects.empty() ? nullptr : listeners;
@@ -753,11 +763,11 @@ bool LaserVolley2D::sound_armed_alike(const Array &entries, const std::shared_pt
 	}
 	size_t k = 0;
 	for (int i = 0; i < entries.size(); ++i) {
-		const Ref<BulletSoundData2D> entry = entries[i];
-		if (entry.is_null()) {
+		LaserSoundData2D *entry = live_object2d<LaserSoundData2D>(entries[i]);
+		if (entry == nullptr) {
 			continue;
 		}
-		if (k >= sound_effects.size() || sound_effects[k] != entry) {
+		if (k >= sound_effects.size() || sound_effects[k].ptr() != entry) {
 			return false;
 		}
 		++k;
@@ -786,6 +796,7 @@ void LaserVolley2D::end_laser(bool fade) {
 		return; // already over (its laser_finished handler)
 	}
 	// No user code here: the next tick announces the phase and ends the contacts.
+	ended_early = true;
 	if (fade && phase != PHASE_FADING) {
 		set_phase(PHASE_FADING);
 		announce_phase = true;

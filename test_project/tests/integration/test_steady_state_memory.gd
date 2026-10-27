@@ -138,7 +138,7 @@ func _laser_spawner(type: int) -> LaserSpawner2D:
 	sp.graze_zones = [H.make_graze_zone([60.0])]
 	sp.graze_enabled = true
 	sp.graze_node_group = &"graze_targets"
-	sp.sound_effects = [H.make_sound(BulletSoundData2D.SOUND_ON_HIT)]
+	sp.sound_effects = [H.make_laser_sound(LaserSoundData2D.LASER_SOUND_ON_HIT)]
 	sp.sound_enabled = true
 	add(sp)
 	sp.set_bullet_factory(factory)

@@ -201,7 +201,7 @@ func test_freeing_the_laser_spawner_from_its_own_signal(sig: String = use_parame
 	sp.graze_zones = [H.make_graze_zone([15.0])] # the muzzles sit 20 px off the target: a sweep leaves the ring
 	sp.graze_node_group = &"rf_graze"
 	sp.sound_enabled = true
-	sp.sound_effects = [H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)]
+	sp.sound_effects = [H.make_laser_sound(LaserSoundData2D.LASER_SOUND_ON_SHOT)]
 	sp.set_movement_path_node(path)
 	sp.movement_loop_mode = LaserSpawner2D.MOVEMENT_LOOP_LOOP
 	sp.movement_duration_sec = 0.1
