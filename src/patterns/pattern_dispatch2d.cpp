@@ -219,6 +219,7 @@ PatternSlots2D PatternKnobs2D::generate_raw(const PatternInputs2D &in) const {
 			ellipse_params.gap_width = helper_ellipse_gap_width;
 			ellipse_params.face_outward = helper_ellipse_face_outward;
 			ellipse_params.facing_offset_degrees = helper_ellipse_facing_offset_deg;
+			ellipse_params.rotate_with_marker = helper_ellipse_rotate_with_marker;
 			ellipse_params.outline = outline_layout();
 			raw = BulletPatterns2D::generate_ellipse2d(helper_bullets_amount, marker, ellipse_params);
 		} break;

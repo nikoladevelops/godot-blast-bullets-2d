@@ -131,6 +131,7 @@ struct EllipseParams2D {
 	real_t gap_width = 0.3;
 	bool face_outward = true;
 	real_t facing_offset_degrees = 0.0;
+	bool rotate_with_marker = true;
 	OutlineLayout2D outline;
 };
 

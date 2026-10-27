@@ -51,9 +51,11 @@ void PatternKnobs2D::build_preview_track(const PatternTrackInputs2D &in, Pattern
 			sink.push_dict(BulletPatterns2D::helper_sample_outline_ring(helper_ring_radius, helper_ring_arc, helper_ring_y_scale, start_abs));
 			break;
 		}
-		case PATTERN_SHAPE_ELLIPSE:
-			sink.push_dict(BulletPatterns2D::helper_sample_outline_ellipse(helper_ellipse_radius_x, helper_ellipse_radius_y, helper_ellipse_rotation, helper_ellipse_start_angle, helper_ellipse_arc, helper_ellipse_mode));
+		case PATTERN_SHAPE_ELLIPSE: {
+			const real_t rotation_abs = (helper_ellipse_rotate_with_marker ? track_marker.get_rotation() : 0.0) + (real_t)helper_ellipse_rotation;
+			sink.push_dict(BulletPatterns2D::helper_sample_outline_ellipse(helper_ellipse_radius_x, helper_ellipse_radius_y, rotation_abs, helper_ellipse_start_angle, helper_ellipse_arc, helper_ellipse_mode));
 			break;
+		}
 		case PATTERN_SHAPE_STAR:
 			sink.push_dict(BulletPatterns2D::helper_sample_outline_star(helper_star_points, helper_star_outer_radius, helper_star_inner_radius, helper_star_base_rotation), true);
 			break;

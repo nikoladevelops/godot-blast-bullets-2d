@@ -481,8 +481,10 @@ PatternSlots2D BulletPatterns2D::generate_ellipse2d(int transforms_amount, Trans
 	PackedVector2Array loop_points;
 	PackedVector2Array loop_normals;
 	const Vector2 origin = marker_transform.get_origin();
-	const real_t ellipse_cos = Math::cos(p.ellipse_rotation);
-	const real_t ellipse_sin = Math::sin(p.ellipse_rotation);
+	// The ellipse turns with the aim like Ring (rotate_with_marker), once.
+	const real_t total_rotation = p.ellipse_rotation + (p.rotate_with_marker ? marker_transform.get_rotation() : (real_t)0.0);
+	const real_t ellipse_cos = Math::cos(total_rotation);
+	const real_t ellipse_sin = Math::sin(total_rotation);
 	// WALL mode needs dense coverage to resolve gaps: map slots evenly over
 	// the arc, then drop the ones landing inside a gap. FULL closes the loop
 	// (divide by n, no duplicated seam bullet like the old n-1 divisor);
@@ -513,7 +515,7 @@ PatternSlots2D BulletPatterns2D::generate_ellipse2d(int transforms_amount, Trans
 		const Vector2 local_n = Vector2(ex / rx2, ey / ry2);
 		Vector2 normal = Vector2(local_n.x * ellipse_cos - local_n.y * ellipse_sin, local_n.x * ellipse_sin + local_n.y * ellipse_cos);
 		if (normal.length_squared() <= 0.0 || !normal.is_finite()) {
-			normal = Vector2(Math::cos(t + p.ellipse_rotation), Math::sin(t + p.ellipse_rotation));
+			normal = Vector2(Math::cos(t + total_rotation), Math::sin(t + total_rotation));
 		}
 		loop_normals.push_back(normal.normalized());
 	}
@@ -650,14 +652,14 @@ PatternSlots2D BulletPatterns2D::generate_lissajous2d(int transforms_amount, Tra
 	PATTERN_REJECT_IF(!Math::is_finite(p.size_x) || p.size_x < 0.0 || !Math::is_finite(p.size_y) || p.size_y < 0.0, "size_x and size_y must be finite and >= 0.");
 	PATTERN_REJECT_IF(!Math::is_finite(p.freq_x) || p.freq_x < 0.0 || !Math::is_finite(p.freq_y) || p.freq_y < 0.0, "freq_x and freq_y must be finite and >= 0.");
 	PATTERN_REJECT_IF(!Math::is_finite(p.phase) || !Math::is_finite(p.facing_offset_degrees), "phase and facing_offset_degrees must be finite.");
-	// Weave sweep plus center-radial outward normals (marker rotation when a
-	// sample lands exactly on the center); the shared outline worker
+	// Weave sweep plus center-radial outward normals (+x when a sample lands
+	// exactly on the center: the weave is world-fixed like the heart and the
+	// rose, so no facing may follow the aim); the shared outline worker
 	// assembles facings. Arc-even from a dense ideal sweep so dots sit
 	// exactly on the weave with even gaps.
 	PackedVector2Array dense_pts;
 	PackedVector2Array dense_nrms;
 	const Vector2 origin = marker_transform.get_origin();
-	const real_t marker_rot = marker_transform.get_rotation();
 	// Integer ratios with a shared factor g trace the curve g times per full
 	// turn (3:3 = 1:1 drawn three times): sweep one closure only. Some
 	// curves are also traced back and forth (1:1 at phase 0 is a line):
@@ -670,7 +672,7 @@ PatternSlots2D BulletPatterns2D::generate_lissajous2d(int transforms_amount, Tra
 		const real_t t = (real_t)(t0 + t_span * (double)k / (open_run ? 719.0 : 720.0));
 		const Vector2 offset = lissajous_point2d(p.size_x, p.size_y, p.freq_x, p.freq_y, p.phase, t);
 		dense_pts.push_back(offset);
-		dense_nrms.push_back((offset.length_squared() > 0.0) ? offset.normalized() : Vector2(Math::cos(marker_rot), Math::sin(marker_rot)));
+		dense_nrms.push_back((offset.length_squared() > 0.0) ? offset.normalized() : Vector2(1, 0));
 	}
 	const DenseLoop2D loop = dense_curve_loop2d(dense_pts, dense_nrms, PackedFloat32Array(), transforms_amount, !open_run, true, origin, p.outline.outline_placement);
 	return layout_outline_slots(caller, marker_transform, loop.points, loop.normals, false, 0.0, p.face_outward, p.facing_offset_degrees, PackedFloat32Array(), p.outline, CornerLayout2D::smooth(), PackedVector2Array(), !open_run, true, loop.fill_outline, dense_nrms);
@@ -682,23 +684,23 @@ PatternSlots2D BulletPatterns2D::generate_circle2d(int transforms_amount, Transf
 	PATTERN_REJECT_IF(p.outline.layer_layout < 0 || p.outline.layer_layout > 1, "layer_layout must be 0 (shared loop) or 1 (even per layer).");
 	PATTERN_REQUIRE(danmaku_validate_head(caller, transforms_amount, marker_transform));
 	PATTERN_REJECT_IF(!Math::is_finite(p.radius) || p.radius < 0.0 || !Math::is_finite(p.facing_offset_degrees), "radius must be finite and >= 0, facing_offset_degrees finite.");
-	// Marker-local loop plus radial outward normals. rot_add carries the
-	// historical double marker rotation (angle folds it in AND the facing
-	// adds it again); the shared outline worker preserves it exactly.
+	// Marker-local loop plus radial outward normals, unrotated: the outline
+	// worker turns the points (points_are_local) and the facing (rot_add)
+	// by the marker once, like the polygon builders.
 	PackedVector2Array loop_points;
 	PackedVector2Array loop_normals;
 	loop_points.resize(transforms_amount);
 	loop_normals.resize(transforms_amount);
 	const real_t marker_rot = marker_transform.get_rotation();
 	for (int i = 0; i < transforms_amount; ++i) {
-		const real_t angle = marker_rot + Math::TAU * (real_t)i / (real_t)transforms_amount;
+		const real_t angle = Math::TAU * (real_t)i / (real_t)transforms_amount;
 		loop_points[i] = Vector2(Math::cos(angle), Math::sin(angle)) * p.radius;
 		loop_normals[i] = Vector2(Math::cos(angle), Math::sin(angle));
 	}
 	PackedVector2Array fill_outline;
 	if (p.outline.outline_placement == OUTLINE_FILL_INSIDE) {
 		for (int q = 0; q < 256; ++q) {
-			const real_t angle = marker_rot + Math::TAU * (real_t)q / 256.0;
+			const real_t angle = Math::TAU * (real_t)q / 256.0;
 			fill_outline.push_back(Vector2(Math::cos(angle), Math::sin(angle)) * p.radius);
 		}
 	}

@@ -110,6 +110,7 @@ PATTERN_KNOB(int64_t, int, INT, helper_ellipse_gap_count, IN, 0, pattern_max_bul
 PATTERN_KNOB(double, double, FLOAT, helper_ellipse_gap_width, FINITE_GE, 0.0, 0, "must be finite and >= 0", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")
 PATTERN_KNOB(bool, bool, BOOL, helper_ellipse_face_outward, NONE, 0, 0, "", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")
 PATTERN_KNOB(double, double, FLOAT, helper_ellipse_facing_offset_deg, FINITE, 0, 0, "must be finite", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")
+PATTERN_KNOB(bool, bool, BOOL, helper_ellipse_rotate_with_marker, NONE, 0, 0, "", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")
 PATTERN_SUBGROUP("Rain", "helper_rain_")
 PATTERN_KNOB(double, double, FLOAT, helper_rain_band_width, FINITE_GE, 0.0, 0, "must be finite and >= 0", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")
 PATTERN_KNOB(const Vector2 &, Vector2, VECTOR2, helper_rain_direction, VEC_FINITE, 0, 0, "must be finite", VEC_NONZERO, 0, 0, "must be non-zero", false, PROPERTY_HINT_NONE, "")

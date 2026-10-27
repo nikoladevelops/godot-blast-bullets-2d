@@ -210,7 +210,8 @@ PATTERN_GENERATOR(flower, FlowerParams2D)
 	OPT(real_t, facing_offset_degrees, 0.0, facing_offset_degrees) \
 	PATTERN_OUTLINE_HEAD(REQ, OPT) \
 	OPT(int, layer_layout, 1, outline.layer_layout) \
-	PATTERN_OUTLINE_FILL_TAIL(REQ, OPT)
+	PATTERN_OUTLINE_FILL_TAIL(REQ, OPT) \
+	OPT(bool, rotate_with_marker, true, rotate_with_marker)
 
 PATTERN_GENERATOR(ellipse, EllipseParams2D)
 

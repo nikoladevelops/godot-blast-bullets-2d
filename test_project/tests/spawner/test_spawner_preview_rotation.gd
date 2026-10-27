@@ -85,3 +85,87 @@ func test_unrotated_layout_exact() -> void:
 		if q.is_finite():
 			nearest = minf(nearest, q.distance_to(Vector2(150, 100)))
 	assert_lt(nearest, 2.0, "axis corner on the track")
+
+
+const ROTATION_SHAPES := ["GRID", "RING", "FAN", "SPIRAL", "LINE", "FLOWER", "ELLIPSE", "RAIN", "STAR_POLYGON",
+	"MULTISPIRAL", "CROSS", "STAR", "HEART", "WAVE", "WATERFALL", "LATTICE", "ROSE", "COUNTER_SPIRAL", "LISSAJOUS",
+	"CIRCLE", "RECTANGLE", "SQUARE", "POLYGON", "TRIANGLE", "TRAPEZOID", "DIAMOND"]
+
+
+## Every helper either follows its aim ONCE (each bullet turns by the aim's
+## turn around the aim and faces that much more) or stays fixed in the world
+## (rain, heart, rose, lissajous: their own base rotation): nothing turns twice
+## or half-way. The Circle used to put bullet 0 at twice the aim's rotation,
+## facing twice as far, the Ellipse ignored the aim, and the Lissajous bullet
+## on the center took its facing from the aim. An odd count and an uneven
+## angle keep a symmetric ring from hiding it.
+func test_every_helper_turns_with_its_aim_once_or_not_at_all() -> void:
+	var turn := 0.7
+	var problems: Array = []
+	var followers: Array = []
+	for shape in ROTATION_SHAPES:
+		var source: int = ClassDB.class_get_integer_constant("PatternSpawner2D", "PATTERN_FROM_HELPER_" + shape)
+		var sp := make_spawner(null, source, 7)
+		sp.position = Vector2(300, 200)
+		if "helper_%s_seed" % shape.to_lower() in sp:
+			sp.set("helper_%s_seed" % shape.to_lower(), 7) # deterministic jitter
+		var flat: Array = sp.collect_spawn_transforms()
+		var aim0: Transform2D = sp.global_transform
+		sp.rotation = turn
+		var turned: Array = sp.collect_spawn_transforms()
+		var aim1: Transform2D = sp.global_transform
+		var follows := flat.size() == turned.size() and not flat.is_empty()
+		var fixed := follows
+		for i in flat.size():
+			var expected: Transform2D = aim1 * aim0.affine_inverse() * (flat[i] as Transform2D)
+			var got: Transform2D = turned[i]
+			if got.origin.distance_to(expected.origin) > 0.05 or absf(angle_difference(got.get_rotation(), expected.get_rotation())) > 0.001:
+				follows = false
+			if got.origin.distance_to((flat[i] as Transform2D).origin) > 0.05 or absf(angle_difference(got.get_rotation(), (flat[i] as Transform2D).get_rotation())) > 0.001:
+				fixed = false
+		if follows:
+			followers.append(shape)
+		elif not fixed:
+			problems.append("%s neither follows its aim once nor stays fixed" % shape)
+		sp.free()
+	assert_eq("\n".join(problems), "", "no helper turns twice or half-way")
+	assert_has(followers, "CIRCLE", "the Circle follows its aim once")
+	assert_has(followers, "ELLIPSE", "the Ellipse follows its aim once")
+	assert_has(followers, "RING", "Ring follows its aim")
+
+
+func test_ellipse_stays_world_fixed_with_rotate_with_marker_off() -> void:
+	var sp := make_spawner(null, BulletSpawner2D.PATTERN_FROM_HELPER_ELLIPSE, 7)
+	sp.helper_ellipse_rotate_with_marker = false
+	sp.helper_ellipse_rotation = 0.3
+	var flat: Array = sp.collect_spawn_transforms()
+	sp.rotation = 1.1
+	var turned: Array = sp.collect_spawn_transforms()
+	for i in flat.size():
+		assert_almost_eq((turned[i] as Transform2D).origin, (flat[i] as Transform2D).origin, Vector2(0.05, 0.05), "bullet %d stays put" % i)
+	sp.rotation = 0.0
+	sp.helper_ellipse_rotate_with_marker = true
+	sp.helper_ellipse_rotation = 0.0
+	var aligned: Array = sp.collect_spawn_transforms()
+	sp.helper_ellipse_rotation = 0.3
+	var by_knob: Array = sp.collect_spawn_transforms()
+	sp.helper_ellipse_rotation = 0.0
+	sp.rotation = 0.3
+	var by_aim: Array = sp.collect_spawn_transforms()
+	for i in aligned.size():
+		assert_almost_eq((by_aim[i] as Transform2D).origin, (by_knob[i] as Transform2D).origin, Vector2(0.05, 0.05), "the aim adds to ellipse_rotation, bullet %d" % i)
+
+
+func test_circle_and_ellipse_reuse_their_bake_on_a_turning_aim() -> void:
+	for source in [BulletSpawner2D.PATTERN_FROM_HELPER_CIRCLE, BulletSpawner2D.PATTERN_FROM_HELPER_ELLIPSE]:
+		var sp := make_spawner(null, source, 16)
+		sp.collect_spawn_transforms()
+		var info: Dictionary = sp.debug_get_pattern_cache_info()
+		assert_eq(int(info["shot_class"]), 2, "source %d is classified RIGID (2)" % source)
+		var hits0: int = info["hits"]
+		for k in 5:
+			sp.rotation = 0.37 * (k + 1)
+			sp.collect_spawn_transforms()
+		info = sp.debug_get_pattern_cache_info()
+		assert_eq(int(info["hits"]) - hits0, 5, "source %d: every turned shot is served from the bake" % source)
+		sp.free()

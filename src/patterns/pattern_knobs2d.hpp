@@ -130,6 +130,7 @@ struct PatternKnobs2D {
 	double helper_ellipse_gap_width = 0.3;
 	bool helper_ellipse_face_outward = true;
 	double helper_ellipse_facing_offset_deg = 0.0;
+	bool helper_ellipse_rotate_with_marker = true;
 
 	// RAIN (curtain band of descending bullets).
 	double helper_rain_band_width = 600.0;
