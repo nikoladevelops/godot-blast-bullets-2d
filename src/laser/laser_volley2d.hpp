@@ -99,6 +99,9 @@ public:
 		bool spent = false;
 		int pierced_total = 0; // distinct targets it started piercing this life
 		int bounces_left = 0;
+		// Bolts and curvy heads: the shot's inherited velocity (px/s), taken
+		// at launch and bounced with the head at every reflection.
+		Vector2 drift;
 		double wave_clock = 0.0;
 		std::vector<Vector2> trail;
 	};
@@ -130,6 +133,10 @@ public:
 	double get_phase_time() const { return phase_time; }
 	Ref<LaserData2D> get_laser_data() const { return data; }
 	int get_life_id() const { return (int)life_id; }
+	// What the shot handed to this laser (its spawner's motion times the
+	// inherit factor, or an emitter bullet's velocity): bolts and curvy heads
+	// drift with it, beams ignore it.
+	Vector2 get_inherited_velocity() const { return inherited_velocity; }
 	bool is_laser_active() const { return active; }
 	bool is_pooled() const { return pooled; }
 	Object *get_owner_spawner() const;
@@ -201,7 +208,7 @@ public:
 	// `anchor_id` (0 = none) from `anchor_frame`. No user code.
 	// anchor_frame_pending: the anchor is outside the tree (no frame yet),
 	// the slots are global poses until it enters.
-	void begin_life(BulletFactory2D *factory, const Ref<LaserData2D> &data, const Transform2D *slots, int count, uint64_t owner_id, uint64_t anchor_id, const Transform2D &anchor_frame, const Vector2 &anchor_offset = Vector2(), bool anchor_frame_pending = false);
+	void begin_life(BulletFactory2D *factory, const Ref<LaserData2D> &data, const Transform2D *slots, int count, uint64_t owner_id, uint64_t anchor_id, const Transform2D &anchor_frame, const Vector2 &anchor_offset = Vector2(), bool anchor_frame_pending = false, const Vector2 &inherited_velocity = Vector2());
 	// Drops everything a life brought (targets, owner, contacts, looks).
 	void release_life();
 	// One factory step. Signals run live inside (user code): the laser
@@ -348,6 +355,7 @@ private:
 	// The laser-wide events of this life: On Charge announced once, and
 	// whether end_laser cut it short (On Ended Early instead of On Finish).
 	bool charge_announced = false;
+	Vector2 inherited_velocity;
 	bool ended_early = false;
 	// Physics queries (one shape, reused every tick).
 	RID query_shape;

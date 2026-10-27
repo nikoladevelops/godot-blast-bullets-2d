@@ -830,7 +830,7 @@
 			Snake row width in pixels. Must be finite and 0 or more.
 		</member>
 		<member name="inherit_movement_velocity" type="bool" setter="set_inherit_movement_velocity" getter="get_inherit_movement_velocity" default="false">
-			Bullets fired while the spawner moves inherit its movement velocity ([method get_movement_velocity] x [member movement_velocity_inherit_factor]), so a moving turret's shots carry its momentum for their whole life. Homing bullets aim through that momentum (they cancel it across the line of sight), but only while their own speed is larger than the sideways part of the inherited velocity: lower the factor for slow homing bullets. Off by default.
+			Bolts and curvy lasers fired while the spawner moves inherit its movement velocity ([method get_movement_velocity] x [member movement_velocity_inherit_factor]): their heads drift with it for their whole flight (bounced with the head at every reflection; [method LaserVolley2D.get_inherited_velocity]), so a moving turret's bolts carry its momentum. Beams stay on their muzzles ([member LaserData2D.follow_spawner]) and ignore it. Off by default.
 		</member>
 		<member name="laser_data" type="LaserData2D" setter="set_laser_data" getter="get_laser_data">
 			What a shot fires (see [LaserData2D]). Edits reach the lasers that are firing; the preview beams follow its [member LaserData2D.length]. A new resource only changes the next shots: the lasers in flight keep theirs (a Track / Lock On laser keeps following the Laser Targeting group, the mouse every frame and the retarget interval included).

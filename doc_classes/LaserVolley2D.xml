@@ -134,6 +134,12 @@
 				Returns the zones this laser grazes with.
 			</description>
 		</method>
+		<method name="get_inherited_velocity" qualifiers="const">
+			<return type="Vector2" />
+			<description>
+				The velocity this laser's shot handed to it (px/s): its [LaserSpawner2D]'s movement velocity times [member LaserSpawner2D.movement_velocity_inherit_factor] while [member LaserSpawner2D.inherit_movement_velocity] is on, or the emitting bullet's velocity for an emitter shot; zero for [method BulletFactory2D.spawn_laser] and on a pooled laser. Bolt and curvy heads drift with it (each bounces its own copy at reflections); beams ignore it.
+			</description>
+		</method>
 		<method name="get_laser_data" qualifiers="const">
 			<return type="LaserData2D" />
 			<description>

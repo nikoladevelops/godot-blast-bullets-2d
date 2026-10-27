@@ -7,7 +7,8 @@ extends BlastTest
 ## targets; leaving the despawn bounds spends it (one laser_despawned per
 ## head, on the owner spawner or the factory; ignore_despawn_bounds flies on).
 ## A spent beam is never drawn or hit again, and the laser finishes when every
-## beam is spent.
+## beam is spent. A head drifts with the velocity its shot inherited (a moving
+## spawner with inherit_movement_velocity), bouncing it at reflections.
 
 const DT := 0.0625
 
@@ -201,3 +202,105 @@ func test_charging_shows_the_path_from_the_muzzle() -> void:
 	assert_true(state[0]["warning"], "a warning while charging")
 	assert_eq((state[0]["points"] as PackedVector2Array)[0], Vector2(10, 10), "from the muzzle")
 	assert_almost_eq(l.get_beam_end(0).x, 90.0, 0.01, "along its path, length long")
+
+
+## A laser spawner riding a straight 300 px path in 1 s (300 px/s along +y).
+func _moving_spawner(data: LaserData2D, inherit: bool, factor := 1.0) -> LaserSpawner2D:
+	var p := Path2D.new()
+	var c := Curve2D.new()
+	c.add_point(Vector2(0, 0))
+	c.add_point(Vector2(0, 300))
+	p.curve = c
+	add(p)
+	var sp := LaserSpawner2D.new()
+	sp.set_shooting_enabled(false)
+	sp.laser_data = data
+	sp.pattern_source = LaserSpawner2D.PATTERN_FROM_HELPER_CUSTOM
+	sp.helper_custom_transforms = [Transform2D(0.0, Vector2.ZERO)]
+	sp.movement_transition = 0
+	sp.movement_ease = 0
+	sp.movement_duration_sec = 1.0
+	sp.inherit_movement_velocity = inherit
+	sp.movement_velocity_inherit_factor = factor
+	add(sp)
+	sp.set_bullet_factory(factory)
+	sp.set_movement_path_node(p)
+	sp.movement_enabled = true
+	return sp
+
+
+func _shoot(sp: LaserSpawner2D) -> LaserVolley2D:
+	var got: Array = []
+	sp.laser_fired.connect(func(l: LaserVolley2D, _n: int) -> void: got.append(l), CONNECT_ONE_SHOT)
+	assert_true(sp.shoot_once(), "fires")
+	return got[0]
+
+
+func test_a_bolt_inherits_its_moving_spawners_velocity() -> void:
+	var d := _bolt()
+	d.follow_spawner = false
+	var sp := _moving_spawner(d, true, 0.5)
+	await idle(10) # moving at 300 px/s
+	var l := _shoot(sp)
+	var inherited: Vector2 = l.get_inherited_velocity()
+	assert_almost_eq(inherited, sp.get_movement_velocity() * 0.5, Vector2(0.001, 0.001), "the spawner's velocity times the factor")
+	assert_almost_eq(inherited.y, 150.0, 8.0, "about 150 px/s along +y")
+	# Every tick the head moves by (speed along its heading + the drift) dt.
+	_step(1)
+	var before: Vector2 = l.get_beam_end(0)
+	_step(1)
+	assert_almost_eq(l.get_beam_end(0) - before, (Vector2(1600, 0) + inherited) * DT, Vector2(0.001, 0.001), "heading x speed + the inherited drift")
+	l.end_laser(false)
+	_step(1)
+	assert_true(l.is_pooled(), "pooled")
+	assert_eq(l.get_inherited_velocity(), Vector2.ZERO, "a pooled laser keeps no drift")
+
+
+func test_without_inheritance_or_for_beams_nothing_drifts() -> void:
+	var d := _bolt()
+	d.follow_spawner = false
+	var sp := _moving_spawner(d, false)
+	await idle(10)
+	var l := _shoot(sp)
+	assert_eq(l.get_inherited_velocity(), Vector2.ZERO, "off: no drift")
+	_step(1)
+	var before: Vector2 = l.get_beam_end(0)
+	_step(1)
+	assert_almost_eq(l.get_beam_end(0) - before, Vector2(100, 0), Vector2(0.001, 0.001), "speed alone")
+	l.end_laser(false)
+	_step(1)
+	var factory_bolt := _fire(_bolt())
+	assert_same(factory_bolt, l, "the pooled laser is reused")
+	assert_eq(factory_bolt.get_inherited_velocity(), Vector2.ZERO, "a reused laser drops the old drift")
+	factory_bolt.end_laser(false)
+	var beam_data := H.make_laser(0.0, 0.0, 0.0, 0.0, 200.0)
+	beam_data.follow_spawner = false
+	var beam_spawner := _moving_spawner(beam_data, true)
+	await idle(10)
+	var beam := _shoot(beam_spawner)
+	var muzzle: Vector2 = beam.get_beam_start(0)
+	_step(3)
+	assert_almost_eq(beam.get_beam_start(0), muzzle, Vector2(0.001, 0.001), "a beam stays on its muzzle (the drift is for heads)")
+
+
+func test_a_reflected_head_bounces_its_drift_too() -> void:
+	make_wall(Vector2(250, 0), Vector2(20, 2000), 16)
+	await idle(2)
+	var d := _bolt()
+	d.follow_spawner = false
+	d.wall_mask = 16
+	d.reflections = 1
+	d.speed = 800.0 # 50 px per tick
+	var sp := _moving_spawner(d, true)
+	await idle(10)
+	var l := _shoot(sp)
+	var drift: Vector2 = l.get_inherited_velocity()
+	assert_gt(drift.y, 200.0, "drifting along +y")
+	for i in 12:
+		_step(1)
+	# Past the wall's face (x 240) the head flies back: -x speed, the x part of
+	# the drift (0) mirrored, the y part kept.
+	var before: Vector2 = l.get_beam_end(0)
+	_step(1)
+	assert_almost_eq(l.get_beam_end(0) - before, (Vector2(-800, 0) + Vector2(-drift.x, drift.y)) * DT, Vector2(0.01, 0.01), "the drift reflects with the head")
+	assert_lt(l.get_beam_end(0).x, 240.0, "back on its side of the wall")

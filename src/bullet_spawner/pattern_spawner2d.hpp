@@ -1318,6 +1318,11 @@ protected:
 	Transform2D shot_pose;
 	double shot_pose_extra_spin_deg = 0.0;
 	Vector2 shot_pose_velocity;
+	// The velocity a shot hands to what it fires: a shoot_from shot's own
+	// (an emitter: its bullet's), else the spawner's movement velocity times
+	// movement_velocity_inherit_factor while inherit_movement_velocity is on
+	// and it moves; zero otherwise (or when not finite).
+	Vector2 shot_inherited_velocity() const;
 	// Countdown to the next volley; volleys fired since (re)arming.
 	double shoot_time_left = 0.0;
 	// Cuts the running wait to the longest the timing settings can roll now.

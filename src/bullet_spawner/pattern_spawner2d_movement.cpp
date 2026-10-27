@@ -581,4 +581,15 @@ int PatternSpawner2D::get_movement_leg() const { return movement_legs_completed;
 
 Vector2 PatternSpawner2D::get_movement_velocity() const { return movement_velocity; }
 
+Vector2 PatternSpawner2D::shot_inherited_velocity() const {
+	Vector2 inherited_velocity = shot_pose_active ? shot_pose_velocity : Vector2();
+	if (!shot_pose_active && inherit_movement_velocity && movement_enabled) {
+		inherited_velocity = movement_velocity * (real_t)movement_velocity_inherit_factor;
+		if (!inherited_velocity.is_finite()) {
+			inherited_velocity = Vector2();
+		}
+	}
+	return inherited_velocity;
+}
+
 } // namespace BlastBullets2D

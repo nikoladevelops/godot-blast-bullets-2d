@@ -315,6 +315,7 @@ void LaserVolley2D::step_head(Beam &b, double delta) {
 		b.trail.push_back(b.head);
 		b.blocked = false;
 		b.impacts.clear();
+		b.drift = inherited_velocity;
 	}
 	if (b.spent) {
 		return;
@@ -339,7 +340,7 @@ void LaserVolley2D::step_head(Beam &b, double delta) {
 			// The lateral velocity of A sin(wt) is A w cos(wt): turn the move by it.
 			move_angle += (real_t)Math::atan2(d->wave_amplitude * omega * Math::cos(omega * b.wave_clock), d->speed);
 		}
-		const Vector2 move = dir_of(move_angle) * (real_t)(d->speed * delta);
+		const Vector2 move = dir_of(move_angle) * (real_t)(d->speed * delta) + b.drift * (real_t)delta;
 		Vector2 to = b.head + move;
 		if (!to.is_finite()) {
 			to = b.head;
@@ -374,6 +375,7 @@ void LaserVolley2D::step_head(Beam &b, double delta) {
 							--b.bounces_left;
 							const Vector2 h = dir_of(b.heading);
 							b.heading = (real_t)(h - n * ((real_t)2.0 * (h.x * n.x + h.y * n.y))).angle();
+							b.drift -= n * ((real_t)2.0 * (b.drift.x * n.x + b.drift.y * n.y)); // the drift bounces too
 							to = q + dir_of(b.heading) * (real_t)0.01;
 						} else {
 							b.pinned = true;

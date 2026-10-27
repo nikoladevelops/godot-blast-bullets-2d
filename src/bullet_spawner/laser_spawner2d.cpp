@@ -436,7 +436,7 @@ ShotResult2D LaserSpawner2D::fire_shot(std::vector<Transform2D> &transforms) {
 	const uint64_t self_id = get_instance_id();
 	const uint64_t anchor = shot_pose_active ? 0 : self_id;
 	const Transform2D frame = get_shot_frame();
-	LaserVolley2D *laser = factory->spawn_laser_span(laser_data, transforms.data(), (int)transforms.size(), self_id, anchor, frame, "LaserSpawner2D::shoot_once", offset);
+	LaserVolley2D *laser = factory->spawn_laser_span(laser_data, transforms.data(), (int)transforms.size(), self_id, anchor, frame, "LaserSpawner2D::shoot_once", offset, false, shot_inherited_velocity());
 	if (laser == nullptr) {
 		result.refusal = ShotRefusal2D::refuse(String(), StringName("factory_refused"), true);
 		return result;

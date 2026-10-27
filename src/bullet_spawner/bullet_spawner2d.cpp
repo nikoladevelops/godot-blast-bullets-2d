@@ -271,13 +271,7 @@ ShotResult2D BulletSpawner2D::fire_shot(std::vector<Transform2D> &transforms) {
 	// turret's momentum). Zero unless inherit_movement_velocity is on.
 	// A shoot_from shot inherits what its caller passed (an emitter: its
 	// bullet's velocity), never the spawner's own motion.
-	Vector2 inherited_velocity = shot_pose_active ? shot_pose_velocity : Vector2();
-	if (!shot_pose_active && inherit_movement_velocity && movement_enabled) {
-		inherited_velocity = movement_velocity * (real_t)movement_velocity_inherit_factor;
-		if (!inherited_velocity.is_finite()) {
-			inherited_velocity = Vector2();
-		}
-	}
+	const Vector2 inherited_velocity = shot_inherited_velocity();
 	// The collect ran the aimed target's get_velocity (user code), which
 	// may have freed the factory: look it up again.
 	factory = get_bullet_factory();
