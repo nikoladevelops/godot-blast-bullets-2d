@@ -6,6 +6,7 @@
 #include "laser/laser_volley2d.hpp"
 #include "core/live_object2d.hpp"
 #include "laser/laser_geometry2d.hpp"
+#include "targets/bullet_targets2d.hpp"
 
 #include "bullet_spawner/laser_spawner2d.hpp"
 #include "bullet_spawner/pattern_spawner2d.hpp"
@@ -248,6 +249,9 @@ void LaserVolley2D::release_life() {
 	signals_to_factory = false;
 	inherited_velocity = Vector2();
 	own_time_scale = 1.0;
+	track_detector.reset();
+	track_interval = 0.0;
+	track_time_left = 0.0;
 	anchor_id = 0;
 	following = false;
 	anchor_frame_pending = false;
@@ -317,11 +321,16 @@ void LaserVolley2D::graze_arm(const Array &zones, const std::shared_ptr<GrazeDet
 	graze_state.assign(beams.size() * graze_zones.size(), GrazeState());
 }
 
-bool LaserVolley2D::graze_set_zones(const Array &zones, const StringName &target_group) {
+bool LaserVolley2D::graze_set_zones(const Array &zones, const Variant &target_group) {
 	if (reject_stale_handle("graze_set_zones")) {
 		return false;
 	}
-	if (target_group.is_empty()) {
+	StringName group;
+	std::shared_ptr<GrazeDetector2D> detector;
+	if (!read_targets_argument2d(target_group, "graze_set_zones", "target_group", group, detector)) {
+		return false;
+	}
+	if (detector == nullptr && group.is_empty()) {
 		UtilityFunctions::push_error("graze_set_zones: target_group is empty (name the group whose nodes graze this laser), nothing changed.");
 		return false;
 	}
@@ -338,8 +347,8 @@ bool LaserVolley2D::graze_set_zones(const Array &zones, const StringName &target
 		UtilityFunctions::push_error("graze_set_zones: zones holds no GrazeZone2D, nothing changed.");
 		return false;
 	}
-	graze_arm(zones, nullptr);
-	graze_target_group = target_group;
+	graze_arm(zones, detector);
+	graze_target_group = detector == nullptr ? group : StringName();
 	return true;
 }
 
@@ -362,7 +371,7 @@ Array LaserVolley2D::get_graze_zones() const {
 	return out;
 }
 
-bool LaserVolley2D::sound_set_effects(const Array &effects, const StringName &listener_group) {
+bool LaserVolley2D::sound_set_effects(const Array &effects, const Variant &listener_group) {
 	if (reject_stale_handle("sound_set_effects")) {
 		return false;
 	}
@@ -374,8 +383,13 @@ bool LaserVolley2D::sound_set_effects(const Array &effects, const StringName &li
 			return false;
 		}
 	}
-	sound_arm(effects, nullptr, 0.0f);
-	sound_listener_group = listener_group;
+	StringName group;
+	std::shared_ptr<GrazeDetector2D> detector;
+	if (!read_targets_argument2d(listener_group, "sound_set_effects", "listener_group", group, detector)) {
+		return false;
+	}
+	sound_arm(effects, detector, 0.0f);
+	sound_listener_group = group;
 	return true;
 }
 
@@ -552,6 +566,29 @@ LaserSpawner2D *LaserVolley2D::get_owner_spawner() const {
 	}
 	LaserSpawner2D *spawner = Object::cast_to<LaserSpawner2D>(ObjectDB::get_instance(ObjectID(owner_spawner_id)));
 	return spawner != nullptr && !spawner->is_queued_for_deletion() ? spawner : nullptr;
+}
+
+bool LaserVolley2D::track(const Variant &targets, double retarget_interval) {
+	if (reject_stale_handle("track")) {
+		return false;
+	}
+	if (!Math::is_finite(retarget_interval) || retarget_interval < 0.0) {
+		UtilityFunctions::push_error("track: retarget_interval must be finite and >= 0 (0 picks every tick), nothing changed.");
+		return false;
+	}
+	if (targets.get_type() == Variant::NIL) {
+		track_detector.reset();
+		return true;
+	}
+	const BulletTargets2D *handle = live_object2d<BulletTargets2D>(targets);
+	if (handle == nullptr) {
+		UtilityFunctions::push_error("track: targets must be a BulletTargets2D or null, nothing changed.");
+		return false;
+	}
+	track_detector = handle->get_detector();
+	track_interval = retarget_interval;
+	track_time_left = 0.0; // the next tick picks
+	return true;
 }
 
 bool LaserVolley2D::detach_from_spawner() {
@@ -978,6 +1015,8 @@ void LaserVolley2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("is_pooled"), &LaserVolley2D::is_pooled);
 	ClassDB::bind_method(D_METHOD("get_owner_spawner"), &LaserVolley2D::get_owner_spawner);
 	ClassDB::bind_method(D_METHOD("detach_from_spawner"), &LaserVolley2D::detach_from_spawner);
+	ClassDB::bind_method(D_METHOD("track", "targets", "retarget_interval"), &LaserVolley2D::track, DEFVAL(0.0));
+	ClassDB::bind_method(D_METHOD("is_tracking"), &LaserVolley2D::is_tracking);
 	ClassDB::bind_method(D_METHOD("get_beam_start", "beam_index"), &LaserVolley2D::get_beam_start);
 	ClassDB::bind_method(D_METHOD("get_beam_end", "beam_index"), &LaserVolley2D::get_beam_end);
 	ClassDB::bind_method(D_METHOD("get_beam_points", "beam_index"), &LaserVolley2D::get_beam_points);
@@ -1011,7 +1050,7 @@ void LaserVolley2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_graze_zones"), &LaserVolley2D::get_graze_zones);
 	ClassDB::bind_method(D_METHOD("is_graze_armed"), &LaserVolley2D::is_graze_armed);
 	ClassDB::bind_method(D_METHOD("is_sound_armed"), &LaserVolley2D::is_sound_armed);
-	ClassDB::bind_method(D_METHOD("sound_set_effects", "effects", "listener_group"), &LaserVolley2D::sound_set_effects, DEFVAL(StringName()));
+	ClassDB::bind_method(D_METHOD("sound_set_effects", "effects", "listener_group"), &LaserVolley2D::sound_set_effects, DEFVAL(Variant()));
 
 	BIND_ENUM_CONSTANT(PHASE_CHARGING);
 	BIND_ENUM_CONSTANT(PHASE_GROWING);

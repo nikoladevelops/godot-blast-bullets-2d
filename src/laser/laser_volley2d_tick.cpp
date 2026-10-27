@@ -712,6 +712,35 @@ bool LaserVolley2D::update_contacts(int beam_index, uint64_t self_id, uint32_t l
 
 // ---- Graze and sound ----------------------------------------------------------------------
 
+void LaserVolley2D::retarget_tracked(double delta) {
+	track_time_left -= delta;
+	if (track_time_left > 0.0 || factory == nullptr || !factory->graze_lists_usable()) {
+		return;
+	}
+	track_time_left = track_interval;
+	// No user code here: the lists are re-validated plain data.
+	const GrazeTargetList2D *list = track_detector->list(*factory);
+	for (int i = 0; i < (int)beams.size(); ++i) {
+		const Vector2 muzzle = beams[i].points.empty() ? beams[i].muzzle : beams[i].points.front();
+		int best = -1;
+		real_t best_d = Math::INF;
+		for (int k = 0; list != nullptr && k < list->count(); ++k) {
+			const real_t d = muzzle.distance_squared_to(list->targets[k].position);
+			// The first candidate always beats none (an overflowed INF distance too).
+			if (best < 0 || d < best_d) {
+				best = k;
+				best_d = d;
+			}
+		}
+		Variant target;
+		if (best >= 0) {
+			const GrazeTarget2D &found = list->targets[best];
+			target = graze_is_point_target2d(found.id) ? Variant(found.position) : Variant(ObjectDB::get_instance(ObjectID(found.id)));
+		}
+		set_beam_target(i, target);
+	}
+}
+
 void LaserVolley2D::append_debug_boxes(std::vector<LaserDebugBox2D> &r_boxes) const {
 	if (!active || data.is_null() || !hitting_phase()) {
 		return;
@@ -984,6 +1013,9 @@ void LaserVolley2D::tick(double delta) {
 	last_tick_delta = delta;
 	if (!announce_pending_phase(self_id, life)) {
 		return;
+	}
+	if (track_detector != nullptr) {
+		retarget_tracked(delta);
 	}
 	if (phase != PHASE_FINISHED && !advance_phases(delta)) {
 		return;

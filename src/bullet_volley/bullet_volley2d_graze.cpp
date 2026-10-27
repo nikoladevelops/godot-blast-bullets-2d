@@ -7,6 +7,7 @@
 #include "bullet_volley/bullet_volley2d_internal.hpp"
 #include "core/emit_on2d.hpp"
 #include "core/live_object2d.hpp"
+#include "targets/bullet_targets2d.hpp"
 
 using namespace godot;
 
@@ -34,7 +35,7 @@ bool BulletVolley2D::graze_collect_zones(const Array &zones, Ref<GrazeZone2D> *r
 	return true;
 }
 
-bool BulletVolley2D::graze_set_zones(const Array &zones, const StringName &target_group) {
+bool BulletVolley2D::graze_set_zones(const Array &zones, const Variant &target_group) {
 	if (reject_pooled_handle("graze_set_zones")) {
 		return false;
 	}
@@ -43,11 +44,18 @@ bool BulletVolley2D::graze_set_zones(const Array &zones, const StringName &targe
 	if (!graze_collect_zones(zones, armed, slots)) {
 		return false;
 	}
-	if (target_group.is_empty()) {
+	// A group name (the factory's lists) or a BulletTargets2D (its detector,
+	// shared: its edits reach these bullets in flight).
+	StringName group;
+	std::shared_ptr<GrazeDetector2D> detector;
+	if (!read_targets_argument2d(target_group, "graze_set_zones", "target_group", group, detector)) {
+		return false;
+	}
+	if (detector == nullptr && group.is_empty()) {
 		UtilityFunctions::push_error("graze_set_zones: target_group is empty (name the group whose nodes graze these bullets), nothing changed.");
 		return false;
 	}
-	graze_arm(armed, slots, nullptr, target_group);
+	graze_arm(armed, slots, detector, group);
 	return true;
 }
 

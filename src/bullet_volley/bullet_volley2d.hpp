@@ -2794,7 +2794,7 @@ public:
 	// Refused on a pooled handle or an empty group; nothing changes on an
 	// error. Spawner volleys are armed by their spawner instead
 	// (graze_arm_from_spawner: its Graze group finds the targets).
-	bool graze_set_zones(const Array &zones, const StringName &target_group);
+	bool graze_set_zones(const Array &zones, const Variant &target_group);
 	// C++ only: zones (already validated by the spawner's setter) found by
 	// the spawner's detector, shared with every volley it armed.
 	bool graze_arm_from_spawner(const Array &zones, const std::shared_ptr<GrazeDetector2D> &detector);
@@ -2991,7 +2991,7 @@ public:
 	// armed by their spawner (sound_arm_from_spawner: its Sound group finds
 	// the listeners, shared like graze). On Shot / On Telegraph entries are
 	// spawner-only: a factory volley never fires them.
-	bool sound_set_effects(const Array &effects, const StringName &listener_group = StringName());
+	bool sound_set_effects(const Array &effects, const Variant &listener_group = Variant());
 	// C++ only: entries (already validated by the spawner's setter) found by
 	// the spawner's listener detector, shared with every volley it armed,
 	// plus the spawner's volume offset added to every entry.

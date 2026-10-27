@@ -159,6 +159,13 @@ public:
 	void collect_now(SceneTree *tree, const World2D *world, const CanvasItem *mouse_space, std::vector<GrazeTarget2D> &r_targets);
 
 	int get_list_count() const { return (int)lists.size(); }
+	// A detector without a spawner (BulletTargets2D) names its Node Path and
+	// Node Children nodes directly (no path to resolve): 0 = none.
+	void set_fixed_nodes(uint64_t target_id, uint64_t parent_id) {
+		path_target_id = target_id;
+		children_parent_id = parent_id;
+		mark_due();
+	}
 	// Debug counters: scans run by this detector, detectors alive.
 	uint64_t scans = 0;
 	static int64_t live_count;

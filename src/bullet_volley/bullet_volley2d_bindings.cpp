@@ -735,7 +735,7 @@ void BulletVolley2D::_bind_methods() {
 
 	// Sound (bullet_volley2d_sound.cpp): trigger entries armed per life, fired
 	// through the factory's SoundMixer2D.
-	ClassDB::bind_method(D_METHOD("sound_set_effects", "effects", "listener_group"), &BulletVolley2D::sound_set_effects, DEFVAL(StringName()));
+	ClassDB::bind_method(D_METHOD("sound_set_effects", "effects", "listener_group"), &BulletVolley2D::sound_set_effects, DEFVAL(Variant()));
 	ClassDB::bind_method(D_METHOD("sound_get_effects"), &BulletVolley2D::sound_get_effects);
 	ClassDB::bind_method(D_METHOD("sound_get_listener_group"), &BulletVolley2D::sound_get_listener_group);
 	ClassDB::bind_method(D_METHOD("is_sound_armed"), &BulletVolley2D::is_sound_armed);

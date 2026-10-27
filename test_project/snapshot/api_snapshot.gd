@@ -16,7 +16,7 @@ const PLUGIN_CLASSES: Array[StringName] = [
 	&"BulletWobbleData2D", &"VolleyPoolKey2D", &"BulletAttachment2D", &"BulletPatterns2D",
 	&"BulletFactory2D", &"BulletVolleyDebugger2D", &"BulletVolleyData2D", &"BulletVolley2D",
 	&"BulletSpawner2D", &"PatternPreviewLayer2D", &"GrazeZone2D", &"GrazePreviewLayer2D",
-	&"BulletSoundData2D", &"LaserSoundData2D", &"LaserSpriteLook2D", &"LaserEffectData2D", &"BulletPickupData2D", &"DespawnBoundsPreviewLayer2D", &"BulletFlock2D",
+	&"BulletSoundData2D", &"LaserSoundData2D", &"LaserSpriteLook2D", &"LaserEffectData2D", &"BulletTargets2D", &"BulletPickupData2D", &"DespawnBoundsPreviewLayer2D", &"BulletFlock2D",
 	&"BulletSplitStage2D", &"BulletSplitData2D", &"BulletEmitterData2D", &"LaserData2D", &"LaserVolley2D", &"LaserSpawner2D",
 ]
 const AMOUNTS := [-1, 0, 1, 2, 7, 24, 10001]

@@ -5,6 +5,7 @@
 
 #include "bullet_volley/bullet_volley2d_internal.hpp"
 #include "core/live_object2d.hpp"
+#include "targets/bullet_targets2d.hpp"
 
 using namespace godot;
 
@@ -33,7 +34,7 @@ static bool sound_collect_entries(const Array &effects, std::vector<Ref<BulletSo
 	return true;
 }
 
-bool BulletVolley2D::sound_set_effects(const Array &effects, const StringName &listener_group) {
+bool BulletVolley2D::sound_set_effects(const Array &effects, const Variant &listener_group) {
 	if (reject_pooled_handle("sound_set_effects")) {
 		return false;
 	}
@@ -42,11 +43,18 @@ bool BulletVolley2D::sound_set_effects(const Array &effects, const StringName &l
 	if (!sound_collect_entries(effects, entries, mask, "sound_set_effects")) {
 		return false;
 	}
+	// A group name (empty: Godot's listener) or a BulletTargets2D.
+	StringName group;
+	std::shared_ptr<GrazeDetector2D> detector;
+	if (!read_targets_argument2d(listener_group, "sound_set_effects", "listener_group", group, detector)) {
+		return false;
+	}
 	sound_release();
 	sound_effects = entries;
 	sound_trigger_mask = mask;
 	sound_mask_epoch = BulletSoundData2D::mask_epoch;
-	sound_listener_group = listener_group;
+	sound_listener_group = group;
+	sound_detector = detector;
 	++split_arming_serial;
 	return true;
 }

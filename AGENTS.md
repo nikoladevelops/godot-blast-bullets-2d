@@ -1832,6 +1832,16 @@ A flying bullet fires a template spawner's whole pattern (any
 
 ## 29. Runtime control, colors, per-bullet lifetimes, scale-in, interpolation
 
+- Code API without a spawner (`integration/test_code_api_parity.gd`): `BulletTargets2D`
+  (`targets/bullet_targets2d.*`: from_group / from_node / from_children / from_name /
+  from_positions / from_mouse, one spawner-less `GrazeDetector2D` shared by everything it arms;
+  node and children sources name their nodes through `set_fixed_nodes`) goes wherever a target
+  group went (`read_targets_argument2d`: graze_set_zones, sound_set_effects on volleys and lasers)
+  and into `LaserVolley2D.track` (nearest target per beam per interval; the spawner's retargets skip
+  a tracking laser). Volley and laser `time_scale`, `all_bullets_scale_speed` /
+  `all_bullets_scale_life_time`, `detach_from_spawner`, `LaserSpawner2D.adopt_live_laser`, the
+  factory listings by owner and `BulletPatterns2D.randomize_transforms` complete it. Volley homing
+  by a handle is not there yet (the spawner's resolver is not a part).
 - `BulletSpawner2D.apply_to_live_volleys(LiveVolleyGroup flags)` re-applies
   homing / graze / sound / flock / split / emitter to what it already fired;
   `home_live_volleys_to`, `aim_live_volleys_at`, `set/scale_live_volleys_speed`.

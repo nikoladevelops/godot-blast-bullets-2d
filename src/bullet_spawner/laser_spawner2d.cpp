@@ -353,8 +353,8 @@ int LaserSpawner2D::retarget_live_lasers() {
 	bool resolved = false;
 	int done = 0;
 	for (LaserVolley2D *laser : owned) {
-		if (!laser_aims_at_targets2d(laser)) {
-			continue;
+		if (!laser_aims_at_targets2d(laser) || laser->is_tracking()) {
+			continue; // a tracking laser picks its own targets
 		}
 		if (!resolved) {
 			targets = live_laser_targets(); // no user code: the loop's pointers stay valid

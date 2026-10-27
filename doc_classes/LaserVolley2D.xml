@@ -198,9 +198,9 @@
 		<method name="graze_set_zones">
 			<return type="bool" />
 			<param index="0" name="zones" type="Array" />
-			<param index="1" name="target_group" type="StringName" />
+			<param index="1" name="target_group" type="Variant" />
 			<description>
-				Makes the beams graze the members of [param target_group] with up to 4 [param zones] (factory lasers, or an override until the next life). Returns [code]false[/code] (nothing changed) for an empty group, no zone, or a finished laser.
+				Makes the beams graze the members of [param target_group] (a group name, or a [BulletTargets2D] for any other source: its detector is shared, so its edits reach this laser in flight; anything else is refused with one error) with up to 4 [param zones] (factory lasers, or an override until the next life). Returns [code]false[/code] (nothing changed) for an empty group, no zone, or a finished laser.
 			</description>
 		</method>
 		<method name="is_beam_blocked" qualifiers="const">
@@ -232,6 +232,12 @@
 			<return type="bool" />
 			<description>
 				Returns [code]true[/code] while the laser has sound entries.
+			</description>
+		</method>
+		<method name="is_tracking" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Whether [method track] steers this laser's targets.
 			</description>
 		</method>
 		<method name="set_active_time_left">
@@ -288,9 +294,17 @@
 		<method name="sound_set_effects">
 			<return type="bool" />
 			<param index="0" name="effects" type="Array" />
-			<param index="1" name="listener_group" type="StringName" default="&amp;&quot;&quot;" />
+			<param index="1" name="listener_group" type="Variant" default="null" />
 			<description>
-				Arms the laser's sound triggers with [param effects] ([LaserSoundData2D] entries or nulls; anything else is refused with one error and changes nothing), heard by the members of [param listener_group] (empty = Godot's listener). An empty array disarms. Returns [code]false[/code] for a finished laser.
+				Arms the laser's sound triggers with [param effects] ([LaserSoundData2D] entries or nulls; anything else is refused with one error and changes nothing), heard by the members of [param listener_group] (empty = Godot's listener; a [BulletTargets2D] for any other source). An empty array disarms. Returns [code]false[/code] for a finished laser.
+			</description>
+		</method>
+		<method name="track">
+			<return type="bool" />
+			<param index="0" name="targets" type="Variant" />
+			<param index="1" name="retarget_interval" type="float" default="0.0" />
+			<description>
+				Keeps aiming every beam at the target of [param targets] (a [BulletTargets2D]) nearest to its muzzle, picked again every [param retarget_interval] seconds of the laser's own clock (0 = every tick), the same rule as [constant LaserSpawner2D.LASER_TARGET_NODE_GROUP]. Track and Lock On aims follow the picked target; a Pattern aim ignores it (one warning). [code]null[/code] stops tracking (the beams keep their last targets). While it tracks, its spawner's retargets leave it alone. Returns [code]false[/code] (nothing changed) after one error; refused on a pooled laser.
 			</description>
 		</method>
 	</methods>

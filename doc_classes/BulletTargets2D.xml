@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="BulletTargets2D" inherits="RefCounted" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		Who a script's bullets and lasers aim at, without a spawner.
+	</brief_description>
+	<description>
+		A target source made by code: [method from_group], [method from_node], [method from_children], [method from_name], [method from_positions] or [method from_mouse], filtered by [member filter_group] and the plugin's target filter (live [Node2D] in the factory's world, never a factory's or a preview's node), rescanned every [member update_interval]. Pass it wherever a target group goes: [method BulletVolley2D.graze_set_zones], [method BulletVolley2D.sound_set_effects], [method LaserVolley2D.graze_set_zones], [method LaserVolley2D.sound_set_effects], and to [method LaserVolley2D.track]. Every volley and laser armed with it shares its one target list: edits ([member positions], [member filter_group], [member update_interval]) reach them in flight, and they keep it after the script drops the handle. Spawners name the same sources in their Graze, Sound and Laser Targeting groups.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="from_children" qualifiers="static">
+			<return type="BulletTargets2D" />
+			<param index="0" name="parent" type="Variant" />
+			<param index="1" name="recursive" type="bool" default="false" />
+			<description>
+				The [Node2D] children of [param parent] (all descendants with [param recursive]).
+			</description>
+		</method>
+		<method name="from_group" qualifiers="static">
+			<return type="BulletTargets2D" />
+			<param index="0" name="group" type="StringName" />
+			<param index="1" name="filter_group" type="StringName" default="&amp;&quot;&quot;" />
+			<description>
+				The live members of [param group] (also in [param filter_group] when set). An empty group is refused (null, one error).
+			</description>
+		</method>
+		<method name="from_mouse" qualifiers="static">
+			<return type="BulletTargets2D" />
+			<description>
+				The cursor, read every sweep in the factory's coordinates.
+			</description>
+		</method>
+		<method name="from_name" qualifiers="static">
+			<return type="BulletTargets2D" />
+			<param index="0" name="name" type="String" />
+			<param index="1" name="match_mode" type="int" default="1" />
+			<param index="2" name="case_sensitive" type="bool" default="false" />
+			<description>
+				Every [Node2D] of the current scene whose name matches [param name] by [param match_mode] (0 Exact, 1 Contains, 2 Starts With, 3 Ends With).
+			</description>
+		</method>
+		<method name="from_node" qualifiers="static">
+			<return type="BulletTargets2D" />
+			<param index="0" name="node" type="Variant" />
+			<description>
+				One [Node2D] ([param node], read by id: a freed node is refused).
+			</description>
+		</method>
+		<method name="from_positions" qualifiers="static">
+			<return type="BulletTargets2D" />
+			<param index="0" name="positions" type="PackedVector2Array" />
+			<description>
+				Fixed points ([member positions], finite); a signal names a point target as [code]null[/code].
+			</description>
+		</method>
+		<method name="get_source" qualifiers="const">
+			<return type="int" enum="BulletTargets2D.Source" />
+			<description>
+				Which source this handle uses ([enum Source]).
+			</description>
+		</method>
+		<method name="refresh">
+			<return type="void" />
+			<description>
+				Every list of this handle rescans at its next use (a node joined a group mid-interval).
+			</description>
+		</method>
+		<method name="resolve" qualifiers="const">
+			<return type="Array" />
+			<param index="0" name="factory" type="Variant" />
+			<description>
+				The targets now as the bullets of [param factory] see them this sweep: nodes, or [Vector2] for points; a fresh scan of its world while it does not run yet.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="filter_group" type="StringName" setter="set_filter_group" getter="get_filter_group" default="&amp;&quot;&quot;">
+			An allow-list group for the node sources (empty = everything found counts); points and the mouse ignore it.
+		</member>
+		<member name="positions" type="PackedVector2Array" setter="set_positions" getter="get_positions" default="PackedVector2Array()">
+			The points of a [method from_positions] handle (finite); set it every frame to move them: armed bullets test the new points at their next tick.
+		</member>
+		<member name="update_interval" type="float" setter="set_update_interval" getter="get_update_interval" default="0.0">
+			Seconds between membership rescans (0 = every tick, the default); positions stay live between them and a freed target drops at once.
+		</member>
+	</members>
+	<constants>
+		<constant name="SOURCE_NODE_GROUP" value="0" enum="Source">
+			[method from_group].
+		</constant>
+		<constant name="SOURCE_NODE" value="1" enum="Source">
+			[method from_node].
+		</constant>
+		<constant name="SOURCE_NODE_NAME" value="2" enum="Source">
+			[method from_name].
+		</constant>
+		<constant name="SOURCE_NODE_CHILDREN" value="3" enum="Source">
+			[method from_children].
+		</constant>
+		<constant name="SOURCE_MOUSE" value="4" enum="Source">
+			[method from_mouse].
+		</constant>
+		<constant name="SOURCE_POSITIONS" value="5" enum="Source">
+			[method from_positions].
+		</constant>
+	</constants>
+</class>

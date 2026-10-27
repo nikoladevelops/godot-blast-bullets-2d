@@ -26,6 +26,7 @@
 #include "data/laser_sprite_look2d.hpp"
 #include "laser/laser_volley2d.hpp"
 #include "pooling/volley_pool_key2d.hpp"
+#include "targets/bullet_targets2d.hpp"
 
 // Factory
 #include "factory/bullet_factory2d.hpp"
@@ -78,6 +79,7 @@ void initialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(BulletSplitStage2D)
 	GDREGISTER_CLASS(BulletSplitData2D)
 	GDREGISTER_CLASS(BulletEmitterData2D)
+	GDREGISTER_CLASS(BulletTargets2D)
 	GDREGISTER_CLASS(LaserSpriteLook2D)
 	GDREGISTER_CLASS(LaserEffectData2D)
 	GDREGISTER_CLASS(LaserData2D)

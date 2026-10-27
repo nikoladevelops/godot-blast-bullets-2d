@@ -156,6 +156,13 @@ public:
 	// anchor (set_anchor(null) leaves it). False (no change) when it already
 	// is factory-owned; refused on a pooled or never-fired laser.
 	bool detach_from_spawner();
+	// Keeps aiming every beam at the target of `targets` (a BulletTargets2D)
+	// nearest to its muzzle, picked again every retarget_interval seconds
+	// (0 = every tick) of the laser's own clock; null stops tracking (the
+	// beams keep their last targets). While it tracks, its spawner's
+	// retargets leave it alone. False (nothing changed) after one error.
+	bool track(const Variant &targets, double retarget_interval = 0.0);
+	bool is_tracking() const { return track_detector != nullptr; }
 	Vector2 get_beam_start(int beam_index) const;
 	Vector2 get_beam_end(int beam_index) const;
 	// A beam a followed sound voice may ride (in range, laser active, not
@@ -257,12 +264,12 @@ public:
 	// Script API (factory lasers, or an override until the next life):
 	// up to 4 zones, grazed by the members of target_group (refused: empty
 	// group, no zone, a pooled laser). graze_clear disarms.
-	bool graze_set_zones(const Array &zones, const StringName &target_group);
+	bool graze_set_zones(const Array &zones, const Variant &target_group);
 	void graze_clear();
 	Array get_graze_zones() const;
 	// Sound entries for the laser triggers, heard by listener_group's
 	// members (empty = Godot's listener). An empty array disarms.
-	bool sound_set_effects(const Array &effects, const StringName &listener_group = StringName());
+	bool sound_set_effects(const Array &effects, const Variant &listener_group = Variant());
 	bool is_sound_armed() const { return !sound_effects.empty(); }
 
 	BulletFactory2D *factory = nullptr;
@@ -371,6 +378,11 @@ private:
 	// The laser-wide events of this life: On Charge announced once, and
 	// whether end_laser cut it short (On Ended Early instead of On Finish).
 	bool charge_announced = false;
+	// track(): the shared detector, its interval and the time to the next pick.
+	std::shared_ptr<GrazeDetector2D> track_detector;
+	double track_interval = 0.0;
+	double track_time_left = 0.0;
+	void retarget_tracked(double delta);
 	Vector2 inherited_velocity;
 	bool ended_early = false;
 	// Physics queries (one shape, reused every tick).
