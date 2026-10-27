@@ -97,6 +97,7 @@ func test_factory_queries_list_what_the_counts_count() -> void:
 	await idle(1)
 	assert_true(parked.is_parked() and pooled.is_pooled(), "one parked, one pooled")
 	assert_eq(factory.get_active_volleys(), [a, b, c], "the active volleys in factory order")
+	assert_eq(factory.get_active_volleys(true), [a, b, c, parked], "include_parked adds the parked one, never the pooled one")
 	var circle: Array = factory.get_bullets_in_circle(Vector2.ZERO, 20.0)
 	assert_eq(circle.size(), 3, "one entry per volley with bullets inside")
 	assert_eq(circle[0]["volley"], a, "factory order")
@@ -401,3 +402,44 @@ func test_area_counts_skip_volleys_queued_for_deletion() -> void:
 	assert_eq(factory.count_bullets_in_circle(Vector2(15, 10), 50.0), 2, "its two bullets counted (circle)")
 	assert_eq(factory.count_bullets_in_rect(Rect2(0, 0, 40, 40)), 2, "its two bullets counted (rect)")
 	assert_not_null(keep, "kept")
+
+
+## Who fired what: get_volleys_owned_by / get_lasers_owned_by list one
+## spawner's live volleys or lasers (null: what the factory fired itself), in
+## factory order; a freed or wrong object lists nothing with one error.
+func test_listings_by_owner() -> void:
+	var sp := make_spawner(H.make_volley_data(2, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 2)
+	var own: Array = []
+	sp.volley_fired.connect(func(v: BulletVolley2D, _n) -> void: own.append(v))
+	assert_true(sp.shoot_once(), "fires")
+	assert_true(sp.shoot_once(), "fires again")
+	var mine := _volley_at([Vector2.ZERO])
+	assert_eq(factory.get_volleys_owned_by(sp), own, "the spawner's two volleys")
+	assert_eq(factory.get_volleys_owned_by(null), [mine], "null: the factory's own")
+	own[0].set_is_auto_pooling_enabled(false)
+	own[0].clear_all_bullets()
+	await idle(1)
+	assert_true(own[0].is_parked(), "parked")
+	assert_eq(factory.get_volleys_owned_by(sp), [own[1]], "a parked volley only with include_parked")
+	assert_eq(factory.get_volleys_owned_by(sp, true), own, "with include_parked")
+	var ls := LaserSpawner2D.new()
+	ls.set_shooting_enabled(false)
+	ls.laser_data = H.make_laser(0.0, 0.0, 0.0, 0.0)
+	ls.pattern_source = LaserSpawner2D.PATTERN_FROM_HELPER_CUSTOM
+	ls.helper_custom_transforms = [Transform2D.IDENTITY]
+	add(ls)
+	ls.set_bullet_factory(factory)
+	assert_true(ls.shoot_once(), "laser fires")
+	var free_laser := factory.spawn_laser(H.make_laser(0.0, 0.0, 0.0, 0.0), [Transform2D.IDENTITY] as Array[Transform2D])
+	assert_eq(factory.get_lasers_owned_by(ls), ls.get_live_lasers(), "the laser spawner's laser")
+	assert_eq(factory.get_lasers_owned_by(null), [free_laser], "null: the factory's own laser")
+	assert_eq(factory.get_volleys_owned_by(ls), [], "a laser spawner owns no volley")
+	var gone := Node2D.new()
+	gone.free()
+	assert_eq(factory.get_volleys_owned_by(gone), [], "a freed object lists nothing")
+	assert_eq(factory.get_lasers_owned_by(factory), [], "a non-spawner lists nothing")
+	expect_error_sequence([
+		"get_volleys_owned_by: spawner must be a PatternSpawner2D or null (a freed object is neither), listing nothing.",
+		"get_lasers_owned_by: spawner must be a PatternSpawner2D or null (a freed object is neither), listing nothing.",
+	])
+

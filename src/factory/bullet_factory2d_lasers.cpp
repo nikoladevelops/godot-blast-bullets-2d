@@ -283,6 +283,20 @@ void BulletFactory2D::redraw_lasers() {
 	}
 }
 
+TypedArray<LaserVolley2D> BulletFactory2D::get_lasers_owned_by(const Variant &spawner) const {
+	TypedArray<LaserVolley2D> out;
+	uint64_t owner_id = 0;
+	if (!listing_owner_id(spawner, "get_lasers_owned_by", owner_id)) {
+		return out;
+	}
+	for (LaserVolley2D *laser : all_lasers) {
+		if (laser_listed(laser) && laser->owner_spawner_id == owner_id) {
+			out.push_back(laser);
+		}
+	}
+	return out;
+}
+
 Array BulletFactory2D::get_active_lasers() const {
 	Array out;
 	for (LaserVolley2D *laser : all_lasers) {

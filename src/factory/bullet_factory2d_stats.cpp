@@ -1,6 +1,7 @@
 // Observability: frame stats, Performance monitors, the collision-shape debugger
 // knobs and the debug_* introspection used by the test suites.
 
+#include "bullet_spawner/pattern_spawner2d.hpp"
 #include "factory/bullet_factory2d_internal.hpp"
 
 #include <unordered_set>
@@ -589,6 +590,51 @@ Array BulletFactory2D::get_active_volleys_owned_by(uint64_t owner_spawner_id) co
 	Array out;
 	for (BulletVolley2D *volley : all_volleys) {
 		if (volley != nullptr && volley->is_active && !volley->is_queued_for_deletion() && volley->owner_spawner_id == owner_spawner_id) {
+			out.push_back(volley);
+		}
+	}
+	return out;
+}
+
+bool BulletFactory2D::volley_listed(const BulletVolley2D *volley, bool include_parked) {
+	if (volley == nullptr || volley->is_pooled_in_pool || volley->is_queued_for_deletion()) {
+		return false;
+	}
+	return volley->is_active || (include_parked && !volley->life_released);
+}
+
+bool BulletFactory2D::listing_owner_id(const Variant &spawner, const char *fn, uint64_t &r_id) {
+	r_id = 0;
+	if (spawner.get_type() == Variant::NIL) {
+		return true;
+	}
+	const PatternSpawner2D *owner = live_object2d<PatternSpawner2D>(spawner);
+	if (owner == nullptr) {
+		UtilityFunctions::push_error(String(fn) + ": spawner must be a PatternSpawner2D or null (a freed object is neither), listing nothing.");
+		return false;
+	}
+	r_id = owner->get_instance_id();
+	return true;
+}
+
+TypedArray<BulletVolley2D> BulletFactory2D::get_active_volleys(bool include_parked) const {
+	TypedArray<BulletVolley2D> out;
+	for (BulletVolley2D *volley : all_volleys) {
+		if (volley_listed(volley, include_parked)) {
+			out.push_back(volley);
+		}
+	}
+	return out;
+}
+
+TypedArray<BulletVolley2D> BulletFactory2D::get_volleys_owned_by(const Variant &spawner, bool include_parked) const {
+	TypedArray<BulletVolley2D> out;
+	uint64_t owner_id = 0;
+	if (!listing_owner_id(spawner, "get_volleys_owned_by", owner_id)) {
+		return out;
+	}
+	for (BulletVolley2D *volley : all_volleys) {
+		if (volley_listed(volley, include_parked) && volley->owner_spawner_id == owner_id) {
 			out.push_back(volley);
 		}
 	}

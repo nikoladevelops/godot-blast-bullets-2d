@@ -569,8 +569,9 @@
 		</method>
 		<method name="get_active_volleys" qualifiers="const">
 			<return type="BulletVolley2D[]" />
+			<param index="0" name="include_parked" type="bool" default="false" />
 			<description>
-				Every active volley (bullets in flight; not pooled, parked or queued for deletion), in the order the factory ticks them. A fresh array per call.
+				Every active volley (bullets in flight; not pooled or queued for deletion), in the order the factory ticks them; parked volleys (auto pooling off, every bullet out, still wakeable) too with [param include_parked]. A fresh array per call. [method get_volleys_owned_by] lists one spawner's.
 			</description>
 		</method>
 		<method name="get_bullets_in_circle" qualifiers="const">
@@ -613,6 +614,13 @@
 				Returns true once the factory started destroying itself. While true, teardown paths stop touching child nodes and most factory operations report an error instead of running.
 			</description>
 		</method>
+		<method name="get_lasers_owned_by" qualifiers="const">
+			<return type="LaserVolley2D[]" />
+			<param index="0" name="spawner" type="Variant" />
+			<description>
+				The firing lasers [param spawner] fired (a [LaserSpawner2D], read by id), or with [code]null[/code] the ones this factory fired itself ([method spawn_laser], orphans handed to the factory), in factory order. A freed or wrong object lists nothing with one error.
+			</description>
+		</method>
 		<method name="get_pending_emit_count" qualifiers="const">
 			<return type="int" />
 			<description>
@@ -629,6 +637,14 @@
 			<return type="RID" />
 			<description>
 				Get the physics world space in which the bullets interact.
+			</description>
+		</method>
+		<method name="get_volleys_owned_by" qualifiers="const">
+			<return type="BulletVolley2D[]" />
+			<param index="0" name="spawner" type="Variant" />
+			<param index="1" name="include_parked" type="bool" default="false" />
+			<description>
+				The live volleys [param spawner] fired (a [BulletSpawner2D], read by id), or with [code]null[/code] the ones this factory fired itself ([method spawn_volley], pickups, splits of factory volleys, orphans handed to the factory), in factory order. Parked volleys (auto pooling off, every bullet out) only with [param include_parked]; pooled ones never. A freed or wrong object lists nothing with one error.
 			</description>
 		</method>
 		<method name="is_physics_interpolation_active" qualifiers="const">

@@ -156,6 +156,8 @@ void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_frame_stats"), &BulletFactory2D::get_frame_stats);
 	ClassDB::bind_method(D_METHOD("reset_frame_stats"), &BulletFactory2D::reset_frame_stats);
 	ClassDB::bind_method(D_METHOD("get_active_bullet_count"), &BulletFactory2D::get_active_bullet_count);
+	ClassDB::bind_method(D_METHOD("get_active_volleys", "include_parked"), &BulletFactory2D::get_active_volleys, DEFVAL(false));
+	ClassDB::bind_method(D_METHOD("get_volleys_owned_by", "spawner", "include_parked"), &BulletFactory2D::get_volleys_owned_by, DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("set_register_performance_monitors", "value"), &BulletFactory2D::set_register_performance_monitors);
 	ClassDB::bind_method(D_METHOD("get_register_performance_monitors"), &BulletFactory2D::get_register_performance_monitors);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "register_performance_monitors"), "set_register_performance_monitors", "get_register_performance_monitors");
@@ -262,6 +264,7 @@ void BulletFactory2D::_bind_methods() {
 	// a LaserSpawner2D's lasers signal on that spawner (the same signals).
 	ClassDB::bind_method(D_METHOD("spawn_laser", "data", "transforms", "anchor"), &BulletFactory2D::spawn_laser_script, DEFVAL(Variant()));
 	ClassDB::bind_method(D_METHOD("get_active_lasers"), &BulletFactory2D::get_active_lasers);
+	ClassDB::bind_method(D_METHOD("get_lasers_owned_by", "spawner"), &BulletFactory2D::get_lasers_owned_by);
 	ClassDB::bind_method(D_METHOD("get_active_laser_count"), &BulletFactory2D::get_active_laser_count);
 	ClassDB::bind_method(D_METHOD("clear_active_lasers", "fade"), &BulletFactory2D::clear_active_lasers, DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("end_lasers_in_circle", "center", "radius", "fade"), &BulletFactory2D::end_lasers_in_circle, DEFVAL(true));
@@ -378,7 +381,6 @@ void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("count_bullets_in_rect", "rect"), &BulletFactory2D::count_bullets_in_rect);
 	ClassDB::bind_method(D_METHOD("get_bullets_in_circle", "center", "radius"), &BulletFactory2D::get_bullets_in_circle);
 	ClassDB::bind_method(D_METHOD("get_bullets_in_rect", "rect"), &BulletFactory2D::get_bullets_in_rect);
-	ClassDB::bind_method(D_METHOD("get_active_volleys"), &BulletFactory2D::get_active_volleys);
 
 	// Bullets that left through the despawn bounds, once per volley and tick
 	// (positions are the poses they left from). Live, inside the sweep: a

@@ -234,9 +234,9 @@ public:
 	// safe anywhere, O(live bullets) per call.
 	TypedArray<Dictionary> get_bullets_in_circle(const Vector2 &center, real_t radius) const;
 	TypedArray<Dictionary> get_bullets_in_rect(const Rect2 &rect) const;
-	// Every ACTIVE volley (not pooled, parked or queued for deletion), in
-	// factory order (the sweep's order).
-	TypedArray<BulletVolley2D> get_active_volleys() const;
+	// Every ACTIVE volley (not pooled or queued for deletion; parked ones
+	// only with include_parked), in factory order (the sweep's order).
+	TypedArray<BulletVolley2D> get_active_volleys(bool include_parked = false) const;
 
 	// ---- Pickups (bullet_factory2d_pickups.cpp) ----
 	// Turns live bullets into one pickup volley per call (split by the pattern
@@ -723,6 +723,16 @@ public:
 	// Every ACTIVE volley owned by a spawner, in factory order (census, not
 	// the spawner's capped retarget list). O(volleys).
 	Array get_active_volleys_owned_by(uint64_t owner_spawner_id) const;
+	// Script listings. A volley is listed while it flies (not pooled, not
+	// queued for deletion), a parked one (auto pooling off, every bullet out)
+	// too with include_parked. `spawner` is a PatternSpawner2D (read by id) or
+	// null for what the factory itself fired; a freed or wrong object lists
+	// nothing with one error.
+	TypedArray<BulletVolley2D> get_volleys_owned_by(const Variant &spawner, bool include_parked = false) const;
+	TypedArray<LaserVolley2D> get_lasers_owned_by(const Variant &spawner) const;
+	// The owner id `spawner` names (0 = the factory); false after an error.
+	static bool listing_owner_id(const Variant &spawner, const char *fn, uint64_t &r_id);
+	static bool volley_listed(const BulletVolley2D *volley, bool include_parked);
 	int count_active_volleys_owned_by(uint64_t owner_spawner_id) const;
 	// Every tracked volley (live or parked) a spawner owns.
 	void collect_volleys_owned_by(uint64_t owner_spawner_id, std::vector<BulletVolley2D *> &r_volleys) const;

@@ -423,16 +423,6 @@ TypedArray<Dictionary> BulletFactory2D::get_bullets_in_rect(const Rect2 &rect) c
 	return bullets_in_area(all_volleys, false, Vector2(), 0.0, normalized);
 }
 
-TypedArray<BulletVolley2D> BulletFactory2D::get_active_volleys() const {
-	TypedArray<BulletVolley2D> out;
-	for (BulletVolley2D *volley : all_volleys) {
-		if (volley != nullptr && volley->is_active && !volley->is_queued_for_deletion()) {
-			out.push_back(volley);
-		}
-	}
-	return out;
-}
-
 int BulletFactory2D::count_bullets_in_rect(const Rect2 &rect) const {
 	Rect2 normalized;
 	if (!area_args_valid("count_bullets_in_rect", false, Vector2(), 0.0, rect, normalized)) {
