@@ -86,6 +86,7 @@ PATTERN_KNOB(double, double, FLOAT, helper_flower_radius, FINITE_GE, 0.0, 0, "mu
 PATTERN_KNOB(double, double, FLOAT, helper_flower_base_rotation, FINITE, 0, 0, "must be finite", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")
 PATTERN_KNOB(bool, bool, BOOL, helper_flower_face_outward, NONE, 0, 0, "", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")
 PATTERN_KNOB(double, double, FLOAT, helper_flower_facing_offset_deg, FINITE, 0, 0, "must be finite", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")
+PATTERN_KNOB(bool, bool, BOOL, helper_flower_rotate_with_marker, NONE, 0, 0, "", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")
 // RHODONEA / PHYLLOTAXIS / SUPERFORMULA: core-hole lift.
 PATTERN_KNOB(double, double, FLOAT, helper_flower_inner_radius_scale, FINITE_IN_CO, 0.0, 1.0, "must be finite in [0, 1)", NONE, 0, 0, "", false, PROPERTY_HINT_RANGE, "0,0.999,0.001")
 // FAN: lobe count + per-lobe fan controls.
@@ -160,6 +161,7 @@ PATTERN_KNOB(double, double, FLOAT, helper_heart_size, FINITE_GT, 0.0, 0, "must 
 PATTERN_KNOB(double, double, FLOAT, helper_heart_base_rotation, FINITE, 0, 0, "must be finite", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")
 PATTERN_KNOB(bool, bool, BOOL, helper_heart_face_outward, NONE, 0, 0, "", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")
 PATTERN_KNOB(double, double, FLOAT, helper_heart_facing_offset_deg, FINITE, 0, 0, "must be finite", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")
+PATTERN_KNOB(bool, bool, BOOL, helper_heart_rotate_with_marker, NONE, 0, 0, "", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")
 PATTERN_SUBGROUP("Wave", "helper_wave_")
 PATTERN_KNOB(double, double, FLOAT, helper_wave_width, FINITE_GE, 0.0, 0, "must be finite and >= 0", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")
 PATTERN_KNOB(double, double, FLOAT, helper_wave_amplitude, FINITE_GE, 0.0, 0, "must be finite and >= 0", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")
@@ -192,6 +194,7 @@ PATTERN_KNOB(double, double, FLOAT, helper_rose_lobe_sharpness, FINITE_GE, 0.0, 
 PATTERN_KNOB(double, double, FLOAT, helper_rose_base_rotation, FINITE, 0, 0, "must be finite", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")
 PATTERN_KNOB(bool, bool, BOOL, helper_rose_face_outward, NONE, 0, 0, "", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")
 PATTERN_KNOB(double, double, FLOAT, helper_rose_facing_offset_deg, FINITE, 0, 0, "must be finite", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")
+PATTERN_KNOB(bool, bool, BOOL, helper_rose_rotate_with_marker, NONE, 0, 0, "", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")
 PATTERN_SUBGROUP("Counter Spiral", "helper_counter_spiral_")
 PATTERN_KNOB(int64_t, int, INT, helper_counter_spiral_arms, GE, 2, 0, "must be >= 2 (use multispiral for 1 arm)", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")
 PATTERN_KNOB(double, double, FLOAT, helper_counter_spiral_start_radius, FINITE_GE, 0.0, 0, "must be finite and >= 0", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")
@@ -216,6 +219,7 @@ PATTERN_KNOB(double, double, FLOAT, helper_lissajous_freq_y, FINITE_GE, 0.0, 0, 
 PATTERN_KNOB(double, double, FLOAT, helper_lissajous_phase, FINITE, 0, 0, "must be finite", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")
 PATTERN_KNOB(bool, bool, BOOL, helper_lissajous_face_outward, NONE, 0, 0, "", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")
 PATTERN_KNOB(double, double, FLOAT, helper_lissajous_facing_offset_deg, FINITE, 0, 0, "must be finite", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")
+PATTERN_KNOB(bool, bool, BOOL, helper_lissajous_rotate_with_marker, NONE, 0, 0, "", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")
 PATTERN_SUBGROUP("Custom", "helper_custom_")
 PATTERN_PROPERTY(ARRAY, helper_custom_transforms, PROPERTY_HINT_ARRAY_TYPE, "Transform2D", set_helper_custom_transforms, get_helper_custom_transforms)
 PATTERN_KNOB(int64_t, BulletPatterns2D::CustomFacing, INT, helper_custom_facing, IN, 0, 4, "must be 0 (as stored), 1 (face outward), 2 (face inward), 3 (+90 deg) or 4 (-90 deg)", NONE, 0, 0, "", false, PROPERTY_HINT_ENUM, "As Stored,Face Outward,Face Inward,+90 Degrees,-90 Degrees")

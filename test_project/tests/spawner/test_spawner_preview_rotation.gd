@@ -94,8 +94,7 @@ const ROTATION_SHAPES := ["GRID", "RING", "FAN", "SPIRAL", "LINE", "FLOWER", "EL
 
 ## Every helper either follows its aim ONCE (each bullet turns by the aim's
 ## turn around the aim and faces that much more) or stays fixed in the world
-## (rain, heart, rose, lissajous: their own base rotation): nothing turns twice
-## or half-way. The Circle used to put bullet 0 at twice the aim's rotation,
+## (rain: a world direction): nothing turns twice or half-way. The Circle used to put bullet 0 at twice the aim's rotation,
 ## facing twice as far, the Ellipse ignored the aim, and the Lissajous bullet
 ## on the center took its facing from the aim. An odd count and an uneven
 ## angle keep a symmetric ring from hiding it.
@@ -132,6 +131,85 @@ func test_every_helper_turns_with_its_aim_once_or_not_at_all() -> void:
 	assert_has(followers, "CIRCLE", "the Circle follows its aim once")
 	assert_has(followers, "ELLIPSE", "the Ellipse follows its aim once")
 	assert_has(followers, "RING", "Ring follows its aim")
+	for shape in ["HEART", "ROSE", "FLOWER", "LISSAJOUS"]:
+		assert_has(followers, shape, "%s follows its aim once (rotate_with_marker)" % shape)
+
+
+## Shapes with a rotate_with_marker knob: off, the shape stays in the world
+## (only the marker's position moves it); on, a turned aim adds to the shape's
+## own base rotation exactly (the same pose either way).
+const ROTATING := {
+	"ELLIPSE": "helper_ellipse_rotation",
+	"HEART": "helper_heart_base_rotation",
+	"ROSE": "helper_rose_base_rotation",
+	"FLOWER": "helper_flower_base_rotation",
+	"LISSAJOUS": "",
+}
+
+
+func _origins(sp: BulletSpawner2D) -> Array:
+	return sp.collect_spawn_transforms().map(func(t): return (t as Transform2D).origin)
+
+
+func test_rotate_with_marker_off_keeps_each_shape_world_fixed(shape: String = use_parameters(ROTATING.keys())) -> void:
+	var source: int = ClassDB.class_get_integer_constant("PatternSpawner2D", "PATTERN_FROM_HELPER_" + shape)
+	var sp := make_spawner(null, source, 9)
+	var knob: String = "helper_%s_rotate_with_marker" % shape.to_lower()
+	assert_true(knob in sp, "%s exists" % knob)
+	assert_true(sp.get(knob), "on by default")
+	sp.set(knob, false)
+	var flat := _origins(sp)
+	sp.rotation = 1.1
+	var turned := _origins(sp)
+	for i in flat.size():
+		assert_almost_eq(turned[i], flat[i], Vector2(0.05, 0.05), "%s off: bullet %d stays put" % [shape, i])
+	var base: String = ROTATING[shape]
+	if base == "":
+		return
+	sp.set(knob, true)
+	sp.rotation = 0.0
+	sp.set(base, 0.3)
+	var by_knob := _origins(sp)
+	sp.set(base, 0.0)
+	sp.rotation = 0.3
+	var by_aim := _origins(sp)
+	for i in by_knob.size():
+		assert_almost_eq(by_aim[i], by_knob[i], Vector2(0.05, 0.05), "%s: the aim adds to %s (bullet %d)" % [shape, base, i])
+
+
+func test_every_flower_type_follows_its_aim_once(flower_type: int = use_parameters([0, 1, 2, 3, 4])) -> void:
+	var sp := make_spawner(null, BulletSpawner2D.PATTERN_FROM_HELPER_FLOWER, 11)
+	sp.helper_flower_type = flower_type
+	sp.position = Vector2(300, 200)
+	var flat: Array = sp.collect_spawn_transforms()
+	var aim0: Transform2D = sp.global_transform
+	sp.rotation = 0.7
+	var aim1: Transform2D = sp.global_transform
+	var turned: Array = sp.collect_spawn_transforms()
+	for i in flat.size():
+		var expected: Transform2D = aim1 * aim0.affine_inverse() * (flat[i] as Transform2D)
+		assert_almost_eq((turned[i] as Transform2D).origin, expected.origin, Vector2(0.05, 0.05), "type %d bullet %d moves around the aim" % [flower_type, i])
+		assert_almost_eq(angle_difference((turned[i] as Transform2D).get_rotation(), expected.get_rotation()), 0.0, 0.001, "type %d bullet %d turns once" % [flower_type, i])
+
+
+## base_rotation turns the rose and the rhodonea bloom: it used to shift the
+## curve's parameter inside the radius as well, which traced the identical
+## curve (the property did nothing).
+func test_base_rotation_turns_the_rose_and_the_rhodonea_bloom() -> void:
+	for setup in [["ROSE", "helper_rose_base_rotation", {"helper_rose_petals": 3}], ["ROSE", "helper_rose_base_rotation", {"helper_rose_petals": 4}], ["FLOWER", "helper_flower_base_rotation", {"helper_flower_type": 1, "helper_flower_petals": 5}]]:
+		var source: int = ClassDB.class_get_integer_constant("PatternSpawner2D", "PATTERN_FROM_HELPER_" + setup[0])
+		var sp := make_spawner(null, source, 15)
+		for k in setup[2]:
+			sp.set(k, setup[2][k])
+		var flat := _origins(sp)
+		sp.set(setup[1], 0.4)
+		var turned := _origins(sp)
+		var off: Array = []
+		for i in flat.size():
+			if (turned[i] as Vector2).distance_to((flat[i] as Vector2).rotated(0.4)) > 0.05:
+				off.append(i)
+		assert_eq(off, [], "%s %s: every bullet turned by base_rotation" % [setup[0], setup[2]])
+		sp.free()
 
 
 func test_ellipse_stays_world_fixed_with_rotate_with_marker_off() -> void:
@@ -157,7 +235,7 @@ func test_ellipse_stays_world_fixed_with_rotate_with_marker_off() -> void:
 
 
 func test_circle_and_ellipse_reuse_their_bake_on_a_turning_aim() -> void:
-	for source in [BulletSpawner2D.PATTERN_FROM_HELPER_CIRCLE, BulletSpawner2D.PATTERN_FROM_HELPER_ELLIPSE]:
+	for source in [BulletSpawner2D.PATTERN_FROM_HELPER_CIRCLE, BulletSpawner2D.PATTERN_FROM_HELPER_ELLIPSE, BulletSpawner2D.PATTERN_FROM_HELPER_HEART, BulletSpawner2D.PATTERN_FROM_HELPER_ROSE, BulletSpawner2D.PATTERN_FROM_HELPER_FLOWER, BulletSpawner2D.PATTERN_FROM_HELPER_LISSAJOUS]:
 		var sp := make_spawner(null, source, 16)
 		sp.collect_spawn_transforms()
 		var info: Dictionary = sp.debug_get_pattern_cache_info()

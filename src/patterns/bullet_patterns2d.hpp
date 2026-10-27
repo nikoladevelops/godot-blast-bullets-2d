@@ -496,7 +496,7 @@ public:
 	// Flower bloom track sampler mirroring helper_generate_transforms_flower
 	// per-type math at fixed density (closed loop). Marker-relative offsets.
 	static Dictionary helper_sample_outline_flower(int flower_type = 0, int petals = 6, real_t radius = 150.0, real_t petal_spread = 0.5, real_t petal_sharpness = 1.0, double inner_radius_scale = 0.0, double spiro_roller = 45.0, double spiro_pen = 80.0, double super_lobes = 6.0, double super_fullness = 1.0, real_t base_rotation = 0.0, int transforms_amount = -1);
-	static Dictionary helper_sample_outline_lissajous(real_t size_x = 200.0, real_t size_y = 120.0, real_t freq_x = 3.0, real_t freq_y = 2.0, real_t phase = 0.0);
+	static Dictionary helper_sample_outline_lissajous(real_t size_x = 200.0, real_t size_y = 120.0, real_t freq_x = 3.0, real_t freq_y = 2.0, real_t phase = 0.0, real_t rotation = 0.0);
 	static Dictionary helper_sample_outline_circle(real_t radius = 150.0);
 	static Dictionary helper_sample_outline_rectangle(const Vector2 &size = Vector2(300, 200));
 	static Dictionary helper_sample_outline_triangle(int triangle_type = 0, real_t size_a = 150.0, real_t size_b = 150.0, real_t rotation = 0.0);

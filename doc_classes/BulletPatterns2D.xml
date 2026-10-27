@@ -364,8 +364,9 @@
 			<param index="30" name="super_fullness" type="float" default="1.0" />
 			<param index="31" name="layer_layout" type="int" default="1" />
 			<param index="32" name="fill_min_spacing" type="float" default="0.5" />
+			<param index="33" name="rotate_with_marker" type="bool" default="true" />
 			<description>
-				Generates a floral spell-card pattern. In FAN mode, [code]transforms_amount[/code] slots are split evenly over [code]petals[/code] symmetric lobes (remainder spread symmetrically) and fan across [code]petal_spread[/code] radians, every slot on its own spot. [code]petal_sharpness[/code] 0 gives round lobes, higher values pinch the waist into tighter flowers. [code]flower_type[/code] picks the bloom kind (0 FAN, 1 RHODONEA, 2 PHYLLOTAXIS, 3 SPIROGRAPH, 4 SUPERFORMULA); [code]inner_radius_scale[/code], [code]spiro_roller[/code]/[code]spiro_pen[/code] and [code]super_lobes[/code]/[code]super_fullness[/code] tune the matching kind. Useful for boss blossoms and mandala rings.
+				Generates a floral spell-card pattern. In FAN mode, [code]transforms_amount[/code] slots are split evenly over [code]petals[/code] symmetric lobes (remainder spread symmetrically) and fan across [code]petal_spread[/code] radians, every slot on its own spot. [code]petal_sharpness[/code] 0 gives round lobes, higher values pinch the waist into tighter flowers. [code]flower_type[/code] picks the bloom kind (0 FAN, 1 RHODONEA, 2 PHYLLOTAXIS, 3 SPIROGRAPH, 4 SUPERFORMULA); [code]inner_radius_scale[/code], [code]spiro_roller[/code]/[code]spiro_pen[/code] and [code]super_lobes[/code]/[code]super_fullness[/code] tune the matching kind. Useful for boss blossoms and mandala rings. With [param rotate_with_marker] (default on) the shape turns with [param marker_transform]'s rotation once; off it stays fixed in the world.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_grid" qualifiers="static">
@@ -410,8 +411,9 @@
 			<param index="21" name="layer_max_dots" type="int" default="0" />
 			<param index="22" name="layer_layout" type="int" default="1" />
 			<param index="23" name="fill_min_spacing" type="float" default="0.5" />
+			<param index="24" name="rotate_with_marker" type="bool" default="true" />
 			<description>
-				Generates a parametric heart outline (classic 16sin^3 curve) scaled by size. Boss love attacks and ending cards. The outline_* tail params place slots on the loop, fill its interior, or layer it across scaled repeats about the loop center.
+				Generates a parametric heart outline (classic 16sin^3 curve) scaled by size. Boss love attacks and ending cards. The outline_* tail params place slots on the loop, fill its interior, or layer it across scaled repeats about the loop center. With [param rotate_with_marker] (default on) the shape turns with [param marker_transform]'s rotation once; off it stays fixed in the world.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_lattice" qualifiers="static">
@@ -471,8 +473,9 @@
 			<param index="24" name="layer_max_dots" type="int" default="0" />
 			<param index="25" name="layer_layout" type="int" default="1" />
 			<param index="26" name="fill_min_spacing" type="float" default="0.5" />
+			<param index="27" name="rotate_with_marker" type="bool" default="true" />
 			<description>
-				Generates figure-8 / weave openings on the lissajous curve (size_x * sin(freq_x * t + phase), size_y * sin(freq_y * t)). The curve is swept exactly once: ratios sharing a factor are not retraced, and curves that fold back on themselves are spread along their open run, so no two slots share a spot. Recipe: slow spin + lissajous weave = butterfly curtain.
+				Generates figure-8 / weave openings on the lissajous curve (size_x * sin(freq_x * t + phase), size_y * sin(freq_y * t)). The curve is swept exactly once: ratios sharing a factor are not retraced, and curves that fold back on themselves are spread along their open run, so no two slots share a spot. Recipe: slow spin + lissajous weave = butterfly curtain. With [param rotate_with_marker] (default on) the shape turns with [param marker_transform]'s rotation once; off it stays fixed in the world.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_multispiral" qualifiers="static">
@@ -655,8 +658,9 @@
 			<param index="23" name="layer_max_dots" type="int" default="0" />
 			<param index="24" name="layer_layout" type="int" default="1" />
 			<param index="25" name="fill_min_spacing" type="float" default="0.5" />
+			<param index="26" name="rotate_with_marker" type="bool" default="true" />
 			<description>
-				Generates an exact rhodonea rose bloom at r = R * cos(k * theta) with k = petals: odd k draws k petals, even k draws 2k, each traced once (no stacked slots). lobe_sharpness 1.0 is the exact rose (0 is round, higher pinches the waist). Used by the petal storm and blossom finale presets.
+				Generates an exact rhodonea rose bloom at r = R * cos(k * theta) with k = petals: odd k draws k petals, even k draws 2k, each traced once (no stacked slots). lobe_sharpness 1.0 is the exact rose (0 is round, higher pinches the waist). Used by the petal storm and blossom finale presets. With [param rotate_with_marker] (default on) the shape turns with [param marker_transform]'s rotation once; off it stays fixed in the world.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_scatter" qualifiers="static">
@@ -955,8 +959,9 @@
 			<param index="2" name="freq_x" type="float" default="3.0" />
 			<param index="3" name="freq_y" type="float" default="2.0" />
 			<param index="4" name="phase" type="float" default="0.0" />
+			<param index="5" name="rotation" type="float" default="0.0" />
 			<description>
-				Lissajous sweep in marker-local pixels. Closed.
+				Lissajous sweep in marker-local pixels, turned by [param rotation] (the generator's aim when its rotate_with_marker is on). Closed unless the curve runs back and forth.
 			</description>
 		</method>
 		<method name="helper_sample_outline_multispiral" qualifiers="static">

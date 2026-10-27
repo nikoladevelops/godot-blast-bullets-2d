@@ -521,6 +521,9 @@
 		<member name="helper_flower_radius" type="float" setter="set_helper_flower_radius" getter="get_helper_flower_radius" default="150.0">
 			Flower radius in pixels. Must be finite and 0 or more.
 		</member>
+		<member name="helper_flower_rotate_with_marker" type="bool" setter="set_helper_flower_rotate_with_marker" getter="get_helper_flower_rotate_with_marker" default="true">
+			When on (default), the bloom turns with the shot's aim (the generator node's rotation or a [method shoot_from] pose), like Ring and Ellipse: [member helper_flower_base_rotation] adds to the aim. Off keeps it fixed in the world, turned by [member helper_flower_base_rotation] alone.
+		</member>
 		<member name="helper_flower_spiro_pen" type="float" setter="set_helper_flower_spiro_pen" getter="get_helper_flower_spiro_pen" default="80.0">
 			SPIROGRAPH only: hypotrochoid pen offset d (&gt;= 0). Larger values stretch the loops outward.
 		</member>
@@ -568,6 +571,9 @@
 		</member>
 		<member name="helper_heart_facing_offset_deg" type="float" setter="set_helper_heart_facing_offset_deg" getter="get_helper_heart_facing_offset_deg" default="0.0">
 			Extra facing twist in degrees.
+		</member>
+		<member name="helper_heart_rotate_with_marker" type="bool" setter="set_helper_heart_rotate_with_marker" getter="get_helper_heart_rotate_with_marker" default="true">
+			When on (default), the heart turns with the shot's aim (the generator node's rotation or a [method shoot_from] pose), like Ring and Ellipse: [member helper_heart_base_rotation] adds to the aim. Off keeps it fixed in the world, turned by [member helper_heart_base_rotation] alone.
 		</member>
 		<member name="helper_heart_size" type="float" setter="set_helper_heart_size" getter="get_helper_heart_size" default="150.0">
 			Heart outline size in pixels. Must be finite and above zero.
@@ -631,6 +637,9 @@
 		</member>
 		<member name="helper_lissajous_phase" type="float" setter="set_helper_lissajous_phase" getter="get_helper_lissajous_phase" default="0.0">
 			Phase offset in radians (morphs the figure-8 into its weave variants). Must be finite.
+		</member>
+		<member name="helper_lissajous_rotate_with_marker" type="bool" setter="set_helper_lissajous_rotate_with_marker" getter="get_helper_lissajous_rotate_with_marker" default="true">
+			When on (default), the weave turns with the shot's aim (the generator node's rotation or a [method shoot_from] pose), like Ring and Ellipse. Off keeps it fixed in the world.
 		</member>
 		<member name="helper_lissajous_size_x" type="float" setter="set_helper_lissajous_size_x" getter="get_helper_lissajous_size_x" default="200.0">
 			Weave half-width in pixels. Must be finite and 0 or more.
@@ -847,6 +856,9 @@
 		</member>
 		<member name="helper_rose_radius" type="float" setter="set_helper_rose_radius" getter="get_helper_rose_radius" default="150.0">
 			Rose radius in pixels. Must be finite and 0 or more.
+		</member>
+		<member name="helper_rose_rotate_with_marker" type="bool" setter="set_helper_rose_rotate_with_marker" getter="get_helper_rose_rotate_with_marker" default="true">
+			When on (default), the rose turns with the shot's aim (the generator node's rotation or a [method shoot_from] pose), like Ring and Ellipse: [member helper_rose_base_rotation] adds to the aim. Off keeps it fixed in the world, turned by [member helper_rose_base_rotation] alone.
 		</member>
 		<member name="helper_scatter_arc" type="float" setter="set_helper_scatter_arc" getter="get_helper_scatter_arc" default="6.2831855">
 			Sector width in radians around [member helper_scatter_direction]. TAU or more is a full circle; narrow it (with a direction) for cones of fire. Must be finite and above 0.

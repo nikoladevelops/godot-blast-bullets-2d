@@ -125,6 +125,7 @@ func test_flower_knobs_follow_the_flower_type() -> void:
 		"helper_flower_radius": all_types,
 		"helper_flower_base_rotation": all_types,
 		"helper_flower_face_outward": all_types,
+		"helper_flower_rotate_with_marker": all_types,
 		"helper_flower_facing_offset_deg": all_types,
 		"helper_flower_petals": [BulletPatterns2D.FLOWER_FAN],
 		"helper_flower_petal_spread": [BulletPatterns2D.FLOWER_FAN],

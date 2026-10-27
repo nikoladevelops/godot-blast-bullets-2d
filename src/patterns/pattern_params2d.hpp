@@ -159,6 +159,7 @@ struct FlowerParams2D {
 	double super_lobes = 6.0;
 	double super_fullness = 1.0;
 	OutlineLayout2D outline;
+	bool rotate_with_marker = true; // the shape turns with the aim, once
 };
 
 struct GridParams2D {
@@ -178,6 +179,7 @@ struct HeartParams2D {
 	bool face_outward = true;
 	real_t facing_offset_degrees = 0.0;
 	OutlineLayout2D outline;
+	bool rotate_with_marker = true; // the shape turns with the aim, once
 };
 
 struct LatticeParams2D {
@@ -207,6 +209,7 @@ struct LissajousParams2D {
 	bool face_outward = true;
 	real_t facing_offset_degrees = 0.0;
 	OutlineLayout2D outline;
+	bool rotate_with_marker = true; // the shape turns with the aim, once
 };
 
 struct MultispiralParams2D {
@@ -280,6 +283,7 @@ struct RoseParams2D {
 	bool face_outward = true;
 	real_t facing_offset_degrees = 0.0;
 	OutlineLayout2D outline;
+	bool rotate_with_marker = true; // the shape turns with the aim, once
 };
 
 struct ScatterParams2D {

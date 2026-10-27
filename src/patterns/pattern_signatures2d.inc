@@ -187,7 +187,8 @@ PATTERN_GENERATOR(aimed, AimedParams2D)
 	OPT(double, super_lobes, 6.0, super_lobes) \
 	OPT(double, super_fullness, 1.0, super_fullness) \
 	OPT(int, layer_layout, 1, outline.layer_layout) \
-	PATTERN_OUTLINE_FILL_TAIL(REQ, OPT)
+	PATTERN_OUTLINE_FILL_TAIL(REQ, OPT) \
+	OPT(bool, rotate_with_marker, true, rotate_with_marker)
 
 PATTERN_GENERATOR(flower, FlowerParams2D)
 
@@ -312,7 +313,8 @@ PATTERN_GENERATOR(star, StarParams2D)
 	OPT(real_t, facing_offset_degrees, 0.0, facing_offset_degrees) \
 	PATTERN_OUTLINE_HEAD(REQ, OPT) \
 	OPT(int, layer_layout, 1, outline.layer_layout) \
-	PATTERN_OUTLINE_FILL_TAIL(REQ, OPT)
+	PATTERN_OUTLINE_FILL_TAIL(REQ, OPT) \
+	OPT(bool, rotate_with_marker, true, rotate_with_marker)
 
 PATTERN_GENERATOR(heart, HeartParams2D)
 
@@ -369,7 +371,8 @@ PATTERN_GENERATOR(lattice, LatticeParams2D)
 	OPT(real_t, facing_offset_degrees, 0.0, facing_offset_degrees) \
 	PATTERN_OUTLINE_HEAD(REQ, OPT) \
 	OPT(int, layer_layout, 1, outline.layer_layout) \
-	PATTERN_OUTLINE_FILL_TAIL(REQ, OPT)
+	PATTERN_OUTLINE_FILL_TAIL(REQ, OPT) \
+	OPT(bool, rotate_with_marker, true, rotate_with_marker)
 
 PATTERN_GENERATOR(rose, RoseParams2D)
 
@@ -415,7 +418,8 @@ PATTERN_GENERATOR(corridor, CorridorParams2D)
 	OPT(real_t, facing_offset_degrees, 0.0, facing_offset_degrees) \
 	PATTERN_OUTLINE_HEAD(REQ, OPT) \
 	OPT(int, layer_layout, 1, outline.layer_layout) \
-	PATTERN_OUTLINE_FILL_TAIL(REQ, OPT)
+	PATTERN_OUTLINE_FILL_TAIL(REQ, OPT) \
+	OPT(bool, rotate_with_marker, true, rotate_with_marker)
 
 PATTERN_GENERATOR(lissajous, LissajousParams2D)
 

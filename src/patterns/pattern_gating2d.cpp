@@ -72,7 +72,7 @@ bool PatternKnobs2D::is_knob_relevant(int source, const String &property_name) c
 			// Clamped defensively: the setter validates, but a raw/desynced
 			// value must degrade to hiding knobs, never to a silent wrong set.
 			const int ftype = Math::clamp(helper_flower_type, 0, 4);
-			if (property_name == "helper_flower_type" || property_name == "helper_flower_radius" || property_name == "helper_flower_base_rotation" || property_name == "helper_flower_face_outward" || property_name == "helper_flower_facing_offset_deg") {
+			if (property_name == "helper_flower_type" || property_name == "helper_flower_radius" || property_name == "helper_flower_base_rotation" || property_name == "helper_flower_face_outward" || property_name == "helper_flower_facing_offset_deg" || property_name == "helper_flower_rotate_with_marker") {
 				return true; // common bloom knobs
 			}
 			if (property_name == "helper_flower_petals" || property_name == "helper_flower_petal_spread") {

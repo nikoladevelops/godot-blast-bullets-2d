@@ -755,6 +755,12 @@
 				Getter of [member BulletSpawner2D.helper_flower_radius] and [member LaserSpawner2D.helper_flower_radius].
 			</description>
 		</method>
+		<method name="get_helper_flower_rotate_with_marker" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Getter of [member BulletSpawner2D.helper_flower_rotate_with_marker] and [member LaserSpawner2D.helper_flower_rotate_with_marker].
+			</description>
+		</method>
 		<method name="get_helper_flower_spiro_pen" qualifiers="const">
 			<return type="float" />
 			<description>
@@ -849,6 +855,12 @@
 			<return type="float" />
 			<description>
 				Getter of [member BulletSpawner2D.helper_heart_facing_offset_deg] and [member LaserSpawner2D.helper_heart_facing_offset_deg].
+			</description>
+		</method>
+		<method name="get_helper_heart_rotate_with_marker" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Getter of [member BulletSpawner2D.helper_heart_rotate_with_marker] and [member LaserSpawner2D.helper_heart_rotate_with_marker].
 			</description>
 		</method>
 		<method name="get_helper_heart_size" qualifiers="const">
@@ -975,6 +987,12 @@
 			<return type="float" />
 			<description>
 				Getter of [member BulletSpawner2D.helper_lissajous_phase] and [member LaserSpawner2D.helper_lissajous_phase].
+			</description>
+		</method>
+		<method name="get_helper_lissajous_rotate_with_marker" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Getter of [member BulletSpawner2D.helper_lissajous_rotate_with_marker] and [member LaserSpawner2D.helper_lissajous_rotate_with_marker].
 			</description>
 		</method>
 		<method name="get_helper_lissajous_size_x" qualifiers="const">
@@ -1413,6 +1431,12 @@
 			<return type="float" />
 			<description>
 				Getter of [member BulletSpawner2D.helper_rose_radius] and [member LaserSpawner2D.helper_rose_radius].
+			</description>
+		</method>
+		<method name="get_helper_rose_rotate_with_marker" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Getter of [member BulletSpawner2D.helper_rose_rotate_with_marker] and [member LaserSpawner2D.helper_rose_rotate_with_marker].
 			</description>
 		</method>
 		<method name="get_helper_scatter_arc" qualifiers="const">
@@ -3131,6 +3155,13 @@
 				Setter of [member BulletSpawner2D.helper_flower_radius] and [member LaserSpawner2D.helper_flower_radius].
 			</description>
 		</method>
+		<method name="set_helper_flower_rotate_with_marker">
+			<return type="void" />
+			<param index="0" name="value" type="bool" />
+			<description>
+				Setter of [member BulletSpawner2D.helper_flower_rotate_with_marker] and [member LaserSpawner2D.helper_flower_rotate_with_marker].
+			</description>
+		</method>
 		<method name="set_helper_flower_spiro_pen">
 			<return type="void" />
 			<param index="0" name="value" type="float" />
@@ -3241,6 +3272,13 @@
 			<param index="0" name="value" type="float" />
 			<description>
 				Setter of [member BulletSpawner2D.helper_heart_facing_offset_deg] and [member LaserSpawner2D.helper_heart_facing_offset_deg].
+			</description>
+		</method>
+		<method name="set_helper_heart_rotate_with_marker">
+			<return type="void" />
+			<param index="0" name="value" type="bool" />
+			<description>
+				Setter of [member BulletSpawner2D.helper_heart_rotate_with_marker] and [member LaserSpawner2D.helper_heart_rotate_with_marker].
 			</description>
 		</method>
 		<method name="set_helper_heart_size">
@@ -3388,6 +3426,13 @@
 			<param index="0" name="value" type="float" />
 			<description>
 				Setter of [member BulletSpawner2D.helper_lissajous_phase] and [member LaserSpawner2D.helper_lissajous_phase].
+			</description>
+		</method>
+		<method name="set_helper_lissajous_rotate_with_marker">
+			<return type="void" />
+			<param index="0" name="value" type="bool" />
+			<description>
+				Setter of [member BulletSpawner2D.helper_lissajous_rotate_with_marker] and [member LaserSpawner2D.helper_lissajous_rotate_with_marker].
 			</description>
 		</method>
 		<method name="set_helper_lissajous_size_x">
@@ -3899,6 +3944,13 @@
 			<param index="0" name="value" type="float" />
 			<description>
 				Setter of [member BulletSpawner2D.helper_rose_radius] and [member LaserSpawner2D.helper_rose_radius].
+			</description>
+		</method>
+		<method name="set_helper_rose_rotate_with_marker">
+			<return type="void" />
+			<param index="0" name="value" type="bool" />
+			<description>
+				Setter of [member BulletSpawner2D.helper_rose_rotate_with_marker] and [member LaserSpawner2D.helper_rose_rotate_with_marker].
 			</description>
 		</method>
 		<method name="set_helper_scatter_arc">

@@ -196,6 +196,7 @@ PatternSlots2D PatternKnobs2D::generate_raw(const PatternInputs2D &in) const {
 			flower_params.petal_spread = helper_flower_petal_spread;
 			flower_params.petal_sharpness = helper_flower_petal_sharpness;
 			flower_params.base_rotation = helper_flower_base_rotation;
+			flower_params.rotate_with_marker = helper_flower_rotate_with_marker;
 			flower_params.face_outward = helper_flower_face_outward;
 			flower_params.facing_offset_degrees = helper_flower_facing_offset_deg;
 			flower_params.outline = outline_layout();
@@ -304,6 +305,7 @@ PatternSlots2D PatternKnobs2D::generate_raw(const PatternInputs2D &in) const {
 			HeartParams2D heart_params;
 			heart_params.size = helper_heart_size;
 			heart_params.base_rotation = helper_heart_base_rotation;
+			heart_params.rotate_with_marker = helper_heart_rotate_with_marker;
 			heart_params.face_outward = helper_heart_face_outward;
 			heart_params.facing_offset_degrees = helper_heart_facing_offset_deg;
 			heart_params.outline = outline_layout();
@@ -369,6 +371,7 @@ PatternSlots2D PatternKnobs2D::generate_raw(const PatternInputs2D &in) const {
 			rose_params.radius = helper_rose_radius;
 			rose_params.lobe_sharpness = helper_rose_lobe_sharpness;
 			rose_params.base_rotation = helper_rose_base_rotation;
+			rose_params.rotate_with_marker = helper_rose_rotate_with_marker;
 			rose_params.face_outward = helper_rose_face_outward;
 			rose_params.facing_offset_degrees = helper_rose_facing_offset_deg;
 			rose_params.outline = outline_layout();
@@ -422,6 +425,7 @@ PatternSlots2D PatternKnobs2D::generate_raw(const PatternInputs2D &in) const {
 			lissajous_params.freq_x = helper_lissajous_freq_x;
 			lissajous_params.freq_y = helper_lissajous_freq_y;
 			lissajous_params.phase = helper_lissajous_phase;
+			lissajous_params.rotate_with_marker = helper_lissajous_rotate_with_marker;
 			lissajous_params.face_outward = helper_lissajous_face_outward;
 			lissajous_params.facing_offset_degrees = helper_lissajous_facing_offset_deg;
 			lissajous_params.outline = outline_layout();

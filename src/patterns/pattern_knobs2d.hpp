@@ -118,6 +118,8 @@ struct PatternKnobs2D {
 	double helper_flower_spiro_pen = 80.0; // hypotrochoid pen d (>= 0)
 	double helper_flower_super_lobes = 6.0; // superformula lobe count m
 	double helper_flower_super_fullness = 1.0; // superformula fullness exponent
+	// Turns the shape with the aim (the marker's rotation), once.
+	bool helper_flower_rotate_with_marker = true;
 
 	// ELLIPSE (true ellipse ring / arc / wall-with-gaps).
 	double helper_ellipse_radius_x = 150.0;
@@ -196,6 +198,8 @@ struct PatternKnobs2D {
 	double helper_heart_base_rotation = 0.0;
 	bool helper_heart_face_outward = true;
 	double helper_heart_facing_offset_deg = 0.0;
+	// Turns the shape with the aim (the marker's rotation), once.
+	bool helper_heart_rotate_with_marker = true;
 
 	// WAVE (snake row along a sine wave).
 	double helper_wave_width = 600.0;
@@ -233,6 +237,8 @@ struct PatternKnobs2D {
 	double helper_rose_base_rotation = 0.0;
 	bool helper_rose_face_outward = true;
 	double helper_rose_facing_offset_deg = 0.0;
+	// Turns the shape with the aim (the marker's rotation), once.
+	bool helper_rose_rotate_with_marker = true;
 
 	// COUNTER SPIRAL (twin counter-rotating galaxy / windmill arms).
 	int helper_counter_spiral_arms = 2;
@@ -262,6 +268,8 @@ struct PatternKnobs2D {
 	double helper_lissajous_phase = 0.0;
 	bool helper_lissajous_face_outward = true;
 	double helper_lissajous_facing_offset_deg = 0.0;
+	// Turns the shape with the aim (the marker's rotation), once.
+	bool helper_lissajous_rotate_with_marker = true;
 
 	// CUSTOM (hand-placed transforms). Store any Transform2D array in
 	// helper_custom_transforms (generator-local: composed as

@@ -107,7 +107,7 @@ void BulletPatterns2D::_bind_methods() {
 
 	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_flower", "flower_type", "petals", "radius", "petal_spread", "petal_sharpness", "inner_radius_scale", "spiro_roller", "spiro_pen", "super_lobes", "super_fullness", "base_rotation", "transforms_amount"), &BulletPatterns2D::helper_sample_outline_flower, DEFVAL(0), DEFVAL(6), DEFVAL(150.0), DEFVAL(0.5), DEFVAL(1.0), DEFVAL(0.0), DEFVAL(45.0), DEFVAL(80.0), DEFVAL(6.0), DEFVAL(1.0), DEFVAL(0.0), DEFVAL(-1));
 
-	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_lissajous", "size_x", "size_y", "freq_x", "freq_y", "phase"), &BulletPatterns2D::helper_sample_outline_lissajous, DEFVAL(200.0), DEFVAL(120.0), DEFVAL(3.0), DEFVAL(2.0), DEFVAL(0.0));
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_lissajous", "size_x", "size_y", "freq_x", "freq_y", "phase", "rotation"), &BulletPatterns2D::helper_sample_outline_lissajous, DEFVAL(200.0), DEFVAL(120.0), DEFVAL(3.0), DEFVAL(2.0), DEFVAL(0.0), DEFVAL(0.0));
 
 	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_circle", "radius"), &BulletPatterns2D::helper_sample_outline_circle, DEFVAL(150.0));
 

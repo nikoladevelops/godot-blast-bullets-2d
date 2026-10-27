@@ -65,9 +65,9 @@ static bool flower_curve_point(int flower_type, int petals, real_t radius, real_
 	}
 	if (flower_type == BulletPatterns2D::FLOWER_RHODONEA) {
 		const real_t sharp = (petal_sharpness < 0.0) ? (real_t)0.0 : petal_sharpness;
-		const real_t theta = base_rotation + (real_t)t;
-		const real_t r = flower_rhodonea_radius2d(petals, theta, radius, sharp, clamped_inner);
-		r_offset = Vector2(Math::cos(theta), Math::sin(theta)) * r;
+		const real_t r = flower_rhodonea_radius2d(petals, (real_t)t, radius, sharp, clamped_inner);
+		const real_t angle = base_rotation + (real_t)t;
+		r_offset = Vector2(Math::cos(angle), Math::sin(angle)) * r;
 		return r_offset.is_finite();
 	}
 	if (flower_type == BulletPatterns2D::FLOWER_PHYLLOTAXIS) {
@@ -214,16 +214,18 @@ Dictionary BulletPatterns2D::helper_sample_outline_rose(int petals, real_t radiu
 	const real_t sweep = rose_sweep2d(petals);
 	PackedVector2Array pts;
 	for (int i = 0; i < n; ++i) {
-		const real_t theta = sweep * (real_t)i / (real_t)n + base_rotation;
+		// The radius follows the unturned theta; base_rotation turns the point.
+		const real_t theta = sweep * (real_t)i / (real_t)n;
 		real_t cos_k = 0.0;
 		const real_t r = rose_radius2d(petals, theta, radius, lobe_sharpness, cos_k);
-		pts.push_back(Vector2(Math::cos(theta), Math::sin(theta)) * r);
+		const real_t angle = theta + base_rotation;
+		pts.push_back(Vector2(Math::cos(angle), Math::sin(angle)) * r);
 	}
 	return outline_track_result(pts, true);
 }
 
-Dictionary BulletPatterns2D::helper_sample_outline_lissajous(real_t size_x, real_t size_y, real_t freq_x, real_t freq_y, real_t phase) {
-	if (!Math::is_finite(size_x) || size_x < 0.0 || !Math::is_finite(size_y) || size_y < 0.0 || !Math::is_finite(freq_x) || freq_x < 0.0 || !Math::is_finite(freq_y) || freq_y < 0.0 || !Math::is_finite(phase)) {
+Dictionary BulletPatterns2D::helper_sample_outline_lissajous(real_t size_x, real_t size_y, real_t freq_x, real_t freq_y, real_t phase, real_t rotation) {
+	if (!Math::is_finite(size_x) || size_x < 0.0 || !Math::is_finite(size_y) || size_y < 0.0 || !Math::is_finite(freq_x) || freq_x < 0.0 || !Math::is_finite(freq_y) || freq_y < 0.0 || !Math::is_finite(phase) || !Math::is_finite(rotation)) {
 		UtilityFunctions::push_error("helper_sample_outline_lissajous: sizes/freqs finite and >= 0, phase finite.");
 		return outline_track_result(PackedVector2Array(), false);
 	}
@@ -237,7 +239,8 @@ Dictionary BulletPatterns2D::helper_sample_outline_lissajous(real_t size_x, real
 	PackedVector2Array pts;
 	for (int i = 0; i < n; ++i) {
 		const real_t tt = (real_t)(t0 + t_span * (double)i / (open_run ? (double)(n - 1) : (double)n));
-		pts.push_back(lissajous_point2d(size_x, size_y, freq_x, freq_y, phase, tt));
+		const Vector2 p = lissajous_point2d(size_x, size_y, freq_x, freq_y, phase, tt);
+		pts.push_back(rotation != (real_t)0.0 ? p.rotated(rotation) : p);
 	}
 	return outline_track_result(pts, !open_run);
 }

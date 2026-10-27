@@ -60,10 +60,10 @@ void PatternKnobs2D::build_preview_track(const PatternTrackInputs2D &in, Pattern
 			sink.push_dict(BulletPatterns2D::helper_sample_outline_star(helper_star_points, helper_star_outer_radius, helper_star_inner_radius, helper_star_base_rotation), true);
 			break;
 		case PATTERN_SHAPE_ROSE:
-			sink.push_dict(BulletPatterns2D::helper_sample_outline_rose(helper_rose_petals, helper_rose_radius, helper_rose_lobe_sharpness, helper_rose_base_rotation));
+			sink.push_dict(BulletPatterns2D::helper_sample_outline_rose(helper_rose_petals, helper_rose_radius, helper_rose_lobe_sharpness, (helper_rose_rotate_with_marker ? track_marker.get_rotation() : 0.0) + (real_t)helper_rose_base_rotation));
 			break;
 		case PATTERN_SHAPE_LISSAJOUS:
-			sink.push_dict(BulletPatterns2D::helper_sample_outline_lissajous(helper_lissajous_size_x, helper_lissajous_size_y, helper_lissajous_freq_x, helper_lissajous_freq_y, helper_lissajous_phase));
+			sink.push_dict(BulletPatterns2D::helper_sample_outline_lissajous(helper_lissajous_size_x, helper_lissajous_size_y, helper_lissajous_freq_x, helper_lissajous_freq_y, helper_lissajous_phase, helper_lissajous_rotate_with_marker ? track_marker.get_rotation() : 0.0));
 			break;
 		case PATTERN_SHAPE_CIRCLE:
 			sink.push_dict(BulletPatterns2D::helper_sample_outline_circle(helper_circle_radius));
@@ -205,14 +205,14 @@ void PatternKnobs2D::build_preview_track(const PatternTrackInputs2D &in, Pattern
 		}
 		case PATTERN_SHAPE_HEART: {
 			// Parametric sweep of the heart curve.
-			sink.push_dict(BulletPatterns2D::helper_sample_outline_heart((real_t)helper_heart_size, (real_t)helper_heart_base_rotation));
+			sink.push_dict(BulletPatterns2D::helper_sample_outline_heart((real_t)helper_heart_size, (helper_heart_rotate_with_marker ? track_marker.get_rotation() : 0.0) + (real_t)helper_heart_base_rotation));
 			break;
 		}
 		case PATTERN_SHAPE_FLOWER: {
 			// Per-type bloom track at fixed density: FAN traces the
 			// petal-tip ring, RHODONEA/SPIROGRAPH/SUPERFORMULA trace the
 			// actual curve, PHYLLOTAXIS bounds the Vogel disc rim.
-			sink.push_dict(BulletPatterns2D::helper_sample_outline_flower(helper_flower_type, helper_flower_petals, (real_t)helper_flower_radius, (real_t)helper_flower_petal_spread, (real_t)helper_flower_petal_sharpness, helper_flower_inner_radius_scale, helper_flower_spiro_roller, helper_flower_spiro_pen, helper_flower_super_lobes, helper_flower_super_fullness, (real_t)helper_flower_base_rotation,
+			sink.push_dict(BulletPatterns2D::helper_sample_outline_flower(helper_flower_type, helper_flower_petals, (real_t)helper_flower_radius, (real_t)helper_flower_petal_spread, (real_t)helper_flower_petal_sharpness, helper_flower_inner_radius_scale, helper_flower_spiro_roller, helper_flower_spiro_pen, helper_flower_super_lobes, helper_flower_super_fullness, (helper_flower_rotate_with_marker ? track_marker.get_rotation() : 0.0) + (real_t)helper_flower_base_rotation,
 					// FAN on outline: skip petals that hold no bullet.
 					helper_outline_placement == BulletPatterns2D::OUTLINE_ON_OUTLINE ? helper_bullets_amount : -1));
 			break;

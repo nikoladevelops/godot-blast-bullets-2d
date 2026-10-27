@@ -325,6 +325,8 @@ PatternSlots2D BulletPatterns2D::generate_flower2d(int transforms_amount, Transf
 	PackedVector2Array fill_outline; // dense curve for Fill / Layers (count-independent)
 	PackedVector2Array fill_normals;
 	const Vector2 origin = marker_transform.get_origin();
+	// The bloom turns with the aim (rotate_with_marker), once.
+	const real_t rotation = p.base_rotation + (p.rotate_with_marker ? marker_transform.get_rotation() : (real_t)0.0);
 	if (p.flower_type == FLOWER_FAN) {
 		// Petal-major fan: the amount is split over the petals
 		// (flower_fan_petal_count spreads the remainder symmetrically), so
@@ -335,7 +337,7 @@ PatternSlots2D BulletPatterns2D::generate_flower2d(int transforms_amount, Transf
 		const bool fans_touch = p.petal_spread * (real_t)p.petals >= Math::TAU - 1e-6;
 		for (int petal = 0; petal < p.petals; ++petal) {
 			const int in_petal = flower_fan_petal_count(petal, p.petals, transforms_amount);
-			const real_t lobe_center = p.base_rotation + Math::TAU * (real_t)petal / (real_t)p.petals;
+			const real_t lobe_center = rotation + Math::TAU * (real_t)petal / (real_t)p.petals;
 			for (int s = 0; s < in_petal; ++s) {
 				real_t frac = 0.0;
 				if (fans_touch) {
@@ -355,7 +357,7 @@ PatternSlots2D BulletPatterns2D::generate_flower2d(int transforms_amount, Transf
 			// Silhouette of every petal arc (independent of the amount).
 			PackedVector2Array arcs;
 			for (int petal = 0; petal < p.petals; ++petal) {
-				const real_t lobe_center = p.base_rotation + Math::TAU * (real_t)petal / (real_t)p.petals;
+				const real_t lobe_center = rotation + Math::TAU * (real_t)petal / (real_t)p.petals;
 				for (int q = 0; q <= 16; ++q) {
 					const real_t frac = (real_t)q / 16.0 - 0.5;
 					const real_t angle = lobe_center + frac * p.petal_spread;
@@ -375,10 +377,13 @@ PatternSlots2D BulletPatterns2D::generate_flower2d(int transforms_amount, Transf
 		PackedVector2Array dense_pts;
 		PackedVector2Array dense_nrms;
 		for (int k = 0; k < 720; ++k) {
-			const real_t theta = Math::TAU * (real_t)k / 720.0 + p.base_rotation;
+			// The radius follows the unturned theta (turning it re-parametrized
+			// the same curve: base_rotation drew the identical bloom).
+			const real_t theta = Math::TAU * (real_t)k / 720.0;
 			const real_t r = flower_rhodonea_radius2d(p.petals, theta, p.radius, sharp, p.inner_radius_scale);
-			dense_pts.push_back(Vector2(Math::cos(theta), Math::sin(theta)) * r);
-			const Vector2 radial = Vector2(Math::cos(theta), Math::sin(theta));
+			const real_t angle = theta + rotation;
+			dense_pts.push_back(Vector2(Math::cos(angle), Math::sin(angle)) * r);
+			const Vector2 radial = Vector2(Math::cos(angle), Math::sin(angle));
 			dense_nrms.push_back((radial.length_squared() > 1e-12) ? radial : Vector2(1, 0));
 		}
 		const DenseLoop2D loop = dense_curve_loop2d(dense_pts, dense_nrms, PackedFloat32Array(), transforms_amount, true, true, origin, p.outline.outline_placement);
@@ -389,7 +394,7 @@ PatternSlots2D BulletPatterns2D::generate_flower2d(int transforms_amount, Transf
 	} else if (p.flower_type == FLOWER_PHYLLOTAXIS) {
 		if (p.outline.outline_placement == OUTLINE_FILL_INSIDE) {
 			for (int q = 0; q < 128; ++q) {
-				const real_t a = p.base_rotation + Math::TAU * (real_t)q / 128.0;
+				const real_t a = rotation + Math::TAU * (real_t)q / 128.0;
 				fill_outline.push_back(origin + Vector2(Math::cos(a), Math::sin(a)) * p.radius);
 			}
 		}
@@ -397,7 +402,7 @@ PatternSlots2D BulletPatterns2D::generate_flower2d(int transforms_amount, Transf
 		// R*sqrt((i+0.5)/n) blended from the inner edge outward.
 		for (int i = 0; i < transforms_amount; ++i) {
 			const double frac = (transforms_amount > 0) ? ((double)i + 0.5) / (double)transforms_amount : 0.0;
-			const real_t angle = p.base_rotation + (real_t)((double)i * golden_angle);
+			const real_t angle = rotation + (real_t)((double)i * golden_angle);
 			const real_t r = p.radius * (real_t)(p.inner_radius_scale + (1.0 - p.inner_radius_scale) * Math::sqrt(Math::clamp(frac, 0.0, 1.0)));
 			loop_points.push_back(origin + Vector2(Math::cos(angle), Math::sin(angle)) * r);
 			const Vector2 radial = Vector2(Math::cos(angle), Math::sin(angle));
@@ -422,7 +427,7 @@ PatternSlots2D BulletPatterns2D::generate_flower2d(int transforms_amount, Transf
 		PackedVector2Array dense_nrms;
 		for (int q = 0; q < dense_n; ++q) {
 			const double t = Math::TAU * (double)revolutions * (double)q / (double)dense_n;
-			Vector2 local = spirograph_point2d(spiro, t).rotated(p.base_rotation);
+			Vector2 local = spirograph_point2d(spiro, t).rotated(rotation);
 			if (!local.is_finite()) {
 				local = Vector2(0, 0);
 			}
@@ -444,7 +449,7 @@ PatternSlots2D BulletPatterns2D::generate_flower2d(int transforms_amount, Transf
 			const double t = Math::TAU * (double)q / 720.0;
 			const double r_norm = superformula_norm2d(p.super_lobes, p.super_fullness, t);
 			const real_t r = p.radius * (real_t)(p.inner_radius_scale + (1.0 - p.inner_radius_scale) * (r_norm * 0.5));
-			const real_t ang = p.base_rotation + (real_t)t;
+			const real_t ang = rotation + (real_t)t;
 			dense_pts.push_back(Vector2(Math::cos(ang), Math::sin(ang)) * r);
 			const Vector2 radial = Vector2(Math::cos(ang), Math::sin(ang));
 			dense_nrms.push_back((radial.length_squared() > 1e-12) ? radial : Vector2(1, 0));
@@ -597,17 +602,19 @@ PatternSlots2D BulletPatterns2D::generate_heart2d(int transforms_amount, Transfo
 	PackedFloat32Array dense_ovr;
 	const Vector2 origin = marker_transform.get_origin();
 	const real_t facing_offset = Math::deg_to_rad(p.facing_offset_degrees);
-	const Vector2 fallback_dir = Vector2(Math::cos(p.base_rotation), Math::sin(p.base_rotation));
+	// The heart turns with the aim (rotate_with_marker), once.
+	const real_t rotation = p.base_rotation + (p.rotate_with_marker ? marker_transform.get_rotation() : (real_t)0.0);
+	const Vector2 fallback_dir = Vector2(Math::cos(rotation), Math::sin(rotation));
 	const real_t scale = p.size / 32.0;
 	for (int k = 0; k < 720; ++k) {
 		const real_t t = Math::TAU * (real_t)k / 720.0;
-		Vector2 local = heart_point2d(t, scale).rotated(p.base_rotation);
+		Vector2 local = heart_point2d(t, scale).rotated(rotation);
 		if (!local.is_finite()) {
 			local = Vector2(0, 0);
 		}
 		dense_pts.push_back(local);
 		dense_nrms.push_back((local.length_squared() > 1e-12) ? local.normalized() : fallback_dir);
-		const real_t radial = (local.length_squared() > 0.0) ? local.angle() : p.base_rotation;
+		const real_t radial = (local.length_squared() > 0.0) ? local.angle() : rotation;
 		dense_ovr.push_back((p.face_outward ? radial : radial + Math::PI) + facing_offset);
 	}
 	const DenseLoop2D loop = dense_curve_loop2d(dense_pts, dense_nrms, dense_ovr, transforms_amount, true, false, origin, p.outline.outline_placement);
@@ -632,12 +639,18 @@ PatternSlots2D BulletPatterns2D::generate_rose2d(int transforms_amount, Transfor
 	// full turn for even k (2k petals): sweeping a full turn for odd k traced
 	// every petal twice, stacking bullet i+n/2 on bullet i.
 	const real_t sweep = rose_sweep2d(p.petals);
+	// The radius follows the unturned theta; the turn (base_rotation, plus
+	// the aim with rotate_with_marker) moves the point. Turning theta inside
+	// the radius only re-parametrized the same curve: base_rotation drew the
+	// identical rose.
+	const real_t rotation = p.base_rotation + (p.rotate_with_marker ? marker_transform.get_rotation() : (real_t)0.0);
 	for (int k = 0; k < 720; ++k) {
-		const real_t theta = sweep * (real_t)k / 720.0 + p.base_rotation;
+		const real_t theta = sweep * (real_t)k / 720.0;
 		real_t cos_k = 0.0;
 		const real_t r = rose_radius2d(p.petals, theta, p.radius, p.lobe_sharpness, cos_k);
-		dense_pts.push_back(Vector2(Math::cos(theta), Math::sin(theta)) * r);
-		const real_t shape_angle = (cos_k >= 0.0) ? theta : theta + Math::PI;
+		const real_t angle = theta + rotation;
+		dense_pts.push_back(Vector2(Math::cos(angle), Math::sin(angle)) * r);
+		const real_t shape_angle = (cos_k >= 0.0) ? angle : angle + Math::PI;
 		dense_nrms.push_back(Vector2(Math::cos(shape_angle), Math::sin(shape_angle)));
 	}
 	const DenseLoop2D loop = dense_curve_loop2d(dense_pts, dense_nrms, PackedFloat32Array(), transforms_amount, true, true, origin, p.outline.outline_placement);
@@ -652,9 +665,8 @@ PatternSlots2D BulletPatterns2D::generate_lissajous2d(int transforms_amount, Tra
 	PATTERN_REJECT_IF(!Math::is_finite(p.size_x) || p.size_x < 0.0 || !Math::is_finite(p.size_y) || p.size_y < 0.0, "size_x and size_y must be finite and >= 0.");
 	PATTERN_REJECT_IF(!Math::is_finite(p.freq_x) || p.freq_x < 0.0 || !Math::is_finite(p.freq_y) || p.freq_y < 0.0, "freq_x and freq_y must be finite and >= 0.");
 	PATTERN_REJECT_IF(!Math::is_finite(p.phase) || !Math::is_finite(p.facing_offset_degrees), "phase and facing_offset_degrees must be finite.");
-	// Weave sweep plus center-radial outward normals (+x when a sample lands
-	// exactly on the center: the weave is world-fixed like the heart and the
-	// rose, so no facing may follow the aim); the shared outline worker
+	// Weave sweep plus center-radial outward normals (the turned +x when a
+	// sample lands exactly on the center); the shared outline worker
 	// assembles facings. Arc-even from a dense ideal sweep so dots sit
 	// exactly on the weave with even gaps.
 	PackedVector2Array dense_pts;
@@ -668,11 +680,17 @@ PatternSlots2D BulletPatterns2D::generate_lissajous2d(int transforms_amount, Tra
 	double t_span = Math::TAU;
 	bool open_run = false;
 	lissajous_sweep2d(p.freq_x, p.freq_y, p.phase, t0, t_span, open_run);
+	// The weave turns with the aim (rotate_with_marker), once.
+	const real_t rotation = p.rotate_with_marker ? marker_transform.get_rotation() : (real_t)0.0;
+	const Vector2 center_normal = Vector2(Math::cos(rotation), Math::sin(rotation));
 	for (int k = 0; k < 720; ++k) {
 		const real_t t = (real_t)(t0 + t_span * (double)k / (open_run ? 719.0 : 720.0));
-		const Vector2 offset = lissajous_point2d(p.size_x, p.size_y, p.freq_x, p.freq_y, p.phase, t);
+		Vector2 offset = lissajous_point2d(p.size_x, p.size_y, p.freq_x, p.freq_y, p.phase, t);
+		if (rotation != (real_t)0.0) {
+			offset = offset.rotated(rotation);
+		}
 		dense_pts.push_back(offset);
-		dense_nrms.push_back((offset.length_squared() > 0.0) ? offset.normalized() : Vector2(1, 0));
+		dense_nrms.push_back((offset.length_squared() > 0.0) ? offset.normalized() : center_normal);
 	}
 	const DenseLoop2D loop = dense_curve_loop2d(dense_pts, dense_nrms, PackedFloat32Array(), transforms_amount, !open_run, true, origin, p.outline.outline_placement);
 	return layout_outline_slots(caller, marker_transform, loop.points, loop.normals, false, 0.0, p.face_outward, p.facing_offset_degrees, PackedFloat32Array(), p.outline, CornerLayout2D::smooth(), PackedVector2Array(), !open_run, true, loop.fill_outline, dense_nrms);
