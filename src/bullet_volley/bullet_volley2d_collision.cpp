@@ -176,6 +176,9 @@ int BulletVolley2D::replay_paused_overlaps() {
 void BulletVolley2D::area_entered_func(PhysicsServer2D::AreaBodyStatus status, RID entered_rid, int64_t entered_instance_id, int entered_shape_index, int bullet_shape_index) {
 	(void)entered_rid;
 	(void)entered_shape_index;
+	if (!factory_alive()) {
+		return; // a volley outliving its factory (detached at its teardown) records nothing
+	}
 	// Paused factory stops draining (no _physics_process) but the physics
 	// server keeps firing: park (bounded) instead of queueing.
 	if (bullet_factory != nullptr && bullet_factory->is_bullet_processing_paused()) {
@@ -221,6 +224,9 @@ void BulletVolley2D::area_entered_func(PhysicsServer2D::AreaBodyStatus status, R
 void BulletVolley2D::body_entered_func(PhysicsServer2D::AreaBodyStatus status, RID entered_rid, int64_t entered_instance_id, int entered_shape_index, int bullet_shape_index) {
 	(void)entered_rid;
 	(void)entered_shape_index;
+	if (!factory_alive()) {
+		return; // a volley outliving its factory (detached at its teardown) records nothing
+	}
 	if (bullet_factory != nullptr && bullet_factory->is_bullet_processing_paused()) {
 		park_paused_overlap(status, entered_instance_id, bullet_shape_index, CollisionType::BODY);
 		return;
@@ -489,13 +495,13 @@ void BulletVolley2D::write_monitorable() {
 }
 
 void BulletVolley2D::request_physics_sync() {
-	if (physics_sync_pending) {
+	// Only a live factory applies the sync: a pending flag nobody would
+	// clear swallowed every later request.
+	if (physics_sync_pending || bullet_factory == nullptr || !factory_alive()) {
 		return;
 	}
 	physics_sync_pending = true;
-	if (bullet_factory != nullptr && factory_alive()) {
-		bullet_factory->queue_physics_sync(this);
-	}
+	bullet_factory->queue_physics_sync(this);
 }
 
 void BulletVolley2D::apply_physics_sync() {

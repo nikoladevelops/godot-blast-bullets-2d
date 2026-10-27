@@ -229,3 +229,55 @@ func test_freeing_from_spawner_signal_handlers_never_touches_freed_memory() -> v
 			if p != "":
 				problems.append(p)
 	assert_eq("\n".join(problems), "", "every spawner signal survives a free from its handler")
+
+
+## A volley emitting its own signal when its handler free()s the factory is
+## detached and queue_freed (Godot must not delete an emitter). With several
+## physics steps per rendered frame and a target entering its bullets right
+## after the free, nothing may call back into the freed factory: the queued
+## volley dies with the physics step that freed its factory (the SceneTree
+## flushes its delete queue after every physics process) and its monitor
+## callbacks also refuse a dead factory. Run under AddressSanitizer.
+func test_a_volley_detached_by_its_factorys_free_never_reads_the_factory_again() -> void:
+	check_factory_after = false
+	fired = 0
+	var ticks := Engine.physics_ticks_per_second
+	var d := _data(0.0)
+	var frames := SpriteFrames.new()
+	var img := Image.create_empty(1, 1, false, Image.FORMAT_RGBA8)
+	img.fill(Color.WHITE)
+	var tex := ImageTexture.create_from_image(img)
+	frames.add_frame("default", tex)
+	frames.add_frame("default", tex)
+	frames.set_animation_speed("default", 30.0)
+	frames.set_animation_loop("default", false)
+	d.sprite_frames = frames
+	d.transforms = [Transform2D(0.0, Vector2(200, 200))]
+	var hurtbox := make_area(Vector2(-3000, -3000), Vector2(40, 40), 4)
+	hurtbox.collision_mask = 0xFFFFFFFF
+	var game_hits: Array = []
+	hurtbox.area_shape_entered.connect(func(_rid: RID, _a: Area2D, _s: int, _l: int) -> void: game_hits.append(true))
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	var f := factory
+	var freed_at := []
+	v.sprite_animation_finished.connect(func(_volley = null, _i = null) -> void:
+		if fired > 0:
+			return
+		fired += 1
+		hurtbox.global_position = Vector2(200, 200) # enters on the next physics step
+		f.free()
+		freed_at.append(Engine.get_physics_frames()))
+	Engine.physics_ticks_per_second = 240 # four physics steps per rendered frame
+	for k in 60:
+		await physics(1)
+		if fired > 0:
+			break
+	await physics(6)
+	Engine.physics_ticks_per_second = ticks
+	await idle(2)
+	assert_eq(fired, 1, "the handler ran once")
+	assert_gt(Engine.get_physics_frames() - int(freed_at[0]), 6, "more physics steps ran after the free")
+	assert_false(is_instance_valid(f), "the factory is gone")
+	assert_false(is_instance_valid(v), "the detached volley died at the end of its frame")
+	assert_true(game_hits.is_empty(), "the detached volley left the physics space with its factory")
+	expect_no_errors()
