@@ -33,13 +33,13 @@ void PatternSpawner2D::_validate_property(PropertyInfo &p_property) const {
 		return;
 	}
 	if (property_name == "bullet_scale_min" || property_name == "bullet_scale_max") {
-		if (bullet_scale_mode != BULLET_SCALE_UNIFORM) {
+		if (placement.scale_mode != BULLET_SCALE_UNIFORM) {
 			p_property.usage &= ~PROPERTY_USAGE_EDITOR;
 		}
 		return;
 	}
 	if (property_name == "bullet_scale_min_xy" || property_name == "bullet_scale_max_xy") {
-		if (bullet_scale_mode != BULLET_SCALE_PER_AXIS) {
+		if (placement.scale_mode != BULLET_SCALE_PER_AXIS) {
 			p_property.usage &= ~PROPERTY_USAGE_EDITOR;
 		}
 		return;

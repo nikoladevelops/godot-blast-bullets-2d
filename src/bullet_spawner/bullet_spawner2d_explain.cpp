@@ -37,7 +37,7 @@ const char *flock_scope_name2d(int scope) {
 PackedStringArray BulletSpawner2D::debug_explain_features() const {
 	PackedStringArray out;
 	const bool rotation_data = spawn_data.is_valid() && (spawn_data->shared_bullet_rotation_data.is_valid() || !spawn_data->all_bullet_rotation_data.is_empty());
-	const bool random_size = bullet_scale_mode != BULLET_SCALE_OFF;
+	const bool random_size = placement.scale_mode != BULLET_SCALE_OFF;
 	int homing_targets = 0;
 
 	// Homing.
@@ -199,7 +199,7 @@ PackedStringArray BulletSpawner2D::debug_explain_features() const {
 	}
 
 	if (random_size) {
-		out.push_back(String("Randomization: bullet sizes vary (") + String::num(bullet_scale_min, 2) + " to " + String::num(bullet_scale_max, 2) + "): the flock (count_bullet_size), graze zones (count_bullet_size) and homing reach (homing_reach_counts_bullet_size) count each bullet's own size.");
+		out.push_back(String("Randomization: bullet sizes vary (") + String::num(placement.scale_min, 2) + " to " + String::num(placement.scale_max, 2) + "): the flock (count_bullet_size), graze zones (count_bullet_size) and homing reach (homing_reach_counts_bullet_size) count each bullet's own size.");
 	}
 	for (const String &warning : get_setup_warnings()) {
 		out.push_back("Warning: " + warning);

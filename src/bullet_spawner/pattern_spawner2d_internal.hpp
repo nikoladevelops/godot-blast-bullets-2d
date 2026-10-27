@@ -27,6 +27,7 @@
 #include "godot_cpp/variant/callable.hpp"
 #include "godot_cpp/variant/dictionary.hpp"
 #include "godot_cpp/variant/utility_functions.hpp"
+#include "patterns/shot_randomizer2d.hpp"
 #include <functional>
 #include <godot_cpp/classes/array_mesh.hpp>
 #include <godot_cpp/classes/multi_mesh.hpp>
@@ -174,33 +175,26 @@ static inline bool node_path_type_ok(const Node *self, const NodePath &p_path, c
 	return false;
 }
 
-// Seeded shot rolls (PatternSpawner2D placement, BulletSpawner2D speed).
+// Seeded shot rolls (PatternSpawner2D placement, BulletSpawner2D speed,
+// colors, lifetimes): the channels and helpers of ShotRandomizer2D.
 namespace {
-// Roll channels: each knob draws from its own stream, so switching one on
-// never shifts what another rolls for the same seed.
-enum RollChannel : uint32_t {
-	CHANNEL_SCALE_X = 1,
-	CHANNEL_SCALE_Y = 2,
-	CHANNEL_ROTATION = 3,
-	CHANNEL_POSITION_ANGLE = 4,
-	CHANNEL_POSITION_RADIUS = 5,
-	CHANNEL_SPEED = 6,
-	CHANNEL_SPIN = 7,
-	CHANNEL_COLOR = 8,
-	CHANNEL_LIFE_TIME = 9,
-};
+using RollChannel = ShotRandomizer2D::Channel;
+constexpr RollChannel CHANNEL_SCALE_X = ShotRandomizer2D::CHANNEL_SCALE_X;
+constexpr RollChannel CHANNEL_SCALE_Y = ShotRandomizer2D::CHANNEL_SCALE_Y;
+constexpr RollChannel CHANNEL_ROTATION = ShotRandomizer2D::CHANNEL_ROTATION;
+constexpr RollChannel CHANNEL_POSITION_ANGLE = ShotRandomizer2D::CHANNEL_POSITION_ANGLE;
+constexpr RollChannel CHANNEL_POSITION_RADIUS = ShotRandomizer2D::CHANNEL_POSITION_RADIUS;
+constexpr RollChannel CHANNEL_SPEED = ShotRandomizer2D::CHANNEL_SPEED;
+constexpr RollChannel CHANNEL_SPIN = ShotRandomizer2D::CHANNEL_SPIN;
+constexpr RollChannel CHANNEL_COLOR = ShotRandomizer2D::CHANNEL_COLOR;
+constexpr RollChannel CHANNEL_LIFE_TIME = ShotRandomizer2D::CHANNEL_LIFE_TIME;
 
 inline uint64_t mix64(uint64_t x) {
-	x += 0x9E3779B97F4A7C15ull;
-	x = (x ^ (x >> 30)) * 0xBF58476D1CE4E5B9ull;
-	x = (x ^ (x >> 27)) * 0x94D049BB133111EBull;
-	return x ^ (x >> 31);
+	return shot_roll_mix64(x);
 }
 
 inline double lerp_range(double a, double b, double t) {
-	const double lo = a < b ? a : b;
-	const double hi = a < b ? b : a;
-	return lo + (hi - lo) * t;
+	return shot_roll_lerp(a, b, t);
 }
 } // namespace
 

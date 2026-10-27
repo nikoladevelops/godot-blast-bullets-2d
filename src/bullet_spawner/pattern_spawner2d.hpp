@@ -10,6 +10,7 @@
 #include "patterns/pattern_bake_cache2d.hpp"
 #include "patterns/pattern_knobs2d.hpp"
 #include "patterns/pattern_registry2d.hpp"
+#include "patterns/shot_randomizer2d.hpp"
 #include "targets/target_source2d.hpp"
 #include <memory>
 #include <vector>
@@ -785,17 +786,10 @@ public:
 		BULLET_SCALE_UNIFORM,
 		BULLET_SCALE_PER_AXIS
 	};
-	int bullet_scale_mode = BULLET_SCALE_OFF;
-	Vector2 bullet_scale_min_xy = Vector2(1, 1);
-	Vector2 bullet_scale_max_xy = Vector2(1, 1);
-	int bullet_random_seed = 0; // 0 = Godot's global RNG
+	static_assert((int)BULLET_SCALE_OFF == ShotRandomizer2D::SCALE_OFF && (int)BULLET_SCALE_UNIFORM == ShotRandomizer2D::SCALE_UNIFORM && (int)BULLET_SCALE_PER_AXIS == ShotRandomizer2D::SCALE_PER_AXIS, "bullet_scale_mode ids are the randomizer's (saved in scenes)");
+	// The placement rolls (scale / rotation / position) and their seed.
+	ShotRandomizer2D placement;
 	bool spin_random_start_phase = false;
-	double bullet_scale_min = 1.0;
-	double bullet_scale_max = 1.0;
-	double bullet_rotation_min_degrees = 0.0;
-	double bullet_rotation_max_degrees = 0.0;
-	double bullet_position_jitter_min = 0.0;
-	double bullet_position_jitter_max = 0.0;
 	double shoot_interval_max_sec = 0.0;
 	double burst_interval_max_sec = 0.0;
 	double telegraph_max_sec = 0.0;
@@ -833,27 +827,27 @@ public:
 	// from outside them, and its muzzle is outside. Shots and telegraphs ask.
 	bool muzzle_outside_despawn_bounds(const BulletFactory2D *factory) const;
 
-	BulletScaleMode get_bullet_scale_mode() const { return static_cast<BulletScaleMode>(bullet_scale_mode); }
+	BulletScaleMode get_bullet_scale_mode() const { return static_cast<BulletScaleMode>(placement.scale_mode); }
 	void set_bullet_scale_mode(BulletScaleMode value);
-	Vector2 get_bullet_scale_min_xy() const { return bullet_scale_min_xy; }
+	Vector2 get_bullet_scale_min_xy() const { return placement.scale_min_xy; }
 	void set_bullet_scale_min_xy(const Vector2 &value);
-	Vector2 get_bullet_scale_max_xy() const { return bullet_scale_max_xy; }
+	Vector2 get_bullet_scale_max_xy() const { return placement.scale_max_xy; }
 	void set_bullet_scale_max_xy(const Vector2 &value);
-	int get_bullet_random_seed() const { return bullet_random_seed; }
-	void set_bullet_random_seed(int value) { bullet_random_seed = value; }
+	int get_bullet_random_seed() const { return (int)placement.seed; }
+	void set_bullet_random_seed(int value) { placement.seed = value; }
 	bool get_spin_random_start_phase() const { return spin_random_start_phase; }
 	void set_spin_random_start_phase(bool value) { spin_random_start_phase = value; }
-	double get_bullet_scale_min() const { return bullet_scale_min; }
+	double get_bullet_scale_min() const { return placement.scale_min; }
 	void set_bullet_scale_min(double value);
-	double get_bullet_scale_max() const { return bullet_scale_max; }
+	double get_bullet_scale_max() const { return placement.scale_max; }
 	void set_bullet_scale_max(double value);
-	double get_bullet_rotation_min_degrees() const { return bullet_rotation_min_degrees; }
+	double get_bullet_rotation_min_degrees() const { return placement.rotation_min_degrees; }
 	void set_bullet_rotation_min_degrees(double value);
-	double get_bullet_rotation_max_degrees() const { return bullet_rotation_max_degrees; }
+	double get_bullet_rotation_max_degrees() const { return placement.rotation_max_degrees; }
 	void set_bullet_rotation_max_degrees(double value);
-	double get_bullet_position_jitter_min() const { return bullet_position_jitter_min; }
+	double get_bullet_position_jitter_min() const { return placement.position_jitter_min; }
 	void set_bullet_position_jitter_min(double value);
-	double get_bullet_position_jitter_max() const { return bullet_position_jitter_max; }
+	double get_bullet_position_jitter_max() const { return placement.position_jitter_max; }
 	void set_bullet_position_jitter_max(double value);
 	double get_shoot_interval_max_sec() const { return shoot_interval_max_sec; }
 	void set_shoot_interval_max_sec(double value);
