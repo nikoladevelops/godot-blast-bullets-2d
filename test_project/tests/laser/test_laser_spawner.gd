@@ -43,7 +43,7 @@ func test_its_groups_come_first_and_gate_the_targeting() -> void:
 	for p in sp.get_property_list():
 		if int(p["usage"]) & PROPERTY_USAGE_GROUP:
 			groups.append(str(p["name"]))
-	assert_eq(groups.slice(0, 3), ["Lasers", "Laser Targeting", "Setup"], "its own groups, then the base's")
+	assert_eq(groups.slice(0, 3), ["Setup", "Lasers", "Patterns"], "Setup, what it fires, then where (test_spawner_inspector_layout pins the rest)")
 	assert_false("Homing" in groups, "no bullet groups")
 	var shown := func() -> Array:
 		var out: Array = []

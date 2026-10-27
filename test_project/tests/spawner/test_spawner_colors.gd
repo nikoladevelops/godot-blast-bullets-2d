@@ -62,7 +62,8 @@ func test_the_group_sits_after_bullets_and_gates_by_mode() -> void:
 			groups.append(name)
 		elif name.begins_with("bullet_color_"):
 			found[name] = [group, str(p["hint_string"])]
-	assert_eq(groups.slice(0, 3), ["Bullets", "Bullet Colors", "Homing"], "right after Bullets")
+	var at := groups.find("Bullet Colors")
+	assert_eq(groups.slice(at - 1, at + 2), ["Randomization", "Bullet Colors", "Homing"], "the first of the bullet groups, after where and when it fires")
 	assert_eq(found.get("bullet_color_mode", ["", ""]), ["Bullet Colors", "Off,Gradient Across Pattern,Random From Gradient,Gradient Per Shot"], "mode hint")
 	assert_eq(found.get("bullet_color_gradient", ["", ""]), ["Bullet Colors", "Gradient"], "gradient type")
 	assert_eq([BulletSpawner2D.COLOR_MODE_OFF, BulletSpawner2D.COLOR_MODE_GRADIENT_ACROSS_PATTERN, BulletSpawner2D.COLOR_MODE_RANDOM_FROM_GRADIENT, BulletSpawner2D.COLOR_MODE_GRADIENT_PER_SHOT], [0, 1, 2, 3], "serialized ids")

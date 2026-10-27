@@ -120,6 +120,13 @@ bool BulletSpawner2D::adopt_live_volley_script(const Variant &volley) {
 }
 
 void BulletSpawner2D::_bind_methods() {
+	// Inspector layout: where the factory and the generator are, what a shot
+	// fires (Bullets), where and when (Patterns, Shooting, Time, Spin,
+	// Randomization), what the bullets do (Colors .. Emitter Bullets), then the
+	// shared Graze / Sound and the editor-facing groups. Names never change
+	// here (they are saved); only the order and the headers do.
+	const StringName cls = get_class_static();
+	bind_spawner_group(cls, SPAWNER_GROUP_SETUP);
 	ADD_GROUP("Bullets", "");
 	ClassDB::bind_method(D_METHOD("get_spawn_data"), &BulletSpawner2D::get_spawn_data);
 	ClassDB::bind_method(D_METHOD("set_spawn_data", "new_spawn_data"), &BulletSpawner2D::set_spawn_data);
@@ -199,6 +206,11 @@ void BulletSpawner2D::_bind_methods() {
 
 	// Bullet Colors (bullet_spawner2d_colors.cpp): per-bullet colors picked at
 	// shot time; the gradient and the mode knobs hide while the mode is Off.
+	bind_spawner_group(cls, SPAWNER_GROUP_PATTERNS);
+	bind_spawner_group(cls, SPAWNER_GROUP_SHOOTING);
+	bind_spawner_group(cls, SPAWNER_GROUP_TIME);
+	bind_spawner_group(cls, SPAWNER_GROUP_SPIN);
+	bind_spawner_group(cls, SPAWNER_GROUP_RANDOMIZATION);
 	ADD_GROUP("Bullet Colors", "");
 	ClassDB::bind_method(D_METHOD("get_bullet_color_mode"), &BulletSpawner2D::get_bullet_color_mode);
 	ClassDB::bind_method(D_METHOD("set_bullet_color_mode", "value"), &BulletSpawner2D::set_bullet_color_mode);
@@ -441,6 +453,11 @@ void BulletSpawner2D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "emitter_enabled"), "set_emitter_enabled", "get_emitter_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "emitter", PROPERTY_HINT_RESOURCE_TYPE, "BulletEmitterData2D"), "set_emitter", "get_emitter");
 	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "emitter_spawner_path", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "PatternSpawner2D"), "set_emitter_spawner_path", "get_emitter_spawner_path");
+	bind_spawner_group(cls, SPAWNER_GROUP_GRAZE);
+	bind_spawner_group(cls, SPAWNER_GROUP_SOUND);
+	bind_spawner_group(cls, SPAWNER_GROUP_PREVIEW);
+	bind_spawner_group(cls, SPAWNER_GROUP_MOVEMENT);
+	bind_spawner_group(cls, SPAWNER_GROUP_PERFORMANCE);
 	ADD_SIGNAL(MethodInfo("bullet_split",
 			PropertyInfo(Variant::VECTOR2, "position"),
 			PropertyInfo(Variant::INT, "cause"),

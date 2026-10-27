@@ -107,7 +107,7 @@ func test_every_helper_shape_property_sits_in_a_shape_subgroup() -> void:
 	for prop_name in where:
 		var pn := str(prop_name)
 		if pn.begins_with("helper_") and pn != "helper_bullets_amount" and pn != "helper_skip_indices":
-			if where[prop_name][0] != "Bullet Patterns" or where[prop_name][2] == "":
+			if where[prop_name][0] != "Patterns" or where[prop_name][2] == "":
 				loose.append(pn)
 	assert_eq(loose, [], "every helper_<shape>_ knob lives in its shape subgroup")
 
@@ -120,9 +120,9 @@ func test_setup_transform_and_outline_placement() -> void:
 	for prop_name in ["spawn_data", "orphaned_volleys", "max_live_bullets", "bullet_speed_scale_min", "bullet_speed_scale_max"]:
 		assert_eq(where[prop_name][0], "Bullets", prop_name + " in Bullets (BulletSpawner2D's own section)")
 	for prop_name in ["pattern_source", "helper_bullets_amount"]:
-		assert_eq(where[prop_name].slice(0, 2), ["Bullet Patterns", ""], prop_name + " heads Bullet Patterns")
+		assert_eq(where[prop_name].slice(0, 2), ["Patterns", ""], prop_name + " heads Patterns")
 	for prop_name in ["pattern_scale", "transforms_scale", "spawn_position_offset", "spawn_position_offset_space", "helper_skip_indices"]:
-		assert_eq(where[prop_name].slice(0, 2), ["Bullet Patterns", "Transform"], prop_name + " in the Transform subgroup")
+		assert_eq(where[prop_name].slice(0, 2), ["Patterns", "Transform"], prop_name + " in the Transform subgroup")
 	assert_eq(where["helper_ring_radius"].slice(1, 3), ["Ring", "helper_ring_"], "ring knobs strip their prefix")
 	# The star_polygon prefix also starts with helper_star_: both must land
 	# in their own subgroup.
@@ -135,7 +135,7 @@ func test_setup_transform_and_outline_placement() -> void:
 	var outline_idx := subs.find("Outline Layers")
 	var polygon_idx := subs.find("Polygon")
 	assert_gt(outline_idx, polygon_idx, "Outline Layers after the shapes")
-	assert_eq(where["helper_outline_placement"].slice(0, 2), ["Bullet Patterns", "Outline Layers"], "outline knobs in Outline Layers")
+	assert_eq(where["helper_outline_placement"].slice(0, 2), ["Patterns", "Outline Layers"], "outline knobs in Outline Layers")
 
 
 func test_related_knobs_are_adjacent() -> void:

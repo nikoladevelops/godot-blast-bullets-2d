@@ -1,5 +1,6 @@
 #pragma once
 
+#include "bullet_spawner/spawner_property_binder2d.hpp"
 #include "bullet_volley/bullet_volley2d.hpp"
 #include "core/emit_guard2d.hpp"
 #include "core/variant_enum_cast2d.hpp"
@@ -1305,6 +1306,10 @@ public:
 
 protected:
 	static void _bind_methods();
+	// Registers the properties of one shared inspector group on `cls` (a
+	// concrete spawner's _bind_methods calls these in its own layout),
+	// leaving out the names in `skip`.
+	static void bind_spawner_group(const StringName &cls, SpawnerGroup2D group, const SpawnerPropertyFilter2D &skip = SpawnerPropertyFilter2D());
 
 	// Shot, cadence, preview and movement state (the derived spawners read it).
 	// shoot_from: set only for the duration of that one shot.

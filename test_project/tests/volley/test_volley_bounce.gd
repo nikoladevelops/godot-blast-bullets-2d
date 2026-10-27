@@ -970,16 +970,16 @@ func test_t20_inspector_groups_stay_coherent() -> void:
 	assert_true(groups_found.has("Homing"), "spawner Homing group present")
 	assert_true(groups_found.has("Orbiting"), "spawner Orbiting group present")
 	assert_true(groups_found.has("Preview"), "spawner Preview group present")
-	assert_true(groups_found.has("Bullet Patterns"), "spawner Bullet Patterns group present")
+	assert_true(groups_found.has("Patterns"), "spawner Patterns group present")
 	assert_true(not groups_found.has("Transform Generation"), "old Transform Generation name gone")
 	assert_true(not groups_found.has("Burst and Telegraph"), "Burst group merged away")
 	assert_true(groups_found.has("Graze"), "spawner Graze group present")
 	assert_true(groups_found.has("Sound"), "spawner Sound group present")
 	assert_true(groups_found.has("Flocking"), "spawner Flocking group present")
 	assert_true(groups_found.has("Splitting"), "spawner Splitting group present")
-	# BulletSpawner2D's own section first (what it fires and how bullets
-	# steer), then its PatternSpawner2D section (where and when it fires).
-	assert_eq(spawner_group_order.slice(0, 18), ["Bullets", "Bullet Colors", "Homing", "Orbiting", "Flocking", "Splitting", "Emitter Bullets", "Setup", "Time", "Bullet Patterns", "Shooting", "Randomization", "Spin", "Graze", "Sound", "Preview", "Movement", "Performance"], "spawner group order")
+	# One layout: Setup, what it fires, where and when, what the bullets do,
+	# then Graze / Sound and the editor groups (test_spawner_inspector_layout).
+	assert_eq(spawner_group_order.slice(0, 18), ["Setup", "Bullets", "Patterns", "Shooting", "Time", "Spin", "Randomization", "Bullet Colors", "Homing", "Orbiting", "Flocking", "Splitting", "Emitter Bullets", "Graze", "Sound", "Preview", "Movement", "Performance"], "spawner group order")
 	spawner20.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_GRID
 	await idle(1)
 	var ring_visible_grid := false
@@ -1010,12 +1010,12 @@ func test_t20_inspector_groups_stay_coherent() -> void:
 			current_group = pname
 		elif pname != "":
 			prop_group[pname] = current_group
-	assert_true(prop_group.get("pattern_source", "") == "Bullet Patterns", "pattern_source grouped under Bullet Patterns")
-	assert_true(prop_group.get("helper_ring_radius", "") == "Bullet Patterns", "helpers grouped under Bullet Patterns")
-	assert_true(prop_group.get("helper_skip_indices", "") == "Bullet Patterns", "skip indices grouped under Bullet Patterns")
-	assert_true(prop_group.get("pattern_scale", "") == "Bullet Patterns", "pattern_scale grouped under Bullet Patterns")
-	assert_true(prop_group.get("transforms_scale", "") == "Bullet Patterns", "transforms_scale grouped under Bullet Patterns")
-	assert_true(prop_group.get("spawn_position_offset", "") == "Bullet Patterns", "spawn offset grouped under Bullet Patterns")
+	assert_true(prop_group.get("pattern_source", "") == "Patterns", "pattern_source grouped under Patterns")
+	assert_true(prop_group.get("helper_ring_radius", "") == "Patterns", "helpers grouped under Patterns")
+	assert_true(prop_group.get("helper_skip_indices", "") == "Patterns", "skip indices grouped under Patterns")
+	assert_true(prop_group.get("pattern_scale", "") == "Patterns", "pattern_scale grouped under Patterns")
+	assert_true(prop_group.get("transforms_scale", "") == "Patterns", "transforms_scale grouped under Patterns")
+	assert_true(prop_group.get("spawn_position_offset", "") == "Patterns", "spawn offset grouped under Patterns")
 	assert_true(prop_group.get("shooting_enabled", "") == "Shooting", "shooting master grouped")
 	assert_true(prop_group.get("reload_jitter_sec", "") == "Shooting", "reload jitter moved to Shooting")
 	assert_true(prop_group.get("reload_jitter_seed", "") == "Shooting", "reload seed moved to Shooting")

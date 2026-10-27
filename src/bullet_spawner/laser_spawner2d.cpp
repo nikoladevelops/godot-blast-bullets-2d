@@ -686,10 +686,25 @@ void LaserSpawner2D::_validate_property(PropertyInfo &p_property) const {
 	ADD_PROPERTY(PropertyInfo(Variant::VARIANT, #NAME, HINT, HINT_STRING), "set_" #NAME, "get_" #NAME);
 
 void LaserSpawner2D::_bind_methods() {
+	// Inspector layout: Setup, what a shot fires (Lasers), where and when,
+	// how the beams aim (Laser Targeting), then the shared Graze / Sound and
+	// the editor-facing groups. A laser draws no collision rings and reads
+	// only each slot's position and angle (no scale randomization).
+	const StringName cls = get_class_static();
+	static const SpawnerPropertyFilter2D laser_skip = {
+		"preview_draw_collision_rings", "preview_collision_ring_color", "preview_collision_ring_width",
+		"bullet_scale_mode", "bullet_scale_min", "bullet_scale_max", "bullet_scale_min_xy", "bullet_scale_max_xy"
+	};
+	bind_spawner_group(cls, SPAWNER_GROUP_SETUP);
 	ADD_GROUP("Lasers", "");
 	LASER_SPAWNER_BIND(laser_data, OBJECT, PROPERTY_HINT_RESOURCE_TYPE, "LaserData2D")
 	LASER_SPAWNER_BIND(orphaned_lasers, INT, PROPERTY_HINT_ENUM, "Fade Out,Keep Firing,Hand To Factory,Remove")
 	LASER_SPAWNER_BIND(max_live_lasers, INT, PROPERTY_HINT_RANGE, "0,64,1,or_greater")
+	bind_spawner_group(cls, SPAWNER_GROUP_PATTERNS);
+	bind_spawner_group(cls, SPAWNER_GROUP_SHOOTING);
+	bind_spawner_group(cls, SPAWNER_GROUP_TIME);
+	bind_spawner_group(cls, SPAWNER_GROUP_SPIN);
+	bind_spawner_group(cls, SPAWNER_GROUP_RANDOMIZATION, laser_skip);
 	ADD_GROUP("Laser Targeting", "");
 	LASER_SPAWNER_BIND(laser_target_source, INT, PROPERTY_HINT_ENUM, "None,Node Group,Node Path,Mouse,Global Position,Node Name,Node Children")
 	LASER_SPAWNER_BIND(laser_target_group, STRING_NAME, PROPERTY_HINT_NONE, "")
@@ -702,6 +717,11 @@ void LaserSpawner2D::_bind_methods() {
 	LASER_SPAWNER_BIND(laser_target_children_parent_path, NODE_PATH, PROPERTY_HINT_NONE, "")
 	LASER_SPAWNER_BIND(laser_target_children_recursive, BOOL, PROPERTY_HINT_NONE, "")
 	LASER_SPAWNER_BIND(laser_retarget_interval_sec, FLOAT, PROPERTY_HINT_RANGE, "0,5,0.01,or_greater,suffix:s")
+	bind_spawner_group(cls, SPAWNER_GROUP_GRAZE);
+	bind_spawner_group(cls, SPAWNER_GROUP_SOUND);
+	bind_spawner_group(cls, SPAWNER_GROUP_PREVIEW, laser_skip);
+	bind_spawner_group(cls, SPAWNER_GROUP_MOVEMENT);
+	bind_spawner_group(cls, SPAWNER_GROUP_PERFORMANCE);
 
 	ClassDB::bind_method(D_METHOD("get_live_lasers"), &LaserSpawner2D::get_live_lasers);
 	ClassDB::bind_method(D_METHOD("get_live_laser_count"), &LaserSpawner2D::get_live_laser_count);

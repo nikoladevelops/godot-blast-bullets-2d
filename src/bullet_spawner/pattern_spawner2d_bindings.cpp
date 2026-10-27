@@ -179,33 +179,24 @@ void PatternSpawner2D::set_movement_path_node_script(const Variant &node) {
 }
 
 void PatternSpawner2D::_bind_methods() {
-	// Inspector layout: Setup (wiring) -> Bullet Patterns (source, amount,
-	// Transform subgroup, one subgroup per shape with its helper_<shape>_
-	// prefix stripped, Outline Layers last) -> Shooting -> Spin -> Homing ->
-	// Orbiting -> Graze -> Preview -> Movement -> Performance. Property NAMES never
-	// change here (they are serialized into .tscn); only the order and the
-	// headers do. ADD_PROPERTY must follow its bind_method calls, otherwise
-	// ClassDB silently drops the property (the test runner flags that).
-	ADD_GROUP("Setup", "");
+	// The shared accessors, signals and enums. The properties of the shared
+	// inspector groups are registered by each concrete spawner through
+	// bind_spawner_group (below), in that spawner's own layout.
 	ClassDB::bind_method(D_METHOD("get_bullet_factory_path"), &PatternSpawner2D::get_bullet_factory_path);
 	ClassDB::bind_method(D_METHOD("set_bullet_factory_path", "path"), &PatternSpawner2D::set_bullet_factory_path);
-	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "bullet_factory_path", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "BulletFactory2D"), "set_bullet_factory_path", "get_bullet_factory_path");
 
 	ClassDB::bind_method(D_METHOD("get_bullet_factory"), &PatternSpawner2D::get_bullet_factory);
 	ClassDB::bind_method(D_METHOD("set_bullet_factory", "factory"), &PatternSpawner2D::set_bullet_factory_script);
 
 	ClassDB::bind_method(D_METHOD("get_transforms_generator_path"), &PatternSpawner2D::get_transforms_generator_path);
 	ClassDB::bind_method(D_METHOD("set_transforms_generator_path", "path"), &PatternSpawner2D::set_transforms_generator_path);
-	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "transforms_generator", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "Node2D"), "set_transforms_generator_path", "get_transforms_generator_path");
 
 	ClassDB::bind_method(D_METHOD("get_transforms_generator"), &PatternSpawner2D::get_transforms_generator);
 	ClassDB::bind_method(D_METHOD("set_transforms_generator", "generator"), &PatternSpawner2D::set_transforms_generator_script);
 	ClassDB::bind_method(D_METHOD("get_effective_generator"), &PatternSpawner2D::get_effective_generator);
 
-	ADD_GROUP("Time", "");
 	ClassDB::bind_method(D_METHOD("get_process_callback"), &PatternSpawner2D::get_process_callback);
 	ClassDB::bind_method(D_METHOD("set_process_callback", "value"), &PatternSpawner2D::set_process_callback);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "process_callback", PROPERTY_HINT_ENUM, "Idle,Physics"), "set_process_callback", "get_process_callback");
 	BIND_ENUM_CONSTANT(PROCESS_IDLE);
 	BIND_ENUM_CONSTANT(PROCESS_PHYSICS);
 	BIND_BITFIELD_FLAG(LIVE_HOMING);
@@ -217,16 +208,12 @@ void PatternSpawner2D::_bind_methods() {
 	BIND_BITFIELD_FLAG(LIVE_ALL);
 	ClassDB::bind_method(D_METHOD("get_time_scale"), &PatternSpawner2D::get_time_scale);
 	ClassDB::bind_method(D_METHOD("set_time_scale", "value"), &PatternSpawner2D::set_time_scale);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "time_scale", PROPERTY_HINT_RANGE, "0,4,0.01,or_greater"), "set_time_scale", "get_time_scale");
 	ClassDB::bind_method(D_METHOD("get_time_scale_affects_volleys"), &PatternSpawner2D::get_time_scale_affects_volleys);
 	ClassDB::bind_method(D_METHOD("set_time_scale_affects_volleys", "value"), &PatternSpawner2D::set_time_scale_affects_volleys);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "time_scale_affects_volleys"), "set_time_scale_affects_volleys", "get_time_scale_affects_volleys");
 	ClassDB::bind_method(D_METHOD("get_process_time_scale"), &PatternSpawner2D::get_process_time_scale);
 	ClassDB::bind_method(D_METHOD("get_volley_time_scale"), &PatternSpawner2D::get_volley_time_scale);
 	ClassDB::bind_method(D_METHOD("set_volley_time_scale", "value"), &PatternSpawner2D::set_volley_time_scale);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "volley_time_scale", PROPERTY_HINT_RANGE, "0,4,0.01,or_greater"), "set_volley_time_scale", "get_volley_time_scale");
 
-	ADD_GROUP("Bullet Patterns", "");
 	// Hand-written accessors of the group (PATTERN_PROPERTY rows); the
 	// table-driven knobs bind themselves in the expansion below.
 	ClassDB::bind_method(D_METHOD("get_pattern_source"), &PatternSpawner2D::get_pattern_source);
@@ -265,13 +252,11 @@ void PatternSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_helper_outline_layer_scales", "value"), &PatternSpawner2D::set_helper_outline_layer_scales);
 
 	// Every property of the group, in inspector order, from the knob table.
-#define PATTERN_SUBGROUP(TITLE, PREFIX) ADD_SUBGROUP(TITLE, PREFIX);
+#define PATTERN_SUBGROUP(TITLE, PREFIX)
 #define PATTERN_KNOB(PTYPE, CTYPE, VTYPE, NAME, C1, A1, B1, M1, C2, A2, B2, M2, NOTIFY, HINT, HINT_STRING) \
 	ClassDB::bind_method(D_METHOD("get_" #NAME), &PatternSpawner2D::get_##NAME);                           \
-	ClassDB::bind_method(D_METHOD("set_" #NAME, "value"), &PatternSpawner2D::set_##NAME);                  \
-	ADD_PROPERTY(PropertyInfo(Variant::VTYPE, #NAME, HINT, HINT_STRING), "set_" #NAME, "get_" #NAME);
-#define PATTERN_PROPERTY(VTYPE, NAME, HINT, HINT_STRING, SETTER, GETTER) \
-	ADD_PROPERTY(PropertyInfo(Variant::VTYPE, #NAME, HINT, HINT_STRING), #SETTER, #GETTER);
+	ClassDB::bind_method(D_METHOD("set_" #NAME, "value"), &PatternSpawner2D::set_##NAME);
+#define PATTERN_PROPERTY(VTYPE, NAME, HINT, HINT_STRING, SETTER, GETTER)
 #include "patterns/pattern_knob_table2d.inc"
 #undef PATTERN_SUBGROUP
 #undef PATTERN_KNOB
@@ -291,126 +276,90 @@ void PatternSpawner2D::_bind_methods() {
 	ADD_SIGNAL(MethodInfo("shooting_finished"));
 	ClassDB::bind_method(D_METHOD("get_shooting_enabled"), &PatternSpawner2D::get_shooting_enabled);
 	ClassDB::bind_method(D_METHOD("set_shooting_enabled", "value"), &PatternSpawner2D::set_shooting_enabled);
-	ADD_GROUP("Shooting", "");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "shooting_enabled"), "set_shooting_enabled", "get_shooting_enabled");
 	ClassDB::bind_method(D_METHOD("is_shooting_active"), &PatternSpawner2D::is_shooting_active);
 
 	ClassDB::bind_method(D_METHOD("get_shoot_interval_sec"), &PatternSpawner2D::get_shoot_interval_sec);
 	ClassDB::bind_method(D_METHOD("set_shoot_interval_sec", "value"), &PatternSpawner2D::set_shoot_interval_sec);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "shoot_interval_sec", PROPERTY_HINT_RANGE, "0.005,30,0.001,or_greater"), "set_shoot_interval_sec", "get_shoot_interval_sec");
 	ClassDB::bind_method(D_METHOD("get_shoot_interval_max_sec"), &PatternSpawner2D::get_shoot_interval_max_sec);
 	ClassDB::bind_method(D_METHOD("set_shoot_interval_max_sec", "value"), &PatternSpawner2D::set_shoot_interval_max_sec);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "shoot_interval_max_sec", PROPERTY_HINT_RANGE, "0,30,0.001,or_greater,suffix:s"), "set_shoot_interval_max_sec", "get_shoot_interval_max_sec");
 
 	ClassDB::bind_method(D_METHOD("get_shoot_outside_despawn_bounds"), &PatternSpawner2D::get_shoot_outside_despawn_bounds);
 	ClassDB::bind_method(D_METHOD("set_shoot_outside_despawn_bounds", "value"), &PatternSpawner2D::set_shoot_outside_despawn_bounds);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "shoot_outside_despawn_bounds"), "set_shoot_outside_despawn_bounds", "get_shoot_outside_despawn_bounds");
 
 	ClassDB::bind_method(D_METHOD("get_shoot_initial_delay_sec"), &PatternSpawner2D::get_shoot_initial_delay_sec);
 	ClassDB::bind_method(D_METHOD("set_shoot_initial_delay_sec", "value"), &PatternSpawner2D::set_shoot_initial_delay_sec);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "shoot_initial_delay_sec"), "set_shoot_initial_delay_sec", "get_shoot_initial_delay_sec");
 
 	ClassDB::bind_method(D_METHOD("get_max_volleys"), &PatternSpawner2D::get_max_volleys);
 	ClassDB::bind_method(D_METHOD("set_max_volleys", "value"), &PatternSpawner2D::set_max_volleys);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "max_volleys"), "set_max_volleys", "get_max_volleys");
 
 	ClassDB::bind_method(D_METHOD("get_max_shots_per_frame"), &PatternSpawner2D::get_max_shots_per_frame);
 	ClassDB::bind_method(D_METHOD("set_max_shots_per_frame", "value"), &PatternSpawner2D::set_max_shots_per_frame);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "max_shots_per_frame", PROPERTY_HINT_RANGE, "1,64,1,or_greater"), "set_max_shots_per_frame", "get_max_shots_per_frame");
 
 	ClassDB::bind_method(D_METHOD("get_reload_jitter_sec"), &PatternSpawner2D::get_reload_jitter_sec);
 	ClassDB::bind_method(D_METHOD("set_reload_jitter_sec", "value"), &PatternSpawner2D::set_reload_jitter_sec);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "reload_jitter_sec"), "set_reload_jitter_sec", "get_reload_jitter_sec");
 	// Seed lives directly under its jitter amount so the pair reads as one feature.
 	ClassDB::bind_method(D_METHOD("get_reload_jitter_seed"), &PatternSpawner2D::get_reload_jitter_seed);
 	ClassDB::bind_method(D_METHOD("set_reload_jitter_seed", "value"), &PatternSpawner2D::set_reload_jitter_seed);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "reload_jitter_seed"), "set_reload_jitter_seed", "get_reload_jitter_seed");
 
 	ClassDB::bind_method(D_METHOD("get_burst_enabled"), &PatternSpawner2D::get_burst_enabled);
 	ClassDB::bind_method(D_METHOD("set_burst_enabled", "value"), &PatternSpawner2D::set_burst_enabled);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "burst_enabled"), "set_burst_enabled", "get_burst_enabled");
 
 	ClassDB::bind_method(D_METHOD("get_burst_count"), &PatternSpawner2D::get_burst_count);
 	ClassDB::bind_method(D_METHOD("set_burst_count", "value"), &PatternSpawner2D::set_burst_count);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "burst_count"), "set_burst_count", "get_burst_count");
 
 	ClassDB::bind_method(D_METHOD("get_burst_interval_sec"), &PatternSpawner2D::get_burst_interval_sec);
 	ClassDB::bind_method(D_METHOD("set_burst_interval_sec", "value"), &PatternSpawner2D::set_burst_interval_sec);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "burst_interval_sec"), "set_burst_interval_sec", "get_burst_interval_sec");
 	ClassDB::bind_method(D_METHOD("get_burst_interval_max_sec"), &PatternSpawner2D::get_burst_interval_max_sec);
 	ClassDB::bind_method(D_METHOD("set_burst_interval_max_sec", "value"), &PatternSpawner2D::set_burst_interval_max_sec);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "burst_interval_max_sec", PROPERTY_HINT_RANGE, "0,30,0.001,or_greater,suffix:s"), "set_burst_interval_max_sec", "get_burst_interval_max_sec");
 
 	ClassDB::bind_method(D_METHOD("get_burst_alternate_mirror"), &PatternSpawner2D::get_burst_alternate_mirror);
 	ClassDB::bind_method(D_METHOD("set_burst_alternate_mirror", "value"), &PatternSpawner2D::set_burst_alternate_mirror);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "burst_alternate_mirror"), "set_burst_alternate_mirror", "get_burst_alternate_mirror");
 
 	ClassDB::bind_method(D_METHOD("get_telegraph_enabled"), &PatternSpawner2D::get_telegraph_enabled);
 	ClassDB::bind_method(D_METHOD("set_telegraph_enabled", "value"), &PatternSpawner2D::set_telegraph_enabled);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "telegraph_enabled"), "set_telegraph_enabled", "get_telegraph_enabled");
 
 	ClassDB::bind_method(D_METHOD("get_telegraph_sec"), &PatternSpawner2D::get_telegraph_sec);
 	ClassDB::bind_method(D_METHOD("set_telegraph_sec", "value"), &PatternSpawner2D::set_telegraph_sec);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "telegraph_sec"), "set_telegraph_sec", "get_telegraph_sec");
 	ClassDB::bind_method(D_METHOD("get_telegraph_max_sec"), &PatternSpawner2D::get_telegraph_max_sec);
 	ClassDB::bind_method(D_METHOD("set_telegraph_max_sec", "value"), &PatternSpawner2D::set_telegraph_max_sec);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "telegraph_max_sec", PROPERTY_HINT_RANGE, "0,30,0.001,or_greater,suffix:s"), "set_telegraph_max_sec", "get_telegraph_max_sec");
 
-	ADD_GROUP("Randomization", "bullet_");
 	ClassDB::bind_method(D_METHOD("get_bullet_scale_mode"), &PatternSpawner2D::get_bullet_scale_mode);
 	ClassDB::bind_method(D_METHOD("set_bullet_scale_mode", "value"), &PatternSpawner2D::set_bullet_scale_mode);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "bullet_scale_mode", PROPERTY_HINT_ENUM, "Off,Uniform,Per Axis"), "set_bullet_scale_mode", "get_bullet_scale_mode");
 	ClassDB::bind_method(D_METHOD("get_bullet_scale_min"), &PatternSpawner2D::get_bullet_scale_min);
 	ClassDB::bind_method(D_METHOD("set_bullet_scale_min", "value"), &PatternSpawner2D::set_bullet_scale_min);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bullet_scale_min", PROPERTY_HINT_RANGE, "0.01,10,0.01,or_greater"), "set_bullet_scale_min", "get_bullet_scale_min");
 	ClassDB::bind_method(D_METHOD("get_bullet_scale_max"), &PatternSpawner2D::get_bullet_scale_max);
 	ClassDB::bind_method(D_METHOD("set_bullet_scale_max", "value"), &PatternSpawner2D::set_bullet_scale_max);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bullet_scale_max", PROPERTY_HINT_RANGE, "0.01,10,0.01,or_greater"), "set_bullet_scale_max", "get_bullet_scale_max");
 	ClassDB::bind_method(D_METHOD("get_bullet_scale_min_xy"), &PatternSpawner2D::get_bullet_scale_min_xy);
 	ClassDB::bind_method(D_METHOD("set_bullet_scale_min_xy", "value"), &PatternSpawner2D::set_bullet_scale_min_xy);
-	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "bullet_scale_min_xy"), "set_bullet_scale_min_xy", "get_bullet_scale_min_xy");
 	ClassDB::bind_method(D_METHOD("get_bullet_scale_max_xy"), &PatternSpawner2D::get_bullet_scale_max_xy);
 	ClassDB::bind_method(D_METHOD("set_bullet_scale_max_xy", "value"), &PatternSpawner2D::set_bullet_scale_max_xy);
-	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "bullet_scale_max_xy"), "set_bullet_scale_max_xy", "get_bullet_scale_max_xy");
 	ClassDB::bind_method(D_METHOD("get_bullet_rotation_min_degrees"), &PatternSpawner2D::get_bullet_rotation_min_degrees);
 	ClassDB::bind_method(D_METHOD("set_bullet_rotation_min_degrees", "value"), &PatternSpawner2D::set_bullet_rotation_min_degrees);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bullet_rotation_min_degrees", PROPERTY_HINT_RANGE, "-360,360,0.1,or_less,or_greater,suffix:deg"), "set_bullet_rotation_min_degrees", "get_bullet_rotation_min_degrees");
 	ClassDB::bind_method(D_METHOD("get_bullet_rotation_max_degrees"), &PatternSpawner2D::get_bullet_rotation_max_degrees);
 	ClassDB::bind_method(D_METHOD("set_bullet_rotation_max_degrees", "value"), &PatternSpawner2D::set_bullet_rotation_max_degrees);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bullet_rotation_max_degrees", PROPERTY_HINT_RANGE, "-360,360,0.1,or_less,or_greater,suffix:deg"), "set_bullet_rotation_max_degrees", "get_bullet_rotation_max_degrees");
 	ClassDB::bind_method(D_METHOD("get_bullet_position_jitter_min"), &PatternSpawner2D::get_bullet_position_jitter_min);
 	ClassDB::bind_method(D_METHOD("set_bullet_position_jitter_min", "value"), &PatternSpawner2D::set_bullet_position_jitter_min);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bullet_position_jitter_min", PROPERTY_HINT_RANGE, "0,200,0.1,or_greater,suffix:px"), "set_bullet_position_jitter_min", "get_bullet_position_jitter_min");
 	ClassDB::bind_method(D_METHOD("get_bullet_position_jitter_max"), &PatternSpawner2D::get_bullet_position_jitter_max);
 	ClassDB::bind_method(D_METHOD("set_bullet_position_jitter_max", "value"), &PatternSpawner2D::set_bullet_position_jitter_max);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bullet_position_jitter_max", PROPERTY_HINT_RANGE, "0,200,0.1,or_greater,suffix:px"), "set_bullet_position_jitter_max", "get_bullet_position_jitter_max");
 	ClassDB::bind_method(D_METHOD("get_bullet_random_seed"), &PatternSpawner2D::get_bullet_random_seed);
 	ClassDB::bind_method(D_METHOD("set_bullet_random_seed", "value"), &PatternSpawner2D::set_bullet_random_seed);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "bullet_random_seed"), "set_bullet_random_seed", "get_bullet_random_seed");
 
 	ClassDB::bind_method(D_METHOD("get_spin_enabled"), &PatternSpawner2D::get_spin_enabled);
 	ClassDB::bind_method(D_METHOD("set_spin_enabled", "value"), &PatternSpawner2D::set_spin_enabled);
-	ADD_GROUP("Spin", "");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "spin_enabled"), "set_spin_enabled", "get_spin_enabled");
 
 	ClassDB::bind_method(D_METHOD("get_spin_mode"), &PatternSpawner2D::get_spin_mode);
 	ClassDB::bind_method(D_METHOD("set_spin_mode", "value"), &PatternSpawner2D::set_spin_mode);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "spin_mode", PROPERTY_HINT_ENUM, "Continuous,Oscillate"), "set_spin_mode", "get_spin_mode");
 	ClassDB::bind_method(D_METHOD("get_spin_speed_deg_per_sec"), &PatternSpawner2D::get_spin_speed_deg_per_sec);
 	ClassDB::bind_method(D_METHOD("set_spin_speed_deg_per_sec", "value"), &PatternSpawner2D::set_spin_speed_deg_per_sec);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "spin_speed_deg_per_sec"), "set_spin_speed_deg_per_sec", "get_spin_speed_deg_per_sec");
 
 	ClassDB::bind_method(D_METHOD("get_spin_amplitude_deg"), &PatternSpawner2D::get_spin_amplitude_deg);
 	ClassDB::bind_method(D_METHOD("set_spin_amplitude_deg", "value"), &PatternSpawner2D::set_spin_amplitude_deg);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "spin_amplitude_deg"), "set_spin_amplitude_deg", "get_spin_amplitude_deg");
 
 	ClassDB::bind_method(D_METHOD("get_spin_frequency_hz"), &PatternSpawner2D::get_spin_frequency_hz);
 	ClassDB::bind_method(D_METHOD("set_spin_frequency_hz", "value"), &PatternSpawner2D::set_spin_frequency_hz);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "spin_frequency_hz"), "set_spin_frequency_hz", "get_spin_frequency_hz");
 
 	ClassDB::bind_method(D_METHOD("get_spin_random_start_phase"), &PatternSpawner2D::get_spin_random_start_phase);
 	ClassDB::bind_method(D_METHOD("set_spin_random_start_phase", "value"), &PatternSpawner2D::set_spin_random_start_phase);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "spin_random_start_phase"), "set_spin_random_start_phase", "get_spin_random_start_phase");
 
 	ClassDB::bind_method(D_METHOD("get_spin_angle_deg"), &PatternSpawner2D::get_spin_angle_deg);
 	ClassDB::bind_method(D_METHOD("set_spin_angle_deg", "degrees"), &PatternSpawner2D::set_spin_angle_deg);
@@ -524,112 +473,59 @@ void PatternSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("resolve_sound_listeners"), &PatternSpawner2D::resolve_sound_listeners);
 	ClassDB::bind_method(D_METHOD("preview_sound_effect", "index"), &PatternSpawner2D::preview_sound_effect);
 	ClassDB::bind_method(D_METHOD("debug_get_sound_detector_stats"), &PatternSpawner2D::debug_get_sound_detector_stats);
-	ADD_GROUP("Graze", "");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "graze_enabled"), "set_graze_enabled", "get_graze_enabled");
-	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "graze_zones", PROPERTY_HINT_ARRAY_TYPE, "BulletGrazeZone2D"), "set_graze_zones", "get_graze_zones");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "graze_target_source", PROPERTY_HINT_ENUM, "Node Group,Node Path,Node Name,Node Children,Mouse,Global Positions"), "set_graze_target_source", "get_graze_target_source");
-	ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "graze_node_group"), "set_graze_node_group", "get_graze_node_group");
-	ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "graze_filter_group"), "set_graze_filter_group", "get_graze_filter_group");
-	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "graze_target_path", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "Node2D"), "set_graze_target_path", "get_graze_target_path");
-	ADD_PROPERTY(PropertyInfo(Variant::STRING, "graze_node_name"), "set_graze_node_name", "get_graze_node_name");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "graze_node_name_match_mode", PROPERTY_HINT_ENUM, "Exact,Contains,Starts With,Ends With"), "set_graze_node_name_match_mode", "get_graze_node_name_match_mode");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "graze_node_name_case_sensitive"), "set_graze_node_name_case_sensitive", "get_graze_node_name_case_sensitive");
-	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "graze_children_parent_path"), "set_graze_children_parent_path", "get_graze_children_parent_path");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "graze_children_recursive"), "set_graze_children_recursive", "get_graze_children_recursive");
-	ADD_PROPERTY(PropertyInfo(Variant::PACKED_VECTOR2_ARRAY, "graze_global_positions"), "set_graze_global_positions", "get_graze_global_positions");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "graze_update_interval", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater,suffix:s"), "set_graze_update_interval", "get_graze_update_interval");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "graze_show_preview"), "set_graze_show_preview", "get_graze_show_preview");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "graze_preview_during_runtime"), "set_graze_preview_during_runtime", "get_graze_preview_during_runtime");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "graze_preview_line_width", PROPERTY_HINT_RANGE, "0.5,16,0.5,or_greater"), "set_graze_preview_line_width", "get_graze_preview_line_width");
 
 	ClassDB::bind_method(D_METHOD("get_show_pattern_preview"), &PatternSpawner2D::get_show_pattern_preview);
 	ClassDB::bind_method(D_METHOD("set_show_pattern_preview", "value"), &PatternSpawner2D::set_show_pattern_preview);
-	ADD_GROUP("Sound", "");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "sound_enabled"), "set_sound_enabled", "get_sound_enabled");
-	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "sound_effects", PROPERTY_HINT_ARRAY_TYPE, "BulletSoundData2D"), "set_sound_effects", "get_sound_effects");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "sound_volume_db", PROPERTY_HINT_RANGE, "-80,24,0.1,suffix:dB"), "set_sound_volume_db", "get_sound_volume_db");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "sound_listener_source", PROPERTY_HINT_ENUM, "Godot Listener,Node Group,Node Path,Node Name,Node Children,Mouse,Global Positions"), "set_sound_listener_source", "get_sound_listener_source");
-	ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "sound_listener_node_group"), "set_sound_listener_node_group", "get_sound_listener_node_group");
-	ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "sound_listener_filter_group"), "set_sound_listener_filter_group", "get_sound_listener_filter_group");
-	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "sound_listener_path", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "Node2D"), "set_sound_listener_path", "get_sound_listener_path");
-	ADD_PROPERTY(PropertyInfo(Variant::STRING, "sound_listener_node_name"), "set_sound_listener_node_name", "get_sound_listener_node_name");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "sound_listener_node_name_match_mode", PROPERTY_HINT_ENUM, "Exact,Contains,Starts With,Ends With"), "set_sound_listener_node_name_match_mode", "get_sound_listener_node_name_match_mode");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "sound_listener_node_name_case_sensitive"), "set_sound_listener_node_name_case_sensitive", "get_sound_listener_node_name_case_sensitive");
-	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "sound_listener_children_parent_path"), "set_sound_listener_children_parent_path", "get_sound_listener_children_parent_path");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "sound_listener_children_recursive"), "set_sound_listener_children_recursive", "get_sound_listener_children_recursive");
-	ADD_PROPERTY(PropertyInfo(Variant::PACKED_VECTOR2_ARRAY, "sound_listener_global_positions"), "set_sound_listener_global_positions", "get_sound_listener_global_positions");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "sound_listener_update_interval", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater,suffix:s"), "set_sound_listener_update_interval", "get_sound_listener_update_interval");
-
-	ADD_GROUP("Preview", "");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "show_pattern_preview"), "set_show_pattern_preview", "get_show_pattern_preview");
 
 	ClassDB::bind_method(D_METHOD("get_show_preview_during_runtime"), &PatternSpawner2D::get_show_preview_during_runtime);
 	ClassDB::bind_method(D_METHOD("set_show_preview_during_runtime", "value"), &PatternSpawner2D::set_show_preview_during_runtime);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "show_preview_during_runtime"), "set_show_preview_during_runtime", "get_show_preview_during_runtime");
 
 	ClassDB::bind_method(D_METHOD("get_preview_dot_color"), &PatternSpawner2D::get_preview_dot_color);
 	ClassDB::bind_method(D_METHOD("set_preview_dot_color", "value"), &PatternSpawner2D::set_preview_dot_color);
-	ADD_PROPERTY(PropertyInfo(Variant::COLOR, "preview_dot_color"), "set_preview_dot_color", "get_preview_dot_color");
 
 	ClassDB::bind_method(D_METHOD("get_preview_arrow_color"), &PatternSpawner2D::get_preview_arrow_color);
 	ClassDB::bind_method(D_METHOD("set_preview_arrow_color", "value"), &PatternSpawner2D::set_preview_arrow_color);
-	ADD_PROPERTY(PropertyInfo(Variant::COLOR, "preview_arrow_color"), "set_preview_arrow_color", "get_preview_arrow_color");
 
 	ClassDB::bind_method(D_METHOD("get_preview_first_dot_color"), &PatternSpawner2D::get_preview_first_dot_color);
 	ClassDB::bind_method(D_METHOD("set_preview_first_dot_color", "value"), &PatternSpawner2D::set_preview_first_dot_color);
-	ADD_PROPERTY(PropertyInfo(Variant::COLOR, "preview_first_dot_color"), "set_preview_first_dot_color", "get_preview_first_dot_color");
 
 	ClassDB::bind_method(D_METHOD("get_preview_path_color"), &PatternSpawner2D::get_preview_path_color);
 	ClassDB::bind_method(D_METHOD("set_preview_path_color", "value"), &PatternSpawner2D::set_preview_path_color);
-	ADD_PROPERTY(PropertyInfo(Variant::COLOR, "preview_path_color"), "set_preview_path_color", "get_preview_path_color");
 
 	ClassDB::bind_method(D_METHOD("get_preview_layer_path_color"), &PatternSpawner2D::get_preview_layer_path_color);
 	ClassDB::bind_method(D_METHOD("set_preview_layer_path_color", "value"), &PatternSpawner2D::set_preview_layer_path_color);
-	ADD_PROPERTY(PropertyInfo(Variant::COLOR, "preview_layer_path_color"), "set_preview_layer_path_color", "get_preview_layer_path_color");
 
 	ClassDB::bind_method(D_METHOD("get_preview_path_width"), &PatternSpawner2D::get_preview_path_width);
 	ClassDB::bind_method(D_METHOD("set_preview_path_width", "value"), &PatternSpawner2D::set_preview_path_width);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "preview_path_width"), "set_preview_path_width", "get_preview_path_width");
 
 	ClassDB::bind_method(D_METHOD("get_preview_dot_radius"), &PatternSpawner2D::get_preview_dot_radius);
 	ClassDB::bind_method(D_METHOD("set_preview_dot_radius", "value"), &PatternSpawner2D::set_preview_dot_radius);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "preview_dot_radius"), "set_preview_dot_radius", "get_preview_dot_radius");
 
 	ClassDB::bind_method(D_METHOD("get_preview_arrow_gap"), &PatternSpawner2D::get_preview_arrow_gap);
 	ClassDB::bind_method(D_METHOD("set_preview_arrow_gap", "value"), &PatternSpawner2D::set_preview_arrow_gap);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "preview_arrow_gap"), "set_preview_arrow_gap", "get_preview_arrow_gap");
 
 	ClassDB::bind_method(D_METHOD("get_preview_arrow_length"), &PatternSpawner2D::get_preview_arrow_length);
 	ClassDB::bind_method(D_METHOD("set_preview_arrow_length", "value"), &PatternSpawner2D::set_preview_arrow_length);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "preview_arrow_length"), "set_preview_arrow_length", "get_preview_arrow_length");
 
 	ClassDB::bind_method(D_METHOD("get_preview_arrow_width"), &PatternSpawner2D::get_preview_arrow_width);
 	ClassDB::bind_method(D_METHOD("set_preview_arrow_width", "value"), &PatternSpawner2D::set_preview_arrow_width);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "preview_arrow_width"), "set_preview_arrow_width", "get_preview_arrow_width");
 
 	ClassDB::bind_method(D_METHOD("get_preview_arrow_head_length"), &PatternSpawner2D::get_preview_arrow_head_length);
 	ClassDB::bind_method(D_METHOD("set_preview_arrow_head_length", "value"), &PatternSpawner2D::set_preview_arrow_head_length);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "preview_arrow_head_length"), "set_preview_arrow_head_length", "get_preview_arrow_head_length");
 
 	ClassDB::bind_method(D_METHOD("get_preview_arrow_head_width"), &PatternSpawner2D::get_preview_arrow_head_width);
 	ClassDB::bind_method(D_METHOD("set_preview_arrow_head_width", "value"), &PatternSpawner2D::set_preview_arrow_head_width);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "preview_arrow_head_width"), "set_preview_arrow_head_width", "get_preview_arrow_head_width");
 	ClassDB::bind_method(D_METHOD("get_preview_z_index"), &PatternSpawner2D::get_preview_z_index);
 	ClassDB::bind_method(D_METHOD("set_preview_z_index", "value"), &PatternSpawner2D::set_preview_z_index);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "preview_z_index", PROPERTY_HINT_RANGE, "-4096,4096,1"), "set_preview_z_index", "get_preview_z_index");
 	ClassDB::bind_method(D_METHOD("get_preview_z_as_relative"), &PatternSpawner2D::get_preview_z_as_relative);
 	ClassDB::bind_method(D_METHOD("set_preview_z_as_relative", "value"), &PatternSpawner2D::set_preview_z_as_relative);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "preview_z_as_relative"), "set_preview_z_as_relative", "get_preview_z_as_relative");
 
 	ClassDB::bind_method(D_METHOD("get_preview_draw_collision_rings"), &PatternSpawner2D::get_preview_draw_collision_rings);
 	ClassDB::bind_method(D_METHOD("set_preview_draw_collision_rings", "value"), &PatternSpawner2D::set_preview_draw_collision_rings);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "preview_draw_collision_rings"), "set_preview_draw_collision_rings", "get_preview_draw_collision_rings");
 	ClassDB::bind_method(D_METHOD("get_preview_collision_ring_color"), &PatternSpawner2D::get_preview_collision_ring_color);
 	ClassDB::bind_method(D_METHOD("set_preview_collision_ring_color", "value"), &PatternSpawner2D::set_preview_collision_ring_color);
-	ADD_PROPERTY(PropertyInfo(Variant::COLOR, "preview_collision_ring_color"), "set_preview_collision_ring_color", "get_preview_collision_ring_color");
 	ClassDB::bind_method(D_METHOD("get_preview_collision_ring_width"), &PatternSpawner2D::get_preview_collision_ring_width);
 	ClassDB::bind_method(D_METHOD("set_preview_collision_ring_width", "value"), &PatternSpawner2D::set_preview_collision_ring_width);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "preview_collision_ring_width"), "set_preview_collision_ring_width", "get_preview_collision_ring_width");
 
 	// ---- Movement ----
 #define BS_BIND_PROP(m_name)                                                         \
@@ -684,33 +580,9 @@ void PatternSpawner2D::_bind_methods() {
 	ADD_SIGNAL(MethodInfo("movement_finished"));
 	ADD_SIGNAL(MethodInfo("movement_loop_completed", PropertyInfo(Variant::INT, "leg_index")));
 	ADD_SIGNAL(MethodInfo("movement_endpoint_reached", PropertyInfo(Variant::BOOL, "at_end")));
-	ADD_GROUP("Movement", "");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "movement_enabled"), "set_movement_enabled", "get_movement_enabled");
-	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "movement_path", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "Path2D"), "set_movement_path", "get_movement_path");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "movement_autostart"), "set_movement_autostart", "get_movement_autostart");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "movement_space", PROPERTY_HINT_ENUM, "Attach:0,Relative To Start:1"), "set_movement_space", "get_movement_space");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "movement_loop_mode", PROPERTY_HINT_ENUM, "Once:0,Loop:1,Ping Pong:2"), "set_movement_loop_mode", "get_movement_loop_mode");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "movement_loops", PROPERTY_HINT_RANGE, "0,1000,1,or_greater"), "set_movement_loops", "get_movement_loops");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "movement_direction", PROPERTY_HINT_ENUM, "Forward:0,Reverse:1"), "set_movement_direction", "get_movement_direction");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "movement_timing", PROPERTY_HINT_ENUM, "Duration:0,Speed:1"), "set_movement_timing", "get_movement_timing");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "movement_duration_sec", PROPERTY_HINT_RANGE, "0.01,60,0.01,or_greater,suffix:s"), "set_movement_duration_sec", "get_movement_duration_sec");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "movement_speed", PROPERTY_HINT_RANGE, "1,4000,1,or_greater,suffix:px/s"), "set_movement_speed", "get_movement_speed");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "movement_transition", PROPERTY_HINT_ENUM, "Linear:0,Sine:1,Quint:2,Quart:3,Quad:4,Expo:5,Elastic:6,Cubic:7,Circ:8,Bounce:9,Back:10,Spring:11"), "set_movement_transition", "get_movement_transition");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "movement_ease", PROPERTY_HINT_ENUM, "In:0,Out:1,In Out:2,Out In:3"), "set_movement_ease", "get_movement_ease");
-	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "movement_progress_curve", PROPERTY_HINT_RESOURCE_TYPE, "Curve"), "set_movement_progress_curve", "get_movement_progress_curve");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "movement_start_ratio", PROPERTY_HINT_RANGE, "0,1,0.001"), "set_movement_start_ratio", "get_movement_start_ratio");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "movement_start_delay_sec", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater,suffix:s"), "set_movement_start_delay_sec", "get_movement_start_delay_sec");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "movement_endpoint_pause_sec", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater,suffix:s"), "set_movement_endpoint_pause_sec", "get_movement_endpoint_pause_sec");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "movement_rotate_with_path"), "set_movement_rotate_with_path", "get_movement_rotate_with_path");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "movement_rotation_offset_deg", PROPERTY_HINT_RANGE, "-360,360,0.1,or_less,or_greater,suffix:deg"), "set_movement_rotation_offset_deg", "get_movement_rotation_offset_deg");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "movement_cubic_sampling"), "set_movement_cubic_sampling", "get_movement_cubic_sampling");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "inherit_movement_velocity"), "set_inherit_movement_velocity", "get_inherit_movement_velocity");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "movement_velocity_inherit_factor", PROPERTY_HINT_RANGE, "-2,2,0.01,or_less,or_greater"), "set_movement_velocity_inherit_factor", "get_movement_velocity_inherit_factor");
 
 	ClassDB::bind_method(D_METHOD("get_pattern_cache_mode"), &PatternSpawner2D::get_pattern_cache_mode);
 	ClassDB::bind_method(D_METHOD("set_pattern_cache_mode", "value"), &PatternSpawner2D::set_pattern_cache_mode);
-	ADD_GROUP("Performance", "");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "pattern_cache_mode", PROPERTY_HINT_ENUM, "Auto:0,Off:1"), "set_pattern_cache_mode", "get_pattern_cache_mode");
 
 	// Need this in order to expose the enum constants to Godot Engine
 	BIND_ENUM_CONSTANT(PATTERN_FROM_CHILDREN);
@@ -789,6 +661,168 @@ void PatternSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_telegraph_time_left"), &PatternSpawner2D::get_telegraph_time_left);
 	ClassDB::bind_method(D_METHOD("get_pattern_list_time_left"), &PatternSpawner2D::get_pattern_list_time_left);
 	ClassDB::bind_method(D_METHOD("volleys_remaining"), &PatternSpawner2D::volleys_remaining);
+}
+
+void PatternSpawner2D::bind_spawner_group(const StringName &cls, SpawnerGroup2D group, const SpawnerPropertyFilter2D &skip) {
+	// The properties of one shared inspector group, registered on the
+	// concrete spawner class (their accessors are bound on PatternSpawner2D
+	// above): each spawner lays its groups out in its own order and leaves
+	// out what does nothing for it. Names never change (they are saved).
+	SpawnerPropertyBinder2D b(cls, skip);
+	switch (group) {
+		case SPAWNER_GROUP_SETUP:
+			b.group("Setup", "");
+			b.property(PropertyInfo(Variant::NODE_PATH, "bullet_factory_path", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "BulletFactory2D"), "set_bullet_factory_path", "get_bullet_factory_path");
+			b.property(PropertyInfo(Variant::NODE_PATH, "transforms_generator", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "Node2D"), "set_transforms_generator_path", "get_transforms_generator_path");
+			break;
+		case SPAWNER_GROUP_TIME:
+			b.group("Time", "");
+			b.property(PropertyInfo(Variant::INT, "process_callback", PROPERTY_HINT_ENUM, "Idle,Physics"), "set_process_callback", "get_process_callback");
+			b.property(PropertyInfo(Variant::FLOAT, "time_scale", PROPERTY_HINT_RANGE, "0,4,0.01,or_greater"), "set_time_scale", "get_time_scale");
+			b.property(PropertyInfo(Variant::BOOL, "time_scale_affects_volleys"), "set_time_scale_affects_volleys", "get_time_scale_affects_volleys");
+			b.property(PropertyInfo(Variant::FLOAT, "volley_time_scale", PROPERTY_HINT_RANGE, "0,4,0.01,or_greater"), "set_volley_time_scale", "get_volley_time_scale");
+			break;
+		case SPAWNER_GROUP_PATTERNS:
+			b.group("Patterns", "");
+#define PATTERN_SUBGROUP(TITLE, PREFIX) b.subgroup(TITLE, PREFIX);
+#define PATTERN_KNOB(PTYPE, CTYPE, VTYPE, NAME, C1, A1, B1, M1, C2, A2, B2, M2, NOTIFY, HINT, HINT_STRING) \
+	b.property(PropertyInfo(Variant::VTYPE, #NAME, HINT, HINT_STRING), "set_" #NAME, "get_" #NAME);
+#define PATTERN_PROPERTY(VTYPE, NAME, HINT, HINT_STRING, SETTER, GETTER) \
+	b.property(PropertyInfo(Variant::VTYPE, #NAME, HINT, HINT_STRING), #SETTER, #GETTER);
+#include "patterns/pattern_knob_table2d.inc"
+#undef PATTERN_SUBGROUP
+#undef PATTERN_KNOB
+#undef PATTERN_PROPERTY
+			break;
+		case SPAWNER_GROUP_SHOOTING:
+			b.group("Shooting", "");
+			b.property(PropertyInfo(Variant::BOOL, "shooting_enabled"), "set_shooting_enabled", "get_shooting_enabled");
+			b.property(PropertyInfo(Variant::FLOAT, "shoot_interval_sec", PROPERTY_HINT_RANGE, "0.005,30,0.001,or_greater"), "set_shoot_interval_sec", "get_shoot_interval_sec");
+			b.property(PropertyInfo(Variant::FLOAT, "shoot_interval_max_sec", PROPERTY_HINT_RANGE, "0,30,0.001,or_greater,suffix:s"), "set_shoot_interval_max_sec", "get_shoot_interval_max_sec");
+			b.property(PropertyInfo(Variant::BOOL, "shoot_outside_despawn_bounds"), "set_shoot_outside_despawn_bounds", "get_shoot_outside_despawn_bounds");
+			b.property(PropertyInfo(Variant::FLOAT, "shoot_initial_delay_sec"), "set_shoot_initial_delay_sec", "get_shoot_initial_delay_sec");
+			b.property(PropertyInfo(Variant::INT, "max_volleys"), "set_max_volleys", "get_max_volleys");
+			b.property(PropertyInfo(Variant::INT, "max_shots_per_frame", PROPERTY_HINT_RANGE, "1,64,1,or_greater"), "set_max_shots_per_frame", "get_max_shots_per_frame");
+			b.property(PropertyInfo(Variant::FLOAT, "reload_jitter_sec"), "set_reload_jitter_sec", "get_reload_jitter_sec");
+			b.property(PropertyInfo(Variant::INT, "reload_jitter_seed"), "set_reload_jitter_seed", "get_reload_jitter_seed");
+			b.property(PropertyInfo(Variant::BOOL, "burst_enabled"), "set_burst_enabled", "get_burst_enabled");
+			b.property(PropertyInfo(Variant::INT, "burst_count"), "set_burst_count", "get_burst_count");
+			b.property(PropertyInfo(Variant::FLOAT, "burst_interval_sec"), "set_burst_interval_sec", "get_burst_interval_sec");
+			b.property(PropertyInfo(Variant::FLOAT, "burst_interval_max_sec", PROPERTY_HINT_RANGE, "0,30,0.001,or_greater,suffix:s"), "set_burst_interval_max_sec", "get_burst_interval_max_sec");
+			b.property(PropertyInfo(Variant::BOOL, "burst_alternate_mirror"), "set_burst_alternate_mirror", "get_burst_alternate_mirror");
+			b.property(PropertyInfo(Variant::BOOL, "telegraph_enabled"), "set_telegraph_enabled", "get_telegraph_enabled");
+			b.property(PropertyInfo(Variant::FLOAT, "telegraph_sec"), "set_telegraph_sec", "get_telegraph_sec");
+			b.property(PropertyInfo(Variant::FLOAT, "telegraph_max_sec", PROPERTY_HINT_RANGE, "0,30,0.001,or_greater,suffix:s"), "set_telegraph_max_sec", "get_telegraph_max_sec");
+			break;
+		case SPAWNER_GROUP_RANDOMIZATION:
+			b.group("Randomization", "bullet_");
+			b.property(PropertyInfo(Variant::INT, "bullet_scale_mode", PROPERTY_HINT_ENUM, "Off,Uniform,Per Axis"), "set_bullet_scale_mode", "get_bullet_scale_mode");
+			b.property(PropertyInfo(Variant::FLOAT, "bullet_scale_min", PROPERTY_HINT_RANGE, "0.01,10,0.01,or_greater"), "set_bullet_scale_min", "get_bullet_scale_min");
+			b.property(PropertyInfo(Variant::FLOAT, "bullet_scale_max", PROPERTY_HINT_RANGE, "0.01,10,0.01,or_greater"), "set_bullet_scale_max", "get_bullet_scale_max");
+			b.property(PropertyInfo(Variant::VECTOR2, "bullet_scale_min_xy"), "set_bullet_scale_min_xy", "get_bullet_scale_min_xy");
+			b.property(PropertyInfo(Variant::VECTOR2, "bullet_scale_max_xy"), "set_bullet_scale_max_xy", "get_bullet_scale_max_xy");
+			b.property(PropertyInfo(Variant::FLOAT, "bullet_rotation_min_degrees", PROPERTY_HINT_RANGE, "-360,360,0.1,or_less,or_greater,suffix:deg"), "set_bullet_rotation_min_degrees", "get_bullet_rotation_min_degrees");
+			b.property(PropertyInfo(Variant::FLOAT, "bullet_rotation_max_degrees", PROPERTY_HINT_RANGE, "-360,360,0.1,or_less,or_greater,suffix:deg"), "set_bullet_rotation_max_degrees", "get_bullet_rotation_max_degrees");
+			b.property(PropertyInfo(Variant::FLOAT, "bullet_position_jitter_min", PROPERTY_HINT_RANGE, "0,200,0.1,or_greater,suffix:px"), "set_bullet_position_jitter_min", "get_bullet_position_jitter_min");
+			b.property(PropertyInfo(Variant::FLOAT, "bullet_position_jitter_max", PROPERTY_HINT_RANGE, "0,200,0.1,or_greater,suffix:px"), "set_bullet_position_jitter_max", "get_bullet_position_jitter_max");
+			b.property(PropertyInfo(Variant::INT, "bullet_random_seed"), "set_bullet_random_seed", "get_bullet_random_seed");
+			break;
+		case SPAWNER_GROUP_SPIN:
+			b.group("Spin", "");
+			b.property(PropertyInfo(Variant::BOOL, "spin_enabled"), "set_spin_enabled", "get_spin_enabled");
+			b.property(PropertyInfo(Variant::INT, "spin_mode", PROPERTY_HINT_ENUM, "Continuous,Oscillate"), "set_spin_mode", "get_spin_mode");
+			b.property(PropertyInfo(Variant::FLOAT, "spin_speed_deg_per_sec"), "set_spin_speed_deg_per_sec", "get_spin_speed_deg_per_sec");
+			b.property(PropertyInfo(Variant::FLOAT, "spin_amplitude_deg"), "set_spin_amplitude_deg", "get_spin_amplitude_deg");
+			b.property(PropertyInfo(Variant::FLOAT, "spin_frequency_hz"), "set_spin_frequency_hz", "get_spin_frequency_hz");
+			b.property(PropertyInfo(Variant::BOOL, "spin_random_start_phase"), "set_spin_random_start_phase", "get_spin_random_start_phase");
+			break;
+		case SPAWNER_GROUP_GRAZE:
+			b.group("Graze", "");
+			b.property(PropertyInfo(Variant::BOOL, "graze_enabled"), "set_graze_enabled", "get_graze_enabled");
+			b.property(PropertyInfo(Variant::ARRAY, "graze_zones", PROPERTY_HINT_ARRAY_TYPE, "BulletGrazeZone2D"), "set_graze_zones", "get_graze_zones");
+			b.property(PropertyInfo(Variant::INT, "graze_target_source", PROPERTY_HINT_ENUM, "Node Group,Node Path,Node Name,Node Children,Mouse,Global Positions"), "set_graze_target_source", "get_graze_target_source");
+			b.property(PropertyInfo(Variant::STRING_NAME, "graze_node_group"), "set_graze_node_group", "get_graze_node_group");
+			b.property(PropertyInfo(Variant::STRING_NAME, "graze_filter_group"), "set_graze_filter_group", "get_graze_filter_group");
+			b.property(PropertyInfo(Variant::NODE_PATH, "graze_target_path", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "Node2D"), "set_graze_target_path", "get_graze_target_path");
+			b.property(PropertyInfo(Variant::STRING, "graze_node_name"), "set_graze_node_name", "get_graze_node_name");
+			b.property(PropertyInfo(Variant::INT, "graze_node_name_match_mode", PROPERTY_HINT_ENUM, "Exact,Contains,Starts With,Ends With"), "set_graze_node_name_match_mode", "get_graze_node_name_match_mode");
+			b.property(PropertyInfo(Variant::BOOL, "graze_node_name_case_sensitive"), "set_graze_node_name_case_sensitive", "get_graze_node_name_case_sensitive");
+			b.property(PropertyInfo(Variant::NODE_PATH, "graze_children_parent_path"), "set_graze_children_parent_path", "get_graze_children_parent_path");
+			b.property(PropertyInfo(Variant::BOOL, "graze_children_recursive"), "set_graze_children_recursive", "get_graze_children_recursive");
+			b.property(PropertyInfo(Variant::PACKED_VECTOR2_ARRAY, "graze_global_positions"), "set_graze_global_positions", "get_graze_global_positions");
+			b.property(PropertyInfo(Variant::FLOAT, "graze_update_interval", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater,suffix:s"), "set_graze_update_interval", "get_graze_update_interval");
+			b.property(PropertyInfo(Variant::BOOL, "graze_show_preview"), "set_graze_show_preview", "get_graze_show_preview");
+			b.property(PropertyInfo(Variant::BOOL, "graze_preview_during_runtime"), "set_graze_preview_during_runtime", "get_graze_preview_during_runtime");
+			b.property(PropertyInfo(Variant::FLOAT, "graze_preview_line_width", PROPERTY_HINT_RANGE, "0.5,16,0.5,or_greater"), "set_graze_preview_line_width", "get_graze_preview_line_width");
+			break;
+		case SPAWNER_GROUP_SOUND:
+			b.group("Sound", "");
+			b.property(PropertyInfo(Variant::BOOL, "sound_enabled"), "set_sound_enabled", "get_sound_enabled");
+			b.property(PropertyInfo(Variant::ARRAY, "sound_effects", PROPERTY_HINT_ARRAY_TYPE, "BulletSoundData2D"), "set_sound_effects", "get_sound_effects");
+			b.property(PropertyInfo(Variant::FLOAT, "sound_volume_db", PROPERTY_HINT_RANGE, "-80,24,0.1,suffix:dB"), "set_sound_volume_db", "get_sound_volume_db");
+			b.property(PropertyInfo(Variant::INT, "sound_listener_source", PROPERTY_HINT_ENUM, "Godot Listener,Node Group,Node Path,Node Name,Node Children,Mouse,Global Positions"), "set_sound_listener_source", "get_sound_listener_source");
+			b.property(PropertyInfo(Variant::STRING_NAME, "sound_listener_node_group"), "set_sound_listener_node_group", "get_sound_listener_node_group");
+			b.property(PropertyInfo(Variant::STRING_NAME, "sound_listener_filter_group"), "set_sound_listener_filter_group", "get_sound_listener_filter_group");
+			b.property(PropertyInfo(Variant::NODE_PATH, "sound_listener_path", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "Node2D"), "set_sound_listener_path", "get_sound_listener_path");
+			b.property(PropertyInfo(Variant::STRING, "sound_listener_node_name"), "set_sound_listener_node_name", "get_sound_listener_node_name");
+			b.property(PropertyInfo(Variant::INT, "sound_listener_node_name_match_mode", PROPERTY_HINT_ENUM, "Exact,Contains,Starts With,Ends With"), "set_sound_listener_node_name_match_mode", "get_sound_listener_node_name_match_mode");
+			b.property(PropertyInfo(Variant::BOOL, "sound_listener_node_name_case_sensitive"), "set_sound_listener_node_name_case_sensitive", "get_sound_listener_node_name_case_sensitive");
+			b.property(PropertyInfo(Variant::NODE_PATH, "sound_listener_children_parent_path"), "set_sound_listener_children_parent_path", "get_sound_listener_children_parent_path");
+			b.property(PropertyInfo(Variant::BOOL, "sound_listener_children_recursive"), "set_sound_listener_children_recursive", "get_sound_listener_children_recursive");
+			b.property(PropertyInfo(Variant::PACKED_VECTOR2_ARRAY, "sound_listener_global_positions"), "set_sound_listener_global_positions", "get_sound_listener_global_positions");
+			b.property(PropertyInfo(Variant::FLOAT, "sound_listener_update_interval", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater,suffix:s"), "set_sound_listener_update_interval", "get_sound_listener_update_interval");
+			break;
+		case SPAWNER_GROUP_PREVIEW:
+			b.group("Preview", "");
+			b.property(PropertyInfo(Variant::BOOL, "show_pattern_preview"), "set_show_pattern_preview", "get_show_pattern_preview");
+			b.property(PropertyInfo(Variant::BOOL, "show_preview_during_runtime"), "set_show_preview_during_runtime", "get_show_preview_during_runtime");
+			b.property(PropertyInfo(Variant::COLOR, "preview_dot_color"), "set_preview_dot_color", "get_preview_dot_color");
+			b.property(PropertyInfo(Variant::COLOR, "preview_arrow_color"), "set_preview_arrow_color", "get_preview_arrow_color");
+			b.property(PropertyInfo(Variant::COLOR, "preview_first_dot_color"), "set_preview_first_dot_color", "get_preview_first_dot_color");
+			b.property(PropertyInfo(Variant::COLOR, "preview_path_color"), "set_preview_path_color", "get_preview_path_color");
+			b.property(PropertyInfo(Variant::COLOR, "preview_layer_path_color"), "set_preview_layer_path_color", "get_preview_layer_path_color");
+			b.property(PropertyInfo(Variant::FLOAT, "preview_path_width"), "set_preview_path_width", "get_preview_path_width");
+			b.property(PropertyInfo(Variant::FLOAT, "preview_dot_radius"), "set_preview_dot_radius", "get_preview_dot_radius");
+			b.property(PropertyInfo(Variant::FLOAT, "preview_arrow_gap"), "set_preview_arrow_gap", "get_preview_arrow_gap");
+			b.property(PropertyInfo(Variant::FLOAT, "preview_arrow_length"), "set_preview_arrow_length", "get_preview_arrow_length");
+			b.property(PropertyInfo(Variant::FLOAT, "preview_arrow_width"), "set_preview_arrow_width", "get_preview_arrow_width");
+			b.property(PropertyInfo(Variant::FLOAT, "preview_arrow_head_length"), "set_preview_arrow_head_length", "get_preview_arrow_head_length");
+			b.property(PropertyInfo(Variant::FLOAT, "preview_arrow_head_width"), "set_preview_arrow_head_width", "get_preview_arrow_head_width");
+			b.property(PropertyInfo(Variant::INT, "preview_z_index", PROPERTY_HINT_RANGE, "-4096,4096,1"), "set_preview_z_index", "get_preview_z_index");
+			b.property(PropertyInfo(Variant::BOOL, "preview_z_as_relative"), "set_preview_z_as_relative", "get_preview_z_as_relative");
+			b.property(PropertyInfo(Variant::BOOL, "preview_draw_collision_rings"), "set_preview_draw_collision_rings", "get_preview_draw_collision_rings");
+			b.property(PropertyInfo(Variant::COLOR, "preview_collision_ring_color"), "set_preview_collision_ring_color", "get_preview_collision_ring_color");
+			b.property(PropertyInfo(Variant::FLOAT, "preview_collision_ring_width"), "set_preview_collision_ring_width", "get_preview_collision_ring_width");
+			break;
+		case SPAWNER_GROUP_MOVEMENT:
+			b.group("Movement", "");
+			b.property(PropertyInfo(Variant::BOOL, "movement_enabled"), "set_movement_enabled", "get_movement_enabled");
+			b.property(PropertyInfo(Variant::NODE_PATH, "movement_path", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "Path2D"), "set_movement_path", "get_movement_path");
+			b.property(PropertyInfo(Variant::BOOL, "movement_autostart"), "set_movement_autostart", "get_movement_autostart");
+			b.property(PropertyInfo(Variant::INT, "movement_space", PROPERTY_HINT_ENUM, "Attach:0,Relative To Start:1"), "set_movement_space", "get_movement_space");
+			b.property(PropertyInfo(Variant::INT, "movement_loop_mode", PROPERTY_HINT_ENUM, "Once:0,Loop:1,Ping Pong:2"), "set_movement_loop_mode", "get_movement_loop_mode");
+			b.property(PropertyInfo(Variant::INT, "movement_loops", PROPERTY_HINT_RANGE, "0,1000,1,or_greater"), "set_movement_loops", "get_movement_loops");
+			b.property(PropertyInfo(Variant::INT, "movement_direction", PROPERTY_HINT_ENUM, "Forward:0,Reverse:1"), "set_movement_direction", "get_movement_direction");
+			b.property(PropertyInfo(Variant::INT, "movement_timing", PROPERTY_HINT_ENUM, "Duration:0,Speed:1"), "set_movement_timing", "get_movement_timing");
+			b.property(PropertyInfo(Variant::FLOAT, "movement_duration_sec", PROPERTY_HINT_RANGE, "0.01,60,0.01,or_greater,suffix:s"), "set_movement_duration_sec", "get_movement_duration_sec");
+			b.property(PropertyInfo(Variant::FLOAT, "movement_speed", PROPERTY_HINT_RANGE, "1,4000,1,or_greater,suffix:px/s"), "set_movement_speed", "get_movement_speed");
+			b.property(PropertyInfo(Variant::INT, "movement_transition", PROPERTY_HINT_ENUM, "Linear:0,Sine:1,Quint:2,Quart:3,Quad:4,Expo:5,Elastic:6,Cubic:7,Circ:8,Bounce:9,Back:10,Spring:11"), "set_movement_transition", "get_movement_transition");
+			b.property(PropertyInfo(Variant::INT, "movement_ease", PROPERTY_HINT_ENUM, "In:0,Out:1,In Out:2,Out In:3"), "set_movement_ease", "get_movement_ease");
+			b.property(PropertyInfo(Variant::OBJECT, "movement_progress_curve", PROPERTY_HINT_RESOURCE_TYPE, "Curve"), "set_movement_progress_curve", "get_movement_progress_curve");
+			b.property(PropertyInfo(Variant::FLOAT, "movement_start_ratio", PROPERTY_HINT_RANGE, "0,1,0.001"), "set_movement_start_ratio", "get_movement_start_ratio");
+			b.property(PropertyInfo(Variant::FLOAT, "movement_start_delay_sec", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater,suffix:s"), "set_movement_start_delay_sec", "get_movement_start_delay_sec");
+			b.property(PropertyInfo(Variant::FLOAT, "movement_endpoint_pause_sec", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater,suffix:s"), "set_movement_endpoint_pause_sec", "get_movement_endpoint_pause_sec");
+			b.property(PropertyInfo(Variant::BOOL, "movement_rotate_with_path"), "set_movement_rotate_with_path", "get_movement_rotate_with_path");
+			b.property(PropertyInfo(Variant::FLOAT, "movement_rotation_offset_deg", PROPERTY_HINT_RANGE, "-360,360,0.1,or_less,or_greater,suffix:deg"), "set_movement_rotation_offset_deg", "get_movement_rotation_offset_deg");
+			b.property(PropertyInfo(Variant::BOOL, "movement_cubic_sampling"), "set_movement_cubic_sampling", "get_movement_cubic_sampling");
+			b.property(PropertyInfo(Variant::BOOL, "inherit_movement_velocity"), "set_inherit_movement_velocity", "get_inherit_movement_velocity");
+			b.property(PropertyInfo(Variant::FLOAT, "movement_velocity_inherit_factor", PROPERTY_HINT_RANGE, "-2,2,0.01,or_less,or_greater"), "set_movement_velocity_inherit_factor", "get_movement_velocity_inherit_factor");
+			break;
+		case SPAWNER_GROUP_PERFORMANCE:
+			b.group("Performance", "");
+			b.property(PropertyInfo(Variant::INT, "pattern_cache_mode", PROPERTY_HINT_ENUM, "Auto:0,Off:1"), "set_pattern_cache_mode", "get_pattern_cache_mode");
+			break;
+	}
 }
 
 } // namespace BlastBullets2D

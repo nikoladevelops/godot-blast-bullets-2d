@@ -70,7 +70,7 @@
 			Seconds of the fading phase: the width shrinks to 0, nothing is hit. Must be finite and &gt;= 0.
 		</member>
 		<member name="follow_spawner" type="bool" setter="set_follow_spawner" getter="get_follow_spawner" default="true">
-			Whether the muzzles ride their spawner (its moves, spin and teleports) or anchor; off, a beam stays where it was fired. Bolts and curvy lasers leave the muzzle when they launch. The spawner's [member PatternSpawner2D.spawn_position_offset] rides on top of the spun muzzles (Global: a world vector, Local: in the generator's frame), like the bullets' offset. While the spawner is outside the scene tree (a reparent across frames) the beams hold their pose and ride it again once it is back; a freed spawner ends the follow and every beam stays where it is.
+			Whether the muzzles ride their spawner (its moves, spin and teleports) or anchor; off, a beam stays where it was fired. Bolts and curvy lasers leave the muzzle when they launch. The spawner's [member BulletSpawner2D.spawn_position_offset] rides on top of the spun muzzles (Global: a world vector, Local: in the generator's frame), like the bullets' offset. While the spawner is outside the scene tree (a reparent across frames) the beams hold their pose and ride it again once it is back; a freed spawner ends the follow and every beam stays where it is.
 		</member>
 		<member name="grow_sec" type="float" setter="set_grow_sec" getter="get_grow_sec" default="0.1">
 			Seconds of the growing phase: the width grows from 0 to [member width]. It hits while growing when [member hit_while_growing] is on. Must be finite and &gt;= 0.

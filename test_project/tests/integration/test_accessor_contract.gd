@@ -243,7 +243,9 @@ func test_every_enum_property_is_typed_with_its_enum() -> void:
 		if ClassDB.class_get_api_type(cls) != ClassDB.API_EXTENSION:
 			continue
 		var returns := {}
-		for m in ClassDB.class_get_method_list(cls, true):
+		# Inherited too: a concrete spawner registers properties whose
+		# accessors PatternSpawner2D binds.
+		for m in ClassDB.class_get_method_list(cls, false):
 			returns[str(m["name"])] = m["return"]
 		for p in ClassDB.class_get_property_list(cls, true):
 			if int(p["type"]) != TYPE_INT or int(p["hint"]) != PROPERTY_HINT_ENUM:

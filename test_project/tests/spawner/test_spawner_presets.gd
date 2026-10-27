@@ -1,5 +1,5 @@
 extends BlastTest
-## apply_pattern_preset is CLEAN: every Bullet Patterns knob (except the
+## apply_pattern_preset is CLEAN: every Patterns knob (except the
 ## Transform subgroup and node/array wiring) and Spin return to their defaults
 ## before the preset applies, so the same preset always gives the same
 ## pattern. Every preset draws exactly its amount.
