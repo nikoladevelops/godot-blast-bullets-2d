@@ -1378,6 +1378,12 @@
 		<member name="preview_path_width" type="float" setter="set_preview_path_width" getter="get_preview_path_width" default="2.0">
 			Track underlay line width in pixels (multiplied by nothing: absolute screen-ish size). 0 hides the track. Must be finite and 0 or more.
 		</member>
+		<member name="preview_z_as_relative" type="bool" setter="set_preview_z_as_relative" getter="get_preview_z_as_relative" default="true">
+			Whether [member preview_z_index] is relative to this spawner's own z order (default) or absolute.
+		</member>
+		<member name="preview_z_index" type="int" setter="set_preview_z_index" getter="get_preview_z_index" default="4000">
+			The z index of the pattern preview (dots, arrows and laser beam bands) and of the runtime graze ring preview (default 4000: over most of the game). Lower it when a background or a UI layer must stay on top. Edits reach the live preview at once. Between -4096 and 4096.
+		</member>
 		<member name="process_callback" type="int" setter="set_process_callback" getter="get_process_callback" enum="PatternSpawner2D.SpawnerProcessCallback" default="0">
 			Which callback runs the spawner at runtime: movement, spin, countdowns and shots. [constant PROCESS_IDLE] (the default) runs every rendered frame. [constant PROCESS_PHYSICS] runs every physics tick: shots line up with the bullets' own ticks, so a stream's bullets sit exactly [code]speed x interval[/code] apart at any frame rate (with Idle, a shot between two ticks still moves a full step on the next one). Pair Physics with Godot's physics interpolation for smooth spawner motion. The editor preview always refreshes per frame.
 		</member>

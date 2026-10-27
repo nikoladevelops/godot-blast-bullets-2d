@@ -244,7 +244,7 @@
 			<return type="void" />
 			<param index="0" name="targets" type="Array" />
 			<description>
-				Sets every beam's target: beam [code]i[/code] takes [code]targets[i % size][/code] (a [Node2D] or a [Vector2]). An empty array clears them.
+				Sets every beam's target: beam [code]i[/code] takes [code]targets[i % size][/code] (a [Node2D] or a [Vector2]). An empty array clears them. Targets steer only a laser whose [member LaserData2D.aim] is Track or Lock On: on a Pattern laser they are kept (for a later aim change) and the first one per life warns.
 			</description>
 		</method>
 		<method name="sound_set_effects">

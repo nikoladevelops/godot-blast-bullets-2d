@@ -91,7 +91,7 @@
 			Global Position: the point every beam aims at. Must be finite.
 		</member>
 		<member name="laser_target_source" type="int" setter="set_laser_target_source" getter="get_laser_target_source" enum="LaserSpawner2D.LaserTargetSource" default="0">
-			Where Track and Lock On lasers find their targets (see [enum LaserTargetSource]). Lasers aiming along the pattern ignore it.
+			Where Track and Lock On lasers find their targets (see [enum LaserTargetSource]). Lasers aiming along the pattern ignore it: set [member LaserData2D.aim] to Track or Lock On to use the targets. The mismatch (a source with a Pattern aim, or Track / Lock On without a source) is a setup warning in the editor and warns once at the first shot of each mismatched configuration.
 		</member>
 		<member name="max_live_lasers" type="int" setter="set_max_live_lasers" getter="get_max_live_lasers" default="0">
 			Soft cap: while this many of its lasers fire, shots are skipped ([signal PatternSpawner2D.volley_skipped] with [code]over_budget[/code]). 0 = no limit.

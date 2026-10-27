@@ -797,6 +797,9 @@
 		<member name="debugger_max_providers" type="int" setter="set_debugger_max_providers" getter="get_debugger_max_providers" default="0">
 			Max debugger providers drawn per tick (0 = unlimited). Beyond the cap extra volleys are hidden, oldest first. Lower this on 10k-bullet demos where the always-draw debugger costs frames.
 		</member>
+		<member name="debugger_z_index" type="int" setter="set_debugger_z_index" getter="get_debugger_z_index" default="999">
+			The z index of the collision debugger's shapes (default 999: over the bullets). Edits reach the drawn shapes at once. Between -4096 and 4096.
+		</member>
 		<member name="despawn_bounds_color" type="Color" setter="set_despawn_bounds_color" getter="get_despawn_bounds_color" default="Color(1, 0, 0, 0.25)">
 			Color of the despawn bounds preview: the fill uses it as is (translucent red by default), the outline is the same color made more opaque. Every component must be finite.
 		</member>
@@ -808,6 +811,9 @@
 		</member>
 		<member name="despawn_bounds_preview_during_runtime" type="bool" setter="set_despawn_bounds_preview_during_runtime" getter="get_despawn_bounds_preview_during_runtime" default="false">
 			Also draws the despawn bounds preview while the game runs (debugging aid). Off by default. Needs [member despawn_bounds_enabled] and [member despawn_bounds_preview].
+		</member>
+		<member name="despawn_bounds_preview_z_index" type="int" setter="set_despawn_bounds_preview_z_index" getter="get_despawn_bounds_preview_z_index" default="4000">
+			The z index of the despawn-bounds preview rectangle (default 4000: over most of the game). Lower it when the preview hides UI or a foreground layer. Between -4096 and 4096.
 		</member>
 		<member name="despawn_bounds_rect" type="Rect2" setter="set_despawn_bounds_rect" getter="get_despawn_bounds_rect" default="Rect2(0, 0, 1152, 648)">
 			The play field for [member despawn_bounds_enabled], in global space. "Not heading back in" means that along every axis where the bullet is outside, its velocity does not point towards the rectangle. Defaults to Godot's default viewport. Must be finite; a negative size is normalized.
