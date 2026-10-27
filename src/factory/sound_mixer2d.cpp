@@ -435,7 +435,7 @@ bool SoundMixer2D::offer(BulletFactory2D &factory, const Ref<BulletSoundData2D> 
 	// One hum per followed bullet: a bullet whose follow voice is still live
 	// (not fading) never offers a second copy. Each bullet offers at most once
 	// per sweep, so every voice that already plays is visible here.
-	if (sound->follow_bullet && follow_volley_id != 0 && follow_bullet >= 0) {
+	if (sound->follow && follow_volley_id != 0 && follow_bullet >= 0) {
 		const uint64_t sid = sound->get_instance_id();
 		for (const Voice &voice : voices) {
 			if (voice.busy && !voice.fading && voice.following && voice.sound_id == sid && voice.follow_volley == follow_volley_id && voice.follow_life == follow_life_id && voice.follow_bullet == follow_bullet) {
@@ -1098,7 +1098,7 @@ void SoundMixer2D::flush(BulletFactory2D &factory) {
 			voice.listener_node_id = winner.node_id;
 			voice.listener_last_pos = winner.listener_pos;
 			voice.follows_node = winner.node_id != 0;
-			voice.following = sound->follow_bullet;
+			voice.following = sound->follow;
 			voice.follow_volley = winner.follow_volley;
 			voice.follow_life = winner.follow_life;
 			voice.follow_bullet = winner.follow_bullet;
