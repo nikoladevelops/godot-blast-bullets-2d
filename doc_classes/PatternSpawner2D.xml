@@ -709,6 +709,9 @@
 		<member name="helper_ellipse_radius_y" type="float" setter="set_helper_ellipse_radius_y" getter="get_helper_ellipse_radius_y" default="100.0">
 			Ellipse semi-axis Y in pixels. Must be finite and 0 or more.
 		</member>
+		<member name="helper_ellipse_rotate_with_marker" type="bool" setter="set_helper_ellipse_rotate_with_marker" getter="get_helper_ellipse_rotate_with_marker" default="true">
+			When on (default), the ellipse turns with the shot's aim (the generator node's rotation or a [method shoot_from] pose) like Ring: [member helper_ellipse_rotation] adds to the aim. Off keeps the ellipse fixed in the world, turned by [member helper_ellipse_rotation] alone.
+		</member>
 		<member name="helper_ellipse_rotation" type="float" setter="set_helper_ellipse_rotation" getter="get_helper_ellipse_rotation" default="0.0">
 			Rotates the ellipse axes. Must be finite.
 		</member>
@@ -1254,6 +1257,9 @@
 		</member>
 		<member name="inherit_movement_velocity" type="bool" setter="set_inherit_movement_velocity" getter="get_inherit_movement_velocity" default="false">
 			Bullets fired while the spawner moves inherit its movement velocity ([method get_movement_velocity] x [member movement_velocity_inherit_factor]), so a moving turret's shots carry its momentum for their whole life. Homing bullets aim through that momentum (they cancel it across the line of sight), but only while their own speed is larger than the sideways part of the inherited velocity: lower the factor for slow homing bullets. Off by default.
+		</member>
+		<member name="max_shots_per_frame" type="int" setter="set_max_shots_per_frame" getter="get_max_shots_per_frame" default="8">
+			The most shots one timer (auto-fire, a burst chain, a pattern list) fires in one frame. An interval shorter than a frame, or a late frame, repays up to this many shots; then the timer resyncs and drops the rest of its backlog. [code]1[/code] never repays a hitch: an overloaded game degrades by firing less instead of piling more volleys onto slow frames. Must be &gt;= 1.
 		</member>
 		<member name="max_volleys" type="int" setter="set_max_volleys" getter="get_max_volleys" default="-1">
 			Auto-shooting stops after this many volleys. -1 is infinite, 0 disables auto-shooting ([method shoot_once] still works). Lowering the cap below the fired count emits [signal shooting_stopped] (raising it back emits [signal shooting_started]); [signal shooting_finished] fires once from the volley that trips the cap, so a volley_fired handler that lowers the cap never double-fires it. Untouched by [method fire_n_volleys].

@@ -373,7 +373,7 @@
 			To keep hit handlers working while the spawner lives, connect to the spawner's signals from a node that outlives it, or set [member BulletVolleyData2D.emit_collision_signals] to [code]false[/code] for bullets that intentionally report nothing.
 		</member>
 		<member name="spawn_data" type="BulletVolleyData2D" setter="set_spawn_data" getter="get_spawn_data">
-			Bullet data for each volley. Duplicated once per resource (the spawner keeps the copy until the resource changes or is replaced), so sharing one resource is safe. Assigning the same resource again keeps the copy.
+			Bullet data for each volley. A shot only reads it (the pattern's transforms travel separately), so sharing one resource between spawners is safe. With a split chain armed the spawner keeps a copy for the children of its bullets (an edit made after a shot never reaches bullets already flying); the copy is refreshed after the resource changes or is replaced. A setter writing the value a property already holds is not a change. Per-shot values (who fired, a damage snapshot) belong on the fired volley, for example [member BulletVolley2D.shared_bullets_custom_data] from a [signal volley_fired] handler, not on this resource: every real edit costs the next shot a refresh.
 		</member>
 		<member name="split_data" type="BulletSplitData2D" setter="set_split_data" getter="get_split_data">
 			The split chain fired volleys carry: [member BulletSplitData2D.stages][code][d][/code] decides how generation [code]d[/code] splits. Edits reach bullets already in flight. Children copy this spawner's spawn data (or the stage's [member BulletSplitStage2D.child_data]) and stay owned by this spawner.

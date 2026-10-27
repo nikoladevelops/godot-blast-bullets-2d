@@ -175,7 +175,7 @@
 			<param index="21" name="layer_layout" type="int" default="1" />
 			<param index="22" name="fill_min_spacing" type="float" default="0.5" />
 			<description>
-				Generates an exact circle outline: slots spread evenly around a radius loop centered on the marker, facing outward (or inward). The outline_* tail params place slots on the loop, fill its interior, or layer it across scaled repeats about the loop center.
+				Generates an exact circle outline: slots spread evenly around a radius loop centered on the marker, facing outward (or inward). The circle turns with the marker's rotation once (bullet 0 sits on the marker's facing direction). The outline_* tail params place slots on the loop, fill its interior, or layer it across scaled repeats about the loop center.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_corridor" qualifiers="static">
@@ -310,8 +310,9 @@
 			<param index="27" name="layer_max_dots" type="int" default="0" />
 			<param index="28" name="layer_layout" type="int" default="1" />
 			<param index="29" name="fill_min_spacing" type="float" default="0.5" />
+			<param index="30" name="rotate_with_marker" type="bool" default="true" />
 			<description>
-				Generates a true ellipse ring with independent [code]radius_x[/code] / [code]radius_y[/code] semi-axes rotated by [code]ellipse_rotation[/code]. Full draws every slot, Arc draws a spaced segment, Wall draws an arc with [code]gap_count[/code] dodge gaps of [code]gap_width[/code] radians each: exactly transforms_amount slots shared by the solid stretches. An Arc or Wall spanning a full turn closes like Full (no doubled seam slot). Facings follow the true outward normal of the rotated ellipse. Useful for oval bosses, stadium arenas and gap walls.
+				Generates a true ellipse ring with independent [code]radius_x[/code] / [code]radius_y[/code] semi-axes rotated by [code]ellipse_rotation[/code]. Full draws every slot, Arc draws a spaced segment, Wall draws an arc with [code]gap_count[/code] dodge gaps of [code]gap_width[/code] radians each: exactly transforms_amount slots shared by the solid stretches. An Arc or Wall spanning a full turn closes like Full (no doubled seam slot). Facings follow the true outward normal of the rotated ellipse. With [code]rotate_with_marker[/code] (default) the marker's rotation adds to [code]ellipse_rotation[/code], like Ring; off keeps the ellipse fixed in the world. Useful for oval bosses, stadium arenas and gap walls.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_fan" qualifiers="static">
