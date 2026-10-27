@@ -76,7 +76,16 @@ private:
 		Transform2D marker;
 		Transform2D marker_inv;
 		std::vector<Transform2D> raw;
+		// The largest coordinate the bake holds (its marker and every raw
+		// origin): what float32 rounds when it is re-posed.
+		real_t extent = 0.0;
 	};
+	// Whether re-posing `bake` to `marker` stays within transforms_match's
+	// tolerance: float32 rounds every re-posed origin by about two ulps of the
+	// largest coordinate involved. A bake taken far away (huge, finite
+	// coordinates) never serves a shot near the origin: re-posing it
+	// cancelled the offset to 0. Such a shot regenerates and re-anchors.
+	static bool repose_is_exact_enough(const Bake &bake, const Transform2D &marker);
 	Bake bakes_by_channel[CHANNEL_COUNT];
 	std::vector<Transform2D> verify_scratch;
 };

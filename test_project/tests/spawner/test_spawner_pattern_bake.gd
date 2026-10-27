@@ -100,6 +100,28 @@ func test_rigid_ring_hits_cache_while_moving() -> void:
 	assert_eq(int(info["bakes"]), bakes0, "no re-bake while only the generator moves")
 
 
+## A bake is reused only where float32 can re-pose it within the cache's own
+## match tolerance: one taken at a huge (finite) position never serves a shot
+## near the origin (re-posing it cancelled the offset to 0: a verifier
+## mismatch and bullets at the wrong spot); it re-anchors there instead, and
+## nearby moves keep hitting.
+func test_a_bake_far_away_is_never_reposed_near_the_origin() -> void:
+	gen.position = Vector2(42.0, 8.3e35)
+	sp.collect_spawn_transforms()
+	gen.position = Vector2(300, 569)
+	var cached: Array = sp.collect_spawn_transforms()
+	expect_no_errors("no cache mismatch")
+	_assert_same(cached, sp.debug_collect_spawn_transforms_uncached(), "after the far bake")
+	var info: Dictionary = sp.debug_get_pattern_cache_info()
+	var hits0: int = info["hits"]
+	gen.position = Vector2(310, 580)
+	sp.collect_spawn_transforms()
+	assert_eq(int(sp.debug_get_pattern_cache_info()["hits"]) - hits0, 1, "re-anchored near the origin: nearby moves hit again")
+	gen.position = Vector2(1e9, -3e9) # float32 spacing is 64-256 px out there: the verifier's relative tolerance judges it
+	sp.collect_spawn_transforms()
+	expect_no_errors("a far shot from a near bake: still no mismatch")
+
+
 func test_scaled_generator_rebakes_then_hits() -> void:
 	sp.collect_spawn_transforms()
 	gen.scale = Vector2(2, 2)

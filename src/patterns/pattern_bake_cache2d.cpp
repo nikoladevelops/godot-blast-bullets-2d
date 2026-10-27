@@ -1,5 +1,7 @@
 #include "patterns/pattern_bake_cache2d.hpp"
 
+#include <limits>
+
 #include "core/transform_math2d.hpp"
 #include "godot_cpp/core/math.hpp"
 #include "godot_cpp/variant/utility_functions.hpp"
@@ -42,6 +44,23 @@ bool PatternBakeCache2D::transforms_match(const Transform2D &a, const Transform2
 	return true;
 }
 
+namespace {
+
+real_t coordinate_extent2d(const Vector2 &v) {
+	return Math::max(Math::abs(v.x), Math::abs(v.y));
+}
+
+} // namespace
+
+bool PatternBakeCache2D::repose_is_exact_enough(const Bake &bake, const Transform2D &marker) {
+	const real_t near = coordinate_extent2d(marker.columns[2]);
+	const real_t scale = Math::max(bake.extent, near);
+	// Two roundings of the delta and one of its application, with margin.
+	const real_t error = scale * (real_t)4.0 * std::numeric_limits<real_t>::epsilon();
+	// transforms_match's origin tolerance at the smallest result magnitude.
+	return error <= (real_t)1e-3 + (real_t)1e-5 * near;
+}
+
 int PatternBakeCache2D::classify(const Transform2D &marker, const std::vector<Transform2D> &raw, const Generator &generate) {
 	if (raw.empty() || !marker.is_finite() || !is_transform_invertible_safe2d(marker)) {
 		return PATTERN_MOTION_NONE;
@@ -82,7 +101,7 @@ void PatternBakeCache2D::resolve(int channel, uint64_t version, bool cache_on, b
 		channel = CHANNEL_SHOT;
 	}
 	Bake &bake = bakes_by_channel[channel];
-	if (cache_on && bake.valid && bake.version == version && bake.motion_class != PATTERN_MOTION_NONE) {
+	if (cache_on && bake.valid && bake.version == version && bake.motion_class != PATTERN_MOTION_NONE && repose_is_exact_enough(bake, marker)) {
 		bool served = false;
 		if (bake.motion_class == PATTERN_MOTION_RIGID) {
 			const Transform2D delta = marker * bake.marker_inv;
@@ -144,6 +163,10 @@ void PatternBakeCache2D::resolve(int channel, uint64_t version, bool cache_on, b
 	bake.marker = marker;
 	bake.marker_inv = marker.affine_inverse();
 	bake.raw = r_raw;
+	bake.extent = coordinate_extent2d(marker.columns[2]);
+	for (const Transform2D &t : r_raw) {
+		bake.extent = Math::max(bake.extent, coordinate_extent2d(t.columns[2]));
+	}
 	++bakes;
 }
 
@@ -152,7 +175,7 @@ bool PatternBakeCache2D::survives_marker_move(uint64_t version, bool cache_on, c
 	if (!cache_on || !bake.valid || bake.version != version) {
 		return false;
 	}
-	if (!old_marker.is_finite() || !new_marker.is_finite()) {
+	if (!old_marker.is_finite() || !new_marker.is_finite() || !repose_is_exact_enough(bake, new_marker)) {
 		return false;
 	}
 	if (bake.motion_class == PATTERN_MOTION_RIGID) {
