@@ -88,8 +88,11 @@ func _expect(count: int, length: float, step: String) -> void:
 	if tails.size() != count:
 		_fail("%s: %d arrows, expected %d" % [step, tails.size(), count])
 		return
-	if not is_equal_approx(float(arrows["length"]), length):
-		_fail("%s: arrow length %s, expected %s" % [step, arrows["length"], length])
+	# A laser's beam: its band runs the laser's length from the muzzle; plain
+	# facing arrows have no band.
+	var drawn := float(arrows["beam_length"]) if float(arrows["beam_width"]) > 0.0 else float(arrows["length"])
+	if not is_equal_approx(drawn, length):
+		_fail("%s: drawn length %s, expected %s" % [step, drawn, length])
 
 
 func _fail(message: String) -> void:

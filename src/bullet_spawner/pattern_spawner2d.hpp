@@ -92,6 +92,11 @@ public:
 	float arrow_width = 2.0f;
 	float arrow_head_length = 8.0f;
 	float arrow_head_width = 10.0f;
+	// A laser's beam: a translucent band of the beam's width from the muzzle
+	// (band_back behind each tail) over band_length. 0 = no band.
+	float arrow_band_width = 0.0f;
+	float arrow_band_back = 0.0f;
+	float arrow_band_length = 0.0f;
 	// Reused draw scratch: _draw runs on every repaint, so member buffers
 	// avoid per-repaint allocations. draw_scratch filters the track;
 	// head_tri holds one arrow-head triangle (one polygon per draw call).
@@ -130,7 +135,7 @@ public:
 	void set_first_marker(bool p_show, const Color &p_color, float p_radius_scale);
 	void set_path_data(const PackedVector2Array &p_points, const Color &p_color, float p_width, bool p_closed);
 	void set_layer_path_data(const PackedVector2Array &p_points, const Color &p_color);
-	void set_arrows_data(const PackedVector2Array &p_tails, const PackedVector2Array &p_dirs, const Color &p_color, float p_length, float p_width, float p_head_length, float p_head_width);
+	void set_arrows_data(const PackedVector2Array &p_tails, const PackedVector2Array &p_dirs, const Color &p_color, float p_length, float p_width, float p_head_length, float p_head_width, float p_band_width = 0.0f, float p_band_back = 0.0f, float p_band_length = 0.0f);
 	// Collision-ring overlay: per-dot outline circle approximating the
 	// volley hitbox (bounding radius from spawn_data's shape). Snapshot
 	// like dots; radius <= 0 hides. Lets users compare visual vs hitbox
@@ -1274,6 +1279,9 @@ public:
 	// >= 0: the preview's direction arrows are this long (a laser spawner
 	// previews its beams); < 0 uses preview_arrow_length.
 	virtual real_t preview_beam_length() const { return -1.0; }
+	// A laser spawner's beam width (world px), drawn as a band under each
+	// arrow; <= 0 draws no band.
+	virtual real_t preview_beam_width() const { return -1.0; }
 	// True when what this spawner fires never culls at the despawn bounds
 	// (the muzzle check then never refuses a shot).
 	virtual bool shots_ignore_despawn_bounds() const { return false; }

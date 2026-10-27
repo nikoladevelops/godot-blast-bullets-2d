@@ -318,7 +318,10 @@ func test_the_preview_draws_each_slot_as_its_beam() -> void:
 	await idle(6) # the deferred preview rebuild
 	var arrows: Dictionary = sp.debug_get_preview_arrows()
 	assert_eq((arrows["tails"] as PackedVector2Array).size(), 4, "one beam per slot")
-	assert_almost_eq(float(arrows["length"]), 200.0, 0.001, "drawn at the laser's length")
+	assert_almost_eq(float(arrows["beam_length"]), 200.0, 0.001, "the beam band runs the laser's length")
+	assert_almost_eq(float(arrows["beam_width"]), d.width, 0.001, "at the laser's width")
+	var offset := sp.preview_dot_radius + sp.preview_arrow_gap
+	assert_almost_eq(float(arrows["length"]), 200.0 - offset, 0.001, "the arrow ends where the beam ends (it starts outside the dot)")
 	var l := _fire(sp)
 	step_factory(1, DT)
 	var dots := sp.debug_get_preview_dot_points()
@@ -330,16 +333,25 @@ func test_the_preview_draws_each_slot_as_its_beam() -> void:
 	assert_eq(off, [], "every preview beam starts and points where its beam fires")
 	d.length = 350.0
 	await idle(6)
-	assert_almost_eq(float(sp.debug_get_preview_arrows()["length"]), 350.0, 0.001, "a laser_data edit redraws")
+	assert_almost_eq(float(sp.debug_get_preview_arrows()["beam_length"]), 350.0, 0.001, "a length edit redraws")
+	d.width = 37.0
+	await idle(6)
+	assert_almost_eq(float(sp.debug_get_preview_arrows()["beam_width"]), 37.0, 0.001, "a width edit redraws at the new width")
+	sp.scale = Vector2(2, 2)
+	await idle(6)
+	assert_almost_eq(float(sp.debug_get_preview_arrows()["beam_width"]), 18.5, 0.001, "drawn in the spawner's space: world px divided by its scale")
+	sp.scale = Vector2.ONE
 	sp.laser_data = LaserData2D.create_preset(LaserData2D.PRESET_WALL_BEAM)
 	await idle(6)
-	assert_almost_eq(float(sp.debug_get_preview_arrows()["length"]), 1200.0, 0.001, "a new laser_data redraws")
+	assert_almost_eq(float(sp.debug_get_preview_arrows()["beam_length"]), 1200.0, 0.001, "a new laser_data redraws")
 	sp.laser_data = null
 	await idle(6)
 	assert_almost_eq(float(sp.debug_get_preview_arrows()["length"]), sp.preview_arrow_length, 0.001, "no laser: the plain facing arrows")
+	assert_eq(float(sp.debug_get_preview_arrows()["beam_width"]), 0.0, "and no beam band")
 	var bullets := make_preview_spawner(BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
 	await idle(6)
 	assert_almost_eq(float(bullets.debug_get_preview_arrows()["length"]), bullets.preview_arrow_length, 0.001, "bullet spawners keep preview_arrow_length")
+	assert_eq(float(bullets.debug_get_preview_arrows()["beam_width"]), 0.0, "bullet spawners draw no beam band")
 
 
 func test_a_teleport_snaps_following_beams_without_a_slide() -> void:

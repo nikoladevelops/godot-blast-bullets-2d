@@ -42,7 +42,10 @@ void PatternPreviewLayer2D::set_layer_path_data(const PackedVector2Array &p_poin
 	queue_redraw();
 }
 
-void PatternPreviewLayer2D::set_arrows_data(const PackedVector2Array &p_tails, const PackedVector2Array &p_dirs, const Color &p_color, float p_length, float p_width, float p_head_length, float p_head_width) {
+void PatternPreviewLayer2D::set_arrows_data(const PackedVector2Array &p_tails, const PackedVector2Array &p_dirs, const Color &p_color, float p_length, float p_width, float p_head_length, float p_head_width, float p_band_width, float p_band_back, float p_band_length) {
+	arrow_band_width = p_band_width;
+	arrow_band_back = p_band_back;
+	arrow_band_length = p_band_length;
 	arrow_tails = p_tails;
 	arrow_dirs = p_dirs;
 	arrow_color = p_color;
@@ -287,6 +290,24 @@ void PatternPreviewLayer2D::_draw() {
 		const Vector2 dir = dirs_p[i];
 		return dir.is_finite() && tails_p[i].is_finite() && dir.length_squared() >= 0.00000001;
 	};
+	// The laser's real beam first (under the arrow): its width and its length
+	// from the muzzle, so the inspector shows how thick the beams are.
+	if (arrow_band_width > 0.0f && arrow_band_length > 0.0f) {
+		for (int i = 0; i < count; i++) {
+			if (!arrow_ok(i)) {
+				continue;
+			}
+			const Vector2 muzzle = tails_p[i] - dirs_p[i] * arrow_band_back;
+			draw_scratch.push_back(muzzle);
+			draw_scratch.push_back(muzzle + dirs_p[i] * arrow_band_length);
+		}
+		if (draw_scratch.size() >= 2) {
+			Color band = arrow_color;
+			band.a *= 0.35f;
+			draw_multiline(draw_scratch, band, arrow_band_width, false);
+		}
+		draw_scratch.clear();
+	}
 	if (want_shafts) {
 		for (int i = 0; i < count; i++) {
 			if (!arrow_ok(i)) {

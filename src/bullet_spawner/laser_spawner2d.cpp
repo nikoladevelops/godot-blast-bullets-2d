@@ -540,6 +540,10 @@ real_t LaserSpawner2D::preview_beam_length() const {
 	return laser_data.is_valid() ? (real_t)laser_data->length : (real_t)-1.0;
 }
 
+real_t LaserSpawner2D::preview_beam_width() const {
+	return laser_data.is_valid() ? (real_t)laser_data->width : (real_t)-1.0;
+}
+
 void LaserSpawner2D::append_payload_warnings(PackedStringArray &r_warnings) const {
 	if (laser_data.is_null()) {
 		r_warnings.push_back("laser_data is empty: the spawner fires nothing. Assign a LaserData2D.");

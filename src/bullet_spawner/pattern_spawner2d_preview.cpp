@@ -266,6 +266,9 @@ Dictionary PatternSpawner2D::debug_get_preview_arrows() const {
 	out["tails"] = arrows != nullptr ? arrows->arrow_tails : PackedVector2Array();
 	out["dirs"] = arrows != nullptr ? arrows->arrow_dirs : PackedVector2Array();
 	out["length"] = arrows != nullptr ? (double)arrows->arrow_length : 0.0;
+	// A laser spawner's beams: their width and length from the muzzle (0 = none).
+	out["beam_width"] = arrows != nullptr ? (double)arrows->arrow_band_width : 0.0;
+	out["beam_length"] = arrows != nullptr ? (double)arrows->arrow_band_length : 0.0;
 	return out;
 }
 
@@ -833,13 +836,21 @@ void PatternSpawner2D::rebuild_preview() {
 	// A laser's beams are world lengths: drawn in holder space, they divide by
 	// the holder's scale (exact for uniform scale, rotation and mirroring).
 	real_t beam_length = preview_beam_length();
-	if (beam_length > (real_t)0.0) {
-		const real_t holder_scale = Math::sqrt(Math::abs(holder_global.determinant()));
-		if (holder_scale > (real_t)0.0 && Math::is_finite(holder_scale)) {
+	real_t beam_width = preview_beam_width();
+	const real_t holder_scale = Math::sqrt(Math::abs(holder_global.determinant()));
+	if (holder_scale > (real_t)0.0 && Math::is_finite(holder_scale)) {
+		if (beam_length > (real_t)0.0) {
 			beam_length /= holder_scale;
 		}
+		if (beam_width > (real_t)0.0) {
+			beam_width /= holder_scale;
+		}
 	}
-	const real_t arrow_length = beam_length >= (real_t)0.0 ? beam_length : (real_t)(preview_arrow_length * glyph_scale);
+	// A beam starts at its muzzle (the dot): the arrow, drawn from outside the
+	// dot, ends exactly where the beam ends.
+	const real_t arrow_offset = dot_radius + arrow_gap;
+	const real_t arrow_length = beam_length >= (real_t)0.0 ? Math::max((real_t)0.0, beam_length - arrow_offset) : (real_t)(preview_arrow_length * glyph_scale);
+	const real_t band_width = beam_length > (real_t)0.0 && beam_width > (real_t)0.0 && Math::is_finite(beam_width) ? beam_width : (real_t)0.0;
 	const real_t arrow_width = (real_t)(preview_arrow_width * glyph_scale);
 	const real_t arrow_head_length = (real_t)(preview_arrow_head_length * glyph_scale);
 	const real_t arrow_head_width = (real_t)(preview_arrow_head_width * glyph_scale);
@@ -1155,7 +1166,7 @@ void PatternSpawner2D::rebuild_preview() {
 	}
 	preview_dots_layer->set_layer_path_data(layer_track, preview_layer_path_color);
 	preview_dots_layer->set_path_data(track, preview_path_color, (float)preview_path_width, track_closed);
-	preview_arrows_layer->set_arrows_data(tails, dirs, preview_arrow_color, (float)arrow_length, (float)arrow_width, (float)arrow_head_length, (float)arrow_head_width);
+	preview_arrows_layer->set_arrows_data(tails, dirs, preview_arrow_color, (float)arrow_length, (float)arrow_width, (float)arrow_head_length, (float)arrow_head_width, (float)band_width, (float)arrow_offset, band_width > (real_t)0.0 ? (float)beam_length : 0.0f);
 	// The snapshot must match what was just drawn: dirty-checks compare
 	// against this, so snap AFTER the collect, not before.
 	snapshot_preview_sources();
