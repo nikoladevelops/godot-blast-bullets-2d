@@ -446,6 +446,20 @@ void BulletFactory2D::set_debugger_color(const Color &new_color) {
 	}
 }
 
+void BulletFactory2D::set_debugger_z_index(int value) {
+	if (value < -4096 || value > 4096) {
+		UtilityFunctions::push_error("BulletFactory2D: debugger_z_index must be between -4096 and 4096, keeping the old value.");
+		return;
+	}
+	debugger_z_index = value;
+	if (!is_ready || is_tearing_down) {
+		return;
+	}
+	if (BulletVolleyDebugger2D *debugger = volley_debugger.get()) {
+		debugger->set_debugger_z_index(value);
+	}
+}
+
 bool BulletFactory2D::get_is_debugger_enabled() const {
 	if (!is_ready || is_tearing_down) {
 		return is_debugger_enabled_cached_before_ready;

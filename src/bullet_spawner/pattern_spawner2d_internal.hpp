@@ -126,8 +126,6 @@ static constexpr int kMaxOutlineLayers = kPatternMaxOutlineLayers; // helper_out
 
 static constexpr int kMaxPreviewTrackPoints = kPatternMaxTrackPoints; // path/cross track decimation stride target
 
-static constexpr int kPreviewZIndex = 4000; // dots + arrows layers
-
 static constexpr float kFirstDotRadiusScale = 1.6f; // bullet-0 emphasis marker
 
 // Pattern-source metadata lives in the pattern registry

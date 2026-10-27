@@ -614,6 +614,12 @@ void PatternSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_preview_arrow_head_width"), &PatternSpawner2D::get_preview_arrow_head_width);
 	ClassDB::bind_method(D_METHOD("set_preview_arrow_head_width", "value"), &PatternSpawner2D::set_preview_arrow_head_width);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "preview_arrow_head_width"), "set_preview_arrow_head_width", "get_preview_arrow_head_width");
+	ClassDB::bind_method(D_METHOD("get_preview_z_index"), &PatternSpawner2D::get_preview_z_index);
+	ClassDB::bind_method(D_METHOD("set_preview_z_index", "value"), &PatternSpawner2D::set_preview_z_index);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "preview_z_index", PROPERTY_HINT_RANGE, "-4096,4096,1"), "set_preview_z_index", "get_preview_z_index");
+	ClassDB::bind_method(D_METHOD("get_preview_z_as_relative"), &PatternSpawner2D::get_preview_z_as_relative);
+	ClassDB::bind_method(D_METHOD("set_preview_z_as_relative", "value"), &PatternSpawner2D::set_preview_z_as_relative);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "preview_z_as_relative"), "set_preview_z_as_relative", "get_preview_z_as_relative");
 
 	ClassDB::bind_method(D_METHOD("get_preview_draw_collision_rings"), &PatternSpawner2D::get_preview_draw_collision_rings);
 	ClassDB::bind_method(D_METHOD("set_preview_draw_collision_rings", "value"), &PatternSpawner2D::set_preview_draw_collision_rings);

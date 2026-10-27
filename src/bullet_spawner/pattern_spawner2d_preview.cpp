@@ -205,6 +205,38 @@ void PatternSpawner2D::set_preview_arrow_head_width(double value) {
 	on_pattern_changed();
 }
 
+void PatternSpawner2D::set_preview_z_index(int value) {
+	if (value < -4096 || value > 4096) {
+		UtilityFunctions::push_error(String(get_class()) + ": preview_z_index must be between -4096 and 4096, keeping the old value.");
+		return;
+	}
+	preview_z_index = value;
+	apply_preview_z_order_to_layers();
+}
+
+void PatternSpawner2D::set_preview_z_as_relative(bool value) {
+	preview_z_as_relative = value;
+	apply_preview_z_order_to_layers();
+}
+
+void PatternSpawner2D::apply_preview_z_order(CanvasItem *layer) const {
+	if (layer == nullptr) {
+		return;
+	}
+	if (layer->get_z_index() != preview_z_index) {
+		layer->set_z_index(preview_z_index);
+	}
+	if (layer->is_z_relative() != preview_z_as_relative) {
+		layer->set_z_as_relative(preview_z_as_relative);
+	}
+}
+
+void PatternSpawner2D::apply_preview_z_order_to_layers() {
+	apply_preview_z_order(live_preview_dots());
+	apply_preview_z_order(live_preview_arrows());
+	apply_preview_z_order(resolve_graze_preview_layer(false));
+}
+
 bool PatternSpawner2D::get_preview_draw_collision_rings() const {
 	return preview_draw_collision_rings;
 }
@@ -772,7 +804,7 @@ void PatternSpawner2D::rebuild_preview() {
 		preview_dots_layer = memnew(PatternPreviewLayer2D);
 		preview_dots_layer->set_name("Dots");
 		preview_dots_layer->kind = PatternPreviewLayer2D::LAYER_DOTS;
-		preview_dots_layer->set_z_index(kPreviewZIndex);
+		apply_preview_z_order(preview_dots_layer);
 		preview_holder->add_child(preview_dots_layer);
 	}
 	preview_arrows_layer = Object::cast_to<PatternPreviewLayer2D>(preview_holder->get_node_or_null(NodePath("Arrows")));
@@ -786,7 +818,7 @@ void PatternSpawner2D::rebuild_preview() {
 		preview_arrows_layer = memnew(PatternPreviewLayer2D);
 		preview_arrows_layer->set_name("Arrows");
 		preview_arrows_layer->kind = PatternPreviewLayer2D::LAYER_ARROWS;
-		preview_arrows_layer->set_z_index(kPreviewZIndex);
+		apply_preview_z_order(preview_arrows_layer);
 		preview_holder->add_child(preview_arrows_layer);
 	}
 	set_preview_nodes(preview_holder, preview_dots_layer, preview_arrows_layer);

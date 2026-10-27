@@ -486,6 +486,7 @@ void BulletFactory2D::add_debuggers() {
 	BulletVolleyDebugger2D *debugger = memnew(BulletVolleyDebugger2D);
 	volley_debugger.set(debugger);
 	debugger->configure(volley_container.get(), "BulletVolleysDebugger", debugger_color_cached_before_ready);
+	debugger->set_debugger_z_index(debugger_z_index);
 	add_child(debugger);
 }
 
@@ -514,6 +515,7 @@ void BulletFactory2D::heal_owned_children() {
 	} else if (volleys_lost) {
 		// configure() switches it off; on again watches the new container.
 		debugger->configure(volley_container.get(), "BulletVolleysDebugger", debugger->get_debugger_color());
+		debugger->set_debugger_z_index(debugger_z_index);
 		debugger->set_is_debugger_enabled(is_debugger_enabled_cached_before_ready);
 	}
 }

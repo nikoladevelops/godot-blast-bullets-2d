@@ -389,7 +389,7 @@ GrazePreviewLayer2D *PatternSpawner2D::resolve_graze_preview_layer(bool create) 
 		layer->set_meta(PREVIEW_META_KEY, true);
 		// Canvas coordinates: target global positions draw as they are.
 		layer->set_as_top_level(true);
-		layer->set_z_index(kPreviewZIndex);
+		apply_preview_z_order(layer);
 		// Internal: never listed by get_children() (pattern markers, scans)
 		// and owner-less: never saved.
 		add_child(layer, false, INTERNAL_MODE_BACK);

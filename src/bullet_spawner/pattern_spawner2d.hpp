@@ -956,6 +956,10 @@ public:
 	double preview_arrow_width = 2.0;
 	double preview_arrow_head_length = 8.0;
 	double preview_arrow_head_width = 10.0;
+	// Where the preview layers (dots, arrows, the runtime graze rings) draw
+	// among the game's canvas items: a background or a UI layer may need it.
+	int preview_z_index = 4000;
+	bool preview_z_as_relative = true;
 	// Collision-ring overlay: when true and spawn_data carries a valid
 	// collision shape, the dots layer also draws one outline circle per
 	// dot with the shape's bounding radius (circle r, rect min/2,
@@ -992,6 +996,13 @@ public:
 	void set_preview_arrow_head_length(double value);
 	double get_preview_arrow_head_width() const;
 	void set_preview_arrow_head_width(double value);
+	int get_preview_z_index() const { return preview_z_index; }
+	void set_preview_z_index(int value);
+	bool get_preview_z_as_relative() const { return preview_z_as_relative; }
+	void set_preview_z_as_relative(bool value);
+	// Writes preview_z_index / preview_z_as_relative onto every live layer.
+	void apply_preview_z_order(CanvasItem *layer) const;
+	void apply_preview_z_order_to_layers();
 	bool get_preview_draw_collision_rings() const;
 	void set_preview_draw_collision_rings(bool value);
 	Color get_preview_collision_ring_color() const;

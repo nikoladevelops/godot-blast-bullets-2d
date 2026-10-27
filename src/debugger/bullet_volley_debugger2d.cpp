@@ -269,8 +269,8 @@ void BulletVolleyDebugger2D::generate_debug_multimesh(Node *node_entered_contain
 	debugger_multimesh->set_transform(Transform2D());
 	debugger_multimesh->set_multimesh(multi);
 
-	// Set the Z index to be a huge value so that the debugger shapes are always visible/ on top of all other textures
-	debugger_multimesh->set_z_index(999);
+	// High by default (the factory's debugger_z_index): the shapes draw over the bullets.
+	debugger_multimesh->set_z_index(debugger_z_index);
 
 	// Store the debugger_data_provider so I can track him
 	debug_data_providers.emplace_back(debugger_data_provider);
@@ -471,6 +471,15 @@ void BulletVolleyDebugger2D::update_debug_multimesh_transforms_to_match_data_pro
 		o[11] = a;
 	}
 	multi->set_buffer(debug_buffer_scratch);
+}
+
+void BulletVolleyDebugger2D::set_debugger_z_index(int value) {
+	debugger_z_index = value;
+	for (OwnedNode2D<MultiMeshInstance2D> &node : debugger_multimeshes) {
+		if (MultiMeshInstance2D *mesh = node.get()) {
+			mesh->set_z_index(value);
+		}
+	}
 }
 
 void BulletVolleyDebugger2D::change_debug_multimeshes_color(const Color &new_multimesh_color) {

@@ -12,7 +12,6 @@ namespace BlastBullets2D {
 
 // Node name of the despawn bounds preview (tilde: internal, sorts last).
 static constexpr const char *DESPAWN_PREVIEW_NAME = "~BlastBulletsDespawnPreview";
-static constexpr int DESPAWN_PREVIEW_Z_INDEX = 4000;
 
 void BulletFactory2D::set_time_scale(double value) {
 	// Any finite scale: one volley tick covers at most MAX_VOLLEY_TICK_DELTA.
@@ -51,6 +50,17 @@ void BulletFactory2D::set_despawn_bounds_preview(bool value) {
 	refresh_despawn_bounds_preview();
 }
 
+void BulletFactory2D::set_despawn_bounds_preview_z_index(int value) {
+	if (value < -4096 || value > 4096) {
+		UtilityFunctions::push_error("BulletFactory2D: despawn_bounds_preview_z_index must be between -4096 and 4096, keeping the old value.");
+		return;
+	}
+	despawn_bounds_preview_z_index = value;
+	if (DespawnBoundsPreviewLayer2D *layer = resolve_despawn_preview_layer(false)) {
+		layer->set_z_index(value);
+	}
+}
+
 void BulletFactory2D::set_despawn_bounds_preview_during_runtime(bool value) {
 	despawn_bounds_preview_during_runtime = value;
 	refresh_despawn_bounds_preview();
@@ -83,7 +93,7 @@ DespawnBoundsPreviewLayer2D *BulletFactory2D::resolve_despawn_preview_layer(bool
 		layer->set_name(DESPAWN_PREVIEW_NAME);
 		layer->set_meta(PREVIEW_META_KEY, true);
 		layer->set_as_top_level(true);
-		layer->set_z_index(DESPAWN_PREVIEW_Z_INDEX);
+		layer->set_z_index(despawn_bounds_preview_z_index);
 		// Internal: never listed by get_children() and owner-less: never saved.
 		add_child(layer, false, INTERNAL_MODE_BACK);
 	}

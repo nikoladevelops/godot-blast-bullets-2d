@@ -42,6 +42,9 @@ public:
 
 	// Sets the debugger color to another color
 	void set_debugger_color(const Color &new_color);
+	int get_debugger_z_index() const { return debugger_z_index; }
+	// Every debug multimesh draws at this z (the factory's debugger_z_index).
+	void set_debugger_z_index(int value);
 
 	// Provider budget: max providers drawn per tick (0 = unlimited, default).
 	// Beyond the cap extra providers are hidden (visible=false), oldest first.
@@ -71,6 +74,7 @@ private:
 
 	// The color which the debugger uses to visualize the collision shapes of all bullets
 	Color debugger_color = Color(0, 0, 0, 1);
+	int debugger_z_index = 999;
 
 	// Stores pointers to the spawned debug_data_providers
 	std::vector<BulletVolley2D *> debug_data_providers;

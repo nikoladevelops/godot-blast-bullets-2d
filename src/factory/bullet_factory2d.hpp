@@ -207,6 +207,12 @@ public:
 	void set_despawn_bounds_preview(bool value);
 	bool get_despawn_bounds_preview_during_runtime() const { return despawn_bounds_preview_during_runtime; }
 	void set_despawn_bounds_preview_during_runtime(bool value);
+	// Where the despawn-bounds preview and the collision debugger draw among
+	// the game's canvas items.
+	int get_despawn_bounds_preview_z_index() const { return despawn_bounds_preview_z_index; }
+	void set_despawn_bounds_preview_z_index(int value);
+	int get_debugger_z_index() const { return debugger_z_index; }
+	void set_debugger_z_index(int value);
 	bool despawn_bounds_preview_active() const;
 	void refresh_despawn_bounds_preview();
 	Dictionary debug_get_despawn_bounds_preview() const;
@@ -919,6 +925,8 @@ private:
 	Color despawn_bounds_color = Color(1, 0, 0, 0.25f);
 	bool despawn_bounds_preview = true;
 	bool despawn_bounds_preview_during_runtime = false;
+	int despawn_bounds_preview_z_index = 4000;
+	int debugger_z_index = 999;
 	// Id-checked (a raw pointer outlives a freed child).
 	DespawnBoundsPreviewLayer2D *despawn_preview_layer = nullptr;
 	uint64_t despawn_preview_layer_id = 0;
