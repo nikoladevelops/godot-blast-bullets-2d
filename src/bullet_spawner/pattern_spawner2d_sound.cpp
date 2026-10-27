@@ -257,7 +257,7 @@ void PatternSpawner2D::fire_spawner_sound(int trigger, int volley_amount) {
 		if (sound == nullptr || !sound->get_enabled() || sound->get_trigger() != trigger) {
 			continue;
 		}
-		factory->sound_offer(Ref<BulletSoundData2D>(sound), at, (float)sound_volume_db, spec, volley_amount);
+		factory->sound_offer(sound, at, (float)sound_volume_db, spec, volley_amount);
 	}
 }
 

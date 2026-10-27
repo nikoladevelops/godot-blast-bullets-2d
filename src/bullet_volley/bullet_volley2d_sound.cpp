@@ -157,7 +157,7 @@ void BulletVolley2D::sound_fire(int trigger, int bullet_index, const Vector2 &ev
 		if (graze_trigger && entry->get_zone_index() >= 0 && entry->get_zone_index() != zone) {
 			continue;
 		}
-		bullet_factory->sound_offer(entry, event_pos, sound_volume_offset_db, spec, amount_bullets, get_instance_id(), get_life_id(), bullet_index);
+		bullet_factory->sound_offer(entry.ptr(), event_pos, sound_volume_offset_db, spec, amount_bullets, get_instance_id(), get_life_id(), bullet_index);
 	}
 }
 
@@ -197,7 +197,7 @@ void BulletVolley2D::sound_fire_flight() {
 			continue;
 		}
 		for (const Ref<BulletSoundData2D> *entry : flight_entries_scratch) {
-			bullet_factory->sound_offer(*entry, at, sound_volume_offset_db, spec, amount_bullets, self_id, life_id, i);
+			bullet_factory->sound_offer(entry->ptr(), at, sound_volume_offset_db, spec, amount_bullets, self_id, life_id, i);
 		}
 	}
 }

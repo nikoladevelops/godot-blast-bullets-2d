@@ -35,6 +35,10 @@ func test_play_sound_happy_path_applies_mix() -> void:
 func test_play_sound_refusals() -> void:
 	assert_false(factory.play_sound(null, Vector2.ZERO), "null refused")
 	expect_error_sequence(["BulletFactory2D.play_sound: sound is null, nothing plays."])
+	assert_false(factory.play_sound(GrazeZone2D.new(), Vector2.ZERO), "a resource that is no sound is refused")
+	expect_error_sequence(["BulletFactory2D.play_sound: sound must be a BulletSoundData2D or a LaserSoundData2D, nothing plays."])
+	assert_eq(factory.debug_explain_sound(GrazeZone2D.new(), Vector2.ZERO, &"", 1), {}, "explain refuses it too")
+	expect_error_sequence(["BulletFactory2D.debug_explain_sound: sound must be a BulletSoundData2D or a LaserSoundData2D, nothing plays."])
 	var disabled := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
 	disabled.enabled = false
 	assert_false(factory.play_sound(disabled, Vector2.ZERO), "disabled plays nothing")

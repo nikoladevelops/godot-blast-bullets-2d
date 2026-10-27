@@ -1,5 +1,6 @@
 #pragma once
 
+#include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/core/property_info.hpp>
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/node_path.hpp>
@@ -193,8 +194,22 @@ struct SoundMix2D {
 	// the fade path. False (default) freezes at the fire pose, like before.
 	bool follow = false;
 
+	// The resource that carries this mix: the mixer keys its channels by it,
+	// keeps it alive while it plays and names it in every warning.
+	virtual Resource *sound_resource() = 0;
+	virtual const Resource *sound_resource() const = 0;
+	uint64_t sound_id() const { return sound_resource()->get_instance_id(); }
+	// The resource's trigger id (its own trigger enum: bullet or laser).
+	virtual int sound_trigger() const = 0;
+	String sound_class() const { return sound_resource()->get_class(); }
+
 	virtual ~SoundMix2D() = default;
 };
+
+// The mix a live object carries (a sound resource), or null.
+inline SoundMix2D *sound_mix_of2d(Object *object) {
+	return dynamic_cast<SoundMix2D *>(object);
+}
 
 // The inspector gating of the mix settings (shared by every sound resource's
 // _validate_property): spatial knobs hide while positional is off, camera

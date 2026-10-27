@@ -5,6 +5,7 @@
 #include "core/cosmetic_rng2d.hpp"
 #include "core/warn_once2d.hpp"
 #include "factory/bullet_factory2d.hpp"
+#include "laser/laser_volley2d.hpp"
 
 #include <godot_cpp/classes/audio_stream_mp3.hpp>
 #include <godot_cpp/classes/audio_stream_ogg_vorbis.hpp>
@@ -41,7 +42,7 @@ static double sound_dist2(const Vector2 &a, const Vector2 &b) {
 }
 
 // Any playable audio: at least one non-null list entry.
-static bool sound_has_audio(const BulletSoundData2D *sound) {
+static bool sound_has_audio(const SoundMix2D *sound) {
 	for (int i = 0; i < sound->streams.size(); ++i) {
 		const Variant entry = sound->streams[i];
 		if (live_object2d<AudioStream>(entry) != nullptr) {
@@ -89,7 +90,7 @@ Camera2D *SoundMixer2D::offer_viewport_camera(BulletFactory2D &factory) const {
 	return offer_cache.camera;
 }
 
-bool SoundMixer2D::offer_has_audio(BulletFactory2D &factory, const BulletSoundData2D *sound) const {
+bool SoundMixer2D::offer_has_audio(BulletFactory2D &factory, const SoundMix2D *sound) const {
 	if (!offer_cache_open(factory)) {
 		return sound_has_audio(sound);
 	}
@@ -100,7 +101,7 @@ bool SoundMixer2D::offer_has_audio(BulletFactory2D &factory, const BulletSoundDa
 	return offer_cache.audio;
 }
 
-Ref<AudioStream> SoundMixer2D::pick_stream(const BulletSoundData2D *sound, Channel &channel) {
+Ref<AudioStream> SoundMixer2D::pick_stream(const SoundMix2D *sound, Channel &channel) {
 	std::vector<Ref<AudioStream>> usable;
 	usable.reserve((size_t)sound->streams.size());
 	for (int i = 0; i < sound->streams.size(); ++i) {
@@ -115,12 +116,12 @@ Ref<AudioStream> SoundMixer2D::pick_stream(const BulletSoundData2D *sound, Chann
 	}
 	const size_t n = usable.size();
 	const int mode = sound->stream_mode;
-	if (mode == BulletSoundData2D::STREAM_SEQUENCE) {
+	if (mode == SoundMix2D::STREAM_SEQUENCE) {
 		const size_t idx = channel.seq_cursor % n;
 		channel.seq_cursor = idx + 1;
 		return usable[idx];
 	}
-	if (mode == BulletSoundData2D::STREAM_SHUFFLE) {
+	if (mode == SoundMix2D::STREAM_SHUFFLE) {
 		if (channel.shuffle_bag.empty() || channel.shuffle_n != n) {
 			channel.shuffle_bag.clear();
 			for (size_t i = 0; i < n; ++i) {
@@ -136,7 +137,7 @@ Ref<AudioStream> SoundMixer2D::pick_stream(const BulletSoundData2D *sound, Chann
 		channel.shuffle_bag.pop_back();
 		return usable[idx];
 	}
-	if (mode == BulletSoundData2D::STREAM_WEIGHTED && sound->stream_weights.size() == sound->streams.size()) {
+	if (mode == SoundMix2D::STREAM_WEIGHTED && sound->stream_weights.size() == sound->streams.size()) {
 		double total = 0.0;
 		for (int i = 0; i < sound->streams.size(); ++i) {
 			const Variant entry = sound->streams[i];
@@ -172,7 +173,7 @@ static float sound_roll_pitch(double range) {
 	return (float)Math::exp(Math::log(range) * (2.0 * u - 1.0));
 }
 
-float SoundMixer2D::apply_playback_mix(AudioStreamPlayer2D *player, const BulletSoundData2D *sound, const Ref<AudioStream> &picked, float volume_offset_db, std::vector<String> *warned_buses, bool force_centered, const StringName &bus_override) {
+float SoundMixer2D::apply_playback_mix(AudioStreamPlayer2D *player, const SoundMix2D *sound, const Ref<AudioStream> &picked, float volume_offset_db, std::vector<String> *warned_buses, bool force_centered, const StringName &bus_override) {
 	// Bus: unknown names play on Master (one warning per name).
 	String bus = bus_override.is_empty() ? String(sound->bus) : String(bus_override);
 	AudioServer *server = AudioServer::get_singleton();
@@ -191,7 +192,7 @@ float SoundMixer2D::apply_playback_mix(AudioStreamPlayer2D *player, const Bullet
 			}
 		}
 		if (!warned) {
-			UtilityFunctions::push_warning("BulletSoundData2D: bus \"" + bus + "\" does not exist, playing on Master.");
+			UtilityFunctions::push_warning(sound->sound_class() + ": bus \"" + bus + "\" does not exist, playing on Master.");
 		}
 		bus = "Master";
 	}
@@ -332,8 +333,8 @@ bool SoundMixer2D::resolve_listener(BulletFactory2D &factory, const SoundListene
 	return true;
 }
 
-bool SoundMixer2D::sound_in_camera_view(const BulletSoundData2D *sound, const Vector2 &event_pos, const Camera2D *camera, const Viewport *vp) {
-	if (sound->audibility_mode != BulletSoundData2D::SOUND_AUDIBILITY_CAMERA && sound->audibility_mode != BulletSoundData2D::SOUND_AUDIBILITY_DISTANCE_AND_CAMERA) {
+bool SoundMixer2D::sound_in_camera_view(const SoundMix2D *sound, const Vector2 &event_pos, const Camera2D *camera, const Viewport *vp) {
+	if (sound->audibility_mode != SoundMix2D::SOUND_AUDIBILITY_CAMERA && sound->audibility_mode != SoundMix2D::SOUND_AUDIBILITY_DISTANCE_AND_CAMERA) {
 		return true;
 	}
 	if (vp == nullptr || camera == nullptr) {
@@ -360,7 +361,7 @@ bool SoundMixer2D::sound_in_camera_view(const BulletSoundData2D *sound, const Ve
 	return Math::abs((double)local.x) <= (double)grown.x && Math::abs((double)local.y) <= (double)grown.y;
 }
 
-double SoundMixer2D::sound_effective_max_distance(const BulletSoundData2D *sound, const Camera2D *camera) {
+double SoundMixer2D::sound_effective_max_distance(const SoundMix2D *sound, const Camera2D *camera) {
 	if (!sound->zoom_scales_distance) {
 		return sound->max_distance;
 	}
@@ -377,7 +378,7 @@ double SoundMixer2D::sound_effective_max_distance(const BulletSoundData2D *sound
 	return sound->max_distance / zoom;
 }
 
-Camera2D *SoundMixer2D::resolve_entry_camera(BulletFactory2D &factory, const BulletSoundData2D *sound, Channel &channel) const {
+Camera2D *SoundMixer2D::resolve_entry_camera(BulletFactory2D &factory, const SoundMix2D *sound, Channel &channel) const {
 	Viewport *vp = factory.get_viewport();
 	if (sound->camera_path.is_empty()) {
 		channel.camera_path = NodePath();
@@ -394,8 +395,8 @@ Camera2D *SoundMixer2D::resolve_entry_camera(BulletFactory2D &factory, const Bul
 	channel.camera_id = 0;
 	Camera2D *pinned = Object::cast_to<Camera2D>(factory.get_node_or_null(sound->camera_path));
 	if (pinned == nullptr || pinned->is_queued_for_deletion() || !pinned->is_inside_tree() || pinned->get_viewport() != vp) {
-		if (WarnOnce2D::first(sound->get_instance_id(), SOUND_WARN_BAD_CAMERA)) {
-			UtilityFunctions::push_warning("BulletSoundData2D: camera_path does not point to a Camera2D in this viewport, using the viewport camera.");
+		if (WarnOnce2D::first(sound->sound_id(), SOUND_WARN_BAD_CAMERA)) {
+			UtilityFunctions::push_warning(sound->sound_class() + ": camera_path does not point to a Camera2D in this viewport, using the viewport camera.");
 		}
 		return vp != nullptr ? vp->get_camera_2d() : nullptr;
 	}
@@ -403,8 +404,8 @@ Camera2D *SoundMixer2D::resolve_entry_camera(BulletFactory2D &factory, const Bul
 	return pinned;
 }
 
-bool SoundMixer2D::offer(BulletFactory2D &factory, const Ref<BulletSoundData2D> &sound, const Vector2 &event_pos, float volume_offset_db, const SoundListenerSpec2D &listener, int volley_amount, uint64_t follow_volley_id, int follow_life_id, int follow_bullet) {
-	if (paused || sound.is_null() || !sound->enabled) {
+bool SoundMixer2D::offer(BulletFactory2D &factory, const SoundMix2D *sound, const Vector2 &event_pos, float volume_offset_db, const SoundListenerSpec2D &listener, int volley_amount, uint64_t follow_volley_id, int follow_life_id, int follow_bullet, int follow_kind) {
+	if (paused || sound == nullptr || !sound->enabled) {
 		if (paused) {
 			++dropped_total;
 		}
@@ -413,9 +414,9 @@ bool SoundMixer2D::offer(BulletFactory2D &factory, const Ref<BulletSoundData2D> 
 	if (Engine::get_singleton()->is_editor_hint()) {
 		return false;
 	}
-	if (!offer_has_audio(factory, sound.ptr())) {
-		if (WarnOnce2D::first(sound->get_instance_id(), SOUND_WARN_EMPTY_STREAM)) {
-			UtilityFunctions::push_warning("BulletSoundData2D: streams is empty, the sound plays nothing.");
+	if (!offer_has_audio(factory, sound)) {
+		if (WarnOnce2D::first(sound->sound_id(), SOUND_WARN_EMPTY_STREAM)) {
+			UtilityFunctions::push_warning(sound->sound_class() + ": streams is empty, the sound plays nothing.");
 		}
 		++dropped_total;
 		return false;
@@ -436,17 +437,17 @@ bool SoundMixer2D::offer(BulletFactory2D &factory, const Ref<BulletSoundData2D> 
 	// (not fading) never offers a second copy. Each bullet offers at most once
 	// per sweep, so every voice that already plays is visible here.
 	if (sound->follow && follow_volley_id != 0 && follow_bullet >= 0) {
-		const uint64_t sid = sound->get_instance_id();
+		const uint64_t sid = sound->sound_id();
 		for (const Voice &voice : voices) {
-			if (voice.busy && !voice.fading && voice.following && voice.sound_id == sid && voice.follow_volley == follow_volley_id && voice.follow_life == follow_life_id && voice.follow_bullet == follow_bullet) {
+			if (voice.busy && !voice.fading && voice.following && voice.sound_id == sid && voice.follow_volley == follow_volley_id && voice.follow_life == follow_life_id && voice.follow_bullet == follow_bullet && voice.follow_kind == follow_kind) {
 				++dropped_total;
 				return false;
 			}
 		}
 	}
 	const size_t cap = sound->min_interval_sec > 0.0 ? 1 : (size_t)Math::max(1, sound->max_voices);
-	Channel &channel = channel_for(sound->get_instance_id(), cap);
-	Camera2D *camera = resolve_entry_camera(factory, sound.ptr(), channel);
+	Channel &channel = channel_for(sound->sound_id(), cap);
+	Camera2D *camera = resolve_entry_camera(factory, sound, channel);
 	Viewport *vp = factory.get_viewport();
 	// Offer-time distance over the current list: evicts the farthest while the
 	// bounded slots fill, so winners are nearest. Re-resolved at flush.
@@ -456,8 +457,8 @@ bool SoundMixer2D::offer(BulletFactory2D &factory, const Ref<BulletSoundData2D> 
 	const bool found = resolve_listener(factory, listener, event_pos, listener_pos, node_id, is_point);
 	const Vector2 anchor = found ? listener_pos : offer_godot_listener(factory);
 	const double dist = Math::sqrt(sound_dist2(event_pos, anchor));
-	const double max_dist = sound_effective_max_distance(sound.ptr(), camera);
-	const bool audible = (!sound->positional || !(dist > max_dist)) && sound_in_camera_view(sound.ptr(), event_pos, camera, vp);
+	const double max_dist = sound_effective_max_distance(sound, camera);
+	const bool audible = (!sound->positional || !(dist > max_dist)) && sound_in_camera_view(sound, event_pos, camera, vp);
 	if (!audible) {
 		++dropped_total;
 		return false;
@@ -471,6 +472,7 @@ bool SoundMixer2D::offer(BulletFactory2D &factory, const Ref<BulletSoundData2D> 
 	candidate.follow_volley = follow_volley_id;
 	candidate.follow_life = follow_life_id;
 	candidate.follow_bullet = follow_bullet;
+	candidate.follow_kind = follow_kind;
 	candidate.dist = dist;
 	if (channel.candidates.size() < channel.cap) {
 		channel.candidates.push_back(candidate);
@@ -604,7 +606,7 @@ void SoundMixer2D::enforce_voice_cap(BulletFactory2D &factory) {
 
 double SoundMixer2D::voice_fade_len(uint64_t sound_id) {
 	Object *obj = ObjectDB::get_instance(ObjectID(sound_id));
-	const BulletSoundData2D *sound = Object::cast_to<BulletSoundData2D>(obj);
+	const SoundMix2D *sound = sound_mix_of2d(obj);
 	if (sound == nullptr) {
 		return 0.0;
 	}
@@ -655,13 +657,37 @@ void SoundMixer2D::apply_voice_time_scale(Voice &voice, double factor) {
 
 double SoundMixer2D::voice_time_factor(BulletFactory2D &factory, const Voice &voice) const {
 	if (voice.following && voice.follow_volley != 0) {
-		BulletVolley2D *followed = Object::cast_to<BulletVolley2D>(ObjectDB::get_instance(ObjectID(voice.follow_volley)));
-		// A pooled and reused volley is a different life: it lends nothing to a stale voice.
-		if (followed != nullptr && followed->get_life_id() == voice.follow_life) {
-			return factory.volley_time_factor(*followed);
+		Object *obj = ObjectDB::get_instance(ObjectID(voice.follow_volley));
+		// A pooled and reused volley (or laser) is a different life: it lends
+		// nothing to a stale voice.
+		if (voice.follow_kind == SOUND_FOLLOW_BULLET) {
+			BulletVolley2D *followed = Object::cast_to<BulletVolley2D>(obj);
+			if (followed != nullptr && followed->get_life_id() == voice.follow_life) {
+				return factory.volley_time_factor(*followed);
+			}
+		} else if (LaserVolley2D *laser = Object::cast_to<LaserVolley2D>(obj); laser != nullptr && laser->get_life_id() == voice.follow_life) {
+			return factory.laser_time_factor(*laser);
 		}
 	}
 	return factory.get_time_scale();
+}
+
+bool SoundMixer2D::follow_pose(const Voice &voice, Vector2 &r_pos) {
+	Object *obj = ObjectDB::get_instance(ObjectID(voice.follow_volley));
+	if (voice.follow_kind == SOUND_FOLLOW_BULLET) {
+		BulletVolley2D *followed = Object::cast_to<BulletVolley2D>(obj);
+		if (followed == nullptr || followed->is_queued_for_deletion() || followed->get_life_id() != voice.follow_life || voice.follow_bullet >= followed->get_amount_bullets() || !followed->is_bullet_status_enabled(voice.follow_bullet)) {
+			return false;
+		}
+		r_pos = followed->get_bullet_transform(voice.follow_bullet).get_origin();
+		return true;
+	}
+	LaserVolley2D *laser = Object::cast_to<LaserVolley2D>(obj);
+	if (laser == nullptr || laser->is_queued_for_deletion() || laser->get_life_id() != voice.follow_life || !laser->beam_sounds(voice.follow_bullet)) {
+		return false;
+	}
+	r_pos = laser->beam_point(voice.follow_bullet, voice.follow_kind == SOUND_FOLLOW_LASER_MUZZLE);
+	return true;
 }
 
 void SoundMixer2D::release_voice(Voice &voice) {
@@ -679,6 +705,7 @@ void SoundMixer2D::release_voice(Voice &voice) {
 	voice.follow_volley = 0;
 	voice.follow_life = -1;
 	voice.follow_bullet = -1;
+	voice.follow_kind = SOUND_FOLLOW_BULLET;
 	const bool was_time_paused = voice.time_paused;
 	voice.time_pitch = false;
 	voice.time_paused = false;
@@ -700,7 +727,7 @@ static void duck_source2d(uint64_t sound_id, int stored_priority, int &r_priorit
 	r_priority = stored_priority;
 	r_duck = 0.0f;
 	Object *obj = ObjectDB::get_instance(ObjectID(sound_id));
-	const BulletSoundData2D *sound = Object::cast_to<BulletSoundData2D>(obj);
+	const SoundMix2D *sound = sound_mix_of2d(obj);
 	if (sound == nullptr) {
 		return;
 	}
@@ -713,7 +740,7 @@ static void duck_source2d(uint64_t sound_id, int stored_priority, int &r_priorit
 // Loudness for one entry's zoom gain (k * log2 of the camera's minimum
 // zoom). 0 when disabled, non-finite, zoom 1, or no camera: zoom 1 adds
 // nothing, so the default mix is bit-identical.
-static double zoom_gain_for2d(const BulletSoundData2D *sound, const Camera2D *camera) {
+static double zoom_gain_for2d(const SoundMix2D *sound, const Camera2D *camera) {
 	if (!(sound->zoom_gain_db > 0.0 || sound->zoom_gain_db < 0.0) || !Math::is_finite((double)sound->zoom_gain_db) || camera == nullptr) {
 		return 0.0;
 	}
@@ -729,7 +756,7 @@ static double zoom_gain_for2d(const BulletSoundData2D *sound, const Camera2D *ca
 // to the event against occlusion_mask (bodies only) and returns
 // occlusion_db on any hit, else 0. Skipped outright while disabled,
 // non-positional, or degenerate: winners only, never per candidate.
-static float occlusion_penalty_for2d(BulletFactory2D &factory, const BulletSoundData2D *sound, const Vector2 &from, const Vector2 &to) {
+static float occlusion_penalty_for2d(BulletFactory2D &factory, const SoundMix2D *sound, const Vector2 &from, const Vector2 &to) {
 	if (!sound->positional || sound->occlusion_mask == 0) {
 		return 0.0f;
 	}
@@ -812,18 +839,17 @@ void SoundMixer2D::flush(BulletFactory2D &factory) {
 			// through the fade path; an already-fading one just keeps
 			// ramping (never restarted). Owns placement: node-follow below
 			// is skipped while the bullet lives.
-			BulletVolley2D *followed = Object::cast_to<BulletVolley2D>(ObjectDB::get_instance(ObjectID(voice.follow_volley)));
-			if (followed == nullptr || followed->is_queued_for_deletion() || followed->get_life_id() != voice.follow_life || voice.follow_bullet >= followed->get_amount_bullets() || !followed->is_bullet_status_enabled(voice.follow_bullet)) {
-				followed = nullptr;
-			}
-			if (followed == nullptr) {
+			// A laser voice rides its beam's tip or muzzle the same way: an
+			// ended, pooled or spent beam ends it.
+			Vector2 followed_at;
+			if (!follow_pose(voice, followed_at)) {
 				if (!voice.fading && !voice_begin_fade(voice, clock, voice_fade_len(voice.sound_id))) {
 					voice.player->stop();
 					release_voice(voice);
 				}
 				continue;
 			}
-			voice.player->set_global_position(followed->get_bullet_transform(voice.follow_bullet).get_origin());
+			voice.player->set_global_position(followed_at);
 		} else if (voice.follows_node && voice.listener_node_id != 0) {
 			Object *obj = ObjectDB::get_instance(ObjectID(voice.listener_node_id));
 			if (const Node2D *node = Object::cast_to<Node2D>(obj); node != nullptr) {
@@ -923,12 +949,12 @@ void SoundMixer2D::flush(BulletFactory2D &factory) {
 			continue;
 		}
 		Object *obj = ObjectDB::get_instance(ObjectID(channel.sound_id));
-		BulletSoundData2D *sound = Object::cast_to<BulletSoundData2D>(obj);
+		SoundMix2D *sound = sound_mix_of2d(obj);
 		if (sound == nullptr) {
 			channel.candidates.clear();
 			continue;
 		}
-		const Ref<BulletSoundData2D> sound_hold(sound);
+		const Ref<Resource> sound_hold(sound->sound_resource());
 		if (!sound->enabled || !sound_has_audio(sound)) {
 			channel.candidates.clear();
 			continue;
@@ -954,6 +980,7 @@ void SoundMixer2D::flush(BulletFactory2D &factory) {
 			uint64_t follow_volley = 0;
 			int follow_life = -1;
 			int follow_bullet = -1;
+			int follow_kind = SOUND_FOLLOW_BULLET;
 		};
 		std::vector<Winner> winners;
 		winners.reserve(channel.candidates.size());
@@ -982,6 +1009,7 @@ void SoundMixer2D::flush(BulletFactory2D &factory) {
 			winner.follow_volley = candidate.follow_volley;
 			winner.follow_life = candidate.follow_life;
 			winner.follow_bullet = candidate.follow_bullet;
+			winner.follow_kind = candidate.follow_kind;
 			winners.push_back(winner);
 		}
 		channel.candidates.clear();
@@ -1011,12 +1039,12 @@ void SoundMixer2D::flush(BulletFactory2D &factory) {
 				}
 			}
 			if (busy_same >= (size_t)Math::max(1, sound->max_voices)) {
-				if (sound->when_limit_reached != BulletSoundData2D::SOUND_LIMIT_REPLACE_OLDEST || oldest_same == voices.size()) {
+				if (sound->when_limit_reached != SoundMix2D::SOUND_LIMIT_REPLACE_OLDEST || oldest_same == voices.size()) {
 					++dropped_total;
 					continue;
 				}
 				size_t victim = oldest_same;
-				if (sound->steal_mode == BulletSoundData2D::STEAL_QUIETEST) {
+				if (sound->steal_mode == SoundMix2D::STEAL_QUIETEST) {
 					for (size_t i = 0; i < voices.size(); ++i) {
 						if (voices[i].busy && !voices[i].fading && voices[i].sound_id == channel.sound_id && voices[i].last_volume < voices[victim].last_volume) {
 							victim = i;
@@ -1102,6 +1130,7 @@ void SoundMixer2D::flush(BulletFactory2D &factory) {
 			voice.follow_volley = winner.follow_volley;
 			voice.follow_life = winner.follow_life;
 			voice.follow_bullet = winner.follow_bullet;
+			voice.follow_kind = winner.follow_kind;
 			voice.use_order = offer_order++;
 			voice.time_pitch = sound->pitch_follows_time_scale;
 			voice.time_paused = false;
@@ -1132,7 +1161,7 @@ static String sound_preview_node_name(uint64_t entry_id) {
 	return "BlastSoundPreview_" + String::num_uint64(entry_id);
 }
 
-void SoundMixer2D::preview_play(BulletSoundData2D *sound, const Vector2 &global_position, float volume_offset_db, bool use_position) {
+void SoundMixer2D::preview_play(SoundMix2D *sound, const Vector2 &global_position, float volume_offset_db, bool use_position) {
 	if (sound == nullptr) {
 		return;
 	}
@@ -1145,12 +1174,12 @@ void SoundMixer2D::preview_play(BulletSoundData2D *sound, const Vector2 &global_
 		return;
 	}
 	if (!sound->enabled) {
-		UtilityFunctions::push_warning("BulletSoundData2D: the sound is disabled, nothing plays.");
+		UtilityFunctions::push_warning(sound->sound_class() + ": the sound is disabled, nothing plays.");
 		return;
 	}
 	if (!sound_has_audio(sound)) {
-		if (WarnOnce2D::first(sound->get_instance_id(), SOUND_WARN_EMPTY_STREAM)) {
-			UtilityFunctions::push_warning("BulletSoundData2D: streams is empty, the sound plays nothing.");
+		if (WarnOnce2D::first(sound->sound_id(), SOUND_WARN_EMPTY_STREAM)) {
+			UtilityFunctions::push_warning(sound->sound_class() + ": streams is empty, the sound plays nothing.");
 		}
 		return;
 	}
@@ -1166,7 +1195,7 @@ void SoundMixer2D::preview_play(BulletSoundData2D *sound, const Vector2 &global_
 	for (auto it = preview_picks.begin(); it != preview_picks.end();) {
 		it = ObjectDB::get_instance(ObjectID(it->first)) == nullptr ? preview_picks.erase(it) : std::next(it);
 	}
-	PreviewPick &state = preview_picks[sound->get_instance_id()];
+	PreviewPick &state = preview_picks[sound->sound_id()];
 	Channel channel;
 	channel.seq_cursor = state.seq_cursor;
 	channel.shuffle_bag = state.shuffle_bag;
@@ -1176,12 +1205,12 @@ void SoundMixer2D::preview_play(BulletSoundData2D *sound, const Vector2 &global_
 	state.shuffle_bag = channel.shuffle_bag;
 	state.shuffle_n = channel.shuffle_n;
 	if (picked.is_null()) {
-		if (WarnOnce2D::first(sound->get_instance_id(), SOUND_WARN_EMPTY_STREAM)) {
-			UtilityFunctions::push_warning("BulletSoundData2D: streams is empty, the sound plays nothing.");
+		if (WarnOnce2D::first(sound->sound_id(), SOUND_WARN_EMPTY_STREAM)) {
+			UtilityFunctions::push_warning(sound->sound_class() + ": streams is empty, the sound plays nothing.");
 		}
 		return;
 	}
-	const String name = sound_preview_node_name(sound->get_instance_id());
+	const String name = sound_preview_node_name(sound->sound_id());
 	if (Node *old = root->get_node_or_null(NodePath(name)); old != nullptr) {
 		// A second call stops the first synchronously: stop, detach and free
 		// now (a queue_free would linger until frame end and force the new
@@ -1261,7 +1290,7 @@ void SoundMixer2D::set_log_enabled(bool enabled) {
 	}
 }
 
-Dictionary SoundMixer2D::explain_sound(BulletFactory2D &factory, const Ref<BulletSoundData2D> &sound, const Vector2 &event_pos, const StringName &listener_group, int volley_amount) {
+Dictionary SoundMixer2D::explain_sound(BulletFactory2D &factory, const SoundMix2D *sound, const Vector2 &event_pos, const StringName &listener_group, int volley_amount) {
 	Dictionary out;
 	out["audible"] = false;
 	out["blocked_by"] = String("none");
@@ -1288,7 +1317,7 @@ Dictionary SoundMixer2D::explain_sound(BulletFactory2D &factory, const Ref<Bulle
 		block("editor");
 		return out;
 	}
-	if (sound.is_null()) {
+	if (sound == nullptr) {
 		block("null");
 		return out;
 	}
@@ -1296,7 +1325,7 @@ Dictionary SoundMixer2D::explain_sound(BulletFactory2D &factory, const Ref<Bulle
 		block("disabled");
 		return out;
 	}
-	if (!sound_has_audio(sound.ptr())) {
+	if (!sound_has_audio(sound)) {
 		block("streamless");
 		return out;
 	}
@@ -1327,7 +1356,7 @@ Dictionary SoundMixer2D::explain_sound(BulletFactory2D &factory, const Ref<Bulle
 	const double dist = sound_dist2(event_pos, anchor);
 	out["distance"] = Math::sqrt(dist);
 	Channel scratch;
-	Camera2D *camera = resolve_entry_camera(factory, sound.ptr(), scratch);
+	Camera2D *camera = resolve_entry_camera(factory, sound, scratch);
 	Viewport *vp = factory.get_viewport();
 	if (camera != nullptr) {
 		const Vector2 z = camera->get_zoom();
@@ -1341,9 +1370,9 @@ Dictionary SoundMixer2D::explain_sound(BulletFactory2D &factory, const Ref<Bulle
 	} else {
 		out["camera"] = String(camera != nullptr ? String("viewport") : String("none"));
 	}
-	const double max_dist = sound_effective_max_distance(sound.ptr(), camera);
+	const double max_dist = sound_effective_max_distance(sound, camera);
 	out["effective_max_distance"] = max_dist;
-	const bool in_view = sound_in_camera_view(sound.ptr(), event_pos, camera, vp);
+	const bool in_view = sound_in_camera_view(sound, event_pos, camera, vp);
 	out["in_camera_view"] = in_view;
 	if (sound->positional && dist > max_dist * max_dist) {
 		block("distance");
@@ -1355,19 +1384,19 @@ Dictionary SoundMixer2D::explain_sound(BulletFactory2D &factory, const Ref<Bulle
 	}
 	if (sound->min_interval_sec > 0.0 && Math::is_finite((double)sound->min_interval_sec)) {
 		bool open = true;
-		const auto it = channels.find(sound->get_instance_id());
+		const auto it = channels.find(sound->sound_id());
 		if (it != channels.end() && factory.get_graze_clock() - it->second.last_play_clock < sound->min_interval_sec) {
 			open = false;
 		}
 		out["interval_open"] = open;
 	}
-	const float occ = occlusion_penalty_for2d(factory, sound.ptr(), anchor, event_pos);
+	const float occ = occlusion_penalty_for2d(factory, sound, anchor, event_pos);
 	out["occluded"] = occ > 0.0f;
 	float gain = 0.0f;
 	if (Math::is_finite((double)sound->amount_gain_db) && sound->amount_gain_db > 0.0) {
 		gain = (float)((double)sound->amount_gain_db * std::log10((double)MAX(1, volley_amount)));
 	}
-	out["volume_base"] = (float)sound->volume_db + gain + (float)zoom_gain_for2d(sound.ptr(), camera) - occ;
+	out["volume_base"] = (float)sound->volume_db + gain + (float)zoom_gain_for2d(sound, camera) - occ;
 	out["audible"] = true;
 	return out;
 }

@@ -718,7 +718,7 @@ void LaserVolley2D::sound_fire(int trigger, const Vector2 &pos, int ring, int zo
 		if (graze_trigger && ((entry->get_ring_index() >= 0 && entry->get_ring_index() != ring) || (entry->get_zone_index() >= 0 && entry->get_zone_index() != zone))) {
 			continue;
 		}
-		factory->sound_offer(entry, pos, sound_volume_db, spec); // no user code (the mixer plays after the sweep)
+		factory->sound_offer(entry.ptr(), pos, sound_volume_db, spec); // no user code (the mixer plays after the sweep)
 	}
 }
 

@@ -8,7 +8,7 @@
 // when unused: trigger sites test one mask bit, flush returns on one branch
 // when nothing is pending and no voice is busy.
 
-#include "data/bullet_sound_data2d.hpp"
+#include "data/sound_mix2d.hpp"
 #include "factory/graze_detector2d.hpp"
 
 #include <godot_cpp/classes/audio_listener2d.hpp>
@@ -34,6 +34,13 @@ class BulletFactory2D;
 // of a group (BulletFactory2D.play_sound), or the spawner's listener detector
 // (shared with its volleys, like graze). Resolved at flush: idle offers use
 // next-sweep positions.
+// What a followed voice rides: a bullet, or a laser beam's tip or muzzle.
+enum SoundFollowKind2D : int {
+	SOUND_FOLLOW_BULLET = 0,
+	SOUND_FOLLOW_LASER_TIP = 1,
+	SOUND_FOLLOW_LASER_MUZZLE = 2,
+};
+
 struct SoundListenerSpec2D {
 	enum Kind {
 		GODOT_LISTENER = 0,
@@ -60,7 +67,7 @@ public:
 	// volley's size (1 for manual hatches): the amount gates read it first,
 	// amount_gain_db is added to the played volume. The follow triple carries
 	// the firing bullet for follow_bullet voices (volley sites only).
-	bool offer(BulletFactory2D &factory, const Ref<BulletSoundData2D> &sound, const Vector2 &event_pos, float volume_offset_db, const SoundListenerSpec2D &listener, int volley_amount = 1, uint64_t follow_volley_id = 0, int follow_life_id = -1, int follow_bullet = -1);
+	bool offer(BulletFactory2D &factory, const SoundMix2D *sound, const Vector2 &event_pos, float volume_offset_db, const SoundListenerSpec2D &listener, int volley_amount = 1, uint64_t follow_volley_id = 0, int follow_life_id = -1, int follow_bullet = -1, int follow_kind = SOUND_FOLLOW_BULLET);
 	// End of sweep: release finished voices, enforce durations, follow node
 	// listeners, pick winners per channel, play them. Returns on one branch
 	// when nothing is pending and no voice is busy.
@@ -79,7 +86,7 @@ public:
 	// would drop the play, with the measured numbers. Read-only except
 	// reusing the resolve paths (a bad camera_path fires its one warning:
 	// diagnosing it is the point). Never queues candidates.
-	Dictionary explain_sound(BulletFactory2D &factory, const Ref<BulletSoundData2D> &sound, const Vector2 &event_pos, const StringName &listener_group, int volley_amount);
+	Dictionary explain_sound(BulletFactory2D &factory, const SoundMix2D *sound, const Vector2 &event_pos, const StringName &listener_group, int volley_amount);
 	Array debug_voices() const;
 	Dictionary debug_stats() const;
 	// Applies one play's mix to a player (stream, volume + offset + randoms
@@ -89,12 +96,12 @@ public:
 	// the applied volume (Quietest steal ranks by it).
 	// bus_override routes one play elsewhere (occluded voices): empty keeps
 	// the entry bus. Shared with the sweep flush and the editor preview.
-	static float apply_playback_mix(AudioStreamPlayer2D *player, const BulletSoundData2D *sound, const Ref<AudioStream> &picked, float volume_offset_db, std::vector<String> *warned_buses, bool force_centered = false, const StringName &bus_override = StringName());
+	static float apply_playback_mix(AudioStreamPlayer2D *player, const SoundMix2D *sound, const Ref<AudioStream> &picked, float volume_offset_db, std::vector<String> *warned_buses, bool force_centered = false, const StringName &bus_override = StringName());
 	// Editor preview: plays the entry's picked stream with its mix through a
 	// transient player under the tree root (never the edited scene). A second
 	// call stops the first, one-shots free themselves on finished, looping
 	// entries are stopped after 10 s. Allowed at runtime too (harmless).
-	static void preview_play(BulletSoundData2D *sound, const Vector2 &global_position, float volume_offset_db, bool use_position);
+	static void preview_play(SoundMix2D *sound, const Vector2 &global_position, float volume_offset_db, bool use_position);
 
 private:
 	struct Candidate {
@@ -105,11 +112,13 @@ private:
 		// Firing volley's size (1 for manual hatches): the amount gates and
 		// the gain read it at flush.
 		int volley_amount = 1;
-		// Follow target (volley offer sites only, else 0/-1): the winning
-		// voice tracks this bullet while follow_bullet is on.
+		// Follow target (volley and laser offer sites only, else 0/-1): the
+		// winning voice tracks this bullet (or laser beam point) while the
+		// entry follows its source.
 		uint64_t follow_volley = 0;
 		int follow_life = -1;
 		int follow_bullet = -1;
+		int follow_kind = SOUND_FOLLOW_BULLET;
 		// Offer-time distance to the resolved listener: evicts the farthest
 		// while the per-sweep slots fill, so winners are nearest.
 		double dist = 0.0;
@@ -168,6 +177,7 @@ private:
 		uint64_t follow_volley = 0;
 		int follow_life = -1;
 		int follow_bullet = -1;
+		int follow_kind = SOUND_FOLLOW_BULLET;
 		uint64_t use_order = 0;
 		// Time scale (pitch_follows_time_scale): the pitch the play started at,
 		// the scale last applied (1 = untouched) and whether the scale paused
@@ -183,18 +193,18 @@ private:
 	// pinned camera_path when it resolves to a live Camera2D in the
 	// factory's viewport, else the viewport's current camera (null when
 	// there is none: no culling, zoom 1). Bad paths warn once per resource.
-	Camera2D *resolve_entry_camera(BulletFactory2D &factory, const BulletSoundData2D *sound, Channel &channel) const;
+	Camera2D *resolve_entry_camera(BulletFactory2D &factory, const SoundMix2D *sound, Channel &channel) const;
 	// Camera view test for one event: false when the event is outside the
 	// given camera's view rect (grown by the entry's margin). No camera, or a
 	// Distance-only entry, never culls.
-	static bool sound_in_camera_view(const BulletSoundData2D *sound, const Vector2 &event_pos, const Camera2D *camera, const Viewport *vp);
+	static bool sound_in_camera_view(const SoundMix2D *sound, const Vector2 &event_pos, const Camera2D *camera, const Viewport *vp);
 	// Effective max_distance for one entry: divided by the given camera's
 	// minimum zoom when zoom_scales_distance is set (no camera means zoom 1).
-	static double sound_effective_max_distance(const BulletSoundData2D *sound, const Camera2D *camera);
+	static double sound_effective_max_distance(const SoundMix2D *sound, const Camera2D *camera);
 	// The stream this play uses: streams picked per stream_mode (nulls
 	// skipped), or null when there is nothing to play.
 	// Round-robin and shuffle state live in the channel (shared).
-	static Ref<AudioStream> pick_stream(const BulletSoundData2D *sound, Channel &channel);
+	static Ref<AudioStream> pick_stream(const SoundMix2D *sound, Channel &channel);
 	// Nearest target of the candidate's spec (fresh list read): returns false
 	// when a node source finds nobody (caller falls back to Godot's listener).
 	bool resolve_listener(BulletFactory2D &factory, const SoundListenerSpec2D &spec, const Vector2 &event_pos, Vector2 &r_listener_pos, uint64_t &r_node_id, bool &r_is_point) const;
@@ -211,13 +221,13 @@ private:
 		Vector2 listener;
 		bool camera_ready = false;
 		Camera2D *camera = nullptr;
-		const BulletSoundData2D *audio_sound = nullptr;
+		const SoundMix2D *audio_sound = nullptr;
 		bool audio = false;
 	};
 	bool offer_cache_open(BulletFactory2D &factory) const;
 	Vector2 offer_godot_listener(BulletFactory2D &factory) const;
 	Camera2D *offer_viewport_camera(BulletFactory2D &factory) const;
-	bool offer_has_audio(BulletFactory2D &factory, const BulletSoundData2D *sound) const;
+	bool offer_has_audio(BulletFactory2D &factory, const SoundMix2D *sound) const;
 	static Vector2 godot_listener_pos(BulletFactory2D &factory);
 	AudioStreamPlayer2D *alloc_voice(BulletFactory2D &factory, int priority);
 	void release_voice(Voice &voice);
@@ -225,6 +235,8 @@ private:
 	// base x factor (clamped to the engine cap), paused while factor < 0.01.
 	void apply_voice_time_scale(Voice &voice, double factor);
 	double voice_time_factor(BulletFactory2D &factory, const Voice &voice) const;
+	// The live pose a following voice rides; false when its bullet or beam is gone.
+	static bool follow_pose(const Voice &voice, Vector2 &r_pos);
 	// Fade-out support (fade_out_sec): the fade length of one sound resource
 	// (0 = stop instantly, like before), and starting a fade on a voice
 	// (false = nothing to fade: stop instantly instead).

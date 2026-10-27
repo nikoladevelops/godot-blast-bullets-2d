@@ -103,3 +103,7 @@
 
 	// The mix part of _validate_property (validate_sound_mix_property2d).
 	void validate_mix_property(PropertyInfo &p_property) const { validate_sound_mix_property2d(*this, p_property); }
+
+	Resource *sound_resource() override { return this; }
+	const Resource *sound_resource() const override { return this; }
+	int sound_trigger() const override { return trigger; }

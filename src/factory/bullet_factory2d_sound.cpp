@@ -9,28 +9,45 @@ using namespace godot;
 
 namespace BlastBullets2D {
 
-bool BulletFactory2D::sound_offer(const Ref<BulletSoundData2D> &sound, const Vector2 &event_pos, float volume_offset_db, const SoundListenerSpec2D &listener, int volley_amount, uint64_t follow_volley_id, int follow_life_id, int follow_bullet) {
+bool BulletFactory2D::sound_offer(const SoundMix2D *sound, const Vector2 &event_pos, float volume_offset_db, const SoundListenerSpec2D &listener, int volley_amount, uint64_t follow_volley_id, int follow_life_id, int follow_bullet, int follow_kind) {
 	if (is_tearing_down) {
 		return false;
 	}
-	if (debug_sound_offer_log_enabled && sound.is_valid()) {
+	if (debug_sound_offer_log_enabled && sound != nullptr) {
 		if (debug_sound_offer_log.size() >= 65536) {
 			debug_sound_offer_log.remove_at(0);
 		}
 		Dictionary e;
-		e["trigger"] = sound->get_trigger();
-		e["volley"] = (int64_t)follow_volley_id;
+		e["trigger"] = sound->sound_trigger();
+		const bool laser = follow_kind != SOUND_FOLLOW_BULLET;
+		e["volley"] = laser ? (int64_t)0 : (int64_t)follow_volley_id;
 		e["life"] = follow_life_id;
-		e["bullet"] = follow_bullet;
+		e["bullet"] = laser ? -1 : follow_bullet;
+		if (laser) {
+			e["laser"] = (int64_t)follow_volley_id;
+			e["beam"] = follow_bullet;
+		}
 		e["frame"] = (int64_t)Engine::get_singleton()->get_physics_frames();
 		debug_sound_offer_log.push_back(e);
 	}
-	return sound_mixer.offer(*this, sound, event_pos, volume_offset_db, listener, volley_amount, follow_volley_id, follow_life_id, follow_bullet);
+	return sound_mixer.offer(*this, sound, event_pos, volume_offset_db, listener, volley_amount, follow_volley_id, follow_life_id, follow_bullet, follow_kind);
 }
 
-bool BulletFactory2D::play_sound(const Ref<BulletSoundData2D> &sound, const Vector2 &global_position, const StringName &listener_group) {
+const SoundMix2D *BulletFactory2D::script_sound_mix(const Ref<Resource> &sound, const char *function_name) {
 	if (sound.is_null()) {
-		UtilityFunctions::push_error("BulletFactory2D.play_sound: sound is null, nothing plays.");
+		UtilityFunctions::push_error(String("BulletFactory2D.") + function_name + ": sound is null, nothing plays.");
+		return nullptr;
+	}
+	const SoundMix2D *mix = sound_mix_of2d(sound.ptr());
+	if (mix == nullptr) {
+		UtilityFunctions::push_error(String("BulletFactory2D.") + function_name + ": sound must be a BulletSoundData2D or a LaserSoundData2D, nothing plays.");
+	}
+	return mix;
+}
+
+bool BulletFactory2D::play_sound(const Ref<Resource> &resource, const Vector2 &global_position, const StringName &listener_group) {
+	const SoundMix2D *sound = script_sound_mix(resource, "play_sound");
+	if (sound == nullptr) {
 		return false;
 	}
 	if (!sound->enabled) {
@@ -95,7 +112,11 @@ Array BulletFactory2D::debug_get_sound_voices() const {
 	return sound_mixer.debug_voices();
 }
 
-Dictionary BulletFactory2D::debug_explain_sound(const Ref<BulletSoundData2D> &sound, const Vector2 &global_position, const StringName &listener_group, int volley_amount) {
+Dictionary BulletFactory2D::debug_explain_sound(const Ref<Resource> &resource, const Vector2 &global_position, const StringName &listener_group, int volley_amount) {
+	const SoundMix2D *sound = script_sound_mix(resource, "debug_explain_sound");
+	if (sound == nullptr) {
+		return Dictionary();
+	}
 	return sound_mixer.explain_sound(*this, sound, global_position, listener_group, volley_amount);
 }
 

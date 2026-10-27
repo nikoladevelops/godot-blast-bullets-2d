@@ -824,11 +824,14 @@ public:
 	// form): false = dropped (paused, editor, disabled, streamless, chance).
 	// volley_amount carries the firing volley's size for the amount gates
 	// (manual hatches count as one).
-	bool sound_offer(const Ref<BulletSoundData2D> &sound, const Vector2 &event_pos, float volume_offset_db, const SoundListenerSpec2D &listener, int volley_amount = 1, uint64_t follow_volley_id = 0, int follow_life_id = -1, int follow_bullet = -1);
-	// User hatch: plays `sound` at the end of the next sweep (Godot listener,
-	// or the nearest member of `listener_group`). False = refused (null,
-	// disabled, outside the tree, paused, editor).
-	bool play_sound(const Ref<BulletSoundData2D> &sound, const Vector2 &global_position, const StringName &listener_group = StringName());
+	// A laser offer names its laser and beam with follow_kind LASER_TIP /
+	// LASER_MUZZLE (the point a following voice rides).
+	bool sound_offer(const SoundMix2D *sound, const Vector2 &event_pos, float volume_offset_db, const SoundListenerSpec2D &listener, int volley_amount = 1, uint64_t follow_volley_id = 0, int follow_life_id = -1, int follow_bullet = -1, int follow_kind = SOUND_FOLLOW_BULLET);
+	// User hatch: plays `sound` (a BulletSoundData2D or a LaserSoundData2D)
+	// at the end of the next sweep (Godot listener, or the nearest member of
+	// `listener_group`). False = refused (null, not a sound, disabled,
+	// outside the tree, paused, editor).
+	bool play_sound(const Ref<Resource> &sound, const Vector2 &global_position, const StringName &listener_group = StringName());
 	// Stops every voice (channels kept). reset() also forgets the channels.
 	void stop_sounds();
 	int get_sound_max_voices() const;
@@ -836,7 +839,8 @@ public:
 	void debug_set_sound_log_enabled(bool enabled);
 	// Offer log for tests (the feature-mix ledger): every sound_offer while
 	// enabled, BEFORE audibility, limits and chance, as {trigger, volley,
-	// life, bullet, frame} (spawner and manual offers: volley 0, bullet -1).
+	// life, bullet, frame} (spawner and manual offers: volley 0, bullet -1;
+	// laser offers: volley 0, bullet -1, plus laser (its id) and beam).
 	// Off by default: one bool check per offer. Bounded like the bullet
 	// event log (oldest dropped past 65536 entries).
 	bool debug_sound_offer_log_enabled = false;
@@ -851,7 +855,10 @@ public:
 	void debug_clear_sound_log();
 	Array debug_get_sound_voices() const;
 	Dictionary debug_get_sound_stats() const;
-	Dictionary debug_explain_sound(const Ref<BulletSoundData2D> &sound, const Vector2 &global_position, const StringName &listener_group, int volley_amount);
+	Dictionary debug_explain_sound(const Ref<Resource> &sound, const Vector2 &global_position, const StringName &listener_group, int volley_amount);
+	// The sound mix of a script-given sound resource, or null after one
+	// error naming `function_name`.
+	static const SoundMix2D *script_sound_mix(const Ref<Resource> &sound, const char *function_name);
 	void debug_stop_sound_voices();
 
 	//

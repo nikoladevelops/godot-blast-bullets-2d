@@ -126,6 +126,10 @@ public:
 	Object *get_owner_spawner() const;
 	Vector2 get_beam_start(int beam_index) const;
 	Vector2 get_beam_end(int beam_index) const;
+	// A beam a followed sound voice may ride (in range, laser active, not
+	// spent), and the point it rides (the muzzle, else the tip).
+	bool beam_sounds(int beam_index) const { return active && beam_index >= 0 && beam_index < (int)beams.size() && !beams[beam_index].spent; }
+	Vector2 beam_point(int beam_index, bool muzzle) const { return muzzle ? get_beam_start(beam_index) : get_beam_end(beam_index); }
 	PackedVector2Array get_beam_points(int beam_index) const;
 	real_t get_beam_length(int beam_index) const;
 	real_t get_beam_angle(int beam_index) const;
