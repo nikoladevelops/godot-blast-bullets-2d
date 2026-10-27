@@ -10,6 +10,7 @@
 #include "patterns/pattern_bake_cache2d.hpp"
 #include "patterns/pattern_knobs2d.hpp"
 #include "patterns/pattern_registry2d.hpp"
+#include "targets/target_source2d.hpp"
 #include <memory>
 #include <vector>
 
@@ -511,25 +512,17 @@ public:
 		GRAZE_SOURCE_GLOBAL_POSITIONS = 5 // every entry of graze_global_positions
 	};
 	GrazeTargetSource graze_target_source = GRAZE_SOURCE_NODE_GROUP;
-	StringName graze_node_group;
+	// The other graze target settings and the detector the volleys share.
+	TargetSource2D graze_targets;
 	// Allow-list for every source: only nodes in this group count.
-	StringName graze_filter_group;
-	NodePath graze_target_path;
 	// Scanned from the current scene (never inside a bullet factory or this
 	// spawner), compared per graze_node_name_match_mode (homing's values).
-	String graze_node_name;
-	HomingNodeNameMatch graze_node_name_match_mode = HOMING_NAME_MATCH_CONTAINS;
-	bool graze_node_name_case_sensitive = false;
-	NodePath graze_children_parent_path;
-	bool graze_children_recursive = false;
 	// Global Positions source: one graze target per entry (finite only),
 	// read every tick (edits reach bullets in flight). No cap.
-	PackedVector2Array graze_global_positions;
 	// Seconds between target scans (factory time); 0 = every physics tick.
 	// Positions are read every tick either way; a target freed or queued
 	// for deletion stops counting at once, a new one waits for the next
 	// scan (or refresh_graze_targets()).
-	double graze_update_interval = 0.0;
 	// Ring preview: each ring of each zone drawn around every resolved
 	// target, in the zone's preview_color (editor by default; at runtime
 	// only when graze_preview_during_runtime is on).
@@ -577,6 +570,7 @@ public:
 	// armed (created on first use). C++ only: the factory's runtime ring
 	// preview draws around its lists.
 	GrazeDetector2D &graze_detector_ref() const;
+	const std::shared_ptr<GrazeDetector2D> &graze_detector_shared() const;
 	// The targets the runtime tests right now (graze_target_source, every
 	// zone rings them, in tree order; this spawner itself never counts).
 	Array resolve_graze_targets() const;
@@ -624,26 +618,18 @@ public:
 		SOUND_LISTENER_GLOBAL_POSITIONS = 6 // every entry of sound_listener_global_positions
 	};
 	SoundListenerSource sound_listener_source = SOUND_LISTENER_GODOT_LISTENER;
-	StringName sound_listener_node_group;
+	// The other listener settings and the detector the volleys share.
+	TargetSource2D sound_targets;
 	// Allow-list for every node source: only nodes in this group count.
-	StringName sound_listener_filter_group;
-	NodePath sound_listener_path;
 	// Scanned from the current scene (never inside a bullet factory or this
 	// spawner), compared per sound_listener_node_name_match_mode (homing's
 	// values).
-	String sound_listener_node_name;
-	HomingNodeNameMatch sound_listener_node_name_match_mode = HOMING_NAME_MATCH_CONTAINS;
-	bool sound_listener_node_name_case_sensitive = false;
-	NodePath sound_listener_children_parent_path;
-	bool sound_listener_children_recursive = false;
 	// Global Positions source: one listener per entry (finite only), read
 	// every sweep (edits reach bullets in flight). No cap.
-	PackedVector2Array sound_listener_global_positions;
 	// Seconds between listener scans (factory time); 0 = every physics tick.
 	// Positions are read every sweep either way; a listener freed or queued
 	// for deletion stops counting at once, a new one waits for the next
 	// scan (or refresh_sound_listeners()).
-	double sound_listener_update_interval = 0.0;
 
 	bool get_sound_enabled() const;
 	void set_sound_enabled(bool value);
@@ -1694,7 +1680,6 @@ protected:
 	Vector2 resolve_corridor_aim(const Vector2 &fallback, const Vector2 &origin) const;
 	// The graze target finder shared with every volley this spawner armed
 	// (created on first use; the factory's runtime preview reads it).
-	mutable std::shared_ptr<GrazeDetector2D> graze_detector;
 	// The graze_* target settings as a detector configuration.
 	GrazeDetector2D::Config graze_detector_config() const;
 	// Pushes them into the detector (rescans due), then the config
@@ -1712,7 +1697,6 @@ protected:
 	bool graze_zones_misuse_warned = false;
 	// The sound listener finder shared with every volley this spawner armed
 	// (created on first use).
-	mutable std::shared_ptr<GrazeDetector2D> sound_detector;
 	// The sound_* listener settings as a detector configuration (Godot
 	// Listener maps to no detector scan: the mixer measures from Godot).
 	GrazeDetector2D::Config sound_detector_config() const;

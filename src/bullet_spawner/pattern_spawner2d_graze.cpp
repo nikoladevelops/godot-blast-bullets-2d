@@ -106,180 +106,127 @@ void PatternSpawner2D::set_graze_target_source(GrazeTargetSource value) {
 }
 
 StringName PatternSpawner2D::get_graze_node_group() const {
-	return graze_node_group;
+	return graze_targets.config.node_group;
 }
 
 void PatternSpawner2D::set_graze_node_group(const StringName &value) {
-	graze_node_group = value;
+	graze_targets.config.node_group = value;
 	apply_graze_detector_config();
 }
 
 StringName PatternSpawner2D::get_graze_filter_group() const {
-	return graze_filter_group;
+	return graze_targets.config.filter_group;
 }
 
 void PatternSpawner2D::set_graze_filter_group(const StringName &value) {
-	graze_filter_group = value;
+	graze_targets.config.filter_group = value;
 	apply_graze_detector_config();
 }
 
 NodePath PatternSpawner2D::get_graze_target_path() const {
-	return graze_target_path;
+	return graze_targets.config.target_path;
 }
 
 void PatternSpawner2D::set_graze_target_path(const NodePath &p_path) {
 	if (!node_path_type_ok<Node2D>(this, p_path, "graze_target_path", "Node2D")) {
 		return;
 	}
-	graze_target_path = p_path;
+	graze_targets.config.target_path = p_path;
 	apply_graze_detector_config();
 }
 
 String PatternSpawner2D::get_graze_node_name() const {
-	return graze_node_name;
+	return graze_targets.config.node_name;
 }
 
 void PatternSpawner2D::set_graze_node_name(const String &value) {
-	graze_node_name = value;
+	graze_targets.config.node_name = value;
 	apply_graze_detector_config();
 }
 
 PatternSpawner2D::HomingNodeNameMatch PatternSpawner2D::get_graze_node_name_match_mode() const {
-	return graze_node_name_match_mode;
+	return (HomingNodeNameMatch)graze_targets.config.node_name_match;
 }
 
 void PatternSpawner2D::set_graze_node_name_match_mode(HomingNodeNameMatch value) {
-	if (value < HOMING_NAME_MATCH_EXACT || value > HOMING_NAME_MATCH_ENDS_WITH) {
-		UtilityFunctions::push_error((String(get_class()) + ": invalid graze_node_name_match_mode, keeping the old value."));
+	if (!TargetSource2D::check_name_match((int)value, get_class(), "graze_node_name_match_mode")) {
 		return;
 	}
-	graze_node_name_match_mode = value;
+	graze_targets.config.node_name_match = (int)value;
 	apply_graze_detector_config();
 }
 
 bool PatternSpawner2D::get_graze_node_name_case_sensitive() const {
-	return graze_node_name_case_sensitive;
+	return graze_targets.config.node_name_case_sensitive;
 }
 
 void PatternSpawner2D::set_graze_node_name_case_sensitive(bool value) {
-	graze_node_name_case_sensitive = value;
+	graze_targets.config.node_name_case_sensitive = value;
 	apply_graze_detector_config();
 }
 
 NodePath PatternSpawner2D::get_graze_children_parent_path() const {
-	return graze_children_parent_path;
+	return graze_targets.config.children_parent_path;
 }
 
 void PatternSpawner2D::set_graze_children_parent_path(const NodePath &p_path) {
-	graze_children_parent_path = p_path;
+	graze_targets.config.children_parent_path = p_path;
 	apply_graze_detector_config();
 }
 
 bool PatternSpawner2D::get_graze_children_recursive() const {
-	return graze_children_recursive;
+	return graze_targets.config.children_recursive;
 }
 
 void PatternSpawner2D::set_graze_children_recursive(bool value) {
-	graze_children_recursive = value;
+	graze_targets.config.children_recursive = value;
 	apply_graze_detector_config();
 }
 
 PackedVector2Array PatternSpawner2D::get_graze_global_positions() const {
-	return graze_global_positions;
+	return graze_targets.config.global_positions;
 }
 
 void PatternSpawner2D::set_graze_global_positions(const PackedVector2Array &value) {
-	for (int i = 0; i < value.size(); ++i) {
-		if (!value[i].is_finite()) {
-			UtilityFunctions::push_error((String(get_class()) + ": graze_global_positions must hold finite positions only, keeping the old value."));
-			return;
-		}
+	if (!TargetSource2D::check_positions(value, get_class(), "graze_global_positions")) {
+		return;
 	}
-	graze_global_positions = value;
+	graze_targets.config.global_positions = value;
 	apply_graze_detector_config();
 }
 
 double PatternSpawner2D::get_graze_update_interval() const {
-	return graze_update_interval;
+	return graze_targets.config.update_interval;
 }
 
 void PatternSpawner2D::set_graze_update_interval(double value) {
-	if (!is_finite_real2d(value) || value < 0.0) {
-		UtilityFunctions::push_error((String(get_class()) + ": graze_update_interval must be finite and >= 0 (0 scans every tick), keeping the old value."));
+	if (!TargetSource2D::check_update_interval(value, get_class(), "graze_update_interval")) {
 		return;
 	}
-	graze_update_interval = value;
+	graze_targets.config.update_interval = value;
 	apply_graze_detector_config();
 }
 
 GrazeDetector2D &PatternSpawner2D::graze_detector_ref() const {
-	if (graze_detector == nullptr) {
-		// Plain creation: callers may be mid preview refresh, so nothing
-		// else may run from here. Never std::make_shared: its type tag is a
-		// GNU unique symbol, which pins the library in memory (dlclose
-		// keeps it, its statics outlive Godot's StringName table).
-		graze_detector = std::shared_ptr<GrazeDetector2D>(new GrazeDetector2D(get_instance_id()));
-		graze_detector->set_config(graze_detector_config());
-	}
-	return *graze_detector;
+	return graze_targets.detector(get_instance_id(), graze_detector_config());
+}
+
+const std::shared_ptr<GrazeDetector2D> &PatternSpawner2D::graze_detector_shared() const {
+	return graze_targets.shared_detector(get_instance_id(), graze_detector_config());
 }
 
 GrazeDetector2D::Config PatternSpawner2D::graze_detector_config() const {
-	GrazeDetector2D::Config config;
-	config.source = (int)graze_target_source;
-	config.node_group = graze_node_group;
-	config.filter_group = graze_filter_group;
-	config.target_path = graze_target_path;
-	config.node_name = graze_node_name;
-	config.node_name_match = (int)graze_node_name_match_mode;
-	config.node_name_case_sensitive = graze_node_name_case_sensitive;
-	config.children_parent_path = graze_children_parent_path;
-	config.children_recursive = graze_children_recursive;
-	config.global_positions = graze_global_positions;
-	config.update_interval = graze_update_interval;
-	return config;
+	return graze_targets.effective((int)graze_target_source);
 }
 
 void PatternSpawner2D::apply_graze_detector_config() {
-	graze_detector_ref().set_config(graze_detector_config());
+	graze_targets.push(graze_detector_config());
 	on_config_changed();
 	refresh_graze_preview();
 }
 
 void PatternSpawner2D::collect_graze_targets(std::vector<GrazeTarget2D> &r_targets) const {
-	r_targets.clear();
-	if (!is_inside_tree()) {
-		return;
-	}
-	GrazeDetector2D &detector = graze_detector_ref();
-	const uint64_t self_id = get_instance_id();
-	BulletFactory2D *factory = get_bullet_factory();
-	if (factory != nullptr && factory->graze_lists_usable() && !Engine::get_singleton()->is_editor_hint()) {
-		// What the volleys test this sweep (shared lists may hold this
-		// spawner; its own volleys skip it, so does this view). A target
-		// freed since the sweep (idle-time user code) is left out too.
-		const GrazeTargetList2D *list = detector.list(*factory);
-		for (int k = 0; list != nullptr && k < list->count(); ++k) {
-			const GrazeTarget2D &target = list->targets[k];
-			if (graze_is_point_target2d(target.id)) {
-				r_targets.push_back(target);
-				continue;
-			}
-			const Node2D *node = Object::cast_to<Node2D>(ObjectDB::get_instance(ObjectID(target.id)));
-			if (target.id != self_id && node != nullptr && !node->is_queued_for_deletion()) {
-				r_targets.push_back(target);
-			}
-		}
-		return;
-	}
-	// No running factory (editor, factory not ready): a fresh scan in the
-	// same space as the runtime, the factory's world when there is one. The
-	// cursor only at runtime (in the editor it sits over the editor's UI).
-	const bool editor = Engine::get_singleton()->is_editor_hint();
-	const bool factory_in_tree = factory != nullptr && factory->is_inside_tree();
-	const Ref<World2D> world = factory_in_tree ? factory->get_world_2d() : get_world_2d();
-	const CanvasItem *mouse_space = editor ? nullptr : (factory_in_tree ? (const CanvasItem *)factory : (const CanvasItem *)this);
-	detector.collect_now(get_tree(), world.ptr(), mouse_space, r_targets);
+	graze_targets.collect(*this, get_bullet_factory(), graze_detector_config(), r_targets);
 }
 
 int PatternSpawner2D::refresh_graze_targets() {
@@ -287,14 +234,7 @@ int PatternSpawner2D::refresh_graze_targets() {
 		UtilityFunctions::push_error((String(get_class()) + ".refresh_graze_targets: spawner is outside the scene tree, nothing refreshed."));
 		return 0;
 	}
-	GrazeDetector2D &detector = graze_detector_ref();
-	detector.mark_due();
-	BulletFactory2D *factory = get_bullet_factory();
-	if (detector.shares_factory_lists() && factory != nullptr) {
-		// Shared lists rescan every tick anyway; due now so the count below
-		// (and the next tick) see the scene as it is.
-		factory->get_graze_default_detector().mark_due();
-	}
+	graze_targets.mark_due(*this, get_bullet_factory(), graze_detector_config());
 	// Rescan through the same path the runtime and the preview read.
 	collect_graze_targets(graze_targets_scratch);
 	const int found = (int)graze_targets_scratch.size();

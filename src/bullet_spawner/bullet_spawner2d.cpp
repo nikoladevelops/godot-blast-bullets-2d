@@ -138,8 +138,7 @@ void BulletSpawner2D::apply_volley_graze(BulletVolley2D *volley) {
 	const Array zones = spawner_graze_zones(any);
 	if (any) {
 		// Shared: setting edits and refresh_graze_targets() reach it in flight.
-		graze_detector_ref();
-		volley->graze_arm_from_spawner(zones, graze_detector);
+		volley->graze_arm_from_spawner(zones, graze_detector_shared());
 	}
 }
 

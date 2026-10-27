@@ -84,7 +84,6 @@ void BulletSpawner2D::graze_live_volleys(std::unordered_set<uint64_t> &r_changed
 	bool any = false;
 	const Array zones = graze_enabled ? spawner_graze_zones(any) : Array();
 	if (any) {
-		graze_detector_ref();
 	}
 	std::vector<BulletVolley2D *> owned;
 	factory->collect_volleys_owned_by(get_instance_id(), owned);
@@ -94,9 +93,9 @@ void BulletSpawner2D::graze_live_volleys(std::unordered_set<uint64_t> &r_changed
 				volley->graze_release();
 				r_changed.insert(volley->get_instance_id());
 			}
-		} else if (!volley->graze_armed_with(zones, graze_detector)) {
+		} else if (!volley->graze_armed_with(zones, graze_detector_shared())) {
 			// A fresh graze state: the rings re-arm.
-			volley->graze_arm_from_spawner(zones, graze_detector);
+			volley->graze_arm_from_spawner(zones, graze_detector_shared());
 			r_changed.insert(volley->get_instance_id());
 		}
 	}

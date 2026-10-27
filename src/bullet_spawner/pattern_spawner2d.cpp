@@ -684,15 +684,15 @@ PackedStringArray PatternSpawner2D::_get_configuration_warnings() const {
 		if (!any_zone) {
 			out.push_back("Graze is enabled but graze_zones is empty: no bullet of this spawner can be grazed.");
 		}
-		if (graze_target_source == GRAZE_SOURCE_NODE_GROUP && graze_node_group.is_empty()) {
+		if (graze_target_source == GRAZE_SOURCE_NODE_GROUP && graze_targets.config.node_group.is_empty()) {
 			out.push_back("graze_target_source is Node Group but graze_node_group is empty: no graze target is found.");
-		} else if (graze_target_source == GRAZE_SOURCE_NODE_PATH && graze_target_path.is_empty()) {
+		} else if (graze_target_source == GRAZE_SOURCE_NODE_PATH && graze_targets.config.target_path.is_empty()) {
 			out.push_back("graze_target_source is Node Path but graze_target_path is empty: no graze target is found.");
-		} else if (graze_target_source == GRAZE_SOURCE_NODE_NAME && graze_node_name.is_empty()) {
+		} else if (graze_target_source == GRAZE_SOURCE_NODE_NAME && graze_targets.config.node_name.is_empty()) {
 			out.push_back("graze_target_source is Node Name but graze_node_name is empty: no graze target is found.");
-		} else if (graze_target_source == GRAZE_SOURCE_NODE_CHILDREN && graze_children_parent_path.is_empty()) {
+		} else if (graze_target_source == GRAZE_SOURCE_NODE_CHILDREN && graze_targets.config.children_parent_path.is_empty()) {
 			out.push_back("graze_target_source is Node Children but graze_children_parent_path is empty: no graze target is found.");
-		} else if (graze_target_source == GRAZE_SOURCE_GLOBAL_POSITIONS && graze_global_positions.is_empty()) {
+		} else if (graze_target_source == GRAZE_SOURCE_GLOBAL_POSITIONS && graze_targets.config.global_positions.is_empty()) {
 			out.push_back("graze_target_source is Global Positions but graze_global_positions is empty: no graze target is found.");
 		}
 	}
@@ -710,15 +710,15 @@ PackedStringArray PatternSpawner2D::_get_configuration_warnings() const {
 		if (!any_sound) {
 			out.push_back("Sound is enabled but sound_effects is empty: no bullet of this spawner plays sounds.");
 		}
-		if (sound_listener_source == SOUND_LISTENER_NODE_GROUP && sound_listener_node_group.is_empty()) {
+		if (sound_listener_source == SOUND_LISTENER_NODE_GROUP && sound_targets.config.node_group.is_empty()) {
 			out.push_back("sound_listener_source is Node Group but sound_listener_node_group is empty: sounds measure from Godot's listener.");
-		} else if (sound_listener_source == SOUND_LISTENER_NODE_PATH && sound_listener_path.is_empty()) {
+		} else if (sound_listener_source == SOUND_LISTENER_NODE_PATH && sound_targets.config.target_path.is_empty()) {
 			out.push_back("sound_listener_source is Node Path but sound_listener_path is empty: sounds measure from Godot's listener.");
-		} else if (sound_listener_source == SOUND_LISTENER_NODE_NAME && sound_listener_node_name.is_empty()) {
+		} else if (sound_listener_source == SOUND_LISTENER_NODE_NAME && sound_targets.config.node_name.is_empty()) {
 			out.push_back("sound_listener_source is Node Name but sound_listener_node_name is empty: sounds measure from Godot's listener.");
-		} else if (sound_listener_source == SOUND_LISTENER_NODE_CHILDREN && sound_listener_children_parent_path.is_empty()) {
+		} else if (sound_listener_source == SOUND_LISTENER_NODE_CHILDREN && sound_targets.config.children_parent_path.is_empty()) {
 			out.push_back("sound_listener_source is Node Children but sound_listener_children_parent_path is empty: sounds measure from Godot's listener.");
-		} else if (sound_listener_source == SOUND_LISTENER_GLOBAL_POSITIONS && sound_listener_global_positions.is_empty()) {
+		} else if (sound_listener_source == SOUND_LISTENER_GLOBAL_POSITIONS && sound_targets.config.global_positions.is_empty()) {
 			out.push_back("sound_listener_source is Global Positions but sound_listener_global_positions is empty: sounds measure from Godot's listener.");
 		}
 	}

@@ -357,7 +357,6 @@ int LaserSpawner2D::apply_to_live_lasers(BitField<LiveVolleyGroup> groups) {
 	if (graze_group && graze_enabled && !graze_zones.is_empty()) {
 		zones = spawner_graze_zones(graze_on);
 		if (graze_on) {
-			graze_detector_ref();
 		}
 	}
 	Array entries;
@@ -374,8 +373,8 @@ int LaserSpawner2D::apply_to_live_lasers(BitField<LiveVolleyGroup> groups) {
 		bool touched = false;
 		if (graze_group) {
 			if (graze_on) {
-				if (!laser->graze_armed_alike(zones, graze_detector)) {
-					laser->graze_arm(zones, graze_detector);
+				if (!laser->graze_armed_alike(zones, graze_detector_shared())) {
+					laser->graze_arm(zones, graze_detector_shared());
 					touched = true;
 				}
 			} else if (laser->is_graze_armed()) {
@@ -447,8 +446,7 @@ ShotResult2D LaserSpawner2D::fire_shot(std::vector<Transform2D> &transforms) {
 		bool any = false;
 		const Array zones = spawner_graze_zones(any);
 		if (any) {
-			graze_detector_ref();
-			laser->graze_arm(zones, graze_detector);
+			laser->graze_arm(zones, graze_detector_shared());
 		}
 	}
 	if (sound_enabled && !sound_effects.is_empty()) {
