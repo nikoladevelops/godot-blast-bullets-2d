@@ -29,14 +29,115 @@ double LaserVolley2D::draw_fraction() const {
 	return 1.0;
 }
 
-void LaserVolley2D::interpolated_points(const Beam &b, double fraction, std::vector<Vector2> &r_points) const {
+namespace {
+
+real_t polyline_length2d(const std::vector<Vector2> &pts) {
+	real_t total = 0.0;
+	for (size_t k = 1; k < pts.size(); ++k) {
+		total += pts[k - 1].distance_to(pts[k]);
+	}
+	return total;
+}
+
+// The piece of `pts` between arc lengths `from` and `to` (clamped).
+void sub_polyline2d(const std::vector<Vector2> &pts, real_t from, real_t to, std::vector<Vector2> &r_out) {
+	r_out.clear();
+	if (pts.empty()) {
+		return;
+	}
+	real_t walked = 0.0;
+	bool started = false;
+	for (size_t k = 1; k < pts.size(); ++k) {
+		const real_t seg = pts[k - 1].distance_to(pts[k]);
+		const real_t seg_end = walked + seg;
+		if (!started && from <= seg_end) {
+			const real_t t = seg > (real_t)0.0 ? Math::clamp((from - walked) / seg, (real_t)0.0, (real_t)1.0) : (real_t)0.0;
+			r_out.push_back(pts[k - 1].lerp(pts[k], t));
+			started = true;
+		}
+		if (started) {
+			if (to <= seg_end) {
+				const real_t t = seg > (real_t)0.0 ? Math::clamp((to - walked) / seg, (real_t)0.0, (real_t)1.0) : (real_t)1.0;
+				r_out.push_back(pts[k - 1].lerp(pts[k], t));
+				return;
+			}
+			r_out.push_back(pts[k]);
+		}
+		walked = seg_end;
+	}
+	if (!started) {
+		r_out.push_back(pts.back());
+	}
+	if (r_out.size() < 2) {
+		r_out.push_back(r_out.back());
+	}
+}
+
+// The facing of the polyline segment nearest to `at`.
+real_t polyline_angle_at2d(const std::vector<Vector2> &pts, const Vector2 &at) {
+	real_t best = -1.0;
+	real_t angle = 0.0;
+	for (size_t k = 1; k < pts.size(); ++k) {
+		const Vector2 a = pts[k - 1];
+		const Vector2 ab = pts[k] - a;
+		const real_t len2 = ab.x * ab.x + ab.y * ab.y;
+		if (!(len2 > (real_t)0.0)) {
+			continue;
+		}
+		const real_t t = Math::clamp(((at - a).x * ab.x + (at - a).y * ab.y) / len2, (real_t)0.0, (real_t)1.0);
+		const real_t dist = (a + ab * t).distance_squared_to(at);
+		if (best < (real_t)0.0 || dist < best) {
+			best = dist;
+			angle = ab.angle();
+		}
+	}
+	return angle;
+}
+
+} // namespace
+
+void LaserVolley2D::interpolated_points(const Beam &b, double fraction, std::vector<Vector2> &r_points, bool *r_aligned) const {
+	if (r_aligned != nullptr) {
+		*r_aligned = true;
+	}
 	const real_t f = (real_t)Math::clamp(fraction, 0.0, 1.0);
-	if (f >= (real_t)1.0 || b.prev_points.empty()) {
+	if (f >= (real_t)1.0 || b.prev_points.empty() || b.points.empty()) {
 		r_points = b.points;
 		return;
 	}
 	const LaserData2D *d = data.ptr();
-	const bool straight = d != nullptr && d->type == LaserData2D::LASER_BEAM && b.points.size() == 2 && b.prev_points.size() == 2;
+	if (d != nullptr && d->type != LaserData2D::LASER_BEAM) {
+		// A bolt or curvy body is the newest stretch of the path its head
+		// flew: last tick's body plus what the head flew since. Its tail and
+		// its head each glide along that path, so a growing trail, a
+		// reflection or a turn never snaps (they used to while the point
+		// count changed: half a second for a homing curvy laser).
+		size_t joint = b.points.size();
+		for (size_t k = b.points.size(); k-- > 0;) {
+			if (b.points[k] == b.prev_points.back()) {
+				joint = k;
+				break;
+			}
+		}
+		if (joint < b.points.size()) {
+			std::vector<Vector2> &path = interp_path_scratch;
+			path = b.prev_points;
+			path.insert(path.end(), b.points.begin() + (std::ptrdiff_t)joint + 1, b.points.end());
+			const real_t prev_len = polyline_length2d(b.prev_points);
+			const real_t total = polyline_length2d(path);
+			const real_t now_len = polyline_length2d(b.points);
+			const real_t from = Math::lerp((real_t)0.0, Math::max((real_t)0.0, total - now_len), f);
+			const real_t to = Math::lerp(prev_len, total, f);
+			sub_polyline2d(path, from, to, r_points);
+			if (r_aligned != nullptr) {
+				*r_aligned = false;
+			}
+			return;
+		}
+		r_points = b.points; // the head jumped (no shared path): this tick's
+		return;
+	}
+	const bool straight = b.points.size() == 2 && b.prev_points.size() == 2;
 	if (straight) {
 		// Muzzle, angle and length: a beam turning on its muzzle stays on it.
 		const Vector2 muzzle = b.prev_points[0].lerp(b.points[0], f);
@@ -45,14 +146,78 @@ void LaserVolley2D::interpolated_points(const Beam &b, double fraction, std::vec
 		r_points.assign({ muzzle, muzzle + Vector2(Math::cos(angle), Math::sin(angle)) * length });
 		return;
 	}
-	if (b.prev_points.size() == b.points.size()) {
-		r_points.resize(b.points.size());
-		for (size_t k = 0; k < b.points.size(); ++k) {
-			r_points[k] = b.prev_points[k].lerp(b.points[k], f);
-		}
-		return;
+	// Point by point. A reflection that appeared or vanished this tick grows
+	// from (or shrinks into) the end of the shorter polyline instead of
+	// snapping.
+	const size_t n = b.points.size();
+	r_points.resize(n);
+	for (size_t k = 0; k < n; ++k) {
+		const Vector2 from = b.prev_points[Math::min(k, b.prev_points.size() - 1)];
+		r_points[k] = from.lerp(b.points[k], f);
 	}
-	r_points = b.points;
+}
+
+real_t LaserVolley2D::draw_width(double fraction) const {
+	const real_t now = get_current_width();
+	const real_t f = (real_t)Math::clamp(fraction, 0.0, 1.0);
+	return f >= (real_t)1.0 ? now : Math::lerp(prev_width, now, f);
+}
+
+void LaserVolley2D::snap_beam_history(Beam &b) {
+	b.prev_muzzle = b.points.empty() ? b.muzzle : b.points.front();
+	b.prev_angle = b.angle;
+	b.prev_length = b.length_now;
+	b.prev_points = b.points;
+	b.prev_impacts = b.impacts;
+	for (Contact &c : b.contacts) {
+		c.prev_position = c.position;
+		c.has_prev = true;
+	}
+}
+
+void LaserVolley2D::build_draw_frame(const Beam &b, double fraction, BeamDrawFrame2D &r_frame) const {
+	bool aligned = true;
+	interpolated_points(b, fraction, r_frame.points, &aligned);
+	r_frame.pierces.clear();
+	r_frame.impacts.clear();
+	const std::vector<Vector2> &pts = r_frame.points;
+	const real_t f = (real_t)Math::clamp(fraction, 0.0, 1.0);
+	for (const Contact &c : b.contacts) {
+		DrawMark2D m;
+		m.position = c.has_prev && f < (real_t)1.0 ? c.prev_position.lerp(c.position, f) : c.position;
+		m.angle = polyline_angle_at2d(pts, m.position);
+		m.since = c.started;
+		r_frame.pierces.push_back(m);
+	}
+	for (size_t k = 0; k < b.impacts.size(); ++k) {
+		const Vector2 &impact = b.impacts[k];
+		DrawMark2D m;
+		m.position = impact;
+		m.since = k < b.impact_since.size() ? b.impact_since[k] : clock;
+		// An impact is a vertex of the beam (a reflection or the stop): it
+		// rides the interpolated vertex and faces along the beam arriving.
+		size_t vertex = b.points.size();
+		if (aligned) {
+			for (size_t v = 1; v < b.points.size() && v < pts.size(); ++v) {
+				if (b.points[v] == impact) {
+					vertex = v;
+					break;
+				}
+			}
+		} else if (!b.points.empty() && b.points.back() == impact && pts.size() >= 2) {
+			vertex = pts.size() - 1;
+		}
+		if (vertex < pts.size()) {
+			m.position = pts[vertex];
+			m.angle = (pts[vertex] - pts[vertex - 1]).angle();
+		} else {
+			if (k < b.prev_impacts.size() && f < (real_t)1.0) {
+				m.position = b.prev_impacts[k].lerp(impact, f);
+			}
+			m.angle = polyline_angle_at2d(pts, m.position);
+		}
+		r_frame.impacts.push_back(m);
+	}
 }
 
 // The bodies of one laser, built on the CPU and handed over in one call.
@@ -67,15 +232,6 @@ struct LaserBodyMesh2D {
 		colors.clear();
 		indices.clear();
 	}
-};
-
-// What the point animations of a beam need after its body was built.
-struct LaserBeamMarks2D {
-	const LaserVolley2D::Beam *beam;
-	Vector2 front;
-	Vector2 back;
-	real_t angle; // the first segment's
-	real_t tip_angle; // the last segment's
 };
 
 namespace {
@@ -180,45 +336,46 @@ LaserBodyMesh2D &body_mesh_scratch() {
 	return mesh;
 }
 
-std::vector<LaserBeamMarks2D> &beam_marks_scratch() {
-	static std::vector<LaserBeamMarks2D> marks;
-	return marks;
+std::vector<LaserVolley2D::BeamDrawFrame2D> &draw_frames_scratch() {
+	static std::vector<LaserVolley2D::BeamDrawFrame2D> frames;
+	return frames;
 }
 
 } // namespace
 
-void LaserVolley2D::build_body_mesh(double fraction, LaserBodyMesh2D &r_mesh, std::vector<LaserBeamMarks2D> *r_marks) const {
+void LaserVolley2D::build_body_mesh(double fraction, LaserBodyMesh2D &r_mesh, std::vector<BeamDrawFrame2D> *r_frames) const {
 	r_mesh.clear();
-	if (r_marks != nullptr) {
-		r_marks->clear();
+	if (r_frames != nullptr) {
+		r_frames->clear();
 	}
 	const LaserData2D *d = data.ptr();
 	if (d == nullptr || !active || phase == PHASE_FINISHED || phase == PHASE_CHARGING) {
 		return;
 	}
-	const real_t width = get_current_width();
+	const real_t width = draw_width(fraction);
 	Texture2D *body = anim_body.texture_at(clock - grow_started);
+	// The scroll runs on the interpolated clock: a tiled body flows between
+	// ticks instead of stepping each tick.
+	const double draw_clock = clock - (1.0 - Math::clamp(fraction, 0.0, 1.0)) * last_tick_delta;
 	BodyStyle2D style;
 	style.data = d;
 	style.half = width * (real_t)0.5;
 	style.tile = d->body_mode == LaserData2D::BODY_TILE && body != nullptr;
 	style.tex_w = body != nullptr ? Math::max((real_t)1.0, body->get_size().x) : (real_t)1.0;
-	style.scroll = (real_t)(-d->body_scroll_speed * (clock - grow_started));
+	style.scroll = (real_t)(-d->body_scroll_speed * (draw_clock - grow_started));
 	const bool bodies = width > (real_t)0.0;
-	std::vector<Vector2> pts;
+	BeamDrawFrame2D local;
 	for (const Beam &b : beams) {
+		if (b.spent && (r_frames == nullptr || b.impacts.empty())) {
+			continue;
+		}
+		BeamDrawFrame2D &frame = r_frames != nullptr ? r_frames->emplace_back() : local;
+		build_draw_frame(b, fraction, frame);
 		if (b.spent) {
-			continue;
+			continue; // only its wall impact still plays (see _draw)
 		}
-		interpolated_points(b, fraction, pts);
-		if (pts.size() < 2) {
-			continue;
-		}
-		if (bodies) {
-			append_body_strip(r_mesh, pts, style);
-		}
-		if (r_marks != nullptr) {
-			r_marks->push_back({ &b, pts.front(), pts.back(), (real_t)(pts[1] - pts[0]).angle(), (real_t)(pts[pts.size() - 1] - pts[pts.size() - 2]).angle() });
+		if (bodies && frame.points.size() >= 2) {
+			append_body_strip(r_mesh, frame.points, style);
 		}
 	}
 }
@@ -251,8 +408,8 @@ void LaserVolley2D::_draw() {
 		return;
 	}
 	LaserBodyMesh2D &mesh = body_mesh_scratch();
-	std::vector<LaserBeamMarks2D> &marks = beam_marks_scratch();
-	build_body_mesh(fraction, mesh, &marks);
+	std::vector<BeamDrawFrame2D> &frames = draw_frames_scratch();
+	build_body_mesh(fraction, mesh, &frames);
 	if (!mesh.indices.empty()) {
 		PackedInt32Array indices;
 		PackedVector2Array points;
@@ -269,21 +426,32 @@ void LaserVolley2D::_draw() {
 		Texture2D *body = anim_body.texture_at(clock - grow_started);
 		RenderingServer::get_singleton()->canvas_item_add_triangle_array(get_canvas_item(), indices, points, colors, uvs, PackedInt32Array(), PackedFloat32Array(), body != nullptr ? body->get_rid() : RID());
 	}
-	for (const LaserBeamMarks2D &mk : marks) {
-		const Beam &b = *mk.beam;
-		if (d->type == LaserData2D::LASER_BEAM) {
-			draw_point_frame(this, anim_muzzle.texture_at(clock - grow_started), mk.front, mk.angle, effects, d->modulate);
+	size_t fi = 0;
+	for (const Beam &b : beams) {
+		if (b.spent && b.impacts.empty()) {
+			continue;
 		}
-		draw_point_frame(this, anim_tip.texture_at(clock - grow_started), mk.back, mk.tip_angle, effects, d->modulate);
-		for (const Contact &c : b.contacts) {
-			draw_point_frame(this, anim_pierce.texture_at(clock - c.started), c.position, mk.angle, effects, d->modulate);
+		const BeamDrawFrame2D &frame = frames[fi++];
+		const std::vector<Vector2> &pts = frame.points;
+		if (!b.spent && pts.size() >= 2) {
+			if (d->type == LaserData2D::LASER_BEAM) {
+				draw_point_frame(this, anim_muzzle.texture_at(clock - grow_started), pts.front(), (pts[1] - pts[0]).angle(), effects, d->modulate);
+			}
+			draw_point_frame(this, anim_tip.texture_at(clock - grow_started), pts.back(), (pts[pts.size() - 1] - pts[pts.size() - 2]).angle(), effects, d->modulate);
+			for (const DrawMark2D &m : frame.pierces) {
+				draw_point_frame(this, anim_pierce.texture_at(clock - m.since), m.position, m.angle, effects, d->modulate);
+			}
 		}
-		for (const Vector2 &impact : b.impacts) {
-			draw_point_frame(this, anim_wall.texture_at(clock - b.blocked_since), impact, mk.angle, effects, d->modulate);
+		for (const DrawMark2D &m : frame.impacts) {
+			// A head spent at a wall still plays its impact once.
+			if (b.spent && !(clock - m.since < anim_wall.total)) {
+				continue;
+			}
+			draw_point_frame(this, anim_wall.texture_at(clock - m.since), m.position, m.angle, effects, d->modulate);
 		}
 	}
 	mesh.clear();
-	marks.clear();
+	frames.clear();
 }
 
 Dictionary LaserVolley2D::debug_get_body_mesh(double fraction) const {
@@ -320,37 +488,41 @@ Array LaserVolley2D::debug_get_draw_state(double fraction) const {
 		return out;
 	}
 	const double f = fraction < 0.0 ? draw_fraction() : fraction;
-	std::vector<Vector2> pts;
 	const bool charging = phase == PHASE_CHARGING;
+	BeamDrawFrame2D frame;
 	for (const Beam &b : beams) {
-		interpolated_points(b, f, pts);
+		build_draw_frame(b, f, frame);
 		Dictionary s;
 		s["spent"] = b.spent;
 		PackedVector2Array line;
-		for (const Vector2 &p : pts) {
+		for (const Vector2 &p : frame.points) {
 			line.push_back(p);
 		}
 		s["points"] = line;
 		s["warning"] = charging && d->charge_sec > 0.0 && d->warning_width > 0.0;
-		s["width"] = charging ? (real_t)0.0 : get_current_width();
+		s["width"] = charging ? (real_t)0.0 : draw_width(f);
 		s["color"] = d->modulate;
 		s["charge"] = charging ? Variant(anim_charge.texture_at(clock)) : Variant();
 		s["body"] = !charging ? Variant(anim_body.texture_at(clock - grow_started)) : Variant();
 		s["muzzle"] = !charging ? Variant(anim_muzzle.texture_at(clock - grow_started)) : Variant();
 		s["tip"] = !charging ? Variant(anim_tip.texture_at(clock - grow_started)) : Variant();
 		Array pierces;
-		for (const Contact &c : b.contacts) {
+		for (const DrawMark2D &m : frame.pierces) {
 			Array entry;
-			entry.push_back(c.position);
-			entry.push_back(Variant(anim_pierce.texture_at(clock - c.started)));
+			entry.push_back(m.position);
+			entry.push_back(Variant(anim_pierce.texture_at(clock - m.since)));
+			entry.push_back(m.angle);
 			pierces.push_back(entry);
 		}
 		s["pierces"] = pierces;
 		Array impacts;
-		for (const Vector2 &impact : b.impacts) {
+		for (const DrawMark2D &m : frame.impacts) {
 			Array entry;
-			entry.push_back(impact);
-			entry.push_back(Variant(anim_wall.texture_at(clock - b.blocked_since)));
+			entry.push_back(m.position);
+			entry.push_back(Variant(anim_wall.texture_at(clock - m.since)));
+			entry.push_back(m.angle);
+			// Drawn: a spent head plays its impact once.
+			entry.push_back(!b.spent || clock - m.since < anim_wall.total);
 			impacts.push_back(entry);
 		}
 		s["impacts"] = impacts;

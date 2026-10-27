@@ -153,9 +153,13 @@ void LaserVolley2D::begin_life(BulletFactory2D *p_factory, const Ref<LaserData2D
 	// The first frame (before the first tick) already shows where it aims.
 	for (Beam &b : beams) {
 		update_beam_geometry(b, 0.0);
+		b.impact_since.assign(b.impacts.size(), 0.0);
 		b.prev_points = b.points;
 		b.prev_length = b.length_now;
+		b.prev_impacts = b.impacts;
 	}
+	prev_width = get_current_width();
+	last_tick_delta = 0.0;
 	set_visible(true);
 	queue_redraw();
 }
@@ -679,10 +683,7 @@ void LaserVolley2D::shift_with_owner(const Vector2 &jump, bool carry) {
 		for (Contact &c : b.contacts) {
 			c.position += jump;
 		}
-		b.prev_points = b.points;
-		b.prev_muzzle = b.points.empty() ? b.muzzle : b.points.front();
-		b.prev_angle = b.angle;
-		b.prev_length = b.length_now;
+		snap_beam_history(b);
 		moved = true;
 	}
 	if (moved) {

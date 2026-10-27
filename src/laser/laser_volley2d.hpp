@@ -28,7 +28,6 @@ class PatternSpawner2D;
 // owner LaserSpawner2D while that lives, else on the factory (never both).
 // Lasers read their LaserData2D every tick: edits reach lasers firing now.
 struct LaserBodyMesh2D;
-struct LaserBeamMarks2D;
 
 class LaserVolley2D : public Node2D {
 	GDCLASS(LaserVolley2D, Node2D)
@@ -52,6 +51,10 @@ public:
 		double next_hit = 0.0; // laser clock of the next repeated hit
 		double started = 0.0; // laser clock of the pierce start (its animation)
 		bool seen = false;
+		// Last tick's position of this contact (the draw lerps from it);
+		// false for a contact that started this tick.
+		Vector2 prev_position;
+		bool has_prev = false;
 	};
 
 	struct Beam {
@@ -66,17 +69,18 @@ public:
 		real_t length_now = 0.0; // drawn and damaging length
 		std::vector<Vector2> points; // muzzle .. end, reflections in between
 		std::vector<Vector2> impacts; // wall points (reflections and the stop)
+		std::vector<double> impact_since; // laser clock each impact appeared (its animation)
 		bool blocked = false;
 		bool wall_reported = false; // laser_wall_hit sent for this block
 		Vector2 wall_point;
 		Vector2 wall_normal;
-		double blocked_since = 0.0;
 		std::vector<Contact> contacts;
 		// Last tick's geometry (the interpolation pass lerps from it).
 		Vector2 prev_muzzle;
 		real_t prev_angle = 0.0;
 		real_t prev_length = 0.0;
 		std::vector<Vector2> prev_points;
+		std::vector<Vector2> prev_impacts;
 		bool snap_history = false; // a script jumped it (set_beam_angle): the next tick draws no sweep
 		// TRACK / LOCK_ON target: a node by id, or a point.
 		uint64_t target_id = 0;
@@ -96,6 +100,19 @@ public:
 		int bounces_left = 0;
 		double wave_clock = 0.0;
 		std::vector<Vector2> trail;
+	};
+
+	// Everything the draw places on a beam at `fraction`: the polyline and
+	// the pierce / wall-impact marks (position, facing, animation age).
+	struct DrawMark2D {
+		Vector2 position;
+		real_t angle = 0.0;
+		double since = 0.0;
+	};
+	struct BeamDrawFrame2D {
+		std::vector<Vector2> points;
+		std::vector<DrawMark2D> pierces;
+		std::vector<DrawMark2D> impacts;
 	};
 
 	// ---- Script API ----
@@ -224,6 +241,10 @@ private:
 	double phase_time = 0.0;
 	double clock = 0.0; // laser time since begin_life
 	double grow_started = 0.0; // clock of the GROWING start (body, muzzle, tip animations)
+	// Last tick's width and step: the draw lerps the width and runs the tile
+	// scroll on the interpolated clock.
+	real_t prev_width = 0.0;
+	double last_tick_delta = 0.0;
 	double active_override = -1.0; // set_active_time_left (seconds of ACTIVE), -1 = the data's
 	// end_laser changed the phase outside a tick: announced at the next tick
 	// start (every signal fires inside the tick), or earlier in the same tick
@@ -309,10 +330,17 @@ private:
 	// Bolts and curvy lasers: the head moves (tracks, waves, reflects or
 	// pins at walls) and the body is the newest `length` px of its path.
 	void step_head(Beam &b, double delta);
-	void interpolated_points(const Beam &b, double fraction, std::vector<Vector2> &r_points) const;
+	// The beam's polyline at `fraction` between last tick and this one.
+	// r_aligned: point k is this tick's point k (impacts can ride it).
+	void interpolated_points(const Beam &b, double fraction, std::vector<Vector2> &r_points, bool *r_aligned = nullptr) const;
+	void build_draw_frame(const Beam &b, double fraction, BeamDrawFrame2D &r_frame) const;
+	real_t draw_width(double fraction) const;
+	// Copies this tick's geometry into the history (a jump drawn as no travel).
+	static void snap_beam_history(Beam &b);
+	mutable std::vector<Vector2> interp_path_scratch; // main thread only
 	// Every unspent beam's body strip (none while charging or at width 0) and,
 	// when asked, what its point animations need.
-	void build_body_mesh(double fraction, LaserBodyMesh2D &r_mesh, std::vector<LaserBeamMarks2D> *r_marks) const;
+	void build_body_mesh(double fraction, LaserBodyMesh2D &r_mesh, std::vector<BeamDrawFrame2D> *r_frames) const;
 	double draw_fraction() const;
 };
 

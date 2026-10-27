@@ -141,7 +141,6 @@ void LaserVolley2D::cut_beam(Beam &b, real_t length) {
 void LaserVolley2D::trace_walls(Beam &b, const Vector2 &from, real_t direction, real_t length) {
 	b.points.clear();
 	b.impacts.clear();
-	const bool was_blocked = b.blocked;
 	b.blocked = false;
 	b.points.push_back(from);
 	b.length_now = 0.0;
@@ -192,9 +191,6 @@ void LaserVolley2D::trace_walls(Beam &b, const Vector2 &from, real_t direction, 
 					b.blocked = true;
 					b.wall_point = q;
 					b.wall_normal = n;
-					if (!was_blocked) {
-						b.blocked_since = clock;
-					}
 					return;
 				}
 			}
@@ -379,7 +375,6 @@ void LaserVolley2D::step_head(Beam &b, double delta) {
 							b.blocked = true;
 							b.wall_point = q;
 							b.wall_normal = n;
-							b.blocked_since = clock;
 							b.impacts.assign(1, q);
 							to = q;
 						}
@@ -869,13 +864,12 @@ void LaserVolley2D::tick(double delta) {
 	const uint64_t self_id = get_instance_id();
 	const uint32_t life = life_id;
 	// Last tick's geometry: the interpolation pass lerps from it.
+	prev_width = get_current_width();
 	for (Beam &b : beams) {
-		b.prev_muzzle = b.points.empty() ? b.muzzle : b.points.front();
-		b.prev_angle = b.angle;
-		b.prev_length = b.length_now;
-		b.prev_points = b.points;
+		snap_beam_history(b);
 	}
 	clock += delta;
+	last_tick_delta = delta;
 	if (!announce_pending_phase(self_id, life)) {
 		return;
 	}
@@ -900,13 +894,13 @@ void LaserVolley2D::tick(double delta) {
 		} else {
 			update_beam_geometry(b, delta);
 		}
+		// Each impact keeps the clock it appeared at while it lasts (its
+		// animation), a new one starts now.
+		b.impact_since.resize(b.impacts.size(), clock);
 		if (b.snap_history) {
 			// A scripted jump is never drawn as travel (like bullet setters).
 			b.snap_history = false;
-			b.prev_points = b.points;
-			b.prev_muzzle = b.points.empty() ? b.muzzle : b.points.front();
-			b.prev_angle = b.angle;
-			b.prev_length = b.length_now;
+			snap_beam_history(b);
 		}
 	}
 	// Bolts and curvy lasers fully outside the despawn bounds are spent (silently).

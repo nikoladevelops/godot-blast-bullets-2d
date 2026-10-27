@@ -410,3 +410,160 @@ func test_an_anchor_outside_the_tree_leaves_the_beam_where_it_was_fired() -> voi
 	loose.free()
 	step_factory(1, DT)
 	assert_eq(l.get_beam_start(0), Vector2(20, 10), "a freed anchor changes nothing")
+
+
+## THE interpolation invariant: drawing at fraction 0 reproduces exactly what
+## was drawn at fraction 1 one tick before (body points, width, pierce and
+## wall-impact marks), and fraction 1 is this tick. Anything else is a visible
+## snap between two rendered frames. It used to fail for the pierce and wall
+## marks (drawn at this tick's spot), every bolt or curvy body whose point count
+## changed (a growing trail: half a second of snapping per shot; a reflection),
+## and the width while growing or fading.
+func _same_points(a: PackedVector2Array, b: PackedVector2Array) -> bool:
+	if a.size() != b.size():
+		return false
+	for k in a.size():
+		if a[k].distance_to(b[k]) > 0.01:
+			return false
+	return true
+
+
+func _marks(state: Dictionary, key: String) -> Array:
+	var out: Array = []
+	for m in state[key]:
+		out.append(m[0])
+	return out
+
+
+func _same_marks(a: Array, b: Array) -> bool:
+	if a.size() != b.size():
+		return false
+	for k in a.size():
+		if (a[k] as Vector2).distance_to(b[k]) > 0.01:
+			return false
+	return true
+
+
+## Ticks `l` and checks the invariant on every beam each tick; returns the
+## problems (empty = continuous).
+func _check_continuity(l: LaserVolley2D, ticks: int, label: String) -> Array:
+	var problems: Array = []
+	# From the first drawn tick on: before it the laser charges (no body).
+	step_factory(1, DT)
+	var last: Array = l.debug_get_draw_state(1.0)
+	for t in ticks:
+		step_factory(1, DT)
+		if not l.is_laser_active():
+			break
+		var at0: Array = l.debug_get_draw_state(0.0)
+		for i in at0.size():
+			if i >= last.size():
+				continue
+			var was: Dictionary = last[i]
+			var now: Dictionary = at0[i]
+			if was["spent"] or now["spent"]:
+				continue
+			if not _same_points(was["points"], now["points"]):
+				problems.append("%s tick %d beam %d: body %s -> %s" % [label, t, i, was["points"], now["points"]])
+			if absf(float(was["width"]) - float(now["width"])) > 0.001:
+				problems.append("%s tick %d beam %d: width %s -> %s" % [label, t, i, was["width"], now["width"]])
+			if not _same_marks(_marks(was, "pierces"), _marks(now, "pierces")) and was["pierces"].size() == now["pierces"].size():
+				problems.append("%s tick %d beam %d: pierces %s -> %s" % [label, t, i, _marks(was, "pierces"), _marks(now, "pierces")])
+			if not _same_marks(_marks(was, "impacts"), _marks(now, "impacts")) and was["impacts"].size() == now["impacts"].size():
+				problems.append("%s tick %d beam %d: impacts %s -> %s" % [label, t, i, _marks(was, "impacts"), _marks(now, "impacts")])
+		last = l.debug_get_draw_state(1.0)
+	return problems
+
+
+func test_a_growing_bolt_glides_instead_of_snapping() -> void:
+	var d := H.make_laser(0.0, 0.0, 2.0, 0.0, 240.0)
+	d.type = LaserData2D.LASER_BOLT
+	d.speed = 500.0 # ~31 px per tick: the trail grows for 8 ticks
+	var l := _fire(d, Transform2D(0.0, Vector2(100, 100)))
+	var problems := _check_continuity(l, 14, "bolt")
+	assert_eq("\n".join(problems), "", "a growing bolt is continuous")
+	var mid: PackedVector2Array = _pts(l, 0.5)
+	var head_before: Vector2 = _pts(l, 0.0)[-1]
+	var head_now: Vector2 = _pts(l, 1.0)[-1]
+	assert_almost_eq(mid[-1].distance_to(head_before.lerp(head_now, 0.5)), 0.0, 0.01, "the head half way at f = 0.5")
+	assert_almost_eq(_length(mid), 240.0, 0.5, "a full-length trail keeps its length mid-frame")
+
+
+func _length(p: PackedVector2Array) -> float:
+	var total := 0.0
+	for k in range(1, p.size()):
+		total += p[k - 1].distance_to(p[k])
+	return total
+
+
+func test_a_reflecting_bolt_and_a_curvy_laser_stay_continuous() -> void:
+	make_wall(Vector2(260, 100), Vector2(20, 2000), 16)
+	await idle(2)
+	var d := H.make_laser(0.0, 0.0, 2.0, 0.0, 200.0)
+	d.type = LaserData2D.LASER_BOLT
+	d.speed = 500.0
+	d.wall_mask = 16
+	d.reflections = 2
+	var l := _fire(d, Transform2D(0.3, Vector2(100, 100)))
+	assert_eq("\n".join(_check_continuity(l, 16, "reflecting bolt")), "", "a reflection never snaps the body")
+	var c := H.make_laser(0.0, 0.0, 2.0, 0.0, 240.0)
+	c.type = LaserData2D.LASER_CURVY
+	c.speed = 500.0
+	c.wave_amplitude = 40.0
+	c.wave_frequency = 2.0
+	var curvy := _fire(c, Transform2D(0.0, Vector2(100, 400)))
+	assert_eq("\n".join(_check_continuity(curvy, 14, "curvy")), "", "a waving curvy laser is continuous")
+
+
+func test_pierce_and_wall_marks_ride_a_sweeping_beam() -> void:
+	make_area(Vector2(150, 40), Vector2(30, 30))
+	make_wall(Vector2(320, 0), Vector2(20, 2000), 16)
+	await idle(2)
+	var d := H.make_laser(0.0, 0.0, 2.0, 0.0, 500.0)
+	d.wall_mask = 16
+	d.reflections = 0
+	d.sweep_speed_degrees = 40.0
+	d.sweep_arc_degrees = 50.0
+	var l := _fire(d, Transform2D(0.0, Vector2.ZERO))
+	var problems := _check_continuity(l, 14, "sweeping beam")
+	assert_eq("\n".join(problems), "", "pierce and wall marks lerp with the beam")
+	var s: Dictionary = l.debug_get_draw_state(0.5)[0]
+	assert_eq(s["impacts"].size(), 1, "blocked by the wall")
+	var pts: PackedVector2Array = s["points"]
+	assert_almost_eq((s["impacts"][0][0] as Vector2).distance_to(pts[-1]), 0.0, 0.01, "the impact sits on the drawn end of the beam mid-frame")
+	assert_almost_eq(float(s["impacts"][0][2]), (pts[-1] - pts[-2]).angle(), 0.0001, "facing along the beam that arrives")
+
+
+func test_the_width_lerps_while_growing_and_fading() -> void:
+	var d := H.make_laser(0.0, 0.5, 0.25, 0.5, 200.0)
+	d.width = 20.0
+	var l := _fire(d)
+	assert_eq("\n".join(_check_continuity(l, 20, "grow and fade")), "", "the width never steps between frames")
+	l = _fire(d)
+	step_factory(3, DT)
+	var before := float(l.debug_get_draw_state(0.0)[0]["width"])
+	var now := float(l.debug_get_draw_state(1.0)[0]["width"])
+	assert_almost_eq(float(l.debug_get_draw_state(0.5)[0]["width"]), (before + now) * 0.5, 0.001, "half way mid-frame")
+	assert_lt(before, now, "it grows")
+
+
+## Each wall impact has its own clock: a reflection that appears later plays
+## its animation from its own start (they all shared the stop's clock), and
+## a pierce or impact frame faces along its own segment, not the first one.
+func test_each_impact_plays_from_its_own_start_and_faces_its_segment() -> void:
+	make_wall(Vector2(200, 0), Vector2(20, 2000), 16)
+	make_wall(Vector2(0, 300), Vector2(2000, 20), 16)
+	await idle(2)
+	var d := H.make_laser(0.0, 0.0, 4.0, 0.0, 2000.0)
+	d.wall_mask = 16
+	d.reflections = 1
+	d.wall_impact_frames = _frames(3, 4.0, false)
+	var l := _fire(d, Transform2D(deg_to_rad(30.0), Vector2.ZERO))
+	step_factory(6, DT) # 0.375 s
+	var s: Dictionary = l.debug_get_draw_state(1.0)[0]
+	assert_eq(s["impacts"].size(), 2, "a reflection and the stop")
+	var pts: PackedVector2Array = s["points"]
+	assert_eq(pts.size(), 3, "muzzle, reflection, stop")
+	assert_almost_eq(float(s["impacts"][0][2]), (pts[1] - pts[0]).angle(), 0.0001, "the reflection faces the first segment")
+	assert_almost_eq(float(s["impacts"][1][2]), (pts[2] - pts[1]).angle(), 0.0001, "the stop faces the reflected segment")
+	assert_eq(s["impacts"][0][1], d.wall_impact_frames.get_frame_texture(&"default", 1), "0.375 s into its own clock: frame 1")
