@@ -1082,6 +1082,16 @@
 				Sine center-line sweep (open).
 			</description>
 		</method>
+		<method name="randomize_transforms" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms" type="Transform2D[]" />
+			<param index="1" name="settings" type="Dictionary" />
+			<param index="2" name="seed" type="int" default="0" />
+			<param index="3" name="shot_index" type="int" default="0" />
+			<description>
+				The spawner's placement rolls (its Randomization group) for scripts: each of [param transforms] is turned by a random angle, then scaled along its own axes, then moved by a random offset, exactly as a [BulletSpawner2D] or [LaserSpawner2D] rolls a shot. [param settings] takes the spawner's property names ([code]bullet_scale_mode[/code], [code]bullet_scale_min[/code] / [code]_max[/code], [code]bullet_scale_min_xy[/code] / [code]_max_xy[/code], [code]bullet_rotation_min_degrees[/code] / [code]_max_degrees[/code], [code]bullet_position_jitter_min[/code] / [code]_max[/code]; a missing key is off) and checks them by the spawner's rules. With [param seed] != 0 the rolls are a pure hash: the same seed and [param shot_index] (the spawner's [method BulletSpawner2D.get_volleys_fired] before the shot) give exactly that spawner shot; [param seed] 0 draws from Godot's global RNG ([method @GlobalScope.seed] reproduces it). Any bad input (an unknown or wrong setting, a negative shot index, a non-finite transform) returns an empty array with one error.
+			</description>
+		</method>
 		<method name="set_max_bullets_per_pattern" qualifiers="static">
 			<return type="void" />
 			<param index="0" name="limit" type="int" />

@@ -1563,6 +1563,11 @@ emits `GRAZE_POINT_TARGET_BIT | index` ids and belongs in
   `collect_spawn_transforms()` never see the rolls (they run in `shoot_once` after the collect).
   The speed multiplier is applied once after the spawn (`BulletVolley2D::apply_speed_factors`);
   nothing changed in the tick.
+- Roll order per bullet (`ShotRandomizer2D::apply`): turn, then scale along the bullet's own
+  (turned) axes, then jitter. Scaling first and turning inside the scaled frame skewed the basis
+  (the volley then silently recomposed it). `BulletPatterns2D.randomize_transforms(transforms,
+  settings, seed, shot_index)` is the same roller for scripts (the spawner's setting names and rules;
+  seeded = exactly the spawner's shot `shot_index`).
 
 ### 22.3 Pickups
 

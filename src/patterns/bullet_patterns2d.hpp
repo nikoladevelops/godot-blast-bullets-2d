@@ -81,6 +81,16 @@ public:
 	// helper_skip_indices applied. Unknown params fail loud with a
 	// did-you-mean and the rest still apply.
 	static TypedArray<Transform2D> generate(int shape, int amount, const Transform2D &marker_transform, const Dictionary &params = Dictionary());
+	// The spawner's placement rolls (its Randomization group) for scripts:
+	// `settings` takes the spawner's property names (bullet_scale_mode,
+	// bullet_scale_min / _max, bullet_scale_min_xy / _max_xy,
+	// bullet_rotation_min_degrees / _max_degrees, bullet_position_jitter_min /
+	// _max; missing = off), checked by the spawner's rules. Seeded (seed != 0)
+	// rolls are the spawner's exactly: the same seed and shot_index (its
+	// volleys fired before the shot) give the same transforms. Seed 0 draws
+	// from Godot's global RNG. Any bad input returns an empty array with one
+	// error.
+	static TypedArray<Transform2D> randomize_transforms(const TypedArray<Transform2D> &transforms, const Dictionary &settings, int64_t seed = 0, int64_t shot_index = 0);
 
 	// Enum class for grid alignment
 	enum Alignment : int {

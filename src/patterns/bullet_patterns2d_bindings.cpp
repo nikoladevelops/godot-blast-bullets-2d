@@ -71,6 +71,7 @@ void BulletPatterns2D::_bind_methods() {
 	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("get_max_bullets_per_pattern"), &BulletPatterns2D::get_max_bullets_per_pattern);
 	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("get_shapes"), &BulletPatterns2D::get_shapes);
 	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("generate", "shape", "amount", "marker_transform", "params"), &BulletPatterns2D::generate, DEFVAL(Dictionary()));
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("randomize_transforms", "transforms", "settings", "seed", "shot_index"), &BulletPatterns2D::randomize_transforms, DEFVAL(0), DEFVAL(0));
 	// Every helper_generate_transforms_<shape>, with its defaults.
 #define PATTERN_NAME_REQ(TYPE, NAME, FIELD) , #NAME
 #define PATTERN_NAME_OPT(TYPE, NAME, DEFAULT, FIELD) , #NAME

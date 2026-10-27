@@ -30,6 +30,12 @@ void ShotRandomizer2D::apply(Transform2D *transforms, size_t count, uint64_t sho
 		Transform2D &t = transforms[i];
 		const Transform2D before_rolls = t;
 		const uint64_t index = (uint64_t)i;
+		// Turn first, then scale along the bullet's own (turned) axes: scaling
+		// first and turning inside the scaled frame would skew the basis.
+		if (rotate) {
+			const real_t angle = (real_t)Math::deg_to_rad(shot_roll_lerp(rotation_min_degrees, rotation_max_degrees, roll_unit(shot, CHANNEL_ROTATION, index)));
+			t = t * Transform2D(angle, Vector2());
+		}
 		if (scale_uniform) {
 			const real_t s = (real_t)shot_roll_lerp(scale_min, scale_max, roll_unit(shot, CHANNEL_SCALE_X, index));
 			t.columns[0] *= s;
@@ -39,10 +45,6 @@ void ShotRandomizer2D::apply(Transform2D *transforms, size_t count, uint64_t sho
 			const real_t sy = (real_t)shot_roll_lerp(scale_min_xy.y, scale_max_xy.y, roll_unit(shot, CHANNEL_SCALE_Y, index));
 			t.columns[0] *= sx;
 			t.columns[1] *= sy;
-		}
-		if (rotate) {
-			const real_t angle = (real_t)Math::deg_to_rad(shot_roll_lerp(rotation_min_degrees, rotation_max_degrees, roll_unit(shot, CHANNEL_ROTATION, index)));
-			t = t * Transform2D(angle, Vector2());
 		}
 		if (jitter) {
 			// Uniform over the annulus' area, not its radius (no clustering at the centre).

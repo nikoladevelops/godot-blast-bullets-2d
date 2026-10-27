@@ -639,3 +639,70 @@ func test_life_time_scale_setters_reject_and_keep() -> void:
 	sp.bullet_life_time_scale_max = 1e300 # past float range: a lifetime would overflow
 	expect_error_sequence(["BulletSpawner2D: bullet_life_time_scale_max must be finite and > 0, keeping the old value."])
 	assert_eq([sp.bullet_life_time_scale_min, sp.bullet_life_time_scale_max], [0.75, 1.0], "old values kept")
+
+
+## BulletPatterns2D.randomize_transforms is the spawner's placement roll for
+## scripts: with the same settings, seed and shot index (the volleys fired
+## before the shot) it gives exactly the spawner's shot; everything off
+## changes nothing; every setting is checked by the spawner's rule.
+func test_scripts_roll_exactly_what_the_spawner_rolls() -> void:
+	var sp := _spawner(24, 0.0)
+	var settings := {
+		"bullet_scale_mode": BulletSpawner2D.BULLET_SCALE_PER_AXIS,
+		"bullet_scale_min_xy": Vector2(0.5, 0.8),
+		"bullet_scale_max_xy": Vector2(1.5, 2.0),
+		"bullet_rotation_min_degrees": -30.0,
+		"bullet_rotation_max_degrees": 45.0,
+		"bullet_position_jitter_min": 2.0,
+		"bullet_position_jitter_max": 12.0,
+	}
+	for key in settings:
+		sp.set(key, settings[key])
+		assert_eq(sp.get(key), settings[key], "%s set on the spawner" % key)
+	sp.bullet_random_seed = 4242
+	var pattern: Array[Transform2D] = []
+	for t in sp.collect_spawn_transforms():
+		pattern.append(t)
+	for shot in 3:
+		var expected := BulletPatterns2D.randomize_transforms(pattern, settings, 4242, sp.get_volleys_fired())
+		var skewed: Array = []
+		for i in expected.size():
+			var b: Transform2D = expected[i]
+			if absf(b.x.normalized().dot(b.y.normalized())) > 1e-4:
+				skewed.append(i)
+		assert_eq(skewed, [], "shot %d: a rolled scale and rotation never skew the basis (turned, then scaled along its own axes)" % shot)
+		var got := _poses(_shoot(sp))
+		var off: Array = []
+		for i in got.size():
+			if not (got[i] as Transform2D).is_equal_approx(expected[i]):
+				off.append(i)
+		assert_eq(off, [], "shot %d: every bullet where the script rolled it" % shot)
+	assert_eq(BulletPatterns2D.randomize_transforms(pattern, {}, 4242, 7), pattern, "everything off changes nothing")
+	var twice := BulletPatterns2D.randomize_transforms(pattern, settings, 4242, 9)
+	assert_eq(BulletPatterns2D.randomize_transforms(pattern, settings, 4242, 9), twice, "seeded: reproducible")
+	assert_ne(BulletPatterns2D.randomize_transforms(pattern, settings, 4242, 10), twice, "another shot rolls differently")
+	seed(5)
+	var global_a := BulletPatterns2D.randomize_transforms(pattern, settings, 0, 0)
+	seed(5)
+	assert_eq(BulletPatterns2D.randomize_transforms(pattern, settings, 0, 0), global_a, "seed 0: Godot's global RNG (seed() reproduces it)")
+
+
+func test_randomize_transforms_refuses_bad_settings() -> void:
+	var t: Array[Transform2D] = [Transform2D.IDENTITY]
+	var bad := [
+		[{"bullet_scale_mode": 3}, "bullet_scale_mode must be 0 (Off), 1 (Uniform) or 2 (Per Axis)"],
+		[{"bullet_scale_min": 0.0}, "bullet_scale_min must be finite and > 0"],
+		[{"bullet_scale_max": NAN}, "bullet_scale_max must be finite and > 0"],
+		[{"bullet_scale_min_xy": Vector2(1, 0)}, "bullet_scale_min_xy must be a finite Vector2 with both components > 0"],
+		[{"bullet_rotation_max_degrees": INF}, "bullet_rotation_max_degrees must be a finite number"],
+		[{"bullet_position_jitter_min": -1.0}, "bullet_position_jitter_min must be finite and >= 0"],
+		[{"bullet_scale": 2.0}, "unknown setting \"bullet_scale\" (bullet_scale_mode, bullet_scale_min, bullet_scale_max, bullet_scale_min_xy, bullet_scale_max_xy, bullet_rotation_min_degrees, bullet_rotation_max_degrees, bullet_position_jitter_min, bullet_position_jitter_max)"],
+		[{1: 2.0}, "every settings key must be a String"],
+	]
+	for case in bad:
+		assert_eq(BulletPatterns2D.randomize_transforms(t, case[0], 1), [], "refused: %s" % str(case[0]))
+		expect_error_sequence(["BulletPatterns2D.randomize_transforms: %s, nothing randomized." % case[1]])
+	assert_eq(BulletPatterns2D.randomize_transforms(t, {}, 1, -1), [], "negative shot index")
+	expect_error_sequence(["BulletPatterns2D.randomize_transforms: shot_index must be >= 0, nothing randomized."])
+	assert_eq(BulletPatterns2D.randomize_transforms([Transform2D(0.0, Vector2(INF, 0))] as Array[Transform2D], {}, 1), [], "a non-finite transform")
+	expect_error_sequence(["BulletPatterns2D.randomize_transforms: transforms[0] must be finite, nothing randomized."])
