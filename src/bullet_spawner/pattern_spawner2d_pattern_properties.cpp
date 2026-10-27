@@ -305,6 +305,9 @@ void PatternSpawner2D::apply_pattern_preset(int preset) {
 			pattern_knob_reject2d(#NAME, M2, get_class());                                                 \
 			return;                                                                                        \
 		}                                                                                                  \
+		if (NAME == (CTYPE)value) {                                                                        \
+			return; /* unchanged: no rebake, no preview rebuild */                                         \
+		}                                                                                                  \
 		NAME = (CTYPE)value;                                                                               \
 		if (NOTIFY) {                                                                                      \
 			notify_property_list_changed();                                                                \

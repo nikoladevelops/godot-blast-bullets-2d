@@ -7,6 +7,10 @@
 #include "core/emit_guard2d.hpp"
 #include "patterns/pattern_pose2d.hpp"
 #include "patterns/patterns_internal.hpp"
+#include <algorithm>
+#include <map>
+#include <string>
+#include <unordered_set>
 
 using namespace godot;
 
@@ -223,7 +227,7 @@ void PatternSpawner2D::end_pattern_batch() {
 // pattern_source (+ the payload key for entries: spawn_data for bullets). Read from ClassDB so new knobs
 // are covered without a hand-kept list: the spawner's class and its plugin
 // bases (the walk stops at the engine's Node2D).
-static void pattern_state_property_names(const StringName &cls, const String &payload, bool reset_only, std::vector<StringName> &r_names) {
+static void collect_pattern_state_property_names(const StringName &cls, const String &payload, bool reset_only, std::vector<StringName> &r_names) {
 	r_names.clear();
 	ClassDBSingleton *class_db = ClassDBSingleton::get_singleton();
 	TypedArray<Dictionary> props;
@@ -253,35 +257,78 @@ static void pattern_state_property_names(const StringName &cls, const String &pa
 	}
 }
 
-Dictionary PatternSpawner2D::snapshot_pattern_state() const {
+// Every PATTERN_KNOB row: their values are snapshotted as a native
+// PatternKnobs2D copy, never by name.
+static bool is_pattern_table_knob(const StringName &name) {
+	static const std::unordered_set<std::string> knobs = {
+#define PATTERN_SUBGROUP(TITLE, PREFIX)
+#define PATTERN_PROPERTY(VTYPE, NAME, HINT, HINT_STRING, SETTER, GETTER)
+#define PATTERN_KNOB(PTYPE, CTYPE, VTYPE, NAME, C1, A1, B1, M1, C2, A2, B2, M2, NOTIFY, HINT, HINT_STRING) #NAME,
+#include "patterns/pattern_knob_table2d.inc"
+#undef PATTERN_SUBGROUP
+#undef PATTERN_PROPERTY
+#undef PATTERN_KNOB
+	};
+	return knobs.count(String(name).utf8().get_data()) != 0;
+}
+
+// The class property lists never change after registration: walk ClassDB
+// once per (class, payload, mode). The walk cost ~0.5 ms per call (455
+// properties on a BulletSpawner2D), twice per override shot.
+// with_table_knobs = false leaves out the PATTERN_KNOB rows.
+static const std::vector<StringName> &pattern_state_property_names(const StringName &cls, const String &payload, bool reset_only, bool with_table_knobs) {
+	static std::map<std::string, std::vector<StringName>> cache;
+	const std::string key = (String(cls) + "|" + payload + "|" + (reset_only ? "1" : "0") + (with_table_knobs ? "1" : "0")).utf8().get_data();
+	auto it = cache.find(key);
+	if (it != cache.end()) {
+		return it->second;
+	}
 	std::vector<StringName> names;
-	pattern_state_property_names(get_class(), String(payload_key()), false, names);
-	Dictionary out;
-	for (const StringName &name : names) {
-		out[name] = get(name);
+	collect_pattern_state_property_names(cls, payload, reset_only, names);
+	if (!with_table_knobs) {
+		names.erase(std::remove_if(names.begin(), names.end(), is_pattern_table_knob), names.end());
+	}
+	return cache.emplace(key, std::move(names)).first->second;
+}
+
+PatternStateSnapshot2D PatternSpawner2D::snapshot_pattern_state() const {
+	PatternStateSnapshot2D out;
+	out.knobs = *this;
+	for (const StringName &name : pattern_state_property_names(get_class(), String(payload_key()), false, false)) {
+		out.others[name] = get(name);
 	}
 	return out;
 }
 
-void PatternSpawner2D::restore_pattern_state(const Dictionary &snapshot) {
+void PatternSpawner2D::restore_pattern_state(const PatternStateSnapshot2D &saved, const PatternStateSnapshot2D &applied) {
 	begin_pattern_batch();
-	const Array keys = snapshot.keys();
+	// A knob goes back when the entry changed it and it still differs (a
+	// handler that set it back already did the job).
+#define PATTERN_SUBGROUP(TITLE, PREFIX)
+#define PATTERN_PROPERTY(VTYPE, NAME, HINT, HINT_STRING, SETTER, GETTER)
+#define PATTERN_KNOB(PTYPE, CTYPE, VTYPE, NAME, C1, A1, B1, M1, C2, A2, B2, M2, NOTIFY, HINT, HINT_STRING) \
+	if (!(applied.knobs.NAME == saved.knobs.NAME) && !(NAME == saved.knobs.NAME)) {                        \
+		set_##NAME(static_cast<CTYPE>(saved.knobs.NAME));                                                  \
+	}
+#include "patterns/pattern_knob_table2d.inc"
+#undef PATTERN_SUBGROUP
+#undef PATTERN_PROPERTY
+#undef PATTERN_KNOB
+	const Array keys = saved.others.keys();
 	for (int i = 0; i < keys.size(); ++i) {
 		const StringName name = keys[i];
-		const Variant saved = snapshot[name];
-		if (get(name) != saved) {
-			set(name, saved);
+		const Variant before = saved.others[name];
+		if (applied.others[name] != before && get(name) != before) {
+			set(name, before);
 		}
 	}
 	end_pattern_batch();
 }
 
 void PatternSpawner2D::reset_pattern_knobs_to_defaults() {
-	std::vector<StringName> names;
-	pattern_state_property_names(get_class(), String(), true, names);
 	ClassDBSingleton *class_db = ClassDBSingleton::get_singleton();
 	begin_pattern_batch();
-	for (const StringName &name : names) {
+	for (const StringName &name : pattern_state_property_names(get_class(), String(), true, true)) {
 		const Variant def = class_db->class_get_property_default_value(get_class(), name);
 		if (def.get_type() != Variant::NIL && get(name) != def) {
 			set(name, def);

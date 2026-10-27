@@ -250,3 +250,56 @@ func test_shoot_from_inherits_no_spawner_motion() -> void:
 	sp.volley_fired.connect(func(v, _n) -> void: got.append(v))
 	assert_true(sp.shoot_from(Transform2D(0.0, Vector2(0, 300))), "fires")
 	assert_eq(got[0].get_bullet_velocity(0), Vector2.ZERO, "a posed shot keeps none of the spawner's motion")
+
+
+## An override restores natively (no property walk): an empty one changes
+## nothing at all, so the spawner's bake keeps serving shots, and every knob
+## a preset entry writes (int, float, bool, enum, Vector2, arrays, the
+## hand-written pattern properties, spin_*, the payload) comes back exactly.
+func test_an_empty_override_keeps_the_bake_and_every_kind_of_knob_comes_back() -> void:
+	var sp := make_spawner(H.make_volley_data(4), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 8)
+	sp.shoot_once()
+	var info: Dictionary = sp.debug_get_pattern_cache_info()
+	var bakes: int = info["bakes"]
+	var hits: int = info["hits"]
+	for k in 3:
+		assert_true(sp.shoot_once_with({}), "an empty override fires")
+	info = sp.debug_get_pattern_cache_info()
+	assert_eq(int(info["bakes"]), bakes, "an empty override never rebakes")
+	assert_eq(int(info["hits"]) - hits, 3, "each empty override is served from the bake")
+	# A preset entry writes knobs of every kind; all of them come back.
+	sp.helper_skip_indices = PackedInt32Array([1, 2])
+	sp.helper_custom_transforms = [Transform2D(0.0, Vector2(5, 5))]
+	sp.spin_speed_deg_per_sec = 45.0
+	var before := {}
+	for p in sp.get_property_list():
+		var pname := String(p["name"])
+		if pname.begins_with("helper_") or pname.begins_with("spin_") or pname in ["pattern_source", "spawn_data"]:
+			before[pname] = sp.get(pname)
+	var other_data := H.make_volley_data(4)
+	assert_true(sp.shoot_once_with({"preset": BulletPatterns2D.PATTERN_PRESET_PETAL_STORM, "helper_bullets_amount": 5, "spawn_data": other_data}), "fires with a preset entry")
+	var changed: Array = []
+	for pname in before:
+		if sp.get(pname) != before[pname]:
+			changed.append(pname)
+	assert_eq(changed, [], "every knob the preset entry wrote came back")
+
+
+func test_a_same_value_knob_write_neither_rebakes_nor_rebuilds() -> void:
+	var sp := make_preview_spawner(BulletSpawner2D.PATTERN_FROM_HELPER_RING, 8)
+	await idle(6)
+	sp.collect_spawn_transforms()
+	var bakes: int = sp.debug_get_pattern_cache_info()["bakes"]
+	var rebuilds: int = sp.debug_get_preview_stats()["rebuilds"]
+	sp.helper_ring_radius = sp.helper_ring_radius
+	sp.helper_bullets_amount = 8
+	sp.helper_ring_rotate_with_marker = sp.helper_ring_rotate_with_marker
+	await idle(6)
+	sp.collect_spawn_transforms()
+	assert_eq(int(sp.debug_get_pattern_cache_info()["bakes"]), bakes, "no rebake")
+	assert_eq(int(sp.debug_get_preview_stats()["rebuilds"]), rebuilds, "no preview rebuild")
+	sp.helper_ring_radius = sp.helper_ring_radius + 1.0
+	await idle(6)
+	sp.collect_spawn_transforms()
+	assert_gt(int(sp.debug_get_pattern_cache_info()["bakes"]), bakes, "a real change still rebakes")
+	assert_gt(int(sp.debug_get_preview_stats()["rebuilds"]), rebuilds, "and rebuilds the preview")

@@ -148,6 +148,13 @@ protected:
 
 // What a refused shot reports (PatternSpawner2D::shoot_once): the error text
 // (empty = none), the volley_skipped reason and whether that signal fires.
+// What a pattern-list entry can change: the table knobs as a native copy,
+// the rest (hand-written pattern properties, spin_*, the payload) by name.
+struct PatternStateSnapshot2D {
+	PatternKnobs2D knobs;
+	Dictionary others;
+};
+
 struct ShotRefusal2D {
 	bool refused = false;
 	String message;
@@ -1617,9 +1624,9 @@ protected:
 	void end_pattern_batch();
 	// Pattern-list entries are temporary overrides: snapshot every knob an
 	// entry or a preset can touch (Bullet Patterns, Spin, spawn_data) and
-	// restore the ones that changed.
-	Dictionary snapshot_pattern_state() const;
-	void restore_pattern_state(const Dictionary &snapshot);
+	// restore the ones the entry changed (saved vs applied) that still differ.
+	PatternStateSnapshot2D snapshot_pattern_state() const;
+	void restore_pattern_state(const PatternStateSnapshot2D &saved, const PatternStateSnapshot2D &applied);
 	// Clean presets: Bullet Patterns knobs (except the Transform subgroup
 	// and node/array wiring) and Spin back to their class defaults.
 	void reset_pattern_knobs_to_defaults();
