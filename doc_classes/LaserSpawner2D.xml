@@ -11,6 +11,13 @@
 	<tutorials>
 	</tutorials>
 	<methods>
+		<method name="adopt_live_laser">
+			<return type="bool" />
+			<param index="0" name="laser" type="Variant" />
+			<description>
+				Takes over a firing [param laser] fired by another spawner or the factory: its signals, time scale, [member max_live_lasers] count, retargets, listings and orphan policy are this spawner's from now on; its arming and anchor stay. Refuses (one error) null, a non-laser or freed object, and a finished, pooled or queued laser.
+			</description>
+		</method>
 		<method name="apply_to_live_lasers">
 			<return type="int" />
 			<param index="0" name="groups" type="int" enum="PatternSpawner2D.LiveVolleyGroup" is_bitfield="true" default="2147483647" />

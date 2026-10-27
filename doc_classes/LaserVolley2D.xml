@@ -42,6 +42,12 @@
 				Returns, per [enum LaserData2D.LookSlot], the canvas item the look draws on: [code]{created, z_index, z_as_relative, material, visible}[/code] as last applied. The five items are created together the first time a life has a look and freed with the node; a pooled laser keeps no look or material.
 			</description>
 		</method>
+		<method name="detach_from_spawner">
+			<return type="bool" />
+			<description>
+				Makes this laser factory-owned: its signals reach the factory, its clock drops the spawner's [member LaserSpawner2D.time_scale], and the spawner's [member LaserSpawner2D.max_live_lasers], retargets, listings and orphan policy no longer see it. It keeps riding its anchor ([method set_anchor] with [code]null[/code] leaves it). Returns [code]false[/code] (no change) for a factory laser; refused on a pooled or never-fired laser. [method LaserSpawner2D.adopt_live_laser] hands it to a spawner again.
+			</description>
+		</method>
 		<method name="end_laser">
 			<return type="void" />
 			<param index="0" name="fade" type="bool" default="true" />
@@ -153,9 +159,9 @@
 			</description>
 		</method>
 		<method name="get_owner_spawner" qualifiers="const">
-			<return type="Object" />
+			<return type="LaserSpawner2D" />
 			<description>
-				Returns the spawner that fired the laser, or [code]null[/code] (a factory laser, or its spawner is gone).
+				The live [LaserSpawner2D] that fired this laser (or adopted it), else [code]null[/code]: factory lasers, detached or handed-over ones, a freed or queued spawner, pooled lasers.
 			</description>
 		</method>
 		<method name="get_phase" qualifiers="const">

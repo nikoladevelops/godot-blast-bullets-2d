@@ -7,6 +7,7 @@
 #include "core/live_object2d.hpp"
 #include "laser/laser_geometry2d.hpp"
 
+#include "bullet_spawner/laser_spawner2d.hpp"
 #include "bullet_spawner/pattern_spawner2d.hpp"
 #include "core/cached_string_names2d.hpp"
 #include "core/node_baseline2d.hpp"
@@ -545,8 +546,24 @@ bool LaserVolley2D::hitting_phase() const {
 		return FALLBACK;                                                                                                                                                            \
 	}
 
-Object *LaserVolley2D::get_owner_spawner() const {
-	return owner_spawner_id != 0 ? ObjectDB::get_instance(ObjectID(owner_spawner_id)) : nullptr;
+LaserSpawner2D *LaserVolley2D::get_owner_spawner() const {
+	if (owner_spawner_id == 0 || pooled || signals_to_factory) {
+		return nullptr;
+	}
+	LaserSpawner2D *spawner = Object::cast_to<LaserSpawner2D>(ObjectDB::get_instance(ObjectID(owner_spawner_id)));
+	return spawner != nullptr && !spawner->is_queued_for_deletion() ? spawner : nullptr;
+}
+
+bool LaserVolley2D::detach_from_spawner() {
+	if (reject_stale_handle("detach_from_spawner")) {
+		return false;
+	}
+	if (owner_spawner_id == 0) {
+		return false;
+	}
+	owner_spawner_id = 0;
+	signals_to_factory = false;
+	return true;
 }
 
 Vector2 LaserVolley2D::get_beam_start(int beam_index) const {
@@ -960,6 +977,7 @@ void LaserVolley2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("is_laser_active"), &LaserVolley2D::is_laser_active);
 	ClassDB::bind_method(D_METHOD("is_pooled"), &LaserVolley2D::is_pooled);
 	ClassDB::bind_method(D_METHOD("get_owner_spawner"), &LaserVolley2D::get_owner_spawner);
+	ClassDB::bind_method(D_METHOD("detach_from_spawner"), &LaserVolley2D::detach_from_spawner);
 	ClassDB::bind_method(D_METHOD("get_beam_start", "beam_index"), &LaserVolley2D::get_beam_start);
 	ClassDB::bind_method(D_METHOD("get_beam_end", "beam_index"), &LaserVolley2D::get_beam_end);
 	ClassDB::bind_method(D_METHOD("get_beam_points", "beam_index"), &LaserVolley2D::get_beam_points);

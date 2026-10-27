@@ -186,6 +186,28 @@ Array LaserSpawner2D::get_live_lasers() const {
 	return out;
 }
 
+bool LaserSpawner2D::adopt_live_laser(const Variant &laser) {
+	LaserVolley2D *l = nullptr;
+	if (!live_argument2d<LaserVolley2D>(laser, "adopt_live_laser", "laser", "LaserVolley2D", l)) {
+		return false;
+	}
+	if (l == nullptr) {
+		UtilityFunctions::push_error("LaserSpawner2D::adopt_live_laser: instance is null.");
+		return false;
+	}
+	if (!l->is_laser_active() || l->is_pooled()) {
+		UtilityFunctions::push_error("LaserSpawner2D::adopt_live_laser: instance is not firing (finished, pooled or never fired).");
+		return false;
+	}
+	if (l->is_queued_for_deletion()) {
+		UtilityFunctions::push_error("LaserSpawner2D::adopt_live_laser: instance is queued for deletion.");
+		return false;
+	}
+	l->owner_spawner_id = get_instance_id();
+	l->signals_to_factory = false;
+	return true;
+}
+
 int LaserSpawner2D::get_live_laser_count() const {
 	std::vector<LaserVolley2D *> owned;
 	collect_owned(owned);
@@ -722,6 +744,7 @@ void LaserSpawner2D::_bind_methods() {
 	bind_spawner_group(cls, SPAWNER_GROUP_PERFORMANCE);
 
 	ClassDB::bind_method(D_METHOD("get_live_lasers"), &LaserSpawner2D::get_live_lasers);
+	ClassDB::bind_method(D_METHOD("adopt_live_laser", "laser"), &LaserSpawner2D::adopt_live_laser);
 	ClassDB::bind_method(D_METHOD("get_live_laser_count"), &LaserSpawner2D::get_live_laser_count);
 	ClassDB::bind_method(D_METHOD("end_live_lasers", "fade"), &LaserSpawner2D::end_live_lasers, DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("retarget_live_lasers"), &LaserSpawner2D::retarget_live_lasers);

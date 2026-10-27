@@ -83,6 +83,10 @@ public:
 
 	// Every laser this spawner fired that still fires.
 	Array get_live_lasers() const;
+	// Takes over a firing laser (fired by another spawner or the factory):
+	// its signals, time scale, max_live_lasers count, retargets and orphan
+	// policy are this spawner's from now on. Its arming and anchor stay.
+	bool adopt_live_laser(const Variant &laser);
 	int get_live_laser_count() const;
 	// Ends them all (fading, or at once). Returns how many.
 	int end_live_lasers(bool fade = true);

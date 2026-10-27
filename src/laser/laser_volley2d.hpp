@@ -23,6 +23,7 @@ using namespace godot;
 class BulletFactory2D;
 class GrazeDetector2D;
 class PatternSpawner2D;
+class LaserSpawner2D;
 
 // One laser shot: a beam per pattern slot, created, ticked, drawn and pooled
 // by BulletFactory2D (bullet_factory2d_lasers.cpp). Its signals fire on its
@@ -145,7 +146,16 @@ public:
 	double own_time_scale = 1.0;
 	bool is_laser_active() const { return active; }
 	bool is_pooled() const { return pooled; }
-	Object *get_owner_spawner() const;
+	// The live LaserSpawner2D that fired this laser (or adopted it), else
+	// null: factory lasers, detached ones, a freed or queued spawner, pooled
+	// lasers.
+	LaserSpawner2D *get_owner_spawner() const;
+	// Makes this laser factory-owned (its signals reach the factory, its
+	// clock drops the spawner's time scale, the spawner's max_live_lasers,
+	// retargets and orphan policy no longer see it). It keeps riding its
+	// anchor (set_anchor(null) leaves it). False (no change) when it already
+	// is factory-owned; refused on a pooled or never-fired laser.
+	bool detach_from_spawner();
 	Vector2 get_beam_start(int beam_index) const;
 	Vector2 get_beam_end(int beam_index) const;
 	// A beam a followed sound voice may ride (in range, laser active, not

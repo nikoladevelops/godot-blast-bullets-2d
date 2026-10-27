@@ -90,6 +90,18 @@ bool BulletVolley2D::is_pooled() const {
 	return is_pooled_in_pool;
 }
 
+bool BulletVolley2D::detach_from_spawner() {
+	if (reject_pooled_handle("detach_from_spawner")) {
+		return false;
+	}
+	if (owner_spawner_id == 0) {
+		return false;
+	}
+	owner_spawner_id = 0;
+	orphaned_spawner_path = String();
+	return true;
+}
+
 BulletSpawner2D *BulletVolley2D::get_owner_spawner() const {
 	if (owner_spawner_id == 0 || is_pooled_in_pool) {
 		return nullptr;

@@ -1383,6 +1383,14 @@ public:
 	// null: factory volleys, orphans (a freed or queued spawner, a hand-over),
 	// pooled volleys.
 	BulletSpawner2D *get_owner_spawner() const;
+	// Makes this volley factory-owned, like the Hand To Factory orphan policy
+	// for one volley: its signals reach the factory, its clock drops the
+	// spawner's time scale, the spawner stops tracking and retargeting it.
+	// What the spawner armed (graze, sound, flock, split, emitter) stays.
+	// False (no change) when it already is factory-owned; refused on a
+	// pooled volley. Splits and emitter shots this volley queued earlier in
+	// the same sweep still belong to the spawner.
+	bool detach_from_spawner();
 	// "active", "parked", "pooled", "fresh" or "dying" (tests/support).
 	String debug_get_life_state() const;
 	// Internal consistency of this volley: "" when every invariant holds,

@@ -873,3 +873,40 @@ func test_a_nested_shot_names_the_laser_signals() -> void:
 	assert_true(sp.shoot_once(), "the outer shot fires")
 	expect_error_sequence(["LaserSpawner2D::shoot_once: re-entrant call from inside a spawner signal handler is not allowed (laser_fired, volley_skipped). Use call_deferred(\"shoot_once\") instead."])
 	factory.clear_active_lasers(false)
+
+
+## A laser changes hands: detach_from_spawner makes it the factory's
+## (signals, time scale, max_live_lasers, listings); adopt_live_laser hands a
+## firing laser to a spawner. get_owner_spawner names the live owner only.
+func test_lasers_change_hands_by_detach_and_adopt() -> void:
+	var sp := _spawner(_laser(), 1)
+	var l := _fire(sp)
+	assert_same(l.get_owner_spawner(), sp, "owned at first")
+	var hits_on_spawner: Array = []
+	sp.laser_phase_changed.connect(func(_l, p: int) -> void: hits_on_spawner.append(p))
+	var on_factory: Array = []
+	factory.laser_phase_changed.connect(func(_l, p: int) -> void: on_factory.append(p))
+	assert_true(l.detach_from_spawner(), "detached")
+	assert_null(l.get_owner_spawner(), "factory-owned now")
+	assert_eq(sp.get_live_lasers(), [], "the spawner no longer counts it")
+	assert_eq(factory.get_lasers_owned_by(null), [l], "the factory lists it")
+	assert_false(l.detach_from_spawner(), "a factory laser: no change")
+	l.end_laser(true)
+	step_factory(1, DT)
+	assert_eq([hits_on_spawner.size() == 0, on_factory.size() > 0], [true, true], "its signals reach the factory only")
+	var free_laser := factory.spawn_laser(_laser(), [Transform2D.IDENTITY] as Array[Transform2D])
+	assert_true(sp.adopt_live_laser(free_laser), "adopted")
+	assert_same(free_laser.get_owner_spawner(), sp, "the spawner owns it")
+	assert_eq(sp.get_live_lasers(), [free_laser], "and counts it")
+	assert_false(sp.adopt_live_laser(null), "null")
+	assert_false(sp.adopt_live_laser(factory), "not a laser")
+	free_laser.end_laser(false)
+	step_factory(2, DT)
+	assert_true(free_laser.is_pooled(), "pooled")
+	assert_false(sp.adopt_live_laser(free_laser), "a pooled laser")
+	assert_null(free_laser.get_owner_spawner(), "a pooled laser has no owner")
+	expect_error_sequence([
+		"LaserSpawner2D::adopt_live_laser: instance is null.",
+		"adopt_live_laser: laser must be a LaserVolley2D or null (a freed object is neither), nothing changed.",
+		"LaserSpawner2D::adopt_live_laser: instance is not firing (finished, pooled or never fired).",
+	])

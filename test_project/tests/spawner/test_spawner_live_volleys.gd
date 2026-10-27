@@ -294,3 +294,31 @@ func test_clear_live_volleys_homing_reaches_parked_volleys() -> void:
 	assert_eq(sp.clear_live_volleys_homing(), 1, "the parked volley is cleared")
 	v.enable_bullet(0)
 	assert_false(_chases(v), "woken, it flies straight")
+
+
+## detach_from_spawner makes one volley factory-owned (Hand To Factory for one
+## volley): its hits reach the factory, the spawner no longer lists or steers
+## it, its clock drops the spawner's time scale; a factory volley is untouched
+## (false), a pooled handle refused.
+func test_detaching_a_volley_hands_it_to_the_factory() -> void:
+	var sp := make_spawner(H.make_volley_data(2, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 2)
+	var fired: Array = []
+	sp.volley_fired.connect(func(v: BulletVolley2D, _n) -> void: fired.append(v))
+	assert_true(sp.shoot_once(), "fires")
+	var v: BulletVolley2D = fired[0]
+	assert_same(v.get_owner_spawner(), sp, "owned at first")
+	sp.time_scale = 0.0 # the spawner's clock would freeze its volleys
+	assert_true(v.detach_from_spawner(), "detached")
+	assert_null(v.get_owner_spawner(), "factory-owned now")
+	assert_eq(sp.get_live_volleys(), [], "the spawner no longer lists it")
+	assert_eq(factory.get_volleys_owned_by(null), [v], "the factory does")
+	v.bullet_set_velocity(0, Vector2(100, 0))
+	var x0: float = v.get_bullet_transform(0).origin.x
+	factory.debug_advance_time(0.5)
+	assert_almost_eq(v.get_bullet_transform(0).origin.x - x0, 50.0, 0.01, "its clock ignores the spawner's time scale")
+	assert_false(v.detach_from_spawner(), "already factory-owned: no change")
+	expect_no_errors("no error for a factory volley")
+	v.clear_all_bullets()
+	await idle(1)
+	assert_false(v.detach_from_spawner(), "pooled")
+	expect_error_sequence(["detach_from_spawner: this volley is in the pool (its last bullet died), so this handle is stale. Spawn a new volley instead."])
