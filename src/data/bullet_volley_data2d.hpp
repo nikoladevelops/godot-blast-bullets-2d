@@ -3,10 +3,10 @@
 #include "core/assign_if_changed2d.hpp"
 #include "core/variant_enum_cast2d.hpp"
 #include "data/bullet_curves_data2d.hpp"
-#include "data/bullet_effect_layer_data2d.hpp"
 #include "data/bullet_rotation_data2d.hpp"
 #include "data/bullet_speed_data2d.hpp"
 #include "data/bullet_wobble_data2d.hpp"
+#include "data/effect_layer_data2d.hpp"
 #include "godot_cpp/variant/node_path.hpp"
 #include "godot_cpp/variant/typed_array.hpp"
 #include <godot_cpp/classes/canvas_item_material.hpp>
@@ -150,9 +150,9 @@ public:
 	// destroy explosions, bounce sparks). Each entry renders through its
 	// own per-frame shards: one extra draw call per animation frame while
 	// anything is visible, zero when idle. Empty (default) disables the
-	// whole feature. Use BulletEffectLayerData2D.make_*() presets for
+	// whole feature. Use EffectLayerData2D.make_*() presets for
 	// zero-art effects, or assign custom SpriteFrames per layer.
-	TypedArray<BlastBullets2D::BulletEffectLayerData2D> effect_layers;
+	TypedArray<BlastBullets2D::EffectLayerData2D> effect_layers;
 
 	// OTHER
 
@@ -309,8 +309,8 @@ public:
 	bool get_shared_bullet_attachment_stick_relative_to_bullet() const;
 	void set_shared_bullet_attachment_stick_relative_to_bullet(bool value);
 
-	TypedArray<BlastBullets2D::BulletEffectLayerData2D> get_effect_layers() const;
-	void set_effect_layers(const TypedArray<BlastBullets2D::BulletEffectLayerData2D> &new_layers);
+	TypedArray<BlastBullets2D::EffectLayerData2D> get_effect_layers() const;
+	void set_effect_layers(const TypedArray<BlastBullets2D::EffectLayerData2D> &new_layers);
 
 	double get_max_life_time() const;
 	void set_max_life_time(double new_max_life_time);

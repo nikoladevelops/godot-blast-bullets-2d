@@ -46,8 +46,8 @@ void LaserEffectData2D::set_at(EffectPoint value) {
 	emit_changed();
 }
 
-void LaserEffectData2D::set_effect(const Ref<BulletEffectLayerData2D> &value) {
-	if (value.is_valid() && value->trigger == BulletEffectLayerData2D::EFFECT_TRAIL_FOLLOW) {
+void LaserEffectData2D::set_effect(const Ref<EffectLayerData2D> &value) {
+	if (value.is_valid() && value->trigger == EffectLayerData2D::EFFECT_TRAIL_FOLLOW) {
 		UtilityFunctions::push_error("LaserEffectData2D: effect must be a one-shot layer (a trail follows a bullet), keeping the old value.");
 		return;
 	}
@@ -83,7 +83,7 @@ void LaserEffectData2D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "at", PROPERTY_HINT_ENUM, "Event,Muzzle,Tip"), "set_at", "get_at");
 	ClassDB::bind_method(D_METHOD("get_effect"), &LaserEffectData2D::get_effect);
 	ClassDB::bind_method(D_METHOD("set_effect", "value"), &LaserEffectData2D::set_effect);
-	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "effect", PROPERTY_HINT_RESOURCE_TYPE, "BulletEffectLayerData2D"), "set_effect", "get_effect");
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "effect", PROPERTY_HINT_RESOURCE_TYPE, "EffectLayerData2D"), "set_effect", "get_effect");
 	ClassDB::bind_method(D_METHOD("get_align_to_beam"), &LaserEffectData2D::get_align_to_beam);
 	ClassDB::bind_method(D_METHOD("set_align_to_beam", "value"), &LaserEffectData2D::set_align_to_beam);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "align_to_beam"), "set_align_to_beam", "get_align_to_beam");

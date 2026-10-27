@@ -9,7 +9,7 @@ extends BlastTest
 ## Two-frame layer: frame 0 lasts 0.5/60 s (shorter than one simulated tick),
 ## frame 1 lasts 5.0/60 s. Total 5.5/60 s: 6 aging sweeps with 0.5-tick margins
 ## on both expiry boundaries, so float epsilon cannot flip the counts.
-func _short_first_frame_layer(trigger: int) -> BulletEffectLayerData2D:
+func _short_first_frame_layer(trigger: int) -> EffectLayerData2D:
 	var sf := SpriteFrames.new()
 	sf.set_animation_speed("default", 60.0)
 	sf.set_animation_loop("default", false)
@@ -17,7 +17,7 @@ func _short_first_frame_layer(trigger: int) -> BulletEffectLayerData2D:
 	img.fill(Color.WHITE)
 	sf.add_frame("default", ImageTexture.create_from_image(img), 0.5)
 	sf.add_frame("default", ImageTexture.create_from_image(img), 5.0)
-	var layer := BulletEffectLayerData2D.new()
+	var layer := EffectLayerData2D.new()
 	layer.trigger = trigger
 	layer.sprite_frames = sf
 	return layer
@@ -36,7 +36,7 @@ func _expiry_shard() -> int:
 
 func test_mid_sweep_fire_shows_frame_zero_on_its_birth_sweep() -> void:
 	var data := H.make_volley_data(1, 0.0, 0.05) # expires on the 3rd tick, mid-sweep
-	data.effect_layers = [_short_first_frame_layer(BulletEffectLayerData2D.EFFECT_ON_LIFETIME_OVER)]
+	data.effect_layers = [_short_first_frame_layer(EffectLayerData2D.EFFECT_ON_LIFETIME_OVER)]
 	var v: BulletVolley2D = factory.spawn_volley(data)
 	assert_not_null(v, "volley spawned")
 	for i in 12: # early-break wait: expiry lands on the 3rd tick
@@ -49,7 +49,7 @@ func test_mid_sweep_fire_shows_frame_zero_on_its_birth_sweep() -> void:
 
 func test_mid_sweep_fire_lives_its_full_total() -> void:
 	var data := H.make_volley_data(1, 0.0, 0.05) # expires on the 3rd tick, mid-sweep
-	data.effect_layers = [_short_first_frame_layer(BulletEffectLayerData2D.EFFECT_ON_LIFETIME_OVER)]
+	data.effect_layers = [_short_first_frame_layer(EffectLayerData2D.EFFECT_ON_LIFETIME_OVER)]
 	var v: BulletVolley2D = factory.spawn_volley(data)
 	assert_not_null(v, "volley spawned")
 	var live_sweeps := 0

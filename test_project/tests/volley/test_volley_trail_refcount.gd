@@ -14,7 +14,7 @@ func _bake(vol: BulletVolley2D) -> Dictionary:
 func before_each() -> void:
 	await super()
 	var d := H.make_still_data(2)
-	d.effect_layers = [H.make_effect_layer(BulletEffectLayerData2D.EFFECT_TRAIL_FOLLOW)]
+	d.effect_layers = [H.make_effect_layer(EffectLayerData2D.EFFECT_TRAIL_FOLLOW)]
 	v = factory.spawn_volley(d)
 	await physics(4)
 

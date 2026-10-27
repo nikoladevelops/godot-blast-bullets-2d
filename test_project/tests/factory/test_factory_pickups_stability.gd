@@ -76,7 +76,7 @@ func _random_pickup() -> BulletPickupData2D:
 	if rng.randf() < 0.4:
 		p.attachment = probe_scene if rng.randf() < 0.5 else time_scene
 	if rng.randf() < 0.4:
-		p.effect_layers = [H.make_effect_layer([BulletEffectLayerData2D.EFFECT_ON_SPAWN, BulletEffectLayerData2D.EFFECT_ON_DESPAWN, BulletEffectLayerData2D.EFFECT_ON_CLEAR][rng.randi() % 3])]
+		p.effect_layers = [H.make_effect_layer([EffectLayerData2D.EFFECT_ON_SPAWN, EffectLayerData2D.EFFECT_ON_DESPAWN, EffectLayerData2D.EFFECT_ON_CLEAR][rng.randi() % 3])]
 	if rng.randf() < 0.3:
 		p.rotation_data = H.make_rotation(rng.randf_range(-5, 5), 100.0, 0.0)
 	if rng.randf() < 0.3:
@@ -105,7 +105,7 @@ func _plain_volley() -> void:
 	if rng.randf() < 0.3:
 		data.shared_bullet_attachment = probe_scene
 	if rng.randf() < 0.3:
-		data.effect_layers = [H.make_effect_layer(BulletEffectLayerData2D.EFFECT_ON_CLEAR)]
+		data.effect_layers = [H.make_effect_layer(EffectLayerData2D.EFFECT_ON_CLEAR)]
 	factory.spawn_volley(data)
 
 

@@ -241,7 +241,7 @@
 		<method name="debug_get_effect_log" qualifiers="const">
 			<return type="Array" />
 			<description>
-				Debug/test helper: the effects recorded since [method debug_set_effect_log_enabled] was turned on, oldest first, one Dictionary per effect: [code]trigger[/code] (BulletEffectLayerData2D trigger), [code]volley[/code] (instance id), [code]life[/code] ([method BulletVolley2D.get_life_id]), [code]bullet[/code] (index), [code]position[/code] and [code]frame[/code] (physics frame). A laser's effects ([member LaserData2D.effects]) log their [enum LaserEffectData2D.LaserEffectTrigger] with [code]volley[/code] 0, [code]bullet[/code] -1 and the extra keys [code]laser[/code] (instance id) and [code]beam[/code].
+				Debug/test helper: the effects recorded since [method debug_set_effect_log_enabled] was turned on, oldest first, one Dictionary per effect: [code]trigger[/code] (EffectLayerData2D trigger), [code]volley[/code] (instance id), [code]life[/code] ([method BulletVolley2D.get_life_id]), [code]bullet[/code] (index), [code]position[/code] and [code]frame[/code] (physics frame). A laser's effects ([member LaserData2D.effects]) log their [enum LaserEffectData2D.LaserEffectTrigger] with [code]volley[/code] 0, [code]bullet[/code] -1 and the extra keys [code]laser[/code] (instance id) and [code]beam[/code].
 			</description>
 		</method>
 		<method name="debug_get_effect_state" qualifiers="const">
@@ -777,7 +777,7 @@
 		</method>
 		<method name="spawn_layer_effect">
 			<return type="int" />
-			<param index="0" name="layer" type="BulletEffectLayerData2D" />
+			<param index="0" name="layer" type="EffectLayerData2D" />
 			<param index="1" name="at" type="Transform2D" />
 			<description>
 				Manual one-shot hatch: plays any layer once at a global pose, owned by the factory (survives volleys). Distinct layers coexist without a cap; a layer's bake is released once its effects have played out and nothing else holds the layer. Returns the slot index, or -1 when the layer is inert.
@@ -826,7 +826,7 @@
 			Color of the despawn bounds preview: the fill uses it as is (translucent red by default), the outline is the same color made more opaque. Every component must be finite.
 		</member>
 		<member name="despawn_bounds_enabled" type="bool" setter="set_despawn_bounds_enabled" getter="get_despawn_bounds_enabled" default="false">
-			When on, every live bullet that is outside [member despawn_bounds_rect] and not heading back in is disabled each tick. Keeps off-screen bullets from living until their lifetime ends. A bullet that is outside and flying inwards is left alone. A culled bullet fires the On Despawn effect layers ([constant BulletEffectLayerData2D.EFFECT_ON_DESPAWN]) and sounds ([constant BulletSoundData2D.SOUND_ON_DESPAWN]) it has and is announced by [signal bullets_despawned]; with none of those configured it is silent. A [BulletSpawner2D] whose muzzle is outside the rectangle does not shoot (see [member BulletSpawner2D.shoot_outside_despawn_bounds]). Off by default.
+			When on, every live bullet that is outside [member despawn_bounds_rect] and not heading back in is disabled each tick. Keeps off-screen bullets from living until their lifetime ends. A bullet that is outside and flying inwards is left alone. A culled bullet fires the On Despawn effect layers ([constant EffectLayerData2D.EFFECT_ON_DESPAWN]) and sounds ([constant BulletSoundData2D.SOUND_ON_DESPAWN]) it has and is announced by [signal bullets_despawned]; with none of those configured it is silent. A [BulletSpawner2D] whose muzzle is outside the rectangle does not shoot (see [member BulletSpawner2D.shoot_outside_despawn_bounds]). Off by default.
 		</member>
 		<member name="despawn_bounds_preview" type="bool" setter="set_despawn_bounds_preview" getter="get_despawn_bounds_preview" default="true">
 			Draws [member despawn_bounds_rect] while [member despawn_bounds_enabled] is on, so you can see the play field in the editor. At runtime it also needs [member despawn_bounds_preview_during_runtime]. Only a visual aid: culling does not depend on it.

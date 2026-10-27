@@ -1,6 +1,6 @@
 extends BlastTest
 ## Laser effects (LaserData2D.effects, LaserEffectData2D): each entry plays a
-## one-shot BulletEffectLayerData2D on one laser event (the ids of the laser
+## one-shot EffectLayerData2D on one laser event (the ids of the laser
 ## sound triggers) exactly once per event: at the event's point (Event), or
 ## the muzzle or tip of the event's beam, turned with the beam there while
 ## align_to_beam. Laser-wide events play once per beam (charge and fire at
@@ -18,9 +18,9 @@ func before_each() -> void:
 
 
 ## A one-shot layer of two frames (0.5 s at 4 fps).
-func _layer() -> BulletEffectLayerData2D:
-	var l := BulletEffectLayerData2D.new()
-	l.trigger = BulletEffectLayerData2D.EFFECT_ON_HIT
+func _layer() -> EffectLayerData2D:
+	var l := EffectLayerData2D.new()
+	l.trigger = EffectLayerData2D.EFFECT_ON_HIT
 	var sf := SpriteFrames.new()
 	sf.set_animation_speed(&"default", 4.0)
 	sf.set_animation_loop(&"default", false)
@@ -79,7 +79,7 @@ func test_the_entry_is_bound_and_refuses_bad_input() -> void:
 	e.trigger = 14
 	e.at = 3
 	var trail := _layer()
-	trail.trigger = BulletEffectLayerData2D.EFFECT_TRAIL_FOLLOW
+	trail.trigger = EffectLayerData2D.EFFECT_TRAIL_FOLLOW
 	e.effect = trail
 	expect_error_sequence([
 		"LaserEffectData2D: trigger must be 2 (On Charge), 3 (On Fire), 4 (On Active), 5 (On Hit), 6 (On Pierce Start), 7 (On Pierce End), 8 (On Wall Hit), 9 (On Graze), 10 (On Graze Exit), 11 (On Finish), 12 (On Ended Early) or 13 (On Despawn), keeping the old value.",
@@ -199,14 +199,14 @@ func test_a_layer_that_cannot_play_reports_once_per_edit() -> void:
 	d.effects = [held]
 	var l := _fire(d, [Transform2D.IDENTITY] as Array[Transform2D])
 	step_factory(4, DT)
-	expect_error_sequence(["BulletEffectLayerData2D: baked zero playable time, layer renders nothing."]) # the layer's own report, once over four events
+	expect_error_sequence(["EffectLayerData2D: baked zero playable time, layer renders nothing."]) # the layer's own report, once over four events
 	assert_eq(_played(LaserEffectData2D.LASER_EFFECT_ON_ACTIVE).size(), 0, "nothing played")
 	held.effect.sprite_frames = _layer().sprite_frames # a bake edit: the layer is tried again
 	step_factory(1, DT)
 	assert_eq(_played(LaserEffectData2D.LASER_EFFECT_ON_ACTIVE).size(), 1, "plays after the edit")
 	var trail := _layer()
 	held.effect = trail
-	trail.trigger = BulletEffectLayerData2D.EFFECT_TRAIL_FOLLOW # turned into a trail after it was assigned
+	trail.trigger = EffectLayerData2D.EFFECT_TRAIL_FOLLOW # turned into a trail after it was assigned
 	step_factory(3, DT)
 	expect_warning_sequence(["LaserEffectData2D: effect is a trail layer (a trail follows a bullet), nothing plays."])
 	assert_eq(_played(LaserEffectData2D.LASER_EFFECT_ON_ACTIVE).size(), 1, "a trail never plays")

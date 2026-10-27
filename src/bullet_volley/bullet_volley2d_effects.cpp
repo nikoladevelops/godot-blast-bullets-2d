@@ -1,4 +1,4 @@
-// Sprite effect layers (BulletEffectLayerData2D): trail shards that follow bullets
+// Sprite effect layers (EffectLayerData2D): trail shards that follow bullets
 // and one-shot effects fired on spawn/hit/destroy/bounce/clear.
 
 #include "bullet_volley/bullet_volley2d_internal.hpp"
@@ -8,7 +8,7 @@ using namespace godot;
 
 namespace BlastBullets2D {
 
-BulletVolley2D::FXLayerSnapshot BulletVolley2D::fx_snapshot_layer(const Ref<BulletEffectLayerData2D> &layer) {
+BulletVolley2D::FXLayerSnapshot BulletVolley2D::fx_snapshot_layer(const Ref<EffectLayerData2D> &layer) {
 	FXLayerSnapshot snap;
 	if (layer.is_null() || !layer->enabled) {
 		return snap;
@@ -32,13 +32,13 @@ BulletVolley2D::FXLayerSnapshot BulletVolley2D::fx_snapshot_layer(const Ref<Bull
 // (children of the volley: pooling hides them, freeing is automatic, and
 // relative z tracks the volley). Shard textures never change, so per-tick
 // work is a single instance write into the current frame's shard.
-void BulletVolley2D::fx_rebuild_trail_layers(const TypedArray<BulletEffectLayerData2D> &layers) {
+void BulletVolley2D::fx_rebuild_trail_layers(const TypedArray<EffectLayerData2D> &layers) {
 	fx_clear_trail_layers();
 	if (amount_bullets <= 0) {
 		return;
 	}
 	for (int li = 0; li < layers.size(); ++li) {
-		Ref<BulletEffectLayerData2D> layer = layers[li];
+		Ref<EffectLayerData2D> layer = layers[li];
 		if (layer.is_null() || !layer->enabled) {
 			continue;
 		}
@@ -96,13 +96,13 @@ void BulletVolley2D::fx_clear_trail_layers() {
 // Full reseed from a layer list: retains it for trigger routing, rebuilds
 // trail shards, and re-registers factory one-shot bakes (erasing the
 // previous life's). fire_spawn flashes ON_SPAWN layers at every bullet.
-bool BulletVolley2D::fx_layers_match_seeded(const TypedArray<BulletEffectLayerData2D> &layers) const {
+bool BulletVolley2D::fx_layers_match_seeded(const TypedArray<EffectLayerData2D> &layers) const {
 	if (layers.size() != fx_data_layers.size() || (int)fx_seeded_snapshots.size() != layers.size()) {
 		return false;
 	}
 	for (int li = 0; li < layers.size(); ++li) {
-		Ref<BulletEffectLayerData2D> incoming = layers[li];
-		Ref<BulletEffectLayerData2D> seeded = fx_data_layers[li];
+		Ref<EffectLayerData2D> incoming = layers[li];
+		Ref<EffectLayerData2D> seeded = fx_data_layers[li];
 		if (incoming != seeded) {
 			return false;
 		}
@@ -163,7 +163,7 @@ void BulletVolley2D::fx_soft_reset_trail_layers() {
 	}
 }
 
-void BulletVolley2D::fx_reseed_from_data(const TypedArray<BulletEffectLayerData2D> &layers, bool fire_spawn) {
+void BulletVolley2D::fx_reseed_from_data(const TypedArray<EffectLayerData2D> &layers, bool fire_spawn) {
 	// Pooled-reuse fast path: same layer resources at the same bake
 	// versions. Shard nodes and factory one-shot bakes are kept (the old
 	// rebuild queue_freed and re-created them on every spawn, and erasing
@@ -183,7 +183,7 @@ void BulletVolley2D::fx_reseed_from_data(const TypedArray<BulletEffectLayerData2
 	// unbox + Ref copy on every bullet disable / hit / spawn.
 	fx_oneshot_trigger_mask = 0;
 	for (int li = 0; li < layers.size(); ++li) {
-		Ref<BulletEffectLayerData2D> layer = layers[li];
+		Ref<EffectLayerData2D> layer = layers[li];
 		if (layer.is_valid() && layer->enabled && layer->trigger != EFFECT_TRAIL_FOLLOW && layer->trigger >= 0 && layer->trigger < 32) {
 			fx_oneshot_trigger_mask |= (1u << layer->trigger);
 		}
@@ -196,7 +196,7 @@ void BulletVolley2D::fx_reseed_from_data(const TypedArray<BulletEffectLayerData2
 	if (bullet_factory != nullptr) {
 		bullet_factory->fx_unregister_volley(get_instance_id());
 		for (int li = 0; li < layers.size(); ++li) {
-			Ref<BulletEffectLayerData2D> layer = layers[li];
+			Ref<EffectLayerData2D> layer = layers[li];
 			if (layer.is_null() || !layer->enabled) {
 				continue;
 			}
@@ -235,7 +235,7 @@ void BulletVolley2D::fx_fire_oneshot(int trigger, int bullet_index, const Transf
 	}
 	bool fired = false;
 	for (int li = 0; li < fx_data_layers.size(); ++li) {
-		Ref<BulletEffectLayerData2D> layer = fx_data_layers[li];
+		Ref<EffectLayerData2D> layer = fx_data_layers[li];
 		if (layer.is_null() || !layer->enabled) {
 			continue;
 		}
@@ -356,11 +356,11 @@ bool BulletVolley2D::play_effect_animation(int layer_index, const StringName &an
 	return false;
 }
 
-TypedArray<BulletEffectLayerData2D> BulletVolley2D::get_effect_layers() const {
+TypedArray<EffectLayerData2D> BulletVolley2D::get_effect_layers() const {
 	return fx_data_layers;
 }
 
-void BulletVolley2D::set_effect_layers(const TypedArray<BulletEffectLayerData2D> &new_layers) {
+void BulletVolley2D::set_effect_layers(const TypedArray<EffectLayerData2D> &new_layers) {
 	if (reject_pooled_handle("set_effect_layers")) {
 		return; // a pooled handle keeps no layers (nor their baked frames)
 	}

@@ -44,9 +44,9 @@ const PREFIXES := {
 	BULLET: "BulletVolley2D",
 	PLAY: "BulletVolley2D",
 	PICKUP: "BulletVolley2D",
-	TRAIL: "BulletEffectLayerData2D",
-	ONE_SHOT: "BulletEffectLayerData2D",
-	MANUAL: "BulletEffectLayerData2D",
+	TRAIL: "EffectLayerData2D",
+	ONE_SHOT: "EffectLayerData2D",
+	MANUAL: "EffectLayerData2D",
 	LASER_BODY: "LaserData2D.body_frames",
 	LASER_CHARGE: "LaserData2D.charge_look",
 	LASER_MUZZLE: "LaserData2D.muzzle_look",
@@ -84,8 +84,8 @@ func _volley_data(sf: SpriteFrames, anim: StringName) -> BulletVolleyData2D:
 	return d
 
 
-func _layer(trigger: int, sf: SpriteFrames, anim: StringName) -> BulletEffectLayerData2D:
-	var layer := BulletEffectLayerData2D.new()
+func _layer(trigger: int, sf: SpriteFrames, anim: StringName) -> EffectLayerData2D:
+	var layer := EffectLayerData2D.new()
 	layer.trigger = trigger
 	layer.sprite_frames = sf
 	layer.animation = anim
@@ -147,15 +147,15 @@ func _build(kind: String, sf: SpriteFrames, anim: StringName) -> Dictionary:
 			out.volley = factory.spawn_volley(d)
 		TRAIL:
 			var d := _volley_data(H.make_sprite_frames(), &"")
-			d.effect_layers = [_layer(BulletEffectLayerData2D.EFFECT_TRAIL_FOLLOW, sf, anim)]
+			d.effect_layers = [_layer(EffectLayerData2D.EFFECT_TRAIL_FOLLOW, sf, anim)]
 			out.volley = factory.spawn_volley(d)
 			out.shards = out.volley.get_children().filter(func(c): return c is MultiMeshInstance2D)
 		ONE_SHOT:
 			var d := _volley_data(H.make_sprite_frames(), &"")
-			d.effect_layers = [_layer(BulletEffectLayerData2D.EFFECT_ON_SPAWN, sf, anim)]
+			d.effect_layers = [_layer(EffectLayerData2D.EFFECT_ON_SPAWN, sf, anim)]
 			out.volley = factory.spawn_volley(d)
 		MANUAL:
-			factory.spawn_layer_effect(_layer(BulletEffectLayerData2D.EFFECT_ON_SPAWN, sf, anim), Transform2D.IDENTITY)
+			factory.spawn_layer_effect(_layer(EffectLayerData2D.EFFECT_ON_SPAWN, sf, anim), Transform2D.IDENTITY)
 		LASER_PIERCE:
 			make_area(Vector2(100, 0), Vector2(20, 60))
 			await idle(2) # a new target is found by queries after one physics step
@@ -292,7 +292,7 @@ func test_speed_zero_one_shots_have_no_playable_time() -> void:
 	for kind in ONE_SHOTS:
 		var built := await _build(kind, _sf({"default": [_tex(4, 4), _tex(4, 4)]}, 0.0), &"")
 		assert_eq(built.shards.size(), 0, "%s: nothing baked" % kind)
-		expect_error_sequence(["BulletEffectLayerData2D: baked zero playable time, layer renders nothing."], kind)
+		expect_error_sequence(["EffectLayerData2D: baked zero playable time, layer renders nothing."], kind)
 
 
 func test_a_non_finite_speed_reports_one_error_in_every_consumer() -> void:
@@ -328,7 +328,7 @@ func test_a_laser_plays_one_second_per_frame_at_a_non_finite_speed() -> void:
 
 func test_a_one_shot_plays_one_second_per_frame_at_a_non_finite_speed() -> void:
 	var built := await _build(MANUAL, _sf({"default": [_tex(4, 4), _tex(4, 4)]}, INF), &"")
-	expect_error_sequence(["BulletEffectLayerData2D: animation 'default' has invalid speed, using 1 fps."])
+	expect_error_sequence(["EffectLayerData2D: animation 'default' has invalid speed, using 1 fps."])
 	assert_eq(built.shards.size(), 2, "two frames")
 	for i in 7:
 		factory.debug_advance_time(0.25)

@@ -30,7 +30,7 @@ func _rich_data() -> BulletVolleyData2D:
 	d.collision_shape = H.make_circle_shape(6.0)
 	d.bullet_max_collision_count = 1
 	d.shared_bullet_attachment = probe_scene
-	d.effect_layers = [H.make_effect_layer(BulletEffectLayerData2D.EFFECT_TRAIL_FOLLOW, 3), H.make_effect_layer(BulletEffectLayerData2D.EFFECT_ON_HIT, 3)]
+	d.effect_layers = [H.make_effect_layer(EffectLayerData2D.EFFECT_TRAIL_FOLLOW, 3), H.make_effect_layer(EffectLayerData2D.EFFECT_ON_HIT, 3)]
 	return d
 
 

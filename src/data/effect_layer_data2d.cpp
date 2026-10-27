@@ -1,4 +1,4 @@
-#include "data/bullet_effect_layer_data2d.hpp"
+#include "data/effect_layer_data2d.hpp"
 #include "core/transform_math2d.hpp"
 #include "core/variant_enum_cast2d.hpp"
 #include "core/warn_once2d.hpp"
@@ -14,14 +14,14 @@ using namespace godot;
 
 namespace BlastBullets2D {
 
-void BulletEffectLayerData2D::invalidate_bake() const {
+void EffectLayerData2D::invalidate_bake() const {
 	bake_valid = false;
 	bake_anim = StringName();
 	++bake_version;
 	bake_cache.clear();
 }
 
-bool BulletEffectLayerData2D::bake_effect_animation(const StringName &anim, FrameTextureCache2D *cache, SpriteAnim2D &out) const {
+bool EffectLayerData2D::bake_effect_animation(const StringName &anim, FrameTextureCache2D *cache, SpriteAnim2D &out) const {
 	// A full factory reset dropped the frame textures: re-bake from them.
 	if (bake_valid && bake_anim == anim && bake_cache_epoch == FrameTextureCache2D::clear_epoch) {
 		out = bake_cache;
@@ -30,14 +30,14 @@ bool BulletEffectLayerData2D::bake_effect_animation(const StringName &anim, Fram
 	const SpriteAnimChoice2D choice = resolve_sprite_animation2d(sprite_frames, anim);
 	switch (choice.pick) {
 		case SpriteAnimPick2D::NULL_FRAMES:
-			UtilityFunctions::push_error("BulletEffectLayerData2D: sprite_frames is null, layer renders nothing. Assign frames to use this layer.");
+			UtilityFunctions::push_error("EffectLayerData2D: sprite_frames is null, layer renders nothing. Assign frames to use this layer.");
 			return false;
 		case SpriteAnimPick2D::NO_ANIMATIONS:
 		case SpriteAnimPick2D::NO_FRAMES_ANYWHERE:
-			UtilityFunctions::push_error("BulletEffectLayerData2D: sprite_frames has no animation with frames.");
+			UtilityFunctions::push_error("EffectLayerData2D: sprite_frames has no animation with frames.");
 			return false;
 		case SpriteAnimPick2D::FELL_BACK:
-			UtilityFunctions::push_error("BulletEffectLayerData2D: missing animation '" + String(anim) + "', falling back to '" + String(choice.anim) + "'.");
+			UtilityFunctions::push_error("EffectLayerData2D: missing animation '" + String(anim) + "', falling back to '" + String(choice.anim) + "'.");
 			break;
 		case SpriteAnimPick2D::RESOLVED:
 			break;
@@ -52,7 +52,7 @@ bool BulletEffectLayerData2D::bake_effect_animation(const StringName &anim, Fram
 	SpriteAnimBakeReport2D report;
 	SpriteAnim2D baked;
 	const bool baked_ok = bake_sprite_animation2d(sprite_frames, choice.anim, options, baked, report);
-	String anim_text = "BulletEffectLayerData2D: animation '" + String(choice.anim) + "'";
+	String anim_text = "EffectLayerData2D: animation '" + String(choice.anim) + "'";
 	if (report.bad_speed) {
 		UtilityFunctions::push_error(anim_text + " has invalid speed, using 1 fps.");
 	}
@@ -63,7 +63,7 @@ bool BulletEffectLayerData2D::bake_effect_animation(const StringName &anim, Fram
 		UtilityFunctions::push_error(anim_text + " frame " + String::num_int64(report.null_frame) + " has null texture.");
 	}
 	if (report.whiten_unreadable) {
-		UtilityFunctions::push_warning("BulletEffectLayerData2D: override_frame_color could not read a frame of '" + String(choice.anim) + "', keeping the original art for unreadable frames.");
+		UtilityFunctions::push_warning("EffectLayerData2D: override_frame_color could not read a frame of '" + String(choice.anim) + "', keeping the original art for unreadable frames.");
 	}
 	if (report.atlas_unreadable_frame >= 0) {
 		WarnOnce2D::warn(sprite_frames->get_instance_id(), 27u, report.atlas_unreadable_frame, 1, anim_text + " frame " + String::num_int64(report.atlas_unreadable_frame) + " is an AtlasTexture whose region cannot be read, drawing its whole atlas.");
@@ -74,7 +74,7 @@ bool BulletEffectLayerData2D::bake_effect_animation(const StringName &anim, Fram
 	// A one-shot lives one pass of its animation: without playable time it
 	// has nothing to show. A held trail (speed 0) shows its first frame.
 	if (!(baked.total > 0.0) && !(baked.held && trigger == EFFECT_TRAIL_FOLLOW)) {
-		UtilityFunctions::push_error("BulletEffectLayerData2D: baked zero playable time, layer renders nothing.");
+		UtilityFunctions::push_error("EffectLayerData2D: baked zero playable time, layer renders nothing.");
 		return false;
 	}
 	bake_cache = baked;
@@ -85,22 +85,22 @@ bool BulletEffectLayerData2D::bake_effect_animation(const StringName &anim, Fram
 	return true;
 }
 
-bool BulletEffectLayerData2D::get_enabled() const {
+bool EffectLayerData2D::get_enabled() const {
 	return enabled;
 }
-void BulletEffectLayerData2D::set_enabled(bool value) {
+void EffectLayerData2D::set_enabled(bool value) {
 	if (!assign_if_changed2d(enabled, value)) {
 		return;
 	}
 	emit_changed();
 }
 
-BulletEffectLayerData2D::EffectTrigger BulletEffectLayerData2D::get_trigger() const {
+EffectLayerData2D::EffectTrigger EffectLayerData2D::get_trigger() const {
 	return static_cast<EffectTrigger>(trigger);
 }
-void BulletEffectLayerData2D::set_trigger(EffectTrigger value) {
+void EffectLayerData2D::set_trigger(EffectTrigger value) {
 	if (value != EFFECT_TRAIL_FOLLOW && value != EFFECT_ON_SPAWN && value != EFFECT_ON_HIT && value != EFFECT_ON_DESTROY && value != EFFECT_ON_BOUNCE && value != EFFECT_ON_LIFETIME_OVER && value != EFFECT_ON_CLEAR && value != EFFECT_ON_DESPAWN && value != EFFECT_ON_SPLIT) {
-		UtilityFunctions::push_error("BulletEffectLayerData2D: trigger must be 0 (Trail Follow), 1 (On Spawn), 2 (On Hit), 3 (On Destroy), 4 (On Bounce), 5 (On Lifetime Over), 6 (On Clear), 7 (On Despawn) or 8 (On Split), keeping the old value.");
+		UtilityFunctions::push_error("EffectLayerData2D: trigger must be 0 (Trail Follow), 1 (On Spawn), 2 (On Hit), 3 (On Destroy), 4 (On Bounce), 5 (On Lifetime Over), 6 (On Clear), 7 (On Despawn) or 8 (On Split), keeping the old value.");
 		return;
 	}
 	if (!assign_if_changed2d(trigger, value)) {
@@ -112,10 +112,10 @@ void BulletEffectLayerData2D::set_trigger(EffectTrigger value) {
 	emit_changed();
 }
 
-Ref<SpriteFrames> BulletEffectLayerData2D::get_sprite_frames() const {
+Ref<SpriteFrames> EffectLayerData2D::get_sprite_frames() const {
 	return sprite_frames;
 }
-void BulletEffectLayerData2D::set_sprite_frames(const Ref<SpriteFrames> &new_frames) {
+void EffectLayerData2D::set_sprite_frames(const Ref<SpriteFrames> &new_frames) {
 	if (!assign_if_changed2d(sprite_frames, new_frames)) {
 		return;
 	}
@@ -123,10 +123,10 @@ void BulletEffectLayerData2D::set_sprite_frames(const Ref<SpriteFrames> &new_fra
 	emit_changed();
 }
 
-StringName BulletEffectLayerData2D::get_animation() const {
+StringName EffectLayerData2D::get_animation() const {
 	return animation;
 }
-void BulletEffectLayerData2D::set_animation(const StringName &new_animation) {
+void EffectLayerData2D::set_animation(const StringName &new_animation) {
 	if (!assign_if_changed2d(animation, new_animation)) {
 		return;
 	}
@@ -134,27 +134,27 @@ void BulletEffectLayerData2D::set_animation(const StringName &new_animation) {
 	emit_changed();
 }
 
-Ref<Material> BulletEffectLayerData2D::get_material() const {
+Ref<Material> EffectLayerData2D::get_material() const {
 	return material;
 }
-void BulletEffectLayerData2D::set_material(const Ref<Material> &new_material) {
+void EffectLayerData2D::set_material(const Ref<Material> &new_material) {
 	if (!assign_if_changed2d(material, new_material)) {
 		return;
 	}
 	emit_changed();
 }
 
-Color BulletEffectLayerData2D::get_self_modulate() const {
+Color EffectLayerData2D::get_self_modulate() const {
 	return self_modulate;
 }
-void BulletEffectLayerData2D::set_self_modulate(const Color &new_color) {
+void EffectLayerData2D::set_self_modulate(const Color &new_color) {
 	// Multiplied into every effect instance tint by fx_refresh_slot_color, so a
 	// NaN channel would spread across the layer. The float/vector setters in
 	// this file all guard; this color setter was the odd one out.
 	// godot-cpp's Color has no is_finite(), so check the channels directly.
 	if (!Math::is_finite(new_color.r) || !Math::is_finite(new_color.g) ||
 			!Math::is_finite(new_color.b) || !Math::is_finite(new_color.a)) {
-		UtilityFunctions::push_error("BulletEffectLayerData2D: self_modulate must be finite, keeping the old value.");
+		UtilityFunctions::push_error("EffectLayerData2D: self_modulate must be finite, keeping the old value.");
 		return;
 	}
 	if (!assign_if_changed2d(self_modulate, new_color)) {
@@ -163,23 +163,23 @@ void BulletEffectLayerData2D::set_self_modulate(const Color &new_color) {
 	emit_changed();
 }
 
-Ref<Gradient> BulletEffectLayerData2D::get_color_ramp() const {
+Ref<Gradient> EffectLayerData2D::get_color_ramp() const {
 	return color_ramp;
 }
-void BulletEffectLayerData2D::set_color_ramp(const Ref<Gradient> &new_ramp) {
+void EffectLayerData2D::set_color_ramp(const Ref<Gradient> &new_ramp) {
 	if (!assign_if_changed2d(color_ramp, new_ramp)) {
 		return;
 	}
 	emit_changed();
 }
 
-int BulletEffectLayerData2D::get_z_index() const {
+int EffectLayerData2D::get_z_index() const {
 	return z_index;
 }
-void BulletEffectLayerData2D::set_z_index(int value) {
+void EffectLayerData2D::set_z_index(int value) {
 	// The CanvasItem range: Godot refuses anything else on every effect node.
 	if (value < -4096 || value > 4096) {
-		UtilityFunctions::push_error("BulletEffectLayerData2D: z_index must be between -4096 and 4096, keeping the old value.");
+		UtilityFunctions::push_error("EffectLayerData2D: z_index must be between -4096 and 4096, keeping the old value.");
 		return;
 	}
 	if (!assign_if_changed2d(z_index, value)) {
@@ -188,42 +188,42 @@ void BulletEffectLayerData2D::set_z_index(int value) {
 	emit_changed();
 }
 
-bool BulletEffectLayerData2D::get_z_as_relative() const {
+bool EffectLayerData2D::get_z_as_relative() const {
 	return z_as_relative;
 }
-void BulletEffectLayerData2D::set_z_as_relative(bool value) {
+void EffectLayerData2D::set_z_as_relative(bool value) {
 	if (!assign_if_changed2d(z_as_relative, value)) {
 		return;
 	}
 	emit_changed();
 }
 
-int BulletEffectLayerData2D::get_visibility_layer() const {
+int EffectLayerData2D::get_visibility_layer() const {
 	return visibility_layer;
 }
-void BulletEffectLayerData2D::set_visibility_layer(int value) {
+void EffectLayerData2D::set_visibility_layer(int value) {
 	if (!assign_if_changed2d(visibility_layer, value)) {
 		return;
 	}
 	emit_changed();
 }
 
-int BulletEffectLayerData2D::get_light_mask() const {
+int EffectLayerData2D::get_light_mask() const {
 	return light_mask;
 }
-void BulletEffectLayerData2D::set_light_mask(int value) {
+void EffectLayerData2D::set_light_mask(int value) {
 	if (!assign_if_changed2d(light_mask, value)) {
 		return;
 	}
 	emit_changed();
 }
 
-Vector2 BulletEffectLayerData2D::get_offset() const {
+Vector2 EffectLayerData2D::get_offset() const {
 	return offset;
 }
-void BulletEffectLayerData2D::set_offset(const Vector2 &new_offset) {
+void EffectLayerData2D::set_offset(const Vector2 &new_offset) {
 	if (!new_offset.is_finite()) {
-		UtilityFunctions::push_error("BulletEffectLayerData2D: offset must be finite, keeping the old value.");
+		UtilityFunctions::push_error("EffectLayerData2D: offset must be finite, keeping the old value.");
 		return;
 	}
 	if (!assign_if_changed2d(offset, new_offset)) {
@@ -232,12 +232,12 @@ void BulletEffectLayerData2D::set_offset(const Vector2 &new_offset) {
 	emit_changed();
 }
 
-double BulletEffectLayerData2D::get_rotation_degrees() const {
+double EffectLayerData2D::get_rotation_degrees() const {
 	return rotation_degrees;
 }
-void BulletEffectLayerData2D::set_rotation_degrees(double value) {
+void EffectLayerData2D::set_rotation_degrees(double value) {
 	if (!is_finite_real2d(value)) {
-		UtilityFunctions::push_error("BulletEffectLayerData2D: rotation_degrees must be finite, keeping the old value.");
+		UtilityFunctions::push_error("EffectLayerData2D: rotation_degrees must be finite, keeping the old value.");
 		return;
 	}
 	if (!assign_if_changed2d(rotation_degrees, value)) {
@@ -246,12 +246,12 @@ void BulletEffectLayerData2D::set_rotation_degrees(double value) {
 	emit_changed();
 }
 
-double BulletEffectLayerData2D::get_spin_degrees_per_sec() const {
+double EffectLayerData2D::get_spin_degrees_per_sec() const {
 	return spin_degrees_per_sec;
 }
-void BulletEffectLayerData2D::set_spin_degrees_per_sec(double value) {
+void EffectLayerData2D::set_spin_degrees_per_sec(double value) {
 	if (!is_finite_real2d(value)) {
-		UtilityFunctions::push_error("BulletEffectLayerData2D: spin_degrees_per_sec must be finite, keeping the old value.");
+		UtilityFunctions::push_error("EffectLayerData2D: spin_degrees_per_sec must be finite, keeping the old value.");
 		return;
 	}
 	if (!assign_if_changed2d(spin_degrees_per_sec, value)) {
@@ -260,12 +260,12 @@ void BulletEffectLayerData2D::set_spin_degrees_per_sec(double value) {
 	emit_changed();
 }
 
-Vector2 BulletEffectLayerData2D::get_scale() const {
+Vector2 EffectLayerData2D::get_scale() const {
 	return scale;
 }
-void BulletEffectLayerData2D::set_scale(const Vector2 &new_scale) {
+void EffectLayerData2D::set_scale(const Vector2 &new_scale) {
 	if (!new_scale.is_finite()) {
-		UtilityFunctions::push_error("BulletEffectLayerData2D: scale must be finite, keeping the old value.");
+		UtilityFunctions::push_error("EffectLayerData2D: scale must be finite, keeping the old value.");
 		return;
 	}
 	if (!assign_if_changed2d(scale, new_scale)) {
@@ -274,32 +274,32 @@ void BulletEffectLayerData2D::set_scale(const Vector2 &new_scale) {
 	emit_changed();
 }
 
-bool BulletEffectLayerData2D::get_random_start_frame() const {
+bool EffectLayerData2D::get_random_start_frame() const {
 	return random_start_frame;
 }
-void BulletEffectLayerData2D::set_random_start_frame(bool value) {
+void EffectLayerData2D::set_random_start_frame(bool value) {
 	if (!assign_if_changed2d(random_start_frame, value)) {
 		return;
 	}
 	emit_changed();
 }
 
-bool BulletEffectLayerData2D::get_randomize_rotation() const {
+bool EffectLayerData2D::get_randomize_rotation() const {
 	return randomize_rotation;
 }
-void BulletEffectLayerData2D::set_randomize_rotation(bool value) {
+void EffectLayerData2D::set_randomize_rotation(bool value) {
 	if (!assign_if_changed2d(randomize_rotation, value)) {
 		return;
 	}
 	emit_changed();
 }
 
-real_t BulletEffectLayerData2D::get_random_scale_min() const {
+real_t EffectLayerData2D::get_random_scale_min() const {
 	return random_scale_min;
 }
-void BulletEffectLayerData2D::set_random_scale_min(real_t value) {
+void EffectLayerData2D::set_random_scale_min(real_t value) {
 	if (!Math::is_finite(value) || value < 0.0) {
-		UtilityFunctions::push_error("BulletEffectLayerData2D: random_scale_min must be finite and >= 0, keeping the old value.");
+		UtilityFunctions::push_error("EffectLayerData2D: random_scale_min must be finite and >= 0, keeping the old value.");
 		return;
 	}
 	if (random_scale_min == value && random_scale_max >= value) {
@@ -314,12 +314,12 @@ void BulletEffectLayerData2D::set_random_scale_min(real_t value) {
 	emit_changed();
 }
 
-real_t BulletEffectLayerData2D::get_random_scale_max() const {
+real_t EffectLayerData2D::get_random_scale_max() const {
 	return random_scale_max;
 }
-void BulletEffectLayerData2D::set_random_scale_max(real_t value) {
+void EffectLayerData2D::set_random_scale_max(real_t value) {
 	if (!Math::is_finite(value) || value < 0.0) {
-		UtilityFunctions::push_error("BulletEffectLayerData2D: random_scale_max must be finite and >= 0, keeping the old value.");
+		UtilityFunctions::push_error("EffectLayerData2D: random_scale_max must be finite and >= 0, keeping the old value.");
 		return;
 	}
 	if (random_scale_max == value && random_scale_min <= value) {
@@ -333,12 +333,12 @@ void BulletEffectLayerData2D::set_random_scale_max(real_t value) {
 	emit_changed();
 }
 
-real_t BulletEffectLayerData2D::get_trigger_chance() const {
+real_t EffectLayerData2D::get_trigger_chance() const {
 	return trigger_chance;
 }
-void BulletEffectLayerData2D::set_trigger_chance(real_t value) {
+void EffectLayerData2D::set_trigger_chance(real_t value) {
 	if (!Math::is_finite(value) || value < 0.0 || value > 1.0) {
-		UtilityFunctions::push_error("BulletEffectLayerData2D: trigger_chance must be finite in [0, 1], keeping the old value.");
+		UtilityFunctions::push_error("EffectLayerData2D: trigger_chance must be finite in [0, 1], keeping the old value.");
 		return;
 	}
 	if (!assign_if_changed2d(trigger_chance, value)) {
@@ -347,14 +347,14 @@ void BulletEffectLayerData2D::set_trigger_chance(real_t value) {
 	emit_changed();
 }
 
-int BulletEffectLayerData2D::get_max_instances() const {
+int EffectLayerData2D::get_max_instances() const {
 	return max_instances;
 }
-void BulletEffectLayerData2D::set_max_instances(int value) {
+void EffectLayerData2D::set_max_instances(int value) {
 	// 4096 is the hard ring cap the factory applies at bake time: a larger
 	// value would be silently clamped, so it is refused here instead.
 	if (value < 0 || value > 4096) {
-		UtilityFunctions::push_error("BulletEffectLayerData2D: max_instances must be in [0, 4096] (0 = auto), keeping the old value.");
+		UtilityFunctions::push_error("EffectLayerData2D: max_instances must be in [0, 4096] (0 = auto), keeping the old value.");
 		return;
 	}
 	if (!assign_if_changed2d(max_instances, value)) {
@@ -363,12 +363,12 @@ void BulletEffectLayerData2D::set_max_instances(int value) {
 	emit_changed();
 }
 
-double BulletEffectLayerData2D::get_fade_in_sec() const {
+double EffectLayerData2D::get_fade_in_sec() const {
 	return fade_in_sec;
 }
-void BulletEffectLayerData2D::set_fade_in_sec(double value) {
+void EffectLayerData2D::set_fade_in_sec(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
-		UtilityFunctions::push_error("BulletEffectLayerData2D: fade_in_sec must be finite and >= 0, keeping the old value.");
+		UtilityFunctions::push_error("EffectLayerData2D: fade_in_sec must be finite and >= 0, keeping the old value.");
 		return;
 	}
 	if (!assign_if_changed2d(fade_in_sec, value)) {
@@ -376,12 +376,12 @@ void BulletEffectLayerData2D::set_fade_in_sec(double value) {
 	}
 	emit_changed();
 }
-double BulletEffectLayerData2D::get_fade_out_sec() const {
+double EffectLayerData2D::get_fade_out_sec() const {
 	return fade_out_sec;
 }
-void BulletEffectLayerData2D::set_fade_out_sec(double value) {
+void EffectLayerData2D::set_fade_out_sec(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
-		UtilityFunctions::push_error("BulletEffectLayerData2D: fade_out_sec must be finite and >= 0, keeping the old value.");
+		UtilityFunctions::push_error("EffectLayerData2D: fade_out_sec must be finite and >= 0, keeping the old value.");
 		return;
 	}
 	if (!assign_if_changed2d(fade_out_sec, value)) {
@@ -389,10 +389,10 @@ void BulletEffectLayerData2D::set_fade_out_sec(double value) {
 	}
 	emit_changed();
 }
-bool BulletEffectLayerData2D::get_override_frame_color() const {
+bool EffectLayerData2D::get_override_frame_color() const {
 	return override_frame_color;
 }
-void BulletEffectLayerData2D::set_override_frame_color(bool value) {
+void EffectLayerData2D::set_override_frame_color(bool value) {
 	if (override_frame_color == value) {
 		return;
 	}
@@ -403,19 +403,19 @@ void BulletEffectLayerData2D::set_override_frame_color(bool value) {
 	emit_changed();
 }
 
-Ref<Image> BulletEffectLayerData2D::whiten_image_copy(const Ref<Image> &src) {
+Ref<Image> EffectLayerData2D::whiten_image_copy(const Ref<Image> &src) {
 	Ref<Image> out;
 	if (src.is_null() || src->is_empty()) {
-		UtilityFunctions::push_error("BulletEffectLayerData2D.whiten_image_copy: source image is null or empty.");
+		UtilityFunctions::push_error("EffectLayerData2D.whiten_image_copy: source image is null or empty.");
 		return out;
 	}
 	Ref<Image> rgba = src->duplicate();
 	if (rgba.is_null()) {
-		UtilityFunctions::push_error("BulletEffectLayerData2D.whiten_image_copy: could not duplicate source image.");
+		UtilityFunctions::push_error("EffectLayerData2D.whiten_image_copy: could not duplicate source image.");
 		return out;
 	}
 	if (rgba->is_compressed() && (rgba->decompress() != OK || rgba->is_compressed())) {
-		UtilityFunctions::push_error("BulletEffectLayerData2D.whiten_image_copy: source image is compressed in a format that cannot be decompressed.");
+		UtilityFunctions::push_error("EffectLayerData2D.whiten_image_copy: source image is compressed in a format that cannot be decompressed.");
 		return out;
 	}
 	rgba->convert(Image::FORMAT_RGBA8);
@@ -434,104 +434,104 @@ Ref<Image> BulletEffectLayerData2D::whiten_image_copy(const Ref<Image> &src) {
 	return rgba;
 }
 
-void BulletEffectLayerData2D::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("get_enabled"), &BulletEffectLayerData2D::get_enabled);
-	ClassDB::bind_method(D_METHOD("set_enabled", "value"), &BulletEffectLayerData2D::set_enabled);
+void EffectLayerData2D::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("get_enabled"), &EffectLayerData2D::get_enabled);
+	ClassDB::bind_method(D_METHOD("set_enabled", "value"), &EffectLayerData2D::set_enabled);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "enabled"), "set_enabled", "get_enabled");
 
-	ClassDB::bind_method(D_METHOD("get_trigger"), &BulletEffectLayerData2D::get_trigger);
-	ClassDB::bind_method(D_METHOD("set_trigger", "value"), &BulletEffectLayerData2D::set_trigger);
+	ClassDB::bind_method(D_METHOD("get_trigger"), &EffectLayerData2D::get_trigger);
+	ClassDB::bind_method(D_METHOD("set_trigger", "value"), &EffectLayerData2D::set_trigger);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "trigger", PROPERTY_HINT_ENUM, "Trail Follow,On Spawn,On Hit,On Destroy,On Bounce,On Lifetime Over,On Clear,On Despawn,On Split"), "set_trigger", "get_trigger");
 
-	ClassDB::bind_method(D_METHOD("get_sprite_frames"), &BulletEffectLayerData2D::get_sprite_frames);
-	ClassDB::bind_method(D_METHOD("set_sprite_frames", "new_frames"), &BulletEffectLayerData2D::set_sprite_frames);
+	ClassDB::bind_method(D_METHOD("get_sprite_frames"), &EffectLayerData2D::get_sprite_frames);
+	ClassDB::bind_method(D_METHOD("set_sprite_frames", "new_frames"), &EffectLayerData2D::set_sprite_frames);
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "sprite_frames", PROPERTY_HINT_RESOURCE_TYPE, "SpriteFrames"), "set_sprite_frames", "get_sprite_frames");
 
-	ClassDB::bind_method(D_METHOD("get_animation"), &BulletEffectLayerData2D::get_animation);
-	ClassDB::bind_method(D_METHOD("set_animation", "new_animation"), &BulletEffectLayerData2D::set_animation);
+	ClassDB::bind_method(D_METHOD("get_animation"), &EffectLayerData2D::get_animation);
+	ClassDB::bind_method(D_METHOD("set_animation", "new_animation"), &EffectLayerData2D::set_animation);
 	ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "animation"), "set_animation", "get_animation");
 
-	ClassDB::bind_method(D_METHOD("get_material"), &BulletEffectLayerData2D::get_material);
-	ClassDB::bind_method(D_METHOD("set_material", "new_material"), &BulletEffectLayerData2D::set_material);
+	ClassDB::bind_method(D_METHOD("get_material"), &EffectLayerData2D::get_material);
+	ClassDB::bind_method(D_METHOD("set_material", "new_material"), &EffectLayerData2D::set_material);
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "material", PROPERTY_HINT_RESOURCE_TYPE, "ShaderMaterial,CanvasItemMaterial"), "set_material", "get_material");
 
-	ClassDB::bind_method(D_METHOD("get_self_modulate"), &BulletEffectLayerData2D::get_self_modulate);
-	ClassDB::bind_method(D_METHOD("set_self_modulate", "new_color"), &BulletEffectLayerData2D::set_self_modulate);
+	ClassDB::bind_method(D_METHOD("get_self_modulate"), &EffectLayerData2D::get_self_modulate);
+	ClassDB::bind_method(D_METHOD("set_self_modulate", "new_color"), &EffectLayerData2D::set_self_modulate);
 	ADD_PROPERTY(PropertyInfo(Variant::COLOR, "self_modulate"), "set_self_modulate", "get_self_modulate");
 
-	ClassDB::bind_method(D_METHOD("get_color_ramp"), &BulletEffectLayerData2D::get_color_ramp);
-	ClassDB::bind_method(D_METHOD("set_color_ramp", "new_ramp"), &BulletEffectLayerData2D::set_color_ramp);
+	ClassDB::bind_method(D_METHOD("get_color_ramp"), &EffectLayerData2D::get_color_ramp);
+	ClassDB::bind_method(D_METHOD("set_color_ramp", "new_ramp"), &EffectLayerData2D::set_color_ramp);
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "color_ramp", PROPERTY_HINT_RESOURCE_TYPE, "Gradient"), "set_color_ramp", "get_color_ramp");
 
-	ClassDB::bind_method(D_METHOD("get_fade_in_sec"), &BulletEffectLayerData2D::get_fade_in_sec);
-	ClassDB::bind_method(D_METHOD("set_fade_in_sec", "value"), &BulletEffectLayerData2D::set_fade_in_sec);
+	ClassDB::bind_method(D_METHOD("get_fade_in_sec"), &EffectLayerData2D::get_fade_in_sec);
+	ClassDB::bind_method(D_METHOD("set_fade_in_sec", "value"), &EffectLayerData2D::set_fade_in_sec);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "fade_in_sec", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater"), "set_fade_in_sec", "get_fade_in_sec");
 
-	ClassDB::bind_method(D_METHOD("get_fade_out_sec"), &BulletEffectLayerData2D::get_fade_out_sec);
-	ClassDB::bind_method(D_METHOD("set_fade_out_sec", "value"), &BulletEffectLayerData2D::set_fade_out_sec);
+	ClassDB::bind_method(D_METHOD("get_fade_out_sec"), &EffectLayerData2D::get_fade_out_sec);
+	ClassDB::bind_method(D_METHOD("set_fade_out_sec", "value"), &EffectLayerData2D::set_fade_out_sec);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "fade_out_sec", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater"), "set_fade_out_sec", "get_fade_out_sec");
 
-	ClassDB::bind_method(D_METHOD("get_override_frame_color"), &BulletEffectLayerData2D::get_override_frame_color);
-	ClassDB::bind_method(D_METHOD("set_override_frame_color", "value"), &BulletEffectLayerData2D::set_override_frame_color);
+	ClassDB::bind_method(D_METHOD("get_override_frame_color"), &EffectLayerData2D::get_override_frame_color);
+	ClassDB::bind_method(D_METHOD("set_override_frame_color", "value"), &EffectLayerData2D::set_override_frame_color);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "override_frame_color"), "set_override_frame_color", "get_override_frame_color");
 
-	ClassDB::bind_method(D_METHOD("get_z_index"), &BulletEffectLayerData2D::get_z_index);
-	ClassDB::bind_method(D_METHOD("set_z_index", "value"), &BulletEffectLayerData2D::set_z_index);
+	ClassDB::bind_method(D_METHOD("get_z_index"), &EffectLayerData2D::get_z_index);
+	ClassDB::bind_method(D_METHOD("set_z_index", "value"), &EffectLayerData2D::set_z_index);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "z_index", PROPERTY_HINT_RANGE, "-4096,4096,1"), "set_z_index", "get_z_index");
 
-	ClassDB::bind_method(D_METHOD("get_z_as_relative"), &BulletEffectLayerData2D::get_z_as_relative);
-	ClassDB::bind_method(D_METHOD("set_z_as_relative", "value"), &BulletEffectLayerData2D::set_z_as_relative);
+	ClassDB::bind_method(D_METHOD("get_z_as_relative"), &EffectLayerData2D::get_z_as_relative);
+	ClassDB::bind_method(D_METHOD("set_z_as_relative", "value"), &EffectLayerData2D::set_z_as_relative);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "z_as_relative"), "set_z_as_relative", "get_z_as_relative");
 
-	ClassDB::bind_method(D_METHOD("get_visibility_layer"), &BulletEffectLayerData2D::get_visibility_layer);
-	ClassDB::bind_method(D_METHOD("set_visibility_layer", "value"), &BulletEffectLayerData2D::set_visibility_layer);
+	ClassDB::bind_method(D_METHOD("get_visibility_layer"), &EffectLayerData2D::get_visibility_layer);
+	ClassDB::bind_method(D_METHOD("set_visibility_layer", "value"), &EffectLayerData2D::set_visibility_layer);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "visibility_layer", PROPERTY_HINT_LAYERS_2D_RENDER), "set_visibility_layer", "get_visibility_layer");
 
-	ClassDB::bind_method(D_METHOD("get_light_mask"), &BulletEffectLayerData2D::get_light_mask);
-	ClassDB::bind_method(D_METHOD("set_light_mask", "value"), &BulletEffectLayerData2D::set_light_mask);
+	ClassDB::bind_method(D_METHOD("get_light_mask"), &EffectLayerData2D::get_light_mask);
+	ClassDB::bind_method(D_METHOD("set_light_mask", "value"), &EffectLayerData2D::set_light_mask);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "light_mask", PROPERTY_HINT_LAYERS_2D_RENDER), "set_light_mask", "get_light_mask");
 
-	ClassDB::bind_method(D_METHOD("get_offset"), &BulletEffectLayerData2D::get_offset);
-	ClassDB::bind_method(D_METHOD("set_offset", "new_offset"), &BulletEffectLayerData2D::set_offset);
+	ClassDB::bind_method(D_METHOD("get_offset"), &EffectLayerData2D::get_offset);
+	ClassDB::bind_method(D_METHOD("set_offset", "new_offset"), &EffectLayerData2D::set_offset);
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "offset"), "set_offset", "get_offset");
 
-	ClassDB::bind_method(D_METHOD("get_rotation_degrees"), &BulletEffectLayerData2D::get_rotation_degrees);
-	ClassDB::bind_method(D_METHOD("set_rotation_degrees", "value"), &BulletEffectLayerData2D::set_rotation_degrees);
+	ClassDB::bind_method(D_METHOD("get_rotation_degrees"), &EffectLayerData2D::get_rotation_degrees);
+	ClassDB::bind_method(D_METHOD("set_rotation_degrees", "value"), &EffectLayerData2D::set_rotation_degrees);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "rotation_degrees"), "set_rotation_degrees", "get_rotation_degrees");
 
-	ClassDB::bind_method(D_METHOD("get_spin_degrees_per_sec"), &BulletEffectLayerData2D::get_spin_degrees_per_sec);
-	ClassDB::bind_method(D_METHOD("set_spin_degrees_per_sec", "value"), &BulletEffectLayerData2D::set_spin_degrees_per_sec);
+	ClassDB::bind_method(D_METHOD("get_spin_degrees_per_sec"), &EffectLayerData2D::get_spin_degrees_per_sec);
+	ClassDB::bind_method(D_METHOD("set_spin_degrees_per_sec", "value"), &EffectLayerData2D::set_spin_degrees_per_sec);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "spin_degrees_per_sec"), "set_spin_degrees_per_sec", "get_spin_degrees_per_sec");
 
-	ClassDB::bind_method(D_METHOD("get_scale"), &BulletEffectLayerData2D::get_scale);
-	ClassDB::bind_method(D_METHOD("set_scale", "new_scale"), &BulletEffectLayerData2D::set_scale);
+	ClassDB::bind_method(D_METHOD("get_scale"), &EffectLayerData2D::get_scale);
+	ClassDB::bind_method(D_METHOD("set_scale", "new_scale"), &EffectLayerData2D::set_scale);
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "scale"), "set_scale", "get_scale");
 
-	ClassDB::bind_method(D_METHOD("get_random_start_frame"), &BulletEffectLayerData2D::get_random_start_frame);
-	ClassDB::bind_method(D_METHOD("set_random_start_frame", "value"), &BulletEffectLayerData2D::set_random_start_frame);
+	ClassDB::bind_method(D_METHOD("get_random_start_frame"), &EffectLayerData2D::get_random_start_frame);
+	ClassDB::bind_method(D_METHOD("set_random_start_frame", "value"), &EffectLayerData2D::set_random_start_frame);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "random_start_frame"), "set_random_start_frame", "get_random_start_frame");
 
-	ClassDB::bind_method(D_METHOD("get_randomize_rotation"), &BulletEffectLayerData2D::get_randomize_rotation);
-	ClassDB::bind_method(D_METHOD("set_randomize_rotation", "value"), &BulletEffectLayerData2D::set_randomize_rotation);
+	ClassDB::bind_method(D_METHOD("get_randomize_rotation"), &EffectLayerData2D::get_randomize_rotation);
+	ClassDB::bind_method(D_METHOD("set_randomize_rotation", "value"), &EffectLayerData2D::set_randomize_rotation);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "randomize_rotation"), "set_randomize_rotation", "get_randomize_rotation");
 
-	ClassDB::bind_method(D_METHOD("get_random_scale_min"), &BulletEffectLayerData2D::get_random_scale_min);
-	ClassDB::bind_method(D_METHOD("set_random_scale_min", "value"), &BulletEffectLayerData2D::set_random_scale_min);
+	ClassDB::bind_method(D_METHOD("get_random_scale_min"), &EffectLayerData2D::get_random_scale_min);
+	ClassDB::bind_method(D_METHOD("set_random_scale_min", "value"), &EffectLayerData2D::set_random_scale_min);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "random_scale_min"), "set_random_scale_min", "get_random_scale_min");
 
-	ClassDB::bind_method(D_METHOD("get_random_scale_max"), &BulletEffectLayerData2D::get_random_scale_max);
-	ClassDB::bind_method(D_METHOD("set_random_scale_max", "value"), &BulletEffectLayerData2D::set_random_scale_max);
+	ClassDB::bind_method(D_METHOD("get_random_scale_max"), &EffectLayerData2D::get_random_scale_max);
+	ClassDB::bind_method(D_METHOD("set_random_scale_max", "value"), &EffectLayerData2D::set_random_scale_max);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "random_scale_max"), "set_random_scale_max", "get_random_scale_max");
 
-	ClassDB::bind_method(D_METHOD("get_trigger_chance"), &BulletEffectLayerData2D::get_trigger_chance);
-	ClassDB::bind_method(D_METHOD("set_trigger_chance", "value"), &BulletEffectLayerData2D::set_trigger_chance);
+	ClassDB::bind_method(D_METHOD("get_trigger_chance"), &EffectLayerData2D::get_trigger_chance);
+	ClassDB::bind_method(D_METHOD("set_trigger_chance", "value"), &EffectLayerData2D::set_trigger_chance);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "trigger_chance", PROPERTY_HINT_RANGE, "0,1,0.01"), "set_trigger_chance", "get_trigger_chance");
 
-	ClassDB::bind_method(D_METHOD("get_max_instances"), &BulletEffectLayerData2D::get_max_instances);
-	ClassDB::bind_method(D_METHOD("set_max_instances", "value"), &BulletEffectLayerData2D::set_max_instances);
+	ClassDB::bind_method(D_METHOD("get_max_instances"), &EffectLayerData2D::get_max_instances);
+	ClassDB::bind_method(D_METHOD("set_max_instances", "value"), &EffectLayerData2D::set_max_instances);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "max_instances", PROPERTY_HINT_RANGE, "0,4096,1"), "set_max_instances", "get_max_instances");
 
-	ClassDB::bind_static_method("BulletEffectLayerData2D", D_METHOD("whiten_image_copy", "src"), &BulletEffectLayerData2D::whiten_image_copy);
+	ClassDB::bind_static_method("EffectLayerData2D", D_METHOD("whiten_image_copy", "src"), &EffectLayerData2D::whiten_image_copy);
 
 	BIND_ENUM_CONSTANT(EFFECT_TRAIL_FOLLOW);
 	BIND_ENUM_CONSTANT(EFFECT_ON_SPAWN);
@@ -545,4 +545,4 @@ void BulletEffectLayerData2D::_bind_methods() {
 }
 } //namespace BlastBullets2D
 
-BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletEffectLayerData2D::EffectTrigger);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::EffectLayerData2D::EffectTrigger);

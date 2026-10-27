@@ -14,13 +14,13 @@
 #include "core/variant_enum_cast2d.hpp"
 #include "core/warn_once2d.hpp"
 #include "data/bullet_curves_data2d.hpp"
-#include "data/bullet_effect_layer_data2d.hpp"
 #include "data/bullet_pickup_data2d.hpp"
 #include "data/bullet_rotation_data2d.hpp"
 #include "data/bullet_sound_data2d.hpp"
 #include "data/bullet_speed_data2d.hpp"
 #include "data/bullet_volley_data2d.hpp"
 #include "data/bullet_wobble_data2d.hpp"
+#include "data/effect_layer_data2d.hpp"
 #include "data/graze_zone2d.hpp"
 #include "factory/bullet_factory2d.hpp"
 #include "factory/flock_solver2d.hpp"
@@ -793,7 +793,7 @@ public:
 	// frame. One-shot layers bake at the factory instead (they outlive the
 	// volley); this volley only keeps the layer list for trigger routing.
 	struct FXTrailBake {
-		Ref<BulletEffectLayerData2D> layer;
+		Ref<EffectLayerData2D> layer;
 		int layer_index = -1;
 		// Set by play_effect_animation: the shards hold another animation's
 		// frames, so a reuse must rebuild from the layer instead.
@@ -845,7 +845,7 @@ public:
 
 	// Layer list retained from the last reseed (spawn/enable/live set), used
 	// to route trigger events to the factory one-shot bakes.
-	TypedArray<BulletEffectLayerData2D> fx_data_layers;
+	TypedArray<EffectLayerData2D> fx_data_layers;
 	// Bit per trigger with at least one enabled one-shot layer (see fx_reseed_from_data).
 	uint32_t fx_oneshot_trigger_mask = 0;
 	// Bake version per layer index at the last full reseed (0 = null/disabled
@@ -869,9 +869,9 @@ public:
 			return present == o.present && bake_version == o.bake_version && trigger == o.trigger && material_id == o.material_id && self_modulate == o.self_modulate && z_index == o.z_index && z_as_relative == o.z_as_relative && visibility_layer == o.visibility_layer && light_mask == o.light_mask && max_instances == o.max_instances;
 		}
 	};
-	static FXLayerSnapshot fx_snapshot_layer(const Ref<BulletEffectLayerData2D> &layer);
+	static FXLayerSnapshot fx_snapshot_layer(const Ref<EffectLayerData2D> &layer);
 	std::vector<FXLayerSnapshot> fx_seeded_snapshots;
-	bool fx_layers_match_seeded(const TypedArray<BulletEffectLayerData2D> &layers) const;
+	bool fx_layers_match_seeded(const TypedArray<EffectLayerData2D> &layers) const;
 	// Hides every live trail instance and rewinds per-bullet trail state,
 	// keeping the shard nodes (pooled-reuse fast path).
 	void fx_soft_reset_trail_layers();
@@ -895,7 +895,7 @@ public:
 
 	// Rebuilds trail shards from a layer list (spawn/enable/live set).
 	// One-shot layers in the same list register at the factory instead.
-	void fx_rebuild_trail_layers(const TypedArray<BulletEffectLayerData2D> &layers);
+	void fx_rebuild_trail_layers(const TypedArray<EffectLayerData2D> &layers);
 	// The factory's frame textures (null without a factory: bakes build uncached).
 	FrameTextureCache2D *frame_cache() const { return bullet_factory != nullptr ? &bullet_factory->frame_cache : nullptr; }
 	// Frees trail shard nodes and drops trail state (reset/teardown).
@@ -915,9 +915,9 @@ public:
 	// trigger routing, rebuilds trail shards, re-registers factory one-shot
 	// bakes. fire_spawn flashes ON_SPAWN layers (activation only, never on
 	// live edits or single-bullet wakes).
-	void fx_reseed_from_data(const TypedArray<BulletEffectLayerData2D> &layers, bool fire_spawn);
-	TypedArray<BulletEffectLayerData2D> get_effect_layers() const;
-	void set_effect_layers(const TypedArray<BulletEffectLayerData2D> &new_layers);
+	void fx_reseed_from_data(const TypedArray<EffectLayerData2D> &layers, bool fire_spawn);
+	TypedArray<EffectLayerData2D> get_effect_layers() const;
+	void set_effect_layers(const TypedArray<EffectLayerData2D> &new_layers);
 	Dictionary debug_get_effect_layers_info() const;
 	// Local-space trail instance transform for tests (zero Transform2D when
 	// the bullet has no visible trail instance on that layer).

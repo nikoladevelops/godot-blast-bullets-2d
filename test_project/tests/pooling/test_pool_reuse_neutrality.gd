@@ -53,7 +53,7 @@ func _loaded() -> BulletVolleyData2D:
 	d.gravity = Vector2(0, 90)
 	d.bounce_mask = 8
 	d.bounce_strength = 0.8
-	d.effect_layers = [H.make_effect_layer(BulletEffectLayerData2D.EFFECT_TRAIL_FOLLOW, 2)]
+	d.effect_layers = [H.make_effect_layer(EffectLayerData2D.EFFECT_TRAIL_FOLLOW, 2)]
 	d.shared_bullets_custom_data = Resource.new()
 	d.self_modulate = Color(1, 0.2, 0.2, 1)
 	d.shared_bullet_attachment = make_probe_scene()
@@ -484,11 +484,11 @@ func test_a_pooled_handle_keeps_no_frames_or_layers() -> void:
 	assert_true(v.is_pooled(), "pooled")
 	var sf := SpriteFrames.new()
 	sf.add_frame(&"default", ImageTexture.create_from_image(Image.create_empty(4, 4, false, Image.FORMAT_RGBA8)))
-	var layer := H.make_effect_layer(BulletEffectLayerData2D.EFFECT_TRAIL_FOLLOW, 2)
+	var layer := H.make_effect_layer(EffectLayerData2D.EFFECT_TRAIL_FOLLOW, 2)
 	var refs := [weakref(sf), weakref(layer)]
 	assert_false(v.play_sprite_animation(sf), "refused")
 	expect_error_sequence(["play_sprite_animation: this volley is in the pool (its last bullet died), so this handle is stale. Spawn a new volley instead."])
-	var layers: Array[BulletEffectLayerData2D] = [layer]
+	var layers: Array[EffectLayerData2D] = [layer]
 	v.set_effect_layers(layers)
 	expect_error_sequence(["set_effect_layers: this volley is in the pool (its last bullet died), so this handle is stale. Spawn a new volley instead."])
 	sf = null

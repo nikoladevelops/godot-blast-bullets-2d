@@ -1,7 +1,7 @@
 #pragma once
 
 #include "core/variant_enum_cast2d.hpp"
-#include "data/bullet_effect_layer_data2d.hpp"
+#include "data/effect_layer_data2d.hpp"
 #include <godot_cpp/classes/resource.hpp>
 
 namespace BlastBullets2D {
@@ -10,7 +10,7 @@ using namespace godot;
 // One one-shot effect a laser plays on one of its events
 // (LaserData2D.effects): a spark where it hits, a flash at the muzzle when it
 // fires, dust where a wall stops it. The effect is a one-shot
-// BulletEffectLayerData2D played through the factory's effect engine (the
+// EffectLayerData2D played through the factory's effect engine (the
 // same one spawn_layer_effect uses), posed at the event's point and turned
 // with the beam there. Every accepted change emits `changed`.
 class LaserEffectData2D : public Resource {
@@ -42,7 +42,7 @@ public:
 
 	int trigger = LASER_EFFECT_ON_HIT;
 	int at = AT_EVENT;
-	Ref<BulletEffectLayerData2D> effect;
+	Ref<EffectLayerData2D> effect;
 	bool align_to_beam = true; // the effect turns with the beam at its point
 	bool enabled = true;
 
@@ -50,8 +50,8 @@ public:
 	void set_trigger(LaserEffectTrigger value);
 	EffectPoint get_at() const { return (EffectPoint)at; }
 	void set_at(EffectPoint value);
-	Ref<BulletEffectLayerData2D> get_effect() const { return effect; }
-	void set_effect(const Ref<BulletEffectLayerData2D> &value);
+	Ref<EffectLayerData2D> get_effect() const { return effect; }
+	void set_effect(const Ref<EffectLayerData2D> &value);
 	bool get_align_to_beam() const { return align_to_beam; }
 	void set_align_to_beam(bool value);
 	bool get_enabled() const { return enabled; }

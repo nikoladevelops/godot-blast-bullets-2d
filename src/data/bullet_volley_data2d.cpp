@@ -227,10 +227,10 @@ void BulletVolleyData2D::set_shared_bullet_attachment_stick_relative_to_bullet(b
 	emit_changed();
 }
 
-TypedArray<BulletEffectLayerData2D> BulletVolleyData2D::get_effect_layers() const {
+TypedArray<EffectLayerData2D> BulletVolleyData2D::get_effect_layers() const {
 	return effect_layers;
 }
-void BulletVolleyData2D::set_effect_layers(const TypedArray<BulletEffectLayerData2D> &new_layers) {
+void BulletVolleyData2D::set_effect_layers(const TypedArray<EffectLayerData2D> &new_layers) {
 	if (!assign_if_changed2d(effect_layers, new_layers)) {
 		return;
 	}
@@ -1549,7 +1549,7 @@ void BulletVolleyData2D::_bind_methods() {
 	ADD_GROUP("Sprite Effects", "");
 	ClassDB::bind_method(D_METHOD("get_effect_layers"), &BulletVolleyData2D::get_effect_layers);
 	ClassDB::bind_method(D_METHOD("set_effect_layers", "new_layers"), &BulletVolleyData2D::set_effect_layers);
-	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "effect_layers", PROPERTY_HINT_ARRAY_TYPE, "BulletEffectLayerData2D"), "set_effect_layers", "get_effect_layers");
+	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "effect_layers", PROPERTY_HINT_ARRAY_TYPE, "EffectLayerData2D"), "set_effect_layers", "get_effect_layers");
 
 	ADD_GROUP("Rendering and Material", "");
 	ClassDB::bind_method(D_METHOD("get_material"), &BulletVolleyData2D::get_material);

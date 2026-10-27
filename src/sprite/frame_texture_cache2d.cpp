@@ -1,6 +1,6 @@
 #include "sprite/frame_texture_cache2d.hpp"
 
-#include "data/bullet_effect_layer_data2d.hpp"
+#include "data/effect_layer_data2d.hpp"
 
 #include <godot_cpp/classes/atlas_texture.hpp>
 #include <godot_cpp/classes/image.hpp>
@@ -28,7 +28,7 @@ Ref<Texture2D> FrameTextureCache2D::build_drawable(const Ref<Texture2D> &source,
 
 Ref<Texture2D> FrameTextureCache2D::build_whitened(const Ref<Texture2D> &source, FrameImageReader2D &reader) {
 	// whiten_image_copy reports an unreadable frame (null image) itself.
-	return texture_from_image2d(BulletEffectLayerData2D::whiten_image_copy(reader.read(source)));
+	return texture_from_image2d(EffectLayerData2D::whiten_image_copy(reader.read(source)));
 }
 
 Ref<Texture2D> FrameTextureCache2D::lookup(std::unordered_map<uint64_t, Entry> &entries, const Ref<Texture2D> &source, bool whiten, FrameImageReader2D &reader) {

@@ -238,7 +238,7 @@ func test_getters_mirror_the_spawn_data() -> void:
 	d.shared_bullet_curves_data = curves
 	var wobble := BulletWobbleData2D.new()
 	d.shared_bullet_wobble_data = wobble
-	var layer := H.make_effect_layer(BulletEffectLayerData2D.EFFECT_ON_HIT)
+	var layer := H.make_effect_layer(EffectLayerData2D.EFFECT_ON_HIT)
 	d.effect_layers = [layer]
 	d.bounce_mode = 1
 	d.bounce_hit_consumed = true

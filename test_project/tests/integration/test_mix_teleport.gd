@@ -14,7 +14,7 @@ const MOVES := ["teleport_bullet", "teleport_shift_bullet", "volley_shift_all", 
 
 func _trail_data(n := 2, speed := 100.0) -> BulletVolleyData2D:
 	var d := H.make_volley_data(n, speed, 30.0)
-	d.effect_layers = [H.make_effect_layer(BulletEffectLayerData2D.EFFECT_TRAIL_FOLLOW)]
+	d.effect_layers = [H.make_effect_layer(EffectLayerData2D.EFFECT_TRAIL_FOLLOW)]
 	return d
 
 
@@ -122,7 +122,7 @@ func test_a_teleport_through_a_wall_never_hits_into_a_wall_hits_once() -> void:
 
 func test_a_frozen_bullet_wakes_where_it_was_teleported() -> void:
 	var v := _flyer(Vector2(0, 0), 60.0)
-	v.effect_layers = [H.make_effect_layer(BulletEffectLayerData2D.EFFECT_TRAIL_FOLLOW)]
+	v.effect_layers = [H.make_effect_layer(EffectLayerData2D.EFFECT_TRAIL_FOLLOW)]
 	step_factory(2)
 	v.set_is_auto_pooling_enabled(false)
 	v.disable_bullet(0, false)

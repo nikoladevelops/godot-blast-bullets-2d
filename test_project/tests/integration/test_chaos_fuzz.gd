@@ -211,7 +211,7 @@ func _build_lasers() -> void:
 			var e := LaserEffectData2D.new()
 			e.trigger = rng.randi_range(LaserEffectData2D.LASER_EFFECT_ON_CHARGE, LaserEffectData2D.LASER_EFFECT_ON_DESPAWN)
 			e.at = rng.randi() % 3
-			e.effect = H.make_effect_layer(BulletEffectLayerData2D.EFFECT_ON_HIT, rng.randi_range(1, 3))
+			e.effect = H.make_effect_layer(EffectLayerData2D.EFFECT_ON_HIT, rng.randi_range(1, 3))
 			effects.append(e)
 		d.effects = effects
 		d.ignore_despawn_bounds = rng.randf() < 0.2

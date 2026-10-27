@@ -385,7 +385,7 @@ func test_attachments_ride_their_flocking_bullets() -> void:
 
 func test_trails_bake_behind_flocking_bullets() -> void:
 	var d := H.make_flight_data(_cluster(6), 120.0, 1000.0)
-	d.effect_layers = [H.make_effect_layer(BulletEffectLayerData2D.EFFECT_TRAIL_FOLLOW, 2)]
+	d.effect_layers = [H.make_effect_layer(EffectLayerData2D.EFFECT_TRAIL_FOLLOW, 2)]
 	var v: BulletVolley2D = factory.spawn_volley(d)
 	v.flock_join(BulletFlock2D.new())
 	step_factory(30)

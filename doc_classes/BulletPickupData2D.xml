@@ -54,7 +54,7 @@
 		<member name="collect_callback" type="Callable" setter="set_collect_callback" getter="get_collect_callback">
 			Optional [Callable] run for every collected pickup, right after [signal BulletFactory2D.pickup_collected], with the same arguments: [code](target, position, volley, bullet_index, value)[/code]. Runtime only: it is never saved with the resource. An invalid callable is ignored. The bullet is still alive inside the callback.
 		</member>
-		<member name="collect_effect" type="BulletEffectLayerData2D" setter="set_collect_effect" getter="get_collect_effect">
+		<member name="collect_effect" type="EffectLayerData2D" setter="set_collect_effect" getter="get_collect_effect">
 			A sprite effect fired at the pickup's position when it is collected (see [method BulletFactory2D.spawn_layer_effect]).
 		</member>
 		<member name="collect_on_collision" type="bool" setter="set_collect_on_collision" getter="get_collect_on_collision" default="false">
@@ -81,7 +81,7 @@
 		<member name="drag" type="float" setter="set_drag" getter="get_drag" default="4.0">
 			How fast the burst slows down (per second, 1 loses all speed in a second). Applies until the magnet starts. Must be finite and 0 or more.
 		</member>
-		<member name="effect_layers" type="BulletEffectLayerData2D[]" setter="set_effect_layers" getter="get_effect_layers" default="[]">
+		<member name="effect_layers" type="EffectLayerData2D[]" setter="set_effect_layers" getter="get_effect_layers" default="[]">
 			Sprite effect layers of the pickup volley, exactly like [member BulletVolleyData2D.effect_layers]: a trail that follows the pickup, an On Spawn flash, an On Despawn puff when it leaves the despawn bounds. Collecting a pickup fires none of the hit or destroy layers (use [member collect_effect]).
 		</member>
 		<member name="fade_in_sec" type="float" setter="set_fade_in_sec" getter="get_fade_in_sec" default="0.0">

@@ -87,9 +87,9 @@ static func make_effect_frames(frames: int = 1, fps: float = 10.0) -> SpriteFram
 		sf.add_frame("default", ImageTexture.create_from_image(img))
 	return sf
 
-## Effect layer with `trigger` (BulletEffectLayerData2D.EFFECT_*).
-static func make_effect_layer(trigger: int, frames: int = 1) -> BulletEffectLayerData2D:
-	var l := BulletEffectLayerData2D.new()
+## Effect layer with `trigger` (EffectLayerData2D.EFFECT_*).
+static func make_effect_layer(trigger: int, frames: int = 1) -> EffectLayerData2D:
+	var l := EffectLayerData2D.new()
 	l.trigger = trigger
 	l.sprite_frames = make_effect_frames(frames)
 	return l

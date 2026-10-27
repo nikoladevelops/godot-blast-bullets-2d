@@ -23,8 +23,8 @@ using namespace godot;
 // triggers fire one-shot visuals (spawn flash, hit sparks, destroy
 // explosion, bounce sparks) that play once and die by age.
 
-class BulletEffectLayerData2D : public Resource {
-	GDCLASS(BulletEffectLayerData2D, Resource)
+class EffectLayerData2D : public Resource {
+	GDCLASS(EffectLayerData2D, Resource)
 
 public:
 	enum EffectTrigger : int {
@@ -258,14 +258,14 @@ private:
 
 // The trigger ids under their old namespace-level names (used across the
 // volley and factory sources).
-using EffectTrigger = BulletEffectLayerData2D::EffectTrigger;
-inline constexpr EffectTrigger EFFECT_TRAIL_FOLLOW = BulletEffectLayerData2D::EFFECT_TRAIL_FOLLOW;
-inline constexpr EffectTrigger EFFECT_ON_SPAWN = BulletEffectLayerData2D::EFFECT_ON_SPAWN;
-inline constexpr EffectTrigger EFFECT_ON_HIT = BulletEffectLayerData2D::EFFECT_ON_HIT;
-inline constexpr EffectTrigger EFFECT_ON_DESTROY = BulletEffectLayerData2D::EFFECT_ON_DESTROY;
-inline constexpr EffectTrigger EFFECT_ON_BOUNCE = BulletEffectLayerData2D::EFFECT_ON_BOUNCE;
-inline constexpr EffectTrigger EFFECT_ON_LIFETIME_OVER = BulletEffectLayerData2D::EFFECT_ON_LIFETIME_OVER;
-inline constexpr EffectTrigger EFFECT_ON_CLEAR = BulletEffectLayerData2D::EFFECT_ON_CLEAR;
-inline constexpr EffectTrigger EFFECT_ON_DESPAWN = BulletEffectLayerData2D::EFFECT_ON_DESPAWN;
-inline constexpr EffectTrigger EFFECT_ON_SPLIT = BulletEffectLayerData2D::EFFECT_ON_SPLIT;
+using EffectTrigger = EffectLayerData2D::EffectTrigger;
+inline constexpr EffectTrigger EFFECT_TRAIL_FOLLOW = EffectLayerData2D::EFFECT_TRAIL_FOLLOW;
+inline constexpr EffectTrigger EFFECT_ON_SPAWN = EffectLayerData2D::EFFECT_ON_SPAWN;
+inline constexpr EffectTrigger EFFECT_ON_HIT = EffectLayerData2D::EFFECT_ON_HIT;
+inline constexpr EffectTrigger EFFECT_ON_DESTROY = EffectLayerData2D::EFFECT_ON_DESTROY;
+inline constexpr EffectTrigger EFFECT_ON_BOUNCE = EffectLayerData2D::EFFECT_ON_BOUNCE;
+inline constexpr EffectTrigger EFFECT_ON_LIFETIME_OVER = EffectLayerData2D::EFFECT_ON_LIFETIME_OVER;
+inline constexpr EffectTrigger EFFECT_ON_CLEAR = EffectLayerData2D::EFFECT_ON_CLEAR;
+inline constexpr EffectTrigger EFFECT_ON_DESPAWN = EffectLayerData2D::EFFECT_ON_DESPAWN;
+inline constexpr EffectTrigger EFFECT_ON_SPLIT = EffectLayerData2D::EFFECT_ON_SPLIT;
 } //namespace BlastBullets2D

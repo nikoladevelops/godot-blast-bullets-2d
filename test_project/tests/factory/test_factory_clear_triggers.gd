@@ -4,13 +4,13 @@ extends BlastTest
 ## stay silent teardown; key-scoped clears touch only their bucket; deferred
 ## twins run on the next idle frame.
 
-var layer: BulletEffectLayerData2D
+var layer: EffectLayerData2D
 
 
 func before_each() -> void:
 	await super()
-	layer = BulletEffectLayerData2D.new()
-	layer.trigger = BulletEffectLayerData2D.EFFECT_ON_CLEAR
+	layer = EffectLayerData2D.new()
+	layer.trigger = EffectLayerData2D.EFFECT_ON_CLEAR
 	var sf := SpriteFrames.new()
 	sf.set_animation_speed("default", 10.0)
 	sf.set_animation_loop("default", false)

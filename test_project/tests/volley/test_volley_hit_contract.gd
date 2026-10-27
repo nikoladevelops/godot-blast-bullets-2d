@@ -11,8 +11,8 @@ extends BlastTest
 ## reports nothing more, a pause parks the remaining records.
 ## Walls sit on layer value 4 at x = 200; bullets fly +X at 300 px/s.
 
-const DESTROY := BulletEffectLayerData2D.EFFECT_ON_DESTROY
-const HIT := BulletEffectLayerData2D.EFFECT_ON_HIT
+const DESTROY := EffectLayerData2D.EFFECT_ON_DESTROY
+const HIT := EffectLayerData2D.EFFECT_ON_HIT
 
 var hits: Array = [] # Dictionaries recorded inside the handler
 var on_hit: Callable = Callable() # optional extra handler action(volley, idx, body)
@@ -324,7 +324,7 @@ func test_spawner_owned_hits_route_live_to_the_spawner() -> void:
 
 func test_clear_active_bullets_inside_a_handler_clears_now() -> void:
 	var d := _hit_data([0.0, 300.0], 0)
-	d.effect_layers = [H.make_effect_layer(BulletEffectLayerData2D.EFFECT_ON_CLEAR, 4)]
+	d.effect_layers = [H.make_effect_layer(EffectLayerData2D.EFFECT_ON_CLEAR, 4)]
 	var cleared := []
 	on_hit = func(_volley, _idx, _body): cleared.append(factory.clear_active_bullets())
 	var v: BulletVolley2D = factory.spawn_volley(d)
@@ -332,5 +332,5 @@ func test_clear_active_bullets_inside_a_handler_clears_now() -> void:
 	assert_eq(cleared, [2], "both live bullets cleared from inside the handler")
 	assert_false(v.is_bullet_status_enabled(0), "cleared")
 	assert_false(v.is_bullet_status_enabled(1), "cleared")
-	assert_eq(_effects(BulletEffectLayerData2D.EFFECT_ON_CLEAR).size(), 2, "On Clear once per bullet")
+	assert_eq(_effects(EffectLayerData2D.EFFECT_ON_CLEAR).size(), 2, "On Clear once per bullet")
 	expect_no_errors()

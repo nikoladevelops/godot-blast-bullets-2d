@@ -131,7 +131,7 @@ func test_debugger_draws_every_shape_where_it_is() -> void:
 func test_every_plugin_multimesh_is_never_culled() -> void:
 	factory.is_debugger_enabled = true
 	var d := H.make_volley_data(3, 100.0, 30.0)
-	d.effect_layers = [H.make_effect_layer(BulletEffectLayerData2D.EFFECT_TRAIL_FOLLOW, 2), H.make_effect_layer(BulletEffectLayerData2D.EFFECT_ON_CLEAR, 2)]
+	d.effect_layers = [H.make_effect_layer(EffectLayerData2D.EFFECT_TRAIL_FOLLOW, 2), H.make_effect_layer(EffectLayerData2D.EFFECT_ON_CLEAR, 2)]
 	var v: BulletVolley2D = factory.spawn_volley(d)
 	await physics(2)
 	v.clear_bullet(0) # the On Clear flash makes the one-shot effect shards

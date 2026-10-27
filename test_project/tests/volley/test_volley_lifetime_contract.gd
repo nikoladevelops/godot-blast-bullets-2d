@@ -8,7 +8,7 @@ extends BlastTest
 ## whole volley (set_is_life_time_infinite(true) or set_life_time_left(t)),
 ## and owns any bullet it disabled or woke itself.
 
-const LIFETIME_FX := BulletEffectLayerData2D.EFFECT_ON_LIFETIME_OVER
+const LIFETIME_FX := EffectLayerData2D.EFFECT_ON_LIFETIME_OVER
 
 var events: Array = [] # one Dictionary per life_time_over emit
 var on_expire: Callable = Callable()

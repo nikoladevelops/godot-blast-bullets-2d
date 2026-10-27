@@ -12,7 +12,7 @@ extends Node
 const H := preload("res://tests/common/blast_test_helpers.gd")
 
 const PLUGIN_CLASSES: Array[StringName] = [
-	&"BulletRotationData2D", &"BulletEffectLayerData2D", &"BulletSpeedData2D", &"BulletCurvesData2D",
+	&"BulletRotationData2D", &"EffectLayerData2D", &"BulletSpeedData2D", &"BulletCurvesData2D",
 	&"BulletWobbleData2D", &"VolleyPoolKey2D", &"BulletAttachment2D", &"BulletPatterns2D",
 	&"BulletFactory2D", &"BulletVolleyDebugger2D", &"BulletVolleyData2D", &"BulletVolley2D",
 	&"BulletSpawner2D", &"PatternPreviewLayer2D", &"GrazeZone2D", &"GrazePreviewLayer2D",
@@ -594,7 +594,7 @@ func _probe_setters(section: String, label: String, obj: Object) -> void:
 
 func _snap_setters(section: String) -> void:
 	for cls in [&"BulletVolleyData2D", &"BulletSpeedData2D", &"BulletRotationData2D", &"BulletCurvesData2D",
-			&"BulletWobbleData2D", &"BulletEffectLayerData2D", &"GrazeZone2D", &"BulletPickupData2D", &"BulletFlock2D", &"BulletSplitStage2D", &"BulletSplitData2D", &"BulletEmitterData2D", &"LaserData2D"]:
+			&"BulletWobbleData2D", &"EffectLayerData2D", &"GrazeZone2D", &"BulletPickupData2D", &"BulletFlock2D", &"BulletSplitStage2D", &"BulletSplitData2D", &"BulletEmitterData2D", &"LaserData2D"]:
 		_probe_setters(section, cls, ClassDB.instantiate(cls))
 	var sp := BulletSpawner2D.new()
 	sp.set_shooting_enabled(false)

@@ -23,7 +23,7 @@ func _data(lifetime := 8.0, max_hits := 1) -> BulletVolleyData2D:
 	d.set_collision_mask_from_array([3])
 	d.collision_shape = H.make_circle_shape(6.0)
 	d.bullet_max_collision_count = max_hits
-	d.effect_layers = [H.make_effect_layer(BulletEffectLayerData2D.EFFECT_ON_CLEAR, 4)]
+	d.effect_layers = [H.make_effect_layer(EffectLayerData2D.EFFECT_ON_CLEAR, 4)]
 	return d
 
 
@@ -65,7 +65,7 @@ func after_each() -> void:
 func _clears() -> int:
 	var n := 0
 	for e in factory.debug_get_effect_log():
-		if int(e["trigger"]) == BulletEffectLayerData2D.EFFECT_ON_CLEAR:
+		if int(e["trigger"]) == EffectLayerData2D.EFFECT_ON_CLEAR:
 			n += 1
 	return n
 

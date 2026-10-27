@@ -198,7 +198,7 @@ func test_enum_ids_are_locked() -> void:
 	assert_eq([BulletSplitStage2D.DIRECTION_FAN, BulletSplitStage2D.DIRECTION_RING, BulletSplitStage2D.DIRECTION_RANDOM_IN_SPREAD], [0, 1, 2], "direction ids")
 	assert_eq([BulletSplitStage2D.SPEED_MULTIPLY_PARENT, BulletSplitStage2D.SPEED_FIXED, BulletSplitStage2D.SPEED_FROM_SPAWN_DATA], [0, 1, 2], "speed mode ids")
 	assert_eq([BulletSplitStage2D.SPEED_RAMP, BulletSplitStage2D.SPEED_RANDOM], [0, 1], "distribution ids")
-	assert_eq(BulletEffectLayerData2D.EFFECT_ON_SPLIT, 8, "effect trigger appended after On Despawn")
+	assert_eq(EffectLayerData2D.EFFECT_ON_SPLIT, 8, "effect trigger appended after On Despawn")
 	assert_eq(BulletSoundData2D.SOUND_ON_SPLIT, 12, "sound trigger appended after On Despawn")
 
 

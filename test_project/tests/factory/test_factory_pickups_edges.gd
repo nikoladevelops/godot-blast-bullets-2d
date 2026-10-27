@@ -156,19 +156,19 @@ func test_a_collected_handler_may_convert_again() -> void:
 func test_clear_effects_only_with_the_option() -> void:
 	var data := H.make_volley_data(2, 0.0, 60.0)
 	data.transforms = [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(10, 0))]
-	data.effect_layers = [H.make_effect_layer(BulletEffectLayerData2D.EFFECT_ON_CLEAR)]
+	data.effect_layers = [H.make_effect_layer(EffectLayerData2D.EFFECT_ON_CLEAR)]
 	factory.debug_set_effect_log_enabled(true)
 	factory.spawn_volley(data)
 	var target := _target(Vector2(300, 0))
 	factory.convert_all_bullets_to_pickups(_coin(), target)
-	var clears := factory.debug_get_effect_log().filter(func(e): return int(e["trigger"]) == BulletEffectLayerData2D.EFFECT_ON_CLEAR)
+	var clears := factory.debug_get_effect_log().filter(func(e): return int(e["trigger"]) == EffectLayerData2D.EFFECT_ON_CLEAR)
 	assert_eq(clears.size(), 0, "silent by default")
 	factory.debug_clear_effect_log()
 	factory.spawn_volley(data)
 	var loud := _coin()
 	loud.fire_clear_effects = true
 	factory.convert_all_bullets_to_pickups(loud, target)
-	clears = factory.debug_get_effect_log().filter(func(e): return int(e["trigger"]) == BulletEffectLayerData2D.EFFECT_ON_CLEAR)
+	clears = factory.debug_get_effect_log().filter(func(e): return int(e["trigger"]) == EffectLayerData2D.EFFECT_ON_CLEAR)
 	assert_eq(clears.size(), 2, "with fire_clear_effects each converted bullet fires its On Clear layer")
 
 

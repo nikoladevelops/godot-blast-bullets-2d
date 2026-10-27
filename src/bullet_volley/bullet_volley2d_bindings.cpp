@@ -707,7 +707,7 @@ void BulletVolley2D::_bind_methods() {
 	ADD_GROUP("Sprite Effects", "");
 	ClassDB::bind_method(D_METHOD("get_effect_layers"), &BulletVolley2D::get_effect_layers);
 	ClassDB::bind_method(D_METHOD("set_effect_layers", "new_layers"), &BulletVolley2D::set_effect_layers);
-	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "effect_layers", PROPERTY_HINT_ARRAY_TYPE, "BulletEffectLayerData2D"), "set_effect_layers", "get_effect_layers");
+	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "effect_layers", PROPERTY_HINT_ARRAY_TYPE, "EffectLayerData2D"), "set_effect_layers", "get_effect_layers");
 
 	ClassDB::bind_method(D_METHOD("has_trail_effects"), &BulletVolley2D::has_trail_effects);
 	ClassDB::bind_method(D_METHOD("bullet_set_trail_enabled", "layer_index", "bullet_index", "trail_on"), &BulletVolley2D::bullet_set_trail_enabled);

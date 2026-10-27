@@ -275,7 +275,7 @@ func test_collect_sound_and_effect_fire_on_collection() -> void:
 	var coin := _coin()
 	var ding := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
 	coin.collect_sound = ding
-	coin.collect_effect = H.make_effect_layer(BulletEffectLayerData2D.EFFECT_ON_SPAWN)
+	coin.collect_effect = H.make_effect_layer(EffectLayerData2D.EFFECT_ON_SPAWN)
 	factory.convert_all_bullets_to_pickups(coin, Vector2(200, 0))
 	assert_eq(factory.get_active_effect_count(), 0, "no effect before the pickup arrives")
 	await _wait_collected(1)

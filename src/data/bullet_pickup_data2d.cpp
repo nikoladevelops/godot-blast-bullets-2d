@@ -66,13 +66,13 @@ BLAST_PICKUP_PLAIN_SETTER(StringName, animation)
 BLAST_PICKUP_PLAIN_SETTER(Ref<Texture2D>, texture)
 BLAST_PICKUP_PLAIN_SETTER(Ref<Material>, material)
 BLAST_PICKUP_PLAIN_SETTER(Ref<PackedScene>, attachment)
-BLAST_PICKUP_PLAIN_SETTER(TypedArray<BulletEffectLayerData2D>, effect_layers)
+BLAST_PICKUP_PLAIN_SETTER(TypedArray<EffectLayerData2D>, effect_layers)
 BLAST_PICKUP_PLAIN_SETTER(Ref<BulletSpeedData2D>, speed_data)
 BLAST_PICKUP_PLAIN_SETTER(Ref<BulletCurvesData2D>, curves_data)
 BLAST_PICKUP_PLAIN_SETTER(Ref<BulletRotationData2D>, rotation_data)
 BLAST_PICKUP_PLAIN_SETTER(bool, collect_on_collision)
 BLAST_PICKUP_PLAIN_SETTER(Ref<BulletSoundData2D>, collect_sound)
-BLAST_PICKUP_PLAIN_SETTER(Ref<BulletEffectLayerData2D>, collect_effect)
+BLAST_PICKUP_PLAIN_SETTER(Ref<EffectLayerData2D>, collect_effect)
 BLAST_PICKUP_PLAIN_SETTER(bool, inherit_custom_data)
 BLAST_PICKUP_PLAIN_SETTER(bool, fire_clear_effects)
 BLAST_PICKUP_PLAIN_SETTER(bool, follow_source_time_scale)
@@ -364,7 +364,7 @@ void BulletPickupData2D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "attachment_offset"), "set_attachment_offset", "get_attachment_offset");
 	ClassDB::bind_method(D_METHOD("get_effect_layers"), &BulletPickupData2D::get_effect_layers);
 	ClassDB::bind_method(D_METHOD("set_effect_layers", "value"), &BulletPickupData2D::set_effect_layers);
-	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "effect_layers", PROPERTY_HINT_ARRAY_TYPE, "BulletEffectLayerData2D"), "set_effect_layers", "get_effect_layers");
+	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "effect_layers", PROPERTY_HINT_ARRAY_TYPE, "EffectLayerData2D"), "set_effect_layers", "get_effect_layers");
 
 	ADD_GROUP("Motion", "");
 	ClassDB::bind_method(D_METHOD("get_motion_mode"), &BulletPickupData2D::get_motion_mode);
@@ -423,7 +423,7 @@ void BulletPickupData2D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "collect_sound", PROPERTY_HINT_RESOURCE_TYPE, "BulletSoundData2D"), "set_collect_sound", "get_collect_sound");
 	ClassDB::bind_method(D_METHOD("get_collect_effect"), &BulletPickupData2D::get_collect_effect);
 	ClassDB::bind_method(D_METHOD("set_collect_effect", "value"), &BulletPickupData2D::set_collect_effect);
-	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "collect_effect", PROPERTY_HINT_RESOURCE_TYPE, "BulletEffectLayerData2D"), "set_collect_effect", "get_collect_effect");
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "collect_effect", PROPERTY_HINT_RESOURCE_TYPE, "EffectLayerData2D"), "set_collect_effect", "get_collect_effect");
 	ClassDB::bind_method(D_METHOD("get_collect_callback"), &BulletPickupData2D::get_collect_callback);
 	ClassDB::bind_method(D_METHOD("set_collect_callback", "value"), &BulletPickupData2D::set_collect_callback);
 	ADD_PROPERTY(PropertyInfo(Variant::CALLABLE, "collect_callback", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NONE), "set_collect_callback", "get_collect_callback");

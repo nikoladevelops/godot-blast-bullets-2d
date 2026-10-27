@@ -361,12 +361,12 @@ func test_split_effects_and_death_effect_silencing() -> void:
 	factory.debug_set_effect_log_enabled(true)
 	var s := _stage(2)
 	var data := H.make_volley_data(1, 0.0, 0.03)
-	data.effect_layers = [H.make_effect_layer(BulletEffectLayerData2D.EFFECT_ON_SPLIT), H.make_effect_layer(BulletEffectLayerData2D.EFFECT_ON_LIFETIME_OVER)]
+	data.effect_layers = [H.make_effect_layer(EffectLayerData2D.EFFECT_ON_SPLIT), H.make_effect_layer(EffectLayerData2D.EFFECT_ON_LIFETIME_OVER)]
 	var v := factory.spawn_volley(data)
 	v.split_set_data(_chain([s]), H.make_volley_data(1, 0.0, 5.0))
 	_step_until_split()
 	var kinds: Array = factory.debug_get_effect_log().map(func(e): return int(e["trigger"]))
-	assert_eq(kinds, [BulletEffectLayerData2D.EFFECT_ON_SPLIT, BulletEffectLayerData2D.EFFECT_ON_LIFETIME_OVER], "On Split, then the parent's own death effect")
+	assert_eq(kinds, [EffectLayerData2D.EFFECT_ON_SPLIT, EffectLayerData2D.EFFECT_ON_LIFETIME_OVER], "On Split, then the parent's own death effect")
 	factory.debug_clear_effect_log()
 	s.fire_death_effects = false
 	var w := factory.spawn_volley(data)
@@ -374,7 +374,7 @@ func test_split_effects_and_death_effect_silencing() -> void:
 	splits.clear()
 	_step_until_split()
 	kinds = factory.debug_get_effect_log().map(func(e): return int(e["trigger"]))
-	assert_eq(kinds, [BulletEffectLayerData2D.EFFECT_ON_SPLIT], "fire_death_effects off: only On Split")
+	assert_eq(kinds, [EffectLayerData2D.EFFECT_ON_SPLIT], "fire_death_effects off: only On Split")
 
 
 func test_split_set_data_and_manual_api_contract() -> void:
@@ -436,7 +436,7 @@ func test_hit_split_after_the_handler_and_a_heal_vetoes_it() -> void:
 func test_a_manual_split_that_cannot_split_keeps_the_bullet() -> void:
 	factory.debug_set_effect_log_enabled(true)
 	var data := H.make_volley_data(2, 0.0, 5.0)
-	data.effect_layers = [H.make_effect_layer(BulletEffectLayerData2D.EFFECT_ON_CLEAR)]
+	data.effect_layers = [H.make_effect_layer(EffectLayerData2D.EFFECT_ON_CLEAR)]
 	var v := factory.spawn_volley(data)
 	var chain := _chain([_stage(2)])
 	v.split_set_data(chain, data)

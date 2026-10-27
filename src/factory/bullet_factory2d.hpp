@@ -26,9 +26,9 @@
 #include "core/emit_guard2d.hpp"
 #include "core/graze_targets2d.hpp"
 #include "core/owned_node2d.hpp"
-#include "data/bullet_effect_layer_data2d.hpp"
 #include "data/bullet_pickup_data2d.hpp"
 #include "data/bullet_volley_data2d.hpp"
+#include "data/effect_layer_data2d.hpp"
 #include "data/laser_data2d.hpp"
 #include "debugger/despawn_bounds_preview_layer2d.hpp"
 #include "debugger/laser_debug_layer2d.hpp"
@@ -380,7 +380,7 @@ public:
 	struct FXOneShotBake {
 		uint64_t volley_id = 0;
 		int layer_index = -1;
-		Ref<BulletEffectLayerData2D> layer;
+		Ref<EffectLayerData2D> layer;
 		// Layer content generation at bake time; a mismatch means the user
 		// edited the layer since (manual hatch path re-bakes on it).
 		uint64_t layer_version = 0;
@@ -432,7 +432,7 @@ public:
 	// coexist instead of rebaking each other away.
 	std::vector<FXOneShotBake> fx_manual_bakes;
 	// spawn_layer_effect's body; `caller` names the hatch in its errors.
-	int fx_spawn_manual(const Ref<BulletEffectLayerData2D> &layer, const Transform2D &at, const char *caller);
+	int fx_spawn_manual(const Ref<EffectLayerData2D> &layer, const Transform2D &at, const char *caller);
 	// Laser effect layers that could not play, by instance id: the bake
 	// version that failed (fx_play_laser_effect tries again after an edit).
 	std::unordered_map<uint64_t, uint64_t> fx_failed_laser_layers;
@@ -482,7 +482,7 @@ public:
 	// amount_bullets sizes the ring when the layer leaves max_instances on
 	// auto (0). False when the layer is inert (disabled, trail trigger,
 	// null, frames missing, zero playable time): warn-once happens inside.
-	bool fx_register_volley_bake(uint64_t volley_id, int layer_index, const Ref<BulletEffectLayerData2D> &layer, int amount_bullets);
+	bool fx_register_volley_bake(uint64_t volley_id, int layer_index, const Ref<EffectLayerData2D> &layer, int amount_bullets);
 	// Every one-shot bake of `volley_id` still has its shard nodes (a script
 	// may free them, or the whole effects container). Cold: a reuse check.
 	bool fx_volley_bakes_intact(uint64_t volley_id) const;
@@ -504,12 +504,12 @@ public:
 	int get_active_effect_count() const;
 	// Manual one-shot hatch: plays any layer once at a pose, owned by the
 	// factory (survives volleys). Returns the slot index, or -1 when inert.
-	int spawn_layer_effect(const Ref<BulletEffectLayerData2D> &layer, const Transform2D &at);
+	int spawn_layer_effect(const Ref<EffectLayerData2D> &layer, const Transform2D &at);
 	// The laser effect hatch (LaserVolley2D::fire_event): plays `layer` once
 	// at `at` through the same manual bakes, silently skipping a missing,
 	// disabled or trail layer; a layer that cannot play reports once per edit
 	// (its bake version), never once per event. False when nothing played.
-	bool fx_play_laser_effect(const Ref<BulletEffectLayerData2D> &layer, const Transform2D &at);
+	bool fx_play_laser_effect(const Ref<EffectLayerData2D> &layer, const Transform2D &at);
 	// The laser effect log rows ({trigger, laser, life, beam, position,
 	// frame}, volley 0 and bullet -1) share the effect log.
 	void debug_log_laser_effect(int trigger, uint64_t laser_id, int life_id, int beam_index, const Vector2 &position);

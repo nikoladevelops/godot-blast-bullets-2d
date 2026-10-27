@@ -146,7 +146,7 @@ func _run_disable_case(trigger: String, victim: String) -> Array:
 	if trigger == "clear_bullet":
 		# The On Clear flash fires after the disable's callback: it must
 		# never run on a volley that callback freed.
-		d.effect_layers = [H.make_effect_layer(BulletEffectLayerData2D.EFFECT_ON_CLEAR)]
+		d.effect_layers = [H.make_effect_layer(EffectLayerData2D.EFFECT_ON_CLEAR)]
 	var v: BulletVolley2D = factory.spawn_volley(d)
 	var other: BulletVolley2D = factory.spawn_volley(d)
 	await idle(1)
@@ -496,7 +496,7 @@ func test_enable_volley_inside_a_busy_factory_is_refused_and_changes_nothing() -
 ## (no split, no On Clear sound or flash) for a bullet that does not die.
 func test_clear_bullet_refused_by_the_latch_records_no_split() -> void:
 	var d := _data(false)
-	d.effect_layers = [H.make_effect_layer(BulletEffectLayerData2D.EFFECT_ON_CLEAR)]
+	d.effect_layers = [H.make_effect_layer(EffectLayerData2D.EFFECT_ON_CLEAR)]
 	var stage := BulletSplitStage2D.new()
 	stage.count = 2
 	stage.split_on_clear = true

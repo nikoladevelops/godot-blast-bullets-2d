@@ -306,7 +306,7 @@ func _orphan_case(policy: int, timing: String) -> Array:
 	factory.debug_clear_effect_log()
 	factory.debug_set_effect_log_enabled(true)
 	var sp := _split_spawner(_orphan_chain(), 2, DT * 0.5 if timing != "before_capture" else 30.0)
-	sp.spawn_data.effect_layers = [H.make_effect_layer(BulletEffectLayerData2D.EFFECT_ON_SPLIT)]
+	sp.spawn_data.effect_layers = [H.make_effect_layer(EffectLayerData2D.EFFECT_ON_SPLIT)]
 	sp.orphaned_volleys = policy
 	if timing == "carry_over":
 		factory.split_max_children_per_sweep = 2 # one parent's children per sweep
@@ -351,7 +351,7 @@ func _orphan_case(policy: int, timing: String) -> Array:
 	factory.split_max_children_per_sweep = 0
 	var effects := 0
 	for e in factory.debug_get_effect_log():
-		if int(e.get("trigger", -1)) == BulletEffectLayerData2D.EFFECT_ON_SPLIT:
+		if int(e.get("trigger", -1)) == EffectLayerData2D.EFFECT_ON_SPLIT:
 			effects += 1
 	return [factory_splits.size(), factory.get_active_bullet_count(), effects]
 

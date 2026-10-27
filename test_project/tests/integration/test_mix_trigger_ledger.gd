@@ -35,7 +35,7 @@ func _volley(speed := 0.0, lifetime := 30.0, setup := Callable()) -> BulletVolle
 	d.transforms = arr
 	d.collision_shape = H.make_circle_shape(4.0)
 	var layers: Array = []
-	for trigger in [BulletEffectLayerData2D.EFFECT_ON_SPAWN, BulletEffectLayerData2D.EFFECT_ON_HIT, BulletEffectLayerData2D.EFFECT_ON_DESTROY, BulletEffectLayerData2D.EFFECT_ON_BOUNCE, BulletEffectLayerData2D.EFFECT_ON_LIFETIME_OVER, BulletEffectLayerData2D.EFFECT_ON_CLEAR, BulletEffectLayerData2D.EFFECT_ON_DESPAWN, BulletEffectLayerData2D.EFFECT_ON_SPLIT]:
+	for trigger in [EffectLayerData2D.EFFECT_ON_SPAWN, EffectLayerData2D.EFFECT_ON_HIT, EffectLayerData2D.EFFECT_ON_DESTROY, EffectLayerData2D.EFFECT_ON_BOUNCE, EffectLayerData2D.EFFECT_ON_LIFETIME_OVER, EffectLayerData2D.EFFECT_ON_CLEAR, EffectLayerData2D.EFFECT_ON_DESPAWN, EffectLayerData2D.EFFECT_ON_SPLIT]:
 		layers.append(H.make_effect_layer(trigger))
 	d.effect_layers = layers
 	if setup.is_valid():
@@ -62,7 +62,7 @@ func _count(kind: String) -> int:
 func _expect(label: String, want: Dictionary) -> void:
 	var problems: Array = ledger.problems()
 	var death_sounds := [BulletSoundData2D.SOUND_ON_DESTROY, BulletSoundData2D.SOUND_ON_LIFETIME_OVER, BulletSoundData2D.SOUND_ON_CLEAR, BulletSoundData2D.SOUND_ON_DESPAWN, BulletSoundData2D.SOUND_ON_HIT, BulletSoundData2D.SOUND_ON_BOUNCE, BulletSoundData2D.SOUND_ON_SPLIT, BulletSoundData2D.SOUND_ON_HOMING_TARGET_REACHED]
-	var death_effects := [BulletEffectLayerData2D.EFFECT_ON_DESTROY, BulletEffectLayerData2D.EFFECT_ON_LIFETIME_OVER, BulletEffectLayerData2D.EFFECT_ON_CLEAR, BulletEffectLayerData2D.EFFECT_ON_DESPAWN, BulletEffectLayerData2D.EFFECT_ON_HIT, BulletEffectLayerData2D.EFFECT_ON_BOUNCE, BulletEffectLayerData2D.EFFECT_ON_SPLIT]
+	var death_effects := [EffectLayerData2D.EFFECT_ON_DESTROY, EffectLayerData2D.EFFECT_ON_LIFETIME_OVER, EffectLayerData2D.EFFECT_ON_CLEAR, EffectLayerData2D.EFFECT_ON_DESPAWN, EffectLayerData2D.EFFECT_ON_HIT, EffectLayerData2D.EFFECT_ON_BOUNCE, EffectLayerData2D.EFFECT_ON_SPLIT]
 	var causes := ["hit", "lifetime", "despawn", "clear", "split", "split_manual", "pickup", "collect", "manual"]
 	for t in death_sounds:
 		var got := _count("offer:%d" % t)
@@ -91,7 +91,7 @@ func test_a_killing_and_a_survived_hit() -> void:
 	_volley(300.0, 30.0, kill)
 	for f in 40:
 		await physics(1)
-	_expect("killing hits", {"s%d" % BulletSoundData2D.SOUND_ON_DESTROY: N, "e%d" % BulletEffectLayerData2D.EFFECT_ON_DESTROY: N, "dhit": N})
+	_expect("killing hits", {"s%d" % BulletSoundData2D.SOUND_ON_DESTROY: N, "e%d" % EffectLayerData2D.EFFECT_ON_DESTROY: N, "dhit": N})
 
 
 func test_a_survived_hit() -> void:
@@ -103,13 +103,13 @@ func test_a_survived_hit() -> void:
 	_volley(300.0, 0.6, survive)
 	for f in 50:
 		await physics(1)
-	_expect("survived hits, then the expiry", {"s%d" % BulletSoundData2D.SOUND_ON_HIT: N, "e%d" % BulletEffectLayerData2D.EFFECT_ON_HIT: N, "s%d" % BulletSoundData2D.SOUND_ON_LIFETIME_OVER: N, "e%d" % BulletEffectLayerData2D.EFFECT_ON_LIFETIME_OVER: N, "dlifetime": N})
+	_expect("survived hits, then the expiry", {"s%d" % BulletSoundData2D.SOUND_ON_HIT: N, "e%d" % EffectLayerData2D.EFFECT_ON_HIT: N, "s%d" % BulletSoundData2D.SOUND_ON_LIFETIME_OVER: N, "e%d" % EffectLayerData2D.EFFECT_ON_LIFETIME_OVER: N, "dlifetime": N})
 
 
 func test_an_expiry() -> void:
 	_volley(50.0, 0.2)
 	step_factory(20)
-	_expect("expiry", {"s%d" % BulletSoundData2D.SOUND_ON_LIFETIME_OVER: N, "e%d" % BulletEffectLayerData2D.EFFECT_ON_LIFETIME_OVER: N, "dlifetime": N})
+	_expect("expiry", {"s%d" % BulletSoundData2D.SOUND_ON_LIFETIME_OVER: N, "e%d" % EffectLayerData2D.EFFECT_ON_LIFETIME_OVER: N, "dlifetime": N})
 
 
 func test_a_despawn() -> void:
@@ -117,7 +117,7 @@ func test_a_despawn() -> void:
 	factory.despawn_bounds_enabled = true
 	_volley(600.0)
 	step_factory(20)
-	_expect("despawn", {"s%d" % BulletSoundData2D.SOUND_ON_DESPAWN: N, "e%d" % BulletEffectLayerData2D.EFFECT_ON_DESPAWN: N, "ddespawn": N})
+	_expect("despawn", {"s%d" % BulletSoundData2D.SOUND_ON_DESPAWN: N, "e%d" % EffectLayerData2D.EFFECT_ON_DESPAWN: N, "ddespawn": N})
 
 
 func test_every_clear(how: String = use_parameters(["clear_bullet", "clear_all_bullets", "circle", "rect", "factory_clear"])) -> void:
@@ -135,7 +135,7 @@ func test_every_clear(how: String = use_parameters(["clear_bullet", "clear_all_b
 			factory.clear_bullets_in_rect(Rect2(-50, -50, 100, 200))
 		"factory_clear":
 			factory.clear_active_bullets()
-	_expect(how, {"s%d" % BulletSoundData2D.SOUND_ON_CLEAR: N, "e%d" % BulletEffectLayerData2D.EFFECT_ON_CLEAR: N, "dclear": N})
+	_expect(how, {"s%d" % BulletSoundData2D.SOUND_ON_CLEAR: N, "e%d" % EffectLayerData2D.EFFECT_ON_CLEAR: N, "dclear": N})
 
 
 func test_a_pickup_conversion_fires_clear_effects_only_when_asked(fire: bool = use_parameters([true, false])) -> void:
@@ -147,7 +147,7 @@ func test_a_pickup_conversion_fires_clear_effects_only_when_asked(fire: bool = u
 	var want := {"dpickup": N}
 	if fire:
 		want["s%d" % BulletSoundData2D.SOUND_ON_CLEAR] = N
-		want["e%d" % BulletEffectLayerData2D.EFFECT_ON_CLEAR] = N
+		want["e%d" % EffectLayerData2D.EFFECT_ON_CLEAR] = N
 	_expect("conversion (fire_clear_effects %s)" % fire, want)
 
 
@@ -161,10 +161,10 @@ func test_a_split_death(death_effects: bool = use_parameters([true, false])) -> 
 	v.split_set_data(chain, H.make_volley_data(2, 0.0, 30.0))
 	for f in 20:
 		await physics(1)
-	var want := {"s%d" % BulletSoundData2D.SOUND_ON_SPLIT: N, "e%d" % BulletEffectLayerData2D.EFFECT_ON_SPLIT: N, "dlifetime": N}
+	var want := {"s%d" % BulletSoundData2D.SOUND_ON_SPLIT: N, "e%d" % EffectLayerData2D.EFFECT_ON_SPLIT: N, "dlifetime": N}
 	if death_effects:
 		want["s%d" % BulletSoundData2D.SOUND_ON_LIFETIME_OVER] = N
-		want["e%d" % BulletEffectLayerData2D.EFFECT_ON_LIFETIME_OVER] = N
+		want["e%d" % EffectLayerData2D.EFFECT_ON_LIFETIME_OVER] = N
 	_expect("split at the expiry (fire_death_effects %s)" % death_effects, want)
 
 
@@ -178,7 +178,7 @@ func test_a_manual_split_leaves_like_a_clear() -> void:
 	step_factory(2)
 	assert_eq(v.all_bullets_split(), N, "every bullet split")
 	await physics(2)
-	_expect("manual split", {"s%d" % BulletSoundData2D.SOUND_ON_SPLIT: N, "e%d" % BulletEffectLayerData2D.EFFECT_ON_SPLIT: N, "s%d" % BulletSoundData2D.SOUND_ON_CLEAR: N, "e%d" % BulletEffectLayerData2D.EFFECT_ON_CLEAR: N, "dsplit_manual": N})
+	_expect("manual split", {"s%d" % BulletSoundData2D.SOUND_ON_SPLIT: N, "e%d" % EffectLayerData2D.EFFECT_ON_SPLIT: N, "s%d" % BulletSoundData2D.SOUND_ON_CLEAR: N, "e%d" % EffectLayerData2D.EFFECT_ON_CLEAR: N, "dsplit_manual": N})
 
 
 func test_silent_ways_out(how: String = use_parameters(["disable_bullet", "free_active_bullets", "reset", "queue_free"])) -> void:
@@ -228,7 +228,7 @@ func test_a_bounce_a_homing_reach_and_a_graze() -> void:
 	assert_eq(reached, N, "every bullet reached the target")
 	assert_gt(grazed, 0, "the bullets grazed it")
 	_expect("bounce, reach, graze", {
-		"s%d" % BulletSoundData2D.SOUND_ON_BOUNCE: N, "e%d" % BulletEffectLayerData2D.EFFECT_ON_BOUNCE: N,
+		"s%d" % BulletSoundData2D.SOUND_ON_BOUNCE: N, "e%d" % EffectLayerData2D.EFFECT_ON_BOUNCE: N,
 		"s%d" % BulletSoundData2D.SOUND_ON_HOMING_TARGET_REACHED: reached,
 	})
 	assert_eq(_count("offer:%d" % BulletSoundData2D.SOUND_ON_GRAZE), grazed, "one On Graze per graze")

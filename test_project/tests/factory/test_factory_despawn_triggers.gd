@@ -122,7 +122,7 @@ func test_bursts_and_telegraphs_respect_the_rule_too() -> void:
 
 func test_the_on_despawn_effect_fires_for_culled_bullets_only() -> void:
 	var data := H.make_volley_data(3, 0.0, 30.0)
-	data.effect_layers = [H.make_effect_layer(BulletEffectLayerData2D.EFFECT_ON_DESPAWN)]
+	data.effect_layers = [H.make_effect_layer(EffectLayerData2D.EFFECT_ON_DESPAWN)]
 	factory.debug_set_effect_log_enabled(true)
 	var v := _flyers([Vector2(380, 100), Vector2(390, 100), Vector2(100, 100)], Vector2(0, 0), data)
 	v.bullet_set_velocity(0, Vector2(600, 0))
@@ -130,7 +130,7 @@ func test_the_on_despawn_effect_fires_for_culled_bullets_only() -> void:
 	await idle(1)
 	for i in 6:
 		factory.debug_advance_time(0.1)
-	var log := factory.debug_get_effect_log().filter(func(e): return int(e["trigger"]) == BulletEffectLayerData2D.EFFECT_ON_DESPAWN)
+	var log := factory.debug_get_effect_log().filter(func(e): return int(e["trigger"]) == EffectLayerData2D.EFFECT_ON_DESPAWN)
 	assert_eq(log.size(), 2, "one effect per culled bullet")
 	for e in log:
 		assert_gt(e["position"].x, 400.0, "fired at the pose it left from")
@@ -139,7 +139,7 @@ func test_the_on_despawn_effect_fires_for_culled_bullets_only() -> void:
 
 func test_other_removals_never_fire_on_despawn() -> void:
 	var data := H.make_volley_data(2, 0.0, 0.2)
-	data.effect_layers = [H.make_effect_layer(BulletEffectLayerData2D.EFFECT_ON_DESPAWN)]
+	data.effect_layers = [H.make_effect_layer(EffectLayerData2D.EFFECT_ON_DESPAWN)]
 	factory.debug_set_effect_log_enabled(true)
 	var v := _flyers([Vector2(100, 100), Vector2(110, 100)], Vector2(0, 0), data)
 	v.clear_bullet(0)
@@ -197,15 +197,15 @@ func test_a_despawn_handler_may_spawn() -> void:
 
 
 func test_trigger_ids_are_stable_and_validated() -> void:
-	assert_eq(BulletEffectLayerData2D.EFFECT_ON_DESPAWN, 7, "effect trigger id is serialized: appended after On Clear")
+	assert_eq(EffectLayerData2D.EFFECT_ON_DESPAWN, 7, "effect trigger id is serialized: appended after On Clear")
 	assert_eq(BulletSoundData2D.SOUND_ON_DESPAWN, 11, "sound trigger id is serialized: appended after On Flight")
-	var layer := BulletEffectLayerData2D.new()
+	var layer := EffectLayerData2D.new()
 	layer.trigger = 7
 	assert_eq(layer.trigger, 7, "accepted")
 	layer.trigger = 8
 	assert_eq(layer.trigger, 8, "On Split (8) is accepted")
 	layer.trigger = 9
-	expect_errors_containing("BulletEffectLayerData2D: trigger must be", 1, "9 is out of range")
+	expect_errors_containing("EffectLayerData2D: trigger must be", 1, "9 is out of range")
 	var sound := BulletSoundData2D.new()
 	sound.trigger = 11
 	assert_eq(sound.trigger, 11, "accepted")

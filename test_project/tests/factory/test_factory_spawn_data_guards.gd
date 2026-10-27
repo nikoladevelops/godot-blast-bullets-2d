@@ -60,10 +60,10 @@ func test_self_modulate_rejects_nan_channel() -> void:
 	d.self_modulate = Color(0, INF, 0, 1)
 	expect_error_sequence(["BulletVolleyData2D: self_modulate must be finite, keeping the old value."])
 	assert_eq(d.self_modulate, Color(1, 0.5, 0.25, 1), "Inf channel refused on spawn data")
-	var layer := BulletEffectLayerData2D.new()
+	var layer := EffectLayerData2D.new()
 	layer.self_modulate = Color(0, 1, 0, 1)
 	layer.self_modulate = Color(0, 0, NAN, 1)
-	expect_error_sequence(["BulletEffectLayerData2D: self_modulate must be finite, keeping the old value."])
+	expect_error_sequence(["EffectLayerData2D: self_modulate must be finite, keeping the old value."])
 	assert_eq(layer.self_modulate, Color(0, 1, 0, 1), "NaN channel refused on effect layer data")
 
 

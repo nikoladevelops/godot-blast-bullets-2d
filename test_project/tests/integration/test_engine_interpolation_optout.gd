@@ -31,7 +31,7 @@ func _collect_interpolated(n: Node, out: Array) -> void:
 
 func test_one_shot_effect_shards_are_not_engine_interpolated() -> void:
 	var data := H.make_volley_data(1, 0.0, 30.0)
-	data.effect_layers = [H.make_effect_layer(BulletEffectLayerData2D.EFFECT_ON_SPAWN, 4)]
+	data.effect_layers = [H.make_effect_layer(EffectLayerData2D.EFFECT_ON_SPAWN, 4)]
 	var v: BulletVolley2D = factory.spawn_volley(data)
 	assert_not_null(v, "volley spawned")
 	await physics(2)
@@ -40,10 +40,10 @@ func test_one_shot_effect_shards_are_not_engine_interpolated() -> void:
 
 func test_trail_and_manual_hatch_shards_are_not_engine_interpolated() -> void:
 	var data := H.make_volley_data(1, 0.0, 30.0)
-	data.effect_layers = [H.make_effect_layer(BulletEffectLayerData2D.EFFECT_TRAIL_FOLLOW, 4)]
+	data.effect_layers = [H.make_effect_layer(EffectLayerData2D.EFFECT_TRAIL_FOLLOW, 4)]
 	var v: BulletVolley2D = factory.spawn_volley(data)
 	assert_not_null(v, "volley spawned")
-	var manual := H.make_effect_layer(BulletEffectLayerData2D.EFFECT_ON_SPAWN, 2)
+	var manual := H.make_effect_layer(EffectLayerData2D.EFFECT_ON_SPAWN, 2)
 	assert_gt(factory.spawn_layer_effect(manual, Transform2D()), -1, "manual hatch fired")
 	await physics(2)
 	assert_eq(_interpolated_nodes(factory), [], "no interpolated canvas items under factory")
@@ -52,8 +52,8 @@ func test_trail_and_manual_hatch_shards_are_not_engine_interpolated() -> void:
 func test_every_factory_canvas_item_opts_out() -> void:
 	var data := H.make_volley_data(1, 0.0, 30.0)
 	data.effect_layers = [
-		H.make_effect_layer(BulletEffectLayerData2D.EFFECT_TRAIL_FOLLOW, 4),
-		H.make_effect_layer(BulletEffectLayerData2D.EFFECT_ON_SPAWN, 4),
+		H.make_effect_layer(EffectLayerData2D.EFFECT_TRAIL_FOLLOW, 4),
+		H.make_effect_layer(EffectLayerData2D.EFFECT_ON_SPAWN, 4),
 	]
 	data.shared_bullet_attachment = make_probe_scene()
 	var v: BulletVolley2D = factory.spawn_volley(data)

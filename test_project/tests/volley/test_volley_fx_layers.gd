@@ -68,8 +68,8 @@ func _make_frames(count: int, anims: Array = ["default"], col: Color = Color(1, 
 			sf.add_frame(a, ImageTexture.create_from_image(img))
 	return sf
 
-func _make_layer(trigger: int, count: int = 4, anims: Array = ["default"]) -> BulletEffectLayerData2D:
-	var l := BulletEffectLayerData2D.new()
+func _make_layer(trigger: int, count: int = 4, anims: Array = ["default"]) -> EffectLayerData2D:
+	var l := EffectLayerData2D.new()
 	l.trigger = trigger
 	l.sprite_frames = _make_frames(count, anims)
 	return l
@@ -107,7 +107,7 @@ func _preamble() -> void:
 func test_validation_inert_layers_stay_silent_rejects_hold() -> void:
 	await _preamble()
 	# FX T1 validation: inert layers stay silent, rejects hold
-	var dead := BulletEffectLayerData2D.new()
+	var dead := EffectLayerData2D.new()
 	assert_true(dead.random_start_frame == false, "desync off by default")
 	assert_true(dead.max_instances == 0, "auto cap by default")
 	assert_true(factory.spawn_layer_effect(dead, Transform2D.IDENTITY) == -1, "null-frames layer inert, no crash")
@@ -304,7 +304,7 @@ func test_per_bullet_toggles_animation_switch() -> void:
 	v7.all_bullets_set_trail_enabled(0, true)
 	await physics()
 	assert_true(v7.debug_get_trail_transform(0, 1).origin.distance_to(v7.get_bullet_transform(1).origin) < 0.01, "range toggle restores")
-	var custom := BulletEffectLayerData2D.new()
+	var custom := EffectLayerData2D.new()
 	custom.trigger = 0
 	custom.sprite_frames = _make_frames(1, ["a", "b"])
 	var v7b: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 200.0, [custom]))
@@ -314,7 +314,7 @@ func test_per_bullet_toggles_animation_switch() -> void:
 	# A wrong name falls back to the first animation with frames, like the
 	# bullets do (one error; the empty "default" never counts).
 	assert_true(v7b.play_effect_animation(0, "nope"), "unknown animation falls back")
-	expect_error_sequence(["BulletEffectLayerData2D: missing animation 'nope', falling back to 'a'."])
+	expect_error_sequence(["EffectLayerData2D: missing animation 'nope', falling back to 'a'."])
 	assert_true(not v7b.play_effect_animation(9, "b"), "unknown layer rejected")
 
 
@@ -350,7 +350,7 @@ func test_pool_reuse_reseeds_caps_hold_explicit_auto() -> void:
 		auto_slots = int(bake.get("slots", -1))
 	assert_true(auto_slots == 32, "auto cap floors at 32 for a 1-bullet volley (got %d)" % auto_slots)
 	await _settle(factory)
-	var wide := BulletEffectLayerData2D.new()
+	var wide := EffectLayerData2D.new()
 	wide.trigger = 0
 	wide.sprite_frames = _make_frames(30)
 	var v8d: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 200.0, [wide]))
@@ -664,7 +664,7 @@ func test_hostile_zero_frames_ring_caps_shared_refs_teardown() -> void:
 	await _settle(factory)
 	# T18a: zero-frame animation is inert, manual hatch refuses it.
 	var zeroframes := SpriteFrames.new()
-	var dead18 := BulletEffectLayerData2D.new()
+	var dead18 := EffectLayerData2D.new()
 	dead18.trigger = 1
 	dead18.sprite_frames = zeroframes
 	var v18: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 300.0, [dead18], false))
@@ -842,17 +842,17 @@ func test_hostile_configs_never_crash() -> void:
 	await _preamble()
 	# FX T20 hostile configs never crash
 	await _settle(factory)
-	var zeroanim := BulletEffectLayerData2D.new()
+	var zeroanim := EffectLayerData2D.new()
 	zeroanim.trigger = 1
 	var empty_sf := SpriteFrames.new()
 	zeroanim.sprite_frames = empty_sf
 	assert_true(factory.spawn_layer_effect(zeroanim, Transform2D.IDENTITY) == -1, "zero-frame animation inert, no crash")
-	var wronganim := BulletEffectLayerData2D.new()
+	var wronganim := EffectLayerData2D.new()
 	wronganim.trigger = 1
 	wronganim.sprite_frames = _make_frames(2)
 	wronganim.animation = &"nope"
 	assert_true(factory.spawn_layer_effect(wronganim, Transform2D.IDENTITY) >= 0, "a wrong animation name falls back to the first animation with frames")
-	expect_error_sequence(["BulletEffectLayerData2D: sprite_frames has no animation with frames.", "BulletEffectLayerData2D: missing animation 'nope', falling back to 'default'."])
+	expect_error_sequence(["EffectLayerData2D: sprite_frames has no animation with frames.", "EffectLayerData2D: missing animation 'nope', falling back to 'default'."])
 	factory.clear_sprite_effects()
 	var dup_a := _make_layer(0, 1)
 	var v20: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 200.0, [dup_a, dup_a], false))
@@ -908,7 +908,7 @@ func test_on_clear_fires_on_manual_clear_only() -> void:
 	await _preamble()
 	# FX T23 On Clear fires on manual clear only
 	await _settle(factory)
-	var clear_ok := BulletEffectLayerData2D.new()
+	var clear_ok := EffectLayerData2D.new()
 	clear_ok.trigger = 6
 	assert_true(clear_ok.trigger == 6, "trigger 6 (On Clear) accepted")
 	var d23 := _fx_data(Vector2.ZERO, 0.0, [_make_layer(6, 4)], false)
@@ -1021,7 +1021,7 @@ func test_on_clear_visible_in_the_inspector_dropdown() -> void:
 	await _settle(factory)
 	var hint_found := false
 	var order: Dictionary = {}
-	for p in BulletEffectLayerData2D.new().get_property_list():
+	for p in EffectLayerData2D.new().get_property_list():
 		var pname: String = p.get("name", "")
 		if pname == "trigger":
 			hint_found = String(p.get("hint_string", "")).contains("On Clear")
@@ -1124,18 +1124,18 @@ func test_whiten_override_pixels_rebake_fallback() -> void:
 	var red := Image.create_empty(4, 4, false, Image.FORMAT_RGBA8)
 	red.fill(Color(1, 0, 0, 1))
 	red.set_pixel(1, 1, Color(1, 0, 0, 0.5))
-	var white: Image = BulletEffectLayerData2D.whiten_image_copy(red)
+	var white: Image = EffectLayerData2D.whiten_image_copy(red)
 	assert_true(white != null and white.get_pixel(0, 0) == Color(1, 1, 1, 1), "red bakes to white")
 	assert_true(white != null and absf(white.get_pixel(1, 1).a - 0.5) < 0.01 and white.get_pixel(1, 1).r > 0.9, "alpha preserved under white")
-	assert_true(BulletEffectLayerData2D.whiten_image_copy(Image.new()) == null, "empty image refused")
+	assert_true(EffectLayerData2D.whiten_image_copy(Image.new()) == null, "empty image refused")
 	# No size cap (one byte loop, cached per frame by the factory).
-	var wide: Image = BulletEffectLayerData2D.whiten_image_copy(Image.create_empty(600, 8, false, Image.FORMAT_RGBA8))
+	var wide: Image = EffectLayerData2D.whiten_image_copy(Image.create_empty(600, 8, false, Image.FORMAT_RGBA8))
 	assert_true(wide != null and wide.get_size() == Vector2i(600, 8) and wide.get_pixel(599, 7) == Color(1, 1, 1, 0), "a 600 px image whitens")
 	# A compressed image is decompressed first.
 	var packed := Image.create_empty(8, 8, false, Image.FORMAT_RGBA8)
 	packed.fill(Color(1, 0, 0, 1))
 	packed.compress(Image.COMPRESS_S3TC)
-	var unpacked: Image = BulletEffectLayerData2D.whiten_image_copy(packed)
+	var unpacked: Image = EffectLayerData2D.whiten_image_copy(packed)
 	assert_true(unpacked != null and unpacked.get_pixel(3, 3).is_equal_approx(Color(1, 1, 1, 1)), "a compressed image whitens")
 	await _settle(factory)
 	var d27 := _fx_data(Vector2.ZERO, 0.0, [], false)
@@ -1160,7 +1160,7 @@ func test_whiten_override_pixels_rebake_fallback() -> void:
 	sf_bad.set_animation_speed("default", 10.0)
 	sf_bad.set_animation_loop("default", false)
 	sf_bad.add_frame("default", AtlasTexture.new())
-	var lfb := BulletEffectLayerData2D.new()
+	var lfb := EffectLayerData2D.new()
 	lfb.trigger = 1
 	lfb.sprite_frames = sf_bad
 	lfb.override_frame_color = true
@@ -1263,15 +1263,15 @@ func test_whiten_reads_an_atlas_region_only_inside_its_atlas() -> void:
 		var v: BulletVolley2D = factory.spawn_volley(d)
 		if not (v.get_texture() is AtlasTexture):
 			problems.append("bullet %s: %s instead of the original art" % [r, v.get_texture()])
-		expect_error_sequence(["BulletEffectLayerData2D.whiten_image_copy: source image is null or empty."])
+		expect_error_sequence(["EffectLayerData2D.whiten_image_copy: source image is null or empty."])
 		expect_warning_sequence(["BulletVolley2D: override_frame_color could not read a frame of 'default', keeping the original art for unreadable frames."])
-		var layer := BulletEffectLayerData2D.new()
+		var layer := EffectLayerData2D.new()
 		layer.sprite_frames = _atlas_frames(r)
 		layer.override_frame_color = true
 		if factory.spawn_layer_effect(layer, Transform2D.IDENTITY) < 0:
 			problems.append("layer %s: not spawned" % r)
-		expect_error_sequence(["BulletEffectLayerData2D.whiten_image_copy: source image is null or empty."])
-		expect_warning_sequence(["BulletEffectLayerData2D: override_frame_color could not read a frame of 'default', keeping the original art for unreadable frames."])
+		expect_error_sequence(["EffectLayerData2D.whiten_image_copy: source image is null or empty."])
+		expect_warning_sequence(["EffectLayerData2D: override_frame_color could not read a frame of 'default', keeping the original art for unreadable frames."])
 		await _settle(factory)
 	assert_eq("\n".join(problems), "", "every bad region keeps the original art")
 	# A region inside the atlas reads exactly its pixels.
@@ -1302,11 +1302,11 @@ func test_every_frame_of_a_long_animation_bakes() -> void:
 func test_scale_range_is_order_independent_and_survives_a_round_trip() -> void:
 	# The scene loader assigns random_scale_min before random_scale_max: a
 	# saved 1.5..2.0 range used to load min as 1.0 (rejected against max 1.0).
-	var l := BulletEffectLayerData2D.new()
+	var l := EffectLayerData2D.new()
 	l.random_scale_min = 1.5
 	l.random_scale_max = 2.0
 	assert_eq([l.random_scale_min, l.random_scale_max], [1.5, 2.0], "min then max keeps both")
-	var r := BulletEffectLayerData2D.new()
+	var r := EffectLayerData2D.new()
 	r.random_scale_max = 2.0
 	r.random_scale_min = 1.5
 	assert_eq([r.random_scale_min, r.random_scale_max], [1.5, 2.0], "max then min keeps both")
@@ -1315,9 +1315,9 @@ func test_scale_range_is_order_independent_and_survives_a_round_trip() -> void:
 	l.random_scale_max = 0.5
 	assert_eq([l.random_scale_min, l.random_scale_max], [0.5, 0.5], "max below min pulls min down")
 	l.random_scale_min = -1.0
-	expect_error_sequence(["BulletEffectLayerData2D: random_scale_min must be finite and >= 0, keeping the old value."])
+	expect_error_sequence(["EffectLayerData2D: random_scale_min must be finite and >= 0, keeping the old value."])
 	l.random_scale_max = INF
-	expect_error_sequence(["BulletEffectLayerData2D: random_scale_max must be finite and >= 0, keeping the old value."])
+	expect_error_sequence(["EffectLayerData2D: random_scale_max must be finite and >= 0, keeping the old value."])
 	assert_eq([l.random_scale_min, l.random_scale_max], [0.5, 0.5], "rejected values keep the old pair")
 
 
@@ -1437,7 +1437,7 @@ func test_a_reused_volley_draws_its_one_shots_after_the_container_was_freed() ->
 	await _preamble()
 	await _settle(factory)
 	var d := H.make_volley_data(2, 0.0, 5.0)
-	d.effect_layers = [H.make_effect_layer(BulletEffectLayerData2D.EFFECT_ON_CLEAR, 2)]
+	d.effect_layers = [H.make_effect_layer(EffectLayerData2D.EFFECT_ON_CLEAR, 2)]
 	var v: BulletVolley2D = factory.spawn_volley(d)
 	v.clear_all_bullets()
 	assert_gt(_visible_effect_shards(), 0, "the clear effect draws")
@@ -1458,7 +1458,7 @@ func test_a_reused_volley_draws_its_one_shots_after_the_container_was_freed() ->
 func test_spawn_layer_effect_refuses_an_animation_without_playable_time() -> void:
 	await _preamble()
 	await _settle(factory)
-	var held := _make_layer(BulletEffectLayerData2D.EFFECT_TRAIL_FOLLOW, 2)
+	var held := _make_layer(EffectLayerData2D.EFFECT_TRAIL_FOLLOW, 2)
 	held.sprite_frames.set_animation_speed(&"default", 0.0)
 	var manual_before := int(factory.debug_get_effect_state()["manual_bakes"])
 	assert_eq(factory.spawn_layer_effect(held, Transform2D(0.0, Vector2(40, 0))), -1, "refused")

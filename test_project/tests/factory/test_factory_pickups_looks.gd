@@ -180,7 +180,7 @@ func test_a_pooled_pickup_volley_returns_as_a_plain_one_without_its_attachment_l
 	coin.z_index = 9
 	coin.tint = Color(1, 0, 0, 0.5)
 	coin.material = CanvasItemMaterial.new()
-	coin.effect_layers = [H.make_effect_layer(BulletEffectLayerData2D.EFFECT_ON_SPAWN)]
+	coin.effect_layers = [H.make_effect_layer(EffectLayerData2D.EFFECT_ON_SPAWN)]
 	var pv := _convert(coin, [Vector2.ZERO, Vector2(8, 0)], Vector2(60, 0))
 	await _wait(2)
 	await idle(3)
@@ -247,23 +247,23 @@ func test_the_factory_time_scale_reaches_a_pickups_attachment() -> void:
 
 func test_effect_layers_fire_for_pickups() -> void:
 	var coin := P.coin()
-	coin.effect_layers = [H.make_effect_layer(BulletEffectLayerData2D.EFFECT_ON_SPAWN)]
+	coin.effect_layers = [H.make_effect_layer(EffectLayerData2D.EFFECT_ON_SPAWN)]
 	factory.debug_set_effect_log_enabled(true)
 	_convert(coin, [Vector2.ZERO, Vector2(8, 0), Vector2(16, 0)])
-	var spawns := factory.debug_get_effect_log().filter(func(e): return int(e["trigger"]) == BulletEffectLayerData2D.EFFECT_ON_SPAWN)
+	var spawns := factory.debug_get_effect_log().filter(func(e): return int(e["trigger"]) == EffectLayerData2D.EFFECT_ON_SPAWN)
 	assert_eq(spawns.size(), 3, "an On Spawn flash per pickup")
 
 
 func test_collection_fires_no_hit_or_destroy_effects_but_the_collect_effect() -> void:
 	var coin := P.coin()
-	coin.effect_layers = [H.make_effect_layer(BulletEffectLayerData2D.EFFECT_ON_DESTROY), H.make_effect_layer(BulletEffectLayerData2D.EFFECT_ON_HIT)]
-	coin.collect_effect = H.make_effect_layer(BulletEffectLayerData2D.EFFECT_ON_SPAWN)
+	coin.effect_layers = [H.make_effect_layer(EffectLayerData2D.EFFECT_ON_DESTROY), H.make_effect_layer(EffectLayerData2D.EFFECT_ON_HIT)]
+	coin.collect_effect = H.make_effect_layer(EffectLayerData2D.EFFECT_ON_SPAWN)
 	factory.debug_set_effect_log_enabled(true)
 	_convert(coin, [Vector2.ZERO], _target(Vector2(300, 0)))
 	await _wait(1)
 	assert_eq(collected.size(), 1, "collected")
 	var log := factory.debug_get_effect_log()
-	assert_eq(log.filter(func(e): return int(e["trigger"]) in [BulletEffectLayerData2D.EFFECT_ON_DESTROY, BulletEffectLayerData2D.EFFECT_ON_HIT]).size(), 0, "a collection is neither a hit nor a destroy")
+	assert_eq(log.filter(func(e): return int(e["trigger"]) in [EffectLayerData2D.EFFECT_ON_DESTROY, EffectLayerData2D.EFFECT_ON_HIT]).size(), 0, "a collection is neither a hit nor a destroy")
 	assert_gt(factory.get_active_effect_count(), 0, "the collect effect plays")
 
 
@@ -271,7 +271,7 @@ func test_a_pickup_that_leaves_the_despawn_bounds_fires_its_on_despawn_layer() -
 	factory.despawn_bounds_rect = Rect2(0, 0, 200, 200)
 	factory.despawn_bounds_enabled = true
 	var coin := P.coin()
-	coin.effect_layers = [H.make_effect_layer(BulletEffectLayerData2D.EFFECT_ON_DESPAWN)]
+	coin.effect_layers = [H.make_effect_layer(EffectLayerData2D.EFFECT_ON_DESPAWN)]
 	coin.motion_mode = BulletPickupData2D.MOTION_KEEP_BULLET_MOTION
 	factory.debug_set_effect_log_enabled(true)
 	var v := P.still(factory, [Vector2(150, 100)])
@@ -280,6 +280,6 @@ func test_a_pickup_that_leaves_the_despawn_bounds_fires_its_on_despawn_layer() -
 	await idle(1)
 	for i in 8:
 		factory.debug_advance_time(0.1)
-	var fired := factory.debug_get_effect_log().filter(func(e): return int(e["trigger"]) == BulletEffectLayerData2D.EFFECT_ON_DESPAWN)
+	var fired := factory.debug_get_effect_log().filter(func(e): return int(e["trigger"]) == EffectLayerData2D.EFFECT_ON_DESPAWN)
 	assert_eq(fired.size(), 1, "pickups obey the bounds like any bullet and fire On Despawn")
 	assert_eq(collected.size(), 0, "and are not collected")

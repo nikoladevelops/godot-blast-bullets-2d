@@ -2,11 +2,11 @@
 
 #include "core/variant_enum_cast2d.hpp"
 #include "data/bullet_curves_data2d.hpp"
-#include "data/bullet_effect_layer_data2d.hpp"
 #include "data/bullet_rotation_data2d.hpp"
 #include "data/bullet_sound_data2d.hpp"
 #include "data/bullet_speed_data2d.hpp"
 #include "data/bullet_volley_data2d.hpp"
+#include "data/effect_layer_data2d.hpp"
 
 #include <godot_cpp/classes/material.hpp>
 #include <godot_cpp/classes/packed_scene.hpp>
@@ -70,7 +70,7 @@ public:
 	int z_index = 0;
 	Ref<PackedScene> attachment;
 	Vector2 attachment_offset = Vector2(0, 0);
-	TypedArray<BulletEffectLayerData2D> effect_layers;
+	TypedArray<EffectLayerData2D> effect_layers;
 	// Motion
 	int motion_mode = MOTION_BURST_AND_MAGNET;
 	Ref<BulletSpeedData2D> speed_data;
@@ -91,7 +91,7 @@ public:
 	bool collect_on_collision = false;
 	Variant value;
 	Ref<BulletSoundData2D> collect_sound;
-	Ref<BulletEffectLayerData2D> collect_effect;
+	Ref<EffectLayerData2D> collect_effect;
 	Callable collect_callback; // runtime only, never saved
 	// Optional physics (0/0: pure distance collection)
 	int collision_layer = 0;
@@ -127,7 +127,7 @@ public:
 	BLAST_PICKUP_ACCESSORS(int, z_index)
 	BLAST_PICKUP_ACCESSORS(Ref<PackedScene>, attachment)
 	BLAST_PICKUP_ACCESSORS(Vector2, attachment_offset)
-	BLAST_PICKUP_ACCESSORS(TypedArray<BulletEffectLayerData2D>, effect_layers)
+	BLAST_PICKUP_ACCESSORS(TypedArray<EffectLayerData2D>, effect_layers)
 	MotionMode get_motion_mode() const { return static_cast<MotionMode>(motion_mode); }
 	void set_motion_mode(MotionMode p_value);
 	BLAST_PICKUP_ACCESSORS(Ref<BulletSpeedData2D>, speed_data)
@@ -145,7 +145,7 @@ public:
 	BLAST_PICKUP_ACCESSORS(bool, collect_on_collision)
 	BLAST_PICKUP_ACCESSORS(Variant, value)
 	BLAST_PICKUP_ACCESSORS(Ref<BulletSoundData2D>, collect_sound)
-	BLAST_PICKUP_ACCESSORS(Ref<BulletEffectLayerData2D>, collect_effect)
+	BLAST_PICKUP_ACCESSORS(Ref<EffectLayerData2D>, collect_effect)
 	BLAST_PICKUP_ACCESSORS(Callable, collect_callback)
 	BLAST_PICKUP_ACCESSORS(int, collision_layer)
 	BLAST_PICKUP_ACCESSORS(int, collision_mask)

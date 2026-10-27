@@ -173,7 +173,7 @@ func test_steady_object_count_over_many_cycles() -> void:
 	var coin := P.coin()
 	coin.attachment = make_probe_scene()
 	coin.sprite_frames = P.frames()
-	coin.effect_layers = [H.make_effect_layer(BulletEffectLayerData2D.EFFECT_ON_SPAWN)]
+	coin.effect_layers = [H.make_effect_layer(EffectLayerData2D.EFFECT_ON_SPAWN)]
 	var target := _target(Vector2(120, 0))
 	var counts: Array = []
 	for cycle in 14:
@@ -479,7 +479,7 @@ func test_a_handler_that_took_the_pickup_out_stops_the_rest_of_the_collection() 
 	var coin := P.coin()
 	var callbacks := [0]
 	coin.collect_callback = func(_t, _p, _v, _i, _val): callbacks[0] += 1
-	coin.collect_effect = H.make_effect_layer(BulletEffectLayerData2D.EFFECT_ON_SPAWN)
+	coin.collect_effect = H.make_effect_layer(EffectLayerData2D.EFFECT_ON_SPAWN)
 	factory.pickup_collected.connect(func(_t, _p, volley, index, _val): volley.disable_bullet(index))
 	factory.convert_all_bullets_to_pickups(coin, Vector2(150, 0))
 	await _wait(1)

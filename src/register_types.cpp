@@ -9,7 +9,6 @@
 #include "bullet_spawner/laser_spawner2d.hpp"
 #include "core/cached_string_names2d.hpp"
 #include "data/bullet_curves_data2d.hpp"
-#include "data/bullet_effect_layer_data2d.hpp"
 #include "data/bullet_emitter_data2d.hpp"
 #include "data/bullet_flock2d.hpp"
 #include "data/bullet_pickup_data2d.hpp"
@@ -19,6 +18,7 @@
 #include "data/bullet_split_data2d.hpp"
 #include "data/bullet_split_stage2d.hpp"
 #include "data/bullet_wobble_data2d.hpp"
+#include "data/effect_layer_data2d.hpp"
 #include "data/graze_zone2d.hpp"
 #include "data/laser_data2d.hpp"
 #include "data/laser_effect_data2d.hpp"
@@ -70,7 +70,7 @@ void initialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
 
 	// Shared
 	GDREGISTER_CLASS(BulletRotationData2D)
-	GDREGISTER_CLASS(BulletEffectLayerData2D)
+	GDREGISTER_CLASS(EffectLayerData2D)
 	GDREGISTER_CLASS(BulletSpeedData2D)
 	GDREGISTER_CLASS(BulletCurvesData2D)
 	GDREGISTER_CLASS(BulletWobbleData2D)

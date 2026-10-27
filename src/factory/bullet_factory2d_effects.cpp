@@ -23,7 +23,7 @@ static double fx_clamp01(double v) {
 // Ring size for one-shot bakes: explicit caps win, 0 means auto (one slot
 // per bullet plus margin, 32 floor). Clamped hard: a misconfigured layer
 // can never preallocate unbounded memory.
-static int fx_ring_size_for_layer(const Ref<BulletEffectLayerData2D> &layer, int amount_bullets) {
+static int fx_ring_size_for_layer(const Ref<EffectLayerData2D> &layer, int amount_bullets) {
 	if (layer.is_valid() && layer->max_instances > 0) {
 		return (int)Math::clamp((double)layer->max_instances, 1.0, 4096.0);
 	}
@@ -209,7 +209,7 @@ void BulletFactory2D::fx_erase_bake(FXOneShotBake &bake) {
 	bake.ring_cursor = 0;
 }
 
-bool BulletFactory2D::fx_register_volley_bake(uint64_t volley_id, int layer_index, const Ref<BulletEffectLayerData2D> &layer, int amount_bullets) {
+bool BulletFactory2D::fx_register_volley_bake(uint64_t volley_id, int layer_index, const Ref<EffectLayerData2D> &layer, int amount_bullets) {
 	if (volley_id == 0 || layer.is_null() || !layer->enabled) {
 		return false;
 	}
@@ -277,7 +277,7 @@ int BulletFactory2D::fx_fire_into_bake(FXOneShotBake &bake, const Transform2D &a
 	if (!at.get_origin().is_finite() || !Math::is_finite(at.get_rotation())) {
 		return -1;
 	}
-	BulletEffectLayerData2D *layer = bake.layer.ptr();
+	EffectLayerData2D *layer = bake.layer.ptr();
 	if (layer->trigger_chance < 1.0) {
 		if (!Math::is_finite((double)layer->trigger_chance) || CosmeticRng2D::randf() > layer->trigger_chance) {
 			return -1;
@@ -498,7 +498,7 @@ int BulletFactory2D::get_active_effect_count() const {
 // Everything a manual bake froze into its shards (the volley path compares
 // the same snapshot, BulletVolley2D::FXLayerSnapshot): an edit of any of it
 // since the bake rebuilds the bake.
-static bool fx_shards_match_layer(const BulletFactory2D::FXOneShotBake &bake, const Ref<BulletEffectLayerData2D> &layer) {
+static bool fx_shards_match_layer(const BulletFactory2D::FXOneShotBake &bake, const Ref<EffectLayerData2D> &layer) {
 	if ((int)bake.slots.size() != fx_ring_size_for_layer(layer, 32)) {
 		return false;
 	}
@@ -510,7 +510,7 @@ static bool fx_shards_match_layer(const BulletFactory2D::FXOneShotBake &bake, co
 	return true;
 }
 
-int BulletFactory2D::spawn_layer_effect(const Ref<BulletEffectLayerData2D> &layer, const Transform2D &at) {
+int BulletFactory2D::spawn_layer_effect(const Ref<EffectLayerData2D> &layer, const Transform2D &at) {
 	if (layer.is_null() || !layer->enabled) {
 		UtilityFunctions::push_error("BulletFactory2D.spawn_layer_effect: layer is null or disabled.");
 		return -1;
@@ -518,12 +518,12 @@ int BulletFactory2D::spawn_layer_effect(const Ref<BulletEffectLayerData2D> &laye
 	return fx_spawn_manual(layer, at, "BulletFactory2D.spawn_layer_effect");
 }
 
-bool BulletFactory2D::fx_play_laser_effect(const Ref<BulletEffectLayerData2D> &layer, const Transform2D &at) {
+bool BulletFactory2D::fx_play_laser_effect(const Ref<EffectLayerData2D> &layer, const Transform2D &at) {
 	if (layer.is_null() || !layer->enabled || is_tearing_down) {
 		return false;
 	}
 	const uint64_t id = (uint64_t)layer->get_instance_id();
-	if (layer->trigger == BulletEffectLayerData2D::EFFECT_TRAIL_FOLLOW) {
+	if (layer->trigger == EffectLayerData2D::EFFECT_TRAIL_FOLLOW) {
 		if (WarnOnce2D::first(id, 28u, 0, 0)) {
 			UtilityFunctions::push_warning("LaserEffectData2D: effect is a trail layer (a trail follows a bullet), nothing plays.");
 		}
@@ -543,7 +543,7 @@ bool BulletFactory2D::fx_play_laser_effect(const Ref<BulletEffectLayerData2D> &l
 	return true;
 }
 
-int BulletFactory2D::fx_spawn_manual(const Ref<BulletEffectLayerData2D> &layer, const Transform2D &at, const char *caller) {
+int BulletFactory2D::fx_spawn_manual(const Ref<EffectLayerData2D> &layer, const Transform2D &at, const char *caller) {
 	for (size_t i = 0; i < fx_manual_bakes.size(); ++i) {
 		// Same resource, edited content: the stored generation trails the
 		// layer's, so drop the stale bake and rebuild below. Same when a

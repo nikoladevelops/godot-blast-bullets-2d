@@ -26,7 +26,7 @@ func _data(layers: Array, max_collisions: int = 0, lifetime: float = 30.0, bounc
 	return d
 
 
-func _layer(trigger: int) -> BulletEffectLayerData2D:
+func _layer(trigger: int) -> EffectLayerData2D:
 	return H.make_effect_layer(trigger, 4)
 
 

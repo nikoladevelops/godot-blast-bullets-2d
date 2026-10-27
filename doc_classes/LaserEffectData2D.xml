@@ -15,8 +15,8 @@
 		<member name="at" type="int" setter="set_at" getter="get_at" enum="LaserEffectData2D.EffectPoint" default="0">
 			Where the effect plays: [constant AT_EVENT] (default) where the event happened (the contact, the wall point, where a head left the bounds), [constant AT_MUZZLE] or [constant AT_TIP] of the event's beam.
 		</member>
-		<member name="effect" type="BulletEffectLayerData2D" setter="set_effect" getter="get_effect">
-			The one-shot layer to play (its own offsets, scale, spin, tint and draw settings apply; its [member BulletEffectLayerData2D.trigger] is ignored). A trail layer is refused with one error (a trail follows a bullet); one turned into a trail later plays nothing, with one warning.
+		<member name="effect" type="EffectLayerData2D" setter="set_effect" getter="get_effect">
+			The one-shot layer to play (its own offsets, scale, spin, tint and draw settings apply; its [member EffectLayerData2D.trigger] is ignored). A trail layer is refused with one error (a trail follows a bullet); one turned into a trail later plays nothing, with one warning.
 		</member>
 		<member name="enabled" type="bool" setter="set_enabled" getter="get_enabled" default="true">
 			When off, the entry plays nothing.
