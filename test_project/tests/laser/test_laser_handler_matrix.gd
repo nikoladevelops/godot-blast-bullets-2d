@@ -48,7 +48,7 @@ func _data() -> LaserData2D:
 	return d
 
 
-func _zone() -> BulletGrazeZone2D:
+func _zone() -> GrazeZone2D:
 	return H.make_graze_zone([40.0])
 
 

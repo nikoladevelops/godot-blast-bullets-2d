@@ -471,13 +471,13 @@ void BulletSpawner2D::_bind_methods() {
 			PropertyInfo(Variant::OBJECT, "target", PROPERTY_HINT_RESOURCE_TYPE, "Node2D"),
 			PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
 			PropertyInfo(Variant::INT, "bullet_index"),
-			PropertyInfo(Variant::OBJECT, "zone", PROPERTY_HINT_RESOURCE_TYPE, "BulletGrazeZone2D"),
+			PropertyInfo(Variant::OBJECT, "zone", PROPERTY_HINT_RESOURCE_TYPE, "GrazeZone2D"),
 			PropertyInfo(Variant::INT, "ring_index")));
 	ADD_SIGNAL(MethodInfo("bullet_graze_exited",
 			PropertyInfo(Variant::OBJECT, "target", PROPERTY_HINT_RESOURCE_TYPE, "Node2D"),
 			PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
 			PropertyInfo(Variant::INT, "bullet_index"),
-			PropertyInfo(Variant::OBJECT, "zone", PROPERTY_HINT_RESOURCE_TYPE, "BulletGrazeZone2D"),
+			PropertyInfo(Variant::OBJECT, "zone", PROPERTY_HINT_RESOURCE_TYPE, "GrazeZone2D"),
 			PropertyInfo(Variant::INT, "deepest_ring_index")));
 	ClassDB::bind_method(D_METHOD("debug_explain_features"), &BulletSpawner2D::debug_explain_features);
 	BIND_ENUM_CONSTANT(ORPHANED_VOLLEYS_KEEP_FLYING);

@@ -113,6 +113,7 @@ public:
 	void append_setup_warnings(PackedStringArray &r_warnings) const override;
 	real_t preview_beam_length() const override;
 	real_t preview_beam_width() const override;
+	String shot_signal_names() const override { return "laser_fired, volley_skipped"; }
 	const char *payload_key() const override { return "laser_data"; }
 	String payload_class_name() const override { return "LaserData2D"; }
 	bool apply_payload_override(const Variant &value) override;

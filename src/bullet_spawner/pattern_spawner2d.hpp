@@ -15,9 +15,9 @@
 #include <memory>
 #include <vector>
 
-#include "data/bullet_graze_zone2d.hpp"
 #include "data/bullet_sound_data2d.hpp"
 #include "data/bullet_volley_data2d.hpp"
+#include "data/graze_zone2d.hpp"
 #include "godot_cpp/classes/array_mesh.hpp"
 #include "godot_cpp/classes/curve.hpp"
 #include "godot_cpp/classes/multi_mesh.hpp"
@@ -483,7 +483,7 @@ public:
 
 	// GRAZE (EASY API, bullet_spawner2d_graze.cpp)
 	//
-	// Every fired volley is armed with graze_zones (BulletGrazeZone2D: a
+	// Every fired volley is armed with graze_zones (GrazeZone2D: a
 	// target group and up to 4 rings around each target). A bullet passing
 	// within a ring of a zone target fires bullet_grazed, and
 	// bullet_graze_exited when it leaves that zone alive: on this spawner
@@ -502,7 +502,7 @@ public:
 	bool graze_enabled = false;
 	// Up to BulletVolley2D::MAX_GRAZE_ZONES zones; null entries are kept
 	// (the inspector adds them) and skipped.
-	TypedArray<BulletGrazeZone2D> graze_zones;
+	TypedArray<GrazeZone2D> graze_zones;
 	// SERIALIZED ids (GrazeDetector2D::Source): never renumber.
 	enum GrazeTargetSource : int {
 		GRAZE_SOURCE_NODE_GROUP = 0, // Node2D members of graze_node_group (default)
@@ -533,7 +533,7 @@ public:
 
 	bool get_graze_enabled() const;
 	void set_graze_enabled(bool value);
-	TypedArray<BulletGrazeZone2D> get_graze_zones() const;
+	TypedArray<GrazeZone2D> get_graze_zones() const;
 	void set_graze_zones(const Array &value);
 	bool get_graze_show_preview() const;
 	void set_graze_show_preview(bool value);
@@ -1281,6 +1281,8 @@ public:
 	// spawner fires (nullptr = none), its class for the error text, and the
 	// swap (false = wrong type, nothing changed).
 	virtual const char *payload_key() const { return nullptr; }
+	// The signals a shot of this spawner emits (named in its nesting error).
+	virtual String shot_signal_names() const { return "volley_skipped"; }
 	virtual String payload_class_name() const { return String(); }
 	virtual bool apply_payload_override(const Variant &value) { return false; }
 

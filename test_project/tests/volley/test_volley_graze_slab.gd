@@ -41,7 +41,7 @@ func _scene(scene_seed: int, slab_min: int, target_count: int = 16) -> Array:
 	d.collision_shape = H.make_circle_shape(4.0)
 	var v: BulletVolley2D = factory.spawn_volley(d)
 	var zone := H.make_graze_zone([14.0, 36.0])
-	zone.regraze = BulletGrazeZone2D.REGRAZE_AFTER_EXIT
+	zone.regraze = GrazeZone2D.REGRAZE_AFTER_EXIT
 	v.graze_set_zones([zone], GROUP)
 	var log := H.record_graze(factory)
 	for tick in 40:

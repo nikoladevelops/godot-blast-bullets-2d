@@ -69,8 +69,8 @@ func test_setters_reject_and_keep() -> void:
 	sp.graze_preview_line_width = 0.0
 	expect_error_sequence([
 		"BulletSpawner2D: graze_zones holds at most 4 zones, keeping the old value.",
-		"BulletSpawner2D: graze_zones entries must be BulletGrazeZone2D or null, keeping the old value.",
-		"BulletSpawner2D: graze_zones entries must be BulletGrazeZone2D or null, keeping the old value.",
+		"BulletSpawner2D: graze_zones entries must be GrazeZone2D or null, keeping the old value.",
+		"BulletSpawner2D: graze_zones entries must be GrazeZone2D or null, keeping the old value.",
 		"BulletSpawner2D: graze_preview_line_width must be finite and > 0, keeping the old value.",
 		"BulletSpawner2D: graze_preview_line_width must be finite and > 0, keeping the old value.",
 	])
@@ -113,8 +113,8 @@ func test_events_bubble_spawner_then_factory_exactly_once_each() -> void:
 	var z := H.make_graze_zone([20.0])
 	var sp := _spawner([z])
 	var order: Array = []
-	sp.bullet_grazed.connect(func(target: Node2D, v: BulletVolley2D, i: int, zone: BulletGrazeZone2D, r: int) -> void: order.append(["spawner", target, v, i, zone, r]))
-	factory.bullet_grazed.connect(func(target: Node2D, v: BulletVolley2D, i: int, zone: BulletGrazeZone2D, r: int) -> void: order.append(["factory", target, v, i, zone, r]))
+	sp.bullet_grazed.connect(func(target: Node2D, v: BulletVolley2D, i: int, zone: GrazeZone2D, r: int) -> void: order.append(["spawner", target, v, i, zone, r]))
+	factory.bullet_grazed.connect(func(target: Node2D, v: BulletVolley2D, i: int, zone: GrazeZone2D, r: int) -> void: order.append(["factory", target, v, i, zone, r]))
 	var v := _shoot(sp)
 	step_factory(3)
 	assert_eq(order, [["spawner", t, v, 0, z, 0], ["factory", t, v, 0, z, 0]], "the spawner first, then the factory, same payload, once each")
@@ -293,7 +293,7 @@ func test_an_array_mutated_in_place_still_arms_its_usable_zones_and_warns_once()
 	var log := H.record_graze(factory)
 	var v := _shoot(sp)
 	_shoot(sp)
-	expect_warning_sequence(["BulletSpawner2D: graze_zones was changed in place and holds more than 4 zones or entries that are not BulletGrazeZone2D; only the first 4 zones are used. Assign the whole array instead (graze_zones = [...])."])
+	expect_warning_sequence(["BulletSpawner2D: graze_zones was changed in place and holds more than 4 zones or entries that are not GrazeZone2D; only the first 4 zones are used. Assign the whole array instead (graze_zones = [...])."])
 	assert_eq(v.get_graze_zones().size(), 4, "the first four arm")
 	step_factory()
 	assert_eq(log.size(), 2, "both volleys graze with the first zone")

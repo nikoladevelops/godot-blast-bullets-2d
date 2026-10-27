@@ -2,11 +2,11 @@
 
 #include "bullet_volley/homing_target_deque.hpp"
 #include "data/bullet_curves_data2d.hpp"
-#include "data/bullet_graze_zone2d.hpp"
 #include "data/bullet_sound_data2d.hpp"
 #include "data/bullet_split_data2d.hpp"
 #include "data/bullet_volley_data2d.hpp"
 #include "data/bullet_wobble_data2d.hpp"
+#include "data/graze_zone2d.hpp"
 #include "factory/flock_solver2d.hpp"
 #include "factory/graze_detector2d.hpp"
 #include "pooling/volley_pool_key2d.hpp"
@@ -36,7 +36,7 @@ struct SplitConfig2D {
 // arming change of a life and shared by every request of that life (one
 // refcount per death instead of copying vectors).
 struct SplitArming2D {
-	Ref<BulletGrazeZone2D> graze_zones[4];
+	Ref<GrazeZone2D> graze_zones[4];
 	int graze_slots = 0;
 	std::shared_ptr<GrazeDetector2D> graze_detector;
 	StringName graze_target_group;

@@ -762,13 +762,13 @@ void LaserSpawner2D::_bind_methods() {
 			PropertyInfo(Variant::OBJECT, "target"),
 			PropertyInfo(Variant::OBJECT, "laser", PROPERTY_HINT_RESOURCE_TYPE, "LaserVolley2D"),
 			PropertyInfo(Variant::INT, "beam_index"),
-			PropertyInfo(Variant::OBJECT, "zone", PROPERTY_HINT_RESOURCE_TYPE, "BulletGrazeZone2D"),
+			PropertyInfo(Variant::OBJECT, "zone", PROPERTY_HINT_RESOURCE_TYPE, "GrazeZone2D"),
 			PropertyInfo(Variant::INT, "ring_index")));
 	ADD_SIGNAL(MethodInfo("laser_graze_exited",
 			PropertyInfo(Variant::OBJECT, "target"),
 			PropertyInfo(Variant::OBJECT, "laser", PROPERTY_HINT_RESOURCE_TYPE, "LaserVolley2D"),
 			PropertyInfo(Variant::INT, "beam_index"),
-			PropertyInfo(Variant::OBJECT, "zone", PROPERTY_HINT_RESOURCE_TYPE, "BulletGrazeZone2D"),
+			PropertyInfo(Variant::OBJECT, "zone", PROPERTY_HINT_RESOURCE_TYPE, "GrazeZone2D"),
 			PropertyInfo(Variant::INT, "deepest_ring_index")));
 
 	BIND_ENUM_CONSTANT(ORPHANED_LASERS_FADE_OUT);

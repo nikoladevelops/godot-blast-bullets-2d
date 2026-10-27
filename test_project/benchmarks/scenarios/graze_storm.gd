@@ -5,7 +5,7 @@ extends BlastBenchmark
 ## handler). Measures event collection + live dispatch, the graze cost that
 ## scales with grazes instead of bullets.
 var _data: BulletVolleyData2D
-var _zone: BulletGrazeZone2D
+var _zone: GrazeZone2D
 var _events := 0
 
 func describe() -> String:
@@ -16,7 +16,7 @@ func setup() -> void:
 	player.position = Vector2(960, 540)
 	add_child(player)
 	player.add_to_group(&"bench_storm_player")
-	_zone = BulletGrazeZone2D.new()
+	_zone = GrazeZone2D.new()
 	_zone.ring_count = 2
 	_zone.ring_1_radius = 64.0
 	_zone.ring_2_radius = 32.0
@@ -24,7 +24,7 @@ func setup() -> void:
 	factory.bullet_grazed.connect(_on_graze)
 	factory.bullet_graze_exited.connect(_on_graze)
 
-func _on_graze(_t: Node2D, _v: BulletVolley2D, _i: int, _z: BulletGrazeZone2D, _r: int) -> void:
+func _on_graze(_t: Node2D, _v: BulletVolley2D, _i: int, _z: GrazeZone2D, _r: int) -> void:
 	_events += 1
 
 func step(frame: int) -> void:

@@ -87,8 +87,8 @@ func test_factory_and_spawner_declare_the_same_volley_signals() -> void:
 func test_factory_and_spawner_declare_the_same_graze_signals() -> void:
 	var spawner := make_spawner()
 	var expected := {
-		"bullet_grazed": [["target", "Node2D"], ["volley", "BulletVolley2D"], ["bullet_index", ""], ["zone", "BulletGrazeZone2D"], ["ring_index", ""]],
-		"bullet_graze_exited": [["target", "Node2D"], ["volley", "BulletVolley2D"], ["bullet_index", ""], ["zone", "BulletGrazeZone2D"], ["deepest_ring_index", ""]],
+		"bullet_grazed": [["target", "Node2D"], ["volley", "BulletVolley2D"], ["bullet_index", ""], ["zone", "GrazeZone2D"], ["ring_index", ""]],
+		"bullet_graze_exited": [["target", "Node2D"], ["volley", "BulletVolley2D"], ["bullet_index", ""], ["zone", "GrazeZone2D"], ["deepest_ring_index", ""]],
 		"bullet_split": [["position", ""], ["cause", ""], ["children", "BulletVolley2D"], ["depth", ""]],
 	}
 	for owner in [factory, spawner]:

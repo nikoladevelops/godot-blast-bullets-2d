@@ -1695,7 +1695,7 @@
 			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="zone_index" type="int" />
 			<description>
-				Bitmask of the rings of zone [param zone_index] that bullet [param bullet_index] already grazed (bit k = ring k). With [constant BulletGrazeZone2D.REGRAZE_ONCE] the bits stay for the bullet's life.
+				Bitmask of the rings of zone [param zone_index] that bullet [param bullet_index] already grazed (bit k = ring k). With [constant GrazeZone2D.REGRAZE_ONCE] the bits stay for the bullet's life.
 			</description>
 		</method>
 		<method name="get_bullet_indexes_in_circle" qualifiers="const">
@@ -1878,7 +1878,7 @@
 			<param index="0" name="zones" type="Array" />
 			<param index="1" name="target_group" type="StringName" />
 			<description>
-				Arms this volley with up to [constant MAX_GRAZE_ZONES] [BulletGrazeZone2D] zones (null entries are skipped but keep their index), all ringing the live [Node2D] members of [param target_group] (no cap), and resets every bullet's graze state. Use it for volleys spawned straight from [BulletFactory2D]; spawner volleys are armed by their spawner ([member BulletSpawner2D.graze_zones] and [member BulletSpawner2D.graze_target_source]), and re-arming one with this method replaces its spawner's targeting with the group. Returns false and changes nothing for more than 4 entries, a non-zone entry or an empty [param target_group]; refused on a pooled handle.
+				Arms this volley with up to [constant MAX_GRAZE_ZONES] [GrazeZone2D] zones (null entries are skipped but keep their index), all ringing the live [Node2D] members of [param target_group] (no cap), and resets every bullet's graze state. Use it for volleys spawned straight from [BulletFactory2D]; spawner volleys are armed by their spawner ([member BulletSpawner2D.graze_zones] and [member BulletSpawner2D.graze_target_source]), and re-arming one with this method replaces its spawner's targeting with the group. Returns false and changes nothing for more than 4 entries, a non-zone entry or an empty [param target_group]; refused on a pooled handle.
 			</description>
 		</method>
 		<method name="has_bullet_movement_pattern" qualifiers="const">

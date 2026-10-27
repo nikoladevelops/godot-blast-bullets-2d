@@ -113,12 +113,12 @@ func test_free_attachment_and_target_inside_graze_handlers() -> void:
 	v.all_bullets_set_attachment(make_probe_scene(), Vector2.ZERO, true)
 	v.graze_set_zones([H.make_graze_zone([30.0])], &"graze_targets")
 	var events: Array = []
-	factory.bullet_grazed.connect(func(t: Node2D, volley: BulletVolley2D, idx: int, _z: BulletGrazeZone2D, _r: int) -> void:
+	factory.bullet_grazed.connect(func(t: Node2D, volley: BulletVolley2D, idx: int, _z: GrazeZone2D, _r: int) -> void:
 		events.append(idx)
 		_free_attachment_of(volley, idx)
 		if is_instance_valid(t):
 			t.free())
-	factory.bullet_graze_exited.connect(func(_t: Node2D, _v: BulletVolley2D, idx: int, _z: BulletGrazeZone2D, _r: int) -> void:
+	factory.bullet_graze_exited.connect(func(_t: Node2D, _v: BulletVolley2D, idx: int, _z: GrazeZone2D, _r: int) -> void:
 		events.append(-1 - idx))
 	for i in 40:
 		await physics()

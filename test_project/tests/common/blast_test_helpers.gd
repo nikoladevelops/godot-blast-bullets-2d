@@ -105,8 +105,8 @@ static func make_flat_curve(value: float) -> Curve:
 
 ## Graze zone with one ring per radius (bullet size off unless
 ## asked, so distances in tests are center to center).
-static func make_graze_zone(radii: Array = [24.0], count_bullet_size := false) -> BulletGrazeZone2D:
-	var z := BulletGrazeZone2D.new()
+static func make_graze_zone(radii: Array = [24.0], count_bullet_size := false) -> GrazeZone2D:
+	var z := GrazeZone2D.new()
 	z.ring_count = radii.size()
 	for i in radii.size():
 		z.set_ring_radius(i, radii[i])
@@ -117,8 +117,8 @@ static func make_graze_zone(radii: Array = [24.0], count_bullet_size := false) -
 ## [kind, target, volley, bullet_index, zone, ring], kind "enter" / "exit".
 static func record_graze(emitter: Object) -> Array:
 	var log: Array = []
-	emitter.connect("bullet_grazed", func(t: Node2D, v: BulletVolley2D, i: int, z: BulletGrazeZone2D, r: int) -> void: log.append(["enter", t, v, i, z, r]))
-	emitter.connect("bullet_graze_exited", func(t: Node2D, v: BulletVolley2D, i: int, z: BulletGrazeZone2D, r: int) -> void: log.append(["exit", t, v, i, z, r]))
+	emitter.connect("bullet_grazed", func(t: Node2D, v: BulletVolley2D, i: int, z: GrazeZone2D, r: int) -> void: log.append(["enter", t, v, i, z, r]))
+	emitter.connect("bullet_graze_exited", func(t: Node2D, v: BulletVolley2D, i: int, z: GrazeZone2D, r: int) -> void: log.append(["exit", t, v, i, z, r]))
 	return log
 
 ## "kind:bullet:ring" per recorded graze event (compact asserts).

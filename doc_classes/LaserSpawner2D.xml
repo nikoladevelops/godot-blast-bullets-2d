@@ -124,20 +124,20 @@
 			Line width of the graze preview rings, in pixels. Must be finite and above zero.
 		</member>
 		<member name="graze_show_preview" type="bool" setter="set_graze_show_preview" getter="get_graze_show_preview" default="true">
-			Draw every ring of every zone around each resolved target in the zone's [member BulletGrazeZone2D.preview_color]: in the editor, and at runtime only with [member graze_preview_during_runtime]. The rings follow moving targets without rebuilding anything else.
+			Draw every ring of every zone around each resolved target in the zone's [member GrazeZone2D.preview_color]: in the editor, and at runtime only with [member graze_preview_during_runtime]. The rings follow moving targets without rebuilding anything else.
 		</member>
 		<member name="graze_target_path" type="NodePath" setter="set_graze_target_path" getter="get_graze_target_path" default="NodePath(&quot;&quot;)">
 			Node Path source: the [Node2D] that grazes this spawner's bullets (a path to another type is rejected). It may be a child of this spawner, never the spawner itself. After the spawner is freed its volleys keep the node this path pointed to.
 		</member>
 		<member name="graze_target_source" type="int" setter="set_graze_target_source" getter="get_graze_target_source" enum="PatternSpawner2D.GrazeTargetSource" default="0">
-			Who can graze this spawner's bullets: the one place that decides it (a [BulletGrazeZone2D] only says how a graze is measured, so one zone resource works for any target). Node Group (default): the members of [member graze_node_group]. Node Path ([member graze_target_path]), Node Name ([member graze_node_name]) or Node Children ([member graze_children_parent_path]). Mouse (the cursor) and Global Positions ([member graze_global_positions]) are points, not nodes: [signal bullet_grazed] and [signal bullet_graze_exited] carry a null [code]target[/code] for them, and they ignore [member graze_filter_group] and [member graze_update_interval] (read every tick). Every zone rings the same targets. Every source counts all it finds (no cap; past 8 targets each bullet only tests the ones near its motion). The node sources honor [member graze_filter_group] and only keep [Node2D]s inside the tree, not queued for deletion, at a finite position and in the bullets' world, never a [BulletFactory2D] or anything inside one, never this spawner itself; the scans (Node Name, Node Children) never find anything under this spawner either, while Node Group members and Node Path may be its children.
+			Who can graze this spawner's bullets: the one place that decides it (a [GrazeZone2D] only says how a graze is measured, so one zone resource works for any target). Node Group (default): the members of [member graze_node_group]. Node Path ([member graze_target_path]), Node Name ([member graze_node_name]) or Node Children ([member graze_children_parent_path]). Mouse (the cursor) and Global Positions ([member graze_global_positions]) are points, not nodes: [signal bullet_grazed] and [signal bullet_graze_exited] carry a null [code]target[/code] for them, and they ignore [member graze_filter_group] and [member graze_update_interval] (read every tick). Every zone rings the same targets. Every source counts all it finds (no cap; past 8 targets each bullet only tests the ones near its motion). The node sources honor [member graze_filter_group] and only keep [Node2D]s inside the tree, not queued for deletion, at a finite position and in the bullets' world, never a [BulletFactory2D] or anything inside one, never this spawner itself; the scans (Node Name, Node Children) never find anything under this spawner either, while Node Group members and Node Path may be its children.
 			The settings are shared with every volley this spawner fired: changing them (or calling [method refresh_graze_targets]) reaches bullets in flight on their next tick, and an open graze visit then moves to the nearest target the bullet is still inside (or ends silently). Orphaned volleys keep the settings after the spawner is freed. Pooled volleys forget them.
 		</member>
 		<member name="graze_update_interval" type="float" setter="set_graze_update_interval" getter="get_graze_update_interval" default="0.0">
 			Seconds of factory time between target scans; 0 scans every physics tick, so a node that joins (an enemy spawned later) is tested on the next tick. Between scans the targets' positions are still read every tick and a freed or dying target stops counting at once; a newcomer waits for the next scan or [method refresh_graze_targets]. Raise it for costly scans (Node Name over a big scene, many spawners with their own settings); spawners left at the defaults share one scan per group per tick with every factory volley. The point sources (Mouse, Global Positions) are read every tick whatever this says.
 		</member>
-		<member name="graze_zones" type="BulletGrazeZone2D[]" setter="set_graze_zones" getter="get_graze_zones" default="[]">
-			Up to 4 [BulletGrazeZone2D] zones armed on every fired volley; null entries are kept and skipped. A shared [code].tres[/code] works across spawners. Assign the whole array: one changed in place still arms its first 4 zones but warns once.
+		<member name="graze_zones" type="GrazeZone2D[]" setter="set_graze_zones" getter="get_graze_zones" default="[]">
+			Up to 4 [GrazeZone2D] zones armed on every fired volley; null entries are kept and skipped. A shared [code].tres[/code] works across spawners. Assign the whole array: one changed in place still arms its first 4 zones but warns once.
 		</member>
 		<member name="helper_aimed_centered" type="bool" setter="set_helper_aimed_centered" getter="get_helper_aimed_centered" default="true">
 			Center the cone on the target. Off starts it to one side.
@@ -1130,7 +1130,7 @@
 			<param index="0" name="target" type="Object" />
 			<param index="1" name="laser" type="LaserVolley2D" />
 			<param index="2" name="beam_index" type="int" />
-			<param index="3" name="zone" type="BulletGrazeZone2D" />
+			<param index="3" name="zone" type="GrazeZone2D" />
 			<param index="4" name="deepest_ring_index" type="int" />
 			<description>
 				Beam [param beam_index] of [param laser] left the zone [param zone] of [param target] after grazing it ([param deepest_ring_index] = the innermost ring it touched). [param target] is [code]null[/code] for a point target. Bubbles to [signal BulletFactory2D.laser_graze_exited].
@@ -1140,10 +1140,10 @@
 			<param index="0" name="target" type="Object" />
 			<param index="1" name="laser" type="LaserVolley2D" />
 			<param index="2" name="beam_index" type="int" />
-			<param index="3" name="zone" type="BulletGrazeZone2D" />
+			<param index="3" name="zone" type="GrazeZone2D" />
 			<param index="4" name="ring_index" type="int" />
 			<description>
-				Beam [param beam_index] of [param laser] grazed ring [param ring_index] of [param zone] around [param target] (its distance to the beam, plus half the width with [member BulletGrazeZone2D.count_bullet_size]). Once per ring per laser life, or again after leaving with [constant BulletGrazeZone2D.REGRAZE_AFTER_EXIT]. Bubbles to [signal BulletFactory2D.laser_grazed].
+				Beam [param beam_index] of [param laser] grazed ring [param ring_index] of [param zone] around [param target] (its distance to the beam, plus half the width with [member GrazeZone2D.count_bullet_size]). Once per ring per laser life, or again after leaving with [constant GrazeZone2D.REGRAZE_AFTER_EXIT]. Bubbles to [signal BulletFactory2D.laser_grazed].
 			</description>
 		</signal>
 		<signal name="laser_hit">

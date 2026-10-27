@@ -11,7 +11,7 @@ const GROUP := &"shared_targets"
 
 var data: BulletVolleyData2D
 var flock: BulletFlock2D
-var zone: BulletGrazeZone2D
+var zone: GrazeZone2D
 var sound: BulletSoundData2D
 var chain: BulletSplitData2D
 var reports := {} # emitter name -> split reports

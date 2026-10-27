@@ -27,18 +27,18 @@ func test_serialized_graze_properties_load() -> void:
 	assert_false(enemy.graze_show_preview, "preview toggle")
 	assert_eq(enemy.graze_preview_line_width, 3.0, "line width")
 	assert_eq(enemy.graze_zones.size(), 1, "one zone")
-	var z: BulletGrazeZone2D = enemy.graze_zones[0]
+	var z: GrazeZone2D = enemy.graze_zones[0]
 	assert_eq(enemy.graze_node_group, &"player", "the spawner names who grazes")
 	assert_eq([z.ring_count, z.ring_1_radius, z.ring_2_radius], [2, 48.0, 24.0], "rings")
-	assert_eq(z.regraze, BulletGrazeZone2D.REGRAZE_AFTER_EXIT, "regraze id 1 = After Exit")
+	assert_eq(z.regraze, GrazeZone2D.REGRAZE_AFTER_EXIT, "regraze id 1 = After Exit")
 	assert_true(z.count_bullet_size, "default kept")
 	assert_eq(enemy.resolve_graze_targets(), [player], "the player is the target")
 
 
 func test_graze_then_hit_in_real_frames() -> void:
 	var log: Array = []
-	enemy.bullet_grazed.connect(func(t: Node2D, _v: BulletVolley2D, _i: int, _z: BulletGrazeZone2D, r: int) -> void: log.append("graze %d %s" % [r, t.name]))
-	enemy.bullet_graze_exited.connect(func(_t: Node2D, _v: BulletVolley2D, _i: int, _z: BulletGrazeZone2D, r: int) -> void: log.append("exit %d" % r))
+	enemy.bullet_grazed.connect(func(t: Node2D, _v: BulletVolley2D, _i: int, _z: GrazeZone2D, r: int) -> void: log.append("graze %d %s" % [r, t.name]))
+	enemy.bullet_graze_exited.connect(func(_t: Node2D, _v: BulletVolley2D, _i: int, _z: GrazeZone2D, r: int) -> void: log.append("exit %d" % r))
 	enemy.area_entered.connect(func(a: Object, _v: BulletVolley2D, _i: int) -> void: log.append("hit %s" % (a as Node).name))
 	assert_true(enemy.shoot_once(), "fired")
 	for i in 120:

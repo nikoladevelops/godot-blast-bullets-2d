@@ -40,7 +40,7 @@ You can call `BulletFactory2D.spawn_volley()` yourself, but for a bullet hell **
 | Hurt the player | Connect the spawner's `area_entered` / `body_entered` signals (see below) |
 | Swarm the player (boids) | `flock_enabled` (Flocking group) plus `homing_enabled`: an empty `flock` flies the default rules, keeping bullets apart while they chase, for any sprite size. To tune, assign a `BulletFlock2D` and pick a preset (Swarm, Fly Together, Keep Distance, Tight Group) |
 | Find out why a feature does nothing | `print("\n".join($BulletSpawner2D.debug_explain_features()))`: one sentence per steering group (targets found now, turn rates, how homing, orbit and the flock mix) plus the setup warnings |
-| Reward near misses | `graze_enabled`, `graze_node_group`, and one or more `BulletGrazeZone2D` in `graze_zones` |
+| Reward near misses | `graze_enabled`, `graze_node_group`, and one or more `GrazeZone2D` in `graze_zones` |
 | Cap the screen | `max_live_bullets` on the spawner (0 = unlimited): shots are skipped with `volley_skipped("over_budget")` |
 | Move the boss | `movement_enabled` with a `Path2D` in `movement_path`; shots inherit its speed (`inherit_movement_velocity`) |
 | Wipe the screen (bomb, player death, phase change) | `factory.clear_active_bullets()` (or the `_deferred` twin from a handler) |
@@ -64,7 +64,7 @@ func _on_bullet_hit_area(target: Object, volley: BulletVolley2D, bullet_index: i
 	if target.has_method("take_hit"):
 		target.take_hit(data.damage if data else 1)
 
-func _on_graze(_target: Node2D, _volley: BulletVolley2D, _index: int, _zone: BulletGrazeZone2D, ring_index: int) -> void:
+func _on_graze(_target: Node2D, _volley: BulletVolley2D, _index: int, _zone: GrazeZone2D, ring_index: int) -> void:
 	score += 10 * (ring_index + 1) # ring_index 0 = ring_1_radius, 1 = ring_2_radius, ...
 ```
 

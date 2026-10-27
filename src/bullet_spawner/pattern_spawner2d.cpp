@@ -674,7 +674,7 @@ PackedStringArray PatternSpawner2D::_get_configuration_warnings() const {
 		bool any_zone = false;
 		for (int i = 0; i < graze_zones.size(); ++i) {
 			const Variant entry = graze_zones[i];
-			const BulletGrazeZone2D *zone = live_object2d<BulletGrazeZone2D>(entry);
+			const GrazeZone2D *zone = live_object2d<GrazeZone2D>(entry);
 			if (zone == nullptr) {
 				out.push_back("graze_zones[" + String::num_int64(i) + "] is empty.");
 				continue;
@@ -733,7 +733,7 @@ bool PatternSpawner2D::shoot_once() {
 	// nested shoot_once() would recurse past the volley cap. Per-spawner latch
 	// stops self-recursion; global depth stops cross-spawner A->B->A ping-pong.
 	if (shoot_once_reentrant_guard || g_shoot_once_nesting_depth > 0) {
-		UtilityFunctions::push_error((String(get_class()) + "::shoot_once: re-entrant call from inside a spawner signal handler is not allowed (pre_shoot, homing_targets_resolved, volley_homing_configured, volley_fired, volley_skipped). Use call_deferred(\"shoot_once\") instead."));
+		UtilityFunctions::push_error((String(get_class()) + "::shoot_once: re-entrant call from inside a spawner signal handler is not allowed (" + shot_signal_names() + "). Use call_deferred(\"shoot_once\") instead."));
 		return false;
 	}
 	// Latch held for the whole body; every return below goes through

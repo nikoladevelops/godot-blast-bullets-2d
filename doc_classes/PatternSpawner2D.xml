@@ -354,7 +354,7 @@
 			</description>
 		</method>
 		<method name="get_graze_zones" qualifiers="const">
-			<return type="BulletGrazeZone2D[]" />
+			<return type="GrazeZone2D[]" />
 			<description>
 				Getter of [member BulletSpawner2D.graze_zones] and [member LaserSpawner2D.graze_zones].
 			</description>

@@ -891,7 +891,7 @@
 			<param index="0" name="target" type="Node2D" />
 			<param index="1" name="volley" type="BulletVolley2D" />
 			<param index="2" name="bullet_index" type="int" />
-			<param index="3" name="zone" type="BulletGrazeZone2D" />
+			<param index="3" name="zone" type="GrazeZone2D" />
 			<param index="4" name="deepest_ring_index" type="int" />
 			<description>
 				Emitted live when a bullet that grazed a zone leaves it alive (outside the outermost ring of every target of the zone). [param deepest_ring_index] is the smallest-radius ring touched during that visit and [param target] the target the visit belonged to (null for a point target: [constant BulletSpawner2D.GRAZE_SOURCE_MOUSE], [constant BulletSpawner2D.GRAZE_SOURCE_GLOBAL_POSITIONS]). A bullet killed, cleared, expired or frozen inside never exits. Every exit reaches the factory (right after the owner spawner's own signal).
@@ -901,10 +901,10 @@
 			<param index="0" name="target" type="Node2D" />
 			<param index="1" name="volley" type="BulletVolley2D" />
 			<param index="2" name="bullet_index" type="int" />
-			<param index="3" name="zone" type="BulletGrazeZone2D" />
+			<param index="3" name="zone" type="GrazeZone2D" />
 			<param index="4" name="ring_index" type="int" />
 			<description>
-				Emitted live, inside the physics tick right after the bullets moved, when a bullet comes within ring [param ring_index] of [param zone] around [param target] (see [BulletGrazeZone2D]). [param target] is null when the target is a point (a spawner's Mouse or Global Positions source). The bullet is alive in the handler: transforms, velocity and custom data are readable and writable through [param volley]. Several rings entered in one tick fire from the largest radius to the smallest. Every graze in the game reaches the factory whoever owns the volley (the owner [BulletSpawner2D] emits first while it lives), including bullets of spawners already freed: connect here once to count graze for score. Structural calls need their [code]_deferred[/code] twins inside the handler.
+				Emitted live, inside the physics tick right after the bullets moved, when a bullet comes within ring [param ring_index] of [param zone] around [param target] (see [GrazeZone2D]). [param target] is null when the target is a point (a spawner's Mouse or Global Positions source). The bullet is alive in the handler: transforms, velocity and custom data are readable and writable through [param volley]. Several rings entered in one tick fire from the largest radius to the smallest. Every graze in the game reaches the factory whoever owns the volley (the owner [BulletSpawner2D] emits first while it lives), including bullets of spawners already freed: connect here once to count graze for score. Structural calls need their [code]_deferred[/code] twins inside the handler.
 			</description>
 		</signal>
 		<signal name="bullet_split">
@@ -949,7 +949,7 @@
 			<param index="0" name="target" type="Object" />
 			<param index="1" name="laser" type="LaserVolley2D" />
 			<param index="2" name="beam_index" type="int" />
-			<param index="3" name="zone" type="BulletGrazeZone2D" />
+			<param index="3" name="zone" type="GrazeZone2D" />
 			<param index="4" name="deepest_ring_index" type="int" />
 			<description>
 				Beam [param beam_index] of [param laser] left the zone [param zone] of [param target] after grazing it ([param deepest_ring_index] = the innermost ring it touched; [param target] is [code]null[/code] for a point target). Every laser graze exit lands here, after the owner spawner's.
@@ -959,7 +959,7 @@
 			<param index="0" name="target" type="Object" />
 			<param index="1" name="laser" type="LaserVolley2D" />
 			<param index="2" name="beam_index" type="int" />
-			<param index="3" name="zone" type="BulletGrazeZone2D" />
+			<param index="3" name="zone" type="GrazeZone2D" />
 			<param index="4" name="ring_index" type="int" />
 			<description>
 				Beam [param beam_index] of [param laser] grazed ring [param ring_index] of [param zone] around [param target] ([code]null[/code] for a point target). Every laser graze lands here, after the owner spawner's.

@@ -17,7 +17,7 @@ func setup() -> void:
 		add_child(t)
 		t.add_to_group(&"bench_enemies")
 		_targets.append(t)
-	var zone := BulletGrazeZone2D.new()
+	var zone := GrazeZone2D.new()
 	zone.ring_count = 3
 	zone.ring_1_radius = 16.0
 	zone.ring_2_radius = 32.0
@@ -27,7 +27,7 @@ func setup() -> void:
 		var v: BulletVolley2D = factory.spawn_volley(ring_data(1000, Vector2(960 * (i % 5), 1200 * (i / 5)), 50.0, 60.0, 1000.0))
 		v.graze_set_zones([zone], &"bench_enemies")
 
-func _on_grazed(_t: Node2D, _v: BulletVolley2D, _i: int, _z: BulletGrazeZone2D, _r: int) -> void:
+func _on_grazed(_t: Node2D, _v: BulletVolley2D, _i: int, _z: GrazeZone2D, _r: int) -> void:
 	_grazes += 1
 
 func step(frame: int) -> void:

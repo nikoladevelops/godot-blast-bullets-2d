@@ -275,7 +275,7 @@ func test_freed_nodes_handed_to_the_api_are_refused() -> void:
 	expect_error_sequence(["home_live_volleys_to: target must be a Node2D in the tree, a finite Vector2, a group name or null (the mouse), nothing changed."])
 	var bad: Array = [gone] # untyped: a script can pass anything
 	sp.set_graze_zones(bad)
-	expect_error_sequence(["BulletSpawner2D: graze_zones entries must be BulletGrazeZone2D or null, keeping the old value."])
+	expect_error_sequence(["BulletSpawner2D: graze_zones entries must be GrazeZone2D or null, keeping the old value."])
 	sp.sound_effects = [gone]
 	expect_error_sequence(["BulletSpawner2D: sound_effects entries must be BulletSoundData2D or null, keeping the old value."])
 	v.shared_homing_deque_replace_homing_targets_with_new_target_array([gone])

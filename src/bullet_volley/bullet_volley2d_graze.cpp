@@ -12,7 +12,7 @@ using namespace godot;
 
 namespace BlastBullets2D {
 
-bool BulletVolley2D::graze_collect_zones(const Array &zones, Ref<BulletGrazeZone2D> *r_armed, int &r_slots) {
+bool BulletVolley2D::graze_collect_zones(const Array &zones, Ref<GrazeZone2D> *r_armed, int &r_slots) {
 	r_slots = 0;
 	if (zones.size() > MAX_GRAZE_ZONES) {
 		UtilityFunctions::push_error("graze_set_zones: at most 4 zones (got " + String::num_int64(zones.size()) + "), nothing changed.");
@@ -23,12 +23,12 @@ bool BulletVolley2D::graze_collect_zones(const Array &zones, Ref<BulletGrazeZone
 		if (entry.get_type() == Variant::NIL) {
 			continue;
 		}
-		BulletGrazeZone2D *zone = live_object2d<BulletGrazeZone2D>(entry);
+		GrazeZone2D *zone = live_object2d<GrazeZone2D>(entry);
 		if (zone == nullptr) {
-			UtilityFunctions::push_error("graze_set_zones: entry " + String::num_int64(i) + " is not a BulletGrazeZone2D, nothing changed.");
+			UtilityFunctions::push_error("graze_set_zones: entry " + String::num_int64(i) + " is not a GrazeZone2D, nothing changed.");
 			return false;
 		}
-		r_armed[i] = Ref<BulletGrazeZone2D>(zone);
+		r_armed[i] = Ref<GrazeZone2D>(zone);
 		r_slots = i + 1;
 	}
 	return true;
@@ -38,7 +38,7 @@ bool BulletVolley2D::graze_set_zones(const Array &zones, const StringName &targe
 	if (reject_pooled_handle("graze_set_zones")) {
 		return false;
 	}
-	Ref<BulletGrazeZone2D> armed[MAX_GRAZE_ZONES];
+	Ref<GrazeZone2D> armed[MAX_GRAZE_ZONES];
 	int slots = 0;
 	if (!graze_collect_zones(zones, armed, slots)) {
 		return false;
@@ -52,7 +52,7 @@ bool BulletVolley2D::graze_set_zones(const Array &zones, const StringName &targe
 }
 
 bool BulletVolley2D::graze_arm_from_spawner(const Array &zones, const std::shared_ptr<GrazeDetector2D> &detector) {
-	Ref<BulletGrazeZone2D> armed[MAX_GRAZE_ZONES];
+	Ref<GrazeZone2D> armed[MAX_GRAZE_ZONES];
 	int slots = 0;
 	if (detector == nullptr || !graze_collect_zones(zones, armed, slots)) {
 		return false;
@@ -79,7 +79,7 @@ bool BulletVolley2D::graze_armed_with(const Array &zones, const std::shared_ptr<
 	return slots == graze_zone_slots;
 }
 
-void BulletVolley2D::graze_arm(const Ref<BulletGrazeZone2D> *armed, int slots, const std::shared_ptr<GrazeDetector2D> &detector, const StringName &target_group) {
+void BulletVolley2D::graze_arm(const Ref<GrazeZone2D> *armed, int slots, const std::shared_ptr<GrazeDetector2D> &detector, const StringName &target_group) {
 	graze_release();
 	if (slots == 0) {
 		return;
@@ -123,7 +123,7 @@ void BulletVolley2D::graze_clear() {
 
 void BulletVolley2D::graze_release() {
 	++split_arming_serial;
-	for (Ref<BulletGrazeZone2D> &zone : graze_zones) {
+	for (Ref<GrazeZone2D> &zone : graze_zones) {
 		zone.unref();
 	}
 	graze_zone_slots = 0;
@@ -199,7 +199,7 @@ void BulletVolley2D::graze_end_visits_of_bullet(int bullet_index) {
 	for (int z = 0; z < graze_zone_slots && from + z < graze_state.size(); ++z) {
 		uint16_t &st = graze_state[from + z];
 		st &= (uint16_t)~(GRAZE_INSIDE | GRAZE_DEEPEST_MASK | GRAZE_VISIT_FIRED);
-		if (graze_zones[z].is_valid() && graze_zones[z]->regraze == BulletGrazeZone2D::REGRAZE_AFTER_EXIT) {
+		if (graze_zones[z].is_valid() && graze_zones[z]->regraze == GrazeZone2D::REGRAZE_AFTER_EXIT) {
 			st &= (uint16_t)~GRAZE_RINGS_MASK;
 		}
 	}
@@ -209,7 +209,7 @@ void BulletVolley2D::graze_end_visits_of_zone(int zone_index) {
 	if (zone_index < 0 || zone_index >= graze_zone_slots) {
 		return;
 	}
-	const bool rearm = graze_zones[zone_index].is_valid() && graze_zones[zone_index]->regraze == BulletGrazeZone2D::REGRAZE_AFTER_EXIT;
+	const bool rearm = graze_zones[zone_index].is_valid() && graze_zones[zone_index]->regraze == GrazeZone2D::REGRAZE_AFTER_EXIT;
 	const uint16_t keep = rearm ? (uint16_t)0 : GRAZE_RINGS_MASK; // the visit bits always go
 	for (size_t at = (size_t)zone_index; at < graze_state.size(); at += (size_t)graze_zone_slots) {
 		graze_state[at] &= keep;
@@ -306,14 +306,14 @@ void BulletVolley2D::prepare_graze_tick() {
 	real_t reach = 0.0;
 	for (int z = 0; z < graze_zone_slots; ++z) {
 		GrazeTickZone2D &tz = graze_tick_zones[z];
-		const BulletGrazeZone2D *zone = graze_zones[z].ptr();
+		const GrazeZone2D *zone = graze_zones[z].ptr();
 		tz.active = zone != nullptr && zone->enabled && tg.count > 0;
 		if (tz.active) {
 			// Rings by radius, largest first (insertion sort: equal radii
 			// keep ring order, so their events fire by ring index).
 			const real_t inflate = zone->count_bullet_size ? bullet_radius : (real_t)0.0;
-			tz.ring_count = CLAMP(zone->ring_count, 1, BulletGrazeZone2D::MAX_RINGS);
-			real_t radius[BulletGrazeZone2D::MAX_RINGS];
+			tz.ring_count = CLAMP(zone->ring_count, 1, GrazeZone2D::MAX_RINGS);
+			real_t radius[GrazeZone2D::MAX_RINGS];
 			for (int r = 0; r < tz.ring_count; ++r) {
 				const real_t value = zone->ring_radii[r] + inflate;
 				int at = r;
@@ -331,7 +331,7 @@ void BulletVolley2D::prepare_graze_tick() {
 				tz.ring_raw[s] = radius[s] - inflate;
 				tz.ring_slot[tz.ring_index[s]] = (uint8_t)s;
 			}
-			tz.regraze_after_exit = zone->regraze == BulletGrazeZone2D::REGRAZE_AFTER_EXIT;
+			tz.regraze_after_exit = zone->regraze == GrazeZone2D::REGRAZE_AFTER_EXIT;
 			// A target farther than this in x can never reach the outermost
 			// ring; the margin keeps every boundary case on the exact test.
 			tz.reach = radius[0] * (real_t)1.001 + (real_t)0.001;
@@ -378,7 +378,7 @@ bool BulletVolley2D::dispatch_graze_events() {
 		if (!point && (target == nullptr || target->is_queued_for_deletion())) {
 			continue;
 		}
-		const Ref<BulletGrazeZone2D> zone = graze_zones[ev.zone];
+		const Ref<GrazeZone2D> zone = graze_zones[ev.zone];
 		// The graze is delivered (drop checks above passed): the sound
 		// offers whether or not anything is connected.
 		if (ev.bullet_index >= 0 && ev.bullet_index < (int)all_cached_instance_transforms.size()) {

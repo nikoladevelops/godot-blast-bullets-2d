@@ -244,7 +244,7 @@ func test_live_zone_edit_applies_to_flying_bullets() -> void:
 	z.ring_1_radius = 30.0
 	step_factory()
 	z.enabled = true
-	z.regraze = BulletGrazeZone2D.REGRAZE_AFTER_EXIT
+	z.regraze = GrazeZone2D.REGRAZE_AFTER_EXIT
 	z.ring_1_radius = 45.0
 	step_factory()
 	assert_eq(H.graze_kinds(log), ["enter:0:0"], "disabling ended the visit silently; Once bits survive it")
@@ -281,9 +281,9 @@ func test_set_zones_rejects_bad_input_and_changes_nothing() -> void:
 	assert_false(v.graze_set_zones([z], &""), "no group: nobody would graze")
 	expect_error_sequence([
 		"graze_set_zones: at most 4 zones (got 5), nothing changed.",
-		"graze_set_zones: entry 1 is not a BulletGrazeZone2D, nothing changed.",
-		"graze_set_zones: entry 1 is not a BulletGrazeZone2D, nothing changed.",
-		"graze_set_zones: entry 0 is not a BulletGrazeZone2D, nothing changed.",
+		"graze_set_zones: entry 1 is not a GrazeZone2D, nothing changed.",
+		"graze_set_zones: entry 1 is not a GrazeZone2D, nothing changed.",
+		"graze_set_zones: entry 0 is not a GrazeZone2D, nothing changed.",
 		"graze_set_zones: target_group is empty (name the group whose nodes graze these bullets), nothing changed.",
 	])
 	assert_eq(v.get_graze_zones(), [z], "the armed zones are untouched")

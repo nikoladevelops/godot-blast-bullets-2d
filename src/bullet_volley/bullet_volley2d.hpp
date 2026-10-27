@@ -15,13 +15,13 @@
 #include "core/warn_once2d.hpp"
 #include "data/bullet_curves_data2d.hpp"
 #include "data/bullet_effect_layer_data2d.hpp"
-#include "data/bullet_graze_zone2d.hpp"
 #include "data/bullet_pickup_data2d.hpp"
 #include "data/bullet_rotation_data2d.hpp"
 #include "data/bullet_sound_data2d.hpp"
 #include "data/bullet_speed_data2d.hpp"
 #include "data/bullet_volley_data2d.hpp"
 #include "data/bullet_wobble_data2d.hpp"
+#include "data/graze_zone2d.hpp"
 #include "factory/bullet_factory2d.hpp"
 #include "factory/flock_solver2d.hpp"
 #include "godot_cpp/classes/curve.hpp"
@@ -2756,7 +2756,7 @@ public:
 	// GRAZE (bullet_volley2d_graze.cpp; the per-bullet stage step_graze is
 	// in bullet_volley2d_tick.cpp). A bullet grazes ring k of a zone when
 	// its motion during one tick comes within that ring's effective radius
-	// of a zone target (see BulletGrazeZone2D). Events are collected by the
+	// of a zone target (see GrazeZone2D). Events are collected by the
 	// move loop and emitted live right after it: bullet_grazed /
 	// bullet_graze_exited on the owner spawner (while it lives), then on
 	// the factory (always).
@@ -2855,15 +2855,15 @@ public:
 		// Effective radius squared per ring, sorted by radius DESCENDING
 		// (equal radii keep ring order); ring_index maps a sorted slot to
 		// its ring, ring_slot a ring to its sorted slot.
-		real_t ring_r2[BulletGrazeZone2D::MAX_RINGS] = {};
-		uint8_t ring_index[BulletGrazeZone2D::MAX_RINGS] = {};
-		uint8_t ring_slot[BulletGrazeZone2D::MAX_RINGS] = {};
+		real_t ring_r2[GrazeZone2D::MAX_RINGS] = {};
+		uint8_t ring_index[GrazeZone2D::MAX_RINGS] = {};
+		uint8_t ring_slot[GrazeZone2D::MAX_RINGS] = {};
 		bool regraze_after_exit = false;
 		// count_bullet_size: ring_r2 is inflated by the volley's LARGEST
 		// bullet (a cheap superset for the fast reject); graze_visit tests
 		// the bullet's own size against the raw radii (same sorted order).
 		bool sized = false;
-		real_t ring_raw[BulletGrazeZone2D::MAX_RINGS] = {};
+		real_t ring_raw[GrazeZone2D::MAX_RINGS] = {};
 		// Outermost effective radius plus a rounding margin: no target
 		// farther than this in x can touch the zone.
 		real_t reach = 0.0;
@@ -2880,7 +2880,7 @@ public:
 		uint8_t ring = 0;
 		bool exit = false;
 	};
-	Ref<BulletGrazeZone2D> graze_zones[MAX_GRAZE_ZONES];
+	Ref<GrazeZone2D> graze_zones[MAX_GRAZE_ZONES];
 	// Highest armed zone index + 1 (0 = disarmed): the graze_state stride.
 	int graze_zone_slots = 0;
 	// Who grazes: the arming spawner's detector (its Graze group settings;
@@ -2951,8 +2951,8 @@ public:
 	// and events cleared.
 	void graze_release();
 	// Validates graze_set_zones input into r_armed (pushes the error).
-	static bool graze_collect_zones(const Array &zones, Ref<BulletGrazeZone2D> *r_armed, int &r_slots);
-	void graze_arm(const Ref<BulletGrazeZone2D> *armed, int slots, const std::shared_ptr<GrazeDetector2D> &detector, const StringName &target_group);
+	static bool graze_collect_zones(const Array &zones, Ref<GrazeZone2D> *r_armed, int &r_slots);
+	void graze_arm(const Ref<GrazeZone2D> *armed, int slots, const std::shared_ptr<GrazeDetector2D> &detector, const StringName &target_group);
 
 	// SOUND (bullet_volley2d_sound.cpp; fired through SoundMixer2D at the
 	// trigger sites). Armed entries play their stream when their trigger

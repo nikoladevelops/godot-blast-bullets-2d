@@ -1,8 +1,8 @@
 #pragma once
 
 #include "core/variant_enum_cast2d.hpp"
-#include "data/bullet_graze_zone2d.hpp"
 #include "data/bullet_sound_data2d.hpp"
+#include "data/graze_zone2d.hpp"
 #include "data/laser_data2d.hpp"
 #include "sprite/sprite_anim2d.hpp"
 
@@ -278,7 +278,7 @@ private:
 	// The LaserData2D animations, baked per shot under the shared SpriteFrames
 	// rules (sprite/sprite_anim2d.hpp) and sampled on the laser's own clocks.
 	SpriteAnim2D anim_body, anim_charge, anim_muzzle, anim_tip, anim_pierce, anim_wall;
-	std::vector<Ref<BulletGrazeZone2D>> graze_zones;
+	std::vector<Ref<GrazeZone2D>> graze_zones;
 	std::shared_ptr<GrazeDetector2D> graze_detector;
 	StringName graze_target_group; // the factory's lists (graze_set_zones), when no detector
 	std::vector<GrazeState> graze_state; // beams x zones

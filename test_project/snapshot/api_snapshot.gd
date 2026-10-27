@@ -15,7 +15,7 @@ const PLUGIN_CLASSES: Array[StringName] = [
 	&"BulletRotationData2D", &"BulletEffectLayerData2D", &"BulletSpeedData2D", &"BulletCurvesData2D",
 	&"BulletWobbleData2D", &"VolleyPoolKey2D", &"BulletAttachment2D", &"BulletPatterns2D",
 	&"BulletFactory2D", &"BulletVolleyDebugger2D", &"BulletVolleyData2D", &"BulletVolley2D",
-	&"BulletSpawner2D", &"PatternPreviewLayer2D", &"BulletGrazeZone2D", &"GrazePreviewLayer2D",
+	&"BulletSpawner2D", &"PatternPreviewLayer2D", &"GrazeZone2D", &"GrazePreviewLayer2D",
 	&"BulletSoundData2D", &"BulletPickupData2D", &"DespawnBoundsPreviewLayer2D", &"BulletFlock2D",
 	&"BulletSplitStage2D", &"BulletSplitData2D", &"BulletEmitterData2D", &"LaserData2D", &"LaserVolley2D", &"LaserSpawner2D",
 ]
@@ -594,7 +594,7 @@ func _probe_setters(section: String, label: String, obj: Object) -> void:
 
 func _snap_setters(section: String) -> void:
 	for cls in [&"BulletVolleyData2D", &"BulletSpeedData2D", &"BulletRotationData2D", &"BulletCurvesData2D",
-			&"BulletWobbleData2D", &"BulletEffectLayerData2D", &"BulletGrazeZone2D", &"BulletPickupData2D", &"BulletFlock2D", &"BulletSplitStage2D", &"BulletSplitData2D", &"BulletEmitterData2D", &"LaserData2D"]:
+			&"BulletWobbleData2D", &"BulletEffectLayerData2D", &"GrazeZone2D", &"BulletPickupData2D", &"BulletFlock2D", &"BulletSplitStage2D", &"BulletSplitData2D", &"BulletEmitterData2D", &"LaserData2D"]:
 		_probe_setters(section, cls, ClassDB.instantiate(cls))
 	var sp := BulletSpawner2D.new()
 	sp.set_shooting_enabled(false)
@@ -646,9 +646,9 @@ func _graze_trace(section: String, factory: BulletFactory2D, label: String, data
 		zones: Array, group: StringName, setup: Callable = Callable(), steps: int = 120) -> void:
 	seed(4242)
 	var log: Array = []
-	var on_enter := func(t: Node2D, _v: BulletVolley2D, i: int, z: BulletGrazeZone2D, r: int) -> void:
+	var on_enter := func(t: Node2D, _v: BulletVolley2D, i: int, z: GrazeZone2D, r: int) -> void:
 		log.append(["enter", str(t.name), i, zones.find(z), r])
-	var on_exit := func(t: Node2D, _v: BulletVolley2D, i: int, z: BulletGrazeZone2D, r: int) -> void:
+	var on_exit := func(t: Node2D, _v: BulletVolley2D, i: int, z: GrazeZone2D, r: int) -> void:
 		log.append(["exit", str(t.name), i, zones.find(z), r])
 	factory.bullet_grazed.connect(on_enter)
 	factory.bullet_graze_exited.connect(on_exit)
@@ -672,8 +672,8 @@ func _graze_trace(section: String, factory: BulletFactory2D, label: String, data
 	cap.take()
 
 
-func _graze_zone(radii: Array, regraze: int, bullet_size: bool) -> BulletGrazeZone2D:
-	var z := BulletGrazeZone2D.new()
+func _graze_zone(radii: Array, regraze: int, bullet_size: bool) -> GrazeZone2D:
+	var z := GrazeZone2D.new()
 	z.ring_count = radii.size()
 	for i in radii.size():
 		z.set_ring_radius(i, radii[i])
@@ -805,11 +805,11 @@ func _snap_traces(section: String) -> void:
 	target_a.add_to_group(&"snap_graze")
 	target_b.add_to_group(&"snap_graze")
 	_graze_trace(section, factory, "graze_homing", homing.duplicate(),
-			[_graze_zone([80.0, 30.0, 10.0], BulletGrazeZone2D.REGRAZE_ONCE, true),
-			_graze_zone([420.0], BulletGrazeZone2D.REGRAZE_AFTER_EXIT, false)], &"snap_graze",
+			[_graze_zone([80.0, 30.0, 10.0], GrazeZone2D.REGRAZE_ONCE, true),
+			_graze_zone([420.0], GrazeZone2D.REGRAZE_AFTER_EXIT, false)], &"snap_graze",
 			func(v: BulletVolley2D) -> void: v.all_bullets_push_back_homing_target(target_a))
 	_graze_trace(section, factory, "graze_line", H.make_volley_data(6, 2400.0),
-			[_graze_zone([205.0, 201.0], BulletGrazeZone2D.REGRAZE_ONCE, false)], &"snap_graze")
+			[_graze_zone([205.0, 201.0], GrazeZone2D.REGRAZE_ONCE, false)], &"snap_graze")
 	# Many targets (the slab path past 8): a fast line through a field of 20.
 	var field: Array = []
 	for i in 20:
@@ -820,7 +820,7 @@ func _snap_traces(section: String) -> void:
 		add_child(t)
 		field.append(t)
 	_graze_trace(section, factory, "graze_field", H.make_volley_data(6, 2400.0),
-			[_graze_zone([24.0, 12.0], BulletGrazeZone2D.REGRAZE_AFTER_EXIT, true)], &"snap_graze_field")
+			[_graze_zone([24.0, 12.0], GrazeZone2D.REGRAZE_AFTER_EXIT, true)], &"snap_graze_field")
 	for t in field:
 		(t as Node).free()
 	factory.reset()
@@ -1400,7 +1400,7 @@ func _snap_lasers(section: String) -> void:
 			d.aim = LaserData2D.LASER_AIM_TRACK
 			d.turn_rate_degrees = 90.0), origin, func(l: LaserVolley2D) -> void: l.set_targets([Vector2(0, 300)])],
 		"beam_lock_on": [_snap_laser(beam, 500.0, func(d: LaserData2D) -> void: d.aim = LaserData2D.LASER_AIM_LOCK_ON), fan, func(l: LaserVolley2D) -> void: l.set_targets([grazer])],
-		"beam_graze": [_snap_laser(beam, 300.0), origin, func(l: LaserVolley2D) -> void: l.graze_set_zones([_graze_zone([30.0, 60.0], BulletGrazeZone2D.REGRAZE_ONCE, true)], &"snap_laser_graze")],
+		"beam_graze": [_snap_laser(beam, 300.0), origin, func(l: LaserVolley2D) -> void: l.graze_set_zones([_graze_zone([30.0, 60.0], GrazeZone2D.REGRAZE_ONCE, true)], &"snap_laser_graze")],
 		"bolt_pierce": [_snap_laser(bolt, 60.0), origin, Callable()],
 		"bolt_pierce_limit": [_snap_laser(bolt, 60.0, func(d: LaserData2D) -> void: d.pierce_limit = 2), origin, Callable()],
 		"bolt_reflect": [_snap_laser(bolt, 60.0, func(d: LaserData2D) -> void:

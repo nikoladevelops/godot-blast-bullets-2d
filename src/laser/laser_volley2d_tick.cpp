@@ -770,15 +770,15 @@ bool LaserVolley2D::update_graze(uint64_t self_id, uint32_t life) {
 			}
 		}
 		for (size_t z = 0; z < zones; ++z) {
-			const BulletGrazeZone2D *zone = graze_zones[z].ptr();
+			const GrazeZone2D *zone = graze_zones[z].ptr();
 			GrazeState &g = graze_state[i * zones + z];
 			if (zone == nullptr) {
 				continue;
 			}
 			const real_t inflate = zone->get_count_bullet_size() ? half_width : (real_t)0.0;
-			const int rings = Math::clamp(zone->get_ring_count(), 1, (int)BulletGrazeZone2D::MAX_RINGS);
+			const int rings = Math::clamp(zone->get_ring_count(), 1, (int)GrazeZone2D::MAX_RINGS);
 			// Rings by radius, largest first (equal radii by index).
-			int order[BulletGrazeZone2D::MAX_RINGS];
+			int order[GrazeZone2D::MAX_RINGS];
 			real_t outer = 0.0;
 			for (int r = 0; r < rings; ++r) {
 				order[r] = r;
@@ -812,7 +812,7 @@ bool LaserVolley2D::update_graze(uint64_t self_id, uint32_t life) {
 				if (g.fired && !b.spent && anchor_live(g.anchor)) {
 					events.push_back({ true, g.anchor, (int)i, (int)z, (int)g.deepest, best_at });
 				}
-				if (zone->get_regraze() == BulletGrazeZone2D::REGRAZE_AFTER_EXIT) {
+				if (zone->get_regraze() == GrazeZone2D::REGRAZE_AFTER_EXIT) {
 					g.rings = 0;
 				}
 				g.fired = false;
@@ -827,7 +827,7 @@ bool LaserVolley2D::update_graze(uint64_t self_id, uint32_t life) {
 		if (graze_generation != generation || (size_t)e.zone >= graze_zones.size()) {
 			return true; // a handler re-armed or cleared the zones: the rest name the old ones
 		}
-		const Ref<BulletGrazeZone2D> zone = graze_zones[(size_t)e.zone];
+		const Ref<GrazeZone2D> zone = graze_zones[(size_t)e.zone];
 		Object *target = graze_is_point_target2d(e.target) ? nullptr : ObjectDB::get_instance(ObjectID(e.target));
 		if (!graze_is_point_target2d(e.target)) {
 			const Node *node = Object::cast_to<Node>(target);

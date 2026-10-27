@@ -49,7 +49,7 @@ func test_graze_shots_retain_nothing() -> void:
 	sp.graze_enabled = true
 	sp.graze_node_group = &"graze_targets"
 	var grazes := [0]
-	factory.bullet_grazed.connect(func(_t: Node2D, _v: BulletVolley2D, _i: int, _z: BulletGrazeZone2D, _r: int) -> void: grazes[0] += 1)
+	factory.bullet_grazed.connect(func(_t: Node2D, _v: BulletVolley2D, _i: int, _z: GrazeZone2D, _r: int) -> void: grazes[0] += 1)
 	var grown: int = await _steady(func(): sp.shoot_once())
 	assert_gt(grazes[0], 1000, "the shots really grazed (%d events)" % grazes[0])
 	assert_eq(grown, 0, "200 warm grazing shots: zero retained objects")

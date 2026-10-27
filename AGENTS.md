@@ -770,7 +770,7 @@ src/
   bullet_spawner/bullet_spawner2d_live.cpp       apply_to_live_volleys(LiveVolleyGroup flags), home/aim/speed of live volleys
   bullet_spawner/laser_spawner2d.*               LaserSpawner2D: Lasers + Laser Targeting groups, laser arming, orphan policy (§27)
   laser/       LaserVolley2D (laser_volley2d.cpp lifecycle + API, _tick.cpp phases/geometry/walls/contacts/graze/sound, _render.cpp draw + interpolation)
-  data/        inspector Resources: BulletVolleyData2D, BulletSpeed/Rotation/Curves/Wobble/EffectLayerData2D, BulletGrazeZone2D, BulletFlock2D,
+  data/        inspector Resources: BulletVolleyData2D, BulletSpeed/Rotation/Curves/Wobble/EffectLayerData2D, GrazeZone2D, BulletFlock2D,
                BulletSoundData2D, BulletPickupData2D, BulletSplitStage2D, BulletSplitData2D (every accepted edit emits `changed` once:
                `data/test_data_setter_contract.gd` sweeps it)
   pooling/     VolleyPool (parked volleys per key), VolleyPoolKey2D
@@ -1379,7 +1379,7 @@ End every task with:
    docs) with one line of justification each.
 6. Open questions for the user (contract changes you did NOT make).
 
-## 20. Graze (`BulletGrazeZone2D`, volley stage, spawner group)
+## 20. Graze (`GrazeZone2D`, volley stage, spawner group)
 
 A bullet grazes ring k of a zone when its motion during one tick (segment
 start -> end, swept: fast bullets never skip a ring) comes within ring k's
@@ -1397,7 +1397,7 @@ rings the same targets.
 
 | Piece | Where | Notes |
 |---|---|---|
-| Zone config | `data/bullet_graze_zone2d.*` | 1..4 rings (fixed `ring_N_radius`: inspector-safe), `regraze` (Once 0 / After Exit 1, serialized), `count_bullet_size`, `preview_color`; every accepted change emits `changed`. No targeting or runtime preview property (the spawner's `graze_preview_during_runtime` is the only runtime ring preview) |
+| Zone config | `data/graze_zone2d.*` | 1..4 rings (fixed `ring_N_radius`: inspector-safe), `regraze` (Once 0 / After Exit 1, serialized), `count_bullet_size`, `preview_color`; every accepted change emits `changed`. No targeting or runtime preview property (the spawner's `graze_preview_during_runtime` is the only runtime ring preview) |
 | Target filter | `core/node_scan2d.hpp`, `core/graze_targets2d.hpp` | `target_node_usable2d` (THE filter, homing too): `target_node_present2d` (Node2D in tree, not queued, finite, same World2D: the per-tick check between scans) + never a preview layer + never inside a factory (`node_in_bullet_factory2d`: one `is_ancestor_of` per `BulletFactory2D::factories_in_tree`, no ancestor walk); `collect_graze_targets2d`: group members (+ filter group), tree order, no cap; shared by every source AND the previews. Point targets (Mouse, Global Positions): id = `GRAZE_POINT_TARGET_BIT` (bit 63, never set for a Node) + index; never looked up in ObjectDB |
 | Target lists | `factory/graze_detector2d.*` | `GrazeDetector2D`: the factory owns one (a list per group, every tick) for factory volleys; each spawner owns one (`std::shared_ptr`, shared with every volley it armed) and hands out the factory's list while it is Node Group + no filter + interval 0. `GrazeTargetList2D`: growable, stable slots (`slot_of` hash, free-slot reuse, per-slot change serials), membership rescanned per `update_interval` (factory `graze_clock`), positions once per sweep, re-validated within a sweep when the factory's user-code epoch moved, x-sorted test view past 8 targets |
 | Arming + dispatch | `bullet_volley/bullet_volley2d_graze.cpp` | `graze_set_zones(zones, group)` (factory volleys; empty group refused), `graze_arm_from_spawner` (C++), `graze_target_list()`, `prepare_graze_tick` (reads the list in place; copies only <= 8 targets inline or a view without its owner spawner), `dispatch_graze_events` |
@@ -1459,7 +1459,7 @@ loop). Bits 0-3 rings grazed, 4 inside, 5-6 deepest ring of the visit,
 7 visit fired; `graze_anchor` (`uint32_t`, same indexing) is the visit's
 target slot. Targets: no cap. Structural limits: 4 zones per volley, 4
 rings per zone (`BulletVolley2D::MAX_GRAZE_ZONES`,
-`BulletGrazeZone2D::MAX_RINGS`). Per-bullet cost grows with the LIVE
+`GrazeZone2D::MAX_RINGS`). Per-bullet cost grows with the LIVE
 targets only; past `GrazeTargetList2D::slab_min_targets` (8) a bullet tests
 only the x-slab around its motion (`debug_set_graze_slab_min_targets`
 forces either path; `test_volley_graze_slab` proves them equal).
@@ -1468,8 +1468,8 @@ forces either path; `test_volley_graze_slab` proves them equal).
 
 A zone option is about HOW a graze is measured (who grazes belongs to the
 spawner's Graze group: §20.5). Field + validated setter (emit_changed,
-"BulletGrazeZone2D: <prop> ..., keeping the old value.") + bind in
-`bullet_graze_zone2d.cpp`; read it in
+"GrazeZone2D: <prop> ..., keeping the old value.") + bind in
+`graze_zone2d.cpp`; read it in
 `prepare_graze_tick` into `GrazeTickZone2D` (never read the Resource per
 bullet); cover it in `test_volley_graze_core` (mutation-checked); the data
 setter sweep picks the setter up automatically; regenerate docs (§17).

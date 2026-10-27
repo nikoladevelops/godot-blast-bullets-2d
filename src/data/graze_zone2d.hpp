@@ -25,8 +25,8 @@ using namespace godot;
 // widens a ring, enabled = false) changes every bullet already in flight.
 // Every accepted change emits `changed` (the spawner's ring preview
 // listens).
-class BulletGrazeZone2D : public Resource {
-	GDCLASS(BulletGrazeZone2D, Resource)
+class GrazeZone2D : public Resource {
+	GDCLASS(GrazeZone2D, Resource)
 
 public:
 	static constexpr int MAX_RINGS = 4;
@@ -89,4 +89,4 @@ private:
 };
 } //namespace BlastBullets2D
 
-BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletGrazeZone2D::Regraze);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::GrazeZone2D::Regraze);

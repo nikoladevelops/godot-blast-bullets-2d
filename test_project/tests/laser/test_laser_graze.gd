@@ -62,7 +62,7 @@ func test_rings_fire_largest_first_once_per_visit_then_one_exit() -> void:
 func test_after_exit_rearms_the_rings() -> void:
 	var t := _target("A", Vector2(150, 30))
 	var zone := H.make_graze_zone([50.0])
-	zone.regraze = BulletGrazeZone2D.REGRAZE_AFTER_EXIT
+	zone.regraze = GrazeZone2D.REGRAZE_AFTER_EXIT
 	_laser([zone])
 	step_factory(1, DT)
 	t.position = Vector2(150, 200)
@@ -162,7 +162,7 @@ func test_graze_set_zones_refuses_bad_requests_and_changes_nothing() -> void:
 	assert_false(l.graze_set_zones([z], &""), "no group")
 	expect_error_sequence(["graze_set_zones: target_group is empty (name the group whose nodes graze this laser), nothing changed."])
 	assert_false(l.graze_set_zones([null, 3], GROUP), "no zone")
-	expect_error_sequence(["graze_set_zones: zones holds no BulletGrazeZone2D, nothing changed."])
+	expect_error_sequence(["graze_set_zones: zones holds no GrazeZone2D, nothing changed."])
 	var five: Array = []
 	for i in 5:
 		five.append(H.make_graze_zone([10.0 + i]))

@@ -664,7 +664,7 @@ func _operate() -> void:
 				0:
 					flock.separation = rng.randf_range(0.0, 12.0)
 				1:
-					(zones[0] as BulletGrazeZone2D).ring_1_radius = rng.randf_range(5.0, 80.0)
+					(zones[0] as GrazeZone2D).ring_1_radius = rng.randf_range(5.0, 80.0)
 				2:
 					(chain.stages[0] as BulletSplitStage2D).count = rng.randi_range(1, 5)
 				3:

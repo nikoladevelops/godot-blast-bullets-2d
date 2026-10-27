@@ -1146,7 +1146,7 @@ _NO_INLINE_ void BulletVolley2D::graze_visit(int z, int bullet_index, const Vect
 	// The bullet's own size (count_bullet_size): its largest basis scale,
 	// at most the volley's largest (the fast reject in step_graze used that
 	// one; every write that grows a bullet raises it, so it is an upper bound).
-	real_t ring_r2[BulletGrazeZone2D::MAX_RINGS];
+	real_t ring_r2[GrazeZone2D::MAX_RINGS];
 	if (zone.sized && bullet_index < (int)all_cached_instance_transforms.size()) {
 		const Transform2D &pose = all_cached_instance_transforms[bullet_index];
 		const real_t sx = pose.columns[0].x * pose.columns[0].x + pose.columns[0].y * pose.columns[0].y;

@@ -17,7 +17,7 @@ func test_handler_sees_a_live_bullet() -> void:
 	v.bullet_set_custom_data(1, data[1])
 	v.graze_set_zones([H.make_graze_zone([20.0])], &"graze_targets")
 	var seen: Array = []
-	factory.bullet_grazed.connect(func(_t: Node2D, vol: BulletVolley2D, i: int, _z: BulletGrazeZone2D, _r: int) -> void:
+	factory.bullet_grazed.connect(func(_t: Node2D, vol: BulletVolley2D, i: int, _z: GrazeZone2D, _r: int) -> void:
 		seen.append([i, vol.is_bullet_status_enabled(i), vol.get_bullet_transform(i).origin, vol.bullet_get_custom_data(i) == data[i], vol.is_bullet_inside_graze(i, 0), vol.get_bullet_grazed_rings(i, 0)]))
 	step_factory()
 	assert_eq(seen, [[0, true, Vector2.ZERO, true, true, 1], [1, true, Vector2(5, 0), true, true, 1]], "alive, in place, own custom data, state already updated")
@@ -28,7 +28,7 @@ func test_handler_disabling_the_bullet_skips_its_later_events() -> void:
 	var v := graze_volley(H.transforms_at([Vector2.ZERO, Vector2(0, 1)]), 600.0)
 	v.graze_set_zones([H.make_graze_zone([30.0, 20.0, 10.0])], &"graze_targets")
 	var log := H.record_graze(factory)
-	factory.bullet_grazed.connect(func(_t: Node2D, vol: BulletVolley2D, i: int, _z: BulletGrazeZone2D, r: int) -> void:
+	factory.bullet_grazed.connect(func(_t: Node2D, vol: BulletVolley2D, i: int, _z: GrazeZone2D, r: int) -> void:
 		if i == 0 and r == 0:
 			vol.disable_bullet(0))
 	step_factory(1, 0.5)
@@ -40,7 +40,7 @@ func test_handler_waking_the_bullet_again_still_drops_its_stale_events() -> void
 	var v := graze_volley(H.transforms_at([Vector2.ZERO, Vector2(0, 1)]), 600.0)
 	v.graze_set_zones([H.make_graze_zone([30.0, 20.0])], &"graze_targets")
 	var log := H.record_graze(factory)
-	factory.bullet_grazed.connect(func(_t: Node2D, vol: BulletVolley2D, i: int, _z: BulletGrazeZone2D, r: int) -> void:
+	factory.bullet_grazed.connect(func(_t: Node2D, vol: BulletVolley2D, i: int, _z: GrazeZone2D, r: int) -> void:
 		if i == 0 and r == 0:
 			vol.disable_bullet(0)
 			vol.enable_bullet(0))
@@ -59,7 +59,7 @@ func _two_bullets_one_target() -> Array:
 func test_handler_freeing_the_target_skips_events_naming_it() -> void:
 	var pair := _two_bullets_one_target()
 	var log := H.record_graze(factory)
-	factory.bullet_grazed.connect(func(t: Node2D, _v: BulletVolley2D, _i: int, _z: BulletGrazeZone2D, _r: int) -> void:
+	factory.bullet_grazed.connect(func(t: Node2D, _v: BulletVolley2D, _i: int, _z: GrazeZone2D, _r: int) -> void:
 		t.free())
 	step_factory(3)
 	assert_eq(H.graze_kinds(log), ["enter:0:0"], "the second bullet's event names a freed target: dropped")
@@ -69,7 +69,7 @@ func test_handler_freeing_the_target_skips_events_naming_it() -> void:
 func test_handler_queue_freeing_the_target_skips_events_naming_it() -> void:
 	var pair := _two_bullets_one_target()
 	var log := H.record_graze(factory)
-	factory.bullet_grazed.connect(func(t: Node2D, _v: BulletVolley2D, _i: int, _z: BulletGrazeZone2D, _r: int) -> void:
+	factory.bullet_grazed.connect(func(t: Node2D, _v: BulletVolley2D, _i: int, _z: GrazeZone2D, _r: int) -> void:
 		t.queue_free())
 	step_factory(3)
 	assert_eq(H.graze_kinds(log), ["enter:0:0"], "a target queued for deletion is not grazed")
@@ -82,7 +82,7 @@ func test_target_freed_between_volleys_of_one_sweep() -> void:
 	for v in [first, second]:
 		v.graze_set_zones([H.make_graze_zone([20.0])], &"graze_targets")
 	var log := H.record_graze(factory)
-	factory.bullet_grazed.connect(func(target: Node2D, _v: BulletVolley2D, _i: int, _z: BulletGrazeZone2D, _r: int) -> void:
+	factory.bullet_grazed.connect(func(target: Node2D, _v: BulletVolley2D, _i: int, _z: GrazeZone2D, _r: int) -> void:
 		target.free())
 	step_factory(2)
 	assert_eq(log.size(), 1, "the first volley's handler freed the target; the second volley never tests the snapshot's dead id")
@@ -119,7 +119,7 @@ func test_target_freed_by_any_live_handler_is_never_tested_later_in_the_sweep() 
 func test_handler_queue_freeing_the_volley_stops_dispatch() -> void:
 	var pair := _two_bullets_one_target()
 	var log := H.record_graze(factory)
-	factory.bullet_grazed.connect(func(_t: Node2D, v: BulletVolley2D, _i: int, _z: BulletGrazeZone2D, _r: int) -> void:
+	factory.bullet_grazed.connect(func(_t: Node2D, v: BulletVolley2D, _i: int, _z: GrazeZone2D, _r: int) -> void:
 		v.queue_free())
 	step_factory(2)
 	assert_eq(H.graze_kinds(log), ["enter:0:0"], "a volley queued for deletion reports nothing more")
@@ -134,7 +134,7 @@ func test_handler_freeing_the_volley_is_survived() -> void:
 	var log := H.record_graze(factory)
 	var first: BulletVolley2D = pair[1]
 	var first_id := first.get_instance_id()
-	factory.bullet_grazed.connect(func(_t: Node2D, v: BulletVolley2D, _i: int, _z: BulletGrazeZone2D, _r: int) -> void:
+	factory.bullet_grazed.connect(func(_t: Node2D, v: BulletVolley2D, _i: int, _z: GrazeZone2D, _r: int) -> void:
 		if v.get_instance_id() == first_id:
 			v.free())
 	step_factory(2)
@@ -150,7 +150,7 @@ func test_handler_pausing_the_factory_finishes_the_batch() -> void:
 	for v in [first, second]:
 		v.graze_set_zones([H.make_graze_zone([20.0])], &"graze_targets")
 	var log := H.record_graze(factory)
-	factory.bullet_grazed.connect(func(_t: Node2D, _v: BulletVolley2D, _i: int, _z: BulletGrazeZone2D, _r: int) -> void:
+	factory.bullet_grazed.connect(func(_t: Node2D, _v: BulletVolley2D, _i: int, _z: GrazeZone2D, _r: int) -> void:
 		factory.is_factory_processing_bullets = false)
 	step_factory()
 	assert_eq(H.graze_kinds(log), ["enter:0:0", "enter:1:0"], "the batch of the volley that paused finishes")
@@ -185,7 +185,7 @@ func test_handler_replacing_zones_skips_stale_events() -> void:
 	v.graze_set_zones([H.make_graze_zone([30.0, 20.0])], &"graze_targets")
 	var other := H.make_graze_zone([5.0]) # too small to reach the target
 	var log := H.record_graze(factory)
-	factory.bullet_grazed.connect(func(_t: Node2D, vol: BulletVolley2D, _i: int, _z: BulletGrazeZone2D, _r: int) -> void:
+	factory.bullet_grazed.connect(func(_t: Node2D, vol: BulletVolley2D, _i: int, _z: GrazeZone2D, _r: int) -> void:
 		vol.graze_set_zones([other], &"graze_targets"))
 	step_factory(1, 0.5)
 	assert_eq(H.graze_kinds(log), ["enter:0:0"], "events of the replaced zones are dropped")
@@ -195,7 +195,7 @@ func test_handler_replacing_zones_skips_stale_events() -> void:
 func test_structural_call_in_a_handler_is_refused_and_the_deferred_twin_works() -> void:
 	var pair := _two_bullets_one_target()
 	var calls := [0]
-	factory.bullet_grazed.connect(func(_t: Node2D, _v: BulletVolley2D, _i: int, _z: BulletGrazeZone2D, _r: int) -> void:
+	factory.bullet_grazed.connect(func(_t: Node2D, _v: BulletVolley2D, _i: int, _z: GrazeZone2D, _r: int) -> void:
 		calls[0] += 1
 		if calls[0] == 1:
 			factory.reset()
@@ -210,7 +210,7 @@ func test_structural_call_in_a_handler_is_refused_and_the_deferred_twin_works() 
 func test_handler_may_spawn() -> void:
 	_two_bullets_one_target()
 	var spawned: Array = []
-	factory.bullet_grazed.connect(func(_t: Node2D, _v: BulletVolley2D, _i: int, _z: BulletGrazeZone2D, _r: int) -> void:
+	factory.bullet_grazed.connect(func(_t: Node2D, _v: BulletVolley2D, _i: int, _z: GrazeZone2D, _r: int) -> void:
 		spawned.append(factory.spawn_volley(H.make_volley_data(2))))
 	step_factory()
 	assert_eq(spawned.size(), 2, "one spawn per graze")

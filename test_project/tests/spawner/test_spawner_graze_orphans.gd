@@ -69,7 +69,7 @@ func test_spawner_freed_inside_its_own_graze_handler() -> void:
 	var keep := _spawner(BulletSpawner2D.ORPHANED_VOLLEYS_KEEP_FLYING)
 	var clear := _spawner(BulletSpawner2D.ORPHANED_VOLLEYS_CLEAR)
 	for sp in [keep, clear]:
-		sp.bullet_grazed.connect(func(_t: Node2D, _v: BulletVolley2D, _i: int, _z: BulletGrazeZone2D, _r: int) -> void:
+		sp.bullet_grazed.connect(func(_t: Node2D, _v: BulletVolley2D, _i: int, _z: GrazeZone2D, _r: int) -> void:
 			sp.queue_free())
 	var factory_log := H.record_graze(factory)
 	var kept := _shoot(keep)

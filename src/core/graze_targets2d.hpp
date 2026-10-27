@@ -1,7 +1,7 @@
 #pragma once
 
 #include "core/node_scan2d.hpp"
-#include "data/bullet_graze_zone2d.hpp"
+#include "data/graze_zone2d.hpp"
 
 #include <godot_cpp/classes/node2d.hpp>
 #include <godot_cpp/classes/physics_server2d.hpp>

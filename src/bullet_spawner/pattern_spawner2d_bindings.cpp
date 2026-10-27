@@ -739,7 +739,7 @@ void PatternSpawner2D::bind_spawner_group(const StringName &cls, SpawnerGroup2D 
 		case SPAWNER_GROUP_GRAZE:
 			b.group("Graze", "");
 			b.property(PropertyInfo(Variant::BOOL, "graze_enabled"), "set_graze_enabled", "get_graze_enabled");
-			b.property(PropertyInfo(Variant::ARRAY, "graze_zones", PROPERTY_HINT_ARRAY_TYPE, "BulletGrazeZone2D"), "set_graze_zones", "get_graze_zones");
+			b.property(PropertyInfo(Variant::ARRAY, "graze_zones", PROPERTY_HINT_ARRAY_TYPE, "GrazeZone2D"), "set_graze_zones", "get_graze_zones");
 			b.property(PropertyInfo(Variant::INT, "graze_target_source", PROPERTY_HINT_ENUM, "Node Group,Node Path,Node Name,Node Children,Mouse,Global Positions"), "set_graze_target_source", "get_graze_target_source");
 			b.property(PropertyInfo(Variant::STRING_NAME, "graze_node_group"), "set_graze_node_group", "get_graze_node_group");
 			b.property(PropertyInfo(Variant::STRING_NAME, "graze_filter_group"), "set_graze_filter_group", "get_graze_filter_group");

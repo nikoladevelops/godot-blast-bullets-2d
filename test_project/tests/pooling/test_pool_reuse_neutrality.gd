@@ -137,7 +137,7 @@ func test_reused_volley_matches_a_cold_volley() -> void:
 	v.bullet_set_custom_data(2, Resource.new())
 	make_graze_target(Vector2(0, 0))
 	v.graze_set_zones([H.make_graze_zone([400.0])], &"graze_targets")
-	factory.bullet_grazed.connect(func(_t: Node2D, _v: BulletVolley2D, _i: int, _z: BulletGrazeZone2D, _r: int) -> void: pass)
+	factory.bullet_grazed.connect(func(_t: Node2D, _v: BulletVolley2D, _i: int, _z: GrazeZone2D, _r: int) -> void: pass)
 	v.flock_join(H.make_flock(1.5, 1.0, 1.0))
 	v.sound_set_effects([H.make_sound(BulletSoundData2D.SOUND_ON_HIT)], &"listeners")
 	var stage := BulletSplitStage2D.new()

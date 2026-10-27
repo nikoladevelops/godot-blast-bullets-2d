@@ -1,7 +1,7 @@
 #pragma once
 
 #include "core/graze_targets2d.hpp"
-#include "data/bullet_graze_zone2d.hpp"
+#include "data/graze_zone2d.hpp"
 
 #include <godot_cpp/classes/node2d.hpp>
 #include <godot_cpp/classes/scene_tree.hpp>
@@ -57,8 +57,8 @@ protected:
 // zone's graze detector, so a preview draws exactly what the runtime
 // tests). Inner rings use the zone's preview_color, each larger ring 0.7x
 // fainter.
-inline void append_graze_zone_circles2d(const BulletGrazeZone2D &zone, int zone_index, const GrazeTarget2D *targets, int count, std::vector<GrazePreviewCircle2D> &r_circles) {
-	const int rings = CLAMP(zone.ring_count, 1, BulletGrazeZone2D::MAX_RINGS);
+inline void append_graze_zone_circles2d(const GrazeZone2D &zone, int zone_index, const GrazeTarget2D *targets, int count, std::vector<GrazePreviewCircle2D> &r_circles) {
+	const int rings = CLAMP(zone.ring_count, 1, GrazeZone2D::MAX_RINGS);
 	for (int r = 0; r < rings; ++r) {
 		int rank = 0;
 		for (int o = 0; o < rings; ++o) {

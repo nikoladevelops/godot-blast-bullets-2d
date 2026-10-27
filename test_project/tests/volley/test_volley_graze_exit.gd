@@ -81,7 +81,7 @@ func test_freeze_ends_the_visit_silently_and_a_wake_starts_fresh() -> void:
 	var log := H.record_graze(factory)
 	once.graze_set_zones([H.make_graze_zone([20.0])], &"graze_targets")
 	var after_exit := H.make_graze_zone([20.0])
-	after_exit.regraze = BulletGrazeZone2D.REGRAZE_AFTER_EXIT
+	after_exit.regraze = GrazeZone2D.REGRAZE_AFTER_EXIT
 	again.graze_set_zones([after_exit], &"graze_targets")
 	step_factory()
 	assert_eq(log.size(), 2, "both grazed")
@@ -114,11 +114,11 @@ func _toggle_visits(regraze: int) -> Array:
 
 
 func test_after_exit_regrazes_on_every_visit() -> void:
-	assert_eq(_toggle_visits(BulletGrazeZone2D.REGRAZE_AFTER_EXIT), ["enter:0:0", "exit:0:0", "enter:0:0", "exit:0:0", "enter:0:0", "exit:0:0"], "one enter and one exit per visit")
+	assert_eq(_toggle_visits(GrazeZone2D.REGRAZE_AFTER_EXIT), ["enter:0:0", "exit:0:0", "enter:0:0", "exit:0:0", "enter:0:0", "exit:0:0"], "one enter and one exit per visit")
 
 
 func test_once_repeat_visits_are_silent() -> void:
-	assert_eq(_toggle_visits(BulletGrazeZone2D.REGRAZE_ONCE), ["enter:0:0", "exit:0:0"], "only the first visit reports")
+	assert_eq(_toggle_visits(GrazeZone2D.REGRAZE_ONCE), ["enter:0:0", "exit:0:0"], "only the first visit reports")
 
 
 func test_once_deeper_second_visit_grazes_only_its_new_ring() -> void:
@@ -176,9 +176,9 @@ func _lose_target(regraze: int, lose: Callable) -> Array:
 
 func test_a_freed_target_ends_visits_silently() -> void:
 	var freed := func(t: Node2D) -> void: t.free()
-	assert_eq(_lose_target(BulletGrazeZone2D.REGRAZE_ONCE, freed), ["enter:0:0"], "no exit; Once does not re-graze the replacement")
+	assert_eq(_lose_target(GrazeZone2D.REGRAZE_ONCE, freed), ["enter:0:0"], "no exit; Once does not re-graze the replacement")
 
 
 func test_a_target_leaving_the_group_ends_visits_silently() -> void:
 	var left := func(t: Node2D) -> void: t.remove_from_group(&"graze_targets")
-	assert_eq(_lose_target(BulletGrazeZone2D.REGRAZE_AFTER_EXIT, left), ["enter:0:0", "enter:0:0"], "no exit; After Exit re-grazes the replacement")
+	assert_eq(_lose_target(GrazeZone2D.REGRAZE_AFTER_EXIT, left), ["enter:0:0", "enter:0:0"], "no exit; After Exit re-grazes the replacement")

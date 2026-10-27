@@ -105,7 +105,7 @@ func test_a_parked_volley_keeps_its_zones_and_a_wake_resumes_grazing() -> void:
 	var log := H.record_graze(factory)
 	var v := graze_volley(H.transforms_at([Vector2.ZERO]), 0.0)
 	var zone := H.make_graze_zone([20.0])
-	zone.regraze = BulletGrazeZone2D.REGRAZE_AFTER_EXIT
+	zone.regraze = GrazeZone2D.REGRAZE_AFTER_EXIT
 	v.graze_set_zones([zone], &"graze_targets")
 	v.set_is_auto_pooling_enabled(false)
 	step_factory()

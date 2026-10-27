@@ -222,7 +222,7 @@ void BulletFactory2D::_bind_methods() {
 
 	ADD_SIGNAL(MethodInfo("reset_finished"));
 
-	// Graze notifications (see BulletGrazeZone2D): EVERY graze in the game
+	// Graze notifications (see GrazeZone2D): EVERY graze in the game
 	// reaches the factory, whoever owns the volley (a spawner's own graze
 	// signals fire first while it lives), so one connection here counts
 	// graze for bullets of spawners that were already freed. Emitted live
@@ -232,13 +232,13 @@ void BulletFactory2D::_bind_methods() {
 			PropertyInfo(Variant::OBJECT, "target", PROPERTY_HINT_RESOURCE_TYPE, "Node2D"),
 			PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
 			PropertyInfo(Variant::INT, "bullet_index"),
-			PropertyInfo(Variant::OBJECT, "zone", PROPERTY_HINT_RESOURCE_TYPE, "BulletGrazeZone2D"),
+			PropertyInfo(Variant::OBJECT, "zone", PROPERTY_HINT_RESOURCE_TYPE, "GrazeZone2D"),
 			PropertyInfo(Variant::INT, "ring_index")));
 	ADD_SIGNAL(MethodInfo("bullet_graze_exited",
 			PropertyInfo(Variant::OBJECT, "target", PROPERTY_HINT_RESOURCE_TYPE, "Node2D"),
 			PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
 			PropertyInfo(Variant::INT, "bullet_index"),
-			PropertyInfo(Variant::OBJECT, "zone", PROPERTY_HINT_RESOURCE_TYPE, "BulletGrazeZone2D"),
+			PropertyInfo(Variant::OBJECT, "zone", PROPERTY_HINT_RESOURCE_TYPE, "GrazeZone2D"),
 			PropertyInfo(Variant::INT, "deepest_ring_index")));
 	ClassDB::bind_method(D_METHOD("debug_get_graze_targets", "group"), &BulletFactory2D::debug_get_graze_targets);
 	ClassDB::bind_method(D_METHOD("debug_get_graze_stats"), &BulletFactory2D::debug_get_graze_stats);
@@ -301,13 +301,13 @@ void BulletFactory2D::_bind_methods() {
 			PropertyInfo(Variant::OBJECT, "target"),
 			PropertyInfo(Variant::OBJECT, "laser", PROPERTY_HINT_RESOURCE_TYPE, "LaserVolley2D"),
 			PropertyInfo(Variant::INT, "beam_index"),
-			PropertyInfo(Variant::OBJECT, "zone", PROPERTY_HINT_RESOURCE_TYPE, "BulletGrazeZone2D"),
+			PropertyInfo(Variant::OBJECT, "zone", PROPERTY_HINT_RESOURCE_TYPE, "GrazeZone2D"),
 			PropertyInfo(Variant::INT, "ring_index")));
 	ADD_SIGNAL(MethodInfo("laser_graze_exited",
 			PropertyInfo(Variant::OBJECT, "target"),
 			PropertyInfo(Variant::OBJECT, "laser", PROPERTY_HINT_RESOURCE_TYPE, "LaserVolley2D"),
 			PropertyInfo(Variant::INT, "beam_index"),
-			PropertyInfo(Variant::OBJECT, "zone", PROPERTY_HINT_RESOURCE_TYPE, "BulletGrazeZone2D"),
+			PropertyInfo(Variant::OBJECT, "zone", PROPERTY_HINT_RESOURCE_TYPE, "GrazeZone2D"),
 			PropertyInfo(Variant::INT, "deepest_ring_index")));
 
 	// Emitter bullets (bullet_factory2d_emitter.cpp): shots recorded during a

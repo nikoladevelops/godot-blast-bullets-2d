@@ -574,6 +574,7 @@ public:
 	void append_setup_warnings(PackedStringArray &r_warnings) const override;
 	real_t preview_collision_ring_radius() const override;
 	bool shots_ignore_despawn_bounds() const override;
+	String shot_signal_names() const override { return "pre_shoot, homing_targets_resolved, volley_homing_configured, volley_fired, volley_skipped"; }
 	const char *payload_key() const override { return "spawn_data"; }
 	String payload_class_name() const override { return "BulletVolleyData2D"; }
 	bool apply_payload_override(const Variant &value) override;

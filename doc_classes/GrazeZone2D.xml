@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<class name="BulletGrazeZone2D" inherits="Resource" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+<class name="GrazeZone2D" inherits="Resource" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
 		Graze configuration: which nodes can graze bullets, and the rings around them.
 	</brief_description>
@@ -43,7 +43,7 @@
 		<member name="preview_color" type="Color" setter="set_preview_color" getter="get_preview_color" default="Color(0.2, 0.9, 0.8, 0.8)">
 			Color of this zone's rings in the spawner's graze preview ([member BulletSpawner2D.graze_show_preview], at runtime [member BulletSpawner2D.graze_preview_during_runtime]). The innermost ring uses it as is; each larger ring is drawn fainter.
 		</member>
-		<member name="regraze" type="int" setter="set_regraze" getter="get_regraze" enum="BulletGrazeZone2D.Regraze" default="0">
+		<member name="regraze" type="int" setter="set_regraze" getter="get_regraze" enum="GrazeZone2D.Regraze" default="0">
 			When a bullet may graze a ring of this zone again. [constant REGRAZE_ONCE]: each ring grazes at most once per bullet life. [constant REGRAZE_AFTER_EXIT]: a bullet that left the zone (the outermost ring of every target) grazes every ring again on its next visit.
 		</member>
 		<member name="ring_1_radius" type="float" setter="set_ring_1_radius" getter="get_ring_1_radius" default="24.0">

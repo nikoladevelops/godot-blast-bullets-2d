@@ -1,0 +1,154 @@
+{
+  "timestamp": "2026-10-23T05-46-24Z",
+  "commit": "9f4d3d1",
+  "dirty": true,
+  "repeat": 5,
+  "machine": {
+    "cpu": "AMD Ryzen 7 8840HS w/ Radeon 780M Graphics",
+    "cores": 16,
+    "os": "Linux-7.3.0-3-cachyos-x86_64-with-glibc2.44",
+    "python": "3.14.8"
+  },
+  "scenarios": {
+    "multi_spawner_pooled_8x": {
+      "active_bullets_mean": 10157.2,
+      "collision_records": 0,
+      "description": "8 auto-fire spawners (spin, homing, split, graze) into one warm pool, ~10k live",
+      "engine_ms": {
+        "max": 2.018,
+        "mean": 1.02227333333333,
+        "p50": 0.965,
+        "p95": 1.386,
+        "p99": 1.75
+      },
+      "expired_bullets": 34032,
+      "extra": {},
+      "factory_tick_ms": {
+        "max": 1.2,
+        "mean": 0.538276666666667,
+        "p50": 0.492,
+        "p95": 0.765,
+        "p99": 0.877
+      },
+      "frame_ms": {
+        "max": 2.019,
+        "mean": 1.02334666666667,
+        "p50": 0.966,
+        "p95": 1.387,
+        "p99": 1.751
+      },
+      "measure_frames": 300,
+      "memory_static_growth_mb": 0.296161651611328,
+      "memory_static_peak_mb": 39.5885858535767,
+      "nodes_end": 447.0,
+      "objects_end": 2884.0,
+      "objects_growth": 0,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 1433,
+      "pool_misses": 427,
+      "spawned_bullets": 33792,
+      "step_ms": {
+        "max": 0.006,
+        "mean": 0.00112666666666667,
+        "p50": 0.001,
+        "p95": 0.002,
+        "p99": 0.003
+      },
+      "warmup_frames": 180
+    },
+    "split_storm": {
+      "active_bullets_mean": 1675.0,
+      "collision_records": 0,
+      "description": "500 parents -> 2000 children -> 4000 grandchildren (two-stage split)",
+      "engine_ms": {
+        "max": 18.755,
+        "mean": 0.683491666666667,
+        "p50": 0.218,
+        "p95": 1.89,
+        "p99": 7.238
+      },
+      "expired_bullets": 19500,
+      "extra": {},
+      "factory_tick_ms": {
+        "max": 17.336,
+        "mean": 0.577488888888889,
+        "p50": 0.154,
+        "p95": 1.616,
+        "p99": 6.675
+      },
+      "frame_ms": {
+        "max": 18.755,
+        "mean": 0.685894444444444,
+        "p50": 0.218,
+        "p95": 1.892,
+        "p99": 7.239
+      },
+      "measure_frames": 360,
+      "memory_static_growth_mb": 0.133499145507812,
+      "memory_static_peak_mb": 60.8448133468628,
+      "nodes_end": 2509.0,
+      "objects_end": 9058.0,
+      "objects_growth": 0,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 7508,
+      "pool_misses": 2502,
+      "spawned_bullets": 19500,
+      "step_ms": {
+        "max": 0.249,
+        "mean": 0.00238333333333333,
+        "p50": 0.0,
+        "p95": 0.002,
+        "p99": 0.004
+      },
+      "warmup_frames": 130
+    },
+    "volley_10k_flight": {
+      "active_bullets_mean": 10000.0,
+      "collision_records": 0,
+      "description": "10k bullets in flight, no overlaps",
+      "engine_ms": {
+        "max": 1.783,
+        "mean": 0.594253333333333,
+        "p50": 0.584,
+        "p95": 0.623,
+        "p99": 0.654
+      },
+      "expired_bullets": 0,
+      "extra": {},
+      "factory_tick_ms": {
+        "max": 1.445,
+        "mean": 0.295406666666667,
+        "p50": 0.289,
+        "p95": 0.309,
+        "p99": 0.322
+      },
+      "frame_ms": {
+        "max": 1.785,
+        "mean": 0.59449,
+        "p50": 0.584,
+        "p95": 0.624,
+        "p99": 0.654
+      },
+      "measure_frames": 300,
+      "memory_static_growth_mb": 0.0398025512695312,
+      "memory_static_peak_mb": 34.4294090270996,
+      "nodes_end": 17.0,
+      "objects_end": 1607.0,
+      "objects_growth": 0,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 0,
+      "pool_misses": 10,
+      "spawned_bullets": 0,
+      "step_ms": {
+        "max": 0.002,
+        "mean": 0.000213333333333333,
+        "p50": 0.0,
+        "p95": 0.001,
+        "p99": 0.001
+      },
+      "warmup_frames": 60
+    }
+  },
+  "godot": "4.7.2-stable (arch_linux)",
+  "debug_build": true
+}

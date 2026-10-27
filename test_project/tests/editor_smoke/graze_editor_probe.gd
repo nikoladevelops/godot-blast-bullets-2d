@@ -49,7 +49,7 @@ func _process(_delta: float) -> void:
 			replacement.add_to_group(&"player")
 		90:
 			_expect(2, Vector2(100, 0), "a replacement target gets rings")
-			var zone := enemy.graze_zones[0] as BulletGrazeZone2D
+			var zone := enemy.graze_zones[0] as GrazeZone2D
 			zone.ring_count = 1
 		120:
 			_expect(1, Vector2(100, 0), "a zone edit redraws")

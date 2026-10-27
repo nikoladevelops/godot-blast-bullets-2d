@@ -25,7 +25,7 @@ void PatternSpawner2D::set_graze_enabled(bool value) {
 	refresh_process_state();
 }
 
-TypedArray<BulletGrazeZone2D> PatternSpawner2D::get_graze_zones() const {
+TypedArray<GrazeZone2D> PatternSpawner2D::get_graze_zones() const {
 	return graze_zones;
 }
 
@@ -34,19 +34,19 @@ void PatternSpawner2D::set_graze_zones(const Array &value) {
 		UtilityFunctions::push_error((String(get_class()) + ": graze_zones holds at most 4 zones, keeping the old value."));
 		return;
 	}
-	TypedArray<BulletGrazeZone2D> zones;
+	TypedArray<GrazeZone2D> zones;
 	for (int i = 0; i < value.size(); ++i) {
 		const Variant &entry = value[i];
 		if (entry.get_type() == Variant::NIL) {
 			zones.push_back(Variant());
 			continue;
 		}
-		BulletGrazeZone2D *zone = live_object2d<BulletGrazeZone2D>(entry);
+		GrazeZone2D *zone = live_object2d<GrazeZone2D>(entry);
 		if (zone == nullptr) {
-			UtilityFunctions::push_error((String(get_class()) + ": graze_zones entries must be BulletGrazeZone2D or null, keeping the old value."));
+			UtilityFunctions::push_error((String(get_class()) + ": graze_zones entries must be GrazeZone2D or null, keeping the old value."));
 			return;
 		}
-		zones.push_back(Ref<BulletGrazeZone2D>(zone));
+		zones.push_back(Ref<GrazeZone2D>(zone));
 	}
 	connect_graze_zones(false);
 	graze_zones = zones;
@@ -246,7 +246,7 @@ void PatternSpawner2D::connect_graze_zones(bool connect) {
 	const Callable on_changed = callable_mp(this, &PatternSpawner2D::_on_graze_zone_changed);
 	const StringName changed("changed");
 	for (int i = 0; i < graze_zones.size(); ++i) {
-		Ref<BulletGrazeZone2D> zone = graze_zones[i];
+		Ref<GrazeZone2D> zone = graze_zones[i];
 		if (zone.is_null()) {
 			continue;
 		}
@@ -273,16 +273,16 @@ Array PatternSpawner2D::spawner_graze_zones(bool &r_any) {
 	bool misuse = graze_zones.size() > BulletVolley2D::MAX_GRAZE_ZONES;
 	for (int i = 0; i < graze_zones.size() && i < BulletVolley2D::MAX_GRAZE_ZONES; ++i) {
 		const Variant entry = graze_zones[i];
-		BulletGrazeZone2D *zone = live_object2d<BulletGrazeZone2D>(entry);
+		GrazeZone2D *zone = live_object2d<GrazeZone2D>(entry);
 		if (zone == nullptr && entry.get_type() != Variant::NIL) {
 			misuse = true;
 		}
-		zones.push_back(zone != nullptr ? Variant(Ref<BulletGrazeZone2D>(zone)) : Variant());
+		zones.push_back(zone != nullptr ? Variant(Ref<GrazeZone2D>(zone)) : Variant());
 		any = any || zone != nullptr;
 	}
 	if (misuse && !graze_zones_misuse_warned) {
 		graze_zones_misuse_warned = true;
-		UtilityFunctions::push_warning((String(get_class()) + ": graze_zones was changed in place and holds more than 4 zones or entries that are not BulletGrazeZone2D; only the first 4 zones are used. Assign the whole array instead (graze_zones = [...])."));
+		UtilityFunctions::push_warning((String(get_class()) + ": graze_zones was changed in place and holds more than 4 zones or entries that are not GrazeZone2D; only the first 4 zones are used. Assign the whole array instead (graze_zones = [...])."));
 	}
 	r_any = any;
 	return zones;
@@ -365,7 +365,7 @@ void PatternSpawner2D::refresh_graze_preview() {
 	collect_graze_targets(graze_targets_scratch);
 	for (int z = 0; z < graze_zones.size() && z < BulletVolley2D::MAX_GRAZE_ZONES; ++z) {
 		const Variant entry = graze_zones[z];
-		const BulletGrazeZone2D *zone = live_object2d<BulletGrazeZone2D>(entry);
+		const GrazeZone2D *zone = live_object2d<GrazeZone2D>(entry);
 		if (zone == nullptr || !zone->enabled) {
 			continue;
 		}

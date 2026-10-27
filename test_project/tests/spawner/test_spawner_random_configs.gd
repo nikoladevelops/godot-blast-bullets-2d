@@ -1,6 +1,6 @@
 extends BlastTest
 ## Random VALID configurations: every inspector property of BulletSpawner2D,
-## BulletVolleyData2D, BulletFlock2D and BulletGrazeZone2D set to a random
+## BulletVolleyData2D, BulletFlock2D and GrazeZone2D set to a random
 ## value inside its own inspector hint (enums, ranges, layers, bools,
 ## colors), then shots, auto-fire and real frames against a wall, an area
 ## and grazing targets. A value the inspector offers is never rejected, no
@@ -137,7 +137,7 @@ func test_random_valid_configurations_stay_clean() -> void:
 		var flock := BulletFlock2D.new()
 		_randomize(flock, "seed %d flock" % sd)
 		sp.flock = flock
-		var zone := BulletGrazeZone2D.new()
+		var zone := GrazeZone2D.new()
 		_randomize(zone, "seed %d zone" % sd)
 		sp.graze_zones = [zone]
 		sp.homing_node_group = &"fuzz_targets"

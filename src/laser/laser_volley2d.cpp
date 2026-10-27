@@ -219,7 +219,7 @@ void LaserVolley2D::graze_arm(const Array &zones, const std::shared_ptr<GrazeDet
 	++graze_generation;
 	graze_zones.clear();
 	for (int i = 0; i < zones.size() && (int)graze_zones.size() < 4; ++i) {
-		const Ref<BulletGrazeZone2D> zone = zones[i];
+		const Ref<GrazeZone2D> zone = zones[i];
 		if (zone.is_valid()) {
 			graze_zones.push_back(zone);
 		}
@@ -243,11 +243,11 @@ bool LaserVolley2D::graze_set_zones(const Array &zones, const StringName &target
 	}
 	int valid = 0;
 	for (int i = 0; i < zones.size(); ++i) {
-		const Ref<BulletGrazeZone2D> zone = zones[i];
+		const Ref<GrazeZone2D> zone = zones[i];
 		valid += zone.is_valid() ? 1 : 0;
 	}
 	if (valid == 0) {
-		UtilityFunctions::push_error("graze_set_zones: zones holds no BulletGrazeZone2D, nothing changed.");
+		UtilityFunctions::push_error("graze_set_zones: zones holds no GrazeZone2D, nothing changed.");
 		return false;
 	}
 	graze_arm(zones, nullptr);
@@ -268,7 +268,7 @@ void LaserVolley2D::graze_clear() {
 
 Array LaserVolley2D::get_graze_zones() const {
 	Array out;
-	for (const Ref<BulletGrazeZone2D> &zone : graze_zones) {
+	for (const Ref<GrazeZone2D> &zone : graze_zones) {
 		out.push_back(zone);
 	}
 	return out;
@@ -735,7 +735,7 @@ bool LaserVolley2D::graze_armed_alike(const Array &zones, const std::shared_ptr<
 	}
 	size_t k = 0;
 	for (int i = 0; i < zones.size() && k < 4; ++i) {
-		const Ref<BulletGrazeZone2D> zone = zones[i];
+		const Ref<GrazeZone2D> zone = zones[i];
 		if (zone.is_null()) {
 			continue;
 		}

@@ -184,14 +184,14 @@ PackedStringArray BulletSpawner2D::debug_explain_features() const {
 		bool sized = false;
 		for (int i = 0; i < graze_zones.size(); ++i) {
 			const Variant entry = graze_zones[i];
-			const BulletGrazeZone2D *zone = live_object2d<BulletGrazeZone2D>(entry);
+			const GrazeZone2D *zone = live_object2d<GrazeZone2D>(entry);
 			if (zone != nullptr) {
 				++zones;
 				sized = sized || zone->count_bullet_size;
 			}
 		}
 		if (zones == 0) {
-			out.push_back("Graze: on but graze_zones is empty: nothing grazes. Add a BulletGrazeZone2D.");
+			out.push_back("Graze: on but graze_zones is empty: nothing grazes. Add a GrazeZone2D.");
 		} else {
 			const int targets = resolve_graze_targets().size();
 			out.push_back(String("Graze: on, ") + itos(zones) + " zone(s), source " + graze_source_name2d(graze_target_source) + ", " + itos(targets) + " target(s) found now" + (targets == 0 ? " (nothing grazes until one appears)" : "") + (sized ? "; rings grow by each bullet's own size." : "; rings measured from bullet centers."));

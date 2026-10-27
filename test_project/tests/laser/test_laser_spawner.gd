@@ -863,3 +863,13 @@ func test_an_aim_and_target_source_mismatch_warns_once_at_the_shot() -> void:
 	assert_true(sp.shoot_once(), "fires")
 	expect_warning_sequence(["LaserSpawner2D: laser_target_source is set but laser_data aims along the pattern: set its aim to Track or Lock On to use the targets."])
 	factory.clear_active_lasers(false)
+
+
+## shoot_once from inside a shot's own signal is refused naming the signals
+## THIS spawner type emits during a shot (it listed the bullet signals).
+func test_a_nested_shot_names_the_laser_signals() -> void:
+	var sp := _spawner(_laser(0.5), 1)
+	sp.laser_fired.connect(func(_l, _n) -> void: sp.shoot_once(), CONNECT_ONE_SHOT)
+	assert_true(sp.shoot_once(), "the outer shot fires")
+	expect_error_sequence(["LaserSpawner2D::shoot_once: re-entrant call from inside a spawner signal handler is not allowed (laser_fired, volley_skipped). Use call_deferred(\"shoot_once\") instead."])
+	factory.clear_active_lasers(false)
