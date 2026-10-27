@@ -287,6 +287,12 @@
 				The graze targets of [param group] exactly as the next volley tick of this physics step tests them: an Array of {id, position} (every live [Node2D] member in tree order, in this factory's World2D; no cap).
 			</description>
 		</method>
+		<method name="debug_get_laser_debug_boxes" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Test helper: what the laser overlay of the collision debugger draws: [code]{visible, draws, color, z_index, boxes}[/code], each box [code]{laser, beam, transform, extents}[/code] (instance id, beam index, the box's pose and half extents), exactly the boxes the lasers' contact queries tested in the last tick.
+			</description>
+		</method>
 		<method name="debug_get_laser_pool_amount" qualifiers="const">
 			<return type="int" />
 			<description>
@@ -825,7 +831,7 @@
 			Emitter-bullet shots fired per physics step at most (0 = no cap, the default). The rest wait for the next step in order and are never dropped, so a wall of emitters spreads its shots over a few frames instead of one heavy frame.
 		</member>
 		<member name="is_debugger_enabled" type="bool" setter="set_is_debugger_enabled" getter="get_is_debugger_enabled" default="false">
-			Whether the debugger of the collision shapes is enabled or not.
+			Whether the collision debugger is on: it draws every bullet's collision shape and, for lasers, every box their contact queries test this tick (one per segment of every unspent beam while it hits) in [member debugger_color] at [member debugger_z_index].
 		</member>
 		<member name="is_factory_processing_bullets" type="bool" setter="set_is_factory_processing_bullets" getter="get_is_factory_processing_bullets" default="true">
 			Use this if you want to pause processing of bullets - being able to stop bullets in place. Always use this instead of [code]set_process[/code]/[code]set_physics_process[/code]. While paused nothing is drained. Overlaps that START during the pause are parked per volley (bounded at 4096 records, deduplicated, cancelled when the overlap ends before resume) and replayed exactly once on resume. Overlaps counted before the pause are never re-reported, and nothing piles up into a resume hitch.

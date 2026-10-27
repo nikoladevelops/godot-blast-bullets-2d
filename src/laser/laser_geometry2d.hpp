@@ -2,6 +2,7 @@
 
 #include <godot_cpp/core/math.hpp>
 #include <godot_cpp/variant/rect2.hpp>
+#include <godot_cpp/variant/transform2d.hpp>
 #include <godot_cpp/variant/vector2.hpp>
 
 #include <vector>
@@ -26,6 +27,21 @@ inline real_t distance_to_polyline2d(const Vector2 &p, const std::vector<Vector2
 }
 
 // The facing of the polyline segment nearest to `at`.
+// The box a laser's contact query tests for the segment a -> c (`seg` long,
+// > 0) of a beam `half_width` wide: centered on the segment, turned along it,
+// half extents (seg / 2, half_width). Shared by the query and the debugger
+// overlay.
+inline void laser_query_box2d(const Vector2 &a, const Vector2 &c, real_t seg, real_t half_width, Transform2D &r_pose, Vector2 &r_extents) {
+	const Vector2 axis = (c - a) / seg;
+	r_pose = Transform2D((real_t)axis.angle(), (a + c) * (real_t)0.5);
+	r_extents = Vector2(seg * (real_t)0.5, half_width);
+}
+
+// The half width every contact query of a beam `width` wide uses.
+inline real_t laser_query_half_width2d(real_t width) {
+	return Math::max((real_t)0.5, width * (real_t)0.5);
+}
+
 inline real_t polyline_angle_at2d(const std::vector<Vector2> &pts, const Vector2 &at) {
 	real_t best = -1.0;
 	real_t angle = 0.0;

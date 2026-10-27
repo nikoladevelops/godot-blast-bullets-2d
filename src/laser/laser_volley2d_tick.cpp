@@ -473,7 +473,7 @@ bool LaserVolley2D::update_contacts(int beam_index, uint64_t self_id, uint32_t l
 	if (shape_query.is_null()) {
 		shape_query.instantiate();
 	}
-	const real_t half_width = Math::max((real_t)0.5, get_current_width() * (real_t)0.5);
+	const real_t half_width = laser_query_half_width2d(get_current_width());
 	shape_query->set_shape_rid(query_shape);
 	shape_query->set_collision_mask((uint32_t)d->collision_mask);
 	shape_query->set_collide_with_bodies(d->collide_with_bodies);
@@ -530,8 +530,11 @@ bool LaserVolley2D::update_contacts(int beam_index, uint64_t self_id, uint32_t l
 			continue;
 		}
 		const Vector2 axis = (c - a) / seg;
-		ps->shape_set_data(query_shape, Vector2(seg * (real_t)0.5, half_width));
-		shape_query->set_transform(Transform2D((real_t)axis.angle(), (a + c) * (real_t)0.5));
+		Transform2D box_pose;
+		Vector2 box_extents;
+		laser_query_box2d(a, c, seg, half_width, box_pose, box_extents);
+		ps->shape_set_data(query_shape, box_extents);
+		shape_query->set_transform(box_pose);
 		const TypedArray<Dictionary> hits = space->intersect_shape(shape_query, d->max_hits_per_beam);
 		for (int h = 0; h < hits.size(); ++h) {
 			const Dictionary hit = hits[h];
@@ -706,6 +709,33 @@ bool LaserVolley2D::update_contacts(int beam_index, uint64_t self_id, uint32_t l
 }
 
 // ---- Graze and sound ----------------------------------------------------------------------
+
+void LaserVolley2D::append_debug_boxes(std::vector<LaserDebugBox2D> &r_boxes) const {
+	if (!active || data.is_null() || !hitting_phase()) {
+		return;
+	}
+	const real_t half_width = laser_query_half_width2d(get_current_width());
+	const uint64_t id = get_instance_id();
+	for (int i = 0; i < (int)beams.size(); ++i) {
+		const Beam &b = beams[i];
+		if (b.spent) {
+			continue;
+		}
+		for (size_t k = 1; k < b.points.size(); ++k) {
+			const Vector2 a = b.points[k - 1];
+			const Vector2 c = b.points[k];
+			const real_t seg = a.distance_to(c);
+			if (!(seg > (real_t)0.0)) {
+				continue;
+			}
+			LaserDebugBox2D box;
+			laser_query_box2d(a, c, seg, half_width, box.pose, box.extents);
+			box.laser_id = id;
+			box.beam = i;
+			r_boxes.push_back(box);
+		}
+	}
+}
 
 void LaserVolley2D::fire_event(int event, const Vector2 &pos, int beam, int ring, int zone) {
 	sound_fire(event, pos, beam, ring, zone);

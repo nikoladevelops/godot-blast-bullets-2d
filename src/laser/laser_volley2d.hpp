@@ -4,6 +4,7 @@
 #include "data/graze_zone2d.hpp"
 #include "data/laser_data2d.hpp"
 #include "data/laser_sound_data2d.hpp"
+#include "debugger/laser_debug_layer2d.hpp"
 #include "sprite/sprite_anim2d.hpp"
 
 #include <godot_cpp/classes/node2d.hpp>
@@ -338,6 +339,9 @@ private:
 	// laser-wide event (its effects play per beam: charge and fire at each
 	// muzzle, finish and ended early at each tip). No user code.
 	void fire_event(int event, const Vector2 &pos, int beam = -1, int ring = -1, int zone = -1);
+	// The boxes this tick's contact queries tested (one per segment of every
+	// unspent beam while the phase hits), for the debugger overlay.
+	void append_debug_boxes(std::vector<LaserDebugBox2D> &r_boxes) const;
 	void play_effects(int event, const Vector2 &pos, int beam);
 	// The point of beam `beam` an entry's follow_point names.
 	Vector2 sound_beam_point(const LaserSoundData2D &entry, int beam) const;

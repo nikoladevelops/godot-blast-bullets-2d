@@ -31,6 +31,7 @@
 #include "data/bullet_volley_data2d.hpp"
 #include "data/laser_data2d.hpp"
 #include "debugger/despawn_bounds_preview_layer2d.hpp"
+#include "debugger/laser_debug_layer2d.hpp"
 #include "factory/emit_queue2d.hpp"
 #include "factory/flock_solver2d.hpp"
 #include "factory/graze_detector2d.hpp"
@@ -212,6 +213,9 @@ public:
 	int get_despawn_bounds_preview_z_index() const { return despawn_bounds_preview_z_index; }
 	void set_despawn_bounds_preview_z_index(int value);
 	int get_debugger_z_index() const { return debugger_z_index; }
+	// What the laser overlay draws: {visible, draws, color, z_index, boxes:
+	// [{laser, beam, transform, extents}]}.
+	Dictionary debug_get_laser_debug_boxes() const;
 	void set_debugger_z_index(int value);
 	bool despawn_bounds_preview_active() const;
 	void refresh_despawn_bounds_preview();
@@ -951,6 +955,13 @@ private:
 	DespawnBoundsPreviewLayer2D *despawn_preview_layer = nullptr;
 	uint64_t despawn_preview_layer_id = 0;
 	DespawnBoundsPreviewLayer2D *resolve_despawn_preview_layer(bool create);
+	// The collision debugger's laser overlay (id-checked like the preview).
+	LaserDebugLayer2D *laser_debug_layer = nullptr;
+	uint64_t laser_debug_layer_id = 0;
+	LaserDebugLayer2D *resolve_laser_debug_layer(bool create);
+	// After the laser tick: the boxes every active laser queried, while the
+	// debugger is enabled (hidden and emptied otherwise). No user code.
+	void refresh_laser_debug_layer();
 	int clear_bullets_in_area(const char *function_name, bool circle, const Vector2 &center, real_t radius, const Rect2 &rect);
 	bool is_ready = false;
 

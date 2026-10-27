@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="LaserDebugLayer2D" inherits="Node2D" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		The collision debugger's laser overlay (internal).
+	</brief_description>
+	<description>
+		Created by [BulletFactory2D] as an internal, owner-less child while [member BulletFactory2D.is_debugger_enabled] is on and lasers exist: it draws every box the active lasers' contact queries test (see [method BulletFactory2D.debug_get_laser_debug_boxes]). Never saved; a script freeing it gets a new one at the next tick.
+	</description>
+	<tutorials>
+	</tutorials>
+</class>

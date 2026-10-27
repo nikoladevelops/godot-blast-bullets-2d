@@ -644,6 +644,7 @@ void BulletFactory2D::_physics_process(double delta) {
 	if (!tick_lasers(delta, alive)) { // each laser scales it by its own time factor
 		return;
 	}
+	refresh_laser_debug_layer();
 	is_iterating_bullets = false;
 
 	// Splits recorded this sweep (and before it) spawn now, at the poses

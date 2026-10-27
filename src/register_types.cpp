@@ -33,6 +33,7 @@
 // Debugger
 #include "debugger/bullet_volley_debugger2d.hpp"
 #include "debugger/graze_preview_layer2d.hpp"
+#include "debugger/laser_debug_layer2d.hpp"
 
 // Spawn data classes
 #include "data/bullet_volley_data2d.hpp"
@@ -111,6 +112,7 @@ void initialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(PatternPreviewLayer2D)
 	GDREGISTER_CLASS(GrazePreviewLayer2D)
 	GDREGISTER_CLASS(DespawnBoundsPreviewLayer2D)
+	GDREGISTER_CLASS(LaserDebugLayer2D)
 
 	CachedStringNames2D::create();
 	WarnOnce2D::create();

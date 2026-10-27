@@ -369,6 +369,7 @@ void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_despawn_bounds_preview_z_index"), &BulletFactory2D::get_despawn_bounds_preview_z_index);
 	ClassDB::bind_method(D_METHOD("set_despawn_bounds_preview_z_index", "value"), &BulletFactory2D::set_despawn_bounds_preview_z_index);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "despawn_bounds_preview_z_index", PROPERTY_HINT_RANGE, "-4096,4096,1"), "set_despawn_bounds_preview_z_index", "get_despawn_bounds_preview_z_index");
+	ClassDB::bind_method(D_METHOD("debug_get_laser_debug_boxes"), &BulletFactory2D::debug_get_laser_debug_boxes);
 	ClassDB::bind_method(D_METHOD("debug_get_despawn_bounds_preview"), &BulletFactory2D::debug_get_despawn_bounds_preview);
 
 	ClassDB::bind_method(D_METHOD("clear_bullets_in_circle", "center", "radius"), &BulletFactory2D::clear_bullets_in_circle);

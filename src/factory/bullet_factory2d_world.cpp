@@ -12,6 +12,7 @@ namespace BlastBullets2D {
 
 // Node name of the despawn bounds preview (tilde: internal, sorts last).
 static constexpr const char *DESPAWN_PREVIEW_NAME = "~BlastBulletsDespawnPreview";
+static constexpr const char *LASER_DEBUG_LAYER_NAME = "~BlastBulletsLaserDebug";
 
 void BulletFactory2D::set_time_scale(double value) {
 	// Any finite scale: one volley tick covers at most MAX_VOLLEY_TICK_DELTA.
@@ -123,6 +124,89 @@ void BulletFactory2D::refresh_despawn_bounds_preview() {
 		layer->set_visible(true);
 	}
 	layer->set_snapshot(despawn_bounds_rect, despawn_bounds_color);
+}
+
+LaserDebugLayer2D *BulletFactory2D::resolve_laser_debug_layer(bool create) {
+	if (laser_debug_layer != nullptr && ObjectDB::get_instance(ObjectID(laser_debug_layer_id)) == laser_debug_layer && laser_debug_layer->get_parent() == this) {
+		return laser_debug_layer;
+	}
+	laser_debug_layer = nullptr;
+	laser_debug_layer_id = 0;
+	Node *existing = get_node_or_null(NodePath(LASER_DEBUG_LAYER_NAME));
+	LaserDebugLayer2D *layer = Object::cast_to<LaserDebugLayer2D>(existing);
+	if (existing != nullptr && layer == nullptr) {
+		existing->set_name(String(LASER_DEBUG_LAYER_NAME) + "Stale");
+		remove_child(existing);
+		existing->queue_free();
+	}
+	if (layer == nullptr && create) {
+		layer = memnew(LaserDebugLayer2D);
+		layer->set_name(LASER_DEBUG_LAYER_NAME);
+		layer->set_meta(PREVIEW_META_KEY, true);
+		layer->set_as_top_level(true);
+		// Internal: never listed by get_children() and owner-less: never saved.
+		add_child(layer, false, INTERNAL_MODE_BACK);
+	}
+	if (layer != nullptr) {
+		laser_debug_layer = layer;
+		laser_debug_layer_id = layer->get_instance_id();
+	}
+	return layer;
+}
+
+void BulletFactory2D::refresh_laser_debug_layer() {
+	if (is_tearing_down || !is_inside_tree()) {
+		return;
+	}
+	const bool enabled = get_is_debugger_enabled();
+	if (laser_debug_layer == nullptr && (!enabled || all_lasers.empty())) {
+		return; // nothing drawn yet and nothing to draw: no lookup per sweep
+	}
+	LaserDebugLayer2D *layer = resolve_laser_debug_layer(enabled && !all_lasers.empty());
+	if (layer == nullptr) {
+		return;
+	}
+	const bool had_boxes = !layer->boxes.empty();
+	layer->boxes.clear();
+	if (enabled) {
+		for (const LaserVolley2D *laser : all_lasers) {
+			if (laser_listed(laser)) {
+				laser->append_debug_boxes(layer->boxes);
+			}
+		}
+	}
+	layer->color = get_debugger_color();
+	if (layer->get_z_index() != debugger_z_index) {
+		layer->set_z_index(debugger_z_index);
+	}
+	if (layer->is_visible() != enabled) {
+		layer->set_visible(enabled);
+	}
+	if (had_boxes || !layer->boxes.empty()) {
+		layer->queue_redraw();
+	}
+}
+
+Dictionary BulletFactory2D::debug_get_laser_debug_boxes() const {
+	const bool alive = laser_debug_layer != nullptr && ObjectDB::get_instance(ObjectID(laser_debug_layer_id)) == laser_debug_layer;
+	Dictionary d;
+	d["visible"] = alive && laser_debug_layer->is_visible();
+	d["draws"] = alive ? laser_debug_layer->debug_draw_count : 0;
+	d["color"] = alive ? laser_debug_layer->color : Color();
+	d["z_index"] = alive ? laser_debug_layer->get_z_index() : 0;
+	Array boxes;
+	if (alive) {
+		for (const LaserDebugBox2D &box : laser_debug_layer->boxes) {
+			Dictionary e;
+			e["laser"] = (int64_t)box.laser_id;
+			e["beam"] = box.beam;
+			e["transform"] = box.pose;
+			e["extents"] = box.extents;
+			boxes.push_back(e);
+		}
+	}
+	d["boxes"] = boxes;
+	return d;
 }
 
 Dictionary BulletFactory2D::debug_get_despawn_bounds_preview() const {

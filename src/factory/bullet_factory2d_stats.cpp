@@ -455,6 +455,9 @@ void BulletFactory2D::set_debugger_z_index(int value) {
 	if (!is_ready || is_tearing_down) {
 		return;
 	}
+	if (LaserDebugLayer2D *layer = resolve_laser_debug_layer(false)) {
+		layer->set_z_index(value);
+	}
 	if (BulletVolleyDebugger2D *debugger = volley_debugger.get()) {
 		debugger->set_debugger_z_index(value);
 	}
@@ -476,6 +479,9 @@ void BulletFactory2D::set_is_debugger_enabled(bool new_is_enabled) {
 	heal_owned_children();
 	if (BulletVolleyDebugger2D *debugger = volley_debugger.get()) {
 		debugger->set_is_debugger_enabled(new_is_enabled);
+	}
+	if (!new_is_enabled) {
+		refresh_laser_debug_layer(); // hidden and emptied at once
 	}
 }
 
