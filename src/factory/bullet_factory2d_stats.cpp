@@ -27,7 +27,7 @@ Dictionary BulletFactory2D::debug_get_factory_state() {
 int BulletFactory2D::get_active_bullet_count() const {
 	int total = 0;
 	for (const BulletVolley2D *volley : all_volleys) {
-		if (volley != nullptr && volley->is_active) {
+		if (volley != nullptr && volley->is_active && !volley->is_queued_for_deletion()) {
 			total += volley->active_bullets_counter;
 		}
 	}
@@ -503,7 +503,7 @@ int BulletFactory2D::debug_get_total_bullets_amount() {
 	return static_cast<int>(all_volleys.size());
 }
 
-int BulletFactory2D::debug_get_active_bullets_amount() {
+int BulletFactory2D::debug_get_active_volleys_amount() {
 	return (int)std::count_if(all_volleys.begin(), all_volleys.end(), [](BulletVolley2D *b) { return b != nullptr && b->is_active && !b->is_queued_for_deletion(); });
 }
 

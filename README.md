@@ -565,7 +565,7 @@ The bullet classes were unified: `BlockBullets2D` is gone and the old `MultiMesh
 | `spawn_directional_bullets()`, `spawn_controllable_directional_bullets()` | `spawn_volley()` (always returns the volley) |
 | factory signals `directional_area_entered` / `directional_body_entered` / `directional_life_time_over` / `directional_bounce_area_entered` / `directional_bounce_body_entered` (and `block_*`) | `area_entered` / `body_entered` / `life_time_over` / `bounce_area_entered` / `bounce_body_entered` (same names as on `BulletSpawner2D`) |
 | signal argument `directional_bullets_instance` | `volley` |
-| `BulletFactory2D.BulletType`, the `bullet_type` argument of `free_bullets_pool()` / `free_bullets_pool_deferred()` / `debug_get_total_bullets_amount()` / `debug_get_active_bullets_amount()` / `debug_get_bullets_pool_amount()` / `debug_get_bullets_pool_info()` | removed (one volley type) |
+| `BulletFactory2D.BulletType`, the `bullet_type` argument of `free_bullets_pool()` / `free_bullets_pool_deferred()` / `debug_get_total_bullets_amount()` / `debug_get_active_volleys_amount()` / `debug_get_bullets_pool_amount()` / `debug_get_bullets_pool_info()` | removed (one volley type) |
 | `directional_bullets_debugger_color`, `block_bullets_debugger_color` | `debugger_color` |
 | `reactivate_multimesh_instance()` | `reactivate_volley()` |
 | volley `enable_multimesh()` | `enable_volley()` |

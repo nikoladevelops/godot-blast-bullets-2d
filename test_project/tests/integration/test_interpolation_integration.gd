@@ -42,7 +42,7 @@ func test_spawner_freed_with_tracked_volleys() -> void:
 	await idle(1)
 	assert_true(factory.debug_assert_no_dangling().get("ok", false), "no dangling after the spawner was freed")
 	await physics(3)
-	assert_eq(factory.debug_get_active_bullets_amount(), 1, "orphaned volley keeps flying")
+	assert_eq(factory.debug_get_active_volleys_amount(), 1, "orphaned volley keeps flying")
 
 
 func test_two_factories_are_independent() -> void:

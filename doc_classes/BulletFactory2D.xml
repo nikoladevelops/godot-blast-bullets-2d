@@ -184,7 +184,7 @@
 				Get the amount of active [BulletAttachment2D] nodes.
 			</description>
 		</method>
-		<method name="debug_get_active_bullets_amount">
+		<method name="debug_get_active_volleys_amount">
 			<return type="int" />
 			<description>
 				Returns how many volleys are active (flying, not pooled and not queued for deletion). Counts volleys, not bullets: see [method get_active_bullet_count] for bullets.
@@ -540,7 +540,7 @@
 		<method name="get_active_bullet_count" qualifiers="const">
 			<return type="int" />
 			<description>
-				Live bullets across every active volley, summed from each volley's live counter: O(active volleys), no per-bullet scan. Counts bullets, unlike [method debug_get_active_bullets_amount], which counts volleys.
+				Live bullets across every active volley, summed from each volley's live counter: O(active volleys), no per-bullet scan. Counts bullets, unlike [method debug_get_active_volleys_amount], which counts volleys.
 			</description>
 		</method>
 		<method name="get_active_effect_count" qualifiers="const">

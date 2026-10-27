@@ -205,7 +205,7 @@ func test_factory_smoke() -> void:
 	factory.free_disabled_bullets()
 	factory.free_bullets_pool()
 	assert_true(factory.debug_get_total_bullets_amount() == 0, "empty factory totals 0")
-	assert_true(factory.debug_get_active_bullets_amount() == 0, "empty factory actives 0")
+	assert_true(factory.debug_get_active_volleys_amount() == 0, "empty factory actives 0")
 	assert_true(factory.debug_get_bullets_pool_amount() == 0, "empty factory pool 0")
 	factory.populate_bullets_pool(null, null, 0)
 	factory.populate_bullets_pool(null, _make_data(), 3)

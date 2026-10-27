@@ -17,7 +17,7 @@ func _ready():
 func _on_update_debug_data_timer_timeout() -> void:
 	# Currently active in scene tree
 	active_volleys_custom_label.update_value(
-		str(BENCHMARK_GLOBALS.FACTORY.debug_get_active_bullets_amount())
+		str(BENCHMARK_GLOBALS.FACTORY.debug_get_active_volleys_amount())
 	)
 	
 	active_attachments_custom_label.update_value(

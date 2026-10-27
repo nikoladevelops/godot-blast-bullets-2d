@@ -16,6 +16,9 @@ bool BulletVolley2D::enable_volley_for_script(const Ref<BulletVolleyData2D> &dat
 		UtilityFunctions::push_error("enable_volley: spawn data is null.");
 		return false;
 	}
+	if (!BulletFactory2D::validate_owner_spawner_id(spawner_id, "enable_volley")) {
+		return false;
+	}
 	return enable_volley(*data.ptr(), new_inherited_velocity_offset, spawner_id);
 }
 

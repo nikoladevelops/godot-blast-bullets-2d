@@ -90,5 +90,5 @@ func test_reset_deferred_inside_handler_resets_on_the_next_idle_frame() -> void:
 	calls.append(func(_v): factory.reset_deferred())
 	await _hit_once()
 	await idle(2)
-	assert_eq(factory.debug_get_active_bullets_amount(), 0, "reset ran on the idle frame")
+	assert_eq(factory.debug_get_active_volleys_amount(), 0, "reset ran on the idle frame")
 	expect_no_errors()

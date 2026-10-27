@@ -50,7 +50,7 @@ func test_clear_active_bullets_clears_every_volley() -> void:
 	factory.clear_sprite_effects()
 	assert_eq(factory.clear_active_bullets(), 5, "returns total live bullets")
 	assert_gte(factory.get_active_effect_count(), 5, "On Clear fired per bullet")
-	assert_eq(factory.debug_get_active_bullets_amount(), 0, "no active volleys left")
+	assert_eq(factory.debug_get_active_volleys_amount(), 0, "no active volleys left")
 	assert_gte(factory.debug_get_bullets_pool_amount(), 2, "emptied volleys parked pooled")
 	assert_false(va.is_bullet_status_enabled(0))
 	assert_false(vb.is_bullet_status_enabled(0))
@@ -61,7 +61,7 @@ func test_free_active_bullets_is_silent() -> void:
 	factory.clear_sprite_effects()
 	factory.free_active_bullets()
 	assert_eq(factory.get_active_effect_count(), 0, "free fires no On Clear")
-	assert_eq(factory.debug_get_active_bullets_amount(), 0, "volleys freed")
+	assert_eq(factory.debug_get_active_volleys_amount(), 0, "volleys freed")
 
 
 func test_reset_is_silent() -> void:
@@ -92,7 +92,7 @@ func test_deferred_twins() -> void:
 	factory.spawn_volley(_data(2))
 	factory.free_active_bullets_deferred()
 	await idle()
-	assert_eq(factory.debug_get_active_bullets_amount(), 0, "deferred free ran")
+	assert_eq(factory.debug_get_active_volleys_amount(), 0, "deferred free ran")
 	assert_eq(factory.get_active_effect_count(), 0, "deferred free stayed silent")
 
 
@@ -106,4 +106,4 @@ func test_deferred_twin_from_inside_physics() -> void:
 	factory.free_active_bullets_deferred()
 	factory.reset_deferred()
 	await idle()
-	assert_eq(factory.debug_get_active_bullets_amount(), 0, "deferred free ran from physics")
+	assert_eq(factory.debug_get_active_volleys_amount(), 0, "deferred free ran from physics")

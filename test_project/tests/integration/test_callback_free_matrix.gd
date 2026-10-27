@@ -609,7 +609,7 @@ func test_counters_read_inside_a_mass_free_never_touch_deleted_volleys() -> void
 		AttachmentHookProbe2D.hook_repeat = true
 		AttachmentHookProbe2D.hook = func() -> void:
 			if is_instance_valid(f) and is_instance_valid(sp):
-				reads.append([f.count_bullets_in_circle(Vector2.ZERO, 1e6), f.count_bullets_in_rect(Rect2(-1e6, -1e6, 2e6, 2e6)), f.get_active_bullet_count(), f.debug_get_active_bullets_amount(), f.debug_get_live_volley_ids(0).size(), sp.get_live_volley_count(), sp.get_active_live_bullet_count()])
+				reads.append([f.count_bullets_in_circle(Vector2.ZERO, 1e6), f.count_bullets_in_rect(Rect2(-1e6, -1e6, 2e6, 2e6)), f.get_active_bullet_count(), f.debug_get_active_volleys_amount(), f.debug_get_live_volley_ids(0).size(), sp.get_live_volley_count(), sp.get_active_live_bullet_count()])
 		if how == "reset":
 			f.reset()
 		else:

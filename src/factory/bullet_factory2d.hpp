@@ -102,6 +102,8 @@ public:
 	// spawner_id pre-stamps signal ownership before activation (configure-then-attach):
 	// BulletSpawner2D passes its instance id; direct factory users leave 0 (factory-owned).
 	BulletVolley2D *spawn_volley(const Ref<BulletVolleyData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset = Vector2(0, 0), uint64_t spawner_id = 0);
+	// Script-given owner ids: 0 or a live BulletSpawner2D (one error, else).
+	static bool validate_owner_spawner_id(uint64_t spawner_id, const char *function_name);
 
 	// C++-only fast path (BulletSpawner2D): transforms come from a native
 	// buffer (no TypedArray, no Variant per bullet). Same validation as the
@@ -609,7 +611,7 @@ public:
 	// and the pooled ones. Pool info maps each VolleyPoolKey2D bucket to
 	// its pooled count.
 	int debug_get_total_bullets_amount();
-	int debug_get_active_bullets_amount();
+	int debug_get_active_volleys_amount();
 	int debug_get_bullets_pool_amount();
 
 	Dictionary debug_get_bullets_pool_info();

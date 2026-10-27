@@ -2,6 +2,7 @@
 // spawn_volley entry points with pool reuse, and pool pre-population for volleys
 // and attachments.
 
+#include "bullet_spawner/bullet_spawner2d.hpp"
 #include "factory/bullet_factory2d_internal.hpp"
 #include "patterns/pattern_inputs2d.hpp"
 
@@ -309,8 +310,21 @@ BulletVolley2D *BulletFactory2D::spawn_volley_span(const Ref<BulletVolleyData2D>
 	return spawn_volley_internal(spawn_data, new_inherited_velocity_offset, spawner_id, transforms, count, colors);
 }
 
+bool BulletFactory2D::validate_owner_spawner_id(uint64_t spawner_id, const char *function_name) {
+	// An owner id reroutes every signal of the volley and applies the
+	// owner's time scale: it must name a live bullet spawner.
+	if (spawner_id == 0 || Object::cast_to<BulletSpawner2D>(ObjectDB::get_instance(ObjectID(spawner_id))) != nullptr) {
+		return true;
+	}
+	UtilityFunctions::push_error(String(function_name) + ": spawner_id must be 0 (factory-owned) or the instance id of a live BulletSpawner2D, nothing spawned.");
+	return false;
+}
+
 BulletVolley2D *BulletFactory2D::spawn_volley(const Ref<BulletVolleyData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset, uint64_t spawner_id) {
 	if (!validate_spawn_request("spawn_volley", spawn_data, new_inherited_velocity_offset)) {
+		return nullptr;
+	}
+	if (!validate_owner_spawner_id(spawner_id, "spawn_volley")) {
 		return nullptr;
 	}
 

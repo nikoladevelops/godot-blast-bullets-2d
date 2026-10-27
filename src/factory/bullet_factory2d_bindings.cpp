@@ -132,7 +132,7 @@ void BulletFactory2D::_bind_methods() {
 	// Additional debug methods related
 
 	ClassDB::bind_method(D_METHOD("debug_get_total_bullets_amount"), &BulletFactory2D::debug_get_total_bullets_amount);
-	ClassDB::bind_method(D_METHOD("debug_get_active_bullets_amount"), &BulletFactory2D::debug_get_active_bullets_amount);
+	ClassDB::bind_method(D_METHOD("debug_get_active_volleys_amount"), &BulletFactory2D::debug_get_active_volleys_amount);
 	ClassDB::bind_method(D_METHOD("debug_get_bullets_pool_amount"), &BulletFactory2D::debug_get_bullets_pool_amount);
 
 	ClassDB::bind_method(

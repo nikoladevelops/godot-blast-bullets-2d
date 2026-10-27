@@ -59,7 +59,7 @@ func test_spawn_pool_stats() -> void:
 	await physics()
 	assert_eq(factory.debug_get_pool_hit_stats().get("misses", 0), 1, "first spawn is a miss")
 	assert_eq(factory.debug_get_total_bullets_amount(), 1, "total volleys")
-	assert_eq(factory.debug_get_active_bullets_amount(), 1, "active volleys")
+	assert_eq(factory.debug_get_active_volleys_amount(), 1, "active volleys")
 
 
 func test_deferred_wrappers_survive_physics() -> void:
@@ -75,7 +75,7 @@ func test_deferred_wrappers_survive_physics() -> void:
 	await idle()
 	await physics()
 	assert_false(factory.debug_get_factory_state().get("is_tearing_down", true), "factory alive after deferred structural ops")
-	assert_eq(factory.debug_get_active_bullets_amount(), 0, "deferred free/reset ran")
+	assert_eq(factory.debug_get_active_volleys_amount(), 0, "deferred free/reset ran")
 
 
 func test_pooling_flags_reset_on_new_life() -> void:
@@ -249,4 +249,4 @@ func test_live_volley_ids_skip_volleys_queued_for_deletion() -> void:
 	var gone: BulletVolley2D = factory.spawn_volley(H.make_still_data(2))
 	gone.queue_free()
 	assert_eq(Array(factory.debug_get_live_volley_ids(0)), [keep.get_instance_id()], "the queued volley is not listed")
-	assert_eq(factory.debug_get_active_bullets_amount(), 1, "the sibling counter agrees")
+	assert_eq(factory.debug_get_active_volleys_amount(), 1, "the sibling counter agrees")

@@ -50,7 +50,7 @@ func test_factory_has_one_spawn_entry_and_no_bullet_type() -> void:
 	assert_eq(_arg_names(_method("BulletFactory2D", "free_bullets_pool")), ["key"], "free_bullets_pool takes only a key")
 	assert_eq(_arg_names(_method("BulletFactory2D", "free_bullets_pool_deferred")), ["key"], "deferred twin takes only a key")
 	assert_eq(_arg_names(_method("BulletFactory2D", "populate_bullets_pool")), ["key", "spawn_data", "instance_count"], "populate_bullets_pool signature")
-	for counter in ["debug_get_total_bullets_amount", "debug_get_active_bullets_amount", "debug_get_bullets_pool_amount", "debug_get_bullets_pool_info"]:
+	for counter in ["debug_get_total_bullets_amount", "debug_get_active_volleys_amount", "debug_get_bullets_pool_amount", "debug_get_bullets_pool_info"]:
 		assert_eq(_arg_names(_method("BulletFactory2D", counter)), [], counter + " takes no bullet type")
 
 
@@ -152,3 +152,39 @@ func test_invisible_bullets_warn_once_in_plain_text() -> void:
 	expect_warning_sequence(["Warning in spawn_volley: no sprite_frames/mesh/texture_size, bullets will be invisible. Assign SpriteFrames with art facing Vector2.RIGHT, or set texture_size/mesh."])
 	factory.spawn_volley(d)
 	expect_no_errors()
+
+
+## spawn_volley / enable_volley take an owner id from scripts: it reroutes
+## every signal and applies the owner's time scale, so it must be 0 or a live
+## BulletSpawner2D (anything else used to be stamped silently).
+func test_a_script_owner_id_must_name_a_live_bullet_spawner() -> void:
+	var data := H.make_volley_data(2)
+	var laser := LaserSpawner2D.new()
+	add(laser)
+	var node := Node2D.new()
+	add(node)
+	var gone := Node2D.new()
+	var stale_id := gone.get_instance_id()
+	gone.free()
+	for bad in [stale_id, node.get_instance_id(), laser.get_instance_id()]:
+		assert_null(factory.spawn_volley(data, Vector2.ZERO, bad), "refused: %d" % bad)
+		expect_error_sequence(["spawn_volley: spawner_id must be 0 (factory-owned) or the instance id of a live BulletSpawner2D, nothing spawned."])
+	assert_eq(factory.get_active_bullet_count(), 0, "nothing spawned")
+	var sp := make_spawner(data)
+	var owned: BulletVolley2D = factory.spawn_volley(data, Vector2.ZERO, sp.get_instance_id())
+	assert_not_null(owned, "a live spawner id is accepted")
+	assert_eq(owned.get_owner_spawner(), sp, "and owns the volley")
+	owned.clear_all_bullets()
+	assert_true(owned.is_pooled(), "pooled")
+	assert_false(owned.enable_volley(data, Vector2.ZERO, node.get_instance_id()), "enable_volley refuses too")
+	expect_error_sequence(["enable_volley: spawner_id must be 0 (factory-owned) or the instance id of a live BulletSpawner2D, nothing spawned."])
+	assert_true(owned.is_pooled(), "the refused enable changed nothing")
+
+
+func test_the_active_counters_count_what_they_say() -> void:
+	var a: BulletVolley2D = factory.spawn_volley(H.make_volley_data(3))
+	factory.spawn_volley(H.make_volley_data(5))
+	assert_eq(factory.debug_get_active_volleys_amount(), 2, "two volleys")
+	assert_eq(factory.get_active_bullet_count(), 8, "eight bullets")
+	a.clear_all_bullets()
+	assert_eq([factory.debug_get_active_volleys_amount(), factory.get_active_bullet_count()], [1, 5], "the pooled volley counts in neither")

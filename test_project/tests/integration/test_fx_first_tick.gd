@@ -41,9 +41,9 @@ func test_mid_sweep_fire_shows_frame_zero_on_its_birth_sweep() -> void:
 	assert_not_null(v, "volley spawned")
 	for i in 12: # early-break wait: expiry lands on the 3rd tick
 		await physics(1)
-		if factory.debug_get_active_bullets_amount() == 0:
+		if factory.debug_get_active_volleys_amount() == 0:
 			break
-	assert_eq(factory.debug_get_active_bullets_amount(), 0, "volley expired")
+	assert_eq(factory.debug_get_active_volleys_amount(), 0, "volley expired")
 	assert_eq(_expiry_shard(), 0, "birth sweep shows frame zero, not frame one")
 
 
@@ -56,7 +56,7 @@ func test_mid_sweep_fire_lives_its_full_total() -> void:
 	var saw_death := false
 	for i in 14: # early-break wait: 5.5-tick total can never need more
 		await physics(1)
-		if factory.debug_get_active_bullets_amount() != 0:
+		if factory.debug_get_active_volleys_amount() != 0:
 			continue
 		if _expiry_shard() == -1:
 			saw_death = live_sweeps > 0
