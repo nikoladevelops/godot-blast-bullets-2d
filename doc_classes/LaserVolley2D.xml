@@ -177,6 +177,12 @@
 				Returns the targets beam [param beam_index] touches now, nearest first.
 			</description>
 		</method>
+		<method name="get_time_scale" qualifiers="const">
+			<return type="float" />
+			<description>
+				This laser's own clock factor (see [method set_time_scale]).
+			</description>
+		</method>
 		<method name="graze_clear">
 			<return type="void" />
 			<description>
@@ -264,6 +270,13 @@
 			<param index="0" name="targets" type="Array" />
 			<description>
 				Sets every beam's target: beam [code]i[/code] takes [code]targets[i % size][/code] (a [Node2D] or a [Vector2]). An empty array clears them. Targets steer only a laser whose [member LaserData2D.aim] is Track or Lock On: on a Pattern laser they are kept (for a later aim change) and the first one per life warns.
+			</description>
+		</method>
+		<method name="set_time_scale">
+			<return type="void" />
+			<param index="0" name="time_scale" type="float" />
+			<description>
+				Sets this laser's own clock factor (1 = normal, 0 = frozen alone): it multiplies [member BulletFactory2D.time_scale] and the owner spawner's [member LaserSpawner2D.time_scale], so its phases, heads, sweeps, hit intervals and followed sounds run on it. Finite and &gt;= 0, else one error and the old value is kept; refused on a pooled or never-fired laser. Every new life starts at 1.
 			</description>
 		</method>
 		<method name="sound_set_effects">

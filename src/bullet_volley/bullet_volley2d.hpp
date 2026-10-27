@@ -290,6 +290,10 @@ public:
 	void set_bullet_life_time_left(int bullet_index, double seconds);
 	PackedFloat64Array all_bullets_get_life_time_left(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) const;
 	void all_bullets_set_life_time_left(double seconds, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
+	// Multiplies the time each bullet in the range has left by `factor`
+	// (> 0): a bullet on the volley timer takes its own lifetime from it; an
+	// infinite volley's bullets without their own lifetime stay infinite.
+	void all_bullets_scale_life_time(double factor, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 	// C++ (spawner randomization): bullet i's lifetime (its own, else the
 	// volley's finite lifetime) times factors[i]. Right after the spawn.
 	void apply_life_time_factors(const real_t *factors, int count);
@@ -319,6 +323,13 @@ public:
 
 	Vector2 get_inherited_velocity_offset() const { return inherited_velocity_offset; }
 	void set_inherited_velocity_offset(const Vector2 &new_offset);
+	// This volley's own clock factor (1 = normal, 0 = frozen), multiplied
+	// into the factory's and its owner spawner's (volley_time_factor): its
+	// ticks, timers, attachments and followed sounds run on it. Every life
+	// starts at 1.
+	double get_time_scale() const { return own_time_scale; }
+	void set_time_scale(double value);
+	double own_time_scale = 1.0;
 
 	bool get_is_auto_pooling_enabled() const { return is_auto_pooling_enabled; }
 	// Turning pooling back ON for a parked volley pools it at once.
@@ -377,6 +388,11 @@ public:
 	void set_bullet_speed(int bullet_index, real_t new_speed);
 	TypedArray<real_t> all_bullets_get_speed(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) const;
 	void all_bullets_set_speed(real_t new_speed, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
+	// Multiplies the speed of every bullet in the range by `factor` (>= 0),
+	// and its top speed and acceleration too unless told not to (an unscaled
+	// cap below the new speed rises to it, like set_bullet_speed). A speed
+	// curve keeps owning the speeds it drives (one warning, like the setters).
+	void all_bullets_scale_speed(real_t factor, bool scale_max_speed = true, bool scale_acceleration = true, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 
 	// Bullet Direction
 
@@ -1480,6 +1496,9 @@ public:
 	// of bullets [0, count) by factors[i] right after the spawn (the cached
 	// velocity is refreshed; a result that would overflow float32 is skipped).
 	void apply_speed_factors(const real_t *factors, int count);
+	// Bullet i's speed (and, when asked, top speed and acceleration) times
+	// `factor`; false (nothing written) when a result would not be finite.
+	bool scale_bullet_speed(int i, real_t factor, bool scale_max_speed, bool scale_acceleration);
 
 	// ---- Pickups (bullet_volley2d_pickups.cpp) ----
 	// A pickup volley carries the BulletPickupData2D it was converted with;

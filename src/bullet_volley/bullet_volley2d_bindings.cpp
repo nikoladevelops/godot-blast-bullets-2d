@@ -98,6 +98,7 @@ void BulletVolley2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_bullet_speed", "bullet_index", "new_speed"), &BulletVolley2D::set_bullet_speed);
 	ClassDB::bind_method(D_METHOD("all_bullets_get_speed", "bullet_index_start", "bullet_index_end_inclusive"), &BulletVolley2D::all_bullets_get_speed, DEFVAL(0), DEFVAL(-1));
 	ClassDB::bind_method(D_METHOD("all_bullets_set_speed", "new_speed", "bullet_index_start", "bullet_index_end_inclusive"), &BulletVolley2D::all_bullets_set_speed, DEFVAL(0), DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("all_bullets_scale_speed", "factor", "scale_max_speed", "scale_acceleration", "bullet_index_start", "bullet_index_end_inclusive"), &BulletVolley2D::all_bullets_scale_speed, DEFVAL(true), DEFVAL(true), DEFVAL(0), DEFVAL(-1));
 
 	ClassDB::bind_method(D_METHOD("get_bullet_direction", "bullet_index"), &BulletVolley2D::get_bullet_direction);
 	ClassDB::bind_method(D_METHOD("set_bullet_direction", "bullet_index", "new_direction"), &BulletVolley2D::set_bullet_direction);
@@ -195,6 +196,8 @@ void BulletVolley2D::_bind_methods() {
 	// Speed group below.
 	ClassDB::bind_method(D_METHOD("get_inherited_velocity_offset"), &BulletVolley2D::get_inherited_velocity_offset);
 	ClassDB::bind_method(D_METHOD("set_inherited_velocity_offset", "new_offset"), &BulletVolley2D::set_inherited_velocity_offset);
+	ClassDB::bind_method(D_METHOD("get_time_scale"), &BulletVolley2D::get_time_scale);
+	ClassDB::bind_method(D_METHOD("set_time_scale", "time_scale"), &BulletVolley2D::set_time_scale);
 
 	ClassDB::bind_method(D_METHOD("get_all_bullets_status"), &BulletVolley2D::get_all_bullets_status);
 	ClassDB::bind_method(D_METHOD("is_bullet_status_enabled", "bullet_index"), &BulletVolley2D::is_bullet_status_enabled);
@@ -585,6 +588,7 @@ void BulletVolley2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_bullet_life_time_left", "bullet_index", "seconds"), &BulletVolley2D::set_bullet_life_time_left);
 	ClassDB::bind_method(D_METHOD("all_bullets_get_life_time_left", "bullet_index_start", "bullet_index_end_inclusive"), &BulletVolley2D::all_bullets_get_life_time_left, DEFVAL(0), DEFVAL(-1));
 	ClassDB::bind_method(D_METHOD("all_bullets_set_life_time_left", "seconds", "bullet_index_start", "bullet_index_end_inclusive"), &BulletVolley2D::all_bullets_set_life_time_left, DEFVAL(0), DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("all_bullets_scale_life_time", "factor", "bullet_index_start", "bullet_index_end_inclusive"), &BulletVolley2D::all_bullets_scale_life_time, DEFVAL(0), DEFVAL(-1));
 	ADD_GROUP("Lifetime", "");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_life_time_infinite"), "set_is_life_time_infinite", "get_is_life_time_infinite");
 

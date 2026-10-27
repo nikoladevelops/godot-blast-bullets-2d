@@ -239,3 +239,48 @@ func test_a_dropped_fall_speed_leaves_the_reported_velocity_at_once(reset_index:
 	factory.debug_advance_time(DT)
 	var moved: Vector2 = (v.get_bullet_transform(0).origin - p0) / DT
 	assert_almost_eq(moved, reported + g * DT, Vector2(0.05, 0.05), "%s: the next tick flies the reported velocity (+ g dt)" % call)
+
+
+## all_bullets_scale_speed multiplies speed, top speed and acceleration (each
+## one can be left out); the velocity follows at once, an unscaled cap below
+## the new speed rises to it, a speed curve keeps owning its speeds.
+func _accelerating(n: int) -> BulletVolley2D:
+	var d := H.make_volley_data(n, 200.0, 30.0)
+	var speeds: Array = []
+	for i in n:
+		speeds.append(H.make_speed(200.0, 300.0, 1000.0)) # +1000 px/s^2 up to 300 px/s
+	d.all_bullet_speed_data = speeds
+	return factory.spawn_volley(d)
+
+
+func test_scaling_speed_scales_speed_top_speed_and_acceleration() -> void:
+	var v := _accelerating(3)
+	v.all_bullets_scale_speed(2.0, true, true, 0, 0)
+	v.all_bullets_scale_speed(2.0, false, false, 1, 1)
+	assert_eq([v.get_bullet_speed(0), v.get_bullet_speed(1), v.get_bullet_speed(2)], [400.0, 400.0, 200.0], "speeds doubled where asked")
+	assert_almost_eq(v.get_bullet_velocity(0).length(), 400.0, 0.001, "the velocity follows at once")
+	factory.debug_advance_time(0.1)
+	assert_almost_eq(v.get_bullet_speed(0), 600.0, 0.001, "doubled acceleration up to the doubled cap: +200 -> 600")
+	assert_almost_eq(v.get_bullet_speed(1), 400.0, 0.001, "an unscaled cap (300) rose to the new speed: held at 400")
+	assert_almost_eq(v.get_bullet_speed(2), 300.0, 0.001, "untouched: +100 up to 300")
+	v.all_bullets_scale_speed(-1.0)
+	v.all_bullets_scale_speed(NAN)
+	v.all_bullets_scale_speed(1e38)
+	expect_error_sequence([
+		"all_bullets_scale_speed: factor must be finite and >= 0, keeping the old values.",
+		"all_bullets_scale_speed: factor must be finite and >= 0, keeping the old values.",
+		"all_bullets_scale_speed: the scaled speed of bullet 0 (and any later one) would overflow, keeping its old values.",
+	])
+	assert_almost_eq(v.get_bullet_speed(0), 600.0, 0.001, "kept")
+	v.all_bullets_scale_speed(0.0)
+	assert_eq(v.get_bullet_velocity(2), Vector2.ZERO, "0 stops them")
+
+
+func test_scaling_speed_leaves_a_speed_curve_in_charge() -> void:
+	var d := H.make_volley_data(2, 200.0, 30.0)
+	d.shared_bullet_curves_data = _speed_curve()
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	var before: float = v.get_bullet_speed(0)
+	v.all_bullets_scale_speed(3.0)
+	expect_warning_sequence(["You are trying to set bullet speed directly while having a movement speed curve assigned to the shared curves data. The curve will override any direct speed changes. Set the curve to null first if you want to set speed directly."])
+	assert_eq(v.get_bullet_speed(0), before, "nothing scaled")

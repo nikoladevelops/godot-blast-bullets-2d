@@ -23,6 +23,17 @@ void BulletVolley2D::present_bullet_transform(int bullet_index, const Vector2 &a
 	update_bullet_previous_transform_for_interpolation(bullet_index);
 }
 
+void BulletVolley2D::set_time_scale(double value) {
+	if (reject_pooled_handle("set_time_scale")) {
+		return;
+	}
+	if (!Math::is_finite(value) || value < 0.0) {
+		UtilityFunctions::push_error("set_time_scale: time_scale must be finite and >= 0 (0 freezes this volley), keeping the old value.");
+		return;
+	}
+	own_time_scale = value;
+}
+
 void BulletVolley2D::set_inherited_velocity_offset(const Vector2 &new_offset) {
 	if (!new_offset.is_finite()) {
 		UtilityFunctions::push_error("set_inherited_velocity_offset: offset must be finite, keeping the old value.");
@@ -634,6 +645,25 @@ void BulletVolley2D::all_bullets_set_texture_rotation_degrees(real_t new_rotatio
 	for_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_texture_rotation_degrees", [&](int i) { set_bullet_texture_rotation_degrees(i, new_rotation_degrees); });
 }
 
+bool BulletVolley2D::scale_bullet_speed(int i, real_t factor, bool scale_max_speed, bool scale_acceleration) {
+	const real_t speed = all_cached_speed[i] * factor;
+	real_t max_speed = scale_max_speed ? all_cached_max_speed[i] * factor : all_cached_max_speed[i];
+	const real_t acceleration = scale_acceleration ? all_cached_acceleration[i] * factor : all_cached_acceleration[i];
+	if (!Math::is_finite(speed) || !Math::is_finite(max_speed) || !Math::is_finite(acceleration)) {
+		return false;
+	}
+	// An unscaled cap below the new speed rises to it (0 stays unlimited).
+	const real_t magnitude = Math::abs(speed);
+	if (!scale_max_speed && max_speed > 0.0 && max_speed < magnitude) {
+		max_speed = magnitude;
+	}
+	all_cached_speed[i] = speed;
+	all_cached_max_speed[i] = max_speed;
+	all_cached_acceleration[i] = acceleration;
+	refresh_cached_velocity(i);
+	return true;
+}
+
 void BulletVolley2D::apply_speed_factors(const real_t *factors, int count) {
 	const int limit = Math::min(count, Math::min(amount_bullets, (int)all_cached_speed.size()));
 	for (int i = 0; i < limit; ++i) {
@@ -641,16 +671,41 @@ void BulletVolley2D::apply_speed_factors(const real_t *factors, int count) {
 		if (!Math::is_finite(f) || f < 0.0f) {
 			continue;
 		}
-		const real_t speed = all_cached_speed[i] * f;
-		const real_t max_speed = all_cached_max_speed[i] * f;
-		const real_t acceleration = all_cached_acceleration[i] * f;
-		if (!Math::is_finite(speed) || !Math::is_finite(max_speed) || !Math::is_finite(acceleration)) {
+		scale_bullet_speed(i, f, true, true);
+	}
+}
+
+void BulletVolley2D::all_bullets_scale_speed(real_t factor, bool scale_max_speed, bool scale_acceleration, int bullet_index_start, int bullet_index_end_inclusive) {
+	if (reject_pooled_handle("all_bullets_scale_speed")) {
+		return;
+	}
+	if (!ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_scale_speed")) {
+		return;
+	}
+	if (bullet_index_start > bullet_index_end_inclusive) {
+		return;
+	}
+	if (!Math::is_finite(factor) || factor < 0.0f) {
+		UtilityFunctions::push_error("all_bullets_scale_speed: factor must be finite and >= 0, keeping the old values.");
+		return;
+	}
+	// A shared speed curve owns every bullet: one warning, not one per bullet.
+	if (shared_bullet_curves_data.is_valid() && shared_bullet_curves_data->movement_speed_curve.is_valid()) {
+		speed_curve_owns_speed(bullet_index_start, "speed");
+		return;
+	}
+	const int limit = Math::min(bullet_index_end_inclusive, Math::min((int)all_cached_speed.size(), Math::min((int)all_cached_max_speed.size(), (int)all_cached_acceleration.size())) - 1);
+	int overflowed = -1;
+	for (int i = bullet_index_start; i <= limit; ++i) {
+		if (speed_curve_owns_speed(i, "speed")) {
 			continue;
 		}
-		all_cached_speed[i] = speed;
-		all_cached_max_speed[i] = max_speed;
-		all_cached_acceleration[i] = acceleration;
-		refresh_cached_velocity(i);
+		if (!scale_bullet_speed(i, factor, scale_max_speed, scale_acceleration) && overflowed < 0) {
+			overflowed = i;
+		}
+	}
+	if (overflowed >= 0) {
+		UtilityFunctions::push_error("all_bullets_scale_speed: the scaled speed of bullet " + String::num_int64(overflowed) + " (and any later one) would overflow, keeping its old values.");
 	}
 }
 

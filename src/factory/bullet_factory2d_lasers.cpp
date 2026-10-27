@@ -21,7 +21,7 @@ void BulletFactory2D::add_laser_container() {
 }
 
 double BulletFactory2D::laser_time_factor(const LaserVolley2D &laser) const {
-	double factor = time_scale;
+	double factor = time_scale * laser.own_time_scale;
 	if (laser.owner_spawner_id != 0) {
 		const PatternSpawner2D *spawner = Object::cast_to<PatternSpawner2D>(ObjectDB::get_instance(ObjectID(laser.owner_spawner_id)));
 		if (spawner != nullptr) {

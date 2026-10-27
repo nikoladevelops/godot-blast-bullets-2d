@@ -254,3 +254,49 @@ func test_nothing_of_the_own_lifetimes_survives_the_pool() -> void:
 	assert_eq(again, first, "the same volley, a new life")
 	assert_eq(_lefts(again), [0.5, 0.5], "both bullets follow the new volley timer")
 	assert_eq(again.debug_check_invariants(), "", "storage agrees")
+
+
+## all_bullets_scale_life_time multiplies the time each bullet has left: a
+## bullet on the volley timer takes its own lifetime from it (and dies on
+## that), an own lifetime scales, an infinite volley's bullets stay infinite.
+func test_scaling_life_time_moves_each_bullets_deadline() -> void:
+	tick = 0
+	expiries.clear()
+	var v: BulletVolley2D = factory.spawn_volley(_timed(3, [0.5, 1.0], false, 1.0)) # bullet 2: on the volley's 1 s
+	expect_warning_sequence(["BulletVolley2D: all_bullet_life_times size (2) != bullets (3); uncovered bullets use max_life_time (check tile_all_bullet_life_times to wrap, or provide one entry per bullet)."])
+	factory.life_time_over.connect(_on_expiry)
+	v.all_bullets_scale_life_time(0.0)
+	v.all_bullets_scale_life_time(NAN)
+	expect_error_sequence([
+		"all_bullets_scale_life_time: factor must be finite and > 0, keeping the old values.",
+		"all_bullets_scale_life_time: factor must be finite and > 0, keeping the old values.",
+	])
+	_step(2) # 0.125 s
+	v.all_bullets_scale_life_time(2.0, 0, 0) # own 0.375 left -> 0.75
+	v.all_bullets_scale_life_time(0.5, 2, 2) # the volley timer's 0.875 -> its own 0.4375
+	assert_eq(_lefts(v), [0.75, 0.875, 0.4375], "scaled where asked, the rest untouched")
+	_step(14)
+	# Ticks of 1/16 s: bullet 2 at 0.125 + 0.4375, bullet 0 at 0.125 + 0.75,
+	# bullet 1 on its own unscaled 1 s.
+	assert_eq(expiries, [[9, [2]], [14, [0]], [16, [1]]], "each bullet at its (scaled) deadline")
+	v.all_bullets_scale_life_time(2.0)
+	expect_error_sequence(["all_bullets_scale_life_time: this volley is in the pool (its last bullet died), so this handle is stale. Spawn a new volley instead."])
+
+
+func test_scaling_life_time_keeps_an_infinite_volley_infinite() -> void:
+	tick = 0
+	expiries.clear()
+	var d := _timed(2, [0.5], false, 1.0) # bullet 1: on the (infinite) volley timer
+	d.is_life_time_infinite = true
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	expect_warning_sequence(["BulletVolley2D: all_bullet_life_times size (1) != bullets (2); uncovered bullets use max_life_time (check tile_all_bullet_life_times to wrap, or provide one entry per bullet)."])
+	factory.life_time_over.connect(_on_expiry)
+	_step(1)
+	v.all_bullets_scale_life_time(4.0)
+	assert_eq(_lefts(v), [1.75, 0.0], "the own lifetime scales (0.4375 x 4), the infinite one stays (0 = infinite)")
+	_step(40)
+	assert_eq(expiries, [[29, [0]]], "only the own lifetime ends")
+	var huge: BulletVolley2D = factory.spawn_volley(_timed(2, [4.0, 4.0]))
+	huge.all_bullets_scale_life_time(1e308) # 4 s x 1e308 is not a finite time
+	expect_error_sequence(["all_bullets_scale_life_time: the scaled lifetime of bullet 0 (and any later one) is not a finite time, keeping its old value."])
+	assert_eq(_lefts(huge), [4.0, 4.0], "both kept")

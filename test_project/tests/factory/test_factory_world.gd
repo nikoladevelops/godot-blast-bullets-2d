@@ -1,6 +1,7 @@
 extends BlastTest
 ## The bullet world controls of the factory: area queries and clears (volley
-## and factory level, `bullets_cleared`), despawn bounds, and time_scale.
+## and factory level, `bullets_cleared`), despawn bounds, and time_scale (the
+## factory's, times each volley's and laser's own).
 
 var cleared_log: Array = []
 
@@ -247,6 +248,72 @@ func test_time_scale_scales_motion_and_lifetime() -> void:
 	factory.time_scale = 2.0
 	factory.debug_advance_time(1.0)
 	assert_almost_eq(v.get_bullet_transform(0).origin.x - x0, 250.0, 0.01, "double speed: +200 px")
+
+
+## A volley's and a laser's own time_scale multiply the factory's: each runs
+## on its own clock (0 freezes it alone), every life starts at 1, and bad
+## values or stale handles are refused with one error.
+func test_each_volley_and_laser_has_its_own_time_scale() -> void:
+	var slow := _volley_at([Vector2.ZERO], 0.0)
+	var normal := _volley_at([Vector2(0, 50)], 0.0)
+	for v in [slow, normal]:
+		v.bullet_set_velocity(0, Vector2(100, 0))
+	await idle(1)
+	assert_eq(slow.get_time_scale(), 1.0, "every life starts at 1")
+	var x0: float = slow.get_bullet_transform(0).origin.x
+	var n0: float = normal.get_bullet_transform(0).origin.x
+	var life0: float = slow.get_life_time_left()
+	slow.set_time_scale(0.25)
+	factory.time_scale = 2.0
+	factory.debug_advance_time(1.0)
+	assert_almost_eq(slow.get_bullet_transform(0).origin.x - x0, 50.0, 0.01, "0.25 x the factory's 2: 50 px in a 1 s tick")
+	assert_almost_eq(life0 - slow.get_life_time_left(), 0.5, 0.01, "its lifetime runs on the same clock")
+	assert_almost_eq(normal.get_bullet_transform(0).origin.x - n0, 200.0, 0.01, "the other volley keeps the factory's 2")
+	slow.set_time_scale(0.0)
+	factory.debug_advance_time(1.0)
+	assert_almost_eq(slow.get_bullet_transform(0).origin.x - x0, 50.0, 0.01, "0 freezes this volley alone")
+	slow.set_time_scale(-1.0)
+	slow.set_time_scale(NAN)
+	expect_error_sequence([
+		"set_time_scale: time_scale must be finite and >= 0 (0 freezes this volley), keeping the old value.",
+		"set_time_scale: time_scale must be finite and >= 0 (0 freezes this volley), keeping the old value.",
+	])
+	assert_eq(slow.get_time_scale(), 0.0, "old value kept")
+	factory.time_scale = 1.0
+	slow.clear_all_bullets()
+	await idle(1)
+	assert_true(slow.is_pooled(), "pooled")
+	slow.set_time_scale(3.0)
+	expect_error_sequence(["set_time_scale: this volley is in the pool (its last bullet died), so this handle is stale. Spawn a new volley instead."])
+	var reused := _volley_at([Vector2.ZERO], 0.0)
+	assert_same(reused, slow, "reused")
+	assert_eq(reused.get_time_scale(), 1.0, "a new life starts at 1")
+	# Lasers: a bolt at half speed, a frozen beam keeps its phase.
+	var bolt_data := H.make_laser(0.0, 0.0, 0.0, 0.0, 20.0)
+	bolt_data.type = LaserData2D.LASER_BOLT
+	bolt_data.speed = 800.0
+	var bolt := factory.spawn_laser(bolt_data, [Transform2D.IDENTITY] as Array[Transform2D])
+	bolt.set_time_scale(0.5)
+	factory.debug_advance_time(0.0625)
+	var head: Vector2 = bolt.get_beam_end(0)
+	factory.debug_advance_time(0.0625)
+	assert_almost_eq(bolt.get_beam_end(0) - head, Vector2(25, 0), Vector2(0.001, 0.001), "a bolt at 0.5: 25 px a 1/16 s tick")
+	var beam := factory.spawn_laser(H.make_laser(0.0, 0.0, 0.125, 0.0), [Transform2D.IDENTITY] as Array[Transform2D])
+	beam.set_time_scale(0.0)
+	for i in 6:
+		factory.debug_advance_time(0.0625)
+	assert_false(beam.is_pooled(), "a frozen laser never runs its active time out")
+	beam.set_time_scale(INF)
+	expect_error_sequence(["set_time_scale: time_scale must be finite and >= 0 (0 freezes this laser), keeping the old value."])
+	beam.set_time_scale(1.0)
+	for i in 4:
+		factory.debug_advance_time(0.0625)
+	assert_true(beam.is_pooled(), "back at 1 it finishes")
+	beam.set_time_scale(2.0)
+	expect_error_sequence(["set_time_scale: this laser finished (it waits in the pool), so this handle is stale. Fire a new laser instead."])
+	var again := factory.spawn_laser(H.make_laser(0.0, 0.0, 0.125, 0.0), [Transform2D.IDENTITY] as Array[Transform2D])
+	assert_same(again, beam, "the laser is reused")
+	assert_eq(again.get_time_scale(), 1.0, "a new laser life starts at 1")
 
 
 ## Any finite time_scale is accepted, but one volley tick never covers more

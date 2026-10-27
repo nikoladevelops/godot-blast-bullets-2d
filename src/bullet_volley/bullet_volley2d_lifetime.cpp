@@ -130,6 +130,45 @@ void BulletVolley2D::set_bullet_life_time_left(int bullet_index, double seconds)
 	give_bullet_own_life(bullet_index, has_own ? own_life_span[bullet_index] : seconds, seconds);
 }
 
+void BulletVolley2D::all_bullets_scale_life_time(double factor, int bullet_index_start, int bullet_index_end_inclusive) {
+	if (reject_pooled_handle("all_bullets_scale_life_time")) {
+		return;
+	}
+	if (!ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_scale_life_time")) {
+		return;
+	}
+	if (bullet_index_start > bullet_index_end_inclusive) {
+		return;
+	}
+	if (!Math::is_finite(factor) || !(factor > 0.0)) {
+		UtilityFunctions::push_error("all_bullets_scale_life_time: factor must be finite and > 0, keeping the old values.");
+		return;
+	}
+	int overflowed = -1;
+	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+		const bool has_own = !own_life_span.empty() && own_life_span[i] >= 0.0;
+		if (!has_own && is_life_time_infinite) {
+			continue; // no time to scale: it stays infinite
+		}
+		const double left = get_bullet_life_time_left(i);
+		const double scaled = left * factor;
+		if (!(left > 0.0)) {
+			continue; // already due this tick
+		}
+		if (!Math::is_finite(scaled) || !(scaled > 0.0)) {
+			if (overflowed < 0) {
+				overflowed = i;
+			}
+			continue;
+		}
+		// The bullet keeps its own span (or takes the scaled time as its own).
+		give_bullet_own_life(i, has_own ? own_life_span[i] : scaled, scaled);
+	}
+	if (overflowed >= 0) {
+		UtilityFunctions::push_error("all_bullets_scale_life_time: the scaled lifetime of bullet " + String::num_int64(overflowed) + " (and any later one) is not a finite time, keeping its old value.");
+	}
+}
+
 PackedFloat64Array BulletVolley2D::all_bullets_get_life_time_left(int bullet_index_start, int bullet_index_end_inclusive) const {
 	return collect_range<PackedFloat64Array>(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_life_time_left", [&](int i) { return get_bullet_life_time_left(i); });
 }

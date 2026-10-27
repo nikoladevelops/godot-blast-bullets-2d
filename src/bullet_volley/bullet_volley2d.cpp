@@ -288,6 +288,7 @@ void BulletVolley2D::begin_life(const BulletVolleyData2D &data, uint64_t new_own
 	owner_spawner_id = new_owner_spawner_id;
 	orphaned_spawner_path = String();
 	inherited_velocity_offset = new_inherited_velocity_offset;
+	own_time_scale = 1.0;
 	reset_bounce_frames();
 	// Runtime-only knobs spawn data never seeds start from their defaults.
 	reset_pooling_flags_to_default();

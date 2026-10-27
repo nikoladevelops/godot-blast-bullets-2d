@@ -174,6 +174,7 @@ void LaserVolley2D::free_look_layers() {
 
 void LaserVolley2D::begin_life(BulletFactory2D *p_factory, const Ref<LaserData2D> &p_data, const Transform2D *slots, int count, uint64_t owner_id, uint64_t p_anchor_id, const Transform2D &anchor_frame, const Vector2 &anchor_offset, bool p_anchor_frame_pending, const Vector2 &p_inherited_velocity) {
 	inherited_velocity = p_inherited_velocity;
+	own_time_scale = 1.0;
 	factory = p_factory;
 	factory_life = p_factory != nullptr ? p_factory->life_token() : std::shared_ptr<bool>();
 	data = p_data;
@@ -245,6 +246,7 @@ void LaserVolley2D::release_life() {
 	owner_spawner_id = 0;
 	signals_to_factory = false;
 	inherited_velocity = Vector2();
+	own_time_scale = 1.0;
 	anchor_id = 0;
 	following = false;
 	anchor_frame_pending = false;
@@ -287,6 +289,17 @@ void LaserVolley2D::_notification(int p_what) {
 		}
 		factory = nullptr;
 	}
+}
+
+void LaserVolley2D::set_time_scale(double value) {
+	if (reject_stale_handle("set_time_scale")) {
+		return;
+	}
+	if (!Math::is_finite(value) || value < 0.0) {
+		UtilityFunctions::push_error("set_time_scale: time_scale must be finite and >= 0 (0 freezes this laser), keeping the old value.");
+		return;
+	}
+	own_time_scale = value;
 }
 
 void LaserVolley2D::graze_arm(const Array &zones, const std::shared_ptr<GrazeDetector2D> &detector) {
@@ -972,6 +985,8 @@ void LaserVolley2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("debug_get_look_draws", "fraction"), &LaserVolley2D::debug_get_look_draws, DEFVAL(-1.0));
 	ClassDB::bind_method(D_METHOD("debug_get_look_layers"), &LaserVolley2D::debug_get_look_layers);
 	ClassDB::bind_method(D_METHOD("get_inherited_velocity"), &LaserVolley2D::get_inherited_velocity);
+	ClassDB::bind_method(D_METHOD("get_time_scale"), &LaserVolley2D::get_time_scale);
+	ClassDB::bind_method(D_METHOD("set_time_scale", "time_scale"), &LaserVolley2D::set_time_scale);
 	ClassDB::bind_method(D_METHOD("debug_check_invariants"), &LaserVolley2D::debug_check_invariants);
 	ClassDB::bind_method(D_METHOD("graze_set_zones", "zones", "target_group"), &LaserVolley2D::graze_set_zones);
 	ClassDB::bind_method(D_METHOD("graze_clear"), &LaserVolley2D::graze_clear);

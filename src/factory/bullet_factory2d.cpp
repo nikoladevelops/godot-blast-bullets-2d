@@ -51,7 +51,7 @@ static _ALWAYS_INLINE_ BulletVolley2D *resolve_iteration_entry(uint64_t id, Bull
 // its owner spawner while that lives (and opted in). Orphans, factory-spawned
 // and pooled volleys (owner 0) run on the factory scale alone.
 double BulletFactory2D::volley_time_factor(const BulletVolley2D &volley) const {
-	double factor = time_scale;
+	double factor = time_scale * volley.own_time_scale;
 	const uint64_t scale_owner = volley.owner_spawner_id != 0 ? volley.owner_spawner_id : volley.pickup_time_scale_owner_id;
 	if (scale_owner != 0) {
 		const PatternSpawner2D *spawner = Object::cast_to<PatternSpawner2D>(ObjectDB::get_instance(ObjectID(scale_owner)));

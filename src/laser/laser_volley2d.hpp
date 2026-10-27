@@ -137,6 +137,12 @@ public:
 	// inherit factor, or an emitter bullet's velocity): bolts and curvy heads
 	// drift with it, beams ignore it.
 	Vector2 get_inherited_velocity() const { return inherited_velocity; }
+	// This laser's own clock factor (1 = normal, 0 = frozen), multiplied into
+	// the factory's and its owner spawner's (laser_time_factor). Every life
+	// starts at 1.
+	double get_time_scale() const { return own_time_scale; }
+	void set_time_scale(double value);
+	double own_time_scale = 1.0;
 	bool is_laser_active() const { return active; }
 	bool is_pooled() const { return pooled; }
 	Object *get_owner_spawner() const;

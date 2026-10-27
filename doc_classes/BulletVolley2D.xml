@@ -443,6 +443,26 @@
 				[method bullet_reset_state] for every bullet in the range ([code](0, -1)[/code] = the whole volley).
 			</description>
 		</method>
+		<method name="all_bullets_scale_life_time">
+			<return type="void" />
+			<param index="0" name="factor" type="float" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Multiplies the time each bullet in the range has left by [param factor] (finite, &gt; 0). A bullet on the volley timer takes the scaled time as its own lifetime ([method set_bullet_life_time_left]); an own lifetime keeps its span. Bullets of an infinite volley without their own lifetime stay infinite; a scaled time that is not finite keeps the old one (one error).
+			</description>
+		</method>
+		<method name="all_bullets_scale_speed">
+			<return type="void" />
+			<param index="0" name="factor" type="float" />
+			<param index="1" name="scale_max_speed" type="bool" default="true" />
+			<param index="2" name="scale_acceleration" type="bool" default="true" />
+			<param index="3" name="bullet_index_start" type="int" default="0" />
+			<param index="4" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Multiplies the speed of every bullet in the range by [param factor] (finite, &gt;= 0), and its top speed and acceleration too unless [param scale_max_speed] / [param scale_acceleration] are off (an unscaled top speed below the new speed rises to it; 0 stays unlimited). The velocity follows at once. A speed curve keeps owning the speeds it drives (one warning, like [method all_bullets_set_speed]); a bullet whose scaled values would overflow keeps its old ones (one error).
+			</description>
+		</method>
 		<method name="all_bullets_set_attachment">
 			<return type="void" />
 			<param index="0" name="attachment_scene" type="PackedScene" />
@@ -1867,6 +1887,12 @@
 				Cached SpriteFrames source of the playing animation. The bake is a snapshot: later edits to the resource need a replay via [method play_sprite_animation] or [method play_sprite_animation_name]. Playing on a pooled (inactive) instance applies immediately but is discarded by the next pool-reuse bake.
 			</description>
 		</method>
+		<method name="get_time_scale" qualifiers="const">
+			<return type="float" />
+			<description>
+				This volley's own clock factor (see [method set_time_scale]).
+			</description>
+		</method>
 		<method name="graze_clear">
 			<return type="void" />
 			<description>
@@ -2317,6 +2343,13 @@
 			<param index="0" name="frame" type="int" />
 			<description>
 				Seeks the sprite animation to [param frame] like [member AnimatedSprite2D.frame]: the frame shows at once for its full duration and the animation plays on from there. A stopped animation stays stopped on the chosen frame; a finished one plays again and emits [signal sprite_animation_finished] again when it ends. Out of range, or no animation baked, is refused with an error and returns false.
+			</description>
+		</method>
+		<method name="set_time_scale">
+			<return type="void" />
+			<param index="0" name="time_scale" type="float" />
+			<description>
+				Sets this volley's own clock factor (1 = normal, 0 = frozen alone): it multiplies [member BulletFactory2D.time_scale] and the owner spawner's [member BulletSpawner2D.time_scale], so its ticks, lifetime, custom timers, attachments and followed sounds run on it. Finite and &gt;= 0, else one error and the old value is kept; refused on a pooled volley. Every new life starts at 1.
 			</description>
 		</method>
 		<method name="shared_homing_deque_check_current_target_type" qualifiers="const">
