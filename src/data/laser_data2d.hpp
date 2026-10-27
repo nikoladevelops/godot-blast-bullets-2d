@@ -69,6 +69,10 @@ public:
 	double speed = 600.0;
 	double wave_amplitude = 0.0; // curvy: px sideways
 	double wave_frequency = 2.0; // curvy: waves per second
+	// Bolts and curvy heads that leave the factory's despawn bounds are spent
+	// there (laser_despawned); true flies them on until their phases end, and
+	// lets a LaserSpawner2D fire from outside the bounds (beams never despawn).
+	bool ignore_despawn_bounds = false;
 	// Walls (rays): the beam stops at the first wall of wall_mask, or
 	// reflects off `reflections` walls first.
 	int64_t wall_mask = 0;
@@ -147,6 +151,8 @@ public:
 	double get_wave_amplitude() const { return wave_amplitude; }
 	void set_wave_amplitude(double value);
 	double get_wave_frequency() const { return wave_frequency; }
+	bool get_ignore_despawn_bounds() const { return ignore_despawn_bounds; }
+	void set_ignore_despawn_bounds(bool value);
 	void set_wave_frequency(double value);
 	int64_t get_wall_mask() const { return wall_mask; }
 	void set_wall_mask(int64_t value);

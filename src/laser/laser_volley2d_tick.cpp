@@ -983,14 +983,30 @@ void LaserVolley2D::tick(double delta) {
 			snap_beam_history(b);
 		}
 	}
-	// Bolts and curvy lasers fully outside the despawn bounds are spent.
-	if (d->type != LaserData2D::LASER_BEAM && factory->get_despawn_bounds_enabled()) {
+	// Bolts and curvy lasers fully outside the despawn bounds are spent
+	// there (On Despawn, then laser_despawned; its contacts end below).
+	if (d->type != LaserData2D::LASER_BEAM && !d->ignore_despawn_bounds && factory->get_despawn_bounds_enabled()) {
 		const Rect2 bounds = factory->get_despawn_bounds_rect();
 		for (int i = 0; i < (int)beams.size(); ++i) {
 			Beam &b = beams[i];
-			if (!b.spent && b.launched && !b.points.empty() && !bounds.has_point(b.points.front()) && !bounds.has_point(b.points.back())) {
-				b.spent = true;
-				fire_event(LaserSoundData2D::LASER_SOUND_ON_DESPAWN, b.points.back(), i);
+			if (b.spent || !b.launched || b.points.empty() || bounds.has_point(b.points.front()) || bounds.has_point(b.points.back())) {
+				continue;
+			}
+			b.spent = true;
+			const Vector2 at = b.points.back();
+			fire_event(LaserSoundData2D::LASER_SOUND_ON_DESPAWN, at, i);
+			Object *emitter = resolve_emitter();
+			if (emitter == nullptr) {
+				continue;
+			}
+			factory->note_user_code();
+			emit_on2d(emitter, CachedStringNames2D::get().laser_despawned, this, i, at);
+			if (!alive_after_user_code(self_id, life)) {
+				return;
+			}
+			d = data.ptr();
+			if (d == nullptr) {
+				return;
 			}
 		}
 	}

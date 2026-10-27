@@ -758,6 +758,11 @@ void LaserSpawner2D::_bind_methods() {
 			PropertyInfo(Variant::VECTOR2, "normal")));
 	ADD_SIGNAL(MethodInfo("laser_finished",
 			PropertyInfo(Variant::OBJECT, "laser", PROPERTY_HINT_RESOURCE_TYPE, "LaserVolley2D")));
+	// A bolt or curvy head left the despawn bounds (spent there).
+	ADD_SIGNAL(MethodInfo("laser_despawned",
+			PropertyInfo(Variant::OBJECT, "laser", PROPERTY_HINT_RESOURCE_TYPE, "LaserVolley2D"),
+			PropertyInfo(Variant::INT, "beam_index"),
+			PropertyInfo(Variant::VECTOR2, "position")));
 	ADD_SIGNAL(MethodInfo("laser_grazed",
 			PropertyInfo(Variant::OBJECT, "target"),
 			PropertyInfo(Variant::OBJECT, "laser", PROPERTY_HINT_RESOURCE_TYPE, "LaserVolley2D"),

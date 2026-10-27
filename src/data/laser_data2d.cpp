@@ -198,6 +198,13 @@ void LaserData2D::set_collision_mask(int64_t value) {
 	emit_changed();
 }
 
+void LaserData2D::set_ignore_despawn_bounds(bool value) {
+	if (!assign_if_changed2d(ignore_despawn_bounds, value)) {
+		return;
+	}
+	emit_changed();
+}
+
 void LaserData2D::set_collide_with_bodies(bool value) {
 	if (!assign_if_changed2d(collide_with_bodies, value)) {
 		return;
@@ -478,6 +485,7 @@ void LaserData2D::_bind_methods() {
 	LASER_BIND(speed, FLOAT, PROPERTY_HINT_RANGE, "0,5000,1,or_greater,suffix:px/s")
 	LASER_BIND(wave_amplitude, FLOAT, PROPERTY_HINT_RANGE, "0,200,0.5,or_greater,suffix:px")
 	LASER_BIND(wave_frequency, FLOAT, PROPERTY_HINT_RANGE, "0,20,0.01,or_greater")
+	LASER_BIND(ignore_despawn_bounds, BOOL, PROPERTY_HINT_NONE, "")
 
 	ADD_GROUP("Phases", "");
 	LASER_BIND(charge_sec, FLOAT, PROPERTY_HINT_RANGE, "0,5,0.01,or_greater,suffix:s")

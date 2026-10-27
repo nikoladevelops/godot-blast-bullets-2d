@@ -122,6 +122,7 @@ public:
 		return event == SPAWNER_SOUND_TELEGRAPH ? LaserSoundData2D::LASER_SOUND_ON_TELEGRAPH : LaserSoundData2D::LASER_SOUND_ON_SHOT;
 	}
 	const char *shot_noun() const override { return "laser"; }
+	bool shots_ignore_despawn_bounds() const override { return laser_data.is_valid() && laser_data->ignore_despawn_bounds; }
 	bool apply_payload_override(const Variant &value) override;
 
 	void _validate_property(PropertyInfo &p_property) const;

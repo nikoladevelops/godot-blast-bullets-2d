@@ -207,6 +207,11 @@ func test_freeing_the_laser_spawner_from_its_own_signal(sig: String = use_parame
 	sp.movement_duration_sec = 0.1
 	if sig == "volley_skipped":
 		sp.max_live_lasers = 1 # the second pull skips ("over_budget")
+	if sig == "laser_despawned":
+		laser.type = LaserData2D.LASER_BOLT # a fast bolt leaves the bounds at once
+		laser.speed = 2000.0
+		factory.despawn_bounds_rect = Rect2(-100, -100, 200, 200)
+		factory.despawn_bounds_enabled = true
 	_handle_all(sp)
 	sp.orphaned_lasers = LaserSpawner2D.ORPHANED_LASERS_REMOVE
 	var fired: Array = []
@@ -266,6 +271,10 @@ func test_freeing_the_factory_from_its_own_signal(sig: String = use_parameters(_
 				f.spawn_volley(_busy_data(4))
 				f.despawn_bounds_rect = Rect2(-50, -50, 100, 100)
 				f.despawn_bounds_enabled = true
+				var bolt := H.make_laser(0.0, 0.0, 1.0, 0.0, 20.0)
+				bolt.type = LaserData2D.LASER_BOLT # leaves the bounds: laser_despawned
+				bolt.speed = 2000.0
+				f.spawn_laser(bolt, [Transform2D.IDENTITY] as Array[Transform2D])
 			170:
 				f.reset()
 		await idle(1)

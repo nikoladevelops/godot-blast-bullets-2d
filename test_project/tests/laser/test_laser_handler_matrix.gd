@@ -52,9 +52,20 @@ func _zone() -> GrazeZone2D:
 	return H.make_graze_zone([40.0])
 
 
-## Fires one laser on `route` ("factory" or "spawner"); returns [laser, emitter, spawner].
-func _fire(route: String) -> Array:
-	var data := _data()
+## A fast bolt that leaves the factory's despawn bounds (laser_despawned).
+func _bolt() -> LaserData2D:
+	var d := H.make_laser(0.0, 0.0, 0.5, 0.0, 40.0)
+	d.type = LaserData2D.LASER_BOLT
+	d.speed = 1600.0 # 100 px per tick: out of the 400 px box within 3 ticks
+	factory.despawn_bounds_rect = Rect2(-200, -200, 400, 400)
+	factory.despawn_bounds_enabled = true
+	return d
+
+
+## Fires one laser on `route` ("factory" or "spawner"), the despawning bolt
+## when `bolt`; returns [laser, emitter, spawner].
+func _fire(route: String, bolt := false) -> Array:
+	var data := _bolt() if bolt else _data()
 	if route == "factory":
 		var poses: Array[Transform2D] = [Transform2D(0.0, Vector2.ZERO)]
 		var l := factory.spawn_laser(data, poses)
@@ -143,7 +154,7 @@ func _act(action: String, laser: LaserVolley2D, spawner: LaserSpawner2D) -> void
 
 ## One run: fire, act inside the first `sig`, tick, wind down. Returns "" or the problem.
 func _run(route: String, sig: String, action: String) -> String:
-	var fired := _fire(route)
+	var fired := _fire(route, sig == "laser_despawned")
 	var laser: LaserVolley2D = fired[0]
 	var emitter: Object = fired[1]
 	var spawner: LaserSpawner2D = fired[2]
@@ -181,6 +192,7 @@ func _run(route: String, sig: String, action: String) -> String:
 	if problem == "" and factory.get_active_laser_count() != 0:
 		problem = "%d lasers still firing after the wind-down" % factory.get_active_laser_count()
 	factory.reset()
+	factory.despawn_bounds_enabled = false
 	await idle(1)
 	if is_instance_valid(spawner):
 		spawner.queue_free()
@@ -190,19 +202,21 @@ func _run(route: String, sig: String, action: String) -> String:
 
 func test_the_scene_raises_every_laser_signal_on_both_routes() -> void:
 	for route in ["factory", "spawner"]:
-		var fired := _fire(route)
 		var heard := {}
-		for sig in _signals():
-			(fired[1] as Object).connect(sig, func(..._args) -> void: heard[sig] = true)
-		for i in 16:
-			step_factory(1, DT)
+		for bolt in [false, true]: # the beam, then the despawning bolt
+			var fired := _fire(route, bolt)
+			for sig in _signals():
+				(fired[1] as Object).connect(sig, func(..._args) -> void: heard[sig] = true)
+			for i in 16:
+				step_factory(1, DT)
+			factory.reset()
+			factory.despawn_bounds_enabled = false
+			await idle(1)
+			if fired[2] != null:
+				(fired[2] as Node).queue_free()
+				await idle(1)
 		var missing: Array = _signals().filter(func(s): return not heard.has(s))
 		assert_eq(missing, [], "%s: every laser signal fires in the scene" % route)
-		factory.reset()
-		await idle(1)
-		if fired[2] != null:
-			(fired[2] as Node).queue_free()
-			await idle(1)
 
 
 func test_every_action_in_every_laser_signal(route: String = use_parameters(["factory", "spawner"])) -> void:

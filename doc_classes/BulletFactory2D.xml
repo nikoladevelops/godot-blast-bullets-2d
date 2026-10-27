@@ -939,6 +939,14 @@
 				Emitted once per volley and tick for the bullets that just left through the despawn bounds (see [member despawn_bounds_enabled]), after their On Despawn effects and sounds. [param positions] holds the pose each bullet left from, parallel to [param bullet_indexes]. It runs live inside the sweep: spawn from it (an item where a bullet fell off the screen), but do not free the volley. Nothing is captured while no handler is connected.
 			</description>
 		</signal>
+		<signal name="laser_despawned">
+			<param index="0" name="laser" type="LaserVolley2D" />
+			<param index="1" name="beam_index" type="int" />
+			<param index="2" name="position" type="Vector2" />
+			<description>
+				Emitted inside the tick when a bolt or curvy head of [param laser] leaves the factory's despawn bounds ([member BulletFactory2D.despawn_bounds_enabled]): beam [param beam_index] is spent where it left ([param position], its head), right after its On Despawn sound and effect; the laser finishes once every beam is spent. Its contacts end afterwards. Not emitted for [member LaserData2D.ignore_despawn_bounds] lasers. Factory lasers signal here; a spawner's lasers signal on their [LaserSpawner2D].
+			</description>
+		</signal>
 		<signal name="laser_finished">
 			<param index="0" name="laser" type="LaserVolley2D" />
 			<description>

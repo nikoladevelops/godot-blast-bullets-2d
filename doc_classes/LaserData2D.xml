@@ -103,6 +103,9 @@
 		<member name="hit_while_growing" type="bool" setter="set_hit_while_growing" getter="get_hit_while_growing" default="true">
 			Whether the growing phase already hits (default on). Off, only the active phase hits.
 		</member>
+		<member name="ignore_despawn_bounds" type="bool" setter="set_ignore_despawn_bounds" getter="get_ignore_despawn_bounds" default="false">
+			Off (default): a bolt or curvy head that leaves the factory's despawn bounds is spent there ([signal BulletFactory2D.laser_despawned]). On: it flies on until its phases end, and a [LaserSpawner2D] firing this data may shoot from outside the bounds (like [member BulletVolleyData2D.ignore_despawn_bounds]). Beams never despawn.
+		</member>
 		<member name="keep_tracking_when_active" type="bool" setter="set_keep_tracking_when_active" getter="get_keep_tracking_when_active" default="true">
 			Track and Lock On: whether the beam keeps following its target while active. Off, it aims while charging and growing, then holds that direction ("charge, lock, fire").
 		</member>

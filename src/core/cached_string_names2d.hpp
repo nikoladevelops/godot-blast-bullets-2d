@@ -37,6 +37,7 @@ struct CachedStringNames2D {
 	const StringName laser_hit = StringName("laser_hit");
 	const StringName laser_wall_hit = StringName("laser_wall_hit");
 	const StringName laser_finished = StringName("laser_finished");
+	const StringName laser_despawned = StringName("laser_despawned");
 	const StringName laser_grazed = StringName("laser_grazed");
 	const StringName laser_graze_exited = StringName("laser_graze_exited");
 	const StringName default_animation = StringName("default");

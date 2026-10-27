@@ -4,8 +4,10 @@ extends BlastTest
 ## body is the newest `length` px of the path it took, tail to head (the head
 ## is get_beam_end). A head reflects off `reflections` walls, then a wall
 ## spends it (one laser_wall_hit); pierce_limit N spends it after N distinct
-## targets; leaving the despawn bounds spends it silently. A spent beam is
-## never drawn or hit again, and the laser finishes when every beam is spent.
+## targets; leaving the despawn bounds spends it (one laser_despawned per
+## head, on the owner spawner or the factory; ignore_despawn_bounds flies on).
+## A spent beam is never drawn or hit again, and the laser finishes when every
+## beam is spent.
 
 const DT := 0.0625
 
@@ -21,6 +23,7 @@ func before_each() -> void:
 	factory.laser_pierce_ended.connect(func(t: Object, _l, i: int) -> void: log.append([tick, "end", str(t.name), i]))
 	factory.laser_wall_hit.connect(func(_l, i: int, p: Vector2, _n) -> void: log.append([tick, "wall", i, p.round()]))
 	factory.laser_finished.connect(func(_l) -> void: log.append([tick, "finished"]))
+	factory.laser_despawned.connect(func(_l, i: int, p: Vector2) -> void: log.append([tick, "despawned", i, p.round()]))
 
 
 func _step(k: int) -> void:
@@ -130,13 +133,50 @@ func test_a_curvy_body_follows_the_path_its_head_took() -> void:
 	assert_eq(l.get_beam_end(0), pts[pts.size() - 1], "the head is the end")
 
 
-func test_leaving_the_despawn_bounds_spends_it_silently() -> void:
+func test_leaving_the_despawn_bounds_spends_it_with_one_signal() -> void:
 	factory.despawn_bounds_rect = Rect2(-50, -50, 300, 100)
 	factory.despawn_bounds_enabled = true
 	var l := _fire(_bolt())
 	_step(6)
-	assert_eq(log, [[4, "finished"]], "out of the bounds (head and tail) by tick 4: finished, no other signal")
+	# The head reaches x 400 on tick 4: head and tail both out of the box.
+	assert_eq(log, [[4, "despawned", 0, Vector2(400, 0)], [4, "finished"]], "out of the bounds by tick 4: announced where it left, then finished")
 	assert_true(l.is_pooled(), "pooled")
+
+
+func test_ignore_despawn_bounds_flies_on_until_its_phases_end() -> void:
+	factory.despawn_bounds_rect = Rect2(-50, -50, 300, 100)
+	factory.despawn_bounds_enabled = true
+	var d := _bolt()
+	d.active_sec = 0.5
+	d.ignore_despawn_bounds = true
+	var l := _fire(d)
+	_step(6)
+	assert_eq(log, [], "never spent by the bounds")
+	assert_gt(l.get_beam_end(0).x, 500.0, "still flying outside them")
+	_step(4)
+	assert_eq(log, [[8, "finished"]], "it ends with its phases (0.5 s = 8 ticks)")
+
+
+func test_a_spawner_bolt_despawns_on_its_spawner_and_may_fire_from_outside_when_ignoring() -> void:
+	factory.despawn_bounds_rect = Rect2(-50, -50, 300, 100)
+	factory.despawn_bounds_enabled = true
+	var sp := LaserSpawner2D.new()
+	sp.set_shooting_enabled(false)
+	sp.laser_data = _bolt()
+	sp.pattern_source = LaserSpawner2D.PATTERN_FROM_HELPER_CUSTOM
+	sp.helper_custom_transforms = [Transform2D(0.0, Vector2.ZERO)]
+	add(sp)
+	sp.set_bullet_factory(factory)
+	var on_spawner: Array = []
+	sp.laser_despawned.connect(func(_l, i: int, _p) -> void: on_spawner.append(i))
+	assert_true(sp.shoot_once(), "fires")
+	_step(6)
+	assert_eq(on_spawner, [0], "the owner spawner hears it")
+	assert_false(log.any(func(e): return e[1] == "despawned"), "never the factory as well")
+	sp.position = Vector2(-400, 0) # the muzzle outside the bounds
+	assert_false(sp.shoot_once(), "refused outside the bounds")
+	sp.laser_data.ignore_despawn_bounds = true
+	assert_true(sp.shoot_once(), "ignore_despawn_bounds lets it fire from outside")
 
 
 func test_the_laser_ends_only_when_every_beam_is_spent() -> void:
