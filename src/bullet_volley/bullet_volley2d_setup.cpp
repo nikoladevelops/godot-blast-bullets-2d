@@ -127,6 +127,7 @@ void BulletVolley2D::set_up_bullet_instances(const BulletVolleyData2D &data) {
 			multi->set_instance_transform_2d(i, to_local_for_multimesh(all_cached_instance_transforms[i]));
 		}
 	}
+	attach_area_to_space();
 }
 
 void BulletVolley2D::generate_multimesh() {

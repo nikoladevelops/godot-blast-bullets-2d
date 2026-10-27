@@ -455,6 +455,8 @@ void BulletVolley2D::predelete_teardown() {
 			physics_server->free_rid(area);
 		}
 		area = RID();
+		area_space = RID();
+		pending_area_space = RID();
 	}
 }
 

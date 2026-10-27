@@ -1146,6 +1146,10 @@ public:
 
 	// The area that holds all collision shapes
 	RID area;
+	// The space the area joined (attach_area_to_space), and the one it joins
+	// after set_up_bullet_instances posed its shapes.
+	RID area_space;
+	RID pending_area_space;
 
 	// Saves whether the bullets can detect bodies or not
 	bool monitorable = false;
@@ -1653,6 +1657,7 @@ protected:
 
 	// Sets up the area correctly with collision related data
 	void set_up_area(const int collision_layer, const int collision_mask, bool new_monitorable, const RID &physics_space);
+	void attach_area_to_space();
 	void generate_physics_shapes_for_area(int amount);
 	// Pushes the cached shape data into volley_shape once (no-op when it
 	// already matches) and marks it applied.

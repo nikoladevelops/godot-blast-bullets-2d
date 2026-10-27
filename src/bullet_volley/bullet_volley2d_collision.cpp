@@ -364,12 +364,36 @@ void BulletVolley2D::set_up_area(const int collision_layer, const int collision_
 		UtilityFunctions::push_error("set_up_area: no valid physics space, bullets will not collide. Set BulletFactory2D physics_space first.");
 		return;
 	}
-	physics_server->area_set_space(area, space_to_use);
-	write_monitorable();
-	physics_server->area_set_area_monitor_callback(area, callable_mp(this, &BulletVolley2D::area_entered_func));
-	physics_server->area_set_monitor_callback(area, callable_mp(this, &BulletVolley2D::body_entered_func));
+	// Configure everything BEFORE the area can pair with anything: a fresh
+	// server area carries the default layer and mask 1, and pairs tested
+	// under those defaults made a burst of new volleys stall the next
+	// physics step about with the square of their bullets.
 	physics_server->area_set_collision_layer(area, collision_layer);
 	physics_server->area_set_collision_mask(area, collision_mask);
+	if (area_space.is_valid()) {
+		write_monitorable();
+	} else {
+		// Outside every space the server takes it even inside its query
+		// flush, and it must: the broadphase never re-pairs a resting area
+		// that turns monitorable after it joined.
+		physics_server->area_set_monitorable(area, monitorable);
+	}
+	physics_server->area_set_area_monitor_callback(area, callable_mp(this, &BulletVolley2D::area_entered_func));
+	physics_server->area_set_monitor_callback(area, callable_mp(this, &BulletVolley2D::body_entered_func));
+	if (area_space != space_to_use) {
+		// Joins the space once its shapes are posed (attach_area_to_space,
+		// end of set_up_bullet_instances): never as a cluster of identity shapes.
+		pending_area_space = space_to_use;
+	}
+}
+
+void BulletVolley2D::attach_area_to_space() {
+	if (!pending_area_space.is_valid() || physics_server == nullptr || !area.is_valid()) {
+		return;
+	}
+	physics_server->area_set_space(area, pending_area_space);
+	area_space = pending_area_space;
+	pending_area_space = RID();
 }
 
 Transform2D BulletVolley2D::generate_collision_shape_transform_for_area(Transform2D transf, const Vector2 &collision_shape_offset, int bullet_index) {
