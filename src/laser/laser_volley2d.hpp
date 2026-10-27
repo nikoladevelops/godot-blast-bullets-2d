@@ -228,6 +228,7 @@ public:
 	uint64_t owner_spawner_id = 0;
 	// A freed owner hands its lasers to the factory's signals (orphan policy).
 	bool signals_to_factory = false;
+	bool pattern_target_warned = false; // one warning per life: a target a Pattern aim never uses
 	int pool_key = 0; // the beam count it is pooled under
 	uint64_t sweep_tick_stamp = 0;
 

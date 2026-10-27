@@ -110,6 +110,7 @@ void LaserVolley2D::begin_life(BulletFactory2D *p_factory, const Ref<LaserData2D
 	data = p_data;
 	owner_spawner_id = owner_id;
 	signals_to_factory = false;
+	pattern_target_warned = false;
 	++life_id;
 	active = true;
 	pooled = false;
@@ -580,6 +581,11 @@ void LaserVolley2D::set_beam_target(int beam_index, const Variant &target) {
 		b.has_target = true;
 	} else if (target.get_type() != Variant::NIL) {
 		UtilityFunctions::push_error("set_beam_target: target must be a Node2D, a Vector2 or null, the beam has no target now.");
+	}
+	const LaserData2D *d = data.ptr();
+	if (b.has_target && !pattern_target_warned && d != nullptr && d->aim == LaserData2D::LASER_AIM_PATTERN) {
+		pattern_target_warned = true;
+		UtilityFunctions::push_warning("LaserVolley2D: laser_data aims along the pattern, so a target steers nothing (kept for a Track or Lock On aim).");
 	}
 }
 

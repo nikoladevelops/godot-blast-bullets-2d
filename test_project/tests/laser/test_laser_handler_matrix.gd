@@ -98,6 +98,11 @@ func _act(action: String, laser: LaserVolley2D, spawner: LaserSpawner2D) -> void
 		"retarget":
 			if alive:
 				laser.set_targets([Vector2(0, 300)])
+				# This laser aims along the pattern: its one per-life warning
+				# that a target steers nothing (pinned in test_laser_aim_and_motion).
+				for err in get_errors():
+					if not err.handled and err.is_push_warning() and err.contains_text("a target steers nothing"):
+						err.handled = true
 		"unanchor":
 			if alive:
 				laser.set_anchor(null)

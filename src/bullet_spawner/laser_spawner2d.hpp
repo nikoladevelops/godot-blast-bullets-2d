@@ -125,6 +125,11 @@ protected:
 private:
 	double retarget_time_left = 0.0;
 	bool aims_at_targets() const;
+	// The aim / target-source mismatch a shot fires with (empty = none); the
+	// runtime warning fires once per mismatched configuration.
+	String aim_mismatch_warning() const;
+	uint64_t warned_aim_key = 0;
+	void warn_aim_mismatch_once();
 	// What a retarget hands the live Track / Lock On lasers (None: nothing).
 	Array live_laser_targets() const;
 	void assign_targets(LaserVolley2D *laser, const Array &targets) const;

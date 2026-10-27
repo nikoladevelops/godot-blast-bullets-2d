@@ -458,6 +458,7 @@ ShotResult2D LaserSpawner2D::fire_shot(std::vector<Transform2D> &transforms) {
 			laser->sound_arm(entries, sound_detector_ref(), (float)sound_volume_db);
 		}
 	}
+	warn_aim_mismatch_once();
 	if (aims_at_targets()) {
 		assign_targets(laser, resolve_laser_targets());
 	}
@@ -554,9 +555,9 @@ void LaserSpawner2D::append_setup_warnings(PackedStringArray &r_warnings) const 
 	if (laser_data.is_null()) {
 		return;
 	}
-	const bool aims = laser_data->aim != LaserData2D::LASER_AIM_PATTERN;
-	if (aims && laser_target_source == LASER_TARGET_NONE) {
-		r_warnings.push_back("laser_data aims with Track or Lock On but laser_target_source is None: the beams keep their pattern direction.");
+	const String mismatch = aim_mismatch_warning();
+	if (!mismatch.is_empty() && laser_target_source == LASER_TARGET_NONE) {
+		r_warnings.push_back(mismatch);
 	}
 	if (laser_target_source == LASER_TARGET_NODE_GROUP && laser_target_group.is_empty()) {
 		r_warnings.push_back("laser_target_source is Node Group but laser_target_group is empty: the lasers have no target.");
@@ -570,9 +571,39 @@ void LaserSpawner2D::append_setup_warnings(PackedStringArray &r_warnings) const 
 	if (laser_target_source == LASER_TARGET_NODE_CHILDREN && laser_target_children_parent_path.is_empty()) {
 		r_warnings.push_back("laser_target_source is Node Children but laser_target_children_parent_path is empty: the lasers have no target.");
 	}
-	if (!aims && laser_target_source != LASER_TARGET_NONE) {
-		r_warnings.push_back("laser_target_source is set but laser_data aims along the pattern: set its aim to Track or Lock On to use the targets.");
+	if (!mismatch.is_empty() && laser_target_source != LASER_TARGET_NONE) {
+		r_warnings.push_back(mismatch);
 	}
+}
+
+String LaserSpawner2D::aim_mismatch_warning() const {
+	if (laser_data.is_null()) {
+		return String();
+	}
+	const bool aims = laser_data->aim != LaserData2D::LASER_AIM_PATTERN;
+	if (aims && laser_target_source == LASER_TARGET_NONE) {
+		return "laser_data aims with Track or Lock On but laser_target_source is None: the beams keep their pattern direction.";
+	}
+	if (!aims && laser_target_source != LASER_TARGET_NONE) {
+		return "laser_target_source is set but laser_data aims along the pattern: set its aim to Track or Lock On to use the targets.";
+	}
+	return String();
+}
+
+void LaserSpawner2D::warn_aim_mismatch_once() {
+	// The editor shows it as a setup warning; a game started without the
+	// editor open hears it once at the first shot of each mismatch.
+	const String warning = aim_mismatch_warning();
+	if (warning.is_empty()) {
+		warned_aim_key = 0;
+		return;
+	}
+	const uint64_t key = ((uint64_t)laser_data->get_instance_id() * 31u + (uint64_t)laser_data->aim) * 31u + (uint64_t)laser_target_source + 1u;
+	if (key == warned_aim_key) {
+		return;
+	}
+	warned_aim_key = key;
+	UtilityFunctions::push_warning("LaserSpawner2D: " + warning);
 }
 
 PackedStringArray LaserSpawner2D::debug_explain_features() const {
@@ -596,7 +627,7 @@ PackedStringArray LaserSpawner2D::debug_explain_features() const {
 		}
 		out.push_back(line);
 		if (d->aim == LaserData2D::LASER_AIM_PATTERN) {
-			out.push_back("Laser Targeting: the beams point along the pattern.");
+			out.push_back(laser_target_source == LASER_TARGET_NONE ? String("Laser Targeting: the beams point along the pattern.") : String("Laser Targeting: the beams point along the pattern; laser_target_source is ignored until laser_data's aim is Track or Lock On."));
 		} else if (laser_target_source == LASER_TARGET_NONE) {
 			out.push_back("Laser Targeting: Track or Lock On without a target source: the beams point along the pattern.");
 		} else {
@@ -614,6 +645,9 @@ PackedStringArray LaserSpawner2D::debug_explain_features() const {
 	}
 	out.push_back(graze_enabled ? String("Graze: on, the beams graze by their distance to the targets.") : String("Graze: off."));
 	out.push_back(sound_enabled ? String("Sound: on.") : String("Sound: off."));
+	for (const String &warning : get_setup_warnings()) {
+		out.push_back("Warning: " + warning);
+	}
 	return out;
 }
 

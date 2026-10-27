@@ -284,3 +284,24 @@ func test_set_anchor_on_a_node_outside_the_tree_rides_it_once_it_enters() -> voi
 	loose.position = Vector2(330, 0)
 	step_factory(1, DT)
 	assert_almost_eq(l.get_beam_start(0).distance_to(Vector2(50, 0)), 0.0, 0.001, "rides it")
+
+
+## A target on a Pattern-aimed laser steers nothing: it is kept (a later Track
+## or Lock On aim uses it) and the first one per life warns; clearing never warns.
+func test_a_target_on_a_pattern_laser_warns_once_per_life() -> void:
+	var d := _endless()
+	var t: Array[Transform2D] = [Transform2D(0.0, Vector2.ZERO), Transform2D(0.0, Vector2.ZERO)]
+	var l := factory.spawn_laser(d, t)
+	l.set_beam_target(0, null)
+	expect_warning_sequence([])
+	l.set_targets([Vector2(0, 100)])
+	expect_warning_sequence(["LaserVolley2D: laser_data aims along the pattern, so a target steers nothing (kept for a Track or Lock On aim)."])
+	l.set_beam_target(1, Vector2(5, 5))
+	expect_warning_sequence([])
+	step_factory(1, DT)
+	assert_eq(_deg(l), 0.0, "the beam keeps its pattern direction")
+	l.end_laser()
+	step_factory(2, DT)
+	var again := factory.spawn_laser(d, t)
+	again.set_targets([Vector2(0, 100)])
+	expect_warning_sequence(["LaserVolley2D: laser_data aims along the pattern, so a target steers nothing (kept for a Track or Lock On aim)."])

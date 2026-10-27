@@ -837,3 +837,29 @@ func test_an_ended_laser_never_counts_against_max_live_lasers() -> void:
 	assert_signal_emit_count(sp, "volley_skipped", 0, "nothing skipped")
 	step_factory(2, DT)
 	assert_eq(sp.get_live_laser_count(), 1, "one fires")
+
+
+## laser_target_source without a Track / Lock On aim (and the reverse) used to
+## warn only in the editor's scene tree: a game hears it once at the first
+## shot of each mismatched configuration, and the explain text names it.
+func test_an_aim_and_target_source_mismatch_warns_once_at_the_shot() -> void:
+	var sp := _spawner(_laser(0.5), 2)
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_MOUSE
+	assert_true(sp.shoot_once(), "fires")
+	expect_warning_sequence(["LaserSpawner2D: laser_target_source is set but laser_data aims along the pattern: set its aim to Track or Lock On to use the targets."])
+	assert_true(sp.shoot_once(), "fires again")
+	expect_warning_sequence([])
+	var explain := "\n".join(sp.debug_explain_features())
+	assert_string_contains(explain, "laser_target_source is ignored until laser_data's aim is Track or Lock On")
+	assert_string_contains(explain, "Warning: laser_target_source is set but laser_data aims along the pattern")
+	sp.laser_data.aim = LaserData2D.LASER_AIM_TRACK
+	assert_true(sp.shoot_once(), "a matching setup fires silently")
+	expect_warning_sequence([])
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_NONE
+	assert_true(sp.shoot_once(), "fires")
+	expect_warning_sequence(["LaserSpawner2D: laser_data aims with Track or Lock On but laser_target_source is None: the beams keep their pattern direction."])
+	sp.laser_data.aim = LaserData2D.LASER_AIM_PATTERN
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_MOUSE
+	assert_true(sp.shoot_once(), "fires")
+	expect_warning_sequence(["LaserSpawner2D: laser_target_source is set but laser_data aims along the pattern: set its aim to Track or Lock On to use the targets."])
+	factory.clear_active_lasers(false)
