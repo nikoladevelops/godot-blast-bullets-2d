@@ -1,7 +1,7 @@
 extends BlastTest
 ## One SpriteFrames contract for every system that draws an animation (bullet
 ## volleys, play_sprite_animation, effect trails, one-shot and manual effects,
-## the six laser animations; src/sprite/): the same animation is picked by the
+## the laser body and its five LaserSpriteLook2D slots; src/sprite/): the same animation is picked by the
 ## same name rule, timed by the same speed and duration rule and refused the
 ## same way. Every rule runs over the whole consumer table, so a system added
 ## later is covered by adding its row.
@@ -13,18 +13,18 @@ const TRAIL := "trail layer"
 const ONE_SHOT := "one-shot layer"
 const MANUAL := "spawn_layer_effect"
 const LASER_BODY := "laser body_frames"
-const LASER_CHARGE := "laser charge_frames"
-const LASER_MUZZLE := "laser muzzle_frames"
-const LASER_TIP := "laser tip_frames"
-const LASER_PIERCE := "laser pierce_frames"
-const LASER_WALL := "laser wall_impact_frames"
+const LASER_CHARGE := "laser charge_look"
+const LASER_MUZZLE := "laser muzzle_look"
+const LASER_TIP := "laser tip_look"
+const LASER_PIERCE := "laser pierce_look"
+const LASER_WALL := "laser wall_impact_look"
 
 ## Every consumer: built from a SpriteFrames, its frame-0 texture read back.
 const CONSUMERS := [BULLET, PLAY, PICKUP, TRAIL, ONE_SHOT, MANUAL, LASER_BODY, LASER_CHARGE, LASER_MUZZLE, LASER_TIP, LASER_PIERCE, LASER_WALL]
 ## Consumers that take an animation name and report a wrong one as an error
-## (pickups warn: their own test; lasers play "default", else the first
-## animation with frames).
-const NAMED := [BULLET, PLAY, TRAIL, ONE_SHOT, MANUAL]
+## (pickups warn: their own test; the laser body plays "default", else the
+## first animation with frames; the laser looks name theirs).
+const NAMED := [BULLET, PLAY, TRAIL, ONE_SHOT, MANUAL, LASER_CHARGE, LASER_MUZZLE, LASER_TIP, LASER_PIERCE, LASER_WALL]
 ## Consumers that play an animation once and need playable time.
 const ONE_SHOTS := [ONE_SHOT, MANUAL]
 ## Laser consumers: the debug_get_draw_state key of what they draw.
@@ -48,11 +48,11 @@ const PREFIXES := {
 	ONE_SHOT: "BulletEffectLayerData2D",
 	MANUAL: "BulletEffectLayerData2D",
 	LASER_BODY: "LaserData2D.body_frames",
-	LASER_CHARGE: "LaserData2D.charge_frames",
-	LASER_MUZZLE: "LaserData2D.muzzle_frames",
-	LASER_TIP: "LaserData2D.tip_frames",
-	LASER_PIERCE: "LaserData2D.pierce_frames",
-	LASER_WALL: "LaserData2D.wall_impact_frames",
+	LASER_CHARGE: "LaserData2D.charge_look",
+	LASER_MUZZLE: "LaserData2D.muzzle_look",
+	LASER_TIP: "LaserData2D.tip_look",
+	LASER_PIERCE: "LaserData2D.pierce_look",
+	LASER_WALL: "LaserData2D.wall_impact_look",
 }
 
 
@@ -98,25 +98,28 @@ func _effect_shards() -> Array:
 	return [] if container == null else container.get_children().filter(func(c): return c is MultiMeshInstance2D)
 
 
-## A laser firing along +x for as long as it lives, `sf` on the consumer's
-## property (a charge never ends; pierce and wall get their target).
-func _laser(kind: String, sf: SpriteFrames) -> LaserVolley2D:
+## A laser firing along +x for as long as it lives, `sf` / `anim` on the
+## consumer's property (a charge never ends; pierce and wall get their target).
+func _laser(kind: String, sf: SpriteFrames, anim: StringName) -> LaserVolley2D:
 	var d := H.make_laser(0.0, 0.0, 0.0, 0.0)
+	var look := LaserSpriteLook2D.new()
+	look.frames = sf
+	look.animation = anim
 	match kind:
 		LASER_BODY:
 			d.body_frames = sf
 		LASER_CHARGE:
 			d.charge_sec = 1000.0
-			d.charge_frames = sf
+			d.charge_look = look
 		LASER_MUZZLE:
-			d.muzzle_frames = sf
+			d.muzzle_look = look
 		LASER_TIP:
-			d.tip_frames = sf
+			d.tip_look = look
 		LASER_PIERCE:
-			d.pierce_frames = sf
+			d.pierce_look = look
 		LASER_WALL:
 			d.wall_mask = 16
-			d.wall_impact_frames = sf
+			d.wall_impact_look = look
 	var t: Array[Transform2D] = [Transform2D.IDENTITY]
 	var l := factory.spawn_laser(d, t)
 	step_factory(2, DT)
@@ -156,13 +159,13 @@ func _build(kind: String, sf: SpriteFrames, anim: StringName) -> Dictionary:
 		LASER_PIERCE:
 			make_area(Vector2(100, 0), Vector2(20, 60))
 			await idle(2) # a new target is found by queries after one physics step
-			out.laser = _laser(kind, sf)
+			out.laser = _laser(kind, sf, anim)
 		LASER_WALL:
 			make_wall(Vector2(300, 0), Vector2(20, 200), 16)
 			await idle(2)
-			out.laser = _laser(kind, sf)
+			out.laser = _laser(kind, sf, anim)
 		_:
-			out.laser = _laser(kind, sf)
+			out.laser = _laser(kind, sf, anim)
 	if kind in ONE_SHOTS:
 		out.shards = _effect_shards().filter(func(c): return not before.has(c))
 	return out
@@ -375,8 +378,8 @@ func test_a_laser_reports_a_sprite_frames_problem_once() -> void:
 	])
 	await _build(LASER_TIP, sf, &"")
 	expect_error_sequence([
-		"LaserData2D.tip_frames: animation 'default' has invalid speed, using 1 fps.",
-		"LaserData2D.tip_frames: animation 'default' frame 1 has null texture.",
+		"LaserData2D.tip_look: animation 'default' has invalid speed, using 1 fps.",
+		"LaserData2D.tip_look: animation 'default' frame 1 has null texture.",
 	], "another property reports its own")
 
 

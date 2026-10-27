@@ -25,6 +25,13 @@ func _frames(count: int, fps := 4.0, loop := true) -> SpriteFrames:
 	return sf
 
 
+## A look playing `sf`.
+func _look(sf: SpriteFrames) -> LaserSpriteLook2D:
+	var look := LaserSpriteLook2D.new()
+	look.frames = sf
+	return look
+
+
 func _fire(data: LaserData2D, pose := Transform2D(0.0, Vector2.ZERO), anchor: Node2D = null) -> LaserVolley2D:
 	var t: Array[Transform2D] = [pose]
 	return factory.spawn_laser(data, t, anchor)
@@ -81,14 +88,14 @@ func test_a_polyline_lerps_point_by_point() -> void:
 
 func test_charging_draws_the_warning_and_the_charge_frames() -> void:
 	var d := H.make_laser(0.25, 0.0, 0.0, 0.0)
-	d.charge_frames = _frames(2)
+	d.charge_look = _look(_frames(2))
 	d.body_frames = _frames(1)
 	var l := _fire(d)
 	step_factory(1, DT)
 	var s: Dictionary = l.debug_get_draw_state(1.0)[0]
 	assert_true(s["warning"], "the warning line")
 	assert_eq(s["width"], 0.0, "no body while charging")
-	assert_eq(s["charge"], d.charge_frames.get_frame_texture(&"default", 0), "the charge frames")
+	assert_eq(s["charge"], d.charge_look.frames.get_frame_texture(&"default", 0), "the charge frames")
 	assert_null(s["body"], "no body frame")
 	step_factory(4, DT) # 0.3125 s: active
 	s = l.debug_get_draw_state(1.0)[0]
@@ -100,8 +107,8 @@ func test_charging_draws_the_warning_and_the_charge_frames() -> void:
 func test_animations_play_on_their_own_clocks() -> void:
 	var d := H.make_laser(0.0, 0.0, 0.0, 0.0)
 	d.body_frames = _frames(2, 4.0, true) # 0.25 s per frame, looping
-	d.muzzle_frames = _frames(2, 4.0, false) # one-shot
-	d.tip_frames = _frames(3, 4.0, true)
+	d.muzzle_look = _look(_frames(2, 4.0, false)) # one-shot
+	d.tip_look = _look(_frames(3, 4.0, true))
 	var l := _fire(d)
 	var body: Array = []
 	var muzzle: Array = []
@@ -124,14 +131,14 @@ func test_pierce_frames_start_per_contact_and_impacts_per_block() -> void:
 	await idle(2)
 	var d := H.make_laser(0.0, 0.0, 0.0, 0.0)
 	d.wall_mask = 16
-	d.pierce_frames = _frames(2)
-	d.wall_impact_frames = _frames(2)
+	d.pierce_look = _look(_frames(2))
+	d.wall_impact_look = _look(_frames(2))
 	var l := _fire(d)
 	step_factory(5, DT) # 0.3125 s into both
 	var s: Dictionary = l.debug_get_draw_state(1.0)[0]
 	assert_eq(s["pierces"].size(), 1, "one pierce")
 	assert_almost_eq((s["pierces"][0][0] as Vector2).x, 100.0, 0.01, "at the target on the beam")
-	assert_eq(s["pierces"][0][1], d.pierce_frames.get_frame_texture(&"default", 1), "0.25 s+ into its own clock: frame 1")
+	assert_eq(s["pierces"][0][1], d.pierce_look.frames.get_frame_texture(&"default", 1), "0.25 s+ into its own clock: frame 1")
 	assert_eq(s["impacts"].size(), 1, "one wall impact")
 	assert_almost_eq((s["impacts"][0][0] as Vector2).x, 290.0, 0.01, "on the wall's face")
 	assert_ne(a, null)
@@ -144,12 +151,12 @@ func test_every_look_draws_headless_with_interpolation_on() -> void:
 	d.body_mode = LaserData2D.BODY_TILE
 	d.body_scroll_speed = 200.0
 	d.color_ramp = Gradient.new()
-	d.material = CanvasItemMaterial.new()
-	d.charge_frames = _frames(2)
-	d.muzzle_frames = _frames(2)
-	d.tip_frames = _frames(2)
-	d.pierce_frames = _frames(2)
-	d.wall_impact_frames = _frames(2)
+	d.body_material = CanvasItemMaterial.new()
+	d.charge_look = _look(_frames(2))
+	d.muzzle_look = _look(_frames(2))
+	d.tip_look = _look(_frames(2))
+	d.pierce_look = _look(_frames(2))
+	d.wall_impact_look = _look(_frames(2))
 	d.reflections = 2
 	d.wall_mask = 16
 	make_wall(Vector2(150, 0), Vector2(20, 400), 16)
@@ -377,7 +384,7 @@ func test_look_edits_reach_a_laser_in_flight() -> void:
 	d.body_frames = fresh
 	d.length = 120.0
 	var mat := CanvasItemMaterial.new()
-	d.material = mat
+	d.body_material = mat
 	d.z_index = 7
 	d.body_mode = LaserData2D.BODY_TILE
 	step_factory(1, DT)
@@ -386,7 +393,7 @@ func test_look_edits_reach_a_laser_in_flight() -> void:
 	assert_almost_eq(l.get_beam_length(0), 120.0, 0.001, "its geometry follows the data at once")
 	assert_eq([l.material, l.z_index, l.texture_repeat], [mat, 7, CanvasItem.TEXTURE_REPEAT_ENABLED], "material, draw order and the tiled body's repeat")
 	d.body_mode = LaserData2D.BODY_STRETCH
-	d.material = null
+	d.body_material = null
 	d.body_frames = null
 	step_factory(1, DT)
 	assert_null(l.material, "the material goes with the data's")
@@ -557,7 +564,7 @@ func test_each_impact_plays_from_its_own_start_and_faces_its_segment() -> void:
 	var d := H.make_laser(0.0, 0.0, 4.0, 0.0, 2000.0)
 	d.wall_mask = 16
 	d.reflections = 1
-	d.wall_impact_frames = _frames(3, 4.0, false)
+	d.wall_impact_look = _look(_frames(3, 4.0, false))
 	var l := _fire(d, Transform2D(deg_to_rad(30.0), Vector2.ZERO))
 	step_factory(6, DT) # 0.375 s
 	var s: Dictionary = l.debug_get_draw_state(1.0)[0]
@@ -566,4 +573,4 @@ func test_each_impact_plays_from_its_own_start_and_faces_its_segment() -> void:
 	assert_eq(pts.size(), 3, "muzzle, reflection, stop")
 	assert_almost_eq(float(s["impacts"][0][2]), (pts[1] - pts[0]).angle(), 0.0001, "the reflection faces the first segment")
 	assert_almost_eq(float(s["impacts"][1][2]), (pts[2] - pts[1]).angle(), 0.0001, "the stop faces the reflected segment")
-	assert_eq(s["impacts"][0][1], d.wall_impact_frames.get_frame_texture(&"default", 1), "0.375 s into its own clock: frame 1")
+	assert_eq(s["impacts"][0][1], d.wall_impact_look.frames.get_frame_texture(&"default", 1), "0.375 s into its own clock: frame 1")

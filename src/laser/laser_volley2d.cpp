@@ -16,6 +16,7 @@
 #include "factory/graze_detector2d.hpp"
 
 #include <godot_cpp/classes/physics_server2d.hpp>
+#include <godot_cpp/classes/rendering_server.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
@@ -30,7 +31,7 @@ namespace BlastBullets2D {
 // with frames (lasers have no animation name to pick). Frames are optional:
 // none assigned draws nothing. A laser bakes per shot, so each problem of a
 // SpriteFrames is reported once per resource and property.
-static void bake_laser_animation(const Ref<SpriteFrames> &sprite_frames, int slot, const char *property, FrameTextureCache2D *cache, SpriteAnim2D &out) {
+static void bake_laser_animation(const Ref<SpriteFrames> &sprite_frames, const StringName &animation, int slot, const char *property, FrameTextureCache2D *cache, SpriteAnim2D &out) {
 	out.clear();
 	if (sprite_frames.is_null()) {
 		return;
@@ -41,12 +42,15 @@ static void bake_laser_animation(const Ref<SpriteFrames> &sprite_frames, int slo
 	auto first_report = [&](int64_t kind, int64_t frame) {
 		return WarnOnce2D::first(id, 26u, slot, kind * 65536 + frame);
 	};
-	const SpriteAnimChoice2D choice = resolve_sprite_animation2d(sprite_frames, StringName());
+	const SpriteAnimChoice2D choice = resolve_sprite_animation2d(sprite_frames, animation);
 	if (!choice.usable()) {
 		if (first_report(0, 0)) {
 			UtilityFunctions::push_error(prefix + ": sprite_frames has no animation with frames.");
 		}
 		return;
+	}
+	if (choice.pick == SpriteAnimPick2D::FELL_BACK && first_report(5, 0)) {
+		UtilityFunctions::push_error(prefix + ": missing animation '" + String(animation) + "', falling back to '" + String(choice.anim) + "'.");
 	}
 	SpriteAnimBakeOptions2D options;
 	options.cache = cache;
@@ -72,25 +76,31 @@ static void bake_laser_animation(const Ref<SpriteFrames> &sprite_frames, int slo
 	}
 }
 
-// The looks of `d` on this laser: the six animations (baked again only when
-// a frame property changed: LaserData2D::looks_serial), the material, the
-// draw order and the body's texture repeat. Applied at begin_life and on
-// every tick (O(1) when nothing changed), so data edits reach a laser in
-// flight; a script's own material on the node stays until the data's changes.
+// The looks of `d` on this laser: the body and the five point animations
+// (baked again only when a look changed: LaserData2D::looks_serial), each
+// look's canvas item (z order, material), the body material, the draw order
+// and the body's texture repeat. Applied at begin_life and on every tick
+// (O(1) when nothing changed), so data edits reach a laser in flight; a
+// script's own material on the node stays until the data's changes.
 void LaserVolley2D::apply_looks(const LaserData2D &d, bool force) {
 	if (force || applied_looks_serial != d.looks_serial) {
 		applied_looks_serial = d.looks_serial;
 		FrameTextureCache2D *cache = factory != nullptr && factory_life != nullptr && *factory_life ? &factory->frame_cache : nullptr;
-		bake_laser_animation(d.body_frames, 0, "body_frames", cache, anim_body);
-		bake_laser_animation(d.charge_frames, 1, "charge_frames", cache, anim_charge);
-		bake_laser_animation(d.muzzle_frames, 2, "muzzle_frames", cache, anim_muzzle);
-		bake_laser_animation(d.tip_frames, 3, "tip_frames", cache, anim_tip);
-		bake_laser_animation(d.pierce_frames, 4, "pierce_frames", cache, anim_pierce);
-		bake_laser_animation(d.wall_impact_frames, 5, "wall_impact_frames", cache, anim_wall);
+		bake_laser_animation(d.body_frames, StringName(), 0, "body_frames", cache, anim_body);
+		for (int slot = 0; slot < LaserData2D::LOOK_SLOT_COUNT; ++slot) {
+			LookLayer2D &layer = look_layers[slot];
+			layer.look = d.looks[slot];
+			if (layer.look.is_valid()) {
+				bake_laser_animation(layer.look->frames, layer.look->animation, slot + 1, LaserData2D::look_property(slot), cache, layer.anim);
+			} else {
+				layer.anim.clear();
+			}
+		}
+		configure_look_layers();
 	}
-	if (force || applied_material != d.material) {
-		applied_material = d.material;
-		set_material(d.material);
+	if (force || applied_material != d.body_material) {
+		applied_material = d.body_material;
+		set_material(d.body_material);
 	}
 	if (force || applied_z_index != d.z_index) {
 		applied_z_index = d.z_index;
@@ -99,6 +109,64 @@ void LaserVolley2D::apply_looks(const LaserData2D &d, bool force) {
 	if (force || applied_body_mode != (int)d.body_mode) {
 		applied_body_mode = (int)d.body_mode;
 		set_texture_repeat(d.body_mode == LaserData2D::BODY_TILE ? TEXTURE_REPEAT_ENABLED : TEXTURE_REPEAT_PARENT_NODE);
+	}
+}
+
+// ---- Look layers ----------------------------------------------------------------
+
+void LaserVolley2D::configure_look_layers() {
+	RenderingServer *rs = RenderingServer::get_singleton();
+	bool any = false;
+	for (const LookLayer2D &layer : look_layers) {
+		any = any || layer.look.is_valid();
+	}
+	if (any && !look_layers[0].item.is_valid()) {
+		// All five at once, in slot order: equal z draws charge, muzzle, tip,
+		// pierce, wall impact (each over the body, which is the node's own).
+		for (LookLayer2D &layer : look_layers) {
+			layer.item = rs->canvas_item_create();
+			rs->canvas_item_set_parent(layer.item, get_canvas_item());
+		}
+	}
+	if (!look_layers[0].item.is_valid()) {
+		return;
+	}
+	// The node's own filter when it names one (a plain Node parent breaks the
+	// inheritance anyway: the project default otherwise).
+	const TextureFilter filter = get_texture_filter();
+	for (LookLayer2D &layer : look_layers) {
+		const LaserSpriteLook2D *look = layer.look.ptr();
+		layer.z_index = look != nullptr ? look->z_index : 0;
+		layer.z_as_relative = look != nullptr ? look->z_as_relative : true;
+		layer.material = look != nullptr ? look->material : Ref<Material>();
+		rs->canvas_item_set_z_index(layer.item, layer.z_index);
+		rs->canvas_item_set_z_as_relative_to_parent(layer.item, layer.z_as_relative);
+		rs->canvas_item_set_material(layer.item, layer.material.is_valid() ? layer.material->get_rid() : RID());
+		rs->canvas_item_set_light_mask(layer.item, get_light_mask());
+		rs->canvas_item_set_visibility_layer(layer.item, get_visibility_layer());
+		rs->canvas_item_set_default_texture_filter(layer.item, filter == TEXTURE_FILTER_PARENT_NODE ? RenderingServer::CANVAS_ITEM_TEXTURE_FILTER_DEFAULT : (RenderingServer::CanvasItemTextureFilter)filter);
+	}
+}
+
+void LaserVolley2D::clear_look_layers() {
+	if (!look_layers[0].item.is_valid()) {
+		return;
+	}
+	RenderingServer *rs = RenderingServer::get_singleton();
+	for (const LookLayer2D &layer : look_layers) {
+		rs->canvas_item_clear(layer.item);
+	}
+}
+
+void LaserVolley2D::free_look_layers() {
+	RenderingServer *rs = RenderingServer::get_singleton();
+	for (LookLayer2D &layer : look_layers) {
+		if (layer.item.is_valid()) {
+			rs->free_rid(layer.item);
+			layer.item = RID();
+		}
+		layer.look.unref();
+		layer.material.unref();
 	}
 }
 
@@ -180,11 +248,12 @@ void LaserVolley2D::release_life() {
 	anchor_frame_pending = false;
 	applied_material.unref();
 	anim_body.clear();
-	anim_charge.clear();
-	anim_muzzle.clear();
-	anim_tip.clear();
-	anim_pierce.clear();
-	anim_wall.clear();
+	for (LookLayer2D &layer : look_layers) {
+		layer.anim.clear();
+		layer.look.unref();
+	}
+	configure_look_layers(); // the pooled laser keeps no look's material alive
+	clear_look_layers();
 	++graze_generation;
 	graze_zones.clear();
 	graze_detector.reset();
@@ -204,6 +273,7 @@ void LaserVolley2D::release_life() {
 
 void LaserVolley2D::_notification(int p_what) {
 	if (p_what == NOTIFICATION_PREDELETE) {
+		free_look_layers();
 		if (query_shape.is_valid()) {
 			PhysicsServer2D::get_singleton()->free_rid(query_shape);
 			query_shape = RID();
@@ -897,6 +967,8 @@ void LaserVolley2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_active_time_left", "seconds"), &LaserVolley2D::set_active_time_left);
 	ClassDB::bind_method(D_METHOD("debug_get_draw_state", "fraction"), &LaserVolley2D::debug_get_draw_state, DEFVAL(-1.0));
 	ClassDB::bind_method(D_METHOD("debug_get_body_mesh", "fraction"), &LaserVolley2D::debug_get_body_mesh, DEFVAL(-1.0));
+	ClassDB::bind_method(D_METHOD("debug_get_look_draws", "fraction"), &LaserVolley2D::debug_get_look_draws, DEFVAL(-1.0));
+	ClassDB::bind_method(D_METHOD("debug_get_look_layers"), &LaserVolley2D::debug_get_look_layers);
 	ClassDB::bind_method(D_METHOD("debug_check_invariants"), &LaserVolley2D::debug_check_invariants);
 	ClassDB::bind_method(D_METHOD("graze_set_zones", "zones", "target_group"), &LaserVolley2D::graze_set_zones);
 	ClassDB::bind_method(D_METHOD("graze_clear"), &LaserVolley2D::graze_clear);

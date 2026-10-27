@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/variant_enum_cast2d.hpp"
+#include "data/laser_sprite_look2d.hpp"
 #include <godot_cpp/classes/gradient.hpp>
 #include <godot_cpp/classes/material.hpp>
 #include <godot_cpp/classes/resource.hpp>
@@ -85,16 +86,23 @@ public:
 	Ref<SpriteFrames> body_frames;
 	BodyMode body_mode = BODY_STRETCH;
 	double body_scroll_speed = 0.0;
-	Ref<SpriteFrames> charge_frames;
-	Ref<SpriteFrames> muzzle_frames;
-	Ref<SpriteFrames> tip_frames;
-	Ref<SpriteFrames> pierce_frames;
-	Ref<SpriteFrames> wall_impact_frames;
-	double effects_scale = 1.0;
-	Ref<Material> material;
+	double body_width_scale = 1.0; // drawn width / `width` (hits keep `width`)
+	Ref<Material> body_material; // the body and the warning line
+	// The point animations, each on its own canvas item (z order relative
+	// to the laser by default, own material). Null = not drawn.
+	enum LookSlot : int {
+		LOOK_CHARGE = 0, // at the muzzle while charging
+		LOOK_MUZZLE = 1, // beams: at the muzzle while it fires
+		LOOK_TIP = 2, // at the end of the beam (the head of a bolt)
+		LOOK_PIERCE = 3, // on every target the beam pierces
+		LOOK_WALL_IMPACT = 4, // where the beam meets a wall
+		LOOK_SLOT_COUNT = 5
+	};
+	Ref<LaserSpriteLook2D> looks[LOOK_SLOT_COUNT];
 	int z_index = 0;
-	// Bumped by every frame property setter: lasers in flight re-bake their
-	// looks once (LaserVolley2D::apply_looks).
+	// Bumped by every look change (a frame property, a look assigned or
+	// edited): lasers in flight re-bake and re-apply their looks once
+	// (LaserVolley2D::apply_looks).
 	uint64_t looks_serial = 0;
 
 	LaserType get_type() const { return type; }
@@ -163,20 +171,24 @@ public:
 	void set_body_mode(BodyMode value);
 	double get_body_scroll_speed() const { return body_scroll_speed; }
 	void set_body_scroll_speed(double value);
-	Ref<SpriteFrames> get_charge_frames() const { return charge_frames; }
-	void set_charge_frames(const Ref<SpriteFrames> &value);
-	Ref<SpriteFrames> get_muzzle_frames() const { return muzzle_frames; }
-	void set_muzzle_frames(const Ref<SpriteFrames> &value);
-	Ref<SpriteFrames> get_tip_frames() const { return tip_frames; }
-	void set_tip_frames(const Ref<SpriteFrames> &value);
-	Ref<SpriteFrames> get_pierce_frames() const { return pierce_frames; }
-	void set_pierce_frames(const Ref<SpriteFrames> &value);
-	Ref<SpriteFrames> get_wall_impact_frames() const { return wall_impact_frames; }
-	void set_wall_impact_frames(const Ref<SpriteFrames> &value);
-	double get_effects_scale() const { return effects_scale; }
-	void set_effects_scale(double value);
-	Ref<Material> get_material() const { return material; }
-	void set_material(const Ref<Material> &value);
+	double get_body_width_scale() const { return body_width_scale; }
+	void set_body_width_scale(double value);
+	Ref<Material> get_body_material() const { return body_material; }
+	void set_body_material(const Ref<Material> &value);
+	Ref<LaserSpriteLook2D> get_look(LookSlot slot) const { return looks[slot]; }
+	void set_look(LookSlot slot, const Ref<LaserSpriteLook2D> &value);
+	Ref<LaserSpriteLook2D> get_charge_look() const { return looks[LOOK_CHARGE]; }
+	void set_charge_look(const Ref<LaserSpriteLook2D> &value) { set_look(LOOK_CHARGE, value); }
+	Ref<LaserSpriteLook2D> get_muzzle_look() const { return looks[LOOK_MUZZLE]; }
+	void set_muzzle_look(const Ref<LaserSpriteLook2D> &value) { set_look(LOOK_MUZZLE, value); }
+	Ref<LaserSpriteLook2D> get_tip_look() const { return looks[LOOK_TIP]; }
+	void set_tip_look(const Ref<LaserSpriteLook2D> &value) { set_look(LOOK_TIP, value); }
+	Ref<LaserSpriteLook2D> get_pierce_look() const { return looks[LOOK_PIERCE]; }
+	void set_pierce_look(const Ref<LaserSpriteLook2D> &value) { set_look(LOOK_PIERCE, value); }
+	Ref<LaserSpriteLook2D> get_wall_impact_look() const { return looks[LOOK_WALL_IMPACT]; }
+	void set_wall_impact_look(const Ref<LaserSpriteLook2D> &value) { set_look(LOOK_WALL_IMPACT, value); }
+	// The property name of each slot ("charge_look", ...).
+	static const char *look_property(int slot);
 	int get_z_index() const { return z_index; }
 	void set_z_index(int value);
 
@@ -188,12 +200,22 @@ public:
 	Preset get_preset() const { return get_matching_preset(); }
 
 	void _validate_property(PropertyInfo &p_property) const;
+	// Scenes saved before the looks keep loading: charge_frames ..
+	// wall_impact_frames become the frames of the matching look (created as
+	// needed), effects_scale its scale, material the body_material. Hidden
+	// (never listed, so never saved again).
+	bool _set(const StringName &p_name, const Variant &p_value);
+	bool _get(const StringName &p_name, Variant &r_ret) const;
 
 protected:
 	static void _bind_methods();
 
 private:
 	void store(double &field, double value);
+	void _on_look_changed();
+	// Old effects_scale, applied to the looks the migration created.
+	double legacy_effects_scale = 1.0;
+	uint32_t legacy_looks = 0; // bit per slot: created by the migration
 };
 } //namespace BlastBullets2D
 
@@ -201,3 +223,4 @@ BLAST_VARIANT_ENUM_CAST(BlastBullets2D::LaserData2D::LaserType);
 BLAST_VARIANT_ENUM_CAST(BlastBullets2D::LaserData2D::LaserAim);
 BLAST_VARIANT_ENUM_CAST(BlastBullets2D::LaserData2D::BodyMode);
 BLAST_VARIANT_ENUM_CAST(BlastBullets2D::LaserData2D::Preset);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::LaserData2D::LookSlot);

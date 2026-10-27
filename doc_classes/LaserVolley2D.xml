@@ -26,7 +26,20 @@
 			<return type="Array" />
 			<param index="0" name="fraction" type="float" default="-1.0" />
 			<description>
-				Returns, per beam, exactly what the next draw uses at [param fraction] (-1 = the interpolation fraction now, 1 = this tick): [code]points[/code], [code]width[/code], [code]color[/code], [code]warning[/code], the [code]charge[/code] / [code]body[/code] / [code]muzzle[/code] / [code]tip[/code] frames, [code]pierces[/code] and [code]impacts[/code] ([position, frame] pairs) and [code]spent[/code].
+				Returns, per beam, exactly what the next draw uses at [param fraction] (-1 = the interpolation fraction now, 1 = this tick): [code]points[/code], [code]width[/code] (the hit width), [code]body_width[/code] (drawn), [code]color[/code], [code]warning[/code], the [code]charge[/code] / [code]body[/code] / [code]muzzle[/code] / [code]tip[/code] frames, [code]pierces[/code] and [code]impacts[/code] ([position, frame] pairs) and [code]spent[/code].
+			</description>
+		</method>
+		<method name="debug_get_look_draws" qualifiers="const">
+			<return type="Array" />
+			<param index="0" name="fraction" type="float" default="-1.0" />
+			<description>
+				Returns every point look the next draw places at [param fraction] (-1 = the interpolation fraction now), in draw order: [code]{slot, transform, texture, color}[/code] with [code]slot[/code] one of [code]"charge"[/code], [code]"muzzle"[/code], [code]"tip"[/code], [code]"pierce"[/code], [code]"wall_impact"[/code]. A hidden ([member LaserSpriteLook2D.visible] off) or frameless look is not listed.
+			</description>
+		</method>
+		<method name="debug_get_look_layers" qualifiers="const">
+			<return type="Array" />
+			<description>
+				Returns, per [enum LaserData2D.LookSlot], the canvas item the look draws on: [code]{created, z_index, z_as_relative, material, visible}[/code] as last applied. The five items are created together the first time a life has a look and freed with the node; a pooled laser keeps no look or material.
 			</description>
 		</method>
 		<method name="end_laser">

@@ -78,7 +78,7 @@ LASER_DOUBLE_SETTER(wave_amplitude, value >= 0.0, ">= 0")
 LASER_DOUBLE_SETTER(wave_frequency, value >= 0.0, ">= 0")
 LASER_DOUBLE_SETTER(hit_interval_sec, value >= 0.0, ">= 0 (0 = one hit per contact)")
 LASER_DOUBLE_SETTER(body_scroll_speed, true, "a number")
-LASER_DOUBLE_SETTER(effects_scale, value > 0.0, "> 0")
+LASER_DOUBLE_SETTER(body_width_scale, value >= 0.0, ">= 0")
 
 #undef LASER_DOUBLE_SETTER
 
@@ -238,29 +238,124 @@ void LaserData2D::set_color_ramp(const Ref<Gradient> &value) {
 	emit_changed();
 }
 
-#define LASER_FRAMES_SETTER(NAME)                                  \
-	void LaserData2D::set_##NAME(const Ref<SpriteFrames> &value) { \
-		if (!assign_if_changed2d(NAME, value)) {                   \
-			return;                                                \
-		}                                                          \
-		++looks_serial;                                            \
-		emit_changed();                                            \
+void LaserData2D::set_body_frames(const Ref<SpriteFrames> &value) {
+	if (!assign_if_changed2d(body_frames, value)) {
+		return;
 	}
+	++looks_serial;
+	emit_changed();
+}
 
-LASER_FRAMES_SETTER(body_frames)
-LASER_FRAMES_SETTER(charge_frames)
-LASER_FRAMES_SETTER(muzzle_frames)
-LASER_FRAMES_SETTER(tip_frames)
-LASER_FRAMES_SETTER(pierce_frames)
-LASER_FRAMES_SETTER(wall_impact_frames)
-
-#undef LASER_FRAMES_SETTER
-
-void LaserData2D::set_material(const Ref<Material> &value) {
-	if (!assign_if_changed2d(material, value)) {
+void LaserData2D::set_body_material(const Ref<Material> &value) {
+	if (!assign_if_changed2d(body_material, value)) {
 		return;
 	}
 	emit_changed();
+}
+
+const char *LaserData2D::look_property(int slot) {
+	static const char *const names[LOOK_SLOT_COUNT] = { "charge_look", "muzzle_look", "tip_look", "pierce_look", "wall_impact_look" };
+	return slot >= 0 && slot < LOOK_SLOT_COUNT ? names[slot] : "";
+}
+
+void LaserData2D::set_look(LookSlot slot, const Ref<LaserSpriteLook2D> &value) {
+	if (slot < LOOK_CHARGE || slot >= LOOK_SLOT_COUNT) {
+		UtilityFunctions::push_error("LaserData2D: set_look slot must be one of the LookSlot values, nothing changed.");
+		return;
+	}
+	Ref<LaserSpriteLook2D> &field = looks[slot];
+	if (field == value) {
+		return;
+	}
+	// One look may sit in several slots (or several lasers): its `changed`
+	// connects once and stays while any slot holds it.
+	const Callable on_changed = callable_mp(this, &LaserData2D::_on_look_changed);
+	const StringName changed("changed");
+	const Ref<LaserSpriteLook2D> old = field;
+	field = value;
+	legacy_looks &= ~(1u << slot);
+	if (old.is_valid()) {
+		bool still_held = false;
+		for (const Ref<LaserSpriteLook2D> &l : looks) {
+			still_held = still_held || l == old;
+		}
+		if (!still_held && old->is_connected(changed, on_changed)) {
+			old->disconnect(changed, on_changed);
+		}
+	}
+	if (value.is_valid() && !value->is_connected(changed, on_changed)) {
+		value->connect(changed, on_changed);
+	}
+	++looks_serial;
+	emit_changed();
+}
+
+void LaserData2D::_on_look_changed() {
+	++looks_serial;
+	emit_changed();
+}
+
+bool LaserData2D::_set(const StringName &p_name, const Variant &p_value) {
+	static const char *const legacy[LOOK_SLOT_COUNT] = { "charge_frames", "muzzle_frames", "tip_frames", "pierce_frames", "wall_impact_frames" };
+	const String name = p_name;
+	for (int slot = 0; slot < LOOK_SLOT_COUNT; ++slot) {
+		if (name != legacy[slot]) {
+			continue;
+		}
+		const Ref<SpriteFrames> frames = p_value;
+		if (looks[slot].is_valid()) {
+			looks[slot]->set_frames(frames);
+			return true;
+		}
+		if (frames.is_null()) {
+			return true;
+		}
+		Ref<LaserSpriteLook2D> look;
+		look.instantiate();
+		look->set_frames(frames);
+		look->set_scale(Vector2(1, 1) * (real_t)legacy_effects_scale);
+		set_look((LookSlot)slot, look);
+		legacy_looks |= 1u << slot;
+		return true;
+	}
+	if (name == "effects_scale") {
+		const double value = p_value;
+		if (!is_finite_real2d(value) || !(value > 0.0)) {
+			return true; // the old setter refused it too
+		}
+		legacy_effects_scale = value;
+		for (int slot = 0; slot < LOOK_SLOT_COUNT; ++slot) {
+			if ((legacy_looks & (1u << slot)) != 0 && looks[slot].is_valid()) {
+				looks[slot]->set_scale(Vector2(1, 1) * (real_t)value);
+			}
+		}
+		return true;
+	}
+	if (name == "material") {
+		set_body_material(p_value);
+		return true;
+	}
+	return false;
+}
+
+bool LaserData2D::_get(const StringName &p_name, Variant &r_ret) const {
+	static const char *const legacy[LOOK_SLOT_COUNT] = { "charge_frames", "muzzle_frames", "tip_frames", "pierce_frames", "wall_impact_frames" };
+	const String name = p_name;
+	for (int slot = 0; slot < LOOK_SLOT_COUNT; ++slot) {
+		if (name == legacy[slot]) {
+			r_ret = looks[slot].is_valid() ? Variant(looks[slot]->get_frames()) : Variant();
+			return true;
+		}
+	}
+	if (name == "effects_scale") {
+		r_ret = legacy_effects_scale;
+		return true;
+	}
+	if (name == "material") {
+		r_ret = body_material;
+		return true;
+	}
+	return false;
 }
 
 void LaserData2D::set_z_index(int value) {
@@ -402,14 +497,16 @@ void LaserData2D::_bind_methods() {
 	LASER_BIND(body_frames, OBJECT, PROPERTY_HINT_RESOURCE_TYPE, "SpriteFrames")
 	LASER_BIND(body_mode, INT, PROPERTY_HINT_ENUM, "Stretch,Tile")
 	LASER_BIND(body_scroll_speed, FLOAT, PROPERTY_HINT_RANGE, "-2000,2000,1,or_less,or_greater,suffix:px/s")
-	LASER_BIND(charge_frames, OBJECT, PROPERTY_HINT_RESOURCE_TYPE, "SpriteFrames")
-	LASER_BIND(muzzle_frames, OBJECT, PROPERTY_HINT_RESOURCE_TYPE, "SpriteFrames")
-	LASER_BIND(tip_frames, OBJECT, PROPERTY_HINT_RESOURCE_TYPE, "SpriteFrames")
-	LASER_BIND(pierce_frames, OBJECT, PROPERTY_HINT_RESOURCE_TYPE, "SpriteFrames")
-	LASER_BIND(wall_impact_frames, OBJECT, PROPERTY_HINT_RESOURCE_TYPE, "SpriteFrames")
-	LASER_BIND(effects_scale, FLOAT, PROPERTY_HINT_RANGE, "0.05,8,0.01,or_greater")
-	LASER_BIND(material, OBJECT, PROPERTY_HINT_RESOURCE_TYPE, "CanvasItemMaterial,ShaderMaterial")
+	LASER_BIND(body_width_scale, FLOAT, PROPERTY_HINT_RANGE, "0,4,0.01,or_greater")
+	LASER_BIND(body_material, OBJECT, PROPERTY_HINT_RESOURCE_TYPE, "CanvasItemMaterial,ShaderMaterial")
+	LASER_BIND(charge_look, OBJECT, PROPERTY_HINT_RESOURCE_TYPE, "LaserSpriteLook2D")
+	LASER_BIND(muzzle_look, OBJECT, PROPERTY_HINT_RESOURCE_TYPE, "LaserSpriteLook2D")
+	LASER_BIND(tip_look, OBJECT, PROPERTY_HINT_RESOURCE_TYPE, "LaserSpriteLook2D")
+	LASER_BIND(pierce_look, OBJECT, PROPERTY_HINT_RESOURCE_TYPE, "LaserSpriteLook2D")
+	LASER_BIND(wall_impact_look, OBJECT, PROPERTY_HINT_RESOURCE_TYPE, "LaserSpriteLook2D")
 	LASER_BIND(z_index, INT, PROPERTY_HINT_RANGE, "-4096,4096,1")
+	ClassDB::bind_method(D_METHOD("get_look", "slot"), &LaserData2D::get_look);
+	ClassDB::bind_method(D_METHOD("set_look", "slot", "look"), &LaserData2D::set_look);
 
 	BIND_ENUM_CONSTANT(LASER_BEAM);
 	BIND_ENUM_CONSTANT(LASER_BOLT);
@@ -418,6 +515,11 @@ void LaserData2D::_bind_methods() {
 	BIND_ENUM_CONSTANT(LASER_AIM_TRACK);
 	BIND_ENUM_CONSTANT(LASER_AIM_LOCK_ON);
 	BIND_ENUM_CONSTANT(BODY_STRETCH);
+	BIND_ENUM_CONSTANT(LOOK_CHARGE);
+	BIND_ENUM_CONSTANT(LOOK_MUZZLE);
+	BIND_ENUM_CONSTANT(LOOK_TIP);
+	BIND_ENUM_CONSTANT(LOOK_PIERCE);
+	BIND_ENUM_CONSTANT(LOOK_WALL_IMPACT);
 	BIND_ENUM_CONSTANT(BODY_TILE);
 	BIND_ENUM_CONSTANT(PRESET_CUSTOM);
 	BIND_ENUM_CONSTANT(PRESET_INSTANT_BEAM);

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="LaserSpriteLook2D" inherits="Resource" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		How one point animation of a laser looks: its frames, where it sits, its tint and its draw order.
+	</brief_description>
+	<description>
+		Assigned to a slot of [LaserData2D] ([member LaserData2D.charge_look], [member LaserData2D.muzzle_look], [member LaserData2D.tip_look], [member LaserData2D.pierce_look], [member LaserData2D.wall_impact_look]). Each slot draws on its own canvas item under the laser, so a look has its own [member z_index] and [member material]; at equal z the slots draw in that order, over the body. One look may sit in several slots or several [LaserData2D]; every accepted change emits [signal Resource.changed], which the data passes on, so lasers that are firing pick the edit up at their next tick.
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="align_to_beam" type="bool" setter="set_align_to_beam" getter="get_align_to_beam" default="true">
+			On (default): the frame and its [member offset] turn with the beam at its point (the heading of the beam there, or the segment arriving at a wall). Off: the frame keeps its [member rotation_degrees] in world space.
+		</member>
+		<member name="animation" type="StringName" setter="set_animation" getter="get_animation" default="&amp;&quot;&quot;">
+			The animation of [member frames] to play. Empty (or [code]"default"[/code]) plays [code]default[/code] when it has frames, else the first animation with frames; a missing name falls back to the first animation with frames with one error per [SpriteFrames] (the rules of [member BulletVolleyData2D.animation]).
+		</member>
+		<member name="frames" type="SpriteFrames" setter="set_frames" getter="get_frames">
+			The animation to play. Empty draws nothing for this slot.
+		</member>
+		<member name="material" type="Material" setter="set_material" getter="get_material">
+			The material of this look's canvas item ([CanvasItemMaterial] or [ShaderMaterial]). [member LaserData2D.body_material] never applies to looks.
+		</member>
+		<member name="modulate" type="Color" setter="set_modulate" getter="get_modulate" default="Color(1, 1, 1, 1)">
+			Multiplies [member LaserData2D.modulate] for this look.
+		</member>
+		<member name="offset" type="Vector2" setter="set_offset" getter="get_offset" default="Vector2(0, 0)">
+			Where the frame sits relative to its point, in px. While [member align_to_beam] is on, x runs along the beam and y across it; off, it is a world offset.
+		</member>
+		<member name="rotation_degrees" type="float" setter="set_rotation_degrees" getter="get_rotation_degrees" default="0.0">
+			Turns the frame by this many degrees (on top of the beam's heading while [member align_to_beam] is on).
+		</member>
+		<member name="scale" type="Vector2" setter="set_scale" getter="get_scale" default="Vector2(1, 1)">
+			The frame's scale along its own axes (after [member rotation_degrees]).
+		</member>
+		<member name="speed_scale" type="float" setter="set_speed_scale" getter="get_speed_scale" default="1.0">
+			Plays the animation this many times faster (0 holds the first frame). Finite and &gt;= 0.
+		</member>
+		<member name="visible" type="bool" setter="set_visible" getter="get_visible" default="true">
+			When off, the look draws nothing (its slot keeps its settings).
+		</member>
+		<member name="z_as_relative" type="bool" setter="set_z_as_relative" getter="get_z_as_relative" default="true">
+			When on (default), [member z_index] adds to the laser's own z order; off, it is absolute.
+		</member>
+		<member name="z_index" type="int" setter="set_z_index" getter="get_z_index" default="0">
+			The draw order of this look's canvas item (-4096..4096), relative to the laser ([member LaserData2D.z_index]) while [member z_as_relative] is on.
+		</member>
+	</members>
+</class>

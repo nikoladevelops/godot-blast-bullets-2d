@@ -114,6 +114,14 @@ public:
 		std::vector<DrawMark2D> pierces;
 		std::vector<DrawMark2D> impacts;
 	};
+	// One point look drawn this frame: its slot (LaserData2D::LookSlot), pose,
+	// frame and tint (the laser's modulate times the look's).
+	struct LookMark2D {
+		int slot = 0;
+		Transform2D pose;
+		Texture2D *texture = nullptr;
+		Color color;
+	};
 
 	// ---- Script API ----
 	int get_beam_count() const { return (int)beams.size(); }
@@ -179,6 +187,12 @@ public:
 	// The bodies as _draw hands them to the renderer (one triangle array):
 	// points, uvs, colors, indices.
 	Dictionary debug_get_body_mesh(double fraction = -1.0) const;
+	// The point looks as _draw hands them to their canvas items: per mark
+	// {slot, transform, texture, color}, in draw order.
+	Array debug_get_look_draws(double fraction = -1.0) const;
+	// The canvas item of every look slot: {created, z_index, z_as_relative,
+	// material, visible} (visible = a look is assigned and visible).
+	Array debug_get_look_layers() const;
 	String debug_check_invariants() const;
 
 	// ---- C++ (factory) ----
@@ -281,7 +295,25 @@ private:
 	// Baked looks (per life).
 	// The LaserData2D animations, baked per shot under the shared SpriteFrames
 	// rules (sprite/sprite_anim2d.hpp) and sampled on the laser's own clocks.
-	SpriteAnim2D anim_body, anim_charge, anim_muzzle, anim_tip, anim_pierce, anim_wall;
+	SpriteAnim2D anim_body;
+	// One point look (LaserData2D::LookSlot): its baked animation, the look
+	// as applied, and the RenderingServer canvas item it draws on (a child of
+	// the laser's own item: its own z order and material). The five items are
+	// created together the first time a life has a look (slot order = draw
+	// order at equal z) and freed with the node.
+	struct LookLayer2D {
+		SpriteAnim2D anim;
+		Ref<LaserSpriteLook2D> look;
+		RID item;
+		// What the item was given (debug_get_look_layers reports it).
+		int z_index = 0;
+		bool z_as_relative = true;
+		Ref<Material> material;
+	};
+	LookLayer2D look_layers[LaserData2D::LOOK_SLOT_COUNT];
+	void configure_look_layers();
+	void clear_look_layers();
+	void free_look_layers();
 	std::vector<Ref<GrazeZone2D>> graze_zones;
 	std::shared_ptr<GrazeDetector2D> graze_detector;
 	StringName graze_target_group; // the factory's lists (graze_set_zones), when no detector
@@ -356,6 +388,14 @@ private:
 	// Every unspent beam's body strip (none while charging or at width 0) and,
 	// when asked, what its point animations need.
 	void build_body_mesh(double fraction, LaserBodyMesh2D &r_mesh, std::vector<BeamDrawFrame2D> *r_frames) const;
+	// The frame of a look slot `t` seconds into its clock (its speed_scale
+	// applied); null without a look or frames.
+	Texture2D *look_texture(int slot, double t) const;
+	// Whether a look `t` seconds into its clock has not played through yet.
+	bool look_still_playing(int slot, double t) const;
+	// Every point look this frame, from the draw frames build_body_mesh made
+	// (while charging, built here).
+	void collect_look_marks(double fraction, const std::vector<BeamDrawFrame2D> &frames, std::vector<LookMark2D> &r_marks) const;
 	double draw_fraction() const;
 };
 

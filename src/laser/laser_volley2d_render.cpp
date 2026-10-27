@@ -236,17 +236,6 @@ struct LaserBodyMesh2D {
 
 namespace {
 
-// The centered, turned, scaled point animation at `pos`.
-void draw_point_frame(CanvasItem *ci, Texture2D *tex, const Vector2 &pos, real_t angle, real_t scale, const Color &color) {
-	if (tex == nullptr) {
-		return;
-	}
-	const Vector2 size = tex->get_size();
-	ci->draw_set_transform(pos, angle, Vector2(scale, scale));
-	ci->draw_texture(tex, -size * (real_t)0.5, color);
-	ci->draw_set_transform(Vector2(), 0.0, Vector2(1, 1));
-}
-
 struct BodyStyle2D {
 	const LaserData2D *data;
 	real_t half; // half the width
@@ -341,6 +330,11 @@ std::vector<LaserVolley2D::BeamDrawFrame2D> &draw_frames_scratch() {
 	return frames;
 }
 
+std::vector<LaserVolley2D::LookMark2D> &look_marks_scratch() {
+	static std::vector<LaserVolley2D::LookMark2D> marks;
+	return marks;
+}
+
 } // namespace
 
 void LaserVolley2D::build_body_mesh(double fraction, LaserBodyMesh2D &r_mesh, std::vector<BeamDrawFrame2D> *r_frames) const {
@@ -359,11 +353,11 @@ void LaserVolley2D::build_body_mesh(double fraction, LaserBodyMesh2D &r_mesh, st
 	const double draw_clock = clock - (1.0 - Math::clamp(fraction, 0.0, 1.0)) * last_tick_delta;
 	BodyStyle2D style;
 	style.data = d;
-	style.half = width * (real_t)0.5;
+	style.half = width * (real_t)d->body_width_scale * (real_t)0.5;
 	style.tile = d->body_mode == LaserData2D::BODY_TILE && body != nullptr;
 	style.tex_w = body != nullptr ? Math::max((real_t)1.0, body->get_size().x) : (real_t)1.0;
 	style.scroll = (real_t)(-d->body_scroll_speed * (draw_clock - grow_started));
-	const bool bodies = width > (real_t)0.0;
+	const bool bodies = style.half > (real_t)0.0;
 	BeamDrawFrame2D local;
 	for (const Beam &b : beams) {
 		if (b.spent && (r_frames == nullptr || b.impacts.empty())) {
@@ -380,13 +374,40 @@ void LaserVolley2D::build_body_mesh(double fraction, LaserBodyMesh2D &r_mesh, st
 	}
 }
 
-void LaserVolley2D::_draw() {
+Texture2D *LaserVolley2D::look_texture(int slot, double t) const {
+	const LookLayer2D &layer = look_layers[slot];
+	const LaserSpriteLook2D *look = layer.look.ptr();
+	return look != nullptr ? layer.anim.texture_at(t * look->speed_scale) : nullptr;
+}
+
+bool LaserVolley2D::look_still_playing(int slot, double t) const {
+	const LookLayer2D &layer = look_layers[slot];
+	const double speed = layer.look.is_valid() ? layer.look->speed_scale : 1.0;
+	return t * speed < layer.anim.total;
+}
+
+void LaserVolley2D::collect_look_marks(double fraction, const std::vector<BeamDrawFrame2D> &frames, std::vector<LookMark2D> &r_marks) const {
+	r_marks.clear();
 	const LaserData2D *d = data.ptr();
-	if (d == nullptr || !active || phase == PHASE_FINISHED) {
+	if (d == nullptr || !active || phase == PHASE_FINISHED || !look_layers[0].item.is_valid()) {
 		return;
 	}
-	const double fraction = draw_fraction();
-	const real_t effects = (real_t)d->effects_scale;
+	auto mark = [&](int slot, double t, const Vector2 &pos, real_t angle) {
+		const LaserSpriteLook2D *look = look_layers[slot].look.ptr();
+		if (look == nullptr || !look->visible) {
+			return;
+		}
+		Texture2D *tex = look_texture(slot, t);
+		if (tex == nullptr) {
+			return;
+		}
+		LookMark2D m;
+		m.slot = slot;
+		m.pose = look->pose_at(pos, angle);
+		m.texture = tex;
+		m.color = d->modulate * look->modulate;
+		r_marks.push_back(m);
+	};
 	if (phase == PHASE_CHARGING) {
 		std::vector<Vector2> pts;
 		for (const Beam &b : beams) {
@@ -394,22 +415,72 @@ void LaserVolley2D::_draw() {
 				continue;
 			}
 			interpolated_points(b, fraction, pts);
-			if (pts.size() < 2) {
+			if (pts.size() >= 2) {
+				mark(LaserData2D::LOOK_CHARGE, clock, pts[0], (pts[1] - pts[0]).angle());
+			}
+		}
+		return;
+	}
+	size_t fi = 0;
+	for (const Beam &b : beams) {
+		if (b.spent && b.impacts.empty()) {
+			continue;
+		}
+		if (fi >= frames.size()) {
+			break;
+		}
+		const BeamDrawFrame2D &frame = frames[fi++];
+		const std::vector<Vector2> &pts = frame.points;
+		if (!b.spent && pts.size() >= 2) {
+			if (d->type == LaserData2D::LASER_BEAM) {
+				mark(LaserData2D::LOOK_MUZZLE, clock - grow_started, pts.front(), (pts[1] - pts[0]).angle());
+			}
+			mark(LaserData2D::LOOK_TIP, clock - grow_started, pts.back(), (pts[pts.size() - 1] - pts[pts.size() - 2]).angle());
+			for (const DrawMark2D &m : frame.pierces) {
+				mark(LaserData2D::LOOK_PIERCE, clock - m.since, m.position, m.angle);
+			}
+		}
+		for (const DrawMark2D &m : frame.impacts) {
+			// A head spent at a wall still plays its impact once.
+			if (b.spent && !look_still_playing(LaserData2D::LOOK_WALL_IMPACT, clock - m.since)) {
 				continue;
 			}
-			if (d->charge_sec > 0.0 && d->warning_width > 0.0) {
+			mark(LaserData2D::LOOK_WALL_IMPACT, clock - m.since, m.position, m.angle);
+		}
+	}
+}
+
+void LaserVolley2D::_draw() {
+	clear_look_layers();
+	const LaserData2D *d = data.ptr();
+	if (d == nullptr || !active || phase == PHASE_FINISHED) {
+		return;
+	}
+	const double fraction = draw_fraction();
+	LaserBodyMesh2D &mesh = body_mesh_scratch();
+	std::vector<BeamDrawFrame2D> &frames = draw_frames_scratch();
+	std::vector<LookMark2D> &marks = look_marks_scratch();
+	if (phase == PHASE_CHARGING) {
+		if (d->charge_sec > 0.0 && d->warning_width > 0.0) {
+			std::vector<Vector2> pts;
+			for (const Beam &b : beams) {
+				if (b.spent) {
+					continue;
+				}
+				interpolated_points(b, fraction, pts);
+				if (pts.size() < 2) {
+					continue;
+				}
 				PackedVector2Array line;
 				line.resize((int64_t)pts.size());
 				std::memcpy(line.ptrw(), pts.data(), pts.size() * sizeof(Vector2));
 				draw_polyline(line, d->warning_color, (real_t)d->warning_width);
 			}
-			draw_point_frame(this, anim_charge.texture_at(clock), pts[0], (real_t)(pts[1] - pts[0]).angle(), effects, d->modulate);
 		}
-		return;
+		frames.clear();
+	} else {
+		build_body_mesh(fraction, mesh, &frames);
 	}
-	LaserBodyMesh2D &mesh = body_mesh_scratch();
-	std::vector<BeamDrawFrame2D> &frames = draw_frames_scratch();
-	build_body_mesh(fraction, mesh, &frames);
 	if (!mesh.indices.empty()) {
 		PackedInt32Array indices;
 		PackedVector2Array points;
@@ -426,32 +497,58 @@ void LaserVolley2D::_draw() {
 		Texture2D *body = anim_body.texture_at(clock - grow_started);
 		RenderingServer::get_singleton()->canvas_item_add_triangle_array(get_canvas_item(), indices, points, colors, uvs, PackedInt32Array(), PackedFloat32Array(), body != nullptr ? body->get_rid() : RID());
 	}
-	size_t fi = 0;
-	for (const Beam &b : beams) {
-		if (b.spent && b.impacts.empty()) {
-			continue;
-		}
-		const BeamDrawFrame2D &frame = frames[fi++];
-		const std::vector<Vector2> &pts = frame.points;
-		if (!b.spent && pts.size() >= 2) {
-			if (d->type == LaserData2D::LASER_BEAM) {
-				draw_point_frame(this, anim_muzzle.texture_at(clock - grow_started), pts.front(), (pts[1] - pts[0]).angle(), effects, d->modulate);
-			}
-			draw_point_frame(this, anim_tip.texture_at(clock - grow_started), pts.back(), (pts[pts.size() - 1] - pts[pts.size() - 2]).angle(), effects, d->modulate);
-			for (const DrawMark2D &m : frame.pierces) {
-				draw_point_frame(this, anim_pierce.texture_at(clock - m.since), m.position, m.angle, effects, d->modulate);
-			}
-		}
-		for (const DrawMark2D &m : frame.impacts) {
-			// A head spent at a wall still plays its impact once.
-			if (b.spent && !(clock - m.since < anim_wall.total)) {
-				continue;
-			}
-			draw_point_frame(this, anim_wall.texture_at(clock - m.since), m.position, m.angle, effects, d->modulate);
+	collect_look_marks(fraction, frames, marks);
+	if (!marks.empty()) {
+		RenderingServer *rs = RenderingServer::get_singleton();
+		for (const LookMark2D &m : marks) {
+			// Centered on its point; Texture2D::draw_rect draws an AtlasTexture's
+			// region (the bake already made atlas frames plain textures).
+			const RID item = look_layers[m.slot].item;
+			const Vector2 size = m.texture->get_size();
+			rs->canvas_item_add_set_transform(item, m.pose);
+			m.texture->draw_rect(item, Rect2(-size * (real_t)0.5, size), false, m.color);
 		}
 	}
 	mesh.clear();
 	frames.clear();
+	marks.clear();
+}
+
+Array LaserVolley2D::debug_get_look_draws(double fraction) const {
+	Array out;
+	const double f = fraction < 0.0 ? draw_fraction() : fraction;
+	LaserBodyMesh2D mesh;
+	std::vector<BeamDrawFrame2D> frames;
+	if (phase != PHASE_CHARGING) {
+		build_body_mesh(f, mesh, &frames);
+	}
+	std::vector<LookMark2D> marks;
+	collect_look_marks(f, frames, marks);
+	static const char *const slot_names[LaserData2D::LOOK_SLOT_COUNT] = { "charge", "muzzle", "tip", "pierce", "wall_impact" };
+	for (const LookMark2D &m : marks) {
+		Dictionary e;
+		e["slot"] = slot_names[m.slot];
+		e["transform"] = m.pose;
+		e["texture"] = Variant(m.texture);
+		e["color"] = m.color;
+		out.push_back(e);
+	}
+	return out;
+}
+
+Array LaserVolley2D::debug_get_look_layers() const {
+	Array out;
+	for (const LookLayer2D &layer : look_layers) {
+		const LaserSpriteLook2D *look = layer.look.ptr();
+		Dictionary e;
+		e["created"] = layer.item.is_valid();
+		e["z_index"] = layer.z_index;
+		e["z_as_relative"] = layer.z_as_relative;
+		e["material"] = layer.material;
+		e["visible"] = look != nullptr && look->visible;
+		out.push_back(e);
+	}
+	return out;
 }
 
 Dictionary LaserVolley2D::debug_get_body_mesh(double fraction) const {
@@ -501,16 +598,17 @@ Array LaserVolley2D::debug_get_draw_state(double fraction) const {
 		s["points"] = line;
 		s["warning"] = charging && d->charge_sec > 0.0 && d->warning_width > 0.0;
 		s["width"] = charging ? (real_t)0.0 : draw_width(f);
+		s["body_width"] = charging ? (real_t)0.0 : draw_width(f) * (real_t)d->body_width_scale;
 		s["color"] = d->modulate;
-		s["charge"] = charging ? Variant(anim_charge.texture_at(clock)) : Variant();
+		s["charge"] = charging ? Variant(look_texture(LaserData2D::LOOK_CHARGE, clock)) : Variant();
 		s["body"] = !charging ? Variant(anim_body.texture_at(clock - grow_started)) : Variant();
-		s["muzzle"] = !charging ? Variant(anim_muzzle.texture_at(clock - grow_started)) : Variant();
-		s["tip"] = !charging ? Variant(anim_tip.texture_at(clock - grow_started)) : Variant();
+		s["muzzle"] = !charging ? Variant(look_texture(LaserData2D::LOOK_MUZZLE, clock - grow_started)) : Variant();
+		s["tip"] = !charging ? Variant(look_texture(LaserData2D::LOOK_TIP, clock - grow_started)) : Variant();
 		Array pierces;
 		for (const DrawMark2D &m : frame.pierces) {
 			Array entry;
 			entry.push_back(m.position);
-			entry.push_back(Variant(anim_pierce.texture_at(clock - m.since)));
+			entry.push_back(Variant(look_texture(LaserData2D::LOOK_PIERCE, clock - m.since)));
 			entry.push_back(m.angle);
 			pierces.push_back(entry);
 		}
@@ -519,10 +617,10 @@ Array LaserVolley2D::debug_get_draw_state(double fraction) const {
 		for (const DrawMark2D &m : frame.impacts) {
 			Array entry;
 			entry.push_back(m.position);
-			entry.push_back(Variant(anim_wall.texture_at(clock - m.since)));
+			entry.push_back(Variant(look_texture(LaserData2D::LOOK_WALL_IMPACT, clock - m.since)));
 			entry.push_back(m.angle);
 			// Drawn: a spent head plays its impact once.
-			entry.push_back(!b.spent || clock - m.since < anim_wall.total);
+			entry.push_back(!b.spent || look_still_playing(LaserData2D::LOOK_WALL_IMPACT, clock - m.since));
 			impacts.push_back(entry);
 		}
 		s["impacts"] = impacts;

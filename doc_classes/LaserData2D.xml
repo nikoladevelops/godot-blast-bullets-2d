@@ -7,7 +7,8 @@
 		A laser resource for [LaserSpawner2D] (one [LaserVolley2D] per shot, a beam per pattern slot) or [method BulletFactory2D.spawn_laser]. Three types: a [constant LASER_BEAM] stays on its muzzle and reaches [member length] (or the first wall), a [constant LASER_BOLT] is a [member length] segment flying away at [member speed], a [constant LASER_CURVY] laser is a snake whose head flies (tracking, waving) while its body follows the path the head took.
 		Every laser runs the same phases: charging (a warning line, no hits), growing (its width grows), active ([member active_sec], 0 = until ended), fading, finished (pooled). While it hits, each beam queries the physics space along its length every tick: targets on [member collision_mask] get [signal BulletFactory2D.laser_pierce_started] and [signal BulletFactory2D.laser_hit] (repeated every [member hit_interval_sec]), then [signal BulletFactory2D.laser_pierce_ended]; bodies on [member wall_mask] stop or reflect it. The signals fire on the owner spawner, or the factory for factory lasers.
 		Lasers read the resource every tick, so edits reach lasers that are firing. Every accepted change emits [signal Resource.changed]. Pick a [member preset] for a ready-made behavior.
-		Every look ([member body_frames], [member charge_frames], [member muzzle_frames], [member tip_frames], [member pierce_frames], [member wall_impact_frames]) plays its "default" animation when it has frames, else the first animation with frames, under the bullet timing rules ([member BulletVolleyData2D.animation]: speed 0 holds the first frame). [AtlasTexture] frames draw as their region (a tiled body repeats the region, not the sheet). A laser bakes its looks per shot, so a broken SpriteFrames (no frames, a null frame, a NaN speed or duration) is reported once per resource and property.
+		The body ([member body_frames]) plays its "default" animation when it has frames, else the first animation with frames; each point look ([member charge_look], [member muzzle_look], [member tip_look], [member pierce_look], [member wall_impact_look], see [LaserSpriteLook2D]) plays the animation it names, by the same rules, on its own canvas item. Both follow the bullet timing rules ([member BulletVolleyData2D.animation]: speed 0 holds the first frame). [AtlasTexture] frames draw as their region (a tiled body repeats the region, not the sheet). A laser bakes its looks per shot, so a broken SpriteFrames (no frames, a null frame, a NaN speed or duration) is reported once per resource and property.
+		Scenes saved with the earlier per-look properties ([code]charge_frames[/code] .. [code]wall_impact_frames[/code], [code]effects_scale[/code], [code]material[/code]) still load: the frames become the matching look's [member LaserSpriteLook2D.frames], [code]effects_scale[/code] its [member LaserSpriteLook2D.scale] and [code]material[/code] the [member body_material]. They are never saved again.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -19,10 +20,25 @@
 				Returns a new laser with the behavior of [param preset] (see [member preset]).
 			</description>
 		</method>
+		<method name="get_look" qualifiers="const">
+			<return type="LaserSpriteLook2D" />
+			<param index="0" name="slot" type="int" enum="LaserData2D.LookSlot" />
+			<description>
+				The look in [param slot] (null when empty).
+			</description>
+		</method>
 		<method name="get_matching_preset" qualifiers="const">
 			<return type="int" enum="LaserData2D.Preset" />
 			<description>
 				Returns the preset whose behavior knobs these knobs match exactly, else [constant PRESET_CUSTOM].
+			</description>
+		</method>
+		<method name="set_look">
+			<return type="void" />
+			<param index="0" name="slot" type="int" enum="LaserData2D.LookSlot" />
+			<param index="1" name="look" type="LaserSpriteLook2D" />
+			<description>
+				Puts [param look] in [param slot] (null empties it), the same as setting that slot's property. A slot outside [enum LookSlot] is refused with one error.
 			</description>
 		</method>
 	</methods>
@@ -36,14 +52,20 @@
 		<member name="body_frames" type="SpriteFrames" setter="set_body_frames" getter="get_body_frames">
 			The body texture ([code]default[/code] when it has frames, else the first animation with frames), playing from the growing start. Empty draws a solid body in [member modulate].
 		</member>
+		<member name="body_material" type="Material" setter="set_body_material" getter="get_body_material">
+			The material of the laser node: the body and the charging warning line. Point looks carry their own ([member LaserSpriteLook2D.material]). Scenes saved before it named [code]material[/code] load into it.
+		</member>
 		<member name="body_mode" type="int" setter="set_body_mode" getter="get_body_mode" enum="LaserData2D.BodyMode" default="0">
 			How the body frame covers the beam (see [enum BodyMode]).
 		</member>
 		<member name="body_scroll_speed" type="float" setter="set_body_scroll_speed" getter="get_body_scroll_speed" default="0.0">
 			Tile mode: how fast the tiled body scrolls along the beam, in px/s (positive flows away from the muzzle).
 		</member>
-		<member name="charge_frames" type="SpriteFrames" setter="set_charge_frames" getter="get_charge_frames">
-			An animation at the muzzle while charging (from the shot on).
+		<member name="body_width_scale" type="float" setter="set_body_width_scale" getter="get_body_width_scale" default="1.0">
+			The drawn width of the body as a multiple of [member width] (hits, graze and the end-of-laser bombs keep [member width]). 0 draws no body. Finite and &gt;= 0.
+		</member>
+		<member name="charge_look" type="LaserSpriteLook2D" setter="set_charge_look" getter="get_charge_look">
+			Drawn at each muzzle while the laser charges, playing from the shot. Null draws nothing.
 		</member>
 		<member name="charge_sec" type="float" setter="set_charge_sec" getter="get_charge_sec" default="0.5">
 			Seconds of the charging phase: the warning line shows the whole path, nothing is hit. 0 fires at once. Must be finite and &gt;= 0.
@@ -59,9 +81,6 @@
 		</member>
 		<member name="color_ramp" type="Gradient" setter="set_color_ramp" getter="get_color_ramp">
 			Tints the body along its length (multiplied with [member modulate]): its start at the muzzle (the tail of a bolt), its end at the tip.
-		</member>
-		<member name="effects_scale" type="float" setter="set_effects_scale" getter="get_effects_scale" default="1.0">
-			Scale of the point animations (charge, muzzle, tip, pierce, wall impact). Must be finite and &gt; 0.
 		</member>
 		<member name="extend_speed" type="float" setter="set_extend_speed" getter="get_extend_speed" default="0.0">
 			Beams: how fast the beam grows out of its muzzle into its full length, in px/s (the warning line already shows the whole path). 0 = full length at once. Must be finite and &gt;= 0.
@@ -87,23 +106,20 @@
 		<member name="length" type="float" setter="set_length" getter="get_length" default="600.0">
 			The beam's length (a beam reaching out of its muzzle, a bolt's segment, a curvy laser's body), in px. Must be finite and &gt; 0.
 		</member>
-		<member name="material" type="Material" setter="set_material" getter="get_material">
-			The canvas material of the laser (for example a [CanvasItemMaterial] with additive blending, or a [ShaderMaterial]).
-		</member>
 		<member name="max_hits_per_beam" type="int" setter="set_max_hits_per_beam" getter="get_max_hits_per_beam" default="32">
 			The most targets one physics query of a beam segment reports (1 to 4096). Raise it when more targets than this can stand in one beam.
 		</member>
 		<member name="modulate" type="Color" setter="set_modulate" getter="get_modulate" default="Color(1, 1, 1, 1)">
 			The laser's color (multiplied with its textures and [member color_ramp]). Must be finite.
 		</member>
-		<member name="muzzle_frames" type="SpriteFrames" setter="set_muzzle_frames" getter="get_muzzle_frames">
-			An animation at the muzzle of a beam while it fires (from the growing start).
-		</member>
-		<member name="pierce_frames" type="SpriteFrames" setter="set_pierce_frames" getter="get_pierce_frames">
-			An animation at every target the beam pierces (from that contact's start, at the target projected onto the beam).
+		<member name="muzzle_look" type="LaserSpriteLook2D" setter="set_muzzle_look" getter="get_muzzle_look">
+			Beams only: drawn at each muzzle while it fires, playing from the growing start.
 		</member>
 		<member name="pierce_limit" type="int" setter="set_pierce_limit" getter="get_pierce_limit" default="0">
 			0 (default): passes through every target. A beam with N hits its N nearest targets and stops at the last one (the drawn and damaging length is cut there). A bolt or curvy laser hits N targets over its flight, then it is spent (gone).
+		</member>
+		<member name="pierce_look" type="LaserSpriteLook2D" setter="set_pierce_look" getter="get_pierce_look">
+			Drawn on every target a beam pierces, playing from when that contact started.
 		</member>
 		<member name="preset" type="int" setter="apply_preset" getter="get_preset" enum="LaserData2D.Preset" default="0">
 			Editor only (never saved): picking a preset writes the behavior knobs (type, size, phases, aim, sweep, walls, pierce, hit interval), never the looks. Shows the preset the knobs match, else Custom.
@@ -120,8 +136,8 @@
 		<member name="sweep_speed_degrees" type="float" setter="set_sweep_speed_degrees" getter="get_sweep_speed_degrees" default="0.0">
 			Beams: how fast the beam turns around its muzzle, in degrees per second (negative turns the other way). 0 = no sweep.
 		</member>
-		<member name="tip_frames" type="SpriteFrames" setter="set_tip_frames" getter="get_tip_frames">
-			An animation at the tip of the beam (the head of a bolt or curvy laser).
+		<member name="tip_look" type="LaserSpriteLook2D" setter="set_tip_look" getter="get_tip_look">
+			Drawn at the end of each beam (the head of a bolt or curvy laser) while it fires, playing from the growing start.
 		</member>
 		<member name="turn_rate_degrees" type="float" setter="set_turn_rate_degrees" getter="get_turn_rate_degrees" default="90.0">
 			Track (and tracking bolt and curvy heads): how fast it turns toward its target, in degrees per second. 0 snaps onto it.
@@ -129,8 +145,8 @@
 		<member name="type" type="int" setter="set_type" getter="get_type" enum="LaserData2D.LaserType" default="0">
 			The kind of laser (see [enum LaserType]).
 		</member>
-		<member name="wall_impact_frames" type="SpriteFrames" setter="set_wall_impact_frames" getter="get_wall_impact_frames">
-			An animation where the beam meets a wall (where it stops and where it reflects), from the moment it got blocked.
+		<member name="wall_impact_look" type="LaserSpriteLook2D" setter="set_wall_impact_look" getter="get_wall_impact_look">
+			Drawn where a beam meets a wall (each reflection and the stop), playing from when it got blocked there; a head spent at a wall plays it once more.
 		</member>
 		<member name="wall_mask" type="int" setter="set_wall_mask" getter="get_wall_mask" default="0">
 			The physics layers whose bodies are walls: a beam stops at the first one (or reflects, see [member reflections]) and never counts it as a target. 0 = passes through walls.
@@ -175,6 +191,21 @@
 		</constant>
 		<constant name="BODY_STRETCH" value="0" enum="BodyMode">
 			One body frame stretched over the whole beam.
+		</constant>
+		<constant name="LOOK_CHARGE" value="0" enum="LookSlot">
+			[member charge_look].
+		</constant>
+		<constant name="LOOK_MUZZLE" value="1" enum="LookSlot">
+			[member muzzle_look].
+		</constant>
+		<constant name="LOOK_TIP" value="2" enum="LookSlot">
+			[member tip_look].
+		</constant>
+		<constant name="LOOK_PIERCE" value="3" enum="LookSlot">
+			[member pierce_look].
+		</constant>
+		<constant name="LOOK_WALL_IMPACT" value="4" enum="LookSlot">
+			[member wall_impact_look].
 		</constant>
 		<constant name="BODY_TILE" value="1" enum="BodyMode">
 			The body frame repeats every texture width (and scrolls with [member body_scroll_speed]).
