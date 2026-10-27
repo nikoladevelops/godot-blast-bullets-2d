@@ -241,7 +241,7 @@
 		<method name="debug_get_effect_log" qualifiers="const">
 			<return type="Array" />
 			<description>
-				Debug/test helper: the effects recorded since [method debug_set_effect_log_enabled] was turned on, oldest first, one Dictionary per effect: [code]trigger[/code] (BulletEffectLayerData2D trigger), [code]volley[/code] (instance id), [code]life[/code] ([method BulletVolley2D.get_life_id]), [code]bullet[/code] (index), [code]position[/code] and [code]frame[/code] (physics frame).
+				Debug/test helper: the effects recorded since [method debug_set_effect_log_enabled] was turned on, oldest first, one Dictionary per effect: [code]trigger[/code] (BulletEffectLayerData2D trigger), [code]volley[/code] (instance id), [code]life[/code] ([method BulletVolley2D.get_life_id]), [code]bullet[/code] (index), [code]position[/code] and [code]frame[/code] (physics frame). A laser's effects ([member LaserData2D.effects]) log their [enum LaserEffectData2D.LaserEffectTrigger] with [code]volley[/code] 0, [code]bullet[/code] -1 and the extra keys [code]laser[/code] (instance id) and [code]beam[/code].
 			</description>
 		</method>
 		<method name="debug_get_effect_state" qualifiers="const">

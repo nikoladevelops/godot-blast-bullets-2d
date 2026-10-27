@@ -3,6 +3,7 @@
 // frame. Volley trails live on the volley (bullet_volley2d_effects.cpp).
 
 #include "core/cosmetic_rng2d.hpp"
+#include "core/warn_once2d.hpp"
 #include "factory/bullet_factory2d_internal.hpp"
 
 using namespace godot;
@@ -514,6 +515,35 @@ int BulletFactory2D::spawn_layer_effect(const Ref<BulletEffectLayerData2D> &laye
 		UtilityFunctions::push_error("BulletFactory2D.spawn_layer_effect: layer is null or disabled.");
 		return -1;
 	}
+	return fx_spawn_manual(layer, at, "BulletFactory2D.spawn_layer_effect");
+}
+
+bool BulletFactory2D::fx_play_laser_effect(const Ref<BulletEffectLayerData2D> &layer, const Transform2D &at) {
+	if (layer.is_null() || !layer->enabled || is_tearing_down) {
+		return false;
+	}
+	const uint64_t id = (uint64_t)layer->get_instance_id();
+	if (layer->trigger == BulletEffectLayerData2D::EFFECT_TRAIL_FOLLOW) {
+		if (WarnOnce2D::first(id, 28u, 0, 0)) {
+			UtilityFunctions::push_warning("LaserEffectData2D: effect is a trail layer (a trail follows a bullet), nothing plays.");
+		}
+		return false;
+	}
+	const auto failed = fx_failed_laser_layers.find(id);
+	if (failed != fx_failed_laser_layers.end() && failed->second == layer->get_bake_version()) {
+		return false;
+	}
+	if (fx_spawn_manual(layer, at, "LaserEffectData2D.effect") < 0) {
+		fx_failed_laser_layers[id] = layer->get_bake_version();
+		return false;
+	}
+	if (failed != fx_failed_laser_layers.end()) {
+		fx_failed_laser_layers.erase(id);
+	}
+	return true;
+}
+
+int BulletFactory2D::fx_spawn_manual(const Ref<BulletEffectLayerData2D> &layer, const Transform2D &at, const char *caller) {
 	for (size_t i = 0; i < fx_manual_bakes.size(); ++i) {
 		// Same resource, edited content: the stored generation trails the
 		// layer's, so drop the stale bake and rebuild below. Same when a
@@ -534,7 +564,7 @@ int BulletFactory2D::spawn_layer_effect(const Ref<BulletEffectLayerData2D> &laye
 		return -1;
 	}
 	if (!(bake.anim.total > 0.0)) {
-		UtilityFunctions::push_error("BulletFactory2D.spawn_layer_effect: the layer's animation has no playable time (speed 0 holds its frame), nothing spawned.");
+		UtilityFunctions::push_error(String(caller) + ": the layer's animation has no playable time (speed 0 holds its frame), nothing spawned.");
 		return -1;
 	}
 	// No cap on distinct layers: an idle bake whose layer nothing else holds
@@ -608,6 +638,25 @@ void BulletFactory2D::debug_log_effect(int trigger, uint64_t volley_id, int life
 	e["volley"] = (int64_t)volley_id;
 	e["life"] = life_id;
 	e["bullet"] = bullet_index;
+	e["position"] = position;
+	e["frame"] = (int64_t)Engine::get_singleton()->get_physics_frames();
+	debug_effect_log.push_back(e);
+}
+
+void BulletFactory2D::debug_log_laser_effect(int trigger, uint64_t laser_id, int life_id, int beam_index, const Vector2 &position) {
+	if (!debug_effect_log_enabled) {
+		return;
+	}
+	if (debug_effect_log.size() >= 4096) {
+		debug_effect_log.remove_at(0);
+	}
+	Dictionary e;
+	e["trigger"] = trigger;
+	e["volley"] = (int64_t)0;
+	e["life"] = life_id;
+	e["bullet"] = -1;
+	e["laser"] = (int64_t)laser_id;
+	e["beam"] = beam_index;
 	e["position"] = position;
 	e["frame"] = (int64_t)Engine::get_singleton()->get_physics_frames();
 	debug_effect_log.push_back(e);
@@ -687,6 +736,7 @@ Dictionary BulletFactory2D::debug_get_effect_state() const {
 			row["shard"] = bake.slots[s].last_shard;
 			row["tint"] = bake.slots[s].tint;
 			row["rotation"] = bake.slots[s].last_angle;
+			row["fixed"] = bake.slots[s].fixed;
 			row["tint_shard"] = bake.slots[s].tint_shard;
 			row["rotation_shard"] = bake.slots[s].angle_shard;
 			live.push_back(row);

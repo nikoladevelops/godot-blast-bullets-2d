@@ -10,7 +10,7 @@ extends BlastTest
 ## must each push exactly ONE error, worded "<Class>: <property> ...,
 ## keeping the old value.", and leave the value unchanged.
 
-const CLASSES := ["BulletVolleyData2D", "BulletSpeedData2D", "BulletRotationData2D", "BulletCurvesData2D", "BulletWobbleData2D", "BulletEffectLayerData2D", "GrazeZone2D", "BulletPickupData2D", "BulletFlock2D", "BulletSoundData2D", "LaserSoundData2D", "LaserSpriteLook2D", "BulletSplitStage2D", "BulletSplitData2D", "BulletEmitterData2D", "LaserData2D"]
+const CLASSES := ["BulletVolleyData2D", "BulletSpeedData2D", "BulletRotationData2D", "BulletCurvesData2D", "BulletWobbleData2D", "BulletEffectLayerData2D", "GrazeZone2D", "BulletPickupData2D", "BulletFlock2D", "BulletSoundData2D", "LaserSoundData2D", "LaserSpriteLook2D", "LaserEffectData2D", "BulletSplitStage2D", "BulletSplitData2D", "BulletEmitterData2D", "LaserData2D"]
 const KEEP_TEXT := "keeping the old value."
 
 ## Properties whose range hint is an editor slider only (any value is valid).

@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="LaserEffectData2D" inherits="Resource" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		A one-shot effect a laser plays on one of its events.
+	</brief_description>
+	<description>
+		An entry of [member LaserData2D.effects]: on [member trigger] (the same event ids as [member LaserSoundData2D.trigger]) the laser plays [member effect] once through the factory's one-shot effect engine (the engine of [method BulletFactory2D.spawn_layer_effect]; the effect outlives the laser), at [member at] and turned with the beam there while [member align_to_beam]. Beam events play where they happen on their beam; laser-wide events play once per beam: On Charge and On Fire at each muzzle, On Finish and On Ended Early at each tip. The laser reads its data at every event, so edits reach lasers that are firing. A layer that cannot play (no playable time, unreadable frames) reports once per edit of the layer, never once per event; effects run on the factory's [member BulletFactory2D.time_scale].
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="align_to_beam" type="bool" setter="set_align_to_beam" getter="get_align_to_beam" default="true">
+			On (default): the effect turns with the beam at its point. Off: it keeps the layer's own rotation in world space.
+		</member>
+		<member name="at" type="int" setter="set_at" getter="get_at" enum="LaserEffectData2D.EffectPoint" default="0">
+			Where the effect plays: [constant AT_EVENT] (default) where the event happened (the contact, the wall point, where a head left the bounds), [constant AT_MUZZLE] or [constant AT_TIP] of the event's beam.
+		</member>
+		<member name="effect" type="BulletEffectLayerData2D" setter="set_effect" getter="get_effect">
+			The one-shot layer to play (its own offsets, scale, spin, tint and draw settings apply; its [member BulletEffectLayerData2D.trigger] is ignored). A trail layer is refused with one error (a trail follows a bullet); one turned into a trail later plays nothing, with one warning.
+		</member>
+		<member name="enabled" type="bool" setter="set_enabled" getter="get_enabled" default="true">
+			When off, the entry plays nothing.
+		</member>
+		<member name="trigger" type="int" setter="set_trigger" getter="get_trigger" enum="LaserEffectData2D.LaserEffectTrigger" default="5">
+			The laser event that plays the effect ([enum LaserEffectTrigger]; the ids of [enum LaserSoundData2D.LaserSoundTrigger], without the spawner's On Shot and On Telegraph). Serialized.
+		</member>
+	</members>
+	<constants>
+		<constant name="LASER_EFFECT_ON_CHARGE" value="2" enum="LaserEffectTrigger">
+			Per beam, at its muzzle, on the laser's first tick when it charges ([member LaserData2D.charge_sec] &gt; 0).
+		</constant>
+		<constant name="LASER_EFFECT_ON_FIRE" value="3" enum="LaserEffectTrigger">
+			Per beam, at its muzzle, when the beams start (the Growing phase).
+		</constant>
+		<constant name="LASER_EFFECT_ON_ACTIVE" value="4" enum="LaserEffectTrigger">
+			Every tick the laser hits, per live beam (an effect per tick: keep it short or use [constant AT_TIP] sparks).
+		</constant>
+		<constant name="LASER_EFFECT_ON_HIT" value="5" enum="LaserEffectTrigger">
+			Every [signal BulletFactory2D.laser_hit], at the contact.
+		</constant>
+		<constant name="LASER_EFFECT_ON_PIERCE_START" value="6" enum="LaserEffectTrigger">
+			Every [signal BulletFactory2D.laser_pierce_started], at the contact.
+		</constant>
+		<constant name="LASER_EFFECT_ON_PIERCE_END" value="7" enum="LaserEffectTrigger">
+			Every [signal BulletFactory2D.laser_pierce_ended], where the contact was last.
+		</constant>
+		<constant name="LASER_EFFECT_ON_WALL_HIT" value="8" enum="LaserEffectTrigger">
+			Every [signal BulletFactory2D.laser_wall_hit] (once per block), at the wall point.
+		</constant>
+		<constant name="LASER_EFFECT_ON_GRAZE" value="9" enum="LaserEffectTrigger">
+			Every [signal BulletFactory2D.laser_grazed].
+		</constant>
+		<constant name="LASER_EFFECT_ON_GRAZE_EXIT" value="10" enum="LaserEffectTrigger">
+			Every [signal BulletFactory2D.laser_graze_exited].
+		</constant>
+		<constant name="LASER_EFFECT_ON_FINISH" value="11" enum="LaserEffectTrigger">
+			Per beam, at its tip, when the laser runs its phases out (or every head is spent).
+		</constant>
+		<constant name="LASER_EFFECT_ON_ENDED_EARLY" value="12" enum="LaserEffectTrigger">
+			Instead of [constant LASER_EFFECT_ON_FINISH] when something cut the laser short ([method LaserVolley2D.end_laser], a clear, an area end, an orphan policy).
+		</constant>
+		<constant name="LASER_EFFECT_ON_DESPAWN" value="13" enum="LaserEffectTrigger">
+			Where a bolt or curvy head left the despawn bounds.
+		</constant>
+		<constant name="AT_EVENT" value="0" enum="EffectPoint">
+			Where the event happened.
+		</constant>
+		<constant name="AT_MUZZLE" value="1" enum="EffectPoint">
+			The muzzle of the event's beam.
+		</constant>
+		<constant name="AT_TIP" value="2" enum="EffectPoint">
+			The end of the event's beam (the head of a bolt or curvy laser).
+		</constant>
+	</constants>
+</class>

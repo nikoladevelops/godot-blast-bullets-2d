@@ -82,6 +82,9 @@
 		<member name="color_ramp" type="Gradient" setter="set_color_ramp" getter="get_color_ramp">
 			Tints the body along its length (multiplied with [member modulate]): its start at the muzzle (the tail of a bolt), its end at the tip.
 		</member>
+		<member name="effects" type="Array" setter="set_effects" getter="get_effects" default="[]">
+			One-shot effects on laser events ([LaserEffectData2D] entries; nulls are skipped, anything else is refused with one error). Read at every event: edits reach lasers that are firing.
+		</member>
 		<member name="extend_speed" type="float" setter="set_extend_speed" getter="get_extend_speed" default="0.0">
 			Beams: how fast the beam grows out of its muzzle into its full length, in px/s (the warning line already shows the whole path). 0 = full length at once. Must be finite and &gt;= 0.
 		</member>

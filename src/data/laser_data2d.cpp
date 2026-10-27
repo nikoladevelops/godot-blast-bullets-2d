@@ -2,6 +2,9 @@
 
 #include "core/transform_math2d.hpp"
 
+#include "core/live_object2d.hpp"
+#include "data/laser_effect_data2d.hpp"
+
 #include "core/assign_if_changed2d.hpp"
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
@@ -248,6 +251,20 @@ void LaserData2D::set_body_frames(const Ref<SpriteFrames> &value) {
 
 void LaserData2D::set_body_material(const Ref<Material> &value) {
 	if (!assign_if_changed2d(body_material, value)) {
+		return;
+	}
+	emit_changed();
+}
+
+void LaserData2D::set_effects(const Array &value) {
+	for (int64_t i = 0; i < value.size(); ++i) {
+		const Variant &entry = value[i];
+		if (entry.get_type() != Variant::NIL && live_object2d<LaserEffectData2D>(entry) == nullptr) {
+			UtilityFunctions::push_error("LaserData2D: effects entries must be LaserEffectData2D or null, keeping the old value.");
+			return;
+		}
+	}
+	if (!assign_if_changed2d(effects, value)) {
 		return;
 	}
 	emit_changed();
@@ -505,6 +522,9 @@ void LaserData2D::_bind_methods() {
 	LASER_BIND(pierce_look, OBJECT, PROPERTY_HINT_RESOURCE_TYPE, "LaserSpriteLook2D")
 	LASER_BIND(wall_impact_look, OBJECT, PROPERTY_HINT_RESOURCE_TYPE, "LaserSpriteLook2D")
 	LASER_BIND(z_index, INT, PROPERTY_HINT_RANGE, "-4096,4096,1")
+
+	ADD_GROUP("Effects", "");
+	LASER_BIND(effects, ARRAY, PROPERTY_HINT_ARRAY_TYPE, "LaserEffectData2D")
 	ClassDB::bind_method(D_METHOD("get_look", "slot"), &LaserData2D::get_look);
 	ClassDB::bind_method(D_METHOD("set_look", "slot", "look"), &LaserData2D::set_look);
 

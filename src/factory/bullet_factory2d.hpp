@@ -427,6 +427,11 @@ public:
 	// distinct layer (capped, oldest dropped) so mixed manual effects
 	// coexist instead of rebaking each other away.
 	std::vector<FXOneShotBake> fx_manual_bakes;
+	// spawn_layer_effect's body; `caller` names the hatch in its errors.
+	int fx_spawn_manual(const Ref<BulletEffectLayerData2D> &layer, const Transform2D &at, const char *caller);
+	// Laser effect layers that could not play, by instance id: the bake
+	// version that failed (fx_play_laser_effect tries again after an edit).
+	std::unordered_map<uint64_t, uint64_t> fx_failed_laser_layers;
 	double fx_clock = 0.0;
 	// Sweep of the last age_fx_effects run, and the delta it advanced with:
 	// newborn slots fired before this sweep's aging rebase their birth by it.
@@ -496,6 +501,14 @@ public:
 	// Manual one-shot hatch: plays any layer once at a pose, owned by the
 	// factory (survives volleys). Returns the slot index, or -1 when inert.
 	int spawn_layer_effect(const Ref<BulletEffectLayerData2D> &layer, const Transform2D &at);
+	// The laser effect hatch (LaserVolley2D::fire_event): plays `layer` once
+	// at `at` through the same manual bakes, silently skipping a missing,
+	// disabled or trail layer; a layer that cannot play reports once per edit
+	// (its bake version), never once per event. False when nothing played.
+	bool fx_play_laser_effect(const Ref<BulletEffectLayerData2D> &layer, const Transform2D &at);
+	// The laser effect log rows ({trigger, laser, life, beam, position,
+	// frame}, volley 0 and bullet -1) share the effect log.
+	void debug_log_laser_effect(int trigger, uint64_t laser_id, int life_id, int beam_index, const Vector2 &position);
 	// Stops every active visual (volley bakes keep their configs, the manual
 	// bake is dropped entirely).
 	void clear_sprite_effects();

@@ -179,7 +179,7 @@ void LaserVolley2D::begin_life(BulletFactory2D *p_factory, const Ref<LaserData2D
 	owner_spawner_id = owner_id;
 	signals_to_factory = false;
 	pattern_target_warned = false;
-	charge_sounded = false;
+	charge_announced = false;
 	ended_early = false;
 	++life_id;
 	active = true;

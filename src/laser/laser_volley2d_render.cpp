@@ -11,6 +11,7 @@
 
 #include "core/transform_math2d.hpp"
 #include "factory/bullet_factory2d.hpp"
+#include "laser/laser_geometry2d.hpp"
 
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/rendering_server.hpp>
@@ -71,27 +72,6 @@ void sub_polyline2d(const std::vector<Vector2> &pts, real_t from, real_t to, std
 	if (r_out.size() < 2) {
 		r_out.push_back(r_out.back());
 	}
-}
-
-// The facing of the polyline segment nearest to `at`.
-real_t polyline_angle_at2d(const std::vector<Vector2> &pts, const Vector2 &at) {
-	real_t best = -1.0;
-	real_t angle = 0.0;
-	for (size_t k = 1; k < pts.size(); ++k) {
-		const Vector2 a = pts[k - 1];
-		const Vector2 ab = pts[k] - a;
-		const real_t len2 = ab.x * ab.x + ab.y * ab.y;
-		if (!(len2 > (real_t)0.0)) {
-			continue;
-		}
-		const real_t t = Math::clamp(((at - a).x * ab.x + (at - a).y * ab.y) / len2, (real_t)0.0, (real_t)1.0);
-		const real_t dist = (a + ab * t).distance_squared_to(at);
-		if (best < (real_t)0.0 || dist < best) {
-			best = dist;
-			angle = ab.angle();
-		}
-	}
-	return angle;
 }
 
 } // namespace

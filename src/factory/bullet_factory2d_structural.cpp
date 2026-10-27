@@ -243,6 +243,7 @@ void BulletFactory2D::reset_factory_state(const PoolKey *key) {
 	// preserve living volleys' bakes, or their triggers would go silent.
 	if (key == nullptr) {
 		fx_unregister_all_bakes();
+		fx_failed_laser_layers.clear();
 		// Full reset: also drop the frame textures so edited art re-bakes.
 		frame_cache.clear();
 	}

@@ -25,6 +25,27 @@ inline real_t distance_to_polyline2d(const Vector2 &p, const std::vector<Vector2
 	return best;
 }
 
+// The facing of the polyline segment nearest to `at`.
+inline real_t polyline_angle_at2d(const std::vector<Vector2> &pts, const Vector2 &at) {
+	real_t best = -1.0;
+	real_t angle = 0.0;
+	for (size_t k = 1; k < pts.size(); ++k) {
+		const Vector2 a = pts[k - 1];
+		const Vector2 ab = pts[k] - a;
+		const real_t len2 = ab.x * ab.x + ab.y * ab.y;
+		if (!(len2 > (real_t)0.0)) {
+			continue;
+		}
+		const real_t t = Math::clamp(((at - a).x * ab.x + (at - a).y * ab.y) / len2, (real_t)0.0, (real_t)1.0);
+		const real_t dist = (a + ab * t).distance_squared_to(at);
+		if (best < (real_t)0.0 || dist < best) {
+			best = dist;
+			angle = ab.angle();
+		}
+	}
+	return angle;
+}
+
 // Whether the segment a-b touches the rectangle `r` (normalized), edges
 // included (Liang-Barsky clipping).
 inline bool segment_touches_rect2d(const Vector2 &a, const Vector2 &b, const Rect2 &r) {

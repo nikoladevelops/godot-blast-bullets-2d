@@ -12,7 +12,9 @@
 #include "core/cached_string_names2d.hpp"
 #include "core/emit_on2d.hpp"
 #include "core/graze_targets2d.hpp"
+#include "core/live_object2d.hpp"
 #include "core/transform_math2d.hpp"
+#include "data/laser_effect_data2d.hpp"
 #include "factory/bullet_factory2d.hpp"
 #include "factory/graze_detector2d.hpp"
 
@@ -97,7 +99,7 @@ bool LaserVolley2D::advance_phases(double delta) {
 		set_phase(next);
 		phase_time = carry;
 		if (next == PHASE_GROWING && !beams.empty()) {
-			sound_fire(LaserSoundData2D::LASER_SOUND_ON_FIRE, beams[0].points.empty() ? beams[0].muzzle : beams[0].points.front());
+			fire_event(LaserSoundData2D::LASER_SOUND_ON_FIRE, beams[0].points.empty() ? beams[0].muzzle : beams[0].points.front());
 		}
 		if (next == PHASE_GROWING) {
 			grow_started = clock - carry; // the looks' clock counts the time carried into the phase
@@ -436,7 +438,7 @@ bool LaserVolley2D::end_contacts(uint64_t self_id, uint32_t life, bool only_spen
 			if (target == nullptr || emitter == nullptr) {
 				continue; // a vanished target ends silently
 			}
-			sound_fire(LaserSoundData2D::LASER_SOUND_ON_PIERCE_END, c.position, i);
+			fire_event(LaserSoundData2D::LASER_SOUND_ON_PIERCE_END, c.position, i);
 			if (factory != nullptr) {
 				factory->note_user_code();
 			}
@@ -627,7 +629,7 @@ bool LaserVolley2D::update_contacts(int beam_index, uint64_t self_id, uint32_t l
 		if (target == nullptr || emitter == nullptr) {
 			continue;
 		}
-		sound_fire(LaserSoundData2D::LASER_SOUND_ON_PIERCE_END, gone.position, beam_index);
+		fire_event(LaserSoundData2D::LASER_SOUND_ON_PIERCE_END, gone.position, beam_index);
 		factory->note_user_code();
 		emit_on2d(emitter, names.laser_pierce_ended, target, this, beam_index);
 		if (!alive_after_user_code(self_id, life)) {
@@ -678,7 +680,7 @@ bool LaserVolley2D::update_contacts(int beam_index, uint64_t self_id, uint32_t l
 			}
 		}
 		if (fresh) {
-			sound_fire(LaserSoundData2D::LASER_SOUND_ON_PIERCE_START, c.position, beam_index);
+			fire_event(LaserSoundData2D::LASER_SOUND_ON_PIERCE_START, c.position, beam_index);
 			factory->note_user_code();
 			emit_on2d(emitter, names.laser_pierce_started, target, this, beam_index, c.position);
 			if (!alive_after_user_code(self_id, life) || !hitting_phase() || k >= beams[beam_index].contacts.size()) {
@@ -690,7 +692,7 @@ bool LaserVolley2D::update_contacts(int beam_index, uint64_t self_id, uint32_t l
 				continue;
 			}
 		}
-		sound_fire(LaserSoundData2D::LASER_SOUND_ON_HIT, c.position, beam_index);
+		fire_event(LaserSoundData2D::LASER_SOUND_ON_HIT, c.position, beam_index);
 		factory->note_user_code();
 		emit_on2d(emitter, names.laser_hit, target, this, beam_index, c.position);
 		if (!alive_after_user_code(self_id, life) || !hitting_phase() || k >= beams[beam_index].contacts.size()) {
@@ -704,6 +706,54 @@ bool LaserVolley2D::update_contacts(int beam_index, uint64_t self_id, uint32_t l
 }
 
 // ---- Graze and sound ----------------------------------------------------------------------
+
+void LaserVolley2D::fire_event(int event, const Vector2 &pos, int beam, int ring, int zone) {
+	sound_fire(event, pos, beam, ring, zone);
+	play_effects(event, pos, beam);
+}
+
+void LaserVolley2D::play_effects(int event, const Vector2 &pos, int beam) {
+	const LaserData2D *d = data.ptr();
+	if (d == nullptr || d->effects.is_empty() || factory == nullptr || beams.empty()) {
+		return;
+	}
+	const Array &entries = d->effects;
+	for (int64_t i = 0; i < entries.size(); ++i) {
+		const LaserEffectData2D *entry = live_object2d<LaserEffectData2D>(entries[i]);
+		if (entry == nullptr || !entry->enabled || entry->trigger != event || entry->effect.is_null()) {
+			continue;
+		}
+		const bool laser_wide = beam < 0 || beam >= (int)beams.size();
+		const int first = laser_wide ? 0 : beam;
+		const int last = laser_wide ? (int)beams.size() - 1 : beam;
+		for (int k = first; k <= last; ++k) {
+			const Beam &b = beams[(size_t)k];
+			const Vector2 muzzle = b.points.empty() ? b.muzzle : b.points.front();
+			const Vector2 tip = b.points.empty() ? b.muzzle : b.points.back();
+			const size_t n = b.points.size();
+			const real_t muzzle_angle = n >= 2 ? (b.points[1] - b.points[0]).angle() : (real_t)get_beam_angle(k);
+			const real_t tip_angle = n >= 2 ? (b.points[n - 1] - b.points[n - 2]).angle() : muzzle_angle;
+			Vector2 at;
+			real_t angle = 0.0;
+			if (entry->at == LaserEffectData2D::AT_MUZZLE || (entry->at == LaserEffectData2D::AT_EVENT && laser_wide && (event == LaserEffectData2D::LASER_EFFECT_ON_CHARGE || event == LaserEffectData2D::LASER_EFFECT_ON_FIRE))) {
+				at = muzzle;
+				angle = muzzle_angle;
+			} else if (entry->at == LaserEffectData2D::AT_TIP || laser_wide) {
+				at = tip;
+				angle = tip_angle;
+			} else {
+				at = pos;
+				angle = n >= 2 ? polyline_angle_at2d(b.points, pos) : muzzle_angle;
+			}
+			if (!at.is_finite()) {
+				continue;
+			}
+			if (factory->fx_play_laser_effect(entry->effect, Transform2D(entry->align_to_beam ? angle : (real_t)0.0, at))) {
+				factory->debug_log_laser_effect(event, get_instance_id(), (int)life_id, k, at);
+			}
+		}
+	}
+}
 
 Vector2 LaserVolley2D::sound_beam_point(const LaserSoundData2D &entry, int beam) const {
 	const Beam &b = beams[(size_t)beam];
@@ -857,7 +907,7 @@ bool LaserVolley2D::update_graze(uint64_t self_id, uint32_t life) {
 				continue; // freed or queued by an earlier handler: dropped
 			}
 		}
-		sound_fire(e.exit ? LaserSoundData2D::LASER_SOUND_ON_GRAZE_EXIT : LaserSoundData2D::LASER_SOUND_ON_GRAZE, e.at, e.beam, e.ring, e.zone);
+		fire_event(e.exit ? LaserSoundData2D::LASER_SOUND_ON_GRAZE_EXIT : LaserSoundData2D::LASER_SOUND_ON_GRAZE, e.at, e.beam, e.ring, e.zone);
 		const StringName &sig = e.exit ? names.laser_graze_exited : names.laser_grazed;
 		// Owner spawner first (while it lives), then the factory always.
 		Object *owner = owner_spawner_id != 0 ? ObjectDB::get_instance(ObjectID(owner_spawner_id)) : nullptr;
@@ -890,12 +940,12 @@ void LaserVolley2D::tick(double delta) {
 	for (Beam &b : beams) {
 		snap_beam_history(b);
 	}
-	if (!charge_sounded) {
+	if (!charge_announced) {
 		// On Charge: the first tick of a laser that charges (the arming of a
 		// shot happens after the spawn, so never at begin_life).
-		charge_sounded = true;
+		charge_announced = true;
 		if (phase == PHASE_CHARGING && phase_length(PHASE_CHARGING) > 0.0 && !beams.empty()) {
-			sound_fire(LaserSoundData2D::LASER_SOUND_ON_CHARGE, beams[0].muzzle);
+			fire_event(LaserSoundData2D::LASER_SOUND_ON_CHARGE, beams[0].muzzle);
 		}
 	}
 	clock += delta;
@@ -940,17 +990,17 @@ void LaserVolley2D::tick(double delta) {
 			Beam &b = beams[i];
 			if (!b.spent && b.launched && !b.points.empty() && !bounds.has_point(b.points.front()) && !bounds.has_point(b.points.back())) {
 				b.spent = true;
-				sound_fire(LaserSoundData2D::LASER_SOUND_ON_DESPAWN, b.points.back(), i);
+				fire_event(LaserSoundData2D::LASER_SOUND_ON_DESPAWN, b.points.back(), i);
 			}
 		}
 	}
 	// Hits while the phase hits; every contact ends when it stops.
 	if (hitting_phase()) {
-		if (!sound_effects.empty()) {
+		if (!sound_effects.empty() || !d->effects.is_empty()) {
 			for (int i = 0; i < (int)beams.size(); ++i) {
 				const Beam &b = beams[i];
 				if (!b.spent && !b.points.empty()) {
-					sound_fire(LaserSoundData2D::LASER_SOUND_ON_ACTIVE, b.points.back(), i);
+					fire_event(LaserSoundData2D::LASER_SOUND_ON_ACTIVE, b.points.back(), i);
 				}
 			}
 		}
@@ -988,7 +1038,7 @@ void LaserVolley2D::tick(double delta) {
 		if (b.pinned) {
 			b.spent = true; // a bolt or curvy head that met a wall is gone after it
 		}
-		sound_fire(LaserSoundData2D::LASER_SOUND_ON_WALL_HIT, b.wall_point, i);
+		fire_event(LaserSoundData2D::LASER_SOUND_ON_WALL_HIT, b.wall_point, i);
 		Object *emitter = resolve_emitter();
 		if (emitter == nullptr) {
 			continue;
@@ -1032,7 +1082,7 @@ void LaserVolley2D::tick(double delta) {
 			return;
 		}
 		if (!beams.empty()) {
-			sound_fire(ended_early ? LaserSoundData2D::LASER_SOUND_ON_ENDED_EARLY : LaserSoundData2D::LASER_SOUND_ON_FINISH, beams[0].points.empty() ? beams[0].muzzle : beams[0].points.back());
+			fire_event(ended_early ? LaserSoundData2D::LASER_SOUND_ON_ENDED_EARLY : LaserSoundData2D::LASER_SOUND_ON_FINISH, beams[0].points.empty() ? beams[0].muzzle : beams[0].points.back());
 		}
 		Object *emitter = resolve_emitter();
 		if (emitter != nullptr) {

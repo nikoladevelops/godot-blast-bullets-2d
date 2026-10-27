@@ -175,6 +175,10 @@ func pull() -> void:
 		if int(o["volley"]) != 0 and int(o["bullet"]) >= 0:
 			_check_report("sound trigger %d" % int(o["trigger"]), int(o["trigger"]), true, int(o["volley"]), int(o["life"]), int(o["bullet"]), int(o["frame"]))
 	for f in effects:
+		if f.has("laser"):
+			# Laser effects have their own ids (LaserEffectTrigger).
+			_count("laser_effect:%d" % int(f["trigger"]))
+			continue
 		_count("effect:%d" % int(f["trigger"]))
 		_check_report("effect trigger %d" % int(f["trigger"]), int(f["trigger"]), false, int(f["volley"]), int(f["life"]), int(f["bullet"]), int(f["frame"]))
 	for out in _pending_out:

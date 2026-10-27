@@ -332,11 +332,18 @@ private:
 	// a beam-wide trigger plays at the tip or muzzle the entry picks). No user
 	// code: the mixer plays after the sweep.
 	void sound_fire(int trigger, const Vector2 &pos, int beam = -1, int ring = -1, int zone = -1);
+	// Every laser event goes through here: its sounds (sound_fire), then the
+	// data's one-shot effects on it (LaserEffectData2D). `event` is the shared
+	// laser event id (LaserSoundTrigger = LaserEffectTrigger); `beam` -1 is a
+	// laser-wide event (its effects play per beam: charge and fire at each
+	// muzzle, finish and ended early at each tip). No user code.
+	void fire_event(int event, const Vector2 &pos, int beam = -1, int ring = -1, int zone = -1);
+	void play_effects(int event, const Vector2 &pos, int beam);
 	// The point of beam `beam` an entry's follow_point names.
 	Vector2 sound_beam_point(const LaserSoundData2D &entry, int beam) const;
-	// The laser-wide sounds already played this life: On Charge once, and
+	// The laser-wide events of this life: On Charge announced once, and
 	// whether end_laser cut it short (On Ended Early instead of On Finish).
-	bool charge_sounded = false;
+	bool charge_announced = false;
 	bool ended_early = false;
 	// Physics queries (one shape, reused every tick).
 	RID query_shape;

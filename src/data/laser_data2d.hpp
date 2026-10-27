@@ -99,6 +99,9 @@ public:
 		LOOK_SLOT_COUNT = 5
 	};
 	Ref<LaserSpriteLook2D> looks[LOOK_SLOT_COUNT];
+	// One-shot effects on laser events (LaserEffectData2D entries or nulls),
+	// read at every event: edits reach lasers in flight.
+	Array effects;
 	int z_index = 0;
 	// Bumped by every look change (a frame property, a look assigned or
 	// edited): lasers in flight re-bake and re-apply their looks once
@@ -175,6 +178,8 @@ public:
 	void set_body_width_scale(double value);
 	Ref<Material> get_body_material() const { return body_material; }
 	void set_body_material(const Ref<Material> &value);
+	Array get_effects() const { return effects; }
+	void set_effects(const Array &value);
 	Ref<LaserSpriteLook2D> get_look(LookSlot slot) const { return looks[slot]; }
 	void set_look(LookSlot slot, const Ref<LaserSpriteLook2D> &value);
 	Ref<LaserSpriteLook2D> get_charge_look() const { return looks[LOOK_CHARGE]; }
