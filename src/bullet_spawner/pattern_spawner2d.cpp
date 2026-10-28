@@ -123,11 +123,11 @@ static bool reports_shooting_transitions(const Node *self) {
 }
 
 bool PatternSpawner2D::auto_shooting_active() const {
-	return shooting_enabled && !shooting_paused && (max_volleys < 0 || volleys_fired < max_volleys);
+	return cadence.auto_active();
 }
 
 bool PatternSpawner2D::get_shooting_enabled() const {
-	return shooting_enabled;
+	return cadence.shooting_enabled;
 }
 
 bool PatternSpawner2D::is_shooting_active() const {
@@ -136,7 +136,7 @@ bool PatternSpawner2D::is_shooting_active() const {
 
 void PatternSpawner2D::set_shooting_enabled(bool value) {
 	const bool was_active = auto_shooting_active();
-	shooting_enabled = value;
+	cadence.shooting_enabled = value;
 	const bool now_active = auto_shooting_active();
 	if (is_inside_tree()) {
 		refresh_process_state();
@@ -152,7 +152,7 @@ void PatternSpawner2D::set_shooting_enabled(bool value) {
 }
 
 double PatternSpawner2D::get_shoot_interval_sec() const {
-	return shoot_interval_sec;
+	return cadence.shoot_interval_sec;
 }
 
 void PatternSpawner2D::set_shoot_interval_sec(double value) {
@@ -160,24 +160,16 @@ void PatternSpawner2D::set_shoot_interval_sec(double value) {
 		UtilityFunctions::push_error((String(get_class()) + ": shoot_interval_sec must be finite and > 0, keeping the old value."));
 		return;
 	}
-	shoot_interval_sec = value;
+	cadence.shoot_interval_sec = value;
 	clamp_shoot_wait_to_settings();
 }
 
 void PatternSpawner2D::clamp_shoot_wait_to_settings() {
-	// Shorter settings apply to the wait already running (otherwise the old,
-	// longer one would still be waited out once), down to the longest wait
-	// the settings can still roll (shoot_interval_sec, shoot_interval_max_sec,
-	// the reload jitter): the same values never cut a rolled wait. The
-	// initial delay is not an interval.
-	const double longest = Math::max(shoot_interval_sec, shoot_interval_max_sec) + Math::max(reload_jitter_sec, 0.0);
-	if (!shoot_initial_wait && shoot_time_left > longest) {
-		shoot_time_left = longest;
-	}
+	cadence.clamp_wait_to_settings();
 }
 
 double PatternSpawner2D::get_shoot_initial_delay_sec() const {
-	return shoot_initial_delay_sec;
+	return cadence.shoot_initial_delay_sec;
 }
 
 void PatternSpawner2D::set_shoot_initial_delay_sec(double value) {
@@ -185,11 +177,11 @@ void PatternSpawner2D::set_shoot_initial_delay_sec(double value) {
 		UtilityFunctions::push_error((String(get_class()) + ": shoot_initial_delay_sec must be finite and >= 0, keeping the old value."));
 		return;
 	}
-	shoot_initial_delay_sec = value;
+	cadence.shoot_initial_delay_sec = value;
 }
 
 int PatternSpawner2D::get_max_volleys() const {
-	return max_volleys;
+	return cadence.max_volleys;
 }
 
 void PatternSpawner2D::set_max_shots_per_frame(int value) {
@@ -197,7 +189,7 @@ void PatternSpawner2D::set_max_shots_per_frame(int value) {
 		UtilityFunctions::push_error(String(get_class()) + ": max_shots_per_frame must be >= 1, keeping the old value.");
 		return;
 	}
-	max_shots_per_frame = value;
+	cadence.max_shots_per_frame = value;
 }
 
 void PatternSpawner2D::set_max_volleys(int value) {
@@ -208,7 +200,7 @@ void PatternSpawner2D::set_max_volleys(int value) {
 	// Raising the cap resumes a stopped spawner; lowering it below the count
 	// stops it on the next opportunity.
 	const bool was_active = auto_shooting_active();
-	max_volleys = value;
+	cadence.max_volleys = value;
 	const bool now_active = auto_shooting_active();
 	if (is_inside_tree()) {
 		refresh_process_state();
@@ -230,7 +222,7 @@ void PatternSpawner2D::set_max_volleys(int value) {
 }
 
 int PatternSpawner2D::get_volleys_fired() const {
-	return volleys_fired;
+	return cadence.volleys_fired;
 }
 
 Vector2 PatternSpawner2D::resolve_spawn_offset_global() const {
@@ -350,14 +342,14 @@ void PatternSpawner2D::advance_spin(double delta) {
 	spin.advance(delta);
 }
 
-double PatternSpawner2D::get_reload_jitter_sec() const { return reload_jitter_sec; }
+double PatternSpawner2D::get_reload_jitter_sec() const { return cadence.reload_jitter_sec; }
 
 void PatternSpawner2D::set_reload_jitter_sec(double value) {
 	if (!is_finite_real2d(value) || value < 0.0) {
 		UtilityFunctions::push_error((String(get_class()) + ": reload_jitter_sec must be finite and >= 0, keeping the old value."));
 		return;
 	}
-	reload_jitter_sec = value;
+	cadence.reload_jitter_sec = value;
 	clamp_shoot_wait_to_settings();
 }
 
@@ -365,20 +357,20 @@ void PatternSpawner2D::set_reload_jitter_sec(double value) {
 // contract as every other spawner knob (validated setters never leave a
 // half-applied value behind).
 bool PatternSpawner2D::get_burst_enabled() const {
-	return burst_enabled;
+	return cadence.burst_enabled;
 }
 
 void PatternSpawner2D::set_burst_enabled(bool value) {
-	burst_enabled = value;
+	cadence.burst_enabled = value;
 	notify_property_list_changed(); // burst_* knobs gate on it
 	if (!value) {
 		// A running chain ends with its first-shot warning; a plain
 		// telegraphed shot (no chain) is not a burst's and keeps its warning.
-		const bool chain_warning = telegraph_pending && burst_shots_left > 0;
+		const bool chain_warning = cadence.telegraph_pending && cadence.burst_shots_left > 0;
 		cancel_burst_chain();
 		if (chain_warning) {
-			telegraph_pending = false;
-			telegraph_time_left = 0.0;
+			cadence.telegraph_pending = false;
+			cadence.telegraph_time_left = 0.0;
 		}
 	} else if (is_inside_tree() && !Engine::get_singleton()->is_editor_hint()) {
 		set_loop_active(true);
@@ -386,7 +378,7 @@ void PatternSpawner2D::set_burst_enabled(bool value) {
 }
 
 int PatternSpawner2D::get_burst_count() const {
-	return burst_count;
+	return cadence.burst_count;
 }
 
 void PatternSpawner2D::set_burst_count(int value) {
@@ -394,22 +386,22 @@ void PatternSpawner2D::set_burst_count(int value) {
 		UtilityFunctions::push_error((String(get_class()) + ": burst_count must be between 1 and ") + itos(kMaxBurstCount) + ", keeping the old value.");
 		return;
 	}
-	burst_count = value;
+	cadence.burst_count = value;
 	// A running chain never exceeds the new count (shot indexes stay 1..n).
 	// Shrunk to the shots already fired, the chain ends with its report
 	// (cancel_burst_chain must still see it running).
-	if (burst_shots_left > 0) {
-		const int left = MAX(0, MIN(burst_shots_left, burst_count - burst_shots_fired));
+	if (cadence.burst_shots_left > 0) {
+		const int left = MAX(0, MIN(cadence.burst_shots_left, cadence.burst_count - cadence.burst_shots_fired));
 		if (left == 0) {
 			cancel_burst_chain();
 		} else {
-			burst_shots_left = left;
+			cadence.burst_shots_left = left;
 		}
 	}
 }
 
 double PatternSpawner2D::get_burst_interval_sec() const {
-	return burst_interval_sec;
+	return cadence.burst_interval_sec;
 }
 
 void PatternSpawner2D::set_burst_interval_sec(double value) {
@@ -417,34 +409,34 @@ void PatternSpawner2D::set_burst_interval_sec(double value) {
 		UtilityFunctions::push_error((String(get_class()) + ": burst_interval_sec must be finite and > 0, keeping the old value."));
 		return;
 	}
-	burst_interval_sec = value;
+	cadence.burst_interval_sec = value;
 }
 
 bool PatternSpawner2D::get_burst_alternate_mirror() const {
-	return burst_alternate_mirror;
+	return cadence.burst_alternate_mirror;
 }
 
 void PatternSpawner2D::set_burst_alternate_mirror(bool value) {
-	burst_alternate_mirror = value;
+	cadence.burst_alternate_mirror = value;
 }
 
 bool PatternSpawner2D::get_telegraph_enabled() const {
-	return telegraph_enabled;
+	return cadence.telegraph_enabled;
 }
 
 void PatternSpawner2D::set_telegraph_enabled(bool value) {
-	telegraph_enabled = value;
+	cadence.telegraph_enabled = value;
 	notify_property_list_changed(); // telegraph_sec gates on it
 	if (!value) {
-		telegraph_pending = false;
-		telegraph_time_left = 0.0;
+		cadence.telegraph_pending = false;
+		cadence.telegraph_time_left = 0.0;
 	} else if (is_inside_tree() && !Engine::get_singleton()->is_editor_hint()) {
 		set_loop_active(true);
 	}
 }
 
 double PatternSpawner2D::get_telegraph_sec() const {
-	return telegraph_sec;
+	return cadence.telegraph_sec;
 }
 
 void PatternSpawner2D::set_telegraph_sec(double value) {
@@ -452,11 +444,11 @@ void PatternSpawner2D::set_telegraph_sec(double value) {
 		UtilityFunctions::push_error((String(get_class()) + ": telegraph_sec must be finite and >= 0, keeping the old value."));
 		return;
 	}
-	telegraph_sec = value;
+	cadence.telegraph_sec = value;
 }
 
 int PatternSpawner2D::get_reload_jitter_seed() const {
-	return reload_jitter_seed;
+	return cadence.reload_jitter_seed;
 }
 
 void PatternSpawner2D::set_reload_jitter_seed(int value) {
@@ -464,28 +456,28 @@ void PatternSpawner2D::set_reload_jitter_seed(int value) {
 		UtilityFunctions::push_error((String(get_class()) + ": reload_jitter_seed must be >= 0 (0 = non-deterministic), keeping the old value."));
 		return;
 	}
-	reload_jitter_seed = value;
+	cadence.reload_jitter_seed = value;
 }
 
 int PatternSpawner2D::get_burst_shots_left() const {
-	return burst_shots_left;
+	return cadence.burst_shots_left;
 }
 
 void PatternSpawner2D::reset_shooting() {
 	const bool was_active = auto_shooting_active();
-	++cadence_serial;
-	volleys_fired = 0;
-	shooting_paused = false;
-	oneshot_volleys_left = -1;
-	shoot_time_left = shoot_initial_delay_sec;
-	shoot_initial_wait = true;
+	++cadence.serial;
+	cadence.volleys_fired = 0;
+	cadence.shooting_paused = false;
+	cadence.oneshot_volleys_left = -1;
+	cadence.shoot_time_left = cadence.shoot_initial_delay_sec;
+	cadence.shoot_initial_wait = true;
 	restart_owned_clocks();
 	// Burst/telegraph chains never survive a restart: a stale mid-burst
 	// countdown firing into a reset wave would double-fire volleys. A
 	// running chain ends with its burst_finished report.
 	cancel_burst_chain();
-	telegraph_pending = false;
-	telegraph_time_left = 0.0;
+	cadence.telegraph_pending = false;
+	cadence.telegraph_time_left = 0.0;
 	// Pattern-list sequencers clear with the rest: resuming a stale queue
 	// into a reset wave would fire another wave's pattern entries.
 	stop_pattern_list();
@@ -508,10 +500,10 @@ void PatternSpawner2D::fire_n_volleys(int n) {
 	// spawner stays unlimited. Replaces any previous budget. Unpauses: an
 	// explicit fire request resumes a paused wave (the budget pauses it again
 	// when spent). Armed while disabled too: volleys fire once re-enabled.
-	++cadence_serial;
-	oneshot_volleys_left = n;
+	++cadence.serial;
+	cadence.oneshot_volleys_left = n;
 	const bool was_active = auto_shooting_active();
-	shooting_paused = false;
+	cadence.shooting_paused = false;
 	if (is_inside_tree()) {
 		refresh_process_state();
 	}
@@ -522,7 +514,7 @@ void PatternSpawner2D::fire_n_volleys(int n) {
 
 void PatternSpawner2D::pause_shooting() {
 	const bool was_active = auto_shooting_active();
-	shooting_paused = true;
+	cadence.shooting_paused = true;
 	if (is_inside_tree()) {
 		refresh_process_state();
 	}
@@ -533,7 +525,7 @@ void PatternSpawner2D::pause_shooting() {
 
 void PatternSpawner2D::resume_shooting() {
 	const bool was_active = auto_shooting_active();
-	shooting_paused = false;
+	cadence.shooting_paused = false;
 	if (is_inside_tree()) {
 		refresh_process_state();
 	}
@@ -543,42 +535,35 @@ void PatternSpawner2D::resume_shooting() {
 }
 
 bool PatternSpawner2D::is_shooting_paused() const {
-	return shooting_paused;
+	return cadence.shooting_paused;
 }
 
 double PatternSpawner2D::get_shoot_time_left() const {
-	return auto_shooting_active() ? Math::max(shoot_time_left, 0.0) : 0.0;
+	return auto_shooting_active() ? Math::max(cadence.shoot_time_left, 0.0) : 0.0;
 }
 
 double PatternSpawner2D::get_burst_time_left() const {
-	if (burst_shots_left <= 0) {
+	if (cadence.burst_shots_left <= 0) {
 		return 0.0;
 	}
 	// The chain's first shot waits behind its warning.
-	return Math::max(telegraph_pending ? telegraph_time_left : burst_time_left, 0.0);
+	return Math::max(cadence.telegraph_pending ? cadence.telegraph_time_left : cadence.burst_time_left, 0.0);
 }
 
 bool PatternSpawner2D::is_telegraph_pending() const {
-	return telegraph_pending;
+	return cadence.telegraph_pending;
 }
 
 double PatternSpawner2D::get_telegraph_time_left() const {
-	return telegraph_pending ? Math::max(telegraph_time_left, 0.0) : 0.0;
+	return cadence.telegraph_pending ? Math::max(cadence.telegraph_time_left, 0.0) : 0.0;
 }
 
 double PatternSpawner2D::get_pattern_list_time_left() const {
-	return pattern_list_active ? Math::max(pattern_list_time_left, 0.0) : 0.0;
+	return cadence.pattern_list_active ? Math::max(cadence.pattern_list_time_left, 0.0) : 0.0;
 }
 
 int PatternSpawner2D::volleys_remaining() const {
-	int remaining = -1;
-	if (max_volleys >= 0) {
-		remaining = MAX(0, max_volleys - volleys_fired);
-	}
-	if (oneshot_volleys_left >= 0) {
-		remaining = (remaining < 0) ? oneshot_volleys_left : MIN(remaining, oneshot_volleys_left);
-	}
-	return remaining;
+	return cadence.volleys_remaining();
 }
 
 // Work that keeps _process alive independently of auto-shooting. The single
@@ -586,7 +571,7 @@ int PatternSpawner2D::volleys_remaining() const {
 // "auto-shooting stopped" sleep paths in _process/shoot_once all use it, so a
 // new subsystem (e.g. movement) is added in exactly one place.
 bool PatternSpawner2D::needs_process_besides_shooting() const {
-	return spin.enabled || needs_process_owned() || preview_active() || graze_preview_active() || burst_shots_left > 0 || telegraph_pending || pattern_list_active || movement_active();
+	return spin.enabled || needs_process_owned() || preview_active() || graze_preview_active() || cadence.burst_shots_left > 0 || cadence.telegraph_pending || cadence.pattern_list_active || movement_active();
 }
 
 bool PatternSpawner2D::needs_process() const {
@@ -715,7 +700,7 @@ bool PatternSpawner2D::shoot_once() {
 	// fail_early or the single clear-point, never a bare return.
 	shoot_once_reentrant_guard = true;
 	++g_shoot_once_nesting_depth;
-	last_shot_spent_budget = false;
+	cadence.last_shot_spent_budget = false;
 	auto fail_early = [&](const String &message, const StringName &skip_reason, bool with_signal) -> bool {
 		// Auto-fire repeats the same misconfiguration every interval: report
 		// it once until the configuration changes or a shot succeeds (manual
@@ -779,7 +764,7 @@ bool PatternSpawner2D::shoot_once() {
 	if (randomization_active()) {
 		randomize_shot_transforms(shot_transforms);
 	}
-	const int fired_before = volleys_fired;
+	const int fired_before = cadence.volleys_fired;
 	const ShotResult2D result = fire_shot(shot_transforms);
 	if (result.refusal.refused) {
 		return fail_early(result.refusal.message, result.refusal.reason, result.refusal.with_signal);
@@ -793,11 +778,11 @@ bool PatternSpawner2D::shoot_once() {
 	// touching max_volleys. Spent budget pauses via the standard path, so
 	// transitions stay consistent; placed after volley_fired so the last
 	// volley's signal precedes the stop.
-	if (!cadence_replaced && oneshot_volleys_left > 0 && --oneshot_volleys_left == 0) {
+	if (!cadence_replaced && cadence.oneshot_volleys_left > 0 && --cadence.oneshot_volleys_left == 0) {
 		// Spent: the budget clears itself (volleys_remaining and a later
 		// resume_shooting() behave like an unlimited spawner again).
-		oneshot_volleys_left = -1;
-		last_shot_spent_budget = true;
+		cadence.oneshot_volleys_left = -1;
+		cadence.last_shot_spent_budget = true;
 		pause_shooting();
 	}
 	// Exact-equality = transition only: further manual shots past the cap do
@@ -807,13 +792,13 @@ bool PatternSpawner2D::shoot_once() {
 	// The shot that tripped the cap reports it: a handler's new budget
 	// (fire_n_volleys) never lifts max_volleys; a reset (the count went back)
 	// leaves nothing to report.
-	if (max_volleys >= 0 && volleys_fired == fired_before + 1 && volleys_fired == max_volleys) {
+	if (cadence.max_volleys >= 0 && cadence.volleys_fired == fired_before + 1 && cadence.volleys_fired == cadence.max_volleys) {
 		// Stop shooting, but stay awake while spinning, retargeting, bursting,
 		// telegraphing, sequencing, or previewing (same keep-awake set as everywhere else).
 		set_loop_active(needs_process_besides_shooting());
 		// shooting_* signals track auto-fire: manual shots on a spawner with
 		// auto-shooting off never report a finish.
-		if (shooting_enabled && reports_shooting_transitions(this)) {
+		if (cadence.shooting_enabled && reports_shooting_transitions(this)) {
 			emit_on2d(this, "shooting_finished");
 		}
 	}
@@ -960,8 +945,8 @@ void PatternSpawner2D::_ready() {
 	}
 	// Controls called before the tree (pause, fire_n_volleys, ...) are kept:
 	// only the timer arms here.
-	shoot_time_left = shoot_initial_delay_sec;
-	shoot_initial_wait = true;
+	cadence.shoot_time_left = cadence.shoot_initial_delay_sec;
+	cadence.shoot_initial_wait = true;
 	// The derived spawner's clocks (bullets: the retarget stagger).
 	restart_owned_clocks();
 	// Movement autostart: the spawner's pose when it enters play is the
@@ -1264,20 +1249,20 @@ void PatternSpawner2D::run_frame(double delta) {
 	// always clears the telegraph), so only one branch fires per tick.
 	// Telegraph countdown: frozen while paused (burst/burst-telegraph chains
 	// must not fire into a pause). Resume continues the warning.
-	if (telegraph_pending && telegraph_from_auto && !shooting_enabled) {
+	if (cadence.telegraph_pending && cadence.telegraph_from_auto && !cadence.shooting_enabled) {
 		// Auto-fire switched off during the warning: the shot is cancelled
 		// (a burst's first-shot warning ends its chain with a report).
-		telegraph_pending = false;
-		telegraph_time_left = 0.0;
-		if (burst_shots_left > 0) {
+		cadence.telegraph_pending = false;
+		cadence.telegraph_time_left = 0.0;
+		if (cadence.burst_shots_left > 0) {
 			cancel_burst_chain();
 		}
 	}
-	if (telegraph_pending && !shooting_paused) {
-		telegraph_time_left -= delta;
-		if (telegraph_time_left <= 0.0) {
-			telegraph_pending = false;
-			auto_fire_in_progress = telegraph_from_auto;
+	if (cadence.telegraph_pending && !cadence.shooting_paused) {
+		cadence.telegraph_time_left -= delta;
+		if (cadence.telegraph_time_left <= 0.0) {
+			cadence.telegraph_pending = false;
+			auto_fire_in_progress = cadence.telegraph_from_auto;
 			fire_burst_volley();
 			auto_fire_in_progress = false;
 		}
@@ -1289,37 +1274,37 @@ void PatternSpawner2D::run_frame(double delta) {
 	}
 	// Burst chain countdown: frozen while paused like the telegraph above.
 	// The keep-alive below still runs via the sleep path (burst_shots_left).
-	if (burst_shots_left > 0 && burst_from_auto && !shooting_enabled) {
+	if (cadence.burst_shots_left > 0 && cadence.burst_from_auto && !cadence.shooting_enabled) {
 		cancel_burst_chain(); // auto-fire switched off mid-chain
 	}
-	if (burst_shots_left > 0 && !shooting_paused) {
-		burst_time_left -= delta;
+	if (cadence.burst_shots_left > 0 && !cadence.shooting_paused) {
+		cadence.burst_time_left -= delta;
 		// Overshoot carries into the next wait (like the main timer below),
 		// so sub-frame intervals keep their average rate; bounded catch-up.
 		int pulls = 0;
-		while (burst_shots_left > 0 && !shooting_paused && burst_time_left <= 0.0) {
-			if (++pulls > max_shots_per_frame) {
-				burst_time_left = next_burst_interval_sec(); // anti-spiral resync
+		while (cadence.burst_shots_left > 0 && !cadence.shooting_paused && cadence.burst_time_left <= 0.0) {
+			if (++pulls > cadence.max_shots_per_frame) {
+				cadence.burst_time_left = next_burst_interval_sec(); // anti-spiral resync
 				break;
 			}
-			const double overshoot = burst_time_left;
-			const int left_before = burst_shots_left;
-			const uint32_t serial = burst_serial;
+			const double overshoot = cadence.burst_time_left;
+			const int left_before = cadence.burst_shots_left;
+			const uint32_t serial = cadence.burst_serial;
 			// Auto chains report a misconfiguration once (like plain auto
 			// shots); manual chains report every attempt.
-			auto_fire_in_progress = burst_from_auto;
+			auto_fire_in_progress = cadence.burst_from_auto;
 			fire_burst_volley();
 			auto_fire_in_progress = false;
-			if (serial != burst_serial || shot_owner_dying()) {
+			if (serial != cadence.burst_serial || shot_owner_dying()) {
 				break; // a handler ended or replaced the chain (a new one keeps its own clock)
 			}
-			if (burst_shots_left <= 0) {
+			if (cadence.burst_shots_left <= 0) {
 				break;
 			}
-			if (burst_shots_left == left_before) {
+			if (cadence.burst_shots_left == left_before) {
 				break; // failed shot: retried a full interval out (no catch-up)
 			}
-			burst_time_left += overshoot; // fire_burst_volley set the next wait
+			cadence.burst_time_left += overshoot; // fire_burst_volley set the next wait
 		}
 		if (!is_loop_active()) {
 			set_loop_active(true);
@@ -1328,27 +1313,27 @@ void PatternSpawner2D::run_frame(double delta) {
 	}
 	// Pattern-list sequencer: frozen while paused like burst/telegraph.
 	// Runs even with auto-shooting off (manual boss-phase driver).
-	if (pattern_list_active && !shooting_paused) {
-		pattern_list_time_left -= delta;
+	if (cadence.pattern_list_active && !cadence.shooting_paused) {
+		cadence.pattern_list_time_left -= delta;
 		// Same overshoot carry as the burst chain; interval 0 stays one
 		// entry per frame.
 		int pulls = 0;
-		while (pattern_list_active && !shooting_paused && pattern_list_time_left <= 0.0) {
-			if (++pulls > max_shots_per_frame) {
-				pattern_list_time_left = pattern_list_interval_sec; // anti-spiral resync
+		while (cadence.pattern_list_active && !cadence.shooting_paused && cadence.pattern_list_time_left <= 0.0) {
+			if (++pulls > cadence.max_shots_per_frame) {
+				cadence.pattern_list_time_left = cadence.pattern_list_interval_sec; // anti-spiral resync
 				break;
 			}
-			const double overshoot = pattern_list_time_left;
-			const uint32_t serial = pattern_list_serial;
+			const double overshoot = cadence.pattern_list_time_left;
+			const uint32_t serial = cadence.pattern_list_serial;
 			fire_pattern_list_entry();
-			if (!pattern_list_active || serial != pattern_list_serial) {
+			if (!cadence.pattern_list_active || serial != cadence.pattern_list_serial) {
 				break; // finished, stopped, or replaced (the new list keeps its own clock)
 			}
-			if (!(pattern_list_interval_sec > 0.0)) {
-				pattern_list_time_left = 0.0;
+			if (!(cadence.pattern_list_interval_sec > 0.0)) {
+				cadence.pattern_list_time_left = 0.0;
 				break;
 			}
-			pattern_list_time_left = pattern_list_interval_sec + overshoot;
+			cadence.pattern_list_time_left = cadence.pattern_list_interval_sec + overshoot;
 		}
 		if (!is_loop_active()) {
 			set_loop_active(true);
@@ -1369,14 +1354,14 @@ void PatternSpawner2D::run_frame(double delta) {
 	// anti-spiral contract as the bullet animation timer: a bounded number
 	// of pulls per tick, then resync (drop the remaining hitch backlog)
 	// instead of looping forever.
-	shoot_time_left -= delta;
+	cadence.shoot_time_left -= delta;
 	int pulls = 0;
-	while (auto_shooting_active() && shoot_time_left <= 0.0) {
-		shoot_initial_wait = false;
-		if (++pulls > max_shots_per_frame) {
+	while (auto_shooting_active() && cadence.shoot_time_left <= 0.0) {
+		cadence.shoot_initial_wait = false;
+		if (++pulls > cadence.max_shots_per_frame) {
 			// Anti-spiral: resync the timer instead of repaying a huge hitch
 			// backlog in one tick (which would melt signal handlers/physics).
-			shoot_time_left = next_shoot_interval_sec();
+			cadence.shoot_time_left = next_shoot_interval_sec();
 			break;
 		}
 		// Trigger pull: burst mode fans out from here, plain mode fires once.
@@ -1385,18 +1370,18 @@ void PatternSpawner2D::run_frame(double delta) {
 		// on their own timers, so the catch-up loop stops here.
 		// A handler inside the pull that reset the wave or armed a budget
 		// owns the cadence: its restarted delay is never rearmed over.
-		const uint32_t cadence = cadence_serial;
-		if (burst_enabled && burst_count > 1) {
+		const uint32_t cadence_before = cadence.serial;
+		if (cadence.burst_enabled && cadence.burst_count > 1) {
 			begin_burst_chain(true);
-			if (cadence == cadence_serial && !shot_owner_dying()) {
-				shoot_time_left += next_shoot_interval_sec();
+			if (cadence_before == cadence.serial && !shot_owner_dying()) {
+				cadence.shoot_time_left += next_shoot_interval_sec();
 			}
 			break;
 		}
-		if (telegraph_wanted() && !telegraph_pending) {
+		if (telegraph_wanted() && !cadence.telegraph_pending) {
 			begin_telegraph(true);
-			if (cadence == cadence_serial && !shot_owner_dying()) {
-				shoot_time_left += next_shoot_interval_sec();
+			if (cadence_before == cadence.serial && !shot_owner_dying()) {
+				cadence.shoot_time_left += next_shoot_interval_sec();
 			}
 			break;
 		}
@@ -1408,14 +1393,14 @@ void PatternSpawner2D::run_frame(double delta) {
 		auto_fire_in_progress = true;
 		const bool fired = shoot_once();
 		auto_fire_in_progress = false;
-		if (cadence != cadence_serial || shot_owner_dying()) {
+		if (cadence_before != cadence.serial || shot_owner_dying()) {
 			break;
 		}
 		// Throttle-on-pull: the interval rearms even when the pull skipped,
 		// failed, or dropped its volley. Throttle-on-success instead would
 		// hot-loop a persistently failing shot (busy factory, over budget)
 		// every frame until it succeeds.
-		shoot_time_left += next_shoot_interval_sec();
+		cadence.shoot_time_left += next_shoot_interval_sec();
 		if (!fired) {
 			break;
 		}
@@ -1429,24 +1414,24 @@ void PatternSpawner2D::begin_burst() {
 void PatternSpawner2D::begin_burst_chain(bool auto_started) {
 	// A chain still running ends first, with its burst_finished report. A
 	// handler of that report that started its own chain wins.
-	if (burst_shots_left > 0 || burst_chain_closing) {
+	if (cadence.burst_shots_left > 0 || cadence.burst_chain_closing) {
 		cancel_burst_chain();
-		if (burst_shots_left > 0) {
+		if (cadence.burst_shots_left > 0) {
 			return;
 		}
 	}
 	// A fresh trigger always owns the phrasing: stale telegraphs from an
 	// interrupted trigger never fire into the new burst. Plain-burst mode
 	// with count 1 collapses to a single immediate shot (no chain to drain).
-	++burst_serial;
-	telegraph_pending = false;
-	telegraph_time_left = 0.0;
-	burst_telegraph_done = false;
-	burst_consecutive_failures = 0;
-	burst_shots_fired = 0;
-	burst_from_auto = auto_started;
-	if (!burst_enabled || burst_count <= 1) {
-		burst_shots_left = 0;
+	++cadence.burst_serial;
+	cadence.telegraph_pending = false;
+	cadence.telegraph_time_left = 0.0;
+	cadence.burst_telegraph_done = false;
+	cadence.burst_consecutive_failures = 0;
+	cadence.burst_shots_fired = 0;
+	cadence.burst_from_auto = auto_started;
+	if (!cadence.burst_enabled || cadence.burst_count <= 1) {
+		cadence.burst_shots_left = 0;
 		// One shot, warned first like an auto pull (the expiry fires it
 		// through fire_burst_volley; outside the bounds the warning refuses).
 		if (telegraph_wanted()) {
@@ -1456,7 +1441,7 @@ void PatternSpawner2D::begin_burst_chain(bool auto_started) {
 		fire_burst_volley();
 		return;
 	}
-	int length = burst_count;
+	int length = cadence.burst_count;
 	if (auto_started) {
 		// Auto chains never fire past max_volleys or a fire_n_volleys budget.
 		const int remaining = volleys_remaining();
@@ -1467,8 +1452,8 @@ void PatternSpawner2D::begin_burst_chain(bool auto_started) {
 			return;
 		}
 	}
-	burst_shots_left = length;
-	burst_time_left = 0.0;
+	cadence.burst_shots_left = length;
+	cadence.burst_time_left = 0.0;
 	set_loop_active(true);
 }
 
@@ -1484,22 +1469,22 @@ void PatternSpawner2D::begin_telegraph(bool auto_started) {
 	// The collect runs the aimed target's get_velocity (user code): a script
 	// there that reset the wave, ended the burst or turned telegraphs off
 	// owns the cadence, and the warning it interrupted never starts.
-	const uint32_t cadence = cadence_serial;
-	const uint32_t burst = burst_serial;
+	const uint32_t cadence_before = cadence.serial;
+	const uint32_t burst = cadence.burst_serial;
 	TypedArray<Transform2D> aim = collect_spawn_transforms_impl(true);
 	if (shot_owner_dying()) {
 		return; // the aimed target's get_velocity freed this spawner
 	}
-	if (cadence != cadence_serial || burst != burst_serial || !telegraph_wanted()) {
+	if (cadence_before != cadence.serial || burst != cadence.burst_serial || !telegraph_wanted()) {
 		return;
 	}
-	telegraph_pending = true;
-	telegraph_from_auto = auto_started;
-	telegraph_time_left = next_telegraph_sec();
+	cadence.telegraph_pending = true;
+	cadence.telegraph_from_auto = auto_started;
+	cadence.telegraph_time_left = next_telegraph_sec();
 	emit_on2d(this, "volley_telegraphed", aim);
 	// A handler that cancelled the warning (or freed this spawner) silences
 	// it; one that started another warning there already played its own.
-	if (shot_owner_dying() || !telegraph_pending || cadence != cadence_serial || burst != burst_serial) {
+	if (shot_owner_dying() || !cadence.telegraph_pending || cadence_before != cadence.serial || burst != cadence.burst_serial) {
 		return;
 	}
 	fire_spawner_sound(SPAWNER_SOUND_TELEGRAPH);
@@ -1507,82 +1492,82 @@ void PatternSpawner2D::begin_telegraph(bool auto_started) {
 }
 
 void PatternSpawner2D::cancel_burst_chain() {
-	const bool was_running = burst_shots_left > 0 || burst_chain_closing;
-	burst_chain_closing = false;
-	++burst_serial;
-	burst_shots_left = 0;
-	burst_shots_fired = 0;
-	burst_consecutive_failures = 0;
-	burst_time_left = 0.0;
-	burst_telegraph_done = false;
-	burst_mirror_next = false;
+	const bool was_running = cadence.burst_shots_left > 0 || cadence.burst_chain_closing;
+	cadence.burst_chain_closing = false;
+	++cadence.burst_serial;
+	cadence.burst_shots_left = 0;
+	cadence.burst_shots_fired = 0;
+	cadence.burst_consecutive_failures = 0;
+	cadence.burst_time_left = 0.0;
+	cadence.burst_telegraph_done = false;
+	cadence.burst_mirror_next = false;
 	if (was_running) {
 		emit_on2d(this, "burst_finished");
 	}
 }
 
 void PatternSpawner2D::fire_burst_volley() {
-	if (burst_enabled && burst_shots_left > 0) {
-		const uint32_t serial = burst_serial;
+	if (cadence.burst_enabled && cadence.burst_shots_left > 0) {
+		const uint32_t serial = cadence.burst_serial;
 		bool fired = false;
 		bool mirrored = false;
-		if (telegraph_wanted() && !telegraph_pending && !burst_telegraph_done && burst_shots_fired == 0) {
+		if (telegraph_wanted() && !cadence.telegraph_pending && !cadence.burst_telegraph_done && cadence.burst_shots_fired == 0) {
 			// First burst shot warns once; done-flag stops the expiry from
 			// re-firing the warning in a loop instead of firing the shot.
-			begin_telegraph(burst_from_auto);
-			if (serial != burst_serial || shot_owner_dying()) {
+			begin_telegraph(cadence.burst_from_auto);
+			if (serial != cadence.burst_serial || shot_owner_dying()) {
 				return; // a handler of the warning took the chain over
 			}
-			if (telegraph_pending) {
-				burst_telegraph_done = true;
+			if (cadence.telegraph_pending) {
+				cadence.burst_telegraph_done = true;
 				return;
 			}
 			// Refused (the muzzle outside the despawn bounds): a failed
 			// attempt, retried a burst interval out, warning first again.
-		} else if (burst_from_auto && volleys_remaining() == 0) {
+		} else if (cadence.burst_from_auto && volleys_remaining() == 0) {
 			// The cap or the budget was lowered onto the shots already
 			// fired: the auto chain ends without another shot.
-			burst_shots_left = 0;
+			cadence.burst_shots_left = 0;
 		} else {
 			// Mirror rhythm: the first shot is plain, then shots alternate
 			// (plain, mirrored, plain, ...) for any burst_count.
-			mirrored = burst_alternate_mirror && (burst_shots_fired % 2 == 1);
-			burst_mirror_next = mirrored;
+			mirrored = cadence.burst_alternate_mirror && (cadence.burst_shots_fired % 2 == 1);
+			cadence.burst_mirror_next = mirrored;
 			fired = shoot_once();
-			burst_mirror_next = false;
-			if (serial != burst_serial || shot_owner_dying()) {
+			cadence.burst_mirror_next = false;
+			if (serial != cadence.burst_serial || shot_owner_dying()) {
 				return; // a shot handler cancelled, restarted or reset the chain: it owns it
 			}
 		}
 		if (fired) {
-			++burst_shots_fired;
-			--burst_shots_left;
-			burst_consecutive_failures = 0;
+			++cadence.burst_shots_fired;
+			--cadence.burst_shots_left;
+			cadence.burst_consecutive_failures = 0;
 			// An auto chain never fires past the cap or the budget, also when
 			// either changed after the chain started.
-			if (burst_from_auto && (volleys_remaining() == 0 || last_shot_spent_budget)) {
-				burst_shots_left = 0;
+			if (cadence.burst_from_auto && (volleys_remaining() == 0 || cadence.last_shot_spent_budget)) {
+				cadence.burst_shots_left = 0;
 			}
-			burst_chain_closing = burst_shots_left <= 0;
-			emit_on2d(this, "burst_shot_fired", burst_shots_fired, mirrored);
-			if (serial != burst_serial || shot_owner_dying()) {
+			cadence.burst_chain_closing = cadence.burst_shots_left <= 0;
+			emit_on2d(this, "burst_shot_fired", cadence.burst_shots_fired, mirrored);
+			if (serial != cadence.burst_serial || shot_owner_dying()) {
 				return; // its handler owns the chain now (its cancel reported the old one)
 			}
-			burst_chain_closing = false;
-		} else if (++burst_consecutive_failures >= burst_count) {
+			cadence.burst_chain_closing = false;
+		} else if (++cadence.burst_consecutive_failures >= cadence.burst_count) {
 			// Persistent failure (bad config, permanent over-budget): end the
 			// chain instead of retrying forever. Each attempt already reported
 			// through volley_skipped, so nothing fails silently.
-			burst_shots_left = 0;
-			burst_consecutive_failures = 0;
+			cadence.burst_shots_left = 0;
+			cadence.burst_consecutive_failures = 0;
 		}
 		// On a transient failure the shot is retried next interval (no
 		// decrement above), so the mirror rhythm and shot indexes stay stable.
-		burst_time_left = next_burst_interval_sec();
-		if (burst_shots_left <= 0) {
-			burst_telegraph_done = false;
-			burst_consecutive_failures = 0;
-			burst_shots_fired = 0;
+		cadence.burst_time_left = next_burst_interval_sec();
+		if (cadence.burst_shots_left <= 0) {
+			cadence.burst_telegraph_done = false;
+			cadence.burst_consecutive_failures = 0;
+			cadence.burst_shots_fired = 0;
 			emit_on2d(this, "burst_finished");
 		}
 		set_loop_active(true);
@@ -1591,10 +1576,10 @@ void PatternSpawner2D::fire_burst_volley() {
 	// Plain telegraphed shot (also the manual-begin_burst escape hatch when
 	// burst mode is off: a hand-started chain with no burst config must fire
 	// exactly once, not loop forever on a stale burst_shots_left).
-	telegraph_pending = false;
-	burst_shots_left = 0;
-	burst_telegraph_done = false;
-	burst_mirror_next = false;
+	cadence.telegraph_pending = false;
+	cadence.burst_shots_left = 0;
+	cadence.burst_telegraph_done = false;
+	cadence.burst_mirror_next = false;
 	if (auto_fire_in_progress && volleys_remaining() == 0) {
 		// The cap or the budget was reached during the warning (lowered, or a
 		// manual shot): the auto shot never fires past it.
@@ -1606,38 +1591,11 @@ void PatternSpawner2D::fire_burst_volley() {
 }
 
 bool PatternSpawner2D::telegraph_wanted() const {
-	return telegraph_enabled && (telegraph_sec > 0.0 || telegraph_max_sec > telegraph_sec);
+	return cadence.telegraph_wanted();
 }
 
 double PatternSpawner2D::next_shoot_interval_sec() const {
-	// Reload jitter: +/- uniform jitter around the base interval (seeded by
-	// reload_jitter_seed for replays; non-deterministic at 0). Floored so a huge
-	// jitter can never invert or stall the timer; the floor sits at 1ms so
-	// fast base intervals keep working with jitter on (the per-tick pull cap
-	// in _process absorbs the rest instead of hot-looping).
-	const double base_interval = roll_timing_range(shoot_interval_sec, shoot_interval_max_sec, 1);
-	if (reload_jitter_sec <= 0.0 || !Math::is_finite(reload_jitter_sec)) {
-		return base_interval;
-	}
-	Ref<RandomNumberGenerator> rng = jitter_rng;
-	if (rng.is_null()) {
-		rng.instantiate();
-		jitter_rng = rng;
-	}
-	if (reload_jitter_seed != 0) {
-		// Hash (seed, shot index): seed + index made consecutive seeds replay
-		// one sequence a shot apart (SplitMix64 finalizer).
-		uint64_t h = (uint64_t)reload_jitter_seed * 0x9E3779B97F4A7C15ull + (uint64_t)volleys_fired;
-		h = (h ^ (h >> 30)) * 0xBF58476D1CE4E5B9ull;
-		h = (h ^ (h >> 27)) * 0x94D049BB133111EBull;
-		rng->set_seed(h ^ (h >> 31));
-		jitter_rng_randomized = false; // seed 0 later must not continue this stream
-	} else if (!jitter_rng_randomized) {
-		rng->randomize();
-		jitter_rng_randomized = true;
-	}
-	const double jitter = rng->randf_range(-reload_jitter_sec, reload_jitter_sec);
-	return Math::max(0.001, base_interval + jitter);
+	return cadence.next_shoot_interval();
 }
 
 int PatternSpawner2D::spawn_pattern_list(const Array &entries, bool simultaneous, double interval_sec) {
@@ -1654,17 +1612,17 @@ int PatternSpawner2D::spawn_pattern_list(const Array &entries, bool simultaneous
 		return 0;
 	}
 	// A new list replaces the running one (which never reports finished).
-	++pattern_list_serial;
+	++cadence.pattern_list_serial;
 	if (simultaneous) {
 		// One tick, N shots: each entry overrides the spawner temporarily,
 		// fires through the guarded shoot_once() path (homing/orbit/signals
 		// consistent), then everything it changed is restored. A bad entry
 		// skips with an error, never aborts. It walks its own copy: a list a
 		// handler starts meanwhile runs on its own.
-		pattern_list_active = false;
-		pattern_list_entries.clear();
-		pattern_list_cursor = 0;
-		pattern_list_time_left = 0.0;
+		cadence.pattern_list_active = false;
+		cadence.pattern_list_entries.clear();
+		cadence.pattern_list_cursor = 0;
+		cadence.pattern_list_time_left = 0.0;
 		const Array list = entries.duplicate();
 		int fired = 0;
 		for (int i = 0; i < list.size(); ++i) {
@@ -1675,26 +1633,26 @@ int PatternSpawner2D::spawn_pattern_list(const Array &entries, bool simultaneous
 		emit_on2d(this, "pattern_list_finished");
 		return fired;
 	}
-	pattern_list_entries = entries.duplicate();
-	pattern_list_interval_sec = interval_sec;
-	pattern_list_cursor = 0;
-	pattern_list_time_left = 0.0;
-	pattern_list_active = true;
+	cadence.pattern_list_entries = entries.duplicate();
+	cadence.pattern_list_interval_sec = interval_sec;
+	cadence.pattern_list_cursor = 0;
+	cadence.pattern_list_time_left = 0.0;
+	cadence.pattern_list_active = true;
 	set_loop_active(true);
-	return pattern_list_entries.size();
+	return cadence.pattern_list_entries.size();
 }
 
 void PatternSpawner2D::stop_pattern_list() {
-	++pattern_list_serial;
-	pattern_list_active = false;
-	pattern_list_entries.clear();
-	pattern_list_cursor = 0;
-	pattern_list_time_left = 0.0;
+	++cadence.pattern_list_serial;
+	cadence.pattern_list_active = false;
+	cadence.pattern_list_entries.clear();
+	cadence.pattern_list_cursor = 0;
+	cadence.pattern_list_time_left = 0.0;
 	refresh_process_state();
 }
 
 bool PatternSpawner2D::is_pattern_list_active() const {
-	return pattern_list_active;
+	return cadence.pattern_list_active;
 }
 
 bool PatternSpawner2D::apply_pattern_list_entry(const Variant &entry, const String &p_caller) {
@@ -1783,19 +1741,19 @@ bool PatternSpawner2D::apply_pattern_list_entry(const Variant &entry, const Stri
 }
 
 void PatternSpawner2D::fire_pattern_list_entry() {
-	if (!pattern_list_active || pattern_list_cursor < 0 || pattern_list_cursor >= pattern_list_entries.size()) {
+	if (!cadence.pattern_list_active || cadence.pattern_list_cursor < 0 || cadence.pattern_list_cursor >= cadence.pattern_list_entries.size()) {
 		stop_pattern_list();
 		return;
 	}
 	// Every entry is a temporary override (same rule as simultaneous mode).
-	const Variant entry = pattern_list_entries[pattern_list_cursor];
-	++pattern_list_cursor;
-	const uint32_t serial = pattern_list_serial;
+	const Variant entry = cadence.pattern_list_entries[cadence.pattern_list_cursor];
+	++cadence.pattern_list_cursor;
+	const uint32_t serial = cadence.pattern_list_serial;
 	fire_pattern_list_override(entry);
-	if (serial != pattern_list_serial) {
+	if (serial != cadence.pattern_list_serial) {
 		return; // a handler stopped this list or started another one
 	}
-	if (pattern_list_cursor >= pattern_list_entries.size()) {
+	if (cadence.pattern_list_cursor >= cadence.pattern_list_entries.size()) {
 		stop_pattern_list();
 		emit_on2d(this, "pattern_list_finished");
 	}

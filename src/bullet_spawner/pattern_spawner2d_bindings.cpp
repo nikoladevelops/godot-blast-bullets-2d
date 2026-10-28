@@ -27,7 +27,7 @@ void PatternSpawner2D::_validate_property(PropertyInfo &p_property) const {
 	}
 	// Burst / telegraph: tuning knobs appear once their switch is on.
 	if (property_name.begins_with("burst_") && property_name != "burst_enabled") {
-		if (!burst_enabled) {
+		if (!cadence.burst_enabled) {
 			p_property.usage &= ~PROPERTY_USAGE_EDITOR;
 		}
 		return;
@@ -45,7 +45,7 @@ void PatternSpawner2D::_validate_property(PropertyInfo &p_property) const {
 		return;
 	}
 	if (property_name == "telegraph_sec" || property_name == "telegraph_max_sec") {
-		if (!telegraph_enabled) {
+		if (!cadence.telegraph_enabled) {
 			p_property.usage &= ~PROPERTY_USAGE_EDITOR;
 		}
 		return;

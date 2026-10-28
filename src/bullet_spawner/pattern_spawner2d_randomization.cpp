@@ -29,8 +29,8 @@ BLAST_RANDOM_SETTER(bullet_position_jitter_min, placement.position_jitter_min, v
 BLAST_RANDOM_SETTER(bullet_position_jitter_max, placement.position_jitter_max, value >= 0.0, ">= 0")
 // Timing maxima feed RandomNumberGenerator.randf_range, which takes floats:
 // past FLT_MAX the wait became INF and the spawner stalled for good.
-BLAST_RANDOM_SETTER(burst_interval_max_sec, burst_interval_max_sec, is_finite_real2d(value) && value >= 0.0, ">= 0 (0 = off)")
-BLAST_RANDOM_SETTER(telegraph_max_sec, telegraph_max_sec, is_finite_real2d(value) && value >= 0.0, ">= 0 (0 = off)")
+BLAST_RANDOM_SETTER(burst_interval_max_sec, cadence.burst_interval_max_sec, is_finite_real2d(value) && value >= 0.0, ">= 0 (0 = off)")
+BLAST_RANDOM_SETTER(telegraph_max_sec, cadence.telegraph_max_sec, is_finite_real2d(value) && value >= 0.0, ">= 0 (0 = off)")
 
 #undef BLAST_RANDOM_SETTER
 
@@ -39,7 +39,7 @@ void PatternSpawner2D::set_shoot_interval_max_sec(double value) {
 		UtilityFunctions::push_error(String(get_class()) + ": shoot_interval_max_sec must be finite and >= 0 (0 = off), keeping the old value.");
 		return;
 	}
-	shoot_interval_max_sec = value;
+	cadence.shoot_interval_max_sec = value;
 	clamp_shoot_wait_to_settings(); // a lower maximum cuts a longer rolled wait
 }
 
@@ -77,7 +77,7 @@ void PatternSpawner2D::set_bullet_scale_max_xy(const Vector2 &value) {
 // [0, 1) of this shot (the next volley's number), bullet `index`, `channel`:
 // ShotRandomizer2D's rolls (seeded: a pure hash; seed 0: Godot's global RNG).
 double PatternSpawner2D::roll_unit(uint32_t channel, uint64_t index) const {
-	return placement.roll_unit((uint64_t)volleys_fired, channel, index);
+	return placement.roll_unit((uint64_t)cadence.volleys_fired, channel, index);
 }
 
 bool PatternSpawner2D::randomization_active() const {
@@ -85,39 +85,21 @@ bool PatternSpawner2D::randomization_active() const {
 }
 
 void PatternSpawner2D::randomize_shot_transforms(std::vector<Transform2D> &transforms) {
-	placement.apply(transforms, (uint64_t)volleys_fired);
+	placement.apply(transforms, (uint64_t)cadence.volleys_fired);
 }
 
 // ---- Timing ranges --------------------------------------------------------------------
 
 double PatternSpawner2D::roll_timing_range(double base, double max_value, uint64_t channel) const {
-	if (!Math::is_finite(max_value) || !(max_value > base)) {
-		return base;
-	}
-	Ref<RandomNumberGenerator> rng = jitter_rng;
-	if (rng.is_null()) {
-		rng.instantiate();
-		jitter_rng = rng;
-	}
-	if (reload_jitter_seed != 0) {
-		// Same family as the reload jitter: (seed, shot index) hashed, with the
-		// channel folded in so the ranges never replay each other's stream.
-		uint64_t h = (uint64_t)reload_jitter_seed * 0x9E3779B97F4A7C15ull + (uint64_t)volleys_fired + channel * 0x632BE59BD9B4E019ull;
-		rng->set_seed(mix64(h));
-		jitter_rng_randomized = false; // seed 0 later must not continue this stream
-	} else if (!jitter_rng_randomized) {
-		rng->randomize();
-		jitter_rng_randomized = true;
-	}
-	return rng->randf_range(base, max_value);
+	return cadence.roll_range(base, max_value, channel);
 }
 
 double PatternSpawner2D::next_burst_interval_sec() const {
-	return roll_timing_range(burst_interval_sec, burst_interval_max_sec, 2);
+	return cadence.next_burst_interval();
 }
 
 double PatternSpawner2D::next_telegraph_sec() const {
-	return roll_timing_range(telegraph_sec, telegraph_max_sec, 3);
+	return cadence.next_telegraph();
 }
 
 // ---- Spin start phase -----------------------------------------------------------------

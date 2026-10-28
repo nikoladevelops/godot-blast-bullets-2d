@@ -1253,7 +1253,7 @@ void BulletSpawner2D::apply_volley_homing_and_orbiting(BulletVolley2D *bullets, 
 	}
 	// volleys_fired still holds the previous count here (shoot_once bumps it
 	// right after), so +1 names the volley being configured.
-	emit_on2d(this, "volley_homing_configured", bullets, volleys_fired + 1);
+	emit_on2d(this, "volley_homing_configured", bullets, cadence.volleys_fired + 1);
 }
 
 bool BulletSpawner2D::fire_arc_covers_targets(const Array &targets) const {
@@ -1277,7 +1277,7 @@ bool BulletSpawner2D::fire_arc_covers_targets(const Array &targets) const {
 	// The volley's actual facing: generator rotation plus the emitter spin
 	// (negated on a mirrored burst shot, like the pattern itself).
 	real_t spin_rad = Math::deg_to_rad((real_t)(spin.angle_deg + (shot_pose_active ? shot_pose_extra_spin_deg : 0.0)));
-	if (burst_alternate_mirror && burst_mirror_next) {
+	if (cadence.burst_alternate_mirror && cadence.burst_mirror_next) {
 		spin_rad = -spin_rad;
 	}
 	const real_t facing = marker.get_rotation() + spin_rad;

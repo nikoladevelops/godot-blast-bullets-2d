@@ -319,7 +319,7 @@ ShotResult2D BulletSpawner2D::fire_shot(std::vector<Transform2D> &transforms) {
 	// Last-chance hook on the freshly spawned, stamped volley (before the
 	// muzzle offset, homing and orbit are configured): handlers may tweak the
 	// live instance (speeds, custom data) or drop it via queue_free().
-	emit_on2d(this, "pre_shoot", bullets, volleys_fired + 1);
+	emit_on2d(this, "pre_shoot", bullets, cadence.volleys_fired + 1);
 	// G1: a pre_shoot handler may have freed this volley (factory reset/free_*,
 	// queue_free) or handed it to another owner (adopt_live_volley). Feeding a
 	// dead/foreign pointer into the configuring step below would be
@@ -366,7 +366,7 @@ ShotResult2D BulletSpawner2D::fire_shot(std::vector<Transform2D> &transforms) {
 		// itself succeeded (bullets were created), but this shot is dropped.
 		return refuse_shot(String(), StringName("dropped"), true);
 	}
-	volleys_fired += 1;
+	const int shot_number = cadence.count_shot();
 	// The latch stays up through this emit AND the cap transition below: a
 	// volley_fired (or shooting_finished) handler calling shoot_once() (same
 	// or cross spawner) would otherwise recurse without bound past the
@@ -375,11 +375,11 @@ ShotResult2D BulletSpawner2D::fire_shot(std::vector<Transform2D> &transforms) {
 	// return while the guard is either unset or already cleared.
 	// Read before the emit: a volley_fired handler may free the volley.
 	const int fired_amount = bullets->get_amount_bullets();
-	const uint32_t cadence = cadence_serial;
-	emit_on2d(this, "volley_fired", bullets, volleys_fired);
+	const uint32_t cadence_before = cadence.serial;
+	emit_on2d(this, "volley_fired", bullets, shot_number);
 	// A handler that reset the wave or armed a new budget owns the cadence:
 	// this shot neither spends that budget nor reports a stale cap.
-	result.cadence_replaced = cadence != cadence_serial;
+	result.cadence_replaced = cadence_before != cadence.serial;
 	result.amount = fired_amount;
 	return result;
 }

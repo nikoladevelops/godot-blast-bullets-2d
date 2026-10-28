@@ -899,7 +899,7 @@ src/
   the chaos fuzz.
 - A handler may also stop, replace or restart what emitted (movement
   playback, pattern lists): the emitting code re-checks an epoch/serial
-  (`movement_epoch`, `pattern_list_serial`) after the emit and leaves the
+  (`movement.epoch`, `cadence.pattern_list_serial`) after the emit and leaves the
   rest to the handler.
 - Pinned by `volley/test_volley_hit_contract`, `test_volley_lifetime_contract`,
   `test_volley_signal_timing`, `test_volley_bounce_signals`,
@@ -1140,7 +1140,7 @@ deduped, cancelled by REMOVED) and replayed once on resume.
   it (`SplitRequest2D::framed`). The frame paths are out of line
   (`bounce_frame_*`): inlined they cost split_storm ~15%. Flat walls need
   `bounce_mode` Precise (radial is for round targets). Shot handlers own
-  what they change: `burst_serial` (chains) and `cadence_serial`
+  what they change: `cadence.burst_serial` (chains) and `cadence.serial`
   (reset_shooting / fire_n_volleys) are re-checked after every shot emit.
 - A pooled volley is a stale handle: every mutator refuses it
   (`reject_pooled_handle`); `volley/test_volley_pooled_handle_writes` calls
@@ -1799,6 +1799,24 @@ riding lasers snap, carry shifts the rest), `append_*_warnings`, `payload_key`,
 `preview_beam_length`, ...). `fire_shot` counts the shot (`volleys_fired`) and
 emits the class's own fired signal; the skeleton then plays On Shot and
 handles budgets and caps.
+
+The base is assembled from parts (plain C++ members, each with its settings,
+runtime state and pure logic; the host keeps the node, the tree and every
+emit, and re-checks the parts' serials after user code):
+
+| Part | Member | Holds |
+|---|---|---|
+| `ShotCadence2D` (`shot_cadence2d.*`) | `cadence` | WHEN: auto fire, interval ranges + reload jitter (its own RNG), budgets, `max_shots_per_frame`, bursts, telegraph, the pattern-list sequencer, `volleys_fired` (`count_shot()`, `next_shot_number()`) and the serials |
+| `SpawnerSpin2D` (`spawner_spin2d.hpp`) | `spin` | the Spin group, the angle and the oscillation clock (`advance`, `reset`, `start_at_phase`) |
+| `SpawnerMovement2D` (`spawner_movement2d.hpp`) | `movement` | the Movement group, the playback state, `epoch`, leg timing and easing |
+| `SpawnerPreview2D` (`spawner_preview2d.hpp`) | `preview` | the preview look, the watched sources, the preview nodes (ids next to pointers) and the rebuild bookkeeping |
+| `ShotRandomizer2D` (`patterns/shot_randomizer2d.hpp`) | `placement` | the placement rolls (also `BulletPatterns2D.randomize_transforms`) |
+| `TargetSource2D` (`targets/target_source2d.*`) | graze / sound sources | WHO a feature finds, one detector shared with the volleys |
+
+Bound accessors stay on the spawner (their error texts name `get_class()`)
+and forward to the part; a part's enums carry the serialized ids, pinned by
+a `static_assert` against the bound enum. A derived spawner fires through the
+part's API (`cadence.count_shot()`), never its counters.
 
 - Base errors name `get_class()` (BulletSpawner2D texts stay byte-identical).
 - Register a derived class AFTER `PatternSpawner2D` in `register_types.cpp`

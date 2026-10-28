@@ -482,11 +482,11 @@ ShotResult2D LaserSpawner2D::fire_shot(std::vector<Transform2D> &transforms) {
 	if (aims_at_targets()) {
 		assign_targets(laser, resolve_laser_targets());
 	}
-	volleys_fired += 1;
+	const int shot_number = cadence.count_shot();
 	const int beams = laser->get_beam_count();
-	const uint32_t cadence = cadence_serial;
-	emit_on2d(this, "laser_fired", laser, volleys_fired);
-	result.cadence_replaced = cadence != cadence_serial;
+	const uint32_t cadence_before = cadence.serial;
+	emit_on2d(this, "laser_fired", laser, shot_number);
+	result.cadence_replaced = cadence_before != cadence.serial;
 	result.amount = beams;
 	return result;
 }

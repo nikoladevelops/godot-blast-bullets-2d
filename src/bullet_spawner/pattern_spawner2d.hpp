@@ -1,5 +1,6 @@
 #pragma once
 
+#include "bullet_spawner/shot_cadence2d.hpp"
 #include "bullet_spawner/spawner_movement2d.hpp"
 #include "bullet_spawner/spawner_preview2d.hpp"
 #include "bullet_spawner/spawner_property_binder2d.hpp"
@@ -386,19 +387,9 @@ public:
 
 	// SHOOTING (TIMER + VOLLEYS)
 
-	// Master switch for automatic shooting. Toggles _process.
-	bool shooting_enabled = true;
-	// Seconds between volleys. Must stay > 0 (setter rejects the rest).
-	double shoot_interval_sec = 1.0;
-	// Delay before the first volley after (re)arming.
-	double shoot_initial_delay_sec = 0.0;
-	// Volleys after which auto-shooting stops. -1 = infinite, 0 = never.
-	int max_volleys = -1;
-	// The most shots ONE timer (auto-fire, a burst chain, a pattern list)
-	// fires in one frame: sub-frame intervals and a late frame repay up to
-	// this many, then the timer resyncs and drops the rest of the backlog.
-	// 1 = never repay a hitch. Bounds an overloaded game's spiral.
-	int max_shots_per_frame = 8;
+	// Auto fire, budgets, bursts, telegraph and pattern lists: the settings,
+	// clocks, counters and serials live in the cadence part (shot_cadence2d.hpp).
+	ShotCadence2D cadence;
 	// Uniform scale applied to every generated transform, relative to the
 	// transforms generator (spread radius and bullet size grow together).
 	// 1.0 = identity. Must stay finite (setter rejects the rest); 0
@@ -458,25 +449,6 @@ public:
 	// (patterns/pattern_knobs2d.hpp): the bound accessors below read and
 	// write those fields.
 
-	// BURST (multi-volley danmaku phrasing: N shots per trigger).
-	bool burst_enabled = false;
-	// Shots per trigger. Must stay >= 1.
-	int burst_count = 3;
-	// Seconds between burst shots. Must stay > 0.
-	double burst_interval_sec = 0.15;
-	// Mirror every other burst volley: the classic reverse-the-angle
-	// rhythm without scripting. A mirrored shot negates BOTH the emitter
-	// spin and the spiral-family winding (spiral / multispiral /
-	// counter-spiral angle_step), so the arms genuinely sweep the other
-	// way. BEHAVIOR CHANGE: earlier this only negated the emitter spin, so
-	// a mirrored spiral wound identically and merely pointed backwards.
-	// Non-spiral patterns are unaffected (they have no winding to flip).
-	bool burst_alternate_mirror = false;
-	// Telegraph: warn before each burst volley fires.
-	bool telegraph_enabled = false;
-	// Seconds of warning before the volley. Must stay >= 0.
-	double telegraph_sec = 0.5;
-
 	// How homing_node_name is compared against node names (node-name source).
 	enum HomingNodeNameMatch : int {
 		HOMING_NAME_MATCH_EXACT = 0, // "Player" matches only "Player"
@@ -484,13 +456,6 @@ public:
 		HOMING_NAME_MATCH_STARTS_WITH, // "Player" matches "Player2" but not "EnemyPlayer"
 		HOMING_NAME_MATCH_ENDS_WITH // "Player" matches "EnemyPlayer" but not "Player2"
 	};
-	// Reload jitter: each auto volley waits shoot_interval_sec +/-
-	// random * reload_jitter_sec (seeded by reload_jitter_seed). 0 = exact.
-	// Must stay finite and >= 0.
-	double reload_jitter_sec = 0.0;
-	// Seed for reload jitter. 0 = non-deterministic, >0 = reproducible
-	// (seed + volleys_fired, so volleys still vary per shot).
-	int reload_jitter_seed = 0;
 
 	// GRAZE (EASY API, bullet_spawner2d_graze.cpp)
 	//
@@ -800,9 +765,6 @@ public:
 	static_assert((int)BULLET_SCALE_OFF == ShotRandomizer2D::SCALE_OFF && (int)BULLET_SCALE_UNIFORM == ShotRandomizer2D::SCALE_UNIFORM && (int)BULLET_SCALE_PER_AXIS == ShotRandomizer2D::SCALE_PER_AXIS, "bullet_scale_mode ids are the randomizer's (saved in scenes)");
 	// The placement rolls (scale / rotation / position) and their seed.
 	ShotRandomizer2D placement;
-	double shoot_interval_max_sec = 0.0;
-	double burst_interval_max_sec = 0.0;
-	double telegraph_max_sec = 0.0;
 
 	// ---- Time (the spawner's own clock) ----
 	// The spawner's cadence, initial delay, telegraph, bursts, pattern list,
@@ -859,11 +821,11 @@ public:
 	void set_bullet_position_jitter_min(double value);
 	double get_bullet_position_jitter_max() const { return placement.position_jitter_max; }
 	void set_bullet_position_jitter_max(double value);
-	double get_shoot_interval_max_sec() const { return shoot_interval_max_sec; }
+	double get_shoot_interval_max_sec() const { return cadence.shoot_interval_max_sec; }
 	void set_shoot_interval_max_sec(double value);
-	double get_burst_interval_max_sec() const { return burst_interval_max_sec; }
+	double get_burst_interval_max_sec() const { return cadence.burst_interval_max_sec; }
 	void set_burst_interval_max_sec(double value);
-	double get_telegraph_max_sec() const { return telegraph_max_sec; }
+	double get_telegraph_max_sec() const { return cadence.telegraph_max_sec; }
 	void set_telegraph_max_sec(double value);
 	// Rolls for one shot: transforms are rewritten in place; speed factors
 	// (empty when off) are applied by the caller after the spawn.
@@ -981,7 +943,7 @@ public:
 	void set_shoot_initial_delay_sec(double value);
 	int get_max_volleys() const;
 	void set_max_volleys(int value);
-	int get_max_shots_per_frame() const { return max_shots_per_frame; }
+	int get_max_shots_per_frame() const { return cadence.max_shots_per_frame; }
 	void set_max_shots_per_frame(int value);
 	int get_volleys_fired() const;
 	double get_pattern_scale() const;
@@ -1292,22 +1254,8 @@ protected:
 	// movement_velocity_inherit_factor while inherit_movement_velocity is on
 	// and it moves; zero otherwise (or when not finite).
 	Vector2 shot_inherited_velocity() const;
-	// Countdown to the next volley; volleys fired since (re)arming.
-	double shoot_time_left = 0.0;
 	// Cuts the running wait to the longest the timing settings can roll now.
 	void clamp_shoot_wait_to_settings();
-	// True while shoot_time_left counts the initial delay (until the first
-	// pull): an interval change never cuts it.
-	bool shoot_initial_wait = false;
-	int volleys_fired = 0;
-	// Pause latch (pause_shooting/resume_shooting): auto_shooting_active()
-	// stays false while set, but volleys_fired/max_volleys are preserved
-	// so resume continues the current wave instead of restarting it.
-	bool shooting_paused = false;
-	// One-shot budget from fire_n_volleys(n): counts every fired volley
-	// (auto or manual) down to 0, then pauses. -1 = no budget.
-	// Never touches max_volleys, so unlimited (-1) stays unlimited.
-	int oneshot_volleys_left = -1;
 	// Re-entrancy latch for shoot_once(): its emits run user handlers
 	// synchronously, which must not nest another shoot_once(). Held across
 	// apply + emit + cap transition; use shoot_once_deferred() instead.
@@ -1324,74 +1272,6 @@ protected:
 	bool shot_owner_dying() const { return refused_free_during_shot || emit_guard.refused_free || is_queued_for_deletion(); }
 	// Single clear-point for the latch + global depth above.
 	void clear_shoot_once_latch();
-	// Dedicated RNG for reload jitter (mutable: used by the const
-	// next_shoot_interval_sec). Separate from homing_rng: jitter reseeds
-	// would otherwise corrupt the homing target sequence.
-	mutable Ref<RandomNumberGenerator> jitter_rng;
-	// Seed 0 (non-deterministic jitter) randomizes the generator once,
-	// not on every interval.
-	mutable bool jitter_rng_randomized = false;
-	// Burst runtime state (never stored): shots left in the current burst,
-	// countdown to the next burst shot, telegraph countdown, and the
-	// mirror flag for the next burst volley.
-	int burst_shots_left = 0;
-	// The chain's last shot is being reported (burst_shot_fired): it still
-	// runs for a handler that takes it over (that handler's cancel reports it).
-	bool burst_chain_closing = false;
-	// Bumped when a chain starts or ends: a burst_shot_fired / volley_fired
-	// handler that cancels, restarts or resets the chain owns it (the running
-	// shot touches no counter after its emits once this moved).
-	uint32_t burst_serial = 0;
-	// Bumped by reset_shooting and fire_n_volleys: a shot handler calling
-	// them owns the cadence (the reporting shot neither spends the new budget
-	// nor rearms the interval over the restarted delay).
-	uint32_t cadence_serial = 0;
-	// Shots fired in the current chain (shot index and mirror rhythm).
-	int burst_shots_fired = 0;
-	// True when the auto loop started the chain: it then follows the
-	// auto-fire rules (clamped to volleys_remaining, cancelled when
-	// shooting_enabled turns off, errors latched once).
-	bool burst_from_auto = false;
-	// Same for a pending telegraph.
-	bool telegraph_from_auto = false;
-	double burst_time_left = 0.0;
-	double telegraph_time_left = 0.0;
-	bool burst_mirror_next = false;
-	// Consecutive shoot_once() failures inside the current burst chain.
-	// A failed shot is retried (not consumed), so transient hitches never
-	// eat burst shots; after a full burst's worth of consecutive failures
-	// the failure is permanent (bad config, hard over-budget) and the
-	// chain aborts with burst_finished instead of retrying forever.
-	// Reset on every success and every new chain.
-	int burst_consecutive_failures = 0;
-	// Set by shoot_once() when its shot spent the fire_n_volleys budget: an
-	// auto chain belongs to that budget and ends with it.
-	bool last_shot_spent_budget = false;
-	// True once the current burst chain has shown its telegraph: stops
-	// the expiry re-firing the warning in a loop instead of firing.
-	bool burst_telegraph_done = false;
-	// NOTE: nesting protection for burst chains is solely the
-	// shoot_once() latch + global depth (a handler calling shoot_once()
-	// from any spawner emission is rejected; use shoot_once_deferred()).
-	// A dedicated burst_firing flag was removed: it was write-only and
-	// shoot_once() never checked it, so it protected nothing.
-	// Telegraph runtime: the pending volley config while warning. Stored
-	// as a flag only (transforms re-collect at fire time, so markers that
-	// move during the warning still aim correctly).
-	bool telegraph_pending = false;
-	// Pattern sequencer (BLAST-style spawn_list): queued entries fired in
-	// order (interval apart) or all at once. Runtime state, never stored.
-	// Each entry is a Dictionary: { "pattern_source": int,
-	// "helper_bullets_amount": int, "spawn_data": Ref, "preset": int }.
-	// Only set keys override the live spawner for that shot.
-	Array pattern_list_entries;
-	double pattern_list_interval_sec = 0.25;
-	int pattern_list_cursor = 0;
-	double pattern_list_time_left = 0.0;
-	bool pattern_list_active = false;
-	// Bumped by every spawn_pattern_list / stop_pattern_list call: a handler
-	// that started or stopped a list inside an entry's shot owns what follows.
-	uint32_t pattern_list_serial = 0;
 	void set_preview_nodes(Node2D *holder, PatternPreviewLayer2D *dots, PatternPreviewLayer2D *arrows);
 	// This spawner's preview holder under `parent` (found by owner meta), or null.
 	Node2D *own_preview_holder_under(Node *parent) const;

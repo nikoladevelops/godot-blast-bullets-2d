@@ -55,7 +55,7 @@ void BulletSpawner2D::roll_shot_colors(size_t count) {
 		return;
 	}
 	shot_colors.resize(count);
-	const uint64_t shot = (uint64_t)volleys_fired;
+	const uint64_t shot = (uint64_t)cadence.volleys_fired;
 	switch (bullet_color_mode) {
 		case COLOR_MODE_GRADIENT_ACROSS_PATTERN: {
 			if (bullet_color_shift_per_shot == 0.0) {

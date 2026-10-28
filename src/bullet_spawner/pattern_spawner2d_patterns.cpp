@@ -429,7 +429,7 @@ void PatternSpawner2D::collect_spawn_transforms_native(bool quiet, std::vector<T
 	// bit-identical to before. The preview gizmo never mirrors (it draws the
 	// pattern, not one shot of a burst; a rebuild during a mirrored shot
 	// would otherwise freeze the mirrored winding into it).
-	const bool mirrored_shot = burst_alternate_mirror && burst_mirror_next && !preview.suppress_spin;
+	const bool mirrored_shot = cadence.burst_alternate_mirror && cadence.burst_mirror_next && !preview.suppress_spin;
 	const real_t mirror_sign = mirrored_shot ? (real_t)-1.0 : (real_t)1.0;
 	std::vector<Transform2D> raw;
 	resolve_raw_pattern(base, marker, mirror_sign, quiet, raw);

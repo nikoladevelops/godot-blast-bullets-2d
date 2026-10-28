@@ -134,7 +134,7 @@ void BulletSpawner2D::apply_volley_emitter(BulletVolley2D *volley) {
 		emitter_shared = std::shared_ptr<EmitterConfig2D>(new EmitterConfig2D());
 	}
 	apply_emitter_config();
-	volley->emitter_arm(emitter_shared, (uint64_t)volleys_fired + 1); // the shot number salts the seeded rolls
+	volley->emitter_arm(emitter_shared, cadence.next_shot_number()); // the shot number salts the seeded rolls
 }
 
 void BulletSpawner2D::emitter_live_volleys(std::unordered_set<uint64_t> &r_changed) {
