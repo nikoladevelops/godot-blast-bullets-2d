@@ -254,8 +254,15 @@ func _on_free_all_bullet_pools_btn_pressed() -> void:
 
 func _on_populate_volley_pool_btn_pressed() -> void:
 	var amount_multi_meshes:int = select_amount_multi_meshes_view.get_selected_btn.text.to_int()
-	var data = BENCHMARK_GLOBALS.PLAYER_DATA_NODE.volley_data
-	var pool_key:VolleyPoolKey2D = VolleyPoolKey2D.make(data.transforms.size(), _effective_shape_type(data.collision_shape))
+	# Warm the bucket the player's next shot uses (the selected bullet amount),
+	# not the size of the last shot the data happened to carry.
+	var player_data:PlayerData = BENCHMARK_GLOBALS.PLAYER_DATA_NODE
+	var data:BulletVolleyData2D = player_data.volley_data.duplicate()
+	var transforms:Array[Transform2D] = []
+	transforms.resize(player_data.bullets_amount)
+	transforms.fill(Transform2D())
+	data.transforms = transforms
+	var pool_key:VolleyPoolKey2D = VolleyPoolKey2D.make(player_data.bullets_amount, _effective_shape_type(data.collision_shape))
 
 	BENCHMARK_GLOBALS.FACTORY.populate_bullets_pool(pool_key, data, amount_multi_meshes)
 	
