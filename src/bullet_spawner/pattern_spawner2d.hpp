@@ -1,5 +1,6 @@
 #pragma once
 
+#include "bullet_spawner/spawner_movement2d.hpp"
 #include "bullet_spawner/spawner_property_binder2d.hpp"
 #include "bullet_spawner/spawner_spin2d.hpp"
 #include "bullet_volley/bullet_volley2d.hpp"
@@ -1559,59 +1560,9 @@ protected:
 	mutable PatternBakeCache2D pattern_cache;
 	int pattern_cache_mode = PATTERN_CACHE_AUTO;
 
-	// Movement properties (see the public block).
-	bool movement_enabled = false;
-	NodePath movement_path;
-	mutable Path2D *movement_path_cache = nullptr;
-	mutable uint64_t movement_path_id = 0;
-	int movement_space = MOVEMENT_SPACE_ATTACH;
-	int movement_loop_mode = MOVEMENT_LOOP_ONCE;
-	int movement_direction = MOVEMENT_DIRECTION_FORWARD;
-	int movement_loops = 0;
-	int movement_timing = MOVEMENT_TIMING_DURATION;
-	double movement_duration_sec = 3.0;
-	double movement_speed = 200.0;
-	int movement_transition = 0; // Tween.TRANS_LINEAR
-	int movement_ease = 2; // Tween.EASE_IN_OUT
-	Ref<Curve> movement_progress_curve;
-	double movement_start_ratio = 0.0;
-	double movement_start_delay_sec = 0.0;
-	double movement_endpoint_pause_sec = 0.0;
-	bool movement_rotate_with_path = false;
-	double movement_rotation_offset_deg = 0.0;
-	bool movement_cubic_sampling = false;
-	bool movement_autostart = true;
-	bool inherit_movement_velocity = false;
-	double movement_velocity_inherit_factor = 1.0;
-	// Movement runtime state.
-	bool movement_playing = false;
-	bool movement_finished = false;
-	double movement_leg_elapsed = 0.0;
-	double movement_delay_left = 0.0;
-	double movement_pause_left = 0.0;
-	int movement_legs_completed = 0;
-	bool movement_leg_forward = true;
-	double movement_progress = 0.0; // distance ratio along the path
-	Vector2 movement_start_origin; // RELATIVE_TO_START anchor (global)
-	bool movement_has_last_position = false;
-	// The global position the movement itself last applied: velocity is
-	// measured from it, so a position written by hand in between is never
-	// motion a shot inherits.
-	Vector2 movement_last_pose;
-	// teleport() jumps an Attach path along (Relative To Start moves its
-	// anchor instead); movement_reset_state drops it.
-	Vector2 movement_teleport_offset;
-	// Bumped by every playback control (play, pause, stop, seek, reverse,
-	// enable): a movement signal handler that used one owns what happens next.
-	uint32_t movement_epoch = 0;
-	// Set on EXIT_TREE and by a new path or space: the next pose is a jump
-	// (no velocity).
-	bool movement_jumped = false;
-	// movement_enabled turned on (autostart) while out of the tree after the
-	// first _ready: plays on the next entry (_ready only runs once).
-	bool movement_autostart_pending = false;
-	Vector2 movement_velocity;
-	bool movement_warned_unusable_path = false;
+	// Movement settings and playback state (see the public block).
+	static_assert((int)MOVEMENT_SPACE_ATTACH == SpawnerMovement2D::SPACE_ATTACH && (int)MOVEMENT_SPACE_RELATIVE_TO_START == SpawnerMovement2D::SPACE_RELATIVE_TO_START && (int)MOVEMENT_LOOP_ONCE == SpawnerMovement2D::LOOP_ONCE && (int)MOVEMENT_LOOP_LOOP == SpawnerMovement2D::LOOP_LOOP && (int)MOVEMENT_LOOP_PING_PONG == SpawnerMovement2D::LOOP_PING_PONG && (int)MOVEMENT_DIRECTION_FORWARD == SpawnerMovement2D::DIRECTION_FORWARD && (int)MOVEMENT_DIRECTION_REVERSE == SpawnerMovement2D::DIRECTION_REVERSE && (int)MOVEMENT_TIMING_DURATION == SpawnerMovement2D::TIMING_DURATION && (int)MOVEMENT_TIMING_SPEED == SpawnerMovement2D::TIMING_SPEED, "movement ids are the movement part's (saved in scenes)");
+	SpawnerMovement2D movement;
 	// Advances playback by delta and moves the node. Returns false when
 	// a signal handler freed this spawner (caller must stop touching it).
 	bool advance_movement(double delta);
@@ -1619,10 +1570,7 @@ protected:
 	// move over `delta`, the time it took (keep_velocity: a pose only, the
 	// velocity stays). Returns false when the path is unusable.
 	bool apply_movement_pose(double delta, bool keep_velocity = false);
-	double movement_leg_duration(double path_length) const;
-	double movement_eased(double leg_ratio) const;
 	bool movement_active() const;
-	void movement_reset_state();
 	// Auto-fire error latch (see shoot_once fail_early).
 	bool auto_fire_in_progress = false;
 	uint64_t run_frame_count = 0;

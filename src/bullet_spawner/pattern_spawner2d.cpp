@@ -642,7 +642,7 @@ PackedStringArray PatternSpawner2D::_get_configuration_warnings() const {
 	if (pattern_source == PATTERN_FROM_HELPER_CUSTOM && helper_custom_transforms.is_empty()) {
 		out.push_back("Custom pattern has no helper_custom_transforms.");
 	}
-	if (movement_enabled && movement_path.is_empty()) {
+	if (movement.enabled && movement.path.is_empty()) {
 		out.push_back("movement_enabled is on but movement_path is empty: assign a Path2D to move along.");
 	}
 	append_setup_warnings(out);
@@ -966,12 +966,12 @@ void PatternSpawner2D::_ready() {
 	restart_owned_clocks();
 	// Movement autostart: the spawner's pose when it enters play is the
 	// RELATIVE_TO_START anchor.
-	movement_autostart_pending = false;
-	if (movement_enabled && movement_autostart && !movement_playing) {
-		movement_has_last_position = false;
-		movement_finished = false;
-		movement_legs_completed = 0;
-		movement_leg_elapsed = 0.0;
+	movement.autostart_pending = false;
+	if (movement.enabled && movement.autostart && !movement.playing) {
+		movement.has_last_position = false;
+		movement.finished = false;
+		movement.legs_completed = 0;
+		movement.leg_elapsed = 0.0;
 		movement_play();
 	}
 	if (preview_active()) {
@@ -1034,9 +1034,9 @@ void PatternSpawner2D::_notification(int p_what) {
 	} else if (p_what == NOTIFICATION_POST_ENTER_TREE) {
 		// Movement switched on while out of the tree after the first _ready
 		// (a pooled enemy, a reparent): autostart now (_ready never runs again).
-		if (movement_autostart_pending && is_node_ready() && !Engine::get_singleton()->is_editor_hint()) {
-			movement_autostart_pending = false;
-			if (movement_enabled && movement_autostart && !movement_playing) {
+		if (movement.autostart_pending && is_node_ready() && !Engine::get_singleton()->is_editor_hint()) {
+			movement.autostart_pending = false;
+			if (movement.enabled && movement.autostart && !movement.playing) {
 				movement_play();
 			}
 		}
@@ -1080,8 +1080,8 @@ void PatternSpawner2D::_notification(int p_what) {
 		on_exit_tree_owned();
 		// The next pose after re-entry is a jump, not motion: report no
 		// velocity for it (shots would inherit it).
-		movement_jumped = true;
-		movement_velocity = Vector2();
+		movement.jumped = true;
+		movement.velocity = Vector2();
 	}
 }
 
@@ -1103,7 +1103,7 @@ void PatternSpawner2D::fill_assigned_node_paths() {
 	fill(transforms_generator, transforms_generator_id, transforms_generator_path);
 	fill(helper_aimed_target, helper_aimed_target_id, helper_aimed_target_path);
 	fill(helper_path2d_cache, helper_path2d_id, helper_path2d_path);
-	fill(movement_path_cache, movement_path_id, movement_path);
+	fill(movement.path_cache, movement.path_id, movement.path);
 }
 
 void PatternSpawner2D::set_time_scale(double value) {
@@ -1224,7 +1224,7 @@ void PatternSpawner2D::run_frame(double delta) {
 		delta *= get_process_time_scale();
 		if (!(delta > 0.0) || !Math::is_finite(delta)) {
 			delta_ok = false;
-			movement_velocity = Vector2(); // standing still: nothing to inherit
+			movement.velocity = Vector2(); // standing still: nothing to inherit
 		}
 	}
 	// Movement first: shots and the preview this frame use the new pose.

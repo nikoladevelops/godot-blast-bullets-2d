@@ -12,59 +12,59 @@ namespace BlastBullets2D {
 
 // ---- Movement along a Path2D -------------------------------------------------
 
-bool PatternSpawner2D::get_movement_enabled() const { return movement_enabled; }
+bool PatternSpawner2D::get_movement_enabled() const { return movement.enabled; }
 
 void PatternSpawner2D::set_movement_enabled(bool value) {
 	on_config_changed();
-	if (movement_enabled == value) {
+	if (movement.enabled == value) {
 		return;
 	}
-	movement_enabled = value;
-	++movement_epoch;
+	movement.enabled = value;
+	++movement.epoch;
 	notify_property_list_changed();
 	// Out of the tree after the first _ready: autostart waits for the next
 	// entry (POST_ENTER_TREE); before it, _ready starts it.
-	movement_autostart_pending = value && movement_autostart && !is_inside_tree();
+	movement.autostart_pending = value && movement.autostart && !is_inside_tree();
 	if (Engine::get_singleton()->is_editor_hint() || !is_inside_tree()) {
 		return;
 	}
-	if (movement_enabled && movement_autostart) {
+	if (movement.enabled && movement.autostart) {
 		movement_play();
-	} else if (!movement_enabled) {
-		movement_playing = false;
-		movement_velocity = Vector2();
+	} else if (!movement.enabled) {
+		movement.playing = false;
+		movement.velocity = Vector2();
 	}
 	refresh_process_state();
 }
 
-NodePath PatternSpawner2D::get_movement_path() const { return movement_path; }
+NodePath PatternSpawner2D::get_movement_path() const { return movement.path; }
 
 void PatternSpawner2D::set_movement_path(const NodePath &p_path) {
 	if (!node_path_type_ok<Path2D>(this, p_path, "movement_path", "Path2D")) {
 		return;
 	}
 	on_config_changed();
-	movement_jumped = movement_jumped || p_path != movement_path; // a new path is a jump, never travel
-	movement_path = p_path;
-	movement_path_cache = nullptr;
-	movement_path_id = 0;
-	movement_warned_unusable_path = false;
-	if (!movement_path.is_empty() && is_inside_tree()) {
-		Path2D *resolved = resolve_node_path(this, movement_path, movement_path_cache);
-		movement_path_id = resolved != nullptr ? resolved->get_instance_id() : 0;
+	movement.jumped = movement.jumped || p_path != movement.path; // a new path is a jump, never travel
+	movement.path = p_path;
+	movement.path_cache = nullptr;
+	movement.path_id = 0;
+	movement.warned_unusable_path = false;
+	if (!movement.path.is_empty() && is_inside_tree()) {
+		Path2D *resolved = resolve_node_path(this, movement.path, movement.path_cache);
+		movement.path_id = resolved != nullptr ? resolved->get_instance_id() : 0;
 	}
 }
 
 Path2D *PatternSpawner2D::get_movement_path_node() const {
-	return validate_cached_node(this, movement_path, movement_path_cache, movement_path_id);
+	return validate_cached_node(this, movement.path, movement.path_cache, movement.path_id);
 }
 
 void PatternSpawner2D::set_movement_path_node(Path2D *node) {
 	on_config_changed();
-	movement_jumped = movement_jumped || node != get_movement_path_node(); // a new path is a jump, never travel
-	assign_node_to_path(this, node, movement_path, movement_path_cache);
-	movement_path_id = node != nullptr ? node->get_instance_id() : 0;
-	movement_warned_unusable_path = false;
+	movement.jumped = movement.jumped || node != get_movement_path_node(); // a new path is a jump, never travel
+	assign_node_to_path(this, node, movement.path, movement.path_cache);
+	movement.path_id = node != nullptr ? node->get_instance_id() : 0;
+	movement.warned_unusable_path = false;
 }
 
 // Small reject-and-keep helpers for the movement setters.
@@ -75,162 +75,162 @@ static bool movement_reject(bool bad, const String &message) {
 	return bad;
 }
 
-PatternSpawner2D::MovementSpace PatternSpawner2D::get_movement_space() const { return static_cast<MovementSpace>(movement_space); }
+PatternSpawner2D::MovementSpace PatternSpawner2D::get_movement_space() const { return static_cast<MovementSpace>(movement.space); }
 
 void PatternSpawner2D::set_movement_space(MovementSpace value) {
 	if (movement_reject(value < MOVEMENT_SPACE_ATTACH || value > MOVEMENT_SPACE_RELATIVE_TO_START, (String(get_class()) + ": movement_space must be 0 (Attach) or 1 (Relative To Start), keeping the old value."))) {
 		return;
 	}
-	movement_jumped = movement_jumped || value != movement_space; // the path moves: a jump, never travel
-	movement_space = value;
+	movement.jumped = movement.jumped || value != movement.space; // the path moves: a jump, never travel
+	movement.space = value;
 }
 
-PatternSpawner2D::MovementLoopMode PatternSpawner2D::get_movement_loop_mode() const { return static_cast<MovementLoopMode>(movement_loop_mode); }
+PatternSpawner2D::MovementLoopMode PatternSpawner2D::get_movement_loop_mode() const { return static_cast<MovementLoopMode>(movement.loop_mode); }
 
 void PatternSpawner2D::set_movement_loop_mode(MovementLoopMode value) {
 	if (movement_reject(value < MOVEMENT_LOOP_ONCE || value > MOVEMENT_LOOP_PING_PONG, (String(get_class()) + ": movement_loop_mode must be 0 (Once), 1 (Loop) or 2 (Ping Pong), keeping the old value."))) {
 		return;
 	}
-	movement_loop_mode = value;
+	movement.loop_mode = value;
 	notify_property_list_changed();
 }
 
-PatternSpawner2D::MovementDirection PatternSpawner2D::get_movement_direction() const { return static_cast<MovementDirection>(movement_direction); }
+PatternSpawner2D::MovementDirection PatternSpawner2D::get_movement_direction() const { return static_cast<MovementDirection>(movement.direction); }
 
 void PatternSpawner2D::set_movement_direction(MovementDirection value) {
 	if (movement_reject(value < MOVEMENT_DIRECTION_FORWARD || value > MOVEMENT_DIRECTION_REVERSE, (String(get_class()) + ": movement_direction must be 0 (Forward) or 1 (Reverse), keeping the old value."))) {
 		return;
 	}
-	movement_direction = value;
+	movement.direction = value;
 }
 
-int PatternSpawner2D::get_movement_loops() const { return movement_loops; }
+int PatternSpawner2D::get_movement_loops() const { return movement.loops; }
 
 void PatternSpawner2D::set_movement_loops(int value) {
 	if (movement_reject(value < 0, (String(get_class()) + ": movement_loops must be >= 0 (0 = forever), keeping the old value."))) {
 		return;
 	}
-	movement_loops = value;
+	movement.loops = value;
 }
 
-PatternSpawner2D::MovementTiming PatternSpawner2D::get_movement_timing() const { return static_cast<MovementTiming>(movement_timing); }
+PatternSpawner2D::MovementTiming PatternSpawner2D::get_movement_timing() const { return static_cast<MovementTiming>(movement.timing); }
 
 void PatternSpawner2D::set_movement_timing(MovementTiming value) {
 	if (movement_reject(value < MOVEMENT_TIMING_DURATION || value > MOVEMENT_TIMING_SPEED, (String(get_class()) + ": movement_timing must be 0 (Duration) or 1 (Speed), keeping the old value."))) {
 		return;
 	}
-	movement_timing = value;
+	movement.timing = value;
 	notify_property_list_changed();
 }
 
-double PatternSpawner2D::get_movement_duration_sec() const { return movement_duration_sec; }
+double PatternSpawner2D::get_movement_duration_sec() const { return movement.duration_sec; }
 
 void PatternSpawner2D::set_movement_duration_sec(double value) {
 	if (movement_reject(!is_finite_real2d(value) || value <= 0.0, (String(get_class()) + ": movement_duration_sec must be finite and > 0, keeping the old value."))) {
 		return;
 	}
-	movement_duration_sec = value;
+	movement.duration_sec = value;
 }
 
-double PatternSpawner2D::get_movement_speed() const { return movement_speed; }
+double PatternSpawner2D::get_movement_speed() const { return movement.speed; }
 
 void PatternSpawner2D::set_movement_speed(double value) {
 	if (movement_reject(!is_finite_real2d(value) || value <= 0.0, (String(get_class()) + ": movement_speed must be finite and > 0, keeping the old value."))) {
 		return;
 	}
-	movement_speed = value;
+	movement.speed = value;
 }
 
-Tween::TransitionType PatternSpawner2D::get_movement_transition() const { return static_cast<Tween::TransitionType>(movement_transition); }
+Tween::TransitionType PatternSpawner2D::get_movement_transition() const { return static_cast<Tween::TransitionType>(movement.transition); }
 
 void PatternSpawner2D::set_movement_transition(Tween::TransitionType value) {
 	if (movement_reject((int)value < 0 || (int)value >= (int)Easing2D::TRANS_COUNT, (String(get_class()) + ": movement_transition must be a Tween.TransitionType (0..11), keeping the old value."))) {
 		return;
 	}
-	movement_transition = value;
+	movement.transition = value;
 }
 
-Tween::EaseType PatternSpawner2D::get_movement_ease() const { return static_cast<Tween::EaseType>(movement_ease); }
+Tween::EaseType PatternSpawner2D::get_movement_ease() const { return static_cast<Tween::EaseType>(movement.ease); }
 
 void PatternSpawner2D::set_movement_ease(Tween::EaseType value) {
 	if (movement_reject((int)value < 0 || (int)value >= (int)Easing2D::EASE_COUNT, (String(get_class()) + ": movement_ease must be a Tween.EaseType (0..3), keeping the old value."))) {
 		return;
 	}
-	movement_ease = value;
+	movement.ease = value;
 }
 
-Ref<Curve> PatternSpawner2D::get_movement_progress_curve() const { return movement_progress_curve; }
+Ref<Curve> PatternSpawner2D::get_movement_progress_curve() const { return movement.progress_curve; }
 
 void PatternSpawner2D::set_movement_progress_curve(const Ref<Curve> &value) {
-	movement_progress_curve = value;
+	movement.progress_curve = value;
 	notify_property_list_changed();
 }
 
-double PatternSpawner2D::get_movement_start_ratio() const { return movement_start_ratio; }
+double PatternSpawner2D::get_movement_start_ratio() const { return movement.start_ratio; }
 
 void PatternSpawner2D::set_movement_start_ratio(double value) {
 	if (movement_reject(!is_finite_real2d(value) || value < 0.0 || value > 1.0, (String(get_class()) + ": movement_start_ratio must be in [0, 1], keeping the old value."))) {
 		return;
 	}
-	movement_start_ratio = value;
+	movement.start_ratio = value;
 }
 
-double PatternSpawner2D::get_movement_start_delay_sec() const { return movement_start_delay_sec; }
+double PatternSpawner2D::get_movement_start_delay_sec() const { return movement.start_delay_sec; }
 
 void PatternSpawner2D::set_movement_start_delay_sec(double value) {
 	if (movement_reject(!is_finite_real2d(value) || value < 0.0, (String(get_class()) + ": movement_start_delay_sec must be finite and >= 0, keeping the old value."))) {
 		return;
 	}
-	movement_start_delay_sec = value;
+	movement.start_delay_sec = value;
 }
 
-double PatternSpawner2D::get_movement_endpoint_pause_sec() const { return movement_endpoint_pause_sec; }
+double PatternSpawner2D::get_movement_endpoint_pause_sec() const { return movement.endpoint_pause_sec; }
 
 void PatternSpawner2D::set_movement_endpoint_pause_sec(double value) {
 	if (movement_reject(!is_finite_real2d(value) || value < 0.0, (String(get_class()) + ": movement_endpoint_pause_sec must be finite and >= 0, keeping the old value."))) {
 		return;
 	}
-	movement_endpoint_pause_sec = value;
+	movement.endpoint_pause_sec = value;
 }
 
-bool PatternSpawner2D::get_movement_rotate_with_path() const { return movement_rotate_with_path; }
+bool PatternSpawner2D::get_movement_rotate_with_path() const { return movement.rotate_with_path; }
 
 void PatternSpawner2D::set_movement_rotate_with_path(bool value) {
-	movement_rotate_with_path = value;
+	movement.rotate_with_path = value;
 	notify_property_list_changed();
 }
 
-double PatternSpawner2D::get_movement_rotation_offset_deg() const { return movement_rotation_offset_deg; }
+double PatternSpawner2D::get_movement_rotation_offset_deg() const { return movement.rotation_offset_deg; }
 
 void PatternSpawner2D::set_movement_rotation_offset_deg(double value) {
 	if (movement_reject(!is_finite_real2d(value), (String(get_class()) + ": movement_rotation_offset_deg must be finite, keeping the old value."))) {
 		return;
 	}
-	movement_rotation_offset_deg = value;
+	movement.rotation_offset_deg = value;
 }
 
-bool PatternSpawner2D::get_movement_cubic_sampling() const { return movement_cubic_sampling; }
+bool PatternSpawner2D::get_movement_cubic_sampling() const { return movement.cubic_sampling; }
 
-void PatternSpawner2D::set_movement_cubic_sampling(bool value) { movement_cubic_sampling = value; }
+void PatternSpawner2D::set_movement_cubic_sampling(bool value) { movement.cubic_sampling = value; }
 
-bool PatternSpawner2D::get_movement_autostart() const { return movement_autostart; }
+bool PatternSpawner2D::get_movement_autostart() const { return movement.autostart; }
 
-void PatternSpawner2D::set_movement_autostart(bool value) { movement_autostart = value; }
+void PatternSpawner2D::set_movement_autostart(bool value) { movement.autostart = value; }
 
-bool PatternSpawner2D::get_inherit_movement_velocity() const { return inherit_movement_velocity; }
+bool PatternSpawner2D::get_inherit_movement_velocity() const { return movement.inherit_velocity; }
 
 void PatternSpawner2D::set_inherit_movement_velocity(bool value) {
-	inherit_movement_velocity = value;
+	movement.inherit_velocity = value;
 	notify_property_list_changed();
 }
 
-double PatternSpawner2D::get_movement_velocity_inherit_factor() const { return movement_velocity_inherit_factor; }
+double PatternSpawner2D::get_movement_velocity_inherit_factor() const { return movement.velocity_inherit_factor; }
 
 void PatternSpawner2D::set_movement_velocity_inherit_factor(double value) {
 	if (movement_reject(!is_finite_real2d(value), (String(get_class()) + ": movement_velocity_inherit_factor must be finite, keeping the old value."))) {
 		return;
 	}
-	movement_velocity_inherit_factor = value;
+	movement.velocity_inherit_factor = value;
 }
 
 double PatternSpawner2D::debug_ease(double t, int transition, int ease) {
@@ -238,35 +238,7 @@ double PatternSpawner2D::debug_ease(double t, int transition, int ease) {
 }
 
 bool PatternSpawner2D::movement_active() const {
-	return movement_enabled && movement_playing && is_inside_tree() && !Engine::get_singleton()->is_editor_hint();
-}
-
-void PatternSpawner2D::movement_reset_state() {
-	movement_finished = false;
-	movement_legs_completed = 0;
-	movement_leg_forward = movement_direction == MOVEMENT_DIRECTION_FORWARD;
-	movement_delay_left = movement_start_delay_sec;
-	movement_pause_left = 0.0;
-	movement_has_last_position = false;
-	movement_velocity = Vector2();
-	movement_leg_elapsed = 0.0;
-	movement_progress = movement_leg_forward ? 0.0 : 1.0;
-	movement_teleport_offset = Vector2();
-}
-
-double PatternSpawner2D::movement_eased(double leg_ratio) const {
-	if (movement_progress_curve.is_valid()) {
-		const double v = (double)movement_progress_curve->sample((real_t)CLAMP(leg_ratio, 0.0, 1.0));
-		return Math::is_finite(v) ? v : leg_ratio;
-	}
-	return Easing2D::ease(leg_ratio, movement_transition, movement_ease);
-}
-
-double PatternSpawner2D::movement_leg_duration(double path_length) const {
-	if (movement_timing == MOVEMENT_TIMING_SPEED) {
-		return (movement_speed > 0.0 && path_length > 0.0) ? path_length / movement_speed : 0.0;
-	}
-	return movement_duration_sec;
+	return movement.enabled && movement.playing && is_inside_tree() && !Engine::get_singleton()->is_editor_hint();
 }
 
 bool PatternSpawner2D::apply_movement_pose(double delta, bool keep_velocity) {
@@ -274,59 +246,59 @@ bool PatternSpawner2D::apply_movement_pose(double delta, bool keep_velocity) {
 	Ref<Curve2D> curve = path != nullptr ? path->get_curve() : Ref<Curve2D>();
 	const double length = curve.is_valid() ? (double)curve->get_baked_length() : 0.0;
 	if (path == nullptr || !path->is_inside_tree() || curve.is_null() || !(length > 0.0) || !Math::is_finite(length)) {
-		if (!movement_warned_unusable_path) {
-			movement_warned_unusable_path = true;
+		if (!movement.warned_unusable_path) {
+			movement.warned_unusable_path = true;
 			UtilityFunctions::push_warning((String(get_class()) + ": movement_path is not a Path2D with a non-empty curve in the tree; the spawner stays where it is."));
 		}
-		movement_velocity = Vector2();
+		movement.velocity = Vector2();
 		return false;
 	}
-	movement_warned_unusable_path = false;
+	movement.warned_unusable_path = false;
 	const Transform2D path_global = path->get_global_transform();
 	if (!path_global.is_finite()) {
 		return false;
 	}
-	const double distance = CLAMP(movement_progress, 0.0, 1.0) * length;
-	const Transform2D sample = curve->sample_baked_with_rotation((real_t)distance, movement_cubic_sampling);
+	const double distance = CLAMP(movement.progress, 0.0, 1.0) * length;
+	const Transform2D sample = curve->sample_baked_with_rotation((real_t)distance, movement.cubic_sampling);
 	Vector2 target = path_global.xform(sample.get_origin());
-	if (movement_space == MOVEMENT_SPACE_RELATIVE_TO_START) {
-		const Vector2 path_start = path_global.xform(curve->sample_baked(0.0, movement_cubic_sampling));
-		target = movement_start_origin + (target - path_start);
+	if (movement.space == MOVEMENT_SPACE_RELATIVE_TO_START) {
+		const Vector2 path_start = path_global.xform(curve->sample_baked(0.0, movement.cubic_sampling));
+		target = movement.start_origin + (target - path_start);
 	} else {
-		target += movement_teleport_offset;
+		target += movement.teleport_offset;
 	}
 	if (!target.is_finite()) {
 		return false;
 	}
-	const Vector2 before = movement_has_last_position ? movement_last_pose : get_global_position();
+	const Vector2 before = movement.has_last_position ? movement.last_pose : get_global_position();
 	set_global_position(target);
-	movement_last_pose = target;
-	if (movement_rotate_with_path) {
+	movement.last_pose = target;
+	if (movement.rotate_with_path) {
 		// Face the direction of travel: the baked tangent points along
 		// increasing distance, so a backward leg turns around.
 		real_t rot = (path_global * sample).get_rotation();
-		if (!movement_leg_forward) {
+		if (!movement.leg_forward) {
 			rot += (real_t)Math::PI;
 		}
-		rot += (real_t)Math::deg_to_rad(movement_rotation_offset_deg);
+		rot += (real_t)Math::deg_to_rad(movement.rotation_offset_deg);
 		if (Math::is_finite(rot)) {
 			set_global_rotation(rot);
 		}
 	}
 	if (keep_velocity) {
-		movement_has_last_position = true;
+		movement.has_last_position = true;
 		return true;
 	}
-	if (delta > 0.0 && movement_has_last_position && !movement_jumped) {
-		movement_velocity = (target - before) / (real_t)delta;
-		if (!movement_velocity.is_finite()) {
-			movement_velocity = Vector2();
+	if (delta > 0.0 && movement.has_last_position && !movement.jumped) {
+		movement.velocity = (target - before) / (real_t)delta;
+		if (!movement.velocity.is_finite()) {
+			movement.velocity = Vector2();
 		}
 	} else {
-		movement_velocity = Vector2();
+		movement.velocity = Vector2();
 	}
-	movement_has_last_position = true;
-	movement_jumped = false;
+	movement.has_last_position = true;
+	movement.jumped = false;
 	return true;
 }
 
@@ -341,14 +313,14 @@ bool PatternSpawner2D::advance_movement(double delta) {
 	auto alive = [&]() { return ObjectDB::get_instance(ObjectID(self_id)) == this; };
 	// A handler that stopped, sought, reversed or restarted the movement
 	// owns it: the rest of this leg's bookkeeping must not overwrite that.
-	const uint32_t epoch = movement_epoch;
-	auto handler_took_over = [&]() { return movement_epoch != epoch; };
+	const uint32_t epoch = movement.epoch;
+	auto handler_took_over = [&]() { return movement.epoch != epoch; };
 	double remaining = delta;
-	if (movement_delay_left > 0.0) {
-		const double used = MIN(remaining, movement_delay_left);
-		movement_delay_left -= used;
+	if (movement.delay_left > 0.0) {
+		const double used = MIN(remaining, movement.delay_left);
+		movement.delay_left -= used;
 		remaining -= used;
-		if (movement_delay_left > 0.0) {
+		if (movement.delay_left > 0.0) {
 			apply_movement_pose(0.0);
 			return true;
 		}
@@ -365,34 +337,34 @@ bool PatternSpawner2D::advance_movement(double delta) {
 	};
 	// Bounded catch-up: a hitch spanning many legs advances at most this many
 	// leg transitions per frame (tiny durations can never spin forever).
-	for (int guard = 0; guard < 64 && remaining > 0.0 && movement_playing; ++guard) {
-		if (movement_pause_left > 0.0) {
-			const double used = MIN(remaining, movement_pause_left);
-			movement_pause_left -= used;
+	for (int guard = 0; guard < 64 && remaining > 0.0 && movement.playing; ++guard) {
+		if (movement.pause_left > 0.0) {
+			const double used = MIN(remaining, movement.pause_left);
+			movement.pause_left -= used;
 			remaining -= used;
-			if (movement_pause_left > 0.0) {
+			if (movement.pause_left > 0.0) {
 				break;
 			}
 			continue;
 		}
-		const double duration = movement_leg_duration(length);
+		const double duration = movement.leg_duration(length);
 		if (!(duration > 0.0) || !Math::is_finite(duration)) {
 			break; // unusable path: apply_movement_pose below warns once
 		}
-		const double to_end = duration - movement_leg_elapsed;
+		const double to_end = duration - movement.leg_elapsed;
 		if (remaining < to_end) {
-			movement_leg_elapsed += remaining;
+			movement.leg_elapsed += remaining;
 			remaining = 0.0;
-			const double eased = movement_eased(movement_leg_elapsed / duration);
-			movement_progress = movement_leg_forward ? eased : 1.0 - eased;
+			const double eased = movement.eased(movement.leg_elapsed / duration);
+			movement.progress = movement.leg_forward ? eased : 1.0 - eased;
 			break;
 		}
 		// Leg completed.
 		remaining -= MAX(to_end, 0.0);
-		movement_leg_elapsed = 0.0;
-		movement_progress = movement_leg_forward ? movement_eased(1.0) : 1.0 - movement_eased(1.0);
-		const bool at_end = movement_leg_forward;
-		++movement_legs_completed;
+		movement.leg_elapsed = 0.0;
+		movement.progress = movement.leg_forward ? movement.eased(1.0) : 1.0 - movement.eased(1.0);
+		const bool at_end = movement.leg_forward;
+		++movement.legs_completed;
 		apply_step();
 		emit_on2d(this, "movement_endpoint_reached", at_end);
 		if (!alive()) {
@@ -401,11 +373,11 @@ bool PatternSpawner2D::advance_movement(double delta) {
 		if (handler_took_over()) {
 			return true;
 		}
-		const bool finite_run = movement_loop_mode == MOVEMENT_LOOP_ONCE || (movement_loops > 0 && movement_legs_completed >= movement_loops);
+		const bool finite_run = movement.loop_mode == MOVEMENT_LOOP_ONCE || (movement.loops > 0 && movement.legs_completed >= movement.loops);
 		if (finite_run) {
-			movement_playing = false;
-			movement_finished = true;
-			movement_velocity = Vector2();
+			movement.playing = false;
+			movement.finished = true;
+			movement.velocity = Vector2();
 			emit_on2d(this, "movement_finished");
 			if (!alive()) {
 				return false;
@@ -416,22 +388,22 @@ bool PatternSpawner2D::advance_movement(double delta) {
 			refresh_process_state();
 			return true;
 		}
-		emit_on2d(this, "movement_loop_completed", movement_legs_completed - 1);
+		emit_on2d(this, "movement_loop_completed", movement.legs_completed - 1);
 		if (!alive()) {
 			return false;
 		}
 		if (handler_took_over()) {
 			return true;
 		}
-		if (movement_loop_mode == MOVEMENT_LOOP_PING_PONG) {
-			movement_leg_forward = !movement_leg_forward;
+		if (movement.loop_mode == MOVEMENT_LOOP_PING_PONG) {
+			movement.leg_forward = !movement.leg_forward;
 		} else {
 			// LOOP: jump back to the leg's start (no interpolated sweep back):
 			// a pose only, the motion (and its velocity) goes on from there.
-			movement_progress = movement_leg_forward ? 0.0 : 1.0;
+			movement.progress = movement.leg_forward ? 0.0 : 1.0;
 			apply_movement_pose(0.0, true);
 		}
-		movement_pause_left = movement_endpoint_pause_sec;
+		movement.pause_left = movement.endpoint_pause_sec;
 	}
 	apply_step();
 	return true;
@@ -441,30 +413,30 @@ void PatternSpawner2D::movement_play() {
 	if (Engine::get_singleton()->is_editor_hint()) {
 		return;
 	}
-	if (!movement_enabled) {
+	if (!movement.enabled) {
 		// It would snap onto the path, report a start and never advance.
 		UtilityFunctions::push_warning(String(get_class()) + "::movement_play: movement_enabled is off, nothing moves (turn it on to play the path).");
 		return;
 	}
-	++movement_epoch;
-	if (!movement_playing && (movement_finished || !movement_has_last_position)) {
-		const bool fresh = !movement_has_last_position && !movement_finished && movement_legs_completed == 0 && movement_leg_elapsed == 0.0;
-		movement_reset_state();
-		if (fresh || movement_space == MOVEMENT_SPACE_RELATIVE_TO_START) {
-			movement_start_origin = is_inside_tree() ? get_global_position() : get_position();
+	++movement.epoch;
+	if (!movement.playing && (movement.finished || !movement.has_last_position)) {
+		const bool fresh = !movement.has_last_position && !movement.finished && movement.legs_completed == 0 && movement.leg_elapsed == 0.0;
+		movement.reset_state();
+		if (fresh || movement.space == MOVEMENT_SPACE_RELATIVE_TO_START) {
+			movement.start_origin = is_inside_tree() ? get_global_position() : get_position();
 		}
 		// Start ratio: fraction of the first leg already elapsed.
 		Path2D *path = get_movement_path_node();
 		Ref<Curve2D> curve = path != nullptr ? path->get_curve() : Ref<Curve2D>();
-		const double duration = movement_leg_duration(curve.is_valid() ? (double)curve->get_baked_length() : 0.0);
+		const double duration = movement.leg_duration(curve.is_valid() ? (double)curve->get_baked_length() : 0.0);
 		if (duration > 0.0) {
-			movement_leg_elapsed = movement_start_ratio * duration;
-			const double eased = movement_eased(movement_start_ratio);
-			movement_progress = movement_leg_forward ? eased : 1.0 - eased;
+			movement.leg_elapsed = movement.start_ratio * duration;
+			const double eased = movement.eased(movement.start_ratio);
+			movement.progress = movement.leg_forward ? eased : 1.0 - eased;
 		}
 	}
-	const bool was_playing = movement_playing;
-	movement_playing = true;
+	const bool was_playing = movement.playing;
+	movement.playing = true;
 	if (is_inside_tree()) {
 		apply_movement_pose(0.0);
 		refresh_process_state();
@@ -475,26 +447,26 @@ void PatternSpawner2D::movement_play() {
 }
 
 void PatternSpawner2D::movement_pause() {
-	++movement_epoch;
-	movement_playing = false;
-	movement_velocity = Vector2();
+	++movement.epoch;
+	movement.playing = false;
+	movement.velocity = Vector2();
 	if (is_inside_tree()) {
 		refresh_process_state();
 	}
 }
 
 void PatternSpawner2D::movement_stop(bool reset_to_start) {
-	++movement_epoch;
-	movement_playing = false;
-	movement_velocity = Vector2();
+	++movement.epoch;
+	movement.playing = false;
+	movement.velocity = Vector2();
 	if (reset_to_start) {
-		movement_reset_state();
-		if (is_inside_tree() && movement_enabled) {
+		movement.reset_state();
+		if (is_inside_tree() && movement.enabled) {
 			apply_movement_pose(0.0);
 		}
-		movement_has_last_position = false;
+		movement.has_last_position = false;
 	} else {
-		movement_finished = true;
+		movement.finished = true;
 	}
 	if (is_inside_tree()) {
 		refresh_process_state();
@@ -520,12 +492,12 @@ void PatternSpawner2D::teleport(const Vector2 &new_global_position, bool carry_l
 	reset_physics_interpolation();
 	// The movement's own pose jumps with the spawner: the next step measures
 	// only the path's motion, and the path goes on from here.
-	if (movement_space == MOVEMENT_SPACE_RELATIVE_TO_START) {
-		movement_start_origin += jump;
+	if (movement.space == MOVEMENT_SPACE_RELATIVE_TO_START) {
+		movement.start_origin += jump;
 	} else {
-		movement_teleport_offset += jump;
+		movement.teleport_offset += jump;
 	}
-	movement_last_pose += jump;
+	movement.last_pose += jump;
 	on_teleported_owned(jump, carry_live_bullets);
 }
 
@@ -534,57 +506,57 @@ void PatternSpawner2D::movement_seek(double ratio) {
 		UtilityFunctions::push_error((String(get_class()) + "::movement_seek: ratio must be in [0, 1], ignoring."));
 		return;
 	}
-	++movement_epoch;
+	++movement.epoch;
 	Path2D *path = get_movement_path_node();
 	Ref<Curve2D> curve = path != nullptr ? path->get_curve() : Ref<Curve2D>();
-	const double duration = movement_leg_duration(curve.is_valid() ? (double)curve->get_baked_length() : 0.0);
-	movement_leg_elapsed = duration > 0.0 ? ratio * duration : 0.0;
-	const double eased = movement_eased(ratio);
-	movement_progress = movement_leg_forward ? eased : 1.0 - eased;
-	movement_has_last_position = false;
+	const double duration = movement.leg_duration(curve.is_valid() ? (double)curve->get_baked_length() : 0.0);
+	movement.leg_elapsed = duration > 0.0 ? ratio * duration : 0.0;
+	const double eased = movement.eased(ratio);
+	movement.progress = movement.leg_forward ? eased : 1.0 - eased;
+	movement.has_last_position = false;
 	if (is_inside_tree() && !Engine::get_singleton()->is_editor_hint()) {
 		apply_movement_pose(0.0);
 	}
 }
 
 void PatternSpawner2D::movement_reverse() {
-	++movement_epoch;
+	++movement.epoch;
 	// Keep the current position: mirror the elapsed time within the leg so
 	// the eased progress continues from here in the other direction.
 	Path2D *path = get_movement_path_node();
 	Ref<Curve2D> curve = path != nullptr ? path->get_curve() : Ref<Curve2D>();
-	const double duration = movement_leg_duration(curve.is_valid() ? (double)curve->get_baked_length() : 0.0);
-	movement_leg_forward = !movement_leg_forward;
+	const double duration = movement.leg_duration(curve.is_valid() ? (double)curve->get_baked_length() : 0.0);
+	movement.leg_forward = !movement.leg_forward;
 	if (duration > 0.0) {
 		// Find the leg time whose eased progress lands on the current spot
 		// (bisection: easing may be non-monotonic, take the first crossing).
-		const double target = movement_leg_forward ? movement_progress : 1.0 - movement_progress;
+		const double target = movement.leg_forward ? movement.progress : 1.0 - movement.progress;
 		double lo = 0.0;
 		double hi = 1.0;
 		for (int i = 0; i < 40; ++i) {
 			const double mid = 0.5 * (lo + hi);
-			if (movement_eased(mid) < target) {
+			if (movement.eased(mid) < target) {
 				lo = mid;
 			} else {
 				hi = mid;
 			}
 		}
-		movement_leg_elapsed = hi * duration;
+		movement.leg_elapsed = hi * duration;
 	}
 }
 
-bool PatternSpawner2D::is_movement_playing() const { return movement_playing; }
+bool PatternSpawner2D::is_movement_playing() const { return movement.playing; }
 
-double PatternSpawner2D::get_movement_progress() const { return movement_progress; }
+double PatternSpawner2D::get_movement_progress() const { return movement.progress; }
 
-int PatternSpawner2D::get_movement_leg() const { return movement_legs_completed; }
+int PatternSpawner2D::get_movement_leg() const { return movement.legs_completed; }
 
-Vector2 PatternSpawner2D::get_movement_velocity() const { return movement_velocity; }
+Vector2 PatternSpawner2D::get_movement_velocity() const { return movement.velocity; }
 
 Vector2 PatternSpawner2D::shot_inherited_velocity() const {
 	Vector2 inherited_velocity = shot_pose_active ? shot_pose_velocity : Vector2();
-	if (!shot_pose_active && inherit_movement_velocity && movement_enabled) {
-		inherited_velocity = movement_velocity * (real_t)movement_velocity_inherit_factor;
+	if (!shot_pose_active && movement.inherit_velocity && movement.enabled) {
+		inherited_velocity = movement.velocity * (real_t)movement.velocity_inherit_factor;
 		if (!inherited_velocity.is_finite()) {
 			inherited_velocity = Vector2();
 		}

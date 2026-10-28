@@ -53,20 +53,20 @@ void PatternSpawner2D::_validate_property(PropertyInfo &p_property) const {
 	// Movement: every knob hides while movement is off; mode-specific knobs
 	// only show where they do something.
 	if (property_name.begins_with("movement_") || property_name == "inherit_movement_velocity") {
-		bool show = movement_enabled || property_name == "movement_enabled";
+		bool show = movement.enabled || property_name == "movement_enabled";
 		if (show) {
 			if (property_name == "movement_loops") {
-				show = movement_loop_mode != MOVEMENT_LOOP_ONCE;
+				show = movement.loop_mode != MOVEMENT_LOOP_ONCE;
 			} else if (property_name == "movement_duration_sec") {
-				show = movement_timing == MOVEMENT_TIMING_DURATION;
+				show = movement.timing == MOVEMENT_TIMING_DURATION;
 			} else if (property_name == "movement_speed") {
-				show = movement_timing == MOVEMENT_TIMING_SPEED;
+				show = movement.timing == MOVEMENT_TIMING_SPEED;
 			} else if (property_name == "movement_transition" || property_name == "movement_ease") {
-				show = movement_progress_curve.is_null();
+				show = movement.progress_curve.is_null();
 			} else if (property_name == "movement_rotation_offset_deg") {
-				show = movement_rotate_with_path;
+				show = movement.rotate_with_path;
 			} else if (property_name == "movement_velocity_inherit_factor") {
-				show = inherit_movement_velocity;
+				show = movement.inherit_velocity;
 			}
 		}
 		if (!show) {
