@@ -47,13 +47,13 @@ static _ALWAYS_INLINE_ BulletVolley2D *resolve_iteration_entry(uint64_t id, Bull
 	return ObjectDB::get_instance(ObjectID(id)) == (Object *)volley ? volley : nullptr;
 }
 
-// The delta one volley runs on: the bullet-world delta times the time scale of
-// its owner spawner while that lives (and opted in). Orphans, factory-spawned
-// and pooled volleys (owner 0) run on the factory scale alone.
+// Shot timing (see the header): what a timed shot fires starts on time.
 double BulletFactory2D::first_tick_lead(double overshoot_sec) const {
 	const Engine *engine = Engine::get_singleton();
-	const int ticks = engine->get_physics_ticks_per_second();
-	const double step = ticks > 0 ? 1.0 / (double)ticks : 0.0;
+	// The delta a sweep runs on (Engine.time_scale included, like the
+	// spawner clock the overshoot was measured on).
+	const double tick = get_physics_process_delta_time();
+	const double step = Math::is_finite(tick) && tick > 0.0 ? tick : 0.0;
 	const double overshoot = Math::is_finite(overshoot_sec) && overshoot_sec > 0.0 ? overshoot_sec : 0.0;
 	if (engine->is_in_physics_frame()) {
 		return sweep_physics_frame == engine->get_physics_frames() ? overshoot : overshoot - step;
@@ -62,6 +62,9 @@ double BulletFactory2D::first_tick_lead(double overshoot_sec) const {
 	return overshoot - (Math::is_finite(fraction) ? Math::clamp(fraction, 0.0, 1.0) : 0.0) * step;
 }
 
+// The delta one volley runs on: the bullet-world delta times the time scale of
+// its owner spawner while that lives (and opted in). Orphans, factory-spawned
+// and pooled volleys (owner 0) run on the factory scale alone.
 double BulletFactory2D::volley_time_factor(const BulletVolley2D &volley) const {
 	double factor = time_scale * volley.own_time_scale;
 	const uint64_t scale_owner = volley.owner_spawner_id != 0 ? volley.owner_spawner_id : volley.pickup_time_scale_owner_id;
