@@ -31,6 +31,7 @@ func test_shared_curves_attach_and_override_guard() -> void:
 	var keep := BulletSpeedData2D.new()
 	keep.speed = 999.0
 	v.set_bullet_speed_data(0, keep)
+	expect_warning_sequence(["You are trying to set bullet speed data directly while having a movement speed curve assigned to the shared curves data. The curve will override any direct speed data changes. Set the curve to null first if you want to set speed data directly."], "the shared curve owns the speed: one warning")
 	v.remove_shared_bullet_curves_data()
 	assert_false(v.has_shared_bullet_curves_data(), "shared curves removed")
 	v.set_bullet_speed_data(0, keep)
@@ -131,6 +132,7 @@ func test_tiled_vs_strict_curves() -> void:
 	var strict := H.make_volley_data(4, 200.0)
 	strict.all_bullet_curves_data = [tc]
 	var sv: BulletVolley2D = factory.spawn_volley(strict)
+	expect_warning_sequence(["BulletVolley2D: all_bullet_curves_data size (1) != bullets (4); uncovered bullets use shared/default (check tile_all_bullet_curves_data to wrap, or provide one entry per bullet)."], "a strict short array says so")
 	await physics()
 	assert_eq(str(sv.debug_get_curves_info(3)["speed_src"]), "none", "strict slot 3 has no curve")
 

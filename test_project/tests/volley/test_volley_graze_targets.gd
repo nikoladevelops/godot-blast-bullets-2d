@@ -171,6 +171,7 @@ func test_a_target_keeps_its_slot_while_others_come_and_go() -> void:
 
 
 func test_volleys_over_one_group_share_one_scan_per_tick() -> void:
+	handle_events(factory) # the hits / grazes / expiries are handled; this test pins something else
 	make_graze_target(Vector2(10, 0))
 	for i in 3:
 		graze_volley(H.transforms_at([Vector2(0, 100 * i)]), 0.0).graze_set_zones([H.make_graze_zone([20.0])], &"graze_targets")

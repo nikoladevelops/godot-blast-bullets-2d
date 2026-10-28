@@ -137,6 +137,7 @@ func test_spawner_seeding_and_indexing() -> void:
 	var fb := _still(3)
 	fb.all_bullet_gravity = [Vector2(500, 0), Vector2(0, 500)]
 	var vf: BulletVolley2D = factory.spawn_volley(fb)
+	expect_warning_sequence(["BulletVolley2D: all_bullet_gravity size (2) != bullets (3); uncovered bullets use gravity (check tile_all_bullet_gravity to wrap, or provide one entry per bullet)."], "a strict short array says so")
 	assert_eq(vf.bullet_get_gravity(0), Vector2(500, 0), "strict slot 0 reads entry 0")
 	assert_eq(vf.bullet_get_gravity(1), Vector2(0, 500), "strict slot 1 reads entry 1")
 	assert_eq(vf.bullet_get_gravity(2), Vector2.ZERO, "strict uncovered slot reads default")

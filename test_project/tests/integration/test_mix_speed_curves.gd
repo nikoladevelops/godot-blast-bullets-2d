@@ -145,6 +145,7 @@ func test_an_orbit_circles_at_the_curve_speed() -> void:
 
 
 func test_a_bounce_strength_carries_across_the_curve() -> void:
+	handle_events(factory) # the hits / grazes / expiries are handled; this test pins something else
 	make_wall(Vector2(120, 0), Vector2(20, 400), 8)
 	var d := _data(1, 5.0)
 	d.transforms = [Transform2D(0.0, Vector2.ZERO)]

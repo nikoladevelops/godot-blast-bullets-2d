@@ -22,7 +22,8 @@ static func make_volley_data(n: int = 4, speed: float = 200.0, lifetime: float =
 	for i in n:
 		arr.append(Transform2D(0.0, Vector2(24.0 * i, 0.0)))
 	data.transforms = arr
-	# Strict indexing: one speed entry per bullet (entry i drives bullet i).
+	# Strict indexing: one speed entry per bullet (entry i drives bullet i),
+	# tiled: a spawner firing another amount gives every bullet `speed` too.
 	var speeds: Array = []
 	for i in n:
 		var sp := BulletSpeedData2D.new()
@@ -31,6 +32,8 @@ static func make_volley_data(n: int = 4, speed: float = 200.0, lifetime: float =
 		sp.acceleration = 0.0
 		speeds.append(sp)
 	data.all_bullet_speed_data = speeds
+	data.tile_all_bullet_speed_data = true
+	data.homing_take_control_of_texture_rotation = true # homing steers (like a spawner's default)
 	data.max_life_time = lifetime
 	data.texture_size = Vector2(16, 16)
 	data.sprite_frames = make_sprite_frames()

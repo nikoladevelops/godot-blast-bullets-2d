@@ -32,6 +32,7 @@ func test_ring_setters_reject_and_keep() -> void:
 
 
 func test_each_ring_fires_its_entry() -> void:
+	handle_events(factory) # the hits / grazes / expiries are handled; this test pins something else
 	factory.debug_set_sound_log_enabled(true)
 	make_graze_target(Vector2(100, 0), &"g")
 	var zone := H.make_graze_zone([120.0, 80.0, 40.0, 20.0])
@@ -61,6 +62,7 @@ func test_each_ring_fires_its_entry() -> void:
 
 
 func test_missing_ring_stays_silent() -> void:
+	handle_events(factory) # the hits / grazes / expiries are handled; this test pins something else
 	factory.debug_set_sound_log_enabled(true)
 	make_graze_target(Vector2(100, 0), &"g")
 	var zone := H.make_graze_zone([24.0])
@@ -78,6 +80,7 @@ func test_missing_ring_stays_silent() -> void:
 
 
 func test_exit_names_the_deepest_ring() -> void:
+	handle_events(factory) # the hits / grazes / expiries are handled; this test pins something else
 	factory.debug_set_sound_log_enabled(true)
 	make_graze_target(Vector2(100, 0), &"g")
 	var results := {}
@@ -130,6 +133,7 @@ func _zone_sound(zone: int) -> BulletSoundData2D:
 
 
 func test_each_zone_fires_its_entry() -> void:
+	handle_events(factory) # the hits / grazes / expiries are handled; this test pins something else
 	factory.debug_set_sound_log_enabled(true)
 	make_graze_target(Vector2(100, 0), &"g")
 	var narrow := H.make_graze_zone([24.0])

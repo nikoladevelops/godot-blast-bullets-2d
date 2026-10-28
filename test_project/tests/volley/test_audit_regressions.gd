@@ -92,6 +92,7 @@ func test_transforms_scale_keeps_mirroring() -> void:
 
 
 func test_bounce_normal_on_scaled_slope() -> void:
+	handle_events(factory) # the hits / grazes / expiries are handled; this test pins something else
 	var wall := StaticBody2D.new()
 	wall.position = Vector2(250, 300)
 	wall.collision_layer = 8

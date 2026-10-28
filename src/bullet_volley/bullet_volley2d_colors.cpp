@@ -49,8 +49,8 @@ void BulletVolley2D::seed_bullet_colors(const BulletVolleyData2D &data, const Co
 	const PackedColorArray &colors = data.bullet_colors;
 	const int size = colors.size();
 	const bool tile = data.tile_bullet_colors;
-	if (size > 0 && size != amount_bullets) {
-		WarnOnce2D::warn(warn_data_id, 12u, size, amount_bullets, "BulletVolley2D: bullet_colors size (" + String::num_int64(size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets are white" + String(tile ? " (tiling on: wrapping short array)." : " (check tile_bullet_colors to wrap, or provide one entry per bullet)."));
+	if (size > 0 && size < amount_bullets && !tile) {
+		WarnOnce2D::warn(warn_data_id, 12u, size, amount_bullets, "BulletVolley2D: bullet_colors size (" + String::num_int64(size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets are white" + String(" (check tile_bullet_colors to wrap, or provide one entry per bullet)."));
 	}
 	const Color white(1, 1, 1, 1);
 	for (int i = 0; i < amount_bullets; ++i) {

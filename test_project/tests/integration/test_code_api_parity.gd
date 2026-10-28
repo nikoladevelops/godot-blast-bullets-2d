@@ -345,9 +345,11 @@ func test_a_spawner_volley_may_follow_and_its_spawner_leaves_it_alone() -> void:
 ## factory: each rescans on its own interval, the reads of the other factory
 ## never force a rescan.
 func test_one_handle_serves_two_factories_without_rescans() -> void:
+	handle_events(factory) # the hits / grazes / expiries are handled; this test pins something else
 	_target(Vector2(20, 0)) # inside the 30 px ring of both bullets
 	var other := BulletFactory2D.new()
 	add(other)
+	handle_events(other)
 	await idle(2)
 	var handle := BulletTargets2D.from_group(GROUP)
 	handle.update_interval = 5.0

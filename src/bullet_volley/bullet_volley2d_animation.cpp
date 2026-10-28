@@ -268,24 +268,30 @@ bool BulletVolley2D::rebuild_sprite_animation(const Ref<SpriteFrames> &p_sprite_
 	// Exact-color bullets (override_frame_color) get whitened copies (alpha
 	// kept) so the volley tint reads exactly: factory-cached, since a
 	// whiten reads pixels back from the GPU. Unreadable frames keep the
-	// original art with one warning per rebuild, never a blank.
+	// original art with one warning per SpriteFrames, never a blank.
 	SpriteAnimBakeOptions2D options;
 	options.whiten = anim_override_frame_color;
 	options.cache = frame_cache();
 	SpriteAnimBakeReport2D report;
 	SpriteAnim2D baked;
 	const bool baked_ok = bake_sprite_animation2d(p_sprite_frames, name, options, baked, report);
+	// Every report describes the data, not the spawn (a bake runs at every
+	// spawn and pool reuse): once per SpriteFrames, animation and frame.
 	String anim_text = "BulletVolley2D: animation '" + String(name) + "'";
-	if (report.bad_speed) {
+	const uint64_t frames_id = p_sprite_frames->get_instance_id();
+	const int64_t name_key = (int64_t)String(name).hash();
+	if (report.bad_speed && WarnOnce2D::first(frames_id, 30u, name_key, 0)) {
 		UtilityFunctions::push_error(anim_text + " has invalid speed, using 1 fps.");
 	}
 	for (int frame : report.bad_duration_frames) {
-		UtilityFunctions::push_error(anim_text + " frame " + String::num_int64(frame) + " has non-finite duration, using 0.");
+		if (WarnOnce2D::first(frames_id, 31u, name_key, frame)) {
+			UtilityFunctions::push_error(anim_text + " frame " + String::num_int64(frame) + " has non-finite duration, using 0.");
+		}
 	}
-	if (report.null_frame >= 0) {
+	if (report.null_frame >= 0 && WarnOnce2D::first(frames_id, 32u, name_key, report.null_frame)) {
 		UtilityFunctions::push_error(anim_text + " frame " + String::num_int64(report.null_frame) + " has null texture.");
 	}
-	if (report.whiten_unreadable) {
+	if (report.whiten_unreadable && WarnOnce2D::first(frames_id, 33u, name_key, 0)) {
 		UtilityFunctions::push_warning("BulletVolley2D: override_frame_color could not read a frame of '" + String(name) + "', keeping the original art for unreadable frames.");
 	}
 	if (report.atlas_unreadable_frame >= 0) {

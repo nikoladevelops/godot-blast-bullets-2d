@@ -133,6 +133,7 @@ func test_the_pool_reuses_a_laser_with_a_clean_life() -> void:
 	add(anchor)
 	first.set_anchor(anchor)
 	first.set_targets([Vector2(5, 5)])
+	expect_warning_sequence(["LaserVolley2D: laser_data aims along the pattern, so a target steers nothing (kept for a Track or Lock On aim)."], "a pattern laser keeps the target for a later aim")
 	_step(2)
 	assert_true(first.is_pooled(), "finished into the pool")
 	assert_eq(first.debug_check_invariants(), "", "a pooled laser holds nothing")

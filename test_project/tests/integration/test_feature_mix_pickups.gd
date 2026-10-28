@@ -73,6 +73,7 @@ func _source(name: String) -> BulletVolley2D:
 
 
 func test_every_converted_bullet_is_collected(p: Array = use_parameters(_cases())) -> void:
+	handle_events(factory) # the hits / grazes / expiries are handled; this test pins something else
 	var name: String = p[0]
 	collected = 0
 	factory.pickup_collected.connect(func(_t, _p, _v, _i, _val) -> void: collected += 1)

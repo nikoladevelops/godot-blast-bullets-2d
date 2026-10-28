@@ -196,6 +196,7 @@ func test_gravity_is_drift_for_the_flock() -> void:
 
 
 func test_bounced_bullets_keep_flocking() -> void:
+	handle_events(factory) # the hits / grazes / expiries are handled; this test pins something else
 	var wall := StaticBody2D.new()
 	wall.position = Vector2(120, 20)
 	wall.collision_layer = 8

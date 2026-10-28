@@ -102,5 +102,6 @@ func test_validate_spawn_data_keys_and_mesh_lint() -> void:
 	invisible.sprite_frames = null
 	invisible.texture_size = Vector2.ZERO
 	assert_ne(str(BulletFactory2D.debug_validate_spawn_data(invisible)["warning"]), "", "nothing to draw: warned")
+	expect_warning_sequence(["Warning in debug_validate_spawn_data: no sprite_frames/mesh/texture_size, bullets will be invisible. Assign SpriteFrames with art facing Vector2.RIGHT, or set texture_size/mesh."], "and said so in the log")
 	invisible.mesh = QuadMesh.new()
 	assert_eq(str(BulletFactory2D.debug_validate_spawn_data(invisible)["warning"]), "", "a mesh draws: no warning")

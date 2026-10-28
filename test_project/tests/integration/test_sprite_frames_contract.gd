@@ -687,3 +687,40 @@ func test_a_pickup_texture_shortcut_draws_an_atlas_region() -> void:
 	var in_box := func(x, y): return Color.RED if x >= 1 and x < 4 and y >= 1 and y < 3 else Color(0, 0, 0, 0)
 	assert_eq(_pixel_misses(shown.get_image(), Vector2i(5, 4), in_box), [], "the region in its margin box")
 	expect_no_errors()
+
+
+func test_a_broken_animation_reports_once_per_sprite_frames_not_per_shot() -> void:
+	# The data, not the spawn: a spawner firing one broken SpriteFrames every
+	# shot reports each problem once (like every configuration warning).
+	var a := _tex(4, 4)
+	var sf := _sf({"default": []}, NAN, false)
+	sf.add_frame(&"default", a, INF)
+	sf.add_frame(&"default", a, 1.0)
+	var data := _volley_data(sf, &"")
+	for i in 3:
+		factory.spawn_volley(data)
+	expect_error_sequence([
+		"BulletVolley2D: animation 'default' has invalid speed, using 1 fps.",
+		"BulletVolley2D: animation 'default' frame 0 has non-finite duration, using 0.",
+	], "three spawns, one report")
+	var refused := _sf({"default": [a]})
+	refused.add_frame(&"default", null)
+	var refused_data := _volley_data(refused, &"")
+	for i in 3:
+		factory.spawn_volley(refused_data)
+	expect_error_sequence(["BulletVolley2D: animation 'default' frame 1 has null texture."], "a null frame: one report")
+	var unreadable := SpriteFrames.new()
+	var atlas := AtlasTexture.new()
+	atlas.atlas = _tex(4, 4)
+	atlas.region = Rect2(2, 2, 4, 4) # outside its atlas
+	unreadable.add_frame(&"default", atlas)
+	var white := _volley_data(unreadable, &"")
+	white.override_frame_color = true
+	for i in 3:
+		factory.spawn_volley(white)
+	expect_error_sequence(["EffectLayerData2D.whiten_image_copy: source image is null or empty."], "the unreadable frame is read once (cached)")
+	expect_warning_sequence(["BulletVolley2D: override_frame_color could not read a frame of 'default', keeping the original art for unreadable frames."], "and reported once")
+	var fresh := _sf({"default": []}, NAN, false)
+	fresh.add_frame(&"default", a, 1.0)
+	factory.spawn_volley(_volley_data(fresh, &""))
+	expect_error_sequence(["BulletVolley2D: animation 'default' has invalid speed, using 1 fps."], "another SpriteFrames reports its own problem")

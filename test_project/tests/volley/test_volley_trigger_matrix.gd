@@ -63,6 +63,7 @@ func test_on_spawn_factory_spawner_and_reuse() -> void:
 
 
 func test_on_hit_counted_hit() -> void:
+	handle_events(factory) # the hits / grazes / expiries are handled; this test pins something else
 	await _wall()
 	var v: BulletVolley2D = factory.spawn_volley(_data([_layer(HIT)], 0))
 	factory.clear_sprite_effects()
@@ -71,6 +72,7 @@ func test_on_hit_counted_hit() -> void:
 
 
 func test_on_destroy_kill_not_timeout() -> void:
+	handle_events(factory) # the hits / grazes / expiries are handled; this test pins something else
 	await _wall()
 	var v: BulletVolley2D = factory.spawn_volley(_data([_layer(DESTROY)], 1))
 	factory.clear_sprite_effects()
@@ -101,6 +103,7 @@ func test_on_clear() -> void:
 
 
 func test_on_bounce() -> void:
+	handle_events(factory) # the hits / grazes / expiries are handled; this test pins something else
 	await _wall()
 	var v: BulletVolley2D = factory.spawn_volley(_data([_layer(BOUNCE)], 0, 60.0, true))
 	factory.clear_sprite_effects()

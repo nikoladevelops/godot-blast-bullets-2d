@@ -900,6 +900,7 @@ func test_spawners_at_the_defaults_share_the_factorys_scan() -> void:
 	var spawners: Array = []
 	for i in 3:
 		var sp := _zoned_spawner()
+		handle_events(sp) # the grazes are handled; this test pins the shared scan
 		sp.position = Vector2(0, 100 * i)
 		_shoot(sp)
 		spawners.append(sp)

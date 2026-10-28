@@ -85,8 +85,10 @@ func test_rotation_ranges_texture_rotation_round_trip() -> void:
 	v2.bullet_set_curves_data(1, vel_block)
 	var vel_before: Vector2 = v2.get_bullet_velocity(1)
 	v2.bullet_set_velocity(1, Vector2(900, 0))
+	expect_warning_sequence(["You are trying to set bullet velocity directly while having a movement speed curve assigned as an individual bullet curves data. The curve will override any direct velocity changes. Set the curve to null first if you want to set velocity directly."], "the curve owns the speed: one warning")
 	assert_true(v2.get_bullet_velocity(1).distance_to(vel_before) < 1.0, "velocity under per-bullet curve blocked")
 	v2.all_bullets_set_velocity(Vector2(900, 0), 1, 1)
+	expect_warning_sequence(["You are trying to set bullet velocity directly while having a movement speed curve assigned as an individual bullet curves data. The curve will override any direct velocity changes. Set the curve to null first if you want to set velocity directly."], "the range write too")
 	assert_true(v2.get_bullet_velocity(1).distance_to(vel_before) < 1.0, "range velocity under curve blocked")
 	v2.clear_per_bullet_curves_data(1)
 	v2.bullet_set_velocity(1, Vector2(50, 60))
@@ -225,6 +227,7 @@ func test_rotation_ranges_texture_rotation_round_trip() -> void:
 	v2.bullet_set_orbiting_rigid_follow(0, false)
 	assert_true(v2.bullet_get_orbiting_rigid_follow(0) == false, "rigid setter")
 	v2.bullet_set_orbiting_center(0, Vector2(5, 5))
+	expect_warning_sequence(["Bullet index 0 is not locked onto its ring yet. Cannot set orbiting center."], "unlocked: refused with a warning")
 	# Center setter needs a locked ring; unlocked bullets warn + keep old.
 	# Lock state is covered in T7b below; here just prove the call is safe.
 	assert_true(v2.get_bullet_transform(0).is_finite(), "center setter safe pre-lock")

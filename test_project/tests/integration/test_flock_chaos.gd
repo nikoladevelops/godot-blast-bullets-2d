@@ -302,6 +302,7 @@ func test_random_flocking_sequences_keep_every_invariant() -> void:
 				assert_eq(bad.slice(0, 4), [], where)
 				return
 			expect_no_errors("no error, " + where)
+			assert_eq(_undocumented_warnings(), [], "no other warning, " + where)
 		# Wind down: nothing may linger after a full reset.
 		factory.time_scale = 1.0
 		factory.despawn_bounds_enabled = false
@@ -324,3 +325,20 @@ func test_random_flocking_sequences_keep_every_invariant() -> void:
 	assert_gt(peak_armed, 5, "many volleys flocked at once (peak %d)" % peak_armed)
 	assert_gt(peak_grid, 50, "big flocks formed (peak %d bullets)" % peak_grid)
 	assert_gt(checks, 10000, "the pass did real work (%d checks sampled)" % checks)
+
+
+## Warnings a random flight may legitimately print (each documented), the
+## rest fail the step: homing without texture control, events nobody handles.
+const WARNING_OK := ["homing", "nothing is connected"]
+
+
+func _undocumented_warnings() -> Array:
+	var out: Array = []
+	for err in get_errors():
+		if err.handled or not err.is_push_warning():
+			continue
+		err.handled = true
+		var text := str(err.code)
+		if not WARNING_OK.any(func(w): return text.contains(w)):
+			out.append(text)
+	return out

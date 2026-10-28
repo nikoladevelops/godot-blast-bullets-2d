@@ -30,8 +30,8 @@ void BulletVolley2D::set_up_bullet_instances(const BulletVolleyData2D &data) {
 	if (data.all_bullets_custom_data.size() > 0) {
 		const int custom_size = data.all_bullets_custom_data.size();
 		const bool tile_custom = data.tile_all_bullets_custom_data;
-		if (custom_size != amount_bullets) {
-			WarnOnce2D::warn(warn_data_id, 2u, custom_size, amount_bullets, "BulletVolley2D: all_bullets_custom_data size (" + String::num_int64(custom_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets read null" + String(tile_custom ? " (tiling on: wrapping short array)." : " (check tile_all_bullets_custom_data to wrap, or provide one entry per bullet)."));
+		if (custom_size < amount_bullets && !tile_custom) {
+			WarnOnce2D::warn(warn_data_id, 2u, custom_size, amount_bullets, "BulletVolley2D: all_bullets_custom_data size (" + String::num_int64(custom_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets read null" + String(" (check tile_all_bullets_custom_data to wrap, or provide one entry per bullet)."));
 		}
 		for (int i = 0; i < amount_bullets; ++i) {
 			const int src = tile_custom ? (i % custom_size) : i;

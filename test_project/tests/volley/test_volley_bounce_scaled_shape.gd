@@ -40,6 +40,7 @@ func _bounce_once(shape_scale: Vector2, max_frames: int) -> BulletVolley2D:
 
 
 func test_zero_scaled_shape_bounces_via_fallback() -> void:
+	handle_events(factory) # the hits / grazes / expiries are handled; this test pins something else
 	var v := await _bounce_once(Vector2(0, 1), 60)
 	assert_eq(v.bullet_get_bounce_count(0), 1, "degenerate shape bounces via fallback")
 	assert_eq(v.get_bullet_collision_count(0), 0, "bounce not double-counted as a hit")
@@ -50,6 +51,7 @@ func test_zero_scaled_shape_bounces_via_fallback() -> void:
 
 
 func test_near_singular_shape_bounces_finite() -> void:
+	handle_events(factory) # the hits / grazes / expiries are handled; this test pins something else
 	var v := await _bounce_once(Vector2(0.01, 1), 120)
 	assert_eq(v.bullet_get_bounce_count(0), 1, "sliver shape bounces")
 	assert_true(v.get_bullet_velocity(0).is_finite(), "post-bounce velocity finite")
@@ -57,12 +59,14 @@ func test_near_singular_shape_bounces_finite() -> void:
 
 
 func test_sane_shape_bounces_precisely() -> void:
+	handle_events(factory) # the hits / grazes / expiries are handled; this test pins something else
 	var v := await _bounce_once(Vector2.ONE, 120)
 	assert_eq(v.bullet_get_bounce_count(0), 1, "sane bounce registered")
 	assert_true(v.get_bullet_velocity(0).is_finite(), "sane post-bounce finite")
 
 
 func test_no_usable_shape_child_falls_back_to_radial() -> void:
+	handle_events(factory) # the hits / grazes / expiries are handled; this test pins something else
 	# Precise mode reads the first USABLE direct CollisionShape2D child. Here
 	# the only CollisionShape2D has no shape (skipped by the null-shape guard)
 	# and the real collider is a CollisionPolygon2D (never analytic), so the

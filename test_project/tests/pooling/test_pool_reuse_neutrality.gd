@@ -369,6 +369,7 @@ func _wall_data() -> BulletVolleyData2D:
 
 
 func test_pooled_reuse_is_a_new_life() -> void:
+	handle_events(factory) # the hits / grazes / expiries are handled; this test pins something else
 	make_wall(Vector2(200, 0), Vector2(20, 400), 8, 2)
 	await physics()
 	var a: BulletVolley2D = factory.spawn_volley(_wall_data())

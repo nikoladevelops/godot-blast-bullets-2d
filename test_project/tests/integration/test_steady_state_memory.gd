@@ -63,37 +63,27 @@ func test_script_spawns_with_short_arrays_retain_nothing() -> void:
 	d.transforms = arr # ...for 200 bullets: a size-mismatch warning case
 	d.all_bullet_gravity = [Vector2(0, 10)]
 	var grown: int = await _steady(func(): factory.spawn_volley(d))
+	expect_warning_sequence(["BulletVolley2D: all_bullet_gravity size (1) != bullets (200); uncovered bullets use gravity (check tile_all_bullet_gravity to wrap, or provide one entry per bullet)."], "once for the resource, not per spawn")
 	assert_eq(grown, 0, "200 warm short-array spawns: zero retained objects")
 
 
 func test_size_warning_once_per_resource_and_rearms() -> void:
 	var d := H.make_volley_data(2, 100.0, 1.0)
+	d.tile_all_bullet_speed_data = false # a strict short array warns
 	var arr: Array = []
 	for i in 10:
 		arr.append(Transform2D(0.0, Vector2(i * 20, 0)))
 	d.transforms = arr
 	for i in 5:
 		factory.spawn_volley(d)
-	var seen := 0
-	for err in get_errors():
-		if err.is_push_warning() and err.contains_text("all_bullet_speed_data size (2) != bullets (10)"):
-			seen += 1
-			err.handled = true
-	assert_eq(seen, 1, "5 spawns of one resource: the size warning fires once")
+	var short_text := "BulletVolley2D: all_bullet_speed_data size (%d) != bullets (10); uncovered bullets fall back to shared/default (check tile_all_bullet_speed_data to wrap, or provide one entry per bullet)."
+	expect_warning_sequence([short_text % 2], "5 spawns of one resource: the size warning fires once")
 	d.all_bullet_speed_data = [H.make_speed(50.0), H.make_speed(60.0), H.make_speed(70.0)]
 	factory.spawn_volley(d)
-	seen = 0
-	for err in get_errors():
-		if not err.handled and err.is_push_warning() and err.contains_text("all_bullet_speed_data size (3) != bullets (10)"):
-			seen += 1
-	assert_eq(seen, 1, "a new array size re-arms the warning")
+	expect_warning_sequence([short_text % 3], "a new array size re-arms the warning")
 	var other := d.duplicate() as BulletVolleyData2D
 	factory.spawn_volley(other)
-	seen = 0
-	for err in get_errors():
-		if not err.handled and err.is_push_warning() and err.contains_text("all_bullet_speed_data size (3) != bullets (10)"):
-			seen += 1
-	assert_eq(seen, 2, "a different resource with the same mistake warns too")
+	expect_warning_sequence([short_text % 3], "a different resource with the same mistake warns too")
 
 
 func test_flocking_shots_retain_nothing(scope: int = use_parameters([BulletFlock2D.SCOPE_PER_SPAWNER, BulletFlock2D.SCOPE_SHARED, BulletFlock2D.SCOPE_PER_VOLLEY])) -> void:

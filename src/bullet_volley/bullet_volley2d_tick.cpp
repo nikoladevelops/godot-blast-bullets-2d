@@ -360,9 +360,10 @@ void BulletVolley2D::move_bullets(double delta) {
 			t.orbit_locked = &snapshot;
 		}
 
-		// Warn once when homing cannot visibly do anything: no texture
-		// steering, no movement pattern, no rotation data and no orbit (usually
-		// a forgotten homing_take_control_of_texture_rotation).
+		// Warn when homing cannot visibly do anything: no texture steering, no
+		// movement pattern, no rotation data and no orbit (usually a forgotten
+		// homing_take_control_of_texture_rotation). Once per spawn data, like
+		// every configuration warning: once per volley repeated it every shot.
 		if (!homing_inert_warning_issued && (t.shared_homing || t.per_bullet_homing) && !homing_take_control_of_texture_rotation && !is_rotation_data_active && active_orbiting_count == 0) {
 			bool any_pattern = shared_movement_pattern_curve.is_valid();
 			for (int pi : all_bullets_enabled_set.get_active_indexes()) {
@@ -371,10 +372,10 @@ void BulletVolley2D::move_bullets(double delta) {
 				}
 				any_pattern = check_exists_bullet_movement_pattern_data(pi);
 			}
-			if (!any_pattern) {
+			if (!any_pattern && WarnOnce2D::first(warn_data_id, 29u, 0, 0)) {
 				UtilityFunctions::push_warning("BulletVolley2D has homing targets but homing_take_control_of_texture_rotation is false (and no movement pattern/rotation data), so homing will not steer bullets. Set it to true.");
-				homing_inert_warning_issued = true;
 			}
+			homing_inert_warning_issued = !any_pattern;
 		}
 
 		// BulletCurvesData2D is a mutable shared Resource: a user can gain a

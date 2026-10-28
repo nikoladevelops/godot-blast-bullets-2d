@@ -287,8 +287,8 @@ void BulletVolley2D::seed_bullets_current_collision_count(const TypedArray<int> 
 		bullets_current_collision_count.resize(amount_bullets, 0);
 		return;
 	}
-	if (arr_size != amount_bullets) {
-		WarnOnce2D::warn(warn_data_id, 1u, arr_size, amount_bullets, "BulletVolley2D: bullets_current_collision_count size (" + String::num_int64(arr_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets start at 0" + String(tile_short_arrays ? " (tiling on: wrapping short array)." : " (check tile_bullets_current_collision_count to wrap, or provide one entry per bullet)."));
+	if (arr_size < amount_bullets && !tile_short_arrays) {
+		WarnOnce2D::warn(warn_data_id, 1u, arr_size, amount_bullets, "BulletVolley2D: bullets_current_collision_count size (" + String::num_int64(arr_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets start at 0" + String(" (check tile_bullets_current_collision_count to wrap, or provide one entry per bullet)."));
 	}
 
 	bullets_current_collision_count.clear();

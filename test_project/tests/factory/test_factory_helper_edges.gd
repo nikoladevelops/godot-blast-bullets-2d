@@ -55,9 +55,11 @@ func test_huge_finite_inputs_clamp() -> void:
 	var far: Array = BulletPatterns2D.helper_generate_transforms_line(8, m, Vector2.RIGHT, 1e30, true)
 	assert_eq(far.size(), 8)
 	assert_true(H.finite_volley(far), "line 1e30 spacing clamps finite")
+	expect_warning_sequence(["helper_generate_transforms_line: some slots overflowed to Inf/NaN or left the world box and were clamped to its edge; shrink the spacing/radius."], "the clamp is named")
 	var wide: Array = BulletPatterns2D.helper_generate_transforms_grid(9, m, 3, 0, 1e30, 1e30, false)
 	assert_eq(wide.size(), 9)
 	assert_true(H.finite_volley(wide), "grid 1e30 offsets clamp finite")
+	expect_warning_sequence(["helper_generate_transforms_grid: some slots overflowed to Inf/NaN or left the world box and were clamped to its edge; shrink the spacing/radius."], "the clamp is named")
 	var big_ring: Array = BulletPatterns2D.helper_generate_transforms_ring(16, m, 1e30)
 	assert_eq(big_ring.size(), 16)
 	assert_true(H.finite_volley(big_ring), "ring 1e30 radius stays finite")
@@ -68,6 +70,7 @@ func test_scale_band_and_skip_guards() -> void:
 	assert_eq(BulletPatterns2D.helper_layer_scale_factor(-3, 0.5, 0, 1, PackedFloat32Array()), 1.0, "negative layer returns 1")
 	var base: Array = BulletPatterns2D.helper_generate_transforms_line(5, m, Vector2.RIGHT, 10.0, true)
 	assert_eq(BulletPatterns2D.helper_apply_skip_indices(base, [1, 99, -2]).size(), 4, "skip ignores OOB indices")
+	expect_warning_sequence(["helper_apply_skip_indices: skip index out of range, ignoring it."], "one warning per call")
 	assert_gte(BulletPatterns2D.helper_bullet_layer_index(3, 10, 4, 0, 0), 0, "layer index sane")
 
 

@@ -77,7 +77,7 @@ func test_tiled_and_strict_short_arrays() -> void:
 	assert_eq([tiled.bullet_get_custom_data(0), tiled.bullet_get_custom_data(1), tiled.bullet_get_custom_data(2), tiled.bullet_get_custom_data(3)], [two[0], two[1], two[0], two[1]], "tiling wraps A,B,A,B")
 	var shared := Resource.new()
 	var strict: BulletVolley2D = factory.spawn_volley(_data(3, [two[0]], shared))
-	expect_errors_containing("all_bullets_custom_data size", 2, "one size warning per mismatched spawn (tiled 2 != 4, strict 1 != 3)")
+	expect_errors_containing("all_bullets_custom_data size", 1, "one size warning for the strict short array (1 != 3); a tiled one covers every bullet")
 	assert_same(strict.bullet_get_custom_data(0), two[0], "entry 0 drives bullet 0")
 	assert_null(strict.bullet_get_custom_data(1), "uncovered bullets read null")
 	assert_null(strict.bullet_get_custom_data(2), "never the shared value")
@@ -85,6 +85,7 @@ func test_tiled_and_strict_short_arrays() -> void:
 
 
 func test_lifetime_bounce_and_homing_handlers_read_custom_data() -> void:
+	handle_events(factory) # the hits / grazes / expiries are handled; this test pins something else
 	var customs := _resources(2)
 	# Lifetime
 	var d := _data(2, customs)

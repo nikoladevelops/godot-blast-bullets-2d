@@ -51,13 +51,8 @@ bool validate_spawn_data_fields(const Ref<BulletVolleyData2D> &spawn_data, int b
 		UtilityFunctions::push_error(String(caller_name) + ": a volley holds at most " + String::num_int64(pattern_max_bullets()) + " bullets (got " + String::num_int64(bullet_count) + "). Raise blastbullets2d/patterns/max_bullets_per_pattern (BulletPatterns2D.max_bullets_per_pattern) for more. Nothing was spawned.");
 		return false;
 	}
-	// Unified tiling rule: every per-bullet array tiles modulo, so any size
-	// is accepted here. Empty collision counts seed zeros downstream.
-	if (spawn_data->bullets_current_collision_count.size() > 0 &&
-			spawn_data->bullets_current_collision_count.size() != bullet_count &&
-			spawn_data->bullets_current_collision_count.size() != 1) {
-		WarnOnce2D::warn(spawn_data->get_instance_id(), 12u, spawn_data->bullets_current_collision_count.size(), bullet_count, String("Warning in ") + caller_name + ": bullets_current_collision_count size (" + String::num_int64(spawn_data->bullets_current_collision_count.size()) + ") != transforms size (" + String::num_int64(bullet_count) + "); tiling modulo across the volley.");
-	}
+	// Per-bullet array sizes are the volley's to report (one warning per
+	// short array, none when its tile checkbox wraps it): any size is fine here.
 	// A non-positive finite lifetime would die on the first tick; fail open with an error instead of a silent vanish.
 	// NaN must be rejected explicitly: NaN <= 0.0 is false, so it would slip through and never expire.
 	if (!spawn_data->is_life_time_infinite && (!(spawn_data->max_life_time > 0.0) || !Math::is_finite(spawn_data->max_life_time))) {

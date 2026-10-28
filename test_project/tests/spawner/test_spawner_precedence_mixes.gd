@@ -44,6 +44,7 @@ func test_three_speed_flavors_one_factory() -> void:
 	da.shared_bullet_speed_data = _speed(999.0)
 	var db := H.make_volley_data(4, 0.0)
 	db.all_bullet_speed_data = [_speed(111.0)]
+	db.tile_all_bullet_speed_data = false # strict: the tail falls to shared
 	db.shared_bullet_speed_data = _speed(222.0)
 	var dc := H.make_volley_data(4, 0.0)
 	dc.all_bullet_speed_data = [_speed(-250.0), _speed(250.0)]

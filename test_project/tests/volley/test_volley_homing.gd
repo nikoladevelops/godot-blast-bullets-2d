@@ -121,3 +121,35 @@ func test_homing_reach_can_count_the_bullets_own_size() -> void:
 	assert_false(got.has(made[0].get_instance_id() * 10), "off: the center must come within 5 px")
 	assert_true(got.has(made[1].get_instance_id() * 10), "on: the 4x bullet's edge reaches")
 	assert_false(got.has(made[1].get_instance_id() * 10 + 1), "on: a 1x bullet still needs 5 + 4 px")
+
+
+const INERT_HOMING_WARNING := "BulletVolley2D has homing targets but homing_take_control_of_texture_rotation is false (and no movement pattern/rotation data), so homing will not steer bullets. Set it to true."
+
+
+func test_inert_homing_warns_once_per_spawn_data() -> void:
+	var data := H.make_volley_data(2, 100.0, 30.0)
+	data.homing_take_control_of_texture_rotation = false
+	for i in 3: # a spawner firing the same data: one line, not one per volley
+		var v: BulletVolley2D = factory.spawn_volley(data)
+		v.all_bullets_push_back_homing_target(target)
+	await physics(2)
+	expect_warning_sequence([INERT_HOMING_WARNING])
+	var pooled: BulletVolley2D = factory.spawn_volley(data)
+	pooled.all_bullets_push_back_homing_target(target)
+	await physics(2)
+	expect_warning_sequence([], "the same data again: silent")
+	var other_data := H.make_volley_data(2, 100.0, 30.0)
+	other_data.homing_take_control_of_texture_rotation = false
+	var other: BulletVolley2D = factory.spawn_volley(other_data)
+	other.all_bullets_push_back_homing_target(target)
+	await physics(2)
+	expect_warning_sequence([INERT_HOMING_WARNING], "another data resource warns once too")
+	var steering_data := H.make_volley_data(2, 100.0, 30.0)
+	steering_data.homing_take_control_of_texture_rotation = false
+	var steering: BulletVolley2D = factory.spawn_volley(steering_data)
+	steering.set_homing_take_control_of_texture_rotation(true)
+	steering.all_bullets_push_back_homing_target(target)
+	await physics(2)
+	expect_warning_sequence([], "steering homing never warns")
+	for v in factory.get_active_volleys(false):
+		v.all_bullets_clear_homing_targets()

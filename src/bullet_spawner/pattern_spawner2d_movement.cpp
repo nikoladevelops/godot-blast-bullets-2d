@@ -241,12 +241,12 @@ bool PatternSpawner2D::movement_active() const {
 	return movement.enabled && movement.playing && is_inside_tree() && !Engine::get_singleton()->is_editor_hint();
 }
 
-bool PatternSpawner2D::apply_movement_pose(double delta, bool keep_velocity) {
+bool PatternSpawner2D::apply_movement_pose(double delta, bool keep_velocity, bool report_unusable) {
 	Path2D *path = get_movement_path_node();
 	Ref<Curve2D> curve = path != nullptr ? path->get_curve() : Ref<Curve2D>();
 	const double length = curve.is_valid() ? (double)curve->get_baked_length() : 0.0;
 	if (path == nullptr || !path->is_inside_tree() || curve.is_null() || !(length > 0.0) || !Math::is_finite(length)) {
-		if (!movement.warned_unusable_path) {
+		if (report_unusable && !movement.warned_unusable_path) {
 			movement.warned_unusable_path = true;
 			UtilityFunctions::push_warning((String(get_class()) + ": movement_path is not a Path2D with a non-empty curve in the tree; the spawner stays where it is."));
 		}
@@ -438,7 +438,9 @@ void PatternSpawner2D::movement_play() {
 	const bool was_playing = movement.playing;
 	movement.playing = true;
 	if (is_inside_tree()) {
-		apply_movement_pose(0.0);
+		// A placement only: the first frame that travels names a missing path
+		// (code may assign it right after adding the spawner).
+		apply_movement_pose(0.0, false, false);
 		refresh_process_state();
 	}
 	if (!was_playing) {
@@ -462,7 +464,7 @@ void PatternSpawner2D::movement_stop(bool reset_to_start) {
 	if (reset_to_start) {
 		movement.reset_state();
 		if (is_inside_tree() && movement.enabled) {
-			apply_movement_pose(0.0);
+			apply_movement_pose(0.0, false, false);
 		}
 		movement.has_last_position = false;
 	} else {
@@ -515,7 +517,7 @@ void PatternSpawner2D::movement_seek(double ratio) {
 	movement.progress = movement.leg_forward ? eased : 1.0 - eased;
 	movement.has_last_position = false;
 	if (is_inside_tree() && !Engine::get_singleton()->is_editor_hint()) {
-		apply_movement_pose(0.0);
+		apply_movement_pose(0.0, false, false);
 	}
 }
 

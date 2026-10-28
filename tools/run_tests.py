@@ -372,7 +372,8 @@ def self_test(godot, timeout):
     """The canaries in tests_meta/ MUST be detected: a failing assert, an
     unexpected push_error, leaked Object/Node/RID at exit, and every precise
     error helper (expect_error_sequence / exact expect_errors_containing /
-    expect_no_errors) failing on a mismatch."""
+    expect_no_errors) failing on a mismatch, and an unclaimed push_warning
+    (also one raised by bullets still flying when the test ends)."""
     ok = True
     strict = run_file(godot, "tests_meta/test_strict_helpers_canary.gd", timeout, True)
     if strict["status"] != "FAIL" or strict["failures"] != strict["tests"] or strict["tests"] < 5:

@@ -138,6 +138,7 @@ func test_pan_meets_pinned_camera() -> void:
 
 
 func test_ring_meets_clamp() -> void:
+	handle_events(factory) # the hits / grazes / expiries are handled; this test pins something else
 	factory.debug_set_sound_log_enabled(true)
 	make_graze_target(Vector2(100, 0), &"g")
 	var zone := H.make_graze_zone([120.0])

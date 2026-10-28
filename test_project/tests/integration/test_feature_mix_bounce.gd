@@ -45,6 +45,9 @@ func _data(n: int, speed: float) -> BulletVolleyData2D:
 	return d
 
 
+const INERT_HOMING_WARNING := "BulletVolley2D has homing targets but homing_take_control_of_texture_rotation is false (and no movement pattern/rotation data), so homing will not steer bullets. Set it to true."
+
+
 ## Case name -> [bullets, own speed, inherited velocity]; _configure edits
 ## the data before the spawn, _after the live volley.
 const CASES := ["plain", "rotate_texture_off", "smooth_visual",
@@ -156,6 +159,7 @@ func _on_bounce(_t: Object, v: BulletVolley2D, i: int) -> void:
 
 
 func test_every_bullet_leaves_the_wall_after_its_bounce(name: String = use_parameters(CASES)) -> void:
+	handle_events(factory) # the hits / grazes / expiries are handled; this test pins something else
 	bounces.clear()
 	bounce_count = 0
 	frame = 0
@@ -181,6 +185,8 @@ func test_every_bullet_leaves_the_wall_after_its_bounce(name: String = use_param
 				xs[i].append(v.get_bullet_transform(i).origin.x)
 		if bounces.size() == n and xs.values().all(func(a): return a.size() > TICKS_AFTER + 2):
 			break
+	if name.begins_with("homing_no_control"):
+		expect_warning_sequence([INERT_HOMING_WARNING], "%s: homing without texture control steers nothing, and says so" % name)
 	assert_eq(bounces.size(), n, "%s: every bullet bounced" % name)
 	var problems: Array = []
 	for i in xs:

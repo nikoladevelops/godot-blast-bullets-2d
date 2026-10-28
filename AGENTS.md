@@ -299,7 +299,15 @@ python3 tools/lint_tests.py                  # static test lint (run first by th
   array diffs: join problems into one string to see them all.
 - A `Packed*Array` read from an Array is a copy (write it back).
 - `push_warning` lands in `get_errors()` (`err.is_push_warning()`); pin it
-  with `expect_warning_sequence`.
+  with `expect_warning_sequence`. `BlastTest.after_each` fails a test that
+  leaves a plugin warning unclaimed, also one printed by bullets still flying
+  while `after_each` steps the frames (GUT closes the test's error list before
+  `after_each`, so the gate reads `gut.error_tracker`). Unclaimed warnings
+  once hid two spurious ones a user saw (a factory fallback warning at
+  `add_child`, a size warning despite the tile checkbox). `expect_no_errors()`
+  ignores warnings: pin silence with `expect_warning_sequence([])`. A GDScript
+  `push_warning` is not classified as a warning by GUT (the self-test canary
+  uses a plugin warning).
 - `obj.set("misspelled", v)` silently does nothing: assert `k in obj` and
   read the value back when a test sets properties by name.
 - NEVER `free()` nodes you `watch_signals()` on: freeing several watched
@@ -356,7 +364,9 @@ prints the first entries per section (`--limit N`).
   before it enters the tree), `make_preview_spawner()`, graze:
   `make_graze_target(pos, group)`, `graze_volley(transforms, speed)`,
   `step_factory(n, delta)`, `H.make_graze_zone(radii, group)`,
-  `H.record_graze(emitter)` + `H.graze_kinds(log)`, `mouse_to(pos)`, `H`
+  `H.record_graze(emitter)` + `H.graze_kinds(log)`, `mouse_to(pos)`,
+  `handle_events(emitter)` (empty handlers on its hit / graze / expiry
+  signals, for tests whose subject is not the handler: unhandled events warn), `H`
   (`blast_test_helpers.gd`: `make_volley_data`, `make_still_data`,
   `make_speed`, `make_rotation`, `make_effect_layer`, `make_flat_curve`,
   ...), `make_wall/make_area/make_probe_scene/add` (autofreed).
@@ -460,7 +470,7 @@ func test_<behavior>_<expectation>() -> void:
   under one `<parameterized>` case.
 - Doubles (`double`/`spy`/`stub`): available, unused so far.
 - Strict errors: any `push_error`/engine error not claimed by an `expect_*`
-  fails the test.
+  fails the test; `BlastTest.after_each` adds the same for plugin warnings.
 
 ### 8.7 Integration tests, scenes and feature mixing
 
@@ -1056,6 +1066,13 @@ replayed once on resume.
 | Every preview takes its z order from a property (`preview_z_index` / `preview_z_as_relative` on spawners, `despawn_bounds_preview_z_index`, `debugger_z_index`; defaults 4000 / 999) | `integration/test_preview_z_order` |
 | Every drawn part of a laser interpolates (body points, width, muzzle, tip, pierce and wall frames each on their own segment angle and clock); a head spent at a wall still plays its impact; laser preview arrows draw at the beam's width | `laser/test_laser_render_interpolation` |
 
+- A warning or error that describes the DATA (a per-bullet array size, a
+  broken SpriteFrames, homing that cannot steer) goes through `WarnOnce2D`
+  (once per resource): printed per spawn it repeats every shot. Only a SHORT,
+  untiled per-bullet array warns (`size < bullets && !tile`); a tiled or
+  longer array covers every bullet and is silent. A warning about wiring that
+  code may still complete (an empty factory path, a movement path) waits for
+  the first use (a shot, a frame that travels), never `add_child`.
 - Edge cases to test everywhere: NaN/Inf scalars and vectors; null array
   entries; empty arrays; short vs oversized arrays; OOB indices (-1/99);
   inverted ranges; zero amounts/sizes/speeds; singular transforms; freed

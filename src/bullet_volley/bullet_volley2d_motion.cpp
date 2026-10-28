@@ -223,8 +223,8 @@ void BulletVolley2D::set_rotation_data(const TypedArray<BulletRotationData2D> &r
 
 	is_rotation_data_active = true;
 
-	if (amount_rotation_data != amount_bullets) {
-		WarnOnce2D::warn(warn_data_id, 4u, amount_rotation_data, amount_bullets, "BulletVolley2D: all_bullet_rotation_data size (" + String::num_int64(amount_rotation_data) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets get zero spin unless shared rotation fills them" + String(tile_short_arrays ? " (tiling on: wrapping short array)." : " (check tile_all_bullet_rotation_data to wrap, or provide one entry per bullet)."));
+	if (amount_rotation_data < amount_bullets && !tile_short_arrays) {
+		WarnOnce2D::warn(warn_data_id, 4u, amount_rotation_data, amount_bullets, "BulletVolley2D: all_bullet_rotation_data size (" + String::num_int64(amount_rotation_data) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets get zero spin unless shared rotation fills them" + String(" (check tile_all_bullet_rotation_data to wrap, or provide one entry per bullet)."));
 	}
 
 	// Validate every element we are about to read. Null/wrong-type entries
@@ -1072,8 +1072,8 @@ void BulletVolley2D::set_up_movement_data(const TypedArray<BulletSpeedData2D> &n
 		if (tiled_speed && speed_data_size > 0) {
 			fallback_data = new_speed_data[0];
 		}
-		if (speed_data_size != 0 && !exact_speed) {
-			WarnOnce2D::warn(warn_data_id, 5u, speed_data_size, amount_bullets, "BulletVolley2D: all_bullet_speed_data size (" + String::num_int64(speed_data_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets fall back to shared/default" + String(tile_short_arrays ? " (tiling on: wrapping short array)." : " (check tile_all_bullet_speed_data to wrap, or provide one entry per bullet)."));
+		if (speed_data_size != 0 && speed_data_size < amount_bullets && !tile_short_arrays) {
+			WarnOnce2D::warn(warn_data_id, 5u, speed_data_size, amount_bullets, "BulletVolley2D: all_bullet_speed_data size (" + String::num_int64(speed_data_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets fall back to shared/default" + String(" (check tile_all_bullet_speed_data to wrap, or provide one entry per bullet)."));
 		}
 
 		// In case no speed data was provided at all, create a default one (everything set to 0 by default)

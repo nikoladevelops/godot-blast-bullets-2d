@@ -15,10 +15,15 @@ var scene_factory: BulletFactory2D
 func before_each() -> void:
 	await super()
 	root = SCENE.instantiate()
-	add(root)
 	turret = root.get_node("Turret")
+	turret.body_entered.connect(_on_floor_hit) # like a game: the hits are handled
+	add(root)
 	scene_factory = root.get_node("BulletFactory2D")
 	await idle(2)
+
+
+func _on_floor_hit(_body: Object, _volley: BulletVolley2D, _bullet_index: int) -> void:
+	pass
 
 
 func test_serialized_movement_properties_load() -> void:

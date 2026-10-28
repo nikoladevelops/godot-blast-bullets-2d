@@ -45,8 +45,10 @@ func test_shared_covers_short_array_tail_strict_uncovered_fall_back() -> void:
 	# GAP T2 shared covers short-array tail (strict: uncovered fall back)
 	var g2 := H.make_volley_data(2, 0.0)
 	g2.all_bullet_speed_data = [_speed(150.0)]
+	g2.tile_all_bullet_speed_data = false # strict
 	g2.shared_bullet_speed_data = _speed(600.0)
 	var v2: BulletVolley2D = factory.spawn_volley(g2)
+	expect_warning_sequence(["BulletVolley2D: all_bullet_speed_data size (1) != bullets (2); uncovered bullets fall back to shared/default (check tile_all_bullet_speed_data to wrap, or provide one entry per bullet)."], "a strict short array says so")
 	assert_true(absf(v2.get_bullet_speed_data(0).speed - 150.0) < 0.01, "covered slot keeps per-bullet")
 	assert_true(absf(v2.get_bullet_speed_data(1).speed - 600.0) < 0.01, "uncovered slot falls back to shared")
 

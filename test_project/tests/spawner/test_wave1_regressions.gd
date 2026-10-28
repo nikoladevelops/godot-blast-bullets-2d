@@ -73,6 +73,7 @@ func test_gravity_fills_gaps_only() -> void:
 	var d := H.make_volley_data(3, 0.0)
 	d.all_bullet_gravity = [Vector2(1000, 0)]
 	var v: BulletVolley2D = factory.spawn_volley(d)
+	expect_warning_sequence(["BulletVolley2D: all_bullet_gravity size (1) != bullets (3); uncovered bullets use gravity (check tile_all_bullet_gravity to wrap, or provide one entry per bullet)."], "a strict short array says so")
 	v.set_gravity(Vector2(0, 2000))
 	assert_eq(v.bullet_get_gravity(0), Vector2(1000, 0), "authored +X survives")
 	assert_eq(v.bullet_get_gravity(1), Vector2(0, 2000), "gap 1 takes shared")

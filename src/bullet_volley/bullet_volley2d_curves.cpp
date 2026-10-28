@@ -265,8 +265,8 @@ void BulletVolley2D::apply_per_bullet_curves_from_data(const BulletVolleyData2D 
 	}
 	const int curves_size = volley_data.all_bullet_curves_data.size();
 	const bool tile = volley_data.tile_all_bullet_curves_data;
-	if (curves_size != 0 && curves_size != amount_bullets) {
-		WarnOnce2D::warn(warn_data_id, 6u, curves_size, amount_bullets, "BulletVolley2D: all_bullet_curves_data size (" + String::num_int64(curves_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets use shared/default" + String(tile ? " (tiling on: wrapping short array)." : " (check tile_all_bullet_curves_data to wrap, or provide one entry per bullet)."));
+	if (curves_size != 0 && curves_size < amount_bullets && !tile) {
+		WarnOnce2D::warn(warn_data_id, 6u, curves_size, amount_bullets, "BulletVolley2D: all_bullet_curves_data size (" + String::num_int64(curves_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets use shared/default" + String(" (check tile_all_bullet_curves_data to wrap, or provide one entry per bullet)."));
 	}
 	for (int i = 0; i < amount_bullets; ++i) {
 		const int entry = tile ? resolve_tiled_data_index(curves_size, i) : resolve_strict_data_index(curves_size, i);
@@ -284,18 +284,18 @@ void BulletVolley2D::apply_per_bullet_curves_from_data(const BulletVolleyData2D 
 void BulletVolley2D::apply_per_bullet_movement_patterns_from_data(const BulletVolleyData2D &volley_data) {
 	const int paths_size = volley_data.all_bullet_movement_pattern_paths.size();
 	const bool tile_paths = volley_data.tile_all_bullet_movement_pattern_paths;
-	if (paths_size != 0 && paths_size != amount_bullets) {
-		WarnOnce2D::warn(warn_data_id, 7u, paths_size, amount_bullets, "BulletVolley2D: all_bullet_movement_pattern_paths size (" + String::num_int64(paths_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets use the shared pattern" + String(tile_paths ? " (tiling on: wrapping short array)." : " (check tile_all_bullet_movement_pattern_paths to wrap, or provide one entry per bullet)."));
+	if (paths_size != 0 && paths_size < amount_bullets && !tile_paths) {
+		WarnOnce2D::warn(warn_data_id, 7u, paths_size, amount_bullets, "BulletVolley2D: all_bullet_movement_pattern_paths size (" + String::num_int64(paths_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets use the shared pattern" + String(" (check tile_all_bullet_movement_pattern_paths to wrap, or provide one entry per bullet)."));
 	}
 	const int face_size = volley_data.all_bullet_movement_pattern_face_movement_directions.size();
 	const bool tile_face = volley_data.tile_all_bullet_movement_pattern_face_movement_directions;
-	if (face_size != 0 && face_size != amount_bullets) {
-		WarnOnce2D::warn(warn_data_id, 8u, face_size, amount_bullets, "BulletVolley2D: all_bullet_movement_pattern_face_movement_directions size (" + String::num_int64(face_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets use the shared face flag" + String(tile_face ? " (tiling on)." : " (check its tile box or provide one entry per bullet)."));
+	if (face_size != 0 && face_size < amount_bullets && !tile_face) {
+		WarnOnce2D::warn(warn_data_id, 8u, face_size, amount_bullets, "BulletVolley2D: all_bullet_movement_pattern_face_movement_directions size (" + String::num_int64(face_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets use the shared face flag" + String(" (check its tile box or provide one entry per bullet)."));
 	}
 	const int repeat_size = volley_data.all_bullet_movement_pattern_repeats.size();
 	const bool tile_repeat = volley_data.tile_all_bullet_movement_pattern_repeats;
-	if (repeat_size != 0 && repeat_size != amount_bullets) {
-		WarnOnce2D::warn(warn_data_id, 9u, repeat_size, amount_bullets, "BulletVolley2D: all_bullet_movement_pattern_repeats size (" + String::num_int64(repeat_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets use the shared repeat flag" + String(tile_repeat ? " (tiling on)." : " (check its tile box or provide one entry per bullet)."));
+	if (repeat_size != 0 && repeat_size < amount_bullets && !tile_repeat) {
+		WarnOnce2D::warn(warn_data_id, 9u, repeat_size, amount_bullets, "BulletVolley2D: all_bullet_movement_pattern_repeats size (" + String::num_int64(repeat_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets use the shared repeat flag" + String(" (check its tile box or provide one entry per bullet)."));
 	}
 	for (int i = 0; i < amount_bullets; ++i) {
 		const int entry = tile_paths ? resolve_tiled_data_index(paths_size, i) : resolve_strict_data_index(paths_size, i);

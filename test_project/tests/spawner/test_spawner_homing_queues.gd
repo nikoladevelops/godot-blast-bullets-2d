@@ -229,3 +229,4 @@ func test_handler_freeing_the_target_is_safe() -> void:
 	assert_false(v.shared_homing_deque_check_has_homing_targets(), "the dead target was trimmed")
 	assert_true(_finite(v), "bullets stay finite")
 	assert_true(sp.shoot_once(), "later shots: plain volley, no crash")
+	expect_warning_sequence(["BulletSpawner2D::resolve_homing_targets: homing_target_path does not point at a live Node2D, volley flies without homing."], "the freed target is named once")

@@ -556,6 +556,7 @@ func test_a_live_target_source_wakes_an_idle_spawner() -> void:
 	d.aim = LaserData2D.LASER_AIM_LOCK_ON
 	var sp := _spawner(d, 1)
 	var l := _fire(sp)
+	expect_warning_sequence(["LaserSpawner2D: laser_data aims with Track or Lock On but laser_target_source is None: the beams keep their pattern direction."], "no source yet: named at the shot")
 	await idle(2)
 	assert_false(sp.is_processing(), "an idle spawner sleeps")
 	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_MOUSE

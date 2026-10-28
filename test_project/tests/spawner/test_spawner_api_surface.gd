@@ -104,5 +104,6 @@ func test_spawn_data_keeps_its_own_adjust_direction_flag() -> void:
 	var sp := make_spawner(data)
 	sp.set_homing_enabled(true)
 	assert_true(sp.shoot_once(), "homing shot")
+	expect_warning_sequence(["BulletSpawner2D::resolve_homing_targets: homing_node_group is empty, volley flies without homing."], "no group named: said once")
 	var volley: BulletVolley2D = sp.get_live_volleys()[0]
 	assert_true(volley.get_adjust_direction_based_on_rotation(), "the data's flag reaches the volley untouched")

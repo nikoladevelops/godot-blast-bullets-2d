@@ -129,11 +129,7 @@ func test_distribute_degenerate_and_real_pools() -> void:
 	s5.set_homing_max_targets(1)
 	assert_true(s5.shoot_once(), "DISTRIBUTE shot still fires with a 1-target pool")
 	assert_true(s5.shoot_once(), "second shot")
-	var warned := 0
-	for err in get_errors():
-		if err.is_push_warning() and err.contains_text("homing_target_selection is DISTRIBUTE but homing_max_targets is 1"):
-			warned += 1
-	assert_eq(warned, 1, "the degenerate pool warns once")
+	expect_warning_sequence(["BulletSpawner2D: homing_target_selection is DISTRIBUTE but homing_max_targets is 1, so every bullet chases the same target (identical to SHARED). Raise homing_max_targets to 2+ to spread targets across the volley."], "the degenerate pool warns once")
 	var v5: BulletVolley2D = s5.get_live_volleys()[0]
 	for i in 4:
 		assert_eq(v5.bullet_get_current_homing_target(i), foes[0], "1-target pool: every bullet chases the nearest")

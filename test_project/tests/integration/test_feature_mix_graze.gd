@@ -11,6 +11,7 @@ const CASES := ["plain", "bounce_back", "homing", "flock", "wobble_lateral", "gr
 
 
 func test_one_graze_and_one_exit_per_life(name: String = use_parameters(CASES)) -> void:
+	handle_events(factory) # the hits / grazes / expiries are handled; this test pins something else
 	var target := make_graze_target(Vector2(200, 20), &"mix_graze")
 	if name == "bounce_back":
 		make_wall(Vector2(320, 0), Vector2(20, 400), 16)

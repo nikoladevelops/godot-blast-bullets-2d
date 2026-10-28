@@ -186,8 +186,8 @@ void BulletVolley2D::apply_gravity_from_data(const BulletVolleyData2D &volley_da
 	// shared gravity above. Tile checkbox wraps short arrays.
 	const int grav_size = volley_data.all_bullet_gravity.size();
 	const bool tile_grav = volley_data.tile_all_bullet_gravity;
-	if (grav_size != 0 && grav_size != amount_bullets) {
-		WarnOnce2D::warn(warn_data_id, 10u, grav_size, amount_bullets, "BulletVolley2D: all_bullet_gravity size (" + String::num_int64(grav_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets use gravity" + String(tile_grav ? " (tiling on: wrapping short array)." : " (check tile_all_bullet_gravity to wrap, or provide one entry per bullet)."));
+	if (grav_size != 0 && grav_size < amount_bullets && !tile_grav) {
+		WarnOnce2D::warn(warn_data_id, 10u, grav_size, amount_bullets, "BulletVolley2D: all_bullet_gravity size (" + String::num_int64(grav_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets use gravity" + String(" (check tile_all_bullet_gravity to wrap, or provide one entry per bullet)."));
 	}
 	// Fresh seed: presence re-derived per slot below (authored entries claim
 	// it, even deliberate zeros; gaps stay fillable by set_gravity).

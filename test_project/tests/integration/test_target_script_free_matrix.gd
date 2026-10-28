@@ -91,6 +91,7 @@ func _target_cases() -> Array:
 
 
 func test_a_hit_target_getter_that_frees(p: Array = use_parameters(_target_cases())) -> void:
+	handle_events(factory) # the hits / grazes / expiries are handled; this test pins something else
 	var kind: String = p[0]
 	var victim: String = p[3]
 	var how: String = p[4]

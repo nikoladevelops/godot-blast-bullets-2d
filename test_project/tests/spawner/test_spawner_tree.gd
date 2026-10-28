@@ -19,6 +19,7 @@ func _make_data() -> BulletVolleyData2D:
 	sp.max_speed = 3000.0
 	sp.acceleration = 1500.0
 	data.all_bullet_speed_data = [sp]
+	data.tile_all_bullet_speed_data = true # every bullet of any pattern
 	data.max_life_time = 5.0
 	data.sprite_frames = H.make_sprite_frames()
 	data.set_collision_layer_from_array([2])

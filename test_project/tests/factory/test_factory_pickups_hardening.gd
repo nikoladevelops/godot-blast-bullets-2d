@@ -526,6 +526,7 @@ func test_a_nested_conversion_from_inside_a_conversion_is_refused() -> void:
 
 
 func test_bounce_off_a_position_moved_wall_is_independent_of_the_time_scale() -> void:
+	handle_events(factory) # the hits / grazes / expiries are handled; this test pins something else
 	var speeds := []
 	for scale in [1.0, 0.25]:
 		factory.time_scale = scale

@@ -43,6 +43,7 @@ func test_validate_and_invisible_lint() -> void:
 	var invis_res: Dictionary = BulletFactory2D.debug_validate_spawn_data(invis)
 	assert_true(invis_res.get("ok", false), "invisible data still valid")
 	assert_ne(invis_res.get("warning", ""), "", "invisible bullets warn")
+	expect_warning_sequence(["Warning in debug_validate_spawn_data: no sprite_frames/mesh/texture_size, bullets will be invisible. Assign SpriteFrames with art facing Vector2.RIGHT, or set texture_size/mesh."], "and say so in the log")
 	var good := _data(3)
 	assert_true(BulletFactory2D.debug_validate_spawn_data(good).get("ok", false), "good data ok")
 	var key: VolleyPoolKey2D = BulletFactory2D.debug_expected_pool_key(good)

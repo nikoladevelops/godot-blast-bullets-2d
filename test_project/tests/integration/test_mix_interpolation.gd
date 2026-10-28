@@ -126,6 +126,7 @@ func test_every_new_or_moved_bullet_is_drawn_where_it_is(event: String = use_par
 
 
 func test_a_bounce_is_drawn_on_its_side_of_the_wall() -> void:
+	handle_events(factory) # the hits / grazes / expiries are handled; this test pins something else
 	# The bounce tick keeps the drawn path continuous: what is drawn after a
 	# bounce never sits behind the wall face.
 	factory.physics_interpolation = BulletFactory2D.INTERPOLATION_ON

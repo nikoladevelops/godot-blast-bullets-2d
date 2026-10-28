@@ -15,6 +15,7 @@ func _sized_spawner(n: int, at: Vector2, lo: float, hi: float, ring_radius := 60
 	d.texture_size = Vector2(16, 16)
 	d.collision_shape = H.make_circle_shape(4.0)
 	var sp := make_spawner(d, BulletSpawner2D.PATTERN_FROM_HELPER_RING, n)
+	handle_events(sp) # grazes and hits are handled; the matrix pins the features
 	sp.global_position = at
 	sp.helper_ring_radius = ring_radius
 	sp.bullet_scale_mode = 1 # Uniform
@@ -199,8 +200,7 @@ func _fly_mix(features: Array) -> MotionProbe:
 		make_wall(Vector2(-120, 0))
 	var sp := make_spawner(d, BulletSpawner2D.PATTERN_FROM_HELPER_RING, 12)
 	sp.helper_ring_radius = 20.0
-	if "bounce" in features:
-		sp.body_entered.connect(func(_b, _v, _i) -> void: pass) # the hits are handled
+	handle_events(sp) # hits and grazes are handled; the matrix pins the features
 	make_graze_target(Vector2(260, 60), &"mix_pair")
 	if "homing" in features or "orbit" in features:
 		sp.homing_node_group = &"mix_pair"

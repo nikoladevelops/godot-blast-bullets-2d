@@ -499,6 +499,10 @@ func test_dying_enemies_keep_their_bullets_dangerous() -> void:
 	for i in 40:
 		await physics(1)
 	assert_gt(factory_hits[0], at_death, "bullets of dead enemies still hit the player (%d after their death)" % (factory_hits[0] - at_death))
-	expect_no_errors("no warning: their hits were handled")
+	expect_no_errors()
+	# While an enemy lived, its gun's hits reported on the gun (a spawner volley
+	# signals on its spawner), where nothing was connected: one warning per gun.
+	var unhandled := "': its bullets hit something, but nothing is connected to its area_entered or body_entered signal"
+	expect_warning_sequence([unhandled, unhandled, unhandled], "the live guns' hits went to the unconnected guns")
 	await idle(30)
 	assert_eq(factory.get_active_bullet_count(), 0, "every bullet ended")

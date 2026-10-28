@@ -225,6 +225,7 @@ func _data_2() -> BulletVolleyData2D:
 
 func test_same_owner_wake_keeps_decisions() -> void:
 	var v: BulletVolley2D = factory.spawn_volley(_data_2())
+	expect_warning_sequence(["BulletVolley2D: all_bullet_rotation_data size (2) != bullets (3); uncovered bullets get zero spin unless shared rotation fills them (check tile_all_bullet_rotation_data to wrap, or provide one entry per bullet)."], "slot 2 is a deliberate gap")
 	v.set_is_auto_pooling_enabled(false)
 	for i in 3:
 		v.disable_bullet(i)
@@ -240,11 +241,13 @@ func test_same_owner_wake_keeps_decisions() -> void:
 
 func test_new_pooled_life_rederives_presence() -> void:
 	var a: BulletVolley2D = factory.spawn_volley(_data_2())
+	expect_warning_sequence(["BulletVolley2D: all_bullet_rotation_data size (2) != bullets (3); uncovered bullets get zero spin unless shared rotation fills them (check tile_all_bullet_rotation_data to wrap, or provide one entry per bullet)."], "slot 2 is a deliberate gap")
 	for i in 3:
 		a.disable_bullet(i)
 	await idle(1)
 	factory.debug_reset_pool_stats()
 	var w: BulletVolley2D = factory.spawn_volley(_data_2())
+	expect_warning_sequence(["BulletVolley2D: all_bullet_rotation_data size (2) != bullets (3); uncovered bullets get zero spin unless shared rotation fills them (check tile_all_bullet_rotation_data to wrap, or provide one entry per bullet)."], "a new data resource says so too")
 	assert_eq(int(factory.debug_get_pool_hit_stats().get("hits", 0)), 1, "second life reuses the pool")
 	w.set_shared_bullet_rotation_data(H.make_rotation(7.0))
 	assert_almost_eq(w.bullet_get_rotation_speed(0), 0.0, 0.01, "new life honors the authored zero")

@@ -41,6 +41,8 @@ func test_steering_settings_reach_the_volley() -> void:
 	assert_almost_eq(v.get_homing_delay_sec(), 0.3, 0.0001, "delay")
 	assert_almost_eq(v.get_homing_duration_sec(), 2.0, 0.0001, "duration")
 	assert_almost_eq(v.get_homing_lose_range_px(), 900.0, 0.0001, "lose range")
+	await physics(2)
+	expect_warning_sequence(["BulletVolley2D has homing targets but homing_take_control_of_texture_rotation is false (and no movement pattern/rotation data), so homing will not steer bullets. Set it to true."], "texture control off: the volley says homing does not steer")
 
 
 func test_per_bullet_smoothing_fans_out() -> void:
@@ -129,11 +131,7 @@ func test_orbiting_without_homing_warns_once_and_stays_silent() -> void:
 	watch_signals(sp)
 	for i in 3:
 		assert_true(sp.shoot_once(), "plain shot %d" % i)
-	var warnings := 0
-	for err in get_errors():
-		if err.is_push_warning() and err.contains_text("orbiting_enabled needs homing_enabled"):
-			warnings += 1
-	assert_eq(warnings, 1, "one warning, not one per volley")
+	expect_warning_sequence(["BulletSpawner2D: orbiting_enabled needs homing_enabled (orbiting locks onto a homing target); volleys fly without orbiting."], "one warning, not one per volley")
 	assert_signal_emit_count(sp, "homing_targets_resolved", 0, "no homing signals without homing")
 	assert_signal_emit_count(sp, "volley_homing_configured", 0, "no homing signals without homing")
 

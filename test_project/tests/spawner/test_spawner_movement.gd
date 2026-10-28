@@ -224,6 +224,7 @@ func test_unusable_paths_never_crash() -> void:
 	sp.movement_enabled = true
 	await idle(5)
 	assert_eq(sp.global_position, Vector2(50, 60), "no path: stays where it is")
+	expect_warning_sequence([UNUSABLE_PATH_WARNING], "no path: warned once, not per frame")
 	var empty := Path2D.new()
 	empty.curve = Curve2D.new()
 	add(empty)
@@ -231,6 +232,7 @@ func test_unusable_paths_never_crash() -> void:
 	sp.movement_play()
 	await idle(5)
 	assert_eq(sp.global_position, Vector2(50, 60), "empty curve: stays")
+	expect_warning_sequence([UNUSABLE_PATH_WARNING], "a new unusable path warns again, once")
 	sp.set_movement_path_node(path)
 	sp.movement_stop()
 	sp.movement_play()
@@ -238,11 +240,33 @@ func test_unusable_paths_never_crash() -> void:
 	path.free()
 	await idle(10)
 	assert_true(sp.global_position.is_finite(), "path freed mid-movement: finite pose")
-	var warnings := 0
-	for err in get_errors():
-		if err.is_push_warning() and err.contains_text("movement_path is not a Path2D"):
-			warnings += 1
-	assert_between(warnings, 1, 3, "warned once per unusable path, not per frame")
+	expect_warning_sequence([UNUSABLE_PATH_WARNING], "the freed path: once")
+
+
+const UNUSABLE_PATH_WARNING := "BulletSpawner2D: movement_path is not a Path2D with a non-empty curve in the tree; the spawner stays where it is."
+
+
+func test_a_path_assigned_right_after_entering_the_tree_never_warns() -> void:
+	# Code builds a mover like a scene would: movement on, into the tree, then
+	# the path (a NodePath needs the tree). Only a frame that should travel
+	# without a usable path warns.
+	var sp := BulletSpawner2D.new()
+	sp.set_shooting_enabled(false)
+	sp.movement_enabled = true
+	sp.movement_duration_sec = 1.0
+	sp.movement_transition = 0
+	add(sp)
+	sp.movement_path = sp.get_path_to(path)
+	expect_warning_sequence([], "nothing travelled yet")
+	await idle(3)
+	expect_warning_sequence([], "the path was there in time")
+	assert_ne(sp.global_position, Vector2.ZERO, "it travels")
+	var lost := BulletSpawner2D.new()
+	lost.set_shooting_enabled(false)
+	lost.movement_enabled = true
+	add(lost)
+	await idle(3)
+	expect_warning_sequence([UNUSABLE_PATH_WARNING], "a frame that should travel without a path warns once")
 
 
 func test_handlers_that_free_things() -> void:
@@ -258,11 +282,7 @@ func test_handlers_that_free_things() -> void:
 	sp2.movement_endpoint_reached.connect(func(_at_end): if is_instance_valid(p2): p2.free())
 	await idle(90)
 	assert_true(sp2.global_position.is_finite(), "path freed from a handler: still finite")
-	var warned := 0
-	for err in get_errors():
-		if err.is_push_warning() and err.contains_text("movement_path is not a Path2D"):
-			warned += 1
-	assert_eq(warned, 1, "warned once")
+	expect_warning_sequence([UNUSABLE_PATH_WARNING], "warned once")
 
 
 func test_shooting_while_moving_follows_and_inherits() -> void:

@@ -69,6 +69,7 @@ func _await_split(frames := 60) -> void:
 
 
 func test_bounce_splits_around_the_new_heading_and_the_parent_leaves() -> void:
+	handle_events(factory) # the hits / grazes / expiries are handled; this test pins something else
 	var s := _stage(3)
 	s.split_on_bounce = true
 	s.spread_degrees = 60.0
@@ -86,6 +87,7 @@ func test_bounce_splits_around_the_new_heading_and_the_parent_leaves() -> void:
 
 
 func test_bounce_never_splits_without_its_switch_or_after_a_handler_disables() -> void:
+	handle_events(factory) # the hits / grazes / expiries are handled; this test pins something else
 	var s := _stage()
 	var v := await _bouncing_volley(s)
 	for i in 40:
@@ -103,6 +105,7 @@ func test_bounce_never_splits_without_its_switch_or_after_a_handler_disables() -
 
 
 func test_a_surviving_parent_splits_once_per_life_then_keeps_bouncing() -> void:
+	handle_events(factory) # the hits / grazes / expiries are handled; this test pins something else
 	var s := _stage(2)
 	s.split_on_bounce = true
 	s.parent_survives = true

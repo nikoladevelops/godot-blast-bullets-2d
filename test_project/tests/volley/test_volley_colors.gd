@@ -98,16 +98,16 @@ func test_a_short_array_leaves_white_or_wraps_with_tile() -> void:
 	expect_warning_sequence(["BulletVolley2D: bullet_colors size (2) != bullets (4); uncovered bullets are white (check tile_bullet_colors to wrap, or provide one entry per bullet)."])
 	assert_eq(_read_all(strict), [RED, GREEN, WHITE, WHITE], "strict: uncovered bullets white")
 	var tiled: BulletVolley2D = factory.spawn_volley(_colored(5, [RED, GREEN], true))
-	expect_warning_sequence(["BulletVolley2D: bullet_colors size (2) != bullets (5); uncovered bullets are white (tiling on: wrapping short array)."])
+	expect_warning_sequence([], "tiling on: every bullet is covered, nothing to warn about")
 	assert_eq(_read_all(tiled), [RED, GREEN, RED, GREEN, RED], "tile wraps the short array")
 	var long: BulletVolley2D = factory.spawn_volley(_colored(2, [RED, GREEN, BLUE]))
-	expect_warning_sequence(["BulletVolley2D: bullet_colors size (3) != bullets (2); uncovered bullets are white (check tile_bullet_colors to wrap, or provide one entry per bullet)."])
+	expect_warning_sequence([], "a longer array covers every bullet: nothing to warn about")
 	assert_eq(_read_all(long), [RED, GREEN], "extra entries are ignored")
 
 
 func test_runtime_setters_write_read_and_draw() -> void:
 	var v: BulletVolley2D = factory.spawn_volley(_colored(4, [WHITE], true))
-	expect_warning_sequence(["BulletVolley2D: bullet_colors size (1) != bullets (4); uncovered bullets are white (tiling on: wrapping short array)."])
+	expect_warning_sequence([], "tiling on: every bullet is covered, nothing to warn about")
 	v.set_bullet_color(2, RED)
 	assert_eq(v.get_bullet_color(2), RED, "set then get")
 	v.all_bullets_set_color(GREEN, 0, 1)

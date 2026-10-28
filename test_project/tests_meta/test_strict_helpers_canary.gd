@@ -29,3 +29,20 @@ func test_containing_is_exact_by_default() -> void:
 func test_no_errors_checkpoint_fails() -> void:
 	push_error("canary: stray")
 	expect_no_errors()
+
+
+func test_unclaimed_warning_fails() -> void:
+	# A plugin warning (a script push_warning is not classified as one by GUT).
+	add(BulletFactory2D.new())
+	var sp := BulletSpawner2D.new()
+	sp.set_shooting_enabled(false)
+	sp.spawn_data = H.make_volley_data(1, 0.0, 5.0)
+	add(sp)
+	sp.shoot_once() # an unwired spawner, two factories in its world: warns
+
+
+func test_warning_of_a_late_tick_fails() -> void:
+	# Bullets still flying at the end warn during after_each: still this test's.
+	var v: BulletVolley2D = quick_volley(1, 0.0)
+	v.set_homing_take_control_of_texture_rotation(false) # homing that cannot steer warns at its tick
+	v.shared_homing_deque_push_back_global_position_target(Vector2(100, 0))

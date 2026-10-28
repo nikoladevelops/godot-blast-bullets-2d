@@ -52,6 +52,7 @@ func test_expiry_counter() -> void:
 
 
 func test_collision_record_counter() -> void:
+	handle_events(factory) # the hits / grazes / expiries are handled; this test pins something else
 	factory.reset_frame_stats()
 	make_wall(Vector2(200, 0))
 	await physics()

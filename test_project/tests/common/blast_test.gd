@@ -9,7 +9,9 @@ extends GutTest
 ##     idle (structural calls are refused inside physics frames), and the test
 ##     must leave zero new orphan nodes.
 ## GUT runs in strict mode: any push_error / engine error the test did not
-## declare with expect_error()/expect_errors_containing() fails the test.
+## declare with expect_error()/expect_errors_containing() fails the test, and
+## after_each fails a test that leaves a push_warning unclaimed
+## (expect_warning_sequence).
 ##
 ## Waiting rules (important):
 ##   - physics(n) resumes INSIDE a physics frame: structural factory calls
@@ -60,6 +62,19 @@ func after_each() -> void:
 		factory.reset()
 		await idle()
 	assert_no_new_orphans("test left orphan nodes behind")
+	# Warnings are API like errors (one documented text each): a test claims
+	# every warning it causes, also those of bullets still flying at its end.
+	# GUT closes the test's error list before after_each: read every list
+	# (this test's, and the one after_each's own frames land in), marking
+	# what is reported so each warning is reported once.
+	var unclaimed: Array[String] = []
+	var lists: Dictionary = gut.error_tracker.errors.items
+	for key in lists:
+		for err in lists[key]:
+			if not err.handled and err.is_push_warning():
+				err.handled = true
+				unclaimed.append(str(err.code))
+	assert_eq(unclaimed.size(), 0, "unclaimed warnings (pin them with expect_warning_sequence): %s" % str(unclaimed))
 
 
 ## Resume on an idle (process) frame: safe for structural factory calls.
@@ -320,6 +335,25 @@ func _mouse_event(screen_pos: Vector2) -> void:
 
 
 ## n factory ticks of `delta` (factory.debug_advance_time), each asserted.
+## Connects an empty handler to the hit, graze and expiry signals of
+## `emitter` (a factory or spawner), like a game handling them: the plugin
+## warns about such events nobody handles. For tests whose subject is not the
+## handler (bounces, graze rings, effect triggers).
+func handle_events(emitter: Object) -> void:
+	for info in emitter.get_signal_list():
+		if info.name in HANDLED_EVENTS:
+			var handler := _ignore_event.unbind(info.args.size())
+			if not emitter.is_connected(info.name, handler):
+				emitter.connect(info.name, handler)
+
+
+const HANDLED_EVENTS := [&"area_entered", &"body_entered", &"bullet_grazed", &"life_time_over"]
+
+
+func _ignore_event() -> void:
+	pass
+
+
 func step_factory(n: int = 1, delta: float = 1.0 / 60.0) -> void:
 	for i in n:
 		assert_true(factory.debug_advance_time(delta), "factory tick %d advanced" % i)

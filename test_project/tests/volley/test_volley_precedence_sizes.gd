@@ -27,7 +27,9 @@ func test_strict_2_speed_entries_cover_only_bullets_0_1_rest_default() -> void:
 	# PREC T1 strict: 2 speed entries cover only bullets 0-1, rest default
 	var d1 := H.make_volley_data(4, 0.0)
 	d1.all_bullet_speed_data = [_speed(100.0), _speed(300.0)]
+	d1.tile_all_bullet_speed_data = false # strict
 	var v1: BulletVolley2D = factory.spawn_volley(d1)
+	expect_warning_sequence(["BulletVolley2D: all_bullet_speed_data size (2) != bullets (4); uncovered bullets fall back to shared/default (check tile_all_bullet_speed_data to wrap, or provide one entry per bullet)."], "a strict short array says so")
 	assert_true(absf(v1.get_bullet_speed_data(0).speed - 100.0) < 0.01, "slot 0 reads entry 0")
 	assert_true(absf(v1.get_bullet_speed_data(1).speed - 300.0) < 0.01, "slot 1 reads entry 1")
 	assert_true(absf(v1.get_bullet_speed_data(2).speed) < 0.01, "slot 2 falls back to default 0")
@@ -61,8 +63,10 @@ func test_short_array_shared_covered_win_rest_fall_to_shared() -> void:
 	# PREC T2b short array + shared: covered win, rest fall to shared
 	var d2b := H.make_volley_data(3, 0.0)
 	d2b.all_bullet_speed_data = [_speed(111.0)]
+	d2b.tile_all_bullet_speed_data = false # strict
 	d2b.shared_bullet_speed_data = _speed(999.0)
 	var v2b: BulletVolley2D = factory.spawn_volley(d2b)
+	expect_warning_sequence(["BulletVolley2D: all_bullet_speed_data size (1) != bullets (3); uncovered bullets fall back to shared/default (check tile_all_bullet_speed_data to wrap, or provide one entry per bullet)."], "a strict short array says so")
 	assert_true(absf(v2b.get_bullet_speed_data(0).speed - 111.0) < 0.01, "covered slot keeps per-bullet")
 	assert_true(absf(v2b.get_bullet_speed_data(1).speed - 999.0) < 0.01, "uncovered slot 1 falls to shared")
 	assert_true(absf(v2b.get_bullet_speed_data(2).speed - 999.0) < 0.01, "uncovered slot 2 falls to shared")
@@ -101,6 +105,7 @@ func test_strict_rotation_short_array_covers_own_indices_only() -> void:
 	var d5 := H.make_volley_data(4, 100.0)
 	d5.all_bullet_rotation_data = [_rot(2.0)]
 	var v5: BulletVolley2D = factory.spawn_volley(d5)
+	expect_warning_sequence(["BulletVolley2D: all_bullet_rotation_data size (1) != bullets (4); uncovered bullets get zero spin unless shared rotation fills them (check tile_all_bullet_rotation_data to wrap, or provide one entry per bullet)."], "a strict short array says so")
 	assert_true(v5.is_rotation_data_active(), "rotation active with partial seed")
 	assert_true(absf(v5.bullet_get_rotation_speed(0) - 2.0) < 0.01, "slot 0 reads entry 0")
 	assert_true(absf(v5.bullet_get_rotation_speed(1)) < 0.01, "slot 1 uncovered reads 0")
@@ -174,6 +179,7 @@ func test_wobble_per_bullet_wins_over_shared() -> void:
 	d8c.shared_bullet_wobble_data = wob_shared
 	d8c.all_bullet_wobble_data = [wob_per]
 	var v8c: BulletVolley2D = factory.spawn_volley(d8c)
+	expect_warning_sequence(["BulletVolley2D: all_bullet_wobble_data size (1) != bullets (3); uncovered bullets use shared wobble (check tile_all_bullet_wobble_data to wrap, or provide one entry per bullet)."], "a strict short array says so")
 	assert_true(absf(v8c.bullet_get_wobble_amplitude(0) - 40.0) < 0.01, "covered wobble slot wins")
 	assert_true(absf(v8c.bullet_get_wobble_amplitude(1) - 10.0) < 0.01, "uncovered slot falls to shared")
 	assert_true(absf(v8c.bullet_get_wobble_amplitude(2) - 10.0) < 0.01, "uncovered slot 2 falls to shared")
@@ -224,6 +230,7 @@ func test_collision_counts_strict_tiled_clamp() -> void:
 	d11.bullet_max_collision_count = 3
 	d11.bullets_current_collision_count = [1, 2]
 	var v11: BulletVolley2D = factory.spawn_volley(d11)
+	expect_warning_sequence(["BulletVolley2D: bullets_current_collision_count size (2) != bullets (4); uncovered bullets start at 0 (check tile_bullets_current_collision_count to wrap, or provide one entry per bullet)."], "a strict short array says so")
 	var cc: Array = v11.get_bullets_current_collision_count()
 	assert_true(int(cc[0]) == 1 and int(cc[1]) == 2 and int(cc[2]) == 0 and int(cc[3]) == 0, "strict: covered keep, rest start at 0")
 	var d11t := H.make_volley_data(4, 100.0)
@@ -261,6 +268,7 @@ func test_custom_data_strict_tiled_never_falls_back_to_shared() -> void:
 	var shared_res := Resource.new()
 	d12.shared_bullets_custom_data = shared_res
 	var v12: BulletVolley2D = factory.spawn_volley(d12)
+	expect_warning_sequence(["BulletVolley2D: all_bullets_custom_data size (2) != bullets (3); uncovered bullets read null (check tile_all_bullets_custom_data to wrap, or provide one entry per bullet)."], "a strict short array says so")
 	assert_true(v12.bullet_get_custom_data(0) == r1, "custom slot 0")
 	assert_true(v12.bullet_get_custom_data(1) == r2, "custom slot 1")
 	assert_true(v12.bullet_get_custom_data(2) == null, "custom slot 2 uncovered reads null, never shared")
@@ -321,3 +329,42 @@ func test_negative_curve_sample_flies_backwards() -> void:
 
 	assert_true(factory.debug_assert_no_dangling().get("ok", false) == true, "no dangling at end")
 	await idle(1)
+
+
+## Every per-bullet array of the spawn data, with one valid entry each.
+const PER_BULLET_ARRAYS := ["all_bullet_speed_data", "all_bullet_rotation_data", "all_bullet_wobble_data",
+	"all_bullet_curves_data", "all_bullet_movement_pattern_paths", "all_bullet_movement_pattern_face_movement_directions",
+	"all_bullet_movement_pattern_repeats", "all_bullet_gravity", "all_bullets_custom_data", "bullet_colors",
+	"all_bullet_life_times", "bullets_current_collision_count"]
+
+
+func _per_bullet_entry(array_name: String) -> Variant:
+	match array_name:
+		"all_bullet_speed_data": return H.make_speed(100.0)
+		"all_bullet_rotation_data": return H.make_rotation(1.0)
+		"all_bullet_wobble_data": return BulletWobbleData2D.new()
+		"all_bullet_curves_data": return BulletCurvesData2D.new()
+		"all_bullet_movement_pattern_paths": return NodePath("")
+		"all_bullet_gravity": return Vector2(0, 10)
+		"all_bullets_custom_data": return Resource.new()
+		"bullet_colors": return Color.RED
+		"all_bullet_life_times": return 2.0
+		"bullets_current_collision_count": return 0
+	return true # the two movement-pattern flag arrays
+
+
+func test_only_a_short_untiled_array_warns(array_name: String = use_parameters(PER_BULLET_ARRAYS)) -> void:
+	# Short and untiled: some bullets are uncovered, say so. Tiled: every
+	# bullet is covered. Longer than the volley: the spare entries are unused.
+	for case in [[1, false, true], [1, true, false], [5, false, false], [5, true, false], [3, false, false]]:
+		var d := H.make_volley_data(3, 100.0)
+		assert_true(array_name in d and ("tile_" + array_name) in d, array_name)
+		var entries: Array = []
+		for i in case[0]:
+			entries.append(_per_bullet_entry(array_name))
+		d.set(array_name, entries)
+		assert_eq(d.get(array_name).size(), case[0], "%s holds the entries" % array_name)
+		d.set("tile_" + array_name, case[1])
+		factory.spawn_volley(d)
+		var size_text := "%s size (%d) != bullets (3)" % [array_name, case[0]]
+		expect_warning_sequence([size_text] if case[2] else [], "%s: %d entries, tiled %s" % [array_name, case[0], case[1]])

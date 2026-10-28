@@ -62,6 +62,7 @@ func _configure(name: String, d: BulletVolleyData2D) -> void:
 
 
 func test_a_separating_flock_spreads_the_clump(name: String = use_parameters(CASES)) -> void:
+	handle_events(factory) # the wall hits are handled; this test pins the flock
 	if name == "bounce_wall":
 		make_wall(Vector2(120, 0), Vector2(20, 800), 16)
 	var d := _data()
@@ -82,6 +83,8 @@ func test_a_separating_flock_spreads_the_clump(name: String = use_parameters(CAS
 	var start := min_pair_distance(origins(v))
 	for k in (120 if name == "time_scale_half" else 60):
 		await physics(1)
+	if name == "homing_no_control":
+		expect_warning_sequence(["BulletVolley2D has homing targets but homing_take_control_of_texture_rotation is false (and no movement pattern/rotation data), so homing will not steer bullets. Set it to true."], "homing without texture control steers nothing, and says so")
 	var spread := min_pair_distance(origins(v))
 	assert_gt(spread, maxf(start, 3.0), "%s: the clump spread (%.2f -> %.2f px)" % [name, start, spread])
 	assert_eq(broken_bullets(v), [], "%s: finite" % name)

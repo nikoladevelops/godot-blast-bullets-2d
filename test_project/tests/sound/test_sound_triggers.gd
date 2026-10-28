@@ -92,6 +92,7 @@ func test_a_cancelled_warning_plays_no_telegraph_sound(action: String = use_para
 
 
 func test_destroy_kill_only_hit_survived_only() -> void:
+	handle_events(factory) # the hits / grazes / expiries are handled; this test pins something else
 	factory.debug_set_sound_log_enabled(true)
 	make_wall(Vector2(200, 0))
 	var hit := H.make_sound(BulletSoundData2D.SOUND_ON_HIT)
@@ -115,6 +116,7 @@ func test_destroy_kill_only_hit_survived_only() -> void:
 
 
 func test_bounce_fires_every_ricochet() -> void:
+	handle_events(factory) # the hits / grazes / expiries are handled; this test pins something else
 	factory.debug_set_sound_log_enabled(true)
 	make_wall(Vector2(200, 0), Vector2(20, 400), 8, 2)
 	var d := H.make_volley_data(1, 300.0, 8.0)
@@ -186,6 +188,7 @@ func test_homing_reached_fires() -> void:
 
 
 func test_graze_and_exit_fire() -> void:
+	handle_events(factory) # the hits / grazes / expiries are handled; this test pins something else
 	factory.debug_set_sound_log_enabled(true)
 	make_graze_target(Vector2(100, 0), &"g")
 	var zone := H.make_graze_zone([24.0])

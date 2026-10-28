@@ -70,6 +70,8 @@ func test_configuration_warnings() -> void:
 	bare.sprite_frames = null
 	sp.set_spawn_data(bare)
 	assert_true(_has(sp.get_setup_warnings(), "bullets will be invisible"), "invisible bullets listed")
+	await idle(1)
+	expect_warning_sequence(["BulletSpawner2D: movement_path is not a Path2D with a non-empty curve in the tree; the spawner stays where it is."], "and the first frame that travels names the missing path")
 
 
 func _has(w: PackedStringArray, needle: String) -> bool:

@@ -82,8 +82,8 @@ void BulletVolley2D::seed_bullet_life_times(const BulletVolleyData2D &data) {
 		return;
 	}
 	const bool tile = data.tile_all_bullet_life_times;
-	if (size != amount_bullets) {
-		WarnOnce2D::warn(warn_data_id, 13u, size, amount_bullets, "BulletVolley2D: all_bullet_life_times size (" + String::num_int64(size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets use max_life_time" + String(tile ? " (tiling on: wrapping short array)." : " (check tile_all_bullet_life_times to wrap, or provide one entry per bullet)."));
+	if (size < amount_bullets && !tile) {
+		WarnOnce2D::warn(warn_data_id, 13u, size, amount_bullets, "BulletVolley2D: all_bullet_life_times size (" + String::num_int64(size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets use max_life_time" + String(" (check tile_all_bullet_life_times to wrap, or provide one entry per bullet)."));
 	}
 	const int covered = tile ? amount_bullets : Math::min(size, amount_bullets);
 	for (int i = 0; i < covered; ++i) {

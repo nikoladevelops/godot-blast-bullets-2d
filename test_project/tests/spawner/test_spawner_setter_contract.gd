@@ -211,11 +211,7 @@ func test_grid_product_over_the_cap_warns_once_and_fires_nothing() -> void:
 	sp.helper_lattice_rows = 1000 # 1000000 > 80000 slots
 	assert_eq(sp.collect_spawn_transforms().size(), 0, "no slots")
 	assert_eq(sp.collect_spawn_transforms().size(), 0, "still none")
-	var warnings := 0
-	for err in get_errors():
-		if err.is_push_warning() and err.contains_text("helper_lattice_columns * helper_lattice_rows exceeds 80000"):
-			warnings += 1
-	assert_eq(warnings, 1, "warned once, not per collect")
+	expect_warning_sequence(["BulletSpawner2D: helper_lattice_columns * helper_lattice_rows exceeds 80000 slots; lower them."], "warned once, not per collect")
 
 
 func test_corridor_width_and_gap_load_in_any_order() -> void:
@@ -244,11 +240,7 @@ func test_corridor_gap_wider_than_wall_is_clamped_with_one_warning() -> void:
 	for t in pts:
 		var x: float = (t as Transform2D).origin.x
 		assert_true(absf(x) >= 25.0 - 0.01 and absf(x) <= 50.0 + 0.01, "door clamped to half the width (x=%.2f)" % x)
-	var warnings := 0
-	for err in get_errors():
-		if err.is_push_warning() and err.contains_text("helper_corridor_gap_width must be smaller than helper_corridor_width"):
-			warnings += 1
-	assert_eq(warnings, 1, "warned once")
+	expect_warning_sequence(["BulletSpawner2D: helper_corridor_gap_width must be smaller than helper_corridor_width; using half the width for the door."], "warned once")
 
 
 func test_node_paths_reject_wrong_types_in_tree() -> void:
@@ -299,17 +291,10 @@ func test_out_of_range_skip_index_warns_once_and_never_from_the_preview() -> voi
 	var sp := make_preview_spawner(BulletSpawner2D.PATTERN_FROM_HELPER_RING, 6)
 	sp.helper_skip_indices = PackedInt32Array([99])
 	await idle(6) # several preview rebuilds
-	var warnings := 0
-	for err in get_errors():
-		if err.is_push_warning() and err.contains_text("helper_skip_indices holds an index outside"):
-			warnings += 1
-	assert_eq(warnings, 0, "the preview stays quiet")
+	expect_warning_sequence([], "the preview stays quiet")
 	assert_true(sp.shoot_once(), "shot 1")
 	assert_true(sp.shoot_once(), "shot 2")
-	for err in get_errors():
-		if err.is_push_warning() and err.contains_text("helper_skip_indices holds an index outside"):
-			warnings += 1
-	assert_eq(warnings, 1, "one warning for two shots")
+	expect_warning_sequence(["BulletSpawner2D: helper_skip_indices holds an index outside 0..5; it is ignored."], "one warning for two shots")
 
 
 ## A strict range hint (min,max without or_greater / or_less) is a promise:

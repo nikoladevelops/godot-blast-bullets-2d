@@ -392,6 +392,7 @@ func test_side_spread_skip() -> void:
 	assert_true(BulletPatterns2D.helper_apply_skip_indices(base, PackedInt32Array()).size() == 6, "skip empty keeps all")
 	assert_true(BulletPatterns2D.helper_apply_skip_indices(base, PackedInt32Array([0])).size() == 5, "skip [0] drops one")
 	assert_true(BulletPatterns2D.helper_apply_skip_indices(base, PackedInt32Array([-1, 99, 2147483647])).size() == 6, "skip OOB ignored")
+	expect_warning_sequence(["helper_apply_skip_indices: skip index out of range, ignoring it."], "one warning per call")
 	assert_true(BulletPatterns2D.helper_apply_skip_indices(base, PackedInt32Array([0, 1, 2, 3, 4, 5])).is_empty(), "skip all drops all")
 	assert_true(BulletPatterns2D.helper_apply_skip_indices(base, PackedInt32Array([2, 2, 2])).size() == 5, "skip dupes drop once")
 

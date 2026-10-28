@@ -246,6 +246,7 @@ func test_freed_pinned_camera_falls_back() -> void:
 	await idle(1)
 	assert_null(get_viewport().get_camera_2d(), "only camera freed: none current")
 	assert_true(factory.play_sound(s, Vector2(1000, 0)), "freed camera falls back without crashing")
+	expect_warning_sequence(["BulletSoundData2D: camera_path does not point to a Camera2D in this viewport, using the viewport camera."], "the stale path is named")
 	await physics(2)
 	assert_false(_logged(s.get_instance_id()).is_empty(), "no current camera means no culling")
 

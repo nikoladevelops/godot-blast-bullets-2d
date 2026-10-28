@@ -95,8 +95,8 @@ void BulletVolley2D::apply_wobble_from_data(const BulletVolleyData2D &volley_dat
 	// shared per bullet. Tile checkbox wraps short arrays.
 	const int wobble_size = volley_data.all_bullet_wobble_data.size();
 	const bool tile_wobble = volley_data.tile_all_bullet_wobble_data;
-	if (wobble_size != 0 && wobble_size != amount_bullets) {
-		WarnOnce2D::warn(warn_data_id, 11u, wobble_size, amount_bullets, "BulletVolley2D: all_bullet_wobble_data size (" + String::num_int64(wobble_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets use shared wobble" + String(tile_wobble ? " (tiling on: wrapping short array)." : " (check tile_all_bullet_wobble_data to wrap, or provide one entry per bullet)."));
+	if (wobble_size != 0 && wobble_size < amount_bullets && !tile_wobble) {
+		WarnOnce2D::warn(warn_data_id, 11u, wobble_size, amount_bullets, "BulletVolley2D: all_bullet_wobble_data size (" + String::num_int64(wobble_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets use shared wobble" + String(" (check tile_all_bullet_wobble_data to wrap, or provide one entry per bullet)."));
 	}
 	for (int i = 0; i < amount_bullets; ++i) {
 		const int entry = tile_wobble ? resolve_tiled_data_index(wobble_size, i) : resolve_strict_data_index(wobble_size, i);

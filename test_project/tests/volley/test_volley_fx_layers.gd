@@ -101,7 +101,14 @@ var wall
 
 func _preamble() -> void:
 	wall = _make_wall(Vector2(200, 0))
+	# The wall hits are handled (unhandled hits warn): this suite pins the effects.
+	factory.area_entered.connect(_on_hit)
+	factory.body_entered.connect(_on_hit)
 	await physics()
+
+
+func _on_hit(_target: Object, _volley: BulletVolley2D, _bullet_index: int) -> void:
+	pass
 
 
 func test_validation_inert_layers_stay_silent_rejects_hold() -> void:
@@ -548,6 +555,7 @@ func test_rotation_offsets_spin() -> void:
 
 
 func test_lifetime_over_trigger_fires_on_both_expiry_paths() -> void:
+	handle_events(factory) # the hits / grazes / expiries are handled; this test pins something else
 	await _preamble()
 	# FX T15 lifetime-over trigger fires on both expiry paths
 	await _settle(factory)
@@ -913,6 +921,7 @@ func test_on_clear_fires_on_manual_clear_only() -> void:
 	assert_true(clear_ok.trigger == 6, "trigger 6 (On Clear) accepted")
 	var d23 := _fx_data(Vector2.ZERO, 0.0, [_make_layer(6, 4)], false)
 	d23.transforms = [Transform2D(0.0, Vector2.ZERO), Transform2D(0.0, Vector2(32, 0))]
+	d23.tile_all_bullet_speed_data = true # both bullets at the one speed entry
 	var v23: BulletVolley2D = factory.spawn_volley(d23)
 	assert_true(v23.clear_bullet(0), "clear_bullet live slot returns true")
 	for i in 3:
@@ -1169,6 +1178,7 @@ func test_whiten_override_pixels_rebake_fallback() -> void:
 	for i in 3:
 		await physics()
 	assert_true(factory.get_active_effect_count() >= 1, "unreadable frame falls back, still fires")
+	expect_warning_sequence(["EffectLayerData2D: override_frame_color could not read a frame of 'default', keeping the original art for unreadable frames."], "the unreadable frame is named once")
 	for i in 30:
 		await physics()
 	expect_errors_containing("source image is null or empty", 2, "empty whiten image fails loud")

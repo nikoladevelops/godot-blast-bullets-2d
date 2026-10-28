@@ -330,6 +330,7 @@ func test_t6_spawner_ownership_spawner_signal_only_factory_silent() -> void:
 	spawner.pattern_source = BulletSpawner2D.PATTERN_FROM_SELF
 	spawner.position = Vector2.ZERO
 	add(spawner)
+	handle_events(spawner) # the hits are handled; this test pins the bounce routing
 	await idle(1)
 	spawner.bounce_body_entered.connect(_on_spawner_bounce)
 	spawner.spawn_data = _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
@@ -737,6 +738,7 @@ func test_t18_spawner_retarget_keeps_bounce_config_live() -> void:
 	sp18.homing_target_source = BulletSpawner2D.HOMING_SOURCE_GLOBAL_POSITION
 	sp18.homing_global_position = Vector2(400, 0)
 	add(sp18)
+	handle_events(sp18) # the hits are handled; this test pins the bounce config
 	await idle(1)
 	sp18.spawn_data = _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
 	assert_true(sp18.shoot_once(), "homing spawner volley fired")
@@ -2175,6 +2177,7 @@ func test_mover_switching_gravity_push_unlocked_orbit_spawner_routing() -> void:
 	spawner32.pattern_source = BulletSpawner2D.PATTERN_FROM_SELF
 	spawner32.position = Vector2(0, 300)
 	add(spawner32)
+	handle_events(spawner32) # the hits are handled; this test pins the bounce routing
 	await idle(1)
 	var push32d := RigidBody2D.new()
 	push32d.position = Vector2(-150, 300)
@@ -2282,6 +2285,7 @@ func test_teleport_matrix_interpolation_mixing() -> void:
 		if reached34.size() >= 1:
 			break
 	assert_true(reached34.size() >= 1, "teleport onto homing target fires reached")
+	expect_warning_sequence(["BulletVolley2D has homing targets but homing_take_control_of_texture_rotation is false (and no movement pattern/rotation data), so homing will not steer bullets. Set it to true."], "homing used for its reach only: the volley says it steers nothing")
 	assert_true(v34b.get_bullet_transform(0).is_finite(), "post-teleport homing flight finite")
 	v34b.bullet_homing_target_reached.disconnect(on_reached)
 	hunter34.queue_free()

@@ -165,7 +165,7 @@ func test_tile_wraps_the_life_times() -> void:
 	expiries.clear()
 	factory.life_time_over.connect(_on_expiry)
 	factory.spawn_volley(_timed(4, [0.125, 0.25], true))
-	expect_warning_sequence(["BulletVolley2D: all_bullet_life_times size (2) != bullets (4); uncovered bullets use max_life_time (tiling on: wrapping short array)."])
+	expect_warning_sequence([], "tiling on: every bullet is covered, nothing to warn about")
 	_step(5)
 	assert_eq(expiries, [[2, [0, 2]], [4, [1, 3]]], "entries wrap: bullets 0 and 2, then 1 and 3")
 
@@ -228,6 +228,7 @@ func test_set_bullet_life_time_left_rejects_and_ranges_apply() -> void:
 
 
 func test_a_wake_after_expiry_restarts_the_own_lifetime_and_a_freeze_keeps_it() -> void:
+	handle_events(factory) # the hits / grazes / expiries are handled; this test pins something else
 	var v: BulletVolley2D = factory.spawn_volley(_timed(2, [0.125, 0.5]))
 	v.set_is_auto_pooling_enabled(false)
 	step_factory(1, DT)
@@ -246,6 +247,7 @@ func test_a_wake_after_expiry_restarts_the_own_lifetime_and_a_freeze_keeps_it() 
 
 
 func test_nothing_of_the_own_lifetimes_survives_the_pool() -> void:
+	handle_events(factory) # the hits / grazes / expiries are handled; this test pins something else
 	var first: BulletVolley2D = factory.spawn_volley(_timed(2, [0.0625, 0.0625]))
 	step_factory(2, DT)
 	await idle(1)

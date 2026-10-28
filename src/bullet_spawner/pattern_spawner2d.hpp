@@ -1395,7 +1395,7 @@ protected:
 	// Moves the node to the pose at the current progress; the velocity is the
 	// move over `delta`, the time it took (keep_velocity: a pose only, the
 	// velocity stays). Returns false when the path is unusable.
-	bool apply_movement_pose(double delta, bool keep_velocity = false);
+	bool apply_movement_pose(double delta, bool keep_velocity = false, bool report_unusable = true);
 	bool movement_active() const;
 	// Auto-fire error latch (see shoot_once fail_early).
 	bool auto_fire_in_progress = false;
