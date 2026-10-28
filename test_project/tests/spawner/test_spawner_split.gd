@@ -384,6 +384,39 @@ func test_orphan_policies_reach_every_queued_split() -> void:
 
 
 
+## A split queued (carried over by split_max_children_per_sweep) belongs to
+## whoever owns its parent volley when it spawns: detach_from_spawner hands
+## the waiting children to the factory, adopt_live_volley to the spawner.
+func test_queued_splits_follow_an_ownership_change() -> void:
+	var chain := _chain(2, false)
+	chain.stages[0].split_after_sec = DT * 0.5
+	chain.stages[0].parent_survives = true
+	chain.stages[0].child_data = H.make_volley_data(1, 0.0, 30.0)
+	factory.split_max_children_per_sweep = 2 # one parent's children per sweep
+	var sp := _split_spawner(chain, 2, 30.0)
+	var v := _fire(sp)
+	step_factory(1)
+	assert_eq([spawner_splits.size(), factory_splits.size()], [1, 0], "the first parent's children spawned, the second waits")
+	assert_true(v.detach_from_spawner(), "detached while its split waits")
+	step_factory(1)
+	assert_eq([spawner_splits.size(), factory_splits.size()], [1, 1], "the waiting children are the factory's")
+	assert_eq(int((factory_splits[0][2] as BulletVolley2D).debug_get_volley_info()["owner_spawner_id"]), 0, "factory-owned")
+
+	# The reverse: a factory volley adopted while its split waits.
+	spawner_splits.clear()
+	factory_splits.clear()
+	var data := H.make_volley_data(2, 0.0, 30.0)
+	var fv: BulletVolley2D = factory.spawn_volley(data)
+	fv.split_set_data(chain, data)
+	step_factory(1)
+	assert_eq([spawner_splits.size(), factory_splits.size()], [0, 1], "the factory volley's first children spawned")
+	assert_true(sp.adopt_live_volley(fv), "adopted while its split waits")
+	step_factory(1)
+	assert_eq([spawner_splits.size(), factory_splits.size()], [1, 1], "the waiting children are the spawner's")
+	assert_eq(int((spawner_splits[0][2] as BulletVolley2D).debug_get_volley_info()["owner_spawner_id"]), sp.get_instance_id(), "spawner-owned")
+	factory.split_max_children_per_sweep = 0
+
+
 ## Graze, sound, flock and split are armed BEFORE pre_shoot: its handler sees
 ## an armed volley, and what the handler sets instead sticks (the spawner's
 ## arming never overwrites it afterwards).

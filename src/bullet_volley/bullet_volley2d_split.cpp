@@ -121,6 +121,8 @@ int BulletVolley2D::split_capture(int bullet_index, int cause, const Transform2D
 		request.frame_y = all_bounce_frame[bullet_index].y_axis;
 	}
 	request.owner_id = owner_spawner_id;
+	request.source_volley_id = get_instance_id();
+	request.source_life = volley_generation;
 	request.shot_salt = split_shot_salt;
 	request.roll_salt = split_roll_salt(split_shot_salt, split_count_of(bullet_index));
 	request.parent_key = get_pool_key();

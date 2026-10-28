@@ -816,6 +816,9 @@ public:
 	void set_split_max_pending(int value);
 	// False (and the drop counted) when the queue is full.
 	bool split_has_room();
+	// The waiting splits and emitter shots of one volley life now belong to
+	// new_owner_id (0 = the factory): its owner changed while they waited.
+	void reown_pending_requests(uint64_t volley_id, int life, uint64_t new_owner_id);
 	int get_pending_split_count() const { return (int)pending_splits.size(); }
 	// Every split ever recorded (monotonic: a manual split counts its own).
 	uint64_t get_split_recorded_total() const { return split_recorded_total; }

@@ -30,6 +30,10 @@ struct EmitterConfig2D {
 struct EmitRequest2D {
 	uint64_t template_id = 0;
 	uint64_t owner_id = 0; // the emitting volley's owner spawner (0 = factory)
+	// The emitting volley and its life: a waiting shot follows an ownership
+	// change of that life (detach_from_spawner, adopt_live_volley).
+	uint64_t source_volley_id = 0;
+	int source_life = 0;
 	PoolKey source_key; // the emitting volley's bucket (scoped resets drop by it)
 	Transform2D pose; // the bullet's position, turned by the aim (unit scale)
 	Vector2 velocity; // inherited by the shot (inherit_bullet_velocity)

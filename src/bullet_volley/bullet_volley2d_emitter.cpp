@@ -84,6 +84,7 @@ void BulletVolley2D::emitter_tick() {
 	const double spin = data->spin_per_shot_degrees;
 	const bool inherit = data->inherit_bullet_velocity;
 	const PoolKey key = get_pool_key();
+	const uint64_t self_id_for_requests = get_instance_id();
 	double next = Math::INF;
 	for (int i : all_bullets_enabled_set.get_active_indexes()) {
 		if (i < 0 || i >= amount_bullets) {
@@ -120,6 +121,8 @@ void BulletVolley2D::emitter_tick() {
 		EmitRequest2D request;
 		request.template_id = config->template_id;
 		request.owner_id = owner_spawner_id;
+		request.source_volley_id = self_id_for_requests;
+		request.source_life = volley_generation;
 		request.source_key = key;
 		double angle = 0.0;
 		if (aim == BulletEmitterData2D::EMITTER_AIM_HEADING) {

@@ -133,6 +133,10 @@ struct SplitRequest2D {
 	real_t max_speed = 0.0;
 	real_t acceleration = 0.0;
 	uint64_t owner_id = 0; // the parent's owner spawner (0 = the factory)
+	// The parent volley and its life: a waiting request follows an ownership
+	// change of that life (detach_from_spawner, adopt_live_volley).
+	uint64_t source_volley_id = 0;
+	int source_life = 0;
 	uint64_t shot_salt = 0; // the parent volley's shot salt (children inherit it)
 	uint64_t roll_salt = 0; // split_roll_salt(shot_salt, the parent's earlier splits)
 	PoolKey parent_key; // the parent volley's bucket (scoped reset/free drop by it)

@@ -417,6 +417,21 @@ func test_a_clear_orphan_policy_drops_the_queued_shots() -> void:
 	assert_eq(shots.size(), 1, "nothing more fires")
 
 
+func test_a_detached_volleys_queued_shots_outlive_its_old_spawner() -> void:
+	var tpl := _template()
+	factory.emitter_max_shots_per_sweep = 1
+	var clear := _emitting(tpl, _timing(10.0), 3)
+	clear.orphaned_volleys = BulletSpawner2D.ORPHANED_VOLLEYS_CLEAR
+	var v := _fire(clear)
+	_step(1)
+	assert_eq([shots.size(), factory.get_pending_emit_count()], [1, 2], "one fired, two waiting")
+	assert_true(v.detach_from_spawner(), "detached while two shots wait")
+	clear.free()
+	assert_eq(factory.get_pending_emit_count(), 2, "Clear leaves the factory's volley and its queued shots alone")
+	_step(3)
+	assert_eq(shots.size(), 3, "both waiting shots fired")
+
+
 func test_a_freed_template_is_skipped_silently() -> void:
 	var tpl := _template()
 	_fire(_emitting(tpl, _timing(DT)))

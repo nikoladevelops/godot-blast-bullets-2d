@@ -1582,7 +1582,7 @@
 		<method name="detach_from_spawner">
 			<return type="bool" />
 			<description>
-				Makes this volley factory-owned, like [constant BulletSpawner2D.ORPHANED_VOLLEYS_HAND_TO_FACTORY] for one volley: its signals reach the factory, its clock drops the spawner's [member BulletSpawner2D.time_scale], and the spawner no longer tracks, lists or retargets it. What the spawner armed (graze, sound, flock, split, emitter) stays. Returns [code]false[/code] (no change) for a factory volley; refused on a pooled volley. Splits and emitter shots this volley queued earlier in the same sweep still belong to the spawner. [method BulletSpawner2D.adopt_live_volley] hands it to a spawner again.
+				Makes this volley factory-owned, like [constant BulletSpawner2D.ORPHANED_VOLLEYS_HAND_TO_FACTORY] for one volley: its signals reach the factory, its clock drops the spawner's [member BulletSpawner2D.time_scale], and the spawner no longer tracks, lists or retargets it. What the spawner armed (graze, sound, flock, split, emitter) stays. Returns [code]false[/code] (no change) for a factory volley; refused on a pooled volley. Splits and emitter shots this volley queued and the factory has not spawned yet (carried over by [member BulletFactory2D.split_max_children_per_sweep] or [member BulletFactory2D.emitter_max_shots_per_sweep]) become the factory's too. [method BulletSpawner2D.adopt_live_volley] hands it to a spawner again.
 			</description>
 		</method>
 		<method name="detach_time_based_function">

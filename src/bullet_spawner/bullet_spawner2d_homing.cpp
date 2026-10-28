@@ -935,6 +935,8 @@ bool BulletSpawner2D::adopt_live_volley(BulletVolley2D *bullets) {
 	// for retargeting. Queues are left alone; user handlers connected
 	// directly on the volley belong to the game and keep working.
 	bullets->owner_spawner_id = get_instance_id();
+	// Splits and emitter shots the volley queued before are this spawner's too.
+	bullets->reown_queued_requests();
 	track_live_volley(bullets);
 	return true;
 }

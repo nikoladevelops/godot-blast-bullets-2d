@@ -99,7 +99,14 @@ bool BulletVolley2D::detach_from_spawner() {
 	}
 	owner_spawner_id = 0;
 	orphaned_spawner_path = String();
+	reown_queued_requests();
 	return true;
+}
+
+void BulletVolley2D::reown_queued_requests() {
+	if (bullet_factory != nullptr) {
+		bullet_factory->reown_pending_requests(get_instance_id(), volley_generation, owner_spawner_id);
+	}
 }
 
 BulletSpawner2D *BulletVolley2D::get_owner_spawner() const {

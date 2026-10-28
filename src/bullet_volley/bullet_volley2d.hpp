@@ -1394,6 +1394,9 @@ public:
 	// pooled volley. Splits and emitter shots this volley queued earlier in
 	// the same sweep still belong to the spawner.
 	bool detach_from_spawner();
+	// After owner_spawner_id changed: the splits and emitter shots this life
+	// queued and the factory has not spawned yet follow the new owner.
+	void reown_queued_requests();
 	// "active", "parked", "pooled", "fresh" or "dying" (tests/support).
 	String debug_get_life_state() const;
 	// Internal consistency of this volley: "" when every invariant holds,
