@@ -433,7 +433,9 @@ public:
 	// On Clear at each pose); parked volleys go back to the pool. Safe
 	// from handlers. Returns how many bullets were cleared.
 	int clear_active_bullets(bool fire_clear_effects = true);
-	int orphaned_volleys = ORPHANED_VOLLEYS_KEEP_FLYING;
+	// Default Hand To Factory: an enemy dying with its spawner leaves bullets
+	// that still hit (their hits reach the factory's signals).
+	int orphaned_volleys = ORPHANED_VOLLEYS_HAND_TO_FACTORY;
 
 	double bullet_speed_scale_min = 1.0;
 	double bullet_speed_scale_max = 1.0;

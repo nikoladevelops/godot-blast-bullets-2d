@@ -283,10 +283,12 @@ func test_orphaned_volleys_enum_is_locked() -> void:
 		if p.name == "orphaned_volleys":
 			hint = p.hint_string
 	assert_eq(hint, "Keep Flying,Hand To Factory,Clear,Remove", "inspector labels in id order")
-	assert_eq(sp.orphaned_volleys, BulletSpawner2D.ORPHANED_VOLLEYS_KEEP_FLYING, "default keeps flying")
+	# An NPC dying with its spawner: its bullets stay dangerous by default
+	# (their hits reach the factory's signals).
+	assert_eq(sp.orphaned_volleys, BulletSpawner2D.ORPHANED_VOLLEYS_HAND_TO_FACTORY, "default hands to the factory")
 	sp.orphaned_volleys = 9
 	expect_error_sequence(["BulletSpawner2D: orphaned_volleys out of range, keeping the old value."])
-	assert_eq(sp.orphaned_volleys, 0, "old value kept")
+	assert_eq(sp.orphaned_volleys, BulletSpawner2D.ORPHANED_VOLLEYS_HAND_TO_FACTORY, "old value kept")
 
 
 ## [policy, state, how]: every policy, freed in the middle of every running

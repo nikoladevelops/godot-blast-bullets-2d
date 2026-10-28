@@ -1232,10 +1232,10 @@
 		<member name="orbiting_texture_rotation" type="int" setter="set_orbiting_texture_rotation" getter="get_orbiting_texture_rotation" enum="BulletVolley2D.OrbitingTextureRotation" default="0">
 			How bullet textures face while physically orbiting.
 		</member>
-		<member name="orphaned_volleys" type="int" setter="set_orphaned_volleys" getter="get_orphaned_volleys" enum="BulletSpawner2D.OrphanedVolleys" default="0">
+		<member name="orphaned_volleys" type="int" setter="set_orphaned_volleys" getter="get_orphaned_volleys" enum="BulletSpawner2D.OrphanedVolleys" default="1">
 			What happens to this spawner's live volleys when the spawner is freed (an enemy dying with its turret, a scene change), in every factory it fired into (also one it used before [method PatternSpawner2D.set_bullet_factory] switched it). Reparenting never triggers it. Freed from user code inside a factory operation (an attachment callback of a clear), Clear and Remove apply right after that operation.
-			- [constant ORPHANED_VOLLEYS_KEEP_FLYING] (default): the bullets fly on, but their hits reach nobody: signal connections live on the emitter, so every connection on the freed spawner is gone, even ones whose callback is on a long-lived node. The first unhandled hit prints one warning explaining this.
-			- [constant ORPHANED_VOLLEYS_HAND_TO_FACTORY]: the volleys become factory-owned, so [signal BulletFactory2D.area_entered] and the other factory signals report their hits. The only way an orphan's hits can still be handled.
+			- [constant ORPHANED_VOLLEYS_KEEP_FLYING]: the bullets fly on, but their hits reach nobody: signal connections live on the emitter, so every connection on the freed spawner is gone, even ones whose callback is on a long-lived node. The first unhandled hit prints one warning explaining this.
+			- [constant ORPHANED_VOLLEYS_HAND_TO_FACTORY] (default): the volleys become factory-owned, so [signal BulletFactory2D.area_entered] and the other factory signals report their hits. The only way an orphan's hits can still be handled.
 			- [constant ORPHANED_VOLLEYS_CLEAR]: every live bullet is cleared with its On Clear effects (a wave that vanishes with its source).
 			- [constant ORPHANED_VOLLEYS_REMOVE]: every live bullet disappears silently and its volley returns to the pool.
 			To keep hit handlers working while the spawner lives, connect to the spawner's signals from a node that outlives it, or set [member BulletVolleyData2D.emit_collision_signals] to [code]false[/code] for bullets that intentionally report nothing.
