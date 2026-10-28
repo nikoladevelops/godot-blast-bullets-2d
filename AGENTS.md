@@ -910,8 +910,10 @@ src/
 Area callbacks (ADDED) → object-level dedup window (O(1) hash;
 `collision_dedup_by_object = false` for shape-level) → records with
 queue-time epochs/velocity/pose → per-tick drain → counting → signals →
-bounce. Paused factory: ADDED events are PARKED per volley (cap 4096,
-deduped, cancelled by REMOVED) and replayed once on resume.
+bounce. Paused factory: ADDED events are PARKED per volley (no cap:
+`PausedOverlaps2D` dedupes through a hash index; the old 4096 cap lost
+hits of big volleys resting on a target), cancelled by REMOVED, and
+replayed once on resume.
 
 ## 13. Pattern bake cache (spawner)
 

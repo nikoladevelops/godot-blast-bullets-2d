@@ -118,32 +118,18 @@ _ALWAYS_INLINE_ void BulletVolley2D::park_paused_overlap(PhysicsServer2D::AreaBo
 	if (bullet_index < 0 || bullet_index >= amount_bullets) {
 		return;
 	}
-	for (size_t i = 0; i < paused_overlaps.size(); ++i) {
-		PausedOverlap2D &p = paused_overlaps[i];
-		if (p.bullet_index == bullet_index && p.target_id == target_id && p.type == type) {
-			if (status == PhysicsServer2D::AREA_BODY_REMOVED) {
-				p = paused_overlaps.back();
-				paused_overlaps.pop_back();
-			}
-			return;
-		}
-	}
-	if (status == PhysicsServer2D::AREA_BODY_ADDED && paused_overlaps.size() < kMaxPausedOverlaps) {
-		PausedOverlap2D p;
-		p.bullet_index = bullet_index;
-		p.target_id = target_id;
-		p.type = type;
-		p.epoch = collision_epoch_for_bullet(bullet_index);
-		paused_overlaps.push_back(p);
+	if (status == PhysicsServer2D::AREA_BODY_REMOVED) {
+		paused_overlaps.remove(bullet_index, target_id, (int)type);
+	} else if (status == PhysicsServer2D::AREA_BODY_ADDED) {
+		paused_overlaps.add(bullet_index, target_id, (int)type, collision_epoch_for_bullet(bullet_index));
 	}
 }
 
 int BulletVolley2D::replay_paused_overlaps() {
 	int queued = 0;
-	std::vector<PausedOverlap2D> pending;
-	pending.swap(paused_overlaps);
+	const std::vector<PausedOverlaps2D::Entry> pending = paused_overlaps.take();
 	const uint64_t self_id = get_instance_id();
-	for (const PausedOverlap2D &p : pending) {
+	for (const PausedOverlaps2D::Entry &p : pending) {
 		if (p.bullet_index < 0 || p.bullet_index >= amount_bullets || !all_bullets_enabled_set.contains(p.bullet_index)) {
 			continue;
 		}
@@ -156,7 +142,7 @@ int BulletVolley2D::replay_paused_overlaps() {
 			}
 			mark_collision_queued(p.bullet_index, p.target_id);
 		}
-		BulletCollisionData2D record(p.bullet_index, p.target_id, p.type);
+		BulletCollisionData2D record(p.bullet_index, p.target_id, (CollisionType)p.type);
 		record.queue_bullet_epoch = p.epoch;
 		if (wants_queued_target_motion()) {
 			if (!read_queued_target_velocity(p.target_id, self_id, record.queue_target_velocity, record.queue_target_velocity_valid)) {
@@ -739,20 +725,7 @@ void BulletVolley2D::park_collision_record(const BulletCollisionData2D &record) 
 	if (record.bullet_index < 0 || record.bullet_index >= amount_bullets) {
 		return;
 	}
-	for (const PausedOverlap2D &p : paused_overlaps) {
-		if (p.bullet_index == record.bullet_index && p.target_id == record.collided_instance_id && p.type == record.collision_type) {
-			return;
-		}
-	}
-	if (paused_overlaps.size() >= kMaxPausedOverlaps) {
-		return;
-	}
-	PausedOverlap2D p;
-	p.bullet_index = record.bullet_index;
-	p.target_id = record.collided_instance_id;
-	p.type = record.collision_type;
-	p.epoch = record.queue_bullet_epoch;
-	paused_overlaps.push_back(p);
+	paused_overlaps.add(record.bullet_index, record.collided_instance_id, (int)record.collision_type, record.queue_bullet_epoch);
 }
 
 void BulletVolley2D::drain_collisions() {

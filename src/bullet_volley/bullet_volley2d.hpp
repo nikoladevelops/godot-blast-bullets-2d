@@ -4,6 +4,7 @@
 #include "attachments/bullet_attachment_object_pool2d.hpp"
 #include "bullet_volley/bullet_movement_pattern_data2d.hpp"
 #include "bullet_volley/homing_target_deque.hpp"
+#include "bullet_volley/paused_overlaps2d.hpp"
 #include "core/cached_string_names2d.hpp"
 #include "core/collision_shape_helper2d.hpp"
 #include "core/dynamic_sparse_set.hpp"
@@ -1618,18 +1619,11 @@ public:
 	// the drain does not run. Dropping those ADDED events meant a bullet that
 	// came to rest inside an enemy during a pause never registered the hit
 	// (no new ADDED ever comes for a steady overlap). Instead they are parked
-	// here (bounded, deduped), cancelled by a REMOVED event if the overlap
-	// ends during the pause, and replayed once on resume: exactly-once, no
-	// physics rescan, and overlaps already counted before the pause are never
-	// re-reported.
-	struct PausedOverlap2D {
-		int bullet_index = -1;
-		int64_t target_id = 0;
-		CollisionType type = CollisionType::AREA;
-		uint64_t epoch = 0;
-	};
-	std::vector<PausedOverlap2D> paused_overlaps;
-	static constexpr size_t kMaxPausedOverlaps = 4096;
+	// here (deduped by a hash index, no cap: paused_overlaps2d.hpp),
+	// cancelled by a REMOVED event if the overlap ends during the pause, and
+	// replayed once on resume: exactly-once, no physics rescan, and overlaps
+	// already counted before the pause are never re-reported.
+	PausedOverlaps2D paused_overlaps;
 	_ALWAYS_INLINE_ void park_paused_overlap(PhysicsServer2D::AreaBodyStatus status, int64_t target_id, int bullet_index, CollisionType type);
 
 	// Called by the factory when processing resumes: queue every parked

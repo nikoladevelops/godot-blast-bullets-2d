@@ -90,3 +90,24 @@ func test_parked_records_never_reach_the_next_life() -> void:
 	await physics(5)
 	assert_eq(hits, 0, "the dead life's parked overlap was not replayed into the new life")
 	assert_true(reused.is_bullet_status_enabled(0), "the reused bullet is untouched")
+
+
+## No hidden cap on parked overlaps: every bullet that starts touching a
+## target during the pause registers on resume, however many there are.
+func test_thousands_of_overlaps_started_while_paused_all_hit() -> void:
+	const N := 5000 # past the old 4096 park cap
+	var d := _data()
+	var transforms: Array[Transform2D] = []
+	for i in N:
+		transforms.append(Transform2D(0.0, Vector2(-300, (i % 50) * 2.0)))
+	d.transforms = transforms
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	await physics(2)
+	_pause()
+	for i in N:
+		v.teleport_bullet(i, Vector2(0, 0)) # all into the wall while paused
+	await physics(4)
+	assert_eq(hits, 0, "nothing drains while paused")
+	_resume()
+	await physics(4)
+	assert_eq(hits, N, "every parked overlap hits once after the resume")
