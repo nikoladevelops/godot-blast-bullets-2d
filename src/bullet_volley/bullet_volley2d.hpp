@@ -3080,7 +3080,10 @@ public:
 	// Salts the seeded rolls (split_queue2d.hpp): the shot this chain began
 	// with (spawner shot number, factory volley life id), kept by children.
 	uint64_t split_shot_salt = 0;
-	bool split_timer_fired = false;
+	// The chain whose split timer fired this life (instance id; 0 = none):
+	// re-arming that chain keeps it spent, another chain runs its own timer.
+	// A new life (begin_life, a fresh-lifetime wake) clears it.
+	uint64_t split_timer_fired_chain = 0;
 	// The chain and rules epoch at which split_check_timer found no timer
 	// for this generation: no lookup until either changes (or a new arming).
 	const BulletSplitData2D *split_timer_idle_chain = nullptr;

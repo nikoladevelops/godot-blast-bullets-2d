@@ -15,9 +15,9 @@ void BulletVolley2D::split_arm(const std::shared_ptr<SplitConfig2D> &config, con
 	split_shot_salt = config != nullptr ? shot_salt : 0;
 	split_spawn_data = config != nullptr ? spawn_data : Ref<BulletVolleyData2D>();
 	split_depth = config != nullptr ? Math::max(0, depth) : 0;
-	split_timer_fired = false;
+	// What this life already spent stays spent (the timer of a chain that
+	// fired, max_splits_per_bullet's counts): begin_life starts a life over.
 	split_timer_idle_chain = nullptr;
-	split_counts.clear();
 	split_arming_cache.reset();
 	split_arming_cache_serial = 0;
 }
@@ -252,12 +252,15 @@ int BulletVolley2D::split_live_bullets(const std::vector<int> &indexes, int caus
 }
 
 void BulletVolley2D::split_check_timer() {
-	if (split_timer_fired || split_config == nullptr || !split_config->enabled || split_config->split.is_null() || active_bullets_counter <= 0) {
+	if (split_config == nullptr || !split_config->enabled || split_config->split.is_null() || active_bullets_counter <= 0) {
 		return;
 	}
 	// Most stages have no timer: remember that until the chain or any
 	// split rules change (the lookup reads a script Array every tick).
 	const BulletSplitData2D *chain = split_config->split.ptr();
+	if (split_timer_fired_chain != 0 && split_timer_fired_chain == (uint64_t)chain->get_instance_id()) {
+		return; // this chain's timer already fired this life
+	}
 	if (split_timer_idle_chain == chain && split_timer_idle_epoch == BulletSplitStage2D::rules_epoch) {
 		return;
 	}
@@ -270,7 +273,7 @@ void BulletVolley2D::split_check_timer() {
 	if (curves_elapsed_time < (double)stage->split_after_sec) {
 		return;
 	}
-	split_timer_fired = true;
+	split_timer_fired_chain = (uint64_t)chain->get_instance_id();
 	// Local copy: the batch mutates the live set and runs attachment callbacks.
 	const std::vector<int> live = all_bullets_enabled_set.get_active_indexes();
 	split_live_bullets(live, SPLIT_CAUSE_TIMER, -1);

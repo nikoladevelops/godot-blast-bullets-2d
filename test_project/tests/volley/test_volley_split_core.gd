@@ -607,3 +607,42 @@ func test_children_wear_the_texture_rotation_once() -> void:
 		if absf(angle_difference(children.debug_get_bullet_shape_transform(c).get_rotation(), children.get_bullet_direction(c).angle())) > 0.001:
 			after.append(c)
 	assert_eq(after, [], "and after a tick")
+
+
+## Re-arming a volley in mid-life keeps what that life already spent: the
+## same chain armed again never re-fires its split timer (a surviving parent
+## would split a second time), and max_splits_per_bullet keeps counting the
+## life. A different chain is a new rule: its own timer runs on the life clock.
+func test_rearming_mid_life_keeps_the_lifes_splits() -> void:
+	var s := _stage(2)
+	s.split_on_lifetime_over = false
+	s.split_after_sec = 0.05
+	s.parent_survives = true
+	s.max_splits_per_bullet = 2
+	var data := H.make_volley_data(1, 50.0, 5.0)
+	var v := factory.spawn_volley(data)
+	var chain := _chain([s])
+	assert_true(v.split_set_data(chain, data), "armed")
+	for i in 5:
+		factory.debug_advance_time(DT)
+	assert_eq(splits.size(), 1, "the timer split the parent once (it survives)")
+	assert_true(v.split_set_data(chain, data), "the same chain armed again")
+	for i in 5:
+		factory.debug_advance_time(DT)
+	assert_eq(splits.size(), 1, "the same chain's timer already fired this life")
+	var other := _stage(2)
+	other.split_on_lifetime_over = false
+	other.split_after_sec = 0.05 # already past on the life clock
+	other.parent_survives = true
+	other.max_splits_per_bullet = 2
+	assert_true(v.split_set_data(_chain([other]), data), "a different chain")
+	factory.debug_advance_time(DT)
+	assert_eq(splits.size(), 2, "a new rule: its timer fires (the life has split once, the cap is 2)")
+	var third := _stage(2)
+	third.split_on_lifetime_over = false
+	third.split_after_sec = 0.05
+	third.parent_survives = true
+	third.max_splits_per_bullet = 2
+	assert_true(v.split_set_data(_chain([third]), data), "yet another chain")
+	factory.debug_advance_time(DT)
+	assert_eq(splits.size(), 2, "max_splits_per_bullet still counts the whole life: no third split")

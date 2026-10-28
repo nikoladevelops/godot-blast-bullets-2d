@@ -230,6 +230,8 @@ void BulletVolley2D::release_life() {
 	graze_detector.reset(); // the arming spawner's target settings
 	flock_set_config(nullptr); // the flock (and the factory's armed count)
 	split_arm(nullptr, Ref<BulletVolleyData2D>(), 0); // the chain and the spawn data copy
+	split_counts.clear(); // what this life spent (split_arm keeps it across re-arming)
+	split_timer_fired_chain = 0;
 	emitter_arm(nullptr); // the timing resource and the template
 	// Volley-level listeners belong to the life that connected them.
 	disconnect_sprite_animation_connections();
@@ -311,7 +313,7 @@ void BulletVolley2D::begin_life(const BulletVolleyData2D &data, uint64_t new_own
 	scale_in_active = Math::is_finite(scale_in_sec) && scale_in_sec > 0.0 && scale_in_from > 0.0 && scale_in_from < 1.0;
 	scale_in_applied = scale_in_active ? scale_in_from : 1.0;
 	curves_elapsed_time = 0.0;
-	split_timer_fired = false;
+	split_timer_fired_chain = 0;
 	split_counts.clear();
 	// Pickup state belongs to one life (release_life drops it too; this
 	// covers a life that was never released, e.g. a pre-populated volley).
@@ -754,7 +756,7 @@ void BulletVolley2D::enable_bullet_core(int bullet_index, int collision_amount, 
 		if (!is_life_time_infinite && current_life_time <= 0.0) {
 			current_life_time = max_life_time;
 			curves_elapsed_time = 0.0;
-			split_timer_fired = false; // the split timer runs on that clock
+			split_timer_fired_chain = 0; // the split timer runs on that clock
 		}
 		is_active = true;
 		set_visible(true);
