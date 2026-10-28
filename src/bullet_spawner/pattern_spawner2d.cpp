@@ -1055,28 +1055,28 @@ void PatternSpawner2D::_notification(int p_what) {
 		// external generator stays in the tree, though: hide it now and free
 		// it at the end of the frame (its parent may be busy removing
 		// children); a re-entry builds a new one.
-		if (preview_holder != nullptr && is_tracked_node_alive(preview_holder, preview_holder_id) && !is_ancestor_of(preview_holder) && !preview_holder->is_queued_for_deletion()) {
-			preview_holder->set_visible(false);
-			preview_holder->queue_free();
+		if (preview.holder != nullptr && is_tracked_node_alive(preview.holder, preview.holder_id) && !is_ancestor_of(preview.holder) && !preview.holder->is_queued_for_deletion()) {
+			preview.holder->set_visible(false);
+			preview.holder->queue_free();
 		}
 		set_preview_nodes(nullptr, nullptr, nullptr);
 		graze_preview_layer = nullptr;
 		graze_preview_layer_id = 0;
-		tracked_base = nullptr;
-		tracked_base_id = 0;
-		tracked_has_base_global = false;
-		tracked_spin_angle = 0.0;
-		tracked_target_id = 0;
-		tracked_has_target_origin = false;
-		tracked_marker_origins.clear();
-		tracked_marker_rots.clear();
-		tracked_marker_ids.clear();
-		tracked_child_count = -1;
-		tracked_has_self = false;
-		tracked_custom_transforms.clear();
-		preview_path2d_sample_cooldown = 0;
-		tracked_path2d_node_id = 0;
-		tracked_has_path2d_node_global = false;
+		preview.tracked_base = nullptr;
+		preview.tracked_base_id = 0;
+		preview.tracked_has_base_global = false;
+		preview.tracked_spin_angle = 0.0;
+		preview.tracked_target_id = 0;
+		preview.tracked_has_target_origin = false;
+		preview.tracked_marker_origins.clear();
+		preview.tracked_marker_rots.clear();
+		preview.tracked_marker_ids.clear();
+		preview.tracked_child_count = -1;
+		preview.tracked_has_self = false;
+		preview.tracked_custom_transforms.clear();
+		preview.path2d_sample_cooldown = 0;
+		preview.tracked_path2d_node_id = 0;
+		preview.tracked_has_path2d_node_global = false;
 		on_exit_tree_owned();
 		// The next pose after re-entry is a jump, not motion: report no
 		// velocity for it (shots would inherit it).

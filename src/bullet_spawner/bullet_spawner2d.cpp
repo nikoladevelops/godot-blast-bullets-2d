@@ -81,7 +81,7 @@ void BulletSpawner2D::set_spawn_data(const Ref<BulletVolleyData2D> &new_data) {
 	}
 	// The preview's collision-ring overlay reads spawn_data's shape. Not a
 	// geometry change (no pattern_version bump): rings only.
-	if (preview_draw_collision_rings) {
+	if (preview.draw_collision_rings) {
 		rebuild_preview();
 	}
 }
@@ -91,7 +91,7 @@ void BulletSpawner2D::_on_spawn_data_changed() {
 	// next shoot_once() re-duplicates fresh data instead of stale template.
 	cached_volley_template.unref();
 	cached_spawn_data_id = 0;
-	if (preview_draw_collision_rings) {
+	if (preview.draw_collision_rings) {
 		rebuild_preview();
 	}
 }

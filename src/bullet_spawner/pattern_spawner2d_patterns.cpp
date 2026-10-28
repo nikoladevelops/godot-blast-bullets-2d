@@ -429,7 +429,7 @@ void PatternSpawner2D::collect_spawn_transforms_native(bool quiet, std::vector<T
 	// bit-identical to before. The preview gizmo never mirrors (it draws the
 	// pattern, not one shot of a burst; a rebuild during a mirrored shot
 	// would otherwise freeze the mirrored winding into it).
-	const bool mirrored_shot = burst_alternate_mirror && burst_mirror_next && !preview_suppress_spin;
+	const bool mirrored_shot = burst_alternate_mirror && burst_mirror_next && !preview.suppress_spin;
 	const real_t mirror_sign = mirrored_shot ? (real_t)-1.0 : (real_t)1.0;
 	std::vector<Transform2D> raw;
 	resolve_raw_pattern(base, marker, mirror_sign, quiet, raw);
@@ -445,7 +445,7 @@ void PatternSpawner2D::collect_spawn_transforms_native(bool quiet, std::vector<T
 	// advancing spin angle changed the geometry every frame and forced a
 	// full 10k-element rebuild per frame.
 	real_t spin_radians = 0.0;
-	if (!preview_suppress_spin) {
+	if (!preview.suppress_spin) {
 		spin_radians = Math::deg_to_rad((real_t)(spin.angle_deg + (shot_pose_active ? shot_pose_extra_spin_deg : 0.0)));
 		if (mirrored_shot) {
 			spin_radians = -spin_radians;

@@ -126,7 +126,7 @@ void PatternSpawner2D::_validate_property(PropertyInfo &p_property) const {
 	// Tidy inspector: hide the preview tuning knobs while both preview
 	// switches are off. The toggles + spin props stay always visible.
 	if (property_name.begins_with("preview_") && property_name != "show_pattern_preview") {
-		if (!show_pattern_preview && !show_preview_during_runtime) {
+		if (!preview.show && !preview.show_during_runtime) {
 			p_property.usage &= ~PROPERTY_USAGE_EDITOR;
 		}
 		return;

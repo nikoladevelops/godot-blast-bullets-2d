@@ -1,6 +1,7 @@
 #pragma once
 
 #include "bullet_spawner/spawner_movement2d.hpp"
+#include "bullet_spawner/spawner_preview2d.hpp"
 #include "bullet_spawner/spawner_property_binder2d.hpp"
 #include "bullet_spawner/spawner_spin2d.hpp"
 #include "bullet_volley/bullet_volley2d.hpp"
@@ -923,40 +924,9 @@ public:
 	// _draw, re-invoked by the engine on every repaint) inside an
 	// owner-less holder node: the holder is never saved to the scene,
 	// never exported, and never created at runtime.
-	bool show_pattern_preview = true;
-	// When true, the preview holder + layers are also built at runtime
-	// (fresh at _ready, never serialized) and follow live transforms.
-	bool show_preview_during_runtime = false;
-	Color preview_dot_color = Color(1.0, 0.05, 0.05);
-	Color preview_arrow_color = Color(1.0, 0.05, 0.05);
-	// Bullet-0 emphasis color (pattern start: anchor / reverse / loop
-	// seam). Drawn bigger on top of the regular dot.
-	Color preview_first_dot_color = Color(1.0, 0.85, 0.2);
-	Color preview_path_color = Color(0.3, 0.85, 1.0, 0.55);
-	// Extra outline-layer rings (LAYERS placement): yellow, same alpha
-	// as the base track, always drawn without antialiasing.
-	Color preview_layer_path_color = Color(1.0, 1.0, 0.0, 0.55);
-	double preview_path_width = 2.0;
-	double preview_dot_radius = 4.0;
-	// Extra pixels between the dot edge and the arrow tail: the shaft
-	// starts at dot_radius + gap so it never hides under the dot.
-	double preview_arrow_gap = 3.0;
-	// Shaft length in pixels, measured from the gap end to the tip.
-	double preview_arrow_length = 16.0;
-	double preview_arrow_width = 2.0;
-	double preview_arrow_head_length = 8.0;
-	double preview_arrow_head_width = 10.0;
-	// Where the preview layers (dots, arrows, the runtime graze rings) draw
-	// among the game's canvas items: a background or a UI layer may need it.
-	int preview_z_index = 4000;
-	bool preview_z_as_relative = true;
-	// Collision-ring overlay: when true and spawn_data carries a valid
-	// collision shape, the dots layer also draws one outline circle per
-	// dot with the shape's bounding radius (circle r, rect min/2,
-	// capsule height/2). Default false preserves the classic dots look.
-	bool preview_draw_collision_rings = false;
-	Color preview_collision_ring_color = Color(1.0, 1.0, 1.0, 0.7);
-	double preview_collision_ring_width = 1.5;
+	// The look, the watched sources, the nodes and the rebuild state live in
+	// the preview part (spawner_preview2d.hpp).
+	SpawnerPreview2D preview;
 
 	bool get_show_pattern_preview() const;
 	void set_show_pattern_preview(bool value);
@@ -986,9 +956,9 @@ public:
 	void set_preview_arrow_head_length(double value);
 	double get_preview_arrow_head_width() const;
 	void set_preview_arrow_head_width(double value);
-	int get_preview_z_index() const { return preview_z_index; }
+	int get_preview_z_index() const { return preview.z_index; }
 	void set_preview_z_index(int value);
-	bool get_preview_z_as_relative() const { return preview_z_as_relative; }
+	bool get_preview_z_as_relative() const { return preview.z_as_relative; }
 	void set_preview_z_as_relative(bool value);
 	// Writes preview_z_index / preview_z_as_relative onto every live layer.
 	void apply_preview_z_order(CanvasItem *layer) const;
@@ -1422,46 +1392,6 @@ protected:
 	// Bumped by every spawn_pattern_list / stop_pattern_list call: a handler
 	// that started or stopped a list inside an entry's shot owns what follows.
 	uint32_t pattern_list_serial = 0;
-	// Preview source tracking: dirty-check state for the live-refresh loop.
-	// Only instance ids + global transforms are stored - never assumed
-	// alive. Every access goes through is_tracked_node_alive() first, so
-	// a freed marker/generator/target can never crash the game.
-	uint64_t tracked_base_id = 0;
-	Node2D *tracked_base = nullptr;
-	Transform2D tracked_base_global;
-	bool tracked_has_base_global = false;
-	double tracked_spin_angle = 0.0;
-	uint64_t tracked_target_id = 0;
-	Transform2D tracked_target_origin;
-	bool tracked_has_target_origin = false;
-	PackedVector2Array tracked_marker_origins;
-	PackedRealArray tracked_marker_rots;
-	PackedInt64Array tracked_marker_ids;
-	int tracked_child_count = -1;
-	bool tracked_has_self = false;
-	// Custom preview tracking: snapshot of the stored array for live
-	// dirty checks (transform compare, no dereference).
-	TypedArray<Transform2D> tracked_custom_transforms;
-	// Path2D preview gating: curve baking every tick is the priciest
-	// dirty check, so the full resample runs on node change or every
-	// 15th tick (~0.25 s staleness bound for in-place curve edits);
-	// node identity + transform compare every tick (cheap). Mutable:
-	// the dirty check runs from const _process.
-	mutable int preview_path2d_sample_cooldown = 0;
-	mutable uint64_t tracked_path2d_node_id = 0;
-	mutable Transform2D tracked_path2d_node_global;
-	mutable bool tracked_has_path2d_node_global = false;
-	// Editor-only pattern preview holder (null at runtime, never saved),
-	// plus its two self-repainting _draw layers (dots + arrows).
-	// The pointers may dangle (a script clearing an external generator's
-	// children frees the holder with them): read them through the live_*
-	// accessors, which check the ids through ObjectDB.
-	Node2D *preview_holder = nullptr;
-	PatternPreviewLayer2D *preview_dots_layer = nullptr;
-	PatternPreviewLayer2D *preview_arrows_layer = nullptr;
-	uint64_t preview_holder_id = 0;
-	uint64_t preview_dots_layer_id = 0;
-	uint64_t preview_arrows_layer_id = 0;
 	void set_preview_nodes(Node2D *holder, PatternPreviewLayer2D *dots, PatternPreviewLayer2D *arrows);
 	// This spawner's preview holder under `parent` (found by owner meta), or null.
 	Node2D *own_preview_holder_under(Node *parent) const;
@@ -1470,43 +1400,18 @@ protected:
 	// previously tracked base) and forgets the layers.
 	void remove_own_preview_holders();
 	PatternPreviewLayer2D *live_preview_dots() const {
-		return is_tracked_node_alive(preview_dots_layer, preview_dots_layer_id) ? preview_dots_layer : nullptr;
+		return is_tracked_node_alive(preview.dots_layer, preview.dots_layer_id) ? preview.dots_layer : nullptr;
 	}
 	PatternPreviewLayer2D *live_preview_arrows() const {
-		return is_tracked_node_alive(preview_arrows_layer, preview_arrows_layer_id) ? preview_arrows_layer : nullptr;
+		return is_tracked_node_alive(preview.arrows_layer, preview.arrows_layer_id) ? preview.arrows_layer : nullptr;
 	}
 	// A cached preview node was freed behind our back: the gizmo must rebuild.
 	bool preview_nodes_lost() const {
-		return (preview_holder != nullptr && !is_tracked_node_alive(preview_holder, preview_holder_id)) ||
-				(preview_dots_layer != nullptr && live_preview_dots() == nullptr) ||
-				(preview_arrows_layer != nullptr && live_preview_arrows() == nullptr);
+		return (preview.holder != nullptr && !is_tracked_node_alive(preview.holder, preview.holder_id)) ||
+				(preview.dots_layer != nullptr && live_preview_dots() == nullptr) ||
+				(preview.arrows_layer != nullptr && live_preview_arrows() == nullptr);
 	}
-	// Last built layer rings (one PackedVector2Array per extra layer,
-	// holder-local, exactly what the yellow pass draws: runs
-	// INF-separated with a closing duplicate per closed run). Debug
-	// readout for scripts/tests; empty when layers are inactive.
-	Array preview_last_layer_rings;
-	// Re-entrancy latch for rebuild_preview(): setters, tree notifications
-	// (child order / transform changed) and the preview loop can all ask
-	// for a rebuild while one is already running (holder add_child fires
-	// NOTIFICATION_CHILD_ORDER_CHANGED synchronously). A nested entry is
-	// always redundant — the outer pass re-reads everything — so it
-	// returns immediately instead of recursing into a stack overflow.
-	// Mutable: rebuilds happen from const setters. Restored on every exit
-	// path (early returns included) so one abort can never wedge preview.
-	mutable bool preview_rebuild_in_progress = false;
-	// Editor coalescing state for rebuild_preview(): a queued deferred
-	// flush plus the one-shot bypass that lets it build instead of
-	// re-queueing. Runtime path never touches either (synchronous).
-	mutable bool preview_rebuild_queued = false;
-	mutable bool preview_sync_rebuild = false;
 	void _do_queued_preview_rebuild();
-	// Set only around the preview's collect_spawn_transforms_impl() call so
-	// the snapshotted gizmo geometry is spin-free. The layer then applies
-	// spin_angle_deg at draw time, which is what keeps an advancing spin
-	// from forcing a full rebuild (and a 10k-element reallocation) every
-	// frame. Mutable because the collect path is const.
-	mutable bool preview_suppress_spin = false;
 
 	bool auto_shooting_active() const;
 	// Advances spin_angle_deg by delta according to spin_mode.
@@ -1581,8 +1486,6 @@ protected:
 	void on_config_changed();
 	// Bypass flag for debug_collect_spawn_transforms_uncached / verify.
 	mutable bool pattern_cache_bypass = false;
-	uint64_t preview_rebuild_count = 0;
-	uint64_t preview_last_rebuild_usec = 0;
 	// Bumped by every geometry-affecting change (mark_pattern_dirty).
 	uint64_t pattern_version = 1;
 	// The raw pattern for `marker` straight from the generators (the old

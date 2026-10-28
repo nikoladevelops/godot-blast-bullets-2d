@@ -10,11 +10,11 @@ using namespace godot;
 namespace BlastBullets2D {
 
 bool PatternSpawner2D::get_show_pattern_preview() const {
-	return show_pattern_preview;
+	return preview.show;
 }
 
 void PatternSpawner2D::set_show_pattern_preview(bool value) {
-	show_pattern_preview = value;
+	preview.show = value;
 	// _validate_property hides preview_* knobs while both toggles are off.
 	notify_property_list_changed();
 	// Same as the runtime toggle below: a runtime preview switched on while
@@ -27,11 +27,11 @@ void PatternSpawner2D::set_show_pattern_preview(bool value) {
 }
 
 bool PatternSpawner2D::get_show_preview_during_runtime() const {
-	return show_preview_during_runtime;
+	return preview.show_during_runtime;
 }
 
 void PatternSpawner2D::set_show_preview_during_runtime(bool value) {
-	show_preview_during_runtime = value;
+	preview.show_during_runtime = value;
 	notify_property_list_changed();
 	// Runtime preview piggy-backs the shooting/spin/retarget loop: enabling
 	// it mid-game while that loop sleeps must wake it, or the preview builds
@@ -55,67 +55,67 @@ static bool preview_color_ok(const Object *self, const Color &value, const char 
 }
 
 Color PatternSpawner2D::get_preview_dot_color() const {
-	return preview_dot_color;
+	return preview.dot_color;
 }
 
 void PatternSpawner2D::set_preview_dot_color(const Color &value) {
 	if (!preview_color_ok(this, value, "preview_dot_color")) {
 		return;
 	}
-	preview_dot_color = value;
+	preview.dot_color = value;
 	rebuild_preview(); // appearance only: the pattern bake stays valid
 }
 
 Color PatternSpawner2D::get_preview_arrow_color() const {
-	return preview_arrow_color;
+	return preview.arrow_color;
 }
 
 void PatternSpawner2D::set_preview_arrow_color(const Color &value) {
 	if (!preview_color_ok(this, value, "preview_arrow_color")) {
 		return;
 	}
-	preview_arrow_color = value;
+	preview.arrow_color = value;
 	rebuild_preview(); // appearance only: the pattern bake stays valid
 }
 
 Color PatternSpawner2D::get_preview_first_dot_color() const {
-	return preview_first_dot_color;
+	return preview.first_dot_color;
 }
 
 void PatternSpawner2D::set_preview_first_dot_color(const Color &value) {
 	if (!preview_color_ok(this, value, "preview_first_dot_color")) {
 		return;
 	}
-	preview_first_dot_color = value;
+	preview.first_dot_color = value;
 	rebuild_preview(); // appearance only: the pattern bake stays valid
 }
 
 Color PatternSpawner2D::get_preview_path_color() const {
-	return preview_path_color;
+	return preview.path_color;
 }
 
 void PatternSpawner2D::set_preview_path_color(const Color &value) {
 	if (!preview_color_ok(this, value, "preview_path_color")) {
 		return;
 	}
-	preview_path_color = value;
+	preview.path_color = value;
 	rebuild_preview(); // appearance only: the pattern bake stays valid
 }
 
 Color PatternSpawner2D::get_preview_layer_path_color() const {
-	return preview_layer_path_color;
+	return preview.layer_path_color;
 }
 
 void PatternSpawner2D::set_preview_layer_path_color(const Color &value) {
 	if (!preview_color_ok(this, value, "preview_layer_path_color")) {
 		return;
 	}
-	preview_layer_path_color = value;
+	preview.layer_path_color = value;
 	rebuild_preview(); // appearance only: the pattern bake stays valid
 }
 
 double PatternSpawner2D::get_preview_path_width() const {
-	return preview_path_width;
+	return preview.path_width;
 }
 
 void PatternSpawner2D::set_preview_path_width(double value) {
@@ -123,12 +123,12 @@ void PatternSpawner2D::set_preview_path_width(double value) {
 		UtilityFunctions::push_error((String(get_class()) + ": preview_path_width must be finite and >= 0 (0 hides the track), keeping the old value."));
 		return;
 	}
-	preview_path_width = value;
+	preview.path_width = value;
 	on_pattern_changed();
 }
 
 double PatternSpawner2D::get_preview_dot_radius() const {
-	return preview_dot_radius;
+	return preview.dot_radius;
 }
 
 void PatternSpawner2D::set_preview_dot_radius(double value) {
@@ -136,12 +136,12 @@ void PatternSpawner2D::set_preview_dot_radius(double value) {
 		UtilityFunctions::push_error((String(get_class()) + ": preview_dot_radius must be finite and >= 0, keeping the old value."));
 		return;
 	}
-	preview_dot_radius = value;
+	preview.dot_radius = value;
 	on_pattern_changed();
 }
 
 double PatternSpawner2D::get_preview_arrow_gap() const {
-	return preview_arrow_gap;
+	return preview.arrow_gap;
 }
 
 void PatternSpawner2D::set_preview_arrow_gap(double value) {
@@ -149,12 +149,12 @@ void PatternSpawner2D::set_preview_arrow_gap(double value) {
 		UtilityFunctions::push_error((String(get_class()) + ": preview_arrow_gap must be finite and >= 0, keeping the old value."));
 		return;
 	}
-	preview_arrow_gap = value;
+	preview.arrow_gap = value;
 	on_pattern_changed();
 }
 
 double PatternSpawner2D::get_preview_arrow_length() const {
-	return preview_arrow_length;
+	return preview.arrow_length;
 }
 
 void PatternSpawner2D::set_preview_arrow_length(double value) {
@@ -162,12 +162,12 @@ void PatternSpawner2D::set_preview_arrow_length(double value) {
 		UtilityFunctions::push_error((String(get_class()) + ": preview_arrow_length must be finite and >= 0, keeping the old value."));
 		return;
 	}
-	preview_arrow_length = value;
+	preview.arrow_length = value;
 	on_pattern_changed();
 }
 
 double PatternSpawner2D::get_preview_arrow_width() const {
-	return preview_arrow_width;
+	return preview.arrow_width;
 }
 
 void PatternSpawner2D::set_preview_arrow_width(double value) {
@@ -175,12 +175,12 @@ void PatternSpawner2D::set_preview_arrow_width(double value) {
 		UtilityFunctions::push_error((String(get_class()) + ": preview_arrow_width must be finite and >= 0, keeping the old value."));
 		return;
 	}
-	preview_arrow_width = value;
+	preview.arrow_width = value;
 	on_pattern_changed();
 }
 
 double PatternSpawner2D::get_preview_arrow_head_length() const {
-	return preview_arrow_head_length;
+	return preview.arrow_head_length;
 }
 
 void PatternSpawner2D::set_preview_arrow_head_length(double value) {
@@ -188,12 +188,12 @@ void PatternSpawner2D::set_preview_arrow_head_length(double value) {
 		UtilityFunctions::push_error((String(get_class()) + ": preview_arrow_head_length must be finite and >= 0, keeping the old value."));
 		return;
 	}
-	preview_arrow_head_length = value;
+	preview.arrow_head_length = value;
 	on_pattern_changed();
 }
 
 double PatternSpawner2D::get_preview_arrow_head_width() const {
-	return preview_arrow_head_width;
+	return preview.arrow_head_width;
 }
 
 void PatternSpawner2D::set_preview_arrow_head_width(double value) {
@@ -201,7 +201,7 @@ void PatternSpawner2D::set_preview_arrow_head_width(double value) {
 		UtilityFunctions::push_error((String(get_class()) + ": preview_arrow_head_width must be finite and >= 0, keeping the old value."));
 		return;
 	}
-	preview_arrow_head_width = value;
+	preview.arrow_head_width = value;
 	on_pattern_changed();
 }
 
@@ -210,12 +210,12 @@ void PatternSpawner2D::set_preview_z_index(int value) {
 		UtilityFunctions::push_error(String(get_class()) + ": preview_z_index must be between -4096 and 4096, keeping the old value.");
 		return;
 	}
-	preview_z_index = value;
+	preview.z_index = value;
 	apply_preview_z_order_to_layers();
 }
 
 void PatternSpawner2D::set_preview_z_as_relative(bool value) {
-	preview_z_as_relative = value;
+	preview.z_as_relative = value;
 	apply_preview_z_order_to_layers();
 }
 
@@ -223,11 +223,11 @@ void PatternSpawner2D::apply_preview_z_order(CanvasItem *layer) const {
 	if (layer == nullptr) {
 		return;
 	}
-	if (layer->get_z_index() != preview_z_index) {
-		layer->set_z_index(preview_z_index);
+	if (layer->get_z_index() != preview.z_index) {
+		layer->set_z_index(preview.z_index);
 	}
-	if (layer->is_z_relative() != preview_z_as_relative) {
-		layer->set_z_as_relative(preview_z_as_relative);
+	if (layer->is_z_relative() != preview.z_as_relative) {
+		layer->set_z_as_relative(preview.z_as_relative);
 	}
 }
 
@@ -238,28 +238,28 @@ void PatternSpawner2D::apply_preview_z_order_to_layers() {
 }
 
 bool PatternSpawner2D::get_preview_draw_collision_rings() const {
-	return preview_draw_collision_rings;
+	return preview.draw_collision_rings;
 }
 
 void PatternSpawner2D::set_preview_draw_collision_rings(bool value) {
-	preview_draw_collision_rings = value;
+	preview.draw_collision_rings = value;
 	on_pattern_changed();
 }
 
 Color PatternSpawner2D::get_preview_collision_ring_color() const {
-	return preview_collision_ring_color;
+	return preview.collision_ring_color;
 }
 
 void PatternSpawner2D::set_preview_collision_ring_color(const Color &value) {
 	if (!preview_color_ok(this, value, "preview_collision_ring_color")) {
 		return;
 	}
-	preview_collision_ring_color = value;
+	preview.collision_ring_color = value;
 	rebuild_preview(); // appearance only: the pattern bake stays valid
 }
 
 double PatternSpawner2D::get_preview_collision_ring_width() const {
-	return preview_collision_ring_width;
+	return preview.collision_ring_width;
 }
 
 void PatternSpawner2D::set_preview_collision_ring_width(double value) {
@@ -267,21 +267,21 @@ void PatternSpawner2D::set_preview_collision_ring_width(double value) {
 		UtilityFunctions::push_error((String(get_class()) + ": preview_collision_ring_width must be finite and >= 0, keeping the old value."));
 		return;
 	}
-	preview_collision_ring_width = value;
+	preview.collision_ring_width = value;
 	on_pattern_changed();
 }
 
 Array PatternSpawner2D::debug_get_layer_rings() const {
-	return preview_last_layer_rings.duplicate();
+	return preview.last_layer_rings.duplicate();
 }
 
 void PatternSpawner2D::set_preview_nodes(Node2D *holder, PatternPreviewLayer2D *dots, PatternPreviewLayer2D *arrows) {
-	preview_holder = holder;
-	preview_dots_layer = dots;
-	preview_arrows_layer = arrows;
-	preview_holder_id = holder != nullptr ? holder->get_instance_id() : 0;
-	preview_dots_layer_id = dots != nullptr ? dots->get_instance_id() : 0;
-	preview_arrows_layer_id = arrows != nullptr ? arrows->get_instance_id() : 0;
+	preview.holder = holder;
+	preview.dots_layer = dots;
+	preview.arrows_layer = arrows;
+	preview.holder_id = holder != nullptr ? holder->get_instance_id() : 0;
+	preview.dots_layer_id = dots != nullptr ? dots->get_instance_id() : 0;
+	preview.arrows_layer_id = arrows != nullptr ? arrows->get_instance_id() : 0;
 }
 
 PackedVector2Array PatternSpawner2D::debug_get_preview_dot_points() const {
@@ -333,7 +333,7 @@ Dictionary PatternSpawner2D::debug_check_layer_coincidence(double tolerance_px) 
 	if (live_preview_dots() == nullptr) {
 		return out;
 	}
-	const PackedVector2Array dots = preview_dots_layer->dots;
+	const PackedVector2Array dots = preview.dots_layer->dots;
 	if (dots.is_empty()) {
 		return out;
 	}
@@ -348,7 +348,7 @@ Dictionary PatternSpawner2D::debug_check_layer_coincidence(double tolerance_px) 
 	// other) and fake a near-match.
 	PackedVector2Array guides;
 	{
-		const PackedVector2Array base = preview_dots_layer->path_points;
+		const PackedVector2Array base = preview.dots_layer->path_points;
 		Array base_runs;
 		{
 			PackedVector2Array cur;
@@ -366,7 +366,7 @@ Dictionary PatternSpawner2D::debug_check_layer_coincidence(double tolerance_px) 
 				base_runs.push_back(cur);
 			}
 		}
-		const bool close_base = preview_dots_layer->path_closed && base_runs.size() == 1;
+		const bool close_base = preview.dots_layer->path_closed && base_runs.size() == 1;
 		for (int r = 0; r < base_runs.size(); ++r) {
 			const PackedVector2Array run = base_runs[r];
 			for (int k = 0; k < run.size(); ++k) {
@@ -378,8 +378,8 @@ Dictionary PatternSpawner2D::debug_check_layer_coincidence(double tolerance_px) 
 			guides.push_back(Vector2(Math::INF, Math::INF));
 		}
 	}
-	for (int i = 0; i < preview_last_layer_rings.size(); ++i) {
-		const PackedVector2Array ring = preview_last_layer_rings[i];
+	for (int i = 0; i < preview.last_layer_rings.size(); ++i) {
+		const PackedVector2Array ring = preview.last_layer_rings[i];
 		for (int k = 0; k < ring.size(); ++k) {
 			guides.push_back(ring[k]);
 		}
@@ -420,7 +420,7 @@ Dictionary PatternSpawner2D::debug_check_layer_coincidence(double tolerance_px) 
 		return out;
 	}
 	out["checked"] = true;
-	out["layers"] = preview_last_layer_rings.size();
+	out["layers"] = preview.last_layer_rings.size();
 	out["max_deviation_px"] = max_dev;
 	out["mean_deviation_px"] = sum_dev / (double)counted;
 	out["ok"] = max_dev <= (double)tolerance_px;
@@ -429,10 +429,10 @@ Dictionary PatternSpawner2D::debug_check_layer_coincidence(double tolerance_px) 
 
 Dictionary PatternSpawner2D::debug_get_preview_stats() const {
 	Dictionary d;
-	d["rebuilds"] = (int64_t)preview_rebuild_count;
-	d["last_rebuild_usec"] = (int64_t)preview_last_rebuild_usec;
-	d["dots_draws"] = live_preview_dots() != nullptr ? preview_dots_layer->debug_draw_count : 0;
-	d["arrows_draws"] = live_preview_arrows() != nullptr ? preview_arrows_layer->debug_draw_count : 0;
+	d["rebuilds"] = (int64_t)preview.rebuild_count;
+	d["last_rebuild_usec"] = (int64_t)preview.last_rebuild_usec;
+	d["dots_draws"] = live_preview_dots() != nullptr ? preview.dots_layer->debug_draw_count : 0;
+	d["arrows_draws"] = live_preview_arrows() != nullptr ? preview.arrows_layer->debug_draw_count : 0;
 	return d;
 }
 
@@ -443,11 +443,11 @@ bool PatternSpawner2D::preview_allowed_here() const {
 	if (Engine::get_singleton()->is_editor_hint()) {
 		return true;
 	}
-	return show_preview_during_runtime;
+	return preview.show_during_runtime;
 }
 
 bool PatternSpawner2D::preview_active() const {
-	return show_pattern_preview && preview_allowed_here();
+	return preview.show && preview_allowed_here();
 }
 
 // Re-poses the existing preview snapshot for a new spin angle. This is the
@@ -462,18 +462,18 @@ void PatternSpawner2D::set_preview_pose(double spin_angle_degrees) {
 	}
 	// Keep the snapshot in step so a later rebuild reproduces the same pose
 	// instead of treating the current angle as fresh geometry.
-	tracked_spin_angle = spin_angle_degrees;
+	preview.tracked_spin_angle = spin_angle_degrees;
 	if (preview_nodes_lost()) {
 		// Freed behind our back (a script cleared an external generator's
 		// children): never touch the old nodes; rebuild them (the rebuild
 		// poses the new layers itself).
 		set_preview_nodes(nullptr, nullptr, nullptr);
-		if (!preview_rebuild_in_progress) {
+		if (!preview.rebuild_in_progress) {
 			rebuild_preview();
 		}
 		return;
 	}
-	if (preview_holder == nullptr || (preview_dots_layer == nullptr && preview_arrows_layer == nullptr)) {
+	if (preview.holder == nullptr || (preview.dots_layer == nullptr && preview.arrows_layer == nullptr)) {
 		return;
 	}
 	// The shot spins about the generator origin in GLOBAL space; the layers
@@ -485,7 +485,7 @@ void PatternSpawner2D::set_preview_pose(double spin_angle_degrees) {
 	Transform2D pose;
 	const real_t radians = Math::deg_to_rad((real_t)spin_angle_degrees);
 	if (radians != 0.0) {
-		Transform2D hb = preview_holder->get_global_transform();
+		Transform2D hb = preview.holder->get_global_transform();
 		hb.columns[2] = Vector2();
 		if (hb.is_finite() && BulletVolley2D::is_transform_invertible_safe(hb)) {
 			pose = hb.affine_inverse() * Transform2D(radians, Vector2()) * hb;
@@ -500,7 +500,7 @@ void PatternSpawner2D::set_preview_pose(double spin_angle_degrees) {
 	if (spawn_position_offset != Vector2(0, 0)) {
 		Vector2 shift = spawn_position_offset;
 		if (spawn_position_offset_space == SPAWN_OFFSET_GLOBAL) {
-			Transform2D hb = preview_holder->get_global_transform();
+			Transform2D hb = preview.holder->get_global_transform();
 			hb.columns[2] = Vector2();
 			if (hb.is_finite() && BulletVolley2D::is_transform_invertible_safe(hb)) {
 				shift = hb.affine_inverse().xform(spawn_position_offset);
@@ -510,11 +510,11 @@ void PatternSpawner2D::set_preview_pose(double spin_angle_degrees) {
 			pose.columns[2] = shift;
 		}
 	}
-	if (preview_dots_layer != nullptr) {
-		preview_dots_layer->set_pose(pose);
+	if (preview.dots_layer != nullptr) {
+		preview.dots_layer->set_pose(pose);
 	}
-	if (preview_arrows_layer != nullptr) {
-		preview_arrows_layer->set_pose(pose);
+	if (preview.arrows_layer != nullptr) {
+		preview.arrows_layer->set_pose(pose);
 	}
 }
 
@@ -561,9 +561,9 @@ void PatternSpawner2D::remove_own_preview_holders() {
 	}
 	// The generator may have been retargeted earlier: also clear a holder
 	// left under the previously tracked base.
-	if (tracked_base != nullptr && tracked_base != this && tracked_base != effective_base &&
-			is_tracked_node_alive(tracked_base, tracked_base_id)) {
-		remove_from(tracked_base);
+	if (preview.tracked_base != nullptr && preview.tracked_base != this && preview.tracked_base != effective_base &&
+			is_tracked_node_alive(preview.tracked_base, preview.tracked_base_id)) {
+		remove_from(preview.tracked_base);
 	}
 	set_preview_nodes(nullptr, nullptr, nullptr);
 }
@@ -574,97 +574,97 @@ void PatternSpawner2D::remove_own_preview_holders() {
 // Deferred flush for editor-coalesced rebuilds (see rebuild_preview): runs
 // the build synchronously exactly once, bypassing re-queue.
 void PatternSpawner2D::_do_queued_preview_rebuild() {
-	preview_rebuild_queued = false;
+	preview.rebuild_queued = false;
 	if (!preview_allowed_here()) {
 		return;
 	}
-	preview_sync_rebuild = true;
+	preview.sync_rebuild = true;
 	rebuild_preview();
-	preview_sync_rebuild = false;
+	preview.sync_rebuild = false;
 }
 
 void PatternSpawner2D::snapshot_preview_sources() {
-	tracked_has_self = true;
-	tracked_base = get_effective_generator();
-	if (tracked_base == nullptr) {
-		tracked_base_id = 0;
-		tracked_has_base_global = false;
+	preview.tracked_has_self = true;
+	preview.tracked_base = get_effective_generator();
+	if (preview.tracked_base == nullptr) {
+		preview.tracked_base_id = 0;
+		preview.tracked_has_base_global = false;
 	} else {
-		tracked_base_id = tracked_base->get_instance_id();
-		tracked_base_global = tracked_base->get_global_transform();
-		tracked_has_base_global = true;
+		preview.tracked_base_id = preview.tracked_base->get_instance_id();
+		preview.tracked_base_global = preview.tracked_base->get_global_transform();
+		preview.tracked_has_base_global = true;
 	}
-	tracked_spin_angle = spin.angle_deg;
-	tracked_target_id = 0;
-	tracked_has_target_origin = false;
+	preview.tracked_spin_angle = spin.angle_deg;
+	preview.tracked_target_id = 0;
+	preview.tracked_has_target_origin = false;
 	if (pattern_source == PATTERN_FROM_HELPER_AIMED || pattern_source == PATTERN_FROM_HELPER_CORRIDOR) {
 		Node2D *target = get_helper_aimed_target();
 		if (target != nullptr) {
-			tracked_target_id = target->get_instance_id();
-			tracked_target_origin = target->get_global_transform();
-			tracked_has_target_origin = true;
+			preview.tracked_target_id = target->get_instance_id();
+			preview.tracked_target_origin = target->get_global_transform();
+			preview.tracked_has_target_origin = true;
 		}
 	}
 	// Custom tracking: snapshot the stored array for the dirty check below
 	// (an inspector edit swaps the whole array, so size + compare catches
 	// it). Path2D re-samples live (curve edits and node motion both change
 	// the compiled points, so both are caught).
-	tracked_custom_transforms.clear();
+	preview.tracked_custom_transforms.clear();
 	if (pattern_source == PATTERN_FROM_HELPER_CUSTOM) {
 		// Deep copy, never an assignment: TypedArray assignment only shares
 		// (COW), and Array::clear() does NOT duplicate before wiping, so a
 		// shared snapshot would let the clear() above destroy the user's
 		// placed transforms on the next rebuild (silent data loss + dead
 		// spawner). Bounded by the setter cap, so the copy stays cheap.
-		tracked_custom_transforms = helper_custom_transforms.duplicate();
+		preview.tracked_custom_transforms = helper_custom_transforms.duplicate();
 	} else if (pattern_source == PATTERN_FROM_HELPER_PATH2D) {
-		tracked_custom_transforms.clear();
+		preview.tracked_custom_transforms.clear();
 		const PackedVector2Array live_pts = sample_path2d_polyline(true);
 		for (int i = 0; i < live_pts.size(); ++i) {
-			tracked_custom_transforms.push_back(Transform2D(0.0, live_pts[i]));
+			preview.tracked_custom_transforms.push_back(Transform2D(0.0, live_pts[i]));
 		}
 		// Node identity + transform for the gated dirty check below (it
 		// resamples sparingly and compares the cheap node state in between).
 		Node *path_node = get_helper_path2d_node();
-		tracked_path2d_node_id = path_node != nullptr ? path_node->get_instance_id() : 0;
+		preview.tracked_path2d_node_id = path_node != nullptr ? path_node->get_instance_id() : 0;
 		if (Node2D *path_2d = Object::cast_to<Node2D>(path_node)) {
-			tracked_path2d_node_global = path_2d->get_global_transform();
-			tracked_has_path2d_node_global = true;
+			preview.tracked_path2d_node_global = path_2d->get_global_transform();
+			preview.tracked_has_path2d_node_global = true;
 		} else {
-			tracked_has_path2d_node_global = false;
+			preview.tracked_has_path2d_node_global = false;
 		}
-		preview_path2d_sample_cooldown = 0;
+		preview.path2d_sample_cooldown = 0;
 	}
-	tracked_marker_origins.clear();
-	tracked_marker_rots.clear();
-	tracked_marker_ids.clear();
-	tracked_child_count = -1;
-	if (!is_inside_tree() || tracked_base == nullptr) {
+	preview.tracked_marker_origins.clear();
+	preview.tracked_marker_rots.clear();
+	preview.tracked_marker_ids.clear();
+	preview.tracked_child_count = -1;
+	if (!is_inside_tree() || preview.tracked_base == nullptr) {
 		return;
 	}
 	// Marker slots: origin + rotation + id per child index. A non-Node2D
 	// child and a freed-then-reused slot both compare unequal (dirty), which
 	// triggers a rebuild that re-resolves - never a dereference of garbage.
-	tracked_child_count = tracked_base->get_child_count();
-	tracked_marker_origins.resize(tracked_child_count);
-	tracked_marker_rots.resize(tracked_child_count);
+	preview.tracked_child_count = preview.tracked_base->get_child_count();
+	preview.tracked_marker_origins.resize(preview.tracked_child_count);
+	preview.tracked_marker_rots.resize(preview.tracked_child_count);
 	// Two int64 entries per child (low/high 32 bits): instance ids don't fit
 	// a double bit-exactly, and float packing would alias distinct objects.
-	tracked_marker_ids.resize(tracked_child_count * 2);
-	for (int i = 0; i < tracked_child_count; i++) {
-		Node2D *marker = Object::cast_to<Node2D>(tracked_base->get_child(i));
+	preview.tracked_marker_ids.resize(preview.tracked_child_count * 2);
+	for (int i = 0; i < preview.tracked_child_count; i++) {
+		Node2D *marker = Object::cast_to<Node2D>(preview.tracked_base->get_child(i));
 		if (marker == nullptr) {
-			tracked_marker_origins[i] = Vector2(Math::INF, Math::INF);
-			tracked_marker_rots[i] = Math::INF;
-			tracked_marker_ids[i * 2] = 0;
-			tracked_marker_ids[i * 2 + 1] = 0;
+			preview.tracked_marker_origins[i] = Vector2(Math::INF, Math::INF);
+			preview.tracked_marker_rots[i] = Math::INF;
+			preview.tracked_marker_ids[i * 2] = 0;
+			preview.tracked_marker_ids[i * 2 + 1] = 0;
 			continue;
 		}
-		tracked_marker_origins[i] = marker->get_global_transform().get_origin();
-		tracked_marker_rots[i] = marker->get_global_rotation();
+		preview.tracked_marker_origins[i] = marker->get_global_transform().get_origin();
+		preview.tracked_marker_rots[i] = marker->get_global_rotation();
 		const uint64_t id = marker->get_instance_id();
-		tracked_marker_ids[i * 2] = (int64_t)(id & 0xFFFFFFFFu);
-		tracked_marker_ids[i * 2 + 1] = (int64_t)(id >> 32);
+		preview.tracked_marker_ids[i * 2] = (int64_t)(id & 0xFFFFFFFFu);
+		preview.tracked_marker_ids[i * 2 + 1] = (int64_t)(id >> 32);
 	}
 }
 
@@ -674,7 +674,7 @@ void PatternSpawner2D::rebuild_preview() {
 	// the node is inside the tree (scene load sets properties first). A
 	// runtime preview switched off goes down (it used to stay drawn).
 	if (!preview_allowed_here()) {
-		if (is_inside_tree() && !preview_rebuild_in_progress) {
+		if (is_inside_tree() && !preview.rebuild_in_progress) {
 			remove_own_preview_holders();
 		}
 		return;
@@ -685,9 +685,9 @@ void PatternSpawner2D::rebuild_preview() {
 	// synchronous so script readback after a setter is exact the same frame.
 	// The bypass flag below lets the deferred flush build immediately
 	// instead of re-queuing forever.
-	if (Engine::get_singleton()->is_editor_hint() && is_inside_tree() && !preview_rebuild_in_progress && !preview_sync_rebuild) {
-		if (!preview_rebuild_queued) {
-			preview_rebuild_queued = true;
+	if (Engine::get_singleton()->is_editor_hint() && is_inside_tree() && !preview.rebuild_in_progress && !preview.sync_rebuild) {
+		if (!preview.rebuild_queued) {
+			preview.rebuild_queued = true;
 			callable_mp(this, &PatternSpawner2D::_do_queued_preview_rebuild).call_deferred();
 		}
 		return;
@@ -696,11 +696,11 @@ void PatternSpawner2D::rebuild_preview() {
 	// synchronously, undo/redo bursts, transform notices mid-build) is always
 	// redundant — the outer pass re-reads everything — so bail instead of
 	// recursing into a stack overflow.
-	if (preview_rebuild_in_progress) {
+	if (preview.rebuild_in_progress) {
 		return;
 	}
-	preview_rebuild_in_progress = true;
-	++preview_rebuild_count;
+	preview.rebuild_in_progress = true;
+	++preview.rebuild_count;
 	const uint64_t rebuild_t0 = Time::get_singleton()->get_ticks_usec();
 	// Crash-safety: the effective generator is resolved from a cached
 	// pointer that may dangle after the target node is freed. get_transforms_generator()
@@ -715,7 +715,7 @@ void PatternSpawner2D::rebuild_preview() {
 		effective_base = const_cast<PatternSpawner2D *>(this);
 	}
 	if (effective_base == nullptr) {
-		preview_rebuild_in_progress = false;
+		preview.rebuild_in_progress = false;
 		return;
 	}
 	const uint64_t self_id = get_instance_id();
@@ -740,15 +740,15 @@ void PatternSpawner2D::rebuild_preview() {
 					continue;
 				}
 				const PatternSpawner2D *owner_spawner = Object::cast_to<PatternSpawner2D>(ObjectDB::get_instance(ObjectID(owner_id)));
-				if (owner_spawner != nullptr && owner_spawner->preview_holder == child) {
+				if (owner_spawner != nullptr && owner_spawner->preview.holder == child) {
 					continue;
 				}
 			}
 			delete_preview_holder(child);
 		}
 	};
-	if (!show_pattern_preview) {
-		preview_rebuild_in_progress = false;
+	if (!preview.show) {
+		preview.rebuild_in_progress = false;
 		remove_own_preview_holders();
 		return;
 	}
@@ -756,94 +756,94 @@ void PatternSpawner2D::rebuild_preview() {
 	// they spawn. Heal from the tree every rebuild: never trust cached
 	// pointers (undo/redo, duplication, scene reload can drop nodes).
 	prune_stray_holders(effective_base);
-	preview_holder = own_preview_holder_under(effective_base);
-	if (preview_holder == nullptr) {
+	preview.holder = own_preview_holder_under(effective_base);
+	if (preview.holder == nullptr) {
 		// Generator was retargeted: drop the stale holder under the spawner
 		// (or under the previously tracked base) so only one preview exists.
 		remove_holder_from(this);
-		if (tracked_base != nullptr && tracked_base != this && tracked_base != effective_base &&
-				is_tracked_node_alive(tracked_base, tracked_base_id)) {
-			remove_holder_from(tracked_base);
+		if (preview.tracked_base != nullptr && preview.tracked_base != this && preview.tracked_base != effective_base &&
+				is_tracked_node_alive(preview.tracked_base, preview.tracked_base_id)) {
+			remove_holder_from(preview.tracked_base);
 		}
 	}
-	if (preview_holder == nullptr) {
+	if (preview.holder == nullptr) {
 		// Owner-less on purpose: never written to the scene, never exported.
 		// The first holder under a node takes the plain name; another
 		// spawner sharing the generator adds its id.
-		preview_holder = memnew(Node2D);
+		preview.holder = memnew(Node2D);
 		const bool name_taken = effective_base->get_node_or_null(NodePath(PREVIEW_HOLDER_NAME)) != nullptr;
-		preview_holder->set_name(name_taken ? String(PREVIEW_HOLDER_NAME) + "_" + String::num_uint64(self_id) : String(PREVIEW_HOLDER_NAME));
-		preview_holder->set_meta(PREVIEW_META_KEY, true);
-		preview_holder->set_meta(PREVIEW_OWNER_META_KEY, (int64_t)self_id);
-		effective_base->add_child(preview_holder);
+		preview.holder->set_name(name_taken ? String(PREVIEW_HOLDER_NAME) + "_" + String::num_uint64(self_id) : String(PREVIEW_HOLDER_NAME));
+		preview.holder->set_meta(PREVIEW_META_KEY, true);
+		preview.holder->set_meta(PREVIEW_OWNER_META_KEY, (int64_t)self_id);
+		effective_base->add_child(preview.holder);
 	}
 	// Cleanup first: older versions drew the preview with Line2D strips
 	// ("Dots"/"Ticks"). Remove any leftover before adopting/creating the
 	// plain Node2D layers, so a healed holder can never clash on child names
 	// and upgraded scenes keep no stray-segment nodes around.
-	TypedArray<Node> stray_lines = preview_holder->find_children("*", "Line2D", false, false);
+	TypedArray<Node> stray_lines = preview.holder->find_children("*", "Line2D", false, false);
 	for (int i = 0; i < stray_lines.size(); i++) {
 		Node *stray = Object::cast_to<Node>(stray_lines[i]);
 		if (stray != nullptr) {
-			preview_holder->remove_child(stray);
+			preview.holder->remove_child(stray);
 			memdelete(stray);
 		}
 	}
 	// Layers are likewise re-resolved from the tree every rebuild, so an
 	// externally removed layer is recreated instead of silently killing the
 	// preview. Only 3 nodes total regardless of bullet count.
-	preview_dots_layer = Object::cast_to<PatternPreviewLayer2D>(preview_holder->get_node_or_null(NodePath("Dots")));
-	if (preview_dots_layer == nullptr) {
+	preview.dots_layer = Object::cast_to<PatternPreviewLayer2D>(preview.holder->get_node_or_null(NodePath("Dots")));
+	if (preview.dots_layer == nullptr) {
 		// Wrong-type leftover (plain Node2D from the RenderingServer build):
 		// drop it so the typed layer can take the canonical name.
-		Node *old_dots = preview_holder->get_node_or_null(NodePath("Dots"));
+		Node *old_dots = preview.holder->get_node_or_null(NodePath("Dots"));
 		if (old_dots != nullptr) {
-			preview_holder->remove_child(old_dots);
+			preview.holder->remove_child(old_dots);
 			memdelete(old_dots);
 		}
-		preview_dots_layer = memnew(PatternPreviewLayer2D);
-		preview_dots_layer->set_name("Dots");
-		preview_dots_layer->kind = PatternPreviewLayer2D::LAYER_DOTS;
-		apply_preview_z_order(preview_dots_layer);
-		preview_holder->add_child(preview_dots_layer);
+		preview.dots_layer = memnew(PatternPreviewLayer2D);
+		preview.dots_layer->set_name("Dots");
+		preview.dots_layer->kind = PatternPreviewLayer2D::LAYER_DOTS;
+		apply_preview_z_order(preview.dots_layer);
+		preview.holder->add_child(preview.dots_layer);
 	}
-	preview_arrows_layer = Object::cast_to<PatternPreviewLayer2D>(preview_holder->get_node_or_null(NodePath("Arrows")));
-	if (preview_arrows_layer == nullptr) {
+	preview.arrows_layer = Object::cast_to<PatternPreviewLayer2D>(preview.holder->get_node_or_null(NodePath("Arrows")));
+	if (preview.arrows_layer == nullptr) {
 		// Same wrong-type migration as Dots above.
-		Node *old_arrows = preview_holder->get_node_or_null(NodePath("Arrows"));
+		Node *old_arrows = preview.holder->get_node_or_null(NodePath("Arrows"));
 		if (old_arrows != nullptr) {
-			preview_holder->remove_child(old_arrows);
+			preview.holder->remove_child(old_arrows);
 			memdelete(old_arrows);
 		}
-		preview_arrows_layer = memnew(PatternPreviewLayer2D);
-		preview_arrows_layer->set_name("Arrows");
-		preview_arrows_layer->kind = PatternPreviewLayer2D::LAYER_ARROWS;
-		apply_preview_z_order(preview_arrows_layer);
-		preview_holder->add_child(preview_arrows_layer);
+		preview.arrows_layer = memnew(PatternPreviewLayer2D);
+		preview.arrows_layer->set_name("Arrows");
+		preview.arrows_layer->kind = PatternPreviewLayer2D::LAYER_ARROWS;
+		apply_preview_z_order(preview.arrows_layer);
+		preview.holder->add_child(preview.arrows_layer);
 	}
-	set_preview_nodes(preview_holder, preview_dots_layer, preview_arrows_layer);
+	set_preview_nodes(preview.holder, preview.dots_layer, preview.arrows_layer);
 	// Quiet collect: the preview must visualize, never scold (e.g. aimed
 	// without a target simply draws nothing instead of erroring per rebuild).
 	// Snapshot the geometry UNSPUN; the layer applies spin_angle_deg at draw
 	// time, so an advancing spin only re-poses the cached points instead of
 	// rebuilding every transform (which at 10k bullets is a per-frame cliff).
-	preview_suppress_spin = true;
+	preview.suppress_spin = true;
 	const TypedArray<Transform2D> transforms = collect_spawn_transforms_impl(true);
-	preview_suppress_spin = false;
+	preview.suppress_spin = false;
 	// The aimed target's get_velocity (user code) may have freed this
 	// spawner or the nodes holding the preview: rebuild next time.
 	if (shot_owner_dying() || preview_nodes_lost()) {
-		preview_rebuild_in_progress = false;
+		preview.rebuild_in_progress = false;
 		return;
 	}
-	const Transform2D holder_global = preview_holder->get_global_transform();
+	const Transform2D holder_global = preview.holder->get_global_transform();
 	if (!holder_global.is_finite()) {
-		preview_rebuild_in_progress = false;
+		preview.rebuild_in_progress = false;
 		return;
 	}
 	const Transform2D to_local = holder_global.affine_inverse();
 	if (!to_local.is_finite()) {
-		preview_rebuild_in_progress = false;
+		preview.rebuild_in_progress = false;
 		return;
 	}
 	const real_t holder_rotation = holder_global.get_rotation();
@@ -863,8 +863,8 @@ void PatternSpawner2D::rebuild_preview() {
 	if (!(glyph_scale > 0.0) || !Math::is_finite(glyph_scale)) {
 		glyph_scale = 1.0;
 	}
-	const real_t dot_radius = (real_t)(preview_dot_radius * glyph_scale);
-	const real_t arrow_gap = (real_t)(preview_arrow_gap * glyph_scale);
+	const real_t dot_radius = (real_t)(preview.dot_radius * glyph_scale);
+	const real_t arrow_gap = (real_t)(preview.arrow_gap * glyph_scale);
 	// A laser's beams are world lengths: drawn in holder space, they divide by
 	// the holder's scale (exact for uniform scale, rotation and mirroring).
 	real_t beam_length = preview_beam_length();
@@ -881,11 +881,11 @@ void PatternSpawner2D::rebuild_preview() {
 	// A beam starts at its muzzle (the dot): the arrow, drawn from outside the
 	// dot, ends exactly where the beam ends.
 	const real_t arrow_offset = dot_radius + arrow_gap;
-	const real_t arrow_length = beam_length >= (real_t)0.0 ? Math::max((real_t)0.0, beam_length - arrow_offset) : (real_t)(preview_arrow_length * glyph_scale);
+	const real_t arrow_length = beam_length >= (real_t)0.0 ? Math::max((real_t)0.0, beam_length - arrow_offset) : (real_t)(preview.arrow_length * glyph_scale);
 	const real_t band_width = beam_length > (real_t)0.0 && beam_width > (real_t)0.0 && Math::is_finite(beam_width) ? beam_width : (real_t)0.0;
-	const real_t arrow_width = (real_t)(preview_arrow_width * glyph_scale);
-	const real_t arrow_head_length = (real_t)(preview_arrow_head_length * glyph_scale);
-	const real_t arrow_head_width = (real_t)(preview_arrow_head_width * glyph_scale);
+	const real_t arrow_width = (real_t)(preview.arrow_width * glyph_scale);
+	const real_t arrow_head_length = (real_t)(preview.arrow_head_length * glyph_scale);
+	const real_t arrow_head_width = (real_t)(preview.arrow_head_width * glyph_scale);
 	// Snapshot into the layers: _draw() repaints this data on every engine
 	// redraw by itself, so zoom/pan/selection/idle can never wipe the gizmo.
 	// (One-shot RenderingServer canvas_item_add_* calls cannot do this: the
@@ -914,8 +914,8 @@ void PatternSpawner2D::rebuild_preview() {
 		tails.push_back(p + dir * (dot_radius + arrow_gap));
 		dirs.push_back(dir);
 	}
-	preview_dots_layer->set_dots_data(dots, preview_dot_color, (float)dot_radius);
-	preview_dots_layer->set_first_marker(!dots.is_empty(), preview_first_dot_color, kFirstDotRadiusScale);
+	preview.dots_layer->set_dots_data(dots, preview.dot_color, (float)dot_radius);
+	preview.dots_layer->set_first_marker(!dots.is_empty(), preview.first_dot_color, kFirstDotRadiusScale);
 	// The snapshot above is spin-free, so the rebuilt gizmo must be re-posed
 	// to the current angle here (otherwise a rebuild during spin would snap
 	// back to 0 until the next advance_spin).
@@ -925,13 +925,13 @@ void PatternSpawner2D::rebuild_preview() {
 	// default; invalid shapes hide.
 	{
 		float ring_r = 0.0f;
-		if (preview_draw_collision_rings) {
+		if (preview.draw_collision_rings) {
 			ring_r = (float)(preview_collision_ring_radius() * glyph_scale);
 			if (!(ring_r > 0.0f) || !Math::is_finite(ring_r)) {
 				ring_r = 0.0f;
 			}
 		}
-		preview_dots_layer->set_rings_data(ring_r, preview_collision_ring_color, (float)preview_collision_ring_width);
+		preview.dots_layer->set_rings_data(ring_r, preview.collision_ring_color, (float)preview.collision_ring_width);
 	}
 	// Track snapshot: the shape/loop/curve bullets ride on, drawn as
 	// segments under the dots. Geometry-sourced (never bullet dots, except
@@ -950,10 +950,10 @@ void PatternSpawner2D::rebuild_preview() {
 	// below builds. A dead generator / zero path width skips the block but
 	// must not serve the previous rebuild's rings to debug_get_layer_rings()
 	// and the coincidence check (which would then lie about dots on rings).
-	preview_last_layer_rings.clear();
+	preview.last_layer_rings.clear();
 	{
 		Node2D *track_base = get_effective_generator();
-		const bool track_live = track_base != nullptr && is_inside_tree() && preview_path_width > 0.0 && Math::is_finite(preview_path_width);
+		const bool track_live = track_base != nullptr && is_inside_tree() && preview.path_width > 0.0 && Math::is_finite(preview.path_width);
 		const Transform2D track_marker = track_live ? track_base->get_global_transform() : Transform2D();
 		if (track_live && track_marker.is_finite()) {
 			const Vector2 track_origin = track_marker.get_origin();
@@ -1190,20 +1190,20 @@ void PatternSpawner2D::rebuild_preview() {
 						layer_track.push_back(Vector2(Math::INF, Math::INF));
 					}
 					if (stored.size() >= 2) {
-						preview_last_layer_rings.push_back(stored);
+						preview.last_layer_rings.push_back(stored);
 					}
 				}
 			}
 		}
 	}
-	preview_dots_layer->set_layer_path_data(layer_track, preview_layer_path_color);
-	preview_dots_layer->set_path_data(track, preview_path_color, (float)preview_path_width, track_closed);
-	preview_arrows_layer->set_arrows_data(tails, dirs, preview_arrow_color, (float)arrow_length, (float)arrow_width, (float)arrow_head_length, (float)arrow_head_width, (float)band_width, (float)arrow_offset, band_width > (real_t)0.0 ? (float)beam_length : 0.0f);
+	preview.dots_layer->set_layer_path_data(layer_track, preview.layer_path_color);
+	preview.dots_layer->set_path_data(track, preview.path_color, (float)preview.path_width, track_closed);
+	preview.arrows_layer->set_arrows_data(tails, dirs, preview.arrow_color, (float)arrow_length, (float)arrow_width, (float)arrow_head_length, (float)arrow_head_width, (float)band_width, (float)arrow_offset, band_width > (real_t)0.0 ? (float)beam_length : 0.0f);
 	// The snapshot must match what was just drawn: dirty-checks compare
 	// against this, so snap AFTER the collect, not before.
 	snapshot_preview_sources();
-	preview_last_rebuild_usec = Time::get_singleton()->get_ticks_usec() - rebuild_t0;
-	preview_rebuild_in_progress = false;
+	preview.last_rebuild_usec = Time::get_singleton()->get_ticks_usec() - rebuild_t0;
+	preview.rebuild_in_progress = false;
 }
 
 // Compares live source state against the snapshot. Crash-safe by
@@ -1214,7 +1214,7 @@ void PatternSpawner2D::rebuild_preview() {
 // the rebuild re-resolves - never a touch of garbage memory.
 bool PatternSpawner2D::preview_sources_dirty() {
 	// No snapshot yet (first frames): dirty so the loop rebuilds + snaps.
-	if (!tracked_has_self) {
+	if (!preview.tracked_has_self) {
 		return true;
 	}
 	if (!is_inside_tree()) {
@@ -1227,7 +1227,7 @@ bool PatternSpawner2D::preview_sources_dirty() {
 	if (base == nullptr) {
 		return true;
 	}
-	if (base->get_instance_id() != tracked_base_id || !is_tracked_node_alive(base, tracked_base_id)) {
+	if (base->get_instance_id() != preview.tracked_base_id || !is_tracked_node_alive(base, preview.tracked_base_id)) {
 		return true;
 	}
 	// Generator moves: the holder is the generator's child and the snapshot
@@ -1236,16 +1236,16 @@ bool PatternSpawner2D::preview_sources_dirty() {
 	// the canvas items ride along. Only the pose is refreshed (it depends on
 	// the holder basis for skewed generators). Anything else rebuilds.
 	const Transform2D base_global = base->get_global_transform();
-	if (!tracked_has_base_global || base_global != tracked_base_global) {
-		if (!tracked_has_base_global || !preview_survives_marker_move(tracked_base_global, base_global)) {
+	if (!preview.tracked_has_base_global || base_global != preview.tracked_base_global) {
+		if (!preview.tracked_has_base_global || !preview_survives_marker_move(preview.tracked_base_global, base_global)) {
 			return true;
 		}
-		tracked_base_global = base_global;
+		preview.tracked_base_global = base_global;
 		set_preview_pose(spin.angle_deg);
 	}
 	// The spawner's own transform only matters when it IS the base (handled
 	// above); for an external generator it never affects the pattern.
-	if (spin.angle_deg != tracked_spin_angle) {
+	if (spin.angle_deg != preview.tracked_spin_angle) {
 		// Spin is POSE, not geometry. advance_spin changes the angle every
 		// frame, so treating it as dirt forced a full rebuild_preview() - which
 		// regenerates every transform and reallocates the whole dot/arrow
@@ -1267,20 +1267,20 @@ bool PatternSpawner2D::preview_sources_dirty() {
 	if (pattern_source == PATTERN_FROM_HELPER_AIMED || pattern_source == PATTERN_FROM_HELPER_CORRIDOR) {
 		Node2D *target = get_helper_aimed_target();
 		const uint64_t target_id = target != nullptr ? target->get_instance_id() : 0;
-		if (target_id != tracked_target_id) {
+		if (target_id != preview.tracked_target_id) {
 			return true;
 		}
 		if (target != nullptr) {
-			if (!is_tracked_node_alive(target, tracked_target_id)) {
+			if (!is_tracked_node_alive(target, preview.tracked_target_id)) {
 				return true;
 			}
-			if (tracked_has_target_origin && target->get_global_transform() != tracked_target_origin) {
+			if (preview.tracked_has_target_origin && target->get_global_transform() != preview.tracked_target_origin) {
 				return true;
 			}
-		} else if (tracked_has_target_origin) {
+		} else if (preview.tracked_has_target_origin) {
 			return true;
 		}
-	} else if (tracked_target_id != 0 || tracked_has_target_origin) {
+	} else if (preview.tracked_target_id != 0 || preview.tracked_has_target_origin) {
 		return true;
 	}
 	if (pattern_source == PATTERN_FROM_HELPER_CUSTOM || pattern_source == PATTERN_FROM_HELPER_PATH2D) {
@@ -1293,18 +1293,18 @@ bool PatternSpawner2D::preview_sources_dirty() {
 			// in-place curve edits, gizmo-only).
 			Node *path_node = get_helper_path2d_node();
 			const uint64_t path_id = path_node != nullptr ? path_node->get_instance_id() : 0;
-			bool node_moved = (path_id != tracked_path2d_node_id);
+			bool node_moved = (path_id != preview.tracked_path2d_node_id);
 			if (!node_moved && path_node != nullptr) {
 				if (Node2D *path_2d = Object::cast_to<Node2D>(path_node)) {
-					node_moved = !tracked_has_path2d_node_global || path_2d->get_global_transform() != tracked_path2d_node_global;
-				} else if (tracked_has_path2d_node_global) {
+					node_moved = !preview.tracked_has_path2d_node_global || path_2d->get_global_transform() != preview.tracked_path2d_node_global;
+				} else if (preview.tracked_has_path2d_node_global) {
 					node_moved = true;
 				}
-			} else if (path_node == nullptr && (tracked_path2d_node_id != 0 || tracked_has_path2d_node_global)) {
+			} else if (path_node == nullptr && (preview.tracked_path2d_node_id != 0 || preview.tracked_has_path2d_node_global)) {
 				node_moved = true;
 			}
-			if (node_moved || ++preview_path2d_sample_cooldown >= 15) {
-				preview_path2d_sample_cooldown = 0;
+			if (node_moved || ++preview.path2d_sample_cooldown >= 15) {
+				preview.path2d_sample_cooldown = 0;
 			} else {
 				skip_path2d_sample = true;
 			}
@@ -1320,15 +1320,15 @@ bool PatternSpawner2D::preview_sources_dirty() {
 		} else {
 			// Gated tick: reuse the snapshot comparison (equal -> clean).
 			// Any node change above already forced a resample.
-			cur = tracked_custom_transforms.duplicate();
+			cur = preview.tracked_custom_transforms.duplicate();
 		}
-		if (cur.size() != tracked_custom_transforms.size())
+		if (cur.size() != preview.tracked_custom_transforms.size())
 			return true;
 		for (int i = 0; i < cur.size(); ++i) {
 			// Typed fetch first: a blind Variant cast on a transient
 			// inspector state is what wedged the editor.
 			const Variant va = cur[i];
-			const Variant vb = tracked_custom_transforms[i];
+			const Variant vb = preview.tracked_custom_transforms[i];
 			if (va.get_type() != Variant::TRANSFORM2D || vb.get_type() != Variant::TRANSFORM2D)
 				return true;
 			const Transform2D a = va;
@@ -1340,7 +1340,7 @@ bool PatternSpawner2D::preview_sources_dirty() {
 			if (a.is_finite() && a != b)
 				return true;
 		}
-	} else if (!tracked_custom_transforms.is_empty()) {
+	} else if (!preview.tracked_custom_transforms.is_empty()) {
 		return true;
 	}
 	// Child markers only shape the pattern for the Children source. For every
@@ -1350,16 +1350,16 @@ bool PatternSpawner2D::preview_sources_dirty() {
 		return false;
 	}
 	const int count = base->get_child_count();
-	if (count != tracked_child_count) {
+	if (count != preview.tracked_child_count) {
 		return true;
 	}
-	if (tracked_marker_origins.size() != count || tracked_marker_rots.size() != count || tracked_marker_ids.size() != count * 2) {
+	if (preview.tracked_marker_origins.size() != count || preview.tracked_marker_rots.size() != count || preview.tracked_marker_ids.size() != count * 2) {
 		return true;
 	}
 	for (int i = 0; i < count; i++) {
 		Node2D *marker = Object::cast_to<Node2D>(base->get_child(i));
 		if (marker == nullptr) {
-			if (tracked_marker_origins[i] != Vector2(Math::INF, Math::INF)) {
+			if (preview.tracked_marker_origins[i] != Vector2(Math::INF, Math::INF)) {
 				return true;
 			}
 			continue;
@@ -1368,10 +1368,10 @@ bool PatternSpawner2D::preview_sources_dirty() {
 		// a marker rotated exactly in place keeps its origin, so the
 		// rotation check is what catches your inspector-rotation bug.
 		const uint64_t id = marker->get_instance_id();
-		if (tracked_marker_ids[i * 2] != (int64_t)(id & 0xFFFFFFFFu) || tracked_marker_ids[i * 2 + 1] != (int64_t)(id >> 32)) {
+		if (preview.tracked_marker_ids[i * 2] != (int64_t)(id & 0xFFFFFFFFu) || preview.tracked_marker_ids[i * 2 + 1] != (int64_t)(id >> 32)) {
 			return true;
 		}
-		if (marker->get_global_transform().get_origin() != tracked_marker_origins[i] || marker->get_global_rotation() != tracked_marker_rots[i]) {
+		if (marker->get_global_transform().get_origin() != preview.tracked_marker_origins[i] || marker->get_global_rotation() != preview.tracked_marker_rots[i]) {
 			return true;
 		}
 	}
@@ -1384,7 +1384,7 @@ void PatternSpawner2D::update_preview_process_state() {
 	// Runtime: never touched here - shooting/spinning own _process, and the
 	// runtime preview piggy-backs that loop via preview_sources_dirty().
 	if (Engine::get_singleton()->is_editor_hint() && is_inside_tree()) {
-		set_process(show_pattern_preview || graze_preview_active());
+		set_process(preview.show || graze_preview_active());
 	}
 }
 
