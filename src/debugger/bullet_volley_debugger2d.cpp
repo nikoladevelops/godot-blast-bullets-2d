@@ -1,5 +1,6 @@
 #include "debugger/bullet_volley_debugger2d.hpp"
 #include "bullet_volley/bullet_volley2d.hpp"
+#include "core/live_object2d.hpp"
 #include "core/transform_math2d.hpp"
 #include "godot_cpp/core/memory.hpp"
 #include "godot_cpp/core/object.hpp"
@@ -90,8 +91,9 @@ bool BulletVolleyDebugger2D::enable() {
 		debugger_multimeshes.reserve(amount_already_spawned);
 
 		for (int i = 0; i < amount_already_spawned; ++i) {
-			// I first need to extract the actual node from the typed array, since it saves it as a Variant
-			Node *node = Object::cast_to<Node>(already_spawned_debugger_data_providers[i]);
+			// By id: generating a multimesh adds a child (tree signals, user
+			// code), which may free a later entry of this snapshot.
+			Node *node = live_object2d<Node>(already_spawned_debugger_data_providers[i]);
 			if (node) {
 				generate_debug_multimesh(node);
 			}

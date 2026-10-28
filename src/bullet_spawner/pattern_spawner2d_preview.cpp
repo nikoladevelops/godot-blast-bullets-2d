@@ -3,6 +3,7 @@
 // detection and the debug_* coincidence bindings used by tests.
 
 #include "bullet_spawner/pattern_spawner2d_internal.hpp"
+#include "core/live_object2d.hpp"
 #include "core/transform_math2d.hpp"
 
 using namespace godot;
@@ -783,7 +784,8 @@ void PatternSpawner2D::rebuild_preview() {
 	// and upgraded scenes keep no stray-segment nodes around.
 	TypedArray<Node> stray_lines = preview.holder->find_children("*", "Line2D", false, false);
 	for (int i = 0; i < stray_lines.size(); i++) {
-		Node *stray = Object::cast_to<Node>(stray_lines[i]);
+		// By id: remove_child runs tree signals (user code) that may free a later one.
+		Node *stray = live_object2d<Node>(stray_lines[i]);
 		if (stray != nullptr) {
 			preview.holder->remove_child(stray);
 			memdelete(stray);
