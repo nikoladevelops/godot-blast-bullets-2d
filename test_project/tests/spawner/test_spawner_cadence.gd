@@ -650,3 +650,26 @@ func test_max_shots_per_frame_rejects_below_one() -> void:
 	sp.max_shots_per_frame = 0
 	expect_error_sequence(["BulletSpawner2D: max_shots_per_frame must be >= 1, keeping the old value."])
 	assert_eq(sp.max_shots_per_frame, 8, "kept")
+
+
+## Auto fire reports a misconfiguration once: the cause the pattern names
+## (no Path2D, no aimed target, no custom transforms) AND the skipped shot,
+## not one cause per interval. A configuration change reports again.
+func test_auto_fire_names_a_broken_pattern_once() -> void:
+	var causes := {
+		BulletSpawner2D.PATTERN_FROM_HELPER_PATH2D: ["Path2D mode has no node assigned", "pattern_source Path2D produced no transforms"],
+		BulletSpawner2D.PATTERN_FROM_HELPER_AIMED: ["no aimed target assigned", "pattern_source Aimed produced no transforms"],
+		BulletSpawner2D.PATTERN_FROM_HELPER_CUSTOM: ["helper_custom_transforms is empty", "pattern_source Custom produced no transforms"],
+	}
+	for source in causes:
+		var sp := make_spawner(H.make_volley_data(1, 0.0, 1.0), source, 4)
+		sp.shoot_interval_sec = 0.05
+		sp.set_shooting_enabled(true)
+		await idle(30) # about ten intervals
+		expect_error_sequence(causes[source], "%d: once, not every interval" % source)
+		sp.set_spawn_data(H.make_volley_data(1, 0.0, 1.0)) # a configuration change re-arms the report
+		await idle(30)
+		expect_error_sequence(causes[source], "%d: reported again after a change" % source)
+		sp.set_shooting_enabled(false)
+		assert_false(sp.shoot_once(), "a manual shot")
+		expect_error_sequence(causes[source], "%d: a manual shot always reports" % source)

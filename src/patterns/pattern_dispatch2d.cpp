@@ -51,7 +51,9 @@ CornerLayout2D PatternKnobs2D::corner_layout() const {
 PatternSlots2D PatternKnobs2D::generate_raw(const PatternInputs2D &in) const {
 	const Transform2D &marker = in.marker;
 	const real_t mirror_sign = in.mirror_sign;
-	const bool quiet = in.quiet;
+	// Messages stay silent for the preview and for a latched auto-fire shot;
+	// only the preview pins its unseeded scatter (in.quiet below).
+	const bool quiet = in.quiet || in.muted;
 	PatternSlots2D raw;
 	switch (in.source) {
 		case PATTERN_SHAPE_SELF:
@@ -235,7 +237,7 @@ PatternSlots2D PatternKnobs2D::generate_raw(const PatternInputs2D &in) const {
 		} break;
 		case PATTERN_SHAPE_SCATTER: {
 			uint64_t scatter_seed = helper_scatter_seed > 0 ? (uint64_t)helper_scatter_seed : 0;
-			if (quiet && scatter_seed == 0) {
+			if (in.quiet && scatter_seed == 0) {
 				// Preview stability: an unseeded layout re-rolls on every
 				// collect, and the preview re-collects on every tracked
 				// change (spin sweeps included), so a live seed would make

@@ -800,7 +800,9 @@ bool PatternSpawner2D::shoot_once() {
 	}
 	// Native shot buffer: no TypedArray / Variant per bullet anywhere between
 	// the pattern bake and the volley setup (spawn_volley_span).
+	shot_reports_muted = auto_fire_in_progress && shoot_error_latch != 0;
 	collect_spawn_transforms_native(false, shot_transforms);
+	shot_reports_muted = false;
 	if (shot_owner_dying()) {
 		// The aimed target's get_velocity (user code) freed this spawner:
 		// the free waits for the shot, which reports nothing.

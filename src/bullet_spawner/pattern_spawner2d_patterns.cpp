@@ -155,6 +155,7 @@ PatternSlots2D PatternSpawner2D::generate_raw_pattern(Node2D *base, const Transf
 	in.marker = marker;
 	in.mirror_sign = mirror_sign;
 	in.quiet = quiet;
+	in.muted = shot_reports_muted;
 	in.warn_owner_id = get_instance_id();
 	in.owner_class = get_class();
 	std::vector<Transform2D> children;
@@ -188,7 +189,7 @@ PatternSlots2D PatternSpawner2D::generate_raw_pattern(Node2D *base, const Transf
 			in.corridor_aim = resolve_corridor_aim(helper_corridor_aim_direction, marker.get_origin());
 			break;
 		case PATTERN_FROM_HELPER_PATH2D:
-			path_pts = sample_path2d_polyline(quiet);
+			path_pts = sample_path2d_polyline(quiet || shot_reports_muted);
 			in.path_points = &path_pts;
 			break;
 		default:
@@ -412,7 +413,7 @@ void PatternSpawner2D::collect_spawn_transforms_native(bool quiet, std::vector<T
 	if (base == nullptr || !base->is_inside_tree()) {
 		// Outside the tree there is no valid global transform; report loudly
 		// for real shots, stay silent for the preview.
-		if (!quiet) {
+		if (!quiet && !shot_reports_muted) {
 			UtilityFunctions::push_error((String(get_class()) + "::collect_spawn_transforms: spawner is outside the scene tree."));
 		}
 		return;

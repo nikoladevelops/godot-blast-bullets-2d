@@ -47,6 +47,7 @@ struct PatternInputs2D {
 	Transform2D marker; // generator global transform (spin/scale NOT applied)
 	real_t mirror_sign = 1.0; // -1 winds spirals the other way
 	bool quiet = false; // preview/probe: never report
+	bool muted = false; // a shot whose report is latched (auto fire): no messages, same pattern
 	uint64_t warn_owner_id = 0; // WarnOnce2D owner (the spawner)
 	// The spawner's class, naming it in the messages below (BulletPatterns2D
 	// .generate keeps the default).

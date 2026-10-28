@@ -1404,6 +1404,9 @@ protected:
 	// Idle inside a physics frame never steps twice in that frame.
 	uint64_t last_run_process_frame = UINT64_MAX;
 	uint32_t shoot_error_latch = 0;
+	// An auto-fire shot while the latch holds the last report: the pattern's
+	// own messages (the cause before the latched summary) stay silent too.
+	bool shot_reports_muted = false;
 	void on_config_changed();
 	// Bypass flag for debug_collect_spawn_transforms_uncached / verify.
 	mutable bool pattern_cache_bypass = false;
