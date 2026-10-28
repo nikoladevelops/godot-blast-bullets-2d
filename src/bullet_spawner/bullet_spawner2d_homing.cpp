@@ -1276,11 +1276,11 @@ bool BulletSpawner2D::fire_arc_covers_targets(const Array &targets) const {
 	const Vector2 origin = marker.get_origin();
 	// The volley's actual facing: generator rotation plus the emitter spin
 	// (negated on a mirrored burst shot, like the pattern itself).
-	real_t spin = Math::deg_to_rad((real_t)(spin_angle_deg + (shot_pose_active ? shot_pose_extra_spin_deg : 0.0)));
+	real_t spin_rad = Math::deg_to_rad((real_t)(spin.angle_deg + (shot_pose_active ? shot_pose_extra_spin_deg : 0.0)));
 	if (burst_alternate_mirror && burst_mirror_next) {
-		spin = -spin;
+		spin_rad = -spin_rad;
 	}
-	const real_t facing = marker.get_rotation() + spin;
+	const real_t facing = marker.get_rotation() + spin_rad;
 	const real_t half_arc = Math::deg_to_rad((real_t)homing_fire_arc_deg) * 0.5;
 	for (int i = 0; i < targets.size(); ++i) {
 		Vector2 pos = Vector2(0, 0);

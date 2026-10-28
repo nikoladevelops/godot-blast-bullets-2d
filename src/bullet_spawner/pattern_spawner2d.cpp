@@ -256,11 +256,11 @@ const World2D *PatternSpawner2D::target_world() const {
 }
 
 bool PatternSpawner2D::get_spin_enabled() const {
-	return spin_enabled;
+	return spin.enabled;
 }
 
 void PatternSpawner2D::set_spin_enabled(bool value) {
-	spin_enabled = value;
+	spin.enabled = value;
 	notify_property_list_changed(); // spin knobs gate on it (_validate_property)
 	if (!Engine::get_singleton()->is_editor_hint() && is_inside_tree()) {
 		// Spinning needs _process even when auto-shooting is off.
@@ -269,7 +269,7 @@ void PatternSpawner2D::set_spin_enabled(bool value) {
 }
 
 double PatternSpawner2D::get_spin_speed_deg_per_sec() const {
-	return spin_speed_deg_per_sec;
+	return spin.speed_deg_per_sec;
 }
 
 void PatternSpawner2D::set_spin_speed_deg_per_sec(double value) {
@@ -277,11 +277,11 @@ void PatternSpawner2D::set_spin_speed_deg_per_sec(double value) {
 		UtilityFunctions::push_error((String(get_class()) + ": spin_speed_deg_per_sec must be finite, keeping the old value."));
 		return;
 	}
-	spin_speed_deg_per_sec = value;
+	spin.speed_deg_per_sec = value;
 }
 
 PatternSpawner2D::SpinMode PatternSpawner2D::get_spin_mode() const {
-	return spin_mode;
+	return (SpinMode)spin.mode;
 }
 
 void PatternSpawner2D::set_spin_mode(SpinMode value) {
@@ -289,12 +289,12 @@ void PatternSpawner2D::set_spin_mode(SpinMode value) {
 		UtilityFunctions::push_error((String(get_class()) + ": invalid spin_mode, keeping the old value."));
 		return;
 	}
-	spin_mode = value;
+	spin.mode = value;
 	notify_property_list_changed(); // speed vs amplitude/frequency per mode
 }
 
 double PatternSpawner2D::get_spin_amplitude_deg() const {
-	return spin_amplitude_deg;
+	return spin.amplitude_deg;
 }
 
 void PatternSpawner2D::set_spin_amplitude_deg(double value) {
@@ -302,11 +302,11 @@ void PatternSpawner2D::set_spin_amplitude_deg(double value) {
 		UtilityFunctions::push_error((String(get_class()) + ": spin_amplitude_deg must be finite and >= 0, keeping the old value."));
 		return;
 	}
-	spin_amplitude_deg = value;
+	spin.amplitude_deg = value;
 }
 
 double PatternSpawner2D::get_spin_frequency_hz() const {
-	return spin_frequency_hz;
+	return spin.frequency_hz;
 }
 
 void PatternSpawner2D::set_spin_frequency_hz(double value) {
@@ -314,11 +314,11 @@ void PatternSpawner2D::set_spin_frequency_hz(double value) {
 		UtilityFunctions::push_error((String(get_class()) + ": spin_frequency_hz must be finite and >= 0, keeping the old value."));
 		return;
 	}
-	spin_frequency_hz = value;
+	spin.frequency_hz = value;
 }
 
 double PatternSpawner2D::get_spin_angle_deg() const {
-	return spin_angle_deg;
+	return spin.angle_deg;
 }
 
 void PatternSpawner2D::set_spin_angle_deg(double degrees) {
@@ -326,52 +326,28 @@ void PatternSpawner2D::set_spin_angle_deg(double degrees) {
 		UtilityFunctions::push_error((String(get_class()) + "::set_spin_angle_deg: degrees must be finite, keeping the old angle."));
 		return;
 	}
-	if (spin_mode == SPIN_OSCILLATE) {
+	if (spin.mode == SPIN_OSCILLATE) {
 		UtilityFunctions::push_error((String(get_class()) + "::set_spin_angle_deg: in Oscillate mode the angle follows spin_amplitude_deg and spin_frequency_hz; use reset_spin_angle() to restart the swing. Keeping the old angle."));
 		return;
 	}
-	spin_angle_deg = Math::fposmod(degrees, 360.0);
+	spin.angle_deg = Math::fposmod(degrees, 360.0);
 	if (preview_active()) {
-		set_preview_pose(spin_angle_deg);
+		set_preview_pose(spin.angle_deg);
 	}
 }
 
 void PatternSpawner2D::reset_spin_angle() {
-	spin_angle_deg = 0.0;
-	spin_time_sec = 0.0;
-	if (spin_random_start_phase) {
+	spin.reset();
+	if (spin.random_start_phase) {
 		roll_spin_start_phase();
 	}
 	if (preview_active()) {
-		set_preview_pose(spin_angle_deg); // like set_spin_angle_deg: the gizmo follows at once
+		set_preview_pose(spin.angle_deg); // like set_spin_angle_deg: the gizmo follows at once
 	}
 }
 
 void PatternSpawner2D::advance_spin(double delta) {
-	if (spin_mode == SPIN_OSCILLATE) {
-		// Wrap the phase clock modulo the oscillation period: an unbounded
-		// float clock loses sin() precision after ~12h of spinning (visible
-		// stutter). Period = 1/frequency; non-positive frequency holds still.
-		if (spin_frequency_hz > 0.0 && Math::is_finite(spin_frequency_hz)) {
-			const double period = 1.0 / spin_frequency_hz;
-			spin_time_sec = Math::fposmod(spin_time_sec + delta, period);
-		} else {
-			spin_time_sec += delta;
-		}
-		const double angle = spin_amplitude_deg * Math::sin(Math::TAU * spin_frequency_hz * spin_time_sec);
-		if (Math::is_finite(angle) && Math::is_finite(spin_time_sec)) {
-			spin_angle_deg = angle;
-		} else {
-			spin_time_sec = 0.0; // an overflowed clock restarts (never a NaN angle for good)
-		}
-	} else {
-		// Any finite time_scale is accepted: a step that overflows holds the
-		// angle (fposmod of INF is NaN, and NaN would stick forever).
-		const double step = spin_speed_deg_per_sec * delta;
-		if (Math::is_finite(step)) {
-			spin_angle_deg = Math::fposmod(spin_angle_deg + step, 360.0);
-		}
-	}
+	spin.advance(delta);
 }
 
 double PatternSpawner2D::get_reload_jitter_sec() const { return reload_jitter_sec; }
@@ -610,7 +586,7 @@ int PatternSpawner2D::volleys_remaining() const {
 // "auto-shooting stopped" sleep paths in _process/shoot_once all use it, so a
 // new subsystem (e.g. movement) is added in exactly one place.
 bool PatternSpawner2D::needs_process_besides_shooting() const {
-	return spin_enabled || needs_process_owned() || preview_active() || graze_preview_active() || burst_shots_left > 0 || telegraph_pending || pattern_list_active || movement_active();
+	return spin.enabled || needs_process_owned() || preview_active() || graze_preview_active() || burst_shots_left > 0 || telegraph_pending || pattern_list_active || movement_active();
 }
 
 bool PatternSpawner2D::needs_process() const {
@@ -897,11 +873,11 @@ bool PatternSpawner2D::emit_shot_from(const Transform2D &global_transform, doubl
 
 Transform2D PatternSpawner2D::get_shot_frame() const {
 	const Transform2D marker = shot_marker();
-	const real_t spin = Math::deg_to_rad((real_t)(spin_angle_deg + (shot_pose_active ? shot_pose_extra_spin_deg : 0.0)));
-	if (!Math::is_finite(spin) || spin == (real_t)0.0) {
+	const real_t spin_rad = Math::deg_to_rad((real_t)(spin.angle_deg + (shot_pose_active ? shot_pose_extra_spin_deg : 0.0)));
+	if (!Math::is_finite(spin_rad) || spin_rad == (real_t)0.0) {
 		return marker;
 	}
-	const Transform2D turn(spin, Vector2());
+	const Transform2D turn(spin_rad, Vector2());
 	Transform2D out = marker;
 	out.columns[0] = turn.basis_xform(marker.columns[0]);
 	out.columns[1] = turn.basis_xform(marker.columns[1]);
@@ -979,7 +955,7 @@ void PatternSpawner2D::_ready() {
 	} else {
 		refresh_graze_preview();
 	}
-	if (spin_random_start_phase) {
+	if (spin.random_start_phase) {
 		roll_spin_start_phase(); // each spawner starts its spin somewhere else
 	}
 	// Controls called before the tree (pause, fire_n_volleys, ...) are kept:
@@ -1261,7 +1237,7 @@ void PatternSpawner2D::run_frame(double delta) {
 	// Spin runs independently of shooting: a silent rotating emitter is valid.
 	// Advanced BEFORE the preview check so the gizmo shows this frame's pose
 	// (it used to lag one frame behind the shots).
-	if (delta_ok && spin_enabled) {
+	if (delta_ok && spin.enabled) {
 		advance_spin(delta);
 	}
 	// Live-refresh loop for the preview: any tracked source move/add/remove
@@ -1838,21 +1814,21 @@ bool PatternSpawner2D::fire_pattern_list_override(const Variant &entry, const St
 	begin_pattern_batch();
 	const PatternStateSnapshot2D saved = snapshot_pattern_state();
 	// The spin angle is state a preset entry resets: it comes back too.
-	const double saved_angle = spin_angle_deg;
-	const double saved_spin_time = spin_time_sec;
+	const double saved_angle = spin.angle_deg;
+	const double saved_spin_time = spin.time_sec;
 	bool fired = false;
 	if (apply_pattern_list_entry(entry, caller)) {
-		const double applied_angle = spin_angle_deg;
-		const double applied_spin_time = spin_time_sec;
+		const double applied_angle = spin.angle_deg;
+		const double applied_spin_time = spin.time_sec;
 		const PatternStateSnapshot2D applied = snapshot_pattern_state();
 		fired = shoot_once();
 		restore_pattern_state(saved, applied);
 		// Only what the entry changed goes back (a handler's own edit sticks).
-		if (applied_angle != saved_angle && spin_angle_deg == applied_angle) {
-			spin_angle_deg = saved_angle;
+		if (applied_angle != saved_angle && spin.angle_deg == applied_angle) {
+			spin.angle_deg = saved_angle;
 		}
-		if (applied_spin_time != saved_spin_time && spin_time_sec == applied_spin_time) {
-			spin_time_sec = saved_spin_time;
+		if (applied_spin_time != saved_spin_time && spin.time_sec == applied_spin_time) {
+			spin.time_sec = saved_spin_time;
 		}
 	}
 	end_pattern_batch();

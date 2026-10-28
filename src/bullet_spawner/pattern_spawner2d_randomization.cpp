@@ -123,15 +123,7 @@ double PatternSpawner2D::next_telegraph_sec() const {
 // ---- Spin start phase -----------------------------------------------------------------
 
 void PatternSpawner2D::roll_spin_start_phase() {
-	const double unit = roll_unit(CHANNEL_SPIN, 0);
-	if (spin_mode == SPIN_OSCILLATE) {
-		if (spin_frequency_hz > 0.0 && Math::is_finite(spin_frequency_hz)) {
-			spin_time_sec = unit / spin_frequency_hz; // a point inside the period
-			spin_angle_deg = spin_amplitude_deg * Math::sin(Math::TAU * spin_frequency_hz * spin_time_sec);
-		}
-		return;
-	}
-	spin_angle_deg = 360.0 * unit;
+	spin.start_at_phase(roll_unit(CHANNEL_SPIN, 0));
 }
 
 } // namespace BlastBullets2D

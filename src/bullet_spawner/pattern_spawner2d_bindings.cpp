@@ -14,11 +14,11 @@ void PatternSpawner2D::_validate_property(PropertyInfo &p_property) const {
 	// Spin: knobs hide while spin is off; CONTINUOUS reads only the speed,
 	// OSCILLATE only amplitude + frequency (advance_spin).
 	if (property_name.begins_with("spin_")) {
-		bool show = property_name == "spin_enabled" || spin_enabled;
+		bool show = property_name == "spin_enabled" || spin.enabled;
 		if (show && property_name == "spin_speed_deg_per_sec") {
-			show = spin_mode == SPIN_CONTINUOUS;
+			show = spin.mode == SPIN_CONTINUOUS;
 		} else if (show && (property_name == "spin_amplitude_deg" || property_name == "spin_frequency_hz")) {
-			show = spin_mode == SPIN_OSCILLATE;
+			show = spin.mode == SPIN_OSCILLATE;
 		}
 		if (!show) {
 			p_property.usage &= ~PROPERTY_USAGE_EDITOR;

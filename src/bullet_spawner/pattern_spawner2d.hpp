@@ -1,6 +1,7 @@
 #pragma once
 
 #include "bullet_spawner/spawner_property_binder2d.hpp"
+#include "bullet_spawner/spawner_spin2d.hpp"
 #include "bullet_volley/bullet_volley2d.hpp"
 #include "core/emit_guard2d.hpp"
 #include "core/variant_enum_cast2d.hpp"
@@ -419,12 +420,10 @@ public:
 	// pattern_source is picked: collect_spawn_transforms() rotates each
 	// transform around the generator origin by the current spin angle.
 	// The scene tree is never touched (no node is rotated). Runtime only:
-	// the angle advances in _process and freezes in the editor.
-	bool spin_enabled = false;
-	double spin_speed_deg_per_sec = 90.0;
-	SpinMode spin_mode = SPIN_CONTINUOUS;
-	double spin_amplitude_deg = 45.0;
-	double spin_frequency_hz = 0.5;
+	// the angle advances in _process and freezes in the editor. The settings
+	// and the runtime angle live in the Spin part.
+	static_assert((int)SPIN_CONTINUOUS == SpawnerSpin2D::CONTINUOUS && (int)SPIN_OSCILLATE == SpawnerSpin2D::OSCILLATE, "spin_mode ids are the spin part's (saved in scenes)");
+	SpawnerSpin2D spin;
 
 	bool get_spin_enabled() const;
 	void set_spin_enabled(bool value);
@@ -799,7 +798,6 @@ public:
 	static_assert((int)BULLET_SCALE_OFF == ShotRandomizer2D::SCALE_OFF && (int)BULLET_SCALE_UNIFORM == ShotRandomizer2D::SCALE_UNIFORM && (int)BULLET_SCALE_PER_AXIS == ShotRandomizer2D::SCALE_PER_AXIS, "bullet_scale_mode ids are the randomizer's (saved in scenes)");
 	// The placement rolls (scale / rotation / position) and their seed.
 	ShotRandomizer2D placement;
-	bool spin_random_start_phase = false;
 	double shoot_interval_max_sec = 0.0;
 	double burst_interval_max_sec = 0.0;
 	double telegraph_max_sec = 0.0;
@@ -845,8 +843,8 @@ public:
 	void set_bullet_scale_max_xy(const Vector2 &value);
 	int get_bullet_random_seed() const { return (int)placement.seed; }
 	void set_bullet_random_seed(int value) { placement.seed = value; }
-	bool get_spin_random_start_phase() const { return spin_random_start_phase; }
-	void set_spin_random_start_phase(bool value) { spin_random_start_phase = value; }
+	bool get_spin_random_start_phase() const { return spin.random_start_phase; }
+	void set_spin_random_start_phase(bool value) { spin.random_start_phase = value; }
 	double get_bullet_scale_min() const { return placement.scale_min; }
 	void set_bullet_scale_min(double value);
 	double get_bullet_scale_max() const { return placement.scale_max; }
@@ -1362,9 +1360,6 @@ protected:
 	// Seed 0 (non-deterministic jitter) randomizes the generator once,
 	// not on every interval.
 	mutable bool jitter_rng_randomized = false;
-	// Spin runtime state (never stored, advances in _process only).
-	double spin_angle_deg = 0.0;
-	double spin_time_sec = 0.0;
 	// Burst runtime state (never stored): shots left in the current burst,
 	// countdown to the next burst shot, telegraph countdown, and the
 	// mirror flag for the next burst volley.

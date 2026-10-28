@@ -446,7 +446,7 @@ void PatternSpawner2D::collect_spawn_transforms_native(bool quiet, std::vector<T
 	// full 10k-element rebuild per frame.
 	real_t spin_radians = 0.0;
 	if (!preview_suppress_spin) {
-		spin_radians = Math::deg_to_rad((real_t)(spin_angle_deg + (shot_pose_active ? shot_pose_extra_spin_deg : 0.0)));
+		spin_radians = Math::deg_to_rad((real_t)(spin.angle_deg + (shot_pose_active ? shot_pose_extra_spin_deg : 0.0)));
 		if (mirrored_shot) {
 			spin_radians = -spin_radians;
 		}

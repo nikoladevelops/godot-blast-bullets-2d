@@ -594,7 +594,7 @@ void PatternSpawner2D::snapshot_preview_sources() {
 		tracked_base_global = tracked_base->get_global_transform();
 		tracked_has_base_global = true;
 	}
-	tracked_spin_angle = spin_angle_deg;
+	tracked_spin_angle = spin.angle_deg;
 	tracked_target_id = 0;
 	tracked_has_target_origin = false;
 	if (pattern_source == PATTERN_FROM_HELPER_AIMED || pattern_source == PATTERN_FROM_HELPER_CORRIDOR) {
@@ -919,7 +919,7 @@ void PatternSpawner2D::rebuild_preview() {
 	// The snapshot above is spin-free, so the rebuilt gizmo must be re-posed
 	// to the current angle here (otherwise a rebuild during spin would snap
 	// back to 0 until the next advance_spin).
-	set_preview_pose(spin_angle_deg);
+	set_preview_pose(spin.angle_deg);
 	// Collision-ring overlay: bounding radius of what the shot fires (the
 	// derived spawner's shape) so the editor shows hitbox vs visual. Off by
 	// default; invalid shapes hide.
@@ -1241,11 +1241,11 @@ bool PatternSpawner2D::preview_sources_dirty() {
 			return true;
 		}
 		tracked_base_global = base_global;
-		set_preview_pose(spin_angle_deg);
+		set_preview_pose(spin.angle_deg);
 	}
 	// The spawner's own transform only matters when it IS the base (handled
 	// above); for an external generator it never affects the pattern.
-	if (spin_angle_deg != tracked_spin_angle) {
+	if (spin.angle_deg != tracked_spin_angle) {
 		// Spin is POSE, not geometry. advance_spin changes the angle every
 		// frame, so treating it as dirt forced a full rebuild_preview() - which
 		// regenerates every transform and reallocates the whole dot/arrow
@@ -1259,10 +1259,10 @@ bool PatternSpawner2D::preview_sources_dirty() {
 		// repaints every frame anyway, so the visual is identical.
 		// Re-pose and KEEP CHECKING: returning here used to hide target,
 		// Path2D, custom and child-marker changes for as long as spin ran.
-		if (!Math::is_finite(spin_angle_deg)) {
+		if (!Math::is_finite(spin.angle_deg)) {
 			return true;
 		}
-		set_preview_pose(spin_angle_deg);
+		set_preview_pose(spin.angle_deg);
 	}
 	if (pattern_source == PATTERN_FROM_HELPER_AIMED || pattern_source == PATTERN_FROM_HELPER_CORRIDOR) {
 		Node2D *target = get_helper_aimed_target();

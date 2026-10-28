@@ -47,7 +47,7 @@ void PatternSpawner2D::set_spawn_position_offset(const Vector2 &value) {
 	}
 	spawn_position_offset = value;
 	// The preview draws the muzzle offset through the layer pose.
-	set_preview_pose(spin_angle_deg);
+	set_preview_pose(spin.angle_deg);
 }
 
 PatternSpawner2D::SpawnOffsetSpace PatternSpawner2D::get_spawn_position_offset_space() const { return static_cast<SpawnOffsetSpace>(spawn_position_offset_space); }
@@ -58,7 +58,7 @@ void PatternSpawner2D::set_spawn_position_offset_space(SpawnOffsetSpace value) {
 		return;
 	}
 	spawn_position_offset_space = value;
-	set_preview_pose(spin_angle_deg);
+	set_preview_pose(spin.angle_deg);
 }
 
 PatternSpawner2D::PatternSource PatternSpawner2D::get_pattern_source() const {
@@ -258,8 +258,7 @@ void PatternSpawner2D::apply_pattern_preset(int preset) {
 	reset_pattern_knobs_to_defaults();
 	// Clean includes where an earlier spin left the pattern: the same preset
 	// always fires the same pattern.
-	spin_angle_deg = 0.0;
-	spin_time_sec = 0.0;
+	spin.reset();
 	// The preset table lives in the patterns module (pattern_presets2d.cpp);
 	// ids are range-checked above, so every remaining id writes.
 	PatternPresetResult2D applied;
@@ -267,8 +266,8 @@ void PatternSpawner2D::apply_pattern_preset(int preset) {
 		pattern_source = (PatternSource)applied.source;
 	}
 	if (applied.spin_enabled) {
-		spin_enabled = true;
-		spin_speed_deg_per_sec = applied.spin_speed_deg_per_sec;
+		spin.enabled = true;
+		spin.speed_deg_per_sec = applied.spin_speed_deg_per_sec;
 	}
 	notify_property_list_changed();
 	on_config_changed();
