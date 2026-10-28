@@ -19,7 +19,7 @@ func setup() -> void:
 		customs.append(_tag)
 	for w in _walls:
 		make_static_box(Vector2(400 + w * 1000, 300), Vector2(40, 900))
-		var d := H.make_volley_data(100, 900.0, 3.0)
+		var d := bench_data(100, 900.0, 3.0)
 		var arr: Array = []
 		for i in 100:
 			arr.append(Transform2D(0.0, Vector2(280 + w * 1000, 300.0 - 400.0 + 8.0 * i)))

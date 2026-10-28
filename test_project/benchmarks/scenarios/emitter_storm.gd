@@ -17,7 +17,7 @@ func setup() -> void:
 	_template.set_shooting_enabled(false)
 	add_child(_template)
 	_template.set_bullet_factory(factory)
-	var child := H.make_volley_data(4, 200.0, 1.5)
+	var child := bench_data(4, 200.0, 1.5)
 	child.shared_bullet_speed_data = child.all_bullet_speed_data[0]
 	child.all_bullet_speed_data = []
 	_template.set_spawn_data(child)

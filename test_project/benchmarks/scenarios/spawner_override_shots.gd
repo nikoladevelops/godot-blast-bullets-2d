@@ -21,7 +21,7 @@ func _per_shot_us(call: Callable, reps: int) -> float:
 func setup() -> void:
 	warmup_frames = 30
 	measure_frames = 200
-	var data := H.make_volley_data(16, 200.0, 0.1)
+	var data := bench_data(16, 200.0, 0.1)
 	for i in 40:
 		var sp := BulletSpawner2D.new()
 		sp.set_shooting_enabled(false)

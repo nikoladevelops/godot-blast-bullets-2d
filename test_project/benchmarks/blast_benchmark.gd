@@ -134,8 +134,20 @@ func results() -> Dictionary:
 
 ## Volley data: n bullets on a ring of radius r around `center`, flying
 ## outward at `speed`. Collision layer 2, mask 3 (walls/areas use value 4).
-func ring_data(n: int, center: Vector2, r: float, speed: float, lifetime: float) -> BulletVolleyData2D:
+## The test helper's data as every baseline measured it: its per-bullet
+## speed array untiled (a spawner firing more bullets than `n` leaves the
+## rest at the default speed) and homing without texture control. The test
+## helper changed both for the warning-free suites; a benchmark keeps its
+## workload so its numbers stay comparable.
+func bench_data(n: int = 4, speed: float = 200.0, lifetime: float = 5.0) -> BulletVolleyData2D:
 	var d := H.make_volley_data(n, speed, lifetime)
+	d.tile_all_bullet_speed_data = false
+	d.homing_take_control_of_texture_rotation = false
+	return d
+
+
+func ring_data(n: int, center: Vector2, r: float, speed: float, lifetime: float) -> BulletVolleyData2D:
+	var d := bench_data(n, speed, lifetime)
 	var arr: Array = []
 	for i in n:
 		var a := TAU * float(i) / float(n)

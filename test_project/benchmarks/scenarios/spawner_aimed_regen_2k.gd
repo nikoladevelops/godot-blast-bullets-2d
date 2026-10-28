@@ -21,7 +21,7 @@ func setup() -> void:
 	_sp.position = Vector2(400, 540)
 	add_child(_sp)
 	_sp.set_bullet_factory(factory)
-	_sp.set_spawn_data(H.make_volley_data(4, 250.0, 0.3))
+	_sp.set_spawn_data(bench_data(4, 250.0, 0.3))
 	_sp.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_AIMED
 	_sp.helper_bullets_amount = 2000
 	_sp.helper_aimed_spread = 1.2

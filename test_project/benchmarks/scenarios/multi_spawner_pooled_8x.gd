@@ -15,7 +15,7 @@ func _spawner(src: int, n: int, pos: Vector2, interval: float) -> BulletSpawner2
 	sp.position = pos
 	add_child(sp)
 	sp.set_bullet_factory(factory)
-	var d := H.make_volley_data(4, 240.0, 1.5)
+	var d := bench_data(4, 240.0, 1.5)
 	d.shared_bullet_speed_data = d.all_bullet_speed_data[0]
 	d.all_bullet_speed_data = []
 	d.set_collision_mask_from_array([1])
