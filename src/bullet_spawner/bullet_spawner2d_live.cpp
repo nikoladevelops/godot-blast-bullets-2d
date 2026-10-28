@@ -285,6 +285,9 @@ int BulletSpawner2D::home_live_volleys_to(const Variant &target) {
 			continue;
 		}
 		// The steering of the Homing group (bullets fired without homing turn too).
+		// An explicit order: it ends a script's homing_follow (whose next pick
+		// would undo it).
+		volley->stop_homing_follow();
 		apply_steering_to_volley(volley);
 		volley->shared_homing_deque_clear_homing_targets();
 		volley->all_bullets_clear_homing_targets();

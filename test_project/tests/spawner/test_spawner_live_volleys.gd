@@ -343,3 +343,22 @@ func test_detaching_a_volley_hands_it_to_the_factory() -> void:
 	await idle(1)
 	assert_false(v.detach_from_spawner(), "pooled")
 	expect_error_sequence(["detach_from_spawner: this volley is in the pool (its last bullet died), so this handle is stale. Spawn a new volley instead."])
+
+
+## The spawner's explicit homing commands are the script's latest order: they
+## end a volley's homing_follow (its next pick would undo them otherwise);
+## the implicit re-applies leave a following volley alone.
+func test_explicit_homing_commands_end_a_follow() -> void:
+	var sp := _homing_spawner()
+	var v := _shoot(sp)
+	var point := PackedVector2Array([Vector2(0, -500)])
+	assert_true(v.homing_follow(BulletTargets2D.from_positions(point)), "follows")
+	assert_eq(sp.home_live_volleys_to(target), 1, "homed by the spawner")
+	assert_false(v.is_homing_following(), "the follow ended")
+	step_factory(2)
+	assert_eq(v.shared_homing_deque_get_current_homing_target(), target, "the spawner's order stands")
+	assert_true(v.homing_follow(BulletTargets2D.from_positions(point)), "follows again")
+	assert_eq(sp.clear_live_volleys_homing(), 1, "cleared by the spawner")
+	assert_false(v.is_homing_following(), "the follow ended")
+	step_factory(2)
+	assert_false(_chases(v), "nothing refills the queue")

@@ -57,7 +57,7 @@
 		<method name="clear_live_volleys_homing">
 			<return type="int" />
 			<description>
-				Kill-switch: clears homing queues and stops orbiting on every tracked volley (live or parked: a wake never resumes the chase), through engine clears that keep all counters exact. Returns how many volleys were touched. Retargeting re-arms them while homing stays on; turn homing off (or clear tracking) to keep them flying straight.
+				Kill-switch: clears homing queues and stops orbiting on every tracked volley (live or parked: a wake never resumes the chase), through engine clears that keep all counters exact. Returns how many volleys were touched. Retargeting re-arms them while homing stays on; turn homing off (or clear tracking) to keep them flying straight. It also ends a volley's [method BulletVolley2D.homing_follow], so nothing refills the queues.
 			</description>
 		</method>
 		<method name="collect_shot_colors" qualifiers="const">
@@ -138,7 +138,7 @@
 			<return type="int" />
 			<param index="0" name="target" type="Variant" />
 			<description>
-				Every bullet this spawner fired chases [param target] now: a [Node2D], a [Vector2], a group name (each bullet the nearest member, filtered like every homing target) or [code]null[/code] (the mouse), with the Homing group's steering even when they were fired without homing. A retarget pass of the Homing group may replace it later (set [member homing_retarget_mode] to Off to keep it). Anything else errors and changes nothing. Returns how many volleys changed.
+				Every bullet this spawner fired chases [param target] now: a [Node2D], a [Vector2], a group name (each bullet the nearest member, filtered like every homing target) or [code]null[/code] (the mouse), with the Homing group's steering even when they were fired without homing. A retarget pass of the Homing group may replace it later (set [member homing_retarget_mode] to Off to keep it). Anything else errors and changes nothing. Returns how many volleys changed. An explicit order: it ends a volley's [method BulletVolley2D.homing_follow] (the implicit re-applies leave a following volley alone).
 			</description>
 		</method>
 		<method name="override_live_volleys_velocity">

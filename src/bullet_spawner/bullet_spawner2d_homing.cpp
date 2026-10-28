@@ -951,6 +951,9 @@ int BulletSpawner2D::clear_live_volleys_homing() {
 		if (volley == nullptr) {
 			continue;
 		}
+		// An explicit order: it ends a script's homing_follow (whose next pick
+		// would refill the queues).
+		volley->stop_homing_follow();
 		// Engine clears keep every counter exact; orbit is stopped with the
 		// same per-bullet guard the retarget path uses (disable warns when
 		// already off).

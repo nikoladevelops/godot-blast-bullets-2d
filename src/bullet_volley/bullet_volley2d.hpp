@@ -1408,6 +1408,9 @@ public:
 	// it alone. Dropped with the life.
 	bool homing_follow(const Variant &targets, double retarget_interval = 0.0, HomingFollowMode mode = HOMING_FOLLOW_SHARED_NEAREST);
 	bool is_homing_following() const { return follow_detector != nullptr; }
+	// An explicit homing command took over (the spawner's home / clear): the
+	// follow ends, the queues stay as the command left them.
+	void stop_homing_follow() { follow_detector.reset(); }
 	// After owner_spawner_id changed: the splits and emitter shots this life
 	// queued and the factory has not spawned yet follow the new owner.
 	void reown_queued_requests();
