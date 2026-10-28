@@ -158,6 +158,8 @@ func spawn_volley_bullets()->void:
 	#volley_data.is_life_time_over_signal_enabled = true
 	#volley_data.bullet_max_collision_amount = 1
 	var volley:BulletVolley2D = BENCHMARK_GLOBALS.FACTORY.spawn_volley(volley_data)
+	if volley == null:
+		return # refused (the error says why)
 	
 	volley.homing_smoothing = 0.0# Set from 0 to 20 or even bigger (but you might have issues with interpolation)
 	volley.homing_update_interval = 0.00# Set an update timer - keep it low for smooth updates

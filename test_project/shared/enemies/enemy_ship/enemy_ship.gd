@@ -111,8 +111,9 @@ func shoot()->void:
 		bullets_data.all_bullet_speed_data = get_speed_data()
 		#bullets_data.block_rotation_radians = animated_sprite.transform.get_rotation() # Since we are using block bullets, their direction is determined by this property instead of automatically by the transforms
 		var bullets_multi:BulletVolley2D = BENCHMARK_GLOBALS.FACTORY.spawn_volley(bullets_data)
-		var scene:PackedScene = BENCHMARK_GLOBALS.ATTACHMENT_SCENES[1]
-		bullets_multi.all_bullets_set_attachment(scene, Vector2(-30, 0))
+		if bullets_multi != null: # null when refused (the error says why)
+			var scene:PackedScene = BENCHMARK_GLOBALS.ATTACHMENT_SCENES[1]
+			bullets_multi.all_bullets_set_attachment(scene, Vector2(-30, 0))
 		
 		can_shoot=false
 		shoot_timer.start()

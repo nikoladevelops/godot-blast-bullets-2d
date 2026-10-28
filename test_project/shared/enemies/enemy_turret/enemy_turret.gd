@@ -67,6 +67,8 @@ func shoot()->void:
 	var transf = Transform2D(original_transform.get_rotation(), original_transform.origin)
 	bullets_data.transforms = [transf]
 	var bullets_multi:BulletVolley2D = BENCHMARK_GLOBALS.FACTORY.spawn_volley(bullets_data)
+	if bullets_multi == null:
+		return # refused (the error says why): nothing to attach to
 	bullets_multi.all_bullets_set_attachment(BENCHMARK_GLOBALS.ATTACHMENT_SCENES[1], Vector2(-30, 0))
 
 func _on_shoot_timer_timeout() -> void:
