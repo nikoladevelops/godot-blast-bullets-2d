@@ -258,6 +258,21 @@ func test_a_chain_back_to_the_spawner_is_refused_once() -> void:
 	expect_error_sequence(["BulletSpawner2D: emitter_spawner_path leads back to this spawner (an emitter cycle), its bullets do not emit."])
 
 
+func test_a_cycle_through_any_number_of_spawners_is_refused() -> void:
+	# No hidden depth: a way back through 20 templates is a cycle too.
+	var ring: Array = []
+	for i in 20:
+		var sp := make_spawner(H.make_volley_data(1, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 1)
+		sp.name = "Ring%d" % i
+		sp.emitter_enabled = true
+		ring.append(sp)
+	for i in 20:
+		ring[i].emitter_spawner_path = ring[i].get_path_to(ring[(i + 1) % 20])
+	var v := _fire(ring[0])
+	expect_error_sequence(["BulletSpawner2D: emitter_spawner_path leads back to this spawner (an emitter cycle), its bullets do not emit."])
+	assert_false(v.is_emitter_armed(), "not armed")
+
+
 # --- caps ---------------------------------------------------------------------------------------
 
 func test_the_per_sweep_cap_carries_shots_over_in_order() -> void:

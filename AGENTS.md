@@ -1856,7 +1856,7 @@ A flying bullet fires a template spawner's whole pattern (any
   template reports once), `emitter_max_shots_per_sweep` carries over in
   order, `emitter_max_pending` drops with one warning; reset / free / teardown
   / orphan Clear-Remove drop queued shots.
-- A spawner's template chain is walked (16 steps, a visited set) before
+- A spawner's template chain is walked (no depth cap, a visited set) before
   arming: a way back to the spawner is refused with one error.
 
 ## 29. Runtime control, colors, per-bullet lifetimes, scale-in, interpolation

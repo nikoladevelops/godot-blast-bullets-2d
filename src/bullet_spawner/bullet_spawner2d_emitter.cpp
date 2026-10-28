@@ -6,6 +6,8 @@
 
 #include "bullet_spawner/pattern_spawner2d_internal.hpp"
 
+#include <unordered_set>
+
 using namespace godot;
 
 namespace BlastBullets2D {
@@ -64,20 +66,17 @@ Ref<BulletEmitterData2D> BulletSpawner2D::get_effective_emitter() const {
 bool BulletSpawner2D::emitter_leads_back() const {
 	// Each step: the template's own emitter template. A loop that does not
 	// pass through this spawner is that chain's own business (its members
-	// refuse themselves); only a way back here is this spawner's cycle.
-	const PatternSpawner2D *visited[16];
-	int count = 0;
+	// refuse themselves); only a way back here is this spawner's cycle. No
+	// depth cap: a chain of distinct spawners ends, a loop revisits one.
+	std::unordered_set<const PatternSpawner2D *> visited;
 	const PatternSpawner2D *step = get_emitter_template();
-	while (step != nullptr && count < 16) {
+	while (step != nullptr) {
 		if (step == this) {
 			return true;
 		}
-		for (int k = 0; k < count; ++k) {
-			if (visited[k] == step) {
-				return false;
-			}
+		if (!visited.insert(step).second) {
+			return false;
 		}
-		visited[count++] = step;
 		const BulletSpawner2D *next = Object::cast_to<BulletSpawner2D>(step);
 		if (next == nullptr || !next->emitter_enabled) {
 			return false;
