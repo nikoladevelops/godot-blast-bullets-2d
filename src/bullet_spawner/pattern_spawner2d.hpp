@@ -360,7 +360,9 @@ public:
 	// left the tree or was freed. A spawner in an instanced scene (an NPC)
 	// needs no wiring.
 	mutable uint64_t world_factory_id = 0;
+	mutable int world_factory_candidates = 0; // factories sharing the world at the last fallback lookup
 	BulletFactory2D *find_world_factory() const;
+	void warn_if_world_factory_ambiguous(const BulletFactory2D *factory) const;
 	// Plain Node2D reference from the scene tree whose children provide
 	// spawn transforms (same NodePath pattern as the factory, but
 	// type-filtered to Node2D since native types always match).

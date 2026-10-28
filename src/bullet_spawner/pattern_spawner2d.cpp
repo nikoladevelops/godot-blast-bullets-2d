@@ -94,11 +94,21 @@ BulletFactory2D *PatternSpawner2D::find_world_factory() const {
 	if (first == nullptr) {
 		return nullptr;
 	}
-	if (candidates > 1) {
-		WarnOnce2D::warn(get_instance_id(), kWarnSeveralWorldFactories, 0, 0, String(get_class()) + " '" + String(get_name()) + "': bullet_factory_path is empty and " + itos(candidates) + " BulletFactory2D share its world; it fires into '" + String(first->get_name()) + "' (the first one in the tree). Set bullet_factory_path to choose another.");
-	}
 	world_factory_id = first->get_instance_id();
+	world_factory_candidates = candidates;
 	return first;
+}
+
+void PatternSpawner2D::warn_if_world_factory_ambiguous(const BulletFactory2D *factory) const {
+	// Warned at a shot, never at a lookup: code that adds a spawner and then
+	// assigns a factory (set_bullet_factory) asked the fallback in between.
+	if (world_factory_candidates < 2 || factory == nullptr || !bullet_factory_path.is_empty() || (uint64_t)factory->get_instance_id() != world_factory_id) {
+		return;
+	}
+	if (validate_cached_node(this, bullet_factory_path, bullet_factory, bullet_factory_id) != nullptr) {
+		return; // assigned by code
+	}
+	WarnOnce2D::warn(get_instance_id(), kWarnSeveralWorldFactories, 0, 0, String(get_class()) + " '" + String(get_name()) + "': bullet_factory_path is empty and " + itos(world_factory_candidates) + " BulletFactory2D share its world; it fires into '" + String(factory->get_name()) + "' (the first one in the tree). Set bullet_factory_path to choose another.");
 }
 
 void PatternSpawner2D::set_bullet_factory(BulletFactory2D *factory) {
@@ -769,6 +779,7 @@ bool PatternSpawner2D::shoot_once() {
 	if (factory == nullptr) {
 		return fail_early((String(get_class()) + "::shoot_once: no BulletFactory2D assigned (bullet_factory_path)."), StringName("no_factory"), true);
 	}
+	warn_if_world_factory_ambiguous(factory);
 	{
 		const ShotRefusal2D refusal = shot_preflight(factory);
 		if (refusal.refused) {
