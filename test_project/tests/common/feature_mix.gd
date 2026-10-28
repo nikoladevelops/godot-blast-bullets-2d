@@ -30,7 +30,7 @@ const FEATURES := [
 	"speed_curve", "accel_speed", "rotation_spin", "rotation_curve", "direction_curve", "wobble",
 	"gravity", "movement_pattern", "texture_rotation", "inherited_velocity", "time_scale",
 	# steering
-	"homing", "orbit", "flock", "retarget", "aimed",
+	"homing", "orbit", "flock", "retarget", "aimed", "follow",
 	# collision
 	"bounce", "hits", "graze",
 	# lifecycle
@@ -450,6 +450,11 @@ func _on_fired(v: BulletVolley2D, _n: int) -> void:
 	if has("park") and int(stats.get("fired", 0)) % 2 == 1:
 		v.set_is_auto_pooling_enabled(false)
 		parked.append(v)
+	if has("follow"):
+		# A script takes the homing over: shared and per-bullet picks alternate
+		# (it steers through the facing, like the homing feature).
+		v.homing_take_control_of_texture_rotation = true
+		v.homing_follow(BulletTargets2D.from_group(TARGET_GROUP), 0.1, int(stats.get("fired", 0)) % 2)
 
 
 func _on_life_time_over(v: BulletVolley2D, idx: Array) -> void:
@@ -467,6 +472,11 @@ func _live() -> Array:
 
 
 func _act(frame: int) -> void:
+	if has("follow"):
+		for v in _live():
+			if v.is_homing_following() and (v.shared_homing_deque_check_has_homing_targets() or Array(v.all_bullets_get_homing_targets_amount()).max() > 0):
+				_stat("follow_targets")
+				break
 	if has("pattern_list") and frame == 5 and is_instance_valid(spawner):
 		var alt := data.duplicate() as BulletVolleyData2D
 		alt.collision_shape = RectangleShape2D.new()
@@ -552,6 +562,8 @@ func _evidence(f: String) -> String:
 			ok = int(stats.get("flock_members", 0)) > 0
 		"retarget":
 			ok = int(stats.get("retargets", 0)) > 0
+		"follow":
+			ok = int(stats.get("follow_targets", 0)) > 0
 		"aimed", "muzzle_offset", "time_scale", "interpolation", "random_jitter":
 			ok = int(stats.get("fired", 0)) > 0
 		"bounce":

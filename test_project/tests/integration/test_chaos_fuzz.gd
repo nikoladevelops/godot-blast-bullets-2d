@@ -430,7 +430,26 @@ func _handler(v: Object, i: int) -> void:
 		return
 	stats["handler_actions"] += 1
 	var volley := v as BulletVolley2D
-	match rng.randi() % 13:
+	match rng.randi() % 18:
+		13:
+			if not volley.is_pooled():
+				volley.detach_from_spawner()
+		14:
+			if not volley.is_pooled():
+				volley.set_time_scale([0.0, 0.5, 1.0, 2.5][rng.randi() % 4])
+		15:
+			# Homing by a handle from inside the sweep (picks from the next tick).
+			if not volley.is_pooled():
+				var handles := [BulletTargets2D.from_group(TARGET_GROUP), BulletTargets2D.from_mouse(), null]
+				volley.homing_follow(handles[rng.randi() % handles.size()], rng.randf_range(0.0, 0.3), rng.randi() % 2)
+		16:
+			var sp = _live_spawner()
+			if sp != null and volley.debug_get_life_state() == "active":
+				sp.adopt_live_volley(volley)
+		17:
+			# (all_bullets_scale_speed refuses a speed-curve volley loudly: not here.)
+			if not volley.is_pooled():
+				volley.all_bullets_scale_life_time(rng.randf_range(0.5, 2.0))
 		12:
 			# A teleport from inside the sweep (no travel, no swept segment).
 			if i >= 0 and i < volley.get_amount_bullets() and volley.is_bullet_status_enabled(i):
