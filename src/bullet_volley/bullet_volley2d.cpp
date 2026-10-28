@@ -720,8 +720,10 @@ void BulletVolley2D::enable_bullet_core(int bullet_index, int collision_amount, 
 	// The freeze ended any graze visit: a fresh one starts (no exit fires
 	// for a visit that ended frozen).
 	graze_end_visits_of_bullet(bullet_index);
+	// Read before own_life_on_wake grants the new lifetime.
+	const bool fresh_life = wake_is_fresh_life(bullet_index);
 	own_life_on_wake(bullet_index);
-	emitter_on_wake(bullet_index);
+	emitter_on_wake(bullet_index, fresh_life);
 	// A woken bullet splits again (max_splits_per_bullet counts one life).
 	if (bullet_index < (int)split_counts.size()) {
 		split_counts[bullet_index] = 0;

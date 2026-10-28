@@ -3170,7 +3170,12 @@ public:
 	// The timer pass (tick, after the split timer): records the due shots.
 	void emitter_tick();
 	// A woken bullet takes part in the gate again.
-	void emitter_on_wake(int bullet_index);
+	// fresh_life: the bullet's life had run out (an expired parked volley, or
+	// its own lifetime): its count starts over and its schedule restarts
+	// with the start delay, like arming. A manual freeze resumes both.
+	void emitter_on_wake(int bullet_index, bool fresh_life);
+	// Whether waking bullet i starts a fresh life (its time had run out).
+	bool wake_is_fresh_life(int bullet_index) const;
 	// Script API (factory volleys, or an override of a spawner volley until
 	// its next life): fire `template_spawner`'s pattern from every flying
 	// bullet as `emitter` times it. Refused (nothing changed) for a null

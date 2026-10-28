@@ -369,6 +369,28 @@ func test_a_parked_volley_holds_its_schedule() -> void:
 	assert_eq(v.get_bullet_emitter_shots(0), 2, "and it comes on time")
 
 
+
+## A wake after the life ran out is a fresh life (the lifetime's own rule):
+## the shot count starts over (max_shots counts one life) and the schedule
+## restarts with its start delay. A manual freeze keeps both (above).
+func test_a_wake_after_expiry_is_a_fresh_emitter_life() -> void:
+	var tpl := _template()
+	var sp := _emitting(tpl, _timing(0.25, 0.125, 0.0, 1))
+	sp.spawn_data.max_life_time = 0.5
+	var v := _fire(sp)
+	v.set_is_auto_pooling_enabled(false)
+	_step(12) # its one shot at 0.125 s, expiry at 0.5 s
+	assert_true(v.is_parked(), "expired and parked")
+	assert_eq(v.get_bullet_emitter_shots(0), 1, "max_shots spent")
+	v.enable_bullet(0)
+	assert_eq(v.get_bullet_emitter_shots(0), 0, "a fresh life starts the count over")
+	_step(1)
+	assert_eq(v.get_bullet_emitter_shots(0), 0, "the start delay restarts too (0.125 s)")
+	_step(1)
+	assert_eq(v.get_bullet_emitter_shots(0), 1, "then its one shot")
+	_step(4)
+	assert_eq(v.get_bullet_emitter_shots(0), 1, "and max_shots holds again")
+
 # --- lifetimes of the pieces ---------------------------------------------------------------
 
 func test_orphans_keep_firing_through_the_template() -> void:

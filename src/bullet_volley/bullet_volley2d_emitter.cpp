@@ -47,9 +47,16 @@ void BulletVolley2D::emitter_arm(const std::shared_ptr<EmitterConfig2D> &config,
 	emit_next_min = amount_bullets > 0 ? emit_next_at[0] : Math::INF;
 }
 
-void BulletVolley2D::emitter_on_wake(int bullet_index) {
+void BulletVolley2D::emitter_on_wake(int bullet_index, bool fresh_life) {
 	if (emitter_config == nullptr || bullet_index < 0 || bullet_index >= (int)emit_next_at.size()) {
 		return;
+	}
+	if (fresh_life && bullet_index < (int)emit_shots.size()) {
+		const BulletEmitterData2D *data = emitter_config->data.ptr();
+		const double delay = data != nullptr ? data->start_delay_sec : 0.0;
+		const double stagger = data != nullptr ? data->stagger_sec : 0.0;
+		emit_shots[bullet_index] = 0;
+		emit_next_at[bullet_index] = life_age + delay + stagger * (double)bullet_index;
 	}
 	emit_next_min = Math::min(emit_next_min, emit_next_at[bullet_index]);
 }

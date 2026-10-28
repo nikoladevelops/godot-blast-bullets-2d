@@ -94,6 +94,14 @@ void BulletVolley2D::seed_bullet_life_times(const BulletVolleyData2D &data) {
 	}
 }
 
+bool BulletVolley2D::wake_is_fresh_life(int bullet_index) const {
+	if (!own_life_span.empty() && own_life_span[bullet_index] >= 0.0) {
+		return own_life_deadline[bullet_index] <= life_age; // its own lifetime ran out
+	}
+	// On the volley timer: an expired parked volley wakes with a fresh one.
+	return !is_active && !is_life_time_infinite && current_life_time <= 0.0;
+}
+
 void BulletVolley2D::own_life_on_wake(int bullet_index) {
 	if (own_life_span.empty() || own_life_span[bullet_index] < 0.0) {
 		return;
