@@ -280,6 +280,9 @@ public:
 	bool pattern_target_warned = false; // one warning per life: a target a Pattern aim never uses
 	int pool_key = 0; // the beam count it is pooled under
 	uint64_t sweep_tick_stamp = 0;
+	// Extra real seconds for this life's first tick (BulletFactory2D::
+	// first_tick_lead: the shot's timing); 0 afterwards.
+	double first_tick_lead = 0.0;
 
 protected:
 	static void _bind_methods();

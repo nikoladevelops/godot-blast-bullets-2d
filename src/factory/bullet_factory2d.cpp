@@ -50,6 +50,18 @@ static _ALWAYS_INLINE_ BulletVolley2D *resolve_iteration_entry(uint64_t id, Bull
 // The delta one volley runs on: the bullet-world delta times the time scale of
 // its owner spawner while that lives (and opted in). Orphans, factory-spawned
 // and pooled volleys (owner 0) run on the factory scale alone.
+double BulletFactory2D::first_tick_lead(double overshoot_sec) const {
+	const Engine *engine = Engine::get_singleton();
+	const int ticks = engine->get_physics_ticks_per_second();
+	const double step = ticks > 0 ? 1.0 / (double)ticks : 0.0;
+	const double overshoot = Math::is_finite(overshoot_sec) && overshoot_sec > 0.0 ? overshoot_sec : 0.0;
+	if (engine->is_in_physics_frame()) {
+		return sweep_physics_frame == engine->get_physics_frames() ? overshoot : overshoot - step;
+	}
+	const double fraction = engine->get_physics_interpolation_fraction();
+	return overshoot - (Math::is_finite(fraction) ? Math::clamp(fraction, 0.0, 1.0) : 0.0) * step;
+}
+
 double BulletFactory2D::volley_time_factor(const BulletVolley2D &volley) const {
 	double factor = time_scale * volley.own_time_scale;
 	const uint64_t scale_owner = volley.owner_spawner_id != 0 ? volley.owner_spawner_id : volley.pickup_time_scale_owner_id;
@@ -86,7 +98,13 @@ bool BulletFactory2D::tick_volleys(double delta, const bool &alive) {
 		}
 		volley->sweep_tick_stamp = sweep_counter;
 		const double time_factor = volley_time_factor(*volley);
-		const double volley_delta = capped_volley_delta(delta, time_factor);
+		double first_delta = delta;
+		if (volley->first_tick_lead != 0.0) {
+			// Its first tick: from when its shot was due (first_tick_lead).
+			first_delta = Math::max(0.0, delta + volley->first_tick_lead);
+			volley->first_tick_lead = 0.0;
+		}
+		const double volley_delta = capped_volley_delta(first_delta, time_factor);
 		volley->set_real_tick_delta(delta);
 		// Flag the volley for its whole tick: handlers fired from inside
 		// (collision drain, attachment callbacks) may spawn, and the pool must
@@ -564,6 +582,7 @@ void BulletFactory2D::native_physics_process(double delta) {
 	stats_tick_bullets = 0;
 	is_iterating_bullets = true;
 	++sweep_counter;
+	sweep_physics_frame = Engine::get_singleton()->get_physics_frames();
 	graze_clock += delta;
 	// The bullet world runs on its own clock (time_scale 1 is bit-identical
 	// to the engine delta); target scans (graze_clock) stay in real time.

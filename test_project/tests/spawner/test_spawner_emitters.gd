@@ -625,3 +625,24 @@ func test_a_cycle_made_in_flight_stops_the_flying_bullets() -> void:
 	assert_eq(shots.size(), fired, "nor the old template")
 	_fire(sp)
 	expect_error_sequence(["BulletSpawner2D: emitter_spawner_path leads back to this spawner (an emitter cycle), its bullets do not emit."])
+
+
+## Shot timing: an emitter's shots fire from where the bullet was when each
+## was due and their bullets move from then, so a stream an emitter lays down
+## is evenly spaced whatever its interval (here 0.04 s, 2.4 ticks).
+func test_an_emitters_stream_is_evenly_spaced() -> void:
+	var tpl := make_spawner(H.make_volley_data(1, 300.0, 30.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
+	tpl.name = "Template"
+	var children: Array = []
+	tpl.volley_fired.connect(func(v: BulletVolley2D, _n: int) -> void: children.append(v))
+	var sp := _emitting(tpl, _timing(0.04), 1, 0.0)
+	_fire(sp)
+	for i in 30:
+		await physics(1)
+	sp.emitter_enabled = false
+	await idle(2)
+	var gaps: Array = []
+	for k in range(1, children.size()):
+		gaps.append(snappedf((children[k - 1] as BulletVolley2D).get_bullet_transform(0).origin.distance_to((children[k] as BulletVolley2D).get_bullet_transform(0).origin), 0.01))
+	assert_gte(gaps.size(), 8, "a stream of emitter shots")
+	assert_true(gaps.all(func(g): return absf(g - 12.0) < 0.05), "every gap 12 px: %s" % [gaps])

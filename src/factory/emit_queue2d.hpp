@@ -39,6 +39,9 @@ struct EmitRequest2D {
 	Vector2 velocity; // inherited by the shot (inherit_bullet_velocity)
 	double extra_spin_deg = 0.0; // spin_per_shot_degrees x the bullet's shot number
 	bool aim_template = false; // EMITTER_AIM_TEMPLATE: the template's rotation, read at the flush
+	// Real seconds since the shot was due (the shot's timing: its bullets
+	// move from then, BulletFactory2D::first_tick_lead).
+	double overshoot_sec = 0.0;
 	bool dropped = false; // set on a request a running flush must skip
 };
 

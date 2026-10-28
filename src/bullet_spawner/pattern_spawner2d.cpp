@@ -890,15 +890,24 @@ bool PatternSpawner2D::shoot_from_with_velocity(const Transform2D &global_transf
 	return shoot_once();
 }
 
-bool PatternSpawner2D::emit_shot_from(const Transform2D &global_transform, double extra_spin_deg, const Vector2 &inherited_velocity) {
+bool PatternSpawner2D::emit_shot_from(const Transform2D &global_transform, double extra_spin_deg, const Vector2 &inherited_velocity, double overshoot_sec) {
 	const uint64_t self_id = get_instance_id();
 	const bool was_auto = auto_fire_in_progress;
 	auto_fire_in_progress = true;
+	shot_overshoot_sec = Math::is_finite(overshoot_sec) && overshoot_sec > 0.0 ? overshoot_sec : 0.0;
+	shot_timed = true;
 	const bool fired = shoot_from_with_velocity(global_transform, extra_spin_deg, inherited_velocity);
 	if (ObjectDB::get_instance(ObjectID(self_id)) == this) {
 		auto_fire_in_progress = was_auto; // a handler may have freed this spawner
+		clear_shot_timing();
 	}
 	return fired;
+}
+
+void PatternSpawner2D::set_shot_overshoot(double clock_seconds) {
+	const double scale = get_process_time_scale();
+	shot_overshoot_sec = Math::is_finite(clock_seconds) && clock_seconds > 0.0 && scale > 0.0 && Math::is_finite(scale) ? clock_seconds / scale : 0.0;
+	shot_timed = true;
 }
 
 Transform2D PatternSpawner2D::get_shot_frame() const {
@@ -1347,7 +1356,9 @@ void PatternSpawner2D::run_frame(double delta) {
 		if (cadence.telegraph_time_left <= 0.0) {
 			cadence.telegraph_pending = false;
 			auto_fire_in_progress = cadence.telegraph_from_auto;
+			set_shot_overshoot(-cadence.telegraph_time_left);
 			fire_burst_volley();
+			clear_shot_timing();
 			auto_fire_in_progress = false;
 		}
 		// Telegraph never sleeps the loop: the countdown owns it.
@@ -1377,7 +1388,9 @@ void PatternSpawner2D::run_frame(double delta) {
 			// Auto chains report a misconfiguration once (like plain auto
 			// shots); manual chains report every attempt.
 			auto_fire_in_progress = cadence.burst_from_auto;
+			set_shot_overshoot(-overshoot);
 			fire_burst_volley();
+			clear_shot_timing();
 			auto_fire_in_progress = false;
 			if (serial != cadence.burst_serial || shot_owner_dying()) {
 				break; // a handler ended or replaced the chain (a new one keeps its own clock)
@@ -1409,7 +1422,9 @@ void PatternSpawner2D::run_frame(double delta) {
 			}
 			const double overshoot = cadence.pattern_list_time_left;
 			const uint32_t serial = cadence.pattern_list_serial;
+			set_shot_overshoot(-overshoot);
 			fire_pattern_list_entry();
+			clear_shot_timing();
 			if (!cadence.pattern_list_active || serial != cadence.pattern_list_serial) {
 				break; // finished, stopped, or replaced (the new list keeps its own clock)
 			}
@@ -1456,7 +1471,9 @@ void PatternSpawner2D::run_frame(double delta) {
 		// owns the cadence: its restarted delay is never rearmed over.
 		const uint32_t cadence_before = cadence.serial;
 		if (cadence.burst_enabled && cadence.burst_count > 1) {
+			set_shot_overshoot(-cadence.shoot_time_left); // the chain's first shot
 			begin_burst_chain(true);
+			clear_shot_timing();
 			if (cadence_before == cadence.serial && !shot_owner_dying()) {
 				cadence.shoot_time_left += next_shoot_interval_sec();
 			}
@@ -1475,7 +1492,9 @@ void PatternSpawner2D::run_frame(double delta) {
 		// so a persistently failing shot (busy factory, over budget) can
 		// never hot-loop.
 		auto_fire_in_progress = true;
+		set_shot_overshoot(-cadence.shoot_time_left);
 		const bool fired = shoot_once();
+		clear_shot_timing();
 		auto_fire_in_progress = false;
 		if (cadence_before != cadence.serial || shot_owner_dying()) {
 			break;

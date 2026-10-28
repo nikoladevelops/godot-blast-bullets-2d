@@ -463,6 +463,8 @@ ShotResult2D LaserSpawner2D::fire_shot(std::vector<Transform2D> &transforms) {
 		result.refusal = ShotRefusal2D::refuse(String(), StringName("factory_refused"), true);
 		return result;
 	}
+	// It moves from when the shot was due (exact spacing of timed shots).
+	laser->first_tick_lead = shot_first_tick_lead(*factory);
 	// Graze, sound and targets before the first signal (no user code).
 	if (graze_enabled && !graze_zones.is_empty()) {
 		bool any = false;

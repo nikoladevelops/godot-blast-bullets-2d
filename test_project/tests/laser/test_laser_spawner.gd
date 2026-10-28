@@ -304,9 +304,13 @@ func test_emitter_bullets_fire_lasers() -> void:
 	bullets.volley_fired.connect(func(vol: BulletVolley2D, _n: int) -> void: fired.append(vol), CONNECT_ONE_SHOT)
 	bullets.shoot_once()
 	var v: BulletVolley2D = fired[0]
+	# The first shot is due at once (no start delay): it fires from where the
+	# bullet was then (shot timing), its spawn point, though the tick that
+	# records it ends later.
+	var born: Vector2 = v.get_bullet_transform(0).origin
 	step_factory(1, DT)
 	assert_eq(lasers.size(), 1, "the flying bullet fired the laser spawner's pattern")
-	assert_almost_eq(lasers[0].get_beam_start(0).distance_to(v.get_bullet_transform(0).origin), 20.0, 0.5, "around the bullet, not the template")
+	assert_almost_eq(lasers[0].get_beam_start(0).distance_to(born), 20.0, 0.5, "around the bullet where its shot was due, not the template")
 	assert_null(lasers[0].get_anchor(), "an emitter shot never follows the template")
 
 

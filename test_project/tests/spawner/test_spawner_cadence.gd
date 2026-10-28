@@ -483,22 +483,72 @@ func test_auto_follows_the_factorys_interpolation() -> void:
 
 
 func test_physics_streams_are_evenly_spaced() -> void:
-	# Physics mode: every shot happens on a tick, so a moving stream's
-	# bullets sit exactly speed x interval apart.
+	# Physics mode: a moving stream's bullets sit exactly speed x interval apart.
 	var sp := make_spawner(H.make_volley_data(1, 300.0, 30.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
 	sp.process_callback = BulletSpawner2D.PROCESS_PHYSICS
 	sp.shoot_interval_sec = 0.05
 	sp.shoot_initial_delay_sec = 0.0
+	var gaps: Array = await _stream_gaps(sp, 20, sp.set_shooting_enabled.bind(true))
+	assert_gte(gaps.size(), 4, "a stream")
+	for g in gaps:
+		assert_almost_eq(g, 15.0, 0.01, "300 px/s x 0.05 s apart: %s" % [gaps])
+
+
+## Shot timing: a shot's bullets move from when it was due, not from the tick
+## that happened to fire it, so a stream sits exactly speed x interval apart
+## at any interval (not only whole multiples of the tick), in both process
+## modes, for plain auto fire, bursts and pattern lists alike, and several
+## shots due inside one tick never stack.
+func _stream_gaps(sp: BulletSpawner2D, frames: int, start := Callable()) -> Array:
 	var volleys: Array = []
 	sp.volley_fired.connect(func(v, _n) -> void: volleys.append(v))
-	sp.set_shooting_enabled(true)
-	await physics(20)
-	assert_gte(volleys.size(), 5, "a stream")
+	if start.is_valid():
+		start.call()
+	for i in frames:
+		await physics(1)
+	# Measured when every volley has had its first tick (a shot fired after
+	# this frame's sweep moves on the next one), all at the same moment.
+	sp.set_shooting_enabled(false)
+	sp.stop_pattern_list()
+	await idle(2)
 	var gaps: Array = []
 	for k in range(1, volleys.size()):
 		gaps.append(snappedf((volleys[k - 1] as BulletVolley2D).get_bullet_transform(0).origin.x - (volleys[k] as BulletVolley2D).get_bullet_transform(0).origin.x, 0.01))
-	for g in gaps:
-		assert_almost_eq(g, 15.0, 0.01, "300 px/s x 0.05 s apart: %s" % [gaps])
+	return gaps
+
+
+func test_streams_are_evenly_spaced_at_any_interval(mode: int = use_parameters([BulletSpawner2D.PROCESS_PHYSICS, BulletSpawner2D.PROCESS_IDLE])) -> void:
+	for interval in [0.04, 0.025, 0.007]: # 2.4, 1.5 and 0.42 ticks (several shots in one tick)
+		var sp := make_spawner(H.make_volley_data(1, 300.0, 30.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
+		sp.process_callback = mode
+		sp.shoot_interval_sec = interval
+		sp.max_shots_per_frame = 8
+		var gaps: Array = await _stream_gaps(sp, 30, sp.set_shooting_enabled.bind(true))
+		assert_gte(gaps.size(), 5, "a stream at %s s" % interval)
+		var ideal: float = 300.0 * interval
+		assert_true(gaps.all(func(g): return absf(g - ideal) < 0.05), "mode %d, %s s: every gap %.2f px: %s" % [mode, interval, ideal, gaps])
+		sp.set_shooting_enabled(false)
+		await idle(1)
+		factory.free_active_bullets()
+
+
+func test_burst_and_list_streams_are_evenly_spaced() -> void:
+	var sp := make_spawner(H.make_volley_data(1, 300.0, 30.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
+	sp.burst_enabled = true
+	sp.burst_count = 12
+	sp.burst_interval_sec = 0.04
+	var gaps: Array = await _stream_gaps(sp, 40, sp.begin_burst)
+	assert_gte(gaps.size(), 8, "a burst stream")
+	assert_true(gaps.all(func(g): return absf(g - 12.0) < 0.05), "burst: every gap 12 px: %s" % [gaps])
+	await idle(1)
+	factory.free_active_bullets()
+	var lister := make_spawner(H.make_volley_data(1, 300.0, 30.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
+	var entries: Array = []
+	for i in 12:
+		entries.append({})
+	var list_gaps: Array = await _stream_gaps(lister, 40, lister.spawn_pattern_list.bind(entries, false, 0.04))
+	assert_gte(list_gaps.size(), 8, "a list stream")
+	assert_true(list_gaps.all(func(g): return absf(g - 12.0) < 0.05), "list: every gap 12 px: %s" % [list_gaps])
 
 
 ## Lowering what a wait was rolled from (shoot_interval_max_sec, the reload

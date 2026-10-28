@@ -85,6 +85,8 @@ void BulletVolley2D::emitter_tick() {
 	const bool inherit = data->inherit_bullet_velocity;
 	const PoolKey key = get_pool_key();
 	const uint64_t self_id_for_requests = get_instance_id();
+	// Bullet seconds per real second (the lateness of a shot is sent real).
+	const double time_factor = bullet_factory->volley_time_factor(*this);
 	double next = Math::INF;
 	for (int i : all_bullets_enabled_set.get_active_indexes()) {
 		if (i < 0 || i >= amount_bullets) {
@@ -99,7 +101,9 @@ void BulletVolley2D::emitter_tick() {
 			continue;
 		}
 		// One shot per bullet per tick: a hitch never fires a burst of
-		// catch-up shots, the schedule simply moves on.
+		// catch-up shots, the schedule simply moves on. How late it is (this
+		// tick ended after it was due) times its bullets, at most an interval.
+		const double late = Math::min(life_age - due, interval);
 		const int shot = emit_shots[i]++;
 		due += interval;
 		if (due <= life_age) {
@@ -133,7 +137,17 @@ void BulletVolley2D::emitter_tick() {
 			angle = (heading.x != 0.0f || heading.y != 0.0f) ? Math::atan2((double)heading.y, (double)heading.x) : (double)pose.get_rotation() - (double)cache_texture_rotation_radians;
 		}
 		request.aim_template = aim == BulletEmitterData2D::EMITTER_AIM_TEMPLATE;
-		request.pose = Transform2D((real_t)angle, pose.columns[2]);
+		// Where the bullet was when the shot was due (straight-line motion):
+		// its bullets then move from there for the time they are late.
+		Vector2 origin = pose.columns[2];
+		if (late > 0.0 && i < (int)all_cached_velocity.size()) {
+			const Vector2 back = all_cached_velocity[i] * (real_t)late;
+			if (back.is_finite() && (origin - back).is_finite()) {
+				origin -= back;
+				request.overshoot_sec = time_factor > 0.0 ? late / time_factor : 0.0;
+			}
+		}
+		request.pose = Transform2D((real_t)angle, origin);
 		request.extra_spin_deg = spin * (double)shot;
 		if (!Math::is_finite(request.extra_spin_deg)) {
 			request.extra_spin_deg = 0.0;

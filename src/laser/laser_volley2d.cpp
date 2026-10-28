@@ -202,6 +202,7 @@ void LaserVolley2D::begin_life(BulletFactory2D *p_factory, const Ref<LaserData2D
 	anchor_frame_pending = following && p_anchor_frame_pending;
 	// A life begun mid-sweep (a handler firing) ticks from the next step.
 	sweep_tick_stamp = p_factory != nullptr ? p_factory->get_sweep_counter() : 0;
+	first_tick_lead = 0.0; // a timed spawner shot sets its own right after
 	const bool relative = following && !anchor_frame_pending;
 	const Transform2D frame_inv = relative ? anchor_frame.affine_inverse() : Transform2D();
 	anchor_offset_now = relative ? anchor_offset : Vector2();

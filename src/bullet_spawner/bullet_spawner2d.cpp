@@ -296,6 +296,8 @@ ShotResult2D BulletSpawner2D::fire_shot(std::vector<Transform2D> &transforms) {
 	// every spawn path through this function. Already stamped pre-activation
 	// by the factory call above; re-assert here in case that ever changes.
 	bullets->owner_spawner_id = get_instance_id();
+	// Its bullets move from when the shot was due (exact stream spacing).
+	bullets->first_tick_lead = shot_first_tick_lead(*factory);
 	if (!shot_speed_factors.empty()) {
 		bullets->apply_speed_factors(shot_speed_factors.data(), (int)shot_speed_factors.size());
 	}

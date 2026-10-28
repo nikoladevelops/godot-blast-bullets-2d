@@ -302,6 +302,7 @@ void BulletVolley2D::begin_life(const BulletVolleyData2D &data, uint64_t new_own
 	// on the NEXT factory step, never inside the one already running.
 	if (bullet_factory != nullptr) {
 		sweep_tick_stamp = bullet_factory->get_sweep_counter();
+		first_tick_lead = 0.0; // a timed spawner shot sets its own right after
 		sweep_timer_stamp = sweep_tick_stamp;
 	}
 	// One generation (life id) per life: stale handles compare against it.

@@ -1925,6 +1925,28 @@ A flying bullet fires a template spawner's whole pattern (any
   and pickups are born full size (`full_grown2d`).
 - Interpolation: `BulletFactory2D.physics_interpolation` Off / On / Follow
   Project (default); lasers redraw every frame while it is active.
+- Shot timing (`BulletFactory2D::first_tick_lead`): a TIMED shot (spawner
+  cadence: auto fire, burst steps, list entries, the telegraphed shot;
+  emitter shots) knows how late it is (`set_shot_overshoot` from the timer,
+  `EmitRequest2D::overshoot_sec`, emitter shots also posed back along the
+  bullet's velocity) and what it fired gets `first_tick_lead` added to its
+  FIRST tick: in a physics frame before the sweep `overshoot - step`, after
+  it `overshoot`, in an idle frame `overshoot - fraction * step`. Streams
+  sit exactly speed x interval apart at any interval (they were 10/10/15 px
+  at 0.04 s, 300 px/s). Manual and script spawns get no lead (deterministic
+  for code that steps the factory). Measure stream spacing at an idle point
+  after every volley's first tick (`spawner/test_spawner_cadence.gd`
+  `_stream_gaps`): mid-frame, the newest volley has not had its first tick.
+- `process_callback` Auto (the default): Physics while the factory
+  interpolates, Idle otherwise, switched live from the running callback.
+- Spawner factory fallback: an empty `bullet_factory_path` (nothing assigned)
+  fires into the first factory in the tree that shares the spawner's
+  World2D (one warning when several do); the cache resets on every
+  ENTER_TREE (a reparent may change the world). Tests that need a spawner
+  without a factory put it in its own world (`BlastTest.add_in_own_world` /
+  `move_to_own_world`).
+- `orphaned_volleys` defaults to Hand To Factory: a dying NPC's bullets keep
+  hitting (their hits reach the factory's signals).
 - GDScript facts that bit the tests: a lambda captures locals by value
   (collect through an Array); a preview rebuild can run user code (the aimed
   target's `get_velocity`): re-check every node after it.

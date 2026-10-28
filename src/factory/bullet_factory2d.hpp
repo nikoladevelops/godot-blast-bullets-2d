@@ -187,6 +187,17 @@ public:
 	// cap bullet time slows down instead of exploding.
 	static constexpr double MAX_VOLLEY_TICK_DELTA = 10.0;
 	// delta x volley_time_factor, capped at MAX_VOLLEY_TICK_DELTA.
+	// Shot timing of a TIMED shot (a spawner's cadence, an emitter): the extra
+	// real seconds (+ or -) the first tick of what it spawned gets, so its
+	// bullets move exactly from when the shot was due (`overshoot_sec` ago).
+	// This frame's sweep ticks a spawn made before it in a physics frame (that
+	// tick ends now); a spawn after it, or in an idle frame, waits for the
+	// next sweep, which ends one step after the last one (the interpolation
+	// fraction says how much of that step already passed). Streams then sit
+	// exactly speed x interval apart however shots and ticks interleave.
+	// Manual and script spawns keep their full first tick (deterministic for
+	// code that steps the factory itself).
+	double first_tick_lead(double overshoot_sec) const;
 	static double capped_volley_delta(double delta, double time_factor) {
 		const double scaled = delta * time_factor;
 		return scaled < MAX_VOLLEY_TICK_DELTA ? scaled : MAX_VOLLEY_TICK_DELTA;
@@ -1119,6 +1130,9 @@ private:
 	void update_process_state();
 	// Advanced once per factory physics step (tick + timers + effects).
 	uint64_t sweep_counter = 0;
+	// The engine physics frame of the last sweep (first_tick_lead: was this
+	// frame swept already?).
+	uint64_t sweep_physics_frame = UINT64_MAX;
 	// Bumped whenever a volley is destroyed (manual free, tracking removal).
 	// A sweep whose epoch is unchanged knows every snapshot pointer is still
 	// live, so the common path pays no ObjectDB lookup at all.

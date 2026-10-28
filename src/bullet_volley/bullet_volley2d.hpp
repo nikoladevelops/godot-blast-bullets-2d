@@ -157,6 +157,9 @@ public:
 	// frees, pools or respawns mid-sweep. begin_life stamps both, so a new
 	// life started mid-sweep (cold or pool reuse) waits for the next step.
 	uint64_t sweep_tick_stamp = 0;
+	// Extra real seconds for this life's first tick (BulletFactory2D::
+	// first_tick_lead: the shot's timing); 0 afterwards.
+	double first_tick_lead = 0.0;
 	uint64_t sweep_timer_stamp = 0;
 	// Own instance id, cached on first use (the sweep resolves its snapshot
 	// by id; the engine call per volley per frame is skipped).

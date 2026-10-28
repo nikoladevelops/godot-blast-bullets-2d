@@ -1144,7 +1144,7 @@ public:
 	// An emitter bullet's shot (BulletFactory2D::flush_emits): shoot_from
 	// with the auto-fire error latch, so a misconfigured template reports
 	// once instead of once per shot.
-	bool emit_shot_from(const Transform2D &global_transform, double extra_spin_deg, const Vector2 &inherited_velocity);
+	bool emit_shot_from(const Transform2D &global_transform, double extra_spin_deg, const Vector2 &inherited_velocity, double overshoot_sec = 0.0);
 	// The frame a shot is posed in now: the marker turned by the spin (what
 	// a following laser's muzzles ride). Needs the tree.
 	Transform2D get_shot_frame() const;
@@ -1267,6 +1267,22 @@ protected:
 	static void bind_spawner_group(const StringName &cls, SpawnerGroup2D group, const SpawnerPropertyFilter2D &skip = SpawnerPropertyFilter2D(), const char *sound_entry_class = nullptr);
 
 	// Shot, cadence, preview and movement state (the derived spawners read it).
+	// Shot timing: real seconds the running shot is late (its timer passed its
+	// due time that long ago; 0 for a manual shot). What it fires moves from
+	// the due time (BulletFactory2D::first_tick_lead). Set around each timed
+	// shot only.
+	double shot_overshoot_sec = 0.0;
+	// The running shot is timed (cadence, emitter): what it fires gets the
+	// shot timing; a manual shot keeps its full first tick.
+	bool shot_timed = false;
+	// From spawner-clock seconds (the timers count them); marks the shot timed.
+	void set_shot_overshoot(double clock_seconds);
+	void clear_shot_timing() {
+		shot_overshoot_sec = 0.0;
+		shot_timed = false;
+	}
+	// The first-tick lead of what the running shot spawned (0 = manual).
+	double shot_first_tick_lead(const BulletFactory2D &factory) const { return shot_timed ? factory.first_tick_lead(shot_overshoot_sec) : 0.0; }
 	// shoot_from: set only for the duration of that one shot.
 	bool shot_pose_active = false;
 	Transform2D shot_pose;

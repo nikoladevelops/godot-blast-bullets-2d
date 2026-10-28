@@ -261,7 +261,12 @@ bool BulletFactory2D::tick_lasers(double delta, const bool &alive) {
 			continue; // finished or queued by a handler, or begun during this sweep
 		}
 		laser->sweep_tick_stamp = sweep_counter;
-		laser->tick(capped_volley_delta(delta, laser_time_factor(*laser)));
+		double first_delta = delta;
+		if (laser->first_tick_lead != 0.0) {
+			first_delta = Math::max(0.0, delta + laser->first_tick_lead); // see first_tick_lead
+			laser->first_tick_lead = 0.0;
+		}
+		laser->tick(capped_volley_delta(first_delta, laser_time_factor(*laser)));
 		if (!sweep_may_continue(alive)) {
 			return false;
 		}

@@ -146,7 +146,7 @@ bool BulletFactory2D::flush_emits(const bool &alive) {
 		++emit_stats_fired_last;
 		++emit_fired_total;
 		note_user_code();
-		tpl->emit_shot_from(pose, r.extra_spin_deg, r.velocity); // user code: its shot signals
+		tpl->emit_shot_from(pose, r.extra_spin_deg, r.velocity, r.overshoot_sec); // user code: its shot signals
 		if (!sweep_may_continue(alive)) {
 			if (alive) {
 				// Queued for deletion: the flush closes, the rest never fires.
