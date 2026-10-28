@@ -71,7 +71,7 @@
 			<param index="0" name="bullet_index_start" type="int" default="0" />
 			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
-				Disables orbiting for the specified range of bullets.
+				Disables orbiting for the specified range of bullets. Bullets that do not orbit are left as they are.
 			</description>
 		</method>
 		<method name="all_bullets_enable_orbiting">
@@ -86,7 +86,7 @@
 			<param index="7" name="orbiting_lock_policy" type="int" enum="BulletVolley2D.OrbitingLockPolicy" default="0" />
 			<param index="8" name="orbiting_rigid_follow" type="bool" default="true" />
 			<description>
-				Enables orbiting for the specified range of bullets with the given parameters.
+				Enables orbiting for the specified range of bullets with the given parameters. Bullets that already orbit take the new settings in place (see [method bullet_enable_orbiting]).
 
 				Note that orbiting relies on having a homing target to orbit around.
 			</description>
@@ -104,7 +104,7 @@
 			<param index="8" name="orbiting_lock_policy" type="int" enum="BulletVolley2D.OrbitingLockPolicy" default="0" />
 			<param index="9" name="orbiting_rigid_follow" type="bool" default="true" />
 			<description>
-				Enables orbiting with concentric radii: bullet (start + k) orbits at radius_start + radius_step * k. Useful for shield rings. Bullets that already orbit keep their radius with a warning.
+				Enables orbiting with concentric radii: bullet (start + k) orbits at radius_start + radius_step * k. Useful for shield rings. Bullets that already orbit take their new radius and settings in place (see [method bullet_enable_orbiting]).
 			</description>
 		</method>
 		<method name="all_bullets_get_attachments">
@@ -840,7 +840,7 @@
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
 			<description>
-				Disables orbiting for the specified bullet.
+				Disables orbiting for the specified bullet. A bullet that does not orbit is left as it is.
 			</description>
 		</method>
 		<method name="bullet_enable_attachment">
@@ -861,7 +861,7 @@
 			<param index="6" name="orbiting_lock_policy" type="int" enum="BulletVolley2D.OrbitingLockPolicy" default="0" />
 			<param index="7" name="orbiting_rigid_follow" type="bool" default="true" />
 			<description>
-				Enables orbiting for the specified bullet with the given parameters.
+				Enables orbiting for the specified bullet with the given parameters. A bullet that already orbits takes the new settings in place: the lock policy is applied first, so [constant StayLocked] keeps its lock while the other policies re-acquire the ring after a new radius or direction, and [constant OrbitRandom] keeps the direction the bullet rolled when it started orbiting.
 				Invalid direction or texture rotation values are rejected with an error and orbiting stays disabled. Enabling on a disabled bullet is rejected: wake it with [method enable_bullet] first, then push targets and enable orbiting.
 				DontMove as direction means escort: the bullet holds a fixed slot on the ring and follows the target without circling. Tangential texture rotations (FaceOrbitingDirection, FaceOppositeOrbitingDirection) have no effect for escorts since there is no direction of travel.
 				The follow mode controls how the locked ring tracks a moving target (FollowTarget, FollowDeadzone with a pixel deadzone, or Anchored), the lock policy controls what drops the lock (RelockAlways, StayLocked, or RelockOnTargetChange), and rigid follow controls whether circling bullets translate 1:1 with the target like escorts (on) or chase the ring and trail behind fast targets (off).

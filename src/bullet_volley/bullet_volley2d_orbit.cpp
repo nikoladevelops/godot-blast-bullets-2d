@@ -41,7 +41,8 @@ void BulletVolley2D::bullet_enable_orbiting(int bullet_index, real_t orbiting_ra
 	// OrbitLeft or OrbitRight (never DontMove) so one call fans a mixed
 	// ring. Stored as the rolled value, so getters and re-applies see a
 	// concrete direction and the roll never changes mid-flight.
-	if (orbiting_direction == OrbitRandom) {
+	const bool random_direction = orbiting_direction == OrbitRandom;
+	if (random_direction) {
 		orbiting_direction = (UtilityFunctions::randi() % 2 == 0) ? OrbitLeft : OrbitRight;
 	}
 
@@ -73,7 +74,19 @@ void BulletVolley2D::bullet_enable_orbiting(int bullet_index, real_t orbiting_ra
 	auto &orbiting_status = all_orbiting_status[bullet_index];
 
 	if (orbiting_status == 1) {
-		UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " already has orbiting enabled.");
+		// Already orbiting: the call updates the ring in place through the
+		// setters. The lock policy goes first, so the call's own policy decides
+		// whether a new radius or direction re-acquires the ring (StayLocked
+		// keeps the lock). A random direction never re-rolls a ring in flight.
+		bullet_set_orbiting_lock_policy(bullet_index, orbiting_lock_policy);
+		bullet_set_orbiting_radius(bullet_index, orbiting_radius);
+		if (!random_direction) {
+			bullet_set_orbiting_direction(bullet_index, orbiting_direction);
+		}
+		bullet_set_orbiting_texture_rotation(bullet_index, orbiting_texture_rotation);
+		bullet_set_orbiting_follow_mode(bullet_index, orbiting_follow_mode);
+		bullet_set_orbiting_follow_deadzone(bullet_index, orbiting_follow_deadzone);
+		bullet_set_orbiting_rigid_follow(bullet_index, orbiting_rigid_follow);
 		return;
 	}
 
@@ -90,8 +103,7 @@ void BulletVolley2D::bullet_disable_orbiting(int bullet_index) {
 	auto &orbiting_status = all_orbiting_status[bullet_index];
 
 	if (orbiting_status == 0) {
-		UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " already has orbiting disabled.");
-		return;
+		return; // not orbiting: nothing to do (ranges cover mixed bullets)
 	}
 
 	all_orbiting_data[bullet_index].is_locked_orbiting = false;
@@ -239,20 +251,9 @@ void BulletVolley2D::all_bullets_enable_orbiting_linear(real_t radius_start, rea
 		return;
 	}
 
+	// An orbiting bullet takes the new settings in place (bullet_enable_orbiting).
 	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
 		const real_t want_radius = radius_start + radius_step * (real_t)(i - bullet_index_start);
-		if (i >= 0 && i < (int)all_orbiting_status.size() && all_orbiting_status[i] == 1) {
-			bullet_set_orbiting_radius(i, want_radius);
-			if (orbiting_direction != OrbitRandom) {
-				bullet_set_orbiting_direction(i, orbiting_direction);
-			}
-			bullet_set_orbiting_texture_rotation(i, orbiting_texture_rotation);
-			bullet_set_orbiting_follow_mode(i, orbiting_follow_mode);
-			bullet_set_orbiting_follow_deadzone(i, orbiting_follow_deadzone);
-			bullet_set_orbiting_lock_policy(i, orbiting_lock_policy);
-			bullet_set_orbiting_rigid_follow(i, orbiting_rigid_follow);
-			continue;
-		}
 		bullet_enable_orbiting(i, want_radius, orbiting_direction, orbiting_texture_rotation, orbiting_follow_mode, orbiting_follow_deadzone, orbiting_lock_policy, orbiting_rigid_follow);
 	}
 }
