@@ -221,15 +221,22 @@ func generate_bullet_speed_data(option_index:int)->void:
 	
 	cache_bullet_speed_option_index = option_index
 	volley_data.all_bullet_speed_data = bullet_speed_data
-#
-## Switches the bullet texture currently being used
-#func switch_bullet_texture(option_index:int)->void:
-	#if option_index == 0:
-		#var rocket_frames := make_sprite_frames(rocket_textures)
-		#volley_data.sprite_frames = rocket_frames
-	#elif option_index == 1:
-		#var single_frames := make_sprite_frames([godot_texture])
-		#volley_data.sprite_frames = single_frames
+
+# One-frame SpriteFrames of the Godot icon (built once, on first use)
+var godot_texture_frames:SpriteFrames
+
+# Switches the bullet texture currently being used
+func switch_bullet_texture(option_index:int)->void:
+	if option_index == 0:
+		# The animated rocket of the player's AnimatedSprite2D
+		volley_data.sprite_frames = animatedSprite.sprite_frames
+		volley_data.animation = "idk2"
+	else:
+		if godot_texture_frames == null:
+			godot_texture_frames = SpriteFrames.new() # holds an empty "default" animation
+			godot_texture_frames.add_frame("default", godot_texture)
+		volley_data.sprite_frames = godot_texture_frames
+		volley_data.animation = "default"
 
 # Sets the is_texture_rotation_permanent property for the bullet that are going to be spawned -> Whether the texture should rotate depending on the direction or if it should stay the same
 func set_bullet_is_texture_rotation_permanent(is_permanent:bool)->void:
@@ -251,9 +258,24 @@ func set_new_damage_value(new_damage:int)->void:
 func set_bullet_collision_mask(arr:Array[int])->void:
 	volley_data.collision_mask = BulletVolleyData2D.calculate_bitmask(arr)
 
-# Changes the size of the collision shapes that the bullets have
+# Changes the size of the collision shapes that the bullets have: a fresh shape
+# of the same kind (volleys already flying keep theirs). A circle takes the
+# width as its radius, a capsule the width as its diameter and the height.
 func set_collision_shape_size(new_size:Vector2)->void:
-	volley_data.collision_shape_size = new_size
+	var current:Shape2D = volley_data.collision_shape
+	if current is RectangleShape2D:
+		var rect := RectangleShape2D.new()
+		rect.size = new_size
+		volley_data.collision_shape = rect
+	elif current is CapsuleShape2D:
+		var capsule := CapsuleShape2D.new()
+		capsule.radius = new_size.x * 0.5
+		capsule.height = maxf(new_size.y, new_size.x)
+		volley_data.collision_shape = capsule
+	else:
+		var circle := CircleShape2D.new()
+		circle.radius = new_size.x
+		volley_data.collision_shape = circle
 
 # Changes the collision shape offset of the bullets
 func set_collision_shape_offset(new_offset:Vector2)->void:
