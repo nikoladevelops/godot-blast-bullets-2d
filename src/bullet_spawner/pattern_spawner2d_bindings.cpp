@@ -199,6 +199,7 @@ void PatternSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_process_callback", "value"), &PatternSpawner2D::set_process_callback);
 	BIND_ENUM_CONSTANT(PROCESS_IDLE);
 	BIND_ENUM_CONSTANT(PROCESS_PHYSICS);
+	BIND_ENUM_CONSTANT(PROCESS_AUTO);
 	BIND_BITFIELD_FLAG(LIVE_HOMING);
 	BIND_BITFIELD_FLAG(LIVE_GRAZE);
 	BIND_BITFIELD_FLAG(LIVE_SOUND);
@@ -677,7 +678,7 @@ void PatternSpawner2D::bind_spawner_group(const StringName &cls, SpawnerGroup2D 
 			break;
 		case SPAWNER_GROUP_TIME:
 			b.group("Time", "");
-			b.property(PropertyInfo(Variant::INT, "process_callback", PROPERTY_HINT_ENUM, "Idle,Physics"), "set_process_callback", "get_process_callback");
+			b.property(PropertyInfo(Variant::INT, "process_callback", PROPERTY_HINT_ENUM, "Idle,Physics,Auto"), "set_process_callback", "get_process_callback");
 			b.property(PropertyInfo(Variant::FLOAT, "time_scale", PROPERTY_HINT_RANGE, "0,4,0.01,or_greater"), "set_time_scale", "get_time_scale");
 			b.property(PropertyInfo(Variant::BOOL, "time_scale_affects_volleys"), "set_time_scale_affects_volleys", "get_time_scale_affects_volleys");
 			b.property(PropertyInfo(Variant::FLOAT, "volley_time_scale", PROPERTY_HINT_RANGE, "0,4,0.01,or_greater"), "set_volley_time_scale", "get_volley_time_scale");

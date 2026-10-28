@@ -1203,21 +1203,45 @@ void PatternSpawner2D::native_process(double delta) {
 		}
 		return;
 	}
+	if (effective_process_callback() != PROCESS_IDLE) {
+		// Auto: the factory started interpolating. The loop moves to the
+		// physics ticks (from the next one: this frame stepped already).
+		set_loop_active(true);
+		return;
+	}
 	// Idle steps once per frame: a handler that switched from Physics inside
 	// this frame's physics step already stepped it.
-	if (process_callback == PROCESS_IDLE && last_run_process_frame != Engine::get_singleton()->get_process_frames()) {
+	if (last_run_process_frame != Engine::get_singleton()->get_process_frames()) {
 		run_frame(delta);
 	}
 }
 
 void PatternSpawner2D::native_physics_process(double delta) {
-	if (process_callback == PROCESS_PHYSICS && !Engine::get_singleton()->is_editor_hint()) {
-		run_frame(delta);
+	if (Engine::get_singleton()->is_editor_hint()) {
+		return;
 	}
+	if (effective_process_callback() != PROCESS_PHYSICS) {
+		// Auto: the factory stopped interpolating. The loop moves to the idle
+		// frames (this frame's idle step runs it: nothing stepped yet).
+		set_loop_active(true);
+		return;
+	}
+	run_frame(delta);
+}
+
+PatternSpawner2D::SpawnerProcessCallback PatternSpawner2D::effective_process_callback() const {
+	if (Engine::get_singleton()->is_editor_hint()) {
+		return PROCESS_IDLE;
+	}
+	if (process_callback != PROCESS_AUTO) {
+		return process_callback;
+	}
+	const BulletFactory2D *factory = get_bullet_factory();
+	return factory != nullptr && factory->use_physics_interpolation ? PROCESS_PHYSICS : PROCESS_IDLE;
 }
 
 void PatternSpawner2D::set_loop_active(bool active) {
-	if (Engine::get_singleton()->is_editor_hint() || process_callback == PROCESS_IDLE) {
+	if (effective_process_callback() == PROCESS_IDLE) {
 		callbacks.apply(*this, active, false);
 	} else {
 		callbacks.apply(*this, false, active);
@@ -1225,15 +1249,12 @@ void PatternSpawner2D::set_loop_active(bool active) {
 }
 
 bool PatternSpawner2D::is_loop_active() const {
-	if (!Engine::get_singleton()->is_editor_hint() && process_callback == PROCESS_PHYSICS) {
-		return callbacks.physics_on;
-	}
-	return callbacks.idle_on;
+	return callbacks.idle_on || callbacks.physics_on;
 }
 
 void PatternSpawner2D::set_process_callback(SpawnerProcessCallback value) {
-	if (value != PROCESS_IDLE && value != PROCESS_PHYSICS) {
-		UtilityFunctions::push_error(String(get_class()) + ": process_callback must be 0 (Idle) or 1 (Physics), keeping the old value.");
+	if (value != PROCESS_IDLE && value != PROCESS_PHYSICS && value != PROCESS_AUTO) {
+		UtilityFunctions::push_error(String(get_class()) + ": process_callback must be 0 (Idle), 1 (Physics) or 2 (Auto), keeping the old value.");
 		return;
 	}
 	if (value == process_callback) {

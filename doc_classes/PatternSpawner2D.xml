@@ -5079,6 +5079,9 @@
 		<constant name="PROCESS_PHYSICS" value="1" enum="SpawnerProcessCallback">
 			The spawner runs every physics tick (evenly spaced streams at any frame rate).
 		</constant>
+		<constant name="PROCESS_AUTO" value="2" enum="SpawnerProcessCallback">
+			The default: physics ticks while the spawner's factory interpolates, rendered frames otherwise.
+		</constant>
 		<constant name="LIVE_HOMING" value="1" enum="LiveVolleyGroup" is_bitfield="true">
 			Homing (and orbiting) of what the spawner fired.
 		</constant>

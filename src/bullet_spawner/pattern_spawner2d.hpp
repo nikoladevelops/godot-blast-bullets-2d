@@ -742,9 +742,15 @@ public:
 		// Every physics tick: shots line up with the bullets' ticks, so streams
 		// are evenly spaced at any frame rate (pair with physics interpolation
 		// for smooth spawner motion).
-		PROCESS_PHYSICS = 1
+		PROCESS_PHYSICS = 1,
+		// Physics while the spawner's factory interpolates (an interpolated
+		// node must move on ticks, or it jitters), Idle otherwise; it follows
+		// the factory's interpolation live.
+		PROCESS_AUTO = 2
 	};
-	SpawnerProcessCallback process_callback = PROCESS_IDLE;
+	SpawnerProcessCallback process_callback = PROCESS_AUTO;
+	// The callback the loop runs in now (Auto resolved; the editor: Idle).
+	SpawnerProcessCallback effective_process_callback() const;
 	// Groups a spawner re-applies to what it already fired
 	// (BulletSpawner2D.apply_to_live_volleys). LIVE_ALL also covers groups
 	// added later. Bit flags: never renumber.

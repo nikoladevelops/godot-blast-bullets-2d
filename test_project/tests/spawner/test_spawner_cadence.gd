@@ -419,12 +419,12 @@ func test_burst_telegraph_and_pattern_list_countdowns() -> void:
 
 
 ## process_callback: the loop (cadence, movement, spin, shots) runs in idle
-## frames (Idle, the default) or in physics ticks (Physics).
+## frames (Idle) or in physics ticks (Physics); Auto (the default) picks one.
 func test_process_callback_runs_the_loop_in_the_chosen_callback() -> void:
-	assert_eq([BulletSpawner2D.PROCESS_IDLE, BulletSpawner2D.PROCESS_PHYSICS], [0, 1], "serialized ids")
+	assert_eq([BulletSpawner2D.PROCESS_IDLE, BulletSpawner2D.PROCESS_PHYSICS, BulletSpawner2D.PROCESS_AUTO], [0, 1, 2], "serialized ids")
 	for mode in [BulletSpawner2D.PROCESS_IDLE, BulletSpawner2D.PROCESS_PHYSICS]:
 		var sp := make_spawner(H.make_volley_data(1, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
-		assert_eq(sp.process_callback, BulletSpawner2D.PROCESS_IDLE, "idle by default")
+		assert_eq(sp.process_callback, BulletSpawner2D.PROCESS_AUTO, "auto by default")
 		sp.process_callback = mode
 		sp.shoot_interval_sec = 0.1
 		sp.shoot_initial_delay_sec = 0.0
@@ -453,7 +453,33 @@ func test_switching_process_callback_keeps_the_cadence() -> void:
 	await idle(30)
 	assert_between(shots[0], 14, 16, "a second and a half at 10 shots a second, across two switches")
 	sp.process_callback = 5
-	expect_error_sequence(["BulletSpawner2D: process_callback must be 0 (Idle) or 1 (Physics), keeping the old value."])
+	expect_error_sequence(["BulletSpawner2D: process_callback must be 0 (Idle), 1 (Physics) or 2 (Auto), keeping the old value."])
+
+
+## Auto (the default): physics ticks while the spawner's factory interpolates
+## (a moving spawner must move on ticks then, or it jitters), idle frames
+## otherwise (smoother without interpolation); it follows a live switch of
+## the factory's interpolation without losing the cadence.
+func test_auto_follows_the_factorys_interpolation() -> void:
+	factory.physics_interpolation = BulletFactory2D.INTERPOLATION_OFF
+	var sp := make_spawner(H.make_volley_data(1, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
+	sp.shoot_interval_sec = 0.1
+	sp.shoot_initial_delay_sec = 0.0
+	var in_physics: Array = []
+	sp.volley_fired.connect(func(_v, _n) -> void: in_physics.append(Engine.is_in_physics_frame()))
+	sp.set_shooting_enabled(true)
+	await idle(30)
+	assert_true(not in_physics.is_empty() and in_physics.all(func(x): return x == false), "not interpolating: idle frames %s" % [in_physics])
+	assert_eq([sp.is_processing(), sp.is_physics_processing()], [true, false], "the idle loop")
+	var before := in_physics.size()
+	factory.physics_interpolation = BulletFactory2D.INTERPOLATION_ON
+	await idle(30)
+	var after: Array = in_physics.slice(before + 1) # the shot of the switch frame may land in either
+	assert_true(not after.is_empty() and after.all(func(x): return x == true), "interpolating: physics ticks %s" % [after])
+	assert_eq([sp.is_processing(), sp.is_physics_processing()], [false, true], "the physics loop")
+	factory.physics_interpolation = BulletFactory2D.INTERPOLATION_OFF
+	await idle(30)
+	assert_between(in_physics.size(), 14, 16, "a second and a half at 10 shots a second, across two switches")
 
 
 func test_physics_streams_are_evenly_spaced() -> void:
