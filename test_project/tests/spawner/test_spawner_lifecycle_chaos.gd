@@ -11,7 +11,7 @@ extends BlastTest
 
 const SEEDS := 10
 const STEPS := 120
-const KNOWN := ["spawner is outside the scene tree", "produced no transforms, volley skipped", "no BulletFactory2D assigned"]
+const KNOWN := ["spawner is outside the scene tree", "produced no transforms, volley skipped", "no BulletFactory2D assigned", "BulletFactory2D share its world"]
 
 var rng := RandomNumberGenerator.new()
 var problems: Array = []

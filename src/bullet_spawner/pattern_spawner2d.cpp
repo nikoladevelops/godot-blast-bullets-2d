@@ -1089,6 +1089,8 @@ void PatternSpawner2D::_notification(int p_what) {
 			}
 		}
 	} else if (p_what == NOTIFICATION_ENTER_TREE) {
+		// The world may differ from the one the factory fallback was found in.
+		world_factory_id = 0;
 		fill_assigned_node_paths();
 		// Setters only refresh the process flag inside the tree: settings changed
 		// while out of it (a pooled spawner) take effect on re-entry.

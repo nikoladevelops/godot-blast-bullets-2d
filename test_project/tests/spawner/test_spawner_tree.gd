@@ -295,3 +295,16 @@ func test_an_unwired_spawner_fires_into_its_worlds_factory() -> void:
 	other.queue_free()
 	await idle(1)
 	assert_eq(sp.get_bullet_factory(), factory, "a gone factory is never used")
+
+
+## The world's factory is found again after a move: a spawner reparented into
+## another world never keeps firing into the old world's factory.
+func test_a_moved_spawner_finds_its_new_worlds_factory() -> void:
+	var sp := make_spawner()
+	sp.set_bullet_factory(null)
+	assert_eq(sp.get_bullet_factory(), factory, "the main world's factory")
+	move_to_own_world(sp)
+	assert_null(sp.get_bullet_factory(), "its new world has none")
+	sp.get_parent().remove_child(sp)
+	add(sp)
+	assert_eq(sp.get_bullet_factory(), factory, "back in the main world")
