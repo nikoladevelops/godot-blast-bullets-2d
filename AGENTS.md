@@ -854,7 +854,12 @@ src/
   call deferred from physics still runs inside the physics frame: pinned in
   `integration/test_engine_facts.gd`).
 - Routing: a spawner volley emits on its spawner, a factory volley on the
-  factory, never both. The ONE exception is graze (§20): `bullet_grazed` /
+  factory, never both. A signal the live owner spawner has NOTHING connected
+  to falls through to the factory (`core/signal_route2d.hpp`,
+  `route_owned_signal2d`: hits, bounces, `life_time_over`, `bullet_split`,
+  every laser signal), so one global factory handler sees the hits of every
+  NPC spawner; the unhandled-event warnings then check both ("(on it or on
+  BulletFactory2D)"). A new routed emit uses the helper. The ONE exception is graze (§20): `bullet_grazed` /
   `bullet_graze_exited` bubble to the owner spawner (while alive) and then
   ALWAYS to the factory (graze changes nothing and must outlive enemies). A freed spawner takes its connections along
   (`orphaned_volleys` decides what its bullets do).
@@ -1967,7 +1972,8 @@ A flying bullet fires a template spawner's whole pattern (any
   without a factory put it in its own world (`BlastTest.add_in_own_world` /
   `move_to_own_world`).
 - `orphaned_volleys` defaults to Hand To Factory: a dying NPC's bullets keep
-  hitting (their hits reach the factory's signals).
+  hitting (their hits reach the factory's signals; a live NPC spawner without
+  handlers falls through to them too, §12.4).
 - GDScript facts that bit the tests: a lambda captures locals by value
   (collect through an Array); a preview rebuild can run user code (the aimed
   target's `get_velocity`): re-check every node after it.

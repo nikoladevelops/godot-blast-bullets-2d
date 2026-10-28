@@ -27,7 +27,8 @@ class LaserSpawner2D;
 
 // One laser shot: a beam per pattern slot, created, ticked, drawn and pooled
 // by BulletFactory2D (bullet_factory2d_lasers.cpp). Its signals fire on its
-// owner LaserSpawner2D while that lives, else on the factory (never both).
+// owner LaserSpawner2D while that lives (each on the factory while nothing is
+// connected to it there: core/signal_route2d.hpp), else on the factory (never both).
 // Lasers read their LaserData2D every tick: edits reach lasers firing now.
 struct LaserBodyMesh2D;
 
@@ -398,6 +399,9 @@ private:
 	// `fn` and returns true.
 	bool reject_stale_handle(const char *fn) const;
 	Object *resolve_emitter() const;
+	// `emitter` for `signal`, or the factory when the owner spawner has
+	// nothing connected to it (core/signal_route2d.hpp).
+	Object *route_emitter(Object *emitter, const StringName &signal) const;
 	enum AnchorState {
 		ANCHOR_FOLLOW, // in the tree: ride its frame
 		ANCHOR_HOLD, // alive but out of the tree (a reparent): keep the last frame

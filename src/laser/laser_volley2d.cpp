@@ -12,6 +12,7 @@
 #include "bullet_spawner/pattern_spawner2d.hpp"
 #include "core/cached_string_names2d.hpp"
 #include "core/node_baseline2d.hpp"
+#include "core/signal_route2d.hpp"
 #include "core/transform_math2d.hpp"
 #include "core/warn_once2d.hpp"
 #include "factory/bullet_factory2d.hpp"
@@ -442,6 +443,11 @@ Object *LaserVolley2D::resolve_emitter() const {
 		}
 	}
 	return factory != nullptr && factory_life != nullptr && *factory_life ? (Object *)factory : nullptr;
+}
+
+Object *LaserVolley2D::route_emitter(Object *emitter, const StringName &signal) const {
+	Object *live_factory = factory != nullptr && factory_life != nullptr && *factory_life ? (Object *)factory : nullptr;
+	return route_owned_signal2d(emitter, live_factory, signal);
 }
 
 LaserVolley2D::AnchorState LaserVolley2D::read_anchor(Transform2D &r_frame, Vector2 &r_offset) const {

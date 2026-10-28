@@ -71,7 +71,7 @@ bool LaserVolley2D::announce_pending_phase(uint64_t self_id, uint32_t life) {
 	if (factory != nullptr) {
 		factory->note_user_code();
 	}
-	emit_on2d(emitter, CachedStringNames2D::get().laser_phase_changed, this, (int)phase);
+	emit_on2d(route_emitter(emitter, CachedStringNames2D::get().laser_phase_changed), CachedStringNames2D::get().laser_phase_changed, this, (int)phase);
 	return alive_after_user_code(self_id, life);
 }
 
@@ -109,7 +109,7 @@ bool LaserVolley2D::advance_phases(double delta) {
 			if (factory != nullptr) {
 				factory->note_user_code();
 			}
-			emit_on2d(emitter, CachedStringNames2D::get().laser_phase_changed, this, (int)next);
+			emit_on2d(route_emitter(emitter, CachedStringNames2D::get().laser_phase_changed), CachedStringNames2D::get().laser_phase_changed, this, (int)next);
 			if (!alive_after_user_code(self_id, life)) {
 				return false;
 			}
@@ -444,7 +444,7 @@ bool LaserVolley2D::end_contacts(uint64_t self_id, uint32_t life, bool only_spen
 			if (factory != nullptr) {
 				factory->note_user_code();
 			}
-			emit_on2d(emitter, CachedStringNames2D::get().laser_pierce_ended, target, this, i);
+			emit_on2d(route_emitter(emitter, CachedStringNames2D::get().laser_pierce_ended), CachedStringNames2D::get().laser_pierce_ended, target, this, i);
 			if (!alive_after_user_code(self_id, life)) {
 				return false;
 			}
@@ -636,7 +636,7 @@ bool LaserVolley2D::update_contacts(int beam_index, uint64_t self_id, uint32_t l
 		}
 		fire_event(LaserSoundData2D::LASER_SOUND_ON_PIERCE_END, gone.position, beam_index);
 		factory->note_user_code();
-		emit_on2d(emitter, names.laser_pierce_ended, target, this, beam_index);
+		emit_on2d(route_emitter(emitter, names.laser_pierce_ended), names.laser_pierce_ended, target, this, beam_index);
 		if (!alive_after_user_code(self_id, life)) {
 			return false;
 		}
@@ -687,7 +687,7 @@ bool LaserVolley2D::update_contacts(int beam_index, uint64_t self_id, uint32_t l
 		if (fresh) {
 			fire_event(LaserSoundData2D::LASER_SOUND_ON_PIERCE_START, c.position, beam_index);
 			factory->note_user_code();
-			emit_on2d(emitter, names.laser_pierce_started, target, this, beam_index, c.position);
+			emit_on2d(route_emitter(emitter, names.laser_pierce_started), names.laser_pierce_started, target, this, beam_index, c.position);
 			if (!alive_after_user_code(self_id, life) || !hitting_phase() || k >= beams[beam_index].contacts.size()) {
 				return drop_unstarted();
 			}
@@ -699,7 +699,7 @@ bool LaserVolley2D::update_contacts(int beam_index, uint64_t self_id, uint32_t l
 		}
 		fire_event(LaserSoundData2D::LASER_SOUND_ON_HIT, c.position, beam_index);
 		factory->note_user_code();
-		emit_on2d(emitter, names.laser_hit, target, this, beam_index, c.position);
+		emit_on2d(route_emitter(emitter, names.laser_hit), names.laser_hit, target, this, beam_index, c.position);
 		if (!alive_after_user_code(self_id, life) || !hitting_phase() || k >= beams[beam_index].contacts.size()) {
 			return drop_unstarted();
 		}
@@ -1064,7 +1064,7 @@ void LaserVolley2D::tick(double delta) {
 				continue;
 			}
 			factory->note_user_code();
-			emit_on2d(emitter, CachedStringNames2D::get().laser_despawned, this, i, at);
+			emit_on2d(route_emitter(emitter, CachedStringNames2D::get().laser_despawned), CachedStringNames2D::get().laser_despawned, this, i, at);
 			if (!alive_after_user_code(self_id, life)) {
 				return;
 			}
@@ -1124,7 +1124,7 @@ void LaserVolley2D::tick(double delta) {
 			continue;
 		}
 		factory->note_user_code();
-		emit_on2d(emitter, CachedStringNames2D::get().laser_wall_hit, this, i, b.wall_point, b.wall_normal);
+		emit_on2d(route_emitter(emitter, CachedStringNames2D::get().laser_wall_hit), CachedStringNames2D::get().laser_wall_hit, this, i, b.wall_point, b.wall_normal);
 		if (!alive_after_user_code(self_id, life)) {
 			return;
 		}
@@ -1148,7 +1148,7 @@ void LaserVolley2D::tick(double delta) {
 				Object *emitter = resolve_emitter();
 				if (emitter != nullptr) {
 					factory->note_user_code();
-					emit_on2d(emitter, CachedStringNames2D::get().laser_phase_changed, this, (int)PHASE_FINISHED);
+					emit_on2d(route_emitter(emitter, CachedStringNames2D::get().laser_phase_changed), CachedStringNames2D::get().laser_phase_changed, this, (int)PHASE_FINISHED);
 					if (!alive_after_user_code(self_id, life)) {
 						return;
 					}
@@ -1167,7 +1167,7 @@ void LaserVolley2D::tick(double delta) {
 		Object *emitter = resolve_emitter();
 		if (emitter != nullptr) {
 			factory->note_user_code();
-			emit_on2d(emitter, CachedStringNames2D::get().laser_finished, this);
+			emit_on2d(route_emitter(emitter, CachedStringNames2D::get().laser_finished), CachedStringNames2D::get().laser_finished, this);
 			if (ObjectDB::get_instance(ObjectID(self_id)) != (Object *)this || factory_life == nullptr || !*factory_life) {
 				return;
 			}

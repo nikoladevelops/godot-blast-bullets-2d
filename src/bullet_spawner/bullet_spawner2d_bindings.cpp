@@ -159,8 +159,9 @@ void BulletSpawner2D::_bind_methods() {
 	// spawned (see owner_spawner_id). Same slim payload shape as the factory
 	// typed signals; emitted synchronously (area/body) or deferred
 	// (life_time_over) under the same handler contract. A spawner volley
-	// NEVER fires factory signals: if this spawner is gone, its bullets'
-	// events are dropped instead of falling back to the factory.
+	// fires these here, or on the factory while nothing is connected here
+	// (core/signal_route2d.hpp), never both; orphaned_volleys decides what
+	// happens once this spawner is gone.
 	// NOTE: PROPERTY_HINT_RESOURCE_TYPE (not NODE_TYPE) carries the class name
 	// to ClassDB/--doctool; see the note on the factory signals.
 	ADD_SIGNAL(MethodInfo("area_entered",
@@ -175,8 +176,8 @@ void BulletSpawner2D::_bind_methods() {
 			PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
 			PropertyInfo(Variant::ARRAY, "bullet_indexes", PROPERTY_HINT_ARRAY_TYPE, "int")));
 	// Bounce notifications possessed by this spawner for the volleys it
-	// spawned (same routing as area_entered/body_entered above: a spawner
-	// volley NEVER fires factory signals). Same slim payload and handler
+	// spawned (same routing as area_entered/body_entered above: here, or the
+	// factory while nothing is connected here). Same slim payload and handler
 	// contract. A consumed bounce (bounce_hit_consumed) emits BOTH the
 	// bounce signal here and the matching area/body_entered signal.
 	ADD_SIGNAL(MethodInfo("bounce_area_entered",

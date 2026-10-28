@@ -1436,7 +1436,7 @@
 			<param index="1" name="volley" type="BulletVolley2D" />
 			<param index="2" name="bullet_index" type="int" />
 			<description>
-				Fired live when one of this spawner's bullets enters an area; same contract as [signal BulletFactory2D.area_entered] (the factory stays silent for spawner volleys). Connections live on the spawner: if it is freed they are gone, see [member orphaned_volleys].
+				Fired live when one of this spawner's bullets enters an area; same contract as [signal BulletFactory2D.area_entered]. With nothing connected here, the hit goes to [signal BulletFactory2D.area_entered] instead (never both); the same holds for [signal body_entered], the bounce signals, [signal life_time_over] and [signal bullet_split]. Connections live on the spawner: if it is freed they are gone, see [member orphaned_volleys].
 			</description>
 		</signal>
 		<signal name="body_entered">

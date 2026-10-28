@@ -9,6 +9,7 @@
 
 #include "bullet_spawner/bullet_spawner2d.hpp"
 #include "core/emit_on2d.hpp"
+#include "core/signal_route2d.hpp"
 #include "core/transform_math2d.hpp"
 #include "factory/bullet_factory2d_internal.hpp"
 #include "patterns/pattern_inputs2d.hpp"
@@ -371,8 +372,10 @@ bool BulletFactory2D::flush_splits(const bool &alive) {
 			}
 		}
 
-		// ---- Tell the game: the owner spawner while it lives (the factory
+		// ---- Tell the game: the owner spawner while it lives, or the factory
+		// when nothing is connected there (core/signal_route2d.hpp; the factory
 		// for factory volleys; an orphan's split stays silent, like its hits).
+		const StringName &split_signal = CachedStringNames2D::get().bullet_split;
 		Object *emitter = nullptr;
 		if (r.owner_id == 0) {
 			emitter = this;
@@ -382,7 +385,7 @@ bool BulletFactory2D::flush_splits(const bool &alive) {
 		}
 		if (emitter != nullptr) {
 			note_user_code();
-			emit_on2d(emitter, "bullet_split", r.pose.columns[2], r.cause, child, r.child_depth);
+			emit_on2d(route_owned_signal2d(emitter, this, split_signal), split_signal, r.pose.columns[2], r.cause, child, r.child_depth);
 			if (stopped()) {
 				return false;
 			}

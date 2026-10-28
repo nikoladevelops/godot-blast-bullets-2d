@@ -716,8 +716,13 @@ public:
 	// when nothing can handle it: the owning spawner was freed (every
 	// connection died with it) or the live emitter has no hit handler
 	// connected. Returns the emitter (null when gone).
-	Object *resolve_hit_emitter_checked();
+	// Where a hit / bounce (`signal`) or an expiry is told: the owner spawner,
+	// or the factory when nothing is connected to that signal on the spawner
+	// (core/signal_route2d.hpp). The first call of a drain also warns once when
+	// nobody handles the event at all.
+	Object *resolve_hit_emitter_checked(const StringName &signal);
 	Object *resolve_lifetime_emitter_checked();
+	Object *routing_factory() const;
 	// Path of the owning spawner, recorded by the spawner when it is freed
 	// with orphaned_volleys = Keep Flying (zero per-shot cost); only read by
 	// the orphan warnings. Cleared on every new life.

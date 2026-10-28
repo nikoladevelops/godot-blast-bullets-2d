@@ -878,7 +878,7 @@
 			<param index="1" name="volley" type="BulletVolley2D" />
 			<param index="2" name="bullet_index" type="int" />
 			<description>
-				Emitted live, inside the physics tick, when a bullet enters an [Area2D]; only for factory-owned volleys (a spawner's volleys emit on the spawner). The bullet is still alive in the handler, with every runtime property readable: [method BulletVolley2D.bullet_get_custom_data], [method BulletVolley2D.get_bullet_global_transform] (the impact pose), [method BulletVolley2D.get_bullet_velocity], [method BulletVolley2D.get_bullet_collision_count] (this hit is already counted) and the attachment.
+				Emitted live, inside the physics tick, when a bullet enters an [Area2D]: for factory-owned volleys, and for a live spawner's volleys while nothing is connected to the spawner's own [signal BulletSpawner2D.area_entered] (a spawner with its own handler keeps its hits: never both, so nothing is handled twice). One handler here therefore receives every hit nobody handles on a spawner, e.g. of a spawner on each enemy. The bullet is still alive in the handler, with every runtime property readable: [method BulletVolley2D.bullet_get_custom_data], [method BulletVolley2D.get_bullet_global_transform] (the impact pose), [method BulletVolley2D.get_bullet_velocity], [method BulletVolley2D.get_bullet_collision_count] (this hit is already counted) and the attachment.
 
 				After the handler returns, the plugin decides: if the hit count is still at [member BulletVolley2D.bullet_max_collision_count] the bullet dies (On Destroy effects at the impact pose), otherwise it lives on (On Hit). A handler may veto the kill by lowering the count, disable the bullet itself (no extra effects), free its target (later hits on it are skipped) or pause the factory (the remaining hits wait for the resume). Structural calls ([method reset], [code]free_*[/code], [code]populate_*[/code]) are rejected here: use their [code]*_deferred[/code] twins. Per-bullet edits and spawning apply immediately.
 			</description>
@@ -935,7 +935,7 @@
 			<param index="2" name="children" type="BulletVolley2D" />
 			<param index="3" name="depth" type="int" />
 			<description>
-				A bullet of a factory volley split: [param children] is the new volley (exactly [member BulletSplitStage2D.count] bullets, already moving and armed), spawned at [param position] where the parent died. [param cause] is one of the [code]BulletVolley2D.SPLIT_CAUSE_*[/code] constants and [param depth] the children's generation (1 = children of fired bullets). Emitted once per parent right after its children spawned, after the sweep in which it died. Spawner volleys report on their spawner instead ([signal BulletSpawner2D.bullet_split]).
+				A bullet of a factory volley split: [param children] is the new volley (exactly [member BulletSplitStage2D.count] bullets, already moving and armed), spawned at [param position] where the parent died. [param cause] is one of the [code]BulletVolley2D.SPLIT_CAUSE_*[/code] constants and [param depth] the children's generation (1 = children of fired bullets). Emitted once per parent right after its children spawned, after the sweep in which it died. Spawner volleys report on their spawner instead ([signal BulletSpawner2D.bullet_split]), or here while nothing is connected there.
 			</description>
 		</signal>
 		<signal name="bullets_cleared">

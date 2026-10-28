@@ -199,17 +199,23 @@ func test_scene_teardown_in_both_orders_is_clean() -> void:
 		expect_no_errors("teardown (spawner first = %s) prints nothing" % spawner_first)
 
 
+func _drop_factory_hit_handlers() -> void:
+	for c in factory.body_entered.get_connections():
+		factory.body_entered.disconnect(c["callable"])
+
+
 func test_a_live_emitter_with_no_hit_handler_warns_once() -> void:
 	var sp := _spawner(BulletSpawner2D.ORPHANED_VOLLEYS_KEEP_FLYING)
 	for c in sp.body_entered.get_connections():
 		sp.body_entered.disconnect(c["callable"])
+	_drop_factory_hit_handlers() # nobody at all: the factory would take the hits
 	var v1 := _shoot(sp)
 	var v2 := _shoot(sp)
 	v2.teleport_bullet(0, Vector2(0, 100))
 	make_wall(Vector2(200, 0))
 	await _wait_dead(v1)
 	await _wait_dead(v2)
-	expect_errors_containing(NO_HANDLER, 1, "warned once for that spawner")
+	expect_errors_containing(NO_HANDLER + " (on it or on BulletFactory2D), so the hit is not handled.", 1, "warned once for that spawner")
 	sp.free()
 
 
@@ -217,6 +223,7 @@ func test_a_freed_receiver_drops_its_connection_and_the_hit_is_explained() -> vo
 	var sp := _spawner(BulletSpawner2D.ORPHANED_VOLLEYS_KEEP_FLYING)
 	for c in sp.body_entered.get_connections():
 		sp.body_entered.disconnect(c["callable"])
+	_drop_factory_hit_handlers() # nobody at all: the factory would take the hits
 	# The handler belongs to a node (an "enemy") that is freed first.
 	var enemy := BodyCounter.new()
 	add_child(enemy)
@@ -492,6 +499,7 @@ func test_dying_enemies_keep_their_bullets_dangerous() -> void:
 		enemies.append(e)
 	for i in 30:
 		await physics(1)
+	assert_gt(factory_hits[0], 0, "while the enemies live, their guns (nothing connected) fall through to the factory")
 	for e in enemies:
 		e.queue_free() # they die with bullets in flight
 	await physics(1)
@@ -500,9 +508,67 @@ func test_dying_enemies_keep_their_bullets_dangerous() -> void:
 		await physics(1)
 	assert_gt(factory_hits[0], at_death, "bullets of dead enemies still hit the player (%d after their death)" % (factory_hits[0] - at_death))
 	expect_no_errors()
-	# While an enemy lived, its gun's hits reported on the gun (a spawner volley
-	# signals on its spawner), where nothing was connected: one warning per gun.
-	var unhandled := "': its bullets hit something, but nothing is connected to its area_entered or body_entered signal"
-	expect_warning_sequence([unhandled, unhandled, unhandled], "the live guns' hits went to the unconnected guns")
+	expect_warning_sequence([], "every hit was handled by the one factory handler")
 	await idle(30)
 	assert_eq(factory.get_active_bullet_count(), 0, "every bullet ended")
+
+
+func test_an_unconnected_live_spawner_falls_through_to_the_factory() -> void:
+	# A live spawner with nothing connected to a signal hands it to the
+	# factory; one that has a handler keeps it (never both).
+	var plain := _spawner(BulletSpawner2D.ORPHANED_VOLLEYS_KEEP_FLYING)
+	for c in plain.body_entered.get_connections():
+		plain.body_entered.disconnect(c["callable"])
+	var v := _shoot(plain)
+	make_wall(Vector2(200, 0))
+	await _wait_dead(v)
+	assert_eq(factory_hits.size(), 1, "the factory handled the live spawner's hit")
+	assert_eq(spawner_hits.size(), 0, "nothing on the spawner")
+	factory_hits.clear()
+	var own := _spawner(BulletSpawner2D.ORPHANED_VOLLEYS_KEEP_FLYING) # connected
+	var w := _shoot(own)
+	await _wait_dead(w)
+	assert_eq(spawner_hits.size(), 1, "a spawner handler keeps its hit")
+	assert_eq(factory_hits.size(), 0, "never both")
+	expect_warning_sequence([], "handled: nothing to warn about")
+
+
+func test_every_routed_signal_falls_through_while_the_spawner_lives() -> void:
+	# Expiry, bounce and split of a live spawner with nothing connected reach
+	# the factory's handlers, like hits; lasers alike.
+	var seen := {}
+	var count := func(signal_name: String) -> void: seen[signal_name] = int(seen.get(signal_name, 0)) + 1
+	factory.life_time_over.connect(func(_v, _i) -> void: count.call("life_time_over"))
+	factory.bounce_body_entered.connect(func(_b, _v, _i) -> void: count.call("bounce_body_entered"))
+	factory.bullet_split.connect(func(_p, _c, _v, _d) -> void: count.call("bullet_split"))
+	factory.laser_finished.connect(func(_l) -> void: count.call("laser_finished"))
+	var expiring := _data(0.2)
+	expiring.is_life_time_over_signal_enabled = true
+	var a := _spawner(BulletSpawner2D.ORPHANED_VOLLEYS_KEEP_FLYING, expiring)
+	a.position = Vector2(0, -300) # away from the wall
+	var stage := BulletSplitStage2D.new()
+	stage.count = 2
+	var chain := BulletSplitData2D.new()
+	chain.stages = [stage]
+	a.split_data = chain
+	a.split_enabled = true
+	_shoot(a)
+	var bouncing := _data(8.0, 3)
+	bouncing.set_bounce_mask_from_array([3]) # make_wall's layer
+	var b := _spawner(BulletSpawner2D.ORPHANED_VOLLEYS_KEEP_FLYING, bouncing)
+	_shoot(b)
+	make_wall(Vector2(200, 0))
+	var laser := LaserSpawner2D.new()
+	laser.set_shooting_enabled(false)
+	laser.laser_data = H.make_laser(0.0, 0.0, 0.1, 0.0, 100.0)
+	laser.pattern_source = LaserSpawner2D.PATTERN_FROM_SELF
+	laser.position = Vector2(0, 300)
+	add(laser)
+	laser.set_bullet_factory(factory)
+	assert_true(laser.shoot_once(), "the laser fires")
+	for i in 120:
+		await physics(1)
+		if seen.size() == 4:
+			break
+	assert_eq(seen.keys().size(), 4, "every routed signal reached the factory: %s" % str(seen))
+	expect_warning_sequence([], "all handled")

@@ -757,14 +757,11 @@ int BulletVolley2D::try_handle_bounce(CollisionType collision_type, int bullet_i
 	// volleys report to their spawner, the rest to the factory. Snapshot the
 	// emitter first (a consumed hit below may pool the volley), guard the
 	// post-emit with the self-liveness token like the normal path.
-	Object *emitter = emit_collision_signals ? resolve_hit_emitter_checked() : nullptr;
+	const StringName &bounce_signal = collision_type == CollisionType::AREA ? CachedStringNames2D::get().bounce_area_entered : CachedStringNames2D::get().bounce_body_entered;
+	Object *emitter = emit_collision_signals ? resolve_hit_emitter_checked(bounce_signal) : nullptr;
 	if (emitter != nullptr) {
 		note_user_code();
-		if (collision_type == CollisionType::AREA) {
-			emit_on2d(emitter, CachedStringNames2D::get().bounce_area_entered, hit_target, this, bullet_index);
-		} else {
-			emit_on2d(emitter, CachedStringNames2D::get().bounce_body_entered, hit_target, this, bullet_index);
-		}
+		emit_on2d(emitter, bounce_signal, hit_target, this, bullet_index);
 	}
 	// A handler that freed this volley leaves every member access below as
 	// use-after-free: swallow the record so handle_bullet_collision returns instantly

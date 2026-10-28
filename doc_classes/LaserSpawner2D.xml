@@ -5,7 +5,7 @@
 	</brief_description>
 	<description>
 		A [PatternSpawner2D] that fires lasers ([member laser_data]) instead of bullets. Everything about where and when to fire works exactly like a [BulletSpawner2D]: the pattern sources and their preview (the arrows show the laser's length), the Transform subgroup, auto fire, bursts, telegraph, pattern lists ([code]laser_data[/code] is their payload key), spin, Path2D movement, time scale, [method PatternSpawner2D.shoot_from] and the Graze and Sound groups (beams graze by their distance to the targets; sound entries fire On Shot, On Telegraph, On Hit, On Bounce for a wall stop, On Graze, On Graze Exit, On Lifetime Over when a laser finishes, On Flight at the tip).
-		While [member LaserData2D.follow_spawner] is on, the muzzles ride this spawner: its moves, its spin and its teleports. Track and Lock On lasers aim at what the Laser Targeting group finds. The laser signals fire on this spawner while it lives (never on the factory; grazes then bubble to the factory too); [member orphaned_lasers] decides what its lasers do when it is freed.
+		While [member LaserData2D.follow_spawner] is on, the muzzles ride this spawner: its moves, its spin and its teleports. Track and Lock On lasers aim at what the Laser Targeting group finds. The laser signals fire on this spawner while it lives, each on the factory instead while nothing is connected to it here (never both; grazes bubble to the factory too); [member orphaned_lasers] decides what its lasers do when it is freed.
 		Bullets can fire lasers too: point a [BulletSpawner2D]'s [member BulletSpawner2D.emitter_spawner_path] at a laser spawner.
 	</description>
 	<tutorials>
