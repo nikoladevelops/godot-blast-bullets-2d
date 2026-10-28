@@ -634,7 +634,11 @@ Pinned by `spawner/test_spawner_pattern_counts.gd`,
    `spawn_volley`, the spawner's span path, `populate_bullets_pool`). Why 20000: a volley is ONE physics area with a shape per
    bullet and Godot's broadphase BVH hitches for seconds on thousands of
    clustered shapes and aborts the game past ~35k (measured on 4.7.2; spread
-   out, 100k works). Tests reset the limit in `BlastTest.before_each`.
+   out, 100k works). Several volleys stacked on one thin curve abort it too
+   (three 20000-bullet rings of 150 px, 0.05 px apart, joining in one frame;
+   ten 10000-bullet rings; a 96k spread-out stress runs fine): an engine limit
+   no per-volley cap can prevent, documented on `set_max_bullets_per_pattern`.
+   Tests reset the limit in `BlastTest.before_each`.
 6. Fill Inside never searches forever: `fill_spacing_that_fits` answers an
    impossible `fill_margin` at once (`fill_margin_unreachable`), floors the
    refinement at `helper_outline_fill_min_spacing` (default 0.5, also at 1/1000
