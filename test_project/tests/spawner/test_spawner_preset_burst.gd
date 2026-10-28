@@ -59,6 +59,7 @@ func test_permanent_failure_aborts_chain() -> void:
 	sp.burst_count = 2
 	sp.burst_interval_sec = 0.02
 	sp.set_bullet_factory(null)
+	move_to_own_world(sp) # no factory in its world to fall back on
 	sp.begin_burst()
 	await idle(1)
 	await idle(1)

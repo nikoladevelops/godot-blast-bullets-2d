@@ -198,7 +198,7 @@
 			Gradient Across Pattern: how far along the gradient the colors move each shot. 0 keeps every shot alike (bullet [code]i[/code] of [code]n[/code] samples [code]i / (n - 1)[/code]); any other value wraps the gradient around (bullet [code]i[/code] samples [code]i / n + shots * shift[/code]), so a ring's rainbow turns from shot to shot. Must be finite.
 		</member>
 		<member name="bullet_factory_path" type="NodePath" setter="set_bullet_factory_path" getter="get_bullet_factory_path" default="NodePath(&quot;&quot;)">
-			Path to the [BulletFactory2D] used for spawning. Inside the tree, a path to a node of another type is rejected (old value kept).
+			Path to the [BulletFactory2D] used for spawning. Inside the tree, a path to a node of another type is rejected (old value kept). Left empty (and nothing assigned with [method PatternSpawner2D.set_bullet_factory]), the spawner fires into the factory of the world it runs in: the first [BulletFactory2D] in the tree that shares its [World2D] (one warning when there are several). So a spawner inside an instanced scene, an enemy for example, needs no wiring. A path that does not resolve never falls back.
 		</member>
 		<member name="bullet_life_time_scale_max" type="float" setter="set_bullet_life_time_scale_max" getter="get_bullet_life_time_scale_max" default="1.0">
 			Upper end of the per-bullet lifetime multiplier (see [member bullet_life_time_scale_min]). Finite and &gt; 0.

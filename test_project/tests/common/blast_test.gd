@@ -217,6 +217,23 @@ func is_editor_visible(obj: Object, prop: StringName) -> bool:
 
 
 ## Static obstacle on `layer_bits` (collision_layer value), rect `size`.
+## Adds `node` inside a SubViewport with its own World2D: a spawner there
+## finds no factory (an empty bullet_factory_path fires into the factory of
+## the spawner's world, and the test factory lives in the main one).
+func add_in_own_world(node: Node) -> Node:
+	var viewport := SubViewport.new()
+	viewport.world_2d = World2D.new()
+	add(viewport)
+	viewport.add_child(node)
+	return node
+
+
+## Moves `node` (already in the tree) into its own world: see add_in_own_world.
+func move_to_own_world(node: Node) -> Node:
+	node.get_parent().remove_child(node)
+	return add_in_own_world(node)
+
+
 func make_wall(pos: Vector2, size: Vector2 = Vector2(20, 400), layer_bits: int = 4, mask_bits: int = 2) -> StaticBody2D:
 	var wall := StaticBody2D.new()
 	wall.position = pos

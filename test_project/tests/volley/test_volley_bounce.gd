@@ -1880,7 +1880,7 @@ func test_t28_hostile_freed_walls_nan_motion_overflow_starvation() -> void:
 	# No-factory path: a spawner with data but no factory refuses cleanly.
 	var lonely28 := BulletSpawner2D.new()
 	lonely28.set_shooting_enabled(false) # manual shots only (no auto-fire spam)
-	add(lonely28)
+	add_in_own_world(lonely28) # no factory in its world to fall back on
 	await idle(1)
 	lonely28.set_spawn_data(_bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4]))
 	var lonely_fired: int = lonely28.get_volleys_fired()

@@ -137,6 +137,7 @@ func test_nested_shoot_once_is_rejected() -> void:
 func test_every_failure_reports_a_skip_reason() -> void:
 	var sp := _spawner()
 	sp.set_bullet_factory(null)
+	move_to_own_world(sp) # no factory in its world to fall back on
 	assert_false(sp.shoot_once(), "no factory")
 	expect_error_sequence(["no BulletFactory2D assigned"])
 	sp.set_bullet_factory(factory)

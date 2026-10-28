@@ -28,7 +28,7 @@ func _make_data() -> BulletVolleyData2D:
 
 func test_error_paths() -> void:
 	var bare := BulletSpawner2D.new()
-	add(bare)
+	add_in_own_world(bare) # no factory in its world to fall back on
 	bare.set_shooting_enabled(false)
 	# No factory, no data: loud failure, no state change, no crash.
 	assert_true(bare.shoot_once() == false, "shoot without factory fails")
@@ -255,3 +255,43 @@ func test_a_script_with_its_own_callbacks_keeps_the_native_ones() -> void:
 		await physics(1)
 	assert_gt(fired[0], 0, "then it fires")
 	assert_gt(sp.processed + sp.physics, 0, "the script's own callbacks ran too")
+
+
+## An NPC scene's spawner needs no wiring: an empty bullet_factory_path fires
+## into the factory of the spawner's world; a path or set_bullet_factory()
+## wins; several factories pick the first one in the tree with one warning; a
+## freed factory is never used (the next one in the world takes over).
+func test_an_unwired_spawner_fires_into_its_worlds_factory() -> void:
+	var npc := Node2D.new()
+	var sp := BulletSpawner2D.new()
+	sp.name = "NpcGun"
+	sp.set_shooting_enabled(false)
+	sp.spawn_data = H.make_volley_data(1, 0.0, 30.0)
+	npc.add_child(sp)
+	add(npc)
+	assert_eq(sp.get_bullet_factory(), factory, "the world's factory")
+	assert_eq(Array(sp.get_setup_warnings()).filter(func(w): return "BulletFactory2D" in w), [], "nothing to fix")
+	assert_true(sp.shoot_once(), "fires without wiring")
+	assert_eq(factory.get_volleys_owned_by(sp).size(), 1, "into that factory, owned by the spawner")
+	var other := BulletFactory2D.new()
+	other.name = "Other"
+	add(other)
+	await idle(1)
+	sp.set_bullet_factory(other)
+	assert_eq(sp.get_bullet_factory(), other, "set_bullet_factory wins")
+	sp.set_bullet_factory(null)
+	assert_eq(sp.get_bullet_factory(), factory, "back to the world's factory: the first in the tree")
+	var fresh := BulletSpawner2D.new()
+	fresh.name = "Fresh"
+	fresh.set_shooting_enabled(false)
+	add(fresh)
+	assert_eq(fresh.get_bullet_factory(), factory, "two factories: the first one")
+	expect_warning_sequence(["BulletSpawner2D 'Fresh': bullet_factory_path is empty and 2 BulletFactory2D share its world; it fires into '%s' (the first one in the tree). Set bullet_factory_path to choose another." % factory.name])
+	assert_eq(fresh.get_bullet_factory(), factory, "found again silently")
+	var lonely := BulletSpawner2D.new()
+	lonely.set_shooting_enabled(false)
+	add_in_own_world(lonely)
+	assert_null(lonely.get_bullet_factory(), "another world has no factory")
+	other.queue_free()
+	await idle(1)
+	assert_eq(sp.get_bullet_factory(), factory, "a gone factory is never used")

@@ -57,7 +57,48 @@ BulletFactory2D *PatternSpawner2D::get_bullet_factory() const {
 	// Validate the stale cache BEFORE touching it: with an empty path or
 	// outside the tree, resolve_node_path() returns the pointer untouched
 	// and it may dangle after the node was freed.
-	return validate_cached_node(this, bullet_factory_path, bullet_factory, bullet_factory_id);
+	BulletFactory2D *assigned = validate_cached_node(this, bullet_factory_path, bullet_factory, bullet_factory_id);
+	if (assigned != nullptr || !bullet_factory_path.is_empty()) {
+		return assigned; // a path or set_bullet_factory() decides (a broken path never falls back)
+	}
+	return find_world_factory();
+}
+
+BulletFactory2D *PatternSpawner2D::find_world_factory() const {
+	if (world_factory_id != 0) {
+		BulletFactory2D *found = Object::cast_to<BulletFactory2D>(ObjectDB::get_instance(ObjectID(world_factory_id)));
+		if (found != nullptr && found->is_inside_tree() && !found->is_queued_for_deletion()) {
+			return found;
+		}
+		world_factory_id = 0;
+	}
+	if (!is_inside_tree()) {
+		return nullptr;
+	}
+	const std::vector<BulletFactory2D *> &factories = BulletFactory2D::factories_in_tree;
+	if (factories.empty()) {
+		return nullptr;
+	}
+	const Ref<World2D> world = get_world_2d();
+	BulletFactory2D *first = nullptr;
+	int candidates = 0;
+	for (BulletFactory2D *f : factories) {
+		if (f->is_queued_for_deletion() || f->get_world_2d() != world) {
+			continue;
+		}
+		if (first == nullptr) {
+			first = f;
+		}
+		++candidates;
+	}
+	if (first == nullptr) {
+		return nullptr;
+	}
+	if (candidates > 1) {
+		WarnOnce2D::warn(get_instance_id(), kWarnSeveralWorldFactories, 0, 0, String(get_class()) + " '" + String(get_name()) + "': bullet_factory_path is empty and " + itos(candidates) + " BulletFactory2D share its world; it fires into '" + String(first->get_name()) + "' (the first one in the tree). Set bullet_factory_path to choose another.");
+	}
+	world_factory_id = first->get_instance_id();
+	return first;
 }
 
 void PatternSpawner2D::set_bullet_factory(BulletFactory2D *factory) {
@@ -615,7 +656,9 @@ void PatternSpawner2D::on_config_changed() {
 PackedStringArray PatternSpawner2D::_get_configuration_warnings() const {
 	PackedStringArray out;
 	if (bullet_factory_path.is_empty() && bullet_factory == nullptr) {
-		out.push_back("No BulletFactory2D assigned: set bullet_factory_path, or nothing can be fired.");
+		if (is_inside_tree() && get_bullet_factory() == nullptr) {
+			out.push_back("No BulletFactory2D in this world: an empty bullet_factory_path fires into the factory of the world the spawner runs in (fine for a scene instanced into one that has a factory); otherwise add one or set bullet_factory_path.");
+		}
 	} else if (is_inside_tree() && get_bullet_factory() == nullptr) {
 		out.push_back("bullet_factory_path does not point to a BulletFactory2D.");
 	}

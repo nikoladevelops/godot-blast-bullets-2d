@@ -355,6 +355,12 @@ public:
 	// (see is_tracked_node_alive). A raw pointer outlives freed nodes.
 	mutable BulletFactory2D *bullet_factory = nullptr;
 	mutable uint64_t bullet_factory_id = 0;
+	// An empty path with nothing assigned: the factory of the spawner's world
+	// (the first one in the tree that shares it), found again only when it
+	// left the tree or was freed. A spawner in an instanced scene (an NPC)
+	// needs no wiring.
+	mutable uint64_t world_factory_id = 0;
+	BulletFactory2D *find_world_factory() const;
 	// Plain Node2D reference from the scene tree whose children provide
 	// spawn transforms (same NodePath pattern as the factory, but
 	// type-filtered to Node2D since native types always match).
@@ -367,6 +373,8 @@ public:
 	NodePath get_bullet_factory_path() const;
 	void set_bullet_factory_path(const NodePath &p_path);
 
+	// The factory shots go to: bullet_factory_path / set_bullet_factory(),
+	// else (empty path) the factory of the spawner's world.
 	BulletFactory2D *get_bullet_factory() const;
 	void set_bullet_factory(BulletFactory2D *factory);
 	// Script entries of the setters taking a node (bound): the Variant is read

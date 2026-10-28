@@ -153,6 +153,7 @@ static constexpr uint32_t kWarnCorridorGap = kPatternWarnCorridorGap; // gap >= 
 static constexpr uint32_t kWarnSkipIndexOutOfRange = 102; // helper_skip_indices
 static constexpr uint32_t kWarnGridTooLarge = kPatternWarnGridTooLarge; // waterfall/lattice columns*rows
 static constexpr uint32_t kWarnOrbitWithoutHoming = 104; // orbiting needs homing
+static constexpr uint32_t kWarnSeveralWorldFactories = 105; // empty bullet_factory_path, several factories in the world
 
 // NodePath setters: inside the tree, a path that resolves to a node of the
 // wrong type is rejected loudly and the old value kept. A path that does

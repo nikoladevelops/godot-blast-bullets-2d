@@ -53,9 +53,9 @@ func test_preview_draws_the_offset(space: int = use_parameters([0, 1])) -> void:
 func test_configuration_warnings() -> void:
 	var sp := BulletSpawner2D.new()
 	sp.set_shooting_enabled(false)
-	add(sp)
+	add_in_own_world(sp) # no factory in its world to fall back on
 	var w: PackedStringArray = sp.get_setup_warnings()
-	assert_true(_has(w, "No BulletFactory2D assigned"), "missing factory listed")
+	assert_true(_has(w, "No BulletFactory2D in this world"), "missing factory listed")
 	assert_true(_has(w, "No spawn_data"), "missing spawn data listed")
 	sp.set_bullet_factory(factory)
 	sp.set_spawn_data(H.make_volley_data(2))
@@ -111,7 +111,8 @@ func test_each_misconfiguration_is_named() -> void:
 	var wrong := Node2D.new()
 	add(wrong)
 	sp.set_bullet_factory(null)
-	assert_true(_has_1(sp, "No BulletFactory2D assigned"), "missing factory")
+	move_to_own_world(sp) # no factory in its world to fall back on
+	assert_true(_has_1(sp, "No BulletFactory2D in this world"), "missing factory")
 	sp.set_bullet_factory(factory)
 	sp.set_spawn_data(null)
 	assert_true(_has_1(sp, "No spawn_data"), "missing spawn data")

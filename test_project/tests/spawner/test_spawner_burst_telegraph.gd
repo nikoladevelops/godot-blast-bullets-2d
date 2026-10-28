@@ -116,6 +116,7 @@ func test_shrinking_burst_count_mid_chain_stays_consistent() -> void:
 func test_misconfigured_auto_burst_reports_once() -> void:
 	var sp := _spawner(3, 0.02)
 	sp.set_bullet_factory(null)
+	move_to_own_world(sp) # no factory in its world to fall back on
 	sp.shoot_interval_sec = 0.1
 	sp.set_shooting_enabled(true)
 	await _until(sp, "burst_finished", 3)
