@@ -10,7 +10,7 @@ extends BulletFactory2D
 # BlastBullets2D plugin created by https://x.com/realNikich / https://github.com/nikoladevelops
 # For tutorials: https://www.youtube.com/@realnikich
 
-# NOTE NEVER OVERRIDE THE _ready FUNC HERE IF YOU ARE PLANNING TO ATTACH A CUSTOM SCRIPT. YOUR GAME WILL CRASH!!
+# NOTE A script may define its own _ready / _physics_process / _process: the factory's own work runs next to them.
 # NOTE Depending on the enemy type (whether the thing being hit by the bullets is an area or a body), you need to handle either the area_entered / body_entered signals of the BulletFactory2D
 # NOTE Ensure the enemy is in the correct collision_layer and that the bullets are also in the same collision_mask
 # NOTE Static bodies can be hit by the bullets, but only if you set the data of the bullets's monitorable property to true - this is at the cost of performance of course, so it's better to stick with Area2D or other types of bodies

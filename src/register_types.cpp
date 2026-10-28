@@ -65,7 +65,7 @@ void initialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
 	// Editor behavior is therefore NEVER controlled through registration. Code
 	// that must not run in the editor (shoot timers, physics setup, processing)
 	// is guarded with Engine::is_editor_hint() at the call site - see
-	// BulletFactory2D::_ready() and BulletSpawner2D::_ready()/_process().
+	// BulletFactory2D::native_ready() and PatternSpawner2D::native_ready()/native_process().
 	// Do not "fix" editor log spam by switching macros; fix (or add) the guard.
 
 	// Shared

@@ -450,7 +450,7 @@
 		<method name="ensure_factory_initialized">
 			<return type="bool" />
 			<description>
-				Lazy recovery for a GDScript _ready() that skipped super._ready(): builds missing containers/debuggers and returns whether the factory is ready. Called automatically by every spawn/populate entry; call it manually after _ready if you override _ready in a script (better: call super._ready() first). Warns once when recovery runs.
+				Starts the factory now if it has not started yet (a spawn from a script [code]_ready()[/code] can come before the factory's own start) and returns whether it is ready. A script may define its own [code]_ready()[/code], [code]_physics_process()[/code] and [code]_process()[/code]: the factory runs its work from notifications, so both run. Called automatically by every spawn and populate call.
 			</description>
 		</method>
 		<method name="free_active_bullets">

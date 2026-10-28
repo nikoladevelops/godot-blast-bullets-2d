@@ -250,3 +250,30 @@ func test_live_volley_ids_skip_volleys_queued_for_deletion() -> void:
 	gone.queue_free()
 	assert_eq(Array(factory.debug_get_live_volley_ids(0)), [keep.get_instance_id()], "the queued volley is not listed")
 	assert_eq(factory.debug_get_active_volleys_amount(), 1, "the sibling counter agrees")
+
+
+## A factory script overriding _ready / _physics_process / _process (GDScript
+## refuses super._ready() on an extension class) still gets the full native
+## start and tick: no warning, one set of containers, bullets fly.
+func test_a_script_with_its_own_callbacks_keeps_the_factory_running() -> void:
+	var s := GDScript.new()
+	s.source_code = "extends BulletFactory2D\nvar readied := false\nvar physics := 0\nfunc _ready() -> void:\n\treadied = true\nfunc _physics_process(_d: float) -> void:\n\tphysics += 1\nfunc _process(_d: float) -> void:\n\tpass\n"
+	assert_eq(s.reload(), OK, "the script compiles")
+	var f := BulletFactory2D.new()
+	f.set_script(s)
+	add(f)
+	expect_no_errors("started without a warning")
+	assert_true(f.readied, "the script's _ready ran")
+	assert_true(f.debug_get_factory_state()["is_ready"], "the native start ran too")
+	var plain := BulletFactory2D.new()
+	add(plain)
+	assert_eq(f.get_child_count(), plain.get_child_count(), "one set of containers, like a plain factory")
+	var v: BulletVolley2D = f.spawn_volley(H.make_volley_data(1, 600.0, 5.0))
+	assert_not_null(v, "spawns")
+	var start: Vector2 = v.get_bullet_transform(0).origin
+	for i in 10:
+		await physics(1)
+	assert_gt(v.get_bullet_transform(0).origin.distance_to(start), 50.0, "the native tick moves the bullets")
+	assert_gt(f.physics, 0, "the script's own _physics_process ran too")
+	await idle(1)
+	f.free_active_bullets()

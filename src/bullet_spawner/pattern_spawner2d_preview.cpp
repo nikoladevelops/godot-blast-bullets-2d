@@ -1386,7 +1386,7 @@ void PatternSpawner2D::update_preview_process_state() {
 	// Runtime: never touched here - shooting/spinning own _process, and the
 	// runtime preview piggy-backs that loop via preview_sources_dirty().
 	if (Engine::get_singleton()->is_editor_hint() && is_inside_tree()) {
-		set_process(preview.show || graze_preview_active());
+		callbacks.apply(*this, preview.show || graze_preview_active(), callbacks.physics_on);
 	}
 }
 

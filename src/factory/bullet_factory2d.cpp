@@ -218,6 +218,24 @@ void BulletFactory2D::on_scene_physics_frame() {
 }
 
 void BulletFactory2D::_notification(int p_what) {
+	// The callbacks (core/native_callbacks2d.hpp): gated by the plugin's own
+	// switches, a script may keep the engine processing for its callbacks.
+	if (p_what == NOTIFICATION_PHYSICS_PROCESS) {
+		if (callbacks.physics_on) {
+			native_physics_process(get_physics_process_delta_time());
+		}
+		return;
+	}
+	if (p_what == NOTIFICATION_PROCESS) {
+		if (callbacks.idle_on) {
+			native_process(get_process_delta_time());
+		}
+		return;
+	}
+	if (p_what == NOTIFICATION_READY) {
+		native_ready();
+		return;
+	}
 	if (p_what == NOTIFICATION_ENTER_TREE) {
 		factories_in_tree.push_back(this);
 		// The physics flush runs before the SceneTree's physics_frame
@@ -334,15 +352,14 @@ void BulletFactory2D::_notification(int p_what) {
 	}
 }
 
-void BulletFactory2D::_ready() {
+void BulletFactory2D::native_ready() {
 	// Ensure the code that is next will not be ran in the editor
 	if (Engine::get_singleton()->is_editor_hint()) {
 		return;
 	}
 
-	// Guard against double-init via ensure_factory_initialized() (lazy init
-	// path may have already built containers when a script _ready() ran first
-	// without super and a spawn happened before the native _ready).
+	// Once: a spawn before the READY notification (from a script _ready,
+	// which runs first) already started it through ensure_factory_initialized.
 	if (is_ready) {
 		return;
 	}
@@ -382,53 +399,13 @@ bool BulletFactory2D::ensure_factory_initialized() {
 	if (is_ready) {
 		return true;
 	}
-	if (Engine::get_singleton()->is_editor_hint()) {
+	if (Engine::get_singleton()->is_editor_hint() || !is_inside_tree() || is_tearing_down) {
 		return false;
 	}
-	if (!is_inside_tree()) {
-		return false;
-	}
-	if (is_tearing_down) {
-		return false;
-	}
-	// Containers already exist (native _ready ran): just mark ready. This
-	// keeps the normal path allocation-free.
-	if (volley_container.ptr != nullptr && bullet_attachments_container.ptr != nullptr && volley_debugger.ptr != nullptr) {
-		is_ready = true;
-		return true;
-	}
-	// Recovery path: a GDScript _ready() without super._ready() skipped native
-	// init. Build what is missing so the game does not ship a dead factory.
-	if (physics_space.is_valid() == false) {
-		Ref<World2D> world = get_world_2d();
-		if (world.is_null()) {
-			return false;
-		}
-		physics_space = world->get_space();
-	}
-	if (all_volleys.capacity() == 0) {
-		all_volleys.reserve(2048);
-		volley_set.resize(2048);
-	}
-	if (volley_container.get() == nullptr) {
-		add_bullet_containers();
-	}
-	if (bullet_attachments_container.get() == nullptr) {
-		add_bullet_attachment_container();
-	}
-	fx_ensure_effects_container();
-	if (volley_debugger.get() == nullptr) {
-		add_debuggers();
-	}
-	apply_debugger_settings(*volley_debugger.ptr);
-	update_process_state();
-	is_ready = true;
-	resolve_physics_interpolation();
-	if (!ready_missing_super_warned) {
-		ready_missing_super_warned = true;
-		UtilityFunctions::push_warning("BulletFactory2D: factory was used before native _ready() ran (likely a GDScript _ready() without super._ready()). Containers were recovered automatically, but call super._ready() in your script to avoid this. See WARNING in README.");
-	}
-	return true;
+	// Used before its READY notification (a spawn from a script _ready that
+	// runs first): the native start now, once.
+	native_ready();
+	return is_ready;
 }
 
 void BulletFactory2D::set_physics_interpolation(PhysicsInterpolation value) {
@@ -558,18 +535,18 @@ void BulletFactory2D::set_is_factory_processing_bullets(bool is_processing_enabl
 		}
 	}
 
-	set_physics_process(is_processing_enabled);
 	update_process_state();
 }
 
 void BulletFactory2D::update_process_state() {
-	// _process drives the interpolation pass (only while bullets process
-	// and interpolation is on): idle otherwise instead of paying an empty
-	// virtual call every rendered frame.
-	set_process(is_factory_processing_bullets && use_physics_interpolation);
+	// The sweep runs while bullets process (a pause stops it); _process
+	// drives the interpolation pass (only while bullets process and
+	// interpolation is on): idle otherwise instead of paying an empty call
+	// every rendered frame.
+	callbacks.apply(*this, is_factory_processing_bullets && use_physics_interpolation, is_factory_processing_bullets);
 }
 
-void BulletFactory2D::_physics_process(double delta) {
+void BulletFactory2D::native_physics_process(double delta) {
 	if (is_queued_for_deletion()) {
 		return; // dying (a refused free queued it, or a script did): no more sweeps
 	}
@@ -672,7 +649,7 @@ void BulletFactory2D::_physics_process(double delta) {
 	++stats_physics_ticks;
 }
 
-void BulletFactory2D::_process(double delta) {
+void BulletFactory2D::native_process(double delta) {
 	if (is_factory_processing_bullets && use_physics_interpolation) {
 		// Same guard as _physics_process: reset/free_* during the render
 		// sweep would mutate the vec under iteration. The interpolation pass

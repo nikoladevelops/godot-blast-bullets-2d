@@ -697,7 +697,7 @@ bool BulletFactory2D::debug_advance_time(double delta) {
 	if (!is_factory_processing_bullets) {
 		return false; // paused: the engine loop would not step either
 	}
-	_physics_process(delta);
+	native_physics_process(delta);
 	return true;
 }
 

@@ -888,7 +888,7 @@ bool PatternSpawner2D::shoot_once_deferred() {
 	return true;
 }
 
-void PatternSpawner2D::_ready() {
+void PatternSpawner2D::native_ready() {
 	// Same contract as BulletFactory2D::_ready: never arm shooting in the
 	// editor. Extension nodes still get _ready/_process there, and without
 	// this the shoot timer would fire against a factory that is deliberately
@@ -970,6 +970,24 @@ void PatternSpawner2D::_ready() {
 }
 
 void PatternSpawner2D::_notification(int p_what) {
+	// The callbacks (core/native_callbacks2d.hpp): gated by the plugin's own
+	// switches, a script may keep the engine processing for its callbacks.
+	if (p_what == NOTIFICATION_PROCESS) {
+		if (callbacks.idle_on) {
+			native_process(get_process_delta_time());
+		}
+		return;
+	}
+	if (p_what == NOTIFICATION_PHYSICS_PROCESS) {
+		if (callbacks.physics_on) {
+			native_physics_process(get_physics_process_delta_time());
+		}
+		return;
+	}
+	if (p_what == NOTIFICATION_READY) {
+		native_ready();
+		return;
+	}
 	if (p_what == NOTIFICATION_CHILD_ORDER_CHANGED) {
 		// Instant refresh for marker changes under this spawner. Markers under
 		// an external generator are picked up by the _process dirty-check
@@ -1125,7 +1143,7 @@ double PatternSpawner2D::get_process_time_scale() const {
 	return (Math::is_finite(scale) && scale > 0.0) ? scale : 0.0;
 }
 
-void PatternSpawner2D::_process(double delta) {
+void PatternSpawner2D::native_process(double delta) {
 	// Self-healing: even if processing gets enabled in the editor somehow
 	// (e.g. set_shooting_enabled(true) from an editor dock), never shoot.
 	// The editor only runs the preview live-refresh loop.
@@ -1145,7 +1163,7 @@ void PatternSpawner2D::_process(double delta) {
 	}
 }
 
-void PatternSpawner2D::_physics_process(double delta) {
+void PatternSpawner2D::native_physics_process(double delta) {
 	if (process_callback == PROCESS_PHYSICS && !Engine::get_singleton()->is_editor_hint()) {
 		run_frame(delta);
 	}
@@ -1153,19 +1171,17 @@ void PatternSpawner2D::_physics_process(double delta) {
 
 void PatternSpawner2D::set_loop_active(bool active) {
 	if (Engine::get_singleton()->is_editor_hint() || process_callback == PROCESS_IDLE) {
-		set_process(active);
-		set_physics_process(false);
+		callbacks.apply(*this, active, false);
 	} else {
-		set_physics_process(active);
-		set_process(false);
+		callbacks.apply(*this, false, active);
 	}
 }
 
 bool PatternSpawner2D::is_loop_active() const {
 	if (!Engine::get_singleton()->is_editor_hint() && process_callback == PROCESS_PHYSICS) {
-		return is_physics_processing();
+		return callbacks.physics_on;
 	}
-	return is_processing();
+	return callbacks.idle_on;
 }
 
 void PatternSpawner2D::set_process_callback(SpawnerProcessCallback value) {

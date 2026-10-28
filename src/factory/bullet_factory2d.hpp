@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/live_object2d.hpp"
+#include "core/native_callbacks2d.hpp"
 
 #include "core/variant_enum_cast2d.hpp"
 
@@ -88,13 +89,10 @@ public:
 	// internal busy flag is held, those operations reject with the standard busy error.
 	void _set_internal_operation_busy(bool value) { is_factory_busy = value; }
 
-	// Ensures the correct initial state
-	virtual void _ready() override;
-
-	// Moves all bullets / handles bullet behavior
-	virtual void _physics_process(double delta) override;
-
-	virtual void _process(double delta) override;
+	// The engine callbacks run from _notification (READY, PHYSICS_PROCESS,
+	// PROCESS), never as virtual overrides: a game's script may define its
+	// own _ready / _physics_process / _process and both run
+	// (core/native_callbacks2d.hpp).
 
 	// Spawns one volley (one bullet per spawn_data.transforms entry), reusing a
 	// pooled volley of the same bucket when one exists. Returns the live
@@ -320,10 +318,9 @@ public:
 	// queue_structural_call in the .cpp). Bound for the not-in-tree fallback.
 	void _flush_structural_calls();
 
-	// Ensures factory containers exist even when a GDScript _ready() overrode
-	// the native _ready() without super._ready(). Called lazily from every
-	// spawn/populate entry via validate_spawn_request(). Emits a loud error
-	// once telling the user to call super._ready(). Returns is_ready.
+	// Starts the factory now when it is used before its READY notification
+	// (a spawn from a script _ready, which runs first). Called lazily from
+	// every spawn/populate entry via validate_spawn_request(). Returns is_ready.
 	bool ensure_factory_initialized();
 
 	//
@@ -1175,7 +1172,15 @@ private:
 	Variant _monitor_active_effects();
 	Variant _monitor_active_attachments();
 	// Once-only _ready-missing warning (lazy init when _ready ran without super).
-	bool ready_missing_super_warned = false;
+	// The plugin's processing switches (the gate of its callbacks).
+	NativeCallbacks2D callbacks;
+	// Builds the containers, the debuggers and the monitors (once).
+	void native_ready();
+	// Moves all bullets / handles bullet behavior. Never inlined into
+	// _notification (measured: a sweep inlined there ran ~14% slower).
+	_NO_INLINE_ void native_physics_process(double delta);
+	// The interpolation pass.
+	_NO_INLINE_ void native_process(double delta);
 
 	// Errors (once per call) when a structural operation runs while mutation
 	// is unsafe: mid-iteration, or inside any physics frame (server flush

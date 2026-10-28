@@ -516,7 +516,7 @@ volley.bullet_homing_target_reached.connect(func():
 # Create a brand new scene and make sure the type is set to BulletAttachment2D. Very important!
 # Place particles or anything you want inside
 # Next override the BulletAttachment2D functions ``on_bullet_disable()``, ``on_bullet_enable()``, ``on_bullet_spawn()``, ``on_spawn_in_pool()`` and (for tree setup) ``_ready()`` and implement custom logic to your liking.
-#(Check out the test_project.zip for examples). Note: this `_ready()` note is only about BulletAttachment2D - never override `_ready()` inside BulletFactory2D (see WARNING below).
+#(Check out the test_project.zip for examples).
 
 # Load the BulletAttachment2D a PackedScene, then do this:
 #volley.bullet_set_attachment(...)
@@ -543,7 +543,7 @@ For smooth bullets no matter the refresh rate enable physics interpolation in yo
 tick the checkbox inside the inspector in `BulletFactory2D`. That's all, enjoy the plugin!
 
 ## WARNING
-- If you attach a script with `_ready()` to `BulletFactory2D`, call `super._ready()` first. The factory now recovers automatically (`ensure_factory_initialized()`) and warns once, but without super the first spawns would previously hit a dead factory.
+- Scripts on `BulletFactory2D`, `BulletSpawner2D` and `LaserSpawner2D` may define their own `_ready()`, `_process()` and `_physics_process()`: the plugin runs its own work from notifications, so both run (no `super._ready()` needed; GDScript refuses it on these classes anyway).
 - Use `queue_free()` when you delete a volley or a bullet attachment yourself, never `free()`. Especially never call `free()` on a volley from inside one of its own collision or attachment callbacks (for example inside `area_entered` or `on_bullet_disable`). `queue_free()` is always safe in those situations. From any callback prefer `factory.free_volley_deferred(volley)`.
 - Structural factory calls (`reset()`/`free_*()`/`populate_*()`) reject inside physics frames/sweeps. From handlers use the deferred variants: `reset_deferred()`, `free_active_bullets_deferred()`, `free_disabled_bullets_deferred()`, `free_bullets_pool_deferred()`, `populate_bullets_pool_deferred()`, `free_attachments_pool(_for_scene)_deferred()`.
 - Cross-owner reuse must go through `spawn_*()` / `enable_volley()` (which re-seed appearance, custom data, speeds and patterns). `enable_bullet()` wakes a pooled instance with its current appearance/custom-data intact - intended for same-owner re-enable, not for handing a volley to a new owner.

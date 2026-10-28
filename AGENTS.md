@@ -1073,7 +1073,13 @@ deduped, cancelled by REMOVED) and replayed once on resume.
   Bind a `const Variant &` and resolve it with `live_argument2d<T>`.
 - Godot facts that bit us: GDExtension virtuals
   (`_get_configuration_warnings`) are not script-callable (expose a public
-  twin); NEVER open the real test_project in an editor with a scene argument
+  twin); a game's script `_ready` / `_process` / `_physics_process` REPLACES
+  the extension's virtual of the same name and GDScript refuses
+  `super._ready()` on an extension class, so the nodes a game scripts
+  (factory, spawners) never override those virtuals: their work runs from
+  `_notification` (READY / PROCESS / PHYSICS_PROCESS) gated by their own
+  switches (`core/native_callbacks2d.hpp`), and processing stays on while the
+  script needs it (pinned by `test_factory_lifecycle`, `test_spawner_tree`); NEVER open the real test_project in an editor with a scene argument
   (headless or not): the editor saves `open_scenes`/`current_scene` in
   `.godot/editor/editor_layout.cfg` and the developer's next launch reopens
   that scene, so a @tool script in it runs in their editor (an editor-smoke
@@ -1241,6 +1247,9 @@ project's `.so`). For quick numeric comparisons load two
   re-updated all shapes; one shared shape per volley made it O(N) (8k: ~10 ms).
 - Inlining `move_bullets` into the factory loop cost 20–25% on
   `trails_fx_2k`: it stays a separate call in its own TU.
+  Same for the factory sweep itself: `native_physics_process` inlined into
+  `_notification` cost `emitter_storm` / `spawner_warm_shot_5k` ~14% (the
+  native callbacks are `_NO_INLINE_`).
 - A `Ref<>` returned by value per bullet costs a reference()/unreference()
   pair (trail and effect shards hand out raw `MultiMesh *`).
 - Pattern layout: the pattern refactor (one `marker.affine_inverse()` per

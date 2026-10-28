@@ -211,3 +211,47 @@ func test_factory_smoke() -> void:
 	factory.populate_bullets_pool(null, _make_data(), 3)
 	expect_errors_containing("explicit VolleyPoolKey2D", 2, "null-key populate fails loud")
 	assert_true(factory.debug_get_bullets_pool_amount() == 0, "null-key populate creates nothing")
+
+
+func _scripted(base: String) -> GDScript:
+	# GDScript refuses super._ready() on an extension class (the virtual is not
+	# a script method), so a script override never reaches the native one.
+	var s := GDScript.new()
+	s.source_code = "extends %s\nvar readied := false\nvar processed := 0\nvar physics := 0\nfunc _ready() -> void:\n\treaded_mark()\nfunc readed_mark() -> void:\n\treadied = true\nfunc _process(_d: float) -> void:\n\tprocessed += 1\nfunc _physics_process(_d: float) -> void:\n\tphysics += 1\n" % base
+	assert_eq(s.reload(), OK, "the script compiles")
+	return s
+
+
+## A script that overrides _ready / _process / _physics_process (connecting
+## signals, its own logic) never costs the spawner its own start and loop:
+## the initial delay, the movement autostart, shooting_started and the shot
+## timer all run next to the script's callbacks.
+func test_a_script_with_its_own_callbacks_keeps_the_native_ones() -> void:
+	var path := Path2D.new()
+	path.curve = Curve2D.new()
+	path.curve.add_point(Vector2.ZERO)
+	path.curve.add_point(Vector2(200, 0))
+	add(path)
+	var sp := BulletSpawner2D.new()
+	sp.set_script(_scripted("BulletSpawner2D"))
+	sp.spawn_data = H.make_volley_data(1, 50.0, 2.0)
+	sp.shoot_interval_sec = 0.1
+	sp.shoot_initial_delay_sec = 0.5
+	sp.movement_enabled = true
+	var started := [0]
+	var fired := [0]
+	sp.shooting_started.connect(func() -> void: started[0] += 1)
+	sp.volley_fired.connect(func(_v, _n) -> void: fired[0] += 1)
+	add(sp)
+	sp.movement_path = sp.get_path_to(path)
+	sp.set_bullet_factory(factory)
+	assert_true(sp.readied, "the script's _ready ran")
+	assert_eq(started[0], 1, "shooting_started once")
+	assert_true(sp.is_movement_playing(), "the movement autostarted")
+	for i in 20: # 1/3 s, inside the initial delay
+		await physics(1)
+	assert_eq(fired[0], 0, "the initial delay holds the first shot")
+	for i in 30:
+		await physics(1)
+	assert_gt(fired[0], 0, "then it fires")
+	assert_gt(sp.processed + sp.physics, 0, "the script's own callbacks ran too")

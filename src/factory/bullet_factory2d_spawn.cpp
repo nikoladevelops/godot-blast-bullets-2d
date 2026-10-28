@@ -123,14 +123,13 @@ bool BulletFactory2D::validate_spawn_request(const char *caller_name, const Ref<
 		UtilityFunctions::push_error("Error when trying to spawn bullets. BulletFactory2D is currently busy. Ignoring the request");
 		return false;
 	}
-	// Lazy init: a GDScript _ready() without super._ready() leaves
-	// containers null and is_ready false. Recover + warn loudly instead of
-	// shipping a dead factory.
+	// Used before its READY notification (a script _ready that spawns runs
+	// first): the native start runs now.
 	if (!is_ready) {
 		ensure_factory_initialized();
 	}
 	if (!is_ready) {
-		UtilityFunctions::push_error(String(caller_name) + ": BulletFactory2D is not in the scene tree yet. Add it first, then spawn. If you attached a script with _ready() to the factory, call super._ready() first.");
+		UtilityFunctions::push_error(String(caller_name) + ": BulletFactory2D is not in the scene tree yet. Add it first, then spawn.");
 		return false;
 	}
 	if (is_tearing_down) {

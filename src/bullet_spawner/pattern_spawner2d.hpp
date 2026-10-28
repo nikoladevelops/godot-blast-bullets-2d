@@ -7,6 +7,7 @@
 #include "bullet_spawner/spawner_spin2d.hpp"
 #include "bullet_volley/bullet_volley2d.hpp"
 #include "core/emit_guard2d.hpp"
+#include "core/native_callbacks2d.hpp"
 #include "core/variant_enum_cast2d.hpp"
 #include "debugger/graze_preview_layer2d.hpp"
 #include "factory/bullet_factory2d.hpp"
@@ -785,6 +786,13 @@ public:
 	void set_process_callback(SpawnerProcessCallback value);
 	// The runtime loop's switch: _process (Idle) or _physics_process
 	// (Physics); the editor preview always uses _process.
+	// The plugin's processing switches (the gate of its callbacks).
+	NativeCallbacks2D callbacks;
+	void native_ready();
+	// Never inlined into _notification (the factory's sweep measured ~14%
+	// slower inlined there).
+	_NO_INLINE_ void native_process(double delta);
+	_NO_INLINE_ void native_physics_process(double delta);
 	void set_loop_active(bool active);
 	bool is_loop_active() const;
 	// One step of the runtime loop (either callback).
@@ -1158,9 +1166,10 @@ public:
 	double get_telegraph_time_left() const;
 	double get_pattern_list_time_left() const;
 
-	virtual void _ready() override;
-	virtual void _process(double delta) override;
-	virtual void _physics_process(double delta) override;
+	// The engine callbacks run from _notification (READY, PROCESS,
+	// PHYSICS_PROCESS), never as virtual overrides: a game's script may
+	// define its own _ready / _process / _physics_process and both run
+	// (core/native_callbacks2d.hpp).
 	// Plain name (no override): godot-cpp routes notifications to this
 	// method through the binding machinery, same as BulletFactory2D.
 	void _notification(int p_what);
