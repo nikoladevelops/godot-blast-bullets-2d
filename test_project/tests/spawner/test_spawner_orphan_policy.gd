@@ -455,3 +455,50 @@ func test_the_policy_reaches_every_factory_the_spawner_fired_into() -> void:
 	sp.free()
 	assert_false(in_first.is_bullet_status_enabled(0), "the first factory's volley is removed too")
 	assert_false(in_second.is_bullet_status_enabled(0), "the current factory's volley is removed")
+
+
+## The NPC case end to end: an enemy scene carries its own spawner (no factory
+## wiring: it fires into its world's factory), several enemies fire at the
+## player and die with bullets in flight. Those bullets keep hitting through
+## the factory's signal (the default Hand To Factory), nothing warns, and
+## everything ends up pooled.
+func test_dying_enemies_keep_their_bullets_dangerous() -> void:
+	var player := make_wall(Vector2(300, 0), Vector2(40, 600), 0xFF, 0xFF)
+	await physics(2)
+	var gun := BulletSpawner2D.new()
+	gun.name = "Gun"
+	gun.pattern_source = BulletSpawner2D.PATTERN_FROM_SELF
+	gun.helper_bullets_amount = 1
+	gun.shoot_interval_sec = 0.05
+	var data := H.make_volley_data(1, 600.0, 5.0)
+	data.monitorable = true
+	gun.spawn_data = data
+	var npc := Node2D.new()
+	npc.name = "Npc"
+	npc.add_child(gun)
+	gun.owner = npc
+	var scene := PackedScene.new()
+	assert_eq(scene.pack(npc), OK, "the enemy scene packs")
+	npc.free()
+	var factory_hits := [0]
+	factory.body_entered.connect(func(body, _v, _i) -> void:
+		if body == player:
+			factory_hits[0] += 1)
+	var enemies: Array = []
+	for k in 3:
+		var e: Node2D = scene.instantiate()
+		e.position = Vector2(0, -100 + k * 100)
+		add(e)
+		enemies.append(e)
+	for i in 30:
+		await physics(1)
+	for e in enemies:
+		e.queue_free() # they die with bullets in flight
+	await physics(1)
+	var at_death: int = factory_hits[0]
+	for i in 40:
+		await physics(1)
+	assert_gt(factory_hits[0], at_death, "bullets of dead enemies still hit the player (%d after their death)" % (factory_hits[0] - at_death))
+	expect_no_errors("no warning: their hits were handled")
+	await idle(30)
+	assert_eq(factory.get_active_bullet_count(), 0, "every bullet ended")
