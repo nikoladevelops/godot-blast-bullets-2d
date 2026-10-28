@@ -120,6 +120,30 @@ func test_a_frozen_volley_clock_holds_the_growth() -> void:
 	assert_eq(_scales(v), [1.0], "resumed: full size")
 
 
+func test_a_handler_pause_mid_tick_never_stalls_the_growth() -> void:
+	# A graze handler pauses the factory: the tick that grew and moved the
+	# bullet returns early (its lifetime pass is skipped). The window runs on
+	# the ticks that grew it, so the next tick grows by its full step.
+	make_graze_target(Vector2(10, 0))
+	var d := _data(1, 0.25, 0.2)
+	d.transforms = H.transforms_at([Vector2.ZERO])
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	v.graze_set_zones([H.make_graze_zone([40.0])], &"graze_targets")
+	var paused := [false]
+	factory.bullet_grazed.connect(func(_t: Node2D, _v: BulletVolley2D, _i: int, _z: GrazeZone2D, _r: int) -> void:
+		if not paused[0]:
+			paused[0] = true
+			factory.is_factory_processing_bullets = false)
+	step_factory(1, DT)
+	assert_true(paused[0], "the first tick grazed and paused")
+	factory.is_factory_processing_bullets = true
+	var seen: Array = [_scales(v)[0]]
+	for i in 4:
+		step_factory(1, DT)
+		seen.append(_scales(v)[0])
+	assert_eq(seen, [0.4, 0.6, 0.8, 1.0, 1.0], "one quarter per tick that moved the bullet, the paused one included")
+
+
 func test_nothing_of_the_window_survives_the_pool() -> void:
 	var d := _data(2, 0.25, 0.2)
 	d.max_life_time = DT

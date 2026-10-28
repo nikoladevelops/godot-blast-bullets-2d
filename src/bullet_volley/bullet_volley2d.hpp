@@ -949,10 +949,13 @@ public:
 	// Scale-in (spawn data scale_in_sec / scale_in_from): bullets spawn at
 	// scale_in_from of their size and every tick of the window multiplies
 	// each bullet's basis by the growth since the last tick (shape included),
-	// landing on full size. scale_in_applied = the factor shown now.
+	// landing on full size. scale_in_applied = the factor shown now;
+	// scale_in_elapsed = the window's own clock (the ticks that grew it: a
+	// tick a handler ends early still moved and grew its bullets).
 	double scale_in_sec = 0.0;
 	double scale_in_from = 1.0;
 	double scale_in_applied = 1.0;
+	double scale_in_elapsed = 0.0;
 	bool scale_in_active = false;
 	void step_scale_in(double delta);
 	// A bullet's drawn pose at full size: the basis without the growth still

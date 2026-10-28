@@ -826,7 +826,8 @@ Vector2 BulletVolley2D::get_bullet_scale(int bullet_index) const {
 // the last tick: a rotated, mirrored or randomized bullet keeps its shape, and
 // the shape (hitbox) follows through the placement in move_bullets.
 void BulletVolley2D::step_scale_in(double delta) {
-	const double progress = scale_in_sec > 0.0 ? Math::min((life_age + delta) / scale_in_sec, 1.0) : 1.0;
+	scale_in_elapsed += delta;
+	const double progress = scale_in_sec > 0.0 ? Math::min(scale_in_elapsed / scale_in_sec, 1.0) : 1.0;
 	const double target = scale_in_from + (1.0 - scale_in_from) * progress;
 	const real_t k = (real_t)(target / scale_in_applied);
 	scale_in_applied = target;

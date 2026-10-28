@@ -312,6 +312,7 @@ void BulletVolley2D::begin_life(const BulletVolleyData2D &data, uint64_t new_own
 	scale_in_from = data.scale_in_from;
 	scale_in_active = Math::is_finite(scale_in_sec) && scale_in_sec > 0.0 && scale_in_from > 0.0 && scale_in_from < 1.0;
 	scale_in_applied = scale_in_active ? scale_in_from : 1.0;
+	scale_in_elapsed = 0.0;
 	curves_elapsed_time = 0.0;
 	split_timer_fired_chain = 0;
 	split_counts.clear();
