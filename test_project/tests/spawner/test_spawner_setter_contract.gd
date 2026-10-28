@@ -184,7 +184,7 @@ func test_caps_match_the_generators() -> void:
 		["helper_waterfall_rows", 80001, "helper_waterfall_rows must be between 1 and 80000"],
 		["helper_lattice_columns", 80001, "helper_lattice_columns must be between 1 and 80000"],
 		["helper_lattice_rows", 80001, "helper_lattice_rows must be between 1 and 80000"],
-		["burst_count", 1025, "burst_count must be between 1 and 1024"],
+		["burst_count", 0, "burst_count must be >= 1"],
 		["helper_line_spacing", 0.0, "helper_line_spacing must be finite and > 0"],
 		["helper_line_spacing", -5.0, "helper_line_spacing must be finite and > 0"],
 		["helper_ring_y_scale", 0.0, "helper_ring_y_scale must be finite and > 0"],
@@ -194,6 +194,15 @@ func test_caps_match_the_generators() -> void:
 		sp.set(case[0], case[1])
 		expect_error_sequence([case[2]], "%s = %s" % [case[0], str(case[1])])
 		assert_eq(sp.get(case[0]), before, "%s kept its old value" % case[0])
+
+
+## No hidden burst cap: a chain fires one shot per interval (and at most
+## max_shots_per_frame in a frame), so any length the developer picks is fine.
+func test_long_bursts_are_accepted() -> void:
+	var sp := make_spawner()
+	sp.burst_count = 5000
+	expect_no_errors("a 5000-shot burst is accepted")
+	assert_eq(sp.burst_count, 5000, "kept")
 
 
 func test_grid_product_over_the_cap_warns_once_and_fires_nothing() -> void:

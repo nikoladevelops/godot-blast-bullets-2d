@@ -154,9 +154,6 @@ static constexpr uint32_t kWarnSkipIndexOutOfRange = 102; // helper_skip_indices
 static constexpr uint32_t kWarnGridTooLarge = kPatternWarnGridTooLarge; // waterfall/lattice columns*rows
 static constexpr uint32_t kWarnOrbitWithoutHoming = 104; // orbiting needs homing
 
-// Burst chains longer than this are a typo, not a pattern.
-static constexpr int kMaxBurstCount = 1024;
-
 // NodePath setters: inside the tree, a path that resolves to a node of the
 // wrong type is rejected loudly and the old value kept. A path that does
 // not resolve yet is accepted (the node may be added later, and scene

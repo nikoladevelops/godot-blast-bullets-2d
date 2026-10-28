@@ -382,8 +382,10 @@ int PatternSpawner2D::get_burst_count() const {
 }
 
 void PatternSpawner2D::set_burst_count(int value) {
-	if (value < 1 || value > kMaxBurstCount) {
-		UtilityFunctions::push_error((String(get_class()) + ": burst_count must be between 1 and ") + itos(kMaxBurstCount) + ", keeping the old value.");
+	// No upper cap: a chain fires one shot per interval (max_shots_per_frame
+	// bounds a frame), so any length the developer picks is cheap.
+	if (value < 1) {
+		UtilityFunctions::push_error(String(get_class()) + ": burst_count must be >= 1, keeping the old value.");
 		return;
 	}
 	cadence.burst_count = value;

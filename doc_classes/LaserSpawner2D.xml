@@ -86,7 +86,7 @@
 			Mirror every other burst volley (fan/spiral chirality flip). The first shot is plain, then shots alternate, for any burst_count.
 		</member>
 		<member name="burst_count" type="int" setter="set_burst_count" getter="get_burst_count" default="3">
-			Shots per burst trigger. Must be between 1 and 1024. Shrinking it during a chain ends the chain at the new count.
+			Shots per burst trigger, at least 1 (no upper limit: a chain fires one shot per interval). Shrinking it during a chain ends the chain at the new count.
 		</member>
 		<member name="burst_enabled" type="bool" setter="set_burst_enabled" getter="get_burst_enabled" default="false">
 			Fire multi-volley bursts per trigger: each interval pulls the trigger for burst_count shots spaced burst_interval_sec apart. Mid-burst shots ignore the main interval. Switching it off ends a running chain (with [signal burst_finished]) and its first-shot warning; a plain telegraphed shot keeps its warning.
