@@ -201,8 +201,9 @@ void BulletSpawner2D::homing_live_volleys(std::unordered_set<uint64_t> &r_change
 
 void BulletSpawner2D::arm_homing_after_wake(BulletVolley2D *volley) {
 	// The volley just woke (BulletVolley2D::enable_bullet): still this
-	// spawner's, homing still on, not armed meanwhile.
-	if (volley == nullptr || !homing_enabled || volley->owner_spawner_id != get_instance_id() || !volley->is_active || volley_tracker.contains((int64_t)volley->get_instance_id())) {
+	// spawner's, homing still on, not armed meanwhile, and no script's
+	// homing_follow owns its targets.
+	if (volley == nullptr || !homing_enabled || volley->owner_spawner_id != get_instance_id() || !volley->is_active || volley->is_homing_following() || volley_tracker.contains((int64_t)volley->get_instance_id())) {
 		return;
 	}
 	apply_volley_homing_and_orbiting(volley);

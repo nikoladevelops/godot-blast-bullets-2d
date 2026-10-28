@@ -211,8 +211,9 @@ func test_a_tracking_laser_aims_like_a_laser_spawner_twin() -> void:
 	assert_true(twin.track(BulletTargets2D.from_positions(PackedVector2Array([Vector2(150, -300)])), 10.0), "a spawner laser may track too (next pick in 10 s)")
 	step_factory(1, DT) # the first pick
 	sp.retarget_live_lasers()
+	sp.apply_to_live_lasers(LaserSpawner2D.LIVE_HOMING)
 	step_factory(1, DT)
-	assert_almost_eq(twin.get_beam_end(0), Vector2(150, -300), Vector2(0.01, 0.01), "its spawner's retargets leave a tracking laser alone")
+	assert_almost_eq(twin.get_beam_end(0), Vector2(150, -300), Vector2(0.01, 0.01), "its spawner's retargets and re-applies leave a tracking laser alone")
 
 
 ## A still factory volley (speed 0: the picks are read, not the flight).

@@ -415,7 +415,7 @@ int LaserSpawner2D::apply_to_live_lasers(BitField<LiveVolleyGroup> groups) {
 				touched = true;
 			}
 		}
-		if (retarget && laser_aims_at_targets2d(laser)) {
+		if (retarget && laser_aims_at_targets2d(laser) && !laser->is_tracking()) { // a track() owns its targets
 			assign_targets(laser, targets);
 			touched = true;
 		}

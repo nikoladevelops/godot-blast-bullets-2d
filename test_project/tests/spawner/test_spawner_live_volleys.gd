@@ -228,6 +228,27 @@ func test_apply_homing_reaches_parked_volleys(mode: int = use_parameters([0, 1])
 	assert_eq(sp.apply_to_live_volleys(BulletSpawner2D.LIVE_HOMING), 0, "armed alike now")
 
 
+## A volley a script made follow a BulletTargets2D owns its targets: a wake
+## the spawner armed before (LIVE_HOMING on a parked volley) arms nothing.
+func test_a_following_volley_wakes_without_the_spawners_homing() -> void:
+	var sp := _homing_spawner()
+	sp.set_homing_mode(BulletSpawner2D.HOMING_PER_BULLET)
+	var v := _shoot(sp)
+	_park(v)
+	sp.set_homing_enabled(false)
+	sp.apply_to_live_volleys(BulletSpawner2D.LIVE_HOMING)
+	sp.set_homing_enabled(true)
+	assert_eq(sp.apply_to_live_volleys(BulletSpawner2D.LIVE_HOMING), 1, "marked for its wake")
+	assert_true(v.homing_follow(BulletTargets2D.from_positions(PackedVector2Array([Vector2(0, -500)]))), "a script takes the homing over")
+	watch_signals(sp)
+	v.enable_bullet(0)
+	assert_signal_emit_count(sp, "volley_homing_configured", 0, "the wake arms nothing")
+	assert_false(_chases(v), "no spawner target until the follow picks")
+	step_factory(1)
+	assert_eq(v.shared_homing_deque_get_current_homing_target(), Vector2(0, -500), "the follow's pick")
+	assert_eq(Array(v.all_bullets_get_homing_targets_amount()).max(), 0, "no per-bullet spawner targets")
+
+
 ## Off then on again re-arms what the off cleared: a cleared volley leaves
 ## the retarget list, so it never counts as "armed alike" afterwards.
 func test_apply_homing_off_then_on_rearms_the_cleared_volleys() -> void:

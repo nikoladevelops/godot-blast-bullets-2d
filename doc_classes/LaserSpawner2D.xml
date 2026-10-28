@@ -22,7 +22,7 @@
 			<return type="int" />
 			<param index="0" name="groups" type="int" enum="PatternSpawner2D.LiveVolleyGroup" is_bitfield="true" default="2147483647" />
 			<description>
-				Re-applies this spawner's settings to the lasers it already fired: [constant PatternSpawner2D.LIVE_GRAZE] and [constant PatternSpawner2D.LIVE_SOUND] arm or disarm their graze zones and sound entries as the spawner stands now (a laser armed alike is left alone), [constant PatternSpawner2D.LIVE_HOMING] gives Track and Lock On lasers (by the data each was fired with) the targets the Laser Targeting group finds now; with [constant LASER_TARGET_NONE] they are left without a target and aim along the pattern. Spawner settings never reach lasers in flight on their own. Runs no user code. Returns how many lasers changed.
+				Re-applies this spawner's settings to the lasers it already fired: [constant PatternSpawner2D.LIVE_GRAZE] and [constant PatternSpawner2D.LIVE_SOUND] arm or disarm their graze zones and sound entries as the spawner stands now (a laser armed alike is left alone), [constant PatternSpawner2D.LIVE_HOMING] gives Track and Lock On lasers (by the data each was fired with) the targets the Laser Targeting group finds now; with [constant LASER_TARGET_NONE] they are left without a target and aim along the pattern; a laser that [method LaserVolley2D.track]s a [BulletTargets2D] keeps its own targets. Spawner settings never reach lasers in flight on their own. Runs no user code. Returns how many lasers changed.
 			</description>
 		</method>
 		<method name="debug_explain_features" qualifiers="const">
