@@ -277,3 +277,37 @@ func test_a_script_with_its_own_callbacks_keeps_the_factory_running() -> void:
 	assert_gt(f.physics, 0, "the script's own _physics_process ran too")
 	await idle(1)
 	f.free_active_bullets()
+
+
+## The pool twins work from inside a physics frame (where the direct calls are
+## refused): populate_bullets_pool_deferred, populate_attachments_pool_deferred
+## and free_attachments_pool_for_scene_deferred queue onto the next idle
+## frame; a missing argument is refused at once, nothing queued.
+func test_pool_deferred_twins_run_on_the_next_idle_frame() -> void:
+	var scene := make_probe_scene()
+	var data := _data(3)
+	await physics()
+	assert_true(Engine.is_in_physics_frame(), "inside physics")
+	factory.populate_bullets_pool_deferred(VolleyPoolKey2D.make(3, PhysicsServer2D.SHAPE_CIRCLE), data, 2)
+	factory.populate_attachments_pool_deferred(scene, 4)
+	assert_eq(factory.debug_get_bullets_pool_amount(), 0, "queued, not run")
+	await idle()
+	assert_eq(factory.debug_get_bullets_pool_amount(), 2, "two volleys pooled")
+	assert_eq(factory.debug_get_attachments_pool_amount(), 4, "four attachments pooled")
+	assert_eq(str(factory.debug_get_attachments_pool_info()).is_empty(), false, "a readable pool readout")
+	await physics()
+	factory.free_attachments_pool_for_scene_deferred(scene)
+	await idle()
+	assert_eq(factory.debug_get_attachments_pool_amount(), 0, "the scene's attachments freed")
+	factory.populate_bullets_pool_deferred(null, data, 1)
+	factory.populate_bullets_pool_deferred(VolleyPoolKey2D.make(3, PhysicsServer2D.SHAPE_CIRCLE), null, 1)
+	factory.populate_attachments_pool_deferred(null, 2)
+	factory.populate_attachments_pool_deferred(scene, 0)
+	factory.free_attachments_pool_for_scene_deferred(null)
+	expect_error_sequence([
+		"populate_bullets_pool_deferred requires an explicit VolleyPoolKey2D. Nothing was queued.",
+		"populate_bullets_pool_deferred: spawn_data is null. Nothing was queued.",
+		"populate_attachments_pool_deferred: needs a scene and amount_attachments > 0. Nothing was queued.",
+		"populate_attachments_pool_deferred: needs a scene and amount_attachments > 0. Nothing was queued.",
+		"free_attachments_pool_for_scene_deferred: attachment_scene is null. Nothing was queued.",
+	])
