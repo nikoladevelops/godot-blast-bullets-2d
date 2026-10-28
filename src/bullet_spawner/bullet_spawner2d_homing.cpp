@@ -1011,6 +1011,10 @@ int BulletSpawner2D::retarget_live_volleys() {
 		if (volley->bullet_factory != factory) {
 			continue;
 		}
+		// A script's homing_follow owns its targets (like a tracking laser).
+		if (volley->is_homing_following()) {
+			continue;
+		}
 		Array volley_targets = shared_targets;
 		if (per_volley_resolve) {
 			// The resolve below runs AFTER the volley was validated above: a

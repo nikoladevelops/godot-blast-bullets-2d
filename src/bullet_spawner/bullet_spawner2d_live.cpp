@@ -83,8 +83,6 @@ void BulletSpawner2D::graze_live_volleys(std::unordered_set<uint64_t> &r_changed
 	}
 	bool any = false;
 	const Array zones = graze_enabled ? spawner_graze_zones(any) : Array();
-	if (any) {
-	}
 	std::vector<BulletVolley2D *> owned;
 	factory->collect_volleys_owned_by(get_instance_id(), owned);
 	for (BulletVolley2D *volley : owned) {
@@ -167,8 +165,8 @@ void BulletSpawner2D::homing_live_volleys(std::unordered_set<uint64_t> &r_change
 	const std::vector<OwnedVolley2D> owned = snapshot_owned2d(factory, self_id);
 	for (const OwnedVolley2D &entry : owned) {
 		BulletVolley2D *volley = still_owned2d(entry, self_id);
-		if (volley == nullptr) {
-			continue;
+		if (volley == nullptr || volley->is_homing_following()) {
+			continue; // a script's homing_follow owns its targets
 		}
 		if (!homing_enabled) {
 			// Off: the volleys stop chasing (queues and orbits cleared), parked

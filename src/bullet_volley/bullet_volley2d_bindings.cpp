@@ -161,6 +161,8 @@ void BulletVolley2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("is_pooled"), &BulletVolley2D::is_pooled);
 	ClassDB::bind_method(D_METHOD("get_owner_spawner"), &BulletVolley2D::get_owner_spawner);
 	ClassDB::bind_method(D_METHOD("detach_from_spawner"), &BulletVolley2D::detach_from_spawner);
+	ClassDB::bind_method(D_METHOD("homing_follow", "targets", "retarget_interval", "mode"), &BulletVolley2D::homing_follow, DEFVAL(0.0), DEFVAL(HOMING_FOLLOW_SHARED_NEAREST));
+	ClassDB::bind_method(D_METHOD("is_homing_following"), &BulletVolley2D::is_homing_following);
 	ClassDB::bind_method(D_METHOD("is_parked"), &BulletVolley2D::is_parked);
 	ClassDB::bind_method(D_METHOD("get_life_id"), &BulletVolley2D::get_life_id);
 	ClassDB::bind_method(D_METHOD("debug_get_life_state"), &BulletVolley2D::debug_get_life_state);
@@ -548,6 +550,8 @@ void BulletVolley2D::_bind_methods() {
 	BIND_ENUM_CONSTANT(Anchored);
 
 	BIND_ENUM_CONSTANT(RelockAlways);
+	BIND_ENUM_CONSTANT(HOMING_FOLLOW_SHARED_NEAREST);
+	BIND_ENUM_CONSTANT(HOMING_FOLLOW_EACH_NEAREST);
 	BIND_ENUM_CONSTANT(StayLocked);
 	BIND_ENUM_CONSTANT(RelockOnTargetChange);
 

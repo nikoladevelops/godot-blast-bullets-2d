@@ -50,6 +50,10 @@ void BulletVolley2D::tick(double delta) {
 	if (pickup_data.is_valid() && !pickup_magnet_started) {
 		maybe_begin_pickup_magnet();
 	}
+	// 1b'. homing_follow: this tick's targets, before anyone steers (no user code).
+	if (follow_detector != nullptr) {
+		homing_follow_pick(delta);
+	}
 	// 1c. Scale-in window: every bullet grows by this tick's step before it
 	// moves (the placement below carries the new size to shape and buffer).
 	if (scale_in_active) {

@@ -235,6 +235,7 @@ void BulletVolley2D::release_life() {
 	graze_release(); // user resources (zones) and queued events
 	sound_release(); // user resources (sounds) and the listener ref
 	graze_detector.reset(); // the arming spawner's target settings
+	follow_detector.reset(); // homing_follow's targets
 	flock_set_config(nullptr); // the flock (and the factory's armed count)
 	split_arm(nullptr, Ref<BulletVolleyData2D>(), 0); // the chain and the spawn data copy
 	split_counts.clear(); // what this life spent (split_arm keeps it across re-arming)

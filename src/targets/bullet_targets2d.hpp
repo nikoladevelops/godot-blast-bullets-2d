@@ -16,7 +16,8 @@ using namespace godot;
 // mouse or fixed points (BulletTargets2D.from_*), filtered by filter_group
 // and THE target filter, rescanned every update_interval. One detector
 // (GrazeDetector2D) behind it is shared with every volley and laser it arms
-// (graze_set_zones, sound_set_effects, LaserVolley2D.track): edits reach
+// (graze_set_zones, sound_set_effects, LaserVolley2D.track,
+// BulletVolley2D.homing_follow): edits reach
 // them in flight, and they keep it when the script drops the handle.
 class BulletTargets2D : public RefCounted {
 	GDCLASS(BulletTargets2D, RefCounted)

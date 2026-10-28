@@ -1958,6 +1958,15 @@
 				Whether any trail layer is currently baked on this volley.
 			</description>
 		</method>
+		<method name="homing_follow">
+			<return type="bool" />
+			<param index="0" name="targets" type="Variant" />
+			<param index="1" name="retarget_interval" type="float" default="0.0" />
+			<param index="2" name="mode" type="int" enum="BulletVolley2D.HomingFollowMode" default="0" />
+			<description>
+				Homes this volley on the targets of a [BulletTargets2D], without a spawner: every [param retarget_interval] seconds of the volley's clock ([code]0[/code] = every tick) it picks by [param mode] ([constant HOMING_FOLLOW_SHARED_NEAREST]: the shared queue holds the target nearest the live bullets' center; [constant HOMING_FOLLOW_EACH_NEAREST]: every live bullet's own queue holds the target nearest it, O(bullets x targets) per pick, so give large volleys an interval). A queue is replaced only when its front changes (a kept target keeps its orbit lock); no target found clears the queue; frozen bullets keep theirs. The mouse source chases the live cursor. The steering (smoothing, reach, auto pop, orbiting) is the volley's own. [code]null[/code] stops following and leaves the queues as they are. While it follows, its spawner's retargets and [method BulletSpawner2D.apply_to_live_volleys] with [constant BulletSpawner2D.LIVE_HOMING] leave it alone. Dropped with the life. Returns [code]false[/code] with one error (nothing changed) for a target that is not a [BulletTargets2D] or [code]null[/code], a non-finite or negative interval or an unknown mode; refused on a pooled volley.
+			</description>
+		</method>
 		<method name="is_bullet_inside_graze" qualifiers="const">
 			<return type="bool" />
 			<param index="0" name="bullet_index" type="int" />
@@ -1983,6 +1992,12 @@
 			<return type="bool" />
 			<description>
 				Whether at least one graze zone is armed on this volley.
+			</description>
+		</method>
+		<method name="is_homing_following" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Whether [method homing_follow] steers this volley's homing queues.
 			</description>
 		</method>
 		<method name="is_parked" qualifiers="const">
@@ -2838,6 +2853,12 @@
 		</constant>
 		<constant name="RelockAlways" value="0" enum="OrbitingLockPolicy">
 			Orbiting lock policy, every retarget or queue replace drops the lock and the bullet re-acquires the radius.
+		</constant>
+		<constant name="HOMING_FOLLOW_SHARED_NEAREST" value="0" enum="HomingFollowMode">
+			[method homing_follow]: the shared queue holds the target nearest the live bullets' center.
+		</constant>
+		<constant name="HOMING_FOLLOW_EACH_NEAREST" value="1" enum="HomingFollowMode">
+			[method homing_follow]: every live bullet's own queue holds the target nearest that bullet.
 		</constant>
 		<constant name="StayLocked" value="1" enum="OrbitingLockPolicy">
 			Orbiting lock policy, once locked the bullet stays locked: retargets and empty-queue gaps never unlock, only an explicit disable, clear, or a freed target does. Use for bodyguard rings on moving Node2Ds.

@@ -550,6 +550,9 @@ String BulletVolley2D::debug_check_invariants() const {
 		if (emitter_config != nullptr) {
 			return "pooled volley still emits";
 		}
+		if (follow_detector != nullptr) {
+			return "pooled volley still follows homing targets";
+		}
 		if (homing_wake_owner_id != 0) {
 			return "pooled volley still waits to be armed for homing";
 		}

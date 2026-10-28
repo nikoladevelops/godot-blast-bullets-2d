@@ -1394,6 +1394,20 @@ public:
 	// pooled volley. Splits and emitter shots this volley queued earlier in
 	// the same sweep still belong to the spawner.
 	bool detach_from_spawner();
+	// SERIALIZED ids. How homing_follow picks from its targets.
+	enum HomingFollowMode : int {
+		HOMING_FOLLOW_SHARED_NEAREST = 0, // the shared queue: the target nearest the live bullets' center
+		HOMING_FOLLOW_EACH_NEAREST = 1, // each bullet's own queue: the target nearest that bullet
+	};
+	// Homing by a BulletTargets2D, without a spawner: every retarget_interval
+	// seconds of the volley's clock (0 = every tick) the volley picks by
+	// `mode` and replaces a queue whose front changed (a kept target keeps
+	// its orbit lock); no target found clears the queue. The steering is the
+	// volley's own (spawn data / setters). null stops following (the queues
+	// keep their targets). While it follows, its spawner's retargets leave
+	// it alone. Dropped with the life.
+	bool homing_follow(const Variant &targets, double retarget_interval = 0.0, HomingFollowMode mode = HOMING_FOLLOW_SHARED_NEAREST);
+	bool is_homing_following() const { return follow_detector != nullptr; }
 	// After owner_spawner_id changed: the splits and emitter shots this life
 	// queued and the factory has not spawned yet follow the new owner.
 	void reown_queued_requests();
@@ -2920,6 +2934,14 @@ public:
 	// orphans keep it), or for factory volleys graze_target_group through
 	// the factory's detector. Dropped when disarmed or with the life.
 	std::shared_ptr<GrazeDetector2D> graze_detector;
+	// homing_follow(): the shared detector, its interval, the time to the
+	// next pick and the mode. One test per tick while unset.
+	std::shared_ptr<GrazeDetector2D> follow_detector;
+	double follow_interval = 0.0;
+	double follow_time_left = 0.0;
+	int follow_mode = 0;
+	void homing_follow_pick(double delta);
+	void homing_follow_bullet(int bullet_index, const Variant &target, bool mouse);
 	StringName graze_target_group;
 	// Armed sound entries (nulls kept in place, skipped at fire). The mask
 	// has one bit per SoundTrigger with at least one enabled entry; WHO
@@ -3331,3 +3353,4 @@ BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletVolley2D::OrbitingDirection);
 BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletVolley2D::OrbitingTextureRotation);
 BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletVolley2D::OrbitingFollowMode);
 BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletVolley2D::OrbitingLockPolicy);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletVolley2D::HomingFollowMode);

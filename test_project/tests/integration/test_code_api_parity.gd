@@ -4,7 +4,8 @@ extends BlastTest
 ## children, nodes by name, fixed points, the mouse; update_interval) and is
 ## accepted wherever a target group was: graze_set_zones and
 ## sound_set_effects on volleys and lasers, plus LaserVolley2D.track (each
-## beam aims at the target nearest its muzzle). Its detector is shared, so
+## beam aims at the target nearest its muzzle) and BulletVolley2D.homing_follow
+## (the shared queue or each bullet's own holds its nearest target). Its detector is shared, so
 ## edits reach armed bullets in flight. Parity: a factory volley armed by code
 ## grazes exactly like a spawner-fired twin, a tracking laser aims exactly like
 ## a laser spawner's Node Group targeting.
@@ -212,3 +213,128 @@ func test_a_tracking_laser_aims_like_a_laser_spawner_twin() -> void:
 	sp.retarget_live_lasers()
 	step_factory(1, DT)
 	assert_almost_eq(twin.get_beam_end(0), Vector2(150, -300), Vector2(0.01, 0.01), "its spawner's retargets leave a tracking laser alone")
+
+
+## A still factory volley (speed 0: the picks are read, not the flight).
+func _follow_volley(points: Array) -> BulletVolley2D:
+	var d := H.make_volley_data(points.size(), 0.0, 30.0)
+	d.transforms = H.transforms_at(points)
+	return factory.spawn_volley(d)
+
+
+func test_a_following_volley_picks_the_nearest_target_on_its_clock() -> void:
+	var near := _target(Vector2(100, 0))
+	var far := _target(Vector2(-300, 0))
+	await idle(1)
+	var v := _follow_volley([Vector2.ZERO])
+	assert_true(v.homing_follow(BulletTargets2D.from_group(GROUP)), "follows")
+	assert_true(v.is_homing_following(), "following")
+	step_factory(1, DT)
+	assert_eq(v.shared_homing_deque_get_current_homing_target(), near, "the shared queue holds the nearest")
+	far.position = Vector2(20, 0)
+	step_factory(1, DT)
+	assert_eq(v.shared_homing_deque_get_current_homing_target(), far, "every tick: the new nearest")
+	assert_eq(v.shared_homing_deque_check_homing_targets_amount(), 1, "replaced, not stacked")
+	var slow := _follow_volley([Vector2.ZERO])
+	assert_true(slow.homing_follow(BulletTargets2D.from_group(GROUP), 0.25), "picks every 0.25 s")
+	step_factory(1, DT)
+	assert_eq(slow.shared_homing_deque_get_current_homing_target(), far, "the first pick")
+	near.position = Vector2(5, 0)
+	step_factory(3, DT)
+	assert_eq(slow.shared_homing_deque_get_current_homing_target(), far, "between picks the target stays")
+	step_factory(1, DT)
+	assert_eq(slow.shared_homing_deque_get_current_homing_target(), near, "the next pick moves to the nearest")
+
+
+func test_each_nearest_gives_every_bullet_its_own_target() -> void:
+	var left := _target(Vector2(-150, 0))
+	var right := _target(Vector2(150, 0))
+	await idle(1)
+	var v := _follow_volley([Vector2(-100, 0), Vector2(100, 0), Vector2(90, 40)])
+	assert_true(v.homing_follow(BulletTargets2D.from_group(GROUP), 0.0, BulletVolley2D.HOMING_FOLLOW_EACH_NEAREST), "each nearest")
+	step_factory(1, DT)
+	assert_eq([v.bullet_get_current_homing_target(0), v.bullet_get_current_homing_target(1), v.bullet_get_current_homing_target(2)], [left, right, right], "each bullet its nearest")
+	assert_false(v.shared_homing_deque_check_has_homing_targets(), "the shared queue stays empty")
+	v.disable_bullet(2)
+	left.position = Vector2(60, 40) # now nearest the frozen bullet 2 (30 px), still not bullet 1's
+	step_factory(1, DT)
+	assert_eq([v.bullet_get_current_homing_target(1), v.bullet_get_current_homing_target(2)], [right, right], "a frozen bullet keeps its queue")
+	assert_eq(v.bullet_get_current_homing_target(0), left, "bullet 0 still chases the moved left target")
+	left.remove_from_group(GROUP)
+	right.remove_from_group(GROUP)
+	step_factory(1, DT)
+	assert_eq([v.bullet_check_has_homing_targets(0), v.bullet_check_has_homing_targets(1)], [false, false], "nobody left: the live bullets' queues clear")
+	assert_eq(v.bullet_get_current_homing_target(2), right, "the frozen bullet keeps its queue")
+
+
+func test_points_the_mouse_and_an_empty_list() -> void:
+	var v := _follow_volley([Vector2.ZERO])
+	assert_true(v.homing_follow(BulletTargets2D.from_positions(PackedVector2Array([Vector2(50, 50), Vector2(-10, 0)]))), "points")
+	step_factory(1, DT)
+	assert_eq(v.shared_homing_deque_get_current_homing_target(), Vector2(-10, 0), "the nearest point")
+	assert_true(v.homing_follow(BulletTargets2D.from_mouse()), "the mouse")
+	step_factory(2, DT)
+	assert_eq(v.shared_homing_deque_check_current_target_type(), BulletVolley2D.MousePositionTarget, "a live mouse target")
+	assert_eq(v.shared_homing_deque_check_homing_targets_amount(), 1, "one mouse target, never re-pushed")
+	var t := _target(Vector2(30, 0))
+	await idle(1)
+	assert_true(v.homing_follow(BulletTargets2D.from_group(GROUP)), "a group")
+	step_factory(1, DT)
+	assert_eq(v.shared_homing_deque_get_current_homing_target(), t, "the member")
+	t.remove_from_group(GROUP)
+	step_factory(1, DT)
+	assert_false(v.shared_homing_deque_check_has_homing_targets(), "nobody left: the queue clears")
+	t.add_to_group(GROUP)
+	step_factory(1, DT)
+	assert_true(v.homing_follow(null), "null stops")
+	assert_false(v.is_homing_following(), "not following")
+	t.remove_from_group(GROUP)
+	step_factory(1, DT)
+	assert_eq(v.shared_homing_deque_get_current_homing_target(), t, "stopped: the queue keeps its target")
+
+
+func test_homing_follow_refuses_bad_input_and_leaves_with_the_life() -> void:
+	var v := _follow_volley([Vector2.ZERO])
+	assert_false(v.homing_follow(factory), "not a handle")
+	assert_false(v.homing_follow(BulletTargets2D.from_mouse(), NAN), "bad interval")
+	assert_false(v.homing_follow(BulletTargets2D.from_mouse(), -1.0), "negative interval")
+	assert_false(v.homing_follow(BulletTargets2D.from_mouse(), 0.0, 7), "bad mode")
+	expect_error_sequence([
+		"homing_follow: targets must be a BulletTargets2D or null, nothing changed.",
+		"homing_follow: retarget_interval must be finite and >= 0 (0 picks every tick), nothing changed.",
+		"homing_follow: retarget_interval must be finite and >= 0 (0 picks every tick), nothing changed.",
+		"homing_follow: mode must be 0 (Shared Nearest) or 1 (Each Nearest), nothing changed.",
+	])
+	assert_false(v.is_homing_following(), "every refusal changed nothing")
+	var d := H.make_volley_data(1, 0.0, DT * 0.5)
+	var short := factory.spawn_volley(d)
+	assert_true(short.homing_follow(BulletTargets2D.from_mouse()), "follows")
+	step_factory(2, DT)
+	assert_true(short.is_pooled(), "expired into the pool")
+	assert_false(short.is_homing_following(), "the life took its following along")
+	var again := factory.spawn_volley(d)
+	assert_eq(again, short, "the pooled volley again")
+	assert_false(again.is_homing_following(), "a new life starts without it")
+
+
+func test_a_spawner_volley_may_follow_and_its_spawner_leaves_it_alone() -> void:
+	var t := _target(Vector2(200, 0))
+	await idle(1)
+	var sp := make_spawner(H.make_volley_data(1, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_CUSTOM, 1)
+	sp.helper_custom_transforms = [Transform2D(0.0, Vector2(0, 0))]
+	sp.homing_enabled = true
+	sp.homing_node_group = GROUP
+	var fired: Array = []
+	sp.volley_fired.connect(func(v: BulletVolley2D, _n: int) -> void: fired.append(v))
+	assert_true(sp.shoot_once(), "fires")
+	var v: BulletVolley2D = fired[0]
+	assert_eq(v.shared_homing_deque_get_current_homing_target(), t, "the spawner's target")
+	assert_true(v.homing_follow(BulletTargets2D.from_positions(PackedVector2Array([Vector2(0, 300)])), 10.0), "the script takes over")
+	step_factory(1, DT)
+	assert_eq(v.shared_homing_deque_get_current_homing_target(), Vector2(0, 300), "the handle's point")
+	sp.retarget_live_volleys()
+	sp.apply_to_live_volleys(BulletSpawner2D.LIVE_HOMING)
+	sp.homing_enabled = false
+	sp.apply_to_live_volleys(BulletSpawner2D.LIVE_HOMING)
+	step_factory(1, DT)
+	assert_eq(v.shared_homing_deque_get_current_homing_target(), Vector2(0, 300), "its spawner's retargets and re-applies leave it alone")
