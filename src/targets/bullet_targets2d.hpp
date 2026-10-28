@@ -4,6 +4,7 @@
 #include "factory/graze_detector2d.hpp"
 
 #include <godot_cpp/classes/ref_counted.hpp>
+#include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/packed_vector2_array.hpp>
 
 #include <memory>
@@ -56,6 +57,9 @@ public:
 	Array resolve(const Variant &factory) const;
 	// Every list rescans at its next use.
 	void refresh();
+	// {scans, lists}: scans run so far and the target lists kept (one per
+	// factory that reads the handle; per group for a node group).
+	Dictionary debug_get_stats() const;
 
 	// C++: the detector every armed volley and laser shares.
 	const std::shared_ptr<GrazeDetector2D> &get_detector() const { return detector; }

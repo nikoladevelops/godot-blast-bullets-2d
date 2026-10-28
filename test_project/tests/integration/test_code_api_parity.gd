@@ -339,3 +339,29 @@ func test_a_spawner_volley_may_follow_and_its_spawner_leaves_it_alone() -> void:
 	sp.apply_to_live_volleys(BulletSpawner2D.LIVE_HOMING)
 	step_factory(1, DT)
 	assert_eq(v.shared_homing_deque_get_current_homing_target(), Vector2(0, 300), "its spawner's retargets and re-applies leave it alone")
+
+
+## One handle read by the bullets of two factories keeps one target list per
+## factory: each rescans on its own interval, the reads of the other factory
+## never force a rescan.
+func test_one_handle_serves_two_factories_without_rescans() -> void:
+	_target(Vector2(20, 0)) # inside the 30 px ring of both bullets
+	var other := BulletFactory2D.new()
+	add(other)
+	await idle(2)
+	var handle := BulletTargets2D.from_group(GROUP)
+	handle.update_interval = 5.0
+	var zone := H.make_graze_zone([30.0])
+	var d := H.make_volley_data(1, 0.0, 30.0)
+	d.transforms = H.transforms_at([Vector2.ZERO])
+	var a: BulletVolley2D = factory.spawn_volley(d)
+	var b: BulletVolley2D = other.spawn_volley(d)
+	assert_true(a.graze_set_zones([zone], handle), "armed in the first factory")
+	assert_true(b.graze_set_zones([zone], handle), "armed in the second")
+	for i in 30:
+		await physics(1)
+	var stats: Dictionary = handle.debug_get_stats()
+	assert_eq([stats["lists"], stats["scans"]], [2, 2], "one list and one scan per factory inside the interval")
+	assert_true(a.is_bullet_inside_graze(0, 0) and b.is_bullet_inside_graze(0, 0), "both bullets graze the target")
+	await idle(1)
+	other.free_active_bullets()

@@ -58,6 +58,10 @@ struct GrazeTargetList2D {
 	std::vector<uint64_t> members;
 	// Node Group lists: the group they serve.
 	StringName group;
+	// The factory whose bullets read it (a detector shared by the bullets of
+	// several factories keeps one list per factory: their worlds and sweeps
+	// differ).
+	uint64_t factory_id = 0;
 	// Updated at most once per factory sweep (and per factory); within a
 	// sweep, re-validated when user code ran since (user code epoch).
 	uint64_t fresh_sweep = 0;
@@ -120,8 +124,10 @@ public:
 	// Mouse and Global Positions: no nodes, no group, no filter; read every
 	// sweep whatever update_interval says.
 	bool uses_points() const { return config.source == SOURCE_MOUSE || config.source == SOURCE_GLOBAL_POSITIONS; }
-	// Lists nobody asked about for this many sweeps are dropped (bounded
-	// memory when games churn through group names).
+	// Lists nobody asked about for this many sweeps of their factory are
+	// dropped (bounded memory when games churn through group names), checked
+	// when a list is created and every 64 sweeps; a gone factory's lists go
+	// at the next creation.
 	static constexpr uint64_t kIdleSweeps = 600;
 
 	// p_spawner_id: the spawner whose paths are resolved and who is never

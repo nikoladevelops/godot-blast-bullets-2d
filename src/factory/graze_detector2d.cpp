@@ -76,28 +76,47 @@ GrazeTargetList2D *GrazeDetector2D::list_for_group(const StringName &group, Bull
 		return nullptr;
 	}
 	const uint64_t sweep = factory.get_sweep_counter();
+	const uint64_t factory_id = factory.get_instance_id();
 	GrazeTargetList2D *list = nullptr;
-	if (by_group) {
-		// Idle groups go first (never the one asked for), then the lookup.
+	// One list per (factory, group): the lookup is a short linear walk (one
+	// entry per factory and group in use).
+	for (const std::unique_ptr<GrazeTargetList2D> &l : lists) {
+		if (l->factory_id == factory_id && (!by_group || l->group == group)) {
+			list = l.get();
+			break;
+		}
+	}
+	if (list == nullptr) {
+		// A new list: idle ones go first (never one of a live reader of this
+		// sweep), then it is created.
 		for (size_t i = 0; i < lists.size();) {
-			if (lists[i]->group != group && lists[i]->last_used_sweep + kIdleSweeps < sweep) {
+			const GrazeTargetList2D &l = *lists[i];
+			// Measured on the sweeps of the list's own factory (gone: idle).
+			const BulletFactory2D *reader = l.factory_id == factory_id ? &factory : Object::cast_to<BulletFactory2D>(ObjectDB::get_instance(ObjectID(l.factory_id)));
+			const bool idle = reader == nullptr || l.last_used_sweep + kIdleSweeps < reader->get_sweep_counter();
+			if (idle) {
 				lists[i] = std::move(lists.back());
 				lists.pop_back();
 				continue;
 			}
-			if (lists[i]->group == group) {
-				list = lists[i].get();
-			}
 			++i;
 		}
-	} else if (!lists.empty()) {
-		list = lists[0].get();
-	}
-	if (list == nullptr) {
 		lists.push_back(std::make_unique<GrazeTargetList2D>());
 		list = lists.back().get();
 		list->uid = ++next_list_uid;
 		list->group = by_group ? group : StringName();
+		list->factory_id = factory_id;
+	} else if (by_group && lists.size() > 1 && (sweep & 63) == 0) {
+		// Now and then: drop this factory's groups nobody asked about.
+		for (size_t i = 0; i < lists.size();) {
+			const GrazeTargetList2D &l = *lists[i];
+			if (&l != list && l.factory_id == factory_id && l.last_used_sweep + kIdleSweeps < sweep) {
+				lists[i] = std::move(lists.back());
+				lists.pop_back();
+				continue;
+			}
+			++i;
+		}
 	}
 	list->last_used_sweep = sweep;
 	update(*list, factory);

@@ -174,6 +174,13 @@ void BulletTargets2D::refresh() {
 	detector->mark_due();
 }
 
+Dictionary BulletTargets2D::debug_get_stats() const {
+	Dictionary d;
+	d["scans"] = (int64_t)detector->scans;
+	d["lists"] = detector->get_list_count();
+	return d;
+}
+
 bool read_targets_argument2d(const Variant &value, const char *fn, const char *param, StringName &r_group, std::shared_ptr<GrazeDetector2D> &r_detector) {
 	r_group = StringName();
 	r_detector.reset();
@@ -213,6 +220,7 @@ void BulletTargets2D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::PACKED_VECTOR2_ARRAY, "positions"), "set_positions", "get_positions");
 	ClassDB::bind_method(D_METHOD("resolve", "factory"), &BulletTargets2D::resolve);
 	ClassDB::bind_method(D_METHOD("refresh"), &BulletTargets2D::refresh);
+	ClassDB::bind_method(D_METHOD("debug_get_stats"), &BulletTargets2D::debug_get_stats);
 	BIND_ENUM_CONSTANT(SOURCE_NODE_GROUP);
 	BIND_ENUM_CONSTANT(SOURCE_NODE);
 	BIND_ENUM_CONSTANT(SOURCE_NODE_NAME);

@@ -4,11 +4,17 @@
 		Who a script's bullets and lasers aim at, without a spawner.
 	</brief_description>
 	<description>
-		A target source made by code: [method from_group], [method from_node], [method from_children], [method from_name], [method from_positions] or [method from_mouse], filtered by [member filter_group] and the plugin's target filter (live [Node2D] in the factory's world, never a factory's or a preview's node), rescanned every [member update_interval]. Pass it wherever a target group goes: [method BulletVolley2D.graze_set_zones], [method BulletVolley2D.sound_set_effects], [method LaserVolley2D.graze_set_zones], [method LaserVolley2D.sound_set_effects], and to [method LaserVolley2D.track] and [method BulletVolley2D.homing_follow]. Every volley and laser armed with it shares its one target list: edits ([member positions], [member filter_group], [member update_interval]) reach them in flight, and they keep it after the script drops the handle. The list follows one factory's world: give the bullets of each [BulletFactory2D] their own handle (one handle read by two factories rescans at every switch). Spawners name the same sources in their Graze, Sound and Laser Targeting groups.
+		A target source made by code: [method from_group], [method from_node], [method from_children], [method from_name], [method from_positions] or [method from_mouse], filtered by [member filter_group] and the plugin's target filter (live [Node2D] in the factory's world, never a factory's or a preview's node), rescanned every [member update_interval]. Pass it wherever a target group goes: [method BulletVolley2D.graze_set_zones], [method BulletVolley2D.sound_set_effects], [method LaserVolley2D.graze_set_zones], [method LaserVolley2D.sound_set_effects], and to [method LaserVolley2D.track] and [method BulletVolley2D.homing_follow]. Every volley and laser armed with it shares its one target list: edits ([member positions], [member filter_group], [member update_interval]) reach them in flight, and they keep it after the script drops the handle. The bullets of several [BulletFactory2D]s may share one handle: it keeps one target list per factory (each in that factory's world, on its own update interval). Spawners name the same sources in their Graze, Sound and Laser Targeting groups.
 	</description>
 	<tutorials>
 	</tutorials>
 	<methods>
+		<method name="debug_get_stats" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Debug readout: [code]scans[/code] (target scans run so far) and [code]lists[/code] (the target lists kept: one per factory that reads the handle, per group for a node group).
+			</description>
+		</method>
 		<method name="from_children" qualifiers="static">
 			<return type="BulletTargets2D" />
 			<param index="0" name="parent" type="Variant" />
