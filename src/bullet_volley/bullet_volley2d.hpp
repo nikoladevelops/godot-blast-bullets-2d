@@ -1947,6 +1947,10 @@ protected:
 	std::vector<uint8_t> has_per_bullet_speed_data;
 	std::vector<uint8_t> has_per_bullet_rotation_data;
 	bool use_per_bullet_homing_smoothing = false;
+	// The per-bullet values are the owner spawner's smoothing fan (set by
+	// mark_homing_smoothing_fanned after it wrote them); any other per-bullet
+	// write makes them the script's, which the fan's off path never clears.
+	bool homing_smoothing_fanned = false;
 
 	// Tracks how many bullets are currently homing in TOTAL (per-bullet homing, NOT shared) - basically determines whether the per-bullet homing feature is even turned on
 	int active_homing_count = 0;
@@ -2574,7 +2578,11 @@ public:
 	// every bullet again. No-op when per-bullet mode was never enabled.
 	void clear_per_bullet_homing_smoothing() {
 		use_per_bullet_homing_smoothing = false;
+		homing_smoothing_fanned = false;
 	}
+	// C++ only (the spawner): right after its fan wrote every bullet.
+	void mark_homing_smoothing_fanned() { homing_smoothing_fanned = true; }
+	bool is_homing_smoothing_fanned() const { return homing_smoothing_fanned; }
 
 	// BOUNCE / RICOCHET RUNTIME API (spawn-data equivalents, editable live).
 	// Unsigned 32-bit view like BulletVolleyData2D (layer 32 = 2147483648).

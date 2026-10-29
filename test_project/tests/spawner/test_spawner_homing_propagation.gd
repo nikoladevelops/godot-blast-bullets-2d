@@ -77,6 +77,27 @@ func test_turning_per_bullet_smoothing_off_restores_the_shared_value() -> void:
 		assert_almost_eq(v.bullet_get_homing_smoothing(i), 20.0, 0.0001, "bullet %d is back on the shared value" % i)
 
 
+## The fan's off path clears only what the fan wrote: per-bullet smoothing a
+## script set on a flying volley survives every retarget pass.
+func test_script_per_bullet_smoothing_survives_the_fan_off_path() -> void:
+	var sp := _homing_spawner(4)
+	sp.set_homing_mode(BulletSpawner2D.HOMING_PER_BULLET)
+	assert_true(sp.shoot_once(), "shot (fan off)")
+	var v: BulletVolley2D = sp.get_live_volleys()[0]
+	v.bullet_set_homing_smoothing(2, 33.0)
+	assert_eq(sp.retarget_live_volleys(), 1, "retarget pass")
+	assert_almost_eq(v.bullet_get_homing_smoothing(2), 33.0, 0.0001, "the script's value is kept")
+	# A fanned volley that a script then edits is the script's too.
+	sp.set_homing_per_bullet_smoothing_enabled(true)
+	sp.set_homing_smoothing_start(5.0)
+	assert_eq(sp.retarget_live_volleys(), 1, "fan on: re-fanned")
+	assert_almost_eq(v.bullet_get_homing_smoothing(2), 5.0, 0.0001, "fanned")
+	v.bullet_set_homing_smoothing(1, 44.0)
+	sp.set_homing_per_bullet_smoothing_enabled(false)
+	assert_eq(sp.retarget_live_volleys(), 1, "fan off again")
+	assert_almost_eq(v.bullet_get_homing_smoothing(1), 44.0, 0.0001, "edited after the fan: kept")
+
+
 func test_homing_signals_fire_once_per_volley_with_payloads() -> void:
 	var sp := _homing_spawner()
 	assert_true(sp.shoot_once(), "shot")

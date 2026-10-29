@@ -652,6 +652,7 @@ void BulletVolley2D::bullet_set_homing_smoothing(int bullet_index, real_t value)
 	}
 	all_bullet_homing_smoothing[bullet_index] = value;
 	use_per_bullet_homing_smoothing = true;
+	homing_smoothing_fanned = false;
 }
 
 void BulletVolley2D::all_bullets_set_homing_smoothing(real_t value, int bullet_index_start, int bullet_index_end_inclusive) {
@@ -677,6 +678,7 @@ void BulletVolley2D::all_bullets_set_homing_smoothing(real_t value, int bullet_i
 		all_bullet_homing_smoothing[i] = value;
 	}
 	use_per_bullet_homing_smoothing = true;
+	homing_smoothing_fanned = false;
 }
 
 TypedArray<real_t> BulletVolley2D::all_bullets_get_homing_smoothing(int bullet_index_start, int bullet_index_end_inclusive) const {
@@ -720,6 +722,7 @@ void BulletVolley2D::clear_homing_state_for_teardown() {
 	// (which skips that path) starts from the same blank state.
 	all_bullet_homing_smoothing.assign(all_bullet_homing_smoothing.size(), 0.0);
 	use_per_bullet_homing_smoothing = false;
+	homing_smoothing_fanned = false;
 	// Value-reset the whole orbit payload, not just the lock: a stale
 	// radius/direction/angle must never ride into the next life.
 	for (auto &o : all_orbiting_data) {
