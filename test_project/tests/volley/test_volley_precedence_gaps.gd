@@ -163,6 +163,21 @@ func test_shared_fill_includes_the_fall_speed() -> void:
 	assert_true(absf(vel.y - fall) < 0.01, "the late fill keeps the fall speed")
 
 
+## A late shared-speed fill must keep the heading the bullet steered onto
+## (the per-bullet twin keeps it; the fill used to re-derive it from the
+## shape rotation).
+func test_a_late_shared_speed_fill_keeps_the_heading() -> void:
+	var d := H.make_volley_data(1, 0.0, 30.0)
+	d.all_bullet_speed_data = [] # slot 0 is a genuine gap
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	await physics(1)
+	v.set_bullet_direction(0, Vector2(0, 1))
+	v.set_shared_bullet_speed_data(_speed(200.0))
+	var dir: Vector2 = v.get_bullet_direction(0)
+	assert_true(absf(dir.x) < 0.001 and absf(dir.y - 1.0) < 0.001, "the fill keeps the heading")
+	assert_true(absf(v.get_bullet_velocity(0).y - 200.0) < 0.01, "speed along the kept heading")
+
+
 func test_tiled_array_with_an_invalid_entry_still_falls_back_per_slot() -> void:
 	# GAP T7 tiled array with an invalid entry still falls back per slot
 	var g7 := H.make_volley_data(4, 0.0)

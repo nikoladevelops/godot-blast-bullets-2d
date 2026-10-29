@@ -1167,9 +1167,16 @@ void BulletVolley2D::apply_shared_speed_fallback(const Ref<BulletSpeedData2D> &s
 		all_cached_acceleration[i] = shared->acceleration;
 		// Fill-once: mark the slot so a later set_shared_* does not re-apply.
 		has_per_bullet_speed_data[i] = 1;
-		const real_t rot = (i >= 0 && i < (int)all_cached_shape_transforms.size()) ? all_cached_shape_transforms[i].get_rotation() : 0.0;
-		Vector2 dir = Vector2(Math::cos(rot), Math::sin(rot));
-		all_cached_direction[i] = dir;
+		// Derive a heading ONLY for an unseeded slot (a zero direction): the
+		// spawn seed already set the same value from the same rotation
+		// (set_up_movement_data), and a LIVE fill must keep the heading the
+		// bullet steered onto - resetting it would contradict the documented
+		// "a write keeps the direction" composition.
+		const Vector2 dir0 = all_cached_direction[i];
+		if (dir0.x * dir0.x + dir0.y * dir0.y < (real_t)0.5) {
+			const real_t rot = (i >= 0 && i < (int)all_cached_shape_transforms.size()) ? all_cached_shape_transforms[i].get_rotation() : 0.0;
+			all_cached_direction[i] = Vector2(Math::cos(rot), Math::sin(rot));
+		}
 		// The documented composition (direction x speed + drift + fall speed):
 		// a gravity volley whose slots are filled late must keep its fall.
 		refresh_cached_velocity(i);
