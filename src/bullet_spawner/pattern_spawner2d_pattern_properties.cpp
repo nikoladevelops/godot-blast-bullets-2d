@@ -66,11 +66,13 @@ PatternSpawner2D::PatternSource PatternSpawner2D::get_pattern_source() const {
 }
 
 void PatternSpawner2D::set_pattern_source(PatternSource value) {
-	on_config_changed();
 	if (value < PATTERN_FROM_CHILDREN || value >= PATTERN_FROM_LAST) {
 		UtilityFunctions::push_error((String(get_class()) + ": invalid pattern_source, keeping the old value."));
 		return;
 	}
+	// Validate first: a rejected write is not a configuration change and must
+	// not reset the auto-fire error latch.
+	on_config_changed();
 	pattern_source = value;
 	// The visible helper_* option groups depend on this mode: refresh the
 	// inspector immediately, otherwise the new mode's options stay hidden
@@ -119,14 +121,13 @@ void PatternSpawner2D::set_helper_aimed_target(Node2D *target) {
 TypedArray<Transform2D> PatternSpawner2D::get_helper_custom_transforms() const { return helper_custom_transforms; }
 
 void PatternSpawner2D::set_helper_custom_transforms(const TypedArray<Transform2D> &value) {
-	on_config_changed();
-	// One shoot fires this array into transforms + buffers + physics: the
-	// same freeze/OOM rationale as helper_bullets_amount caps it at the
-	// developer-set pattern limit.
+	// Validate first: a rejected write is not a configuration change and must
+	// not reset the auto-fire error latch.
 	if (const String problem = pattern_custom_transforms_problem2d(value, pattern_max_bullets()); !problem.is_empty()) {
 		pattern_knob_reject2d("helper_custom_transforms", problem, get_class());
 		return;
 	}
+	on_config_changed();
 	helper_custom_transforms = value;
 	on_pattern_changed();
 }

@@ -99,6 +99,25 @@ func test_auto_fire_reports_a_misconfiguration_once() -> void:
 	expect_errors_containing("shoot_once: no spawn_data assigned", 2, "manual calls always report")
 
 
+## A rejected or no-op config write is not a configuration change: it must not
+## reset the auto-fire error latch and re-fire the same misconfiguration.
+func test_a_rejected_write_does_not_rearm_the_auto_fire_error() -> void:
+	var sp := BulletSpawner2D.new()
+	sp.set_shooting_enabled(false)
+	sp.shoot_interval_sec = 0.05
+	add(sp)
+	sp.set_bullet_factory(factory)
+	sp.set_shooting_enabled(true) # no spawn_data: every interval fails
+	await idle(30)
+	expect_errors_containing("shoot_once: no spawn_data assigned", 1, "one report, latched")
+	sp.set_pattern_source(99) # rejected: not a config change
+	sp.set_movement_enabled(sp.get_movement_enabled()) # no-op: not a config change
+	expect_errors_containing("invalid pattern_source", 1, "the rejection reports")
+	await idle(20)
+	expect_errors_containing("shoot_once: no spawn_data assigned", 0, "rejected/no-op writes keep the latch")
+	sp.set_shooting_enabled(false)
+
+
 func _has_1(sp: BulletSpawner2D, text: String) -> bool:
 	return Array(sp.get_setup_warnings()).any(func(w): return text in str(w))
 

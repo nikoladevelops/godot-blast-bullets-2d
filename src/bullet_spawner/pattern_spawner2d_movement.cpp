@@ -15,10 +15,10 @@ namespace BlastBullets2D {
 bool PatternSpawner2D::get_movement_enabled() const { return movement.enabled; }
 
 void PatternSpawner2D::set_movement_enabled(bool value) {
-	on_config_changed();
 	if (movement.enabled == value) {
-		return;
+		return; // no-op: not a configuration change, keep the error latch
 	}
+	on_config_changed();
 	movement.enabled = value;
 	++movement.epoch;
 	notify_property_list_changed();
