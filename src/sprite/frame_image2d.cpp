@@ -60,8 +60,14 @@ Ref<Image> FrameImageReader2D::read_atlas(const Ref<Texture2D> &tex, int depth) 
 	// NaN fails every comparison below.
 	const Rect2 region = atlas->get_region();
 	const Rect2 margin = atlas->get_margin();
-	const double rx = Math::round((double)region.position.x);
-	const double ry = Math::round((double)region.position.y);
+	// A zero region axis means the atlas's whole one AND ignores the origin on
+	// that axis (Godot's AtlasTexture semantics), so a non-zero position on a
+	// zero-size axis must not shift the rect out of the sheet and read as
+	// unreadable.
+	const bool zero_w = region.size.x == 0.0f;
+	const bool zero_h = region.size.y == 0.0f;
+	const double rx = zero_w ? 0.0 : Math::round((double)region.position.x);
+	const double ry = zero_h ? 0.0 : Math::round((double)region.position.y);
 	const double mx = Math::round((double)margin.position.x);
 	const double my = Math::round((double)margin.position.y);
 	const double mw = Math::round((double)margin.size.x);
@@ -78,15 +84,15 @@ Ref<Image> FrameImageReader2D::read_atlas(const Ref<Texture2D> &tex, int depth) 
 	const double sheet_w = (double)sheet->get_width();
 	const double sheet_h = (double)sheet->get_height();
 	// Godot reads a zero region width or height as the atlas's whole one.
-	const double rw = region.size.x == 0.0f ? sheet_w : Math::round((double)region.size.x);
-	const double rh = region.size.y == 0.0f ? sheet_h : Math::round((double)region.size.y);
+	const double rw = zero_w ? sheet_w : Math::round((double)region.size.x);
+	const double rh = zero_h ? sheet_h : Math::round((double)region.size.y);
 	if (!(rw > 0.0) || !(rh > 0.0) || !(rx >= 0.0) || !(ry >= 0.0) || !(rx + rw <= sheet_w) || !(ry + rh <= sheet_h)) {
 		return Ref<Image>();
 	}
 	// The box Godot sizes it at (AtlasTexture::get_width / get_height): a zero
 	// region axis is the atlas's whole one, WITHOUT the margin's size.
-	const double box_w = region.size.x == 0.0f ? rw : rw + mw;
-	const double box_h = region.size.y == 0.0f ? rh : rh + mh;
+	const double box_w = zero_w ? rw : rw + mw;
+	const double box_h = zero_h ? rh : rh + mh;
 	if (!(box_w >= 1.0) || !(box_h >= 1.0) || !(box_w <= side) || !(box_h <= side)) {
 		return Ref<Image>();
 	}
