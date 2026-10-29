@@ -400,12 +400,17 @@ func test_user_code_that_frees_the_volley_while_an_attachment_is_released_is_sur
 	var v := factory.spawn_volley(data)
 	v.bullet_set_attachment(0, scene, Vector2.ZERO, true)
 	await idle(3) # the attachment is told 0.5
+	var att: Node2D = v.bullet_get_attachment(0)
+	assert_not_null(att, "bullet 0 carries the attachment")
 	AttachmentSelfFreeProbe2D.armed = true
 	AttachmentSelfFreeProbe2D.volley = v
 	v.disable_bullet(0) # released: told 1.0 first, which frees the volley
 	AttachmentSelfFreeProbe2D.armed = false
 	await idle(2)
 	assert_true(factory.debug_assert_no_dangling().get("ok", false), "nothing dangles")
+	# The volley died inside the callback: nothing pools the released
+	# attachment any more, so it must not stay behind in the scene.
+	assert_false(is_instance_valid(att), "the released attachment does not leak after the volley died")
 
 
 func test_user_code_that_frees_the_target_during_a_conversion_does_not_crash_it() -> void:

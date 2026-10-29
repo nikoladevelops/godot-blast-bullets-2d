@@ -186,7 +186,15 @@ void BulletVolley2D::bullet_disable_attachment(int bullet_index) {
 	// re-scaled for its new owner).
 	detaching->set_time_scale_factor(1.0);
 	// on_time_scale_changed is user code: look again before the next call.
-	if (ObjectDB::get_instance(ObjectID(self_id)) != this || ObjectDB::get_instance(ObjectID(detaching_id)) == nullptr) {
+	if (ObjectDB::get_instance(ObjectID(detaching_id)) == nullptr) {
+		return; // the callback freed the attachment itself
+	}
+	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+		// The volley is gone and already let go of this attachment: nothing
+		// pools it any more, so it must not stay behind in the scene.
+		if (!detaching->is_queued_for_deletion()) {
+			detaching->queue_free();
+		}
 		return;
 	}
 	if (!was_suspended) {
