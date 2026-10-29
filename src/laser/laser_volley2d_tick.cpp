@@ -914,13 +914,49 @@ bool LaserVolley2D::update_graze(uint64_t self_id, uint32_t life) {
 		}
 		return false;
 	};
+	// The farthest a target can be from a beam and still be inside a zone
+	// (the largest effective ring of the enabled zones): a target outside
+	// the beam's box grown by it is in no zone, so it is skipped before the
+	// exact distance (a curvy beam has dozens of segments per target).
+	// Candidates keep list order, so the nearest and its ties are unchanged.
+	real_t reach = -1.0;
+	for (size_t z = 0; z < zones; ++z) {
+		const GrazeZone2D *zone = graze_zones[z].ptr();
+		if (zone == nullptr || !zone->enabled) {
+			continue;
+		}
+		const real_t inflate = zone->get_count_bullet_size() ? half_width : (real_t)0.0;
+		const int rings = Math::clamp(zone->get_ring_count(), 1, (int)GrazeZone2D::MAX_RINGS);
+		for (int r = 0; r < rings; ++r) {
+			reach = Math::max(reach, zone->get_ring_radius(r) + inflate);
+		}
+	}
 	for (size_t i = 0; i < beams.size(); ++i) {
 		const Beam &b = beams[i];
 		real_t best = Math::INF;
 		uint64_t best_id = 0;
 		Vector2 best_at;
-		if (list != nullptr && !b.spent && b.points.size() >= 2) {
+		if (list != nullptr && !b.spent && b.points.size() >= 2 && reach >= (real_t)0.0) {
+			real_t min_x = b.points[0].x;
+			real_t max_x = min_x;
+			real_t min_y = b.points[0].y;
+			real_t max_y = min_y;
+			for (const Vector2 &p : b.points) {
+				min_x = Math::min(min_x, p.x);
+				max_x = Math::max(max_x, p.x);
+				min_y = Math::min(min_y, p.y);
+				max_y = Math::max(max_y, p.y);
+			}
+			// A hair wider than the reach: every boundary case takes the exact test.
+			const real_t pad = reach * (real_t)1.001 + (real_t)0.001;
+			min_x -= pad;
+			max_x += pad;
+			min_y -= pad;
+			max_y += pad;
 			for (const GrazeTarget2D &t : list->targets) {
+				if (t.position.x < min_x || t.position.x > max_x || t.position.y < min_y || t.position.y > max_y) {
+					continue;
+				}
 				const real_t d = distance_to_polyline2d(t.position, b.points);
 				if (d < best) {
 					best = d;

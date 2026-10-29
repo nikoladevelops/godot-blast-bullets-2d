@@ -1321,7 +1321,7 @@ replayed once on resume.
 ### 15.1 Running
 
 ```sh
-python3 tools/run_benchmarks.py                     # 39 headless scenarios x5 (median)
+python3 tools/run_benchmarks.py                     # 40 headless scenarios x5 (median)
 python3 tools/run_benchmarks.py --scenario spawner_ # substring filter (repeatable)
 python3 tools/run_benchmarks.py --gate              # exit 1 on regression vs log/baseline.json
 python3 tools/run_benchmarks.py --update-baseline   # ONLY for an accepted change; say so in the commit
@@ -1443,6 +1443,10 @@ project's `.so`). For quick numeric comparisons load two
   0.34 ms tick. Prove a draw change in a real window (a throwaway
   `--script` probe outside the project that saves a screenshot, counting
   PHYSICS frames: a window renders far faster than 60 fps).
+  Laser graze measured every target's exact polyline distance per beam
+  per tick (`curvy_graze_300`: 256 snakes of ~36 segments, 300 targets,
+  10.4 ms tick); the beam's box grown by the largest enabled ring first
+  culls targets no zone can reach (exact, list order kept): 0.6 ms.
 - Many tiny volleys: `emitter_storm` (256 emitters, ~1500 live 8-bullet
   child volleys) ticks ~1.7 ms, about 1 us per volley per tick on top of the
   per-bullet cost; a few big volleys (`volley_10k_flight`) are far cheaper

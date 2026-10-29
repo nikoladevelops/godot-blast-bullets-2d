@@ -101,6 +101,21 @@ func test_disabling_a_zone_ends_its_visit_silently() -> void:
 	assert_eq(log.size(), 1, "Once survives the disabled window")
 
 
+## The outer ring is inclusive everywhere around the beam (beside it, past
+## its tip, off its end at an angle; + half its width with count_bullet_size);
+## a hair outside never grazes. (The beam's box grown by the largest ring
+## culls far targets before the exact distance: the edge must survive it.)
+func test_the_outer_ring_edge_grazes_all_around_the_beam(c: Array = use_parameters([
+		[Vector2(150, 50), false, true], [Vector2(150, -50), false, true],
+		[Vector2(350, 0), false, true], [Vector2(-50, 0), false, true], [Vector2(330, 40), false, true],
+		[Vector2(150, 50.5), false, false], [Vector2(351, 0), false, false],
+		[Vector2(150, 56), true, true], [Vector2(150, 56.5), true, false]])) -> void:
+	_target("A", c[0])
+	_laser([H.make_graze_zone([50.0], c[1])]) # 300 px along +X, 12 px wide
+	step_factory(1, DT)
+	assert_eq(log, [["graze", "A", 0, 0, 0]] if c[2] else [], "%s (count_bullet_size %s)" % [c[0], c[1]])
+
+
 func test_count_bullet_size_adds_half_the_beam_width() -> void:
 	_target("A", Vector2(150, 54)) # the ring reaches 50, the 12 px beam's edge 6 more
 	_laser([H.make_graze_zone([50.0]), H.make_graze_zone([50.0], true)])
