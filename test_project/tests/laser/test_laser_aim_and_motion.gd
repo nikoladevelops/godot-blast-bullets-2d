@@ -55,6 +55,45 @@ func test_it_follows_its_anchor_while_follow_spawner_is_on() -> void:
 	assert_null(l.get_anchor(), "no anchor")
 
 
+## LaserData2D is read every tick: a follow_spawner edit reaches a firing
+## laser. Off, its beams stay where they are; on again, they ride the anchor
+## from where they are (no jump); a laser fired with it off picks it up. A
+## script's own set_anchor still rides between edits.
+func test_a_follow_spawner_edit_reaches_a_firing_laser() -> void:
+	var anchor := Node2D.new()
+	anchor.position = Vector2(50, 50)
+	add(anchor)
+	var d := _endless()
+	var l := _fire(d, Transform2D(0.0, Vector2(60, 50)), anchor)
+	step_factory(1, DT)
+	d.follow_spawner = false
+	anchor.position = Vector2(100, 50)
+	step_factory(1, DT)
+	assert_eq(l.get_beam_start(0), Vector2(60, 50), "off: the beam stays where it is")
+	d.follow_spawner = true
+	step_factory(1, DT)
+	assert_eq(l.get_beam_start(0), Vector2(60, 50), "on again: no jump onto the anchor")
+	anchor.position = Vector2(130, 70)
+	step_factory(1, DT)
+	assert_almost_eq(l.get_beam_start(0).distance_to(Vector2(90, 70)), 0.0, 0.01, "it rides the anchor from where it was")
+	var late := _endless()
+	late.follow_spawner = false
+	var fixed := _fire(late, Transform2D(0.0, Vector2(140, 70)), anchor)
+	step_factory(1, DT)
+	late.follow_spawner = true
+	step_factory(1, DT)
+	anchor.position = Vector2(130, 100)
+	step_factory(1, DT)
+	assert_almost_eq(fixed.get_beam_start(0).distance_to(Vector2(140, 100)), 0.0, 0.01, "fired with it off, it rides once turned on")
+	var scripted := _endless()
+	scripted.follow_spawner = false
+	var by_script := _fire(scripted, Transform2D(0.0, Vector2(0, 0)))
+	by_script.set_anchor(anchor)
+	anchor.position = Vector2(150, 100)
+	step_factory(1, DT)
+	assert_almost_eq(by_script.get_beam_start(0).distance_to(Vector2(20, 0)), 0.0, 0.01, "a script's set_anchor rides between edits")
+
+
 func test_a_spawner_anchor_adds_its_spin() -> void:
 	var sp := make_spawner()
 	sp.position = Vector2(200, 0)

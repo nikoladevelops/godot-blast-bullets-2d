@@ -313,6 +313,9 @@ private:
 	uint32_t life_id = 0;
 	uint64_t anchor_id = 0;
 	bool following = false;
+	// LaserData2D::follow_spawner as last seen (begin_life, then every tick):
+	// an edit reaches a firing laser (sync_anchor_frame).
+	bool follow_data_seen = false;
 	// The anchor's frame and world muzzle offset for this tick
 	// (sync_anchor_frame, once per tick); held while the anchor is out of the tree.
 	Transform2D anchor_frame_now;
@@ -415,6 +418,9 @@ private:
 	// EVERY beam's slot into its world pose and ends the follow; a held one
 	// keeps the last frame and resumes without a slide.
 	void sync_anchor_frame();
+	// The beams keep their current pose and ride anchor `id` from now on
+	// (0, or a lost anchor: they stay where they are). set_anchor's body.
+	void rebind_anchor(uint64_t id);
 	bool target_position(const Beam &b, Vector2 &r_pos) const;
 	bool hitting_phase() const;
 	double phase_length(LaserPhase p) const;

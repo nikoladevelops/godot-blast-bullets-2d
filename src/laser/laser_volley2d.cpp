@@ -197,7 +197,8 @@ void LaserVolley2D::begin_life(BulletFactory2D *p_factory, const Ref<LaserData2D
 	announce_phase = false;
 	anchor_id = p_anchor_id;
 	const LaserData2D *d = p_data.ptr();
-	following = p_anchor_id != 0 && d != nullptr && d->follow_spawner;
+	follow_data_seen = d != nullptr && d->follow_spawner;
+	following = p_anchor_id != 0 && follow_data_seen;
 	// An anchor outside the tree has no frame yet: the slots stay global
 	// poses until it enters (sync_anchor_frame takes them onto its frame then).
 	anchor_frame_pending = following && p_anchor_frame_pending;
@@ -476,6 +477,20 @@ LaserVolley2D::AnchorState LaserVolley2D::read_anchor(Transform2D &r_frame, Vect
 }
 
 void LaserVolley2D::sync_anchor_frame() {
+	const LaserData2D *d = data.ptr();
+	if (d != nullptr && d->follow_spawner != follow_data_seen) {
+		// A follow_spawner edit reaches a firing laser: off, the beams stay
+		// where they are (the anchor is kept); on, they ride it again from
+		// where they are, without a jump. A script's set_anchor in between
+		// still rides: only an edit of the data switches.
+		follow_data_seen = d->follow_spawner;
+		const uint64_t id = anchor_id;
+		rebind_anchor(0);
+		anchor_id = id;
+		if (follow_data_seen && id != 0) {
+			rebind_anchor(id);
+		}
+	}
 	if (!following) {
 		return;
 	}
@@ -769,7 +784,11 @@ void LaserVolley2D::set_anchor(Node2D *anchor) {
 	if (reject_stale_handle("set_anchor")) {
 		return;
 	}
-	// The beams keep their current pose; from now on they ride `anchor`.
+	rebind_anchor(anchor != nullptr ? (uint64_t)anchor->get_instance_id() : 0);
+}
+
+void LaserVolley2D::rebind_anchor(uint64_t id) {
+	// The beams keep their current pose; from now on they ride the anchor.
 	// The slot holds the aim, never the sweep: a running sweep goes on
 	// exactly as before (its arc stays centered on the pattern direction).
 	Transform2D frame;
@@ -777,7 +796,7 @@ void LaserVolley2D::set_anchor(Node2D *anchor) {
 	for (Beam &b : beams) {
 		b.slot = Transform2D(b.aim, b.muzzle);
 	}
-	anchor_id = anchor != nullptr ? anchor->get_instance_id() : 0;
+	anchor_id = id;
 	following = false;
 	anchor_holding = false;
 	anchor_frame_pending = false;
