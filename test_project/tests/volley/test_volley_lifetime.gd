@@ -48,6 +48,23 @@ func test_invalid_lifetimes_rejected_at_setter() -> void:
 	assert_eq(factory.debug_get_total_bullets_amount(), 1, "spawn uses the kept valid lifetime")
 
 
+## The engine loads a saved resource's properties in bind order. A saved
+## {is_life_time_infinite=true, max_life_time=0} must therefore write the flag
+## BEFORE max_life_time, or the cross-field guard rejects 0 on load.
+func test_the_infinite_flag_binds_before_max_life_time() -> void:
+	var d := BulletVolleyData2D.new()
+	var names: Array = []
+	for p in d.get_property_list():
+		if int(p.get("usage", 0)) & PROPERTY_USAGE_STORAGE:
+			names.append(String(p["name"]))
+	assert_lt(names.find("is_life_time_infinite"), names.find("max_life_time"), "the flag loads before max_life_time")
+	# In that order the pair round-trips with no error.
+	d.set_is_life_time_infinite(true)
+	d.set_max_life_time(0.0)
+	expect_no_errors()
+	assert_true(d.get_is_life_time_infinite(), "infinite kept")
+
+
 func test_max_collisions_zero_is_infinite() -> void:
 	var t: BulletVolley2D = quick_volley(1, 0.0, 30.0)
 	t.set_bullet_max_collision_count(0)

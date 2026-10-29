@@ -1189,6 +1189,13 @@ void BulletVolleyData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_is_texture_rotation_permanent", "new_is_texture_rotation_permanent"), &BulletVolleyData2D::set_is_texture_rotation_permanent);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_texture_rotation_permanent"), "set_is_texture_rotation_permanent", "get_is_texture_rotation_permanent");
 
+	ClassDB::bind_method(D_METHOD("get_is_life_time_infinite"), &BulletVolleyData2D::get_is_life_time_infinite);
+	ClassDB::bind_method(D_METHOD("set_is_life_time_infinite", "value"), &BulletVolleyData2D::set_is_life_time_infinite);
+	// Bound before max_life_time: the engine loads properties in bind order, so
+	// a saved {is_life_time_infinite=true, max_life_time=0} would otherwise be
+	// rejected by the cross-field guard before the flag is set.
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_life_time_infinite"), "set_is_life_time_infinite", "get_is_life_time_infinite");
+
 	ClassDB::bind_method(D_METHOD("get_max_life_time"), &BulletVolleyData2D::get_max_life_time);
 	ClassDB::bind_method(D_METHOD("set_max_life_time", "new_max_life_time"), &BulletVolleyData2D::set_max_life_time);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "max_life_time"), "set_max_life_time", "get_max_life_time");
@@ -1200,10 +1207,6 @@ void BulletVolleyData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_ignore_despawn_bounds"), &BulletVolleyData2D::get_ignore_despawn_bounds);
 	ClassDB::bind_method(D_METHOD("set_ignore_despawn_bounds", "value"), &BulletVolleyData2D::set_ignore_despawn_bounds);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "ignore_despawn_bounds"), "set_ignore_despawn_bounds", "get_ignore_despawn_bounds");
-
-	ClassDB::bind_method(D_METHOD("get_is_life_time_infinite"), &BulletVolleyData2D::get_is_life_time_infinite);
-	ClassDB::bind_method(D_METHOD("set_is_life_time_infinite", "value"), &BulletVolleyData2D::set_is_life_time_infinite);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_life_time_infinite"), "set_is_life_time_infinite", "get_is_life_time_infinite");
 
 	ClassDB::bind_method(D_METHOD("get_all_bullet_life_times"), &BulletVolleyData2D::get_all_bullet_life_times);
 	ClassDB::bind_method(D_METHOD("set_all_bullet_life_times", "value"), &BulletVolleyData2D::set_all_bullet_life_times);
