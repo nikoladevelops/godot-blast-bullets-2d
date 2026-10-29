@@ -518,3 +518,20 @@ func test_movement_play_while_disabled_is_refused_with_a_warning() -> void:
 	assert_signal_emit_count(sp, "movement_started", 0, "no start reported")
 	sp.movement_enabled = true
 	assert_true(sp.is_movement_playing(), "turned on: it plays (autostart)")
+
+
+## Re-assigning the same (unusable) movement path is not a new configuration:
+## the once-per-path warning must not re-arm.
+func test_reassigning_the_same_unusable_path_does_not_rewarn() -> void:
+	var empty := Path2D.new()
+	empty.curve = Curve2D.new() # no points: unusable
+	add(empty)
+	var sp := make_spawner(H.make_volley_data(1, 0.0, 5.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
+	sp.set_movement_path_node(empty)
+	sp.movement_enabled = true # autostart: plays now, warns once
+	await idle(3)
+	expect_warning_sequence(["BulletSpawner2D: movement_path is not a Path2D with a non-empty curve in the tree; the spawner stays where it is."], "warned once")
+	sp.set_movement_path(sp.get_movement_path()) # the very same path again
+	sp.movement_seek(0.5) # re-applies the pose (no new warning expected)
+	await idle(3)
+	expect_warning_sequence([], "a same-value path write does not re-arm the warning")

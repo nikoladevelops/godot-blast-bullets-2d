@@ -43,6 +43,9 @@ void PatternSpawner2D::set_movement_path(const NodePath &p_path) {
 	if (!node_path_type_ok<Path2D>(this, p_path, "movement_path", "Path2D")) {
 		return;
 	}
+	if (p_path == movement.path) {
+		return; // same path: never re-arm the unusable-path warning
+	}
 	on_config_changed();
 	movement.jumped = movement.jumped || p_path != movement.path; // a new path is a jump, never travel
 	movement.path = p_path;
@@ -60,6 +63,9 @@ Path2D *PatternSpawner2D::get_movement_path_node() const {
 }
 
 void PatternSpawner2D::set_movement_path_node(Path2D *node) {
+	if (node == get_movement_path_node()) {
+		return; // same node: never re-arm the unusable-path warning
+	}
 	on_config_changed();
 	movement.jumped = movement.jumped || node != get_movement_path_node(); // a new path is a jump, never travel
 	assign_node_to_path(this, node, movement.path, movement.path_cache);
