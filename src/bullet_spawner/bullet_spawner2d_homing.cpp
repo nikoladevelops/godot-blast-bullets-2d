@@ -191,7 +191,13 @@ void BulletSpawner2D::set_homing_max_targets(int value) {
 		UtilityFunctions::push_error("BulletSpawner2D: homing_max_targets must be >= 1, keeping the old value.");
 		return;
 	}
+	if (value == homing_max_targets) {
+		return;
+	}
 	homing_max_targets = value;
+	// The DISTRIBUTE-degenerates warning depends on this value: re-arm it so
+	// going 1 -> 2 -> 1 warns again.
+	homing_distribute_degenerate_warned = false;
 }
 
 double BulletSpawner2D::get_homing_max_detection_range() const {

@@ -915,3 +915,16 @@ func test_lasers_change_hands_by_detach_and_adopt() -> void:
 		"adopt_live_laser: laser must be a LaserVolley2D or null (a freed object is neither), nothing changed.",
 		"LaserSpawner2D::adopt_live_laser: instance is not firing (finished, pooled or never fired).",
 	])
+
+
+## A static Global Position with a retarget interval never wakes the loop: the
+## point cannot move, so re-picking it every interval would change nothing.
+func test_a_static_global_position_never_wakes_the_loop() -> void:
+	var d := _laser()
+	d.aim = LaserData2D.LASER_AIM_TRACK
+	var sp := _spawner(d, 1)
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_GLOBAL_POSITION
+	sp.laser_target_position = Vector2(50, 0)
+	sp.laser_retarget_interval_sec = 0.5
+	_fire(sp)
+	assert_false(sp.is_processing(), "a static point never needs retargeting")

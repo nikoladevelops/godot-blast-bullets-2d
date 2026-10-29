@@ -279,3 +279,31 @@ func test_fire_arc_with_a_huge_angle_returns() -> void:
 		var t0 := Time.get_ticks_msec()
 		sp.shoot_once()
 		assert_lt(Time.get_ticks_msec() - t0, 1000, "%s: the fire-arc gate returns" % how)
+
+
+## The DISTRIBUTE-degenerates warning fires once per configuration. Raising
+## homing_max_targets to 2+ and lowering it back to 1 is a new configuration
+## that degenerates again, so it must warn again (the latch re-arms on the
+## value change).
+func test_distribute_warning_rearms_after_max_targets_changes() -> void:
+	var foes: Array = []
+	for i in 4:
+		var foe := Node2D.new()
+		foe.position = Vector2(100.0 * (i + 1), 0)
+		add(foe)
+		foe.add_to_group("enemies_rearm")
+		foes.append(foe)
+	var sp := make_spawner(H.make_volley_data(4, 50.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
+	sp.set_homing_enabled(true)
+	sp.set_homing_node_group(&"enemies_rearm")
+	sp.set_homing_mode(BulletSpawner2D.HOMING_PER_BULLET)
+	sp.set_homing_target_selection(BulletSpawner2D.HOMING_SELECT_DISTRIBUTE)
+	sp.set_homing_max_targets(1)
+	assert_true(sp.shoot_once(), "shot 1")
+	expect_warning_sequence(["BulletSpawner2D: homing_target_selection is DISTRIBUTE but homing_max_targets is 1, so every bullet chases the same target (identical to SHARED). Raise homing_max_targets to 2+ to spread targets across the volley."], "1 target: warned once")
+	sp.set_homing_max_targets(2)
+	assert_true(sp.shoot_once(), "shot 2")
+	expect_warning_sequence([], "2+ targets: no warning")
+	sp.set_homing_max_targets(1)
+	assert_true(sp.shoot_once(), "shot 3")
+	expect_warning_sequence(["BulletSpawner2D: homing_target_selection is DISTRIBUTE but homing_max_targets is 1, so every bullet chases the same target (identical to SHARED). Raise homing_max_targets to 2+ to spread targets across the volley."], "back to 1: warns again")
