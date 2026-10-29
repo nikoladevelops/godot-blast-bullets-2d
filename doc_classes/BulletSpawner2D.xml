@@ -516,7 +516,7 @@
 			Angular width of each FAN lobe in radians. When the lobes touch or overlap, edge slots of neighboring petals never land on the same spot. Must be finite and 0 or more.
 		</member>
 		<member name="helper_flower_petals" type="int" setter="set_helper_flower_petals" getter="get_helper_flower_petals" default="6">
-			Lobes in the flower pattern. In FAN mode the [member helper_bullets_amount] bullets are split evenly over the petals (the remainder spread symmetrically; fewer bullets than petals light evenly spaced petals). Must be 1 or more.
+			Lobes in the flower pattern. In FAN mode the [member helper_bullets_amount] bullets are split evenly over the petals (the remainder spread symmetrically; fewer bullets than petals light evenly spaced petals). Must be 1 or more and at most [method BulletPatterns2D.get_max_bullets_per_pattern].
 		</member>
 		<member name="helper_flower_radius" type="float" setter="set_helper_flower_radius" getter="get_helper_flower_radius" default="150.0">
 			Flower radius in pixels. Must be finite and 0 or more.

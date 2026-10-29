@@ -90,7 +90,7 @@ PATTERN_KNOB(bool, bool, BOOL, helper_flower_rotate_with_marker, NONE, 0, 0, "",
 // RHODONEA / PHYLLOTAXIS / SUPERFORMULA: core-hole lift.
 PATTERN_KNOB(double, double, FLOAT, helper_flower_inner_radius_scale, FINITE_IN_CO, 0.0, 1.0, "must be finite in [0, 1)", NONE, 0, 0, "", false, PROPERTY_HINT_RANGE, "0,0.999,0.001")
 // FAN: lobe count + per-lobe fan controls.
-PATTERN_KNOB(int64_t, int, INT, helper_flower_petals, GE, 1, 0, "must be >= 1", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")
+PATTERN_KNOB(int64_t, int, INT, helper_flower_petals, GE, 1, 0, "must be >= 1", LE, pattern_max_bullets(), 0, String("must be <= ") + itos(pattern_max_bullets()), false, PROPERTY_HINT_NONE, "")
 PATTERN_KNOB(double, double, FLOAT, helper_flower_petal_spread, FINITE_GE, 0.0, 0, "must be finite and >= 0", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")
 // FAN + RHODONEA: waist pinch between lobes.
 PATTERN_KNOB(double, double, FLOAT, helper_flower_petal_sharpness, FINITE_GE, 0.0, 0, "must be finite and >= 0", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")

@@ -141,6 +141,10 @@ Dictionary BulletPatterns2D::helper_sample_outline_flower(int flower_type, int p
 		UtilityFunctions::push_error("helper_sample_outline_flower: bad bloom knob range.");
 		return outline_track_result(PackedVector2Array(), false);
 	}
+	if (petals > pattern_max_bullets()) { // FAN samples every petal
+		UtilityFunctions::push_error("helper_sample_outline_flower: petals is absurdly large; keep it near the bullet count.");
+		return outline_track_result(PackedVector2Array(), false);
+	}
 	// Spirographs close only after several revolutions (k=(R-r)/r fractional),
 	// so sweep the full closure and scale density to keep the extra winding
 	// from coming out undersampled. Other kinds close in one revolution.

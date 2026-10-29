@@ -308,6 +308,8 @@ PatternSlots2D BulletPatterns2D::generate_flower2d(int transforms_amount, Transf
 	PATTERN_REQUIRE(danmaku_validate_head(caller, transforms_amount, marker_transform));
 	PATTERN_REJECT_IF(p.flower_type < FLOWER_FAN || p.flower_type > FLOWER_SUPERFORMULA, "unknown flower_type.");
 	PATTERN_REJECT_IF(p.petals < 1, "petals must be >= 1.");
+	// FAN walks every petal (17 silhouette points each for Fill Inside).
+	PATTERN_REJECT_IF(p.petals > pattern_max_bullets(), "petals is absurdly large; keep it near the bullet count.");
 	PATTERN_REJECT_IF(!Math::is_finite(p.radius) || p.radius < 0.0, "radius must be finite and >= 0.");
 	PATTERN_REJECT_IF(!Math::is_finite(p.petal_spread) || p.petal_spread < 0.0 || !Math::is_finite(p.petal_sharpness) || p.petal_sharpness < 0.0 || !Math::is_finite(p.base_rotation) || !Math::is_finite(p.facing_offset_degrees), "petal_spread, petal_sharpness, base_rotation and facing_offset_degrees must be finite (spreads/sharpness >= 0).");
 	PATTERN_REJECT_IF(!Math::is_finite(p.inner_radius_scale) || p.inner_radius_scale < 0.0 || p.inner_radius_scale >= 1.0, "inner_radius_scale must be finite in [0, 1).");

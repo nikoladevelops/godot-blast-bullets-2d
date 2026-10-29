@@ -36,6 +36,22 @@ func test_product_and_count_caps() -> void:
 	expect_error_sequence(["helper_generate_transforms_polygon: vertices is absurdly large; keep it near the bullet count."])
 	assert_true(BulletPatterns2D.helper_generate_transforms_ellipse(10, m, 60.0, 40.0, 0.0, 0.0, TAU, 2, 1000000).is_empty(), "ellipse 1M gaps rejected")
 	expect_error_sequence(["helper_generate_transforms_ellipse: gap_count is absurdly large; keep it near the bullet count."])
+	# A FAN flower walks every petal (Fill Inside: 17 points each): 2e9 petals
+	# froze for seconds and could run out of memory, in the editor preview too.
+	var t0 := Time.get_ticks_msec()
+	assert_true(BulletPatterns2D.helper_generate_transforms_flower(10, m, 2000000000).is_empty(), "flower 2e9 petals rejected")
+	expect_error_sequence(["helper_generate_transforms_flower: petals is absurdly large; keep it near the bullet count."])
+	assert_eq(BulletPatterns2D.helper_generate_transforms_flower(10, m, 20000).size(), 10, "the pattern limit itself is fine")
+	BulletPatterns2D.helper_sample_outline_flower(BulletPatterns2D.FLOWER_FAN, 2000000000, 100.0, 0.5, 0.0, 0.0, 0.5, 0.5, 4.0, 1.0, 0.0, -1)
+	expect_error_sequence(["helper_sample_outline_flower: petals is absurdly large; keep it near the bullet count."])
+	var sp := BulletSpawner2D.new()
+	sp.helper_flower_petals = 20001
+	expect_error_sequence(["BulletSpawner2D: helper_flower_petals must be <= 20000, keeping the old value."])
+	assert_eq(sp.helper_flower_petals, 6, "old value kept")
+	sp.helper_flower_petals = 0
+	expect_error_sequence(["BulletSpawner2D: helper_flower_petals must be >= 1, keeping the old value."])
+	sp.free()
+	assert_lt(Time.get_ticks_msec() - t0, 2000, "no freeze")
 
 
 func test_nan_inf_rejected_loud() -> void:
