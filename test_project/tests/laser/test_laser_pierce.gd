@@ -77,6 +77,22 @@ func test_hit_interval_repeats_hits_and_never_bursts() -> void:
 	assert_eq(_kinds(), ["hit:A"], "one hit after the hitch, never the eight it missed")
 
 
+## Raising hit_interval_sec on a live laser must reach a contact that already
+## started: it was scheduled at INF while the interval was 0.
+func test_raising_the_hit_interval_reaches_an_open_contact() -> void:
+	var d := H.make_laser(0.0, 0.0, 0.0, 0.0, 150.0) # reaches A only
+	_fire(d)
+	_step(1)
+	assert_eq(log, [[1, "start", "A", 0, 100], [1, "hit", "A", 0, 100]], "one hit while the interval is 0")
+	log.clear()
+	d.hit_interval_sec = 0.25
+	_step(1)
+	assert_eq(_kinds(), ["hit:A"], "the raised interval takes effect on the open contact")
+	log.clear()
+	_step(4)
+	assert_eq(_kinds(), ["hit:A"], "and repeats every 0.25 s")
+
+
 func test_pierce_limit_hits_the_nearest_and_cuts_the_beam() -> void:
 	var d := H.make_laser(0.0, 0.0, 0.0, 0.0)
 	d.pierce_limit = 2
