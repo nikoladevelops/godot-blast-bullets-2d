@@ -52,6 +52,7 @@ Dictionary BulletFactory2D::get_frame_stats() const {
 	d["active_bullets"] = get_active_bullet_count();
 	int active_volleys = 0;
 	int pooled_volleys = 0;
+	int parked_volleys = 0;
 	for (const BulletVolley2D *volley : all_volleys) {
 		if (volley == nullptr || volley->is_queued_for_deletion()) {
 			continue;
@@ -63,10 +64,13 @@ Dictionary BulletFactory2D::get_frame_stats() const {
 			pooled_volleys++;
 		} else if (volley->is_active) {
 			active_volleys++;
+		} else {
+			parked_volleys++; // auto pooling off: frozen, still owned, wakeable
 		}
 	}
 	d["active_volleys"] = active_volleys;
 	d["pooled_volleys"] = pooled_volleys;
+	d["parked_volleys"] = parked_volleys;
 	d["active_effects"] = get_active_effect_count();
 	d["active_attachments"] = const_cast<BulletFactory2D *>(this)->debug_get_active_attachments_amount();
 	return d;
@@ -100,6 +104,7 @@ static const char *const kBlastMonitorIds[] = {
 	"BlastBullets2D/Active Bullets",
 	"BlastBullets2D/Active Volleys",
 	"BlastBullets2D/Pooled Volleys",
+	"BlastBullets2D/Parked Volleys",
 	"BlastBullets2D/Physics Tick (ms)",
 	"BlastBullets2D/Peak Physics Tick (ms)",
 	"BlastBullets2D/Interpolation (ms)",
@@ -124,12 +129,14 @@ void BulletFactory2D::register_monitors() {
 		callable_mp(this, &BulletFactory2D::_monitor_active_bullets),
 		callable_mp(this, &BulletFactory2D::_monitor_active_volleys),
 		callable_mp(this, &BulletFactory2D::_monitor_pooled_volleys),
+		callable_mp(this, &BulletFactory2D::_monitor_parked_volleys),
 		callable_mp(this, &BulletFactory2D::_monitor_physics_tick_ms),
 		callable_mp(this, &BulletFactory2D::_monitor_peak_physics_tick_ms),
 		callable_mp(this, &BulletFactory2D::_monitor_render_ms),
 		callable_mp(this, &BulletFactory2D::_monitor_active_effects),
 		callable_mp(this, &BulletFactory2D::_monitor_active_attachments),
 	};
+	static_assert(sizeof(callables) / sizeof(callables[0]) == sizeof(kBlastMonitorIds) / sizeof(kBlastMonitorIds[0]), "one callable per monitor id");
 	for (int i = 0; i < (int)(sizeof(kBlastMonitorIds) / sizeof(kBlastMonitorIds[0])); ++i) {
 		const StringName id(kBlastMonitorIds[i]);
 		if (perf->has_custom_monitor(id)) {
@@ -177,6 +184,7 @@ Variant BulletFactory2D::_monitor_active_bullets() { return get_active_bullet_co
 Variant BulletFactory2D::_monitor_active_volleys() { return get_frame_stats()["active_volleys"]; }
 
 Variant BulletFactory2D::_monitor_pooled_volleys() { return get_frame_stats()["pooled_volleys"]; }
+Variant BulletFactory2D::_monitor_parked_volleys() { return get_frame_stats()["parked_volleys"]; }
 
 Variant BulletFactory2D::_monitor_physics_tick_ms() { return (double)stats_last_physics_tick_usec / 1000.0; }
 

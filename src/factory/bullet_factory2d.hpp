@@ -675,7 +675,7 @@ public:
 	//   render_usec (last interpolation pass, 0 when interpolation is off),
 	//   volleys_ticked / bullets_ticked (last tick), collision_records_total,
 	//   expired_bullets_total, spawned_bullets_total, pool_hits, pool_misses,
-	//   active_bullets, active_volleys, pooled_volleys, active_effects,
+	//   active_bullets, active_volleys, pooled_volleys, parked_volleys, active_effects,
 	//   active_attachments.
 	// Counters are cumulative: sample twice and subtract for per-frame rates.
 	Dictionary get_frame_stats() const;
@@ -1180,6 +1180,7 @@ private:
 	Variant _monitor_active_bullets();
 	Variant _monitor_active_volleys();
 	Variant _monitor_pooled_volleys();
+	Variant _monitor_parked_volleys();
 	Variant _monitor_physics_tick_ms();
 	Variant _monitor_peak_physics_tick_ms();
 	Variant _monitor_render_ms();

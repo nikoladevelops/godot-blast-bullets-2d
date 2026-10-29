@@ -12,7 +12,7 @@ func test_keys_present() -> void:
 	for key in ["physics_ticks", "physics_tick_usec", "peak_physics_tick_usec", "render_usec",
 			"volleys_ticked", "bullets_ticked", "collision_records_total", "expired_bullets_total",
 			"spawned_bullets_total", "pool_hits", "pool_misses", "active_bullets", "active_volleys",
-			"pooled_volleys", "active_effects", "active_attachments"]:
+			"pooled_volleys", "parked_volleys", "active_effects", "active_attachments"]:
 		assert_has(s, key)
 
 
@@ -65,10 +65,15 @@ func test_parked_and_queued_volleys_are_bucketed_correctly() -> void:
 	var s: Dictionary = factory.get_frame_stats()
 	assert_eq(int(s["pooled_volleys"]), 0, "a parked volley is not pooled")
 	assert_eq(int(s["active_volleys"]), 0, "and not active")
+	assert_eq(int(s["parked_volleys"]), 1, "it is parked")
+	assert_eq(Performance.get_custom_monitor("BlastBullets2D/Parked Volleys"), 1, "the editor monitor reads it")
 	var q: BulletVolley2D = quick_volley(1, 0.0, 30.0)
 	assert_eq(int(factory.get_frame_stats()["active_volleys"]), 1, "the live volley counts")
 	q.queue_free()
 	assert_eq(int(factory.get_frame_stats()["active_volleys"]), 0, "a queued volley drops out at once")
+	v.enable_bullet(0)
+	assert_eq(int(factory.get_frame_stats()["parked_volleys"]), 0, "woken: no longer parked")
+	assert_eq(int(factory.get_frame_stats()["active_volleys"]), 1, "woken: active again")
 
 
 func test_collision_record_counter() -> void:
