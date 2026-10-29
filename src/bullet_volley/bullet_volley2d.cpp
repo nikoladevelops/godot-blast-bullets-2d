@@ -104,7 +104,7 @@ bool BulletVolley2D::detach_from_spawner() {
 }
 
 void BulletVolley2D::reown_queued_requests() {
-	if (bullet_factory != nullptr) {
+	if (bullet_factory != nullptr && factory_alive()) {
 		bullet_factory->reown_pending_requests(get_instance_id(), volley_generation, owner_spawner_id);
 	}
 }
@@ -302,7 +302,7 @@ void BulletVolley2D::begin_life(const BulletVolleyData2D &data, uint64_t new_own
 	}
 	// A life begun mid-sweep (cold spawn or pool reuse from a handler) starts
 	// on the NEXT factory step, never inside the one already running.
-	if (bullet_factory != nullptr) {
+	if (bullet_factory != nullptr && factory_alive()) {
 		sweep_tick_stamp = bullet_factory->get_sweep_counter();
 		first_tick_lead = 0.0; // a timed spawner shot sets its own right after
 		sweep_timer_stamp = sweep_tick_stamp;
@@ -578,7 +578,7 @@ bool BulletVolley2D::enable_volley(const BulletVolleyData2D &data, const Vector2
 		UtilityFunctions::push_error("enable_volley cannot run on a volley while its own tick is running (e.g. from its collision handler or attachment callback). Spawn a new volley instead.");
 		return false;
 	}
-	if (shape_type_changes && bullet_factory != nullptr && bullet_factory->is_structural_mutation_unsafe()) {
+	if (shape_type_changes && bullet_factory != nullptr && factory_alive() && bullet_factory->is_structural_mutation_unsafe()) {
 		UtilityFunctions::push_error("enable_volley with a different collision shape type cannot run inside a physics frame (server flush locks apply to the shape RIDs it must recreate). Spawn through BulletFactory2D (a shape change pops a matching pool bucket) or call enable_volley from an idle frame.");
 		return false;
 	}
@@ -629,7 +629,7 @@ bool BulletVolley2D::enable_volley(const BulletVolleyData2D &data, const Vector2
 	set_visible(true);
 	all_bullets_enabled_set.activate_all_data();
 	is_active = true;
-	if (bullet_factory != nullptr && bullet_factory->debug_bullet_event_log_enabled) {
+	if (bullet_factory != nullptr && factory_alive() && bullet_factory->debug_bullet_event_log_enabled) {
 		bullet_factory->debug_log_bullet_event("life", "", get_instance_id(), get_life_id(), amount_bullets, 0);
 	}
 	move_to_front(); // Pooled instances render behind newer ones without this; moving to front emulates fresh spawn order.
@@ -650,7 +650,7 @@ bool BulletVolley2D::enable_volley(const BulletVolleyData2D &data, const Vector2
 	// Join the factory tick (the spawn path does this too; the sparse set
 	// dedups). Without it a direct enable_volley() call left an active
 	// volley that never moved.
-	if (bullet_factory != nullptr) {
+	if (bullet_factory != nullptr && factory_alive()) {
 		bullet_factory->track_volley_active(*this);
 	}
 	return true;
@@ -1198,7 +1198,7 @@ void BulletVolley2D::on_volley_deactivated() {
 	// Dying life: reached events collected this tick die with it.
 	homing_reached_events.clear();
 	shared_pop_requested = false;
-	if (bullet_factory != nullptr) {
+	if (bullet_factory != nullptr && factory_alive()) {
 		bullet_factory->track_volley_inactive(*this);
 	}
 }
