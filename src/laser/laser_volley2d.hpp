@@ -255,6 +255,10 @@ public:
 		bool fired = false;
 		int8_t deepest = -1;
 		uint64_t anchor = 0;
+		// The anchor target's position when the visit started / moved to it:
+		// the exit event names that target, so its sound/effect must land there
+		// (not on whichever target happens to be nearest at exit time).
+		Vector2 anchor_pos;
 	};
 	void graze_arm(const Array &zones, const std::shared_ptr<GrazeDetector2D> &detector);
 	// Sound triggers: On Hit (laser_hit), On Bounce (a wall stop), On Graze /
