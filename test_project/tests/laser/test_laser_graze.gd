@@ -72,6 +72,35 @@ func test_after_exit_rearms_the_rings() -> void:
 	assert_eq(log, [["graze", "A", 0, 0, 0], ["exit", "A", 0, 0, 0], ["graze", "A", 0, 0, 0]], "graze, exit, graze again")
 
 
+## GrazeZone2D.enabled off must match the bullet contract: the zone tests
+## nothing and an open visit ends silently.
+func test_a_disabled_zone_never_grazes() -> void:
+	_target("A", Vector2(150, 10))
+	var z := H.make_graze_zone([50.0])
+	z.enabled = false
+	_laser([z])
+	step_factory(3, DT)
+	assert_eq(log, [], "a disabled zone never grazes")
+
+
+func test_disabling_a_zone_ends_its_visit_silently() -> void:
+	var t := _target("A", Vector2(150, 10))
+	var z := H.make_graze_zone([50.0])
+	_laser([z])
+	step_factory(1, DT)
+	assert_eq(log.size(), 1, "grazed while the zone is on")
+	z.enabled = false
+	step_factory(1, DT)
+	assert_eq(log.size(), 1, "disabling tests nothing and exits nothing")
+	t.position = Vector2(150, 400)
+	step_factory(1, DT)
+	assert_eq(log.size(), 1, "the visit already ended silently: no exit when it leaves")
+	z.enabled = true
+	t.position = Vector2(150, 10)
+	step_factory(2, DT)
+	assert_eq(log.size(), 1, "Once survives the disabled window")
+
+
 func test_count_bullet_size_adds_half_the_beam_width() -> void:
 	_target("A", Vector2(150, 54)) # the ring reaches 50, the 12 px beam's edge 6 more
 	_laser([H.make_graze_zone([50.0]), H.make_graze_zone([50.0], true)])

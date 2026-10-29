@@ -928,6 +928,18 @@ bool LaserVolley2D::update_graze(uint64_t self_id, uint32_t life) {
 			if (zone == nullptr) {
 				continue;
 			}
+			if (!zone->enabled) {
+				// Disabled: the zone tests nothing and an open visit ends
+				// silently, exactly like the bullet path (no exit event, the
+				// Once bits survive unless the zone re-arms on exit).
+				if (zone->get_regraze() == GrazeZone2D::REGRAZE_AFTER_EXIT) {
+					g.rings = 0;
+				}
+				g.inside = false;
+				g.fired = false;
+				g.deepest = -1;
+				continue;
+			}
 			const real_t inflate = zone->get_count_bullet_size() ? half_width : (real_t)0.0;
 			const int rings = Math::clamp(zone->get_ring_count(), 1, (int)GrazeZone2D::MAX_RINGS);
 			// Rings by radius, largest first (equal radii by index).
