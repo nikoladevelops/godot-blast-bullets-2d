@@ -57,6 +57,26 @@ func test_per_bullet_smoothing_fans_out() -> void:
 		assert_almost_eq(v.bullet_get_homing_smoothing(i), 5.0 + 1.5 * i, 0.0001, "bullet %d smoothing" % i)
 
 
+## Turning the per-bullet fan OFF must hand control back to the shared
+## homing_smoothing on volleys already flying: the volley latches the
+## per-bullet values once written, so without the clear every later edit is
+## silently ignored. The retarget pass is what re-applies steering.
+func test_turning_per_bullet_smoothing_off_restores_the_shared_value() -> void:
+	var sp := _homing_spawner(4)
+	sp.set_homing_mode(BulletSpawner2D.HOMING_PER_BULLET)
+	sp.set_homing_per_bullet_smoothing_enabled(true)
+	sp.set_homing_smoothing_start(5.0)
+	sp.set_homing_smoothing_step(1.5)
+	assert_true(sp.shoot_once(), "shot")
+	var v: BulletVolley2D = sp.get_live_volleys()[0]
+	assert_almost_eq(v.bullet_get_homing_smoothing(3), 9.5, 0.0001, "fanned while on")
+	sp.set_homing_per_bullet_smoothing_enabled(false)
+	sp.set_homing_smoothing(20.0)
+	assert_eq(sp.retarget_live_volleys(), 1, "the retarget pass re-applies steering")
+	for i in 4:
+		assert_almost_eq(v.bullet_get_homing_smoothing(i), 20.0, 0.0001, "bullet %d is back on the shared value" % i)
+
+
 func test_homing_signals_fire_once_per_volley_with_payloads() -> void:
 	var sp := _homing_spawner()
 	assert_true(sp.shoot_once(), "shot")

@@ -1123,6 +1123,11 @@ void BulletSpawner2D::apply_steering_to_volley(BulletVolley2D *volley) const {
 			const double per_bullet = MAX(homing_smoothing_start + homing_smoothing_step * i, 0.0);
 			volley->bullet_set_homing_smoothing(i, (real_t)per_bullet);
 		}
+	} else {
+		// Turning the fan off hands control back to the shared homing_smoothing.
+		// The volley latches per-bullet values once written, so a live volley
+		// that was fanned once would otherwise ignore every later edit.
+		volley->clear_per_bullet_homing_smoothing();
 	}
 }
 
