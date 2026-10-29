@@ -535,3 +535,14 @@ func test_reassigning_the_same_unusable_path_does_not_rewarn() -> void:
 	sp.movement_seek(0.5) # re-applies the pose (no new warning expected)
 	await idle(3)
 	expect_warning_sequence([], "a same-value path write does not re-arm the warning")
+
+
+## Clearing the Path2D node by code clears the stored path too, also while
+## that path resolves to nothing (the node it named is gone).
+func test_clearing_the_path_node_clears_an_unresolved_path() -> void:
+	var sp := make_spawner(H.make_volley_data(1, 0.0, 5.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
+	sp.movement_path = NodePath("NoSuchPath")
+	assert_null(sp.get_movement_path_node(), "the path resolves to nothing")
+	sp.set_movement_path_node(null)
+	assert_eq(sp.movement_path, NodePath(), "the stale path is cleared")
+	expect_warning_sequence([])

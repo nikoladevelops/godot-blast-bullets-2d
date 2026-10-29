@@ -63,8 +63,10 @@ Path2D *PatternSpawner2D::get_movement_path_node() const {
 }
 
 void PatternSpawner2D::set_movement_path_node(Path2D *node) {
-	if (node == get_movement_path_node()) {
-		return; // same node: never re-arm the unusable-path warning
+	// Same node: never re-arm the unusable-path warning. A null write while
+	// a path is stored still clears it (that path resolves to nothing).
+	if (node == get_movement_path_node() && (node != nullptr || movement.path.is_empty())) {
+		return;
 	}
 	on_config_changed();
 	movement.jumped = movement.jumped || node != get_movement_path_node(); // a new path is a jump, never travel
