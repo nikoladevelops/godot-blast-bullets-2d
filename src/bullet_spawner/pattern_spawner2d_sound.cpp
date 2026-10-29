@@ -18,6 +18,9 @@ bool PatternSpawner2D::get_sound_enabled() const {
 }
 
 void PatternSpawner2D::set_sound_enabled(bool value) {
+	if (value == sound_enabled) {
+		return; // no-op: not a configuration change, keep the error latch
+	}
 	sound_enabled = value;
 	on_config_changed();
 	notify_property_list_changed();

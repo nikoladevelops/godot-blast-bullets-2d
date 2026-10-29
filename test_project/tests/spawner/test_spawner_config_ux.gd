@@ -118,6 +118,24 @@ func test_a_rejected_write_does_not_rearm_the_auto_fire_error() -> void:
 	sp.set_shooting_enabled(false)
 
 
+## A no-op feature switch is not a configuration change either: it must not
+## reset the auto-fire error latch.
+func test_a_noop_feature_switch_does_not_rearm_the_auto_fire_error() -> void:
+	var sp := BulletSpawner2D.new()
+	sp.set_shooting_enabled(false)
+	sp.shoot_interval_sec = 0.05
+	add(sp)
+	sp.set_bullet_factory(factory)
+	sp.set_shooting_enabled(true) # no spawn_data: every interval fails
+	await idle(30)
+	expect_errors_containing("shoot_once: no spawn_data assigned", 1, "one report, latched")
+	sp.set_graze_enabled(sp.get_graze_enabled()) # no-op (false -> false)
+	sp.set_sound_enabled(sp.get_sound_enabled()) # no-op
+	await idle(20)
+	expect_errors_containing("shoot_once: no spawn_data assigned", 0, "no-op switches keep the latch")
+	sp.set_shooting_enabled(false)
+
+
 func _has_1(sp: BulletSpawner2D, text: String) -> bool:
 	return Array(sp.get_setup_warnings()).any(func(w): return text in str(w))
 
