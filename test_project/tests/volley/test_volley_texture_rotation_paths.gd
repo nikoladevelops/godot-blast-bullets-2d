@@ -85,6 +85,42 @@ func test_texture_rotation_never_changes_the_flight_path(case_name: String = use
 	assert_eq("\n".join(problems.slice(0, 6)), "", "%s: the texture rotation is cosmetic" % case_name)
 
 
+## The texture follows the FIRST channel that steered: a shared y-curve must
+## not steal the facing source from the bullet's own x-curve.
+func test_the_own_x_curve_keeps_the_facing_source() -> void:
+	var own := BulletCurvesData2D.new()
+	var cx := Curve.new()
+	cx.min_value = -2.0
+	cx.max_value = 2.0
+	cx.add_point(Vector2(0, -1))
+	cx.add_point(Vector2(0.5, 1))
+	cx.add_point(Vector2(1, -1))
+	own.x_direction_curve = cx
+	own.rotate_towards_adjusted_direction = true
+	own.direction_curve_rotation_speed = 12.0
+	var shared := BulletCurvesData2D.new()
+	var cy := Curve.new()
+	cy.min_value = -2.0
+	cy.max_value = 2.0
+	cy.add_point(Vector2(0, -1))
+	cy.add_point(Vector2(0.5, 1))
+	cy.add_point(Vector2(1, -1))
+	shared.y_direction_curve = cy
+	shared.rotate_towards_adjusted_direction = false # the shared resource never turns the art
+	var d := H.make_flight_data([Transform2D(0.0, Vector2.ZERO)], 180.0, 1000.0)
+	d.shared_bullet_curves_data = shared
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	v.bullet_set_curves_data(0, own)
+	var first: float = v.get_bullet_transform(0).x.angle()
+	var turned := false
+	for tick in 120:
+		factory.debug_advance_time(DT)
+		if absf(angle_difference(v.get_bullet_transform(0).x.angle(), first)) > 0.2:
+			turned = true
+			break
+	assert_true(turned, "the bullet's own x-curve owns the facing (shared rotate = false)")
+
+
 func test_a_homing_bullet_with_a_texture_rotation_reaches_its_target() -> void:
 	for offset in [0.0, 0.7, -1.5, PI]:
 		var d := H.make_flight_data([Transform2D(0.0, Vector2(0, 0))], 300.0, 1000.0)

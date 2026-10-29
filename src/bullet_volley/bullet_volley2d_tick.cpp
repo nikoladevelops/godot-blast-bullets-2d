@@ -686,7 +686,11 @@ _ALWAYS_INLINE_ void BulletVolley2D::step_direction_curves(const MoveTick2D &t, 
 		}
 	} else if (t.shared_y) {
 		apply_direction_axis2d(*b.direction, 1, t.shared_y_mode, t.shared_y_offset, t.shared_y_strength);
-		texture_source = t.shared_curves;
+		// First-wins, like the own_y branch above: a shared y-curve must not
+		// steal the facing source from the bullet's own (or shared) x-curve.
+		if (texture_source == nullptr) {
+			texture_source = t.shared_curves;
+		}
 	}
 	if (framed) {
 		*b.direction = bounce_frame_apply(b.i, *b.direction);
