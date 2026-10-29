@@ -88,6 +88,8 @@ func test_the_data_holds_five_look_slots_and_passes_their_edits_on() -> void:
 		assert_same(d.get(names[slot]), other, "set_look writes %s" % names[slot])
 	d.set_look(5, _look())
 	expect_error_sequence(["LaserData2D: set_look slot must be one of the LookSlot values, nothing changed."])
+	assert_null(d.get_look(5), "an out-of-range slot reads null, never past the slot array")
+	assert_null(d.get_look(-1), "a negative slot reads null too")
 	watch_signals(d)
 	d.tip_look.scale = Vector2(2, 2)
 	assert_signal_emit_count(d, "changed", 1, "an edit inside a look is a data change")

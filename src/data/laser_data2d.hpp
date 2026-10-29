@@ -186,7 +186,10 @@ public:
 	void set_body_material(const Ref<Material> &value);
 	Array get_effects() const { return effects; }
 	void set_effects(const Array &value);
-	Ref<LaserSpriteLook2D> get_look(LookSlot slot) const { return looks[slot]; }
+	Ref<LaserSpriteLook2D> get_look(LookSlot slot) const {
+		// Scripts pass any int: never index past the fixed slot array.
+		return (slot >= LOOK_CHARGE && slot < LOOK_SLOT_COUNT) ? looks[slot] : Ref<LaserSpriteLook2D>();
+	}
 	void set_look(LookSlot slot, const Ref<LaserSpriteLook2D> &value);
 	Ref<LaserSpriteLook2D> get_charge_look() const { return looks[LOOK_CHARGE]; }
 	void set_charge_look(const Ref<LaserSpriteLook2D> &value) { set_look(LOOK_CHARGE, value); }
