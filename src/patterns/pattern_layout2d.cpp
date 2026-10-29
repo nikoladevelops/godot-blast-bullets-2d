@@ -4,6 +4,7 @@
 
 #include "patterns/patterns_internal.hpp"
 
+#include <algorithm>
 #include <limits>
 #include <queue>
 #include <vector>
@@ -77,29 +78,21 @@ bool outline_build_boundary(const PackedVector2Array &points, PackedVector2Array
 	if (!avg.is_finite()) {
 		return false;
 	}
-	// Insertion sort by polar angle (slot clouds are small; no allocations).
-	PackedInt32Array order;
-	order.resize(finite.size());
-	for (int i = 0; i < finite.size(); ++i) {
-		order[i] = i;
+	// Stable sort by polar angle, each angle computed once. (An insertion
+	// sort recomputing atan2 in its inner loop was O(n^2): a Fill Inside
+	// flower of 20000 petals, 17 silhouette points each, took minutes.)
+	// Stable like it was: equal angles keep their input order.
+	const int count = (int)finite.size();
+	std::vector<double> angle_of((size_t)count);
+	std::vector<int> order((size_t)count);
+	for (int i = 0; i < count; ++i) {
+		order[(size_t)i] = i;
+		angle_of[(size_t)i] = Math::atan2((double)finite[i].y - (double)avg.y, (double)finite[i].x - (double)avg.x);
 	}
-	for (int i = 1; i < order.size(); ++i) {
-		const int key = order[i];
-		const double key_a = Math::atan2((double)finite[key].y - (double)avg.y, (double)finite[key].x - (double)avg.x);
-		int j = i - 1;
-		while (j >= 0) {
-			const double ja = Math::atan2((double)finite[order[j]].y - (double)avg.y, (double)finite[order[j]].x - (double)avg.x);
-			if (ja <= key_a) {
-				break;
-			}
-			order[j + 1] = order[j];
-			--j;
-		}
-		order[j + 1] = key;
-	}
+	std::stable_sort(order.begin(), order.end(), [&angle_of](int a, int b) { return angle_of[(size_t)a] < angle_of[(size_t)b]; });
 	r_boundary.clear();
-	for (int i = 0; i < order.size(); ++i) {
-		const Vector2 p = finite[order[i]];
+	for (int i = 0; i < count; ++i) {
+		const Vector2 p = finite[order[(size_t)i]];
 		if (r_boundary.is_empty() || r_boundary[r_boundary.size() - 1].distance_to(p) > 1e-6) {
 			r_boundary.push_back(p);
 		}
