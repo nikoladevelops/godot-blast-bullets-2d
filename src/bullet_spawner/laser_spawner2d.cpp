@@ -71,6 +71,9 @@ void LaserSpawner2D::set_laser_target_source(LaserTargetSource value) {
 		UtilityFunctions::push_error("LaserSpawner2D: laser_target_source must be 0 (None), 1 (Node Group), 2 (Node Path), 3 (Mouse), 4 (Global Position), 5 (Node Name) or 6 (Node Children), keeping the old value.");
 		return;
 	}
+	if (laser_target_source == value) {
+		return; // same value: not a configuration change
+	}
 	laser_target_source = value;
 	notify_property_list_changed();
 	on_config_changed();
@@ -78,11 +81,17 @@ void LaserSpawner2D::set_laser_target_source(LaserTargetSource value) {
 }
 
 void LaserSpawner2D::set_laser_target_group(const StringName &value) {
+	if (laser_target_group == value) {
+		return; // same value: not a configuration change
+	}
 	laser_target_group = value;
 	on_config_changed();
 }
 
 void LaserSpawner2D::set_laser_target_filter_group(const StringName &value) {
+	if (laser_target_filter_group == value) {
+		return; // same value: not a configuration change
+	}
 	laser_target_filter_group = value;
 	on_config_changed();
 }
@@ -90,6 +99,9 @@ void LaserSpawner2D::set_laser_target_filter_group(const StringName &value) {
 void LaserSpawner2D::set_laser_target_path(const NodePath &value) {
 	if (!node_path_type_ok<Node2D>(this, value, "laser_target_path", "Node2D")) {
 		return;
+	}
+	if (laser_target_path == value) {
+		return; // same value: not a configuration change
 	}
 	laser_target_path = value;
 	on_config_changed();
@@ -119,6 +131,9 @@ void LaserSpawner2D::set_laser_retarget_interval_sec(double value) {
 }
 
 void LaserSpawner2D::set_laser_target_node_name(const String &value) {
+	if (laser_target_node_name == value) {
+		return; // same value: not a configuration change
+	}
 	laser_target_node_name = value;
 	on_config_changed();
 }
@@ -128,21 +143,33 @@ void LaserSpawner2D::set_laser_target_name_match_mode(HomingNodeNameMatch value)
 		UtilityFunctions::push_error("LaserSpawner2D: invalid laser_target_name_match_mode, keeping the old value.");
 		return;
 	}
+	if (laser_target_name_match_mode == value) {
+		return; // same value: not a configuration change
+	}
 	laser_target_name_match_mode = value;
 	on_config_changed();
 }
 
 void LaserSpawner2D::set_laser_target_name_case_sensitive(bool value) {
+	if (laser_target_name_case_sensitive == value) {
+		return; // same value: not a configuration change
+	}
 	laser_target_name_case_sensitive = value;
 	on_config_changed();
 }
 
 void LaserSpawner2D::set_laser_target_children_parent_path(const NodePath &value) {
+	if (laser_target_children_parent_path == value) {
+		return; // same value: not a configuration change
+	}
 	laser_target_children_parent_path = value;
 	on_config_changed();
 }
 
 void LaserSpawner2D::set_laser_target_children_recursive(bool value) {
+	if (laser_target_children_recursive == value) {
+		return; // same value: not a configuration change
+	}
 	laser_target_children_recursive = value;
 	on_config_changed();
 }

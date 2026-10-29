@@ -55,6 +55,9 @@ void PatternSpawner2D::set_sound_volume_db(double value) {
 		UtilityFunctions::push_error((String(get_class()) + ": sound_volume_db must be finite and between -80 and 24, keeping the old value."));
 		return;
 	}
+	if (value == sound_volume_db) {
+		return; // same value: not a configuration change
+	}
 	sound_volume_db = value;
 	on_config_changed();
 }
@@ -68,6 +71,9 @@ void PatternSpawner2D::set_sound_listener_source(SoundListenerSource value) {
 		UtilityFunctions::push_error((String(get_class()) + ": invalid sound_listener_source, keeping the old value."));
 		return;
 	}
+	if (value == sound_listener_source) {
+		return; // same value: not a configuration change
+	}
 	sound_listener_source = value;
 	notify_property_list_changed();
 	apply_sound_detector_config();
@@ -78,6 +84,9 @@ StringName PatternSpawner2D::get_sound_listener_node_group() const {
 }
 
 void PatternSpawner2D::set_sound_listener_node_group(const StringName &value) {
+	if (sound_targets.config.node_group == value) {
+		return; // same value: not a configuration change
+	}
 	sound_targets.config.node_group = value;
 	apply_sound_detector_config();
 }
@@ -87,6 +96,9 @@ StringName PatternSpawner2D::get_sound_listener_filter_group() const {
 }
 
 void PatternSpawner2D::set_sound_listener_filter_group(const StringName &value) {
+	if (sound_targets.config.filter_group == value) {
+		return; // same value: not a configuration change
+	}
 	sound_targets.config.filter_group = value;
 	apply_sound_detector_config();
 }
@@ -99,6 +111,9 @@ void PatternSpawner2D::set_sound_listener_path(const NodePath &p_path) {
 	if (!node_path_type_ok<Node2D>(this, p_path, "sound_listener_path", "Node2D")) {
 		return;
 	}
+	if (sound_targets.config.target_path == p_path) {
+		return; // same value: not a configuration change
+	}
 	sound_targets.config.target_path = p_path;
 	apply_sound_detector_config();
 }
@@ -108,6 +123,9 @@ String PatternSpawner2D::get_sound_listener_node_name() const {
 }
 
 void PatternSpawner2D::set_sound_listener_node_name(const String &value) {
+	if (sound_targets.config.node_name == value) {
+		return; // same value: not a configuration change
+	}
 	sound_targets.config.node_name = value;
 	apply_sound_detector_config();
 }
@@ -120,6 +138,9 @@ void PatternSpawner2D::set_sound_listener_node_name_match_mode(HomingNodeNameMat
 	if (!TargetSource2D::check_name_match((int)value, get_class(), "sound_listener_node_name_match_mode")) {
 		return;
 	}
+	if (sound_targets.config.node_name_match == (int)value) {
+		return; // same value: not a configuration change
+	}
 	sound_targets.config.node_name_match = (int)value;
 	apply_sound_detector_config();
 }
@@ -129,6 +150,9 @@ bool PatternSpawner2D::get_sound_listener_node_name_case_sensitive() const {
 }
 
 void PatternSpawner2D::set_sound_listener_node_name_case_sensitive(bool value) {
+	if (sound_targets.config.node_name_case_sensitive == value) {
+		return; // same value: not a configuration change
+	}
 	sound_targets.config.node_name_case_sensitive = value;
 	apply_sound_detector_config();
 }
@@ -138,6 +162,9 @@ NodePath PatternSpawner2D::get_sound_listener_children_parent_path() const {
 }
 
 void PatternSpawner2D::set_sound_listener_children_parent_path(const NodePath &p_path) {
+	if (sound_targets.config.children_parent_path == p_path) {
+		return; // same value: not a configuration change
+	}
 	sound_targets.config.children_parent_path = p_path;
 	apply_sound_detector_config();
 }
@@ -147,6 +174,9 @@ bool PatternSpawner2D::get_sound_listener_children_recursive() const {
 }
 
 void PatternSpawner2D::set_sound_listener_children_recursive(bool value) {
+	if (sound_targets.config.children_recursive == value) {
+		return; // same value: not a configuration change
+	}
 	sound_targets.config.children_recursive = value;
 	apply_sound_detector_config();
 }
@@ -159,6 +189,9 @@ void PatternSpawner2D::set_sound_listener_global_positions(const PackedVector2Ar
 	if (!TargetSource2D::check_positions(value, get_class(), "sound_listener_global_positions")) {
 		return;
 	}
+	if (sound_targets.config.global_positions == value) {
+		return; // same value: not a configuration change
+	}
 	sound_targets.config.global_positions = value;
 	apply_sound_detector_config();
 }
@@ -170,6 +203,9 @@ double PatternSpawner2D::get_sound_listener_update_interval() const {
 void PatternSpawner2D::set_sound_listener_update_interval(double value) {
 	if (!TargetSource2D::check_update_interval(value, get_class(), "sound_listener_update_interval")) {
 		return;
+	}
+	if (sound_targets.config.update_interval == value) {
+		return; // same value: not a configuration change
 	}
 	sound_targets.config.update_interval = value;
 	apply_sound_detector_config();

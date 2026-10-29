@@ -115,6 +115,9 @@ bool BulletSpawner2D::get_homing_enabled() const {
 }
 
 void BulletSpawner2D::set_homing_enabled(bool value) {
+	if (value == homing_enabled) {
+		return; // no-op: not a configuration change, keep the error latch
+	}
 	on_config_changed();
 	const bool was_active = homing_retarget_active();
 	homing_enabled = value;
@@ -461,6 +464,9 @@ bool BulletSpawner2D::get_orbiting_enabled() const {
 }
 
 void BulletSpawner2D::set_orbiting_enabled(bool value) {
+	if (value == orbiting_enabled) {
+		return; // no-op: not a configuration change, keep the error latch
+	}
 	on_config_changed();
 	orbiting_enabled = value;
 	notify_property_list_changed();

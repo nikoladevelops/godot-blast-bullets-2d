@@ -90,7 +90,7 @@ func test_auto_fire_reports_a_misconfiguration_once() -> void:
 	sp.set_shooting_enabled(true) # no spawn_data: every interval fails
 	await idle(30) # ~10 attempts
 	assert_eq(expect_errors_containing("shoot_once: no spawn_data assigned", 1, "", true), 1, "auto-fire: one report, not one per interval") # lint: at-least the count is asserted exactly by assert_eq
-	sp.set_spawn_data(null) # configuration touched: re-armed
+	sp.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_RING # a real configuration change: re-armed
 	await idle(10)
 	expect_errors_containing("shoot_once: no spawn_data assigned", 1, "re-armed after a config change")
 	sp.set_shooting_enabled(false)
@@ -133,6 +133,41 @@ func test_a_noop_feature_switch_does_not_rearm_the_auto_fire_error() -> void:
 	sp.set_sound_enabled(sp.get_sound_enabled()) # no-op
 	await idle(20)
 	expect_errors_containing("shoot_once: no spawn_data assigned", 0, "no-op switches keep the latch")
+	sp.set_shooting_enabled(false)
+
+
+## Every stored property written back with its own value keeps the latch:
+## a script that writes its whole config every frame must not re-arm the
+## auto-fire report each frame (ClassDB-driven: new setters are covered).
+func test_every_same_value_write_keeps_the_auto_fire_latch(kind: String = use_parameters(["BulletSpawner2D", "LaserSpawner2D"])) -> void:
+	var text := "no spawn_data assigned" if kind == "BulletSpawner2D" else "no laser_data assigned"
+	var sp: PatternSpawner2D = ClassDB.instantiate(kind)
+	sp.set_shooting_enabled(false)
+	sp.shoot_interval_sec = 0.05 # 3 frames
+	add(sp)
+	sp.set_bullet_factory(factory)
+	sp.set_shooting_enabled(true) # no data: every interval fails
+	await idle(10)
+	expect_errors_containing(text, 1, "one report, latched")
+	var rearmed: Array = []
+	for prop in sp.get_property_list():
+		if not (prop.usage & PROPERTY_USAGE_STORAGE) or prop.name in ["script", "owner"]:
+			continue
+		if prop.type == TYPE_ARRAY:
+			continue # an Array write always counts: a script may have edited it in place
+		if not ClassDB.class_has_method(kind, "set_" + prop.name) and not prop.name in ["process_mode"]:
+			continue
+		sp.set(prop.name, sp.get(prop.name))
+		await idle(4) # longer than one interval
+		var seen := 0
+		for err in get_errors():
+			if not err.handled and err.contains_text(text):
+				err.handled = true
+				seen += 1
+		if seen > 0:
+			rearmed.append(prop.name)
+	assert_eq(", ".join(rearmed), "", "same-value writes that re-armed the report")
+	expect_no_errors()
 	sp.set_shooting_enabled(false)
 
 

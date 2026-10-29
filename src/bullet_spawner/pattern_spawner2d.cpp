@@ -41,7 +41,11 @@ void PatternSpawner2D::set_bullet_factory_path(const NodePath &p_path) {
 	if (!node_path_type_ok<BulletFactory2D>(this, p_path, "bullet_factory_path", "BulletFactory2D")) {
 		return;
 	}
-	on_config_changed();
+	// A same-path write still re-resolves the cache but is not a
+	// configuration change (it keeps the auto-fire error latch).
+	if (p_path != bullet_factory_path) {
+		on_config_changed();
+	}
 	bullet_factory_path = p_path;
 	bullet_factory = nullptr;
 	bullet_factory_id = 0;

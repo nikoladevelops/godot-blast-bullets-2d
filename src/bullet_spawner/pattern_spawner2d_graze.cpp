@@ -103,6 +103,9 @@ void PatternSpawner2D::set_graze_target_source(GrazeTargetSource value) {
 		UtilityFunctions::push_error((String(get_class()) + ": invalid graze_target_source, keeping the old value."));
 		return;
 	}
+	if (value == graze_target_source) {
+		return; // same value: not a configuration change
+	}
 	graze_target_source = value;
 	notify_property_list_changed();
 	apply_graze_detector_config();
@@ -113,6 +116,9 @@ StringName PatternSpawner2D::get_graze_node_group() const {
 }
 
 void PatternSpawner2D::set_graze_node_group(const StringName &value) {
+	if (graze_targets.config.node_group == value) {
+		return; // same value: not a configuration change
+	}
 	graze_targets.config.node_group = value;
 	apply_graze_detector_config();
 }
@@ -122,6 +128,9 @@ StringName PatternSpawner2D::get_graze_filter_group() const {
 }
 
 void PatternSpawner2D::set_graze_filter_group(const StringName &value) {
+	if (graze_targets.config.filter_group == value) {
+		return; // same value: not a configuration change
+	}
 	graze_targets.config.filter_group = value;
 	apply_graze_detector_config();
 }
@@ -134,6 +143,9 @@ void PatternSpawner2D::set_graze_target_path(const NodePath &p_path) {
 	if (!node_path_type_ok<Node2D>(this, p_path, "graze_target_path", "Node2D")) {
 		return;
 	}
+	if (graze_targets.config.target_path == p_path) {
+		return; // same value: not a configuration change
+	}
 	graze_targets.config.target_path = p_path;
 	apply_graze_detector_config();
 }
@@ -143,6 +155,9 @@ String PatternSpawner2D::get_graze_node_name() const {
 }
 
 void PatternSpawner2D::set_graze_node_name(const String &value) {
+	if (graze_targets.config.node_name == value) {
+		return; // same value: not a configuration change
+	}
 	graze_targets.config.node_name = value;
 	apply_graze_detector_config();
 }
@@ -155,6 +170,9 @@ void PatternSpawner2D::set_graze_node_name_match_mode(HomingNodeNameMatch value)
 	if (!TargetSource2D::check_name_match((int)value, get_class(), "graze_node_name_match_mode")) {
 		return;
 	}
+	if (graze_targets.config.node_name_match == (int)value) {
+		return; // same value: not a configuration change
+	}
 	graze_targets.config.node_name_match = (int)value;
 	apply_graze_detector_config();
 }
@@ -164,6 +182,9 @@ bool PatternSpawner2D::get_graze_node_name_case_sensitive() const {
 }
 
 void PatternSpawner2D::set_graze_node_name_case_sensitive(bool value) {
+	if (graze_targets.config.node_name_case_sensitive == value) {
+		return; // same value: not a configuration change
+	}
 	graze_targets.config.node_name_case_sensitive = value;
 	apply_graze_detector_config();
 }
@@ -173,6 +194,9 @@ NodePath PatternSpawner2D::get_graze_children_parent_path() const {
 }
 
 void PatternSpawner2D::set_graze_children_parent_path(const NodePath &p_path) {
+	if (graze_targets.config.children_parent_path == p_path) {
+		return; // same value: not a configuration change
+	}
 	graze_targets.config.children_parent_path = p_path;
 	apply_graze_detector_config();
 }
@@ -182,6 +206,9 @@ bool PatternSpawner2D::get_graze_children_recursive() const {
 }
 
 void PatternSpawner2D::set_graze_children_recursive(bool value) {
+	if (graze_targets.config.children_recursive == value) {
+		return; // same value: not a configuration change
+	}
 	graze_targets.config.children_recursive = value;
 	apply_graze_detector_config();
 }
@@ -194,6 +221,9 @@ void PatternSpawner2D::set_graze_global_positions(const PackedVector2Array &valu
 	if (!TargetSource2D::check_positions(value, get_class(), "graze_global_positions")) {
 		return;
 	}
+	if (graze_targets.config.global_positions == value) {
+		return; // same value: not a configuration change
+	}
 	graze_targets.config.global_positions = value;
 	apply_graze_detector_config();
 }
@@ -205,6 +235,9 @@ double PatternSpawner2D::get_graze_update_interval() const {
 void PatternSpawner2D::set_graze_update_interval(double value) {
 	if (!TargetSource2D::check_update_interval(value, get_class(), "graze_update_interval")) {
 		return;
+	}
+	if (graze_targets.config.update_interval == value) {
+		return; // same value: not a configuration change
 	}
 	graze_targets.config.update_interval = value;
 	apply_graze_detector_config();

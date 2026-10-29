@@ -562,6 +562,7 @@ func test_each_source_shows_only_its_own_knobs() -> void:
 		assert_false(is_editor_visible(sp, StringName(k)), k + " hides while graze is off")
 	sp.graze_enabled = true
 	sp.graze_node_group = &"graze_targets"
+	sp.graze_target_source = GLOBAL_POSITIONS # so every write below is a change (a same-value write is a no-op)
 	watch_signals(sp)
 	for source in own:
 		sp.graze_target_source = source

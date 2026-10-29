@@ -70,8 +70,11 @@ void PatternSpawner2D::set_pattern_source(PatternSource value) {
 		UtilityFunctions::push_error((String(get_class()) + ": invalid pattern_source, keeping the old value."));
 		return;
 	}
-	// Validate first: a rejected write is not a configuration change and must
-	// not reset the auto-fire error latch.
+	// Validate first: a rejected (or same-value) write is not a configuration
+	// change and must not reset the auto-fire error latch.
+	if (value == pattern_source) {
+		return;
+	}
 	on_config_changed();
 	pattern_source = value;
 	// The visible helper_* option groups depend on this mode: refresh the
@@ -90,7 +93,11 @@ void PatternSpawner2D::set_helper_aimed_target_path(const NodePath &p_path) {
 	if (!node_path_type_ok<Node2D>(this, p_path, "helper_aimed_target", "Node2D")) {
 		return;
 	}
-	on_config_changed();
+	// A same-path write still re-resolves the cache but is not a
+	// configuration change (it keeps the auto-fire error latch).
+	if (p_path != helper_aimed_target_path) {
+		on_config_changed();
+	}
 	helper_aimed_target_path = p_path;
 	helper_aimed_target = nullptr;
 	helper_aimed_target_id = 0;
@@ -149,7 +156,11 @@ void PatternSpawner2D::set_helper_path2d_path(const NodePath &p_path) {
 	if (!node_path_type_ok<Path2D>(this, p_path, "helper_path2d_path", "Path2D")) {
 		return;
 	}
-	on_config_changed();
+	// A same-path write still re-resolves the cache but is not a
+	// configuration change (it keeps the auto-fire error latch).
+	if (p_path != helper_path2d_path) {
+		on_config_changed();
+	}
 	helper_path2d_path = p_path;
 	helper_path2d_cache = nullptr;
 	helper_path2d_id = 0;

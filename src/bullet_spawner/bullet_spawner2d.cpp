@@ -64,10 +64,12 @@ Ref<BulletVolleyData2D> BulletSpawner2D::get_spawn_data() const {
 }
 
 void BulletSpawner2D::set_spawn_data(const Ref<BulletVolleyData2D> &new_data) {
-	on_config_changed();
 	if (new_data == spawn_data) {
-		return; // same resource: keep the duplicate template and connection
+		// Same resource: keep the duplicate template, the connection and the
+		// auto-fire error latch (its edits arrive through `changed`).
+		return;
 	}
+	on_config_changed();
 	const Callable on_changed = callable_mp(this, &BulletSpawner2D::_on_spawn_data_changed);
 	if (spawn_data.is_valid() && spawn_data->is_connected("changed", on_changed)) {
 		spawn_data->disconnect("changed", on_changed);
