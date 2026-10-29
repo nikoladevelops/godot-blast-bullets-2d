@@ -131,6 +131,7 @@ void PatternSpawner2D::set_transforms_generator_path(const NodePath &p_path) {
 	if (!node_path_type_ok<Node2D>(this, p_path, "transforms_generator", "Node2D")) {
 		return;
 	}
+	const bool changed = p_path != transforms_generator_path;
 	transforms_generator_path = p_path;
 	transforms_generator = nullptr;
 	transforms_generator_id = 0;
@@ -140,6 +141,11 @@ void PatternSpawner2D::set_transforms_generator_path(const NodePath &p_path) {
 		if (resolved == nullptr)
 			transforms_generator = nullptr;
 	}
+	// A real change re-arms the auto-fire error report (the same path written
+	// back is a no-op that keeps the latch, per the documented policy).
+	if (changed) {
+		on_config_changed();
+	}
 	on_pattern_changed();
 }
 
@@ -148,10 +154,15 @@ Node2D *PatternSpawner2D::get_transforms_generator() const {
 }
 
 void PatternSpawner2D::set_transforms_generator(Node2D *generator) {
+	Node2D *before = transforms_generator;
 	assign_node_to_path(this, generator, transforms_generator_path, transforms_generator);
 	transforms_generator_id = generator != nullptr ? generator->get_instance_id() : 0;
 	if (generator == nullptr)
 		transforms_generator = nullptr;
+	// A real change re-arms the auto-fire error report.
+	if (generator != before) {
+		on_config_changed();
+	}
 	on_pattern_changed();
 }
 

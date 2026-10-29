@@ -171,6 +171,29 @@ func test_every_same_value_write_keeps_the_auto_fire_latch(kind: String = use_pa
 	sp.set_shooting_enabled(false)
 
 
+## A real transforms_generator change re-arms the auto-fire report; writing
+## the same generator back keeps the latch (the documented policy).
+func test_a_transforms_generator_change_rearms_the_auto_fire_error() -> void:
+	var sp := make_spawner(H.make_volley_data(4), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
+	sp.shoot_interval_sec = 0.05
+	sp.set_spawn_data(null) # every shot fails: "no spawn_data assigned"
+	var a := Node2D.new()
+	add(a)
+	var b := Node2D.new()
+	add(b)
+	sp.set_transforms_generator(a)
+	sp.set_shooting_enabled(true)
+	await idle(30)
+	expect_errors_containing("shoot_once: no spawn_data assigned", 1, "one report, latched")
+	sp.set_transforms_generator(a) # same generator: keeps the latch
+	await idle(10)
+	expect_errors_containing("shoot_once: no spawn_data assigned", 0, "a same-value write keeps it")
+	sp.set_transforms_generator(b) # a real config change
+	await idle(20)
+	expect_errors_containing("shoot_once: no spawn_data assigned", 1, "re-armed after a real change")
+	sp.set_shooting_enabled(false)
+
+
 func _has_1(sp: BulletSpawner2D, text: String) -> bool:
 	return Array(sp.get_setup_warnings()).any(func(w): return text in str(w))
 
