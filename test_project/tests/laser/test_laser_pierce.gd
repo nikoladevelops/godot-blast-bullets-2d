@@ -78,19 +78,37 @@ func test_hit_interval_repeats_hits_and_never_bursts() -> void:
 
 
 ## Raising hit_interval_sec on a live laser must reach a contact that already
-## started: it was scheduled at INF while the interval was 0.
+## started (it was scheduled at INF while the interval was 0): its start hit
+## was its last one, so the next comes one interval after it, never sooner.
 func test_raising_the_hit_interval_reaches_an_open_contact() -> void:
 	var d := H.make_laser(0.0, 0.0, 0.0, 0.0, 150.0) # reaches A only
 	_fire(d)
 	_step(1)
 	assert_eq(log, [[1, "start", "A", 0, 100], [1, "hit", "A", 0, 100]], "one hit while the interval is 0")
 	log.clear()
-	d.hit_interval_sec = 0.25
+	d.hit_interval_sec = 0.25 # 4 ticks of 1/16 s
+	_step(3)
+	assert_eq(log, [], "no hit before one interval since the start hit")
 	_step(1)
-	assert_eq(_kinds(), ["hit:A"], "the raised interval takes effect on the open contact")
+	assert_eq(log, [[5, "hit", "A", 0, 100]], "the raised interval reaches the open contact, one interval after its start hit")
 	log.clear()
 	_step(4)
-	assert_eq(_kinds(), ["hit:A"], "and repeats every 0.25 s")
+	assert_eq(log, [[9, "hit", "A", 0, 100]], "and repeats every 0.25 s")
+
+
+## Raised long after the start hit: the overdue repeat comes once at once,
+## never a burst of the hits the interval would have sent.
+func test_raising_the_hit_interval_late_hits_once_then_repeats() -> void:
+	var d := H.make_laser(0.0, 0.0, 0.0, 0.0, 150.0)
+	_fire(d)
+	_step(10)
+	log.clear()
+	d.hit_interval_sec = 0.25
+	_step(1)
+	assert_eq(log, [[11, "hit", "A", 0, 100]], "one overdue hit")
+	log.clear()
+	_step(4)
+	assert_eq(log, [[15, "hit", "A", 0, 100]], "then every 0.25 s")
 
 
 func test_pierce_limit_hits_the_nearest_and_cuts_the_beam() -> void:

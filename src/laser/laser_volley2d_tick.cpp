@@ -666,18 +666,21 @@ bool LaserVolley2D::update_contacts(int beam_index, uint64_t self_id, uint32_t l
 		// Re-read through the index: a handler may have rebuilt the vector.
 		Contact c = beams[beam_index].contacts[k];
 		const bool fresh = c.next_hit < 0.0;
-		// A contact that started while the interval was 0 is scheduled at INF.
-		// Once a script raises hit_interval_sec, that open contact must pick it
-		// up: a non-finite schedule counts as due now and re-arms from here.
-		const bool unscheduled = interval > 0.0 && !fresh && !Math::is_finite(c.next_hit);
-		bool hit_now = fresh || unscheduled;
+		if (!fresh && interval > 0.0 && !Math::is_finite(c.next_hit)) {
+			// Started while the interval was 0 (scheduled at INF): its start
+			// hit was its last one, so a raised interval repeats one interval
+			// after it (an overdue repeat comes once, below).
+			c.next_hit = c.started + interval;
+			beams[beam_index].contacts[k].next_hit = c.next_hit;
+		}
+		bool hit_now = fresh;
 		if (!fresh && interval > 0.0 && clock + 1e-9 >= c.next_hit) {
 			hit_now = true;
 		}
 		if (!hit_now) {
 			continue;
 		}
-		double next_hit = interval > 0.0 ? ((fresh || unscheduled) ? clock + interval : c.next_hit + interval) : Math::INF;
+		double next_hit = interval > 0.0 ? (fresh ? clock + interval : c.next_hit + interval) : Math::INF;
 		if (next_hit <= clock) {
 			next_hit = clock + interval; // no burst of missed hits after a hitch
 		}
