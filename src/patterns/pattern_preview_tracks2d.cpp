@@ -384,7 +384,7 @@ Dictionary BulletPatterns2D::helper_sample_outline_waterfall(int transforms_amou
 	const int total_rows = rows + (transforms_amount > capacity ? (transforms_amount - capacity + columns - 1) / columns : 0);
 	PackedVector2Array pts;
 	for (int row = 0; row < total_rows; ++row) {
-		const double row_phase = (rows > 1) ? ((double)row / (double)(rows - 1) - 0.5) : 0.0;
+		const double row_phase = (rows > 1) ? ((double)(row % rows) / (double)(rows - 1) - 0.5) : 0.0;
 		for (int col = 0; col < columns; ++col) {
 			const double col_centered = (columns > 1) ? ((double)col / (double)(columns - 1) - 0.5) : 0.0;
 			const Vector2 cell = across * (real_t)(col_centered * column_spacing * (columns - 1) + stagger * column_spacing * row_phase) + axis * (real_t)(row * row_spacing);

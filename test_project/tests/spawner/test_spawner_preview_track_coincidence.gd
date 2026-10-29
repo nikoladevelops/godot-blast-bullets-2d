@@ -143,6 +143,15 @@ func test_jittered_rain_and_waterfall_stay_within_the_jitter_of_their_row() -> v
 		assert_lte(float(m["worst"]), 6.0 * sqrt(2.0) + 0.01, "source %d dots within the jitter box" % src)
 
 
+## Waterfall rows past the columns x rows capacity repeat their stagger
+## phase (row % rows, so the curtain grows seamlessly). The preview track
+## must use the same phase, or the overflow rows draw off their bullets.
+func test_waterfall_overflow_rows_stay_on_their_track() -> void:
+	var m: Dictionary = await _measure(BulletSpawner2D.PATTERN_FROM_HELPER_WATERFALL, 24, false, 0.0,
+			{"helper_waterfall_columns": 3, "helper_waterfall_rows": 2})
+	assert_lte(float(m["worst"]), TOL, "overflow rows sit on the drawn track")
+
+
 ## Knob settings where a sampler once drifted from its generator (each curve
 ## now has ONE shared formula in patterns/pattern_curves2d.hpp).
 const VARIANTS := [
