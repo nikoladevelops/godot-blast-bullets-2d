@@ -37,6 +37,9 @@ const char *flock_scope_name2d(int scope) {
 PackedStringArray BulletSpawner2D::debug_explain_features() const {
 	PackedStringArray out;
 	const bool rotation_data = spawn_data.is_valid() && (spawn_data->shared_bullet_rotation_data.is_valid() || !spawn_data->all_bullet_rotation_data.is_empty());
+	// A movement pattern path steers the heading every tick (like rotation
+	// data), so the "cannot steer" note below must account for it.
+	const bool movement_pattern = spawn_data.is_valid() && (!spawn_data->shared_movement_pattern_path.is_empty() || !spawn_data->all_bullet_movement_pattern_paths.is_empty());
 	const bool random_size = placement.scale_mode != BULLET_SCALE_OFF;
 	int homing_targets = 0;
 
@@ -66,7 +69,7 @@ PackedStringArray BulletSpawner2D::debug_explain_features() const {
 		} else {
 			line += "Turns at " + String::num(homing_smoothing, 2) + " rad/s (homing_smoothing). ";
 		}
-		if (!homing_take_control_of_texture_rotation && !rotation_data) {
+		if (!homing_take_control_of_texture_rotation && !rotation_data && !movement_pattern) {
 			line += "homing_take_control_of_texture_rotation is off: homing cannot steer these bullets. ";
 		}
 		line += "Reached within " + String::num(homing_distance_before_reached, 1) + " px" + (homing_reach_counts_bullet_size ? " of each bullet's edge." : " of each bullet's center.");

@@ -204,3 +204,18 @@ func test_explaining_never_changes_the_next_picks(selection: int = use_parameter
 		picks_a.append(a.resolve_homing_targets(true, true))
 		picks_b.append(b.resolve_homing_targets(true, true))
 	assert_eq(picks_a, picks_b, "the same picks as a spawner never explained")
+
+
+## A movement pattern path steers the heading, so the explain must not claim
+## homing "cannot steer" when such a path is present.
+func test_explain_does_not_deny_steering_when_a_movement_pattern_steers() -> void:
+	var d := H.make_volley_data(4)
+	d.set_shared_movement_pattern_path(NodePath("Path2D"))
+	var s := make_spawner(d, BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
+	s.homing_enabled = true
+	s.homing_take_control_of_texture_rotation = false
+	s.homing_target_source = BulletSpawner2D.HOMING_SOURCE_GLOBAL_POSITION
+	s.homing_global_position = Vector2(100, 0)
+	await idle(1)
+	var explain := "\n".join(s.debug_explain_features())
+	assert_false(explain.contains("cannot steer"), "a movement pattern steers, so the deny line must not appear")
