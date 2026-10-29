@@ -153,3 +153,22 @@ func test_inert_homing_warns_once_per_spawn_data() -> void:
 	expect_warning_sequence([], "steering homing never warns")
 	for v in factory.get_active_volleys(false):
 		v.all_bullets_clear_homing_targets()
+
+
+## A back-push that grows the shared deque must not re-fire the reached signal
+## for the same front target: the old code compared the element's address, and
+## a reallocation moves it.
+func test_a_shared_deque_growth_does_not_duplicate_the_reached_signal() -> void:
+	var v: BulletVolley2D = factory.spawn_volley(H.make_volley_data(1, 0.0, 60.0))
+	v.set_homing_distance_before_reached(10.0)
+	v.set_shared_homing_deque_auto_pop_after_target_reached(false)
+	var reached: Array = []
+	v.bullet_homing_target_reached.connect(func(_v, i: int, _t, _p) -> void: reached.append(i))
+	v.shared_homing_deque_push_back_global_position_target(Vector2(5, 0)) # the front, in reach
+	for k in 3:
+		v.shared_homing_deque_push_back_global_position_target(Vector2(500 + 100 * k, 0))
+	step_factory(1)
+	assert_eq(reached, [0], "fired once for the front target")
+	v.shared_homing_deque_push_back_global_position_target(Vector2(2000, 0)) # 5th: grows 4 -> 8
+	step_factory(1)
+	assert_eq(reached, [0], "a back-push growth does not re-fire the signal")

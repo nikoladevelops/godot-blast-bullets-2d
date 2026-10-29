@@ -1709,8 +1709,11 @@ _ALWAYS_INLINE_ void BulletVolley2D::try_to_emit_bullet_homing_target_reached_si
 		if (is_using_shared_homing_deque) {
 			if (bullet_index >= 0 && bullet_index < (int)all_shared_homing_reached.size()) {
 				SharedHomingReachedState &state = all_shared_homing_reached[bullet_index];
-				fire_for_this_bullet = (state.front_target != (const void *)&target) || !state.fired;
-				state.front_target = &target;
+				// Compare a stable identity, not the element address: a back-push
+				// that grows the ring deque reallocates it and moves the address.
+				const uint64_t front_identity = orbit_target_identity(homing_deque);
+				fire_for_this_bullet = (state.front_identity != front_identity) || !state.fired;
+				state.front_identity = front_identity;
 				state.fired = true;
 			}
 		} else {

@@ -3256,10 +3256,11 @@ protected:
 	// bullet_homing_target_reached, but the signal carries bullet_index and auto-pop
 	// is a per-bullet feature. Each bullet tracks which front target it already fired
 	// for; popping the front re-arms everyone (reset_shared_homing_reached_state).
-	// Pointer is only COMPARED (deque references stay valid while the element is
-	// stored), never dereferenced.
+	// Stable identity of the front target (not its address: a back-push that
+	// grows the ring deque reallocates the buffer, which would move every
+	// stored address and re-fire the signal for the same target).
 	struct SharedHomingReachedState {
-		const void *front_target = nullptr;
+		uint64_t front_identity = 0;
 		bool fired = false;
 	};
 	std::vector<SharedHomingReachedState> all_shared_homing_reached;

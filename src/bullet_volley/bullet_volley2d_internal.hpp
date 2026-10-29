@@ -1101,7 +1101,7 @@ _ALWAYS_INLINE_ void BulletVolley2D::rotate_to_target(int bullet_index, const Ve
 
 _ALWAYS_INLINE_ void BulletVolley2D::reset_shared_homing_reached_state() {
 	for (SharedHomingReachedState &state : all_shared_homing_reached) {
-		state.front_target = nullptr;
+		state.front_identity = 0;
 		state.fired = false;
 	}
 }
