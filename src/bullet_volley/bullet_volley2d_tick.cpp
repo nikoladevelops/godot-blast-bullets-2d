@@ -1711,7 +1711,9 @@ _ALWAYS_INLINE_ void BulletVolley2D::try_to_emit_bullet_homing_target_reached_si
 				SharedHomingReachedState &state = all_shared_homing_reached[bullet_index];
 				// Compare a stable identity, not the element address: a back-push
 				// that grows the ring deque reallocates it and moves the address.
-				const uint64_t front_identity = orbit_target_identity(homing_deque);
+				// A node front compares by its id alone (no per-bullet engine
+				// call: the tick trimmed a freed front before the move).
+				const uint64_t front_identity = target.type == Node2DTarget ? target.node2d_target_data.cached_valid_instance_id : orbit_target_identity(homing_deque);
 				fire_for_this_bullet = (state.front_identity != front_identity) || !state.fired;
 				state.front_identity = front_identity;
 				state.fired = true;
