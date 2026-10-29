@@ -6,14 +6,24 @@ test, every refactor by an unchanged behavior snapshot. Every fact below was
 verified by running it; if one turns out wrong, fix this file in the same
 change.
 
-**If you read nothing else, read §0, §1 and §2.** Use the table of contents
-for the rest: the sections are written to be looked up, not read once.
+**If you read nothing else, read §0, §1 and §2 (with §2.1).** Use the table
+of contents for the rest: the sections are written to be looked up, not read
+once.
+
+§0 and §2.1 are mechanical on purpose. They do not depend on how hard you
+think or on your reasoning budget: every step produces a command output you
+can paste. If you cannot show the output, the step did not happen, and the
+work is not done. A fix campaign by a model once shipped 24 "red-first,
+proven" commits: one was wrong about Godot, two broke working behavior, two
+were half done and three changed a contract nobody approved (§2.1 lists them).
+Each would have been caught by a rule below. "My effort setting was too low"
+is not an explanation; skipping a step is.
 
 | § | Topic | § | Topic |
 |---|---|---|---|
 | 0 | Golden rules | 10 | Pattern module (BulletPatterns2D, spawner patterns) |
 | 1 | Commands | 11 | Volley (BulletVolley2D) architecture |
-| 2 | The work loop (do it like this) | 12 | Factory, spawner, signals, pooling |
+| 2 | The work loop (do it like this); 2.1 the fix protocol | 12 | Factory, spawner, signals, pooling |
 | 3 | Decision table | 13 | Pattern bake cache |
 | 4 | Playbooks | 14 | Contracts and pitfalls catalog |
 | 5 | Commits | 15 | Benchmarks and performance lessons |
@@ -57,6 +67,22 @@ for the rest: the sections are written to be looked up, not read once.
     `check_portability.py` + snapshot diff + benchmark gate (+ `run_editor_smoke.py` when editor/preview code
     changed, + `run_sanitizer_tests.py` when casts, enums, integer math,
     lifetimes or user-callback paths changed), then report with Big-O and a ratings table (§19).
+11. **Your own red test proves your intent, not the contract.** Red-then-green
+    shows the code does what YOU decided. Before you decide, name where the
+    expected behavior comes from: Godot's own output (`tools/probe.py`), an
+    existing test, `doc_classes/`, or §14. "Godot does X" without probe output
+    is a guess, even when you are sure (§2.1, case 1).
+12. **A fix covers every sibling or it is not done.** List every branch,
+    caller, setter and copy that has the same shape (`rg`), fix all of them,
+    and say which you checked. Prefer one ClassDB-driven test that walks them
+    all over one hand-picked example (§2.1, cases 4 and 5).
+13. **An existing test or doc that disagrees with your fix is a contract
+    question: stop and ask.** Never "fix" a pinned behavior without the user
+    (§0.9); never route around a pin by only changing the code it does not
+    reach (§2.1, case 7).
+14. **Unfinished is a valid result; claiming it done is not.** Report what is
+    open; report a refutation only with the probe or test output that refutes
+    it.
 
 ## 1. Commands
 
@@ -65,6 +91,7 @@ GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py   # build (exit 1 
 python3 tools/run_tests.py                                       # 246 files / ~2400 tests, ~30 s, leak-checked
 python3 tools/run_tests.py --suite <substring> --full            # one area, every failure message unclipped
 python3 tools/run_tests.py --self-test                           # proves the harness still catches failures/leaks
+python3 tools/probe.py -c 'probe("x", AtlasTexture.new().get_size())'  # ask the engine / the built plugin (§2.2); hangs still show progress
 python3 tools/run_editor_smoke.py                                # headless EDITOR run of tests/editor_smoke/ (editor-only paths)
 python3 tools/run_sanitizer_tests.py [--sanitizer address|undefined] [--suite <x>]  # suites under ASan + UBSan (~12 min both; Linux/GCC)
 python3 tools/api_snapshot.py save <label>                       # behavior snapshot (~10 s, §7.4)
@@ -85,12 +112,13 @@ know what "done" looks like.
    files: never assume what a function does from its name). Find the tests
    that pin it: `rg -n "name" test_project/tests`. Note the error texts.
 2. **Probe what you are unsure about** (engine behavior, current output):
-   write `test_project/tests/spawner/test_zz_probe.gd` (extends BlastTest,
-   print values through a failing `assert_eq(str(values), "", "PROBE")`),
-   run it with `python3 tools/run_tests.py --suite test_zz_probe --full
-   --no-lint` (lint R6 refuses an unlisted suite), read the FAIL line
-   (`["<your values>"] expected to equal [""]: PROBE`), then DELETE the file
-   and its `.uid`.
+   `python3 tools/probe.py snippet.gd` (or `-c '<code>'`, or `-` for stdin).
+   The snippet is the body of a BlastTest test (`factory`, `add()`,
+   `await idle()`, `H` work); `probe(label, value)` prints one line, written
+   to disk at once (a hang still shows how far it got: `--timeout 60`), and
+   the errors and warnings it caused are printed after. The tool deletes its
+   files. Probe Godot's OWN answer when you claim engine behavior: e.g.
+   `AtlasTexture.get_image()` for what an atlas draws, never our reader.
 3. **Take a snapshot** when you will change C++: build, then
    `python3 tools/api_snapshot.py save before`.
 4. **Bug fix: write the test first.** Add it to the suite of that area (or a
@@ -130,6 +158,48 @@ Habits that matter:
 - Keep the user's hand-edited files out of your commits
   (`test_project/benchmark_scene/benchmark.tscn`).
 
+### 2.1 The fix protocol (mandatory evidence for every fix)
+
+Before you commit a fix, write down these six answers, each with the command
+output that supports it. They go into the final report (§19), one row per fix.
+A fix missing any of them is not done.
+
+| # | Question | How you answer it (evidence) |
+|---|---|---|
+| E1 | **Where does the expected behavior come from?** | Godot's own output (`tools/probe.py`: the engine API, not our code), an existing test (`file:line`), `doc_classes/` text, or a §14 row. "It is obviously right" is not a source. |
+| E2 | **Is it reachable through the public API?** | A probe or test that triggers it from GDScript (no `debug_*` hook that real code cannot call). Not reachable: report it as latent, do not "fix" it. |
+| E3 | **Who else has the same shape?** | The `rg` you ran for siblings (other branches of the same `if`, the other selection modes, the twin setter on the other spawner, the laser twin of a bullet path) and the list it gave. Fix all of them or name the open ones. |
+| E4 | **What pins the old behavior?** | `rg` of the tests for the function, property and several fragments of every message you touch. A pin that disagrees with your fix = STOP, ask (§0.13). |
+| E5 | **Who writes and reads every value you now trust or cache?** | For a "this never changes" premise: every bound property can be set from a script at any time (`rg "set_<name>"` + ClassDB). For a stored snapshot: when does it go stale? |
+| E6 | **What did the guard or early return change for every input class?** | A table of null, unresolved path, empty, same value, out of tree, freed, pooled, huge/NaN: what each did before and after. |
+
+Then the usual gates: red test for the right reason (§2.4), mutation check
+(§8.3), snapshot diff (§2.5), full suite, and for a hot path the benchmark.
+
+**The cases this protocol comes from** (one campaign, October 2026; each
+was committed as "red-first, proven"):
+
+| # | What shipped | What broke | The rule that catches it |
+|---|---|---|---|
+| 1 | "A zero AtlasTexture region axis ignores the origin" (assumed) | Wrong: Godot keeps `region.position` (probed with `AtlasTexture.get_image()`); the reader baked pixels Godot never draws | E1: probe the engine, test against the engine's own output |
+| 2 | An early return `if (node == get_movement_path_node()) return;` | `set_movement_path_node(null)` stopped clearing a path that resolved to nothing (both sides null) | E6: the null / unresolved row |
+| 3 | "A Global Position never changes, so the retarget loop can sleep" | A script moving `laser_target_position` never reached lasers in flight | E5: every bound property is writable at runtime |
+| 4 | The orbit-off stop on an empty pool, fixed in the shared-target branch | Random / Round Robin / Distribute took another branch and still skipped it | E3: every branch of the same function; a parametrized test over every mode |
+| 5 | "Same-value writes keep the error latch" in 13 setters | ~40 other setters still re-armed: the behavior became inconsistent | E3 + a ClassDB sweep (`test_every_same_value_write_keeps_the_auto_fire_latch`) |
+| 6 | The graze-exit sound placed at a position stored when the visit started | Stale: the target had moved; the exit belongs where it is now | E5: a stored snapshot goes stale |
+| 7 | The same-value latch change itself | An existing test (`test_auto_fire_reports_a_misconfiguration_once`) pinned the opposite ("configuration touched: re-armed"); it passed only because its setter was not changed | E4: a pin that disagrees is a question for the user |
+| 8 | A fix that compared targets through `orbit_target_identity` | Added an engine call per bullet per tick inside reach (hot path) | §0.5: read what a helper does before calling it per bullet |
+| 9 | A mechanism replaced by a parameter | The old member stayed behind, unused | After replacing something: `rg` the old name, zero uses |
+
+**Bug-hunt and audit campaigns.** Every claim in a report has a probe or
+test output behind it: "found N bugs" counts only reproduced ones, "refuted"
+only with the output that refutes it. Static review misses whole classes
+that a brute-force probe finds in minutes: sweep extremes (every int and
+float knob of every source at 1e9, 1e6, 1000, 0.001, with and without
+Fill Inside, timed with `Time.get_ticks_msec()` through `tools/probe.py`).
+That sweep found a pattern that froze for over 10 minutes (§10.4.7) that no
+reviewer had seen.
+
 ## 3. Decision table
 
 | Situation | Do this | Never do this |
@@ -151,19 +221,30 @@ Habits that matter:
 | A handler needs reset / free_* / populate_* / a shape change | Call the `*_deferred` twin (§12.3) | `call_deferred` from physics (still inside the physics frame) |
 | "Homing bullets sometimes miss" | Check inherited momentum vs speed (`inherit_movement_velocity`), turn rate (`homing_smoothing`) vs hitbox | Assume a pattern bug |
 | A warning must be pinned | `expect_warning_sequence([...])` | `expect_error_sequence` (it ignores warnings) |
+| Your fix makes an existing test fail, or contradicts one that still passes | Read what the test says it pins; ask the user (§0.13, §2.1 E4) | Edit the test, or change only the setters the test does not reach |
+| You believe a value "never changes" | `rg` its setter: a bound property is script-writable at any time (§2.1 E5) | Remove the refresh / wake / re-read that keeps it live |
+| You add an early return or a guard | Fill the E6 table (null, unresolved, empty, same, out of tree, freed, pooled) | Test only the case you wrote it for |
+| A claim about what Godot does | `tools/probe.py` with Godot's own API (e.g. `AtlasTexture.get_image()`) | Reason from memory, or test against the plugin's own reader |
+| You fixed one branch, mode or setter | `rg` the siblings; a parametrized or ClassDB-driven test over all of them | Ship the one you saw |
+| Hunting freezes / DoS | Time every knob at extremes through `tools/probe.py` (§2.1) | Trust a `>= 1` check to bound a loop |
 
 ## 4. Playbooks
 
 ### 4.1 Fix a bug
-1. Reproduce: smallest script or test that shows it (§2.2 probe).
+1. Reproduce: smallest script or test that shows it (`tools/probe.py`),
+   through the public API (§2.1 E2).
 2. Find the cause in code; cite `file:line`. Look for siblings: the same
    mistake is often copied (e.g. velocity composed without the fall speed
-   appeared in 8 setters).
-3. Red test in the area's suite (assert the documented behavior, exact
-   texts). Run: it fails for the right reason.
-4. Minimal fix; rebuild; the test passes; the full suite passes.
-5. Snapshot diff: only the intended entries changed.
-6. Commit: `Fix <thing>` + one line of why.
+   appeared in 8 setters) (§2.1 E3).
+3. Answer E1, E4, E5 and E6 of §2.1 BEFORE writing the fix. If E1 has no
+   source or E4 finds a pin that disagrees: ask the user.
+4. Red test in the area's suite (assert the documented behavior, exact
+   texts). Run: it fails for the right reason. When the expected behavior
+   is Godot's, the test compares against Godot's own API, not a literal you
+   derived.
+5. Minimal fix; rebuild; the test passes; the full suite passes.
+6. Snapshot diff: only the intended entries changed.
+7. Commit: `Fix <thing>` + one line of why. Record the E1-E6 row for §19.
 
 ### 4.2 Pure refactor (behavior must not change)
 1. `save before` on the current build.
@@ -654,6 +735,14 @@ Pinned by `spawner/test_spawner_pattern_counts.gd`,
    refinement at `helper_outline_fill_min_spacing` (default 0.5, also at 1/1000
    of the shape so a scan stays ~1M cells) and tests cells through a segment
    grid. Taking it away brings back 20-100 s freezes (the editor preview runs it).
+7. No knob makes a loop run longer than the bullets need: a count knob that
+   sizes a loop (petals, points, vertices, gaps, grid cells) is bounded by
+   `pattern_max_bullets()` (a `>= 1` check alone let 2e9 FAN petals freeze for
+   6 s). Helpers over point clouds stay O(n log n): `outline_build_boundary`
+   once sorted by insertion with `atan2` in the inner loop, and a Fill Inside
+   flower of 20000 petals (17 silhouette points each) ran past the 10-minute test timeout.
+   Pinned by `factory/test_factory_helper_edges.gd`; the extreme-knob sweep
+   in §2.1 is how to check a new generator.
 
 Not merged on purpose: the six arc-length resamplers (precision and
 threshold differences change bits).
@@ -811,7 +900,10 @@ src/
 - Spawner loop: `_process` runs iff `needs_process()`. Order: movement →
   spin → preview → shooting/bursts. `shooting_*` signals track auto-fire
   transitions only; auto-fire errors are latched (one report per
-  misconfiguration until a config setter re-arms it).
+  misconfiguration until a config setter CHANGES a value: a write of the
+  value already held is a no-op and keeps the latch, an Array write always
+  counts; ClassDB-swept by `test_spawner_config_ux`
+  `test_every_same_value_write_keeps_the_auto_fire_latch`).
 - Preview: geometry snapshotted UNSPUN in holder space; spin/move are the
   layer NODE transform, so spinning/moving costs 0 rebuilds / 0 redraws.
   Holders are found by OWNER (meta `_blast_preview_owner` = spawner id),
@@ -1068,6 +1160,13 @@ replayed once on resume.
 | Every data-resource setter skips a same-value write (`core/assign_if_changed2d.hpp`: no `changed`); an Array or Dictionary write always counts (in-place edits) | `data/test_data_setter_contract` (same-value sweep) |
 | One frame repays at most `max_shots_per_frame` (default 8, >= 1) late shots, bursts and list entries, then resyncs | `spawner/test_spawner_cadence` |
 | `spawn_volley` / `enable_volley` refuse a `spawner_id` that is not 0 or a live BulletSpawner2D (nothing spawned); `get_active_bullet_count` skips pooled and queued volleys; the volley counter is `debug_get_active_volleys_amount` | `factory/test_factory_api_surface` |
+| A same-value config write keeps the auto-fire latch (no re-report every frame from a script writing its config); a real change or an Array write re-arms it | `spawner/test_spawner_config_ux` (ClassDB sweep over both spawner types) |
+| The smoothing fan's off path clears only per-bullet smoothing the fan wrote (`homing_smoothing_fanned`); a script's per-bullet values survive retarget passes | `spawner/test_spawner_homing_propagation` |
+| An empty homing pool still stops live orbits when orbiting is off, in every selection mode | `spawner/test_spawner_homing_orbit` |
+| `keep_tracking_when_active` off: the beam holds its line (also when the target is gone); Lock On also holds the length it locked at (ends where the warning line ended) | `laser/test_laser_aim_and_motion` |
+| A laser Global Position target is re-picked on the retarget interval (a script may move it) | `laser/test_laser_spawner` |
+| A laser graze exit plays where its target is at the exit | `laser/test_laser_graze` |
+| A zero AtlasTexture region axis keeps its origin (Godot's `_get_region_rect` only fills the size); a region past the sheet is unreadable | `integration/test_sprite_frames_contract` |
 | Every preview takes its z order from a property (`preview_z_index` / `preview_z_as_relative` on spawners, `despawn_bounds_preview_z_index`, `debugger_z_index`; defaults 4000 / 999) | `integration/test_preview_z_order` |
 | Every drawn part of a laser interpolates (body points, width, muzzle, tip, pierce and wall frames each on their own segment angle and clock); a head spent at a wall still plays its impact; laser preview arrows draw at the beam's width | `laser/test_laser_render_interpolation` |
 
@@ -1411,6 +1510,10 @@ project's `.so`). For quick numeric comparisons load two
   / `edit_build_profile.py` / `change_lto_mode.py` / `toggle_editor_target.py`
   / `toggle_debug_symbols.py` / `toggle_reloadable.py`.
 - Verification: `run_tests.py`, `lint_tests.py`, `api_snapshot.py` (§7.4),
+  `probe.py` (a GDScript snippet as a BlastTest body against the built
+  plugin; `probe(label, value)` lines stream to
+  `test_project/test_results/probe_output.txt`, the errors it caused are
+  listed, the probe suite is always deleted; §2.2),
   `check_portability.py` (GCC -Wpedantic -Wnarrowing syntax pass over every
   src TU, std:: names without their own header include, non-ASCII literals
   outside String::utf8: the Windows-only failures, caught on Linux),
@@ -1437,7 +1540,10 @@ project's `.so`). For quick numeric comparisons load two
 
 End every task with:
 1. What changed (per area), with the commits.
-2. Bugs found and fixed, each with the test that pins it.
+2. Bugs found and fixed, each with the test that pins it, as one row per
+   fix: `commit | E1 source | E2 reproduction | E3 siblings checked |
+   E4 pins checked | E5/E6 notes` (§2.1). A refuted claim gets the output that
+   refutes it.
 3. Verification: suite (`ALL n TEST FILES PASSED`), `--self-test`, format
    check, snapshot diff (IDENTICAL or the listed intended deltas), benchmark
    gate + the notable deltas.

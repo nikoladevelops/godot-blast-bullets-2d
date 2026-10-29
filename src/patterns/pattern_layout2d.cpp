@@ -80,7 +80,7 @@ bool outline_build_boundary(const PackedVector2Array &points, PackedVector2Array
 	}
 	// Stable sort by polar angle, each angle computed once. (An insertion
 	// sort recomputing atan2 in its inner loop was O(n^2): a Fill Inside
-	// flower of 20000 petals, 17 silhouette points each, took minutes.)
+	// flower of 20000 petals, 17 silhouette points each, took over 10 minutes.)
 	// Stable like it was: equal angles keep their input order.
 	const int count = (int)finite.size();
 	std::vector<double> angle_of((size_t)count);

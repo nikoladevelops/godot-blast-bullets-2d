@@ -53,7 +53,7 @@ func test_product_and_count_caps() -> void:
 	sp.free()
 	assert_lt(Time.get_ticks_msec() - t0, 2000, "no freeze")
 	# Fill Inside at the limit: the silhouette sort was O(n^2) in atan2 calls
-	# (17 points per petal: 20000 petals took about 11 minutes).
+	# (17 points per petal: 20000 petals ran past a 10-minute timeout).
 	t0 = Time.get_ticks_msec()
 	var filled := BulletPatterns2D.generate(BulletSpawner2D.PATTERN_FROM_HELPER_FLOWER, 2000, m, {"helper_flower_petals": 20000, "helper_outline_placement": BulletPatterns2D.OUTLINE_FILL_INSIDE})
 	assert_eq(filled.size(), 2000, "every bullet placed")
