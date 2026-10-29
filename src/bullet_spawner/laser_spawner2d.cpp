@@ -494,12 +494,9 @@ ShotResult2D LaserSpawner2D::fire_shot(std::vector<Transform2D> &transforms) {
 }
 
 bool LaserSpawner2D::needs_process_owned() const {
-	// Only the Mouse (read live) and the node sources (re-picked on the
-	// interval) need the loop. A Global Position never changes, so a retarget
-	// interval on it would only wake the loop to re-pick an identical target.
-	const bool mouse = laser_target_source == LASER_TARGET_MOUSE;
-	const bool node_source = laser_target_source == LASER_TARGET_NODE_GROUP || laser_target_source == LASER_TARGET_NODE_PATH || laser_target_source == LASER_TARGET_NODE_NAME || laser_target_source == LASER_TARGET_NODE_CHILDREN;
-	if (laser_target_source == LASER_TARGET_NONE || !(mouse || (node_source && laser_retarget_interval_sec > 0.0))) {
+	// The Mouse is read every frame; every other source (a Global Position
+	// too: a script may move it) is re-picked on the retarget interval.
+	if (laser_target_source == LASER_TARGET_NONE || !(laser_target_source == LASER_TARGET_MOUSE || laser_retarget_interval_sec > 0.0)) {
 		return false;
 	}
 	if (aims_at_targets()) {

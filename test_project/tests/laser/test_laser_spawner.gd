@@ -917,14 +917,22 @@ func test_lasers_change_hands_by_detach_and_adopt() -> void:
 	])
 
 
-## A static Global Position with a retarget interval never wakes the loop: the
-## point cannot move, so re-picking it every interval would change nothing.
-func test_a_static_global_position_never_wakes_the_loop() -> void:
+## A Global Position with a retarget interval is re-picked on it: a script
+## that moves the point reaches the lasers in flight at the next interval.
+func test_a_moved_global_position_reaches_live_lasers_on_the_interval() -> void:
 	var d := _laser()
-	d.aim = LaserData2D.LASER_AIM_TRACK
+	d.aim = LaserData2D.LASER_AIM_LOCK_ON
 	var sp := _spawner(d, 1)
 	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_GLOBAL_POSITION
-	sp.laser_target_position = Vector2(50, 0)
-	sp.laser_retarget_interval_sec = 0.5
-	_fire(sp)
-	assert_false(sp.is_processing(), "a static point never needs retargeting")
+	sp.laser_target_position = Vector2(0, 300)
+	sp.laser_retarget_interval_sec = 0.1
+	var l := _fire(sp)
+	assert_true(sp.is_processing(), "the interval keeps the loop awake")
+	sp.laser_target_position = Vector2(0, -300)
+	var aim_at := func(p: Vector2) -> float:
+		return absf(angle_difference((p - l.get_beam_start(0)).angle(), l.get_beam_angle(0)))
+	for i in 30: # the interval is 6 frames: early break
+		await idle(1)
+		if aim_at.call(Vector2(0, -300)) < 0.0001:
+			break
+	assert_almost_eq(aim_at.call(Vector2(0, -300)), 0.0, 0.0001, "the moved point was picked up")
