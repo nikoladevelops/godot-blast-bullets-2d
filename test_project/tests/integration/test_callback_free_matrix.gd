@@ -815,3 +815,24 @@ func test_an_attachment_init_that_clears_its_volley_attaches_nothing() -> void:
 	assert_true(books["ok"], str(books["error"]))
 	await idle(2)
 	expect_no_errors()
+
+
+## Replacing a bullet's attachment releases the old one first (on_bullet_disable,
+## which runs user code). A handler that frees the volley there must leave
+## bullet_set_attachment with nothing to touch: the freed volley and its
+## factory/pool are never dereferenced again (tools/run_sanitizer_tests.py runs
+## this suite under AddressSanitizer).
+func test_replacing_an_attachment_whose_release_frees_the_volley_is_survived() -> void:
+	var v: BulletVolley2D = factory.spawn_volley(_data(false))
+	assert_not_null(v.bullet_get_attachment(0), "bullet 0 carries the probe")
+	AttachmentHookProbe2D.hook_on = ["disable"]
+	AttachmentHookProbe2D.hook = func() -> void:
+		if is_instance_valid(v):
+			v.free()
+	v.bullet_set_attachment(0, probe_scene)
+	await idle(2)
+	assert_false(is_instance_valid(v), "the release callback freed the volley")
+	expect_no_errors()
+	if is_instance_valid(factory):
+		var books: Dictionary = factory.debug_assert_no_dangling()
+		assert_true(books["ok"], str(books["error"]))

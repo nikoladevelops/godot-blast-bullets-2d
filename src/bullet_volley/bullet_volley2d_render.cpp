@@ -4,6 +4,9 @@
 
 #include "bullet_volley/bullet_volley2d_internal.hpp"
 
+#include <cstdint>
+#include <vector>
+
 using namespace godot;
 
 namespace BlastBullets2D {
@@ -43,7 +46,12 @@ void BulletVolley2D::interpolate_bullet_visuals(double fraction_override) {
 	}
 	multi->set_buffer(batch_buffer);
 	const auto &active_bullet_indexes = all_bullets_enabled_set.get_active_indexes();
-	for (int i : active_bullet_indexes) {
+	// The attachment write below emits NOTIFICATION_TRANSFORM_CHANGED, which is
+	// user code: its handler may free this volley/factory or mutate the active
+	// set. Walk a snapshot and re-check liveness after every call.
+	const uint64_t self_id = get_instance_id();
+	const std::vector<int> active(active_bullet_indexes);
+	for (int i : active) {
 		if (i < 0 || i >= amount_bullets || i >= (int)attachments.size() || i >= (int)attachment_transforms.size() || i >= (int)all_previous_attachment_transf.size()) {
 			continue;
 		}
@@ -51,6 +59,9 @@ void BulletVolley2D::interpolate_bullet_visuals(double fraction_override) {
 			continue;
 		const Transform2D &at = get_interpolated_transform(attachment_transforms[i], all_previous_attachment_transf[i], fraction);
 		attachments[i]->set_global_transform(at);
+		if (!survived_user_code(self_id)) {
+			return;
+		}
 	}
 	// Trail shards follow the lerped bullet pose (same derivation as the
 	// physics tick, so trails never lag the rendered bullets by a step).
@@ -58,8 +69,8 @@ void BulletVolley2D::interpolate_bullet_visuals(double fraction_override) {
 	// needed); one-shot shards are static and need nothing here.
 	if (!fx_trail_bakes.empty() && (int)all_cached_instance_transforms.size() == amount_bullets && (int)all_previous_instance_transf.size() == amount_bullets) {
 		NodeInverseScope trail_inverse_scope(this);
-		for (int i : active_bullet_indexes) {
-			if (i < 0 || i >= amount_bullets) {
+		for (int i : active) {
+			if (i < 0 || i >= amount_bullets || !all_bullets_enabled_set.contains(i)) {
 				continue;
 			}
 			const Transform2D lerped_global = get_interpolated_transform(all_cached_instance_transforms[i], all_previous_instance_transf[i], fraction);

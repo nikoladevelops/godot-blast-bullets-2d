@@ -210,7 +210,9 @@ void BulletVolley2D::release_life() {
 	// instance retains nothing and fires nothing. Plain values (ballistics,
 	// ledgers, seeds) are NOT reset here: begin_life() reseeds every one of
 	// them once, from the next owner's data.
-	FactoryBusyScope2D busy(bullet_factory);
+	// A dead factory (freed from an attachment callback) must never be touched:
+	// the scope only holds it to toggle the busy flag.
+	FactoryBusyScope2D busy(factory_alive() ? bullet_factory : nullptr);
 	const uint64_t self_id = get_instance_id();
 	for (int i = 0; i < (int)attachments.size(); ++i) {
 		if (attachments[i] != nullptr) {
@@ -704,7 +706,7 @@ void BulletVolley2D::enable_bullet_core(int bullet_index, int collision_amount, 
 	}
 	// A wake from inside a sweep (on_bullet_disable handler during a pool
 	// release or a clear) would resurrect a volley that is being torn down.
-	if (bullet_factory != nullptr && bullet_factory->get_is_factory_busy()) {
+	if (bullet_factory != nullptr && factory_alive() && bullet_factory->get_is_factory_busy()) {
 		UtilityFunctions::push_error("enable_bullet: cannot wake a bullet while the factory is busy (e.g. inside an on_bullet_disable handler during a sweep). Wake it after the sweep (e.g. from the next frame).");
 		return;
 	}
@@ -726,7 +728,7 @@ void BulletVolley2D::enable_bullet_core(int bullet_index, int collision_amount, 
 	// A wake is a new slot life: records queued before the disable must not
 	// fire now (same-overlap double count).
 	bump_collision_epoch_for_bullet(bullet_index);
-	if (bullet_factory != nullptr && bullet_factory->debug_bullet_event_log_enabled) {
+	if (bullet_factory != nullptr && factory_alive() && bullet_factory->debug_bullet_event_log_enabled) {
 		bullet_factory->debug_log_bullet_event("wake", "", get_instance_id(), get_life_id(), bullet_index, collision_epoch_for_bullet(bullet_index));
 	}
 	// The freeze ended any graze visit: a fresh one starts (no exit fires
@@ -770,7 +772,7 @@ void BulletVolley2D::enable_bullet_core(int bullet_index, int collision_amount, 
 		}
 		is_active = true;
 		set_visible(true);
-		if (bullet_factory != nullptr) {
+		if (bullet_factory != nullptr && factory_alive()) {
 			bullet_factory->track_volley_active(*this);
 		}
 		// Disabled bullets are not rendered, but their prev cache is stale:
@@ -823,7 +825,7 @@ void BulletVolley2D::disable_bullet_core(int bullet_index, bool release_attachme
 	if (active_bullets_counter < 0) {
 		active_bullets_counter = 0;
 	}
-	if (bullet_factory != nullptr && bullet_factory->debug_bullet_event_log_enabled) {
+	if (bullet_factory != nullptr && factory_alive() && bullet_factory->debug_bullet_event_log_enabled) {
 		bullet_factory->debug_log_bullet_event("disable", cause, get_instance_id(), get_life_id(), bullet_index, collision_epoch_for_bullet(bullet_index));
 	}
 	// Records queued before this disable must not fire after a re-enable.
@@ -874,7 +876,7 @@ int BulletVolley2D::disable_bullets_bulk(const std::vector<int> &indexes, int fx
 	int disabled_count = 0;
 	// Tests' bullet event log: one check per batch, not per bullet (a
 	// callback inside cannot free the factory without this batch stopping).
-	const bool log_events = bullet_factory != nullptr && bullet_factory->debug_bullet_event_log_enabled;
+	const bool log_events = bullet_factory != nullptr && factory_alive() && bullet_factory->debug_bullet_event_log_enabled;
 	// Inside the physics flush the shapes sync right after it (one check
 	// for the batch, not one per bullet).
 	const bool defer_shapes = PhysicsFlush2D::flushing();
@@ -915,7 +917,7 @@ int BulletVolley2D::disable_bullets_bulk(const std::vector<int> &indexes, int fx
 			if (active_bullets_counter < 0) {
 				active_bullets_counter = 0;
 			}
-			if (log_events) {
+			if (log_events && factory_alive()) {
 				bullet_factory->debug_log_bullet_event("disable", cause, get_instance_id(), get_life_id(), i, collision_epoch_for_bullet(i));
 			}
 			bump_collision_epoch_for_bullet(i);

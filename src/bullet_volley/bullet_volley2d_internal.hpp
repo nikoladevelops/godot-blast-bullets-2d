@@ -652,6 +652,12 @@ _ALWAYS_INLINE_ bool BulletVolley2D::attach_bullet_attachment_internal(int bulle
 		return false;
 	}
 
+	// A dead factory (freed from an attachment callback) must never be
+	// dereferenced: nothing can be attached without its pool.
+	if (!factory_alive()) {
+		return false;
+	}
+
 	if (bullet_factory->get_is_tearing_down()) {
 		UtilityFunctions::push_error("bullet_set_attachment: cannot attach while the factory is tearing down. The scene is being freed.");
 		return false;
@@ -683,7 +689,14 @@ _ALWAYS_INLINE_ bool BulletVolley2D::attach_bullet_attachment_internal(int bulle
 	auto &pool = bullet_factory->bullet_attachments_pool;
 	const uint32_t pooling_key = BulletAttachmentObjectPool2D::make_pooling_key_for_scene(attachment_scene);
 	const bool key_recognized = pool.is_key_recognized(pooling_key);
+	const uint64_t setup_self_id = get_instance_id();
 	bullet_disable_attachment(bullet_index);
+	// The release callback above (on_bullet_disable / on_time_scale_changed)
+	// runs user code that may free this volley or its factory (and the pool):
+	// nothing below may touch either unless both survived.
+	if (!survived_user_code(setup_self_id)) {
+		return false;
+	}
 	BulletAttachment2D *attachment_instance = pool.pop(pooling_key);
 	bool created_brand_new_instance = false;
 

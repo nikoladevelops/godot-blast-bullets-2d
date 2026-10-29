@@ -2994,7 +2994,7 @@ public:
 	// signal and timer callback): graze target lists re-validate (a target
 	// a handler freed is never tested by a later volley of the sweep).
 	_FORCE_INLINE_ void note_user_code() const {
-		if (bullet_factory != nullptr) {
+		if (bullet_factory != nullptr && factory_alive()) {
 			bullet_factory->note_user_code();
 		}
 	}

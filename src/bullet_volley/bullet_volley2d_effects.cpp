@@ -227,7 +227,7 @@ void BulletVolley2D::fx_fire_oneshot(int trigger, int bullet_index, const Transf
 	if (trigger < 0 || trigger >= 32 || !(fx_oneshot_trigger_mask & (1u << trigger))) {
 		return;
 	}
-	if (bullet_factory == nullptr || bullet_index < 0 || bullet_index >= amount_bullets) {
+	if (bullet_factory == nullptr || !factory_alive() || bullet_index < 0 || bullet_index >= amount_bullets) {
 		return;
 	}
 	if (!at.get_origin().is_finite() || !Math::is_finite(at.get_rotation())) {

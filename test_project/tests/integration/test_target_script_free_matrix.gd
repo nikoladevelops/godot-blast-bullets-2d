@@ -230,3 +230,35 @@ func test_an_aimed_target_velocity_that_frees(p: Array = use_parameters(_aim_cas
 		if not err.handled and str(err.code).contains("no BulletFactory2D assigned"):
 			err.handled = true
 	expect_no_errors()
+
+
+## The volley's OWN bullet_homing_target_reached handler frees the target node.
+## The forward to the owner spawner runs AFTER that handler, so it must
+## re-resolve the target by id and never pass the freed pointer (godot-cpp
+## boxes the argument into a Variant). It arrives with a null target instead.
+## tools/run_sanitizer_tests.py runs this under AddressSanitizer.
+func test_a_homing_target_freed_by_the_volleys_own_handler_is_forwarded_null() -> void:
+	make_graze_target(Vector2(40, 0), &"signal_targets")
+	var d := H.make_volley_data(1, 300.0, 5.0)
+	d.homing_distance_before_reached = 10.0
+	var sp := make_spawner(d, BulletSpawner2D.PATTERN_FROM_SELF, 1)
+	sp.homing_node_group = &"signal_targets"
+	sp.set_homing_enabled(true)
+	var seen: Array = []
+	sp.connect("volley_bullet_homing_target_reached", func(_v, _i, t, _p) -> void:
+		seen.append(t))
+	var shots: Array = [] # a lambda captures locals by value: collect through an Array
+	sp.volley_fired.connect(func(v: BulletVolley2D, _n: int) -> void: shots.append(v))
+	sp.shoot_once()
+	assert_eq(shots.size(), 1, "the shot fired")
+	var volley: BulletVolley2D = shots[0]
+	volley.bullet_homing_target_reached.connect(func(_vol, _i, t, _p) -> void:
+		if is_instance_valid(t):
+			t.free())
+	for k in 40:
+		await physics(1)
+		if not seen.is_empty():
+			break
+	assert_eq(seen.size(), 1, "the spawner forward fired once")
+	assert_eq(seen[0], null, "a target freed by the volley's handler reaches the spawner as null")
+	expect_no_errors()

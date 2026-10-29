@@ -816,6 +816,12 @@ bool BulletVolley2D::dispatch_homing_events() {
 		if (owner_spawner_id != 0) {
 			Object *owner = ObjectDB::get_instance(ObjectID(owner_spawner_id));
 			if (owner != nullptr) {
+				// The volley's own handler above is user code: it may have freed
+				// the target node. Re-resolve it by id before forwarding; never
+				// pass a stale pointer (godot-cpp boxes the argument into a Variant).
+				if (ev.target_instance_id != 0) {
+					target = Object::cast_to<Node2D>(ObjectDB::get_instance(ObjectID(ev.target_instance_id)));
+				}
 				note_user_code();
 				emit_on2d(owner, forward_signal, this, ev.bullet_index, target, ev.target_position);
 				if (ObjectDB::get_instance(ObjectID(self_id)) != this) {

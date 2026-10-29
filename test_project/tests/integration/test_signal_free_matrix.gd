@@ -281,3 +281,41 @@ func test_a_volley_detached_by_its_factorys_free_never_reads_the_factory_again()
 	assert_false(is_instance_valid(v), "the detached volley died at the end of its frame")
 	assert_true(game_hits.is_empty(), "the detached volley left the physics space with its factory")
 	expect_no_errors()
+
+
+## A handler of the volley's OWN signal frees the factory and then keeps using
+## the volley it was handling (clearing and disabling bullets). The factory
+## detaches and queue_frees the emitting volley; those follow-up calls must not
+## touch the freed factory, its pool, or a dangling raw factory pointer.
+## tools/run_sanitizer_tests.py runs this under AddressSanitizer.
+func test_a_volley_used_after_its_factory_was_freed_from_its_own_signal_is_survived() -> void:
+	check_factory_after = false
+	fired = 0
+	var d := _data(0.0)
+	var frames := SpriteFrames.new()
+	var img := Image.create_empty(1, 1, false, Image.FORMAT_RGBA8)
+	img.fill(Color.WHITE)
+	var tex := ImageTexture.create_from_image(img)
+	frames.add_frame("default", tex)
+	frames.add_frame("default", tex)
+	frames.set_animation_speed("default", 30.0)
+	frames.set_animation_loop("default", false)
+	d.sprite_frames = frames
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	var f := factory
+	v.sprite_animation_finished.connect(func(_volley = null, _i = null) -> void:
+		if fired > 0:
+			return
+		fired += 1
+		f.free()                 # detaches + queue_frees the emitting volley
+		v.clear_all_bullets()    # must not reach the freed factory/pool
+		v.disable_bullet(0))
+	for k in 60:
+		await physics(1)
+		if fired > 0:
+			break
+	await idle(2)
+	assert_eq(fired, 1, "the handler ran once")
+	assert_false(is_instance_valid(f), "the factory is gone")
+	assert_false(is_instance_valid(v), "the detached volley died at the end of its frame")
+	expect_no_errors()

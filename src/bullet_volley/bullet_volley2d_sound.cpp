@@ -137,7 +137,7 @@ void BulletVolley2D::sound_fire(int trigger, int bullet_index, const Vector2 &ev
 	if (trigger < 0 || trigger >= 32 || !(sound_trigger_mask & (1u << trigger))) {
 		return;
 	}
-	if (bullet_factory == nullptr || sound_effects.empty()) {
+	if (bullet_factory == nullptr || !factory_alive() || sound_effects.empty()) {
 		return;
 	}
 	if (bullet_index < 0 || bullet_index >= amount_bullets || !event_pos.is_finite()) {
@@ -173,7 +173,7 @@ void BulletVolley2D::sound_fire_flight() {
 	if (!(sound_trigger_mask & (1u << BulletSoundData2D::SOUND_ON_FLIGHT))) {
 		return;
 	}
-	if (bullet_factory == nullptr || sound_effects.empty()) {
+	if (bullet_factory == nullptr || !factory_alive() || sound_effects.empty()) {
 		return;
 	}
 	SoundListenerSpec2D spec;
