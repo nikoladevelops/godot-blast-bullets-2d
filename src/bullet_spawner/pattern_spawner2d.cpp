@@ -116,11 +116,14 @@ void PatternSpawner2D::warn_if_world_factory_ambiguous(const BulletFactory2D *fa
 }
 
 void PatternSpawner2D::set_bullet_factory(BulletFactory2D *factory) {
-	on_config_changed();
+	const NodeAssignment2D<BulletFactory2D> before(this, bullet_factory_path, bullet_factory, bullet_factory_id);
 	assign_node_to_path(this, factory, bullet_factory_path, bullet_factory);
 	bullet_factory_id = factory != nullptr ? factory->get_instance_id() : 0;
 	if (factory == nullptr)
 		bullet_factory = nullptr;
+	if (before.changed_to(factory, bullet_factory_path)) {
+		on_config_changed();
+	}
 }
 
 NodePath PatternSpawner2D::get_transforms_generator_path() const {
@@ -154,13 +157,12 @@ Node2D *PatternSpawner2D::get_transforms_generator() const {
 }
 
 void PatternSpawner2D::set_transforms_generator(Node2D *generator) {
-	Node2D *before = transforms_generator;
+	const NodeAssignment2D<Node2D> before(this, transforms_generator_path, transforms_generator, transforms_generator_id);
 	assign_node_to_path(this, generator, transforms_generator_path, transforms_generator);
 	transforms_generator_id = generator != nullptr ? generator->get_instance_id() : 0;
 	if (generator == nullptr)
 		transforms_generator = nullptr;
-	// A real change re-arms the auto-fire error report.
-	if (generator != before) {
+	if (before.changed_to(generator, transforms_generator_path)) {
 		on_config_changed();
 	}
 	on_pattern_changed();

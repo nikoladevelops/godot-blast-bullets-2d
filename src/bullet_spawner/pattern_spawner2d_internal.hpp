@@ -110,6 +110,21 @@ static inline T *validate_cached_node(const Node *self, const NodePath &p_path, 
 	return resolved;
 }
 
+// What a node setter held before its write: the node it resolved to
+// (validated through ObjectDB, never a raw pointer compare: a freed node's
+// address may come back) and the stored path. The write is a configuration
+// change (re-arms the auto-fire error latch) only when either differs, so
+// the same node written back keeps the latch, and a null written over a
+// path that resolves to nothing still counts (the path goes).
+template <typename T>
+struct NodeAssignment2D {
+	const T *node;
+	NodePath path;
+	NodeAssignment2D(const Node *self, const NodePath &p_path, T *&r_cache, uint64_t &r_id) :
+			node(validate_cached_node(self, p_path, r_cache, r_id)), path(p_path) {}
+	bool changed_to(const T *p_node, const NodePath &p_path) const { return p_node != node || p_path != path; }
+};
+
 // Node name for the editor-only pattern preview holder (tagged with
 // PREVIEW_META_KEY, core/node_scan2d.hpp). The tilde sorts it last and marks
 // it as internal. The holder is owner-less: never saved, never exported.

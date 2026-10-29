@@ -115,11 +115,14 @@ Node2D *PatternSpawner2D::get_helper_aimed_target() const {
 }
 
 void PatternSpawner2D::set_helper_aimed_target(Node2D *target) {
-	on_config_changed();
+	const NodeAssignment2D<Node2D> before(this, helper_aimed_target_path, helper_aimed_target, helper_aimed_target_id);
 	assign_node_to_path(this, target, helper_aimed_target_path, helper_aimed_target);
 	helper_aimed_target_id = target != nullptr ? target->get_instance_id() : 0;
 	if (target == nullptr)
 		helper_aimed_target = nullptr;
+	if (before.changed_to(target, helper_aimed_target_path)) {
+		on_config_changed();
+	}
 	on_pattern_changed();
 }
 
@@ -199,11 +202,14 @@ void PatternSpawner2D::set_helper_path2d_node(Node *node) {
 		UtilityFunctions::push_error(String(get_class()) + ": helper_path2d_path must point to a Path2D, keeping the old value.");
 		return;
 	}
-	on_config_changed();
+	const NodeAssignment2D<Node> before(this, helper_path2d_path, helper_path2d_cache, helper_path2d_id);
 	assign_node_to_path(this, node, helper_path2d_path, helper_path2d_cache);
 	helper_path2d_id = node != nullptr ? node->get_instance_id() : 0;
 	if (node == nullptr)
 		helper_path2d_cache = nullptr;
+	if (before.changed_to(node, helper_path2d_path)) {
+		on_config_changed();
+	}
 	on_pattern_changed();
 }
 

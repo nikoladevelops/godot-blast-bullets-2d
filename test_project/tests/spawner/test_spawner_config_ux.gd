@@ -194,6 +194,85 @@ func test_a_transforms_generator_change_rearms_the_auto_fire_error() -> void:
 	sp.set_shooting_enabled(false)
 
 
+## The node setters (Variant in, Object out) store no property of their own,
+## so the stored sweep above never reaches them: the same node written back
+## keeps the latch, a different node re-arms it (ClassDB-driven).
+func test_every_node_setter_keeps_the_latch_on_the_same_node(kind: String = use_parameters(["BulletSpawner2D", "LaserSpawner2D"])) -> void:
+	var text := "no spawn_data assigned" if kind == "BulletSpawner2D" else "no laser_data assigned"
+	var setters: Array = []
+	for cls in ["PatternSpawner2D", kind]:
+		for m in ClassDB.class_get_method_list(cls, true):
+			var getter: String = "get_" + str(m.name).substr(4)
+			if str(m.name).begins_with("set_") and m.args.size() == 1 and m.args[0].type == TYPE_NIL and ClassDB.class_has_method(kind, getter):
+				setters.append(str(m.name).substr(4))
+	assert_true(setters.has("bullet_factory") and setters.has("helper_aimed_target"), "the walk finds the node setters: %s" % [setters])
+	var rearmed: Array = []
+	for prop in setters:
+		var path := Path2D.new() # a Node2D and a Path2D: valid for every node setter but the factory
+		path.curve = Curve2D.new()
+		add(path)
+		var sp: PatternSpawner2D = ClassDB.instantiate(kind)
+		sp.set_shooting_enabled(false)
+		sp.shoot_interval_sec = 0.05 # 3 frames
+		add(sp)
+		sp.set_bullet_factory(factory)
+		if prop != "bullet_factory":
+			sp.call("set_" + prop, path)
+		sp.set_shooting_enabled(true) # no data: every interval fails
+		await idle(10)
+		expect_errors_containing(text, 1, "%s: one report, latched" % prop)
+		sp.call("set_" + prop, sp.call("get_" + prop))
+		await idle(4) # longer than one interval
+		var seen := 0
+		for err in get_errors():
+			if not err.handled and err.contains_text(text):
+				err.handled = true
+				seen += 1
+		if seen > 0:
+			rearmed.append(prop)
+		sp.set_shooting_enabled(false)
+	assert_eq(", ".join(rearmed), "", "same-node writes that re-armed the report")
+
+
+## A real node change still re-arms, also a null written over a path that
+## resolves to nothing (both sides null, but the stored path changes).
+func test_a_real_node_change_rearms_the_auto_fire_error(prop: String = use_parameters(["helper_aimed_target", "helper_path2d_node", "transforms_generator", "bullet_factory"])) -> void:
+	const TEXT := "shoot_once: no spawn_data assigned"
+	var path_setter := {"helper_aimed_target": "set_helper_aimed_target_path", "helper_path2d_node": "set_helper_path2d_path", "transforms_generator": "set_transforms_generator_path"}
+	var sp := make_spawner()
+	sp.shoot_interval_sec = 0.05 # 3 frames
+	sp.set_spawn_data(null) # every shot fails
+	var a := Path2D.new() # a Node2D and a Path2D: valid for every node setter but the factory
+	a.curve = Curve2D.new()
+	add(a)
+	var b := Path2D.new()
+	b.curve = Curve2D.new()
+	add(b)
+	var other: Node = b
+	if prop == "bullet_factory":
+		other = BulletFactory2D.new()
+		add(other)
+	else:
+		sp.call("set_" + prop, a)
+	sp.set_shooting_enabled(true)
+	await idle(10)
+	expect_errors_containing(TEXT, 1, "one report, latched")
+	sp.call("set_" + prop, other)
+	await idle(4) # longer than one interval
+	expect_errors_containing(TEXT, 1, "a different node re-arms")
+	if path_setter.has(prop):
+		assert_true(ClassDB.class_has_method("BulletSpawner2D", path_setter[prop]), "path setter bound")
+		sp.call(path_setter[prop], NodePath("missing"))
+		await idle(4)
+		expect_errors_containing(TEXT, 1, "a new path re-arms")
+		assert_null(sp.call("get_" + prop), "the path resolves to nothing")
+		sp.call("set_" + prop, null)
+		await idle(4)
+		expect_errors_containing(TEXT, 1, "null over an unresolved path clears the path: a change")
+		assert_eq(sp.call(path_setter[prop].replace("set_", "get_")), NodePath(), "the path is gone")
+	sp.set_shooting_enabled(false)
+
+
 func _has_1(sp: BulletSpawner2D, text: String) -> bool:
 	return Array(sp.get_setup_warnings()).any(func(w): return text in str(w))
 
