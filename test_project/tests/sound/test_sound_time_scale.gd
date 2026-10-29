@@ -70,6 +70,17 @@ func test_a_sound_started_while_slowed_is_pitched_at_once() -> void:
 	assert_almost_eq(float(busy_voices()[0]["pitch_scale"]), 0.6, 0.001, "base 1.2 x 0.5")
 
 
+## pitch_follows_time_scale never pushes the played pitch past the sound's
+## own pitch_max ceiling (only the engine cap 1000 used to bound it).
+func test_a_scaled_pitch_never_exceeds_the_pitch_max_ceiling() -> void:
+	var s := _hum(true, 1.2)
+	s.set("pitch_max", 1.5)
+	await _play(s)
+	factory.time_scale = 2.0
+	await physics(2)
+	assert_lte(float(busy_voices()[0]["pitch_scale"]), 1.5 + 0.001, "capped at pitch_max, not base x scale")
+
+
 func test_pitch_stays_inside_the_engine_cap() -> void:
 	await _play(_hum(true, 900.0))
 	factory.time_scale = 4.0

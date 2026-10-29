@@ -651,8 +651,15 @@ void SoundMixer2D::apply_voice_time_scale(Voice &voice, double factor) {
 			voice.player->set_stream_paused(false);
 		}
 	}
-	// Godot's player range; 1000 is the pitch cap the data setters pin.
-	voice.player->set_pitch_scale((float)CLAMP((double)voice.base_pitch * factor, 0.01, 1000.0));
+	// Godot's player range; 1000 is the pitch cap the data setters pin. The
+	// sound's own pitch_max ceiling caps a scale-driven pitch too, so a high
+	// time scale never plays past the authored ceiling.
+	const SoundMix2D *sound = sound_mix_of2d(ObjectDB::get_instance(ObjectID(voice.sound_id)));
+	double pitch_hi = 1000.0;
+	if (sound != nullptr && Math::is_finite((double)sound->pitch_max) && sound->pitch_max > 0.0) {
+		pitch_hi = MIN((double)sound->pitch_max, 1000.0);
+	}
+	voice.player->set_pitch_scale((float)CLAMP((double)voice.base_pitch * factor, 0.01, pitch_hi));
 }
 
 double SoundMixer2D::voice_time_factor(BulletFactory2D &factory, const Voice &voice) const {
