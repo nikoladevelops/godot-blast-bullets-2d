@@ -1170,7 +1170,9 @@ void BulletVolley2D::apply_shared_speed_fallback(const Ref<BulletSpeedData2D> &s
 		const real_t rot = (i >= 0 && i < (int)all_cached_shape_transforms.size()) ? all_cached_shape_transforms[i].get_rotation() : 0.0;
 		Vector2 dir = Vector2(Math::cos(rot), Math::sin(rot));
 		all_cached_direction[i] = dir;
-		all_cached_velocity[i] = (dir * shared->speed) + bullet_drift(i);
+		// The documented composition (direction x speed + drift + fall speed):
+		// a gravity volley whose slots are filled late must keep its fall.
+		refresh_cached_velocity(i);
 	}
 }
 

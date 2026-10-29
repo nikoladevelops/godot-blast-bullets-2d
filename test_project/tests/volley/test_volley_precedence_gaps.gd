@@ -146,6 +146,23 @@ func test_live_shared_fills_seeded_zero_slots_then_fill_once_order() -> void:
 	assert_true(absf(o4.get_bullet_speed_data(1).speed - 400.0) < 0.01, "unseeded slot still falls back to shared (absence != deliberate zero)")
 
 
+func test_shared_fill_includes_the_fall_speed() -> void:
+	# GAP T9 a gravity volley whose speed slots are gaps and later gets a
+	# shared speed must report direction x speed PLUS the integrated fall
+	# speed (the fallback used to drop it, so the next tick contradicted it).
+	var d := H.make_volley_data(2, 0.0)
+	d.all_bullet_speed_data = [] # every slot is a gap
+	d.all_bullet_gravity = [Vector2(0, 400), Vector2(0, 400)]
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	await physics(3)
+	var fall: float = v.get_bullet_velocity(0).y
+	assert_true(absf(fall) > 0.1, "gravity integrated before the late fill")
+	v.set_shared_bullet_speed_data(_speed(200.0))
+	var vel: Vector2 = v.get_bullet_velocity(0)
+	assert_true(absf(vel.x - 200.0) < 0.01, "shared speed along the direction")
+	assert_true(absf(vel.y - fall) < 0.01, "the late fill keeps the fall speed")
+
+
 func test_tiled_array_with_an_invalid_entry_still_falls_back_per_slot() -> void:
 	# GAP T7 tiled array with an invalid entry still falls back per slot
 	var g7 := H.make_volley_data(4, 0.0)
