@@ -398,3 +398,47 @@ func test_a_z_order_write_never_frees_a_foreign_same_named_child() -> void:
 	sp.set_preview_z_index(5)
 	await idle(2) # a queue_free would land here
 	assert_true(is_instance_valid(foreign), "a z-order write leaves a foreign child alone")
+
+
+## A shot fired from user code inside a preview rebuild (the aimed target's
+## get_velocity) must wear the spin: the unspun snapshot is a collect
+## parameter, not shared state the nested shot could inherit.
+func test_a_shot_fired_from_a_preview_rebuild_is_spun() -> void:
+	var target := Node2D.new()
+	target.position = Vector2(200, 0)
+	add(target)
+	var probe := GDScript.new()
+	probe.source_code = """
+extends Node2D
+var action: Callable
+var calls := 0
+func get_velocity() -> Vector2:
+	calls += 1
+	if calls == 1 and action.is_valid():
+		action.call()
+	return Vector2.ZERO
+"""
+	assert_eq(probe.reload(), OK, "the probe compiles")
+	target.set_script(probe)
+	var sp := make_preview_spawner(BulletSpawner2D.PATTERN_FROM_HELPER_AIMED, 4)
+	sp.helper_aimed_prediction = 1.0
+	sp.helper_aimed_prediction_time = 0.5
+	sp.set_spin_angle_deg(45.0) # a static spin: the shot must use it
+	var fired: Array = []
+	sp.volley_fired.connect(func(v: BulletVolley2D, _n: int) -> void: fired.append(v))
+	target.action = func() -> void: sp.shoot_once()
+	sp.set_helper_aimed_target(target) # marks the preview dirty: its rebuild reads get_velocity
+	for i in 20:
+		await idle(1)
+		if not fired.is_empty():
+			break
+	assert_eq(fired.size(), 1, "the preview rebuild fired one shot")
+	var v: BulletVolley2D = fired[0]
+	# Reference: the same pattern at 0 degrees (the spin is the only change).
+	sp.set_spin_angle_deg(0.0)
+	var unspun: Array = sp.collect_spawn_transforms()
+	assert_eq(unspun.size(), v.get_amount_bullets(), "same bullet count")
+	var max_gap := 0.0
+	for i in v.get_amount_bullets():
+		max_gap = maxf(max_gap, absf(angle_difference(v.get_bullet_transform(i).get_rotation(), unspun[i].get_rotation())))
+	assert_gt(max_gap, 0.1, "the nested shot is spun (its basis carries the angle the preview snapshot dropped)")

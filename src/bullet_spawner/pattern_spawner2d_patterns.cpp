@@ -403,7 +403,7 @@ bool PatternSpawner2D::debug_get_pattern_cache_verify() {
 	return PatternBakeCache2D::verify;
 }
 
-void PatternSpawner2D::collect_spawn_transforms_native(bool quiet, std::vector<Transform2D> &r_out) const {
+void PatternSpawner2D::collect_spawn_transforms_native(bool quiet, std::vector<Transform2D> &r_out, bool suppress_spin) const {
 	r_out.clear();
 	// The one user-code point of a collect, before any node is resolved.
 	if (!snapshot_aim_velocity()) {
@@ -430,7 +430,7 @@ void PatternSpawner2D::collect_spawn_transforms_native(bool quiet, std::vector<T
 	// bit-identical to before. The preview gizmo never mirrors (it draws the
 	// pattern, not one shot of a burst; a rebuild during a mirrored shot
 	// would otherwise freeze the mirrored winding into it).
-	const bool mirrored_shot = cadence.burst_alternate_mirror && cadence.burst_mirror_next && !preview.suppress_spin;
+	const bool mirrored_shot = cadence.burst_alternate_mirror && cadence.burst_mirror_next && !suppress_spin;
 	const real_t mirror_sign = mirrored_shot ? (real_t)-1.0 : (real_t)1.0;
 	std::vector<Transform2D> raw;
 	resolve_raw_pattern(base, marker, mirror_sign, quiet, raw);
@@ -446,7 +446,7 @@ void PatternSpawner2D::collect_spawn_transforms_native(bool quiet, std::vector<T
 	// advancing spin angle changed the geometry every frame and forced a
 	// full 10k-element rebuild per frame.
 	real_t spin_radians = 0.0;
-	if (!preview.suppress_spin) {
+	if (!suppress_spin) {
 		spin_radians = Math::deg_to_rad((real_t)(spin.angle_deg + (shot_pose_active ? shot_pose_extra_spin_deg : 0.0)));
 		if (mirrored_shot) {
 			spin_radians = -spin_radians;
@@ -483,10 +483,10 @@ void PatternSpawner2D::collect_spawn_transforms_native(bool quiet, std::vector<T
 	PatternPose2D::pose(raw, spin_scale_mx, use_spin_scale_mx, any_skip ? &skip_mask_scratch : nullptr, local_factor, r_out);
 }
 
-TypedArray<Transform2D> PatternSpawner2D::collect_spawn_transforms_impl(bool quiet) const {
+TypedArray<Transform2D> PatternSpawner2D::collect_spawn_transforms_impl(bool quiet, bool suppress_spin) const {
 	// Script-facing form: one boxing pass at the very end (the shot path uses
 	// collect_spawn_transforms_native directly and never boxes).
-	collect_spawn_transforms_native(quiet, collect_scratch);
+	collect_spawn_transforms_native(quiet, collect_scratch, suppress_spin);
 	TypedArray<Transform2D> transforms;
 	transforms.resize((int)collect_scratch.size());
 	for (int i = 0; i < (int)collect_scratch.size(); ++i) {

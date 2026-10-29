@@ -1364,9 +1364,12 @@ protected:
 	void rebuild_preview();
 	// collect_spawn_transforms() with error reporting: the public method
 	// reports problems, the preview passes true to stay quiet.
-	TypedArray<Transform2D> collect_spawn_transforms_impl(bool quiet) const;
+	TypedArray<Transform2D> collect_spawn_transforms_impl(bool quiet, bool suppress_spin = false) const;
 	// The same collect into a native buffer (no Variant): the shot path.
-	void collect_spawn_transforms_native(bool quiet, std::vector<Transform2D> &r_out) const;
+	// suppress_spin snapshots the geometry unspun (the preview applies the
+	// angle at draw time); the shot path never sets it, so a shot fired from
+	// user code during a preview rebuild stays spun.
+	void collect_spawn_transforms_native(bool quiet, std::vector<Transform2D> &r_out, bool suppress_spin = false) const;
 	// Reused buffers (no per-shot allocation once warm).
 	mutable std::vector<Transform2D> collect_scratch;
 	mutable std::vector<uint8_t> skip_mask_scratch;

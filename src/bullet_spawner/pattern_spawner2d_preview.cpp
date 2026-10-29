@@ -829,9 +829,9 @@ void PatternSpawner2D::rebuild_preview() {
 	// Snapshot the geometry UNSPUN; the layer applies spin_angle_deg at draw
 	// time, so an advancing spin only re-poses the cached points instead of
 	// rebuilding every transform (which at 10k bullets is a per-frame cliff).
-	preview.suppress_spin = true;
-	const TypedArray<Transform2D> transforms = collect_spawn_transforms_impl(true);
-	preview.suppress_spin = false;
+	// Quiet + unspun collect for the gizmo (a shot fired from user code inside
+	// this collect stays spun: the flag is a parameter, not shared state).
+	const TypedArray<Transform2D> transforms = collect_spawn_transforms_impl(true, true);
 	// The aimed target's get_velocity (user code) may have freed this
 	// spawner or the nodes holding the preview: rebuild next time.
 	if (shot_owner_dying() || preview_nodes_lost()) {
