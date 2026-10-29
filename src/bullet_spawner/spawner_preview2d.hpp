@@ -121,11 +121,6 @@ struct SpawnerPreview2D {
 	// touches either (synchronous).
 	mutable bool rebuild_queued = false;
 	mutable bool sync_rebuild = false;
-	// Set only around the preview's pattern collect so the snapshotted
-	// geometry is spin-free: the layer applies the spin angle at draw time,
-	// which keeps an advancing spin from forcing a full rebuild every frame.
-	// Mutable because the collect path is const.
-	mutable bool suppress_spin = false;
 	uint64_t rebuild_count = 0;
 	uint64_t last_rebuild_usec = 0;
 };
