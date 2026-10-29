@@ -443,3 +443,69 @@ func test_listings_by_owner() -> void:
 		"get_lasers_owned_by: spawner must be a PatternSpawner2D or null (a freed object is neither), listing nothing.",
 	])
 
+
+
+## A pause taken by a handler inside the sweep freezes the rest of it (a
+## hit-stop freezes the frame): no custom timer, laser tick, effect aging,
+## split or emitter shot runs after it. What was queued waits and happens
+## exactly once after the resume.
+func test_a_pause_from_a_handler_freezes_the_rest_of_the_sweep() -> void:
+	const DT := 1.0 / 60.0
+	var counts := {"timer": 0, "splits": 0, "emits": 0}
+	var tpl := BulletSpawner2D.new()
+	tpl.set_shooting_enabled(false)
+	tpl.set_spawn_data(H.make_volley_data(1, 0.0, 30.0))
+	tpl.helper_bullets_amount = 1
+	add(tpl)
+	tpl.set_bullet_factory(factory)
+	tpl.volley_fired.connect(func(_a = null, _b = null, _c = null) -> void: counts.emits += 1)
+	var timing := BulletEmitterData2D.new()
+	timing.interval_sec = DT # one shot every tick
+	var emitter_volley: BulletVolley2D = factory.spawn_volley(H.make_volley_data(1, 0.0, 30.0)) # ticked before the pauser
+	assert_true(emitter_volley.emitter_set(timing, tpl), "emitter armed")
+	var split_data := H.make_volley_data(1, 0.0, 30.0)
+	var to_split: BulletVolley2D = factory.spawn_volley(split_data)
+	var stage := BulletSplitStage2D.new()
+	stage.count = 2
+	var chain := BulletSplitData2D.new()
+	chain.stages = [stage]
+	assert_true(to_split.split_set_data(chain, split_data), "split armed")
+	factory.bullet_split.connect(func(_a = null, _b = null, _c = null, _d = null, _e = null) -> void: counts.splits += 1)
+	var pauser_data := H.make_volley_data(1, 0.0, 0.1)
+	pauser_data.is_life_time_over_signal_enabled = true
+	var pauser: BulletVolley2D = factory.spawn_volley(pauser_data)
+	factory.life_time_over.connect(func(v: BulletVolley2D, _idx = null) -> void:
+		if v == pauser:
+			to_split.all_bullets_split() # queued inside the sweep
+			factory.set_is_factory_processing_bullets(false))
+	var timer_volley: BulletVolley2D = factory.spawn_volley(H.make_volley_data(1, 0.0, 30.0))
+	timer_volley.attach_time_based_function(DT * 0.5, func() -> void: counts.timer += 1, true)
+	var laser: LaserVolley2D = factory.spawn_laser(H.make_laser(0.0, 0.0, 5.0, 0.0), [Transform2D()])
+	var paused_at := -1
+	var before := {}
+	for i in 30:
+		before = counts.duplicate()
+		before["laser"] = laser.get_active_time_left()
+		factory.debug_advance_time(DT)
+		if not factory.is_factory_processing_bullets:
+			paused_at = i
+			break
+	assert_gt(paused_at, 0, "the handler paused the factory after a few sweeps")
+	assert_gt(before.timer, 0, "the timer ran before the pause")
+	assert_gt(before.emits, 0, "the emitter fired before the pause")
+	var problems: Array = []
+	if counts.timer != before.timer:
+		problems.append("a timer ran after the pause")
+	if laser.get_active_time_left() != before.laser:
+		problems.append("the laser ticked after the pause")
+	if counts.splits != 0:
+		problems.append("the split flushed during the pause")
+	if counts.emits != before.emits:
+		problems.append("an emitter shot fired during the pause")
+	assert_eq(", ".join(problems), "", "nothing after the pause ran in that sweep")
+	assert_eq(factory.get_pending_split_count(), 1, "the split waits")
+	factory.set_is_factory_processing_bullets(true)
+	factory.debug_advance_time(DT)
+	assert_eq(counts.splits, 1, "the queued split happens exactly once after the resume")
+	assert_gt(counts.emits, before.emits, "the carried emitter shot fires after the resume")
+	handle_events(factory)

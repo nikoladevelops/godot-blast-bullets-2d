@@ -1259,6 +1259,9 @@ private:
 	// not queued for deletion (a free refused under its emit guard queues it
 	// and Godot already took it out of the tree: nothing may spawn anymore).
 	bool sweep_may_continue(const bool &alive) const { return alive && !is_queued_for_deletion(); }
+	// A handler paused the factory (a hit-stop): nothing after it runs in this
+	// sweep. What it queued (splits, emitter shots) waits for the resume.
+	bool sweep_paused() const { return !is_factory_processing_bullets; }
 	void redraw_lasers();
 	void free_all_lasers();
 	void detach_lasers_for_teardown();

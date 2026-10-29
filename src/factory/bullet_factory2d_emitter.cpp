@@ -126,6 +126,9 @@ bool BulletFactory2D::flush_emits(const bool &alive) {
 		if (emit_drop_epoch != drop_epoch) {
 			break; // a handler reset the factory: the rest never fires
 		}
+		if (sweep_paused()) {
+			break; // a handler paused the factory: the rest waits (carried below)
+		}
 		if (cap > 0 && emit_stats_fired_last >= cap) {
 			break; // over the cap: this and the rest wait for the next sweep
 		}

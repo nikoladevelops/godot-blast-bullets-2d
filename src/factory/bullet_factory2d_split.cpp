@@ -244,6 +244,9 @@ bool BulletFactory2D::flush_splits(const bool &alive) {
 		if (split_drop_epoch != drop_epoch) {
 			break; // a handler reset the factory: the rest never spawns
 		}
+		if (sweep_paused()) {
+			break; // a handler paused the factory: the rest waits (carried below)
+		}
 		split_flush_next = next;
 		const SplitRequest2D &r = batch[next];
 		const BulletSplitStage2D *stage = r.stage.ptr();

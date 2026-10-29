@@ -270,6 +270,9 @@ bool BulletFactory2D::tick_lasers(double delta, const bool &alive) {
 		if (!sweep_may_continue(alive)) {
 			return false;
 		}
+		if (sweep_paused()) {
+			break; // a handler paused the factory: the lasers after it hold
+		}
 	}
 	return true;
 }

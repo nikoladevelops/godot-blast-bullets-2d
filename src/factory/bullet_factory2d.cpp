@@ -605,7 +605,7 @@ void BulletFactory2D::native_physics_process(double delta) {
 			}
 		}
 	} iteration_scope{ this, life };
-	if (!tick_volleys(delta, alive) || !sweep_may_continue(alive)) {
+	if (!tick_volleys(delta, alive) || !sweep_may_continue(alive) || sweep_paused()) {
 		return;
 	}
 	// One-shot sprite effects age on the same clock as bullets (pausing the
@@ -635,12 +635,12 @@ void BulletFactory2D::native_physics_process(double delta) {
 		}
 		volley->sweep_timer_stamp = sweep_counter;
 		volley->run_custom_timers(capped_volley_delta(delta, volley_time_factor(*volley)));
-		if (!sweep_may_continue(alive)) {
+		if (!sweep_may_continue(alive) || sweep_paused()) {
 			return;
 		}
 	}
 	// Lasers after the volleys (their signals are live: user code inside).
-	if (!tick_lasers(delta, alive)) { // each laser scales it by its own time factor
+	if (!tick_lasers(delta, alive) || sweep_paused()) { // each laser scales it by its own time factor
 		return;
 	}
 	refresh_laser_debug_layer();
@@ -649,12 +649,12 @@ void BulletFactory2D::native_physics_process(double delta) {
 	// Splits recorded this sweep (and before it) spawn now, at the poses
 	// their parents died at; the children tick from the next sweep. User
 	// code runs inside (spawn callbacks, homing and bullet_split signals).
-	if (!flush_splits(alive) || !sweep_may_continue(alive)) {
+	if (!flush_splits(alive) || !sweep_may_continue(alive) || sweep_paused()) {
 		return;
 	}
 	// Emitter bullets fire their due shots through their templates (user
 	// code: the templates' shot signals); the new volleys tick next sweep.
-	if (!flush_emits(alive) || !sweep_may_continue(alive)) {
+	if (!flush_emits(alive) || !sweep_may_continue(alive) || sweep_paused()) {
 		return;
 	}
 
