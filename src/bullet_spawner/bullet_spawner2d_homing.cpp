@@ -999,6 +999,25 @@ int BulletSpawner2D::retarget_live_volleys() {
 		// wiping them with a warning every interval.
 		shared_targets = resolve_homing_targets(true, false);
 		if (shared_targets.is_empty()) {
+			// The orbit-off stop needs no targets: run it before bailing so a
+			// live ring still stops when the group is empty (the early return
+			// used to skip it, leaving bullets circling forever).
+			if (homing_enabled && !orbiting_enabled) {
+				const uint64_t self_id = get_instance_id();
+				BulletFactory2D *factory = get_bullet_factory();
+				for (int i = 0; i < (int)tracked_ids.size(); ++i) {
+					BulletVolley2D *volley = VolleyTracker2D::resolve_live(tracked_ids[i], self_id);
+					if (volley == nullptr || volley->bullet_factory != factory || volley->is_homing_following()) {
+						continue;
+					}
+					const int bullet_count = volley->get_amount_bullets();
+					for (int b = 0; b < bullet_count; ++b) {
+						if (volley->bullet_is_orbiting_enabled(b)) {
+							volley->bullet_disable_orbiting(b);
+						}
+					}
+				}
+			}
 			return 0;
 		}
 	}

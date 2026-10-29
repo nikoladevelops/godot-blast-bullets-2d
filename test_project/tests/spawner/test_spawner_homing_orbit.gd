@@ -74,6 +74,25 @@ func test_orbit_and_retarget() -> void:
 	assert_eq(sp.get_live_volley_count(), 2, "homing volleys still tracked")
 
 
+## An empty shared target pool must not skip the orbit-off stop: a live ring
+## still stops when its group empties out.
+func test_turning_orbiting_off_with_an_empty_pool_stops_live_rings() -> void:
+	var fired: Array = []
+	sp.volley_fired.connect(func(v: BulletVolley2D, _n: int) -> void: fired.append(v))
+	assert_true(sp.shoot_once(), "shot fires while the group resolves")
+	await idle(1)
+	assert_eq(fired.size(), 1, "one volley")
+	var v: BulletVolley2D = fired[0]
+	v.bullet_enable_orbiting(0, 40.0)
+	assert_true(v.bullet_is_orbiting_enabled(0), "ring armed by hand")
+	# Empty the pool, then switch orbiting off.
+	e1.remove_from_group("swarm")
+	e2.remove_from_group("swarm")
+	sp.set_orbiting_enabled(false)
+	assert_eq(sp.retarget_live_volleys(), 0, "empty pool: nothing to retarget")
+	assert_false(v.bullet_is_orbiting_enabled(0), "the empty-pool retarget still stopped the ring")
+
+
 func test_live_bullet_fuse() -> void:
 	assert_true(sp.shoot_once())
 	sp.set_max_live_bullets(1)
