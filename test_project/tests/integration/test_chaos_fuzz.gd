@@ -218,6 +218,7 @@ func _build_lasers() -> void:
 		laser_datas.append(d)
 	emitter_template = make_spawner(_data(3), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 3)
 	emitter_template.name = "ChaosEmitterTemplate"
+	ledger.watch_spawner(emitter_template) # first: before the chaos handlers
 	_connect_handlers(emitter_template)
 	factory.emitter_max_pending = 512 # bounded: a battlefield of emitters stays fast
 
