@@ -50,7 +50,8 @@ void BulletVolley2D::interpolate_bullet_visuals(double fraction_override) {
 	// user code: its handler may free this volley/factory or mutate the active
 	// set. Walk a snapshot and re-check liveness after every call.
 	const uint64_t self_id = get_instance_id();
-	const std::vector<int> active(active_bullet_indexes);
+	std::vector<int> &active = interp_active_scratch;
+	active.assign(active_bullet_indexes.begin(), active_bullet_indexes.end());
 	for (int i : active) {
 		if (i < 0 || i >= amount_bullets || i >= (int)attachments.size() || i >= (int)attachment_transforms.size() || i >= (int)all_previous_attachment_transf.size()) {
 			continue;

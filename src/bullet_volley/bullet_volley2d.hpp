@@ -1903,7 +1903,9 @@ protected:
 	// Reused per-tick scratch: the orbit-lock snapshot used to keep read to avoid per-tick std::vector
 	// assignment churn in move_bullets.
 	std::vector<uint8_t> orbit_locked_scratch;
-	//
+	// Reused snapshot of the active bullets for the interpolation pass (its
+	// attachment writes run user code, so it walks a stable copy).
+	std::vector<int> interp_active_scratch;
 
 	// HOMING
 
