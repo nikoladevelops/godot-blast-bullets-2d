@@ -305,3 +305,24 @@ func test_a_target_on_a_pattern_laser_warns_once_per_life() -> void:
 	var again := factory.spawn_laser(d, t)
 	again.set_targets([Vector2(0, 100)])
 	expect_warning_sequence(["LaserVolley2D: laser_data aims along the pattern, so a target steers nothing (kept for a Track or Lock On aim)."])
+
+
+## A bolt / curvy laser honours keep_tracking_when_active: once active, its
+## head stops re-aiming at a moving target (only the beam used to).
+func test_keep_tracking_when_active_freezes_a_bolt_head() -> void:
+	var target := Node2D.new()
+	target.position = Vector2(100, 0)
+	add(target)
+	var d := H.make_laser(0.0, 0.0, 0.0, 0.0, 40.0)
+	d.type = LaserData2D.LASER_BOLT
+	d.speed = 100.0
+	d.aim = LaserData2D.LASER_AIM_TRACK
+	d.turn_rate_degrees = 0.0 # snap
+	d.keep_tracking_when_active = false
+	var l := _fire(d)
+	l.set_beam_target(0, target)
+	step_factory(1, DT)
+	var before := l.get_beam_angle(0)
+	target.position = Vector2(0, 100) # desired heading becomes ~90 degrees
+	step_factory(1, DT)
+	assert_almost_eq(l.get_beam_angle(0), before, 0.001, "a frozen bolt keeps its heading")

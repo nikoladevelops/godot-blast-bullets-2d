@@ -321,8 +321,11 @@ void LaserVolley2D::step_head(Beam &b, double delta) {
 		return;
 	}
 	if (!b.pinned) {
+		// Tracking stops on ACTIVE when keep_tracking_when_active is off: the
+		// bolt/curvy head then flies straight, like a beam that froze its aim.
+		const bool tracking_now = phase != PHASE_ACTIVE || d->keep_tracking_when_active;
 		Vector2 target;
-		if (d->aim != LaserData2D::LASER_AIM_PATTERN && target_position(b, target) && (target - b.head).length_squared() > (real_t)0.0001) {
+		if (tracking_now && d->aim != LaserData2D::LASER_AIM_PATTERN && target_position(b, target) && (target - b.head).length_squared() > (real_t)0.0001) {
 			const real_t desired = (real_t)(target - b.head).angle();
 			const real_t max_step = d->turn_rate_degrees > 0.0 ? (real_t)Math::deg_to_rad(d->turn_rate_degrees * delta) : (real_t)0.0;
 			if (d->aim == LaserData2D::LASER_AIM_LOCK_ON || d->turn_rate_degrees <= 0.0) {
