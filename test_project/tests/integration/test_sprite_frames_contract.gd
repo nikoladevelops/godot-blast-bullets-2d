@@ -460,14 +460,17 @@ func test_an_atlas_frame_reads_exactly_its_region() -> void:
 	assert_eq(_pixel_misses(rows.get_image(), Vector2i(8, 2), func(x, y): return _sheet_image().get_pixel(x, y + 2)), [], "full width, two rows")
 	# A zero region axis ignores the margin's size on that axis (Godot sizes
 	# it as the whole atlas there); the content still sits at margin.position.
-	for case in [[Rect2(), Rect2(2, 3, 10, 10)], [Rect2(0, 2, 0, 2), Rect2(1, 1, 6, 6)], [Rect2(1, 0, 3, 0), Rect2(1, 2, 2, 4)], [Rect2(5, 2, 0, 2), Rect2()]]:
+	for case in [[Rect2(), Rect2(2, 3, 10, 10)], [Rect2(0, 2, 0, 2), Rect2(1, 1, 6, 6)], [Rect2(1, 0, 3, 0), Rect2(1, 2, 2, 4)]]:
 		var a := _atlas(sheet, case[0], case[1])
 		var read := factory.debug_read_frame(a)
 		assert_eq(read.get_size(), a.get_size(), "region %s margin %s: the size Godot draws it at" % [case[0], case[1]])
-	# A zero region axis ignores a non-zero origin on that axis too (Godot reads
-	# the whole atlas there); such a frame must read, not fall back unreadable.
-	var shifted := factory.debug_read_frame(_atlas(sheet, Rect2(5, 2, 0, 2)))
-	assert_eq(_pixel_misses(shifted.get_image(), Vector2i(8, 2), func(x, y): return _sheet_image().get_pixel(x, y + 2)), [], "whole width at rows 2-3 despite the x origin")
+	# A zero region axis keeps its origin (Godot's _get_region_rect only fills
+	# the size: x 5 + the sheet's 8 px runs past the sheet, and get_image shows
+	# x 5..7 then nothing). An overflowing region is unreadable (the original
+	# texture is drawn), never a bake of pixels Godot does not draw.
+	var shifted := _atlas(sheet, Rect2(5, 2, 0, 2))
+	assert_eq(shifted.get_image().get_pixel(3, 0), Color(0, 0, 0, 0), "Godot reads past the sheet there")
+	assert_null(factory.debug_read_frame(shifted), "an overflowing zero-axis region is unreadable")
 	# An atlas of an atlas reads the inner one as drawn (its margin box too).
 	var inner := _atlas(sheet, Rect2(1, 1, 4, 4), Rect2(1, 0, 2, 0))
 	var nested := factory.debug_read_frame(_atlas(inner, Rect2(2, 1, 3, 2)))
