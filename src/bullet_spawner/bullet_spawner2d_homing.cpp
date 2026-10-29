@@ -144,6 +144,9 @@ void BulletSpawner2D::set_homing_target_source(HomingTargetSource value) {
 		UtilityFunctions::push_error("BulletSpawner2D: invalid homing_target_source, keeping the old value.");
 		return;
 	}
+	if (value == homing_target_source) {
+		return;
+	}
 	homing_target_source = value;
 	clear_empty_homing_targets_warning();
 	on_config_changed();
@@ -155,6 +158,9 @@ StringName BulletSpawner2D::get_homing_node_group() const {
 }
 
 void BulletSpawner2D::set_homing_node_group(const StringName &value) {
+	if (value == homing_node_group) {
+		return;
+	}
 	homing_node_group = value;
 	clear_empty_homing_targets_warning();
 	on_config_changed();
@@ -165,6 +171,9 @@ StringName BulletSpawner2D::get_homing_filter_group() const {
 }
 
 void BulletSpawner2D::set_homing_filter_group(const StringName &value) {
+	if (value == homing_filter_group) {
+		return;
+	}
 	homing_filter_group = value;
 	clear_empty_homing_targets_warning();
 }
@@ -209,6 +218,9 @@ void BulletSpawner2D::set_homing_max_detection_range(double value) {
 		UtilityFunctions::push_error("BulletSpawner2D: homing_max_detection_range must be finite and >= 0 (0 is unlimited), keeping the old value.");
 		return;
 	}
+	if (value == homing_max_detection_range) {
+		return;
+	}
 	homing_max_detection_range = value;
 	clear_empty_homing_targets_warning();
 }
@@ -233,6 +245,9 @@ void BulletSpawner2D::set_homing_target_path(const NodePath &p_path) {
 	if (!node_path_type_ok<Node2D>(this, p_path, "homing_target_path", "Node2D")) {
 		return;
 	}
+	if (p_path == homing_target_path) {
+		return;
+	}
 	homing_target_path = p_path;
 	clear_empty_homing_targets_warning();
 	on_config_changed();
@@ -243,6 +258,9 @@ String BulletSpawner2D::get_homing_node_name() const {
 }
 
 void BulletSpawner2D::set_homing_node_name(const String &value) {
+	if (value == homing_node_name) {
+		return;
+	}
 	homing_node_name = value;
 	clear_empty_homing_targets_warning();
 	on_config_changed();
@@ -257,6 +275,9 @@ void BulletSpawner2D::set_homing_node_name_match_mode(HomingNodeNameMatch value)
 		UtilityFunctions::push_error("BulletSpawner2D: invalid homing_node_name_match_mode, keeping the old value.");
 		return;
 	}
+	if (value == homing_node_name_match_mode) {
+		return;
+	}
 	homing_node_name_match_mode = value;
 	clear_empty_homing_targets_warning();
 }
@@ -266,6 +287,9 @@ bool BulletSpawner2D::get_homing_node_name_case_sensitive() const {
 }
 
 void BulletSpawner2D::set_homing_node_name_case_sensitive(bool value) {
+	if (value == homing_node_name_case_sensitive) {
+		return;
+	}
 	homing_node_name_case_sensitive = value;
 	clear_empty_homing_targets_warning();
 }
@@ -275,6 +299,9 @@ NodePath BulletSpawner2D::get_homing_children_parent_path() const {
 }
 
 void BulletSpawner2D::set_homing_children_parent_path(const NodePath &p_path) {
+	if (p_path == homing_children_parent_path) {
+		return;
+	}
 	homing_children_parent_path = p_path;
 	clear_empty_homing_targets_warning();
 	on_config_changed();
@@ -285,6 +312,9 @@ bool BulletSpawner2D::get_homing_children_recursive() const {
 }
 
 void BulletSpawner2D::set_homing_children_recursive(bool value) {
+	if (value == homing_children_recursive) {
+		return;
+	}
 	homing_children_recursive = value;
 	clear_empty_homing_targets_warning();
 }

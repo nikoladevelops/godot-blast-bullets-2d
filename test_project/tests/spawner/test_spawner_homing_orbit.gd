@@ -93,6 +93,27 @@ func test_turning_orbiting_off_with_an_empty_pool_stops_live_rings() -> void:
 	assert_false(v.bullet_is_orbiting_enabled(0), "the empty-pool retarget still stopped the ring")
 
 
+## A no-op write to any homing target knob must not re-arm the empty-pool
+## warning latch (a same-value write is not a configuration change).
+func test_a_noop_homing_setter_write_does_not_rearm_the_empty_warning() -> void:
+	sp.set_homing_node_group(&"zz_empty_group")
+	await idle(1)
+	sp.resolve_homing_targets(false)
+	expect_warning_sequence(["BulletSpawner2D::resolve_homing_targets: no live Node2D found in group 'zz_empty_group', volley flies without homing."])
+	sp.set_homing_node_group(sp.get_homing_node_group())
+	sp.set_homing_filter_group(sp.get_homing_filter_group())
+	sp.set_homing_max_detection_range(sp.get_homing_max_detection_range())
+	sp.set_homing_node_name(sp.get_homing_node_name())
+	sp.set_homing_node_name_match_mode(sp.get_homing_node_name_match_mode())
+	sp.set_homing_node_name_case_sensitive(sp.get_homing_node_name_case_sensitive())
+	sp.set_homing_children_recursive(sp.get_homing_children_recursive())
+	sp.set_homing_target_path(sp.get_homing_target_path())
+	sp.set_homing_children_parent_path(sp.get_homing_children_parent_path())
+	sp.set_homing_target_source(sp.get_homing_target_source())
+	sp.resolve_homing_targets(false)
+	expect_warning_sequence([])
+
+
 func test_live_bullet_fuse() -> void:
 	assert_true(sp.shoot_once())
 	sp.set_max_live_bullets(1)
