@@ -245,8 +245,8 @@ void LaserVolley2D::update_beam_geometry(Beam &b, double delta) {
 		case LaserData2D::LASER_AIM_LOCK_ON: {
 			if (has_target && tracking_now && (target - b.muzzle).length_squared() > (real_t)0.0001) {
 				b.aim = (real_t)(target - b.muzzle).angle();
-			} else if (!has_target) {
-				b.aim = pattern_angle;
+			} else if (!has_target && tracking_now) {
+				b.aim = pattern_angle; // a locked beam holds its line, also when the target is gone
 			}
 		} break;
 		default:
@@ -283,8 +283,15 @@ void LaserVolley2D::update_beam_geometry(Beam &b, double delta) {
 	}
 	// Extension: the warning line shows the whole path; the beam grows into it.
 	real_t max_length = (real_t)d->length;
-	if (d->aim == LaserData2D::LASER_AIM_LOCK_ON && has_target) {
-		max_length = Math::min(max_length, b.muzzle.distance_to(target));
+	if (d->aim == LaserData2D::LASER_AIM_LOCK_ON) {
+		if (tracking_now) {
+			b.lock_length = has_target ? Math::min(max_length, b.muzzle.distance_to(target)) : (real_t)-1.0;
+			max_length = has_target ? b.lock_length : max_length;
+		} else if (b.lock_length >= (real_t)0.0) {
+			// Charge, lock, fire: the beam ends where the telegraph ended
+			// (a beam that never tracked aimed at nothing: full length).
+			max_length = Math::min(max_length, b.lock_length);
+		}
 	}
 	if (phase == PHASE_CHARGING) {
 		b.reach = d->extend_speed > 0.0 ? (real_t)0.0 : max_length;

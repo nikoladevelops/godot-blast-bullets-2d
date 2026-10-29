@@ -107,7 +107,7 @@
 			Off (default): a bolt or curvy head that leaves the factory's despawn bounds is spent there ([signal BulletFactory2D.laser_despawned]). On: it flies on until its phases end, and a [LaserSpawner2D] firing this data may shoot from outside the bounds (like [member BulletVolleyData2D.ignore_despawn_bounds]). Beams never despawn.
 		</member>
 		<member name="keep_tracking_when_active" type="bool" setter="set_keep_tracking_when_active" getter="get_keep_tracking_when_active" default="true">
-			Track and Lock On: whether the beam keeps following its target while active. Off, it aims while charging and growing, then holds that direction ("charge, lock, fire").
+			Track and Lock On: whether the beam keeps following its target while active. Off, it aims while charging and growing, then holds that direction ("charge, lock, fire"): a Lock On beam also keeps the length it locked at (it ends where the warning line ended), and a target lost while active changes nothing.
 		</member>
 		<member name="length" type="float" setter="set_length" getter="get_length" default="600.0">
 			The beam's length (a beam reaching out of its muzzle, a bolt's segment, a curvy laser's body), in px. Must be finite and &gt; 0.

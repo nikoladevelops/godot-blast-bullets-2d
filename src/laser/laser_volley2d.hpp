@@ -67,6 +67,7 @@ public:
 		real_t sweep = 0.0; // sweep offset (radians)
 		real_t sweep_dir = 1.0;
 		real_t reach = 0.0; // how far it extended (px)
+		real_t lock_length = -1.0; // Lock On: the length at the last tracking tick (< 0: none yet)
 		Vector2 muzzle;
 		real_t angle = 0.0; // aim + sweep: where it points now
 		real_t length_now = 0.0; // drawn and damaging length

@@ -141,6 +141,35 @@ func test_keep_tracking_when_active_off_freezes_the_aim() -> void:
 	target.position = Vector2(100, 0)
 	step_factory(2, DT)
 	assert_almost_eq(_deg(l), 90.0, 0.001, "active: the aim holds")
+	target.queue_free()
+	await idle(1)
+	step_factory(2, DT)
+	assert_almost_eq(_deg(l), 90.0, 0.001, "active: the aim holds when the target is gone too")
+
+
+## Lock On with keep_tracking_when_active off: "charge, lock, fire". The beam
+## fires along the locked line AND ends where the telegraph ended (where the
+## target stood at the lock), wherever the target moves or goes afterwards.
+func test_lock_on_without_tracking_freezes_its_length_at_the_lock() -> void:
+	var d := H.make_laser(0.125, 0.0, 0.0, 0.0, 400.0)
+	d.aim = LaserData2D.LASER_AIM_LOCK_ON
+	d.keep_tracking_when_active = false
+	var l := _fire(d)
+	var target := Node2D.new()
+	target.position = Vector2(60, 80) # 100 px away
+	add(target)
+	l.set_beam_target(0, target)
+	step_factory(2, DT) # charging: tracks
+	target.position = Vector2(0, 50) # dodges inward
+	step_factory(2, DT) # active
+	assert_almost_eq(l.get_beam_end(0).distance_to(Vector2(60, 80)), 0.0, 0.01, "ends at the locked point, not on the moved target")
+	target.position = Vector2(0, 300)
+	step_factory(1, DT)
+	assert_almost_eq(l.get_beam_length(0), 100.0, 0.01, "the length holds")
+	target.queue_free()
+	await idle(1)
+	step_factory(1, DT)
+	assert_almost_eq(l.get_beam_end(0).distance_to(Vector2(60, 80)), 0.0, 0.01, "a lost target changes nothing")
 
 
 func test_lock_on_ends_on_its_target_capped_at_length() -> void:
