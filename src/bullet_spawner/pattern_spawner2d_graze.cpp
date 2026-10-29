@@ -317,8 +317,10 @@ GrazePreviewLayer2D *PatternSpawner2D::resolve_graze_preview_layer(bool create) 
 	// cached pointer.
 	Node *existing = get_node_or_null(NodePath(GRAZE_PREVIEW_NAME));
 	GrazePreviewLayer2D *layer = Object::cast_to<GrazePreviewLayer2D>(existing);
-	if (existing != nullptr && layer == nullptr) {
-		// Something else took the name: move it out of the way.
+	if (create && existing != nullptr && layer == nullptr) {
+		// Something else took the name while we are building the layer: move it
+		// out of the way. A pure lookup (create == false, e.g. a z-order write)
+		// must never rename or free an unrelated child.
 		existing->set_name(String(GRAZE_PREVIEW_NAME) + "Stale");
 		remove_child(existing);
 		existing->queue_free();

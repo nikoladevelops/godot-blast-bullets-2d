@@ -386,3 +386,15 @@ func test_laser_preview_beams_keep_their_world_length_under_a_scaled_generator()
 	var arrows: Dictionary = sp.debug_get_preview_arrows()
 	assert_almost_eq(float(arrows["beam_length"]) * 2.0, 200.0, 0.001, "holder-local length x the generator scale = the beam's 200 px")
 	assert_almost_eq(float(arrows["beam_width"]) * 2.0, sp.laser_data.width, 0.001, "and its world width")
+
+
+## A preview z-order write is a LOOKUP, not a build: it must never rename or
+## free an unrelated child that merely carries the internal layer name.
+func test_a_z_order_write_never_frees_a_foreign_same_named_child() -> void:
+	var sp := make_spawner(H.make_volley_data(1, 0.0, 5.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
+	var foreign := Node2D.new()
+	foreign.name = "~BlastBulletsGrazePreview"
+	sp.add_child(foreign)
+	sp.set_preview_z_index(5)
+	await idle(2) # a queue_free would land here
+	assert_true(is_instance_valid(foreign), "a z-order write leaves a foreign child alone")
