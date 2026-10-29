@@ -221,8 +221,9 @@ func test_a_spent_bolt_ends_its_visit_silently() -> void:
 
 
 ## The On Graze Exit event names the visit's target, so its sound/effect must
-## land on THAT target's last position, not on whichever target happens to be
-## nearest the beam at exit time (and never at the world origin).
+## land where THAT target is when the visit ends, not on whichever target
+## happens to be nearest the beam (never at the world origin, never where the
+## target stood when it grazed).
 func test_the_exit_sound_lands_on_the_exiting_target() -> void:
 	var a := _target("A", Vector2(150, 10)) # grazes the 30 px ring
 	_target("B", Vector2(200, 60)) # nearest once A leaves, but outside the ring
@@ -239,4 +240,4 @@ func test_the_exit_sound_lands_on_the_exiting_target() -> void:
 	step_factory(1, DT)
 	var exits: Array = factory.debug_get_sound_offer_log().filter(func(e): return int(e["trigger"]) == LaserSoundData2D.LASER_SOUND_ON_GRAZE_EXIT)
 	assert_eq(exits.size(), 1, "one exit offer")
-	assert_almost_eq(exits[0]["position"], Vector2(150, 10), Vector2(0.5, 0.5), "the exit lands on the exiting target, not the nearest one")
+	assert_almost_eq(exits[0]["position"], Vector2(150, 200), Vector2(0.5, 0.5), "the exit lands on the exiting target as it is now, not the nearest one")

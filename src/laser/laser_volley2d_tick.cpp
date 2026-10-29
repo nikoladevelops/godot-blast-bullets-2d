@@ -890,6 +890,16 @@ bool LaserVolley2D::update_graze(uint64_t self_id, uint32_t life) {
 		const Node *node = Object::cast_to<Node>(ObjectDB::get_instance(ObjectID(id)));
 		return node != nullptr && node->is_inside_tree() && !node->is_queued_for_deletion();
 	};
+	// Exits only (rare): one pass over the list.
+	auto anchor_position = [&](uint64_t id, Vector2 &r_at) {
+		for (const GrazeTarget2D &t : list->targets) {
+			if (t.id == id) {
+				r_at = t.position;
+				return true;
+			}
+		}
+		return false;
+	};
 	for (size_t i = 0; i < beams.size(); ++i) {
 		const Beam &b = beams[i];
 		real_t best = Math::INF;
@@ -929,7 +939,6 @@ bool LaserVolley2D::update_graze(uint64_t self_id, uint32_t life) {
 			if (inside_now) {
 				if (g.inside && g.fired && g.anchor != best_id && !anchor_live(g.anchor)) {
 					g.anchor = best_id;
-					g.anchor_pos = best_at;
 				}
 				for (int k = 0; k < rings; ++k) {
 					const int r = order[k];
@@ -937,7 +946,6 @@ bool LaserVolley2D::update_graze(uint64_t self_id, uint32_t life) {
 						g.rings |= (uint8_t)(1u << r);
 						g.fired = true;
 						g.anchor = best_id;
-						g.anchor_pos = best_at;
 						if (g.deepest < 0 || zone->get_ring_radius(r) < zone->get_ring_radius(g.deepest)) {
 							g.deepest = (int8_t)r;
 						}
@@ -947,8 +955,11 @@ bool LaserVolley2D::update_graze(uint64_t self_id, uint32_t life) {
 			} else if (g.inside) {
 				// A spent beam (gone) or a target that left the list ends
 				// its visit silently, like a killed bullet or a vanished target.
-				if (g.fired && !b.spent && anchor_live(g.anchor)) {
-					events.push_back({ true, g.anchor, (int)i, (int)z, (int)g.deepest, g.anchor_pos });
+				// The exit names the visit's target, so its sound and effect land
+				// where that target is now (never on the nearest other one).
+				Vector2 anchor_at;
+				if (g.fired && !b.spent && anchor_live(g.anchor) && anchor_position(g.anchor, anchor_at)) {
+					events.push_back({ true, g.anchor, (int)i, (int)z, (int)g.deepest, anchor_at });
 				}
 				if (zone->get_regraze() == GrazeZone2D::REGRAZE_AFTER_EXIT) {
 					g.rings = 0;
