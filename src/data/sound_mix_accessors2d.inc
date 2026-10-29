@@ -28,9 +28,8 @@ void SOUND_DATA_CLASS::set_streams(const Array &value) {
 			return;
 		}
 	}
-	if (streams == value) {
-		return;
-	}
+	// An Array write always counts: a script may have mutated the very same
+	// Array in place before handing it back (core/assign_if_changed2d.hpp).
 	streams = value;
 	notify_property_list_changed(); // stream_weights gates on the list (_validate_property)
 	emit_changed();

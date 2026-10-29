@@ -333,3 +333,14 @@ func test_float_properties_never_reach_the_player_as_inf() -> void:
 				err.handled = true
 				bad.append("%s = 1e300: the play reported %s" % [prop, err.code])
 	assert_eq("\n".join(bad), "", "no INF reaches a voice")
+
+
+## An Array write always counts (in-place edits): handing the same Array back
+## after appending must emit `changed` once, like every other Array property.
+func test_a_streams_array_written_back_after_an_in_place_edit_still_counts() -> void:
+	var s := BulletSoundData2D.new()
+	watch_signals(s)
+	var live: Array = s.streams
+	live.append(H.make_sound_stream()) # edit the very same Array in place
+	s.set_streams(live)                # hand the same Array back
+	assert_signal_emit_count(s, "changed", 1, "an Array write always counts")
