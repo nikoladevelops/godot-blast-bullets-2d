@@ -53,8 +53,16 @@ Dictionary BulletFactory2D::get_frame_stats() const {
 	int active_volleys = 0;
 	int pooled_volleys = 0;
 	for (const BulletVolley2D *volley : all_volleys) {
-		if (volley != nullptr) {
-			(volley->is_active ? active_volleys : pooled_volleys)++;
+		if (volley == nullptr || volley->is_queued_for_deletion()) {
+			continue;
+		}
+		// The real buckets (same source as debug_get_life_state and
+		// debug_get_active_volleys_amount): a PARKED volley (auto pooling off)
+		// is neither active nor pooled, and a queued one is already gone.
+		if (volley->is_pooled_in_pool) {
+			pooled_volleys++;
+		} else if (volley->is_active) {
+			active_volleys++;
 		}
 	}
 	d["active_volleys"] = active_volleys;

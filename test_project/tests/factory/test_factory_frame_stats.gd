@@ -51,6 +51,26 @@ func test_expiry_counter() -> void:
 	assert_eq(int(factory.get_frame_stats()["pooled_volleys"]), 1, "expired volley parked in the pool")
 
 
+## Parked (auto pooling off) and queued volleys are not pooled / not active:
+## get_frame_stats must use the same buckets as debug_get_life_state.
+func test_parked_and_queued_volleys_are_bucketed_correctly() -> void:
+	factory.reset_frame_stats()
+	var v: BulletVolley2D = quick_volley(2, 0.0, 0.05)
+	v.is_auto_pooling_enabled = false
+	for i in 30:
+		await physics()
+		if v.debug_get_life_state() != "active":
+			break
+	assert_eq(v.debug_get_life_state(), "parked", "kept frozen, never pooled")
+	var s: Dictionary = factory.get_frame_stats()
+	assert_eq(int(s["pooled_volleys"]), 0, "a parked volley is not pooled")
+	assert_eq(int(s["active_volleys"]), 0, "and not active")
+	var q: BulletVolley2D = quick_volley(1, 0.0, 30.0)
+	assert_eq(int(factory.get_frame_stats()["active_volleys"]), 1, "the live volley counts")
+	q.queue_free()
+	assert_eq(int(factory.get_frame_stats()["active_volleys"]), 0, "a queued volley drops out at once")
+
+
 func test_collision_record_counter() -> void:
 	handle_events(factory) # the hits / grazes / expiries are handled; this test pins something else
 	factory.reset_frame_stats()
