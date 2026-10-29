@@ -93,6 +93,26 @@ func test_turning_orbiting_off_with_an_empty_pool_stops_live_rings() -> void:
 	assert_false(v.bullet_is_orbiting_enabled(0), "the empty-pool retarget still stopped the ring")
 
 
+## The same stop in every selection mode: Random, Round Robin and Distribute
+## resolve per volley, and an empty pool there must not skip it either.
+func test_an_empty_pool_stops_live_rings_in_every_selection(selection: int = use_parameters([BulletSpawner2D.HOMING_SELECT_NEAREST, BulletSpawner2D.HOMING_SELECT_RANDOM, BulletSpawner2D.HOMING_SELECT_FIRST, BulletSpawner2D.HOMING_SELECT_ROUND_ROBIN, BulletSpawner2D.HOMING_SELECT_DISTRIBUTE])) -> void:
+	sp.set_homing_target_selection(selection)
+	sp.set_homing_random_seed(7)
+	if selection == BulletSpawner2D.HOMING_SELECT_DISTRIBUTE:
+		sp.set_homing_mode(BulletSpawner2D.HOMING_PER_BULLET)
+	var fired: Array = []
+	sp.volley_fired.connect(func(v: BulletVolley2D, _n: int) -> void: fired.append(v))
+	assert_true(sp.shoot_once(), "shot fires while the group resolves")
+	await idle(1)
+	var v: BulletVolley2D = fired[0]
+	v.bullet_enable_orbiting(0, 40.0)
+	e1.remove_from_group("swarm")
+	e2.remove_from_group("swarm")
+	sp.set_orbiting_enabled(false)
+	assert_eq(sp.retarget_live_volleys(), 0, "empty pool: nothing to retarget")
+	assert_false(v.bullet_is_orbiting_enabled(0), "selection %d: the empty-pool retarget still stopped the ring" % selection)
+
+
 ## A no-op write to any homing target knob must not re-arm the empty-pool
 ## warning latch (a same-value write is not a configuration change).
 func test_a_noop_homing_setter_write_does_not_rearm_the_empty_warning() -> void:

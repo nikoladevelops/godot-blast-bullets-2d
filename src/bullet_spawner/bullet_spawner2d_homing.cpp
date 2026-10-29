@@ -1028,29 +1028,23 @@ int BulletSpawner2D::retarget_live_volleys() {
 		// Quiet: an empty group mid-flight keeps the old queues instead of
 		// wiping them with a warning every interval.
 		shared_targets = resolve_homing_targets(true, false);
-		if (shared_targets.is_empty()) {
-			// The orbit-off stop needs no targets: run it before bailing so a
-			// live ring still stops when the group is empty (the early return
-			// used to skip it, leaving bullets circling forever).
-			if (homing_enabled && !orbiting_enabled) {
-				const uint64_t self_id = get_instance_id();
-				BulletFactory2D *factory = get_bullet_factory();
-				for (int i = 0; i < (int)tracked_ids.size(); ++i) {
-					BulletVolley2D *volley = VolleyTracker2D::resolve_live(tracked_ids[i], self_id);
-					if (volley == nullptr || volley->bullet_factory != factory || volley->is_homing_following()) {
-						continue;
-					}
-					const int bullet_count = volley->get_amount_bullets();
-					for (int b = 0; b < bullet_count; ++b) {
-						if (volley->bullet_is_orbiting_enabled(b)) {
-							volley->bullet_disable_orbiting(b);
-						}
-					}
-				}
-			}
-			return 0;
-		}
 	}
+	// An empty pool keeps the old queues, but the orbit-off stop needs no
+	// targets: it still runs (a ring would circle an emptied group forever).
+	const bool shared_pool_empty = !use_mouse && !per_volley_resolve && shared_targets.is_empty();
+	auto stop_orbits_when_off = [this](BulletVolley2D *volley) {
+		if (orbiting_enabled) {
+			return;
+		}
+		// Guarded per bullet: disabling an already disabled orbit warns, and
+		// this runs every pass.
+		const int bullet_count = volley->get_amount_bullets();
+		for (int b = 0; b < bullet_count; ++b) {
+			if (volley->bullet_is_orbiting_enabled(b)) {
+				volley->bullet_disable_orbiting(b);
+			}
+		}
+	};
 	// Newest tracked volley is last (spawn order preserved by prune).
 	const int loop_start = homing_retarget_previous_volleys ? 0 : (int)tracked_ids.size() - 1;
 	int done = 0;
@@ -1073,6 +1067,10 @@ int BulletSpawner2D::retarget_live_volleys() {
 		if (volley->is_homing_following()) {
 			continue;
 		}
+		if (shared_pool_empty) {
+			stop_orbits_when_off(volley);
+			continue;
+		}
 		Array volley_targets = shared_targets;
 		if (per_volley_resolve) {
 			// The resolve below runs AFTER the volley was validated above: a
@@ -1081,11 +1079,12 @@ int BulletSpawner2D::retarget_live_volleys() {
 			// instead of steered through a stale pointer.
 			const uint64_t volley_id = volley->get_instance_id();
 			volley_targets = resolve_homing_targets(true, false);
-			if (volley_targets.is_empty()) {
-				continue;
-			}
 			volley = VolleyTracker2D::resolve_live((int64_t)volley_id, self_id);
 			if (volley == nullptr) {
+				continue;
+			}
+			if (volley_targets.is_empty()) {
+				stop_orbits_when_off(volley);
 				continue;
 			}
 		}
@@ -1139,18 +1138,12 @@ int BulletSpawner2D::retarget_live_volleys() {
 				volley->all_bullets_replace_homing_targets_with_new_target_array(volley_targets);
 			}
 		}
-		if (orbiting_enabled && homing_enabled) {
+		// Toggle switched off after spawn: stop live rings instead of
+		// orbiting forever (homing_enabled is checked at the top).
+		if (orbiting_enabled) {
 			apply_orbiting_to_volley(volley);
-		} else if (homing_enabled) {
-			// Toggle switched off after spawn: stop live rings instead of
-			// orbiting forever. Guarded per bullet: disabling an already
-			// disabled orbit warns, and this runs every pass.
-			const int bullet_count = volley->get_amount_bullets();
-			for (int i = 0; i < bullet_count; ++i) {
-				if (volley->bullet_is_orbiting_enabled(i)) {
-					volley->bullet_disable_orbiting(i);
-				}
-			}
+		} else {
+			stop_orbits_when_off(volley);
 		}
 		++done;
 	}
