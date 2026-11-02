@@ -370,10 +370,10 @@
 		</member>
 		<member name="transforms" type="Transform2D[]" setter="set_transforms" getter="get_transforms" default="[]">
 			[b]MANDATORY[/b]
-			Determines the transforms of the bullets, in global space (use each marker's global transform). Movement, physics shapes, collision signals and [method BulletVolley2D.get_bullet_global_transform] all operate in global space.
+			Determines the transforms of the bullets, in global space (use each marker's global transform). Movement, physics shapes, collision signals and [method BulletVolley2D.get_bullet_transform] all operate in global space.
 
 			Tip: place [Marker2D] nodes in your scene and read their global transforms each time you spawn.
-			Note: There is a helper static function that can generate a grid pattern of [Transform2D] that you can use: [method BulletFactory2D.helper_generate_transforms_grid]. You might want to implement your own custom pattern generation logic in C++ for maximum performance.
+			Note: There is a helper static function that can generate a grid pattern of [Transform2D] that you can use: [method BulletPatterns2D.helper_generate_transforms_grid]. You might want to implement your own custom pattern generation logic in C++ for maximum performance.
 		</member>
 		<member name="use_bullet_colors" type="bool" setter="set_use_bullet_colors" getter="get_use_bullet_colors" default="false">
 			Turns per-bullet colors on even without [member bullet_colors] entries (every bullet starts white), so scripts can tint bullets later with [method BulletVolley2D.set_bullet_color]. Off (and with no entries) the volley's MultiMesh carries no color data at all, so the feature costs nothing. Colored and plain volleys pool separately ([member VolleyPoolKey2D.use_bullet_colors]).

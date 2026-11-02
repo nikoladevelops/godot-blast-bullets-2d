@@ -280,7 +280,7 @@
 			<param index="0" name="bullet_index_start" type="int" default="0" />
 			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
-				Returns the logical velocities of all bullets in the range (direction x speed + inherited offset), excluding per-tick pattern/orbit displacement. Pair with [method BulletFactory2D.helper_generate_transforms_fan] for split patterns.
+				Returns the logical velocities of all bullets in the range (direction x speed + inherited offset), excluding per-tick pattern/orbit displacement. Pair with [method BulletPatterns2D.helper_generate_transforms_fan] for split patterns.
 			</description>
 		</method>
 		<method name="all_bullets_get_wobble_data">
@@ -1799,7 +1799,7 @@
 			<return type="Transform2D" />
 			<param index="0" name="bullet_index" type="int" />
 			<description>
-				Get the transform of a specific bullet in global space (the same space as [method set_bullet_transform] and [method get_bullet_global_transform]). Returns a [Transform2D] containing the bullet's position, rotation and scale.
+				Get the transform of a specific bullet in global space (the same space as [method set_bullet_transform]). Returns a [Transform2D] containing the bullet's position, rotation and scale.
 			</description>
 		</method>
 		<method name="get_bullet_velocity" qualifiers="const">
@@ -2291,7 +2291,7 @@
 			<param index="1" name="new_transform" type="Transform2D" />
 			<param index="2" name="set_direction_based_on_transform" type="bool" default="false" />
 			<description>
-				Set the transform of a specific bullet, in global space (matching [method get_bullet_transform] and [method get_bullet_global_transform]). Zero-scale and non-finite transforms are rejected. With set_direction_based_on_transform, the logical direction is derived from the transform with the volley-wide texture offset stripped (same convention as the tick), unless a direction curve owns the direction.
+				Set the transform of a specific bullet, in global space (matching [method get_bullet_transform]). Zero-scale and non-finite transforms are rejected. With set_direction_based_on_transform, the logical direction is derived from the transform with the volley-wide texture offset stripped (same convention as the tick), unless a direction curve owns the direction.
 			</description>
 		</method>
 		<method name="set_collision_layer">
@@ -2799,7 +2799,7 @@
 			</description>
 		</signal>
 		<signal name="sprite_animation_finished">
-			<param index="0" name="volley" type="BulletVolley2D" />
+			<param index="0" name="multimesh_instance" type="BulletVolley2D" />
 			<description>
 				Emitted live, once, when a non-looping SpriteFrames animation reaches its last frame. Re-armed by every play or restart.
 			</description>

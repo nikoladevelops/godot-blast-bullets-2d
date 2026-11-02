@@ -104,7 +104,7 @@
 			Node Children source: also every [Node2D] below the children (depth-first, tree order), walking through plain [Node]s.
 		</member>
 		<member name="graze_enabled" type="bool" setter="set_graze_enabled" getter="get_graze_enabled" default="false">
-			Master switch: every volley this spawner fires is armed with [member graze_zones]. Changes apply to the next shots; volleys already flying keep their zones until [method graze_live_volleys] applies the current settings to them.
+			Master switch: every laser this spawner fires is armed with [member graze_zones]. Changes apply to the next shots; lasers already firing keep their zones until [method apply_to_live_lasers] with [code]LIVE_GRAZE[/code] applies the current settings to them.
 		</member>
 		<member name="graze_filter_group" type="StringName" setter="set_graze_filter_group" getter="get_graze_filter_group" default="&amp;&quot;&quot;">
 			Allow-list for every node [member graze_target_source]: only nodes also in this group are graze targets. Empty = everything the source finds. The point sources (Mouse, Global Positions) have no nodes and ignore it.
@@ -116,7 +116,7 @@
 			Node Group source: the group whose [Node2D] members graze this spawner's bullets (e.g. your player's group). Empty by default: name it, or nothing grazes (the editor warns). Members that join later (respawns, enemies spawned after the shot) count from the next scan.
 		</member>
 		<member name="graze_node_name" type="String" setter="set_graze_node_name" getter="get_graze_node_name" default="&quot;&quot;">
-			Node Name source: the current scene is scanned for [Node2D]s named like this, compared per [member graze_node_name_match_mode] and [member graze_node_name_case_sensitive] (the same matching as [member homing_node_name]). Never this spawner or its markers, nothing inside a [BulletFactory2D]. A scan walks the scene: with a big scene, give [member graze_update_interval] a few tenths of a second.
+			Node Name source: the current scene is scanned for [Node2D]s named like this, compared per [member graze_node_name_match_mode] and [member graze_node_name_case_sensitive] (the same matching as [member laser_target_node_name]). Never this spawner or its markers, nothing inside a [BulletFactory2D]. A scan walks the scene: with a big scene, give [member graze_update_interval] a few tenths of a second.
 		</member>
 		<member name="graze_node_name_case_sensitive" type="bool" setter="set_graze_node_name_case_sensitive" getter="get_graze_node_name_case_sensitive" default="false">
 			Node Name source: compare names with their case (off: "enemy" also matches "Enemy").
@@ -137,7 +137,7 @@
 			Node Path source: the [Node2D] that grazes this spawner's bullets (a path to another type is rejected). It may be a child of this spawner, never the spawner itself. After the spawner is freed its volleys keep the node this path pointed to.
 		</member>
 		<member name="graze_target_source" type="int" setter="set_graze_target_source" getter="get_graze_target_source" enum="PatternSpawner2D.GrazeTargetSource" default="0">
-			Who can graze this spawner's bullets: the one place that decides it (a [GrazeZone2D] only says how a graze is measured, so one zone resource works for any target). Node Group (default): the members of [member graze_node_group]. Node Path ([member graze_target_path]), Node Name ([member graze_node_name]) or Node Children ([member graze_children_parent_path]). Mouse (the cursor) and Global Positions ([member graze_global_positions]) are points, not nodes: [signal bullet_grazed] and [signal bullet_graze_exited] carry a null [code]target[/code] for them, and they ignore [member graze_filter_group] and [member graze_update_interval] (read every tick). Every zone rings the same targets. Every source counts all it finds (no cap; past 8 targets each bullet only tests the ones near its motion). The node sources honor [member graze_filter_group] and only keep [Node2D]s inside the tree, not queued for deletion, at a finite position and in the bullets' world, never a [BulletFactory2D] or anything inside one, never this spawner itself; the scans (Node Name, Node Children) never find anything under this spawner either, while Node Group members and Node Path may be its children.
+			Who can graze this spawner's bullets: the one place that decides it (a [GrazeZone2D] only says how a graze is measured, so one zone resource works for any target). Node Group (default): the members of [member graze_node_group]. Node Path ([member graze_target_path]), Node Name ([member graze_node_name]) or Node Children ([member graze_children_parent_path]). Mouse (the cursor) and Global Positions ([member graze_global_positions]) are points, not nodes: [signal laser_grazed] and [signal laser_graze_exited] carry a null [code]target[/code] for them, and they ignore [member graze_filter_group] and [member graze_update_interval] (read every tick). Every zone rings the same targets. Every source counts all it finds (no cap; past 8 targets each bullet only tests the ones near its motion). The node sources honor [member graze_filter_group] and only keep [Node2D]s inside the tree, not queued for deletion, at a finite position and in the bullets' world, never a [BulletFactory2D] or anything inside one, never this spawner itself; the scans (Node Name, Node Children) never find anything under this spawner either, while Node Group members and Node Path may be its children.
 			The settings are shared with every volley this spawner fired: changing them (or calling [method refresh_graze_targets]) reaches bullets in flight on their next tick, and an open graze visit then moves to the nearest target the bullet is still inside (or ends silently). Orphaned volleys keep the settings after the spawner is freed. Pooled volleys forget them.
 		</member>
 		<member name="graze_update_interval" type="float" setter="set_graze_update_interval" getter="get_graze_update_interval" default="0.0">
@@ -360,7 +360,7 @@
 			Bloom kind selector (0 FAN, 1 RHODONEA, 2 PHYLLOTAXIS, 3 SPIROGRAPH, 4 SUPERFORMULA). Per-type knobs below apply only to their matching bloom kind.
 		</member>
 		<member name="helper_grid_alignment" type="int" setter="set_helper_grid_alignment" getter="get_helper_grid_alignment" enum="BulletPatterns2D.Alignment" default="3">
-			Grid anchor, same values as [constant BulletFactory2D.CENTER] (0 TOP_LEFT through 8 BOTTOM_RIGHT).
+			Grid anchor, same values as [enum BulletPatterns2D.Alignment] (0 TOP_LEFT through 8 BOTTOM_RIGHT).
 		</member>
 		<member name="helper_grid_column_offset" type="float" setter="set_helper_grid_column_offset" getter="get_helper_grid_column_offset" default="150.0">
 			Grid horizontal spacing.
@@ -420,7 +420,7 @@
 			Offset odd rows by half spacing for the honeycomb look.
 		</member>
 		<member name="helper_line_anchor" type="int" setter="set_helper_line_anchor" getter="get_helper_line_anchor" enum="BulletPatterns2D.LineAnchor" default="1">
-			Where the generator sits on the line, same values as [constant BulletFactory2D.LINE_ANCHOR_CENTER] (0 START, 1 CENTER, 2 END).
+			Where the generator sits on the line, same values as [enum BulletPatterns2D.LineAnchor] (0 START, 1 CENTER, 2 END).
 		</member>
 		<member name="helper_line_direction" type="Vector2" setter="set_helper_line_direction" getter="get_helper_line_direction" default="Vector2(1, 0)">
 			Line axis. Does not need to be normalized.
@@ -708,7 +708,7 @@
 			Angle step in radians per spiral bullet.
 		</member>
 		<member name="helper_spiral_facing" type="int" setter="set_helper_spiral_facing" getter="get_helper_spiral_facing" enum="BulletPatterns2D.SpiralFacingMode" default="0">
-			Spiral facing, same values as [constant BulletFactory2D.SPIRAL_FACING_TANGENT] (0 TANGENT, 1 RADIAL_OUTWARD, 2 TOWARD_CENTER, 3 KEEP_MARKER).
+			Spiral facing, same values as [enum BulletPatterns2D.SpiralFacingMode] (0 TANGENT, 1 RADIAL_OUTWARD, 2 TOWARD_CENTER, 3 KEEP_MARKER).
 		</member>
 		<member name="helper_spiral_facing_offset_deg" type="float" setter="set_helper_spiral_facing_offset_deg" getter="get_helper_spiral_facing_offset_deg" default="0.0">
 			Twists every spiral facing by this many degrees.
@@ -1044,7 +1044,7 @@
 			Stacked [LaserSoundData2D] entries (nulls allowed, skipped; a [BulletSoundData2D] is refused with one error, keeping the old value). Each entry plays one of its [member LaserSoundData2D.streams] when its laser trigger fires, subject to its own limits. On Shot and On Telegraph entries offer from the spawner itself; the rest fire from the laser, where the event happened.
 		</member>
 		<member name="sound_enabled" type="bool" setter="set_sound_enabled" getter="get_sound_enabled" default="false">
-			Master switch: every volley this spawner fires is armed with [member sound_effects]. Changes apply to the next shots; volleys already flying keep their entries until [method sound_live_volleys] applies the current settings to them.
+			Master switch: every laser this spawner fires is armed with [member sound_effects]. Changes apply to the next shots; lasers already firing keep their entries until [method apply_to_live_lasers] with [code]LIVE_SOUND[/code] applies the current settings to them.
 		</member>
 		<member name="sound_listener_children_parent_path" type="NodePath" setter="set_sound_listener_children_parent_path" getter="get_sound_listener_children_parent_path" default="NodePath(&quot;&quot;)">
 			Node Children source: Node2D children of this parent.

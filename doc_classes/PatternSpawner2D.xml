@@ -2423,7 +2423,7 @@
 		<method name="refresh_graze_targets">
 			<return type="int" />
 			<description>
-				Scans for graze targets now, whatever [member BulletSpawner2D.graze_update_interval] says: every bullet this spawner fired (still flying, orphaned or not) tests the nodes found from its next tick on. Call it right after spawning enemies when the interval is long. Returns how many targets it has now (every zone rings the same ones; this spawner never counts). Pushes an error and returns 0 outside the scene tree. Homing's counterpart is [method retarget_live_volleys].
+				Scans for graze targets now, whatever [member BulletSpawner2D.graze_update_interval] says: every bullet this spawner fired (still flying, orphaned or not) tests the nodes found from its next tick on. Call it right after spawning enemies when the interval is long. Returns how many targets it has now (every zone rings the same ones; this spawner never counts). Pushes an error and returns 0 outside the scene tree. Homing's counterpart is [method BulletSpawner2D.retarget_live_volleys].
 			</description>
 		</method>
 		<method name="refresh_sound_listeners">
@@ -4971,7 +4971,7 @@
 			<return type="bool" />
 			<param index="0" name="overrides" type="Dictionary" />
 			<description>
-				Fires one volley like [method shoot_once] with temporary overrides: [param overrides] takes the keys of a [method spawn_pattern_list] entry ([code]"preset"[/code], [code]"pattern_source"[/code], [code]"helper_bullets_amount"[/code], [code]"spawn_data"[/code]) with the same checks and errors (an unknown key names the closest valid one and is skipped). After the shot, every setting the overrides changed returns to the spawner's own value; edits a shot handler makes to other settings stick. Counts as a normal shot ([signal volley_fired], [member BulletSpawner2D.max_volleys], [method fire_n_volleys] budgets, the nested-call refusal of [method shoot_once]) and never emits [signal pattern_list_finished]. Returns true when the volley fired.
+				Fires one volley like [method shoot_once] with temporary overrides: [param overrides] takes the keys of a [method spawn_pattern_list] entry ([code]"preset"[/code], [code]"pattern_source"[/code], [code]"helper_bullets_amount"[/code], [code]"spawn_data"[/code]) with the same checks and errors (an unknown key names the closest valid one and is skipped). After the shot, every setting the overrides changed returns to the spawner's own value; edits a shot handler makes to other settings stick. Counts as a normal shot ([signal BulletSpawner2D.volley_fired] / [signal LaserSpawner2D.laser_fired], [member BulletSpawner2D.max_volleys], [method fire_n_volleys] budgets, the nested-call refusal of [method shoot_once]) and never emits [signal pattern_list_finished]. Returns true when the volley fired.
 			</description>
 		</method>
 		<method name="spawn_pattern_list">
