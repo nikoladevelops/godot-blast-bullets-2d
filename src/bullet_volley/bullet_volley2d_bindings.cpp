@@ -559,7 +559,7 @@ void BulletVolley2D::_bind_methods() {
 	// class name reaches ClassDB and --doctool; see the note on the factory
 	// signals.
 	ADD_SIGNAL(MethodInfo("bullet_homing_target_reached",
-			PropertyInfo(Variant::OBJECT, "multimesh_instance", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
+			PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
 			PropertyInfo(Variant::INT, "bullet_index"),
 			PropertyInfo(Variant::OBJECT, "target", PROPERTY_HINT_RESOURCE_TYPE, "Node2D"),
 			PropertyInfo(Variant::VECTOR2, "target_global_position")));

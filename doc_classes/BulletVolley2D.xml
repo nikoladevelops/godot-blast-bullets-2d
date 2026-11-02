@@ -2789,7 +2789,7 @@
 	</members>
 	<signals>
 		<signal name="bullet_homing_target_reached">
-			<param index="0" name="multimesh_instance" type="BulletVolley2D" />
+			<param index="0" name="volley" type="BulletVolley2D" />
 			<param index="1" name="bullet_index" type="int" />
 			<param index="2" name="target" type="Node2D" />
 			<param index="3" name="target_global_position" type="Vector2" />
@@ -2799,7 +2799,7 @@
 			</description>
 		</signal>
 		<signal name="sprite_animation_finished">
-			<param index="0" name="multimesh_instance" type="BulletVolley2D" />
+			<param index="0" name="volley" type="BulletVolley2D" />
 			<description>
 				Emitted live, once, when a non-looping SpriteFrames animation reaches its last frame. Re-armed by every play or restart.
 			</description>
