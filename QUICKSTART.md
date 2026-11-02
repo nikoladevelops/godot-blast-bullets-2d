@@ -14,8 +14,8 @@ You can call `BulletFactory2D.spawn_volley()` yourself, but for a bullet hell **
 
 ## 1. Set up the scene
 
-1. Add a `BulletFactory2D` to your level. Keep one reference to it (autoload, or a `static var`), see the README.
-2. Add a `BulletSpawner2D` under your boss. Set **Bullet Factory Path** to the factory.
+1. Add a `BulletFactory2D` to your level.
+2. Add a `BulletSpawner2D` under your boss. It fires into the factory of its scene by itself (set **Bullet Factory Path** only when a level has several factories).
 3. Create a `BulletVolleyData2D` in **Spawn Data** and fill in:
    - `sprite_frames` (your bullet art) and `texture_size`
    - `collision_shape` (circle, rectangle or capsule), `collision_layer`, `collision_mask`
@@ -115,7 +115,7 @@ $Boss.emitter_enabled = true                             # timing: $Boss.emitter
 - **Keep bullet counts steady per volley.** Pooling is by exact `(bullet count, shape)`; a repeat of the same size is a cheap reuse, a new size is a fresh allocation. Constant-size patterns are ideal. Pre-warm the sizes you use with `factory.populate_bullets_pool(key, data, n)` at load time (`factory.debug_expected_pool_key(data)` gives you the key).
 - **Fewer, bigger volleys beat many tiny ones**: one volley is one MultiMesh draw and one physics area. All bullets in a volley share one texture, so put different looks in different spawners/data.
 - Use areas for enemies and the player; static bodies need `monitorable` on and cost more.
-- Turn on `factory.use_physics_interpolation` (and the matching project setting) for smooth bullets on 120 Hz+ screens.
+- Turn on the project setting *Physics → Common → Physics Interpolation* for smooth bullets on 120 Hz+ screens: the factory's `physics_interpolation` follows it by default.
 - Watch the numbers with `factory.get_frame_stats()` or `register_performance_monitors`, and see the shapes with the factory's debugger (`is_debugger_enabled`).
 - The per-call bullet limit defaults to 20,000 and mainly catches typos. Raise it with the project setting `blastbullets2d/patterns/max_bullets_per_pattern` or `BulletPatterns2D.set_max_bullets_per_pattern(n)`, but know the cost: one volley is one physics area with a shape per bullet, and tens of thousands of tightly packed shapes make Godot's broadphase hitch for seconds and can abort the game. For bigger barrages fire several volleys of a few thousand bullets (several spawners, or `burst_count`).
 

@@ -1,559 +1,275 @@
 <p align="center">
-  <img src="showcase/logo-big.jpg" alt="BlastBullets2D - Logo" width="500"/>
+  <img src="showcase/logo-big.jpg" alt="BlastBullets2D logo" width="500"/>
 </p>
-
-## Purpose
-
-**BlastBullets2D** is a high-performance, **free and open source C++ plugin** for [Godot Engine](https://godotengine.org) that enables **optimized bullet spawning and management** in 2D games. It’s designed to efficiently handle a large number of bullets with minimal performance overhead, making it **ideal for fast-paced, bullet-heavy gameplay**.
-
-If you're searching for a **Godot optimized bullets plugin**, **BlastBullets2D** is built exactly for that purpose.
-
-Also perfect as a **Godot bullet hell plugin** since it allows having **THOUSANDS of bullets visible on screen**.
-
-**New here? Read the [one-page Quickstart](QUICKSTART.md)**: it shows the recommended `BulletSpawner2D` workflow and the common bullet hell recipes (patterns, bursts, homing, graze, hits, budgets).
-
-BlastBullets2D comes already compiled and ready for these platforms:
-- **Windows**
-- **macOS**
-- **Linux**
-- **Android**
-- **iOS**
-- **Web**
-
-**BlastBullets2D is fully cross platform now, because it uses the [godot-plus-plus template](https://github.com/nikoladevelops/godot-plus-plus)**. If you also want to write C++ code in Godot or you have some old GDExtension plugins you want to update, I suggest checking it out.
-
-**BlastBullets2D** integrates seamlessly into your Godot project. You do not need any knowledge of C++ to use it. Everything is controlled through **GDScript**, made possible by Godot’s [GDExtension](https://docs.godotengine.org/en/stable/tutorials/scripting/gdextension/what_is_gdextension.html) system.
-
-
----
-
-## Why Choose BlastBullets2D?
 
 <p align="center">
-  <img src="showcase/example.gif" alt="BlastBullets2D - Showcase Gif" width="500"/>
+  <b>Thousands of bullets, lasers and bullet-hell patterns for Godot 4, written in C++, driven from GDScript.</b><br>
+  Free, open source (MIT), no C++ knowledge needed.
 </p>
 
-[The Official Trailer Of BlastBullets2D](https://www.youtube.com/watch?v=OJK7201pzsE)
+<p align="center">
+  <a href="https://github.com/nikoladevelops/godot-blast-bullets-2d/actions/workflows/tests.yml"><img src="https://github.com/nikoladevelops/godot-blast-bullets-2d/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
+  <a href="https://github.com/nikoladevelops/godot-blast-bullets-2d/releases"><img src="https://img.shields.io/github/v/release/nikoladevelops/godot-blast-bullets-2d" alt="Latest release"></a>
+  <img src="https://img.shields.io/badge/Godot-4.5%2B-478cbf" alt="Godot 4.5+">
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license">
+</p>
 
-[BlastBullets2D Features Showcase](https://www.youtube.com/watch?v=SeyD1YVIZss)
+<p align="center">
+  <img src="showcase/example.gif" alt="BlastBullets2D in action" width="500"/>
+</p>
 
-[BlastBullets2D TUTORIAL PART 1](https://www.youtube.com/watch?v=L10sHF4BnLs)
+**Contents:** [Why](#why-blastbullets2d) · [Install](#install) · [Your first boss in 5 minutes](#your-first-boss-in-5-minutes-no-code) · [Handle hits](#handle-hits) · [Recipes](#recipes) · [Spawning from code](#spawning-from-code) · [Performance](#performance) · [Limits](#limits) · [Rules worth knowing](#rules-worth-knowing) · [Reference](#reference) · [Building and testing](#building-from-source-and-running-the-tests)
 
-[BlastBullets2D TUTORIAL PART 2](https://www.youtube.com/watch?v=R2olIyF7aPQ)
+## Why BlastBullets2D
 
-[Old Video Showcasing The Plugin](https://www.youtube.com/watch?v=eMvR3UWXtH0)
+- **Fast.** One volley is one MultiMesh draw and one physics area, not one node per bullet. 10,000 flying bullets cost about **0.3 ms** per physics tick, and 8 auto-firing bosses with homing, splitting and graze keeping ~10,000 bullets alive about **0.5 ms** (Ryzen 7 8840HS, the shipped release build). Volleys, lasers and attachments are pooled automatically.
+- **Patterns without math.** `BulletSpawner2D` has **33 pattern sources** (ring, fan, spiral, flower, rose, star, heart, rain, walls with gaps, Lissajous, any `Path2D`, your own markers...) with a **live preview in the editor**, 20 one-click presets, spin, bursts, telegraphs, fire budgets and boss phase sequences.
+- **Every bullet-hell system, already integrated:** homing and orbiting, bouncing, curves, wobble, gravity, `Path2D` movement patterns, graze (near misses), boids flocking, bullets that split, bullets that fire bullets, lasers (beams, bolts, curvy snakes), bullets that turn into coins, sound with a voice mixer, slow motion, per-bullet colors and lifetimes, animated `SpriteFrames` art, particles that follow bullets.
+- **Safe to use.** Every signal fires while the bullet is still alive (read it, heal it, split it), handlers may free anything, and wrong settings fail loudly with a message that says what to fix. Every feature is covered by an automated test suite (about 2,500 tests) that also runs on the release build, under memory and undefined-behavior sanitizers, and under seeded fuzzing.
+- **Documented in the editor.** Every class, property, method and signal has in-editor help (<kbd>F1</kbd> or Ctrl+click), and the inspector warns about missing setup.
+- **Every platform:** Windows, macOS, Linux, Android, iOS and Web, prebuilt.
 
-[GDExtension C++ Tutorial](https://www.youtube.com/watch?v=I79u5KNl34o&t=1s)
+**Videos:** [Trailer](https://www.youtube.com/watch?v=OJK7201pzsE) · [Features showcase](https://www.youtube.com/watch?v=SeyD1YVIZss) · [Tutorial part 1](https://www.youtube.com/watch?v=L10sHF4BnLs) · [Tutorial part 2](https://www.youtube.com/watch?v=R2olIyF7aPQ)
 
+## Install
 
-If you're developing a bullet-hell shooter or any game that involves a high number of 2D bullets, **BlastBullets2D** provides a powerful and easy-to-use solution that delivers **outstanding performance** inside Godot Engine.
+Requires **Godot 4.5 or newer** (tested on 4.7).
 
-The main advantages to using this custom built plugin:
+1. Download `blastbullets2d.zip` from the [latest release](https://github.com/nikoladevelops/godot-blast-bullets-2d/releases) (also on the [Godot Asset Library](https://godotengine.org/asset-library/asset/2632) and [itch.io](https://realnikich.itch.io/blastbullets2d)).
+2. Extract it and copy the `blastbullets2d` folder anywhere into your project (for example `res://addons/blastbullets2d`).
+3. Restart the editor. `BulletFactory2D`, `BulletSpawner2D` and `LaserSpawner2D` now appear in the **Add Node** dialog.
 
-- **Production Ready, Free, Open Source And Yours Forever Without Any Hidden Fees Or Weird Licenses** - If you like what I do and you find the plugin useful consider supporting further development of such tools on [KoFi](https://ko-fi.com/realnikich) and [Patreon](https://patreon.com/realnikich). Expect tutorials on [My Youtube Channel](https://www.youtube.com/@realnikich).
+There is no plugin to enable: it is a GDExtension and loads by itself.
 
-- **Superior Performance And Simple To Use API That Does NOT Require Any Math Knowledge**.
+## Your first boss in 5 minutes (no code)
 
-- **Homing Bullets** - Targets Node2D enemies, GlobalPositions and even the Mouse. You have support for shared homing targets and per-bullet homing targets with a double ended queue implementation. You can control the smoothness of the rotation, the update time interval for tracking the targets, register a callback function when the required distance away from the target has been reached and much much more!
+You need three things:
 
-- **Orbiting Bullets** - Each bullet can begin orbiting a homing target at a custom radius while also moving in a circle around it. Imagine a swarm of bullets orbiting your mouse as you move it, while the radius increases or decreases then some of them go and orbit another target, this is the type of behavior you can implement on the go.
+| What | Job | How many |
+|---|---|---|
+| `BulletFactory2D` (node) | Owns every bullet: pooling, physics, drawing, signals | One per level |
+| `BulletSpawner2D` (node) | Decides **where** and **when** bullets spawn (pattern, fire rate, spin...) | One per gun, turret or boss |
+| `BulletVolleyData2D` (resource) | Decides **what** a bullet is (art, speed, hitbox, lifetime) | One per bullet type |
 
-- **Graze (Near Misses)** - Bullets that pass close to the player report it: up to 4 rings per graze zone ("near", "close", "razor"...), swept so fast bullets never skip a ring, once per bullet or again on every visit, with an exit signal when the bullet leaves alive. Configure it once as a `GrazeZone2D` resource, drop it into every enemy spawner, and connect `BulletFactory2D.bullet_grazed` once to count graze for score, even for bullets of enemies that already died. The editor draws the rings around your player.
-- **Flocking (Boids)** - Bullets that swarm like birds: a `BulletFlock2D` resource holds the rules (separation, alignment, cohesion, neighbor and separation ranges measured between bullet edges so the defaults fit any sprite size, a turn-rate cap to keep swarms fair to dodge, a neighbor cap that bounds the cost of dense swarms). Switch on the spawner's Flocking group and its bullets fly as one flock (per spawner, shared between spawners, or one per shot); no resource needed, an empty slot flies the default rules, and presets (Swarm, Fly Together, Keep Distance, Tight Group) give one-click starting points. Bullets turn in smooth, capped arcs (never a snap, even in a burst stacked at the muzzle; new shots ease in), and every bullet counts its own size, random sizes included. Edit the resource at runtime and every bullet in flight follows. Turn on homing as well and the defaults show a swarm that chases the player while keeping its bullets apart. `BulletSpawner2D.debug_explain_features()` explains in plain sentences what homing, orbiting, flocking and graze will do with the current settings. Factory volleys join with `volley.flock_join(flock)`.
-- **World controls** - `BulletFactory2D.time_scale` slows everything (spawners, bullets, particles and animations on attachments, effects); each spawner has its own `time_scale` (and `time_scale_affects_volleys`). The factory draws the despawn rectangle (translucent red) in the editor, culled bullets fire an On Despawn effect/sound trigger and the `bullets_despawned` signal, and a spawner outside the rectangle does not shoot.
-- **Randomization** - Per spawner: random bullet scale (uniform or per axis), rotation and position jitter, speed multiplier, random spin start, and random shoot/burst/telegraph intervals, all with an optional `bullet_random_seed`. Flocking, graze rings and homing reach count each bullet's own size.
-- **Lasers And Beams** - A `LaserSpawner2D` fires lasers along the same patterns, bursts, spin and movement as bullets: straight beams (charge warning, grow, fire, fade; sweeping, extending, stopping at walls or reflecting off them, piercing a set number of targets), fast bolts, and curvy lasers that snake after their target. Lock-on beams end right on the target, tracking beams turn toward it (targets by group, path, node name, children, the mouse or a position). Every laser has its own signals (`laser_pierce_started`, `laser_hit` repeating like damage ticks, `laser_pierce_ended`, `laser_wall_hit`, `laser_grazed`...), charge / muzzle / tip / pierce / wall-impact animations, a body texture that stretches or tiles and scrolls, a color ramp, and stays smooth with physics interpolation. Presets (Instant Beam, Charged Sweep, Wall Beam, Reflecting Beam, Bolt, Homing Curvy, Lock On) give one-click starting points.
-- **Emitter Bullets** - Bullets that fire while they fly: point a spawner's Emitter Bullets group at any other spawner (bullets or lasers) and every flying bullet fires its whole pattern on its own schedule (interval, delay, stagger, shot limit, chance, spin per shot for spirals, along its heading or unrotated). Emitters of emitters work; a loop back to the spawner is refused.
-- **Per-Bullet Colors, Lifetimes And Scale-In** - Rainbow rings with one knob (`bullet_color_mode`), colors per bullet from the data or at runtime (`set_bullet_color`), a lifetime per bullet (`all_bullet_life_times`, a random lifetime spread on the spawner), and bullets that pop in from small to full size (`scale_in_sec`) with their hitbox.
-- **Pickups (coins and gems)** - `BulletPickupData2D` turns bullets into animated (SpriteFrames) collectibles that burst out, get pulled to a target and report `pickup_collected`, in one call for a volley, a spawner's bullets, an area or every bullet on screen.
+1. **Add a `BulletFactory2D`** to your level scene.
+2. **Add a `BulletSpawner2D`** (as a child of your boss, or anywhere). It finds the factory by itself.
+3. **Give it bullets:** in the inspector, **Setup → Spawn Data → New BulletVolleyData2D**, then open it and set:
+   - **Appearance → Sprite Frames:** a `SpriteFrames` with your bullet art. Draw bullets **facing right**.
+   - **Movement Speed → Shared Bullet Speed Data → New BulletSpeedData2D**, and set its **Speed** (try `200`). *Speed defaults to 0: without this the bullets stand still.*
+   - **Collision → Collision Shape** (a `CircleShape2D` is the cheapest), plus **Collision Layer** and **Collision Mask** (what the bullets are, and what they hit).
+4. **Pick a pattern:** **Patterns → Pattern Source → Spiral** (or any other) and set **Helper Bullets Amount**. The editor draws a dot and an arrow for every bullet that will spawn.
+5. **Press play.** The spawner fires once per second (**Shooting → Shoot Interval Sec**).
 
-- **Bouncing Bullets (Ricochet)** - Pick bounce layers and bullets reflect off those targets automatically with configurable strength (elastic, damped, dead-stop, super-elastic), optional hit consumption, bounce budgets, radial or shape-accurate normals, instant or smooth visual turn, scatter randomness and overlap cooldown. Full signals (`bounce_area_entered` / `bounce_body_entered`, on the factory or on the spawner that fired the volley) included.
+> **Faster start:** select the spawner and run `apply_pattern_preset(BulletPatterns2D.PATTERN_PRESET_SPIRAL_3ARM)` from a script, or browse the presets in code completion. They set the pattern knobs for you; tune from there.
 
-- **Path2D Movement Patterns** - Draw a Path2D in your scene and suddenly the bullets possess that movement behavior
-relative to their direction (allows zig zag patterns and any other creative pattern you can think about). Example: A bullet gets spawned with a zig zag pattern (that might or might not repeat), then you can swap it with another pattern during runtime or even have homing bullets with custom movement patterns - very powerful.
+Nothing appears? Look at the warning icon on the spawner node: it says what is missing. At runtime, `print($BulletSpawner2D.get_setup_warnings())` returns the same list, and the spawner's `volley_skipped(reason)` signal tells you why a shot did not fire.
 
-- **BulletCurvesData2D** - You can use curves inside the Inspector to control the speed, rotation and direction. Choose between using unit curves (normalized time) or absolute values (at exactly X time have Y speed). Handy way of having bullets that speed up or slow down at specific times without writing any extra code.
+## Handle hits
 
-- **Control Speed And Rotation The Normal Way** - If bullet curves are not needed, you can still use normal speed and speed acceleration values for both movement and rotation using **BulletSpeedData2D** and **BulletRotationData2D**.
+Bullets report what they hit through signals. Connect them on the **spawner** that fired the bullets (or once on the **factory**: a hit the spawner does not handle goes to the factory). The bullet is **still alive** inside the handler, so you can read anything about it:
 
-- **Animated Textures With SpriteFrames** - Assign a `SpriteFrames` resource (plain textures or `AtlasTexture` regions) and an animation name. Timing comes from the animation itself (speed as fps, per-frame durations, loop flag). QuadMesh size auto-derives from the first frame unless you override `texture_size`. Switch animations at runtime per volley with `play_sprite_animation()` and get a `sprite_animation_finished` signal for non-looping animations.
+```gdscript
+extends Node2D
 
-- **Custom Collision Shapes** - Support for `RectangleShape2D`, `CircleShape2D` and `CapsuleShape2D` with custom sizes.
+@onready var gun: BulletSpawner2D = $Boss/BulletSpawner2D
 
-- **Support For Custom Bullet Max Collisions Amount** - A bullet can collide multiple times before being disabled. Very useful for Bullet Hell games.
+func _ready() -> void:
+	gun.area_entered.connect(_on_bullet_hit)
 
-- **Custom Bullets Debugger** - Debug collision shapes easily to see what is going on in your game and find problems. The debugger draws every shape of every volley at all times: live bullets follow their movement, collided or disabled bullets stay visible frozen where they stopped, and even pooled volleys keep their full shape set on screen. It also survives volley frees, pool reuse and shape changes without any manual cleanup on your side.
+func _on_bullet_hit(target: Object, volley: BulletVolley2D, bullet_index: int) -> void:
+	if target.has_method("take_damage"):
+		target.take_damage(10)
+	var hit_position := volley.get_bullet_transform(bullet_index).origin
+	print("hit at ", hit_position)
+```
 
-- **Attach Timer Logic** - The ability to attach function callbacks that execute at a particular time on the entire volley with the option to be repeated over and over (safely executes code during runtime while preventing crashes that might occur with the normal timers if you don't use `call_deferred()`). This is the preferred way of manipulating bullet related data, don't use the normal Godot timers!
+- `area_entered` fires for `Area2D` targets (recommended: give players and enemies a hurtbox `Area2D`). `body_entered` fires for physics bodies, and needs **Collision → Monitorable** on in the bullet data.
+- A bullet dies after **Collision → Bullet Max Collision Count** hits (default 1). `0` makes it pierce forever.
+- **Different damage per bullet type?** Put your own `Resource` in **Shared Bullets Custom Data** (or one per bullet in **All Bullets Custom Data**) and read it in the handler with `volley.bullet_get_custom_data(bullet_index)`.
 
-- **Edit Properties And Call Methods During Runtime** - Every single feature has helper methods that you can use during runtime to adjust the behavior of the bullets (change homing targets, orbiting radius, switch movement pattern, disable a bullet and so on..). Combine this with the attach timer logic and you have the most flexible bullet system ever created. Collision signals fire synchronously in the physics tick; only structural factory calls (`reset()`/`free_*()`/`populate_*()`, and `enable_volley()` with a shape change) must be deferred with `call_deferred()` - per-bullet edits apply immediately.
+## Recipes
 
-- **Teleport And Offset Support** - Instantly shift bullets with a Vector2 offset value or teleport them in global space to a new position.
+Every snippet assumes `spawner` is a `BulletSpawner2D`, `factory` your `BulletFactory2D` and `player` a `Node2D` of yours. Each property is also in the inspector under the group named in the heading.
 
-- **Set Inherited Velocity Offset** - This is the velocity that gets added to the bullets when they are spawned. Useful for creating effects like a machine gun that inherits the velocity of the player character, so that the bullets shoot out with more speed if the player is moving forward, and with less speed if the player is moving backward or standing still.
+<details open>
+<summary><b>Aim, spin, bursts and warnings</b> (Patterns, Spin, Shooting)</summary>
 
-- **Instance Shader Parameters** - Support for shaders with instance uniform variables.
-
-- **Custom Physics Interpolation logic** - Bullets will always look smooth no matter the refresh rate of the monitor/device that you are targeting. No more weird jitter and buggy choppy feel on screens above 60Hz.
-
-- **Bullet Attachments** - Seamlessly attach GPUParticles2D, CPUParticles2D or custom sprites that follow the bullet's transform with optional offsets. The use of **modern GDExtension features** like virtual methods allow you to override what happens when attachments are spawned/disabled/pooled. These custom methods get called *inside C++* to set up your bullet attachment as necessary. Example - Spawn attachments with visible particles but when they collide you have to disable the emitting and even disable visibility of extra nodes you might've attached. Super flexible and easy to use.
-
-- **Automatic Object Pooling** - Volleys and attachments are automatically pooled and reused. Pool buckets are exact `(amount of bullets, collision shape type, per-bullet colors)` triples identified by `VolleyPoolKey2D` (for example `VolleyPoolKey2D.make(200, PhysicsServer2D.SHAPE_CIRCLE)`, or `make(200, PhysicsServer2D.SHAPE_CIRCLE, true)` for colored volleys). You can manually populate (`populate_bullets_pool(key, data, instance_count)`) or free (`free_bullets_pool()`, `free_active_bullets()`, `free_disabled_bullets()`, `reset()`; pass `null` for everything or a key for one bucket), or disable the system to use your own custom logic. Every pre-populated instance is verified against its key and fully initialized before it enters the bucket, so pooled instances are always safe to reuse and safe for the debugger to visualize. You can choose the easy way of using the plugin without any care (because performance is handled for you already) OR you can delve deeper. Example: disable auto pooling, which will allow you to save your volleys into an array without fear of problems. Reuse them whenever you want with runtime functions such as `enable_bullet()`/`disable_bullet()`.
-
-- **Dynamic Sparse Set** - The plugin uses custom made data structure that is used internally for precise tracking and looping over ONLY ACTIVE volleys and ONLY THE ACTIVE bullets inside them. This reduces branching and improves performance (a pattern used in ECS engines that could be further improved in future versions of BlastBullets2D).
-
-- **Bullets Custom Data** - Attach a custom resource that the volley carries - used for storing damage, armor damage or anything else custom that should be available during collision.
-
-- **Familiar Signals** - Collisions are tracked with the typed `area_entered` / `body_entered` signals inside the BulletFactory2D node. Combine this with the bullet custom data and you can easily differentiate between types of bullets. You can even detach/attach new bullet attachments or make explosion effects while editing runtime properties inside the function callbacks.
-
-- **Extensive Documentation** - Full in-editor documentation for every function and property, accessible directly within the Godot Inspector and Script Editor.
-
-- **Even Faster Release Builds** - Release builds (`template_release`) enable Link Time Optimization (LTO) for maximum runtime performance in your exported projects. Release builds are used for both the editor and game release.
-
-- **....AND SO MUCH MORE** - Download the plugin and experiment with it right away! There is also a test_project.zip available where you can check out some of the features and benchmark against a normal Godot Area2D bullet implementation.
-
----
-
-## Advanced Data Model: Per-Bullet vs Shared vs Default
-
-Every steering feature (speed, rotation, curves, movement patterns, wobble, gravity, homing smoothing, custom data, collision counts) resolves with **one rule, everywhere**:
-
-> **per-bullet (valid) > shared (valid) > feature default.** Entry `i` drives **bullet `i` only** — never its siblings.
-
-- **Per-bullet** — one array entry per bullet in the spawn data (`all_bullet_speed_data`, `all_bullet_rotation_data`, `all_bullet_curves_data`, `all_bullet_movement_pattern_paths`, `all_bullet_wobble_data`, `all_bullet_gravity`, `all_bullets_custom_data`, ...). A short array covers only its own indices; the rest fall back. A null/wrong-type/non-finite entry is invalid and falls back for that slot only. Long-array extras are ignored.
-- **Shared** — the single fallback value (`shared_bullet_speed_data`, `shared_bullet_rotation_data`, `shared_bullet_curves_data`, `shared_movement_pattern_curve`, `shared_bullet_wobble_data`, `gravity`, ...). It fills only the gaps per-bullet left behind — valid per-bullet slots always win. Live setters (`set_shared_*`) fill once at call time; clearing shared keeps current ballistics.
-- **Default** — what a bullet does with neither: speed 0 ballistics, no curves/pattern/wobble/gravity, per-bullet homing empty, collision counts 0, custom data null (custom data **never** falls back to shared — by design).
-- **`tile_*` checkboxes (off by default)** — one opt-in box per array (`tile_all_bullet_speed_data`, `tile_all_bullet_rotation_data`, `tile_all_bullet_curves_data`, `tile_all_bullet_movement_pattern_paths/_face.../_repeats`, `tile_all_bullet_wobble_data`, `tile_all_bullet_gravity`, `tile_all_bullets_custom_data`, `tile_bullets_current_collision_count`). Checked wraps the short array (`slot i reads entry i % size`); unchecked keeps strict indexing. Invalid entries still fall back per slot even when tiling.
-- **Negative speed is legal** — negative `BulletSpeedData2D.speed` (or negative curve samples) flies backwards along the heading, clamped symmetrically to `[-max_speed, max_speed]`. NaN/Inf is always rejected. Note: Godot's `Curve` clamps points to `[min_value, max_value]`, so widen the range *before* adding negative points.
-- **Documented limits** — a fully-zero speed/rotation triple reads as an invalid-entry gap (shared fills it); all-zero shared is a silent no-op; non-finite shared aborts the fallback for the whole volley with an error; shared speed/rotation curves outrank ballistics per tick; per-bullet smoothing latches (later shared writes need `clear_per_bullet_homing_smoothing`); finished non-repeating shared patterns park at the end while finished per-bullet runs clear.
-- **Prove it live** — `debug_get_curves_info(i)` names the per-channel winner (`per`/`shared`/`none`), `debug_get_pattern_info(i)` names the pattern source plus distance/finish, `debug_get_orbiting_info(i)` names the deque source, `debug_get_wobble_info(i)` exposes the full seed, `all_bullets_get_orbiting_center/angle` and `all_bullets_get_homing_targets_amount` bulk-read ranges, and `clear_per_bullet_curves_data` / `all_bullets_clear_curves_data` mirror the smoothing clears.
-
-Example — a 4-bullet volley where slot 0 is special and the rest share: give `all_bullet_speed_data` one entry (fast, slot 0), set `shared_bullet_speed_data` (cruise, slots 1–3). Or check `tile_all_bullet_speed_data` with two entries to alternate fast/slow/fast/slow.
-
-<details>
-<summary><b>⚠️ When Not To Use BlastBullets2D</b></summary>
-
-While **BlastBullets2D** is highly optimized and feature-rich for top-down 2D games, there are a few limitations you should be aware of:
-
-- ❌ **Y-sorting is not supported**<br>
-If your game relies heavily on Y-based depth sorting (common in platformers or isometric games), this plugin may not be a good fit.
-
-- ❌ **Only `RectangleShape2D`, `CircleShape2D` and `CapsuleShape2D` are supported for collisions**<br>
-Other collision shapes fall back to a circle with an error message.
-
-- ❌ **Only Area2D like behavior**<br>
-All bullets act as `Area2D` - they are not `RigidBody2D` and don't support bouncing off of other bullets and so on. Basically you can NOT apply impulse forces. Just view them as `Area2D` bullets.
-
-- ❌**No Save/Load System**<br>
-Version 2.0 of BlastBullets2D had a saving/loading system based on custom resources that **got removed in version 3.0.** This is due to the enormous amount of features and changes that got added and the difficulty of keeping everything supported for **every type of game** and **every mix of features**, which proved very hard in practice. The recommended way is for the user to implement this logic depending on the game he's working on - you can fork the repository and begin experimenting. There are currently no plans of this getting implemented again, since people that donated or contacted me privately wanted the advanced features mostly and found the saving/loading unnecessary.
-
-   
-
-In conclusion, **BlastBullets2D is ideal for top-down shooters and arcade-style games**, but may not be suitable for other 2D genres if those specific features are essential to your project.
-
+```gdscript
+spawner.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_AIMED
+spawner.helper_aimed_target = spawner.get_path_to(player)   # aims a cone at the player, with lead
+spawner.spin_enabled = true                                # turn the whole pattern while firing
+spawner.spin_speed_deg_per_sec = 90.0
+spawner.burst_enabled = true                               # 3 quick shots, then a pause
+spawner.burst_count = 3
+spawner.burst_interval_sec = 0.1
+spawner.telegraph_enabled = true                           # volley_telegraphed fires 0.5 s before each shot
+spawner.telegraph_sec = 0.5
+spawner.max_live_bullets = 400                             # skip shots while 400 of its bullets fly
+```
 </details>
 
----
+<details>
+<summary><b>Homing bullets</b> (Homing, Orbiting)</summary>
 
-## How To Install
-#### BlastBullets2D targets <b>Godot Engine 4.5+</b> (tested on 4.7). As long as there are no breaking changes to GDExtension in the future, then it should work for all future Godot releases.
-
-1. Go in [Releases](https://github.com/nikoladevelops/godot-blast-bullets-2d/releases) and on the latest release click and download `blastbullets2d.zip`
-
-Note: <b>BlastBullets2D</b> is also available in: [Godot Asset Library](https://godotengine.org/asset-library/asset/2632) and [Itch.io](https://realnikich.itch.io/blastbullets2d).
-
-2. Extract the zip and you will get a single folder `blastbullets2d`
-3. Open your <b>Godot</b> game project and paste the folder inside. No matter if you place it inside an `addons` folder or the root of the project, the plugin will still work
-
-
-
-The compiled plugin files have been loaded and you are ready to begin coding!
-
-All functions and properties have been documented <b>INSIDE THE EDITOR</b>, so it will be extremely easy for you to take full advantage of all features.
-
-If you want to benchmark/compare performance of `BlastBullets2D` bullets to `Area2D` bullets you can download the second zip file `test_project.zip` that contains the test project showcased in the gif and in the videos on my [Youtube Channel](https://www.youtube.com/@realnikich). I will post some tutorials there.
-
----
-## How To Use
-When designing the API, I've ensured that it's as easy as possible for anyone no matter the skill level to use this plugin.
-
-It is recommended to watch these tutorials if you are struggling with the documentation:
-
-[BlastBullets2D TUTORIAL PART 1](https://www.youtube.com/watch?v=L10sHF4BnLs)
-
-[BlastBullets2D TUTORIAL PART 2](https://www.youtube.com/watch?v=R2olIyF7aPQ)
-
-Here is how the basic setup goes:
-1. Add a `BulletFactory2D` node to your scene tree. The BulletFactory's job is to spawn bullets and manage plugin related options (debugger, physics interpolations and so on..).
-2. The `BulletFactory2D` node has the typed signals `area_entered`, `body_entered`, `life_time_over` (plus `bounce_area_entered` / `bounce_body_entered`), and each volley emits `sprite_animation_finished` when a non-looping animation ends. A `BulletSpawner2D` declares the same signals for the volleys it fires. The instance argument is already typed (`BulletVolley2D`), so handlers need no casts - custom data and transforms are one instance call away (`bullet_get_custom_data()`, `get_bullet_transform()`). Collision signals fire synchronously in the physics tick; only structural factory calls (`reset()`/`free_*()`/`populate_*()`) must be deferred, and the error message tells you when that happens. You should handle them in your script and write custom logic for your game.
-
-Keep a reference to the factory globally, so you can access it in any other script(enemies/player). There's two ways of doing this.
-
-The first way would be to create an [Autoload/Singleton](https://docs.godotengine.org/en/stable/tutorials/scripting/singletons_autoload.html) where you keep the factory as a variable.
-
-The second way would be to create a class with a static variable that keeps the reference of the factory. This approach is the one I'll be using, since you can put your Invetory, UI and other stuff you plan on supporting.
-
-Example:
-
-```
-# globals.gd - script for global variables
-
-class_name GLOBALS
-
-static var BULLET_FACTORY:BulletFactory2D
-
-```
-
-Then inside your main level script, you need to save the reference of your factory inside the `BULLET_FACTORY` static variable like so:
-```
-# main.gd - script of the main scene, where the factory is located
-
-extends Node
-
-func _ready():
-	GLOBALS.BULLET_FACTORY = $BulletFactory2D # save a reference to the factory
-
-```
-
-Now the factory can be accessed through any script by doing this
-```
-# myscript.gd - script where you need to spawn bullets (enemy/player)
-
-func spawn_bullets()->void:
-	GLOBALS.BULLET_FACTORY.spawn_volley(bullets_data)
-```
-
-3. Use the `BulletFactory2D`'s functions to spawn bullets in any other script.
-
-#### If you want aimed patterns without writing any math, use `BulletSpawner2D`<br>
-
-`BulletSpawner2D` is a `Node2D` that owns the whole firing loop: it builds one global `Transform2D` per bullet from `pattern_source`, then spawns through the factory. Point `bullet_factory_path` at your factory, assign `spawn_data`, and either call `shoot_once()` yourself or turn on `shooting_enabled` for the timed auto loop (`shoot_interval_sec`, `shoot_initial_delay_sec`, `max_volleys`, `reload_jitter_sec`).
-
-- **33 pattern sources** - `From Children` (one transform per `Node2D` child marker), `From Self` (single bullet), `Path2D` (bullets laid along any curve you draw), `Custom` (your own transform array), plus procedural helpers, each in its own inspector subgroup: `Circle`, `Square`, `Rectangle`, `Triangle`, `Diamond`, `Trapezoid`, `Polygon`, `Star Polygon`, `Grid`, `Ring`, `Fan` (with `helper_fan_angle_jitter` shotgun spread), `Spiral`, `Multi Spiral`, `Counter Spiral` (twin counter-rotating arms), `Line`, `Aimed` (aims a cone at `helper_aimed_target`, with velocity prediction), `Flower`, `Ellipse` (ring / arc / wall-with-gaps), `Rain`, `Scatter`, `Cross`, `Star`, `Heart`, `Wave`, `Waterfall`, `Lattice`, `Rose` (exact rhodonea bloom), `Corridor` (dense wall with a carved center dodge door, steered by the aimed target when set), `Lissajous` (figure-8 weave). Closed shapes can also be drawn as nested outline layers or filled. Every helper draws exactly `helper_bullets_amount` bullets, each on its own spot (the flower splits them evenly over its petals; gap walls and fills keep the full count). Pipeline per volley: generate, then spin, then `transforms_scale`, then `helper_skip_indices` carving (slot indexes dropped after spin/scale, so they match the editor preview - use them for extra dodge doors or bullet text).
-- **Starter presets** - `apply_pattern_preset()` fills the `helper_*` properties and switches `pattern_source` for 20 one-call patterns (`PatternPreset`: radial dense/sparse, 3-arm spiral, narrow/wide aimed fan, slow ring, gap wall, rain, 6-petal flower, scatter/cross/star/heart/snake/waterfall, petal storm via Rose, twin counter-spiral, aimed trap via Corridor, blossom finale via Rose, terrain crest via Custom). Presets are clean (pattern knobs and spin reset first, so the same preset always looks the same); tune from there. Nothing fires.
-- **Motion and phrasing** - `spin_enabled` (`SPIN_CONTINUOUS` at `spin_speed_deg_per_sec`, or `SPIN_OSCILLATE` with amplitude/frequency), `spawn_position_offset` muzzle nudge (`spawn_position_offset_space`: Global, or Local so the muzzle turns with the spawner), `burst_enabled` / `burst_count` / `burst_interval_sec` / `burst_alternate_mirror`, and `telegraph_enabled` / `telegraph_sec` warnings (`volley_telegraphed` fires first, the real shot re-collects transforms so moving markers still aim right).
-- **Sequencer** - `spawn_pattern_list(entries, simultaneous, interval_sec)` queues boss phases from Dictionaries with `preset` / `pattern_source` / `helper_bullets_amount` / `spawn_data` keys (each entry is a temporary override: the spawner returns to its own settings afterwards; unknown keys are reported with a did-you-mean suggestion); sequential mode fires one entry per interval and emits `pattern_list_finished`, simultaneous mode fires all at once and returns the fired count.
-- **Live preview** - `show_pattern_preview` draws one dot plus one facing arrow per bullet in the editor (follows the generator live, never saved to the scene); `show_preview_during_runtime` keeps it during play. Spinning or moving the spawner costs nothing extra: the preview is re-posed, never redrawn.
-- **Movement along a Path2D** - `movement_enabled` makes the spawner itself travel a `Path2D` at runtime: timed by duration or speed, eased with any Tween transition/ease (or your own progress `Curve`), Once / Loop / Ping Pong, forward or reverse, attached to the path or replayed from the start position, optional face-the-path rotation, start delay, endpoint pauses, and bullets that inherit the spawner's velocity. Control it from code with `movement_play()` / `movement_pause()` / `movement_stop()` / `movement_seek()` / `movement_reverse()` and the `movement_*` signals.
-- **Pattern bake cache** - patterns are generated once and re-posed per shot whenever they provably follow the spawner, and rebaked automatically when any pattern property changes (`pattern_cache_mode`, group Performance). Moving or spinning spawners stay cheap with thousands of bullets.
-- **Setup help** - the editor shows a warning icon for missing wiring (no factory, no spawn data, Aimed without a target, movement without a path, ...); `get_setup_warnings()` returns the same list at runtime, and a misconfigured auto-firing spawner reports its error once instead of every interval.
-- **Graze, configured per spawner** - `graze_enabled` + `graze_zones` (up to 4 `GrazeZone2D` resources, up to 4 ring radii each) arm every fired volley; `graze_target_source` decides who grazes: a node group, a node path, a node name, a node's children, the mouse, or a list of global positions (`graze_global_positions`). `bullet_grazed(target, volley, bullet_index, zone, ring_index)` and `bullet_graze_exited(...)` fire live on the spawner while it lives, then on the factory, which hears every graze in the game (`target` is null for the mouse and global positions). `graze_show_preview` draws the rings around each target in the editor (`graze_preview_during_runtime` for play).
-- **Homing and orbiting, configured per spawner** - `homing_enabled` with shared or per-bullet queues, six target sources (node group, mouse, global position, node path, node name, children), steering (`homing_smoothing`, `homing_update_interval`, `homing_delay_sec`, `homing_duration_sec`, `homing_lose_range_px`), interval retargeting of flying volleys, and `orbiting_enabled` rings with radius/direction/follow/lock controls. Every volley is tracked for `retarget_live_volleys()`, `clear_live_volleys_homing()`, and `volley_*` signals; `max_live_bullets` pauses firing while too many of this spawner's bullets are alive.
-
-Full property and method reference for all of the above lives in the editor docs (`BulletSpawner2D`, `BulletFactory2D`).
-
-#### Profiling your bullets
-`BulletFactory2D` registers live `BlastBullets2D/*` custom monitors (active bullets and volleys, physics tick time, interpolation time, effects, attachments). Run your game and open the editor's **Debugger > Monitors** tab to see which frames are heavy. From code, `get_frame_stats()` and `get_active_bullet_count()` return the same numbers.
-
-#### Spawning bullets<br>
-- <b>`spawn_volley(data)`</b> - Spawns one volley (a `BulletVolley2D`): one bullet per entry of `data.transforms`, each flying along its transform's rotation with its own speed. Ignore the return value for fire-and-forget bullets, or keep the returned `BulletVolley2D` to steer the bullets at runtime - this is where all the advanced features live: homing, orbiting, bullet curves, attachments, movement patterns, teleporting, timers, object pooling options and so on.
-
-#### How to configure `BulletVolleyData2D`?
-
-The spawn functions require a `BulletVolleyData2D`.
-It's important that you always check its in-engine documentation.<br>
-
-The same goes for the `BulletVolley2D` class, which holds the runtime properties and helper functions of a live volley. The documentation is always there to help you!
-
-
-The `BulletVolleyData2D` resource needs its `transforms` property set to an array of `Transform2D` - this data determines the global position and rotation of all bullets. The amount of `Transform2D` will also determine the amount of bullets that need to be spawned.
-
-A smart way is to generate these transforms using a bunch of `Marker2D` nodes as children of your player (that is supposed to shoot bullets). This way, as he moves the markers will also move along with him. The only thing you need to do is get all these marker2d's transforms, store them in an array and set it to the bullets data resource class each time you need to spawn bullets. Having a shoot cooldown timer would be nice too.
-
-Only thing is your bullets are invisible and have no collision shape size set..
-So how about start playing around with all the properties the data class provides?
-
-Code example:
-```
-# Returns a partially set up BulletVolleyData2D, only thing left to do is set a new value to the .transforms property when the fire cooldown timer times out and you are ready to spawn a new batch of bullets..
-func set_up_volley_data()->BulletVolleyData2D:
-	var data:BulletVolleyData2D = BulletVolleyData2D.new()
-	# Build a SpriteFrames animation (plain textures or AtlasTexture regions work).
-	# WARNING: Make sure your textures are FACING the Vector2.RIGHT direction when you draw them (basically your bullets should be facing right)
-	# If you have to, go through each texture and rotate it manually with an image editor and only then load them all in Godot.
-	var frames := SpriteFrames.new()
-	frames.add_animation(&"default")
-	frames.set_animation_speed(&"default", 11.0) # fps; each frame shows for duration / fps seconds
-	frames.set_animation_loop(&"default", true)
-	for tex in rocket_textures:
-		frames.add_frame(&"default", tex)
-	data.sprite_frames = frames
-	data.animation = &"default" # empty also works: plays "default" if present, else the first animation
-	
-	
-	data.all_bullet_speed_data = bullet_speed_data # every bullet uses its own speed entry
-	
-	data.set_collision_layer_from_array([2])
-	data.set_collision_mask_from_array([3])
-
-	data.texture_size = Vector2(140,140) # QuadMesh override; use Vector2(0,0) to auto-size from the first frame
-	data.collision_shape_offset=Vector2(0,0)
-	data.max_life_time = 2
-	data.all_bullet_rotation_data = bullet_rotation_data
-	data.shared_bullets_custom_data = damage_data # shared by the whole volley; use all_bullets_custom_data for per-bullet resources, read with bullet_get_custom_data(index)
-	#data.is_life_time_over_signal_enabled = true # If you want to track when the life time is over and receive a signal inside BulletFactory2D
-	
-	return data
-```
-
-#### How do we handle collision and bullet damage?<br>
-Notice the ``data.shared_bullets_custom_data = damage_data``. This is a custom resource class instance that you should create. The data it holds can help you differentiate between types of bullets and damage. Use `shared_bullets_custom_data` for one resource shared by the whole volley, or `all_bullets_custom_data` (array) for per-bullet resources; read either slot with `bullet_get_custom_data(index)` on the volley.
-
-Example:
-
-
-```
-class_name DamageData
-extends Resource
-
-# The base damage amount
-@export var base_damage:int
-# Whether the bullet was spawned from the player
-@export var is_player_owned:bool
-```
-
-
-Next up go inside the ``BulletFactory2D`` node and register callbacks for the signals ``area_entered``, ``body_entered`` and even ``life_time_over`` if you are interested in it.
-
-Example:
-
-```
-# This function is connected to the area_entered signal of the bullet factory. It is executed each time a bullet spawned from the factory hits an Area2D (and again in order for a thing to be hit, ensure the layers are correct!)
-func _on_area_entered(hit_target_area: Object, volley: BulletVolley2D, bullet_index: int) -> void:	
-	if hit_target_area is AbstractEnemy:
-		var dmg_data:DamageData = volley.bullet_get_custom_data(bullet_index) as DamageData # We know for a fact that we have a DamageData inside our bullets, because that's how we've set them up before spawning them - we can replace it with some other custom resource instead and check for its type here too (we may spawn bullets with different custom data and have additional check logic)
-		if dmg_data.is_player_owned == false: # If it wasn't the player who spawned the bullet, then that means an enemy is hitting another enemy - I want the bullet to disappear without it damaging the enemy (No friendly fire :P)
-			return
-		hit_target_area.take_damage(dmg_data.base_damage) # You can do way more complex damage logic with the rest of the properties inside bullets_custom_data, you can do anything..
-		#print("Bullet just collided with an enemy area")
-	#else:
-		#print("Bullet just collided with an area")
-
-# This function is connected to the body_entered signal of the bullet factory.  It is executed each time a bullet spawned from the factory hits a body (and again in order for a thing to be hit, ensure the layers are correct and you also have enabled the .monitorable property inside bullets data!)
-func _on_body_entered(hit_target_body: Object, volley: BulletVolley2D, bullet_index: int) -> void:
-	if hit_target_body is Player:
-		var dmg_data:DamageData = volley.bullet_get_custom_data(bullet_index) as DamageData
-		hit_target_body.take_damage(dmg_data.base_damage)
-		
-	#print("Bullet just collided with a body")
-
-# Works only if data.is_life_time_over_signal_enabled set to true
-func _on_life_time_over(_volley: BulletVolley2D, _bullet_indexes: Array[int]) -> void:
-	pass
-```
-
-
-#### Graze (near misses)<br>
-Make one `GrazeZone2D` resource (`ring_count`, `ring_1_radius`...), then on every enemy spawner turn on `graze_enabled`, add the zone to `graze_zones` and say who grazes: put your player in a group and name it in `graze_node_group` (the default Node Group source), or pick another `graze_target_source` (Node Path, Node Name, Node Children, Mouse, Global Positions). Volleys spawned straight from the factory use `volley.graze_set_zones([zone], &"player")`. Connect the factory once:
-
-```
-# Every graze in the game, whoever fired the bullet (even an enemy that already died).
-func _on_bullet_grazed(target: Node2D, volley: BulletVolley2D, bullet_index: int, zone: GrazeZone2D, ring_index: int) -> void:
-	score += 10 if ring_index == 0 else 50 # ring 1 is the tight one in this zone
-	# The bullet is alive here: read or change it through the volley.
-	var hit_pos := volley.get_bullet_transform(bullet_index).origin
-	spawn_graze_spark(hit_pos)
-
-# Optional: the bullet left the zone alive (deepest_ring_index = closest ring it reached).
-func _on_bullet_graze_exited(target: Node2D, volley: BulletVolley2D, bullet_index: int, zone: GrazeZone2D, deepest_ring_index: int) -> void:
-	pass
-```
-
-Each ring grazes once per bullet by default (`regraze = Once`); `After Exit` re-grazes every time a bullet comes back. Edit the zone at runtime (a power-up widening `ring_1_radius`) and every bullet in flight follows it.
-
-To tune ring sizes while the game runs, tick `graze_preview_during_runtime` on one spawner that uses the zone: it draws the rings around your player, and edits made from a script or the remote inspector show at once. It is off by default and costs nothing while off.
-
-#### World controls, randomization and pickups<br>
 ```gdscript
-factory.time_scale = 0.3                       # slow motion: spawners, bullets, attachments, effects
-boss_spawner.time_scale = 0.5                  # factory 0.3 x spawner 0.5 = 0.15 for this boss
-factory.despawn_bounds_enabled = true          # the rectangle is drawn in the editor (despawn_bounds_preview_during_runtime for play)
-factory.bullets_despawned.connect(func(positions, volley, indexes): pass)
-
-spawner.bullet_scale_mode = BulletSpawner2D.BULLET_SCALE_UNIFORM   # random size per bullet
-spawner.bullet_scale_min = 0.7
-spawner.bullet_scale_max = 1.6
-spawner.bullet_random_seed = 1234                           # 0 = Godot's global RNG
-
-var coin := BulletPickupData2D.new()
-coin.sprite_frames = preload("res://coin_frames.tres")      # animated look
-coin.animation = &"spin"
-coin.collect_radius = 20.0
-coin.value = 10
-factory.pickup_collected.connect(func(target, pos, volley, idx, value): score += value)
-factory.convert_all_bullets_to_pickups(coin, player)        # bomb: any Node2D, Vector2, null (mouse) or group name
-boss.convert_live_bullets_to_pickups(coin, player)          # only one spawner's bullets
+player.add_to_group(&"player")
+spawner.homing_enabled = true
+spawner.homing_target_source = BulletSpawner2D.HOMING_SOURCE_NODE_GROUP
+spawner.homing_node_group = &"player"
+spawner.homing_smoothing = 4.0         # 0 snaps, higher turns more gently
+spawner.homing_duration_sec = 2.0      # stop steering after 2 s (0 = forever)
+spawner.home_live_volleys_to(player)   # re-aim bullets already flying
 ```
-`motion_mode` picks how pickups move (Burst And Magnet, Keep Bullet Motion, Custom with your own `speed_data`). Pickups obey the despawn bounds unless `obey_despawn_bounds` is off. Call the `*_deferred` twins from signal handlers, and pre-warm with `factory.populate_pickup_pool(coin, bullet_count, n)`.
+Bullets can also circle their target: turn on `orbiting_enabled`. `print("\n".join(spawner.debug_explain_features()))` explains in plain sentences what homing, orbiting and flocking will do with the current settings.
+</details>
 
-#### Runtime control and readouts<br>
+<details>
+<summary><b>Graze (near misses)</b> (Graze)</summary>
+
+Create a `GrazeZone2D` resource (one to four ring radii around the player), then:
+
 ```gdscript
-boss.teleport(Vector2(640, 120), true)            # jump without a velocity kick (a playing Path2D keeps its shape); true carries its live bullets
-boss.set_spin_angle_deg(90.0)                     # Continuous spin: aim the pattern now
-boss.shoot_once_with({"pattern_source": BulletSpawner2D.PATTERN_FROM_HELPER_FAN, "helper_bullets_amount": 12})  # one shot, settings restored after
-var next_shot := boss.get_shoot_time_left()       # also get_burst_time_left, get_telegraph_time_left, get_pattern_list_time_left
-boss.graze_zones = [wide_zone]
-boss.apply_to_live_volleys(BulletSpawner2D.LIVE_GRAZE)  # bullets in flight take the new zones (LIVE_ALL: every group)
-boss.home_live_volleys_to(player)                 # every bullet of this boss chases the player now (Node2D, Vector2, group, null = mouse)
-boss.volley_time_scale = 0.0                      # time stop for its bullets; the boss keeps moving
-boss.shoot_from(weak_point.global_transform)      # the whole pattern from any transform
-
-volley.set_bullet_speed(i, 50.0)                  # get_bullet_speed, all_bullets_set_speed
-volley.set_bullet_scale(i, Vector2(2, 2))         # the hitbox grows with the bullet
-volley.set_sprite_frame(0)                        # seek like AnimatedSprite2D.frame
-var shooter := volley.get_owner_spawner()         # null for factory bullets, orphans and pooled volleys
-for found in factory.get_bullets_in_circle(bomb_position, 120.0):  # also get_bullets_in_rect, get_active_volleys
-	for i in found["bullet_indexes"]:
-		found["volley"].set_bullet_speed(i, 20.0)
+spawner.graze_enabled = true
+spawner.graze_zones = [preload("res://graze_zone.tres")]
+spawner.graze_node_group = &"player"          # who can be grazed
+factory.bullet_grazed.connect(func(target, volley, bullet_index, zone, ring_index):
+	score += 10 * (ring_index + 1))
 ```
+Graze always reaches the factory too, so one handler counts every graze in the game, even of enemies that already died. The editor draws the rings around your player.
+</details>
 
-#### Lasers<br>
-Add a `LaserSpawner2D` (it has every pattern, cadence, spin and movement setting of `BulletSpawner2D`) and give it a `LaserData2D`, or pick a preset in the inspector:
+<details>
+<summary><b>Lasers</b> (LaserSpawner2D)</summary>
+
+Add a `LaserSpawner2D`: it has every pattern, timing, spin and movement setting of `BulletSpawner2D` and fires one laser per pattern slot. Pick a **Laser Data** preset in the inspector, or in code:
+
 ```gdscript
+var lasers: LaserSpawner2D = $Boss/LaserSpawner2D
 var laser := LaserData2D.create_preset(LaserData2D.PRESET_CHARGED_SWEEP)
-laser.collision_mask = 2                          # what it hits (bodies and areas)
-laser.wall_mask = 1                               # what stops it (reflections = 2 bounces it off two walls first)
-laser.hit_interval_sec = 0.1                      # laser_hit repeats while a target stays in the beam
-$BossLasers.laser_data = laser
-$BossLasers.laser_hit.connect(func(target, beam_laser, beam_index, position): target.take_damage(2))
-$BossLasers.laser_pierce_started.connect(func(target, beam_laser, beam_index, position): target.start_burning())
-$BossLasers.laser_pierce_ended.connect(func(target, beam_laser, beam_index): target.stop_burning())
-
-# Lock-on lasers end right on the player (PRESET_HOMING_CURVY: snakes that chase it).
-$Snipers.laser_data = LaserData2D.create_preset(LaserData2D.PRESET_LOCK_ON)
-$Snipers.laser_target_source = LaserSpawner2D.LASER_TARGET_NODE_GROUP
-$Snipers.laser_target_group = &"player"       # each beam aims at the nearest member
-
-# From a script: one beam per transform, following an anchor node.
-var beams: Array[Transform2D] = [Transform2D(0.0, muzzle.global_position)]
-var beam := factory.spawn_laser(laser, beams, muzzle)
-beam.end_laser()                                  # fade out now (end_laser(false): at once)
-
-beam.set_custom_data({"damage": 3})              # read it in any laser signal; the pool clears it
-factory.end_lasers_in_circle(bomb_position, 150.0)  # a bomb: every laser crossing it fades (legal in handlers)
-factory.populate_lasers_pool(12, 4)              # no first-shot hitch: 4 lasers of 12 beams (one per slot)
-$BossLasers.apply_to_live_lasers()               # settings changed mid-fight: re-arm graze/sound, retarget
+laser.collision_mask = 2                # what it hurts
+laser.wall_mask = 1                     # what stops it
+laser.hit_interval_sec = 0.1            # laser_hit repeats while a target stays in the beam
+lasers.laser_data = laser
+lasers.laser_hit.connect(func(target, laser_volley, beam_index, hit_position):
+	if target.has_method("take_damage"):
+		target.take_damage(2))
 ```
+Presets: instant beam, charged sweep, wall beam, reflecting beam, bolt, homing curvy laser, lock-on.
+</details>
 
-#### Emitter bullets<br>
+<details>
+<summary><b>Coins and slow motion</b> (World controls, pickups)</summary>
+
 ```gdscript
-# Every bullet of $Boss fires $Sparks's whole pattern every 0.3 s, twice, along its flight.
-$Sparks.shooting_enabled = false                  # the template only fires from the bullets
-var timing := BulletEmitterData2D.new()
-timing.interval_sec = 0.3
-timing.max_shots = 2
-timing.spin_per_shot_degrees = 15.0               # each shot turns a little further: spirals
-$Boss.emitter = timing
-$Boss.emitter_spawner_path = $Boss.get_path_to($Sparks)   # a LaserSpawner2D works too: bullets that fire lasers
-$Boss.emitter_enabled = true
-```
+var coin := BulletPickupData2D.new()
+coin.sprite_frames = preload("res://coin_frames.tres")
+coin.value = 1
+factory.pickup_collected.connect(func(target, at, volley, bullet_index, value):
+	score += value)
+factory.convert_all_bullets_to_pickups(coin, player)   # a bomb: every bullet becomes a coin flying to the player
 
-#### Colors, lifetimes and scale-in<br>
+factory.time_scale = 0.3                               # slow motion for every bullet, spawner and effect
+spawner.time_scale = 0.5                               # this spawner even slower (0.3 x 0.5)
+factory.clear_active_bullets()                         # wipe the screen (player death, phase change)
+```
+</details>
+
+<details>
+<summary><b>Bullets that fire bullets, split or flock</b> (Emitter Bullets, Splitting, Flocking)</summary>
+
 ```gdscript
-$Boss.bullet_color_mode = BulletSpawner2D.COLOR_MODE_GRADIENT_ACROSS_PATTERN  # a rainbow ring (empty gradient = rainbow)
-$Boss.bullet_color_shift_per_shot = 0.1                                         # and it turns from shot to shot
-$Boss.bullet_life_time_scale_min = 0.5                                          # every bullet lives 0.5x .. 1.5x max_life_time
-$Boss.bullet_life_time_scale_max = 1.5
-data.scale_in_sec = 0.15                                                        # bullets pop in from 10 % of their size
-volley.set_bullet_color(i, Color.GOLD)                                          # needs data.use_bullet_colors (or a color mode)
-volley.set_bullet_life_time_left(i, 2.0)                                        # this bullet lives 2 more seconds
+# Every bullet of `spawner` fires the whole pattern of `sparks` while it flies.
+sparks.shooting_enabled = false                        # sparks only fires from the bullets
+spawner.emitter = BulletEmitterData2D.new()            # interval, delay, shot limit, spin per shot
+spawner.emitter_spawner_path = spawner.get_path_to(sparks)   # a LaserSpawner2D works too
+spawner.emitter_enabled = true
+
+spawner.split_enabled = true                           # bullets burst into children when they die
+spawner.split_data = BulletSplitData2D.create_preset(BulletSplitData2D.PRESET_BURST_RING)
+
+spawner.flock_enabled = true                           # boids: bullets swarm and keep their distance
 ```
+</details>
 
-#### Accessing advanced features
+<details>
+<summary><b>Boss phases</b> (pattern lists)</summary>
 
+```gdscript
+spawner.pattern_list_finished.connect(_next_phase)
+spawner.spawn_pattern_list([
+	{"preset": BulletPatterns2D.PATTERN_PRESET_RADIAL_DENSE},
+	{"preset": BulletPatterns2D.PATTERN_PRESET_SPIRAL_3ARM, "helper_bullets_amount": 30},
+	{"pattern_source": BulletSpawner2D.PATTERN_FROM_HELPER_FAN, "helper_bullets_amount": 12},
+], false, 0.5)                                         # one entry every 0.5 s
+spawner.shoot_once_with({"helper_bullets_amount": 64})  # one special shot; settings restored after
 ```
-# All this code is inside a function that you call each time you spawn bullets..
-# Note the .transforms of the volley_data class is edited outside this, each time the player shoots..
+</details>
 
-var volley:BulletVolley2D = BENCHMARK_GLOBALS.FACTORY.spawn_volley(volley_data)
+## Spawning from code
 
-# Homing Functionality
-# We have a shared homing deque and a per-bullet homing deque. Depends on what you need
+For one-off effects you can skip the spawner. Build the transforms (where and which way each bullet starts) and spawn:
 
-# Settings
-volley.homing_smoothing = 0.0# Set from 0 to 20 or even bigger (but you might have issues with interpolation)
-volley.homing_update_interval = 0.00# Set an update timer - keep it low for smooth updates
-volley.homing_take_control_of_texture_rotation = true
-volley.homing_distance_before_reached = 50 # instead of always going to the center of the texture, this acts like radius offset
-volley.bullet_homing_auto_pop_after_target_reached = false # should it automatically go to the next target in the deque or keep homing even if it had reached the target
-volley.shared_homing_deque_auto_pop_after_target_reached = false
-
-# When target gets reached do this..
-volley.bullet_homing_target_reached.connect(func():
-	print("Hey I reached the target..")
-)
-
-
-# Push actual target (choose per-bullet homing or shared or even both).
-# Note that shared homing deque takes precedence, until its empty it won't target the per bullet homing deque..
-
-#volley.shared_homing_deque_push_back_node2d_target(target1) # shared homing
-#volley.bullet_homing_push_back_node2d_target(bullet_index, target1) # per-bullet homing
-#volley.all_bullets_push_back_homing_target(target1) # per-bullet homing helper function with range
-# Check out all the docs in the engine where you can push the Mouse or a global position target as the homing target.
-
-# Orbiting
-#volley.bullet_enable_orbiting(...)
-#volley.all_bullets_enable_orbiting(...)
-
-# Bullet Curves Data - Takes precedence over BulletSpeedData2D and BulletRotationData2D
-# Note that you should create a BulletCurvesData2D resource in the editor and configure it first
-#In FileSystem -> Right Click With Mouse -> New Resource -> Search And Select BulletCurvesData2D. Configure it to your liking.
-
-# Next here in code just do this
-#volley.bullet_set_curves_data(...)
-#volley.all_bullets_set_curves_data(...)
-
-# Movement Patterns
-# Note that you should create a Path2D inside your scene and place it/ draw a few points to make a nice pattern.
-
-# Get a reference of it and call these:
-#volley.set_bullet_movement_pattern_from_path(...)
-#volley.all_bullets_set_movement_pattern_from_path(...)
-
-# Bullet attachments - attaching GPU particles and other custom nodes to follow the bullets..
-
-# Create a brand new scene and make sure the type is set to BulletAttachment2D. Very important!
-# Place particles or anything you want inside
-# Next override the BulletAttachment2D functions ``on_bullet_disable()``, ``on_bullet_enable()``, ``on_bullet_spawn()``, ``on_spawn_in_pool()`` and (for tree setup) ``_ready()`` and implement custom logic to your liking.
-#(Check out the test_project.zip for examples).
-
-# Load the BulletAttachment2D a PackedScene, then do this:
-#volley.bullet_set_attachment(...)
-#volley.all_bullets_set_attachment(...)
-
-
-# Attach timer related functions
-# Imagine wanting to change the movement pattern at a specific time, or you want your bullets to home towards another target or you want to switch textures and so on..
-
-# To edit runtime properties safely at a specific time, use this function:
-#volley.attach_time_based_function(0.5, func():
-	# custom code goes here
-	# change orbiting radius, do anything basically..
-#)
-
+```gdscript
+var data: BulletVolleyData2D = preload("res://bullets/spark.tres")
+data = data.duplicate()     # never edit a shared resource: every user of it would change
+data.transforms = BulletPatterns2D.helper_generate_transforms_ring(24, Transform2D(0.0, global_position))
+var volley := factory.spawn_volley(data)
+volley.all_bullets_set_speed(300.0, 0, -1)   # steer it afterwards (0, -1 = every bullet): speed, homing, colors, teleport...
 ```
+Every pattern of the spawner is a static `BulletPatterns2D.helper_generate_transforms_*` function, and `BulletVolley2D` has runtime control for every feature (see its in-editor docs). Factory-spawned bullets report their hits on the factory's signals.
 
+## Performance
 
-This is pretty much everything you need to know to get started. Practice with the plugin by looking at the in-engine docs!
+- **Fewer, bigger volleys beat many tiny ones.** One volley is one draw call and one physics area; a pattern of 200 bullets is one volley.
+- **Keep volley sizes steady.** The pool reuses volleys with the exact same bullet count and shape. Pre-warm a size at load time: `factory.populate_bullets_pool(factory.debug_expected_pool_key(data), data, 5)`.
+- **Use `Area2D` hurtboxes** for players and enemies. Physics bodies need `monitorable` on and cost more.
+- **Smooth motion on 120 Hz+ screens:** turn on *Project Settings → Physics → Common → Physics Interpolation*; the factory follows it (`physics_interpolation`).
+- **Measure:** the factory registers live monitors (*Debugger → Monitors → BlastBullets2D*) and `factory.get_frame_stats()` returns the same numbers. Tick `is_debugger_enabled` on the factory to see every hitbox.
+- **The 20,000 limit:** one volley holds at most 20,000 bullets by default (project setting `blastbullets2d/patterns/max_bullets_per_pattern`). It exists because one volley is one physics area, and Godot's broadphase stalls on tens of thousands of tightly packed shapes. For bigger barrages fire several smaller volleys.
 
-You can also download the `test_project.zip` from the latest release and get a feel for it by modifying the `player_data_node.gd` script.
+## Limits
 
-For smooth bullets no matter the refresh rate enable physics interpolation in your project settings as well as
-tick the checkbox inside the inspector in `BulletFactory2D`. That's all, enjoy the plugin!
+Know these before you build a game around the plugin:
 
-## WARNING
-- Scripts on `BulletFactory2D`, `BulletSpawner2D` and `LaserSpawner2D` may define their own `_ready()`, `_process()` and `_physics_process()`: the plugin runs its own work from notifications, so both run (no `super._ready()` needed; GDScript refuses it on these classes anyway).
-- Use `queue_free()` when you delete a volley or a bullet attachment yourself, never `free()`. Especially never call `free()` on a volley from inside one of its own collision or attachment callbacks (for example inside `area_entered` or `on_bullet_disable`). `queue_free()` is always safe in those situations. From any callback prefer `factory.free_volley_deferred(volley)`.
-- Structural factory calls (`reset()`/`free_*()`/`populate_*()`) reject inside physics frames/sweeps. From handlers use the deferred variants: `reset_deferred()`, `free_active_bullets_deferred()`, `free_disabled_bullets_deferred()`, `free_bullets_pool_deferred()`, `populate_bullets_pool_deferred()`, `free_attachments_pool(_for_scene)_deferred()`.
-- Cross-owner reuse must go through `spawn_*()` / `enable_volley()` (which re-seed appearance, custom data, speeds and patterns). `enable_bullet()` wakes a pooled instance with its current appearance/custom-data intact - intended for same-owner re-enable, not for handing a volley to a new owner.
-- Pooling flags reset to defaults on every new life (`spawn`/`enable_volley`). Set `is_auto_pooling_enabled` / `is_attachments_auto_pooling_enabled` explicitly after each spawn when you want manual ownership. Same-owner `enable_bullet()` wakes keep flags by design.
-- Pool buckets are exact `(amount_bullets, shape)` pairs. Use `BulletFactory2D.debug_expected_pool_key(data)` and `debug_get_pool_hit_stats()` / `debug_get_bullets_pool_info()` to diagnose 0% pool hits (e.g. `helper_skip_indices` shrank transforms after `populate`). `validate` first with `BulletFactory2D.debug_validate_spawn_data(data)`.
-- Smooth bullets: enable ProjectSettings `physics/common/physics_interpolation`; the factory's `physics_interpolation` follows it by default (Follow Project; On / Off override it). Check `factory.debug_check_interpolation_status()` when motion looks steppy. Art must face `Vector2.RIGHT`; invisible bullets (no `sprite_frames`/`mesh`/`texture_size`) now warn via `debug_validate_spawn_data()`.
-- `VolleyPoolKey2D.make()` returns `null` on invalid input instead of a default bucket.
+- **No Y-sorting.** A volley draws as one canvas item, so bullets cannot sort between your Y-sorted characters. Use `z_index` (Rendering and Material) to put bullets above or below them. Top-down, side-view and shmup games are the sweet spot.
+- **Collision shapes:** `CircleShape2D`, `RectangleShape2D` and `CapsuleShape2D` (one shape per volley; each bullet's scale applies). Other shapes fall back to a circle with an error.
+- **Bullets behave like `Area2D`s:** they detect and bounce, but they are not rigid bodies (no impulses), and bullets do not collide with each other.
+- **Very fast bullets** move in steps of one physics tick. A bullet that travels further than its own size in one tick can step over a thin target: make thin targets thicker, or the hitbox larger.
+- **No save/load** of bullets in flight.
 
-## Migrating from earlier versions
-The bullet classes were unified: `BlockBullets2D` is gone and the old `MultiMeshBullets2D` base is merged into one class, `BulletVolley2D` ("one volley" = every bullet of one spawn call). Rename these in your scripts and saved scenes (`.tscn` / `.tres` files store class and signal names as text):
+## Rules worth knowing
+
+- **Inside signal handlers**, structural factory calls (`reset()`, `free_*()`, `populate_*()`) are refused: use their `*_deferred` versions (for example `factory.reset_deferred()`). Editing bullets, spawning and clearing work anywhere.
+- **Free volleys with `queue_free()`**, never `free()`; better, let the pool handle them. A volley returned to the pool is a stale handle: do not keep using a reference after its bullets are gone.
+- **Duplicate shared resources before editing them from code** (`data.duplicate()`), or every spawner using them changes.
+- **Your scripts may use `_ready()`, `_process()` and `_physics_process()`** on the factory and spawners: the plugin does its work through notifications, so both run.
+- **Collision signals arrive during the physics step** and the bullet is alive in the handler. Whether it dies is decided afterwards: lower its hit count in the handler (`volley.set_bullet_collision_count(bullet_index, 0)`) and it survives.
+- **When an enemy dies,** its spawner's `orphaned_volleys` setting decides what its bullets in flight do (keep flying and hand their hits to the factory, by default).
+
+## Reference
+
+- **In-editor docs:** every class (<kbd>F1</kbd> → `BulletSpawner2D`, `BulletFactory2D`, `BulletVolley2D`, `LaserSpawner2D`...).
+- **[QUICKSTART.md](QUICKSTART.md):** one page of common bullet-hell recipes.
+- **Test project:** the repository's `test_project/` contains a benchmark scene comparing BlastBullets2D with plain `Area2D` bullets.
+
+<details>
+<summary><b>The data model: per-bullet, shared and default values</b></summary>
+
+Most data properties come in two flavors, and every feature resolves them with one rule:
+
+> **per-bullet (valid) > shared (valid) > default.** Entry `i` of a per-bullet array drives bullet `i` only.
+
+- **Per-bullet** arrays (`all_bullet_speed_data`, `all_bullet_rotation_data`, `all_bullet_curves_data`, `all_bullets_custom_data`, ...): one entry per bullet. A short array covers only its own indices; an invalid entry (null, wrong type, not finite) falls back for that bullet only.
+- **Shared** values (`shared_bullet_speed_data`, `shared_bullet_rotation_data`, `shared_bullets_custom_data`, ...): one value for every bullet the per-bullet array does not cover. **With a spawner, prefer the shared fields**: a pattern's bullet count can change.
+- **Tiling** (`tile_*` checkboxes, off by default): a short per-bullet array repeats (`bullet i` reads entry `i % size`), for example two speed entries for fast/slow/fast/slow.
+- **Negative speed** flies backwards; NaN and infinite values are always refused with an error.
+- **Inspect it live:** `volley.debug_get_curves_info(i)`, `debug_get_pattern_info(i)`, `debug_get_orbiting_info(i)` and `debug_get_wobble_info(i)` say which value a bullet uses and where it came from.
+</details>
+
+<details>
+<summary><b>Migrating from version 3.x</b></summary>
+
+The bullet classes were unified into one volley class. Rename these in your scripts and saved scenes (`.tscn` / `.tres` files store class and signal names as text):
 
 | Old | New |
 |---|---|
@@ -573,19 +289,22 @@ The bullet classes were unified: `BlockBullets2D` is gone and the old `MultiMesh
 | volley `is_multimesh_auto_pooling_enabled` | `is_auto_pooling_enabled` |
 | debug dictionary keys `directional_total` / `directional_pooled` / `directional_hits` / `directional_misses` | `volleys_total` / `volleys_pooled` / `hits` / `misses` |
 | factory child nodes `DirectionalBulletsContainer` / `DirectionalBulletsDebugger` | `BulletVolleysContainer` / `BulletVolleysDebugger` |
+| `bullet_homing_target_reached` argument `multimesh_instance` | `volley` |
+| a spawner needed `bullet_factory_path` | optional: an empty path uses the factory in the spawner's scene |
+</details>
 
+## Building from source and running the tests
 
-## How To Compile
+You only need this to change the C++ code.
 
-Fork the repository, then go inside the GitHub Actions tab, and run the workflow. This easy process is due to using [godot-plus-plus template](https://github.com/nikoladevelops/godot-plus-plus) - allows for cross platform easy workflow when making Godot C++ GDExtension plugins.
-
-[GDExtension C++ Tutorial](https://www.youtube.com/watch?v=I79u5KNl34o&t=1s)
+- **Easiest:** fork the repository and run the **Build GDExtension Cross Platform Plugin** workflow in the GitHub Actions tab: it builds every platform and packages the zip ([godot-plus-plus template](https://github.com/nikoladevelops/godot-plus-plus)).
+- **Locally:** `python3 setup.py` opens a menu for the Godot path, builds, icons and docs. For scripts and CI: `GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py`.
+- **Tests:** `python3 tools/run_tests.py` runs every suite headless (about 30 s); `python3 tools/run_release_tests.py` runs them against the release build. Every push runs both, plus format, portability and editor checks, in the [Tests workflow](.github/workflows/tests.yml). [AGENTS.md](AGENTS.md) describes how the code base is organized and how changes are proven.
 
 ## Support
-If you wish to support me you can do so here - https://ko-fi.com/realnikich or https://patreon.com/realnikich
 
-If you find this plugin useful:
-- <b>Leave a Star on the repository</b>
-- Expect tutorials on my YouTube channel - https://www.youtube.com/@realnikich
-- [Follow me on X (Twitter)](https://x.com/realNikich)
-- [Follow me on Bluesky](https://bsky.app/profile/realnikich.bsky.social)
+BlastBullets2D is free forever. If it helps your game:
+
+- Leave a **star** on the repository.
+- Support development on [Ko-fi](https://ko-fi.com/realnikich) or [Patreon](https://patreon.com/realnikich).
+- Tutorials on [YouTube](https://www.youtube.com/@realnikich) · [X (Twitter)](https://x.com/realNikich) · [Bluesky](https://bsky.app/profile/realnikich.bsky.social)
