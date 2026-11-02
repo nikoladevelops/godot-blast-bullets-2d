@@ -66,7 +66,11 @@ is not an explanation; skipping a step is.
 10. **Finish green:** full suite + `--self-test` + format check +
     `check_portability.py` + snapshot diff + benchmark gate (+ `run_editor_smoke.py` when editor/preview code
     changed, + `run_sanitizer_tests.py` when casts, enums, integer math,
-    lifetimes or user-callback paths changed), then report with Big-O and a ratings table (§19).
+    lifetimes or user-callback paths changed, + `run_release_tests.py` before a release
+    or after inlining / LTO-sensitive changes), then report with Big-O and a ratings table (§19).
+    CI (`.github/workflows/tests.yml`) runs lint, format, portability, the self-test,
+    the suites on the debug AND release library and the editor smoke on every push;
+    sanitizers and fuzz soaks weekly.
 11. **Your own red test proves your intent, not the contract.** Red-then-green
     shows the code does what YOU decided. Before you decide, name where the
     expected behavior comes from: Godot's own output (`tools/probe.py`), an
@@ -88,7 +92,8 @@ is not an explanation; skipping a step is.
 
 ```sh
 GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py   # build (exit 1 = failed; never raw scons, never edit SConstruct)
-python3 tools/run_tests.py                                       # 246 files / ~2400 tests, ~30 s, leak-checked
+python3 tools/run_tests.py                                       # 247 files / ~2480 tests, ~35 s, leak-checked
+python3 tools/run_release_tests.py [--no-build] [run_tests args]  # the suites against the RELEASE (LTO) library a game ships (~2 min build)
 python3 tools/run_tests.py --suite <substring> --full            # one area, every failure message unclipped
 python3 tools/run_tests.py --self-test                           # proves the harness still catches failures/leaks
 python3 tools/probe.py -c 'probe("x", AtlasTexture.new().get_size())'  # ask the engine / the built plugin (§2.2); hangs still show progress
@@ -1513,7 +1518,9 @@ project's `.so`). For quick numeric comparisons load two
   the build stamp on success) / `clean_build.py` / `select_build_profile.py`
   / `edit_build_profile.py` / `change_lto_mode.py` / `toggle_editor_target.py`
   / `toggle_debug_symbols.py` / `toggle_reloadable.py`.
-- Verification: `run_tests.py`, `lint_tests.py`, `api_snapshot.py` (§7.4),
+- Verification: `run_tests.py`, `run_release_tests.py` (builds template_release, swaps it in for the
+  installed debug library, runs the suites, always restores it; restores compile_commands.json),
+  `lint_tests.py`, `api_snapshot.py` (§7.4),
   `probe.py` (a GDScript snippet as a BlastTest body against the built
   plugin; `probe(label, value)` lines stream to
   `test_project/test_results/probe_output.txt`, the errors it caused are
@@ -1535,7 +1542,9 @@ project's `.so`). For quick numeric comparisons load two
 - Config: `select_godot_path.py`, `select_godot_project.py`,
   `change_godot_target_version.py`, `update_godot_cpp.py`,
   `config_manager.py` + `config.json` (machine state), `paths.py`.
-- Plugin: `renaming.py`, `update_icons.py`, `export_plugin.py`,
+- Plugin: `renaming.py`, `update_icons.py` (copies `icons/*.svg`, named exactly like the class,
+  into the addon and writes the `[icons]` block of the .gdextension; it clears only those icons'
+  import cache: re-import the project afterwards), `export_plugin.py`,
   `generate_xml_docs.py`, `gdextension_file_helper.py`, `apple_helpers.py`,
   `git_helpers.py`, `scons_helpers.py` + `scons_build_helpers.py`,
   `tutorials.py`.
