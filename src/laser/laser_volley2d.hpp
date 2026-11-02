@@ -300,6 +300,11 @@ private:
 	// scroll on the interpolated clock.
 	real_t prev_width = 0.0;
 	double last_tick_delta = 0.0;
+	// False from begin_life until the first tick's geometry pass: a target set
+	// before then (a spawner right after the shot, set_targets, track()'s first
+	// pick) re-poses its beam and restarts its draw history, so a Lock-On beam
+	// is drawn at its target from the first frame instead of swinging there.
+	bool geometry_ticked = false;
 	double active_override = -1.0; // set_active_time_left (seconds of ACTIVE), -1 = the data's
 	// end_laser changed the phase outside a tick: announced at the next tick
 	// start (every signal fires inside the tick), or earlier in the same tick

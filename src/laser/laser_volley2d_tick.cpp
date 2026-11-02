@@ -1125,6 +1125,7 @@ void LaserVolley2D::tick(double delta) {
 			snap_beam_history(b);
 		}
 	}
+	geometry_ticked = true;
 	// Bolts and curvy lasers fully outside the despawn bounds are spent
 	// there (On Despawn, then laser_despawned; its contacts end below).
 	if (d->type != LaserData2D::LASER_BEAM && !d->ignore_despawn_bounds && factory->get_despawn_bounds_enabled()) {

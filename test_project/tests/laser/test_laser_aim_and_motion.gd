@@ -6,7 +6,8 @@ extends BlastTest
 ## extend_speed behind a full-length warning, turns toward its target at
 ## turn_rate_degrees (AIM_TRACK; 0 snaps; keep_tracking_when_active off stops
 ## once active), ends on its target (AIM_LOCK_ON, capped at length), and
-## takes set_beam_angle / set_targets / set_anchor at any time.
+## takes set_beam_angle / set_targets / set_anchor at any time. A Lock-On beam
+## is drawn at its target from its first frame, however it got the target.
 
 const DT := 0.0625
 
@@ -225,6 +226,50 @@ func test_lock_on_ends_on_its_target_capped_at_length() -> void:
 	step_factory(1, DT)
 	assert_almost_eq(l.get_beam_length(0), 200.0, 0.01, "a far target: capped at length")
 	assert_almost_eq(_deg(l), 90.0, 0.001, "still aimed at it")
+
+
+## The drawn angle of beam 0 at an interpolation fraction (its polyline's direction).
+func _drawn_deg(l: LaserVolley2D, fraction: float) -> float:
+	var p: PackedVector2Array = l.debug_get_draw_state(fraction)[0]["points"]
+	return snappedf(rad_to_deg((p[p.size() - 1] - p[0]).angle()), 0.01)
+
+
+## A Lock-On beam is drawn at its target from its very first frame, however it
+## got the target: a spawner (targets assigned right after the spawn), a
+## script's set_targets, or track() (picked inside the first tick). It used to
+## show its pattern slot until the first tick and interpolate a swing from there.
+func test_a_lock_on_beam_draws_at_its_target_from_the_first_frame(path: String = use_parameters(["spawner", "set_targets", "track"])) -> void:
+	factory.physics_interpolation = BulletFactory2D.INTERPOLATION_ON
+	var d := H.make_laser(0.5, 0.0, 1.0, 0.0, 2000.0)
+	d.aim = LaserData2D.LASER_AIM_LOCK_ON
+	var target := Vector2(500, 900) # straight below the muzzle at (500, 300): 90 degrees
+	var l: LaserVolley2D
+	match path:
+		"spawner":
+			var s := LaserSpawner2D.new()
+			s.set_shooting_enabled(false)
+			s.laser_data = d
+			s.pattern_source = BulletSpawner2D.PATTERN_FROM_SELF # the slot points along +x: 0 degrees
+			s.laser_target_source = LaserSpawner2D.LASER_TARGET_GLOBAL_POSITION
+			s.laser_target_position = target
+			s.position = Vector2(500, 300)
+			add(s)
+			await idle(1)
+			assert_true(s.shoot_once(), "fired")
+			l = s.get_live_lasers()[0]
+		"set_targets":
+			l = _fire(d, Transform2D(0.0, Vector2(500, 300)))
+			l.set_targets([target])
+		"track":
+			l = _fire(d, Transform2D(0.0, Vector2(500, 300)))
+			assert_true(l.track(BulletTargets2D.from_positions(PackedVector2Array([target]))), "tracks")
+	if path != "track": # track() picks inside the first tick
+		assert_eq(_drawn_deg(l, 0.0), 90.0, "%s: the frame before the first tick draws at the target" % path)
+		assert_eq(_drawn_deg(l, 1.0), 90.0, "%s: also at fraction 1" % path)
+	step_factory(1, DT)
+	assert_eq(_deg(l), 90.0, "%s: aimed at the target" % path)
+	assert_eq(_drawn_deg(l, 0.0), 90.0, "%s: the first tick interpolates from the target, never from the slot" % path)
+	assert_eq(_drawn_deg(l, 0.5), 90.0, "%s: no swing mid-frame" % path)
 
 
 func test_setters_reject_and_keep() -> void:

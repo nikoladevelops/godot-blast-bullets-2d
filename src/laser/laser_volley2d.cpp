@@ -238,6 +238,7 @@ void LaserVolley2D::begin_life(BulletFactory2D *p_factory, const Ref<LaserData2D
 	}
 	prev_width = get_current_width();
 	last_tick_delta = 0.0;
+	geometry_ticked = false;
 	set_visible(true);
 	queue_redraw();
 }
@@ -754,6 +755,13 @@ void LaserVolley2D::set_beam_target(int beam_index, const Variant &target) {
 		UtilityFunctions::push_error("set_beam_target: target must be a Node2D, a Vector2 or null, the beam has no target now.");
 	}
 	const LaserData2D *d = data.ptr();
+	if (!geometry_ticked && active && d != nullptr && d->aim != LaserData2D::LASER_AIM_PATTERN) {
+		// Not ticked yet: the frame before the first tick (and the first tick's
+		// interpolation) must already show the aim at this target.
+		update_beam_geometry(b, 0.0);
+		snap_beam_history(b);
+		queue_redraw();
+	}
 	if (b.has_target && !pattern_target_warned && d != nullptr && d->aim == LaserData2D::LASER_AIM_PATTERN) {
 		pattern_target_warned = true;
 		UtilityFunctions::push_warning("LaserVolley2D: laser_data aims along the pattern, so a target steers nothing (kept for a Track or Lock On aim).");
