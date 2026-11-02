@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16204a"/><stop offset="1" stop-color="#080b18"/></linearGradient>
+<radialGradient id="halo" cx=".55" cy=".5" r=".5"><stop offset="0" stop-color="#3b6cff" stop-opacity=".45"/><stop offset="1" stop-color="#3b6cff" stop-opacity="0"/></radialGradient>
+<linearGradient id="steel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset=".45" stop-color="#bfe3ff"/><stop offset="1" stop-color="#4f7cf0"/></linearGradient>
+<linearGradient id="fire" x1="1" y1="0" x2="0" y2="0"><stop offset="0" stop-color="#ffe27a"/><stop offset=".35" stop-color="#ff8a2a"/><stop offset="1" stop-color="#ff2d6f" stop-opacity="0"/></linearGradient>
+<linearGradient id="firecore" x1="1" y1="0" x2="0" y2="0"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#ffd46b" stop-opacity="0"/></linearGradient>
+<filter id="glow" x="-20%" y="-60%" width="140%" height="220%"><feGaussianBlur stdDeviation="10"/></filter>
+</defs>
+<rect width="512" height="512" rx="96" fill="url(#bg)"/>
+<rect width="512" height="512" rx="96" fill="url(#halo)"/>
+<g transform="translate(262 262) rotate(-32) scale(0.48) translate(-690 -430)">
+<path d="M620 386L400 338L530 396L180 404L480 424L270 448L500 450L350 500L540 470L620 474z" fill="url(#fire)"/>
+<path d="M620 402L480 390L540 416L350 428L540 442L450 468L620 458z" fill="url(#firecore)"/>
+<path d="M650 384h250l18 10h70c58 0 112 16 162 46c-50 30-104 46-162 46h-70l-18 10H650z" fill="#6fa8ff" filter="url(#glow)" opacity=".7"/>
+<path d="M650 384h250l18 10h70c58 0 112 16 162 46c-50 30-104 46-162 46h-70l-18 10H650z" fill="url(#steel)"/>
+<path d="M624 372l20 6v104l-20 6z" fill="url(#steel)"/>
+<path d="M900 394h6v72h-6zM988 396h5v68h-5z" fill="#0b1026" opacity=".55"/>
+</g>
+</svg>
