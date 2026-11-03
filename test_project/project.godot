@@ -10,8 +10,8 @@ config_version=5
 
 [application]
 
-config/name="BlastBullets2D - Arcane Barrage Demo"
-run/main_scene="res://demo/demo.tscn"
+config/name="Test-Project-BlastBullets2D"
+run/main_scene="res://main.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://icon.svg"
 
