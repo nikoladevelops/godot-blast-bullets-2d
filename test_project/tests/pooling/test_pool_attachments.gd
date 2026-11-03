@@ -117,3 +117,54 @@ func test_dead_in_memory_scenes_are_forgotten() -> void:
 	assert_lte(factory.debug_get_attachment_scene_memory_count(), 128, "bounded by the live scenes, not every scene ever seen")
 	factory.populate_attachments_pool(ps, 2)
 	assert_eq(factory.debug_get_attachments_pool_amount(), 2, "the live scene still pools")
+
+
+## A PackedScene whose root is a plain Node2D (never a BulletAttachment2D).
+func _foreign_scene() -> PackedScene:
+	var foreign := Node2D.new()
+	var scene := PackedScene.new()
+	scene.pack(foreign)
+	foreign.free()
+	return scene
+
+
+func test_a_broken_shared_attachment_reports_once_per_resource() -> void:
+	# The data's attachment describes the DATA: a broken one reports once per
+	# resource (like every data warning), never once per shot (AGENTS §14).
+	var data := H.make_volley_data(3, 200.0)
+	data.shared_bullet_attachment = _foreign_scene()
+	for i in 4:
+		var v: BulletVolley2D = factory.spawn_volley(data)
+		assert_not_null(v, "the bullets still spawn")
+		assert_false(v.debug_get_attachment_info(0).get("has_attachment", false), "no attachment from a foreign scene")
+	expect_error_sequence(["BulletVolleyData2D: shared_bullet_attachment is not a BulletAttachment2D scene (its root is a Node2D), the bullets spawn without attachments."])
+	data.shared_bullet_attachment = PackedScene.new()
+	for i in 3:
+		factory.spawn_volley(data)
+	expect_error_sequence(["BulletVolleyData2D: shared_bullet_attachment is an empty PackedScene (nothing to instantiate), the bullets spawn without attachments."])
+
+
+func test_an_empty_attachment_scene_is_refused_before_instantiating() -> void:
+	# Instantiating an empty PackedScene is an engine error on top of ours: the
+	# plugin refuses it first, with one error of its own.
+	var v: BulletVolley2D = factory.spawn_volley(H.make_volley_data(2, 200.0))
+	v.bullet_set_attachment(0, PackedScene.new(), Vector2.ZERO, true)
+	expect_error_sequence(["Tried to set an empty attachment scene (a PackedScene with no nodes) to bullet index: 0"])
+	factory.populate_attachments_pool(PackedScene.new(), 3)
+	expect_error_sequence(["PackedScene is empty (no nodes). Nothing was pooled."])
+	assert_eq(factory.debug_get_attachments_pool_amount(), 0, "nothing pooled")
+
+
+func test_all_bullets_set_attachment_reports_a_bad_scene_once() -> void:
+	# Every bullet would fail the same way: one report for the call, not one per bullet.
+	var v: BulletVolley2D = factory.spawn_volley(H.make_volley_data(6, 200.0))
+	v.all_bullets_set_attachment(_foreign_scene(), Vector2.ZERO)
+	expect_error_sequence(["Tried to instantiate an attachment scene that is not of type BulletAttachment2D at bullet index: 0"])
+	v.all_bullets_set_attachment(PackedScene.new(), Vector2.ZERO)
+	expect_error_sequence(["Tried to set an empty attachment scene (a PackedScene with no nodes) to bullet index: 0"])
+	for i in 6:
+		assert_false(v.debug_get_attachment_info(i).get("has_attachment", false), "bullet %d has no attachment" % i)
+	v.all_bullets_set_attachment(ps, Vector2.ZERO)
+	expect_no_errors()
+	for i in 6:
+		assert_true(v.debug_get_attachment_info(i).get("has_attachment", false), "a good scene still attaches bullet %d" % i)

@@ -101,9 +101,14 @@ void BulletVolley2D::all_bullets_set_attachment(const Ref<PackedScene> &attachme
 	// factory ends the loop.
 	const uint64_t self_id = get_instance_id();
 	bool alive = true;
+	// A scene every bullet would refuse the same way (null, empty, foreign root)
+	// is reported once, for the first bullet of the range, not once per bullet.
+	const bool scene_refused = attachment_scene.is_null() || check_attachment_scene2d(attachment_scene) != AttachmentSceneCheck2D::OK;
+	bool reported = false;
 	for_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_attachment", [&](int i) {
-		if (alive) {
+		if (alive && !reported) {
 			bullet_set_attachment(i, attachment_scene, bullet_attachment_offset, stick_relative_to_bullet);
+			reported = scene_refused;
 			alive = survived_user_code(self_id);
 		}
 	});

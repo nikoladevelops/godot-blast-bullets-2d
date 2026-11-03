@@ -3,6 +3,7 @@
 // and attachments.
 
 #include "bullet_spawner/bullet_spawner2d.hpp"
+#include "core/attachment_scene_check2d.hpp"
 #include "factory/bullet_factory2d_internal.hpp"
 #include "patterns/pattern_inputs2d.hpp"
 
@@ -412,6 +413,18 @@ void BulletFactory2D::populate_attachments_pool(const Ref<PackedScene> attachmen
 	}
 
 	if (reject_when_iterating("populate_attachments_pool")) {
+		return;
+	}
+
+	// The scene's own state answers an empty or foreign scene without
+	// instantiating it (an empty one is an engine error).
+	const AttachmentSceneCheck2D scene_check = check_attachment_scene2d(attachment_scene);
+	if (scene_check == AttachmentSceneCheck2D::EMPTY) {
+		UtilityFunctions::push_error("PackedScene is empty (no nodes). Nothing was pooled.");
+		return;
+	}
+	if (scene_check == AttachmentSceneCheck2D::FOREIGN) {
+		UtilityFunctions::push_error("PackedScene does not contain a BulletAttachment2D. Nothing was pooled.");
 		return;
 	}
 

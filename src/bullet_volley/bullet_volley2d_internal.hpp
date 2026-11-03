@@ -8,6 +8,7 @@
 
 #include "bullet_volley/bullet_movement_pattern_data2d.hpp"
 #include "bullet_volley/bullet_volley2d.hpp"
+#include "core/attachment_scene_check2d.hpp"
 #include "core/cached_string_names2d.hpp"
 #include "core/collision_shape_helper2d.hpp"
 #include "core/warn_once2d.hpp"
@@ -709,6 +710,18 @@ _ALWAYS_INLINE_ bool BulletVolley2D::attach_bullet_attachment_internal(int bulle
 	}
 
 	if (!attachment_instance) {
+		// The scene's own state answers an empty or foreign scene before
+		// anything is instantiated (an empty one is an engine error; a foreign
+		// root would run its scripts only to be thrown away).
+		const AttachmentSceneCheck2D scene_check = check_attachment_scene2d(attachment_scene);
+		if (scene_check == AttachmentSceneCheck2D::EMPTY) {
+			UtilityFunctions::push_error("Tried to set an empty attachment scene (a PackedScene with no nodes) to bullet index: " + String::num_int64(bullet_index));
+			return false;
+		}
+		if (scene_check == AttachmentSceneCheck2D::FOREIGN) {
+			UtilityFunctions::push_error("Tried to instantiate an attachment scene that is not of type BulletAttachment2D at bullet index: " + String::num_int64(bullet_index));
+			return false;
+		}
 		// Instantiating runs the scene's scripts (_init): user code that may
 		// free this volley or the factory (its pool with it), or take this
 		// bullet out (a clear pools the volley): then nothing is attached.

@@ -60,6 +60,23 @@ _ALWAYS_INLINE_ void BulletVolley2D::apply_shared_bullet_attachment_from_data(co
 	if (data.shared_bullet_attachment.is_null()) {
 		return;
 	}
+	// A broken scene describes the DATA: it reports once per resource (WarnOnce2D,
+	// re-armed when the scene is packed again), never once per shot, and spawns
+	// the bullets without attachments.
+	StringName root_type;
+	const AttachmentSceneCheck2D scene_check = check_attachment_scene2d(data.shared_bullet_attachment, &root_type);
+	if (scene_check != AttachmentSceneCheck2D::OK) {
+		const Ref<SceneState> state = data.shared_bullet_attachment->get_state();
+		const int64_t node_count = state.is_valid() ? state->get_node_count() : 0;
+		if (WarnOnce2D::first(data.shared_bullet_attachment->get_instance_id(), 34u, (int64_t)scene_check, node_count * 1000003 + String(root_type).hash())) {
+			if (scene_check == AttachmentSceneCheck2D::EMPTY) {
+				UtilityFunctions::push_error("BulletVolleyData2D: shared_bullet_attachment is an empty PackedScene (nothing to instantiate), the bullets spawn without attachments.");
+			} else {
+				UtilityFunctions::push_error("BulletVolleyData2D: shared_bullet_attachment is not a BulletAttachment2D scene (its root is a " + String(root_type) + "), the bullets spawn without attachments.");
+			}
+		}
+		return;
+	}
 	for (int i = 0; i < amount_bullets; ++i) {
 		// A callback of an earlier bullet may have drained this volley (it is
 		// pooled or parked now: attaching would leak into the pool) or
