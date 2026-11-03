@@ -8,6 +8,7 @@
 #include "bullet_spawner/pattern_spawner2d_internal.hpp"
 #include "core/emit_on2d.hpp"
 #include "core/live_object2d.hpp"
+#include "core/spawn_report2d.hpp"
 #include "core/transform_math2d.hpp"
 
 using namespace godot;
@@ -283,10 +284,19 @@ ShotResult2D BulletSpawner2D::fire_shot(std::vector<Transform2D> &transforms) {
 	if (factory == nullptr) {
 		return refuse_shot("BulletSpawner2D::shoot_once: no BulletFactory2D assigned (bullet_factory_path).", StringName("no_factory"), true);
 	}
-	BulletVolley2D *bullets = factory->spawn_volley_span(volley_data, transforms.data(), (int)transforms.size(), inherited_velocity, get_instance_id(), shot_colors.empty() ? nullptr : shot_colors.data());
+	// A refusal of the request comes back here (the factory's own words) and
+	// goes through shoot_once's auto-fire error latch: once per misconfiguration.
+	BulletVolley2D *bullets = nullptr;
+	String refusal_message;
+	{
+		SpawnReportCapture2D capture;
+		bullets = factory->spawn_volley_span(volley_data, transforms.data(), (int)transforms.size(), inherited_velocity, get_instance_id(), shot_colors.empty() ? nullptr : shot_colors.data());
+		refusal_message = capture.message;
+	}
 	if (bullets == nullptr) {
-		// The factory already reported why (busy, teardown, bad data).
-		return refuse_shot(String(), StringName("factory_refused"), !refused_free_during_shot);
+		// Why (busy, teardown, bad data, a singular transform) is the factory's
+		// message, reported by shoot_once (latched while auto firing).
+		return refuse_shot(refusal_message, StringName("factory_refused"), !refused_free_during_shot);
 	}
 	if (refused_free_during_shot) {
 		// An attachment callback of the new volley freed this spawner (the

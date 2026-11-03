@@ -5,6 +5,7 @@
 // work itself (laser/laser_volley2d*.cpp).
 
 #include "bullet_spawner/pattern_spawner2d.hpp"
+#include "core/spawn_report2d.hpp"
 #include "factory/bullet_factory2d_internal.hpp"
 #include "laser/laser_volley2d.hpp"
 #include "patterns/pattern_inputs2d.hpp"
@@ -52,38 +53,44 @@ LaserVolley2D *BulletFactory2D::spawn_laser(const Ref<LaserData2D> &data, const 
 
 LaserVolley2D *BulletFactory2D::spawn_laser_span(const Ref<LaserData2D> &data, const Transform2D *transforms, int count, uint64_t owner_id, uint64_t anchor_id, const Transform2D &anchor_frame, const char *caller, const Vector2 &anchor_offset, bool anchor_frame_pending, const Vector2 &inherited_velocity) {
 	if (is_factory_busy) {
-		UtilityFunctions::push_error(String(caller) + ": BulletFactory2D is currently busy. Ignoring the request.");
+		SpawnReport2D::error(String(caller) + ": BulletFactory2D is currently busy. Ignoring the request.");
 		return nullptr;
 	}
 	if (!is_ready) {
+		// The native start may run user code (tree signals): never captured.
+		String *held_capture = SpawnReport2D::capture;
+		SpawnReport2D::release_capture();
 		ensure_factory_initialized();
+		SpawnReport2D::capture = held_capture;
 	}
 	if (!is_ready || is_tearing_down || !is_inside_tree()) {
-		UtilityFunctions::push_error(String(caller) + ": BulletFactory2D is not in the scene tree (or is being freed). Ignoring the request.");
+		SpawnReport2D::error(String(caller) + ": BulletFactory2D is not in the scene tree (or is being freed). Ignoring the request.");
 		return nullptr;
 	}
 	if (data.is_null()) {
-		UtilityFunctions::push_error(String(caller) + ": data is null, nothing fired.");
+		SpawnReport2D::error(String(caller) + ": data is null, nothing fired.");
 		return nullptr;
 	}
 	if (count <= 0 || transforms == nullptr) {
-		UtilityFunctions::push_error(String(caller) + ": no transforms, nothing fired.");
+		SpawnReport2D::error(String(caller) + ": no transforms, nothing fired.");
 		return nullptr;
 	}
 	if (count > pattern_max_bullets()) {
-		UtilityFunctions::push_error(String(caller) + ": " + String::num_int64(count) + " beams is more than BulletPatterns2D.max_bullets_per_pattern (" + String::num_int64(pattern_max_bullets()) + "), nothing fired.");
+		SpawnReport2D::error(String(caller) + ": " + String::num_int64(count) + " beams is more than BulletPatterns2D.max_bullets_per_pattern (" + String::num_int64(pattern_max_bullets()) + "), nothing fired.");
 		return nullptr;
 	}
 	for (int i = 0; i < count; ++i) {
 		if (!transform_is_sane2d(transforms[i]) || !BulletVolley2D::is_transform_invertible_safe(transforms[i])) {
-			UtilityFunctions::push_error(String(caller) + ": every transform must be finite and invertible, nothing fired.");
+			SpawnReport2D::error(String(caller) + ": every transform must be finite and invertible, nothing fired.");
 			return nullptr;
 		}
 	}
 	if (!anchor_frame.is_finite() || (anchor_id != 0 && !BulletVolley2D::is_transform_invertible_safe(anchor_frame))) {
-		UtilityFunctions::push_error(String(caller) + ": the anchor's transform must be finite and invertible, nothing fired.");
+		SpawnReport2D::error(String(caller) + ": the anchor's transform must be finite and invertible, nothing fired.");
 		return nullptr;
 	}
+	// Validated: anything later is not a refusal of this request.
+	SpawnReport2D::release_capture();
 	heal_owned_children();
 	if (laser_container.get() == nullptr) {
 		add_laser_container();

@@ -4,6 +4,7 @@
 
 #include "bullet_spawner/bullet_spawner2d.hpp"
 #include "core/attachment_scene_check2d.hpp"
+#include "core/spawn_report2d.hpp"
 #include "factory/bullet_factory2d_internal.hpp"
 #include "patterns/pattern_inputs2d.hpp"
 
@@ -16,11 +17,11 @@ namespace BlastBullets2D {
 static bool validate_one_spawn_transform(const Transform2D &t, int i, const char *caller_name) {
 	const Vector2 o = t.get_origin();
 	if (!o.is_finite() || !Math::is_finite(t.get_rotation()) || !t.get_scale().is_finite()) {
-		UtilityFunctions::push_error(String("Error in ") + caller_name + ": transforms[" + String::num_int64(i) + "] contains NaN/Inf. Nothing was spawned.");
+		SpawnReport2D::error(String("Error in ") + caller_name + ": transforms[" + String::num_int64(i) + "] contains NaN/Inf. Nothing was spawned.");
 		return false;
 	}
 	if (t.get_scale().length_squared() < 0.00000001 || !BulletVolley2D::is_transform_invertible_safe(t)) {
-		UtilityFunctions::push_error(String("Error in ") + caller_name + ": transforms[" + String::num_int64(i) + "] has zero or singular scale. Nothing was spawned.");
+		SpawnReport2D::error(String("Error in ") + caller_name + ": transforms[" + String::num_int64(i) + "] has zero or singular scale. Nothing was spawned.");
 		return false;
 	}
 	return true;
@@ -28,7 +29,7 @@ static bool validate_one_spawn_transform(const Transform2D &t, int i, const char
 
 bool validate_spawn_transform_span(const Transform2D *transforms, int count, const char *caller_name) {
 	if (transforms == nullptr || count <= 0) {
-		UtilityFunctions::push_error(String("Error when trying to spawn bullets in ") + caller_name + ". No spawn_data or no transforms were provided. Ignoring the request");
+		SpawnReport2D::error(String("Error when trying to spawn bullets in ") + caller_name + ". No spawn_data or no transforms were provided. Ignoring the request");
 		return false;
 	}
 	for (int i = 0; i < count; ++i) {
@@ -42,14 +43,14 @@ bool validate_spawn_transform_span(const Transform2D *transforms, int count, con
 // Everything except the transforms themselves, for a volley of bullet_count.
 bool validate_spawn_data_fields(const Ref<BulletVolleyData2D> &spawn_data, int bullet_count, const char *caller_name) {
 	if (spawn_data.is_null() || bullet_count <= 0) {
-		UtilityFunctions::push_error(String("Error when trying to spawn bullets in ") + caller_name + ". No spawn_data or no transforms were provided. Ignoring the request");
+		SpawnReport2D::error(String("Error when trying to spawn bullets in ") + caller_name + ". No spawn_data or no transforms were provided. Ignoring the request");
 		return false;
 	}
 	// One volley is one physics area with a shape per bullet: Godot's
 	// broadphase aborts the game past ~35k clustered shapes. The developer-set
 	// pattern limit bounds every way of making a volley, not only generators.
 	if (bullet_count > pattern_max_bullets()) {
-		UtilityFunctions::push_error(String(caller_name) + ": a volley holds at most " + String::num_int64(pattern_max_bullets()) + " bullets (got " + String::num_int64(bullet_count) + "). Raise blastbullets2d/patterns/max_bullets_per_pattern (BulletPatterns2D.max_bullets_per_pattern) for more. Nothing was spawned.");
+		SpawnReport2D::error(String(caller_name) + ": a volley holds at most " + String::num_int64(pattern_max_bullets()) + " bullets (got " + String::num_int64(bullet_count) + "). Raise blastbullets2d/patterns/max_bullets_per_pattern (BulletPatterns2D.max_bullets_per_pattern) for more. Nothing was spawned.");
 		return false;
 	}
 	// Per-bullet array sizes are the volley's to report (one warning per
@@ -57,7 +58,7 @@ bool validate_spawn_data_fields(const Ref<BulletVolleyData2D> &spawn_data, int b
 	// A non-positive finite lifetime would die on the first tick; fail open with an error instead of a silent vanish.
 	// NaN must be rejected explicitly: NaN <= 0.0 is false, so it would slip through and never expire.
 	if (!spawn_data->is_life_time_infinite && (!(spawn_data->max_life_time > 0.0) || !Math::is_finite(spawn_data->max_life_time))) {
-		UtilityFunctions::push_error(String("Error in ") + caller_name + ": max_life_time must be a finite value > 0 when lifetime is not infinite.");
+		SpawnReport2D::error(String("Error in ") + caller_name + ": max_life_time must be a finite value > 0 when lifetime is not infinite.");
 		return false;
 	}
 	// Second line of defence, for state the setters cannot cover: a caller can
@@ -66,20 +67,20 @@ bool validate_spawn_data_fields(const Ref<BulletVolleyData2D> &spawn_data, int b
 	// EVERY bullet's transform, so a single NaN here silently produces a
 	// fully-NaN volley that the per-transform check cannot see.
 	if (!Math::is_finite(spawn_data->texture_rotation_radians)) {
-		UtilityFunctions::push_error(String("Error in ") + caller_name + ": texture_rotation_radians must be finite (it is added to every bullet rotation). Nothing was spawned.");
+		SpawnReport2D::error(String("Error in ") + caller_name + ": texture_rotation_radians must be finite (it is added to every bullet rotation). Nothing was spawned.");
 		return false;
 	}
 	if (!spawn_data->texture_size.is_finite()) {
-		UtilityFunctions::push_error(String("Error in ") + caller_name + ": texture_size must be finite. Nothing was spawned.");
+		SpawnReport2D::error(String("Error in ") + caller_name + ": texture_size must be finite. Nothing was spawned.");
 		return false;
 	}
 	if (!spawn_data->collision_shape_offset.is_finite()) {
-		UtilityFunctions::push_error(String("Error in ") + caller_name + ": collision_shape_offset must be finite. Nothing was spawned.");
+		SpawnReport2D::error(String("Error in ") + caller_name + ": collision_shape_offset must be finite. Nothing was spawned.");
 		return false;
 	}
 	if (!Math::is_finite(spawn_data->self_modulate.r) || !Math::is_finite(spawn_data->self_modulate.g) ||
 			!Math::is_finite(spawn_data->self_modulate.b) || !Math::is_finite(spawn_data->self_modulate.a)) {
-		UtilityFunctions::push_error(String("Error in ") + caller_name + ": self_modulate must be finite. Nothing was spawned.");
+		SpawnReport2D::error(String("Error in ") + caller_name + ": self_modulate must be finite. Nothing was spawned.");
 		return false;
 	}
 	return true;
@@ -95,7 +96,7 @@ void warn_if_spawn_invisible(const Ref<BulletVolleyData2D> &spawn_data, const ch
 
 bool validate_spawn_data(const Ref<BulletVolleyData2D> &spawn_data, const char *caller_name) {
 	if (spawn_data.is_null() || spawn_data->transforms.size() == 0) {
-		UtilityFunctions::push_error(String("Error when trying to spawn bullets in ") + caller_name + ". No spawn_data or no transforms were provided. Ignoring the request");
+		SpawnReport2D::error(String("Error when trying to spawn bullets in ") + caller_name + ". No spawn_data or no transforms were provided. Ignoring the request");
 		return false;
 	}
 	const int bullet_count = spawn_data->transforms.size();
@@ -116,36 +117,41 @@ bool validate_spawn_data(const Ref<BulletVolleyData2D> &spawn_data, const char *
 
 bool BulletFactory2D::validate_spawn_request(const char *caller_name, const Ref<BulletVolleyData2D> &spawn_data, const Vector2 &inherited_velocity_offset, int override_count) {
 	if (is_factory_busy) {
-		UtilityFunctions::push_error("Error when trying to spawn bullets. BulletFactory2D is currently busy. Ignoring the request");
+		SpawnReport2D::error("Error when trying to spawn bullets. BulletFactory2D is currently busy. Ignoring the request");
 		return false;
 	}
 	// Used before its READY notification (a script _ready that spawns runs
 	// first): the native start runs now.
 	if (!is_ready) {
+		// The native start builds the factory's children (their tree signals
+		// may run user code): a shot's capture never sees what that reports.
+		String *held_capture = SpawnReport2D::capture;
+		SpawnReport2D::release_capture();
 		ensure_factory_initialized();
+		SpawnReport2D::capture = held_capture;
 	}
 	if (!is_ready) {
-		UtilityFunctions::push_error(String(caller_name) + ": BulletFactory2D is not in the scene tree yet. Add it first, then spawn.");
+		SpawnReport2D::error(String(caller_name) + ": BulletFactory2D is not in the scene tree yet. Add it first, then spawn.");
 		return false;
 	}
 	if (is_tearing_down) {
-		UtilityFunctions::push_error(String(caller_name) + ": BulletFactory2D is being freed. Ignoring the request.");
+		SpawnReport2D::error(String(caller_name) + ": BulletFactory2D is being freed. Ignoring the request.");
 		return false;
 	}
 	// A factory removed from the tree (but kept alive) still holds a
 	// valid physics space: spawning would create bullets that collide
 	// but never render. Refuse loudly instead.
 	if (!is_inside_tree()) {
-		UtilityFunctions::push_error(String(caller_name) + ": BulletFactory2D is not inside the scene tree. Ignoring the request.");
+		SpawnReport2D::error(String(caller_name) + ": BulletFactory2D is not inside the scene tree. Ignoring the request.");
 		return false;
 	}
 	if (!inherited_velocity_offset.is_finite()) {
-		UtilityFunctions::push_error(String("Error in ") + caller_name + ": inherited velocity offset must be finite. Nothing was spawned.");
+		SpawnReport2D::error(String("Error in ") + caller_name + ": inherited velocity offset must be finite. Nothing was spawned.");
 		return false;
 	}
 	const int count = override_count >= 0 ? override_count : (spawn_data.is_null() ? 0 : (int)spawn_data->transforms.size());
 	if (spawn_data.is_null() || count == 0) {
-		UtilityFunctions::push_error(String("Error when trying to spawn bullets in ") + caller_name + ". No spawn_data or no transforms were provided. Ignoring the request");
+		SpawnReport2D::error(String("Error when trying to spawn bullets in ") + caller_name + ". No spawn_data or no transforms were provided. Ignoring the request");
 		return false;
 	}
 	// Native span callers validated their transforms already (no Variant
@@ -301,6 +307,9 @@ BulletVolley2D *BulletFactory2D::spawn_volley_span(const Ref<BulletVolleyData2D>
 	if (!validate_spawn_transform_span(transforms, count, "spawn_volley")) {
 		return nullptr;
 	}
+	// Validated: from here on (attachment callbacks, user code) nothing is a
+	// refusal of this request, so a shot's capture stops listening.
+	SpawnReport2D::release_capture();
 	warn_if_spawn_invisible(spawn_data, "spawn_volley");
 	return spawn_volley_internal(spawn_data, new_inherited_velocity_offset, spawner_id, transforms, count, colors);
 }

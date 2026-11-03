@@ -9,6 +9,7 @@
 #include "bullet_spawner/pattern_spawner2d_internal.hpp"
 #include "core/emit_on2d.hpp"
 #include "core/node_scan2d.hpp"
+#include "core/spawn_report2d.hpp"
 #include "factory/bullet_factory2d.hpp"
 #include "laser/laser_volley2d.hpp"
 
@@ -485,9 +486,17 @@ ShotResult2D LaserSpawner2D::fire_shot(std::vector<Transform2D> &transforms) {
 	const uint64_t self_id = get_instance_id();
 	const uint64_t anchor = shot_pose_active ? 0 : self_id;
 	const Transform2D frame = get_shot_frame();
-	LaserVolley2D *laser = factory->spawn_laser_span(laser_data, transforms.data(), (int)transforms.size(), self_id, anchor, frame, "LaserSpawner2D::shoot_once", offset, false, shot_inherited_velocity());
+	// A refusal of the request comes back here (the factory's own words) and
+	// goes through shoot_once's auto-fire error latch: once per misconfiguration.
+	LaserVolley2D *laser = nullptr;
+	String refusal_message;
+	{
+		SpawnReportCapture2D capture;
+		laser = factory->spawn_laser_span(laser_data, transforms.data(), (int)transforms.size(), self_id, anchor, frame, "LaserSpawner2D::shoot_once", offset, false, shot_inherited_velocity());
+		refusal_message = capture.message;
+	}
 	if (laser == nullptr) {
-		result.refusal = ShotRefusal2D::refuse(String(), StringName("factory_refused"), true);
+		result.refusal = ShotRefusal2D::refuse(refusal_message, StringName("factory_refused"), true);
 		return result;
 	}
 	// It moves from when the shot was due (exact spacing of timed shots).

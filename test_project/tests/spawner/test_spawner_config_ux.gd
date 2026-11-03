@@ -312,3 +312,55 @@ func test_each_misconfiguration_is_named() -> void:
 	assert_true(_has_1(sp, "orbiting_enabled needs homing_enabled"), "orbiting without homing")
 	sp.set_orbiting_enabled(false)
 	assert_eq(Array(sp.get_setup_warnings()), [], "clean again")
+
+
+## A shot the FACTORY refuses (a singular transform, more bullets than the
+## pattern limit) is a misconfiguration like any other: while auto firing it is
+## reported once (the factory's own words), every shot still reports
+## volley_skipped, and manual shots always report. It printed once per shot.
+const _REFUSED_SHOTS := ["bullet_zero_pattern_scale", "bullet_zero_transforms_scale", "bullet_over_limit", "laser_zero_pattern_scale", "laser_over_limit"]
+
+
+func test_auto_fire_reports_a_factory_refusal_once(case: String = use_parameters(_REFUSED_SHOTS)) -> void:
+	var laser := case.begins_with("laser")
+	var over_limit := case.ends_with("over_limit")
+	var sp: PatternSpawner2D = LaserSpawner2D.new() if laser else BulletSpawner2D.new()
+	if laser:
+		sp.set("laser_data", LaserData2D.new())
+	else:
+		sp.set("spawn_data", H.make_volley_data(1, 0.0, 100.0))
+	sp.set_shooting_enabled(false)
+	sp.shoot_interval_sec = 0.05
+	sp.pattern_source = BulletSpawner2D.PATTERN_FROM_CHILDREN
+	for i in (9 if over_limit else 2):
+		var marker := Marker2D.new()
+		marker.position = Vector2(12 * i, 0)
+		sp.add_child(marker)
+	add(sp)
+	sp.set_bullet_factory(factory)
+	if over_limit:
+		BulletPatterns2D.set_max_bullets_per_pattern(8)
+	elif case.contains("pattern_scale"):
+		sp.pattern_scale = 0.0
+	else:
+		sp.transforms_scale = 0.0
+	var text := ""
+	match case:
+		"bullet_zero_pattern_scale", "bullet_zero_transforms_scale":
+			text = "Error in spawn_volley: transforms[0] has zero or singular scale. Nothing was spawned."
+		"bullet_over_limit":
+			text = "spawn_volley: a volley holds at most 8 bullets (got 9). Raise blastbullets2d/patterns/max_bullets_per_pattern (BulletPatterns2D.max_bullets_per_pattern) for more. Nothing was spawned."
+		"laser_zero_pattern_scale":
+			text = "LaserSpawner2D::shoot_once: every transform must be finite and invertible, nothing fired."
+		"laser_over_limit":
+			text = "LaserSpawner2D::shoot_once: 9 beams is more than BulletPatterns2D.max_bullets_per_pattern (8), nothing fired."
+	watch_signals(sp)
+	sp.set_shooting_enabled(true)
+	await idle(30) # ~10 refused attempts
+	expect_error_sequence([text])
+	assert_gt(get_signal_emit_count(sp, "volley_skipped"), 3, "every refused shot still reports volley_skipped")
+	assert_eq(get_signal_parameters(sp, "volley_skipped"), [&"factory_refused"], "the reason is unchanged")
+	sp.set_shooting_enabled(false)
+	sp.shoot_once()
+	sp.shoot_once()
+	expect_error_sequence([text, text])
