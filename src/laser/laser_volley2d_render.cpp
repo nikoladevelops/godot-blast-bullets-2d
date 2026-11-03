@@ -222,12 +222,17 @@ struct BodyStyle2D {
 	bool tile;
 	real_t tex_w;
 	real_t scroll;
+	real_t feather; // the width of each soft edge (one screen pixel in local units), 0 = hard edges
 };
 
 // One beam's strip: a left/right vertex pair per point (v = 0 left, 1
 // right), joined at a miter where the beam turns by at most 90 degrees and
 // split where it turns sharper (a reflection). A segment is cut into pieces
 // for the color ramp (8 over the whole length, at least one per segment).
+// Antialiased (feather > 0): four vertices per point instead, an outer one
+// faded to alpha 0 half a feather beyond each edge and an inner one half a
+// feather inside, so the drawn width stays the beam's and its edges blend
+// over a screen pixel (hard edges crawl in whole pixels and stair-step).
 void append_body_strip(LaserBodyMesh2D &m, const std::vector<Vector2> &pts, const BodyStyle2D &s) {
 	real_t total = 0.0;
 	for (size_t k = 1; k < pts.size(); ++k) {
@@ -238,23 +243,48 @@ void append_body_strip(LaserBodyMesh2D &m, const std::vector<Vector2> &pts, cons
 	}
 	const LaserData2D *d = s.data;
 	const bool ramp = d->color_ramp.is_valid();
+	const bool soft = s.feather > (real_t)0.0;
+	// Along the (possibly mitered) offset: the outer and inner edge scales.
+	const real_t k_out = soft ? (s.half + s.feather * (real_t)0.5) / s.half : (real_t)1.0;
+	const real_t k_in = soft ? Math::max((real_t)0.0, s.half - s.feather * (real_t)0.5) / s.half : (real_t)1.0;
+	const real_t v_in = soft ? (k_out - k_in) / ((real_t)2.0 * k_out) : (real_t)0.0;
 	auto pair = [&](const Vector2 &at, const Vector2 &offset, real_t dist, bool connect) {
 		const int32_t base = (int32_t)m.points.size();
-		m.points.push_back(at + offset);
-		m.points.push_back(at - offset);
 		const real_t t = dist / total;
 		Color col = d->modulate;
 		if (ramp) {
 			col = col * d->color_ramp->sample(t);
 		}
-		m.colors.push_back(col);
-		m.colors.push_back(col);
 		const real_t u = s.tile ? (dist + s.scroll) / s.tex_w : t;
-		m.uvs.push_back(Vector2(u, 0.0));
-		m.uvs.push_back(Vector2(u, 1.0));
-		if (connect) {
-			const int32_t quad[6] = { base - 2, base - 1, base, base - 1, base + 1, base };
-			m.indices.insert(m.indices.end(), quad, quad + 6);
+		if (!soft) {
+			const Vector2 points[2] = { at + offset, at - offset };
+			const Color colors[2] = { col, col };
+			const Vector2 uvs[2] = { Vector2(u, 0.0), Vector2(u, 1.0) };
+			m.points.insert(m.points.end(), points, points + 2);
+			m.colors.insert(m.colors.end(), colors, colors + 2);
+			m.uvs.insert(m.uvs.end(), uvs, uvs + 2);
+			if (connect) {
+				const int32_t quad[6] = { base - 2, base - 1, base, base - 1, base + 1, base };
+				m.indices.insert(m.indices.end(), quad, quad + 6);
+			}
+			return;
+		}
+		Color clear = col;
+		clear.a = 0.0;
+		const Vector2 out = offset * k_out;
+		const Vector2 in = offset * k_in;
+		const Vector2 points[4] = { at + out, at + in, at - in, at - out };
+		const Color colors[4] = { clear, col, col, clear };
+		const Vector2 uvs[4] = { Vector2(u, 0.0), Vector2(u, v_in), Vector2(u, (real_t)1.0 - v_in), Vector2(u, 1.0) };
+		m.points.insert(m.points.end(), points, points + 4);
+		m.colors.insert(m.colors.end(), colors, colors + 4);
+		m.uvs.insert(m.uvs.end(), uvs, uvs + 4);
+		if (connect) { // three quads: fade, body, fade
+			const int32_t p = base - 4;
+			const int32_t quads[18] = { p, p + 1, base, p + 1, base + 1, base,
+				p + 1, p + 2, base + 1, p + 2, base + 2, base + 1,
+				p + 2, p + 3, base + 2, p + 3, base + 3, base + 2 };
+			m.indices.insert(m.indices.end(), quads, quads + 18);
 		}
 	};
 	bool started = false;
@@ -337,6 +367,15 @@ void LaserVolley2D::build_body_mesh(double fraction, LaserBodyMesh2D &r_mesh, st
 	style.tile = d->body_mode == LaserData2D::BODY_TILE && body != nullptr;
 	style.tex_w = body != nullptr ? Math::max((real_t)1.0, body->get_size().x) : (real_t)1.0;
 	style.scroll = (real_t)(-d->body_scroll_speed * (draw_clock - grow_started));
+	style.feather = 0.0;
+	if (d->antialiased) {
+		// One screen pixel in the laser's own units (zoom, scaled parents).
+		const Transform2D to_screen = get_global_transform_with_canvas();
+		const real_t scale = Math::max(to_screen.columns[0].length(), to_screen.columns[1].length());
+		if (Math::is_finite(scale) && scale > (real_t)1e-6) {
+			style.feather = (real_t)1.0 / scale;
+		}
+	}
 	const bool bodies = style.half > (real_t)0.0;
 	BeamDrawFrame2D local;
 	for (const Beam &b : beams) {
@@ -454,7 +493,7 @@ void LaserVolley2D::_draw() {
 				PackedVector2Array line;
 				line.resize((int64_t)pts.size());
 				std::memcpy(line.ptrw(), pts.data(), pts.size() * sizeof(Vector2));
-				draw_polyline(line, d->warning_color, (real_t)d->warning_width);
+				draw_polyline(line, d->warning_color, (real_t)d->warning_width, d->antialiased); // soft like the body
 			}
 		}
 		frames.clear();

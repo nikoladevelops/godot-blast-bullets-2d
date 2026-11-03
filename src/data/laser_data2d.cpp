@@ -150,6 +150,13 @@ void LaserData2D::set_hit_while_growing(bool value) {
 	emit_changed();
 }
 
+void LaserData2D::set_antialiased(bool value) {
+	if (!assign_if_changed2d(antialiased, value)) {
+		return;
+	}
+	emit_changed();
+}
+
 void LaserData2D::set_keep_tracking_when_active(bool value) {
 	if (!assign_if_changed2d(keep_tracking_when_active, value)) {
 		return;
@@ -523,6 +530,7 @@ void LaserData2D::_bind_methods() {
 	LASER_BIND(body_mode, INT, PROPERTY_HINT_ENUM, "Stretch,Tile")
 	LASER_BIND(body_scroll_speed, FLOAT, PROPERTY_HINT_RANGE, "-2000,2000,1,or_less,or_greater,suffix:px/s")
 	LASER_BIND(body_width_scale, FLOAT, PROPERTY_HINT_RANGE, "0,4,0.01,or_greater")
+	LASER_BIND(antialiased, BOOL, PROPERTY_HINT_NONE, "")
 	LASER_BIND(body_material, OBJECT, PROPERTY_HINT_RESOURCE_TYPE, "CanvasItemMaterial,ShaderMaterial")
 	LASER_BIND(charge_look, OBJECT, PROPERTY_HINT_RESOURCE_TYPE, "LaserSpriteLook2D")
 	LASER_BIND(muzzle_look, OBJECT, PROPERTY_HINT_RESOURCE_TYPE, "LaserSpriteLook2D")

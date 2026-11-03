@@ -49,6 +49,9 @@
 		<member name="aim" type="int" setter="set_aim" getter="get_aim" enum="LaserData2D.LaserAim" default="0">
 			How each beam aims (see [enum LaserAim]). Track and Lock On need targets: [method LaserVolley2D.set_targets], or the spawner's targeting.
 		</member>
+		<member name="antialiased" type="bool" setter="set_antialiased" getter="get_antialiased" default="true">
+			Soft body edges (on by default): each edge of the body, and the charge warning line, fades out over one screen pixel (zoom and scaled parents counted), so a moving or turning beam glides between pixels instead of crawling in whole-pixel steps with stair-stepped edges. The drawn width stays the same. Off draws the hard-edged strip.
+		</member>
 		<member name="body_frames" type="SpriteFrames" setter="set_body_frames" getter="get_body_frames">
 			The body texture ([code]default[/code] when it has frames, else the first animation with frames), playing from the growing start. Empty draws a solid body in [member modulate].
 		</member>

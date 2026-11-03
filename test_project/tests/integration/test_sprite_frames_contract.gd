@@ -668,6 +668,7 @@ func test_populating_the_pool_reads_the_frames_ahead_of_the_first_shot() -> void
 
 func test_a_tiled_laser_body_repeats_its_region_not_its_sheet() -> void:
 	var d := H.make_laser(0.0, 0.0, 0.0, 0.0, 200.0)
+	d.antialiased = false  # pins the hard-edged strip (antialiased adds a faded outer ring)
 	d.body_frames = _sf({"default": [_atlas(ImageTexture.create_from_image(_sheet_image()), Rect2(0, 0, 4, 2))]})
 	d.body_mode = LaserData2D.BODY_TILE
 	var t: Array[Transform2D] = [Transform2D.IDENTITY]

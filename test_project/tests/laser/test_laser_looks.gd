@@ -231,6 +231,7 @@ func test_body_width_scale_widens_only_the_drawn_body() -> void:
 	var hits: Array = []
 	factory.laser_hit.connect(func(t, _l, _b, _p) -> void: hits.append(t))
 	var d := H.make_laser(0.0, 0.0, 0.0, 0.0, 200.0)
+	d.antialiased = false  # pins the hard-edged strip (antialiased adds a faded outer ring)
 	d.width = 12.0 # reaches 6 px off the axis: misses the target
 	d.body_width_scale = 2.0
 	var l := _fire(d)

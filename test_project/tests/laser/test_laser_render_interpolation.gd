@@ -213,6 +213,7 @@ func _corridor_beam() -> LaserVolley2D:
 	make_wall(Vector2(400, 50), Vector2(1200, 20), 16)
 	await idle(2)
 	var d := H.make_laser(0.0, 0.0, 0.0, 0.0, 2000.0)
+	d.antialiased = false  # pins the hard-edged strip (antialiased adds a faded outer ring)
 	d.wall_mask = 16
 	d.reflections = 8
 	var l := _fire(d, Transform2D(deg_to_rad(45.0), Vector2.ZERO))
@@ -221,7 +222,9 @@ func _corridor_beam() -> LaserVolley2D:
 
 
 func test_a_straight_body_is_one_quad_of_the_beam_width() -> void:
-	var l := _fire(H.make_laser(0.0, 0.0, 0.0, 0.0, 200.0), Transform2D(0.0, Vector2(50, 50)))
+	var d := H.make_laser(0.0, 0.0, 0.0, 0.0, 200.0)
+	d.antialiased = false  # pins the hard-edged strip (antialiased adds a faded outer ring)
+	var l := _fire(d, Transform2D(0.0, Vector2(50, 50)))
 	step_factory(1, DT)
 	var mesh: Dictionary = l.debug_get_body_mesh(1.0)
 	assert_eq(Array(mesh["points"]), [Vector2(50, 56), Vector2(50, 44), Vector2(250, 56), Vector2(250, 44)], "left/right at the muzzle and the end, half the width (12) off the beam")
@@ -232,6 +235,7 @@ func test_a_straight_body_is_one_quad_of_the_beam_width() -> void:
 
 func test_a_color_ramp_samples_the_body_in_eight_pieces() -> void:
 	var d := H.make_laser(0.0, 0.0, 0.0, 0.0, 200.0)
+	d.antialiased = false  # pins the hard-edged strip (antialiased adds a faded outer ring)
 	d.color_ramp = Gradient.new() # black -> white
 	d.modulate = Color(1.0, 0.5, 0.25)
 	var l := _fire(d)
@@ -271,6 +275,7 @@ func test_a_sharp_reflection_splits_the_strip() -> void:
 	make_wall(Vector2(200, 0), Vector2(20, 600), 16)
 	await idle(2)
 	var d := H.make_laser(0.0, 0.0, 0.0, 0.0)
+	d.antialiased = false  # pins the hard-edged strip (antialiased adds a faded outer ring)
 	d.wall_mask = 16
 	d.reflections = 1
 	var l := _fire(d, Transform2D(deg_to_rad(30.0), Vector2.ZERO))
@@ -286,6 +291,7 @@ func test_a_sharp_reflection_splits_the_strip() -> void:
 
 func test_a_curvy_body_is_one_smooth_strip() -> void:
 	var d := H.make_laser(0.0, 0.0, 0.0, 0.0, 300.0)
+	d.antialiased = false  # pins the hard-edged strip (antialiased adds a faded outer ring)
 	d.type = LaserData2D.LASER_CURVY
 	d.speed = 800.0
 	d.wave_amplitude = 40.0
@@ -301,6 +307,7 @@ func test_a_curvy_body_is_one_smooth_strip() -> void:
 
 func test_a_tiled_body_runs_its_texture_along_the_length() -> void:
 	var d := H.make_laser(0.0, 0.0, 0.0, 0.0, 200.0)
+	d.antialiased = false  # pins the hard-edged strip (antialiased adds a faded outer ring)
 	var sf := SpriteFrames.new()
 	sf.add_frame(&"default", ImageTexture.create_from_image(Image.create(16, 4, false, Image.FORMAT_RGBA8)))
 	d.body_frames = sf
@@ -324,6 +331,7 @@ func test_no_body_while_charging_or_for_a_spent_beam() -> void:
 	factory.despawn_bounds_rect = Rect2(-50, -50, 300, 100)
 	factory.despawn_bounds_enabled = true
 	var b := H.make_laser(0.0, 0.0, 0.0, 0.0, 80.0)
+	b.antialiased = false  # pins the hard-edged strip (antialiased adds a faded outer ring)
 	b.type = LaserData2D.LASER_BOLT
 	b.speed = 1600.0
 	var poses: Array[Transform2D] = [Transform2D(0.0, Vector2.ZERO), Transform2D(PI / 2.0, Vector2.ZERO)]
@@ -336,6 +344,7 @@ func test_no_body_while_charging_or_for_a_spent_beam() -> void:
 
 func test_the_body_follows_the_interpolated_beam() -> void:
 	var d := H.make_laser(0.0, 0.0, 0.0, 0.0, 200.0)
+	d.antialiased = false  # pins the hard-edged strip (antialiased adds a faded outer ring)
 	d.sweep_speed_degrees = 160.0 # 10 deg per tick
 	var l := _fire(d, Transform2D(0.0, Vector2(50, 50)))
 	step_factory(2, DT)
@@ -574,3 +583,46 @@ func test_each_impact_plays_from_its_own_start_and_faces_its_segment() -> void:
 	assert_almost_eq(float(s["impacts"][0][2]), (pts[1] - pts[0]).angle(), 0.0001, "the reflection faces the first segment")
 	assert_almost_eq(float(s["impacts"][1][2]), (pts[2] - pts[1]).angle(), 0.0001, "the stop faces the reflected segment")
 	assert_eq(s["impacts"][0][1], d.wall_impact_look.frames.get_frame_texture(&"default", 1), "0.375 s into its own clock: frame 1")
+
+
+# --- antialiased edges (LaserData2D.antialiased, on by default) -----------------
+
+func test_antialiased_edges_are_on_by_default() -> void:
+	assert_true(LaserData2D.new().antialiased, "soft edges by default")
+	assert_true("antialiased" in LaserData2D.new(), "a bound property")
+
+
+func test_an_antialiased_body_fades_one_screen_pixel_across_each_edge() -> void:
+	var l := _fire(H.make_laser(0.0, 0.0, 0.0, 0.0, 200.0), Transform2D(0.0, Vector2(50, 50)))
+	l.get_laser_data().antialiased = true
+	step_factory(1, DT)
+	var mesh: Dictionary = l.debug_get_body_mesh(1.0)
+	# Half the width is 6: the inner edge sits half a pixel in, the faded outer one half a pixel out.
+	assert_eq(Array(mesh["points"]), [Vector2(50, 56.5), Vector2(50, 55.5), Vector2(50, 44.5), Vector2(50, 43.5),
+		Vector2(250, 56.5), Vector2(250, 55.5), Vector2(250, 44.5), Vector2(250, 43.5)], "outer, inner, inner, outer at both ends")
+	var clear := Color(1, 1, 1, 0)
+	assert_eq(Array(mesh["colors"]), [clear, Color.WHITE, Color.WHITE, clear, clear, Color.WHITE, Color.WHITE, clear], "the outer ring fades to nothing")
+	var v: Array = []
+	for uv in (mesh["uvs"] as PackedVector2Array):
+		v.append(snappedf(uv.y, 0.0001))
+	assert_eq(v, [0.0, snappedf(1.0 / 13.0, 0.0001), snappedf(12.0 / 13.0, 0.0001), 1.0, 0.0, snappedf(1.0 / 13.0, 0.0001), snappedf(12.0 / 13.0, 0.0001), 1.0], "v spans the whole 13 px drawn width")
+	assert_eq(Array(mesh["indices"]), [0, 1, 4, 1, 5, 4, 1, 2, 5, 2, 6, 5, 2, 3, 6, 3, 7, 6], "three quads: fade, body, fade")
+
+
+func test_the_edge_fade_stays_one_screen_pixel_under_a_zoom() -> void:
+	var vp := get_viewport()
+	var was := vp.canvas_transform
+	vp.canvas_transform = Transform2D().scaled(Vector2(2, 2))
+	var l := _fire(H.make_laser(0.0, 0.0, 0.0, 0.0, 200.0), Transform2D(0.0, Vector2(50, 50)))
+	l.get_laser_data().antialiased = true
+	step_factory(1, DT)
+	var pts: PackedVector2Array = l.debug_get_body_mesh(1.0)["points"]
+	vp.canvas_transform = was
+	assert_eq([pts[0].y, pts[1].y], [56.25, 55.75], "drawn at 2x, a screen pixel is half a unit")
+
+
+func test_antialiased_off_draws_exactly_the_hard_edged_strip() -> void:
+	var l := _fire(H.make_laser(0.0, 0.0, 0.0, 0.0, 200.0), Transform2D(0.0, Vector2(50, 50)))
+	l.get_laser_data().antialiased = false
+	step_factory(1, DT)
+	assert_eq(Array(l.debug_get_body_mesh(1.0)["points"]), [Vector2(50, 56), Vector2(50, 44), Vector2(250, 56), Vector2(250, 44)], "today's strip")

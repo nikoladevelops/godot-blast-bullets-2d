@@ -91,6 +91,7 @@ public:
 	BodyMode body_mode = BODY_STRETCH;
 	double body_scroll_speed = 0.0;
 	double body_width_scale = 1.0; // drawn width / `width` (hits keep `width`)
+	bool antialiased = true; // soft body edges: a one-screen-pixel fade on each side
 	Ref<Material> body_material; // the body and the warning line
 	// The point animations, each on its own canvas item (z order relative
 	// to the laser by default, own material). Null = not drawn.
@@ -182,6 +183,8 @@ public:
 	void set_body_scroll_speed(double value);
 	double get_body_width_scale() const { return body_width_scale; }
 	void set_body_width_scale(double value);
+	bool get_antialiased() const { return antialiased; }
+	void set_antialiased(bool value);
 	Ref<Material> get_body_material() const { return body_material; }
 	void set_body_material(const Ref<Material> &value);
 	Array get_effects() const { return effects; }
