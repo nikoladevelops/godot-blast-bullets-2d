@@ -1,0 +1,138 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://examples/05_split.gd" id="1_blsx8"]
+[ext_resource type="Script" path="res://examples/common/example_player.gd" id="2_fmy8v"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/player_ship1.png" id="3_e0vup"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/player_ship2.png" id="4_4jk8k"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/player_ship3.png" id="5_3mb4v"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/player_ship5.png" id="6_cxm0k"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/player_ship6.png" id="7_3bcit"]
+[ext_resource type="Theme" path="res://shared/ui/test_lab_theme.tres" id="8_rku4y"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_turret/enemy_turret_holder.png" id="9_qqmle"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_turret/enemy_turret.png" id="10_k55oe"]
+[ext_resource type="Texture2D" path="res://shared/art/light/light_texture.png" id="11_k5h5u"]
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_2fj44"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("3_e0vup")
+}, {
+"duration": 1.0,
+"texture": ExtResource("4_4jk8k")
+}, {
+"duration": 1.0,
+"texture": ExtResource("5_3mb4v")
+}, {
+"duration": 1.0,
+"texture": ExtResource("6_cxm0k")
+}, {
+"duration": 1.0,
+"texture": ExtResource("7_3bcit")
+}],
+"loop": 1,
+"name": &"default",
+"speed": 12.0
+}]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_fjnnk"]
+radius = 8.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_s3i70"]
+
+[sub_resource type="BulletSpeedData2D" id="BulletSpeedData2D_agse7"]
+speed = 110.0
+max_speed = 110.0
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_o0vmh"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("11_k5h5u")
+}],
+"loop": 1,
+"name": &"default",
+"speed": 12.0
+}]
+
+[sub_resource type="BulletVolleyData2D" id="BulletVolleyData2D_gp4y2"]
+sprite_frames = SubResource("SpriteFrames_o0vmh")
+max_life_time = 3.0
+self_modulate = Color(1, 0.41568628, 0.6901961, 1)
+shared_bullet_speed_data = SubResource("BulletSpeedData2D_agse7")
+collision_mask = 2
+collision_shape = SubResource("CircleShape2D_s3i70")
+
+[sub_resource type="BulletSplitStage2D" id="BulletSplitStage2D_c745p"]
+split_after_sec = 0.9
+count = 8
+direction_mode = 1
+scale_multiplier = 0.6
+
+[sub_resource type="BulletSplitData2D" id="BulletSplitData2D_iygwo"]
+stages = Array[BulletSplitStage2D]([SubResource("BulletSplitStage2D_c745p")])
+
+[node name="Split" type="Node2D" unique_id=2072824225]
+script = ExtResource("1_blsx8")
+
+[node name="Background" type="ColorRect" parent="." unique_id=186390228]
+offset_right = 1152.0
+offset_bottom = 648.0
+color = Color(0.043137256, 0.05882353, 0.101960786, 1)
+
+[node name="BulletFactory2D" type="BulletFactory2D" parent="." unique_id=1353686026]
+
+[node name="Player" type="Area2D" parent="." unique_id=462905106 groups=["player"]]
+position = Vector2(576, 540)
+collision_layer = 2
+collision_mask = 0
+script = ExtResource("2_fmy8v")
+
+[node name="Ship" type="AnimatedSprite2D" parent="Player" unique_id=2051655115]
+scale = Vector2(1.5, 1.5)
+sprite_frames = SubResource("SpriteFrames_2fj44")
+autoplay = "default"
+
+[node name="Hitbox" type="CollisionShape2D" parent="Player" unique_id=411761768]
+shape = SubResource("CircleShape2D_fjnnk")
+
+[node name="Tip" type="Label" parent="." unique_id=1431463833]
+offset_left = 16.0
+offset_top = 612.0
+offset_right = 16.0
+offset_bottom = 612.0
+theme = ExtResource("8_rku4y")
+theme_override_font_sizes/font_size = 15
+text = "Arrow keys move. Each slow orb bursts into a ring of eight after 0.9 s."
+
+[node name="Bursts" type="Label" parent="." unique_id=430766447]
+offset_left = 16.0
+offset_top = 12.0
+offset_right = 16.0
+offset_bottom = 12.0
+theme = ExtResource("8_rku4y")
+theme_override_font_sizes/font_size = 24
+text = "Bursts: 0"
+
+[node name="Turret" type="Node2D" parent="." unique_id=1462962599]
+position = Vector2(576, 150)
+
+[node name="EnemyTurretHolder" type="Sprite2D" parent="Turret" unique_id=917232283]
+rotation = 3.1415927
+scale = Vector2(2, 2)
+texture = ExtResource("9_qqmle")
+
+[node name="EnemyTurret" type="Sprite2D" parent="Turret" unique_id=1889720487]
+rotation = 3.1415927
+scale = Vector2(2, 2)
+texture = ExtResource("10_k55oe")
+
+[node name="Spawner" type="BulletSpawner2D" parent="Turret" unique_id=1043507375]
+spawn_data = SubResource("BulletVolleyData2D_gp4y2")
+pattern_source = 4
+helper_bullets_amount = 5
+helper_fan_spread = 1.2
+helper_fan_direction_angle = 1.5707963267948966
+shoot_interval_sec = 1.4
+split_enabled = true
+split_data = SubResource("BulletSplitData2D_iygwo")

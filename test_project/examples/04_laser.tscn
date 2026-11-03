@@ -1,0 +1,95 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://examples/04_laser.gd" id="1_jwtmk"]
+[ext_resource type="Script" path="res://examples/common/example_player.gd" id="2_7ypw5"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/player_ship1.png" id="3_jvbco"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/player_ship2.png" id="4_d8bx3"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/player_ship3.png" id="5_x4op0"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/player_ship5.png" id="6_g0t8d"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/player_ship6.png" id="7_jhqq7"]
+[ext_resource type="Theme" path="res://shared/ui/test_lab_theme.tres" id="8_o047x"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_turret/enemy_turret_holder.png" id="9_wprjc"]
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_xqcec"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("3_jvbco")
+}, {
+"duration": 1.0,
+"texture": ExtResource("4_d8bx3")
+}, {
+"duration": 1.0,
+"texture": ExtResource("5_x4op0")
+}, {
+"duration": 1.0,
+"texture": ExtResource("6_g0t8d")
+}, {
+"duration": 1.0,
+"texture": ExtResource("7_jhqq7")
+}],
+"loop": 1,
+"name": &"default",
+"speed": 12.0
+}]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_xcrcj"]
+radius = 8.0
+
+[sub_resource type="LaserData2D" id="LaserData2D_ghp5f"]
+length = 760.0
+charge_sec = 0.8
+active_sec = 2.4
+fade_sec = 0.3
+sweep_speed_degrees = 45.0
+sweep_arc_degrees = 110.0
+collision_mask = 2
+hit_interval_sec = 0.3
+modulate = Color(1, 0.23921569, 0.56078434, 1)
+
+[node name="Laser" type="Node2D" unique_id=17510645]
+script = ExtResource("1_jwtmk")
+
+[node name="Background" type="ColorRect" parent="." unique_id=604422601]
+offset_right = 1152.0
+offset_bottom = 648.0
+color = Color(0.043137256, 0.05882353, 0.101960786, 1)
+
+[node name="BulletFactory2D" type="BulletFactory2D" parent="." unique_id=1765192327]
+
+[node name="Player" type="Area2D" parent="." unique_id=1253171773 groups=["player"]]
+position = Vector2(576, 540)
+collision_layer = 2
+collision_mask = 0
+script = ExtResource("2_7ypw5")
+
+[node name="Ship" type="AnimatedSprite2D" parent="Player" unique_id=1252291133]
+scale = Vector2(1.5, 1.5)
+sprite_frames = SubResource("SpriteFrames_xqcec")
+autoplay = "default"
+
+[node name="Hitbox" type="CollisionShape2D" parent="Player" unique_id=649125984]
+shape = SubResource("CircleShape2D_xcrcj")
+
+[node name="Tip" type="Label" parent="." unique_id=1890315135]
+offset_left = 16.0
+offset_top = 612.0
+offset_right = 16.0
+offset_bottom = 612.0
+theme = ExtResource("8_o047x")
+theme_override_font_sizes/font_size = 15
+text = "Arrow keys move. The beam charges (thin line), then sweeps: stay out of it."
+
+[node name="Emitter" type="Node2D" parent="." unique_id=1582113926]
+position = Vector2(576, 110)
+
+[node name="Base" type="Sprite2D" parent="Emitter" unique_id=1289907939]
+scale = Vector2(2, 2)
+texture = ExtResource("9_wprjc")
+
+[node name="Laser" type="LaserSpawner2D" parent="Emitter" unique_id=1682583517]
+laser_data = SubResource("LaserData2D_ghp5f")
+pattern_source = 4
+helper_bullets_amount = 1
+helper_fan_direction_angle = 1.5707963267948966
+shoot_interval_sec = 4.0
