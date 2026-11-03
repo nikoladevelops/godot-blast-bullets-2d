@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://shared/live_inspector/live_inspector.gd" id="1_insp"]
+
+[node name="LiveInspector" type="CanvasLayer"]
+script = ExtResource("1_insp")
