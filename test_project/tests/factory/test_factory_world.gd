@@ -516,7 +516,7 @@ func test_a_pause_from_a_handler_freezes_the_rest_of_the_sweep() -> void:
 ## The factory area calls take a trailing can_hit_mask: only bullets (and lasers)
 ## whose collision_mask shares a bit with it count; 0 = all. A bomb clears
 ## "everything that can hurt the player" without touching the player's shots.
-const AREA_CALLS := ["get_bullets_in_circle", "get_bullets_in_rect", "count_bullets_in_circle", "count_bullets_in_rect",
+const AREA_CALLS := ["get_bullets_in_circle", "get_bullets_in_rect", "get_bullet_positions_in_circle", "get_nearest_bullet", "count_bullets_in_circle", "count_bullets_in_rect",
 	"clear_bullets_in_circle", "clear_bullets_in_rect", "convert_all_bullets_to_pickups",
 	"convert_all_bullets_to_pickups_deferred", "convert_bullets_in_circle_to_pickups",
 	"convert_bullets_in_rect_to_pickups", "end_lasers_in_circle", "end_lasers_in_rect"]
@@ -600,3 +600,56 @@ func test_a_can_hit_mask_outside_32_bits_is_refused_and_changes_nothing() -> voi
 		assert_eq(factory.end_lasers_in_circle(Vector2.ZERO, 5.0, true, bad), 0, "laser end refused")
 		expect_error_sequence(["end_lasers_in_circle: can_hit_mask must be between 0 and 4294967295 (0 matches everything)."])
 	assert_eq(_alive(v), [0], "nothing happened")
+
+
+# --- fast queries: positions and the nearest bullet --------------------------
+
+func test_positions_in_circle_match_the_listing_without_dictionaries() -> void:
+	var a := _masked_volley([Vector2(0, 0), Vector2(50, 0), Vector2(3, 4)], 2)
+	var b := _masked_volley([Vector2(-6, 0), Vector2(8, 0)], 4)
+	b.disable_bullet(1)
+	var listed := PackedVector2Array()
+	for e in factory.get_bullets_in_circle(Vector2.ZERO, 10.0):
+		listed.append_array(e["positions"])
+	var fast: PackedVector2Array = factory.get_bullet_positions_in_circle(Vector2.ZERO, 10.0)
+	assert_eq(fast, listed, "the same positions, in volley then index order")
+	assert_eq(fast, PackedVector2Array([Vector2(0, 0), Vector2(3, 4), Vector2(-6, 0)]), "cleared and far bullets left out")
+	assert_eq(factory.get_bullet_positions_in_circle(Vector2.ZERO, 10.0, 4), PackedVector2Array([Vector2(-6, 0)]), "filtered by what they can hit")
+	assert_eq(factory.get_bullet_positions_in_circle(Vector2.ZERO, 10.0, 8).size(), 0, "nothing can hit 8")
+	assert_eq(a.get_amount_bullets(), 3, "a query changes nothing")
+
+
+func test_nearest_bullet_is_the_closest_that_can_hit_the_mask() -> void:
+	var a := _masked_volley([Vector2(30, 0), Vector2(10, 0)], 2)
+	var b := _masked_volley([Vector2(-8, 0), Vector2(5, 5)], 4)
+	var n: Dictionary = factory.get_nearest_bullet(Vector2.ZERO, 100.0)
+	assert_eq([n["volley"], n["index"], n["position"]], [b, 1, Vector2(5, 5)], "the closest of every volley (7.07 px)")
+	n = factory.get_nearest_bullet(Vector2.ZERO, 100.0, 2)
+	assert_eq([n["volley"], n["index"]], [a, 1], "the closest that can hit 2")
+	assert_true(factory.get_nearest_bullet(Vector2.ZERO, 7.0).is_empty(), "nothing within 7 px: an empty Dictionary")
+	assert_eq(factory.get_nearest_bullet(Vector2(10, 0), 0.0)["index"], 1, "distance 0 finds a bullet exactly there")
+	b.disable_bullet(1)
+	assert_eq(factory.get_nearest_bullet(Vector2.ZERO, 100.0)["position"], Vector2(-8, 0), "a cleared bullet is not a candidate")
+
+
+func test_nearest_bullet_ties_go_to_the_first_volley_and_index() -> void:
+	var a := _masked_volley([Vector2(5, 0), Vector2(-5, 0)], 2)
+	_masked_volley([Vector2(0, 5)], 2)
+	var n: Dictionary = factory.get_nearest_bullet(Vector2.ZERO, 10.0)
+	assert_eq([n["volley"], n["index"]], [a, 0], "equal distances: the first found wins")
+
+
+func test_fast_queries_refuse_bad_input() -> void:
+	_masked_volley([Vector2(0, 0)], 2)
+	assert_eq(factory.get_bullet_positions_in_circle(Vector2(INF, 0), 5.0).size(), 0, "bad center")
+	expect_error_sequence(["get_bullet_positions_in_circle: center must be finite and radius a finite number >= 0."])
+	assert_eq(factory.get_bullet_positions_in_circle(Vector2.ZERO, 5.0, -3).size(), 0, "bad mask")
+	expect_error_sequence(["get_bullet_positions_in_circle: can_hit_mask must be between 0 and 4294967295 (0 matches everything)."])
+	assert_true(factory.get_nearest_bullet(Vector2(0, NAN), 5.0).is_empty(), "bad position")
+	expect_error_sequence(["get_nearest_bullet: position must be finite and max_distance a finite number >= 0."])
+	assert_true(factory.get_nearest_bullet(Vector2.ZERO, -1.0).is_empty(), "negative distance")
+	expect_error_sequence(["get_nearest_bullet: position must be finite and max_distance a finite number >= 0."])
+	assert_true(factory.get_nearest_bullet(Vector2.ZERO, 5.0, 1 << 33).is_empty(), "bad mask")
+	expect_error_sequence(["get_nearest_bullet: can_hit_mask must be between 0 and 4294967295 (0 matches everything)."])
+	for m in ["get_bullet_positions_in_circle", "get_nearest_bullet"]:
+		assert_true(factory.has_method(m), "bound: " + m)

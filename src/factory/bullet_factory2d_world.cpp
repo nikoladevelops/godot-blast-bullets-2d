@@ -424,6 +424,71 @@ TypedArray<Dictionary> BulletFactory2D::get_bullets_in_circle(const Vector2 &cen
 	return bullets_in_area(all_volleys, true, center, radius, Rect2(), can_hit_mask);
 }
 
+PackedVector2Array BulletFactory2D::get_bullet_positions_in_circle(const Vector2 &center, real_t radius, int64_t can_hit_mask) const {
+	PackedVector2Array out;
+	Rect2 unused;
+	if (!area_args_valid("get_bullet_positions_in_circle", true, center, radius, Rect2(), unused) || !can_hit_mask_valid("get_bullet_positions_in_circle", can_hit_mask)) {
+		return out;
+	}
+	// The positions get_bullets_in_circle lists, in the same order, without a
+	// Dictionary per volley (dodge AI and aim assist call it every frame).
+	std::vector<int> found;
+	for (BulletVolley2D *volley : all_volleys) {
+		if (volley == nullptr || !volley->is_active || volley->is_queued_for_deletion() || !can_hit(can_hit_mask, volley->get_collision_mask())) {
+			continue;
+		}
+		found.clear();
+		volley->collect_indexes_in_circle(center, radius, found);
+		for (const int i : found) {
+			out.push_back(volley->get_bullet_transform(i).columns[2]);
+		}
+	}
+	return out;
+}
+
+Dictionary BulletFactory2D::get_nearest_bullet(const Vector2 &position, real_t max_distance, int64_t can_hit_mask) const {
+	Dictionary out;
+	if (!Math::is_finite(position.x) || !Math::is_finite(position.y) || !Math::is_finite(max_distance) || max_distance < 0.0) {
+		UtilityFunctions::push_error("get_nearest_bullet: position must be finite and max_distance a finite number >= 0.");
+		return out;
+	}
+	if (!can_hit_mask_valid("get_nearest_bullet", can_hit_mask)) {
+		return out;
+	}
+	// The circle search bounds the candidates; the strictly closer test keeps the
+	// first found (volley order, then index) on a tie.
+	std::vector<int> found;
+	BulletVolley2D *best_volley = nullptr;
+	int best_index = -1;
+	Vector2 best_position;
+	real_t best_d2 = 0.0;
+	for (BulletVolley2D *volley : all_volleys) {
+		if (volley == nullptr || !volley->is_active || volley->is_queued_for_deletion() || !can_hit(can_hit_mask, volley->get_collision_mask())) {
+			continue;
+		}
+		found.clear();
+		volley->collect_indexes_in_circle(position, max_distance, found);
+		for (const int i : found) {
+			const Vector2 p = volley->get_bullet_transform(i).columns[2];
+			const real_t dx = p.x - position.x;
+			const real_t dy = p.y - position.y;
+			const real_t d2 = dx * dx + dy * dy;
+			if (best_volley == nullptr || d2 < best_d2) {
+				best_volley = volley;
+				best_index = i;
+				best_position = p;
+				best_d2 = d2;
+			}
+		}
+	}
+	if (best_volley != nullptr) {
+		out["volley"] = best_volley;
+		out["index"] = best_index;
+		out["position"] = best_position;
+	}
+	return out;
+}
+
 TypedArray<Dictionary> BulletFactory2D::get_bullets_in_rect(const Rect2 &rect, int64_t can_hit_mask) const {
 	Rect2 normalized;
 	if (!area_args_valid("get_bullets_in_rect", false, Vector2(), 0.0, rect, normalized) || !can_hit_mask_valid("get_bullets_in_rect", can_hit_mask)) {

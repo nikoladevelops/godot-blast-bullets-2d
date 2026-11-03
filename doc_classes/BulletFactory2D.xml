@@ -594,6 +594,19 @@
 				Every active volley (bullets in flight; not pooled or queued for deletion), in the order the factory ticks them; parked volleys (auto pooling off, every bullet out, still wakeable) too with [param include_parked]. A fresh array per call. [method get_volleys_owned_by] lists one spawner's.
 			</description>
 		</method>
+		<method name="get_bullet_positions_in_circle" qualifiers="const">
+			<return type="PackedVector2Array" />
+			<param index="0" name="center" type="Vector2" />
+			<param index="1" name="radius" type="float" />
+			<param index="2" name="can_hit_mask" type="int" default="0" />
+			<description>
+				The positions of the live bullets within [param radius] of [param center] (edge included), in the order [method get_bullets_in_circle] lists them, as one [PackedVector2Array]: no Dictionary per volley, cheap enough to call every frame (dodge AI, aim assist, a danger meter). [param can_hit_mask] filters by what the bullets can hit: only volleys whose [member BulletVolleyData2D.collision_mask] shares a bit with it count (0, the default, takes every bullet).
+				[codeblock]
+				for p in factory.get_bullet_positions_in_circle(player.global_position, 120.0, PLAYER_LAYER):
+				    push += (player.global_position - p).normalized()
+				[/codeblock]
+			</description>
+		</method>
 		<method name="get_bullets_in_circle" qualifiers="const">
 			<return type="Dictionary[]" />
 			<param index="0" name="center" type="Vector2" />
@@ -643,6 +656,15 @@
 			<param index="0" name="spawner" type="Variant" />
 			<description>
 				The firing lasers [param spawner] fired (a [LaserSpawner2D], read by id), or with [code]null[/code] the ones this factory fired itself ([method spawn_laser], orphans handed to the factory), in factory order. A freed or wrong object lists nothing with one error.
+			</description>
+		</method>
+		<method name="get_nearest_bullet" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="position" type="Vector2" />
+			<param index="1" name="max_distance" type="float" />
+			<param index="2" name="can_hit_mask" type="int" default="0" />
+			<description>
+				The live bullet closest to [param position] within [param max_distance] (edge included) as [code]{"volley": BulletVolley2D, "index": int, "position": Vector2}[/code], or an empty Dictionary when none is in range. On a tie the first found wins (volley order, then bullet index). [param can_hit_mask] filters by what the bullets can hit: only volleys whose [member BulletVolleyData2D.collision_mask] shares a bit with it count (0, the default, takes every bullet). [param position] must be finite and [param max_distance] a finite number &gt;= 0.
 			</description>
 		</method>
 		<method name="get_pending_emit_count" qualifiers="const">

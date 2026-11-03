@@ -381,6 +381,8 @@ void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("count_bullets_in_rect", "rect", "can_hit_mask"), &BulletFactory2D::count_bullets_in_rect, DEFVAL(0));
 	ClassDB::bind_method(D_METHOD("get_bullets_in_circle", "center", "radius", "can_hit_mask"), &BulletFactory2D::get_bullets_in_circle, DEFVAL(0));
 	ClassDB::bind_method(D_METHOD("get_bullets_in_rect", "rect", "can_hit_mask"), &BulletFactory2D::get_bullets_in_rect, DEFVAL(0));
+	ClassDB::bind_method(D_METHOD("get_bullet_positions_in_circle", "center", "radius", "can_hit_mask"), &BulletFactory2D::get_bullet_positions_in_circle, DEFVAL(0));
+	ClassDB::bind_method(D_METHOD("get_nearest_bullet", "position", "max_distance", "can_hit_mask"), &BulletFactory2D::get_nearest_bullet, DEFVAL(0));
 
 	// Bullets that left through the despawn bounds, once per volley and tick
 	// (positions are the poses they left from). Live, inside the sweep: a

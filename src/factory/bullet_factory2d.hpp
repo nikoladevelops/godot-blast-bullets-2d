@@ -243,6 +243,8 @@ public:
 	// safe anywhere, O(live bullets) per call.
 	TypedArray<Dictionary> get_bullets_in_circle(const Vector2 &center, real_t radius, int64_t can_hit_mask = 0) const;
 	TypedArray<Dictionary> get_bullets_in_rect(const Rect2 &rect, int64_t can_hit_mask = 0) const;
+	PackedVector2Array get_bullet_positions_in_circle(const Vector2 &center, real_t radius, int64_t can_hit_mask = 0) const;
+	Dictionary get_nearest_bullet(const Vector2 &position, real_t max_distance, int64_t can_hit_mask = 0) const;
 	// Every ACTIVE volley (not pooled or queued for deletion; parked ones
 	// only with include_parked), in factory order (the sweep's order).
 	TypedArray<BulletVolley2D> get_active_volleys(bool include_parked = false) const;
