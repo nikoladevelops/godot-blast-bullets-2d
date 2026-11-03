@@ -205,3 +205,21 @@ func test_the_pending_cap_drops_new_splits_with_one_warning() -> void:
 	_run(2)
 	assert_eq(int(factory.debug_get_split_stats()["dropped_total"]), 9, "0 = no cap: nothing dropped")
 	assert_eq(splits.size(), 3 + 3 + 10, "every accepted split spawned")
+
+
+## A mass split spreads over a few sweeps by default: 1024 children per sweep
+## (activating ~2000 child volleys in one frame cost ~15 ms), in order, none dropped.
+func test_a_mass_split_spreads_over_sweeps_by_default() -> void:
+	var fresh := BulletFactory2D.new()
+	var cap := fresh.split_max_children_per_sweep
+	fresh.free()
+	assert_eq(cap, 1024, "the default cap")
+	assert_eq(factory.split_max_children_per_sweep, 1024, "on the suite's factory too")
+	_armed(_chain([_stage(4)]), 600) # 600 parents x 4 = 2400 children in one sweep
+	var per_sweep: Array = []
+	for i in 4:
+		var before := splits.size()
+		_run(1)
+		per_sweep.append((splits.size() - before) * 4)
+	assert_eq(per_sweep, [1024, 1024, 352, 0], "1024, 1024, then the rest")
+	assert_eq(int(factory.debug_get_split_stats()["dropped_total"]), 0, "none dropped")

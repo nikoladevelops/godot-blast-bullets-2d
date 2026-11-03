@@ -1063,7 +1063,7 @@ private:
 	std::vector<Color> split_color_scratch; // the parent's color per child (a colored parent)
 	std::vector<Vector2> split_direction_scratch;
 	std::vector<real_t> split_speed_scratch;
-	int split_max_children_per_sweep = 0;
+	int split_max_children_per_sweep = 1024; // a mass split spreads over a few sweeps (~8 us per child volley)
 	int split_max_pending = 100000;
 	uint64_t split_dropped_total = 0;
 	bool split_full_warned = false; // one warning per overflow
