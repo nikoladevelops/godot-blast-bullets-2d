@@ -10,7 +10,12 @@ namespace BlastBullets2D {
 // The shared name rule (sprite/sprite_anim2d.hpp) in the volley's wording.
 static bool resolve_sprite_animation_impl(const Ref<SpriteFrames> &p_sprite_frames, const StringName &p_requested, StringName &out_anim, bool silent) {
 	const SpriteAnimChoice2D choice = resolve_sprite_animation2d(p_sprite_frames, p_requested);
-	if (!silent) {
+	// A problem of the SpriteFrames itself describes the data, not the spawn
+	// (every spawn and pool reuse resolves again): once per SpriteFrames,
+	// requested name and problem, like the bake's reports below. A null
+	// SpriteFrames is the caller's and always reports.
+	const bool report = !silent && (choice.pick == SpriteAnimPick2D::NULL_FRAMES || choice.pick == SpriteAnimPick2D::RESOLVED || WarnOnce2D::first(p_sprite_frames->get_instance_id(), 35u, (int64_t)String(p_requested).hash(), (int64_t)choice.pick));
+	if (report) {
 		switch (choice.pick) {
 			case SpriteAnimPick2D::NULL_FRAMES:
 				UtilityFunctions::push_error("BulletVolley2D: sprite_frames is null. Assign a SpriteFrames resource.");

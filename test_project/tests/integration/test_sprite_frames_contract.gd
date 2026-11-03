@@ -732,3 +732,24 @@ func test_a_broken_animation_reports_once_per_sprite_frames_not_per_shot() -> vo
 	fresh.add_frame(&"default", a, 1.0)
 	factory.spawn_volley(_volley_data(fresh, &""))
 	expect_error_sequence(["BulletVolley2D: animation 'default' has invalid speed, using 1 fps."], "another SpriteFrames reports its own problem")
+
+
+func test_a_wrong_name_reports_once_per_resource_not_per_spawn() -> void:
+	# The name describes the DATA: a spawner firing it every interval reported
+	# the same fallback once per shot (lasers and the volley's own bake reports
+	# already said it once per SpriteFrames).
+	var data := H.make_volley_data(2, 0.0, 100.0)
+	data.sprite_frames = _sf({"fire": [_tex(4, 4)]})
+	data.animation = &"nope"
+	for i in 5:
+		assert_not_null(factory.spawn_volley(data), "spawn %d" % i)
+	expect_error_sequence(["BulletVolley2D: missing animation 'nope', falling back to 'fire'."])
+	data.animation = &"other"
+	factory.spawn_volley(data)
+	factory.spawn_volley(data)
+	expect_error_sequence(["BulletVolley2D: missing animation 'other', falling back to 'fire'."])
+	var empty := _sf({"none": []})
+	data.sprite_frames = empty
+	factory.spawn_volley(data)
+	factory.spawn_volley(data)
+	expect_error_sequence(["BulletVolley2D: sprite_frames has no animation with frames."])
