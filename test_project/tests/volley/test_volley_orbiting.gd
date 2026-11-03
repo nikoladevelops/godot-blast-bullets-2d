@@ -144,3 +144,16 @@ func test_enabling_again_updates_the_ring_and_disabling_twice_is_quiet() -> void
 	expect_warning_sequence([], "disabling a bullet that does not orbit does nothing, quietly")
 	assert_false(v.bullet_is_orbiting_enabled(0) or v.bullet_is_orbiting_enabled(1) or v.bullet_is_orbiting_enabled(2), "all off")
 	assert_eq(v.debug_check_invariants(), "", "the orbit counter matches the bullets")
+
+
+func test_the_documented_minimum_radius_is_accepted_silently() -> void:
+	# 0.01 is the documented minimum (>= 0.01), also what a spawner passes for
+	# orbiting_radius = 0.01: as a float it is 0.0099999998, which the check
+	# compared to the double 0.01 and "clamped" (to the same value) with an error.
+	var v := quick_volley(1, 100.0, 60.0)
+	v.bullet_enable_orbiting(0, 0.01)
+	expect_no_errors("enable at the minimum")
+	v.bullet_set_orbiting_radius(0, 0.01)
+	expect_no_errors("set at the minimum")
+	v.bullet_set_orbiting_radius(0, 0.0078125) # exact in float: below the minimum
+	expect_error_sequence(["Orbiting radius must be >= 0.01, got 0.0078125. Clamping to 0.01."])

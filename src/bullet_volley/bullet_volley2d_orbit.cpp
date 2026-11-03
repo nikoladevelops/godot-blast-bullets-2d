@@ -28,7 +28,9 @@ void BulletVolley2D::bullet_enable_orbiting(int bullet_index, real_t orbiting_ra
 	// NaN comparisons are always false, so a bare `< 0.01` check would
 	// store NaN and brick the volley (tick math propagates it into the
 	// origin forever). Reject non-finite outright like the setters do.
-	if (!Math::is_finite(orbiting_radius) || orbiting_radius < 0.01) {
+	// The minimum in real_t: 0.01 handed in (a spawner's orbiting_radius = 0.01,
+	// a script's 0.01) is 0.0099999998f, which is below the double 0.01.
+	if (!Math::is_finite(orbiting_radius) || orbiting_radius < (real_t)0.01) {
 		if (!Math::is_finite(orbiting_radius)) {
 			UtilityFunctions::push_error("Orbiting radius must be finite and >= 0.01, got " + String::num(orbiting_radius) + ". Orbiting stays disabled.");
 			return;
@@ -120,7 +122,7 @@ void BulletVolley2D::bullet_set_orbiting_radius(int bullet_index, real_t new_rad
 		UtilityFunctions::push_error("Orbiting radius must be finite, got " + String::num(new_radius) + ". Radius unchanged (a NaN radius would brick the volley).");
 		return;
 	}
-	if (new_radius < 0.01) {
+	if (new_radius < (real_t)0.01) { // the minimum in real_t (see bullet_enable_orbiting)
 		UtilityFunctions::push_error("Orbiting radius must be >= 0.01, got " + String::num(new_radius) + ". Clamping to 0.01.");
 		new_radius = 0.01;
 	}
