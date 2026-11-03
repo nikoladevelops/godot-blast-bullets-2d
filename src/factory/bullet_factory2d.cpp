@@ -411,8 +411,8 @@ void BulletFactory2D::native_ready() {
 
 	// On while Godot's own interpolation is off: bullets are smooth but every
 	// other node (the player, the camera) steps, which reads as bullet jitter.
-	if (physics_interpolation == INTERPOLATION_ON && !ProjectSettings::get_singleton()->get_setting("physics/common/physics_interpolation", false)) {
-		UtilityFunctions::push_warning("BulletFactory2D: physics_interpolation is On but ProjectSettings physics/common/physics_interpolation is OFF, so the rest of the scene is not interpolated. Enable it in Project Settings (or use Follow Project). See debug_check_interpolation_status().");
+	if (physics_interpolation == INTERPOLATION_ON && !godot_interpolation_enabled()) {
+		UtilityFunctions::push_warning("BulletFactory2D: physics_interpolation is On but Godot's physics interpolation is OFF (SceneTree.physics_interpolation, which starts from ProjectSettings physics/common/physics_interpolation), so the rest of the scene is not interpolated. Enable it in Project Settings or at runtime (or use Follow Project). See debug_check_interpolation_status().");
 	}
 }
 
@@ -438,11 +438,17 @@ void BulletFactory2D::set_physics_interpolation(PhysicsInterpolation value) {
 	resolve_physics_interpolation();
 }
 
+// Godot interpolates nodes by the live SceneTree switch: a game may turn it on
+// or off at runtime, and ProjectSettings keeps only its startup value.
+bool BulletFactory2D::godot_interpolation_enabled() const {
+	const SceneTree *tree = is_inside_tree() ? get_tree() : nullptr;
+	return tree != nullptr && tree->is_physics_interpolation_enabled();
+}
+
 void BulletFactory2D::resolve_physics_interpolation() {
 	bool want = physics_interpolation == INTERPOLATION_ON;
 	if (physics_interpolation == INTERPOLATION_FOLLOW_PROJECT) {
-		const SceneTree *tree = is_inside_tree() ? get_tree() : nullptr;
-		want = tree != nullptr && tree->is_physics_interpolation_enabled();
+		want = godot_interpolation_enabled();
 	}
 	if (want == use_physics_interpolation || !is_ready || is_tearing_down || is_factory_busy || is_iterating_bullets) {
 		return; // nothing to do, or the next physics frame applies it

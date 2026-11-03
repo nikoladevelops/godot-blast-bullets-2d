@@ -582,6 +582,7 @@ public:
 	// otherwise the next physics frame does), seeding the previous poses when
 	// it turns on and waking or sleeping the render pass.
 	void resolve_physics_interpolation();
+	bool godot_interpolation_enabled() const;
 
 	//
 

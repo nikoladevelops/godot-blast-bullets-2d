@@ -127,7 +127,7 @@
 		<method name="debug_check_interpolation_status">
 			<return type="Dictionary" />
 			<description>
-				Interpolation agreement check: factory_enabled, project_enabled_2d, mismatch, hint. Enable both the factory flag and ProjectSettings physics/common/physics_interpolation for smooth high-refresh bullets.
+				Interpolation agreement check: factory_enabled, project_enabled_2d (Godot's live [member SceneTree.physics_interpolation], which starts from ProjectSettings physics/common/physics_interpolation and may be changed at runtime), mismatch, hint. Enable both the factory flag and Godot's interpolation for smooth high-refresh bullets.
 			</description>
 		</method>
 		<method name="debug_clear_bullet_event_log">

@@ -252,10 +252,7 @@ Dictionary BulletFactory2D::debug_validate_spawn_data(const Ref<BulletVolleyData
 
 Dictionary BulletFactory2D::debug_check_interpolation_status() {
 	Dictionary d;
-	bool project_enabled = false;
-	if (ProjectSettings::get_singleton()->has_setting("physics/common/physics_interpolation")) {
-		project_enabled = (bool)ProjectSettings::get_singleton()->get_setting("physics/common/physics_interpolation", false);
-	}
+	const bool project_enabled = godot_interpolation_enabled(); // the live switch, not the stored setting
 	d["mode"] = (int)physics_interpolation;
 	d["factory_enabled"] = use_physics_interpolation;
 	d["project_enabled_2d"] = project_enabled;
@@ -263,7 +260,7 @@ Dictionary BulletFactory2D::debug_check_interpolation_status() {
 	const bool off_alone = physics_interpolation == INTERPOLATION_OFF && project_enabled;
 	d["mismatch"] = on_alone || off_alone;
 	if (on_alone) {
-		d["hint"] = "physics_interpolation is On but ProjectSettings physics/common/physics_interpolation is OFF: bullets are smooth, the rest of the scene steps. Enable the project setting or use Follow Project.";
+		d["hint"] = "physics_interpolation is On but Godot's physics interpolation is OFF (SceneTree.physics_interpolation): bullets are smooth, the rest of the scene steps. Enable it (Project Settings or at runtime) or use Follow Project.";
 	} else if (off_alone) {
 		d["hint"] = "Project interpolation is ON but physics_interpolation is Off: bullets are drawn at their physics poses. Use Follow Project (the default) or On.";
 	} else {
