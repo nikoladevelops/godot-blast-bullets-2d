@@ -93,6 +93,9 @@ void BulletSpawner2D::_on_spawn_data_changed() {
 	// next shoot_once() re-duplicates fresh data instead of stale template.
 	cached_volley_template.unref();
 	cached_spawn_data_id = 0;
+	// Its warnings read the resource (a missing sprite, rotation data under
+	// flocking): the editor's triangle must follow the edit.
+	refresh_editor_warnings();
 	if (preview.draw_collision_rings) {
 		rebuild_preview();
 	}

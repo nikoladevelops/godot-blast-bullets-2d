@@ -671,6 +671,10 @@ void PatternSpawner2D::refresh_process_state_editor_guarded() {
 void PatternSpawner2D::on_config_changed() {
 	shoot_error_latch = 0;
 	on_config_changed_owned();
+	refresh_editor_warnings();
+}
+
+void PatternSpawner2D::refresh_editor_warnings() {
 	if (Engine::get_singleton()->is_editor_hint() && is_inside_tree()) {
 		update_configuration_warnings();
 	}

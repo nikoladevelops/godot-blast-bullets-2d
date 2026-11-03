@@ -63,7 +63,8 @@ def lint():
     problems = []
     # R1 over the whole project (addons excluded).
     for dirpath, dirs, files in os.walk(PROJECT):
-        dirs[:] = [d for d in dirs if d not in ("addons", ".godot")]
+        # Folders Godot ignores (.gdignore) hold tools, never suites.
+        dirs[:] = [d for d in dirs if d not in ("addons", ".godot") and not os.path.isfile(os.path.join(dirpath, d, ".gdignore"))]
         for name in files:
             if not name.endswith(".gd"):
                 continue

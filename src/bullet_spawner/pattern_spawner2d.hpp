@@ -1411,6 +1411,9 @@ protected:
 	// own messages (the cause before the latched summary) stay silent too.
 	bool shot_reports_muted = false;
 	void on_config_changed();
+	// The editor's warning triangle re-reads the warnings (editor only). Also
+	// for edits inside a resource the warnings read (spawn_data's sprite).
+	void refresh_editor_warnings();
 	// Bypass flag for debug_collect_spawn_transforms_uncached / verify.
 	mutable bool pattern_cache_bypass = false;
 	// Bumped by every geometry-affecting change (mark_pattern_dirty).

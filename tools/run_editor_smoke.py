@@ -50,6 +50,9 @@ def copy_project(dest):
             skip.add("test_results")
         if rel == ".godot":
             skip.add("editor")
+        # Folders Godot ignores (a .gdignore inside) are invisible to the editor:
+        # the demo's tools folder holds gigabytes of recorded video.
+        skip.update(n for n in names if os.path.isfile(os.path.join(directory, n, ".gdignore")))
         return skip & set(names)
     shutil.copytree(PROJECT, dest, ignore=ignore, symlinks=True)
 

@@ -1,0 +1,16 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/editor_smoke/spawner_warning_probe.gd" id="1_probe"]
+
+[node name="SpawnerWarningSmoke" type="Node2D"]
+
+[node name="BulletFactory2D" type="BulletFactory2D" parent="."]
+
+[node name="Bullets" type="BulletSpawner2D" parent="."]
+shooting_enabled = false
+
+[node name="Lasers" type="LaserSpawner2D" parent="."]
+shooting_enabled = false
+
+[node name="Probe" type="Node" parent="."]
+script = ExtResource("1_probe")
