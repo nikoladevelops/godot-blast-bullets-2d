@@ -1,0 +1,8 @@
+[gd_resource type="BulletSoundData2D" format=3]
+
+[ext_resource type="AudioStream" path="res://shared/sound/explosion.wav" id="1_oy6gs"]
+
+[resource]
+streams = [ExtResource("1_oy6gs")]
+volume_db = -6.0
+random_pitch = 1.25

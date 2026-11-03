@@ -1,0 +1,9 @@
+[gd_resource type="EffectLayerData2D" format=3]
+
+[ext_resource type="SpriteFrames" path="res://shared/effects/hit_spark_frames.tres" id="1_saull"]
+
+[resource]
+trigger = 2
+sprite_frames = ExtResource("1_saull")
+scale = Vector2(0.7, 0.7)
+randomize_rotation = true

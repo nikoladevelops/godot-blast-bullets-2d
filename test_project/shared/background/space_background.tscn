@@ -1,0 +1,25 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://shared/background/space_background.gd" id="1_script"]
+[ext_resource type="Shader" path="res://shared/background/space_background.gdshader" id="2_shader"]
+[ext_resource type="Texture2D" path="res://shared/art/background/nebula.png" id="3_nebula"]
+[ext_resource type="Texture2D" path="res://shared/art/background/stars.png" id="4_stars"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_space"]
+shader = ExtResource("2_shader")
+shader_parameter/nebula = ExtResource("3_nebula")
+shader_parameter/stars = ExtResource("4_stars")
+
+[node name="SpaceBackground" type="CanvasLayer"]
+layer = -100
+script = ExtResource("1_script")
+
+[node name="Backdrop" type="ColorRect" parent="."]
+material = SubResource("ShaderMaterial_space")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0, 0, 0, 1)
