@@ -267,8 +267,8 @@ void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_lasers_owned_by", "spawner"), &BulletFactory2D::get_lasers_owned_by);
 	ClassDB::bind_method(D_METHOD("get_active_laser_count"), &BulletFactory2D::get_active_laser_count);
 	ClassDB::bind_method(D_METHOD("clear_active_lasers", "fade"), &BulletFactory2D::clear_active_lasers, DEFVAL(true));
-	ClassDB::bind_method(D_METHOD("end_lasers_in_circle", "center", "radius", "fade"), &BulletFactory2D::end_lasers_in_circle, DEFVAL(true));
-	ClassDB::bind_method(D_METHOD("end_lasers_in_rect", "rect", "fade"), &BulletFactory2D::end_lasers_in_rect, DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("end_lasers_in_circle", "center", "radius", "fade", "can_hit_mask"), &BulletFactory2D::end_lasers_in_circle, DEFVAL(true), DEFVAL(0));
+	ClassDB::bind_method(D_METHOD("end_lasers_in_rect", "rect", "fade", "can_hit_mask"), &BulletFactory2D::end_lasers_in_rect, DEFVAL(true), DEFVAL(0));
 	ClassDB::bind_method(D_METHOD("populate_lasers_pool", "beam_count", "amount"), &BulletFactory2D::populate_lasers_pool);
 	ClassDB::bind_method(D_METHOD("populate_lasers_pool_deferred", "beam_count", "amount"), &BulletFactory2D::populate_lasers_pool_deferred);
 	ClassDB::bind_method(D_METHOD("free_lasers_pool", "beam_count"), &BulletFactory2D::free_lasers_pool, DEFVAL(-1));
@@ -375,12 +375,12 @@ void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("debug_get_laser_debug_boxes"), &BulletFactory2D::debug_get_laser_debug_boxes);
 	ClassDB::bind_method(D_METHOD("debug_get_despawn_bounds_preview"), &BulletFactory2D::debug_get_despawn_bounds_preview);
 
-	ClassDB::bind_method(D_METHOD("clear_bullets_in_circle", "center", "radius"), &BulletFactory2D::clear_bullets_in_circle);
-	ClassDB::bind_method(D_METHOD("clear_bullets_in_rect", "rect"), &BulletFactory2D::clear_bullets_in_rect);
-	ClassDB::bind_method(D_METHOD("count_bullets_in_circle", "center", "radius"), &BulletFactory2D::count_bullets_in_circle);
-	ClassDB::bind_method(D_METHOD("count_bullets_in_rect", "rect"), &BulletFactory2D::count_bullets_in_rect);
-	ClassDB::bind_method(D_METHOD("get_bullets_in_circle", "center", "radius"), &BulletFactory2D::get_bullets_in_circle);
-	ClassDB::bind_method(D_METHOD("get_bullets_in_rect", "rect"), &BulletFactory2D::get_bullets_in_rect);
+	ClassDB::bind_method(D_METHOD("clear_bullets_in_circle", "center", "radius", "can_hit_mask"), &BulletFactory2D::clear_bullets_in_circle, DEFVAL(0));
+	ClassDB::bind_method(D_METHOD("clear_bullets_in_rect", "rect", "can_hit_mask"), &BulletFactory2D::clear_bullets_in_rect, DEFVAL(0));
+	ClassDB::bind_method(D_METHOD("count_bullets_in_circle", "center", "radius", "can_hit_mask"), &BulletFactory2D::count_bullets_in_circle, DEFVAL(0));
+	ClassDB::bind_method(D_METHOD("count_bullets_in_rect", "rect", "can_hit_mask"), &BulletFactory2D::count_bullets_in_rect, DEFVAL(0));
+	ClassDB::bind_method(D_METHOD("get_bullets_in_circle", "center", "radius", "can_hit_mask"), &BulletFactory2D::get_bullets_in_circle, DEFVAL(0));
+	ClassDB::bind_method(D_METHOD("get_bullets_in_rect", "rect", "can_hit_mask"), &BulletFactory2D::get_bullets_in_rect, DEFVAL(0));
 
 	// Bullets that left through the despawn bounds, once per volley and tick
 	// (positions are the poses they left from). Live, inside the sweep: a
@@ -391,10 +391,10 @@ void BulletFactory2D::_bind_methods() {
 			PropertyInfo(Variant::ARRAY, "bullet_indexes", PROPERTY_HINT_ARRAY_TYPE, "int")));
 
 	// Pickups: bullets to coins/gems that are pulled to a target.
-	ClassDB::bind_method(D_METHOD("convert_all_bullets_to_pickups", "pickup", "target"), &BulletFactory2D::convert_all_bullets_to_pickups);
-	ClassDB::bind_method(D_METHOD("convert_bullets_in_circle_to_pickups", "center", "radius", "pickup", "target"), &BulletFactory2D::convert_bullets_in_circle_to_pickups);
-	ClassDB::bind_method(D_METHOD("convert_bullets_in_rect_to_pickups", "rect", "pickup", "target"), &BulletFactory2D::convert_bullets_in_rect_to_pickups);
-	ClassDB::bind_method(D_METHOD("convert_all_bullets_to_pickups_deferred", "pickup", "target"), &BulletFactory2D::convert_all_bullets_to_pickups_deferred);
+	ClassDB::bind_method(D_METHOD("convert_all_bullets_to_pickups", "pickup", "target", "can_hit_mask"), &BulletFactory2D::convert_all_bullets_to_pickups, DEFVAL(0));
+	ClassDB::bind_method(D_METHOD("convert_bullets_in_circle_to_pickups", "center", "radius", "pickup", "target", "can_hit_mask"), &BulletFactory2D::convert_bullets_in_circle_to_pickups, DEFVAL(0));
+	ClassDB::bind_method(D_METHOD("convert_bullets_in_rect_to_pickups", "rect", "pickup", "target", "can_hit_mask"), &BulletFactory2D::convert_bullets_in_rect_to_pickups, DEFVAL(0));
+	ClassDB::bind_method(D_METHOD("convert_all_bullets_to_pickups_deferred", "pickup", "target", "can_hit_mask"), &BulletFactory2D::convert_all_bullets_to_pickups_deferred, DEFVAL(0));
 	ClassDB::bind_method(D_METHOD("populate_pickup_pool", "pickup", "bullet_count", "instance_count"), &BulletFactory2D::populate_pickup_pool);
 	ClassDB::bind_method(D_METHOD("populate_pickup_pool_deferred", "pickup", "bullet_count", "instance_count"), &BulletFactory2D::populate_pickup_pool_deferred);
 	// A pickup reached its target (the bullet is still alive in the handler,

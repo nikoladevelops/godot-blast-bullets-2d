@@ -93,3 +93,18 @@ func test_time_scale_and_a_pause_hold_lasers() -> void:
 	factory.set_is_factory_processing_bullets(true)
 	step_factory(8, DT)
 	assert_true(l.is_pooled(), "and it finishes on time once running")
+
+
+func test_can_hit_mask_ends_only_lasers_that_can_hit_it() -> void:
+	var at_player_data := H.make_laser(0.0, 0.0, 0.0, 0.25, 200.0)
+	at_player_data.collision_mask = 2
+	var at_enemies_data := H.make_laser(0.0, 0.0, 0.0, 0.25, 200.0)
+	at_enemies_data.collision_mask = 4
+	var at_player := _fire(Transform2D(0.0, Vector2(0, 0)), at_player_data)
+	var at_enemies := _fire(Transform2D(0.0, Vector2(0, 4)), at_enemies_data)
+	step_factory(1, DT)
+	assert_eq(factory.end_lasers_in_circle(Vector2(100, 2), 10.0, true, 2), 1, "circle: the one that can hit the player")
+	assert_eq(factory.end_lasers_in_rect(Rect2(50, -10, 20, 20), false, 8), 0, "rect: none can hit 8")
+	step_factory(1, DT)
+	assert_eq([at_player.get_phase(), at_enemies.get_phase()], [LaserVolley2D.PHASE_FADING, LaserVolley2D.PHASE_ACTIVE], "only the matching laser fades")
+	assert_eq(factory.end_lasers_in_rect(Rect2(50, -10, 20, 20), false, 4 | 8), 1, "rect: the enemy-bound one")

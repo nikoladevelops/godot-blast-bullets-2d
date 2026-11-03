@@ -194,7 +194,7 @@ Array BulletFactory2D::convert_to_pickups_impl(const char *function_name, const 
 	} else {
 		Rect2 normalized = selection.rect.abs();
 		for (BulletVolley2D *volley : all_volleys) {
-			if (!eligible(volley)) {
+			if (!eligible(volley) || !can_hit(selection.can_hit_mask, volley->get_collision_mask())) {
 				continue;
 			}
 			if (selection.kind == PickupSelection::OWNER && volley->owner_spawner_id != selection.owner_spawner_id) {
@@ -389,41 +389,58 @@ Array BulletFactory2D::convert_to_pickups_impl(const char *function_name, const 
 	return result;
 }
 
-Array BulletFactory2D::convert_all_bullets_to_pickups(const Ref<BulletPickupData2D> &pickup, const Variant &target) {
-	return convert_to_pickups_impl("BulletFactory2D.convert_all_bullets_to_pickups", pickup, target, PickupSelection());
+Array BulletFactory2D::convert_all_bullets_to_pickups(const Ref<BulletPickupData2D> &pickup, const Variant &target, int64_t can_hit_mask) {
+	const char *fn = "BulletFactory2D.convert_all_bullets_to_pickups";
+	if (!can_hit_mask_valid(fn, can_hit_mask, ", nothing converted.")) {
+		return Array();
+	}
+	PickupSelection selection;
+	selection.can_hit_mask = can_hit_mask;
+	return convert_to_pickups_impl(fn, pickup, target, selection);
 }
 
-Array BulletFactory2D::convert_bullets_in_circle_to_pickups(const Vector2 &center, real_t radius, const Ref<BulletPickupData2D> &pickup, const Variant &target) {
+Array BulletFactory2D::convert_bullets_in_circle_to_pickups(const Vector2 &center, real_t radius, const Ref<BulletPickupData2D> &pickup, const Variant &target, int64_t can_hit_mask) {
 	const char *fn = "BulletFactory2D.convert_bullets_in_circle_to_pickups";
 	if (!Math::is_finite(center.x) || !Math::is_finite(center.y) || !Math::is_finite(radius) || radius < 0.0) {
 		UtilityFunctions::push_error(String(fn) + ": center must be finite and radius a finite number >= 0, nothing converted.");
+		return Array();
+	}
+	if (!can_hit_mask_valid(fn, can_hit_mask, ", nothing converted.")) {
 		return Array();
 	}
 	PickupSelection selection;
 	selection.kind = PickupSelection::CIRCLE;
 	selection.center = center;
 	selection.radius = radius;
+	selection.can_hit_mask = can_hit_mask;
 	return convert_to_pickups_impl(fn, pickup, target, selection);
 }
 
-Array BulletFactory2D::convert_bullets_in_rect_to_pickups(const Rect2 &rect, const Ref<BulletPickupData2D> &pickup, const Variant &target) {
+Array BulletFactory2D::convert_bullets_in_rect_to_pickups(const Rect2 &rect, const Ref<BulletPickupData2D> &pickup, const Variant &target, int64_t can_hit_mask) {
 	const char *fn = "BulletFactory2D.convert_bullets_in_rect_to_pickups";
 	if (!Math::is_finite(rect.position.x) || !Math::is_finite(rect.position.y) || !Math::is_finite(rect.size.x) || !Math::is_finite(rect.size.y)) {
 		UtilityFunctions::push_error(String(fn) + ": rect must be finite, nothing converted.");
 		return Array();
 	}
+	if (!can_hit_mask_valid(fn, can_hit_mask, ", nothing converted.")) {
+		return Array();
+	}
 	PickupSelection selection;
 	selection.kind = PickupSelection::RECT;
 	selection.rect = rect;
+	selection.can_hit_mask = can_hit_mask;
 	return convert_to_pickups_impl(fn, pickup, target, selection);
 }
 
-void BulletFactory2D::convert_all_bullets_to_pickups_deferred(const Ref<BulletPickupData2D> &pickup, const Variant &target) {
+void BulletFactory2D::convert_all_bullets_to_pickups_deferred(const Ref<BulletPickupData2D> &pickup, const Variant &target, int64_t can_hit_mask) {
 	if (is_tearing_down) {
 		UtilityFunctions::push_error("convert_all_bullets_to_pickups_deferred: BulletFactory2D is being freed. Ignoring the request.");
 		return;
 	}
-	queue_structural_call([this, pickup, target]() { convert_all_bullets_to_pickups(pickup, target); });
+	if (!can_hit_mask_valid("convert_all_bullets_to_pickups_deferred", can_hit_mask, ", nothing queued.")) {
+		return;
+	}
+	queue_structural_call([this, pickup, target, can_hit_mask]() { convert_all_bullets_to_pickups(pickup, target, can_hit_mask); });
 }
 
 void BulletFactory2D::populate_pickup_pool(const Ref<BulletPickupData2D> &pickup, int bullet_count, int instance_count) {

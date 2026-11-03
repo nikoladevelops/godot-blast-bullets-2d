@@ -509,3 +509,94 @@ func test_a_pause_from_a_handler_freezes_the_rest_of_the_sweep() -> void:
 	assert_eq(counts.splits, 1, "the queued split happens exactly once after the resume")
 	assert_gt(counts.emits, before.emits, "the carried emitter shot fires after the resume")
 	handle_events(factory)
+
+
+# --- can_hit_mask: what the bullets can hit ---------------------------------
+
+## The factory area calls take a trailing can_hit_mask: only bullets (and lasers)
+## whose collision_mask shares a bit with it count; 0 = all. A bomb clears
+## "everything that can hurt the player" without touching the player's shots.
+const AREA_CALLS := ["get_bullets_in_circle", "get_bullets_in_rect", "count_bullets_in_circle", "count_bullets_in_rect",
+	"clear_bullets_in_circle", "clear_bullets_in_rect", "convert_all_bullets_to_pickups",
+	"convert_all_bullets_to_pickups_deferred", "convert_bullets_in_circle_to_pickups",
+	"convert_bullets_in_rect_to_pickups", "end_lasers_in_circle", "end_lasers_in_rect"]
+
+
+func _masked_volley(points: Array, mask: int) -> BulletVolley2D:
+	var data := H.make_volley_data(points.size(), 0.0, 60.0)
+	var arr: Array = []
+	for p in points:
+		arr.append(Transform2D(0.0, p))
+	data.transforms = arr
+	data.collision_mask = mask
+	return factory.spawn_volley(data)
+
+
+func test_every_area_call_ends_in_can_hit_mask_defaulting_to_all() -> void:
+	for m in ClassDB.class_get_method_list("BulletFactory2D", true):
+		if m["name"] in AREA_CALLS:
+			var args: Array = m["args"]
+			assert_eq(args[-1]["name"], "can_hit_mask", m["name"] + ": the filter is the last argument")
+			assert_eq(args[-1]["type"], TYPE_INT, m["name"] + ": an int mask")
+			assert_eq(m["default_args"][-1], 0, m["name"] + ": 0 (every bullet) by default")
+
+
+func test_area_calls_count_only_bullets_that_can_hit_the_mask() -> void:
+	var at_player := _masked_volley([Vector2(0, 0), Vector2(5, 0)], 2)
+	var at_enemies := _masked_volley([Vector2(3, 0)], 4 | 8)
+	var both := _masked_volley([Vector2(6, 0)], 2 | 4)
+	var box := Rect2(-10, -10, 30, 30)
+	assert_eq([factory.count_bullets_in_circle(Vector2.ZERO, 20.0, 2), factory.count_bullets_in_circle(Vector2.ZERO, 20.0, 4),
+		factory.count_bullets_in_circle(Vector2.ZERO, 20.0, 8), factory.count_bullets_in_circle(Vector2.ZERO, 20.0)], [3, 2, 1, 4], "circle counts per mask")
+	assert_eq([factory.count_bullets_in_rect(box, 2), factory.count_bullets_in_rect(box, 16), factory.count_bullets_in_rect(box)], [3, 0, 4], "rect counts per mask")
+	var found: Array = []
+	for e in factory.get_bullets_in_circle(Vector2.ZERO, 20.0, 4):
+		found.append(e["volley"])
+	assert_eq(found, [at_enemies, both], "circle listing keeps the volleys that can hit 4")
+	found.clear()
+	for e in factory.get_bullets_in_rect(box, 2):
+		found.append(e["volley"])
+	assert_eq(found, [at_player, both], "rect listing keeps the volleys that can hit 2")
+	assert_eq(factory.clear_bullets_in_circle(Vector2.ZERO, 20.0, 2), 3, "the bomb clears what can hit the player")
+	assert_eq([_alive(at_player), _alive(at_enemies), _alive(both)], [[], [0], []], "the player's shots survive")
+	assert_eq(factory.clear_bullets_in_rect(box, 2), 0, "nothing left that can hit 2")
+	assert_eq(factory.clear_bullets_in_rect(box, 8), 1, "then the rest")
+
+
+func test_pickup_conversions_take_only_bullets_that_can_hit_the_mask() -> void:
+	var target := Node2D.new()
+	target.position = Vector2(500, 500)
+	add(target)
+	var at_player := _masked_volley([Vector2(0, 0), Vector2(5, 0)], 2)
+	var at_enemies := _masked_volley([Vector2(3, 0), Vector2(4, 0)], 4)
+	assert_eq(factory.convert_bullets_in_circle_to_pickups(Vector2.ZERO, 20.0, PickupTestHelpers.coin(), target, 4).size(), 1, "one pickup volley, from the enemy-bound bullets")
+	assert_eq([_alive(at_player), _alive(at_enemies)], [[0, 1], []], "circle: the other volley untouched")
+	var again := _masked_volley([Vector2(7, 0)], 4)
+	assert_eq(factory.convert_bullets_in_rect_to_pickups(Rect2(-10, -10, 30, 30), PickupTestHelpers.coin(), target, 2).size(), 1, "rect: the player-bound ones")
+	assert_eq([_alive(at_player), _alive(again)], [[], [0]], "rect: only mask 2 converted")
+	assert_eq(factory.convert_all_bullets_to_pickups(PickupTestHelpers.coin(), target, 8).size(), 0, "nothing can hit 8")
+	assert_eq(factory.convert_all_bullets_to_pickups(PickupTestHelpers.coin(), target, 4).size(), 1, "all: the one left that can hit 4")
+	assert_eq(_alive(again), [], "converted")
+	var last := _masked_volley([Vector2(9, 0)], 2)
+	var spare := _masked_volley([Vector2(9, 0)], 4)
+	factory.convert_all_bullets_to_pickups_deferred(PickupTestHelpers.coin(), target, 2)
+	await idle(2)
+	assert_eq([_alive(last), _alive(spare)], [[], [0]], "deferred: the mask travels with the call")
+
+
+func test_a_can_hit_mask_outside_32_bits_is_refused_and_changes_nothing() -> void:
+	var v := _masked_volley([Vector2(0, 0)], 2)
+	var target := Node2D.new()
+	add(target)
+	for bad in [-1, 1 << 32]:
+		assert_eq(factory.count_bullets_in_circle(Vector2.ZERO, 5.0, bad), 0, "count refused")
+		expect_error_sequence(["count_bullets_in_circle: can_hit_mask must be between 0 and 4294967295 (0 matches everything)."])
+		assert_eq(factory.clear_bullets_in_rect(Rect2(-5, -5, 10, 10), bad), 0, "clear refused")
+		expect_error_sequence(["clear_bullets_in_rect: can_hit_mask must be between 0 and 4294967295 (0 matches everything)."])
+		assert_eq(factory.get_bullets_in_circle(Vector2.ZERO, 5.0, bad).size(), 0, "listing refused")
+		expect_error_sequence(["get_bullets_in_circle: can_hit_mask must be between 0 and 4294967295 (0 matches everything)."])
+		assert_eq(factory.convert_all_bullets_to_pickups(PickupTestHelpers.coin(), target, bad).size(), 0, "conversion refused")
+		expect_error_sequence(["BulletFactory2D.convert_all_bullets_to_pickups: can_hit_mask must be between 0 and 4294967295 (0 matches everything), nothing converted."])
+		assert_eq(factory.end_lasers_in_circle(Vector2.ZERO, 5.0, true, bad), 0, "laser end refused")
+		expect_error_sequence(["end_lasers_in_circle: can_hit_mask must be between 0 and 4294967295 (0 matches everything)."])
+	assert_eq(_alive(v), [0], "nothing happened")

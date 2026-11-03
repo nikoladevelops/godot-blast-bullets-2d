@@ -135,9 +135,9 @@ public:
 	int clear_active_lasers(bool fade = true);
 	// Ends every laser whose live body touches the area (edges included,
 	// negative rects normalized). No user code: safe inside handlers.
-	int end_lasers_in_circle(const Vector2 &center, real_t radius, bool fade = true);
-	int end_lasers_in_rect(const Rect2 &rect, bool fade = true);
-	int end_lasers_in_area(const char *function_name, bool circle, const Vector2 &center, real_t radius, const Rect2 &rect, bool fade);
+	int end_lasers_in_circle(const Vector2 &center, real_t radius, bool fade = true, int64_t can_hit_mask = 0);
+	int end_lasers_in_rect(const Rect2 &rect, bool fade = true, int64_t can_hit_mask = 0);
+	int end_lasers_in_area(const char *function_name, bool circle, const Vector2 &center, real_t radius, const Rect2 &rect, bool fade, int64_t can_hit_mask);
 	// Pre-warms `amount` pooled lasers of `beam_count` beams (no first-shot
 	// allocation); frees pooled lasers (every bucket, or one beam count).
 	// Idle only: their _deferred twins queue from anywhere.
@@ -233,16 +233,16 @@ public:
 	// Clear effects and sounds like clear_active_bullets), then emits
 	// bullets_cleared once per volley. Allowed from physics handlers (not
 	// structural). Returns how many bullets were cleared.
-	int clear_bullets_in_circle(const Vector2 &center, real_t radius);
-	int clear_bullets_in_rect(const Rect2 &rect);
-	int count_bullets_in_circle(const Vector2 &center, real_t radius) const;
+	int clear_bullets_in_circle(const Vector2 &center, real_t radius, int64_t can_hit_mask = 0);
+	int clear_bullets_in_rect(const Rect2 &rect, int64_t can_hit_mask = 0);
+	int count_bullets_in_circle(const Vector2 &center, real_t radius, int64_t can_hit_mask = 0) const;
 	// The live bullets inside the area (edge-inclusive like the clears, rect
 	// normalized), one Dictionary per volley that has any: {"volley",
 	// "bullet_indexes" (PackedInt32Array), "positions" (PackedVector2Array)},
 	// in factory order. Volleys queued for deletion are skipped. Read-only:
 	// safe anywhere, O(live bullets) per call.
-	TypedArray<Dictionary> get_bullets_in_circle(const Vector2 &center, real_t radius) const;
-	TypedArray<Dictionary> get_bullets_in_rect(const Rect2 &rect) const;
+	TypedArray<Dictionary> get_bullets_in_circle(const Vector2 &center, real_t radius, int64_t can_hit_mask = 0) const;
+	TypedArray<Dictionary> get_bullets_in_rect(const Rect2 &rect, int64_t can_hit_mask = 0) const;
 	// Every ACTIVE volley (not pooled or queued for deletion; parked ones
 	// only with include_parked), in factory order (the sweep's order).
 	TypedArray<BulletVolley2D> get_active_volleys(bool include_parked = false) const;
@@ -254,10 +254,10 @@ public:
 	// the mouse) and are collected on arrival (signal pickup_collected). Not
 	// structural: allowed from physics handlers, refused while a sweep runs
 	// (use the deferred twin there). Bad input converts nothing.
-	Array convert_all_bullets_to_pickups(const Ref<BulletPickupData2D> &pickup, const Variant &target);
-	Array convert_bullets_in_circle_to_pickups(const Vector2 &center, real_t radius, const Ref<BulletPickupData2D> &pickup, const Variant &target);
-	Array convert_bullets_in_rect_to_pickups(const Rect2 &rect, const Ref<BulletPickupData2D> &pickup, const Variant &target);
-	void convert_all_bullets_to_pickups_deferred(const Ref<BulletPickupData2D> &pickup, const Variant &target);
+	Array convert_all_bullets_to_pickups(const Ref<BulletPickupData2D> &pickup, const Variant &target, int64_t can_hit_mask = 0);
+	Array convert_bullets_in_circle_to_pickups(const Vector2 &center, real_t radius, const Ref<BulletPickupData2D> &pickup, const Variant &target, int64_t can_hit_mask = 0);
+	Array convert_bullets_in_rect_to_pickups(const Rect2 &rect, const Ref<BulletPickupData2D> &pickup, const Variant &target, int64_t can_hit_mask = 0);
+	void convert_all_bullets_to_pickups_deferred(const Ref<BulletPickupData2D> &pickup, const Variant &target, int64_t can_hit_mask = 0);
 	// Pre-warms the pool for pickup volleys of `bullet_count` bullets
 	// (instance_count volleys, like populate_bullets_pool). The pool is keyed
 	// by bullet count, so a game that converts waves of a known size can
@@ -277,9 +277,14 @@ public:
 		Rect2 rect;
 		BulletVolley2D *volley = nullptr; // VOLLEY: used immediately, never kept
 		const PackedInt32Array *indexes = nullptr; // VOLLEY: empty = every live bullet
+		int64_t can_hit_mask = 0; // ALL / CIRCLE / RECT: only volleys whose collision_mask shares a bit (0 = all)
 	};
 	Array convert_to_pickups_impl(const char *function_name, const Ref<BulletPickupData2D> &pickup, const Variant &target, const PickupSelection &selection);
-	int count_bullets_in_rect(const Rect2 &rect) const;
+	int count_bullets_in_rect(const Rect2 &rect, int64_t can_hit_mask = 0) const;
+	// can_hit_mask of the area calls: 0 = everything, else what a collision_mask
+	// must share a bit with (bullets and lasers alike). Checked once per call.
+	static bool can_hit_mask_valid(const String &function_name, int64_t can_hit_mask, const char *tail = ".");
+	static bool can_hit(int64_t can_hit_mask, int64_t collision_mask) { return can_hit_mask == 0 || (collision_mask & can_hit_mask) != 0; }
 
 	void free_disabled_bullets(const Ref<VolleyPoolKey2D> &key = Ref<VolleyPoolKey2D>());
 
@@ -984,7 +989,7 @@ private:
 	// After the laser tick: the boxes every active laser queried, while the
 	// debugger is enabled (hidden and emptied otherwise). No user code.
 	void refresh_laser_debug_layer();
-	int clear_bullets_in_area(const char *function_name, bool circle, const Vector2 &center, real_t radius, const Rect2 &rect);
+	int clear_bullets_in_area(const char *function_name, bool circle, const Vector2 &center, real_t radius, const Rect2 &rect, int64_t can_hit_mask);
 	bool is_ready = false;
 
 	// Set in NOTIFICATION_PREDELETE (parent notified before children are destroyed).

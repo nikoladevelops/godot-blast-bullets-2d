@@ -247,9 +247,18 @@ bool area_args_valid(const char *function_name, bool circle, const Vector2 &cent
 }
 } // namespace
 
-int BulletFactory2D::clear_bullets_in_area(const char *function_name, bool circle, const Vector2 &center, real_t radius, const Rect2 &rect) {
+bool BulletFactory2D::can_hit_mask_valid(const String &function_name, int64_t can_hit_mask, const char *tail) {
+	// A GDScript int is 64-bit; a collision mask holds 32 bits.
+	if (can_hit_mask < 0 || can_hit_mask > (int64_t)UINT32_MAX) {
+		UtilityFunctions::push_error(function_name + String(": can_hit_mask must be between 0 and 4294967295 (0 matches everything)") + String(tail));
+		return false;
+	}
+	return true;
+}
+
+int BulletFactory2D::clear_bullets_in_area(const char *function_name, bool circle, const Vector2 &center, real_t radius, const Rect2 &rect, int64_t can_hit_mask) {
 	Rect2 normalized;
-	if (!area_args_valid(function_name, circle, center, radius, rect, normalized)) {
+	if (!area_args_valid(function_name, circle, center, radius, rect, normalized) || !can_hit_mask_valid(function_name, can_hit_mask)) {
 		return 0;
 	}
 	if (is_factory_busy) {
@@ -273,7 +282,7 @@ int BulletFactory2D::clear_bullets_in_area(const char *function_name, bool circl
 	for (const VolleyIterationEntry &entry : snapshot) {
 		BulletVolley2D *volley = entry.volley;
 		const uint64_t volley_id = entry.id;
-		if (ObjectDB::get_instance(ObjectID(volley_id)) != volley || !volley->is_active || volley->is_queued_for_deletion()) {
+		if (ObjectDB::get_instance(ObjectID(volley_id)) != volley || !volley->is_active || volley->is_queued_for_deletion() || !can_hit(can_hit_mask, volley->get_collision_mask())) {
 			continue;
 		}
 		AreaClearRecord record;
@@ -322,31 +331,31 @@ int BulletFactory2D::clear_bullets_in_area(const char *function_name, bool circl
 	return cleared;
 }
 
-int BulletFactory2D::clear_bullets_in_circle(const Vector2 &center, real_t radius) {
-	return clear_bullets_in_area("clear_bullets_in_circle", true, center, radius, Rect2());
+int BulletFactory2D::clear_bullets_in_circle(const Vector2 &center, real_t radius, int64_t can_hit_mask) {
+	return clear_bullets_in_area("clear_bullets_in_circle", true, center, radius, Rect2(), can_hit_mask);
 }
 
-int BulletFactory2D::clear_bullets_in_rect(const Rect2 &rect) {
-	return clear_bullets_in_area("clear_bullets_in_rect", false, Vector2(), 0.0, rect);
+int BulletFactory2D::clear_bullets_in_rect(const Rect2 &rect, int64_t can_hit_mask) {
+	return clear_bullets_in_area("clear_bullets_in_rect", false, Vector2(), 0.0, rect, can_hit_mask);
 }
 
-int BulletFactory2D::end_lasers_in_circle(const Vector2 &center, real_t radius, bool fade) {
-	return end_lasers_in_area("end_lasers_in_circle", true, center, radius, Rect2(), fade);
+int BulletFactory2D::end_lasers_in_circle(const Vector2 &center, real_t radius, bool fade, int64_t can_hit_mask) {
+	return end_lasers_in_area("end_lasers_in_circle", true, center, radius, Rect2(), fade, can_hit_mask);
 }
 
-int BulletFactory2D::end_lasers_in_rect(const Rect2 &rect, bool fade) {
-	return end_lasers_in_area("end_lasers_in_rect", false, Vector2(), 0.0, rect, fade);
+int BulletFactory2D::end_lasers_in_rect(const Rect2 &rect, bool fade, int64_t can_hit_mask) {
+	return end_lasers_in_area("end_lasers_in_rect", false, Vector2(), 0.0, rect, fade, can_hit_mask);
 }
 
-int BulletFactory2D::end_lasers_in_area(const char *function_name, bool circle, const Vector2 &center, real_t radius, const Rect2 &rect, bool fade) {
+int BulletFactory2D::end_lasers_in_area(const char *function_name, bool circle, const Vector2 &center, real_t radius, const Rect2 &rect, bool fade, int64_t can_hit_mask) {
 	Rect2 normalized;
-	if (!area_args_valid(function_name, circle, center, radius, rect, normalized)) {
+	if (!area_args_valid(function_name, circle, center, radius, rect, normalized) || !can_hit_mask_valid(function_name, can_hit_mask)) {
 		return 0;
 	}
 	// end_laser runs no user code (the next tick announces and signals).
 	int n = 0;
 	for (LaserVolley2D *laser : all_lasers) {
-		if (laser != nullptr && laser->touches_area(circle, center, radius, normalized)) {
+		if (laser != nullptr && (can_hit_mask == 0 || (laser->data.is_valid() && can_hit(can_hit_mask, laser->data->get_collision_mask()))) && laser->touches_area(circle, center, radius, normalized)) {
 			laser->end_laser(fade);
 			++n;
 		}
@@ -354,15 +363,15 @@ int BulletFactory2D::end_lasers_in_area(const char *function_name, bool circle, 
 	return n;
 }
 
-int BulletFactory2D::count_bullets_in_circle(const Vector2 &center, real_t radius) const {
+int BulletFactory2D::count_bullets_in_circle(const Vector2 &center, real_t radius, int64_t can_hit_mask) const {
 	Rect2 unused;
-	if (!area_args_valid("count_bullets_in_circle", true, center, radius, Rect2(), unused)) {
+	if (!area_args_valid("count_bullets_in_circle", true, center, radius, Rect2(), unused) || !can_hit_mask_valid("count_bullets_in_circle", can_hit_mask)) {
 		return 0;
 	}
 	std::vector<int> found;
 	int total = 0;
 	for (BulletVolley2D *volley : all_volleys) {
-		if (volley == nullptr || !volley->is_active || volley->is_queued_for_deletion()) {
+		if (volley == nullptr || !volley->is_active || volley->is_queued_for_deletion() || !can_hit(can_hit_mask, volley->get_collision_mask())) {
 			continue; // like get_bullets_in_* and the clears
 		}
 		found.clear();
@@ -373,11 +382,11 @@ int BulletFactory2D::count_bullets_in_circle(const Vector2 &center, real_t radiu
 }
 
 namespace {
-TypedArray<Dictionary> bullets_in_area(const std::vector<BulletVolley2D *> &volleys, bool circle, const Vector2 &center, real_t radius, const Rect2 &normalized) {
+TypedArray<Dictionary> bullets_in_area(const std::vector<BulletVolley2D *> &volleys, bool circle, const Vector2 &center, real_t radius, const Rect2 &normalized, int64_t can_hit_mask) {
 	TypedArray<Dictionary> out;
 	std::vector<int> found;
 	for (BulletVolley2D *volley : volleys) {
-		if (volley == nullptr || !volley->is_active || volley->is_queued_for_deletion()) {
+		if (volley == nullptr || !volley->is_active || volley->is_queued_for_deletion() || !BulletFactory2D::can_hit(can_hit_mask, volley->get_collision_mask())) {
 			continue;
 		}
 		found.clear();
@@ -407,31 +416,31 @@ TypedArray<Dictionary> bullets_in_area(const std::vector<BulletVolley2D *> &voll
 }
 } // namespace
 
-TypedArray<Dictionary> BulletFactory2D::get_bullets_in_circle(const Vector2 &center, real_t radius) const {
+TypedArray<Dictionary> BulletFactory2D::get_bullets_in_circle(const Vector2 &center, real_t radius, int64_t can_hit_mask) const {
 	Rect2 unused;
-	if (!area_args_valid("get_bullets_in_circle", true, center, radius, Rect2(), unused)) {
+	if (!area_args_valid("get_bullets_in_circle", true, center, radius, Rect2(), unused) || !can_hit_mask_valid("get_bullets_in_circle", can_hit_mask)) {
 		return TypedArray<Dictionary>();
 	}
-	return bullets_in_area(all_volleys, true, center, radius, Rect2());
+	return bullets_in_area(all_volleys, true, center, radius, Rect2(), can_hit_mask);
 }
 
-TypedArray<Dictionary> BulletFactory2D::get_bullets_in_rect(const Rect2 &rect) const {
+TypedArray<Dictionary> BulletFactory2D::get_bullets_in_rect(const Rect2 &rect, int64_t can_hit_mask) const {
 	Rect2 normalized;
-	if (!area_args_valid("get_bullets_in_rect", false, Vector2(), 0.0, rect, normalized)) {
+	if (!area_args_valid("get_bullets_in_rect", false, Vector2(), 0.0, rect, normalized) || !can_hit_mask_valid("get_bullets_in_rect", can_hit_mask)) {
 		return TypedArray<Dictionary>();
 	}
-	return bullets_in_area(all_volleys, false, Vector2(), 0.0, normalized);
+	return bullets_in_area(all_volleys, false, Vector2(), 0.0, normalized, can_hit_mask);
 }
 
-int BulletFactory2D::count_bullets_in_rect(const Rect2 &rect) const {
+int BulletFactory2D::count_bullets_in_rect(const Rect2 &rect, int64_t can_hit_mask) const {
 	Rect2 normalized;
-	if (!area_args_valid("count_bullets_in_rect", false, Vector2(), 0.0, rect, normalized)) {
+	if (!area_args_valid("count_bullets_in_rect", false, Vector2(), 0.0, rect, normalized) || !can_hit_mask_valid("count_bullets_in_rect", can_hit_mask)) {
 		return 0;
 	}
 	std::vector<int> found;
 	int total = 0;
 	for (BulletVolley2D *volley : all_volleys) {
-		if (volley == nullptr || !volley->is_active || volley->is_queued_for_deletion()) {
+		if (volley == nullptr || !volley->is_active || volley->is_queued_for_deletion() || !can_hit(can_hit_mask, volley->get_collision_mask())) {
 			continue; // like get_bullets_in_* and the clears
 		}
 		found.clear();

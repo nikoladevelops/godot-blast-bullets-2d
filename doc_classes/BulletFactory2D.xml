@@ -44,15 +44,19 @@
 			<return type="int" />
 			<param index="0" name="center" type="Vector2" />
 			<param index="1" name="radius" type="float" />
+			<param index="2" name="can_hit_mask" type="int" default="0" />
 			<description>
 				Clears every live bullet of every active volley whose centre is inside the circle (global space, edge inclusive), with the same On Clear effects and sounds as [method clear_active_bullets]. Then emits [signal bullets_cleared] once per volley that lost bullets. Allowed from physics handlers (a bomb on a hit); refused while a sweep is running. Returns how many bullets were cleared. [param center] must be finite and [param radius] a finite number 0 or more, else one error is pushed and nothing is cleared.
+				[param can_hit_mask] filters by what the bullets can hit: only volleys whose [member BulletVolleyData2D.collision_mask] shares a bit with it count (0, the default, takes every bullet). Pass the player's collision layer to take only what can hurt the player (a bomb) and leave the player's own shots.
 			</description>
 		</method>
 		<method name="clear_bullets_in_rect">
 			<return type="int" />
 			<param index="0" name="rect" type="Rect2" />
+			<param index="1" name="can_hit_mask" type="int" default="0" />
 			<description>
 				Like [method clear_bullets_in_circle] for a rectangle (global space, all four edges inclusive). A negative size is accepted and means the same rectangle. [param rect] must be finite.
+				[param can_hit_mask] filters by what the bullets can hit: only volleys whose [member BulletVolleyData2D.collision_mask] shares a bit with it count (0, the default, takes every bullet). Pass the player's collision layer to take only what can hurt the player (a bomb) and leave the player's own shots.
 			</description>
 		</method>
 		<method name="clear_sprite_effects">
@@ -65,16 +69,20 @@
 			<return type="Array" />
 			<param index="0" name="pickup" type="BulletPickupData2D" />
 			<param index="1" name="target" type="Variant" />
+			<param index="2" name="can_hit_mask" type="int" default="0" />
 			<description>
 				Turns every live bullet of every active volley on screen, whoever fired it, into pickups (coins, gems, score items) described by [param pickup]. Returns the new pickup volleys, usually one: a call that converts more bullets than [method BulletPatterns2D.get_max_bullets_per_pattern] is split into volleys of at most that size. Converting nothing returns an empty array without an error. Allowed from physics handlers (a bomb, a boss dying); refused while a sweep is running, use [method convert_all_bullets_to_pickups_deferred] there. A conversion started from inside a conversion (for example from the attachment callbacks of the new pickups) is refused with an error instead of converting the same bullets twice. The converted bullets leave their volleys (silently, or with their On Clear effects when [member BulletPickupData2D.fire_clear_effects] is on) and reappear as pickups at the same pose, scaled by [member BulletPickupData2D.scale_multiplier]. Pickups are owned by the factory, follow [member BulletFactory2D.time_scale] and are never converted again. Collecting one emits [signal BulletFactory2D.pickup_collected]. [param target] is where the pickups are pulled: a [Node2D] (followed while it moves), a [Vector2] (a global position), a group name as a String or StringName (each pickup goes to the nearest usable member of that group at the moment of the call), or null (the mouse cursor). Anything else, an empty group, or a node outside the tree pushes one error and converts nothing.
+				[param can_hit_mask] filters by what the bullets can hit: only volleys whose [member BulletVolleyData2D.collision_mask] shares a bit with it count (0, the default, takes every bullet). Pass the player's collision layer to take only what can hurt the player (a bomb) and leave the player's own shots.
 			</description>
 		</method>
 		<method name="convert_all_bullets_to_pickups_deferred">
 			<return type="void" />
 			<param index="0" name="pickup" type="BulletPickupData2D" />
 			<param index="1" name="target" type="Variant" />
+			<param index="2" name="can_hit_mask" type="int" default="0" />
 			<description>
 				Queues [method convert_all_bullets_to_pickups] for the next idle frame, in call order with the other deferred structural calls. Safe from anywhere, including callbacks that run inside a sweep. The result of the queued call is not returned.
+				[param can_hit_mask] filters by what the bullets can hit: only volleys whose [member BulletVolleyData2D.collision_mask] shares a bit with it count (0, the default, takes every bullet). Pass the player's collision layer to take only what can hurt the player (a bomb) and leave the player's own shots.
 			</description>
 		</method>
 		<method name="convert_bullets_in_circle_to_pickups">
@@ -83,8 +91,10 @@
 			<param index="1" name="radius" type="float" />
 			<param index="2" name="pickup" type="BulletPickupData2D" />
 			<param index="3" name="target" type="Variant" />
+			<param index="4" name="can_hit_mask" type="int" default="0" />
 			<description>
 				Like [method convert_all_bullets_to_pickups], but only the bullets whose centre is inside the circle (global space, edge inclusive). [param center] must be finite and [param radius] a finite number 0 or more, otherwise one error is pushed and nothing is converted.
+				[param can_hit_mask] filters by what the bullets can hit: only volleys whose [member BulletVolleyData2D.collision_mask] shares a bit with it count (0, the default, takes every bullet). Pass the player's collision layer to take only what can hurt the player (a bomb) and leave the player's own shots.
 			</description>
 		</method>
 		<method name="convert_bullets_in_rect_to_pickups">
@@ -92,23 +102,29 @@
 			<param index="0" name="rect" type="Rect2" />
 			<param index="1" name="pickup" type="BulletPickupData2D" />
 			<param index="2" name="target" type="Variant" />
+			<param index="3" name="can_hit_mask" type="int" default="0" />
 			<description>
 				Like [method convert_all_bullets_to_pickups], but only the bullets whose centre is inside the rectangle (global space, edges inclusive, a negative size is the same rectangle). [param rect] must be finite.
+				[param can_hit_mask] filters by what the bullets can hit: only volleys whose [member BulletVolleyData2D.collision_mask] shares a bit with it count (0, the default, takes every bullet). Pass the player's collision layer to take only what can hurt the player (a bomb) and leave the player's own shots.
 			</description>
 		</method>
 		<method name="count_bullets_in_circle" qualifiers="const">
 			<return type="int" />
 			<param index="0" name="center" type="Vector2" />
 			<param index="1" name="radius" type="float" />
+			<param index="2" name="can_hit_mask" type="int" default="0" />
 			<description>
 				How many live bullets, across every active volley, have their centre inside the circle (edge inclusive). Bullet size is not counted. Use it for danger meters and proximity checks. Bad input pushes one error and returns 0.
+				[param can_hit_mask] filters by what the bullets can hit: only volleys whose [member BulletVolleyData2D.collision_mask] shares a bit with it count (0, the default, takes every bullet). Pass the player's collision layer to take only what can hurt the player (a bomb) and leave the player's own shots.
 			</description>
 		</method>
 		<method name="count_bullets_in_rect" qualifiers="const">
 			<return type="int" />
 			<param index="0" name="rect" type="Rect2" />
+			<param index="1" name="can_hit_mask" type="int" default="0" />
 			<description>
 				Like [method count_bullets_in_circle] for a rectangle. A negative size is accepted. Bad input pushes one error and returns 0.
+				[param can_hit_mask] filters by what the bullets can hit: only volleys whose [member BulletVolleyData2D.collision_mask] shares a bit with it count (0, the default, takes every bullet). Pass the player's collision layer to take only what can hurt the player (a bomb) and leave the player's own shots.
 			</description>
 		</method>
 		<method name="debug_advance_time">
@@ -435,16 +451,20 @@
 			<param index="0" name="center" type="Vector2" />
 			<param index="1" name="radius" type="float" />
 			<param index="2" name="fade" type="bool" default="true" />
+			<param index="3" name="can_hit_mask" type="int" default="0" />
 			<description>
 				Ends every laser whose live body touches the circle: the distance from [param center] to a beam's polyline is at most [param radius] plus half the beam's current width (edges included; a charging laser's warning line counts, spent bolt or curvy beams never). With [param fade] the lasers fade out, else they end on the next tick. Runs no user code, so a signal handler may call it (a bomb). Refuses a non-finite center or a negative radius with the same error as [method clear_bullets_in_circle]. Returns how many lasers it ended (or that were already fading).
+				[param can_hit_mask] filters by what the lasers can hit: only lasers whose [member LaserData2D.collision_mask] shares a bit with it count (0, the default, takes every laser).
 			</description>
 		</method>
 		<method name="end_lasers_in_rect">
 			<return type="int" />
 			<param index="0" name="rect" type="Rect2" />
 			<param index="1" name="fade" type="bool" default="true" />
+			<param index="2" name="can_hit_mask" type="int" default="0" />
 			<description>
 				Ends every laser whose live body touches [param rect] (edges included, a negative size is normalized, half the beam's width counted), fading with [param fade]. Same rules as [method end_lasers_in_circle]. Returns how many lasers it ended.
+				[param can_hit_mask] filters by what the lasers can hit: only lasers whose [member LaserData2D.collision_mask] shares a bit with it count (0, the default, takes every laser).
 			</description>
 		</method>
 		<method name="ensure_factory_initialized">
@@ -578,15 +598,19 @@
 			<return type="Dictionary[]" />
 			<param index="0" name="center" type="Vector2" />
 			<param index="1" name="radius" type="float" />
+			<param index="2" name="can_hit_mask" type="int" default="0" />
 			<description>
 				The live bullets within [param radius] of [param center] (edge included, like [method clear_bullets_in_circle]): one Dictionary per volley that has any, in factory order, with [code]"volley"[/code] (the [BulletVolley2D]), [code]"bullet_indexes"[/code] ([PackedInt32Array]) and [code]"positions"[/code] ([PackedVector2Array], parallel to the indexes). Frozen bullets and volleys queued for deletion are left out. Read-only and safe anywhere (handlers included); O(live bullets). A non-finite center or a negative radius fails loud and returns an empty array.
+				[param can_hit_mask] filters by what the bullets can hit: only volleys whose [member BulletVolleyData2D.collision_mask] shares a bit with it count (0, the default, takes every bullet). Pass the player's collision layer to take only what can hurt the player (a bomb) and leave the player's own shots.
 			</description>
 		</method>
 		<method name="get_bullets_in_rect" qualifiers="const">
 			<return type="Dictionary[]" />
 			<param index="0" name="rect" type="Rect2" />
+			<param index="1" name="can_hit_mask" type="int" default="0" />
 			<description>
 				Same as [method get_bullets_in_circle] for a rectangle (all four edges included; a negative size is normalized). A non-finite rect fails loud and returns an empty array.
+				[param can_hit_mask] filters by what the bullets can hit: only volleys whose [member BulletVolleyData2D.collision_mask] shares a bit with it count (0, the default, takes every bullet). Pass the player's collision layer to take only what can hurt the player (a bomb) and leave the player's own shots.
 			</description>
 		</method>
 		<method name="get_default_flock">
