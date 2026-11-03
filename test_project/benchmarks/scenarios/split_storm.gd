@@ -15,6 +15,9 @@ var _chain: BulletSplitData2D
 func setup() -> void:
 	warmup_frames = 130
 	measure_frames = 360
+	# Three waves in 360 frames: the 18th-worst frame (p95) is a wave frame in
+	# one run and the one after it in the next (1.5 to 2.4 ms on one build).
+	gate_p95 = false
 	var ring := BulletSplitStage2D.new()
 	ring.count = 4
 	ring.direction_mode = BulletSplitStage2D.DIRECTION_RING

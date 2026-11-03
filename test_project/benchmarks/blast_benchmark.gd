@@ -24,6 +24,10 @@ const H := preload("res://tests/common/blast_test_helpers.gd")
 var factory: BulletFactory2D
 var warmup_frames := 60
 var measure_frames := 300
+## False for a scenario that spikes on purpose every few frames (a wave every
+## N frames): its p95 lands on or next to a spike run by run, so only its p50
+## is gated (p95, p99 and max are still reported).
+var gate_p95 := true
 ## Scenario-specific metrics (numbers only), merged into the result JSON.
 var extra := {}
 var rng := RandomNumberGenerator.new()
@@ -109,6 +113,7 @@ func results() -> Dictionary:
 		"description": describe(),
 		"warmup_frames": warmup_frames,
 		"measure_frames": measure_frames,
+		"gate_p95": gate_p95,
 		"frame_ms": _stats_ms(_frame_us),
 		"factory_tick_ms": _stats_ms(_tick_us),
 		"step_ms": _stats_ms(_step_us),

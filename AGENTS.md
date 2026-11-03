@@ -1333,7 +1333,9 @@ python3 tools/run_benchmarks.py --update-baseline   # ONLY for an accepted chang
 ```
 
 - Read `test_project/benchmarks/log/LATEST.md`. Regression = p50 > +10% AND
-  > +0.05 ms, or p95 > +20% AND > +0.3 ms (p99/max reported, not gated).
+  > +0.05 ms, or p95 > +20% AND > +0.3 ms (p99/max reported, not gated; a
+  scenario that spikes on purpose sets `gate_p95 = false` and gates p50 only:
+  split_storm's p95 swings 1.5-2.4 ms between runs of one build).
   `log/history.csv` = trend, `log/results/*.json` = raw runs. Compare only
   same machine + same build type. Differences under ~5% p50 are noise.
 - Columns: frame = step (the scenario's plugin calls) + engine (physics +

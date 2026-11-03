@@ -24,7 +24,9 @@ Usage:
 Regression rule (per scenario, vs baseline): frame or factory-tick p50 more
 than +10% AND more than +0.05 ms, or p95 more than +20% AND +0.3 ms. p99 and
 max are reported (spike hunting) but not gated: with 300 frames they are a
-handful of frames and flip between modes from run to run.
+handful of frames and flip between modes from run to run. A scenario that
+spikes on purpose (gate_p95 = false in its script, e.g. split_storm's waves)
+gates p50 only.
 Numbers are only comparable on the same machine and build type; the result
 files record both. Close other heavy programs while benchmarking.
 """
@@ -130,7 +132,7 @@ def is_regression(new, old):
             continue
         if n["p50"] > o["p50"] * 1.10 and n["p50"] - o["p50"] > 0.05:
             flags.append(f"{series}.p50 {o['p50']:.3f}->{n['p50']:.3f} ms ({pct(n['p50'], o['p50']):+.0f}%)")
-        if n["p95"] > o["p95"] * 1.20 and n["p95"] - o["p95"] > 0.3:
+        if new.get("gate_p95", True) and n["p95"] > o["p95"] * 1.20 and n["p95"] - o["p95"] > 0.3:
             flags.append(f"{series}.p95 {o['p95']:.3f}->{n['p95']:.3f} ms ({pct(n['p95'], o['p95']):+.0f}%)")
     return flags
 
