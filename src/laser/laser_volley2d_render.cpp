@@ -99,6 +99,20 @@ void LaserVolley2D::interpolated_points(const Beam &b, double fraction, std::vec
 				break;
 			}
 		}
+		// A slow head moved its newest point instead of adding one (under a
+		// pixel, Beam::head_extendable): last tick's head then sits on (within
+		// a pixel of) the newest segment, and the path continues from there.
+		if (joint == b.points.size() && b.points.size() >= 2) {
+			const Vector2 a = b.points[b.points.size() - 2];
+			const Vector2 ac = b.points.back() - a;
+			const Vector2 ap = b.prev_points.back() - a;
+			const real_t ac_sq = ac.x * ac.x + ac.y * ac.y;
+			const real_t t = ac_sq > (real_t)0.0 ? Math::clamp((ap.x * ac.x + ap.y * ac.y) / ac_sq, (real_t)0.0, (real_t)1.0) : (real_t)0.0;
+			const Vector2 off = ap - ac * t;
+			if (off.x * off.x + off.y * off.y <= (real_t)1.0) {
+				joint = b.points.size() - 2;
+			}
+		}
 		if (joint < b.points.size()) {
 			std::vector<Vector2> &path = interp_path_scratch;
 			path = b.prev_points;

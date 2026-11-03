@@ -1,7 +1,7 @@
 #include "debugger/laser_debug_layer2d.hpp"
 
-#include <godot_cpp/variant/packed_color_array.hpp>
-#include <godot_cpp/variant/packed_vector2_array.hpp>
+#include <godot_cpp/variant/rect2.hpp>
+#include <godot_cpp/variant/transform2d.hpp>
 
 using namespace godot;
 namespace BlastBullets2D {
@@ -13,21 +13,17 @@ void LaserDebugLayer2D::_draw() {
 	}
 	Color fill = color;
 	fill.a = color.a * 0.35f;
-	PackedVector2Array quad;
-	quad.resize(4);
-	PackedVector2Array outline;
-	outline.resize(5);
+	// Each box is a rect in its own pose: a rect never triangulates, so a
+	// hairline box (a slow head's tiny segment) draws where a polygon of its
+	// corners failed in float (Godot printed an error per box per frame).
 	for (const LaserDebugBox2D &box : boxes) {
 		const Vector2 e = box.extents;
-		const Vector2 corners[4] = { box.pose.xform(Vector2(-e.x, -e.y)), box.pose.xform(Vector2(e.x, -e.y)), box.pose.xform(Vector2(e.x, e.y)), box.pose.xform(Vector2(-e.x, e.y)) };
-		for (int k = 0; k < 4; ++k) {
-			quad.set(k, corners[k]);
-			outline.set(k, corners[k]);
-		}
-		outline.set(4, corners[0]);
-		draw_colored_polygon(quad, fill);
-		draw_polyline(outline, color, 1.0f);
+		const Rect2 rect(-e, e * (real_t)2.0);
+		draw_set_transform_matrix(box.pose);
+		draw_rect(rect, fill, true);
+		draw_rect(rect, color, false, 1.0f);
 	}
+	draw_set_transform_matrix(Transform2D());
 }
 
 } // namespace BlastBullets2D

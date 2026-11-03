@@ -107,6 +107,11 @@ public:
 		Vector2 drift;
 		double wave_clock = 0.0;
 		std::vector<Vector2> trail;
+		// The newest trail point is the head itself (not a wall point): while
+		// the newest segment is under a pixel, a move shifts that point instead
+		// of adding one, so a slow head keeps at most one point per pixel flown
+		// (it kept one per tick: a bolt at 1 px/s piled up 36000 of them).
+		bool head_extendable = false;
 	};
 
 	// Everything the draw places on a beam at `fraction`: the polyline and

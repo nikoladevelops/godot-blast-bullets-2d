@@ -304,3 +304,49 @@ func test_a_reflected_head_bounces_its_drift_too() -> void:
 	_step(1)
 	assert_almost_eq(l.get_beam_end(0) - before, (Vector2(-800, 0) + Vector2(-drift.x, drift.y)) * DT, Vector2(0.01, 0.01), "the drift reflects with the head")
 	assert_lt(l.get_beam_end(0).x, 240.0, "back on its side of the wall")
+
+
+func test_a_slow_bolt_keeps_one_point_per_pixel_flown() -> void:
+	# One path point per tick piled up: a bolt at 1 px/s carried 36000 points
+	# after 10 minutes, and every tick walked (and queried) all of them. A
+	# head keeps at most one point per pixel it flew.
+	var d := _bolt()
+	d.speed = 1.0
+	d.length = 600.0
+	d.active_sec = 0.0
+	var l := factory.spawn_laser(d, [Transform2D.IDENTITY])
+	step_factory(1800, 1.0 / 60.0)
+	var pts: PackedVector2Array = l.debug_get_draw_state(1.0)[0]["points"]
+	assert_between(pts.size(), 2, 32, "30 px flown: at most a point per pixel (it kept 1801)")
+	assert_almost_eq(pts[-1].x, 30.0, 0.01, "the head flew 30 px")
+	assert_almost_eq(pts[0].x, 0.0, 0.01, "the tail is still the muzzle (shorter than length)")
+	assert_almost_eq(l.get_beam_end(0).x, 30.0, 0.01, "the head is the beam's end")
+
+
+func test_a_slow_curvy_body_keeps_its_points_a_pixel_apart() -> void:
+	# A waving head turns every tick, so its path keeps bends, but never more
+	# than one point per pixel it flew (it kept one per tick).
+	var d := _bolt(LaserData2D.LASER_CURVY)
+	d.speed = 5.0
+	d.length = 600.0
+	d.active_sec = 0.0
+	d.wave_amplitude = 20.0
+	d.wave_frequency = 0.5
+	var l := factory.spawn_laser(d, [Transform2D.IDENTITY])
+	step_factory(1800, 1.0 / 60.0)
+	var pts: PackedVector2Array = l.debug_get_draw_state(1.0)[0]["points"]
+	var traveled := 0.0
+	var close := []
+	for i in range(1, pts.size()):
+		var seg := pts[i].distance_to(pts[i - 1])
+		traveled += seg
+		if seg < 1.0 and i < pts.size() - 1: # the newest segment may be shorter
+			close.append([i, seg])
+	assert_eq(close, [], "every kept point is at least 1 px from the one before")
+	assert_lte(pts.size(), int(traveled) + 2, "at most one point per pixel flown")
+	var widest := 0.0
+	for p in pts:
+		widest = maxf(widest, absf(p.y))
+	# At 5 px/s the wave turns the head (its lateral speed is A w cos(w t)),
+	# but the head flies 5 px/s in total: the swing is about 2 px wide.
+	assert_gt(widest, 1.5, "the body still waves")

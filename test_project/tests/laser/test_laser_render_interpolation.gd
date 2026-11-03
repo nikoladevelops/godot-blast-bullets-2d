@@ -626,3 +626,15 @@ func test_antialiased_off_draws_exactly_the_hard_edged_strip() -> void:
 	l.get_laser_data().antialiased = false
 	step_factory(1, DT)
 	assert_eq(Array(l.debug_get_body_mesh(1.0)["points"]), [Vector2(50, 56), Vector2(50, 44), Vector2(250, 56), Vector2(250, 44)], "today's strip")
+
+
+func test_a_slow_bolt_glides_while_its_head_point_moves() -> void:
+	# Under a pixel per tick the head moves its newest point instead of adding
+	# one: last tick's head is then no point of the new body, and the body
+	# must still glide (not snap to this tick).
+	var d := H.make_laser(0.0, 0.0, 4.0, 0.0, 240.0)
+	d.type = LaserData2D.LASER_BOLT
+	d.speed = 6.0 # 0.375 px per tick
+	var l := _fire(d, Transform2D(0.3, Vector2(100, 100)))
+	step_factory(8, DT) # a few pixels of path first
+	assert_eq("\n".join(_check_continuity(l, 14, "slow bolt")), "", "a slow bolt never snaps")

@@ -320,6 +320,7 @@ void LaserVolley2D::step_head(Beam &b, double delta) {
 		b.wave_clock = 0.0;
 		b.trail.clear();
 		b.trail.push_back(b.head);
+		b.head_extendable = false;
 		b.blocked = false;
 		b.impacts.clear();
 		b.drift = inherited_velocity;
@@ -380,6 +381,7 @@ void LaserVolley2D::step_head(Beam &b, double delta) {
 						n = n.normalized();
 						if (q.distance_squared_to(b.head) > (real_t)1e-8) {
 							b.trail.push_back(q);
+							b.head_extendable = false; // the wall point stays a corner
 						}
 						if (b.bounces_left > 0) {
 							--b.bounces_left;
@@ -400,8 +402,22 @@ void LaserVolley2D::step_head(Beam &b, double delta) {
 			}
 		}
 		if (to.distance_squared_to(b.head) > (real_t)1e-8) {
+			// A still head adds nothing (no zero-length runs). While the newest
+			// segment is still under a pixel, the head moves the newest point
+			// instead of adding one (see Beam::head_extendable).
+			const size_t n = b.trail.size();
+			bool extend = false;
+			if (n >= 2 && b.head_extendable) {
+				const Vector2 last = b.trail[n - 1] - b.trail[n - 2];
+				extend = last.x * last.x + last.y * last.y < (real_t)1.0;
+			}
 			b.head = to;
-			b.trail.push_back(b.head); // a still head adds nothing (no zero-length runs)
+			if (extend) {
+				b.trail[n - 1] = b.head;
+			} else {
+				b.trail.push_back(b.head);
+			}
+			b.head_extendable = true;
 		}
 	}
 	b.angle = b.heading;

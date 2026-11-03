@@ -131,3 +131,17 @@ func test_a_script_freeing_the_overlay_never_breaks_it() -> void:
 	step_factory(1, DT)
 	assert_eq(_boxes().size(), 1, "recreated at the next tick")
 	expect_no_errors("freeing it reported nothing")
+
+
+func test_a_hairline_box_draws_without_an_engine_error() -> void:
+	# A box a few hundred-thousandths of a pixel thin, turned 90 degrees far
+	# from the origin, does not triangulate in float (Godot's
+	# Geometry2D.triangulate_polygon returns nothing for such a quad): drawn as
+	# a polygon it printed an engine error every frame (a slow bolt made
+	# hundreds of them).
+	factory.is_debugger_enabled = true
+	_fire(H.make_laser(0.0, 0.0, 0.0, 0.0, 0.00002), [Transform2D(PI / 2, Vector2(3000.0, 111.5824))] as Array[Transform2D])
+	step_factory(1, DT)
+	await idle(2) # the overlay draws in the idle frame
+	assert_eq(_boxes().size(), 1, "the hairline box is listed")
+	expect_no_errors()
