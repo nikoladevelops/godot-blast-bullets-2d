@@ -4,103 +4,103 @@ extends CanvasLayer
 # The default health that the player begins with
 @export var default_player_health:float
 # The player health bar
-@onready var player_health_bar:HealthBarComponent = $AlwaysVisibleView/HealthBar
+@onready var player_health_bar:HealthBarComponent = $Sidebar/List/AlwaysVisibleView/HealthRow/HealthBar
 
 ## Bullet Settings Related
 # Displays all object pool related settings
-@onready var object_pool_settings_view:Control = $ObjectPoolSettingsView
+@onready var object_pool_settings_view:Control = $Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView
 # Displays all bullet related settings
-@onready var bullet_settings_view:Control = $BulletSettingsView
+@onready var bullet_settings_view:Control = $Sidebar/List/Scroll/ViewStack/BulletSettingsView
 # Displays more settings for the bullets
-@onready var more_settings_view:Control = $MoreSettingsView
+@onready var more_settings_view:Control = $Sidebar/List/Scroll/ViewStack/MoreSettingsView
 # Displays settings only related to godot area2ds'
 @onready var godot_area2d_bullets_view:Control = $GodotArea2DBulletsView
 
-@onready var bullet_settings_btn:Button = $AlwaysVisibleView/SettingsUIManagerVBoxContainer/BulletSettingsBtn
-@onready var object_pool_settings_btn:Button = $AlwaysVisibleView/SettingsUIManagerVBoxContainer/ObjectPoolSettingsBtn
-@onready var more_settings_btn:Button = $AlwaysVisibleView/SettingsUIManagerVBoxContainer/MoreSettingsBtn
+@onready var bullet_settings_btn:Button = $Sidebar/List/ViewTabs/BulletSettingsBtn
+@onready var object_pool_settings_btn:Button = $Sidebar/List/ViewTabs/ObjectPoolSettingsBtn
+@onready var more_settings_btn:Button = $Sidebar/List/ViewTabs/MoreSettingsBtn
 
 # Saves the last view the user switched to
-@onready var last_visible_ui_setting_view:Control = $BulletSettingsView
+@onready var last_visible_ui_setting_view:Control = $Sidebar/List/Scroll/ViewStack/BulletSettingsView
 ##
 
 # The label that displays the current fps
-@onready var current_fps_label:Label = $TopRightContainer/CurrentFPS
+@onready var current_fps_label:Label = $StatsPanel/TopRightContainer/CurrentFPS
 # The label that displays the lowest recorded fps
-@onready var low_fps_label:Label = $TopRightContainer/LowFPS
+@onready var low_fps_label:Label = $StatsPanel/TopRightContainer/LowFPS
 # The button responsible for toggling whether the tracking of the fps is enabled
-@onready var track_fps_btn:Button = $TopRightContainer/TrackFPSBtn
+@onready var track_fps_btn:Button = $StatsPanel/TopRightContainer/TrackFPSBtn
 # If you check this checkbox then the monitorable property will be set to true, and all static bodies will now be detected by the bullets
-@onready var enable_monitorable_checkbox:CheckBox = $BulletSettingsView/VBoxContainer3/EnableMonitorableCheckBox
+@onready var enable_monitorable_checkbox:CheckBox = $Sidebar/List/Scroll/ViewStack/BulletSettingsView/EnableMonitorableCheckBox
 # If you check this checkbox then the debugger will be enabled and you will be able to see the movement of the collision shapes of the bullets
-@onready var enable_debugger_checkbox:CheckBox = $BulletSettingsView/VBoxContainer/VBoxContainer/EnableDebuggerCheckBox
+@onready var enable_debugger_checkbox:CheckBox = $Sidebar/List/Scroll/ViewStack/BulletSettingsView/EnableDebuggerCheckBox
 # Whether the rotation of the bullets should be stopped when the max rotation has been reached
-@onready var stop_rotation_when_max_reached_checkbox:CheckBox = $BulletSettingsView/VBoxContainer/VBoxContainer/StopRotationWhenMaxReachedCheckBox
+@onready var stop_rotation_when_max_reached_checkbox:CheckBox = $Sidebar/List/Scroll/ViewStack/BulletSettingsView/StopRotationWhenMaxReachedCheckBox
 
 ## Color Picker
 # Responsible for picking a color for the collision-shape debugger
 @onready var debugger_color_picker:ColorPicker = $DebuggerColorPicker
 # Responsible for showing/hiding the debugger color picker
-@onready var show_debugger_color_picker_btn:Button = $BulletSettingsView/VBoxContainer/DebuggerVBoxContainer/ShowDebuggerColorPickerBtn
+@onready var show_debugger_color_picker_btn:Button = $Sidebar/List/Scroll/ViewStack/BulletSettingsView/DebuggerVBoxContainerFrame/DebuggerVBoxContainer/Options/ShowDebuggerColorPickerBtn
 # Responsible for closing the currently shown color picker
 @onready var close_color_picker_btn:Button = $CloseCurrentColorPickerBtn
 var last_selected_color_picker:ColorPicker = null
 ##
 
 # If you check this checkbox then the bullets will always keep their texture rotation, no matter the direction they travel in
-@onready var is_texture_rotation_permanent_checkbox:CheckBox = $BulletSettingsView/VBoxContainer3/IsTextureRotationPermanentCheckBox
+@onready var is_texture_rotation_permanent_checkbox:CheckBox = $Sidebar/List/Scroll/ViewStack/BulletSettingsView/IsTextureRotationPermanentCheckBox
 # The view that holds all buttons responsible for setting the amount of bullets the player spawns when shooting
-@onready var select_amount_bullets_view:SelectBtnView = $AlwaysVisibleView/SelectAmountBulletsBtnView
+@onready var select_amount_bullets_view:SelectBtnView = $Helpers/SelectAmountBulletsBtnView
 # The view that holds all buttons responsible for setting the amount of multimeshes to be freed / object pool settings related
-@onready var select_amount_multi_meshes_view:SelectBtnView = $ObjectPoolSettingsView/SelectAmountMultiMeshesBtnView
+@onready var select_amount_multi_meshes_view:SelectBtnView = $Helpers/SelectAmountMultiMeshesBtnView
 # Whether the physics shapes get rotated when rotation data is provided
-@onready var rotate_physics_shapes_checkbox:CheckBox = $BulletSettingsView/VBoxContainer/VBoxContainer/RotatePhysicsShapesCheckBox
+@onready var rotate_physics_shapes_checkbox:CheckBox = $Sidebar/List/Scroll/ViewStack/BulletSettingsView/RotatePhysicsShapesCheckBox
 # Will adjust the direction of the bullets based on their rotation data if they have any
-@onready var adjust_direction_based_on_rotation_checkbox:CheckBox = $BulletSettingsView/VBoxContainer/VBoxContainer/AdjustDirectionBasedOnRotationCheckBox
+@onready var adjust_direction_based_on_rotation_checkbox:CheckBox = $Sidebar/List/Scroll/ViewStack/BulletSettingsView/AdjustDirectionBasedOnRotationCheckBox
 
 ## Bullet On Bullet Collision
-@onready var dont_collide_btn:Button = $BulletSettingsView/BulletCollisionVboxContainer/DontCollideBtn
-@onready var destroy_player_bullets_btn:Button = $BulletSettingsView/BulletCollisionVboxContainer/DestroyPlayerBulletsBtn
-@onready var destroy_enemy_bullets_btn:Button = $BulletSettingsView/BulletCollisionVboxContainer/DestroyEnemyBulletsBtn
-@onready var destroy_both_btn:Button = $BulletSettingsView/BulletCollisionVboxContainer/DestroyBothBtn
+@onready var dont_collide_btn:Button = $Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletCollisionVboxContainerFrame/BulletCollisionVboxContainer/Options/DontCollideBtn
+@onready var destroy_player_bullets_btn:Button = $Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletCollisionVboxContainerFrame/BulletCollisionVboxContainer/Options/DestroyPlayerBulletsBtn
+@onready var destroy_enemy_bullets_btn:Button = $Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletCollisionVboxContainerFrame/BulletCollisionVboxContainer/Options/DestroyEnemyBulletsBtn
+@onready var destroy_both_btn:Button = $Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletCollisionVboxContainerFrame/BulletCollisionVboxContainer/Options/DestroyBothBtn
 ##
 
 ## Bullet Type
 # Button responsible for switching the type of bullets that are being spawned
-@onready var volley_btn:Button = $AlwaysVisibleView/BulletTypeContainer/VolleyBtn
+@onready var volley_btn:Button = $Sidebar/List/AlwaysVisibleView/BulletTypeContainerFrame/BulletTypeContainer/Options/VolleyBtn
 # Button responsible for switching the type of bullets that are being spawned
-@onready var godot_area2d_bullets_btn:Button = $AlwaysVisibleView/BulletTypeContainer/GodotArea2DBulletsBtn
+@onready var godot_area2d_bullets_btn:Button = $Sidebar/List/AlwaysVisibleView/BulletTypeContainerFrame/BulletTypeContainer/Options/GodotArea2DBulletsBtn
 ##
 
 # Switch buttons
-@onready var switch_bullet_texture_btn:SwitchButton = $BulletSettingsView/VBoxContainer5/SwitchBulletTextureBtn
-@onready var switch_attachment_scene_btn:SwitchButton = $BulletSettingsView/VBoxContainer5/SwitchAttachmentBtn
-@onready var generate_speed_btn:SwitchButton = $BulletSettingsView/VBoxContainer4/GenerateSpeedBtn
-@onready var generate_rotation_btn:SwitchButton = $BulletSettingsView/VBoxContainer4/GenerateRotationBtn
-@onready var switch_material_btn:SwitchButton = $BulletSettingsView/VBoxContainer5/SwitchMaterialBtn
+@onready var switch_bullet_texture_btn:SwitchButton = $Sidebar/List/Scroll/ViewStack/BulletSettingsView/VBoxContainer5Frame/VBoxContainer5/Options/SwitchBulletTextureBtn
+@onready var switch_attachment_scene_btn:SwitchButton = $Sidebar/List/Scroll/ViewStack/BulletSettingsView/VBoxContainer5Frame/VBoxContainer5/Options/SwitchAttachmentBtn
+@onready var generate_speed_btn:SwitchButton = $Sidebar/List/Scroll/ViewStack/BulletSettingsView/VBoxContainer5Frame/VBoxContainer5/Options/GenerateSpeedBtn
+@onready var generate_rotation_btn:SwitchButton = $Sidebar/List/Scroll/ViewStack/BulletSettingsView/VBoxContainer5Frame/VBoxContainer5/Options/GenerateRotationBtn
+@onready var switch_material_btn:SwitchButton = $Sidebar/List/Scroll/ViewStack/BulletSettingsView/VBoxContainer5Frame/VBoxContainer5/Options/SwitchMaterialBtn
 
 # Note when refactoring this button has dependencies in other scripts
-@onready var disable_or_enable_factory_btn:SwitchButton = $BulletSettingsView/VBoxContainer2/DisableOrEnableFactoryBtn
+@onready var disable_or_enable_factory_btn:SwitchButton = $Sidebar/List/Scroll/ViewStack/BulletSettingsView/VBoxContainer5Frame/VBoxContainer5/Options/DisableOrEnableFactoryBtn
 #
 
 # Attachment pooling related
-@onready var switch_bullet_attachment_id_btn:SwitchButton = $ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer/SwitchBulletAttachmentIdBtn
-@onready var select_amount_attachments_btn_view:SelectBtnView =$ObjectPoolSettingsView/AttachmentPoolRelated/SelectAmountAttachmentsBtnView
+@onready var switch_bullet_attachment_id_btn:SwitchButton = $Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/VBoxContainerFrame/VBoxContainer/Options/SwitchBulletAttachmentIdBtn
+@onready var select_amount_attachments_btn_view:SelectBtnView =$Helpers/SelectAmountAttachmentsBtnView
 #
 
 # Change UI Settings View
-@onready var change_settings_ui_select_btn_view:SelectBtnView = $AlwaysVisibleView/ChangeSettingsUISelectBtnView
+@onready var change_settings_ui_select_btn_view:SelectBtnView = $Helpers/ChangeSettingsUISelectBtnView
 #
 
 ## More Settings
 # Responsible for setting physics interpolation ON/OFF (both the engine setting and the BulletFactory2D setting)
-@onready var physics_interpolation_check_box:CheckBox = $MoreSettingsView/VBoxContainer3/HBoxContainer/PhysicsInterpolationCheckBox
+@onready var physics_interpolation_check_box:CheckBox = $Sidebar/List/Scroll/ViewStack/MoreSettingsView/PhysicsInterpolationCheckBox
 # Responsible for setting VSync ON/OFF
-@onready var enable_v_sync_check_box:CheckBox = $MoreSettingsView/VBoxContainer3/HBoxContainer/VSyncCheckBox
+@onready var enable_v_sync_check_box:CheckBox = $Sidebar/List/Scroll/ViewStack/MoreSettingsView/VSyncCheckBox
 # Responsible for setting whether the grid should rotate with the marker
-@onready var rotate_grid_with_marker_check_box:CheckBox = $MoreSettingsView/VBoxContainer2/RotateGridWithMarkerCheckBox
+@onready var rotate_grid_with_marker_check_box:CheckBox = $Sidebar/List/Scroll/ViewStack/MoreSettingsView/RotateGridWithMarkerCheckBox
 # Responsible for setting random local rotation when spawning bullets
-@onready var random_local_rotation_check_box:CheckBox = $MoreSettingsView/VBoxContainer2/RandomLocalRotationCheckBox
+@onready var random_local_rotation_check_box:CheckBox = $Sidebar/List/Scroll/ViewStack/MoreSettingsView/RandomLocalRotationCheckBox
 ##
 
 # Emitted when the selected z-index changes

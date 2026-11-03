@@ -318,7 +318,9 @@ git commit -m "Fix flower bullet count" -m "FAN splits the amount over petals."
 - `SConstruct` (use `tools/*.py` / `setup.py`).
 - `test_project/addons/gut/` (vendored GUT).
 - Personal paths in `tools/config.json`.
-- Scenes the user edits by hand (`test_project/benchmark_scene/*.tscn`).
+- Scenes the user edits by hand (`test_project/benchmark_scene/benchmark.tscn`).
+  Its UI (`benchmark_ui.tscn`, `ui.gd`, the themes in `shared/ui/`) may be
+  restyled; keep every control and its wiring.
 - The structure of generated `doc_classes/*.xml` (description text only; §17).
 
 ## 7. Test harness

@@ -1,15 +1,52 @@
-[gd_resource type="Theme" format=3 uid="uid://dwqt78wi7igiw"]
+[gd_resource type="Theme" format=3]
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_52c8o"]
-bg_color = Color(0.25052, 0.281646, 0.977182, 1)
+[ext_resource type="FontFile" path="res://shared/ui/fonts/Exo2.ttf" id="1_nv7ds"]
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_yqnrs"]
-bg_color = Color(0.25098, 0.282353, 0.976471, 1)
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_mgcdf"]
+content_margin_left = 8.0
+content_margin_top = 3.0
+content_margin_right = 8.0
+content_margin_bottom = 3.0
+bg_color = Color(0.05882353, 0.22745098, 0.2784314, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.30980393, 0.9529412, 1, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_6dpi4"]
-bg_color = Color(0.25098, 0.282353, 0.976471, 1)
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_7lh2q"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_h15fe"]
+content_margin_left = 8.0
+content_margin_top = 3.0
+content_margin_right = 8.0
+content_margin_bottom = 3.0
+bg_color = Color(0.07450981, 0.28627452, 0.3529412, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.30980393, 0.9529412, 1, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
 
 [resource]
-Button/styles/hover = SubResource("StyleBoxFlat_52c8o")
-Button/styles/normal = SubResource("StyleBoxFlat_yqnrs")
-Button/styles/pressed = SubResource("StyleBoxFlat_6dpi4")
+default_font = ExtResource("1_nv7ds")
+default_font_size = 11
+Button/colors/font_color = Color(1, 1, 1, 1)
+Button/colors/font_focus_color = Color(1, 1, 1, 1)
+Button/colors/font_hover_color = Color(1, 1, 1, 1)
+Button/colors/font_hover_pressed_color = Color(1, 1, 1, 1)
+Button/colors/font_pressed_color = Color(1, 1, 1, 1)
+Button/styles/disabled = SubResource("StyleBoxFlat_mgcdf")
+Button/styles/focus = SubResource("StyleBoxEmpty_7lh2q")
+Button/styles/hover = SubResource("StyleBoxFlat_h15fe")
+Button/styles/hover_pressed = SubResource("StyleBoxFlat_mgcdf")
+Button/styles/normal = SubResource("StyleBoxFlat_mgcdf")
+Button/styles/pressed = SubResource("StyleBoxFlat_mgcdf")
