@@ -54,7 +54,7 @@ animations = [{
 "speed": 5.0
 }]
 
-[sub_resource type="BulletEffectLayerData2D" id="BulletEffectLayerData2D_g0agp"]
+[sub_resource type="EffectLayerData2D" id="BulletEffectLayerData2D_g0agp"]
 trigger = 5
 sprite_frames = SubResource("SpriteFrames_mouoi")
 color_ramp = SubResource("Gradient_7gbxi")
@@ -119,7 +119,7 @@ shared_movement_pattern_face_movement_direction = true
 collision_layer = 2
 effect_layers = Array[BulletEffectLayerData2D]([SubResource("BulletEffectLayerData2D_g0agp")])
 
-[sub_resource type="BulletGrazeZone2D" id="BulletGrazeZone2D_c5op3"]
+[sub_resource type="GrazeZone2D" id="BulletGrazeZone2D_c5op3"]
 ring_count = 3
 ring_1_radius = 30.5
 ring_2_radius = 65.0
