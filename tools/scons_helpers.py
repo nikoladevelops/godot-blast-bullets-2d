@@ -131,6 +131,9 @@ def run_scons_build(target: BuildTarget) -> None:
             print(f"Target API: Godot {godot_version} | LTO: {lto_mode} | Debug Symbols: {debug_symbols}")
             print(f"A {mode_label.lower()} build was added to the bin/ folder.")
             print("The compile_commands.json file was also updated for IDE IntelliSense support.")
+            # Keep every extra project (a game, a demo) on this build too.
+            from sync_project_folders import sync_extra_project_folders
+            sync_extra_project_folders()
         else:
             print("\n" + "=" * 50)
             print(f"Compilation FAILED ({mode_label} Build):")

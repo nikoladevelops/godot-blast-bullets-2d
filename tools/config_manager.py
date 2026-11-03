@@ -13,6 +13,7 @@ class _PluginConfig:
             "godotActivePath": "",
             "savedGodotPaths": [],
             "godotProjectFolder": "",
+            "extraProjectFolders": [],
             "ltoMode": "none",
             "selectedBuildProfile": "build_profile.json",
             "extensionApiPath": "godot-cpp/gdextension/extension_api.json",
@@ -61,6 +62,15 @@ class _PluginConfig:
 
     def setGodotProjectFolder(self, new_folder: str) -> None:
         self.data["godotProjectFolder"] = new_folder
+        self._save_config()
+
+    def getExtraProjectFolders(self) -> list:
+        """Other Godot projects that receive the addon after every successful build."""
+        self.reload()
+        return list(self.data.get("extraProjectFolders", []))
+
+    def setExtraProjectFolders(self, folders: list) -> None:
+        self.data["extraProjectFolders"] = list(folders)
         self._save_config()
 
     def getLtoMode(self) -> str:

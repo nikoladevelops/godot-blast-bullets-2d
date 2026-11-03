@@ -1543,6 +1543,10 @@ project's `.so`). For quick numeric comparisons load two
   Godot's RTLD_DEEPBIND; leak gate off: a sanitizer runtime makes every file
   report Orphan StringNames; wall-clock budgets scale through
   `BLAST_TIME_BUDGET_SCALE` / `BlastTest.time_budget_ms`).
+- Extra projects: `sync_project_folders.py` copies the built addon into every
+  `extraProjectFolders` entry of `config.json` after each successful build
+  (missing or non-Godot folders are skipped with one line); `manage_extra_folders.py`
+  (setup.py menu) edits the list.
 - Config: `select_godot_path.py`, `select_godot_project.py`,
   `change_godot_target_version.py`, `update_godot_cpp.py`,
   `config_manager.py` + `config.json` (machine state), `paths.py`.
