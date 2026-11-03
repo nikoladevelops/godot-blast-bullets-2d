@@ -60,7 +60,7 @@ Every clip and screenshot below is **Arcane Barrage**, a complete bullet-hell ga
 | `05_split` | slow orbs that burst into rings of small bullets |
 | `06_boss_phases` | a boss that changes its attack at half health, and your ship's gun hitting it |
 
-The rest of `test_project/` is the test lab: a scene with a sidebar to try every feature live (bullet counts, collision, pools, physics rates), and the automated test suites.
+The rest of `test_project/` is the test lab: a scene with a sidebar to try every feature live (bullet counts, collision, pools, physics rates), and the automated test suites. Press <kbd>F2</kbd> in the test lab or in any example to open the **live inspector**: every property of the factory, the spawners, their spawn and laser data and any nested resource, edited while the game runs (a refused value keeps the old one and says so), plus a button for every argument-free method.
 
 ## Install
 

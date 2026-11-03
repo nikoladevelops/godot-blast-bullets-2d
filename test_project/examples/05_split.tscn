@@ -1,38 +1,52 @@
 [gd_scene format=3]
+[ext_resource type="PackedScene" path="res://shared/background/space_background.tscn" id="bg_space"]
+[ext_resource type="PackedScene" path="res://shared/live_inspector/live_inspector.tscn" id="live_inspector"]
 
 [ext_resource type="Script" path="res://examples/05_split.gd" id="1_blsx8"]
 [ext_resource type="Script" path="res://examples/common/example_player.gd" id="2_fmy8v"]
-[ext_resource type="Texture2D" path="res://shared/art/player_ship/player_ship1.png" id="3_e0vup"]
-[ext_resource type="Texture2D" path="res://shared/art/player_ship/player_ship2.png" id="4_4jk8k"]
-[ext_resource type="Texture2D" path="res://shared/art/player_ship/player_ship3.png" id="5_3mb4v"]
-[ext_resource type="Texture2D" path="res://shared/art/player_ship/player_ship5.png" id="6_cxm0k"]
-[ext_resource type="Texture2D" path="res://shared/art/player_ship/player_ship6.png" id="7_3bcit"]
 [ext_resource type="Theme" path="res://shared/ui/test_lab_theme.tres" id="8_rku4y"]
-[ext_resource type="Texture2D" path="res://shared/art/enemy_turret/enemy_turret_holder.png" id="9_qqmle"]
-[ext_resource type="Texture2D" path="res://shared/art/enemy_turret/enemy_turret.png" id="10_k55oe"]
-[ext_resource type="Texture2D" path="res://shared/art/light/light_texture.png" id="11_k5h5u"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_turret/turret_base.png" id="9_qqmle"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_turret/turret_gun.png" id="10_k55oe"]
+[ext_resource type="Texture2D" path="res://shared/art/light/light.png" id="11_k5h5u"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/moving_01.png" id="art_moving_01"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/moving_02.png" id="art_moving_02"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/moving_03.png" id="art_moving_03"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/moving_04.png" id="art_moving_04"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/moving_05.png" id="art_moving_05"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/moving_06.png" id="art_moving_06"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/moving_07.png" id="art_moving_07"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/moving_08.png" id="art_moving_08"]
 
 [sub_resource type="SpriteFrames" id="SpriteFrames_2fj44"]
 animations = [{
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("3_e0vup")
+"texture": ExtResource("art_moving_01")
 }, {
 "duration": 1.0,
-"texture": ExtResource("4_4jk8k")
+"texture": ExtResource("art_moving_02")
 }, {
 "duration": 1.0,
-"texture": ExtResource("5_3mb4v")
+"texture": ExtResource("art_moving_03")
 }, {
 "duration": 1.0,
-"texture": ExtResource("6_cxm0k")
+"texture": ExtResource("art_moving_04")
 }, {
 "duration": 1.0,
-"texture": ExtResource("7_3bcit")
+"texture": ExtResource("art_moving_05")
+}, {
+"duration": 1.0,
+"texture": ExtResource("art_moving_06")
+}, {
+"duration": 1.0,
+"texture": ExtResource("art_moving_07")
+}, {
+"duration": 1.0,
+"texture": ExtResource("art_moving_08")
 }],
 "loop": 1,
 "name": &"default",
-"speed": 12.0
+"speed": 14.0
 }]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_fjnnk"]
@@ -57,6 +71,7 @@ animations = [{
 
 [sub_resource type="BulletVolleyData2D" id="BulletVolleyData2D_gp4y2"]
 sprite_frames = SubResource("SpriteFrames_o0vmh")
+texture_size = Vector2(36, 36)
 max_life_time = 3.0
 self_modulate = Color(1, 0.41568628, 0.6901961, 1)
 shared_bullet_speed_data = SubResource("BulletSpeedData2D_agse7")
@@ -75,10 +90,7 @@ stages = Array[BulletSplitStage2D]([SubResource("BulletSplitStage2D_c745p")])
 [node name="Split" type="Node2D" unique_id=2072824225]
 script = ExtResource("1_blsx8")
 
-[node name="Background" type="ColorRect" parent="." unique_id=186390228]
-offset_right = 1152.0
-offset_bottom = 648.0
-color = Color(0.043137256, 0.05882353, 0.101960786, 1)
+[node name="SpaceBackground" parent="." instance=ExtResource("bg_space")]
 
 [node name="BulletFactory2D" type="BulletFactory2D" parent="." unique_id=1353686026]
 
@@ -89,7 +101,7 @@ collision_mask = 0
 script = ExtResource("2_fmy8v")
 
 [node name="Ship" type="AnimatedSprite2D" parent="Player" unique_id=2051655115]
-scale = Vector2(1.5, 1.5)
+scale = Vector2(0.1875, 0.1875)
 sprite_frames = SubResource("SpriteFrames_2fj44")
 autoplay = "default"
 
@@ -119,12 +131,12 @@ position = Vector2(576, 150)
 
 [node name="EnemyTurretHolder" type="Sprite2D" parent="Turret" unique_id=917232283]
 rotation = 3.1415927
-scale = Vector2(2, 2)
+scale = Vector2(0.25, 0.25)
 texture = ExtResource("9_qqmle")
 
 [node name="EnemyTurret" type="Sprite2D" parent="Turret" unique_id=1889720487]
 rotation = 3.1415927
-scale = Vector2(2, 2)
+scale = Vector2(0.25, 0.25)
 texture = ExtResource("10_k55oe")
 
 [node name="Spawner" type="BulletSpawner2D" parent="Turret" unique_id=1043507375]
@@ -136,3 +148,5 @@ helper_fan_direction_angle = 1.5707963267948966
 shoot_interval_sec = 1.4
 split_enabled = true
 split_data = SubResource("BulletSplitData2D_iygwo")
+
+[node name="LiveInspector" parent="." instance=ExtResource("live_inspector")]

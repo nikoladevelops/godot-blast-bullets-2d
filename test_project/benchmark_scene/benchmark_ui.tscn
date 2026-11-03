@@ -1,4 +1,4 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://cud5bunpvk1hb"]
 
 [ext_resource type="Script" path="res://benchmark_scene/ui.gd" id="1_lkveq"]
 [ext_resource type="FontFile" path="res://shared/ui/fonts/Exo2.ttf" id="2_4nhgn"]

@@ -31,6 +31,10 @@ func _ready() -> void:
 	BENCHMARK_GLOBALS.MOVING_TARGET_ONE = $BulletHellRelated/MovingTargetOne
 	BENCHMARK_GLOBALS.MOVING_TARGET_TWO = $BulletHellRelated/MovingTargetTwo
 	BENCHMARK_GLOBALS.MOVEMENT_PATH_HOLDER = $Paths
+
+	# The live inspector (F2) finds the factory and the spawners itself; the player's bullets are
+	# plain script data, so they are added by hand.
+	$LiveInspector.add_target("Player bullets  (BulletVolleyData2D)", func(): return BENCHMARK_GLOBALS.PLAYER_DATA_NODE.volley_data)
 	
 	# Make sure to set the actual debugger colors to the UI buttons
 	var initial_debugger_color:Color = BENCHMARK_GLOBALS.FACTORY.debugger_color

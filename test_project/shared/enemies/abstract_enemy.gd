@@ -12,6 +12,7 @@ signal died
 
 # Called whenever the enemy needs to be freed from the scene
 func die()->void:
+	BENCHMARK_GLOBALS.explode_at(global_position)
 	emit_signal("died")
 	queue_free()
 

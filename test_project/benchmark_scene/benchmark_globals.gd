@@ -54,3 +54,17 @@ static var MOVEMENT_PATH_HOLDER:Node
 
 # Holds all attachment scenes
 static var ATTACHMENT_SCENES:Dictionary[int, PackedScene]
+
+# Effects every scene shares (sprite effect layers played by the plugin, sounds through its mixer)
+const EXPLOSION_EFFECT:EffectLayerData2D = preload("res://shared/effects/explosion_effect.tres")
+const EXPLOSION_SOUND:BulletSoundData2D = preload("res://shared/effects/explosion_sound.tres")
+const PLAYER_HIT_SPARK:EffectLayerData2D = preload("res://shared/effects/player_hit_spark_effect.tres")
+const ENEMY_HIT_SPARK:EffectLayerData2D = preload("res://shared/effects/enemy_hit_spark_effect.tres")
+const MUZZLE_FLASH:EffectLayerData2D = preload("res://shared/effects/muzzle_flash_effect.tres")
+
+# Plays the explosion one-shot (and its sound) at a position, through the factory.
+static func explode_at(at:Vector2, size:float = 1.0)->void:
+	if FACTORY == null or not is_instance_valid(FACTORY) or not FACTORY.is_inside_tree():
+		return
+	FACTORY.spawn_layer_effect(EXPLOSION_EFFECT, Transform2D(0.0, Vector2(size, size), 0.0, at))
+	FACTORY.play_sound(EXPLOSION_SOUND, at)

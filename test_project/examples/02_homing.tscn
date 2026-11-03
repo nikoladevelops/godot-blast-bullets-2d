@@ -1,41 +1,59 @@
 [gd_scene format=3]
+[ext_resource type="PackedScene" path="res://shared/background/space_background.tscn" id="bg_space"]
+[ext_resource type="PackedScene" path="res://shared/live_inspector/live_inspector.tscn" id="live_inspector"]
 
 [ext_resource type="Script" path="res://examples/02_homing.gd" id="1_evvny"]
 [ext_resource type="Script" path="res://examples/common/example_player.gd" id="2_ifw3g"]
-[ext_resource type="Texture2D" path="res://shared/art/player_ship/player_ship1.png" id="3_0b0is"]
-[ext_resource type="Texture2D" path="res://shared/art/player_ship/player_ship2.png" id="4_s8rjw"]
-[ext_resource type="Texture2D" path="res://shared/art/player_ship/player_ship3.png" id="5_xanwk"]
-[ext_resource type="Texture2D" path="res://shared/art/player_ship/player_ship5.png" id="6_vy3pp"]
-[ext_resource type="Texture2D" path="res://shared/art/player_ship/player_ship6.png" id="7_u6q25"]
 [ext_resource type="Theme" path="res://shared/ui/test_lab_theme.tres" id="8_mi6ic"]
-[ext_resource type="Texture2D" path="res://shared/art/enemy_turret/enemy_turret_holder.png" id="9_321qk"]
-[ext_resource type="Texture2D" path="res://shared/art/enemy_turret/enemy_turret.png" id="10_im7ix"]
-[ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/enemy_bullet1.png" id="11_33nl6"]
-[ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/enemy_bullet2.png" id="12_x1gm7"]
-[ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/enemy_bullet3.png" id="13_cxwk4"]
-[ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/enemy_bullet4.png" id="14_d83yq"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_turret/turret_base.png" id="9_321qk"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_turret/turret_gun.png" id="10_im7ix"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/moving_01.png" id="art_moving_01"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/moving_02.png" id="art_moving_02"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/moving_03.png" id="art_moving_03"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/moving_04.png" id="art_moving_04"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/moving_05.png" id="art_moving_05"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/moving_06.png" id="art_moving_06"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/moving_07.png" id="art_moving_07"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/moving_08.png" id="art_moving_08"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/plasma_rocket_01.png" id="art_plasma_rocket_01"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/plasma_rocket_02.png" id="art_plasma_rocket_02"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/plasma_rocket_03.png" id="art_plasma_rocket_03"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/plasma_rocket_04.png" id="art_plasma_rocket_04"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/plasma_rocket_05.png" id="art_plasma_rocket_05"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/plasma_rocket_06.png" id="art_plasma_rocket_06"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/plasma_rocket_07.png" id="art_plasma_rocket_07"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/plasma_rocket_08.png" id="art_plasma_rocket_08"]
 
 [sub_resource type="SpriteFrames" id="SpriteFrames_kvey0"]
 animations = [{
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("3_0b0is")
+"texture": ExtResource("art_moving_01")
 }, {
 "duration": 1.0,
-"texture": ExtResource("4_s8rjw")
+"texture": ExtResource("art_moving_02")
 }, {
 "duration": 1.0,
-"texture": ExtResource("5_xanwk")
+"texture": ExtResource("art_moving_03")
 }, {
 "duration": 1.0,
-"texture": ExtResource("6_vy3pp")
+"texture": ExtResource("art_moving_04")
 }, {
 "duration": 1.0,
-"texture": ExtResource("7_u6q25")
+"texture": ExtResource("art_moving_05")
+}, {
+"duration": 1.0,
+"texture": ExtResource("art_moving_06")
+}, {
+"duration": 1.0,
+"texture": ExtResource("art_moving_07")
+}, {
+"duration": 1.0,
+"texture": ExtResource("art_moving_08")
 }],
 "loop": 1,
 "name": &"default",
-"speed": 12.0
+"speed": 14.0
 }]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_h1fwp"]
@@ -52,24 +70,37 @@ max_speed = 200.0
 animations = [{
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("11_33nl6")
+"texture": ExtResource("art_plasma_rocket_01")
 }, {
 "duration": 1.0,
-"texture": ExtResource("12_x1gm7")
+"texture": ExtResource("art_plasma_rocket_02")
 }, {
 "duration": 1.0,
-"texture": ExtResource("13_cxwk4")
+"texture": ExtResource("art_plasma_rocket_03")
 }, {
 "duration": 1.0,
-"texture": ExtResource("14_d83yq")
+"texture": ExtResource("art_plasma_rocket_04")
+}, {
+"duration": 1.0,
+"texture": ExtResource("art_plasma_rocket_05")
+}, {
+"duration": 1.0,
+"texture": ExtResource("art_plasma_rocket_06")
+}, {
+"duration": 1.0,
+"texture": ExtResource("art_plasma_rocket_07")
+}, {
+"duration": 1.0,
+"texture": ExtResource("art_plasma_rocket_08")
 }],
 "loop": 1,
 "name": &"default",
-"speed": 12.0
+"speed": 16.0
 }]
 
 [sub_resource type="BulletVolleyData2D" id="BulletVolleyData2D_cawlp"]
 sprite_frames = SubResource("SpriteFrames_wms1v")
+texture_size = Vector2(36, 36)
 max_life_time = 4.5
 shared_bullet_speed_data = SubResource("BulletSpeedData2D_ktl2w")
 collision_mask = 2
@@ -78,10 +109,7 @@ collision_shape = SubResource("CircleShape2D_qg50l")
 [node name="Homing" type="Node2D" unique_id=898486958]
 script = ExtResource("1_evvny")
 
-[node name="Background" type="ColorRect" parent="." unique_id=1608977201]
-offset_right = 1152.0
-offset_bottom = 648.0
-color = Color(0.043137256, 0.05882353, 0.101960786, 1)
+[node name="SpaceBackground" parent="." instance=ExtResource("bg_space")]
 
 [node name="BulletFactory2D" type="BulletFactory2D" parent="." unique_id=448909931]
 
@@ -92,7 +120,7 @@ collision_mask = 0
 script = ExtResource("2_ifw3g")
 
 [node name="Ship" type="AnimatedSprite2D" parent="Player" unique_id=367913673]
-scale = Vector2(1.5, 1.5)
+scale = Vector2(0.1875, 0.1875)
 sprite_frames = SubResource("SpriteFrames_kvey0")
 autoplay = "default"
 
@@ -113,12 +141,12 @@ position = Vector2(576, 150)
 
 [node name="EnemyTurretHolder" type="Sprite2D" parent="Turret" unique_id=472739534]
 rotation = 3.1415927
-scale = Vector2(2, 2)
+scale = Vector2(0.25, 0.25)
 texture = ExtResource("9_321qk")
 
 [node name="EnemyTurret" type="Sprite2D" parent="Turret" unique_id=601652694]
 rotation = 3.1415927
-scale = Vector2(2, 2)
+scale = Vector2(0.25, 0.25)
 texture = ExtResource("10_im7ix")
 
 [node name="Spawner" type="BulletSpawner2D" parent="Turret" unique_id=1236153070]
@@ -130,3 +158,5 @@ helper_fan_direction_angle = 1.5707963267948966
 shoot_interval_sec = 0.9
 homing_enabled = true
 homing_node_group = &"player"
+
+[node name="LiveInspector" parent="." instance=ExtResource("live_inspector")]

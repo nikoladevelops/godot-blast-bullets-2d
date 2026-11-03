@@ -1,26 +1,42 @@
 [gd_resource type="SpriteFrames" format=3 uid="uid://dm6fv2ulo5qm6"]
 
-[ext_resource type="Texture2D" uid="uid://fg061as0ss1o" path="res://shared/art/enemy_bullets/enemy_bullet1.png" id="1_jl2am"]
-[ext_resource type="Texture2D" uid="uid://cmvklt4kge35w" path="res://shared/art/enemy_bullets/enemy_bullet2.png" id="2_mufc6"]
-[ext_resource type="Texture2D" uid="uid://dwqwuseyc2cfo" path="res://shared/art/enemy_bullets/enemy_bullet3.png" id="3_rg52a"]
-[ext_resource type="Texture2D" uid="uid://ddnexf0qpih04" path="res://shared/art/enemy_bullets/enemy_bullet4.png" id="4_ct5mj"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/plasma_rocket_01.png" id="art_plasma_rocket_01"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/plasma_rocket_02.png" id="art_plasma_rocket_02"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/plasma_rocket_03.png" id="art_plasma_rocket_03"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/plasma_rocket_04.png" id="art_plasma_rocket_04"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/plasma_rocket_05.png" id="art_plasma_rocket_05"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/plasma_rocket_06.png" id="art_plasma_rocket_06"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/plasma_rocket_07.png" id="art_plasma_rocket_07"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/plasma_rocket_08.png" id="art_plasma_rocket_08"]
 
 [resource]
 animations = [{
 "frames": [{
-"duration": 0.35,
-"texture": ExtResource("1_jl2am")
+"duration": 1.0,
+"texture": ExtResource("art_plasma_rocket_01")
 }, {
-"duration": 0.35,
-"texture": ExtResource("2_mufc6")
+"duration": 1.0,
+"texture": ExtResource("art_plasma_rocket_02")
 }, {
-"duration": 0.35,
-"texture": ExtResource("3_rg52a")
+"duration": 1.0,
+"texture": ExtResource("art_plasma_rocket_03")
 }, {
-"duration": 0.35,
-"texture": ExtResource("4_ct5mj")
+"duration": 1.0,
+"texture": ExtResource("art_plasma_rocket_04")
+}, {
+"duration": 1.0,
+"texture": ExtResource("art_plasma_rocket_05")
+}, {
+"duration": 1.0,
+"texture": ExtResource("art_plasma_rocket_06")
+}, {
+"duration": 1.0,
+"texture": ExtResource("art_plasma_rocket_07")
+}, {
+"duration": 1.0,
+"texture": ExtResource("art_plasma_rocket_08")
 }],
 "loop": 1,
 "name": &"default",
-"speed": 5.0
+"speed": 16.0
 }]

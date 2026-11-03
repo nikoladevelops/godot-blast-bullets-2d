@@ -79,6 +79,10 @@ func _ready() -> void:
 	bullets_data.sprite_frames = $BulletAnimatedSprite.sprite_frames
 	
 	bullets_data.texture_size = Vector2(100,100)
+	# The plasma rocket's body (the art faces right) at this texture size
+	var hitbox := RectangleShape2D.new()
+	hitbox.size = Vector2(78, 18)
+	bullets_data.collision_shape = hitbox
 	
 	bullets_data.max_life_time = 5
 	
@@ -95,6 +99,7 @@ func _ready() -> void:
 	bullets_data.collision_layer = BulletVolleyData2D.calculate_bitmask([4])
 	bullets_data.collision_mask = BulletVolleyData2D.calculate_bitmask(default_bullet_collision_mask)
 	bullets_data.monitorable=true # Monitorable allows for these bullets to be detected by other areas
+	bullets_data.effect_layers = [BENCHMARK_GLOBALS.ENEMY_HIT_SPARK]
 
 func _physics_process(delta: float) -> void:
 	calculate_new_direction()
@@ -109,7 +114,6 @@ func shoot()->void:
 	if can_shoot:
 		bullets_data.transforms = get_marker_transforms()
 		bullets_data.all_bullet_speed_data = get_speed_data()
-		#bullets_data.block_rotation_radians = animated_sprite.transform.get_rotation() # Since we are using block bullets, their direction is determined by this property instead of automatically by the transforms
 		var bullets_multi:BulletVolley2D = BENCHMARK_GLOBALS.FACTORY.spawn_volley(bullets_data)
 		if bullets_multi != null: # null when refused (the error says why)
 			var scene:PackedScene = BENCHMARK_GLOBALS.ATTACHMENT_SCENES[1]

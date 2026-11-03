@@ -1,53 +1,75 @@
 [gd_scene format=3]
+[ext_resource type="PackedScene" path="res://shared/background/space_background.tscn" id="bg_space"]
+[ext_resource type="PackedScene" path="res://shared/live_inspector/live_inspector.tscn" id="live_inspector"]
 
 [ext_resource type="Script" path="res://examples/06_boss_phases.gd" id="1_8n37s"]
 [ext_resource type="Script" path="res://examples/common/example_player.gd" id="2_e75vr"]
-[ext_resource type="Texture2D" path="res://shared/art/player_ship/player_ship1.png" id="3_t1qx3"]
-[ext_resource type="Texture2D" path="res://shared/art/player_ship/player_ship2.png" id="4_37f5b"]
-[ext_resource type="Texture2D" path="res://shared/art/player_ship/player_ship3.png" id="5_caq6m"]
-[ext_resource type="Texture2D" path="res://shared/art/player_ship/player_ship5.png" id="6_ktyk5"]
-[ext_resource type="Texture2D" path="res://shared/art/player_ship/player_ship6.png" id="7_i6tr8"]
-[ext_resource type="Texture2D" path="res://shared/art/player_bullets/1.png" id="8_j8cac"]
-[ext_resource type="Texture2D" path="res://shared/art/player_bullets/2.png" id="9_4rx8l"]
-[ext_resource type="Texture2D" path="res://shared/art/player_bullets/3.png" id="10_aturj"]
-[ext_resource type="Texture2D" path="res://shared/art/player_bullets/4.png" id="11_5cm5s"]
-[ext_resource type="Texture2D" path="res://shared/art/player_bullets/5.png" id="12_gc708"]
-[ext_resource type="Texture2D" path="res://shared/art/player_bullets/6.png" id="13_sauoa"]
-[ext_resource type="Texture2D" path="res://shared/art/player_bullets/7.png" id="14_px88i"]
-[ext_resource type="Texture2D" path="res://shared/art/player_bullets/8.png" id="15_fh8jl"]
-[ext_resource type="Texture2D" path="res://shared/art/player_bullets/9.png" id="16_kesay"]
-[ext_resource type="Texture2D" path="res://shared/art/player_bullets/10.png" id="17_nyrct"]
 [ext_resource type="Theme" path="res://shared/ui/test_lab_theme.tres" id="18_4lwwh"]
-[ext_resource type="Texture2D" path="res://shared/art/enemy_ship/enemy_ship1.png" id="19_7bxi5"]
-[ext_resource type="Texture2D" path="res://shared/art/enemy_ship/enemy_ship2.png" id="20_2royh"]
-[ext_resource type="Texture2D" path="res://shared/art/enemy_ship/enemy_ship3.png" id="21_84acc"]
-[ext_resource type="Texture2D" path="res://shared/art/enemy_ship/enemy_ship4.png" id="22_oigek"]
-[ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/enemy_bullet1.png" id="23_0wgv7"]
-[ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/enemy_bullet2.png" id="24_bkwgg"]
-[ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/enemy_bullet3.png" id="25_pgucl"]
-[ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/enemy_bullet4.png" id="26_0rehd"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/moving_01.png" id="art_moving_01"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/moving_02.png" id="art_moving_02"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/moving_03.png" id="art_moving_03"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/moving_04.png" id="art_moving_04"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/moving_05.png" id="art_moving_05"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/moving_06.png" id="art_moving_06"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/moving_07.png" id="art_moving_07"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/moving_08.png" id="art_moving_08"]
+[ext_resource type="Texture2D" path="res://shared/art/player_bullets/rocket_01.png" id="art_rocket_01"]
+[ext_resource type="Texture2D" path="res://shared/art/player_bullets/rocket_02.png" id="art_rocket_02"]
+[ext_resource type="Texture2D" path="res://shared/art/player_bullets/rocket_03.png" id="art_rocket_03"]
+[ext_resource type="Texture2D" path="res://shared/art/player_bullets/rocket_04.png" id="art_rocket_04"]
+[ext_resource type="Texture2D" path="res://shared/art/player_bullets/rocket_05.png" id="art_rocket_05"]
+[ext_resource type="Texture2D" path="res://shared/art/player_bullets/rocket_06.png" id="art_rocket_06"]
+[ext_resource type="Texture2D" path="res://shared/art/player_bullets/rocket_07.png" id="art_rocket_07"]
+[ext_resource type="Texture2D" path="res://shared/art/player_bullets/rocket_08.png" id="art_rocket_08"]
+[ext_resource type="Texture2D" path="res://shared/art/player_bullets/rocket_09.png" id="art_rocket_09"]
+[ext_resource type="Texture2D" path="res://shared/art/player_bullets/rocket_10.png" id="art_rocket_10"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_ship/moving_01.png" id="art_moving_01"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_ship/moving_02.png" id="art_moving_02"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_ship/moving_03.png" id="art_moving_03"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_ship/moving_04.png" id="art_moving_04"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_ship/moving_05.png" id="art_moving_05"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_ship/moving_06.png" id="art_moving_06"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_ship/moving_07.png" id="art_moving_07"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_ship/moving_08.png" id="art_moving_08"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/plasma_rocket_01.png" id="art_plasma_rocket_01"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/plasma_rocket_02.png" id="art_plasma_rocket_02"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/plasma_rocket_03.png" id="art_plasma_rocket_03"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/plasma_rocket_04.png" id="art_plasma_rocket_04"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/plasma_rocket_05.png" id="art_plasma_rocket_05"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/plasma_rocket_06.png" id="art_plasma_rocket_06"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/plasma_rocket_07.png" id="art_plasma_rocket_07"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/plasma_rocket_08.png" id="art_plasma_rocket_08"]
 
 [sub_resource type="SpriteFrames" id="SpriteFrames_43oka"]
 animations = [{
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("3_t1qx3")
+"texture": ExtResource("art_moving_01")
 }, {
 "duration": 1.0,
-"texture": ExtResource("4_37f5b")
+"texture": ExtResource("art_moving_02")
 }, {
 "duration": 1.0,
-"texture": ExtResource("5_caq6m")
+"texture": ExtResource("art_moving_03")
 }, {
 "duration": 1.0,
-"texture": ExtResource("6_ktyk5")
+"texture": ExtResource("art_moving_04")
 }, {
 "duration": 1.0,
-"texture": ExtResource("7_i6tr8")
+"texture": ExtResource("art_moving_05")
+}, {
+"duration": 1.0,
+"texture": ExtResource("art_moving_06")
+}, {
+"duration": 1.0,
+"texture": ExtResource("art_moving_07")
+}, {
+"duration": 1.0,
+"texture": ExtResource("art_moving_08")
 }],
 "loop": 1,
 "name": &"default",
-"speed": 12.0
+"speed": 14.0
 }]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_gimmh"]
@@ -64,42 +86,43 @@ max_speed = 700.0
 animations = [{
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("8_j8cac")
+"texture": ExtResource("art_rocket_01")
 }, {
 "duration": 1.0,
-"texture": ExtResource("9_4rx8l")
+"texture": ExtResource("art_rocket_02")
 }, {
 "duration": 1.0,
-"texture": ExtResource("10_aturj")
+"texture": ExtResource("art_rocket_03")
 }, {
 "duration": 1.0,
-"texture": ExtResource("11_5cm5s")
+"texture": ExtResource("art_rocket_04")
 }, {
 "duration": 1.0,
-"texture": ExtResource("12_gc708")
+"texture": ExtResource("art_rocket_05")
 }, {
 "duration": 1.0,
-"texture": ExtResource("13_sauoa")
+"texture": ExtResource("art_rocket_06")
 }, {
 "duration": 1.0,
-"texture": ExtResource("14_px88i")
+"texture": ExtResource("art_rocket_07")
 }, {
 "duration": 1.0,
-"texture": ExtResource("15_fh8jl")
+"texture": ExtResource("art_rocket_08")
 }, {
 "duration": 1.0,
-"texture": ExtResource("16_kesay")
+"texture": ExtResource("art_rocket_09")
 }, {
 "duration": 1.0,
-"texture": ExtResource("17_nyrct")
+"texture": ExtResource("art_rocket_10")
 }],
 "loop": 1,
 "name": &"default",
-"speed": 20.0
+"speed": 16.0
 }]
 
 [sub_resource type="BulletVolleyData2D" id="BulletVolleyData2D_r0ewq"]
 sprite_frames = SubResource("SpriteFrames_r55jy")
+texture_size = Vector2(36, 36)
 max_life_time = 1.2
 shared_bullet_speed_data = SubResource("BulletSpeedData2D_jj2a4")
 collision_mask = 4
@@ -109,20 +132,32 @@ collision_shape = SubResource("CircleShape2D_d8y4d")
 animations = [{
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("19_7bxi5")
+"texture": ExtResource("art_moving_01")
 }, {
 "duration": 1.0,
-"texture": ExtResource("20_2royh")
+"texture": ExtResource("art_moving_02")
 }, {
 "duration": 1.0,
-"texture": ExtResource("21_84acc")
+"texture": ExtResource("art_moving_03")
 }, {
 "duration": 1.0,
-"texture": ExtResource("22_oigek")
+"texture": ExtResource("art_moving_04")
+}, {
+"duration": 1.0,
+"texture": ExtResource("art_moving_05")
+}, {
+"duration": 1.0,
+"texture": ExtResource("art_moving_06")
+}, {
+"duration": 1.0,
+"texture": ExtResource("art_moving_07")
+}, {
+"duration": 1.0,
+"texture": ExtResource("art_moving_08")
 }],
 "loop": 1,
 "name": &"default",
-"speed": 12.0
+"speed": 14.0
 }]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_e1vm1"]
@@ -139,24 +174,37 @@ max_speed = 170.0
 animations = [{
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("23_0wgv7")
+"texture": ExtResource("art_plasma_rocket_01")
 }, {
 "duration": 1.0,
-"texture": ExtResource("24_bkwgg")
+"texture": ExtResource("art_plasma_rocket_02")
 }, {
 "duration": 1.0,
-"texture": ExtResource("25_pgucl")
+"texture": ExtResource("art_plasma_rocket_03")
 }, {
 "duration": 1.0,
-"texture": ExtResource("26_0rehd")
+"texture": ExtResource("art_plasma_rocket_04")
+}, {
+"duration": 1.0,
+"texture": ExtResource("art_plasma_rocket_05")
+}, {
+"duration": 1.0,
+"texture": ExtResource("art_plasma_rocket_06")
+}, {
+"duration": 1.0,
+"texture": ExtResource("art_plasma_rocket_07")
+}, {
+"duration": 1.0,
+"texture": ExtResource("art_plasma_rocket_08")
 }],
 "loop": 1,
 "name": &"default",
-"speed": 12.0
+"speed": 16.0
 }]
 
 [sub_resource type="BulletVolleyData2D" id="BulletVolleyData2D_xaf1o"]
 sprite_frames = SubResource("SpriteFrames_m7go5")
+texture_size = Vector2(36, 36)
 max_life_time = 5.0
 shared_bullet_speed_data = SubResource("BulletSpeedData2D_lp3km")
 collision_mask = 2
@@ -165,10 +213,7 @@ collision_shape = SubResource("CircleShape2D_44ulh")
 [node name="BossPhases" type="Node2D" unique_id=482278809]
 script = ExtResource("1_8n37s")
 
-[node name="Background" type="ColorRect" parent="." unique_id=347754906]
-offset_right = 1152.0
-offset_bottom = 648.0
-color = Color(0.043137256, 0.05882353, 0.101960786, 1)
+[node name="SpaceBackground" parent="." instance=ExtResource("bg_space")]
 
 [node name="BulletFactory2D" type="BulletFactory2D" parent="." unique_id=2030838251]
 
@@ -179,7 +224,7 @@ collision_mask = 0
 script = ExtResource("2_e75vr")
 
 [node name="Ship" type="AnimatedSprite2D" parent="Player" unique_id=864313487]
-scale = Vector2(1.5, 1.5)
+scale = Vector2(0.1875, 0.1875)
 sprite_frames = SubResource("SpriteFrames_43oka")
 autoplay = "default"
 
@@ -219,7 +264,7 @@ collision_layer = 4
 collision_mask = 0
 
 [node name="Ship" type="AnimatedSprite2D" parent="Boss" unique_id=760058684]
-scale = Vector2(3.5, -3.5)
+scale = Vector2(0.4375, -0.4375)
 sprite_frames = SubResource("SpriteFrames_b77ny")
 autoplay = "default"
 
@@ -234,3 +279,5 @@ helper_ring_radius = 40.0
 shoot_interval_sec = 0.45
 spin_enabled = true
 spin_speed_deg_per_sec = 60.0
+
+[node name="LiveInspector" parent="." instance=ExtResource("live_inspector")]

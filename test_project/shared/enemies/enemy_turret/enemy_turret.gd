@@ -31,8 +31,11 @@ func _ready() -> void:
 	bullets_data.sprite_frames = $BulletAnimatedSprite.sprite_frames
 	
 	bullets_data.texture_size = Vector2(142,142)
-	
-	# TODO enemy bullet size and shape
+	bullets_data.effect_layers = [BENCHMARK_GLOBALS.ENEMY_HIT_SPARK]
+	# The plasma rocket's body (the art faces right): about 120 x 30 px at this texture size
+	var hitbox := RectangleShape2D.new()
+	hitbox.size = Vector2(110, 26)
+	bullets_data.collision_shape = hitbox
 	bullets_data.max_life_time = 2
 	
 	var sp_data:BulletSpeedData2D = BulletSpeedData2D.new()

@@ -13,16 +13,16 @@ extends Node
 # These textures are used as animation frames for the bullets. 
 # They are being iterated over again and again until the life time of the bullets is over.
 var rocket_textures:Array[Texture2D] = [
-	preload("res://shared/art/player_bullets/1.png"), 
-	preload("res://shared/art/player_bullets/2.png"),
-	preload("res://shared/art/player_bullets/3.png"),
-	preload("res://shared/art/player_bullets/4.png"),
-	preload("res://shared/art/player_bullets/5.png"),
-	preload("res://shared/art/player_bullets/6.png"),
-	preload("res://shared/art/player_bullets/7.png"),
-	preload("res://shared/art/player_bullets/8.png"),
-	preload("res://shared/art/player_bullets/9.png"),
-	preload("res://shared/art/player_bullets/10.png")
+	preload("res://shared/art/player_bullets/rocket_01.png"), 
+	preload("res://shared/art/player_bullets/rocket_02.png"),
+	preload("res://shared/art/player_bullets/rocket_03.png"),
+	preload("res://shared/art/player_bullets/rocket_04.png"),
+	preload("res://shared/art/player_bullets/rocket_05.png"),
+	preload("res://shared/art/player_bullets/rocket_06.png"),
+	preload("res://shared/art/player_bullets/rocket_07.png"),
+	preload("res://shared/art/player_bullets/rocket_08.png"),
+	preload("res://shared/art/player_bullets/rocket_09.png"),
+	preload("res://shared/art/player_bullets/rocket_10.png")
 	]
 	
 @onready var animatedSprite:AnimatedSprite2D = $BulletsAnimatedSprite
@@ -95,13 +95,11 @@ func set_up_volley_data()->BulletVolleyData2D:
 	var data:BulletVolleyData2D = BulletVolleyData2D.new()
 	data.sprite_frames = animatedSprite.sprite_frames
 
-	data.animation = "idk2"
+	data.animation = "rockets"
 	
 	data.transforms=[Transform2D()]
 	data.all_bullet_speed_data = bullet_speed_data # every bullet uses its own speed entry
 	
-	#data.collision_layer = BulletVolleyData2D.calculate_bitmask([2])
-	#data.collision_mask = BulletVolleyData2D.calculate_bitmask([3]) # by default bullets interact only with enemy
 	data.set_collision_layer_from_array([2])
 	data.set_collision_mask_from_array([3])
 	
@@ -125,6 +123,7 @@ func set_up_volley_data()->BulletVolleyData2D:
 	data.shared_bullets_custom_data = damage_data
 	#data.is_life_time_over_signal_enabled = true # If you want to track when the life time is over and receive a signal inside BulletFactory2D
 	data.shared_bullet_attachment_offset = selected_attachment_offset
+	data.effect_layers = [BENCHMARK_GLOBALS.PLAYER_HIT_SPARK, BENCHMARK_GLOBALS.MUZZLE_FLASH]
 	return data
 
 # Determines which type of bullets to be spawned
@@ -154,9 +153,6 @@ func spawn_volley_bullets()->void:
 	else:
 		volley_data.transforms = BulletPatterns2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), rows_per_column, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation)
 	
-	#volley_data.max_life_time = 5
-	#volley_data.is_life_time_over_signal_enabled = true
-	#volley_data.bullet_max_collision_amount = 1
 	var volley:BulletVolley2D = BENCHMARK_GLOBALS.FACTORY.spawn_volley(volley_data)
 	if volley == null:
 		return # refused (the error says why)
@@ -232,7 +228,7 @@ func switch_bullet_texture(option_index:int)->void:
 	if option_index == 0:
 		# The animated rocket of the player's AnimatedSprite2D
 		volley_data.sprite_frames = animatedSprite.sprite_frames
-		volley_data.animation = "idk2"
+		volley_data.animation = "rockets"
 	else:
 		if godot_texture_frames == null:
 			godot_texture_frames = SpriteFrames.new() # holds an empty "default" animation
