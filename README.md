@@ -18,7 +18,7 @@
   <img src="showcase/clips/hero.webp" alt="The Hive Mother's spiral waves in the Arcane Barrage demo" width="720"/>
 </p>
 
-**Contents:** [Why](#why-blastbullets2d) · [See it in action](#see-it-in-action) · [Install](#install) · [Your first boss in 5 minutes](#your-first-boss-in-5-minutes-no-code) · [Handle hits](#handle-hits) · [Recipes](#recipes) · [Spawning from code](#spawning-from-code) · [Performance](#performance) · [Limits](#limits) · [Rules worth knowing](#rules-worth-knowing) · [Reference](#reference) · [Building and testing](#building-from-source-and-running-the-tests)
+**Contents:** [Why](#why-blastbullets2d) · [See it in action](#see-it-in-action) · [Examples](#learn-from-the-examples) · [Install](#install) · [Your first boss in 5 minutes](#your-first-boss-in-5-minutes-no-code) · [Handle hits](#handle-hits) · [Recipes](#recipes) · [Spawning from code](#spawning-from-code) · [Performance](#performance) · [Limits](#limits) · [Rules worth knowing](#rules-worth-knowing) · [Reference](#reference) · [Building and testing](#building-from-source-and-running-the-tests)
 
 ## Why BlastBullets2D
 
@@ -33,14 +33,34 @@
 
 ## See it in action
 
-Every clip below is **Arcane Barrage**, the demo game in [`test_project/demo/`](test_project/demo): a wizard against four bullet-hell bosses, built only with the plugin's nodes and resources. Clone the repository, open `test_project/` in Godot and press play.
+Every clip and screenshot below is **Arcane Barrage**, a complete bullet-hell game built only with the plugin's nodes and resources: a wizard against four bosses, six spells, graze scoring, bombs that turn bullets into gems and a 16,000-bullet stress test.
 
 | | |
 |---|---|
 | <img src="showcase/clips/lasers.webp" alt="Charged laser beams sweeping the arena" width="360"/><br>**Lasers:** charged beams that sweep, lock-on and curvy snakes | <img src="showcase/clips/swarm.webp" alt="A homing, flocking swarm" width="360"/><br>**Homing and flocking:** a swarm that hunts but keeps its distance |
-| <img src="showcase/clips/galaxies.webp" alt="Counter-rotating galaxies and an orbit cage" width="360"/><br>**Spin, emitters and orbiting:** bullets that fire bullets, cages that circle you | <img src="showcase/clips/stress.webp" alt="Sixteen thousand bullets" width="360"/><br>**16,000 bullets** with the boss fight running, under 2 ms per physics tick |
+| <img src="showcase/clips/galaxies.webp" alt="Counter-rotating galaxies and an orbit cage" width="360"/><br>**Spin, emitters and orbiting:** bullets that fire bullets, cages that circle you | <img src="showcase/clips/stress.webp" alt="Sixteen thousand bullets" width="360"/><br>**16,000 bullets** with the boss fight running, still at a steady 60 FPS |
 
-**Play the demo:** WASD to move, mouse to aim, left click to cast, <kbd>1</kbd>-<kbd>6</kbd> to switch spells (homing wisps, splitting stars, curvy lasers, a flocking swarm, comets that fire sparks), <kbd>Shift</kbd> to focus, <kbd>E</kbd> to bomb (every enemy bullet becomes a gem) and <kbd>Q</kbd> to slow time. The panel on the left switches physics interpolation, the frame-rate cap and the physics rate, shows the hitboxes and starts a stress test; the top right shows the live bullet count and tick time. Every spell and attack is a short, commented function in [`demo_spells.gd`](test_project/demo/scripts/demo_spells.gd) and [`demo_attacks.gd`](test_project/demo/scripts/demo_attacks.gd): read them to see how each feature is set up.
+| | | |
+|---|---|---|
+| <img src="showcase/screenshots/hive_spirals.jpg" alt="Spiral waves around the Hive Mother" width="250"/> | <img src="showcase/screenshots/laser_sweep.jpg" alt="Laser beams sweeping the arena" width="250"/> | <img src="showcase/screenshots/rose_storm.jpg" alt="A rose-shaped bullet storm" width="250"/> |
+| <img src="showcase/screenshots/serpents.jpg" alt="Curvy laser serpents hunting the wizard" width="250"/> | <img src="showcase/screenshots/twin_galaxies.jpg" alt="Two counter-rotating bullet galaxies" width="250"/> | <img src="showcase/screenshots/stress_16k.jpg" alt="The 16,000-bullet stress test" width="250"/> |
+
+**Get the whole game:** the complete Arcane Barrage project (every boss, attack and spell as short, commented code, plus its art, music and sound) is a thank-you for supporters on [Ko-fi](https://ko-fi.com/realnikich) and [Patreon](https://patreon.com/realnikich). Open it to see how a full bullet hell is put together with the plugin.
+
+## Learn from the examples
+
+[`test_project/examples/`](test_project/examples) holds six small scenes, each a few nodes and one short script. Open `test_project/` in Godot, open a scene and press <kbd>F6</kbd>:
+
+| Scene | Shows |
+|---|---|
+| `01_ring_turret` | a spinning ring pattern set up entirely in the inspector, and reacting to hits |
+| `02_homing` | bullets that chase the player, retargeted to the mouse while you hold the button |
+| `03_graze_score` | points for near misses with a two-ring graze zone |
+| `04_laser` | a charging beam that sweeps the arena |
+| `05_split` | slow orbs that burst into rings of small bullets |
+| `06_boss_phases` | a boss that changes its attack at half health, and your ship's gun hitting it |
+
+The rest of `test_project/` is the test lab: a scene with a sidebar to try every feature live (bullet counts, collision, pools, physics rates), and the automated test suites.
 
 ## Install
 
@@ -186,6 +206,25 @@ factory.clear_active_bullets()                         # wipe the screen (player
 </details>
 
 <details>
+<summary><b>Bombs, clears and dodging</b> (World controls)</summary>
+
+```gdscript
+# can_hit_mask picks bullets (and lasers) by what they can hit: pass the player's
+# collision layer to take only what can hurt the player and spare the player's shots.
+const PLAYER_LAYER := 1
+factory.clear_bullets_in_circle(player.global_position, 160.0, PLAYER_LAYER)   # a hurt-flash clear
+factory.convert_all_bullets_to_pickups(coin, player, PLAYER_LAYER)             # a bomb: bullets become coins
+factory.end_lasers_in_rect(get_viewport_rect(), true, PLAYER_LAYER)            # and enemy beams fade out
+# Cheap enough every frame: where the dangerous bullets are, and the closest one.
+for p in factory.get_bullet_positions_in_circle(player.global_position, 120.0, PLAYER_LAYER):
+    pass   # push your dodge AI away from p
+var nearest := factory.get_nearest_bullet(player.global_position, 300.0, PLAYER_LAYER)
+if not nearest.is_empty():
+    print("closest danger at ", nearest["position"])
+```
+</details>
+
+<details>
 <summary><b>Bullets that fire bullets, split or flock</b> (Emitter Bullets, Splitting, Flocking)</summary>
 
 ```gdscript
@@ -261,7 +300,8 @@ Know these before you build a game around the plugin:
 
 - **In-editor docs:** every class (<kbd>F1</kbd> → `BulletSpawner2D`, `BulletFactory2D`, `BulletVolley2D`, `LaserSpawner2D`...).
 - **[QUICKSTART.md](QUICKSTART.md):** one page of common bullet-hell recipes.
-- **Demo game:** `test_project/demo/` (Arcane Barrage, the main scene of `test_project/`). Its art, music and sound are original and generated by the scripts in `test_project/demo/tools/`.
+- **Examples:** [`test_project/examples/`](test_project/examples), six small scenes (see [Learn from the examples](#learn-from-the-examples)).
+- **Arcane Barrage:** the full game project, for [Ko-fi](https://ko-fi.com/realnikich) and [Patreon](https://patreon.com/realnikich) supporters.
 
 <details>
 <summary><b>The data model: per-bullet, shared and default values</b></summary>
