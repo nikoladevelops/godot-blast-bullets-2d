@@ -496,3 +496,31 @@ func test_a_pooled_handle_keeps_no_frames_or_layers() -> void:
 	layer = null
 	layers.clear()
 	assert_eq([refs[0].get_ref(), refs[1].get_ref()], [null, null], "nothing kept alive by the pooled volley")
+
+
+## Pooling drops the life's collision Shape2D too (the pool key keeps only its
+## type and size): a pooled volley never keeps a user's shape alive, and the
+## next life uses its own data's shape.
+func test_a_pooled_volley_keeps_no_collision_shape() -> void:
+	var data := _plain()
+	var shape := CircleShape2D.new()
+	shape.radius = 6.0
+	data.collision_shape = shape
+	var v: BulletVolley2D = factory.spawn_volley(data)
+	var ref: WeakRef = weakref(shape)
+	assert_same(v.get_collision_shape(), shape, "the live volley reports its shape")
+	await idle(1)
+	factory.clear_active_bullets()
+	await idle(1)
+	assert_true(v.is_pooled(), "pooled")
+	assert_null(v.get_collision_shape(), "no shape while pooled")
+	data.collision_shape = null
+	shape = null
+	assert_null(ref.get_ref(), "the pool keeps the shape alive no more")
+	var next := _plain()
+	var other := CircleShape2D.new()
+	other.radius = 6.0
+	next.collision_shape = other
+	var reused: BulletVolley2D = factory.spawn_volley(next)
+	assert_eq(reused, v, "reused")
+	assert_same(reused.get_collision_shape(), other, "the next life reports its own shape")

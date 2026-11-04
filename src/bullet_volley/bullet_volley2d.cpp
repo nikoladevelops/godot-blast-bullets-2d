@@ -248,6 +248,7 @@ void BulletVolley2D::release_life() {
 	homing_reached_events.clear();
 	shared_pop_requested = false;
 	pickup_data.unref(); // a pooled volley is a plain one again
+	cached_collision_shape.unref(); // the pool key keeps only its type and size (cached scalars): never the user's Shape2D
 	pickup_magnet_started = false;
 	pickup_time_scale_owner_id = 0;
 	anim_finished_event_pending = false;
