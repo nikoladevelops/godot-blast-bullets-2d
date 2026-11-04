@@ -1,0 +1,10 @@
+[gd_resource type="EffectLayerData2D" format=3]
+
+[ext_resource type="SpriteFrames" path="res://shared/effects/hit_spark_frames.tres" id="1_3iywu"]
+
+[resource]
+trigger = 3
+sprite_frames = ExtResource("1_3iywu")
+self_modulate = Color(1, 0.41568628, 0.6901961, 1)
+scale = Vector2(0.8, 0.8)
+randomize_rotation = true

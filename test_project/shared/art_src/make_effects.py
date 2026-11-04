@@ -2,7 +2,8 @@
 
   explosion_NN.png   16 frames, 256 px: flash, a noise-shaped fireball cooling from
                      white to orange to smoke, a shockwave ring and spark streaks
-  hit_spark_NN.png    8 frames, 128 px: a radial burst of thin streaks (bullet hits)
+  hit_spark_NN.png    8 frames, 128 px: an impact burst: flash, shock ring, tapered sparks (bullet hits)
+  laser_impact_NN.png 8 frames, 128 px: a laser's wall / target impact, sparks thrown back along -X
   muzzle_flash_NN.png 4 frames, 128 px: a cone flash pointing right (spawn flashes)
   laser_beam_NN.png   4 frames, 256 x 64: a beam body that tiles along x
   laser_orb_NN.png    8 frames, 128 px: a pulsing orb (laser muzzle and tip)
@@ -11,7 +12,7 @@
 
 Everything is drawn 2x larger and downsampled (clean edges). Deterministic.
 
-    python3 test_project/shared/art_src/make_effects.py
+    python3 test_project/shared/art_src/make_effects.py [names]   (ART_OUT=<dir> previews elsewhere)
 """
 import os
 import subprocess
@@ -21,7 +22,7 @@ import numpy as np
 from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ART = os.path.normpath(os.path.join(HERE, "..", "art"))
+ART = os.environ.get("ART_OUT") or os.path.normpath(os.path.join(HERE, "..", "art"))
 
 
 def save(rgba, path, size):
@@ -110,25 +111,61 @@ def explosion():
         save(img, os.path.join(ART, "effects", f"explosion_{k + 1:02d}.png"), 256)
 
 
-def hit_spark():
-    n, frames = 256, 8
+def burst(n, t, rays, ray_rgb, ring_rgb, core_rgb, ray_width=0.028, reach=0.95):
+    """One frame (t in 0..1) of an impact burst: a white-hot flash, an
+    expanding shock ring and tapered sparks with hot heads flying out."""
     yy, xx = (np.mgrid[0:n, 0:n] - n / 2 + 0.5) / (n / 2)
     r = np.hypot(xx, yy)
     ang = np.arctan2(yy, xx)
+    img = np.zeros((n, n, 4))
+    fade = (1 - t) ** 1.3
+    # Shock ring.
+    ring_r = 0.18 + 0.7 * t ** 0.6
+    ring = np.exp(-((r - ring_r) / (0.03 + 0.05 * t)) ** 2) * (1 - t) ** 1.6
+    img = add_light(img, ring_rgb, ring * 0.45)
+    # Sparks: tapered streaks, thickest at the head, white near the head.
+    for a, speed, width in rays:
+        head = speed * reach * (0.3 + 0.7 * (1 - (1 - t) ** 2.0))
+        length = 0.55 * (1 - t) ** 0.8 + 0.08
+        along = r * np.cos(ang - a)
+        across = r * np.abs(np.sin(ang - a))
+        u = np.clip((along - (head - length)) / length, 0, 1)  # 0 at the tail, 1 at the head
+        inside = (along <= head + 0.02) & (along > 0)
+        w = ray_width * width * (0.12 + 0.88 * u)
+        m = np.exp(-(across / np.maximum(w, 1e-4)) ** 2) * u ** 0.5 * inside
+        img = add_light(img, ray_rgb, np.clip(m * fade * 1.3, 0, 1))
+        img = add_light(img, np.array([1.0, 1.0, 1.0]), m * u ** 2 * fade)
+    # Core flash (first frames) and a soft glow.
+    core = np.exp(-(r / (0.16 + 0.22 * t)) ** 2) * (1 - t) ** 2.4
+    glow = np.exp(-(r / (0.45 + 0.2 * t)) ** 2) * (1 - t) ** 2 * 0.45
+    img = add_light(img, core_rgb, glow)
+    img = add_light(img, np.array([1.0, 1.0, 1.0]), np.clip(core * 1.4, 0, 1))
+    return img
+
+
+def hit_spark():
+    """8 frames, 128 px: a bright impact burst (bullet hits; tinted by each
+    effect's self_modulate, so the art is near white with a cool edge)."""
+    n, frames = 256, 8
     rng = np.random.default_rng(9)
-    rays = [(rng.uniform(0, 2 * np.pi), rng.uniform(0.5, 1.0)) for _ in range(14)]
+    rays = [(a + rng.uniform(-0.18, 0.18), rng.uniform(0.6, 1.0), rng.uniform(0.7, 1.3)) for a in np.linspace(0, 2 * np.pi, 11, endpoint=False)]
     for k in range(frames):
         t = k / (frames - 1)
-        img = np.zeros((n, n, 4))
-        for a, speed in rays:
-            d = speed * (0.2 + 0.8 * t ** 0.5)
-            along = r * np.cos(ang - a)
-            across = r * np.abs(np.sin(ang - a))
-            m = np.exp(-(across / 0.02) ** 2) * np.clip(1 - np.abs(along - d) / (0.25 * (1 - t) + 0.05), 0, 1) * (along > 0)
-            img = add_light(img, np.array([0.75, 0.98, 1.0]), m * (1 - t))
-        core = np.exp(-(r / (0.18 + 0.2 * t)) ** 2) * (1 - t) ** 2
-        img = add_light(img, np.array([1.0, 1.0, 1.0]), core)
+        img = burst(n, t, rays, np.array([0.8, 0.97, 1.0]), np.array([0.7, 0.95, 1.0]), np.array([0.85, 0.97, 1.0]))
         save(img, os.path.join(ART, "effects", f"hit_spark_{k + 1:02d}.png"), 128)
+
+
+def laser_impact():
+    """8 frames, 128 px: where a laser meets a wall or a target (wall_impact_look,
+    pierce_look): a hot flash with sparks thrown back (+X is along the beam,
+    so the sparks fan out toward -X, back at the shooter)."""
+    n, frames = 256, 8
+    rng = np.random.default_rng(13)
+    rays = [(np.pi + rng.uniform(-1.25, 1.25), rng.uniform(0.55, 1.0), rng.uniform(0.7, 1.2)) for _ in range(11)]
+    for k in range(frames):
+        t = k / (frames - 1)
+        img = burst(n, t, rays, np.array([1.0, 0.92, 0.85]), np.array([1.0, 0.9, 0.95]), np.array([1.0, 0.95, 1.0]), ray_width=0.024, reach=0.92)
+        save(img, os.path.join(ART, "effects", f"laser_impact_{k + 1:02d}.png"), 128)
 
 
 def muzzle_flash():
@@ -167,21 +204,25 @@ def laser_beam():
 
 
 def laser_orb():
-    """8 frames, 128 px: a pulsing white orb with a soft halo and a rotating four-point
-    glint (muzzle and tip looks; the laser's modulate tints it)."""
+    """8 frames, 128 px: a pulsing white-hot orb in a tinted halo with a slowly
+    turning four-point flare (muzzle and tip looks; the laser's modulate tints it)."""
     n, frames = 256, 8
     yy, xx = (np.mgrid[0:n, 0:n] - n / 2 + 0.5) / (n / 2)
     r = np.hypot(xx, yy)
     ang = np.arctan2(yy, xx)
     for k in range(frames):
         t = k / frames
-        pulse = 0.85 + 0.15 * np.sin(2 * np.pi * t)
+        pulse = 0.9 + 0.1 * np.sin(2 * np.pi * t)
         img = np.zeros((n, n, 4))
-        halo = np.exp(-(r / (0.55 * pulse)) ** 2) * 0.55
-        core = np.exp(-(r / (0.2 * pulse)) ** 2)
-        glint = np.exp(-(np.abs(np.sin(2 * (ang - t * np.pi / 2))) * r / 0.035) ** 2) * np.clip(1 - r, 0, 1) ** 2
-        img = add_light(img, np.array([0.8, 0.9, 1.0]), halo)
-        img = add_light(img, np.array([1.0, 1.0, 1.0]), np.clip(core + glint * 0.7, 0, 1))
+        halo = np.exp(-(r / (0.5 * pulse)) ** 2) * 0.75
+        corona = np.exp(-(r / (0.26 * pulse)) ** 2)
+        core = np.exp(-(r / (0.11 * pulse)) ** 2)
+        spin = t * np.pi / 2
+        flare = sum(np.exp(-(np.abs(np.sin(ang - spin - q * np.pi / 2)) * r / 0.022) ** 2) for q in range(2)) * np.clip(1 - r / 0.95, 0, 1) ** 2.2
+        diag = sum(np.exp(-(np.abs(np.sin(ang - spin - np.pi / 4 - q * np.pi / 2)) * r / 0.018) ** 2) for q in range(2)) * np.clip(1 - r / 0.55, 0, 1) ** 2.5 * 0.5
+        img = add_light(img, np.array([0.75, 0.88, 1.0]), halo)
+        img = add_light(img, np.array([0.92, 0.97, 1.0]), corona * 0.9)
+        img = add_light(img, np.array([1.0, 1.0, 1.0]), np.clip(core * 1.5 + flare * 0.85 + diag, 0, 1))
         save(img, os.path.join(ART, "effects", f"laser_orb_{k + 1:02d}.png"), 128)
 
 
@@ -239,14 +280,12 @@ def stars():
 
 def main():
     import tempfile
+    only = sys.argv[1:]
     work = tempfile.mkdtemp(prefix="fx_", dir=os.environ.get("ART_WORK"))
-    explosion()
-    hit_spark()
-    muzzle_flash()
-    laser_beam()
-    laser_orb()
-    nebula(work)
-    stars()
+    for name, make in (("explosion", explosion), ("hit_spark", hit_spark), ("laser_impact", laser_impact), ("muzzle_flash", muzzle_flash),
+                       ("laser_beam", laser_beam), ("laser_orb", laser_orb), ("nebula", lambda: nebula(work)), ("stars", stars)):
+        if not only or name in only:
+            make()
     print("effects and backgrounds written to", ART)
 
 

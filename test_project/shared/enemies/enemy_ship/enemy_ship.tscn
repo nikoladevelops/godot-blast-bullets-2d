@@ -119,15 +119,15 @@ sprite_frames = SubResource("SpriteFrames_wqqrr")
 animation = &"idle"
 
 [node name="LeftMarker2D" type="Marker2D" parent="AnimatedSprite2D" unique_id=40854020]
-position = Vector2(-72, -136)
+position = Vector2(-54.4, -80.8)
 rotation = -1.5708
 
 [node name="CenterMarker2D" type="Marker2D" parent="AnimatedSprite2D" unique_id=220569991]
-position = Vector2(1.59999, -176)
+position = Vector2(0, -104)
 rotation = -1.5708
 
 [node name="RightMarker2D" type="Marker2D" parent="AnimatedSprite2D" unique_id=1071363261]
-position = Vector2(88, -152)
+position = Vector2(54.4, -80.8)
 rotation = -1.5708
 
 [node name="ShootTimer" type="Timer" parent="." unique_id=2123705527]

@@ -19,7 +19,7 @@ import sys
 import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ART = os.path.normpath(os.path.join(HERE, "..", "art"))
+ART = os.environ.get("ART_OUT") or os.path.normpath(os.path.join(HERE, "..", "art"))
 SCALE = 8  # 32 design units -> 256 px
 
 CYAN = "#4ff3ff"
@@ -63,110 +63,167 @@ def flame(gid, base, axis, length, half, outer, inner="#ffffff", lick=0.0):
              f"Q{c2x:.3f} {c2y:.3f} {bx - px * w:.3f} {by - py * w:.3f} Z")
         g = lin(f"{gid}{tag}", [(0, color_a, op), (0.55, color_b, op * 0.85), (1, color_b, 0)],
                 0.5 - ax * 0.5, 0.5 - ay * 0.5, 0.5 + ax * 0.5, 0.5 + ay * 0.5)
-        return g, f'<path id="glow_plume_{gid}{tag}" d="{d}" fill="url(#{gid}{tag})"/>'
+        return g, f'<path d="{d}" fill="url(#{gid}{tag})"/>'
     g1, p1 = tongue(length, half, "o", inner, outer, 0.95)
     g2, p2 = tongue(length * 0.55, half * 0.5, "i", "#ffffff", inner, 1.0)
     return g1 + g2, p1 + p2
 
 
+def mirror(left):
+    """A closed, exactly symmetric polygon path from its left half: points from
+    the top of the axis (x = 16) down its left side; the right side mirrors them."""
+    right = [(32 - x, y) for x, y in reversed(left) if x != 16]
+    pts = list(left) + right
+    return "M" + " L".join(f"{x:.3f} {y:.3f}" for x, y in pts) + " Z"
+
+
+def both(path_of):
+    """`path_of(sign, cx)` drawn for the left (sign -1) and the mirrored right side."""
+    return path_of(-1) + path_of(1)
+
+
 # ------------------------------------------------------------------ player ship (nose up)
 def player_ship(t, thrust):
     pulse = 0.5 + 0.5 * wave(t)
-    defs = (lin("hull", [(0, "#6a7ca8", 1), (0.45, "#34425f", 1), (1, "#161c2c", 1)], 0, 0, 1, 1)
-            + lin("wing", [(0, "#2b3654", 1), (1, "#141a29", 1)])
-            + lin("glass", [(0, "#e6feff", 1), (0.5, "#5fd8f0", 1), (1, "#0f5d78", 1)])
-            + rad("engine", [(0, "#ffffff", 1), (0.5, CYAN, 0.9), (1, CYAN, 0)]))
+    defs = (lin("hull", [(0, "#8ea2cf", 1), (0.35, "#4a5b82", 1), (1, "#1a2134", 1)])
+            + lin("hullside", [(0, "#10162a", 0.0), (1, "#05070d", 0.55)], 0, 0, 1, 0)
+            + lin("wing", [(0, "#3a4870", 1), (1, "#161c2e", 1)])
+            + lin("pod", [(0, "#5a6b94", 1), (0.5, "#2a3450", 1), (1, "#141a2a", 1)], 0, 0, 1, 0)
+            + lin("glass", [(0, "#f2ffff", 1), (0.45, "#6fe3f6", 1), (1, "#0d4f68", 1)])
+            + rad("engcore", [(0, "#ffffff", 1), (0.45, "#c8fdff", 1), (1, CYAN, 0.0)]))
+    wing = mirror([(16, 12.6), (12.6, 13.2), (4.4, 21.2), (3.9, 23.9), (6.4, 24.4), (12.8, 22.6), (16, 22.6)])
+    hull = mirror([(16, 1.8), (14.9, 5.0), (14.0, 9.6), (13.5, 14.0), (13.2, 19.0), (13.6, 23.2), (14.4, 24.8), (16, 25.2)])
     body = (
-        # Wings first (under the hull), with a darker inner panel and edge highlight.
-        '<path d="M12.2 14.6 L3.6 21.4 L3.6 24.6 L12.4 22.4 Z M19.8 14.6 L28.4 21.4 L28.4 24.6 L19.6 22.4 Z" fill="url(#wing)"/>'
-        '<path d="M11.8 16.4 L6 21.3 L6 22.9 L11.9 21.4 Z M20.2 16.4 L26 21.3 L26 22.9 L20.1 21.4 Z" fill="#0f1422" opacity="0.8"/>'
-        # Hull.
-        '<path d="M16 1.6 L18.9 9.6 L19.9 14.8 L20.2 23.2 L18.6 26.2 L13.4 26.2 L11.8 23.2 L12.1 14.8 L13.1 9.6 Z" fill="url(#hull)"/>'
-        '<path d="M16 1.6 L16 26.2 L13.4 26.2 L11.8 23.2 L12.1 14.8 L13.1 9.6 Z" fill="#ffffff" opacity="0.07"/>'
-        # Panel lines and rivets.
-        '<path d="M13.6 16.6 L18.4 16.6 M13.4 19.6 L18.6 19.6 M16 15.2 L16 23.6" stroke="#0b0f19" stroke-width="0.22" opacity="0.8"/>'
-        + "".join(f'<circle cx="{x}" cy="{y}" r="0.18" fill="#9fb0d6" opacity="0.7"/>' for x, y in ((13.9, 18.1), (18.1, 18.1), (13.9, 21.1), (18.1, 21.1)))
-        # Cockpit with a glint.
-        + '<ellipse cx="16" cy="10.6" rx="1.85" ry="3.3" fill="#0a0e18"/>'
-        '<ellipse id="glow_cockpit" cx="16" cy="10.6" rx="1.5" ry="2.95" fill="url(#glass)"/>'
-        '<ellipse cx="15.35" cy="9.4" rx="0.4" ry="1.1" fill="#ffffff" opacity="0.75"/>'
-        # Neon trims along the leading edges and the spine.
-        f'<path id="glow_trim" d="M12.5 15.2 L4.1 21.8 M19.5 15.2 L27.9 21.8 M13.3 9.8 L16 2.6 L18.7 9.8" fill="none" stroke="{CYAN}" stroke-width="0.55" stroke-linecap="round" stroke-linejoin="round"/>'
-        # Engines: nozzles with a hot core that breathes.
-        '<rect x="13.2" y="23.4" width="2.3" height="3.1" rx="0.5" fill="#0c111c"/>'
-        '<rect x="16.5" y="23.4" width="2.3" height="3.1" rx="0.5" fill="#0c111c"/>'
-        f'<ellipse id="glow_engine" cx="14.35" cy="26.1" rx="{0.8 + 0.2 * pulse:.3f}" ry="0.5" fill="url(#engine)"/>'
-        f'<ellipse id="glow_engine2" cx="17.65" cy="26.1" rx="{0.8 + 0.2 * pulse:.3f}" ry="0.5" fill="url(#engine)"/>')
+        # Wings (under the hull), a darker inner panel and a lit leading edge.
+        f'<path d="{wing}" fill="url(#wing)"/>'
+        + f'<path d="{mirror([(16, 15.2), (12.4, 15.6), (6.6, 21.4), (6.6, 22.6), (12.4, 21.2), (16, 21.2)])}" fill="#0c1120" opacity="0.75"/>'
+        # Wingtip pods.
+        + both(lambda s: f'<rect x="{(16 + s * 11.6) - 0.9:.3f}" y="19.6" width="1.8" height="5.2" rx="0.9" fill="url(#pod)"/>')
+        # Engine nacelles beside the hull.
+        + both(lambda s: f'<rect x="{(16 + s * 2.55) - 1.45:.3f}" y="17.2" width="2.9" height="9.0" rx="1.2" fill="url(#pod)"/>')
+        # Hull with a soft side shade (the same on both sides) and a spine highlight.
+        + f'<path d="{hull}" fill="url(#hull)"/>'
+        + f'<path d="{hull}" fill="url(#hullside)" opacity="0.6"/>'
+        + f'<path d="{mirror([(16, 3.4), (15.6, 6.0), (16, 6.2)])}" fill="#ffffff" opacity="0.25"/>'
+        '<path d="M16 7.4 L16 24.4" stroke="#c9d6f2" stroke-width="0.35" opacity="0.35"/>'
+        # Panel lines and rivets, mirrored.
+        '<path d="M14.0 16.2 L18.0 16.2 M13.8 19.6 L18.2 19.6" stroke="#0b0f19" stroke-width="0.22" opacity="0.8"/>'
+        + both(lambda s: f'<circle cx="{16 + s * 1.5:.3f}" cy="17.9" r="0.2" fill="#a9b9de" opacity="0.75"/><circle cx="{16 + s * 1.5:.3f}" cy="21.3" r="0.2" fill="#a9b9de" opacity="0.75"/>')
+        # Cockpit: a dark frame, the canopy and one central glint.
+        + '<ellipse cx="16" cy="10.4" rx="1.75" ry="3.4" fill="#070a12"/>'
+        '<ellipse id="gl_cockpit" cx="16" cy="10.4" rx="1.35" ry="3.0" fill="url(#glass)"/>'
+        '<ellipse cx="16" cy="9.0" rx="0.45" ry="1.2" fill="#ffffff" opacity="0.8"/>'
+        # Neon trims: leading edges of both wings and the nose, one group.
+        f'<g id="gl_trim" fill="none" stroke="{CYAN}" stroke-width="0.5" stroke-linecap="round" stroke-linejoin="round">'
+        + both(lambda s: f'<path d="M{16 + s * 3.3:.3f} 13.4 L{16 + s * 11.4:.3f} 21.3"/>')
+        + '<path d="M14.95 5.2 L16 2.4 L17.05 5.2"/></g>'
+        # Nozzle rings, then the hot cores (one group: one glow for both).
+        + both(lambda s: f'<ellipse cx="{16 + s * 2.55:.3f}" cy="26.0" rx="1.3" ry="0.62" fill="#05070c"/>')
+        + '<g id="gl_engines">'
+        + both(lambda s: f'<ellipse cx="{16 + s * 2.55:.3f}" cy="26.0" rx="{0.95 + 0.12 * pulse:.3f}" ry="0.45" fill="url(#engcore)"/>')
+        + '</g>')
     # Navigation lights: red port, green starboard, blinking in turn.
-    port = 1.0 if (t * 8) % 8 < 2 else 0.25
-    star = 1.0 if ((t * 8) + 4) % 8 < 2 else 0.25
-    body += (f'<circle id="glow_navl" cx="4.2" cy="23" r="0.55" fill="{RED}" opacity="{port}"/>'
-             f'<circle id="glow_navr" cx="27.8" cy="23" r="0.55" fill="{GREEN}" opacity="{star}"/>')
+    port = 1.0 if (t * 8) % 8 < 2 else 0.3
+    star = 1.0 if ((t * 8) + 4) % 8 < 2 else 0.3
+    body += (f'<circle id="gl_navl" cx="4.4" cy="20.2" r="0.5" fill="{RED}" opacity="{port}"/>'
+             f'<circle id="gl_navr" cx="27.6" cy="20.2" r="0.5" fill="{GREEN}" opacity="{star}"/>')
+    # Both engines burn in step (the same flame), mirrored.
     if thrust:
-        for i, cx in enumerate((14.35, 17.65)):
-            L = 4.6 + 1.1 * wave(t, 1, i * 0.37) + 0.5 * wave(t, 3, 0.2 + i * 0.5)
-            d, p = flame(f"f{i}", (cx, 26.3), (0, 1), L, 0.95 + 0.12 * wave(t, 2, i * 0.3), CYAN, "#bffbff", 0.5 * wave(t, 2, i * 0.25))
-            defs, body = defs + d, p + body
+        L = 4.8 + 0.9 * wave(t, 1) + 0.4 * wave(t, 3, 0.2)
+        half = 1.0 + 0.1 * wave(t, 2)
+        lick = 0.35 * wave(t, 2, 0.25)
     else:
-        for i, cx in enumerate((14.35, 17.65)):
-            d, p = flame(f"f{i}", (cx, 26.3), (0, 1), 1.6 + 0.35 * pulse, 0.7, CYAN, "#bffbff")
-            defs, body = defs + d, p + body
-    glows = {"glow_trim": (CYAN, 0.9, 85), "glow_cockpit": (CYAN, 1.0, 60), "glow_engine": (CYAN, 1.2, 90),
-             "glow_engine2": (CYAN, 1.2, 90), "glow_plume": (CYAN, 1.3, 75), "glow_navl": (RED, 0.9, 90 * port),
-             "glow_navr": (GREEN, 0.9, 90 * star)}
+        L, half, lick = 1.7 + 0.35 * pulse, 0.75, 0.0
+    flames = ""
+    for i, s in enumerate((-1, 1)):
+        d, p = flame(f"f{i}", (16 + s * 2.55, 26.25), (0, 1), L, half, CYAN, "#bffbff", lick * s)
+        defs += d
+        flames += p
+    body = f'<g id="gl_plume">{flames}</g>' + body
+    glows = {"gl_trim": (CYAN, 0.7, 80), "gl_cockpit": (CYAN, 0.8, 55), "gl_engines": (CYAN, 1.1, 90),
+             "gl_plume": (CYAN, 1.2, 70), "gl_navl": (RED, 0.8, 90 * port), "gl_navr": (GREEN, 0.8, 90 * star)}
     return svg(body, defs), glows
 
 
 # ------------------------------------------------------------------ enemy ship (nose up)
+# Gun muzzles (design units), mirrored: the enemy_ship.tscn markers sit here.
+ENEMY_GUNS = ((9.2, 5.9), (16, 3.0), (22.8, 5.9))
+
+
 def enemy_ship(t, thrust):
     pulse = 0.5 + 0.5 * wave(t)
-    defs = (lin("hull", [(0, "#a03d63", 1), (0.5, "#5a1f37", 1), (1, "#260a17", 1)], 0, 0, 1, 1)
-            + lin("plate", [(0, "#6e2744", 1), (1, "#2a0c1a", 1)])
-            + rad("core", [(0, "#ffffff", 1), (0.35, "#ffb3cc", 1), (1, MAGENTA, 1)]))
-    r = 2.1 + 0.35 * pulse
+    defs = (lin("hull", [(0, "#b5487a", 1), (0.45, "#621f3d", 1), (1, "#22070f", 1)])
+            + lin("plate", [(0, "#7d2c4e", 1), (1, "#2a0b18", 1)])
+            + lin("gun", [(0, "#c9a9b9", 1), (0.5, "#6e4f60", 1), (1, "#2a1a23", 1)], 0, 0, 1, 0)
+            + rad("core", [(0, "#ffffff", 1), (0.35, "#ffb8d0", 1), (1, MAGENTA, 1)]))
+    hull = mirror([(16, 3.6), (14.2, 8.4), (10.4, 9.4), (6.6, 7.6), (2.6, 14.2), (3.4, 16.0), (8.6, 17.6), (11.0, 23.4), (13.6, 24.6), (16, 24.6)])
+    plate = mirror([(16, 10.6), (13.8, 11.2), (10.2, 11.8), (7.0, 10.6), (4.8, 14.4), (9.4, 15.8), (12.4, 20.6), (16, 21.2)])
     body = (
-        '<path d="M16 3.4 L19.2 10.6 L25.4 8 L29.8 15.6 L23.6 18.2 L20.2 24.4 L11.8 24.4 L8.4 18.2 L2.2 15.6 L6.6 8 L12.8 10.6 Z" fill="url(#hull)"/>'
-        '<path d="M7.2 9.6 L12.6 11.8 L10.6 17 L4.2 15.2 Z M24.8 9.6 L19.4 11.8 L21.4 17 L27.8 15.2 Z" fill="url(#plate)"/>'
-        '<path d="M16 3.4 L19.2 10.6 L16 12.4 L12.8 10.6 Z" fill="#c25079" opacity="0.6"/>'
-        '<path d="M10.6 17 L12 21.6 M21.4 17 L20 21.6 M13 13 L19 13" stroke="#14050b" stroke-width="0.22" opacity="0.85"/>'
-        + "".join(f'<circle cx="{x}" cy="{y}" r="0.2" fill="#ffa3c2" opacity="0.6"/>' for x, y in ((8.2, 12), (23.8, 12), (12.6, 20.4), (19.4, 20.4)))
-        + f'<path id="glow_trim" d="M2.7 15.6 L6.9 8.5 L12.8 10.9 M29.3 15.6 L25.1 8.5 L19.2 10.9 M12 23.8 L16 19.8 L20 23.8" fill="none" stroke="{MAGENTA}" stroke-width="0.55" stroke-linecap="round" stroke-linejoin="round"/>'
-        '<circle cx="16" cy="15" r="3.1" fill="#12050a"/>'
-        f'<circle id="glow_core" cx="16" cy="15" r="{r:.3f}" fill="url(#core)"/>'
-        '<rect x="14.4" y="23" width="3.2" height="2.2" rx="0.5" fill="#12060c"/>')
+        # Gun barrels on the wing roots and the nose, under the hull.
+        f'<path d="{hull}" fill="url(#hull)"/>'
+        + f'<path d="{plate}" fill="url(#plate)"/>'
+        # Wing guns on top of the hull: a housing and a lit barrel.
+        + both(lambda s: f'<rect x="{16 + s * 6.8 - 1.7:.3f}" y="9.4" width="3.4" height="3.4" rx="0.9" fill="#1e0d16" stroke="#8a4a68" stroke-width="0.25"/>'
+                         f'<rect x="{16 + s * 6.8 - 0.85:.3f}" y="5.6" width="1.7" height="5.6" rx="0.45" fill="url(#gun)"/>')
+        + f'<path d="{mirror([(16, 3.6), (14.4, 8.0), (16, 9.6)])}" fill="#d25a8a" opacity="0.55"/>'
+        '<path d="M10.2 11.8 L12.4 20.6 M21.8 11.8 L19.6 20.6 M13 13.2 L19 13.2" stroke="#12040a" stroke-width="0.24" opacity="0.85"/>'
+        + both(lambda s: f'<circle cx="{16 + s * 7.6:.3f}" cy="12.6" r="0.22" fill="#ffa8c6" opacity="0.6"/><circle cx="{16 + s * 3.6:.3f}" cy="20.4" r="0.22" fill="#ffa8c6" opacity="0.6"/>')
+        # Neon trims (one group) and gun tips.
+        + f'<g id="gl_trim" fill="none" stroke="{MAGENTA}" stroke-width="0.5" stroke-linecap="round" stroke-linejoin="round">'
+        + both(lambda s: f'<path d="M{16 + s * 13.0:.3f} 14.4 L{16 + s * 9.2:.3f} 8.2 L{16 + s * 5.4:.3f} 9.6"/>')
+        + '<path d="M12.2 23.6 L16 20.2 L19.8 23.6"/></g>'
+        + '<g id="gl_tips">' + "".join(f'<rect x="{x - 0.95:.3f}" y="{y - 0.5:.3f}" width="1.9" height="1.2" rx="0.35" fill="{ORANGE}"/>' for x, y in ENEMY_GUNS) + '</g>'
+        # The core.
+        '<circle cx="16" cy="15" r="3.2" fill="#100408"/>'
+        f'<circle id="gl_core" cx="16" cy="15" r="{2.1 + 0.35 * pulse:.3f}" fill="url(#core)"/>'
+        '<rect x="14.3" y="23.4" width="3.4" height="2.0" rx="0.6" fill="#10050a"/>')
+    # The nose gun (on top: it is the hull's spike).
+    body = f'<rect x="15.25" y="2.6" width="1.5" height="4.0" rx="0.4" fill="url(#gun)"/>' + body
     eyes = 0.55 + 0.45 * (0.5 + 0.5 * wave(t, 2, 0.25))
-    body += "".join(f'<circle id="glow_eye{i}" cx="{x}" cy="9.4" r="0.45" fill="{ORANGE}" opacity="{eyes:.2f}"/>' for i, x in enumerate((9.6, 22.4)))
+    body += f'<g id="gl_eyes" opacity="{eyes:.2f}">' + both(lambda s: f'<circle cx="{16 + s * 3.1:.3f}" cy="10.2" r="0.42" fill="{ORANGE}"/>') + '</g>'
     L = (5.4 + 1.2 * wave(t, 1) + 0.5 * wave(t, 3, 0.3)) if thrust else (1.8 + 0.4 * pulse)
-    d, p = flame("f", (16, 24.9), (0, 1), L, 1.35 + (0.15 * wave(t, 2) if thrust else 0), ORANGE, "#ffd9a8", 0.45 * wave(t, 2, 0.1) if thrust else 0)
-    glows = {"glow_trim": (MAGENTA, 0.9, 85), "glow_core": (MAGENTA, 1.4 + 0.4 * pulse, 90), "glow_plume": (ORANGE, 1.3, 75),
-             "glow_eye0": (ORANGE, 0.8, 80), "glow_eye1": (ORANGE, 0.8, 80)}
-    return svg(p + body, defs + d), glows
+    d, p = flame("f", (16, 25.2), (0, 1), L, 1.35 + (0.15 * wave(t, 2) if thrust else 0), ORANGE, "#ffd9a8", 0.0)
+    glows = {"gl_trim": (MAGENTA, 0.7, 80), "gl_core": (MAGENTA, 1.3 + 0.4 * pulse, 90), "gl_plume": (ORANGE, 1.2, 75),
+             "gl_eyes": (ORANGE, 0.7, 80), "gl_tips": (ORANGE, 0.6, 70)}
+    return svg(f'<g id="gl_plume">{p}</g>' + body, defs + d), glows
 
 
 # ------------------------------------------------------------------ turret
+# The gun turns about the image centre (16, 16) and points along +X; the
+# muzzle tip is TURRET_MUZZLE_X (enemy_turret.tscn's BulletMarker).
+TURRET_MUZZLE_X = 29.6
+
+
 def turret(t):
-    defs = (lin("metal", [(0, "#7c87a3", 1), (0.5, "#3e475c", 1), (1, "#232837", 1)], 0, 0, 1, 0)
-            + lin("body", [(0, "#525b72", 1), (1, "#20242f", 1)]))
-    body = ('<rect x="13.3" y="4.6" width="5.4" height="13.6" rx="1" fill="url(#metal)"/>'
-            '<rect x="14.4" y="5.2" width="0.9" height="12.4" fill="#a6b0c8" opacity="0.6"/>'
-            '<rect x="13.3" y="9" width="5.4" height="0.6" fill="#1a1e29"/><rect x="13.3" y="12.4" width="5.4" height="0.6" fill="#1a1e29"/>'
-            f'<rect id="glow_muzzle" x="12.8" y="2.8" width="6.4" height="2.7" rx="0.8" fill="{RED}"/>'
-            '<path d="M8 19 Q8 15.2 11.8 15.2 L20.2 15.2 Q24 15.2 24 19 L24 25 Q24 27.6 21.4 27.6 L10.6 27.6 Q8 27.6 8 25 Z" fill="url(#body)"/>'
-            '<path d="M9.4 17.2 L22.6 17.2" stroke="#7c87a3" stroke-width="0.4" opacity="0.8"/>'
-            f'<path id="glow_trim" d="M11 23.6 L21 23.6" stroke="{RED}" stroke-width="0.8" stroke-linecap="round"/>'
-            '<circle cx="10.6" cy="20" r="0.7" fill="#0d1017"/><circle cx="21.4" cy="20" r="0.7" fill="#0d1017"/>')
-    return svg(body, defs), {"glow_muzzle": (RED, 1.3, 85), "glow_trim": (RED, 0.9, 85)}
+    defs = (lin("barrel", [(0, "#9aa5c0", 1), (0.45, "#4a5470", 1), (1, "#1c2130", 1)])
+            + rad("hub", [(0, "#6c7792", 1), (0.7, "#343b50", 1), (1, "#1a1e2a", 1)]))
+    body = (
+        # Twin side rails and the barrel along +X.
+        '<rect x="17.5" y="13.2" width="9.5" height="1.2" rx="0.4" fill="#262c3c"/>'
+        '<rect x="17.5" y="17.6" width="9.5" height="1.2" rx="0.4" fill="#262c3c"/>'
+        '<rect x="17" y="14.3" width="11.4" height="3.4" rx="0.8" fill="url(#barrel)"/>'
+        '<rect x="18" y="14.75" width="9.6" height="0.55" fill="#d6dcef" opacity="0.5"/>'
+        '<rect x="21.6" y="14.3" width="0.5" height="3.4" fill="#141824"/><rect x="24.6" y="14.3" width="0.5" height="3.4" fill="#141824"/>'
+        f'<rect id="gl_muzzle" x="27.6" y="13.9" width="2.2" height="4.2" rx="0.6" fill="{RED}"/>'
+        # The hub: a round armoured housing centred on the pivot.
+        '<circle cx="16" cy="16" r="6.4" fill="#10131c"/>'
+        '<circle cx="16" cy="16" r="5.9" fill="url(#hub)"/>'
+        '<path d="M11.4 12.6 A5.9 5.9 0 0 1 20.6 12.6" stroke="#b8c2da" stroke-width="0.35" fill="none" opacity="0.6"/>'
+        f'<circle id="gl_eye" cx="16" cy="16" r="1.5" fill="{RED}"/>'
+        '<circle cx="16" cy="16" r="2.7" fill="none" stroke="#0b0d14" stroke-width="0.5"/>'
+        + "".join('<circle cx="%.2f" cy="%.2f" r="0.35" fill="#9aa5c0"/>' % (16 + 4.4 * math.cos(a), 16 + 4.4 * math.sin(a)) for a in (math.pi * 0.25, math.pi * 0.75, math.pi * 1.25, math.pi * 1.75)))
+    return svg(body, defs), {"gl_muzzle": (RED, 1.0, 85), "gl_eye": (RED, 0.9, 85)}
 
 
 def turret_holder(t):
     pts = " ".join("%.2f,%.2f" % (16 + 12.6 * math.cos(math.pi / 8 + k * math.pi / 4), 16 + 12.6 * math.sin(math.pi / 8 + k * math.pi / 4)) for k in range(8))
-    inner = " ".join("%.2f,%.2f" % (16 + 7 * math.cos(math.pi / 8 + k * math.pi / 4), 16 + 7 * math.sin(math.pi / 8 + k * math.pi / 4)) for k in range(8))
-    bolts = "".join('<circle cx="%.2f" cy="%.2f" r="0.7" fill="#a8b2cb"/>' % (16 + 10.6 * math.cos(k * math.pi / 2 + math.pi / 4), 16 + 10.6 * math.sin(k * math.pi / 2 + math.pi / 4)) for k in range(4))
+    inner = " ".join("%.2f,%.2f" % (16 + 7.4 * math.cos(math.pi / 8 + k * math.pi / 4), 16 + 7.4 * math.sin(math.pi / 8 + k * math.pi / 4)) for k in range(8))
+    bolts = "".join('<circle cx="%.2f" cy="%.2f" r="0.65" fill="#a8b2cb"/>' % (16 + 10.6 * math.cos(k * math.pi / 2 + math.pi / 4), 16 + 10.6 * math.sin(k * math.pi / 2 + math.pi / 4)) for k in range(4))
     defs = rad("plate", [(0, "#5f6987", 1), (1, "#272c3c", 1)])
     body = (f'<polygon points="{pts}" fill="url(#plate)" stroke="#121520" stroke-width="0.35"/>'
-            f'<circle id="glow_ring" cx="16" cy="16" r="9" fill="none" stroke="{RED}" stroke-width="0.7"/>'
-            f'<polygon points="{inner}" fill="#363d52" stroke="#7a84a0" stroke-width="0.3"/>' + bolts)
-    return svg(body, defs), {"glow_ring": (RED, 1.2, 85)}
+            f'<circle id="gl_ring" cx="16" cy="16" r="9.2" fill="none" stroke="{RED}" stroke-width="0.6"/>'
+            f'<polygon points="{inner}" fill="#2c3245" stroke="#7a84a0" stroke-width="0.3"/>' + bolts)
+    return svg(body, defs), {"gl_ring": (RED, 1.0, 80)}
 
 
 # ------------------------------------------------------------------ rockets (fly right)
@@ -182,13 +239,13 @@ def rocket(t, enemy):
     body = ('<path d="M8 13.7 L20.4 13.7 Q26.7 13.9 29.2 16 Q26.7 18.1 20.4 18.3 L8 18.3 Z" fill="url(#body)"/>'
             '<path d="M8 13.7 L20.4 13.7 Q26.7 13.9 29.2 16 L8 16 Z" fill="#ffffff" opacity="0.12"/>'
             f'<path d="M8.2 13.7 L11.9 13.7 L8.8 10.1 L7.2 10.1 Z M8.2 18.3 L11.9 18.3 L8.8 21.9 L7.2 21.9 Z" fill="{fin}"/>'
-            f'<path id="glow_fin" d="M7.5 10.3 L8.7 10.3 L11.6 13.7 M7.5 21.7 L8.7 21.7 L11.6 18.3" fill="none" stroke="{stripe}" stroke-width="0.4"/>'
-            f'<rect id="glow_stripe" x="12.5" y="13.7" width="1.6" height="4.6" fill="{stripe}" opacity="{blink:.2f}"/>'
+            f'<path id="gl_fin" d="M7.5 10.3 L8.7 10.3 L11.6 13.7 M7.5 21.7 L8.7 21.7 L11.6 18.3" fill="none" stroke="{stripe}" stroke-width="0.4"/>'
+            f'<rect id="gl_stripe" x="12.5" y="13.7" width="1.6" height="4.6" fill="{stripe}" opacity="{blink:.2f}"/>'
             '<rect x="15.2" y="13.7" width="0.5" height="4.6" fill="#0d1220" opacity="0.5"/>'
             '<path d="M24.5 14.3 Q27.6 14.9 29.2 16 Q27.6 17.1 24.5 17.7 Z" fill="url(#nose)"/>')
     L = 5.6 + 1.3 * wave(t, 1) + 0.6 * wave(t, 3, 0.35)
     d, p = flame("fl", (8.1, 16), (-1, 0), L, 1.9 + 0.2 * wave(t, 2, 0.2), flame_col, flame_in, 0.55 * wave(t, 2, 0.15))
-    return svg(p + body, defs + d), {"glow_stripe": (stripe, 0.8, 80), "glow_fin": (stripe, 0.6, 70), "glow_plume": (flame_col, 1.2, 75)}
+    return svg(f'<g id="gl_plume">{p}</g>' + body, defs + d), {"gl_stripe": (stripe, 0.8, 80), "gl_fin": (stripe, 0.6, 70), "gl_plume": (flame_col, 1.2, 75)}
 
 
 def light(t):
@@ -220,10 +277,16 @@ def render(text, glows, dst, work):
     stem = os.path.basename(dst).replace(".png", "")
     src = os.path.join(work, stem + ".svg")
     open(src, "w").write(text)
-    steps = []
+    names = list(glows)
+    for a in names:  # document.find matches a SUBSTRING of the name
+        for b in names:
+            if a != b and a in b:
+                sys.exit(f"{dst}: glow part names must not contain each other ({a} in {b})")
+    steps, finds = [], []
     for part, (color, blur, opacity) in glows.items():
-        if opacity <= 0.5:
+        if opacity <= 0:
             continue
+        finds.append(part)
         steps += [{"command": "document.find", "params": {"name": part, "select": True}},
                   {"command": "effect.apply", "params": {"effect": "stylize.outerGlow",
                                                          "params": {"blur": blur, "color": color, "opacity": opacity, "mode": "screen"}}},
@@ -231,11 +294,11 @@ def render(text, glows, dst, work):
     plan = os.path.join(work, stem + ".jsonl")
     open(plan, "w").write("\n".join(json.dumps(s) for s in steps) + "\n")
     out = vectorcraft(["run", "--in", src, "--commands", plan, "--export", dst, "--scale", str(SCALE)], work)
-    for line in out.splitlines():
-        r = json.loads(line)
-        if r.get("command") == "document.find" and not r["result"]["matches"]:
-            name = steps[[i for i, s in enumerate(steps) if s["command"] == "document.find"][0]]["params"]["name"]
-            sys.exit(f"{dst}: a glow part was not found ({name})")
+    found = [json.loads(line) for line in out.splitlines() if line.strip().startswith("{")]
+    found = [r for r in found if r.get("command") == "document.find"]
+    for part, r in zip(finds, found):
+        if r["result"].get("total") != 1:
+            sys.exit(f"{dst}: glow part {part} matched {r['result'].get('total')} objects (expected exactly 1)")
 
 
 def main():

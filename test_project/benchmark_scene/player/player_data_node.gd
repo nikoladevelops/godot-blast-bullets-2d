@@ -123,7 +123,7 @@ func set_up_volley_data()->BulletVolleyData2D:
 	data.shared_bullets_custom_data = damage_data
 	#data.is_life_time_over_signal_enabled = true # If you want to track when the life time is over and receive a signal inside BulletFactory2D
 	data.shared_bullet_attachment_offset = selected_attachment_offset
-	data.effect_layers = [BENCHMARK_GLOBALS.PLAYER_HIT_SPARK, BENCHMARK_GLOBALS.MUZZLE_FLASH]
+	data.effect_layers = [BENCHMARK_GLOBALS.PLAYER_HIT_SPARK, BENCHMARK_GLOBALS.PLAYER_KILL_SPARK, BENCHMARK_GLOBALS.MUZZLE_FLASH]
 	return data
 
 # Determines which type of bullets to be spawned

@@ -1,0 +1,42 @@
+[gd_resource type="SpriteFrames" format=3]
+
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_impact_01.png" id="1_impact"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_impact_02.png" id="2_impact"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_impact_03.png" id="3_impact"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_impact_04.png" id="4_impact"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_impact_05.png" id="5_impact"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_impact_06.png" id="6_impact"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_impact_07.png" id="7_impact"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_impact_08.png" id="8_impact"]
+
+[resource]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("1_impact")
+}, {
+"duration": 1.0,
+"texture": ExtResource("2_impact")
+}, {
+"duration": 1.0,
+"texture": ExtResource("3_impact")
+}, {
+"duration": 1.0,
+"texture": ExtResource("4_impact")
+}, {
+"duration": 1.0,
+"texture": ExtResource("5_impact")
+}, {
+"duration": 1.0,
+"texture": ExtResource("6_impact")
+}, {
+"duration": 1.0,
+"texture": ExtResource("7_impact")
+}, {
+"duration": 1.0,
+"texture": ExtResource("8_impact")
+}],
+"loop": true,
+"name": &"default",
+"speed": 20.0
+}]

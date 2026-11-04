@@ -99,7 +99,7 @@ func _ready() -> void:
 	bullets_data.collision_layer = BulletVolleyData2D.calculate_bitmask([4])
 	bullets_data.collision_mask = BulletVolleyData2D.calculate_bitmask(default_bullet_collision_mask)
 	bullets_data.monitorable=true # Monitorable allows for these bullets to be detected by other areas
-	bullets_data.effect_layers = [BENCHMARK_GLOBALS.ENEMY_HIT_SPARK]
+	bullets_data.effect_layers = [BENCHMARK_GLOBALS.ENEMY_HIT_SPARK, BENCHMARK_GLOBALS.ENEMY_KILL_SPARK]
 
 func _physics_process(delta: float) -> void:
 	calculate_new_direction()

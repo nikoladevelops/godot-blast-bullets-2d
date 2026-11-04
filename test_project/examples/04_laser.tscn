@@ -2,6 +2,7 @@
 [ext_resource type="PackedScene" path="res://shared/background/space_background.tscn" id="bg_space"]
 [ext_resource type="SpriteFrames" path="res://shared/effects/laser_beam_frames.tres" id="fx_beam"]
 [ext_resource type="SpriteFrames" path="res://shared/effects/laser_orb_frames.tres" id="fx_orb"]
+[ext_resource type="SpriteFrames" path="res://shared/effects/laser_impact_frames.tres" id="fx_impact"]
 [ext_resource type="PackedScene" path="res://shared/live_inspector/live_inspector.tscn" id="live_inspector"]
 
 [ext_resource type="Script" path="res://examples/04_laser.gd" id="1_jwtmk"]
@@ -60,6 +61,10 @@ scale = Vector2(0.6, 0.6)
 frames = ExtResource("fx_orb")
 scale = Vector2(0.35, 0.35)
 
+[sub_resource type="LaserSpriteLook2D" id="LaserSpriteLook2D_pierce"]
+frames = ExtResource("fx_impact")
+scale = Vector2(0.9, 0.9)
+
 [sub_resource type="LaserData2D" id="LaserData2D_ghp5f"]
 length = 760.0
 width = 16.0
@@ -76,6 +81,7 @@ body_mode = 1
 body_scroll_speed = 600.0
 muzzle_look = SubResource("LaserSpriteLook2D_muzzle")
 tip_look = SubResource("LaserSpriteLook2D_tip")
+pierce_look = SubResource("LaserSpriteLook2D_pierce")
 
 [node name="Laser" type="Node2D" unique_id=17510645]
 script = ExtResource("1_jwtmk")

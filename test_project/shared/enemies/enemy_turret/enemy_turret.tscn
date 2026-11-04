@@ -26,13 +26,11 @@ scale = Vector2(0.75, 0.75)
 texture = ExtResource("1_me7l0")
 
 [node name="TurretGun" type="Sprite2D" parent="." unique_id=1116340627]
-rotation = -1.5708
 scale = Vector2(0.75, 0.75)
 texture = ExtResource("2_wqeu6")
 
 [node name="BulletMarker" type="Marker2D" parent="TurretGun" unique_id=2092693056]
-position = Vector2(-0.000106811, 108)
-rotation = 1.5708
+position = Vector2(109, 0)
 
 [node name="DetectArea2D" type="Area2D" parent="." unique_id=237426411]
 visible = false
@@ -63,6 +61,7 @@ position = Vector2(0, -3)
 shape = SubResource("CircleShape2D_mpoao")
 
 [node name="BulletAnimatedSprite" type="AnimatedSprite2D" parent="." unique_id=470460003]
+visible = false
 sprite_frames = ExtResource("5_6vbbr")
 
 [connection signal="body_entered" from="DetectArea2D" to="." method="_on_detect_area_2d_body_entered"]

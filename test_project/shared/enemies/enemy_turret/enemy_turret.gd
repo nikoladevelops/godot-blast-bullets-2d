@@ -31,7 +31,7 @@ func _ready() -> void:
 	bullets_data.sprite_frames = $BulletAnimatedSprite.sprite_frames
 	
 	bullets_data.texture_size = Vector2(142,142)
-	bullets_data.effect_layers = [BENCHMARK_GLOBALS.ENEMY_HIT_SPARK]
+	bullets_data.effect_layers = [BENCHMARK_GLOBALS.ENEMY_HIT_SPARK, BENCHMARK_GLOBALS.ENEMY_KILL_SPARK]
 	# The plasma rocket's body (the art faces right): about 120 x 30 px at this texture size
 	var hitbox := RectangleShape2D.new()
 	hitbox.size = Vector2(110, 26)
@@ -56,8 +56,7 @@ func _ready() -> void:
 	
 func _physics_process(_delta: float) -> void:
 	if can_look_at:
-		turret_gun.look_at(BENCHMARK_GLOBALS.PLAYER.global_position)
-		turret_gun.rotation += deg_to_rad(-90) # since the texture is rotated
+		turret_gun.look_at(BENCHMARK_GLOBALS.PLAYER.global_position) # the gun art points along +X
 		
 	if can_shoot:
 		shoot()
