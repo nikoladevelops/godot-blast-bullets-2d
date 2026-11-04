@@ -20,8 +20,8 @@
 [ext_resource type="Texture2D" path="res://shared/art/enemy_ship/moving_07.png" id="art_moving_07"]
 [ext_resource type="Texture2D" path="res://shared/art/enemy_ship/moving_08.png" id="art_moving_08"]
 
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_c1d14"]
-size = Vector2(116, 117)
+[sub_resource type="CircleShape2D" id="CircleShape2D_c1d14"]
+radius = 58.0
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_kvg0p"]
 radius = 649.278
@@ -96,7 +96,7 @@ script = ExtResource("1_vp35s")
 [node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=202931782]
 visible = false
 position = Vector2(-1, -0.5)
-shape = SubResource("RectangleShape2D_c1d14")
+shape = SubResource("CircleShape2D_c1d14")
 
 [node name="FollowTargetRadiusArea2D" type="Area2D" parent="." unique_id=7061103]
 visible = false

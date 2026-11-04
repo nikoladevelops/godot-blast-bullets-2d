@@ -151,10 +151,10 @@ func get_marker_transforms()->Array[Transform2D]:
 		var transf1:Transform2D = Transform2D(left_marker.global_transform.get_rotation() , left_marker.global_transform.origin)
 		var transf2:Transform2D = Transform2D(right_marker.global_transform.get_rotation(), right_marker.global_transform.origin)
 		
-		return [transf1, transf2]
+		return [AbstractEnemy.ahead_of_muzzle(transf1, bullets_data), AbstractEnemy.ahead_of_muzzle(transf2, bullets_data)]
 	
 	var center_transf = Transform2D(center_marker.global_transform.get_rotation(), center_marker.global_transform.origin)
-	return [center_transf]
+	return [AbstractEnemy.ahead_of_muzzle(center_transf, bullets_data)]
 
 func get_speed_data()->Array[BulletSpeedData2D]:
 	var sp_data:BulletSpeedData2D = BulletSpeedData2D.new()

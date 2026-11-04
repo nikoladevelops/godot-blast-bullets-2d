@@ -67,7 +67,7 @@ func shoot()->void:
 	var original_transform:Transform2D = bullet_marker.global_transform
 	# Create a new transform with the same rotation and position, but scale of 1. This is because I've scaled the marker by x amount of times since it's a child of the TurretGun that is scaled (it scales all children) and I want to reverse that so that only the texture_size is taken into account
 	var transf = Transform2D(original_transform.get_rotation(), original_transform.origin)
-	bullets_data.transforms = [transf]
+	bullets_data.transforms = [AbstractEnemy.ahead_of_muzzle(transf, bullets_data)]
 	var bullets_multi:BulletVolley2D = BENCHMARK_GLOBALS.FACTORY.spawn_volley(bullets_data)
 	if bullets_multi == null:
 		return # refused (the error says why): nothing to attach to
