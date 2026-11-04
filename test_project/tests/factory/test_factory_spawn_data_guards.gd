@@ -105,3 +105,43 @@ func test_validate_spawn_data_keys_and_mesh_lint() -> void:
 	expect_warning_sequence(["Warning in debug_validate_spawn_data: no sprite_frames/mesh/texture_size, bullets will be invisible. Assign SpriteFrames with art facing Vector2.RIGHT, or set texture_size/mesh."], "and said so in the log")
 	invisible.mesh = QuadMesh.new()
 	assert_eq(str(BulletFactory2D.debug_validate_spawn_data(invisible)["warning"]), "", "a mesh draws: no warning")
+
+
+## A collision shape dimension must be finite and > 0 (Godot's shapes store
+## NaN and INF as given): a NaN or infinite radius, size or height falls back
+## to the default circle r16 with one error, at spawn and at a runtime shape
+## change, and the volley's pool bucket agrees with what it caches (a NaN
+## rectangle once cached a RECTANGLE under a circle key and fed rectangle data
+## to a circle shape).
+func test_a_non_finite_shape_dimension_falls_back_to_the_default_circle() -> void:
+	var circle := CircleShape2D.new()
+	circle.radius = NAN
+	var rect := RectangleShape2D.new()
+	rect.size = Vector2(NAN, 10.0)
+	var capsule := CapsuleShape2D.new()
+	capsule.radius = 4.0
+	capsule.height = INF
+	var wide := RectangleShape2D.new()
+	wide.size = Vector2(INF, 10.0)
+	var seen: Array = []
+	for shape in [circle, rect, capsule, wide]:
+		var d := H.make_volley_data(2, 0.0, 30.0)
+		d.collision_shape = shape
+		var v := factory.spawn_volley(d)
+		var st: Dictionary = v.debug_get_shape_state()
+		seen.append([st["type"], st["circle_radius"]])
+		v.clear_all_bullets()
+	assert_eq(seen, [[PhysicsServer2D.SHAPE_CIRCLE, 16.0], [PhysicsServer2D.SHAPE_CIRCLE, 16.0], [PhysicsServer2D.SHAPE_CIRCLE, 16.0], [PhysicsServer2D.SHAPE_CIRCLE, 16.0]], "every one falls back to the circle r16")
+	expect_error_sequence([
+		"CircleShape2D radius must be finite and > 0. Falling back to circle r16.",
+		"RectangleShape2D size must be finite and > 0. Falling back to circle r16.",
+		"CapsuleShape2D radius/height must be finite and > 0. Falling back to circle r16.",
+		"RectangleShape2D size must be finite and > 0. Falling back to circle r16.",
+	])
+	await idle(1)
+	var books: Dictionary = factory.debug_assert_no_dangling()
+	assert_true(books.get("ok", false), "every pooled volley sits in its own bucket: %s" % books.get("error", ""))
+	var v2 := factory.spawn_volley(H.make_volley_data(2, 0.0, 30.0))
+	v2.set_collision_shape_runtime(rect)
+	expect_error_sequence(["RectangleShape2D size must be finite and > 0. Falling back to circle r16."])
+	assert_eq(v2.debug_get_shape_state()["type"], PhysicsServer2D.SHAPE_CIRCLE, "a runtime change falls back too")

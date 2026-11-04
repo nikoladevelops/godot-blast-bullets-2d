@@ -39,20 +39,27 @@ struct CollisionShapeHelper2D {
 		return type == PhysicsServer2D::SHAPE_RECTANGLE || type == PhysicsServer2D::SHAPE_CIRCLE || type == PhysicsServer2D::SHAPE_CAPSULE;
 	}
 
+	// THE rule for a shape dimension (radius, height, size axis): finite and > 0.
+	// Godot's shapes store NaN and INF as given (only negatives are refused): a
+	// NaN or infinite dimension would reach the physics server and its broadphase.
+	_ALWAYS_INLINE_ static bool dimension_ok(real_t value) {
+		return Math::is_finite(value) && value > (real_t)0.0;
+	}
+
 	// Quiet param validation, no error print. Null => true (default valid).
 	_ALWAYS_INLINE_ static bool is_valid_data(const Ref<Shape2D> &shape) {
 		if (shape.is_null()) {
 			return true;
 		}
 		if (auto *circle = Object::cast_to<CircleShape2D>(shape.ptr())) {
-			return circle->get_radius() > 0.0f;
+			return dimension_ok(circle->get_radius());
 		}
 		if (auto *capsule = Object::cast_to<CapsuleShape2D>(shape.ptr())) {
-			return capsule->get_radius() > 0.0f && capsule->get_height() > 0.0f;
+			return dimension_ok(capsule->get_radius()) && dimension_ok(capsule->get_height());
 		}
 		if (auto *rect = Object::cast_to<RectangleShape2D>(shape.ptr())) {
 			Vector2 s = rect->get_size();
-			return s.x > 0.0f && s.y > 0.0f;
+			return dimension_ok(s.x) && dimension_ok(s.y);
 		}
 		return false;
 	}
@@ -72,7 +79,7 @@ struct CollisionShapeHelper2D {
 		}
 		if (!is_valid_data(shape)) {
 			if (print_error) {
-				UtilityFunctions::push_error("Invalid collision shape parameters for " + shape->get_class() + " (size/radius/height must be > 0). Falling back to circle r16.");
+				UtilityFunctions::push_error("Invalid collision shape parameters for " + shape->get_class() + " (size/radius/height must be finite and > 0). Falling back to circle r16.");
 			}
 			return PhysicsServer2D::SHAPE_CIRCLE;
 		}

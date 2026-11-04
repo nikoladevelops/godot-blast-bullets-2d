@@ -423,8 +423,8 @@ _ALWAYS_INLINE_ void BulletVolley2D::cache_collision_shape_typed(const Ref<Shape
 	}
 	if (auto *rect = Object::cast_to<RectangleShape2D>(shape.ptr())) {
 		Vector2 s = rect->get_size();
-		if (s.x <= 0.0f || s.y <= 0.0f) {
-			UtilityFunctions::push_error("RectangleShape2D size must be > 0. Falling back to circle r16.");
+		if (!CollisionShapeHelper2D::dimension_ok(s.x) || !CollisionShapeHelper2D::dimension_ok(s.y)) {
+			UtilityFunctions::push_error("RectangleShape2D size must be finite and > 0. Falling back to circle r16.");
 			return;
 		}
 		cached_effective_shape_type = PhysicsServer2D::SHAPE_RECTANGLE;
@@ -433,8 +433,8 @@ _ALWAYS_INLINE_ void BulletVolley2D::cache_collision_shape_typed(const Ref<Shape
 	}
 	if (auto *circle = Object::cast_to<CircleShape2D>(shape.ptr())) {
 		float r = circle->get_radius();
-		if (r <= 0.0f) {
-			UtilityFunctions::push_error("CircleShape2D radius must be > 0. Falling back to circle r16.");
+		if (!CollisionShapeHelper2D::dimension_ok(r)) {
+			UtilityFunctions::push_error("CircleShape2D radius must be finite and > 0. Falling back to circle r16.");
 			return;
 		}
 		cached_effective_shape_type = PhysicsServer2D::SHAPE_CIRCLE;
@@ -444,8 +444,8 @@ _ALWAYS_INLINE_ void BulletVolley2D::cache_collision_shape_typed(const Ref<Shape
 	if (auto *capsule = Object::cast_to<CapsuleShape2D>(shape.ptr())) {
 		float r = capsule->get_radius();
 		float h = capsule->get_height();
-		if (r <= 0.0f || h <= 0.0f) {
-			UtilityFunctions::push_error("CapsuleShape2D radius/height must be > 0. Falling back to circle r16.");
+		if (!CollisionShapeHelper2D::dimension_ok(r) || !CollisionShapeHelper2D::dimension_ok(h)) {
+			UtilityFunctions::push_error("CapsuleShape2D radius/height must be finite and > 0. Falling back to circle r16.");
 			return;
 		}
 		cached_effective_shape_type = PhysicsServer2D::SHAPE_CAPSULE;
