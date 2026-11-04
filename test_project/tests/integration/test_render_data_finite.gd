@@ -76,3 +76,37 @@ func test_hostile_input_never_reaches_the_gpu_as_nan_or_inf() -> void:
 		problems.append_array(render_data_problems(factory, INF))
 	assert_eq(problems.slice(0, 5), [], "finite everywhere, however far the bullets went")
 	factory.is_debugger_enabled = false
+
+
+## Laser looks that overflow when combined (each setter accepts its own
+## finite value): width x body_width_scale past what a float holds, a
+## subnormal width, a huge length, a huge warning width while charging. The
+## body strip and the warning line stay finite (the body is clamped or not
+## drawn); NaN vertices once reached canvas_item_add_triangle_array.
+func test_overflowing_laser_looks_never_hand_the_gpu_nan() -> void:
+	handle_events(factory)
+	var cases: Array = []
+	var wide := H.make_laser(0.0, 0.0, 0.0, 0.0, 200.0)
+	wide.width = 12.0
+	wide.body_width_scale = 1.0e38
+	cases.append(wide)
+	var thin := H.make_laser(0.0, 0.0, 0.0, 0.0, 200.0)
+	thin.width = 1.0e-40
+	cases.append(thin)
+	var far := H.make_laser(0.0, 0.0, 0.0, 0.0, 3.0e38)
+	cases.append(far)
+	var warn := H.make_laser(1.0, 0.0, 0.0, 0.0, 200.0)
+	warn.warning_width = 1.0e38
+	cases.append(warn)
+	var problems: Array = []
+	for d in cases:
+		var l := factory.spawn_laser(d, [Transform2D.IDENTITY] as Array[Transform2D])
+		step_factory(2, 1.0 / 16.0)
+		for p in (l.debug_get_body_mesh(1.0)["points"] as PackedVector2Array):
+			if not p.is_finite():
+				problems.append("width %s scale %s length %s: vertex %s" % [d.width, d.body_width_scale, d.length, p])
+				break
+		problems.append_array(render_data_problems(factory, INF))
+		l.end_laser(false)
+		step_factory(1, 1.0 / 16.0)
+	assert_eq(problems, [], "every laser body vertex stays finite")

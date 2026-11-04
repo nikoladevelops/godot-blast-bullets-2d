@@ -254,7 +254,7 @@ void append_body_strip(LaserBodyMesh2D &m, const std::vector<Vector2> &pts, cons
 	for (size_t k = 1; k < pts.size(); ++k) {
 		total += pts[k - 1].distance_to(pts[k]);
 	}
-	if (!(total > (real_t)0.0)) {
+	if (!(total > (real_t)0.0) || !Math::is_finite(total)) {
 		return;
 	}
 	const LaserData2D *d = s.data;
@@ -402,7 +402,12 @@ void LaserVolley2D::build_body_mesh(double fraction, LaserBodyMesh2D &r_mesh, st
 	const double draw_clock = clock - (1.0 - Math::clamp(fraction, 0.0, 1.0)) * last_tick_delta;
 	BodyStyle2D style;
 	style.data = d;
-	style.half = width * (real_t)d->body_width_scale * (real_t)0.5;
+	// In double, then into a range the strip math keeps finite: width and
+	// body_width_scale are each finite, but their product may overflow real_t,
+	// and a subnormal half would overflow the antialias ratio (k_out). The
+	// renderer must never receive a non-finite vertex (a GPU driver may hang).
+	const double half_d = (double)width * d->body_width_scale * 0.5;
+	style.half = (Math::is_finite(half_d) && half_d >= 1.0e-6) ? (real_t)Math::min(half_d, 1.0e15) : (real_t)0.0;
 	style.tile = d->body_mode == LaserData2D::BODY_TILE && body != nullptr;
 	style.tex_w = body != nullptr ? Math::max((real_t)1.0, body->get_size().x) : (real_t)1.0;
 	style.scroll = (real_t)(-d->body_scroll_speed * (draw_clock - grow_started));
@@ -536,7 +541,8 @@ void LaserVolley2D::_draw() {
 				PackedVector2Array line;
 				line.resize((int64_t)pts.size());
 				std::memcpy(line.ptrw(), pts.data(), pts.size() * sizeof(Vector2));
-				draw_polyline(line, d->warning_color, (real_t)d->warning_width, d->antialiased); // soft like the body
+				// Capped like the body: the engine's polyline math must stay finite.
+				draw_polyline(line, d->warning_color, (real_t)Math::min(d->warning_width, 1.0e7), d->antialiased); // soft like the body
 			}
 		}
 		frames.clear();
