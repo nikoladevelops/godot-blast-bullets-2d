@@ -80,7 +80,7 @@
 			Frames to play (required: null frames leave the layer inert with a single bake-time error, never a crash). Plain textures or [AtlasTexture] regions of a sprite sheet (each drawn exactly as a [Sprite2D] would show it).
 		</member>
 		<member name="trigger" type="int" setter="set_trigger" getter="get_trigger" enum="EffectLayerData2D.EffectTrigger" default="0">
-			What this layer does: 0 Trail Follow (sticks to its bullet every tick, and follows physics interpolation exactly like the bullet), 1 On Spawn (muzzle flash at every bullet's spawn pose), 2 On Hit (sparks on counted hits), 3 On Destroy (explosion on collision-kill only, never on lifetime expiry or manual disable), 4 On Bounce (sparks on ricochet; a consumed bounce fires this once, not the hit spark), 5 On Lifetime Over (fizzle at expiry, on both the silent and the signalled expiry path), 6 On Clear (dismissal puff fired by clear_bullet()/clear_all_bullets() and BulletFactory2D.clear_active_bullets() only; kills, timeouts, free_active_bullets and reset never fire it, teardown stays silent), 7 On Despawn (a bullet that leaves through the factory's despawn bounds, see [member BulletFactory2D.despawn_bounds_enabled]; nothing else fires it).
+			What this layer does: 0 Trail Follow (sticks to its bullet every tick, and follows physics interpolation exactly like the bullet), 1 On Spawn (muzzle flash at every bullet's spawn pose), 2 On Hit (sparks on counted hits), 3 On Destroy (explosion on collision-kill only, never on lifetime expiry or manual disable), 4 On Bounce (sparks on ricochet; a consumed bounce fires this once, not the hit spark), 5 On Lifetime Over (fizzle at expiry, on both the silent and the signalled expiry path), 6 On Clear (dismissal puff fired by clear_bullet()/clear_all_bullets() and BulletFactory2D.clear_active_bullets() only; kills, timeouts, free_active_bullets and reset never fire it, teardown stays silent), 7 On Despawn (a bullet that leaves through the factory's despawn bounds, see [member BulletFactory2D.despawn_bounds_enabled]; nothing else fires it), 8 On Split (fired at a bullet's pose when it splits into children, whatever made it split; see [member BulletSplitStage2D.fire_death_effects]), 9 On Any Hit (every counted collision hit, killing or survived, bodies and areas: beside On Destroy on a killing blow and beside On Hit on a survived one; hits a bounce fully swallows never count, and a consumed bounce's survived hit fires the bounce spark only, like On Hit).
 		</member>
 		<member name="trigger_chance" type="float" setter="set_trigger_chance" getter="get_trigger_chance" default="1.0">
 			Fire probability per event. Stack three explosion layers at 0.5 and every kill looks different. 0 never fires, 1 always fires.
@@ -122,6 +122,9 @@
 		</constant>
 		<constant name="EFFECT_ON_SPLIT" value="8" enum="EffectTrigger">
 			Fired at a bullet's pose when it splits into children ([BulletSplitStage2D]), whatever made it split. The parent's own death trigger (On Destroy, On Lifetime Over, ...) fires too unless [member BulletSplitStage2D.fire_death_effects] is off.
+		</constant>
+		<constant name="EFFECT_ON_ANY_HIT" value="9" enum="EffectTrigger">
+			Fired on every collision hit that counts: beside On Destroy on a killing blow and beside On Hit on a survived one, at the bullet's impact pose (bodies and areas). Hits a bounce fully swallows never count; a consumed bounce's survived hit keeps firing the bounce spark only, like On Hit.
 		</constant>
 	</constants>
 </class>

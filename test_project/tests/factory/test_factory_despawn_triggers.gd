@@ -204,9 +204,10 @@ func test_trigger_ids_are_stable_and_validated() -> void:
 	assert_eq(layer.trigger, 7, "accepted")
 	layer.trigger = EffectLayerData2D.EFFECT_ON_SPLIT
 	assert_eq(layer.trigger, 8, "On Split (8) is accepted")
+	assert_eq(EffectLayerData2D.EFFECT_ON_ANY_HIT, 9, "On Any Hit (9) is appended after On Split")
 	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
-	layer.trigger = (9 as EffectLayerData2D.EffectTrigger)
-	expect_errors_containing("EffectLayerData2D: trigger must be", 1, "9 is out of range")
+	layer.trigger = (10 as EffectLayerData2D.EffectTrigger)
+	expect_errors_containing("EffectLayerData2D: trigger must be", 1, "10 is out of range")
 	var sound := BulletSoundData2D.new()
 	sound.trigger = BulletSoundData2D.SOUND_ON_DESPAWN
 	assert_eq(sound.trigger, 11, "accepted")

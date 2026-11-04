@@ -12,6 +12,7 @@ const DESTROY := 3
 const BOUNCE := 4
 const LIFETIME := 5
 const CLEAR := 6
+const ANY_HIT := 9
 
 
 func _data(layers: Array, max_collisions: int = 0, lifetime: float = 30.0, bounce: bool = false) -> BulletVolleyData2D:
@@ -120,3 +121,80 @@ func test_spawner_hits_route_to_spawner_only() -> void:
 	await _wait(func(): return get_signal_emit_count(spawner, "body_entered") >= 1)
 	assert_signal_emitted(spawner, "body_entered", "spawner body_entered fired")
 	assert_signal_not_emitted(factory, "body_entered", "factory signal silent for a spawner volley")
+
+
+func test_on_any_hit_is_appended_and_visible_in_the_trigger_hint() -> void:
+	assert_eq(EffectLayerData2D.EFFECT_ON_ANY_HIT, 9, "appended after On Split (serialized ids)")
+	var hint := ""
+	for p in EffectLayerData2D.new().get_property_list():
+		if p.get("name", "") == "trigger":
+			hint = String(p.get("hint_string", ""))
+	assert_true(hint.ends_with(",On Any Hit"), "the inspector lists On Any Hit last")
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	var l := H.make_effect_layer(10)
+	expect_error_sequence(["EffectLayerData2D: trigger must be 0 (Trail Follow), 1 (On Spawn), 2 (On Hit), 3 (On Destroy), 4 (On Bounce), 5 (On Lifetime Over), 6 (On Clear), 7 (On Despawn), 8 (On Split) or 9 (On Any Hit), keeping the old value."])
+	assert_eq(int(l.trigger), int(EffectLayerData2D.EFFECT_TRAIL_FOLLOW), "a rejected trigger keeps the old value")
+
+
+func test_on_any_hit_fires_once_on_the_killing_blow() -> void:
+	handle_events(factory) # the hit is handled; this test pins the effect
+	await _wall()
+	factory.debug_set_effect_log_enabled(true)
+	factory.debug_clear_effect_log()
+	var v: BulletVolley2D = factory.spawn_volley(_data([_layer(ANY_HIT)], 1))
+	factory.clear_sprite_effects()
+	await _wait(func(): return not v.is_bullet_status_enabled(0))
+	assert_false(v.is_bullet_status_enabled(0), "the killing blow disabled the bullet")
+	assert_eq(factory.get_active_effect_count(), 1, "exactly one effect: On Any Hit never doubles with itself")
+	var rows: Array = []
+	for e in factory.debug_get_effect_log():
+		if int(e.get("trigger", -1)) == ANY_HIT:
+			rows.append(e)
+	assert_eq(rows.size(), 1, "the killing hit registered one On Any Hit fire")
+	# The effect fired at the pose the physics server tested (the bullet's
+	# cached transform: disable freezes it), never at a spawn or zero pose.
+	var pos: Vector2 = rows[0].get("position", Vector2(-9999, -9999))
+	var impact: Vector2 = v.get_bullet_transform(0).origin
+	assert_almost_eq(pos.x, impact.x, 0.01, "impact pose x")
+	assert_almost_eq(pos.y, impact.y, 0.01, "impact pose y")
+	assert_gt(pos.x, 180.0, "the impact pose is at the wall, not the spawn point")
+
+
+func test_on_any_hit_fires_once_per_survived_hit() -> void:
+	handle_events(factory) # the hits are handled; this test pins the effect
+	await _wall()
+	make_wall(Vector2(400, 0), Vector2(20, 400), 8, 2) # a second wall in line
+	await physics()
+	var v: BulletVolley2D = factory.spawn_volley(_data([_layer(ANY_HIT)], 0))
+	factory.clear_sprite_effects()
+	assert_true(await _wait(func(): return v.get_bullet_collision_count(0) >= 2, 60), "the bullet registered both walls")
+	assert_eq(factory.get_active_effect_count(), 2, "one On Any Hit per counted hit")
+
+
+func test_on_any_hit_fires_on_an_area_hit() -> void:
+	handle_events(factory) # the hit is handled; this test pins the effect
+	make_area(Vector2(200, 0), Vector2(20, 400), 8)
+	await physics()
+	var v: BulletVolley2D = factory.spawn_volley(_data([_layer(ANY_HIT)], 0))
+	factory.clear_sprite_effects()
+	assert_true(await _wait(func(): return v.get_bullet_collision_count(0) >= 1), "the area hit counted")
+	assert_eq(factory.get_active_effect_count(), 1, "On Any Hit fired on the area hit too")
+
+
+func test_on_any_hit_never_fires_without_a_hit_or_from_pool_reuse() -> void:
+	var d := _data([_layer(ANY_HIT)], 0, 0.2) # no wall: nothing to hit
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	factory.clear_sprite_effects()
+	assert_true(await _wait(func(): return not v.is_bullet_status_enabled(0), 60), "the expiry is not a hit")
+	assert_eq(factory.get_active_effect_count(), 0, "an expiry never fires On Any Hit")
+	factory.debug_reset_pool_stats()
+	factory.debug_set_effect_log_enabled(true)
+	factory.debug_clear_effect_log()
+	var again: BulletVolley2D = factory.spawn_volley(d)
+	assert_eq(again, v, "the pooled volley is reused")
+	assert_eq(int(factory.debug_get_pool_hit_stats().get("hits", 0)), 1, "the second spawn came from the pool")
+	factory.clear_sprite_effects()
+	assert_true(await _wait(func(): return not again.is_bullet_status_enabled(0), 60), "the second life expired too")
+	assert_eq(factory.get_active_effect_count(), 0, "pooled reuse alone never fires On Any Hit")
+	for e in factory.debug_get_effect_log():
+		assert_ne(int(e.get("trigger", -1)), ANY_HIT, "no On Any Hit row for a life that never hit")

@@ -44,8 +44,12 @@ public:
 		// ids are serialized.
 		EFFECT_ON_DESPAWN,
 		// Fired where a bullet splits into children (BulletSplitStage2D), at
-		// the parent's pose, whatever made it split. Appended last.
-		EFFECT_ON_SPLIT
+		// the parent's pose, whatever made it split. Appended after On Despawn.
+		EFFECT_ON_SPLIT,
+		// Every collision hit that counts, killing or survived (bodies and
+		// areas): beside On Destroy on a killing blow, beside On Hit on a
+		// survived one. Appended last: the ids are serialized.
+		EFFECT_ON_ANY_HIT
 	};
 
 	// Master switch: lets users toggle a layer without removing it.
@@ -268,4 +272,5 @@ inline constexpr EffectTrigger EFFECT_ON_LIFETIME_OVER = EffectLayerData2D::EFFE
 inline constexpr EffectTrigger EFFECT_ON_CLEAR = EffectLayerData2D::EFFECT_ON_CLEAR;
 inline constexpr EffectTrigger EFFECT_ON_DESPAWN = EffectLayerData2D::EFFECT_ON_DESPAWN;
 inline constexpr EffectTrigger EFFECT_ON_SPLIT = EffectLayerData2D::EFFECT_ON_SPLIT;
+inline constexpr EffectTrigger EFFECT_ON_ANY_HIT = EffectLayerData2D::EFFECT_ON_ANY_HIT;
 } //namespace BlastBullets2D

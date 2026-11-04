@@ -119,7 +119,7 @@ func test_validation_inert_layers_stay_silent_rejects_hold() -> void:
 	assert_true(dead.max_instances == 0, "auto cap by default")
 	assert_true(factory.spawn_layer_effect(dead, Transform2D.IDENTITY) == -1, "null-frames layer inert, no crash")
 	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
-	dead.trigger = (9 as EffectLayerData2D.EffectTrigger)
+	dead.trigger = (10 as EffectLayerData2D.EffectTrigger) # 9 is the appended On Any Hit
 	assert_true(dead.trigger == 0, "bad trigger rejected")
 	dead.set_trigger_chance(2.0)
 	assert_true(dead.trigger_chance == 1.0, "chance > 1 rejected")

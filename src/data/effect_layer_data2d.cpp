@@ -99,8 +99,8 @@ EffectLayerData2D::EffectTrigger EffectLayerData2D::get_trigger() const {
 	return static_cast<EffectTrigger>(trigger);
 }
 void EffectLayerData2D::set_trigger(EffectTrigger value) {
-	if (value != EFFECT_TRAIL_FOLLOW && value != EFFECT_ON_SPAWN && value != EFFECT_ON_HIT && value != EFFECT_ON_DESTROY && value != EFFECT_ON_BOUNCE && value != EFFECT_ON_LIFETIME_OVER && value != EFFECT_ON_CLEAR && value != EFFECT_ON_DESPAWN && value != EFFECT_ON_SPLIT) {
-		UtilityFunctions::push_error("EffectLayerData2D: trigger must be 0 (Trail Follow), 1 (On Spawn), 2 (On Hit), 3 (On Destroy), 4 (On Bounce), 5 (On Lifetime Over), 6 (On Clear), 7 (On Despawn) or 8 (On Split), keeping the old value.");
+	if (value != EFFECT_TRAIL_FOLLOW && value != EFFECT_ON_SPAWN && value != EFFECT_ON_HIT && value != EFFECT_ON_DESTROY && value != EFFECT_ON_BOUNCE && value != EFFECT_ON_LIFETIME_OVER && value != EFFECT_ON_CLEAR && value != EFFECT_ON_DESPAWN && value != EFFECT_ON_SPLIT && value != EFFECT_ON_ANY_HIT) {
+		UtilityFunctions::push_error("EffectLayerData2D: trigger must be 0 (Trail Follow), 1 (On Spawn), 2 (On Hit), 3 (On Destroy), 4 (On Bounce), 5 (On Lifetime Over), 6 (On Clear), 7 (On Despawn), 8 (On Split) or 9 (On Any Hit), keeping the old value.");
 		return;
 	}
 	if (!assign_if_changed2d(trigger, value)) {
@@ -441,7 +441,7 @@ void EffectLayerData2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_trigger"), &EffectLayerData2D::get_trigger);
 	ClassDB::bind_method(D_METHOD("set_trigger", "value"), &EffectLayerData2D::set_trigger);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "trigger", PROPERTY_HINT_ENUM, "Trail Follow,On Spawn,On Hit,On Destroy,On Bounce,On Lifetime Over,On Clear,On Despawn,On Split"), "set_trigger", "get_trigger");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "trigger", PROPERTY_HINT_ENUM, "Trail Follow,On Spawn,On Hit,On Destroy,On Bounce,On Lifetime Over,On Clear,On Despawn,On Split,On Any Hit"), "set_trigger", "get_trigger");
 
 	ClassDB::bind_method(D_METHOD("get_sprite_frames"), &EffectLayerData2D::get_sprite_frames);
 	ClassDB::bind_method(D_METHOD("set_sprite_frames", "new_frames"), &EffectLayerData2D::set_sprite_frames);
@@ -542,6 +542,7 @@ void EffectLayerData2D::_bind_methods() {
 	BIND_ENUM_CONSTANT(EFFECT_ON_CLEAR);
 	BIND_ENUM_CONSTANT(EFFECT_ON_DESPAWN);
 	BIND_ENUM_CONSTANT(EFFECT_ON_SPLIT);
+	BIND_ENUM_CONSTANT(EFFECT_ON_ANY_HIT);
 }
 } //namespace BlastBullets2D
 

@@ -312,7 +312,7 @@ func _configure() -> void:
 		d.sprite_frames = B.make_effect_frames(4, 20.0) # 0.2 s, no loop
 	if has("effects"):
 		var layers: Array = []
-		for trigger in 9: # trail + every one-shot trigger
+		for trigger in 10: # trail + every one-shot trigger
 			layers.append(B.make_effect_layer(trigger))
 		d.effect_layers = layers
 	if has("attachments"):

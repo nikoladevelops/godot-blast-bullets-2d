@@ -924,11 +924,16 @@ void BulletVolley2D::handle_bullet_collision(const BulletCollisionData2D &record
 		if (!(split & SPLIT_SILENCE_DEATH)) {
 			fx_fire_oneshot(EFFECT_ON_DESTROY, bullet_index, impact_transf);
 		}
+		// On Any Hit is a hit visual, not a death visual: it fires on every
+		// counted hit, so a killing blow gets it beside (or without) the
+		// destroy effect, split death-silencing included.
+		fx_fire_oneshot(EFFECT_ON_ANY_HIT, bullet_index, impact_transf);
 	} else if (bounce_decision != 2) {
 		// Hit sparks for counted, survived hits (a consumed bounce already
 		// fired its bounce spark, so it stays silent here).
 		sound_fire(BulletSoundData2D::SOUND_ON_HIT, bullet_index, impact_transf.get_origin());
 		fx_fire_oneshot(EFFECT_ON_HIT, bullet_index, impact_transf);
+		fx_fire_oneshot(EFFECT_ON_ANY_HIT, bullet_index, impact_transf);
 		// Split on a hit it survived, at the impact pose (a consumed bounce
 		// already had its chance to split as a bounce).
 		if (split_config != nullptr) {
