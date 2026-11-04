@@ -871,3 +871,29 @@ func test_replacing_an_attachment_whose_release_frees_the_volley_is_survived() -
 	if is_instance_valid(factory):
 		var books: Dictionary = factory.debug_assert_no_dangling()
 		assert_true(books["ok"], str(books["error"]))
+
+
+## The pooled-reuse twin of the case above: an on_bullet_enable that drains the
+## reused volley and spawns the same key again must not hand the instance to
+## the outer caller either (that life belongs to the nested spawn).
+func test_a_same_key_respawn_inside_a_pooled_spawn_callback_is_never_double_handed_out() -> void:
+	var f := factory
+	var d := _data(false)
+	var first: BulletVolley2D = f.spawn_volley(d)
+	await idle(1)
+	f.clear_active_bullets()
+	await idle(1)
+	assert_true(first.is_pooled(), "a pooled instance waits for reuse")
+	var nested: Array = []
+	AttachmentHookProbe2D.hook_on = ["enable"]
+	AttachmentHookProbe2D.hook = func() -> void:
+		assert_true(is_instance_valid(first), "the reused volley is reachable from on_bullet_enable")
+		first.clear_all_bullets() # drains + pools the volley being enabled
+		nested.append(f.spawn_volley(H.make_volley_data(3, 0.0, 30.0))) # same key: pops it again
+	var outer: BulletVolley2D = f.spawn_volley(d)
+	AttachmentHookProbe2D.clear_hook()
+	assert_eq(nested.size(), 1, "the callback spawned once")
+	assert_true(outer == null, "the outer spawn never hands out the instance the nested spawn took")
+	var books: Dictionary = f.debug_assert_no_dangling()
+	assert_true(books["ok"], str(books["error"]))
+	expect_no_errors()
