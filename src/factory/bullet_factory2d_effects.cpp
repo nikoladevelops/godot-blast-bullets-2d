@@ -343,10 +343,22 @@ int BulletFactory2D::fx_fire_into_bake(FXOneShotBake &bake, const Transform2D &a
 		if (local.get_origin().is_finite()) {
 			bake.shard_multimesh(frame)->set_instance_transform_2d(slot_index, local);
 			slot.angle_shard = frame;
-			if (MultiMeshInstance2D *node = bake.shards[frame].get()) {
-				node->set_visible(true);
-			}
 			fx_refresh_slot_color(bake, slot_index, slot.start_age, true);
+			// LAST write of the fire: set_visible runs the shard's
+			// visibility_changed handlers (user code). A handler that frees the
+			// volley owning this bake is refused by the volley's emit guard
+			// (finished with queue_free()), so the bake it would have
+			// unregistered stays alive for this call; nothing of the bake is
+			// touched afterwards either way.
+			MultiMeshInstance2D *shard_node = bake.shards[frame].get();
+			if (shard_node != nullptr) {
+				BulletVolley2D *owner = bake.volley_id != 0 ? Object::cast_to<BulletVolley2D>(ObjectDB::get_instance(ObjectID(bake.volley_id))) : nullptr;
+				if (owner != nullptr) {
+					guarded_user_call2d(owner, owner->emit_guard, [&]() { shard_node->set_visible(true); });
+				} else {
+					shard_node->set_visible(true);
+				}
+			}
 		}
 	}
 	return slot_index;

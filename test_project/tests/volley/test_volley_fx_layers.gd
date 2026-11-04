@@ -1575,3 +1575,35 @@ func test_pooled_reuse_with_different_layers_uses_only_the_new_ones() -> void:
 			spawn_rows += 1
 	assert_eq(hit_rows, 1, "exactly one new On Hit")
 	assert_eq(spawn_rows, 0, "the old On Spawn never fired on the new life")
+
+
+## One-shot shards are children of the factory's effects container, so a
+## visibility_changed handler may free the volley that fired them (only the
+## emitter itself and its ancestors are the engine's own boundary). The fire
+## path must survive it: the volley's emit guard refuses the free and finishes
+## it with queue_free(), nothing of the bake is used after user code, and the
+## books stay balanced.
+func test_a_visibility_changed_handler_that_frees_the_volley_is_survived() -> void:
+	var layer := _make_layer(EffectLayerData2D.EFFECT_ON_CLEAR, 1)
+	var v: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 0.0, [layer]))
+	await idle(1)
+	var shard: MultiMeshInstance2D = null
+	for c in factory.get_node("SpriteEffectsContainer").get_children():
+		if c is MultiMeshInstance2D:
+			shard = c
+			break
+	assert_not_null(shard, "the one-shot shard exists")
+	var freed := [false]
+	shard.visibility_changed.connect(func() -> void:
+		if not freed[0] and is_instance_valid(v):
+			freed[0] = true
+			v.free())
+	v.clear_all_bullets()
+	assert_true(freed[0], "the handler ran from the fire's set_visible")
+	assert_true(is_instance_valid(v), "a refused free keeps the volley alive until frame end")
+	assert_true(v.is_queued_for_deletion(), "the refused free finishes with queue_free")
+	await idle(2)
+	assert_false(is_instance_valid(v), "the volley is gone")
+	var books: Dictionary = factory.debug_assert_no_dangling()
+	assert_true(books["ok"], str(books["error"]))
+	expect_no_errors()
