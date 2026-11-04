@@ -66,7 +66,7 @@ func test_same_key_spawn_from_killing_blow() -> void:
 
 
 func test_prepopulated_pool_reused_from_handler() -> void:
-	factory.populate_bullets_pool(VolleyPoolKey2D.make(1, 3), _bodied_data(), 3)
+	factory.populate_bullets_pool(VolleyPoolKey2D.make(1, PhysicsServer2D.SHAPE_CIRCLE), _bodied_data(), 3)
 	factory.debug_reset_pool_stats()
 	var v: BulletVolley2D = factory.spawn_volley(_bodied_data())
 	await _wait_for_handler()

@@ -34,10 +34,11 @@ func test_audibility_setters_reject_and_keep() -> void:
 	assert_eq(s.audibility_mode, 0, "distance only by default")
 	assert_eq(s.camera_margin_px, 200.0, "margin defaults 200")
 	assert_false(s.zoom_scales_distance, "zoom scaling off by default")
-	s.set_audibility_mode(5)
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	s.set_audibility_mode(5 as BulletSoundData2D.AudibilityMode)
 	expect_error_sequence(["BulletSoundData2D: audibility_mode must be 0 (Distance), 1 (Camera) or 2 (Distance and Camera), keeping the old value."])
 	assert_eq(s.audibility_mode, 0, "kept")
-	s.set_audibility_mode(2)
+	s.set_audibility_mode(BulletSoundData2D.SOUND_AUDIBILITY_DISTANCE_AND_CAMERA)
 	assert_eq(s.audibility_mode, 2, "valid mode applies")
 	s.set_camera_margin_px(-1.0)
 	expect_error_sequence(["BulletSoundData2D: camera_margin_px must be finite and >= 0, keeping the old value."])
@@ -46,6 +47,7 @@ func test_audibility_setters_reject_and_keep() -> void:
 
 func test_inside_view_plays_outside_silent() -> void:
 	godot_listener_at(Vector2.ZERO)
+	@warning_ignore("missing_await")
 	_add_camera()
 	factory.debug_set_sound_log_enabled(true)
 	var s := _camera_sound()
@@ -61,6 +63,7 @@ func test_inside_view_plays_outside_silent() -> void:
 
 func test_zoom_halves_effective_range() -> void:
 	godot_listener_at(Vector2.ZERO)
+	@warning_ignore("missing_await")
 	_add_camera(Vector2(2, 2))
 	factory.debug_set_sound_log_enabled(true)
 	var s := _camera_sound()
@@ -80,6 +83,7 @@ func test_zoom_halves_effective_range() -> void:
 
 func test_margin_rescues_near_outside() -> void:
 	godot_listener_at(Vector2.ZERO)
+	@warning_ignore("missing_await")
 	_add_camera()
 	factory.debug_set_sound_log_enabled(true)
 	var s := _camera_sound()
@@ -93,6 +97,7 @@ func test_margin_rescues_near_outside() -> void:
 
 func test_margin_means_screen_pixels_at_any_zoom() -> void:
 	godot_listener_at(Vector2.ZERO)
+	@warning_ignore("missing_await")
 	_add_camera(Vector2(2, 2))
 	factory.debug_set_sound_log_enabled(true)
 	var s := _camera_sound()
@@ -124,6 +129,7 @@ func test_zoom_gain_follows_the_camera() -> void:
 	godot_listener_at(Vector2.ZERO)
 	var volumes := {}
 	for zoom in [1.0, 2.0, 0.5]:
+		@warning_ignore("missing_await")
 		_add_camera(Vector2(zoom, zoom))
 		var s := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
 		s.volume_db = -6.0
@@ -140,6 +146,7 @@ func test_zoom_gain_follows_the_camera() -> void:
 
 func test_zoom_gain_off_is_identical_and_clamps_last() -> void:
 	godot_listener_at(Vector2.ZERO)
+	@warning_ignore("missing_await")
 	_add_camera(Vector2(2, 2))
 	var s := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
 	s.volume_db = -6.0
@@ -219,6 +226,7 @@ func test_pinned_camera_wins_over_current() -> void:
 
 func test_bad_and_freed_paths_fall_back() -> void:
 	godot_listener_at(Vector2.ZERO)
+	@warning_ignore("missing_await")
 	_add_camera()
 	factory.debug_set_sound_log_enabled(true)
 	var bad := _camera_sound()
@@ -300,6 +308,7 @@ func _pinned_degenerate_voice(z: Vector2) -> void:
 
 func test_zero_zoom_pinned_reads_as_one() -> void:
 	godot_listener_at(Vector2.ZERO)
+	@warning_ignore("missing_await")
 	_add_camera()
 	await _pinned_degenerate_voice(Vector2.ZERO)
 	# Godot reacts exactly once to a zero-zoom camera living in the tree
@@ -310,6 +319,7 @@ func test_zero_zoom_pinned_reads_as_one() -> void:
 
 func test_degenerate_zoom_reads_as_one() -> void:
 	godot_listener_at(Vector2.ZERO)
+	@warning_ignore("missing_await")
 	_add_camera()
 	for z in [Vector2(-2, -2), Vector2(INF, INF), Vector2(NAN, NAN)]:
 		await _pinned_degenerate_voice(z)
@@ -321,6 +331,7 @@ func test_explain_names_the_gate() -> void:
 	if not factory.has_method("debug_explain_sound"):
 		return
 	godot_listener_at(Vector2.ZERO)
+	@warning_ignore("missing_await")
 	_add_camera()
 	var s := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
 	var ok: Dictionary = factory.debug_explain_sound(s, Vector2(100, 0))
@@ -339,6 +350,7 @@ func test_explain_covers_view_zoom_interval_and_chance() -> void:
 	if not factory.has_method("debug_explain_sound"):
 		return
 	godot_listener_at(Vector2.ZERO)
+	@warning_ignore("missing_await")
 	_add_camera(Vector2(2, 2))
 	var s := _camera_sound()
 	var out: Dictionary = factory.debug_explain_sound(s, Vector2(1000, 0))
@@ -363,6 +375,7 @@ func test_explain_refusals_and_bad_path() -> void:
 	if not factory.has_method("debug_explain_sound"):
 		return
 	godot_listener_at(Vector2.ZERO)
+	@warning_ignore("missing_await")
 	_add_camera()
 	var disabled := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
 	disabled.enabled = false

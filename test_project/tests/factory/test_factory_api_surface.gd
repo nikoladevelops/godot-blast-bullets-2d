@@ -9,16 +9,16 @@ extends BlastTest
 const VOLLEY_SIGNALS := ["area_entered", "body_entered", "life_time_over", "bounce_area_entered", "bounce_body_entered"]
 
 
-func _signal(obj: Object, name: String) -> Dictionary:
+func _signal(obj: Object, signal_name: String) -> Dictionary:
 	for s in obj.get_signal_list():
-		if str(s["name"]) == name:
+		if str(s["name"]) == signal_name:
 			return s
 	return {}
 
 
-func _method(cls: String, name: String) -> Dictionary:
+func _method(cls: String, method_name: String) -> Dictionary:
 	for m in ClassDB.class_get_method_list(cls, true):
-		if str(m["name"]) == name:
+		if str(m["name"]) == method_name:
 			return m
 	return {}
 
@@ -65,21 +65,21 @@ func test_spawn_volley_returns_the_volley_or_null() -> void:
 
 func test_factory_and_spawner_declare_the_same_volley_signals() -> void:
 	var spawner := make_spawner()
-	for owner in [factory, spawner]:
-		for name in VOLLEY_SIGNALS:
-			var s := _signal(owner, name)
-			assert_false(s.is_empty(), "%s declares %s" % [owner.get_class(), name])
+	for owner_node in [factory, spawner]:
+		for signal_name in VOLLEY_SIGNALS:
+			var s := _signal(owner_node, signal_name)
+			assert_false(s.is_empty(), "%s declares %s" % [owner_node.get_class(), signal_name])
 			var args: Array = s.get("args", [])
 			var names: Array = []
 			for a in args:
 				names.append(str(a["name"]))
-			var volley_arg: Dictionary = args[1] if name != "life_time_over" else args[0]
-			assert_eq(str(volley_arg["name"]), "volley", "%s.%s names its volley argument 'volley'" % [owner.get_class(), name])
-			assert_eq(str(volley_arg["class_name"]), "BulletVolley2D", "%s.%s types its volley argument" % [owner.get_class(), name])
-			if name == "life_time_over":
-				assert_eq(names, ["volley", "bullet_indexes"], name + " payload")
+			var volley_arg: Dictionary = args[1] if signal_name != "life_time_over" else args[0]
+			assert_eq(str(volley_arg["name"]), "volley", "%s.%s names its volley argument 'volley'" % [owner_node.get_class(), signal_name])
+			assert_eq(str(volley_arg["class_name"]), "BulletVolley2D", "%s.%s types its volley argument" % [owner_node.get_class(), signal_name])
+			if signal_name == "life_time_over":
+				assert_eq(names, ["volley", "bullet_indexes"], signal_name + " payload")
 			else:
-				assert_eq(names.slice(1), ["volley", "bullet_index"], name + " payload")
+				assert_eq(names.slice(1), ["volley", "bullet_index"], signal_name + " payload")
 	for gone in ["directional_area_entered", "directional_body_entered", "directional_life_time_over", "directional_bounce_area_entered", "directional_bounce_body_entered", "block_area_entered", "block_body_entered", "block_life_time_over"]:
 		assert_false(factory.has_signal(gone), gone + " is gone")
 
@@ -91,14 +91,14 @@ func test_factory_and_spawner_declare_the_same_graze_signals() -> void:
 		"bullet_graze_exited": [["target", "Node2D"], ["volley", "BulletVolley2D"], ["bullet_index", ""], ["zone", "GrazeZone2D"], ["deepest_ring_index", ""]],
 		"bullet_split": [["position", ""], ["cause", ""], ["children", "BulletVolley2D"], ["depth", ""]],
 	}
-	for owner in [factory, spawner]:
-		for name in expected:
-			var s := _signal(owner, name)
-			assert_false(s.is_empty(), "%s declares %s" % [owner.get_class(), name])
+	for owner_node in [factory, spawner]:
+		for signal_name in expected:
+			var s := _signal(owner_node, signal_name)
+			assert_false(s.is_empty(), "%s declares %s" % [owner_node.get_class(), signal_name])
 			var got: Array = []
 			for a in s.get("args", []):
 				got.append([str(a["name"]), str(a["class_name"])])
-			assert_eq(got, expected[name], "%s.%s payload" % [owner.get_class(), name])
+			assert_eq(got, expected[signal_name], "%s.%s payload" % [owner_node.get_class(), signal_name])
 
 
 func test_stats_dictionaries_have_exact_keys() -> void:

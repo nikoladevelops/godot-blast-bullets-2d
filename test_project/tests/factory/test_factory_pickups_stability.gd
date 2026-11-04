@@ -21,7 +21,7 @@ var probe_scene: PackedScene
 var time_scene: PackedScene
 
 
-func _on_collected(target: Variant, position: Vector2, volley: BulletVolley2D, index: int, value: Variant) -> void:
+func _on_collected(target: Variant, position: Vector2, volley: BulletVolley2D, index: int, _value: Variant) -> void:
 	collected.append({ "target": target, "position": position, "volley": volley, "index": index })
 	assert_true(position.is_finite(), "a finite collection position")
 	assert_true(index >= 0 and index < volley.get_amount_bullets(), "a valid bullet index")
@@ -67,7 +67,7 @@ func _live_target() -> Node2D:
 
 func _random_pickup() -> BulletPickupData2D:
 	var p := P.coin(rng.randi() % 100)
-	p.motion_mode = rng.randi() % 3
+	p.motion_mode = (rng.randi() % 3) as BulletPickupData2D.MotionMode
 	if p.motion_mode == BulletPickupData2D.MOTION_CUSTOM:
 		p.speed_data = H.make_speed(rng.randf_range(0, 600), 800.0, rng.randf_range(0, 500))
 	if rng.randf() < 0.5:
@@ -98,10 +98,10 @@ func _random_pickup() -> BulletPickupData2D:
 func _plain_volley() -> void:
 	var n := rng.randi_range(1, 40)
 	var data := H.make_volley_data(n, rng.randf_range(0, 300), [0.4, 3.0, 30.0][rng.randi() % 3])
-	var tr: Array = []
+	var transforms: Array = []
 	for i in n:
-		tr.append(Transform2D(rng.randf_range(0, TAU), Vector2(rng.randf_range(-100, 600), rng.randf_range(-50, 450))))
-	data.transforms = tr
+		transforms.append(Transform2D(rng.randf_range(0, TAU), Vector2(rng.randf_range(-100, 600), rng.randf_range(-50, 450))))
+	data.transforms = transforms
 	if rng.randf() < 0.3:
 		data.shared_bullet_attachment = probe_scene
 	if rng.randf() < 0.3:
@@ -111,10 +111,10 @@ func _plain_volley() -> void:
 
 func _spawner_shot() -> void:
 	if spawners.is_empty() or rng.randf() < 0.3:
-		var sp := make_spawner(H.make_volley_data(rng.randi_range(1, 12), rng.randf_range(0, 200), 3.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, rng.randi_range(1, 12))
-		sp.position = Vector2(rng.randf_range(0, 400), rng.randf_range(0, 300))
-		sp.time_scale = [0.0, 0.25, 1.0, 2.0][rng.randi() % 4]
-		spawners.append(sp)
+		var new_spawner := make_spawner(H.make_volley_data(rng.randi_range(1, 12), rng.randf_range(0, 200), 3.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, rng.randi_range(1, 12))
+		new_spawner.position = Vector2(rng.randf_range(0, 400), rng.randf_range(0, 300))
+		new_spawner.time_scale = [0.0, 0.25, 1.0, 2.0][rng.randi() % 4]
+		spawners.append(new_spawner)
 	var sp: BulletSpawner2D = spawners[rng.randi() % spawners.size()]
 	if is_instance_valid(sp):
 		sp.shoot_once()
@@ -131,7 +131,11 @@ func _convert() -> void:
 		3:
 			spawners = spawners.filter(func(s): return is_instance_valid(s))
 			if not spawners.is_empty():
-				out = spawners[rng.randi() % spawners.size()].convert_live_bullets_to_pickups(pickup, "stability_targets" if rng.randf() < 0.5 else target)
+				var spawner_at: BulletSpawner2D = spawners[rng.randi() % spawners.size()]
+				var pickup_target: Variant = target
+				if rng.randf() < 0.5:
+					pickup_target = "stability_targets"
+				out = spawner_at.convert_live_bullets_to_pickups(pickup, pickup_target)
 		4:
 			out = factory.convert_all_bullets_to_pickups(pickup, null if rng.randf() < 0.2 else target)
 	for v in out:

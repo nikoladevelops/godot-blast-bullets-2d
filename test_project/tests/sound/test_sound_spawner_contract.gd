@@ -27,12 +27,12 @@ func test_bind_and_defaults() -> void:
 
 func test_setters_reject_and_keep() -> void:
 	var sp := make_spawner()
-	sp.set_sound_listener_source(-1)
+	sp.set_sound_listener_source((-1) as PatternSpawner2D.SoundListenerSource)
 	expect_error_sequence(["BulletSpawner2D: invalid sound_listener_source, keeping the old value."])
 	assert_eq(sp.sound_listener_source, BulletSpawner2D.SOUND_LISTENER_GODOT_LISTENER, "source kept")
-	sp.set_sound_listener_source(7)
+	sp.set_sound_listener_source(7 as PatternSpawner2D.SoundListenerSource)
 	expect_error_sequence(["BulletSpawner2D: invalid sound_listener_source, keeping the old value."])
-	sp.set_sound_listener_node_name_match_mode(4)
+	sp.set_sound_listener_node_name_match_mode(4 as PatternSpawner2D.HomingNodeNameMatch)
 	expect_error_sequence(["BulletSpawner2D: invalid sound_listener_node_name_match_mode, keeping the old value."])
 	assert_eq(sp.sound_listener_node_name_match_mode, 1, "match mode kept")
 	sp.set_sound_listener_update_interval(-1.0)

@@ -28,7 +28,7 @@ func setup() -> void:
 	var zone := H.make_graze_zone([20.0, 40.0])
 	factory.laser_hit.connect(_on_hit)
 	for k in 8:
-		var center := Vector2(300 + 440 * (k % 4), 300 + 480 * (k / 4))
+		var center := Vector2(300 + 440 * (k % 4), 300 + 480 * floori(k / 4.0))
 		var beams: Array[Transform2D] = []
 		for b in 32:
 			beams.append(Transform2D(TAU * b / 32.0, center))

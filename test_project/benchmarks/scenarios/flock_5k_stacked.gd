@@ -7,10 +7,10 @@ func describe() -> String:
 	return "5k bullets stacked on one point, one flock (cap bound)"
 
 func setup() -> void:
-	var tr: Array = []
+	var transforms: Array = []
 	for i in 5000:
-		tr.append(Transform2D(TAU * i / 5000.0, Vector2(600, 600)))
-	var d := H.make_flight_data(tr, 80.0, 1000.0)
+		transforms.append(Transform2D(TAU * i / 5000.0, Vector2(600, 600)))
+	var d := H.make_flight_data(transforms, 80.0, 1000.0)
 	d.set_collision_mask_from_array([3])
 	d.collision_shape = H.make_circle_shape(4.0)
 	var v: BulletVolley2D = factory.spawn_volley(d)

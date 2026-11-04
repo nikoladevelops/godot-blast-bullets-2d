@@ -58,7 +58,7 @@ func test_rearm_updates_every_parameter() -> void:
 	var v: BulletVolley2D = factory.spawn_volley(H.make_still_data(2))
 	v.all_bullets_enable_orbiting_linear(40.0, 10.0, BulletVolley2D.OrbitRight, BulletVolley2D.FaceTarget)
 	assert_eq(v.bullet_get_orbiting_direction(0), BulletVolley2D.OrbitRight, "armed OrbitRight")
-	v.all_bullets_enable_orbiting_linear(50.0, 5.0, BulletVolley2D.OrbitLeft, BulletVolley2D.FaceOppositeTarget, 0, 1, BulletVolley2D.FollowDeadzone, 12.0, 0, false)
+	v.all_bullets_enable_orbiting_linear(50.0, 5.0, BulletVolley2D.OrbitLeft, BulletVolley2D.FaceOppositeTarget, 0, 1, BulletVolley2D.FollowDeadzone, 12.0, BulletVolley2D.RelockAlways, false)
 	assert_eq(v.bullet_get_orbiting_direction(0), BulletVolley2D.OrbitLeft, "direction re-armed")
 	assert_eq(v.bullet_get_orbiting_direction(1), BulletVolley2D.OrbitLeft, "second bullet re-armed too")
 	assert_eq(v.bullet_get_orbiting_texture_rotation(0), BulletVolley2D.FaceOppositeTarget, "texture rotation re-armed")

@@ -423,7 +423,10 @@ func _make_editor(obj: Object, p: Dictionary, r: Dictionary) -> Control:
 			var ys := _raw_spin(p, p.type == TYPE_VECTOR2I)
 			var write := func(_v):
 				var v = Vector2(xs.value, ys.value)
-				_push(obj, r, Vector2i(v) if p.type == TYPE_VECTOR2I else v)
+				var pushed: Variant = v
+				if p.type == TYPE_VECTOR2I:
+					pushed = Vector2i(v)
+				_push(obj, r, pushed)
 			xs.value_changed.connect(write)
 			ys.value_changed.connect(write)
 			h.add_child(xs)
@@ -524,7 +527,7 @@ func _resource_editor(obj: Object, p: Dictionary, r: Dictionary) -> Control:
 	return h
 
 
-func _array_editor(obj: Object, p: Dictionary, r: Dictionary) -> Control:
+func _array_editor(_obj: Object, p: Dictionary, r: Dictionary) -> Control:
 	# Typed Resource arrays ("24/17:ClassName") get Open [i] and Add buttons; others are shown.
 	var v := VBoxContainer.new()
 	var cls := ""

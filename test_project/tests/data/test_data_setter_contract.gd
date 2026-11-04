@@ -31,7 +31,7 @@ func _own_props(cls: String) -> Array:
 
 
 func _bad_values(p: Dictionary) -> Array:
-	var name := str(p["name"])
+	var node_name := str(p["name"])
 	var hint := int(p.get("hint", 0))
 	var hs := str(p.get("hint_string", ""))
 	var out: Array = []
@@ -53,7 +53,7 @@ func _bad_values(p: Dictionary) -> Array:
 			next = id + 1
 		out.append(int(ids.max()) + 1)
 		out.append(int(ids.min()) - 1)
-	if hint == PROPERTY_HINT_RANGE and not RANGE_IS_A_SLIDER.has(name) and (int(p["type"]) == TYPE_FLOAT or int(p["type"]) == TYPE_INT):
+	if hint == PROPERTY_HINT_RANGE and not RANGE_IS_A_SLIDER.has(node_name) and (int(p["type"]) == TYPE_FLOAT or int(p["type"]) == TYPE_INT):
 		var parts := hs.split(",")
 		if parts.size() >= 2:
 			var lo := float(parts[0])
@@ -61,9 +61,15 @@ func _bad_values(p: Dictionary) -> Array:
 			var span := maxf(absf(hi - lo), 1.0)
 			var step := 1.0 if int(p["type"]) == TYPE_INT else span * 0.25
 			if not hs.contains("or_less"):
-				out.append(lo - step if int(p["type"]) == TYPE_FLOAT else int(lo) - 1)
+				if int(p["type"]) == TYPE_FLOAT:
+					out.append(lo - step)
+				else:
+					out.append(int(lo) - 1)
 			if not hs.contains("or_greater"):
-				out.append(hi + step if int(p["type"]) == TYPE_FLOAT else int(hi) + 1)
+				if int(p["type"]) == TYPE_FLOAT:
+					out.append(hi + step)
+				else:
+					out.append(int(hi) + 1)
 	return out
 
 
@@ -79,22 +85,22 @@ func test_every_data_setter_rejects_bad_values_loudly_and_keeps_the_old_one() ->
 	for cls in CLASSES:
 		var obj: Object = ClassDB.instantiate(cls)
 		for p in _own_props(cls):
-			var name := str(p["name"])
+			var node_name := str(p["name"])
 			for bad in _bad_values(p):
-				var before: Variant = obj.get(name)
-				expect_no_errors("clean before %s.%s" % [cls, name])
-				obj.set(name, bad)
-				var after: Variant = obj.get(name)
+				var before: Variant = obj.get(node_name)
+				expect_no_errors("clean before %s.%s" % [cls, node_name])
+				obj.set(node_name, bad)
+				var after: Variant = obj.get(node_name)
 				probed += 1
 				var texts: Array = []
 				for err in get_errors():
 					if not err.handled:
 						err.handled = true
 						texts.append(str(err.code))
-				var label := "%s.%s = %s" % [cls, name, bad]
+				var label := "%s.%s = %s" % [cls, node_name, bad]
 				if texts.size() != 1:
 					problems.append("%s: expected one error, got %s" % [label, texts])
-				elif not (texts[0] as String).begins_with("%s: %s " % [cls, name]) or not (texts[0] as String).ends_with(KEEP_TEXT):
+				elif not (texts[0] as String).begins_with("%s: %s " % [cls, node_name]) or not (texts[0] as String).ends_with(KEEP_TEXT):
 					problems.append("%s: wording %s" % [label, texts[0]])
 				if not _same(before, after):
 					problems.append("%s: value changed %s -> %s" % [label, before, after])
@@ -151,23 +157,23 @@ func test_every_accepted_data_edit_emits_changed_once() -> void:
 		var obj: Resource = ClassDB.instantiate(cls)
 		obj.changed.connect(_on_changed)
 		for p in _own_props(cls):
-			var name := str(p["name"])
-			var before: Variant = obj.get(name)
+			var node_name := str(p["name"])
+			var before: Variant = obj.get(node_name)
 			var value: Variant = _other_value(p, before)
 			if value == null:
 				continue
 			_changed_count = 0
-			obj.set(name, value)
+			obj.set(node_name, value)
 			var rejected := false
 			for err in get_errors():
 				if not err.handled:
 					err.handled = true
 					rejected = true
-			if rejected or _same(obj.get(name), before):
+			if rejected or _same(obj.get(node_name), before):
 				continue
 			probed += 1
 			if _changed_count != 1:
-				problems.append("%s.%s = %s: changed emitted %d times" % [cls, name, value, _changed_count])
+				problems.append("%s.%s = %s: changed emitted %d times" % [cls, node_name, value, _changed_count])
 	assert_gt(probed, 100, "the sweep reached the data classes (%d edits)" % probed)
 	assert_eq("\n".join(problems), "", "every accepted edit emits changed once")
 
@@ -184,20 +190,20 @@ func test_writing_the_current_value_emits_nothing() -> void:
 		var obj: Resource = ClassDB.instantiate(cls)
 		obj.changed.connect(_on_changed)
 		for p in _own_props(cls):
-			var name := str(p["name"])
+			var node_name := str(p["name"])
 			var type := int(p["type"])
 			if type == TYPE_ARRAY or type == TYPE_DICTIONARY:
 				continue
-			var value: Variant = _other_value(p, obj.get(name))
+			var value: Variant = _other_value(p, obj.get(node_name))
 			if value != null:
-				obj.set(name, value) # a non-default current value where one is valid
+				obj.set(node_name, value) # a non-default current value where one is valid
 				for err in get_errors():
 					err.handled = true
 			_changed_count = 0
-			obj.set(name, obj.get(name))
+			obj.set(node_name, obj.get(node_name))
 			probed += 1
 			if _changed_count != 0:
-				problems.append("%s.%s: a same-value write emitted changed %d times" % [cls, name, _changed_count])
+				problems.append("%s.%s: a same-value write emitted changed %d times" % [cls, node_name, _changed_count])
 	assert_gt(probed, 200, "the sweep reached the data classes (%d writes)" % probed)
 	assert_eq("\n".join(problems), "", "same-value writes emit nothing")
 

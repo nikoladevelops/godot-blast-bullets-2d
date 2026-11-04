@@ -46,10 +46,10 @@ func _worst_to_runs(pts: PackedVector2Array, runs: Array) -> float:
 
 func _flower(petals: int, per_petal: int, radius: float, placement: int) -> BulletSpawner2D:
 	var sp := make_preview_spawner(BulletSpawner2D.PATTERN_FROM_HELPER_FLOWER, petals * per_petal)
-	sp.helper_flower_type = 0 # FAN
+	sp.helper_flower_type = BulletPatterns2D.FLOWER_FAN
 	sp.helper_flower_petals = petals
 	sp.helper_flower_radius = radius
-	sp.helper_outline_placement = placement
+	sp.helper_outline_placement = placement as BulletPatterns2D.OutlinePlacement
 	return sp
 
 
@@ -79,7 +79,7 @@ func test_fan_rings_never_bridge_petals() -> void:
 func test_inward_rings_stay_on_arcs() -> void:
 	var sp := _flower(5, 4, 120.0, 1)
 	sp.helper_outline_layer_count = 3
-	sp.helper_outline_layer_side = 1 # INWARD
+	sp.helper_outline_layer_side = BulletPatterns2D.OUTLINE_LAYER_INWARD
 	await idle(8)
 	var runs := _runs(sp.debug_get_preview_track_points())
 	assert_gte(runs.size(), 5, "five petal arcs tracked")

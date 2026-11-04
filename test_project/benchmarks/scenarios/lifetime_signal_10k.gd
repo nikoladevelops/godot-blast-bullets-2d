@@ -18,7 +18,7 @@ func setup() -> void:
 	for i in 1000:
 		customs.append(_tag)
 	for i in 10:
-		var d := ring_data(1000, Vector2(960 * (i % 5), 1200 * (i / 5)), 40.0, 50.0, 1.0)
+		var d := ring_data(1000, Vector2(960 * (i % 5), 1200 * int(i / 5.0)), 40.0, 50.0, 1.0)
 		d.is_life_time_over_signal_enabled = true
 		d.all_bullets_custom_data = customs
 		_data.append(d)

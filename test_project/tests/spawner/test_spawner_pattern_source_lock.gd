@@ -65,11 +65,11 @@ func test_inspector_hint_pins_every_id() -> void:
 func test_setter_range() -> void:
 	var accepted := 0
 	for i in range(33):
-		sp.pattern_source = i
+		sp.pattern_source = (i as BulletSpawner2D.PatternSource)
 		if int(sp.pattern_source) == i:
 			accepted += 1
 	assert_eq(accepted, 33, "all 33 legal values accepted")
-	sp.pattern_source = 5
+	sp.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_SPIRAL
 	for bad in [-1, 33, 9999]:
 		sp.pattern_source = bad
 		expect_error_sequence(["invalid pattern_source, keeping the old value"], "value %d" % bad)

@@ -10,10 +10,10 @@ func describe() -> String:
 func setup() -> void:
 	var flock := BulletFlock2D.new()
 	for k in 20:
-		var tr: Array = []
+		var transforms: Array = []
 		for i in 100:
-			tr.append(Transform2D(rng.randf_range(-PI, PI), Vector2(rng.randf_range(0, 1200), rng.randf_range(0, 1200))))
-		var d := H.make_flight_data(tr, 120.0, 1000.0)
+			transforms.append(Transform2D(rng.randf_range(-PI, PI), Vector2(rng.randf_range(0, 1200), rng.randf_range(0, 1200))))
+		var d := H.make_flight_data(transforms, 120.0, 1000.0)
 		d.set_collision_mask_from_array([3])
 		d.collision_shape = H.make_circle_shape(4.0)
 		var v: BulletVolley2D = factory.spawn_volley(d)

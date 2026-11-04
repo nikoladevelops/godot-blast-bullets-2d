@@ -44,7 +44,7 @@ func test_unrelated_knob_keeps_countdown() -> void:
 	sp.homing_enabled = true
 	sp.homing_target_source = BulletSpawner2D.HOMING_SOURCE_GLOBAL_POSITION
 	sp.homing_global_position = Vector2(500, 0)
-	sp.homing_retarget_mode = 1 # ON_INTERVAL
+	sp.homing_retarget_mode = BulletSpawner2D.HOMING_RETARGET_ON_INTERVAL # ON_INTERVAL
 	sp.homing_retarget_interval_sec = 10.0
 	sp.homing_retarget_phase = 5.0
 	await idle(1)

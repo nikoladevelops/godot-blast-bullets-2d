@@ -12,11 +12,11 @@ extends BlastTest
 
 func _layers_spawner(src: int, amount: int = 24) -> BulletSpawner2D:
 	var sp := make_preview_spawner(src, amount)
-	sp.helper_outline_placement = 1 # LAYERS
+	sp.helper_outline_placement = BulletPatterns2D.OUTLINE_LAYERS # LAYERS
 	sp.helper_outline_layer_count = 3
 	sp.helper_outline_layer_scale = 0.25
-	sp.helper_outline_layer_side = 0
-	sp.helper_outline_layer_fill = 0
+	sp.helper_outline_layer_side = BulletPatterns2D.OUTLINE_LAYER_OUTWARD
+	sp.helper_outline_layer_fill = BulletPatterns2D.OUTLINE_LAYER_INTERLEAVED
 	return sp
 
 
@@ -36,15 +36,15 @@ func test_all_shapes_coincide(src: int = use_parameters([3, 9, 15, 16, 25, 26, 2
 func test_fill_deals_coincide() -> void:
 	var sp := _layers_spawner(25)
 	await idle(6)
-	sp.helper_outline_layer_fill = 1
-	sp.helper_outline_layer_side = 1
+	sp.helper_outline_layer_fill = BulletPatterns2D.OUTLINE_LAYER_SEQUENTIAL
+	sp.helper_outline_layer_side = BulletPatterns2D.OUTLINE_LAYER_INWARD
 	await idle(6)
 	_check_coincidence(sp, 2.0, "circle sequential+inward")
-	sp.helper_outline_layer_fill = 2
-	sp.helper_outline_layer_side = 0
+	sp.helper_outline_layer_fill = BulletPatterns2D.OUTLINE_LAYER_OUTER_FIRST
+	sp.helper_outline_layer_side = BulletPatterns2D.OUTLINE_LAYER_OUTWARD
 	await idle(6)
 	_check_coincidence(sp, 2.0, "circle outer-first")
-	sp.helper_outline_layer_fill = 3
+	sp.helper_outline_layer_fill = BulletPatterns2D.OUTLINE_LAYER_PINGPONG
 	await idle(6)
 	_check_coincidence(sp, 2.0, "circle pingpong")
 
@@ -64,7 +64,7 @@ func test_twist_caps_scales_curve() -> void:
 	await idle(6)
 	_check_coincidence(sp, 2.0, "circle custom scales")
 	sp.helper_outline_layer_scales = PackedFloat32Array()
-	sp.helper_outline_layer_scale_curve = 1
+	sp.helper_outline_layer_scale_curve = BulletPatterns2D.OUTLINE_LAYER_CURVE_EXPONENTIAL
 	await idle(6)
 	_check_coincidence(sp, 2.0, "circle exponential")
 
@@ -81,7 +81,7 @@ func test_side_start_layout_distribution() -> void:
 			sp.helper_outline_layer_side = side
 			await idle(6)
 			_check_coincidence(sp, 2.0, "src %d side %d" % [src, side])
-	sp.helper_outline_layer_side = 0
+	sp.helper_outline_layer_side = BulletPatterns2D.OUTLINE_LAYER_OUTWARD
 	sp.helper_outline_layer_count = 3
 	for start_off in [0, 2]:
 		sp.helper_outline_layer_start_offset = start_off
@@ -92,7 +92,7 @@ func test_side_start_layout_distribution() -> void:
 		sp.helper_outline_layer_layout = layout
 		await idle(6)
 		_check_coincidence(sp, 2.0, "rect layout %d" % layout)
-	sp.helper_outline_layer_layout = 1
+	sp.helper_outline_layer_layout = BulletPatterns2D.OUTLINE_LAYER_LAYOUT_EVEN_PER_LAYER
 	for dist in [0, 1]:
 		sp.helper_outline_distribution = dist
 		await idle(6)
@@ -106,28 +106,28 @@ func test_corner_knobs() -> void:
 		sp.helper_outline_corner_priority = pri
 		await idle(6)
 		_check_coincidence(sp, 2.0, "rect priority %d" % pri)
-	sp.helper_outline_corner_priority = 0
+	sp.helper_outline_corner_priority = BulletPatterns2D.OUTLINE_CORNER_PRIORITY_HORIZONTAL
 	for facing in [0, 1, 2]:
 		sp.helper_outline_corner_facing = facing
 		await idle(6)
 		_check_coincidence(sp, 2.0, "rect facing %d" % facing)
-	sp.helper_outline_corner_facing = 0
+	sp.helper_outline_corner_facing = BulletPatterns2D.OUTLINE_CORNER_FACING_SIDE
 	for mode in [0, 1]:
 		sp.helper_outline_corner_mode = mode
 		await idle(6)
 		_check_coincidence(sp, 2.0, "rect corner mode %d" % mode)
-	sp.helper_outline_corner_mode = 0
+	sp.helper_outline_corner_mode = BulletPatterns2D.OUTLINE_CORNER_MODE_PIN_CORNERS
 	sp.helper_outline_edge_margin = 20.0
 	await idle(6)
 	_check_coincidence(sp, 2.0, "rect margin")
 	sp.helper_outline_edge_margin = 0.0
-	sp.pattern_source = 30
-	sp.helper_outline_corner_facing = 1
+	sp.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_TRIANGLE
+	sp.helper_outline_corner_facing = BulletPatterns2D.OUTLINE_CORNER_FACING_MITER
 	await idle(6)
 	_check_coincidence(sp, 2.0, "triangle miter")
-	sp.helper_outline_corner_facing = 0
-	sp.pattern_source = 15
-	sp.helper_outline_corner_facing = 2
+	sp.helper_outline_corner_facing = BulletPatterns2D.OUTLINE_CORNER_FACING_SIDE
+	sp.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_STAR
+	sp.helper_outline_corner_facing = BulletPatterns2D.OUTLINE_CORNER_FACING_SMOOTH
 	await idle(6)
 	_check_coincidence(sp, 2.5, "star smooth")
 

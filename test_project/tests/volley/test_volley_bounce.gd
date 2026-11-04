@@ -129,10 +129,10 @@ func _clear_signals() -> void:
 # Park on idle, wipe every flying volley, clear signal buckets: each phase
 # then observes ONLY the volley it spawns (stray infinite-lifetime volleys
 # from earlier phases would otherwise satisfy signal waits early).
-func _settle(factory: BulletFactory2D) -> void:
+func _settle(factory_node: BulletFactory2D) -> void:
 	await idle(1)
 	await idle(1)
-	factory.free_active_bullets()
+	factory_node.free_active_bullets()
 	_clear_signals()
 	await physics()
 
@@ -168,7 +168,7 @@ func test_t0_defaults_feature_off_normal_path_intact() -> void:
 	assert_true(d0.bounce_rotate_texture == true, "bounce_rotate_texture defaults true")
 	assert_true(d0.bounce_rotation_smooth == 0.0, "bounce_rotation_smooth defaults 0")
 	assert_true(d0.bounce_randomness_deg == 0.0, "bounce_randomness defaults 0")
-	var wall := _make_wall(Vector2(200, 0), 8)
+	var _wall := _make_wall(Vector2(200, 0), 8)
 	await physics()
 	var v0: BulletVolley2D = factory.spawn_volley(d0)
 	assert_true(v0 != null, "plain spawn ok")
@@ -304,11 +304,11 @@ func test_t4_ping_pong_between_two_walls_max_count_gates_back_to_normal() -> voi
 
 func test_t5_mask_precedence_bounce_layer_wins_plain_layer_stays_normal() -> void:
 	# BOUNCE T5 mask precedence: bounce layer wins, plain layer stays normal
-	var wall := await _arena()
+	var _wall := await _arena()
 	await _settle(factory)
 	var plain := _make_wall(Vector2(200, 220), 16, Vector2(20, 120))
 	await physics()
-	var v5: BulletVolley2D = factory.spawn_volley(_bounce_data(Vector2(0, 220), 0.0, 300.0, [4], [4, 5]))
+	var _v5: BulletVolley2D = factory.spawn_volley(_bounce_data(Vector2(0, 220), 0.0, 300.0, [4], [4, 5]))
 	for i in 120:
 		await physics()
 		if _norm_body.size() >= 1:
@@ -354,7 +354,7 @@ func test_t7_precise_mode_on_45_degree_wall_reflects_across_face() -> void:
 	var diag := _make_wall(Vector2(200, 0), 8, Vector2(20, 400), PI / 4.0)
 	await physics()
 	var d7 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
-	d7.bounce_mode = 1
+	d7.bounce_mode = BulletVolleyData2D.BOUNCE_PRECISE_SHAPE
 	var v7: BulletVolley2D = factory.spawn_volley(d7)
 	for i in 120:
 		await physics()
@@ -458,7 +458,7 @@ func test_t10_rejects_fuzz_pool_reuse_neutrality() -> void:
 	dr.set_bounce_mask(-1)
 	expect_error_sequence(["BulletVolleyData2D: bounce_mask must be >= 0"])
 	assert_true(dr.bounce_mask == keep_mask, "negative mask rejected")
-	dr.set_bounce_mode(7)
+	dr.set_bounce_mode(7 as BulletVolleyData2D.BounceMode)
 	expect_error_sequence(["BulletVolleyData2D: bounce_mode must be"])
 	assert_true(dr.bounce_mode == 0, "bad mode rejected")
 	dr.set_bounce_randomness_deg(999.0)
@@ -607,7 +607,7 @@ func test_t13_snap_keeps_render_position_continuous() -> void:
 	await _settle(factory)
 	factory.physics_interpolation = BulletFactory2D.INTERPOLATION_ON
 	factory.bounce_body_entered.connect(_on_bounce_capture)
-	var v13: BulletVolley2D = factory.spawn_volley(_bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4]))
+	var _v13: BulletVolley2D = factory.spawn_volley(_bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4]))
 	for i in 5:
 		await physics()
 	for i in 120:
@@ -648,7 +648,7 @@ func test_t14_precise_mode_on_capsule_wall_uses_cap_normal() -> void:
 	add(cap_wall)
 	await physics()
 	var d14 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
-	d14.bounce_mode = 1
+	d14.bounce_mode = BulletVolleyData2D.BOUNCE_PRECISE_SHAPE
 	var v14: BulletVolley2D = factory.spawn_volley(d14)
 	for i in 120:
 		await physics()
@@ -800,7 +800,7 @@ func test_t20_inspector_groups_stay_coherent() -> void:
 	var props20: Array = data20.get_property_list()
 	var bounce_group_at := -1
 	var first_bounce_at := -1
-	var collision_at := -1
+	var _collision_at := -1
 	for i in props20.size():
 		var pname := str(props20[i].get("name", ""))
 		var usage: int = int(props20[i].get("usage", 0))
@@ -809,7 +809,7 @@ func test_t20_inspector_groups_stay_coherent() -> void:
 		if first_bounce_at < 0 and pname == "bounce_mask":
 			first_bounce_at = i
 		if pname == "collision_mask":
-			collision_at = i
+			_collision_at = i
 	assert_true(bounce_group_at >= 0, "bounce group header registered")
 	assert_true(first_bounce_at > bounce_group_at, "bounce props follow their group")
 	# Data class: exact group order follows the setup workflow, and every
@@ -1090,7 +1090,7 @@ func test_t21_runtime_toggles_and_gravity_flag_refresh() -> void:
 
 func test_t22_same_target_debounce_stuck_bullet_bounces_once_per_window() -> void:
 	# BOUNCE T22 same-target debounce: stuck bullet bounces once per window
-	var wall := await _arena()
+	var _wall := await _arena()
 	await _settle(factory)
 	var d22 := _bounce_data(Vector2(100, 0), 0.0, 0.0, [4], [4])
 	assert_true(d22.bounce_debounce_sec == 0.15, "debounce defaults 0.15")
@@ -1150,7 +1150,7 @@ func test_t22b_debounce_is_per_target_alternating_walls_bounce_freely() -> void:
 
 func test_t23_moving_targets_push_surges_head_on_amplifies_separating_swal() -> void:
 	# BOUNCE T23 moving targets: push surges, head-on amplifies, separating swallows
-	var wall := await _arena()
+	var _wall := await _arena()
 	await _settle(factory)
 	var pusher := RigidBody2D.new()
 	pusher.position = Vector2(-150, 0)
@@ -1436,7 +1436,7 @@ func test_t25_velocity_sources_characterbody_reads_area2d_stays_static() -> void
 
 func test_t25b_strength_0_vs_pusher_sticks_precise_moves_too() -> void:
 	# BOUNCE T25b strength 0 vs pusher sticks, precise moves too
-	var wall := await _arena()
+	var _wall := await _arena()
 	await _settle(factory)
 	var pusher0 := RigidBody2D.new()
 	pusher0.position = Vector2(-150, 0)
@@ -1484,7 +1484,7 @@ func test_t25b_strength_0_vs_pusher_sticks_precise_moves_too() -> void:
 	add(pusher1)
 	await physics()
 	var d25e := _bounce_data(Vector2.ZERO, 0.0, 100.0, [4], [4])
-	d25e.bounce_mode = 1
+	d25e.bounce_mode = BulletVolleyData2D.BOUNCE_PRECISE_SHAPE
 	var v25e: BulletVolley2D = factory.spawn_volley(d25e)
 	for i in 150:
 		await physics()
@@ -1957,7 +1957,7 @@ func test_t28_hostile_freed_walls_nan_motion_overflow_starvation() -> void:
 	var v28h: BulletVolley2D = factory.spawn_volley(d28h)
 	# OrbitRight=2, FaceTarget=0, FollowTarget=0, StayLocked=1.
 	v28h.bullet_homing_push_back_homing_target(0, orbit28)
-	v28h.bullet_enable_orbiting(0, 60.0, 2, 0, 0, 0.0, 1, true)
+	v28h.bullet_enable_orbiting(0, 60.0, BulletVolley2D.OrbitRight, BulletVolley2D.FaceTarget, BulletVolley2D.FollowTarget, 0.0, BulletVolley2D.StayLocked, true)
 	for i in 150:
 		await physics()
 		if v28h.bullet_is_orbiting_locked(0):
@@ -1991,7 +1991,7 @@ func test_precise_mode_degenerate_shapes_fall_back_to_radial() -> void:
 	add(zero29)
 	await physics()
 	var d29 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
-	d29.bounce_mode = 1
+	d29.bounce_mode = BulletVolleyData2D.BOUNCE_PRECISE_SHAPE
 	var v29: BulletVolley2D = factory.spawn_volley(d29)
 	for i in 120:
 		await physics()
@@ -2029,7 +2029,7 @@ func test_consumed_bounces_spark_once_and_still_count() -> void:
 	_connect_signals()
 	# BOUNCE T30 consumed bounces spark once and still count
 	await _settle(factory)
-	var wall30 := _make_wall(Vector2(200, 0), 8)
+	var _wall30 := _make_wall(Vector2(200, 0), 8)
 	var d30 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
 	d30.bounce_hit_consumed = true
 	d30.bounce_max_count = 2
@@ -2160,7 +2160,7 @@ func test_mover_switching_gravity_push_unlocked_orbit_spawner_routing() -> void:
 	d32c.set_bullet_max_collision_count(0)
 	var v32c: BulletVolley2D = factory.spawn_volley(d32c)
 	v32c.shared_homing_deque_push_back_node2d_target(moon32)
-	v32c.bullet_enable_orbiting(0, 64.0, 2, 0)
+	v32c.bullet_enable_orbiting(0, 64.0, BulletVolley2D.OrbitRight, BulletVolley2D.FaceTarget)
 	for i in 150:
 		await physics()
 		if v32c.bullet_get_bounce_count(0) >= 1:
@@ -2249,7 +2249,7 @@ func test_teleport_matrix_interpolation_mixing() -> void:
 	# BOUNCE T34 teleport matrix + interpolation mixing
 	await _settle(factory)
 	factory.physics_interpolation = BulletFactory2D.INTERPOLATION_OFF
-	var wall34 := _make_wall(Vector2(200, 0), 8)
+	var _wall34 := _make_wall(Vector2(200, 0), 8)
 	var d34 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
 	var v34: BulletVolley2D = factory.spawn_volley(d34)
 	v34.set_bullet_transform(0, Transform2D(0.0, Vector2(100, 0)))
@@ -2338,7 +2338,7 @@ func test_orbit_endurance_census_telegraph_zero_helper_hostility() -> void:
 	var d35 := _bounce_data(Vector2(500, 300), 0.0, 200.0, [], [4], 30.0)
 	var v35: BulletVolley2D = factory.spawn_volley(d35)
 	v35.shared_homing_deque_push_back_node2d_target(moon35)
-	v35.bullet_enable_orbiting(0, 64.0, 2, 0)
+	v35.bullet_enable_orbiting(0, 64.0, BulletVolley2D.OrbitRight, BulletVolley2D.FaceTarget)
 	for i in 720:
 		await physics()
 	assert_true(v35.get_bullet_transform(0).is_finite() and v35.get_bullet_velocity(0).is_finite(), "720-frame orbit never NaNs")
@@ -2557,7 +2557,7 @@ func test_cross_type_matrix_platforms_slopes_edges_areas_tilemaps() -> void:
 	add(slope37)
 	await physics()
 	var d37b := _bounce_data(Vector2(100, 300), 0.0, 200.0, [4], [4])
-	d37b.bounce_mode = 1
+	d37b.bounce_mode = BulletVolleyData2D.BOUNCE_PRECISE_SHAPE
 	var v37b: BulletVolley2D = factory.spawn_volley(d37b)
 	for i in 150:
 		await physics()
@@ -2585,7 +2585,7 @@ func test_cross_type_matrix_platforms_slopes_edges_areas_tilemaps() -> void:
 	add(edge37)
 	await physics()
 	var d37c := _bounce_data(Vector2(100, 300), 0.0, 200.0, [4], [4])
-	d37c.bounce_mode = 1
+	d37c.bounce_mode = BulletVolleyData2D.BOUNCE_PRECISE_SHAPE
 	var v37c: BulletVolley2D = factory.spawn_volley(d37c)
 	for i in 150:
 		await physics()
@@ -2611,7 +2611,7 @@ func test_cross_type_matrix_platforms_slopes_edges_areas_tilemaps() -> void:
 	add(poly37)
 	await physics()
 	var d37d := _bounce_data(Vector2(100, 300), 0.0, 200.0, [4], [4])
-	d37d.bounce_mode = 1
+	d37d.bounce_mode = BulletVolleyData2D.BOUNCE_PRECISE_SHAPE
 	var v37d: BulletVolley2D = factory.spawn_volley(d37d)
 	for i in 150:
 		await physics()

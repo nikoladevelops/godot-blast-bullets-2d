@@ -18,7 +18,7 @@ func _sized_spawner(n: int, at: Vector2, lo: float, hi: float, ring_radius := 60
 	handle_events(sp) # grazes and hits are handled; the matrix pins the features
 	sp.global_position = at
 	sp.helper_ring_radius = ring_radius
-	sp.bullet_scale_mode = 1 # Uniform
+	sp.bullet_scale_mode = BulletSpawner2D.BULLET_SCALE_UNIFORM # Uniform
 	sp.bullet_scale_min = lo
 	sp.bullet_scale_max = hi
 	sp.bullet_random_seed = 77
@@ -112,7 +112,7 @@ func test_burst_shots_flock_as_the_scope_says(scope: int = use_parameters([Bulle
 	for k in 2:
 		var sp := _sized_spawner(6, Vector2(400 * k, 0), 1.0, 1.0, 20.0)
 		sp.flock_enabled = true
-		sp.flock_scope = scope
+		sp.flock_scope = (scope as BulletFlock2D.Scope)
 		sp.burst_enabled = true
 		sp.burst_count = 3
 		sp.burst_interval_sec = 0.05
@@ -164,7 +164,7 @@ func test_debug_explain_features_says_what_each_group_does_and_why_not() -> void
 	sp.graze_node_group = &"explain_targets"
 	sp.graze_zones = [H.make_graze_zone([30.0], true)]
 	sp.homing_reach_counts_bullet_size = true
-	sp.bullet_scale_mode = 1
+	sp.bullet_scale_mode = BulletSpawner2D.BULLET_SCALE_UNIFORM
 	sp.bullet_scale_max = 2.0
 	var f := BulletFlock2D.create_preset(BulletFlock2D.PRESET_KEEP_DISTANCE)
 	f.separation = 2.0
@@ -215,7 +215,7 @@ func _fly_mix(features: Array) -> MotionProbe:
 	if "flock" in features:
 		sp.flock_enabled = true
 	if "random_scale" in features:
-		sp.bullet_scale_mode = 1 # Uniform
+		sp.bullet_scale_mode = BulletSpawner2D.BULLET_SCALE_UNIFORM # Uniform
 		sp.bullet_scale_min = 0.5
 		sp.bullet_scale_max = 2.0
 		sp.bullet_random_seed = 5

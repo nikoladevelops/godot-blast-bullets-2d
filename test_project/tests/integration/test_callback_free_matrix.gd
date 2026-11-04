@@ -705,7 +705,7 @@ func _free_victim(victim: String, v: BulletVolley2D) -> Callable:
 		check_factory_after = false
 	var f := factory
 	return func() -> void:
-		var target: Object = v if victim == "volley" else f
+		var target: Object = (v as Object) if victim == "volley" else (f as Object)
 		if is_instance_valid(target):
 			target.free()
 
@@ -792,7 +792,7 @@ func test_freeing_inside_visibility_changed_of_a_freed_attachment() -> void:
 		check_factory_after = false
 	var f := factory
 	att.visibility_changed.connect(func() -> void:
-		var target: Object = f if victim == "factory" else v
+		var target: Object = (f as Object) if victim == "factory" else (v as Object)
 		if is_instance_valid(target):
 			BulletFactory2D.debug_free_like_release(target))
 	v.bullet_free_attachment(0)

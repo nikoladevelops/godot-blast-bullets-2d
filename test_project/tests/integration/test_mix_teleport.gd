@@ -171,7 +171,7 @@ func test_a_locked_orbit_holds_a_teleport_along_its_ring() -> void:
 	sp.orbiting_radius = 40.0
 	sp.orbiting_enabled = true
 	var got: Array = []
-	sp.volley_fired.connect(func(v, _n) -> void: got.append(v), CONNECT_ONE_SHOT)
+	sp.volley_fired.connect(func(volley, _n) -> void: got.append(volley), CONNECT_ONE_SHOT)
 	assert_true(sp.shoot_once(), "fires")
 	var v: BulletVolley2D = got[0]
 	for f in 120:
@@ -200,7 +200,7 @@ func test_a_locked_orbit_pulls_a_radial_teleport_back_onto_its_ring() -> void:
 	sp.orbiting_radius = 40.0
 	sp.orbiting_enabled = true
 	var got: Array = []
-	sp.volley_fired.connect(func(v, _n) -> void: got.append(v), CONNECT_ONE_SHOT)
+	sp.volley_fired.connect(func(volley, _n) -> void: got.append(volley), CONNECT_ONE_SHOT)
 	assert_true(sp.shoot_once(), "fires")
 	var v: BulletVolley2D = got[0]
 	for f in 120:

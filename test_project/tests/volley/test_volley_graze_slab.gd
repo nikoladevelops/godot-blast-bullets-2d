@@ -43,13 +43,13 @@ func _scene(scene_seed: int, slab_min: int, target_count: int = 16) -> Array:
 	var zone := H.make_graze_zone([14.0, 36.0])
 	zone.regraze = GrazeZone2D.REGRAZE_AFTER_EXIT
 	v.graze_set_zones([zone], GROUP)
-	var log := H.record_graze(factory)
+	var graze_log := H.record_graze(factory)
 	for tick in 40:
 		for i in targets.size():
 			(targets[i] as Node2D).position = homes[i] + Vector2(cos(tick * 0.3 + i), sin(tick * 0.2 + 2 * i)) * 90.0
 		step_factory()
 	var out: Array = []
-	for e in log:
+	for e in graze_log:
 		out.append([e[0], targets.find(e[1]), e[3], e[5]])
 	for t in targets:
 		(t as Node).free()
@@ -79,16 +79,16 @@ func test_equal_distances_go_to_the_first_target_in_tree_order() -> void:
 		var left := make_graze_target(Vector2(-10, 0), group) # first in x order
 		var v := graze_volley(H.transforms_at([Vector2.ZERO]), 0.0)
 		v.graze_set_zones([H.make_graze_zone([20.0])], group)
-		var log := H.record_graze(factory)
+		var graze_log := H.record_graze(factory)
 		step_factory()
-		assert_eq(H.graze_kinds(log), ["enter:0:0"], "slab_min %d: one graze" % slab_min)
-		assert_eq(log[0][1], right, "slab_min %d: the tie goes to the first in tree order" % slab_min)
+		assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "slab_min %d: one graze" % slab_min)
+		assert_eq(graze_log[0][1], right, "slab_min %d: the tie goes to the first in tree order" % slab_min)
 		right.position = Vector2(300, 0)
 		left.position = Vector2(-300, 0)
 		step_factory()
-		assert_eq(H.graze_kinds(log), ["enter:0:0", "exit:0:0"], "slab_min %d: one exit" % slab_min)
-		assert_eq(log[1][1], right, "slab_min %d: naming the same target" % slab_min)
-		assert_ne(log[1][1], left, "slab_min %d: not the other" % slab_min)
+		assert_eq(H.graze_kinds(graze_log), ["enter:0:0", "exit:0:0"], "slab_min %d: one exit" % slab_min)
+		assert_eq(graze_log[1][1], right, "slab_min %d: naming the same target" % slab_min)
+		assert_ne(graze_log[1][1], left, "slab_min %d: not the other" % slab_min)
 		v.graze_clear()
 
 

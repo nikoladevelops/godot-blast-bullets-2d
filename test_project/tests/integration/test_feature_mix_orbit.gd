@@ -25,20 +25,20 @@ func _data(n: int) -> BulletVolleyData2D:
 	return d
 
 
-func _configure(name: String, d: BulletVolleyData2D) -> void:
-	match name:
+func _configure(case_name: String, d: BulletVolleyData2D) -> void:
+	match case_name:
 		"gravity":
 			d.gravity = Vector2(0, 200)
 		"wobble_lateral", "wobble_angular":
 			var w := BulletWobbleData2D.new()
 			w.enabled = true
-			w.mode = BulletWobbleData2D.WOBBLE_LATERAL if name == "wobble_lateral" else BulletWobbleData2D.WOBBLE_ANGULAR
-			w.amplitude = 8.0 if name == "wobble_lateral" else 0.3
+			w.mode = BulletWobbleData2D.WOBBLE_LATERAL if case_name == "wobble_lateral" else BulletWobbleData2D.WOBBLE_ANGULAR
+			w.amplitude = 8.0 if case_name == "wobble_lateral" else 0.3
 			w.frequency_hz = 3.0
 			d.shared_bullet_wobble_data = w
 		"speed_curve", "direction_curve":
 			var c := BulletCurvesData2D.new()
-			if name == "speed_curve":
+			if case_name == "speed_curve":
 				c.movement_speed_curve = H.make_flat_curve(300.0)
 				c.movement_use_unit_curve = false
 			else:
@@ -52,20 +52,20 @@ func _configure(name: String, d: BulletVolleyData2D) -> void:
 		"bounce_armed":
 			d.set_collision_mask_from_array([5])
 			d.set_bounce_mask_from_array([5])
-			d.bounce_mode = 1
+			d.bounce_mode = BulletVolleyData2D.BOUNCE_PRECISE_SHAPE
 
 
-func test_a_locked_orbit_keeps_its_radius(name: String = use_parameters(CASES)) -> void:
-	var n := 3 if name == "flock" else 1
+func test_a_locked_orbit_keeps_its_radius(case_name: String = use_parameters(CASES)) -> void:
+	var n := 3 if case_name == "flock" else 1
 	var d := _data(n)
-	_configure(name, d)
-	var v: BulletVolley2D = factory.spawn_volley(d, Vector2(80, 40) if name == "inherited_velocity" else Vector2.ZERO)
+	_configure(case_name, d)
+	var v: BulletVolley2D = factory.spawn_volley(d, Vector2(80, 40) if case_name == "inherited_velocity" else Vector2.ZERO)
 	for i in n:
 		v.bullet_homing_push_back_global_position_target(i, CENTER)
 		v.bullet_enable_orbiting(i, RADIUS, BulletVolley2D.OrbitRight, BulletVolley2D.FaceTarget)
-	if name == "flock":
+	if case_name == "flock":
 		v.flock_join(H.make_flock(10.0, 0.0, 0.0, 60.0, 20.0))
-	if name == "time_scale_half":
+	if case_name == "time_scale_half":
 		factory.time_scale = 0.5
 	var locked := false
 	for k in 480:
@@ -73,11 +73,11 @@ func test_a_locked_orbit_keeps_its_radius(name: String = use_parameters(CASES)) 
 		if range(n).all(func(i): return v.bullet_is_orbiting_locked(i)):
 			locked = true
 			break
-	assert_true(locked, "%s: every bullet locked onto its ring" % name)
+	assert_true(locked, "%s: every bullet locked onto its ring" % case_name)
 	var worst := 0.0
 	for k in 120:
 		factory.debug_advance_time(1.0 / 60.0)
 		for i in n:
 			worst = maxf(worst, absf(v.get_bullet_transform(i).origin.distance_to(CENTER) - RADIUS))
-	assert_lt(worst, TOLERANCE, "%s: the orbit holds its radius (worst error %.2f px)" % [name, worst])
-	assert_eq(broken_bullets(v), [], "%s: finite" % name)
+	assert_lt(worst, TOLERANCE, "%s: the orbit holds its radius (worst error %.2f px)" % [case_name, worst])
+	assert_eq(broken_bullets(v), [], "%s: finite" % case_name)

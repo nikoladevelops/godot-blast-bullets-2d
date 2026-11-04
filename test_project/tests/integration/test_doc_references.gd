@@ -15,7 +15,7 @@ var doc_dir := ""
 
 
 func before_all() -> void:
-	await super()
+	super()
 	doc_dir = ProjectSettings.globalize_path("res://").path_join("../doc_classes").simplify_path()
 
 
@@ -34,24 +34,24 @@ func _builtin_type_names() -> Array:
 	return names
 
 
-func _resolves(kind: String, cls: String, name: String) -> bool:
+func _resolves(kind: String, cls: String, node_name: String) -> bool:
 	match kind:
 		"method":
 			for m in ClassDB.class_get_method_list(cls): # includes virtuals and inherited methods
-				if m.name == name:
+				if m.name == node_name:
 					return true
 			return false
 		"member":
 			for p in ClassDB.class_get_property_list(cls):
-				if p.name == name:
+				if p.name == node_name:
 					return true
 			return false
 		"signal":
-			return ClassDB.class_has_signal(cls, name)
+			return ClassDB.class_has_signal(cls, node_name)
 		"constant":
-			return name in ClassDB.class_get_integer_constant_list(cls)
+			return node_name in ClassDB.class_get_integer_constant_list(cls)
 		"enum":
-			return ClassDB.class_has_enum(cls, name)
+			return ClassDB.class_has_enum(cls, node_name)
 	return false
 
 
@@ -79,10 +79,10 @@ func test_every_link_in_every_page_resolves() -> void:
 			total += 1
 			var qualified := m.get_string(3) != ""
 			var cls := m.get_string(2) if qualified else own
-			var name := m.get_string(3) if qualified else m.get_string(2)
-			if (cls + "." + name) in ENGINE_SPECIALS or cls in builtins or cls.begins_with("@"):
+			var link_name := m.get_string(3) if qualified else m.get_string(2)
+			if (cls + "." + link_name) in ENGINE_SPECIALS or cls in builtins or cls.begins_with("@"):
 				continue
-			if not ClassDB.class_exists(cls) or not _resolves(m.get_string(1), cls, name):
+			if not ClassDB.class_exists(cls) or not _resolves(m.get_string(1), cls, link_name):
 				broken.append("%s: %s" % [f, m.get_string(0)])
 	assert_gt(total, 1000, "the pages were read")
 	assert_eq(broken, [], "links that resolve to nothing")

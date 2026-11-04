@@ -46,9 +46,9 @@ func _random_pose() -> void:
 ## generator re-rolls per call, so two collects can never be compared.
 func _seed_all() -> void:
 	for p in sp.get_property_list():
-		var name := str(p["name"])
-		if name.begins_with("helper_") and name.ends_with("_seed"):
-			sp.set(name, 1234)
+		var node_name := str(p["name"])
+		if node_name.begins_with("helper_") and node_name.ends_with("_seed"):
+			sp.set(node_name, 1234)
 
 
 func _configure_input(src: int) -> void:
@@ -75,7 +75,7 @@ func _configure_input(src: int) -> void:
 
 
 func test_every_source_cached_equals_uncached_under_motion(src: int = use_parameters(range(BulletSpawner2D.PATTERN_FROM_LAST))) -> void:
-	sp.pattern_source = src
+	sp.pattern_source = (src as BulletSpawner2D.PatternSource)
 	_seed_all()
 	_configure_input(src)
 	for step in 6:
@@ -162,7 +162,7 @@ func test_unseeded_scatter_never_cached_for_shots() -> void:
 
 
 func test_external_sources_are_never_cached(src: int = use_parameters([BulletSpawner2D.PATTERN_FROM_CHILDREN, BulletSpawner2D.PATTERN_FROM_HELPER_AIMED, BulletSpawner2D.PATTERN_FROM_HELPER_CORRIDOR, BulletSpawner2D.PATTERN_FROM_HELPER_CUSTOM, BulletSpawner2D.PATTERN_FROM_HELPER_PATH2D])) -> void:
-	sp.pattern_source = src
+	sp.pattern_source = (src as BulletSpawner2D.PatternSource)
 	_configure_input(src)
 	sp.collect_spawn_transforms()
 	sp.collect_spawn_transforms()
@@ -177,7 +177,8 @@ func test_cache_off_never_hits() -> void:
 		_random_pose()
 		sp.collect_spawn_transforms()
 	assert_eq(int(sp.debug_get_pattern_cache_info()["hits"]), 0, "OFF regenerates every time")
-	sp.pattern_cache_mode = 7
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the setter must reject it
+	sp.pattern_cache_mode = (7 as BulletSpawner2D.PatternCacheMode)
 	expect_error_sequence(["pattern_cache_mode must be 0 (Auto) or 1 (Off)"])
 	assert_eq(sp.pattern_cache_mode, BulletSpawner2D.PATTERN_CACHE_OFF, "invalid mode rejected, old value kept")
 
@@ -218,27 +219,27 @@ func test_every_pattern_property_invalidates_the_bake() -> void:
 	for src in [BulletSpawner2D.PATTERN_FROM_HELPER_RING, BulletSpawner2D.PATTERN_FROM_HELPER_RECTANGLE, BulletSpawner2D.PATTERN_FROM_HELPER_SPIRAL, BulletSpawner2D.PATTERN_FROM_HELPER_FLOWER, BulletSpawner2D.PATTERN_FROM_HELPER_GRID]:
 		sp.pattern_source = src
 		for p in sp.get_property_list():
-			var name := str(p["name"])
-			if not (name.begins_with("helper_") or name in ["pattern_scale", "transforms_scale"]):
+			var node_name := str(p["name"])
+			if not (node_name.begins_with("helper_") or node_name in ["pattern_scale", "transforms_scale"]):
 				continue
-			if name == "helper_bullets_amount" or name.ends_with("_path") or name.ends_with("_target") or name.ends_with("_seed") or name == "helper_custom_transforms" or name == "helper_skip_indices":
+			if node_name == "helper_bullets_amount" or node_name.ends_with("_path") or node_name.ends_with("_target") or node_name.ends_with("_seed") or node_name == "helper_custom_transforms" or node_name == "helper_skip_indices":
 				continue
-			var old: Variant = sp.get(name)
+			var old: Variant = sp.get(node_name)
 			var nv: Variant = _perturb(p, old)
 			if nv == null:
 				continue
 			sp.collect_spawn_transforms() # bake at the old value
 			_random_pose()
 			sp.collect_spawn_transforms()
-			sp.set(name, nv)
-			swallow_rejections_for(name)
+			sp.set(node_name, nv)
+			swallow_rejections_for(node_name)
 			_random_pose()
 			var cached: Array = sp.collect_spawn_transforms()
-			swallow_rejections_for(name)
-			_assert_same(cached, sp.debug_collect_spawn_transforms_uncached(), "after changing %s (source %d)" % [name, src])
-			swallow_rejections_for(name)
-			sp.set(name, old)
-			swallow_rejections_for(name)
+			swallow_rejections_for(node_name)
+			_assert_same(cached, sp.debug_collect_spawn_transforms_uncached(), "after changing %s (source %d)" % [node_name, src])
+			swallow_rejections_for(node_name)
+			sp.set(node_name, old)
+			swallow_rejections_for(node_name)
 			swept += 1
 	assert_gt(swept, 100, "sweep covered the pattern inspector (%d properties)" % swept)
 
@@ -296,43 +297,43 @@ func test_every_shape_knob_invalidates_the_bake_under_its_own_shape() -> void:
 	_seed_all()
 	var by_owner := {}
 	for p in sp.get_property_list():
-		var name := str(p["name"])
-		if not name.begins_with("helper_") or name.begins_with("helper_outline_") or name.ends_with("_seed") or name.ends_with("_path") or name.ends_with("_target"):
+		var node_name := str(p["name"])
+		if not node_name.begins_with("helper_") or node_name.begins_with("helper_outline_") or node_name.ends_with("_seed") or node_name.ends_with("_path") or node_name.ends_with("_target"):
 			continue
-		var owner := _owner(name, shapes)
-		if owner >= 0:
-			if not by_owner.has(owner):
-				by_owner[owner] = []
-			by_owner[owner].append(p)
+		var owner_id := _owner(node_name, shapes)
+		if owner_id >= 0:
+			if not by_owner.has(owner_id):
+				by_owner[owner_id] = []
+			by_owner[owner_id].append(p)
 	var swept := 0
 	var moved := 0
 	var inert: Array = []
 	for s in shapes:
 		if bool(s["reads_external_state"]) or not by_owner.has(int(s["id"])):
 			continue
-		sp.pattern_source = int(s["id"])
+		sp.pattern_source = (int(s["id"]) as BulletSpawner2D.PatternSource)
 		for p in by_owner[int(s["id"])]:
-			var name := str(p["name"])
-			var old: Variant = sp.get(name)
+			var knob_name := str(p["name"])
+			var old: Variant = sp.get(knob_name)
 			var nv: Variant = _perturb(p, old)
 			if nv == null:
 				continue
 			_random_pose()
 			var before: Array = sp.debug_collect_spawn_transforms_uncached()
 			sp.collect_spawn_transforms() # bake at the old value
-			sp.set(name, nv)
-			swallow_rejections_for(name)
+			sp.set(knob_name, nv)
+			swallow_rejections_for(knob_name)
 			var cached: Array = sp.collect_spawn_transforms()
-			swallow_rejections_for(name)
+			swallow_rejections_for(knob_name)
 			var fresh: Array = sp.debug_collect_spawn_transforms_uncached()
-			swallow_rejections_for(name)
-			_assert_same(cached, fresh, "after changing %s under %s" % [name, s["name"]])
+			swallow_rejections_for(knob_name)
+			_assert_same(cached, fresh, "after changing %s under %s" % [knob_name, s["name"]])
 			if _differs(before, fresh):
 				moved += 1
-			elif sp.get(name) == nv:
-				inert.append(name)
-			sp.set(name, old)
-			swallow_rejections_for(name)
+			elif sp.get(knob_name) == nv:
+				inert.append(knob_name)
+			sp.set(knob_name, old)
+			swallow_rejections_for(knob_name)
 			swept += 1
 	assert_gt(swept, 150, "every cacheable shape's knobs swept (%d)" % swept)
-	assert_gt(moved, swept * 85 / 100, "most perturbations really move bullets (%d of %d); inert: %s" % [moved, swept, inert])
+	assert_gt(moved, int(swept * 85.0 / 100.0), "most perturbations really move bullets (%d of %d); inert: %s" % [moved, swept, inert])

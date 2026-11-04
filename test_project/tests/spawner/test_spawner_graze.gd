@@ -113,8 +113,8 @@ func test_events_bubble_spawner_then_factory_exactly_once_each() -> void:
 	var z := H.make_graze_zone([20.0])
 	var sp := _spawner([z])
 	var order: Array = []
-	sp.bullet_grazed.connect(func(target: Node2D, v: BulletVolley2D, i: int, zone: GrazeZone2D, r: int) -> void: order.append(["spawner", target, v, i, zone, r]))
-	factory.bullet_grazed.connect(func(target: Node2D, v: BulletVolley2D, i: int, zone: GrazeZone2D, r: int) -> void: order.append(["factory", target, v, i, zone, r]))
+	sp.bullet_grazed.connect(func(target: Node2D, volley: BulletVolley2D, i: int, zone: GrazeZone2D, r: int) -> void: order.append(["spawner", target, volley, i, zone, r]))
+	factory.bullet_grazed.connect(func(target: Node2D, volley: BulletVolley2D, i: int, zone: GrazeZone2D, r: int) -> void: order.append(["factory", target, volley, i, zone, r]))
 	var v := _shoot(sp)
 	step_factory(3)
 	assert_eq(order, [["spawner", t, v, 0, z, 0], ["factory", t, v, 0, z, 0]], "the spawner first, then the factory, same payload, once each")
@@ -123,10 +123,10 @@ func test_events_bubble_spawner_then_factory_exactly_once_each() -> void:
 func test_a_spawner_only_listener_handles_the_graze() -> void:
 	make_graze_target(Vector2(10, 0))
 	var sp := _spawner([H.make_graze_zone([20.0])])
-	var log := H.record_graze(sp)
+	var log_entries := H.record_graze(sp)
 	_shoot(sp)
 	step_factory(2)
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "the spawner alone is enough (no unhandled warning)")
+	assert_eq(H.graze_kinds(log_entries), ["enter:0:0"], "the spawner alone is enough (no unhandled warning)")
 
 
 func test_factory_volleys_never_fire_spawner_signals() -> void:
@@ -150,12 +150,12 @@ func test_a_spawner_never_grazes_its_own_bullets() -> void:
 	other.graze_zones = [H.make_graze_zone([20.0])]
 	other.graze_enabled = true
 	other.graze_node_group = &"graze_targets"
-	var log := H.record_graze(factory)
+	var log_entries := H.record_graze(factory)
 	_shoot(sp)
 	_shoot(other)
 	step_factory(2)
-	assert_eq(log.size(), 2, "each spawner's bullet grazed the OTHER spawner only")
-	assert_eq([log[0][1], log[1][1]], [other, sp], "never its own")
+	assert_eq(log_entries.size(), 2, "each spawner's bullet grazed the OTHER spawner only")
+	assert_eq([log_entries[0][1], log_entries[1][1]], [other, sp], "never its own")
 	assert_eq(sp.resolve_graze_targets(), [other], "resolve skips the spawner itself")
 
 
@@ -167,11 +167,11 @@ func test_a_spawner_among_many_targets_never_grazes_its_own_bullets() -> void:
 	for i in 9:
 		make_graze_target(Vector2(1000 + 100 * i, 0))
 	var near := make_graze_target(Vector2(15, 0))
-	var log := H.record_graze(factory)
+	var log_entries := H.record_graze(factory)
 	_shoot(sp)
 	step_factory(2)
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "one graze")
-	assert_eq(log[0][1], near, "by the nearest OTHER target, never the spawner at distance 0")
+	assert_eq(H.graze_kinds(log_entries), ["enter:0:0"], "one graze")
+	assert_eq(log_entries[0][1], near, "by the nearest OTHER target, never the spawner at distance 0")
 
 
 func test_bursts_and_pattern_lists_arm_every_volley() -> void:
@@ -196,7 +196,7 @@ func test_bursts_and_pattern_lists_arm_every_volley() -> void:
 func test_pooled_reuse_arms_a_fresh_state() -> void:
 	make_graze_target(Vector2(10, 0))
 	var sp := _spawner([H.make_graze_zone([20.0])])
-	var log := H.record_graze(factory)
+	var log_entries := H.record_graze(factory)
 	var first := _shoot(sp)
 	step_factory()
 	first.disable_bullet(0)
@@ -204,22 +204,22 @@ func test_pooled_reuse_arms_a_fresh_state() -> void:
 	var second := _shoot(sp)
 	assert_eq(second, first, "the pool handed back the same instance")
 	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0", "enter:0:0"], "the new life grazes again")
+	assert_eq(H.graze_kinds(log_entries), ["enter:0:0", "enter:0:0"], "the new life grazes again")
 
 
 func test_edits_after_a_shot_keep_the_flying_volley_armed() -> void:
 	var t := make_graze_target(Vector2(100, 0))
 	var z := H.make_graze_zone([20.0])
 	var sp := _spawner([z])
-	var log := H.record_graze(factory)
+	var log_entries := H.record_graze(factory)
 	var v := _shoot(sp)
 	sp.graze_zones = []
 	sp.graze_enabled = false
 	assert_true(v.is_graze_armed(), "the flying volley keeps its zones")
 	z.ring_1_radius = 120.0
 	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "and follows edits made inside the zone resource")
-	assert_eq(log[0][1], t, "named")
+	assert_eq(H.graze_kinds(log_entries), ["enter:0:0"], "and follows edits made inside the zone resource")
+	assert_eq(log_entries[0][1], t, "named")
 
 
 func test_presets_keep_graze_settings() -> void:
@@ -290,13 +290,13 @@ func test_an_array_mutated_in_place_still_arms_its_usable_zones_and_warns_once()
 	var zones: Array = sp.graze_zones
 	for i in 4:
 		zones.append(H.make_graze_zone([5.0])) # too small to reach the target
-	var log := H.record_graze(factory)
+	var log_entries := H.record_graze(factory)
 	var v := _shoot(sp)
 	_shoot(sp)
 	expect_warning_sequence(["BulletSpawner2D: graze_zones was changed in place and holds more than 4 zones or entries that are not GrazeZone2D; only the first 4 zones are used. Assign the whole array instead (graze_zones = [...])."])
 	assert_eq(v.get_graze_zones().size(), 4, "the first four arm")
 	step_factory()
-	assert_eq(log.size(), 2, "both volleys graze with the first zone")
+	assert_eq(log_entries.size(), 2, "both volleys graze with the first zone")
 
 
 ## Every graze handler sees a live bullet of the arming it grazed with: when
@@ -332,16 +332,16 @@ func test_graze_live_volleys_applies_the_group_to_flying_volleys() -> void:
 	assert_eq(sp.apply_to_live_volleys(BulletSpawner2D.LIVE_GRAZE), 1, "only the volley fired while off changed")
 	assert_eq(off.get_graze_zones(), [near], "armed with the current zones")
 	assert_eq(sp.apply_to_live_volleys(BulletSpawner2D.LIVE_GRAZE), 0, "idempotent")
-	var log := H.record_graze(factory)
+	var log_entries := H.record_graze(factory)
 	sp.graze_zones = [wide]
 	assert_eq(sp.apply_to_live_volleys(BulletSpawner2D.LIVE_GRAZE), 2, "a new zone list re-arms both")
 	assert_eq(on.get_graze_zones(), [wide], "with the new zones")
 	assert_eq(other.get_graze_zones(), [near], "the other spawner's volley kept its own")
 	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0", "enter:0:0"], "both graze the wide ring")
+	assert_eq(H.graze_kinds(log_entries), ["enter:0:0", "enter:0:0"], "both graze the wide ring")
 	assert_eq(sp.apply_to_live_volleys(BulletSpawner2D.LIVE_GRAZE), 0, "armed alike: the spent rings stay spent")
 	step_factory(3)
-	assert_eq(log.size(), 2, "no second graze of a Once ring")
+	assert_eq(log_entries.size(), 2, "no second graze of a Once ring")
 	sp.graze_enabled = false
 	assert_eq(sp.apply_to_live_volleys(BulletSpawner2D.LIVE_GRAZE), 2, "graze off disarms both")
 	assert_false(on.is_graze_armed(), "disarmed")

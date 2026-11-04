@@ -21,7 +21,7 @@ func _logged(sound_id: int) -> Array:
 func test_flight_trigger_bound() -> void:
 	var s := BulletSoundData2D.new()
 	assert_true(s.has_method("set_trigger"), "trigger setter bound")
-	s.set_trigger(10)
+	s.set_trigger(BulletSoundData2D.SOUND_ON_FLIGHT)
 	assert_eq(s.trigger, 10, "flight trigger sets")
 	assert_true(BulletSoundData2D.SOUND_ON_FLIGHT == 10, "flight is trigger 10")
 

@@ -121,8 +121,8 @@ func test_spawner_driven_mixed_volley() -> void:
 	sd.homing_smoothing = 5.0
 	sd.homing_take_control_of_texture_rotation = true
 	var spawner := make_spawner(sd, 1)
-	spawner.homing_mode = 1
-	spawner.homing_target_source = 2
+	spawner.homing_mode = BulletSpawner2D.HOMING_PER_BULLET
+	spawner.homing_target_source = BulletSpawner2D.HOMING_SOURCE_GLOBAL_POSITION
 	spawner.homing_global_position = Vector2(500, -100)
 	spawner.set_homing_enabled(true)
 	assert_true(spawner.shoot_once(), "mixed spawner shot fires")

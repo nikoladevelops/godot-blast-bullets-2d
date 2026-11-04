@@ -57,10 +57,10 @@ func test_keep_awake() -> void:
 	assert_signal_emit_count(s, "shooting_stopped", 1, "cleared burst is signal-silent")
 	# Interval retargeting owns the loop while armed.
 	s.set_homing_enabled(true)
-	s.set_homing_retarget_mode(1)
+	s.set_homing_retarget_mode(BulletSpawner2D.HOMING_RETARGET_ON_INTERVAL)
 	assert_true(s.is_processing(), "retarget interval wakes")
 	assert_signal_emit_count(s, "shooting_started", 1, "retarget arm is signal-silent")
-	s.set_homing_retarget_mode(0)
+	s.set_homing_retarget_mode(BulletSpawner2D.HOMING_RETARGET_OFF)
 	assert_true(not s.is_processing(), "retarget off sleeps again")
 	assert_signal_emit_count(s, "shooting_stopped", 1, "retarget off is signal-silent")
 	s.set_homing_enabled(false)
@@ -111,7 +111,7 @@ func test_corridor_door() -> void:
 	var s := _fresh()
 	s.set_shooting_enabled(false)
 	# PatternSource ids: fan=4, aimed=7, corridor=22 (see hint string).
-	s.set_pattern_source(22)
+	s.set_pattern_source(BulletSpawner2D.PATTERN_FROM_HELPER_CORRIDOR)
 	s.set_helper_bullets_amount(25)
 	# With a live target straight down: wall runs flank the door, nothing
 	# inside it, nothing outside the wall.
@@ -159,13 +159,13 @@ func test_cone_parity() -> void:
 	target.name = "Target"
 	add(target)
 	target.global_position = Vector2(0, 400)
-	s.set_pattern_source(4)
+	s.set_pattern_source(BulletSpawner2D.PATTERN_FROM_HELPER_FAN)
 	s.set_helper_fan_direction_angle(PI * 0.5)
 	s.set_helper_fan_spread(0.6)
 	s.set_helper_fan_centered(true)
 	s.set_helper_fan_step_offset(0.0)
 	var fan: Array = s.collect_spawn_transforms()
-	s.set_pattern_source(7)
+	s.set_pattern_source(BulletSpawner2D.PATTERN_FROM_HELPER_AIMED)
 	s.set_helper_aimed_target(target)
 	s.set_helper_aimed_spread(0.6)
 	s.set_helper_aimed_centered(true)

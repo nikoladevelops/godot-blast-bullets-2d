@@ -8,16 +8,16 @@ extends BlastTest
 
 const DT := 0.0625 # exact binary ticks: phases end exactly on their tick
 
-var log: Array = [] # [tick, signal, payload...]
+var log_entries: Array = [] # [tick, signal, payload...]
 var tick := 0
 
 
 func before_each() -> void:
 	await super()
-	log.clear()
+	log_entries.clear()
 	tick = 0
-	factory.laser_phase_changed.connect(func(l: LaserVolley2D, p: int) -> void: log.append([tick, "phase", p]))
-	factory.laser_finished.connect(func(l: LaserVolley2D) -> void: log.append([tick, "finished"]))
+	factory.laser_phase_changed.connect(func(_l: LaserVolley2D, p: int) -> void: log_entries.append([tick, "phase", p]))
+	factory.laser_finished.connect(func(_l: LaserVolley2D) -> void: log_entries.append([tick, "finished"]))
 
 
 func _step(n: int) -> void:
@@ -48,7 +48,7 @@ func test_phases_run_in_order_on_their_ticks() -> void:
 	assert_eq(l.get_phase(), LaserVolley2D.PHASE_CHARGING, "charging from the start")
 	_step(10)
 	# charge 2 ticks, grow 1, active 4, fade 2.
-	assert_eq(log, [[2, "phase", 1], [3, "phase", 2], [7, "phase", 3], [9, "phase", 4], [9, "finished"]], "one signal per phase, on its tick")
+	assert_eq(log_entries, [[2, "phase", 1], [3, "phase", 2], [7, "phase", 3], [9, "phase", 4], [9, "finished"]], "one signal per phase, on its tick")
 	assert_true(l.is_pooled(), "pooled after laser_finished")
 	assert_eq(factory.get_active_laser_count(), 0, "nothing firing")
 	assert_eq(factory.debug_get_laser_pool_amount(), 1, "one in the pool")
@@ -57,11 +57,11 @@ func test_phases_run_in_order_on_their_ticks() -> void:
 func test_zero_length_phases_pass_in_one_tick() -> void:
 	var l := _fire(H.make_laser(0.0, 0.0, 0.125, 0.0))
 	_step(1)
-	assert_eq(log, [[1, "phase", 1], [1, "phase", 2]], "charging and growing pass on the first tick")
+	assert_eq(log_entries, [[1, "phase", 1], [1, "phase", 2]], "charging and growing pass on the first tick")
 	assert_eq(l.get_phase(), LaserVolley2D.PHASE_ACTIVE, "active on its first tick")
 	_step(2)
 	# Active for its whole first tick (nothing came before it), so 0.125 s ends on tick 2.
-	assert_eq(log.slice(2), [[2, "phase", 3], [2, "phase", 4], [2, "finished"]], "no fade: straight to finished")
+	assert_eq(log_entries.slice(2), [[2, "phase", 3], [2, "phase", 4], [2, "finished"]], "no fade: straight to finished")
 
 
 func test_widths_follow_the_phase() -> void:
@@ -88,7 +88,7 @@ func test_active_zero_lasts_until_ended() -> void:
 	l.end_laser()
 	assert_eq(l.get_phase(), LaserVolley2D.PHASE_FADING, "fading at once")
 	_step(1)
-	assert_eq(log.slice(-3), [[41, "phase", 3], [41, "phase", 4], [41, "finished"]], "end_laser announced at the next tick, then gone after the fade")
+	assert_eq(log_entries.slice(-3), [[41, "phase", 3], [41, "phase", 4], [41, "finished"]], "end_laser announced at the next tick, then gone after the fade")
 
 
 func test_end_laser_without_fade_finishes_next_tick() -> void:
@@ -97,7 +97,7 @@ func test_end_laser_without_fade_finishes_next_tick() -> void:
 	l.end_laser(false)
 	assert_eq(l.get_current_width(), 0.0, "drawn no more at once")
 	_step(1)
-	assert_eq(log.slice(-2), [[2, "phase", 4], [2, "finished"]], "finished on the next tick, no fade")
+	assert_eq(log_entries.slice(-2), [[2, "phase", 4], [2, "finished"]], "finished on the next tick, no fade")
 	assert_true(l.is_pooled(), "pooled")
 	l.end_laser() # a pooled laser is a stale handle: refused, nothing happens
 	expect_error_sequence(["end_laser: this laser finished (it waits in the pool), so this handle is stale. Fire a new laser instead."])
@@ -109,7 +109,7 @@ func test_set_active_time_left_moves_the_end() -> void:
 	assert_almost_eq(l.get_active_time_left(), 0.875, 1e-9, "1 s minus two ticks")
 	l.set_active_time_left(0.125)
 	_step(2)
-	assert_eq(log.back(), [4, "finished"], "ended 0.125 s later")
+	assert_eq(log_entries.back(), [4, "finished"], "ended 0.125 s later")
 	var charged := _fire(H.make_laser(0.125, 0.0, 1.0, 0.0))
 	charged.set_active_time_left(0.0625)
 	assert_eq(charged.get_active_time_left(), 0.0625, "before ACTIVE: the length of ACTIVE")
@@ -193,10 +193,10 @@ func test_end_laser_from_a_live_handler_announces_every_phase(source: String = u
 	_step(2)
 	assert_true(ended[0], "the handler ran")
 	var kinds: Array = []
-	for e in log:
+	for e in log_entries:
 		kinds.append(e.slice(1))
-	assert_eq(kinds.count(["phase", LaserVolley2D.PHASE_FINISHED]), 1, "FINISHED announced exactly once (%s)" % [log])
-	assert_eq(kinds.back(), ["finished"], "laser_finished last (%s)" % [log])
+	assert_eq(kinds.count(["phase", LaserVolley2D.PHASE_FINISHED]), 1, "FINISHED announced exactly once (%s)" % [log_entries])
+	assert_eq(kinds.back(), ["finished"], "laser_finished last (%s)" % [log_entries])
 	assert_lt(kinds.find(["phase", LaserVolley2D.PHASE_FINISHED]), kinds.find(["finished"]), "the phase before the finish")
 	assert_true(l.is_pooled(), "pooled")
 
@@ -209,7 +209,7 @@ func test_a_zero_fade_ended_in_a_phase_handler_announces_fading() -> void:
 		if p == LaserVolley2D.PHASE_ACTIVE:
 			l.end_laser(true))
 	_step(1)
-	assert_eq(log, [[1, "phase", 1], [1, "phase", 2], [1, "phase", 3], [1, "phase", 4], [1, "finished"]], "every phase once, in order")
+	assert_eq(log_entries, [[1, "phase", 1], [1, "phase", 2], [1, "phase", 3], [1, "phase", 4], [1, "finished"]], "every phase once, in order")
 
 
 ## A bolt spent in the tick a hit handler faded it, whose FADING handler then
@@ -231,8 +231,8 @@ func test_a_spent_bolt_ended_from_its_fading_handler_finishes_once() -> void:
 		if l.is_pooled():
 			break
 	var kinds: Array = []
-	for e in log:
+	for e in log_entries:
 		kinds.append(e.slice(1))
 	assert_true(l.is_pooled(), "finished")
-	assert_eq(kinds.count(["phase", LaserVolley2D.PHASE_FINISHED]), 1, "FINISHED announced once (%s)" % [log])
+	assert_eq(kinds.count(["phase", LaserVolley2D.PHASE_FINISHED]), 1, "FINISHED announced once (%s)" % [log_entries])
 	assert_eq(kinds.count(["finished"]), 1, "one laser_finished")

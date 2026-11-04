@@ -178,16 +178,16 @@ func test_a_shared_deque_growth_does_not_duplicate_the_reached_signal() -> void:
 ## outlasts it, so 0 refreshes the target position from the next tick (it once
 ## waited out the previous 60 s interval, steering at a stale spot).
 func test_a_shorter_update_interval_applies_at_once() -> void:
-	var target := Node2D.new()
-	target.position = Vector2(300, 0)
-	add(target)
+	var target_node := Node2D.new()
+	target_node.position = Vector2(300, 0)
+	add(target_node)
 	var v: BulletVolley2D = factory.spawn_volley(H.make_volley_data(1, 0.0, 30.0))
 	v.set_homing_smoothing(0.0) # snap: the direction is the direction to the cached target spot
 	v.set_homing_update_interval(60.0)
-	v.bullet_homing_push_back_node2d_target(0, target)
+	v.bullet_homing_push_back_node2d_target(0, target_node)
 	await physics(2)
 	assert_almost_eq(v.get_bullet_direction(0), Vector2(1, 0), Vector2(0.001, 0.001), "aimed at the first spot")
 	v.set_homing_update_interval(0.0)
-	target.position = Vector2(-300, 0)
+	target_node.position = Vector2(-300, 0)
 	await physics(3)
 	assert_almost_eq(v.get_bullet_direction(0), Vector2(-1, 0), Vector2(0.001, 0.001), "0 refreshes every tick: aimed at the new spot")

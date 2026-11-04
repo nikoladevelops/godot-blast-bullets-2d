@@ -179,7 +179,7 @@ func test_rotate_with_marker_off_keeps_each_shape_world_fixed(shape: String = us
 
 func test_every_flower_type_follows_its_aim_once(flower_type: int = use_parameters([0, 1, 2, 3, 4])) -> void:
 	var sp := make_spawner(null, BulletSpawner2D.PATTERN_FROM_HELPER_FLOWER, 11)
-	sp.helper_flower_type = flower_type
+	sp.helper_flower_type = flower_type as BulletPatterns2D.FlowerBloom
 	sp.position = Vector2(300, 200)
 	var flat: Array = sp.collect_spawn_transforms()
 	var aim0: Transform2D = sp.global_transform

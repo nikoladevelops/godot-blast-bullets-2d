@@ -93,7 +93,7 @@ func test_flocking_shots_retain_nothing(scope: int = use_parameters([BulletFlock
 	sp.helper_ring_radius = 30.0
 	sp.flock_enabled = true
 	sp.flock = BulletFlock2D.new()
-	sp.flock_scope = scope
+	sp.flock_scope = scope as BulletFlock2D.Scope
 	var grown: int = await _steady(func(): sp.shoot_once())
 	assert_gt(factory.get_frame_stats()["flock_usec"], -1, "the pass ran")
 	assert_eq(grown, 0, "200 warm flocking shots: zero retained objects")
@@ -115,7 +115,7 @@ func test_joined_factory_spawns_and_swapped_flocks_retain_nothing() -> void:
 ## wall, graze and sound armed: every life recycles through the laser pool.
 func _laser_spawner(type: int) -> LaserSpawner2D:
 	var d := H.make_laser(0.0, 0.0, 0.05, 0.0, 200.0)
-	d.type = type
+	d.type = type as LaserData2D.LaserType
 	d.speed = 1200.0
 	d.wall_mask = 16
 	d.hit_interval_sec = 0.02

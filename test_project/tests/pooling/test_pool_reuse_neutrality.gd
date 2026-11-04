@@ -328,12 +328,12 @@ func test_every_volley_property_returns_to_its_cold_value_after_reuse() -> void:
 	assert_gt(mutated.size(), 40, "the sweep really mutated the volley (%d properties)" % mutated.size())
 	var reused := await _drain_and_reuse(v)
 	var leaks: Array = []
-	for name in mutated:
-		var now: Variant = reused.get(name)
-		var was: Variant = cold[name]
+	for node_name in mutated:
+		var now: Variant = reused.get(node_name)
+		var was: Variant = cold[node_name]
 		var same: bool = (now == was) if typeof(was) != TYPE_FLOAT else is_equal_approx(float(now), float(was))
 		if not same:
-			leaks.append("%s: %s (cold %s)" % [name, str(now), str(was)])
+			leaks.append("%s: %s (cold %s)" % [node_name, str(now), str(was)])
 	assert_eq(" | ".join(leaks), "", "no runtime setting of the previous life leaks into the reused volley")
 
 

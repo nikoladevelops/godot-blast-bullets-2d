@@ -93,7 +93,7 @@ static func make_effect_frames(frames: int = 1, fps: float = 10.0) -> SpriteFram
 ## Effect layer with `trigger` (EffectLayerData2D.EFFECT_*).
 static func make_effect_layer(trigger: int, frames: int = 1) -> EffectLayerData2D:
 	var l := EffectLayerData2D.new()
-	l.trigger = trigger
+	l.trigger = trigger as EffectLayerData2D.EffectTrigger
 	l.sprite_frames = make_effect_frames(frames)
 	return l
 
@@ -119,15 +119,15 @@ static func make_graze_zone(radii: Array = [24.0], count_bullet_size := false) -
 ## Records every graze event `emitter` (a factory or a spawner) emits as
 ## [kind, target, volley, bullet_index, zone, ring], kind "enter" / "exit".
 static func record_graze(emitter: Object) -> Array:
-	var log: Array = []
-	emitter.connect("bullet_grazed", func(t: Node2D, v: BulletVolley2D, i: int, z: GrazeZone2D, r: int) -> void: log.append(["enter", t, v, i, z, r]))
-	emitter.connect("bullet_graze_exited", func(t: Node2D, v: BulletVolley2D, i: int, z: GrazeZone2D, r: int) -> void: log.append(["exit", t, v, i, z, r]))
-	return log
+	var events: Array = []
+	emitter.connect("bullet_grazed", func(t: Node2D, v: BulletVolley2D, i: int, z: GrazeZone2D, r: int) -> void: events.append(["enter", t, v, i, z, r]))
+	emitter.connect("bullet_graze_exited", func(t: Node2D, v: BulletVolley2D, i: int, z: GrazeZone2D, r: int) -> void: events.append(["exit", t, v, i, z, r]))
+	return events
 
 ## "kind:bullet:ring" per recorded graze event (compact asserts).
-static func graze_kinds(log: Array) -> Array:
+static func graze_kinds(events: Array) -> Array:
 	var out: Array = []
-	for e in log:
+	for e in events:
 		out.append("%s:%d:%d" % [e[0], e[3], e[5]])
 	return out
 
@@ -192,7 +192,7 @@ static func make_sound_stream(seconds := 0.25, loop := true) -> AudioStreamWAV:
 ## offer can play (tests that pin the interval set it themselves).
 static func make_sound(trigger: int, max_voices := 4) -> BulletSoundData2D:
 	var s := BulletSoundData2D.new()
-	s.trigger = trigger
+	s.trigger = trigger as BulletSoundData2D.SoundTrigger
 	s.streams = [make_sound_stream()]
 	s.min_interval_sec = 0.0
 	s.max_voices = max_voices
@@ -202,7 +202,7 @@ static func make_sound(trigger: int, max_voices := 4) -> BulletSoundData2D:
 ## limits as make_sound.
 static func make_laser_sound(trigger: int, max_voices := 4) -> LaserSoundData2D:
 	var s := LaserSoundData2D.new()
-	s.trigger = trigger
+	s.trigger = trigger as LaserSoundData2D.LaserSoundTrigger
 	s.streams = [make_sound_stream()]
 	s.min_interval_sec = 0.0
 	s.max_voices = max_voices

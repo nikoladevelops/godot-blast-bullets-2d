@@ -10,10 +10,10 @@ const DT := 1.0 / 60.0
 
 
 func _stacked(count: int, at: Vector2) -> Array:
-	var tr: Array = []
+	var transforms: Array = []
 	for k in count:
-		tr.append(Transform2D(0.0, at))
-	return tr
+		transforms.append(Transform2D(0.0, at))
+	return transforms
 
 
 func _volley(transforms: Array, speed := 100.0) -> BulletVolley2D:
@@ -57,10 +57,10 @@ func test_huge_coordinates_stay_out_of_the_grid() -> void:
 
 func test_tiny_and_huge_ranges_stay_bounded(range_px: float = use_parameters([0.001, 1e30])) -> void:
 	seed(2)
-	var tr: Array = []
+	var transforms: Array = []
 	for k in 200:
-		tr.append(Transform2D(randf_range(-PI, PI), Vector2(randf_range(0, 400), randf_range(0, 400))))
-	var v := _volley(tr)
+		transforms.append(Transform2D(randf_range(-PI, PI), Vector2(randf_range(0, 400), randf_range(0, 400))))
+	var v := _volley(transforms)
 	var f := H.make_flock(1.5, 1.0, 1.0, range_px, range_px)
 	v.flock_join(f)
 	step_factory(20)
@@ -75,10 +75,10 @@ func test_tiny_and_huge_ranges_stay_bounded(range_px: float = use_parameters([0.
 
 func test_extreme_weights_stay_finite() -> void:
 	seed(4)
-	var tr: Array = []
+	var transforms: Array = []
 	for k in 60:
-		tr.append(Transform2D(randf_range(-PI, PI), Vector2(randf_range(0, 50), randf_range(0, 50))))
-	var v := _volley(tr)
+		transforms.append(Transform2D(randf_range(-PI, PI), Vector2(randf_range(0, 50), randf_range(0, 50))))
+	var v := _volley(transforms)
 	v.flock_join(H.make_flock(1e30, 1e30, 1e30))
 	step_factory(60)
 	assert_eq("\n".join(broken_bullets(v).slice(0, 5)), "", "finite, unit headings")
@@ -89,7 +89,7 @@ func test_hundreds_of_flocks_resolve_in_one_pass() -> void:
 	var f := H.make_flock(1.0, 1.0, 1.0)
 	var volleys: Array = []
 	for k in 500:
-		var at := Vector2((k % 25) * 10.0, (k / 25) * 10.0)
+		var at := Vector2((k % 25) * 10.0, floori(k / 25.0) * 10.0)
 		var v := _volley([Transform2D(0.0, at), Transform2D(0.0, at + Vector2(3, 0))])
 		v.flock_join(f, BulletFlock2D.SCOPE_PER_VOLLEY)
 		volleys.append(v)
@@ -115,11 +115,11 @@ func test_a_storm_of_membership_changes_keeps_every_invariant() -> void:
 			var pick: BulletVolley2D = null if live.is_empty() else live[randi() % live.size()]
 			match roll:
 				0, 1:
-					var tr: Array = []
+					var transforms: Array = []
 					var at := Vector2(randf_range(0, 300), randf_range(0, 300))
 					for k in 1 + randi() % 12:
-						tr.append(Transform2D(randf_range(-PI, PI), at + Vector2(randf_range(-20, 20), randf_range(-20, 20))))
-					var v := _volley(tr, randf_range(-80.0, 160.0))
+						transforms.append(Transform2D(randf_range(-PI, PI), at + Vector2(randf_range(-20, 20), randf_range(-20, 20))))
+					var v := _volley(transforms, randf_range(-80.0, 160.0))
 					v.flock_join(flocks[randi() % 3], randi() % 3)
 					volleys.append(v)
 				2:

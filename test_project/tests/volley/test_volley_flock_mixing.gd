@@ -40,14 +40,14 @@ func _mean_nearest_distance(points: Array) -> float:
 
 func _stream(count: int, seed_value: int) -> Array:
 	seed(seed_value)
-	var tr: Array = []
+	var tr_list: Array = []
 	for k in count:
-		tr.append(Transform2D(-PI * 0.5 + randf_range(-0.5, 0.5), Vector2(randf_range(-25, 25), randf_range(-25, 25))))
-	return tr
+		tr_list.append(Transform2D(-PI * 0.5 + randf_range(-0.5, 0.5), Vector2(randf_range(-25, 25), randf_range(-25, 25))))
+	return tr_list
 
 
-func _homing_data(tr: Array, smoothing := 3.0) -> BulletVolleyData2D:
-	var d := H.make_flight_data(tr, 220.0, 1000.0)
+func _homing_data(tr_list: Array, smoothing := 3.0) -> BulletVolleyData2D:
+	var d := H.make_flight_data(tr_list, 220.0, 1000.0)
 	d.homing_smoothing = smoothing
 	d.homing_take_control_of_texture_rotation = true
 	return d
@@ -58,9 +58,9 @@ func test_a_homing_swarm_reaches_its_target_spread_out() -> void:
 	# separation (10, faster than homing) spreads the arrival (bullets
 	# queue around the target) but every bullet still gets there.
 	var target := Vector2(600, 200)
-	var tr := _stream(24, 3)
-	var swarm := _volley(_homing_data(tr, 5.0), BulletFlock2D.new())
-	var plain := _volley(_homing_data(tr, 5.0))
+	var tr_list := _stream(24, 3)
+	var swarm := _volley(_homing_data(tr_list, 5.0), BulletFlock2D.new())
+	var plain := _volley(_homing_data(tr_list, 5.0))
 	swarm.shared_homing_deque_push_back_global_position_target(target)
 	plain.shared_homing_deque_push_back_global_position_target(target)
 	var reached := {}
@@ -110,12 +110,12 @@ func test_no_heading_snap_when_the_homing_delay_ends() -> void:
 
 func test_override_direction_curves_win_and_additive_ones_compose() -> void:
 	# The pair pulls together along y; the curves run after the flock.
-	var tr := [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 30))]
+	var tr_list := [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 30))]
 	for mode in [BulletCurvesData2D.Override, BulletCurvesData2D.Additive]:
 		var curves := BulletCurvesData2D.new()
 		curves.y_direction_curve = H.make_flat_curve(0.0)
 		curves.y_direction_curve_mode = mode
-		var d := H.make_flight_data(tr, 100.0, 1000.0)
+		var d := H.make_flight_data(tr_list, 100.0, 1000.0)
 		d.shared_bullet_curves_data = curves
 		var flocked := _volley(d, H.make_flock(0.0, 0.0, 3.0))
 		step_factory(30)
@@ -129,8 +129,8 @@ func test_override_direction_curves_win_and_additive_ones_compose() -> void:
 
 
 func test_a_rotation_that_owns_the_heading_still_lets_the_flock_turn() -> void:
-	var tr := [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 40))]
-	var d := H.make_flight_data(tr, 100.0, 1000.0)
+	var tr_list := [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 40))]
+	var d := H.make_flight_data(tr_list, 100.0, 1000.0)
 	d.adjust_direction_based_on_rotation = true
 	d.rotate_only_textures = false
 	d.shared_bullet_rotation_data = H.make_rotation(0.0, 0.0)
@@ -144,11 +144,11 @@ func test_a_rotation_that_owns_the_heading_still_lets_the_flock_turn() -> void:
 
 
 func test_face_heading_turns_the_sprite_with_the_heading() -> void:
-	var tr := [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 40))]
-	var on := _volley(H.make_flight_data(tr, 100.0, 1000.0), H.make_flock(0.0, 0.0, 3.0))
+	var tr_list := [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 40))]
+	var on := _volley(H.make_flight_data(tr_list, 100.0, 1000.0), H.make_flock(0.0, 0.0, 3.0))
 	var off_flock := H.make_flock(0.0, 0.0, 3.0)
 	off_flock.face_heading = false
-	var off := _volley(H.make_flight_data(tr, 100.0, 1000.0), off_flock)
+	var off := _volley(H.make_flight_data(tr_list, 100.0, 1000.0), off_flock)
 	step_factory(20)
 	assert_gt(on.get_bullet_direction(0).y, 0.05, "turned")
 	assert_almost_eq(on.get_bullet_transform(0).get_rotation(), on.get_bullet_direction(0).angle(), 1e-4, "face_heading: the sprite faces the heading")
@@ -157,10 +157,10 @@ func test_face_heading_turns_the_sprite_with_the_heading() -> void:
 
 
 func test_a_locked_orbit_is_never_turned() -> void:
-	var tr := [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 30))]
+	var tr_list := [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 30))]
 	var volleys: Array = []
 	for k in 2:
-		var d := H.make_flight_data(tr, 300.0, 1000.0)
+		var d := H.make_flight_data(tr_list, 300.0, 1000.0)
 		d.homing_smoothing = 30.0
 		d.homing_take_control_of_texture_rotation = true
 		var v: BulletVolley2D = factory.spawn_volley(d)
@@ -182,13 +182,13 @@ func test_a_locked_orbit_is_never_turned() -> void:
 
 
 func test_gravity_is_drift_for_the_flock() -> void:
-	var tr: Array = []
+	var tr_list: Array = []
 	for k in 5:
-		tr.append(Transform2D(0.0, Vector2(k * 15.0, 0)))
-	var d := H.make_flight_data(tr, 100.0, 1000.0)
+		tr_list.append(Transform2D(0.0, Vector2(k * 15.0, 0)))
+	var d := H.make_flight_data(tr_list, 100.0, 1000.0)
 	d.gravity = Vector2(0, 300)
 	var flocked := _volley(d, H.make_flock(0.0, 1.0, 0.0))
-	var d2 := H.make_flight_data(tr, 100.0, 1000.0)
+	var d2 := H.make_flight_data(tr_list, 100.0, 1000.0)
 	d2.gravity = Vector2(0, 300)
 	var control := _volley(d2)
 	step_factory(40)
@@ -207,8 +207,8 @@ func test_bounced_bullets_keep_flocking() -> void:
 	col.shape = box
 	wall.add_child(col)
 	add(wall)
-	var tr := [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 20)), Transform2D(0.0, Vector2(0, 40))]
-	var d := H.make_flight_data(tr, 200.0, 1000.0)
+	var tr_list := [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 20)), Transform2D(0.0, Vector2(0, 40))]
+	var d := H.make_flight_data(tr_list, 200.0, 1000.0)
 	d.set_collision_mask_from_array([4])
 	d.set_bounce_mask_from_array([4])
 	d.bounce_mode = BulletVolleyData2D.BOUNCE_PRECISE_SHAPE
@@ -230,8 +230,8 @@ func test_bounced_bullets_keep_flocking() -> void:
 
 
 func test_a_frozen_bullet_world_turns_nothing() -> void:
-	var tr := [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 40))]
-	var v := _volley(H.make_flight_data(tr, 100.0, 1000.0), H.make_flock(0.0, 0.0, 3.0))
+	var tr_list := [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 40))]
+	var v := _volley(H.make_flight_data(tr_list, 100.0, 1000.0), H.make_flock(0.0, 0.0, 3.0))
 	step_factory(1)
 	factory.time_scale = 0.0
 	var headings := [v.get_bullet_direction(0), v.get_bullet_direction(1)]
@@ -245,8 +245,8 @@ func test_a_frozen_bullet_world_turns_nothing() -> void:
 
 func test_interpolated_flocks_stay_finite() -> void:
 	factory.physics_interpolation = BulletFactory2D.INTERPOLATION_ON
-	var tr := _stream(12, 4)
-	var v := _volley(H.make_flight_data(tr, 150.0, 1000.0), BulletFlock2D.new())
+	var tr_list := _stream(12, 4)
+	var v := _volley(H.make_flight_data(tr_list, 150.0, 1000.0), BulletFlock2D.new())
 	for frame in 30:
 		await physics()
 		await idle(1)
@@ -258,8 +258,8 @@ func test_interpolated_flocks_stay_finite() -> void:
 func test_despawned_bullets_leave_the_flock() -> void:
 	factory.despawn_bounds_enabled = true
 	factory.despawn_bounds_rect = Rect2(-100, -100, 300, 300)
-	var tr := [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 20)), Transform2D(0.0, Vector2(190, 50))]
-	var v := _volley(H.make_flight_data(tr, 100.0, 1000.0), H.make_flock(0.0, 0.0, 0.5))
+	var tr_list := [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 20)), Transform2D(0.0, Vector2(190, 50))]
+	var v := _volley(H.make_flight_data(tr_list, 100.0, 1000.0), H.make_flock(0.0, 0.0, 0.5))
 	step_factory(1)
 	assert_eq(factory.debug_get_flock_stats()["grid_members"], 3, "three in the flock")
 	for tick in 60: # bullet 2 leaves the bounds
@@ -275,8 +275,8 @@ func test_face_heading_keeps_facing_while_homing_snaps_the_heading() -> void:
 	# A movement pattern makes homing snap the heading straight at the target
 	# every tick (the sprite is not touched by that snap): face_heading must
 	# still leave the sprite facing the flight, never drift away from it.
-	var tr := [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 40)), Transform2D(0.0, Vector2(30, 20))]
-	var v := _volley(H.make_flight_data(tr, 120.0, 1000.0), H.make_flock(2.0, 1.0, 3.0))
+	var tr_list := [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 40)), Transform2D(0.0, Vector2(30, 20))]
+	var v := _volley(H.make_flight_data(tr_list, 120.0, 1000.0), H.make_flock(2.0, 1.0, 3.0))
 	var c := Curve2D.new()
 	c.add_point(Vector2.ZERO)
 	c.add_point(Vector2(100, 0))
@@ -299,11 +299,11 @@ func test_face_heading_keeps_facing_while_homing_snaps_the_heading() -> void:
 func test_face_heading_leaves_a_spinning_sprite_to_its_spin() -> void:
 	# Rotation data owns the sprite (it spins): the flock turns the heading
 	# but never adds its turns to the spinning sprite.
-	var tr := [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 40))]
-	var d := H.make_flight_data(tr, 100.0, 1000.0)
+	var tr_list := [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 40))]
+	var d := H.make_flight_data(tr_list, 100.0, 1000.0)
 	d.shared_bullet_rotation_data = H.make_rotation(2.0, 10.0)
 	var flocked := _volley(d, H.make_flock(0.0, 0.0, 3.0))
-	var d2 := H.make_flight_data(tr, 100.0, 1000.0)
+	var d2 := H.make_flight_data(tr_list, 100.0, 1000.0)
 	d2.shared_bullet_rotation_data = H.make_rotation(2.0, 10.0)
 	var control := _volley(d2)
 	step_factory(40)
@@ -314,14 +314,14 @@ func test_face_heading_leaves_a_spinning_sprite_to_its_spin() -> void:
 
 func _cluster(count: int, at := Vector2.ZERO, seed_value := 3, spread := 40.0) -> Array:
 	seed(seed_value)
-	var tr: Array = []
+	var tr_list: Array = []
 	for k in count:
-		tr.append(Transform2D(randf_range(-0.6, 0.6), at + Vector2(randf_range(0, spread), randf_range(0, spread))))
-	return tr
+		tr_list.append(Transform2D(randf_range(-0.6, 0.6), at + Vector2(randf_range(0, spread), randf_range(0, spread))))
+	return tr_list
 
 
-func _flock_volley(tr: Array, flock: BulletFlock2D = null, speed := 120.0) -> BulletVolley2D:
-	var v: BulletVolley2D = factory.spawn_volley(H.make_flight_data(tr, speed, 1000.0))
+func _flock_volley(tr_list: Array, flock: BulletFlock2D = null, speed := 120.0) -> BulletVolley2D:
+	var v: BulletVolley2D = factory.spawn_volley(H.make_flight_data(tr_list, speed, 1000.0))
 	v.flock_join(flock if flock != null else BulletFlock2D.new())
 	return v
 
@@ -352,11 +352,11 @@ func _steered(v: BulletVolley2D) -> bool:
 
 func test_graze_reports_while_the_flock_steers() -> void:
 	make_graze_target(Vector2(150, 20))
-	var log := H.record_graze(factory)
+	var entries := H.record_graze(factory)
 	var v := _flock_volley(_cluster(8))
 	v.graze_set_zones([H.make_graze_zone([80.0])], &"graze_targets") # the default flock spreads the cluster
 	step_factory(90)
-	assert_gt(log.size(), 0, "the flock grazed the target")
+	assert_gt(entries.size(), 0, "the flock grazed the target")
 	assert_true(_steered(v), "and kept flocking")
 	assert_eq(_broken(v), [], "finite, unit, consistent")
 
@@ -522,8 +522,8 @@ func test_converting_a_flock_to_pickups_leaves_no_flocking_behind() -> void:
 
 
 func test_an_area_clear_removes_flockmates() -> void:
-	var tr := [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(10, 0)), Transform2D(0.0, Vector2(0, 30)), Transform2D(0.0, Vector2(300, 0))]
-	var v := _flock_volley(tr)
+	var tr_list := [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(10, 0)), Transform2D(0.0, Vector2(0, 30)), Transform2D(0.0, Vector2(300, 0))]
+	var v := _flock_volley(tr_list)
 	step_factory(1)
 	assert_eq(factory.debug_get_flock_stats()["grid_members"], 4, "four in the grid")
 	factory.clear_bullets_in_circle(Vector2(0, 0), 15.0)
@@ -541,7 +541,7 @@ func test_randomized_speeds_stay_owned_by_the_spawner() -> void:
 	sp.flock_enabled = true
 	sp.flock = BulletFlock2D.new()
 	var got: Array = []
-	sp.volley_fired.connect(func(v: BulletVolley2D, _n: int) -> void: got.append(v))
+	sp.volley_fired.connect(func(fired: BulletVolley2D, _n: int) -> void: got.append(fired))
 	sp.shoot_once()
 	var v: BulletVolley2D = got[0]
 	var speeds: Array = []
@@ -561,11 +561,11 @@ func test_two_factories_never_share_a_flock() -> void:
 	add(other)
 	await idle(1)
 	var f := BulletFlock2D.new()
-	var tr := _cluster(8)
-	var here := _flock_volley(tr, f)
-	var there: BulletVolley2D = other.spawn_volley(H.make_flight_data(tr, 120.0, 1000.0))
+	var tr_list := _cluster(8)
+	var _here := _flock_volley(tr_list, f)
+	var there: BulletVolley2D = other.spawn_volley(H.make_flight_data(tr_list, 120.0, 1000.0))
 	there.flock_join(f)
-	var solo := _flock_volley(tr, BulletFlock2D.new())
+	var solo := _flock_volley(tr_list, BulletFlock2D.new())
 	solo.global_position = Vector2.ZERO
 	for k in 30:
 		factory.debug_advance_time(DT)

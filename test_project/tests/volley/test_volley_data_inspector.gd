@@ -16,20 +16,20 @@ func _own_properties(obj: Object) -> Array:
 	var group := ""
 	for p in obj.get_property_list():
 		var usage: int = int(p.get("usage", 0))
-		var name := str(p.get("name", ""))
+		var node_name := str(p.get("name", ""))
 		if (usage & PROPERTY_USAGE_CATEGORY) != 0:
-			in_own = name == own_category
+			in_own = node_name == own_category
 			continue
 		if not in_own:
 			continue
 		if (usage & PROPERTY_USAGE_GROUP) != 0:
-			group = name
+			group = node_name
 			continue
 		if (usage & PROPERTY_USAGE_SUBGROUP) != 0:
 			continue
 		if (usage & PROPERTY_USAGE_EDITOR) == 0:
 			continue
-		out.append({"name": name, "group": group})
+		out.append({"name": node_name, "group": group})
 	return out
 
 
@@ -39,11 +39,11 @@ func _groups(obj: Object) -> Array:
 	var in_own := false
 	for p in obj.get_property_list():
 		var usage: int = int(p.get("usage", 0))
-		var name := str(p.get("name", ""))
+		var node_name := str(p.get("name", ""))
 		if (usage & PROPERTY_USAGE_CATEGORY) != 0:
-			in_own = name == own_category
+			in_own = node_name == own_category
 		elif in_own and (usage & PROPERTY_USAGE_GROUP) != 0:
-			out.append(name)
+			out.append(node_name)
 	return out
 
 

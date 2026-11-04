@@ -37,9 +37,9 @@ func _polarization(v: BulletVolley2D) -> float:
 
 
 func test_cohesion_turns_flockmates_toward_each_other() -> void:
-	var tr := [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 30))]
-	var v := _flocked(tr, H.make_flock(0.0, 0.0, 1.0))
-	var control := _volley(tr)
+	var transforms := [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 30))]
+	var v := _flocked(transforms, H.make_flock(0.0, 0.0, 1.0))
+	var control := _volley(transforms)
 	step_factory(1)
 	var s0: Vector2 = v.debug_get_bullet_flock_steering(0)
 	assert_gt(s0.y, 0.0, "bullet 0 is pulled toward bullet 1 (+y)")
@@ -58,10 +58,10 @@ func test_cohesion_turns_flockmates_toward_each_other() -> void:
 
 func test_alignment_lines_the_headings_up() -> void:
 	seed(7)
-	var tr: Array = []
+	var transforms: Array = []
 	for k in 9:
-		tr.append(Transform2D(randf_range(-1.2, 1.2), Vector2((k % 3) * 12.0, (k / 3) * 12.0)))
-	var v := _flocked(tr, H.make_flock(0.0, 2.0, 0.0, 200.0, 0.0))
+		transforms.append(Transform2D(randf_range(-1.2, 1.2), Vector2((k % 3) * 12.0, floori(k / 3.0) * 12.0)))
+	var v := _flocked(transforms, H.make_flock(0.0, 2.0, 0.0, 200.0, 0.0))
 	var before := _polarization(v)
 	var last := before
 	var problems: Array = []
@@ -76,19 +76,19 @@ func test_alignment_lines_the_headings_up() -> void:
 
 
 func test_a_calm_aligned_flock_flies_bit_identical_to_no_flock() -> void:
-	var tr: Array = []
+	var transforms: Array = []
 	for k in 6:
-		tr.append(Transform2D(0.3, Vector2(k * 15.0, k * 4.0)))
-	var v := _flocked(tr, H.make_flock(0.0, 1.0, 0.0))
-	var control := _volley(tr)
+		transforms.append(Transform2D(0.3, Vector2(k * 15.0, k * 4.0)))
+	var v := _flocked(transforms, H.make_flock(0.0, 1.0, 0.0))
+	var control := _volley(transforms)
 	step_factory(30)
 	assert_eq(origins(v), origins(control), "every heading already matches the flock: nothing turns")
 	assert_eq(_headings(v), _headings(control), "headings untouched")
 
 
 func test_separation_opens_the_gap_up_to_the_separation_range() -> void:
-	var tr := [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 10))]
-	var v := _flocked(tr, H.make_flock(2.0, 0.0, 0.0, 100.0, 40.0))
+	var transforms := [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 10))]
+	var v := _flocked(transforms, H.make_flock(2.0, 0.0, 0.0, 100.0, 40.0))
 	step_factory(1)
 	var s0: Vector2 = v.debug_get_bullet_flock_steering(0)
 	assert_lt(s0.y, 0.0, "bullet 0 is pushed away from bullet 1 (-y)")
@@ -114,10 +114,10 @@ func test_separation_opens_the_gap_up_to_the_separation_range() -> void:
 func test_stacked_bullets_part_deterministically() -> void:
 	var runs: Array = []
 	for run in 2:
-		var tr: Array = []
+		var transforms: Array = []
 		for k in 6:
-			tr.append(Transform2D(0.0, Vector2(50, 50)))
-		var v := _flocked(tr, H.make_flock(2.0, 0.0, 0.0, 100.0, 40.0))
+			transforms.append(Transform2D(0.0, Vector2(50, 50)))
+		var v := _flocked(transforms, H.make_flock(2.0, 0.0, 0.0, 100.0, 40.0))
 		step_factory(60)
 		var p := origins(v)
 		assert_gt(min_pair_distance(p), 4.0, "run %d: every stacked pair parted" % run)
@@ -128,9 +128,9 @@ func test_stacked_bullets_part_deterministically() -> void:
 
 
 func test_flockmates_out_of_range_change_nothing() -> void:
-	var tr := [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 150)), Transform2D(0.0, Vector2(150, 0))]
-	var v := _flocked(tr, H.make_flock(2.0, 1.0, 1.0, 100.0, 40.0))
-	var control := _volley(tr)
+	var transforms := [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 150)), Transform2D(0.0, Vector2(150, 0))]
+	var v := _flocked(transforms, H.make_flock(2.0, 1.0, 1.0, 100.0, 40.0))
+	var control := _volley(transforms)
 	step_factory(30)
 	assert_eq(origins(v), origins(control), "150 px apart with a 100 px range: no flockmate in sight")
 	for i in 3:
@@ -140,11 +140,11 @@ func test_flockmates_out_of_range_change_nothing() -> void:
 
 func test_zero_weights_are_bit_identical_to_no_flock() -> void:
 	seed(3)
-	var tr: Array = []
+	var transforms: Array = []
 	for k in 12:
-		tr.append(Transform2D(randf_range(-PI, PI), Vector2(randf_range(0, 40), randf_range(0, 40))))
-	var v := _flocked(tr, H.make_flock(0.0, 0.0, 0.0))
-	var control := _volley(tr)
+		transforms.append(Transform2D(randf_range(-PI, PI), Vector2(randf_range(0, 40), randf_range(0, 40))))
+	var v := _flocked(transforms, H.make_flock(0.0, 0.0, 0.0))
+	var control := _volley(transforms)
 	step_factory(30)
 	assert_eq(origins(v), origins(control), "positions bit-identical")
 	assert_eq(_headings(v), _headings(control), "headings bit-identical")
@@ -153,8 +153,8 @@ func test_zero_weights_are_bit_identical_to_no_flock() -> void:
 
 func test_ranges_are_independent() -> void:
 	# Separation reaching past the neighbor range still pushes.
-	var tr := [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 30))]
-	var v := _flocked(tr, H.make_flock(1.0, 0.0, 1.0, 20.0, 60.0))
+	var transforms := [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 30))]
+	var v := _flocked(transforms, H.make_flock(1.0, 0.0, 1.0, 20.0, 60.0))
 	step_factory(1)
 	var s0: Vector2 = v.debug_get_bullet_flock_steering(0)
 	assert_almost_eq(s0.y, -1.0 * (1.0 - 30.0 / 60.0), 1e-5, "separation only: the pair is outside the 20 px neighbor range")
@@ -163,15 +163,15 @@ func test_ranges_are_independent() -> void:
 
 func test_mirrored_flocks_fly_mirrored() -> void:
 	seed(11)
-	var tr: Array = []
+	var transforms: Array = []
 	var mirrored: Array = []
 	for k in 7:
 		var angle := randf_range(-0.8, 0.8)
 		var pos := Vector2(randf_range(0, 60), randf_range(5, 50))
-		tr.append(Transform2D(angle, pos))
+		transforms.append(Transform2D(angle, pos))
 		mirrored.append(Transform2D(-angle, Vector2(pos.x, -pos.y) + Vector2(0, 1000)))
 	var f := H.make_flock(1.5, 1.0, 1.0)
-	var a := _flocked(tr, f)
+	var a := _flocked(transforms, f)
 	var b := _flocked(mirrored, H.make_flock(1.5, 1.0, 1.0))
 	step_factory(60)
 	var problems: Array = []
@@ -189,17 +189,17 @@ func test_a_capped_lattice_has_no_net_pull() -> void:
 	# every flockmate a capped bullet reads comes from the cell rings around
 	# it: with the ring start rotating per bullet the pulls cancel out (a
 	# fixed scan order would pull every bullet toward the same corner).
-	var tr: Array = []
+	var transforms: Array = []
 	for row in 20:
 		for col in 20:
-			tr.append(Transform2D(0.0, Vector2(25.0 + 50.0 * col, 25.0 + 50.0 * row)))
+			transforms.append(Transform2D(0.0, Vector2(25.0 + 50.0 * col, 25.0 + 50.0 * row)))
 	var capped := H.make_flock(0.0, 0.0, 1.0)
 	capped.max_neighbors = 3
-	var v := _flocked(tr, capped, 0.0)
+	var v := _flocked(transforms, capped, 0.0)
 	step_factory(1)
 	var net := Vector2()
 	var total := 0.0
-	for i in tr.size():
+	for i in transforms.size():
 		var s: Vector2 = v.debug_get_bullet_flock_steering(i)
 		net += s
 		total += s.length()
@@ -209,12 +209,12 @@ func test_a_capped_lattice_has_no_net_pull() -> void:
 
 
 func test_max_neighbors_is_exact_and_bounds_the_work(cap: int = use_parameters([0, 1, 5, 49, 100])) -> void:
-	var tr: Array = []
+	var transforms: Array = []
 	for k in 50:
-		tr.append(Transform2D(0.0, Vector2(10, 10)))
+		transforms.append(Transform2D(0.0, Vector2(10, 10)))
 	var f := H.make_flock(1.0, 1.0, 1.0)
 	f.max_neighbors = cap
-	var v := _flocked(tr, f, 0.0)
+	var v := _flocked(transforms, f, 0.0)
 	step_factory(1)
 	var want := 49 if cap == 0 or cap >= 49 else cap
 	for i in 50:
@@ -225,11 +225,11 @@ func test_max_neighbors_is_exact_and_bounds_the_work(cap: int = use_parameters([
 
 
 func test_the_turn_cap_holds_every_tick() -> void:
-	var tr := [Transform2D(0.0, Vector2(0, 0)), Transform2D(PI, Vector2(0, 20))]
+	var transforms := [Transform2D(0.0, Vector2(0, 0)), Transform2D(PI, Vector2(0, 20))]
 	var f := H.make_flock(0.0, 50.0, 50.0)
 	f.max_turn_rate_degrees = 90.0
-	var v := _flocked(tr, f)
-	var free_v := _flocked(tr, H.make_flock(0.0, 50.0, 50.0))
+	var v := _flocked(transforms, f)
+	var free_v := _flocked(transforms, H.make_flock(0.0, 50.0, 50.0))
 	var limit := deg_to_rad(90.0) * DT
 	var problems: Array = []
 	var biggest_free := 0.0
@@ -247,22 +247,22 @@ func test_the_turn_cap_holds_every_tick() -> void:
 
 func test_only_the_direction_turns() -> void:
 	seed(5)
-	var tr: Array = []
+	var transforms: Array = []
 	for k in 6:
-		tr.append(Transform2D(randf_range(-PI, PI), Vector2(randf_range(0, 30), randf_range(0, 30))))
-	var v := _flocked(tr, H.make_flock(1.5, 1.0, 1.0), 120.0)
+		transforms.append(Transform2D(randf_range(-PI, PI), Vector2(randf_range(0, 30), randf_range(0, 30))))
+	var v := _flocked(transforms, H.make_flock(1.5, 1.0, 1.0), 120.0)
 	var problems: Array = []
-	for round in 100:
+	for round_index in 100:
 		step_factory(100)
 		for i in 6:
 			var d: Vector2 = v.get_bullet_direction(i)
 			if absf(d.length() - 1.0) > 1e-5:
-				problems.append("tick %d bullet %d: |direction| = %.7f" % [(round + 1) * 100, i, d.length()])
+				problems.append("tick %d bullet %d: |direction| = %.7f" % [(round_index + 1) * 100, i, d.length()])
 			if absf(v.get_bullet_velocity(i).length() - 120.0) > 1e-3:
-				problems.append("tick %d bullet %d: |velocity| = %.5f" % [(round + 1) * 100, i, v.get_bullet_velocity(i).length()])
+				problems.append("tick %d bullet %d: |velocity| = %.5f" % [(round_index + 1) * 100, i, v.get_bullet_velocity(i).length()])
 			var basis: Transform2D = v.get_bullet_transform(i)
 			if absf(basis.x.length() - 1.0) > 1e-4 or absf(basis.y.length() - 1.0) > 1e-4:
-				problems.append("tick %d bullet %d: the rotation scaled the bullet (%f, %f)" % [(round + 1) * 100, i, basis.x.length(), basis.y.length()])
+				problems.append("tick %d bullet %d: the rotation scaled the bullet (%f, %f)" % [(round_index + 1) * 100, i, basis.x.length(), basis.y.length()])
 	assert_eq("\n".join(problems.slice(0, 8)), "", "10k ticks: unit direction, speed untouched, the sprite keeps its size")
 
 
@@ -270,12 +270,12 @@ func test_two_runs_are_bit_identical() -> void:
 	var runs: Array = []
 	for run in 2:
 		seed(21)
-		var tr: Array = []
+		var transforms: Array = []
 		for k in 40:
-			tr.append(Transform2D(randf_range(-PI, PI), Vector2(randf_range(0, 120), randf_range(0, 120))))
+			transforms.append(Transform2D(randf_range(-PI, PI), Vector2(randf_range(0, 120), randf_range(0, 120))))
 		var f := H.make_flock(1.5, 1.0, 1.0)
 		f.max_neighbors = 8
-		var v := _flocked(tr, f)
+		var v := _flocked(transforms, f)
 		step_factory(90)
 		runs.append(origins(v))
 		factory.reset()
@@ -315,8 +315,8 @@ func test_volley_order_only_changes_rounding() -> void:
 func test_frame_rate_changes_the_flight_only_slightly() -> void:
 	var results: Array = []
 	for rate in [60, 120]:
-		var tr := [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.4, Vector2(10, 40)), Transform2D(-0.3, Vector2(30, 15))]
-		var v := _flocked(tr, H.make_flock(1.5, 1.0, 1.0))
+		var transforms := [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.4, Vector2(10, 40)), Transform2D(-0.3, Vector2(30, 15))]
+		var v := _flocked(transforms, H.make_flock(1.5, 1.0, 1.0))
 		step_factory(rate, 1.0 / rate)
 		results.append([origins(v), _headings(v)])
 		factory.reset()
@@ -347,10 +347,10 @@ func test_a_negative_speed_flies_with_its_flock() -> void:
 func test_the_view_angle_hides_flockmates_behind() -> void:
 	# Bullet 0 flies +x; bullet 1 sits 30 px straight behind it, bullet 2
 	# 30 px straight ahead of bullet 1 (so bullet 1 sees it).
-	var tr := [Transform2D(0.0, Vector2(30, 0)), Transform2D(0.0, Vector2(0, 0))]
+	var transforms := [Transform2D(0.0, Vector2(30, 0)), Transform2D(0.0, Vector2(0, 0))]
 	var narrow := H.make_flock(0.0, 0.0, 1.0)
 	narrow.view_angle_degrees = 180.0
-	var v := _flocked(tr, narrow)
+	var v := _flocked(transforms, narrow)
 	var wide := _flocked([Transform2D(0.0, Vector2(30, 500)), Transform2D(0.0, Vector2(0, 500))], H.make_flock(0.0, 0.0, 1.0))
 	step_factory(1)
 	assert_eq(v.debug_get_bullet_flock_neighbors(0), 0, "180 deg: the flockmate behind is not seen")
@@ -373,12 +373,12 @@ func test_the_view_cone_follows_the_flight_heading() -> void:
 
 
 func test_a_narrow_view_still_parts_stacked_bullets() -> void:
-	var tr: Array = []
+	var transforms: Array = []
 	for k in 6:
-		tr.append(Transform2D(0.0, Vector2(50, 50)))
+		transforms.append(Transform2D(0.0, Vector2(50, 50)))
 	var f := H.make_flock(2.0, 0.0, 0.0)
 	f.view_angle_degrees = 10.0
-	var v := _flocked(tr, f)
+	var v := _flocked(transforms, f)
 	step_factory(60)
 	# Once parted they leave each other's 10 deg view (and stop pushing):
 	# what matters is that no two stay stacked.
@@ -415,8 +415,8 @@ func _sized(transforms: Array, size: float, flock: BulletFlock2D) -> BulletVolle
 func test_separation_counts_the_gap_between_bullet_edges() -> void:
 	# Two 64 px bullets 80 px apart: a 16 px gap inside the 24 px personal
 	# space. Push = weight x (1 - gap / range) along the pair.
-	var tr := [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 80))]
-	var v := _sized(tr, 64.0, H.make_flock(3.0, 0.0, 0.0, 100.0, 24.0, true))
+	var transforms := [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 80))]
+	var v := _sized(transforms, 64.0, H.make_flock(3.0, 0.0, 0.0, 100.0, 24.0, true))
 	step_factory(1)
 	assert_almost_eq(v.debug_get_bullet_flock_steering(0).y, -3.0 * (1.0 - 16.0 / 24.0), 1e-4, "edge gap 16 of 24")
 	# Centers only (off): 80 px is far outside 24 px, no push at all.
@@ -437,8 +437,8 @@ func test_overlapping_bullets_push_harder_than_touching_ones() -> void:
 
 func test_each_bullets_scale_counts() -> void:
 	# A bullet drawn at 2x is twice as wide: 16 px quads at 2x = 32 px.
-	var tr := [Transform2D(0.0, Vector2(2, 2), 0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(2, 2), 0.0, Vector2(0, 50))]
-	var v := _sized(tr, 16.0, H.make_flock(3.0, 0.0, 0.0, 100.0, 24.0, true))
+	var transforms := [Transform2D(0.0, Vector2(2, 2), 0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(2, 2), 0.0, Vector2(0, 50))]
+	var v := _sized(transforms, 16.0, H.make_flock(3.0, 0.0, 0.0, 100.0, 24.0, true))
 	step_factory(1)
 	assert_almost_eq(v.debug_get_bullet_flock_steering(0).y, -3.0 * (1.0 - 18.0 / 24.0), 1e-4, "50 - 16 - 16 = an 18 px gap")
 
@@ -466,10 +466,10 @@ func test_the_defaults_spread_overlapping_bullets_of_any_size() -> void:
 	# The out-of-the-box flock: a 5-bullet clump of 16 px or 128 px bullets
 	# (overlapping) parts until every pair has a visible gap.
 	for size in [16.0, 128.0]:
-		var tr: Array = []
+		var transforms: Array = []
 		for k in 5:
-			tr.append(Transform2D(0.0, Vector2(k * size * 0.5, 0.0) + Vector2(0, size * 10.0)))
-		var d := H.make_flight_data(tr, 120.0, 1000.0)
+			transforms.append(Transform2D(0.0, Vector2(k * size * 0.5, 0.0) + Vector2(0, size * 10.0)))
+		var d := H.make_flight_data(transforms, 120.0, 1000.0)
 		d.texture_size = Vector2(size, size)
 		var v: BulletVolley2D = factory.spawn_volley(d)
 		v.flock_join(BulletFlock2D.new())

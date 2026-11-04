@@ -66,19 +66,19 @@ func _expect(label: String, want: Dictionary) -> void:
 	var causes := ["hit", "lifetime", "despawn", "clear", "split", "split_manual", "pickup", "collect", "manual"]
 	for t in death_sounds:
 		var got := _count("offer:%d" % t)
-		var exp := int(want.get("s%d" % t, 0))
-		if got != exp:
-			problems.append("%s: %d sound offers of trigger %d, expected %d" % [label, got, t, exp])
+		var expected := int(want.get("s%d" % t, 0))
+		if got != expected:
+			problems.append("%s: %d sound offers of trigger %d, expected %d" % [label, got, t, expected])
 	for t in death_effects:
 		var got := _count("effect:%d" % t)
-		var exp := int(want.get("e%d" % t, 0))
-		if got != exp:
-			problems.append("%s: %d effects of trigger %d, expected %d" % [label, got, t, exp])
+		var expected := int(want.get("e%d" % t, 0))
+		if got != expected:
+			problems.append("%s: %d effects of trigger %d, expected %d" % [label, got, t, expected])
 	for c in causes:
 		var got := _count("disable:" + c)
-		var exp := int(want.get("d" + c, 0))
-		if got != exp:
-			problems.append("%s: %d bullets left by '%s', expected %d" % [label, got, c, exp])
+		var expected := int(want.get("d" + c, 0))
+		if got != expected:
+			problems.append("%s: %d bullets left by '%s', expected %d" % [label, got, c, expected])
 	assert_eq("\n".join(problems), "", label)
 
 
@@ -207,7 +207,7 @@ func test_a_bounce_a_homing_reach_and_a_graze() -> void:
 		d.monitorable = true
 		d.set_collision_mask_from_array([4])
 		d.set_bounce_mask_from_array([4])
-		d.bounce_mode = 1
+		d.bounce_mode = BulletVolleyData2D.BOUNCE_PRECISE_SHAPE
 		d.bullet_max_collision_count = 0
 		d.homing_smoothing = 0.0
 		d.homing_take_control_of_texture_rotation = true

@@ -82,18 +82,20 @@ func test_the_resource_is_bound_with_serialized_triggers() -> void:
 	assert_eq([LaserSoundData2D.STREAM_SHUFFLE, LaserSoundData2D.SOUND_AUDIBILITY_CAMERA, LaserSoundData2D.STEAL_QUIETEST, LaserSoundData2D.SOUND_LIMIT_SKIP_NEW], [BulletSoundData2D.STREAM_SHUFFLE, BulletSoundData2D.SOUND_AUDIBILITY_CAMERA, BulletSoundData2D.STEAL_QUIETEST, BulletSoundData2D.SOUND_LIMIT_SKIP_NEW], "the shared mix enums are spelled on the laser class too")
 	assert_eq(s.trigger, LaserSoundData2D.LASER_SOUND_ON_HIT, "On Hit by default")
 	assert_eq(s.follow_point, LaserSoundData2D.FOLLOW_TIP, "the tip by default")
-	s.trigger = 14
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	s.trigger = (14 as LaserSoundData2D.LaserSoundTrigger)
 	expect_error_sequence(["LaserSoundData2D: trigger must be 0 (On Shot), 1 (On Telegraph), 2 (On Charge), 3 (On Fire), 4 (On Active), 5 (On Hit), 6 (On Pierce Start), 7 (On Pierce End), 8 (On Wall Hit), 9 (On Graze), 10 (On Graze Exit), 11 (On Finish), 12 (On Ended Early) or 13 (On Despawn), keeping the old value."])
-	s.follow_point = 2
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	s.follow_point = (2 as LaserSoundData2D.FollowPoint)
 	expect_error_sequence(["LaserSoundData2D: follow_point must be 0 (Tip) or 1 (Muzzle), keeping the old value."])
 	assert_eq([s.trigger, s.follow_point], [LaserSoundData2D.LASER_SOUND_ON_HIT, LaserSoundData2D.FOLLOW_TIP], "old values kept")
 
 
 func test_ring_filters_show_only_for_the_graze_triggers() -> void:
 	var s := LaserSoundData2D.new()
-	var visible := func(name: String) -> bool:
+	var visible := func(sound_name: String) -> bool:
 		for p in s.get_property_list():
-			if p["name"] == name:
+			if p["name"] == sound_name:
 				return int(p["usage"]) & PROPERTY_USAGE_EDITOR != 0
 		return false
 	assert_false(visible.call("ring_index"), "hidden for On Hit")

@@ -11,11 +11,11 @@ var _knob := {"helper_ring_radius": 140.0}
 func describe() -> String:
 	return "40 spawners x shoot_once_with() per frame (empty / one-knob overrides)"
 
-func _per_shot_us(call: Callable, reps: int) -> float:
+func _per_shot_us(callable: Callable, reps: int) -> float:
 	var t0 := Time.get_ticks_usec()
 	for r in reps:
 		for sp in _spawners:
-			call.call(sp)
+			callable.call(sp)
 	return float(Time.get_ticks_usec() - t0) / float(reps * _spawners.size())
 
 func setup() -> void:
@@ -25,7 +25,7 @@ func setup() -> void:
 	for i in 40:
 		var sp := BulletSpawner2D.new()
 		sp.set_shooting_enabled(false)
-		sp.position = Vector2(100 + 40 * (i % 10), 100 + 60 * (i / 10))
+		sp.position = Vector2(100 + 40 * (i % 10), 100 + 60 * floori(i / 10.0))
 		add_child(sp)
 		sp.set_bullet_factory(factory)
 		sp.set_spawn_data(data)

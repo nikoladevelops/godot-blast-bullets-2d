@@ -76,7 +76,7 @@ func _worst_step_ms(frames: int) -> float:
 func test_new_volleys_fired_from_physics_do_not_stall_the_next_step() -> void:
 	var datas: Array = []
 	for i in 40: # rings 64 px apart: no two volleys overlap
-		datas.append(_ring_data(Vector2(640 + 64 * (i % 10), 480 + 64 * (i / 10)), 64, 0, 1))
+		datas.append(_ring_data(Vector2(640 + 64 * (i % 10), 480 + 64 * floori(i / 10.0)), 64, 0, 1))
 	var shooter := _shooter(datas)
 	await physics(3)
 	shooter.armed = true
@@ -93,7 +93,7 @@ func test_layer_with_bit_one_or_none_never_matters() -> void:
 	for layer in [0, 4]:
 		var datas: Array = []
 		for i in 20:
-			datas.append(_ring_data(Vector2(640 + 64 * (i % 10), 480 + 64 * (i / 10)), 64, layer, 1))
+			datas.append(_ring_data(Vector2(640 + 64 * (i % 10), 480 + 64 * floori(i / 10.0)), 64, layer, 1))
 		var shooter := _shooter(datas)
 		await physics(2)
 		shooter.armed = true

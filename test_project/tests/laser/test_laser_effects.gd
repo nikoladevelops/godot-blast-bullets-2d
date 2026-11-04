@@ -32,8 +32,8 @@ func _layer() -> EffectLayerData2D:
 
 func _entry(trigger: int, at := 0) -> LaserEffectData2D:
 	var e := LaserEffectData2D.new()
-	e.trigger = trigger
-	e.at = at
+	e.trigger = trigger as LaserEffectData2D.LaserEffectTrigger
+	e.at = at as LaserEffectData2D.EffectPoint
 	e.effect = _layer()
 	return e
 
@@ -75,9 +75,9 @@ func test_the_entry_is_bound_and_refuses_bad_input() -> void:
 	assert_eq([LaserEffectData2D.LASER_EFFECT_ON_CHARGE, LaserEffectData2D.LASER_EFFECT_ON_HIT, LaserEffectData2D.LASER_EFFECT_ON_DESPAWN], [LaserSoundData2D.LASER_SOUND_ON_CHARGE, LaserSoundData2D.LASER_SOUND_ON_HIT, LaserSoundData2D.LASER_SOUND_ON_DESPAWN], "the laser sound trigger ids")
 	assert_eq([LaserEffectData2D.AT_EVENT, LaserEffectData2D.AT_MUZZLE, LaserEffectData2D.AT_TIP], [0, 1, 2], "serialized points")
 	assert_eq([e.trigger, e.at, e.align_to_beam, e.enabled], [LaserEffectData2D.LASER_EFFECT_ON_HIT, LaserEffectData2D.AT_EVENT, true, true], "defaults")
-	e.trigger = 1
-	e.trigger = 14
-	e.at = 3
+	e.trigger = 1 as LaserEffectData2D.LaserEffectTrigger
+	e.trigger = 14 as LaserEffectData2D.LaserEffectTrigger
+	e.at = 3 as LaserEffectData2D.EffectPoint
 	var trail := _layer()
 	trail.trigger = EffectLayerData2D.EFFECT_TRAIL_FOLLOW
 	e.effect = trail

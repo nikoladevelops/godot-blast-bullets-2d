@@ -21,7 +21,7 @@ func setup() -> void:
 	zone.ring_3_radius = 48.0
 	factory.bullet_grazed.connect(_on_grazed)
 	for i in 10:
-		var v: BulletVolley2D = factory.spawn_volley(ring_data(1000, Vector2(960 * (i % 5), 1200 * (i / 5)), 50.0, 60.0, 1000.0))
+		var v: BulletVolley2D = factory.spawn_volley(ring_data(1000, Vector2(960 * (i % 5), 1200 * int(i / 5.0)), 50.0, 60.0, 1000.0))
 		v.graze_set_zones([zone], &"bench_player")
 
 func _on_grazed(_t: Node2D, _v: BulletVolley2D, _i: int, _z: GrazeZone2D, _r: int) -> void:

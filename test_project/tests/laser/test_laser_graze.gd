@@ -13,16 +13,16 @@ extends BlastTest
 const DT := 0.0625
 const GROUP := &"laser_graze_targets"
 
-var log: Array = [] # [kind, target name, beam, zone index, ring]
+var graze_log: Array = [] # [kind, target name, beam, zone index, ring]
 var zones: Array = []
 
 
 func before_each() -> void:
 	await super()
-	log.clear()
+	graze_log.clear()
 	zones.clear()
-	factory.laser_grazed.connect(func(t: Object, _l, b: int, z, r: int) -> void: log.append(["graze", str(t.name) if t != null else "", b, zones.find(z), r]))
-	factory.laser_graze_exited.connect(func(t: Object, _l, b: int, z, r: int) -> void: log.append(["exit", str(t.name) if t != null else "", b, zones.find(z), r]))
+	factory.laser_grazed.connect(func(t: Object, _l, b: int, z, r: int) -> void: graze_log.append(["graze", str(t.name) if t != null else "", b, zones.find(z), r]))
+	factory.laser_graze_exited.connect(func(t: Object, _l, b: int, z, r: int) -> void: graze_log.append(["exit", str(t.name) if t != null else "", b, zones.find(z), r]))
 
 
 func _target(n: String, pos: Vector2) -> Node2D:
@@ -48,15 +48,15 @@ func test_rings_fire_largest_first_once_per_visit_then_one_exit() -> void:
 	var t := _target("A", Vector2(150, 10)) # 10 px beside the beam
 	_laser([H.make_graze_zone([20.0, 50.0, 35.0])])
 	step_factory(1, DT)
-	assert_eq(log, [["graze", "A", 0, 0, 1], ["graze", "A", 0, 0, 2], ["graze", "A", 0, 0, 0]], "largest radius first, every ring once")
+	assert_eq(graze_log, [["graze", "A", 0, 0, 1], ["graze", "A", 0, 0, 2], ["graze", "A", 0, 0, 0]], "largest radius first, every ring once")
 	step_factory(3, DT)
-	assert_eq(log.size(), 3, "staying inside grazes nothing more")
+	assert_eq(graze_log.size(), 3, "staying inside grazes nothing more")
 	t.position = Vector2(150, 200)
 	step_factory(1, DT)
-	assert_eq(log.back(), ["exit", "A", 0, 0, 0], "one exit, naming the deepest ring (20 px)")
+	assert_eq(graze_log.back(), ["exit", "A", 0, 0, 0], "one exit, naming the deepest ring (20 px)")
 	t.position = Vector2(150, 10)
 	step_factory(2, DT)
-	assert_eq(log.size(), 4, "Once: a second visit grazes nothing")
+	assert_eq(graze_log.size(), 4, "Once: a second visit grazes nothing")
 
 
 func test_after_exit_rearms_the_rings() -> void:
@@ -69,7 +69,7 @@ func test_after_exit_rearms_the_rings() -> void:
 	step_factory(1, DT)
 	t.position = Vector2(150, 30)
 	step_factory(1, DT)
-	assert_eq(log, [["graze", "A", 0, 0, 0], ["exit", "A", 0, 0, 0], ["graze", "A", 0, 0, 0]], "graze, exit, graze again")
+	assert_eq(graze_log, [["graze", "A", 0, 0, 0], ["exit", "A", 0, 0, 0], ["graze", "A", 0, 0, 0]], "graze, exit, graze again")
 
 
 ## GrazeZone2D.enabled off must match the bullet contract: the zone tests
@@ -80,7 +80,7 @@ func test_a_disabled_zone_never_grazes() -> void:
 	z.enabled = false
 	_laser([z])
 	step_factory(3, DT)
-	assert_eq(log, [], "a disabled zone never grazes")
+	assert_eq(graze_log, [], "a disabled zone never grazes")
 
 
 func test_disabling_a_zone_ends_its_visit_silently() -> void:
@@ -88,17 +88,17 @@ func test_disabling_a_zone_ends_its_visit_silently() -> void:
 	var z := H.make_graze_zone([50.0])
 	_laser([z])
 	step_factory(1, DT)
-	assert_eq(log.size(), 1, "grazed while the zone is on")
+	assert_eq(graze_log.size(), 1, "grazed while the zone is on")
 	z.enabled = false
 	step_factory(1, DT)
-	assert_eq(log.size(), 1, "disabling tests nothing and exits nothing")
+	assert_eq(graze_log.size(), 1, "disabling tests nothing and exits nothing")
 	t.position = Vector2(150, 400)
 	step_factory(1, DT)
-	assert_eq(log.size(), 1, "the visit already ended silently: no exit when it leaves")
+	assert_eq(graze_log.size(), 1, "the visit already ended silently: no exit when it leaves")
 	z.enabled = true
 	t.position = Vector2(150, 10)
 	step_factory(2, DT)
-	assert_eq(log.size(), 1, "Once survives the disabled window")
+	assert_eq(graze_log.size(), 1, "Once survives the disabled window")
 
 
 ## The outer ring is inclusive everywhere around the beam (beside it, past
@@ -113,14 +113,14 @@ func test_the_outer_ring_edge_grazes_all_around_the_beam(c: Array = use_paramete
 	_target("A", c[0])
 	_laser([H.make_graze_zone([50.0], c[1])]) # 300 px along +X, 12 px wide
 	step_factory(1, DT)
-	assert_eq(log, [["graze", "A", 0, 0, 0]] if c[2] else [], "%s (count_bullet_size %s)" % [c[0], c[1]])
+	assert_eq(graze_log, [["graze", "A", 0, 0, 0]] if c[2] else [], "%s (count_bullet_size %s)" % [c[0], c[1]])
 
 
 func test_count_bullet_size_adds_half_the_beam_width() -> void:
 	_target("A", Vector2(150, 54)) # the ring reaches 50, the 12 px beam's edge 6 more
 	_laser([H.make_graze_zone([50.0]), H.make_graze_zone([50.0], true)])
 	step_factory(1, DT)
-	assert_eq(log, [["graze", "A", 0, 1, 0]], "only the zone that counts the beam's width")
+	assert_eq(graze_log, [["graze", "A", 0, 1, 0]], "only the zone that counts the beam's width")
 
 
 func test_the_distance_is_to_the_beam_not_its_end() -> void:
@@ -128,7 +128,7 @@ func test_the_distance_is_to_the_beam_not_its_end() -> void:
 	_target("B", Vector2(-30, 0)) # 30 px behind the muzzle
 	_laser([H.make_graze_zone([25.0])])
 	step_factory(1, DT)
-	assert_eq(log, [["graze", "A", 0, 0, 0]], "measured to the nearest point of the segment")
+	assert_eq(graze_log, [["graze", "A", 0, 0, 0]], "measured to the nearest point of the segment")
 
 
 func test_every_beam_grazes_on_its_own_index() -> void:
@@ -138,16 +138,16 @@ func test_every_beam_grazes_on_its_own_index() -> void:
 	var l := factory.spawn_laser(H.make_laser(0.0, 0.0, 0.0, 0.0, 300.0), poses)
 	l.graze_set_zones(zones, GROUP)
 	step_factory(1, DT)
-	assert_eq(log, [["graze", "A", 1, 0, 0]], "beam 1 (10 px away), not beam 0 (150 px)")
+	assert_eq(graze_log, [["graze", "A", 1, 0, 0]], "beam 1 (10 px away), not beam 0 (150 px)")
 
 
 func test_charging_never_grazes() -> void:
 	_target("A", Vector2(150, 10))
 	_laser([H.make_graze_zone([50.0])], 300.0, H.make_laser(0.25, 0.0, 0.0, 0.0, 300.0))
 	step_factory(3, DT)
-	assert_eq(log, [], "the warning line is no hazard")
+	assert_eq(graze_log, [], "the warning line is no hazard")
 	step_factory(2, DT)
-	assert_eq(log, [["graze", "A", 0, 0, 0]], "grazes once it fires")
+	assert_eq(graze_log, [["graze", "A", 0, 0, 0]], "grazes once it fires")
 
 
 func test_a_freed_target_hands_its_visit_to_another_target_inside() -> void:
@@ -155,14 +155,14 @@ func test_a_freed_target_hands_its_visit_to_another_target_inside() -> void:
 	var b := _target("B", Vector2(200, 10)) # as near: tree order picks A
 	_laser([H.make_graze_zone([30.0])])
 	step_factory(1, DT)
-	assert_eq(log, [["graze", "A", 0, 0, 0]], "the nearest target grazes")
+	assert_eq(graze_log, [["graze", "A", 0, 0, 0]], "the nearest target grazes")
 	a.queue_free()
 	await idle(1)
 	step_factory(2, DT)
-	assert_eq(log.size(), 1, "Once: B joins the visit without a second graze")
+	assert_eq(graze_log.size(), 1, "Once: B joins the visit without a second graze")
 	b.position = Vector2(200, 200)
 	step_factory(1, DT)
-	assert_eq(log.back(), ["exit", "B", 0, 0, 0], "the visit moved to B: its exit names B")
+	assert_eq(graze_log.back(), ["exit", "B", 0, 0, 0], "the visit moved to B: its exit names B")
 
 
 func test_a_freed_target_with_nobody_else_inside_ends_the_visit_silently() -> void:
@@ -172,7 +172,7 @@ func test_a_freed_target_with_nobody_else_inside_ends_the_visit_silently() -> vo
 	a.queue_free()
 	await idle(1)
 	step_factory(3, DT)
-	assert_eq(log, [["graze", "A", 0, 0, 0]], "no exit for a vanished target")
+	assert_eq(graze_log, [["graze", "A", 0, 0, 0]], "no exit for a vanished target")
 
 
 func test_a_handler_that_clears_the_zones_drops_the_rest_of_the_batch() -> void:
@@ -181,7 +181,7 @@ func test_a_handler_that_clears_the_zones_drops_the_rest_of_the_batch() -> void:
 	factory.laser_grazed.connect(func(_t, laser: LaserVolley2D, _b, _z, _r) -> void: laser.graze_clear(), CONNECT_ONE_SHOT)
 	step_factory(3, DT)
 	expect_no_errors()
-	assert_eq(log, [["graze", "A", 0, 0, 0]], "the first event ran its handler; the other three were dropped")
+	assert_eq(graze_log, [["graze", "A", 0, 0, 0]], "the first event ran its handler; the other three were dropped")
 	assert_false(l.is_graze_armed(), "cleared")
 
 
@@ -193,10 +193,10 @@ func test_a_handler_that_rearms_the_zones_drops_the_batch_and_the_new_zone_graze
 		zones = [fresh]
 		laser.graze_set_zones([fresh], GROUP), CONNECT_ONE_SHOT)
 	step_factory(1, DT)
-	assert_eq(log.size(), 1, "the old batch stops after its first event")
+	assert_eq(graze_log.size(), 1, "the old batch stops after its first event")
 	step_factory(1, DT)
 	expect_no_errors()
-	assert_eq(log.back(), ["graze", "A", 0, 0, 0], "the new zone grazes from the next tick")
+	assert_eq(graze_log.back(), ["graze", "A", 0, 0, 0], "the new zone grazes from the next tick")
 	assert_eq(l.get_graze_zones(), [fresh], "re-armed")
 
 
@@ -238,10 +238,10 @@ func test_a_target_leaving_the_group_ends_the_visit_silently() -> void:
 	var a := _target("A", Vector2(100, 10))
 	_laser([H.make_graze_zone([30.0])])
 	step_factory(1, DT)
-	assert_eq(log, [["graze", "A", 0, 0, 0]], "grazed")
+	assert_eq(graze_log, [["graze", "A", 0, 0, 0]], "grazed")
 	a.remove_from_group(GROUP)
 	step_factory(3, DT)
-	assert_eq(log, [["graze", "A", 0, 0, 0]], "no exit for a target that left the group")
+	assert_eq(graze_log, [["graze", "A", 0, 0, 0]], "no exit for a target that left the group")
 
 
 ## A bolt that is spent (here: it left the despawn bounds) while grazing ends
@@ -261,7 +261,7 @@ func test_a_spent_bolt_ends_its_visit_silently() -> void:
 			spent = true
 			break
 	assert_true(spent, "the bolt was spent and the laser finished")
-	assert_eq(log, [["graze", "A", 0, 0, 0]], "grazed, then no exit for the spent bolt")
+	assert_eq(graze_log, [["graze", "A", 0, 0, 0]], "grazed, then no exit for the spent bolt")
 
 
 ## The On Graze Exit event names the visit's target, so its sound/effect must
@@ -279,7 +279,7 @@ func test_the_exit_sound_lands_on_the_exiting_target() -> void:
 	l.sound_set_effects([entry], null)
 	factory.debug_set_sound_offer_log_enabled(true)
 	step_factory(1, DT)
-	assert_eq(log.size(), 1, "A grazes")
+	assert_eq(graze_log.size(), 1, "A grazes")
 	a.position = Vector2(150, 200) # A leaves; B is nearest but outside the ring
 	step_factory(1, DT)
 	var exits: Array = factory.debug_get_sound_offer_log().filter(func(e): return int(e["trigger"]) == LaserSoundData2D.LASER_SOUND_ON_GRAZE_EXIT)

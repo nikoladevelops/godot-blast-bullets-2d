@@ -60,7 +60,7 @@ func test_partial_zero_triples_block_the_fallback() -> void:
 	# seeds max 3000, so it is valid and wins; deliberate full stops are
 	# max 0 + speed 0 + accel 0 and intentionally read as gaps. This T3
 	# proves the partial case directly.)
-	var g3 := H.make_volley_data(2, 0.0)
+	var _g3 := H.make_volley_data(2, 0.0)
 	var p0 := _speed(0.0)
 	p0.max_speed = 500.0
 	var p1 := _rot(0.0, 500.0)

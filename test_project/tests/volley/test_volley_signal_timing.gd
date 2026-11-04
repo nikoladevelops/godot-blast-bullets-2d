@@ -111,7 +111,7 @@ func test_spawner_forwards_reached_live_without_connecting_to_the_volley() -> vo
 	sp.set_homing_enabled(true)
 	sp.set_homing_target_source(BulletSpawner2D.HOMING_SOURCE_GLOBAL_POSITION)
 	sp.set_homing_global_position(Vector2(5, 0))
-	sp.volley_bullet_homing_target_reached.connect(func(vol: BulletVolley2D, idx: int, _t, _p): got.append([vol.is_bullet_status_enabled(idx), Engine.is_in_physics_frame()]))
+	sp.volley_bullet_homing_target_reached.connect(func(volley: BulletVolley2D, idx: int, _t, _p): got.append([volley.is_bullet_status_enabled(idx), Engine.is_in_physics_frame()]))
 	watch_signals(sp)
 	assert_true(sp.shoot_once(), "fired")
 	var vol: BulletVolley2D = get_signal_parameters(sp, "volley_fired", 0)[0]

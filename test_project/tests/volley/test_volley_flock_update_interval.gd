@@ -11,14 +11,14 @@ const DT := 1.0 / 60.0
 
 
 func _stack(count: int) -> Array:
-	var tr: Array = []
+	var transforms: Array = []
 	for k in count:
-		tr.append(Transform2D(0.0, Vector2(100, 100)))
-	return tr
+		transforms.append(Transform2D(0.0, Vector2(100, 100)))
+	return transforms
 
 
-func _volley(tr: Array, flock: BulletFlock2D, speed := 0.0) -> BulletVolley2D:
-	var v: BulletVolley2D = factory.spawn_volley(H.make_flight_data(tr, speed, 1000.0))
+func _volley(transforms: Array, flock: BulletFlock2D, speed := 0.0) -> BulletVolley2D:
+	var v: BulletVolley2D = factory.spawn_volley(H.make_flight_data(transforms, speed, 1000.0))
 	v.flock_join(flock)
 	return v
 

@@ -101,11 +101,14 @@ func test_accepted_edits_emit_changed_and_rejected_ones_do_not() -> void:
 	expect_error_sequence(["BulletSplitStage2D: angle_offset_degrees must be finite, keeping the old value."])
 	s.scale_multiplier = 0.0
 	expect_error_sequence(["BulletSplitStage2D: scale_multiplier must be finite and > 0, keeping the old value."])
-	s.direction_mode = 3
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	s.direction_mode = 3 as BulletSplitStage2D.DirectionMode
 	expect_error_sequence(["BulletSplitStage2D: direction_mode must be 0 (Fan), 1 (Ring) or 2 (Random In Spread), keeping the old value."])
-	s.speed_mode = -1
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	s.speed_mode = -1 as BulletSplitStage2D.SpeedMode
 	expect_error_sequence(["BulletSplitStage2D: speed_mode must be 0 (Multiply Parent), 1 (Fixed) or 2 (From Spawn Data), keeping the old value."])
-	s.speed_distribution = 2
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	s.speed_distribution = 2 as BulletSplitStage2D.SpeedDistribution
 	expect_error_sequence(["BulletSplitStage2D: speed_distribution must be 0 (Ramp) or 1 (Random), keeping the old value."])
 	s.max_splits_per_bullet = -1
 	expect_error_sequence(["BulletSplitStage2D: max_splits_per_bullet must be >= 0 (0 = no limit), keeping the old value."])
@@ -188,9 +191,11 @@ func test_presets() -> void:
 	d.apply_preset(BulletSplitData2D.PRESET_FAN_FORWARD)
 	assert_eq(n[0], 1, "one change")
 	assert_eq(d.stages[0].count, 3, "fan of 3")
-	d.apply_preset(7)
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	d.apply_preset(7 as BulletSplitData2D.Preset)
 	expect_error_sequence(["BulletSplitData2D: preset must be 0 (Burst Ring), 1 (Fan Forward) or 2 (Cascade), keeping the old values."])
-	assert_null(BulletSplitData2D.create_preset(-1))
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	assert_null(BulletSplitData2D.create_preset(-1 as BulletSplitData2D.Preset))
 	expect_error_sequence(["BulletSplitData2D.create_preset: preset must be 0 (Burst Ring), 1 (Fan Forward) or 2 (Cascade), nothing created."])
 
 

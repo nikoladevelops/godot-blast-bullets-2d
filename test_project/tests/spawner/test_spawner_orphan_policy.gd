@@ -35,7 +35,7 @@ func _spawner(policy: int, data: BulletVolleyData2D = null) -> BulletSpawner2D:
 	sp.set_spawn_data(data if data != null else _data())
 	sp.pattern_source = BulletSpawner2D.PATTERN_FROM_SELF
 	sp.helper_bullets_amount = 1
-	sp.orphaned_volleys = policy
+	sp.orphaned_volleys = (policy as BulletSpawner2D.OrphanedVolleys)
 	add_child(sp)
 	sp.set_bullet_factory(factory)
 	sp.body_entered.connect(func(_b, v, i): spawner_hits.append([v, i]))
@@ -293,7 +293,8 @@ func test_orphaned_volleys_enum_is_locked() -> void:
 	# An NPC dying with its spawner: its bullets stay dangerous by default
 	# (their hits reach the factory's signals).
 	assert_eq(sp.orphaned_volleys, BulletSpawner2D.ORPHANED_VOLLEYS_HAND_TO_FACTORY, "default hands to the factory")
-	sp.orphaned_volleys = 9
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the setter must reject it
+	sp.orphaned_volleys = (9 as BulletSpawner2D.OrphanedVolleys)
 	expect_error_sequence(["BulletSpawner2D: orphaned_volleys out of range, keeping the old value."])
 	assert_eq(sp.orphaned_volleys, BulletSpawner2D.ORPHANED_VOLLEYS_HAND_TO_FACTORY, "old value kept")
 
@@ -321,7 +322,7 @@ func test_freed_in_the_middle_of_any_chain_under_any_policy(c: Array = use_param
 	ledger.watch_spawner(sp)
 	sp.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_RING
 	sp.helper_bullets_amount = 4
-	var t := make_graze_target(Vector2(200, 0), &"orphan_chain")
+	var _t := make_graze_target(Vector2(200, 0), &"orphan_chain")
 	var path := Path2D.new()
 	path.curve = Curve2D.new()
 	path.curve.add_point(Vector2(0, 0))
@@ -487,10 +488,10 @@ func test_dying_enemies_keep_their_bullets_dangerous() -> void:
 	var scene := PackedScene.new()
 	assert_eq(scene.pack(npc), OK, "the enemy scene packs")
 	npc.free()
-	var factory_hits := [0]
+	var factory_hits_local := [0]
 	factory.body_entered.connect(func(body, _v, _i) -> void:
 		if body == player:
-			factory_hits[0] += 1)
+			factory_hits_local[0] += 1)
 	var enemies: Array = []
 	for k in 3:
 		var e: Node2D = scene.instantiate()
@@ -499,14 +500,14 @@ func test_dying_enemies_keep_their_bullets_dangerous() -> void:
 		enemies.append(e)
 	for i in 30:
 		await physics(1)
-	assert_gt(factory_hits[0], 0, "while the enemies live, their guns (nothing connected) fall through to the factory")
+	assert_gt(factory_hits_local[0], 0, "while the enemies live, their guns (nothing connected) fall through to the factory")
 	for e in enemies:
 		e.queue_free() # they die with bullets in flight
 	await physics(1)
-	var at_death: int = factory_hits[0]
+	var at_death: int = factory_hits_local[0]
 	for i in 40:
 		await physics(1)
-	assert_gt(factory_hits[0], at_death, "bullets of dead enemies still hit the player (%d after their death)" % (factory_hits[0] - at_death))
+	assert_gt(factory_hits_local[0], at_death, "bullets of dead enemies still hit the player (%d after their death)" % (factory_hits_local[0] - at_death))
 	expect_no_errors()
 	expect_warning_sequence([], "every hit was handled by the one factory handler")
 	await idle(30)

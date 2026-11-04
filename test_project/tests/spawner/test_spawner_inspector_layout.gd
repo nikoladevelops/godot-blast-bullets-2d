@@ -49,35 +49,35 @@ func test_every_property_sits_in_one_group_and_the_shared_ones_match() -> void:
 	var lasers: Dictionary = _layout("LaserSpawner2D")[1]
 	var loose: Array = []
 	for cls_props in [bullets, lasers]:
-		for name in cls_props:
-			if cls_props[name][0] == "":
-				loose.append(name)
+		for prop_name in cls_props:
+			if cls_props[prop_name][0] == "":
+				loose.append(prop_name)
 	assert_eq(loose, [], "no property outside a group")
 	var shared_groups := ["Setup", "Patterns", "Shooting", "Time", "Spin", "Randomization", "Graze", "Sound", "Preview", "Movement", "Performance"]
 	var mismatched: Array = []
 	var missing: Array = []
-	for name in bullets:
-		if not shared_groups.has(bullets[name][0]):
+	for prop_name in bullets:
+		if not shared_groups.has(bullets[prop_name][0]):
 			continue
-		if not lasers.has(name):
-			if not LASER_LEAVES_OUT.has(name):
-				missing.append(name)
-		elif lasers[name] != bullets[name] and name != "sound_effects":
-			mismatched.append("%s: %s vs %s" % [name, bullets[name], lasers[name]])
+		if not lasers.has(prop_name):
+			if not LASER_LEAVES_OUT.has(prop_name):
+				missing.append(prop_name)
+		elif lasers[prop_name] != bullets[prop_name] and prop_name != "sound_effects":
+			mismatched.append("%s: %s vs %s" % [prop_name, bullets[prop_name], lasers[prop_name]])
 	assert_eq(missing, [], "every shared property exists on both (except what a laser leaves out)")
 	assert_eq(mismatched, [], "and with the same group, type and hint")
 	# Each spawner arms its own sound class (same group, type and hint kind).
 	assert_eq(bullets["sound_effects"], ["Sound", TYPE_ARRAY, PROPERTY_HINT_ARRAY_TYPE, "BulletSoundData2D"], "bullet sounds")
 	assert_eq(lasers["sound_effects"], ["Sound", TYPE_ARRAY, PROPERTY_HINT_ARRAY_TYPE, "LaserSoundData2D"], "laser sounds")
-	for name in LASER_LEAVES_OUT:
-		assert_true(bullets.has(name), "%s stays on the bullet spawner" % name)
-		assert_false(lasers.has(name), "%s is left out of the laser spawner" % name)
-	for name in lasers:
-		if lasers[name][0] in ["Lasers", "Laser Targeting"]:
-			assert_false(bullets.has(name), "%s is laser-only" % name)
-	for name in bullets:
-		if bullets[name][0] in ["Bullets", "Bullet Colors", "Homing", "Orbiting", "Flocking", "Splitting", "Emitter Bullets"]:
-			assert_false(lasers.has(name), "%s is bullet-only" % name)
+	for prop_name in LASER_LEAVES_OUT:
+		assert_true(bullets.has(prop_name), "%s stays on the bullet spawner" % prop_name)
+		assert_false(lasers.has(prop_name), "%s is left out of the laser spawner" % prop_name)
+	for prop_name in lasers:
+		if lasers[prop_name][0] in ["Lasers", "Laser Targeting"]:
+			assert_false(bullets.has(prop_name), "%s is laser-only" % prop_name)
+	for prop_name in bullets:
+		if bullets[prop_name][0] in ["Bullets", "Bullet Colors", "Homing", "Orbiting", "Flocking", "Splitting", "Emitter Bullets"]:
+			assert_false(lasers.has(prop_name), "%s is bullet-only" % prop_name)
 
 
 func test_a_left_out_knob_still_scripts_and_never_saves() -> void:

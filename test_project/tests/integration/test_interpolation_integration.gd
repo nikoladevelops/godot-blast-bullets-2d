@@ -83,7 +83,8 @@ func test_follow_project_tracks_the_scene_tree_at_runtime() -> void:
 	tree.physics_interpolation = false
 	factory.physics_interpolation = BulletFactory2D.INTERPOLATION_ON
 	assert_true(factory.is_physics_interpolation_active(), "On wins over the tree")
-	factory.physics_interpolation = 7
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	factory.physics_interpolation = (7 as BulletFactory2D.PhysicsInterpolation)
 	expect_error_sequence(["BulletFactory2D: physics_interpolation must be 0 (Off), 1 (On) or 2 (Follow Project), keeping the old value."])
 	assert_eq(factory.physics_interpolation, BulletFactory2D.INTERPOLATION_ON, "kept")
 	tree.physics_interpolation = was

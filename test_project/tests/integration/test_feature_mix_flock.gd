@@ -23,29 +23,29 @@ func _data() -> BulletVolleyData2D:
 	return d
 
 
-func _configure(name: String, d: BulletVolleyData2D) -> void:
-	match name:
+func _configure(case_name: String, d: BulletVolleyData2D) -> void:
+	match case_name:
 		"homing", "homing_no_control":
 			d.homing_smoothing = 3.0
-			d.homing_take_control_of_texture_rotation = name == "homing"
+			d.homing_take_control_of_texture_rotation = case_name == "homing"
 		"bounce_wall":
 			d.monitorable = true
 			d.set_collision_mask_from_array([5])
 			d.set_bounce_mask_from_array([5])
-			d.bounce_mode = 1
+			d.bounce_mode = BulletVolleyData2D.BOUNCE_PRECISE_SHAPE
 			d.bullet_max_collision_count = 0
 		"wobble_lateral", "wobble_angular":
 			var w := BulletWobbleData2D.new()
 			w.enabled = true
-			w.mode = BulletWobbleData2D.WOBBLE_LATERAL if name == "wobble_lateral" else BulletWobbleData2D.WOBBLE_ANGULAR
-			w.amplitude = 6.0 if name == "wobble_lateral" else 0.2
+			w.mode = BulletWobbleData2D.WOBBLE_LATERAL if case_name == "wobble_lateral" else BulletWobbleData2D.WOBBLE_ANGULAR
+			w.amplitude = 6.0 if case_name == "wobble_lateral" else 0.2
 			w.frequency_hz = 2.0
 			d.shared_bullet_wobble_data = w
 		"gravity":
 			d.gravity = Vector2(0, 150)
 		"speed_curve", "direction_curve":
 			var c := BulletCurvesData2D.new()
-			if name == "speed_curve":
+			if case_name == "speed_curve":
 				c.movement_speed_curve = H.make_flat_curve(200.0)
 				c.movement_use_unit_curve = false
 			else:
@@ -61,18 +61,18 @@ func _configure(name: String, d: BulletVolleyData2D) -> void:
 			d.shared_bullet_rotation_data = H.make_rotation(0.5, 0.5)
 
 
-func test_a_separating_flock_spreads_the_clump(name: String = use_parameters(CASES)) -> void:
+func test_a_separating_flock_spreads_the_clump(case_name: String = use_parameters(CASES)) -> void:
 	handle_events(factory) # the wall hits are handled; this test pins the flock
-	if name == "bounce_wall":
+	if case_name == "bounce_wall":
 		make_wall(Vector2(120, 0), Vector2(20, 800), 16)
 	var d := _data()
-	_configure(name, d)
-	var v: BulletVolley2D = factory.spawn_volley(d, Vector2(60, 0) if name == "inherited_velocity" else Vector2.ZERO)
+	_configure(case_name, d)
+	var v: BulletVolley2D = factory.spawn_volley(d, Vector2(60, 0) if case_name == "inherited_velocity" else Vector2.ZERO)
 	var f := H.make_flock(20.0, 0.0, 0.0, 60.0, 30.0)
 	v.flock_join(f)
-	if name.begins_with("homing"):
+	if case_name.begins_with("homing"):
 		v.shared_homing_deque_push_back_global_position_target(Vector2(600, 0))
-	match name:
+	match case_name:
 		"movement_pattern":
 			var c := Curve2D.new()
 			for p in [Vector2(0, 0), Vector2(30, 8), Vector2(60, -8), Vector2(90, 0)]:
@@ -81,10 +81,10 @@ func test_a_separating_flock_spreads_the_clump(name: String = use_parameters(CAS
 		"time_scale_half":
 			factory.time_scale = 0.5
 	var start := min_pair_distance(origins(v))
-	for k in (120 if name == "time_scale_half" else 60):
+	for k in (120 if case_name == "time_scale_half" else 60):
 		await physics(1)
-	if name == "homing_no_control":
+	if case_name == "homing_no_control":
 		expect_warning_sequence(["BulletVolley2D has homing targets but homing_take_control_of_texture_rotation is false (and no movement pattern/rotation data), so homing will not steer bullets. Set it to true."], "homing without texture control steers nothing, and says so")
 	var spread := min_pair_distance(origins(v))
-	assert_gt(spread, maxf(start, 3.0), "%s: the clump spread (%.2f -> %.2f px)" % [name, start, spread])
-	assert_eq(broken_bullets(v), [], "%s: finite" % name)
+	assert_gt(spread, maxf(start, 3.0), "%s: the clump spread (%.2f -> %.2f px)" % [case_name, start, spread])
+	assert_eq(broken_bullets(v), [], "%s: finite" % case_name)

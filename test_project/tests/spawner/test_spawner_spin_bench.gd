@@ -40,7 +40,7 @@ func test_shoot_tick_heart_spin_off_vs_on() -> void:
 	# in test_shoot_once_cpu_cold_vs_warm below.
 	var sp := _heart_spawner()
 	await idle(1)
-	for round in 2:
+	for round_index in 2:
 		assert_true(sp.shoot_once(), "shot fires")
 		await physics(5)
 		await idle(1)

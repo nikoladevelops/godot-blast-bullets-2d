@@ -322,9 +322,15 @@ func test_range_hints_are_enforced(kind: String = use_parameters(["bullet", "las
 		var step := 1.0 if t == TYPE_INT else maxf(absf(hi - lo), 1.0) * 0.25
 		var outside: Array = []
 		if not hs.contains("or_less"):
-			outside.append(int(lo) - 1 if t == TYPE_INT else lo - step)
+			if t == TYPE_INT:
+				outside.append(int(lo) - 1)
+			else:
+				outside.append(lo - step)
 		if not hs.contains("or_greater"):
-			outside.append(int(hi) + 1 if t == TYPE_INT else hi + step)
+			if t == TYPE_INT:
+				outside.append(int(hi) + 1)
+			else:
+				outside.append(hi + step)
 		for v in outside:
 			probed += 1
 			var problem := _probe(sp, prop, v)

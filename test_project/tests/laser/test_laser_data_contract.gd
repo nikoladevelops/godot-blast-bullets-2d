@@ -88,7 +88,8 @@ func test_presets_write_behavior_and_keep_the_looks() -> void:
 	assert_eq([looks.charge_sec, looks.sweep_speed_degrees, looks.sweep_arc_degrees], [1.0, 45.0, 90.0], "the behavior is written")
 	looks.apply_preset(LaserData2D.PRESET_CUSTOM)
 	assert_eq(looks.get_matching_preset(), LaserData2D.PRESET_CHARGED_SWEEP, "Custom writes nothing")
-	looks.apply_preset(99)
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	looks.apply_preset(99 as LaserData2D.Preset)
 	expect_error_sequence(["LaserData2D: preset must be one of the Preset values, nothing changed."])
 	var preset_usage := 0
 	for p in looks.get_property_list():

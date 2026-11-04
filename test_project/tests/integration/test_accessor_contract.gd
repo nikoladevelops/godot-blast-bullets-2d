@@ -49,20 +49,20 @@ func _pairs(cls: String) -> Array:
 			methods[str(m["name"])] = m
 		c = ClassDB.get_parent_class(c)
 	var out: Array = []
-	for name in methods:
-		if not name.begins_with("set_"):
+	for method_name in methods:
+		if not method_name.begins_with("set_"):
 			continue
-		var m: Dictionary = methods[name]
+		var m: Dictionary = methods[method_name]
 		if (m["args"] as Array).size() != 1:
 			continue
-		var stem: String = name.substr(4)
+		var stem: String = method_name.substr(4)
 		var getter := ""
 		for g in ["get_" + stem, "is_" + stem, "get_is_" + stem]:
 			if methods.has(g) and (methods[g]["args"] as Array).size() - (methods[g]["default_args"] as Array).size() == 0:
 				getter = g
 				break
 		if getter != "":
-			out.append([name, getter, int(m["args"][0]["type"])])
+			out.append([method_name, getter, int(m["args"][0]["type"])])
 	return out
 
 

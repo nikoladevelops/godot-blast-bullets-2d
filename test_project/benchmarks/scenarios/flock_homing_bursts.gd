@@ -15,12 +15,12 @@ func describe() -> String:
 
 
 func _shot() -> void:
-	var tr: Array = []
+	var transforms: Array = []
 	for i in 55:
 		var a := TAU * i / 55.0
 		var s := rng.randf_range(1.0, 2.0)
-		tr.append(Transform2D(a, Vector2(200, 500) + Vector2(cos(a), sin(a)) * 12.0).scaled_local(Vector2(s, s)))
-	var d := H.make_flight_data(tr, 300.0, 4.0)
+		transforms.append(Transform2D(a, Vector2(200, 500) + Vector2(cos(a), sin(a)) * 12.0).scaled_local(Vector2(s, s)))
+	var d := H.make_flight_data(transforms, 300.0, 4.0)
 	d.texture_size = Vector2(128, 128)
 	d.set_collision_mask_from_array([3])
 	d.collision_shape = H.make_circle_shape(30.0)

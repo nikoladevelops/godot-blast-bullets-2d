@@ -121,7 +121,7 @@ func test_an_orbit_circles_at_the_curve_speed() -> void:
 	sp.orbiting_radius = 40.0
 	sp.orbiting_enabled = true
 	var got: Array = []
-	sp.volley_fired.connect(func(v, _n) -> void: got.append(v), CONNECT_ONE_SHOT)
+	sp.volley_fired.connect(func(fired_volley, _n) -> void: got.append(fired_volley), CONNECT_ONE_SHOT)
 	assert_true(sp.shoot_once(), "fires")
 	var v: BulletVolley2D = got[0]
 	var locked_at := -1
@@ -153,7 +153,7 @@ func test_a_bounce_strength_carries_across_the_curve() -> void:
 	d.monitorable = true
 	d.set_collision_mask_from_array([4])
 	d.set_bounce_mask_from_array([4])
-	d.bounce_mode = 1
+	d.bounce_mode = BulletVolleyData2D.BOUNCE_PRECISE_SHAPE
 	d.bounce_strength = 0.5
 	d.bullet_max_collision_count = 0
 	var v: BulletVolley2D = factory.spawn_volley(d)

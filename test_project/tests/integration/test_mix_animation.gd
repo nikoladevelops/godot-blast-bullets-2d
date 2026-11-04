@@ -17,8 +17,8 @@ func _data(lifetime := 2.0, n := 2) -> BulletVolleyData2D:
 	return d
 
 
-func _watch(v: BulletVolley2D, log: Array) -> void:
-	v.sprite_animation_finished.connect(func(vv) -> void: log.append([vv.get_life_id(), Engine.get_physics_frames()]))
+func _watch(v: BulletVolley2D, events: Array) -> void:
+	v.sprite_animation_finished.connect(func(vv) -> void: events.append([vv.get_life_id(), Engine.get_physics_frames()]))
 
 
 func _frame(v: BulletVolley2D) -> int:

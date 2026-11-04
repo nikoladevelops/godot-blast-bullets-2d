@@ -137,7 +137,7 @@ func test_a_bounce_is_drawn_on_its_side_of_the_wall() -> void:
 	d.monitorable = true
 	d.set_collision_mask_from_array([4])
 	d.set_bounce_mask_from_array([4])
-	d.bounce_mode = 1
+	d.bounce_mode = BulletVolleyData2D.BOUNCE_PRECISE_SHAPE
 	d.bullet_max_collision_count = 0
 	var v: BulletVolley2D = factory.spawn_volley(d)
 	var worst := -INF

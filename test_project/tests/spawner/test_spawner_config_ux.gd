@@ -27,7 +27,8 @@ func test_offset_space_global_vs_local() -> void:
 	assert_almost_eq(_first_bullet(sp), Vector2(120, 100), Vector2(0.01, 0.01), "GLOBAL: world-space shift")
 	sp.spawn_position_offset_space = BulletSpawner2D.SPAWN_OFFSET_LOCAL
 	assert_almost_eq(_first_bullet(sp), Vector2(100, 120), Vector2(0.01, 0.01), "LOCAL: the muzzle turns with the spawner")
-	sp.spawn_position_offset_space = 5
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	sp.spawn_position_offset_space = (5 as BulletSpawner2D.SpawnOffsetSpace)
 	expect_error_sequence(["spawn_position_offset_space must be 0 (Global) or 1 (Local)"])
 	assert_eq(sp.spawn_position_offset_space, BulletSpawner2D.SPAWN_OFFSET_LOCAL, "invalid space rejected")
 
@@ -37,7 +38,7 @@ func test_preview_draws_the_offset(space: int = use_parameters([0, 1])) -> void:
 	sp.position = Vector2(400, 300)
 	sp.rotation = 0.7
 	sp.spawn_position_offset = Vector2(30, -12)
-	sp.spawn_position_offset_space = space
+	sp.spawn_position_offset_space = (space as BulletSpawner2D.SpawnOffsetSpace)
 	sp.spin_enabled = true
 	sp.spin_speed_deg_per_sec = 45.0
 	await idle(12)
@@ -110,7 +111,8 @@ func test_a_rejected_write_does_not_rearm_the_auto_fire_error() -> void:
 	sp.set_shooting_enabled(true) # no spawn_data: every interval fails
 	await idle(30)
 	expect_errors_containing("shoot_once: no spawn_data assigned", 1, "one report, latched")
-	sp.set_pattern_source(99) # rejected: not a config change
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	sp.set_pattern_source(99 as BulletSpawner2D.PatternSource) # rejected: not a config change
 	sp.set_movement_enabled(sp.get_movement_enabled()) # no-op: not a config change
 	expect_errors_containing("invalid pattern_source", 1, "the rejection reports")
 	await idle(20)
@@ -324,7 +326,7 @@ const _REFUSED_SHOTS := ["bullet_zero_pattern_scale", "bullet_zero_transforms_sc
 func test_auto_fire_reports_a_factory_refusal_once(case: String = use_parameters(_REFUSED_SHOTS)) -> void:
 	var laser := case.begins_with("laser")
 	var over_limit := case.ends_with("over_limit")
-	var sp: PatternSpawner2D = LaserSpawner2D.new() if laser else BulletSpawner2D.new()
+	var sp: PatternSpawner2D = (LaserSpawner2D.new() as PatternSpawner2D) if laser else (BulletSpawner2D.new() as PatternSpawner2D)
 	if laser:
 		sp.set("laser_data", LaserData2D.new())
 	else:

@@ -14,11 +14,11 @@ func describe() -> String:
 
 func setup() -> void:
 	warmup_frames = 240 # two waves: the pool holds the 8 lasers
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 11
+	var rng_local := RandomNumberGenerator.new()
+	rng_local.seed = 11
 	for i in 300:
 		var t := Node2D.new()
-		t.position = Vector2(rng.randf_range(0, 1920), rng.randf_range(0, 1080))
+		t.position = Vector2(rng_local.randf_range(0, 1920), rng_local.randf_range(0, 1080))
 		add_child(t)
 		t.add_to_group(&"bench_graze")
 		_targets.append(t)
@@ -30,7 +30,7 @@ func setup() -> void:
 	_zone = H.make_graze_zone([20.0, 40.0])
 	factory.laser_grazed.connect(_on_graze)
 	for k in 8:
-		var center := Vector2(300 + 440 * (k % 4), 300 + 480 * (k / 4))
+		var center := Vector2(300 + 440 * (k % 4), 300 + 480 * int(k / 4.0))
 		var beams: Array[Transform2D] = []
 		for b in 32:
 			beams.append(Transform2D(TAU * b / 32.0, center))

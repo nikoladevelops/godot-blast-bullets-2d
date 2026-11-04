@@ -36,7 +36,7 @@ func _data() -> BulletVolleyData2D:
 	var d := H.make_volley_data(64, 120.0, 30.0)
 	var arr: Array = []
 	for i in 64:
-		arr.append(Transform2D(0.1 * i, Vector2(10 * (i % 8), 12 * (i / 8))))
+		arr.append(Transform2D(0.1 * i, Vector2(10 * (i % 8), 12 * int(i / 8.0))))
 	d.transforms = arr
 	return d
 

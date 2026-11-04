@@ -22,20 +22,20 @@ func _cases() -> Array:
 	return out
 
 
-func _source(name: String) -> BulletVolley2D:
+func _source(source_name: String) -> BulletVolley2D:
 	var d := H.make_volley_data(N, 200.0, 60.0)
 	var arr: Array = []
 	for i in N:
 		arr.append(Transform2D(0.0, Vector2(0, 10.0 * i)))
 	d.transforms = arr
 	d.collision_shape = H.make_circle_shape(4.0)
-	match name:
+	match source_name:
 		"bounced":
 			make_wall(Vector2(80, 0), Vector2(20, 400), 16)
 			d.monitorable = true
 			d.set_collision_mask_from_array([5])
 			d.set_bounce_mask_from_array([5])
-			d.bounce_mode = 1
+			d.bounce_mode = BulletVolleyData2D.BOUNCE_PRECISE_SHAPE
 			d.bullet_max_collision_count = 0
 		"direction_curve":
 			var c := BulletCurvesData2D.new()
@@ -57,8 +57,8 @@ func _source(name: String) -> BulletVolley2D:
 		"homing", "orbit_locked":
 			d.homing_smoothing = 20.0
 			d.homing_take_control_of_texture_rotation = true
-	var v: BulletVolley2D = factory.spawn_volley(d, Vector2(50, 30) if name == "inherited_velocity" else Vector2.ZERO)
-	match name:
+	var v: BulletVolley2D = factory.spawn_volley(d, Vector2(50, 30) if source_name == "inherited_velocity" else Vector2.ZERO)
+	match source_name:
 		"flock":
 			v.flock_join(H.make_flock(10.0, 1.0, 1.0, 60.0, 20.0))
 		"homing":
@@ -74,17 +74,17 @@ func _source(name: String) -> BulletVolley2D:
 
 func test_every_converted_bullet_is_collected(p: Array = use_parameters(_cases())) -> void:
 	handle_events(factory) # the hits / grazes / expiries are handled; this test pins something else
-	var name: String = p[0]
+	var source_name: String = p[0]
 	collected = 0
 	factory.pickup_collected.connect(func(_t, _p, _v, _i, _val) -> void: collected += 1)
-	var v := _source(name)
+	var v := _source(source_name)
 	for k in 45: # the source flies (bounces, locks its orbit, flocks...)
 		await physics(1)
 	var live := 0
 	for i in N:
 		if v.is_bullet_status_enabled(i):
 			live += 1
-	assert_gt(live, 0, "%s: bullets to convert" % name)
+	assert_gt(live, 0, "%s: bullets to convert" % source_name)
 	var coin := P.coin()
 	coin.motion_mode = p[1]
 	coin.magnet_delay_sec = 0.05
@@ -97,4 +97,4 @@ func test_every_converted_bullet_is_collected(p: Array = use_parameters(_cases()
 		await physics(1)
 		if collected >= live:
 			break
-	assert_eq(collected, live, "%s (mode %d): every pickup reached its collector" % [name, p[1]])
+	assert_eq(collected, live, "%s (mode %d): every pickup reached its collector" % [source_name, p[1]])

@@ -65,6 +65,7 @@ func run() -> Dictionary:
 	add_child(factory)
 	await get_tree().process_frame
 	await get_tree().process_frame
+	@warning_ignore("redundant_await")
 	await setup()
 	for i in warmup_frames:
 		step(i)

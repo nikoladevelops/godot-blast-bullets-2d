@@ -95,7 +95,7 @@ func test_defaults() -> void:
 func test_uniform_scale_stays_in_range_and_varies() -> void:
 	var sp := _spawner()
 	var ref: Array = sp.collect_spawn_transforms()
-	sp.bullet_scale_mode = 1
+	sp.bullet_scale_mode = BulletSpawner2D.BULLET_SCALE_UNIFORM
 	sp.bullet_scale_min = 0.5
 	sp.bullet_scale_max = 2.0
 	var v := _shoot(sp)
@@ -115,7 +115,7 @@ func test_uniform_scale_stays_in_range_and_varies() -> void:
 func test_equal_min_and_max_is_exact() -> void:
 	var sp := _spawner(10)
 	var ref: Array = sp.collect_spawn_transforms()
-	sp.bullet_scale_mode = 1
+	sp.bullet_scale_mode = BulletSpawner2D.BULLET_SCALE_UNIFORM
 	sp.bullet_scale_min = 1.5
 	sp.bullet_scale_max = 1.5
 	for r in _ratios(_poses(_shoot(sp)), ref, 0):
@@ -125,7 +125,7 @@ func test_equal_min_and_max_is_exact() -> void:
 func test_inverted_range_is_normalized_at_use_and_assignment_order_is_free() -> void:
 	var sp := _spawner(100)
 	var ref: Array = sp.collect_spawn_transforms()
-	sp.bullet_scale_mode = 1
+	sp.bullet_scale_mode = BulletSpawner2D.BULLET_SCALE_UNIFORM
 	sp.bullet_scale_min = 3.0 # above the current max of 1.0: accepted, no error
 	assert_eq(sp.bullet_scale_min, 3.0, "no pair rejection")
 	sp.bullet_scale_max = 1.0
@@ -138,7 +138,7 @@ func test_inverted_range_is_normalized_at_use_and_assignment_order_is_free() -> 
 func test_per_axis_scale_rolls_each_axis_in_its_own_range() -> void:
 	var sp := _spawner()
 	var ref: Array = sp.collect_spawn_transforms()
-	sp.bullet_scale_mode = 2
+	sp.bullet_scale_mode = BulletSpawner2D.BULLET_SCALE_PER_AXIS
 	sp.bullet_scale_min_xy = Vector2(0.5, 2.0)
 	sp.bullet_scale_max_xy = Vector2(1.0, 3.0)
 	var shot := _poses(_shoot(sp))
@@ -154,7 +154,7 @@ func test_per_axis_scale_rolls_each_axis_in_its_own_range() -> void:
 	for i in N:
 		if absf(rx[i] - ry[i]) > 0.01:
 			differ += 1
-	assert_gt(differ, N / 2, "the axes are independent")
+	assert_gt(differ, floori(N / 2.0), "the axes are independent")
 
 
 func test_mode_off_ignores_a_configured_range() -> void:
@@ -181,7 +181,7 @@ func test_a_scaled_bullet_collides_with_its_scaled_shape() -> void:
 	await physics(4)
 	assert_signal_not_emitted(sp, "body_entered", "an unscaled bullet misses the wall")
 	plain.clear_all_bullets()
-	sp.bullet_scale_mode = 1
+	sp.bullet_scale_mode = BulletSpawner2D.BULLET_SCALE_UNIFORM
 	sp.bullet_scale_min = 4.0
 	sp.bullet_scale_max = 4.0
 	_shoot(sp)
@@ -263,7 +263,7 @@ func test_speed_range_stays_in_bounds() -> void:
 
 func _configure_all(sp: BulletSpawner2D, seed_value: int) -> void:
 	sp.bullet_random_seed = seed_value
-	sp.bullet_scale_mode = 1
+	sp.bullet_scale_mode = BulletSpawner2D.BULLET_SCALE_UNIFORM
 	sp.bullet_scale_min = 0.5
 	sp.bullet_scale_max = 2.0
 	sp.bullet_rotation_min_degrees = -20.0
@@ -295,7 +295,7 @@ func test_each_knob_rolls_its_own_numbers() -> void:
 	var sp := _spawner(N)
 	var ref: Array = sp.collect_spawn_transforms()
 	sp.bullet_random_seed = 99
-	sp.bullet_scale_mode = 2
+	sp.bullet_scale_mode = BulletSpawner2D.BULLET_SCALE_PER_AXIS
 	sp.bullet_scale_min_xy = Vector2(1.0, 1.0)
 	sp.bullet_scale_max_xy = Vector2(2.0, 2.0)
 	sp.bullet_rotation_min_degrees = 0.0
@@ -312,15 +312,15 @@ func test_each_knob_rolls_its_own_numbers() -> void:
 	for i in N:
 		var tx: float = scale_x[i] - 1.0
 		var ty: float = scale_y[i] - 1.0
-		var tr: float = rad_to_deg(wrapf(shot[i].get_rotation() - ref[i].get_rotation(), -PI, PI)) / 40.0
+		var tr_roll: float = rad_to_deg(wrapf(shot[i].get_rotation() - ref[i].get_rotation(), -PI, PI)) / 40.0
 		var ts: float = v.get_bullet_velocity(i).length() / 100.0 - 1.0
 		if absf(tx - ty) < 0.001:
 			same["x~y"] += 1
-		if absf(tx - tr) < 0.001:
+		if absf(tx - tr_roll) < 0.001:
 			same["x~rotation"] += 1
 		if absf(tx - ts) < 0.001:
 			same["x~speed"] += 1
-		if absf(tr - ts) < 0.001:
+		if absf(tr_roll - ts) < 0.001:
 			same["rotation~speed"] += 1
 	for pair in same:
 		assert_lt(int(same[pair]), 5, "%s: rolled together for %d of %d bullets" % [pair, same[pair], N])
@@ -363,7 +363,7 @@ func test_nothing_leaks_into_a_pooled_volley() -> void:
 	await idle(2)
 	v.clear_all_bullets()
 	await idle(1)
-	sp.bullet_scale_mode = 0
+	sp.bullet_scale_mode = BulletSpawner2D.BULLET_SCALE_OFF
 	sp.bullet_rotation_min_degrees = 0.0
 	sp.bullet_rotation_max_degrees = 0.0
 	sp.bullet_position_jitter_max = 0.0
@@ -382,7 +382,7 @@ func test_nothing_leaks_into_a_pooled_volley() -> void:
 func test_knobs_survive_a_scene_round_trip() -> void:
 	var sp := _spawner(5)
 	_configure_all(sp, 31)
-	sp.bullet_scale_mode = 2
+	sp.bullet_scale_mode = BulletSpawner2D.BULLET_SCALE_PER_AXIS
 	sp.bullet_scale_min_xy = Vector2(0.5, 0.25)
 	sp.bullet_scale_max_xy = Vector2(2.0, 4.0)
 	sp.bullet_speed_scale_min = 0.5
@@ -432,7 +432,8 @@ func test_setters_reject_bad_values_and_keep_the_old_one() -> void:
 	sp.bullet_scale_max_xy = Vector2(1, 0)
 	expect_errors_containing("BulletSpawner2D: bullet_scale_max_xy must be", 1, "zero component")
 	assert_eq(sp.bullet_scale_min_xy, Vector2.ONE, "old per-axis value kept")
-	sp.bullet_scale_mode = 7
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	sp.bullet_scale_mode = (7 as BulletSpawner2D.BulletScaleMode)
 	expect_errors_containing("BulletSpawner2D: bullet_scale_mode must be", 1, "unknown mode")
 	assert_eq(sp.bullet_scale_mode, 0, "old mode kept")
 	sp.bullet_random_seed = -5
@@ -462,7 +463,7 @@ func test_spin_start_phase_is_random_but_seedable() -> void:
 func test_oscillating_spin_starts_at_a_random_phase_inside_its_amplitude() -> void:
 	var sp := make_spawner()
 	sp.spin_enabled = true
-	sp.spin_mode = 1
+	sp.spin_mode = BulletSpawner2D.SPIN_OSCILLATE
 	sp.spin_amplitude_deg = 40.0
 	sp.spin_frequency_hz = 1.0
 	sp.spin_random_start_phase = true

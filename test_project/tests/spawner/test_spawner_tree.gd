@@ -6,8 +6,8 @@ extends BlastTest
 ## add()/make_spawner (autofreed), frames via idle(), rejections fail loud.
 func _finite_volley(v: Array) -> bool:
 	for t in v:
-		var tr: Transform2D = t
-		if not tr.is_finite():
+		var transform_value: Transform2D = t
+		if not transform_value.is_finite():
 			return false
 	return true
 
@@ -58,10 +58,10 @@ func test_error_paths() -> void:
 	assert_true(seq == 1 and bare.is_pattern_list_active(), "sequential list queues")
 	bare.stop_pattern_list()
 	assert_true(not bare.is_pattern_list_active(), "stop_pattern_list disarms")
-	bare.pattern_source = 33
+	bare.pattern_source = 33 as PatternSpawner2D.PatternSource
 	expect_errors_containing("invalid pattern_source", 1, "source 33 fails loud")
 	assert_true(bare.get_pattern_source() == src0, "pattern_source 33 rejected")
-	bare.pattern_source = -1
+	bare.pattern_source = (-1) as PatternSpawner2D.PatternSource
 	expect_errors_containing("invalid pattern_source", 1, "source -1 fails loud")
 	assert_true(bare.get_pattern_source() == src0, "pattern_source -1 rejected")
 
@@ -77,14 +77,14 @@ func test_preview_cap_custom_line() -> void:
 	BulletPatterns2D.set_max_bullets_per_pattern(10000)
 	spawner.helper_bullets_amount = 10000
 	assert_true(spawner.get_helper_bullets_amount() == 10000, "amount cap accepts 10000")
-	spawner.pattern_source = 3
+	spawner.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_RING
 	assert_true(spawner.collect_spawn_transforms().size() == 10000, "cap volley collects 10000")
 	spawner.helper_bullets_amount = 10001
 	expect_errors_containing("must be <= 10000", 1, "amount cap fails loud")
 	assert_true(spawner.get_helper_bullets_amount() == 10000, "amount 10001 rejected")
 	spawner.helper_bullets_amount = 5
 	# Custom compose + order ops (spawner at origin identity).
-	spawner.pattern_source = 24
+	spawner.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_CUSTOM
 	spawner.set_helper_custom_transforms([Transform2D(0.0, Vector2(10, 0)), Transform2D(0.0, Vector2(0, 20)), Transform2D(0.0, Vector2(-5, -5))])
 	var cust: Array = spawner.collect_spawn_transforms()
 	assert_eq(cust.size(), 3, "custom collects all")
@@ -93,12 +93,12 @@ func test_preview_cap_custom_line() -> void:
 	# Regression (COW aliasing): rebuilds and mode switches must never wipe
 	# placed transforms — the snapshot keeps a private copy now.
 	assert_true(spawner.get_helper_custom_transforms().size() == 3, "custom array survives rebuilds")
-	spawner.pattern_source = 6
-	spawner.pattern_source = 24
+	spawner.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_LINE
+	spawner.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_CUSTOM
 	assert_true(spawner.get_helper_custom_transforms().size() == 3, "custom array survives mode switch")
 	assert_true(spawner.collect_spawn_transforms().size() == 3, "custom still collects after switch")
 	# Line row + order ops: center-anchored row, reverse flips it.
-	spawner.pattern_source = 6
+	spawner.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_LINE
 	spawner.helper_bullets_amount = 5
 	spawner.set_helper_line_direction(Vector2(1, 0))
 	spawner.set_helper_line_spacing(10.0)
@@ -129,7 +129,7 @@ func test_homing_resolve() -> void:
 	var spawner := make_spawner(_make_data(), BulletSpawner2D.PATTERN_FROM_SELF, 5)
 	spawner.set_homing_enabled(true)
 	spawner.set_homing_max_targets(5)
-	spawner.set_homing_target_source(0)
+	spawner.set_homing_target_source(BulletSpawner2D.HOMING_SOURCE_NODE_GROUP)
 	spawner.set_homing_node_group("no_such_group_xyz")
 	assert_true(spawner.resolve_homing_targets(true).is_empty(), "empty group resolves empty")
 	var d1 := Node2D.new()
@@ -145,9 +145,9 @@ func test_homing_resolve() -> void:
 	spawner.set_homing_node_group("test_targets")
 	spawner.set_homing_max_targets(2)
 	assert_eq(spawner.resolve_homing_targets(true, false), [d1, d2], "group source resolves both, nearest first (per-mode semantics: test_spawner_homing_selection)")
-	spawner.set_homing_target_source(1)
+	spawner.set_homing_target_source(BulletSpawner2D.HOMING_SOURCE_MOUSE)
 	assert_true(spawner.resolve_homing_targets(true).is_empty(), "mouse resolves empty array")
-	spawner.set_homing_target_source(2)
+	spawner.set_homing_target_source(BulletSpawner2D.HOMING_SOURCE_GLOBAL_POSITION)
 	spawner.set_homing_global_position(Vector2(50, 50))
 	var gp: Array = spawner.resolve_homing_targets(true)
 	assert_true(gp.size() == 1 and (gp[0] as Vector2) == Vector2(50, 50), "global position resolves")
@@ -155,18 +155,18 @@ func test_homing_resolve() -> void:
 	expect_errors_containing("must be finite", 1, "NAN global fails loud")
 	assert_true(spawner.get_homing_global_position() == Vector2(50, 50), "NAN global keeps old value")
 	assert_true(spawner.resolve_homing_targets(true).size() == 1, "kept global still resolves")
-	spawner.set_homing_target_source(3)
+	spawner.set_homing_target_source(BulletSpawner2D.HOMING_SOURCE_NODE_PATH)
 	spawner.set_homing_target_path(NodePath("nope"))
 	assert_true(spawner.resolve_homing_targets(true).is_empty(), "dead path resolves empty")
 	spawner.set_homing_target_path(d1.get_path())
 	assert_true(spawner.resolve_homing_targets(true).size() == 1, "live path resolves")
-	spawner.set_homing_target_source(4)
+	spawner.set_homing_target_source(BulletSpawner2D.HOMING_SOURCE_NODE_NAME)
 	spawner.set_homing_node_name("")
 	assert_true(spawner.resolve_homing_targets(true).is_empty(), "empty name resolves empty")
 	spawner.set_homing_node_name("Dummy")
-	spawner.set_homing_node_name_match_mode(1)
+	spawner.set_homing_node_name_match_mode(PatternSpawner2D.HOMING_NAME_MATCH_CONTAINS)
 	assert_true(spawner.resolve_homing_targets(true).size() == 2, "contains name resolves both")
-	spawner.set_homing_target_source(5)
+	spawner.set_homing_target_source(BulletSpawner2D.HOMING_SOURCE_NODE_CHILDREN)
 	spawner.set_homing_children_parent_path(NodePath("."))
 	# Regression: the runtime preview holder is a Node2D child of the
 	# spawner and must never resolve as a homing target.
@@ -176,7 +176,7 @@ func test_homing_resolve() -> void:
 
 func test_live_shoot() -> void:
 	var spawner := make_spawner(_make_data(), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 5)
-	spawner.pattern_source = 3
+	spawner.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_RING
 	# Homing on so the volley is tracked (plain volleys stay untracked by
 	# design: only homing volleys need retargeting).
 	var t1 := Node2D.new()
@@ -188,7 +188,7 @@ func test_live_shoot() -> void:
 	t2.add_to_group("test_targets")
 	add(t2)
 	spawner.set_homing_enabled(true)
-	spawner.set_homing_target_source(0)
+	spawner.set_homing_target_source(BulletSpawner2D.HOMING_SOURCE_NODE_GROUP)
 	spawner.set_homing_node_group("test_targets")
 	assert_true(spawner.shoot_once(), "homing shot fires")
 	assert_eq(spawner.get_volleys_fired(), 1, "fired volley counted")

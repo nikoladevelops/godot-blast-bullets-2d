@@ -39,9 +39,9 @@ func _arg_count(sig: String) -> int:
 	return 0
 
 
-func _connect(sig: String, call: Callable) -> void:
+func _connect(sig: String, callable: Callable) -> void:
 	var n := _arg_count(sig)
-	factory.connect(sig, call.unbind(n) if n > 0 else call)
+	factory.connect(sig, callable.unbind(n) if n > 0 else callable)
 
 
 func test_active_lasers_are_listed_and_cleared() -> void:

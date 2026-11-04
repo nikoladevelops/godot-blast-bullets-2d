@@ -50,15 +50,15 @@ func test_property_list_order_and_hints_are_pinned() -> void:
 	var order: Array = []
 	var problems: Array = []
 	for p in ClassDB.class_get_property_list("BulletFlock2D", true):
-		var name := str(p["name"])
-		if not want.has(name):
+		var node_name := str(p["name"])
+		if not want.has(node_name):
 			continue
-		order.append(name)
-		var w: Array = want[name]
+		order.append(node_name)
+		var w: Array = want[node_name]
 		if int(p["type"]) != w[0] or int(p["hint"]) != w[1] or str(p["hint_string"]) != w[2]:
-			problems.append("%s: type %d hint %d '%s'" % [name, p["type"], p["hint"], p["hint_string"]])
+			problems.append("%s: type %d hint %d '%s'" % [node_name, p["type"], p["hint"], p["hint_string"]])
 		if (int(p["usage"]) & PROPERTY_USAGE_STORAGE) == 0 or (int(p["usage"]) & PROPERTY_USAGE_EDITOR) == 0:
-			problems.append("%s: not stored and shown" % name)
+			problems.append("%s: not stored and shown" % node_name)
 	assert_eq(order, PROPS, "inspector order")
 	assert_eq("\n".join(problems), "", "hints and usage")
 
@@ -184,8 +184,10 @@ func test_presets_write_the_steering_knobs_and_report_the_match() -> void:
 	assert_eq(f.preset, BulletFlock2D.PRESET_KEEP_DISTANCE, "the inspector menu reads the match")
 	f.separation = 2.0
 	assert_eq(f.preset, BulletFlock2D.PRESET_CUSTOM, "a tuned knob is Custom")
-	f.apply_preset(5)
-	f.apply_preset(-1)
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	f.apply_preset(5 as BulletFlock2D.Preset)
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	f.apply_preset(-1 as BulletFlock2D.Preset)
 	expect_error_sequence([
 		"BulletFlock2D: preset must be 0 (Custom), 1 (Swarm), 2 (Fly Together), 3 (Keep Distance) or 4 (Tight Group), keeping the old values.",
 		"BulletFlock2D: preset must be 0 (Custom), 1 (Swarm), 2 (Fly Together), 3 (Keep Distance) or 4 (Tight Group), keeping the old values.",
@@ -199,7 +201,8 @@ func test_create_preset_builds_each_preset() -> void:
 		assert_not_null(f, "preset %d built" % p)
 		var want: int = BulletFlock2D.PRESET_SWARM if p == BulletFlock2D.PRESET_CUSTOM else p
 		assert_eq(f.get_matching_preset(), want, "preset %d: its rules (Custom = the defaults)" % p)
-	assert_null(BulletFlock2D.create_preset(9), "a bad id builds nothing")
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	assert_null(BulletFlock2D.create_preset(9 as BulletFlock2D.Preset), "a bad id builds nothing")
 	expect_error("BulletFlock2D.create_preset: preset must be 0 (Custom), 1 (Swarm), 2 (Fly Together), 3 (Keep Distance) or 4 (Tight Group), nothing created.")
 
 

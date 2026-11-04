@@ -183,12 +183,12 @@ func _leaks_through(method: Dictionary) -> String:
 func test_writes_through_a_pooled_handle_never_reach_the_next_life() -> void:
 	var leaks: Array = []
 	for m in ClassDB.class_get_method_list(&"BulletVolley2D", true):
-		var name := String(m["name"])
-		if name.begins_with("_") or name.begins_with("get_") or name.begins_with("is_") or name.begins_with("debug_") or EXEMPT.has(name):
+		var method_name := String(m["name"])
+		if method_name.begins_with("_") or method_name.begins_with("get_") or method_name.begins_with("is_") or method_name.begins_with("debug_") or EXEMPT.has(method_name):
 			continue
 		var why := _leaks_through(m)
 		if why != "":
-			leaks.append("%s: %s" % [name, why])
+			leaks.append("%s: %s" % [method_name, why])
 	assert_eq("\n".join(leaks), "", "no write through a pooled handle reaches the next life")
 
 

@@ -76,11 +76,11 @@ func _pick_volley() -> BulletVolley2D:
 
 
 func _flight_data(count: int) -> BulletVolleyData2D:
-	var tr: Array = []
+	var transforms: Array = []
 	var at := Vector2(rng.randf_range(0, 500), rng.randf_range(0, 400))
 	for k in count:
-		tr.append(Transform2D(rng.randf_range(-PI, PI), at + Vector2(rng.randf_range(-30, 30), rng.randf_range(-30, 30))))
-	var d := H.make_flight_data(tr, rng.randf_range(-60, 260), [0.3, 2.0, 30.0][rng.randi() % 3])
+		transforms.append(Transform2D(rng.randf_range(-PI, PI), at + Vector2(rng.randf_range(-30, 30), rng.randf_range(-30, 30))))
+	var d := H.make_flight_data(transforms, rng.randf_range(-60, 260), [0.3, 2.0, 30.0][rng.randi() % 3])
 	d.set_collision_mask_from_array([4])
 	if rng.randf() < 0.4:
 		d.set_bounce_mask_from_array([4])
@@ -102,9 +102,9 @@ func _new_spawner() -> void:
 	sp.helper_ring_radius = rng.randf_range(5, 60)
 	sp.flock_enabled = rng.randf() < 0.8
 	sp.flock = _random_flock() if rng.randf() < 0.8 else null # null: the factory's default flock
-	sp.flock_scope = rng.randi() % 3
+	sp.flock_scope = (rng.randi() % 3) as BulletFlock2D.Scope
 	if rng.randf() < 0.3:
-		sp.bullet_scale_mode = 1 + rng.randi() % 2 # Uniform / Per Axis
+		sp.bullet_scale_mode = (1 + rng.randi() % 2) as PatternSpawner2D.BulletScaleMode # Uniform / Per Axis
 		sp.bullet_scale_min = rng.randf_range(0.2, 1.0)
 		sp.bullet_scale_max = rng.randf_range(1.0, 3.0)
 		sp.bullet_scale_min_xy = Vector2(rng.randf_range(0.2, 1.0), rng.randf_range(0.2, 1.0))
@@ -114,7 +114,7 @@ func _new_spawner() -> void:
 		sp.burst_count = rng.randi_range(2, 4)
 		sp.burst_interval_sec = rng.randf_range(0.02, 0.2)
 	sp.time_scale = [0.0, 0.5, 1.0, 2.0][rng.randi() % 4]
-	sp.orphaned_volleys = rng.randi() % 4
+	sp.orphaned_volleys = (rng.randi() % 4) as BulletSpawner2D.OrphanedVolleys
 	if rng.randf() < 0.3:
 		sp.graze_zones = [H.make_graze_zone([rng.randf_range(10, 80)])]
 		sp.graze_node_group = &"chaos_graze"
@@ -158,11 +158,11 @@ func _edit_spawner() -> void:
 	match rng.randi() % 5:
 		0: sp.flock_enabled = not sp.flock_enabled
 		1: sp.flock = _random_flock() if rng.randf() < 0.8 else null
-		2: sp.flock_scope = rng.randi() % 3
+		2: sp.flock_scope = (rng.randi() % 3) as BulletFlock2D.Scope
 		3:
 			if sp.burst_enabled:
 				sp.begin_burst() # the shots come over the next frames
-		4: sp.bullet_scale_mode = rng.randi() % 3
+		4: sp.bullet_scale_mode = (rng.randi() % 3) as PatternSpawner2D.BulletScaleMode
 		3: sp.queue_free() # orphans its volleys per orphaned_volleys
 		4: sp.time_scale = [0.0, 1.0, 3.0][rng.randi() % 3]
 

@@ -322,11 +322,11 @@ func test_rotated_ellipse_faces_its_true_normal() -> void:
 	sp.helper_bullets_amount = 24
 	var worst := 0.0
 	for t in sp.collect_spawn_transforms():
-		var tr := t as Transform2D
-		var local := tr.origin.rotated(-0.6) # spawner at the origin
+		var transform_value := t as Transform2D
+		var local := transform_value.origin.rotated(-0.6) # spawner at the origin
 		var n_local := Vector2(local.x / (200.0 * 200.0), local.y / (80.0 * 80.0))
 		var want := n_local.rotated(0.6).angle()
-		worst = maxf(worst, absf(angle_difference(tr.get_rotation(), want)))
+		worst = maxf(worst, absf(angle_difference(transform_value.get_rotation(), want)))
 	assert_lt(worst, 0.001, "every bullet faces the ellipse's outward normal (worst %.5f rad)" % worst)
 
 
@@ -356,15 +356,15 @@ func test_a_band_wider_than_the_int_range_stays_one_sheet() -> void:
 	# the amount (one sheet across the band), never wrap into one column of
 	# rows. The sheet then leaves the world box: its drops land on the box
 	# edge (+-400000) with the documented warning.
-	var tr: Array = BulletPatterns2D.helper_generate_transforms_rain(8, Transform2D(), 1e12, Vector2(0, 1), 48.0, 0.0)
+	var transforms: Array = BulletPatterns2D.helper_generate_transforms_rain(8, Transform2D(), 1e12, Vector2(0, 1), 48.0, 0.0)
 	expect_warning_sequence(["helper_generate_transforms_rain: some slots overflowed to Inf/NaN or left the world box and were clamped to its edge; shrink the spacing/radius."])
 	var problems: Array = []
-	for k in tr.size():
-		var o: Vector2 = (tr[k] as Transform2D).origin
+	for k in transforms.size():
+		var o: Vector2 = (transforms[k] as Transform2D).origin
 		var want := Vector2(-400000.0 if k < 4 else 400000.0, 0.0)
 		if o != want:
 			problems.append("drop %d at %s, want %s" % [k, o, want])
-	assert_eq(tr.size(), 8, "every drop")
+	assert_eq(transforms.size(), 8, "every drop")
 	assert_eq("\n".join(problems), "", "one sheet across the band, clamped to the box edge")
 	var track: PackedVector2Array = BulletPatterns2D.helper_sample_outline_rain(8, 1e12, Vector2(0, 1), 48.0)["points"]
 	var rows := 0

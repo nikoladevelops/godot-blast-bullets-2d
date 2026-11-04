@@ -42,7 +42,7 @@ func test_additive_direction_steers_cumulatively() -> void:
 	var dc := BulletCurvesData2D.new()
 	dc.x_direction_curve = H.make_flat_curve(0.5)
 	dc.x_direction_curve_strength = 1.0
-	dc.x_direction_curve_mode = 0 # Additive
+	dc.x_direction_curve_mode = BulletCurvesData2D.Additive # Additive
 	v.set_shared_bullet_curves_data(dc)
 	await physics(5)
 	var early: float = v.get_bullet_direction(0).angle()

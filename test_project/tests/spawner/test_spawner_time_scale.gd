@@ -75,8 +75,8 @@ func test_spawner_scale_scales_the_cadence() -> void:
 	var half := await _shots_over(60)
 	assert_between(half, 4, 6, "half speed: about 5 shots per second")
 	sp.time_scale = 2.0
-	var double := await _shots_over(60)
-	assert_between(double, 19, 21, "double speed: about 20 shots per second")
+	var doubled := await _shots_over(60)
+	assert_between(doubled, 19, 21, "double speed: about 20 shots per second")
 
 
 func test_factory_scale_now_slows_spawners_too() -> void:
@@ -167,7 +167,7 @@ func test_burst_chain_follows_the_scale() -> void:
 func test_spin_follows_the_scale() -> void:
 	var sp := make_spawner()
 	sp.spin_enabled = true
-	sp.spin_mode = 0 # continuous
+	sp.spin_mode = BulletSpawner2D.SPIN_CONTINUOUS # continuous
 	sp.spin_speed_deg_per_sec = 90.0
 	sp.reset_spin_angle()
 	await idle(60)
@@ -191,8 +191,8 @@ func test_movement_follows_the_scale_and_reports_zero_velocity_when_frozen() -> 
 	path.curve = curve
 	add(path)
 	var sp := make_spawner()
-	sp.movement_transition = 0
-	sp.movement_ease = 0
+	sp.movement_transition = Tween.TRANS_LINEAR
+	sp.movement_ease = Tween.EASE_IN
 	sp.movement_duration_sec = 1.0
 	sp.set_movement_path_node(path)
 	sp.time_scale = 0.5
@@ -237,7 +237,7 @@ func test_volley_lifetime_runs_on_the_scaled_clock() -> void:
 
 func test_orphans_fall_back_to_the_factory_scale() -> void:
 	var sp := _shooter(100.0, 100.0)
-	sp.orphaned_volleys = 0 # keep flying
+	sp.orphaned_volleys = BulletSpawner2D.ORPHANED_VOLLEYS_KEEP_FLYING # keep flying
 	_start(sp)
 	await idle(2)
 	var v: BulletVolley2D = fired.back()
@@ -316,7 +316,7 @@ func test_spin_angle_stays_finite_at_a_huge_time_scale() -> void:
 
 func test_scale_zero_freezes_pattern_lists_and_the_retarget_countdown() -> void:
 	var sp := _shooter(10.0)
-	var t := make_graze_target(Vector2(300, 0), &"scaled_targets")
+	var _t := make_graze_target(Vector2(300, 0), &"scaled_targets")
 	sp.homing_node_group = &"scaled_targets"
 	sp.homing_take_control_of_texture_rotation = true
 	sp.homing_retarget_interval_sec = 0.2

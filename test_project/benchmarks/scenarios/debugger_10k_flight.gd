@@ -7,4 +7,4 @@ func describe() -> String:
 func setup() -> void:
 	factory.is_debugger_enabled = true
 	for i in 10:
-		factory.spawn_volley(ring_data(1000, Vector2(960 * (i % 5), 1200 * (i / 5)), 50.0, 60.0, 1000.0))
+		factory.spawn_volley(ring_data(1000, Vector2(960 * (i % 5), 1200 * int(i / 5.0)), 50.0, 60.0, 1000.0))

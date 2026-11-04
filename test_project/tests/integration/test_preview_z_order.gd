@@ -34,7 +34,10 @@ func _spawner_layers(sp: BulletSpawner2D) -> Array:
 func _orders(layers: Array) -> Array:
 	var out: Array = []
 	for l in layers:
-		out.append([(l as CanvasItem).z_index, (l as CanvasItem).z_as_relative] if l != null else null)
+		if l == null:
+			out.append(null)
+		else:
+			out.append([(l as CanvasItem).z_index, (l as CanvasItem).z_as_relative])
 	return out
 
 

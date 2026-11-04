@@ -63,8 +63,10 @@ func test_the_look_is_bound_with_defaults_and_refuses_bad_input() -> void:
 	look.rotation_degrees = INF
 	look.modulate = Color(NAN, 1, 1)
 	look.z_index = 5000
-	look.show_when = 3
-	look.show_when = -1
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	look.show_when = 3 as LaserSpriteLook2D.ShowWhen
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	look.show_when = -1 as LaserSpriteLook2D.ShowWhen
 	expect_error_sequence([
 		"LaserSpriteLook2D: speed_scale must be finite and >= 0 (0 = holds the first frame), keeping the old value.",
 		"LaserSpriteLook2D: speed_scale must be finite and >= 0 (0 = holds the first frame), keeping the old value.",
@@ -91,10 +93,13 @@ func test_the_data_holds_five_look_slots_and_passes_their_edits_on() -> void:
 		var other := _look()
 		d.set_look(slot, other)
 		assert_same(d.get(names[slot]), other, "set_look writes %s" % names[slot])
-	d.set_look(5, _look())
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	d.set_look(5 as LaserData2D.LookSlot, _look())
 	expect_error_sequence(["LaserData2D: set_look slot must be one of the LookSlot values, nothing changed."])
-	assert_null(d.get_look(5), "an out-of-range slot reads null, never past the slot array")
-	assert_null(d.get_look(-1), "a negative slot reads null too")
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	assert_null(d.get_look(5 as LaserData2D.LookSlot), "an out-of-range slot reads null, never past the slot array")
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	assert_null(d.get_look(-1 as LaserData2D.LookSlot), "a negative slot reads null too")
 	watch_signals(d)
 	d.tip_look.scale = Vector2(2, 2)
 	assert_signal_emit_count(d, "changed", 1, "an edit inside a look is a data change")

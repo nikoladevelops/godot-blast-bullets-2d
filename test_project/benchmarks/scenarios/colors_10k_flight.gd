@@ -8,7 +8,7 @@ func describe() -> String:
 
 func setup() -> void:
 	for i in 10:
-		var d := ring_data(1000, Vector2(960 * (i % 5), 1200 * (i / 5)), 50.0, 60.0, 1000.0)
+		var d := ring_data(1000, Vector2(960 * (i % 5), 1200 * floori(i / 5.0)), 50.0, 60.0, 1000.0)
 		var colors := PackedColorArray()
 		for b in 1000:
 			colors.append(Color.from_hsv(b / 1000.0, 0.8, 1.0))

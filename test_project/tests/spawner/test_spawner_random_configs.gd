@@ -90,20 +90,20 @@ func _audit(where: String) -> void:
 func _randomize(obj: Object, where: String) -> void:
 	for p in obj.get_property_list():
 		var usage := int(p["usage"])
-		var name := str(p["name"])
-		if (usage & PROPERTY_USAGE_STORAGE) == 0 or (usage & PROPERTY_USAGE_EDITOR) == 0 or name in SKIP:
+		var node_name := str(p["name"])
+		if (usage & PROPERTY_USAGE_STORAGE) == 0 or (usage & PROPERTY_USAGE_EDITOR) == 0 or node_name in SKIP:
 			continue
 		var v: Variant = _value(p)
 		if v == null:
 			continue
-		obj.set(name, v)
+		obj.set(node_name, v)
 		# A value the inspector offers must be accepted (a warning about a
 		# missing companion node is fine, a rejection is not).
 		for err in get_errors():
 			if not err.handled:
 				err.handled = true
 				if str(err.code).contains("keeping the old value") or not _known(str(err.code)):
-					problems.append("%s.%s = %s: %s" % [where, name, v, err.code])
+					problems.append("%s.%s = %s: %s" % [where, node_name, v, err.code])
 
 
 func _check_bullets(where: String) -> void:

@@ -36,9 +36,9 @@ func before_each() -> void:
 	factory.bullet_grazed.connect(func(_t, _v, _i, _z, _r) -> void: pass)
 
 
-func _spawner(name: String, at: Vector2) -> BulletSpawner2D:
+func _spawner(node_name: String, at: Vector2) -> BulletSpawner2D:
 	var sp := make_spawner(data, BulletSpawner2D.PATTERN_FROM_HELPER_RING, 6)
-	sp.name = name
+	sp.name = node_name
 	sp.global_position = at
 	sp.flock_enabled = true
 	sp.flock = flock
@@ -49,7 +49,7 @@ func _spawner(name: String, at: Vector2) -> BulletSpawner2D:
 	sp.sound_effects = [sound]
 	sp.split_enabled = true
 	sp.split_data = chain
-	sp.bullet_split.connect(func(_p, _c, _ch, _d) -> void: reports[name] += 1)
+	sp.bullet_split.connect(func(_p, _c, _ch, _d) -> void: reports[node_name] += 1)
 	return sp
 
 

@@ -56,9 +56,9 @@ func test_mode_ids_are_stable_and_validated() -> void:
 	assert_eq(BulletPickupData2D.MOTION_CUSTOM, 2, "serialized id")
 	var p := BulletPickupData2D.new()
 	assert_eq(p.motion_mode, 0, "the built-in coin physics by default")
-	p.motion_mode = 3
+	p.motion_mode = 3 as BulletPickupData2D.MotionMode
 	expect_error_sequence(["BulletPickupData2D: motion_mode must be 0 (Burst And Magnet), 1 (Keep Bullet Motion) or 2 (Custom), keeping the old value."])
-	p.motion_mode = -1
+	p.motion_mode = (-1) as BulletPickupData2D.MotionMode
 	expect_error_sequence(["BulletPickupData2D: motion_mode must be 0 (Burst And Magnet), 1 (Keep Bullet Motion) or 2 (Custom), keeping the old value."])
 	assert_eq(p.motion_mode, 0, "kept")
 

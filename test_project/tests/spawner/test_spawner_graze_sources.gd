@@ -65,7 +65,7 @@ func before_each() -> void:
 func _configure(sp: BulletSpawner2D, source: int) -> BulletSpawner2D:
 	sp.graze_zones = [H.make_graze_zone([20.0])]
 	sp.graze_enabled = true
-	sp.graze_target_source = source
+	sp.graze_target_source = (source as BulletSpawner2D.GrazeTargetSource)
 	match source:
 		GROUP:
 			sp.graze_node_group = &"src"
@@ -155,67 +155,67 @@ func test_the_source_grazes_its_target_and_names_it(source: int = use_parameters
 	var sp := _spawner(source)
 	_decoy(Vector2(5, 0)) # nearer, matched by no source
 	var t := _target(source, Vector2(10, 0))
-	var log := H.record_graze(sp)
+	var graze_log := H.record_graze(sp)
 	_shoot(sp)
 	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "source %d: one graze" % source)
-	assert_eq(log[0][1], t, "source %d: named, never the nearer decoy" % source)
+	assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "source %d: one graze" % source)
+	assert_eq(graze_log[0][1], t, "source %d: named, never the nearer decoy" % source)
 	assert_eq(sp.resolve_graze_targets(), [t], "source %d: resolves exactly its node" % source)
 
 
 func test_a_node_that_appears_after_the_shot_grazes_next_tick(source: int = use_parameters(SOURCES)) -> void:
 	var sp := _spawner(source)
-	var log := H.record_graze(sp)
+	var graze_log := H.record_graze(sp)
 	_shoot(sp)
 	step_factory(2)
-	assert_eq(log, [], "source %d: nothing to graze yet" % source)
+	assert_eq(graze_log, [], "source %d: nothing to graze yet" % source)
 	var t := _target(source, Vector2(10, 0))
 	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "source %d: found by the next tick's scan" % source)
-	assert_eq(log[0][1], t, "source %d: named" % source)
+	assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "source %d: found by the next tick's scan" % source)
+	assert_eq(graze_log[0][1], t, "source %d: named" % source)
 
 
 func test_between_scans_positions_stay_live(source: int = use_parameters(SOURCES)) -> void:
 	var sp := _spawner(source)
 	sp.graze_update_interval = 10.0
 	var t := _target(source, Vector2(-500, 0))
-	var log := H.record_graze(sp)
+	var graze_log := H.record_graze(sp)
 	_shoot(sp)
 	step_factory() # the first scan finds it, far away
 	var scans: int = sp.debug_get_graze_detector_stats()["scans"]
 	t.position = Vector2(10, 0)
 	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "source %d: a found target moving onto the bullet grazes at once" % source)
+	assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "source %d: a found target moving onto the bullet grazes at once" % source)
 	assert_eq(sp.debug_get_graze_detector_stats()["scans"], scans, "source %d: without a rescan" % source)
 
 
 func test_a_newcomer_waits_for_the_next_scan_or_a_refresh(source: int = use_parameters(SOURCES)) -> void:
 	var sp := _spawner(source)
 	sp.graze_update_interval = 10.0
-	var log := H.record_graze(sp)
+	var graze_log := H.record_graze(sp)
 	_shoot(sp)
 	step_factory() # the first scan finds nothing
 	var t := _target(source, Vector2(10, 0))
 	step_factory(3)
-	assert_eq(log, [], "source %d: not before the next scan, 10 s away" % source)
+	assert_eq(graze_log, [], "source %d: not before the next scan, 10 s away" % source)
 	assert_eq(sp.resolve_graze_targets(), [], "source %d: not a target yet" % source)
 	assert_eq(sp.refresh_graze_targets(), 1, "source %d: a refresh finds it now" % source)
 	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "source %d: the flying bullet grazes it next tick" % source)
-	assert_eq(log[0][1], t, "source %d: named" % source)
+	assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "source %d: the flying bullet grazes it next tick" % source)
+	assert_eq(graze_log[0][1], t, "source %d: named" % source)
 
 
 func test_a_freed_target_drops_at_once_between_scans(source: int = use_parameters(SOURCES)) -> void:
 	var sp := _spawner(source)
 	sp.graze_update_interval = 10.0
 	var t := _target(source, Vector2(10, 0))
-	var log := H.record_graze(sp)
+	var graze_log := H.record_graze(sp)
 	var v := _shoot(sp)
 	step_factory()
 	assert_true(v.is_bullet_inside_graze(0, 0), "source %d: inside" % source)
 	t.free()
 	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "source %d: the visit ended silently" % source)
+	assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "source %d: the visit ended silently" % source)
 	assert_false(v.is_bullet_inside_graze(0, 0), "source %d: no visit left" % source)
 	assert_eq(sp.resolve_graze_targets(), [], "source %d: no target" % source)
 
@@ -223,13 +223,13 @@ func test_a_freed_target_drops_at_once_between_scans(source: int = use_parameter
 func test_a_target_that_stops_matching_drops_at_the_next_scan(source: int = use_parameters(SOURCES)) -> void:
 	var sp := _spawner(source)
 	var t := _target(source, Vector2(10, 0))
-	var log := H.record_graze(sp)
+	var graze_log := H.record_graze(sp)
 	var v := _shoot(sp)
 	step_factory()
 	assert_true(v.is_bullet_inside_graze(0, 0), "source %d: inside" % source)
 	_unmatch(source, t)
 	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "source %d: no exit, the visit ended silently" % source)
+	assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "source %d: no exit, the visit ended silently" % source)
 	assert_false(v.is_bullet_inside_graze(0, 0), "source %d: no visit left" % source)
 	assert_eq(sp.resolve_graze_targets(), [], "source %d: no longer a target" % source)
 
@@ -239,17 +239,17 @@ func test_a_target_outside_the_tree_sits_out_until_it_is_back(source: int = use_
 		var sp := _spawner(source)
 		sp.graze_update_interval = interval
 		var t := _target(source, Vector2(-500, 0))
-		var log := H.record_graze(sp)
+		var graze_log := H.record_graze(sp)
 		_shoot(sp)
 		step_factory()
 		var home := t.get_parent()
 		home.remove_child(t)
 		t.position = Vector2(10, 0)
 		step_factory(2)
-		assert_eq(log, [], "source %d, interval %s: a detached target grazes nothing" % [source, interval])
+		assert_eq(graze_log, [], "source %d, interval %s: a detached target grazes nothing" % [source, interval])
 		home.add_child(t)
 		step_factory()
-		assert_eq(H.graze_kinds(log), ["enter:0:0"], "source %d, interval %s: back in the tree, it grazes" % [source, interval])
+		assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "source %d, interval %s: back in the tree, it grazes" % [source, interval])
 		t.free()
 		sp.free()
 
@@ -258,14 +258,14 @@ func test_the_filter_group_applies(source: int = use_parameters(SOURCES)) -> voi
 	var sp := _spawner(source)
 	sp.graze_filter_group = &"allowed"
 	var t := _target(source, Vector2(10, 0))
-	var log := H.record_graze(sp)
+	var graze_log := H.record_graze(sp)
 	_shoot(sp)
 	step_factory(2)
-	assert_eq(log, [], "source %d: a node outside the filter group never grazes" % source)
+	assert_eq(graze_log, [], "source %d: a node outside the filter group never grazes" % source)
 	assert_eq(sp.resolve_graze_targets(), [], "source %d: and is no target" % source)
 	t.add_to_group(&"allowed")
 	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "source %d: in the filter group: grazes" % source)
+	assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "source %d: in the filter group: grazes" % source)
 
 
 func test_setting_edits_reach_bullets_in_flight(source: int = use_parameters(SOURCES)) -> void:
@@ -278,10 +278,10 @@ func test_setting_edits_reach_bullets_in_flight(source: int = use_parameters(SOU
 	add(other_parent)
 	other_parent.add_child(other)
 	other.name = "Other"
-	var log := H.record_graze(sp)
+	var graze_log := H.record_graze(sp)
 	_shoot(sp)
 	step_factory(2)
-	assert_eq(log, [], "source %d: the first setting's node is far" % source)
+	assert_eq(graze_log, [], "source %d: the first setting's node is far" % source)
 	match source:
 		GROUP:
 			other.add_to_group(&"other")
@@ -293,33 +293,33 @@ func test_setting_edits_reach_bullets_in_flight(source: int = use_parameters(SOU
 		CHILDREN:
 			sp.graze_children_parent_path = NodePath("../Elsewhere")
 	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "source %d: the flying bullet follows the new setting" % source)
-	assert_eq(log[0][1], other, "source %d: named" % source)
+	assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "source %d: the flying bullet follows the new setting" % source)
+	assert_eq(graze_log[0][1], other, "source %d: named" % source)
 
 
 func test_orphaned_volleys_keep_the_source(source: int = use_parameters(SOURCES)) -> void:
 	var sp := _loose_spawner(source)
 	var t := _target(source, Vector2(-500, 0))
-	var log := H.record_graze(factory)
+	var graze_log := H.record_graze(factory)
 	_shoot(sp)
 	step_factory() # resolved while the spawner lives
 	sp.free()
 	t.position = Vector2(10, 0)
 	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "source %d: the orphaned volley still grazes its target" % source)
-	assert_eq(log[0][1], t, "source %d: named, on the factory" % source)
+	assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "source %d: the orphaned volley still grazes its target" % source)
+	assert_eq(graze_log[0][1], t, "source %d: named, on the factory" % source)
 
 
 func test_orphaned_volleys_find_newcomers(source: int = use_parameters(MULTI_SOURCES)) -> void:
 	var sp := _loose_spawner(source)
-	var log := H.record_graze(factory)
+	var graze_log := H.record_graze(factory)
 	_shoot(sp)
 	step_factory()
 	sp.free()
 	var late := _target(source, Vector2(10, 0), 7)
 	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "source %d: a node that appears after the spawner is gone still grazes" % source)
-	assert_eq(log[0][1], late, "source %d: named" % source)
+	assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "source %d: a node that appears after the spawner is gone still grazes" % source)
+	assert_eq(graze_log[0][1], late, "source %d: named" % source)
 
 
 func test_the_preview_draws_exactly_the_runtime_targets(source: int = use_parameters(SOURCES)) -> void:
@@ -366,28 +366,28 @@ func test_paths_resolve_from_the_spawner() -> void:
 			inside.name = "SrcTarget"
 		else:
 			inner_parent.add_child(inside)
-		var log := H.record_graze(sp)
+		var graze_log := H.record_graze(sp)
 		_shoot(sp)
 		step_factory()
-		assert_eq(log, [], "source %d: the path's node is far" % source)
+		assert_eq(graze_log, [], "source %d: the path's node is far" % source)
 		sp.reparent(holder)
 		step_factory()
-		assert_eq(H.graze_kinds(log), ["enter:0:0"], "source %d: after the move the path names the holder's node" % source)
-		assert_eq(log[0][1], inside, "source %d: named" % source)
-		assert_ne(log[0][1], outside, "source %d: not the old one" % source)
+		assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "source %d: after the move the path names the holder's node" % source)
+		assert_eq(graze_log[0][1], inside, "source %d: named" % source)
+		assert_ne(graze_log[0][1], outside, "source %d: not the old one" % source)
 		sp.free()
 
 
 func test_renaming_a_node_into_the_pattern_makes_it_a_target() -> void:
 	var sp := _spawner(NAME)
 	var n := _decoy(Vector2(10, 0))
-	var log := H.record_graze(sp)
+	var graze_log := H.record_graze(sp)
 	_shoot(sp)
 	step_factory()
-	assert_eq(log, [], "Decoy is no SrcTarget")
+	assert_eq(graze_log, [], "Decoy is no SrcTarget")
 	n.name = "SrcTargetLate"
 	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "renamed into the pattern: found by the next scan")
+	assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "renamed into the pattern: found by the next scan")
 
 
 func test_every_source_keeps_its_own_settings_across_switches() -> void:
@@ -398,13 +398,13 @@ func test_every_source_keeps_its_own_settings_across_switches() -> void:
 	var group_target := _target(GROUP, Vector2(100, 0), 1)
 	var path_target := _target(PATH, Vector2(200, 0))
 	var child := _target(CHILDREN, Vector2(300, 0), 2)
-	for round in 2:
+	for round_index in 2:
 		for source in SOURCES:
 			sp.graze_target_source = source
 			sp.refresh_graze_targets()
 			# Name scans the scene in tree order: SrcParent (with the child) came first.
 			var expected: Array = {GROUP: [group_target], PATH: [path_target], NAME: [child, group_target, path_target], CHILDREN: [child]}[source]
-			assert_eq(sp.resolve_graze_targets(), expected, "round %d, source %d: only the active source decides" % [round, source])
+			assert_eq(sp.resolve_graze_targets(), expected, "round %d, source %d: only the active source decides" % [round_index, source])
 	assert_eq([sp.graze_node_group, sp.graze_target_path, sp.graze_node_name, sp.graze_children_parent_path], [&"src", NodePath("../SrcTarget"), "SrcTarget", NodePath("../SrcParent")], "every setting kept")
 
 
@@ -445,7 +445,7 @@ func _zoned_spawner(zones: Array = [], source: int = NODE_GROUP) -> BulletSpawne
 	sp.graze_zones = zones if not zones.is_empty() else [H.make_graze_zone([20.0])]
 	sp.graze_enabled = true
 	sp.graze_node_group = &"graze_targets"
-	sp.graze_target_source = source
+	sp.graze_target_source = (source as BulletSpawner2D.GrazeTargetSource)
 	return sp
 
 
@@ -462,21 +462,21 @@ func _loose_group_spawner(source: int) -> BulletSpawner2D:
 	sp.graze_zones = [H.make_graze_zone([20.0])]
 	sp.graze_enabled = true
 	sp.graze_node_group = &"graze_targets"
-	sp.graze_target_source = source
+	sp.graze_target_source = (source as BulletSpawner2D.GrazeTargetSource)
 	add_child(sp)
 	sp.set_bullet_factory(factory)
 	return sp
 
 
 ## A named Node2D at `pos` (under `parent`, else under the test).
-func _node(node_name: String, pos: Vector2, parent: Node = null) -> Node2D:
+func _node(node_name: String, pos: Vector2, parent_node: Node = null) -> Node2D:
 	var n := Node2D.new()
 	n.name = node_name
 	n.position = pos
-	if parent == null:
+	if parent_node == null:
 		add(n)
 	else:
-		parent.add_child(n)
+		parent_node.add_child(n)
 	assert_eq(String(n.name), node_name, "the name stuck")
 	return n
 
@@ -592,15 +592,15 @@ func test_enemies_spawned_after_the_spawner_are_grazed() -> void:
 	# the shot, more of them than the old cap of four.
 	var sp := _zoned_spawner([H.make_graze_zone([20.0])])
 	sp.graze_node_group = &"enemies"
-	var log := H.record_graze(sp)
+	var graze_log := H.record_graze(sp)
 	_shoot(sp)
 	step_factory()
 	for i in 5:
 		make_graze_target(Vector2(-1000 - 100 * i, 0), &"enemies")
 	var sixth := make_graze_target(Vector2(10, 0), &"enemies")
 	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "the sixth enemy, spawned after the shot, grazes on the next tick")
-	assert_eq(log[0][1], sixth, "named")
+	assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "the sixth enemy, spawned after the shot, grazes on the next tick")
+	assert_eq(graze_log[0][1], sixth, "named")
 	assert_eq(sp.resolve_graze_targets().size(), 6, "all six are targets")
 
 
@@ -642,11 +642,11 @@ func test_node_name_scan_skips_the_spawner_its_markers_factories_dying_and_plain
 	dying.queue_free()
 	var real := _node("TargetReal", Vector2(10, 0))
 	assert_eq(sp.resolve_graze_targets(), [real], "only the live Node2D outside the spawner and the factory")
-	var log := H.record_graze(sp)
+	var graze_log := H.record_graze(sp)
 	_shoot(sp)
 	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "one graze")
-	assert_eq(log[0][1], real, "by the real target")
+	assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "one graze")
+	assert_eq(graze_log[0][1], real, "by the real target")
 
 
 func test_node_path_source_grazes_the_node_at_the_path() -> void:
@@ -654,11 +654,11 @@ func test_node_path_source_grazes_the_node_at_the_path() -> void:
 	make_graze_target(Vector2(-10, 0)) # a zone-group member: not this source
 	var sp := _zoned_spawner([], NODE_PATH)
 	sp.graze_target_path = sp.get_path_to(target)
-	var log := H.record_graze(sp)
+	var graze_log := H.record_graze(sp)
 	_shoot(sp)
 	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "one graze")
-	assert_eq(log[0][1], target, "the node at the path, not the zone group's member")
+	assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "one graze")
+	assert_eq(graze_log[0][1], target, "the node at the path, not the zone group's member")
 	sp.graze_target_path = NodePath("")
 	assert_eq(sp.resolve_graze_targets(), [], "an empty path finds nothing")
 	sp.graze_target_path = sp.get_path_to(target)
@@ -681,11 +681,11 @@ func test_node_children_source_direct_or_recursive() -> void:
 	sp.graze_children_recursive = true
 	assert_eq(sp.resolve_graze_targets(), [a, d, b, c], "the whole subtree, depth-first in tree order")
 	squad.position = Vector2(-10, 0) # A sits 10 px from the bullet
-	var log := H.record_graze(sp)
+	var graze_log := H.record_graze(sp)
 	_shoot(sp)
 	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "one graze")
-	assert_eq(log[0][1], a, "by the nearest child")
+	assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "one graze")
+	assert_eq(graze_log[0][1], a, "by the nearest child")
 
 
 func test_a_spawner_never_finds_itself() -> void:
@@ -733,7 +733,7 @@ func test_update_interval_holds_membership_between_scans() -> void:
 	sp.graze_node_name = "Mover"
 	sp.graze_update_interval = 0.5
 	var far := _node("MoverFar", Vector2(-500, 0))
-	var log := H.record_graze(sp)
+	var graze_log := H.record_graze(sp)
 	var v := _shoot(sp)
 	step_factory() # the first scan finds MoverFar
 	var scans: int = sp.debug_get_graze_detector_stats()["scans"]
@@ -742,7 +742,7 @@ func test_update_interval_holds_membership_between_scans() -> void:
 	assert_eq(sp.resolve_graze_targets(), [far], "a newcomer waits for the next scan")
 	far.position = Vector2(-10, 0)
 	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "a found target moving onto the bullet grazes at once: positions are live")
+	assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "a found target moving onto the bullet grazes at once: positions are live")
 	assert_eq(sp.debug_get_graze_detector_stats()["scans"], scans, "no scan in between")
 	step_factory(15) # past 0.5 s since the first scan
 	assert_eq(sp.debug_get_graze_detector_stats()["scans"], scans + 1, "one rescan per interval")
@@ -750,7 +750,7 @@ func test_update_interval_holds_membership_between_scans() -> void:
 	far.free()
 	step_factory()
 	assert_eq(sp.resolve_graze_targets(), [late], "a freed target stops counting at once")
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "its visit ended silently")
+	assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "its visit ended silently")
 	assert_false(v.is_bullet_inside_graze(0, 0), "no visit left")
 
 
@@ -758,16 +758,16 @@ func test_refresh_graze_targets_rescans_at_once() -> void:
 	var sp := _zoned_spawner([], NODE_NAME)
 	sp.graze_node_name = "Fresh"
 	sp.graze_update_interval = 10.0
-	var log := H.record_graze(sp)
+	var graze_log := H.record_graze(sp)
 	_shoot(sp)
 	step_factory()
 	var late := _node("FreshLate", Vector2(10, 0))
 	step_factory(3)
-	assert_eq(log, [], "not before the next scan, 10 s away")
+	assert_eq(graze_log, [], "not before the next scan, 10 s away")
 	assert_eq(sp.refresh_graze_targets(), 1, "one target now")
 	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "the flying bullet grazes it on the next tick")
-	assert_eq(log[0][1], late, "named")
+	assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "the flying bullet grazes it on the next tick")
+	assert_eq(graze_log[0][1], late, "named")
 
 
 func test_refresh_counts_targets_and_refuses_outside_the_tree() -> void:
@@ -789,17 +789,17 @@ func test_a_name_edit_or_source_switch_in_flight_moves_or_ends_the_visit() -> vo
 	var sp := _zoned_spawner([], NODE_NAME)
 	sp.graze_node_name = "Alpha"
 	_node("Beta", Vector2(10, 0))
-	var log := H.record_graze(sp)
+	var graze_log := H.record_graze(sp)
 	var v := _shoot(sp)
 	step_factory(2)
-	assert_eq(log, [], "Beta is no Alpha")
+	assert_eq(graze_log, [], "Beta is no Alpha")
 	sp.graze_node_name = "Beta"
 	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "the flying bullet follows the new name")
+	assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "the flying bullet follows the new name")
 	assert_true(v.is_bullet_inside_graze(0, 0), "inside")
 	sp.graze_target_source = NODE_GROUP # Beta is in no zone group
 	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "switching the source away ends the visit silently")
+	assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "switching the source away ends the visit silently")
 	assert_false(v.is_bullet_inside_graze(0, 0), "no visit left")
 
 
@@ -810,10 +810,10 @@ func test_a_source_switch_re_anchors_open_visits_to_the_nearest_target() -> void
 	sp.graze_node_name = "Both"
 	parent.position = Vector2(9000, 9000) # this suite's Node Children parent is a sibling too: out of reach
 	var held := _node("BothHeld", Vector2(15, 0))
-	var log := H.record_graze(sp)
+	var graze_log := H.record_graze(sp)
 	_shoot(sp)
 	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "the visit belongs to the held target")
+	assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "the visit belongs to the held target")
 	var nearer := _node("BothNearer", Vector2(-5, 0)) # inside too; Once: no new graze
 	step_factory()
 	sp.graze_target_source = NODE_CHILDREN
@@ -822,8 +822,8 @@ func test_a_source_switch_re_anchors_open_visits_to_the_nearest_target() -> void
 	held.position = Vector2(300, 0)
 	nearer.position = Vector2(-300, 0)
 	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0", "exit:0:0"], "one visit, one exit")
-	assert_eq(log[1][1], nearer, "re-anchored to the nearest target at the switch")
+	assert_eq(H.graze_kinds(graze_log), ["enter:0:0", "exit:0:0"], "one visit, one exit")
+	assert_eq(graze_log[1][1], nearer, "re-anchored to the nearest target at the switch")
 
 
 func test_the_children_source_never_finds_a_bullet_factory() -> void:
@@ -841,13 +841,13 @@ func test_the_children_source_never_finds_a_bullet_factory() -> void:
 func test_orphaned_volleys_keep_their_spawner_settings() -> void:
 	var named := _loose_group_spawner(NODE_NAME)
 	named.graze_node_name = "Orphan"
-	var log := H.record_graze(factory)
+	var graze_log := H.record_graze(factory)
 	_shoot(named)
 	named.free()
 	var late := _node("OrphanLate", Vector2(10, 0))
 	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "the name scan goes on without the spawner")
-	assert_eq(log[0][1], late, "named")
+	assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "the name scan goes on without the spawner")
+	assert_eq(graze_log[0][1], late, "named")
 	var target := _node("OrphanPathTarget", Vector2(500, 300))
 	var pathed := _loose_group_spawner(NODE_PATH)
 	pathed.position = Vector2(500, 0)
@@ -857,8 +857,8 @@ func test_orphaned_volleys_keep_their_spawner_settings() -> void:
 	pathed.free()
 	target.position = Vector2(510, 0)
 	step_factory()
-	assert_eq(log.size(), 2, "the node the path pointed at still grazes the orphan")
-	assert_eq(log[1][1], target, "named")
+	assert_eq(graze_log.size(), 2, "the node the path pointed at still grazes the orphan")
+	assert_eq(graze_log[1][1], target, "named")
 
 
 func test_the_ring_preview_draws_the_source_targets() -> void:
@@ -889,11 +889,11 @@ func test_hundreds_of_matches_all_count() -> void:
 	sp.graze_children_parent_path = sp.get_path_to(squad)
 	assert_eq(sp.resolve_graze_targets().size(), 300, "every child, no cap")
 	var last := _node("Member300", Vector2(1010, 0), squad) # the 301st, last in tree order, 10 px from the bullet
-	var log := H.record_graze(sp)
+	var graze_log := H.record_graze(sp)
 	_shoot(sp)
 	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "one graze")
-	assert_eq(log[0][1], last, "by the 301st child")
+	assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "one graze")
+	assert_eq(graze_log[0][1], last, "by the 301st child")
 
 
 func test_spawners_at_the_defaults_share_the_factorys_scan() -> void:
@@ -931,18 +931,18 @@ func test_a_pooled_spawner_volley_reused_by_the_factory_finds_zone_groups() -> v
 	var member := make_graze_target(Vector2(10, 0))
 	var sp := _zoned_spawner([], NODE_NAME)
 	sp.graze_node_name = "PoolName"
-	var log := H.record_graze(factory)
+	var graze_log := H.record_graze(factory)
 	var v := _shoot(sp)
 	step_factory()
-	assert_eq(log.size(), 1, "the spawner life grazed the named node")
+	assert_eq(graze_log.size(), 1, "the spawner life grazed the named node")
 	v.disable_bullet(0)
 	var reused := graze_volley(H.transforms_at([Vector2.ZERO]), 0.0)
 	assert_eq(reused, v, "the pool handed it back")
 	reused.graze_set_zones([H.make_graze_zone([20.0])], &"graze_targets")
-	log.clear()
+	graze_log.clear()
 	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "one graze")
-	assert_eq(log[0][1], member, "by the zone group's member: the spawner's settings did not survive the pool")
+	assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "one graze")
+	assert_eq(graze_log[0][1], member, "by the zone group's member: the spawner's settings did not survive the pool")
 
 
 func test_homing_refresh_is_retarget_live_volleys() -> void:

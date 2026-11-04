@@ -23,10 +23,10 @@ func before_each() -> void:
 
 func _data(bullets: int) -> BulletVolleyData2D:
 	var d := H.make_volley_data(bullets, 0.0, 60.0)
-	var tr: Array = []
+	var transforms: Array = []
 	for i in bullets:
-		tr.append(Transform2D(0.0, Vector2(i * 8.0, 0.0)))
-	d.transforms = tr
+		transforms.append(Transform2D(0.0, Vector2(i * 8.0, 0.0)))
+	d.transforms = transforms
 	d.set_collision_mask_from_array([3])
 	d.collision_shape = H.make_circle_shape(6.0)
 	d.bullet_max_collision_count = 0
@@ -74,7 +74,7 @@ func test_reset_is_silent() -> void:
 func test_key_scoped_clear() -> void:
 	factory.spawn_volley(_data(2))
 	var vb: BulletVolley2D = factory.spawn_volley(_data(3))
-	var key_a: VolleyPoolKey2D = factory.debug_expected_pool_key(_data(2))
+	var key_a: VolleyPoolKey2D = BulletFactory2D.debug_expected_pool_key(_data(2))
 	factory.clear_sprite_effects()
 	assert_eq(factory.clear_active_bullets(key_a), 2, "scoped clear returns its bucket's bullets")
 	assert_gte(factory.get_active_effect_count(), 2, "scoped clear fires visuals")

@@ -17,24 +17,24 @@ func _volley(transforms: Array, speed := 100.0, lifetime := 1000.0) -> BulletVol
 
 func _cluster(origin: Vector2, count := 6, seed_value := 1) -> Array:
 	seed(seed_value)
-	var tr: Array = []
+	var tr_list: Array = []
 	for k in count:
-		tr.append(Transform2D(randf_range(-PI, PI), origin + Vector2(randf_range(0, 40), randf_range(0, 40))))
-	return tr
+		tr_list.append(Transform2D(randf_range(-PI, PI), origin + Vector2(randf_range(0, 40), randf_range(0, 40))))
+	return tr_list
 
 
-func _sees_across(a: BulletVolley2D, b: BulletVolley2D) -> bool:
+func _sees_across(_a: BulletVolley2D, b: BulletVolley2D) -> bool:
 	# a's bullets are counted by b's flock readout when they share a flock.
 	return b.debug_get_bullet_flock_neighbors(0) > b.get_amount_bullets() - 1
 
 
 func test_separate_flocks_never_see_each_other() -> void:
-	var tr := _cluster(Vector2(0, 0), 8, 4)
-	var a := _volley(tr)
+	var tr_list := _cluster(Vector2(0, 0), 8, 4)
+	var a := _volley(tr_list)
 	a.flock_join(H.make_flock(1.5, 1.0, 1.0))
 	var b := _volley(_cluster(Vector2(5, 5), 8, 5))
 	b.flock_join(H.make_flock(3.0, 0.5, 2.0))
-	var solo := _volley(tr) # a's twin in a third flock with a's rules
+	var solo := _volley(tr_list) # a's twin in a third flock with a's rules
 	solo.flock_join(H.make_flock(1.5, 1.0, 1.0))
 	step_factory(60)
 	assert_eq(origins(a), origins(solo), "a flies exactly as if b did not exist")
@@ -55,8 +55,8 @@ func test_shared_scope_merges_volleys_of_one_resource() -> void:
 
 func test_scopes_split_one_resource_into_separate_flocks() -> void:
 	var f := H.make_flock(1.5, 1.0, 1.0)
-	var tr := _cluster(Vector2(0, 0), 5, 3)
-	var shared := _volley(tr)
+	var tr_list := _cluster(Vector2(0, 0), 5, 3)
+	var shared := _volley(tr_list)
 	shared.flock_join(f, BulletFlock2D.SCOPE_SHARED)
 	var factory_group_a := _volley(_cluster(Vector2(0, 0), 5, 6))
 	var factory_group_b := _volley(_cluster(Vector2(0, 0), 5, 7))
@@ -66,7 +66,7 @@ func test_scopes_split_one_resource_into_separate_flocks() -> void:
 	var alone_b := _volley(_cluster(Vector2(0, 0), 5, 9))
 	alone_a.flock_join(f, BulletFlock2D.SCOPE_PER_VOLLEY)
 	alone_b.flock_join(f, BulletFlock2D.SCOPE_PER_VOLLEY)
-	var solo := _volley(tr)
+	var solo := _volley(tr_list)
 	solo.flock_join(H.make_flock(1.5, 1.0, 1.0))
 	step_factory(1)
 	assert_eq(factory.debug_get_flock_stats()["flocks"], 5, "shared + the factory's own group + two single volleys + the twin")
@@ -78,8 +78,8 @@ func test_scopes_split_one_resource_into_separate_flocks() -> void:
 
 
 func test_frozen_bullets_are_not_flockmates() -> void:
-	var tr := [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 20)), Transform2D(0.0, Vector2(0, 40))]
-	var v := _volley(tr)
+	var tr_list := [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 20)), Transform2D(0.0, Vector2(0, 40))]
+	var v := _volley(tr_list)
 	v.flock_join(H.make_flock(0.0, 0.0, 1.0))
 	v.disable_bullet(1)
 	step_factory(1)
@@ -143,8 +143,10 @@ func test_stats_keys_are_exact() -> void:
 func test_bad_arguments_fail_loud_and_change_nothing() -> void:
 	var v := _volley(_cluster(Vector2(0, 0), 3, 1))
 	var f := H.make_flock(1.0, 1.0, 1.0)
-	assert_false(v.flock_join(f, 3), "scope 3 refused")
-	assert_false(v.flock_join(f, -1), "scope -1 refused")
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	assert_false(v.flock_join(f, (3 as BulletFlock2D.Scope)), "scope 3 refused")
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	assert_false(v.flock_join(f, (-1 as BulletFlock2D.Scope)), "scope -1 refused")
 	expect_error_sequence([
 		"flock_join: scope must be 0 (Per Spawner), 1 (Shared) or 2 (Per Volley), nothing changed.",
 		"flock_join: scope must be 0 (Per Spawner), 1 (Shared) or 2 (Per Volley), nothing changed.",
@@ -287,8 +289,8 @@ func test_a_freed_factory_takes_its_flocks_along() -> void:
 
 
 func test_debug_get_bullet_flock_info_reads_one_bullet_at_a_glance() -> void:
-	var tr := [Transform2D(0.0, Vector2(2, 2), 0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 30))]
-	var d := H.make_flight_data(tr, 100.0)
+	var tr_list := [Transform2D(0.0, Vector2(2, 2), 0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 30))]
+	var d := H.make_flight_data(tr_list, 100.0)
 	d.texture_size = Vector2(16, 16)
 	d.texture_rotation_radians = 0.5
 	var v: BulletVolley2D = factory.spawn_volley(d)

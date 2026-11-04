@@ -56,8 +56,8 @@ func test_every_bullet_reads_its_own_data_in_hit_handlers_first_middle_and_last(
 	await physics()
 	var customs := _resources(3)
 	var shared := Resource.new()
-	factory.body_entered.connect(func(_b, v: BulletVolley2D, i: int):
-		_record("hit", v, i, {"alive": v.is_bullet_status_enabled(i), "count": v.get_bullet_collision_count(i), "velocity": v.get_bullet_velocity(i)}))
+	factory.body_entered.connect(func(_b, volley: BulletVolley2D, i: int):
+		_record("hit", volley, i, {"alive": volley.is_bullet_status_enabled(i), "count": volley.get_bullet_collision_count(i), "velocity": volley.get_bullet_velocity(i)}))
 	var v: BulletVolley2D = factory.spawn_volley(_data(3, customs, shared))
 	await _wait(func(): return seen.size() >= 3)
 	assert_eq(seen.size(), 3, "three killing hits (max 1)")
@@ -147,10 +147,10 @@ func test_runtime_writes_persist_across_hits_and_freeze() -> void:
 	make_wall(Vector2(300, 0), Vector2(10, 600))
 	await physics()
 	var tag := Resource.new()
-	factory.body_entered.connect(func(_b, v: BulletVolley2D, i: int):
-		_record("hit", v, i)
+	factory.body_entered.connect(func(_b, volley: BulletVolley2D, i: int):
+		_record("hit", volley, i)
 		if seen.size() == 1:
-			v.bullet_set_custom_data(i, tag))
+			volley.bullet_set_custom_data(i, tag))
 	var d := _data(1, [])
 	d.bullet_max_collision_count = 0
 	var v: BulletVolley2D = factory.spawn_volley(d)

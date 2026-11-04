@@ -40,8 +40,8 @@ func _data(n: int) -> BulletVolleyData2D:
 	return d
 
 
-func _configure(name: String, d: BulletVolleyData2D) -> void:
-	match name:
+func _configure(case_name: String, d: BulletVolleyData2D) -> void:
+	match case_name:
 		"snap":
 			d.homing_smoothing = 0.0
 		"flock", "flock_no_face":
@@ -55,10 +55,10 @@ func _configure(name: String, d: BulletVolleyData2D) -> void:
 		"wobble_lateral", "wobble_angular", "wobble_angular_face":
 			var w := BulletWobbleData2D.new()
 			w.enabled = true
-			w.mode = BulletWobbleData2D.WOBBLE_LATERAL if name == "wobble_lateral" else BulletWobbleData2D.WOBBLE_ANGULAR
-			w.amplitude = 8.0 if name == "wobble_lateral" else 0.25
+			w.mode = BulletWobbleData2D.WOBBLE_LATERAL if case_name == "wobble_lateral" else BulletWobbleData2D.WOBBLE_ANGULAR
+			w.amplitude = 8.0 if case_name == "wobble_lateral" else 0.25
 			w.frequency_hz = 3.0
-			w.face_movement_direction = name == "wobble_angular_face"
+			w.face_movement_direction = case_name == "wobble_angular_face"
 			d.shared_bullet_wobble_data = w
 		"speed_curve":
 			var c := BulletCurvesData2D.new()
@@ -74,18 +74,18 @@ func _configure(name: String, d: BulletVolleyData2D) -> void:
 			d.monitorable = true
 			d.set_collision_mask_from_array([5])
 			d.set_bounce_mask_from_array([5])
-			d.bounce_mode = 1
+			d.bounce_mode = BulletVolleyData2D.BOUNCE_PRECISE_SHAPE
 			d.bullet_max_collision_count = 0
 		"gravity_light":
 			d.gravity = Vector2(0, 60)
 
 
-func _after(name: String, v: BulletVolley2D) -> void:
+func _after(case_name: String, v: BulletVolley2D) -> void:
 	v.shared_homing_deque_push_back_global_position_target(TARGET)
-	match name:
+	match case_name:
 		"flock", "flock_no_face":
 			var f := H.make_flock(15.0, 1.0, 1.0, 100.0, 30.0)
-			f.face_heading = name == "flock"
+			f.face_heading = case_name == "flock"
 			v.flock_join(f)
 		"movement_pattern":
 			var c := Curve2D.new()
@@ -106,24 +106,24 @@ func _on_reached(v: BulletVolley2D, i: int, _t: Node2D, _p: Vector2) -> void:
 		v.disable_bullet(i)
 
 
-func test_every_bullet_reaches_its_target(name: String = use_parameters(CASES)) -> void:
+func test_every_bullet_reaches_its_target(case_name: String = use_parameters(CASES)) -> void:
 	reached.clear()
-	var n := 3 if name.begins_with("flock") else 1
-	if name == "bounce_wall_on_the_way":
+	var n := 3 if case_name.begins_with("flock") else 1
+	if case_name == "bounce_wall_on_the_way":
 		# A short wall straight ahead: the bullet bounces, then homes in around it.
 		make_wall(Vector2(140, 0), Vector2(20, 60), 16)
 	var d := _data(n)
-	_configure(name, d)
-	var inherited := Vector2(0, -80) if name == "inherited_velocity" else Vector2.ZERO
+	_configure(case_name, d)
+	var inherited := Vector2(0, -80) if case_name == "inherited_velocity" else Vector2.ZERO
 	var v: BulletVolley2D = factory.spawn_volley(d, inherited)
 	v.bullet_homing_target_reached.connect(_on_reached)
-	_after(name, v)
-	var budget := FRAMES * (2 if name == "time_scale_half" else 1)
+	_after(case_name, v)
+	var budget := FRAMES * (2 if case_name == "time_scale_half" else 1)
 	for k in budget:
 		await physics(1)
 		if reached.size() == n:
 			break
-	assert_eq(reached.size(), n, "%s: every bullet reached the target" % name)
+	assert_eq(reached.size(), n, "%s: every bullet reached the target" % case_name)
 	for i in n:
 		if v.is_bullet_status_enabled(i):
-			assert_true(v.get_bullet_transform(i).is_finite() and v.get_bullet_velocity(i).is_finite(), "%s: finite" % name)
+			assert_true(v.get_bullet_transform(i).is_finite() and v.get_bullet_velocity(i).is_finite(), "%s: finite" % case_name)

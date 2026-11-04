@@ -143,8 +143,8 @@ func test_setters_reject_and_keep() -> void:
 func test_the_format_is_part_of_the_pool_key() -> void:
 	var colored := _colored(3, [RED, GREEN, BLUE], false, 0.05)
 	var plain := H.make_volley_data(3, 100.0, 0.05)
-	assert_true(factory.debug_expected_pool_key(colored).use_bullet_colors, "colored data keys the colored bucket")
-	assert_false(factory.debug_expected_pool_key(plain).use_bullet_colors, "plain data keys the plain bucket")
+	assert_true(BulletFactory2D.debug_expected_pool_key(colored).use_bullet_colors, "colored data keys the colored bucket")
+	assert_false(BulletFactory2D.debug_expected_pool_key(plain).use_bullet_colors, "plain data keys the plain bucket")
 	assert_true(VolleyPoolKey2D.make(3, PhysicsServer2D.SHAPE_CIRCLE, true).use_bullet_colors, "make takes the format")
 	assert_false(VolleyPoolKey2D.make(3, PhysicsServer2D.SHAPE_CIRCLE).use_bullet_colors, "make defaults to no colors")
 	var first: BulletVolley2D = factory.spawn_volley(colored)

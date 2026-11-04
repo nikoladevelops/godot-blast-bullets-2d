@@ -17,10 +17,10 @@ const FAR := Vector2(0, 5000)
 
 
 func _data(texture_rotation: float, at: Vector2, case_name: String) -> BulletVolleyData2D:
-	var tr: Array = []
+	var tr_list: Array = []
 	for k in 5:
-		tr.append(Transform2D(-0.3 + 0.15 * k, at + Vector2(0, 14 * k)))
-	var d := H.make_flight_data(tr, 180.0, 1000.0)
+		tr_list.append(Transform2D(-0.3 + 0.15 * k, at + Vector2(0, 14 * k)))
+	var d := H.make_flight_data(tr_list, 180.0, 1000.0)
 	d.texture_rotation_radians = texture_rotation
 	if case_name.contains("homing"):
 		d.homing_smoothing = 4.0

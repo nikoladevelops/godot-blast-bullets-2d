@@ -8,8 +8,8 @@ extends BlastTest
 func _range_methods(v: Object) -> Array:
 	var out: Array = []
 	for m in v.get_method_list():
-		var name: String = m["name"]
-		if not name.begins_with("all_bullets_"):
+		var method_name: String = m["name"]
+		if not method_name.begins_with("all_bullets_"):
 			continue
 		var args: Array = m["args"]
 		var n := args.size()
@@ -90,13 +90,13 @@ func test_every_range_method_names_its_range_arguments_alike() -> void:
 	var v: BulletVolley2D = quick_volley(2, 100.0, 30.0)
 	var odd: Array = []
 	for m in v.get_method_list():
-		var name: String = m["name"]
-		if not name.begins_with("all_bullets_"):
+		var method_name: String = m["name"]
+		if not method_name.begins_with("all_bullets_"):
 			continue
 		for a in m["args"]:
 			var arg := str(a["name"])
 			if int(a["type"]) == TYPE_INT and "index" in arg and ("start" in arg or "end" in arg) and arg not in ["bullet_index_start", "bullet_index_end_inclusive"]:
-				odd.append("%s(%s)" % [name, arg])
+				odd.append("%s(%s)" % [method_name, arg])
 	assert_eq(odd, [], "range arguments are bullet_index_start / bullet_index_end_inclusive")
 
 

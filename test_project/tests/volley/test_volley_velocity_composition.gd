@@ -211,7 +211,7 @@ const FALL_RESETS := ["bullet_set_gravity", "set_gravity", "all_bullets_set_grav
 
 
 func test_a_dropped_fall_speed_leaves_the_reported_velocity_at_once(reset_index: int = use_parameters(range(FALL_RESETS.size()))) -> void:
-	var call: String = FALL_RESETS[reset_index]
+	var callable_name: String = FALL_RESETS[reset_index]
 	var d := H.make_volley_data(1, 200.0, 30.0)
 	d.gravity = Vector2(0, 400)
 	var v: BulletVolley2D = factory.spawn_volley(d)
@@ -219,7 +219,7 @@ func test_a_dropped_fall_speed_leaves_the_reported_velocity_at_once(reset_index:
 	for i in 20:
 		factory.debug_advance_time(DT)
 	assert_gt(v.bullet_get_fall_speed(0), 100.0, "the bullet is falling")
-	match call:
+	match callable_name:
 		"bullet_set_gravity":
 			v.bullet_set_gravity(0, Vector2(0, 100))
 		"set_gravity":
@@ -230,15 +230,15 @@ func test_a_dropped_fall_speed_leaves_the_reported_velocity_at_once(reset_index:
 			v.bullet_reset_state(0)
 		"all_bullets_reset_state":
 			v.all_bullets_reset_state()
-	assert_eq(v.bullet_get_fall_speed(0), 0.0, "%s drops the fall speed" % call)
+	assert_eq(v.bullet_get_fall_speed(0), 0.0, "%s drops the fall speed" % callable_name)
 	var own: Vector2 = v.get_bullet_direction(0) * v.debug_get_bullet_info(0)["speed"]
 	var reported: Vector2 = v.get_bullet_velocity(0)
-	assert_almost_eq(reported, own, Vector2(0.05, 0.05), "%s: reported without the old fall speed at once" % call)
+	assert_almost_eq(reported, own, Vector2(0.05, 0.05), "%s: reported without the old fall speed at once" % callable_name)
 	var g: Vector2 = v.bullet_get_gravity(0)
 	var p0: Vector2 = v.get_bullet_transform(0).origin
 	factory.debug_advance_time(DT)
 	var moved: Vector2 = (v.get_bullet_transform(0).origin - p0) / DT
-	assert_almost_eq(moved, reported + g * DT, Vector2(0.05, 0.05), "%s: the next tick flies the reported velocity (+ g dt)" % call)
+	assert_almost_eq(moved, reported + g * DT, Vector2(0.05, 0.05), "%s: the next tick flies the reported velocity (+ g dt)" % callable_name)
 
 
 ## all_bullets_scale_speed multiplies speed, top speed and acceleration (each

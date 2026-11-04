@@ -68,8 +68,8 @@ func _args(m: Dictionary) -> Array:
 func _writes() -> Array:
 	var out: Array = []
 	for m in ClassDB.class_get_method_list(&"LaserVolley2D", true):
-		var name := String(m["name"])
-		if name.begins_with("_") or name.begins_with("get_") or name.begins_with("is_") or name.begins_with("debug_") or EXEMPT.has(name) or READS.has(name):
+		var method_name := String(m["name"])
+		if method_name.begins_with("_") or method_name.begins_with("get_") or method_name.begins_with("is_") or method_name.begins_with("debug_") or EXEMPT.has(method_name) or READS.has(method_name):
 			continue
 		out.append(m)
 	return out
@@ -105,22 +105,22 @@ func test_every_write_on_a_pooled_laser_is_refused_once_and_never_reaches_the_ne
 	assert_true(cold.is_pooled(), "pooled")
 	var problems: Array = []
 	for m in _writes():
-		var name := String(m["name"])
-		cold.callv(name, _args(m))
+		var method_name := String(m["name"])
+		cold.callv(method_name, _args(m))
 		var texts: Array = []
 		for err in get_errors():
 			if not err.handled:
-				texts.append(err.contains_text(_stale(name)))
+				texts.append(err.contains_text(_stale(method_name)))
 				err.handled = true
 		if texts != [true]:
-			problems.append("%s: %d errors, expected the one stale-handle error" % [name, texts.size()])
+			problems.append("%s: %d errors, expected the one stale-handle error" % [method_name, texts.size()])
 		var again := _fire(data)
 		if again != cold:
-			problems.append("%s: the pool handed out another laser" % name)
+			problems.append("%s: the pool handed out another laser" % method_name)
 			continue
 		step_factory(1, DT)
 		if _state(again) != want:
-			problems.append("%s: the next life inherited it" % name)
+			problems.append("%s: the next life inherited it" % method_name)
 		again.end_laser(false)
 		step_factory(1, DT)
 	assert_eq("\n".join(problems), "", "every write on a pooled laser is refused")
@@ -145,15 +145,15 @@ func test_a_laser_that_was_never_fired_refuses_writes() -> void:
 	add(l)
 	var problems: Array = []
 	for m in _writes():
-		var name := String(m["name"])
-		l.callv(name, _args(m))
+		var method_name := String(m["name"])
+		l.callv(method_name, _args(m))
 		var texts: Array = []
 		for err in get_errors():
 			if not err.handled:
-				texts.append(err.contains_text("%s: this laser was never fired (BulletFactory2D.spawn_laser or a LaserSpawner2D fires lasers), nothing changed." % name))
+				texts.append(err.contains_text("%s: this laser was never fired (BulletFactory2D.spawn_laser or a LaserSpawner2D fires lasers), nothing changed." % method_name))
 				err.handled = true
 		if texts != [true]:
-			problems.append("%s: %s" % [name, texts])
+			problems.append("%s: %s" % [method_name, texts])
 	assert_eq("\n".join(problems), "", "one refusal per write")
 	assert_eq([l.get_beam_count(), l.is_laser_active(), l.debug_check_invariants()], [0, false, ""], "still empty and consistent")
 	await idle(1) # its draw runs with nothing to draw

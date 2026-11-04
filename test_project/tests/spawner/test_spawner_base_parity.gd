@@ -8,7 +8,7 @@ extends BlastTest
 
 const FRAMES := 60
 
-var log: Array = []
+var events: Array = []
 var frame := 0
 var current: PatternSpawner2D
 
@@ -37,11 +37,11 @@ func _spawner(kind: String, configure: Callable = Callable()) -> PatternSpawner2
 	sp.set_bullet_factory(factory)
 	current = sp
 	for s in ["volley_skipped", "volley_telegraphed", "burst_shot_fired", "burst_finished", "pattern_list_finished", "shooting_started", "shooting_stopped", "shooting_finished", "movement_started", "movement_finished", "movement_loop_completed", "movement_endpoint_reached"]:
-		sp.connect(s, func(...args) -> void: log.append([frame, s, _plain(args)]))
+		sp.connect(s, func(...args) -> void: events.append([frame, s, _plain(args)]))
 	if kind == "bullet":
-		sp.connect("volley_fired", func(v: BulletVolley2D, n: int) -> void: log.append([frame, "fired", n, _poses_bullets(v)]))
+		sp.connect("volley_fired", func(v: BulletVolley2D, n: int) -> void: events.append([frame, "fired", n, _poses_bullets(v)]))
 	else:
-		sp.connect("laser_fired", func(l: LaserVolley2D, n: int) -> void: log.append([frame, "fired", n, _poses_lasers(l)]))
+		sp.connect("laser_fired", func(l: LaserVolley2D, n: int) -> void: events.append([frame, "fired", n, _poses_lasers(l)]))
 	return sp
 
 
@@ -76,11 +76,11 @@ func _poses_lasers(l: LaserVolley2D) -> Array:
 func _both(scenario: Callable) -> Array:
 	var logs: Array = []
 	for kind in ["bullet", "laser"]:
-		log = []
+		events = []
 		frame = 0
 		seed(11)
 		await scenario.call(kind)
-		logs.append(log.duplicate(true))
+		logs.append(events.duplicate(true))
 		if is_instance_valid(current):
 			current.queue_free() # its signals must not reach the next run's log
 		factory.reset()
@@ -190,7 +190,7 @@ func test_pattern_lists_and_shot_overrides_and_shoot_from() -> void:
 		sp.spawn_pattern_list([{"helper_bullets_amount": 2}, {"pattern_source": PatternSpawner2D.PATTERN_FROM_HELPER_LINE, "helper_bullets_amount": 3}], false, 0.1)
 		await _frames(20)
 		sp.shoot_once_with({"helper_bullets_amount": 5})
-		log.append([frame, "restored", sp.helper_bullets_amount])
+		events.append([frame, "restored", sp.helper_bullets_amount])
 		sp.shoot_from(Transform2D(0.5, Vector2(300, -40)), 15.0)
 		await _frames(1))
 	assert_eq(logs[0], logs[1], "the same shots and poses")

@@ -262,8 +262,8 @@ func test_collection_fires_no_hit_or_destroy_effects_but_the_collect_effect() ->
 	_convert(coin, [Vector2.ZERO], _target(Vector2(300, 0)))
 	await _wait(1)
 	assert_eq(collected.size(), 1, "collected")
-	var log := factory.debug_get_effect_log()
-	assert_eq(log.filter(func(e): return int(e["trigger"]) in [EffectLayerData2D.EFFECT_ON_DESTROY, EffectLayerData2D.EFFECT_ON_HIT]).size(), 0, "a collection is neither a hit nor a destroy")
+	var effect_log := factory.debug_get_effect_log()
+	assert_eq(effect_log.filter(func(e): return int(e["trigger"]) in [EffectLayerData2D.EFFECT_ON_DESTROY, EffectLayerData2D.EFFECT_ON_HIT]).size(), 0, "a collection is neither a hit nor a destroy")
 	assert_gt(factory.get_active_effect_count(), 0, "the collect effect plays")
 
 

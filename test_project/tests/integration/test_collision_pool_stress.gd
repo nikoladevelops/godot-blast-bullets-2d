@@ -157,7 +157,7 @@ func test_every_life_hits_its_target_exactly_once_through_pool_reuse() -> void:
 
 func test_monitorable_switched_between_lives_decides_body_hits() -> void:
 	_log_factory_hits()
-	var wall := _target("static", Vector2(300, 0))
+	var _wall := _target("static", Vector2(300, 0))
 	await idle(2)
 	var circle := CircleShape2D.new()
 	circle.radius = 20.0
@@ -177,18 +177,18 @@ func test_monitorable_switched_between_lives_decides_body_hits() -> void:
 
 
 func test_hits_reach_only_the_current_owner_after_every_reuse() -> void:
-	var log: Array = []
-	factory.area_entered.connect(func(_t: Object, v: BulletVolley2D, _i: int) -> void: log.append(["factory", v]))
-	var target := _target("area", Vector2(300, 0))
+	var log_entries: Array = []
+	factory.area_entered.connect(func(_t: Object, v: BulletVolley2D, _i: int) -> void: log_entries.append(["factory", v]))
+	var _target_node := _target("area", Vector2(300, 0))
 	await idle(2)
 	var data := H.make_volley_data(1, 0.0, 4.0)
 	data.collision_mask = 4
 	var spawners: Array = []
-	for name in ["A", "B"]:
+	for label in ["A", "B"]:
 		var sp := make_spawner(data, BulletSpawner2D.PATTERN_FROM_HELPER_RING, 1)
 		sp.helper_ring_radius = 0.0
 		sp.position = Vector2(300, 0)
-		sp.area_entered.connect(func(_t: Object, v: BulletVolley2D, _i: int) -> void: log.append([name, v]))
+		sp.area_entered.connect(func(_t: Object, v: BulletVolley2D, _i: int) -> void: log_entries.append([label, v]))
 		spawners.append(sp)
 	var fired: Array = []
 	var shoot := func(who: String) -> BulletVolley2D:
@@ -202,25 +202,25 @@ func test_hits_reach_only_the_current_owner_after_every_reuse() -> void:
 			sp.shoot_once()
 		return got[0]
 	for who in ["A", "B", "factory", "A", "factory", "B"]:
-		log.clear()
+		log_entries.clear()
 		var v: BulletVolley2D = shoot.call(who)
 		for k in 6:
 			await physics(1)
 			if v.is_pooled():
 				break
 		fired.append(v)
-		assert_eq(log, [[who, v]], "%s's life: one hit, heard only by %s" % [who, who])
+		assert_eq(log_entries, [[who, v]], "%s's life: one hit, heard only by %s" % [who, who])
 	var distinct := {}
 	for v in fired:
 		distinct[v.get_instance_id()] = true
 	assert_eq(distinct.size(), 1, "one pooled volley served every owner in turn")
 	# A freed spawner's pooled volley serves the factory next, silently for the old owner.
 	spawners[0].free()
-	log.clear()
+	log_entries.clear()
 	var last: BulletVolley2D = shoot.call("factory")
 	for k in 6:
 		await physics(1)
-	assert_eq(log, [["factory", last]], "after the old owner is gone, the factory hears it")
+	assert_eq(log_entries, [["factory", last]], "after the old owner is gone, the factory hears it")
 
 
 ## Godot's own rule for a shape switched off and on (probed with a plain
@@ -230,7 +230,7 @@ func test_hits_reach_only_the_current_owner_after_every_reuse() -> void:
 ## step, it enters again.
 func test_a_bullet_woken_inside_its_target_enters_again_only_after_a_step() -> void:
 	_log_factory_hits()
-	var target := _target("area", Vector2(300, 0))
+	var _target_node := _target("area", Vector2(300, 0))
 	await idle(2)
 	var circle := CircleShape2D.new()
 	circle.radius = 20.0

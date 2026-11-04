@@ -32,10 +32,10 @@ func test_the_laser_example_burns_a_target_with_repeating_hits() -> void:
 	laser.wall_mask = 1 # what stops it
 	laser.hit_interval_sec = 0.1 # laser_hit repeats while a target stays in the beam
 	var boss_lasers := _laser_spawner(laser)
-	var log: Array = []
-	boss_lasers.laser_hit.connect(func(_target, _l, _beam_index, _position) -> void: log.append("hit"))
-	boss_lasers.laser_pierce_started.connect(func(_target, _l, _beam_index, _position) -> void: log.append("start"))
-	boss_lasers.laser_pierce_ended.connect(func(_target, _l, _beam_index) -> void: log.append("end"))
+	var event_log: Array = []
+	boss_lasers.laser_hit.connect(func(_target, _l, _beam_index, _position) -> void: event_log.append("hit"))
+	boss_lasers.laser_pierce_started.connect(func(_target, _l, _beam_index, _position) -> void: event_log.append("start"))
+	boss_lasers.laser_pierce_ended.connect(func(_target, _l, _beam_index) -> void: event_log.append("end"))
 	# A long target across the beam 300 px out: the 90 deg sweep (+-45) never leaves it.
 	var a := _slot_angle(boss_lasers)
 	var enemy := make_area(Vector2.from_angle(a) * 300.0, Vector2(40, 2000), 2)
@@ -49,9 +49,9 @@ func test_the_laser_example_burns_a_target_with_repeating_hits() -> void:
 		if not finished.is_empty():
 			break
 	assert_eq(finished.size(), 1, "the laser ran its course")
-	assert_eq([log.count("start"), log.count("end"), log.front(), log.back()], [1, 1, "start", "end"], "one burn: started, then ended when the laser stopped")
+	assert_eq([event_log.count("start"), event_log.count("end"), event_log.front(), event_log.back()], [1, 1, "start", "end"], "one burn: started, then ended when the laser stopped")
 	# A hit about every 0.1 s (every second 1/16 s tick) over the 2.15 s it hits.
-	assert_between(log.count("hit"), 15, 23, "laser_hit repeats like damage ticks")
+	assert_between(event_log.count("hit"), 15, 23, "laser_hit repeats like damage ticks")
 
 
 func test_the_lock_on_example_ends_right_on_the_player() -> void:
@@ -67,7 +67,7 @@ func test_the_lock_on_example_ends_right_on_the_player() -> void:
 	add(decoy)
 	decoy.add_to_group(&"player")
 	var got: Array = []
-	snipers.laser_fired.connect(func(l: LaserVolley2D, _n: int) -> void: got.append(l))
+	snipers.laser_fired.connect(func(fired_laser: LaserVolley2D, _n: int) -> void: got.append(fired_laser))
 	assert_true(snipers.shoot_once(), "fires")
 	var l: LaserVolley2D = got[0]
 	for i in 30: # the 0.6 s warning, then the beam

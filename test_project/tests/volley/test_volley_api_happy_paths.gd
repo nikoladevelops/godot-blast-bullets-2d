@@ -240,7 +240,7 @@ func test_getters_mirror_the_spawn_data() -> void:
 	d.shared_bullet_wobble_data = wobble
 	var layer := H.make_effect_layer(EffectLayerData2D.EFFECT_ON_HIT)
 	d.effect_layers = [layer]
-	d.bounce_mode = 1
+	d.bounce_mode = BulletVolleyData2D.BOUNCE_PRECISE_SHAPE
 	d.bounce_hit_consumed = true
 	d.bounce_max_count = 3
 	d.bounce_randomness_deg = 7.0

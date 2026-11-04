@@ -14,7 +14,7 @@ func _spawner(src: int) -> LaserSpawner2D:
 	var sp := LaserSpawner2D.new()
 	sp.set_shooting_enabled(false)
 	sp.laser_data = H.make_laser(0.0, 0.0, 0.0, 0.0, 100.0)
-	sp.pattern_source = src
+	sp.pattern_source = src as PatternSpawner2D.PatternSource
 	sp.helper_bullets_amount = 6
 	sp.position = Vector2(50, 30)
 	for p in sp.get_property_list():

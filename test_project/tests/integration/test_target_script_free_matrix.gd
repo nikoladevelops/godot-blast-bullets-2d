@@ -114,7 +114,9 @@ func test_a_hit_target_getter_that_frees(p: Array = use_parameters(_target_cases
 	var on_hit := func(_t, _v, i) -> void:
 		if not fired.is_empty():
 			hits_after.append(i)
-	var hit_emitter: Object = spawner if spawner != null else factory
+	var hit_emitter: Object = spawner
+	if spawner == null:
+		hit_emitter = factory
 	hit_emitter.area_entered.connect(on_hit)
 	hit_emitter.body_entered.connect(on_hit)
 	target.action = func() -> void:
@@ -167,14 +169,20 @@ func test_a_game_area_handler_inside_the_flush_frees(p: Array = use_parameters([
 	hurtbox.area_shape_entered.connect(func(_rid: RID, _a: Area2D, _s: int, _l: int) -> void:
 		if fired.is_empty():
 			fired.append(true)
-			_free_now(f if victim == "factory" else volley, how))
+			var doomed: Object = volley
+			if victim == "factory":
+				doomed = f
+			_free_now(doomed, how))
 	for k in 30:
 		if not fired.is_empty():
 			break
 		await physics(1)
 	assert_false(fired.is_empty(), "the hurtbox saw the bullets")
 	await idle(2)
-	assert_false(is_instance_valid(f if victim == "factory" else volley), "the %s is gone" % victim)
+	var gone: Object = volley
+	if victim == "factory":
+		gone = f
+	assert_false(is_instance_valid(gone), "the %s is gone" % victim)
 	expect_no_errors()
 
 
@@ -207,7 +215,11 @@ func test_an_aimed_target_velocity_that_frees(p: Array = use_parameters(_aim_cas
 	sp.helper_aimed_prediction = 1.0
 	sp.helper_aimed_prediction_time = 0.5
 	var f := factory
-	target.action = func() -> void: _free_now(sp if victim == "spawner" else f, how)
+	target.action = func() -> void:
+		var doomed: Object = f
+		if victim == "spawner":
+			doomed = sp
+		_free_now(doomed, how)
 	sp.set_helper_aimed_target(target)
 	match route:
 		"collect":
@@ -225,7 +237,10 @@ func test_an_aimed_target_velocity_that_frees(p: Array = use_parameters(_aim_cas
 		await idle(1)
 	assert_gt(target.calls, 0, "%s read the target's velocity" % route)
 	await idle(2)
-	assert_false(is_instance_valid(sp if victim == "spawner" else f), "the %s is gone" % victim)
+	var gone: Object = f
+	if victim == "spawner":
+		gone = sp
+	assert_false(is_instance_valid(gone), "the %s is gone" % victim)
 	for err in get_errors(): # a shot whose factory vanished reports why
 		if not err.handled and str(err.code).contains("no BulletFactory2D assigned"):
 			err.handled = true

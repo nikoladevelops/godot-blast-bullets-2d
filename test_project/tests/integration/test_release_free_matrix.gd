@@ -94,8 +94,8 @@ func _arm(emitter: Object, sig: String, fired: Array) -> void:
 
 
 ## `call` accepting `n` ignored arguments (unbind(0) is an error).
-func _taking(call: Callable, n: int) -> Callable:
-	return call.unbind(n) if n > 0 else call
+func _taking(callable: Callable, n: int) -> Callable:
+	return callable.unbind(n) if n > 0 else callable
 
 
 ## A no-op handler on every signal: nothing counts as unhandled (those

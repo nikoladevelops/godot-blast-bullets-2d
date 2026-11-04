@@ -19,7 +19,7 @@ func _spawner(policy: int) -> BulletSpawner2D:
 	sp.set_spawn_data(d)
 	sp.pattern_source = BulletSpawner2D.PATTERN_FROM_SELF
 	sp.helper_bullets_amount = 1
-	sp.orphaned_volleys = policy
+	sp.orphaned_volleys = policy as BulletSpawner2D.OrphanedVolleys
 	sp.graze_zones = [H.make_graze_zone([20.0])]
 	sp.graze_enabled = true
 	sp.graze_node_group = &"graze_targets"
@@ -38,7 +38,7 @@ func _shoot(sp: BulletSpawner2D) -> BulletVolley2D:
 func _graze_after_free(policy: int) -> Array:
 	var t := make_graze_target(Vector2(100, 0))
 	var sp := _spawner(policy)
-	var log := H.record_graze(factory)
+	var graze_log := H.record_graze(factory)
 	var v := _shoot(sp)
 	step_factory()
 	sp.free()
@@ -48,7 +48,7 @@ func _graze_after_free(policy: int) -> Array:
 	step_factory()
 	if is_instance_valid(v) and v.debug_get_life_state() == "active":
 		assert_true(v.is_graze_armed(), "the orphaned volley kept its zones")
-	return H.graze_kinds(log)
+	return H.graze_kinds(graze_log)
 
 
 func test_keep_flying_bullets_still_graze_on_the_factory() -> void:

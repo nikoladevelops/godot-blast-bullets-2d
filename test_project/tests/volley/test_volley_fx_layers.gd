@@ -36,23 +36,23 @@ func _fx_data(from: Vector2, speed: float, layers: Array, bounce: bool = true) -
 	return d
 
 func _make_wall(pos: Vector2) -> StaticBody2D:
-	var wall := StaticBody2D.new()
-	wall.position = pos
-	wall.collision_layer = 8
-	wall.collision_mask = 2
+	var wall_body := StaticBody2D.new()
+	wall_body.position = pos
+	wall_body.collision_layer = 8
+	wall_body.collision_mask = 2
 	var col := CollisionShape2D.new()
 	var box := RectangleShape2D.new()
 	box.size = Vector2(20, 400)
 	col.shape = box
-	wall.add_child(col)
-	add(wall)
-	return wall
+	wall_body.add_child(col)
+	add(wall_body)
+	return wall_body
 
-func _settle(factory: BulletFactory2D) -> void:
+func _settle(fx_factory: BulletFactory2D) -> void:
 	await idle(1)
 	await idle(1)
-	factory.free_active_bullets()
-	factory.clear_sprite_effects()
+	fx_factory.free_active_bullets()
+	fx_factory.clear_sprite_effects()
 	await physics()
 
 func _make_frames(count: int, anims: Array = ["default"], col: Color = Color(1, 1, 1, 1)) -> SpriteFrames:
@@ -70,12 +70,12 @@ func _make_frames(count: int, anims: Array = ["default"], col: Color = Color(1, 
 
 func _make_layer(trigger: int, count: int = 4, anims: Array = ["default"]) -> EffectLayerData2D:
 	var l := EffectLayerData2D.new()
-	l.trigger = trigger
+	l.trigger = trigger as EffectLayerData2D.EffectTrigger
 	l.sprite_frames = _make_frames(count, anims)
 	return l
 
-func _fx_live_tint(factory: BulletFactory2D, layer: int) -> Color:
-	var st: Dictionary = factory.debug_get_effect_state()
+func _fx_live_tint(fx_factory: BulletFactory2D, layer: int) -> Color:
+	var st: Dictionary = fx_factory.debug_get_effect_state()
 	var bakes: Array = st.get("bakes", [])
 	for b in bakes:
 		if int(b.get("layer", -1)) != layer:
@@ -118,7 +118,8 @@ func test_validation_inert_layers_stay_silent_rejects_hold() -> void:
 	assert_true(dead.random_start_frame == false, "desync off by default")
 	assert_true(dead.max_instances == 0, "auto cap by default")
 	assert_true(factory.spawn_layer_effect(dead, Transform2D.IDENTITY) == -1, "null-frames layer inert, no crash")
-	dead.trigger = 9
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	dead.trigger = (9 as EffectLayerData2D.EffectTrigger)
 	assert_true(dead.trigger == 0, "bad trigger rejected")
 	dead.set_trigger_chance(2.0)
 	assert_true(dead.trigger_chance == 1.0, "chance > 1 rejected")
@@ -152,7 +153,7 @@ func test_spawn_flash_fires_once_expires() -> void:
 	await _preamble()
 	# FX T2 spawn flash fires once + expires
 	await _settle(factory)
-	var v2: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 300.0, [_make_layer(1, 4), _make_layer(2, 4), _make_layer(3, 4)]))
+	var _v2: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 300.0, [_make_layer(1, 4), _make_layer(2, 4), _make_layer(3, 4)]))
 	await physics()
 	assert_true(factory.get_active_effect_count() == 1, "only the flash fires at spawn (hit/destroy silent)")
 	for i in 30:
@@ -214,7 +215,7 @@ func test_destroy_explosion_on_kill_only_chance_gate() -> void:
 	await _settle(factory)
 	var d4c := _fx_data(Vector2.ZERO, 0.0, [_make_layer(3, 4)], false)
 	d4c.max_life_time = 0.2
-	var v4c: BulletVolley2D = factory.spawn_volley(d4c)
+	var _v4c: BulletVolley2D = factory.spawn_volley(d4c)
 	for i in 60:
 		await physics()
 	assert_true(factory.get_active_effect_count() == 0, "timeout never detonates")
@@ -265,7 +266,7 @@ func test_opt_in_desync_same_tick_kills_span_shards() -> void:
 	dd.collision_shape = c
 	dd.effect_layers = [big]
 	dd.set_bullet_max_collision_count(1)
-	var v6: BulletVolley2D = factory.spawn_volley(dd)
+	var _v6: BulletVolley2D = factory.spawn_volley(dd)
 	for i in 120:
 		await physics()
 		if factory.debug_get_effect_state().get("active_total", 0) >= 1:
@@ -312,7 +313,7 @@ func test_per_bullet_toggles_animation_switch() -> void:
 	await physics()
 	assert_true(v7.debug_get_trail_transform(0, 1).origin.distance_to(v7.get_bullet_transform(1).origin) < 0.01, "range toggle restores")
 	var custom := EffectLayerData2D.new()
-	custom.trigger = 0
+	custom.trigger = EffectLayerData2D.EFFECT_TRAIL_FOLLOW
 	custom.sprite_frames = _make_frames(1, ["a", "b"])
 	var v7b: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 200.0, [custom]))
 	assert_true(v7b.has_trail_effects(), "custom frames bake as trail")
@@ -351,14 +352,14 @@ func test_pool_reuse_reseeds_caps_hold_explicit_auto() -> void:
 	assert_true(factory.get_active_effect_count() <= 2, "explicit ring cap holds at 2")
 	factory.clear_sprite_effects()
 	var auto_small := _make_layer(1, 2)
-	var v8c: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 200.0, [auto_small]))
+	var _v8c: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 200.0, [auto_small]))
 	var auto_slots := -1
 	for bake in factory.debug_get_effect_state().get("bakes", []):
 		auto_slots = int(bake.get("slots", -1))
 	assert_true(auto_slots == 32, "auto cap floors at 32 for a 1-bullet volley (got %d)" % auto_slots)
 	await _settle(factory)
 	var wide := EffectLayerData2D.new()
-	wide.trigger = 0
+	wide.trigger = EffectLayerData2D.EFFECT_TRAIL_FOLLOW
 	wide.sprite_frames = _make_frames(30)
 	var v8d: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 200.0, [wide]))
 	var baked_frames := -1
@@ -673,9 +674,9 @@ func test_hostile_zero_frames_ring_caps_shared_refs_teardown() -> void:
 	# T18a: zero-frame animation is inert, manual hatch refuses it.
 	var zeroframes := SpriteFrames.new()
 	var dead18 := EffectLayerData2D.new()
-	dead18.trigger = 1
+	dead18.trigger = EffectLayerData2D.EFFECT_ON_SPAWN
 	dead18.sprite_frames = zeroframes
-	var v18: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 300.0, [dead18], false))
+	var _v18: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 300.0, [dead18], false))
 	await physics()
 	assert_true(factory.get_active_effect_count() == 0, "zero-frame volley layer stays silent")
 	assert_true(factory.spawn_layer_effect(dead18, Transform2D.IDENTITY) == -1, "zero-frame manual hatch refused")
@@ -685,7 +686,7 @@ func test_hostile_zero_frames_ring_caps_shared_refs_teardown() -> void:
 	cap18.max_instances = 1
 	var d18b := _fx_data(Vector2.ZERO, 300.0, [cap18], false)
 	d18b.set_bullet_max_collision_count(1)
-	var v18b: BulletVolley2D = factory.spawn_volley(d18b)
+	var _v18b: BulletVolley2D = factory.spawn_volley(d18b)
 	for i in 200:
 		await physics()
 		if factory.get_active_effect_count() >= 1:
@@ -694,8 +695,8 @@ func test_hostile_zero_frames_ring_caps_shared_refs_teardown() -> void:
 	await _settle(factory)
 	# T18c: one shared layer Ref across two volleys fires independently.
 	var shared18 := _make_layer(1, 4)
-	var v18c1: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 300.0, [shared18], false))
-	var v18c2: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 300.0, [shared18], false))
+	var _v18c1: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 300.0, [shared18], false))
+	var _v18c2: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 300.0, [shared18], false))
 	await physics()
 	await physics()
 	assert_true(factory.get_active_effect_count() == 2, "shared Ref fires once per volley")
@@ -714,7 +715,7 @@ func test_hostile_zero_frames_ring_caps_shared_refs_teardown() -> void:
 	assert_true(factory.debug_assert_no_dangling().get("ok", false) == true, "no dangling after volley freed with live effects")
 	# T18e: factory.reset() with live effects zeroes everything.
 	await _settle(factory)
-	var live18e: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 300.0, [_make_layer(1, 4)], false))
+	var _live18e: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 300.0, [_make_layer(1, 4)], false))
 	await physics()
 	assert_true(factory.get_active_effect_count() >= 1, "one-shot live before reset")
 	# Structural calls reject inside the physics step: awaiting
@@ -746,14 +747,14 @@ func test_hostile_zero_frames_ring_caps_shared_refs_teardown() -> void:
 	await _settle(factory)
 	var never18 := _make_layer(1, 4)
 	never18.trigger_chance = 0.0
-	var v18h: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 300.0, [never18], false))
+	var _v18h: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 300.0, [never18], false))
 	await physics()
 	await physics()
 	assert_true(factory.get_active_effect_count() == 0, "trigger_chance 0 never fires")
 	await _settle(factory)
 	var always18 := _make_layer(1, 4)
 	always18.trigger_chance = 1.0
-	var v18h2: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 300.0, [always18], false))
+	var _v18h2: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 300.0, [always18], false))
 	await physics()
 	assert_true(factory.get_active_effect_count() >= 1, "trigger_chance 1 always fires")
 	await _settle(factory)
@@ -762,7 +763,7 @@ func test_hostile_zero_frames_ring_caps_shared_refs_teardown() -> void:
 	# finite-gate with a huge-but-finite spin instead: it must still fire
 	# statically and never crash the ager.
 	spin18.spin_degrees_per_sec = 1e30
-	var v18h3: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 300.0, [spin18], false))
+	var _v18h3: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 300.0, [spin18], false))
 	await physics()
 	assert_true(factory.get_active_effect_count() >= 1, "huge spin still fires statically")
 	for i in 10:
@@ -804,7 +805,7 @@ func test_hostile_zero_frames_ring_caps_shared_refs_teardown() -> void:
 	await _settle(factory)
 	var inf18 := _fx_data(Vector2.ZERO, 100.0, [_make_layer(5, 4)], false)
 	inf18.is_life_time_infinite = true
-	var v18i2: BulletVolley2D = factory.spawn_volley(inf18)
+	var _v18i2: BulletVolley2D = factory.spawn_volley(inf18)
 	for i in 30:
 		await physics()
 	assert_true(factory.get_active_effect_count() == 0, "infinite life never fizzles")
@@ -851,12 +852,12 @@ func test_hostile_configs_never_crash() -> void:
 	# FX T20 hostile configs never crash
 	await _settle(factory)
 	var zeroanim := EffectLayerData2D.new()
-	zeroanim.trigger = 1
+	zeroanim.trigger = EffectLayerData2D.EFFECT_ON_SPAWN
 	var empty_sf := SpriteFrames.new()
 	zeroanim.sprite_frames = empty_sf
 	assert_true(factory.spawn_layer_effect(zeroanim, Transform2D.IDENTITY) == -1, "zero-frame animation inert, no crash")
 	var wronganim := EffectLayerData2D.new()
-	wronganim.trigger = 1
+	wronganim.trigger = EffectLayerData2D.EFFECT_ON_SPAWN
 	wronganim.sprite_frames = _make_frames(2)
 	wronganim.animation = &"nope"
 	assert_true(factory.spawn_layer_effect(wronganim, Transform2D.IDENTITY) >= 0, "a wrong animation name falls back to the first animation with frames")
@@ -917,7 +918,7 @@ func test_on_clear_fires_on_manual_clear_only() -> void:
 	# FX T23 On Clear fires on manual clear only
 	await _settle(factory)
 	var clear_ok := EffectLayerData2D.new()
-	clear_ok.trigger = 6
+	clear_ok.trigger = EffectLayerData2D.EFFECT_ON_CLEAR
 	assert_true(clear_ok.trigger == 6, "trigger 6 (On Clear) accepted")
 	var d23 := _fx_data(Vector2.ZERO, 0.0, [_make_layer(6, 4)], false)
 	d23.transforms = [Transform2D(0.0, Vector2.ZERO), Transform2D(0.0, Vector2(32, 0))]
@@ -1013,7 +1014,7 @@ func test_volley_fades_in_out_ramp_infinite_reuse() -> void:
 	assert_true(d24n.fade_out_sec == 0.0, "negative fade-out rejected")
 	d24n.fade_in_sec = 0.5
 	d24n.max_life_time = 8.0
-	var v24a: BulletVolley2D = factory.spawn_volley(d24n)
+	var _v24a: BulletVolley2D = factory.spawn_volley(d24n)
 	for i in 70:
 		await physics()
 	var v24b: BulletVolley2D = factory.spawn_volley(d24n)
@@ -1057,7 +1058,7 @@ func test_layer_fades_envelope_on_one_shots_trails_ignore() -> void:
 	var lin := _make_layer(1, 4)
 	lin.fade_in_sec = 0.2
 	d26a.effect_layers = [lin]
-	var v26a: BulletVolley2D = factory.spawn_volley(d26a)
+	var _v26a: BulletVolley2D = factory.spawn_volley(d26a)
 	for i in 2:
 		await physics()
 	var tint_in: Color = _fx_live_tint(factory, 0)
@@ -1070,7 +1071,7 @@ func test_layer_fades_envelope_on_one_shots_trails_ignore() -> void:
 	var lout := _make_layer(1, 4)
 	lout.fade_out_sec = 0.2
 	d26b.effect_layers = [lout]
-	var v26b: BulletVolley2D = factory.spawn_volley(d26b)
+	var _v26b: BulletVolley2D = factory.spawn_volley(d26b)
 	for i in 2:
 		await physics()
 	assert_true(_fx_live_tint(factory, 0).a > 0.95, "fade-out slot starts solid")
@@ -1085,7 +1086,7 @@ func test_layer_fades_envelope_on_one_shots_trails_ignore() -> void:
 	var llong := _make_layer(1, 4)
 	llong.fade_out_sec = 5.0
 	d26c.effect_layers = [llong]
-	var v26c: BulletVolley2D = factory.spawn_volley(d26c)
+	var _v26c: BulletVolley2D = factory.spawn_volley(d26c)
 	for i in 15:
 		await physics()
 	assert_true(_fx_live_tint(factory, 0).a < 0.5, "oversized fade-out dims proportionally, never sticks at full")
@@ -1150,12 +1151,12 @@ func test_whiten_override_pixels_rebake_fallback() -> void:
 	var d27 := _fx_data(Vector2.ZERO, 0.0, [], false)
 	var lwhite := _make_layer(1, 4)
 	d27.effect_layers = [lwhite]
-	var v27: BulletVolley2D = factory.spawn_volley(d27)
+	var _v27: BulletVolley2D = factory.spawn_volley(d27)
 	for i in 3:
 		await physics()
 	assert_true(factory.get_active_effect_count() >= 1, "plain layer fires before override")
 	lwhite.override_frame_color = true
-	var v27b: BulletVolley2D = factory.spawn_volley(d27)
+	var _v27b: BulletVolley2D = factory.spawn_volley(d27)
 	for i in 3:
 		await physics()
 	assert_true(factory.get_active_effect_count() >= 1, "whitened layer fires after rebake")
@@ -1170,11 +1171,11 @@ func test_whiten_override_pixels_rebake_fallback() -> void:
 	sf_bad.set_animation_loop("default", false)
 	sf_bad.add_frame("default", AtlasTexture.new())
 	var lfb := EffectLayerData2D.new()
-	lfb.trigger = 1
+	lfb.trigger = EffectLayerData2D.EFFECT_ON_SPAWN
 	lfb.sprite_frames = sf_bad
 	lfb.override_frame_color = true
 	var d27b := _fx_data(Vector2.ZERO, 0.0, [lfb], false)
-	var v27c: BulletVolley2D = factory.spawn_volley(d27b)
+	var _v27c: BulletVolley2D = factory.spawn_volley(d27b)
 	for i in 3:
 		await physics()
 	assert_true(factory.get_active_effect_count() >= 1, "unreadable frame falls back, still fires")

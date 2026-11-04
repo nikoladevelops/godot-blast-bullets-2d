@@ -64,10 +64,10 @@ func _new_spawner() -> void:
 	sp.telegraph_sec = 0.1
 	sp.flock_enabled = rng.randf() < 0.5
 	sp.flock = BulletFlock2D.new()
-	sp.flock_scope = rng.randi() % 3
+	sp.flock_scope = ((rng.randi() % 3) as BulletFlock2D.Scope)
 	sp.show_pattern_preview = rng.randf() < 0.5
 	sp.show_preview_during_runtime = rng.randf() < 0.5
-	sp.orphaned_volleys = rng.randi() % 4
+	sp.orphaned_volleys = ((rng.randi() % 4) as BulletSpawner2D.OrphanedVolleys)
 	sp.position = Vector2(rng.randf_range(0, 400), rng.randf_range(0, 300))
 	sp.volley_fired.connect(func(v: BulletVolley2D, _n: int) -> void: volleys.append(v))
 	var parent: Node = self if holders.is_empty() or rng.randf() < 0.5 else holders[rng.randi() % holders.size()]

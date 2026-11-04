@@ -76,12 +76,12 @@ func _ready() -> void:
 		"split": _snap_split,
 		"lasers": _snap_lasers,
 	}
-	for name in sections:
-		if only != "" and not (name in only.split(",")):
+	for section_name in sections:
+		if only != "" and not (section_name in only.split(",")):
 			continue
-		out[name] = {}
+		out[section_name] = {}
 		cap.take()
-		await sections[name].call(name)
+		await sections[section_name].call(section_name)
 	OS.remove_logger(cap)
 	var f := FileAccess.open(out_path, FileAccess.WRITE)
 	if f == null:
@@ -150,8 +150,8 @@ func _snap_surface(section: String) -> void:
 	for cls in PLUGIN_CLASSES:
 		var chain := _plugin_chain(cls)
 		var methods := {}
-		for owner in chain:
-			for m in ClassDB.class_get_method_list(owner, true):
+		for owner_cls in chain:
+			for m in ClassDB.class_get_method_list(owner_cls, true):
 				var args := PackedStringArray()
 				for a in m.get("args", []):
 					args.append(_prop_info(a))
@@ -166,16 +166,16 @@ func _snap_surface(section: String) -> void:
 			_rec(section, "%s.method.%s" % [cls, n], methods[n])
 		# Sorted: the inspector order is locked by the group-order suites.
 		var props := PackedStringArray()
-		for owner in chain:
-			for p in ClassDB.class_get_property_list(owner, true):
+		for owner_cls in chain:
+			for p in ClassDB.class_get_property_list(owner_cls, true):
 				if int(p.get("usage", 0)) & (PROPERTY_USAGE_GROUP | PROPERTY_USAGE_SUBGROUP | PROPERTY_USAGE_CATEGORY):
 					continue
 				props.append(_prop_info(p))
 		props.sort()
 		_rec(section, "%s.properties" % cls, props)
 		var sigs := PackedStringArray()
-		for owner in chain:
-			for s in ClassDB.class_get_signal_list(owner, true):
+		for owner_cls in chain:
+			for s in ClassDB.class_get_signal_list(owner_cls, true):
 				var args := PackedStringArray()
 				for a in s.get("args", []):
 					args.append(_prop_info(a))
@@ -183,10 +183,10 @@ func _snap_surface(section: String) -> void:
 		sigs.sort()
 		_rec(section, "%s.signals" % cls, sigs)
 		var consts := PackedStringArray()
-		for owner in chain:
-			for c in ClassDB.class_get_integer_constant_list(owner, true):
-				consts.append("%s=%d enum=%s" % [c, ClassDB.class_get_integer_constant(owner, c),
-						ClassDB.class_get_integer_constant_enum(owner, c, true)])
+		for owner_cls in chain:
+			for c in ClassDB.class_get_integer_constant_list(owner_cls, true):
+				consts.append("%s=%d enum=%s" % [c, ClassDB.class_get_integer_constant(owner_cls, c),
+						ClassDB.class_get_integer_constant_enum(owner_cls, c, true)])
 		consts.sort()
 		_rec(section, "%s.constants" % cls, consts)
 		_rec(section, "%s.parent" % cls, ClassDB.get_parent_class(chain[-1]))
@@ -202,7 +202,7 @@ func _ring_volley(n: int) -> Array:
 	return arr
 
 
-func _candidates(cls: StringName, arg: Dictionary) -> Array:
+func _candidates(_cls: StringName, arg: Dictionary) -> Array:
 	var t: int = arg.get("type", TYPE_NIL)
 	var cn: String = arg.get("class_name", "")
 	var n: String = arg.get("name", "")
@@ -270,7 +270,7 @@ func _call_static_twice(cls: StringName, m: StringName, args: Array) -> Array:
 
 
 func _snap_static_method(section: String, cls: StringName, info: Dictionary) -> void:
-	var name: StringName = info["name"]
+	var method_name: StringName = info["name"]
 	var args: Array = info.get("args", [])
 	var defs: Array = info.get("default_args", [])
 	var nreq := args.size() - defs.size()
@@ -286,13 +286,13 @@ func _snap_static_method(section: String, cls: StringName, info: Dictionary) -> 
 	# Defaults across amounts and markers.
 	for amount in (AMOUNTS if amount_i >= 0 else [null]):
 		for mi in (markers.size() if marker_i >= 0 else 1):
-			var call := base.duplicate()
+			var call_args := base.duplicate()
 			if amount_i >= 0:
-				call[amount_i] = amount
+				call_args[amount_i] = amount
 			if marker_i >= 0:
-				call[marker_i] = markers[mi]
-			var r := _call_static_twice(cls, name, call)
-			_rec(section, "%s#base a=%s m=%d" % [name, amount, mi], r[0], r[1])
+				call_args[marker_i] = markers[mi]
+			var r := _call_static_twice(cls, method_name, call_args)
+			_rec(section, "%s#base a=%s m=%d" % [method_name, amount, mi], r[0], r[1])
 	# One argument at a time (amount 7, rotated/scaled marker).
 	var mid := base.duplicate()
 	if amount_i >= 0:
@@ -305,22 +305,22 @@ func _snap_static_method(section: String, cls: StringName, info: Dictionary) -> 
 		for c in _candidates(cls, args[i]).slice(0, 4):
 			if typeof(c) == typeof(mid[i]) and c == mid[i]:
 				continue
-			var call := mid.duplicate()
-			call[i] = c
-			var r := _call_static_twice(cls, name, call)
-			_rec(section, "%s#%s=%s" % [name, args[i]["name"], var_to_str(c).substr(0, 60)], r[0], r[1])
+			var call_args := mid.duplicate()
+			call_args[i] = c
+			var r := _call_static_twice(cls, method_name, call_args)
+			_rec(section, "%s#%s=%s" % [method_name, args[i]["name"], var_to_str(c).substr(0, 60)], r[0], r[1])
 	# Seeded combinations.
 	var rng := RandomNumberGenerator.new()
-	rng.seed = hash(String(name))
+	rng.seed = hash(String(method_name))
 	for k in 6:
-		var call := mid.duplicate()
+		var call_args := mid.duplicate()
 		for i in args.size():
 			if i == amount_i or i == marker_i or rng.randf() > 0.4:
 				continue
 			var cands := _candidates(cls, args[i])
-			call[i] = cands[rng.randi_range(0, cands.size() - 1)]
-		var r := _call_static_twice(cls, name, call)
-		_rec(section, "%s#combo%d" % [name, k], r[0], r[1])
+			call_args[i] = cands[rng.randi_range(0, cands.size() - 1)]
+		var r := _call_static_twice(cls, method_name, call_args)
+		_rec(section, "%s#combo%d" % [method_name, k], r[0], r[1])
 
 
 func _snap_patterns(section: String) -> void:
@@ -522,7 +522,7 @@ func _snap_spawner(section: String) -> void:
 	cap.take()
 	var sources: int = BulletPatterns2D.get_shapes().size()
 	for src in sources:
-		sp.pattern_source = src
+		sp.pattern_source = src as PatternSpawner2D.PatternSource
 		for amount in [1, 7, 24]:
 			sp.helper_bullets_amount = amount
 			_rec(section, "src%d#a=%d" % [src, amount], _spawner_state(sp))
@@ -550,7 +550,7 @@ func _snap_spawner(section: String) -> void:
 		var id := ClassDB.class_get_integer_constant(&"BulletPatterns2D", c)
 		if id < 0:
 			continue
-		sp.pattern_source = 1
+		sp.pattern_source = BulletSpawner2D.PATTERN_FROM_SELF
 		sp.apply_pattern_preset(id)
 		var knobs := {}
 		for p in sp.get_property_list():
@@ -645,11 +645,11 @@ func _trace(section: String, factory: BulletFactory2D, label: String, data: Bull
 func _graze_trace(section: String, factory: BulletFactory2D, label: String, data: BulletVolleyData2D,
 		zones: Array, group: StringName, setup: Callable = Callable(), steps: int = 120) -> void:
 	seed(4242)
-	var log: Array = []
+	var graze_log: Array = []
 	var on_enter := func(t: Node2D, _v: BulletVolley2D, i: int, z: GrazeZone2D, r: int) -> void:
-		log.append(["enter", str(t.name), i, zones.find(z), r])
+		graze_log.append(["enter", str(t.name), i, zones.find(z), r])
 	var on_exit := func(t: Node2D, _v: BulletVolley2D, i: int, z: GrazeZone2D, r: int) -> void:
-		log.append(["exit", str(t.name), i, zones.find(z), r])
+		graze_log.append(["exit", str(t.name), i, zones.find(z), r])
 	factory.bullet_grazed.connect(on_enter)
 	factory.bullet_graze_exited.connect(on_exit)
 	var v: BulletVolley2D = factory.spawn_volley(data)
@@ -658,7 +658,7 @@ func _graze_trace(section: String, factory: BulletFactory2D, label: String, data
 	v.graze_set_zones(zones, group)
 	for step in steps:
 		factory.debug_advance_time(TRACE_STEP)
-	_rec(section, label + "#events", log)
+	_rec(section, label + "#events", graze_log)
 	var rings := []
 	for i in v.get_amount_bullets():
 		var row := []
@@ -677,7 +677,7 @@ func _graze_zone(radii: Array, regraze: int, bullet_size: bool) -> GrazeZone2D:
 	z.ring_count = radii.size()
 	for i in radii.size():
 		z.set_ring_radius(i, radii[i])
-	z.regraze = regraze
+	z.regraze = regraze as GrazeZone2D.Regraze
 	z.count_bullet_size = bullet_size
 	return z
 
@@ -880,7 +880,7 @@ func _api_object(cls: String, variant: int) -> Variant:
 		"BulletWobbleData2D":
 			var w := BulletWobbleData2D.new()
 			w.enabled = true
-			w.mode = variant
+			w.mode = variant as BulletWobbleData2D.WobbleMode
 			w.amplitude = 25.0
 			w.frequency_hz = 2.0
 			return w
@@ -991,8 +991,8 @@ func _snap_volley_api(section: String) -> void:
 	var methods := ClassDB.class_get_method_list(&"BulletVolley2D", true)
 	methods.sort_custom(func(a, b): return String(a["name"]) < String(b["name"]))
 	for m in methods:
-		var name := String(m["name"])
-		if name.begins_with("_"):
+		var method_name := String(m["name"])
+		if method_name.begins_with("_"):
 			continue
 		for base in ["plain", "rich"]:
 			for variant in 3:
@@ -1006,7 +1006,7 @@ func _snap_volley_api(section: String) -> void:
 				var args := []
 				for a in m.get("args", []):
 					args.append(_api_arg(a, variant))
-				var ret: Variant = v.callv(name, args)
+				var ret: Variant = v.callv(method_name, args)
 				var errs := cap.take()
 				var after := []
 				if is_instance_valid(v):
@@ -1014,7 +1014,7 @@ func _snap_volley_api(section: String) -> void:
 					factory.debug_advance_time(TRACE_STEP)
 					if is_instance_valid(v):
 						after.append(_volley_full_state(v))
-				_rec(section, "%s#%s%d" % [name, base, variant], [_plain(ret), after, _api_calls.duplicate()], errs)
+				_rec(section, "%s#%s%d" % [method_name, base, variant], [_plain(ret), after, _api_calls.duplicate()], errs)
 				if is_instance_valid(v) and not v.is_queued_for_deletion():
 					v.clear_all_bullets()
 				cap.take()
@@ -1185,10 +1185,10 @@ func _flock_state(v: BulletVolley2D) -> Array:
 func _flock_cloud(count: int, seed_value: int, spread: float = 80.0, at: Vector2 = Vector2.ZERO) -> Array:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value
-	var tr := []
+	var transforms := []
 	for k in count:
-		tr.append(Transform2D(rng.randf_range(-PI, PI), at + Vector2(rng.randf_range(0, spread), rng.randf_range(0, spread))))
-	return tr
+		transforms.append(Transform2D(rng.randf_range(-PI, PI), at + Vector2(rng.randf_range(0, spread), rng.randf_range(0, spread))))
+	return transforms
 
 
 ## Flies `volleys` (already joined) for `steps` ticks, recording every 15.
@@ -1230,14 +1230,14 @@ func _snap_flock(section: String) -> void:
 		var v: BulletVolley2D = factory.spawn_volley(H.make_flight_data(_flock_cloud(16, 7), 120.0, 60.0))
 		v.flock_join(cases[label])
 		_rec(section, label + "#t0", _flock_state(v))
-		await _flock_run(section, factory, label, [v])
+		_flock_run(section, factory, label, [v])
 	# A stack parting, deterministically.
 	var stack := []
 	for k in 12:
 		stack.append(Transform2D(0.0, Vector2(30, 30)))
 	var stacked: BulletVolley2D = factory.spawn_volley(H.make_flight_data(stack, 80.0, 60.0))
 	stacked.flock_join(H.make_flock(2.0, 0.0, 0.0))
-	await _flock_run(section, factory, "stacked", [stacked])
+	_flock_run(section, factory, "stacked", [stacked])
 	# Scopes: one resource, Shared vs Per Volley vs separate resources.
 	for scope in [BulletFlock2D.SCOPE_SHARED, BulletFlock2D.SCOPE_PER_VOLLEY]:
 		var f := BulletFlock2D.new()
@@ -1245,7 +1245,7 @@ func _snap_flock(section: String) -> void:
 		var b: BulletVolley2D = factory.spawn_volley(H.make_flight_data(_flock_cloud(8, 12), 120.0, 60.0))
 		a.flock_join(f, scope)
 		b.flock_join(f, scope)
-		await _flock_run(section, factory, "scope_%d" % scope, [a, b])
+		_flock_run(section, factory, "scope_%d" % scope, [a, b])
 	# A homing swarm (homing turns first, the flock bends it).
 	var d := H.make_flight_data(_flock_cloud(16, 21, 40.0), 200.0, 60.0)
 	d.homing_smoothing = 3.0
@@ -1253,7 +1253,7 @@ func _snap_flock(section: String) -> void:
 	var swarm: BulletVolley2D = factory.spawn_volley(d)
 	swarm.shared_homing_deque_push_back_global_position_target(Vector2(500, 200))
 	swarm.flock_join(BulletFlock2D.new())
-	await _flock_run(section, factory, "homing_swarm", [swarm], 120)
+	_flock_run(section, factory, "homing_swarm", [swarm], 120)
 	factory.queue_free()
 	await get_tree().process_frame
 
@@ -1273,8 +1273,8 @@ func _snap_split(section: String) -> void:
 	add_child(factory)
 	await get_tree().process_frame
 	await get_tree().process_frame
-	var log: Array = []
-	factory.bullet_split.connect(func(pos, cause, children, depth): log.append([pos, cause, depth, children]))
+	var split_log: Array = []
+	factory.bullet_split.connect(func(pos, cause, children, depth): split_log.append([pos, cause, depth, children]))
 	var cases := {}
 	var fan := BulletSplitStage2D.new()
 	fan.count = 5
@@ -1318,7 +1318,7 @@ func _snap_split(section: String) -> void:
 	survivor.direction_mode = BulletSplitStage2D.DIRECTION_RING
 	cases["timer_parent_survives"] = [survivor]
 	for label in cases:
-		log.clear()
+		split_log.clear()
 		var data := H.make_volley_data(3, 120.0, 0.1)
 		data.transforms = [Transform2D(0.3, Vector2(0, 0)), Transform2D(-0.6, Vector2(40, 10)), Transform2D(1.2, Vector2(80, -20))]
 		data.all_bullet_rotation_data = [H.make_rotation(1.0, 5.0), H.make_rotation(2.0, 5.0), H.make_rotation(3.0, 5.0)]
@@ -1329,12 +1329,12 @@ func _snap_split(section: String) -> void:
 		var seen := 0
 		for t in 30:
 			factory.debug_advance_time(TRACE_STEP)
-			while seen < log.size():
-				var e: Array = log[seen]
+			while seen < split_log.size():
+				var e: Array = split_log[seen]
 				_rec(section, "%s#split%d" % [label, seen], [e[0], e[1], e[2], _split_state(e[3])])
 				seen += 1
 		var last: Array = []
-		for e in log:
+		for e in split_log:
 			last.append(_split_state(e[3]))
 		_rec(section, label + "#end", last)
 		factory.free_active_bullets()
@@ -1360,7 +1360,7 @@ func _laser_state(l: LaserVolley2D) -> Array:
 
 func _snap_laser(kind: int, length: float, setup: Callable = Callable()) -> LaserData2D:
 	var d := H.make_laser(0.0, 0.0, 1.5, 0.125, length)
-	d.type = kind
+	d.type = kind as LaserData2D.LaserType
 	d.speed = 480.0 # 30 px per tick
 	if setup.is_valid():
 		setup.call(d)
@@ -1404,16 +1404,16 @@ func _snap_lasers(section: String) -> void:
 	grazer.add_to_group(&"snap_laser_graze")
 	for i in 3:
 		await get_tree().physics_frame
-	var log: Array = []
+	var laser_log: Array = []
 	var tick := [0]
-	factory.laser_phase_changed.connect(func(_l, p: int) -> void: log.append([tick[0], "phase", p]))
-	factory.laser_pierce_started.connect(func(t: Object, _l, i: int, p: Vector2) -> void: log.append([tick[0], "start", str(t.name), i, p]))
-	factory.laser_hit.connect(func(t: Object, _l, i: int, p: Vector2) -> void: log.append([tick[0], "hit", str(t.name), i, p]))
-	factory.laser_pierce_ended.connect(func(t: Object, _l, i: int) -> void: log.append([tick[0], "end", str(t.name), i]))
-	factory.laser_wall_hit.connect(func(_l, i: int, p: Vector2, n: Vector2) -> void: log.append([tick[0], "wall", i, p, n]))
-	factory.laser_finished.connect(func(_l) -> void: log.append([tick[0], "finished"]))
-	factory.laser_grazed.connect(func(t: Object, _l, i: int, _z, r: int) -> void: log.append([tick[0], "graze", str(t.name) if t != null else "", i, r]))
-	factory.laser_graze_exited.connect(func(t: Object, _l, i: int, _z, r: int) -> void: log.append([tick[0], "graze_exit", str(t.name) if t != null else "", i, r]))
+	factory.laser_phase_changed.connect(func(_l, p: int) -> void: laser_log.append([tick[0], "phase", p]))
+	factory.laser_pierce_started.connect(func(t: Object, _l, i: int, p: Vector2) -> void: laser_log.append([tick[0], "start", str(t.name), i, p]))
+	factory.laser_hit.connect(func(t: Object, _l, i: int, p: Vector2) -> void: laser_log.append([tick[0], "hit", str(t.name), i, p]))
+	factory.laser_pierce_ended.connect(func(t: Object, _l, i: int) -> void: laser_log.append([tick[0], "end", str(t.name), i]))
+	factory.laser_wall_hit.connect(func(_l, i: int, p: Vector2, n: Vector2) -> void: laser_log.append([tick[0], "wall", i, p, n]))
+	factory.laser_finished.connect(func(_l) -> void: laser_log.append([tick[0], "finished"]))
+	factory.laser_grazed.connect(func(t: Object, _l, i: int, _z, r: int) -> void: laser_log.append([tick[0], "graze", str(t.name) if t != null else "", i, r]))
+	factory.laser_graze_exited.connect(func(t: Object, _l, i: int, _z, r: int) -> void: laser_log.append([tick[0], "graze_exit", str(t.name) if t != null else "", i, r]))
 	var beam := LaserData2D.LASER_BEAM
 	var bolt := LaserData2D.LASER_BOLT
 	var curvy := LaserData2D.LASER_CURVY
@@ -1461,7 +1461,7 @@ func _snap_lasers(section: String) -> void:
 	}
 	for label in cases:
 		var c: Array = cases[label]
-		log.clear()
+		laser_log.clear()
 		tick[0] = 0
 		var poses: Array[Transform2D] = []
 		for p in c[1]:
@@ -1475,7 +1475,7 @@ func _snap_lasers(section: String) -> void:
 			_rec(section, "%s#%02d" % [label, t], _laser_state(l))
 			if l.is_pooled():
 				break
-		_rec(section, label + "#signals", log.duplicate(true))
+		_rec(section, label + "#signals", laser_log.duplicate(true))
 		factory.clear_active_lasers(false)
 		factory.debug_advance_time(LASER_STEP)
 	# LaserSpawner2D: one shot per pattern source, a beam per slot.
@@ -1486,7 +1486,7 @@ func _snap_lasers(section: String) -> void:
 		var sp := LaserSpawner2D.new()
 		sp.set_shooting_enabled(false)
 		sp.laser_data = data
-		sp.pattern_source = ClassDB.class_get_integer_constant("LaserSpawner2D", c)
+		sp.pattern_source = ClassDB.class_get_integer_constant("LaserSpawner2D", c) as PatternSpawner2D.PatternSource
 		sp.helper_bullets_amount = 5
 		for p in sp.get_property_list():
 			if String(p["name"]).ends_with("_seed") and int(p["type"]) == TYPE_INT:

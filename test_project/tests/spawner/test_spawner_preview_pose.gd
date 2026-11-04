@@ -171,9 +171,9 @@ func test_inspector_refresh_signals() -> void:
 	# property_list_changed so the inspector refreshes.
 	var sp := make_spawner()
 	watch_signals(sp)
-	sp.helper_flower_type = 1
+	sp.helper_flower_type = BulletPatterns2D.FLOWER_RHODONEA
 	assert_signal_emit_count(sp, "property_list_changed", 1, "flower type refreshes the inspector")
-	sp.homing_target_selection = 1
+	sp.homing_target_selection = BulletSpawner2D.HOMING_SELECT_RANDOM
 	assert_signal_emit_count(sp, "property_list_changed", 2, "target selection refreshes the inspector")
 	sp.show_pattern_preview = true
 	assert_signal_emit_count(sp, "property_list_changed", 3, "preview toggle refreshes the inspector")
@@ -184,8 +184,8 @@ func test_inspector_refresh_signals() -> void:
 func test_layer_start_offset_hidden_outside_outline_sources() -> void:
 	# P9: missing `relevant &&` guard leaked the knob into every mode.
 	var sp := make_spawner(null, BulletSpawner2D.PATTERN_FROM_HELPER_GRID)
-	sp.helper_outline_placement = 1
-	sp.helper_outline_layer_fill = 1
+	sp.helper_outline_placement = BulletPatterns2D.OUTLINE_LAYERS
+	sp.helper_outline_layer_fill = BulletPatterns2D.OUTLINE_LAYER_SEQUENTIAL
 	assert_false(is_editor_visible(sp, &"helper_outline_layer_start_offset"), "hidden for GRID")
 	sp.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_CIRCLE
 	assert_true(is_editor_visible(sp, &"helper_outline_layer_start_offset"), "shown for an outline source in LAYERS + sequential")
@@ -194,7 +194,7 @@ func test_layer_start_offset_hidden_outside_outline_sources() -> void:
 func test_dead_track_drops_rings_keeps_dots() -> void:
 	var sp := make_preview_spawner(BulletSpawner2D.PATTERN_FROM_HELPER_RING, 24)
 	sp.helper_ring_radius = 120.0
-	sp.helper_outline_placement = 1 # LAYERS
+	sp.helper_outline_placement = BulletPatterns2D.OUTLINE_LAYERS
 	sp.helper_outline_layer_count = 3
 	await idle(8)
 	assert_eq(sp.debug_get_layer_rings().size(), 2, "two rings while live")
@@ -225,8 +225,8 @@ func test_scatter_seed_rebuilds_dots() -> void:
 
 func _visible_for(src: int) -> bool:
 	var sp := make_spawner()
-	sp.helper_outline_placement = 0 # ON_OUTLINE
-	sp.pattern_source = src
+	sp.helper_outline_placement = BulletPatterns2D.OUTLINE_ON_OUTLINE
+	sp.pattern_source = src as PatternSpawner2D.PatternSource
 	return is_editor_visible(sp, &"helper_outline_distribution")
 
 
@@ -425,7 +425,7 @@ func get_velocity() -> Vector2:
 	sp.helper_aimed_prediction_time = 0.5
 	sp.set_spin_angle_deg(45.0) # a static spin: the shot must use it
 	var fired: Array = []
-	sp.volley_fired.connect(func(v: BulletVolley2D, _n: int) -> void: fired.append(v))
+	sp.volley_fired.connect(func(volley: BulletVolley2D, _n: int) -> void: fired.append(volley))
 	target.action = func() -> void: sp.shoot_once()
 	sp.set_helper_aimed_target(target) # marks the preview dirty: its rebuild reads get_velocity
 	for i in 20:

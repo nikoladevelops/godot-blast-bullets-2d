@@ -17,12 +17,12 @@ const DT := 1.0 / 60.0
 ## each scaled by a seeded 1..scale_max.
 func _ring(n: int, at: Vector2, quad: float, scale_max: float, seed_value: int, texture_rotation := 0.0) -> BulletVolleyData2D:
 	seed(seed_value)
-	var tr: Array = []
+	var tr_list: Array = []
 	for k in n:
 		var a := TAU * k / n
 		var s := randf_range(1.0, scale_max)
-		tr.append(Transform2D(a, at + Vector2(cos(a), sin(a)) * 12.0).scaled_local(Vector2(s, s)))
-	var d := H.make_flight_data(tr, 300.0, 1000.0)
+		tr_list.append(Transform2D(a, at + Vector2(cos(a), sin(a)) * 12.0).scaled_local(Vector2(s, s)))
+	var d := H.make_flight_data(tr_list, 300.0, 1000.0)
 	d.texture_size = Vector2(quad, quad)
 	d.texture_rotation_radians = texture_rotation
 	return d
@@ -90,10 +90,10 @@ func test_the_turn_never_exceeds_max_turn_rate_degrees(cap: float = use_paramete
 
 func test_a_flockmate_dead_ahead_turns_a_bullet_aside_never_around() -> void:
 	# A convoy: five overlapping bullets in one line along their heading.
-	var tr: Array = []
+	var tr_list: Array = []
 	for k in 5:
-		tr.append(Transform2D(0.0, Vector2(k * 8.0, 0.0)))
-	var v: BulletVolley2D = factory.spawn_volley(H.make_flight_data(tr, 120.0, 1000.0))
+		tr_list.append(Transform2D(0.0, Vector2(k * 8.0, 0.0)))
+	var v: BulletVolley2D = factory.spawn_volley(H.make_flight_data(tr_list, 120.0, 1000.0))
 	v.flock_join(BulletFlock2D.new())
 	var probe := MotionProbe.new(factory, [v])
 	var worst := 0.0
@@ -111,8 +111,8 @@ func test_steering_fades_in_over_blend_in_sec() -> void:
 	var eased := H.make_flock(1.0, 0.0, 0.0, 100.0, 40.0)
 	eased.blend_in_sec = 0.3
 	var sharp := H.make_flock(1.0, 0.0, 0.0, 100.0, 40.0)
-	var tr := [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 20))]
-	var a: BulletVolley2D = factory.spawn_volley(H.make_flight_data(tr, 100.0))
+	var tr_list := [Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 20))]
+	var a: BulletVolley2D = factory.spawn_volley(H.make_flight_data(tr_list, 100.0))
 	var b: BulletVolley2D = factory.spawn_volley(H.make_flight_data([Transform2D(0.0, Vector2(0, 900)), Transform2D(0.0, Vector2(0, 920))], 100.0))
 	a.flock_join(eased)
 	b.flock_join(sharp)
@@ -170,12 +170,12 @@ func test_every_preset_flies_a_burst_calmly(preset: int = use_parameters([Bullet
 func _homing_swarm_spacing(f: BulletFlock2D, quad: float) -> Array:
 	var probe := MotionProbe.new(factory, [])
 	for shot in 3:
-		var tr: Array = []
+		var tr_list: Array = []
 		seed(5 + shot)
 		for k in 24:
 			var a := TAU * k / 24
-			tr.append(Transform2D(a, Vector2(cos(a), sin(a)) * 12.0).scaled_local(Vector2.ONE * randf_range(1.0, 1.5)))
-		var d := H.make_flight_data(tr, 300.0, 1000.0)
+			tr_list.append(Transform2D(a, Vector2(cos(a), sin(a)) * 12.0).scaled_local(Vector2.ONE * randf_range(1.0, 1.5)))
+		var d := H.make_flight_data(tr_list, 300.0, 1000.0)
 		d.texture_size = Vector2(quad, quad)
 		d.homing_smoothing = 5.0
 		d.homing_take_control_of_texture_rotation = true

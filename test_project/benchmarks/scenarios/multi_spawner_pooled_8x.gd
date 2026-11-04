@@ -20,7 +20,7 @@ func _spawner(src: int, n: int, pos: Vector2, interval: float) -> BulletSpawner2
 	d.all_bullet_speed_data = []
 	d.set_collision_mask_from_array([1])
 	sp.set_spawn_data(d)
-	sp.pattern_source = src
+	sp.pattern_source = src as PatternSpawner2D.PatternSource
 	sp.helper_bullets_amount = n
 	sp.shoot_interval_sec = interval
 	return sp

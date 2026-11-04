@@ -128,15 +128,15 @@ func test_a_prepopulated_pool_serves_pickup_conversions_completely() -> void:
 
 
 func test_freeing_and_repopulating_around_pickups_stays_consistent() -> void:
-	for round in 3:
+	for round_index in 3:
 		P.still(factory, [Vector2.ZERO, Vector2(5, 0)])
 		factory.convert_all_bullets_to_pickups(P.coin(), _target(Vector2(5000, 0)))
 		await idle(3)
 		factory.free_active_bullets()
 		factory.free_bullets_pool()
 		await idle(2)
-		assert_eq(factory.get_active_bullet_count(), 0, "round %d: cleared" % round)
-		assert_true(factory.debug_assert_no_dangling().get("ok", false), "round %d: nothing dangles" % round)
+		assert_eq(factory.get_active_bullet_count(), 0, "round %d: cleared" % round_index)
+		assert_true(factory.debug_assert_no_dangling().get("ok", false), "round %d: nothing dangles" % round_index)
 
 
 # --- source bullets leave cleanly ----------------------------------------------------------------------------------------------------------
@@ -191,7 +191,7 @@ func test_steady_object_count_over_many_cycles() -> void:
 func test_a_bullets_converted_handler_may_clear_and_convert_again() -> void:
 	P.still(factory, [Vector2.ZERO, Vector2(5, 0)])
 	var seen := []
-	factory.bullets_converted.connect(func(count, volleys):
+	factory.bullets_converted.connect(func(count, _volleys):
 		seen.append(count)
 		if seen.size() == 1:
 			factory.clear_active_bullets() # the pickups just made
@@ -428,7 +428,10 @@ func test_user_code_that_frees_the_target_during_a_conversion_does_not_crash_it(
 		AttachmentFreeTargetProbe2D.calls = 0
 		AttachmentFreeTargetProbe2D.victims = [target, other] if mode == "group" else [target]
 		P.still(factory, [Vector2.ZERO, Vector2(20, 0)])
-		var out: Array = factory.convert_all_bullets_to_pickups(coin, target if mode == "node" else "fragile")
+		var aim: Variant = "fragile"
+		if mode == "node":
+			aim = target
+		var out: Array = factory.convert_all_bullets_to_pickups(coin, aim)
 		assert_eq(out.size(), 1, "%s: the conversion completed" % mode)
 		assert_gt(AttachmentFreeTargetProbe2D.calls, 0, "%s: the attachment callback ran inside it" % mode)
 		await idle(3)
@@ -495,7 +498,7 @@ func test_a_handler_that_took_the_pickup_out_stops_the_rest_of_the_collection() 
 
 func test_spawner_randomization_with_overflowing_settings_never_corrupts_the_shot() -> void:
 	var sp := make_spawner(H.make_volley_data(5, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 5)
-	sp.bullet_scale_mode = 1
+	sp.bullet_scale_mode = BulletSpawner2D.BULLET_SCALE_UNIFORM
 	sp.bullet_scale_min = 1.0e39
 	sp.bullet_scale_max = 1.0e39
 	sp.bullet_position_jitter_max = 1.0e39
@@ -551,7 +554,7 @@ func test_bounce_off_a_position_moved_wall_is_independent_of_the_time_scale() ->
 		d.collision_shape = H.make_circle_shape(6.0)
 		d.bullet_max_collision_count = 0
 		d.set_bounce_mask_from_array([4])
-		d.bounce_mode = 1
+		d.bounce_mode = BulletVolleyData2D.BOUNCE_PRECISE_SHAPE
 		var v := factory.spawn_volley(d)
 		for i in 600:
 			wall.position.x -= 3.0 # a real 180 px/s toward the bullet

@@ -187,10 +187,10 @@ func test_handlers_that_cancel_or_restart_a_burst_own_the_chain(p: Array = use_p
 	var sig: String = p[0]
 	var action: String = p[1]
 	var sp := _spawner(3, 0.02)
-	var log: Array = []
+	var log_entries: Array = []
 	var acted: Array = []
-	sp.burst_shot_fired.connect(func(_n, _m) -> void: log.append("shot"))
-	sp.burst_finished.connect(func() -> void: log.append("finished"))
+	sp.burst_shot_fired.connect(func(_n, _m) -> void: log_entries.append("shot"))
+	sp.burst_finished.connect(func() -> void: log_entries.append("finished"))
 	var handler := func() -> void:
 		if acted.is_empty():
 			acted.append(true)
@@ -222,7 +222,7 @@ func test_handlers_that_cancel_or_restart_a_burst_own_the_chain(p: Array = use_p
 			expected = ["finished"] # cancelled inside the shot: no shot report after it
 		_:
 			expected = ["shot", "finished"]
-	assert_eq(log, expected, "%s from %s" % [action, sig])
+	assert_eq(log_entries, expected, "%s from %s" % [action, sig])
 
 
 ## Reports a velocity and runs `action` on its first call.
@@ -356,11 +356,11 @@ func test_a_one_shot_manual_burst_is_warned_first(burst_on: bool = use_parameter
 ## reports burst_finished exactly once, before anything of the new one.
 func test_a_handler_of_the_last_burst_shot_still_finishes_the_chain(action: String = use_parameters(["cancel", "reset_shooting", "begin_burst"])) -> void:
 	var sp := _spawner(3, 0.02)
-	var log: Array = []
+	var log_entries: Array = []
 	var acted: Array = []
-	sp.burst_finished.connect(func() -> void: log.append("finished"))
+	sp.burst_finished.connect(func() -> void: log_entries.append("finished"))
 	sp.burst_shot_fired.connect(func(n: int, _m) -> void:
-		log.append("shot %d" % n)
+		log_entries.append("shot %d" % n)
 		if n == 3 and acted.is_empty():
 			acted.append(true)
 			if action == "cancel":
@@ -376,7 +376,7 @@ func test_a_handler_of_the_last_burst_shot_still_finishes_the_chain(action: Stri
 	var expected := ["shot 1", "shot 2", "shot 3", "finished"]
 	if action == "begin_burst":
 		expected += ["shot 1", "shot 2", "shot 3", "finished"]
-	assert_eq(log, expected, "%s from the last shot" % action)
+	assert_eq(log_entries, expected, "%s from the last shot" % action)
 
 
 ## An auto shot waiting behind its warning never fires past the cap: a cap

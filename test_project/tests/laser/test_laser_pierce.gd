@@ -10,7 +10,7 @@ extends BlastTest
 
 const DT := 0.0625
 
-var log: Array = [] # [tick, kind, target name, beam, position x]
+var log_entries: Array = [] # [tick, kind, target name, beam, position x]
 var tick := 0
 var a: Area2D
 var b: Area2D
@@ -19,14 +19,14 @@ var c: Area2D
 
 func before_each() -> void:
 	await super()
-	log.clear()
+	log_entries.clear()
 	tick = 0
 	a = _target("A", 100.0)
 	b = _target("B", 200.0)
 	c = _target("C", 300.0)
-	factory.laser_pierce_started.connect(func(t: Object, _l: LaserVolley2D, i: int, p: Vector2) -> void: log.append([tick, "start", str(t.name), i, roundi(p.x)]))
-	factory.laser_hit.connect(func(t: Object, _l: LaserVolley2D, i: int, p: Vector2) -> void: log.append([tick, "hit", str(t.name), i, roundi(p.x)]))
-	factory.laser_pierce_ended.connect(func(t: Object, _l: LaserVolley2D, i: int) -> void: log.append([tick, "end", str(t.name), i]))
+	factory.laser_pierce_started.connect(func(t: Object, _l: LaserVolley2D, i: int, p: Vector2) -> void: log_entries.append([tick, "start", str(t.name), i, roundi(p.x)]))
+	factory.laser_hit.connect(func(t: Object, _l: LaserVolley2D, i: int, p: Vector2) -> void: log_entries.append([tick, "hit", str(t.name), i, roundi(p.x)]))
+	factory.laser_pierce_ended.connect(func(t: Object, _l: LaserVolley2D, i: int) -> void: log_entries.append([tick, "end", str(t.name), i]))
 	await idle(2) # the targets join the physics space
 
 
@@ -49,7 +49,7 @@ func _fire(data: LaserData2D) -> LaserVolley2D:
 
 func _kinds() -> Array:
 	var out: Array = []
-	for e in log:
+	for e in log_entries:
 		out.append("%s:%s" % [e[1], e[2]])
 	return out
 
@@ -57,10 +57,10 @@ func _kinds() -> Array:
 func test_every_target_along_the_beam_is_started_then_hit_nearest_first() -> void:
 	var l := _fire(H.make_laser(0.0, 0.0, 0.0, 0.0))
 	_step(1)
-	assert_eq(log, [[1, "start", "A", 0, 100], [1, "hit", "A", 0, 100], [1, "start", "B", 0, 200], [1, "hit", "B", 0, 200], [1, "start", "C", 0, 300], [1, "hit", "C", 0, 300]], "one start + hit each, nearest first, on the beam")
+	assert_eq(log_entries, [[1, "start", "A", 0, 100], [1, "hit", "A", 0, 100], [1, "start", "B", 0, 200], [1, "hit", "B", 0, 200], [1, "start", "C", 0, 300], [1, "hit", "C", 0, 300]], "one start + hit each, nearest first, on the beam")
 	assert_eq(l.get_pierced_targets(0), [a, b, c], "the readout, nearest first")
 	_step(3)
-	assert_eq(log.size(), 6, "no interval: one hit per contact")
+	assert_eq(log_entries.size(), 6, "no interval: one hit per contact")
 
 
 func test_hit_interval_repeats_hits_and_never_bursts() -> void:
@@ -68,8 +68,8 @@ func test_hit_interval_repeats_hits_and_never_bursts() -> void:
 	d.hit_interval_sec = 0.125
 	_fire(d)
 	_step(5)
-	assert_eq(log, [[1, "start", "A", 0, 100], [1, "hit", "A", 0, 100], [3, "hit", "A", 0, 100], [5, "hit", "A", 0, 100]], "every 0.125 s")
-	log.clear()
+	assert_eq(log_entries, [[1, "start", "A", 0, 100], [1, "hit", "A", 0, 100], [3, "hit", "A", 0, 100], [5, "hit", "A", 0, 100]], "every 0.125 s")
+	log_entries.clear()
 	tick = 0
 	step_factory(1, 1.0) # a one-second hitch
 	tick = 1
@@ -84,16 +84,16 @@ func test_raising_the_hit_interval_reaches_an_open_contact() -> void:
 	var d := H.make_laser(0.0, 0.0, 0.0, 0.0, 150.0) # reaches A only
 	_fire(d)
 	_step(1)
-	assert_eq(log, [[1, "start", "A", 0, 100], [1, "hit", "A", 0, 100]], "one hit while the interval is 0")
-	log.clear()
+	assert_eq(log_entries, [[1, "start", "A", 0, 100], [1, "hit", "A", 0, 100]], "one hit while the interval is 0")
+	log_entries.clear()
 	d.hit_interval_sec = 0.25 # 4 ticks of 1/16 s
 	_step(3)
-	assert_eq(log, [], "no hit before one interval since the start hit")
+	assert_eq(log_entries, [], "no hit before one interval since the start hit")
 	_step(1)
-	assert_eq(log, [[5, "hit", "A", 0, 100]], "the raised interval reaches the open contact, one interval after its start hit")
-	log.clear()
+	assert_eq(log_entries, [[5, "hit", "A", 0, 100]], "the raised interval reaches the open contact, one interval after its start hit")
+	log_entries.clear()
 	_step(4)
-	assert_eq(log, [[9, "hit", "A", 0, 100]], "and repeats every 0.25 s")
+	assert_eq(log_entries, [[9, "hit", "A", 0, 100]], "and repeats every 0.25 s")
 
 
 ## Raised long after the start hit: the overdue repeat comes once at once,
@@ -102,13 +102,13 @@ func test_raising_the_hit_interval_late_hits_once_then_repeats() -> void:
 	var d := H.make_laser(0.0, 0.0, 0.0, 0.0, 150.0)
 	_fire(d)
 	_step(10)
-	log.clear()
+	log_entries.clear()
 	d.hit_interval_sec = 0.25
 	_step(1)
-	assert_eq(log, [[11, "hit", "A", 0, 100]], "one overdue hit")
-	log.clear()
+	assert_eq(log_entries, [[11, "hit", "A", 0, 100]], "one overdue hit")
+	log_entries.clear()
 	_step(4)
-	assert_eq(log, [[15, "hit", "A", 0, 100]], "then every 0.25 s")
+	assert_eq(log_entries, [[15, "hit", "A", 0, 100]], "then every 0.25 s")
 
 
 func test_pierce_limit_hits_the_nearest_and_cuts_the_beam() -> void:
@@ -128,7 +128,7 @@ func test_pierce_limit_hits_the_nearest_and_cuts_the_beam() -> void:
 func test_a_target_that_leaves_ends_and_a_freed_one_ends_silently() -> void:
 	_fire(H.make_laser(0.0, 0.0, 0.0, 0.0))
 	_step(1)
-	log.clear()
+	log_entries.clear()
 	c.position = Vector2(300, 500) # out of the beam
 	b.free()
 	await idle(1) # the physics space sees the move (one factory tick too)
@@ -139,7 +139,7 @@ func test_a_target_that_leaves_ends_and_a_freed_one_ends_silently() -> void:
 func test_every_contact_ends_when_the_laser_stops_hitting() -> void:
 	var l := _fire(H.make_laser(0.0, 0.0, 0.125, 0.125))
 	_step(1)
-	log.clear()
+	log_entries.clear()
 	_step(2) # active ends on tick 2: fading
 	assert_eq(_kinds(), ["end:A", "end:B", "end:C"], "fading ends every contact")
 	assert_eq(l.get_pierced_targets(0), [], "nothing touched")
@@ -150,7 +150,7 @@ func test_charging_never_hits_and_growing_hits_only_when_asked() -> void:
 	d.hit_while_growing = false
 	_fire(d)
 	_step(3) # charging 2 ticks, growing from tick 2
-	assert_eq(log, [], "no hits while charging or (hit_while_growing off) growing")
+	assert_eq(log_entries, [], "no hits while charging or (hit_while_growing off) growing")
 	_step(2)
 	assert_eq(_kinds().slice(0, 2), ["start:A", "hit:A"], "active: hits")
 
@@ -164,7 +164,7 @@ func test_bodies_and_areas_can_be_left_out() -> void:
 	_fire(d)
 	_step(1)
 	assert_eq(_kinds(), ["start:W", "hit:W"], "bodies only")
-	log.clear()
+	log_entries.clear()
 	d.collide_with_areas = true
 	d.collide_with_bodies = false
 	_step(1)
@@ -190,7 +190,7 @@ func test_two_beams_hit_on_their_own_index() -> void:
 	factory.spawn_laser(d, t)
 	_step(1)
 	var by_beam := {}
-	for e in log:
+	for e in log_entries:
 		if e[1] == "hit":
 			by_beam[e[2]] = e[3]
 	assert_eq(by_beam, {"A": 0, "B": 0, "U": 1}, "each target on the beam that touched it")

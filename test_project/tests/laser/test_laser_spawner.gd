@@ -188,7 +188,7 @@ func test_the_retarget_interval_and_the_mouse_follow_their_targets() -> void:
 
 func test_orphan_policies(policy: int = use_parameters([0, 1, 2, 3])) -> void:
 	var sp := _spawner(H.make_laser(0.0, 0.0, 0.0, 0.25), 1)
-	sp.orphaned_lasers = policy
+	sp.orphaned_lasers = (policy as LaserSpawner2D.OrphanedLasers)
 	var l := _fire(sp)
 	var heard: Array = []
 	factory.laser_phase_changed.connect(func(_l, p: int) -> void: heard.append(p))
@@ -482,7 +482,8 @@ func test_the_node_name_source_aims_each_beam_at_the_nearest_named_node() -> voi
 	sp.laser_target_name_case_sensitive = false
 	sp.laser_target_node_name = "enemya"
 	assert_eq(sp.resolve_laser_targets(), [a], "Exact")
-	sp.laser_target_name_match_mode = 9
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	sp.laser_target_name_match_mode = (9 as PatternSpawner2D.HomingNodeNameMatch)
 	expect_error_sequence(["LaserSpawner2D: invalid laser_target_name_match_mode, keeping the old value."])
 	assert_eq(sp.laser_target_name_match_mode, PatternSpawner2D.HOMING_NAME_MATCH_EXACT, "kept")
 
@@ -523,7 +524,8 @@ func test_the_new_sources_gate_their_knobs_and_warn_when_empty() -> void:
 	assert_eq(shown.call(), [false, false, false, true, true, true, true], "Node Children")
 	assert_true("laser_target_source is Node Children but laser_target_children_parent_path is empty: the lasers have no target." in sp.get_setup_warnings(), "empty parent")
 	assert_eq([LaserSpawner2D.LASER_TARGET_NODE_NAME, LaserSpawner2D.LASER_TARGET_NODE_CHILDREN], [5, 6], "serialized ids appended")
-	sp.laser_target_source = 7
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	sp.laser_target_source = (7 as LaserSpawner2D.LaserTargetSource)
 	expect_error_sequence(["LaserSpawner2D: laser_target_source must be 0 (None), 1 (Node Group), 2 (Node Path), 3 (Mouse), 4 (Global Position), 5 (Node Name) or 6 (Node Children), keeping the old value."])
 
 
@@ -533,7 +535,7 @@ func test_the_new_sources_gate_their_knobs_and_warn_when_empty() -> void:
 func test_every_beam_keeps_its_pose_when_the_spawner_is_freed(policy: int = use_parameters([0, 1, 2])) -> void:
 	var sp := _spawner(H.make_laser(0.0, 0.0, 0.0, 0.5, 200.0), 4)
 	sp.position = Vector2(300, 300)
-	sp.orphaned_lasers = policy
+	sp.orphaned_lasers = (policy as LaserSpawner2D.OrphanedLasers)
 	var l := _fire(sp)
 	step_factory(1, DT)
 	var before: Array = []
@@ -689,7 +691,7 @@ func test_following_beams_hold_while_the_spawner_is_out_of_the_tree() -> void:
 func test_the_muzzle_offset_never_turns_with_the_spin(space: int = use_parameters([0, 1])) -> void:
 	var sp := _spawner(_laser(), 1) # slot 0 at (20, 0) pointing +X
 	sp.spawn_position_offset = Vector2(0, 50)
-	sp.spawn_position_offset_space = space
+	sp.spawn_position_offset_space = (space as LaserSpawner2D.SpawnOffsetSpace)
 	var l := _fire(sp)
 	step_factory(1, DT)
 	assert_true(l.get_beam_start(0).is_equal_approx(Vector2(20, 50)), "fired at the slot plus the offset: %s" % l.get_beam_start(0))

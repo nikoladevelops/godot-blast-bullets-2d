@@ -23,7 +23,7 @@ const POSITIONS := BulletSpawner2D.GRAZE_SOURCE_GLOBAL_POSITIONS
 func _configure(sp: BulletSpawner2D, source: int, points := PackedVector2Array()) -> BulletSpawner2D:
 	sp.graze_zones = [H.make_graze_zone([20.0])]
 	sp.graze_enabled = true
-	sp.graze_target_source = source
+	sp.graze_target_source = source as PatternSpawner2D.GrazeTargetSource
 	sp.graze_global_positions = points
 	return sp
 
@@ -112,17 +112,17 @@ func test_each_position_grazes_with_a_null_target() -> void:
 
 func test_removing_the_point_of_a_visit_ends_it_silently() -> void:
 	var sp := _spawner(POSITIONS, PackedVector2Array([Vector2(10, 0), Vector2(15, 0)]))
-	var log := H.record_graze(sp)
+	var graze_log := H.record_graze(sp)
 	var v := _shoot(sp)
 	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "one graze for the zone")
+	assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "one graze for the zone")
 	sp.graze_global_positions = PackedVector2Array([Vector2(15, 0)])
 	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "index 0 now sits at 15 px: still inside, same visit")
+	assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "index 0 now sits at 15 px: still inside, same visit")
 	assert_true(v.is_bullet_inside_graze(0, 0), "inside")
 	sp.graze_global_positions = PackedVector2Array()
 	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "no point left: the visit ended silently")
+	assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "no point left: the visit ended silently")
 	assert_false(v.is_bullet_inside_graze(0, 0), "no visit")
 
 
@@ -141,38 +141,38 @@ func test_resolve_and_refresh_report_the_points() -> void:
 
 func test_edits_reach_bullets_in_flight() -> void:
 	var sp := _spawner(POSITIONS, PackedVector2Array([Vector2(500, 0)]))
-	var log := H.record_graze(sp)
+	var graze_log := H.record_graze(sp)
 	_shoot(sp)
 	step_factory(2)
-	assert_eq(log, [], "far")
+	assert_eq(graze_log, [], "far")
 	sp.graze_global_positions = PackedVector2Array([Vector2(10, 0)])
 	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "the flying bullet tests the new point next tick")
+	assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "the flying bullet tests the new point next tick")
 
 
 func test_the_filter_group_and_the_interval_never_apply_to_points() -> void:
 	var sp := _spawner(POSITIONS, PackedVector2Array([Vector2(500, 0)]))
 	sp.graze_filter_group = &"nobody"
 	sp.graze_update_interval = 10.0
-	var log := H.record_graze(sp)
+	var graze_log := H.record_graze(sp)
 	_shoot(sp)
 	step_factory(2)
 	sp.graze_global_positions = PackedVector2Array([Vector2(10, 0)])
 	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "points have no group and are read every tick")
+	assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "points have no group and are read every tick")
 
 
 func test_the_cursor_is_read_every_tick_whatever_the_interval() -> void:
 	mouse_to(Vector2(500, 0))
 	var sp := _spawner(MOUSE)
 	sp.graze_update_interval = 10.0
-	var log := H.record_graze(sp)
+	var graze_log := H.record_graze(sp)
 	_shoot(sp)
 	step_factory(2)
-	assert_eq(log, [], "far")
+	assert_eq(graze_log, [], "far")
 	mouse_to(Vector2(10, 0))
 	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "the cursor moved onto the bullet: grazed next tick, no rescan wait")
+	assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "the cursor moved onto the bullet: grazed next tick, no rescan wait")
 
 
 func test_points_survive_the_handlers_of_earlier_volleys_in_the_sweep() -> void:
@@ -181,12 +181,12 @@ func test_points_survive_the_handlers_of_earlier_volleys_in_the_sweep() -> void:
 	for source in [POSITIONS, MOUSE]:
 		mouse_to(Vector2(10, 0))
 		var sp := _spawner(source, PackedVector2Array([Vector2(10, 0)]))
-		var log := H.record_graze(sp)
+		var graze_log := H.record_graze(sp)
 		_shoot(sp)
 		_shoot(sp)
 		step_factory()
-		assert_eq(log.size(), 2, "source %d: both volleys grazed in the same tick" % source)
-		assert_ne(log[0][2], log[1][2], "source %d: one event per volley" % source)
+		assert_eq(graze_log.size(), 2, "source %d: both volleys grazed in the same tick" % source)
+		assert_ne(graze_log[0][2], graze_log[1][2], "source %d: one event per volley" % source)
 		factory.clear_active_bullets()
 
 
@@ -196,10 +196,10 @@ func test_there_is_no_cap() -> void:
 		points.append(Vector2(1000 + 10 * i, 0))
 	points.append(Vector2(10, 0)) # the 301st, past the slab threshold
 	var sp := _spawner(POSITIONS, points)
-	var log := H.record_graze(sp)
+	var graze_log := H.record_graze(sp)
 	_shoot(sp)
 	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "the 301st point grazes")
+	assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "the 301st point grazes")
 	assert_eq(sp.refresh_graze_targets(), 301, "every point counts")
 
 
@@ -217,12 +217,12 @@ func test_orphaned_volleys_keep_the_source() -> void:
 		add_child(sp)
 		sp.set_bullet_factory(factory)
 		_configure(sp, source, PackedVector2Array([Vector2(10, 0)]))
-		var log := H.record_graze(factory)
+		var graze_log := H.record_graze(factory)
 		_shoot(sp)
 		sp.free()
 		step_factory()
-		assert_eq(H.graze_kinds(log), ["enter:0:0"], "source %d: the orphaned volley still grazes" % source)
-		assert_null(log[0][1], "source %d: a null target" % source)
+		assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "source %d: the orphaned volley still grazes" % source)
+		assert_null(graze_log[0][1], "source %d: a null target" % source)
 		factory.clear_active_bullets()
 		for c in factory.get_signal_connection_list("bullet_grazed") + factory.get_signal_connection_list("bullet_graze_exited"):
 			factory.disconnect(c["signal"].get_name(), c["callable"])
@@ -231,17 +231,17 @@ func test_orphaned_volleys_keep_the_source() -> void:
 func test_the_mouse_grazes_with_a_null_target() -> void:
 	mouse_to(Vector2(10, 0))
 	var sp := _spawner(MOUSE)
-	var log := H.record_graze(sp)
+	var graze_log := H.record_graze(sp)
 	var v := _shoot(sp)
 	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "the cursor grazes")
-	assert_null(log[0][1], "a null target")
+	assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "the cursor grazes")
+	assert_null(graze_log[0][1], "a null target")
 	mouse_to(Vector2(15, 5))
 	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "moving inside keeps the visit")
+	assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "moving inside keeps the visit")
 	mouse_to(Vector2(300, 0))
 	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0", "exit:0:0"], "moving away exits")
+	assert_eq(H.graze_kinds(graze_log), ["enter:0:0", "exit:0:0"], "moving away exits")
 	assert_false(v.is_bullet_inside_graze(0, 0), "outside")
 
 
@@ -255,10 +255,10 @@ func test_the_cursor_is_read_through_the_camera() -> void:
 	await idle(2)
 	mouse_to(Vector2(2010, 1000))
 	var sp := _spawner(MOUSE, PackedVector2Array(), Vector2(2000, 1000))
-	var log := H.record_graze(sp)
+	var graze_log := H.record_graze(sp)
 	_shoot(sp)
 	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "grazed where the cursor is in the world")
+	assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "grazed where the cursor is in the world")
 
 
 func test_the_runtime_preview_draws_each_point_and_follows_the_cursor() -> void:
@@ -280,19 +280,19 @@ func test_switching_between_node_and_point_sources_re_anchors_visits() -> void:
 	var t := make_graze_target(Vector2(10, 0), &"nodes")
 	var sp := _spawner(BulletSpawner2D.GRAZE_SOURCE_NODE_GROUP)
 	sp.graze_node_group = &"nodes"
-	var log := H.record_graze(sp)
+	var graze_log := H.record_graze(sp)
 	var v := _shoot(sp)
 	step_factory()
-	assert_eq(log[0][1], t, "a node visit")
+	assert_eq(graze_log[0][1], t, "a node visit")
 	sp.graze_global_positions = PackedVector2Array([Vector2(-12, 0)])
 	sp.graze_target_source = POSITIONS
 	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "the visit moved to the point it is inside: no exit, no new graze")
+	assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "the visit moved to the point it is inside: no exit, no new graze")
 	assert_true(v.is_bullet_inside_graze(0, 0), "still inside")
 	mouse_to(Vector2(400, 0))
 	sp.graze_target_source = MOUSE
 	step_factory()
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "the cursor is far: the visit ended silently")
+	assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "the cursor is far: the visit ended silently")
 	assert_false(v.is_bullet_inside_graze(0, 0), "no visit")
 
 

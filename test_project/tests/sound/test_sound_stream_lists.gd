@@ -6,7 +6,7 @@ extends BlastTest
 func _list_sound(mode: int, streams: Array, weights := PackedFloat32Array()) -> BulletSoundData2D:
 	var s := BulletSoundData2D.new()
 	s.streams = streams
-	s.stream_mode = mode
+	s.stream_mode = mode as BulletSoundData2D.StreamMode
 	s.stream_weights = weights
 	s.min_interval_sec = 0.0
 	s.max_voices = 1
@@ -34,7 +34,8 @@ func test_setters_reject_and_keep() -> void:
 	s.set_streams(["nope"] as Array)
 	expect_error_sequence(["BulletSoundData2D: streams entries must be AudioStream or null, keeping the old value."])
 	assert_true((s.streams as Array).is_empty(), "streams kept")
-	s.set_stream_mode(4)
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	s.set_stream_mode(4 as BulletSoundData2D.StreamMode)
 	expect_error_sequence(["BulletSoundData2D: stream_mode must be 0 (Random), 1 (Weighted), 2 (Sequence) or 3 (Shuffle), keeping the old value."])
 	assert_eq(s.stream_mode, BulletSoundData2D.STREAM_RANDOM, "mode kept")
 	s.set_stream_weights(PackedFloat32Array([-1.0]))
@@ -224,12 +225,12 @@ func test_avoid_repeat_never_plays_a_stream_twice_in_a_row(mode: int = use_param
 	for t in trio:
 		assert_has(ids, (t as AudioStreamWAV).get_instance_id(), "mode %d: every stream still plays" % mode)
 	if mode == BulletSoundData2D.STREAM_SHUFFLE:
-		for round in 40:
-			var dealt := ids.slice(round * 3, round * 3 + 3)
+		for round_index in 40:
+			var dealt := ids.slice(round_index * 3, round_index * 3 + 3)
 			dealt.sort()
 			var want: Array = trio.map(func(t): return (t as AudioStreamWAV).get_instance_id())
 			want.sort()
-			assert_eq(dealt, want, "round %d deals every entry once" % round)
+			assert_eq(dealt, want, "round %d deals every entry once" % round_index)
 
 
 func test_avoid_repeat_off_lets_random_repeat_and_two_streams_alternate_on() -> void:

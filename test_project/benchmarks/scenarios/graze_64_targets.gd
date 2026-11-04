@@ -24,7 +24,7 @@ func setup() -> void:
 	zone.ring_3_radius = 48.0
 	factory.bullet_grazed.connect(_on_grazed)
 	for i in 10:
-		var v: BulletVolley2D = factory.spawn_volley(ring_data(1000, Vector2(960 * (i % 5), 1200 * (i / 5)), 50.0, 60.0, 1000.0))
+		var v: BulletVolley2D = factory.spawn_volley(ring_data(1000, Vector2(960 * (i % 5), 1200 * floori(i / 5.0)), 50.0, 60.0, 1000.0))
 		v.graze_set_zones([zone], &"bench_enemies")
 
 func _on_grazed(_t: Node2D, _v: BulletVolley2D, _i: int, _z: GrazeZone2D, _r: int) -> void:
@@ -33,6 +33,6 @@ func _on_grazed(_t: Node2D, _v: BulletVolley2D, _i: int, _z: GrazeZone2D, _r: in
 func step(frame: int) -> void:
 	var t := frame / 60.0
 	for i in _targets.size():
-		var home := Vector2(480 * (i % 8), 300 * (i / 8))
+		var home := Vector2(480 * (i % 8), 300 * floori(i / 8.0))
 		_targets[i].position = home + Vector2(cos(t * 0.7 + i), sin(t * 1.3 + i)) * 120.0
 	extra["grazes"] = _grazes

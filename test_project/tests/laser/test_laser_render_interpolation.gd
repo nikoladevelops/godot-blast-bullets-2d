@@ -706,7 +706,7 @@ func test_body_end_fade_follows_the_whole_polyline_with_the_color_ramp() -> void
 		prev = mid
 		var want := clampf(minf(walked, total - walked) / 30.0, 0.0, 1.0)
 		if absf(cols[i].a - want) > 0.002:
-			problems.append("pair %d at %.1f px: alpha %.3f, want %.3f" % [i / 2, walked, cols[i].a, want])
+			problems.append("pair %d at %.1f px: alpha %.3f, want %.3f" % [floori(i / 2.0), walked, cols[i].a, want])
 	assert_gt(line.size(), 2, "reflected: a polyline")
 	assert_eq(problems, [], "the fade runs along the whole beam, across the reflection")
 	assert_eq(_alphas(mesh).slice(0, 2), [0.0, 0.0], "clear at the muzzle")

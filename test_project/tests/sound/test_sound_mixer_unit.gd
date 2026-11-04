@@ -231,7 +231,8 @@ func test_steal_mode_setter_rejects_and_keeps() -> void:
 	assert_has_method(s, "set_steal_mode", "bound set_steal_mode")
 	assert_has_method(s, "get_steal_mode", "bound get_steal_mode")
 	assert_eq(s.steal_mode, BulletSoundData2D.STEAL_OLDEST, "oldest by default")
-	s.set_steal_mode(2)
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	s.set_steal_mode(2 as BulletSoundData2D.StealMode)
 	expect_error_sequence(["BulletSoundData2D: steal_mode must be 0 (Oldest) or 1 (Quietest), keeping the old value."])
 	assert_eq(s.steal_mode, BulletSoundData2D.STEAL_OLDEST, "kept")
 
@@ -464,6 +465,7 @@ func _offer_temps(n: int) -> void:
 func test_dead_resource_channels_pruned() -> void:
 	godot_listener_at(Vector2.ZERO)
 	var base: int = int(factory.debug_get_sound_stats()["channels"])
+	@warning_ignore("missing_await")
 	_offer_temps(3)
 	assert_eq(int(factory.debug_get_sound_stats()["channels"]), base + 3, "one channel per resource")
 	await physics(4)

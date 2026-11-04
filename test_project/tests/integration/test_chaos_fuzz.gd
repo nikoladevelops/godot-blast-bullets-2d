@@ -137,7 +137,7 @@ func _data(n: int) -> BulletVolleyData2D:
 	d.bullet_max_collision_count = rng.randi_range(0, 3)
 	if rng.randf() < 0.4:
 		d.set_bounce_mask_from_array([4])
-		d.bounce_mode = rng.randi() % 2
+		d.bounce_mode = ((rng.randi() % 2) as BulletVolleyData2D.BounceMode)
 		d.bounce_rotate_texture = rng.randf() < 0.7
 		d.bounce_rotation_smooth = [0.0, 0.0, 0.2][rng.randi() % 3]
 	if rng.randf() < 0.15:
@@ -145,7 +145,7 @@ func _data(n: int) -> BulletVolleyData2D:
 		var curves := BulletCurvesData2D.new()
 		curves.x_direction_curve = H.make_flat_curve(rng.randf_range(-1.0, 1.0))
 		curves.x_direction_use_unit_curve = false
-		curves.x_direction_curve_mode = rng.randi() % 2
+		curves.x_direction_curve_mode = ((rng.randi() % 2) as BulletCurvesData2D.DirectionCurveMode)
 		d.shared_bullet_curves_data = curves
 		d.bounce_max_count = rng.randi_range(0, 4)
 	if rng.randf() < 0.3:
@@ -209,8 +209,8 @@ func _build_lasers() -> void:
 		var effects: Array = []
 		for k in rng.randi_range(0, 2):
 			var e := LaserEffectData2D.new()
-			e.trigger = rng.randi_range(LaserEffectData2D.LASER_EFFECT_ON_CHARGE, LaserEffectData2D.LASER_EFFECT_ON_DESPAWN)
-			e.at = rng.randi() % 3
+			e.trigger = (rng.randi_range(LaserEffectData2D.LASER_EFFECT_ON_CHARGE, LaserEffectData2D.LASER_EFFECT_ON_DESPAWN) as LaserEffectData2D.LaserEffectTrigger)
+			e.at = ((rng.randi() % 3) as LaserEffectData2D.EffectPoint)
 			e.effect = H.make_effect_layer(EffectLayerData2D.EFFECT_ON_HIT, rng.randi_range(1, 3))
 			effects.append(e)
 		d.effects = effects
@@ -340,7 +340,7 @@ func _add_spawner() -> void:
 	var data: BulletVolleyData2D = datas[rng.randi() % datas.size()] if rng.randf() < 0.7 else _data(n)
 	var sp := make_spawner(data, sources[rng.randi() % sources.size()], n)
 	sp.position = Vector2(rng.randf_range(-300, 300), rng.randf_range(-300, 300))
-	sp.orphaned_volleys = rng.randi() % 4
+	sp.orphaned_volleys = ((rng.randi() % 4) as BulletSpawner2D.OrphanedVolleys)
 	if rng.randf() < 0.5:
 		sp.homing_enabled = true
 		sp.homing_target_source = BulletSpawner2D.HOMING_SOURCE_NODE_GROUP
@@ -374,7 +374,7 @@ func _add_spawner() -> void:
 		_randomize(sp)
 	if rng.randf() < 0.15:
 		sp.spawn_position_offset = Vector2(rng.randf_range(-20, 20), rng.randf_range(-20, 20))
-		sp.spawn_position_offset_space = rng.randi() % 2
+		sp.spawn_position_offset_space = ((rng.randi() % 2) as PatternSpawner2D.SpawnOffsetSpace)
 	if rng.randf() < 0.3:
 		sp.shoot_interval_sec = rng.randf_range(0.03, 0.3)
 		sp.shooting_enabled = true
@@ -385,7 +385,7 @@ func _add_spawner() -> void:
 
 ## The Randomization group, seeded or not.
 func _randomize(sp: BulletSpawner2D) -> void:
-	sp.bullet_scale_mode = rng.randi() % 3
+	sp.bullet_scale_mode = ((rng.randi() % 3) as PatternSpawner2D.BulletScaleMode)
 	sp.bullet_scale_min = rng.randf_range(0.3, 1.0)
 	sp.bullet_scale_max = rng.randf_range(1.0, 2.5)
 	sp.bullet_rotation_min_degrees = rng.randf_range(-45.0, 0.0)
@@ -538,7 +538,7 @@ func _add_laser_spawner() -> void:
 	ls.pattern_source = LaserSpawner2D.PATTERN_FROM_HELPER_RING
 	ls.helper_bullets_amount = rng.randi_range(1, 6)
 	ls.position = Vector2(rng.randf_range(-300, 300), rng.randf_range(-300, 300))
-	ls.orphaned_lasers = rng.randi() % 4
+	ls.orphaned_lasers = ((rng.randi() % 4) as LaserSpawner2D.OrphanedLasers)
 	ls.inherit_movement_velocity = rng.randf() < 0.5
 	match rng.randi() % 3:
 		0:
@@ -608,7 +608,7 @@ func _laser_handler(l: Object) -> void:
 		19:
 			var d: LaserData2D = laser.get_laser_data()
 			if not d.effects.is_empty():
-				(d.effects[0] as LaserEffectData2D).trigger = rng.randi_range(LaserEffectData2D.LASER_EFFECT_ON_CHARGE, LaserEffectData2D.LASER_EFFECT_ON_DESPAWN)
+				(d.effects[0] as LaserEffectData2D).trigger = (rng.randi_range(LaserEffectData2D.LASER_EFFECT_ON_CHARGE, LaserEffectData2D.LASER_EFFECT_ON_DESPAWN) as LaserEffectData2D.LaserEffectTrigger)
 		0:
 			laser.end_laser(rng.randf() < 0.5)
 		1:
@@ -619,7 +619,8 @@ func _laser_handler(l: Object) -> void:
 			var beams: Array[Transform2D] = [Transform2D(rng.randf() * TAU, Vector2(rng.randf_range(-200, 200), rng.randf_range(-200, 200)))]
 			factory.spawn_laser(laser_datas[rng.randi() % laser_datas.size()], beams)
 		4:
-			laser.set_beam_angle(0, rng.randf() * TAU) if laser.get_beam_count() > 0 else null
+			if laser.get_beam_count() > 0:
+				laser.set_beam_angle(0, rng.randf() * TAU)
 		5:
 			factory.spawn_volley(datas[rng.randi() % datas.size()])
 		6:
@@ -631,14 +632,14 @@ func _laser_handler(l: Object) -> void:
 		9:
 			laser.set_custom_data({"hits": rng.randi()})
 		10:
-			var owner = laser.get_owner_spawner()
-			if owner != null:
-				owner.teleport(Vector2(rng.randf_range(-300, 300), rng.randf_range(-300, 300)), rng.randf() < 0.5)
+			var owner_node = laser.get_owner_spawner()
+			if owner_node != null:
+				owner_node.teleport(Vector2(rng.randf_range(-300, 300), rng.randf_range(-300, 300)), rng.randf() < 0.5)
 		11:
-			var owner = laser.get_owner_spawner()
-			if owner is LaserSpawner2D:
-				owner.graze_enabled = rng.randf() < 0.5
-				owner.apply_to_live_lasers()
+			var owner_node = laser.get_owner_spawner()
+			if owner_node is LaserSpawner2D:
+				owner_node.graze_enabled = rng.randf() < 0.5
+				owner_node.apply_to_live_lasers()
 		12:
 			if rng.randf() < 0.5:
 				factory.populate_lasers_pool_deferred(rng.randi_range(1, 6), 2)
@@ -697,7 +698,7 @@ func _operate() -> void:
 			var sp = _live_spawner()
 			if sp != null:
 				stats["reparents"] += 1
-				var to: Node = other_parent if sp.get_parent() != other_parent else self
+				var to: Node = (other_parent as Node) if sp.get_parent() != other_parent else (self as Node)
 				sp.get_parent().remove_child(sp)
 				to.add_child(sp)
 		9:
@@ -991,7 +992,7 @@ func _operate() -> void:
 					laser_spawners = laser_spawners.filter(func(s): return is_instance_valid(s) and not s.is_queued_for_deletion())
 					if not laser_spawners.is_empty():
 						var ls: LaserSpawner2D = laser_spawners[rng.randi() % laser_spawners.size()]
-						ls.orphaned_lasers = rng.randi() % 4
+						ls.orphaned_lasers = ((rng.randi() % 4) as LaserSpawner2D.OrphanedLasers)
 						ls.free()
 		44:
 			# Emitter bullets: a spawner (or a flying factory volley) fires the
@@ -1000,7 +1001,7 @@ func _operate() -> void:
 			var timing := BulletEmitterData2D.new()
 			timing.interval_sec = rng.randf_range(0.15, 0.6)
 			timing.max_shots = rng.randi_range(1, 3)
-			timing.aim = rng.randi() % 3
+			timing.aim = ((rng.randi() % 3) as BulletEmitterData2D.EmitterAim)
 			timing.spin_per_shot_degrees = rng.randf_range(-40, 40)
 			laser_spawners = laser_spawners.filter(func(s): return is_instance_valid(s) and not s.is_queued_for_deletion())
 			var tpl: Node = emitter_template if laser_spawners.is_empty() or rng.randf() < 0.6 else laser_spawners[rng.randi() % laser_spawners.size()]
@@ -1033,10 +1034,10 @@ func _operate() -> void:
 			var stale := lasers_seen.filter(func(x): return x.is_pooled())
 			if not stale.is_empty():
 				var l: LaserVolley2D = stale[rng.randi() % stale.size()]
-				var call: Array = [["end_laser", [true]], ["set_custom_data", [1]], ["set_targets", [[Vector2.ZERO]]], ["set_beam_angle", [0, 1.0]], ["graze_clear", []], ["set_anchor", [null]]][rng.randi() % 6]
-				l.callv(call[0], call[1])
+				var call_data: Array = [["end_laser", [true]], ["set_custom_data", [1]], ["set_targets", [[Vector2.ZERO]]], ["set_beam_angle", [0, 1.0]], ["graze_clear", []], ["set_anchor", [null]]][rng.randi() % 6]
+				l.callv(call_data[0], call_data[1])
 				for err in get_errors():
-					if not err.handled and err.contains_text("%s: this laser finished (it waits in the pool), so this handle is stale." % call[0]):
+					if not err.handled and err.contains_text("%s: this laser finished (it waits in the pool), so this handle is stale." % call_data[0]):
 						err.handled = true
 						break
 			if rng.randf() < 0.3:
@@ -1073,13 +1074,13 @@ func _check(where: String) -> Array:
 	if not books["ok"]:
 		problems.append("%s: books: %s" % [where, books["error"]])
 	volleys = volleys.filter(func(v): return is_instance_valid(v))
-	var live_bullets := 0
+	var _live_bullets := 0
 	for v in volleys:
 		if v.debug_get_life_state() != "active":
 			continue
 		for i in v.get_amount_bullets():
 			if v.is_bullet_status_enabled(i):
-				live_bullets += 1
+				_live_bullets += 1
 				if not v.get_bullet_transform(i).is_finite() or not v.get_bullet_velocity(i).is_finite():
 					problems.append("%s: volley %d bullet %d is not finite" % [where, v.get_instance_id(), i])
 					return problems

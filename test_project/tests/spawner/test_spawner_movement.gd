@@ -25,8 +25,8 @@ func _line_path(a: Vector2, b: Vector2) -> Path2D:
 
 func _mover(p: Path2D, configure: Callable = func(_s): pass) -> BulletSpawner2D:
 	var sp := make_spawner(H.make_volley_data(4, 200.0, 2.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 8)
-	sp.movement_transition = 0 # linear unless a test says otherwise
-	sp.movement_ease = 0
+	sp.movement_transition = Tween.TRANS_LINEAR # linear unless a test says otherwise
+	sp.movement_ease = Tween.EASE_IN
 	sp.movement_duration_sec = 1.0
 	sp.set_movement_path_node(p)
 	configure.call(sp)
@@ -118,8 +118,8 @@ func test_reverse_direction_starts_at_end() -> void:
 func test_relative_to_start_replays_the_shape() -> void:
 	var sp := make_spawner()
 	sp.global_position = Vector2(1000, 500)
-	sp.movement_transition = 0
-	sp.movement_ease = 0
+	sp.movement_transition = Tween.TRANS_LINEAR
+	sp.movement_ease = Tween.EASE_IN
 	sp.movement_duration_sec = 1.0
 	sp.movement_space = BulletSpawner2D.MOVEMENT_SPACE_RELATIVE_TO_START
 	sp.set_movement_path_node(path)
@@ -254,7 +254,7 @@ func test_a_path_assigned_right_after_entering_the_tree_never_warns() -> void:
 	sp.set_shooting_enabled(false)
 	sp.movement_enabled = true
 	sp.movement_duration_sec = 1.0
-	sp.movement_transition = 0
+	sp.movement_transition = Tween.TRANS_LINEAR
 	add(sp)
 	sp.movement_path = sp.get_path_to(path)
 	expect_warning_sequence([], "nothing travelled yet")
@@ -490,8 +490,8 @@ func test_switching_the_path_or_space_mid_play_is_not_travel(kind: String = use_
 ## _ready (a pooled enemy, a reparent) starts with autostart once it is back.
 func test_movement_enabled_while_detached_autostarts_on_reentry() -> void:
 	var sp := make_spawner(H.make_volley_data(4, 200.0, 2.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 8)
-	sp.movement_transition = 0
-	sp.movement_ease = 0
+	sp.movement_transition = Tween.TRANS_LINEAR
+	sp.movement_ease = Tween.EASE_IN
 	sp.movement_duration_sec = 1.0
 	sp.set_movement_path_node(path)
 	await idle(1)

@@ -38,10 +38,12 @@ func test_bind_and_defaults() -> void:
 func test_trigger_rejects_and_keeps() -> void:
 	var s := BulletSoundData2D.new()
 	s.trigger = BulletSoundData2D.SOUND_ON_GRAZE
-	s.set_trigger(-1)
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	s.set_trigger((-1) as BulletSoundData2D.SoundTrigger)
 	expect_error_sequence(["BulletSoundData2D: trigger must be 0 (On Shot), 1 (On Hit), 2 (On Destroy), 3 (On Bounce), 4 (On Lifetime Over), 5 (On Clear), 6 (On Homing Target Reached), 7 (On Graze), 8 (On Graze Exit), 9 (On Telegraph), 10 (On Flight), 11 (On Despawn) or 12 (On Split), keeping the old value."])
 	assert_eq(s.trigger, BulletSoundData2D.SOUND_ON_GRAZE, "old trigger kept")
-	s.set_trigger(13)
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	s.set_trigger(13 as BulletSoundData2D.SoundTrigger)
 	expect_error_sequence(["BulletSoundData2D: trigger must be 0 (On Shot), 1 (On Hit), 2 (On Destroy), 3 (On Bounce), 4 (On Lifetime Over), 5 (On Clear), 6 (On Homing Target Reached), 7 (On Graze), 8 (On Graze Exit), 9 (On Telegraph), 10 (On Flight), 11 (On Despawn) or 12 (On Split), keeping the old value."])
 	assert_eq(s.trigger, BulletSoundData2D.SOUND_ON_GRAZE, "old trigger kept")
 	s.set_trigger(BulletSoundData2D.SOUND_ON_FLIGHT)
@@ -107,7 +109,8 @@ func test_int_and_bus_setters_reject_and_keep() -> void:
 	assert_eq(s.max_voices, 4, "max_voices kept")
 	s.set_max_voices(33)
 	expect_error_sequence(["BulletSoundData2D: max_voices must be between 1 and 32, keeping the old value."])
-	s.set_when_limit_reached(2)
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	s.set_when_limit_reached(2 as BulletSoundData2D.SoundLimitMode)
 	expect_error_sequence(["BulletSoundData2D: when_limit_reached must be 0 (Replace Oldest) or 1 (Skip New), keeping the old value."])
 	assert_eq(s.when_limit_reached, BulletSoundData2D.SOUND_LIMIT_REPLACE_OLDEST, "limit mode kept")
 	s.set_priority(17)
@@ -121,16 +124,16 @@ func test_int_and_bus_setters_reject_and_keep() -> void:
 
 func test_changed_emission_discipline() -> void:
 	var s := BulletSoundData2D.new()
-	var log: Array = []
-	s.changed.connect(func() -> void: log.append(1))
+	var change_log: Array = []
+	s.changed.connect(func() -> void: change_log.append(1))
 	s.set_volume_db(0.0) # same value: silent
 	s.set_enabled(true) # same value: silent
 	s.set_bus(&"Master") # same value: silent
-	assert_eq(log.size(), 0, "same-value sets emit nothing")
+	assert_eq(change_log.size(), 0, "same-value sets emit nothing")
 	s.set_volume_db(-3.0)
 	s.set_enabled(false)
 	s.set_bus(&"Effects")
-	assert_eq(log.size(), 3, "accepted changes emit changed")
+	assert_eq(change_log.size(), 3, "accepted changes emit changed")
 
 
 func test_hint_strings_byte_exact() -> void:
@@ -262,14 +265,14 @@ func test_new_random_and_limit_setters_reject_and_keep() -> void:
 	expect_error_sequence(["BulletSoundData2D: pitch_max must be finite and between 0.01 and 1000, keeping the old value."])
 	assert_eq(s.get("pitch_max"), 16.0, "kept")
 	# Accepted values apply and emit changed (same-value sets stay silent).
-	var log: Array = []
-	s.changed.connect(func() -> void: log.append(1))
+	var change_log: Array = []
+	s.changed.connect(func() -> void: change_log.append(1))
 	s.set("random_volume_min_db", -3.0)
 	s.set("random_volume_max_db", 2.0)
 	s.set("volume_max_db", 6.0)
-	assert_eq(log.size(), 3, "accepted changes emit changed")
+	assert_eq(change_log.size(), 3, "accepted changes emit changed")
 	s.set("volume_max_db", 6.0)
-	assert_eq(log.size(), 3, "same-value set emits nothing")
+	assert_eq(change_log.size(), 3, "same-value set emits nothing")
 
 
 func test_pitch_ceiling_keeps_absurd_values_away_from_the_audio_engine() -> void:

@@ -14,10 +14,10 @@ const DT := 0.0625
 const GROUP := &"code_api_targets"
 
 
-func _target(pos: Vector2, group := GROUP, name := "") -> Node2D:
+func _target(pos: Vector2, group := GROUP, node_name := "") -> Node2D:
 	var n := make_graze_target(pos, group)
-	if name != "":
-		n.name = name
+	if node_name != "":
+		n.name = node_name
 	return n
 
 
@@ -90,22 +90,22 @@ func test_a_factory_volley_grazes_the_handles_targets_and_follows_its_edits() ->
 	_target(Vector2(100, -10)) # same group, not named by the handle
 	await idle(1)
 	var v := graze_volley([Transform2D(0.0, Vector2(0, 0))], 1600.0) # 100 px per tick along +x
-	var log := H.record_graze(factory)
+	var graze_log := H.record_graze(factory)
 	var targets := BulletTargets2D.from_node(only)
 	assert_true(v.graze_set_zones([H.make_graze_zone([15.0])], targets), "armed with the handle")
 	targets = null # the volley keeps the detector
 	step_factory(2, DT)
-	assert_eq(log.filter(func(e): return e[0] == "enter").map(func(e): return e[1]), [only], "only the handle's node grazed")
-	log.clear()
+	assert_eq(graze_log.filter(func(e): return e[0] == "enter").map(func(e): return e[1]), [only], "only the handle's node grazed")
+	graze_log.clear()
 	var points := BulletTargets2D.from_positions(PackedVector2Array([Vector2(1000, 1000)]))
 	var w := graze_volley([Transform2D(0.0, Vector2(0, 200))], 1600.0)
 	assert_true(w.graze_set_zones([H.make_graze_zone([15.0])], points), "armed with points")
 	step_factory(1, DT)
-	assert_eq(log, [], "nothing near the point")
+	assert_eq(graze_log, [], "nothing near the point")
 	points.positions = PackedVector2Array([Vector2(w.get_bullet_transform(0).origin.x + 100.0, 205.0)])
 	step_factory(1, DT)
-	assert_eq(log.size(), 1, "the moved point is grazed by the bullet in flight")
-	assert_null(log[0][1], "a point target has a null target in the signal")
+	assert_eq(graze_log.size(), 1, "the moved point is grazed by the bullet in flight")
+	assert_null(graze_log[0][1], "a point target has a null target in the signal")
 
 
 func test_a_volley_and_a_laser_hear_through_the_handles_listeners() -> void:
@@ -299,7 +299,8 @@ func test_homing_follow_refuses_bad_input_and_leaves_with_the_life() -> void:
 	assert_false(v.homing_follow(factory), "not a handle")
 	assert_false(v.homing_follow(BulletTargets2D.from_mouse(), NAN), "bad interval")
 	assert_false(v.homing_follow(BulletTargets2D.from_mouse(), -1.0), "negative interval")
-	assert_false(v.homing_follow(BulletTargets2D.from_mouse(), 0.0, 7), "bad mode")
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	assert_false(v.homing_follow(BulletTargets2D.from_mouse(), 0.0, (7 as BulletVolley2D.HomingFollowMode)), "bad mode")
 	expect_error_sequence([
 		"homing_follow: targets must be a BulletTargets2D or null, nothing changed.",
 		"homing_follow: retarget_interval must be finite and >= 0 (0 picks every tick), nothing changed.",
@@ -326,7 +327,7 @@ func test_a_spawner_volley_may_follow_and_its_spawner_leaves_it_alone() -> void:
 	sp.homing_enabled = true
 	sp.homing_node_group = GROUP
 	var fired: Array = []
-	sp.volley_fired.connect(func(v: BulletVolley2D, _n: int) -> void: fired.append(v))
+	sp.volley_fired.connect(func(fired_volley: BulletVolley2D, _n: int) -> void: fired.append(fired_volley))
 	assert_true(sp.shoot_once(), "fires")
 	var v: BulletVolley2D = fired[0]
 	assert_eq(v.shared_homing_deque_get_current_homing_target(), t, "the spawner's target")

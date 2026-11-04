@@ -63,11 +63,11 @@ func test_the_splitting_group_sits_after_flocking_and_gates_its_chain() -> void:
 	var group := ""
 	var found := {}
 	for p in sp.get_property_list():
-		var name := str(p["name"])
+		var node_name := str(p["name"])
 		if int(p["usage"]) & PROPERTY_USAGE_GROUP:
-			group = name
-		elif name in ["split_enabled", "split_data"]:
-			found[name] = [group, str(p["hint_string"])]
+			group = node_name
+		elif node_name in ["split_enabled", "split_data"]:
+			found[node_name] = [group, str(p["hint_string"])]
 	assert_eq(found.get("split_enabled", [""])[0], "Splitting", "split_enabled in Splitting")
 	assert_eq(found.get("split_data", ["", ""]), ["Splitting", "BulletSplitData2D"], "split_data takes a BulletSplitData2D")
 	assert_false(is_editor_visible(sp, &"split_data"), "hidden while off")
@@ -307,7 +307,7 @@ func _orphan_case(policy: int, timing: String) -> Array:
 	factory.debug_set_effect_log_enabled(true)
 	var sp := _split_spawner(_orphan_chain(), 2, DT * 0.5 if timing != "before_capture" else 30.0)
 	sp.spawn_data.effect_layers = [H.make_effect_layer(EffectLayerData2D.EFFECT_ON_SPLIT)]
-	sp.orphaned_volleys = policy
+	sp.orphaned_volleys = (policy as BulletSpawner2D.OrphanedVolleys)
 	if timing == "carry_over":
 		factory.split_max_children_per_sweep = 2 # one parent's children per sweep
 	var trap_split: BulletVolley2D = null
@@ -433,12 +433,12 @@ func test_pre_shoot_sees_the_arming_and_its_own_arming_sticks() -> void:
 	var mine_flock := H.make_flock(2.0)
 	var mine_sound := H.make_sound(BulletSoundData2D.SOUND_ON_CLEAR)
 	var seen: Array = []
-	sp.pre_shoot.connect(func(v: BulletVolley2D, _n: int) -> void:
-		seen.append([v.split_get_data() == sp.split_data, v.flock_get() == sp.flock, int(v.debug_get_graze_info()["zone_slots"]), v.sound_get_effects().size()])
-		v.split_set_data(mine_chain, H.make_volley_data(1, 0.0, 5.0))
-		v.flock_join(mine_flock)
-		v.graze_set_zones([H.make_graze_zone([10.0]), H.make_graze_zone([30.0])], &"mine")
-		v.sound_set_effects([mine_sound]))
+	sp.pre_shoot.connect(func(volley: BulletVolley2D, _n: int) -> void:
+		seen.append([volley.split_get_data() == sp.split_data, volley.flock_get() == sp.flock, int(volley.debug_get_graze_info()["zone_slots"]), volley.sound_get_effects().size()])
+		volley.split_set_data(mine_chain, H.make_volley_data(1, 0.0, 5.0))
+		volley.flock_join(mine_flock)
+		volley.graze_set_zones([H.make_graze_zone([10.0]), H.make_graze_zone([30.0])], &"mine")
+		volley.sound_set_effects([mine_sound]))
 	var v := _fire(sp)
 	expect_no_errors()
 	assert_eq(seen, [[true, true, 1, 1]], "pre_shoot sees every feature armed")

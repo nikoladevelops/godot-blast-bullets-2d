@@ -10,8 +10,8 @@ const MARKER := Transform2D.IDENTITY
 
 func _finite_volley(v: Array) -> bool:
 	for t in v:
-		var tr: Transform2D = t
-		if not tr.is_finite():
+		var transform_value: Transform2D = t
+		if not transform_value.is_finite():
 			return false
 	return true
 
@@ -258,7 +258,7 @@ func test_nan() -> void:
 	assert_true(vm.is_empty(), "NAN marker rejected")
 	expect_error_sequence(["helper_generate_transforms_ring: marker_transform contains NaN/Inf"])
 	# NAN direction is rejected by the strict generators (line/rain).
-	var dl: Array = BulletPatterns2D.helper_generate_transforms_line(8, MARKER, Vector2(NAN, 0), 32.0, true, 1, false)
+	var dl: Array = BulletPatterns2D.helper_generate_transforms_line(8, MARKER, Vector2(NAN, 0), 32.0, true, BulletPatterns2D.LINE_ANCHOR_CENTER, false)
 	assert_true(dl.is_empty(), "line NAN direction rejected")
 	expect_error_sequence(["helper_generate_transforms_line: direction and spacing must be finite"])
 func test_twist_extreme() -> void:
@@ -431,7 +431,7 @@ func test_semantics() -> void:
 			muzzles = false
 	assert_true(muzzles, "aimed muzzles stack at marker")
 	# Spiral radii grow linearly, angles step evenly (marker rotation off).
-	var spi: Array = BulletPatterns2D.helper_generate_transforms_spiral(4, m, 50.0, 15.0, 0.6, false, 0, 0.0)
+	var spi: Array = BulletPatterns2D.helper_generate_transforms_spiral(4, m, 50.0, 15.0, 0.6, false, BulletPatterns2D.SPIRAL_FACING_TANGENT, 0.0)
 	var ok_s := spi.size() == 4
 	for i in 4:
 		var p: Vector2 = (spi[i] as Transform2D).origin
@@ -439,7 +439,7 @@ func test_semantics() -> void:
 			ok_s = false
 	assert_true(ok_s, "spiral radii/angles exact")
 	# Multispiral deals arms round-robin; counter-spiral mirrors alternates.
-	var msp: Array = BulletPatterns2D.helper_generate_transforms_multispiral(4, m, 2, 50.0, 15.0, 0.6, false, 0, 0.0, 1)
+	var msp: Array = BulletPatterns2D.helper_generate_transforms_multispiral(4, m, 2, 50.0, 15.0, 0.6, false, BulletPatterns2D.SPIRAL_FACING_TANGENT, 0.0, 1)
 	var rr: Array = []
 	for t in msp:
 		rr.append((t as Transform2D).origin.length())
@@ -450,7 +450,7 @@ func test_semantics() -> void:
 		if not _approx(rr[i], want_m[i], 0.01):
 			ok_m = false
 	assert_true(ok_m, "multispiral deals arms")
-	var csp: Array = BulletPatterns2D.helper_generate_transforms_counter_spiral(4, m, 2, 50.0, 15.0, 0.6, false, 0, 0.0, 1, true)
+	var csp: Array = BulletPatterns2D.helper_generate_transforms_counter_spiral(4, m, 2, 50.0, 15.0, 0.6, false, BulletPatterns2D.SPIRAL_FACING_TANGENT, 0.0, 1, true)
 	var want_a := [0.0, PI, 0.6, PI - 0.6]
 	var ok_c := csp.size() == 4
 	for i in 4:
@@ -479,14 +479,14 @@ func test_semantics() -> void:
 			ok_w2 = false
 	assert_true(ok_w2, "wave sweep exact")
 	# Grid centers full layouts and ragged tails on their own rows.
-	var gr: Array = BulletPatterns2D.helper_generate_transforms_grid(6, m, 3, 4, 100.0, 100.0, true, false, 0.0, 0)
+	var gr: Array = BulletPatterns2D.helper_generate_transforms_grid(6, m, 3, BulletPatterns2D.CENTER, 100.0, 100.0, true, false, 0.0, 0)
 	var want_g := [Vector2(-50, -100), Vector2(-50, 0), Vector2(-50, 100), Vector2(50, -100), Vector2(50, 0), Vector2(50, 100)]
 	var ok_g := gr.size() == 6
 	for i in 6:
 		if ((gr[i] as Transform2D).origin.distance_to(want_g[i]) > 0.01):
 			ok_g = false
 	assert_true(ok_g, "grid centers full layout")
-	var gr5: Array = BulletPatterns2D.helper_generate_transforms_grid(5, m, 3, 4, 100.0, 100.0, true, false, 0.0, 0)
+	var gr5: Array = BulletPatterns2D.helper_generate_transforms_grid(5, m, 3, BulletPatterns2D.CENTER, 100.0, 100.0, true, false, 0.0, 0)
 	var want_g5 := [Vector2(-50, -100), Vector2(-50, 0), Vector2(-50, 100), Vector2(50, -50), Vector2(50, 50)]
 	var ok_g5 := gr5.size() == 5
 	for i in 5:
@@ -523,8 +523,8 @@ func test_semantics() -> void:
 			ok_la = false
 	assert_true(ok_la, "lattice honeycomb exact")
 	# Seeded scatter reproduces identically; cross rays split evenly.
-	var s1: Array = BulletPatterns2D.helper_generate_transforms_scatter(8, m, 120.0, 0.4, 7, 0.0, Vector2(1, 0), TAU, 0)
-	var s2: Array = BulletPatterns2D.helper_generate_transforms_scatter(8, m, 120.0, 0.4, 7, 0.0, Vector2(1, 0), TAU, 0)
+	var s1: Array = BulletPatterns2D.helper_generate_transforms_scatter(8, m, 120.0, 0.4, 7, 0.0, Vector2(1, 0), TAU, BulletPatterns2D.SCATTER_FACING_OUTWARD)
+	var s2: Array = BulletPatterns2D.helper_generate_transforms_scatter(8, m, 120.0, 0.4, 7, 0.0, Vector2(1, 0), TAU, BulletPatterns2D.SCATTER_FACING_OUTWARD)
 	var same := s1.size() == 8 and s2.size() == 8
 	for i in 8:
 		if ((s1[i] as Transform2D).origin.distance_to((s2[i] as Transform2D).origin) > 0.0001):

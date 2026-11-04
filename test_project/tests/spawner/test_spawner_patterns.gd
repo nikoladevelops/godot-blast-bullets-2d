@@ -18,7 +18,7 @@ func before_each() -> void:
 
 
 func test_all_sources_collect(src: int = use_parameters(range(BulletSpawner2D.PATTERN_FROM_LAST))) -> void:
-	sp.pattern_source = src
+	sp.pattern_source = (src as BulletSpawner2D.PatternSource)
 	var tf: Array = sp.collect_spawn_transforms()
 	if src in EMPTY_WITHOUT_INPUT:
 		assert_true(tf.is_empty(), "source %d without input is empty" % src)
@@ -37,7 +37,8 @@ func test_all_sources_collect(src: int = use_parameters(range(BulletSpawner2D.PA
 
 func test_invalid_source_and_amount_cap() -> void:
 	var src0: int = sp.get_pattern_source()
-	sp.pattern_source = 99
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	sp.pattern_source = (99 as BulletSpawner2D.PatternSource)
 	expect_error_sequence(["invalid pattern_source, keeping the old value"])
 	assert_eq(sp.get_pattern_source(), src0, "source 99 rejected")
 	sp.helper_bullets_amount = 20000

@@ -32,7 +32,7 @@ func setup() -> void:
 	d.set("pierce_frames", sf)
 	factory.laser_hit.connect(_on_hit)
 	for k in 8:
-		var center := Vector2(300 + 440 * (k % 4), 300 + 480 * (k / 4))
+		var center := Vector2(300 + 440 * (k % 4), 300 + 480 * int(k / 4.0))
 		var beams: Array[Transform2D] = []
 		for b in 32:
 			beams.append(Transform2D(TAU * b / 32.0, center))
@@ -41,5 +41,5 @@ func setup() -> void:
 func _on_hit(_t: Node, _l: LaserVolley2D, _b: int, _p: Vector2) -> void:
 	_hits += 1
 
-func step(frame: int) -> void:
+func step(_frame: int) -> void:
 	extra["hits"] = _hits

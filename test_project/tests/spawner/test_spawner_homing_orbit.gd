@@ -78,7 +78,7 @@ func test_orbit_and_retarget() -> void:
 ## still stops when its group empties out.
 func test_turning_orbiting_off_with_an_empty_pool_stops_live_rings() -> void:
 	var fired: Array = []
-	sp.volley_fired.connect(func(v: BulletVolley2D, _n: int) -> void: fired.append(v))
+	sp.volley_fired.connect(func(fired_volley: BulletVolley2D, _n: int) -> void: fired.append(fired_volley))
 	assert_true(sp.shoot_once(), "shot fires while the group resolves")
 	await idle(1)
 	assert_eq(fired.size(), 1, "one volley")
@@ -101,7 +101,7 @@ func test_an_empty_pool_stops_live_rings_in_every_selection(selection: int = use
 	if selection == BulletSpawner2D.HOMING_SELECT_DISTRIBUTE:
 		sp.set_homing_mode(BulletSpawner2D.HOMING_PER_BULLET)
 	var fired: Array = []
-	sp.volley_fired.connect(func(v: BulletVolley2D, _n: int) -> void: fired.append(v))
+	sp.volley_fired.connect(func(fired_volley: BulletVolley2D, _n: int) -> void: fired.append(fired_volley))
 	assert_true(sp.shoot_once(), "shot fires while the group resolves")
 	await idle(1)
 	var v: BulletVolley2D = fired[0]
@@ -167,7 +167,7 @@ func _orbiter(policy: int, n := 4) -> Array:
 	s.homing_retarget_interval_sec = 1000.0 # retargets only when the test asks
 	s.set_homing_enabled(true)
 	s.orbiting_radius = 40.0
-	s.orbiting_lock_policy = policy
+	s.orbiting_lock_policy = policy as BulletVolley2D.OrbitingLockPolicy
 	s.orbiting_enabled = true
 	var got: Array = []
 	s.volley_fired.connect(func(v, _n) -> void: got.append(v), CONNECT_ONE_SHOT)
@@ -231,7 +231,7 @@ func test_the_live_bullet_budget_counts_split_children_never_frozen_bullets_or_p
 	s.split_data = chain
 	s.split_enabled = true
 	var got: Array = []
-	s.volley_fired.connect(func(v, _n) -> void: got.append(v), CONNECT_ONE_SHOT)
+	s.volley_fired.connect(func(fired_volley, _n) -> void: got.append(fired_volley), CONNECT_ONE_SHOT)
 	assert_true(s.shoot_once(), "fires")
 	for f in 8:
 		await physics(1)

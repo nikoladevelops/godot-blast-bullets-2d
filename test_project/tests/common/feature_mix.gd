@@ -193,7 +193,7 @@ func _data() -> BulletVolleyData2D:
 	if has("bounce"):
 		mask.append(4)
 		d.set_bounce_mask_from_array([4])
-		d.bounce_mode = 1 # precise: flat walls
+		d.bounce_mode = BulletVolleyData2D.BOUNCE_PRECISE_SHAPE # precise: flat walls
 	d.set_collision_mask_from_array(mask)
 	return d
 
@@ -305,7 +305,7 @@ func _configure() -> void:
 		pickup.lifetime_sec = 4.0
 		_link(factory, "pickup_collected", func(_t, _p, _v, _i, _val) -> void: _stat("collected"))
 	if has("orphan"):
-		sp.orphaned_volleys = rng.randi_range(0, 3)
+		sp.orphaned_volleys = rng.randi_range(0, 3) as BulletSpawner2D.OrphanedVolleys
 	if has("interpolation"):
 		factory.physics_interpolation = BulletFactory2D.INTERPOLATION_ON
 	if has("animation"):
@@ -318,12 +318,12 @@ func _configure() -> void:
 	if has("attachments"):
 		d.shared_bullet_attachment = t.make_probe_scene()
 	if has("random_scale"):
-		sp.bullet_scale_mode = 1 # Uniform
+		sp.bullet_scale_mode = BulletSpawner2D.BULLET_SCALE_UNIFORM
 		sp.bullet_scale_min = 0.6
 		sp.bullet_scale_max = 1.6
 		sp.bullet_random_seed = seed_value + 11
 	if has("colors"):
-		sp.bullet_color_mode = rng.randi_range(1, 3)
+		sp.bullet_color_mode = rng.randi_range(1, 3) as BulletSpawner2D.BulletColorMode
 		var g := Gradient.new()
 		g.colors = PackedColorArray([Color(1.0, 0.2, 0.2), Color(0.2, 0.4, 1.0)])
 		sp.bullet_color_gradient = g if rng.randf() < 0.5 else null # null: the rainbow
@@ -500,8 +500,8 @@ func _act(frame: int) -> void:
 				21:
 					var i := mini(1, n - 1)
 					if v.is_bullet_status_enabled(i):
-						var tr: Transform2D = v.get_bullet_transform(i)
-						v.set_bullet_transform(i, Transform2D(tr.get_rotation(), tr.get_scale(), 0.0, tr.origin + Vector2(4, 4)), false)
+						var transform_value: Transform2D = v.get_bullet_transform(i)
+						v.set_bullet_transform(i, Transform2D(transform_value.get_rotation(), transform_value.get_scale(), 0.0, transform_value.origin + Vector2(4, 4)), false)
 						moved.append([v, i])
 		if frame == 27:
 			factory.teleport_shift_all_bullets(Vector2(3, 0))
@@ -725,8 +725,8 @@ func _sample() -> void:
 			var speed: float = v.get_bullet_velocity(i).length()
 			_samples["speed_max"] = maxf(float(_samples.get("speed_max", 0.0)), speed)
 			_samples["speed_min"] = minf(float(_samples.get("speed_min", INF)), speed)
-			var tr: Transform2D = v.get_bullet_transform(i)
-			var sc := tr.get_scale().x
+			var transform_value: Transform2D = v.get_bullet_transform(i)
+			var sc := transform_value.get_scale().x
 			_samples["scale_max"] = maxf(float(_samples.get("scale_max", 0.0)), sc)
 			_samples["scale_min"] = minf(float(_samples.get("scale_min", INF)), sc)
 			if has("scale_in") and sc < 0.5:
@@ -734,11 +734,11 @@ func _sample() -> void:
 			var dir: Vector2 = v.get_bullet_direction(i)
 			var okey := "%d:%d:%d" % [v.get_instance_id(), v.get_life_id(), i]
 			if _last_origin.has(okey):
-				var step: Vector2 = tr.origin - _last_origin[okey]
+				var step: Vector2 = transform_value.origin - _last_origin[okey]
 				if step.length() > 0.5 and dir.length() > 0.5:
 					_samples["path_bend"] = maxf(float(_samples.get("path_bend", 0.0)), absf(angle_difference(step.angle(), dir.angle())))
-			_last_origin[okey] = tr.origin
-			_samples["facing_offset"] = maxf(float(_samples.get("facing_offset", 0.0)), absf(angle_difference(tr.x.angle(), dir.angle())))
+			_last_origin[okey] = transform_value.origin
+			_samples["facing_offset"] = maxf(float(_samples.get("facing_offset", 0.0)), absf(angle_difference(transform_value.x.angle(), dir.angle())))
 			_samples["drift"] = maxf(float(_samples.get("drift", 0.0)), v.get_inherited_velocity_offset().length())
 			if v.bullet_is_orbiting_locked(i):
 				_stat("orbit_locked")

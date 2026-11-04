@@ -6,8 +6,8 @@ extends BulletAttachment2D
 
 var scale_calls: Array = []
 
-func on_time_scale_changed(scale: float) -> void:
-	scale_calls.append(scale)
+func on_time_scale_changed(scale_value: float) -> void:
+	scale_calls.append(scale_value)
 
 func gpu() -> GPUParticles2D:
 	return get_node("Gpu") as GPUParticles2D

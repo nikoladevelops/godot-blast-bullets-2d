@@ -234,7 +234,7 @@ func test_rotation_and_position_of_each_source_are_kept() -> void:
 func test_a_couple_of_thousand_bullets_are_converted_and_collected_exactly_once() -> void:
 	var pts: Array = []
 	for i in 2500:
-		pts.append(Vector2(float(i % 50) * 6.0, float(i / 50) * 6.0))
+		pts.append(Vector2(float(i % 50) * 6.0, float(int(i / 50.0)) * 6.0))
 	_bullets(pts)
 	var coin := _coin()
 	coin.scatter_speed_max = 200.0

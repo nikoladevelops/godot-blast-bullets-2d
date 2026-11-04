@@ -16,7 +16,7 @@ func _bounce_data() -> BulletVolleyData2D:
 	d.collision_shape = H.make_circle_shape(6.0)
 	d.bullet_max_collision_count = 0
 	d.set_bounce_mask_from_array([4])
-	d.bounce_mode = 1
+	d.bounce_mode = BulletVolleyData2D.BOUNCE_PRECISE_SHAPE
 	return d
 
 
@@ -129,7 +129,7 @@ func test_distance_phased_wobble_stays_bounded() -> void:
 	var wd := H.make_volley_data(1, 300.0, 30.0)
 	var wob := BulletWobbleData2D.new()
 	wob.enabled = true
-	wob.mode = 0
+	wob.mode = BulletWobbleData2D.WOBBLE_LATERAL
 	wob.amplitude = 40.0
 	wob.frequency_hz = 1.0
 	wob.distance_phased = true

@@ -367,7 +367,7 @@ func test_clear_active_bullets_with_a_key_announces_only_that_bucket() -> void:
 	_volley_at([Vector2(0, 0)])
 	_volley_at([Vector2(1, 0), Vector2(2, 0)])
 	factory.bullets_cleared.connect(_on_bullets_cleared)
-	var key: VolleyPoolKey2D = factory.debug_expected_pool_key(H.make_volley_data(2, 0.0, 60.0))
+	var key: VolleyPoolKey2D = BulletFactory2D.debug_expected_pool_key(H.make_volley_data(2, 0.0, 60.0))
 	assert_eq(factory.clear_active_bullets(key), 2, "only the two-bullet volley")
 	assert_eq(cleared_log.size(), 1, "one signal")
 	assert_eq(cleared_log[0]["positions"].size(), 2, "for that volley")

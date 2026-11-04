@@ -62,7 +62,7 @@ func _spawner(source: int) -> BulletSpawner2D:
 	sp.homing_enabled = true
 	sp.homing_retarget_mode = BulletSpawner2D.HOMING_RETARGET_OFF
 	sp.homing_smoothing = 0.0
-	sp.homing_target_source = source
+	sp.homing_target_source = (source as BulletSpawner2D.HomingTargetSource)
 	match source:
 		GROUP:
 			sp.homing_node_group = &"src"
@@ -177,14 +177,14 @@ func test_every_selection_mode_picks_the_same_for_every_multi_source() -> void:
 	for m in modes:
 		var picks := {}
 		for source in MULTI_SOURCES:
-			var sp := _spawner(source)
-			sp.homing_target_selection = m[0]
-			sp.homing_max_targets = m[1]
-			sp.homing_random_seed = 7
+			var multi_sp := _spawner(source)
+			multi_sp.homing_target_selection = m[0]
+			multi_sp.homing_max_targets = m[1]
+			multi_sp.homing_random_seed = 7
 			# Three consecutive resolves: round robin advances, random rolls on.
 			var rounds: Array = []
 			for r in 3:
-				rounds.append(sp.resolve_homing_targets(true, true))
+				rounds.append(multi_sp.resolve_homing_targets(true, true))
 			picks[source] = rounds
 		assert_eq(picks[NAME], picks[GROUP], "mode %d: Node Name picks what Node Group picks" % m[0])
 		assert_eq(picks[CHILDREN], picks[GROUP], "mode %d: Node Children picks what Node Group picks" % m[0])
@@ -296,10 +296,10 @@ func test_every_source_keeps_its_own_settings_across_switches() -> void:
 		GROUP: [group_target], PATH: [path_target], NAME: [child, group_target, path_target],
 		CHILDREN: [child], GLOBAL: [Vector2(7, 8)], MOUSE: [],
 	}
-	for round in 2:
+	for rep in 2:
 		for source in expected:
 			sp.homing_target_source = source
-			assert_eq(sp.resolve_homing_targets(true, false), expected[source], "round %d, source %d: only the active source decides" % [round, source])
+			assert_eq(sp.resolve_homing_targets(true, false), expected[source], "round %d, source %d: only the active source decides" % [rep, source])
 
 
 func test_every_homing_target_setting_survives_a_scene_round_trip() -> void:
@@ -451,10 +451,10 @@ func test_node_path_target_out_of_tree_or_dying_is_not_chased() -> void:
 	var sp := _tracking_spawner(BulletSpawner2D.HOMING_SOURCE_NODE_PATH)
 	var target := _node("T", Vector2(300, 0))
 	sp.set_homing_target_path(sp.get_path_to(target))
-	var parent := target.get_parent()
-	parent.remove_child(target)
+	var parent_node := target.get_parent()
+	parent_node.remove_child(target)
 	assert_eq(sp.resolve_homing_targets(true, false), [], "a node outside the tree is not a target")
-	parent.add_child(target)
+	parent_node.add_child(target)
 	assert_eq(sp.resolve_homing_targets(true, false), [target], "back in the tree")
 	target.queue_free()
 	assert_eq(sp.resolve_homing_targets(true, false), [], "a node queued for deletion is not a target")
@@ -557,13 +557,13 @@ func test_children_source_failures_and_walk() -> void:
 	sp.set_homing_children_parent_path(NodePath("Missing"))
 	assert_true(sp.shoot_once(), "missing parent: plain volley")
 	assert_eq(_warnings("homing_children_parent_path does not point at a live node"), 1, "explains why")
-	var parent := Node2D.new()
-	add(parent)
+	var parent_node := Node2D.new()
+	add(parent_node)
 	var holder := Node.new() # not a Node2D: never a target, but may hold some
-	parent.add_child(holder)
+	parent_node.add_child(holder)
 	var deep := Node2D.new()
 	holder.add_child(deep)
-	sp.set_homing_children_parent_path(sp.get_path_to(parent))
+	sp.set_homing_children_parent_path(sp.get_path_to(parent_node))
 	sp.set_homing_max_targets(10)
 	sp.set_homing_target_selection(BulletSpawner2D.HOMING_SELECT_FIRST)
 	sp.set_homing_children_recursive(false)
@@ -576,13 +576,13 @@ func test_children_source_failures_and_walk() -> void:
 
 func test_children_of_the_spawners_own_parent_exclude_the_spawner() -> void:
 	var sp := _tracking_spawner(BulletSpawner2D.HOMING_SOURCE_NODE_CHILDREN)
-	var parent := Node2D.new()
-	add(parent)
+	var parent_node := Node2D.new()
+	add(parent_node)
 	sp.get_parent().remove_child(sp)
-	parent.add_child(sp)
+	parent_node.add_child(sp)
 	var foe := Node2D.new()
-	parent.add_child(foe)
-	sp.set_homing_children_parent_path(sp.get_path_to(parent))
+	parent_node.add_child(foe)
+	sp.set_homing_children_parent_path(sp.get_path_to(parent_node))
 	sp.set_homing_max_targets(10)
 	sp.set_homing_target_selection(BulletSpawner2D.HOMING_SELECT_FIRST)
 	assert_eq(sp.resolve_homing_targets(true, false), [foe], "the spawner never chases itself")

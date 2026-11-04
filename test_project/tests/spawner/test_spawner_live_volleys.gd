@@ -107,7 +107,7 @@ func test_apply_homing_arms_volleys_fired_while_it_was_off() -> void:
 func test_apply_split_arms_volleys_fired_while_it_was_off() -> void:
 	var sp := _plain_spawner(1, 0.0)
 	sp.spawn_data.max_life_time = 0.1
-	var v := _shoot(sp)
+	var _v := _shoot(sp)
 	var stage := BulletSplitStage2D.new()
 	stage.count = 3
 	var chain := BulletSplitData2D.new()
@@ -324,7 +324,7 @@ func test_clear_live_volleys_homing_reaches_parked_volleys() -> void:
 func test_detaching_a_volley_hands_it_to_the_factory() -> void:
 	var sp := make_spawner(H.make_volley_data(2, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 2)
 	var fired: Array = []
-	sp.volley_fired.connect(func(v: BulletVolley2D, _n) -> void: fired.append(v))
+	sp.volley_fired.connect(func(fired_volley: BulletVolley2D, _n) -> void: fired.append(fired_volley))
 	assert_true(sp.shoot_once(), "fires")
 	var v: BulletVolley2D = fired[0]
 	assert_same(v.get_owner_spawner(), sp, "owned at first")

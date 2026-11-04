@@ -106,25 +106,25 @@ func test_direction_setters_under_a_direction_curve_refuse_with_direction_wordin
 	var target := Node2D.new()
 	target.position = Vector2(0, 300)
 	add(target)
-	for owner in ["shared", "individual"]:
+	for curve_owner in ["shared", "individual"]:
 		var curves := BulletCurvesData2D.new()
 		curves.x_direction_curve = H.make_flat_curve(0.5)
 		var d := H.make_volley_data(2, 100.0, 30.0)
-		if owner == "shared":
+		if curve_owner == "shared":
 			d.shared_bullet_curves_data = curves
 		else:
 			d.all_bullet_curves_data = [curves, curves]
-		var v: BulletVolley2D = factory.spawn_volley(d)
-		var before: Vector2 = v.get_bullet_direction(0)
-		var text := "You are trying to set bullet direction directly while having a direction curve assigned to the %s curves data. The curve will override any direct direction changes. Set the curve to null first if you want to set direction directly." % owner
-		v.set_bullet_direction(0, Vector2(0, -1))
+		var volley: BulletVolley2D = factory.spawn_volley(d)
+		var before: Vector2 = volley.get_bullet_direction(0)
+		var text := "You are trying to set bullet direction directly while having a direction curve assigned to the %s curves data. The curve will override any direct direction changes. Set the curve to null first if you want to set direction directly." % curve_owner
+		volley.set_bullet_direction(0, Vector2(0, -1))
 		expect_warning_sequence([text])
-		v.set_bullet_direction_towards_position(0, Vector2(-400, 0))
+		volley.set_bullet_direction_towards_position(0, Vector2(-400, 0))
 		expect_warning_sequence([text])
-		v.set_bullet_direction_towards_node2d(0, target)
+		volley.set_bullet_direction_towards_node2d(0, target)
 		expect_warning_sequence([text])
-		assert_eq(v.get_bullet_direction(0), before, "%s curve: the direction was left to the curve" % owner)
-		v.clear_all_bullets()
+		assert_eq(volley.get_bullet_direction(0), before, "%s curve: the direction was left to the curve" % curve_owner)
+		volley.clear_all_bullets()
 		await idle(1)
 
 
@@ -146,16 +146,16 @@ func test_huge_directions_keep_their_heading(how: String = use_parameters(["sett
 		w.amplitude = 1e22
 		w.frequency_hz = 2.0
 		d.shared_bullet_wobble_data = w
-	var v: BulletVolley2D = factory.spawn_volley(d)
+	var volley: BulletVolley2D = factory.spawn_volley(d)
 	if how == "setter":
-		v.set_bullet_direction(0, Vector2(1e20, 0))
-		assert_almost_eq(v.get_bullet_direction(0), Vector2(1, 0), Vector2(0.0001, 0.0001), "normalized, not zeroed")
-	var start: Vector2 = v.get_bullet_transform(0).origin
+		volley.set_bullet_direction(0, Vector2(1e20, 0))
+		assert_almost_eq(volley.get_bullet_direction(0), Vector2(1, 0), Vector2(0.0001, 0.0001), "normalized, not zeroed")
+	var start: Vector2 = volley.get_bullet_transform(0).origin
 	for k in 6:
 		factory.debug_advance_time(1.0 / 60.0)
-	var dir: Vector2 = v.get_bullet_direction(0)
+	var dir: Vector2 = volley.get_bullet_direction(0)
 	assert_true(dir.is_finite() and dir.length() > 0.99, "%s: a unit heading (%s)" % [how, dir])
-	assert_gt(v.get_bullet_transform(0).origin.distance_to(start), 1.0, "%s: the bullet keeps moving" % how)
+	assert_gt(volley.get_bullet_transform(0).origin.distance_to(start), 1.0, "%s: the bullet keeps moving" % how)
 
 
 ## Integrated motion never overflows into INF/NaN poses: speed with an
@@ -169,34 +169,34 @@ func test_extreme_motion_stays_finite(how: String = use_parameters(["speed", "sp
 		d.all_bullet_speed_data = [H.make_speed(100.0, 0.0, 3e38), H.make_speed(100.0, 0.0, 3e38)]
 	elif how == "spin":
 		d.all_bullet_rotation_data = [H.make_rotation(1.0, 0.0, 3e38), H.make_rotation(1.0, 0.0, 3e38)]
-	var v: BulletVolley2D = factory.spawn_volley(d)
+	var volley: BulletVolley2D = factory.spawn_volley(d)
 	match how:
 		"gravity":
-			v.all_bullets_set_gravity(Vector2(3e38, 0))
+			volley.all_bullets_set_gravity(Vector2(3e38, 0))
 		"teleport":
-			v.teleport_bullet(0, Vector2(3e38, 0))
-			v.teleport_shift_bullet(0, Vector2(3e38, 0))
+			volley.teleport_bullet(0, Vector2(3e38, 0))
+			volley.teleport_shift_bullet(0, Vector2(3e38, 0))
 			expect_error_sequence(["teleport_shift_bullet: the shifted position must be finite (it overflows float range), the bullet stays where it is."])
-			assert_eq(v.get_bullet_transform(0).origin, Vector2(3e38, 0), "the refused shift kept the bullet")
+			assert_eq(volley.get_bullet_transform(0).origin, Vector2(3e38, 0), "the refused shift kept the bullet")
 		"orbit":
-			v.shared_homing_deque_push_back_global_position_target(Vector2(50, 0))
-			v.bullet_enable_orbiting(0, 0.5)
-			v.set_bullet_speed_data(0, H.make_speed(3e38, 0.0, 0.0))
+			volley.shared_homing_deque_push_back_global_position_target(Vector2(50, 0))
+			volley.bullet_enable_orbiting(0, 0.5)
+			volley.set_bullet_speed_data(0, H.make_speed(3e38, 0.0, 0.0))
 		"movement_pattern":
 			# A step whose length overflows float range (|v dt| of ~1e36
 			# components is INF in float32) must not walk the pattern to INF.
 			var c := Curve2D.new()
 			for p in [Vector2(0, 0), Vector2(30, 10), Vector2(60, -10), Vector2(90, 0)]:
 				c.add_point(p)
-			v.set_shared_movement_pattern_curve(c)
+			volley.set_shared_movement_pattern_curve(c)
 	for k in 120:
 		factory.debug_advance_time(1.0 / 60.0)
 	var bad := ""
 	for i in 2:
-		if not v.get_bullet_transform(i).is_finite():
-			bad += "bullet %d pose %s; " % [i, v.get_bullet_transform(i)]
-		if not v.get_bullet_velocity(i).is_finite():
-			bad += "bullet %d velocity %s; " % [i, v.get_bullet_velocity(i)]
+		if not volley.get_bullet_transform(i).is_finite():
+			bad += "bullet %d pose %s; " % [i, volley.get_bullet_transform(i)]
+		if not volley.get_bullet_velocity(i).is_finite():
+			bad += "bullet %d velocity %s; " % [i, volley.get_bullet_velocity(i)]
 	assert_eq(bad, "", "%s: every pose and velocity stays finite" % how)
 
 
@@ -271,16 +271,16 @@ func test_set_bullet_transform_rescales_the_hitbox(rotate_only_textures: bool = 
 	var d := H.make_still_data(1)
 	d.rotate_only_textures = rotate_only_textures
 	d.transforms = [Transform2D(0.3, Vector2(10, 20))]
-	var v: BulletVolley2D = factory.spawn_volley(d)
-	var shape_before: Transform2D = v.debug_get_bullet_shape_transform(0)
-	v.set_bullet_transform(0, Transform2D(0.3, Vector2(3, 3), 0.0, Vector2(40, 20)))
-	var shape: Transform2D = v.debug_get_bullet_shape_transform(0)
+	var volley: BulletVolley2D = factory.spawn_volley(d)
+	var shape_before: Transform2D = volley.debug_get_bullet_shape_transform(0)
+	volley.set_bullet_transform(0, Transform2D(0.3, Vector2(3, 3), 0.0, Vector2(40, 20)))
+	var shape: Transform2D = volley.debug_get_bullet_shape_transform(0)
 	assert_almost_eq(shape.get_scale(), Vector2(3, 3), Vector2(0.001, 0.001), "rotate_only_textures %s: the hitbox took the new scale" % rotate_only_textures)
 	assert_almost_eq(shape.origin, Vector2(40, 20), Vector2(0.001, 0.001), "at the new position")
 	if rotate_only_textures:
 		assert_almost_eq(shape.get_rotation(), shape_before.get_rotation(), 0.0001, "its frozen rotation kept")
-	v.set_bullet_transform(0, Transform2D(0.3, Vector2(0.5, 0.5), 0.0, Vector2(40, 20)))
-	assert_almost_eq(v.debug_get_bullet_shape_transform(0).get_scale(), Vector2(0.5, 0.5), Vector2(0.001, 0.001), "and shrinks it again")
+	volley.set_bullet_transform(0, Transform2D(0.3, Vector2(0.5, 0.5), 0.0, Vector2(40, 20)))
+	assert_almost_eq(volley.debug_get_bullet_shape_transform(0).get_scale(), Vector2(0.5, 0.5), Vector2(0.001, 0.001), "and shrinks it again")
 
 
 func test_a_written_scale_never_reaches_the_next_life() -> void:

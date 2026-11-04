@@ -211,11 +211,11 @@ func _apply_event(e: Dictionary) -> void:
 	if kind == "life":
 		_count("life")
 		for b in int(e["bullet"]):
-			var iv = _last(volley, b)
-			if iv != null and int(iv[1]) < 0:
-				_problem("volley %d began life %d while bullet %d of life %d was still alive" % [volley, life, b, int(iv[2])])
-				iv[1] = frame
-				iv[4] = "relife"
+			var life_iv = _last(volley, b)
+			if life_iv != null and int(life_iv[1]) < 0:
+				_problem("volley %d began life %d while bullet %d of life %d was still alive" % [volley, life, b, int(life_iv[2])])
+				life_iv[1] = frame
+				life_iv[4] = "relife"
 			_open(volley, b, frame, life, -1)
 		return
 	var bullet := int(e["bullet"])

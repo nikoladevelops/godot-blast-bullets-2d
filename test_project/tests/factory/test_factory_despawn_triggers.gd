@@ -130,9 +130,9 @@ func test_the_on_despawn_effect_fires_for_culled_bullets_only() -> void:
 	await idle(1)
 	for i in 6:
 		factory.debug_advance_time(0.1)
-	var log := factory.debug_get_effect_log().filter(func(e): return int(e["trigger"]) == EffectLayerData2D.EFFECT_ON_DESPAWN)
-	assert_eq(log.size(), 2, "one effect per culled bullet")
-	for e in log:
+	var event_log := factory.debug_get_effect_log().filter(func(e): return int(e["trigger"]) == EffectLayerData2D.EFFECT_ON_DESPAWN)
+	assert_eq(event_log.size(), 2, "one effect per culled bullet")
+	for e in event_log:
 		assert_gt(e["position"].x, 400.0, "fired at the pose it left from")
 	assert_true(v.is_bullet_status_enabled(2), "the bullet inside is untouched")
 
@@ -200,18 +200,20 @@ func test_trigger_ids_are_stable_and_validated() -> void:
 	assert_eq(EffectLayerData2D.EFFECT_ON_DESPAWN, 7, "effect trigger id is serialized: appended after On Clear")
 	assert_eq(BulletSoundData2D.SOUND_ON_DESPAWN, 11, "sound trigger id is serialized: appended after On Flight")
 	var layer := EffectLayerData2D.new()
-	layer.trigger = 7
+	layer.trigger = EffectLayerData2D.EFFECT_ON_DESPAWN
 	assert_eq(layer.trigger, 7, "accepted")
-	layer.trigger = 8
+	layer.trigger = EffectLayerData2D.EFFECT_ON_SPLIT
 	assert_eq(layer.trigger, 8, "On Split (8) is accepted")
-	layer.trigger = 9
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	layer.trigger = (9 as EffectLayerData2D.EffectTrigger)
 	expect_errors_containing("EffectLayerData2D: trigger must be", 1, "9 is out of range")
 	var sound := BulletSoundData2D.new()
-	sound.trigger = 11
+	sound.trigger = BulletSoundData2D.SOUND_ON_DESPAWN
 	assert_eq(sound.trigger, 11, "accepted")
-	sound.trigger = 12
+	sound.trigger = BulletSoundData2D.SOUND_ON_SPLIT
 	assert_eq(sound.trigger, 12, "On Split (12) is accepted")
-	sound.trigger = 13
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	sound.trigger = (13 as BulletSoundData2D.SoundTrigger)
 	expect_errors_containing("BulletSoundData2D: trigger must be", 1, "13 is out of range")
 
 
@@ -226,9 +228,9 @@ func test_a_burst_warning_refused_outside_is_given_once_inside() -> void:
 	sp.burst_interval_sec = 0.1
 	sp.telegraph_enabled = true
 	sp.telegraph_sec = 0.1
-	var log: Array = []
-	sp.volley_telegraphed.connect(func(_aim) -> void: log.append("telegraph"))
-	sp.volley_fired.connect(func(_v, _n) -> void: log.append("shot"))
+	var event_log: Array = []
+	sp.volley_telegraphed.connect(func(_aim) -> void: event_log.append("telegraph"))
+	sp.volley_fired.connect(func(_v, _n) -> void: event_log.append("shot"))
 	sp.begin_burst()
 	for i in 10:
 		await idle(1)
@@ -238,9 +240,9 @@ func test_a_burst_warning_refused_outside_is_given_once_inside() -> void:
 	sp.position = Vector2(100, 100)
 	for i in 60:
 		await idle(1)
-		if log.size() >= 2:
+		if event_log.size() >= 2:
 			break
-	assert_eq(log.slice(0, 2), ["telegraph", "shot"], "the first burst shot is warned before it fires")
+	assert_eq(event_log.slice(0, 2), ["telegraph", "shot"], "the first burst shot is warned before it fires")
 
 
 ## A spawner outside the scene tree is refused with its own documented

@@ -73,7 +73,8 @@ func test_rejected_sets_keep_the_value_and_emit_nothing() -> void:
 	z.ring_count = 5
 	z.ring_1_radius = 0.0
 	z.ring_2_radius = -3.0
-	z.regraze = 7
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	z.regraze = (7 as GrazeZone2D.Regraze)
 	z.preview_color = Color(NAN, 0, 0, 1)
 	expect_error_sequence([
 		"GrazeZone2D: ring_count must be between 1 and 4, keeping the old value.",

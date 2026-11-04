@@ -15,5 +15,5 @@ func setup() -> void:
 	_sound.follow_bullet = true
 	_sound.fade_out_sec = 0.1
 	for i in 10:
-		var v: BulletVolley2D = factory.spawn_volley(ring_data(1000, Vector2(960 * (i % 5), 1200 * (i / 5)), 50.0, 60.0, 1000.0))
+		var v: BulletVolley2D = factory.spawn_volley(ring_data(1000, Vector2(960 * (i % 5), 1200 * int(i / 5.0)), 50.0, 60.0, 1000.0))
 		v.sound_set_effects([_sound])

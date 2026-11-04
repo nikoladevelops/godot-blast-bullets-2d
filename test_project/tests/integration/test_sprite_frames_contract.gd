@@ -86,7 +86,7 @@ func _volley_data(sf: SpriteFrames, anim: StringName) -> BulletVolleyData2D:
 
 func _layer(trigger: int, sf: SpriteFrames, anim: StringName) -> EffectLayerData2D:
 	var layer := EffectLayerData2D.new()
-	layer.trigger = trigger
+	layer.trigger = trigger as EffectLayerData2D.EffectTrigger
 	layer.sprite_frames = sf
 	layer.animation = anim
 	return layer
@@ -190,13 +190,13 @@ func test_an_empty_default_never_hides_a_populated_animation() -> void:
 	# next to it is what an unselected (empty or "default") name plays.
 	var problems: Array = []
 	for kind in CONSUMERS:
-		for name in [&"", &"default"]:
+		for anim_name in [&"", &"default"]:
 			var fire := _tex(5, 3, Color.RED)
-			var built := await _build(kind, _sf({"fire": [fire]}), name)
+			var built := await _build(kind, _sf({"fire": [fire]}), anim_name)
 			var shown := _drawn(kind, built)
 			if shown != fire:
-				problems.append("%s '%s': %s instead of the fire frame" % [kind, name, shown])
-			expect_no_errors("%s '%s' resolves silently" % [kind, name])
+				problems.append("%s '%s': %s instead of the fire frame" % [kind, anim_name, shown])
+			expect_no_errors("%s '%s' resolves silently" % [kind, anim_name])
 	assert_eq("\n".join(problems), "", "the populated animation plays")
 
 
@@ -507,10 +507,10 @@ func test_an_unreadable_atlas_frame_reads_null() -> void:
 		"empty sheet": _atlas(ImageTexture.new(), Rect2(0, 0, 4, 4)),
 	}
 	var problems: Array = []
-	for name in bad:
-		var shown := factory.debug_read_frame(bad[name])
+	for label in bad:
+		var shown := factory.debug_read_frame(bad[label])
 		if shown != null:
-			problems.append("%s: %s" % [name, shown])
+			problems.append("%s: %s" % [label, shown])
 	assert_eq(problems, [], "every unreadable frame reads null")
 	expect_no_errors("unreadable is not an error here: the consumers report it")
 	assert_null(factory.debug_read_frame(null), "no texture")
@@ -554,18 +554,18 @@ func test_whitened_frames_honor_the_margin_and_the_compressed_sheet() -> void:
 		"compressed": [_atlas(ImageTexture.create_from_image(packed), Rect2(4, 4, 4, 4)), Vector2i(4, 4), Vector2i(3, 3), null],
 	}
 	var problems: Array = []
-	for name in cases:
-		var c: Array = cases[name]
+	for label in cases:
+		var c: Array = cases[label]
 		var d := _volley_data(_sf({"default": [c[0]]}), &"")
 		d.override_frame_color = true
 		var img: Image = factory.spawn_volley(d).get_texture().get_image()
 		if img.get_size() != c[1]:
-			problems.append("%s: size %s" % [name, img.get_size()])
+			problems.append("%s: size %s" % [label, img.get_size()])
 			continue
 		if not img.get_pixelv(c[2]).is_equal_approx(Color.WHITE):
-			problems.append("%s: %s at %s, not opaque white" % [name, img.get_pixelv(c[2]), c[2]])
+			problems.append("%s: %s at %s, not opaque white" % [label, img.get_pixelv(c[2]), c[2]])
 		if c[3] != null and img.get_pixelv(c[3]).a != 0.0:
-			problems.append("%s: %s at %s, not clear" % [name, img.get_pixelv(c[3]), c[3]])
+			problems.append("%s: %s at %s, not clear" % [label, img.get_pixelv(c[3]), c[3]])
 	assert_eq(problems, [], "whitened as drawn")
 	expect_no_errors()
 

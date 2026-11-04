@@ -56,12 +56,12 @@ func test_the_group_sits_after_bullets_and_gates_by_mode() -> void:
 	var groups: Array = []
 	var found := {}
 	for p in sp.get_property_list():
-		var name := str(p["name"])
+		var node_name := str(p["name"])
 		if int(p["usage"]) & PROPERTY_USAGE_GROUP:
-			group = name
-			groups.append(name)
-		elif name.begins_with("bullet_color_"):
-			found[name] = [group, str(p["hint_string"])]
+			group = node_name
+			groups.append(node_name)
+		elif node_name.begins_with("bullet_color_"):
+			found[node_name] = [group, str(p["hint_string"])]
 	var at := groups.find("Bullet Colors")
 	assert_eq(groups.slice(at - 1, at + 2), ["Randomization", "Bullet Colors", "Homing"], "the first of the bullet groups, after where and when it fires")
 	assert_eq(found.get("bullet_color_mode", ["", ""]), ["Bullet Colors", "Off,Gradient Across Pattern,Random From Gradient,Gradient Per Shot"], "mode hint")

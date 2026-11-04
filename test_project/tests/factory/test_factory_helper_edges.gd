@@ -34,7 +34,7 @@ func test_product_and_count_caps() -> void:
 	expect_error_sequence(["helper_generate_transforms_star: points is absurdly large; keep it near the bullet count."])
 	assert_true(BulletPatterns2D.helper_generate_transforms_polygon(10, m, 1000000).is_empty(), "polygon 1M vertices rejected")
 	expect_error_sequence(["helper_generate_transforms_polygon: vertices is absurdly large; keep it near the bullet count."])
-	assert_true(BulletPatterns2D.helper_generate_transforms_ellipse(10, m, 60.0, 40.0, 0.0, 0.0, TAU, 2, 1000000).is_empty(), "ellipse 1M gaps rejected")
+	assert_true(BulletPatterns2D.helper_generate_transforms_ellipse(10, m, 60.0, 40.0, 0.0, 0.0, TAU, BulletPatterns2D.ELLIPSE_WALL, 1000000).is_empty(), "ellipse 1M gaps rejected")
 	expect_error_sequence(["helper_generate_transforms_ellipse: gap_count is absurdly large; keep it near the bullet count."])
 	# A FAN flower walks every petal (Fill Inside: 17 points each): 2e9 petals
 	# froze for seconds and could run out of memory, in the editor preview too.
@@ -78,7 +78,7 @@ func test_huge_finite_inputs_clamp() -> void:
 	assert_eq(far.size(), 8)
 	assert_true(H.finite_volley(far), "line 1e30 spacing clamps finite")
 	expect_warning_sequence(["helper_generate_transforms_line: some slots overflowed to Inf/NaN or left the world box and were clamped to its edge; shrink the spacing/radius."], "the clamp is named")
-	var wide: Array = BulletPatterns2D.helper_generate_transforms_grid(9, m, 3, 0, 1e30, 1e30, false)
+	var wide: Array = BulletPatterns2D.helper_generate_transforms_grid(9, m, 3, BulletPatterns2D.TOP_LEFT, 1e30, 1e30, false)
 	assert_eq(wide.size(), 9)
 	assert_true(H.finite_volley(wide), "grid 1e30 offsets clamp finite")
 	expect_warning_sequence(["helper_generate_transforms_grid: some slots overflowed to Inf/NaN or left the world box and were clamped to its edge; shrink the spacing/radius."], "the clamp is named")
@@ -156,7 +156,7 @@ func test_circle_rejects_singular_marker() -> void:
 
 
 func test_grid_degrades_finite_on_singular_marker() -> void:
-	var grid = BulletPatterns2D.helper_generate_transforms_grid(6, singular, 3, 4, 32.0, 32.0, true, false, 0.0, 0)
+	var grid = BulletPatterns2D.helper_generate_transforms_grid(6, singular, 3, BulletPatterns2D.CENTER, 32.0, 32.0, true, false, 0.0, 0)
 	assert_eq(grid.size(), 6, "grid still emits")
 	assert_true(H.finite_volley(grid), "grid slots finite (graceful zero-size)")
 

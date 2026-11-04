@@ -213,13 +213,13 @@ func _sweep_arg(type: int, int_probe: int) -> Variant:
 func _sweep_all_methods(v: BulletVolley2D, int_probe: int) -> int:
 	var called := 0
 	for m in ClassDB.class_get_method_list("BulletVolley2D", true):
-		var name := str(m["name"])
-		if name.begins_with("_"):
+		var method_name := str(m["name"])
+		if method_name.begins_with("_"):
 			continue
 		var args: Array = []
 		for a in m["args"]:
 			args.append(_sweep_arg(int(a["type"]), int_probe))
-		v.callv(name, args)
+		v.callv(method_name, args)
 		called += 1
 		if not is_instance_valid(v):
 			break
@@ -290,7 +290,7 @@ func _storm_object(class_name_hint: String) -> Variant:
 			c.movement_speed_curve = H.make_flat_curve(storm_rng.randf_range(0, 300))
 			if storm_rng.randf() < 0.5:
 				c.x_direction_curve = H.make_flat_curve(storm_rng.randf_range(-1, 1))
-				c.x_direction_curve_mode = storm_rng.randi() % 2
+				c.x_direction_curve_mode = (storm_rng.randi() % 2) as BulletCurvesData2D.DirectionCurveMode
 			return c
 		"BulletFlock2D":
 			return H.make_flock(storm_rng.randf_range(0, 3), storm_rng.randf_range(0, 3), storm_rng.randf_range(0, 3))
@@ -347,10 +347,10 @@ func _storm_arg(a: Dictionary, v: BulletVolley2D) -> Variant:
 func _storm_volley(index: int) -> BulletVolley2D:
 	var n := storm_rng.randi_range(1, 24)
 	var d := H.make_volley_data(n, storm_rng.randf_range(0, 250), 60.0)
-	var tr: Array = []
+	var transforms: Array = []
 	for i in n:
-		tr.append(Transform2D(storm_rng.randf_range(-PI, PI), Vector2(storm_rng.randf_range(-100, 300), storm_rng.randf_range(-100, 300))))
-	d.transforms = tr
+		transforms.append(Transform2D(storm_rng.randf_range(-PI, PI), Vector2(storm_rng.randf_range(-100, 300), storm_rng.randf_range(-100, 300))))
+	d.transforms = transforms
 	var v: BulletVolley2D = factory.spawn_volley(d)
 	if index % 2 == 0:
 		v.flock_join(H.make_flock(1.5, 1.0, 1.0), storm_rng.randi() % 3)
@@ -362,8 +362,8 @@ func test_random_api_storm_keeps_every_invariant() -> void:
 	storm_scene = make_probe_scene()
 	var methods: Array = []
 	for m in ClassDB.class_get_method_list("BulletVolley2D", true):
-		var name := str(m["name"])
-		if not name.begins_with("_") and not (name in STORM_SKIP):
+		var method_name := str(m["name"])
+		if not method_name.begins_with("_") and not (method_name in STORM_SKIP):
 			methods.append(m)
 	var total_calls := 0
 	for sd in STORM_SEEDS:

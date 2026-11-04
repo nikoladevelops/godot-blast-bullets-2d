@@ -10,7 +10,7 @@ func setup() -> void:
 	warmup_frames = 10
 	measure_frames = 240
 	for i in 10:
-		_data.append(ring_data(1000, Vector2(960 * (i % 5), 1200 * (i / 5)), 40.0, 50.0, 1.0))
+		_data.append(ring_data(1000, Vector2(960 * (i % 5), 1200 * floori(i / 5.0)), 40.0, 50.0, 1.0))
 	# Pre-warm: the first wave would otherwise measure cold allocation
 	# (that is cold_spawn_scaling's job) instead of the expiry burst.
 	for d in _data:

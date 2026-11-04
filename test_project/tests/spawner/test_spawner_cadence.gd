@@ -452,7 +452,8 @@ func test_switching_process_callback_keeps_the_cadence() -> void:
 	sp.process_callback = BulletSpawner2D.PROCESS_IDLE
 	await idle(30)
 	assert_between(shots[0], 14, 16, "a second and a half at 10 shots a second, across two switches")
-	sp.process_callback = 5
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	sp.process_callback = (5 as BulletSpawner2D.SpawnerProcessCallback)
 	expect_error_sequence(["BulletSpawner2D: process_callback must be 0 (Idle), 1 (Physics) or 2 (Auto), keeping the old value."])
 
 
@@ -520,7 +521,7 @@ func _stream_gaps(sp: BulletSpawner2D, frames: int, start := Callable()) -> Arra
 func test_streams_are_evenly_spaced_at_any_interval(mode: int = use_parameters([BulletSpawner2D.PROCESS_PHYSICS, BulletSpawner2D.PROCESS_IDLE])) -> void:
 	for interval in [0.04, 0.025, 0.007]: # 2.4, 1.5 and 0.42 ticks (several shots in one tick)
 		var sp := make_spawner(H.make_volley_data(1, 300.0, 30.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
-		sp.process_callback = mode
+		sp.process_callback = (mode as BulletSpawner2D.SpawnerProcessCallback)
 		sp.shoot_interval_sec = interval
 		sp.max_shots_per_frame = 8
 		var gaps: Array = await _stream_gaps(sp, 30, sp.set_shooting_enabled.bind(true))

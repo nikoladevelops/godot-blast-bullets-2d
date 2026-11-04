@@ -12,4 +12,7 @@ func _ready() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
-		spawner.home_live_volleys_to(get_global_mouse_position() if event.pressed else $Player)
+		var target: Variant = $Player
+		if event.pressed:
+			target = get_global_mouse_position()
+		spawner.home_live_volleys_to(target)

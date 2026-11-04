@@ -208,7 +208,7 @@ func make_spawner(data: BulletVolleyData2D = null, source: int = BulletSpawner2D
 	s.set_shooting_enabled(false)
 	s.set_homing_enabled(false)
 	s.set_spawn_data(data if data != null else H.make_volley_data(amount))
-	s.pattern_source = source
+	s.pattern_source = source as PatternSpawner2D.PatternSource
 	s.helper_bullets_amount = amount
 	add(s)
 	s.set_bullet_factory(factory)
@@ -390,7 +390,7 @@ func render_data_problems(root: Node, bound := 1.0e30) -> Array:
 					break
 			for i in range(0, buf.size() - 7, stride):
 				if absf(buf[i + 3]) > bound or absf(buf[i + 7]) > bound:
-					out.append("%s %s: instance %d at (%s, %s) past %s px" % [n.get_class(), n.name, i / stride, buf[i + 3], buf[i + 7], bound])
+					out.append("%s %s: instance %d at (%s, %s) past %s px" % [n.get_class(), n.name, int(i / float(stride)), buf[i + 3], buf[i + 7], bound])
 					break
 		var laser := n as LaserVolley2D
 		if laser != null and laser.is_laser_active():

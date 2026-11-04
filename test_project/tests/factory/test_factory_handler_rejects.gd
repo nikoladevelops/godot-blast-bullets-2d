@@ -75,9 +75,9 @@ var shape_types_in_handler: Array = []
 
 func test_deferred_shape_change_applies_on_the_next_idle_frame() -> void:
 	shape_types_in_handler.clear()
-	calls.append(func(v):
-		v.set_collision_shape_runtime_deferred(RectangleShape2D.new())
-		shape_types_in_handler.append(int(v.debug_get_shape_state().get("type", -1))))
+	calls.append(func(volley):
+		volley.set_collision_shape_runtime_deferred(RectangleShape2D.new())
+		shape_types_in_handler.append(int(volley.debug_get_shape_state().get("type", -1))))
 	await _hit_once()
 	var v: BulletVolley2D = hit_volleys[0]
 	assert_eq(shape_types_in_handler, [PhysicsServer2D.SHAPE_CIRCLE], "still a circle inside the physics frame (queued, not applied)")

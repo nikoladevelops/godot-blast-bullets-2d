@@ -96,7 +96,7 @@ func test_the_hitbox_grows_with_the_bullet(rotate_only: bool = use_parameters([f
 
 func test_graze_rings_follow_the_growth() -> void:
 	make_graze_target(Vector2(30, 0))
-	var log := H.record_graze(factory)
+	var graze_log := H.record_graze(factory)
 	var d := _data(1, 0.25, 0.25)
 	d.transforms = [Transform2D(0.0, Vector2(4, 4), 0.0, Vector2.ZERO)]
 	d.collision_shape = H.make_circle_shape(4.0)
@@ -105,9 +105,9 @@ func test_graze_rings_follow_the_growth() -> void:
 	# Ring 20 + 4 px x scale: 1x at spawn (24 px, out of reach), 4x at the
 	# end of the window (36 px, in reach of the target 30 px away).
 	step_factory(1, DT)
-	assert_eq(H.graze_kinds(log), [], "still small: out of reach")
+	assert_eq(H.graze_kinds(graze_log), [], "still small: out of reach")
 	step_factory(3, DT)
-	assert_eq(H.graze_kinds(log), ["enter:0:0"], "grown: the ring reaches the target")
+	assert_eq(H.graze_kinds(graze_log), ["enter:0:0"], "grown: the ring reaches the target")
 
 
 func test_a_frozen_volley_clock_holds_the_growth() -> void:

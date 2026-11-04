@@ -33,9 +33,9 @@ func test_on_shot_fires_at_spawner_position() -> void:
 	watch_signals(sp)
 	assert_true(sp.shoot_once(), "shot fires")
 	await physics(2)
-	var log := _logged(s.get_instance_id())
-	assert_eq(log.size(), 1, "exactly one shot sound")
-	assert_almost_eq((log[0] as Dictionary)["position"], Vector2(50, 60), Vector2(0.5, 0.5), "at the spawner position")
+	var sound_log := _logged(s.get_instance_id())
+	assert_eq(sound_log.size(), 1, "exactly one shot sound")
+	assert_almost_eq((sound_log[0] as Dictionary)["position"], Vector2(50, 60), Vector2(0.5, 0.5), "at the spawner position")
 
 
 func test_on_telegraph_fires_with_the_warning() -> void:
@@ -278,7 +278,7 @@ func test_on_shot_of_a_shoot_from_shot_plays_where_it_fires() -> void:
 	sp.sound_effects = [s]
 	assert_true(sp.shoot_from(Transform2D(0.0, Vector2(50, 60))), "fires from the pose")
 	await physics(2)
-	var log := _logged(s.get_instance_id())
-	assert_eq(log.size(), 1, "exactly one shot sound")
-	if log.size() == 1:
-		assert_almost_eq((log[0] as Dictionary)["position"], Vector2(50, 60), Vector2(0.5, 0.5), "at the shot pose")
+	var sound_log := _logged(s.get_instance_id())
+	assert_eq(sound_log.size(), 1, "exactly one shot sound")
+	if sound_log.size() == 1:
+		assert_almost_eq((sound_log[0] as Dictionary)["position"], Vector2(50, 60), Vector2(0.5, 0.5), "at the shot pose")

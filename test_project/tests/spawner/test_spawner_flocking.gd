@@ -52,11 +52,11 @@ func test_the_flocking_group_sits_after_orbiting_and_gates_its_knobs() -> void:
 	var group := ""
 	var found := {}
 	for p in sp.get_property_list():
-		var name := str(p["name"])
+		var prop_name := str(p["name"])
 		if int(p["usage"]) & PROPERTY_USAGE_GROUP:
-			group = name
-		elif name in ["flock_enabled", "flock", "flock_scope"]:
-			found[name] = [group, int(p["type"]), str(p["hint_string"])]
+			group = prop_name
+		elif prop_name in ["flock_enabled", "flock", "flock_scope"]:
+			found[prop_name] = [group, int(p["type"]), str(p["hint_string"])]
 	assert_eq(found.get("flock_enabled", [""])[0], "Flocking", "flock_enabled in Flocking")
 	assert_eq(found.get("flock", [""])[0], "Flocking", "flock in Flocking")
 	assert_eq(found.get("flock", ["", 0, ""])[2], "BulletFlock2D", "flock takes a BulletFlock2D")
@@ -72,8 +72,10 @@ func test_the_flocking_group_sits_after_orbiting_and_gates_its_knobs() -> void:
 func test_a_bad_scope_is_refused_and_kept() -> void:
 	var sp := make_spawner()
 	sp.flock_scope = BulletFlock2D.SCOPE_SHARED
-	sp.flock_scope = 3
-	sp.flock_scope = -1
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	sp.flock_scope = (3 as BulletFlock2D.Scope)
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	sp.flock_scope = (-1 as BulletFlock2D.Scope)
 	expect_error_sequence([
 		"BulletSpawner2D: flock_scope must be 0 (Per Spawner), 1 (Shared) or 2 (Per Volley), keeping the old value.",
 		"BulletSpawner2D: flock_scope must be 0 (Per Spawner), 1 (Shared) or 2 (Per Volley), keeping the old value.",

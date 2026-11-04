@@ -18,7 +18,7 @@ func _short_first_frame_layer(trigger: int) -> EffectLayerData2D:
 	sf.add_frame("default", ImageTexture.create_from_image(img), 0.5)
 	sf.add_frame("default", ImageTexture.create_from_image(img), 5.0)
 	var layer := EffectLayerData2D.new()
-	layer.trigger = trigger
+	layer.trigger = trigger as EffectLayerData2D.EffectTrigger
 	layer.sprite_frames = sf
 	return layer
 

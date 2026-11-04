@@ -64,7 +64,7 @@ func _handover() -> BulletVolley2D:
 
 
 func test_hits_reach_the_new_owner_only() -> void:
-	var w := await _handover()
+	var w := _handover()
 	make_wall(Vector2(200, 0))
 	for i in 90:
 		await physics()
@@ -82,7 +82,7 @@ func test_bounces_reach_the_new_owner_only() -> void:
 	d.set_bounce_mask_from_array([4])
 	a.set_spawn_data(d)
 	b.set_spawn_data(d.duplicate())
-	await _handover()
+	_handover()
 	make_wall(Vector2(200, 0), Vector2(20, 400), 8, 2)
 	for i in 90:
 		await physics()
@@ -98,7 +98,7 @@ func test_lifetime_reaches_the_new_owner_only() -> void:
 	d.is_life_time_over_signal_enabled = true
 	a.set_spawn_data(d)
 	b.set_spawn_data(d.duplicate())
-	await _handover()
+	_handover()
 	for i in 60:
 		await physics()
 		if not b_events.is_empty():
@@ -109,7 +109,7 @@ func test_lifetime_reaches_the_new_owner_only() -> void:
 
 
 func test_homing_reached_reaches_the_new_owner_only() -> void:
-	var w := await _handover()
+	var w := _handover()
 	w.set_homing_distance_before_reached(400.0)
 	w.shared_homing_deque_push_back_global_position_target(Vector2(40, 0))
 	for i in 10:
@@ -143,7 +143,7 @@ func test_first_owner_retarget_never_touches_the_reused_volley() -> void:
 	a.set_homing_enabled(true)
 	a.set_homing_target_source(BulletSpawner2D.HOMING_SOURCE_GLOBAL_POSITION)
 	a.set_homing_global_position(Vector2(0, -500))
-	var w := await _handover()
+	var w := _handover()
 	assert_eq(a.retarget_live_volleys(), 0, "A has nothing to retarget")
 	assert_eq(w.shared_homing_deque_check_homing_targets_amount(), 0, "B's volley untouched")
 

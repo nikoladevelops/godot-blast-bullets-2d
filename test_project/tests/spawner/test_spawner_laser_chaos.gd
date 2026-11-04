@@ -54,8 +54,8 @@ func _live_factories() -> Array:
 
 func _laser_data() -> LaserData2D:
 	var d := H.make_laser(rng.randf_range(0.0, 0.1), rng.randf_range(0.0, 0.1), rng.randf_range(0.0, 0.6), rng.randf_range(0.0, 0.2), rng.randf_range(20.0, 300.0))
-	d.type = rng.randi() % 3
-	d.aim = rng.randi() % 3
+	d.type = ((rng.randi() % 3) as LaserData2D.LaserType)
+	d.aim = ((rng.randi() % 3) as LaserData2D.LaserAim)
 	d.follow_spawner = rng.randf() < 0.7
 	d.speed = rng.randf_range(50.0, 400.0)
 	d.turn_rate_degrees = [0.0, 90.0, 720.0][rng.randi() % 3]
@@ -75,12 +75,12 @@ func _new_spawner() -> void:
 	sp.spin_enabled = rng.randf() < 0.5
 	sp.spin_speed_deg_per_sec = rng.randf_range(-180.0, 180.0)
 	sp.spawn_position_offset = Vector2(rng.randf_range(-30, 30), rng.randf_range(-30, 30)) if rng.randf() < 0.4 else Vector2.ZERO
-	sp.spawn_position_offset_space = rng.randi() % 2
+	sp.spawn_position_offset_space = ((rng.randi() % 2) as LaserSpawner2D.SpawnOffsetSpace)
 	sp.show_pattern_preview = rng.randf() < 0.5
 	sp.show_preview_during_runtime = rng.randf() < 0.3
-	sp.orphaned_lasers = rng.randi() % 4
+	sp.orphaned_lasers = ((rng.randi() % 4) as LaserSpawner2D.OrphanedLasers)
 	sp.max_live_lasers = rng.randi_range(0, 3)
-	sp.laser_target_source = rng.randi() % 7
+	sp.laser_target_source = ((rng.randi() % 7) as LaserSpawner2D.LaserTargetSource)
 	sp.laser_target_group = &"laser_chaos_foes"
 	sp.laser_target_position = Vector2(rng.randf_range(0, 400), rng.randf_range(0, 300))
 	sp.laser_target_node_name = "Foe"
@@ -134,7 +134,7 @@ func _op() -> void:
 				sp.teleport(Vector2(rng.randf_range(0, 400), rng.randf_range(0, 300)), rng.randf() < 0.5)
 		8:
 			if sp != null:
-				sp.laser_target_source = rng.randi() % 7
+				sp.laser_target_source = ((rng.randi() % 7) as LaserSpawner2D.LaserTargetSource)
 				if rng.randf() < 0.5:
 					sp.retarget_live_lasers()
 				else:
@@ -144,7 +144,7 @@ func _op() -> void:
 				if rng.randf() < 0.5:
 					sp.laser_data = _laser_data()
 				elif sp.laser_data != null:
-					sp.laser_data.aim = rng.randi() % 3
+					sp.laser_data.aim = ((rng.randi() % 3) as LaserData2D.LaserAim)
 					sp.laser_data.length = rng.randf_range(10.0, 400.0)
 		10:
 			if sp != null:
@@ -181,7 +181,7 @@ func _op() -> void:
 			if sp != null:
 				sp.show_preview_during_runtime = not sp.show_preview_during_runtime
 				sp.set_spin_angle_deg(rng.randf_range(0, 360))
-				sp.spawn_position_offset_space = rng.randi() % 2
+				sp.spawn_position_offset_space = ((rng.randi() % 2) as LaserSpawner2D.SpawnOffsetSpace)
 		17:
 			if not targets.is_empty() and rng.randf() < 0.4:
 				var t: Node2D = targets.pop_back()

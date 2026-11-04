@@ -11,7 +11,7 @@ func _data() -> BulletVolleyData2D:
 	d.collision_shape = H.make_circle_shape(6.0)
 	d.bullet_max_collision_count = 0
 	d.set_bounce_mask_from_array([4])
-	d.bounce_mode = 1 # precise: exercises the shape-normal path
+	d.bounce_mode = BulletVolleyData2D.BOUNCE_PRECISE_SHAPE # precise: exercises the shape-normal path
 	return d
 
 

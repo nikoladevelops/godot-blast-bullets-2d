@@ -134,7 +134,7 @@ func test_polygon_layers() -> void:
 	assert_true(_layer_rings_have_corners(layered, 12, 3, 0, 0), "polygon every ring has corners")
 	var sq_base: Array = BulletPatterns2D.helper_generate_transforms_rectangle(4, marker, Vector2(200, 200), true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
 	assert_true(_approx((sq_base[0] as Transform2D).get_rotation(), -PI * 0.5, 0.01), "square bullet 0 faces straight")
-	assert_true(BulletPatterns2D.helper_generate_transforms_triangle(9, marker, 0, 200.0, 200.0, 0.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0).size() == 9, "triangle emits in LAYERS")
+	assert_true(BulletPatterns2D.helper_generate_transforms_triangle(9, marker, BulletPatterns2D.TRIANGLE_EQUILATERAL, 200.0, 200.0, 0.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0).size() == 9, "triangle emits in LAYERS")
 	assert_true(BulletPatterns2D.helper_generate_transforms_trapezoid(8, marker, 150.0, 280.0, 140.0, 0.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0).size() == 8, "trapezoid emits in LAYERS")
 	assert_true(BulletPatterns2D.helper_generate_transforms_diamond(8, marker, 280.0, 200.0, 0.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0).size() == 8, "diamond emits in LAYERS")
 
@@ -175,7 +175,7 @@ func test_star_heart_emit() -> void:
 	_check_pair(base_flower, layered_flower, marker.origin, 3, STEP, 0, "flower")
 	var star: Array = BulletPatterns2D.helper_generate_transforms_star(20, marker, 5, 150.0, 65.0, 0.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
 	assert_true(star.size() == 20, "star emits in LAYERS")
-	var base_rose: Array = BulletPatterns2D.helper_generate_transforms_rose(24, marker, 6, 150.0, 1.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
+	var _base_rose: Array = BulletPatterns2D.helper_generate_transforms_rose(24, marker, 6, 150.0, 1.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
 	var layered_rose: Array = BulletPatterns2D.helper_generate_transforms_rose(24, marker, 6, 150.0, 1.0, 0.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
 	assert_true(_ring_gaps_ok(layered_rose, 24, 3, 0, 0, 1.3), "rose rings even")
 	var ok := true
@@ -348,7 +348,7 @@ func test_anchored_corners() -> void:
 				found = true
 		assert_true(found, "rect corner occupied at " + str(c))
 	# Fewer bullets than corners: evenly spaced corners (2 on a triangle).
-	var tri: Array = BulletPatterns2D.helper_generate_transforms_triangle(2, marker, 0, 200.0, 200.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
+	var tri: Array = BulletPatterns2D.helper_generate_transforms_triangle(2, marker, BulletPatterns2D.TRIANGLE_EQUILATERAL, 200.0, 200.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
 	assert_true(tri.size() == 2, "tiny triangle emits pair")
 
 # Distance from a marker-relative point to a rectangle border (0 = on border).
@@ -517,7 +517,7 @@ func test_star_edge_walk() -> void:
 func test_ellipse_full_no_seam() -> void:
 	var marker := Transform2D(0.0, Vector2(400, 300))
 	# FULL ellipse closes the loop without duplicating the seam bullet.
-	var ell: Array = BulletPatterns2D.helper_generate_transforms_ellipse(12, marker, 150.0, 100.0, 0.0, 0.0, TAU, 0, 0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
+	var ell: Array = BulletPatterns2D.helper_generate_transforms_ellipse(12, marker, 150.0, 100.0, 0.0, 0.0, TAU, BulletPatterns2D.ELLIPSE_FULL, 0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
 	var stacked := false
 	for i in ell.size():
 		for j in range(i + 1, ell.size()):
@@ -638,7 +638,7 @@ func test_circle_screenshot_settings() -> void:
 	var ok: Dictionary = BulletPatterns2D.debug_verify_volley(plain, BulletPatterns2D.DEBUG_SHAPE_CIRCLE, marker, 55, {})
 	assert_true(bool(ok.get("ok", false)), "circle volley verifies (worst %.3f px)" % float(ok.get("worst_pos_px", -1.0)))
 
-func _heart_rings_cusp_ok(volley: Array, marker: Vector2, n: int) -> bool:
+func _heart_rings_cusp_ok(volley: Array, _marker: Vector2, n: int) -> bool:
 	# Even-count rings: uniform gaps. Odd-count rings: exactly one short
 	# chord, and it must sit on the cusp tip (lowest point of the heart).
 	for L in 3:
@@ -687,7 +687,7 @@ func test_debug_verify() -> void:
 	var star: Array = BulletPatterns2D.helper_generate_transforms_star(20, marker, 5, 150.0, 65.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
 	var sok: Dictionary = BulletPatterns2D.debug_verify_volley(star, BulletPatterns2D.DEBUG_SHAPE_STAR, marker, 20, {"points": 5, "outer_radius": 150.0, "inner_radius": 65.0})
 	assert_true(bool(sok.get("ok", false)), "star verify ok")
-	var tri: Array = BulletPatterns2D.helper_generate_transforms_triangle(9, marker, 0, 200.0, 200.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
+	var tri: Array = BulletPatterns2D.helper_generate_transforms_triangle(9, marker, BulletPatterns2D.TRIANGLE_EQUILATERAL, 200.0, 200.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
 	var tok: Dictionary = BulletPatterns2D.debug_verify_volley(tri, BulletPatterns2D.DEBUG_SHAPE_TRIANGLE, marker, 9, {"triangle_type": 0, "size_a": 200.0, "size_b": 200.0})
 	assert_true(bool(tok.get("ok", false)), "triangle verify ok")
 	# Unknown shape + bad count fail loudly, not silently.
@@ -737,7 +737,7 @@ func test_corner_facing() -> void:
 	# Real volley conformance under every facing policy.
 	var marker := Transform2D(0.0, Vector2(400, 300))
 	for facing in [0, 1, 2]:
-		var volley: Array = BulletPatterns2D.helper_generate_transforms_triangle(12, marker, 0, 200.0, 200.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 1, 1, 0, 0, 0.0, facing)
+		var volley: Array = BulletPatterns2D.helper_generate_transforms_triangle(12, marker, BulletPatterns2D.TRIANGLE_EQUILATERAL, 200.0, 200.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 1, 1, 0, 0, 0.0, facing)
 		var ok: Dictionary = BulletPatterns2D.debug_verify_volley(volley, BulletPatterns2D.DEBUG_SHAPE_TRIANGLE, marker, 12, {"triangle_type": 0, "size_a": 200.0, "size_b": 200.0, "outline_corner_facing": facing})
 		assert_true(bool(ok.get("ok", false)), "triangle verify facing %d" % facing)
 
@@ -825,10 +825,10 @@ func test_mix_match() -> void:
 
 func _fuzz_volley_finite(volley: Array) -> bool:
 	for t in volley:
-		var tr: Transform2D = t
-		if not tr.is_finite():
+		var transform_value: Transform2D = t
+		if not transform_value.is_finite():
 			return false
-		if not tr.origin.is_finite():
+		if not transform_value.origin.is_finite():
 			return false
 	return true
 
@@ -847,7 +847,7 @@ func test_fuzz_closed_shapes() -> void:
 			var q: Dictionary = BulletPatterns2D.debug_outline_quotas(BulletPatterns2D.DEBUG_SHAPE_RECTANGLE, n, {"size": Vector2(300, 200)})
 			assert_true(bool(q.get("optimal", false)) or n <= 4, "rect n=%d optimal" % n)
 		for facing in [0, 1, 2]:
-			var tri: Array = BulletPatterns2D.helper_generate_transforms_triangle(n, marker, 0, 200.0, 200.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 1, 1, 0, 0, 0.0, facing)
+			var tri: Array = BulletPatterns2D.helper_generate_transforms_triangle(n, marker, BulletPatterns2D.TRIANGLE_EQUILATERAL, 200.0, 200.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 1, 1, 0, 0, 0.0, facing)
 			assert_true(tri.size() == n and _fuzz_volley_finite(tri), "tri n=%d facing=%d sane" % [n, facing])
 		var star: Array = BulletPatterns2D.helper_generate_transforms_star(n, marker, 5, 150.0, 65.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
 		assert_true(star.size() == n and _fuzz_volley_finite(star), "star n=%d sane" % n)
@@ -866,7 +866,7 @@ func test_fuzz_closed_shapes() -> void:
 func test_wall_gaps_layers() -> void:
 	# WALL dodge gaps stay empty on every ring (resampling must not pave them).
 	var marker := Transform2D(0.0, Vector2(400, 300))
-	var wall: Array = BulletPatterns2D.helper_generate_transforms_ellipse(40, marker, 150.0, 100.0, 0.0, 0.0, TAU, 2, 2, 0.5, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
+	var wall: Array = BulletPatterns2D.helper_generate_transforms_ellipse(40, marker, 150.0, 100.0, 0.0, 0.0, TAU, BulletPatterns2D.ELLIPSE_WALL, 2, 0.5, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
 	assert_true(wall.size() > 0 and wall.size() <= 40, "wall emits survivors (%d)" % wall.size())
 	var centers := [TAU * 0.25, TAU * 0.75]
 	for t in wall:

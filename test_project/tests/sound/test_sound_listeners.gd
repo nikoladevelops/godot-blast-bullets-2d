@@ -8,7 +8,7 @@ extends BlastTest
 func _spawner_with_listener(source: int) -> BulletSpawner2D:
 	var sp := make_spawner(H.make_volley_data(1, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 1)
 	sp.sound_enabled = true
-	sp.sound_listener_source = source
+	sp.sound_listener_source = source as PatternSpawner2D.SoundListenerSource
 	return sp
 
 
@@ -42,7 +42,7 @@ func test_nearest_wins_tree_order_breaks_ties() -> void:
 	assert_almost_eq((busy_voices()[0] as Dictionary)["position"], Vector2(50, 0), Vector2(0.5, 0.5), "nearest listener wins")
 	factory.stop_sounds()
 	await idle(1)
-	var twin_a := make_listener(Vector2(100, 0), &"twins")
+	var _twin_a := make_listener(Vector2(100, 0), &"twins")
 	var twin_b := make_listener(Vector2(100, 0), &"twins")
 	sp.sound_listener_node_group = &"twins"
 	assert_true(sp.shoot_once(), "second shot fires")

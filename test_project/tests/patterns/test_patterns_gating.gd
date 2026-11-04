@@ -101,15 +101,15 @@ func test_a_shape_knob_shows_only_under_its_owning_shape() -> void:
 		if _owner(prop) < 0:
 			problems.append("%s has no owning shape prefix" % prop)
 	for src in BulletSpawner2D.PATTERN_FROM_LAST:
-		sp.pattern_source = src
+		sp.pattern_source = src as PatternSpawner2D.PatternSource
 		var vis := _visible_set()
 		for prop in props:
 			if prop.begins_with("helper_outline_") or SHARED_KNOBS.has(prop):
 				continue
-			var owner := _owner(prop)
-			if owner != src and vis.has(prop):
-				problems.append("%s visible under source %d (owner %d)" % [prop, src, owner])
-			elif owner == src and not vis.has(prop) and not SUB_RULED.has(prop):
+			var owner_src := _owner(prop)
+			if owner_src != src and vis.has(prop):
+				problems.append("%s visible under source %d (owner %d)" % [prop, src, owner_src])
+			elif owner_src == src and not vis.has(prop) and not SUB_RULED.has(prop):
 				problems.append("%s hidden under its own source %d" % [prop, src])
 	assert_eq(problems, [], "every shape knob follows its owner")
 	sp.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_STAR
@@ -160,7 +160,7 @@ func test_ellipse_triangle_and_path2d_sub_rules() -> void:
 	sp.helper_triangle_type = BulletPatterns2D.TRIANGLE_EQUILATERAL
 	assert_false(is_editor_visible(sp, &"helper_triangle_size_b"), "equilateral has no second size")
 	assert_true(is_editor_visible(sp, &"helper_triangle_size_a"), "first size always")
-	sp.helper_triangle_type = BulletPatterns2D.TRIANGLE_EQUILATERAL + 1
+	sp.helper_triangle_type = BulletPatterns2D.TRIANGLE_ISOSCELES
 	assert_true(is_editor_visible(sp, &"helper_triangle_size_b"), "other kinds show it")
 	sp.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_PATH2D
 	for dist in [BulletSpawner2D.PATH2D_DISTRIBUTION_FIXED_SPACING, BulletSpawner2D.PATH2D_DISTRIBUTION_EVEN]:
@@ -203,7 +203,7 @@ func test_outline_knobs_follow_shape_placement_fill_and_corner_mode() -> void:
 	# A smooth loop, two corner loops, a non-outline shape and the scatter
 	# disc (which never takes the outline layout).
 	for shape_name in ["Circle", "Rectangle", "Star", "Line", "Scatter"]:
-		sp.pattern_source = _id(shape_name)
+		sp.pattern_source = _id(shape_name) as PatternSpawner2D.PatternSource
 		var outline: bool = OUTLINE_SHAPES.has(shape_name)
 		var corners: bool = CORNER_SHAPES.has(shape_name)
 		for placement in [BulletPatterns2D.OUTLINE_ON_OUTLINE, BulletPatterns2D.OUTLINE_LAYERS, BulletPatterns2D.OUTLINE_FILL_INSIDE]:
@@ -225,7 +225,7 @@ func test_outline_knobs_follow_shape_placement_fill_and_corner_mode() -> void:
 func test_shared_amount_skip_and_aimed_target() -> void:
 	var problems: Array = []
 	for s in shapes:
-		sp.pattern_source = int(s["id"])
+		sp.pattern_source = int(s["id"]) as PatternSpawner2D.PatternSource
 		var vis := _visible_set()
 		var helper_shape: bool = s["id"] > BulletSpawner2D.PATTERN_FROM_SELF
 		if vis.has("helper_bullets_amount") != (helper_shape and s["name"] != "Custom"):

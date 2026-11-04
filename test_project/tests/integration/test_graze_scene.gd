@@ -36,14 +36,14 @@ func test_serialized_graze_properties_load() -> void:
 
 
 func test_graze_then_hit_in_real_frames() -> void:
-	var log: Array = []
-	enemy.bullet_grazed.connect(func(t: Node2D, _v: BulletVolley2D, _i: int, _z: GrazeZone2D, r: int) -> void: log.append("graze %d %s" % [r, t.name]))
-	enemy.bullet_graze_exited.connect(func(_t: Node2D, _v: BulletVolley2D, _i: int, _z: GrazeZone2D, r: int) -> void: log.append("exit %d" % r))
-	enemy.area_entered.connect(func(a: Object, _v: BulletVolley2D, _i: int) -> void: log.append("hit %s" % (a as Node).name))
+	var log_entries: Array = []
+	enemy.bullet_grazed.connect(func(t: Node2D, _v: BulletVolley2D, _i: int, _z: GrazeZone2D, r: int) -> void: log_entries.append("graze %d %s" % [r, t.name]))
+	enemy.bullet_graze_exited.connect(func(_t: Node2D, _v: BulletVolley2D, _i: int, _z: GrazeZone2D, r: int) -> void: log_entries.append("exit %d" % r))
+	enemy.area_entered.connect(func(a: Object, _v: BulletVolley2D, _i: int) -> void: log_entries.append("hit %s" % (a as Node).name))
 	assert_true(enemy.shoot_once(), "fired")
 	for i in 120:
 		await physics()
-		if log.has("hit Player"):
+		if log_entries.has("hit Player"):
 			break
 	await physics(10)
-	assert_eq(log, ["graze 0 Player", "graze 1 Player", "hit Player"], "outer ring, inner ring, then the killing hit: no exit for a dead bullet")
+	assert_eq(log_entries, ["graze 0 Player", "graze 1 Player", "hit Player"], "outer ring, inner ring, then the killing hit: no exit for a dead bullet")
