@@ -1475,3 +1475,103 @@ func test_spawn_layer_effect_refuses_an_animation_without_playable_time() -> voi
 	assert_eq(factory.spawn_layer_effect(held, Transform2D(0.0, Vector2(40, 0))), -1, "refused")
 	expect_error_sequence(["BulletFactory2D.spawn_layer_effect: the layer's animation has no playable time (speed 0 holds its frame), nothing spawned."])
 	assert_eq(int(factory.debug_get_effect_state()["manual_bakes"]), manual_before, "no bake built or dropped")
+
+
+## A pooled volley reused for data with NO effect layers starts clean: the
+## previous life's trail and one-shot routing are dropped, never replayed.
+## The pool keeps its internal cache while the volley waits (the previous
+## life's in-flight one-shots must finish), but nothing plays from it.
+func test_pooled_reuse_without_layers_starts_clean() -> void:
+	await _preamble()
+	await _settle(factory)
+	var with_layers := _fx_data(Vector2.ZERO, 0.0, [_make_layer(0, 1), _make_layer(2, 4)], false)
+	with_layers.max_life_time = 0.2
+	var v: BulletVolley2D = factory.spawn_volley(with_layers)
+	assert_true(v.has_trail_effects(), "the first life baked its trail")
+	for i in 60:
+		await physics()
+		if not v.is_bullet_status_enabled(0):
+			break
+	assert_true(v.is_pooled(), "the first life drained into the pool")
+	var pooled_info: Dictionary = v.debug_get_effect_layers_info()
+	assert_eq(int(pooled_info.get("data_layer_count", -1)), 2, "the pooled cache still names the old layers")
+	assert_eq(int(pooled_info.get("trail_bake_count", -1)), 1, "the pooled cache still holds the old trail bake")
+	assert_eq(factory.get_active_effect_count(), 0, "pooling plays nothing")
+	var plain := _fx_data(Vector2.ZERO, 0.0, [], false)
+	plain.max_life_time = 0.2
+	factory.debug_reset_pool_stats()
+	factory.debug_set_effect_log_enabled(true)
+	factory.debug_clear_effect_log()
+	var again: BulletVolley2D = factory.spawn_volley(plain)
+	assert_eq(again, v, "the pooled volley is reused")
+	assert_eq(int(factory.debug_get_pool_hit_stats().get("hits", 0)), 1, "the second spawn came from the pool")
+	var info: Dictionary = again.debug_get_effect_layers_info()
+	assert_false(again.has_trail_effects(), "no trail for the new life")
+	assert_eq(int(info.get("data_layer_count", -1)), 0, "no effect layer named for the new life")
+	assert_eq(int(info.get("trail_bake_count", -1)), 0, "no trail bake for the new life")
+	for bake in factory.debug_get_effect_state().get("bakes", []):
+		assert_ne(int(bake.get("volley", 0)), int(again.get_instance_id()), "no one-shot bake routed to the reused volley")
+	await idle(1) # let the cleared trail shard nodes finish queue_free
+	var strays := 0
+	for child in again.get_children():
+		if child is MultiMeshInstance2D:
+			strays += 1
+	assert_eq(strays, 0, "the old trail shard nodes are gone, not drawn")
+	for i in 60:
+		await physics()
+		if not again.is_bullet_status_enabled(0):
+			break
+	assert_true(again.is_pooled(), "the second life drained too")
+	assert_eq(factory.get_active_effect_count(), 0, "the new life played no effect")
+	assert_eq(factory.debug_get_effect_log().size(), 0, "no trigger row fired for the new life")
+
+
+## A pooled volley reused with DIFFERENT layers uses only the new ones: the
+## old trigger never fires on the new life, and the new layers work.
+func test_pooled_reuse_with_different_layers_uses_only_the_new_ones() -> void:
+	await _preamble()
+	await _settle(factory)
+	var first := _fx_data(Vector2.ZERO, 0.0, [_make_layer(1, 4)], false) # On Spawn
+	first.max_life_time = 0.2
+	var v: BulletVolley2D = factory.spawn_volley(first)
+	assert_eq(factory.get_active_effect_count(), 1, "the old On Spawn layer flashed")
+	for i in 60:
+		await physics()
+		if not v.is_bullet_status_enabled(0):
+			break
+	assert_true(v.is_pooled(), "the first life pooled")
+	var new_trail := _make_layer(0, 1)
+	var new_hit := _make_layer(2, 4)
+	var second := _fx_data(Vector2.ZERO, 300.0, [new_trail, new_hit], false)
+	second.max_life_time = 2.0
+	second.set_bullet_max_collision_count(0) # the wall hit is survived, so On Hit owns it
+	factory.clear_sprite_effects()
+	factory.debug_reset_pool_stats()
+	factory.debug_set_effect_log_enabled(true)
+	factory.debug_clear_effect_log()
+	var again: BulletVolley2D = factory.spawn_volley(second)
+	assert_eq(again, v, "the pooled volley is reused")
+	assert_eq(int(factory.debug_get_pool_hit_stats().get("hits", 0)), 1, "the second spawn came from the pool")
+	assert_true(again.has_trail_effects(), "the NEW trail baked")
+	var info: Dictionary = again.debug_get_effect_layers_info()
+	assert_eq(int(info.get("data_layer_count", -1)), 2, "only the new layers are named")
+	var bakes: Array = info.get("trail_bakes", [])
+	assert_eq(bakes.size(), 1, "one new trail bake")
+	assert_eq(int(bakes[0].get("frames", -1)), 1, "the bake is the new 1-frame trail, not the old 4-frame layer")
+	assert_eq(factory.get_active_effect_count(), 0, "the old On Spawn layer did not fire on the new life")
+	assert_eq(factory.debug_get_effect_log().size(), 0, "no effect row at the new spawn")
+	for i in 60:
+		await physics()
+		if again.get_bullet_collision_count(0) >= 1:
+			break
+	assert_gte(again.get_bullet_collision_count(0), 1, "the new life hit the wall")
+	assert_eq(factory.get_active_effect_count(), 1, "the new On Hit layer fired once")
+	var hit_rows := 0
+	var spawn_rows := 0
+	for e in factory.debug_get_effect_log():
+		if int(e.get("trigger", -1)) == 2:
+			hit_rows += 1
+		if int(e.get("trigger", -1)) == 1:
+			spawn_rows += 1
+	assert_eq(hit_rows, 1, "exactly one new On Hit")
+	assert_eq(spawn_rows, 0, "the old On Spawn never fired on the new life")
