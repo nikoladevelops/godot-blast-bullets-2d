@@ -4,7 +4,9 @@
 // side (spawn, tick, pool, signals) in factory/bullet_factory2d_lasers.cpp.
 
 #include "laser/laser_volley2d.hpp"
+
 #include "core/live_object2d.hpp"
+#include "core/physics_flush2d.hpp"
 #include "laser/laser_geometry2d.hpp"
 #include "targets/bullet_targets2d.hpp"
 
@@ -186,6 +188,8 @@ void LaserVolley2D::begin_life(BulletFactory2D *p_factory, const Ref<LaserData2D
 	pattern_target_warned = false;
 	charge_announced = false;
 	ended_early = false;
+	tip_hits_wanted = false;
+	tips_measured_at = UINT64_MAX;
 	++life_id;
 	active = true;
 	pooled = false;
@@ -664,6 +668,21 @@ bool LaserVolley2D::is_beam_blocked(int beam_index) const {
 	return beams[beam_index].blocked;
 }
 
+bool LaserVolley2D::is_beam_tip_hitting(int beam_index) {
+	LASER_BEAM_INDEX_OR("is_beam_tip_hitting", false)
+	if (!active) {
+		return false;
+	}
+	// From now on every hitting tick measures the ends. Asked before this
+	// tick measured them: measure now (never inside a physics flush, where
+	// the space refuses queries: the next tick measures).
+	tip_hits_wanted = true;
+	if (tips_measured_at != tick_count && hitting_phase() && !PhysicsFlush2D::flushing()) {
+		measure_tip_contacts();
+	}
+	return tip_hitting(beams[beam_index]);
+}
+
 Vector2 LaserVolley2D::get_beam_wall_point(int beam_index) const {
 	LASER_BEAM_INDEX_OR("get_beam_wall_point", Vector2())
 	return beams[beam_index].wall_point;
@@ -1057,6 +1076,7 @@ void LaserVolley2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_beam_length", "beam_index"), &LaserVolley2D::get_beam_length);
 	ClassDB::bind_method(D_METHOD("get_beam_angle", "beam_index"), &LaserVolley2D::get_beam_angle);
 	ClassDB::bind_method(D_METHOD("is_beam_blocked", "beam_index"), &LaserVolley2D::is_beam_blocked);
+	ClassDB::bind_method(D_METHOD("is_beam_tip_hitting", "beam_index"), &LaserVolley2D::is_beam_tip_hitting);
 	ClassDB::bind_method(D_METHOD("get_beam_wall_point", "beam_index"), &LaserVolley2D::get_beam_wall_point);
 	ClassDB::bind_method(D_METHOD("get_beam_wall_normal", "beam_index"), &LaserVolley2D::get_beam_wall_normal);
 	ClassDB::bind_method(D_METHOD("get_pierced_targets", "beam_index"), &LaserVolley2D::get_pierced_targets);

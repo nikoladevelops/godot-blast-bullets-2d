@@ -479,6 +479,50 @@ bool LaserVolley2D::end_contacts(uint64_t self_id, uint32_t life, bool only_spen
 	return true;
 }
 
+void LaserVolley2D::measure_tip_contacts() {
+	const LaserData2D *d = data.ptr();
+	PhysicsDirectSpaceState2D *space = nullptr;
+	bool looked_up = false;
+	tips_measured_at = tick_count;
+	for (Beam &b : beams) {
+		b.tip_on_target = false;
+		if (d == nullptr || b.spent || b.contacts.empty() || b.points.size() < 2 || factory == nullptr) {
+			continue;
+		}
+		if (!looked_up) {
+			looked_up = true;
+			RID space_rid = factory->physics_space;
+			if (!space_rid.is_valid() && is_inside_tree() && get_world_2d().is_valid()) {
+				space_rid = get_world_2d()->get_space();
+			}
+			space = space_rid.is_valid() ? PhysicsServer2D::get_singleton()->space_get_direct_state(space_rid) : nullptr;
+		}
+		if (space == nullptr || !query_shape.is_valid() || shape_query.is_null()) {
+			continue;
+		}
+		// A box of the half width around the end, turned with the last segment:
+		// the end is on a target when it touches one the beam hits now.
+		const Vector2 end = b.points.back();
+		const Vector2 dir = end - b.points[b.points.size() - 2];
+		const real_t half = Math::max(laser_query_half_width2d(get_current_width()), (real_t)1.0);
+		if (!Math::is_finite(end.x) || !Math::is_finite(end.y)) {
+			continue;
+		}
+		PhysicsServer2D::get_singleton()->shape_set_data(query_shape, Vector2(half, half));
+		shape_query->set_transform(Transform2D(dir.angle(), end));
+		const TypedArray<Dictionary> hits = space->intersect_shape(shape_query, Math::max(d->max_hits_per_beam, 1));
+		for (int h = 0; h < hits.size() && !b.tip_on_target; ++h) {
+			const uint64_t id = (uint64_t)(int64_t)(((Dictionary)hits[h])["collider_id"]);
+			for (const Contact &c : b.contacts) {
+				if (c.id == id) {
+					b.tip_on_target = true;
+					break;
+				}
+			}
+		}
+	}
+}
+
 bool LaserVolley2D::update_contacts(int beam_index, uint64_t self_id, uint32_t life) {
 	const LaserData2D *d = data.ptr();
 	Beam &b = beams[beam_index];
@@ -1090,6 +1134,7 @@ void LaserVolley2D::tick(double delta) {
 	}
 	const uint64_t self_id = get_instance_id();
 	const uint32_t life = life_id;
+	++tick_count;
 	// Last tick's geometry: the interpolation pass lerps from it.
 	prev_width = get_current_width();
 	for (Beam &b : beams) {
@@ -1186,6 +1231,10 @@ void LaserVolley2D::tick(double delta) {
 			if (!hitting_phase()) {
 				break; // a handler ended the laser: the rest end below
 			}
+		}
+		const Ref<LaserSpriteLook2D> &tip = d->looks[LaserData2D::LOOK_TIP];
+		if (tip_hits_wanted || (tip.is_valid() && tip->show_when != LaserSpriteLook2D::SHOW_ALWAYS)) {
+			measure_tip_contacts();
 		}
 		if (hitting_phase() && !update_graze(self_id, life)) {
 			return;

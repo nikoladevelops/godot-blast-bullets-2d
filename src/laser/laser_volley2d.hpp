@@ -76,6 +76,10 @@ public:
 		std::vector<double> impact_since; // laser clock each impact appeared (its animation)
 		bool blocked = false;
 		bool wall_reported = false; // laser_wall_hit sent for this block
+		// The end sits on a target it hits (measured after this tick's
+		// contacts: a box of the half width around the end touches one of
+		// them). See tip_hitting().
+		bool tip_on_target = false;
 		Vector2 wall_point;
 		Vector2 wall_normal;
 		std::vector<Contact> contacts;
@@ -180,6 +184,12 @@ public:
 	real_t get_beam_length(int beam_index) const;
 	real_t get_beam_angle(int beam_index) const;
 	bool is_beam_blocked(int beam_index) const;
+	// The beam's end is hitting: stopped by a wall (outside the charge) or
+	// on a target the beam hits now (LaserSpriteLook2D.show_when).
+	// Measured in the tick only while wanted (a tip look with show_when, or
+	// once a script asked); asked between ticks it measures at once.
+	bool is_beam_tip_hitting(int beam_index);
+	bool tip_hitting(const Beam &b) const { return (b.blocked && phase != PHASE_CHARGING) || (tips_measured_at == tick_count && b.tip_on_target && !b.contacts.empty()); }
 	Vector2 get_beam_wall_point(int beam_index) const;
 	Vector2 get_beam_wall_normal(int beam_index) const;
 	Array get_pierced_targets(int beam_index) const;
@@ -300,6 +310,9 @@ private:
 	LaserPhase phase = PHASE_CHARGING;
 	double phase_time = 0.0;
 	double clock = 0.0; // laser time since begin_life
+	uint64_t tick_count = 0; // ticks run (this life and before)
+	uint64_t tips_measured_at = UINT64_MAX; // tick_count when Beam::tip_on_target was measured
+	bool tip_hits_wanted = false; // a script asked is_beam_tip_hitting this life
 	double grow_started = 0.0; // clock of the GROWING start (body, muzzle, tip animations)
 	// Last tick's width and step: the draw lerps the width and runs the tile
 	// scroll on the interpolated clock.
@@ -433,6 +446,8 @@ private:
 	void rebind_anchor(uint64_t id);
 	bool target_position(const Beam &b, Vector2 &r_pos) const;
 	bool hitting_phase() const;
+	// Measures Beam::tip_on_target for every beam (no user code).
+	void measure_tip_contacts();
 	double phase_length(LaserPhase p) const;
 	// Advances the phase clock; emits laser_phase_changed per change. False
 	// when user code took the laser away.

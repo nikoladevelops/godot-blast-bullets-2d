@@ -33,6 +33,9 @@
 		<member name="scale" type="Vector2" setter="set_scale" getter="get_scale" default="Vector2(1, 1)">
 			The frame's scale along its own axes (after [member rotation_degrees]).
 		</member>
+		<member name="show_when" type="int" setter="set_show_when" getter="get_show_when" enum="LaserSpriteLook2D.ShowWhen" default="0">
+			When the look draws at the end of a beam: always, only while the end is hitting (stopped by a wall, or sitting on a target the beam hits now), or only while it is not. Pick [constant SHOW_WHEN_HITTING] for an impact sparkle that never shows in empty space. Read by the tip slot ([member LaserData2D.tip_look]) only; the other slots draw at their own events and ignore it. See [method LaserVolley2D.is_beam_tip_hitting].
+		</member>
 		<member name="speed_scale" type="float" setter="set_speed_scale" getter="get_speed_scale" default="1.0">
 			Plays the animation this many times faster (0 holds the first frame). Finite and &gt;= 0.
 		</member>
@@ -46,4 +49,15 @@
 			The draw order of this look's canvas item (-4096..4096), relative to the laser ([member LaserData2D.z_index]) while [member z_as_relative] is on.
 		</member>
 	</members>
+	<constants>
+		<constant name="SHOW_ALWAYS" value="0" enum="ShowWhen">
+			Draws on every live beam, hit or not (the default).
+		</constant>
+		<constant name="SHOW_WHEN_HITTING" value="1" enum="ShowWhen">
+			Draws only while the beam's end is stopped by a wall or sits on a target the beam hits now.
+		</constant>
+		<constant name="SHOW_WHEN_NOT_HITTING" value="2" enum="ShowWhen">
+			Draws only while the beam's end hits nothing (a "searching" glow that goes out on impact).
+		</constant>
+	</constants>
 </class>

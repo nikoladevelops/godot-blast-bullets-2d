@@ -26,14 +26,14 @@
 			<return type="Array" />
 			<param index="0" name="fraction" type="float" default="-1.0" />
 			<description>
-				Returns, per beam, exactly what the next draw uses at [param fraction] (-1 = the interpolation fraction now, 1 = this tick): [code]points[/code], [code]width[/code] (the hit width), [code]body_width[/code] (drawn), [code]color[/code], [code]warning[/code], the [code]charge[/code] / [code]body[/code] / [code]muzzle[/code] / [code]tip[/code] frames, [code]pierces[/code] and [code]impacts[/code] ([position, frame] pairs) and [code]spent[/code].
+				Returns, per beam, exactly what the next draw uses at [param fraction] (-1 = the interpolation fraction now, 1 = this tick): [code]points[/code], [code]width[/code] (the hit width), [code]body_width[/code] (drawn), [code]color[/code], [code]warning[/code], the [code]charge[/code] / [code]body[/code] / [code]muzzle[/code] / [code]tip[/code] frames (no tip where [member LaserSpriteLook2D.show_when] leaves it out), [code]tip_hitting[/code] ([method is_beam_tip_hitting]), [code]pierces[/code] and [code]impacts[/code] ([position, frame] pairs) and [code]spent[/code].
 			</description>
 		</method>
 		<method name="debug_get_look_draws" qualifiers="const">
 			<return type="Array" />
 			<param index="0" name="fraction" type="float" default="-1.0" />
 			<description>
-				Returns every point look the next draw places at [param fraction] (-1 = the interpolation fraction now), in draw order: [code]{slot, transform, texture, color}[/code] with [code]slot[/code] one of [code]"charge"[/code], [code]"muzzle"[/code], [code]"tip"[/code], [code]"pierce"[/code], [code]"wall_impact"[/code]. A hidden ([member LaserSpriteLook2D.visible] off) or frameless look is not listed.
+				Returns every point look the next draw places at [param fraction] (-1 = the interpolation fraction now), in draw order: [code]{slot, transform, texture, color}[/code] with [code]slot[/code] one of [code]"charge"[/code], [code]"muzzle"[/code], [code]"tip"[/code], [code]"pierce"[/code], [code]"wall_impact"[/code]. A hidden ([member LaserSpriteLook2D.visible] off) or frameless look is not listed, nor a tip its [member LaserSpriteLook2D.show_when] leaves out.
 			</description>
 		</method>
 		<method name="debug_get_look_layers" qualifiers="const">
@@ -208,6 +208,13 @@
 			<param index="0" name="beam_index" type="int" />
 			<description>
 				Returns [code]true[/code] while beam [param beam_index] is stopped by a wall.
+			</description>
+		</method>
+		<method name="is_beam_tip_hitting">
+			<return type="bool" />
+			<param index="0" name="beam_index" type="int" />
+			<description>
+				Returns [code]true[/code] while the end of beam [param beam_index] is hitting: stopped by a wall (outside the charge), or sitting on a target the beam hits now (a box of half the beam's width around the end touches it: a [member LaserData2D.pierce_limit] cut, a Lock On end, a bolt head inside a target). A target crossed earlier along the body does not count. This is what [member LaserSpriteLook2D.show_when] reads. The ends are measured (one physics query per beam touching a target) only while something wants them: a tip look that is not [constant LaserSpriteLook2D.SHOW_ALWAYS], or, after the first call, every tick of this life. A first call measures at once, except inside a physics callback (the space refuses queries there), where it counts walls only until the next tick.
 			</description>
 		</method>
 		<method name="is_graze_armed" qualifiers="const">

@@ -125,6 +125,17 @@ void LaserSpriteLook2D::set_visible(bool value) {
 	emit_changed();
 }
 
+void LaserSpriteLook2D::set_show_when(ShowWhen value) {
+	if (value < SHOW_ALWAYS || value > SHOW_WHEN_NOT_HITTING) {
+		UtilityFunctions::push_error("LaserSpriteLook2D: show_when must be 0 (Always), 1 (When Hitting) or 2 (When Not Hitting), keeping the old value.");
+		return;
+	}
+	if (!assign_if_changed2d(show_when, (int)value)) {
+		return;
+	}
+	emit_changed();
+}
+
 Transform2D LaserSpriteLook2D::pose_at(const Vector2 &point, real_t beam_angle) const {
 	const real_t turn = align_to_beam ? beam_angle : (real_t)0.0;
 	const Vector2 at = point + offset.rotated(turn);
@@ -153,6 +164,11 @@ void LaserSpriteLook2D::_bind_methods() {
 	LOOK_BIND(z_as_relative, BOOL, PROPERTY_HINT_NONE, "")
 	LOOK_BIND(material, OBJECT, PROPERTY_HINT_RESOURCE_TYPE, "CanvasItemMaterial,ShaderMaterial")
 	LOOK_BIND(visible, BOOL, PROPERTY_HINT_NONE, "")
+	LOOK_BIND(show_when, INT, PROPERTY_HINT_ENUM, "Always,When Hitting,When Not Hitting")
+
+	BIND_ENUM_CONSTANT(SHOW_ALWAYS);
+	BIND_ENUM_CONSTANT(SHOW_WHEN_HITTING);
+	BIND_ENUM_CONSTANT(SHOW_WHEN_NOT_HITTING);
 }
 
 #undef LOOK_BIND

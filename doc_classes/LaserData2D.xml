@@ -146,7 +146,7 @@
 			Beams: how fast the beam turns around its muzzle, in degrees per second (negative turns the other way). 0 = no sweep.
 		</member>
 		<member name="tip_look" type="LaserSpriteLook2D" setter="set_tip_look" getter="get_tip_look">
-			Drawn at the end of each beam (the head of a bolt or curvy laser) while it fires, playing from the growing start.
+			Drawn at the end of each beam (the head of a bolt or curvy laser) while it fires, playing from the growing start. Its [member LaserSpriteLook2D.show_when] decides whether it also draws where the end hits nothing (an impact sparkle: [constant LaserSpriteLook2D.SHOW_WHEN_HITTING]).
 		</member>
 		<member name="turn_rate_degrees" type="float" setter="set_turn_rate_degrees" getter="get_turn_rate_degrees" default="90.0">
 			Track (and tracking bolt and curvy heads): how fast it turns toward its target, in degrees per second. 0 snaps onto it.

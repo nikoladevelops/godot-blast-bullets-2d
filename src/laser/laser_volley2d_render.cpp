@@ -468,7 +468,10 @@ void LaserVolley2D::collect_look_marks(double fraction, const std::vector<BeamDr
 			if (d->type == LaserData2D::LASER_BEAM) {
 				mark(LaserData2D::LOOK_MUZZLE, clock - grow_started, pts.front(), (pts[1] - pts[0]).angle());
 			}
-			mark(LaserData2D::LOOK_TIP, clock - grow_started, pts.back(), (pts[pts.size() - 1] - pts[pts.size() - 2]).angle());
+			const Ref<LaserSpriteLook2D> &tip = d->looks[LaserData2D::LOOK_TIP];
+			if (tip.is_null() || tip->shows_at_end(tip_hitting(b))) {
+				mark(LaserData2D::LOOK_TIP, clock - grow_started, pts.back(), (pts[pts.size() - 1] - pts[pts.size() - 2]).angle());
+			}
 			for (const DrawMark2D &m : frame.pierces) {
 				mark(LaserData2D::LOOK_PIERCE, clock - m.since, m.position, m.angle);
 			}
@@ -636,7 +639,10 @@ Array LaserVolley2D::debug_get_draw_state(double fraction) const {
 		s["charge"] = charging ? Variant(look_texture(LaserData2D::LOOK_CHARGE, clock)) : Variant();
 		s["body"] = !charging ? Variant(anim_body.texture_at(clock - grow_started)) : Variant();
 		s["muzzle"] = !charging ? Variant(look_texture(LaserData2D::LOOK_MUZZLE, clock - grow_started)) : Variant();
-		s["tip"] = !charging ? Variant(look_texture(LaserData2D::LOOK_TIP, clock - grow_started)) : Variant();
+		const Ref<LaserSpriteLook2D> &tip = d->looks[LaserData2D::LOOK_TIP];
+		const bool tip_shown = tip.is_null() || tip->shows_at_end(tip_hitting(b));
+		s["tip"] = !charging && tip_shown ? Variant(look_texture(LaserData2D::LOOK_TIP, clock - grow_started)) : Variant();
+		s["tip_hitting"] = tip_hitting(b);
 		Array pierces;
 		for (const DrawMark2D &m : frame.pierces) {
 			Array entry;

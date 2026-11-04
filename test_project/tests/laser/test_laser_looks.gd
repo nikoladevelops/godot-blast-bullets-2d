@@ -51,9 +51,10 @@ func _marks(l: LaserVolley2D, slot: String) -> Array:
 
 func test_the_look_is_bound_with_defaults_and_refuses_bad_input() -> void:
 	var look := LaserSpriteLook2D.new()
-	for m in ["set_frames", "set_animation", "set_speed_scale", "set_scale", "set_offset", "set_rotation_degrees", "set_align_to_beam", "set_modulate", "set_z_index", "set_z_as_relative", "set_material", "set_visible"]:
+	for m in ["set_frames", "set_animation", "set_speed_scale", "set_scale", "set_offset", "set_rotation_degrees", "set_align_to_beam", "set_modulate", "set_z_index", "set_z_as_relative", "set_material", "set_visible", "set_show_when"]:
 		assert_true(look.has_method(m), "LaserSpriteLook2D.%s is bound" % m)
-	assert_eq([look.animation, look.speed_scale, look.scale, look.offset, look.rotation_degrees, look.align_to_beam, look.modulate, look.z_index, look.z_as_relative, look.visible], [&"", 1.0, Vector2.ONE, Vector2.ZERO, 0.0, true, Color.WHITE, 0, true, true], "defaults")
+	assert_eq([look.animation, look.speed_scale, look.scale, look.offset, look.rotation_degrees, look.align_to_beam, look.modulate, look.z_index, look.z_as_relative, look.visible, look.show_when], [&"", 1.0, Vector2.ONE, Vector2.ZERO, 0.0, true, Color.WHITE, 0, true, true, LaserSpriteLook2D.SHOW_ALWAYS], "defaults")
+	assert_eq([LaserSpriteLook2D.SHOW_ALWAYS, LaserSpriteLook2D.SHOW_WHEN_HITTING, LaserSpriteLook2D.SHOW_WHEN_NOT_HITTING], [0, 1, 2], "serialized show_when ids")
 	watch_signals(look)
 	look.speed_scale = -1.0
 	look.speed_scale = NAN
@@ -62,6 +63,8 @@ func test_the_look_is_bound_with_defaults_and_refuses_bad_input() -> void:
 	look.rotation_degrees = INF
 	look.modulate = Color(NAN, 1, 1)
 	look.z_index = 5000
+	look.show_when = 3
+	look.show_when = -1
 	expect_error_sequence([
 		"LaserSpriteLook2D: speed_scale must be finite and >= 0 (0 = holds the first frame), keeping the old value.",
 		"LaserSpriteLook2D: speed_scale must be finite and >= 0 (0 = holds the first frame), keeping the old value.",
@@ -70,8 +73,10 @@ func test_the_look_is_bound_with_defaults_and_refuses_bad_input() -> void:
 		"LaserSpriteLook2D: rotation_degrees must be finite, keeping the old value.",
 		"LaserSpriteLook2D: modulate must be finite, keeping the old value.",
 		"LaserSpriteLook2D: z_index must be between -4096 and 4096, keeping the old value.",
+		"LaserSpriteLook2D: show_when must be 0 (Always), 1 (When Hitting) or 2 (When Not Hitting), keeping the old value.",
+		"LaserSpriteLook2D: show_when must be 0 (Always), 1 (When Hitting) or 2 (When Not Hitting), keeping the old value.",
 	])
-	assert_eq([look.speed_scale, look.scale, look.offset, look.rotation_degrees, look.modulate, look.z_index], [1.0, Vector2.ONE, Vector2.ZERO, 0.0, Color.WHITE, 0], "old values kept")
+	assert_eq([look.speed_scale, look.scale, look.offset, look.rotation_degrees, look.modulate, look.z_index, look.show_when], [1.0, Vector2.ONE, Vector2.ZERO, 0.0, Color.WHITE, 0, LaserSpriteLook2D.SHOW_ALWAYS], "old values kept")
 	assert_signal_emit_count(look, "changed", 0, "a refused edit changes nothing")
 
 
@@ -290,3 +295,126 @@ func test_an_old_scene_file_loads_its_looks() -> void:
 	assert_almost_eq(d.wall_impact_look.scale.x, 2.82, 0.0001, "effects_scale applied after the frames")
 	assert_not_null(d.body_material, "material became the body material")
 	assert_eq(d.z_index, 3, "the rest loads as before")
+
+
+## The tip's show_when per mode: [Always, When Hitting, When Not Hitting]
+## drawn, and is_beam_tip_hitting.
+func _tip_modes(l: LaserVolley2D, tip: LaserSpriteLook2D) -> Array:
+	var drawn := []
+	for mode in [LaserSpriteLook2D.SHOW_ALWAYS, LaserSpriteLook2D.SHOW_WHEN_HITTING, LaserSpriteLook2D.SHOW_WHEN_NOT_HITTING]:
+		tip.show_when = mode
+		drawn.append(_marks(l, "tip").size())
+	tip.show_when = LaserSpriteLook2D.SHOW_ALWAYS
+	return [drawn, l.is_beam_tip_hitting(0)]
+
+
+func test_show_when_draws_the_tip_only_where_the_end_is_hitting_as_asked() -> void:
+	var d := H.make_laser(0.0, 0.0, 0.0, 0.0, 400.0)
+	d.wall_mask = 16
+	var tip := _look()
+	d.tip_look = tip
+	var l := _fire(d)
+	step_factory(1, DT)
+	assert_eq(_tip_modes(l, tip), [[1, 0, 1], false], "empty space: the end hits nothing")
+	var wall := make_wall(Vector2(300, 0), Vector2(20, 200), 16)
+	await idle(2)
+	step_factory(1, DT)
+	assert_almost_eq(l.get_beam_end(0).x, 290.0, 0.01, "the wall stops it")
+	assert_eq(_tip_modes(l, tip), [[1, 1, 0], true], "stopped by a wall: hitting")
+	wall.position = Vector2(300, 900)
+	await idle(2)
+	var area := make_area(Vector2(150, 0), Vector2(20, 60))
+	await idle(2)
+	step_factory(1, DT)
+	assert_eq(l.get_pierced_targets(0), [area], "the beam passes through a target")
+	assert_eq(_tip_modes(l, tip), [[1, 0, 1], false], "a target along the body is not the end")
+	d.pierce_limit = 1
+	step_factory(1, DT)
+	assert_almost_eq(l.get_beam_end(0).x, 150.0, 0.01, "pierce_limit cuts it on the target")
+	assert_eq(_tip_modes(l, tip), [[1, 1, 0], true], "cut on a target: hitting")
+	assert_true(l.debug_get_draw_state(1.0)[0]["tip_hitting"], "the draw state reports it")
+	tip.show_when = LaserSpriteLook2D.SHOW_WHEN_NOT_HITTING
+	assert_null(l.debug_get_draw_state(1.0)[0]["tip"], "the draw state leaves a hidden tip out")
+	l.end_laser(false)
+	expect_no_errors()
+
+
+func test_show_when_follows_a_lock_on_beam_onto_its_target() -> void:
+	var area := make_area(Vector2(200, 0), Vector2(30, 30))
+	await idle(2)
+	var d := H.make_laser(0.0, 0.0, 0.0, 0.0, 400.0)
+	d.aim = LaserData2D.LASER_AIM_LOCK_ON
+	var tip := _look()
+	tip.show_when = LaserSpriteLook2D.SHOW_WHEN_HITTING
+	d.tip_look = tip
+	var l := _fire(d)
+	l.set_beam_target(0, area)
+	step_factory(1, DT)
+	assert_almost_eq(l.get_beam_end(0).x, 200.0, 0.01, "ends on its target")
+	assert_true(l.is_beam_tip_hitting(0), "on its target: hitting")
+	assert_eq(_marks(l, "tip").size(), 1, "When Hitting: drawn")
+	area.position = Vector2(900, 0)
+	await idle(2)
+	step_factory(1, DT)
+	assert_almost_eq(l.get_beam_length(0), 400.0, 0.01, "out of reach: capped at length")
+	assert_false(l.is_beam_tip_hitting(0), "short of its target: not hitting")
+	assert_eq(_marks(l, "tip").size(), 0, "When Hitting: the sparkle stays away from empty space")
+
+
+func test_show_when_follows_a_bolt_head_through_a_target() -> void:
+	make_area(Vector2(400, 0), Vector2(20, 60))
+	await idle(2)
+	var d := H.make_laser(0.0, 0.0, 0.0, 0.0, 40.0)
+	d.type = LaserData2D.LASER_BOLT
+	d.speed = 1600.0 # 100 px per tick
+	var tip := _look()
+	tip.show_when = LaserSpriteLook2D.SHOW_WHEN_HITTING
+	d.tip_look = tip
+	var l := _fire(d)
+	var hitting_heads := []
+	var problems := []
+	for i in 8:
+		step_factory(1, DT)
+		var head := l.get_beam_end(0).x
+		var drawn := _marks(l, "tip").size()
+		if l.is_beam_tip_hitting(0):
+			hitting_heads.append(head)
+		if drawn != int(l.is_beam_tip_hitting(0)):
+			problems.append("tick %d: drawn %d, hitting %s" % [i, drawn, l.is_beam_tip_hitting(0)])
+	assert_eq(problems, [], "When Hitting draws exactly while the head is hitting")
+	assert_false(hitting_heads.is_empty(), "the head passed through the target")
+	for x in hitting_heads:
+		assert_between(x, 380.0, 420.0, "hitting only while the head is on the target")
+
+
+func test_show_when_edits_reach_a_laser_in_flight_and_survive_the_pool() -> void:
+	var d := H.make_laser(0.0, 0.0, 0.0, 0.0, 100.0)
+	var tip := _look()
+	d.tip_look = tip
+	var l := _fire(d)
+	step_factory(1, DT)
+	assert_eq(_marks(l, "tip").size(), 1, "Always")
+	tip.show_when = LaserSpriteLook2D.SHOW_WHEN_HITTING
+	step_factory(1, DT)
+	assert_eq(_marks(l, "tip").size(), 0, "the edit reached the laser in flight")
+	assert_false(l.is_beam_tip_hitting(0), "nothing at its end")
+	l.end_laser(false)
+	step_factory(2, DT)
+	assert_false(l.is_beam_tip_hitting(0), "a pooled laser reports no hit")
+	expect_error_sequence(["Invalid beam index in is_beam_tip_hitting: 0 (beam count: 0)"]) # like every beam getter
+
+
+func test_is_beam_tip_hitting_answers_its_first_call_between_ticks() -> void:
+	make_area(Vector2(150, 0), Vector2(20, 60))
+	await idle(2)
+	var d := H.make_laser(0.0, 0.0, 0.0, 0.0, 400.0)
+	d.pierce_limit = 1
+	d.tip_look = _look() # Always: nothing wants the ends measured yet
+	var l := _fire(d)
+	step_factory(1, DT)
+	assert_almost_eq(l.get_beam_end(0).x, 150.0, 0.01, "cut on the target")
+	assert_true(l.is_beam_tip_hitting(0), "the first call measures the end at once")
+	step_factory(1, DT)
+	assert_true(l.is_beam_tip_hitting(0), "and every tick measures it from then on")
+	l.end_laser(false)
+	expect_no_errors()

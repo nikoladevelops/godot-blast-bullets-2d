@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core/variant_enum_cast2d.hpp"
+
 #include <godot_cpp/classes/material.hpp>
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/classes/sprite_frames.hpp>
@@ -19,6 +21,14 @@ class LaserSpriteLook2D : public Resource {
 	GDCLASS(LaserSpriteLook2D, Resource)
 
 public:
+	// When a look at the beam's end draws (SERIALIZED ids). Only the tip slot
+	// reads it; the other slots draw at their own events and ignore it.
+	enum ShowWhen : int {
+		SHOW_ALWAYS = 0,
+		SHOW_WHEN_HITTING = 1, // the end is stopped by a wall or sits on a target it hits
+		SHOW_WHEN_NOT_HITTING = 2,
+	};
+
 	Ref<SpriteFrames> frames;
 	StringName animation; // empty = "default", else the first animation with frames
 	double speed_scale = 1.0;
@@ -31,6 +41,7 @@ public:
 	bool z_as_relative = true;
 	Ref<Material> material;
 	bool visible = true;
+	int show_when = SHOW_ALWAYS;
 
 	Ref<SpriteFrames> get_frames() const { return frames; }
 	void set_frames(const Ref<SpriteFrames> &value);
@@ -56,6 +67,10 @@ public:
 	void set_material(const Ref<Material> &value);
 	bool get_visible() const { return visible; }
 	void set_visible(bool value);
+	ShowWhen get_show_when() const { return (ShowWhen)show_when; }
+	void set_show_when(ShowWhen value);
+	// Whether the look draws at an end that is (or is not) hitting.
+	bool shows_at_end(bool hitting) const { return show_when == SHOW_ALWAYS || (show_when == SHOW_WHEN_HITTING) == hitting; }
 
 	// The look's pose at `point` on a beam heading `beam_angle`.
 	Transform2D pose_at(const Vector2 &point, real_t beam_angle) const;
@@ -65,3 +80,5 @@ protected:
 };
 
 } // namespace BlastBullets2D
+
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::LaserSpriteLook2D::ShowWhen);
