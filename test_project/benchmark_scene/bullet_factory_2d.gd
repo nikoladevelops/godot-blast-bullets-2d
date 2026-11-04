@@ -22,14 +22,7 @@ extends BulletFactory2D
 func _on_area_entered(hit_target_area: Object, volley: BulletVolley2D, _bullet_index: int) -> void:
 	if log_hits:
 		print("BulletFactory2D hit an area!")
-	if hit_target_area is AbstractEnemy:
-		var dmg_data: DamageData = volley.shared_bullets_custom_data as DamageData # We know for a fact that we have a DamageData inside our bullets, because that's how we've set them up before spawning them - we can replace it with some other custom resource instead and check for its type here too (we may spawn bullets with different custom data and have additional check logic)
-		if dmg_data.is_player_owned == false: # If it wasn't the player who spawned the bullet, then that means an enemy is hitting another enemy - I want the bullet to dissapear without it damaging the enemy (No friendly fire :P)
-			return
-		hit_target_area.take_damage(dmg_data.base_damage) # You can do way more complex damage logic with the rest of the properties inside the custom data, you can do anything..
-		#print("Bullet just collided with an enemy area")
-	#else:
-		#print("Bullet just collided with an area")
+	_damage_enemy(hit_target_area, volley)
 
 # This function is connected to the body_entered signal of the bullet factory.  It is executed each time a bullet spawned from the factory hits a body (and again in order for a thing to be hit, ensure the layers are correct and you also have enabled the .monitorable property inside bullets data!)
 func _on_body_entered(hit_target_body: Object, volley: BulletVolley2D, _bullet_index: int) -> void:
@@ -38,8 +31,26 @@ func _on_body_entered(hit_target_body: Object, volley: BulletVolley2D, _bullet_i
 	if hit_target_body is Player:
 		var dmg_data: DamageData = volley.shared_bullets_custom_data as DamageData
 		hit_target_body.take_damage(dmg_data.base_damage)
+		return
+	# An enemy can be hit through one of its child bodies too (the turret has a StaticBody2D next to its
+	# Area2D): with monitorable on, a bullet's single hit may land on that body first.
+	_damage_enemy(hit_target_body, volley)
 
 	#print("Bullet just collided with a body")
+
+# The enemy that owns `hit` (the hit node itself, or its nearest AbstractEnemy ancestor), damaged by a
+# player bullet. Enemy bullets never hurt enemies (no friendly fire).
+func _damage_enemy(hit: Object, volley: BulletVolley2D) -> void:
+	var node := hit as Node
+	while node != null and not node is AbstractEnemy:
+		node = node.get_parent()
+	if node == null:
+		return
+	var dmg_data: DamageData = volley.shared_bullets_custom_data as DamageData # We know for a fact that we have a DamageData inside our bullets, because that's how we've set them up before spawning them
+	if dmg_data == null or dmg_data.is_player_owned == false: # an enemy hitting another enemy: the bullet disappears without damage (no friendly fire)
+		return
+	(node as AbstractEnemy).take_damage(dmg_data.base_damage)
+
 
 func _on_life_time_over(_volley: BulletVolley2D, _bullet_indexes: Array[int]) -> void:
 	pass
