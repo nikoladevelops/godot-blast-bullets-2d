@@ -13,6 +13,7 @@
 #include "core/spawn_report2d.hpp"
 #include "factory/bullet_factory2d.hpp"
 #include "laser/laser_volley2d.hpp"
+#include <algorithm>
 
 using namespace godot;
 
@@ -189,9 +190,21 @@ bool LaserSpawner2D::apply_payload_override(const Variant &value) {
 
 void LaserSpawner2D::collect_owned(std::vector<LaserVolley2D *> &r_out) const {
 	r_out.clear();
-	BulletFactory2D *factory = get_bullet_factory();
-	if (factory != nullptr) {
-		factory->collect_lasers_owned_by(get_instance_id(), r_out);
+	// Every factory it may own lasers in (it fired into one, was pointed at
+	// another, or adopted a laser of a third): the ones in the tree plus its
+	// own, like the orphan policy at PREDELETE. No user code runs here.
+	std::vector<BulletFactory2D *> factories = BulletFactory2D::factories_in_tree;
+	BulletFactory2D *own = get_bullet_factory();
+	if (own != nullptr && std::find(factories.begin(), factories.end(), own) == factories.end()) {
+		factories.push_back(own);
+	}
+	std::vector<LaserVolley2D *> found;
+	for (BulletFactory2D *factory : factories) {
+		if (factory == nullptr || factory->get_is_tearing_down()) {
+			continue;
+		}
+		factory->collect_lasers_owned_by(get_instance_id(), found);
+		r_out.insert(r_out.end(), found.begin(), found.end());
 	}
 }
 

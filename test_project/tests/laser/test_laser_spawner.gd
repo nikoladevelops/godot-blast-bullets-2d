@@ -977,3 +977,21 @@ func test_set_live_lasers_target_aims_the_live_lasers() -> void:
 	l.track(null)
 	assert_eq(sp.clear_live_lasers_targets(), 1, "cleared")
 	assert_null(l.get_beam_target(0), "no target")
+
+
+## A spawner's lasers in every factory are its own: one it adopted from
+## another factory is listed, counted, held to max_live_lasers and ended
+## like the lasers it fired (the listings once read only its current factory).
+func test_lasers_in_another_factory_are_listed_capped_and_ended() -> void:
+	var second := BulletFactory2D.new()
+	add(second)
+	await idle(1)
+	var sp := _spawner(_laser(), 1)
+	var l := second.spawn_laser(_laser(), [Transform2D.IDENTITY] as Array[Transform2D])
+	assert_true(sp.adopt_live_laser(l), "adopted from the second factory")
+	assert_eq([sp.get_live_lasers(), sp.get_live_laser_count()], [[l], 1], "listed and counted")
+	sp.max_live_lasers = 1
+	watch_signals(sp)
+	assert_false(sp.shoot_once(), "the cap counts it")
+	assert_signal_emit_count(sp, "volley_skipped", 1, "refused once at the cap")
+	assert_eq(sp.end_live_lasers(false), 1, "ended like its own")
