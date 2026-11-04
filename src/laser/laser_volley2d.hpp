@@ -78,6 +78,7 @@ public:
 		std::vector<uint64_t> impact_since_ids; // the wall each impact_since entry started on
 		bool blocked = false;
 		bool wall_reported = false; // laser_wall_hit sent for this block
+		uint64_t wall_reported_id = 0; // the wall (collider id) that report named
 		// The end sits on a target it hits (measured after this tick's
 		// contacts: a box of the half width around the end touches one of
 		// them). See tip_hitting().

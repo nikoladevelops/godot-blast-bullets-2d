@@ -189,3 +189,25 @@ func test_a_long_curvy_body_pierces_targets_along_its_whole_length() -> void:
 	for t in l.get_pierced_targets(0):
 		got.append(str(t.name))
 	assert_eq(got, ["B", "C"], "the tail passed A (x = 150 now)")
+
+
+## "Once per block" is once per BLOCKING WALL the stop lands on: a sweeping
+## beam whose stop slides from one wall body onto another never unblocks, and
+## the new wall still reports (the drawn impact already restarts there). On
+## Wall Hit sound and effect ride the same event.
+func test_a_sweep_onto_another_block_reports_the_new_wall() -> void:
+	make_wall(Vector2(300, 0), Vector2(200, 200), 16) # A: x 200..400, y -100..100
+	make_wall(Vector2(300, 150), Vector2(200, 100), 16) # B: x 200..400, y 100..200 (touches A)
+	await idle(2)
+	var d := _walled()
+	d.length = 600.0
+	d.sweep_speed_degrees = 90.0 # 5.625 deg per tick: the stop walks up A, then onto B
+	var l := _fire(d)
+	for k in 6:
+		_step(1)
+		assert_true(l.is_beam_blocked(0), "never unblocked (tick %d)" % k)
+	assert_eq(walls.size(), 2, "one report per wall the stop landed on")
+	assert_almost_eq(walls[0][1].x, 200.0, 0.5, "A's left face first")
+	assert_lt(absf(walls[0][1].y), 100.0, "on A")
+	assert_almost_eq(walls[1][1].x, 200.0, 2.0, "then B's left face")
+	assert_gt(walls[1][1].y, 100.0, "on the block below A")

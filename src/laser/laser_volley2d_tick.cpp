@@ -1288,10 +1288,20 @@ void LaserVolley2D::tick(double delta) {
 			b.wall_reported = false;
 			continue;
 		}
-		if (b.wall_reported || phase == PHASE_CHARGING) {
+		if (phase == PHASE_CHARGING) {
+			continue;
+		}
+		// "Once per block" = once per WALL the stop lands on: a sweeping,
+		// tracking or extending beam whose stop slides from one block onto
+		// another stays blocked throughout, and the new wall still reports
+		// (the drawn impact already restarts for it). The same wall, however
+		// long the stop slides along it, reports once.
+		const uint64_t wall_id = b.impact_ids.empty() ? 0 : b.impact_ids.back();
+		if (b.wall_reported && b.wall_reported_id == wall_id) {
 			continue;
 		}
 		b.wall_reported = true;
+		b.wall_reported_id = wall_id;
 		if (b.pinned) {
 			b.spent = true; // a bolt or curvy head that met a wall is gone after it
 		}
