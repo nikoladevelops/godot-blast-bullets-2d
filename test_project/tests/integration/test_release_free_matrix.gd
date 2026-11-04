@@ -313,3 +313,31 @@ func test_freeing_a_volley_from_its_own_signal(sig: String = use_parameters(_sig
 	assert_eq(_errors(), [], "%s: freeing the emitter reported nothing" % sig)
 	var books: Dictionary = factory.debug_assert_no_dangling()
 	assert_true(books["ok"], "%s: %s" % [sig, books["error"]])
+
+
+## A factory queued for deletion by a handler (queue_free, or a free refused
+## under its emit guard) stops its volley sweep there, like the laser, timer, split and
+## emitter passes: the volleys after it in the same sweep raise no more
+## signals into a factory that is about to go.
+func test_a_factory_queued_by_a_hit_handler_ticks_no_further_volley() -> void:
+	check_factory_after = false
+	var f := factory
+	make_area(Vector2(60, 0), Vector2(40, 200))
+	await idle(2)
+	var d := H.make_volley_data(1, 600.0, 5.0)
+	d.collision_mask = 4
+	var hits: Array = []
+	f.area_entered.connect(func(_t: Object, _v: BulletVolley2D, _i: int) -> void:
+		hits.append(Engine.get_physics_frames())
+		if hits.size() == 1:
+			f.queue_free() # gone at the end of the frame
+	)
+	f.spawn_volley(d)
+	f.spawn_volley(d) # the same pose: both hit in one sweep
+	for k in 30:
+		await physics(1)
+		if not hits.is_empty() and not is_instance_valid(f):
+			break
+	await idle(2)
+	assert_false(is_instance_valid(f), "the freed factory is gone")
+	assert_eq(hits.size(), 1, "the sweep stopped at the queued factory: one handler ran")

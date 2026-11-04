@@ -127,6 +127,10 @@ bool BulletFactory2D::tick_volleys(double delta, const bool &alive) {
 		if (volley_free_epoch != epoch_before_tick && ObjectDB::get_instance(ObjectID(entry.id)) != (Object *)volley) {
 			continue;
 		}
+		if (is_queued_for_deletion()) {
+			volley->is_being_ticked = false;
+			return false; // an attachment callback queued this factory for deletion
+		}
 		volley->tick(volley_delta);
 		if (!alive) {
 			return false;
@@ -135,6 +139,11 @@ bool BulletFactory2D::tick_volleys(double delta, const bool &alive) {
 			continue; // a handler freed this volley
 		}
 		volley->is_being_ticked = false;
+		// A handler queued this factory for deletion: the volleys after it raise
+		// nothing more into a dying factory (like every other sweep pass).
+		if (!sweep_may_continue(alive)) {
+			return false;
+		}
 		// A handler paused the factory: every volley not ticked yet this
 		// frame stays exactly where it is (hit-stop freezes the frame).
 		if (!is_factory_processing_bullets) {
