@@ -1362,6 +1362,10 @@ protected:
 	// (Re)builds the editor preview from the current pattern.
 	// No-op outside the editor or when the preview is disabled.
 	void rebuild_preview();
+	// The rebuild itself; rebuild_preview() runs it under the emit guard: its
+	// add_child / remove_child fire tree signals (user code) on the generator,
+	// and a handler free()ing this spawner is refused until the rebuild ends.
+	void rebuild_preview_body();
 	// collect_spawn_transforms() with error reporting: the public method
 	// reports problems, the preview passes true to stay quiet.
 	TypedArray<Transform2D> collect_spawn_transforms_impl(bool quiet, bool suppress_spin = false) const;

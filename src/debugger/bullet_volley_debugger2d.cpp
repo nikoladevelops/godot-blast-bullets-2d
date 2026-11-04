@@ -1,6 +1,7 @@
 #include "debugger/bullet_volley_debugger2d.hpp"
 #include "bullet_volley/bullet_volley2d.hpp"
 #include "core/live_object2d.hpp"
+#include "core/owned_node2d.hpp"
 #include "core/transform_math2d.hpp"
 #include "godot_cpp/core/memory.hpp"
 #include "godot_cpp/core/object.hpp"
@@ -138,10 +139,7 @@ void BulletVolleyDebugger2D::disable() {
 
 	for (size_t i = 0; i < debugger_multimeshes.size(); ++i) {
 		if (MultiMeshInstance2D *mesh = debugger_multimeshes[i].get()) {
-			if (mesh->get_parent() != nullptr) {
-				mesh->get_parent()->remove_child(mesh);
-			}
-			memdelete(mesh);
+			remove_and_delete2d(mesh);
 		}
 	}
 
@@ -178,10 +176,7 @@ void BulletVolleyDebugger2D::erase_debug_entry(int i) {
 	// Order-preserving erase keeps every array aligned at the same index.
 	if (i < (int)debugger_multimeshes.size()) {
 		if (MultiMeshInstance2D *mesh = debugger_multimeshes[i].get()) {
-			if (mesh->get_parent() != nullptr) {
-				mesh->get_parent()->remove_child(mesh);
-			}
-			memdelete(mesh);
+			remove_and_delete2d(mesh);
 		}
 	}
 	if (i < (int)debug_data_provider_ids.size()) {

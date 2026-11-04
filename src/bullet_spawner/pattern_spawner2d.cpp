@@ -1,6 +1,7 @@
 #include "bullet_spawner/pattern_spawner2d_internal.hpp"
 #include "core/emit_on2d.hpp"
 #include "core/live_object2d.hpp"
+#include "core/owned_node2d.hpp"
 #include "core/transform_math2d.hpp"
 #include <algorithm>
 
@@ -1005,24 +1006,24 @@ void PatternSpawner2D::native_ready() {
 			if (stray == nullptr || (stray->has_meta(PREVIEW_OWNER_META_KEY) && (int64_t)stray->get_meta(PREVIEW_OWNER_META_KEY) != self_id)) {
 				return;
 			}
-			parent->remove_child(stray);
-			memdelete(stray);
+			remove_and_delete2d(stray);
 		};
-		drop_stray(this);
-		Node2D *base = get_effective_generator();
-		if (base != nullptr && base != this) {
-			drop_stray(base);
-		}
+		// remove_child runs tree signals (user code): a handler free()ing this
+		// spawner is refused until the cleanup ends (then queue_free).
+		guarded_user_call2d(this, emit_guard, [&]() {
+			drop_stray(this);
+			Node2D *base = get_effective_generator();
+			if (base != nullptr && base != this) {
+				drop_stray(base);
+			}
+		});
 	} else {
 		rebuild_preview();
 	}
 	// The same stray cleanup for the spawner's own ring layer.
 	if (!graze_preview_active()) {
 		Node *stray_rings = get_node_or_null(NodePath(GRAZE_PREVIEW_NAME));
-		if (stray_rings != nullptr) {
-			remove_child(stray_rings);
-			memdelete(stray_rings);
-		}
+		remove_and_delete2d(stray_rings);
 		graze_preview_layer = nullptr;
 		graze_preview_layer_id = 0;
 	} else {

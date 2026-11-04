@@ -195,3 +195,32 @@ func test_free_volley_inside_attachment_disable_callback() -> void:
 	assert_eq(AttachmentFreeVolleyProbe2D.freed, 1, "the callback freed the volley")
 	await idle(2)
 	assert_eq(factory.get_active_bullet_count(), 0, "factory keeps running with no dangling volley")
+
+
+## A generator whose child_entered_tree handler frees the spawner while the
+## preview holder is being added under it: the spawner's free is refused
+## until the rebuild ends (then queue_free), and the rebuild stops touching
+## the holder Godot's own teardown already deleted (it once read it: a crash).
+class FreeingGenerator extends Node2D:
+	var target: Node
+
+	func _ready() -> void:
+		child_entered_tree.connect(_on_child)
+
+	func _on_child(child: Node) -> void:
+		if String(child.name).begins_with("~BlastBulletsPatternPreview") and is_instance_valid(target):
+			target.free()
+
+
+func test_freeing_the_spawner_while_its_preview_holder_is_added() -> void:
+	var gen := FreeingGenerator.new()
+	add(gen)
+	var sp := make_spawner(H.make_volley_data(1, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
+	sp.show_pattern_preview = true
+	sp.show_preview_during_runtime = true
+	gen.target = sp
+	sp.set_transforms_generator(gen) # the rebuild adds the holder under gen: its handler frees sp
+	await idle(3)
+	assert_false(is_instance_valid(sp), "the spawner went at the end of the rebuild")
+	var holders := gen.get_children().filter(func(c: Node) -> bool: return String(c.name).begins_with("~BlastBulletsPatternPreview"))
+	assert_true(holders.size() <= 1, "no duplicate holders left behind")

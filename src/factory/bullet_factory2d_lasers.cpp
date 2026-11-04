@@ -5,6 +5,7 @@
 // work itself (laser/laser_volley2d*.cpp).
 
 #include "bullet_spawner/pattern_spawner2d.hpp"
+#include "core/owned_node2d.hpp"
 #include "core/spawn_report2d.hpp"
 #include "factory/bullet_factory2d_internal.hpp"
 #include "laser/laser_volley2d.hpp"
@@ -372,11 +373,7 @@ void BulletFactory2D::free_all_lasers() {
 			continue;
 		}
 		laser->factory = nullptr;
-		Node *parent = laser->get_parent();
-		if (parent != nullptr) {
-			parent->remove_child(laser);
-		}
-		memdelete(laser);
+		remove_and_delete2d(laser);
 	}
 }
 

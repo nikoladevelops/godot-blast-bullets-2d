@@ -3,6 +3,7 @@
 
 #include "bullet_volley/bullet_volley2d.hpp"
 #include "core/cosmetic_rng2d.hpp"
+#include "core/owned_node2d.hpp"
 #include "core/warn_once2d.hpp"
 #include "factory/bullet_factory2d.hpp"
 #include "laser/laser_volley2d.hpp"
@@ -1254,8 +1255,7 @@ void SoundMixer2D::preview_play(SoundMix2D *sound, const Vector2 &global_positio
 		if (AudioStreamPlayer2D *old_player = Object::cast_to<AudioStreamPlayer2D>(old); old_player != nullptr) {
 			old_player->stop();
 		}
-		root->remove_child(old);
-		memdelete(old);
+		remove_and_delete2d(old);
 	}
 	AudioStreamPlayer2D *player = memnew(AudioStreamPlayer2D);
 	player->set_name(name);

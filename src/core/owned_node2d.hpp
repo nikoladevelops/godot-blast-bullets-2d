@@ -1,5 +1,7 @@
 #pragma once
 
+#include <godot_cpp/classes/node.hpp>
+#include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/core/object.hpp>
 
 namespace BlastBullets2D {
@@ -35,5 +37,22 @@ struct OwnedNode2D {
 	// Set but freed behind our back.
 	bool lost() const { return ptr != nullptr && get() == nullptr; }
 };
+
+// Detaches a node the plugin owns from its parent and deletes it, unless the
+// removal's tree signals (user code: the parent's child_exiting_tree, the
+// node's own tree_exiting) already freed it. Every plugin "remove, then
+// delete" goes through here: a second delete of a freed node is a crash.
+inline void remove_and_delete2d(godot::Node *node) {
+	if (node == nullptr) {
+		return;
+	}
+	const uint64_t id = (uint64_t)node->get_instance_id();
+	if (godot::Node *parent = node->get_parent()) {
+		parent->remove_child(node);
+	}
+	if (godot::ObjectDB::get_instance(godot::ObjectID(id)) == static_cast<godot::Object *>(node)) {
+		godot::memdelete(node);
+	}
+}
 
 } // namespace BlastBullets2D

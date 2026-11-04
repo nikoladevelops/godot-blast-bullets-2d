@@ -4,6 +4,7 @@
 
 #include "bullet_spawner/pattern_spawner2d_internal.hpp"
 #include "core/live_object2d.hpp"
+#include "core/owned_node2d.hpp"
 #include "core/transform_math2d.hpp"
 
 using namespace godot;
@@ -543,10 +544,7 @@ Node2D *PatternSpawner2D::own_preview_holder_under(Node *parent) const {
 // until the flush. Preview paths only (never physics bodies), so immediate
 // deletion is safe.
 void PatternSpawner2D::delete_preview_holder(Node *holder) {
-	if (Node *parent = holder->get_parent()) {
-		parent->remove_child(holder);
-	}
-	memdelete(holder);
+	remove_and_delete2d(holder);
 }
 
 void PatternSpawner2D::remove_own_preview_holders() {
@@ -670,6 +668,10 @@ void PatternSpawner2D::snapshot_preview_sources() {
 }
 
 void PatternSpawner2D::rebuild_preview() {
+	guarded_user_call2d(this, emit_guard, [this]() { rebuild_preview_body(); });
+}
+
+void PatternSpawner2D::rebuild_preview_body() {
 	// Preview may exist in the editor (toggle decides) and at runtime only
 	// when the user opted in via show_preview_during_runtime. Never before
 	// the node is inside the tree (scene load sets properties first). A
@@ -776,7 +778,18 @@ void PatternSpawner2D::rebuild_preview() {
 		preview.holder->set_name(name_taken ? String(PREVIEW_HOLDER_NAME) + "_" + String::num_uint64(self_id) : String(PREVIEW_HOLDER_NAME));
 		preview.holder->set_meta(PREVIEW_META_KEY, true);
 		preview.holder->set_meta(PREVIEW_OWNER_META_KEY, (int64_t)self_id);
+		const uint64_t new_holder_id = preview.holder->get_instance_id();
+		// add_child fires tree signals on the generator (user code): a handler
+		// may free this spawner (refused under the guard, but Godot's own Node
+		// teardown still runs and its exit cleanup deletes the holder) or the
+		// holder itself. Never touch either after that: stop this rebuild.
 		effective_base->add_child(preview.holder);
+		if (ObjectDB::get_instance(ObjectID(new_holder_id)) != static_cast<Object *>(preview.holder) || shot_owner_dying() || !is_inside_tree()) {
+			preview.holder = nullptr;
+			set_preview_nodes(nullptr, nullptr, nullptr);
+			preview.rebuild_in_progress = false;
+			return;
+		}
 	}
 	// Cleanup first: older versions drew the preview with Line2D strips
 	// ("Dots"/"Ticks"). Remove any leftover before adopting/creating the
@@ -786,10 +799,7 @@ void PatternSpawner2D::rebuild_preview() {
 	for (int i = 0; i < stray_lines.size(); i++) {
 		// By id: remove_child runs tree signals (user code) that may free a later one.
 		Node *stray = live_object2d<Node>(stray_lines[i]);
-		if (stray != nullptr) {
-			preview.holder->remove_child(stray);
-			memdelete(stray);
-		}
+		remove_and_delete2d(stray);
 	}
 	// Layers are likewise re-resolved from the tree every rebuild, so an
 	// externally removed layer is recreated instead of silently killing the
@@ -799,10 +809,7 @@ void PatternSpawner2D::rebuild_preview() {
 		// Wrong-type leftover (plain Node2D from the RenderingServer build):
 		// drop it so the typed layer can take the canonical name.
 		Node *old_dots = preview.holder->get_node_or_null(NodePath("Dots"));
-		if (old_dots != nullptr) {
-			preview.holder->remove_child(old_dots);
-			memdelete(old_dots);
-		}
+		remove_and_delete2d(old_dots);
 		preview.dots_layer = memnew(PatternPreviewLayer2D);
 		preview.dots_layer->set_name("Dots");
 		preview.dots_layer->kind = PatternPreviewLayer2D::LAYER_DOTS;
@@ -813,10 +820,7 @@ void PatternSpawner2D::rebuild_preview() {
 	if (preview.arrows_layer == nullptr) {
 		// Same wrong-type migration as Dots above.
 		Node *old_arrows = preview.holder->get_node_or_null(NodePath("Arrows"));
-		if (old_arrows != nullptr) {
-			preview.holder->remove_child(old_arrows);
-			memdelete(old_arrows);
-		}
+		remove_and_delete2d(old_arrows);
 		preview.arrows_layer = memnew(PatternPreviewLayer2D);
 		preview.arrows_layer->set_name("Arrows");
 		preview.arrows_layer->kind = PatternPreviewLayer2D::LAYER_ARROWS;
