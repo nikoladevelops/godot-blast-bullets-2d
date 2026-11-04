@@ -587,7 +587,13 @@ void BulletVolley2D::set_collision_shape_runtime(const Ref<Shape2D> &new_shape) 
 	}
 	// Frees/recreates server RIDs and re-buckets the pool: unsafe while the
 	// factory iterates bullet state or inside any physics frame (server flush
-	// locks apply). Same contract as the factory structural methods.
+	// locks apply). Same contract as the factory structural methods. A factory
+	// freed by a handler (this volley is detached and dying with it) is just
+	// as unsafe: its guard flags live in freed memory, so never read them.
+	if (bullet_factory != nullptr && !factory_alive()) {
+		UtilityFunctions::push_error("set_collision_shape_runtime: BulletFactory2D is being freed. Ignoring the request.");
+		return;
+	}
 	if (bullet_factory != nullptr && bullet_factory->is_structural_mutation_unsafe()) {
 		UtilityFunctions::push_error("set_collision_shape_runtime cannot run inside a physics frame or while bullets are being processed (e.g. inside area_entered/body_entered handlers). Use set_collision_shape_runtime_deferred() instead: it runs on the next idle frame (a plain call_deferred() still runs inside the physics frame).");
 		return;
@@ -646,6 +652,13 @@ void BulletVolley2D::set_collision_shape_runtime(const Ref<Shape2D> &new_shape) 
 void BulletVolley2D::set_collision_shape_runtime_deferred(const Ref<Shape2D> &new_shape) {
 	if (bullet_factory == nullptr || physics_server == nullptr || !area.is_valid()) {
 		UtilityFunctions::push_error("set_collision_shape_runtime_deferred: multimesh was never spawned through BulletFactory2D.");
+		return;
+	}
+	// A factory freed by a handler: this volley is detached and dies with it
+	// (a queue on its idle queue would land in freed memory). Same refusal as
+	// a factory that is still tearing down.
+	if (!factory_alive()) {
+		UtilityFunctions::push_error("set_collision_shape_runtime_deferred: BulletFactory2D is being freed. Ignoring the request.");
 		return;
 	}
 	if (bullet_factory->get_is_tearing_down()) {

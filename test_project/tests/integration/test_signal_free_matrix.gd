@@ -319,3 +319,43 @@ func test_a_volley_used_after_its_factory_was_freed_from_its_own_signal_is_survi
 	assert_false(is_instance_valid(f), "the factory is gone")
 	assert_false(is_instance_valid(v), "the detached volley died at the end of its frame")
 	expect_no_errors()
+
+
+## The same freed-factory handler also changes the volley's collision shape
+## through both setters: their factory guards must never read the freed
+## factory (the deferred twin queued on the dead idle queue and the plain one
+## read its "busy" flags). Both refuse loudly with the existing texts.
+func test_shape_setters_after_a_factory_free_from_the_volleys_own_signal_are_survived() -> void:
+	check_factory_after = false
+	fired = 0
+	var d := _data(0.0)
+	var frames := SpriteFrames.new()
+	var img := Image.create_empty(1, 1, false, Image.FORMAT_RGBA8)
+	img.fill(Color.WHITE)
+	var tex := ImageTexture.create_from_image(img)
+	frames.add_frame("default", tex)
+	frames.add_frame("default", tex)
+	frames.set_animation_speed("default", 30.0)
+	frames.set_animation_loop("default", false)
+	d.sprite_frames = frames
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	var f := factory
+	v.sprite_animation_finished.connect(func(_volley = null, _i = null) -> void:
+		if fired > 0:
+			return
+		fired += 1
+		f.free() # detaches + queue_frees the emitting volley
+		v.set_collision_shape_runtime_deferred(RectangleShape2D.new())
+		v.set_collision_shape_runtime(RectangleShape2D.new()))
+	for k in 60:
+		await physics(1)
+		if fired > 0:
+			break
+	await idle(2)
+	assert_eq(fired, 1, "the handler ran once")
+	assert_false(is_instance_valid(f), "the factory is gone")
+	assert_false(is_instance_valid(v), "the detached volley died at the end of its frame")
+	expect_error_sequence([
+		"set_collision_shape_runtime_deferred: BulletFactory2D is being freed. Ignoring the request.",
+		"set_collision_shape_runtime: BulletFactory2D is being freed. Ignoring the request.",
+	], "both setters refuse a dead factory without touching it")
