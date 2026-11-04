@@ -213,6 +213,7 @@ BulletVolley2D *BulletFactory2D::spawn_volley_internal(const Ref<BulletVolleyDat
 		volley->spawn_transforms_count = bullet_count;
 		volley->spawn_colors_ptr = colors_ptr;
 		const uint64_t reuse_volley_id = volley->get_instance_id();
+		const int reuse_generation = volley->get_life_id();
 		const bool enabled = volley->enable_volley(*spawn_data.ptr(), new_inherited_velocity_offset, spawner_id);
 		if (watch.died()) {
 			return nullptr;
@@ -232,6 +233,18 @@ BulletVolley2D *BulletFactory2D::spawn_volley_internal(const Ref<BulletVolleyDat
 			// refused reuse must never turn a valid spawn into a silent null.
 			volley_pool.push(volley, volley->get_pool_key());
 			volley = nullptr;
+		}
+		if (volley != nullptr && volley->get_life_id() != reuse_generation + 1) {
+			// A callback drained this volley and a NESTED same-key spawn took
+			// the very same instance out of the pool again: that life belongs
+			// to the nested caller, which tracks it. Never hand it out (or
+			// re-track it) here - begin_life bumps the life id once per life.
+			return nullptr;
+		}
+		if (volley != nullptr && volley->is_queued_for_deletion()) {
+			// A callback queued it for deletion: a dying volley is never handed
+			// out (it is already tracked, so its PREDELETE untracks it).
+			return nullptr;
 		}
 		if (volley != nullptr && !volley->is_active) {
 			// An attachment callback drained it (a clear from on_bullet_enable):
@@ -275,6 +288,7 @@ BulletVolley2D *BulletFactory2D::spawn_volley_internal(const Ref<BulletVolleyDat
 	volley->spawn_transforms_count = bullet_count;
 	volley->spawn_colors_ptr = colors_ptr;
 	const uint64_t fresh_volley_id = volley->get_instance_id();
+	const int fresh_generation = volley->get_life_id();
 	volley->spawn(*spawn_data.ptr(), &volley_pool, this, volley_container.get(), new_inherited_velocity_offset, (int)all_volleys.size(), false, spawner_id);
 	if (watch.died()) {
 		return nullptr;
@@ -285,12 +299,20 @@ BulletVolley2D *BulletFactory2D::spawn_volley_internal(const Ref<BulletVolleyDat
 	volley->spawn_transforms_ptr = nullptr;
 	volley->spawn_colors_ptr = nullptr;
 	const bool drained = !volley->is_active; // a callback cleared it: pooled already
+	// A callback may also have drained it and a NESTED same-key spawn taken the
+	// very same instance out of the pool again (on_bullet_spawn): that life
+	// belongs to the nested caller, which already tracks it. Appending it here
+	// would file the instance twice (its sparse_set_id would name the second
+	// entry, and freeing it later would leave the first one dangling).
+	if (volley->get_life_id() != fresh_generation + 1) {
+		return nullptr;
+	}
 	// The slot is taken AFTER the spawn: its on_bullet_spawn callbacks may
 	// have spawned or freed other volleys, which moves the list's end.
 	const int sparse_set_id = (int)all_volleys.size();
 	volley->sparse_set_id = sparse_set_id;
 	all_volleys.emplace_back(volley);
-	if (drained) {
+	if (drained || volley->is_queued_for_deletion()) {
 		return nullptr; // tracked (frees reach it), never ticked or handed out
 	}
 	volley_set.activate_data(sparse_set_id);

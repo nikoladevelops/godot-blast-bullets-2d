@@ -306,6 +306,41 @@ func test_a_volley_drained_by_its_own_spawn_callbacks_is_never_handed_out() -> v
 	assert_eq("\n".join(problems), "", "a volley drained during its spawn stays pooled and plain")
 
 
+## A fresh spawn whose on_bullet_spawn drains the volley AND then spawns the
+## same pool key again: the nested spawn pops the very instance the outer call
+## is still setting up. That life belongs to the nested caller (which tracks
+## it); the outer must never hand it out or file a second tracking entry for
+## it (the duplicate dangled after a later single-volley free).
+func test_a_same_key_respawn_inside_a_fresh_spawn_callback_is_never_double_tracked() -> void:
+	var f := factory
+	var container: Node = f.get_node("BulletVolleysContainer")
+	var before: Array = container.get_children().filter(func(c): return c is BulletVolley2D)
+	var nested: Array = []
+	AttachmentHookProbe2D.hook_on = ["spawn"]
+	AttachmentHookProbe2D.hook = func() -> void:
+		var spawning: BulletVolley2D = null
+		for child in container.get_children():
+			if child is BulletVolley2D and not before.has(child):
+				spawning = child
+		assert_not_null(spawning, "the volley being spawned is reachable from on_bullet_spawn")
+		spawning.clear_all_bullets() # drains + pools the instance being set up
+		nested.append(f.spawn_volley(H.make_volley_data(3, 0.0, 30.0))) # same key: pops it again
+	var outer: BulletVolley2D = f.spawn_volley(_data(false))
+	AttachmentHookProbe2D.clear_hook()
+	assert_eq(nested.size(), 1, "the callback spawned once")
+	assert_not_null(nested[0], "the nested spawn got the pooled instance")
+	assert_true(outer == null, "the outer spawn never hands out the instance the nested spawn took")
+	var books: Dictionary = f.debug_assert_no_dangling()
+	assert_true(books["ok"], str(books["error"]))
+	var ids: Array = Array(f.debug_get_live_volley_ids(0))
+	assert_eq(ids.count(nested[0].get_instance_id()), 1, "the instance is tracked exactly once")
+	f.free_volley_deferred(nested[0])
+	await idle(2)
+	books = f.debug_assert_no_dangling()
+	assert_true(books["ok"], str(books["error"]))
+	expect_no_errors()
+
+
 func _split_chain() -> BulletSplitData2D:
 	var stage := BulletSplitStage2D.new()
 	stage.count = 3
