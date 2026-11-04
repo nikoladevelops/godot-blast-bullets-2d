@@ -110,3 +110,33 @@ func test_overflowing_laser_looks_never_hand_the_gpu_nan() -> void:
 		l.end_laser(false)
 		step_factory(1, 1.0 / 16.0)
 	assert_eq(problems, [], "every laser body vertex stays finite")
+
+
+## A finite muzzle plus a finite length whose sum overflows real_t (a beam
+## 1e38 px away and 3e38 px long): every accepted input is finite, so every
+## beam point must stay finite too (the invariant check, the readouts and the
+## charging warning polyline all carry them). A zero-length or huge-but-finite
+## beam is fine; an INF vertex is not.
+func test_a_huge_finite_muzzle_and_length_keep_the_beam_points_finite() -> void:
+	handle_events(factory)
+	var d := H.make_laser(0.5, 0.0, 0.0, 0.0, 3.0e38) # charging: the warning line draws the points
+	var t: Array[Transform2D] = [Transform2D(0.0, Vector2(1.0e38, 0.0))]
+	var l := factory.spawn_laser(d, t)
+	assert_not_null(l, "the laser fired")
+	_check_finite_beam(l, "right after the spawn")
+	step_factory(1, 1.0 / 16.0)
+	_check_finite_beam(l, "after a tick")
+	assert_eq(l.debug_check_invariants(), "", "the beam geometry is a valid state")
+	var books: Dictionary = factory.debug_assert_no_dangling()
+	assert_true(books["ok"], str(books["error"]))
+	l.end_laser(false)
+	step_factory(1, 1.0 / 16.0)
+	expect_no_errors()
+
+
+func _check_finite_beam(l: LaserVolley2D, where: String) -> void:
+	var bad: Array = []
+	for p in l.get_beam_points(0):
+		if not p.is_finite():
+			bad.append(p)
+	assert_eq(bad, [], "every beam point stays finite %s" % where)

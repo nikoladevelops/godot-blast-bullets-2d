@@ -25,6 +25,7 @@
 #include <godot_cpp/classes/world2d.hpp>
 
 #include <algorithm>
+#include <limits>
 
 using namespace godot;
 
@@ -169,7 +170,19 @@ void LaserVolley2D::trace_walls(Beam &b, const Vector2 &from, real_t direction, 
 	real_t remaining = length;
 	int reflections_left = d != nullptr ? d->reflections : 0;
 	for (int step = 0; step < 1 + 256 && remaining > (real_t)0.0; ++step) {
-		const Vector2 end = p + dir * remaining;
+		Vector2 end = p + dir * remaining;
+		if (!end.is_finite()) {
+			// Every accepted input is finite (the muzzle's slot transform and
+			// the data's length), but their sum can still overflow real_t: a
+			// beam 1e38 px away plus a 3e38 px length turns INF. The readouts,
+			// the invariant check and the charging warning polyline all carry
+			// the points, so clamp the traced end into the float range (in
+			// double first: real_t multiplication already overflowed).
+			const double max_real = (double)std::numeric_limits<real_t>::max();
+			const double end_x = (double)p.x + (double)dir.x * (double)remaining;
+			const double end_y = (double)p.y + (double)dir.y * (double)remaining;
+			end = Vector2((real_t)Math::clamp(end_x, -max_real, max_real), (real_t)Math::clamp(end_y, -max_real, max_real));
+		}
 		if (space != nullptr) {
 			if (ray_query.is_null()) {
 				ray_query.instantiate();
