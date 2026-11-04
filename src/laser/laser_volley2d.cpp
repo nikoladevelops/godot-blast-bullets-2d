@@ -683,6 +683,71 @@ bool LaserVolley2D::is_beam_tip_hitting(int beam_index) {
 	return tip_hitting(beams[beam_index]);
 }
 
+TypedArray<Dictionary> LaserVolley2D::get_beam_contacts(int beam_index) const {
+	TypedArray<Dictionary> out;
+	LASER_BEAM_INDEX_OR("get_beam_contacts", out)
+	for (const Contact &c : beams[beam_index].contacts) {
+		Object *target = ObjectDB::get_instance(ObjectID(c.id));
+		if (target == nullptr) {
+			continue; // a freed target is no contact
+		}
+		Dictionary entry;
+		entry["target"] = target;
+		entry["position"] = c.position;
+		entry["distance"] = c.distance;
+		entry["since"] = Math::max(clock - c.started, 0.0);
+		out.push_back(entry);
+	}
+	return out;
+}
+
+Variant LaserVolley2D::get_beam_target(int beam_index) const {
+	LASER_BEAM_INDEX_OR("get_beam_target", Variant())
+	const Beam &b = beams[beam_index];
+	if (!b.has_target) {
+		return Variant();
+	}
+	if (b.target_is_point) {
+		return b.target_point;
+	}
+	Object *node = ObjectDB::get_instance(ObjectID(b.target_id));
+	return node != nullptr ? Variant(node) : Variant();
+}
+
+bool LaserVolley2D::is_beam_spent(int beam_index) const {
+	LASER_BEAM_INDEX_OR("is_beam_spent", true)
+	return beams[beam_index].spent;
+}
+
+int LaserVolley2D::get_beam_pierced_total(int beam_index) const {
+	LASER_BEAM_INDEX_OR("get_beam_pierced_total", 0)
+	return beams[beam_index].pierced_total;
+}
+
+bool LaserVolley2D::touches_circle(const Vector2 &center, real_t radius) const {
+	if (!center.is_finite() || !Math::is_finite(radius) || radius < 0.0) {
+		UtilityFunctions::push_error("touches_circle: center must be finite and radius a finite number >= 0.");
+		return false;
+	}
+	return touches_area(true, center, radius, Rect2());
+}
+
+bool LaserVolley2D::touches_rect(const Rect2 &rect) const {
+	if (!rect.position.is_finite() || !rect.size.is_finite()) {
+		UtilityFunctions::push_error("touches_rect: rect must be finite.");
+		return false;
+	}
+	return touches_area(false, Vector2(), 0.0, rect.abs());
+}
+
+Array LaserVolley2D::sound_get_effects() const {
+	Array out;
+	for (const Ref<LaserSoundData2D> &entry : sound_effects) {
+		out.push_back(entry.is_valid() ? Variant(entry) : Variant());
+	}
+	return out;
+}
+
 Vector2 LaserVolley2D::get_beam_wall_point(int beam_index) const {
 	LASER_BEAM_INDEX_OR("get_beam_wall_point", Vector2())
 	return beams[beam_index].wall_point;
@@ -1077,6 +1142,15 @@ void LaserVolley2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_beam_angle", "beam_index"), &LaserVolley2D::get_beam_angle);
 	ClassDB::bind_method(D_METHOD("is_beam_blocked", "beam_index"), &LaserVolley2D::is_beam_blocked);
 	ClassDB::bind_method(D_METHOD("is_beam_tip_hitting", "beam_index"), &LaserVolley2D::is_beam_tip_hitting);
+	ClassDB::bind_method(D_METHOD("is_hitting"), &LaserVolley2D::is_hitting);
+	ClassDB::bind_method(D_METHOD("get_beam_contacts", "beam_index"), &LaserVolley2D::get_beam_contacts);
+	ClassDB::bind_method(D_METHOD("get_beam_target", "beam_index"), &LaserVolley2D::get_beam_target);
+	ClassDB::bind_method(D_METHOD("is_beam_spent", "beam_index"), &LaserVolley2D::is_beam_spent);
+	ClassDB::bind_method(D_METHOD("get_beam_pierced_total", "beam_index"), &LaserVolley2D::get_beam_pierced_total);
+	ClassDB::bind_method(D_METHOD("touches_circle", "center", "radius"), &LaserVolley2D::touches_circle);
+	ClassDB::bind_method(D_METHOD("touches_rect", "rect"), &LaserVolley2D::touches_rect);
+	ClassDB::bind_method(D_METHOD("sound_get_effects"), &LaserVolley2D::sound_get_effects);
+	ClassDB::bind_method(D_METHOD("sound_get_listener_group"), &LaserVolley2D::sound_get_listener_group);
 	ClassDB::bind_method(D_METHOD("get_beam_wall_point", "beam_index"), &LaserVolley2D::get_beam_wall_point);
 	ClassDB::bind_method(D_METHOD("get_beam_wall_normal", "beam_index"), &LaserVolley2D::get_beam_wall_normal);
 	ClassDB::bind_method(D_METHOD("get_pierced_targets", "beam_index"), &LaserVolley2D::get_pierced_targets);

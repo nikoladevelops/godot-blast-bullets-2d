@@ -363,6 +363,34 @@ int BulletFactory2D::end_lasers_in_area(const char *function_name, bool circle, 
 	return n;
 }
 
+namespace {
+TypedArray<LaserVolley2D> lasers_in_area(const std::vector<LaserVolley2D *> &lasers, bool circle, const Vector2 &center, real_t radius, const Rect2 &normalized, int64_t can_hit_mask) {
+	TypedArray<LaserVolley2D> out;
+	for (LaserVolley2D *laser : lasers) {
+		if (laser != nullptr && BulletFactory2D::laser_listed(laser) && (can_hit_mask == 0 || (laser->get_laser_data().is_valid() && BulletFactory2D::can_hit(can_hit_mask, laser->get_laser_data()->get_collision_mask()))) && laser->touches_area(circle, center, radius, normalized)) {
+			out.push_back(laser);
+		}
+	}
+	return out;
+}
+} // namespace
+
+TypedArray<LaserVolley2D> BulletFactory2D::get_lasers_in_circle(const Vector2 &center, real_t radius, int64_t can_hit_mask) const {
+	Rect2 unused;
+	if (!area_args_valid("get_lasers_in_circle", true, center, radius, Rect2(), unused) || !can_hit_mask_valid("get_lasers_in_circle", can_hit_mask)) {
+		return TypedArray<LaserVolley2D>();
+	}
+	return lasers_in_area(all_lasers, true, center, radius, Rect2(), can_hit_mask);
+}
+
+TypedArray<LaserVolley2D> BulletFactory2D::get_lasers_in_rect(const Rect2 &rect, int64_t can_hit_mask) const {
+	Rect2 normalized;
+	if (!area_args_valid("get_lasers_in_rect", false, Vector2(), 0.0, rect, normalized) || !can_hit_mask_valid("get_lasers_in_rect", can_hit_mask)) {
+		return TypedArray<LaserVolley2D>();
+	}
+	return lasers_in_area(all_lasers, false, Vector2(), 0.0, normalized, can_hit_mask);
+}
+
 int BulletFactory2D::count_bullets_in_circle(const Vector2 &center, real_t radius, int64_t can_hit_mask) const {
 	Rect2 unused;
 	if (!area_args_valid("count_bullets_in_circle", true, center, radius, Rect2(), unused) || !can_hit_mask_valid("count_bullets_in_circle", can_hit_mask)) {

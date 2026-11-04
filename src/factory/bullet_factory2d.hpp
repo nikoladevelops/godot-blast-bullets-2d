@@ -136,6 +136,9 @@ public:
 	// Ends every laser whose live body touches the area (edges included,
 	// negative rects normalized). No user code: safe inside handlers.
 	int end_lasers_in_circle(const Vector2 &center, real_t radius, bool fade = true, int64_t can_hit_mask = 0);
+	// Read-only twins of end_lasers_in_*: the listed lasers whose body touches the area.
+	TypedArray<LaserVolley2D> get_lasers_in_circle(const Vector2 &center, real_t radius, int64_t can_hit_mask = 0) const;
+	TypedArray<LaserVolley2D> get_lasers_in_rect(const Rect2 &rect, int64_t can_hit_mask = 0) const;
 	int end_lasers_in_rect(const Rect2 &rect, bool fade = true, int64_t can_hit_mask = 0);
 	int end_lasers_in_area(const char *function_name, bool circle, const Vector2 &center, real_t radius, const Rect2 &rect, bool fade, int64_t can_hit_mask);
 	// Pre-warms `amount` pooled lasers of `beam_count` beams (no first-shot

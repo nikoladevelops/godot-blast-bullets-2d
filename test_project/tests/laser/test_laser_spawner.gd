@@ -936,3 +936,44 @@ func test_a_moved_global_position_reaches_live_lasers_on_the_interval() -> void:
 		if aim_at.call(Vector2(0, -300)) < 0.0001:
 			break
 	assert_almost_eq(aim_at.call(Vector2(0, -300)), 0.0, 0.0001, "the moved point was picked up")
+
+
+## set_live_lasers_target aims every live Track / Lock On laser (never a
+## Pattern one or one that tracks its own targets); clear_live_lasers_targets
+## leaves them none; a bad target changes nothing.
+func test_set_live_lasers_target_aims_the_live_lasers() -> void:
+	var d := _laser()
+	d.aim = LaserData2D.LASER_AIM_LOCK_ON
+	var sp := _spawner(d, 1)
+	var l := _fire(sp)
+	expect_warning_sequence(["LaserSpawner2D: laser_data aims with Track or Lock On but laser_target_source is None: the beams keep their pattern direction."])
+	var plain := _spawner(_laser(), 1)
+	var straight := _fire(plain)
+	var node := Node2D.new()
+	node.position = Vector2(0, 120)
+	add(node)
+	assert_eq(sp.set_live_lasers_target(node), 1, "one Lock On laser aimed")
+	assert_eq(plain.set_live_lasers_target(node), 0, "a Pattern laser keeps its aim")
+	assert_same(l.get_beam_target(0), node, "the beam's target")
+	assert_null(straight.get_beam_target(0), "untouched")
+	step_factory(1, DT)
+	assert_almost_eq(l.get_beam_end(0).distance_to(Vector2(0, 120)), 0.0, 0.01, "locked onto it")
+	assert_eq(sp.set_live_lasers_target(Vector2(-80, 0)), 1, "a point")
+	assert_eq(l.get_beam_target(0), Vector2(-80, 0), "the point")
+	assert_eq(sp.set_live_lasers_target(Vector2(NAN, 0)), 0, "refused")
+	assert_eq(sp.set_live_lasers_target("nope"), 0, "refused")
+	var gone := Node2D.new()
+	add(gone)
+	gone.free()
+	assert_eq(sp.set_live_lasers_target(gone), 0, "a freed node is refused")
+	expect_error_sequence([
+		"LaserSpawner2D::set_live_lasers_target: a Vector2 target must be finite, nothing changed.",
+		"LaserSpawner2D::set_live_lasers_target: target must be a live Node2D or a Vector2, nothing changed.",
+		"LaserSpawner2D::set_live_lasers_target: target must be a live Node2D or a Vector2, nothing changed.",
+	])
+	assert_eq(l.get_beam_target(0), Vector2(-80, 0), "the refused calls kept the target")
+	l.track(BulletTargets2D.from_positions([Vector2(0, -50)]))
+	assert_eq(sp.set_live_lasers_target(node), 0, "a tracking laser picks its own targets")
+	l.track(null)
+	assert_eq(sp.clear_live_lasers_targets(), 1, "cleared")
+	assert_null(l.get_beam_target(0), "no target")

@@ -485,7 +485,6 @@ void BulletSpawner2D::_bind_methods() {
 	BIND_ENUM_CONSTANT(ORPHANED_VOLLEYS_HAND_TO_FACTORY);
 	BIND_ENUM_CONSTANT(ORPHANED_VOLLEYS_CLEAR);
 	BIND_ENUM_CONSTANT(ORPHANED_VOLLEYS_REMOVE);
-	ClassDB::bind_method(D_METHOD("shoot_once"), &BulletSpawner2D::shoot_once);
 }
 
 } // namespace BlastBullets2D

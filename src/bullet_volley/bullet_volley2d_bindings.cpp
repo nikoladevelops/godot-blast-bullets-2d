@@ -164,6 +164,16 @@ void BulletVolley2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("homing_follow", "targets", "retarget_interval", "mode"), &BulletVolley2D::homing_follow, DEFVAL(0.0), DEFVAL(HOMING_FOLLOW_SHARED_NEAREST));
 	ClassDB::bind_method(D_METHOD("is_homing_following"), &BulletVolley2D::is_homing_following);
 	ClassDB::bind_method(D_METHOD("is_parked"), &BulletVolley2D::is_parked);
+	ClassDB::bind_method(D_METHOD("is_volley_active"), &BulletVolley2D::is_volley_active);
+	ClassDB::bind_method(D_METHOD("get_active_bullet_count"), &BulletVolley2D::get_active_bullet_count);
+	ClassDB::bind_method(D_METHOD("get_active_bullet_indexes"), &BulletVolley2D::get_active_bullet_indexes);
+	ClassDB::bind_method(D_METHOD("get_life_age"), &BulletVolley2D::get_life_age);
+	ClassDB::bind_method(D_METHOD("get_scale_in_sec"), &BulletVolley2D::get_scale_in_sec);
+	ClassDB::bind_method(D_METHOD("get_scale_in_from"), &BulletVolley2D::get_scale_in_from);
+	ClassDB::bind_method(D_METHOD("get_scale_in_factor"), &BulletVolley2D::get_scale_in_factor);
+	ClassDB::bind_method(D_METHOD("get_pickup_data"), &BulletVolley2D::get_pickup_data);
+	ClassDB::bind_method(D_METHOD("bullet_get_split_count", "bullet_index"), &BulletVolley2D::bullet_get_split_count);
+	ClassDB::bind_method(D_METHOD("bullet_get_emitter_next_shot_sec", "bullet_index"), &BulletVolley2D::bullet_get_emitter_next_shot_sec);
 	ClassDB::bind_method(D_METHOD("get_life_id"), &BulletVolley2D::get_life_id);
 	ClassDB::bind_method(D_METHOD("debug_get_life_state"), &BulletVolley2D::debug_get_life_state);
 	ClassDB::bind_method(D_METHOD("debug_check_invariants"), &BulletVolley2D::debug_check_invariants);
@@ -348,6 +358,8 @@ void BulletVolley2D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bounce_debounce_sec"), "set_bounce_debounce_sec", "get_bounce_debounce_sec");
 
 	ClassDB::bind_method(D_METHOD("bullet_get_bounce_count", "bullet_index"), &BulletVolley2D::bullet_get_bounce_count);
+	ClassDB::bind_method(D_METHOD("bullet_set_bounce_count", "bullet_index", "count"), &BulletVolley2D::bullet_set_bounce_count);
+	ClassDB::bind_method(D_METHOD("bullet_get_last_bounce_normal", "bullet_index"), &BulletVolley2D::bullet_get_last_bounce_normal);
 	ClassDB::bind_method(D_METHOD("all_bullets_get_bounce_count", "bullet_index_start", "bullet_index_end_inclusive"), &BulletVolley2D::all_bullets_get_bounce_count, DEFVAL(0), DEFVAL(-1));
 	ClassDB::bind_method(D_METHOD("debug_get_bounce_info", "bullet_index"), &BulletVolley2D::debug_get_bounce_info);
 	ClassDB::bind_method(D_METHOD("debug_get_previous_origin", "bullet_index"), &BulletVolley2D::debug_get_previous_origin);

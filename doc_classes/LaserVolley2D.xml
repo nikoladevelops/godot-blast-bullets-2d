@@ -74,6 +74,13 @@
 				Returns where beam [param beam_index] points now, in radians (a bolt's or curvy laser's heading).
 			</description>
 		</method>
+		<method name="get_beam_contacts" qualifiers="const">
+			<return type="Dictionary[]" />
+			<param index="0" name="beam_index" type="int" />
+			<description>
+				Every target beam [param beam_index] hits now, nearest first: [code]{target, position, distance, since}[/code] with the point where the beam meets it, its distance along the beam from the muzzle and the seconds it has been touched. A freed target is left out. Use it to place impact effects or deal damage over time without connecting [signal BulletFactory2D.laser_hit].
+			</description>
+		</method>
 		<method name="get_beam_count" qualifiers="const">
 			<return type="int" />
 			<description>
@@ -94,6 +101,13 @@
 				Returns the drawn and damaging length of beam [param beam_index] now (cut by walls and [member LaserData2D.pierce_limit]).
 			</description>
 		</method>
+		<method name="get_beam_pierced_total" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="beam_index" type="int" />
+			<description>
+				How many distinct targets beam [param beam_index] started piercing this life (a bolt or curvy laser is spent at [member LaserData2D.pierce_limit]).
+			</description>
+		</method>
 		<method name="get_beam_points" qualifiers="const">
 			<return type="PackedVector2Array" />
 			<param index="0" name="beam_index" type="int" />
@@ -106,6 +120,13 @@
 			<param index="0" name="beam_index" type="int" />
 			<description>
 				Returns the start of beam [param beam_index]: the muzzle of a beam, the tail of a bolt or curvy laser.
+			</description>
+		</method>
+		<method name="get_beam_target" qualifiers="const">
+			<return type="Variant" />
+			<param index="0" name="beam_index" type="int" />
+			<description>
+				The target beam [param beam_index] aims at (Track / Lock On): the [Node2D], the [Vector2] point, or null without one (or when the node was freed). Reads back [method set_beam_target], [method set_targets] and the spawner's retargets.
 			</description>
 		</method>
 		<method name="get_beam_wall_normal" qualifiers="const">
@@ -210,6 +231,13 @@
 				Returns [code]true[/code] while beam [param beam_index] is stopped by a wall.
 			</description>
 		</method>
+		<method name="is_beam_spent" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="beam_index" type="int" />
+			<description>
+				Returns [code]true[/code] when beam [param beam_index] is gone for this life: a bolt or curvy head that hit a wall it could not reflect off, used up its [member LaserData2D.pierce_limit] or left the despawn bounds. A spent beam is never drawn or hits again.
+			</description>
+		</method>
 		<method name="is_beam_tip_hitting">
 			<return type="bool" />
 			<param index="0" name="beam_index" type="int" />
@@ -221,6 +249,12 @@
 			<return type="bool" />
 			<description>
 				Returns [code]true[/code] while the laser grazes (a spawner's Graze group or [method graze_set_zones]).
+			</description>
+		</method>
+		<method name="is_hitting" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] while the laser's phase hits: active, or growing with [member LaserData2D.hit_while_growing]. Charging and fading never hit.
 			</description>
 		</method>
 		<method name="is_laser_active" qualifiers="const">
@@ -298,12 +332,39 @@
 				Sets this laser's own clock factor (1 = normal, 0 = frozen alone): it multiplies [member BulletFactory2D.time_scale] and the owner spawner's [member LaserSpawner2D.time_scale], so its phases, heads, sweeps, hit intervals and followed sounds run on it. Finite and &gt;= 0, else one error and the old value is kept; refused on a pooled or never-fired laser. Every new life starts at 1.
 			</description>
 		</method>
+		<method name="sound_get_effects" qualifiers="const">
+			<return type="Array" />
+			<description>
+				The sound entries armed on this laser ([method sound_set_effects] or its spawner's Sound group), in order; an empty slot reads null.
+			</description>
+		</method>
+		<method name="sound_get_listener_group" qualifiers="const">
+			<return type="StringName" />
+			<description>
+				The listener group the laser's sounds were armed with (empty: the factory's default listener).
+			</description>
+		</method>
 		<method name="sound_set_effects">
 			<return type="bool" />
 			<param index="0" name="effects" type="Array" />
 			<param index="1" name="listener_group" type="Variant" default="null" />
 			<description>
 				Arms the laser's sound triggers with [param effects] ([LaserSoundData2D] entries or nulls; anything else is refused with one error and changes nothing), heard by the members of [param listener_group] (empty = Godot's listener; a [BulletTargets2D] for any other source). An empty array disarms. Returns [code]false[/code] for a finished laser.
+			</description>
+		</method>
+		<method name="touches_circle" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="center" type="Vector2" />
+			<param index="1" name="radius" type="float" />
+			<description>
+				Returns [code]true[/code] when a live beam's body (half its current width included) touches the circle, edges included: "is the player inside a beam" without the physics engine. [param radius] must be finite and &gt;= 0.
+			</description>
+		</method>
+		<method name="touches_rect" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="rect" type="Rect2" />
+			<description>
+				Returns [code]true[/code] when a live beam's body (half its current width included) touches the rect (a negative size is normalized, edges included).
 			</description>
 		</method>
 		<method name="track">

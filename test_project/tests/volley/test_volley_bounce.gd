@@ -2928,3 +2928,31 @@ func test_layer_32_bounces() -> void:
 			break
 	assert_eq(_bounce_body.size(), 1, "bounced off the layer-32 wall")
 	assert_lt(v.get_bullet_velocity(0).x, 0.0, "heading back")
+
+
+func test_bounce_readouts_report_the_normal_and_refill_the_count() -> void:
+	await _arena()
+	await _settle(factory)
+	var d := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
+	d.bounce_max_count = 1
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	assert_eq(v.bullet_get_last_bounce_normal(0), Vector2.ZERO, "no bounce yet: no normal")
+	for i in 120:
+		await physics()
+		if _bounce_body.size() >= 1:
+			break
+	assert_eq(v.bullet_get_bounce_count(0), 1, "one bounce: the cap")
+	var n: Vector2 = v.bullet_get_last_bounce_normal(0)
+	assert_true(n.x < -0.9 and absf(n.y) < 0.3, "the wall's normal points back at the bullet (got %s)" % n)
+	v.bullet_set_bounce_count(0, 0)
+	assert_eq(v.bullet_get_bounce_count(0), 0, "refilled: it may bounce again")
+	v.bullet_set_bounce_count(0, -1)
+	v.bullet_set_bounce_count(7, 0)
+	expect_error_sequence([
+		"BulletVolley2D: bullet_set_bounce_count count must be >= 0, nothing changed.",
+		"Invalid bullet index in bullet_set_bounce_count: 7 (amount_bullets: 1)",
+	])
+	assert_eq(v.bullet_get_bounce_count(0), 0, "refused writes keep the count")
+	var plain: BulletVolley2D = factory.spawn_volley(_bounce_data(Vector2(0, 300), 0.0, 0.0, [], [4]))
+	plain.bullet_set_bounce_count(0, 2)
+	expect_error_sequence(["BulletVolley2D: bullet_set_bounce_count needs bouncing on (bounce_mask is 0), nothing changed."])

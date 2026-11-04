@@ -8,6 +8,7 @@
 
 #include "bullet_spawner/pattern_spawner2d_internal.hpp"
 #include "core/emit_on2d.hpp"
+#include "core/live_object2d.hpp"
 #include "core/node_scan2d.hpp"
 #include "core/spawn_report2d.hpp"
 #include "factory/bullet_factory2d.hpp"
@@ -389,6 +390,48 @@ int LaserSpawner2D::retarget_live_lasers() {
 			resolved = true;
 		}
 		assign_targets(laser, targets);
+		++done;
+	}
+	return done;
+}
+
+int LaserSpawner2D::set_live_lasers_target(const Variant &target) {
+	Array targets;
+	if (target.get_type() == Variant::VECTOR2) {
+		const Vector2 p = target;
+		if (!Math::is_finite(p.x) || !Math::is_finite(p.y)) {
+			UtilityFunctions::push_error("LaserSpawner2D::set_live_lasers_target: a Vector2 target must be finite, nothing changed.");
+			return 0;
+		}
+		targets.push_back(p);
+	} else if (Node2D *node = live_object2d<Node2D>(target)) {
+		targets.push_back(node);
+	} else {
+		UtilityFunctions::push_error("LaserSpawner2D::set_live_lasers_target: target must be a live Node2D or a Vector2, nothing changed.");
+		return 0;
+	}
+	std::vector<LaserVolley2D *> owned;
+	collect_owned(owned);
+	int done = 0;
+	for (LaserVolley2D *laser : owned) {
+		if (!laser_aims_at_targets2d(laser) || laser->is_tracking()) {
+			continue;
+		}
+		assign_targets(laser, targets); // no user code
+		++done;
+	}
+	return done;
+}
+
+int LaserSpawner2D::clear_live_lasers_targets() {
+	std::vector<LaserVolley2D *> owned;
+	collect_owned(owned);
+	int done = 0;
+	for (LaserVolley2D *laser : owned) {
+		if (!laser_aims_at_targets2d(laser) || laser->is_tracking()) {
+			continue;
+		}
+		assign_targets(laser, Array());
 		++done;
 	}
 	return done;
@@ -788,6 +831,8 @@ void LaserSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_live_laser_count"), &LaserSpawner2D::get_live_laser_count);
 	ClassDB::bind_method(D_METHOD("end_live_lasers", "fade"), &LaserSpawner2D::end_live_lasers, DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("retarget_live_lasers"), &LaserSpawner2D::retarget_live_lasers);
+	ClassDB::bind_method(D_METHOD("set_live_lasers_target", "target"), &LaserSpawner2D::set_live_lasers_target);
+	ClassDB::bind_method(D_METHOD("clear_live_lasers_targets"), &LaserSpawner2D::clear_live_lasers_targets);
 	ClassDB::bind_method(D_METHOD("apply_to_live_lasers", "groups"), &LaserSpawner2D::apply_to_live_lasers, DEFVAL(LIVE_ALL));
 	ClassDB::bind_method(D_METHOD("resolve_laser_targets"), &LaserSpawner2D::resolve_laser_targets);
 	ClassDB::bind_method(D_METHOD("debug_explain_features"), &LaserSpawner2D::debug_explain_features);

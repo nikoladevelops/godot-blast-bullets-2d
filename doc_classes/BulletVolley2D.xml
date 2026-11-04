@@ -919,6 +919,13 @@
 				Gets the per-bullet custom data of a specific bullet, null when none is set. Strictly separate from [member shared_bullets_custom_data] - read that member for the shared value.
 			</description>
 		</method>
+		<method name="bullet_get_emitter_next_shot_sec" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Seconds of this volley's time ([method set_time_scale], its spawner's and the factory's time scale apply) until bullet [param bullet_index] fires its emitter template next: 0 when due this tick, -1 when it will not fire (no emitter, switched off, the bullet is out, or it fired [member BulletEmitterData2D.max_shots]). Use it to telegraph an emitter bullet (a flash or a growing ring before each shot).
+			</description>
+		</method>
 		<method name="bullet_get_fall_speed" qualifiers="const">
 			<return type="float" />
 			<param index="0" name="bullet_index" type="int" />
@@ -938,6 +945,13 @@
 			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Returns the effective homing turn agility for the specified bullet: its per-bullet value when per-bullet mode is active, otherwise the shared [member homing_smoothing].
+			</description>
+		</method>
+		<method name="bullet_get_last_bounce_normal" qualifiers="const">
+			<return type="Vector2" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				The surface normal of the last wall bullet [param bullet_index] bounced off this life (pointing away from the wall), or [code]Vector2(0, 0)[/code] before its first bounce or while bouncing is off. Aim ricochet sparks or decals with it in a [signal BulletFactory2D.bounce_body_entered] handler.
 			</description>
 		</method>
 		<method name="bullet_get_orbiting_angle">
@@ -1008,6 +1022,13 @@
 			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Effective per-bullet rotation speed (seeded value, live-updated by the tick). 0 when inactive or out of range.
+			</description>
+		</method>
+		<method name="bullet_get_split_count" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				How many times bullet [param bullet_index] split this life (counted toward [member BulletSplitStage2D.max_splits_per_bullet] for a surviving parent). 0 for a bullet that never split.
 			</description>
 		</method>
 		<method name="bullet_get_wobble_amplitude" qualifiers="const">
@@ -1203,6 +1224,14 @@
 				A cool trick you can do is, when a bullet collides or you want to disable it manually (with [method disable_bullet]) but keep its attachment active for a bit longer (for example, to let some particles or lights finish their effect), you can call this function to detach the attachment from the bullet and keep it on the scene.
 
 				Warning: You have to take care of the returned attachment yourself.
+			</description>
+		</method>
+		<method name="bullet_set_bounce_count">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="count" type="int" />
+			<description>
+				Sets how many bounces bullet [param bullet_index] has used this life (the count [member bounce_max_count] caps). Lower it to give a bullet more ricochets (a power-up, a mirror), raise it to end them early. [param count] must be &gt;= 0; bouncing must be on ([member bounce_mask] not 0). A refused call changes nothing; a pooled handle is refused.
 			</description>
 		</method>
 		<method name="bullet_set_curves_data">
@@ -1670,6 +1699,18 @@
 				Stops flocking (the bullets keep their current headings). Harmless when not flocking; refused on a pooled handle.
 			</description>
 		</method>
+		<method name="get_active_bullet_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				How many bullets of this volley are alive now (0 once it is pooled). Cheaper than counting [method get_all_bullets_status]: use it for "wave cleared" logic.
+			</description>
+		</method>
+		<method name="get_active_bullet_indexes" qualifiers="const">
+			<return type="PackedInt32Array" />
+			<description>
+				The indexes of the bullets alive now, ascending (empty once pooled). Loop over these instead of every index when you act on the live bullets only.
+			</description>
+		</method>
 		<method name="get_all_bullets_status">
 			<return type="bool[]" />
 			<description>
@@ -1845,6 +1886,12 @@
 				Whether any wobble entry is currently enabled on this volley (shared or per-bullet). Set wobble data through [member BulletVolleyData2D.shared_bullet_wobble_data] or [member BulletVolleyData2D.all_bullet_wobble_data] before spawning, or live via [method bullet_set_wobble_data] / [method set_shared_bullet_wobble_data].
 			</description>
 		</method>
+		<method name="get_life_age" qualifiers="const">
+			<return type="float" />
+			<description>
+				Seconds of this volley's time since its current life began (its spawn or the reuse that woke it from the pool), scaled like its bullets (0 for a pooled handle). Volley-wide clocks (lifetime, [member BulletSplitStage2D.split_after_sec], emitter schedules) run on it.
+			</description>
+		</method>
 		<method name="get_life_id" qualifiers="const">
 			<return type="int" />
 			<description>
@@ -1867,6 +1914,30 @@
 			<return type="BulletSpawner2D" />
 			<description>
 				The [BulletSpawner2D] that fired this volley (or adopted it with [method BulletSpawner2D.adopt_live_volley]) while that spawner is alive, else null: volleys the factory spawned directly, orphans (a freed or queued spawner, or one that handed them to the factory), and pooled volleys. Handy in factory-level signal handlers to tell who fired a bullet.
+			</description>
+		</method>
+		<method name="get_pickup_data" qualifiers="const">
+			<return type="BulletPickupData2D" />
+			<description>
+				The [BulletPickupData2D] this pickup volley was converted with (its value, magnet and collection settings), or null for a bullet volley. See [method is_pickup_volley].
+			</description>
+		</method>
+		<method name="get_scale_in_factor" qualifiers="const">
+			<return type="float" />
+			<description>
+				The growth the scale-in window shows now: [member BulletVolleyData2D.scale_in_from] at spawn up to 1.0 at the end of the window (1.0 without a window). The drawn size and the hitbox are the full-grown size times this.
+			</description>
+		</method>
+		<method name="get_scale_in_from" qualifiers="const">
+			<return type="float" />
+			<description>
+				The scale-in start size this life took from its spawn data ([member BulletVolleyData2D.scale_in_from]).
+			</description>
+		</method>
+		<method name="get_scale_in_sec" qualifiers="const">
+			<return type="float" />
+			<description>
+				The scale-in window this life took from its spawn data ([member BulletVolleyData2D.scale_in_sec]; 0 = no window).
 			</description>
 		</method>
 		<method name="get_sprite_animation" qualifiers="const">
@@ -2046,6 +2117,12 @@
 			<return type="bool" />
 			<description>
 				Returns [code]true[/code] when this volley draws per-bullet colors (its spawn data had [member BulletVolleyData2D.use_bullet_colors] on or a [member BulletVolleyData2D.bullet_colors] entry). The format is part of the pool key, so it stays the same for the volley's whole life.
+			</description>
+		</method>
+		<method name="is_volley_active" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] while this volley has a live life: spawned (or woken) and holding at least one bullet. False once it is parked ([method is_parked]) or pooled ([method is_pooled]): check it before acting on a handle you kept.
 			</description>
 		</method>
 		<method name="play_effect_animation">

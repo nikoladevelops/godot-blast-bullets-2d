@@ -776,6 +776,7 @@ bullet_volley2d_graze.cpp      graze arming, per-tick zone snapshot (prepare_gra
 bullet_volley2d_flock.cpp      flock arming (flock_set_config = THE choke point), join/leave/get, readouts (§23)
 bullet_volley2d_colors.cpp     per-bullet colors: the 12-float MultiMesh format, seeding, get/set color API (§29)
 bullet_volley2d_emitter.cpp    emitter arming (emitter_arm = THE choke point), the timer pass, emitter_set (§28)
+bullet_volley2d_readouts.cpp   script readouts (live count/indexes, life age, split/bounce/emitter per bullet, scale-in, pickup data)
 homing_target_deque.hpp        per-bullet/shared target queue (RingDeque2D: allocates nothing while empty)
 ```
 

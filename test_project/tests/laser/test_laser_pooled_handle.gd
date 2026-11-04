@@ -8,6 +8,13 @@ extends BlastTest
 
 const DT := 0.0625
 const EXEMPT := {"queue_free": "Node API", "free": "Node API"}
+## Reads named without get_ / is_ (pinned to read empty on a pooled laser below).
+const READS := {
+	"touches_circle": "an area query, like BulletFactory2D.get_lasers_in_circle",
+	"touches_rect": "an area query",
+	"sound_get_effects": "named like BulletVolley2D.sound_get_effects",
+	"sound_get_listener_group": "named like BulletVolley2D.sound_get_listener_group",
+}
 
 var _node: Node2D
 
@@ -62,7 +69,7 @@ func _writes() -> Array:
 	var out: Array = []
 	for m in ClassDB.class_get_method_list(&"LaserVolley2D", true):
 		var name := String(m["name"])
-		if name.begins_with("_") or name.begins_with("get_") or name.begins_with("is_") or name.begins_with("debug_") or EXEMPT.has(name):
+		if name.begins_with("_") or name.begins_with("get_") or name.begins_with("is_") or name.begins_with("debug_") or EXEMPT.has(name) or READS.has(name):
 			continue
 		out.append(m)
 	return out
@@ -128,6 +135,7 @@ func test_reads_on_a_pooled_laser_are_neutral() -> void:
 	assert_eq([l.get_beam_count(), l.is_laser_active(), l.get_phase(), l.get_anchor() == null, l.get_active_time_left(), l.get_laser_data() == null, l.get_owner_spawner() == null, l.is_graze_armed(), l.is_sound_armed(), l.get_graze_zones(), l.get_current_width()],
 		[0, false, LaserVolley2D.PHASE_FINISHED, true, 0.0, true, true, false, false, [], 0.0], "nothing left of its life")
 	assert_eq([l.debug_check_invariants(), l.debug_get_draw_state(1.0), (l.debug_get_body_mesh(1.0)["points"] as PackedVector2Array).size()], ["", [], 0], "clean, draws nothing")
+	assert_eq([l.touches_circle(Vector2.ZERO, 1e6), l.touches_rect(Rect2(-1e6, -1e6, 2e6, 2e6)), l.sound_get_effects(), l.sound_get_listener_group()], [false, false, [], &""], "the reads read empty")
 	l.get_beam_start(0)
 	expect_error_sequence(["Invalid beam index in get_beam_start: 0 (beam count: 0)"])
 

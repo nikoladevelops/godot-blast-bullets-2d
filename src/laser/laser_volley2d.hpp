@@ -184,6 +184,16 @@ public:
 	real_t get_beam_length(int beam_index) const;
 	real_t get_beam_angle(int beam_index) const;
 	bool is_beam_blocked(int beam_index) const;
+	// Script readouts: the hits now, a beam's target and whether it is used up.
+	bool is_hitting() const { return active && hitting_phase(); }
+	TypedArray<Dictionary> get_beam_contacts(int beam_index) const;
+	Variant get_beam_target(int beam_index) const;
+	bool is_beam_spent(int beam_index) const;
+	int get_beam_pierced_total(int beam_index) const;
+	bool touches_circle(const Vector2 &center, real_t radius) const;
+	bool touches_rect(const Rect2 &rect) const;
+	Array sound_get_effects() const;
+	StringName sound_get_listener_group() const { return sound_listener_group; }
 	// The beam's end is hitting: stopped by a wall (outside the charge) or
 	// on a target the beam hits now (LaserSpriteLook2D.show_when).
 	// Measured in the tick only while wanted (a tip look with show_when, or

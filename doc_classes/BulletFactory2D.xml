@@ -651,6 +651,23 @@
 				Returns true once the factory started destroying itself. While true, teardown paths stop touching child nodes and most factory operations report an error instead of running.
 			</description>
 		</method>
+		<method name="get_lasers_in_circle" qualifiers="const">
+			<return type="LaserVolley2D[]" />
+			<param index="0" name="center" type="Vector2" />
+			<param index="1" name="radius" type="float" />
+			<param index="2" name="can_hit_mask" type="int" default="0" />
+			<description>
+				Returns every firing laser whose body (half its current width included) touches the circle, in list order; [param can_hit_mask] keeps only the lasers whose [member LaserData2D.collision_mask] shares a bit with it (0 = all). The read-only twin of [method end_lasers_in_circle]: it ends nothing, so a bomb can decide per laser (score, shield) before ending them.
+			</description>
+		</method>
+		<method name="get_lasers_in_rect" qualifiers="const">
+			<return type="LaserVolley2D[]" />
+			<param index="0" name="rect" type="Rect2" />
+			<param index="1" name="can_hit_mask" type="int" default="0" />
+			<description>
+				Returns every firing laser whose body (half its current width included) touches the rect (a negative size is normalized, edges count). Same filter as [method get_lasers_in_circle]; the read-only twin of [method end_lasers_in_rect].
+			</description>
+		</method>
 		<method name="get_lasers_owned_by" qualifiers="const">
 			<return type="LaserVolley2D[]" />
 			<param index="0" name="spawner" type="Variant" />

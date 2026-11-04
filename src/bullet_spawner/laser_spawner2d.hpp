@@ -94,6 +94,15 @@ public:
 	// the targets resolved now; None leaves them none. Returns how many
 	// lasers it retargeted.
 	int retarget_live_lasers();
+	// Every live Track / Lock On laser aims at `target` now (a Node2D or a
+	// Vector2), like home_live_volleys_to for bullets. A tracking laser picks
+	// its own targets and is left alone; a later retarget pass of the Laser
+	// Targeting group may replace it. A bad target errors and changes nothing.
+	// Returns how many lasers it aimed.
+	int set_live_lasers_target(const Variant &target);
+	// Leaves every live Track / Lock On laser without a target (they fall back
+	// to the pattern) until the next retarget pass. Returns how many.
+	int clear_live_lasers_targets();
 	// Re-applies the spawner's settings to the lasers it fired: LIVE_GRAZE and
 	// LIVE_SOUND arm or disarm them as the spawner stands now (a laser armed
 	// alike is untouched), LIVE_HOMING retargets Track / Lock On lasers.

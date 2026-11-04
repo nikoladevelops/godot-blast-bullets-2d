@@ -268,6 +268,8 @@ void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_active_laser_count"), &BulletFactory2D::get_active_laser_count);
 	ClassDB::bind_method(D_METHOD("clear_active_lasers", "fade"), &BulletFactory2D::clear_active_lasers, DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("end_lasers_in_circle", "center", "radius", "fade", "can_hit_mask"), &BulletFactory2D::end_lasers_in_circle, DEFVAL(true), DEFVAL(0));
+	ClassDB::bind_method(D_METHOD("get_lasers_in_circle", "center", "radius", "can_hit_mask"), &BulletFactory2D::get_lasers_in_circle, DEFVAL(0));
+	ClassDB::bind_method(D_METHOD("get_lasers_in_rect", "rect", "can_hit_mask"), &BulletFactory2D::get_lasers_in_rect, DEFVAL(0));
 	ClassDB::bind_method(D_METHOD("end_lasers_in_rect", "rect", "fade", "can_hit_mask"), &BulletFactory2D::end_lasers_in_rect, DEFVAL(true), DEFVAL(0));
 	ClassDB::bind_method(D_METHOD("populate_lasers_pool", "beam_count", "amount"), &BulletFactory2D::populate_lasers_pool);
 	ClassDB::bind_method(D_METHOD("populate_lasers_pool_deferred", "beam_count", "amount"), &BulletFactory2D::populate_lasers_pool_deferred);

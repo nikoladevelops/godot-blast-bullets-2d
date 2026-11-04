@@ -1391,6 +1391,21 @@ public:
 	// auto-pooling on: released, only a new life revives it).
 	bool is_pooled() const;
 	bool is_parked() const;
+
+	// SCRIPT READOUTS (bullet_volley2d_readouts.cpp): live state for game
+	// code. A pooled handle reads as empty (0, [], -1).
+	int get_active_bullet_count() const;
+	PackedInt32Array get_active_bullet_indexes() const;
+	bool is_volley_active() const;
+	double get_life_age() const;
+	int bullet_get_split_count(int bullet_index) const;
+	Vector2 bullet_get_last_bounce_normal(int bullet_index) const;
+	void bullet_set_bounce_count(int bullet_index, int count);
+	double get_scale_in_sec() const;
+	double get_scale_in_from() const;
+	double get_scale_in_factor() const;
+	Ref<BulletPickupData2D> get_pickup_data() const;
+	double bullet_get_emitter_next_shot_sec(int bullet_index) const;
 	// The live BulletSpawner2D that fired this volley (or adopted it), else
 	// null: factory volleys, orphans (a freed or queued spawner, a hand-over),
 	// pooled volleys.
