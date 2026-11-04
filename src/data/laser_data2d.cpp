@@ -82,6 +82,7 @@ LASER_DOUBLE_SETTER(wave_frequency, value >= 0.0, ">= 0")
 LASER_DOUBLE_SETTER(hit_interval_sec, value >= 0.0, ">= 0 (0 = one hit per contact)")
 LASER_DOUBLE_SETTER(body_scroll_speed, true, "a number")
 LASER_DOUBLE_SETTER(body_width_scale, value >= 0.0, ">= 0")
+LASER_DOUBLE_SETTER(body_end_fade, value >= 0.0, ">= 0 (0 = square ends)")
 
 #undef LASER_DOUBLE_SETTER
 
@@ -530,6 +531,7 @@ void LaserData2D::_bind_methods() {
 	LASER_BIND(body_mode, INT, PROPERTY_HINT_ENUM, "Stretch,Tile")
 	LASER_BIND(body_scroll_speed, FLOAT, PROPERTY_HINT_RANGE, "-2000,2000,1,or_less,or_greater,suffix:px/s")
 	LASER_BIND(body_width_scale, FLOAT, PROPERTY_HINT_RANGE, "0,4,0.01,or_greater")
+	LASER_BIND(body_end_fade, FLOAT, PROPERTY_HINT_RANGE, "0,200,0.5,or_greater,suffix:px")
 	LASER_BIND(antialiased, BOOL, PROPERTY_HINT_NONE, "")
 	LASER_BIND(body_material, OBJECT, PROPERTY_HINT_RESOURCE_TYPE, "CanvasItemMaterial,ShaderMaterial")
 	LASER_BIND(charge_look, OBJECT, PROPERTY_HINT_RESOURCE_TYPE, "LaserSpriteLook2D")

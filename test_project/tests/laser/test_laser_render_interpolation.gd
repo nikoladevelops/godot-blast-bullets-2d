@@ -638,3 +638,76 @@ func test_a_slow_bolt_glides_while_its_head_point_moves() -> void:
 	var l := _fire(d, Transform2D(0.3, Vector2(100, 100)))
 	step_factory(8, DT) # a few pixels of path first
 	assert_eq("\n".join(_check_continuity(l, 14, "slow bolt")), "", "a slow bolt never snaps")
+
+
+# --- body_end_fade (LaserData2D.body_end_fade, off by default) ------------------
+
+func _alphas(mesh: Dictionary) -> Array:
+	var out: Array = []
+	for c in (mesh["colors"] as PackedColorArray):
+		out.append(snappedf(c.a, 0.0001))
+	return out
+
+
+func test_body_end_fade_fades_the_body_toward_both_ends() -> void:
+	assert_eq(LaserData2D.new().body_end_fade, 0.0, "square ends by default")
+	var l := _fire(H.make_laser(0.0, 0.0, 0.0, 0.0, 200.0), Transform2D(0.0, Vector2(50, 50)))
+	var d := l.get_laser_data()
+	d.antialiased = false
+	d.body_end_fade = 20.0
+	step_factory(1, DT)
+	var mesh: Dictionary = l.debug_get_body_mesh(1.0)
+	assert_eq(Array(mesh["points"]), [Vector2(50, 56), Vector2(50, 44), Vector2(70, 56), Vector2(70, 44),
+		Vector2(230, 56), Vector2(230, 44), Vector2(250, 56), Vector2(250, 44)], "a pair where each fade ends")
+	assert_eq(_alphas(mesh), [0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0], "clear at both ends, full between")
+	d.body_end_fade = 500.0
+	step_factory(1, DT)
+	mesh = l.debug_get_body_mesh(1.0)
+	assert_eq(Array(mesh["points"]), [Vector2(50, 56), Vector2(50, 44), Vector2(150, 56), Vector2(150, 44), Vector2(250, 56), Vector2(250, 44)], "longer than half: it fades in to the middle and out again (one pair there)")
+	assert_eq(_alphas(mesh), [0.0, 0.0, 1.0, 1.0, 0.0, 0.0], "full only in the middle")
+	d.body_end_fade = 0.0
+	step_factory(1, DT)
+	assert_eq(Array(l.debug_get_body_mesh(1.0)["points"]), [Vector2(50, 56), Vector2(50, 44), Vector2(250, 56), Vector2(250, 44)], "0: the square strip again")
+	d.body_end_fade = -1.0
+	d.body_end_fade = NAN
+	expect_error_sequence([
+		"LaserData2D: body_end_fade must be finite and >= 0 (0 = square ends), keeping the old value.",
+		"LaserData2D: body_end_fade must be finite and >= 0 (0 = square ends), keeping the old value.",
+	])
+	assert_eq(d.body_end_fade, 0.0, "kept")
+
+
+func test_body_end_fade_follows_the_whole_polyline_with_the_color_ramp() -> void:
+	make_wall(Vector2(150, 50), Vector2(20, 200), 16)
+	await idle(2)
+	var d := H.make_laser(0.0, 0.0, 0.0, 0.0, 200.0)
+	d.wall_mask = 16
+	d.reflections = 1
+	d.antialiased = false
+	d.color_ramp = Gradient.new()
+	d.body_end_fade = 30.0
+	var l := _fire(d, Transform2D(0.0, Vector2(50, 50)))
+	step_factory(1, DT)
+	var mesh: Dictionary = l.debug_get_body_mesh(1.0)
+	var pts: PackedVector2Array = mesh["points"]
+	var cols: PackedColorArray = mesh["colors"]
+	var problems: Array = []
+	var walked := 0.0
+	var line: PackedVector2Array = l.get_beam_points(0)
+	var total := 0.0
+	for k in range(1, line.size()):
+		total += line[k - 1].distance_to(line[k])
+	# Pairs come in order along the beam: the walked distance is the sum of the
+	# steps between pair midpoints. Every pair's alpha is the fade there.
+	var prev := (pts[0] + pts[1]) * 0.5
+	for i in range(0, pts.size(), 2):
+		var mid := (pts[i] + pts[i + 1]) * 0.5
+		walked += prev.distance_to(mid)
+		prev = mid
+		var want := clampf(minf(walked, total - walked) / 30.0, 0.0, 1.0)
+		if absf(cols[i].a - want) > 0.002:
+			problems.append("pair %d at %.1f px: alpha %.3f, want %.3f" % [i / 2, walked, cols[i].a, want])
+	assert_gt(line.size(), 2, "reflected: a polyline")
+	assert_eq(problems, [], "the fade runs along the whole beam, across the reflection")
+	assert_eq(_alphas(mesh).slice(0, 2), [0.0, 0.0], "clear at the muzzle")
+	assert_eq(_alphas(mesh).slice(-2), [0.0, 0.0], "clear at the end")

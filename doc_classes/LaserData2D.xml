@@ -52,6 +52,9 @@
 		<member name="antialiased" type="bool" setter="set_antialiased" getter="get_antialiased" default="true">
 			Soft body edges (on by default): each edge of the body, and the charge warning line, fades out over one screen pixel (zoom and scaled parents counted), so a moving or turning beam glides between pixels instead of crawling in whole-pixel steps with stair-stepped edges. The drawn width stays the same. Off draws the hard-edged strip.
 		</member>
+		<member name="body_end_fade" type="float" setter="set_body_end_fade" getter="get_body_end_fade" default="0.0">
+			The body fades out toward both of its ends over this many pixels (measured along the beam, across reflections; at most half its length), so a wide, glowing body ends softly instead of being cut off square. 0 draws square ends. Only the drawn body changes: hits, walls and the looks are unaffected. Finite and &gt;= 0.
+		</member>
 		<member name="body_frames" type="SpriteFrames" setter="set_body_frames" getter="get_body_frames">
 			The body texture ([code]default[/code] when it has frames, else the first animation with frames), playing from the growing start. Empty draws a solid body in [member modulate].
 		</member>

@@ -16,6 +16,7 @@
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/rendering_server.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 
@@ -237,6 +238,7 @@ struct BodyStyle2D {
 	real_t tex_w;
 	real_t scroll;
 	real_t feather; // the width of each soft edge (one screen pixel in local units), 0 = hard edges
+	real_t end_fade; // px over which the body fades out toward each end (0 = square ends)
 };
 
 // One beam's strip: a left/right vertex pair per point (v = 0 left, 1
@@ -258,6 +260,10 @@ void append_body_strip(LaserBodyMesh2D &m, const std::vector<Vector2> &pts, cons
 	const LaserData2D *d = s.data;
 	const bool ramp = d->color_ramp.is_valid();
 	const bool soft = s.feather > (real_t)0.0;
+	// End fade: alpha 0 at both ends, full past `fade` from each (at most half
+	// the body: a short beam fades in and straight back out).
+	const real_t fade = Math::min(s.end_fade, total * (real_t)0.5);
+	const bool fading = fade > (real_t)0.0;
 	// Along the (possibly mitered) offset: the outer and inner edge scales.
 	const real_t k_out = soft ? (s.half + s.feather * (real_t)0.5) / s.half : (real_t)1.0;
 	const real_t k_in = soft ? Math::max((real_t)0.0, s.half - s.feather * (real_t)0.5) / s.half : (real_t)1.0;
@@ -268,6 +274,9 @@ void append_body_strip(LaserBodyMesh2D &m, const std::vector<Vector2> &pts, cons
 		Color col = d->modulate;
 		if (ramp) {
 			col = col * d->color_ramp->sample(t);
+		}
+		if (fading) {
+			col.a *= Math::clamp(Math::min(dist, total - dist) / fade, (real_t)0.0, (real_t)1.0);
 		}
 		const real_t u = s.tile ? (dist + s.scroll) / s.tex_w : t;
 		if (!soft) {
@@ -329,9 +338,25 @@ void append_body_strip(LaserBodyMesh2D &m, const std::vector<Vector2> &pts, cons
 			}
 		}
 		const int pieces = ramp ? (int)Math::clamp(std::ceil((double)((real_t)8.0 * seg / total)), 1.0, 8.0) : 1;
+		// Inner pairs along the segment: the color ramp pieces and, while the
+		// ends fade, the two distances where the fade ends (alpha is linear
+		// between pairs, so a pair there keeps the fade exact), in order.
+		real_t cuts[10];
+		int n = 0;
 		for (int p = 1; p < pieces; ++p) {
-			const real_t along = seg * (real_t)p / (real_t)pieces;
-			pair(a + axis * along, normal * s.half, walked + along, true);
+			cuts[n++] = seg * (real_t)p / (real_t)pieces;
+		}
+		if (fading) {
+			for (const real_t at : { fade - walked, total - fade - walked }) {
+				if (at > (real_t)0.0 && at < seg) {
+					cuts[n++] = at;
+				}
+			}
+			std::sort(cuts, cuts + n);
+			n = (int)(std::unique(cuts, cuts + n) - cuts);
+		}
+		for (int q = 0; q < n; ++q) {
+			pair(a + axis * cuts[q], normal * s.half, walked + cuts[q], true);
 		}
 		walked += seg;
 		prev_axis = axis;
@@ -382,6 +407,7 @@ void LaserVolley2D::build_body_mesh(double fraction, LaserBodyMesh2D &r_mesh, st
 	style.tex_w = body != nullptr ? Math::max((real_t)1.0, body->get_size().x) : (real_t)1.0;
 	style.scroll = (real_t)(-d->body_scroll_speed * (draw_clock - grow_started));
 	style.feather = 0.0;
+	style.end_fade = (real_t)d->body_end_fade;
 	if (d->antialiased) {
 		// One screen pixel in the laser's own units (zoom, scaled parents).
 		const Transform2D to_screen = get_global_transform_with_canvas();

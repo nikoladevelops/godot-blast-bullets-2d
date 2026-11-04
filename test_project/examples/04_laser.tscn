@@ -79,6 +79,7 @@ modulate = Color(1, 0.23921569, 0.56078434, 1)
 body_frames = ExtResource("fx_beam")
 body_mode = 1
 body_scroll_speed = 600.0
+body_end_fade = 24.0
 muzzle_look = SubResource("LaserSpriteLook2D_muzzle")
 tip_look = SubResource("LaserSpriteLook2D_tip")
 pierce_look = SubResource("LaserSpriteLook2D_pierce")
