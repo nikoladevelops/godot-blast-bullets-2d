@@ -463,6 +463,20 @@ public:
 	// allocating it fresh per bake per tick was heap churn on every physics
 	// frame. Sized per use via assign (no preservation needed).
 	std::vector<int> fx_occupancy_scratch;
+	// Visibility writes collected while the bake loops hold FXOneShotBake&:
+	// set_visible runs a shard's visibility_changed handlers (user code), and
+	// a handler may register another bake (the vectors reallocate), clear the
+	// manual bakes or free shards. No bake may be held across one, so the
+	// loops queue plain ids here and the outermost caller applies them once
+	// its bake references are gone (fx_apply_queued_visibility).
+	struct FXVisibilityWrite2D {
+		uint64_t id = 0;
+		MultiMeshInstance2D *node = nullptr;
+		bool visible = false;
+	};
+	std::vector<FXVisibilityWrite2D> fx_visibility_writes;
+	void fx_queue_visibility(MultiMeshInstance2D *node, bool visible);
+	void fx_apply_queued_visibility();
 
 	// Structural calls queued by the *_deferred wrappers, flushed together on
 	// the next SceneTree process_frame (idle, outside the physics step).

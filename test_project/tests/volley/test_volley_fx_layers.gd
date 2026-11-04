@@ -1607,3 +1607,36 @@ func test_a_visibility_changed_handler_that_frees_the_volley_is_survived() -> vo
 	var books: Dictionary = factory.debug_assert_no_dangling()
 	assert_true(books["ok"], str(books["error"]))
 	expect_no_errors()
+
+
+## age_fx_effects holds no FXOneShotBake& across user code: a shard's
+## visibility_changed handler may register another manual effect, which
+## reallocates fx_manual_bakes. Aging must resume on the moved vector (both
+## bakes stay intact, both effects play), never on freed memory.
+## tools/run_sanitizer_tests.py runs this under AddressSanitizer.
+func test_registering_a_manual_effect_from_a_shard_visibility_handler_is_survived() -> void:
+	var layer := _make_layer(EffectLayerData2D.EFFECT_ON_CLEAR, 2) # a frame change at 0.1 s
+	var other := _make_layer(EffectLayerData2D.EFFECT_ON_CLEAR, 1)
+	assert_gte(factory.spawn_layer_effect(layer, Transform2D(0.0, Vector2.ZERO)), 0, "the manual effect fired")
+	await idle(1)
+	var shard: MultiMeshInstance2D = null
+	for c in factory.get_node("SpriteEffectsContainer").get_children():
+		if c is MultiMeshInstance2D:
+			shard = c
+			break
+	assert_not_null(shard, "the manual shard exists")
+	var registered := [false]
+	shard.visibility_changed.connect(func() -> void:
+		if not registered[0]:
+			registered[0] = true
+			factory.spawn_layer_effect(other, Transform2D(0.0, Vector2(40, 0))))
+	for i in 20:
+		await physics(1)
+		if registered[0]:
+			break
+	assert_true(registered[0], "the handler ran from the aging pass's set_visible")
+	assert_eq(int(factory.debug_get_effect_state().get("manual_bakes", 0)), 2, "both manual bakes exist")
+	assert_eq(factory.get_active_effect_count(), 2, "both manual effects are alive")
+	var books: Dictionary = factory.debug_assert_no_dangling()
+	assert_true(books["ok"], str(books["error"]))
+	expect_no_errors()

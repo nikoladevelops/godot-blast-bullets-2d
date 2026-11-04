@@ -209,6 +209,39 @@ void BulletFactory2D::fx_erase_bake(FXOneShotBake &bake) {
 	bake.ring_cursor = 0;
 }
 
+void BulletFactory2D::fx_queue_visibility(MultiMeshInstance2D *node, bool visible) {
+	if (node == nullptr || node->is_queued_for_deletion()) {
+		return;
+	}
+	FXVisibilityWrite2D write;
+	write.id = (uint64_t)node->get_instance_id();
+	write.node = node;
+	write.visible = visible;
+	fx_visibility_writes.push_back(write);
+}
+
+void BulletFactory2D::fx_apply_queued_visibility() {
+	if (fx_visibility_writes.empty()) {
+		return;
+	}
+	// Swapped out: a handler may queue more writes (a nested clear or an
+	// effect spawn), which must not grow the batch being iterated.
+	std::vector<FXVisibilityWrite2D> pending;
+	pending.swap(fx_visibility_writes);
+	const LifeWatch watch = watch_life();
+	for (const FXVisibilityWrite2D &write : pending) {
+		if (watch.died()) {
+			return; // a handler freed the factory: no bake or shard may be reached again
+		}
+		// A handler may have freed the shard (or its container): ids are never
+		// reused, so a mismatch is a freed node and is skipped.
+		if (ObjectDB::get_instance(ObjectID(write.id)) != (Object *)write.node) {
+			continue;
+		}
+		write.node->set_visible(write.visible);
+	}
+}
+
 bool BulletFactory2D::fx_register_volley_bake(uint64_t volley_id, int layer_index, const Ref<EffectLayerData2D> &layer, int amount_bullets) {
 	if (volley_id == 0 || layer.is_null() || !layer->enabled) {
 		return false;
@@ -403,6 +436,9 @@ void BulletFactory2D::age_fx_effects(double delta) {
 		}
 		++m;
 	}
+	// Only now run the queued visibility handlers: the bake vectors above may
+	// no longer be held (a handler can register a bake or clear the hatch).
+	fx_apply_queued_visibility();
 }
 
 void BulletFactory2D::age_fx_bake(FXOneShotBake &bake) {
@@ -460,9 +496,9 @@ void BulletFactory2D::age_fx_bake(FXOneShotBake &bake) {
 				if (local.get_origin().is_finite()) {
 					bake.shard_multimesh(frame)->set_instance_transform_2d((int)s, local);
 					slot.angle_shard = frame;
-					if (MultiMeshInstance2D *node = bake.shards[frame].get()) {
-						node->set_visible(true);
-					}
+					// set_visible is user code (visibility_changed): queued, so
+					// no bake is held while it runs (see fx_queue_visibility).
+					fx_queue_visibility(bake.shards[frame].get(), true);
 				}
 			}
 		}
@@ -477,9 +513,7 @@ void BulletFactory2D::age_fx_bake(FXOneShotBake &bake) {
 		}
 	}
 	for (size_t s = 0; s < bake.shards.size(); ++s) {
-		if (MultiMeshInstance2D *node = bake.shards[s].get()) {
-			node->set_visible(occupancy[s] > 0);
-		}
+		fx_queue_visibility(bake.shards[s].get(), occupancy[s] > 0);
 	}
 }
 
@@ -637,7 +671,8 @@ void BulletFactory2D::clear_sprite_effects() {
 						mm->set_instance_transform_2d(k, hidden);
 					}
 				}
-				node->set_visible(false);
+				// set_visible is user code: queued, applied once no bake is held.
+				fx_queue_visibility(node, false);
 			}
 		}
 		bake.active_count = 0;
@@ -647,6 +682,7 @@ void BulletFactory2D::clear_sprite_effects() {
 		fx_erase_bake(fx_manual_bakes[i]);
 	}
 	fx_manual_bakes.clear();
+	fx_apply_queued_visibility();
 }
 
 void BulletFactory2D::debug_set_effect_log_enabled(bool enabled) {
