@@ -211,3 +211,29 @@ func test_a_layer_that_cannot_play_reports_once_per_edit() -> void:
 	expect_warning_sequence(["LaserEffectData2D: effect is a trail layer (a trail follows a bullet), nothing plays."])
 	assert_eq(_played(LaserEffectData2D.LASER_EFFECT_ON_ACTIVE).size(), 1, "a trail never plays")
 	l.end_laser(false)
+
+
+## Spawning an effect adds nodes (SceneTree.node_added, the parent's
+## child_entered_tree: user code), so a laser's effects play right after its
+## tick, never between resolving an event's target and emitting it: the hit
+## is announced first, with a live target, even when a node_added handler
+## frees that target (it once received the freed target).
+func test_effect_nodes_are_added_after_the_event_signal() -> void:
+	var target := make_area(Vector2(100, 0), Vector2(20, 60))
+	await idle(2)
+	var d := H.make_laser(0.0, 0.0, 0.5, 0.0, 400.0)
+	d.effects = [_entry(LaserEffectData2D.LASER_EFFECT_ON_HIT)]
+	var order: Array = []
+	var on_added := func(n: Node) -> void:
+		if String(n.name) == "SpriteEffectsContainer" or n is MultiMeshInstance2D:
+			order.append("effect node")
+			if is_instance_valid(target):
+				target.queue_free()
+	get_tree().node_added.connect(on_added)
+	factory.laser_hit.connect(func(t: Object, _l: LaserVolley2D, _b: int, _p: Vector2) -> void:
+		order.append("hit" if is_instance_valid(t) else "hit with a freed target"))
+	_fire(d, [Transform2D.IDENTITY] as Array[Transform2D])
+	step_factory(1, DT)
+	get_tree().node_added.disconnect(on_added)
+	assert_eq(order.slice(0, 2), ["hit", "effect node"], "the hit first (live target), the effect's nodes after the tick")
+	assert_eq(_positions(LaserEffectData2D.LASER_EFFECT_ON_HIT), [Vector2(100, 0)], "and the effect still plays where the hit was")

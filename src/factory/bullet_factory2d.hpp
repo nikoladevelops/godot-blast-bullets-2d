@@ -528,6 +528,25 @@ public:
 	// disabled or trail layer; a layer that cannot play reports once per edit
 	// (its bake version), never once per event. False when nothing played.
 	bool fx_play_laser_effect(const Ref<EffectLayerData2D> &layer, const Transform2D &at);
+	// Laser effects are queued while a laser ticks (spawning a shard adds a
+	// node: SceneTree.node_added and the parent's child_entered_tree run user
+	// code) and played right after that laser's tick, so a laser's event code
+	// never runs user code between resolving a target and emitting it.
+	struct PendingLaserEffect2D {
+		Ref<EffectLayerData2D> layer;
+		Transform2D at;
+		int event = 0;
+		uint64_t laser_id = 0;
+		int life_id = 0;
+		int beam = 0;
+	};
+	std::vector<PendingLaserEffect2D> pending_laser_effects;
+	void queue_laser_effect(const Ref<EffectLayerData2D> &layer, const Transform2D &at, int event, uint64_t laser_id, int life_id, int beam) {
+		pending_laser_effects.push_back({ layer, at, event, laser_id, life_id, beam });
+	}
+	// Plays the queued laser effects (user code inside). False: this factory
+	// was freed by it.
+	bool flush_laser_effects();
 	// The laser effect log rows ({trigger, laser, life, beam, position,
 	// frame}, volley 0 and bullet -1) share the effect log.
 	void debug_log_laser_effect(int trigger, uint64_t laser_id, int life_id, int beam_index, const Vector2 &position);

@@ -46,10 +46,18 @@ LaserVolley2D *BulletFactory2D::spawn_laser(const Ref<LaserData2D> &data, const 
 	}
 	const uint64_t anchor_id = anchor != nullptr ? anchor->get_instance_id() : 0;
 	const bool in_tree = anchor != nullptr && anchor->is_inside_tree();
-	const Transform2D frame = in_tree ? anchor->get_global_transform() : Transform2D();
+	Transform2D frame = in_tree ? anchor->get_global_transform() : Transform2D();
+	Vector2 offset;
+	// A spawner anchor is read the way every tick reads it (its shot frame:
+	// spin included, plus its spawn offset): read another way here, the beams
+	// jumped by the spin and the offset on their first tick.
+	if (const PatternSpawner2D *sp = in_tree ? Object::cast_to<PatternSpawner2D>(anchor) : nullptr) {
+		frame = sp->get_shot_frame();
+		offset = sp->resolve_spawn_offset_global();
+	}
 	// An anchor outside the tree: the beams fire from their global poses and
 	// ride it once it enters (no jump by its transform).
-	return spawn_laser_span(data, slots.data(), (int)slots.size(), 0, anchor_id, frame, "spawn_laser", Vector2(), anchor != nullptr && !in_tree);
+	return spawn_laser_span(data, slots.data(), (int)slots.size(), 0, anchor_id, frame, "spawn_laser", offset, anchor != nullptr && !in_tree);
 }
 
 LaserVolley2D *BulletFactory2D::spawn_laser_span(const Ref<LaserData2D> &data, const Transform2D *transforms, int count, uint64_t owner_id, uint64_t anchor_id, const Transform2D &anchor_frame, const char *caller, const Vector2 &anchor_offset, bool anchor_frame_pending, const Vector2 &inherited_velocity) {
@@ -275,11 +283,32 @@ bool BulletFactory2D::tick_lasers(double delta, const bool &alive) {
 			laser->first_tick_lead = 0.0;
 		}
 		laser->tick(capped_volley_delta(first_delta, laser_time_factor(*laser)));
-		if (!sweep_may_continue(alive)) {
+		if (!alive || !flush_laser_effects() || !sweep_may_continue(alive)) {
 			return false;
 		}
 		if (sweep_paused()) {
 			break; // a handler paused the factory: the lasers after it hold
+		}
+	}
+	return true;
+}
+
+bool BulletFactory2D::flush_laser_effects() {
+	if (pending_laser_effects.empty()) {
+		return true;
+	}
+	std::vector<PendingLaserEffect2D> batch;
+	batch.swap(pending_laser_effects);
+	const LifeWatch watch = watch_life();
+	for (const PendingLaserEffect2D &e : batch) {
+		if (fx_play_laser_effect(e.layer, e.at)) {
+			if (watch.died()) {
+				return false;
+			}
+			debug_log_laser_effect(e.event, e.laser_id, e.life_id, e.beam, e.at.get_origin());
+		}
+		if (watch.died()) {
+			return false; // user code (node_added) freed this factory
 		}
 	}
 	return true;
@@ -368,8 +397,16 @@ void BulletFactory2D::free_all_lasers() {
 	doomed.swap(all_lasers);
 	laser_pool.clear();
 	++laser_free_epoch;
+	// By id: removing one laser fires tree signals (user code) that may free a
+	// later one; a freed entry is skipped, never dereferenced.
+	std::vector<uint64_t> ids;
+	ids.reserve(doomed.size());
 	for (LaserVolley2D *laser : doomed) {
-		if (laser == nullptr) {
+		ids.push_back(laser != nullptr ? (uint64_t)laser->get_instance_id() : 0);
+	}
+	for (size_t k = 0; k < doomed.size(); ++k) {
+		LaserVolley2D *laser = doomed[k];
+		if (laser == nullptr || ObjectDB::get_instance(ObjectID(ids[k])) != static_cast<Object *>(laser)) {
 			continue;
 		}
 		laser->factory = nullptr;

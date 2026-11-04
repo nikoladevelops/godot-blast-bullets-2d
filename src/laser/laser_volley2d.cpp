@@ -236,6 +236,7 @@ void LaserVolley2D::begin_life(BulletFactory2D *p_factory, const Ref<LaserData2D
 	for (Beam &b : beams) {
 		update_beam_geometry(b, 0.0);
 		b.impact_since.assign(b.impacts.size(), 0.0);
+		b.impact_since_ids = b.impact_ids;
 		b.prev_points = b.points;
 		b.prev_length = b.length_now;
 		b.prev_impacts = b.impacts;

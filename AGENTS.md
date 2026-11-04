@@ -1311,6 +1311,15 @@ replayed once on resume.
   inside that emit (an attachment's own `visibility_changed`), user code in
   notifications the user opts into (`NOTIFICATION_LOCAL_TRANSFORM_CHANGED`),
   and scripted engine resources (a GDScript `AudioStream` or `Texture2D`).
+  Also freeing a SIBLING while the parent is busy removing a child (a
+  `tree_exiting` handler freeing another child of the same parent): Godot
+  refuses the removal (`data.blocked > 0`) and keeps a dangling child even
+  for plain Node2Ds (probed, November 2026). The plugin's own loops still
+  check every entry by id (`free_all_lasers`, `remove_and_delete2d`), so it
+  never adds a use-after-free of its own.
+- A 2D `NOTIFICATION_TRANSFORM_CHANGED` is DEFERRED (probed: 0 calls inside
+  `set_global_transform`, 1 a frame later): attachment transform writes in
+  the tick run no user code.
 - Every `area_entered` / `body_entered` callback of EVERY node (a game's
   hurtbox too) runs inside Godot's physics query flush, where the server
   refuses `area_set_shape_disabled` and `area_set_monitorable`. Volleys write

@@ -159,3 +159,33 @@ func test_factory_lists_the_lasers_in_an_area_and_ends_none() -> void:
 	a.end_laser(false)
 	step_factory(2, DT)
 	assert_eq(factory.get_lasers_in_circle(Vector2(200, 0), 5.0), [], "a pooled laser is not listed")
+
+
+## get_beam_pierced_total counts DISTINCT targets for every laser type, also
+## with no pierce_limit; a target that leaves the beam and comes back is not
+## a new one (the count once stayed 0 without a limit and counted re-entries).
+func test_pierced_total_counts_distinct_targets_for_every_type() -> void:
+	make_area(Vector2(150, 0), Vector2(20, 60))
+	make_area(Vector2(300, 0), Vector2(20, 60))
+	var mover := make_area(Vector2(100, 200), Vector2(20, 60))
+	await idle(2)
+	var bolt := H.make_laser(0.0, 0.0, 0.0, 0.0, 40.0)
+	bolt.type = LaserData2D.LASER_BOLT
+	bolt.speed = 1600.0 # 100 px per tick
+	bolt.pierce_limit = 0
+	var b := _fire(bolt)
+	step_factory(6, DT)
+	assert_eq([b.is_beam_spent(0), b.get_beam_pierced_total(0)], [false, 2], "an unlimited bolt counts both targets")
+	b.end_laser(false)
+	var beam := _fire(H.make_laser(0.0, 0.0, 0.0, 0.0, 400.0), Transform2D(0.0, Vector2(0, 200)))
+	step_factory(1, DT)
+	assert_eq(beam.get_beam_pierced_total(0), 1, "a straight beam counts the target it pierces")
+	mover.position = Vector2(100, 600)
+	await idle(2)
+	step_factory(1, DT)
+	mover.position = Vector2(100, 200)
+	await idle(2)
+	step_factory(1, DT)
+	assert_eq(beam.get_pierced_targets(0), [mover], "touching it again")
+	assert_eq(beam.get_beam_pierced_total(0), 1, "a re-entry is not a new target")
+	beam.end_laser(false)

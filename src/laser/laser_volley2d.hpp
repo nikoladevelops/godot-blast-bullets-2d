@@ -74,6 +74,8 @@ public:
 		std::vector<Vector2> points; // muzzle .. end, reflections in between
 		std::vector<Vector2> impacts; // wall points (reflections and the stop)
 		std::vector<double> impact_since; // laser clock each impact appeared (its animation)
+		std::vector<uint64_t> impact_ids; // the wall (collider id) of each impact, aligned with impacts
+		std::vector<uint64_t> impact_since_ids; // the wall each impact_since entry started on
 		bool blocked = false;
 		bool wall_reported = false; // laser_wall_hit sent for this block
 		// The end sits on a target it hits (measured after this tick's
@@ -105,6 +107,7 @@ public:
 		// hit a wall, or left the despawn bounds): never drawn or hit again.
 		bool spent = false;
 		int pierced_total = 0; // distinct targets it started piercing this life
+		std::vector<uint64_t> pierced_ids; // those targets (a re-entry is not a new one)
 		int bounces_left = 0;
 		// Bolts and curvy heads: the shot's inherited velocity (px/s), taken
 		// at launch and bounced with the head at every reflection.

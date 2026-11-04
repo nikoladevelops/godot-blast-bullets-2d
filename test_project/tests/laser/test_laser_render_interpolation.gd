@@ -711,3 +711,31 @@ func test_body_end_fade_follows_the_whole_polyline_with_the_color_ramp() -> void
 	assert_eq(problems, [], "the fade runs along the whole beam, across the reflection")
 	assert_eq(_alphas(mesh).slice(0, 2), [0.0, 0.0], "clear at the muzzle")
 	assert_eq(_alphas(mesh).slice(-2), [0.0, 0.0], "clear at the end")
+
+
+## A wall impact belongs to its wall: when a sweep moves the stop onto
+## another block, the new block's impact plays from when it was hit (it
+## once kept the previous block's clock and showed up mid-animation).
+func test_a_new_wall_impact_starts_its_own_animation() -> void:
+	var sf := SpriteFrames.new()
+	sf.set_animation_speed(&"default", 4.0) # 0.25 s per frame
+	sf.set_animation_loop(&"default", false)
+	for i in 2:
+		sf.add_frame(&"default", ImageTexture.create_from_image(Image.create(4, 4, false, Image.FORMAT_RGBA8)))
+	var look := LaserSpriteLook2D.new()
+	look.frames = sf
+	for k in 8: # a ring of blocks around the muzzle
+		var a := TAU * k / 8.0
+		make_wall(Vector2(cos(a), sin(a)) * 300.0, Vector2(200, 200), 16)
+	await idle(2)
+	var d := H.make_laser(0.0, 0.0, 0.0, 0.0, 700.0)
+	d.wall_mask = 16
+	d.sweep_speed_degrees = 720.0 # 45 degrees per 1/16 s tick: another block every tick
+	d.wall_impact_look = look
+	var l := factory.spawn_laser(d, [Transform2D.IDENTITY] as Array[Transform2D])
+	for i in 5:
+		step_factory(1, DT)
+	var state: Dictionary = l.debug_get_draw_state(1.0)[0]
+	assert_eq(state["impacts"].size(), 1, "one block hit")
+	assert_eq(state["impacts"][0][1], sf.get_frame_texture(&"default", 0), "the block just hit plays from its first frame")
+	l.end_laser(false)

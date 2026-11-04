@@ -439,3 +439,21 @@ func test_keep_tracking_when_active_freezes_a_bolt_head() -> void:
 	target.position = Vector2(0, 100) # desired heading becomes ~90 degrees
 	step_factory(1, DT)
 	assert_almost_eq(l.get_beam_angle(0), before, 0.001, "a frozen bolt keeps its heading")
+
+
+## spawn_laser with a spawner as the anchor reads it the way every tick does
+## (its shot frame plus its spawn offset): the beams start exactly where they
+## were fired and never jump on their first tick (they once moved by the
+## spawner's spawn offset, and turned by its spin).
+func test_a_spawner_anchor_never_jumps_the_first_tick() -> void:
+	var sp := make_spawner()
+	sp.position = Vector2(200, 0)
+	sp.spawn_position_offset = Vector2(40, 0)
+	var l := factory.spawn_laser(H.make_laser(0.0, 0.0, 1.0, 0.0, 200.0), [Transform2D(0.0, Vector2(250, 0))] as Array[Transform2D], sp)
+	assert_eq(l.get_beam_start(0), Vector2(250, 0), "fires at the pose")
+	step_factory(1, DT)
+	assert_almost_eq(l.get_beam_start(0), Vector2(250, 0), Vector2(0.001, 0.001), "no jump on the first tick")
+	sp.position = Vector2(230, 0)
+	step_factory(1, DT)
+	assert_almost_eq(l.get_beam_start(0), Vector2(280, 0), Vector2(0.001, 0.001), "and it rides the anchor from there")
+	l.end_laser(false)

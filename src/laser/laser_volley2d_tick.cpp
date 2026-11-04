@@ -135,6 +135,9 @@ void LaserVolley2D::cut_beam(Beam &b, real_t length) {
 			// Walls past the cut are not touched any more.
 			while (!b.impacts.empty() && b.impacts.size() >= k) {
 				b.impacts.pop_back();
+				if (!b.impact_ids.empty()) {
+					b.impact_ids.pop_back();
+				}
 			}
 			b.blocked = false;
 			return;
@@ -146,6 +149,7 @@ void LaserVolley2D::cut_beam(Beam &b, real_t length) {
 void LaserVolley2D::trace_walls(Beam &b, const Vector2 &from, real_t direction, real_t length) {
 	b.points.clear();
 	b.impacts.clear();
+	b.impact_ids.clear();
 	b.blocked = false;
 	b.points.push_back(from);
 	b.length_now = 0.0;
@@ -184,6 +188,7 @@ void LaserVolley2D::trace_walls(Beam &b, const Vector2 &from, real_t direction, 
 					const real_t walked = p.distance_to(q);
 					b.points.push_back(q);
 					b.impacts.push_back(q);
+					b.impact_ids.push_back((uint64_t)(int64_t)hit["collider_id"]);
 					b.length_now += walked;
 					remaining -= walked;
 					if (reflections_left > 0 && remaining > (real_t)0.5 && n.length_squared() > (real_t)0.0) {
@@ -323,6 +328,7 @@ void LaserVolley2D::step_head(Beam &b, double delta) {
 		b.head_extendable = false;
 		b.blocked = false;
 		b.impacts.clear();
+		b.impact_ids.clear();
 		b.drift = inherited_velocity;
 	}
 	if (b.spent) {
@@ -395,6 +401,7 @@ void LaserVolley2D::step_head(Beam &b, double delta) {
 							b.wall_point = q;
 							b.wall_normal = n;
 							b.impacts.assign(1, q);
+							b.impact_ids.assign(1, (uint64_t)(int64_t)hit["collider_id"]);
 							to = q;
 						}
 					}
@@ -753,11 +760,17 @@ bool LaserVolley2D::update_contacts(int beam_index, uint64_t self_id, uint32_t l
 		// Started before its signal runs: a handler stopping the hits keeps it
 		// (so its end is sent), the ones after it are dropped.
 		beams[beam_index].contacts[k].next_hit = next_hit;
-		if (fresh && !is_beam && d->pierce_limit > 0) {
-			// Counted before the signals: a bolt at its limit is spent right
-			// after this hit (its contacts end with it).
+		if (fresh) {
+			// Counted before the signals, once per DISTINCT target (a target the
+			// body leaves and touches again is not a new one), for every type:
+			// a bolt or curvy head at its pierce_limit is spent right after
+			// this hit (its contacts end with it).
 			Beam &self = beams[beam_index];
-			if (++self.pierced_total >= d->pierce_limit) {
+			if (std::find(self.pierced_ids.begin(), self.pierced_ids.end(), c.id) == self.pierced_ids.end()) {
+				self.pierced_ids.push_back(c.id);
+				++self.pierced_total;
+			}
+			if (!is_beam && d->pierce_limit > 0 && self.pierced_total >= d->pierce_limit) {
 				self.spent = true;
 			}
 		}
@@ -886,9 +899,8 @@ void LaserVolley2D::play_effects(int event, const Vector2 &pos, int beam) {
 			if (!at.is_finite()) {
 				continue;
 			}
-			if (factory->fx_play_laser_effect(entry->effect, Transform2D(entry->align_to_beam ? angle : (real_t)0.0, at))) {
-				factory->debug_log_laser_effect(event, get_instance_id(), (int)life_id, k, at);
-			}
+			// Queued, played right after this laser's tick (no user code here).
+			factory->queue_laser_effect(entry->effect, Transform2D(entry->align_to_beam ? angle : (real_t)0.0, at), event, get_instance_id(), (int)life_id, k);
 		}
 	}
 }
@@ -1179,7 +1191,15 @@ void LaserVolley2D::tick(double delta) {
 		}
 		// Each impact keeps the clock it appeared at while it lasts (its
 		// animation), a new one starts now.
+		// An impact whose wall changed (a sweep onto another block) is a new
+		// one: its animation starts now (sliding along one wall keeps it).
+		for (size_t k = 0; k < b.impact_since.size() && k < b.impact_ids.size(); ++k) {
+			if (k >= b.impact_since_ids.size() || b.impact_since_ids[k] != b.impact_ids[k]) {
+				b.impact_since[k] = clock;
+			}
+		}
 		b.impact_since.resize(b.impacts.size(), clock);
+		b.impact_since_ids = b.impact_ids;
 		if (b.snap_history) {
 			// A scripted jump is never drawn as travel (like bullet setters).
 			b.snap_history = false;

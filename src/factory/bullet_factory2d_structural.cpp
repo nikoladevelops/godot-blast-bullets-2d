@@ -236,6 +236,7 @@ void BulletFactory2D::reset_factory_state(const PoolKey *key) {
 	const LifeWatch watch = watch_life();
 	if (key == nullptr) {
 		free_all_lasers(); // a full reset takes the lasers too (no user code)
+		pending_laser_effects.clear();
 	}
 	free_all_volleys(key);
 	if (watch.died()) {
