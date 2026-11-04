@@ -42,6 +42,9 @@ public:
 	std::map<PoolKey, int, std::less<PoolKey>> get_pool_info();
 
 	bool try_remove_instance(BulletVolley2D *target, const PoolKey &key);
+	// Removes target from whichever bucket holds it (a cold scan of every bucket):
+	// the delete paths' fallback when its live key no longer names its bucket.
+	bool try_remove_anywhere(BulletVolley2D *target);
 
 	// Every (bucket key, instance) pair currently pooled. Cold path: the
 	// factory's debug_assert_no_dangling invariant check only.

@@ -137,11 +137,8 @@ int BulletVolley2D::replay_paused_overlaps() {
 		if (p.epoch != collision_epoch_for_bullet(p.bullet_index)) {
 			continue;
 		}
-		if (collision_dedup_by_object) {
-			if (collision_already_queued(p.bullet_index, p.target_id)) {
-				continue;
-			}
-			mark_collision_queued(p.bullet_index, p.target_id);
+		if (collision_dedup_by_object && collision_already_queued(p.bullet_index, p.target_id)) {
+			continue;
 		}
 		BulletCollisionData2D record(p.bullet_index, p.target_id, (CollisionType)p.type);
 		record.queue_bullet_epoch = p.epoch;
@@ -153,6 +150,11 @@ int BulletVolley2D::replay_paused_overlaps() {
 				continue; // the getter disabled, cleared or pooled the bullet
 			}
 			read_queued_target_pose(p.target_id, record.queue_target_position, record.queue_target_position_valid);
+		}
+		// Marked only with the record it guards (a getter above may have taken
+		// the bullet out: a key without a record would swallow a later real hit).
+		if (collision_dedup_by_object) {
+			mark_collision_queued(p.bullet_index, p.target_id);
 		}
 		all_collided_bullets.push_back(record);
 		++queued;
@@ -167,7 +169,7 @@ void BulletVolley2D::area_entered_func(PhysicsServer2D::AreaBodyStatus status, R
 		return; // a volley outliving its factory (detached at its teardown) records nothing
 	}
 	// Paused factory stops draining (no _physics_process) but the physics
-	// server keeps firing: park (bounded) instead of queueing.
+	// server keeps firing: park (deduplicated, no cap) instead of queueing.
 	if (bullet_factory != nullptr && bullet_factory->is_bullet_processing_paused()) {
 		park_paused_overlap(status, entered_instance_id, bullet_shape_index, CollisionType::AREA);
 		return;
@@ -188,7 +190,6 @@ void BulletVolley2D::area_entered_func(PhysicsServer2D::AreaBodyStatus status, R
 			if (collision_already_queued(bullet_shape_index, entered_instance_id)) {
 				return;
 			}
-			mark_collision_queued(bullet_shape_index, entered_instance_id);
 		}
 		BulletCollisionData2D record(bullet_shape_index, entered_instance_id, CollisionType::AREA);
 		record.queue_bullet_epoch = collision_epoch_for_bullet(bullet_shape_index);
@@ -203,6 +204,12 @@ void BulletVolley2D::area_entered_func(PhysicsServer2D::AreaBodyStatus status, R
 				return; // the getter disabled, cleared or pooled the bullet
 			}
 			read_queued_target_pose(entered_instance_id, record.queue_target_position, record.queue_target_position_valid);
+		}
+		// Marked only with the record it guards: a target getter above may have
+		// taken the bullet out, and a key without a record would swallow the
+		// bullet's later real entry (an empty drain never clears the keys).
+		if (collision_dedup_by_object) {
+			mark_collision_queued(bullet_shape_index, entered_instance_id);
 		}
 		all_collided_bullets.push_back(record);
 	}
@@ -229,7 +236,6 @@ void BulletVolley2D::body_entered_func(PhysicsServer2D::AreaBodyStatus status, R
 			if (collision_already_queued(bullet_shape_index, entered_instance_id)) {
 				return;
 			}
-			mark_collision_queued(bullet_shape_index, entered_instance_id);
 		}
 		BulletCollisionData2D record(bullet_shape_index, entered_instance_id, CollisionType::BODY);
 		record.queue_bullet_epoch = collision_epoch_for_bullet(bullet_shape_index);
@@ -244,6 +250,9 @@ void BulletVolley2D::body_entered_func(PhysicsServer2D::AreaBodyStatus status, R
 				return; // the getter disabled, cleared or pooled the bullet
 			}
 			read_queued_target_pose(entered_instance_id, record.queue_target_position, record.queue_target_position_valid);
+		}
+		if (collision_dedup_by_object) {
+			mark_collision_queued(bullet_shape_index, entered_instance_id); // with its record (see the area path)
 		}
 		all_collided_bullets.push_back(record);
 	}
@@ -619,12 +628,13 @@ void BulletVolley2D::set_collision_shape_runtime(const Ref<Shape2D> &new_shape) 
 		mark_shape_data_applied();
 	}
 	// Pooled instances live inside a bucket keyed by get_pool_key(). A runtime type change
-	// while disabled would otherwise leave this instance in the stale bucket. Re-bucket it,
-	// unless the user opted out of auto pooling (then it must never enter the pool).
-	// An unpooled instance with pooling off keeps its new key cached but stays
-	// out of every bucket on purpose: it is only reusable through a direct
-	// enable_volley() (which reads the live key) or free_disabled_bullets().
-	if (!is_active && is_auto_pooling_enabled && bullets_pool != nullptr) {
+	// while it sits in a bucket would otherwise leave it in the stale one: re-bucket it,
+	// whatever is_auto_pooling_enabled says NOW (a pooled volley that turned pooling off
+	// afterwards is still in the pool; left in the old bucket, the free paths deleted it
+	// twice). An unpooled instance keeps its new key cached but stays out of every bucket
+	// on purpose: it is only reusable through a direct enable_volley() (which reads the
+	// live key) or free_disabled_bullets().
+	if (is_pooled_in_pool && bullets_pool != nullptr) {
 		const PoolKey new_key = get_pool_key();
 		if (!(new_key == old_key)) {
 			bullets_pool->try_remove_instance(this, old_key);

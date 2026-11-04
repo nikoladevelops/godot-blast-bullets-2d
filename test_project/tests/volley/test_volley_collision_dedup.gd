@@ -124,3 +124,57 @@ func test_the_spawn_data_seeds_the_mode_every_life() -> void:
 	var again: BulletVolley2D = factory.spawn_volley(_bodied_data())
 	assert_eq(again, v, "the same volley, a new life")
 	assert_true(again.get_collision_dedup_by_object(), "object mode again from the next data")
+
+
+## A target whose script getter (read while the overlap is queued: a bouncing
+## volley reads the target's velocity) takes the bullet out leaves no dedup key
+## behind: the key is marked only together with the record it guards. A stale
+## key once swallowed the bullet's later, real re-entry for good (an empty
+## drain never cleared it).
+class DisablingTarget extends StaticBody2D:
+	var volley: BulletVolley2D
+	var armed := true
+
+	func _get(property: StringName) -> Variant:
+		if armed and volley != null and property in [&"linear_velocity", &"velocity", &"constant_linear_velocity"]:
+			armed = false
+			volley.disable_bullet(0)
+		return null
+
+
+func test_a_getter_that_takes_the_bullet_out_leaves_no_stale_dedup_key() -> void:
+	var target := DisablingTarget.new()
+	target.collision_layer = 4
+	target.collision_mask = 0
+	var cs := CollisionShape2D.new()
+	var box := RectangleShape2D.new()
+	box.size = Vector2(160, 160)
+	cs.shape = box
+	target.add_child(cs)
+	target.position = Vector2(600, 0)
+	add(target)
+	await idle(2)
+	var d := H.make_volley_data(2, 0.0, 30.0)
+	d.monitorable = true
+	d.collision_mask = 12 # 4 = the target | 8 = the bounce mask (nothing on it)
+	d.bounce_mask = 8 # a bouncing volley reads the target's motion while queueing
+	d.collision_shape = H.make_circle_shape(6.0)
+	d.bullet_max_collision_count = 0
+	d.transforms = [Transform2D(0.0, Vector2(600, 0)), Transform2D(0.0, Vector2(1200, 0))]
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	v.set_is_auto_pooling_enabled(false)
+	target.volley = v
+	for k in 6:
+		await physics(1)
+		if not v.is_bullet_status_enabled(0):
+			break
+	assert_false(v.is_bullet_status_enabled(0), "the getter took bullet 0 out")
+	assert_eq(v.get_bullet_collision_count(0), 0, "no hit was counted")
+	for k in 3:
+		await physics(1) # empty drains
+	v.enable_bullet(0) # woken inside the target steps later: Godot reports a new entry
+	for k in 10:
+		await physics(1)
+	assert_eq(v.get_bullet_collision_count(0), 1, "the re-entry after the wake is a real hit")
+	v.disable_bullet(0)
+	v.disable_bullet(1)

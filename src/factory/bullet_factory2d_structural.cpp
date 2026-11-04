@@ -51,7 +51,11 @@ static bool entry_alive(const BulletFactory2D::VolleyIterationEntry &entry) {
 }
 
 void BulletFactory2D::unlink_and_delete_volley(BulletVolley2D *volley) {
-	volley_pool.try_remove_instance(volley, volley->get_pool_key());
+	// A pooled volley whose live key no longer names its bucket is still taken out
+	// of the pool before it is deleted: a pointer left behind would be deleted again.
+	if (!volley_pool.try_remove_instance(volley, volley->get_pool_key()) && volley->is_pooled_in_pool) {
+		volley_pool.try_remove_anywhere(volley);
+	}
 	volley->force_delete();
 }
 

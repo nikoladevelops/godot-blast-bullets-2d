@@ -143,6 +143,18 @@ bool VolleyPool::try_remove_instance(BulletVolley2D *target, const PoolKey &key)
 	}
 	return false;
 }
+bool VolleyPool::try_remove_anywhere(BulletVolley2D *target) {
+	for (auto &[key, vec] : pool) {
+		for (BulletVolley2D *volley : vec) {
+			if (volley == target) {
+				const PoolKey found = key; // copy: the erase in try_remove_instance invalidates `key`
+				return try_remove_instance(target, found);
+			}
+		}
+	}
+	return false;
+}
+
 std::vector<std::pair<PoolKey, BulletVolley2D *>> VolleyPool::debug_entries() const {
 	std::vector<std::pair<PoolKey, BulletVolley2D *>> out;
 	for (const auto &[key, vec] : pool) {

@@ -913,7 +913,7 @@
 			Whether the collision debugger is on: it draws every bullet's collision shape and, for lasers, every box their contact queries test this tick (one per segment of every unspent beam while it hits) in [member debugger_color] at [member debugger_z_index].
 		</member>
 		<member name="is_factory_processing_bullets" type="bool" setter="set_is_factory_processing_bullets" getter="get_is_factory_processing_bullets" default="true">
-			Use this if you want to pause processing of bullets - being able to stop bullets in place. Always use this instead of [code]set_process[/code]/[code]set_physics_process[/code]. While paused nothing is drained. Overlaps that START during the pause are parked per volley (bounded at 4096 records, deduplicated, cancelled when the overlap ends before resume) and replayed exactly once on resume. Overlaps counted before the pause are never re-reported, and nothing piles up into a resume hitch.
+			Use this if you want to pause processing of bullets - being able to stop bullets in place. Always use this instead of [code]set_process[/code]/[code]set_physics_process[/code]. While paused nothing is drained. Overlaps that START during the pause are parked per volley (no cap: one record per bullet, target and kind, deduplicated, cancelled when the overlap ends before resume) and replayed exactly once on resume. Overlaps counted before the pause are never re-reported, and nothing piles up into a resume hitch.
 			Warning (shared factories): pausing stops EVERY spawner's bullets at once - there is no per-spawner pause.
 		</member>
 		<member name="physics_interpolation" type="int" setter="set_physics_interpolation" getter="get_physics_interpolation" enum="BulletFactory2D.PhysicsInterpolation" default="2">

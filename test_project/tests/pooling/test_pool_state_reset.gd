@@ -102,6 +102,24 @@ func test_shape_change_rebuckets() -> void:
 	assert_eq(factory.debug_get_bullets_pool_amount(), 1, "freeing the stale circle bucket keeps the rect-pooled volley")
 
 
+## A volley already in the pool that turns auto pooling off keeps its bucket
+## in step with its key on a shape change: it sits in the pool, so it moves
+## with its new key (it once stayed in the old bucket and free_bullets_pool
+## deleted it twice, a crash).
+func test_shape_change_rebuckets_a_pooled_volley_with_pooling_turned_off() -> void:
+	await _drain_and_pool()
+	assert_true(a.is_pooled(), "pooled under the circle key")
+	a.is_auto_pooling_enabled = false
+	var rect := RectangleShape2D.new()
+	rect.size = Vector2(20, 10)
+	a.set_collision_shape_runtime(rect)
+	var books: Dictionary = factory.debug_assert_no_dangling()
+	assert_true(books.get("ok", false), "the bucket follows the key: %s" % books.get("error", ""))
+	factory.free_bullets_pool()
+	await idle()
+	assert_eq(factory.debug_get_bullets_pool_amount(), 0, "freed once, from its own bucket")
+
+
 func test_new_amount_never_reuses() -> void:
 	await _drain_and_pool()
 	factory.debug_reset_pool_stats()
