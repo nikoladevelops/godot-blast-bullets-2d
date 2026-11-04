@@ -265,9 +265,16 @@ bool BulletFactory2D::fx_register_volley_bake(uint64_t volley_id, int layer_inde
 	const int ring = fx_ring_size_for_layer(layer, amount_bullets);
 	bake.slots.assign(ring, FXOneShotSlot());
 	const std::vector<Ref<Texture2D>> &frames = bake.anim.frames;
+	// Each shard is add_child'ed (SceneTree.node_added, the container's
+	// child_entered_tree: user code): never touch this factory once it died,
+	// and never create the next shard into a container a handler freed.
+	const LifeWatch watch = watch_life();
 	for (size_t f = 0; f < frames.size(); ++f) {
-		MultiMeshInstance2D *shard = fx_create_shard(sprite_effects_container.ptr, frames[f], fx_quad_size_for_texture(frames[f]), layer->material, layer->self_modulate, layer->z_index, layer->z_as_relative, layer->visibility_layer, layer->light_mask, ring, true);
+		MultiMeshInstance2D *shard = fx_create_shard(sprite_effects_container.get(), frames[f], fx_quad_size_for_texture(frames[f]), layer->material, layer->self_modulate, layer->z_index, layer->z_as_relative, layer->visibility_layer, layer->light_mask, ring, true);
 		bake.add_shard(shard);
+		if (watch.died() || sprite_effects_container.get() == nullptr) {
+			return false; // the factory (or the container a handler freed) is gone: the shards went with it
+		}
 	}
 	fx_bakes.push_back(bake);
 	return true;

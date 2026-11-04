@@ -193,18 +193,25 @@ void BulletVolley2D::fx_reseed_from_data(const TypedArray<EffectLayerData2D> &la
 		fx_seeded_snapshots[li] = fx_snapshot_layer(layers[li]);
 	}
 	fx_rebuild_trail_layers(layers);
-	if (bullet_factory != nullptr) {
+	if (bullet_factory != nullptr && factory_alive()) {
 		bullet_factory->fx_unregister_volley(get_instance_id());
-		for (int li = 0; li < layers.size(); ++li) {
-			Ref<EffectLayerData2D> layer = layers[li];
-			if (layer.is_null() || !layer->enabled) {
-				continue;
+		// Registering a bake builds its shard nodes: every add_child runs
+		// SceneTree.node_added handlers (user code), and one may free this
+		// volley. Under the volley's emit guard that free is refused and
+		// finished with queue_free(), so this loop never resumes on a freed
+		// volley and the bakes it registers die with it in PREDELETE.
+		guarded_user_call2d(this, emit_guard, [&]() {
+			for (int li = 0; li < layers.size(); ++li) {
+				Ref<EffectLayerData2D> layer = layers[li];
+				if (layer.is_null() || !layer->enabled) {
+					continue;
+				}
+				if (layer->trigger == EFFECT_TRAIL_FOLLOW) {
+					continue;
+				}
+				bullet_factory->fx_register_volley_bake(get_instance_id(), li, layer, amount_bullets);
 			}
-			if (layer->trigger == EFFECT_TRAIL_FOLLOW) {
-				continue;
-			}
-			bullet_factory->fx_register_volley_bake(get_instance_id(), li, layer, amount_bullets);
-		}
+		});
 	}
 	if (fire_spawn) {
 		fx_fire_spawn_layers();

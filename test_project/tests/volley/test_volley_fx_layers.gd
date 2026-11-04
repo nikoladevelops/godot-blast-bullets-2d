@@ -1640,3 +1640,36 @@ func test_registering_a_manual_effect_from_a_shard_visibility_handler_is_survive
 	var books: Dictionary = factory.debug_assert_no_dangling()
 	assert_true(books["ok"], str(books["error"]))
 	expect_no_errors()
+
+
+## set_effect_layers registers one factory one-shot bake per layer; each shard
+## is add_child'ed, which runs SceneTree.node_added handlers (user code). A
+## handler that frees the volley there must not leave the registration loop
+## touching it for the next layer: the volley's emit guard refuses the free
+## and finishes it with queue_free(), and every bake it registered is
+## unregistered when it dies. tools/run_sanitizer_tests.py runs this under
+## AddressSanitizer.
+func test_a_node_added_handler_that_frees_the_volley_during_set_effect_layers_is_survived() -> void:
+	var l1 := _make_layer(EffectLayerData2D.EFFECT_ON_CLEAR, 1)
+	var l2 := _make_layer(EffectLayerData2D.EFFECT_ON_HIT, 1)
+	var v: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 0.0, []))
+	await idle(1)
+	assert_eq(int(v.debug_get_effect_layers_info().get("data_layer_count", -1)), 0, "no layers to begin with")
+	var freed := [false]
+	var tree := factory.get_tree()
+	var on_added := func(node: Node) -> void:
+		if not freed[0] and is_instance_valid(v) and node is MultiMeshInstance2D:
+			freed[0] = true
+			v.free()
+	tree.node_added.connect(on_added)
+	v.set_effect_layers([l1, l2])
+	tree.node_added.disconnect(on_added)
+	assert_true(freed[0], "the handler ran while the bakes registered")
+	assert_true(is_instance_valid(v), "a refused free keeps the volley alive until frame end")
+	assert_true(v.is_queued_for_deletion(), "the refused free finishes with queue_free")
+	await idle(2)
+	assert_false(is_instance_valid(v), "the volley is gone")
+	assert_eq(int(factory.debug_get_effect_state().get("bake_count", -1)), 0, "its bakes died with it")
+	var books: Dictionary = factory.debug_assert_no_dangling()
+	assert_true(books["ok"], str(books["error"]))
+	expect_no_errors()
