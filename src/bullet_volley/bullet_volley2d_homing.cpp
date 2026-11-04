@@ -607,12 +607,44 @@ void BulletVolley2D::set_homing_smoothing(real_t value) {
 	homing_smoothing = value;
 }
 
+void BulletVolley2D::fan_set_homing_smoothing(int bullet_index, real_t value) {
+	if (bullet_index < 0 || bullet_index >= (int)all_bullet_homing_smoothing.size() || !Math::is_finite(value) || value < 0.0) {
+		return; // the spawner clamps its fan into range
+	}
+	if (!use_per_bullet_homing_smoothing) {
+		all_bullet_homing_smoothing.assign(all_bullet_homing_smoothing.size(), homing_smoothing);
+	}
+	all_bullet_homing_smoothing[bullet_index] = value;
+	if (bullet_index < (int)homing_smoothing_script_owned.size()) {
+		homing_smoothing_script_owned[bullet_index] = 0;
+	}
+	use_per_bullet_homing_smoothing = true;
+}
+
+void BulletVolley2D::release_fanned_homing_smoothing() {
+	bool any_script_owned = false;
+	for (size_t i = 0; i < all_bullet_homing_smoothing.size(); ++i) {
+		if (i < homing_smoothing_script_owned.size() && homing_smoothing_script_owned[i] != 0) {
+			any_script_owned = true;
+		} else {
+			all_bullet_homing_smoothing[i] = homing_smoothing;
+		}
+	}
+	use_per_bullet_homing_smoothing = any_script_owned;
+	homing_smoothing_fanned = false;
+}
+
 void BulletVolley2D::set_homing_update_interval(real_t value) {
 	if (!Math::is_finite(value) || value < 0.0) {
 		UtilityFunctions::push_error("homing_update_interval must be a finite value >= 0 (0 refreshes every tick).");
 		return;
 	}
 	homing_update_interval = value;
+	// A shorter interval applies now: the pending wait never outlasts it (like
+	// the spawner's retarget interval), so 0 refreshes from the next tick.
+	if (homing_update_timer > value) {
+		homing_update_timer = value;
+	}
 }
 
 void BulletVolley2D::set_homing_distance_before_reached(real_t value) {
@@ -651,8 +683,10 @@ void BulletVolley2D::bullet_set_homing_smoothing(int bullet_index, real_t value)
 		all_bullet_homing_smoothing.assign(all_bullet_homing_smoothing.size(), homing_smoothing);
 	}
 	all_bullet_homing_smoothing[bullet_index] = value;
+	if (bullet_index < (int)homing_smoothing_script_owned.size()) {
+		homing_smoothing_script_owned[bullet_index] = 1; // the script's: the fan's off path keeps it
+	}
 	use_per_bullet_homing_smoothing = true;
-	homing_smoothing_fanned = false;
 }
 
 void BulletVolley2D::all_bullets_set_homing_smoothing(real_t value, int bullet_index_start, int bullet_index_end_inclusive) {
@@ -676,9 +710,11 @@ void BulletVolley2D::all_bullets_set_homing_smoothing(real_t value, int bullet_i
 	}
 	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
 		all_bullet_homing_smoothing[i] = value;
+		if (i < (int)homing_smoothing_script_owned.size()) {
+			homing_smoothing_script_owned[i] = 1;
+		}
 	}
 	use_per_bullet_homing_smoothing = true;
-	homing_smoothing_fanned = false;
 }
 
 TypedArray<real_t> BulletVolley2D::all_bullets_get_homing_smoothing(int bullet_index_start, int bullet_index_end_inclusive) const {
@@ -721,6 +757,7 @@ void BulletVolley2D::clear_homing_state_for_teardown() {
 	// next owner. Mirrors the seed in begin_life, so an enable_bullet() wake
 	// (which skips that path) starts from the same blank state.
 	all_bullet_homing_smoothing.assign(all_bullet_homing_smoothing.size(), 0.0);
+	homing_smoothing_script_owned.assign(homing_smoothing_script_owned.size(), 0);
 	use_per_bullet_homing_smoothing = false;
 	homing_smoothing_fanned = false;
 	// Value-reset the whole orbit payload, not just the lock: a stale
