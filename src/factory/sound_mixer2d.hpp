@@ -135,6 +135,7 @@ private:
 		size_t seq_cursor = 0;
 		std::vector<size_t> shuffle_bag;
 		size_t shuffle_n = 0;
+		size_t last_pick = SIZE_MAX; // index into the usable streams of the last play (avoid_repeat)
 		// Pinned-camera cache (camera_path, per factory: factory-relative
 		// paths resolve differently per factory sharing this resource).
 		NodePath camera_path;

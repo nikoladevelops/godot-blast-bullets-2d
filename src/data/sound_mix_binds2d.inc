@@ -21,6 +21,10 @@
 	ClassDB::bind_method(D_METHOD("set_stream_weights", "weights"), &SOUND_DATA_CLASS::set_stream_weights);
 	ADD_PROPERTY(PropertyInfo(Variant::PACKED_FLOAT32_ARRAY, "stream_weights"), "set_stream_weights", "get_stream_weights");
 
+	ClassDB::bind_method(D_METHOD("get_avoid_repeat"), &SOUND_DATA_CLASS::get_avoid_repeat);
+	ClassDB::bind_method(D_METHOD("set_avoid_repeat", "value"), &SOUND_DATA_CLASS::set_avoid_repeat);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "avoid_repeat"), "set_avoid_repeat", "get_avoid_repeat");
+
 	ADD_GROUP("Volume and Pitch", "");
 
 	ClassDB::bind_method(D_METHOD("get_volume_db"), &SOUND_DATA_CLASS::get_volume_db);

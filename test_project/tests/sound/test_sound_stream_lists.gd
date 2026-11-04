@@ -197,3 +197,53 @@ func test_swapping_weights_mid_fight_rebalances() -> void:
 			heavy += 1
 	assert_gte(heavy, 10, "rebalanced: first entry still plays")
 	assert_lte(heavy, 50, "rebalanced: second entry wins now")
+
+
+## avoid_repeat (on by default): Random and Shuffle never play the stream that
+## played last on the channel (a new Shuffle round never opens with the one
+## that closed the last), every stream still plays, a Shuffle round still deals
+## every entry once; off, Random repeats like a plain roll; Weighted keeps its
+## weights (test_weighted_favors_heavier_entries).
+func _repeats(ids: Array) -> int:
+	var n := 0
+	for k in range(1, ids.size()):
+		n += int(ids[k] == ids[k - 1])
+	return n
+
+
+func test_avoid_repeat_never_plays_a_stream_twice_in_a_row(mode: int = use_parameters([BulletSoundData2D.STREAM_RANDOM, BulletSoundData2D.STREAM_SHUFFLE])) -> void:
+	godot_listener_at(Vector2.ZERO)
+	var s0 := BulletSoundData2D.new()
+	assert_true(s0.avoid_repeat, "on by default")
+	assert_true(LaserSoundData2D.new().avoid_repeat, "lasers share the switch")
+	factory.debug_seed_cosmetic_rng(99)
+	var trio := [H.make_sound_stream(0.2), H.make_sound_stream(0.21), H.make_sound_stream(0.22)]
+	var s := _list_sound(mode, trio)
+	var ids := await _play_each_sweep(s, 120)
+	assert_eq(_repeats(ids), 0, "mode %d: no back-to-back repeat in 120 plays" % mode)
+	for t in trio:
+		assert_has(ids, (t as AudioStreamWAV).get_instance_id(), "mode %d: every stream still plays" % mode)
+	if mode == BulletSoundData2D.STREAM_SHUFFLE:
+		for round in 40:
+			var dealt := ids.slice(round * 3, round * 3 + 3)
+			dealt.sort()
+			var want: Array = trio.map(func(t): return (t as AudioStreamWAV).get_instance_id())
+			want.sort()
+			assert_eq(dealt, want, "round %d deals every entry once" % round)
+
+
+func test_avoid_repeat_off_lets_random_repeat_and_two_streams_alternate_on() -> void:
+	godot_listener_at(Vector2.ZERO)
+	factory.debug_seed_cosmetic_rng(99)
+	var pair := [H.make_sound_stream(0.2), H.make_sound_stream(0.21)]
+	var s := _list_sound(BulletSoundData2D.STREAM_RANDOM, pair)
+	s.avoid_repeat = false
+	assert_gt(_repeats(await _play_each_sweep(s, 60)), 5, "off: a plain roll repeats")
+	s.avoid_repeat = true
+	var ids := await _play_each_sweep(s, 20)
+	assert_eq(_repeats(ids), 0, "on: two streams alternate")
+	watch_signals(s)
+	s.avoid_repeat = true
+	assert_signal_emit_count(s, "changed", 0, "a same-value write changes nothing")
+	s.avoid_repeat = false
+	assert_signal_emit_count(s, "changed", 1, "a real change emits changed once")

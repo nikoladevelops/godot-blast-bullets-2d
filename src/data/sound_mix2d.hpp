@@ -58,6 +58,10 @@ struct SoundMix2D {
 	// once per cycle (both cursors live in the shared channel, like the
 	// limits: every spawner using this resource shares the order).
 	int stream_mode = STREAM_RANDOM;
+	// Random and Shuffle never pick the stream that played last on this
+	// channel (2+ usable streams): no audible back-to-back repeat. Weighted
+	// keeps its weights exactly; Sequence never repeats anyway.
+	bool avoid_repeat = true;
 	// Per-entry weight for Weighted mode, parallel to streams (all-zero,
 	// empty or size-mismatched = uniform). Swapping the array mid-fight
 	// works: the next play re-reads it.

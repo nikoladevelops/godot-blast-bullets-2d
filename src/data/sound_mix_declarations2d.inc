@@ -7,6 +7,8 @@
 	Array get_streams() const;
 	void set_streams(const Array &value);
 	StreamMode get_stream_mode() const;
+	bool get_avoid_repeat() const { return avoid_repeat; }
+	void set_avoid_repeat(bool value);
 	void set_stream_mode(StreamMode value);
 	PackedFloat32Array get_stream_weights() const;
 	void set_stream_weights(const PackedFloat32Array &value);

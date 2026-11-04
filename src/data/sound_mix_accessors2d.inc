@@ -50,6 +50,13 @@ void SOUND_DATA_CLASS::set_stream_mode(StreamMode value) {
 	emit_changed();
 }
 
+void SOUND_DATA_CLASS::set_avoid_repeat(bool value) {
+	if (!assign_if_changed2d(avoid_repeat, value)) {
+		return;
+	}
+	emit_changed();
+}
+
 PackedFloat32Array SOUND_DATA_CLASS::get_stream_weights() const { return stream_weights; }
 
 void SOUND_DATA_CLASS::set_stream_weights(const PackedFloat32Array &value) {

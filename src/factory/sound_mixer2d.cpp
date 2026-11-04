@@ -103,25 +103,34 @@ bool SoundMixer2D::offer_has_audio(BulletFactory2D &factory, const SoundMix2D *s
 
 Ref<AudioStream> SoundMixer2D::pick_stream(const SoundMix2D *sound, Channel &channel) {
 	std::vector<Ref<AudioStream>> usable;
+	std::vector<double> weights; // parallel to usable (Weighted only)
 	usable.reserve((size_t)sound->streams.size());
+	const int mode = sound->stream_mode;
+	const bool weighted = mode == SoundMix2D::STREAM_WEIGHTED && sound->stream_weights.size() == sound->streams.size();
 	for (int i = 0; i < sound->streams.size(); ++i) {
 		const Variant entry = sound->streams[i];
 		AudioStream *s = live_object2d<AudioStream>(entry);
 		if (s != nullptr) {
 			usable.push_back(Ref<AudioStream>(s));
+			if (weighted) {
+				weights.push_back(sound->stream_weights[i] > 0.0f ? (double)sound->stream_weights[i] : 0.0);
+			}
 		}
 	}
 	if (usable.empty()) {
 		return Ref<AudioStream>();
 	}
 	const size_t n = usable.size();
-	const int mode = sound->stream_mode;
+	// The stream that played last on this channel is left out (avoid_repeat):
+	// Random and Shuffle only (Weighted keeps its weights exactly), only with a
+	// choice to make, and only while that index is still valid.
+	const bool may_skip = sound->avoid_repeat && n >= 2 && channel.last_pick < n && !(weighted && mode == SoundMix2D::STREAM_WEIGHTED);
+	const size_t skip = may_skip ? channel.last_pick : SIZE_MAX;
+	size_t idx = 0;
 	if (mode == SoundMix2D::STREAM_SEQUENCE) {
-		const size_t idx = channel.seq_cursor % n;
+		idx = channel.seq_cursor % n;
 		channel.seq_cursor = idx + 1;
-		return usable[idx];
-	}
-	if (mode == SoundMix2D::STREAM_SHUFFLE) {
+	} else if (mode == SoundMix2D::STREAM_SHUFFLE) {
 		if (channel.shuffle_bag.empty() || channel.shuffle_n != n) {
 			channel.shuffle_bag.clear();
 			for (size_t i = 0; i < n; ++i) {
@@ -132,37 +141,56 @@ Ref<AudioStream> SoundMixer2D::pick_stream(const SoundMix2D *sound, Channel &cha
 				std::swap(channel.shuffle_bag[i - 1], channel.shuffle_bag[j]);
 			}
 			channel.shuffle_n = n;
-		}
-		const size_t idx = channel.shuffle_bag.back();
-		channel.shuffle_bag.pop_back();
-		return usable[idx];
-	}
-	if (mode == SoundMix2D::STREAM_WEIGHTED && sound->stream_weights.size() == sound->streams.size()) {
-		double total = 0.0;
-		for (int i = 0; i < sound->streams.size(); ++i) {
-			const Variant entry = sound->streams[i];
-			if (live_object2d<AudioStream>(entry) != nullptr && sound->stream_weights[i] > 0.0f) {
-				total += (double)sound->stream_weights[i];
+			// A new round never opens with the stream that closed the last one.
+			if (skip != SIZE_MAX && channel.shuffle_bag.back() == skip) {
+				std::swap(channel.shuffle_bag.back(), channel.shuffle_bag.front());
 			}
 		}
-		if (total > 0.0) {
+		idx = channel.shuffle_bag.back();
+		channel.shuffle_bag.pop_back();
+	} else {
+		double total = 0.0;
+		double skipped = 0.0;
+		for (size_t i = 0; i < weights.size(); ++i) {
+			(i == skip ? skipped : total) += weights[i];
+		}
+		if (total <= 0.0 && skipped > 0.0) {
+			idx = skip; // the only stream with weight: a zero weight still means never
+		} else if (total > 0.0) {
 			double roll = CosmeticRng2D::randf() * total;
-			for (int i = 0; i < sound->streams.size(); ++i) {
-				const Variant entry = sound->streams[i];
-				AudioStream *s = live_object2d<AudioStream>(entry);
-				if (s == nullptr || sound->stream_weights[i] <= 0.0f) {
+			idx = n - 1;
+			for (size_t i = 0; i < n; ++i) {
+				if (i == skip || weights[i] <= 0.0) {
 					continue;
 				}
-				roll -= (double)sound->stream_weights[i];
+				roll -= weights[i];
 				if (roll <= 0.0) {
-					return Ref<AudioStream>(s);
+					idx = i;
+					break;
 				}
 			}
-			return usable.back();
+			if (idx == skip || weights[idx] <= 0.0) { // rounding at the end: the last weighted entry
+				for (size_t i = n; i-- > 0;) {
+					if (i != skip && weights[i] > 0.0) {
+						idx = i;
+						break;
+					}
+				}
+			}
+		} else if (skip != SIZE_MAX) {
+			// Uniform among the others (Random, or Weighted without usable weights).
+			idx = (size_t)CosmeticRng2D::randi() % (n - 1);
+			if (idx >= skip) {
+				++idx;
+			}
+		} else {
+			idx = (size_t)CosmeticRng2D::randi() % n;
 		}
 	}
-	return usable[(size_t)CosmeticRng2D::randi() % n];
+	channel.last_pick = idx;
+	return usable[idx];
 }
+
 // AudioStreamRandomizer pitch math: pitch_scale * exp(lerp(log(1/r),
 // log(r), randf)). Rolled only when r > 1 (no RNG burn otherwise).
 static float sound_roll_pitch(double range) {
