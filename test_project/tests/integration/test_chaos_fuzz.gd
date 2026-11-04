@@ -1083,6 +1083,9 @@ func _check(where: String) -> Array:
 				if not v.get_bullet_transform(i).is_finite() or not v.get_bullet_velocity(i).is_finite():
 					problems.append("%s: volley %d bullet %d is not finite" % [where, v.get_instance_id(), i])
 					return problems
+	for r in render_data_problems(factory, INF): # its hostile moves reach 8e35 px on purpose: finite is the rule
+		problems.append("%s: render data: %s" % [where, r])
+		return problems
 	stats["max_live"] = maxi(stats["max_live"], factory.get_active_bullet_count())
 	if ledger != null:
 		ledger.pull()

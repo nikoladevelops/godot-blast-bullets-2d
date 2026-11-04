@@ -368,6 +368,43 @@ func origins(v: BulletVolley2D) -> Array:
 
 
 ## The smallest distance between any two of `points` (INF for fewer than 2).
+## Problems in what the plugin hands the GPU: every float of every
+## MultiMesh buffer under `root` (bullet volleys, effect and trail shards, the
+## debugger), every laser body vertex and every look pose must be finite, and
+## every instance origin inside +-`bound` px. A non-finite or absurd vertex is
+## what a GPU driver may hang on; finite bullet math guarantees none reaches it.
+func render_data_problems(root: Node, bound := 1.0e30) -> Array:
+	var out: Array = []
+	var stack: Array = [root]
+	while not stack.is_empty():
+		var n: Node = stack.pop_back()
+		stack.append_array(n.get_children(true))
+		var mmi := n as MultiMeshInstance2D
+		if mmi != null and mmi.multimesh != null:
+			var mm := mmi.multimesh
+			var buf: PackedFloat32Array = mm.buffer
+			var stride := 8 + (4 if mm.use_colors else 0) + (4 if mm.use_custom_data else 0)
+			for k in buf.size():
+				if is_nan(buf[k]) or is_inf(buf[k]):
+					out.append("%s %s: buffer float %d is %s" % [n.get_class(), n.name, k, buf[k]])
+					break
+			for i in range(0, buf.size() - 7, stride):
+				if absf(buf[i + 3]) > bound or absf(buf[i + 7]) > bound:
+					out.append("%s %s: instance %d at (%s, %s) past %s px" % [n.get_class(), n.name, i / stride, buf[i + 3], buf[i + 7], bound])
+					break
+		var laser := n as LaserVolley2D
+		if laser != null and laser.is_laser_active():
+			for p in (laser.debug_get_body_mesh(1.0)["points"] as PackedVector2Array):
+				if not p.is_finite() or absf(p.x) > bound or absf(p.y) > bound:
+					out.append("LaserVolley2D %s: body vertex %s" % [n.name, p])
+					break
+			for m in laser.debug_get_look_draws(1.0):
+				if not (m["transform"] as Transform2D).is_finite():
+					out.append("LaserVolley2D %s: %s look pose %s" % [n.name, m["slot"], m["transform"]])
+					break
+	return out
+
+
 func min_pair_distance(points: Array) -> float:
 	var best := INF
 	for a in points.size():
