@@ -1172,18 +1172,18 @@ void BulletSpawner2D::apply_steering_to_volley(BulletVolley2D *volley) const {
 	if (homing_per_bullet_smoothing_enabled) {
 		const int bullet_count = volley->get_amount_bullets();
 		for (int i = 0; i < bullet_count; ++i) {
-			// A negative step fans downward: clamp per bullet so the
-			// engine setter never sees an invalid value.
-			const double per_bullet = MAX(homing_smoothing_start + homing_smoothing_step * i, 0.0);
-			volley->bullet_set_homing_smoothing(i, (real_t)per_bullet);
+			// A negative step fans downward, a huge one past what real_t
+			// holds: clamp per bullet so every bullet gets a valid value
+			// (like the orbiting fan).
+			const double per_bullet = Math::clamp(homing_smoothing_start + homing_smoothing_step * i, 0.0, (double)std::numeric_limits<real_t>::max());
+			volley->fan_set_homing_smoothing(i, (real_t)per_bullet);
 		}
 		volley->mark_homing_smoothing_fanned();
 	} else if (volley->is_homing_smoothing_fanned()) {
-		// Turning the fan off hands control back to the shared homing_smoothing.
-		// The volley latches per-bullet values once written, so a live volley
-		// that was fanned once would otherwise ignore every later edit. Values
-		// a script wrote (also after the fan) are the script's: kept.
-		volley->clear_per_bullet_homing_smoothing();
+		// Turning the fan off hands control back to the shared homing_smoothing:
+		// every slot the fan wrote follows it again. Slots a script wrote (also
+		// after the fan) are the script's: kept.
+		volley->release_fanned_homing_smoothing();
 	}
 }
 

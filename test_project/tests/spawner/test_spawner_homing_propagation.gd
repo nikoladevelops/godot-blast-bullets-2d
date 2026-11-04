@@ -98,6 +98,41 @@ func test_script_per_bullet_smoothing_survives_the_fan_off_path() -> void:
 	assert_almost_eq(v.bullet_get_homing_smoothing(1), 44.0, 0.0001, "edited after the fan: kept")
 
 
+## The off path is per bullet: one script write after the fan keeps that
+## bullet's value, while every slot the fan wrote goes back to the shared
+## value (a single volley-wide flag once kept the whole fan latched).
+func test_the_fan_off_path_releases_the_fans_slots_beside_a_script_slot() -> void:
+	var sp := _homing_spawner(4)
+	sp.set_homing_mode(BulletSpawner2D.HOMING_PER_BULLET)
+	sp.set_homing_per_bullet_smoothing_enabled(true)
+	sp.set_homing_smoothing_start(5.0)
+	sp.set_homing_smoothing_step(1.5)
+	assert_true(sp.shoot_once(), "shot")
+	var v: BulletVolley2D = sp.get_live_volleys()[0]
+	v.bullet_set_homing_smoothing(1, 44.0)
+	sp.set_homing_per_bullet_smoothing_enabled(false)
+	sp.set_homing_smoothing(20.0)
+	assert_eq(sp.retarget_live_volleys(), 1, "the retarget pass re-applies steering")
+	assert_eq(Array(v.all_bullets_get_homing_smoothing()), [20.0, 44.0, 20.0, 20.0], "the fan's slots take the shared value, the script's slot is kept")
+
+
+## A fan whose values pass what real_t holds is clamped per bullet (like the
+## orbiting fan): every bullet gets a valid value, nothing errors per pass.
+func test_a_huge_smoothing_fan_is_clamped_per_bullet() -> void:
+	var sp := _homing_spawner(3)
+	sp.set_homing_mode(BulletSpawner2D.HOMING_PER_BULLET)
+	sp.set_homing_per_bullet_smoothing_enabled(true)
+	sp.set_homing_smoothing_start(3.0e38)
+	sp.set_homing_smoothing_step(3.0e38) # bullet 1 would need 6e38: INF as a float
+	assert_true(sp.shoot_once(), "shot")
+	var v: BulletVolley2D = sp.get_live_volleys()[0]
+	assert_eq(sp.retarget_live_volleys(), 1, "a retarget pass re-applies the fan")
+	expect_no_errors()
+	for i in 3:
+		var s := v.bullet_get_homing_smoothing(i)
+		assert_true(is_finite(s) and s >= 2.9e38, "bullet %d holds a finite, clamped rate (%s)" % [i, s])
+
+
 func test_homing_signals_fire_once_per_volley_with_payloads() -> void:
 	var sp := _homing_spawner()
 	assert_true(sp.shoot_once(), "shot")

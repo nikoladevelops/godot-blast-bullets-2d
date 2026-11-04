@@ -1966,6 +1966,10 @@ protected:
 	// mark_homing_smoothing_fanned after it wrote them); any other per-bullet
 	// write makes them the script's, which the fan's off path never clears.
 	bool homing_smoothing_fanned = false;
+	// Per bullet: 1 = a script wrote this slot's smoothing (the fan's off path
+	// keeps it); 0 = the fan's or the seeded shared value (the off path sets
+	// it to the shared value; the documented latch keeps it after that).
+	std::vector<uint8_t> homing_smoothing_script_owned;
 
 	// Tracks how many bullets are currently homing in TOTAL (per-bullet homing, NOT shared) - basically determines whether the per-bullet homing feature is even turned on
 	int active_homing_count = 0;
@@ -2594,7 +2598,14 @@ public:
 	void clear_per_bullet_homing_smoothing() {
 		use_per_bullet_homing_smoothing = false;
 		homing_smoothing_fanned = false;
+		homing_smoothing_script_owned.assign(homing_smoothing_script_owned.size(), 0);
 	}
+	// C++ only (the spawner's smoothing fan): writes slot i as the fan's own.
+	void fan_set_homing_smoothing(int bullet_index, real_t value);
+	// C++ only (the fan turned off): every slot the fan owns goes back to the
+	// shared homing_smoothing; slots a script wrote keep their values, and
+	// per-bullet mode ends once no script-owned slot remains.
+	void release_fanned_homing_smoothing();
 	// C++ only (the spawner): right after its fan wrote every bullet.
 	void mark_homing_smoothing_fanned() { homing_smoothing_fanned = true; }
 	bool is_homing_smoothing_fanned() const { return homing_smoothing_fanned; }

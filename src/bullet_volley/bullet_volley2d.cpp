@@ -1143,6 +1143,7 @@ void BulletVolley2D::seed_motion_features(const BulletVolleyData2D &data) {
 	all_bullet_homing_targets.resize(amount_bullets);
 	all_homing_count.assign(amount_bullets, 0);
 	all_bullet_homing_smoothing.assign(amount_bullets, 0.0);
+	homing_smoothing_script_owned.assign(amount_bullets, 0);
 	use_per_bullet_homing_smoothing = false;
 	homing_smoothing_fanned = false;
 	all_orbiting_data.resize(amount_bullets);
