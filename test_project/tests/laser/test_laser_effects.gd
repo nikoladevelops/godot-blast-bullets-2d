@@ -253,3 +253,26 @@ func test_a_skipped_chance_roll_never_latches_the_layer() -> void:
 	entry.effect.trigger_chance = 1.0
 	step_factory(4, DT)
 	assert_eq(_played(LaserEffectData2D.LASER_EFFECT_ON_ACTIVE).size(), 4, "chance 1 plays on every event")
+
+
+## The unplayable-layer latch is bounded: it keeps one entry per distinct layer
+## until that resource is gone (instance ids are never reused), so a game
+## minting a broken layer per shot must not grow the map for the factory's
+## whole life. Dead entries are dropped once the map reaches its bound; live
+## broken layers keep theirs (they are tried again after an edit).
+func test_the_failed_layer_latch_map_forgets_dead_layers() -> void:
+	var d := H.make_laser(0.0, 0.0, 0.0, 0.0, 100.0)
+	for i in 70: # past the bound
+		var broken := EffectLayerData2D.new() # no frames: cannot bake, one error
+		broken.trigger = EffectLayerData2D.EFFECT_ON_HIT # not a trail: the entry accepts it
+		var entry := LaserEffectData2D.new()
+		entry.trigger = LaserEffectData2D.LASER_EFFECT_ON_ACTIVE
+		entry.effect = broken
+		d.effects = [entry]
+		var l := _fire(d, [Transform2D.IDENTITY] as Array[Transform2D])
+		step_factory(1, DT) # one active event: the layer is tried and latched
+		l.end_laser(false)
+		step_factory(2, DT)
+	expect_errors_containing("EffectLayerData2D: sprite_frames is null", 70)
+	var latched := int(factory.debug_get_effect_state().get("failed_laser_layers", 999))
+	assert_lte(latched, 64, "the map never grows past its bound (dead layers were dropped)")

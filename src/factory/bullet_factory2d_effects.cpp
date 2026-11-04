@@ -592,6 +592,20 @@ bool BulletFactory2D::fx_play_laser_effect(const Ref<EffectLayerData2D> &layer, 
 		// Latched only when the layer CANNOT play (until it is edited); a
 		// skipped trigger_chance roll is not a failure, the next event rolls again.
 		if (unplayable && !watch.died()) {
+			// Bounded like WarnOnce2D and the sound mixer's channel map: a game
+			// minting a broken layer per shot must not keep every entry for the
+			// factory's whole life. An entry whose layer is gone can only grow
+			// the map (instance ids are never reused), so drop those first.
+			constexpr size_t kMaxFailedLaserLayers = 64;
+			if (fx_failed_laser_layers.size() >= kMaxFailedLaserLayers) {
+				for (auto it = fx_failed_laser_layers.begin(); it != fx_failed_laser_layers.end();) {
+					if (ObjectDB::get_instance(ObjectID(it->first)) == nullptr) {
+						it = fx_failed_laser_layers.erase(it);
+					} else {
+						++it;
+					}
+				}
+			}
 			fx_failed_laser_layers[id] = layer->get_bake_version();
 		}
 		return false;
@@ -776,6 +790,7 @@ Dictionary BulletFactory2D::debug_get_effect_state() const {
 	d["manual_active"] = manual_active;
 	d["manual_frames"] = manual_frames;
 	d["manual_bakes"] = (int)fx_manual_bakes.size();
+	d["failed_laser_layers"] = (int)fx_failed_laser_layers.size();
 	d["container_valid"] = sprite_effects_container.get() != nullptr;
 	// One row per bake: the volley bakes, then (under "manual") the manual hatch's.
 	auto describe = [](const FXOneShotBake &bake) {
