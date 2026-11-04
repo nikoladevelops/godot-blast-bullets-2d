@@ -200,6 +200,31 @@ func test_configure_a_frozen_bullet_then_wake_it() -> void:
 	assert_gt(v.get_bullet_direction(0).y, 0.3, "the woken bullet steers toward the queued target")
 
 
+## The freeze contract covers orbiting too (what the docs state): a frozen
+## bullet accepts orbit arming and a new configuration in place, and a locked
+## frozen bullet re-pins its center. Only a pooled volley refuses (stale).
+func test_a_frozen_bullet_accepts_orbit_configuration() -> void:
+	var v: BulletVolley2D = factory.spawn_volley(_data())
+	v.set_homing_take_control_of_texture_rotation(true)
+	v.bullet_homing_push_back_global_position_target(0, Vector2(0, 300))
+	v.bullet_enable_orbiting(0, 40.0)
+	for i in 240:
+		await physics(1)
+		if v.bullet_is_orbiting_locked(0):
+			break
+	assert_true(v.bullet_is_orbiting_locked(0), "the ring locked")
+	v.bullet_set_orbiting_lock_policy(0, BulletVolley2D.StayLocked) # keeps the lock across a re-arm
+	v.disable_bullet(0)
+	assert_true(v.bullet_is_orbiting_enabled(0), "a frozen bullet keeps its orbit armed")
+	v.bullet_enable_orbiting(0, 40.0, BulletVolley2D.OrbitRight, BulletVolley2D.FaceTarget, BulletVolley2D.FollowTarget, 0.0, BulletVolley2D.StayLocked, true)
+	assert_true(v.bullet_is_orbiting_locked(0), "a frozen bullet accepts a re-arm and StayLocked keeps the lock")
+	v.bullet_set_orbiting_radius(0, 60.0)
+	assert_almost_eq(v.bullet_get_orbiting_radius(0), 60.0, 0.01, "a frozen bullet takes new orbit settings in place")
+	v.all_bullets_set_orbiting_center(Vector2(77, 77), 0, 0)
+	assert_almost_eq(v.bullet_get_orbiting_center(0).distance_to(Vector2(77, 77)), 0.0, 0.01, "a locked frozen bullet re-pins")
+	expect_no_errors()
+
+
 func test_life_id_changes_once_per_life() -> void:
 	var v: BulletVolley2D = factory.spawn_volley(_data(1))
 	var first := v.get_life_id()

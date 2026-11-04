@@ -2437,10 +2437,11 @@ public:
 	Array all_bullets_pop_front_target(int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 	Array all_bullets_pop_back_target(int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 
-	// Bulk push paths skip disabled slots silently: the per-bullet push
-	// rejects them loudly, and a retarget pass over a partially-disabled
-	// volley must not spam one error per bullet per interval. Declared
-	// before every bulk path that uses it (including the mouse pushes).
+	// Bulk push paths skip disabled slots silently: a frozen bullet takes its
+	// own per-bullet push (applied on the wake), but the bulk helpers leave
+	// disabled slots untouched instead of half-arming a partially frozen
+	// volley. Declared before every bulk path that uses it (including the
+	// mouse pushes).
 	_ALWAYS_INLINE_ bool orbit_skip_disabled_in_bulk(int bullet_index) const {
 		return bullet_index < 0 || bullet_index >= amount_bullets || !all_bullets_enabled_set.contains(bullet_index);
 	}
@@ -2449,9 +2450,8 @@ public:
 	void all_bullets_push_front_mouse_position_target(int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 
 	// Bulk push paths skip disabled slots silently (see the helper above the
-	// mouse pushes): the per-bullet push rejects them loudly, and a retarget
-	// pass over a partially-disabled volley must not spam one error per
-	// bullet per interval.
+	// mouse pushes): a frozen bullet takes its own per-bullet push instead of
+	// being half-armed by a bulk call.
 	void all_bullets_push_back_homing_target(const Variant &node2d_or_global_position, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 	void all_bullets_push_front_homing_target(const Variant &node2d_or_global_position, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 	void all_bullets_push_back_homing_targets_array(const Array &node2ds_or_global_positions_array, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);

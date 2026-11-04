@@ -609,7 +609,7 @@
 			<param index="1" name="bullet_index_start" type="int" default="0" />
 			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
-				Re-pins the locked ring center for each locked bullet in the range without unlocking. Unlocked or disabled bullets warn and are skipped.
+				Re-pins the locked ring center for each locked bullet in the range without unlocking. Unlocked bullets warn and are skipped (a frozen bullet keeps its lock, so it is re-pinned too).
 			</description>
 		</method>
 		<method name="all_bullets_set_orbiting_direction">
@@ -862,11 +862,11 @@
 			<param index="7" name="orbiting_rigid_follow" type="bool" default="true" />
 			<description>
 				Enables orbiting for the specified bullet with the given parameters. A bullet that already orbits takes the new settings in place: the lock policy is applied first, so [constant StayLocked] keeps its lock while the other policies re-acquire the ring after a new radius or direction, and [constant OrbitRandom] keeps the direction the bullet rolled when it started orbiting.
-				Invalid direction or texture rotation values are rejected with an error and orbiting stays disabled. Enabling on a disabled bullet is rejected: wake it with [method enable_bullet] first, then push targets and enable orbiting.
+				Invalid direction or texture rotation values are rejected with an error and orbiting stays disabled. A frozen (disabled) bullet accepts the call: the configuration applies when the bullet is woken with [method enable_bullet] (only a pooled volley, the stale handle, refuses).
 				DontMove as direction means escort: the bullet holds a fixed slot on the ring and follows the target without circling. Tangential texture rotations (FaceOrbitingDirection, FaceOppositeOrbitingDirection) have no effect for escorts since there is no direction of travel.
 				The follow mode controls how the locked ring tracks a moving target (FollowTarget, FollowDeadzone with a pixel deadzone, or Anchored), the lock policy controls what drops the lock (RelockAlways, StayLocked, or RelockOnTargetChange), and rigid follow controls whether circling bullets translate 1:1 with the target like escorts (on) or chase the ring and trail behind fast targets (off).
 
-				Note that orbiting relies on having a homing target to orbit around. Push targets only onto enabled bullets for the same reason; the spawner retarget pass skips disabled slots automatically.
+				Note that orbiting relies on having a homing target to orbit around. Frozen bullets accept targets too (they apply on the wake); the spawner retarget pass skips disabled slots automatically.
 
 				Example: [code]bullets.bullet_enable_orbiting(0, 90.0, 2); bullets.bullet_homing_push_back_global_position_target(0, boss.global_position)[/code], then read [method debug_get_orbiting_info].
 			</description>
@@ -1100,7 +1100,7 @@
 			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="global_position" type="Vector2" />
 			<description>
-				Pushes a global position target to the back of the specified bullet's per-bullet deque. Returns true on success (bullet enabled/valid index). Per-bullet deque wins over the shared deque per bullet; a drained per-bullet deque falls back to shared. Example: [code]bullets.bullet_homing_push_back_global_position_target(0, boss.global_position)[/code].
+				Pushes a global position target to the back of the specified bullet's per-bullet deque. Returns true on success (valid index and finite target); a frozen bullet queues it for the wake and a pooled volley refuses. Per-bullet deque wins over the shared deque per bullet; a drained per-bullet deque falls back to shared. Example: [code]bullets.bullet_homing_push_back_global_position_target(0, boss.global_position)[/code].
 
 				If you want to push back a target to the shared deque, use [method shared_homing_deque_push_back_global_position_target] instead.
 			</description>
@@ -1127,7 +1127,7 @@
 			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="new_homing_target" type="Variant" />
 			<description>
-				Pushes a Node2D target to the back of the specified bullet's per-bullet deque. Returns true on success (bullet enabled/valid index/target).
+				Pushes a Node2D target to the back of the specified bullet's per-bullet deque. Returns true on success (valid index and target); a frozen bullet queues it for the wake and a pooled volley refuses.
 
 				If you want to push back a target to the shared deque, use [method shared_homing_deque_push_back_node2d_target] instead.
 			</description>
@@ -1137,7 +1137,7 @@
 			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="global_position" type="Vector2" />
 			<description>
-				Pushes a global position target to the front of the specified bullet's per-bullet deque. Returns true on success (bullet enabled/valid index).
+				Pushes a global position target to the front of the specified bullet's per-bullet deque. Returns true on success (valid index and finite target); a frozen bullet queues it for the wake and a pooled volley refuses.
 
 				If you want to push front a target to the shared deque, use [method shared_homing_deque_push_front_global_position_target] instead.
 			</description>
@@ -1164,7 +1164,7 @@
 			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="new_homing_target" type="Variant" />
 			<description>
-				Pushes a Node2D target to the front of the specified bullet's per-bullet deque. Returns true on success (bullet enabled/valid index/target).
+				Pushes a Node2D target to the front of the specified bullet's per-bullet deque. Returns true on success (valid index and target); a frozen bullet queues it for the wake and a pooled volley refuses.
 
 				If you want to push front a target to the shared deque, use [method shared_homing_deque_push_front_node2d_target] instead.
 			</description>
