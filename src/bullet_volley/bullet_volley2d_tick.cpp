@@ -1207,7 +1207,7 @@ _NO_INLINE_ void BulletVolley2D::graze_visit(int z, int bullet_index, const Vect
 	uint32_t anchor = graze_anchor[at];
 	bool was_inside = (st & GRAZE_INSIDE) != 0;
 	if (was_inside && tg.anchor_changed(anchor)) {
-		if (end <= ring_r2[0]) {
+		if (end <= ring_r2[0] && end_target >= 0) {
 			// Still inside another target: the visit moves on to it.
 			anchor = tg.slots[end_target];
 		} else {

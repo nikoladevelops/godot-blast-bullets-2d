@@ -533,8 +533,14 @@ bool BulletFactory2D::fx_play_laser_effect(const Ref<EffectLayerData2D> &layer, 
 	if (failed != fx_failed_laser_layers.end() && failed->second == layer->get_bake_version()) {
 		return false;
 	}
-	if (fx_spawn_manual(layer, at, "LaserEffectData2D.effect") < 0) {
-		fx_failed_laser_layers[id] = layer->get_bake_version();
+	bool unplayable = false;
+	const LifeWatch watch = watch_life();
+	if (fx_spawn_manual(layer, at, "LaserEffectData2D.effect", &unplayable) < 0) {
+		// Latched only when the layer CANNOT play (until it is edited); a
+		// skipped trigger_chance roll is not a failure, the next event rolls again.
+		if (unplayable && !watch.died()) {
+			fx_failed_laser_layers[id] = layer->get_bake_version();
+		}
 		return false;
 	}
 	if (failed != fx_failed_laser_layers.end()) {
@@ -543,7 +549,7 @@ bool BulletFactory2D::fx_play_laser_effect(const Ref<EffectLayerData2D> &layer, 
 	return true;
 }
 
-int BulletFactory2D::fx_spawn_manual(const Ref<EffectLayerData2D> &layer, const Transform2D &at, const char *caller) {
+int BulletFactory2D::fx_spawn_manual(const Ref<EffectLayerData2D> &layer, const Transform2D &at, const char *caller, bool *r_unplayable) {
 	for (size_t i = 0; i < fx_manual_bakes.size(); ++i) {
 		// Same resource, edited content: the stored generation trails the
 		// layer's, so drop the stale bake and rebuild below. Same when a
@@ -561,10 +567,16 @@ int BulletFactory2D::fx_spawn_manual(const Ref<EffectLayerData2D> &layer, const 
 	// drops another manual bake.
 	FXOneShotBake bake;
 	if (!layer->bake_effect_animation(layer->animation, &frame_cache, bake.anim)) {
+		if (r_unplayable != nullptr) {
+			*r_unplayable = true;
+		}
 		return -1;
 	}
 	if (!(bake.anim.total > 0.0)) {
 		UtilityFunctions::push_error(String(caller) + ": the layer's animation has no playable time (speed 0 holds its frame), nothing spawned.");
+		if (r_unplayable != nullptr) {
+			*r_unplayable = true;
+		}
 		return -1;
 	}
 	// No cap on distinct layers: an idle bake whose layer nothing else holds
@@ -582,8 +594,14 @@ int BulletFactory2D::fx_spawn_manual(const Ref<EffectLayerData2D> &layer, const 
 	const int ring = fx_ring_size_for_layer(layer, 32);
 	bake.slots.assign(ring, FXOneShotSlot());
 	const std::vector<Ref<Texture2D>> &frames = bake.anim.frames;
+	// Each shard is add_child'ed (SceneTree.node_added, the container's
+	// child_entered_tree: user code): never touch this factory once it died.
+	const LifeWatch watch = watch_life();
 	for (size_t f = 0; f < frames.size(); ++f) {
 		bake.add_shard(fx_create_shard(sprite_effects_container.ptr, frames[f], fx_quad_size_for_texture(frames[f]), layer->material, layer->self_modulate, layer->z_index, layer->z_as_relative, layer->visibility_layer, layer->light_mask, ring, true));
+		if (watch.died() || sprite_effects_container.get() == nullptr) {
+			return -1; // the factory (or the container a handler freed) is gone: the shards went with it
+		}
 	}
 	fx_manual_bakes.push_back(bake);
 	return fx_fire_into_bake(fx_manual_bakes[fx_manual_bakes.size() - 1], at);

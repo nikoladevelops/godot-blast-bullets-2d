@@ -237,3 +237,19 @@ func test_effect_nodes_are_added_after_the_event_signal() -> void:
 	get_tree().node_added.disconnect(on_added)
 	assert_eq(order.slice(0, 2), ["hit", "effect node"], "the hit first (live target), the effect's nodes after the tick")
 	assert_eq(_positions(LaserEffectData2D.LASER_EFFECT_ON_HIT), [Vector2(100, 0)], "and the effect still plays where the hit was")
+
+
+## A trigger_chance roll that skips is not a failure: only a layer that
+## cannot play is latched until edited (a skipped roll once latched the
+## layer for good, so chance 1 later never played).
+func test_a_skipped_chance_roll_never_latches_the_layer() -> void:
+	var entry := _entry(LaserEffectData2D.LASER_EFFECT_ON_ACTIVE)
+	entry.effect.trigger_chance = 0.0
+	var d := H.make_laser(0.0, 0.0, 0.0, 0.0, 100.0)
+	d.effects = [entry]
+	_fire(d, [Transform2D.IDENTITY] as Array[Transform2D])
+	step_factory(4, DT)
+	assert_eq(_played(LaserEffectData2D.LASER_EFFECT_ON_ACTIVE).size(), 0, "chance 0 never plays")
+	entry.effect.trigger_chance = 1.0
+	step_factory(4, DT)
+	assert_eq(_played(LaserEffectData2D.LASER_EFFECT_ON_ACTIVE).size(), 4, "chance 1 plays on every event")

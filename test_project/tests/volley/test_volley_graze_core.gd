@@ -366,3 +366,17 @@ func test_factory_target_cache_snapshot() -> void:
 	assert_eq(targets[0]["id"], a.get_instance_id(), "tree order")
 	assert_eq(targets[1]["position"], Vector2(3, 4), "positions")
 	assert_eq(factory.debug_get_graze_targets(&""), [], "an empty group has no targets")
+
+
+## A ring radius past what a float squares (accepted: finite and > 0) still
+## measures real distances: a target far outside it is never grazed (the
+## squared radius once overflowed to INF and every target grazed).
+func test_a_huge_ring_radius_never_grazes_a_target_outside_it() -> void:
+	var zone := GrazeZone2D.new()
+	zone.ring_1_radius = 1.0e20
+	make_graze_target(Vector2(1.0e25, 0.0))
+	var v := graze_volley([Transform2D(0.0, Vector2.ZERO)], 200.0)
+	assert_true(v.graze_set_zones([zone], &"graze_targets"), "armed")
+	watch_signals(factory)
+	await physics(3)
+	assert_eq(get_signal_emit_count(factory, "bullet_grazed"), 0, "a target 1e25 px away is outside a 1e20 px ring")

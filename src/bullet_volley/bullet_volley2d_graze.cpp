@@ -323,7 +323,9 @@ void BulletVolley2D::prepare_graze_tick() {
 			tz.ring_count = CLAMP(zone->ring_count, 1, GrazeZone2D::MAX_RINGS);
 			real_t radius[GrazeZone2D::MAX_RINGS];
 			for (int r = 0; r < tz.ring_count; ++r) {
-				const real_t value = zone->ring_radii[r] + inflate;
+				// Capped so its square stays a finite float (a radius past
+				// ~1.8e19 squared to INF: every target, however far, grazed).
+				const real_t value = MIN(zone->ring_radii[r] + inflate, (real_t)1.0e15);
 				int at = r;
 				while (at > 0 && radius[at - 1] < value) {
 					radius[at] = radius[at - 1];

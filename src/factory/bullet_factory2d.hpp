@@ -450,7 +450,7 @@ public:
 	// coexist instead of rebaking each other away.
 	std::vector<FXOneShotBake> fx_manual_bakes;
 	// spawn_layer_effect's body; `caller` names the hatch in its errors.
-	int fx_spawn_manual(const Ref<EffectLayerData2D> &layer, const Transform2D &at, const char *caller);
+	int fx_spawn_manual(const Ref<EffectLayerData2D> &layer, const Transform2D &at, const char *caller, bool *r_unplayable = nullptr);
 	// Laser effect layers that could not play, by instance id: the bake
 	// version that failed (fx_play_laser_effect tries again after an edit).
 	std::unordered_map<uint64_t, uint64_t> fx_failed_laser_layers;
