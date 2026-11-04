@@ -391,7 +391,10 @@ int BulletFactory2D::fx_fire_into_bake(FXOneShotBake &bake, const Transform2D &a
 			// unregistered stays alive for this call; nothing of the bake is
 			// touched afterwards either way.
 			MultiMeshInstance2D *shard_node = bake.shards[frame].get();
-			if (shard_node != nullptr) {
+			// An already visible shard: set_visible(true) is a no-op, so the
+			// handler can never run and the guard lookup is skipped (fires
+			// on an occupied shard stay exactly as cheap as before).
+			if (shard_node != nullptr && !shard_node->is_visible()) {
 				BulletVolley2D *owner = bake.volley_id != 0 ? Object::cast_to<BulletVolley2D>(ObjectDB::get_instance(ObjectID(bake.volley_id))) : nullptr;
 				if (owner != nullptr) {
 					guarded_user_call2d(owner, owner->emit_guard, [&]() { shard_node->set_visible(true); });
