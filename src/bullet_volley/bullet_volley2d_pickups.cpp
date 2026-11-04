@@ -116,6 +116,11 @@ bool BulletVolley2D::collect_pickup_bullet(int bullet_index, Node2D *collector) 
 	}
 	if (pickup->collect_effect.is_valid()) {
 		bullet_factory->spawn_layer_effect(pickup->collect_effect, Transform2D(0.0f, position));
+		// Spawning adds nodes (SceneTree.node_added, child_entered_tree: user
+		// code): this volley or its factory may be gone.
+		if (!survived_user_code(self_id)) {
+			return false;
+		}
 	}
 	// A handler may have disabled or recycled the bullet: only a still-live,
 	// same-life bullet is taken out now.

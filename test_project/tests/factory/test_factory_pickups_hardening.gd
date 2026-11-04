@@ -565,3 +565,29 @@ func test_bounce_off_a_position_moved_wall_is_independent_of_the_time_scale() ->
 		wall.free()
 		await idle(2)
 	assert_almost_eq(speeds[1], speeds[0], speeds[0] * 0.15, "the moving wall adds the same kick at any scale (%s)" % [speeds])
+
+
+## The collect effect adds nodes (SceneTree.node_added: user code): a handler
+## that frees the pickup volley right there is survived, the volley touches
+## nothing of itself afterwards (it once took the collected bullet out of the
+## freed volley).
+func test_a_volley_freed_by_its_collect_effect_nodes_is_survived() -> void:
+	P.still(factory, [Vector2.ZERO])
+	var coin := P.coin()
+	coin.collect_effect = H.make_effect_layer(EffectLayerData2D.EFFECT_ON_SPAWN)
+	var made: Array = factory.convert_all_bullets_to_pickups(coin, _target(Vector2(150, 0)))
+	assert_eq(made.size(), 1, "one pickup volley")
+	var pv: BulletVolley2D = made[0]
+	var freed := [false]
+	var on_added := func(n: Node) -> void:
+		if not freed[0] and n is MultiMeshInstance2D and is_instance_valid(pv) and not (n is BulletVolley2D):
+			freed[0] = true
+			pv.free()
+	get_tree().node_added.connect(on_added)
+	await _wait(1)
+	get_tree().node_added.disconnect(on_added)
+	await idle(2)
+	assert_eq(collected.size(), 1, "collected once")
+	assert_true(freed[0], "the effect's nodes were added (and the handler queued the volley)")
+	var books: Dictionary = factory.debug_assert_no_dangling()
+	assert_true(books["ok"], books.get("error", ""))
