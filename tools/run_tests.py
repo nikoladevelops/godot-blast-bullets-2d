@@ -344,7 +344,8 @@ def report(results):
             for line in r["script_errors"][:10]:
                 print(f"  SCRIPT {line}")
             if r["status"] in ("CRASH", "TIMEOUT", "EMPTY"):
-                tail = [ln for ln in r["output"].splitlines() if ln.strip()][-15:]
+                # BLAST_CRASH_TAIL=<n> widens the window when diagnosing a crash.
+                tail = [ln for ln in r["output"].splitlines() if ln.strip()][-int(os.environ.get("BLAST_CRASH_TAIL", "15")):]
                 for ln in tail:
                     print(f"  | {ln}")
         print("=" * 72)
