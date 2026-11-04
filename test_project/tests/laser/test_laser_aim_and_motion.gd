@@ -457,3 +457,22 @@ func test_a_spawner_anchor_never_jumps_the_first_tick() -> void:
 	step_factory(1, DT)
 	assert_almost_eq(l.get_beam_start(0), Vector2(280, 0), Vector2(0.001, 0.001), "and it rides the anchor from there")
 	l.end_laser(false)
+
+
+## set_beam_angle sets the beam's PATTERN aim ("so it points along radians now
+## (its pattern aim)"): on a Track / Lock On beam the slot turns to `radians`
+## too, so a target dropped later leaves the beam where the call pointed it -
+## not at old_pattern + radians - tracking_aim.
+func test_set_beam_angle_sets_the_pattern_aim_of_a_tracked_beam() -> void:
+	var d := H.make_laser(0.0, 0.0, 0.0, 0.0, 1000.0)
+	d.aim = LaserData2D.LASER_AIM_LOCK_ON
+	var l := _fire(d)
+	l.set_beam_target(0, Vector2(0, 300))
+	step_factory(1, DT)
+	assert_true(_same_angle(l.get_beam_angle(0), PI / 2.0), "locked onto the target below (90 deg)")
+	l.set_beam_angle(0, 0.0)
+	assert_true(_same_angle(l.get_beam_angle(0), 0.0), "reads back at once")
+	l.set_beam_target(0, null) # the pattern aim shows now
+	step_factory(1, DT)
+	assert_true(_same_angle(l.get_beam_angle(0), 0.0), "the pattern aim is 0: the beam keeps pointing +x")
+	assert_almost_eq(l.get_beam_end(0), Vector2(1000, 0), Vector2(0.5, 0.5), "and its end follows")

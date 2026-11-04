@@ -801,16 +801,23 @@ void LaserVolley2D::set_beam_angle(int beam_index, real_t radians) {
 		return;
 	}
 	Beam &b = beams[beam_index];
-	const real_t turn = radians - b.aim;
 	const LaserData2D *d = data.ptr();
 	const bool is_beam = d == nullptr || d->type == LaserData2D::LASER_BEAM;
+	// The slot carries the PATTERN aim (where a beam points with no target):
+	// turn it to `radians` in world terms, so a Track / Lock-On beam that loses
+	// its target later still points where this call aimed it. For a Pattern
+	// beam this is the same turn as before (its aim IS the slot's angle).
+	Transform2D pose = b.slot;
+	if (following) {
+		pose = anchor_frame_now * b.slot; // the origin is irrelevant: only the x axis is read
+	}
+	const real_t pattern_turn = radians - (real_t)pose.columns[0].angle();
 	b.aim = radians;
 	b.heading = radians;
 	// Read back at once (get_beam_angle); points and walls follow next tick.
 	b.angle = is_beam ? radians + b.sweep : radians;
 	b.snap_history = true;
-	// The slot turns too, so a pattern aim keeps the new direction.
-	const Transform2D rotate(turn, Vector2());
+	const Transform2D rotate(pattern_turn, Vector2());
 	b.slot.columns[0] = rotate.basis_xform(b.slot.columns[0]);
 	b.slot.columns[1] = rotate.basis_xform(b.slot.columns[1]);
 }
