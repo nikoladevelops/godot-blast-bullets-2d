@@ -1034,9 +1034,16 @@ _ALWAYS_INLINE_ void BulletVolley2D::orbit_keep_lock_across_replace_for_bullet_f
 		return;
 	}
 	if (!orbit_should_unlock_for_front_change(o, deque)) {
-		o.locked_center = deque.get_cached_front_target_global_position();
+		// Same front identity = keep angle AND center (a queue rebuild or a
+		// retarget pass is not a move: Anchored stays anchored and a
+		// FollowDeadzone pin is not reset). A NEW front under StayLocked /
+		// RelockOnTargetChange stamps the new target's spot (angle preserved).
+		const uint64_t front_identity = orbit_target_identity(deque);
+		if (front_identity != o.locked_target_identity) {
+			o.locked_center = deque.get_cached_front_target_global_position();
+		}
 		o.locked_target_type = deque.get_current_target_type();
-		o.locked_target_identity = orbit_target_identity(deque);
+		o.locked_target_identity = front_identity;
 	} else {
 		o.is_locked_orbiting = false;
 	}

@@ -157,3 +157,26 @@ func test_the_documented_minimum_radius_is_accepted_silently() -> void:
 	expect_no_errors("set at the minimum")
 	v.bullet_set_orbiting_radius(0, 0.0078125) # exact in float: below the minimum
 	expect_error_sequence(["Orbiting radius must be >= 0.01, got 0.0078125. Clamping to 0.01."])
+
+
+## A queue rebuild that keeps the SAME front target keeps the locked center
+## (doc: "same front target keeps angle and center"; Anchored "freezes the
+## ring where it locked"): only a new front identity re-pins it. A same-target
+## replace must not drag an Anchored ring onto the target's new position.
+func test_a_same_target_replace_keeps_the_anchored_ring_center() -> void:
+	var v: BulletVolley2D = factory.spawn_volley(H.make_volley_data(1, 250.0, 30.0))
+	v.set_homing_smoothing(0.0) # snap onto the ring
+	v.set_homing_take_control_of_texture_rotation(true)
+	v.bullet_homing_push_back_node2d_target(0, target)
+	v.bullet_enable_orbiting(0, 50.0, BulletVolley2D.OrbitRight, BulletVolley2D.FaceTarget, BulletVolley2D.Anchored, 0.0, BulletVolley2D.RelockOnTargetChange, true)
+	await _wait_locked(v, 300)
+	assert_true(v.bullet_is_orbiting_locked(0), "the ring locked")
+	var center: Vector2 = v.bullet_get_orbiting_center(0)
+	assert_almost_eq(center, Vector2(400, 0), Vector2(1, 1), "the anchored center is where it locked")
+	target.position = Vector2(700, 0)
+	await physics(1)
+	v.bullet_replace_homing_targets_with_new_target(0, target) # the SAME node
+	assert_almost_eq(v.bullet_get_orbiting_center(0), center, Vector2(0.01, 0.01), "a same-target replace keeps the anchored center")
+	await physics(20)
+	assert_almost_eq(v.bullet_get_orbiting_center(0), center, Vector2(0.01, 0.01), "and it stays frozen where it locked")
+	assert_almost_eq(v.get_bullet_transform(0).origin.distance_to(center), 50.0, 3.0, "the bullet still circles the old center")
