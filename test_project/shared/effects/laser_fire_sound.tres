@@ -1,0 +1,16 @@
+[gd_resource type="LaserSoundData2D" format=3]
+
+[ext_resource type="AudioStream" path="res://shared/sound/laser_fire_01.wav" id="1_laser_fire"]
+[ext_resource type="AudioStream" path="res://shared/sound/laser_fire_02.wav" id="2_laser_fire"]
+[ext_resource type="AudioStream" path="res://shared/sound/laser_fire_03.wav" id="3_laser_fire"]
+[ext_resource type="AudioStream" path="res://shared/sound/laser_fire_04.wav" id="4_laser_fire"]
+[ext_resource type="AudioStream" path="res://shared/sound/laser_fire_05.wav" id="5_laser_fire"]
+[ext_resource type="AudioStream" path="res://shared/sound/laser_fire_06.wav" id="6_laser_fire"]
+
+[resource]
+trigger = 3
+volume_db = -8.0
+streams = [ExtResource("1_laser_fire"), ExtResource("2_laser_fire"), ExtResource("3_laser_fire"), ExtResource("4_laser_fire"), ExtResource("5_laser_fire"), ExtResource("6_laser_fire")]
+stream_mode = 3
+random_pitch = 1.1
+random_volume_offset_db = 2.0

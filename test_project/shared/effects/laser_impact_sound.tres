@@ -1,0 +1,15 @@
+[gd_resource type="LaserSoundData2D" format=3]
+
+[ext_resource type="AudioStream" path="res://shared/sound/laser_impact_01.wav" id="1_laser_impact"]
+[ext_resource type="AudioStream" path="res://shared/sound/laser_impact_02.wav" id="2_laser_impact"]
+[ext_resource type="AudioStream" path="res://shared/sound/laser_impact_03.wav" id="3_laser_impact"]
+[ext_resource type="AudioStream" path="res://shared/sound/laser_impact_04.wav" id="4_laser_impact"]
+
+[resource]
+trigger = 5
+volume_db = -10.0
+min_interval_sec = 0.08
+streams = [ExtResource("1_laser_impact"), ExtResource("2_laser_impact"), ExtResource("3_laser_impact"), ExtResource("4_laser_impact")]
+stream_mode = 3
+random_pitch = 1.1
+random_volume_offset_db = 2.0

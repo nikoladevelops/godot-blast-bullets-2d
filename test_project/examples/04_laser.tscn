@@ -3,6 +3,8 @@
 [ext_resource type="SpriteFrames" path="res://shared/effects/laser_beam_frames.tres" id="fx_beam"]
 [ext_resource type="SpriteFrames" path="res://shared/effects/laser_orb_frames.tres" id="fx_orb"]
 [ext_resource type="SpriteFrames" path="res://shared/effects/laser_impact_frames.tres" id="fx_impact"]
+[ext_resource type="LaserSoundData2D" path="res://shared/effects/laser_fire_sound.tres" id="snd_fire"]
+[ext_resource type="LaserSoundData2D" path="res://shared/effects/laser_impact_sound.tres" id="snd_impact"]
 [ext_resource type="PackedScene" path="res://shared/live_inspector/live_inspector.tscn" id="live_inspector"]
 
 [ext_resource type="Script" path="res://examples/04_laser.gd" id="1_jwtmk"]
@@ -127,5 +129,7 @@ pattern_source = 4
 helper_bullets_amount = 1
 helper_fan_direction_angle = 1.5707963267948966
 shoot_interval_sec = 4.0
+sound_enabled = true
+sound_effects = [ExtResource("snd_fire"), ExtResource("snd_impact")]
 
 [node name="LiveInspector" parent="." instance=ExtResource("live_inspector")]
