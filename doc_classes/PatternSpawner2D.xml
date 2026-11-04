@@ -4994,7 +4994,7 @@
 			<param index="0" name="global_position" type="Vector2" />
 			<param index="1" name="carry_live_bullets" type="bool" default="false" />
 			<description>
-				Moves the spawner to [param new_global_position] without travel: the jump is never reported as movement velocity, so [member BulletSpawner2D.inherit_movement_velocity] gives the next shot no kick. A playing Path2D movement continues from the new spot with the same path shape (Relative To Start shifts its start, Attach shifts the path by the jump until the movement is stopped or played from the start). With [param carry_live_bullets], every live or parked volley this spawner owns moves by the same jump ([method BulletVolley2D.teleport_shift_all_bullets]: no hits, grazes or homing reach along the way). The preview follows without a rebuild. A non-finite position, or a spawner outside the scene tree, is refused with an error and nothing moves.
+				Moves the spawner to [param global_position] without travel: the jump is never reported as movement velocity, so [member BulletSpawner2D.inherit_movement_velocity] gives the next shot no kick. A playing Path2D movement continues from the new spot with the same path shape (Relative To Start shifts its start, Attach shifts the path by the jump until the movement is stopped or played from the start). With [param carry_live_bullets], every live or parked volley this spawner owns moves by the same jump ([method BulletVolley2D.teleport_shift_all_bullets]: no hits, grazes or homing reach along the way). The preview follows without a rebuild. A non-finite position, or a spawner outside the scene tree, is refused with an error and nothing moves.
 			</description>
 		</method>
 		<method name="volleys_remaining" qualifiers="const">
