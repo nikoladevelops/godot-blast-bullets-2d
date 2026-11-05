@@ -73,6 +73,12 @@ public:
 		--count;
 	}
 
+	// Debug readouts (tests): the ring's allocated slots (0 until the first
+	// push: the deque allocates nothing while empty) and where the live
+	// window starts (0 when empty).
+	int debug_capacity() const noexcept { return capacity(); }
+	int debug_head() const noexcept { return count > 0 ? head : 0; }
+
 private:
 	std::vector<T> buf;
 	int head = 0;
@@ -119,6 +125,11 @@ public:
 	_ALWAYS_INLINE_ bool has_homing_targets() const {
 		return get_homing_targets_amount() > 0;
 	}
+
+	// Debug readouts (tests): the ring internals behind this queue.
+	int debug_capacity() const { return homing_targets.debug_capacity(); }
+	int debug_head() const { return homing_targets.debug_head(); }
+	int debug_front_type() const { return homing_targets.empty() ? 0 : (int)homing_targets.front().type; }
 
 	// Checks if a homing target is valid. Follows the same guard pattern as
 	// BulletSpawner2D::is_tracked_node_alive(): the cached id must still be

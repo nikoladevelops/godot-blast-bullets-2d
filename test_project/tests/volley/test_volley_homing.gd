@@ -36,6 +36,34 @@ func test_deque_push_check_clear() -> void:
 	assert_false(v.shared_homing_deque_check_has_homing_targets(), "shared clear")
 
 
+## The ring internals behind the deques: nothing is allocated before the
+## first push (capacity 0), the ring doubles 4 -> 8, pops move the head, and
+## shared and per-bullet queues report independently.
+func test_the_homing_queue_readout_reports_the_ring_internals() -> void:
+	var v: BulletVolley2D = quick_volley(2, 250.0)
+	var empty: Dictionary = v.debug_get_homing_queue_info(0)
+	assert_true(bool(empty.get("valid", false)), "per-bullet queue valid")
+	assert_eq(int(empty.get("size", -1)), 0, "no targets yet")
+	assert_eq(int(empty.get("capacity", -1)), 0, "the ring allocates nothing while empty")
+	assert_true(bool(empty.get("empty", false)), "empty")
+	for i in 5:
+		v.bullet_homing_push_back_global_position_target(0, Vector2(100 + i, 0))
+	var grown: Dictionary = v.debug_get_homing_queue_info(0)
+	assert_eq(int(grown.get("size", 0)), 5, "five targets")
+	assert_eq(int(grown.get("capacity", 0)), 8, "the ring grew 0 -> 4 -> 8")
+	assert_eq(int(grown.get("head", -1)), 0, "head at the first push slot")
+	assert_eq(grown.get("front_position"), Vector2(100, 0), "the cached front position")
+	v.bullet_homing_pop_front_target(0)
+	var popped: Dictionary = v.debug_get_homing_queue_info(0)
+	assert_eq(int(popped.get("size", 0)), 4, "one popped")
+	assert_eq(int(popped.get("head", -1)), 1, "the head moved past the popped slot")
+	assert_eq(popped.get("front_position"), Vector2(101, 0), "the new front")
+	var shared: Dictionary = v.debug_get_homing_queue_info(-1)
+	assert_eq(String(shared.get("queue", "")), "shared", "the shared queue")
+	assert_eq(int(shared.get("size", -1)), 0, "the shared deque stays independent")
+	assert_false(bool(v.debug_get_homing_queue_info(9).get("valid", true)), "OOB invalid")
+
+
 func test_target_types() -> void:
 	var v: BulletVolley2D = quick_volley(2, 250.0)
 	v.bullet_homing_push_back_global_position_target(0, Vector2(400, 100))

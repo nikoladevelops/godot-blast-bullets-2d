@@ -1496,6 +1496,28 @@ public:
 	// every per-bullet loop walks): {active, capacity, amount_bullets,
 	// active_indexes}. For tests asserting the live counter and the set agree.
 	Dictionary debug_get_active_set_stats() const;
+	// Collision records queued by the physics flush and not drained yet (empty
+	// mid-tick): {size, rows: [{bullet, target_id, type, epoch,
+	// target_velocity_valid, target_position_valid}]}. Tests read it between
+	// frames to pin queueing/dedup without inferring from hits.
+	Dictionary debug_get_collision_queue() const;
+	// Overlaps a paused factory parked (one row per logical overlap, with the
+	// number of shape pairs still inside): [{bullet, target_id, type, epoch,
+	// pairs}].
+	Array debug_get_paused_overlaps() const;
+	// One bullet's bounce mirror frame: {valid, active, x_axis, y_axis}.
+	// Identity until the bullet bounced; split children inherit it.
+	Dictionary debug_get_bounce_frame(int bullet_index) const;
+	// A homing queue's ring internals: {valid, queue ("shared"/"bullet"/
+	// "none"), bullet_index, size, capacity, empty, head, front_type,
+	// front_position}. capacity stays 0 until the first push (the ring
+	// allocates nothing while empty).
+	Dictionary debug_get_homing_queue_info(int bullet_index = -1) const;
+	// One bullet x zone graze visit: {valid, inside, rings, deepest,
+	// visit_fired, anchor_slot, has_visit}. anchor_slot is the visited
+	// target's stable slot (meaningful while has_visit); an exit clears the
+	// visit bits but leaves the stale anchor.
+	Dictionary debug_get_graze_visit(int bullet_index, int zone_index) const;
 	// The transform the physics server holds for bullet i's shape (its hitbox).
 	Transform2D debug_get_bullet_shape_transform(int bullet_index) const;
 	// Attachment slot introspection: {has_attachment, pooling_id,

@@ -19,6 +19,35 @@ func test_exit_reports_the_deepest_ring_of_the_visit() -> void:
 	assert_eq(graze_log[2].slice(1), [t, v, 0, z, 1], "exit payload")
 
 
+## The visit readout mirrors the state the exit logic uses: an open visit
+## names its anchor target's slot (stable while the target lives), the ring
+## mask tracks the deepest ring, and an exit clears the open-visit bits.
+func test_the_graze_visit_readout_tracks_the_open_visit_and_its_anchor() -> void:
+	var t := make_graze_target(Vector2(10, 0))
+	var v := graze_volley(H.transforms_at([Vector2.ZERO]), 0.0)
+	H.record_graze(factory) # handled: the readout is the subject here
+	var z := H.make_graze_zone([40.0, 20.0])
+	v.graze_set_zones([z], &"graze_targets")
+	var before: Dictionary = v.debug_get_graze_visit(0, 0)
+	assert_true(bool(before.get("valid", false)), "valid")
+	assert_false(bool(before.get("has_visit", true)), "no visit before the tick")
+	step_factory()
+	var inside: Dictionary = v.debug_get_graze_visit(0, 0)
+	assert_true(bool(inside.get("has_visit", false)), "the visit is open")
+	assert_eq(int(inside.get("rings")), 3, "both rings grazed (bits 0-1)")
+	assert_eq(int(inside.get("deepest")), 1, "deepest ring 1")
+	var anchor := int(inside.get("anchor_slot"))
+	assert_gte(anchor, 0, "the anchor slot is readable")
+	step_factory()
+	assert_eq(int(v.debug_get_graze_visit(0, 0).get("anchor_slot")), anchor, "the anchor stays while the target lives")
+	t.position = Vector2(200, 0)
+	step_factory()
+	var after: Dictionary = v.debug_get_graze_visit(0, 0)
+	assert_false(bool(after.get("has_visit", true)), "the exit closed the visit")
+	assert_false(bool(v.debug_get_graze_visit(1, 0).get("valid", true)), "OOB bullet invalid")
+	assert_false(bool(v.debug_get_graze_visit(0, 4).get("valid", true)), "OOB zone invalid")
+
+
 func test_exit_names_the_target_the_visit_grazed() -> void:
 	var a := make_graze_target(Vector2(10, 0))
 	var b := make_graze_target(Vector2(30, 0))

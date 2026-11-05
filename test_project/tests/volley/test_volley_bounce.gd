@@ -2972,3 +2972,25 @@ func test_a_bounce_count_at_int_max_saturates() -> void:
 			break
 	assert_true(_bounce_body.size() >= 1, "the wall bounced the bullet")
 	assert_eq(v.bullet_get_bounce_count(0), 2147483647, "the count saturates, never wraps")
+
+
+## The bounce mirror frame starts as the identity and reflects with the
+## bounce (split children inherit it). Read through the new debug readout.
+func test_the_bounce_frame_readout_starts_identity_and_reflects() -> void:
+	await _arena()
+	await _settle(factory)
+	var v: BulletVolley2D = factory.spawn_volley(_bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4]))
+	var before: Dictionary = v.debug_get_bounce_frame(0)
+	assert_true(bool(before.get("valid", false)), "valid")
+	assert_false(bool(before.get("active", true)), "no frame before a bounce")
+	assert_eq(before.get("x_axis"), Vector2(1, 0), "identity x axis")
+	assert_eq(before.get("y_axis"), Vector2(0, 1), "identity y axis")
+	for i in 120:
+		await physics()
+		if _bounce_body.size() >= 1:
+			break
+	assert_true(_bounce_body.size() >= 1, "the wall bounced the bullet")
+	var after: Dictionary = v.debug_get_bounce_frame(0)
+	assert_true(bool(after.get("active", false)), "the frame is live after a bounce")
+	assert_almost_eq((after.get("x_axis") as Vector2).x, -1.0, 0.05, "the x axis mirrored off the wall normal")
+	assert_false(bool(v.debug_get_bounce_frame(99).get("valid", true)), "OOB invalid")

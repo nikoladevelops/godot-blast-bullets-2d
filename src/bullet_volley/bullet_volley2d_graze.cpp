@@ -483,4 +483,33 @@ Dictionary BulletVolley2D::debug_get_graze_info() const {
 	return d;
 }
 
+Dictionary BulletVolley2D::debug_get_graze_visit(int bullet_index, int zone_index) const {
+	Dictionary d;
+	d["valid"] = false;
+	d["inside"] = false;
+	d["rings"] = 0;
+	d["deepest"] = 0;
+	d["visit_fired"] = false;
+	d["anchor_slot"] = -1;
+	d["has_visit"] = false;
+	if (bullet_index < 0 || bullet_index >= amount_bullets || zone_index < 0 || zone_index >= graze_zone_slots) {
+		return d;
+	}
+	const size_t at = (size_t)bullet_index * (size_t)graze_zone_slots + (size_t)zone_index;
+	if (at >= graze_state.size() || at >= graze_anchor.size()) {
+		return d;
+	}
+	const uint16_t state = graze_state[at];
+	d["valid"] = true;
+	d["inside"] = (state & GRAZE_INSIDE) != 0;
+	d["rings"] = (int)(state & GRAZE_RINGS_MASK);
+	d["deepest"] = (int)((state & GRAZE_DEEPEST_MASK) >> GRAZE_DEEPEST_SHIFT);
+	d["visit_fired"] = (state & GRAZE_VISIT_FIRED) != 0;
+	d["anchor_slot"] = (int64_t)graze_anchor[at];
+	// An exit clears INSIDE/DEEPEST/VISIT_FIRED and leaves the stale anchor:
+	// only an open visit names a target.
+	d["has_visit"] = (state & GRAZE_INSIDE) != 0;
+	return d;
+}
+
 } // namespace BlastBullets2D

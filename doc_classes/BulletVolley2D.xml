@@ -1467,6 +1467,13 @@
 				Attachment slot introspection: has_attachment, pooling_id, owner_match. owner_match verifies the attachment's owner ids point back at this volley + index (stale ownership after reuse fails here). No range variant exists; loop bullet indices instead.
 			</description>
 		</method>
+		<method name="debug_get_bounce_frame" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Debug/test readout of one bullet's bounce mirror frame: [code]{valid, active, x_axis, y_axis}[/code]. The axes are the identity until the bullet bounces; a bounce reflects them, and split children inherit the frame (the inherited drift and the direction curves ride through it).
+			</description>
+		</method>
 		<method name="debug_get_bounce_info" qualifiers="const">
 			<return type="Dictionary" />
 			<param index="0" name="bullet_index" type="int" />
@@ -1515,6 +1522,12 @@
 				Debug/test helper: a read-only snapshot of every clock the volley advances (curve clock, lifetime, homing interval, sprite animation, fade, custom timers, bounce cooldowns).
 			</description>
 		</method>
+		<method name="debug_get_collision_queue" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Debug/test readout of the collision records the physics flush queued and the next tick has not drained yet: [code]{size, rows}[/code]. Each row holds [code]bullet[/code], [code]target_id[/code], [code]type[/code] (0 = area, 1 = body), [code]epoch[/code] (the bullet's collision epoch when it was queued), [code]target_velocity_valid[/code] and [code]target_position_valid[/code]. Usually empty mid-tick; read it between physics frames.
+			</description>
+		</method>
 		<method name="debug_get_curves_info" qualifiers="const">
 			<return type="Dictionary" />
 			<param index="0" name="bullet_index" type="int" />
@@ -1541,6 +1554,21 @@
 				Graze introspection: armed, zone_slots, state_bytes, active_this_tick (some zone had a live target), pending_events (queued for the next dispatch), dispatched_events, bullet_radius (added when a zone counts bullet size), generation, target_group (the group of a factory volley), spawner_targets (true while its spawner's settings find the targets), targets (how many it tested last tick).
 			</description>
 		</method>
+		<method name="debug_get_graze_visit" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="zone_index" type="int" />
+			<description>
+				Debug/test readout of one bullet x zone graze visit: [code]{valid, inside, rings, deepest, visit_fired, anchor_slot, has_visit}[/code]. [code]anchor_slot[/code] is the stable slot of the target the visit belongs to (meaningful while [code]has_visit[/code]); an exit clears the visit bits but leaves the stale anchor.
+			</description>
+		</method>
+		<method name="debug_get_homing_queue_info" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="bullet_index" type="int" default="-1" />
+			<description>
+				Debug/test readout of a homing queue's ring internals: [code]{valid, queue, bullet_index, size, capacity, empty, head, front_type, front_position}[/code]. Pass a bullet index for its own queue or -1 for the shared deque. [code]capacity[/code] is 0 until the first push (the ring allocates nothing while empty) and doubles as it fills; [code]head[/code] moves with front pops.
+			</description>
+		</method>
 		<method name="debug_get_life_state" qualifiers="const">
 			<return type="String" />
 			<description>
@@ -1559,6 +1587,12 @@
 			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Movement-pattern state for one bullet: {valid, src, face, repeat, distance, length, finished, has_shared_fallback}, where src is "per", "shared" or "none". Finished shared parks at length; finished per-bullet clears back to src "none". Never mutates; invalid index returns valid=false.
+			</description>
+		</method>
+		<method name="debug_get_paused_overlaps" qualifiers="const">
+			<return type="Array" />
+			<description>
+				Debug/test readout of the overlaps a paused factory parked: one row per logical overlap with [code]bullet[/code], [code]target_id[/code], [code]type[/code] (0 = area, 1 = body), [code]epoch[/code] and [code]pairs[/code] (how many shape pairs of that target currently overlap). The replay empties it on resume.
 			</description>
 		</method>
 		<method name="debug_get_previous_origin" qualifiers="const">

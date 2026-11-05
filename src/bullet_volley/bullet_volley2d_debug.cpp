@@ -298,6 +298,88 @@ Dictionary BulletVolley2D::debug_get_active_set_stats() const {
 	return d;
 }
 
+Dictionary BulletVolley2D::debug_get_collision_queue() const {
+	Dictionary d;
+	Array rows;
+	rows.resize((int64_t)all_collided_bullets.size());
+	for (int64_t i = 0; i < (int64_t)all_collided_bullets.size(); ++i) {
+		const BulletCollisionData2D &record = all_collided_bullets[(size_t)i];
+		Dictionary row;
+		row["bullet"] = record.bullet_index;
+		row["target_id"] = (int64_t)record.collided_instance_id;
+		row["type"] = (int)record.collision_type;
+		row["epoch"] = (int64_t)record.queue_bullet_epoch;
+		row["target_velocity_valid"] = record.queue_target_velocity_valid;
+		row["target_position_valid"] = record.queue_target_position_valid;
+		rows[i] = row;
+	}
+	d["size"] = (int)all_collided_bullets.size();
+	d["rows"] = rows;
+	return d;
+}
+
+Array BulletVolley2D::debug_get_paused_overlaps() const {
+	Array rows;
+	for (const PausedOverlaps2D::Entry &entry : paused_overlaps.debug_rows()) {
+		Dictionary row;
+		row["bullet"] = entry.bullet_index;
+		row["target_id"] = entry.target_id;
+		row["type"] = entry.type;
+		row["epoch"] = (int64_t)entry.epoch;
+		row["pairs"] = entry.pairs;
+		rows.append(row);
+	}
+	return rows;
+}
+
+Dictionary BulletVolley2D::debug_get_bounce_frame(int bullet_index) const {
+	Dictionary d;
+	d["valid"] = bullet_index >= 0 && bullet_index < amount_bullets;
+	d["active"] = bounce_frames_active;
+	Vector2 x_axis(1, 0);
+	Vector2 y_axis(0, 1);
+	if (bullet_index >= 0 && bullet_index < (int)all_bounce_frame.size()) {
+		x_axis = all_bounce_frame[bullet_index].x_axis;
+		y_axis = all_bounce_frame[bullet_index].y_axis;
+	}
+	d["x_axis"] = x_axis;
+	d["y_axis"] = y_axis;
+	return d;
+}
+
+Dictionary BulletVolley2D::debug_get_homing_queue_info(int bullet_index) const {
+	Dictionary d;
+	const HomingTargetDeque *queue = nullptr;
+	if (bullet_index < 0) {
+		queue = &shared_homing_deque;
+		d["queue"] = String("shared");
+	} else if (bullet_index < amount_bullets && bullet_index < (int)all_bullet_homing_targets.size()) {
+		queue = &all_bullet_homing_targets[bullet_index];
+		d["queue"] = String("bullet");
+	} else {
+		d["queue"] = String("none");
+	}
+	d["valid"] = queue != nullptr;
+	d["bullet_index"] = bullet_index;
+	if (queue == nullptr) {
+		d["size"] = 0;
+		d["capacity"] = 0;
+		d["empty"] = true;
+		d["head"] = 0;
+		d["front_type"] = 0;
+		d["front_position"] = Vector2();
+		return d;
+	}
+	const bool empty = queue->empty();
+	d["size"] = queue->get_homing_targets_amount();
+	d["capacity"] = queue->debug_capacity();
+	d["empty"] = empty;
+	d["head"] = queue->debug_head();
+	d["front_type"] = empty ? 0 : queue->debug_front_type();
+	d["front_position"] = empty ? Vector2() : queue->get_cached_front_target_global_position();
+	return d;
+}
+
 Dictionary BulletVolley2D::debug_get_attachment_info(int bullet_index) const {
 	Dictionary d;
 	d["has_attachment"] = false;

@@ -6,6 +6,7 @@ extends BlastTest
 ## survive into a pooled volley's next life.
 
 var hits := 0
+var arena_wall: StaticBody2D
 
 
 func _on_body(_b: Object, _v: BulletVolley2D, _i: int) -> void:
@@ -26,7 +27,7 @@ func before_each() -> void:
 	await super()
 	hits = 0
 	factory.body_entered.connect(_on_body)
-	make_wall(Vector2(0, 0), Vector2(40, 40))
+	arena_wall = make_wall(Vector2(0, 0), Vector2(40, 40))
 	await physics()
 
 
@@ -145,3 +146,52 @@ func test_a_partial_multishape_exit_keeps_the_parked_overlap() -> void:
 	await physics(8)
 	assert_eq(hits, 1, "the overlap that still exists replays exactly once")
 	assert_eq(v.get_bullet_collision_count(0), 1, "and counts it")
+
+
+## The queue readout sees what the flush queued, one frame before the drain:
+## the record names the bullet, the target, its kind (0 area / 1 body) and the
+## queue-time collision epoch (0 is a valid epoch, so only the row matters).
+func test_the_collision_queue_readout_exposes_the_queued_record() -> void:
+	var v: BulletVolley2D = factory.spawn_volley(_data())
+	await physics(2)
+	v.teleport_bullet(0, Vector2(0, 0)) # into the arena wall
+	var queued: Dictionary = {}
+	for i in 6:
+		await physics(1)
+		var q: Dictionary = v.debug_get_collision_queue()
+		if int(q.get("size", 0)) > 0:
+			queued = q
+			break
+	assert_eq(int(queued.get("size", 0)), 1, "one record queued before the drain")
+	var rows: Array = queued.get("rows", [])
+	assert_eq(rows.size(), 1, "one row")
+	if rows.size() == 1:
+		assert_eq(int(rows[0]["bullet"]), 0, "bullet index")
+		assert_eq(int(rows[0]["target_id"]), arena_wall.get_instance_id(), "target id")
+		assert_eq(int(rows[0]["type"]), 1, "a body (0 = area, 1 = body)")
+		assert_gte(int(rows[0]["epoch"]), 0, "the queue-time epoch is readable")
+	await physics(2)
+	assert_eq(hits, 1, "the queued record drained into exactly one hit")
+	assert_eq(int(v.debug_get_collision_queue().get("size", -1)), 0, "the queue is empty after the drain")
+
+
+## A paused factory parks overlaps instead of queueing them; the readout shows
+## the parked set (with its shape-pair count) and the replay empties it.
+func test_the_paused_overlaps_readout_matches_the_parked_set() -> void:
+	var v: BulletVolley2D = factory.spawn_volley(_data())
+	await physics(2)
+	_pause()
+	v.teleport_bullet(0, Vector2(0, 0))
+	await physics(3)
+	var rows: Array = v.debug_get_paused_overlaps()
+	assert_eq(rows.size(), 1, "one parked overlap")
+	if rows.size() == 1:
+		assert_eq(int(rows[0]["bullet"]), 0, "bullet index")
+		assert_eq(int(rows[0]["target_id"]), arena_wall.get_instance_id(), "target id")
+		assert_eq(int(rows[0]["type"]), 1, "a body")
+		assert_eq(int(rows[0]["pairs"]), 1, "one shape pair")
+	assert_eq(int(v.debug_get_collision_queue().get("size", -1)), 0, "a parked overlap is not queued")
+	_resume()
+	await physics(3)
+	assert_eq(v.debug_get_paused_overlaps().size(), 0, "the replay empties the parked set")
+	assert_eq(hits, 1, "and reports the overlap once")

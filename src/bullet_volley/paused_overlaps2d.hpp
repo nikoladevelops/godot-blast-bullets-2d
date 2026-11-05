@@ -25,6 +25,8 @@ struct PausedOverlaps2D {
 
 	bool empty() const { return entries.empty(); }
 	size_t size() const { return entries.size(); }
+	// Read-only rows for debug_get_paused_overlaps (no mutation, no user code).
+	const std::vector<Entry> &debug_rows() const { return entries; }
 
 	bool contains(int bullet_index, int64_t target_id, int type) const {
 		return index.find(Key{ bullet_index, target_id, type }) != index.end();
