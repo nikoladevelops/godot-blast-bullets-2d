@@ -177,7 +177,7 @@ void BulletVolley2D::area_entered_func(PhysicsServer2D::AreaBodyStatus status, R
 	}
 	// Paused factory stops draining (no _physics_process) but the physics
 	// server keeps firing: park (deduplicated, no cap) instead of queueing.
-	if (bullet_factory != nullptr && bullet_factory->is_bullet_processing_paused()) {
+	if (bullet_factory != nullptr && factory_alive() && bullet_factory->is_bullet_processing_paused()) {
 		park_paused_overlap(status, entered_instance_id, bullet_shape_index, CollisionType::AREA);
 		return;
 	}
@@ -211,6 +211,9 @@ void BulletVolley2D::area_entered_func(PhysicsServer2D::AreaBodyStatus status, R
 				return; // the getter disabled, cleared or pooled the bullet
 			}
 			read_queued_target_pose(entered_instance_id, record.queue_target_position, record.queue_target_position_valid);
+			if (!all_bullets_enabled_set.contains(bullet_shape_index) || collision_epoch_for_bullet(bullet_shape_index) != record.queue_bullet_epoch) {
+				return; // the pose getter disabled, cleared or pooled the bullet: never mark this record
+			}
 		}
 		// Marked only with the record it guards: a target getter above may have
 		// taken the bullet out, and a key without a record would swallow the
@@ -257,6 +260,9 @@ void BulletVolley2D::body_entered_func(PhysicsServer2D::AreaBodyStatus status, R
 				return; // the getter disabled, cleared or pooled the bullet
 			}
 			read_queued_target_pose(entered_instance_id, record.queue_target_position, record.queue_target_position_valid);
+			if (!all_bullets_enabled_set.contains(bullet_shape_index) || collision_epoch_for_bullet(bullet_shape_index) != record.queue_bullet_epoch) {
+				return; // the pose getter disabled, cleared or pooled the bullet: never mark this record
+			}
 		}
 		if (collision_dedup_by_object) {
 			mark_collision_queued(bullet_shape_index, entered_instance_id); // with its record (see the area path)
@@ -476,7 +482,9 @@ void BulletVolley2D::set_all_physics_shapes_enabled_for_area(bool enable) {
 		request_physics_sync();
 		return;
 	}
-	for (int i = 0; i < amount_bullets; ++i) {
+	for (int i = 0; i < amount_bullets && i < area_shape_count; ++i) {
+		// Same clamp as apply_physics_sync: the server only holds
+		// area_shape_count shapes; a desynced amount must not write past them.
 		physics_server->area_set_shape_disabled(area, i, !enable);
 	}
 }
@@ -485,6 +493,9 @@ void BulletVolley2D::write_shape_disabled(int bullet_index, bool disabled) {
 	if (PhysicsFlush2D::flushing()) {
 		request_physics_sync();
 		return;
+	}
+	if (bullet_index >= area_shape_count) {
+		return; // defensive: never write a shape index the server does not hold
 	}
 	physics_server->area_set_shape_disabled(area, bullet_index, disabled);
 }
@@ -803,7 +814,7 @@ void BulletVolley2D::drain_collisions() {
 			collision_scratch.clear();
 			return;
 		}
-		if (bullet_factory != nullptr && bullet_factory->is_bullet_processing_paused()) {
+		if (bullet_factory != nullptr && factory_alive() && bullet_factory->is_bullet_processing_paused()) {
 			// A handler paused the factory: the rest of this window waits.
 			for (size_t r = k + 1; r < collision_scratch.size(); ++r) {
 				park_collision_record(collision_scratch[r]);
@@ -840,7 +851,7 @@ void BulletVolley2D::handle_bullet_collision(const BulletCollisionData2D &record
 	if (hit_target == nullptr) {
 		return;
 	}
-	if (bullet_factory != nullptr) {
+	if (bullet_factory != nullptr && factory_alive()) {
 		++bullet_factory->stats_collision_records_total;
 	}
 	// A pickup that collects by touch: whatever it touched (an Area2D, a

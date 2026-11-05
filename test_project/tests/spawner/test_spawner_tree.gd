@@ -320,3 +320,21 @@ func test_a_moved_spawner_finds_its_new_worlds_factory() -> void:
 	sp.get_parent().remove_child(sp)
 	add(sp)
 	assert_eq(sp.get_bullet_factory(), factory, "back in the main world")
+
+
+## A game often subclasses its own base spawner script. The plugin must see
+## `_process`/`_physics_process` inherited from a base GDScript too, or its
+## set_process(false) silently stops the game's own logic while the plugin
+## keeps ticking.
+func test_a_script_chain_inheriting_process_keeps_it_running() -> void:
+	var sp := BulletSpawner2D.new()
+	sp.set_script(load("res://tests/scenes/child_spawner_process.gd"))
+	sp.spawn_data = H.make_volley_data(1, 50.0, 2.0)
+	sp.set_shooting_enabled(false)
+	sp.spin_enabled = true # keeps the plugin loop alive
+	sp.spin_speed_deg_per_sec = 90.0
+	add(sp)
+	await idle(20)
+	assert_gt(int(sp.processed), 0, "the inherited _process still runs")
+	assert_gt(sp.debug_get_run_frame_count(), 0, "and the plugin still ticks")
+	expect_no_errors()

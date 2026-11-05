@@ -424,7 +424,7 @@ bool BulletVolley2D::dispatch_graze_events() {
 				}
 			}
 		}
-		if (bullet_factory != nullptr && bullet_factory->has_connections(signal_name)) {
+		if (bullet_factory != nullptr && factory_alive() && bullet_factory->has_connections(signal_name)) {
 			handled = true;
 			note_user_code();
 			emit_on2d(bullet_factory, signal_name, target, this, ev.bullet_index, zone, (int)ev.ring);
@@ -436,7 +436,7 @@ bool BulletVolley2D::dispatch_graze_events() {
 				return true;
 			}
 		}
-		if (bullet_factory != nullptr) {
+		if (bullet_factory != nullptr && factory_alive()) {
 			++bullet_factory->stats_graze_events_total;
 		}
 		++graze_events_dispatched;

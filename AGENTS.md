@@ -1111,6 +1111,9 @@ replayed once on resume.
 | Every GDScript "how many instances" entry is bounded by max_bullets_per_pattern (populate bullets/attachments/lasers/pickups, generate_random_data, the limit setter's 1e6 ceiling); play_sound rejects a non-finite position | `test_factory_input_limits`, `test_data_setter_contract`, `test_patterns_bullet_limit` |
 | VolleyPoolKey2D takes shape_type as an int64 and range-checks before storing (engine enums are unfixed: cast-before-check is UB) | `test_pool_key_validity` |
 | The per-bullet and tick sparse sets are validated (dense/sparse bijection) by debug_check_invariants / debug_assert_no_dangling after every test; `debug_get_active_set_stats().consistent` exposes the same check | all suites, `test_volley_readouts` |
+| A script chain inheriting `_process`/`_physics_process` from a base GDScript keeps them: the engine's script method list includes inherited script methods | `test_spawner_tree` |
+| A GDScript `_draw`/`_get_configuration_warnings` on a spawner replaces the native virtual (the plugin gizmo draw and editor warnings): plugin work stays in `_notification`, but these two virtuals remain a documented limitation | documented, not tested |
+| Freeing a volley (or any ancestor) from a CHILD's signal is Godot's own boundary: the engine destroys the parent's children before the plugin's PREDELETE refusal can cancel | documented, never tested (§14 above) |
 | disable_bullet freezes; opt-in reset; parked vs pooled; pooled wake refused | `test_volley_freeze_contract` |
 | Every clock restarts per life, holds while parked/paused, finite under hitches | `test_volley_clock_audit` |
 | Custom data per bullet and shared, readable in every callback, never leaks through the pool | `test_volley_custom_data_contract` |

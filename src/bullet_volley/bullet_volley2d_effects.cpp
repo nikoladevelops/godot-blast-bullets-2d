@@ -307,10 +307,14 @@ void BulletVolley2D::fx_fire_oneshot(int trigger, int bullet_index, const Transf
 		if (layer->trigger != trigger) {
 			continue;
 		}
+		const uint64_t self_id = get_instance_id();
 		bullet_factory->fx_fire(get_instance_id(), li, at);
 		fired = true;
+		if (!survived_user_code(self_id)) {
+			return; // fx_fire adds shard nodes (user code): the factory or volley may be gone
+		}
 	}
-	if (fired && bullet_factory->debug_effect_log_enabled) {
+	if (fired && factory_alive() && bullet_factory->debug_effect_log_enabled) {
 		bullet_factory->debug_log_effect(trigger, get_instance_id(), get_life_id(), bullet_index, at.get_origin());
 	}
 }

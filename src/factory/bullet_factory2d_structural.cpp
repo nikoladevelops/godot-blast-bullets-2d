@@ -673,8 +673,8 @@ void BulletFactory2D::_flush_structural_calls() {
 	// is read after a call before the liveness check.
 	const LifeWatch watch = watch_life();
 	for (const std::function<void()> &call : calls) {
-		if (watch.died() || is_tearing_down) {
-			return;
+		if (watch.died() || is_tearing_down || is_queued_for_deletion()) {
+			return; // a queued factory must not run deferred work on a doomed subtree
 		}
 		call();
 	}

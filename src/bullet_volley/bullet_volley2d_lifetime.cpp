@@ -229,7 +229,7 @@ void BulletVolley2D::expire_own_life_bullets() {
 	if (expiring_count == 0) {
 		return;
 	}
-	if (bullet_factory != nullptr) {
+	if (bullet_factory != nullptr && factory_alive()) {
 		bullet_factory->stats_expired_bullets_total += (uint64_t)expiring_count;
 	}
 	const std::vector<uint64_t> *epochs = nullptr;
