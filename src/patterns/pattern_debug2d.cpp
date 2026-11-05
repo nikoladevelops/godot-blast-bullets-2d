@@ -3,6 +3,8 @@
 
 #include "patterns/patterns_internal.hpp"
 
+#include <cstdint>
+
 using namespace godot;
 
 namespace BlastBullets2D {
@@ -26,8 +28,23 @@ static int debug_param_int(const Dictionary &p, const StringName &k, int fallbac
 		return fallback;
 	}
 	const Variant v = p[k];
-	if (v.get_type() == Variant::FLOAT || v.get_type() == Variant::INT) {
-		return (int)v;
+	if (v.get_type() == Variant::FLOAT) {
+		// A FLOAT is script input: (int) of 1e30/INF/NaN is undefined behavior
+		// (x86 yields INT_MIN, which reached the generators as a bogus knob).
+		// Only a finite value inside the int range converts; anything else
+		// reads as a missing key, like debug_param_real.
+		const double d = (double)v;
+		if (!Math::is_finite(d) || d < (double)INT32_MIN || d > (double)INT32_MAX) {
+			return fallback;
+		}
+		return (int)d;
+	}
+	if (v.get_type() == Variant::INT) {
+		const int64_t i = (int64_t)v;
+		if (i < (int64_t)INT32_MIN || i > (int64_t)INT32_MAX) {
+			return fallback;
+		}
+		return (int)i;
 	}
 	if (v.get_type() == Variant::BOOL) {
 		return (bool)v ? 1 : 0;
@@ -44,7 +61,11 @@ static bool debug_param_bool(const Dictionary &p, const StringName &k, bool fall
 		return (bool)v;
 	}
 	if (v.get_type() == Variant::FLOAT || v.get_type() == Variant::INT) {
-		return (int)v != 0;
+		const double d = (double)v;
+		if (!Math::is_finite(d)) {
+			return fallback; // a NaN/INF cast is UB: read it as missing
+		}
+		return d != 0.0;
 	}
 	return fallback;
 }

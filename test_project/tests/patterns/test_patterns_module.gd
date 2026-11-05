@@ -118,3 +118,32 @@ func test_polyline_even_closed_ring_never_doubles_the_seam() -> void:
 	for i in out.size():
 		for j in range(i + 1, out.size()):
 			assert_gt((out[i] as Transform2D).origin.distance_to((out[j] as Transform2D).origin), 0.5, "slots %d and %d distinct" % [i, j])
+
+
+## A debug inspector's params Dictionary is script input: a FLOAT that cannot
+## be a representable int (1e30, INF, NaN, past INT32) must fall back like a
+## missing key. The old cast was UB (x86: INT_MIN - the flower rejected its
+## petals and the ring silently reversed its outline).
+func test_debug_inspector_params_never_cast_unrepresentable_numbers() -> void:
+	var flower_plain: Dictionary = BulletPatterns2D.debug_describe_outline(BulletPatterns2D.DEBUG_SHAPE_FLOWER, 12, {})
+	var ring_plain: Dictionary = BulletPatterns2D.debug_describe_outline(BulletPatterns2D.DEBUG_SHAPE_RING, 12, {})
+	assert_true(bool(flower_plain.get("ok", false)), "the flower baseline describes")
+	assert_true(bool(ring_plain.get("ok", false)), "the ring baseline describes")
+	for bad in [1e30, -1e30, 2147483648.0, -2147483649.0, INF, -INF, NAN]:
+		var petals: Dictionary = BulletPatterns2D.debug_describe_outline(BulletPatterns2D.DEBUG_SHAPE_FLOWER, 12, {"petals": bad})
+		assert_true(bool(petals.get("ok", false)), "petals %s falls back (no generator error)" % bad)
+		assert_eq(petals.get("points"), flower_plain.get("points"), "petals %s uses the default" % bad)
+	# A bool knob reads any FINITE number as truthiness (no int conversion
+	# needed); a non-finite one would be UB to cast, so it falls back.
+	for bad in [INF, -INF, NAN]:
+		var reversed: Dictionary = BulletPatterns2D.debug_describe_outline(BulletPatterns2D.DEBUG_SHAPE_RING, 12, {"outline_reverse": bad})
+		assert_true(bool(reversed.get("ok", false)), "outline_reverse %s falls back" % bad)
+		assert_eq(reversed.get("points"), ring_plain.get("points"), "outline_reverse %s uses the default" % bad)
+	var ring_reversed: Dictionary = BulletPatterns2D.debug_describe_outline(BulletPatterns2D.DEBUG_SHAPE_RING, 12, {"outline_reverse": true})
+	for truthy in [1e30, -1e30, 2147483648.0, 5.0, -1.0]:
+		var reversed: Dictionary = BulletPatterns2D.debug_describe_outline(BulletPatterns2D.DEBUG_SHAPE_RING, 12, {"outline_reverse": truthy})
+		assert_eq(reversed.get("points"), ring_reversed.get("points"), "a finite number %s is truthy" % truthy)
+	# A finite float that fits an int still converts: 5.0 selects 5 petals.
+	var as_float: Dictionary = BulletPatterns2D.debug_describe_outline(BulletPatterns2D.DEBUG_SHAPE_FLOWER, 12, {"petals": 5.0})
+	var as_int: Dictionary = BulletPatterns2D.debug_describe_outline(BulletPatterns2D.DEBUG_SHAPE_FLOWER, 12, {"petals": 5})
+	assert_eq(as_float.get("points"), as_int.get("points"), "a representable float still converts")
