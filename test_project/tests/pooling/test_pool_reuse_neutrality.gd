@@ -68,7 +68,10 @@ func _pattern_curve() -> Curve2D:
 
 
 ## Fields a fresh life must reproduce. Instance-specific values (generation,
-## ids) are left out on purpose.
+## ids) are left out on purpose. Beyond the feature state this covers the
+## REPORTED state a game reads back: every clock, the collision shape the area
+## uses, the flock readout, a trail layer's transform and the pool bookkeeping
+## fields of the volley info (amount / shape / colors / the two auto knobs).
 func _volley_state(v: BulletVolley2D) -> Dictionary:
 	var info: Dictionary = v.debug_get_volley_info()
 	var fx: Dictionary = v.debug_get_effect_layers_info()
@@ -91,6 +94,11 @@ func _volley_state(v: BulletVolley2D) -> Dictionary:
 		"material": [v.material, v.texture, v.z_index, v.light_mask, v.visibility_layer],
 		"groups": v.get_groups().filter(func(g): return not str(g).begins_with("_")),
 		"meta": v.get_meta_list(),
+		"clocks": v.debug_get_clocks(),
+		"shape_state": v.debug_get_shape_state(),
+		"flock_info": v.debug_get_bullet_flock_info(0),
+		"trail_transform": v.debug_get_trail_transform(0, 0),
+		"pool": [info.get("pool_amount"), info.get("pool_shape"), info.get("pool_colors"), info.get("auto_pool_volley"), info.get("auto_pool_attachments")],
 	}
 
 
@@ -524,3 +532,131 @@ func test_a_pooled_volley_keeps_no_collision_shape() -> void:
 	var reused: BulletVolley2D = factory.spawn_volley(next)
 	assert_eq(reused, v, "reused")
 	assert_same(reused.get_collision_shape(), other, "the next life reports its own shape")
+
+
+# ---- A fully mutated spawn data resource (every property) ----
+
+
+## A value every BulletVolleyData2D setter accepts and that differs from
+## `current` (the ClassDB recipe: bools flip, numbers move, vectors/colors get a
+## fixed other value, object properties instantiate the first able class of
+## their hint - so a FULLY mutated data still holds real resources).
+func _mutated_data_value(p: Dictionary, current: Variant) -> Variant:
+	match int(p.type):
+		TYPE_BOOL:
+			return not bool(current)
+		TYPE_INT:
+			return int(current) + 1
+		TYPE_FLOAT:
+			return 0.37 if not is_equal_approx(float(current), 0.37) else 0.21
+		TYPE_VECTOR2:
+			return Vector2(3, 4)
+		TYPE_COLOR:
+			return Color(0.5, 0.4, 0.3, 0.9)
+		TYPE_OBJECT:
+			var cls: String = String(p.hint_string).get_slice(",", 0)
+			if cls != "" and ClassDB.class_exists(cls) and ClassDB.can_instantiate(cls):
+				return ClassDB.instantiate(cls)
+	return null
+
+
+## The data properties the recipe cannot produce a value for (arrays and paths:
+## they need their own builders and a wrong length would change the key) and the
+## two it CAN produce but that are unusable by design (an empty SpriteFrames and
+## an empty PackedScene: neither can be read). They are asserted below.
+const DATA_SWEEP_SKIP := [
+	"transforms", "animation", "all_bullet_life_times", "bullet_colors",
+	"all_bullet_speed_data", "all_bullet_curves_data", "all_bullet_rotation_data",
+	"all_bullet_wobble_data", "all_bullet_gravity", "shared_movement_pattern_path",
+	"all_bullet_movement_pattern_paths", "all_bullet_movement_pattern_face_movement_directions",
+	"all_bullet_movement_pattern_repeats", "collision_shape", "all_bullets_custom_data",
+	"instance_shader_parameters", "resource_path", "resource_name", "resource_local_to_scene",
+]
+
+
+## Mutates every property of `data` the recipe can, and returns the names.
+func _mutate_data(data: BulletVolleyData2D) -> Array:
+	var mutated: Array = []
+	for p in data.get_property_list():
+		if (int(p.usage) & (PROPERTY_USAGE_STORAGE | PROPERTY_USAGE_EDITOR)) == 0:
+			continue
+		if String(p.name) in DATA_SWEEP_SKIP:
+			continue
+		var value: Variant = _mutated_data_value(p, data.get(p.name))
+		if value == null:
+			continue
+		data.set(p.name, value)
+		mutated.append(String(p.name))
+	return mutated
+
+
+## A data resource mutated in EVERY property (81 of them: every numeric knob,
+## every flag, every enum, five per-bullet resource arrays' shared twins, a
+## custom data Resource, a shared attachment scene, a material, a mesh, a
+## gradient) is spawned into the pool and reused: the reused volley reads
+## exactly like a COLD spawn of the same data, the two unusable resources it
+## carries (an empty SpriteFrames, an empty PackedScene) report once, and the
+## resources of the previous life are released by the pool (weakref proof).
+func test_a_fully_mutated_data_spawns_the_same_pooled_as_cold() -> void:
+	var data := _sweep_plain()
+	var mutated := _mutate_data(data)
+	assert_gt(mutated.size(), 70, "the sweep really mutated the data (%d properties)" % mutated.size())
+	assert_true("sprite_frames" in mutated and "shared_bullet_attachment" in mutated, "including the two unusable resources")
+	var v: BulletVolley2D = factory.spawn_volley(data)
+	assert_not_null(v, "the mutated data still spawns")
+	expect_error_sequence([
+		"BulletVolley2D: sprite_frames has no animation with frames.",
+		"BulletVolleyData2D: shared_bullet_attachment is an empty PackedScene (nothing to instantiate), the bullets spawn without attachments.",
+	])
+	assert_eq(v.get_is_life_time_infinite(), data.is_life_time_infinite, "the mutated lifetime mode the volley runs on")
+	assert_eq(v.get_collision_mask(), data.collision_mask, "and the mutated mask the one it collides with")
+	assert_eq(Color(v.get_self_modulate(), 1.0), Color(data.self_modulate, 1.0), "the mutated tint (the alpha is the fade-in's)")
+	assert_same(v.get_shared_bullets_custom_data(), data.shared_bullets_custom_data, "and the mutated shared custom data")
+	# Resources armed at RUNTIME only (nothing else holds them): the pool must
+	# release every one of them.
+	var material := CanvasItemMaterial.new()
+	v.material = material
+	var sound := H.make_sound(BulletSoundData2D.SOUND_ON_HIT)
+	v.sound_set_effects([sound], &"listeners")
+	var chain := BulletSplitData2D.new()
+	chain.stages = [BulletSplitStage2D.new()]
+	v.split_set_data(chain, data)
+	var zone := H.make_graze_zone([200.0])
+	v.graze_set_zones([zone], &"graze_targets")
+	var scene := make_probe_scene()
+	v.bullet_set_attachment(0, scene, Vector2.ZERO, true)
+	# The attachment scene is not watched: the factory remembers the scenes it
+	# validated for its error wording (see test_pool_attachments.gd), so its
+	# weakref would outlive the volley for a reason that is not the pool.
+	var refs := {"material": weakref(material), "sound": weakref(sound), "chain": weakref(chain), "zone": weakref(zone)}
+	material = null
+	sound = null
+	chain = null
+	zone = null
+	scene = null
+	for k in refs:
+		assert_not_null((refs[k] as WeakRef).get_ref(), "the live life holds %s" % k)
+	var attached: int = int(factory.debug_get_attachments_pool_amount())
+	for i in v.get_amount_bullets():
+		v.disable_bullet(i)
+	await idle(1)
+	assert_true(v.is_pooled(), "expired into the pool")
+	assert_eq(int(factory.debug_get_attachments_pool_amount()), attached + 1, "the life's attachment returned to the attachment pool")
+	for k in refs:
+		assert_null((refs[k] as WeakRef).get_ref(), "the pool released %s" % k)
+
+	var reused: BulletVolley2D = factory.spawn_volley(data)
+	assert_same(reused, v, "the pooled instance is reused")
+	var cold: BulletVolley2D = factory.spawn_volley(data)
+	assert_ne(cold, reused, "the second spawn allocates a fresh volley")
+	expect_no_errors("the unusable resources report once per data resource, never per life")
+	assert_eq(_diff(_volley_state(reused), _volley_state(cold)), {}, "volley-wide readouts match a cold spawn of the mutated data")
+	for i in SWEEP_N:
+		assert_eq(_bullet_state(reused, i), _bullet_state(cold, i), "bullet %d state matches the cold spawn" % i)
+		assert_eq(reused.get_bullet_transform(i), cold.get_bullet_transform(i), "bullet %d starts at the cold pose" % i)
+		assert_eq(reused.get_bullet_velocity(i), cold.get_bullet_velocity(i), "bullet %d starts with the cold velocity" % i)
+	assert_eq(reused.get_life_time_left(), cold.get_life_time_left(), "the reused life runs the mutated lifetime like a cold one")
+	assert_eq(reused.get_is_life_time_infinite(), data.is_life_time_infinite, "and the mutated lifetime mode again")
+	assert_same(reused.get_shared_bullets_custom_data(), data.shared_bullets_custom_data, "and the mutated shared custom data again")
+	for i in SWEEP_N:
+		assert_false(reused.debug_get_attachment_info(i).get("has_attachment", false), "no attachment of the previous life survives")

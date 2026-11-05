@@ -122,6 +122,53 @@ func test_shoot_once_deferred_fires_once_after_the_frame() -> void:
 	outside.free()
 
 
+## shoot_once_deferred works from anywhere a game runs its logic: from inside a
+## physics callback (where structural factory calls are refused) and from a
+## physics-frame resume. Each queued call fires exactly ONE volley on the next
+## frame and reports no re-entrancy error (a nested shoot_once inside a spawner
+## signal would).
+func test_shoot_once_deferred_from_a_physics_callback_fires_exactly_once() -> void:
+	var sp := _spawner()
+	var queued: Array = []
+	factory.body_entered.connect(func(_b, _v, _i):
+		if queued.is_empty():
+			queued.append(sp.shoot_once_deferred()))
+	make_wall(Vector2(60, 0))
+	await physics()
+	factory.spawn_volley(_hit_data())
+	for i in 90:
+		await physics()
+		if not queued.is_empty():
+			break
+	assert_eq(queued, [true], "queued from inside the hit handler")
+	await idle(2)
+	assert_eq(sp.get_volleys_fired(), 1, "exactly one volley for the queued call")
+	assert_signal_emit_count(sp, "volley_fired", 1, "exactly one volley_fired")
+	await idle(2)
+	assert_eq(sp.get_volleys_fired(), 1, "and it never fires a second time")
+	expect_no_errors("no re-entrancy error")
+	# From a physics-frame resume: the same contract.
+	await physics()
+	assert_true(sp.shoot_once_deferred(), "queued from inside a physics frame")
+	await idle(2)
+	assert_eq(sp.get_volleys_fired(), 2, "one more volley, exactly one per queued call")
+	assert_signal_emit_count(sp, "volley_fired", 2, "one more volley_fired")
+	await idle(2)
+	assert_eq(sp.get_volleys_fired(), 2, "and still no second shot")
+	expect_no_errors("no re-entrancy error")
+
+
+## One bullet that flies into a wall and never dies (the callback tester).
+func _hit_data() -> BulletVolleyData2D:
+	var d := H.make_volley_data(1, 300.0, 30.0)
+	d.transforms = [Transform2D(0.0, Vector2.ZERO)]
+	d.monitorable = true
+	d.set_collision_mask_from_array([3])
+	d.collision_shape = H.make_circle_shape(6.0)
+	d.bullet_max_collision_count = 0
+	return d
+
+
 func test_nested_shoot_once_is_rejected() -> void:
 	var a := _spawner()
 	var b := _spawner()

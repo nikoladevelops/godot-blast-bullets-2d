@@ -255,3 +255,70 @@ func test_auto_pooling_toggles_between_parked_and_pooled() -> void:
 	assert_true(v.is_pooled(), "turning pooling on pools a parked volley at once")
 	v.set_is_auto_pooling_enabled(false)
 	assert_true(v.is_pooled(), "turning it off again never un-pools (the flag governs the next drain)")
+
+
+## Every way into a new life bumps the generation exactly once: three pool
+## reuses and an explicit `enable_volley` wake, while pooling itself never
+## bumps it, and waking a PARKED volley keeps the life (it never ended).
+func test_every_new_life_bumps_the_generation_once() -> void:
+	var v: BulletVolley2D = factory.spawn_volley(_data(1))
+	var life := v.get_life_id()
+	for cycle in 3:
+		v.disable_bullet(0)
+		assert_true(v.is_pooled(), "cycle %d pooled" % cycle)
+		assert_eq(v.get_life_id(), life, "pooling ends a life without starting one")
+		var reused: BulletVolley2D = factory.spawn_volley(_data(1))
+		assert_same(reused, v, "cycle %d reuses the instance" % cycle)
+		life += 1
+		assert_eq(reused.get_life_id(), life, "cycle %d is exactly one generation later" % cycle)
+		v = reused
+	v.disable_bullet(0)
+	await idle(1)
+	assert_true(v.is_pooled(), "pooled before the manual wake")
+	var data := _data(1)
+	assert_true(v.enable_volley(data, Vector2.ZERO, 0), "enable_volley starts a life on the pooled instance")
+	assert_eq(v.get_life_id(), life + 1, "the manual wake bumps the generation exactly once")
+	assert_eq(v.debug_get_life_state(), "active", "and the volley is active again")
+	var parked: BulletVolley2D = factory.spawn_volley(H.make_volley_data(2, 0.0, 30.0))
+	parked.set_is_auto_pooling_enabled(false)
+	parked.disable_bullet(0)
+	parked.disable_bullet(1)
+	assert_eq(parked.debug_get_life_state(), "parked", "the second volley parks")
+	var parked_life := parked.get_life_id()
+	parked.enable_bullet(0)
+	assert_eq(parked.get_life_id(), parked_life, "a parked wake keeps the same life")
+
+
+## The life state is ONE truth table: debug_get_life_state() agrees with
+## is_pooled / is_parked / is_volley_active / is_queued_for_deletion and with
+## the volley info's is_active / is_pooled flags in every state.
+func _state_row(v: BulletVolley2D) -> Array:
+	var info: Dictionary = v.debug_get_volley_info()
+	return [
+		v.debug_get_life_state(),
+		v.is_pooled(),
+		v.is_parked(),
+		v.is_volley_active(),
+		v.is_queued_for_deletion(),
+		bool(info.get("is_active", false)),
+		bool(info.get("is_pooled", false)),
+	]
+
+
+func test_the_life_state_truth_table_holds_across_the_whole_cycle() -> void:
+	var v: BulletVolley2D = factory.spawn_volley(_data(2))
+	assert_eq(_state_row(v), ["active", false, false, true, false, true, false], "at spawn")
+	v.disable_bullet(0)
+	assert_eq(_state_row(v), ["active", false, false, true, false, true, false], "one bullet left")
+	v.disable_bullet(1)
+	assert_eq(_state_row(v), ["pooled", true, false, false, false, false, true], "the last bullet out pools it")
+	var reused: BulletVolley2D = factory.spawn_volley(_data(2))
+	assert_same(reused, v, "the pool hands it back")
+	assert_eq(_state_row(v), ["active", false, false, true, false, true, false], "a reuse is active again")
+	v.set_is_auto_pooling_enabled(false)
+	v.disable_bullet(0)
+	v.disable_bullet(1)
+	assert_eq(_state_row(v), ["parked", false, true, false, false, false, false], "with pooling off it parks")
+	v.enable_bullet(1)
+	assert_eq(_state_row(v), ["active", false, false, true, false, true, false], "a single wake makes it active")
+	assert_eq(_state_row(v)[0], v.debug_get_life_state(), "the state string is the last word")

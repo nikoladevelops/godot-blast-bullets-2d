@@ -92,3 +92,39 @@ func test_reset_deferred_inside_handler_resets_on_the_next_idle_frame() -> void:
 	await idle(2)
 	assert_eq(factory.debug_get_active_volleys_amount(), 0, "reset ran on the idle frame")
 	expect_no_errors()
+
+
+## The pre-warm path has a deferred twin too: queued from a hit handler it
+## applies exactly ONCE (three entries, one bucket) and never again.
+func test_populate_pool_deferred_inside_handler_applies_once() -> void:
+	var data := H.make_volley_data(2, 0.0, 30.0)
+	data.collision_shape = H.make_circle_shape(6.0)
+	var key := VolleyPoolKey2D.make(2, PhysicsServer2D.SHAPE_CIRCLE)
+	calls.append(func(_v): factory.populate_bullets_pool_deferred(key, data, 3))
+	await _hit_once()
+	await idle(2)
+	assert_eq(factory.debug_get_bullets_pool_amount(), 3, "the queued populate ran exactly once")
+	var info: Dictionary = factory.debug_get_bullets_pool_info()
+	assert_eq(info.size(), 1, "one bucket")
+	assert_eq(int(info.values()[0]), 3, "holding the three requests entries")
+	await idle(2)
+	assert_eq(factory.debug_get_bullets_pool_amount(), 3, "and it never runs a second time")
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "books ok")
+	expect_no_errors()
+
+
+## The plain twin is refused inside the handler with the exact wording that
+## names the deferred twin, and the refused call queues nothing: the pool
+## stays empty after the idle frame too.
+func test_populate_pool_inside_handler_points_at_its_deferred_twin() -> void:
+	var data := H.make_volley_data(2, 0.0, 30.0)
+	data.collision_shape = H.make_circle_shape(6.0)
+	var key := VolleyPoolKey2D.make(2, PhysicsServer2D.SHAPE_CIRCLE)
+	calls.append(func(_v): factory.populate_bullets_pool(key, data, 3))
+	await _hit_once()
+	expect_error_sequence(["Use populate_bullets_pool_deferred() instead"])
+	assert_eq(factory.debug_get_bullets_pool_amount(), 0, "the refused call pooled nothing")
+	await idle(2)
+	assert_eq(factory.debug_get_bullets_pool_amount(), 0, "and queued nothing either")
+	assert_eq(factory.debug_get_bullets_pool_info(), {}, "no bucket appeared")
+	expect_no_errors()

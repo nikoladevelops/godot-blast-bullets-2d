@@ -312,3 +312,26 @@ func test_pool_deferred_twins_run_on_the_next_idle_frame() -> void:
 		"populate_attachments_pool_deferred: needs a scene and amount_attachments > 0. Nothing was queued.",
 		"free_attachments_pool_for_scene_deferred: attachment_scene is null. Nothing was queued.",
 	])
+
+
+## A reset_deferred() queued and then a queue_free() of the factory BEFORE the
+## flush: the queued call never runs (no reset_finished, nothing applied), it
+## reports no error and nothing crashes - the deferred queue dies with its
+## factory.
+func test_reset_deferred_before_a_queue_free_is_never_applied() -> void:
+	check_factory_after = false
+	factory.spawn_volley(_data(2))
+	await idle(1)
+	assert_eq(factory.debug_get_active_volleys_amount(), 1, "one volley lives")
+	var resets := 0
+	factory.reset_finished.connect(func(): resets += 1)
+	factory.reset_deferred()
+	factory.queue_free()
+	assert_true(factory.is_queued_for_deletion(), "the factory is going away")
+	expect_no_errors("queuing both reports nothing")
+	await idle(1)
+	assert_false(is_instance_valid(factory), "the factory is gone")
+	assert_eq(resets, 0, "the queued reset never ran")
+	await idle(3)
+	assert_eq(resets, 0, "and never runs later either")
+	expect_no_errors("nothing reported an error")

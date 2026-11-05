@@ -151,3 +151,162 @@ func test_every_plugin_multimesh_is_never_culled() -> void:
 		if not (mm as MultiMesh).custom_aabb.encloses(far):
 			bad += 1
 	assert_eq(bad, 0, "every multimesh's bounds cover +-1e9 px")
+
+
+## Pool buckets are read out as data: {key: count}, each key naming its
+## (amount_bullets, shape_type, use_bullet_colors) triple. Returns the count
+## of the bucket matching that triple (-1 when no such bucket exists).
+func _bucket_count(info: Dictionary, amount: int, shape_type: int, colors: bool) -> int:
+	for k in info:
+		var key: VolleyPoolKey2D = k
+		if key.amount_bullets == amount and key.shape_type == shape_type and key.use_bullet_colors == colors:
+			return int(info[k])
+	return -1
+
+
+func _pooled_data(n: int) -> BulletVolleyData2D:
+	var d := H.make_volley_data(n, 0.0, 30.0)
+	d.collision_shape = H.make_circle_shape(6.0)
+	return d
+
+
+## Pre-warming allocates exactly the requested bucket entries, and a spawn
+## pops one of THAT bucket: the reported pool holds one entry less of exactly
+## the key `debug_expected_pool_key(spawn_data)` names (amount 4, circle, no
+## per-bullet colors), and the popped volley reports the same key as its
+## bucket. This is the readout a game uses to verify its pre-warm actually
+## matches the shots it fires.
+func test_a_pre_warmed_bucket_pops_for_the_key_the_data_maps_to() -> void:
+	var d := _pooled_data(4)
+	var key: VolleyPoolKey2D = BulletFactory2D.debug_expected_pool_key(d)
+	factory.populate_bullets_pool(key, d, 2)
+	var info: Dictionary = factory.debug_get_bullets_pool_info()
+	assert_eq(info.size(), 1, "one bucket")
+	assert_eq(_bucket_count(info, 4, PhysicsServer2D.SHAPE_CIRCLE, false), 2, "pre-populated 2 entries")
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	assert_not_null(v, "spawned from the warm bucket")
+	info = factory.debug_get_bullets_pool_info()
+	assert_eq(info.size(), 1, "still one bucket")
+	assert_eq(_bucket_count(info, 4, PhysicsServer2D.SHAPE_CIRCLE, false), 1, "the spawn popped exactly one entry")
+	var bucket: VolleyPoolKey2D = factory.debug_get_pool_bucket(v)
+	assert_true(bucket.equals(key), "the live volley's bucket equals the data's expected key")
+	assert_eq(bucket.amount_bullets, 4, "amount 4")
+	assert_eq(bucket.shape_type, PhysicsServer2D.SHAPE_CIRCLE, "circle")
+	assert_false(bucket.use_bullet_colors, "no per-bullet colors")
+	assert_eq(factory.debug_get_pool_hit_stats().get("hits", 0), 1, "the spawn was a hit")
+
+
+## Two distinct keys (a plain circle bucket and a colored circle bucket), both
+## mapped from their own data: freeing one key drains exactly that bucket and
+## leaves the other entry alone. Every key equals the key its data maps to.
+func test_freeing_one_key_leaves_every_other_bucket_alone() -> void:
+	var plain := _pooled_data(2)
+	var colored := _pooled_data(2)
+	colored.use_bullet_colors = true
+	colored.bullet_colors = [Color.RED, Color.BLUE]
+	var plain_key: VolleyPoolKey2D = BulletFactory2D.debug_expected_pool_key(plain)
+	var colored_key: VolleyPoolKey2D = BulletFactory2D.debug_expected_pool_key(colored)
+	assert_false(plain_key.use_bullet_colors, "the plain data maps to a plain key")
+	assert_true(colored_key.use_bullet_colors, "the colored data maps to a colored key")
+	factory.populate_bullets_pool(plain_key, plain, 2)
+	factory.populate_bullets_pool(colored_key, colored, 1)
+	assert_eq(factory.debug_get_bullets_pool_amount(), 3, "three entries in two buckets")
+	factory.free_bullets_pool(plain_key)
+	await idle()
+	var info: Dictionary = factory.debug_get_bullets_pool_info()
+	assert_eq(info.size(), 1, "only the colored bucket is left")
+	assert_eq(_bucket_count(info, 2, PhysicsServer2D.SHAPE_CIRCLE, true), 1, "the colored bucket is untouched")
+	assert_eq(_bucket_count(info, 2, PhysicsServer2D.SHAPE_CIRCLE, false), -1, "the plain bucket is gone")
+	assert_eq(factory.debug_get_bullets_pool_amount(), 1, "one pooled volley left")
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "books ok")
+
+
+## free_bullets_pool() with no key is the whole-pool teardown: every bucket is
+## gone ({}) and the next spawn of any key is a MISS (nothing was silently
+## kept alive).
+func test_free_bullets_pool_without_a_key_empties_every_bucket() -> void:
+	var plain := _pooled_data(4)
+	var colored := _pooled_data(3)
+	colored.use_bullet_colors = true
+	colored.bullet_colors = [Color.RED, Color.GREEN, Color.BLUE]
+	factory.populate_bullets_pool(BulletFactory2D.debug_expected_pool_key(plain), plain, 2)
+	factory.populate_bullets_pool(BulletFactory2D.debug_expected_pool_key(colored), colored, 1)
+	assert_eq(factory.debug_get_bullets_pool_amount(), 3, "two buckets warmed")
+	factory.free_bullets_pool()
+	await idle()
+	assert_eq(factory.debug_get_bullets_pool_info(), {}, "every bucket drained")
+	assert_eq(factory.debug_get_bullets_pool_amount(), 0, "nothing pooled")
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "books ok")
+	factory.debug_reset_pool_stats()
+	factory.spawn_volley(plain)
+	assert_eq(factory.debug_get_pool_hit_stats().get("misses", 0), 1, "the next spawn of that key is a miss")
+	assert_eq(factory.debug_get_pool_hit_stats().get("hits", 0), 0, "and no hit")
+
+
+## The hit/miss counters describe every spawn: three spawns across three keys
+## are three hits and no miss, each one draining exactly its own bucket, and
+## the counters sum to the number of spawns (a spawn is never uncounted).
+func test_every_spawn_counts_one_hit_or_miss_and_drains_its_own_bucket() -> void:
+	var datas: Array[BulletVolleyData2D] = []
+	for i in 3:
+		var d := _pooled_data(2 + i) # 2, 3, 4 bullets: three distinct keys
+		factory.populate_bullets_pool(BulletFactory2D.debug_expected_pool_key(d), d, 1)
+		datas.append(d)
+	assert_eq(factory.debug_get_bullets_pool_amount(), 3, "three warm buckets")
+	factory.debug_reset_pool_stats()
+	assert_eq(factory.debug_get_pool_hit_stats(), {"hits": 0, "misses": 0}, "the reset zeroes both counters")
+	for i in 3:
+		factory.spawn_volley(datas[i])
+		var stats: Dictionary = factory.debug_get_pool_hit_stats()
+		assert_eq(int(stats["hits"]), i + 1, "spawn %d counted one hit" % i)
+		assert_eq(int(stats["misses"]), 0, "spawn %d counted no miss" % i)
+		assert_eq(int(stats["hits"]) + int(stats["misses"]), i + 1, "hits + misses == the spawn count")
+	assert_eq(factory.debug_get_bullets_pool_amount(), 0, "each hit drained exactly its own bucket")
+	factory.spawn_volley(_pooled_data(5))
+	assert_eq(factory.debug_get_pool_hit_stats().get("misses", 0), 1, "a key with no bucket misses")
+	assert_eq(factory.debug_get_pool_hit_stats().get("hits", 0), 3, "and the hits stay")
+
+
+func _hit_data_for_reset() -> BulletVolleyData2D:
+	var d := H.make_volley_data(1, 300.0, 8.0)
+	d.transforms = [Transform2D(0.0, Vector2.ZERO)]
+	d.monitorable = true
+	d.set_collision_mask_from_array([3])
+	d.collision_shape = H.make_circle_shape(6.0)
+	d.bullet_max_collision_count = 0 # never dies: the handler runs once, the volley survives
+	return d
+
+
+## A reset_deferred() queued from inside a hit handler (the physics frame)
+## runs later and must leave exactly ONE debugger node: the debugger is
+## re-created at most once and its container is never duplicated, so the
+## overlay of the next life-cycles keeps drawing.
+func test_reset_deferred_from_a_hit_handler_keeps_one_debugger_node() -> void:
+	factory.is_debugger_enabled = true
+	make_wall(Vector2(200, 0))
+	await physics()
+	var hits: Array = [] # a lambda captures a bool by value: collect through an Array
+	factory.body_entered.connect(func(_body: Object, _v: BulletVolley2D, _i: int) -> void:
+		if hits.is_empty():
+			hits.append(true)
+			factory.reset_deferred())
+	factory.spawn_volley(_hit_data_for_reset())
+	for i in 90:
+		await physics()
+		if not hits.is_empty():
+			break
+	assert_eq(hits.size(), 1, "the hit handler ran")
+	await idle(3)
+	assert_eq(factory.debug_get_active_volleys_amount(), 0, "the deferred reset ran")
+	assert_true(factory.get_is_debugger_enabled(), "the debugger switch survives the reset")
+	var debuggers: Array = []
+	for c in factory.get_children(true):
+		if String(c.name).begins_with("BulletVolleysDebugger"):
+			debuggers.append(c)
+	assert_eq(debuggers.size(), 1, "exactly one debugger container")
+	assert_eq((debuggers[0] as Node).get_child_count(true), 0, "the reset emptied it")
+	factory.spawn_volley(_pooled_data(2))
+	await physics(3)
+	assert_eq(debuggers.size(), 1, "still one debugger container after the next spawn")
+	assert_eq((debuggers[0] as Node).get_child_count(true), 1, "and exactly one debug mesh node for the new volley")
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "books ok")

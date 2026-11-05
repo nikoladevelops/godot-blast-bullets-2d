@@ -162,6 +162,27 @@ func expect_no_errors(msg := "") -> void:
 	expect_error_sequence([], msg if msg != "" else "no errors expected here")
 
 
+## The precise "explain, never fail" pin: EXACTLY one unhandled message
+## containing `text` (and, when given, `also`) since the last expect_* call,
+## and it must be a push_warning - a push_error or engine error carrying the
+## same text (or a second copy of it) fails. For the messages that describe an
+## event nobody handles: they must never abort a game.
+func expect_warning(text: String, msg := "", also := "") -> void:
+	var seen := 0
+	var kinds: Array[String] = []
+	var full: Array[String] = []
+	for err in get_errors():
+		if not err.handled and err.contains_text(text) and (also == "" or err.contains_text(also)):
+			err.handled = true
+			seen += 1
+			kinds.append("warning" if err.is_push_warning() else "error")
+			full.append(str(err.code))
+	var where := msg if msg != "" else "expected warning"
+	assert_eq(seen, 1, "%s: exactly one message containing '%s' (got %d: %s)" % [where, text, seen, str(full)])
+	if seen == 1:
+		assert_eq(kinds, ["warning"] as Array[String], "%s: it is a push_warning, never a push_error" % where)
+
+
 ## Asserts that at least `min_count` NEW (unhandled) errors were recorded since
 ## the last expect_* call, then marks them handled. For hostile-input calls
 ## whose contract is "fail loud" when the exact wording is not the point.

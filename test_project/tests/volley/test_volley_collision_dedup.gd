@@ -60,6 +60,78 @@ func _wait(cond: Callable, frames := 20) -> void:
 			return
 
 
+## One body whose two boxes overlap each other, so a bullet resting on it has
+## both shapes' overlap records in the SAME drain window.
+func _stacked_wall(origin: Vector2) -> StaticBody2D:
+	var wall := StaticBody2D.new()
+	wall.position = origin
+	wall.collision_layer = 4
+	wall.collision_mask = 2
+	for offset in [Vector2.ZERO, Vector2(4, 0)]:
+		var cs := CollisionShape2D.new()
+		var box := RectangleShape2D.new()
+		box.size = Vector2(20, 120)
+		cs.shape = box
+		cs.position = offset
+		wall.add_child(cs)
+	add(wall)
+	return wall
+
+
+func _resting_data(pos: Vector2) -> BulletVolleyData2D:
+	var d := H.make_volley_data(1, 0.0, 30.0)
+	d.transforms = [Transform2D(0.0, pos)]
+	d.monitorable = true
+	d.set_collision_mask_from_array([3])
+	d.collision_shape = H.make_circle_shape(6.0)
+	d.bullet_max_collision_count = 0
+	return d
+
+
+## Flipping collision_dedup_by_object mid-overlap neither double counts the
+## shapes already recorded nor SWALLOWS the records queued under the old mode:
+## the flip lands between the physics flush that queued both shape records and
+## the drain that reports them, and both are still delivered; the same resting
+## overlap is never counted again afterwards, in either mode.
+func test_flipping_the_mode_mid_overlap_never_double_counts_or_swallows() -> void:
+	hits = 0
+	_stacked_wall(Vector2(600, 0)) # far from the suite's three-shape wall
+	await physics(2)
+	var v: BulletVolley2D = factory.spawn_volley(_resting_data(Vector2(602, 0)))
+	v.set_collision_dedup_by_object(false)
+	assert_false(v.get_collision_dedup_by_object(), "shape mode")
+	await physics() # the flush queued the two shape records, the drain has not run
+	v.set_collision_dedup_by_object(true)
+	await physics(2)
+	assert_eq(v.get_bullet_collision_count(0), 2, "both records queued under shape mode were delivered")
+	assert_eq(hits, 2, "and both were reported")
+	await physics(10)
+	assert_eq(v.get_bullet_collision_count(0), 2, "object mode adds nothing for the same resting overlap")
+	assert_eq(hits, 2, "no double count")
+	v.set_collision_dedup_by_object(false)
+	await physics(6)
+	assert_eq(v.get_bullet_collision_count(0), 2, "and flipping back never double counts either")
+	assert_eq(hits, 2, "still exactly two counted hits")
+
+
+## The two modes side by side on the same resting overlap: shape mode counts
+## one hit per overlapping shape (exact), object mode exactly one.
+func test_the_two_modes_count_exactly_on_the_same_overlap() -> void:
+	hits = 0
+	_stacked_wall(Vector2(600, 0))
+	await physics(2)
+	var shape_mode: BulletVolley2D = factory.spawn_volley(_resting_data(Vector2(602, 0)))
+	shape_mode.set_collision_dedup_by_object(false)
+	await physics(3)
+	assert_eq(shape_mode.get_bullet_collision_count(0), 2, "shape mode counts both shapes")
+	assert_eq(hits, 2, "and reports both")
+	var object_mode: BulletVolley2D = factory.spawn_volley(_resting_data(Vector2(602, 0)))
+	assert_true(object_mode.get_collision_dedup_by_object(), "object mode is the default")
+	await physics(3)
+	assert_eq(object_mode.get_bullet_collision_count(0), 1, "object mode counts the target once")
+	assert_eq(hits, 3, "one more signal only")
+
+
 func test_object_mode_counts_once() -> void:
 	var v: BulletVolley2D = factory.spawn_volley(_bodied_data())
 	assert_true(v.get_collision_dedup_by_object(), "collision_dedup_by_object defaults to true")

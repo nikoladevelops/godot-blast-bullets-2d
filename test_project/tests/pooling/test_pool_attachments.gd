@@ -168,3 +168,82 @@ func test_all_bullets_set_attachment_reports_a_bad_scene_once() -> void:
 	expect_no_errors()
 	for i in 6:
 		assert_true(v.debug_get_attachment_info(i).get("has_attachment", false), "a good scene still attaches bullet %d" % i)
+
+
+func _attached_data(count: int, scene: PackedScene) -> BulletVolleyData2D:
+	var d := H.make_volley_data(count, 0.0, 30.0)
+	d.shared_bullet_attachment = scene
+	return d
+
+
+## The attachment pool is read out as data ({scene: count}) and a scoped free
+## empties exactly one scene's probes: the other scene's pre-pooled probes
+## survive AND still come out of the pool (they are popped with
+## in_pool_calls == 1, never reinstantiated), which is what proves the
+## survivors belong to the untouched scene.
+func test_scoped_free_empties_only_that_scene_and_the_rest_still_pops() -> void:
+	var other := make_probe_scene()
+	factory.populate_attachments_pool(ps, 3)
+	var info: Dictionary = factory.debug_get_attachments_pool_info()
+	assert_eq(info.size(), 1, "one entry for the in-memory scene")
+	assert_eq(int(info.values()[0]), 3, "the info dict counts the 3 pooled probes")
+	assert_eq(factory.debug_get_attachments_pool_amount(), 3, "and the plain count agrees")
+	factory.populate_attachments_pool(other, 2)
+	assert_eq(factory.debug_get_attachments_pool_amount(), 5, "five probes pooled in total")
+	factory.free_attachments_pool_for_scene(ps)
+	await idle()
+	assert_eq(factory.debug_get_attachments_pool_amount(), 2, "exactly the other scene's 2 probes are left")
+	var v: BulletVolley2D = factory.spawn_volley(_attached_data(2, other))
+	await idle(1)
+	assert_eq(factory.debug_get_attachments_pool_amount(), 0, "the other scene's probes are popped by the spawn")
+	assert_eq(factory.debug_get_active_attachments_amount(), 2, "both bullets carry one")
+	for i in 2:
+		var probe = v.bullet_get_attachment(i)
+		assert_eq(probe.get("in_pool_calls"), 1, "bullet %d got a pre-pooled probe" % i)
+		assert_eq(probe.get("spawn_calls"), 0, "bullet %d did not instantiate a fresh one" % i)
+
+
+## A pre-warmed attachment pool feeds the next volley's bullets (the pool empties
+## into the volley: 2 -> 0) and the drain puts every probe back.
+func test_pre_pooled_attachments_are_handed_out_and_returned() -> void:
+	factory.populate_attachments_pool(ps, 2)
+	assert_eq(factory.debug_get_attachments_pool_amount(), 2, "2 probes pre-pooled")
+	assert_eq(factory.debug_get_active_attachments_amount(), 0, "nothing attached yet")
+	var v: BulletVolley2D = factory.spawn_volley(_attached_data(2, ps))
+	await idle(1)
+	assert_eq(factory.debug_get_attachments_pool_amount(), 0, "both probes went to the volley")
+	assert_eq(factory.debug_get_active_attachments_amount(), 2, "both bullets are attached")
+	for i in 2:
+		assert_true(v.debug_get_attachment_info(i).get("has_attachment", false), "bullet %d is attached" % i)
+		assert_eq(v.bullet_get_attachment(i).get("in_pool_calls"), 1, "bullet %d took one from the pool" % i)
+	v.disable_bullet(0)
+	v.disable_bullet(1)
+	await idle(1)
+	assert_eq(factory.debug_get_attachments_pool_amount(), 2, "the drain returned both to the pool")
+	assert_eq(factory.debug_get_active_attachments_amount(), 0, "nothing is attached any more")
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "books ok")
+
+
+## Freeing the attachment pool spares what is IN USE: the two attached probes
+## keep their slots and stay alive, and the drain afterwards fills the empty
+## pool again.
+func test_freeing_the_pool_spares_the_attachments_in_use() -> void:
+	factory.populate_attachments_pool(ps, 2)
+	var v: BulletVolley2D = factory.spawn_volley(_attached_data(2, ps))
+	await idle(1)
+	assert_eq(factory.debug_get_active_attachments_amount(), 2, "2 in use")
+	var in_use: Array = [v.bullet_get_attachment(0), v.bullet_get_attachment(1)]
+	factory.free_attachments_pool()
+	await idle(1)
+	assert_eq(factory.debug_get_attachments_pool_amount(), 0, "the pool is empty")
+	assert_eq(factory.debug_get_active_attachments_amount(), 2, "the in-use attachments are untouched")
+	for i in 2:
+		assert_true(is_instance_valid(in_use[i]), "attachment %d is alive" % i)
+		assert_false((in_use[i] as Node).is_queued_for_deletion(), "attachment %d is not queued for deletion" % i)
+		assert_true(v.debug_get_attachment_info(i).get("has_attachment", false), "slot %d is still attached" % i)
+	v.disable_bullet(0)
+	v.disable_bullet(1)
+	await idle(1)
+	assert_eq(factory.debug_get_attachments_pool_amount(), 2, "the drain put both into the emptied pool")
+	assert_eq(factory.debug_get_active_attachments_amount(), 0, "nothing is attached any more")
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "books ok")

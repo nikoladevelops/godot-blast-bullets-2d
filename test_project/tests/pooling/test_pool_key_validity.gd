@@ -121,3 +121,101 @@ func test_pop_skips_a_dying_entry_below_the_ticked_volley() -> void:
 	assert_eq(spawned.size(), 1, "the handler ran")
 	expect_no_errors()
 	assert_true(spawned[0] != null and spawned[0] != x and spawned[0] != dying, "the spawn got a usable volley")
+
+
+func _bucket_count(info: Dictionary, amount: int, shape_type: int, colors: bool) -> int:
+	for k in info:
+		var key: VolleyPoolKey2D = k
+		if key.amount_bullets == amount and key.shape_type == shape_type and key.use_bullet_colors == colors:
+			return int(info[k])
+	return -1
+
+
+func _hits() -> int:
+	return int(factory.debug_get_pool_hit_stats().get("hits", 0))
+
+
+## A warm bucket hands back the SAME instance life after life (this is what
+## "pool reuse" means: no allocation), counting exactly one hit per life, and
+## a second, unrelated bucket is never touched by any of those lives.
+func test_a_warm_bucket_reuses_one_instance_for_every_life() -> void:
+	var capsule_data := _shaped(3, _capsule())
+	var circle_data := _shaped(4, circ)
+	factory.populate_bullets_pool(VolleyPoolKey2D.make(3, PhysicsServer2D.SHAPE_CAPSULE), capsule_data, 1)
+	factory.populate_bullets_pool(VolleyPoolKey2D.make(4, PhysicsServer2D.SHAPE_CIRCLE), circle_data, 1)
+	factory.debug_reset_pool_stats()
+	var v: BulletVolley2D = factory.spawn_volley(capsule_data)
+	assert_eq(_hits(), 1, "the first life is a hit")
+	for life in 3:
+		for i in 3:
+			v.disable_bullet(i)
+		assert_true(v.is_pooled(), "life %d pooled itself" % (life + 1))
+		var again: BulletVolley2D = factory.spawn_volley(capsule_data)
+		assert_same(again, v, "life %d is the very same instance" % (life + 2))
+		assert_eq(_hits(), life + 2, "life %d counted one more hit" % (life + 2))
+		v = again
+	assert_eq(factory.debug_get_pool_hit_stats().get("misses", 0), 0, "no miss in any of the four lives")
+	var info: Dictionary = factory.debug_get_bullets_pool_info()
+	assert_eq(_bucket_count(info, 4, PhysicsServer2D.SHAPE_CIRCLE, false), 1, "the other bucket still holds its one entry")
+	assert_eq(_bucket_count(info, 3, PhysicsServer2D.SHAPE_CAPSULE, false), -1, "this bucket is empty while the life flies")
+	for i in 3:
+		v.disable_bullet(i)
+	assert_eq(v.debug_get_life_state(), "pooled", "the last life pooled itself")
+	info = factory.debug_get_bullets_pool_info()
+	assert_eq(_bucket_count(info, 3, PhysicsServer2D.SHAPE_CAPSULE, false), 1, "and its bucket holds it again")
+	assert_eq(_bucket_count(info, 4, PhysicsServer2D.SHAPE_CIRCLE, false), 1, "while the other bucket never moved")
+
+
+## A pooled volley a script queue_frees is a dead pool entry: the pool drops
+## it and the next spawn of that key allocates a different, live instance (a
+## miss), never the freed one.
+func test_a_queue_freed_pooled_entry_is_dropped_and_the_next_spawn_allocates() -> void:
+	var d := _shaped(2, circ)
+	var key := VolleyPoolKey2D.make(2, PhysicsServer2D.SHAPE_CIRCLE)
+	factory.populate_bullets_pool(key, d, 1)
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	assert_eq(_hits(), 1, "the spawn reused the warm entry")
+	for i in 2:
+		v.disable_bullet(i)
+	assert_true(v.is_pooled(), "it pooled itself again")
+	factory.debug_reset_pool_stats()
+	v.queue_free()
+	await idle(2)
+	assert_false(is_instance_valid(v), "the pooled volley is gone")
+	assert_eq(factory.debug_get_bullets_pool_amount(), 0, "the pool dropped the dead entry")
+	var w: BulletVolley2D = factory.spawn_volley(d)
+	assert_not_same(w, v, "a different instance")
+	assert_true(is_instance_valid(w), "a live instance")
+	assert_false(w.is_queued_for_deletion(), "not queued for deletion")
+	assert_true(w.is_volley_active(), "and it is active")
+	assert_eq(factory.debug_get_pool_hit_stats().get("misses", 0), 1, "the spawn was a miss")
+	assert_eq(_hits(), 0, "not a hit")
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "books ok")
+
+
+## The pool key is (amount, shape type, per-bullet colors): every combination
+## spawns into the bucket its own data maps to, and that bucket is what the
+## volley reports.
+func test_every_shape_and_color_combination_buckets_by_its_own_key() -> void:
+	var cases: Array = [
+		[PhysicsServer2D.SHAPE_CIRCLE, circ],
+		[PhysicsServer2D.SHAPE_RECTANGLE, _rect()],
+		[PhysicsServer2D.SHAPE_CAPSULE, _capsule()],
+	]
+	for case in cases:
+		for colors in [false, true]:
+			var d := _shaped(2, case[1])
+			d.use_bullet_colors = colors
+			if colors:
+				d.bullet_colors = [Color.RED, Color.BLUE]
+			var v: BulletVolley2D = factory.spawn_volley(d)
+			var expected: VolleyPoolKey2D = BulletFactory2D.debug_expected_pool_key(d)
+			var bucket: VolleyPoolKey2D = factory.debug_get_pool_bucket(v)
+			var where := "shape %d, colors %s" % [case[0], colors]
+			assert_eq(expected.shape_type, case[0], "%s: the data maps to its shape" % where)
+			assert_eq(expected.use_bullet_colors, colors, "%s: the data maps to its color mode" % where)
+			assert_eq(bucket.amount_bullets, 2, "%s: amount" % where)
+			assert_true(bucket.equals(expected), "%s: the spawn's bucket is the expected key" % where)
+			v.clear_all_bullets()
+			await idle(1)
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "books ok")
