@@ -337,3 +337,55 @@ func test_every_shape_knob_invalidates_the_bake_under_its_own_shape() -> void:
 			swept += 1
 	assert_gt(swept, 150, "every cacheable shape's knobs swept (%d)" % swept)
 	assert_gt(moved, int(swept * 85.0 / 100.0), "most perturbations really move bullets (%d of %d); inert: %s" % [moved, swept, inert])
+
+
+## The random-layout sources (one `*_seed` knob each) and the exact key set of
+## debug_get_pattern_cache_info for a bullet spawner (it adds the spawn-data
+## duplicate cache to the pattern cache's six).
+const RANDOM_SOURCES := [
+	[BulletSpawner2D.PATTERN_FROM_HELPER_GRID, "helper_grid_seed"],
+	[BulletSpawner2D.PATTERN_FROM_HELPER_RING, "helper_ring_seed"],
+	[BulletSpawner2D.PATTERN_FROM_HELPER_FAN, "helper_fan_seed"],
+	[BulletSpawner2D.PATTERN_FROM_HELPER_RAIN, "helper_rain_seed"],
+	[BulletSpawner2D.PATTERN_FROM_HELPER_SCATTER, "helper_scatter_seed"],
+	[BulletSpawner2D.PATTERN_FROM_HELPER_WATERFALL, "helper_waterfall_seed"],
+]
+const CACHE_INFO_KEYS := ["hits", "misses", "bakes", "version", "shot_class", "preview_class", "template_valid", "spawn_id_match"]
+
+
+## Every seeded random source reports the exact cache-info key set, finite
+## non-negative counters that never decrease, no re-bake while its knobs stay
+## unchanged, and exactly one more bake when the seed changes: a seeded
+## random layout is fully cacheable (class RIGID or TRANSLATION).
+func test_random_source_cache_info_is_exact_and_monotonic(i: int = use_parameters(range(RANDOM_SOURCES.size()))) -> void:
+	var src: int = RANDOM_SOURCES[i][0]
+	var knob: String = RANDOM_SOURCES[i][1]
+	sp.pattern_source = src as BulletSpawner2D.PatternSource
+	assert_true(knob in sp, "the seed knob exists: %s" % knob)
+	sp.set(knob, 7)
+	assert_eq(int(sp.get(knob)), 7, "the seed is set")
+	var base: Dictionary = sp.debug_get_pattern_cache_info()
+	assert_eq(base.keys(), CACHE_INFO_KEYS, "the exact key set")
+	assert_eq([int(base["hits"]), int(base["misses"]), int(base["bakes"])], [0, 0, 0], "a fresh spawner has no cache history")
+	var hits := 0
+	var bakes := -1
+	for k in 3:
+		sp.collect_spawn_transforms()
+		var info: Dictionary = sp.debug_get_pattern_cache_info()
+		assert_eq(info.keys(), CACHE_INFO_KEYS, "key set")
+		assert_between(int(info["shot_class"]), 1, 2, "the seeded shot bake is classified RIGID or TRANSLATION")
+		assert_between(int(info["preview_class"]), -1, 2, "the preview channel is unclassified (-1) or a real class")
+		for key in ["hits", "misses", "bakes", "version"]:
+			assert_gte(int(info[key]), 0, "%s is a finite non-negative counter" % key)
+		assert_gte(int(info["hits"]), hits, "hits never decrease")
+		if bakes >= 0:
+			assert_eq(int(info["bakes"]), bakes, "unchanged knobs: no re-bake after the first collect")
+		bakes = int(info["bakes"])
+		hits = int(info["hits"])
+	assert_eq([hits, bakes], [2, 1], "the first collect baked, the next two hit")
+	sp.set(knob, 8)
+	sp.collect_spawn_transforms()
+	var changed: Dictionary = sp.debug_get_pattern_cache_info()
+	assert_eq([int(changed["hits"]), int(changed["misses"]), int(changed["bakes"])], [2, 2, 2], "the seed change re-baked exactly once")
+	assert_gt(int(changed["version"]), int(base["version"]), "and bumped the pattern version")
+	expect_no_errors()

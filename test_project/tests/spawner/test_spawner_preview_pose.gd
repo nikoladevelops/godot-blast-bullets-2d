@@ -442,3 +442,119 @@ func get_velocity() -> Vector2:
 	for i in v.get_amount_bullets():
 		max_gap = maxf(max_gap, absf(angle_difference(v.get_bullet_transform(i).get_rotation(), unspun[i].get_rotation())))
 	assert_gt(max_gap, 0.1, "the nested shot is spun (its basis carries the angle the preview snapshot dropped)")
+
+
+## The drawn track's closedness is a property of the shape CLASS: loop shapes
+## close their track, strips / rows / arms / rays / cones / paths stay open.
+const CLOSED_SOURCES := [
+	BulletSpawner2D.PATTERN_FROM_HELPER_CIRCLE,
+	BulletSpawner2D.PATTERN_FROM_HELPER_SQUARE,
+	BulletSpawner2D.PATTERN_FROM_HELPER_RECTANGLE,
+	BulletSpawner2D.PATTERN_FROM_HELPER_TRIANGLE,
+	BulletSpawner2D.PATTERN_FROM_HELPER_DIAMOND,
+	BulletSpawner2D.PATTERN_FROM_HELPER_TRAPEZOID,
+	BulletSpawner2D.PATTERN_FROM_HELPER_POLYGON,
+	BulletSpawner2D.PATTERN_FROM_HELPER_ELLIPSE,
+	BulletSpawner2D.PATTERN_FROM_HELPER_RING,
+	BulletSpawner2D.PATTERN_FROM_HELPER_STAR,
+	BulletSpawner2D.PATTERN_FROM_HELPER_HEART,
+	BulletSpawner2D.PATTERN_FROM_HELPER_STAR_POLYGON,
+	BulletSpawner2D.PATTERN_FROM_HELPER_FLOWER,
+	BulletSpawner2D.PATTERN_FROM_HELPER_ROSE,
+	BulletSpawner2D.PATTERN_FROM_HELPER_LISSAJOUS,
+	BulletSpawner2D.PATTERN_FROM_HELPER_SCATTER,
+]
+const OPEN_SOURCES := [
+	BulletSpawner2D.PATTERN_FROM_HELPER_PATH2D,
+	BulletSpawner2D.PATTERN_FROM_HELPER_AIMED,
+	BulletSpawner2D.PATTERN_FROM_HELPER_CUSTOM,
+	BulletSpawner2D.PATTERN_FROM_HELPER_LINE,
+	BulletSpawner2D.PATTERN_FROM_HELPER_GRID,
+	BulletSpawner2D.PATTERN_FROM_HELPER_LATTICE,
+	BulletSpawner2D.PATTERN_FROM_HELPER_RAIN,
+	BulletSpawner2D.PATTERN_FROM_HELPER_WATERFALL,
+	BulletSpawner2D.PATTERN_FROM_HELPER_WAVE,
+	BulletSpawner2D.PATTERN_FROM_HELPER_FAN,
+	BulletSpawner2D.PATTERN_FROM_HELPER_CORRIDOR,
+	BulletSpawner2D.PATTERN_FROM_HELPER_SPIRAL,
+	BulletSpawner2D.PATTERN_FROM_HELPER_MULTISPIRAL,
+	BulletSpawner2D.PATTERN_FROM_HELPER_COUNTER_SPIRAL,
+	BulletSpawner2D.PATTERN_FROM_HELPER_CROSS,
+]
+
+
+## Every source that draws a track draws exactly helper_bullets_amount dots;
+## the sources needing scene input get it (aimed/corridor a target, custom a
+## transform per bullet, path2d a curve).
+func test_dot_count_and_track_closedness_by_source_class() -> void:
+	var wrong_dots: Array = []
+	var wrong_closed: Array = []
+	for src in CLOSED_SOURCES + OPEN_SOURCES:
+		var sp := make_preview_spawner(src, 24)
+		_configure_preview_input(sp, src)
+		await idle(6)
+		var dots: PackedVector2Array = sp.debug_get_preview_dot_points()
+		if dots.size() != 24:
+			wrong_dots.append("%d: %d dots" % [src, dots.size()])
+		if sp.debug_get_preview_track_closed() != (src in CLOSED_SOURCES):
+			wrong_closed.append("%d: closed=%s" % [src, sp.debug_get_preview_track_closed()])
+		sp.queue_free()
+	assert_eq("\n".join(wrong_dots), "", "every track source draws exactly helper_bullets_amount dots")
+	assert_eq("\n".join(wrong_closed), "", "loop shapes close their track, strips/arms/cones stay open")
+
+
+func _configure_preview_input(sp: BulletSpawner2D, src: int) -> void:
+	if src == BulletSpawner2D.PATTERN_FROM_HELPER_AIMED or src == BulletSpawner2D.PATTERN_FROM_HELPER_CORRIDOR:
+		var t := Node2D.new()
+		t.position = Vector2(300, -200)
+		add(t)
+		sp.set_helper_aimed_target(t)
+	elif src == BulletSpawner2D.PATTERN_FROM_HELPER_CUSTOM:
+		var list: Array = []
+		for i in 24:
+			list.append(Transform2D(0.01 * i, Vector2(6.0 * i, 0)))
+		sp.set_helper_custom_transforms(list)
+	elif src == BulletSpawner2D.PATTERN_FROM_HELPER_PATH2D:
+		var path := Path2D.new()
+		var curve := Curve2D.new()
+		for p in [Vector2(0, 0), Vector2(100, 40), Vector2(200, -20), Vector2(320, 30)]:
+			curve.add_point(p)
+		path.curve = curve
+		add(path)
+		sp.set_helper_path2d_node(path)
+
+
+## A geometry edit forces a rebuild in the middle of the spin: the fresh track
+## keeps its class and every dot still sits on it (both snapshots are unspun:
+## a rebuild during spin must not double-spin the track). The closed tracks
+## are measured including their closing segment, which _max_dev skips.
+func _max_dev_on_track(dots: PackedVector2Array, track: PackedVector2Array, closed: bool) -> float:
+	var worst := 0.0
+	for d in dots:
+		var best := 1e30
+		for k in track.size() - (0 if closed else 1):
+			var a := track[k]
+			var b := track[(k + 1) % track.size()]
+			if a.is_finite() and b.is_finite():
+				best = minf(best, _seg_dist(d, a, b))
+		if best < 1e29:
+			worst = maxf(worst, best)
+	return worst
+
+
+func test_a_mid_spin_rebuild_keeps_the_dots_on_a_closed_and_an_open_track() -> void:
+	var cases := [
+		[BulletSpawner2D.PATTERN_FROM_HELPER_STAR, true],
+		[BulletSpawner2D.PATTERN_FROM_HELPER_WAVE, false],
+	]
+	for row in cases:
+		var sp := _spinning_preview(row[0], 24)
+		await idle(23) # ~34 deg into the 90 deg/s spin: not a symmetry angle
+		if row[0] == BulletSpawner2D.PATTERN_FROM_HELPER_STAR:
+			sp.helper_star_points = 5
+		else:
+			sp.helper_wave_waves = 3.0
+		await idle(1)
+		assert_eq(sp.debug_get_preview_dot_points().size(), 24, "source %d still draws every dot" % row[0])
+		assert_eq(sp.debug_get_preview_track_closed(), row[1], "source %d keeps its track class after the rebuild" % row[0])
+		assert_lt(_max_dev_on_track(sp.debug_get_preview_dot_points(), sp.debug_get_preview_track_points(), row[1]), 1.0, "source %d: every dot sits on the freshly rebuilt track" % row[0])

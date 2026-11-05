@@ -1016,3 +1016,30 @@ func test_a_laser_data_predelede_freeing_the_spawner_mid_setter_is_survived() ->
 	await idle(1)
 	assert_true(factory.debug_assert_no_dangling().get("ok", false), "nothing dangles")
 	assert_not_null(quick_volley(2), "the factory still spawns")
+
+
+## Asking the spawner to explain its features changes nothing: two collects of
+## the same seeded pattern stay identical with the explain call between them,
+## and the explain lines themselves are stable between calls (the explain
+## path must not touch the bake, the seed stream or any knob).
+func test_identically_seeded_collects_stay_identical_across_explain() -> void:
+	var sp := _spawner(_laser(), 24)
+	sp.pattern_source = LaserSpawner2D.PATTERN_FROM_HELPER_SCATTER
+	sp.helper_scatter_seed = 4242
+	sp.helper_scatter_burst_radius = 120.0
+	var first: Array = sp.collect_spawn_transforms()
+	assert_eq(first.size(), 24, "the seeded scatter draws every slot")
+	var lines: PackedStringArray = sp.debug_explain_features()
+	var second: Array = sp.collect_spawn_transforms()
+	assert_eq(second.size(), first.size(), "same slot count")
+	var divergent := 0
+	for i in first.size():
+		var a := first[i] as Transform2D
+		var b := second[i] as Transform2D
+		if a.origin.distance_to(b.origin) > 0.0001 or absf(angle_difference(a.get_rotation(), b.get_rotation())) > 0.0001:
+			divergent += 1
+	assert_eq(divergent, 0, "an identical seed collects identical transforms with explain in between")
+	assert_eq(sp.debug_explain_features(), lines, "the explain lines are stable between calls")
+	var info: Dictionary = sp.debug_get_pattern_cache_info()
+	assert_gte(int(info["hits"]), 1, "the second collect was served from the bake")
+	expect_no_errors()

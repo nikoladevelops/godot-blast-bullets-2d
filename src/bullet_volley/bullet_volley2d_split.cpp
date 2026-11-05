@@ -286,7 +286,16 @@ void BulletVolley2D::split_check_timer() {
 	const std::vector<int> live = all_bullets_enabled_set.get_active_indexes();
 	const uint64_t recorded_before = split_record_total;
 	const uint64_t blocked_before = split_queue_block_total;
+	// The batch's attachment callbacks (on_bullet_disable) are user code: they
+	// may free this volley (or replace the chain the stamp below names). Both
+	// ids are read BEFORE it, so nothing of the volley is touched unless the
+	// same instance still owns its id (the id-revalidation pattern, §12.4).
+	const uint64_t self_id = get_instance_id();
+	const uint64_t chain_id = (uint64_t)chain->get_instance_id();
 	split_live_bullets(live, SPLIT_CAUSE_TIMER, -1);
+	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+		return; // a callback freed this volley: read nothing more from it
+	}
 	// Spend the timer unless the factory's queue refused capture at some
 	// bullet: that rejection is transient (the flush drains it this sweep),
 	// so the timer retries next tick instead of staying spent forever. A
@@ -294,7 +303,7 @@ void BulletVolley2D::split_check_timer() {
 	// missing child data) and a recorded split both spend it: the roll
 	// must not be taken again every tick (one roll per bullet per life).
 	if (split_record_total != recorded_before || split_queue_block_total == blocked_before) {
-		split_timer_fired_chain = (uint64_t)chain->get_instance_id();
+		split_timer_fired_chain = chain_id;
 	}
 }
 

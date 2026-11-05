@@ -189,3 +189,34 @@ func test_pierced_total_counts_distinct_targets_for_every_type() -> void:
 	assert_eq(beam.get_pierced_targets(0), [mover], "touching it again")
 	assert_eq(beam.get_beam_pierced_total(0), 1, "a re-entry is not a new target")
 	beam.end_laser(false)
+
+
+## Every phase of a laser's life has clean invariant books; the finish pools
+## it with nothing left to draw (draw state, body mesh, look layers), and the
+## pool hands the same instance back under a fresh life id.
+func test_phases_pooling_and_reuse_keep_the_books_clean() -> void:
+	var d := H.make_laser(0.0625, 0.0625, 0.0625, 0.0625, 400.0) # one tick per phase
+	var l := _fire(d)
+	assert_eq(l.get_phase(), LaserVolley2D.PHASE_CHARGING, "spawned in the charge")
+	var seen: Array = []
+	for i in 6:
+		step_factory(1, DT)
+		if not seen.has(l.get_phase()):
+			seen.append(l.get_phase())
+			assert_eq(l.debug_check_invariants(), "", "phase %d: invariants hold" % l.get_phase())
+		if l.is_pooled():
+			break
+	assert_eq(seen, [LaserVolley2D.PHASE_GROWING, LaserVolley2D.PHASE_ACTIVE, LaserVolley2D.PHASE_FADING, LaserVolley2D.PHASE_FINISHED], "one tick per phase, then finished")
+	assert_true(l.is_pooled(), "the finished laser is pooled")
+	assert_eq(l.get_phase(), LaserVolley2D.PHASE_FINISHED, "the stale handle reads finished")
+	assert_eq(l.debug_check_invariants(), "", "pooled: invariants hold")
+	assert_eq(l.debug_get_draw_state(), [], "pooled: nothing drawn")
+	assert_eq((l.debug_get_body_mesh()["points"] as PackedVector2Array).size(), 0, "pooled: no body points")
+	for layer in l.debug_get_look_layers():
+		assert_false(layer["created"], "pooled: no look layer holds a canvas item")
+	var life := l.get_life_id()
+	var reused: LaserVolley2D = _fire(d)
+	assert_same(reused, l, "the pool handed the same instance back")
+	assert_eq(reused.get_life_id(), life + 1, "one generation later")
+	assert_eq([reused.get_phase(), reused.debug_check_invariants()], [LaserVolley2D.PHASE_CHARGING, ""], "the new life starts clean in the charge")
+	expect_no_errors()
