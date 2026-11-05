@@ -177,6 +177,48 @@ func test_the_attachment_rides_every_move_in_every_mode() -> void:
 	assert_eq("\n".join(problems), "", "the attachment rides every move in every mode")
 
 
+## The factory-wide shift is a world move: active, parked and spawner-owned
+## volleys move; a pooled instance is dormant, so the shift must never leak
+## into its next life. No error at any step. The pooled volley uses its own
+## pool key (3 bullets) so the other spawns cannot pop it.
+func test_the_factory_wide_shift_spares_pooled_lives() -> void:
+	var pooled_data := H.make_volley_data(3, 0.0, 30.0)
+	pooled_data.transforms = [Transform2D(0.0, Vector2(500, 500)), Transform2D(0.0, Vector2(520, 500)), Transform2D(0.0, Vector2(540, 500))]
+	var pooled: BulletVolley2D = factory.spawn_volley(pooled_data)
+	await idle(1)
+	for i in 3:
+		pooled.disable_bullet(i)
+	await idle(1)
+	assert_true(pooled.is_pooled(), "the drained volley is pooled")
+	var parked_data := H.make_volley_data(2, 0.0, 30.0)
+	parked_data.transforms = [Transform2D(0.0, Vector2(20, 0)), Transform2D(0.0, Vector2(40, 0))]
+	var parked: BulletVolley2D = factory.spawn_volley(parked_data)
+	parked.set_is_auto_pooling_enabled(false)
+	await idle(1)
+	for i in 2:
+		parked.disable_bullet(i)
+	await idle(1)
+	assert_true(parked.is_parked(), "pooling off: the drained volley is parked")
+	var active := _flyer(Vector2(10, 0), 0.0)
+	var sp := make_spawner(H.make_volley_data(1, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 1)
+	assert_true(sp.shoot_once(), "spawner shot")
+	await idle(2)
+	var ids: PackedInt64Array = factory.debug_get_live_volley_ids(sp.get_instance_id())
+	assert_eq(ids.size(), 1, "the spawner owns one live volley")
+	var owned: BulletVolley2D = instance_from_id(ids[0])
+	var owned_before: Vector2 = owned.get_bullet_transform(0).origin
+	factory.teleport_shift_all_bullets(Vector2(40, 30))
+	expect_no_errors()
+	assert_almost_eq(active.get_bullet_transform(0).origin, Vector2(50, 30), Vector2(0.01, 0.01), "active volley shifted")
+	assert_almost_eq(owned.get_bullet_transform(0).origin, owned_before + Vector2(40, 30), Vector2(0.01, 0.01), "spawner-owned volley shifted too")
+	parked.enable_bullet(0)
+	assert_almost_eq(parked.get_bullet_transform(0).origin, Vector2(60, 30), Vector2(0.01, 0.01), "parked volley shifted; the wake starts there")
+	factory.debug_reset_pool_stats()
+	var reused: BulletVolley2D = factory.spawn_volley(pooled_data)
+	assert_same(reused, pooled, "the pooled instance is reused")
+	assert_almost_eq(reused.get_bullet_transform(0).origin, Vector2(500, 500), Vector2(0.01, 0.01), "a cold spawn pose, never the shifted dormant one")
+
+
 func test_a_movement_pattern_continues_from_the_teleported_spot() -> void:
 	var v := _flyer(Vector2(0, 0), 120.0)
 	var c := Curve2D.new()
