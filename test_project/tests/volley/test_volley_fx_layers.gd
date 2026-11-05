@@ -1782,3 +1782,73 @@ func test_a_disabled_layer_predelede_freeing_the_volley_mid_setter_is_survived()
 	await idle(1)
 	assert_true(factory.debug_assert_no_dangling().get("ok", false), "nothing dangles")
 	assert_not_null(quick_volley(2), "the factory still spawns")
+
+
+## A shard visibility handler that replaces the effect layers mid-tick runs a
+## nested trail rebuild. The tick must abandon its stale bake element (the
+## epoch) and keep running on a live volley; pre-fix this is a use-after-free.
+## NOTE: freeing the volley (an ancestor) from a child shard's signal is
+## Godot's own boundary (the engine destroys the children before the plugin's
+## PREDELETE refusal can cancel), so this pins the guardable hazard instead.
+func test_a_trail_handler_replacing_the_layers_mid_tick_is_survived() -> void:
+	var layer := _make_layer(EffectLayerData2D.EFFECT_TRAIL_FOLLOW, 4)
+	var v: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 30.0, [layer]))
+	await idle(1) # the first tick already showed frame 0's shard
+	var done := []
+	for c in v.get_children():
+		if c is MultiMeshInstance2D:
+			(c as MultiMeshInstance2D).visibility_changed.connect(func() -> void:
+				if done.is_empty():
+					done.append(true)
+					v.set_effect_layers([layer]))
+	step_factory(12) # a frame transition hides frame 0's shard inside the tick
+	assert_eq(done, [true], "the handler replaced the layers from an in-tick shard hide")
+	assert_true(is_instance_valid(v), "the volley survived the nested rebuild")
+	assert_eq(int(v.debug_get_effect_layers_info().get("trail_bake_count", -1)), 1, "one trail bake after the rebuild")
+	expect_no_errors()
+	step_factory(4)
+	assert_true(is_instance_valid(v), "and keeps ticking")
+	expect_no_errors()
+
+
+## A shard handler disabling a later bullet mid-tick must not corrupt the
+## iteration: the tick walks a snapshot and skips bullets disabled meanwhile.
+func test_a_trail_handler_disabling_another_bullet_mid_tick_is_safe() -> void:
+	var d := H.make_volley_data(3, 30.0, 8.0)
+	d.effect_layers = [_make_layer(EffectLayerData2D.EFFECT_TRAIL_FOLLOW, 4)]
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	await idle(1)
+	var done := []
+	for c in v.get_children():
+		if c is MultiMeshInstance2D:
+			(c as MultiMeshInstance2D).visibility_changed.connect(func() -> void:
+				if done.is_empty():
+					done.append(true)
+					v.disable_bullet(2))
+	step_factory(12)
+	assert_eq(done, [true], "the handler ran and disabled a bullet mid-tick")
+	assert_false(v.is_bullet_status_enabled(2), "bullet 2 disabled")
+	assert_eq(int(v.debug_get_volley_info().get("active_bullets", -1)), 2, "two bullets stay live")
+	expect_no_errors()
+
+
+## play_effect_animation rebuilds its shard nodes; a node_added handler that
+## replaces the effect layers there must not leave the switch writing into a
+## stale bake (the epoch abandons the superseded switch).
+func test_play_effect_animation_survives_a_handler_replacing_the_layers() -> void:
+	var layer := _make_layer(EffectLayerData2D.EFFECT_TRAIL_FOLLOW, 4)
+	var v: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 30.0, [layer]))
+	await idle(1)
+	var fired := []
+	var tree := get_tree()
+	var on_added := func(n: Node) -> void:
+		if fired.is_empty() and n is MultiMeshInstance2D and is_instance_valid(v) and v.is_ancestor_of(n):
+			fired.append(true)
+			v.set_effect_layers([layer])
+	tree.node_added.connect(on_added)
+	var switched := v.play_effect_animation(0, "default")
+	tree.node_added.disconnect(on_added)
+	assert_eq(fired, [true], "the handler replaced the layers while the animation switched")
+	assert_true(is_instance_valid(v), "the volley survived the nested rebuild")
+	assert_false(switched, "the superseded switch reports false")
+	expect_no_errors()

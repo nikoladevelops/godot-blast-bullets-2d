@@ -215,3 +215,16 @@ func test_an_array_written_back_after_an_in_place_edit_still_counts() -> void:
 	transforms.append(Transform2D(0.0, Vector2(99, 0)))
 	data.transforms = transforms # the same Array, edited in place
 	assert_signal_emit_count(data, "changed", 1, "the spawner hears about the new transform")
+
+
+## generate_random_data is bounded by the same developer limit as every other
+## "how many" entry: an absurd count must not resize a TypedArray to billions
+## of Variants (and memnew that many resources).
+func test_random_data_generators_reject_counts_above_the_limit() -> void:
+	var limit := BulletPatterns2D.get_max_bullets_per_pattern()
+	assert_true(BulletSpeedData2D.generate_random_data(limit + 1, 1.0, 2.0, 1.0, 2.0, 0.0, 1.0).is_empty(), "speed generator")
+	expect_error_sequence(["BulletSpeedData2D.generate_random_data: amount_to_generate must be <= %d." % limit])
+	assert_true(BulletRotationData2D.generate_random_data(limit + 1, 1.0, 2.0, 1.0, 2.0, 0.0, 1.0).is_empty(), "rotation generator")
+	expect_error_sequence(["BulletRotationData2D.generate_random_data: amount_to_generate must be <= %d." % limit])
+	assert_true(BulletWobbleData2D.generate_random_data(limit + 1, 10.0, 40.0, 1.0, 4.0).is_empty(), "wobble generator")
+	expect_error_sequence(["BulletWobbleData2D.generate_random_data: amount_to_generate must be <= %d." % limit])

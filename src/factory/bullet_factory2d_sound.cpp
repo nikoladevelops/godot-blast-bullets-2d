@@ -59,6 +59,10 @@ bool BulletFactory2D::play_sound(const Ref<Resource> &resource, const Vector2 &g
 		UtilityFunctions::push_error("BulletFactory2D.play_sound: the factory is outside the tree, the sound plays nothing.");
 		return false;
 	}
+	if (!global_position.is_finite()) {
+		UtilityFunctions::push_error("BulletFactory2D.play_sound: global_position must be finite (NaN/Inf is rejected).");
+		return false;
+	}
 	if (!is_factory_processing_bullets) {
 		return false;
 	}

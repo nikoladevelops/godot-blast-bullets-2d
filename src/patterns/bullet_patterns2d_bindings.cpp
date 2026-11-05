@@ -34,6 +34,12 @@ void BulletPatterns2D::set_max_bullets_per_pattern(int p_limit) {
 		pattern_knob_reject2d("max_bullets_per_pattern", "must be >= 1", "BulletPatterns2D");
 		return;
 	}
+	// Hard ceiling: the limit is the only bound every generator and every
+	// spawn path trusts, so a typo must not remove the bound itself.
+	if (p_limit > 1000000) {
+		pattern_knob_reject2d("max_bullets_per_pattern", "must be <= 1000000", "BulletPatterns2D");
+		return;
+	}
 	if (p_limit != g_pattern_max_bullets) {
 		g_pattern_max_bullets = p_limit;
 		++g_pattern_limit_generation;

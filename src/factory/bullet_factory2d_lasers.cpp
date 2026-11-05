@@ -141,6 +141,10 @@ bool laser_pool_args_valid(const char *fn, int beam_count, int amount) {
 		UtilityFunctions::push_error(String(fn) + ": amount must be > 0, nothing was created.");
 		return false;
 	}
+	if (amount > pattern_max_bullets()) {
+		UtilityFunctions::push_error(String(fn) + ": amount must be <= BulletPatterns2D.max_bullets_per_pattern (" + String::num_int64(pattern_max_bullets()) + "), nothing was created.");
+		return false;
+	}
 	return true;
 }
 

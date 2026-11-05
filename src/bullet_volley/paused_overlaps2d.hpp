@@ -62,6 +62,10 @@ struct PausedOverlaps2D {
 			return;
 		}
 		const uint32_t slot = found->second;
+		if (slot >= (uint32_t)entries.size()) {
+			index.erase(found); // defensive: never index a desynced entry
+			return;
+		}
 		Entry &entry = entries[slot];
 		if (entry.pairs > 1) {
 			--entry.pairs;

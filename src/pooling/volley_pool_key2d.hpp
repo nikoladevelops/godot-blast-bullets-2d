@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include <godot_cpp/classes/physics_server2d.hpp>
 #include <godot_cpp/classes/resource.hpp>
 
@@ -57,14 +59,16 @@ public:
 	void set_amount_bullets(int p_amount_bullets);
 
 	PhysicsServer2D::ShapeType get_shape_type() const { return static_cast<PhysicsServer2D::ShapeType>(shape_type); }
-	void set_shape_type(PhysicsServer2D::ShapeType p_shape_type);
+	// int64 parameter: a script may pass any int, and converting it to the
+	// engine enum (no fixed underlying type) before the check is UB.
+	void set_shape_type(int64_t p_shape_type);
 
 	// Whether the bucket's volleys carry per-bullet colors
 	// (BulletVolleyData2D.use_bullet_colors or bullet_colors).
 	bool get_use_bullet_colors() const { return use_bullet_colors; }
 	void set_use_bullet_colors(bool value) { use_bullet_colors = value; }
 
-	static Ref<VolleyPoolKey2D> make(int p_amount_bullets, PhysicsServer2D::ShapeType p_shape_type, bool p_use_bullet_colors = false);
+	static Ref<VolleyPoolKey2D> make(int p_amount_bullets, int64_t p_shape_type, bool p_use_bullet_colors = false);
 	// Same bucket (amount + shape). Keys are Resources: == compares identity.
 	bool equals(const Ref<VolleyPoolKey2D> &other) const;
 

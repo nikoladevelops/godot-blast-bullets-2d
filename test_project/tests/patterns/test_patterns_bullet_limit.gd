@@ -106,3 +106,11 @@ func test_lowering_the_limit_invalidates_a_baked_pattern() -> void:
 	var after: Array = sp.collect_spawn_transforms()
 	assert_eq(after.size(), 0, "the old bake is not served under a lower limit")
 	expect_error_sequence(["helper_generate_transforms_ring: transforms_amount must be between 0 and 500."])
+
+
+## The limit is the bound every generator and spawn path trusts: a typo above
+## the ceiling is refused instead of removing the bound itself.
+func test_a_limit_above_the_ceiling_is_rejected() -> void:
+	BulletPatterns2D.set_max_bullets_per_pattern(1000001)
+	expect_error_sequence(["BulletPatterns2D: max_bullets_per_pattern must be <= 1000000, keeping the old value."])
+	assert_eq(BulletPatterns2D.get_max_bullets_per_pattern(), DEFAULT_LIMIT, "old value kept")

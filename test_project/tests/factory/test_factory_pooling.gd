@@ -310,3 +310,24 @@ func test_reset_deferred_from_a_hit_handler_keeps_one_debugger_node() -> void:
 	assert_eq(debuggers.size(), 1, "still one debugger container after the next spawn")
 	assert_eq((debuggers[0] as Node).get_child_count(true), 1, "and exactly one debug mesh node for the new volley")
 	assert_true(factory.debug_assert_no_dangling().get("ok", false), "books ok")
+
+
+## free_bullets_pool clears the bucket before deleting: the deletion runs
+## tree_exiting handlers (user code) and a pool that still lists the dying
+## bucket would hand the same instance out or erase the node under its loop.
+func test_freeing_the_pool_clears_it_before_running_deletion_callbacks() -> void:
+	var data := H.make_volley_data(1, 0.0, 30.0)
+	var v: BulletVolley2D = factory.spawn_volley(data)
+	var seen := []
+	v.tree_exiting.connect(func() -> void:
+		if seen.is_empty():
+			seen.append(int(factory.debug_get_bullets_pool_amount())))
+	v.disable_bullet(0)
+	await idle(1)
+	assert_true(v.is_pooled(), "pooled")
+	assert_eq(int(factory.debug_get_bullets_pool_amount()), 1, "one pooled entry")
+	factory.free_bullets_pool()
+	assert_eq(seen, [0], "the bucket was cleared before the deletion callback ran")
+	await idle(2)
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "books stay clean")
+	expect_no_errors()

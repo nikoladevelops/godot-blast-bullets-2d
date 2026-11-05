@@ -858,6 +858,11 @@ public:
 		}
 	};
 	std::vector<FXTrailBake> fx_trail_bakes;
+	// Bumped whenever the bake list is cleared or one bake is rebuilt in
+	// place: a loop that runs user code between element writes re-checks it
+	// and abandons its stale element (a nested set_effect_layers or
+	// play_effect_animation).
+	uint64_t fx_trail_epoch = 0;
 
 	// Layer list retained from the last reseed (spawn/enable/live set), used
 	// to route trigger events to the factory one-shot bakes.
@@ -896,12 +901,15 @@ public:
 	// plus the bullet's random phase, composes the follow transform, moves
 	// shards when the frame changes. Called from both move_bullets loops
 	// after the instance transform is final, and from enable_bullet wakes.
-	_ALWAYS_INLINE_ void write_trail_instances(int bullet_index);
+	// Returns true when a shard's set_visible ran user code this call (the
+	// caller re-checks liveness before touching this volley again).
+	_ALWAYS_INLINE_ bool write_trail_instances(int bullet_index);
 
 	// Core trail write from an explicit global pose (physics cache above,
 	// lerped pose from the interpolation pass below). Frame, shard routing
 	// and per-instance ramp sampling live here so both paths stay identical.
-	_ALWAYS_INLINE_ void write_trail_from_global(int bullet_index, const Transform2D &bullet_transf);
+	// Returns true when a shard's set_visible ran user code.
+	_ALWAYS_INLINE_ bool write_trail_from_global(int bullet_index, const Transform2D &bullet_transf);
 
 	// Hides one bullet across every trail shard (disable path). Retires a
 	// shard's visibility when nothing tracks it anymore, so a fully
@@ -1954,6 +1962,10 @@ protected:
 	// Reused snapshot of the active bullets for the interpolation pass (its
 	// attachment writes run user code, so it walks a stable copy).
 	std::vector<int> interp_active_scratch;
+	// Reused snapshot of the live bullets for the tick's move loop. Its trail
+	// writes run shard visibility handlers (user code) that may disable or
+	// enable bullets, so the loop must never iterate the live dense vector.
+	std::vector<int> tick_active_scratch;
 
 	// HOMING
 
@@ -2081,7 +2093,9 @@ protected:
 	bool is_wobble_feature_enabled = false;
 	// Per-bullet distance ledger for distance-phased wobble (same idea as
 	// the shared pattern ledger; time-phased wobble uses curves_elapsed_time).
-	std::vector<real_t> wobble_distance_traveled;
+	// double: the phase uses this distance directly and a float loses
+	// resolution after a long session (the orbit angle wraps instead).
+	std::vector<double> wobble_distance_traveled;
 
 	// GRAVITY / DRAG (seeded from spawn data; editable live below).
 	// Gravity is a constant acceleration in px/s^2; drag is a linear
@@ -2306,7 +2320,9 @@ public:
 	_ALWAYS_INLINE_ void step_rotation(const MoveTick2D &t, BulletStep2D &b);
 	_ALWAYS_INLINE_ void step_pattern_and_forces(const MoveTick2D &t, BulletStep2D &b);
 	_ALWAYS_INLINE_ void step_orbit(const MoveTick2D &t, BulletStep2D &b);
-	_ALWAYS_INLINE_ void step_place(const MoveTick2D &t, BulletStep2D &b);
+	// Returns true when a trail shard's set_visible or the homing reach signal
+	// ran user code (the caller re-checks liveness before continuing).
+	_ALWAYS_INLINE_ bool step_place(const MoveTick2D &t, BulletStep2D &b);
 	_ALWAYS_INLINE_ void step_speed(const MoveTick2D &t, BulletStep2D &b);
 	// velocity = direction x speed + inherited offset + fall speed.
 	_ALWAYS_INLINE_ void refresh_cached_velocity(int bullet_index);

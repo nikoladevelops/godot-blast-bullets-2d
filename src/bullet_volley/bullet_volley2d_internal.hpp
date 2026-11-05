@@ -235,29 +235,35 @@ _ALWAYS_INLINE_ void BulletVolley2D::mark_collision_queued(int bullet_index, int
 	}
 }
 
-_ALWAYS_INLINE_ void BulletVolley2D::write_trail_instances(int bullet_index) {
+_ALWAYS_INLINE_ bool BulletVolley2D::write_trail_instances(int bullet_index) {
 	if (fx_trail_bakes.empty()) {
-		return;
+		return false;
 	}
 	if (bullet_index < 0 || bullet_index >= amount_bullets) {
-		return;
+		return false;
 	}
 	if (bullet_index >= (int)all_cached_instance_transforms.size()) {
-		return;
+		return false;
 	}
 	if (!all_bullets_enabled_set.contains(bullet_index)) {
-		return;
+		return false;
 	}
-	write_trail_from_global(bullet_index, all_cached_instance_transforms[bullet_index]);
+	return write_trail_from_global(bullet_index, all_cached_instance_transforms[bullet_index]);
 }
 
-_ALWAYS_INLINE_ void BulletVolley2D::write_trail_from_global(int bullet_index, const Transform2D &bullet_transf) {
+_ALWAYS_INLINE_ bool BulletVolley2D::write_trail_from_global(int bullet_index, const Transform2D &bullet_transf) {
 	if (bullet_index < 0 || bullet_index >= amount_bullets) {
-		return;
+		return false;
 	}
 	if (!bullet_transf.get_origin().is_finite() || !Math::is_finite(bullet_transf.get_rotation())) {
-		return;
+		return false;
 	}
+	// A shard's set_visible runs its visibility_changed handlers synchronously
+	// (user code): guard the free of this volley, and abandon the loop if a
+	// handler replaced the bake list (epoch) or the volley/factory died.
+	const uint64_t self_id = get_instance_id();
+	const uint64_t trail_epoch = fx_trail_epoch;
+	bool user_code_ran = false;
 	for (auto &bake : fx_trail_bakes) {
 		if (bake.layer.is_null() || bake.anim.empty() || bake.shards.empty()) {
 			continue;
@@ -320,7 +326,11 @@ _ALWAYS_INLINE_ void BulletVolley2D::write_trail_from_global(int bullet_index, c
 					if (--bake.shard_refcount[prev] == 0 && prev < (int)bake.shard_visible.size()) {
 						bake.shard_visible[prev] = 0;
 						if (MultiMeshInstance2D *node = bake.shards[prev].get()) {
-							node->set_visible(false);
+							guarded_user_call2d(this, emit_guard, [&]() { node->set_visible(false); });
+							user_code_ran = true;
+							if (fx_trail_epoch != trail_epoch || !survived_user_code(self_id) || is_queued_for_deletion()) {
+								return user_code_ran;
+							}
 						}
 					}
 				}
@@ -380,16 +390,25 @@ _ALWAYS_INLINE_ void BulletVolley2D::write_trail_from_global(int bullet_index, c
 				bake.shard_visible[frame] = 1;
 			}
 			if (MultiMeshInstance2D *node = bake.shards[frame].get()) {
-				node->set_visible(true);
+				guarded_user_call2d(this, emit_guard, [&]() { node->set_visible(true); });
+				user_code_ran = true;
+				if (fx_trail_epoch != trail_epoch || !survived_user_code(self_id) || is_queued_for_deletion()) {
+					return user_code_ran;
+				}
 			}
 		}
 	}
+	return user_code_ran;
 }
 
 _ALWAYS_INLINE_ void BulletVolley2D::hide_trail_instances(int bullet_index) {
 	if (fx_trail_bakes.empty() || bullet_index < 0 || bullet_index >= amount_bullets) {
 		return;
 	}
+	// set_visible runs shard visibility handlers (user code): guard the free,
+	// and stop if a handler replaced the bake list.
+	const uint64_t self_id = get_instance_id();
+	const uint64_t trail_epoch = fx_trail_epoch;
 	for (auto &bake : fx_trail_bakes) {
 		if (bullet_index < 0 || bullet_index >= (int)bake.bullet_shard.size()) {
 			continue;
@@ -406,7 +425,10 @@ _ALWAYS_INLINE_ void BulletVolley2D::hide_trail_instances(int bullet_index) {
 				bake.shard_visible[prev] = 0;
 				if (prev < (int)bake.shards.size() && bake.shards[prev].ptr != nullptr) {
 					if (MultiMeshInstance2D *node = bake.shards[prev].get()) {
-						node->set_visible(false);
+						guarded_user_call2d(this, emit_guard, [&]() { node->set_visible(false); });
+						if (fx_trail_epoch != trail_epoch || !survived_user_code(self_id) || is_queued_for_deletion()) {
+							return;
+						}
 					}
 				}
 			}

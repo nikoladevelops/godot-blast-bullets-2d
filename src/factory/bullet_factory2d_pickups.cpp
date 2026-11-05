@@ -452,6 +452,10 @@ void BulletFactory2D::populate_pickup_pool(const Ref<BulletPickupData2D> &pickup
 		UtilityFunctions::push_error(String("BulletFactory2D.populate_pickup_pool: bullet_count must be between 1 and ") + String::num_int64(pattern_max_bullets()) + String(", nothing populated."));
 		return;
 	}
+	if (instance_count < 1 || instance_count > pattern_max_bullets()) {
+		UtilityFunctions::push_error(String("BulletFactory2D.populate_pickup_pool: instance_count must be between 1 and ") + String::num_int64(pattern_max_bullets()) + String(", nothing populated."));
+		return;
+	}
 	// A pooled volley of this key needs spawn data that carries the transforms.
 	Ref<BulletVolleyData2D> data = pickup->get_volley_data()->duplicate();
 	TypedArray<Transform2D> transforms;

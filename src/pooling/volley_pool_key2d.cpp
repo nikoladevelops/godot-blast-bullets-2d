@@ -15,20 +15,20 @@ void VolleyPoolKey2D::set_amount_bullets(int p_amount_bullets) {
 	amount_bullets = p_amount_bullets;
 }
 
-void VolleyPoolKey2D::set_shape_type(PhysicsServer2D::ShapeType p_shape_type) {
-	if (p_shape_type != PhysicsServer2D::SHAPE_CIRCLE && p_shape_type != PhysicsServer2D::SHAPE_RECTANGLE && p_shape_type != PhysicsServer2D::SHAPE_CAPSULE) {
+void VolleyPoolKey2D::set_shape_type(int64_t p_shape_type) {
+	if (p_shape_type != (int64_t)PhysicsServer2D::SHAPE_CIRCLE && p_shape_type != (int64_t)PhysicsServer2D::SHAPE_RECTANGLE && p_shape_type != (int64_t)PhysicsServer2D::SHAPE_CAPSULE) {
 		UtilityFunctions::push_error("VolleyPoolKey2D shape_type must be Circle, Rectangle or Capsule (the only types the bullet physics supports).");
 		return;
 	}
-	shape_type = p_shape_type;
+	shape_type = (int)p_shape_type;
 }
 
-Ref<VolleyPoolKey2D> VolleyPoolKey2D::make(int p_amount_bullets, PhysicsServer2D::ShapeType p_shape_type, bool p_use_bullet_colors) {
+Ref<VolleyPoolKey2D> VolleyPoolKey2D::make(int p_amount_bullets, int64_t p_shape_type, bool p_use_bullet_colors) {
 	if (p_amount_bullets < 0) {
 		UtilityFunctions::push_error("VolleyPoolKey2D.make: amount_bullets must be >= 0, returning null.");
 		return Ref<VolleyPoolKey2D>();
 	}
-	if (p_shape_type != PhysicsServer2D::SHAPE_CIRCLE && p_shape_type != PhysicsServer2D::SHAPE_RECTANGLE && p_shape_type != PhysicsServer2D::SHAPE_CAPSULE) {
+	if (p_shape_type != (int64_t)PhysicsServer2D::SHAPE_CIRCLE && p_shape_type != (int64_t)PhysicsServer2D::SHAPE_RECTANGLE && p_shape_type != (int64_t)PhysicsServer2D::SHAPE_CAPSULE) {
 		UtilityFunctions::push_error("VolleyPoolKey2D.make: shape_type must be Circle, Rectangle or Capsule, returning null.");
 		return Ref<VolleyPoolKey2D>();
 	}

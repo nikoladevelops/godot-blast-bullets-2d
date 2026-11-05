@@ -231,7 +231,12 @@ BulletVolley2D *BulletFactory2D::spawn_volley_internal(const Ref<BulletVolleyDat
 			// volley is a clean disabled one: file it back under its live key
 			// (not the spawn key) and fall through to a fresh allocation. A
 			// refused reuse must never turn a valid spawn into a silent null.
-			volley_pool.push(volley, volley->get_pool_key());
+			// A volley a handler queued for deletion (the enable was refused
+			// by an emit guard) is never pushed back: the bucket would hold a
+			// dying instance.
+			if (!volley->is_queued_for_deletion()) {
+				volley_pool.push(volley, volley->get_pool_key());
+			}
 			volley = nullptr;
 		}
 		if (volley != nullptr && volley->get_life_id() != reuse_generation + 1) {
@@ -390,6 +395,10 @@ void BulletFactory2D::populate_bullets_pool(const Ref<VolleyPoolKey2D> &key, con
 		UtilityFunctions::push_error("Error. You can't populate the bullets pool with instance_count <= 0");
 		return;
 	}
+	if (instance_count > pattern_max_bullets()) {
+		UtilityFunctions::push_error("BulletFactory2D.populate_bullets_pool: instance_count must be <= " + String::num_int64(pattern_max_bullets()) + ", ignoring the request.");
+		return;
+	}
 
 	if (spawn_data.is_null() || spawn_data->transforms.size() == 0) {
 		UtilityFunctions::push_error("Error when trying to pool bullets. No transforms were provided in the spawn data. Ignoring the request");
@@ -424,6 +433,10 @@ void BulletFactory2D::populate_bullets_pool(const Ref<VolleyPoolKey2D> &key, con
 void BulletFactory2D::populate_attachments_pool(const Ref<PackedScene> attachment_scene, int amount_instances) {
 	if (amount_instances <= 0 || attachment_scene.is_null()) {
 		UtilityFunctions::push_error("Invalid parameters for populate_attachments_pool.");
+		return;
+	}
+	if (amount_instances > pattern_max_bullets()) {
+		UtilityFunctions::push_error("BulletFactory2D.populate_attachments_pool: amount_instances must be <= " + String::num_int64(pattern_max_bullets()) + ", ignoring the request.");
 		return;
 	}
 

@@ -1104,6 +1104,13 @@ replayed once on resume.
 | Movement LOOP wraps, seeks and teleports restart engine interpolation; PING_PONG turns continuously | `test_spawner_movement` |
 | A paused factory's transform setters move the attachment node at once (its interpolation pass never runs) | `test_mix_teleport` |
 | Preview tracks refuse the lattice/waterfall products the dispatch refuses and never sweep arms x amount | `test_spawner_preview_track_coincidence` |
+| A volley's own visibility_changed handlers are guarded on drain/enable/wake (a release-path free is refused, finished with queue_free); freeing the volley from a CHILD's signal is Godot's own boundary | `test_volley_freeze_contract` (the child case is documented, never tested) |
+| The move loop walks a snapshot of the live set, skips bullets disabled by a trail handler, and re-checks liveness after a shard visibility toggle | `test_volley_fx_layers` |
+| Effect-layer rebuilds carry an epoch: a nested set_effect_layers/play_effect_animation abandons the outer loop instead of touching a stale bake | `test_volley_fx_layers` |
+| `free_bullets_pool` clears the buckets before deleting (tree_exiting/resource callbacks may spawn); release_life re-checks after every resource/connection drop | `test_factory_pooling`, `test_volley_freeze_contract` |
+| Every GDScript "how many instances" entry is bounded by max_bullets_per_pattern (populate bullets/attachments/lasers/pickups, generate_random_data, the limit setter's 1e6 ceiling); play_sound rejects a non-finite position | `test_factory_input_limits`, `test_data_setter_contract`, `test_patterns_bullet_limit` |
+| VolleyPoolKey2D takes shape_type as an int64 and range-checks before storing (engine enums are unfixed: cast-before-check is UB) | `test_pool_key_validity` |
+| The per-bullet and tick sparse sets are validated (dense/sparse bijection) by debug_check_invariants / debug_assert_no_dangling after every test; `debug_get_active_set_stats().consistent` exposes the same check | all suites, `test_volley_readouts` |
 | disable_bullet freezes; opt-in reset; parked vs pooled; pooled wake refused | `test_volley_freeze_contract` |
 | Every clock restarts per life, holds while parked/paused, finite under hitches | `test_volley_clock_audit` |
 | Custom data per bullet and shared, readable in every callback, never leaks through the pool | `test_volley_custom_data_contract` |

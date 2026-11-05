@@ -219,3 +219,15 @@ func test_every_shape_and_color_combination_buckets_by_its_own_key() -> void:
 			v.clear_all_bullets()
 			await idle(1)
 	assert_true(factory.debug_assert_no_dangling().get("ok", false), "books ok")
+
+
+## The setter takes a plain int64 and range-checks it BEFORE storing anything:
+## an out-of-range engine enum value never reaches the enum load (UB).
+func test_an_out_of_range_shape_type_is_rejected_without_touching_the_key() -> void:
+	var key := VolleyPoolKey2D.make(4, PhysicsServer2D.SHAPE_CIRCLE)
+	for bad in [999, -1, 2147483647]:
+		key.set_shape_type(bad)
+		expect_error_sequence(["VolleyPoolKey2D shape_type must be Circle, Rectangle or Capsule (the only types the bullet physics supports)."])
+		assert_eq(key.shape_type, PhysicsServer2D.SHAPE_CIRCLE, "kept after %d" % bad)
+		assert_null(VolleyPoolKey2D.make(4, bad), "make refuses %d" % bad)
+		expect_error_sequence(["VolleyPoolKey2D.make: shape_type must be Circle, Rectangle or Capsule, returning null."])

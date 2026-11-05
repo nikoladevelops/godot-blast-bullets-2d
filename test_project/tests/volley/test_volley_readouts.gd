@@ -127,6 +127,7 @@ func test_active_set_stats_agree_with_the_live_counter() -> void:
 	var st: Dictionary = v.debug_get_active_set_stats()
 	assert_eq(st["active"], v.debug_get_volley_info()["active_bullets"], "a fresh volley: every bullet active")
 	assert_eq(st["amount_bullets"], 6, "the volley's bullet count")
+	assert_true(bool(st["consistent"]), "the sparse set agrees with itself (dense/sparse bijection)")
 	assert_eq(Array(st["active_indexes"]), [0, 1, 2, 3, 4, 5], "all six, in index order")
 	assert_gte(st["capacity"], st["active"], "the index space covers the active indexes")
 	v.disable_bullet(2)

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "godot_cpp/core/defs.hpp"
+#include <climits>
 #include <vector>
 
 class DynamicSparseSet {
@@ -46,14 +47,14 @@ public:
 			return;
 		}
 
-		// Allocate more space if needed
+		// Allocate more space if needed. The growth arithmetic saturates:
+		// max_size * 2 and index + 1 overflow an int at the extremes (UB),
+		// even though no script-reachable index gets near them.
 		if (index >= max_size) {
-			int new_size = (max_size == 0) ? 8 : max_size * 2;
-
-			if (index >= new_size) {
+			int new_size = (max_size == 0) ? 8 : (max_size > INT_MAX / 2 ? INT_MAX : max_size * 2);
+			if (index >= new_size && index < INT_MAX) {
 				new_size = index + 1;
 			}
-
 			resize(new_size);
 		}
 
@@ -78,8 +79,10 @@ public:
 		// Get the index's position inside the active indexes dense vec
 		int position_in_dense = sparse[index];
 
-		// If the index is not active, do nothing
-		if (position_in_dense == -1) {
+		// If the index is not active, do nothing. The range check is
+		// defensive: a desynced slot must never index dense out of bounds.
+		if (position_in_dense < 0 || position_in_dense >= (int)dense.size()) {
+			sparse[index] = -1;
 			return;
 		}
 
@@ -110,7 +113,10 @@ public:
 		sparse.assign(max_size, -1);
 	}
 
-	// Get the active indexes dense vector
+	// The active indexes in dense order, BY REFERENCE (hot loops read it
+	// without a copy). Never hold this reference across user code: a callback
+	// may disable/enable an index and invalidate it. Snapshot it first (the
+	// volley tick and interpolation pass use their own scratch vectors).
 	_ALWAYS_INLINE_ const std::vector<int> &get_active_indexes() const {
 		return dense;
 	}
@@ -132,8 +138,12 @@ public:
 		// Sanitize index_start
 		index_start = (index_start < 0) ? 0 : index_start;
 
-		// Sanitize End
+		// Sanitize End. INT_MAX is not representable as a loop bound
+		// (++i would overflow): the last valid index is INT_MAX - 1.
 		int end = index_end_inclusive;
+		if (end >= INT_MAX) {
+			end = INT_MAX - 1;
+		}
 		if (end < 0) {
 			if (max_size <= 0) {
 				return;
@@ -162,5 +172,35 @@ public:
 			return;
 		}
 		activate_range_data(0, max_size - 1);
+	}
+
+	// Full consistency check (cold; used by debug_check_invariants after every
+	// test): every dense entry maps back to its own sparse slot, no duplicates,
+	// no active sparse slot missing from dense. Never mutates.
+	bool debug_validate() const {
+		std::vector<uint8_t> seen((size_t)max_size, 0);
+		for (size_t pos = 0; pos < dense.size(); ++pos) {
+			const int value = dense[pos];
+			if (value < 0 || value >= max_size) {
+				return false;
+			}
+			if (sparse[(size_t)value] != (int)pos) {
+				return false;
+			}
+			if (seen[(size_t)value] != 0) {
+				return false;
+			}
+			seen[(size_t)value] = 1;
+		}
+		for (int i = 0; i < max_size; ++i) {
+			const int pos = sparse[(size_t)i];
+			if (pos < 0) {
+				continue;
+			}
+			if (pos >= (int)dense.size() || dense[(size_t)pos] != i) {
+				return false;
+			}
+		}
+		return true;
 	}
 };

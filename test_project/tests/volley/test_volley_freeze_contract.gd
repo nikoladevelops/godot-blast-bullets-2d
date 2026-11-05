@@ -322,3 +322,83 @@ func test_the_life_state_truth_table_holds_across_the_whole_cycle() -> void:
 	v.enable_bullet(1)
 	assert_eq(_state_row(v), ["active", false, false, true, false, true, false], "a single wake makes it active")
 	assert_eq(_state_row(v)[0], v.debug_get_life_state(), "the state string is the last word")
+
+
+## The drain hide runs the volley's visibility_changed handlers (Godot emits
+## it synchronously). A release-path free there must be refused by the drain
+## guard and finished with queue_free, never deleting the volley mid-drain.
+func test_a_visibility_handler_freeing_the_volley_on_drain_is_refused() -> void:
+	var v: BulletVolley2D = quick_volley(1, 0.0)
+	var fired := []
+	v.visibility_changed.connect(func() -> void:
+		if fired.is_empty():
+			fired.append(true)
+			BulletFactory2D.debug_free_like_release(v))
+	v.disable_bullet(0) # the last bullet: the volley hides and drains
+	assert_eq(fired, [true], "the handler ran from the drain hide")
+	assert_true(is_instance_valid(v), "the release-path free was refused")
+	assert_true(v.is_queued_for_deletion(), "and finished with queue_free")
+	expect_no_errors()
+	await idle(2)
+	assert_false(is_instance_valid(v), "gone at frame end")
+
+
+## Waking a parked volley shows it; a release-path free from that handler is
+## refused and the wake is not left half-applied.
+func test_a_visibility_handler_freeing_a_wake_is_refused() -> void:
+	var v: BulletVolley2D = quick_volley(1, 0.0)
+	v.set_is_auto_pooling_enabled(false)
+	var fired := []
+	v.visibility_changed.connect(func() -> void:
+		if v.visible and fired.is_empty():
+			fired.append(true)
+			BulletFactory2D.debug_free_like_release(v))
+	v.disable_bullet(0) # park: the hide fires while visible is already false
+	assert_true(v.is_parked(), "parked")
+	v.enable_bullet(0) # wake: set_visible(true)
+	assert_eq(fired, [true], "the handler ran from the wake show")
+	assert_true(is_instance_valid(v), "the release-path free was refused during the wake")
+	assert_true(v.is_queued_for_deletion(), "finished with queue_free")
+	expect_no_errors()
+	await idle(2)
+	assert_false(is_instance_valid(v), "gone at frame end")
+
+
+## Reusing a pooled volley shows it; a surviving visibility handler freeing it
+## must be refused and the spawn must still return a usable volley.
+func test_a_visibility_handler_freeing_a_pooled_reuse_is_refused() -> void:
+	var data := H.make_volley_data(1, 0.0, 30.0)
+	var v: BulletVolley2D = factory.spawn_volley(data)
+	var fired := []
+	v.visibility_changed.connect(func() -> void:
+		if v.visible and fired.is_empty():
+			fired.append(true)
+			BulletFactory2D.debug_free_like_release(v))
+	v.disable_bullet(0) # drain -> pooled (the hide fires while invisible already)
+	await idle(1)
+	assert_true(v.is_pooled(), "pooled")
+	var again: BulletVolley2D = factory.spawn_volley(data) # reuse: set_visible(true)
+	assert_eq(fired, [true], "the handler ran from the reuse show")
+	assert_true(is_instance_valid(again), "a usable volley came back")
+	assert_false(again.is_queued_for_deletion(), "the returned one is not queued")
+	expect_no_errors()
+	await idle(2)
+	assert_false(is_instance_valid(v), "the refused one died at frame end")
+
+
+## release_life drops the life's user resources; a script resource whose
+## PREDELETE frees the volley must stop the release, not leave it writing
+## into freed memory (the release-path free the other setters already guard).
+func test_a_resource_predelede_freeing_the_volley_during_release_is_survived() -> void:
+	var data := H.make_volley_data(1, 0.0, 30.0)
+	var v: BulletVolley2D = factory.spawn_volley(data)
+	var probe := FreeVolleyOnPredeleteSpeed2D.new()
+	FreeVolleyOnPredeleteSpeed2D.victim = v
+	FreeVolleyOnPredeleteSpeed2D.fired = 0
+	v.set_shared_bullet_speed_data(probe)
+	probe = null
+	v.disable_bullet(0) # drain -> release_life unrefs the speed resource -> PREDELETE -> free()
+	assert_gt(FreeVolleyOnPredeleteSpeed2D.fired, 0, "the PREDELETE handler ran during the release")
+	await idle(2)
+	assert_not_null(quick_volley(1), "the factory still works")
+	expect_no_errors()

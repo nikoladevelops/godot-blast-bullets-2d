@@ -5,6 +5,10 @@
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/core/class_db.hpp>
 
+#include <cstdint>
+#include <utility>
+#include <vector>
+
 using namespace godot;
 
 namespace BlastBullets2D {
@@ -81,16 +85,26 @@ void VolleyPool::clear() {
 }
 
 void VolleyPool::free_all_bullets() {
+	// Snapshot, clear the map, THEN delete: every force_delete runs tree and
+	// Resource user code that may spawn (a pop erases a bucket) or free
+	// another entry. Never delete while walking the live map.
+	std::vector<std::pair<uint64_t, BulletVolley2D *>> doomed;
+	doomed.reserve((size_t)get_total_amount_pooled());
 	for (auto &[key, vec] : pool) {
-		// Free every object in the vector
 		for (BulletVolley2D *bullet_multi : vec) {
-			if (bullet_multi) {
-				bullet_multi->force_delete();
+			if (bullet_multi != nullptr) {
+				doomed.emplace_back((uint64_t)bullet_multi->get_instance_id(), bullet_multi);
 			}
 		}
-		vec.clear();
 	}
 	pool.clear();
+	for (const std::pair<uint64_t, BulletVolley2D *> &entry : doomed) {
+		// An earlier deletion's user code may have freed another entry.
+		if (ObjectDB::get_instance(ObjectID(entry.first)) != entry.second) {
+			continue;
+		}
+		entry.second->force_delete();
+	}
 }
 
 void VolleyPool::free_specific_bullets(const PoolKey &key) {
@@ -98,12 +112,20 @@ void VolleyPool::free_specific_bullets(const PoolKey &key) {
 	if (it == pool.end()) {
 		return;
 	}
+	std::vector<std::pair<uint64_t, BulletVolley2D *>> doomed;
+	doomed.reserve(it->second.size());
 	for (BulletVolley2D *bullet_multi : it->second) {
-		if (bullet_multi) {
-			bullet_multi->force_delete();
+		if (bullet_multi != nullptr) {
+			doomed.emplace_back((uint64_t)bullet_multi->get_instance_id(), bullet_multi);
 		}
 	}
 	pool.erase(it);
+	for (const std::pair<uint64_t, BulletVolley2D *> &entry : doomed) {
+		if (ObjectDB::get_instance(ObjectID(entry.first)) != entry.second) {
+			continue;
+		}
+		entry.second->force_delete();
+	}
 }
 
 int VolleyPool::get_total_amount_pooled() {

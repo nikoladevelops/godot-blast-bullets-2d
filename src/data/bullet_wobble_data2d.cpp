@@ -1,6 +1,7 @@
 #include "data/bullet_wobble_data2d.hpp"
 
 #include "core/assign_if_changed2d.hpp"
+#include "patterns/pattern_inputs2d.hpp"
 #include <godot_cpp/classes/random_number_generator.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
@@ -17,6 +18,10 @@ TypedArray<BulletWobbleData2D> BulletWobbleData2D::generate_random_data(
 	TypedArray<BulletWobbleData2D> data;
 	if (amount_to_generate <= 0) {
 		UtilityFunctions::push_error("BulletWobbleData2D.generate_random_data: amount_to_generate must be > 0.");
+		return data;
+	}
+	if (amount_to_generate > pattern_max_bullets()) {
+		UtilityFunctions::push_error("BulletWobbleData2D.generate_random_data: amount_to_generate must be <= " + String::num_int64(pattern_max_bullets()) + ".");
 		return data;
 	}
 	if (!(amplitude_MIN <= amplitude_MAX) || !(frequency_MIN <= frequency_MAX)) {

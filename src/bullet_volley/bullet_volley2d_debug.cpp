@@ -289,6 +289,7 @@ Dictionary BulletVolley2D::debug_get_active_set_stats() const {
 	d["active"] = (int)active_indexes.size();
 	d["capacity"] = all_bullets_enabled_set.capacity();
 	d["amount_bullets"] = amount_bullets;
+	d["consistent"] = all_bullets_enabled_set.debug_validate();
 	PackedInt32Array indexes;
 	indexes.resize((int64_t)active_indexes.size());
 	for (int64_t k = 0; k < (int64_t)active_indexes.size(); ++k) {
@@ -632,6 +633,9 @@ Dictionary BulletVolley2D::debug_get_clocks() const {
 }
 
 String BulletVolley2D::debug_check_invariants() const {
+	if (!all_bullets_enabled_set.debug_validate()) {
+		return "per-bullet sparse set is inconsistent (dense/sparse desync)";
+	}
 	if (is_pooled_in_pool) {
 		if (pickup_data.is_valid() || pickup_time_scale_owner_id != 0) {
 			return "pooled volley is still a pickup";

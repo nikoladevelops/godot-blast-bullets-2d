@@ -429,10 +429,17 @@ void BulletVolley2D::move_bullets(double delta) {
 	}();
 
 	BulletStep2D b;
-	{ // One node inverse for the whole loop (trail writes convert per bullet); no user code runs inside.
+	{ // One node inverse for the whole loop (trail writes convert per bullet).
+		// The trail writes run shard visibility handlers (user code) that may
+		// disable/enable bullets: walk a stable snapshot, skip bullets disabled
+		// meanwhile, and stop when a handler asked to free this volley (the
+		// emit guard refuses the free and finishes it with queue_free).
+		const uint64_t loop_self_id = get_instance_id();
 		NodeInverseScope tick_inverse_scope(this);
-		for (int i : all_bullets_enabled_set.get_active_indexes()) {
-			if (i < 0 || i >= amount_bullets) {
+		std::vector<int> &active = tick_active_scratch;
+		active.assign(all_bullets_enabled_set.get_active_indexes().begin(), all_bullets_enabled_set.get_active_indexes().end());
+		for (int i : active) {
+			if (i < 0 || i >= amount_bullets || !all_bullets_enabled_set.contains(i)) {
 				continue;
 			}
 			// Bounce cooldown ticks down so the bullet can escape the overlap
@@ -473,7 +480,10 @@ void BulletVolley2D::move_bullets(double delta) {
 			b.velocity_delta = (*b.direction * all_cached_speed[i]) * (real_t)delta;
 			step_pattern_and_forces(t, b);
 			step_orbit(t, b);
-			step_place(t, b);
+			const bool placed_user_code = step_place(t, b);
+			if (placed_user_code && (!survived_user_code(loop_self_id) || is_queued_for_deletion())) {
+				return; // a shard/reach handler asked for a free refused by the guard
+			}
 			if (t.graze) {
 				step_graze(t, i, all_cached_instance_origin[i], b.velocity_delta);
 			}
@@ -1011,7 +1021,7 @@ _ALWAYS_INLINE_ void BulletVolley2D::step_orbit(const MoveTick2D &t, BulletStep2
 // the texture-only rotation stripped, frozen while rotate_only_textures),
 // offset it, push it to the physics server, carry the attachment and the
 // trail, then test the homing reach at the post-move position.
-_ALWAYS_INLINE_ void BulletVolley2D::step_place(const MoveTick2D &t, BulletStep2D &b) {
+_ALWAYS_INLINE_ bool BulletVolley2D::step_place(const MoveTick2D &t, BulletStep2D &b) {
 	const int i = b.i;
 	Vector2 &origin = all_cached_instance_origin[i];
 	const Vector2 pre_move_origin = origin;
@@ -1053,14 +1063,16 @@ _ALWAYS_INLINE_ void BulletVolley2D::step_place(const MoveTick2D &t, BulletStep2
 
 	physics_server->area_set_shape_transform(area, i, shape);
 	move_bullet_attachment(b.velocity_delta, i);
-	write_trail_instances(i);
+	const bool trail_user_code = write_trail_instances(i); // shard set_visible handlers are user code
 
 	// 7b. REACHED: the whole move of this tick (pre-move origin -> origin) is
 	// tested, so a fast bullet cannot fly through the threshold circle; the
 	// reach belongs to the deque the bullet steered by.
 	if (b.steering_deque != nullptr && !b.steering_deque->empty() && b.target_pos.is_finite()) {
 		try_to_emit_bullet_homing_target_reached_signal(*b.steering_deque, b.steering_deque == &shared_homing_deque, i, pre_move_origin, b.target_pos, b.velocity_delta);
+		return true; // the reach signal is a live user-code point
 	}
+	return trail_user_code;
 }
 
 // 8b. GRAZE. The bullet's motion this tick is the segment p1 - v -> p1;

@@ -1,6 +1,7 @@
 #include "data/bullet_speed_data2d.hpp"
 
 #include "core/assign_if_changed2d.hpp"
+#include "patterns/pattern_inputs2d.hpp"
 #include <godot_cpp/classes/random_number_generator.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
@@ -21,6 +22,10 @@ TypedArray<BulletSpeedData2D> BulletSpeedData2D::generate_random_data(
 	TypedArray<BulletSpeedData2D> data;
 	if (amount_to_generate <= 0) {
 		UtilityFunctions::push_error("BulletSpeedData2D.generate_random_data: amount_to_generate must be > 0.");
+		return data;
+	}
+	if (amount_to_generate > pattern_max_bullets()) {
+		UtilityFunctions::push_error("BulletSpeedData2D.generate_random_data: amount_to_generate must be <= " + String::num_int64(pattern_max_bullets()) + ".");
 		return data;
 	}
 	if (!(speed_MIN <= speed_MAX) || !(max_speed_MIN <= max_speed_MAX) || !(acceleration_MIN <= acceleration_MAX)) {

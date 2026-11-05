@@ -334,6 +334,9 @@ Dictionary BulletFactory2D::debug_assert_no_dangling() {
 			return fail("active set holds stale id " + String::num_int64(id));
 		}
 	}
+	if (!volley_set.debug_validate()) {
+		return fail("tick set sparse/dense invariants broke");
+	}
 	// Life-state invariants (ACTIVE / PARKED / POOLED, see BulletVolley2D):
 	// the counter mirrors the live set, an active volley is ticked, and a
 	// pooled volley is fully released (no live bullet, attachment, timer,

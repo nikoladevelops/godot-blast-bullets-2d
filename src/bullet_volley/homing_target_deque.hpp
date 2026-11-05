@@ -64,11 +64,17 @@ public:
 		++count;
 	}
 	void pop_front() {
+		if (count <= 0) {
+			return; // defensive: pops on an empty ring are no-ops
+		}
 		buf[head] = T();
 		head = wrap(head + 1);
 		--count;
 	}
 	void pop_back() {
+		if (count <= 0) {
+			return; // defensive: pops on an empty ring are no-ops
+		}
 		buf[wrap(head + count - 1)] = T();
 		--count;
 	}
@@ -85,7 +91,10 @@ private:
 	int count = 0;
 
 	int capacity() const { return (int)buf.size(); }
-	int wrap(int index) const { return index % capacity(); }
+	int wrap(int index) const {
+		const int cap = capacity();
+		return cap > 0 ? index % cap : 0; // defensive: empty rings never divide by zero
+	}
 	void grow_if_full() {
 		if (count < capacity()) {
 			return;

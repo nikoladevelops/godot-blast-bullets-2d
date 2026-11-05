@@ -59,9 +59,29 @@ void BulletVolley2D::fx_rebuild_trail_layers(const TypedArray<EffectLayerData2D>
 		}
 		bake.layer = layer;
 		bake.layer_index = li;
+		const uint64_t entry_epoch = fx_trail_epoch;
 		for (size_t f = 0; f < bake.anim.frames.size(); ++f) {
-			const Ref<Texture2D> &frame = bake.anim.frames[f];
-			MultiMeshInstance2D *shard = BulletFactory2D::fx_create_shard(this, frame, BulletFactory2D::fx_quad_size_for_texture(frame), layer->material, layer->self_modulate, layer->z_index, layer->z_as_relative, layer->visibility_layer, layer->light_mask, amount_bullets, true);
+			const Ref<Texture2D> frame = bake.anim.frames[f];
+			MultiMeshInstance2D *shard = nullptr;
+			// add_child runs node_added handlers (user code): guard the free of
+			// this volley and re-check after it.
+			guarded_user_call2d(this, emit_guard, [&]() {
+				shard = BulletFactory2D::fx_create_shard(this, frame, BulletFactory2D::fx_quad_size_for_texture(frame), layer->material, layer->self_modulate, layer->z_index, layer->z_as_relative, layer->visibility_layer, layer->light_mask, amount_bullets, true);
+			});
+			if (fx_trail_epoch != entry_epoch || !survived_user_code(self_id) || is_queued_for_deletion()) {
+				// A handler replaced the layers or asked to free the volley (the
+				// guard refused it): drop the shards this loop made, keep whatever
+				// the nested call left in the member list.
+				for (auto &created : bake.shards) {
+					if (MultiMeshInstance2D *node = created.get()) {
+						node->queue_free();
+					}
+				}
+				if (shard != nullptr) {
+					shard->queue_free();
+				}
+				return;
+			}
 			bake.shards.push_back(shard);
 			bake.shard_multimeshes.push_back(shard != nullptr ? shard->get_multimesh() : Ref<MultiMesh>());
 		}
@@ -82,6 +102,9 @@ void BulletVolley2D::fx_rebuild_trail_layers(const TypedArray<EffectLayerData2D>
 }
 
 void BulletVolley2D::fx_clear_trail_layers() {
+	// Every rebuild invalidates loops that hold a bake element across user
+	// code (nested set_effect_layers / play_effect_animation).
+	++fx_trail_epoch;
 	// The bakes are swapped into a local first: dropping their layer Refs is
 	// the destruction of a script layer, whose NOTIFICATION_PREDELETE is user
 	// code that may free this volley (proven under ASan). Destroying them in
@@ -349,50 +372,74 @@ void BulletVolley2D::all_bullets_set_trail_enabled(int layer_index, bool trail_o
 // set_effect_layers). Shard nodes are rebuilt: counts follow the new frame
 // list, per-bullet phase/toggles survive.
 bool BulletVolley2D::play_effect_animation(int layer_index, const StringName &animation) {
+	const uint64_t self_id = get_instance_id();
 	for (size_t b = 0; b < fx_trail_bakes.size(); ++b) {
-		FXTrailBake &bake = fx_trail_bakes[b];
-		if (bake.layer_index != layer_index || bake.layer.is_null()) {
+		if (fx_trail_bakes[b].layer_index != layer_index || fx_trail_bakes[b].layer.is_null()) {
 			continue;
 		}
 		SpriteAnim2D baked;
-		if (!bake.layer->bake_effect_animation(animation, frame_cache(), baked)) {
+		if (!fx_trail_bakes[b].layer->bake_effect_animation(animation, frame_cache(), baked)) {
 			return false;
 		}
-		for (size_t s = 0; s < bake.shards.size(); ++s) {
-			if (MultiMeshInstance2D *shard = bake.shards[s].get()) {
-				// Zero first: a queued-free node still renders this frame.
-				Ref<MultiMesh> mm = shard->get_multimesh();
-				if (mm.is_valid()) {
-					for (int i = 0; i < mm->get_instance_count(); ++i) {
-						mm->set_instance_transform_2d(i, zero_transform);
+		// This rebuild invalidates every outer loop over the bakes.
+		++fx_trail_epoch;
+		const uint64_t epoch = fx_trail_epoch;
+		{
+			// Old shards out (queue_free: deferred, no user code), then the new
+			// animation and bookkeeping in place.
+			FXTrailBake &bake = fx_trail_bakes[b];
+			for (auto &created : bake.shards) {
+				if (MultiMeshInstance2D *node = created.get()) {
+					// Zero first: a queued-free node still renders this frame.
+					Ref<MultiMesh> mm = node->get_multimesh();
+					if (mm.is_valid()) {
+						for (int i = 0; i < mm->get_instance_count(); ++i) {
+							mm->set_instance_transform_2d(i, zero_transform);
+						}
 					}
+					node->queue_free();
 				}
-				shard->queue_free();
+			}
+			bake.shards.clear();
+			bake.shard_multimeshes.clear();
+			bake.shard_visible.clear();
+			bake.shard_refcount.clear();
+			bake.anim = std::move(baked);
+			bake.animation_override = true;
+			bake.bullet_shard.assign(amount_bullets, -1);
+			bake.bullet_trail_transf.assign(amount_bullets, Transform2D());
+			bake.bullet_trail_tint.assign(amount_bullets, Color(1, 1, 1, 1));
+			if ((int)bake.phase.size() != amount_bullets) {
+				bake.phase.assign(amount_bullets, 0.0);
+			}
+			if ((int)bake.bullet_on.size() != amount_bullets) {
+				bake.bullet_on.assign(amount_bullets, 1);
 			}
 		}
-		bake.shards.clear();
-		bake.shard_multimeshes.clear();
-		bake.shard_visible.clear();
-		bake.shard_refcount.clear();
-		bake.anim = std::move(baked);
-		bake.animation_override = true;
-		const std::vector<Ref<Texture2D>> &frames = bake.anim.frames;
-		for (size_t f = 0; f < frames.size(); ++f) {
-			MultiMeshInstance2D *shard = BulletFactory2D::fx_create_shard(this, frames[f], BulletFactory2D::fx_quad_size_for_texture(frames[f]), bake.layer->material, bake.layer->self_modulate, bake.layer->z_index, bake.layer->z_as_relative, bake.layer->visibility_layer, bake.layer->light_mask, amount_bullets, true);
-			bake.shards.push_back(shard);
-			bake.shard_multimeshes.push_back(shard != nullptr ? shard->get_multimesh() : Ref<MultiMesh>());
+		// Create the shards without holding a reference into the bake list:
+		// each add_child runs node_added handlers (user code) that may replace
+		// the layers or ask to free the volley (refused by the guard above).
+		const int frame_count = (int)fx_trail_bakes[b].anim.frames.size();
+		for (int f = 0; f < frame_count; ++f) {
+			const Ref<Texture2D> frame = fx_trail_bakes[b].anim.frames[f];
+			const Ref<EffectLayerData2D> layer = fx_trail_bakes[b].layer;
+			MultiMeshInstance2D *shard = nullptr;
+			guarded_user_call2d(this, emit_guard, [&]() {
+				shard = BulletFactory2D::fx_create_shard(this, frame, BulletFactory2D::fx_quad_size_for_texture(frame), layer->material, layer->self_modulate, layer->z_index, layer->z_as_relative, layer->visibility_layer, layer->light_mask, amount_bullets, true);
+			});
+			if (fx_trail_epoch != epoch || !survived_user_code(self_id) || is_queued_for_deletion()) {
+				if (shard != nullptr) {
+					shard->queue_free();
+				}
+				return false; // a handler replaced the layers or freed the volley
+			}
+			FXTrailBake &live = fx_trail_bakes[b];
+			live.shards.push_back(shard);
+			live.shard_multimeshes.push_back(shard != nullptr ? shard->get_multimesh() : Ref<MultiMesh>());
 		}
-		bake.shard_visible.assign(bake.shards.size(), 0);
-		bake.shard_refcount.assign(bake.shards.size(), 0);
-		bake.bullet_shard.assign(amount_bullets, -1);
-		bake.bullet_trail_transf.assign(amount_bullets, Transform2D());
-		bake.bullet_trail_tint.assign(amount_bullets, Color(1, 1, 1, 1));
-		if ((int)bake.phase.size() != amount_bullets) {
-			bake.phase.assign(amount_bullets, 0.0);
-		}
-		if ((int)bake.bullet_on.size() != amount_bullets) {
-			bake.bullet_on.assign(amount_bullets, 1);
-		}
+		FXTrailBake &live = fx_trail_bakes[b];
+		live.shard_visible.assign(live.shards.size(), 0);
+		live.shard_refcount.assign(live.shards.size(), 0);
 		return true;
 	}
 	return false;

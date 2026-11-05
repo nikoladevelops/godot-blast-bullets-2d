@@ -1,6 +1,7 @@
 #include "data/bullet_rotation_data2d.hpp"
 
 #include "core/assign_if_changed2d.hpp"
+#include "patterns/pattern_inputs2d.hpp"
 #include <godot_cpp/classes/random_number_generator.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
@@ -23,6 +24,10 @@ TypedArray<BulletRotationData2D> BulletRotationData2D::generate_random_data(
 	TypedArray<BulletRotationData2D> data;
 	if (amount_to_generate <= 0) {
 		UtilityFunctions::push_error("BulletRotationData2D.generate_random_data: amount_to_generate must be > 0.");
+		return data;
+	}
+	if (amount_to_generate > pattern_max_bullets()) {
+		UtilityFunctions::push_error("BulletRotationData2D.generate_random_data: amount_to_generate must be <= " + String::num_int64(pattern_max_bullets()) + ".");
 		return data;
 	}
 	if (!(rotation_speed_MIN <= rotation_speed_MAX) || !(max_rotation_speed_MIN <= max_rotation_speed_MAX) || !(rotation_acceleration_MIN <= rotation_acceleration_MAX)) {
