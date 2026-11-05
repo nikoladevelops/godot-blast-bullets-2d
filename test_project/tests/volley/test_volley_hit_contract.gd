@@ -153,6 +153,27 @@ func test_killing_hit_detonates_once_at_the_impact_pose() -> void:
 	assert_eq(_effects(HIT).size(), 0, "a killing blow never sparks On Hit too")
 
 
+## A consumed bounce reflects and still counts the hit (so max 1 dies). The
+## death effect must use the impact pose the physics server tested (the
+## frame-start pose), never the plugin's own escape nudge (shape radius + 2
+## along the normal) that the bounce ran before the hit path.
+func test_a_consumed_bounce_kills_at_the_tested_impact_pose() -> void:
+	var d := _hit_data([0.0], 1)
+	d.set_bounce_mask_from_array([3]) # the wall's layer bits (4)
+	d.bounce_hit_consumed = true
+	d.effect_layers = _layers()
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	watched = v
+	await _wait_hits(1)
+	await physics()
+	assert_false(v.is_bullet_status_enabled(0), "the consumed bounce counted the hit and killed at max 1")
+	var destroys := _effects(DESTROY)
+	assert_eq(destroys.size(), 1, "On Destroy fired exactly once")
+	var frame: int = hits[0]["frame"]
+	assert_true(start_pose.has(frame), "frame-start pose captured")
+	assert_eq(destroys[0]["position"], start_pose[frame][0], "On Destroy at the tested pose, not the escape nudge")
+
+
 func test_handler_heal_vetoes_the_kill() -> void:
 	var d := _hit_data([0.0])
 	d.effect_layers = _layers()

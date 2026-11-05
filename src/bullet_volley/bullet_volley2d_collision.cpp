@@ -859,6 +859,12 @@ void BulletVolley2D::handle_bullet_collision(const BulletCollisionData2D &record
 		return all_bullets_enabled_set.contains(bullet_index) && collision_epoch_for_bullet(bullet_index) == record_epoch;
 	};
 
+	// Impact pose, captured before any user code AND before the bounce below:
+	// the drain runs before this frame's move, so this is the pose the physics
+	// server tested. The bounce's escape nudge (radius + 2 along the normal)
+	// must never leak into the hit path's effects, split or signals.
+	const Transform2D impact_transf = all_cached_instance_transforms[bullet_index];
+
 	// Bounce precedence: a bounce-eligible hit ricochets here (its own live
 	// signal) and never reaches the counter below, unless the volley asked
 	// to consume the hit too (decision 2).
@@ -895,11 +901,6 @@ void BulletVolley2D::handle_bullet_collision(const BulletCollisionData2D &record
 	if (bullets_current_collision_count[bullet_index] < INT32_MAX) {
 		++bullets_current_collision_count[bullet_index];
 	}
-
-	// Impact pose, captured before user code (a handler may move the bullet):
-	// the drain runs before this frame's move, so this is the pose the
-	// physics server tested.
-	const Transform2D impact_transf = all_cached_instance_transforms[bullet_index];
 
 	// LIVE emit: the bullet is still enabled, its attachment still attached,
 	// every per-bullet value intact. Factory and spawner declare the same
