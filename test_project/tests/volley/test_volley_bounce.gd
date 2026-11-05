@@ -2956,3 +2956,19 @@ func test_bounce_readouts_report_the_normal_and_refill_the_count() -> void:
 	var plain: BulletVolley2D = factory.spawn_volley(_bounce_data(Vector2(0, 300), 0.0, 0.0, [], [4]))
 	plain.bullet_set_bounce_count(0, 2)
 	expect_error_sequence(["BulletVolley2D: bullet_set_bounce_count needs bouncing on (bounce_mask is 0), nothing changed."])
+
+
+## The bounce ledger is an int and bounce_max_count 0 means unlimited: the
+## increment at INT32_MAX must saturate, not wrap to INT_MIN (signed-overflow
+## UB; x86 turned the count negative and every readout lied from then on).
+func test_a_bounce_count_at_int_max_saturates() -> void:
+	await _arena()
+	await _settle(factory)
+	var v: BulletVolley2D = factory.spawn_volley(_bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4]))
+	v.bullet_set_bounce_count(0, 2147483647)
+	for i in 120:
+		await physics()
+		if _bounce_body.size() >= 1:
+			break
+	assert_true(_bounce_body.size() >= 1, "the wall bounced the bullet")
+	assert_eq(v.bullet_get_bounce_count(0), 2147483647, "the count saturates, never wraps")

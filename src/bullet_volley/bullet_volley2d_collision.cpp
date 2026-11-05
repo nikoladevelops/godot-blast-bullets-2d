@@ -890,8 +890,11 @@ void BulletVolley2D::handle_bullet_collision(const BulletCollisionData2D &record
 
 	// Count the hit BEFORE the signal: handlers read the hit that just landed
 	// (get_bullet_collision_count == get_bullet_max_collision_count means
-	// this hit is lethal unless the handler intervenes).
-	++bullets_current_collision_count[bullet_index];
+	// this hit is lethal unless the handler intervenes). max 0 means infinite
+	// hits, so the counter saturates instead of overflowing an int (UB).
+	if (bullets_current_collision_count[bullet_index] < INT32_MAX) {
+		++bullets_current_collision_count[bullet_index];
+	}
 
 	// Impact pose, captured before user code (a handler may move the bullet):
 	// the drain runs before this frame's move, so this is the pose the

@@ -723,7 +723,11 @@ int BulletVolley2D::try_handle_bounce(CollisionType collision_type, int bullet_i
 		}
 	}
 	if (bullet_index < (int)all_bounce_count.size()) {
-		++all_bounce_count[bullet_index];
+		// bounce_max_count 0 means unlimited: saturate instead of overflowing
+		// an int after ~2^31 bounces on one bullet (signed overflow is UB).
+		if (all_bounce_count[bullet_index] < INT32_MAX) {
+			++all_bounce_count[bullet_index];
+		}
 	}
 	// Forensics for debug_get_bounce_info: the normal and target motion
 	// this bounce committed with (size-checked like every ledger write).

@@ -334,3 +334,14 @@ func test_clear_active_bullets_inside_a_handler_clears_now() -> void:
 	assert_false(v.is_bullet_status_enabled(1), "cleared")
 	assert_eq(_effects(EffectLayerData2D.EFFECT_ON_CLEAR).size(), 2, "On Clear once per bullet")
 	expect_no_errors()
+
+
+## The per-bullet collision counter is an int and max 0 means infinite hits:
+## the increment at INT32_MAX must saturate, not wrap to INT_MIN (signed
+## overflow UB; the readout then reported a negative count forever).
+func test_a_collision_count_at_int_max_saturates() -> void:
+	var v: BulletVolley2D = factory.spawn_volley(_hit_data([0.0], 0))
+	v.set_bullet_collision_count(0, 2147483647)
+	await _wait_hits(1)
+	assert_eq(hits.size(), 1, "the wall hit was counted")
+	assert_eq(v.get_bullet_collision_count(0), 2147483647, "the count saturates, never wraps")
