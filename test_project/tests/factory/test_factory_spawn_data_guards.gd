@@ -2,7 +2,8 @@ extends BlastTest
 ## Spawn-data finiteness: fields folded into EVERY bullet transform reject
 ## NaN/Inf at the setter and keep the old value (a single NaN
 ## texture_rotation_radians used to turn a whole volley NaN), and a volley with
-## a valid non-zero texture rotation stays finite.
+## a valid non-zero texture rotation stays finite. The four collision-shape
+## fallbacks report once per spawn-data resource, never once per shot.
 
 
 func _data(n: int = 2) -> BulletVolleyData2D:
@@ -145,3 +146,38 @@ func test_a_non_finite_shape_dimension_falls_back_to_the_default_circle() -> voi
 	v2.set_collision_shape_runtime(rect)
 	expect_error_sequence(["RectangleShape2D size must be finite and > 0. Falling back to circle r16."])
 	assert_eq(v2.debug_get_shape_state()["type"], PhysicsServer2D.SHAPE_CIRCLE, "a runtime change falls back too")
+
+
+## Every collision-shape fallback is latched per spawn-data resource, like the
+## per-bullet array warnings: a spawner firing the same bad shape reports the
+## fallback ONCE, not one line per volley life (both a cold spawn and a pooled
+## reuse cache the shape). The four branches keep separate latches.
+func test_every_collision_shape_fallback_reports_once_per_data() -> void:
+	var zero_circle := CircleShape2D.new()
+	zero_circle.radius = 0.0
+	var zero_rect := RectangleShape2D.new()
+	zero_rect.size = Vector2.ZERO
+	var bad_capsule := CapsuleShape2D.new()
+	bad_capsule.radius = 0.0
+	var unsupported := ConvexPolygonShape2D.new()
+	var cases: Array = [
+		[zero_circle, "CircleShape2D radius must be finite and > 0. Falling back to circle r16."],
+		[zero_rect, "RectangleShape2D size must be finite and > 0. Falling back to circle r16."],
+		[bad_capsule, "CapsuleShape2D radius/height must be finite and > 0. Falling back to circle r16."],
+		[unsupported, "Unsupported collision shape type: ConvexPolygonShape2D - only RectangleShape2D/CircleShape2D/CapsuleShape2D supported. Falling back to circle r16."],
+	]
+	for case in cases:
+		var d := _data()
+		d.collision_shape = case[0]
+		for i in 10: # ten frame-separated volley lives off the same data resource
+			var v := factory.spawn_volley(d)
+			assert_not_null(v, "the fallback still spawns")
+			await idle(1)
+	expect_error_sequence([
+		"CircleShape2D radius must be finite and > 0. Falling back to circle r16.",
+		"RectangleShape2D size must be finite and > 0. Falling back to circle r16.",
+		"CapsuleShape2D radius/height must be finite and > 0. Falling back to circle r16.",
+		"Unsupported collision shape type: ConvexPolygonShape2D - only RectangleShape2D/CircleShape2D/CapsuleShape2D supported. Falling back to circle r16.",
+	], "one report per data resource and branch, in case order")
+	await idle(2)
+	expect_no_errors()

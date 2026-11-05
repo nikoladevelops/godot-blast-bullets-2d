@@ -433,6 +433,13 @@ _ALWAYS_INLINE_ bool BulletVolley2D::ensure_indexes_match_amount_bullets_range(i
 	return true;
 }
 
+// The effective shape the whole volley uses, resolved from the spawn data's
+// shape: an unsupported type or a dimension that is not finite and > 0 falls
+// back to the default circle r16. This runs once per volley LIFE (a cold
+// spawn AND every pooled reuse), so each fallback reports once per spawn data
+// resource (WarnOnce2D, one code per branch): a spawner firing the same bad
+// shape used to print one line per shot. Runtime shape changes report through
+// the same latch (the volley's data id).
 _ALWAYS_INLINE_ void BulletVolley2D::cache_collision_shape_typed(const Ref<Shape2D> &shape) {
 	cached_collision_shape = shape;
 	cached_effective_shape_type = PhysicsServer2D::SHAPE_CIRCLE;
@@ -446,7 +453,9 @@ _ALWAYS_INLINE_ void BulletVolley2D::cache_collision_shape_typed(const Ref<Shape
 	if (auto *rect = Object::cast_to<RectangleShape2D>(shape.ptr())) {
 		Vector2 s = rect->get_size();
 		if (!CollisionShapeHelper2D::dimension_ok(s.x) || !CollisionShapeHelper2D::dimension_ok(s.y)) {
-			UtilityFunctions::push_error("RectangleShape2D size must be finite and > 0. Falling back to circle r16.");
+			if (WarnOnce2D::first(warn_data_id, 14u, 0, 0)) {
+				UtilityFunctions::push_error("RectangleShape2D size must be finite and > 0. Falling back to circle r16.");
+			}
 			return;
 		}
 		cached_effective_shape_type = PhysicsServer2D::SHAPE_RECTANGLE;
@@ -456,7 +465,9 @@ _ALWAYS_INLINE_ void BulletVolley2D::cache_collision_shape_typed(const Ref<Shape
 	if (auto *circle = Object::cast_to<CircleShape2D>(shape.ptr())) {
 		float r = circle->get_radius();
 		if (!CollisionShapeHelper2D::dimension_ok(r)) {
-			UtilityFunctions::push_error("CircleShape2D radius must be finite and > 0. Falling back to circle r16.");
+			if (WarnOnce2D::first(warn_data_id, 15u, 0, 0)) {
+				UtilityFunctions::push_error("CircleShape2D radius must be finite and > 0. Falling back to circle r16.");
+			}
 			return;
 		}
 		cached_effective_shape_type = PhysicsServer2D::SHAPE_CIRCLE;
@@ -467,7 +478,9 @@ _ALWAYS_INLINE_ void BulletVolley2D::cache_collision_shape_typed(const Ref<Shape
 		float r = capsule->get_radius();
 		float h = capsule->get_height();
 		if (!CollisionShapeHelper2D::dimension_ok(r) || !CollisionShapeHelper2D::dimension_ok(h)) {
-			UtilityFunctions::push_error("CapsuleShape2D radius/height must be finite and > 0. Falling back to circle r16.");
+			if (WarnOnce2D::first(warn_data_id, 16u, 0, 0)) {
+				UtilityFunctions::push_error("CapsuleShape2D radius/height must be finite and > 0. Falling back to circle r16.");
+			}
 			return;
 		}
 		cached_effective_shape_type = PhysicsServer2D::SHAPE_CAPSULE;
@@ -475,7 +488,9 @@ _ALWAYS_INLINE_ void BulletVolley2D::cache_collision_shape_typed(const Ref<Shape
 		cached_capsule_height = h;
 		return;
 	}
-	UtilityFunctions::push_error("Unsupported collision shape type: " + shape->get_class() + " - only RectangleShape2D/CircleShape2D/CapsuleShape2D supported. Falling back to circle r16.");
+	if (WarnOnce2D::first(warn_data_id, 17u, 0, 0)) {
+		UtilityFunctions::push_error("Unsupported collision shape type: " + shape->get_class() + " - only RectangleShape2D/CircleShape2D/CapsuleShape2D supported. Falling back to circle r16.");
+	}
 }
 
 _ALWAYS_INLINE_ void BulletVolley2D::sync_shape_transform_from_instance(int bullet_index, const Transform2D &instance_transf) {
