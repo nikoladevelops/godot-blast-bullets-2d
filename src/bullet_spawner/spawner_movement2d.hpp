@@ -88,6 +88,10 @@ struct SpawnerMovement2D {
 	// Set on EXIT_TREE and by a new path or space: the next pose is a jump
 	// (no velocity).
 	bool jumped = false;
+	// How many times the engine's interpolation history was restarted for a
+	// pose jump (teleport, a LOOP wrap, a seek). PING_PONG turns around
+	// continuously. Read by debug_get_movement_state.
+	uint64_t interpolation_resets = 0;
 	// enabled turned on (autostart) while out of the tree after the first
 	// _ready: plays on the next entry (_ready only runs once).
 	bool autostart_pending = false;

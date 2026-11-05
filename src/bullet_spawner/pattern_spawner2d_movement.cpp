@@ -249,6 +249,24 @@ bool PatternSpawner2D::movement_active() const {
 	return movement.enabled && movement.playing && is_inside_tree() && !Engine::get_singleton()->is_editor_hint();
 }
 
+Dictionary PatternSpawner2D::debug_get_movement_state() const {
+	Dictionary d;
+	d["playing"] = movement.playing;
+	d["finished"] = movement.finished;
+	d["leg_elapsed"] = movement.leg_elapsed;
+	d["delay_left"] = movement.delay_left;
+	d["pause_left"] = movement.pause_left;
+	d["legs_completed"] = movement.legs_completed;
+	d["leg_forward"] = movement.leg_forward;
+	d["progress"] = movement.progress;
+	d["epoch"] = (int64_t)movement.epoch;
+	d["velocity"] = movement.velocity;
+	d["has_last_position"] = movement.has_last_position;
+	d["jumped"] = movement.jumped;
+	d["interpolation_resets"] = (int64_t)movement.interpolation_resets;
+	return d;
+}
+
 bool PatternSpawner2D::apply_movement_pose(double delta, bool keep_velocity, bool report_unusable) {
 	Path2D *path = get_movement_path_node();
 	Ref<Curve2D> curve = path != nullptr ? path->get_curve() : Ref<Curve2D>();
@@ -410,6 +428,11 @@ bool PatternSpawner2D::advance_movement(double delta) {
 			// a pose only, the motion (and its velocity) goes on from there.
 			movement.progress = movement.leg_forward ? 0.0 : 1.0;
 			apply_movement_pose(0.0, true);
+			// The wrap is a pose jump (the line above promises no sweep back):
+			// restart the engine interpolation history, or a windowed run draws
+			// the node traveling the whole path gap in one frame.
+			reset_physics_interpolation();
+			++movement.interpolation_resets;
 		}
 		movement.pause_left = movement.endpoint_pause_sec;
 	}
@@ -500,6 +523,7 @@ void PatternSpawner2D::teleport(const Vector2 &new_global_position, bool carry_l
 	set_global_position(new_global_position);
 	// Godot's own interpolation of this node must not draw the jump as travel.
 	reset_physics_interpolation();
+	++movement.interpolation_resets;
 	// The movement's own pose jumps with the spawner: the next step measures
 	// only the path's motion, and the path goes on from here.
 	if (movement.space == MOVEMENT_SPACE_RELATIVE_TO_START) {
@@ -526,6 +550,10 @@ void PatternSpawner2D::movement_seek(double ratio) {
 	movement.has_last_position = false;
 	if (is_inside_tree() && !Engine::get_singleton()->is_editor_hint()) {
 		apply_movement_pose(0.0, false, false);
+		// A seek is a pose jump like a teleport (the velocity is zeroed): the
+		// engine must not draw the node sliding from its old spot.
+		reset_physics_interpolation();
+		++movement.interpolation_resets;
 	}
 }
 

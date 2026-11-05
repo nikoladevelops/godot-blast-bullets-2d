@@ -75,6 +75,12 @@
 				Debug readout of the yellow preview rings: one PackedVector2Array per extra outline layer, exactly as drawn (holder-local; runs INF-separated with a closing duplicate per closed run). Empty when layers are inactive. Lets scripts and tests verify bullets sit on their rings without screenshotting the editor.
 			</description>
 		</method>
+		<method name="debug_get_movement_state" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Debug readout of the Movement group's live playback state: [code]leg_elapsed[/code], [code]delay_left[/code], [code]pause_left[/code], [code]legs_completed[/code], [code]playing[/code], [code]finished[/code], [code]leg_forward[/code], [code]progress[/code], [code]epoch[/code], [code]velocity[/code], [code]has_last_position[/code], [code]jumped[/code] and [code]interpolation_resets[/code] (how many pose jumps restarted the engine's physics interpolation history: a teleport, a LOOP wrap and [method movement_seek] must, PING_PONG must not). Lets scripts and tests pin playback state and the jump behavior headlessly.
+			</description>
+		</method>
 		<method name="debug_get_pattern_cache_info" qualifiers="const">
 			<return type="Dictionary" />
 			<description>

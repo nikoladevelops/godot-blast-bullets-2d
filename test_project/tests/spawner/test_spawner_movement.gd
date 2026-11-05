@@ -563,3 +563,26 @@ func test_a_huge_time_scale_cannot_fast_forward_the_movement() -> void:
 	await idle(4)
 	var total: int = get_signal_emit_count(sp, "movement_endpoint_reached") + get_signal_emit_count(sp, "movement_loop_completed")
 	assert_lte(total, 64, "5 frames of 0.5 s-scaled movement stay far below it (%d)" % total)
+
+
+## A LOOP wrap and a seek are pose jumps, not travel: the node must restart
+## its engine interpolation history (teleport does), or a windowed run draws
+## the spawner sliding across the path. PING_PONG turns around continuously
+## and must never reset. debug_get_movement_state counts the resets.
+func test_loop_wrap_and_seek_restart_interpolation_but_ping_pong_does_not() -> void:
+	var sp := _mover(path, func(s):
+		s.movement_loop_mode = BulletSpawner2D.MOVEMENT_LOOP_LOOP
+		s.movement_loops = 2)
+	await idle(70) # past the 1 s wrap
+	var looped := int(sp.debug_get_movement_state().get("interpolation_resets", -1))
+	assert_gte(looped, 1, "the LOOP wrap restarted interpolation")
+	sp.movement_seek(0.25)
+	assert_eq(int(sp.debug_get_movement_state().get("interpolation_resets", -1)), looped + 1, "a seek restarts it too")
+	sp.teleport(sp.global_position, false)
+	assert_eq(int(sp.debug_get_movement_state().get("interpolation_resets", -1)), looped + 2, "teleport restarts it (baseline)")
+	var pp := _mover(_line_path(Vector2(0, 0), Vector2(100, 0)), func(s):
+		s.movement_loop_mode = BulletSpawner2D.MOVEMENT_LOOP_PING_PONG
+		s.movement_loops = 2)
+	await idle(75) # past the 1 s turn-around
+	assert_gte(pp.get_movement_leg(), 1, "the ping-pong turned around")
+	assert_eq(int(pp.debug_get_movement_state().get("interpolation_resets", -1)), 0, "PING_PONG never resets (continuous)")

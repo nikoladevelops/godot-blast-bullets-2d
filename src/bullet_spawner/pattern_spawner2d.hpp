@@ -815,6 +815,11 @@ public:
 	void run_frame(double delta);
 	// How many runtime loop steps ran (debug: one per frame, either callback).
 	int64_t debug_get_run_frame_count() const { return (int64_t)run_frame_count; }
+	// The Movement group's live playback state (spawner_movement2d.hpp) for
+	// tests: leg elapsed/delay/pause, flags, epoch, velocity, the next-pose
+	// jump flag and how many pose jumps restarted the engine interpolation
+	// history (teleport, LOOP wraps and seeks must; PING_PONG must not).
+	Dictionary debug_get_movement_state() const;
 	// spawner scale x factory scale, 0 when either is not finite and positive.
 	double get_process_time_scale() const;
 	bool get_shoot_outside_despawn_bounds() const { return shoot_outside_despawn_bounds; }
