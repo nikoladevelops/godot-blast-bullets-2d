@@ -366,3 +366,34 @@ func test_auto_fire_reports_a_factory_refusal_once(case: String = use_parameters
 	sp.shoot_once()
 	sp.shoot_once()
 	expect_error_sequence([text, text])
+
+
+## Replacing an armed split chain: a volley holds the shared config's Ref, so
+## the member drop leaves the probe alive and the LAST reference drops inside
+## apply_split_config's own replacement. Its NOTIFICATION_PREDELETE may free
+## the spawner; every later read of `this` (in the apply and in the setter
+## after it) must be guarded (ASan: heap-use-after-free otherwise).
+func test_an_armed_split_predelede_freeing_the_spawner_mid_setter_is_survived() -> void:
+	var chain := BulletSplitData2D.new()
+	var stage := BulletSplitStage2D.new()
+	stage.count = 2
+	chain.stages = [stage]
+	var sp := make_spawner(H.make_volley_data(1, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
+	sp.split_enabled = true
+	sp.split_data = chain
+	var got: Array = []
+	sp.volley_fired.connect(func(v: BulletVolley2D, _n: int) -> void: got.append(v), CONNECT_ONE_SHOT)
+	assert_true(sp.shoot_once(), "fires")
+	assert_eq(got.size(), 1, "the volley armed the shared config")
+	var probe := FreeSpawnerOnPredeleteSplit2D.new()
+	sp.split_data = probe
+	probe = null
+	FreeSpawnerOnPredeleteSplit2D.fired = 0
+	FreeSpawnerOnPredeleteSplit2D.victim = sp
+	check_factory_after = false
+	sp.split_data = null
+	assert_gt(FreeSpawnerOnPredeleteSplit2D.fired, 0, "the last Ref dropped inside apply_split_config")
+	assert_false(is_instance_valid(sp), "the PREDELETE handler freed the spawner")
+	await idle(1)
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "nothing dangles")
+	assert_not_null(quick_volley(2), "the factory still spawns")

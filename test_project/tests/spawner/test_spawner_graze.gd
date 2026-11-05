@@ -347,3 +347,22 @@ func test_graze_live_volleys_applies_the_group_to_flying_volleys() -> void:
 	assert_false(on.is_graze_armed(), "disarmed")
 	assert_eq(sp.apply_to_live_volleys(BulletSpawner2D.LIVE_GRAZE), 0, "nothing left to disarm")
 	assert_true(other.is_graze_armed(), "still not the other spawner's")
+
+
+## A graze zone's LAST reference can drop inside `set_graze_zones`: its
+## NOTIFICATION_PREDELETE is user code that may free the spawner, so the
+## setter must stop before reading `this` again (ASan: heap-use-after-free).
+func test_a_graze_zone_predelede_freeing_the_spawner_mid_setter_is_survived() -> void:
+	var sp := make_spawner()
+	var probe := FreeSpawnerOnPredeleteGrazeZone2D.new()
+	sp.graze_zones = [probe]
+	probe = null
+	FreeSpawnerOnPredeleteGrazeZone2D.fired = 0
+	FreeSpawnerOnPredeleteGrazeZone2D.victim = sp
+	check_factory_after = false
+	sp.graze_zones = []
+	assert_gt(FreeSpawnerOnPredeleteGrazeZone2D.fired, 0, "the last Ref dropped inside the setter")
+	assert_false(is_instance_valid(sp), "the PREDELETE handler freed the spawner")
+	await idle(1)
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "nothing dangles")
+	assert_not_null(quick_volley(2), "the factory still spawns")

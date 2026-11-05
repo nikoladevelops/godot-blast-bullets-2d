@@ -186,3 +186,23 @@ func test_monitorable_round_trip() -> void:
 	assert_true(v.get_monitorable(), "monitorable round-trips")
 	v.set_monitorable(false)
 	assert_false(v.get_monitorable(), "monitorable clears")
+
+
+## A wobble resource's LAST reference can drop inside
+## set_shared_bullet_wobble_data: its NOTIFICATION_PREDELETE is user code that
+## may free the volley, so the setter must stop before reading `this` again
+## (ASan: heap-use-after-free otherwise).
+func test_a_wobble_predelede_freeing_the_volley_mid_setter_is_survived() -> void:
+	var v := quick_volley(2)
+	var probe := FreeVolleyOnPredeleteWobble2D.new()
+	v.set_shared_bullet_wobble_data(probe)
+	probe = null
+	FreeVolleyOnPredeleteWobble2D.fired = 0
+	FreeVolleyOnPredeleteWobble2D.victim = v
+	check_factory_after = false
+	v.set_shared_bullet_wobble_data(BulletWobbleData2D.new())
+	assert_gt(FreeVolleyOnPredeleteWobble2D.fired, 0, "the last Ref dropped inside the setter")
+	assert_false(is_instance_valid(v), "the PREDELETE handler freed the volley")
+	await idle(1)
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "nothing dangles")
+	assert_not_null(quick_volley(2), "the factory still spawns")

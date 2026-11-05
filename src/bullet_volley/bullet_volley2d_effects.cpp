@@ -33,7 +33,15 @@ BulletVolley2D::FXLayerSnapshot BulletVolley2D::fx_snapshot_layer(const Ref<Effe
 // relative z tracks the volley). Shard textures never change, so per-tick
 // work is a single instance write into the current frame's shard.
 void BulletVolley2D::fx_rebuild_trail_layers(const TypedArray<EffectLayerData2D> &layers) {
+	// Dropping the previous trail bakes drops their layer Refs: the last one
+	// destroys a script layer whose NOTIFICATION_PREDELETE is user code that
+	// may free this volley (proven under ASan). Nothing below may read `this`
+	// while the check fails.
+	const uint64_t self_id = get_instance_id();
 	fx_clear_trail_layers();
+	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+		return;
+	}
 	if (amount_bullets <= 0) {
 		return;
 	}
@@ -74,9 +82,17 @@ void BulletVolley2D::fx_rebuild_trail_layers(const TypedArray<EffectLayerData2D>
 }
 
 void BulletVolley2D::fx_clear_trail_layers() {
-	for (size_t b = 0; b < fx_trail_bakes.size(); ++b) {
-		for (size_t s = 0; s < fx_trail_bakes[b].shards.size(); ++s) {
-			MultiMeshInstance2D *shard = fx_trail_bakes[b].shards[s].get();
+	// The bakes are swapped into a local first: dropping their layer Refs is
+	// the destruction of a script layer, whose NOTIFICATION_PREDELETE is user
+	// code that may free this volley (proven under ASan). Destroying them in
+	// place would keep mutating the member vector (storage inside the volley)
+	// after that free. The local dies here, after every read of `this`, and
+	// the caller re-checks before touching the volley again.
+	std::vector<FXTrailBake> dying;
+	dying.swap(fx_trail_bakes);
+	for (size_t b = 0; b < dying.size(); ++b) {
+		for (size_t s = 0; s < dying[b].shards.size(); ++s) {
+			MultiMeshInstance2D *shard = dying[b].shards[s].get();
 			if (shard == nullptr) {
 				continue; // never made, or freed by a script
 			}
@@ -90,7 +106,6 @@ void BulletVolley2D::fx_clear_trail_layers() {
 			shard->queue_free();
 		}
 	}
-	fx_trail_bakes.clear();
 }
 
 // Full reseed from a layer list: retains it for trigger routing, rebuilds
@@ -176,7 +191,21 @@ void BulletVolley2D::fx_reseed_from_data(const TypedArray<EffectLayerData2D> &la
 		}
 		return;
 	}
-	fx_data_layers = layers;
+	// Replacing the layer list drops the old Refs: the last one destroys a
+	// script layer whose NOTIFICATION_PREDELETE is user code that may free
+	// this volley (proven under ASan). godot-cpp's Array assignment destroys
+	// the old value BEFORE it constructs the new one, so the old array is held
+	// in a local across the store (the store itself then runs no user code);
+	// the local's own drop does, and nothing below may read `this` while the
+	// check fails.
+	const uint64_t self_id = get_instance_id();
+	{
+		const TypedArray<EffectLayerData2D> previous_layers = fx_data_layers;
+		fx_data_layers = layers;
+	}
+	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+		return;
+	}
 	// One-shot trigger mask: only layers registered as factory bakes below
 	// (enabled, non-trail) can ever fire, so a trigger missing here makes
 	// fx_fire_oneshot a single bit test instead of a per-layer Variant
@@ -193,8 +222,14 @@ void BulletVolley2D::fx_reseed_from_data(const TypedArray<EffectLayerData2D> &la
 		fx_seeded_snapshots[li] = fx_snapshot_layer(layers[li]);
 	}
 	fx_rebuild_trail_layers(layers);
+	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+		return; // the trail rebuild dropped a script layer's last Ref
+	}
 	if (bullet_factory != nullptr && factory_alive()) {
 		bullet_factory->fx_unregister_volley(get_instance_id());
+		if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+			return; // the factory's old bake Refs dropped a script layer's last Ref
+		}
 		// Registering a bake builds its shard nodes: every add_child runs
 		// SceneTree.node_added handlers (user code), and one may free this
 		// volley. Under the volley's emit guard that free is refused and

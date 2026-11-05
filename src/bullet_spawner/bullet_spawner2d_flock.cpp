@@ -18,7 +18,11 @@ void BulletSpawner2D::set_flock_enabled(bool value) {
 		return;
 	}
 	flock_enabled = value;
+	const uint64_t self_id = get_instance_id();
 	apply_flock_config();
+	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+		return; // the replaced flock resource's PREDELETE freed this spawner
+	}
 	on_config_changed();
 	notify_property_list_changed();
 }
@@ -31,8 +35,19 @@ void BulletSpawner2D::set_flock(const Ref<BulletFlock2D> &value) {
 	if (flock == value) {
 		return;
 	}
+	// Dropping the old member Ref below can destroy a script resource: its
+	// NOTIFICATION_PREDELETE is user code that may free this spawner (proven
+	// under ASan). The id is captured first; nothing after the drop may read
+	// `this` while the check fails.
+	const uint64_t self_id = get_instance_id();
 	flock = value;
+	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+		return;
+	}
 	apply_flock_config();
+	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+		return; // the shared config's own Ref drop freed this spawner
+	}
 	on_config_changed();
 }
 
@@ -49,7 +64,11 @@ void BulletSpawner2D::set_flock_scope(BulletFlock2D::Scope value) {
 		return;
 	}
 	flock_scope = value;
+	const uint64_t self_id = get_instance_id();
 	apply_flock_config();
+	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+		return; // the shared config's own Ref drop freed this spawner
+	}
 	on_config_changed();
 }
 
@@ -66,7 +85,15 @@ void BulletSpawner2D::apply_flock_config() {
 	if (flock_shared == nullptr) {
 		return; // nothing armed yet: the first arm copies the settings
 	}
+	// Replacing the shared config's flock drops its old Ref: the last one
+	// destroys a script resource whose NOTIFICATION_PREDELETE is user code
+	// that may free this spawner (proven under ASan). Capture the id before
+	// the drop; nothing below may read `this` while the check fails.
+	const uint64_t self_id = get_instance_id();
 	flock_shared->flock = effective_flock();
+	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+		return;
+	}
 	flock_shared->scope = flock_scope;
 	flock_shared->enabled = flock_enabled;
 	++flock_shared->serial;

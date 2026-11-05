@@ -313,7 +313,15 @@ bool BulletVolley2D::rebuild_sprite_animation(const Ref<SpriteFrames> &p_sprite_
 	}
 	// The same frames again (an edited SpriteFrames restarts instead).
 	keep_position = keep_position && baked.size() == anim.size() && anim_frame_index >= 0 && anim_frame_index < baked.size();
+	// Replacing anim_source drops the old Ref: the last one destroys a script
+	// SpriteFrames whose NOTIFICATION_PREDELETE is user code that may free
+	// this volley (proven under ASan). Nothing below may read `this` while
+	// the check fails; the rebuild reports "not playing".
+	const uint64_t self_id = get_instance_id();
 	anim_source = p_sprite_frames;
+	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+		return false;
+	}
 	anim_name = name;
 	anim = std::move(baked);
 	if (keep_position) {

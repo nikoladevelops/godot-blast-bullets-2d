@@ -277,3 +277,23 @@ func test_seeded_entries_claim_presence() -> void:
 	v.set_gravity(Vector2(0, 300))
 	assert_eq(v.bullet_get_gravity(0), Vector2(10, 0), "seeded slot 0 kept")
 	assert_eq(v.bullet_get_gravity(1), Vector2(20, 0), "seeded slot 1 kept")
+
+
+## A speed resource's LAST reference can drop inside
+## set_shared_bullet_speed_data: its NOTIFICATION_PREDELETE is user code that
+## may free the volley, so the setter must stop before reading `this` again
+## (ASan: heap-use-after-free otherwise).
+func test_a_speed_predelede_freeing_the_volley_mid_setter_is_survived() -> void:
+	var v := quick_volley(2)
+	var probe := FreeVolleyOnPredeleteSpeed2D.new()
+	v.set_shared_bullet_speed_data(probe)
+	probe = null
+	FreeVolleyOnPredeleteSpeed2D.fired = 0
+	FreeVolleyOnPredeleteSpeed2D.victim = v
+	check_factory_after = false
+	v.set_shared_bullet_speed_data(H.make_speed(80.0))
+	assert_gt(FreeVolleyOnPredeleteSpeed2D.fired, 0, "the last Ref dropped inside the setter")
+	assert_false(is_instance_valid(v), "the PREDELETE handler freed the volley")
+	await idle(1)
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "nothing dangles")
+	assert_not_null(quick_volley(2), "the factory still spawns")

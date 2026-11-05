@@ -1714,3 +1714,71 @@ func test_a_node_added_handler_that_frees_the_volley_during_set_effect_layers_is
 	var books: Dictionary = factory.debug_assert_no_dangling()
 	assert_true(books["ok"], str(books["error"]))
 	expect_no_errors()
+
+
+## An effect layer's LAST reference can drop inside set_effect_layers
+## (fx_reseed_from_data): its NOTIFICATION_PREDELETE is user code that may
+## free the volley, so the setter must stop before reading `this` again
+## (ASan: heap-use-after-free otherwise).
+func test_an_effect_layer_predelede_freeing_the_volley_mid_setter_is_survived() -> void:
+	var v := quick_volley(2)
+	# A real trail layer (frames + the default Trail Follow trigger): the
+	# volley's trail bake holds it too, so its last Ref drops inside the
+	# rebuild of the trail bakes while the setter runs.
+	var probe := FreeVolleyOnPredeleteEffectLayer2D.new()
+	probe.sprite_frames = _make_frames(4)
+	v.set_effect_layers([probe])
+	probe = null
+	FreeVolleyOnPredeleteEffectLayer2D.fired = 0
+	FreeVolleyOnPredeleteEffectLayer2D.victim = v
+	check_factory_after = false
+	v.set_effect_layers([])
+	assert_gt(FreeVolleyOnPredeleteEffectLayer2D.fired, 0, "the last Ref dropped inside the setter")
+	assert_false(is_instance_valid(v), "the PREDELETE handler freed the volley")
+	await idle(1)
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "nothing dangles")
+	assert_not_null(quick_volley(2), "the factory still spawns")
+
+
+## The one-shot sibling: an ON_SPAWN layer is held by the FACTORY's register
+## bake, so its last Ref drops where the setter unregisters the volley's old
+## bakes (fx_unregister_volley). That drop is user code too: the setter must
+## re-check the volley before it registers the new bakes.
+func test_a_oneshot_effect_layer_predelede_freeing_the_volley_mid_setter_is_survived() -> void:
+	var v := quick_volley(2)
+	var probe := FreeVolleyOnPredeleteEffectLayer2D.new()
+	probe.trigger = EffectLayerData2D.EFFECT_ON_SPAWN
+	probe.sprite_frames = _make_frames(4)
+	v.set_effect_layers([probe])
+	probe = null
+	FreeVolleyOnPredeleteEffectLayer2D.fired = 0
+	FreeVolleyOnPredeleteEffectLayer2D.victim = v
+	check_factory_after = false
+	v.set_effect_layers([])
+	assert_gt(FreeVolleyOnPredeleteEffectLayer2D.fired, 0, "the last Ref dropped inside the setter")
+	assert_false(is_instance_valid(v), "the PREDELETE handler freed the volley")
+	await idle(1)
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "nothing dangles")
+	assert_not_null(quick_volley(2), "the factory still spawns")
+
+
+## A disabled layer bakes nothing, so the volley's layer list alone holds it:
+## its last Ref drops inside the list store itself. godot-cpp's Array
+## assignment destroys the old value BEFORE it constructs the new one, so that
+## store must not run the layer's PREDELETE while it still writes the member
+## (ASan: heap-use-after-free; the store leaked an orphan StringName before).
+func test_a_disabled_layer_predelede_freeing_the_volley_mid_setter_is_survived() -> void:
+	var v := quick_volley(2)
+	var probe := FreeVolleyOnPredeleteEffectLayer2D.new()
+	probe.enabled = false
+	v.set_effect_layers([probe])
+	probe = null
+	FreeVolleyOnPredeleteEffectLayer2D.fired = 0
+	FreeVolleyOnPredeleteEffectLayer2D.victim = v
+	check_factory_after = false
+	v.set_effect_layers([])
+	assert_gt(FreeVolleyOnPredeleteEffectLayer2D.fired, 0, "the last Ref dropped inside the setter")
+	assert_false(is_instance_valid(v), "the PREDELETE handler freed the volley")
+	await idle(1)
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "nothing dangles")
+	assert_not_null(quick_volley(2), "the factory still spawns")

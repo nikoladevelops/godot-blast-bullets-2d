@@ -52,7 +52,21 @@ void PatternSpawner2D::set_graze_zones(const Array &value) {
 		zones.push_back(Ref<GrazeZone2D>(zone));
 	}
 	connect_graze_zones(false);
-	graze_zones = zones;
+	// Replacing the zones drops the old Refs: the last one destroys a script
+	// zone whose NOTIFICATION_PREDELETE is user code that may free this
+	// spawner (proven under ASan). godot-cpp's Array assignment destroys the
+	// old value BEFORE it constructs the new one, so the old array is held in
+	// a local across the store (the store itself then runs no user code); the
+	// local's own drop does, and nothing below may read `this` while the
+	// check fails.
+	const uint64_t self_id = get_instance_id();
+	{
+		const TypedArray<GrazeZone2D> previous_zones = graze_zones;
+		graze_zones = zones;
+	}
+	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+		return;
+	}
 	graze_zones_misuse_warned = false;
 	connect_graze_zones(true);
 	on_config_changed();

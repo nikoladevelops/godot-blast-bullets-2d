@@ -244,3 +244,22 @@ func test_sound_live_volleys_applies_the_group_to_flying_volleys() -> void:
 	assert_false(on.is_sound_armed(), "disarmed")
 	assert_eq(_flight_offers(1), 0, "nothing offers")
 	factory.debug_set_sound_offer_log_enabled(false)
+
+
+## A sound entry's LAST reference can drop inside `set_sound_effects`: its
+## NOTIFICATION_PREDELETE is user code that may free the spawner, so the
+## setter must stop before reading `this` again (ASan: heap-use-after-free).
+func test_a_sound_entry_predelede_freeing_the_spawner_mid_setter_is_survived() -> void:
+	var sp := make_spawner()
+	var probe := FreeSpawnerOnPredeleteSound2D.new()
+	sp.sound_effects = [probe]
+	probe = null
+	FreeSpawnerOnPredeleteSound2D.fired = 0
+	FreeSpawnerOnPredeleteSound2D.victim = sp
+	check_factory_after = false
+	sp.sound_effects = []
+	assert_gt(FreeSpawnerOnPredeleteSound2D.fired, 0, "the last Ref dropped inside the setter")
+	assert_false(is_instance_valid(sp), "the PREDELETE handler freed the spawner")
+	await idle(1)
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "nothing dangles")
+	assert_not_null(quick_volley(2), "the factory still spawns")

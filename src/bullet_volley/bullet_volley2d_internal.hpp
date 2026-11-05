@@ -538,7 +538,15 @@ _ALWAYS_INLINE_ void BulletVolley2D::populate_shared_curves_related_data(const R
 		return;
 	}
 
+	// Replacing the shared curves drops the old Ref: the last one destroys a
+	// script resource whose NOTIFICATION_PREDELETE is user code that may free
+	// this volley (proven under ASan). Nothing below may read `this` while the
+	// check fails.
+	const uint64_t self_id = get_instance_id();
 	shared_bullet_curves_data = new_curves_data;
+	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+		return;
+	}
 	const bool is_movement_curve_valid = shared_bullet_curves_data->movement_speed_curve.is_valid();
 	const bool is_rotation_curve_valid = shared_bullet_curves_data->rotation_speed_curve.is_valid();
 	const bool is_x_direction_curve_valid = shared_bullet_curves_data->x_direction_curve.is_valid();

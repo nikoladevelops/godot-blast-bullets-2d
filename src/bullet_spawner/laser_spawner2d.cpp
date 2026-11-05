@@ -45,8 +45,16 @@ void LaserSpawner2D::set_laser_data(const Ref<LaserData2D> &value) {
 	if (laser_data == value) {
 		return;
 	}
+	// Dropping the old member Ref below can destroy a script resource: its
+	// NOTIFICATION_PREDELETE is user code that may free this spawner (proven
+	// under ASan). The id is captured first; nothing after the drop may read
+	// `this` while the check fails.
+	const uint64_t self_id = get_instance_id();
 	connect_laser_data(false);
 	laser_data = value;
+	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+		return;
+	}
 	connect_laser_data(true);
 	on_config_changed();
 	rebuild_preview();

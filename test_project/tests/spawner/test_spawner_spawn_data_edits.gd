@@ -43,3 +43,22 @@ func test_accepted_setters_emit_changed_and_rejected_ones_do_not() -> void:
 	data.shared_bullet_attachment_offset = Vector2(NAN, 0)
 	expect_error_sequence(["BulletVolleyData2D: shared_bullet_attachment_offset must be finite, keeping the old value."])
 	assert_signal_emit_count(data, "changed", 5, "a rejected edit emits nothing")
+
+
+## A spawn data resource's LAST reference can drop inside `set_spawn_data`:
+## its NOTIFICATION_PREDELETE is user code that may free the spawner, so the
+## setter must stop before reading `this` again (ASan: heap-use-after-free).
+func test_a_spawn_data_predelede_freeing_the_spawner_mid_setter_is_survived() -> void:
+	var sp := make_spawner()
+	var probe := FreeSpawnerOnPredeleteSpawnData2D.new()
+	sp.spawn_data = probe
+	probe = null
+	FreeSpawnerOnPredeleteSpawnData2D.fired = 0
+	FreeSpawnerOnPredeleteSpawnData2D.victim = sp
+	check_factory_after = false
+	sp.spawn_data = null
+	assert_gt(FreeSpawnerOnPredeleteSpawnData2D.fired, 0, "the last Ref dropped inside the setter")
+	assert_false(is_instance_valid(sp), "the PREDELETE handler freed the spawner")
+	await idle(1)
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "nothing dangles")
+	assert_not_null(quick_volley(2), "the factory still spawns")

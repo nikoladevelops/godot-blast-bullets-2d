@@ -579,3 +579,47 @@ func test_a_split_predelede_freeing_the_spawner_mid_leg_is_survived() -> void:
 	for v in volleys:
 		assert_true(is_instance_valid(v), "the volleys are alive")
 	assert_not_null(quick_volley(2), "the factory still spawns")
+
+
+## The same shape one step earlier: a split chain's LAST reference can drop
+## inside `set_split_data` itself. `split_data = null` drops the member Ref,
+## which destroys the probe chain; its NOTIFICATION_PREDELETE is user code
+## that may free the spawner. The setter must stop before reading `this`
+## again (ASan: heap-use-after-free in connect_split_data / apply_split_config
+## otherwise).
+func test_a_null_setter_write_whose_predelede_frees_the_spawner_is_survived() -> void:
+	var sp := _split_spawner(_chain(), 1, 30.0)
+	# No volley armed: the member Ref is the probe's only owner.
+	var probe := FreeSpawnerOnPredeleteSplit2D.new()
+	sp.split_data = probe
+	probe = null
+	FreeSpawnerOnPredeleteSplit2D.fired = 0
+	FreeSpawnerOnPredeleteSplit2D.victim = sp
+	check_factory_after = false
+	sp.split_data = null
+	assert_gt(FreeSpawnerOnPredeleteSplit2D.fired, 0, "the last Ref dropped inside the setter")
+	assert_false(is_instance_valid(sp), "the PREDELETE handler freed the spawner")
+	await idle(1)
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "nothing dangles")
+	assert_not_null(quick_volley(2), "the factory still spawns")
+
+
+## And once a volley armed the shared config: the member drop leaves the
+## probe to `split_shared->split`, whose own replacement (null) destroys it
+## inside apply_split_config. That drop is user code too, so the function
+## (and its caller) must re-check the spawner after it.
+func test_a_setter_write_whose_armed_config_predelede_frees_the_spawner_is_survived() -> void:
+	var sp := _split_spawner(_chain(), 1, 30.0)
+	_fire(sp) # arms split_shared; its split Ref now holds the chain
+	var probe := FreeSpawnerOnPredeleteSplit2D.new()
+	sp.split_data = probe # member AND split_shared->split hold it
+	probe = null
+	FreeSpawnerOnPredeleteSplit2D.fired = 0
+	FreeSpawnerOnPredeleteSplit2D.victim = sp
+	check_factory_after = false
+	sp.split_data = null # the member drops; apply_split_config's split drop destroys the probe
+	assert_gt(FreeSpawnerOnPredeleteSplit2D.fired, 0, "the last Ref dropped inside apply_split_config")
+	assert_false(is_instance_valid(sp), "the PREDELETE handler freed the spawner")
+	await idle(1)
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "nothing dangles")
+	assert_not_null(quick_volley(2), "the factory still spawns")

@@ -41,7 +41,21 @@ void PatternSpawner2D::set_sound_effects(const Array &value) {
 			return;
 		}
 	}
-	sound_effects = value;
+	// Replacing the entries drops the old Refs: the last one destroys a script
+	// entry whose NOTIFICATION_PREDELETE is user code that may free this
+	// spawner (proven under ASan). godot-cpp's Array assignment destroys the
+	// old value BEFORE it constructs the new one, so the old array is held in
+	// a local across the store (the store itself then runs no user code); the
+	// local's own drop does, and nothing below may read `this` while the
+	// check fails.
+	const uint64_t self_id = get_instance_id();
+	{
+		const Array previous_effects = sound_effects;
+		sound_effects = value;
+	}
+	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+		return;
+	}
 	sound_effects_misuse_warned = false;
 	on_config_changed();
 }

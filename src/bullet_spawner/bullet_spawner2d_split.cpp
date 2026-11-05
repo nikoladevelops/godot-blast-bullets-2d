@@ -19,7 +19,11 @@ void BulletSpawner2D::set_split_enabled(bool value) {
 		return;
 	}
 	split_enabled = value;
+	const uint64_t self_id = get_instance_id();
 	apply_split_config();
+	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+		return; // the replaced chain's PREDELETE freed this spawner
+	}
 	on_config_changed();
 	notify_property_list_changed();
 }
@@ -32,10 +36,21 @@ void BulletSpawner2D::set_split_data(const Ref<BulletSplitData2D> &value) {
 	if (split_data == value) {
 		return;
 	}
+	// Dropping the old member Ref below can destroy a script resource: its
+	// NOTIFICATION_PREDELETE is user code that may free this spawner (proven
+	// under ASan). The id is captured first so the check never reads `this`
+	// after the drop; nothing below may run while it fails.
+	const uint64_t self_id = get_instance_id();
 	connect_split_data(false);
 	split_data = value;
+	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+		return;
+	}
 	connect_split_data(true);
 	apply_split_config();
+	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+		return; // the shared config's own Ref drop freed this spawner
+	}
 	on_config_changed();
 }
 
@@ -61,7 +76,15 @@ void BulletSpawner2D::apply_split_config() {
 	if (split_shared == nullptr) {
 		return; // nothing armed yet: the first arm copies the settings
 	}
+	// Replacing the shared config's chain drops its old Ref: the last one
+	// destroys a script resource whose NOTIFICATION_PREDELETE is user code
+	// that may free this spawner (proven under ASan). Capture the id before
+	// the drop; nothing below may read `this` while the check fails.
+	const uint64_t self_id = get_instance_id();
 	split_shared->split = split_data;
+	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+		return;
+	}
 	split_shared->enabled = split_enabled;
 }
 

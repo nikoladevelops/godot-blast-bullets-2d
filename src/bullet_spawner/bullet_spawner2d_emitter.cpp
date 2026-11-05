@@ -18,7 +18,11 @@ void BulletSpawner2D::set_emitter_enabled(bool value) {
 		return;
 	}
 	emitter_enabled = value;
+	const uint64_t self_id = get_instance_id();
 	apply_emitter_config();
+	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+		return; // the replaced timing resource's PREDELETE freed this spawner
+	}
 	emitter_cycle_reported = false;
 	on_config_changed();
 	notify_property_list_changed();
@@ -28,8 +32,19 @@ void BulletSpawner2D::set_emitter(const Ref<BulletEmitterData2D> &value) {
 	if (emitter == value) {
 		return;
 	}
+	// Dropping the old member Ref below can destroy a script resource: its
+	// NOTIFICATION_PREDELETE is user code that may free this spawner (proven
+	// under ASan). The id is captured first so the check never reads `this`
+	// after the drop; nothing below may run while it fails.
+	const uint64_t self_id = get_instance_id();
 	emitter = value;
+	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+		return;
+	}
 	apply_emitter_config();
+	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+		return; // the shared config's own Ref drop freed this spawner
+	}
 	on_config_changed();
 }
 
@@ -38,7 +53,11 @@ void BulletSpawner2D::set_emitter_spawner_path(const NodePath &value) {
 		return;
 	}
 	emitter_spawner_path = value;
+	const uint64_t self_id = get_instance_id();
 	apply_emitter_config();
+	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+		return; // the replaced timing resource's PREDELETE freed this spawner
+	}
 	emitter_cycle_reported = false;
 	on_config_changed();
 }
@@ -91,10 +110,18 @@ void BulletSpawner2D::apply_emitter_config() {
 	if (emitter_shared == nullptr) {
 		return; // nothing armed yet: the first arm copies the settings
 	}
+	// Replacing the shared config's timing resource drops its old Ref: the
+	// last one destroys a script resource whose NOTIFICATION_PREDELETE is user
+	// code that may free this spawner (proven under ASan). Capture the id
+	// before the drop; nothing below may read `this` while the check fails.
+	const uint64_t self_id = get_instance_id();
 	const Ref<BulletEmitterData2D> data = get_effective_emitter();
 	const uint64_t template_before = emitter_shared->template_id;
 	const bool changed = emitter_shared->data != data || emitter_shared->enabled != emitter_enabled;
 	emitter_shared->data = data;
+	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+		return;
+	}
 	emitter_shared->enabled = emitter_enabled;
 	// A template that cannot be resolved right now (outside the tree, a
 	// path being edited) keeps the last one: flying bullets never lose it.

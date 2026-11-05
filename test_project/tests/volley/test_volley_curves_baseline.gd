@@ -50,3 +50,23 @@ func test_additive_direction_steers_cumulatively() -> void:
 	assert_gt(absf(angle_difference(early, v.get_bullet_direction(0).angle())), 0.05, "heading steered over ticks")
 	assert_true(v.get_bullet_direction(0).is_normalized(), "direction normalized")
 	assert_true(v.get_bullet_direction(0).is_finite(), "direction finite")
+
+
+## A curves resource's LAST reference can drop inside
+## set_shared_bullet_curves_data (populate_shared_curves_related_data): its
+## NOTIFICATION_PREDELETE is user code that may free the volley, so the setter
+## must stop before reading `this` again (ASan: heap-use-after-free otherwise).
+func test_a_curves_resource_predelede_freeing_the_volley_mid_setter_is_survived() -> void:
+	var v := quick_volley(2)
+	var probe := FreeVolleyOnPredeleteCurves2D.new()
+	v.set_shared_bullet_curves_data(probe)
+	probe = null
+	FreeVolleyOnPredeleteCurves2D.fired = 0
+	FreeVolleyOnPredeleteCurves2D.victim = v
+	check_factory_after = false
+	v.set_shared_bullet_curves_data(BulletCurvesData2D.new())
+	assert_gt(FreeVolleyOnPredeleteCurves2D.fired, 0, "the last Ref dropped inside the setter")
+	assert_false(is_instance_valid(v), "the PREDELETE handler freed the volley")
+	await idle(1)
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "nothing dangles")
+	assert_not_null(quick_volley(2), "the factory still spawns")

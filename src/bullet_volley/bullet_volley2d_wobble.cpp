@@ -165,7 +165,15 @@ TypedArray<BulletWobbleData2D> BulletVolley2D::all_bullets_get_wobble_data(int b
 }
 
 void BulletVolley2D::set_shared_bullet_wobble_data(const Ref<BulletWobbleData2D> &new_wobble_data) {
+	// The drop below can destroy a script resource: its
+	// NOTIFICATION_PREDELETE is user code that may free this volley (proven
+	// under ASan). The id is captured first; nothing after the drop may read
+	// `this` while the check fails.
+	const uint64_t self_id = get_instance_id();
 	shared_bullet_wobble_data = new_wobble_data;
+	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+		return;
+	}
 	if ((int)all_bullet_wobble.size() != amount_bullets || (int)all_bullet_wobble_data.size() != amount_bullets) {
 		return;
 	}

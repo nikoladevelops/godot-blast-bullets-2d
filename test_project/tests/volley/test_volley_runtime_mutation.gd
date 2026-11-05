@@ -99,3 +99,26 @@ func test_sprite_animation_guards() -> void:
 	expect_error("missing animation 'nope'")
 	assert_false(v.play_sprite_animation(null), "null frames fail loud")
 	expect_error("is null")
+
+
+## Sprite frames' LAST reference can drop inside play_sprite_animation
+## (rebuild_sprite_animation): their NOTIFICATION_PREDELETE is user code that
+## may free the volley, so the setter must stop before reading `this` again
+## (ASan: heap-use-after-free otherwise) and reports "not playing" (false):
+## the animation was never applied.
+func test_sprite_frames_predelede_freeing_the_volley_mid_setter_is_survived() -> void:
+	var v := quick_volley(2)
+	var probe := FreeVolleyOnPredeleteFrames2D.new()
+	# A fresh SpriteFrames already carries the "default" animation.
+	probe.add_frame("default", ImageTexture.create_from_image(Image.create(2, 2, false, Image.FORMAT_RGBA8)))
+	assert_true(v.play_sprite_animation(probe), "the probe frames play")
+	probe = null
+	FreeVolleyOnPredeleteFrames2D.fired = 0
+	FreeVolleyOnPredeleteFrames2D.victim = v
+	check_factory_after = false
+	assert_false(v.play_sprite_animation(H.make_sprite_frames()), "the dead volley reports not playing")
+	assert_gt(FreeVolleyOnPredeleteFrames2D.fired, 0, "the last Ref dropped inside the setter")
+	assert_false(is_instance_valid(v), "the PREDELETE handler freed the volley")
+	await idle(1)
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "nothing dangles")
+	assert_not_null(quick_volley(2), "the factory still spawns")

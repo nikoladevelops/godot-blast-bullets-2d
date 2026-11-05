@@ -75,7 +75,15 @@ void BulletSpawner2D::set_spawn_data(const Ref<BulletVolleyData2D> &new_data) {
 	if (spawn_data.is_valid() && spawn_data->is_connected("changed", on_changed)) {
 		spawn_data->disconnect("changed", on_changed);
 	}
+	// The drop below can destroy a script resource: its
+	// NOTIFICATION_PREDELETE is user code that may free this spawner (proven
+	// under ASan). The id is captured first; nothing after the drop may read
+	// `this` while the check fails.
+	const uint64_t self_id = get_instance_id();
 	spawn_data = new_data;
+	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+		return;
+	}
 	// A new resource invalidates the duplicate cache (see header).
 	cached_volley_template.unref();
 	cached_spawn_data_id = 0;

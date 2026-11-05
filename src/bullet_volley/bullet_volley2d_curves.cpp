@@ -68,7 +68,14 @@ _ALWAYS_INLINE_ void BulletVolley2D::populate_individual_bullet_curves_related_d
 	}
 
 	// Vector is pre-sized to amount_bullets, direct index
+	// The replaced slot Ref's drop can destroy a script resource whose
+	// NOTIFICATION_PREDELETE frees this volley (proven under ASan for the
+	// shared twin); only the new slot is touched below.
+	const uint64_t self_id = get_instance_id();
 	all_bullet_curves_data[bullet_index] = new_curves_data;
+	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+		return;
+	}
 	Ref<BulletCurvesData2D> &curr_curves = all_bullet_curves_data[bullet_index];
 
 	const bool is_movement_curve_valid = curr_curves->movement_speed_curve.is_valid();
@@ -156,7 +163,15 @@ void BulletVolley2D::all_bullets_clear_curves_data(int bullet_index_start, int b
 }
 
 void BulletVolley2D::set_shared_movement_pattern_curve(const Ref<Curve2D> &new_curve) {
+	// The drop below can destroy a script resource: its
+	// NOTIFICATION_PREDELETE is user code that may free this volley (proven
+	// under ASan). The id is captured first; nothing after the drop may read
+	// `this` while the check fails.
+	const uint64_t self_id = get_instance_id();
 	shared_movement_pattern_curve = new_curve;
+	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+		return;
+	}
 	// A fresh pattern starts every bullet at distance 0. A null curve
 	// removes the feature: flags go back to defaults, matching the
 	// spawn-data null handling.

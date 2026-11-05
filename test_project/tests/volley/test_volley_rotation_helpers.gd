@@ -171,3 +171,23 @@ func test_pool_reuse_drops_live_edits() -> void:
 	var v6: BulletVolley2D = quick_volley(1, 100.0)
 	assert_false(v6.is_rotation_data_active(), "reuse has no rotation")
 	assert_almost_eq(v6.bullet_get_rotation_speed(0), 0.0, 0.01, "reuse speed zeroed")
+
+
+## A rotation resource's LAST reference can drop inside
+## set_shared_bullet_rotation_data: its NOTIFICATION_PREDELETE is user code
+## that may free the volley, so the setter must stop before reading `this`
+## again (ASan: heap-use-after-free otherwise).
+func test_a_rotation_predelede_freeing_the_volley_mid_setter_is_survived() -> void:
+	var v := quick_volley(2)
+	var probe := FreeVolleyOnPredeleteRotation2D.new()
+	v.set_shared_bullet_rotation_data(probe)
+	probe = null
+	FreeVolleyOnPredeleteRotation2D.fired = 0
+	FreeVolleyOnPredeleteRotation2D.victim = v
+	check_factory_after = false
+	v.set_shared_bullet_rotation_data(H.make_rotation(2.0))
+	assert_gt(FreeVolleyOnPredeleteRotation2D.fired, 0, "the last Ref dropped inside the setter")
+	assert_false(is_instance_valid(v), "the PREDELETE handler freed the volley")
+	await idle(1)
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "nothing dangles")
+	assert_not_null(quick_volley(2), "the factory still spawns")

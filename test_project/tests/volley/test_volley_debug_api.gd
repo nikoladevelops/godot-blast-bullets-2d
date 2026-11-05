@@ -118,3 +118,28 @@ func test_curves_clear_helpers_bound_and_work() -> void:
 	v.clear_per_bullet_curves_data(1)
 	assert_true(v.bullet_get_curves_data(1) == null, "per-bullet clear drops slot 1")
 	expect_errors_containing("has no individual curves data", 2, "cleared slots read loud")
+
+
+## A movement-pattern curve's LAST reference can drop inside
+## set_shared_movement_pattern_curve: its NOTIFICATION_PREDELETE is user code
+## that may free the volley, so the setter must stop before reading `this`
+## again (ASan: heap-use-after-free otherwise).
+func test_a_movement_pattern_curve_predelede_freeing_the_volley_mid_setter_is_survived() -> void:
+	var v := quick_volley(2)
+	var probe := FreeVolleyOnPredeleteCurve2D.new()
+	probe.add_point(Vector2(0, 0))
+	probe.add_point(Vector2(10, 0))
+	v.set_shared_movement_pattern_curve(probe)
+	probe = null
+	FreeVolleyOnPredeleteCurve2D.fired = 0
+	FreeVolleyOnPredeleteCurve2D.victim = v
+	check_factory_after = false
+	var other := Curve2D.new()
+	other.add_point(Vector2(0, 0))
+	other.add_point(Vector2(10, 0))
+	v.set_shared_movement_pattern_curve(other)
+	assert_gt(FreeVolleyOnPredeleteCurve2D.fired, 0, "the last Ref dropped inside the setter")
+	assert_false(is_instance_valid(v), "the PREDELETE handler freed the volley")
+	await idle(1)
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "nothing dangles")
+	assert_not_null(quick_volley(2), "the factory still spawns")

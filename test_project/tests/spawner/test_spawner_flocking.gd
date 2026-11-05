@@ -306,3 +306,22 @@ func test_an_empty_flock_slot_flies_the_factory_default_flock() -> void:
 	var mine := BulletFlock2D.new()
 	a.flock = mine
 	assert_eq(va.flock_get(), mine, "assigning a flock takes over in flight")
+
+
+## A flock resource's LAST reference can drop inside `set_flock` (and inside
+## the apply_flock_config it runs): its NOTIFICATION_PREDELETE is user code
+## that may free the spawner (ASan: heap-use-after-free otherwise).
+func test_a_flock_predelede_freeing_the_spawner_mid_setter_is_survived() -> void:
+	var sp := make_spawner()
+	var probe := FreeSpawnerOnPredeleteFlock2D.new()
+	sp.flock = probe
+	probe = null
+	FreeSpawnerOnPredeleteFlock2D.fired = 0
+	FreeSpawnerOnPredeleteFlock2D.victim = sp
+	check_factory_after = false
+	sp.flock = null
+	assert_gt(FreeSpawnerOnPredeleteFlock2D.fired, 0, "the last Ref dropped inside the setter")
+	assert_false(is_instance_valid(sp), "the PREDELETE handler freed the spawner")
+	await idle(1)
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "nothing dangles")
+	assert_not_null(quick_volley(2), "the factory still spawns")

@@ -680,3 +680,47 @@ func test_an_emitter_predelede_freeing_the_spawner_mid_leg_is_survived() -> void
 	for v in volleys:
 		assert_true(is_instance_valid(v), "the volleys are alive")
 	assert_not_null(quick_volley(2), "the factory still spawns")
+
+
+## The same shape one step earlier: a timing resource's LAST reference can
+## drop inside `set_emitter` itself. `emitter = null` drops the member Ref,
+## which destroys the probe resource; its NOTIFICATION_PREDELETE is user code
+## that may free the spawner. The setter must stop before reading `this` again
+## (ASan: heap-use-after-free in apply_emitter_config otherwise).
+func test_a_null_setter_write_whose_predelede_frees_the_spawner_is_survived() -> void:
+	var sp := _emitting(_template(), _timing(0.25), 1)
+	# No volley armed: the member Ref is the probe's only owner.
+	var probe := FreeSpawnerOnPredeleteEmitter2D.new()
+	sp.emitter = probe
+	probe = null
+	FreeSpawnerOnPredeleteEmitter2D.fired = 0
+	FreeSpawnerOnPredeleteEmitter2D.victim = sp
+	check_factory_after = false
+	sp.emitter = null
+	assert_gt(FreeSpawnerOnPredeleteEmitter2D.fired, 0, "the last Ref dropped inside the setter")
+	assert_false(is_instance_valid(sp), "the PREDELETE handler freed the spawner")
+	await idle(1)
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "nothing dangles")
+	assert_not_null(quick_volley(2), "the factory still spawns")
+
+
+## And once a volley armed the shared config: the member drop leaves the
+## probe to `emitter_shared->data`, whose own replacement (the default timing)
+## destroys it inside apply_emitter_config. That drop is user code too, so the
+## function (and its caller) must re-check the spawner after it.
+func test_a_setter_write_whose_armed_config_predelede_frees_the_spawner_is_survived() -> void:
+	var tpl := _template()
+	var sp := _emitting(tpl, _timing(0.25), 1)
+	_fire(sp) # arms emitter_shared; its data Ref now holds the timing resource
+	var probe := FreeSpawnerOnPredeleteEmitter2D.new()
+	sp.emitter = probe # member AND emitter_shared->data hold it
+	probe = null
+	FreeSpawnerOnPredeleteEmitter2D.fired = 0
+	FreeSpawnerOnPredeleteEmitter2D.victim = sp
+	check_factory_after = false
+	sp.emitter = null # the member drops; apply_emitter_config's data drop destroys the probe
+	assert_gt(FreeSpawnerOnPredeleteEmitter2D.fired, 0, "the last Ref dropped inside apply_emitter_config")
+	assert_false(is_instance_valid(sp), "the PREDELETE handler freed the spawner")
+	await idle(1)
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "nothing dangles")
+	assert_not_null(quick_volley(2), "the factory still spawns")

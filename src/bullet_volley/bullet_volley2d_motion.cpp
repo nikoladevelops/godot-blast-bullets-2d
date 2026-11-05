@@ -185,7 +185,15 @@ int BulletVolley2D::resolve_tiled_data_index(int array_size, int bullet_index) c
 }
 
 void BulletVolley2D::set_shared_bullet_speed_data(const Ref<BulletSpeedData2D> &new_speed_data) {
+	// The drop below can destroy a script resource: its
+	// NOTIFICATION_PREDELETE is user code that may free this volley (proven
+	// under ASan). The id is captured first; nothing after the drop may read
+	// `this` while the check fails.
+	const uint64_t self_id = get_instance_id();
 	shared_bullet_speed_data = new_speed_data;
+	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+		return;
+	}
 	if (new_speed_data.is_null()) {
 		return;
 	}
@@ -193,7 +201,13 @@ void BulletVolley2D::set_shared_bullet_speed_data(const Ref<BulletSpeedData2D> &
 }
 
 void BulletVolley2D::set_shared_bullet_rotation_data(const Ref<BulletRotationData2D> &new_rotation_data) {
+	// See set_shared_bullet_speed_data: the replaced resource's PREDELETE is
+	// user code that may free this volley.
+	const uint64_t self_id = get_instance_id();
 	shared_bullet_rotation_data = new_rotation_data;
+	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+		return;
+	}
 	if (new_rotation_data.is_null()) {
 		return;
 	}

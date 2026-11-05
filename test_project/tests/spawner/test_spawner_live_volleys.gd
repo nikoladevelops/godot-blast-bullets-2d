@@ -399,3 +399,33 @@ func test_a_sound_predelede_freeing_the_spawner_mid_leg_is_survived() -> void:
 	assert_true(factory.debug_assert_no_dangling().get("ok", false), "nothing dangles")
 	assert_true(is_instance_valid(first) and is_instance_valid(second) and is_instance_valid(third), "the volleys are alive")
 	assert_not_null(quick_volley(2), "the factory still spawns")
+
+
+## Replacing an armed emitter timing: a volley holds the shared config's Ref,
+## so the member drop leaves the probe alive and the LAST reference drops
+## inside apply_emitter_config's own replacement. Its NOTIFICATION_PREDELETE
+## may free the spawner; every later read of `this` (in the apply and in the
+## setter after it) must be guarded (ASan: heap-use-after-free otherwise).
+func test_an_armed_emitter_predelede_freeing_the_spawner_mid_setter_is_survived() -> void:
+	var tpl := make_spawner(H.make_volley_data(1, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
+	tpl.name = "Template"
+	var sp := make_spawner(H.make_volley_data(1, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
+	sp.emitter_enabled = true
+	sp.emitter = BulletEmitterData2D.new()
+	sp.emitter_spawner_path = sp.get_path_to(tpl)
+	var got: Array = []
+	sp.volley_fired.connect(func(v: BulletVolley2D, _n: int) -> void: got.append(v), CONNECT_ONE_SHOT)
+	assert_true(sp.shoot_once(), "fires")
+	assert_eq(got.size(), 1, "the volley armed the shared config")
+	var probe := FreeSpawnerOnPredeleteEmitter2D.new()
+	sp.emitter = probe
+	probe = null
+	FreeSpawnerOnPredeleteEmitter2D.fired = 0
+	FreeSpawnerOnPredeleteEmitter2D.victim = sp
+	check_factory_after = false
+	sp.emitter = null
+	assert_gt(FreeSpawnerOnPredeleteEmitter2D.fired, 0, "the last Ref dropped inside apply_emitter_config")
+	assert_false(is_instance_valid(sp), "the PREDELETE handler freed the spawner")
+	await idle(1)
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "nothing dangles")
+	assert_not_null(quick_volley(2), "the factory still spawns")
