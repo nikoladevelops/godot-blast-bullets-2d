@@ -92,7 +92,7 @@ is not an explanation; skipping a step is.
 
 ```sh
 GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py   # build (exit 1 = failed; never raw scons, never edit SConstruct)
-python3 tools/run_tests.py                                       # 247 files / ~2480 tests, ~35 s, leak-checked
+python3 tools/run_tests.py                                       # 256 files / 2710 tests, ~35 s, leak-checked
 python3 tools/run_release_tests.py [--no-build] [run_tests args]  # the suites against the RELEASE (LTO) library a game ships (~2 min build)
 python3 tools/run_tests.py --suite <substring> --full            # one area, every failure message unclipped
 python3 tools/run_tests.py --self-test                           # proves the harness still catches failures/leaks
@@ -1096,10 +1096,14 @@ replayed once on resume.
 | `get_bullet_velocity` = direction x speed + inherited + fall speed, in the tick AND right after every setter; `bullet_set_velocity` sets the exact total | `test_volley_velocity_composition` |
 | Direction setters under a direction curve refuse with one direction-worded warning | `test_volley_core` |
 | Public surface: one `spawn_volley`, no `BulletType`, shared signal names/payloads, exact stats keys | `test_factory_api_surface` |
-| A pooled volley reused for plain data matches a cold volley field by field | `test_volley_pool_reuse_all_features` |
+| A pooled volley reused for plain data matches a cold volley field by field | `pooling/test_pool_reuse_neutrality` |
 | A one-bullet volley behaves like bullet 0 of any volley | `test_volley_single_bullet` |
 | Every spawn-data and volley property sits in a group; names and titles unique | `test_volley_data_inspector` |
 | Hits/bounces/lifetime/homing fire live; the kill is decided after the handler | `test_volley_hit_contract`, `test_volley_lifetime_contract`, `test_volley_signal_timing`, `test_volley_bounce_signals` |
+| A consumed bounce's hit path reports the pose the physics server tested (never the bounce's escape nudge); hit and bounce counters saturate at INT32_MAX with max 0 | `test_volley_hit_contract`, `test_volley_bounce` |
+| Movement LOOP wraps, seeks and teleports restart engine interpolation; PING_PONG turns continuously | `test_spawner_movement` |
+| A paused factory's transform setters move the attachment node at once (its interpolation pass never runs) | `test_mix_teleport` |
+| Preview tracks refuse the lattice/waterfall products the dispatch refuses and never sweep arms x amount | `test_spawner_preview_track_coincidence` |
 | disable_bullet freezes; opt-in reset; parked vs pooled; pooled wake refused | `test_volley_freeze_contract` |
 | Every clock restarts per life, holds while parked/paused, finite under hitches | `test_volley_clock_audit` |
 | Custom data per bullet and shared, readable in every callback, never leaks through the pool | `test_volley_custom_data_contract` |
