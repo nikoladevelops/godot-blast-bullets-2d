@@ -44,7 +44,9 @@ func _ready() -> void:
 	
 	BENCHMARK_GLOBALS.UI.enable_debugger_checkbox.button_pressed = BENCHMARK_GLOBALS.FACTORY.is_debugger_enabled
 	
-	# Add all spawners so they are available globally
+	# Add all spawners so they are available globally (the static survives a
+	# scene reload, so stale instances never accumulate across reloads)
+	BENCHMARK_GLOBALS.ALL_ENEMY_SPAWNERS.clear()
 	for child in enemy_spawners_container.get_children():
 		var spawner:EnemySpawner = child as EnemySpawner
 		BENCHMARK_GLOBALS.ALL_ENEMY_SPAWNERS.push_back(spawner)

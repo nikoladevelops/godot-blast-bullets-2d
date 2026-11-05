@@ -30,6 +30,8 @@ func _on_body_entered(hit_target_body: Object, volley: BulletVolley2D, _bullet_i
 		print("BulletFactory2D hit a body!")
 	if hit_target_body is Player:
 		var dmg_data: DamageData = volley.shared_bullets_custom_data as DamageData
+		if dmg_data == null:
+			return # a volley without damage data hurts nobody
 		hit_target_body.take_damage(dmg_data.base_damage)
 		return
 	# An enemy can be hit through one of its child bodies too (the turret has a StaticBody2D next to its

@@ -31,7 +31,7 @@ func die()->void:
 func take_damage(dmg_amount:int)->void:
 	health_bar.take_damage(dmg_amount)
 	
-	if health_bar.health == 0:
+	if health_bar.health <= 0:
 		die()
 
 # Sets a brand new collision mask based on the integers passed / Should be overriden in child to provide correct implementation based on bullet type
