@@ -147,6 +147,36 @@ func test_a_stuck_attachment_rides_the_teleport() -> void:
 	assert_almost_eq(attachment.global_position - v.get_bullet_transform(0).origin, offset, Vector2(0.01, 0.01), "the attachment keeps its offset")
 
 
+## The header above promises the ATTACHMENT moves with every move path,
+## running or paused, interpolation on or off. With interpolation ON the
+## render pass moves the node - and a paused factory never runs that pass, so
+## a setter must move it at once (teleport does in every mode).
+func test_the_attachment_rides_every_move_in_every_mode() -> void:
+	var problems: Array = []
+	for how in MOVES:
+		for paused in [false, true]:
+			for interpolation in [false, true]:
+				factory.physics_interpolation = BulletFactory2D.INTERPOLATION_ON if interpolation else BulletFactory2D.INTERPOLATION_OFF
+				var d := H.make_volley_data(1, 0.0, 30.0)
+				d.transforms = [Transform2D(0.0, Vector2(50, 20))]
+				d.shared_bullet_attachment = make_probe_scene()
+				var v: BulletVolley2D = factory.spawn_volley(d)
+				await physics(2)
+				await idle(1)
+				factory.set_is_factory_processing_bullets(not paused)
+				var attachment: Node2D = v.bullet_get_attachment(0)
+				var offset: Vector2 = attachment.global_position - v.get_bullet_transform(0).origin
+				_move(v, how)
+				await idle(2) # a running factory's interpolation pass moves it; paused never runs
+				var now: Vector2 = attachment.global_position - v.get_bullet_transform(0).origin
+				if now.distance_to(offset) > 0.01:
+					problems.append("%s paused=%s interpolation=%s: attachment offset %s -> %s" % [how, paused, interpolation, offset, now])
+				factory.set_is_factory_processing_bullets(true)
+				v.clear_all_bullets()
+				await idle(1)
+	assert_eq("\n".join(problems), "", "the attachment rides every move in every mode")
+
+
 func test_a_movement_pattern_continues_from_the_teleported_spot() -> void:
 	var v := _flyer(Vector2(0, 0), 120.0)
 	var c := Curve2D.new()

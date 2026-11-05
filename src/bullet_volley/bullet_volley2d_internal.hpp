@@ -527,7 +527,11 @@ _ALWAYS_INLINE_ void BulletVolley2D::carry_attachment_with_transform(int bullet_
 	} else {
 		attachment_transforms[bullet_index] = attachment_transforms[bullet_index].translated(origin_delta);
 	}
-	if (!bullet_factory->use_physics_interpolation) {
+	// With interpolation on, the render pass normally moves the node (lerped).
+	// A paused factory never runs that pass, so the setter must move it now,
+	// like a teleport does in every mode; otherwise the attachment stays at
+	// its old pose for the whole pause.
+	if (!bullet_factory->use_physics_interpolation || bullet_factory->is_bullet_processing_paused()) {
 		attachments[bullet_index]->set_global_transform(attachment_transforms[bullet_index]);
 	}
 }
