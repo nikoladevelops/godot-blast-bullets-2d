@@ -187,3 +187,27 @@ func test_intersect_ray_answers_inside_the_physics_frame() -> void:
 	assert_true(Engine.is_in_physics_frame(), "inside the physics step")
 	var hit := factory.get_world_2d().direct_space_state.intersect_ray(PhysicsRayQueryParameters2D.create(Vector2(-100, 0), Vector2(100, 0), 4))
 	assert_eq(hit.get("position"), Vector2(39, 0), "the near face of the 2 px box")
+
+
+class TransformNotificationProbe extends Node2D:
+	var notifications := 0
+
+	func _notification(what: int) -> void:
+		if what == NOTIFICATION_TRANSFORM_CHANGED:
+			notifications += 1
+
+
+## A 2D NOTIFICATION_TRANSFORM_CHANGED is DEFERRED: set_global_transform runs
+## no handler synchronously, the notification lands a frame later. The
+## attachment writes in the interpolation pass rely on this. Node2D only
+## sends it while notify_transform is enabled (off by default).
+func test_a_2d_transform_notification_is_deferred() -> void:
+	var probe := TransformNotificationProbe.new()
+	add(probe)
+	probe.set_notify_transform(true)
+	await idle(2)
+	probe.notifications = 0
+	probe.global_position = Vector2(10, 20)
+	assert_eq(probe.notifications, 0, "no handler runs inside set_global_transform")
+	await idle(2)
+	assert_gte(probe.notifications, 1, "the deferred notification lands later")

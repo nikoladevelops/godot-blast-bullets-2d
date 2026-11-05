@@ -263,3 +263,25 @@ func test_a_sound_entry_predelede_freeing_the_spawner_mid_setter_is_survived() -
 	await idle(1)
 	assert_true(factory.debug_assert_no_dangling().get("ok", false), "nothing dangles")
 	assert_not_null(quick_volley(2), "the factory still spawns")
+
+
+## The detector readout mirrors the listener scan: a group source with no
+## filter and interval 0 shares the factory's lists (no scan of its own);
+## a filter group opts out and scans itself.
+func test_the_sound_detector_stats_report_the_scan_state() -> void:
+	var sp := make_spawner()
+	sp.set_sound_listener_source(BulletSpawner2D.SOUND_LISTENER_NODE_GROUP)
+	sp.sound_listener_node_group = &"sound_stats_targets"
+	var t := make_graze_target(Vector2(100, 0), &"sound_stats_targets")
+	assert_not_null(t, "the listener target exists")
+	var before: Dictionary = sp.debug_get_sound_detector_stats()
+	assert_true(before.has("scans") and before.has("lists") and before.has("shares_factory_lists"), "the contract keys")
+	assert_true(bool(before["shares_factory_lists"]), "group + no filter + interval 0 shares the factory lists")
+	assert_gte(sp.refresh_sound_listeners(), 1, "the shared list finds the target")
+	t.add_to_group(&"sound_stats_filter")
+	sp.sound_listener_filter_group = &"sound_stats_filter"
+	assert_false(bool(sp.debug_get_sound_detector_stats()["shares_factory_lists"]), "a filter group opts out of the shared lists")
+	var own_before := int(sp.debug_get_sound_detector_stats()["scans"])
+	assert_gte(sp.refresh_sound_listeners(), 1, "the own scan finds the target too")
+	var own_after: Dictionary = sp.debug_get_sound_detector_stats()
+	assert_gte(int(own_after["scans"]), own_before + 1, "the detector scanned itself")

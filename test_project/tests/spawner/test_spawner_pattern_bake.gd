@@ -389,3 +389,13 @@ func test_random_source_cache_info_is_exact_and_monotonic(i: int = use_parameter
 	assert_eq([int(changed["hits"]), int(changed["misses"]), int(changed["bakes"])], [2, 2, 2], "the seed change re-baked exactly once")
 	assert_gt(int(changed["version"]), int(base["version"]), "and bumped the pattern version")
 	expect_no_errors()
+
+
+## The cache verifier toggle reads back (the harness turns it on for every
+## test; restoring it keeps sibling tests intact).
+func test_the_cache_verify_toggle_reads_back() -> void:
+	var before := PatternSpawner2D.debug_get_pattern_cache_verify()
+	PatternSpawner2D.debug_set_pattern_cache_verify(not before)
+	assert_eq(PatternSpawner2D.debug_get_pattern_cache_verify(), not before, "toggled")
+	PatternSpawner2D.debug_set_pattern_cache_verify(before)
+	assert_eq(PatternSpawner2D.debug_get_pattern_cache_verify(), before, "restored")
