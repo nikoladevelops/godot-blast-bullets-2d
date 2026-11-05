@@ -410,7 +410,14 @@ void LaserVolley2D::build_body_mesh(double fraction, LaserBodyMesh2D &r_mesh, st
 	style.half = (Math::is_finite(half_d) && half_d >= 1.0e-6) ? (real_t)Math::min(half_d, 1.0e15) : (real_t)0.0;
 	style.tile = d->body_mode == LaserData2D::BODY_TILE && body != nullptr;
 	style.tex_w = body != nullptr ? Math::max((real_t)1.0, body->get_size().x) : (real_t)1.0;
-	style.scroll = (real_t)(-d->body_scroll_speed * (draw_clock - grow_started));
+	// The scroll walks on the interpolated clock, wrapped into one texture
+	// width. In double: body_scroll_speed accepts every value that fits a
+	// real_t (~3.4e38) and its product with the clock overflows float after a
+	// second, so an unchecked `u` reached the GPU as INF. A UV one texture
+	// width off samples the same texel (the body repeats), so the wrap is the
+	// same picture; a non-finite product scrolls nothing.
+	const double scroll_d = -d->body_scroll_speed * (draw_clock - grow_started);
+	style.scroll = Math::is_finite(scroll_d) ? (real_t)Math::fposmod(scroll_d, (double)style.tex_w) : (real_t)0.0;
 	style.feather = 0.0;
 	style.end_fade = (real_t)d->body_end_fade;
 	if (d->antialiased) {

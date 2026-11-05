@@ -31,10 +31,37 @@ inline real_t distance_to_polyline2d(const Vector2 &p, const std::vector<Vector2
 // > 0) of a beam `half_width` wide: centered on the segment, turned along it,
 // half extents (seg / 2, half_width). Shared by the query and the debugger
 // overlay.
-inline void laser_query_box2d(const Vector2 &a, const Vector2 &c, real_t seg, real_t half_width, Transform2D &r_pose, Vector2 &r_extents) {
-	const Vector2 axis = (c - a) / seg;
-	r_pose = Transform2D((real_t)axis.angle(), (a + c) * (real_t)0.5);
-	r_extents = Vector2(seg * (real_t)0.5, half_width);
+//
+// Returns false when the box cannot be represented as finite real_t, so both
+// callers skip the segment instead of handing the physics server or the drawn
+// overlay a non-finite rect: a finite but huge pair of beam points (1e38 px
+// away, 3e38 px long) makes the real_t length INF and the real_t center
+// overflow, and the axis, the angle, the center and the extents would come
+// out NaN/INF. The fallback recomputes the same box in double first.
+inline bool laser_query_box2d(const Vector2 &a, const Vector2 &c, real_t seg, real_t half_width, Transform2D &r_pose, Vector2 &r_extents) {
+	if (!Math::is_finite(half_width) || !(half_width > (real_t)0.0)) {
+		return false;
+	}
+	// The shared path keeps the exact expressions the query always used.
+	if (Math::is_finite(seg) && seg > (real_t)0.0 && (a + c).is_finite() && (c - a).is_finite()) {
+		const Vector2 axis = (c - a) / seg;
+		r_pose = Transform2D((real_t)axis.angle(), (a + c) * (real_t)0.5);
+		r_extents = Vector2(seg * (real_t)0.5, half_width);
+		if (r_pose.is_finite() && r_extents.is_finite()) {
+			return true;
+		}
+	}
+	const double dx = (double)c.x - (double)a.x;
+	const double dy = (double)c.y - (double)a.y;
+	const double length = Math::sqrt(dx * dx + dy * dy);
+	const double center_x = ((double)a.x + (double)c.x) * 0.5;
+	const double center_y = ((double)a.y + (double)c.y) * 0.5;
+	if (!(length > 0.0) || !Math::is_finite(length)) {
+		return false;
+	}
+	r_pose = Transform2D((real_t)Math::atan2(dy, dx), Vector2((real_t)center_x, (real_t)center_y));
+	r_extents = Vector2((real_t)(length * 0.5), half_width);
+	return r_pose.is_finite() && r_extents.is_finite();
 }
 
 // The half width every contact query of a beam `width` wide uses.

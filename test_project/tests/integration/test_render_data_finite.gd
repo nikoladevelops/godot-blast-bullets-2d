@@ -80,9 +80,12 @@ func test_hostile_input_never_reaches_the_gpu_as_nan_or_inf() -> void:
 
 ## Laser looks that overflow when combined (each setter accepts its own
 ## finite value): width x body_width_scale past what a float holds, a
-## subnormal width, a huge length, a huge warning width while charging. The
-## body strip and the warning line stay finite (the body is clamped or not
-## drawn); NaN vertices once reached canvas_item_add_triangle_array.
+## subnormal width, a huge length, a huge warning width while charging, and a
+## tiled body scrolled at the largest speed a real_t holds (its product with
+## the laser's own clock overflows: body_scroll_speed accepts every value that
+## fits a float, so ~1.1 s of scroll turns the UV INF). The body strip, its
+## UVs and the warning line stay finite (the body is clamped or not drawn);
+## NaN vertices once reached canvas_item_add_triangle_array.
 func test_overflowing_laser_looks_never_hand_the_gpu_nan() -> void:
 	handle_events(factory)
 	var cases: Array = []
@@ -98,18 +101,33 @@ func test_overflowing_laser_looks_never_hand_the_gpu_nan() -> void:
 	var warn := H.make_laser(1.0, 0.0, 0.0, 0.0, 200.0)
 	warn.warning_width = 1.0e38
 	cases.append(warn)
+	var scrolled := H.make_laser(0.0, 0.0, 0.0, 0.0, 200.0)
+	scrolled.body_frames = H.make_sprite_frames()
+	scrolled.body_mode = LaserData2D.BODY_TILE
+	scrolled.body_scroll_speed = 3.4e38 # the largest scale a real_t holds (the setter refuses more)
+	cases.append(scrolled)
 	var problems: Array = []
+	var tiled_uvs := 0
 	for d in cases:
 		var l := factory.spawn_laser(d, [Transform2D.IDENTITY] as Array[Transform2D])
-		step_factory(2, 1.0 / 16.0)
-		for p in (l.debug_get_body_mesh(1.0)["points"] as PackedVector2Array):
+		step_factory(18, 1.0 / 16.0) # 1.125 s: the scroll speed x the clock overflows real_t
+		var mesh: Dictionary = l.debug_get_body_mesh(1.0)
+		for p in (mesh["points"] as PackedVector2Array):
 			if not p.is_finite():
 				problems.append("width %s scale %s length %s: vertex %s" % [d.width, d.body_width_scale, d.length, p])
 				break
+		var uvs: PackedVector2Array = mesh["uvs"]
+		for uv in uvs:
+			if not uv.is_finite():
+				problems.append("width %s scale %s body_mode %d: uv %s" % [d.width, d.body_width_scale, d.body_mode, uv])
+				break
+		if d.body_mode == LaserData2D.BODY_TILE:
+			tiled_uvs += uvs.size()
 		problems.append_array(render_data_problems(factory, INF))
 		l.end_laser(false)
 		step_factory(1, 1.0 / 16.0)
-	assert_eq(problems, [], "every laser body vertex stays finite")
+	assert_gt(tiled_uvs, 0, "the tiled body was drawn: its UVs were actually tested")
+	assert_eq(problems, [], "every laser body vertex and UV stays finite")
 
 
 ## A finite muzzle plus a finite length whose sum overflows real_t (a beam

@@ -145,3 +145,31 @@ func test_a_hairline_box_draws_without_an_engine_error() -> void:
 	await idle(2) # the overlay draws in the idle frame
 	assert_eq(_boxes().size(), 1, "the hairline box is listed")
 	expect_no_errors()
+
+
+## A finite muzzle plus a finite length whose sum overflows real_t (a beam
+## 1e38 px away and 3e38 px long, the scenario of
+## integration/test_render_data_finite.gd): the segment's real_t length is
+## INF, so the axis, the angle, the center and the extents would all come out
+## NaN/INF and the layer would draw a garbage rect. Every box the overlay
+## emits (and the query tests) stays finite.
+func test_a_huge_beam_never_emits_a_non_finite_box() -> void:
+	factory.is_debugger_enabled = true
+	var d := H.make_laser(0.5, 0.0, 0.0, 0.0, 3.0e38)
+	var l := _fire(d, [Transform2D(0.0, Vector2(1.0e38, 0.0))] as Array[Transform2D])
+	var problems: Array = []
+	var seen := 0
+	for k in 12: # past the 0.5 s charge: the boxes exist while hitting
+		step_factory(1, DT)
+		var boxes := _boxes()
+		seen = maxi(seen, boxes.size())
+		for box in boxes:
+			var pose: Transform2D = box["transform"]
+			var extents: Vector2 = box["extents"]
+			if not (pose.is_finite() and extents.is_finite()):
+				problems.append([k, pose, extents])
+	assert_gt(seen, 0, "the huge beam's segment still gets its box")
+	assert_eq(problems.slice(0, 2), [], "every box pose and extents is finite")
+	expect_no_errors()
+	l.end_laser(false)
+	step_factory(1, DT)

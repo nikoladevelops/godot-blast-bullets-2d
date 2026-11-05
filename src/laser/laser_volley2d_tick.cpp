@@ -624,7 +624,12 @@ bool LaserVolley2D::update_contacts(int beam_index, uint64_t self_id, uint32_t l
 		const Vector2 axis = (c - a) / seg;
 		Transform2D box_pose;
 		Vector2 box_extents;
-		laser_query_box2d(a, c, seg, half_width, box_pose, box_extents);
+		if (!laser_query_box2d(a, c, seg, half_width, box_pose, box_extents)) {
+			// A huge but finite segment: no box the server could test (see
+			// laser_query_box2d). Its length does not advance the walk either:
+			// it is INF and the rest of the beam keeps finite distances.
+			continue;
+		}
 		ps->shape_set_data(query_shape, box_extents);
 		shape_query->set_transform(box_pose);
 		const TypedArray<Dictionary> hits = space->intersect_shape(shape_query, d->max_hits_per_beam);
@@ -863,7 +868,9 @@ void LaserVolley2D::append_debug_boxes(std::vector<LaserDebugBox2D> &r_boxes) co
 				continue;
 			}
 			LaserDebugBox2D box;
-			laser_query_box2d(a, c, seg, half_width, box.pose, box.extents);
+			if (!laser_query_box2d(a, c, seg, half_width, box.pose, box.extents)) {
+				continue; // no finite box for this segment: never draw a NaN/INF rect
+			}
 			box.laser_id = id;
 			box.beam = i;
 			r_boxes.push_back(box);
