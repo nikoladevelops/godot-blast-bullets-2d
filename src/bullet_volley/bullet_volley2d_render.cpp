@@ -32,13 +32,20 @@ void BulletVolley2D::interpolate_bullet_visuals(double fraction_override) {
 	if (!is_transform_invertible_safe(node_global)) {
 		return;
 	}
-	const Transform2D multimesh_inv = node_global.affine_inverse();
+	const bool node_is_identity = node_global.columns[0] == Vector2(1, 0) && node_global.columns[1] == Vector2(0, 1) && node_global.columns[2] == Vector2(0, 0);
+	const Transform2D multimesh_inv = node_is_identity ? Transform2D() : node_global.affine_inverse();
 
 	float *w = batch_buffer.ptrw();
 	for (int i = 0; i < amount_bullets; ++i) {
 		Transform2D t;
 		if (all_bullets_enabled_set.contains(i)) {
-			t = multimesh_inv * get_interpolated_transform(all_cached_instance_transforms[i], all_previous_instance_transf[i], fraction);
+			const Transform2D blended = get_interpolated_transform(all_cached_instance_transforms[i], all_previous_instance_transf[i], fraction);
+			if (node_is_identity) {
+				t = blended;
+			} else {
+				const Transform2D local = multimesh_inv * blended;
+				t = converted_pose_safe2d(local) ? local : blended;
+			}
 		} else {
 			t = zero_transform;
 		}

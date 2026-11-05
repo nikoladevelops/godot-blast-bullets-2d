@@ -227,16 +227,19 @@ public:
 	// NodeInverseScope is alive (no user code may move the node inside).
 	mutable bool node_inverse_scope_active = false;
 	mutable bool node_inverse_scope_valid = false;
+	mutable bool node_inverse_scope_identity = false;
 	mutable Transform2D node_inverse_scope;
 
 	struct NodeInverseScope {
 		const BulletVolley2D *owner;
 		bool saved_active;
 		bool saved_valid;
+		bool saved_identity;
 		Transform2D saved_inverse;
 		explicit NodeInverseScope(const BulletVolley2D *p_owner) :
-				owner(p_owner), saved_active(p_owner->node_inverse_scope_active), saved_valid(p_owner->node_inverse_scope_valid), saved_inverse(p_owner->node_inverse_scope) {
+				owner(p_owner), saved_active(p_owner->node_inverse_scope_active), saved_valid(p_owner->node_inverse_scope_valid), saved_identity(p_owner->node_inverse_scope_identity), saved_inverse(p_owner->node_inverse_scope) {
 			const Transform2D node_global = owner->get_global_transform();
+			owner->node_inverse_scope_identity = node_global.columns[0] == Vector2(1, 0) && node_global.columns[1] == Vector2(0, 1) && node_global.columns[2] == Vector2(0, 0);
 			owner->node_inverse_scope_valid = is_transform_invertible_safe(node_global);
 			owner->node_inverse_scope = owner->node_inverse_scope_valid ? node_global.affine_inverse() : Transform2D();
 			owner->node_inverse_scope_active = true;
@@ -244,6 +247,7 @@ public:
 		~NodeInverseScope() {
 			owner->node_inverse_scope_active = saved_active;
 			owner->node_inverse_scope_valid = saved_valid;
+			owner->node_inverse_scope_identity = saved_identity;
 			owner->node_inverse_scope = saved_inverse;
 		}
 		NodeInverseScope(const NodeInverseScope &) = delete;

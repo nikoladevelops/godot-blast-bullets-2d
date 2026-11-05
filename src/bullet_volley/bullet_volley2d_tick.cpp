@@ -1330,16 +1330,25 @@ _ALWAYS_INLINE_ void BulletVolley2D::batch_flush_instance_transforms() {
 	}
 	float *w = batch_buffer.ptrw();
 	// Same degenerate-global guard as interpolate_bullet_visuals: never
-	// write a non-finite inverse into the buffer.
+	// write a non-finite inverse into the buffer. A node at the identity
+	// needs no conversion at all, and a product that overflows float32 (a
+	// far pose met by a small inverse) falls back to the raw finite pose.
 	const Transform2D node_global = get_global_transform();
 	if (!is_transform_invertible_safe(node_global)) {
 		return;
 	}
-	const Transform2D multimesh_inv = node_global.affine_inverse();
+	const bool node_is_identity = node_global.columns[0] == Vector2(1, 0) && node_global.columns[1] == Vector2(0, 1) && node_global.columns[2] == Vector2(0, 0);
+	const Transform2D multimesh_inv = node_is_identity ? Transform2D() : node_global.affine_inverse();
 	for (int i = 0; i < amount_bullets; ++i) {
 		Transform2D t = zero_transform;
 		if (all_bullets_enabled_set.contains(i)) {
-			t = multimesh_inv * all_cached_instance_transforms[i];
+			const Transform2D &cached = all_cached_instance_transforms[i];
+			if (node_is_identity) {
+				t = cached;
+			} else {
+				const Transform2D local = multimesh_inv * cached;
+				t = converted_pose_safe2d(local) ? local : cached;
+			}
 		}
 		write_multimesh_transform2d(w + i * stride, t);
 	}

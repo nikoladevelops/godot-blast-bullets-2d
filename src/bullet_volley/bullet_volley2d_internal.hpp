@@ -85,15 +85,37 @@ static _ALWAYS_INLINE_ void write_multimesh_transform2d(float *out, const Transf
 	out[7] = t.columns[2][1];
 }
 
+// A converted pose can overflow float32 when a far pose meets a small node
+// inverse (3.5e34 px x 1e4): the renderer must never see that INF/NaN, so an
+// unconvertible product falls back to the raw (finite) pose, exactly like a
+// node whose inverse is unusable. NaN fails every comparison here.
+static _ALWAYS_INLINE_ bool converted_pose_safe2d(const Transform2D &t) {
+	constexpr real_t limit = (real_t)1.0e37;
+	return Math::abs(t.columns[0].x) <= limit && Math::abs(t.columns[0].y) <= limit &&
+			Math::abs(t.columns[1].x) <= limit && Math::abs(t.columns[1].y) <= limit &&
+			Math::abs(t.columns[2].x) <= limit && Math::abs(t.columns[2].y) <= limit;
+}
+
 _ALWAYS_INLINE_ Transform2D BulletVolley2D::to_local_for_multimesh(const Transform2D &global_transf) const {
 	if (node_inverse_scope_active) {
-		return node_inverse_scope_valid ? node_inverse_scope * global_transf : global_transf;
+		if (!node_inverse_scope_valid) {
+			return global_transf;
+		}
+		if (node_inverse_scope_identity) {
+			return global_transf; // node at the identity: the local pose IS the global one (no multiply, no overflow)
+		}
+		const Transform2D local = node_inverse_scope * global_transf;
+		return converted_pose_safe2d(local) ? local : global_transf;
 	}
 	const Transform2D node_global = get_global_transform();
 	if (!is_transform_invertible_safe(node_global)) {
 		return global_transf;
 	}
-	return node_global.affine_inverse() * global_transf;
+	if (node_global.columns[0] == Vector2(1, 0) && node_global.columns[1] == Vector2(0, 1) && node_global.columns[2] == Vector2(0, 0)) {
+		return global_transf;
+	}
+	const Transform2D local = node_global.affine_inverse() * global_transf;
+	return converted_pose_safe2d(local) ? local : global_transf;
 }
 
 _ALWAYS_INLINE_ void BulletVolley2D::update_bullet_previous_transform_for_interpolation(int bullet_index) {

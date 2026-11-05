@@ -140,3 +140,23 @@ func _check_finite_beam(l: LaserVolley2D, where: String) -> void:
 		if not p.is_finite():
 			bad.append(p)
 	assert_eq(bad, [], "every beam point stays finite %s" % where)
+
+
+## A far bullet under a down-scaled ancestor (anisotropic: the determinant
+## stays above the invertibility floor): the node inverse times a 3.5e34 px
+## pose overflows float32. The local pose written into the MultiMesh buffer
+## must stay finite; the conversion falls back to the raw pose instead of
+## handing the GPU an INF instance.
+func test_a_down_scaled_ancestor_and_a_far_bullet_stay_finite() -> void:
+	handle_events(factory)
+	var d := H.make_volley_data(2, 0.0, 30.0)
+	d.monitorable = true
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	v.scale = Vector2(1.0e-4, 2.0e-4) # the node inverse is 1e4/5e3 (det above the floor)
+	v.teleport_bullet(0, Vector2(3.5e34, 0.0)) # finite; the converted pose is not
+	var problems: Array = []
+	for k in 4:
+		await physics(1)
+		problems.append_array(render_data_problems(factory, INF))
+	assert_eq(problems.slice(0, 5), [], "the converted poses stay finite")
+	expect_no_errors()
