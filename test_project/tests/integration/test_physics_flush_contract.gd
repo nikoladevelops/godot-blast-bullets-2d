@@ -112,3 +112,40 @@ func test_volleys_cleared_inside_the_flush_record_no_hits() -> void:
 	var books: Dictionary = factory.debug_assert_no_dangling()
 	assert_true(books["ok"], str(books["error"]))
 	expect_no_errors()
+
+
+## The unique-key cold path: a volley shape that never existed before (5
+## bullets) spawned from inside the flush joins the space fully posed and
+## collides (attach_area_to_space runs inside the flush for pool misses).
+func test_a_brand_new_volley_spawned_inside_the_flush_collides() -> void:
+	var d := H.make_still_data(5)
+	d.monitorable = true
+	var transforms: Array[Transform2D] = []
+	for i in 5:
+		transforms.append(Transform2D(0.0, Vector2(-260, 20.0 * i)))
+	d.transforms = transforms
+	var seen := _detector(Vector2(-260, 40))
+	var fired := _flush_trigger(func() -> void: factory.spawn_volley(d))
+	await _wait_for(fired)
+	for k in 10:
+		if not seen.is_empty():
+			break
+		await physics(1)
+	assert_false(seen.is_empty(), "a detector sees the cold volley spawned inside the flush")
+	expect_no_errors()
+
+
+## A game callback may queue_free a volley from inside the flush (the
+## documented way to destroy things from a handler): the factory's books stay
+## balanced and nothing errors.
+func test_a_volley_queue_freed_inside_the_flush_leaves_clean_books() -> void:
+	var d := H.make_still_data(2)
+	d.monitorable = true
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	var fired := _flush_trigger(func() -> void: v.queue_free())
+	await _wait_for(fired)
+	await idle(2)
+	assert_false(is_instance_valid(v), "the queued free ran")
+	var books: Dictionary = factory.debug_assert_no_dangling()
+	assert_true(books["ok"], str(books["error"]))
+	expect_no_errors()
