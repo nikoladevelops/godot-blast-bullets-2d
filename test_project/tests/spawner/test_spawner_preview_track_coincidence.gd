@@ -247,3 +247,63 @@ func test_a_corridor_door_wider_than_the_wall_draws_the_clamped_track() -> void:
 		assert_eq((m["runs"] as Array).size(), 2, "posed %s: two strips beside the clamped door" % posed)
 		if not (m["runs"] as Array).is_empty():
 			assert_lte(float(m["worst"]), TOL * (POSED_SCALE if posed else 1.0), "posed %s: every dot on the track" % posed)
+
+
+## Grid rows_per_column near INT_MAX overflowed the sampler's
+## (amount + rows_per_column - 1) int math once: columns_amount wrapped to 0
+## and the track vanished while the generator (float ceil) fills one column.
+func test_grid_rows_per_column_near_int_max_still_draws_its_track() -> void:
+	var m: Dictionary = await _measure(BulletSpawner2D.PATTERN_FROM_HELPER_GRID, 24, false, 0.0, {"helper_grid_rows_per_column": 2147483647})
+	assert_false((m["dots"] as PackedVector2Array).is_empty(), "bullets drawn")
+	assert_false((m["runs"] as Array).is_empty(), "the track exists")
+	assert_lte(float(m["worst"]), TOL, "every dot on the track")
+
+
+## A lattice/waterfall product past the grid-slot limit fires no bullets
+## (dispatch guard), so the preview must draw neither dots nor a track. The
+## sampler once ignored the guard and swept columns x rows points anyway.
+func test_a_refused_grid_product_draws_no_track() -> void:
+	var cases := [
+		[BulletSpawner2D.PATTERN_FROM_HELPER_LATTICE, {"helper_lattice_columns": 300, "helper_lattice_rows": 300}],
+		[BulletSpawner2D.PATTERN_FROM_HELPER_WATERFALL, {"helper_waterfall_columns": 300, "helper_waterfall_rows": 300}],
+	]
+	for row in cases:
+		var m: Dictionary = await _measure(row[0], 24, false, 0.0, row[1])
+		assert_true((m["dots"] as PackedVector2Array).is_empty(), "%s: no bullets fire" % row[1])
+		assert_true((m["track"] as PackedVector2Array).is_empty(), "%s: no track drawn" % row[1])
+
+
+## An arms knob far past the bullet count once made the spiral sampler run
+## arms x amount iterations and draw one INF separator per arm, empty or not.
+## Only arms that hold a bullet may draw a strip.
+func test_a_spiral_arm_count_past_the_bullets_draws_only_its_strips() -> void:
+	var m: Dictionary = await _measure(BulletSpawner2D.PATTERN_FROM_HELPER_MULTISPIRAL, 24, false, 0.0, {"helper_multispiral_arms": 100000})
+	var track: PackedVector2Array = m["track"]
+	assert_false((m["runs"] as Array).is_empty(), "the track exists")
+	assert_lte(track.size(), 24 + 24, "one point per bullet + one separator per drawn strip")
+	assert_lte(float(m["worst"]), TOL, "every dot on the track")
+
+
+## The worst knob combination used to sweep 6.4e9 points: each side caps at
+## the grid-slot limit (80000), so the product guard refuses it. The rebuild
+## must finish instantly and draw nothing, never freeze the editor.
+func test_extreme_grid_dimensions_never_freeze_the_preview() -> void:
+	var cases := [
+		[BulletSpawner2D.PATTERN_FROM_HELPER_LATTICE, {"helper_lattice_columns": 80000, "helper_lattice_rows": 80000}],
+		[BulletSpawner2D.PATTERN_FROM_HELPER_WATERFALL, {"helper_waterfall_columns": 80000, "helper_waterfall_rows": 80000}],
+	]
+	for row in cases:
+		var started := Time.get_ticks_msec()
+		var m: Dictionary = await _measure(row[0], 24, false, 0.0, row[1])
+		assert_true((m["track"] as PackedVector2Array).is_empty(), "%s: a refused product draws nothing" % row[1])
+		assert_lt(Time.get_ticks_msec() - started, 3000, "%s: the rebuild stays instant" % row[1])
+
+
+## arms near INT_MAX (the knob allows it): the sampler must stay O(amount),
+## like the generator, not O(arms x amount).
+func test_an_extreme_spiral_arm_count_never_freezes_the_preview() -> void:
+	var started := Time.get_ticks_msec()
+	var m: Dictionary = await _measure(BulletSpawner2D.PATTERN_FROM_HELPER_MULTISPIRAL, 24, false, 0.0, {"helper_multispiral_arms": 2147483647})
+	assert_lt(Time.get_ticks_msec() - started, 3000, "the rebuild stays instant")
+	assert_false((m["runs"] as Array).is_empty(), "the track exists")
+	assert_lte(float(m["worst"]), TOL, "every dot on the track")

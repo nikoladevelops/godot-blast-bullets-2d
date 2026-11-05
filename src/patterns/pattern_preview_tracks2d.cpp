@@ -4,6 +4,11 @@
 #include "patterns/pattern_curves2d.hpp"
 #include "patterns/patterns_internal.hpp"
 
+#include <algorithm>
+#include <cstdint>
+#include <utility>
+#include <vector>
+
 using namespace godot;
 
 namespace BlastBullets2D {
@@ -107,25 +112,45 @@ static void outline_emit_inf(PackedVector2Array &r_pts) {
 }
 
 static void outline_emit_spiral_arms(PackedVector2Array &r_pts, int transforms_amount, int arms, real_t start_radius, real_t radius_step, real_t angle_step, real_t base_rotation_abs, int arm_index_stride, bool mirror_alternate_arms) {
-	for (int arm = 0; arm < arms; ++arm) {
-		for (int i = 0; i < transforms_amount; ++i) {
-			int ia = 0;
-			int step_index = 0;
-			spiral_arm_step(i, arms, arm_index_stride, ia, step_index);
-			if (ia != arm) {
-				continue;
-			}
-			const real_t dir_sign = (mirror_alternate_arms && (arm % 2 == 1)) ? -1.0 : 1.0;
-			const real_t arm_phase = Math::TAU * (real_t)arm / (real_t)arms;
-			const real_t r = start_radius + radius_step * (real_t)step_index;
-			const real_t angle = base_rotation_abs + arm_phase + dir_sign * angle_step * (real_t)step_index;
-			const Vector2 p = Vector2(Math::cos(angle), Math::sin(angle)) * r;
-			if (p.is_finite()) {
-				r_pts.push_back(p);
-			}
-		}
-		outline_emit_inf(r_pts);
+	// Same slot deal as the generator (arm_spirals2d / spiral_arm_step): walk
+	// the slots ONCE, then group per arm. O(amount), never O(arms * amount):
+	// the arms knob has no upper bound (INT_MAX is legal), so the old
+	// arms-outer loop could stall a preview rebuild for hours and emit one
+	// INF separator per arm, empty or not. Arms that hold no bullet draw no
+	// strip (an INF run nothing sits on is not a track).
+	std::vector<std::pair<int, Vector2>> slots;
+	if (transforms_amount > 0) {
+		slots.reserve((size_t)transforms_amount);
 	}
+	for (int i = 0; i < transforms_amount; ++i) {
+		int arm = 0;
+		int step_index = 0;
+		spiral_arm_step(i, arms, arm_index_stride, arm, step_index);
+		const real_t dir_sign = (mirror_alternate_arms && (arm % 2 == 1)) ? -1.0 : 1.0;
+		const real_t arm_phase = Math::TAU * (real_t)arm / (real_t)arms;
+		const real_t r = start_radius + radius_step * (real_t)step_index;
+		const real_t angle = base_rotation_abs + arm_phase + dir_sign * angle_step * (real_t)step_index;
+		const Vector2 p = Vector2(Math::cos(angle), Math::sin(angle)) * r;
+		if (p.is_finite()) {
+			slots.emplace_back(arm, p);
+		}
+	}
+	if (slots.empty()) {
+		return;
+	}
+	// Stable: inside an arm the points keep slot order (the generator's order).
+	std::stable_sort(slots.begin(), slots.end(), [](const std::pair<int, Vector2> &a, const std::pair<int, Vector2> &b) {
+		return a.first < b.first;
+	});
+	int drawn_arm = slots[0].first;
+	for (const std::pair<int, Vector2> &slot : slots) {
+		if (slot.first != drawn_arm) {
+			outline_emit_inf(r_pts);
+			drawn_arm = slot.first;
+		}
+		r_pts.push_back(slot.second);
+	}
+	outline_emit_inf(r_pts);
 }
 
 Dictionary BulletPatterns2D::helper_sample_outline_flower(int flower_type, int petals, real_t radius, real_t petal_spread, real_t petal_sharpness, double inner_radius_scale, double spiro_roller, double spiro_pen, double super_lobes, double super_fullness, real_t base_rotation, int transforms_amount) {
@@ -308,8 +333,11 @@ Dictionary BulletPatterns2D::helper_sample_outline_grid(int transforms_amount, i
 		return outline_track_result(PackedVector2Array(), false, false);
 	}
 	// Mirrors helper_generate_transforms_grid column/row math (ideal grid:
-	// no jitter, no random rotation). Row strips, INF-separated.
-	const int columns_amount = (transforms_amount + rows_per_column - 1) / rows_per_column;
+	// no jitter, no random rotation). Row strips, INF-separated. Same float
+	// ceil as the generator: (amount + rows_per_column - 1) overflowed an
+	// int for a rows_per_column near INT_MAX (the wrapped columns count then
+	// left the track empty while the generator filled one column).
+	const int columns_amount = (int)Math::ceil((real_t)transforms_amount / (real_t)rows_per_column);
 	const int used_rows = (columns_amount > 1) ? rows_per_column : transforms_amount;
 	const int last_column_rows = transforms_amount - (columns_amount - 1) * rows_per_column;
 	const real_t total_width = (real_t)(columns_amount - 1) * column_offset;
@@ -358,11 +386,18 @@ Dictionary BulletPatterns2D::helper_sample_outline_lattice(int transforms_amount
 		return outline_track_result(PackedVector2Array(), false, false);
 	}
 	// Mirrors helper_generate_transforms_lattice row math, including the
-	// overflow rows past capacity.
-	const int capacity = columns * rows;
-	const int total_rows = rows + (transforms_amount > capacity ? (transforms_amount - capacity + columns - 1) / columns : 0);
+	// overflow rows past capacity. The dispatch refuses a columns x rows
+	// product past the developer's grid-slot limit (one warning, no bullets),
+	// so the track draws nothing: the sweep must stay bounded either way
+	// (columns*rows reached 6.4e9 as a plain int, a signed overflow plus a
+	// multi-minute preview freeze).
+	if ((int64_t)columns * (int64_t)rows > (int64_t)pattern_max_grid_slots()) {
+		return outline_track_result(PackedVector2Array(), false, false);
+	}
+	const int64_t capacity = (int64_t)columns * (int64_t)rows;
+	const int64_t total_rows = (int64_t)rows + ((int64_t)transforms_amount > capacity ? ((int64_t)transforms_amount - capacity + columns - 1) / columns : 0);
 	PackedVector2Array pts;
-	for (int row = 0; row < total_rows; ++row) {
+	for (int64_t row = 0; row < total_rows; ++row) {
 		const real_t stagger = (stagger_rows && (row % 2 == 1)) ? spacing_x * 0.5 : 0.0;
 		for (int col = 0; col < columns; ++col) {
 			const Vector2 cell((col - (columns - 1) * 0.5) * spacing_x + stagger, (row - (rows - 1) * 0.5) * spacing_y);
@@ -381,13 +416,18 @@ Dictionary BulletPatterns2D::helper_sample_outline_waterfall(int transforms_amou
 		return outline_track_result(PackedVector2Array(), false, false);
 	}
 	// Mirrors helper_generate_transforms_waterfall row math, including the
-	// overflow rows past capacity.
+	// overflow rows past capacity. Same grid-slot guard as lattice: the
+	// dispatch fires no bullets past the limit, so there is no track to draw
+	// (and the product can no longer overflow an int).
 	const Vector2 axis = rain_direction.normalized();
 	const Vector2 across = axis.orthogonal();
-	const int capacity = columns * rows;
-	const int total_rows = rows + (transforms_amount > capacity ? (transforms_amount - capacity + columns - 1) / columns : 0);
+	if ((int64_t)columns * (int64_t)rows > (int64_t)pattern_max_grid_slots()) {
+		return outline_track_result(PackedVector2Array(), false, false);
+	}
+	const int64_t capacity = (int64_t)columns * (int64_t)rows;
+	const int64_t total_rows = (int64_t)rows + ((int64_t)transforms_amount > capacity ? ((int64_t)transforms_amount - capacity + columns - 1) / columns : 0);
 	PackedVector2Array pts;
-	for (int row = 0; row < total_rows; ++row) {
+	for (int64_t row = 0; row < total_rows; ++row) {
 		const double row_phase = (rows > 1) ? ((double)(row % rows) / (double)(rows - 1) - 0.5) : 0.0;
 		for (int col = 0; col < columns; ++col) {
 			const double col_centered = (columns > 1) ? ((double)col / (double)(columns - 1) - 0.5) : 0.0;
