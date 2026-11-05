@@ -104,6 +104,21 @@ func test_rejects_at_every_layer() -> void:
 	expect_error_sequence(["BulletVolleyData2D: gravity must be finite, keeping the old value.", "BulletVolleyData2D all_bullet_gravity[0] is not finite, using (0, 0) for bullet index 0.", "BulletVolley2D.bullet_set_gravity: value must be finite, keeping the old value.", "BulletVolley2D.set_gravity_delay_sec: value must be finite and >= 0, keeping the old value.", "BulletVolley2D.set_gravity_duration_sec: value must be finite and >= 0 (0 = infinite), keeping the old value.", "BulletVolleyData2D: gravity_delay_sec must be finite and >= 0, keeping the old value."], "every non-finite or negative gravity input fails loud")
 
 
+## One data resource, ten lives, every bullet reading the bad entry (the tile
+## checkbox): the report describes the DATA, so it latches on the resource
+## (WarnOnce2D) instead of printing one line per bullet per shot. Before the
+## latch: 10 bullets x 10 spawns = 100 errors.
+func test_a_non_finite_per_bullet_entry_reports_once_per_data_resource() -> void:
+	var d := _still(10)
+	d.all_bullet_gravity = [Vector2(NAN, 0)]
+	d.tile_all_bullet_gravity = true
+	for i in 10:
+		factory.spawn_volley(d)
+	# The message names the entry and the bullet: its prefix matches every
+	# bullet's row, so the count is bullets x lives before the latch.
+	expect_errors_containing("all_bullet_gravity[0] is not finite, using (0, 0) for bullet index", 1, "one report per data resource, not one per bullet per shot (10 bullets x 10 lives before the latch)")
+
+
 func test_reuse_neutral_and_homing_mix() -> void:
 	var d := _still(1)
 	d.gravity = Vector2(0, 1000)

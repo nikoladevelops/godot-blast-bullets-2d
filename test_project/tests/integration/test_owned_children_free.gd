@@ -149,3 +149,47 @@ func test_freeing_debugger_multimesh_nodes_never_breaks_the_debugger() -> void:
 	await physics(2)
 	var problems := await _exercise("debugger nodes")
 	assert_eq("\n".join(problems), "", "the debugger survives its nodes being freed")
+
+
+## A SceneTree.node_added handler that queue-frees the factory while the
+## factory adds one of its own nodes (a laser, a pre-pooled attachment, the
+## first sound voice/container) must be survived: the operation finishes on
+## the (still alive, queued) factory without an engine error, its books stay
+## clean, and a fresh factory still spawns. NOTE: an immediate free() there
+## is Godot's own boundary, not the plugin's (probed: freeing an ancestor of
+## the node being added inside add_child aborts the engine; §14 never does
+## it), so the in-contract queue_free is pinned.
+func test_a_node_added_handler_queue_freeing_the_factory_is_survived(mode: String = use_parameters(["laser", "attachments_pool", "sound"])) -> void:
+	check_factory_after = false
+	godot_listener_at(Vector2.ZERO)
+	var armed := [true] # a lambda captures an Array by reference, a bool by value
+	var handler := func(n: Node) -> void:
+		if armed[0] and is_instance_valid(factory) and factory.is_ancestor_of(n):
+			armed[0] = false
+			factory.queue_free()
+	get_tree().node_added.connect(handler)
+	match mode:
+		"laser":
+			assert_not_null(factory.spawn_laser(H.make_laser(0.0, 0.0, 0.0, 0.0, 200.0), [Transform2D()]), "the laser spawned")
+		"attachments_pool":
+			factory.populate_attachments_pool(probe_scene, 2)
+		"sound":
+			# Held: a dead resource's offer is dropped at flush (no voice).
+			var s := H.make_sound(BulletSoundData2D.SOUND_ON_HIT)
+			assert_true(factory.play_sound(s, Vector2.ZERO), "the offer was accepted")
+			for k in 4: # the flush plays it and creates the voice container
+				await physics(1)
+				if not armed[0]:
+					break
+	get_tree().node_added.disconnect(handler)
+	assert_false(armed[0], "the handler ran during the operation")
+	if is_instance_valid(factory): # a synchronously added node: queued, not deleted yet
+		assert_true(factory.debug_assert_no_dangling().get("ok", false), "the queued factory's books are clean")
+		await idle(2)
+	assert_false(is_instance_valid(factory), "the queued factory is gone")
+	var fresh := BulletFactory2D.new()
+	add(fresh)
+	await idle(1)
+	assert_not_null(fresh.spawn_volley(H.make_volley_data(2, 0.0, 1.0)), "a subsequent spawn works")
+	await idle(1)
+	assert_true(fresh.debug_assert_no_dangling().get("ok", false), "the new factory is clean")

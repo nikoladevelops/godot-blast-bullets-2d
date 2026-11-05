@@ -291,6 +291,39 @@ func test_timer_keeps_the_bullets_that_did_not_split() -> void:
 		assert_eq(e[1], BulletVolley2D.SPLIT_CAUSE_TIMER, "timer cause")
 
 
+## A timer blocked by a full split queue is not spent: the queue drains in
+## the same sweep (the flush runs after the volleys), the next tick retries
+## and the split still happens — once, with the timer cause.
+func test_a_timer_blocked_by_a_full_queue_retries_once_it_drains() -> void:
+	factory.split_max_pending = 1 # smallest cap: one earlier request fills it
+	var filler_stage := _stage(2)
+	filler_stage.split_on_lifetime_over = false
+	filler_stage.split_after_sec = 0.05
+	var filler := _armed([filler_stage], 1, 0.0, 5.0) # ticks first: its request fills the queue
+	var target_stage := _stage(2)
+	target_stage.split_on_lifetime_over = false
+	target_stage.split_after_sec = 0.05
+	var target := _armed([target_stage], 1, 0.0, 5.0)
+	for i in 6:
+		factory.debug_advance_time(DT)
+		if not splits.is_empty():
+			break
+	assert_eq(splits.size(), 1, "only the first timer recorded a split: the queue was full")
+	assert_eq(splits[0][1], BulletVolley2D.SPLIT_CAUSE_TIMER, "timer cause")
+	expect_warning_sequence(["BulletFactory2D: split_max_pending (1) reached, new splits are dropped until the queue drains (raise it, or 0 = no cap)."])
+	assert_eq(int(factory.debug_get_split_stats()["pending"]), 0, "the flush drained the one request")
+	assert_eq(int(factory.debug_get_split_stats()["dropped_total"]), 1, "the blocked split counted, never silently lost")
+	assert_true(target.is_bullet_status_enabled(0), "the blocked parent is still alive")
+	assert_false(filler.is_bullet_status_enabled(0), "the first parent left with its split")
+	for i in 2:
+		factory.debug_advance_time(DT)
+	assert_eq(splits.size(), 2, "the blocked timer retried once the queue drained")
+	if splits.size() != 2:
+		return # a build that spends the timer reports the assert above alone
+	assert_eq(splits[1][1], BulletVolley2D.SPLIT_CAUSE_TIMER, "timer cause")
+	assert_false(target.is_bullet_status_enabled(0), "the parent left with its split")
+
+
 ## A volley that found no split timer skips the lookup until a split rule
 ## changes: turning the timer on in flight still splits on time.
 func test_a_timer_switched_on_in_flight_splits() -> void:

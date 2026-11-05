@@ -206,3 +206,47 @@ func test_user_code_inside_a_new_voice_never_breaks_the_flush(action: String = u
 		assert_lte(busy, f.get_sound_max_voices(), "no slot beyond the cap")
 		assert_true(f.play_sound(shots[0], Vector2.ZERO), "the mixer still takes offers")
 		await physics(2)
+
+
+## A child_entered_tree handler that queue-frees the factory while the flush
+## creates its first voice (a sound trigger in a physics callback) must be
+## survived: the post-flush stats write runs on the still alive (queued)
+## factory, the queued free lands cleanly and a fresh factory still spawns.
+## (An immediate free() there frees an ancestor of the emitting node inside
+## add_child: that aborts the ENGINE itself — probed, §14 — so the
+## in-contract queue_free is pinned here.)
+func test_a_child_entered_tree_handler_freeing_the_factory_during_flush_is_survived() -> void:
+	check_factory_after = false
+	godot_listener_at(Vector2.ZERO)
+	make_wall(Vector2(60, 0))
+	var d := H.make_volley_data(1, 600.0, 30.0)
+	d.transforms = [Transform2D(0.0, Vector2(50, 0))]
+	d.monitorable = true
+	d.set_collision_mask_from_array([3])
+	d.collision_shape = H.make_circle_shape(6.0)
+	d.bullet_max_collision_count = 1
+	assert_not_null(factory.spawn_volley(d), "the volley flies into the wall")
+	var shot := H.make_sound(BulletSoundData2D.SOUND_ON_HIT) # held: a dead resource's offer is dropped at flush
+	var armed := [true]
+	var handler := func(n: Node) -> void:
+		if armed[0] and is_instance_valid(factory) and n.get_parent() == factory:
+			armed[0] = false
+			factory.queue_free()
+	factory.child_entered_tree.connect(handler)
+	factory.body_entered.connect(func(_b: Object, _v: BulletVolley2D, _i: int) -> void:
+		if armed[0]:
+			factory.play_sound(shot, Vector2.ZERO))
+	for k in 30:
+		await physics(1)
+		if not armed[0]:
+			break
+	if is_instance_valid(factory) and factory.child_entered_tree.is_connected(handler):
+		factory.child_entered_tree.disconnect(handler)
+	assert_false(armed[0], "the flush created the first voice inside the handler")
+	assert_false(is_instance_valid(factory), "the queued factory was freed at the end of its frame")
+	expect_no_errors("the flush and the post-flush stats write survived")
+	var fresh := BulletFactory2D.new()
+	add(fresh)
+	await idle(1)
+	assert_not_null(fresh.spawn_volley(H.make_volley_data(2, 0.0, 1.0)), "a subsequent spawn works")
+	assert_true(fresh.debug_assert_no_dangling().get("ok", false), "the new factory is clean")

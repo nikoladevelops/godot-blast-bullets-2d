@@ -116,6 +116,38 @@ func test_target_freed_by_any_live_handler_is_never_tested_later_in_the_sweep() 
 	assert_eq(later.get_bullet_grazed_rings(0, 0), 0, "nor spent its Once ring on it")
 
 
+func test_target_freed_by_an_attachment_disable_callback_is_never_tested_later() -> void:
+	# The disable-path attachment callbacks (on_bullet_disable) are user code
+	# inside the sweep too: a target they free must drop out of this sweep's
+	# target list, never spend a later volley's Once ring (§20.2).
+	var t := make_graze_target(Vector2(10, 0))
+	var probe := AttachmentFreeGrazeTargetProbe2D.new()
+	var scene := PackedScene.new()
+	assert_eq(scene.pack(probe), OK, "probe scene packs")
+	probe.free()
+	var expiring_data := H.make_volley_data(1, 0.0, 0.01) # dies within the first tick
+	expiring_data.transforms = H.transforms_at([Vector2(0, 500)])
+	expiring_data.shared_bullet_attachment = scene
+	var expiring: BulletVolley2D = factory.spawn_volley(expiring_data)
+	expiring.graze_set_zones([H.make_graze_zone([5.0])], &"graze_targets") # builds the list first
+	var later := graze_volley(H.transforms_at([Vector2.ZERO]), 0.0)
+	later.graze_set_zones([H.make_graze_zone([20.0])], &"graze_targets")
+	var log_entries := H.record_graze(factory)
+	AttachmentFreeGrazeTargetProbe2D.victims = [t]
+	AttachmentFreeGrazeTargetProbe2D.calls = 0
+	step_factory()
+	assert_gt(AttachmentFreeGrazeTargetProbe2D.calls, 0, "the attachment's on_bullet_disable ran inside the sweep")
+	assert_false(is_instance_valid(t), "the disable callback freed the target")
+	assert_eq(log_entries, [], "the later volley never grazed the dead target")
+	assert_eq(later.get_bullet_grazed_rings(0, 0), 0, "nor spent its Once ring on it")
+	make_graze_target(Vector2(10, 0))
+	step_factory()
+	assert_eq(log_entries.size(), 1, "so it grazes the next target")
+	if log_entries.size() != 1:
+		return # a build that spent the ring on the dead target reports the asserts above alone
+	assert_eq(log_entries[0][2], later, "the later volley")
+
+
 func test_handler_queue_freeing_the_volley_stops_dispatch() -> void:
 	var pair := _two_bullets_one_target()
 	var log_entries := H.record_graze(factory)

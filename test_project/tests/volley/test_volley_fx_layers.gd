@@ -959,6 +959,47 @@ func test_on_clear_fires_on_manual_clear_only() -> void:
 	expect_errors_containing("Invalid bullet index in clear_bullet", 1, "stale clear fails loud")
 
 
+## A Gradient can hold a NaN point (a script writes one, or a tool writes a
+## Gradient resource): every sampled ramp color is checked before it is
+## written, so a NaN never reaches the volley's modulate, a trail's instance
+## color or a one-shot's tint. The ramp's own base color stands instead.
+func test_a_nan_ramp_point_never_writes_a_nan_tint() -> void:
+	await _preamble()
+	await _settle(factory)
+	var nan_ramp := Gradient.new()
+	nan_ramp.set_color(0, Color(NAN, 0, 0, 1))
+	nan_ramp.set_color(1, Color(0, 1, 0, 1))
+	var vol: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 0.0, []))
+	vol.set_modulate_ramp(nan_ramp)
+	for i in 4:
+		await physics()
+	var vol_tint: Color = vol.get_self_modulate()
+	assert_true(_color_finite(vol_tint), "volley self_modulate stays finite (got %s)" % str(vol_tint))
+	await _settle(factory)
+	# The trail path (an EffectLayerData2D.color_ramp sampled per bullet).
+	var trail := _make_layer(EffectLayerData2D.EFFECT_TRAIL_FOLLOW, 1)
+	trail.color_ramp = nan_ramp
+	var vt: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 0.0, [trail], false))
+	for i in 4:
+		await physics()
+	var trail_tint: Color = _fx_trail_tint(vt)
+	assert_true(_color_finite(trail_tint), "trail tint stays finite (got %s)" % str(trail_tint))
+	assert_eq(vt.debug_get_effect_layers_info().get("trail_bakes", []).size(), 1, "the trail baked")
+	await _settle(factory)
+	# The one-shot path (fx_refresh_slot_color samples the layer's ramp).
+	var spark := _make_layer(EffectLayerData2D.EFFECT_ON_SPAWN, 2)
+	spark.color_ramp = nan_ramp
+	var _vs: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 0.0, [spark], false))
+	for i in 3:
+		await physics()
+	var fx_tint: Color = _fx_live_tint(factory, 0)
+	assert_true(_color_finite(fx_tint), "one-shot tint stays finite (got %s)" % str(fx_tint))
+
+
+func _color_finite(c: Color) -> bool:
+	return is_finite(c.r) and is_finite(c.g) and is_finite(c.b) and is_finite(c.a)
+
+
 func test_volley_fades_in_out_ramp_infinite_reuse() -> void:
 	await _preamble()
 	# FX T24 volley fades: in, out, ramp, infinite, reuse

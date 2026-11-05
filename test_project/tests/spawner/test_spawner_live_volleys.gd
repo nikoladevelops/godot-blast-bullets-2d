@@ -362,3 +362,40 @@ func test_explicit_homing_commands_end_a_follow() -> void:
 	assert_false(v.is_homing_following(), "the follow ended")
 	step_factory(2)
 	assert_false(_chases(v), "nothing refills the queue")
+
+
+## A probe entry that never fires in this suite (no expiry) and carries a
+## valid stream (no empty-stream warning): only its PREDELETE matters.
+func _probe_sound() -> FreeSpawnerOnPredeleteSound2D:
+	var p := FreeSpawnerOnPredeleteSound2D.new()
+	p.streams = [H.make_sound_stream()]
+	p.trigger = BulletSoundData2D.SOUND_ON_LIFETIME_OVER
+	return p
+
+
+## A sound entry's LAST reference can drop inside a live leg (an arm replaces
+## it): its NOTIFICATION_PREDELETE is user code that may free the spawner.
+## Every leg walks a snapshot and re-validates the owner before each touch,
+## so the freed spawner is never written through: no crash, a clean factory,
+## spawning still works. Two probe entries (one per volley) make a death
+## happen before at least one later touch whichever order the leg walks.
+func test_a_sound_predelede_freeing_the_spawner_mid_leg_is_survived() -> void:
+	var sp := _plain_spawner()
+	sp.sound_enabled = true
+	sp.sound_effects = [_probe_sound()] # volley 1's entry
+	var first := _shoot(sp)
+	sp.sound_effects = [_probe_sound()] # volley 2's entry (drops volley 1's spawner ref)
+	var second := _shoot(sp)
+	sp.sound_effects = [H.make_sound(BulletSoundData2D.SOUND_ON_HIT)] # what the leg arms towards
+	var third := _shoot(sp)
+	FreeSpawnerOnPredeleteSound2D.fired = 0
+	FreeSpawnerOnPredeleteSound2D.victim = sp
+	check_factory_after = false
+	sp.apply_to_live_volleys(BulletSpawner2D.LIVE_SOUND)
+	assert_gt(FreeSpawnerOnPredeleteSound2D.fired, 0, "a probe's last reference dropped inside the leg")
+	assert_false(is_instance_valid(sp), "the PREDELETE handler freed the spawner")
+	# The factory and its volleys survive the death; a subsequent spawn works.
+	await idle(1)
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "nothing dangles")
+	assert_true(is_instance_valid(first) and is_instance_valid(second) and is_instance_valid(third), "the volleys are alive")
+	assert_not_null(quick_volley(2), "the factory still spawns")

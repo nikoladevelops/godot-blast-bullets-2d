@@ -252,6 +252,27 @@ func test_a_color_ramp_samples_the_body_in_eight_pieces() -> void:
 	assert_eq(bad, [], "piece q: modulate x ramp(q / 8) on both sides, u = q / 8")
 
 
+## A Gradient can hold a NaN point: the vertex colors handed to draw_polygon
+## are checked, so a NaN never reaches the render server (the modulate stands
+## instead).
+func test_a_nan_ramp_point_never_writes_nan_vertex_colors() -> void:
+	var d := H.make_laser(0.0, 0.0, 0.0, 0.0, 200.0)
+	d.antialiased = false  # pins the hard-edged strip (antialiased adds a faded outer ring)
+	var ramp := Gradient.new()
+	ramp.set_color(0, Color(NAN, 0, 0, 1))
+	ramp.set_color(1, Color(0, 1, 0, 1))
+	d.color_ramp = ramp
+	var l := _fire(d)
+	step_factory(1, DT)
+	var colors: PackedColorArray = l.debug_get_body_mesh(1.0)["colors"]
+	assert_gt(colors.size(), 0, "the body drew")
+	var bad: Array = []
+	for q in colors.size():
+		if not is_finite(colors[q].r) or not is_finite(colors[q].g) or not is_finite(colors[q].b) or not is_finite(colors[q].a):
+			bad.append(q)
+	assert_eq(bad, [], "every drawn vertex color is finite")
+
+
 func test_a_reflected_body_joins_at_miters_and_covers_exactly_the_beam() -> void:
 	var l: LaserVolley2D = await _corridor_beam()
 	var beam := l.get_beam_points(0)
