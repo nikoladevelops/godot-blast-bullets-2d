@@ -1744,9 +1744,10 @@ emits `GRAZE_POINT_TARGET_BIT | index` ids and belongs in
   orphans, factory-spawned and pooled volleys use the factory scale alone). Custom timers use the
   same factor. One-shot effects (`age_fx_effects`) use the factory scale only.
 - A spawner's own clock (`BulletSpawner2D::get_process_time_scale`) = hitch-clamped delta (0.5 s)
-  x spawner scale x factory scale; every countdown, spin and the Path2D movement run on it.
-  Scale 0 freezes everything and resumes with the exact remaining time; large scales stay bounded
-  by the existing caps (8 shot pulls per frame, 64 movement legs).
+  x spawner scale x factory scale, clamped to 0.5 s again after the scale; every countdown, spin
+  and the Path2D movement run on it. Scale 0 freezes everything and resumes with the exact
+  remaining time; large scales stay bounded by that second clamp (one frame never runs a
+  month-long scaled step) plus the existing caps (8 shot pulls per frame, 64 movement legs).
 - Real time on purpose: `graze_clock` (target rescans), sound fades/intervals/`min_interval_sec`.
   Opt-in: `BulletSoundData2D.pitch_follows_time_scale` (pitch x scale, paused below 0.01; a pause
   is re-asserted every sweep because Godot drops one requested before the playback registers).
