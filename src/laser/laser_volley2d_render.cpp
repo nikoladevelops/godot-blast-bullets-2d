@@ -9,6 +9,7 @@
 
 #include "laser/laser_volley2d.hpp"
 
+#include "core/color_math2d.hpp"
 #include "core/transform_math2d.hpp"
 #include "factory/bullet_factory2d.hpp"
 #include "laser/laser_geometry2d.hpp"
@@ -273,7 +274,12 @@ void append_body_strip(LaserBodyMesh2D &m, const std::vector<Vector2> &pts, cons
 		const real_t t = dist / total;
 		Color col = d->modulate;
 		if (ramp) {
-			col = col * d->color_ramp->sample(t);
+			const Color sampled = d->color_ramp->sample(t);
+			// A NaN/Inf ramp point would land in the vertex colors handed to
+			// draw_polygon: the modulate stands instead.
+			if (color_is_finite2d(sampled)) {
+				col = col * sampled;
+			}
 		}
 		if (fading) {
 			col.a *= Math::clamp(Math::min(dist, total - dist) / fade, (real_t)0.0, (real_t)1.0);

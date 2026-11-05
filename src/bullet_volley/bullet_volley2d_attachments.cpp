@@ -189,6 +189,7 @@ void BulletVolley2D::bullet_disable_attachment(int bullet_index) {
 	const uint64_t self_id = get_instance_id();
 	// Back to real time before it is pooled or freed (a reused attachment is
 	// re-scaled for its new owner).
+	note_user_code(); // on_time_scale_changed is user code inside the sweep
 	detaching->set_time_scale_factor(1.0);
 	// on_time_scale_changed is user code: look again before the next call.
 	if (ObjectDB::get_instance(ObjectID(detaching_id)) == nullptr) {
@@ -203,6 +204,7 @@ void BulletVolley2D::bullet_disable_attachment(int bullet_index) {
 		return;
 	}
 	if (!was_suspended) {
+		note_user_code(); // on_bullet_disable is user code inside the sweep
 		detaching->call_on_bullet_disable();
 	}
 
@@ -282,6 +284,7 @@ void BulletVolley2D::suspend_bullet_attachment(int bullet_index) {
 	}
 	// The slot keeps the node: a callback that frees it drops the slot via
 	// its own PREDELETE (owner tracking), so nothing dangles here.
+	note_user_code(); // on_bullet_disable is user code inside the sweep
 	attachment->call_on_bullet_disable();
 }
 
@@ -296,6 +299,7 @@ void BulletVolley2D::bullet_enable_attachment(int bullet_index) {
 		if (bullet_index < (int)attachment_suspended.size()) {
 			attachment_suspended[bullet_index] = 0;
 		}
+		note_user_code(); // on_bullet_enable is user code inside the sweep
 		attachment_ptr->call_on_bullet_enable();
 	}
 }

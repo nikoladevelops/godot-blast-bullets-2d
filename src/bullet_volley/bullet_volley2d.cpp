@@ -799,6 +799,7 @@ void BulletVolley2D::enable_bullet_core(int bullet_index, int collision_amount, 
 	}
 
 	if (should_enable_attachment) {
+		note_user_code(); // on_bullet_enable runs user code inside the sweep
 		bullet_enable_attachment(bullet_index); // resumes a suspended attachment (on_bullet_enable)
 	}
 }
@@ -857,6 +858,9 @@ void BulletVolley2D::disable_bullet_core(int bullet_index, bool release_attachme
 	write_shape_disabled(bullet_index, true);
 
 	const uint64_t self_id = get_instance_id();
+	// on_bullet_disable / on_time_scale_changed run user code inside the
+	// sweep (graze target lists re-validate when the epoch moved, §20.2).
+	note_user_code();
 	if (release_attachment) {
 		bullet_disable_attachment(bullet_index);
 	} else {

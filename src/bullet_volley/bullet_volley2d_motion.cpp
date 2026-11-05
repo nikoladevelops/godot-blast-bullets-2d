@@ -737,7 +737,10 @@ void BulletVolley2D::set_bullet_transform(int bullet_index, const Transform2D &n
 	if (!validate_bullet_index(bullet_index, "set_bullet_transform")) {
 		return;
 	}
-	if (!new_transform.get_origin().is_finite() || !Math::is_finite(new_transform.get_rotation()) || !new_transform.get_scale().is_finite()) {
+	// is_finite(): every component of both columns and the origin, so a NaN
+	// basis keeps the "must be finite" wording (get_scale() below derives
+	// from squares and would read INF for a finite-but-huge scale).
+	if (!new_transform.get_origin().is_finite() || !Math::is_finite(new_transform.get_rotation()) || !new_transform.is_finite()) {
 		UtilityFunctions::push_error("set_bullet_transform: new_transform must be finite, keeping the old transform.");
 		return;
 	}
@@ -749,6 +752,13 @@ void BulletVolley2D::set_bullet_transform(int bullet_index, const Transform2D &n
 	// of storing a poisoned basis.
 	if (new_transform.get_scale().length_squared() < 0.00000001 || !is_transform_invertible_safe(new_transform)) {
 		UtilityFunctions::push_error("set_bullet_transform: scale must be non-zero and non-singular, keeping the old transform.");
+		return;
+	}
+	// Finite is not enough: (1e38, 1e-4) has a finite determinant, but each
+	// column's square overflows float32 to INF, and every later conversion of
+	// the pose (shape, multimesh, interpolation) derives from that INF.
+	if (!transform_is_sane2d(new_transform)) {
+		UtilityFunctions::push_error("set_bullet_transform: scale is too large to represent (its square overflows), keeping the old transform.");
 		return;
 	}
 	if (bullet_index >= (int)all_cached_instance_transforms.size() || bullet_index >= (int)all_cached_instance_origin.size()) {
@@ -885,6 +895,13 @@ void BulletVolley2D::set_bullet_scale(int bullet_index, const Vector2 &new_scale
 	const Transform2D shape_scaled = own_shape_basis ? rescaled(all_cached_shape_transforms[bullet_index]) : Transform2D();
 	if (!is_transform_invertible_safe(scaled) || (own_shape_basis && !is_transform_invertible_safe(shape_scaled))) {
 		UtilityFunctions::push_error("set_bullet_scale: the scaled transform would be singular, keeping the old scale.");
+		return;
+	}
+	// Finite is not enough (see set_bullet_transform): a (1e38, 1e-4) pair is
+	// finite with a finite determinant, but its column squares overflow
+	// float32 to INF.
+	if (!transform_is_sane2d(scaled) || (own_shape_basis && !transform_is_sane2d(shape_scaled))) {
+		UtilityFunctions::push_error("set_bullet_scale: new_scale is too large to represent (its square overflows), keeping the old scale.");
 		return;
 	}
 	all_cached_instance_transforms[bullet_index] = scaled;

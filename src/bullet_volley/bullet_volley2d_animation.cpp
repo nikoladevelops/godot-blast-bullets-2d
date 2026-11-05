@@ -241,7 +241,12 @@ void BulletVolley2D::tick_volley_fade() {
 		}
 		if (fade_modulate_ramp.is_valid()) {
 			const double pos = Math::clamp(age / max_life_time, 0.0, 1.0);
-			target = fade_base_modulate * fade_modulate_ramp->sample((float)pos);
+			const Color sampled = fade_modulate_ramp->sample((float)pos);
+			// A NaN/Inf ramp point must never reach the volley's modulate
+			// (the renderer keeps it for the whole life): the base color stands.
+			if (color_is_finite2d(sampled)) {
+				target = fade_base_modulate * sampled;
+			}
 		}
 	}
 	if (alpha < 0.0) {

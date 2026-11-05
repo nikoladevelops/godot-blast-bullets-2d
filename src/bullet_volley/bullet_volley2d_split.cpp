@@ -96,6 +96,7 @@ int BulletVolley2D::split_capture(int bullet_index, int cause, const Transform2D
 		}
 	}
 	if (!bullet_factory->split_has_room()) {
+		++split_queue_block_total; // transient: the queue drains in a sweep
 		return 0; // the queue is full: no split (counted and warned once)
 	}
 	SplitRequest2D request;
@@ -208,6 +209,7 @@ int BulletVolley2D::split_capture(int bullet_index, int cause, const Transform2D
 	if (split_counts[bullet_index] < (uint32_t)INT32_MAX) {
 		++split_counts[bullet_index];
 	}
+	++split_record_total;
 	// The split's own report, at the parent's pose (no user code: offers and
 	// one-shot effects only).
 	sound_fire(BulletSoundData2D::SOUND_ON_SPLIT, bullet_index, pose.get_origin());
@@ -275,10 +277,20 @@ void BulletVolley2D::split_check_timer() {
 	if (curves_elapsed_time < (double)stage->split_after_sec) {
 		return;
 	}
-	split_timer_fired_chain = (uint64_t)chain->get_instance_id();
 	// Local copy: the batch mutates the live set and runs attachment callbacks.
 	const std::vector<int> live = all_bullets_enabled_set.get_active_indexes();
+	const uint64_t recorded_before = split_record_total;
+	const uint64_t blocked_before = split_queue_block_total;
 	split_live_bullets(live, SPLIT_CAUSE_TIMER, -1);
+	// Spend the timer unless the factory's queue refused capture at some
+	// bullet: that rejection is transient (the flush drains it this sweep),
+	// so the timer retries next tick instead of staying spent forever. A
+	// deterministic rejection (a lost chance roll, max_splits reached,
+	// missing child data) and a recorded split both spend it: the roll
+	// must not be taken again every tick (one roll per bullet per life).
+	if (split_record_total != recorded_before || split_queue_block_total == blocked_before) {
+		split_timer_fired_chain = (uint64_t)chain->get_instance_id();
+	}
 }
 
 void BulletVolley2D::split_seed_children(const SplitRequest2D &request, const Vector2 *directions, const real_t *speed_multipliers, int count) {

@@ -167,19 +167,24 @@ void BulletVolley2D::apply_gravity_from_data(const BulletVolleyData2D &volley_da
 	gravity_delay_sec = 0.0;
 	gravity_duration_sec = 0.0;
 	// Windows validate like their homing twins; bad values keep 0 (off/immediate).
+	// Every branch describes the DATA (a spawner firing the same resource would
+	// print one line per bullet per shot), so each reports once per spawn data
+	// resource through WarnOnce2D (codes 18-21, like the collision-shape latch).
 	if (Math::is_finite(volley_data.gravity_delay_sec) && volley_data.gravity_delay_sec >= 0.0) {
 		gravity_delay_sec = (real_t)volley_data.gravity_delay_sec;
-	} else {
+	} else if (WarnOnce2D::first(warn_data_id, 18u, 0, 0)) {
 		UtilityFunctions::push_error("BulletVolleyData2D gravity_delay_sec must be finite and >= 0, using 0 (immediate).");
 	}
 	if (Math::is_finite(volley_data.gravity_duration_sec) && volley_data.gravity_duration_sec >= 0.0) {
 		gravity_duration_sec = (real_t)volley_data.gravity_duration_sec;
-	} else {
+	} else if (WarnOnce2D::first(warn_data_id, 19u, 0, 0)) {
 		UtilityFunctions::push_error("BulletVolleyData2D gravity_duration_sec must be finite and >= 0 (0 = infinite), using 0 (infinite).");
 	}
 	gravity = volley_data.gravity;
 	if (!gravity.is_finite()) {
-		UtilityFunctions::push_error("BulletVolleyData2D gravity must be finite, using (0, 0).");
+		if (WarnOnce2D::first(warn_data_id, 20u, 0, 0)) {
+			UtilityFunctions::push_error("BulletVolleyData2D gravity must be finite, using (0, 0).");
+		}
 		gravity = Vector2(0, 0);
 	}
 	// Strict: entry i pulls bullet i only. Uncovered bullets keep the
@@ -202,7 +207,9 @@ void BulletVolley2D::apply_gravity_from_data(const BulletVolleyData2D &volley_da
 				g = candidate;
 				authored = true;
 			} else {
-				UtilityFunctions::push_error("BulletVolleyData2D all_bullet_gravity[" + String::num_int64(entry) + "] is not finite, using (0, 0) for bullet index " + String::num_int64(i) + ".");
+				if (WarnOnce2D::first(warn_data_id, 21u, 0, 0)) {
+					UtilityFunctions::push_error("BulletVolleyData2D all_bullet_gravity[" + String::num_int64(entry) + "] is not finite, using (0, 0) for bullet index " + String::num_int64(i) + ".");
+				}
 				g = Vector2(0, 0);
 			}
 		}

@@ -66,6 +66,12 @@ void BulletVolleyData2D::set_texture_size(Vector2 new_texture_size) {
 		UtilityFunctions::push_error("BulletVolleyData2D: texture_size must be finite and >= 0, keeping the old value.");
 		return;
 	}
+	// A finite-but-absurd quad (a typo'd 1e7 px) is representable but breaks
+	// the draw: one sane maximum per axis.
+	if (new_texture_size.x > 1000000.0 || new_texture_size.y > 1000000.0) {
+		UtilityFunctions::push_error("BulletVolleyData2D: texture_size must be at most 1000000 px per axis, keeping the old value.");
+		return;
+	}
 	if (!assign_if_changed2d(texture_size, new_texture_size)) {
 		return;
 	}

@@ -76,25 +76,43 @@ int BulletSpawner2D::apply_to_live_volleys(BitField<LiveVolleyGroup> groups) {
 	return (int)changed.size();
 }
 
+// The four legs below arm or release user Resources (zones, sounds, the flock,
+// split data). Dropping the last Ref destroys it, and a script resource's
+// PREDELETE handler is user code that may free this spawner mid-leg (proven
+// under AddressSanitizer: sound_live_volleys once read sound_volume_db after
+// such a callback freed it). Each leg walks a snapshot of (pointer, id) pairs,
+// re-validates the entry AND the spawner after every callback, and leaves at
+// the first mismatch - the same discipline as homing_live_volleys below.
+
 void BulletSpawner2D::graze_live_volleys(std::unordered_set<uint64_t> &r_changed) {
 	BulletFactory2D *factory = get_bullet_factory();
 	if (factory == nullptr) {
 		return;
 	}
+	const uint64_t self_id = get_instance_id();
 	bool any = false;
 	const Array zones = graze_enabled ? spawner_graze_zones(any) : Array();
-	std::vector<BulletVolley2D *> owned;
-	factory->collect_volleys_owned_by(get_instance_id(), owned);
-	for (BulletVolley2D *volley : owned) {
+	const std::vector<OwnedVolley2D> owned = snapshot_owned2d(factory, self_id);
+	for (const OwnedVolley2D &entry : owned) {
+		BulletVolley2D *volley = still_owned2d(entry, self_id);
+		if (volley == nullptr) {
+			continue;
+		}
 		if (!any) {
 			if (volley->graze_zone_slots > 0) {
 				volley->graze_release();
-				r_changed.insert(volley->get_instance_id());
+				r_changed.insert(entry.id);
+				if (ObjectDB::get_instance(ObjectID(self_id)) != this || shot_owner_dying()) {
+					return;
+				}
 			}
 		} else if (!volley->graze_armed_with(zones, graze_detector_shared())) {
 			// A fresh graze state: the rings re-arm.
 			volley->graze_arm_from_spawner(zones, graze_detector_shared());
-			r_changed.insert(volley->get_instance_id());
+			r_changed.insert(entry.id);
+			if (ObjectDB::get_instance(ObjectID(self_id)) != this || shot_owner_dying()) {
+				return;
+			}
 		}
 	}
 }
@@ -104,20 +122,33 @@ void BulletSpawner2D::sound_live_volleys(std::unordered_set<uint64_t> &r_changed
 	if (factory == nullptr) {
 		return;
 	}
+	const uint64_t self_id = get_instance_id();
 	bool any = false;
 	const Array entries = sound_enabled ? spawner_sound_entries(any) : Array();
 	const std::shared_ptr<GrazeDetector2D> detector = any ? sound_detector_ref() : nullptr;
-	std::vector<BulletVolley2D *> owned;
-	factory->collect_volleys_owned_by(get_instance_id(), owned);
-	for (BulletVolley2D *volley : owned) {
+	// Read once, before any callback: a sound_release() may drop the last Ref
+	// of a script sound resource whose PREDELETE frees this spawner.
+	const float volume = (float)sound_volume_db;
+	const std::vector<OwnedVolley2D> owned = snapshot_owned2d(factory, self_id);
+	for (const OwnedVolley2D &entry : owned) {
+		BulletVolley2D *volley = still_owned2d(entry, self_id);
+		if (volley == nullptr) {
+			continue;
+		}
 		if (!any) {
 			if (!volley->sound_effects.empty()) {
 				volley->sound_release();
-				r_changed.insert(volley->get_instance_id());
+				r_changed.insert(entry.id);
+				if (ObjectDB::get_instance(ObjectID(self_id)) != this || shot_owner_dying()) {
+					return;
+				}
 			}
-		} else if (!volley->sound_armed_with(entries, detector, (float)sound_volume_db)) {
-			volley->sound_arm_from_spawner(entries, detector, (float)sound_volume_db);
-			r_changed.insert(volley->get_instance_id());
+		} else if (!volley->sound_armed_with(entries, detector, volume)) {
+			volley->sound_arm_from_spawner(entries, detector, volume);
+			r_changed.insert(entry.id);
+			if (ObjectDB::get_instance(ObjectID(self_id)) != this || shot_owner_dying()) {
+				return;
+			}
 		}
 	}
 }
@@ -128,12 +159,19 @@ void BulletSpawner2D::flock_live_volleys(std::unordered_set<uint64_t> &r_changed
 	if (factory == nullptr || !flock_enabled) {
 		return;
 	}
-	std::vector<BulletVolley2D *> owned;
-	factory->collect_volleys_owned_by(get_instance_id(), owned);
-	for (BulletVolley2D *volley : owned) {
+	const uint64_t self_id = get_instance_id();
+	const std::vector<OwnedVolley2D> owned = snapshot_owned2d(factory, self_id);
+	for (const OwnedVolley2D &entry : owned) {
+		BulletVolley2D *volley = still_owned2d(entry, self_id);
+		if (volley == nullptr) {
+			continue;
+		}
 		if (volley->flock_config == nullptr || volley->flock_config != flock_shared) {
 			apply_volley_flock(volley);
-			r_changed.insert(volley->get_instance_id());
+			r_changed.insert(entry.id);
+			if (ObjectDB::get_instance(ObjectID(self_id)) != this || shot_owner_dying()) {
+				return;
+			}
 		}
 	}
 }
@@ -144,14 +182,21 @@ void BulletSpawner2D::split_live_volleys(std::unordered_set<uint64_t> &r_changed
 	if (factory == nullptr || !split_enabled || split_data.is_null() || spawn_data.is_null()) {
 		return;
 	}
+	const uint64_t self_id = get_instance_id();
 	// Children copy the spawn data like a fresh shot's (the spawner-owned copy).
 	const Ref<BulletVolleyData2D> child_source = cached_volley_template.is_valid() && cached_spawn_data_id == spawn_data->get_instance_id() ? cached_volley_template : spawn_data;
-	std::vector<BulletVolley2D *> owned;
-	factory->collect_volleys_owned_by(get_instance_id(), owned);
-	for (BulletVolley2D *volley : owned) {
+	const std::vector<OwnedVolley2D> owned = snapshot_owned2d(factory, self_id);
+	for (const OwnedVolley2D &entry : owned) {
+		BulletVolley2D *volley = still_owned2d(entry, self_id);
+		if (volley == nullptr) {
+			continue;
+		}
 		if (split_shared == nullptr || volley->split_config != split_shared) {
 			apply_volley_split(volley, child_source);
-			r_changed.insert(volley->get_instance_id());
+			r_changed.insert(entry.id);
+			if (ObjectDB::get_instance(ObjectID(self_id)) != this || shot_owner_dying()) {
+				return;
+			}
 		}
 	}
 }

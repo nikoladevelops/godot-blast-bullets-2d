@@ -3174,6 +3174,13 @@ public:
 	// Saturates at INT32_MAX, the largest max_splits_per_bullet (an int), so
 	// the cap always holds (a uint16_t once saturated below caps > 65535).
 	std::vector<uint32_t> split_counts;
+	// Monotone counters, read only as before/after deltas by
+	// split_check_timer: every split this volley recorded, and every split
+	// its capture refused because the factory's pending queue was full (the
+	// one TRANSIENT rejection: a queued burst must not spend a timer that
+	// never got to record anything).
+	uint64_t split_record_total = 0;
+	uint64_t split_queue_block_total = 0;
 	// The arming snapshot shared by this life's requests, rebuilt when an
 	// arming choke point (graze_arm/release, sound arm/release,
 	// flock_set_config) bumped split_arming_serial.

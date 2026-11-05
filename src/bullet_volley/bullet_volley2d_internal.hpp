@@ -11,6 +11,7 @@
 #include "core/attachment_scene_check2d.hpp"
 #include "core/cached_string_names2d.hpp"
 #include "core/collision_shape_helper2d.hpp"
+#include "core/color_math2d.hpp"
 #include "core/warn_once2d.hpp"
 #include "data/bullet_curves_data2d.hpp"
 #include "data/bullet_volley_data2d.hpp"
@@ -349,7 +350,12 @@ _ALWAYS_INLINE_ void BulletVolley2D::write_trail_from_global(int bullet_index, c
 		if (bake.layer->color_ramp.is_valid() || trail_has_fade) {
 			Color tint(1, 1, 1, 1);
 			if (bake.layer->color_ramp.is_valid()) {
-				tint = bake.layer->color_ramp->sample(total > 0.0 ? (float)(age / total) : 0.0f);
+				const Color sampled = bake.layer->color_ramp->sample(total > 0.0 ? (float)(age / total) : 0.0f);
+				// A NaN/Inf ramp point would land in the instance color (and
+				// the renderer): the white base stands instead.
+				if (color_is_finite2d(sampled)) {
+					tint = sampled;
+				}
 			}
 			if (trail_has_fade) {
 				double alpha = 1.0;
@@ -843,6 +849,7 @@ _ALWAYS_INLINE_ bool BulletVolley2D::attach_bullet_attachment_internal(int bulle
 
 	if (created_brand_new_instance) {
 		attachment_instance->set_physics_interpolation_mode(Node::PHYSICS_INTERPOLATION_MODE_OFF); // I have custom physics interpolation logic, so disable the Godot one
+		note_user_code(); // on_bullet_spawn is user code inside the sweep
 		attachment_instance->call_on_bullet_spawn(); // Call GDScript custom virtual method to ensure the proper state before adding to the scene tree
 		const bool instance_alive = ObjectDB::get_instance(ObjectID(setup_instance_id)) != nullptr;
 		if (life != nullptr && !*life) {
@@ -862,6 +869,7 @@ _ALWAYS_INLINE_ bool BulletVolley2D::attach_bullet_attachment_internal(int bulle
 			}
 		}
 	} else {
+		note_user_code(); // on_bullet_enable is user code inside the sweep
 		attachment_instance->call_on_bullet_enable(); // Call GDScript custom virtual method so that it gets enabled properly
 	}
 	if (!survived_user_code(self_id)) {
@@ -876,6 +884,7 @@ _ALWAYS_INLINE_ bool BulletVolley2D::attach_bullet_attachment_internal(int bulle
 
 	// A volley running slowed (or sped up) hands its scale to the newcomer.
 	if (attachment_time_scale != 1.0) {
+		note_user_code(); // on_time_scale_changed is user code inside the sweep
 		attachment_instance->set_time_scale_factor(attachment_time_scale); // on_time_scale_changed: user code
 		if (!survived_user_code(self_id) || ObjectDB::get_instance(ObjectID(setup_instance_id)) == nullptr) {
 			return false;

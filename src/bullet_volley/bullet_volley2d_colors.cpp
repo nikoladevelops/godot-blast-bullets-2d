@@ -10,10 +10,6 @@ using namespace godot;
 
 namespace BlastBullets2D {
 
-static bool color_is_finite2d(const Color &c) {
-	return Math::is_finite(c.r) && Math::is_finite(c.g) && Math::is_finite(c.b) && Math::is_finite(c.a);
-}
-
 static void write_color2d(float *at, const Color &c) {
 	at[0] = c.r;
 	at[1] = c.g;

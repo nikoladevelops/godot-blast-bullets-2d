@@ -2,6 +2,7 @@
 // clear flashes) fired by volleys or by spawn_layer_effect, aged every physics
 // frame. Volley trails live on the volley (bullet_volley2d_effects.cpp).
 
+#include "core/color_math2d.hpp"
 #include "core/cosmetic_rng2d.hpp"
 #include "core/warn_once2d.hpp"
 #include "factory/bullet_factory2d_internal.hpp"
@@ -92,7 +93,11 @@ static void fx_refresh_slot_color(BulletFactory2D::FXOneShotBake &bake, int slot
 	}
 	Color tint(1, 1, 1, 1);
 	if (has_ramp) {
-		tint = bake.layer->color_ramp->sample((float)fx_clamp01(age / bake.anim.total));
+		const Color sampled = bake.layer->color_ramp->sample((float)fx_clamp01(age / bake.anim.total));
+		// A NaN/Inf ramp point would land in the instance color: white stands.
+		if (color_is_finite2d(sampled)) {
+			tint = sampled;
+		}
 	}
 	if (has_fade) {
 		double alpha = 1.0;
