@@ -1338,6 +1338,12 @@ void PatternSpawner2D::run_frame(double delta) {
 		if (!(delta > 0.0) || !Math::is_finite(delta)) {
 			delta_ok = false;
 			movement.velocity = Vector2(); // standing still: nothing to inherit
+		} else if (delta > 0.5) {
+			// Clamped again AFTER the scale: time_scale has no upper bound, so
+			// one frame could otherwise run the whole 64-leg movement catch-up
+			// with a month-long scaled delta (128 movement signals in one
+			// frame at 1e9).
+			delta = 0.5;
 		}
 	}
 	// Movement first: shots and the preview this frame use the new pose.

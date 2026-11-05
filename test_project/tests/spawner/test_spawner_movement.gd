@@ -546,3 +546,20 @@ func test_clearing_the_path_node_clears_an_unresolved_path() -> void:
 	sp.set_movement_path_node(null)
 	assert_eq(sp.movement_path, NodePath(), "the stale path is cleared")
 	expect_warning_sequence([])
+
+
+## The 0.5 s hitch clamp covers the SCALED delta too. time_scale is unbounded
+## on purpose, so one frame could otherwise run the whole 64-leg movement
+## catch-up with a month-long scaled delta (every completed leg emits
+## movement_endpoint_reached + movement_loop_completed).
+func test_a_huge_time_scale_cannot_fast_forward_the_movement() -> void:
+	var sp := _mover(path, func(s):
+		s.movement_loop_mode = BulletSpawner2D.MOVEMENT_LOOP_LOOP
+		s.time_scale = 1.0e9)
+	watch_signals(sp)
+	await idle(1) # 1e9 x 1/60 s without the clamp: the whole 64-leg catch-up in this one frame
+	var one_frame: int = get_signal_emit_count(sp, "movement_endpoint_reached") + get_signal_emit_count(sp, "movement_loop_completed")
+	assert_lte(one_frame, 64, "one frame never runs more leg transitions than the 64-leg catch-up bound (was %d)" % one_frame)
+	await idle(4)
+	var total: int = get_signal_emit_count(sp, "movement_endpoint_reached") + get_signal_emit_count(sp, "movement_loop_completed")
+	assert_lte(total, 64, "5 frames of 0.5 s-scaled movement stay far below it (%d)" % total)
