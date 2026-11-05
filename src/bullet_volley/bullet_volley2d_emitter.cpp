@@ -24,7 +24,12 @@ double emitter_roll(int64_t seed, uint64_t salt, int bullet_index, int shot) {
 
 } // namespace
 
-void BulletVolley2D::emitter_arm(const std::shared_ptr<EmitterConfig2D> &config, uint64_t salt) {
+// `config` by value: the assignment below drops the volley's previous config,
+// and that config's Ref to its timing resource is then the last one. A script
+// resource's PREDELETE is user code that may free the caller whose member a
+// `const &` parameter would alias (BulletSpawner2D::apply_volley_emitter passes
+// emitter_shared), so the callee must own what it reads afterwards.
+void BulletVolley2D::emitter_arm(std::shared_ptr<EmitterConfig2D> config, uint64_t salt) {
 	if (config == emitter_config && config != nullptr && emit_next_at.size() == (size_t)amount_bullets) {
 		return; // armed alike: the clocks keep running
 	}

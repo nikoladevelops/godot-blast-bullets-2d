@@ -7,6 +7,7 @@
 // each touch: homing signals run user code that may free anything.
 
 #include "bullet_spawner/pattern_spawner2d_internal.hpp"
+#include "bullet_spawner/spawner_live_helpers2d.hpp"
 #include "core/live_object2d.hpp"
 #include "core/node_scan2d.hpp"
 
@@ -15,37 +16,6 @@
 using namespace godot;
 
 namespace BlastBullets2D {
-
-namespace {
-// The owned volleys with their ids, captured before any user code runs.
-struct OwnedVolley2D {
-	BulletVolley2D *volley;
-	uint64_t id;
-};
-
-std::vector<OwnedVolley2D> snapshot_owned2d(BulletFactory2D *factory, uint64_t owner_id) {
-	std::vector<BulletVolley2D *> owned;
-	factory->collect_volleys_owned_by(owner_id, owned);
-	std::vector<OwnedVolley2D> out;
-	out.reserve(owned.size());
-	for (BulletVolley2D *volley : owned) {
-		out.push_back({ volley, volley->get_instance_id() });
-	}
-	return out;
-}
-
-// The snapshot entry, while it is still this spawner's and not pooled.
-BulletVolley2D *still_owned2d(const OwnedVolley2D &entry, uint64_t owner_id) {
-	if (ObjectDB::get_instance(ObjectID(entry.id)) != entry.volley) {
-		return nullptr;
-	}
-	BulletVolley2D *volley = entry.volley;
-	if (volley->owner_spawner_id != owner_id || volley->is_pooled() || volley->is_queued_for_deletion()) {
-		return nullptr;
-	}
-	return volley;
-}
-} // namespace
 
 int BulletSpawner2D::apply_to_live_volleys(BitField<LiveVolleyGroup> groups) {
 	if (get_bullet_factory() == nullptr) {
@@ -76,13 +46,15 @@ int BulletSpawner2D::apply_to_live_volleys(BitField<LiveVolleyGroup> groups) {
 	return (int)changed.size();
 }
 
-// The four legs below arm or release user Resources (zones, sounds, the flock,
+// The legs below arm or release user Resources (zones, sounds, the flock, the
 // split data). Dropping the last Ref destroys it, and a script resource's
 // PREDELETE handler is user code that may free this spawner mid-leg (proven
 // under AddressSanitizer: sound_live_volleys once read sound_volume_db after
-// such a callback freed it). Each leg walks a snapshot of (pointer, id) pairs,
-// re-validates the entry AND the spawner after every callback, and leaves at
-// the first mismatch - the same discipline as homing_live_volleys below.
+// such a callback freed it). Each leg walks the (pointer, id) snapshot of
+// spawner_live_helpers2d.hpp, re-validates the entry AND the spawner after
+// every callback, and leaves at the first mismatch - the same discipline as
+// emitter_live_volleys (bullet_spawner2d_emitter.cpp) and homing_live_volleys
+// below.
 
 void BulletSpawner2D::graze_live_volleys(std::unordered_set<uint64_t> &r_changed) {
 	BulletFactory2D *factory = get_bullet_factory();

@@ -5,6 +5,7 @@
 // its sweep (BulletFactory2D::flush_emits).
 
 #include "bullet_spawner/pattern_spawner2d_internal.hpp"
+#include "bullet_spawner/spawner_live_helpers2d.hpp"
 
 #include <unordered_set>
 
@@ -143,13 +144,25 @@ void BulletSpawner2D::emitter_live_volleys(std::unordered_set<uint64_t> &r_chang
 	if (factory == nullptr || !emitter_enabled) {
 		return;
 	}
-	std::vector<BulletVolley2D *> owned;
-	factory->collect_volleys_owned_by(get_instance_id(), owned);
-	for (BulletVolley2D *volley : owned) {
+	const uint64_t self_id = get_instance_id();
+	const std::vector<OwnedVolley2D> owned = snapshot_owned2d(factory, self_id);
+	for (const OwnedVolley2D &entry : owned) {
+		BulletVolley2D *volley = still_owned2d(entry, self_id);
+		if (volley == nullptr) {
+			continue;
+		}
 		if (emitter_shared == nullptr || volley->emitter_config != emitter_shared) {
+			// The arm replaces the config a script may have given this volley
+			// (emitter_set): that config's Ref to its timing resource is then
+			// the last one, and the resource's PREDELETE is user code that may
+			// free this spawner (proven under AddressSanitizer). Read nothing
+			// on `this` after it and re-validate the volley before counting it.
 			apply_volley_emitter(volley);
-			if (volley->emitter_config != nullptr) {
-				r_changed.insert(volley->get_instance_id());
+			if (still_owned2d(entry, self_id) != nullptr && entry.volley->emitter_config != nullptr) {
+				r_changed.insert(entry.id);
+			}
+			if (ObjectDB::get_instance(ObjectID(self_id)) != this || shot_owner_dying()) {
+				return;
 			}
 		}
 	}

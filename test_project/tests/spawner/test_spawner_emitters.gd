@@ -646,3 +646,37 @@ func test_an_emitters_stream_is_evenly_spaced() -> void:
 		gaps.append(snappedf((children[k - 1] as BulletVolley2D).get_bullet_transform(0).origin.distance_to((children[k] as BulletVolley2D).get_bullet_transform(0).origin), 0.01))
 	assert_gte(gaps.size(), 8, "a stream of emitter shots")
 	assert_true(gaps.all(func(g): return absf(g - 12.0) < 0.05), "every gap 12 px: %s" % [gaps])
+
+
+# --- the live leg (L6: user code mid-leg) ----------------------------------------------------
+
+## A script timing resource's LAST reference can drop inside the emitter live
+## leg: re-arming a volley replaces the config a script gave it with
+## emitter_set, and dropping that config destroys its Ref to this resource.
+## Its NOTIFICATION_PREDELETE is user code that may free the spawner mid-leg
+## (the same shape as the sound leg's proven heap-use-after-free): the leg
+## walks a (pointer, id) snapshot and re-validates the entry AND the spawner
+## after every callback, so the freed spawner is never read again.
+func test_an_emitter_predelede_freeing_the_spawner_mid_leg_is_survived() -> void:
+	var tpl := _template()
+	var sp := _emitting(tpl, _timing(0.25), 1)
+	var volleys: Array = []
+	for k in 3:
+		volleys.append(_fire(sp))
+	# A script config per volley, each holding the ONLY reference to a probe
+	# emitter: the leg's re-arm (the spawner's shared config takes over) drops
+	# the config, and with it the probe -> NOTIFICATION_PREDELETE -> free(sp).
+	for i in volleys.size():
+		assert_true((volleys[i] as BulletVolley2D).emitter_set(FreeSpawnerOnPredeleteEmitter2D.new(), tpl), "volley %d got a script config" % i)
+	FreeSpawnerOnPredeleteEmitter2D.fired = 0
+	FreeSpawnerOnPredeleteEmitter2D.victim = sp
+	check_factory_after = false
+	sp.apply_to_live_volleys(BulletSpawner2D.LIVE_EMITTER)
+	assert_gt(FreeSpawnerOnPredeleteEmitter2D.fired, 0, "a probe's last reference dropped inside the leg")
+	assert_false(is_instance_valid(sp), "the PREDELETE handler freed the spawner")
+	# The factory and its volleys survive the death; a subsequent spawn works.
+	await idle(1)
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "nothing dangles")
+	for v in volleys:
+		assert_true(is_instance_valid(v), "the volleys are alive")
+	assert_not_null(quick_volley(2), "the factory still spawns")

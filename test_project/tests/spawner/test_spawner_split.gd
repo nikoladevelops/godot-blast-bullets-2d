@@ -553,3 +553,29 @@ func test_orphaned_children_home_like_their_parent() -> void:
 		factory.debug_advance_time(DT)
 	assert_gt(absf(angle_difference(before.angle(), c.get_bullet_direction(0).angle())), 0.05, "and they really turn toward it")
 	expect_no_errors("no inert-homing warning")
+
+
+## A script split chain's LAST reference can drop inside the split live leg:
+## re-arming a volley replaces the config a script gave it with split_set_data,
+## and dropping that config destroys its Ref to this chain. Its
+## NOTIFICATION_PREDELETE is user code that may free the spawner mid-leg, so
+## the arm must never read the spawner through the reference it was handed
+## (L6: the same shape as the emitter timing resource).
+func test_a_split_predelede_freeing_the_spawner_mid_leg_is_survived() -> void:
+	var sp := _split_spawner(_chain(), 1, 30.0)
+	var volleys: Array = []
+	for k in 3:
+		volleys.append(_fire(sp))
+	for i in volleys.size():
+		assert_true((volleys[i] as BulletVolley2D).split_set_data(FreeSpawnerOnPredeleteSplit2D.new()), "volley %d got a script config" % i)
+	FreeSpawnerOnPredeleteSplit2D.fired = 0
+	FreeSpawnerOnPredeleteSplit2D.victim = sp
+	check_factory_after = false
+	sp.apply_to_live_volleys(BulletSpawner2D.LIVE_SPLIT)
+	assert_gt(FreeSpawnerOnPredeleteSplit2D.fired, 0, "a probe's last reference dropped inside the leg")
+	assert_false(is_instance_valid(sp), "the PREDELETE handler freed the spawner")
+	await idle(1)
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "nothing dangles")
+	for v in volleys:
+		assert_true(is_instance_valid(v), "the volleys are alive")
+	assert_not_null(quick_volley(2), "the factory still spawns")

@@ -3191,8 +3191,12 @@ public:
 	// stack local; nested calls save and restore it).
 	int *split_manual_tally = nullptr;
 	// THE one place that arms or disarms splitting (spawner arming, the
-	// factory flush, split_set_data/split_clear, release_life).
-	void split_arm(const std::shared_ptr<SplitConfig2D> &config, const Ref<BulletVolleyData2D> &spawn_data, int depth, uint64_t shot_salt = 0);
+	// factory flush, split_set_data/split_clear, release_life). `config` by
+	// value: assigning it drops the volley's previous config, whose Ref to its
+	// split chain is then the last one - a script resource's PREDELETE is user
+	// code that may free the caller a `const &` would alias
+	// (BulletSpawner2D::apply_volley_split hands it split_shared).
+	void split_arm(std::shared_ptr<SplitConfig2D> config, const Ref<BulletVolleyData2D> &spawn_data, int depth, uint64_t shot_salt = 0);
 	// How many times bullet i split this life (0 before its first split).
 	int split_count_of(int bullet_index) const { return bullet_index >= 0 && bullet_index < (int)split_counts.size() ? (int)split_counts[bullet_index] : 0; }
 	// Records bullet i's split when its stage splits on `cause` (and the
@@ -3255,8 +3259,11 @@ public:
 	// THE one place that arms or disarms emitting (spawner arming, live
 	// re-arming, emitter_set/emitter_clear, release_life). Arming starts
 	// every bullet's clock at life_age + start delay + index x stagger;
-	// re-arming with the same config keeps the clocks.
-	void emitter_arm(const std::shared_ptr<EmitterConfig2D> &config, uint64_t salt = 0);
+	// re-arming with the same config keeps the clocks. `config` by value:
+	// same reason as split_arm (a dropped config's Ref to its timing resource
+	// is user code, BulletSpawner2D::apply_volley_emitter hands it
+	// emitter_shared).
+	void emitter_arm(std::shared_ptr<EmitterConfig2D> config, uint64_t salt = 0);
 	// The timer pass (tick, after the split timer): records the due shots.
 	void emitter_tick();
 	// A woken bullet takes part in the gate again.

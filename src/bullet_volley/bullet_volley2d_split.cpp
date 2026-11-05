@@ -10,7 +10,12 @@ using namespace godot;
 
 namespace BlastBullets2D {
 
-void BulletVolley2D::split_arm(const std::shared_ptr<SplitConfig2D> &config, const Ref<BulletVolleyData2D> &spawn_data, int depth, uint64_t shot_salt) {
+// `config` by value: the assignment below drops the volley's previous config,
+// whose Ref to its split chain is then the last one. A script resource's
+// PREDELETE is user code that may free the caller whose member a `const &`
+// parameter would alias (BulletSpawner2D::apply_volley_split passes
+// split_shared), so the callee must own what it reads afterwards.
+void BulletVolley2D::split_arm(std::shared_ptr<SplitConfig2D> config, const Ref<BulletVolleyData2D> &spawn_data, int depth, uint64_t shot_salt) {
 	split_config = config;
 	split_shot_salt = config != nullptr ? shot_salt : 0;
 	split_spawn_data = config != nullptr ? spawn_data : Ref<BulletVolleyData2D>();
