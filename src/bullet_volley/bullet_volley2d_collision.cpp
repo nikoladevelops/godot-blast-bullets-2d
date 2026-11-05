@@ -12,7 +12,7 @@ using namespace godot;
 
 namespace BlastBullets2D {
 
-uint64_t BulletVolley2D::collision_dedup_key(int bullet_index, int64_t instance_id) {
+uint64_t BulletVolley2D::collision_dedup_key(int bullet_index, int64_t instance_id, uint64_t epoch) {
 	uint64_t h = 14695981039346656037ull;
 	const uint32_t a = (uint32_t)bullet_index;
 	for (int i = 0; i < 4; ++i) {
@@ -22,6 +22,13 @@ uint64_t BulletVolley2D::collision_dedup_key(int bullet_index, int64_t instance_
 	const uint64_t b = (uint64_t)instance_id;
 	for (int i = 0; i < 8; ++i) {
 		h ^= (b >> (i * 8)) & 0xFFull;
+		h *= 1099511628211ull;
+	}
+	// The epoch separates slot lives: marks from a window that never drained
+	// (a paused factory skips every drain, and the replay runs before the
+	// next one) must not gate the entry a disable/wake started afterwards.
+	for (int i = 0; i < 8; ++i) {
+		h ^= (epoch >> (i * 8)) & 0xFFull;
 		h *= 1099511628211ull;
 	}
 	return h == 0 ? 1 : h;
@@ -766,7 +773,7 @@ void BulletVolley2D::park_collision_record(const BulletCollisionData2D &record) 
 	if (record.bullet_index < 0 || record.bullet_index >= amount_bullets) {
 		return;
 	}
-	paused_overlaps.add(record.bullet_index, record.collided_instance_id, (int)record.collision_type, record.queue_bullet_epoch);
+	paused_overlaps.add_record(record.bullet_index, record.collided_instance_id, (int)record.collision_type, record.queue_bullet_epoch);
 }
 
 void BulletVolley2D::drain_collisions() {

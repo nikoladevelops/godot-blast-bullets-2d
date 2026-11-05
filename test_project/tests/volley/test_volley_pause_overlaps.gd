@@ -111,3 +111,37 @@ func test_thousands_of_overlaps_started_while_paused_all_hit() -> void:
 	_resume()
 	await physics(4)
 	assert_eq(hits, N, "every parked overlap hits once after the resume")
+
+
+## One body, two shapes. A parked overlap is keyed per (bullet, target, kind),
+## so a partial shape exit must not cancel it: the pair still overlapping
+## replays exactly once on resume.
+func _two_shape_wall(origin: Vector2) -> StaticBody2D:
+	var wall := StaticBody2D.new()
+	wall.position = origin
+	wall.collision_layer = 4
+	wall.collision_mask = 0
+	for offset in [Vector2(-10, 0), Vector2(10, 0)]:
+		var cs := CollisionShape2D.new()
+		var box := RectangleShape2D.new()
+		box.size = Vector2(24, 24)
+		cs.shape = box
+		cs.position = offset
+		wall.add_child(cs)
+	add(wall)
+	return wall
+
+
+func test_a_partial_multishape_exit_keeps_the_parked_overlap() -> void:
+	var wall := _two_shape_wall(Vector2(500, 0))
+	var v: BulletVolley2D = factory.spawn_volley(_data())
+	await physics(2)
+	_pause()
+	v.teleport_bullet(0, Vector2(500, 0)) # inside BOTH shapes
+	await physics(5)
+	wall.position = Vector2(520, 0) # the +10 shape leaves; the -10 one still overlaps
+	await physics(5)
+	_resume()
+	await physics(8)
+	assert_eq(hits, 1, "the overlap that still exists replays exactly once")
+	assert_eq(v.get_bullet_collision_count(0), 1, "and counts it")

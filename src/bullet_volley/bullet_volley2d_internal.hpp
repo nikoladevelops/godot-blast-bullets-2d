@@ -145,7 +145,7 @@ _ALWAYS_INLINE_ bool BulletVolley2D::collision_already_queued(int bullet_index, 
 	if (!collision_dedup_by_object || collision_dedup_slots.empty()) {
 		return false;
 	}
-	const uint64_t key = collision_dedup_key(bullet_index, entered_instance_id);
+	const uint64_t key = collision_dedup_key(bullet_index, entered_instance_id, collision_epoch_for_bullet(bullet_index));
 	uint32_t idx = (uint32_t)key & collision_dedup_slot_mask;
 	for (uint32_t probe = 0; probe <= collision_dedup_slot_mask; ++probe) {
 		const uint64_t slot = collision_dedup_slots[idx];
@@ -196,7 +196,7 @@ _ALWAYS_INLINE_ void BulletVolley2D::mark_collision_queued(int bullet_index, int
 			}
 		}
 	}
-	const uint64_t key = collision_dedup_key(bullet_index, entered_instance_id);
+	const uint64_t key = collision_dedup_key(bullet_index, entered_instance_id, collision_epoch_for_bullet(bullet_index));
 	uint32_t idx = (uint32_t)key & collision_dedup_slot_mask;
 	for (uint32_t probe = 0; probe <= collision_dedup_slot_mask; ++probe) {
 		const uint64_t slot = collision_dedup_slots[idx];

@@ -686,12 +686,15 @@ public:
 	uint32_t collision_dedup_slot_mask = 0;
 	uint32_t collision_dedup_slot_used = 0;
 
-	// 64-bit FNV-1a over both fields; the result is never 0, which is what
+	// 64-bit FNV-1a over all fields; the result is never 0, which is what
 	// lets 0 mean "empty slot" in the open-addressed table below. 64 bits,
 	// not 32: at 10k entries a 32-bit key collides with ~1% probability and
 	// silently merges two unrelated pairs (a real hit gets dropped); at
-	// 64 bits that probability is ~5e-12.
-	static uint64_t collision_dedup_key(int bullet_index, int64_t instance_id);
+	// 64 bits that probability is ~5e-12. The bullet's collision epoch is
+	// part of the key: a disable/wake starts a new slot life, so marks left
+	// in an undrained window (a factory pause skips every drain) can never
+	// gate the new life's entry.
+	static uint64_t collision_dedup_key(int bullet_index, int64_t instance_id, uint64_t epoch);
 	_ALWAYS_INLINE_ bool collision_already_queued(int bullet_index, int64_t entered_instance_id);
 	_ALWAYS_INLINE_ void mark_collision_queued(int bullet_index, int64_t entered_instance_id);
 	void clear_collision_dedup_keys();

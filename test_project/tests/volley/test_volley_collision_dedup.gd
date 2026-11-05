@@ -178,3 +178,69 @@ func test_a_getter_that_takes_the_bullet_out_leaves_no_stale_dedup_key() -> void
 	assert_eq(v.get_bullet_collision_count(0), 1, "the re-entry after the wake is a real hit")
 	v.disable_bullet(0)
 	v.disable_bullet(1)
+
+
+## The undrained-window half of the dedup contract: keys describe ONE drain
+## window. A recorded overlap whose window never drains (the volley parks
+## first) leaves stale keys behind; a wake bumps the bullet's collision epoch,
+## so the new entry must not be gated by a key from the old life. A still
+## bullet spawned inside the wall queues the overlap; parking the volley keeps
+## that window undrained.
+func test_a_wake_inside_a_target_after_a_park_reports_the_hit() -> void:
+	var d := H.make_volley_data(1, 0.0, 30.0)
+	d.transforms = [Transform2D(0.0, Vector2(200, 0))] # inside the suite's wall
+	d.monitorable = true
+	d.set_collision_mask_from_array([3])
+	d.collision_shape = H.make_circle_shape(6.0)
+	d.bullet_max_collision_count = 0
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	v.set_is_auto_pooling_enabled(false)
+	for k in 20: # wait for the queued window (a mark exists), before any drain
+		await physics(1)
+		if int(v.debug_dedup_stats().get("used", 0)) > 0:
+			break
+	assert_gt(int(v.debug_dedup_stats().get("used", 0)), 0, "the overlap is queued before the drain")
+	v.disable_bullet(0) # the last bullet out parks the volley; the window stays undrained
+	await physics(2)
+	assert_true(v.is_parked(), "parked with the queued window")
+	v.enable_bullet(0) # a wake inside the target: Godot reports a new entry
+	for k in 10:
+		await physics(1)
+		if hits > 0:
+			break
+	assert_eq(hits, 1, "the woken bullet reports the overlap exactly once")
+	assert_eq(v.get_bullet_collision_count(0), 1, "and counts it")
+	v.disable_bullet(0)
+
+
+## The same contract around a factory pause: the new entry waits in the parked
+## set, and the resume replay must not consult keys left over from the
+## pre-pause window (the disable/wake inside the pause moved the epoch).
+func test_a_wake_inside_a_target_while_paused_replays_on_resume() -> void:
+	var d := H.make_volley_data(1, 0.0, 30.0)
+	d.transforms = [Transform2D(0.0, Vector2(200, 0))] # inside the suite's wall
+	d.monitorable = true
+	d.set_collision_mask_from_array([3])
+	d.collision_shape = H.make_circle_shape(6.0)
+	d.bullet_max_collision_count = 0
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	v.set_is_auto_pooling_enabled(false)
+	for k in 20: # wait for the queued window (a mark exists), before any drain
+		await physics(1)
+		if int(v.debug_dedup_stats().get("used", 0)) > 0:
+			break
+	assert_gt(int(v.debug_dedup_stats().get("used", 0)), 0, "the overlap is queued before the pause")
+	factory.set_is_factory_processing_bullets(false)
+	v.disable_bullet(0)
+	await physics(1) # the disabled shape leaves the world before the wake
+	assert_true(v.is_parked(), "parked while paused")
+	v.enable_bullet(0) # a new entry during the pause waits in the parked set
+	await physics(4)
+	assert_eq(hits, 0, "nothing drains while paused")
+	factory.set_is_factory_processing_bullets(true)
+	for k in 10:
+		await physics(1)
+		if hits > 0:
+			break
+	assert_eq(hits, 1, "the parked overlap replays exactly once")
+	assert_eq(v.get_bullet_collision_count(0), 1, "and counts it")

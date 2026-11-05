@@ -39,7 +39,7 @@ Dictionary BulletVolley2D::debug_dedup_find_collision(int probe_count) const {
 	std::vector<uint64_t> keys;
 	keys.reserve((size_t)probe_count);
 	for (int i = 0; i < probe_count; ++i) {
-		keys.push_back(collision_dedup_key(i, (int64_t)1000003 + (int64_t)i * (int64_t)7919));
+		keys.push_back(collision_dedup_key(i, (int64_t)1000003 + (int64_t)i * (int64_t)7919, collision_epoch_for_bullet(i)));
 	}
 	std::sort(keys.begin(), keys.end());
 	for (size_t i = 1; i < keys.size(); ++i) {
