@@ -1454,6 +1454,12 @@
 				Dedup table introspection: used pairs, slot capacity, and the collision_dedup_by_object mode.
 			</description>
 		</method>
+		<method name="debug_get_active_set_stats" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				The volley's own per-bullet sparse set, the one every per-bullet loop walks: active (live bullets), capacity (the index space it covers), amount_bullets and active_indexes (the indexes in the order the loops walk them). Use it to prove the set and the live counter stay in step; a pooled handle reads active 0 with an empty index list.
+			</description>
+		</method>
 		<method name="debug_get_attachment_info" qualifiers="const">
 			<return type="Dictionary" />
 			<param index="0" name="bullet_index" type="int" />

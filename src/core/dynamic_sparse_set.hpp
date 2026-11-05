@@ -120,6 +120,12 @@ public:
 		return static_cast<int>(dense.size());
 	}
 
+	// The index space the set currently covers (the allocated sparse slots; 0
+	// before the first resize). For readouts: active <= capacity always.
+	_ALWAYS_INLINE_ int capacity() const {
+		return max_size;
+	}
+
 	// Activates a range of indexes
 	// If end is -1, it uses max_size. If end > max_size, it resizes.
 	_ALWAYS_INLINE_ void activate_range_data(int index_start, int index_end_inclusive = -1) {

@@ -1492,6 +1492,10 @@ public:
 	// capsule_radius, capsule_height, rid_count}. For tests asserting
 	// set_collision_shape_runtime same-type vs type-change paths.
 	Dictionary debug_get_shape_state() const;
+	// The volley's own per-bullet sparse set (all_bullets_enabled_set, what
+	// every per-bullet loop walks): {active, capacity, amount_bullets,
+	// active_indexes}. For tests asserting the live counter and the set agree.
+	Dictionary debug_get_active_set_stats() const;
 	// The transform the physics server holds for bullet i's shape (its hitbox).
 	Transform2D debug_get_bullet_shape_transform(int bullet_index) const;
 	// Attachment slot introspection: {has_attachment, pooling_id,

@@ -279,6 +279,25 @@ Dictionary BulletVolley2D::debug_get_shape_state() const {
 	return d;
 }
 
+Dictionary BulletVolley2D::debug_get_active_set_stats() const {
+	// The dynamic sparse set of the live bullets: the dense vector every
+	// per-bullet loop walks (its order), the index space it covers and the
+	// volley's bullet count. A pooled handle holds no bullets (the same read
+	// get_active_bullet_count reports), while the index space stays allocated.
+	Dictionary d;
+	const std::vector<int> &active_indexes = all_bullets_enabled_set.get_active_indexes();
+	d["active"] = (int)active_indexes.size();
+	d["capacity"] = all_bullets_enabled_set.capacity();
+	d["amount_bullets"] = amount_bullets;
+	PackedInt32Array indexes;
+	indexes.resize((int64_t)active_indexes.size());
+	for (int64_t k = 0; k < (int64_t)active_indexes.size(); ++k) {
+		indexes[k] = active_indexes[(size_t)k];
+	}
+	d["active_indexes"] = indexes;
+	return d;
+}
+
 Dictionary BulletVolley2D::debug_get_attachment_info(int bullet_index) const {
 	Dictionary d;
 	d["has_attachment"] = false;
