@@ -108,26 +108,62 @@ Nothing appears? Look at the warning icon on the spawner node: it says what is m
 
 ## Handle hits
 
-Bullets report what they hit through signals. Connect them on the **spawner** that fired the bullets (or once on the **factory**: a hit the spawner does not handle goes to the factory). The bullet is **still alive** inside the handler, so you can read anything about it:
+Bullets report what they hit through signals, **while the bullet is still alive**: inside the handler you can read its position, velocity and custom data, and even save it.
+
+### Where to connect: factory or spawner
+
+Every hit is reported **exactly once**, on one of two nodes:
+
+| Connect on | Receives | Use it for |
+|---|---|---|
+| **The factory** (recommended default) | the hits of every bullet in the game: volleys from `factory.spawn_volley`, split children, pickups, bullets of a dead enemy (`orphaned_volleys` = Hand To Factory, the default), **and** every spawner that has no handler of its own for that signal | damage, score, hit sparks: rules that are the same for all bullets. One handler, connected once, never misses a bullet |
+| **A spawner** | the hits of the bullets **that spawner** fired | one attack that behaves differently (this boss's ice shots freeze, this turret's bullets heal allies) |
+
+A spawner with a handler **takes its hits away from the factory**: they are never reported twice. The choice is per signal: a spawner handling only `area_entered` still lets its `body_entered` go to the factory. So: put your general rules on the factory, and connect a spawner only where an attack needs its own behavior. Lasers follow the same rule (`laser_hit`, ...); graze is the one exception and always reaches the factory too.
+
+### Damage per bullet type: custom data
+
+Give bullets your own `Resource` (damage, element, owner team, ...) and read it in the handler:
+
+```gdscript
+extends Resource
+# bullet_damage.gd: your own data type. Save instances as .tres files.
+@export var amount := 10
+@export var element := &"fire"
+```
+
+- **Shared Bullets Custom Data** (spawn data, Collision group): one value for every bullet of the volley. Read it with `volley.shared_bullets_custom_data`.
+- **All Bullets Custom Data**: one value per bullet (entry `i` belongs to bullet `i`). Read it with `volley.bullet_get_custom_data(bullet_index)`, change it at runtime with `bullet_set_custom_data`.
+- The two never fall back to each other: `bullet_get_custom_data` returns `null` for a bullet without its own entry. The helper below reads the bullet's own data first, then the shared one.
 
 ```gdscript
 extends Node2D
 
-@onready var gun: BulletSpawner2D = $Boss/BulletSpawner2D
+@onready var bullets: BulletFactory2D = $BulletFactory2D
 
 func _ready() -> void:
-	gun.area_entered.connect(_on_bullet_hit)
+	bullets.area_entered.connect(_on_bullet_hit)   # Area2D hurtboxes (recommended)
+	bullets.body_entered.connect(_on_bullet_hit)   # physics bodies: needs Collision > Monitorable on
 
 func _on_bullet_hit(target: Object, volley: BulletVolley2D, bullet_index: int) -> void:
-	if target.has_method("take_damage"):
-		target.take_damage(10)
-	var hit_position := volley.get_bullet_transform(bullet_index).origin
-	print("hit at ", hit_position)
+	var damage := bullet_data(volley, bullet_index)
+	if damage != null and target.has_method("take_damage"):
+		target.take_damage(damage.amount, damage.element)
+	print("hit at ", volley.get_bullet_transform(bullet_index).origin)
+
+## The bullet's own custom data, else the volley's shared custom data.
+func bullet_data(volley: BulletVolley2D, bullet_index: int) -> Resource:
+	var own: Resource = volley.bullet_get_custom_data(bullet_index)
+	return own if own != null else volley.shared_bullets_custom_data
 ```
 
-- `area_entered` fires for `Area2D` targets (recommended: give players and enemies a hurtbox `Area2D`). `body_entered` fires for physics bodies, and needs **Collision → Monitorable** on in the bullet data.
-- A bullet dies after **Collision → Bullet Max Collision Count** hits (default 1). `0` makes it pierce forever.
-- **Different damage per bullet type?** Put your own `Resource` in **Shared Bullets Custom Data** (or one per bullet in **All Bullets Custom Data**) and read it in the handler with `volley.bullet_get_custom_data(bullet_index)`.
+A spawner handler for one special attack takes the same arguments: `$Boss/IceGun.area_entered.connect(_on_ice_hit)`.
+
+### Piercing and surviving a hit
+
+- A bullet dies after **Collision → Bullet Max Collision Count** hits (default 1). `0` pierces forever. `volley.get_bullet_collision_count(bullet_index)` tells how many it has taken.
+- Whether it dies is decided **after** your handler: `volley.set_bullet_collision_count(bullet_index, 0)` in the handler lets it survive this hit (a shield that reflects, a bullet that passes through allies).
+- Want the bullet gone right away? `volley.disable_bullet(bullet_index)`.
 
 ## Recipes
 

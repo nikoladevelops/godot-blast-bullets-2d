@@ -60,7 +60,9 @@ func _ready() -> void:
 
 # The bullet is still alive in the handler: read its data, then let it die.
 func _on_bullet_hit_area(target: Object, volley: BulletVolley2D, bullet_index: int) -> void:
-	var data := volley.bullet_get_custom_data(bullet_index) # your own Resource, e.g. damage
+	var data := volley.bullet_get_custom_data(bullet_index) # this bullet's own Resource (All Bullets Custom Data), else null
+	if data == null:
+		data = volley.shared_bullets_custom_data # the volley's shared one
 	if target.has_method("take_hit"):
 		target.take_hit(data.damage if data else 1)
 

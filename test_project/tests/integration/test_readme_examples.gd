@@ -411,3 +411,61 @@ func test_the_bullet_motion_recipe_does_what_it_says() -> void:
 	assert_gt(max_off_line, 2.0, "the wobble weaves off the line") # ~4 px at 200 px/s, 3 Hz: amplitude tilts the heading
 	assert_gt(falling.get_bullet_velocity(0).y, 300.0, "gravity pulls down")
 	expect_no_errors()
+
+
+## The README "Handle hits" claims, through real collisions.
+func _damage(amount: int) -> Resource:
+	var r := Resource.new()
+	r.set_meta("amount", amount)
+	return r
+
+
+func _bullet_data(volley: BulletVolley2D, bullet_index: int) -> Resource:
+	var own: Resource = volley.bullet_get_custom_data(bullet_index)
+	return own if own != null else volley.shared_bullets_custom_data
+
+
+func _wait_for(log: Array, n: int) -> void:
+	for i in 60:
+		await physics(1)
+		if log.size() >= n:
+			return
+
+
+func test_the_handle_hits_section_holds() -> void:
+	make_area(Vector2(120, 0), Vector2(20, 400), 8) # the layer H.make_volley_data's bullets mask
+	await physics(2)
+	var factory_hits := []
+	factory.area_entered.connect(func(_t: Object, v: BulletVolley2D, i: int) -> void: factory_hits.append(_bullet_data(v, i)))
+	# A spawner without a handler: its hits reach the factory handler.
+	var d := H.make_volley_data(1, 600.0)
+	d.shared_bullets_custom_data = _damage(10)
+	var plain := make_spawner(d, BulletSpawner2D.PATTERN_FROM_HELPER_RING, 1)
+	plain.helper_ring_radius = 0.0
+	assert_true(plain.shoot_once(), "plain spawner fired")
+	await _wait_for(factory_hits, 1)
+	assert_eq(factory_hits.size(), 1, "an unhandled spawner hit reaches the factory")
+	assert_eq((factory_hits[0] as Resource).get_meta("amount"), 10, "the shared custom data, through the helper")
+	# A spawner WITH a handler takes its hits: the factory hears nothing.
+	var own_hits := []
+	var d2 := H.make_volley_data(1, 600.0)
+	d2.shared_bullets_custom_data = _damage(10)
+	d2.all_bullets_custom_data = [_damage(99)] # bullet 0's own entry wins over the shared one
+	var ice := make_spawner(d2, BulletSpawner2D.PATTERN_FROM_HELPER_RING, 1)
+	ice.helper_ring_radius = 0.0
+	ice.area_entered.connect(func(_t: Object, v: BulletVolley2D, i: int) -> void:
+		own_hits.append(_bullet_data(v, i))
+		v.set_bullet_collision_count(i, 0)) # survive this hit
+	var fired := []
+	ice.volley_fired.connect(func(v: BulletVolley2D, _n: int) -> void: fired.append(v))
+	assert_true(ice.shoot_once(), "ice spawner fired")
+	await _wait_for(own_hits, 1)
+	await physics(3)
+	assert_eq(own_hits.size(), 1, "the spawner's handler got its hit")
+	assert_eq(factory_hits.size(), 1, "never reported twice: the factory heard nothing new")
+	assert_eq((own_hits[0] as Resource).get_meta("amount"), 99, "per-bullet custom data wins")
+	assert_true((fired[0] as BulletVolley2D).is_bullet_status_enabled(0), "a handler that reset the count saved the bullet")
+	# bullet_get_custom_data alone never falls back to shared.
+	var v3 := factory.spawn_volley(d)
+	assert_null(v3.bullet_get_custom_data(0), "no own entry: null, not the shared value")
+	assert_eq(v3.shared_bullets_custom_data.get_meta("amount"), 10, "the shared value is on the volley")
