@@ -1,4 +1,5 @@
 [gd_scene format=3]
+[ext_resource type="PackedScene" path="res://examples/common/world_environment.tscn" id="world_env"]
 [ext_resource type="PackedScene" path="res://shared/background/space_background.tscn" id="bg_space"]
 [ext_resource type="PackedScene" path="res://shared/live_inspector/live_inspector.tscn" id="live_inspector"]
 
@@ -247,7 +248,7 @@ offset_right = 16.0
 offset_bottom = 612.0
 theme = ExtResource("18_4lwwh")
 theme_override_font_sizes/font_size = 15
-text = "Arrow keys move. Your ship fires on its own. Halve the boss's health to see phase two."
+text = "WASD/arrows move, Space/left click fire, 1-4 weapons. Halve the boss's health to see phase two."
 
 [node name="HP" type="Label" parent="." unique_id=58907721]
 offset_left = 16.0
@@ -279,5 +280,7 @@ helper_ring_radius = 40.0
 shoot_interval_sec = 0.45
 spin_enabled = true
 spin_speed_deg_per_sec = 60.0
+
+[node name="WorldEnvironment" parent="." instance=ExtResource("world_env")]
 
 [node name="LiveInspector" parent="." instance=ExtResource("live_inspector")]

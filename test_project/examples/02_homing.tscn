@@ -1,4 +1,6 @@
 [gd_scene format=3]
+[ext_resource type="Script" path="res://examples/common/example_turret.gd" id="turret_script"]
+[ext_resource type="PackedScene" path="res://examples/common/world_environment.tscn" id="world_env"]
 [ext_resource type="PackedScene" path="res://shared/background/space_background.tscn" id="bg_space"]
 [ext_resource type="PackedScene" path="res://shared/live_inspector/live_inspector.tscn" id="live_inspector"]
 
@@ -134,9 +136,10 @@ offset_right = 16.0
 offset_bottom = 612.0
 theme = ExtResource("8_mi6ic")
 theme_override_font_sizes/font_size = 15
-text = "Arrow keys move. Hold the left mouse button: flying bullets chase the cursor."
+text = "WASD/arrows move, Space/left click fire, 1-4 weapons. Hold the RIGHT mouse button: the turret's flying bullets chase the cursor."
 
 [node name="Turret" type="Node2D" parent="." unique_id=904323181]
+script = ExtResource("turret_script")
 position = Vector2(576, 150)
 
 [node name="EnemyTurretHolder" type="Sprite2D" parent="Turret" unique_id=472739534]
@@ -158,5 +161,7 @@ helper_fan_direction_angle = 1.5707963267948966
 shoot_interval_sec = 0.9
 homing_enabled = true
 homing_node_group = &"player"
+
+[node name="WorldEnvironment" parent="." instance=ExtResource("world_env")]
 
 [node name="LiveInspector" parent="." instance=ExtResource("live_inspector")]

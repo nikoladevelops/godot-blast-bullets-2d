@@ -1,4 +1,5 @@
 [gd_scene format=3]
+[ext_resource type="PackedScene" path="res://examples/common/world_environment.tscn" id="world_env"]
 [ext_resource type="PackedScene" path="res://shared/background/space_background.tscn" id="bg_space"]
 [ext_resource type="PackedScene" path="res://shared/live_inspector/live_inspector.tscn" id="live_inspector"]
 
@@ -265,7 +266,7 @@ offset_right = 16.0
 offset_bottom = 612.0
 theme = ExtResource("18_4lwwh")
 theme_override_font_sizes/font_size = 15
-text = "Arrow keys move. Hold Space or the left mouse button to fire. B: bomb (clears the boss's bullets)."
+text = "WASD/arrows move, Space/left click fire, 1-4 weapons. B: bomb (clears the boss's bullets)."
 
 [node name="HP" type="Label" parent="." unique_id=58907721]
 offset_left = 16.0
@@ -306,5 +307,7 @@ collision_mask = 0
 
 [node name="Hitbox" type="CollisionShape2D" parent="Boss/Hurtbox" unique_id=779639957]
 shape = SubResource("CircleShape2D_e1vm1")
+
+[node name="WorldEnvironment" parent="." instance=ExtResource("world_env")]
 
 [node name="LiveInspector" parent="." instance=ExtResource("live_inspector")]

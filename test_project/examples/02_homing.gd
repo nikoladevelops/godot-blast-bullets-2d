@@ -1,6 +1,6 @@
 extends Node2D
 ## Bullets that chase the player: the Homing group of Turret/Spawner targets
-## the node group "player". Hold the left mouse button and every bullet already
+## the node group "player". Hold the right mouse button (the left one fires) and every bullet already
 ## flying turns toward the cursor instead; let go and they hunt the player again.
 
 @onready var spawner: BulletSpawner2D = $Turret/Spawner
@@ -11,7 +11,7 @@ func _ready() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT:
 		var target: Variant = $Player
 		if event.pressed:
 			target = get_global_mouse_position()

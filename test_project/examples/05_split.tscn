@@ -1,4 +1,6 @@
 [gd_scene format=3]
+[ext_resource type="Script" path="res://examples/common/example_turret.gd" id="turret_script"]
+[ext_resource type="PackedScene" path="res://examples/common/world_environment.tscn" id="world_env"]
 [ext_resource type="PackedScene" path="res://shared/background/space_background.tscn" id="bg_space"]
 [ext_resource type="PackedScene" path="res://shared/live_inspector/live_inspector.tscn" id="live_inspector"]
 
@@ -115,7 +117,7 @@ offset_right = 16.0
 offset_bottom = 612.0
 theme = ExtResource("8_rku4y")
 theme_override_font_sizes/font_size = 15
-text = "Arrow keys move. Each slow orb bursts into a ring of eight after 0.9 s."
+text = "WASD/arrows move, Space/left click fire, 1-4 weapons. Each slow orb bursts into a ring of eight after 0.9 s."
 
 [node name="Bursts" type="Label" parent="." unique_id=430766447]
 offset_left = 16.0
@@ -127,6 +129,7 @@ theme_override_font_sizes/font_size = 24
 text = "Bursts: 0"
 
 [node name="Turret" type="Node2D" parent="." unique_id=1462962599]
+script = ExtResource("turret_script")
 position = Vector2(576, 150)
 
 [node name="EnemyTurretHolder" type="Sprite2D" parent="Turret" unique_id=917232283]
@@ -148,5 +151,7 @@ helper_fan_direction_angle = 1.5707963267948966
 shoot_interval_sec = 1.4
 split_enabled = true
 split_data = SubResource("BulletSplitData2D_iygwo")
+
+[node name="WorldEnvironment" parent="." instance=ExtResource("world_env")]
 
 [node name="LiveInspector" parent="." instance=ExtResource("live_inspector")]

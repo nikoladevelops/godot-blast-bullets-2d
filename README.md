@@ -60,7 +60,7 @@ Every clip and screenshot below is **Arcane Barrage**, a complete bullet-hell ga
 
 ## Learn from the examples
 
-[`test_project/examples/`](test_project/examples) holds seven small scenes, each a few nodes and one short script. Open `test_project/` in Godot, open a scene and press <kbd>F6</kbd>:
+[`test_project/examples/`](test_project/examples) holds seven small scenes, each a few nodes and one short script. Open `test_project/` in Godot, open a scene and press <kbd>F6</kbd>. In every example: <kbd>WASD</kbd> or the arrow keys move, hold <kbd>Space</kbd> or the left mouse button to fire, <kbd>1</kbd>-<kbd>4</kbd> switch weapons (Rapid, Spread, Homing, Nova); enemy turrets track you, hits spark and bosses explode.
 
 | Scene | Shows |
 |---|---|

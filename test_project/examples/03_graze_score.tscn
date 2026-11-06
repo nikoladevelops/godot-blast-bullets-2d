@@ -1,4 +1,6 @@
 [gd_scene format=3]
+[ext_resource type="Script" path="res://examples/common/example_turret.gd" id="turret_script"]
+[ext_resource type="PackedScene" path="res://examples/common/world_environment.tscn" id="world_env"]
 [ext_resource type="PackedScene" path="res://shared/background/space_background.tscn" id="bg_space"]
 [ext_resource type="PackedScene" path="res://shared/live_inspector/live_inspector.tscn" id="live_inspector"]
 
@@ -139,7 +141,7 @@ offset_right = 16.0
 offset_bottom = 612.0
 theme = ExtResource("8_plitv")
 theme_override_font_sizes/font_size = 15
-text = "Arrow keys move. Brush past bullets without touching them: the closer, the more points."
+text = "WASD/arrows move, Space/left click fire, 1-4 weapons. Brush past bullets without touching them: the closer, the more points."
 
 [node name="Score" type="Label" parent="." unique_id=1919261330]
 offset_left = 16.0
@@ -151,6 +153,7 @@ theme_override_font_sizes/font_size = 24
 text = "Score: 0"
 
 [node name="Turret" type="Node2D" parent="." unique_id=1877236800]
+script = ExtResource("turret_script")
 position = Vector2(576, 150)
 
 [node name="EnemyTurretHolder" type="Sprite2D" parent="Turret" unique_id=74358148]
@@ -173,5 +176,7 @@ spin_speed_deg_per_sec = 30.0
 graze_enabled = true
 graze_zones = Array[GrazeZone2D]([SubResource("GrazeZone2D_f46tx")])
 graze_node_group = &"player"
+
+[node name="WorldEnvironment" parent="." instance=ExtResource("world_env")]
 
 [node name="LiveInspector" parent="." instance=ExtResource("live_inspector")]

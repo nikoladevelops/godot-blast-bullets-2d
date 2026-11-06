@@ -1,4 +1,5 @@
 [gd_scene format=3]
+[ext_resource type="PackedScene" path="res://examples/common/world_environment.tscn" id="world_env"]
 [ext_resource type="PackedScene" path="res://shared/background/space_background.tscn" id="bg_space"]
 [ext_resource type="SpriteFrames" path="res://shared/effects/laser_beam_frames.tres" id="fx_beam"]
 [ext_resource type="SpriteFrames" path="res://shared/effects/laser_orb_frames.tres" id="fx_orb"]
@@ -114,7 +115,7 @@ offset_right = 16.0
 offset_bottom = 612.0
 theme = ExtResource("8_o047x")
 theme_override_font_sizes/font_size = 15
-text = "Arrow keys move. The beam charges (thin line), then sweeps: stay out of it."
+text = "WASD/arrows move, Space/left click fire, 1-4 weapons. The beam charges (thin line), then sweeps: stay out of it."
 
 [node name="Emitter" type="Node2D" parent="." unique_id=1582113926]
 position = Vector2(576, 110)
@@ -131,5 +132,7 @@ helper_fan_direction_angle = 1.5707963267948966
 shoot_interval_sec = 4.0
 sound_enabled = true
 sound_effects = [ExtResource("snd_fire"), ExtResource("snd_impact")]
+
+[node name="WorldEnvironment" parent="." instance=ExtResource("world_env")]
 
 [node name="LiveInspector" parent="." instance=ExtResource("live_inspector")]
