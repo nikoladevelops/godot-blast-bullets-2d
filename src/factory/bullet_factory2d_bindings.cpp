@@ -223,6 +223,12 @@ void BulletFactory2D::_bind_methods() {
 			PropertyInfo(Variant::INT, "bullet_index")));
 
 	ADD_SIGNAL(MethodInfo("reset_finished"));
+	// Once per volley life, from every spawn path (spawn_volley, a spawner's
+	// shot, a split, a pickup conversion), at the start of the next factory
+	// step before it moves. spawner is null for factory volleys.
+	ADD_SIGNAL(MethodInfo("volley_spawned",
+			PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
+			PropertyInfo(Variant::OBJECT, "spawner", PROPERTY_HINT_RESOURCE_TYPE, "PatternSpawner2D")));
 
 	// Graze notifications (see GrazeZone2D): EVERY graze in the game
 	// reaches the factory, whoever owns the volley (a spawner's own graze

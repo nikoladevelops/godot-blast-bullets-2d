@@ -374,6 +374,7 @@ boom.streams = [preload("res://sfx/boom.wav")]
 boom.priority = 10
 boom.duck_amount_db = 8.0   # dip lower-priority voices by 8 dB
 
+spawner.sound_enabled = true                      # off by default, like every spawner feature group
 spawner.sound_effects = [hit, hum, boom]
 volley.sound_set_effects([hit, hum])              # a volley from factory.spawn_volley (Shot/Telegraph are spawner-only)
 factory.play_sound(hit, global_position)          # a one-off play, anywhere
@@ -453,6 +454,13 @@ var laser := factory.spawn_laser(beam, [Transform2D(0.0, global_position)], self
 factory.laser_hit.connect(func(target, _laser, _beam_index, _position) -> void: print("burned ", target))
 laser.end_laser()   # or let its phases run out
 ```
+To tag, track or debug every volley in one place, whoever fired it, connect the factory's `volley_spawned(volley, spawner)`: it fires once per volley (spawn_volley, spawner shots, splits, pickups) before the volley's first move, with `spawner` null for factory volleys:
+
+```gdscript
+factory.volley_spawned.connect(func(volley: BulletVolley2D, spawner: Node) -> void:
+	volley.set_meta("team", 1 if spawner == null else 2))
+```
+
 Every pattern of the spawner is a static `BulletPatterns2D.helper_generate_transforms_*` function, and `BulletVolley2D` has runtime control for every feature (see its in-editor docs). Factory-spawned bullets report their hits on the factory's signals.
 
 ## Performance

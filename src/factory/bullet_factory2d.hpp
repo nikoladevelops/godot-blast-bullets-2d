@@ -1310,6 +1310,19 @@ private:
 	// A handler paused the factory (a hit-stop): nothing after it runs in this
 	// sweep. What it queued (splits, emitter shots) waits for the resume.
 	bool sweep_paused() const { return !is_factory_processing_bullets; }
+	// volley_spawned: every spawn path (script, spawner shot, split child,
+	// pickup) only RECORDS the started life (no user code inside a spawn);
+	// the next sweep announces them before any volley moves, fully armed.
+	// Recorded only while something is connected.
+	struct SpawnAnnouncement2D {
+		uint64_t volley_id = 0;
+		uint64_t spawner_id = 0;
+		int life_id = 0;
+	};
+	std::vector<SpawnAnnouncement2D> pending_spawn_announcements;
+	void note_volley_spawned(const BulletVolley2D *volley, uint64_t spawner_id);
+	// False when a handler freed/queued this factory or paused it.
+	bool announce_spawned_volleys(const bool &alive);
 	void redraw_lasers();
 	void free_all_lasers();
 	void detach_lasers_for_teardown();

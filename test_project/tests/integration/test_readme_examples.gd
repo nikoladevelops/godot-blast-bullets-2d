@@ -325,8 +325,12 @@ func test_the_sound_recipe_runs_as_written() -> void:
 	assert_eq([hit.random_pitch_min, hit.random_pitch_max, hit.max_voices, hit.bus, hum.follow_bullet, boom.duck_amount_db],
 			[0.9, 1.1, 6, &"SFX", true, 8.0], "every setting sticks")
 	var sp := make_spawner(H.make_volley_data(4), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
+	sp.sound_enabled = true
 	sp.sound_effects = [hit, hum, boom]
-	assert_eq(sp.sound_effects.size(), 3, "the spawner takes the entries")
+	var fired := []
+	sp.volley_fired.connect(func(v: BulletVolley2D, _i: int) -> void: fired.append(v))
+	assert_true(sp.shoot_once(), "the spawner fires")
+	assert_true((fired[0] as BulletVolley2D).is_sound_armed(), "its volley is armed with the entries")
 	var volley := factory.spawn_volley(H.make_volley_data(4))
 	volley.sound_set_effects([hit, hum])
 	assert_true(volley.is_sound_armed(), "a factory volley is armed")

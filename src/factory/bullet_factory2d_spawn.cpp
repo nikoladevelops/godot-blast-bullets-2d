@@ -4,6 +4,8 @@
 
 #include "bullet_spawner/bullet_spawner2d.hpp"
 #include "core/attachment_scene_check2d.hpp"
+#include "core/cached_string_names2d.hpp"
+#include "core/emit_on2d.hpp"
 #include "core/spawn_report2d.hpp"
 #include "factory/bullet_factory2d_internal.hpp"
 #include "patterns/pattern_inputs2d.hpp"
@@ -283,6 +285,7 @@ BulletVolley2D *BulletFactory2D::spawn_volley_internal(const Ref<BulletVolleyDat
 		}
 		volley_set.activate_data(reuse_id);
 		stats_spawned_bullets_total += (uint64_t)volley->amount_bullets;
+		note_volley_spawned(volley, spawner_id);
 		return volley;
 	}
 
@@ -322,6 +325,7 @@ BulletVolley2D *BulletFactory2D::spawn_volley_internal(const Ref<BulletVolleyDat
 	}
 	volley_set.activate_data(sparse_set_id);
 	stats_spawned_bullets_total += (uint64_t)volley->amount_bullets;
+	note_volley_spawned(volley, spawner_id);
 	return volley;
 }
 
@@ -563,6 +567,50 @@ void BulletFactory2D::populate_attachments_pool(const Ref<PackedScene> attachmen
 			return;
 		}
 	}
+}
+
+// ---- volley_spawned -------------------------------------------------------
+
+void BulletFactory2D::note_volley_spawned(const BulletVolley2D *volley, uint64_t spawner_id) {
+	// A record only (no user code): a handler that is not connected yet would
+	// not see it anyway, and an unconnected factory keeps no list.
+	if (volley == nullptr || !has_connections(CachedStringNames2D::get().volley_spawned)) {
+		return;
+	}
+	SpawnAnnouncement2D note;
+	note.volley_id = volley->get_instance_id();
+	note.spawner_id = spawner_id;
+	note.life_id = volley->get_life_id();
+	pending_spawn_announcements.push_back(note);
+}
+
+bool BulletFactory2D::announce_spawned_volleys(const bool &alive) {
+	if (pending_spawn_announcements.empty()) {
+		return true;
+	}
+	// The batch is a local: a handler may free this factory (no member is
+	// touched afterwards) or spawn again (announced at the next sweep, never
+	// in this loop).
+	std::vector<SpawnAnnouncement2D> batch;
+	batch.swap(pending_spawn_announcements);
+	const StringName &signal_name = CachedStringNames2D::get().volley_spawned;
+	for (const SpawnAnnouncement2D &note : batch) {
+		// Only the life that was spawned, still going: a volley cleared,
+		// pooled, reused or freed before this sweep is skipped.
+		BulletVolley2D *volley = Object::cast_to<BulletVolley2D>(ObjectDB::get_instance(ObjectID(note.volley_id)));
+		if (volley == nullptr || volley->is_queued_for_deletion() || volley->is_pooled() || volley->get_life_id() != note.life_id) {
+			continue;
+		}
+		// A spawner freed since is reported as null.
+		Object *spawner = note.spawner_id != 0 ? ObjectDB::get_instance(ObjectID(note.spawner_id)) : nullptr;
+		const Variant spawner_arg = (spawner != nullptr && !spawner->is_queued_for_deletion()) ? Variant(spawner) : Variant();
+		note_user_code();
+		emit_on2d(this, signal_name, volley, spawner_arg);
+		if (!sweep_may_continue(alive) || sweep_paused()) {
+			return false;
+		}
+	}
+	return true;
 }
 
 } // namespace BlastBullets2D

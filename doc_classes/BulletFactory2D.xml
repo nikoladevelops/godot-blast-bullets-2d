@@ -1122,6 +1122,13 @@
 				Emitted once after an accepted [method reset] (full or scoped) or [method reset_deferred] has completed and the factory is processing again, so a handler can spawn the next wave right away. A rejected reset emits nothing.
 			</description>
 		</signal>
+		<signal name="volley_spawned">
+			<param index="0" name="volley" type="BulletVolley2D" />
+			<param index="1" name="spawner" type="PatternSpawner2D" />
+			<description>
+				Emitted once per volley life, whatever started it: [method spawn_volley], a spawner's shot, a split's children or a pickup conversion. It arrives at the start of the next factory step, before the volley's first move and after its spawner armed it (homing, graze, sound, flocking, splitting, emitters), so a handler can tag, track or edit it: [code]volley.set_meta("team", 1)[/code], a network id, a debug overlay. [param spawner] is the [BulletSpawner2D] that fired it, or [code]null[/code] for a factory volley (and for a spawner freed since). A life that ended before the step (cleared, pooled, reused) is never announced. Spawns are only recorded while something is connected to this signal. A handler may spawn (announced at the next step), pause the factory (the rest waits for the resume) or free anything.
+			</description>
+		</signal>
 	</signals>
 	<constants>
 		<constant name="INTERPOLATION_OFF" value="0" enum="PhysicsInterpolation">

@@ -619,6 +619,11 @@ void BulletFactory2D::native_physics_process(double delta) {
 			}
 		}
 	} iteration_scope{ this, life };
+	// Volleys started since the last sweep are announced before any of them
+	// moves (volley_spawned): fully armed, at a point handlers may act.
+	if (!sweep_paused() && !announce_spawned_volleys(alive)) {
+		return;
+	}
 	if (!tick_volleys(delta, alive) || !sweep_may_continue(alive) || sweep_paused()) {
 		return;
 	}
