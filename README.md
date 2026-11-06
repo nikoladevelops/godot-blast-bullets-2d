@@ -60,7 +60,7 @@ Every clip and screenshot below is **Arcane Barrage**, a complete bullet-hell ga
 
 ## Learn from the examples
 
-[`test_project/examples/`](test_project/examples) holds seven small scenes, each a few nodes and one short script. Open `test_project/` in Godot, open a scene and press <kbd>F6</kbd>. In every example: <kbd>WASD</kbd> or the arrow keys move, hold <kbd>Space</kbd> or the left mouse button to fire, <kbd>1</kbd>-<kbd>4</kbd> switch weapons (Rapid, Spread, Homing, Nova); enemy turrets track you, hits spark and bosses explode.
+[`test_project/examples/`](test_project/examples) holds nine small scenes, each a few nodes and one short script. Open `test_project/` in Godot, open a scene and press <kbd>F6</kbd>. In every example: <kbd>WASD</kbd> or the arrow keys move, hold <kbd>Space</kbd> or the left mouse button to fire, <kbd>1</kbd>-<kbd>4</kbd> switch weapons (Rapid, Spread, Homing, Nova); enemy turrets track you, hits spark and bosses explode.
 
 | Scene | Shows |
 |---|---|
@@ -71,6 +71,8 @@ Every clip and screenshot below is **Arcane Barrage**, a complete bullet-hell ga
 | `05_split` | slow orbs that burst into rings of small bullets |
 | `06_boss_phases` | a boss that changes its attack at half health, and your ship's gun hitting it |
 | `07_player_gun` | a complete small fight: a gun that fires while you hold the button, ONE hit handler on the factory with damage from custom data, a boss strafing along a `Path2D`, a bomb that clears only the boss's bullets |
+| `08_gem_pickups` | a bomb (B) that turns every bullet that can hit you into gems: they burst out, a magnet pulls them in, each one chimes and counts |
+| `09_shmup_boss` | a complete small shmup fight: a strafing boss with three phases and a rage, patterns that switch, per-phase bullet colors, health bars, victory and death screens (R restarts) |
 
 The rest of `test_project/` is the test lab: a scene with a sidebar to try every feature live (bullet counts, collision, pools, physics rates), and the automated test suites. Press <kbd>F2</kbd> in the test lab or in any example to open the **live inspector**: every property of the factory, the spawners, their spawn and laser data and any nested resource, edited while the game runs (a refused value keeps the old one and says so), plus a button for every argument-free method.
 

@@ -1,0 +1,13 @@
+[gd_resource type="BulletSoundData2D" format=3]
+
+[ext_resource type="AudioStream" path="res://shared/sound/gem_collect_01.wav" id="1_s"]
+[ext_resource type="AudioStream" path="res://shared/sound/gem_collect_02.wav" id="2_s"]
+[ext_resource type="AudioStream" path="res://shared/sound/gem_collect_03.wav" id="3_s"]
+
+[resource]
+volume_db = -8.0
+streams = [ExtResource("1_s"), ExtResource("2_s"), ExtResource("3_s")]
+stream_mode = 3
+random_pitch = 1.04
+min_interval_sec = 0.03
+max_voices = 6

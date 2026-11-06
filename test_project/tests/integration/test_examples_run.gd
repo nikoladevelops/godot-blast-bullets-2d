@@ -258,3 +258,83 @@ func test_the_homing_redirect_holds() -> void:
 	expect_no_errors()
 	scene.queue_free()
 	await idle(2)
+
+
+func _end_screen_text(hud: CanvasLayer) -> String:
+	var texts := []
+	for n in hud.find_children("*", "Label", true, false):
+		texts.append((n as Label).text)
+	return " | ".join(texts)
+
+
+func test_the_gem_example_turns_bullets_into_gems_you_collect() -> void:
+	var scene := await _play("res://examples/08_gem_pickups.tscn")
+	var example_factory: BulletFactory2D = scene.get_node("BulletFactory2D")
+	scene.get_node("Player").global_position = Vector2(576, 560)
+	for i in 180:
+		await physics(1)
+		if example_factory.get_active_bullet_count() > 20:
+			break
+	assert_gt(scene.bomb(), 0, "the bomb made gems")
+	assert_eq(example_factory.get_nearest_bullet(Vector2.ZERO, 1.0e6, scene.PLAYER_LAYER), {}, "nothing dangerous is left")
+	for i in 240:
+		await physics(1)
+		if scene.gems > 0:
+			break
+	assert_gt(scene.gems, 0, "the gems flew to the player and were collected")
+	assert_string_contains(_end_screen_text(scene.get_node("Player").hud), "Gems: %d" % scene.gems, "the counter shows them")
+	scene.queue_free()
+	await idle(2)
+
+
+func test_the_boss_fight_runs_its_phases_to_victory() -> void:
+	var scene := await _play("res://examples/09_shmup_boss.tscn")
+	var boss: BulletSpawner2D = scene.get_node("Boss")
+	var player: Area2D = scene.get_node("Player")
+	await idle(3)
+	assert_eq(scene.phase, 0, "phase 1 first")
+	var first_colors: PackedColorArray = boss.bullet_color_gradient.colors
+	var first_pattern := boss.pattern_source
+	await physics(260) # past the phase's switch time
+	assert_ne(boss.pattern_source, first_pattern, "patterns switch within a phase")
+	_key(KEY_SPACE, true)
+	var targets := [162, 82, 6] # just above each threshold: a few hits cross it
+	var phases_seen := [0]
+	for hp in targets:
+		scene.boss_hp = hp
+		for i in 600:
+			player.global_position = Vector2(boss.global_position.x, 560)
+			scene._invulnerable_until = 1.0e9 # this test is about the boss
+			await physics(1)
+			if scene.phase != phases_seen[-1] or scene.over:
+				break
+		phases_seen.append(scene.phase)
+	_key(KEY_SPACE, false)
+	assert_eq(phases_seen, [0, 1, 2, 2], "phase 2 at 66 %, rage at 33 %")
+	assert_ne(boss.bullet_color_gradient.colors, first_colors, "each phase has its own bullet colors")
+	assert_almost_eq(boss.movement_speed, 280.0, 0.01, "the rage strafes faster")
+	assert_true(scene.over, "the boss went down")
+	await physics(30)
+	assert_string_contains(_end_screen_text(player.hud), "BOSS DEFEATED", "the victory screen")
+	await physics(80)
+	scene.queue_free()
+	await idle(2)
+
+
+func test_the_boss_fight_shows_the_death_screen() -> void:
+	var scene := await _play("res://examples/09_shmup_boss.tscn")
+	var player: Area2D = scene.get_node("Player")
+	await idle(3)
+	scene.player_hp = 1
+	player.global_position = Vector2(576, 260) # right under the boss's fire
+	for i in 600:
+		player.global_position = Vector2(scene.get_node("Boss").global_position.x, 260)
+		await physics(1)
+		if scene.over:
+			break
+	assert_true(scene.over, "the player died")
+	assert_eq(scene.player_hp, 0, "out of health")
+	await physics(30)
+	assert_string_contains(_end_screen_text(player.hud), "YOU DIED", "the death screen")
+	scene.queue_free()
+	await idle(2)

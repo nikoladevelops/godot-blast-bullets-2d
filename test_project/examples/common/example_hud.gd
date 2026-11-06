@@ -168,3 +168,57 @@ class _WeaponIcon extends Control:
 			3: # Nova: a ring
 				for k in 12:
 					draw_circle(c + Vector2(0, -8) + Vector2.from_angle(TAU * k / 12.0) * 13.0, 2.2, col)
+
+
+var _counter: Label
+
+
+## A big centred banner for a moment ("PHASE 2", "RAGE!").
+func announce(text: String, color := Color(1, 1, 1)) -> void:
+	var banner := _label(text, 46, HORIZONTAL_ALIGNMENT_CENTER)
+	banner.anchor_left = 0.0
+	banner.anchor_right = 1.0
+	banner.anchor_top = 0.4
+	banner.anchor_bottom = 0.4
+	banner.modulate = Color(color.r * 1.8, color.g * 1.8, color.b * 1.8, 0.0)
+	add_child(banner)
+	var t := create_tween()
+	t.tween_property(banner, "modulate:a", 1.0, 0.15)
+	t.tween_interval(1.0)
+	t.tween_property(banner, "modulate:a", 0.0, 0.5)
+	t.tween_callback(banner.queue_free)
+
+
+## A counter at the top left ("Gems: 12").
+func set_counter(text: String) -> void:
+	if _counter == null:
+		_counter = _label("", 22, HORIZONTAL_ALIGNMENT_LEFT)
+		_counter.offset_left = 16
+		_counter.offset_top = 12
+		add_child(_counter)
+	_counter.text = text
+
+
+## A full-screen end card: title, a line under it and how to restart.
+func show_end_screen(title: String, subtitle: String, color: Color) -> void:
+	var dim := ColorRect.new()
+	dim.color = Color(0.02, 0.03, 0.07, 0.0)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(dim)
+	var box := VBoxContainer.new()
+	box.set_anchors_preset(Control.PRESET_CENTER)
+	box.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	box.grow_vertical = Control.GROW_DIRECTION_BOTH
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	var head := _label(title, 64, HORIZONTAL_ALIGNMENT_CENTER)
+	head.modulate = Color(color.r * 1.6, color.g * 1.6, color.b * 1.6)
+	box.add_child(head)
+	box.add_child(_label(subtitle, 20, HORIZONTAL_ALIGNMENT_CENTER))
+	var again := _label("Press R to play again", 16, HORIZONTAL_ALIGNMENT_CENTER)
+	again.modulate = Color(1, 1, 1, 0.7)
+	box.add_child(again)
+	box.modulate.a = 0.0
+	add_child(box)
+	var t := create_tween().set_parallel()
+	t.tween_property(dim, "color:a", 0.7, 0.6)
+	t.tween_property(box, "modulate:a", 1.0, 0.6)
