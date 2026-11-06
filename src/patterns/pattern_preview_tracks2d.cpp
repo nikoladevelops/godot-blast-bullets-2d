@@ -111,6 +111,25 @@ static void outline_emit_inf(PackedVector2Array &r_pts) {
 	r_pts.push_back(Vector2(Math::INF, Math::INF));
 }
 
+// The public samplers sweep up to their count, exactly like the generators
+// they mirror: the developer-set bullet limit bounds them too (a 1e9-point
+// preview froze the editor, and `points * 2` overflowed an int).
+static bool outline_track_amount_ok(const char *caller, int amount) {
+	if (amount <= pattern_max_bullets()) {
+		return true;
+	}
+	UtilityFunctions::push_error(String(caller) + ": transforms_amount must be between 0 and " + itos(pattern_max_bullets()) + ".");
+	return false;
+}
+
+static bool outline_track_count_ok(const char *caller, int count, const char *what) {
+	if (count <= pattern_max_bullets()) {
+		return true;
+	}
+	UtilityFunctions::push_error(String(caller) + ": " + what + " is absurdly large; keep it near the bullet count.");
+	return false;
+}
+
 static void outline_emit_spiral_arms(PackedVector2Array &r_pts, int transforms_amount, int arms, real_t start_radius, real_t radius_step, real_t angle_step, real_t base_rotation_abs, int arm_index_stride, bool mirror_alternate_arms) {
 	// Same slot deal as the generator (arm_spirals2d / spiral_arm_step): walk
 	// the slots ONCE, then group per arm. O(amount), never O(arms * amount):
@@ -295,6 +314,9 @@ Dictionary BulletPatterns2D::helper_sample_outline_spiral(int transforms_amount,
 		UtilityFunctions::push_error("helper_sample_outline_spiral: bad args.");
 		return outline_track_result(PackedVector2Array(), false, false);
 	}
+	if (!outline_track_amount_ok("helper_sample_outline_spiral", transforms_amount)) {
+		return outline_track_result(PackedVector2Array(), false, false);
+	}
 	PackedVector2Array pts;
 	for (int i = 0; i < transforms_amount; ++i) {
 		const real_t r = start_radius + radius_step * (real_t)i;
@@ -312,6 +334,9 @@ Dictionary BulletPatterns2D::helper_sample_outline_multispiral(int transforms_am
 		UtilityFunctions::push_error("helper_sample_outline_multispiral: bad args.");
 		return outline_track_result(PackedVector2Array(), false, false);
 	}
+	if (!outline_track_amount_ok("helper_sample_outline_multispiral", transforms_amount)) {
+		return outline_track_result(PackedVector2Array(), false, false);
+	}
 	PackedVector2Array pts;
 	outline_emit_spiral_arms(pts, transforms_amount, arms, start_radius, radius_step, angle_step, base_rotation_abs, arm_index_stride, false);
 	return outline_track_result(pts, false, false);
@@ -322,6 +347,9 @@ Dictionary BulletPatterns2D::helper_sample_outline_counter_spiral(int transforms
 		UtilityFunctions::push_error("helper_sample_outline_counter_spiral: bad args.");
 		return outline_track_result(PackedVector2Array(), false, false);
 	}
+	if (!outline_track_amount_ok("helper_sample_outline_counter_spiral", transforms_amount)) {
+		return outline_track_result(PackedVector2Array(), false, false);
+	}
 	PackedVector2Array pts;
 	outline_emit_spiral_arms(pts, transforms_amount, arms, start_radius, radius_step, angle_step, base_rotation_abs, arm_index_stride, mirror_alternate_arms);
 	return outline_track_result(pts, false, false);
@@ -330,6 +358,9 @@ Dictionary BulletPatterns2D::helper_sample_outline_counter_spiral(int transforms
 Dictionary BulletPatterns2D::helper_sample_outline_grid(int transforms_amount, int rows_per_column, int alignment, real_t column_offset, real_t row_offset, real_t base_rotation_abs, bool rotate_with_marker) {
 	if (transforms_amount < 0 || rows_per_column < 1 || alignment < 0 || alignment > 8 || !Math::is_finite(column_offset) || !Math::is_finite(row_offset) || !Math::is_finite(base_rotation_abs)) {
 		UtilityFunctions::push_error("helper_sample_outline_grid: bad args.");
+		return outline_track_result(PackedVector2Array(), false, false);
+	}
+	if (!outline_track_amount_ok("helper_sample_outline_grid", transforms_amount)) {
 		return outline_track_result(PackedVector2Array(), false, false);
 	}
 	// Mirrors helper_generate_transforms_grid column/row math (ideal grid:
@@ -385,6 +416,9 @@ Dictionary BulletPatterns2D::helper_sample_outline_lattice(int transforms_amount
 		UtilityFunctions::push_error("helper_sample_outline_lattice: bad args.");
 		return outline_track_result(PackedVector2Array(), false, false);
 	}
+	if (!outline_track_amount_ok("helper_sample_outline_lattice", transforms_amount)) {
+		return outline_track_result(PackedVector2Array(), false, false);
+	}
 	// Mirrors helper_generate_transforms_lattice row math, including the
 	// overflow rows past capacity. The dispatch refuses a columns x rows
 	// product past the developer's grid-slot limit (one warning, no bullets),
@@ -413,6 +447,9 @@ Dictionary BulletPatterns2D::helper_sample_outline_lattice(int transforms_amount
 Dictionary BulletPatterns2D::helper_sample_outline_waterfall(int transforms_amount, int columns, real_t column_spacing, int rows, real_t row_spacing, real_t stagger, const Vector2 &rain_direction) {
 	if (transforms_amount < 0 || columns < 1 || rows < 1 || !Math::is_finite(column_spacing) || !Math::is_finite(row_spacing) || !Math::is_finite(stagger) || !rain_direction.is_finite() || rain_direction.length_squared() <= 0.0) {
 		UtilityFunctions::push_error("helper_sample_outline_waterfall: bad args.");
+		return outline_track_result(PackedVector2Array(), false, false);
+	}
+	if (!outline_track_amount_ok("helper_sample_outline_waterfall", transforms_amount)) {
 		return outline_track_result(PackedVector2Array(), false, false);
 	}
 	// Mirrors helper_generate_transforms_waterfall row math, including the
@@ -444,6 +481,9 @@ Dictionary BulletPatterns2D::helper_sample_outline_waterfall(int transforms_amou
 Dictionary BulletPatterns2D::helper_sample_outline_rain(int transforms_amount, real_t band_width, const Vector2 &rain_direction, real_t drop_spacing) {
 	if (transforms_amount < 0 || !Math::is_finite(band_width) || band_width < 0.0 || !rain_direction.is_finite() || rain_direction.length_squared() <= 0.0 || !Math::is_finite(drop_spacing)) {
 		UtilityFunctions::push_error("helper_sample_outline_rain: bad args.");
+		return outline_track_result(PackedVector2Array(), false, false);
+	}
+	if (!outline_track_amount_ok("helper_sample_outline_rain", transforms_amount)) {
 		return outline_track_result(PackedVector2Array(), false, false);
 	}
 	// Mirrors helper_generate_transforms_rain row grouping.
@@ -546,6 +586,9 @@ Dictionary BulletPatterns2D::helper_sample_outline_polygon(int vertices, real_t 
 		UtilityFunctions::push_error("helper_sample_outline_polygon: vertices >= 3, finite radius > 0.");
 		return outline_track_result(PackedVector2Array(), false);
 	}
+	if (!outline_track_count_ok("helper_sample_outline_polygon", vertices, "vertices")) {
+		return outline_track_result(PackedVector2Array(), false);
+	}
 	// Mirrors helper_generate_transforms_polygon corner order.
 	PackedVector2Array pts;
 	for (int k = 0; k < vertices; ++k) {
@@ -605,6 +648,9 @@ Dictionary BulletPatterns2D::helper_sample_outline_ring(real_t radius, real_t ar
 Dictionary BulletPatterns2D::helper_sample_outline_star(int points, real_t outer_radius, real_t inner_radius, real_t base_rotation) {
 	if (points < 2 || !Math::is_finite(outer_radius) || outer_radius < 0.0 || !Math::is_finite(inner_radius) || inner_radius < 0.0 || !Math::is_finite(base_rotation)) {
 		UtilityFunctions::push_error("helper_sample_outline_star: points >= 2, finite radii >= 0.");
+		return outline_track_result(PackedVector2Array(), false);
+	}
+	if (!outline_track_count_ok("helper_sample_outline_star", points, "points")) {
 		return outline_track_result(PackedVector2Array(), false);
 	}
 	// Mirrors helper_generate_transforms_star corner order.

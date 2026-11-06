@@ -143,7 +143,7 @@ PATTERN_KNOB(int64_t, BulletPatterns2D::SpiralFacingMode, INT, helper_multispira
 PATTERN_KNOB(double, double, FLOAT, helper_multispiral_facing_offset_deg, FINITE, 0, 0, "must be finite", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")
 PATTERN_KNOB(int64_t, int, INT, helper_multispiral_arm_stride, GE, 1, 0, "must be >= 1", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")
 PATTERN_SUBGROUP("Cross", "helper_cross_")
-PATTERN_KNOB(int64_t, int, INT, helper_cross_arm_count, GE, 1, 0, "must be >= 1", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")
+PATTERN_KNOB(int64_t, int, INT, helper_cross_arm_count, GE, 1, 0, "must be >= 1", LE, pattern_max_bullets(), 0, String("must be <= ") + itos(pattern_max_bullets()), false, PROPERTY_HINT_NONE, "")
 PATTERN_KNOB(double, double, FLOAT, helper_cross_arm_length, FINITE_GE, 0.0, 0, "must be finite and >= 0", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")
 PATTERN_KNOB(double, double, FLOAT, helper_cross_spacing, FINITE_GT, 0.0, 0, "must be finite and > 0", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")
 PATTERN_KNOB(double, double, FLOAT, helper_cross_base_rotation, FINITE, 0, 0, "must be finite", NONE, 0, 0, "", false, PROPERTY_HINT_NONE, "")

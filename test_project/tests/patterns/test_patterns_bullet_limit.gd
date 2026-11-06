@@ -108,6 +108,45 @@ func test_lowering_the_limit_invalidates_a_baked_pattern() -> void:
 	expect_error_sequence(["helper_generate_transforms_ring: transforms_amount must be between 0 and 500."])
 
 
+## The preview-track samplers are public API too: a huge count used to sweep
+## the raw amount (1e9 push_backs, or `points * 2` overflowing int) while the
+## generator refused the same value. They share the live limit.
+func test_preview_track_samplers_are_bounded_by_the_live_limit() -> void:
+	BulletPatterns2D.set_max_bullets_per_pattern(10)
+	var cases: Array = [
+		[func() -> Dictionary: return BulletPatterns2D.helper_sample_outline_spiral(11, 10.0, 5.0, 0.5, 0.0), "helper_sample_outline_spiral: transforms_amount must be between 0 and 10."],
+		[func() -> Dictionary: return BulletPatterns2D.helper_sample_outline_multispiral(11, 2, 10.0, 5.0, 0.5, 0.0, 1), "helper_sample_outline_multispiral: transforms_amount must be between 0 and 10."],
+		[func() -> Dictionary: return BulletPatterns2D.helper_sample_outline_counter_spiral(11, 2, 10.0, 5.0, 0.5, 0.0, 1, false), "helper_sample_outline_counter_spiral: transforms_amount must be between 0 and 10."],
+		[func() -> Dictionary: return BulletPatterns2D.helper_sample_outline_grid(11, 2, 4, 10.0, 10.0, 0.0, false), "helper_sample_outline_grid: transforms_amount must be between 0 and 10."],
+		[func() -> Dictionary: return BulletPatterns2D.helper_sample_outline_lattice(11, 2, 2, 10.0, 10.0, false), "helper_sample_outline_lattice: transforms_amount must be between 0 and 10."],
+		[func() -> Dictionary: return BulletPatterns2D.helper_sample_outline_waterfall(11, 2, 10.0, 2, 10.0, 0.0, Vector2(0, 1)), "helper_sample_outline_waterfall: transforms_amount must be between 0 and 10."],
+		[func() -> Dictionary: return BulletPatterns2D.helper_sample_outline_rain(11, 100.0, Vector2(0, 1), 10.0), "helper_sample_outline_rain: transforms_amount must be between 0 and 10."],
+		[func() -> Dictionary: return BulletPatterns2D.helper_sample_outline_polygon(11, 10.0, 0.0), "helper_sample_outline_polygon: vertices is absurdly large; keep it near the bullet count."],
+		[func() -> Dictionary: return BulletPatterns2D.helper_sample_outline_star(11, 10.0, 5.0, 0.0), "helper_sample_outline_star: points is absurdly large; keep it near the bullet count."],
+	]
+	for c in cases:
+		var track: Dictionary = (c[0] as Callable).call()
+		assert_eq((track.get("points", PackedVector2Array()) as PackedVector2Array).size(), 0, c[1])
+		expect_error_sequence([c[1]])
+	# The limit itself is still sampled (the bound is not off by one).
+	assert_eq((BulletPatterns2D.helper_sample_outline_spiral(10, 10.0, 5.0, 0.5, 0.0)["points"] as PackedVector2Array).size(), 10, "the limit is accepted")
+
+
+## helper_cross_arm_count sizes the preview's arm loop (and the generator's
+## per-arm math): an unbounded value overflowed `amount - arm + arms - 1` and
+## swept 2^31 arms on every rebuild. It shares the live limit like every other
+## count knob.
+func test_cross_arm_count_is_bounded_by_the_live_limit() -> void:
+	BulletPatterns2D.set_max_bullets_per_pattern(10)
+	var sp := make_spawner(H.make_volley_data(4), BulletSpawner2D.PATTERN_FROM_HELPER_CROSS, 4)
+	assert_eq(sp.helper_cross_arm_count, 4, "default")
+	sp.helper_cross_arm_count = 11
+	expect_error_sequence(["BulletSpawner2D: helper_cross_arm_count must be <= 10, keeping the old value."])
+	assert_eq(sp.helper_cross_arm_count, 4, "old value kept")
+	sp.helper_cross_arm_count = 10
+	assert_eq(sp.helper_cross_arm_count, 10, "the limit itself is accepted")
+
+
 ## The limit is the bound every generator and spawn path trusts: a typo above
 ## the ceiling is refused instead of removing the bound itself.
 func test_a_limit_above_the_ceiling_is_rejected() -> void:

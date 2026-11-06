@@ -399,7 +399,7 @@
 			First-slot radius in pixels. Must be finite and 0 or more.
 		</member>
 		<member name="helper_cross_arm_count" type="int" setter="set_helper_cross_arm_count" getter="get_helper_cross_arm_count" default="4">
-			Rays in the cross/plus barrage. Must be 1 or more.
+			Rays in the cross/plus barrage. Must be between 1 and the current [method BulletPatterns2D.get_max_bullets_per_pattern] (a count past the bullet amount only sweeps empty arms).
 		</member>
 		<member name="helper_cross_arm_length" type="float" setter="set_helper_cross_arm_length" getter="get_helper_cross_arm_length" default="150.0">
 			How far each ray reaches from the marker. Must be finite and 0 or more.
