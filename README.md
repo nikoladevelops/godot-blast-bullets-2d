@@ -255,6 +255,70 @@ spawner.shoot_once_with({"helper_bullets_amount": 64})  # one special shot; sett
 ```
 </details>
 
+<details>
+<summary><b>Bounce off walls and read the normal</b> (Bounce and Ricochet)</summary>
+
+```gdscript
+var data: BulletVolleyData2D = spawner.spawn_data    # the spawner's spawn data (duplicate it first if shared)
+data.set_bounce_mask_from_array([1])                 # walls on layer 1; must also be in the collision mask
+data.set_collision_mask_from_array([1, 2])
+data.bounce_mode = BulletVolleyData2D.BOUNCE_PRECISE_SHAPE   # flat walls reflect flat
+data.bounce_max_count = 3                            # 0 = unlimited
+
+spawner.bounce_body_entered.connect(func(wall, volley: BulletVolley2D, i: int) -> void:
+	var normal := volley.bullet_get_last_bounce_normal(i)   # points away from the wall
+	spawn_spark(volley.get_bullet_transform(i).origin, normal))
+```
+</details>
+
+<details>
+<summary><b>Resize bullets and hitboxes at runtime</b></summary>
+
+```gdscript
+volley.set_bullet_scale(0, Vector2(2, 2))            # one bullet: sprite AND hitbox grow
+volley.all_bullets_set_scale(Vector2(0.5, 0.5), 0, -1)   # every bullet (0, -1 = the whole volley)
+var big := CircleShape2D.new()
+big.radius = 24.0
+volley.set_collision_shape_runtime(big)              # a new hitbox for the whole volley, sprites untouched
+```
+</details>
+
+<details>
+<summary><b>Multiplayer: late joiners see every bullet</b></summary>
+
+Bullets are simulated locally on every peer. A peer that joins mid-game gets one snapshot of what is flying (plain arrays, RPC friendly) and rebuilds it from its own copies of the spawn data. Tag each volley with a kind when it is fired (`volley.set_meta("kind", "spark")`, for a spawner in its `volley_fired` handler).
+
+```gdscript
+# Server: every live bullet as plain data.
+func capture_bullets(factory: BulletFactory2D) -> Array:
+	var out := []
+	for volley: BulletVolley2D in factory.get_active_volleys():
+		var transforms := []
+		var velocities := PackedVector2Array()
+		var life_left := PackedFloat64Array()
+		for i in volley.get_active_bullet_indexes():
+			transforms.append(volley.get_bullet_transform(i))
+			velocities.append(volley.get_bullet_velocity(i))
+			life_left.append(volley.get_bullet_life_time_left(i))
+		out.append({"kind": volley.get_meta("kind", ""), "transforms": transforms, "velocities": velocities, "life_left": life_left})
+	return out
+
+# Joining peer: rebuild them (data_by_kind maps a kind to its BulletVolleyData2D).
+func restore_bullets(factory: BulletFactory2D, snapshot: Array, data_by_kind: Dictionary) -> void:
+	for entry: Dictionary in snapshot:
+		if entry.transforms.is_empty():
+			continue
+		var data: BulletVolleyData2D = data_by_kind[entry.kind].duplicate()
+		data.transforms = entry.transforms
+		var volley := factory.spawn_volley(data)
+		volley.set_meta("kind", entry.kind)
+		for i in entry.transforms.size():
+			volley.bullet_set_velocity(i, entry.velocities[i])
+			if entry.life_left[i] > 0.0:   # 0 = an infinite volley
+				volley.set_bullet_life_time_left(i, entry.life_left[i])
+```
+</details>
+
 ## Spawning from code
 
 For one-off effects you can skip the spawner. Build the transforms (where and which way each bullet starts) and spawn:
@@ -343,6 +407,19 @@ The bullet classes were unified into one volley class. Rename these in your scri
 | `bullet_homing_target_reached` argument `multimesh_instance` | `volley` |
 | a spawner needed `bullet_factory_path` | optional: an empty path uses the factory in the spawner's scene |
 </details>
+
+## C#
+
+The plugin is a GDExtension: Godot generates no C# bindings for it, so C# calls it dynamically. Every class, method, property and signal works:
+
+```csharp
+var factory = GetNode("BulletFactory2D");
+var spawner = GetNode("BulletSpawner2D");
+spawner.Set("helper_bullets_amount", 24);
+spawner.Call("shoot_once");
+spawner.Connect("body_entered", Callable.From<GodotObject, GodotObject, int>((body, volley, index) => GD.Print(body)));
+```
+Wrapping the calls you use in small typed C# classes gives you IntelliSense.
 
 ## Building from source and running the tests
 

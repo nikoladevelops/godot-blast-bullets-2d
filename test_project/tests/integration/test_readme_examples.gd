@@ -198,3 +198,79 @@ func test_the_laser_helpers_example() -> void:
 	boss_lasers.graze_node_group = &"player"
 	boss_lasers.graze_enabled = true
 	assert_eq(boss_lasers.apply_to_live_lasers(), 1, "settings changed mid-fight reach the laser in flight")
+
+
+## The README late-join recipe, as written: capture every live bullet as plain
+## data (RPC friendly), rebuild it from the peer's own spawn data.
+func _capture_bullets(f: BulletFactory2D) -> Array:
+	var out := []
+	for volley: BulletVolley2D in f.get_active_volleys():
+		var transforms := []
+		var velocities := PackedVector2Array()
+		var life_left := PackedFloat64Array()
+		for i in volley.get_active_bullet_indexes():
+			transforms.append(volley.get_bullet_transform(i))
+			velocities.append(volley.get_bullet_velocity(i))
+			life_left.append(volley.get_bullet_life_time_left(i))
+		out.append({"kind": volley.get_meta("kind", ""), "transforms": transforms, "velocities": velocities, "life_left": life_left})
+	return out
+
+
+func _restore_bullets(f: BulletFactory2D, snapshot: Array, data_by_kind: Dictionary) -> Array:
+	var spawned := []
+	for entry: Dictionary in snapshot:
+		if entry.transforms.is_empty():
+			continue
+		var data: BulletVolleyData2D = data_by_kind[entry.kind].duplicate()
+		data.transforms = entry.transforms
+		var volley := f.spawn_volley(data)
+		volley.set_meta("kind", entry.kind)
+		for i in entry.transforms.size():
+			volley.bullet_set_velocity(i, entry.velocities[i])
+			if entry.life_left[i] > 0.0: # 0 = an infinite volley
+				volley.set_bullet_life_time_left(i, entry.life_left[i])
+		spawned.append(volley)
+	return spawned
+
+
+func test_the_late_join_recipe_rebuilds_every_live_bullet() -> void:
+	var data := H.make_volley_data(5, 240.0, 3.0)
+	var original := factory.spawn_volley(data.duplicate())
+	original.set_meta("kind", "spark")
+	original.all_bullets_set_direction(Vector2(1, 1), 0, -1)
+	step_factory(10, DT)
+	original.disable_bullet(1) # a hit bullet: never sent
+	var snapshot := _capture_bullets(factory)
+	assert_eq(snapshot.size(), 1, "one live volley")
+	assert_eq(snapshot[0].transforms.size(), 4, "only live bullets are captured")
+	var copies := _restore_bullets(factory, snapshot, {"spark": data})
+	assert_eq(copies.size(), 1, "one volley rebuilt")
+	var copy: BulletVolley2D = copies[0]
+	var live := Array(original.get_active_bullet_indexes())
+	for k in 2: # at restore, and after flying side by side
+		for j in live.size():
+			var i: int = live[j]
+			assert_almost_eq(copy.get_bullet_transform(j).origin, original.get_bullet_transform(i).origin, Vector2(0.01, 0.01), "pose of bullet %d, pass %d" % [i, k])
+			assert_almost_eq(copy.get_bullet_velocity(j), original.get_bullet_velocity(i), Vector2(0.01, 0.01), "velocity of bullet %d" % i)
+			assert_almost_eq(copy.get_bullet_life_time_left(j), original.get_bullet_life_time_left(i), 0.001, "life left of bullet %d" % i)
+		step_factory(6, DT)
+
+
+func test_the_resize_and_bounce_recipes_run_as_written() -> void:
+	var volley := factory.spawn_volley(H.make_volley_data(3))
+	volley.set_bullet_scale(0, Vector2(2, 2))
+	assert_almost_eq(volley.get_bullet_scale(0), Vector2(2, 2), Vector2(0.001, 0.001), "one bullet grows")
+	volley.all_bullets_set_scale(Vector2(0.5, 0.5), 0, -1)
+	assert_almost_eq(volley.get_bullet_scale(2), Vector2(0.5, 0.5), Vector2(0.001, 0.001), "every bullet shrinks")
+	var big := CircleShape2D.new()
+	big.radius = 24.0
+	volley.set_collision_shape_runtime(big)
+	assert_almost_eq((volley.get_collision_shape() as CircleShape2D).radius, 24.0, 0.001, "a new hitbox")
+	var data := H.make_volley_data(3)
+	data.set_bounce_mask_from_array([1])
+	data.set_collision_mask_from_array([1, 2])
+	data.bounce_mode = BulletVolleyData2D.BOUNCE_PRECISE_SHAPE
+	data.bounce_max_count = 3
+	assert_eq([data.bounce_mask, data.collision_mask, data.bounce_max_count], [1, 3, 3], "the bounce settings stick")
+	assert_true(volley.has_method("bullet_get_last_bounce_normal"), "the normal readout exists")
+	expect_no_errors()
