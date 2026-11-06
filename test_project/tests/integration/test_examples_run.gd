@@ -241,3 +241,20 @@ func test_the_boss_blows_up() -> void:
 	await physics(90) # let the chain of blasts finish
 	scene.queue_free()
 	await idle(2)
+
+
+## The homing example's right-click redirect survives the spawner's own
+## retarget passes (every 0.5 s): the source itself switches to Mouse.
+func test_the_homing_redirect_holds() -> void:
+	var scene := await _play("res://examples/02_homing.tscn")
+	var spawner: BulletSpawner2D = scene.get_node("Turret/Spawner")
+	await physics(120) # bullets in flight
+	scene.set_chase_mouse(true)
+	await physics(90) # longer than homing_retarget_interval_sec (0.5 s)
+	assert_eq(spawner.homing_target_source, BulletSpawner2D.HOMING_SOURCE_MOUSE, "still hunting the mouse after several retarget passes")
+	scene.set_chase_mouse(false)
+	await physics(10)
+	assert_eq(spawner.homing_target_source, BulletSpawner2D.HOMING_SOURCE_NODE_GROUP, "back to the player")
+	expect_no_errors()
+	scene.queue_free()
+	await idle(2)
