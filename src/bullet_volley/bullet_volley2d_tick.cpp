@@ -1069,8 +1069,9 @@ _ALWAYS_INLINE_ bool BulletVolley2D::step_place(const MoveTick2D &t, BulletStep2
 	// tested, so a fast bullet cannot fly through the threshold circle; the
 	// reach belongs to the deque the bullet steered by.
 	if (b.steering_deque != nullptr && !b.steering_deque->empty() && b.target_pos.is_finite()) {
+		// Records the reach only (dispatch_homing_events emits after the
+		// loop): no user code here, so no per-bullet liveness check either.
 		try_to_emit_bullet_homing_target_reached_signal(*b.steering_deque, b.steering_deque == &shared_homing_deque, i, pre_move_origin, b.target_pos, b.velocity_delta);
-		return true; // the reach signal is a live user-code point
 	}
 	return trail_user_code;
 }
