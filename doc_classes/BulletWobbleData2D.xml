@@ -24,7 +24,7 @@
 	</methods>
 	<members>
 		<member name="amplitude" type="float" setter="set_amplitude" getter="get_amplitude" default="24.0">
-			Wobble size in pixels (Lateral) or degrees (Angular). Must be finite and &gt;= 0.
+			Wobble strength. Angular: the heading swings by up to this many degrees. Lateral: the heading tilts by up to about [code]amplitude / 100[/code] radians (20 is about 11 degrees), so the sideways weave grows with the bullet's speed and shrinks with [member frequency_hz]: the bullet strays up to about [code]speed * amplitude / (314 * frequency_hz)[/code] pixels to one side of its launch line (20 at 200 px/s and 3 Hz: about 4 px). Must be finite and &gt;= 0.
 		</member>
 		<member name="damping_per_sec" type="float" setter="set_damping_per_sec" getter="get_damping_per_sec" default="0.0">
 			Exponential decay of the wobble over time. 0 = undamped.

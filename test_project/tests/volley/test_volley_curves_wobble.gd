@@ -212,3 +212,25 @@ func test_negative_speed_under_gravity() -> void:
 	assert_true(v.get_bullet_transform(0).is_finite(), "reverse gravity flight finite")
 	assert_lt(v.get_bullet_transform(0).origin.x, p0.x - 10.0, "reverse flight retreats")
 	assert_gt(v.bullet_get_fall_speed(0), 1.0, "gravity still integrates in reverse")
+
+
+## The documented Lateral amplitude: the heading tilts by about amplitude/100
+## rad, so the bullet strays up to about speed * amplitude / (314 * f) px to
+## one side of its launch line (BulletWobbleData2D.amplitude).
+func test_lateral_amplitude_matches_its_documented_reach() -> void:
+	for c in [[200.0, 20.0, 3.0], [50.0, 20.0, 3.0], [300.0, 40.0, 2.0]]:
+		var d := H.make_volley_data(1, c[0], 10.0)
+		var w := BulletWobbleData2D.new()
+		w.enabled = true
+		w.amplitude = c[1]
+		w.frequency_hz = c[2]
+		d.shared_bullet_wobble_data = w
+		var v: BulletVolley2D = factory.spawn_volley(d)
+		var reach := 0.0
+		for i in 64: # 1 s at 1/64 s ticks: three full weaves at 3 Hz
+			factory.debug_advance_time(1.0 / 64.0)
+			reach = maxf(reach, absf(v.get_bullet_transform(0).origin.y))
+		var documented: float = c[0] * c[1] / (314.0 * c[2])
+		assert_almost_eq(reach, documented, documented * 0.15, "speed %s, amplitude %s, %s Hz" % c)
+		v.queue_free()
+		await idle(1)
