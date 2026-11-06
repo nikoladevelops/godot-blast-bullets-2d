@@ -1,0 +1,65 @@
+{
+  "timestamp": "2026-11-04T18-37-54Z",
+  "commit": "d06a668",
+  "dirty": false,
+  "repeat": 5,
+  "machine": {
+    "cpu": "AMD Ryzen 7 8840HS w/ Radeon 780M Graphics",
+    "cores": 16,
+    "os": "Linux-7.3.1-1-cachyos-x86_64-with-glibc2.44",
+    "python": "3.14.9"
+  },
+  "scenarios": {
+    "emitter_storm": {
+      "active_bullets_mean": 12531.9466666667,
+      "collision_records": 0,
+      "description": "256 emitter bullets firing 8-rings every 0.25 s (~8k children)",
+      "engine_ms": {
+        "max": 6.422,
+        "mean": 2.93624333333333,
+        "p50": 2.82,
+        "p95": 3.783,
+        "p99": 5.207
+      },
+      "expired_bullets": 41152,
+      "extra": {
+        "emitted": 10212
+      },
+      "factory_tick_ms": {
+        "max": 4.431,
+        "mean": 1.84724666666667,
+        "p50": 1.769,
+        "p95": 2.279,
+        "p99": 3.502
+      },
+      "frame_ms": {
+        "max": 6.43,
+        "mean": 2.94020333333333,
+        "p50": 2.823,
+        "p95": 3.79,
+        "p99": 5.218
+      },
+      "gate_p95": true,
+      "measure_frames": 300,
+      "memory_static_growth_mb": 0.0396232604980469,
+      "memory_static_peak_mb": 54.9037952423096,
+      "nodes_end": 1552.0,
+      "objects_end": 6457.0,
+      "objects_growth": 0,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 8696,
+      "pool_misses": 1544,
+      "spawned_bullets": 41152,
+      "step_ms": {
+        "max": 0.167,
+        "mean": 0.00396,
+        "p50": 0.003,
+        "p95": 0.005,
+        "p99": 0.008
+      },
+      "warmup_frames": 300
+    }
+  },
+  "godot": "4.7.2-stable (arch_linux)",
+  "debug_build": true
+}

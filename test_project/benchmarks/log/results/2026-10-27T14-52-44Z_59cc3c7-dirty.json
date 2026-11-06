@@ -1,0 +1,160 @@
+{
+  "timestamp": "2026-10-27T14-52-44Z",
+  "commit": "59cc3c7",
+  "dirty": true,
+  "repeat": 5,
+  "machine": {
+    "cpu": "AMD Ryzen 7 8840HS w/ Radeon 780M Graphics",
+    "cores": 16,
+    "os": "Linux-7.3.0-5-cachyos-x86_64-with-glibc2.44",
+    "python": "3.14.8"
+  },
+  "scenarios": {
+    "curvy_lasers_256": {
+      "active_bullets_mean": 0.0,
+      "collision_records": 0,
+      "description": "256 curvy tracking lasers (8 x 32), a wave every 2 s, 1.9 s lives",
+      "engine_ms": {
+        "max": 2.35,
+        "mean": 0.56237,
+        "p50": 0.666,
+        "p95": 0.686,
+        "p99": 0.711
+      },
+      "expired_bullets": 0,
+      "extra": {
+        "lasers": 8
+      },
+      "factory_tick_ms": {
+        "max": 1.449,
+        "mean": 0.255936666666667,
+        "p50": 0.293,
+        "p95": 0.305,
+        "p99": 0.317
+      },
+      "frame_ms": {
+        "max": 2.351,
+        "mean": 0.563836666666667,
+        "p50": 0.667,
+        "p95": 0.687,
+        "p99": 0.712
+      },
+      "measure_frames": 300,
+      "memory_static_growth_mb": 0.0396270751953125,
+      "memory_static_peak_mb": 32.3608160018921,
+      "nodes_end": 17.0,
+      "objects_end": 1560.0,
+      "objects_growth": 0,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 0,
+      "pool_misses": 0,
+      "spawned_bullets": 0,
+      "step_ms": {
+        "max": 0.109,
+        "mean": 0.00160666666666667,
+        "p50": 0.001,
+        "p95": 0.001,
+        "p99": 0.006
+      },
+      "warmup_frames": 240
+    },
+    "laser_beams_256": {
+      "active_bullets_mean": 0.0,
+      "collision_records": 0,
+      "description": "256 sweeping beams (8 lasers), walls, graze, 24 pierce targets",
+      "engine_ms": {
+        "max": 2.066,
+        "mean": 0.3974,
+        "p50": 0.39,
+        "p95": 0.415,
+        "p99": 0.431
+      },
+      "expired_bullets": 0,
+      "extra": {
+        "hits": 8324
+      },
+      "factory_tick_ms": {
+        "max": 1.95,
+        "mean": 0.35762,
+        "p50": 0.351,
+        "p95": 0.373,
+        "p99": 0.388
+      },
+      "frame_ms": {
+        "max": 2.067,
+        "mean": 0.397973333333333,
+        "p50": 0.391,
+        "p95": 0.415,
+        "p99": 0.432
+      },
+      "measure_frames": 300,
+      "memory_static_growth_mb": 0.0391998291015625,
+      "memory_static_peak_mb": 32.7280607223511,
+      "nodes_end": 73.0,
+      "objects_end": 1653.0,
+      "objects_growth": 0,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 0,
+      "pool_misses": 0,
+      "spawned_bullets": 0,
+      "step_ms": {
+        "max": 0.005,
+        "mean": 0.000573333333333333,
+        "p50": 0.001,
+        "p95": 0.001,
+        "p99": 0.001
+      },
+      "warmup_frames": 60
+    },
+    "laser_looks_256": {
+      "active_bullets_mean": 0.0,
+      "collision_records": 0,
+      "description": "256 sweeping beams (8 lasers) with body, muzzle, tip and pierce animations",
+      "engine_ms": {
+        "max": 1.189,
+        "mean": 0.254126666666667,
+        "p50": 0.25,
+        "p95": 0.257,
+        "p99": 0.266
+      },
+      "expired_bullets": 0,
+      "extra": {
+        "hits": 763
+      },
+      "factory_tick_ms": {
+        "max": 0.845,
+        "mean": 0.16933,
+        "p50": 0.167,
+        "p95": 0.174,
+        "p99": 0.177
+      },
+      "frame_ms": {
+        "max": 1.189,
+        "mean": 0.254286666666667,
+        "p50": 0.25,
+        "p95": 0.258,
+        "p99": 0.266
+      },
+      "measure_frames": 300,
+      "memory_static_growth_mb": 0.0391998291015625,
+      "memory_static_peak_mb": 32.8785161972046,
+      "nodes_end": 64.0,
+      "objects_end": 1650.0,
+      "objects_growth": 0,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 0,
+      "pool_misses": 0,
+      "spawned_bullets": 0,
+      "step_ms": {
+        "max": 0.002,
+        "mean": 0.00019,
+        "p50": 0.0,
+        "p95": 0.001,
+        "p99": 0.001
+      },
+      "warmup_frames": 60
+    }
+  },
+  "godot": "4.7.2-stable (arch_linux)",
+  "debug_build": true
+}

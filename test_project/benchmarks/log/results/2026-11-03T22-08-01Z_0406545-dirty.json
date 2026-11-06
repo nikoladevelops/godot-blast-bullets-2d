@@ -1,0 +1,212 @@
+{
+  "timestamp": "2026-11-03T22-08-01Z",
+  "commit": "0406545",
+  "dirty": true,
+  "repeat": 5,
+  "machine": {
+    "cpu": "AMD Ryzen 7 8840HS w/ Radeon 780M Graphics",
+    "cores": 16,
+    "os": "Linux-7.3.1-1-cachyos-x86_64-with-glibc2.44",
+    "python": "3.14.9"
+  },
+  "scenarios": {
+    "curvy_graze_300": {
+      "active_bullets_mean": 0.0,
+      "collision_records": 0,
+      "description": "256 curvy lasers grazing among 300 targets (2-ring zone)",
+      "engine_ms": {
+        "max": 2.874,
+        "mean": 0.992336666666667,
+        "p50": 1.165,
+        "p95": 1.275,
+        "p99": 1.345
+      },
+      "expired_bullets": 0,
+      "extra": {
+        "grazes": 2447
+      },
+      "factory_tick_ms": {
+        "max": 1.707,
+        "mean": 0.548836666666667,
+        "p50": 0.617,
+        "p95": 0.719,
+        "p99": 0.75
+      },
+      "frame_ms": {
+        "max": 2.874,
+        "mean": 0.993676666666667,
+        "p50": 1.166,
+        "p95": 1.276,
+        "p99": 1.346
+      },
+      "gate_p95": true,
+      "measure_frames": 300,
+      "memory_static_growth_mb": 0.0400505065917969,
+      "memory_static_peak_mb": 33.3359270095825,
+      "nodes_end": 316.0,
+      "objects_end": 1861.0,
+      "objects_growth": 0,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 0,
+      "pool_misses": 0,
+      "spawned_bullets": 0,
+      "step_ms": {
+        "max": 0.106,
+        "mean": 0.00134,
+        "p50": 0.0,
+        "p95": 0.001,
+        "p99": 0.003
+      },
+      "warmup_frames": 240
+    },
+    "curvy_lasers_256": {
+      "active_bullets_mean": 0.0,
+      "collision_records": 0,
+      "description": "256 curvy tracking lasers (8 x 32), a wave every 2 s, 1.9 s lives",
+      "engine_ms": {
+        "max": 2.499,
+        "mean": 0.69764,
+        "p50": 0.839,
+        "p95": 0.867,
+        "p99": 0.899
+      },
+      "expired_bullets": 0,
+      "extra": {
+        "lasers": 8
+      },
+      "factory_tick_ms": {
+        "max": 1.532,
+        "mean": 0.255266666666667,
+        "p50": 0.292,
+        "p95": 0.306,
+        "p99": 0.322
+      },
+      "frame_ms": {
+        "max": 2.5,
+        "mean": 0.699813333333333,
+        "p50": 0.84,
+        "p95": 0.868,
+        "p99": 0.9
+      },
+      "gate_p95": true,
+      "measure_frames": 300,
+      "memory_static_growth_mb": 0.0400505065917969,
+      "memory_static_peak_mb": 32.6313238143921,
+      "nodes_end": 17.0,
+      "objects_end": 1561.0,
+      "objects_growth": 0,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 0,
+      "pool_misses": 0,
+      "spawned_bullets": 0,
+      "step_ms": {
+        "max": 0.132,
+        "mean": 0.00194666666666667,
+        "p50": 0.001,
+        "p95": 0.001,
+        "p99": 0.007
+      },
+      "warmup_frames": 240
+    },
+    "laser_beams_256": {
+      "active_bullets_mean": 0.0,
+      "collision_records": 0,
+      "description": "256 sweeping beams (8 lasers), walls, graze, 24 pierce targets",
+      "engine_ms": {
+        "max": 1.988,
+        "mean": 0.404136666666667,
+        "p50": 0.397,
+        "p95": 0.422,
+        "p99": 0.429
+      },
+      "expired_bullets": 0,
+      "extra": {
+        "hits": 8324
+      },
+      "factory_tick_ms": {
+        "max": 1.836,
+        "mean": 0.356946666666667,
+        "p50": 0.35,
+        "p95": 0.373,
+        "p99": 0.38
+      },
+      "frame_ms": {
+        "max": 1.989,
+        "mean": 0.40471,
+        "p50": 0.398,
+        "p95": 0.423,
+        "p99": 0.429
+      },
+      "gate_p95": true,
+      "measure_frames": 300,
+      "memory_static_growth_mb": 0.0396232604980469,
+      "memory_static_peak_mb": 32.9985609054565,
+      "nodes_end": 73.0,
+      "objects_end": 1654.0,
+      "objects_growth": 0,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 0,
+      "pool_misses": 0,
+      "spawned_bullets": 0,
+      "step_ms": {
+        "max": 0.005,
+        "mean": 0.000563333333333333,
+        "p50": 0.001,
+        "p95": 0.001,
+        "p99": 0.001
+      },
+      "warmup_frames": 60
+    },
+    "laser_looks_256": {
+      "active_bullets_mean": 0.0,
+      "collision_records": 0,
+      "description": "256 sweeping beams (8 lasers) with body, muzzle, tip and pierce animations",
+      "engine_ms": {
+        "max": 0.297,
+        "mean": 0.25885,
+        "p50": 0.258,
+        "p95": 0.266,
+        "p99": 0.281
+      },
+      "expired_bullets": 0,
+      "extra": {
+        "hits": 763
+      },
+      "factory_tick_ms": {
+        "max": 0.202,
+        "mean": 0.169176666666667,
+        "p50": 0.167,
+        "p95": 0.174,
+        "p99": 0.179
+      },
+      "frame_ms": {
+        "max": 0.298,
+        "mean": 0.259056666666667,
+        "p50": 0.258,
+        "p95": 0.267,
+        "p99": 0.281
+      },
+      "gate_p95": true,
+      "measure_frames": 300,
+      "memory_static_growth_mb": 0.0396232604980469,
+      "memory_static_peak_mb": 33.1490240097046,
+      "nodes_end": 64.0,
+      "objects_end": 1651.0,
+      "objects_growth": 0,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 0,
+      "pool_misses": 0,
+      "spawned_bullets": 0,
+      "step_ms": {
+        "max": 0.001,
+        "mean": 0.000203333333333333,
+        "p50": 0.0,
+        "p95": 0.001,
+        "p99": 0.001
+      },
+      "warmup_frames": 60
+    }
+  },
+  "godot": "4.7.2-stable (arch_linux)",
+  "debug_build": true
+}

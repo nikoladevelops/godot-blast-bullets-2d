@@ -1,0 +1,163 @@
+{
+  "timestamp": "2026-11-04T11-33-36Z",
+  "commit": "c13609c",
+  "dirty": true,
+  "repeat": 5,
+  "machine": {
+    "cpu": "AMD Ryzen 7 8840HS w/ Radeon 780M Graphics",
+    "cores": 16,
+    "os": "Linux-7.3.1-1-cachyos-x86_64-with-glibc2.44",
+    "python": "3.14.9"
+  },
+  "scenarios": {
+    "curvy_lasers_256": {
+      "active_bullets_mean": 0.0,
+      "collision_records": 0,
+      "description": "256 curvy tracking lasers (8 x 32), a wave every 2 s, 1.9 s lives",
+      "engine_ms": {
+        "max": 2.812,
+        "mean": 0.728353333333333,
+        "p50": 0.856,
+        "p95": 0.926,
+        "p99": 1.063
+      },
+      "expired_bullets": 0,
+      "extra": {
+        "lasers": 8
+      },
+      "factory_tick_ms": {
+        "max": 2.133,
+        "mean": 0.26737,
+        "p50": 0.3,
+        "p95": 0.336,
+        "p99": 0.358
+      },
+      "frame_ms": {
+        "max": 2.814,
+        "mean": 0.731423333333333,
+        "p50": 0.857,
+        "p95": 0.928,
+        "p99": 1.066
+      },
+      "gate_p95": true,
+      "measure_frames": 300,
+      "memory_static_growth_mb": 0.0400505065917969,
+      "memory_static_peak_mb": 32.7012805938721,
+      "nodes_end": 17.0,
+      "objects_end": 1561.0,
+      "objects_growth": 0,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 0,
+      "pool_misses": 0,
+      "spawned_bullets": 0,
+      "step_ms": {
+        "max": 0.212,
+        "mean": 0.00307,
+        "p50": 0.001,
+        "p95": 0.002,
+        "p99": 0.007
+      },
+      "warmup_frames": 240
+    },
+    "laser_beams_256": {
+      "active_bullets_mean": 0.0,
+      "collision_records": 0,
+      "description": "256 sweeping beams (8 lasers), walls, graze, 24 pierce targets",
+      "engine_ms": {
+        "max": 1.777,
+        "mean": 0.41666,
+        "p50": 0.409,
+        "p95": 0.435,
+        "p99": 0.451
+      },
+      "expired_bullets": 0,
+      "extra": {
+        "hits": 8324
+      },
+      "factory_tick_ms": {
+        "max": 1.427,
+        "mean": 0.36745,
+        "p50": 0.361,
+        "p95": 0.383,
+        "p99": 0.398
+      },
+      "frame_ms": {
+        "max": 1.778,
+        "mean": 0.417306666666667,
+        "p50": 0.409,
+        "p95": 0.436,
+        "p99": 0.451
+      },
+      "gate_p95": true,
+      "measure_frames": 300,
+      "memory_static_growth_mb": 0.0396232604980469,
+      "memory_static_peak_mb": 33.0685176849365,
+      "nodes_end": 73.0,
+      "objects_end": 1654.0,
+      "objects_growth": 0,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 0,
+      "pool_misses": 0,
+      "spawned_bullets": 0,
+      "step_ms": {
+        "max": 0.005,
+        "mean": 0.000646666666666667,
+        "p50": 0.001,
+        "p95": 0.001,
+        "p99": 0.003
+      },
+      "warmup_frames": 60
+    },
+    "laser_looks_256": {
+      "active_bullets_mean": 0.0,
+      "collision_records": 0,
+      "description": "256 sweeping beams (8 lasers) with body, muzzle, tip and pierce animations",
+      "engine_ms": {
+        "max": 1.256,
+        "mean": 0.271183333333333,
+        "p50": 0.264,
+        "p95": 0.282,
+        "p99": 0.302
+      },
+      "expired_bullets": 0,
+      "extra": {
+        "hits": 763
+      },
+      "factory_tick_ms": {
+        "max": 1.117,
+        "mean": 0.17643,
+        "p50": 0.172,
+        "p95": 0.18,
+        "p99": 0.188
+      },
+      "frame_ms": {
+        "max": 1.258,
+        "mean": 0.271413333333333,
+        "p50": 0.264,
+        "p95": 0.282,
+        "p99": 0.303
+      },
+      "gate_p95": true,
+      "measure_frames": 300,
+      "memory_static_growth_mb": 0.0396232604980469,
+      "memory_static_peak_mb": 33.2189807891846,
+      "nodes_end": 64.0,
+      "objects_end": 1651.0,
+      "objects_growth": 0,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 0,
+      "pool_misses": 0,
+      "spawned_bullets": 0,
+      "step_ms": {
+        "max": 0.002,
+        "mean": 0.000216666666666667,
+        "p50": 0.0,
+        "p95": 0.001,
+        "p99": 0.001
+      },
+      "warmup_frames": 60
+    }
+  },
+  "godot": "4.7.2-stable (arch_linux)",
+  "debug_build": true
+}

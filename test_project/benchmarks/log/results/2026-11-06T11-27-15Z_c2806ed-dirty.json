@@ -1,0 +1,65 @@
+{
+  "timestamp": "2026-11-06T11-27-15Z",
+  "commit": "c2806ed",
+  "dirty": true,
+  "repeat": 5,
+  "machine": {
+    "cpu": "AMD Ryzen 7 8840HS w/ Radeon 780M Graphics",
+    "cores": 16,
+    "os": "Linux-7.3.1-1-cachyos-x86_64-with-glibc2.44",
+    "python": "3.14.9"
+  },
+  "scenarios": {
+    "pickup_convert_5k": {
+      "active_bullets_mean": 3352.17,
+      "collision_records": 0,
+      "description": "5k bullets converted to pickups every 60 frames, magnet to a target, collected on arrival",
+      "engine_ms": {
+        "max": 4.076,
+        "mean": 0.665633333333333,
+        "p50": 0.813,
+        "p95": 1.648,
+        "p99": 3.377
+      },
+      "expired_bullets": 0,
+      "extra": {
+        "conversions": 7
+      },
+      "factory_tick_ms": {
+        "max": 1.547,
+        "mean": 0.379223333333333,
+        "p50": 0.227,
+        "p95": 0.93,
+        "p99": 1.295
+      },
+      "frame_ms": {
+        "max": 10.999,
+        "mean": 0.752606666666667,
+        "p50": 0.813,
+        "p95": 1.648,
+        "p99": 7.674
+      },
+      "gate_p95": true,
+      "measure_frames": 300,
+      "memory_static_growth_mb": 2.05813217163086,
+      "memory_static_peak_mb": 44.2912425994873,
+      "nodes_end": 10.0,
+      "objects_end": 6560.0,
+      "objects_growth": 0,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 14,
+      "pool_misses": 0,
+      "spawned_bullets": 50000,
+      "step_ms": {
+        "max": 6.844,
+        "mean": 0.0869733333333333,
+        "p50": 0.0,
+        "p95": 0.001,
+        "p99": 4.55
+      },
+      "warmup_frames": 70
+    }
+  },
+  "godot": "4.7.2-stable (arch_linux)",
+  "debug_build": true
+}

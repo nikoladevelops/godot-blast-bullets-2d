@@ -1,0 +1,156 @@
+{
+  "timestamp": "2026-11-03T19-03-41Z",
+  "commit": "d8fde52",
+  "dirty": true,
+  "repeat": 5,
+  "machine": {
+    "cpu": "AMD Ryzen 7 8840HS w/ Radeon 780M Graphics",
+    "cores": 16,
+    "os": "Linux-7.3.1-1-cachyos-x86_64-with-glibc2.44",
+    "python": "3.14.9"
+  },
+  "scenarios": {
+    "emitter_storm": {
+      "active_bullets_mean": 12531.9466666667,
+      "collision_records": 0,
+      "description": "256 emitter bullets firing 8-rings every 0.25 s (~8k children)",
+      "engine_ms": {
+        "max": 7.475,
+        "mean": 3.23179333333333,
+        "p50": 2.805,
+        "p95": 5.365,
+        "p99": 6.866
+      },
+      "expired_bullets": 41152,
+      "extra": {
+        "emitted": 10212
+      },
+      "factory_tick_ms": {
+        "max": 5.28,
+        "mean": 2.04494,
+        "p50": 1.765,
+        "p95": 3.561,
+        "p99": 4.518
+      },
+      "frame_ms": {
+        "max": 7.48,
+        "mean": 3.23622666666667,
+        "p50": 2.808,
+        "p95": 5.375,
+        "p99": 6.873
+      },
+      "measure_frames": 300,
+      "memory_static_growth_mb": 0.0396232604980469,
+      "memory_static_peak_mb": 54.7710905075073,
+      "nodes_end": 1552.0,
+      "objects_end": 6457.0,
+      "objects_growth": 0,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 8696,
+      "pool_misses": 1544,
+      "spawned_bullets": 41152,
+      "step_ms": {
+        "max": 0.176,
+        "mean": 0.00443333333333333,
+        "p50": 0.003,
+        "p95": 0.007,
+        "p99": 0.013
+      },
+      "warmup_frames": 300
+    },
+    "pool_churn": {
+      "active_bullets_mean": 9000.0,
+      "collision_records": 0,
+      "description": "one 300-bullet volley per frame, 0.5 s life (warm-pool spawn + expiry)",
+      "engine_ms": {
+        "max": 2.412,
+        "mean": 0.725406666666667,
+        "p50": 0.713,
+        "p95": 0.761,
+        "p99": 0.841
+      },
+      "expired_bullets": 90000,
+      "extra": {},
+      "factory_tick_ms": {
+        "max": 1.89,
+        "mean": 0.29869,
+        "p50": 0.29,
+        "p95": 0.32,
+        "p99": 0.351
+      },
+      "frame_ms": {
+        "max": 2.519,
+        "mean": 0.809336666666667,
+        "p50": 0.786,
+        "p95": 0.862,
+        "p99": 0.97
+      },
+      "measure_frames": 300,
+      "memory_static_growth_mb": 0.0396232604980469,
+      "memory_static_peak_mb": 37.4645261764526,
+      "nodes_end": 38.0,
+      "objects_end": 4075.0,
+      "objects_growth": 0,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 329,
+      "pool_misses": 31,
+      "spawned_bullets": 90000,
+      "step_ms": {
+        "max": 0.436,
+        "mean": 0.0811533333333333,
+        "p50": 0.07,
+        "p95": 0.111,
+        "p99": 0.175
+      },
+      "warmup_frames": 60
+    },
+    "split_storm": {
+      "active_bullets_mean": 1675.0,
+      "collision_records": 0,
+      "description": "500 parents -> 2000 children -> 4000 grandchildren (two-stage split)",
+      "engine_ms": {
+        "max": 20.72,
+        "mean": 0.701844444444444,
+        "p50": 0.245,
+        "p95": 1.938,
+        "p99": 6.492
+      },
+      "expired_bullets": 19500,
+      "extra": {},
+      "factory_tick_ms": {
+        "max": 18.585,
+        "mean": 0.594577777777778,
+        "p50": 0.181,
+        "p95": 1.687,
+        "p99": 6.033
+      },
+      "frame_ms": {
+        "max": 20.72,
+        "mean": 0.704002777777778,
+        "p50": 0.246,
+        "p95": 1.939,
+        "p99": 6.493
+      },
+      "measure_frames": 360,
+      "memory_static_growth_mb": 0.136325836181641,
+      "memory_static_peak_mb": 63.1167821884155,
+      "nodes_end": 2509.0,
+      "objects_end": 9063.0,
+      "objects_growth": 0,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 7508,
+      "pool_misses": 2502,
+      "spawned_bullets": 19500,
+      "step_ms": {
+        "max": 0.198,
+        "mean": 0.00216388888888889,
+        "p50": 0.001,
+        "p95": 0.001,
+        "p99": 0.006
+      },
+      "warmup_frames": 130
+    }
+  },
+  "godot": "4.7.2-stable (arch_linux)",
+  "debug_build": true
+}
