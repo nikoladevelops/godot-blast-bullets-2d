@@ -23,14 +23,14 @@
 [ext_resource type="Texture2D" path="res://shared/art/player_bullets/rocket_08.png" id="art_rocket_08"]
 [ext_resource type="Texture2D" path="res://shared/art/player_bullets/rocket_09.png" id="art_rocket_09"]
 [ext_resource type="Texture2D" path="res://shared/art/player_bullets/rocket_10.png" id="art_rocket_10"]
-[ext_resource type="Texture2D" path="res://shared/art/enemy_ship/moving_01.png" id="art_moving_01"]
-[ext_resource type="Texture2D" path="res://shared/art/enemy_ship/moving_02.png" id="art_moving_02"]
-[ext_resource type="Texture2D" path="res://shared/art/enemy_ship/moving_03.png" id="art_moving_03"]
-[ext_resource type="Texture2D" path="res://shared/art/enemy_ship/moving_04.png" id="art_moving_04"]
-[ext_resource type="Texture2D" path="res://shared/art/enemy_ship/moving_05.png" id="art_moving_05"]
-[ext_resource type="Texture2D" path="res://shared/art/enemy_ship/moving_06.png" id="art_moving_06"]
-[ext_resource type="Texture2D" path="res://shared/art/enemy_ship/moving_07.png" id="art_moving_07"]
-[ext_resource type="Texture2D" path="res://shared/art/enemy_ship/moving_08.png" id="art_moving_08"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_ship/moving_01.png" id="art_enemy_moving_01"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_ship/moving_02.png" id="art_enemy_moving_02"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_ship/moving_03.png" id="art_enemy_moving_03"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_ship/moving_04.png" id="art_enemy_moving_04"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_ship/moving_05.png" id="art_enemy_moving_05"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_ship/moving_06.png" id="art_enemy_moving_06"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_ship/moving_07.png" id="art_enemy_moving_07"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_ship/moving_08.png" id="art_enemy_moving_08"]
 [ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/plasma_rocket_01.png" id="art_plasma_rocket_01"]
 [ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/plasma_rocket_02.png" id="art_plasma_rocket_02"]
 [ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/plasma_rocket_03.png" id="art_plasma_rocket_03"]
@@ -132,28 +132,28 @@ collision_shape = SubResource("CircleShape2D_d8y4d")
 animations = [{
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("art_moving_01")
+"texture": ExtResource("art_enemy_moving_01")
 }, {
 "duration": 1.0,
-"texture": ExtResource("art_moving_02")
+"texture": ExtResource("art_enemy_moving_02")
 }, {
 "duration": 1.0,
-"texture": ExtResource("art_moving_03")
+"texture": ExtResource("art_enemy_moving_03")
 }, {
 "duration": 1.0,
-"texture": ExtResource("art_moving_04")
+"texture": ExtResource("art_enemy_moving_04")
 }, {
 "duration": 1.0,
-"texture": ExtResource("art_moving_05")
+"texture": ExtResource("art_enemy_moving_05")
 }, {
 "duration": 1.0,
-"texture": ExtResource("art_moving_06")
+"texture": ExtResource("art_enemy_moving_06")
 }, {
 "duration": 1.0,
-"texture": ExtResource("art_moving_07")
+"texture": ExtResource("art_enemy_moving_07")
 }, {
 "duration": 1.0,
-"texture": ExtResource("art_moving_08")
+"texture": ExtResource("art_enemy_moving_08")
 }],
 "loop": 1,
 "name": &"default",
