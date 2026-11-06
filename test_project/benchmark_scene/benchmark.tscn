@@ -22,45 +22,167 @@
 [ext_resource type="Texture2D" path="res://shared/art/player_bullets/rocket_09.png" id="art_rocket_09"]
 [ext_resource type="Texture2D" path="res://shared/art/player_bullets/rocket_10.png" id="art_rocket_10"]
 [ext_resource type="PackedScene" path="res://shared/background/space_background.tscn" id="bg_space"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_beam_01.png" id="fx_laser_beam_01"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_beam_02.png" id="fx_laser_beam_02"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_beam_03.png" id="fx_laser_beam_03"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_beam_04.png" id="fx_laser_beam_04"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_orb_01.png" id="fx_laser_orb_01"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_orb_02.png" id="fx_laser_orb_02"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_orb_03.png" id="fx_laser_orb_03"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_orb_04.png" id="fx_laser_orb_04"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_orb_05.png" id="fx_laser_orb_05"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_orb_06.png" id="fx_laser_orb_06"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_orb_07.png" id="fx_laser_orb_07"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_orb_08.png" id="fx_laser_orb_08"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/hit_spark_01.png" id="fx_hit_spark_01"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/hit_spark_02.png" id="fx_hit_spark_02"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/hit_spark_03.png" id="fx_hit_spark_03"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/hit_spark_04.png" id="fx_hit_spark_04"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/hit_spark_05.png" id="fx_hit_spark_05"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/hit_spark_06.png" id="fx_hit_spark_06"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/hit_spark_07.png" id="fx_hit_spark_07"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/hit_spark_08.png" id="fx_hit_spark_08"]
+[ext_resource type="AudioStream" path="res://shared/sound/laser_fire.wav" id="snd_laser_fire"]
 [ext_resource type="PackedScene" path="res://shared/live_inspector/live_inspector.tscn" id="live_inspector"]
+[ext_resource type="AudioStream" path="res://shared/sound/hit_01.wav" id="snd_hit_01"]
+[ext_resource type="AudioStream" path="res://shared/sound/hit_02.wav" id="snd_hit_02"]
+[ext_resource type="AudioStream" path="res://shared/sound/hit_03.wav" id="snd_hit_03"]
+[ext_resource type="AudioStream" path="res://shared/sound/hit_04.wav" id="snd_hit_04"]
+[ext_resource type="AudioStream" path="res://shared/sound/hit_05.wav" id="snd_hit_05"]
+[ext_resource type="AudioStream" path="res://shared/sound/hit_06.wav" id="snd_hit_06"]
+[ext_resource type="AudioStream" path="res://shared/sound/hit_07.wav" id="snd_hit_07"]
+[ext_resource type="AudioStream" path="res://shared/sound/hit_08.wav" id="snd_hit_08"]
+[ext_resource type="AudioStream" path="res://shared/sound/laser_fire_01.wav" id="snd_laser_fire_01"]
+[ext_resource type="AudioStream" path="res://shared/sound/laser_fire_02.wav" id="snd_laser_fire_02"]
+[ext_resource type="AudioStream" path="res://shared/sound/laser_fire_03.wav" id="snd_laser_fire_03"]
+[ext_resource type="AudioStream" path="res://shared/sound/laser_fire_04.wav" id="snd_laser_fire_04"]
+[ext_resource type="AudioStream" path="res://shared/sound/laser_fire_05.wav" id="snd_laser_fire_05"]
+[ext_resource type="AudioStream" path="res://shared/sound/laser_fire_06.wav" id="snd_laser_fire_06"]
 
-[sub_resource type="Gradient" id="Gradient_7gbxi"]
-offsets = PackedFloat32Array(0, 0.486747, 1)
-colors = PackedColorArray(0, 0, 0, 1, 0.88136345, 0, 0.440892, 1, 1, 1, 1, 1)
-
-[sub_resource type="SpriteFrames" id="SpriteFrames_mouoi"]
+[sub_resource type="SpriteFrames" id="SpriteFrames_jbfhk"]
 animations = [{
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("3_1inld")
+"texture": ExtResource("fx_laser_beam_01")
 }, {
 "duration": 1.0,
-"texture": ExtResource("3_1inld")
+"texture": ExtResource("fx_laser_beam_02")
 }, {
 "duration": 1.0,
-"texture": ExtResource("3_1inld")
+"texture": ExtResource("fx_laser_beam_03")
 }, {
 "duration": 1.0,
-"texture": ExtResource("3_1inld")
-}, {
-"duration": 1.0,
-"texture": ExtResource("3_1inld")
-}, {
-"duration": 1.0,
-"texture": ExtResource("3_1inld")
+"texture": ExtResource("fx_laser_beam_04")
 }],
-"loop": 1,
+"loop": true,
 "name": &"default",
-"speed": 5.0
+"speed": 12.0
 }]
 
-[sub_resource type="EffectLayerData2D" id="BulletEffectLayerData2D_g0agp"]
-trigger = 5
-sprite_frames = SubResource("SpriteFrames_mouoi")
-color_ramp = SubResource("Gradient_7gbxi")
-override_frame_color = true
-offset = Vector2(-70, 0)
-scale = Vector2(0.2, 0.2)
+[sub_resource type="Gradient" id="Gradient_jbfhk"]
+colors = PackedColorArray(0, 0, 0, 1, 0.4400404, 0.00013495862, 0.44005203, 1)
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_3oxbl"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("fx_laser_orb_01")
+}, {
+"duration": 1.0,
+"texture": ExtResource("fx_laser_orb_02")
+}, {
+"duration": 1.0,
+"texture": ExtResource("fx_laser_orb_03")
+}, {
+"duration": 1.0,
+"texture": ExtResource("fx_laser_orb_04")
+}, {
+"duration": 1.0,
+"texture": ExtResource("fx_laser_orb_05")
+}, {
+"duration": 1.0,
+"texture": ExtResource("fx_laser_orb_06")
+}, {
+"duration": 1.0,
+"texture": ExtResource("fx_laser_orb_07")
+}, {
+"duration": 1.0,
+"texture": ExtResource("fx_laser_orb_08")
+}],
+"loop": true,
+"name": &"default",
+"speed": 14.0
+}]
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_laser_impact"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("fx_hit_spark_01")
+}, {
+"duration": 1.0,
+"texture": ExtResource("fx_hit_spark_02")
+}, {
+"duration": 1.0,
+"texture": ExtResource("fx_hit_spark_03")
+}, {
+"duration": 1.0,
+"texture": ExtResource("fx_hit_spark_04")
+}, {
+"duration": 1.0,
+"texture": ExtResource("fx_hit_spark_05")
+}, {
+"duration": 1.0,
+"texture": ExtResource("fx_hit_spark_06")
+}, {
+"duration": 1.0,
+"texture": ExtResource("fx_hit_spark_07")
+}, {
+"duration": 1.0,
+"texture": ExtResource("fx_hit_spark_08")
+}],
+"loop": false,
+"name": &"default",
+"speed": 20.0
+}]
+
+[sub_resource type="LaserSpriteLook2D" id="LaserSpriteLook2D_jbfhk"]
+frames = SubResource("SpriteFrames_3oxbl")
+scale = Vector2(1.3, 1.3)
+
+[sub_resource type="LaserSpriteLook2D" id="LaserSpriteLook2D_8p66i"]
+frames = SubResource("SpriteFrames_3oxbl")
+scale = Vector2(1.3, 1.3)
+show_when = 1
+
+[sub_resource type="LaserSpriteLook2D" id="LaserSpriteLook2D_3oxbl"]
+frames = SubResource("SpriteFrames_laser_impact")
+scale = Vector2(1.6, 1.6)
+
+[sub_resource type="LaserData2D" id="LaserData2D_jbfhk"]
+length = 780.0
+width = 97.0
+extend_speed = 4717.0
+grow_sec = 0.05
+active_sec = 0.5
+fade_sec = 0.15
+aim = 2
+wall_mask = 1
+reflections = 5
+hit_interval_sec = 0.1
+color_ramp = SubResource("Gradient_jbfhk")
+body_frames = SubResource("SpriteFrames_jbfhk")
+body_mode = 1
+body_scroll_speed = 1459.0
+body_end_fade = 60.0
+muzzle_look = SubResource("LaserSpriteLook2D_jbfhk")
+tip_look = SubResource("LaserSpriteLook2D_8p66i")
+wall_impact_look = SubResource("LaserSpriteLook2D_3oxbl")
+
+[sub_resource type="GrazeZone2D" id="GrazeZone2D_7gbxi"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_jbfhk"]
+radius = 50.0
 
 [sub_resource type="BulletSpeedData2D" id="BulletSpeedData2D_mouoi"]
 speed = 500.0
@@ -112,31 +234,52 @@ animations = [{
 sprite_frames = SubResource("SpriteFrames_y4v7i")
 texture_size = Vector2(127, 127)
 max_life_time = 10.0
+override_frame_color = true
 shared_bullet_speed_data = SubResource("BulletSpeedData2D_mouoi")
 shared_bullet_wobble_data = SubResource("BulletWobbleData2D_46wrg")
-bounce_mask = 1
+bounce_hit_consumed = true
+bounce_mode = 1
 shared_movement_pattern_face_movement_direction = true
 collision_layer = 2
-effect_layers = Array[BulletEffectLayerData2D]([SubResource("BulletEffectLayerData2D_g0agp")])
+collision_shape = SubResource("CircleShape2D_jbfhk")
+monitorable = true
 
-[sub_resource type="GrazeZone2D" id="BulletGrazeZone2D_c5op3"]
-ring_count = 3
-ring_1_radius = 30.5
-ring_2_radius = 65.0
-ring_3_radius = 120.0
-count_bullet_size = false
+[sub_resource type="Gradient" id="Gradient_tw22b"]
+offsets = PackedFloat32Array(0, 0.663113, 0.6823028, 1)
+colors = PackedColorArray(0, 0, 0, 1, 0.19170053, 0.22663772, 0.7630246, 1, 0.17731248, 0.20962746, 0.70575595, 1, 0.25123733, 0.29702502, 0.9999986, 1)
+
+[sub_resource type="BulletFlock2D" id="BulletFlock2D_0466e"]
+separation = 6.0
+alignment = 0.5
+cohesion = 5.0
+neighbor_range = 200.0
+separation_range = 8.0
+max_turn_rate_degrees = 360.0
+
+[sub_resource type="BulletSplitStage2D" id="BulletSplitStage2D_4arnt"]
+split_on_lifetime_over = false
+split_after_sec = 4.28
+
+[sub_resource type="BulletSplitData2D" id="BulletSplitData2D_dvbyj"]
+stages = Array[BulletSplitStage2D]([SubResource("BulletSplitStage2D_4arnt")])
+
+[sub_resource type="BulletEmitterData2D" id="BulletEmitterData2D_jbfhk"]
+interval_sec = 10.0
+start_delay_sec = 5.32
+aim = 2
+inherit_bullet_velocity = true
 
 [sub_resource type="BulletSoundData2D" id="BulletSoundData2D_0yymp"]
-enabled = false
-trigger = 3
-streams = [ExtResource("13_jbfhk")]
+trigger = 2
+streams = [ExtResource("snd_hit_01"), ExtResource("snd_hit_02"), ExtResource("snd_hit_03"), ExtResource("snd_hit_04"), ExtResource("snd_hit_05"), ExtResource("snd_hit_06"), ExtResource("snd_hit_07"), ExtResource("snd_hit_08")]
+stream_mode = 3
 pitch_scale = 2.0999999999999996
-random_pitch = 5.31
-random_volume_offset_db = 3.11
+random_pitch = 1.44
 audibility_mode = 1
 zoom_scales_distance = true
 
 [sub_resource type="BulletSoundData2D" id="BulletSoundData2D_102ar"]
+enabled = false
 streams = [ExtResource("13_jbfhk")]
 pitch_scale = 0.51
 random_pitch = 1.99
@@ -173,17 +316,38 @@ _data = {
 }
 point_count = 5
 
+[sub_resource type="LaserSoundData2D" id="LaserSoundData2D_fire"]
+trigger = 3
+streams = [ExtResource("snd_laser_fire_01"), ExtResource("snd_laser_fire_02"), ExtResource("snd_laser_fire_03"), ExtResource("snd_laser_fire_04"), ExtResource("snd_laser_fire_05"), ExtResource("snd_laser_fire_06")]
+stream_mode = 3
+volume_db = -8.0
+
 [node name="BenchmarkScene" type="Node2D" unique_id=775074199]
 script = ExtResource("1_cfubd")
 
 [node name="SpaceBackground" parent="." instance=ExtResource("bg_space")]
 
+[node name="LaserSpawner2D" type="LaserSpawner2D" parent="." unique_id=2093696587]
+bullet_factory_path = NodePath("../BulletFactory2D")
+laser_data = SubResource("LaserData2D_jbfhk")
+laser_target_source = 2
+laser_target_group = &"player"
+laser_target_path = NodePath("../Player")
+graze_enabled = true
+graze_zones = Array[GrazeZone2D]([SubResource("GrazeZone2D_7gbxi")])
+graze_node_group = &"player"
+graze_preview_during_runtime = true
+sound_enabled = true
+sound_effects = [SubResource("LaserSoundData2D_fire")]
+
 [node name="BulletSpawner2D" type="BulletSpawner2D" parent="." unique_id=1540696231]
 bullet_factory_path = NodePath("../BulletFactory2D")
 transforms_generator = NodePath(".")
 spawn_data = SubResource("BulletVolleyData2D_nkrfg")
-pattern_source = 30
-helper_bullets_amount = 555
+bullet_speed_scale_min = 0.83
+bullet_speed_scale_max = 2.99
+pattern_source = 32
+helper_bullets_amount = 55
 helper_ring_y_scale = 3.0
 helper_fan_spread = 3.0
 helper_aimed_target = NodePath("../Level/Area2D")
@@ -194,21 +358,29 @@ helper_path2d_path = NodePath("../Paths/Path2D")
 helper_path2d_distribution = 1
 helper_path2d_overflow = 1
 helper_outline_placement = 1
-helper_outline_layer_count = 5
 helper_outline_layer_scale_curve = 1
 helper_outline_corner_facing = 1
+shoot_interval_sec = 2.0
 burst_enabled = true
-burst_count = 5
 spin_enabled = true
 spin_mode = 1
+bullet_scale_max = 2.0
+bullet_rotation_min_degrees = -91.5
+bullet_rotation_max_degrees = 71.60000000000002
+bullet_position_jitter_min = 27.2
+bullet_color_mode = 2
+bullet_color_gradient = SubResource("Gradient_tw22b")
+bullet_color_shift_per_shot = 0.3719999999999999
+homing_target_source = 1
 homing_node_group = &"player"
 homing_target_path = NodePath("../Player")
 homing_retarget_mode = 0
 orbiting_radius = 300.0
 orbiting_radius_start = 350.0
 orbiting_lock_policy = 1
-graze_enabled = true
-graze_zones = Array[BulletGrazeZone2D]([SubResource("BulletGrazeZone2D_c5op3")])
+flock = SubResource("BulletFlock2D_0466e")
+split_data = SubResource("BulletSplitData2D_dvbyj")
+emitter = SubResource("BulletEmitterData2D_jbfhk")
 graze_target_source = 1
 graze_node_group = &"enemy"
 graze_target_path = NodePath("../Player")
@@ -459,6 +631,8 @@ enemy_scn = ExtResource("7_n3lca")
 [node name="LiveInspector" parent="." instance=ExtResource("live_inspector")]
 
 [node name="BulletFactory2D" type="BulletFactory2D" parent="." unique_id=1288814825]
+despawn_bounds_rect = Rect2(-1500, -600, 1152, 1000)
+despawn_bounds_preview_during_runtime = true
 script = ExtResource("7_6fsjh")
 
 [node name="AllGodotArea2DBulletsContainer" type="Node" parent="." unique_id=2042474770]
