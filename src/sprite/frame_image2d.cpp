@@ -3,6 +3,7 @@
 #include <godot_cpp/classes/atlas_texture.hpp>
 #include <godot_cpp/core/math.hpp>
 
+#include <cmath>
 #include <cstring>
 
 using namespace godot;
@@ -55,17 +56,25 @@ Ref<Image> FrameImageReader2D::read_atlas(const Ref<Texture2D> &tex, int depth) 
 	if (base.is_null()) {
 		return Ref<Image>();
 	}
-	// Rounded in double BEFORE any int cast: a huge or non-finite rect
+	// Truncated in double BEFORE any int cast: a huge or non-finite rect
 	// overflows the cast or x + w (UB; it once slipped past an int check).
-	// NaN fails every comparison below.
+	// NaN fails every comparison below. Godot truncates each component
+	// (Rect2 -> Rect2i) and sizes the texture at the truncated region plus
+	// the truncated margin; rounding here baked a different box (12x8 for
+	// Godot's 10x7) and stretched every consumer's frame. Positions trunc
+	// toward zero like Rect2i (only when the cast is representable: a huge
+	// position is fully outside and never reaches a blit).
 	const Rect2 region = atlas->get_region();
 	const Rect2 margin = atlas->get_margin();
-	const double rx = Math::round((double)region.position.x);
-	const double ry = Math::round((double)region.position.y);
-	const double mx = Math::round((double)margin.position.x);
-	const double my = Math::round((double)margin.position.y);
-	const double mw = Math::round((double)margin.size.x);
-	const double mh = Math::round((double)margin.size.y);
+	auto trunc_position = [](double v) -> double {
+		return Math::abs(v) <= 1e15 ? std::trunc(v) : v;
+	};
+	const double rx = trunc_position(region.position.x);
+	const double ry = trunc_position(region.position.y);
+	const double mx = Math::floor((double)margin.position.x);
+	const double my = Math::floor((double)margin.position.y);
+	const double mw = Math::floor((double)margin.size.x);
+	const double mh = Math::floor((double)margin.size.y);
 	const double side = (double)MAX_SIDE;
 	if (!Math::is_finite(rx) || !Math::is_finite(ry) || !Math::is_finite(region.size.x) || !Math::is_finite(region.size.y) ||
 			!(Math::abs(mx) <= side) || !(Math::abs(my) <= side) || !(Math::abs(mw) <= side) || !(Math::abs(mh) <= side)) {
@@ -77,16 +86,21 @@ Ref<Image> FrameImageReader2D::read_atlas(const Ref<Texture2D> &tex, int depth) 
 	}
 	const double sheet_w = (double)sheet->get_width();
 	const double sheet_h = (double)sheet->get_height();
-	// Godot reads a zero region width or height as the atlas's whole one.
-	const double rw = region.size.x == 0.0f ? sheet_w : Math::round((double)region.size.x);
-	const double rh = region.size.y == 0.0f ? sheet_h : Math::round((double)region.size.y);
-	if (!(rw > 0.0) || !(rh > 0.0) || !(rx >= 0.0) || !(ry >= 0.0) || !(rx + rw <= sheet_w) || !(ry + rh <= sheet_h)) {
+	// Godot reads a region axis that truncates to zero as the atlas's whole
+	// one (0.4 px included: get_width() is the truncated size).
+	const double rw_raw = Math::floor((double)region.size.x);
+	const double rh_raw = Math::floor((double)region.size.y);
+	const bool whole_x = rw_raw == 0.0 && region.size.x >= 0.0;
+	const bool whole_y = rh_raw == 0.0 && region.size.y >= 0.0;
+	const double rw = whole_x ? sheet_w : rw_raw;
+	const double rh = whole_y ? sheet_h : rh_raw;
+	if (!(rw > 0.0) || !(rh > 0.0)) {
 		return Ref<Image>();
 	}
 	// The box Godot sizes it at (AtlasTexture::get_width / get_height): a zero
 	// region axis is the atlas's whole one, WITHOUT the margin's size.
-	const double box_w = region.size.x == 0.0f ? rw : rw + mw;
-	const double box_h = region.size.y == 0.0f ? rh : rh + mh;
+	const double box_w = whole_x ? rw : rw + mw;
+	const double box_h = whole_y ? rh : rh + mh;
 	if (!(box_w >= 1.0) || !(box_h >= 1.0) || !(box_w <= side) || !(box_h <= side)) {
 		return Ref<Image>();
 	}
@@ -94,8 +108,18 @@ Ref<Image> FrameImageReader2D::read_atlas(const Ref<Texture2D> &tex, int depth) 
 	if (out.is_null()) {
 		return out;
 	}
-	// The region at the margin's offset; blit_rect cuts it at the box.
-	out->blit_rect(sheet, Rect2i((int)rx, (int)ry, (int)rw, (int)rh), Vector2i((int)mx, (int)my));
+	// Godot's get_image() CLIPS a region that runs past the sheet (a fully
+	// outside region reads transparent, not "unreadable"). Bake exactly that
+	// intersection at the margin's offset; the old inside-check returned null,
+	// and the consumer then drew the AtlasTexture mesh RID = the WHOLE sheet.
+	const double src_left = Math::max(rx, 0.0);
+	const double src_top = Math::max(ry, 0.0);
+	const double src_right = Math::min(rx + rw, sheet_w);
+	const double src_bottom = Math::min(ry + rh, sheet_h);
+	if (src_right > src_left && src_bottom > src_top) {
+		const Vector2i at((int)(mx + (src_left - rx)), (int)(my + (src_top - ry)));
+		out->blit_rect(sheet, Rect2i((int)src_left, (int)src_top, (int)(src_right - src_left), (int)(src_bottom - src_top)), at);
+	}
 	if (sheet->has_mipmaps()) {
 		out->generate_mipmaps();
 	}

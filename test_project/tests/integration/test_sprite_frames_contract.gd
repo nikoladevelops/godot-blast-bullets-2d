@@ -427,6 +427,16 @@ func _atlas(sheet: Texture2D, region: Rect2, margin := Rect2()) -> AtlasTexture:
 	return a
 
 
+## A valid 4x4 box whose atlas chain is deeper than FrameImageReader2D can
+## read: a genuinely unreadable frame (the out-of-sheet regions are readable
+## now, since Godot clips them).
+func _deep_atlas(levels := 17) -> AtlasTexture:
+	var tex: Texture2D = _tex(8, 8)
+	for i in levels:
+		tex = _atlas(tex, Rect2(0, 0, 4, 4))
+	return tex as AtlasTexture
+
+
 ## The pixels of `img` that differ from `expect(x, y)`, as "x,y: got want".
 func _pixel_misses(img: Image, size: Vector2i, expect: Callable) -> Array:
 	if img == null:
@@ -464,17 +474,49 @@ func test_an_atlas_frame_reads_exactly_its_region() -> void:
 		var a := _atlas(sheet, case[0], case[1])
 		var read := factory.debug_read_frame(a)
 		assert_eq(read.get_size(), a.get_size(), "region %s margin %s: the size Godot draws it at" % [case[0], case[1]])
-	# A zero region axis keeps its origin (Godot's _get_region_rect only fills
-	# the size: x 5 + the sheet's 8 px runs past the sheet, and get_image shows
-	# x 5..7 then nothing). An overflowing region is unreadable (the original
-	# texture is drawn), never a bake of pixels Godot does not draw.
-	var shifted := _atlas(sheet, Rect2(5, 2, 0, 2))
-	assert_eq(shifted.get_image().get_pixel(3, 0), Color(0, 0, 0, 0), "Godot reads past the sheet there")
-	assert_null(factory.debug_read_frame(shifted), "an overflowing zero-axis region is unreadable")
 	# An atlas of an atlas reads the inner one as drawn (its margin box too).
 	var inner := _atlas(sheet, Rect2(1, 1, 4, 4), Rect2(1, 0, 2, 0))
 	var nested := factory.debug_read_frame(_atlas(inner, Rect2(2, 1, 3, 2)))
 	assert_eq(_pixel_misses(nested.get_image(), Vector2i(3, 2), red), [], "the red block through two atlases")
+	expect_no_errors()
+
+
+## Godot truncates a fractional AtlasTexture rect per component before it
+## reads pixels (region size 3.6 -> 3, margin size 1.6 -> 1, region origin
+## 1.6 -> 1); a region axis that truncates to 0 is the atlas's whole axis.
+## The bake must cover exactly the size Godot draws and read the pixels it
+## reads, never a round()ed box (it used to draw a 12x8 bake inside a 10x7
+## quad, and declared a 0.4 px region unreadable = the whole sheet).
+func test_a_fractional_atlas_rect_reads_as_godot_draws_it() -> void:
+	var sheet := ImageTexture.create_from_image(_sheet_image())
+	# 8x8 sheet: region (1.6, 1.4, 3.6, 2.4) reads source (1, 1) 3x2;
+	# margin size (1.6, 1.8) adds 1x1 -> Godot's size is (4, 3).
+	var a := _atlas(sheet, Rect2(1.6, 1.4, 3.6, 2.4), Rect2(0, 0, 1.6, 1.8))
+	var read := factory.debug_read_frame(a)
+	assert_not_null(read, "a fractional rect is readable")
+	assert_eq(read.get_size(), a.get_size(), "the size Godot draws it at")
+	var src := a.get_image()
+	assert_eq(src.get_size(), Vector2i(3, 2), "Godot truncates the region size")
+	var misses: Array = []
+	for y in 3:
+		for x in 4:
+			var want: Color = src.get_pixel(x, y) if x < 3 and y < 2 else Color(0, 0, 0, 0)
+			if not read.get_image().get_pixel(x, y).is_equal_approx(want):
+				misses.append("%d,%d: %s %s" % [x, y, read.get_image().get_pixel(x, y), want])
+	assert_eq(misses, [], "the region pixels at the margin offset, the rest transparent")
+	# A sub-pixel region axis is the whole atlas axis in Godot (a 0.4 px
+	# region still reads all 8 columns), not an unreadable frame.
+	var sliver := _atlas(sheet, Rect2(0, 0, 0.4, 4.0))
+	var rows := factory.debug_read_frame(sliver)
+	assert_not_null(rows, "a sub-pixel region axis is readable")
+	assert_eq(rows.get_size(), sliver.get_size(), "Godot draws the whole atlas width")
+	assert_eq(rows.get_image().get_size(), Vector2i(8, 4), "all 8 columns, 4 rows")
+	var row_misses: Array = []
+	for y in 4:
+		for x in 8:
+			if not rows.get_image().get_pixel(x, y).is_equal_approx(_sheet_image().get_pixel(x, y)):
+				row_misses.append("%d,%d" % [x, y])
+	assert_eq(row_misses, [], "the whole sheet's first four rows")
 	expect_no_errors()
 
 
@@ -491,15 +533,36 @@ func test_a_compressed_or_mipmapped_sheet_reads_its_region() -> void:
 	expect_no_errors()
 
 
+## Godot reads a region that runs past the sheet as a CLIPPED image (and a
+## fully outside one as transparent), never as "unreadable": an atlas frame
+## slightly past the sheet is common after an edit. The bake must equal
+## get_image() pixel for pixel. It used to read null and the consumer drew the
+## ORIGINAL AtlasTexture, whose mesh RID is the whole sheet - the invisible
+## clipped frame became the entire atlas drawn across the bullet.
+func test_an_out_of_sheet_atlas_region_bakes_what_godot_reads() -> void:
+	var sheet := ImageTexture.create_from_image(_sheet_image())
+	for region in [Rect2(6, 6, 4, 4), Rect2(10, 10, 4, 4), Rect2(-2, -2, 4, 4), Rect2(5, 2, 0, 2), Rect2(2147483520, 0, 256, 4), Rect2(-2147483520, 0, 256, 4)]:
+		var a := _atlas(sheet, region)
+		var read := factory.debug_read_frame(a)
+		assert_not_null(read, "region %s is readable" % region)
+		assert_eq(read.get_size(), a.get_size(), "region %s: the size Godot draws it at" % region)
+		var want := a.get_image()
+		assert_eq(read.get_image().get_size(), want.get_size(), "region %s: Godot's image size" % region)
+		var misses: Array = []
+		for y in want.get_height():
+			for x in want.get_width():
+				if not read.get_image().get_pixel(x, y).is_equal_approx(want.get_pixel(x, y)):
+					misses.append("%d,%d: %s %s" % [x, y, read.get_image().get_pixel(x, y), want.get_pixel(x, y)])
+		assert_eq(misses, [], "region %s: the pixels Godot reads" % region)
+	expect_no_errors()
+
+
 func test_an_unreadable_atlas_frame_reads_null() -> void:
 	var sheet := ImageTexture.create_from_image(_sheet_image())
 	var bad := {
 		"no atlas": AtlasTexture.new(),
 		"NaN region": _atlas(sheet, Rect2(NAN, 0, 4, 4)),
 		"INF size": _atlas(sheet, Rect2(0, 0, INF, 4)),
-		"partly outside": _atlas(sheet, Rect2(6, 6, 4, 4)),
-		"negative position": _atlas(sheet, Rect2(-1, 0, 4, 4)),
-		"int overflow": _atlas(sheet, Rect2(2147483520, 0, 256, 4)),
 		"negative size": _atlas(sheet, Rect2(0, 0, -4, 4)),
 		"NaN margin": _atlas(sheet, Rect2(0, 0, 4, 4), Rect2(0, 0, NAN, 0)),
 		"empty box": _atlas(sheet, Rect2(0, 0, 4, 4), Rect2(0, 0, -4, 0)),
@@ -624,11 +687,11 @@ func test_a_frame_with_a_margin_sizes_the_quad_as_drawn() -> void:
 
 
 func test_an_unreadable_atlas_frame_draws_its_original_with_one_warning() -> void:
-	# The region is outside its atlas: nothing to bake; the frame draws as it
-	# is (its whole atlas), and the data is reported once, never per spawn.
+	# A chain too deep to read: nothing to bake; the frame draws as it is and
+	# the data is reported once, never per spawn.
 	var problems: Array = []
 	for kind in CONSUMERS:
-		var frame := _atlas(ImageTexture.create_from_image(_sheet_image()), Rect2(6, 6, 4, 4))
+		var frame := _deep_atlas()
 		var sf := _sf({"default": [frame]})
 		for shot in 2:
 			var built := await _build(kind, sf, &"")
@@ -718,10 +781,7 @@ func test_a_broken_animation_reports_once_per_sprite_frames_not_per_shot() -> vo
 		factory.spawn_volley(refused_data)
 	expect_error_sequence(["BulletVolley2D: animation 'default' frame 1 has null texture."], "a null frame: one report")
 	var unreadable := SpriteFrames.new()
-	var atlas := AtlasTexture.new()
-	atlas.atlas = _tex(4, 4)
-	atlas.region = Rect2(2, 2, 4, 4) # outside its atlas
-	unreadable.add_frame(&"default", atlas)
+	unreadable.add_frame(&"default", _deep_atlas()) # a chain too deep to read
 	var white := _volley_data(unreadable, &"")
 	white.override_frame_color = true
 	for i in 3:

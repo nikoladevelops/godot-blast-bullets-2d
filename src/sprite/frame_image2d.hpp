@@ -24,13 +24,15 @@ public:
 	static constexpr int MAX_DEPTH = 16;
 
 	// RGBA8 pixels as drawn. A plain texture: its image. An AtlasTexture: its
-	// region (rounded; a zero width or height means the atlas's whole width
-	// or height, like Godot) placed at margin.position inside a box of
-	// region.size + margin.size (transparent around it, cut at the box), its
+	// region (truncated per component like Godot's Rect2i; a zero width or
+	// height means the atlas's whole width or height; a region past the sheet
+	// is CLIPPED to it, a fully outside one reads transparent) placed at
+	// margin.position inside a box of region.size + margin.size (both
+	// truncated; a zero region axis ignores the margin's size there), its
 	// atlas read the same way when that is an AtlasTexture too. Compressed
 	// images are decompressed. Null when unreadable: no texture, atlas or
-	// image; a region that is non-finite or not fully inside its atlas; a
-	// non-finite margin or an empty or oversized box; a format that cannot be
+	// image; a region size that is non-finite or negative; a non-finite
+	// margin or an empty or oversized box; a format that cannot be
 	// decompressed; a chain deeper than MAX_DEPTH. The image is shared with
 	// later reads of this reader: copy it before changing it.
 	Ref<Image> read(const Ref<Texture2D> &tex);
