@@ -1253,7 +1253,7 @@ replayed once on resume.
   its type tag `_Sp_make_shared_tag::_S_ti()::__tag` is a GNU unique
   symbol, glibc then marks the library NODELETE, `dlclose` keeps it, its
   statics outlive Godot's StringName table and EVERY test file reports ~86
-  `Orphan StringName` leaks (diagnose with `LD_DEBUG=all ... | grep NODELETE`).
+  `Orphan StringName` leaks (diagnose with `LD_DEBUG=all ... | grep NODELETE`)). Older GCCs emit such symbols from libstdc++ itself (CI's GCC 13 did, GCC 16 does not): Linux GCC builds pass `-fno-gnu-unique` (`tools/scons_build_helpers.py`) and CI fails on any `UNIQUE` symbol in `readelf -Ws`.
 - Memory errors and undefined behavior the suites cannot see (a write into
   freed memory passes every assert; x86 hides most UB, ARM and the optimizer
   do not): `tools/run_sanitizer_tests.py` finds them with file:line and a

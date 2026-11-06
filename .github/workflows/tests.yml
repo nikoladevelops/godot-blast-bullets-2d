@@ -80,6 +80,14 @@ jobs:
           mv compile_commands.debug.json compile_commands.json
       - name: Install the plugin into the test project
         run: bash .github/scripts/install_plugin.sh
+      - name: No GNU unique symbols (they pin the library: Orphan StringName leaks)
+        run: |
+          bad=0
+          for lib in test_project/addons/blastbullets2d/bin/linux/*.so; do
+            syms=$(readelf -Ws "$lib" | awk '$5=="UNIQUE"{print $8}' | c++filt)
+            if [ -n "$syms" ]; then echo "::error::$lib has GNU unique symbols:"; echo "$syms"; bad=1; fi
+          done
+          exit $bad
       - name: Portability (MSVC / Clang only failures)
         if: matrix.build == 'debug'
         run: python3 tools/check_portability.py

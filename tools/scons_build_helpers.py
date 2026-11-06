@@ -1,3 +1,4 @@
+import sys
 import os
 from pathlib import Path
 
@@ -39,6 +40,24 @@ def setup_build_environment(env, opts) -> None:
         print("No selected build profile\n")
 
     opts.Update(env)
+    _disable_gnu_unique_symbols(env)
+
+
+def _disable_gnu_unique_symbols(env) -> None:
+    """GCC on Linux: never emit STB_GNU_UNIQUE symbols.
+
+    One unique symbol (older libstdc++ emits them for function-local statics
+    in inline templates) makes glibc mark the library NODELETE: dlclose keeps
+    it, its statics outlive Godot's StringName table and every run reports
+    Orphan StringName leaks (CI's GCC 13 did; GCC 16 emitted none). Clang
+    toolchains (macOS, iOS, Android NDK, Emscripten) never emit them.
+    """
+    from SCons.Script import ARGUMENTS
+
+    platform = ARGUMENTS.get("platform", ARGUMENTS.get("p", ""))
+    use_llvm = str(ARGUMENTS.get("use_llvm", "no")).lower() in ("yes", "true", "1")
+    if sys.platform.startswith("linux") and platform in ("", "linux") and not use_llvm:
+        env.Append(CCFLAGS=["-fno-gnu-unique"])
 
 
 def get_library_filename(env, libname: str, precision: str) -> str:
