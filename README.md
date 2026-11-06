@@ -18,7 +18,7 @@
   <img src="showcase/clips/hero.webp" alt="Godot 4 bullet hell: spiral bullet waves from a boss in the Arcane Barrage demo, made with BlastBullets2D" width="720"/>
 </p>
 
-**Contents:** [Why](#why-blastbullets2d) · [Made for](#made-for) · [See it in action](#see-it-in-action) · [Examples](#learn-from-the-examples) · [Install](#install) · [Your first boss in 5 minutes](#your-first-boss-in-5-minutes-no-code) · [Handle hits](#handle-hits) · [Recipes](#recipes) · [Spawning from code](#spawning-from-code) · [Performance](#performance) · [Limits](#limits) · [Multiplayer status](#multiplayer-status) · [Rules worth knowing](#rules-worth-knowing) · [Reference](#reference) · [Building and testing](#building-from-source-and-running-the-tests)
+**Contents:** [Why](#why-blastbullets2d) · [Made for](#made-for) · [See it in action](#see-it-in-action) · [Examples](#learn-from-the-examples) · [Install](#install) · [Your first boss in 5 minutes](#your-first-boss-in-5-minutes-no-code) · [Set up your game](#set-up-your-game) · [Handle hits](#handle-hits) · [Recipes](#recipes) · [Spawning from code](#spawning-from-code) · [Performance](#performance) · [Limits](#limits) · [Multiplayer status](#multiplayer-status) · [Rules worth knowing](#rules-worth-knowing) · [Reference](#reference) · [Building and testing](#building-from-source-and-running-the-tests)
 
 ## Why BlastBullets2D
 
@@ -60,7 +60,7 @@ Every clip and screenshot below is **Arcane Barrage**, a complete bullet-hell ga
 
 ## Learn from the examples
 
-[`test_project/examples/`](test_project/examples) holds six small scenes, each a few nodes and one short script. Open `test_project/` in Godot, open a scene and press <kbd>F6</kbd>:
+[`test_project/examples/`](test_project/examples) holds seven small scenes, each a few nodes and one short script. Open `test_project/` in Godot, open a scene and press <kbd>F6</kbd>:
 
 | Scene | Shows |
 |---|---|
@@ -70,6 +70,7 @@ Every clip and screenshot below is **Arcane Barrage**, a complete bullet-hell ga
 | `04_laser` | a charging beam that sweeps the arena |
 | `05_split` | slow orbs that burst into rings of small bullets |
 | `06_boss_phases` | a boss that changes its attack at half health, and your ship's gun hitting it |
+| `07_player_gun` | a complete small fight: a gun that fires while you hold the button, ONE hit handler on the factory with damage from custom data, a boss strafing along a `Path2D`, a bomb that clears only the boss's bullets |
 
 The rest of `test_project/` is the test lab: a scene with a sidebar to try every feature live (bullet counts, collision, pools, physics rates), and the automated test suites. Press <kbd>F2</kbd> in the test lab or in any example to open the **live inspector**: every property of the factory, the spawners, their spawn and laser data and any nested resource, edited while the game runs (a refused value keeps the old one and says so), plus a button for every argument-free method.
 
@@ -105,6 +106,43 @@ You need three things:
 > **Faster start:** select the spawner and run `apply_pattern_preset(BulletPatterns2D.PATTERN_PRESET_SPIRAL_3ARM)` from a script, or browse the presets in code completion. They set the pattern knobs for you; tune from there.
 
 Nothing appears? Look at the warning icon on the spawner node: it says what is missing. At runtime, `print($BulletSpawner2D.get_setup_warnings())` returns the same list, and the spawner's `volley_skipped(reason)` signal tells you why a shot did not fire.
+
+## Set up your game
+
+### How many factories, and where
+
+- **One `BulletFactory2D` per level scene** is the right setup for almost every game. It holds **every** bullet and laser of that level: the enemies' and the player's alike. They differ only by their collision layers and masks, never by factory.
+- **Where it sits does not matter:** bullets live in world coordinates, so moving or rotating the factory (or its parent) moves no bullet. Put it at the root of your level, in the same world as your gameplay (not inside a `CanvasLayer`).
+- **Spawners find it by themselves:** a spawner with an empty **Bullet Factory Path** fires into the first factory in its `World2D`.
+- **Add a second factory only for a second world:** a `SubViewport` with its own `World2D` (split screen, a minimap arena) needs its own factory. Two factories in the **same** world work too, but then set every spawner's **Bullet Factory Path** (an unset one warns once and picks the first). Slow motion does not need one: `factory.time_scale` slows every bullet, a spawner's `time_scale` slows one attack (its bullets follow it while `time_scale_affects_volleys` is on).
+- **Scene changes:** the factory is freed with its level and takes its bullets and pools along; the next level starts clean. Pre-warm the pools of a busy level once it loads (see [Performance](#performance)) so its first shots allocate nothing.
+
+### Which node fires what
+
+| You want | Use | Why |
+|---|---|---|
+| Enemy and boss attacks, turrets, the player's gun | **`BulletSpawner2D`** | Patterns with a live editor preview, fire rate, bursts, warnings, spin, homing, graze, sound, movement: set up in the inspector, no code |
+| Beams, bolts, curvy laser snakes | **`LaserSpawner2D`** | The same patterns and timing as `BulletSpawner2D`, firing one laser per pattern slot |
+| Bullets that fire their own patterns (fireworks, mines) | a spawner as an **emitter template** | `emitter_spawner_path` on the firing spawner: every flying bullet fires the template's whole pattern |
+| A scripted one-off (a death burst, a cutscene volley) | **`factory.spawn_volley(data)`** / **`factory.spawn_laser(...)`** | Any transforms you compute; full control from code |
+| Several attacks for one boss | one spawner per attack, **or** one spawner with `spawn_pattern_list(...)` | Separate spawners can fire together and be switched on and off; a pattern list runs a sequence of overrides on one spawner and reports `pattern_list_finished` |
+
+Share one `BulletVolleyData2D` (`.tres`) between every spawner that fires the same bullet: it is the bullet's definition. When code changes data at runtime, `duplicate()` it first, or every spawner using it changes.
+
+### The player's gun
+
+A `BulletSpawner2D` under the player, firing while a button is held. Its **Shoot Interval Sec** sets the fire rate: holding fires at once and then at that rate, and tapping faster never beats it.
+
+```gdscript
+extends Area2D
+
+@onready var gun: BulletSpawner2D = $Gun
+
+func _physics_process(_delta: float) -> void:
+	gun.shooting_enabled = Input.is_action_pressed("ui_accept")
+```
+
+Give the gun's bullets a collision mask that hits enemies only, and the enemies' bullets a mask that hits the player only. A bomb then clears exactly the dangerous ones: `factory.clear_bullets_in_circle(player.global_position, 4000.0, PLAYER_LAYER)` (bullets that can hit the player's layer). `examples/07_player_gun.tscn` shows the whole loop: hold-to-fire, one hit handler on the factory, damage from custom data, a boss strafing along a `Path2D`, and a bomb.
 
 ## Handle hits
 

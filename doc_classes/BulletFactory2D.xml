@@ -4,9 +4,10 @@
 		The heart of the BlastBullets2D plugin. Use this node to spawn bullets.
 	</brief_description>
 	<description>
-		The factory does all the work in spawning bullets and configuring other plugin related options.
-		Keep a reference of your [b]BulletFactory2D[/b] node throughout the lifetime of your game and call the functions you need.
-
+		Owns every bullet and laser of a level: pooling, movement, physics, drawing, sounds and signals. Add [b]one[/b] [BulletFactory2D] to each level scene, anywhere in it (bullets live in world coordinates, so the factory's own position does not matter), and put [BulletSpawner2D] / [LaserSpawner2D] nodes wherever things shoot: a spawner with an empty [member BulletSpawner2D.bullet_factory_path] fires into the first factory of its [World2D] by itself. Player and enemy bullets share the factory; collision layers and masks tell them apart.
+		Add a second factory only for a second world (a [SubViewport] with its own [World2D]); two factories in one world work too, but then name the factory on every spawner.
+		[b]Signals:[/b] connect the hit signals ([signal area_entered], [signal body_entered], [signal laser_hit], ...) here once to handle every bullet of the level: a spawner that has its own handler for a signal keeps those hits instead (never both). Inside a handler the bullet is still alive. Structural calls ([method reset], [code]free_*[/code], [code]populate_*[/code]) are refused inside physics handlers: use their [code]_deferred[/code] twins.
+		[b]From code:[/b] [method spawn_volley] and [method spawn_laser] fire one-off volleys and lasers; [method clear_active_bullets], [method clear_bullets_in_circle] and [method convert_all_bullets_to_pickups] are bombs; [member time_scale] is bullet time.
 		For tutorials and usage examples:
 		[url=https://www.youtube.com/@realnikich]YouTube Channel[/url]
 		[url=https://github.com/nikoladevelops/godot-blast-bullets-2d]Official Repository Of BlastBullets2D[/url]
