@@ -996,12 +996,19 @@ src/
   `free()` on an emitting object ONLY in debug builds (`Object::callp`'s lock
   check is `DEBUG_ENABLED`); an exported release game deletes it in the middle
   of the plugin's code. EVERY plugin emit goes through `emit_on2d(emitter,
-  ...)` (never a bare `emit_signal`): spawner, factory and volley keep an
-  `EmitGuardState2D`, PREDELETE refuses a free while one is emitting
-  (`cancel_free()`) and the outermost emit then `queue_free()`s it. Tests take
+  ...)` (never a bare `emit_signal`): spawner, factory, volley and laser keep
+  an `EmitGuardState2D`, PREDELETE refuses a free while one is emitting
+  (`cancel_free()`) and the outermost emit then `queue_free()`s it. The
+  laser's own guard covers the `set_visible` calls of `begin_life` /
+  `release_life` / `enter_pool_unfired` (its only self-emitted signal is
+  Godot's `visibility_changed`); `spawn_laser_span` and `laser_finished_now`
+  re-check the factory life after them, exactly like the volley twin (a
+  handler freeing the factory there used to abort the engine). Tests take
   the release path with `BulletFactory2D.debug_free_like_release(object)`
   (C++ `memdelete`, no lock check): `integration/test_release_free_matrix`
-  frees the emitter from EVERY signal of the three classes (ClassDB-driven).
+  frees the emitter from EVERY signal of the three classes (ClassDB-driven);
+  the laser's own `visibility_changed` is covered by
+  `laser/test_laser_pool_and_lifecycle`.
   The same guard covers user code the plugin runs OUTSIDE a signal where the
   caller must outlive it (`guarded_user_call2d`: the aimed target's
   `get_velocity`, a hit target's `_get` read inside the physics flush).
@@ -1142,7 +1149,8 @@ replayed once on resume.
 | `shoot_once_with` is one counted shot with pattern-list entry overrides, restored afterwards (only what it changed), never a list report | `spawner/test_spawner_pattern_lists` |
 | A speed or velocity write raises only a capped `max_speed`: 0 stays unlimited | `volley/test_volley_velocity_composition` |
 | `set_bullet_scale` keeps pose and direction and rescales the hitbox in both `rotate_only_textures` modes | `volley/test_volley_core` |
-| `apply_to_live_volleys(groups)` applies homing / graze / sound / flock / split / emitter to flying volleys; a volley armed alike is untouched (spent rings stay spent) | `spawner/test_spawner_graze`, `sound/test_sound_spawner_contract`, the flock suites, `spawner/test_spawner_emitters` |
+| A bubbled graze event revalidates its target after the owner spawner's handler: the factory never receives a Variant built from a freed target (bullet and laser dispatch), and a live target array is read by id (`live_object2d`), never through godot-cpp's Variant object operator | `laser/test_laser_spawner`, `volley/test_volley_graze_handlers` |
+| `apply_to_live_volleys(groups)` applies homing / graze / sound / flock / split / emitter to flying volleys; a volley armed alike is untouched (spent rings stay spent). The live legs walk (pointer, id) snapshots and re-check the spawner after every resource PREDELETE; `LaserSpawner2D.apply_to_live_lasers` does the same for lasers (a zone that frees the spawner mid-leg stops it) | `spawner/test_spawner_graze`, `sound/test_sound_spawner_contract`, the flock suites, `spawner/test_spawner_emitters`, `laser/test_laser_spawner` |
 | Per-bullet colors: 12-float MultiMesh format only while used, part of the pool key; colors survive every upload, the interpolation pass and a parked wake; split children wear their parent's color | `volley/test_volley_colors`, `spawner/test_spawner_colors` |
 | Per-bullet lifetimes: an own lifetime ignores the volley timer (also in an infinite volley), a handler extending it keeps the bullet, a wake after expiry restarts it | `volley/test_volley_lifetime` |
 | Scale-in grows bullets (hitbox and graze rings too) to full size exactly; graze's size bound grows with any bullet scaled after arming | `volley/test_volley_scale_in`, `volley/test_volley_graze_core` |
@@ -1162,10 +1170,12 @@ replayed once on resume.
 | A telegraph refused at the bounds retries a burst interval later (warning first); get_velocity user code that cancels the wave, burst or telegraph wins; telegraph_sec 0 with a max still warns; auto chains end at a cap or budget set mid-chain | `spawner/test_spawner_burst_telegraph`, `factory/test_factory_despawn_triggers` |
 | Movement velocity is measured over the time each step took (endpoint frames, Loop wraps); a new path or space is a jump | `spawner/test_spawner_movement` |
 | Every system that plays SpriteFrames (bullets, `play_sprite_animation`, pickups, trails, one-shots, `spawn_layer_effect`, the laser body and its five LaserSpriteLook2D slots) picks, times and draws a frame by the same rules; an AtlasTexture frame draws its region (margin box, zero region = whole atlas, nested, compressed), never its sheet | `integration/test_sprite_frames_contract` |
+| An AtlasTexture rect is TRUNCATED per component like Godot (`Rect2 -> Rect2i`): a fractional region/margin bakes the size `get_size()` draws (never a round()ed box), a region axis under 1 px is the atlas's whole axis, and a region past the sheet is CLIPPED to it (fully outside reads transparent) - never "unreadable", which fell back to drawing the WHOLE sheet across the quad | `integration/test_sprite_frames_contract` |
+| The trail soft reset (`fx_soft_reset_trail_layers`) runs a shard's `visibility_changed` handlers: every hide goes through `guarded_user_call2d` and the loop abandons its bake on `fx_trail_epoch` / death / queued (a nested `set_effect_layers` destroys the vector; ASan caught the write) | `volley/test_volley_fx_layers` |
 | `override_frame_color` toggled live keeps the animation's frame, time, paused and finished state | `volley/test_volley_fx_layers` |
 | A rejected range applies NOTHING, also through a nested all_bullets_* call (callers return on `!ensure_indexes_match_amount_bullets_range`: the emptied (0, -1) reads as the whole volley); every range method names its args `bullet_index_start` / `bullet_index_end_inclusive` | `volley/test_volley_range_contract` (state-checked sweep) |
 | Gravity setters and state resets report the velocity without the dropped fall speed at once | `volley/test_volley_velocity_composition` |
-| A laser queued for deletion is never pooled, popped, listed, counted or ticked; an ended laser no longer counts for max_live_lasers | `laser/test_laser_pool_and_lifecycle`, `laser/test_laser_spawner` |
+| A laser queued for deletion is never pooled, popped, listed, counted or ticked; an ended laser (fading included) no longer counts for max_live_lasers or appears in get_live_lasers, while teleport carry and orphan policies still reach a fading beam | `laser/test_laser_pool_and_lifecycle`, `laser/test_laser_spawner` |
 | set_anchor keeps a running sweep; an anchor outside the tree (spawn_laser, set_anchor) is ridden once it enters, without a jump; a teleport moves a beam only when its own anchor jumped | `laser/test_laser_aim_and_motion`, `laser/test_laser_spawner` |
 | end_laser from a live handler announces every phase it entered before laser_finished | `laser/test_laser_beam_phases` |
 | A spent beam and a target that left the graze list end a laser graze visit silently (like bullets) | `laser/test_laser_graze` |
@@ -1185,10 +1195,14 @@ replayed once on resume.
 | A same-value config write keeps the auto-fire latch (no re-report every frame from a script writing its config); a real change or an Array write re-arms it | `spawner/test_spawner_config_ux` (ClassDB sweep over both spawner types) |
 | The smoothing fan's off path clears only per-bullet smoothing the fan wrote (`homing_smoothing_fanned`); a script's per-bullet values survive retarget passes | `spawner/test_spawner_homing_propagation` |
 | An empty homing pool still stops live orbits when orbiting is off, in every selection mode | `spawner/test_spawner_homing_orbit` |
-| `keep_tracking_when_active` off: the beam holds its line (also when the target is gone); Lock On also holds the length it locked at (ends where the warning line ended) | `laser/test_laser_aim_and_motion` |
+| `keep_tracking_when_active` off: the beam holds its line (also when the target is gone, anchored or not) through ACTIVE **and FADING**; Lock On also holds the length it locked at (ends where the warning line ended) | `laser/test_laser_aim_and_motion` |
 | A laser Global Position target is re-picked on the retarget interval (a script may move it) | `laser/test_laser_spawner` |
 | A laser graze exit plays where its target is at the exit | `laser/test_laser_graze` |
-| A zero AtlasTexture region axis keeps its origin (Godot's `_get_region_rect` only fills the size); a region past the sheet is unreadable | `integration/test_sprite_frames_contract` |
+| A zero AtlasTexture region axis keeps its origin (Godot's `_get_region_rect` only fills the size); an out-of-sheet region is clipped like `get_image()` (fully outside = transparent), not rejected | `integration/test_sprite_frames_contract` |
+| Every public `helper_sample_outline_*` count (`transforms_amount`, `vertices`, `points`) and `helper_cross_arm_count` is bounded by the live `pattern_max_bullets()`: the samplers used to sweep 1e9 points (`points * 2` overflowed) while the generator refused the same value | `patterns/test_patterns_bullet_limit` |
+| One-shot sprite effects age on `capped_volley_delta` like bullets, lasers and timers: a raw `delta * time_scale` tick at 1e300 left `fx_clock` where adding 1/60 is a no-op, freezing every later effect on frame 0 | `factory/test_factory_world` |
+| Pool time drops the modulate ramp and the instance shader parameter dictionary/CanvasItem overrides (even after a script cleared the material); `debug_check_invariants` rejects a pooled volley holding either | `pooling/test_pool_reuse_neutrality` |
+| Live resource replacement drops old Refs whose script PREDELETE may free the owner: `graze_release` / `sound_release` / the laser's `graze_arm`/`graze_clear`/`sound_arm` run the drop under the emit guard (a free is refused+queued), and `split_arm` moves the old config/spawn-data into locals that drop after the last write. Never a write through freed memory | `volley/test_volley_crash_proof`, `laser/test_laser_pool_and_lifecycle` |
 | Every preview takes its z order from a property (`preview_z_index` / `preview_z_as_relative` on spawners, `despawn_bounds_preview_z_index`, `debugger_z_index`; defaults 4000 / 999) | `integration/test_preview_z_order` |
 | Every drawn part of a laser interpolates (body points, width, muzzle, tip, pierce and wall frames each on their own segment angle and clock); a head spent at a wall still plays its impact; laser preview arrows draw at the beam's width | `laser/test_laser_render_interpolation` |
 
@@ -2082,6 +2096,9 @@ A flying bullet fires a template spawner's whole pattern (any
 - `BulletSpawner2D.apply_to_live_volleys(LiveVolleyGroup flags)` re-applies
   homing / graze / sound / flock / split / emitter to what it already fired;
   `home_live_volleys_to`, `aim_live_volleys_at`, `set/scale_live_volleys_speed`.
+  `LaserSpawner2D.apply_to_live_lasers` re-applies graze / sound / homing to its
+  flying lasers through a (laser, id) snapshot with a spawner re-check after
+  every resource PREDELETE.
 - Per-bullet colors: `BulletVolleyData2D.use_bullet_colors` / `bullet_colors`
   (+ tile) switch the MultiMesh to 12 floats per instance (colors live in the
   batch buffer after the transform; transform passes write only their 8

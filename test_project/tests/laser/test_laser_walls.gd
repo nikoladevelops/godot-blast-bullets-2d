@@ -49,6 +49,7 @@ func test_a_beam_stops_at_the_first_wall() -> void:
 	assert_almost_eq(l.get_beam_end(0).x, 190.0, 0.01, "it ends on the wall's face")
 	assert_almost_eq(l.get_beam_length(0), 190.0, 0.01, "length up to the wall")
 	assert_eq(l.get_beam_wall_normal(0).round(), Vector2(-1, 0), "the wall's normal")
+	assert_eq(l.get_beam_wall_point(0).round(), Vector2(190, 0), "the readout names the wall point")
 	assert_eq(walls, [[1, Vector2(190, 0), Vector2(-1, 0)]], "one laser_wall_hit")
 	assert_eq(hits, [front], "the target in front is hit, the one behind the wall never")
 	_step(3)

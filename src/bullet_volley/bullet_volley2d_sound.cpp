@@ -124,12 +124,16 @@ void BulletVolley2D::sound_refresh_mask() const {
 }
 
 void BulletVolley2D::sound_release() {
-	++split_arming_serial;
-	sound_effects.clear();
-	sound_trigger_mask = 0;
-	sound_detector.reset();
-	sound_listener_group = StringName();
-	sound_volume_offset_db = 0.0f;
+	// A sound entry's script PREDELETE may free this volley while the vector
+	// drops it: guard the free (queued) so the release stays on a live object.
+	guarded_user_call2d(this, emit_guard, [&]() {
+		++split_arming_serial;
+		sound_effects.clear();
+		sound_trigger_mask = 0;
+		sound_detector.reset();
+		sound_listener_group = StringName();
+		sound_volume_offset_db = 0.0f;
+	});
 }
 
 void BulletVolley2D::sound_fire(int trigger, int bullet_index, const Vector2 &event_pos, int ring, int zone) {

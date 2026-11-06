@@ -63,6 +63,22 @@ func test_spawn_volley_returns_the_volley_or_null() -> void:
 	assert_null(refused, "a refused request returns null")
 
 
+## Runtime state readouts a game may probe: a fresh factory is idle and alive,
+## uses its World2D's physics space, and the space setter rejects an invalid
+## RID with one error while keeping the old space.
+func test_factory_runtime_state_readouts() -> void:
+	assert_false(factory.get_is_factory_busy(), "idle")
+	assert_false(factory.get_is_tearing_down(), "alive")
+	var space: RID = factory.get_physics_space()
+	assert_true(space.is_valid(), "a valid space")
+	assert_true(space == factory.get_world_2d().get_space(), "the world's space")
+	factory.set_physics_space(RID())
+	expect_error_sequence(["set_physics_space: the provided RID is invalid. Set a valid physics space before spawning (it applies to subsequently spawned bullets; already spawned areas stay in their space)."])
+	assert_true(factory.get_physics_space() == space, "the old space is kept")
+	factory.set_physics_space(space)
+	assert_true(factory.get_physics_space() == space, "a valid space is accepted")
+
+
 func test_factory_and_spawner_declare_the_same_volley_signals() -> void:
 	var spawner := make_spawner()
 	for owner_node in [factory, spawner]:

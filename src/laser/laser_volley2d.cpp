@@ -244,7 +244,16 @@ void LaserVolley2D::begin_life(BulletFactory2D *p_factory, const Ref<LaserData2D
 	prev_width = get_current_width();
 	last_tick_delta = 0.0;
 	geometry_ticked = false;
-	set_visible(true);
+	// set_visible runs this node's visibility_changed handlers (user code):
+	// a handler may free the factory or queue_free this laser. The emit
+	// guard refuses a release-build free of this node; the life check stops
+	// touching either after the handler (core/emit_guard2d.hpp).
+	const uint64_t show_self_id = get_instance_id();
+	const uint32_t show_life = life_id;
+	guarded_user_call2d(this, emit_guard, [&]() { set_visible(true); });
+	if (!alive_after_user_code(show_self_id, show_life)) {
+		return;
+	}
 	queue_redraw();
 }
 
@@ -253,44 +262,80 @@ void LaserVolley2D::release_life() {
 	pooled = true;
 	phase = PHASE_FINISHED;
 	beams.clear();
-	data.unref();
-	owner_spawner_id = 0;
-	signals_to_factory = false;
-	inherited_velocity = Vector2();
-	own_time_scale = 1.0;
-	track_detector.reset();
-	track_interval = 0.0;
-	track_time_left = 0.0;
-	anchor_id = 0;
-	following = false;
-	anchor_frame_pending = false;
-	applied_material.unref();
-	anim_body.clear();
-	for (LookLayer2D &layer : look_layers) {
-		layer.anim.clear();
-		layer.look.unref();
+	// Everything below drops external Refs and script-owned values whose
+	// PREDELETE is user code that may free this laser (or its factory). Under
+	// the emit guard a free of this laser is refused (finished with
+	// queue_free); the caller (laser_finished_now) re-checks afterwards.
+	const uint64_t release_self_id = get_instance_id();
+	guarded_user_call2d(this, emit_guard, [&]() {
+		data.unref();
+		owner_spawner_id = 0;
+		signals_to_factory = false;
+		inherited_velocity = Vector2();
+		own_time_scale = 1.0;
+		track_detector.reset();
+		track_interval = 0.0;
+		track_time_left = 0.0;
+		anchor_id = 0;
+		following = false;
+		anchor_frame_pending = false;
+		applied_material.unref();
+		anim_body.clear();
+		for (LookLayer2D &layer : look_layers) {
+			layer.anim.clear();
+			layer.look.unref();
+		}
+		configure_look_layers(); // the pooled laser keeps no look's material alive
+		clear_look_layers();
+		++graze_generation;
+		graze_zones.clear();
+		graze_detector.reset();
+		graze_target_group = StringName();
+		graze_state.clear();
+		sound_effects.clear();
+		sound_listeners.reset();
+		sound_listener_group = StringName();
+		set_material(Ref<Material>());
+		custom_data = Variant();
+		// What a script added to the node: the next owner gets a neutral laser.
+		strip_user_decorations2d(this);
+		restore_node_baseline2d(this); // a script _get runs here
+	});
+	if (ObjectDB::get_instance(ObjectID(release_self_id)) != this || is_queued_for_deletion()) {
+		return; // a dropped Ref's PREDELETE freed/queued this laser
 	}
-	configure_look_layers(); // the pooled laser keeps no look's material alive
-	clear_look_layers();
-	++graze_generation;
-	graze_zones.clear();
-	graze_detector.reset();
-	graze_target_group = StringName();
-	graze_state.clear();
-	sound_effects.clear();
-	sound_listeners.reset();
-	sound_listener_group = StringName();
-	set_material(Ref<Material>());
-	custom_data = Variant();
-	// What a script added to the node: the next owner gets a neutral laser.
-	strip_user_decorations2d(this);
-	restore_node_baseline2d(this);
-	set_visible(false);
+	// Hiding runs visibility_changed handlers (user code): guard a free of
+	// this laser and never touch it after a handler queued/freed it. The
+	// factory may be gone too; release_life below uses no factory member.
+	const uint64_t hide_self_id = get_instance_id();
+	guarded_user_call2d(this, emit_guard, [&]() { set_visible(false); });
+	if (ObjectDB::get_instance(ObjectID(hide_self_id)) != this || is_queued_for_deletion()) {
+		return;
+	}
 	queue_redraw();
 }
 
 void LaserVolley2D::_notification(int p_what) {
 	if (p_what == NOTIFICATION_PREDELETE) {
+		if (emit_guard.depth > 0 && predelete_state == PREDELETE_NONE) {
+			// Freed from a handler of its own visibility signal (a release
+			// build's free): refuse now, finish with queue_free() when the
+			// guarded call returns (the engine's emit still runs on it).
+			cancel_free();
+			emit_guard.refused_free = true;
+			return;
+		}
+		if (predelete_state == PREDELETE_RUNNING) {
+			// A free from user code inside this teardown: a second deletion
+			// would free this memory under the running one.
+			cancel_free();
+			refused_nested_free = true;
+			return;
+		}
+		if (predelete_state == PREDELETE_DONE) {
+			return; // the deferred deletion below
+		}
+		predelete_state = PREDELETE_RUNNING;
 		free_look_layers();
 		if (query_shape.is_valid()) {
 			PhysicsServer2D::get_singleton()->free_rid(query_shape);
@@ -302,6 +347,10 @@ void LaserVolley2D::_notification(int p_what) {
 			factory->laser_forget(this);
 		}
 		factory = nullptr;
+		predelete_state = PREDELETE_DONE;
+		if (refused_nested_free) {
+			queue_free();
+		}
 	}
 }
 
@@ -318,7 +367,9 @@ void LaserVolley2D::set_time_scale(double value) {
 
 void LaserVolley2D::graze_arm(const Array &zones, const std::shared_ptr<GrazeDetector2D> &detector) {
 	++graze_generation;
-	graze_zones.clear();
+	// Dropping old zone Refs runs script PREDELETE code that may free this
+	// laser: the guard refuses it (queued) so the arming stays on live memory.
+	guarded_user_call2d(this, emit_guard, [&]() { graze_zones.clear(); });
 	for (int i = 0; i < zones.size() && (int)graze_zones.size() < 4; ++i) {
 		const Ref<GrazeZone2D> zone = zones[i];
 		if (zone.is_valid()) {
@@ -365,11 +416,13 @@ void LaserVolley2D::graze_clear() {
 	if (reject_stale_handle("graze_clear")) {
 		return;
 	}
-	++graze_generation;
-	graze_zones.clear();
-	graze_detector.reset();
-	graze_target_group = StringName();
-	graze_state.clear();
+	guarded_user_call2d(this, emit_guard, [&]() {
+		++graze_generation;
+		graze_zones.clear();
+		graze_detector.reset();
+		graze_target_group = StringName();
+		graze_state.clear();
+	});
 }
 
 Array LaserVolley2D::get_graze_zones() const {
@@ -403,7 +456,9 @@ bool LaserVolley2D::sound_set_effects(const Array &effects, const Variant &liste
 }
 
 void LaserVolley2D::sound_arm(const Array &entries, const std::shared_ptr<GrazeDetector2D> &listeners, float volume_db) {
-	sound_effects.clear();
+	// A dropped entry's PREDELETE may free this laser: guard it, like the
+	// volley's sound_release.
+	guarded_user_call2d(this, emit_guard, [&]() { sound_effects.clear(); });
 	for (int i = 0; i < entries.size(); ++i) {
 		LaserSoundData2D *entry = live_object2d<LaserSoundData2D>(entries[i]);
 		if (entry != nullptr) {
@@ -1046,7 +1101,11 @@ void LaserVolley2D::enter_pool_unfired(BulletFactory2D *p_factory) {
 	active = false;
 	pooled = true;
 	phase = PHASE_FINISHED;
-	set_visible(false);
+	const uint64_t hide_self_id = get_instance_id();
+	guarded_user_call2d(this, emit_guard, [&]() { set_visible(false); });
+	if (ObjectDB::get_instance(ObjectID(hide_self_id)) != this || is_queued_for_deletion()) {
+		return;
+	}
 }
 
 Node2D *LaserVolley2D::get_anchor() const {

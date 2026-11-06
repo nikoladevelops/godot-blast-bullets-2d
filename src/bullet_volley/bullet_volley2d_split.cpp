@@ -16,15 +16,23 @@ namespace BlastBullets2D {
 // parameter would alias (BulletSpawner2D::apply_volley_split passes
 // split_shared), so the callee must own what it reads afterwards.
 void BulletVolley2D::split_arm(std::shared_ptr<SplitConfig2D> config, const Ref<BulletVolleyData2D> &spawn_data, int depth, uint64_t shot_salt) {
+	// Move the old values out first: letting the member assignment drop the
+	// last Ref to an old split chain / spawn data runs script PREDELETE code
+	// that may free this volley. The new values are written while the locals
+	// keep the old ones alive; the locals drop at function end, after the
+	// last read of `this`.
+	std::shared_ptr<SplitConfig2D> previous_config = split_config;
+	Ref<BulletVolleyData2D> previous_data = split_spawn_data;
 	split_config = config;
-	split_shot_salt = config != nullptr ? shot_salt : 0;
 	split_spawn_data = config != nullptr ? spawn_data : Ref<BulletVolleyData2D>();
+	split_shot_salt = config != nullptr ? shot_salt : 0;
 	split_depth = config != nullptr ? Math::max(0, depth) : 0;
 	// What this life already spent stays spent (the timer of a chain that
 	// fired, max_splits_per_bullet's counts): begin_life starts a life over.
 	split_timer_idle_chain = nullptr;
 	split_arming_cache.reset();
 	split_arming_cache_serial = 0;
+	// previous_data / previous_config drop here; nothing below touches `this`.
 }
 
 int BulletVolley2D::split_capture(int bullet_index, int cause, const Transform2D &pose) {

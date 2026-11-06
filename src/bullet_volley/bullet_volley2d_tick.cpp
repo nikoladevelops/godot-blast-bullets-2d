@@ -1463,8 +1463,9 @@ _ALWAYS_INLINE_ void BulletVolley2D::move_bullet_attachment(const Vector2 &trans
 	// Store the new transform as the current one
 	attachment_transforms[bullet_index] = new_attachment_transf;
 
-	// Apply immediately only if not using interpolation
-	if (bullet_factory == nullptr || !bullet_factory->use_physics_interpolation) {
+	// Apply immediately only if not using interpolation (or the factory is
+	// gone: its interpolation pass will never run again).
+	if (bullet_factory == nullptr || !factory_alive() || !bullet_factory->use_physics_interpolation) {
 		curr_attachment->set_global_transform(new_attachment_transf);
 	}
 }

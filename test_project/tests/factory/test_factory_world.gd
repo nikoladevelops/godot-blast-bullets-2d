@@ -334,6 +334,25 @@ func test_a_huge_time_scale_keeps_bullets_finite() -> void:
 	expect_no_errors("no engine error from a huge scale")
 
 
+## One-shot sprite effects age on the same capped bullet-world clock. They
+## used to get the raw delta * time_scale: one 1e300 tick moved fx_clock to
+## 1e298, where adding 1/60 is a no-op in a double, and every effect fired
+## afterwards froze on frame 0 forever.
+func test_a_huge_time_scale_does_not_freeze_later_effects() -> void:
+	var clock_before: float = float(factory.debug_get_effect_state()["clock"])
+	factory.time_scale = 1e300
+	factory.debug_advance_time(1.0 / 60.0)
+	var clock_after: float = float(factory.debug_get_effect_state()["clock"])
+	assert_lte(clock_after - clock_before, 10.0001, "the effect clock covers at most one capped bullet tick")
+	factory.time_scale = 1.0
+	var layer := H.make_effect_layer(EffectLayerData2D.EFFECT_ON_HIT, 2) # 2 frames at 10 fps = 0.2 s
+	assert_gte(factory.spawn_layer_effect(layer, Transform2D()), 0, "the effect fires")
+	assert_eq(factory.get_active_effect_count(), 1, "one live slot")
+	factory.debug_advance_time(1.0)
+	assert_eq(factory.get_active_effect_count(), 0, "the effect ages out after the huge-scale tick")
+	expect_no_errors()
+
+
 func test_time_scale_default_and_validation() -> void:
 	assert_eq(factory.time_scale, 1.0, "default is real time")
 	factory.time_scale = -1.0

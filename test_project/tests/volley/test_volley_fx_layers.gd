@@ -1066,6 +1066,28 @@ func test_volley_fades_in_out_ramp_infinite_reuse() -> void:
 	expect_errors_containing("fade_out_sec must be finite", 1, "NaN fade-out fails loud")
 
 
+## fade_base_modulate is the base the fade/ramp multiplies. With no fade and
+## no ramp the tick early-returns, so the setter applies it at once (the
+## documented path); with a ramp the next tick multiplies the new base.
+func test_fade_base_modulate_applies_immediately_without_fade() -> void:
+	var v: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 0.0, [], false))
+	var want := Color(0.5, 0.25, 0.125, 1.0)
+	v.set_fade_base_modulate(want)
+	assert_eq(v.get_fade_base_modulate(), want, "round trip")
+	assert_eq(v.self_modulate, want, "no fade/ramp: applied now")
+	await _settle(factory)
+	var ramp := Gradient.new()
+	ramp.set_color(0, Color(1, 1, 1, 1))
+	ramp.set_color(1, Color(1, 1, 1, 1))
+	var d := _fx_data(Vector2.ZERO, 0.0, [], false)
+	d.modulate_ramp = ramp
+	var r: BulletVolley2D = factory.spawn_volley(d)
+	var green := Color(0.0, 1.0, 0.0, 1.0)
+	r.set_fade_base_modulate(green)
+	await physics()
+	assert_true(r.self_modulate.g > 0.9 and r.self_modulate.r < 0.1, "the ramp multiplies the new base")
+
+
 func test_on_clear_visible_in_the_inspector_dropdown() -> void:
 	await _preamble()
 	# FX T25 On Clear visible in the inspector dropdown
@@ -1301,12 +1323,11 @@ func _atlas_frames(region: Rect2) -> SpriteFrames:
 
 func test_whiten_reads_an_atlas_region_only_inside_its_atlas() -> void:
 	# override_frame_color reads AtlasTexture frames through their region.
-	# A region that is not fully inside the atlas (non-finite, huge, partly
-	# outside, or whose end overflows an int: 2147483520 + 256) keeps the
-	# original art with the documented texts, never a silent blank frame.
-	var bad := [Rect2(2147483520, 0, 256, 4), Rect2(0, 2147483520, 4, 256), Rect2(2147483520, 0, 128, 4),
-		Rect2(NAN, 0, 4, 4), Rect2(0, 0, INF, 4), Rect2(1e12, 0, 4, 4), Rect2(-1e12, 0, 4, 4),
-		Rect2(0, 0, 1e12, 4), Rect2(2, 2, 4, 4), Rect2(-1, 0, 4, 4)]
+	# A genuinely unreadable region (non-finite, a negative size, or a box past
+	# MAX_SIDE) keeps the original art with the documented texts, never a
+	# silent blank frame. An out-of-sheet region is READABLE (Godot clips it):
+	# it must be baked, not fall back to the original whole sheet.
+	var bad := [Rect2(NAN, 0, 4, 4), Rect2(0, 0, INF, 4), Rect2(0, 0, 1e12, 4), Rect2(0, 0, -4, 4)]
 	var problems: Array = []
 	for r in bad:
 		var d := _fx_data(Vector2.ZERO, 0.0, [], false)
@@ -1326,6 +1347,17 @@ func test_whiten_reads_an_atlas_region_only_inside_its_atlas() -> void:
 		expect_warning_sequence(["EffectLayerData2D: override_frame_color could not read a frame of 'default', keeping the original art for unreadable frames."])
 		await _settle(factory)
 	assert_eq("\n".join(problems), "", "every bad region keeps the original art")
+	# Out-of-sheet regions are READABLE: Godot clips them, so the whiten path
+	# must bake the clipped pixels instead of keeping the whole-sheet original.
+	for r in [Rect2(2, 2, 4, 4), Rect2(-1, 0, 4, 4), Rect2(2147483520, 0, 4, 4)]:
+		var clipped := _fx_data(Vector2.ZERO, 0.0, [], false)
+		clipped.sprite_frames = _atlas_frames(r)
+		clipped.override_frame_color = true
+		var cv: BulletVolley2D = factory.spawn_volley(clipped)
+		assert_true(cv.get_texture() is ImageTexture, "region %s: a baked (clipped) frame" % r)
+		assert_eq(cv.get_texture().get_size(), _atlas_frames(r).get_frame_texture("default", 0).get_size(), "region %s: Godot's size" % r)
+		await _settle(factory)
+	expect_no_errors("clipping is not an error")
 	# A region inside the atlas reads exactly its pixels.
 	var dg := _fx_data(Vector2.ZERO, 0.0, [], false)
 	dg.sprite_frames = _atlas_frames(Rect2(1, 1, 2, 3))
@@ -1829,6 +1861,40 @@ func test_a_trail_handler_disabling_another_bullet_mid_tick_is_safe() -> void:
 	assert_eq(done, [true], "the handler ran and disabled a bullet mid-tick")
 	assert_false(v.is_bullet_status_enabled(2), "bullet 2 disabled")
 	assert_eq(int(v.debug_get_volley_info().get("active_bullets", -1)), 2, "two bullets stay live")
+	expect_no_errors()
+
+
+## The soft-reset fast path (same layers, same bake version) hides the trail
+## shards. A shard's visibility_changed handler may rebake the layers (a
+## nested set_effect_layers swaps fx_trail_bakes): the outer loop must abandon
+## its bake then, never write through a reference into the destroyed vector.
+## tools/run_sanitizer_tests.py runs this under AddressSanitizer (it used to
+## be a heap-use-after-free).
+func test_a_trail_visibility_handler_that_rebakes_the_layers_is_survived() -> void:
+	var layer := _make_layer(EffectLayerData2D.EFFECT_TRAIL_FOLLOW, 1)
+	var v: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 0.0, [layer]))
+	step_factory(2) # a tick writes the trail, making its shard visible
+	var shard: MultiMeshInstance2D = null
+	for c in v.get_children():
+		if c is MultiMeshInstance2D:
+			shard = c
+			break
+	assert_not_null(shard, "the trail shard exists")
+	assert_true(shard.visible, "the tick showed the trail shard")
+	var rebound := [false]
+	shard.visibility_changed.connect(func() -> void:
+		if not rebound[0] and not shard.visible and is_instance_valid(v):
+			rebound[0] = true
+			v.set_effect_layers([]))
+	# The same list and the same bake versions take the soft-reset fast path,
+	# which hides every shard (`set_visible(false)` = the handler above).
+	v.set_effect_layers(v.get_effect_layers())
+	assert_true(rebound[0], "the handler ran from the soft reset")
+	assert_eq(v.get_effect_layers().size(), 0, "the nested rebake wins")
+	assert_false(v.has_trail_effects(), "the nested clear dropped the trail")
+	var books: Dictionary = factory.debug_assert_no_dangling()
+	assert_true(books["ok"], str(books["error"]))
+	await idle(1)
 	expect_no_errors()
 
 

@@ -921,7 +921,7 @@ public:
 	// One-shot layers in the same list register at the factory instead.
 	void fx_rebuild_trail_layers(const TypedArray<EffectLayerData2D> &layers);
 	// The factory's frame textures (null without a factory: bakes build uncached).
-	FrameTextureCache2D *frame_cache() const { return bullet_factory != nullptr ? &bullet_factory->frame_cache : nullptr; }
+	FrameTextureCache2D *frame_cache() const { return bullet_factory != nullptr && factory_alive() ? &bullet_factory->frame_cache : nullptr; }
 	// Frees trail shard nodes and drops trail state (reset/teardown).
 	void fx_clear_trail_layers();
 	// Routes one trigger event for one bullet to the factory one-shot bakes.

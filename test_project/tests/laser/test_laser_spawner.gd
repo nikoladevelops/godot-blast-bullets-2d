@@ -13,6 +13,15 @@ const DT := 0.0625
 const SCENE_PATH := "user://laser_spawner_round_trip.tscn"
 
 
+## A script zone whose PREDELETE frees a node while a live-laser leg drops it.
+class HostileZone extends GrazeZone2D:
+	var target: Node
+
+	func _notification(what: int) -> void:
+		if what == NOTIFICATION_PREDELETE and is_instance_valid(target):
+			target.free()
+
+
 func _laser(active := 0.0) -> LaserData2D:
 	return H.make_laser(0.0, 0.0, active, 0.0, 200.0)
 
@@ -844,6 +853,81 @@ func test_an_ended_laser_never_counts_against_max_live_lasers() -> void:
 	assert_signal_emit_count(sp, "volley_skipped", 0, "nothing skipped")
 	step_factory(2, DT)
 	assert_eq(sp.get_live_laser_count(), 1, "one fires")
+
+
+## A fading laser is an ENDED laser: it can no longer hit, so it must not
+## hold max_live_lasers, be listed by get_live_lasers or counted. It used to
+## block the next shot with a silent over_budget skip for its whole fade.
+func test_a_fading_laser_no_longer_counts_as_live() -> void:
+	var sp := _spawner(H.make_laser(0.0, 0.0, 10.0, 2.0, 200.0), 1)
+	sp.max_live_lasers = 1
+	watch_signals(sp)
+	var l := _fire(sp)
+	assert_eq(sp.end_live_lasers(true), 1, "fade out")
+	assert_eq(l.get_phase(), LaserVolley2D.PHASE_FADING, "fading")
+	assert_eq(sp.get_live_lasers(), [], "a fading laser is not live")
+	assert_eq(sp.get_live_laser_count(), 0, "nor counted")
+	assert_true(sp.shoot_once(), "the next shot is not blocked by the fade")
+	assert_signal_emit_count(sp, "volley_skipped", 0, "nothing skipped")
+	step_factory(1, DT)
+	assert_true(is_instance_valid(l), "the fading laser still draws")
+	expect_no_errors()
+
+
+## A spawner's graze handler may free the target: the factory copy of the
+## event must be dropped, never built from a freed target Variant.
+func test_a_spawner_graze_handler_freeing_the_target_drops_the_factory_copy() -> void:
+	var target := Node2D.new()
+	target.name = "graze_victim"
+	target.position = Vector2(50, 0)
+	add(target)
+	target.add_to_group(&"laser_foes")
+	var sp := _spawner(_laser(10.0), 1)
+	sp.graze_enabled = true
+	sp.graze_zones = [H.make_graze_zone([80.0])]
+	sp.graze_node_group = &"laser_foes"
+	var freed := [false]
+	var factory_saw: Array = []
+	sp.laser_grazed.connect(func(t: Object, _l, _b, _z, _r) -> void:
+		if not freed[0] and is_instance_valid(t):
+			freed[0] = true
+			t.free())
+	factory.laser_grazed.connect(func(t: Object, _l, _b, _z, _r) -> void: factory_saw.append(t))
+	var l := _fire(sp)
+	assert_not_null(l, "fired")
+	for i in 5:
+		if freed[0]:
+			break
+		step_factory(1, DT)
+	assert_true(freed[0], "the spawner handler ran and freed the target")
+	assert_eq(factory_saw, [], "the factory never receives the freed target")
+	expect_no_errors()
+
+
+## apply_to_live_lasers arms the laser's resources: an old zone's PREDELETE
+## that frees the spawner mid-leg must stop the walk (snapshot + id checks),
+## never continue into the next laser through a freed spawner.
+func test_apply_to_live_lasers_survives_a_zone_predelete_that_frees_the_spawner() -> void:
+	var sp := _spawner(_laser(10.0), 1)
+	sp.graze_enabled = true
+	sp.graze_zones = [H.make_graze_zone([30.0])]
+	sp.graze_node_group = &"laser_foes"
+	var a := _fire(sp)
+	var b := _fire(sp)
+	assert_not_null(a, "first laser")
+	assert_not_null(b, "second laser")
+	var z := HostileZone.new()
+	z.ring_count = 1
+	z.set_ring_radius(0, 20.0)
+	z.target = sp
+	assert_true(a.graze_set_zones([z], &"laser_foes"), "the first laser holds the hostile zone")
+	z = null # the laser holds the zone's last Ref
+	sp.apply_to_live_lasers(PatternSpawner2D.LIVE_GRAZE)
+	await idle(1)
+	assert_true(is_instance_valid(factory), "the factory survives")
+	assert_false(is_instance_valid(sp), "the zone PREDELETE freed the spawner cleanly")
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "books balanced")
+	expect_no_errors()
 
 
 ## laser_target_source without a Track / Lock On aim (and the reverse) used to

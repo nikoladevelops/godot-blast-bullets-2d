@@ -187,6 +187,78 @@ func test_keep_tracking_when_active_off_freezes_the_aim() -> void:
 	assert_almost_eq(_deg(l), 90.0, 0.001, "active: the aim holds when the target is gone too")
 
 
+## keep_tracking_when_active off is about the ACTIVE phase: a following beam
+## (anchored to a spawner, the normal LaserSpawner2D case) whose target dies
+## must keep its line. It used to snap back to the anchor's pattern direction
+## because the lost-target branch was gated on `following`, not on tracking.
+func test_a_following_track_beam_holds_its_aim_when_the_target_dies() -> void:
+	var anchor := Node2D.new()
+	add(anchor)
+	var d := H.make_laser(0.125, 0.0, 0.0, 0.0, 200.0)
+	d.aim = LaserData2D.LASER_AIM_TRACK
+	d.turn_rate_degrees = 0.0
+	d.keep_tracking_when_active = false
+	var l := _fire(d, Transform2D.IDENTITY, anchor)
+	var target := Node2D.new()
+	target.position = Vector2(0, 100)
+	add(target)
+	l.set_targets([target])
+	step_factory(2, DT) # charging tracks
+	assert_almost_eq(_deg(l), 90.0, 0.001, "aimed while charging")
+	step_factory(2, DT) # active
+	assert_almost_eq(_deg(l), 90.0, 0.001, "active: the aim holds")
+	target.queue_free()
+	await idle(1)
+	step_factory(1, DT)
+	assert_almost_eq(_deg(l), 90.0, 0.001, "a lost target changes nothing, anchored or not")
+
+
+## Fading is after ACTIVE: keep_tracking_when_active off freezes the aim from
+## the moment the beam goes active, the fade included (it used to resume
+## tracking because `phase != ACTIVE` is true for FADING too).
+func test_fading_keeps_the_aim_the_active_phase_held() -> void:
+	var target := Node2D.new()
+	target.position = Vector2(0, 100)
+	add(target)
+	var d := H.make_laser(0.0, 0.0, 0.125, 1.0, 400.0)
+	d.aim = LaserData2D.LASER_AIM_TRACK
+	d.turn_rate_degrees = 0.0
+	d.keep_tracking_when_active = false
+	var l := _fire(d)
+	l.set_beam_target(0, target)
+	for i in 20:
+		step_factory(1, DT)
+		if l.get_phase() == LaserVolley2D.PHASE_FADING:
+			break
+	assert_eq(l.get_phase(), LaserVolley2D.PHASE_FADING, "reached the fade")
+	assert_almost_eq(_deg(l), 90.0, 0.001, "the active aim held")
+	target.position = Vector2(100, 0)
+	step_factory(1, DT)
+	assert_almost_eq(_deg(l), 90.0, 0.001, "fading keeps the aim it held")
+
+
+## Lock On without tracking also keeps the length it locked at through the
+## fade (a re-lock there made the beam grow/shrink while fading out).
+func test_fading_keeps_a_locked_length() -> void:
+	var target := Node2D.new()
+	target.position = Vector2(60, 80) # 100 px away
+	add(target)
+	var d := H.make_laser(0.0, 0.0, 0.125, 1.0, 400.0)
+	d.aim = LaserData2D.LASER_AIM_LOCK_ON
+	d.keep_tracking_when_active = false
+	var l := _fire(d)
+	l.set_beam_target(0, target)
+	for i in 20:
+		step_factory(1, DT)
+		if l.get_phase() == LaserVolley2D.PHASE_FADING:
+			break
+	assert_eq(l.get_phase(), LaserVolley2D.PHASE_FADING, "reached the fade")
+	assert_almost_eq(l.get_beam_length(0), 100.0, 0.01, "locked at the target")
+	target.position = Vector2(0, 300)
+	step_factory(1, DT)
+	assert_almost_eq(l.get_beam_length(0), 100.0, 0.01, "fading keeps the locked length")
+
+
 ## Lock On with keep_tracking_when_active off: "charge, lock, fire". The beam
 ## fires along the locked line AND ends where the telegraph ended (where the
 ## target stood at the lock), wherever the target moves or goes afterwards.

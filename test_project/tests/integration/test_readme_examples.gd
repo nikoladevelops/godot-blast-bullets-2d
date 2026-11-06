@@ -128,6 +128,8 @@ func test_the_emitter_example_fires_the_template_twice_per_bullet_turning() -> v
 
 func test_an_emitter_template_can_be_a_laser_spawner() -> void:
 	var lasers := _laser_spawner(LaserData2D.create_preset(LaserData2D.PRESET_INSTANT_BEAM))
+	var fired: Array = []
+	lasers.laser_fired.connect(func(l: LaserVolley2D, _n: int) -> void: fired.append(l))
 	var boss := make_spawner(H.make_volley_data(2, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 2)
 	var timing := BulletEmitterData2D.new()
 	timing.max_shots = 1
@@ -136,7 +138,7 @@ func test_an_emitter_template_can_be_a_laser_spawner() -> void:
 	boss.emitter_enabled = true
 	assert_true(boss.shoot_once(), "fires")
 	step_factory(10, DT) # the default 0.5 s interval
-	assert_eq(lasers.get_live_laser_count(), 2, "every flying bullet fired a laser")
+	assert_eq(fired.size(), 2, "every flying bullet fired a laser")
 
 
 func test_the_colors_lifetimes_and_scale_in_example() -> void:

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/emit_guard2d.hpp"
 #include "core/variant_enum_cast2d.hpp"
 #include "data/graze_zone2d.hpp"
 #include "data/laser_data2d.hpp"
@@ -37,6 +38,10 @@ class LaserVolley2D : public Node2D {
 	friend class BulletFactory2D;
 
 public:
+	// Refuses a release-build free() while this node runs its own
+	// visibility_changed handlers (core/emit_guard2d.hpp), like the volley.
+	EmitGuardState2D emit_guard;
+
 	// Serialized ids: never renumber.
 	enum LaserPhase : int {
 		PHASE_CHARGING = 0, // the warning line: no hits
@@ -319,6 +324,18 @@ protected:
 	static void _bind_methods();
 
 private:
+	// NOTIFICATION_PREDELETE progress: a free of this laser from user code
+	// inside its own visibility signal (or the factory teardown it triggers)
+	// is refused with cancel_free() instead of deleting it twice under the
+	// running emit.
+	enum PredeleteState : uint8_t {
+		PREDELETE_NONE,
+		PREDELETE_RUNNING,
+		PREDELETE_DONE,
+	};
+	PredeleteState predelete_state = PREDELETE_NONE;
+	bool refused_nested_free = false;
+
 	Ref<LaserData2D> data;
 	std::vector<Beam> beams;
 	LaserPhase phase = PHASE_CHARGING;

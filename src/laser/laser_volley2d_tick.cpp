@@ -245,7 +245,10 @@ void LaserVolley2D::update_beam_geometry(Beam &b, double delta) {
 	// Aim.
 	Vector2 target;
 	const bool has_target = target_position(b, target);
-	const bool tracking_now = phase != PHASE_ACTIVE || d->keep_tracking_when_active;
+	// Keep tracking through CHARGING/GROWING only when the switch is off:
+	// ACTIVE and FADING hold the line the beam fired with (`phase != ACTIVE`
+	// made a fading beam track again and snap back when its target died).
+	const bool tracking_now = phase < PHASE_ACTIVE || d->keep_tracking_when_active;
 	switch (d->aim) {
 		case LaserData2D::LASER_AIM_TRACK: {
 			if (has_target && tracking_now && (target - b.muzzle).length_squared() > (real_t)0.0001) {
@@ -256,7 +259,9 @@ void LaserVolley2D::update_beam_geometry(Beam &b, double delta) {
 				} else if (delta > 0.0) {
 					b.aim = turn_toward(b.aim, desired, max_step); // a zero-delta tick never turns
 				}
-			} else if (!has_target && following) {
+			} else if (!has_target && tracking_now) {
+				// Still aiming at a target that is gone (a following beam
+				// falls back to the anchor's direction while it may aim).
 				b.aim = pattern_angle;
 			}
 		} break;
@@ -349,8 +354,9 @@ void LaserVolley2D::step_head(Beam &b, double delta) {
 	}
 	if (!b.pinned) {
 		// Tracking stops on ACTIVE when keep_tracking_when_active is off: the
-		// bolt/curvy head then flies straight, like a beam that froze its aim.
-		const bool tracking_now = phase != PHASE_ACTIVE || d->keep_tracking_when_active;
+		// bolt/curvy head then flies straight, like a beam that froze its aim
+		// (and keeps flying straight through the fade).
+		const bool tracking_now = phase < PHASE_ACTIVE || d->keep_tracking_when_active;
 		Vector2 target;
 		if (tracking_now && d->aim != LaserData2D::LASER_AIM_PATTERN && target_position(b, target) && (target - b.head).length_squared() > (real_t)0.0001) {
 			const real_t desired = (real_t)(target - b.head).angle();
@@ -1147,6 +1153,16 @@ bool LaserVolley2D::update_graze(uint64_t self_id, uint32_t life) {
 			emit_on2d(owner, sig, Variant(target), this, e.beam, zone, e.ring);
 			if (!alive_after_user_code(self_id, life)) {
 				return false;
+			}
+			// The owner handler may have freed (or queued) the target: the
+			// factory gets a live Variant or no event, exactly like the
+			// bullet's graze bubble. Building a Variant from a freed pointer
+			// reads freed memory (ASan).
+			if (!graze_is_point_target2d(e.target)) {
+				target = ObjectDB::get_instance(ObjectID(e.target));
+				if (target == nullptr || target->is_queued_for_deletion()) {
+					continue;
+				}
 			}
 		}
 		factory->note_user_code();

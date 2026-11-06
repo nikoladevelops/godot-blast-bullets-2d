@@ -5,6 +5,35 @@ extends BlastTest
 ## NaN-poison a volley, siblings intact. Hostile calls must fail loud.
 
 
+## A script GrazeZone2D whose PREDELETE frees its volley while the volley is
+## dropping the zone Ref (graze_clear/graze_arm): the same owner-free hazard
+## the release path guards against.
+class HostileZone extends GrazeZone2D:
+	var target: Node
+
+	func _notification(what: int) -> void:
+		if what == NOTIFICATION_PREDELETE and is_instance_valid(target):
+			target.free()
+
+
+## Same hazard for the sound entries: sound_set_effects disarms the old list.
+class HostileSound extends BulletSoundData2D:
+	var target: Node
+
+	func _notification(what: int) -> void:
+		if what == NOTIFICATION_PREDELETE and is_instance_valid(target):
+			target.free()
+
+
+## Replacing a split chain drops the old one: its PREDELETE may free the volley.
+class HostileSplit extends BulletSplitData2D:
+	var target: Node
+
+	func _notification(what: int) -> void:
+		if what == NOTIFICATION_PREDELETE and is_instance_valid(target):
+			target.free()
+
+
 func _finite_volley(v: BulletVolley2D) -> bool:
 	for i in v.get_amount_bullets():
 		if not v.get_bullet_transform(i).is_finite() or not v.get_bullet_direction(i).is_finite() \
@@ -671,3 +700,58 @@ func test_random_laser_storm_keeps_every_invariant() -> void:
 				sp.queue_free()
 		await idle(1)
 	assert_gt(calls, 1200, "the storm made %d calls" % calls)
+
+
+## A live graze_clear/graze_arm drops the old zone Refs: a script zone's
+## PREDELETE that frees the volley must be refused (queued), never let the
+## release code continue on freed memory.
+func test_a_zone_predelete_that_frees_the_volley_is_survived() -> void:
+	var v: BulletVolley2D = factory.spawn_volley(H.make_volley_data(1, 0.0, 30.0))
+	var z := HostileZone.new()
+	z.ring_count = 1
+	z.set_ring_radius(0, 24.0)
+	z.target = v
+	assert_true(v.graze_set_zones([z], &"graze_targets"), "armed")
+	z = null # the volley holds the zone's last Ref
+	v.graze_clear()
+	await idle(1)
+	assert_true(is_instance_valid(factory), "the factory survives")
+	assert_false(is_instance_valid(v), "the refused PREDELETE free finished with queue_free")
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "books balanced")
+	expect_no_errors()
+
+
+## A sound entry's PREDELETE that frees the volley, during sound_set_effects'
+## disarm of the old list, is refused the same way.
+func test_a_sound_predelete_that_frees_the_volley_is_survived() -> void:
+	var v: BulletVolley2D = factory.spawn_volley(H.make_volley_data(1, 0.0, 30.0))
+	var s := HostileSound.new()
+	s.enabled = true
+	assert_true(v.sound_set_effects([s], &"sound_listeners"), "armed")
+	s.target = v
+	s = null # the volley holds the entry's last Ref
+	v.sound_set_effects([], &"sound_listeners") # sound_release drops it
+	await idle(1)
+	assert_true(is_instance_valid(factory), "the factory survives")
+	assert_false(is_instance_valid(v), "the refused PREDELETE free finished with queue_free")
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "books balanced")
+	expect_no_errors()
+
+
+## Replacing a split chain drops the old chain/config: a chain PREDELETE that
+## frees the volley must not be followed by writes through `this` (the old
+## order wrote split_spawn_data/depth after the drop).
+func test_a_split_chain_predelete_that_frees_the_volley_is_survived() -> void:
+	var v: BulletVolley2D = factory.spawn_volley(H.make_volley_data(1, 0.0, 30.0))
+	var data := H.make_volley_data(1, 0.0, 30.0)
+	var old := HostileSplit.new()
+	old.target = v
+	assert_true(v.split_set_data(old, data), "armed with the hostile chain")
+	old = null # the volley's config holds the chain's last Ref
+	var fresh := BulletSplitData2D.new()
+	v.split_set_data(fresh, data) # split_arm drops the old config
+	await idle(1)
+	assert_true(is_instance_valid(factory), "the factory survives")
+	assert_false(is_instance_valid(v), "the chain PREDELETE freed the volley cleanly")
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "books balanced")
+	expect_no_errors()

@@ -3,12 +3,41 @@ extends BlastTest
 ## count) and comes back with a clean life; get_active_lasers lists what
 ## fires; clear_active_lasers fades or ends them all (safe from handlers);
 ## reset() destroys every laser; a script may free a laser at any time (the
-## factory forgets it), and a handler of ANY laser signal may free the laser,
-## spawn more lasers or free the factory (queue_free, or the release way)
-## without a crash or a dangling entry.
+## factory forgets it), and a handler of ANY laser signal (or of the laser's
+## own visibility_changed, which begin_life/release_life/enter_pool_unfired
+## run) may free the laser, spawn more lasers or free the factory (queue_free,
+## or the release way) without a crash or a dangling entry.
 
 const DT := 0.0625
 const SIGNALS := ["laser_phase_changed", "laser_pierce_started", "laser_hit", "laser_pierce_ended", "laser_wall_hit", "laser_finished"]
+
+
+## A script LaserData2D whose PREDELETE frees its laser: dropping the data
+## Ref inside release_life runs user code that may delete the node under it.
+class HostileLaserData extends LaserData2D:
+	var target: Node
+
+	func _notification(what: int) -> void:
+		if what == NOTIFICATION_PREDELETE and is_instance_valid(target):
+			target.free()
+
+
+## The same owner-free hazard for a zone dropped by graze_clear/graze_arm.
+class HostileZone extends GrazeZone2D:
+	var target: Node
+
+	func _notification(what: int) -> void:
+		if what == NOTIFICATION_PREDELETE and is_instance_valid(target):
+			target.free()
+
+
+## ... and for a Variant custom-data value replaced by set_custom_data.
+class HostileData extends Resource:
+	var target: Node
+
+	func _notification(what: int) -> void:
+		if what == NOTIFICATION_PREDELETE and is_instance_valid(target):
+			target.free()
 
 
 func _busy() -> LaserData2D:
@@ -239,6 +268,138 @@ func test_a_laser_queued_by_its_finished_handler_never_comes_back() -> void:
 	await idle(1)
 	assert_true(is_instance_valid(spawned[0]) and spawned[0].is_laser_active(), "the new laser survives the deletion")
 	assert_true(factory.debug_assert_no_dangling().get("ok", false), "consistent books")
+
+
+## The laser's own visibility_changed is user code too (begin_life shows it,
+## release_life/enter_pool_unfired hide it). A handler that frees the factory
+## there must be survived like the volley twin: guarded visibility calls, no
+## use of `this` (factory or laser) after the handler, never an engine abort.
+func test_a_visibility_handler_freeing_the_factory_is_survived() -> void:
+	check_factory_after = false
+	var l := _fire(H.make_laser(0.0, 0.0, 0.0625, 0.0, 40.0))
+	assert_not_null(l, "fired")
+	var freed := [false]
+	l.visibility_changed.connect(func() -> void:
+		if not freed[0] and is_instance_valid(factory):
+			freed[0] = true
+			factory.free())
+	for i in 4:
+		if not is_instance_valid(factory):
+			break
+		step_factory(1, DT)
+	assert_true(freed[0], "the handler ran from a laser set_visible")
+	assert_false(is_instance_valid(factory), "the factory is gone")
+	await idle(1)
+	assert_false(is_instance_valid(l), "the refused laser free finished with queue_free")
+	expect_no_errors()
+
+
+## A release-build free of the LASER itself from its visibility_changed is
+## refused by its emit guard and finished with queue_free (the volley twin's
+## rule; the laser used to have no guard at all).
+func test_a_release_free_of_the_laser_from_its_visibility_signal_is_refused() -> void:
+	var l := _fire(H.make_laser(0.0, 0.0, 0.0625, 0.0, 40.0))
+	var freed := [false]
+	l.visibility_changed.connect(func() -> void:
+		if not freed[0] and is_instance_valid(l):
+			freed[0] = true
+			BulletFactory2D.debug_free_like_release(l))
+	step_factory(2, DT)
+	assert_true(freed[0], "the handler ran from the release set_visible")
+	assert_true(is_instance_valid(l), "the release free was refused")
+	assert_true(l.is_queued_for_deletion(), "and finished with queue_free")
+	await idle(1)
+	assert_false(is_instance_valid(l), "gone at the end of the frame")
+	expect_no_errors()
+
+
+## The spawn/reuse path is the second trigger: begin_life's set_visible(true)
+## runs the handler of a pooled laser; freeing the factory there must return
+## no stale laser (a LifeWatch in spawn_laser_span) and finish cleanly.
+func test_a_visibility_handler_freeing_the_factory_during_reuse_is_survived() -> void:
+	check_factory_after = false
+	var a := _fire(H.make_laser(0.0, 0.0, 0.0625, 0.0, 40.0))
+	for i in 4:
+		if not is_instance_valid(factory):
+			break
+		step_factory(1, DT)
+	assert_true(a.is_pooled(), "the first laser finished and pooled")
+	var freed := [false]
+	a.visibility_changed.connect(func() -> void:
+		if not freed[0] and is_instance_valid(factory):
+			freed[0] = true
+			factory.free())
+	var b := factory.spawn_laser(H.make_laser(0.0, 0.0, 0.5, 0.0, 40.0), [Transform2D.IDENTITY] as Array[Transform2D])
+	assert_true(freed[0], "the handler ran from begin_life's set_visible")
+	assert_null(b, "the dead factory hands out no laser")
+	assert_false(is_instance_valid(factory), "the factory is gone")
+	await idle(1)
+	assert_false(is_instance_valid(a), "the reused laser's refused free finished")
+	expect_no_errors()
+
+
+## release_life drops the laser's data/look Refs: their PREDELETE is script
+## user code that may free the laser (the volley's twin wraps those drops in
+## guarded_user_call2d and re-checks). The laser used to continue on freed
+## memory.
+func test_a_data_predelete_that_frees_the_laser_is_survived() -> void:
+	var d := HostileLaserData.new()
+	d.charge_sec = 0.0
+	d.grow_sec = 0.0
+	d.active_sec = 0.0625
+	d.fade_sec = 0.0
+	d.length = 40.0
+	var t: Array[Transform2D] = [Transform2D.IDENTITY]
+	var l := factory.spawn_laser(d, t)
+	assert_not_null(l, "fired")
+	d.target = l
+	d = null # the laser holds the data's last Ref
+	var finished := [false]
+	factory.laser_finished.connect(func(_l: LaserVolley2D) -> void: finished[0] = true)
+	for i in 4:
+		if not is_instance_valid(factory):
+			break
+		step_factory(1, DT)
+	assert_true(finished[0] or not is_instance_valid(l), "the laser finished")
+	await idle(1)
+	assert_true(is_instance_valid(factory), "the factory survives")
+	assert_false(is_instance_valid(l), "the PREDELETE free finished (refused and queued)")
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "books balanced")
+	expect_no_errors()
+
+
+## A zone's PREDELETE that frees the laser during graze_clear/graze_arm must
+## be refused (queued), never let the arming write on freed memory.
+func test_a_zone_predelete_that_frees_the_laser_is_survived() -> void:
+	var l := _fire(H.make_laser(0.0, 0.0, 10.0, 0.0, 200.0))
+	var z := HostileZone.new()
+	z.ring_count = 1
+	z.set_ring_radius(0, 24.0)
+	z.target = l
+	assert_true(l.graze_set_zones([z], &"graze_targets"), "armed")
+	z = null # the laser holds the zone's last Ref
+	l.graze_clear()
+	await idle(1)
+	assert_true(is_instance_valid(factory), "the factory survives")
+	assert_false(is_instance_valid(l), "the refused PREDELETE free finished with queue_free")
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "books balanced")
+	expect_no_errors()
+
+
+## Replacing custom_data drops the old Variant: a script value PREDELETE
+## that frees the laser must be survived.
+func test_custom_data_predelete_that_frees_the_laser_is_survived() -> void:
+	var l := _fire(H.make_laser(0.0, 0.0, 10.0, 0.0, 200.0))
+	var d := HostileData.new()
+	d.target = l
+	l.set_custom_data(d)
+	d = null # the laser holds the value's last Ref
+	l.set_custom_data(null)
+	await idle(1)
+	assert_true(is_instance_valid(factory), "the factory survives")
+	assert_false(is_instance_valid(l), "the value PREDELETE freed the laser cleanly")
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "books balanced")
+	expect_no_errors()
 
 
 ## A laser queued for deletion (a script's queue_free) is gone for the

@@ -196,7 +196,7 @@ bool LaserSpawner2D::apply_payload_override(const Variant &value) {
 
 // ---- Live lasers ----------------------------------------------------------------------------
 
-void LaserSpawner2D::collect_owned(std::vector<LaserVolley2D *> &r_out) const {
+void LaserSpawner2D::collect_owned(std::vector<LaserVolley2D *> &r_out, bool firing_only) const {
 	r_out.clear();
 	// Every factory it may own lasers in (it fired into one, was pointed at
 	// another, or adopted a laser of a third): the ones in the tree plus its
@@ -211,7 +211,7 @@ void LaserSpawner2D::collect_owned(std::vector<LaserVolley2D *> &r_out) const {
 		if (factory == nullptr || factory->get_is_tearing_down()) {
 			continue;
 		}
-		factory->collect_lasers_owned_by(get_instance_id(), found);
+		factory->collect_lasers_owned_by(get_instance_id(), found, firing_only);
 		r_out.insert(r_out.end(), found.begin(), found.end());
 	}
 }
@@ -220,7 +220,7 @@ void LaserSpawner2D::on_teleported_owned(const Vector2 &jump, bool carry) {
 	// Beams riding this spawner jump with it; with carry, every laser it
 	// fired moves too. No user code runs (geometry only).
 	std::vector<LaserVolley2D *> owned;
-	collect_owned(owned);
+	collect_owned(owned, false); // a fading beam still draws: carry it along
 	for (LaserVolley2D *laser : owned) {
 		laser->shift_with_owner(jump, carry);
 	}
@@ -366,7 +366,10 @@ void LaserSpawner2D::assign_targets(LaserVolley2D *laser, const Array &targets) 
 			Vector2 at;
 			if (t.get_type() == Variant::VECTOR2) {
 				at = t;
-			} else if (const Node2D *n = Object::cast_to<Node2D>(t)) {
+			} else if (const Node2D *n = live_object2d<Node2D>(t)) {
+				// By id, never through godot-cpp's Variant object operator: the
+				// array may be carried across a resource PREDELETE (apply_to_
+				// live_lasers) that freed a target.
 				at = n->get_global_position();
 			} else {
 				continue;
@@ -481,30 +484,72 @@ int LaserSpawner2D::apply_to_live_lasers(BitField<LiveVolleyGroup> groups) {
 	const std::shared_ptr<GrazeDetector2D> listeners = sound_on ? sound_detector_ref() : nullptr;
 	const bool retarget = groups.has_flag(LIVE_HOMING);
 	const Array targets = retarget ? live_laser_targets() : Array();
-	// No user code below: arming and targets only.
-	int changed = 0;
+	// Arming drops old user Resources (zones, sound entries): a script
+	// resource's PREDELETE may free this spawner or another laser in the
+	// snapshot. Walk (pointer, id) pairs and re-validate both after each
+	// callback, like the bullet spawner's live legs (proven under ASan).
+	const uint64_t self_id = get_instance_id();
+	const std::shared_ptr<GrazeDetector2D> graze_listener = graze_group ? graze_detector_shared() : nullptr;
+	const float volume_db = (float)sound_volume_db;
+	std::vector<std::pair<LaserVolley2D *, uint64_t>> snapshot;
+	snapshot.reserve(owned.size());
 	for (LaserVolley2D *laser : owned) {
+		snapshot.push_back({ laser, (uint64_t)laser->get_instance_id() });
+	}
+	int changed = 0;
+	for (const std::pair<LaserVolley2D *, uint64_t> &entry : snapshot) {
+		if (ObjectDB::get_instance(ObjectID(entry.second)) != (Object *)entry.first) {
+			continue; // freed by an earlier resource callback
+		}
+		LaserVolley2D *laser = entry.first;
+		if (!laser->is_laser_active() || laser->is_pooled() || laser->is_queued_for_deletion() || laser->owner_spawner_id != self_id) {
+			continue;
+		}
 		bool touched = false;
 		if (graze_group) {
 			if (graze_on) {
-				if (!laser->graze_armed_alike(zones, graze_detector_shared())) {
-					laser->graze_arm(zones, graze_detector_shared());
+				if (!laser->graze_armed_alike(zones, graze_listener)) {
+					laser->graze_arm(zones, graze_listener);
 					touched = true;
+					if (ObjectDB::get_instance(ObjectID(self_id)) != (Object *)this) {
+						return changed; // a zone PREDELETE freed this spawner
+					}
+					if (laser->is_queued_for_deletion()) {
+						continue; // refused free: it dies at frame end
+					}
 				}
 			} else if (laser->is_graze_armed()) {
 				laser->graze_clear();
 				touched = true;
+				if (ObjectDB::get_instance(ObjectID(self_id)) != (Object *)this) {
+					return changed;
+				}
+				if (laser->is_queued_for_deletion()) {
+					continue;
+				}
 			}
 		}
 		if (sound_group) {
 			if (sound_on) {
-				if (!laser->sound_armed_alike(entries, listeners, (float)sound_volume_db)) {
-					laser->sound_arm(entries, listeners, (float)sound_volume_db);
+				if (!laser->sound_armed_alike(entries, listeners, volume_db)) {
+					laser->sound_arm(entries, listeners, volume_db);
 					touched = true;
+					if (ObjectDB::get_instance(ObjectID(self_id)) != (Object *)this) {
+						return changed; // a sound PREDELETE freed this spawner
+					}
+					if (laser->is_queued_for_deletion()) {
+						continue;
+					}
 				}
 			} else if (laser->is_sound_armed()) {
 				laser->sound_arm(Array(), nullptr, 0.0f);
 				touched = true;
+				if (ObjectDB::get_instance(ObjectID(self_id)) != (Object *)this) {
+					return changed;
+				}
+				if (laser->is_queued_for_deletion()) {
+					continue;
+				}
 			}
 		}
 		if (retarget && laser_aims_at_targets2d(laser) && !laser->is_tracking()) { // a track() owns its targets
@@ -643,7 +688,7 @@ void LaserSpawner2D::on_predelete_owned(BulletFactory2D *factory) {
 		return;
 	}
 	std::vector<LaserVolley2D *> owned;
-	factory->collect_lasers_owned_by(get_instance_id(), owned);
+	factory->collect_lasers_owned_by(get_instance_id(), owned, false); // a fading beam's finish still routes
 	for (LaserVolley2D *laser : owned) {
 		switch (orphaned_lasers) {
 			case ORPHANED_LASERS_FADE_OUT:

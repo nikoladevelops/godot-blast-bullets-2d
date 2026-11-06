@@ -101,3 +101,16 @@ func test_calculate_bitmask_keeps_the_layer_contract() -> void:
 		"Invalid layer number 4294967297 in calculate_bitmask. Valid range is 1..32. Ignoring.",
 		"Invalid layer number -4294967294 in calculate_bitmask. Valid range is 1..32. Ignoring.",
 	])
+
+
+## The light mask and visibility layer have array setters too (scripts that
+## build the layer list at runtime): same helper, same bitmask in the property.
+func test_light_and_visibility_array_setters_use_the_bitmask_helper() -> void:
+	var d := BulletVolleyData2D.new()
+	d.set_light_mask_from_array([1, 32])
+	assert_eq(d.light_mask, BulletVolleyData2D.calculate_bitmask([1, 32]), "light mask")
+	d.set_visibility_layer_from_array([2, 3])
+	assert_eq(d.visibility_layer, BulletVolleyData2D.calculate_bitmask([2, 3]), "visibility layer")
+	d.set_light_mask_from_array([1, 0])
+	expect_error_sequence(["Invalid layer number 0 in calculate_bitmask. Valid range is 1..32. Ignoring."])
+	assert_eq(d.light_mask, 1, "the valid entry still lands")

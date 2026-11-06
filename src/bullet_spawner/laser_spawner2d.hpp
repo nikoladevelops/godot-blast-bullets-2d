@@ -154,7 +154,7 @@ private:
 	// What a retarget hands the live Track / Lock On lasers (None: nothing).
 	Array live_laser_targets() const;
 	void assign_targets(LaserVolley2D *laser, const Array &targets) const;
-	void collect_owned(std::vector<LaserVolley2D *> &r_out) const;
+	void collect_owned(std::vector<LaserVolley2D *> &r_out, bool firing_only = true) const;
 	void _on_laser_data_changed();
 	void connect_laser_data(bool connect);
 };

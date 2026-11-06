@@ -5,7 +5,8 @@ extends BlastTest
 ## re-arms graze, retargets, unanchors, sets custom data, edits the shared
 ## LaserData2D (a type switch, reflections, a tiny length), spawns more
 ## lasers, teleports or re-applies its spawner, queues pool and reset calls,
-## or queue_frees the laser. Contract: no error, the books balance (checked
+## or frees the laser (queue_free or the release path). Contract: no error,
+## the books balance (checked
 ## after every run), every laser finishes or fires on, nothing is left firing
 ## after the wind-down.
 
@@ -13,7 +14,7 @@ const DT := 0.0625
 const GROUP := &"laser_matrix_targets"
 const ACTIONS := ["end_fade", "end_now", "clear_all", "end_by_area", "graze_clear", "graze_rearm",
 	"retarget", "unanchor", "custom_data", "data_type", "data_reflections", "data_length",
-	"spawn_more", "teleport", "apply", "end_live", "pool_deferred", "reset_deferred", "queue_free"]
+	"spawn_more", "teleport", "apply", "end_live", "pool_deferred", "reset_deferred", "queue_free", "release_free"]
 
 var _grazer: Node2D
 
@@ -147,6 +148,9 @@ func _act(action: String, laser: LaserVolley2D, spawner: LaserSpawner2D) -> void
 			factory.free_lasers_pool_deferred()
 		"reset_deferred":
 			factory.reset_deferred()
+		"release_free":
+			if alive:
+				BulletFactory2D.debug_free_like_release(laser)
 		"queue_free":
 			if alive:
 				laser.queue_free()

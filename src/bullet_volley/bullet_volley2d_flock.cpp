@@ -26,7 +26,7 @@ bool BulletVolley2D::flock_join(const Ref<BulletFlock2D> &flock, BulletFlock2D::
 	if (reject_pooled_handle("flock_join")) {
 		return false;
 	}
-	if (bullet_factory == nullptr) {
+	if (bullet_factory == nullptr || !factory_alive()) {
 		UtilityFunctions::push_error("flock_join: this volley was never spawned by a BulletFactory2D, nothing changed.");
 		return false;
 	}

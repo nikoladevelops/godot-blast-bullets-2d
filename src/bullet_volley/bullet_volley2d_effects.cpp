@@ -173,6 +173,13 @@ bool BulletVolley2D::fx_layers_match_seeded(const TypedArray<EffectLayerData2D> 
 }
 
 void BulletVolley2D::fx_soft_reset_trail_layers() {
+	// set_visible(false) runs a shard's visibility_changed handlers (user
+	// code): a nested set_effect_layers/play_effect_animation swaps
+	// fx_trail_bakes (fx_clear_trail_layers), so the loop below must abandon
+	// its bake on a moved epoch or a freed/queued volley, never write into
+	// the destroyed vector (ASan: heap-use-after-free).
+	const uint64_t entry_epoch = fx_trail_epoch;
+	const uint64_t self_id = get_instance_id();
 	for (FXTrailBake &bake : fx_trail_bakes) {
 		for (int i = 0; i < (int)bake.bullet_shard.size(); ++i) {
 			const int shard_index = bake.bullet_shard[i];
@@ -183,7 +190,10 @@ void BulletVolley2D::fx_soft_reset_trail_layers() {
 		for (size_t s = 0; s < bake.shards.size(); ++s) {
 			MultiMeshInstance2D *node = bake.shards[s].get();
 			if (node != nullptr && s < bake.shard_visible.size() && bake.shard_visible[s]) {
-				node->set_visible(false);
+				guarded_user_call2d(this, emit_guard, [&]() { node->set_visible(false); });
+				if (fx_trail_epoch != entry_epoch || !survived_user_code(self_id) || is_queued_for_deletion()) {
+					return;
+				}
 			}
 		}
 		bake.shard_visible.assign(bake.shards.size(), 0);

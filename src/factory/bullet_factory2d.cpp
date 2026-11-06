@@ -604,7 +604,6 @@ void BulletFactory2D::native_physics_process(double delta) {
 	graze_clock += delta;
 	// The bullet world runs on its own clock (time_scale 1 is bit-identical
 	// to the engine delta); target scans (graze_clock) stay in real time.
-	const double bullet_delta = delta * time_scale;
 	// User code in the sweep (attachment callbacks, timers) may free this
 	// factory: the copy outlives it and every step after user code tests it.
 	const std::shared_ptr<bool> life = alive_flag;
@@ -624,8 +623,11 @@ void BulletFactory2D::native_physics_process(double delta) {
 		return;
 	}
 	// One-shot sprite effects age on the same clock as bullets (pausing the
-	// factory freezes both). Volley trails tick inside move_bullets instead.
-	age_fx_effects(bullet_delta);
+	// factory freezes both), capped like every other bullet-world step: an
+	// uncapped 1e300 tick poisoned fx_clock, and doubles stop advancing
+	// 1/60 s around 1e17 (every later effect froze on frame 0). Volley
+	// trails tick inside move_bullets instead.
+	age_fx_effects(capped_volley_delta(delta, time_scale));
 
 	// Timers run for every volley that holds some (parked ones included:
 	// their timers may be wake-up timers; pooled ones released theirs).

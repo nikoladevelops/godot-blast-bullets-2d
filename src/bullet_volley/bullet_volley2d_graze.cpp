@@ -130,25 +130,31 @@ void BulletVolley2D::graze_clear() {
 }
 
 void BulletVolley2D::graze_release() {
-	++split_arming_serial;
-	for (Ref<GrazeZone2D> &zone : graze_zones) {
-		zone.unref();
-	}
-	graze_zone_slots = 0;
-	graze_detector.reset();
-	graze_target_group = StringName();
-	++graze_generation;
-	graze_state.clear();
-	graze_anchor.clear();
-	graze_tick_targets = GrazeTickTargets2D();
-	for (GrazeTickZone2D &tz : graze_tick_zones) {
-		tz = GrazeTickZone2D();
-	}
-	graze_events.clear();
-	graze_tick_active = false;
-	graze_zones_with_targets = 0;
-	graze_bullet_scale = 1.0;
-	graze_events_dispatched = 0;
+	// Dropping a zone Ref runs its script PREDELETE (user code) which may
+	// free this volley. Under the emit guard that free is refused (finished
+	// with queue_free) and the loop stays on a live object (ASan: the old
+	// member range-for read freed memory after the first unref).
+	guarded_user_call2d(this, emit_guard, [&]() {
+		++split_arming_serial;
+		for (Ref<GrazeZone2D> &zone : graze_zones) {
+			zone.unref();
+		}
+		graze_zone_slots = 0;
+		graze_detector.reset();
+		graze_target_group = StringName();
+		++graze_generation;
+		graze_state.clear();
+		graze_anchor.clear();
+		graze_tick_targets = GrazeTickTargets2D();
+		for (GrazeTickZone2D &tz : graze_tick_zones) {
+			tz = GrazeTickZone2D();
+		}
+		graze_events.clear();
+		graze_tick_active = false;
+		graze_zones_with_targets = 0;
+		graze_bullet_scale = 1.0;
+		graze_events_dispatched = 0;
+	});
 }
 
 Array BulletVolley2D::get_graze_zones() const {

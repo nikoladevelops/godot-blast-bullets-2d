@@ -26,6 +26,17 @@ func test_every_readout_is_bound() -> void:
 		assert_true(factory.has_method(m), "BulletFactory2D.%s is bound" % m)
 
 
+## get_phase_time is the time spent in the current phase (scripts pacing a
+## telegraph read it): zero on a fresh laser, one tick after the first step.
+func test_get_phase_time_reports_the_time_in_the_phase() -> void:
+	var l := _fire(H.make_laser(0.125, 0.0, 0.0, 0.0, 200.0))
+	assert_eq(l.get_phase(), LaserVolley2D.PHASE_CHARGING, "charging")
+	assert_almost_eq(l.get_phase_time(), 0.0, 1e-9, "starts at zero")
+	step_factory(1, DT)
+	assert_eq(l.get_phase(), LaserVolley2D.PHASE_CHARGING, "still charging")
+	assert_almost_eq(l.get_phase_time(), DT, 1e-9, "one tick into the phase")
+
+
 func test_is_hitting_follows_the_hitting_phases() -> void:
 	var d := H.make_laser(0.125, 0.125, 0.125, 0.125) # 2 ticks each
 	d.hit_while_growing = false

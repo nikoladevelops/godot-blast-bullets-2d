@@ -126,7 +126,15 @@ LaserVolley2D *BulletFactory2D::spawn_laser_span(const Ref<LaserData2D> &data, c
 		laser_container.get()->add_child(laser);
 		all_lasers.push_back(laser);
 	}
+	// begin_life shows the laser: its visibility_changed handler may free
+	// this factory (a release-build free is refused on the laser itself by
+	// its emit guard). Never hand out a laser of a life that died there.
+	const uint64_t laser_id = (uint64_t)laser->get_instance_id();
+	const LifeWatch watch = watch_life();
 	laser->begin_life(this, data, transforms, count, owner_id, anchor_id, anchor_frame, anchor_offset.is_finite() ? anchor_offset : Vector2(), anchor_frame_pending, inherited_velocity.is_finite() ? inherited_velocity : Vector2());
+	if (watch.died() || ObjectDB::get_instance(ObjectID(laser_id)) != (Object *)laser || laser->is_queued_for_deletion()) {
+		return nullptr;
+	}
 	return laser;
 }
 
@@ -254,10 +262,19 @@ void BulletFactory2D::laser_finished_now(LaserVolley2D *laser) {
 	if (laser == nullptr || laser->pooled) {
 		return;
 	}
+	const uint64_t laser_id = (uint64_t)laser->get_instance_id();
+	const LifeWatch watch = watch_life();
+	// release_life hides the laser: its visibility_changed handlers may free
+	// this factory or queue/free the laser. No `this` or `laser` use after a
+	// handler that did (release_life itself re-checks and returns early).
 	laser->release_life();
-	if (!laser->is_queued_for_deletion()) {
-		laser_pool[laser->pool_key].push_back(laser); // a queued laser is gone at the next idle frame
+	if (watch.died()) {
+		return;
 	}
+	if (ObjectDB::get_instance(ObjectID(laser_id)) != (Object *)laser || laser->is_queued_for_deletion()) {
+		return; // gone at the next idle frame: never pooled
+	}
+	laser_pool[laser->pool_key].push_back(laser);
 }
 
 bool BulletFactory2D::tick_lasers(double delta, const bool &alive) {
@@ -383,14 +400,18 @@ int BulletFactory2D::clear_active_lasers(bool fade) {
 	return n;
 }
 
-void BulletFactory2D::collect_lasers_owned_by(uint64_t owner_id, std::vector<LaserVolley2D *> &r_out) const {
+void BulletFactory2D::collect_lasers_owned_by(uint64_t owner_id, std::vector<LaserVolley2D *> &r_out, bool firing_only) const {
 	r_out.clear();
 	for (LaserVolley2D *laser : all_lasers) {
-		// Still firing: an ended laser (finished, pooled on the next tick) is
-		// no longer its spawner's.
-		if (laser_listed(laser) && laser->owner_spawner_id == owner_id && laser->phase != LaserVolley2D::PHASE_FINISHED) {
-			r_out.push_back(laser);
+		// Still firing: a finished/pooled laser is no longer its spawner's,
+		// and a fading one no longer hits (firing_only default).
+		if (!laser_listed(laser) || laser->owner_spawner_id != owner_id || laser->phase == LaserVolley2D::PHASE_FINISHED) {
+			continue;
 		}
+		if (firing_only && laser->phase >= LaserVolley2D::PHASE_FADING) {
+			continue;
+		}
+		r_out.push_back(laser);
 	}
 }
 

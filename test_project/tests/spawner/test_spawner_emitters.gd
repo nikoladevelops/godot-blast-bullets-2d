@@ -116,6 +116,18 @@ func test_the_group_sits_after_splitting_and_gates_its_settings() -> void:
 	assert_eq(sp.get_effective_emitter().interval_sec, 0.5, "every 0.5 s")
 
 
+## get_emitter_template() is the readout a chain walk uses: the node
+## emitter_spawner_path resolves to, null for an empty or broken path.
+func test_get_emitter_template_follows_the_path() -> void:
+	var tpl := _template()
+	var sp := _emitting(tpl, _timing())
+	assert_same(sp.get_emitter_template(), tpl, "resolves the template")
+	sp.emitter_spawner_path = NodePath("")
+	assert_null(sp.get_emitter_template(), "empty path")
+	sp.emitter_spawner_path = NodePath("Missing")
+	assert_null(sp.get_emitter_template(), "unresolved path")
+
+
 # --- timing --------------------------------------------------------------------------------
 
 func test_interval_delay_stagger_and_max_shots_schedule_every_bullet() -> void:

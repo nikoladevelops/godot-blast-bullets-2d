@@ -646,8 +646,11 @@ String BulletVolley2D::debug_check_invariants() const {
 		if (!sound_effects.empty() || sound_detector != nullptr) {
 			return "pooled volley still plays sounds";
 		}
-		if (get_material().is_valid() || shared_bullets_custom_data.is_valid()) {
+		if (get_material().is_valid() || shared_bullets_custom_data.is_valid() || fade_modulate_ramp.is_valid()) {
 			return "pooled volley still holds its life's resources";
+		}
+		if (!instance_shader_parameters.is_empty()) {
+			return "pooled volley still holds shader parameter values";
 		}
 		if (!custom_timers.empty()) {
 			return "pooled volley still holds timers";

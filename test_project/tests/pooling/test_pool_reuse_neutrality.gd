@@ -257,6 +257,49 @@ func test_a_pooled_volley_keeps_no_material() -> void:
 	assert_null(reused.get_instance_shader_parameter(&"tint"), "the old life's parameter is gone")
 
 
+## The modulate ramp is a user Resource of the life: pool time drops it like
+## the material and the frames (the volley used to keep the Gradient alive).
+func test_a_pooled_volley_keeps_no_modulate_ramp() -> void:
+	var data := _plain()
+	data.modulate_ramp = Gradient.new()
+	var v: BulletVolley2D = factory.spawn_volley(data)
+	assert_not_null(v.get_modulate_ramp(), "the live life holds the ramp")
+	await idle(1)
+	factory.clear_active_bullets()
+	await idle(1)
+	assert_true(v.is_pooled(), "pooled")
+	assert_null(v.get_modulate_ramp(), "the park holds no ramp")
+	assert_eq(v.debug_check_invariants(), "", "a pooled volley passes every invariant")
+
+
+## A script may clear the material before the volley pools: the instance
+## shader parameter values still belong to the finished life and must be
+## released (they used to survive because the clear was tied to a live
+## material).
+func test_a_pooled_volley_drops_shader_parameters_after_the_material_was_cleared() -> void:
+	var data := _plain()
+	var shader := Shader.new()
+	shader.code = "shader_type canvas_item;" # an undeclared parameter still stores its RID
+	var mat := ShaderMaterial.new()
+	mat.shader = shader
+	var tex := ImageTexture.create_from_image(Image.create_empty(2, 2, false, Image.FORMAT_RGBA8))
+	data.material = mat
+	data.instance_shader_parameters = {"tex": tex}
+	var v: BulletVolley2D = factory.spawn_volley(data)
+	var ref: WeakRef = weakref(tex)
+	v.material = null # the life's material is gone before the pool
+	data.material = null
+	data.instance_shader_parameters = {}
+	mat = null
+	tex = null
+	await idle(1)
+	factory.clear_active_bullets()
+	await idle(1)
+	assert_true(v.is_pooled(), "pooled")
+	assert_null(ref.get_ref(), "the pool released the shader parameter value")
+	assert_eq(v.debug_check_invariants(), "", "a pooled volley passes every invariant")
+
+
 # ---- Runtime-only knobs and node decorations (property sweep) ----
 
 const SWEEP_N := 3

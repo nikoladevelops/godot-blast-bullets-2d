@@ -314,6 +314,7 @@ void BulletVolley2D::release_life() {
 		}
 		anim_source.unref();
 		anim.clear();
+		fade_modulate_ramp.unref(); // the life's Gradient (a pooled volley retains nothing)
 		anim_name = StringName("default"); // a frameless next life reads like a cold volley
 		set_texture(Ref<Texture2D>());
 		if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
@@ -321,11 +322,13 @@ void BulletVolley2D::release_life() {
 		}
 		// The material (and its instance parameter values, which may hold
 		// textures) belongs to the spawn data: the next life sets its own.
+		// Clear the CanvasItem overrides even when a script already dropped
+		// the material: they still reference the values on their own.
+		clear_applied_instance_shader_overrides();
 		if (get_material().is_valid()) {
-			clear_applied_instance_shader_overrides();
-			instance_shader_parameters.clear();
 			set_material(Ref<Material>());
 		}
+		instance_shader_parameters.clear();
 		if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
 			return; // the material's PREDELETE freed this volley
 		}
