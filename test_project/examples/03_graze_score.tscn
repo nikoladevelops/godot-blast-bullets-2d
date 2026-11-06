@@ -141,7 +141,7 @@ offset_right = 16.0
 offset_bottom = 612.0
 theme = ExtResource("8_plitv")
 theme_override_font_sizes/font_size = 15
-text = "WASD/arrows move, Space/left click fire, 1-4 weapons. Brush past bullets without touching them: the closer, the more points."
+text = "Brush past bullets without touching them: the closer, the more points."
 
 [node name="Score" type="Label" parent="." unique_id=1919261330]
 offset_left = 16.0

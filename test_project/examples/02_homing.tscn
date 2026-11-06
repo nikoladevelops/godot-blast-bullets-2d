@@ -136,7 +136,7 @@ offset_right = 16.0
 offset_bottom = 612.0
 theme = ExtResource("8_mi6ic")
 theme_override_font_sizes/font_size = 15
-text = "WASD/arrows move, Space/left click fire, 1-4 weapons. Hold the RIGHT mouse button: the turret's flying bullets chase the cursor."
+text = "Hold the RIGHT mouse button: the turret's flying bullets chase the cursor."
 
 [node name="Turret" type="Node2D" parent="." unique_id=904323181]
 script = ExtResource("turret_script")

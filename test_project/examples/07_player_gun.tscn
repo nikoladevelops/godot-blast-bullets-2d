@@ -266,16 +266,7 @@ offset_right = 16.0
 offset_bottom = 612.0
 theme = ExtResource("18_4lwwh")
 theme_override_font_sizes/font_size = 15
-text = "WASD/arrows move, Space/left click fire, 1-4 weapons. B: bomb (clears the boss's bullets)."
-
-[node name="HP" type="Label" parent="." unique_id=58907721]
-offset_left = 16.0
-offset_top = 12.0
-offset_right = 16.0
-offset_bottom = 12.0
-theme = ExtResource("18_4lwwh")
-theme_override_font_sizes/font_size = 24
-text = "Boss HP: 60    Your HP: 10"
+text = "B: bomb (clears the boss's bullets)."
 
 [node name="StrafePath" type="Path2D" parent="." unique_id=1931165790]
 curve = SubResource("Curve2D_strafe")

@@ -14,7 +14,8 @@ const WEAPON_NAMES := ["Rapid", "Spread", "Homing", "Nova"]
 var weapon := 0
 var gun: BulletSpawner2D
 var _base_data: BulletVolleyData2D
-var _label: Label
+## The weapon bar and health bars (examples/common/example_hud.gd).
+var hud: CanvasLayer
 
 
 func _ready() -> void:
@@ -23,11 +24,10 @@ func _ready() -> void:
 		gun = _build_gun()
 	gun.shooting_enabled = false # fires only while the button is held
 	_base_data = gun.spawn_data
-	_label = Label.new()
-	_label.position = Vector2(16, 44)
-	_label.add_theme_font_size_override("font_size", 15)
-	get_parent().add_child.call_deferred(_label)
-	select_weapon(0)
+	hud = preload("res://examples/common/example_hud.gd").new()
+	hud.build(WEAPON_NAMES)
+	get_parent().add_child.call_deferred(hud)
+	select_weapon(0, false)
 
 
 func _physics_process(delta: float) -> void:
@@ -49,7 +49,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 ## Rebuilds the gun as one of the four weapons. Each copies the base spawn
 ## data (so damage and collision stay), then changes speed and pattern.
-func select_weapon(slot: int) -> void:
+func select_weapon(slot: int, announce := true) -> void:
 	weapon = clampi(slot, 0, WEAPON_NAMES.size() - 1)
 	var data: BulletVolleyData2D = _base_data.duplicate()
 	var bullet_speed := BulletSpeedData2D.new()
@@ -89,8 +89,7 @@ func select_weapon(slot: int) -> void:
 	data.shared_bullet_speed_data = bullet_speed
 	data.all_bullet_speed_data = []
 	gun.spawn_data = data
-	if _label != null:
-		_label.text = "Weapon %d/4: %s   (1-4 to switch)" % [weapon + 1, WEAPON_NAMES[weapon]]
+	hud.select(weapon, announce)
 
 
 func hit() -> void:

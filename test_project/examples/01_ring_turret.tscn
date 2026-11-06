@@ -136,7 +136,7 @@ offset_right = 16.0
 offset_bottom = 612.0
 theme = ExtResource("8_od5f0")
 theme_override_font_sizes/font_size = 15
-text = "WASD/arrows move, Space/left click fire, 1-4 weapons. Turret/Spawner: pattern Ring (16 bullets), Spin 50 deg/s."
+text = "Turret/Spawner: pattern Ring (16 bullets), Spin 50 deg/s."
 
 [node name="Turret" type="Node2D" parent="." unique_id=1784550933]
 script = ExtResource("turret_script")

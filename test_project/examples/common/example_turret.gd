@@ -1,16 +1,15 @@
 extends Node2D
 ## The examples' enemy turret: the barrel and the spawner turn toward the
 ## player (so aimed fans really aim), and your shots spark on its hurtbox.
-## The barrel art and the spawner's fan point down at rest (rotation 0).
 
 @export var turn_speed_degrees := 220.0
-const REST_AIM := PI / 2 # down: where the barrel and the fan point at rest
+## The barrel art points right (+x, Godot's forward); the spawner's fan
+## points down (+y) in its own space. Both turn to the same global aim.
+const FAN_FORWARD := PI / 2
 
-var _aim := 0.0
+var _aim := PI / 2 # global angle the turret points at: down at the start
 @onready var _barrel: Node2D = $EnemyTurret
 @onready var _spawner: Node2D = $Spawner
-@onready var _barrel_rest: float = _barrel.rotation
-@onready var _spawner_rest: float = _spawner.rotation
 
 
 func _ready() -> void:
@@ -32,12 +31,11 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	var player := get_tree().get_first_node_in_group(&"player") as Node2D
-	if player == null:
-		return
-	var wanted := (player.global_position - global_position).angle() - REST_AIM
-	_aim = rotate_toward(_aim, wanted, deg_to_rad(turn_speed_degrees) * delta)
-	_barrel.rotation = _barrel_rest + _aim
-	_spawner.rotation = _spawner_rest + _aim
+	if player != null:
+		var wanted := (player.global_position - global_position).angle()
+		_aim = rotate_toward(_aim, wanted, deg_to_rad(turn_speed_degrees) * delta)
+	_barrel.global_rotation = _aim # the barrel's +x points at the player
+	_spawner.global_rotation = _aim - FAN_FORWARD # the fan's +y too
 
 
 ## The player's shots reach the factory (the gun has no handler of its own).

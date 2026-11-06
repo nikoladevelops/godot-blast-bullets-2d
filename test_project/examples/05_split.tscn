@@ -117,7 +117,7 @@ offset_right = 16.0
 offset_bottom = 612.0
 theme = ExtResource("8_rku4y")
 theme_override_font_sizes/font_size = 15
-text = "WASD/arrows move, Space/left click fire, 1-4 weapons. Each slow orb bursts into a ring of eight after 0.9 s."
+text = "Each slow orb bursts into a ring of eight after 0.9 s."
 
 [node name="Bursts" type="Label" parent="." unique_id=430766447]
 offset_left = 16.0

@@ -16,13 +16,18 @@ func _ready() -> void:
 	$Boss.add_to_group(&"enemy") # the Homing weapon hunts this group
 	$Player/Gun.area_entered.connect(_on_player_shot_hit)
 	attack.area_entered.connect(func(target: Object, _v, _b): if target == $Player: $Player.hit())
+	_show_hp.call_deferred() # the HUD joins the tree a frame after the player
+
+
+func _show_hp() -> void:
+	$Player.hud.set_health("boss", "BOSS", hp, 120, Color(1.0, 0.3, 0.45))
 
 
 func _on_player_shot_hit(target: Object, volley: BulletVolley2D, bullet: int) -> void:
 	if target != $Boss or hp <= 0:
 		return
 	hp -= 1
-	$HP.text = "Boss HP: %d" % hp
+	_show_hp()
 	FX.hit_spark(factory, volley.get_bullet_transform(bullet).origin)
 	$Boss/Ship.modulate = Color(2.2, 1.4, 1.4)
 	create_tween().tween_property($Boss/Ship, "modulate", Color.WHITE, 0.12)

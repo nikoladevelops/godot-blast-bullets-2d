@@ -126,18 +126,24 @@ func test_the_player_moves_with_wasd_switches_weapons_and_fires() -> void:
 	await idle(2)
 
 
+## The barrel art points along +x (measured from turret_gun.png): its global
+## +x axis must point at the player, and so must the shots the spawner fires.
 func test_the_turret_faces_the_player_and_sparks_when_hit() -> void:
 	var scene := await _play("res://examples/02_homing.tscn")
 	var turret: Node2D = scene.get_node("Turret")
+	var spawner: BulletSpawner2D = turret.get_node("Spawner")
 	var player: Area2D = scene.get_node("Player")
 	var example_factory: BulletFactory2D = scene.get_node("BulletFactory2D")
-	for x in [200.0, 950.0]: # far left, then far right of the turret
-		player.global_position = Vector2(x, 500)
+	for spot in [Vector2(200, 500), Vector2(950, 500), Vector2(576, 600), Vector2(1000, 160)]:
+		player.global_position = spot
 		await physics(90) # the turn rate needs under a second
-		var to_player: float = (player.global_position - turret.global_position).angle()
-		var aim: float = turret.get_node("Spawner").global_rotation + PI / 2 # the fan points down at rest
-		assert_almost_eq(angle_difference(aim, to_player), 0.0, 0.05, "the spawner aims at the player at x=%d" % x)
-		assert_almost_eq(angle_difference(turret.get_node("EnemyTurret").global_rotation - PI + PI / 2, to_player), 0.0, 0.05, "the barrel too")
+		var to_player: Vector2 = (player.global_position - turret.global_position).normalized()
+		var barrel_forward: Vector2 = (turret.get_node("EnemyTurret") as Node2D).global_transform.x.normalized()
+		assert_gt(barrel_forward.dot(to_player), 0.995, "the barrel points at the player at %s" % spot)
+		var shots := Vector2.ZERO
+		for t: Transform2D in spawner.collect_spawn_transforms():
+			shots += t.x.normalized()
+		assert_gt(shots.normalized().dot(to_player), 0.995, "the fan is centred on the player at %s" % spot)
 	# Fire straight up into the turret: the hurtbox sparks.
 	player.global_position = Vector2(turret.global_position.x, 500)
 	_key(KEY_1, true)
@@ -152,6 +158,66 @@ func test_the_turret_faces_the_player_and_sparks_when_hit() -> void:
 			break
 	_key(KEY_SPACE, false)
 	assert_true(sparked, "a shot on the turret sparks")
+	scene.queue_free()
+	await idle(2)
+
+
+func test_the_strafing_boss_explodes_where_it_dies() -> void:
+	var scene := await _play("res://examples/07_player_gun.tscn")
+	var example_factory: BulletFactory2D = scene.get_node("BulletFactory2D")
+	var boss: BulletSpawner2D = scene.get_node("Boss")
+	await physics(120) # let it strafe away from the path's start
+	var start: Vector2 = boss.get_parent().get_node("StrafePath").curve.get_point_position(0)
+	example_factory.debug_set_effect_log_enabled(true)
+	scene.boss_hp = 1
+	var died_at := Vector2.INF
+	scene.get_node("Player").global_position = Vector2(boss.global_position.x, 540)
+	_key(KEY_SPACE, true)
+	for i in 300:
+		scene.get_node("Player").global_position.x = boss.global_position.x # follow it
+		await physics(1)
+		if scene.boss_hp == 0:
+			died_at = boss.global_position
+			break
+	_key(KEY_SPACE, false)
+	assert_eq(scene.boss_hp, 0, "the boss went down")
+	assert_gt(died_at.distance_to(start), 50.0, "it died away from the path's start")
+	# The chain plays over ~1 s: collect every live explosion's pose meanwhile.
+	var seen := {}
+	for i in 80:
+		await physics(1)
+		for bake: Dictionary in example_factory.debug_get_effect_state()["manual"]:
+			for slot: Dictionary in bake["live_slots"]:
+				var pose: Transform2D = slot["fixed"]
+				seen["%s:%s" % [bake["layer"], slot["slot"]] + str(pose.origin)] = pose
+	var near := 0
+	var biggest := 0.0
+	for pose: Transform2D in seen.values():
+		assert_lt(pose.origin.distance_to(died_at), 160.0, "every blast goes off where the boss died, not at %s" % pose.origin)
+		near += 1
+		biggest = maxf(biggest, pose.get_scale().x)
+	assert_gt(near, 6, "a chain of blasts")
+	assert_gt(biggest, 1.5, "ending in a big one (the 2.2x layer copy)")
+	scene.queue_free()
+	await idle(2)
+
+
+func test_the_hud_shows_the_weapons_and_health() -> void:
+	var scene := await _play("res://examples/07_player_gun.tscn")
+	await idle(2)
+	var hud: CanvasLayer = scene.get_node("Player").hud
+	assert_true(hud.is_inside_tree(), "the HUD is in the scene")
+	assert_eq(hud._slots.size(), 4, "one slot per weapon")
+	for slot in 4:
+		_key([KEY_1, KEY_2, KEY_3, KEY_4][slot], true)
+		await idle(1)
+		_key([KEY_1, KEY_2, KEY_3, KEY_4][slot], false)
+		for i in 4:
+			assert_eq((hud._slots[i].get_child(0).get_child(0)).active, i == slot, "slot %d lit only when selected (picked %d)" % [i, slot])
+		assert_eq(hud._banner.text, (["RAPID", "SPREAD", "HOMING", "NOVA"] as Array)[slot], "the banner names the pick")
+	await physics(20)
+	assert_almost_eq(hud.health_value("boss"), 60.0, 0.01, "the boss bar starts full")
+	assert_almost_eq(hud.health_value("player"), 10.0, 0.01, "the player bar too")
 	scene.queue_free()
 	await idle(2)
 

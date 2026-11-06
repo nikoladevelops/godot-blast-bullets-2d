@@ -248,16 +248,7 @@ offset_right = 16.0
 offset_bottom = 612.0
 theme = ExtResource("18_4lwwh")
 theme_override_font_sizes/font_size = 15
-text = "WASD/arrows move, Space/left click fire, 1-4 weapons. Halve the boss's health to see phase two."
-
-[node name="HP" type="Label" parent="." unique_id=58907721]
-offset_left = 16.0
-offset_top = 12.0
-offset_right = 16.0
-offset_bottom = 12.0
-theme = ExtResource("18_4lwwh")
-theme_override_font_sizes/font_size = 24
-text = "Boss HP: 120"
+text = "Halve the boss's health to see phase two."
 
 [node name="Boss" type="Area2D" parent="." unique_id=1931165780]
 position = Vector2(576, 150)

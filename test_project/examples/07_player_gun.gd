@@ -22,7 +22,7 @@ var player_hp := 10
 func _ready() -> void:
 	boss.add_to_group(&"enemy") # the Homing weapon hunts this group
 	factory.area_entered.connect(_on_bullet_hit)
-	_update_labels()
+	_update_labels.call_deferred() # the HUD joins the tree a frame after the player
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -45,10 +45,11 @@ func _on_bullet_hit(target: Object, volley: BulletVolley2D, bullet_index: int) -
 		$Boss/Ship.modulate = Color(2.2, 1.4, 1.4)
 		create_tween().tween_property($Boss/Ship, "modulate", Color.WHITE, 0.12)
 		if boss_hp == 0:
+			var at := boss.global_position # where it dies (read before anything moves it)
 			boss.shooting_enabled = false
-			boss.movement_stop()
+			boss.movement_stop(false) # stop in place: the default resets it to the path's start
 			bomb() # its bullets go with it
-			FX.boss_death(factory, boss.global_position, 70.0)
+			FX.boss_death(factory, at, 70.0)
 			boss.hide()
 			$Boss/Hurtbox.set_deferred("monitorable", false)
 	elif target == $Player and player_hp > 0:
@@ -71,4 +72,5 @@ func _bullet_damage(volley: BulletVolley2D, bullet_index: int) -> int:
 
 
 func _update_labels() -> void:
-	$HP.text = "Boss HP: %d    Your HP: %d" % [boss_hp, player_hp]
+	$Player.hud.set_health("boss", "BOSS", boss_hp, 60, Color(1.0, 0.3, 0.45))
+	$Player.hud.set_health("player", "YOU", player_hp, 10, Color(0.3, 0.9, 1.0))

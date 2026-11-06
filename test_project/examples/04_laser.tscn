@@ -115,7 +115,7 @@ offset_right = 16.0
 offset_bottom = 612.0
 theme = ExtResource("8_o047x")
 theme_override_font_sizes/font_size = 15
-text = "WASD/arrows move, Space/left click fire, 1-4 weapons. The beam charges (thin line), then sweeps: stay out of it."
+text = "The beam charges (thin line), then sweeps: stay out of it."
 
 [node name="Emitter" type="Node2D" parent="." unique_id=1582113926]
 position = Vector2(576, 110)
