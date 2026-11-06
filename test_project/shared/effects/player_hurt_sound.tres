@@ -1,0 +1,14 @@
+[gd_resource type="BulletSoundData2D" format=3]
+
+[ext_resource type="AudioStream" path="res://shared/sound/player_hurt_01.wav" id="1_s"]
+[ext_resource type="AudioStream" path="res://shared/sound/player_hurt_02.wav" id="2_s"]
+[ext_resource type="AudioStream" path="res://shared/sound/player_hurt_03.wav" id="3_s"]
+[ext_resource type="AudioStream" path="res://shared/sound/player_hurt_04.wav" id="4_s"]
+
+[resource]
+trigger = 1
+volume_db = -3.0
+streams = [ExtResource("1_s"), ExtResource("2_s"), ExtResource("3_s"), ExtResource("4_s")]
+stream_mode = 3
+random_pitch = 1.06
+random_volume_offset_db = 1.5

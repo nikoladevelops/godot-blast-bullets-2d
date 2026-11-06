@@ -8,13 +8,18 @@ const EXPLOSION := preload("res://shared/effects/explosion_effect.tres")
 ## spawn_layer_effect takes the position and rotation of its pose, never its
 ## scale: a bigger blast is a copy of the layer with a larger scale.
 static var _sized := {}
-const HIT_SOUND := preload("res://shared/effects/hit_sound.tres")
+const HIT_SOUND := preload("res://shared/effects/hit_sound.tres") # a shot lands on an enemy
+const PLAYER_HURT_SOUND := preload("res://shared/effects/player_hurt_sound.tres") # an enemy shot lands on the player
 const EXPLOSION_SOUND := preload("res://shared/effects/explosion_sound.tres")
 
 
 static func hit_spark(factory: BulletFactory2D, at: Vector2) -> void:
 	factory.spawn_layer_effect(HIT_SPARK, Transform2D(randf() * TAU, at))
 	factory.play_sound(HIT_SOUND, at)
+
+
+static func player_hurt(factory: BulletFactory2D, at: Vector2) -> void:
+	factory.play_sound(PLAYER_HURT_SOUND, at)
 
 
 static func explosion(factory: BulletFactory2D, at: Vector2, size := 1.0) -> void:

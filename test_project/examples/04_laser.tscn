@@ -110,13 +110,15 @@ shape = SubResource("CircleShape2D_xcrcj")
 
 [node name="Tip" type="Label" parent="." unique_id=1890315135]
 offset_left = 16.0
-offset_top = 612.0
-offset_right = 16.0
-offset_bottom = 612.0
+offset_top = 548.0
+offset_right = 330.0
+offset_bottom = 636.0
 theme = ExtResource("8_o047x")
 theme_override_font_sizes/font_size = 15
 text = "The beam charges (thin line), then sweeps: stay out of it."
 
+autowrap_mode = 3
+vertical_alignment = 2
 [node name="Emitter" type="Node2D" parent="." unique_id=1582113926]
 position = Vector2(576, 110)
 

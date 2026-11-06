@@ -136,13 +136,15 @@ shape = SubResource("CircleShape2D_vthb6")
 
 [node name="Tip" type="Label" parent="." unique_id=2036762702]
 offset_left = 16.0
-offset_top = 612.0
-offset_right = 16.0
-offset_bottom = 612.0
+offset_top = 548.0
+offset_right = 330.0
+offset_bottom = 636.0
 theme = ExtResource("8_plitv")
 theme_override_font_sizes/font_size = 15
 text = "Brush past bullets without touching them: the closer, the more points."
 
+autowrap_mode = 3
+vertical_alignment = 2
 [node name="Score" type="Label" parent="." unique_id=1919261330]
 offset_left = 16.0
 offset_top = 12.0

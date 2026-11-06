@@ -10,7 +10,7 @@
 [ext_resource type="PackedScene" uid="uid://cjrcvxa7bnus" path="res://shared/enemies/enemy_turret/enemy_turret.tscn" id="7_n3lca"]
 [ext_resource type="PackedScene" uid="uid://3dxd6rfhxqym" path="res://shared/enemies/enemy_ship/enemy_ship.tscn" id="8_yyku6"]
 [ext_resource type="PackedScene" uid="uid://bqi8tdtf1dh4n" path="res://shared/moving_target.tscn" id="10_nkrfg"]
-[ext_resource type="AudioStream" uid="uid://o63fjokh33ki" path="res://shared/sound/hit.wav" id="13_jbfhk"]
+[ext_resource type="AudioStream" path="res://shared/sound/player_hurt_01.wav" id="13_jbfhk"]
 [ext_resource type="Texture2D" path="res://shared/art/player_bullets/rocket_01.png" id="art_rocket_01"]
 [ext_resource type="Texture2D" path="res://shared/art/player_bullets/rocket_02.png" id="art_rocket_02"]
 [ext_resource type="Texture2D" path="res://shared/art/player_bullets/rocket_03.png" id="art_rocket_03"]
@@ -44,14 +44,14 @@
 [ext_resource type="Texture2D" path="res://shared/art/effects/hit_spark_08.png" id="fx_hit_spark_08"]
 [ext_resource type="AudioStream" path="res://shared/sound/laser_fire.wav" id="snd_laser_fire"]
 [ext_resource type="PackedScene" path="res://shared/live_inspector/live_inspector.tscn" id="live_inspector"]
-[ext_resource type="AudioStream" path="res://shared/sound/hit_01.wav" id="snd_hit_01"]
-[ext_resource type="AudioStream" path="res://shared/sound/hit_02.wav" id="snd_hit_02"]
-[ext_resource type="AudioStream" path="res://shared/sound/hit_03.wav" id="snd_hit_03"]
-[ext_resource type="AudioStream" path="res://shared/sound/hit_04.wav" id="snd_hit_04"]
-[ext_resource type="AudioStream" path="res://shared/sound/hit_05.wav" id="snd_hit_05"]
-[ext_resource type="AudioStream" path="res://shared/sound/hit_06.wav" id="snd_hit_06"]
-[ext_resource type="AudioStream" path="res://shared/sound/hit_07.wav" id="snd_hit_07"]
-[ext_resource type="AudioStream" path="res://shared/sound/hit_08.wav" id="snd_hit_08"]
+[ext_resource type="AudioStream" path="res://shared/sound/enemy_hit_01.wav" id="snd_hit_01"]
+[ext_resource type="AudioStream" path="res://shared/sound/enemy_hit_02.wav" id="snd_hit_02"]
+[ext_resource type="AudioStream" path="res://shared/sound/enemy_hit_03.wav" id="snd_hit_03"]
+[ext_resource type="AudioStream" path="res://shared/sound/enemy_hit_04.wav" id="snd_hit_04"]
+[ext_resource type="AudioStream" path="res://shared/sound/player_hurt_01.wav" id="snd_hit_05"]
+[ext_resource type="AudioStream" path="res://shared/sound/player_hurt_02.wav" id="snd_hit_06"]
+[ext_resource type="AudioStream" path="res://shared/sound/player_hurt_03.wav" id="snd_hit_07"]
+[ext_resource type="AudioStream" path="res://shared/sound/player_hurt_04.wav" id="snd_hit_08"]
 [ext_resource type="AudioStream" path="res://shared/sound/laser_fire_01.wav" id="snd_laser_fire_01"]
 [ext_resource type="AudioStream" path="res://shared/sound/laser_fire_02.wav" id="snd_laser_fire_02"]
 [ext_resource type="AudioStream" path="res://shared/sound/laser_fire_03.wav" id="snd_laser_fire_03"]
@@ -271,20 +271,16 @@ inherit_bullet_velocity = true
 
 [sub_resource type="BulletSoundData2D" id="BulletSoundData2D_0yymp"]
 trigger = 2
-streams = [ExtResource("snd_hit_01"), ExtResource("snd_hit_02"), ExtResource("snd_hit_03"), ExtResource("snd_hit_04"), ExtResource("snd_hit_05"), ExtResource("snd_hit_06"), ExtResource("snd_hit_07"), ExtResource("snd_hit_08")]
+streams = [ExtResource("snd_hit_01"), ExtResource("snd_hit_02"), ExtResource("snd_hit_03"), ExtResource("snd_hit_04")]
 stream_mode = 3
-pitch_scale = 2.0999999999999996
-random_pitch = 1.44
+random_pitch = 1.06
 audibility_mode = 1
 zoom_scales_distance = true
 
 [sub_resource type="BulletSoundData2D" id="BulletSoundData2D_102ar"]
 enabled = false
 streams = [ExtResource("13_jbfhk")]
-pitch_scale = 0.51
-random_pitch = 1.99
-random_pitch_min = 0.52
-random_pitch_max = 2.15
+random_pitch = 1.06
 random_pan = 0.18
 max_distance = 4096.0
 when_limit_reached = 1

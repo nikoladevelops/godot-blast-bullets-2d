@@ -93,6 +93,9 @@ func select_weapon(slot: int, announce := true) -> void:
 
 
 func hit() -> void:
+	var factory := get_parent().get_node_or_null("BulletFactory2D") as BulletFactory2D
+	if factory != null:
+		preload("res://examples/common/example_fx.gd").player_hurt(factory, global_position)
 	modulate = Color(2.0, 0.4, 0.4)
 	create_tween().tween_property(self, "modulate", Color.WHITE, 0.25)
 

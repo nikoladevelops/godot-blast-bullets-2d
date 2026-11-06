@@ -243,13 +243,15 @@ position = Vector2(0, -18)
 
 [node name="Tip" type="Label" parent="." unique_id=2111673580]
 offset_left = 16.0
-offset_top = 612.0
-offset_right = 16.0
-offset_bottom = 612.0
+offset_top = 548.0
+offset_right = 330.0
+offset_bottom = 636.0
 theme = ExtResource("18_4lwwh")
 theme_override_font_sizes/font_size = 15
 text = "Halve the boss's health to see phase two."
 
+autowrap_mode = 3
+vertical_alignment = 2
 [node name="Boss" type="Area2D" parent="." unique_id=1931165780]
 position = Vector2(576, 150)
 collision_layer = 4

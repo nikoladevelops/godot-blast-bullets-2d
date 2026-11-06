@@ -3,7 +3,7 @@ extends CanvasLayer
 ## - a weapon bar (bottom centre): one slot per weapon with its key, name and
 ##   an icon of its pattern; the active slot is lit, a banner names a new pick
 ## - health bars (top centre) for a boss and the player, shown on first use
-## - a one-line controls hint (bottom left)
+## - a one-line controls hint (top right)
 
 const FONT := preload("res://shared/ui/fonts/Exo2.ttf")
 const ACCENT := Color(0.35, 0.85, 1.0)
@@ -56,11 +56,13 @@ func build(names: Array) -> void:
 	_banner.offset_top = -150
 	_banner.modulate.a = 0.0
 	add_child(_banner)
-	var hint := _label("WASD / arrows: move    Space / left click: fire    1-4: weapon", 13, HORIZONTAL_ALIGNMENT_LEFT)
-	hint.anchor_top = 1.0
-	hint.anchor_bottom = 1.0
-	hint.offset_left = 16
-	hint.offset_top = -28
+	# Top right: the scene's own tip text owns the bottom left.
+	var hint := _label("WASD / arrows: move    Space / left click: fire    1-4: weapon", 13, HORIZONTAL_ALIGNMENT_RIGHT)
+	hint.anchor_left = 1.0
+	hint.anchor_right = 1.0
+	hint.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	hint.offset_right = -16
+	hint.offset_top = 12
 	hint.modulate = Color(1, 1, 1, 0.6)
 	add_child(hint)
 

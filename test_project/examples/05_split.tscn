@@ -112,13 +112,15 @@ shape = SubResource("CircleShape2D_fjnnk")
 
 [node name="Tip" type="Label" parent="." unique_id=1431463833]
 offset_left = 16.0
-offset_top = 612.0
-offset_right = 16.0
-offset_bottom = 612.0
+offset_top = 548.0
+offset_right = 330.0
+offset_bottom = 636.0
 theme = ExtResource("8_rku4y")
 theme_override_font_sizes/font_size = 15
 text = "Each slow orb bursts into a ring of eight after 0.9 s."
 
+autowrap_mode = 3
+vertical_alignment = 2
 [node name="Bursts" type="Label" parent="." unique_id=430766447]
 offset_left = 16.0
 offset_top = 12.0

@@ -131,13 +131,15 @@ shape = SubResource("CircleShape2D_h1fwp")
 
 [node name="Tip" type="Label" parent="." unique_id=299184255]
 offset_left = 16.0
-offset_top = 612.0
-offset_right = 16.0
-offset_bottom = 612.0
+offset_top = 548.0
+offset_right = 330.0
+offset_bottom = 636.0
 theme = ExtResource("8_mi6ic")
 theme_override_font_sizes/font_size = 15
 text = "Hold the RIGHT mouse button: the turret's flying bullets chase the cursor."
 
+autowrap_mode = 3
+vertical_alignment = 2
 [node name="Turret" type="Node2D" parent="." unique_id=904323181]
 script = ExtResource("turret_script")
 position = Vector2(576, 150)
