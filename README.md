@@ -161,8 +161,66 @@ spawner.homing_node_group = &"player"
 spawner.homing_smoothing = 4.0         # 0 snaps, higher turns more gently
 spawner.homing_duration_sec = 2.0      # stop steering after 2 s (0 = forever)
 spawner.home_live_volleys_to(player)   # re-aim bullets already flying
+
+spawner.orbiting_enabled = true        # circle the target instead of hitting it...
+spawner.orbiting_radius = 120.0        # ...on a 120 px ring (orbiting_direction: left, right, random or escort)
 ```
-Bullets can also circle their target: turn on `orbiting_enabled`. `print("\n".join(spawner.debug_explain_features()))` explains in plain sentences what homing, orbiting and flocking will do with the current settings.
+Orbiting uses the same targets as homing. `print("\n".join(spawner.debug_explain_features()))` explains in plain sentences what homing, orbiting and flocking will do with the current settings.
+</details>
+
+<details>
+<summary><b>A moving spawner: a boss that strafes</b> (Movement)</summary>
+
+The spawner travels along any `Path2D` while it fires, and its bullets inherit its motion.
+
+```gdscript
+spawner.movement_enabled = true
+spawner.set_movement_path_node($StrafePath)            # any Path2D with a curve
+spawner.movement_timing = BulletSpawner2D.MOVEMENT_TIMING_SPEED
+spawner.movement_speed = 180.0                          # px/s along the path (or MOVEMENT_TIMING_DURATION + movement_duration_sec)
+spawner.movement_loop_mode = BulletSpawner2D.MOVEMENT_LOOP_PING_PONG   # or ONCE, LOOP
+spawner.movement_endpoint_pause_sec = 0.5               # rest at each end
+spawner.movement_velocity_inherit_factor = 1.0          # bullets keep the boss's momentum (0 = none)
+spawner.movement_play()                                 # also movement_pause/stop/reverse/seek; movement_autostart plays on _ready
+spawner.teleport(Vector2(640, 120))                     # jump without a velocity kick
+```
+Easing (`movement_transition`, `movement_ease`, `movement_progress_curve`) and `movement_rotate_with_path` are in the same group.
+</details>
+
+<details>
+<summary><b>Bullet motion: speed, curves, rotation, wobble, gravity</b> (spawn data)</summary>
+
+Motion lives on the spawn data (`BulletVolleyData2D`, the spawner's `spawn_data`). Each part takes one `shared_bullet_*` value for every bullet, or an `all_bullet_*` array with one entry per bullet.
+
+```gdscript
+var data: BulletVolleyData2D = spawner.spawn_data.duplicate()
+
+var speed := BulletSpeedData2D.new()     # start slow, then accelerate
+speed.speed = 120.0
+speed.acceleration = 400.0               # px/s gained per second
+speed.max_speed = 600.0
+data.shared_bullet_speed_data = speed
+
+var curves := BulletCurvesData2D.new()   # or shape speed over the bullet's life with a Curve
+curves.movement_speed_curve = preload("res://curves/burst_then_glide.tres")   # x: 0..1 of max_life_time
+data.shared_bullet_curves_data = curves  # direction and gravity curves live here too
+
+var spin := BulletRotationData2D.new()   # the sprite turns...
+spin.rotation_speed = PI                 # rad/s
+data.shared_bullet_rotation_data = spin
+data.rotate_only_textures = false               # the whole bullet turns, not just its sprite...
+data.adjust_direction_based_on_rotation = true   # ...and the flight follows it: curving bullets
+
+var wobble := BulletWobbleData2D.new()   # weave side to side while flying straight on
+wobble.enabled = true                    # off by default
+wobble.amplitude = 20.0                  # how strongly it weaves (degrees in WOBBLE_ANGULAR mode)
+wobble.frequency_hz = 3.0
+data.shared_bullet_wobble_data = wobble
+
+data.gravity = Vector2(0, 400)           # arcs (side view); gravity_delay_sec waits before it pulls
+spawner.spawn_data = data
+```
+Bullets already flying are steered from code with `BulletVolley2D` (`all_bullets_set_speed`, `bullet_set_velocity`, `set_bullet_rotation_data`, ...).
 </details>
 
 <details>
@@ -228,10 +286,10 @@ factory.convert_all_bullets_to_pickups(coin, player, PLAYER_LAYER)             #
 factory.end_lasers_in_rect(get_viewport_rect(), true, PLAYER_LAYER)            # and enemy beams fade out
 # Cheap enough every frame: where the dangerous bullets are, and the closest one.
 for p in factory.get_bullet_positions_in_circle(player.global_position, 120.0, PLAYER_LAYER):
-    pass   # push your dodge AI away from p
+	pass   # push your dodge AI away from p
 var nearest := factory.get_nearest_bullet(player.global_position, 300.0, PLAYER_LAYER)
 if not nearest.is_empty():
-    print("closest danger at ", nearest["position"])
+	print("closest danger at ", nearest["position"])
 ```
 </details>
 

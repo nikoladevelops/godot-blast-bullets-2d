@@ -342,3 +342,68 @@ func test_the_sound_recipe_runs_as_written() -> void:
 	expect_no_errors()
 	expect_warning_sequence([])
 	AudioServer.remove_bus(AudioServer.get_bus_index("SFX"))
+
+
+func test_the_moving_spawner_recipe_strafes_and_teleports() -> void:
+	var path := Path2D.new()
+	path.curve = Curve2D.new()
+	path.curve.add_point(Vector2(0, 0))
+	path.curve.add_point(Vector2(400, 0))
+	add(path)
+	var sp := make_spawner(H.make_volley_data(4), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
+	sp.movement_enabled = true
+	sp.set_movement_path_node(path)
+	sp.movement_timing = BulletSpawner2D.MOVEMENT_TIMING_SPEED
+	sp.movement_speed = 180.0
+	sp.movement_loop_mode = BulletSpawner2D.MOVEMENT_LOOP_PING_PONG
+	sp.movement_endpoint_pause_sec = 0.5
+	sp.movement_velocity_inherit_factor = 1.0
+	sp.movement_play()
+	await idle(30) # half a second at 180 px/s: about 90 px along the path
+	assert_true(sp.is_movement_playing(), "playing")
+	assert_between(sp.global_position.x, 60.0, 120.0, "travels along the path at movement_speed")
+	assert_almost_eq(sp.get_movement_velocity(), Vector2(180, 0), Vector2(5, 5), "its velocity is what bullets inherit")
+	sp.teleport(Vector2(640, 120))
+	assert_almost_eq(sp.global_position, Vector2(640, 120), Vector2(0.01, 0.01), "teleported")
+	expect_no_errors()
+
+
+func test_the_bullet_motion_recipe_does_what_it_says() -> void:
+	# Speed: 120 px/s + 400 px/s per second, capped at 600.
+	var d := H.make_volley_data(1, 0.0, 10.0)
+	var speed := BulletSpeedData2D.new()
+	speed.speed = 120.0
+	speed.acceleration = 400.0
+	speed.max_speed = 600.0
+	d.all_bullet_speed_data = []
+	d.shared_bullet_speed_data = speed
+	var fast := factory.spawn_volley(d)
+	# Rotation that steers the flight: the heading turns.
+	var r := H.make_volley_data(1, 200.0, 10.0)
+	var spin := BulletRotationData2D.new()
+	spin.rotation_speed = PI
+	r.shared_bullet_rotation_data = spin
+	r.rotate_only_textures = false
+	r.adjust_direction_based_on_rotation = true
+	var curving := factory.spawn_volley(r)
+	# Wobble: weaves off the straight line.
+	var w := H.make_volley_data(1, 200.0, 10.0)
+	var wobble := BulletWobbleData2D.new()
+	wobble.enabled = true
+	wobble.amplitude = 20.0
+	wobble.frequency_hz = 3.0
+	w.shared_bullet_wobble_data = wobble
+	var weaving := factory.spawn_volley(w)
+	# Gravity: pulls the flight down.
+	var g := H.make_volley_data(1, 200.0, 10.0)
+	g.gravity = Vector2(0, 400)
+	var falling := factory.spawn_volley(g)
+	var max_off_line := 0.0
+	for i in 16: # one second at 1/16 s ticks
+		step_factory(1, DT)
+		max_off_line = maxf(max_off_line, absf(weaving.get_bullet_transform(0).origin.y))
+	assert_almost_eq(fast.get_bullet_speed(0), 520.0, 30.0, "accelerated by about 400 px/s in a second")
+	assert_gt(absf(curving.get_bullet_direction(0).angle()), 0.5, "the heading turned with the rotation")
+	assert_gt(max_off_line, 2.0, "the wobble weaves off the line") # ~4 px at 200 px/s, 3 Hz: amplitude tilts the heading
+	assert_gt(falling.get_bullet_velocity(0).y, 300.0, "gravity pulls down")
+	expect_no_errors()

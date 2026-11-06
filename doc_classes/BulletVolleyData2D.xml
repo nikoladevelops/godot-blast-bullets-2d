@@ -59,7 +59,7 @@
 	</methods>
 	<members>
 		<member name="adjust_direction_based_on_rotation" type="bool" setter="set_adjust_direction_based_on_rotation" getter="get_adjust_direction_based_on_rotation" default="false">
-			If enabled, the bullets will adjust their direction when rotating, instead of only spinning in place.
+			If enabled, the bullets will adjust their direction when rotating, instead of only spinning in place. Needs [member rotate_only_textures] off: while it is on (the default), rotation only turns the sprite and never steers.
 		</member>
 		<member name="all_bullet_curves_data" type="BulletCurvesData2D[]" setter="set_all_bullet_curves_data" getter="get_all_bullet_curves_data" default="[]">
 			Curves for each bullet, applied at spawn time (and on pool reuse). Entry [code]i[/code] drives bullet [code]i[/code] only. Bullets without an entry (short array) or with a null entry use [member shared_bullet_curves_data] per channel, or plain ballistics when that is unset too. Invalid means: null entry. Example: 4 bullets, entries [A, null] → bullets 0 and 1 use A and the shared fallback, bullets 2 and 3 use the shared fallback only.
