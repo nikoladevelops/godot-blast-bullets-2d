@@ -3,8 +3,8 @@
 </p>
 
 <p align="center">
-  <b>Thousands of bullets, lasers and bullet-hell patterns for Godot 4, written in C++, driven from GDScript.</b><br>
-  Free, open source (MIT), no C++ knowledge needed.
+  <b>The bullet hell plugin for Godot 4: thousands of bullets, lasers and danmaku patterns, written in C++, driven from GDScript.</b><br>
+  For shmups, bullet hells, twin-stick and top-down shooters. Free, open source (MIT), no C++ knowledge needed.
 </p>
 
 <p align="center">
@@ -15,19 +15,30 @@
 </p>
 
 <p align="center">
-  <img src="showcase/clips/hero.webp" alt="The Hive Mother's spiral waves in the Arcane Barrage demo" width="720"/>
+  <img src="showcase/clips/hero.webp" alt="Godot 4 bullet hell: spiral bullet waves from a boss in the Arcane Barrage demo, made with BlastBullets2D" width="720"/>
 </p>
 
-**Contents:** [Why](#why-blastbullets2d) · [See it in action](#see-it-in-action) · [Examples](#learn-from-the-examples) · [Install](#install) · [Your first boss in 5 minutes](#your-first-boss-in-5-minutes-no-code) · [Handle hits](#handle-hits) · [Recipes](#recipes) · [Spawning from code](#spawning-from-code) · [Performance](#performance) · [Limits](#limits) · [Rules worth knowing](#rules-worth-knowing) · [Reference](#reference) · [Building and testing](#building-from-source-and-running-the-tests)
+**Contents:** [Why](#why-blastbullets2d) · [Made for](#made-for) · [See it in action](#see-it-in-action) · [Examples](#learn-from-the-examples) · [Install](#install) · [Your first boss in 5 minutes](#your-first-boss-in-5-minutes-no-code) · [Handle hits](#handle-hits) · [Recipes](#recipes) · [Spawning from code](#spawning-from-code) · [Performance](#performance) · [Limits](#limits) · [Multiplayer status](#multiplayer-status) · [Rules worth knowing](#rules-worth-knowing) · [Reference](#reference) · [Building and testing](#building-from-source-and-running-the-tests)
 
 ## Why BlastBullets2D
+
+BlastBullets2D is a GDExtension projectile system for Godot 4: a bullet spawner, a pattern generator and a pooled bullet engine for 2D games with a lot of projectiles.
 
 - **Fast.** One volley is one MultiMesh draw and one physics area, not one node per bullet. 10,000 flying bullets cost about **0.3 ms** per physics tick, and 8 auto-firing bosses with homing, splitting and graze keeping ~10,000 bullets alive about **0.5 ms** (Ryzen 7 8840HS, the shipped release build). Volleys, lasers and attachments are pooled automatically.
 - **Patterns without math.** `BulletSpawner2D` has **33 pattern sources** (ring, fan, spiral, flower, rose, star, heart, rain, walls with gaps, Lissajous, any `Path2D`, your own markers...) with a **live preview in the editor**, 20 one-click presets, spin, bursts, telegraphs, fire budgets and boss phase sequences.
 - **Every bullet-hell system, already integrated:** homing and orbiting, bouncing, curves, wobble, gravity, `Path2D` movement patterns, graze (near misses), boids flocking, bullets that split, bullets that fire bullets, lasers (beams, bolts, curvy snakes), bullets that turn into coins, a sound mixer, slow motion, per-bullet colors and lifetimes, animated `SpriteFrames` art, particles that follow bullets.
-- **Safe to use.** Every signal fires while the bullet is still alive (read it, heal it, split it), handlers may free anything, and wrong settings fail loudly with a message that says what to fix. Every feature is covered by an automated test suite (about 2,500 tests) that also runs on the release build, under memory and undefined-behavior sanitizers, and under seeded fuzzing.
+- **Safe to use.** Every signal fires while the bullet is still alive (read it, heal it, split it), handlers may free anything, and wrong settings fail loudly with a message that says what to fix. Every feature is covered by an automated test suite (more than 2,700 tests) that also runs on the release build, under memory and undefined-behavior sanitizers, and under seeded fuzzing.
 - **Documented in the editor.** Every class, property, method and signal has in-editor help (<kbd>F1</kbd> or Ctrl+click), and the inspector warns about missing setup.
 - **Every platform:** Windows, macOS, Linux, Android, iOS and Web, prebuilt.
+
+## Made for
+
+- **Bullet hell and danmaku** games: boss patterns, spell cards, graze scoring, bombs that clear the screen.
+- **Shoot 'em ups (shmups)**, vertical or horizontal scrollers.
+- **Twin-stick and top-down shooters**, arena shooters and survivor-likes (auto-fire weapons, thousands of enemy projectiles, pickups that fly to the player).
+- **Tower defense and action roguelites** that need many projectiles, homing missiles, lasers and splitting shots.
+
+Less of a fit: games that Y-sort every projectile between characters (see [Limits](#limits)), projectiles that must push rigid bodies, and 3D games.
 
 **Videos:** [Trailer](https://www.youtube.com/watch?v=OJK7201pzsE) · [Features showcase](https://www.youtube.com/watch?v=SeyD1YVIZss) · [Tutorial part 1](https://www.youtube.com/watch?v=L10sHF4BnLs) · [Tutorial part 2](https://www.youtube.com/watch?v=R2olIyF7aPQ)
 
@@ -284,9 +295,9 @@ volley.set_collision_shape_runtime(big)              # a new hitbox for the whol
 </details>
 
 <details>
-<summary><b>Multiplayer: late joiners see every bullet</b></summary>
+<summary><b>Multiplayer: show the bullets in flight to a late joiner</b></summary>
 
-Bullets are simulated locally on every peer. A peer that joins mid-game gets one snapshot of what is flying (plain arrays, RPC friendly) and rebuilds it from its own copies of the spawn data. Tag each volley with a kind when it is fired (`volley.set_meta("kind", "spark")`, for a spawner in its `volley_fired` handler).
+Visual sync only, restoring position, velocity and time left (read [Multiplayer status](#multiplayer-status) first). Bullets are simulated locally on every peer. A peer that joins mid-game gets one snapshot of what is flying (plain arrays, RPC friendly) and rebuilds it from its own copies of the spawn data. Tag each volley with a kind when it is fired (`volley.set_meta("kind", "spark")`, for a spawner in its `volley_fired` handler).
 
 ```gdscript
 # Server: every live bullet as plain data.
@@ -349,7 +360,19 @@ Know these before you build a game around the plugin:
 - **Collision shapes:** `CircleShape2D`, `RectangleShape2D` and `CapsuleShape2D` (one shape per volley; each bullet's scale applies). Other shapes fall back to a circle with an error.
 - **Bullets behave like `Area2D`s:** they detect and bounce, but they are not rigid bodies (no impulses), and bullets do not collide with each other.
 - **Very fast bullets** move in steps of one physics tick. A bullet that travels further than its own size in one tick can step over a thin target: make thin targets thicker, or the hitbox larger.
-- **No save/load** of bullets in flight.
+- **Bullets per volley:** up to `max_bullets_per_pattern` (project setting, default 20,000). Many large volleys stacked on one spot can still overload Godot's physics broadphase; spread out, 100,000 bullets run fine.
+- **No built-in save/load or network sync** of bullets in flight (see [Multiplayer status](#multiplayer-status)).
+- **C#** works through `Call` / `Set` / `Connect` (see [C#](#c)): Godot generates no C# bindings for GDExtensions, so there is no IntelliSense.
+- **2D only.**
+
+## Multiplayer status
+
+BlastBullets2D does not replicate anything over the network by itself. What works today:
+
+- **Every peer runs its own bullets.** Fire the same spawners on every peer (for example from an RPC or a synced state) and each peer simulates and draws them locally. Peers drift apart over time (frame timing, physics contact order, unseeded randomness), so let **one peer (the host) decide hits and damage** and treat the other peers' bullets as visuals.
+- **Late joiners** can be shown the bullets already in flight with the [late-join recipe](#recipes): position, velocity and time left of every live bullet, as plain RPC-friendly arrays.
+
+Not covered yet: the recipe restores position, velocity and lifetime only, so homing targets, bounce and hit counts, curve and wobble clocks, split chains, emitter schedules and animation frames start fresh on the joining peer. Lasers in flight and a spawner's timers (cadence, spin, movement) cannot be restored mid-way. A full state capture and restore API is planned for a later release.
 
 ## Rules worth knowing
 
