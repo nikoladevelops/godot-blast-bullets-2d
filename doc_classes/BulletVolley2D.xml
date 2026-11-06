@@ -2659,7 +2659,7 @@
 			<param index="0" name="effects" type="Array" />
 			<param index="1" name="listener_group" type="Variant" default="null" />
 			<description>
-				Arms a factory volley with sound entries (empty [param listener_group] means Godot's listener, else the nearest member of that group or the nearest target of a [BulletTargets2D]; anything else is refused with one error). On Shot and On Telegraph entries never fire on a factory volley: they are spawner-only. Refused on a pooled handle. The trigger mask is read when armed: enabling a disabled entry afterwards will not fire it, while disabling a live one skips its plays.
+				Arms a factory volley with sound entries (empty [param listener_group] means Godot's listener, else the nearest member of that group or the nearest target of a [BulletTargets2D]; anything else is refused with one error). On Shot and On Telegraph entries never fire on a factory volley: they are spawner-only. Refused on a pooled handle. Edits to an entry's [member BulletSoundData2D.trigger] or [member BulletSoundData2D.enabled] reach volleys in flight: enabling a disabled entry starts its plays, disabling one stops them.
 			</description>
 		</method>
 		<method name="split_bullet">

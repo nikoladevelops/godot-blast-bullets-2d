@@ -283,6 +283,24 @@ spawner.bounce_body_entered.connect(func(wall, volley: BulletVolley2D, i: int) -
 </details>
 
 <details>
+<summary><b>Sound effects</b> (Sound)</summary>
+
+Each `BulletSoundData2D` entry says WHEN it plays (`trigger`: On Hit, On Bounce, On Graze, On Flight, On Split...) and HOW (streams, volume, pitch, spatial range, voice limits). The factory mixes every play: the nearest wins when too many fire at once.
+
+```gdscript
+var hit := BulletSoundData2D.new()
+hit.trigger = BulletSoundData2D.SOUND_ON_HIT
+hit.streams = [preload("res://sfx/hit.wav")]
+
+spawner.sound_effects = [hit]                 # a spawner's bullets (On Shot and On Telegraph work here too)
+var volley := factory.spawn_volley(data)
+volley.sound_set_effects([hit])               # a volley spawned from code
+factory.play_sound(hit, global_position)      # a one-off play, anywhere
+```
+Edits to an entry (`enabled`, `trigger`, volume...) reach bullets already in flight.
+</details>
+
+<details>
 <summary><b>Resize bullets and hitboxes at runtime</b></summary>
 
 ```gdscript

@@ -294,3 +294,20 @@ func test_the_laser_from_code_example_runs_as_written() -> void:
 			break
 	assert_false(laser.is_laser_active(), "ended")
 	expect_no_errors()
+
+
+func test_the_sound_recipe_runs_as_written() -> void:
+	factory.debug_set_sound_offer_log_enabled(true)
+	var hit := BulletSoundData2D.new()
+	hit.trigger = BulletSoundData2D.SOUND_ON_HIT
+	hit.streams = [H.make_sound_stream()] # marks the file for the headless audio drain
+	var sp := make_spawner(H.make_volley_data(4), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
+	sp.sound_effects = [hit]
+	assert_eq(sp.sound_effects.size(), 1, "the spawner takes the entry")
+	var volley := factory.spawn_volley(H.make_volley_data(4))
+	volley.sound_set_effects([hit])
+	assert_true(volley.is_sound_armed(), "a factory volley is armed")
+	factory.play_sound(hit, Vector2(10, 10))
+	step_factory(1, DT)
+	assert_gt(factory.debug_get_sound_offer_log().size(), 0, "the one-off play was offered")
+	expect_no_errors()
