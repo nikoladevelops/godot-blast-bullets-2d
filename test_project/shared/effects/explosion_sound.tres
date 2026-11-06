@@ -1,0 +1,13 @@
+[gd_resource type="BulletSoundData2D" format=3]
+
+[ext_resource type="AudioStream" path="res://shared/sound/explosion_01.wav" id="1_explosion"]
+[ext_resource type="AudioStream" path="res://shared/sound/explosion_02.wav" id="2_explosion"]
+[ext_resource type="AudioStream" path="res://shared/sound/explosion_03.wav" id="3_explosion"]
+[ext_resource type="AudioStream" path="res://shared/sound/explosion_04.wav" id="4_explosion"]
+
+[resource]
+volume_db = -6.0
+streams = [ExtResource("1_explosion"), ExtResource("2_explosion"), ExtResource("3_explosion"), ExtResource("4_explosion")]
+stream_mode = 3
+random_pitch = 1.1
+random_volume_offset_db = 2.0

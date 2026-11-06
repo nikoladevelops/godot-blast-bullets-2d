@@ -1,0 +1,250 @@
+{
+  "timestamp": "2026-10-06T04-32-31Z",
+  "commit": "3ba2fa9",
+  "dirty": false,
+  "repeat": 5,
+  "machine": {
+    "cpu": "AMD Ryzen 7 8840HS w/ Radeon 780M Graphics",
+    "cores": 16,
+    "os": "Linux-7.2.9-1-cachyos-x86_64-with-glibc2.44",
+    "python": "3.14.7"
+  },
+  "scenarios": {
+    "spawner_aimed_regen_2k": {
+      "active_bullets_mean": 36000.0,
+      "collision_records": 0,
+      "description": "2000-bullet aimed spawner regenerating its pattern every frame (uncacheable source)",
+      "engine_ms": {
+        "max": 4.255,
+        "mean": 2.32874,
+        "p50": 2.285,
+        "p95": 2.435,
+        "p99": 4.159
+      },
+      "expired_bullets": 400000,
+      "extra": {},
+      "factory_tick_ms": {
+        "max": 2.979,
+        "mean": 1.22038,
+        "p50": 1.195,
+        "p95": 1.26,
+        "p99": 1.398
+      },
+      "frame_ms": {
+        "max": 4.768,
+        "mean": 2.835495,
+        "p50": 2.786,
+        "p95": 2.952,
+        "p99": 4.683
+      },
+      "measure_frames": 200,
+      "memory_static_growth_mb": 0.0561447143554688,
+      "memory_static_peak_mb": 43.4370365142822,
+      "nodes_end": 28.0,
+      "objects_end": 1592.0,
+      "objects_growth": 0,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 221,
+      "pool_misses": 19,
+      "spawned_bullets": 400000,
+      "step_ms": {
+        "max": 2.2,
+        "mean": 0.50905,
+        "p50": 0.499,
+        "p95": 0.52,
+        "p99": 0.57
+      },
+      "warmup_frames": 40
+    },
+    "spawner_moving_preview_1500": {
+      "active_bullets_mean": 11550.0,
+      "collision_records": 0,
+      "description": "1500-bullet spawner on a moving parent, runtime preview on, firing 4/s",
+      "engine_ms": {
+        "max": 3.323,
+        "mean": 0.651906666666667,
+        "p50": 0.582,
+        "p95": 1.329,
+        "p99": 2.654
+      },
+      "expired_bullets": 24000,
+      "extra": {},
+      "factory_tick_ms": {
+        "max": 2.003,
+        "mean": 0.33568,
+        "p50": 0.333,
+        "p95": 0.446,
+        "p99": 0.481
+      },
+      "frame_ms": {
+        "max": 3.324,
+        "mean": 0.65258,
+        "p50": 0.582,
+        "p95": 1.329,
+        "p99": 2.655
+      },
+      "measure_frames": 300,
+      "memory_static_growth_mb": 3.18025207519531,
+      "memory_static_peak_mb": 34.9300785064697,
+      "nodes_end": 21.0,
+      "objects_end": 1569.0,
+      "objects_growth": 15,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 15,
+      "pool_misses": 9,
+      "spawned_bullets": 30000,
+      "step_ms": {
+        "max": 0.004,
+        "mean": 0.000626666666666667,
+        "p50": 0.001,
+        "p95": 0.001,
+        "p99": 0.002
+      },
+      "warmup_frames": 60
+    },
+    "spawner_path_move_1500": {
+      "active_bullets_mean": 17780.0,
+      "collision_records": 0,
+      "description": "1500-bullet star spawner moving along a Path2D, preview on, firing 8/s",
+      "engine_ms": {
+        "max": 3.776,
+        "mean": 1.01340666666667,
+        "p50": 0.875,
+        "p95": 1.667,
+        "p99": 3.369
+      },
+      "expired_bullets": 54000,
+      "extra": {
+        "pattern_cache_hits": 47,
+        "pattern_cache_misses": 2,
+        "preview_rebuilds": 1
+      },
+      "factory_tick_ms": {
+        "max": 2.288,
+        "mean": 0.51637,
+        "p50": 0.502,
+        "p95": 0.626,
+        "p99": 0.66
+      },
+      "frame_ms": {
+        "max": 3.777,
+        "mean": 1.01362666666667,
+        "p50": 0.875,
+        "p95": 1.668,
+        "p99": 3.37
+      },
+      "measure_frames": 300,
+      "memory_static_growth_mb": 3.54176330566406,
+      "memory_static_peak_mb": 37.6554079055786,
+      "nodes_end": 25.0,
+      "objects_end": 1582.0,
+      "objects_growth": 15,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 35,
+      "pool_misses": 13,
+      "spawned_bullets": 60000,
+      "step_ms": {
+        "max": 0.001,
+        "mean": 0.000226666666666667,
+        "p50": 0.0,
+        "p95": 0.001,
+        "p99": 0.001
+      },
+      "warmup_frames": 60
+    },
+    "spawner_spin_preview_1500": {
+      "active_bullets_mean": 11550.0,
+      "collision_records": 0,
+      "description": "1500-bullet heart spawner, spin + runtime preview, firing 4/s",
+      "engine_ms": {
+        "max": 8.922,
+        "mean": 0.735036666666667,
+        "p50": 0.593,
+        "p95": 1.553,
+        "p99": 4.629
+      },
+      "expired_bullets": 24000,
+      "extra": {},
+      "factory_tick_ms": {
+        "max": 1.469,
+        "mean": 0.330486666666667,
+        "p50": 0.331,
+        "p95": 0.453,
+        "p99": 0.496
+      },
+      "frame_ms": {
+        "max": 8.922,
+        "mean": 0.73525,
+        "p50": 0.593,
+        "p95": 1.553,
+        "p99": 4.63
+      },
+      "measure_frames": 300,
+      "memory_static_growth_mb": 5.88419342041016,
+      "memory_static_peak_mb": 39.7836866378784,
+      "nodes_end": 20.0,
+      "objects_end": 1568.0,
+      "objects_growth": 15,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 15,
+      "pool_misses": 9,
+      "spawned_bullets": 30000,
+      "step_ms": {
+        "max": 0.002,
+        "mean": 0.000213333333333333,
+        "p50": 0.0,
+        "p95": 0.001,
+        "p99": 0.001
+      },
+      "warmup_frames": 60
+    },
+    "spawner_warm_shot_5k": {
+      "active_bullets_mean": 90000.0,
+      "collision_records": 0,
+      "description": "5000-bullet heart spawner, shoot_once every frame, warm pool",
+      "engine_ms": {
+        "max": 16.493,
+        "mean": 11.52091,
+        "p50": 11.303,
+        "p95": 13.993,
+        "p99": 14.94
+      },
+      "expired_bullets": 1000000,
+      "extra": {},
+      "factory_tick_ms": {
+        "max": 5.455,
+        "mean": 3.514545,
+        "p50": 3.431,
+        "p95": 3.776,
+        "p99": 5.343
+      },
+      "frame_ms": {
+        "max": 18.368,
+        "mean": 13.43796,
+        "p50": 13.223,
+        "p95": 16.165,
+        "p99": 16.906
+      },
+      "measure_frames": 200,
+      "memory_static_growth_mb": 1.04824066162109,
+      "memory_static_peak_mb": 163.522607803345,
+      "nodes_end": 27.0,
+      "objects_end": 1591.0,
+      "objects_growth": 0,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 221,
+      "pool_misses": 19,
+      "spawned_bullets": 1000000,
+      "step_ms": {
+        "max": 3.621,
+        "mean": 1.91972,
+        "p50": 1.909,
+        "p95": 1.969,
+        "p99": 2.058
+      },
+      "warmup_frames": 40
+    }
+  },
+  "godot": "4.7.2-stable (arch_linux)",
+  "debug_build": true
+}

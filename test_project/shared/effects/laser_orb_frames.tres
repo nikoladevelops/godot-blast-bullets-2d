@@ -1,0 +1,42 @@
+[gd_resource type="SpriteFrames" format=3]
+
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_orb_01.png" id="1_xwebf"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_orb_02.png" id="2_hulo3"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_orb_03.png" id="3_qt7qb"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_orb_04.png" id="4_p3xdp"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_orb_05.png" id="5_8uf1l"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_orb_06.png" id="6_h8pxh"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_orb_07.png" id="7_lw2ui"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_orb_08.png" id="8_d03r6"]
+
+[resource]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("1_xwebf")
+}, {
+"duration": 1.0,
+"texture": ExtResource("2_hulo3")
+}, {
+"duration": 1.0,
+"texture": ExtResource("3_qt7qb")
+}, {
+"duration": 1.0,
+"texture": ExtResource("4_p3xdp")
+}, {
+"duration": 1.0,
+"texture": ExtResource("5_8uf1l")
+}, {
+"duration": 1.0,
+"texture": ExtResource("6_h8pxh")
+}, {
+"duration": 1.0,
+"texture": ExtResource("7_lw2ui")
+}, {
+"duration": 1.0,
+"texture": ExtResource("8_d03r6")
+}],
+"loop": 1,
+"name": &"default",
+"speed": 14.0
+}]

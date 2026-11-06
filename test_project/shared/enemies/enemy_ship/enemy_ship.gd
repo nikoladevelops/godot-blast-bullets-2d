@@ -38,7 +38,7 @@ extends AbstractEnemy
 @onready var center_marker:Marker2D = $AnimatedSprite2D/CenterMarker2D
 
 # The bullet data used to spawn bullets from
-var bullets_data:DirectionalBulletsData2D
+var bullets_data:BulletVolleyData2D
 
 # Whether the ship should shoot two bullets at a time or not
 var is_shooting_two_at_a_time:bool
@@ -74,17 +74,15 @@ func _ready() -> void:
 	calculate_new_direction()
 	
 	# Set up bullets data
-	bullets_data = DirectionalBulletsData2D.new()
-	bullets_data.textures = [
-		preload("res://shared/art/enemy_bullets/enemy_bullet1.png"),
-		preload("res://shared/art/enemy_bullets/enemy_bullet2.png"),
-		preload("res://shared/art/enemy_bullets/enemy_bullet3.png"),
-		preload("res://shared/art/enemy_bullets/enemy_bullet4.png")
-	]
+	bullets_data = BulletVolleyData2D.new()
+	
+	bullets_data.sprite_frames = $BulletAnimatedSprite.sprite_frames
 	
 	bullets_data.texture_size = Vector2(100,100)
-	bullets_data.collision_shape_size = Vector2(32,32)
-	bullets_data.default_change_texture_time = 0.09
+	# The plasma rocket's body (the art faces right) at this texture size
+	var hitbox := RectangleShape2D.new()
+	hitbox.size = Vector2(78, 18)
+	bullets_data.collision_shape = hitbox
 	
 	bullets_data.max_life_time = 5
 	
@@ -96,11 +94,12 @@ func _ready() -> void:
 	var dmg_data:DamageData = DamageData.new()
 	dmg_data.base_damage = 1
 	
-	bullets_data.bullets_custom_data = dmg_data
+	bullets_data.shared_bullets_custom_data = dmg_data
 	
-	bullets_data.collision_layer = DirectionalBulletsData2D.calculate_bitmask([4])
-	bullets_data.collision_mask = DirectionalBulletsData2D.calculate_bitmask(default_bullet_collision_mask)
+	bullets_data.collision_layer = BulletVolleyData2D.calculate_bitmask([4])
+	bullets_data.collision_mask = BulletVolleyData2D.calculate_bitmask(default_bullet_collision_mask)
 	bullets_data.monitorable=true # Monitorable allows for these bullets to be detected by other areas
+	bullets_data.effect_layers = [BENCHMARK_GLOBALS.ENEMY_HIT_SPARK, BENCHMARK_GLOBALS.ENEMY_KILL_SPARK]
 
 func _physics_process(delta: float) -> void:
 	calculate_new_direction()
@@ -115,9 +114,10 @@ func shoot()->void:
 	if can_shoot:
 		bullets_data.transforms = get_marker_transforms()
 		bullets_data.all_bullet_speed_data = get_speed_data()
-		#bullets_data.block_rotation_radians = animated_sprite.transform.get_rotation() # Since we are using block bullets, their direction is determined by this property instead of automatically by the transforms
-		var bullets_multi:DirectionalBullets2D = BENCHMARK_GLOBALS.FACTORY.spawn_controllable_directional_bullets(bullets_data)
-		bullets_multi.all_bullets_set_attachment(BENCHMARK_GLOBALS.ATTACHMENT_SCENES[1], 1, Vector2(-30, 0))
+		var bullets_multi:BulletVolley2D = BENCHMARK_GLOBALS.FACTORY.spawn_volley(bullets_data)
+		if bullets_multi != null: # null when refused (the error says why)
+			var scene:PackedScene = BENCHMARK_GLOBALS.ATTACHMENT_SCENES[1]
+			bullets_multi.all_bullets_set_attachment(scene, Vector2(-30, 0))
 		
 		can_shoot=false
 		shoot_timer.start()
@@ -151,10 +151,10 @@ func get_marker_transforms()->Array[Transform2D]:
 		var transf1:Transform2D = Transform2D(left_marker.global_transform.get_rotation() , left_marker.global_transform.origin)
 		var transf2:Transform2D = Transform2D(right_marker.global_transform.get_rotation(), right_marker.global_transform.origin)
 		
-		return [transf1, transf2]
+		return [AbstractEnemy.ahead_of_muzzle(transf1, bullets_data), AbstractEnemy.ahead_of_muzzle(transf2, bullets_data)]
 	
 	var center_transf = Transform2D(center_marker.global_transform.get_rotation(), center_marker.global_transform.origin)
-	return [center_transf]
+	return [AbstractEnemy.ahead_of_muzzle(center_transf, bullets_data)]
 
 func get_speed_data()->Array[BulletSpeedData2D]:
 	var sp_data:BulletSpeedData2D = BulletSpeedData2D.new()
@@ -185,4 +185,4 @@ func _on_shoot_timer_timeout() -> void:
 	is_shooting_two_at_a_time = !is_shooting_two_at_a_time # next time with different shoot behavior
 
 func set_bullet_collision_mask(arr:Array[int])->void:
-	bullets_data.collision_mask = MultiMeshBulletsData2D.calculate_bitmask(arr)
+	bullets_data.collision_mask = BulletVolleyData2D.calculate_bitmask(arr)

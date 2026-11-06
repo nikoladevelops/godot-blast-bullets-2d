@@ -1,0 +1,20 @@
+[gd_scene format=3]
+
+[sub_resource type="Environment" id="Environment_glow"]
+background_mode = 3
+glow_enabled = true
+glow_levels/1 = 1.0
+glow_levels/2 = 0.6
+glow_levels/3 = 0.4
+glow_levels/5 = 0.0
+glow_intensity = 0.9
+glow_strength = 1.1
+glow_bloom = 0.08
+glow_blend_mode = 1
+glow_hdr_threshold = 0.85
+adjustment_enabled = true
+adjustment_contrast = 1.08
+adjustment_saturation = 1.15
+
+[node name="WorldEnvironment" type="WorldEnvironment"]
+environment = SubResource("Environment_glow")

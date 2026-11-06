@@ -59,3 +59,8 @@ ios.debug = {
 ios.release = {
   "./bin/ios/libblastbullets2d.ios.template_release.single.xcframework": ""
 }
+
+[icons]
+BulletFactory2D = "./icons/BulletFactory2D.svg"
+BulletSpawner2D = "./icons/BulletSpawner2D.svg"
+LaserSpawner2D = "./icons/LaserSpawner2D.svg"

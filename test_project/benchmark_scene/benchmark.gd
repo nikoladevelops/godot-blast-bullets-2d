@@ -2,6 +2,10 @@ extends Node2D
 
 @onready var enemy_spawners_container:Node = $EnemySpawnersContainer
 
+## Prints one line per spawner hit (off by default: per-hit printing distorts
+## the measured FPS).
+@export var log_spawner_hits := false
+
 @onready var attachment_scenes:Dictionary[int, PackedScene] = {
 	0 : null,
 	1 : preload("res://shared/bullet_attachment_nodes/attached_particles.tscn"),
@@ -17,31 +21,47 @@ func _ready() -> void:
 	
 	BENCHMARK_GLOBALS.ATTACHMENT_SCENES = attachment_scenes
 	BENCHMARK_GLOBALS.FACTORY = $BulletFactory2D
-	BENCHMARK_GLOBALS.BULLET_TYPE_TO_SPAWN = BENCHMARK_GLOBALS.BulletType.MultiMeshDirectional # set the default current bullet type that needs to be spawned
+	BENCHMARK_GLOBALS.BULLET_TYPE_TO_SPAWN = BENCHMARK_GLOBALS.BulletType.BulletVolley # set the default current bullet type that needs to be spawned
 	BENCHMARK_GLOBALS.PLAYER = $Player
 	BENCHMARK_GLOBALS.PLAYER_DATA_NODE = $Player/PlayerDataNode
 	BENCHMARK_GLOBALS.UI = $UI
-	BENCHMARK_GLOBALS.PLAYER_HEALTH_BAR = $UI/AlwaysVisibleView/HealthBar
+	BENCHMARK_GLOBALS.PLAYER_HEALTH_BAR = $UI/Sidebar/List/AlwaysVisibleView/HealthRow/HealthBar
 	BENCHMARK_GLOBALS.ALL_GODOT_AREA2D_BULLETS_CONTAINER = $AllGodotArea2DBulletsContainer
 	BENCHMARK_GLOBALS.STATIONARY_TARGET = $BulletHellRelated/StationaryTarget
 	BENCHMARK_GLOBALS.MOVING_TARGET_ONE = $BulletHellRelated/MovingTargetOne
 	BENCHMARK_GLOBALS.MOVING_TARGET_TWO = $BulletHellRelated/MovingTargetTwo
 	BENCHMARK_GLOBALS.MOVEMENT_PATH_HOLDER = $Paths
+
+	# The live inspector (F2) finds the factory and the spawners itself; the player's bullets are
+	# plain script data, so they are added by hand.
+	$LiveInspector.add_target("Player bullets  (BulletVolleyData2D)", func(): return BENCHMARK_GLOBALS.PLAYER_DATA_NODE.volley_data)
 	
 	# Make sure to set the actual debugger colors to the UI buttons
-	var initial_block_debugger_color:Color = BENCHMARK_GLOBALS.FACTORY.block_bullets_debugger_color
-	var initial_directional_debugger_color:Color = BENCHMARK_GLOBALS.FACTORY.directional_bullets_debugger_color
+	var initial_debugger_color:Color = BENCHMARK_GLOBALS.FACTORY.debugger_color
 	
-	BENCHMARK_GLOBALS.UI.change_block_debugger_btn_color(initial_block_debugger_color)
-	BENCHMARK_GLOBALS.UI.block_debugger_color_picker.color = initial_block_debugger_color
-	
-	BENCHMARK_GLOBALS.UI.change_directional_debugger_btn_color(initial_directional_debugger_color)
-	BENCHMARK_GLOBALS.UI.directional_debugger_color_picker.color = initial_directional_debugger_color
+	BENCHMARK_GLOBALS.UI.change_debugger_btn_color(initial_debugger_color)
+	BENCHMARK_GLOBALS.UI.debugger_color_picker.color = initial_debugger_color
 	
 	BENCHMARK_GLOBALS.UI.enable_debugger_checkbox.button_pressed = BENCHMARK_GLOBALS.FACTORY.is_debugger_enabled
 	
-	# Add all spawners so they are available globally
+	# Add all spawners so they are available globally (the static survives a
+	# scene reload, so stale instances never accumulate across reloads)
+	BENCHMARK_GLOBALS.ALL_ENEMY_SPAWNERS.clear()
 	for child in enemy_spawners_container.get_children():
 		var spawner:EnemySpawner = child as EnemySpawner
 		BENCHMARK_GLOBALS.ALL_ENEMY_SPAWNERS.push_back(spawner)
 	
+
+
+func _on_bullet_spawner_2d_area_entered(_hit_target_area: Object, _volley: BulletVolley2D, _bullet_index: int) -> void:
+	if log_spawner_hits:
+		print("Spawner hit an area!")
+
+
+func _on_bullet_spawner_2d_body_entered(_hit_target_body: Object, _volley: BulletVolley2D, _bullet_index: int) -> void:
+	if log_spawner_hits:
+		print("Spawner hit a body!")
+
+
+func _on_bullet_spawner_2d_bullet_grazed(_target: Node2D, volley: BulletVolley2D, bullet_index: int, _zone: GrazeZone2D, ring_index: int) -> void:
+	print("Bullet volley" + str(volley) + " at index " + str(bullet_index) + " grazed " + str(ring_index))

@@ -1,0 +1,161 @@
+#pragma once
+
+#include <godot_cpp/classes/mesh.hpp>
+#include <godot_cpp/classes/node.hpp>
+#include <godot_cpp/classes/physics_server2d.hpp>
+
+#include "core/owned_node2d.hpp"
+
+#include <unordered_set>
+#include <vector>
+
+namespace godot {
+
+class MultiMeshInstance2D;
+class PhysicsServer2D;
+} //namespace godot
+
+namespace BlastBullets2D {
+using namespace godot;
+
+class BulletVolley2D;
+
+// Visualizes the collision shapes of the bullets
+class BulletVolleyDebugger2D : public Node {
+	GDCLASS(BulletVolleyDebugger2D, Node)
+
+public:
+	// Handles movement of the debug multimeshes
+	virtual void _physics_process(double delta) override;
+
+	// Configures the debugger so that it's in valid state. It's mandatory to call this method since it acts as a second constructor. Also mandatory that new_container_to_debug only ever holds volley children (the factory's volley container)
+	void configure(Node *new_container_to_debug, const String &new_debugger_name, const Color &new_debugger_color);
+
+	// Get whether the debugger is enabled or not
+	bool get_is_debugger_enabled() const;
+
+	// Enables/disables the debugger by generating/deleting debugger multimeshes
+	void set_is_debugger_enabled(bool value);
+
+	// Gets the current debugger color
+	Color get_debugger_color() const;
+
+	// Sets the debugger color to another color
+	void set_debugger_color(const Color &new_color);
+	int get_debugger_z_index() const { return debugger_z_index; }
+	// Every debug multimesh draws at this z (the factory's debugger_z_index).
+	void set_debugger_z_index(int value);
+
+	// Provider budget: max providers drawn per tick (0 = unlimited, default).
+	// Beyond the cap extra providers are hidden (visible=false), oldest first.
+	// Prevents the always-draw-everything debugger from melting on 10k-bullet
+	// demos while keeping default behavior unchanged.
+	int get_max_debug_providers() const { return max_debug_providers; }
+	void set_max_debug_providers(int v) { max_debug_providers = (v < 0) ? 0 : v; }
+
+	// When false, inactive (pooled/frozen) providers are hidden instead of
+	// drawn frozen. Default true preserves the documented always-draw behavior.
+	bool get_draw_inactive_shapes() const { return draw_inactive_shapes; }
+	void set_draw_inactive_shapes(bool v) { draw_inactive_shapes = v; }
+
+protected:
+	static void _bind_methods() {};
+
+private:
+	// Whether the debugger is actually working or not
+	bool is_debugger_enabled = false; // Note: weird bugs might happen if this isn't initialized and is not the same value as the one used outside. Always initialize values that are exposed to the outside world or used instanly without having to run the setter first - undefined values will be read and you will waste time figuring out why code sometimes works and sometimes doesn't lol
+
+	// One-shot throttling for the release-build size-mismatch warning.
+	bool size_mismatch_warned = false;
+
+	// Separate latch for tracking-array desync: sharing one flag with the
+	// per-multimesh size warning would silence the other condition forever.
+	bool desync_warned = false;
+
+	// The color which the debugger uses to visualize the collision shapes of all bullets
+	Color debugger_color = Color(0, 0, 0, 1);
+	int debugger_z_index = 999;
+
+	// Stores pointers to the spawned debug_data_providers
+	std::vector<BulletVolley2D *> debug_data_providers;
+
+	// Instance ids parallel to debug_data_providers. Raw provider pointers can
+	// dangle when a multimesh is freed while pooled or during factory teardown;
+	// the id lets the tick validate via ObjectDB before touching the pointer.
+	std::vector<uint64_t> debug_data_provider_ids;
+
+	// Node identity parallel to debug_data_providers, captured while alive.
+	// Only ever compared BY VALUE against the ObjectDB-resolved live node -
+	// never dereferenced - so id reuse by an unrelated object can't pass.
+	std::vector<Node *> debug_data_provider_nodes;
+
+	// The spawned debug multimesh nodes: ordinary children a script may free
+	// (or empty), so every read goes through get().
+	std::vector<OwnedNode2D<MultiMeshInstance2D>> debugger_multimeshes;
+
+	// Tracks mesh type/size per debugger entry so pool reuse with different sizes recreates correct true-shape mesh
+	std::vector<PhysicsServer2D::ShapeType> debugger_mesh_types;
+	std::vector<Vector2> debugger_mesh_sizes;
+
+	// Per-entry active state, kept parallel with the other arrays: lets the tick skip
+	// the transform rewrite for inactive (pooled) providers whose frozen transforms
+	// cannot change, while still drawing them (one final sync on the transition).
+	std::vector<bool> debugger_last_active_states;
+
+	// Entries whose debug node was lost this tick (reused, no per-tick alloc).
+	std::vector<int> lost_entries_scratch;
+
+	// Instance ids of the providers already drawn (O(1) dedupe when a volley
+	// re-enters). Ids, not pointers: a new volley may reuse a freed one's
+	// address.
+	std::unordered_set<uint64_t> debug_provider_set;
+
+	// One provider's instance buffer (8 transform + 4 color floats per
+	// shape), uploaded with ONE set_buffer per provider per tick instead of
+	// an engine call per shape.
+	PackedFloat32Array debug_buffer_scratch;
+
+	// The container whose volley children get debugged (the factory
+	// re-points it when a script freed the container and it was recreated).
+	OwnedNode2D<Node> container_to_debug;
+
+	// A pointer to the physics server
+	PhysicsServer2D *physics_server = nullptr;
+
+	// Provider budget state (see public setters). Zero = unlimited.
+	int max_debug_providers = 0;
+	bool draw_inactive_shapes = true;
+
+	// Generates a debug multimesh for a volley that entered the container
+	void generate_debug_multimesh(Node *node_entered_container_to_debug);
+
+	// Erases entry i from every parallel array, deleting its debug node when
+	// it is still alive.
+	void erase_debug_entry(int i);
+
+	// Drops the provider + its debug mesh when the multimesh exits the container's
+	// subtree (manual free/reparent/scene teardown). Without this the raw provider
+	// pointer dangles and _physics_process dereferences freed memory every tick.
+	void remove_debug_multimesh_for_node(Node *node_exiting_container_to_debug);
+
+	// Creates true-shape debug mesh by type: rect->QuadMesh, circle->ArrayMesh fan, capsule->ArrayMesh rect+caps
+	Ref<Mesh> create_debug_mesh_for_shape(PhysicsServer2D::ShapeType type, const Vector2 &full_size);
+
+	// Ensures debug mesh type/size matches provider (handles pool reuse with different sizes)
+	void ensure_quadmesh_matches_data_provider_collision_shape_size(int dbg_index, MultiMeshInstance2D &debug_multimesh_instance, BulletVolley2D &debugger_data_provider);
+
+	// Updates each debug multimesh's instance transforms to match the debug_data_providers's data
+	void update_debug_multimesh_transforms_to_match_data_provider_collision_shape_transforms(MultiMeshInstance2D &debug_multimesh_instance, BulletVolley2D &debugger_data_provider);
+
+	// Changes the color of all debug multimeshes/ the color of the debug shapes
+	void change_debug_multimeshes_color(const Color &new_multimesh_color);
+
+	// Disables the debugger and frees all debugger multimeshes
+	void disable();
+
+	// Activates the debugger and spawns all needed debugger multimeshes.
+	// Returns false (without latching state) when it had to abort (no container).
+	bool enable();
+};
+
+} //namespace BlastBullets2D

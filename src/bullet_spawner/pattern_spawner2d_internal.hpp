@@ -1,0 +1,214 @@
+#pragma once
+
+// Private to the bullet_spawner2d*.cpp translation units: file-local
+// helpers, limits and tables shared by more than one of them. Never
+// include from anywhere else. Functions are `static inline` (one private
+// copy per TU, no ODR coupling, no unused-function warnings).
+
+#include "bullet_spawner/bullet_spawner2d.hpp"
+#include "core/warn_once2d.hpp"
+#include <godot_cpp/classes/class_db_singleton.hpp>
+
+#include "bullet_volley/bullet_volley2d.hpp"
+#include "core/easing2d.hpp"
+#include "core/node_scan2d.hpp"
+#include "godot_cpp/classes/capsule_shape2d.hpp"
+#include "godot_cpp/classes/circle_shape2d.hpp"
+#include "godot_cpp/classes/curve2d.hpp"
+#include "godot_cpp/classes/engine.hpp"
+#include "godot_cpp/classes/global_constants.hpp"
+#include "godot_cpp/classes/path2d.hpp"
+#include "godot_cpp/classes/rectangle_shape2d.hpp"
+#include "godot_cpp/classes/scene_tree.hpp"
+#include "godot_cpp/classes/window.hpp"
+#include "godot_cpp/core/class_db.hpp"
+#include "godot_cpp/core/math.hpp"
+#include "godot_cpp/core/object.hpp"
+#include "godot_cpp/variant/callable.hpp"
+#include "godot_cpp/variant/dictionary.hpp"
+#include "godot_cpp/variant/utility_functions.hpp"
+#include "patterns/shot_randomizer2d.hpp"
+#include <functional>
+#include <godot_cpp/classes/array_mesh.hpp>
+#include <godot_cpp/classes/multi_mesh.hpp>
+#include <godot_cpp/classes/texture2d.hpp>
+#include <godot_cpp/classes/time.hpp>
+
+namespace BlastBullets2D {
+
+// Resolves a stored NodePath to a typed node. When inside the tree the path is
+// authoritative: a missing target clears the cache instead of serving a stale
+// pointer. Outside the tree the previously cached pointer is returned.
+template <typename T>
+static inline T *resolve_node_path(const Node *self, const NodePath &p_path, T *&r_cache) {
+	if (self->is_inside_tree() && !p_path.is_empty()) {
+		Node *node = self->get_node_or_null(p_path);
+		if (node == nullptr) {
+			r_cache = nullptr;
+			return nullptr;
+		}
+		T *typed = Object::cast_to<T>(node);
+		r_cache = typed;
+		return typed;
+	}
+	return r_cache;
+}
+
+template <typename T>
+static inline void assign_node_to_path(const Node *self, T *node, NodePath &r_path, T *&r_cache) {
+	r_cache = node;
+	// Path updates only when both ends share one tree: get_path_to across
+	// trees errors (or yields a path that later resolves elsewhere), and an
+	// out-of-tree assignment must not keep a stale path that would silently
+	// replace this node on re-entry (see validate_cached_node).
+	if (node != nullptr && self->is_inside_tree() && node->is_inside_tree() && self->get_tree() == node->get_tree()) {
+		r_path = self->get_path_to(node);
+	} else {
+		// Null, or a pointer assigned across trees / while out of the tree:
+		// the old path must go (it would resolve the OLD node on re-entry).
+		// fill_assigned_node_paths() writes the new one once both share a tree.
+		r_path = NodePath();
+	}
+}
+
+// Validates a cached node pointer against its stored instance id, then falls
+// back to the stored path. Every cached node getter (factory, generator,
+// aimed target, Path2D node) shares this exact shape: a stale cache is
+// cleared and reported as missing WITHOUT consulting the path (the path may
+// since resolve elsewhere), while an empty cache resolves through the path.
+// ObjectDB is consulted before any dereference, so a freed node can never be
+// touched here.
+template <typename T>
+static inline T *validate_cached_node(const Node *self, const NodePath &p_path, T *&r_cache, uint64_t &r_id) {
+	if (r_cache != nullptr) {
+		if (r_id == 0 || !UtilityFunctions::is_instance_id_valid(r_id)) {
+			r_cache = nullptr;
+			r_id = 0;
+		} else if (ObjectDB::get_instance(ObjectID(r_id)) != (Object *)r_cache) {
+			r_cache = nullptr;
+			r_id = 0;
+		} else {
+			// Validated cache wins outright: re-resolving the path here
+			// would let a stale path silently replace a manually assigned
+			// node (assign_node_to_path deliberately leaves the path behind
+			// out-of-tree assignments). Setters clear the cache, so a live
+			// cache always agrees with the path. This also skips the
+			// string-parse + tree walk on every getter call.
+			return r_cache;
+		}
+		if (r_cache == nullptr) {
+			return nullptr;
+		}
+	}
+	T *resolved = resolve_node_path(self, p_path, r_cache);
+	if (resolved == nullptr) {
+		r_cache = nullptr;
+		r_id = 0;
+		return nullptr;
+	}
+	r_id = resolved->get_instance_id();
+	return resolved;
+}
+
+// What a node setter held before its write: the node it resolved to
+// (validated through ObjectDB, never a raw pointer compare: a freed node's
+// address may come back) and the stored path. The write is a configuration
+// change (re-arms the auto-fire error latch) only when either differs, so
+// the same node written back keeps the latch, and a null written over a
+// path that resolves to nothing still counts (the path goes).
+template <typename T>
+struct NodeAssignment2D {
+	const T *node;
+	NodePath path;
+	NodeAssignment2D(const Node *self, const NodePath &p_path, T *&r_cache, uint64_t &r_id) :
+			node(validate_cached_node(self, p_path, r_cache, r_id)), path(p_path) {}
+	bool changed_to(const T *p_node, const NodePath &p_path) const { return p_node != node || p_path != path; }
+};
+
+// Node name for the editor-only pattern preview holder (tagged with
+// PREVIEW_META_KEY, core/node_scan2d.hpp). The tilde sorts it last and marks
+// it as internal. The holder is owner-less: never saved, never exported.
+static constexpr const char *PREVIEW_HOLDER_NAME = "~BlastBulletsPatternPreview";
+// Instance id of the spawner that owns a preview holder: holders are found by
+// owner, so spawners sharing one generator never touch each other's.
+static constexpr const char *PREVIEW_OWNER_META_KEY = "_blast_preview_owner";
+// The graze ring preview layer (internal child of the spawner).
+static constexpr const char *GRAZE_PREVIEW_NAME = "~BlastBulletsGrazePreview";
+
+// Shared limits (single definition so validation, generation and preview
+// agree; the inspector hint strings in _bind_methods mirror these).
+
+static constexpr int kMaxOutlineLayers = kPatternMaxOutlineLayers; // helper_outline_layer_count + helper_outline_layer_scales
+
+static constexpr int kMaxPreviewTrackPoints = kPatternMaxTrackPoints; // path/cross track decimation stride target
+
+static constexpr float kFirstDotRadiusScale = 1.6f; // bullet-0 emphasis marker
+
+// Pattern-source metadata lives in the pattern registry
+// (patterns/pattern_registry2d.hpp): names, ids, knob prefixes and shape
+// capabilities come from that one table. These wrappers keep the spawner's
+// historical call sites typed on its enum.
+static inline const char *pattern_source_name(PatternSpawner2D::PatternSource source) {
+	return pattern_shape_name2d((int)source);
+}
+
+static inline String pattern_source_hint() {
+	return pattern_shape_hint2d();
+}
+
+// Corner-anchored polygon loops: the only shapes with shared corner dots
+// (rectangle, square, polygon, triangle, trapezoid, diamond, star). Corner
+// priority/mode/margin/facing knobs show for these only.
+static inline bool supports_corner_layout(PatternSpawner2D::PatternSource source) {
+	return pattern_shape_supports_corners2d((int)source);
+}
+
+// WarnOnce2D codes owned by the spawner (1..99 belong to the volleys).
+static constexpr uint32_t kWarnCorridorGap = kPatternWarnCorridorGap; // gap >= width at generation
+static constexpr uint32_t kWarnSkipIndexOutOfRange = 102; // helper_skip_indices
+static constexpr uint32_t kWarnGridTooLarge = kPatternWarnGridTooLarge; // waterfall/lattice columns*rows
+static constexpr uint32_t kWarnOrbitWithoutHoming = 104; // orbiting needs homing
+static constexpr uint32_t kWarnSeveralWorldFactories = 105; // empty bullet_factory_path, several factories in the world
+
+// NodePath setters: inside the tree, a path that resolves to a node of the
+// wrong type is rejected loudly and the old value kept. A path that does
+// not resolve yet is accepted (the node may be added later, and scene
+// loading assigns properties before the spawner enters the tree).
+template <typename T>
+static inline bool node_path_type_ok(const Node *self, const NodePath &p_path, const char *prop, const char *type_name) {
+	// self is the spawner: its class names it in the error.
+	if (p_path.is_empty() || !self->is_inside_tree()) {
+		return true;
+	}
+	Node *node = self->get_node_or_null(p_path);
+	if (node == nullptr || Object::cast_to<T>(node) != nullptr) {
+		return true;
+	}
+	UtilityFunctions::push_error(String(self->get_class()) + ": " + prop + " must point to a " + type_name + ", keeping the old value.");
+	return false;
+}
+
+// Seeded shot rolls (PatternSpawner2D placement, BulletSpawner2D speed,
+// colors, lifetimes): the channels and helpers of ShotRandomizer2D.
+namespace {
+using RollChannel = ShotRandomizer2D::Channel;
+constexpr RollChannel CHANNEL_SCALE_X = ShotRandomizer2D::CHANNEL_SCALE_X;
+constexpr RollChannel CHANNEL_SCALE_Y = ShotRandomizer2D::CHANNEL_SCALE_Y;
+constexpr RollChannel CHANNEL_ROTATION = ShotRandomizer2D::CHANNEL_ROTATION;
+constexpr RollChannel CHANNEL_POSITION_ANGLE = ShotRandomizer2D::CHANNEL_POSITION_ANGLE;
+constexpr RollChannel CHANNEL_POSITION_RADIUS = ShotRandomizer2D::CHANNEL_POSITION_RADIUS;
+constexpr RollChannel CHANNEL_SPEED = ShotRandomizer2D::CHANNEL_SPEED;
+constexpr RollChannel CHANNEL_SPIN = ShotRandomizer2D::CHANNEL_SPIN;
+constexpr RollChannel CHANNEL_COLOR = ShotRandomizer2D::CHANNEL_COLOR;
+constexpr RollChannel CHANNEL_LIFE_TIME = ShotRandomizer2D::CHANNEL_LIFE_TIME;
+
+inline uint64_t mix64(uint64_t x) {
+	return shot_roll_mix64(x);
+}
+
+inline double lerp_range(double a, double b, double t) {
+	return shot_roll_lerp(a, b, t);
+}
+} // namespace
+
+} // namespace BlastBullets2D

@@ -1,0 +1,3020 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="BulletVolley2D" inherits="MultiMeshInstance2D" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		One volley of bullets: everything one spawn call created, drawn by one multimesh and moved together. Spawn it with [method BulletFactory2D.spawn_volley] (or a [BulletSpawner2D]), never with [code]new()[/code].
+	</brief_description>
+	<description>
+		One live volley: every bullet of one spawn call, drawn by a single multimesh and collided by one physics area. Each bullet flies along its own transform's rotation with its own speed. The volley holds everything the bullets need at runtime (per-bullet motion, collision shapes, attachments, curves, movement patterns, wobble, gravity, bounce, timers, animation, effect trails) plus advanced homing and orbiting. Keep the instance returned by [method BulletFactory2D.spawn_volley] to steer the bullets live; when the last bullet dies the volley returns to the factory's object pool and may be handed out again by a later spawn. It supports per-bullet homing deques for individualized target chasing (e.g., specific enemies) and a shared deque for uniform swarm behaviors (e.g., collective waypoint following). Targets can be global positions, Node2D instances, or mouse position, with optional auto-pop on reach (see [member bullet_homing_auto_pop_after_target_reached], [member shared_homing_deque_auto_pop_after_target_reached], [signal bullet_homing_target_reached]), smoothing for natural turning (see [member homing_smoothing]), distance before reached - [member homing_distance_before_reached] and update time interval (see [member homing_update_interval]). Enables complex bullet patterns in 2D games.
+
+		Warning: Never use [code]get_tree().create_timer()[/code] or any other godot timers with this class. It will cause issues with the internal timing of the bullets. If you need timers, use [method attach_time_based_function] instead.
+
+		Warning: Every signal fires live inside the physics tick (hits, bounces, lifetime, homing reached, animation finished), with the bullet still alive and every runtime property readable; per-bullet edits and spawning apply immediately from any handler. Only structural factory calls ([method BulletFactory2D.reset], [method BulletFactory2D.free_active_bullets], [method BulletFactory2D.free_disabled_bullets], [method BulletFactory2D.free_bullets_pool], [method BulletFactory2D.populate_bullets_pool], a collision-shape change) are rejected inside the tick: use their [code]*_deferred[/code] twins (for example [method BulletFactory2D.reset_deferred], [method set_collision_shape_runtime_deferred]), which run on the factory's idle queue. A plain [method Object.call_deferred] is not enough, because calls deferred from the physics step still run inside it.
+
+		Note: A volley's life: it is ACTIVE while any bullet flies. When its last bullet is disabled it returns to the pool ([method is_pooled], the handle is stale) if [member is_auto_pooling_enabled] is on, or it PARKS ([method is_parked]: frozen, still yours, wakeable with [method enable_bullet]) when it is off. [method disable_bullet] freezes a bullet with its state; [method bullet_reset_state] clears it. [method get_life_id] tells two lives of the same instance apart.
+
+		Warning: Homing functionality can be done in two ways - either using [b]per-bullet homing deques[/b] (each bullet has its own deque of homing targets) or a [b]shared homing deque[/b] (broadcast fallback for bullets without their own targets). Both are supported and per-bullet deques always win per bullet: a bullet with its own non-empty deque follows it, otherwise it follows the shared deque. If a per-bullet deque drains mid-flight the bullet falls back to the shared deque. Any method or property that mentions "shared" is related to the shared deque.
+
+		Note: Deque means double ended queue (you can push and pop from both ends), the homing target at the front is always the one being followed.
+
+		Note: Bullets can orbit around their current homing target if enabled (see [method bullet_enable_orbiting], [method all_bullets_enable_orbiting]). Orbiting requires having a valid homing target to orbit around. Be aware that orbiting does not care about the difference between a shared homing deque or a per bullet deque, as long as there is a target to orbit around it will work.
+
+		Note: Feature mixing has a fixed precedence each tick: homing steers the direction (per-bullet deque wins per bullet, shared is the fallback), direction curves adjust it (per-bullet channels win per channel, shared covers the rest), rotation spins only the visual, adjust_direction_based_on_rotation feeds the visual back into ballistics (skipped when rotate_only_textures is on, since that spin is rendering-only), movement patterns steer the displacement (per-bullet patterns win per bullet, shared is the fallback; skipped while a locked orbit owns the bullet, so non-repeating patterns never finish invisibly on the ring), and a locked orbit owns the final displacement. Homing smoothing has no effect while a movement pattern or rotation data drives the direction (the direction snaps instead). Teleporting a locked bullet re-aims its ring slot from the new position instead of snapping back. [method get_bullet_velocity] reports the logical velocity (direction times speed plus wind), excluding pattern and orbit displacement.
+
+		Note: Instead of [BulletSpeedData2D] with [method set_bullet_speed_data] you can take advantage of [BulletCurvesData2D] by using [method bullet_set_curves_data], [method all_bullets_set_curves_data] or [member shared_bullet_curves_data] if you want a shared curve for all bullets.
+
+		Note: For [Path2D] drawn bullet patterns try using [method set_bullet_movement_pattern_from_path] or [method set_bullet_movement_pattern_from_curve].
+
+		Note: For bullet attachments (particles, lights, etc...) use [BulletAttachment2D] and attach them via [method bullet_set_attachment] or [method all_bullets_set_attachment].
+
+			Note: For initial velocity/inertia use [member inherited_velocity_offset].
+
+			Note: For custom data that the multimesh should carry use [member shared_bullets_custom_data] - used for damage or anything else custom that is available in collision callbacks inside [BulletFactory2D].
+
+		Note: For object pooling options see [member is_auto_pooling_enabled] and [member is_attachments_auto_pooling_enabled].
+
+		Note: Bullets can be made to collide multiple times - use [member bullet_max_collision_count] and [member bullets_current_collision_count].
+
+		Note: Bullets animate via SpriteFrames. Switch with [method play_sprite_animation].
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="all_bullets_assign_homing_targets_array">
+			<return type="void" />
+			<param index="0" name="node2ds_or_global_positions_array" type="Array" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Pushes one homing target per bullet: array element i goes to bullet (start + i), pushed to the back of its per-bullet deque. The array size must match the range size, and every element must be a Node2D or Vector2, otherwise nothing is pushed. Useful for scatter-to-enemies spreads.
+			</description>
+		</method>
+		<method name="all_bullets_clear_curves_data">
+			<return type="void" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Clears per-bullet curves over a range (default all) back to the shared fallback (or no curves when unset), mirroring [method clear_per_bullet_homing_smoothing]. Example: [code]bullets.all_bullets_clear_curves_data(); print(bullets.debug_get_curves_info(0)["speed_src"])[/code] prints "shared" or "none".
+			</description>
+		</method>
+		<method name="all_bullets_clear_homing_targets">
+			<return type="void" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Clears all homing targets for the specified range of bullets (per-bullet deques only; shared deque unaffected).
+
+				If you want to clear all bullet targets for a shared deque, use [method shared_homing_deque_clear_homing_targets] instead.
+			</description>
+		</method>
+		<method name="all_bullets_disable_orbiting">
+			<return type="void" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Disables orbiting for the specified range of bullets. Bullets that do not orbit are left as they are.
+			</description>
+		</method>
+		<method name="all_bullets_enable_orbiting">
+			<return type="void" />
+			<param index="0" name="orbiting_radius" type="float" />
+			<param index="1" name="orbiting_direction" type="int" enum="BulletVolley2D.OrbitingDirection" default="2" />
+			<param index="2" name="orbiting_texture_rotation" type="int" enum="BulletVolley2D.OrbitingTextureRotation" default="0" />
+			<param index="3" name="bullet_index_start" type="int" default="0" />
+			<param index="4" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<param index="5" name="orbiting_follow_mode" type="int" enum="BulletVolley2D.OrbitingFollowMode" default="0" />
+			<param index="6" name="orbiting_follow_deadzone" type="float" default="0.0" />
+			<param index="7" name="orbiting_lock_policy" type="int" enum="BulletVolley2D.OrbitingLockPolicy" default="0" />
+			<param index="8" name="orbiting_rigid_follow" type="bool" default="true" />
+			<description>
+				Enables orbiting for the specified range of bullets with the given parameters. Bullets that already orbit take the new settings in place (see [method bullet_enable_orbiting]).
+
+				Note that orbiting relies on having a homing target to orbit around.
+			</description>
+		</method>
+		<method name="all_bullets_enable_orbiting_linear">
+			<return type="void" />
+			<param index="0" name="radius_start" type="float" />
+			<param index="1" name="radius_step" type="float" />
+			<param index="2" name="orbiting_direction" type="int" enum="BulletVolley2D.OrbitingDirection" default="2" />
+			<param index="3" name="orbiting_texture_rotation" type="int" enum="BulletVolley2D.OrbitingTextureRotation" default="0" />
+			<param index="4" name="bullet_index_start" type="int" default="0" />
+			<param index="5" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<param index="6" name="orbiting_follow_mode" type="int" enum="BulletVolley2D.OrbitingFollowMode" default="0" />
+			<param index="7" name="orbiting_follow_deadzone" type="float" default="0.0" />
+			<param index="8" name="orbiting_lock_policy" type="int" enum="BulletVolley2D.OrbitingLockPolicy" default="0" />
+			<param index="9" name="orbiting_rigid_follow" type="bool" default="true" />
+			<description>
+				Enables orbiting with concentric radii: bullet (start + k) orbits at radius_start + radius_step * k. Useful for shield rings. Bullets that already orbit take their new radius and settings in place (see [method bullet_enable_orbiting]).
+			</description>
+		</method>
+		<method name="all_bullets_get_attachments">
+			<return type="BulletAttachment2D[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Get the attachments of all bullets in the specified range. Returns an array of [BulletAttachment2D], which can be null if a bullet doesn't have an attachment.
+			</description>
+		</method>
+		<method name="all_bullets_get_bounce_count" qualifiers="const">
+			<return type="int[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Bounce counts over a bullet range (mirrors [method bullet_get_bounce_count]). Inverted ranges are rejected.
+			</description>
+		</method>
+		<method name="all_bullets_get_color" qualifiers="const">
+			<return type="PackedColorArray" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Returns the color of every bullet in the range (see [method get_bullet_color]). The default range covers the whole volley.
+			</description>
+		</method>
+		<method name="all_bullets_get_curves_data">
+			<return type="BulletCurvesData2D[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Get the curves data of all bullets in the specified range. Returns an array of [BulletCurvesData2D], which can be null if a bullet doesn't have curves data assigned.
+			</description>
+		</method>
+		<method name="all_bullets_get_custom_data">
+			<return type="Resource[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Get the per-bullet custom data of all bullets in the specified range. Returns an array of [Resource], null where a bullet has none set. Strictly separate from [member shared_bullets_custom_data].
+			</description>
+		</method>
+		<method name="all_bullets_get_direction" qualifiers="const">
+			<return type="Vector2[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Get the direction of all bullets in the specified range. Returns an array of [Vector2] directions.
+			</description>
+		</method>
+		<method name="all_bullets_get_fall_speed" qualifiers="const">
+			<return type="float[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Integrated fall-speed magnitudes over a range (0 where gravity never integrated).
+			</description>
+		</method>
+		<method name="all_bullets_get_gravity" qualifiers="const">
+			<return type="Vector2[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Per-bullet gravity vectors over a range.
+			</description>
+		</method>
+		<method name="all_bullets_get_homing_smoothing" qualifiers="const">
+			<return type="float[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Effective per-bullet homing smoothing over a range (per-bullet value where set, else shared).
+			</description>
+		</method>
+		<method name="all_bullets_get_homing_targets_amount">
+			<return type="PackedInt32Array" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Returns the per-bullet homing queue depth of each bullet in the range (shared deque excluded; read it via [method shared_homing_deque_check_homing_targets_amount]). Example: after [method all_bullets_push_back_homing_target], depths are 1 per bullet.
+			</description>
+		</method>
+		<method name="all_bullets_get_life_time_left" qualifiers="const">
+			<return type="PackedFloat64Array" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Returns the time left of every bullet in the range (see [method get_bullet_life_time_left]). The default range covers the whole volley.
+			</description>
+		</method>
+		<method name="all_bullets_get_orbiting_angle">
+			<return type="PackedFloat32Array" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Returns the locked ring angle (radians) of each bullet in the range. Same per-bullet warnings as [method bullet_get_orbiting_angle].
+			</description>
+		</method>
+		<method name="all_bullets_get_orbiting_center">
+			<return type="PackedVector2Array" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Returns the orbit center of each bullet in the range: the locked ring point once locked, else the live deque front (per-bullet deque wins, shared is the fallback). Same per-bullet warnings as [method bullet_get_orbiting_center]. Example: [code]var centers = bullets.all_bullets_get_orbiting_center()[/code].
+			</description>
+		</method>
+		<method name="all_bullets_get_orbiting_radius">
+			<return type="PackedFloat32Array" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Returns the orbiting radius of all bullets in the range.
+			</description>
+		</method>
+		<method name="all_bullets_get_rotation_data" qualifiers="const">
+			<return type="BulletRotationData2D[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Rotation triples over a range (live values, mirrors [method all_bullets_get_speed_data]).
+			</description>
+		</method>
+		<method name="all_bullets_get_scale" qualifiers="const">
+			<return type="Vector2[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				The scale of every bullet in the range (see [method get_bullet_scale]).
+			</description>
+		</method>
+		<method name="all_bullets_get_speed" qualifiers="const">
+			<return type="float[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				The speed of every bullet in the range (see [method get_bullet_speed]).
+			</description>
+		</method>
+		<method name="all_bullets_get_speed_data" qualifiers="const">
+			<return type="BulletSpeedData2D[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Get the speed data of all bullets in the specified range. Returns an array of [BulletSpeedData2D].
+			</description>
+		</method>
+		<method name="all_bullets_get_texture_rotation_degrees" qualifiers="const">
+			<return type="float[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Get the texture rotation in degrees of all bullets in the specified range. Returns an array of floats representing the rotation in degrees.
+			</description>
+		</method>
+		<method name="all_bullets_get_texture_rotation_radians" qualifiers="const">
+			<return type="float[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Get the texture rotation in radians of all bullets in the specified range. Returns an array of floats representing the rotation in radians.
+			</description>
+		</method>
+		<method name="all_bullets_get_transforms" qualifiers="const">
+			<return type="Transform2D[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Get the transforms of all bullets in the specified range. Returns an array of [Transform2D].
+			</description>
+		</method>
+		<method name="all_bullets_get_velocity" qualifiers="const">
+			<return type="Vector2[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Returns the logical velocities of all bullets in the range (direction x speed + inherited offset), excluding per-tick pattern/orbit displacement. Pair with [method BulletPatterns2D.helper_generate_transforms_fan] for split patterns.
+			</description>
+		</method>
+		<method name="all_bullets_get_wobble_data">
+			<return type="BulletWobbleData2D[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Per-bullet wobble resources over a range (null where the slot runs on the shared fallback or is inactive).
+			</description>
+		</method>
+		<method name="all_bullets_is_orbiting_enabled">
+			<return type="bool[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Returns whether orbiting is enabled for each bullet in the range.
+			</description>
+		</method>
+		<method name="all_bullets_is_orbiting_locked">
+			<return type="bool[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Returns whether each bullet in the range is currently locked onto its orbit ring (as opposed to merely enabled but still flying to the ring).
+			</description>
+		</method>
+		<method name="all_bullets_pop_back_target">
+			<return type="Array" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Pops a homing target from the back of the deque for all bullets in the range (per-bullet deques only).
+
+				Returns an array of popped targets.
+			</description>
+		</method>
+		<method name="all_bullets_pop_front_target">
+			<return type="Array" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Pops a homing target from the front of the deque for all bullets in the range (per-bullet deques only).
+
+				Returns an array of popped targets.
+			</description>
+		</method>
+		<method name="all_bullets_push_back_homing_target">
+			<return type="void" />
+			<param index="0" name="node2d_or_global_position" type="Variant" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				This is a helper that allows you to push a single homing target(Node2D or Vector2 global position) to the back of the deque for all bullets in the range (per-bullet deques only).
+
+				If you want to push back a target to the shared deque, use [method shared_homing_deque_push_back_global_position_target], [method shared_homing_deque_push_back_node2d_target] or [method shared_homing_deque_push_back_mouse_position_target] instead.
+			</description>
+		</method>
+		<method name="all_bullets_push_back_homing_targets_array">
+			<return type="void" />
+			<param index="0" name="node2ds_or_global_positions_array" type="Array" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Pushes an array of homing targets (mix of Node2D and Vector2) to the back of the deque for all bullets in the range (per-bullet deques only).
+
+				If you want to push back targets to the shared deque, use [method shared_homing_deque_push_back_homing_targets_array] instead.
+			</description>
+		</method>
+		<method name="all_bullets_push_back_mouse_position_target">
+			<return type="void" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Pushes the current mouse global position as a homing target to the back of the deque for all bullets in the range (per-bullet deques only).
+
+				If you want to push back a mouse position target to the shared deque, use [method shared_homing_deque_push_back_mouse_position_target] instead.
+			</description>
+		</method>
+		<method name="all_bullets_push_front_homing_target">
+			<return type="void" />
+			<param index="0" name="node2d_or_global_position" type="Variant" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Pushes a single homing target (Node2D or Vector2 global position) to the front of the deque for all bullets in the range (per-bullet deques only).
+
+				Warning: Pushing to the front changes the current target being followed immediately.
+
+				If you want to push front a target to the shared deque, use [method shared_homing_deque_push_front_global_position_target], [method shared_homing_deque_push_front_node2d_target] or [method shared_homing_deque_push_front_mouse_position_target] instead.
+			</description>
+		</method>
+		<method name="all_bullets_push_front_homing_targets_array">
+			<return type="void" />
+			<param index="0" name="node2ds_or_global_positions_array" type="Array" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Pushes an array of homing targets to the front of the deque for all bullets in the range (per-bullet deques only).
+
+				Warning: Pushing to the front changes the current target being followed immediately.
+
+				If you want to push front targets to the shared deque, use [method shared_homing_deque_push_front_homing_targets_array] instead.
+			</description>
+		</method>
+		<method name="all_bullets_push_front_mouse_position_target">
+			<return type="void" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Pushes the current mouse global position to the front of the deque for all bullets in the range (per-bullet deques only).
+
+				Warning: Pushing to the front changes the current target being followed immediately.
+
+				If you want to push front a mouse position target to the shared deque, use [method shared_homing_deque_push_front_mouse_position_target] instead.
+			</description>
+		</method>
+		<method name="all_bullets_remove_movement_pattern">
+			<return type="void" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Removes the movement pattern from all bullets in the specified range, making them lose any [Path2D] or [Curve2D] drawn pattern they had and move solely based on their direction and speed data.
+			</description>
+		</method>
+		<method name="all_bullets_replace_homing_targets_with_mouse">
+			<return type="void" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Each homing target gets cleared and replaced with the Mouse as the target for all bullets in the range (per-bullet deques only). Locked orbit rings follow the lock policy ([method bullet_set_orbiting_lock_policy]); explicit clears still always unlock unless the policy is StayLocked.
+			</description>
+		</method>
+		<method name="all_bullets_replace_homing_targets_with_new_target">
+			<return type="void" />
+			<param index="0" name="node2d_or_global_position" type="Variant" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Clears then pushes a single homing target to the back for all bullets in the range (per-bullet deques only). Locked orbit rings are kept or re-acquired per the lock policy instead of always dropping: same target keeps angle and center, a different target re-locks.
+
+				If you want to clear then push a single target to the shared deque, use [method shared_homing_deque_replace_homing_targets_with_new_target] instead.
+			</description>
+		</method>
+		<method name="all_bullets_replace_homing_targets_with_new_target_array">
+			<return type="void" />
+			<param index="0" name="node2ds_or_global_positions_array" type="Array" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Clears then pushes an array of homing targets to the back for all bullets in the range (per-bullet deques only). Locked orbit rings are kept or re-acquired per the lock policy ([method bullet_set_orbiting_lock_policy]).
+
+				If you want to clear then push an array of targets to the shared deque, use [method shared_homing_deque_replace_homing_targets_with_new_target_array] instead.
+			</description>
+		</method>
+		<method name="all_bullets_reset_state">
+			<return type="void" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				[method bullet_reset_state] for every bullet in the range ([code](0, -1)[/code] = the whole volley).
+			</description>
+		</method>
+		<method name="all_bullets_scale_life_time">
+			<return type="void" />
+			<param index="0" name="factor" type="float" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Multiplies the time each bullet in the range has left by [param factor] (finite, &gt; 0). A bullet on the volley timer takes the scaled time as its own lifetime ([method set_bullet_life_time_left]); an own lifetime keeps its span. Bullets of an infinite volley without their own lifetime stay infinite; a scaled time that is not finite keeps the old one (one error).
+			</description>
+		</method>
+		<method name="all_bullets_scale_speed">
+			<return type="void" />
+			<param index="0" name="factor" type="float" />
+			<param index="1" name="scale_max_speed" type="bool" default="true" />
+			<param index="2" name="scale_acceleration" type="bool" default="true" />
+			<param index="3" name="bullet_index_start" type="int" default="0" />
+			<param index="4" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Multiplies the speed of every bullet in the range by [param factor] (finite, &gt;= 0), and its top speed and acceleration too unless [param scale_max_speed] / [param scale_acceleration] are off (an unscaled top speed below the new speed rises to it; 0 stays unlimited). The velocity follows at once. A speed curve keeps owning the speeds it drives (one warning, like [method all_bullets_set_speed]); a bullet whose scaled values would overflow keeps its old ones (one error).
+			</description>
+		</method>
+		<method name="all_bullets_set_attachment">
+			<return type="void" />
+			<param index="0" name="attachment_scene" type="PackedScene" />
+			<param index="1" name="bullet_attachment_offset" type="Vector2" />
+			<param index="2" name="stick_relative_to_bullet" type="bool" default="true" />
+			<param index="3" name="bullet_index_start" type="int" default="0" />
+			<param index="4" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Spawns the same attachment to all bullets in the specified range. An attachment is a [BulletAttachment2D] that can contain a [Node2D] with particles, lights, etc... that will be attached to the bullet and follow it around. You can use the [BulletAttachment2D] properties to control how the attachment behaves and is positioned relative to the bullet. Pooling is keyed by the scene itself, so every loader of the same scene shares one pool bucket.
+			</description>
+		</method>
+		<method name="all_bullets_set_attachment_to_null">
+			<return type="BulletAttachment2D[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Removes the attachments of all bullets in the specified range by setting them to null. Returns an array of the removed [BulletAttachment2D] attachments, which can be useful if you want to reuse them as they are not freed, just detached from the bullets.
+
+				Warning: You have to take care of the returned attachments yourself.
+			</description>
+		</method>
+		<method name="all_bullets_set_color">
+			<return type="void" />
+			<param index="0" name="new_color" type="Color" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Tints every bullet in the range with [param new_color] (see [method set_bullet_color]). An invalid range or a volley without per-bullet colors is refused once for the whole call.
+			</description>
+		</method>
+		<method name="all_bullets_set_colors">
+			<return type="void" />
+			<param index="0" name="new_colors" type="PackedColorArray" />
+			<param index="1" name="tile" type="bool" default="false" />
+			<description>
+				Writes one color per bullet: entry [code]i[/code] tints bullet [code]i[/code]. A short array leaves the remaining bullets unchanged, or wraps around when [param tile] is [code]true[/code]. Refused (nothing changes) on a volley without per-bullet colors or when any entry is not finite.
+			</description>
+		</method>
+		<method name="all_bullets_set_curves_data">
+			<return type="void" />
+			<param index="0" name="curves_data" type="BulletCurvesData2D" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Sets the same curves data to all bullets in the specified range. Curves data is a [BulletCurvesData2D] resource that can contain multiple curves used to control different aspects of the bullet's behavior over time, such as movement speed, rotation speed, direction adjustment, etc...
+			</description>
+		</method>
+		<method name="all_bullets_set_custom_data">
+			<return type="void" />
+			<param index="0" name="new_custom_data" type="Resource" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Sets the same custom data to all bullets in the specified range. Pass null to clear the per-bullet values (they read as null afterwards, never as the shared value).
+			</description>
+		</method>
+		<method name="all_bullets_set_direction">
+			<return type="void" />
+			<param index="0" name="new_direction" type="Vector2" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Sets the direction of all bullets in the specified range to a new direction. The direction gets normalized automatically.
+			</description>
+		</method>
+		<method name="all_bullets_set_direction_towards_node2d">
+			<return type="void" />
+			<param index="0" name="target_node" type="Variant" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Sets the direction of all bullets in the specified range towards a target [Node2D]. The direction gets normalized automatically.
+			</description>
+		</method>
+		<method name="all_bullets_set_direction_towards_position">
+			<return type="void" />
+			<param index="0" name="target_position" type="Vector2" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Sets the direction of all bullets in the specified range towards a target global position. The direction gets normalized automatically.
+			</description>
+		</method>
+		<method name="all_bullets_set_gravity">
+			<return type="void" />
+			<param index="0" name="value" type="Vector2" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Sets the gravity acceleration for a bullet range (default all), restarting each touched fall speed. Each slot behaves like [method bullet_set_gravity] and claims presence, so a later shared [member gravity] write keeps range-written slots. Non-finite values are rejected.
+			</description>
+		</method>
+		<method name="all_bullets_set_homing_smoothing">
+			<return type="void" />
+			<param index="0" name="value" type="float" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Sets the homing turn agility for each bullet in the range. Setting any per-bullet value enables per-bullet mode, after which the shared [member homing_smoothing] is ignored. Useful for mixed volleys with fast and drifting homers.
+			</description>
+		</method>
+		<method name="all_bullets_set_life_time_left">
+			<return type="void" />
+			<param index="0" name="seconds" type="float" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Gives every bullet in the range [param seconds] to live (see [method set_bullet_life_time_left]). An invalid range or a non-finite / non-positive time is refused once for the whole call.
+			</description>
+		</method>
+		<method name="all_bullets_set_movement_pattern_from_curve">
+			<return type="void" />
+			<param index="0" name="curve_pattern" type="Curve2D" />
+			<param index="1" name="face_movement_direction" type="bool" default="false" />
+			<param index="2" name="repeat_pattern" type="bool" default="true" />
+			<param index="3" name="bullet_index_start" type="int" default="0" />
+			<param index="4" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Sets a [Curve2D] drawn movement pattern to all bullets in the specified range. The bullets will follow the shape of the curve as they move.
+
+				If [code]face_movement_direction[/code] is set to true, the bullets will also rotate to face the direction they are moving along the curve.
+
+				If [code]repeat_pattern[/code] is set to true, once a bullet reaches the end of the curve pattern it will start again from the beginning, creating a loop. If false, once a bullet reaches the end of the curve pattern it will stop following it and continue moving in a straight line based on its current direction and speed.
+			</description>
+		</method>
+		<method name="all_bullets_set_movement_pattern_from_path">
+			<return type="void" />
+			<param index="0" name="path_holding_pattern" type="Variant" />
+			<param index="1" name="face_movement_direction" type="bool" default="false" />
+			<param index="2" name="repeat_pattern" type="bool" default="true" />
+			<param index="3" name="bullet_index_start" type="int" default="0" />
+			<param index="4" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Sets a [Path2D] drawn movement pattern to all bullets in the specified range. The bullets will follow the shape of the path as they move.
+
+				If [code]face_movement_direction[/code] is set to true, the bullets will also rotate to face the direction they are moving along the path.
+
+				If [code]repeat_pattern[/code] is set to true, once a bullet reaches the end of the path pattern it will start again from the beginning, creating a loop. If false, once a bullet reaches the end of the path pattern it will stop following it and continue moving in a straight line based on its current direction and speed.
+			</description>
+		</method>
+		<method name="all_bullets_set_orbiting_center">
+			<return type="void" />
+			<param index="0" name="new_center" type="Vector2" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Re-pins the locked ring center for each locked bullet in the range without unlocking. Unlocked bullets warn and are skipped (a frozen bullet keeps its lock, so it is re-pinned too).
+			</description>
+		</method>
+		<method name="all_bullets_set_orbiting_direction">
+			<return type="void" />
+			<param index="0" name="new_direction" type="int" enum="BulletVolley2D.OrbitingDirection" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Sets the orbiting direction for all bullets in the range. Passing OrbitRandom re-rolls OrbitLeft or OrbitRight per bullet (never DontMove).
+			</description>
+		</method>
+		<method name="all_bullets_set_orbiting_follow_deadzone">
+			<return type="void" />
+			<param index="0" name="new_deadzone" type="float" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Sets the follow deadzone in pixels for all bullets in the range. Only meaningful with FollowDeadzone mode; non-finite or negative values are rejected.
+			</description>
+		</method>
+		<method name="all_bullets_set_orbiting_follow_mode">
+			<return type="void" />
+			<param index="0" name="new_follow_mode" type="int" enum="BulletVolley2D.OrbitingFollowMode" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Sets how the locked ring follows a moving target for all bullets in the range: FollowTarget tracks 1:1, FollowDeadzone pins the center inside the deadzone, Anchored freezes the ring where it locked.
+			</description>
+		</method>
+		<method name="all_bullets_set_orbiting_lock_policy">
+			<return type="void" />
+			<param index="0" name="new_lock_policy" type="int" enum="BulletVolley2D.OrbitingLockPolicy" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Sets what drops the orbit lock for all bullets in the range: RelockAlways re-acquires on every retarget, StayLocked never unlocks on retarget/empty, RelockOnTargetChange unlocks only when the front target changes identity.
+			</description>
+		</method>
+		<method name="all_bullets_set_orbiting_radius">
+			<return type="void" />
+			<param index="0" name="new_radius" type="float" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Sets the orbiting radius for all bullets in the range.
+			</description>
+		</method>
+		<method name="all_bullets_set_orbiting_rigid_follow">
+			<return type="void" />
+			<param index="0" name="new_rigid_follow" type="bool" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Sets rigid follow for all bullets in the range. When on, locked bullets translate 1:1 with the target while circling, exactly like DontMove escorts. When off, locked bullets chase the ring clamped to speed times delta and trail behind fast targets.
+			</description>
+		</method>
+		<method name="all_bullets_set_orbiting_texture_rotation">
+			<return type="void" />
+			<param index="0" name="new_rotation" type="int" enum="BulletVolley2D.OrbitingTextureRotation" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Sets the orbiting texture rotation for all bullets in the range.
+			</description>
+		</method>
+		<method name="all_bullets_set_rotation_data">
+			<return type="void" />
+			<param index="0" name="new_bullet_rotation_data" type="BulletRotationData2D" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Fans one rotation triple over a range (null and non-finite values rejected). Mirrors [method all_bullets_set_speed_data].
+			</description>
+		</method>
+		<method name="all_bullets_set_scale">
+			<return type="void" />
+			<param index="0" name="new_scale" type="Vector2" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Sets the scale of every bullet in the range (see [method set_bullet_scale]).
+			</description>
+		</method>
+		<method name="all_bullets_set_speed">
+			<return type="void" />
+			<param index="0" name="new_speed" type="float" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Sets the speed of every bullet in the range (see [method set_bullet_speed]).
+			</description>
+		</method>
+		<method name="all_bullets_set_speed_data">
+			<return type="void" />
+			<param index="0" name="new_bullet_speed_data" type="BulletSpeedData2D" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Sets the same speed data to all bullets in the specified range. Speed data is a [BulletSpeedData2D] resource that can contain multiple properties used to control different aspects of the bullet's speed behavior, such as initial speed, acceleration, deceleration, max speed, etc...
+			</description>
+		</method>
+		<method name="all_bullets_set_texture_rotation_degrees">
+			<return type="void" />
+			<param index="0" name="new_rotation_degrees" type="float" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Sets the same texture rotation in degrees to all bullets in the specified range.
+			</description>
+		</method>
+		<method name="all_bullets_set_texture_rotation_radians">
+			<return type="void" />
+			<param index="0" name="new_rotation_radians" type="float" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Sets the same texture rotation in radians to all bullets in the specified range.
+			</description>
+		</method>
+		<method name="all_bullets_set_texture_rotation_towards_node2d">
+			<return type="void" />
+			<param index="0" name="target_node" type="Variant" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Sets the texture rotation of all bullets in the specified range towards a target [Node2D].
+				The rotation will be set so that the bullet's texture faces towards the target node.
+			</description>
+		</method>
+		<method name="all_bullets_set_texture_rotation_towards_position">
+			<return type="void" />
+			<param index="0" name="target_position" type="Vector2" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Sets the texture rotation of all bullets in the specified range towards a target global position.
+				The rotation will be set so that the bullet's texture faces towards the target position.
+			</description>
+		</method>
+		<method name="all_bullets_set_trail_enabled">
+			<return type="void" />
+			<param index="0" name="layer_index" type="int" />
+			<param index="1" name="trail_on" type="bool" />
+			<param index="2" name="bullet_index_start" type="int" default="0" />
+			<param index="3" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Toggles one trail layer over a bullet range. Hidden bullets show no trail; re-enabling resumes it on the next tick.
+			</description>
+		</method>
+		<method name="all_bullets_set_transforms">
+			<return type="void" />
+			<param index="0" name="new_transform" type="Transform2D" />
+			<param index="1" name="set_direction_based_on_transform" type="bool" default="false" />
+			<param index="2" name="bullet_index_start" type="int" default="0" />
+			<param index="3" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Sets the same transform to all bullets in the specified range. A transform is a [Transform2D] that contains the bullet's position, rotation and scale. If you want to set them separately, use [method all_bullets_set_direction], [method all_bullets_set_texture_rotation_degrees], [method all_bullets_set_texture_rotation_radians] or [method all_bullets_set_speed_data].
+
+				If [code]set_direction_based_on_transform[/code] is set to true, the direction of the bullets will be set based on the rotation of the provided transform.
+				If false, the transform's rotation will be ignored and only its position and scale will be applied to the bullets, keeping their original direction.
+				The direction gets normalized automatically.
+			</description>
+		</method>
+		<method name="all_bullets_set_velocity">
+			<return type="void" />
+			<param index="0" name="new_velocity" type="Vector2" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Sets the exact velocity of all bullets in the range (wind, knockback, slow fields). Decomposes into direction and speed so the integrator keeps producing it; a capped [member BulletSpeedData2D.max_speed] below the new speed rises to it, while 0 stays unlimited. Non-finite input is rejected.
+			</description>
+		</method>
+		<method name="all_bullets_set_wobble_data">
+			<return type="void" />
+			<param index="0" name="wobble_data" type="BulletWobbleData2D" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Seeds wobble live over a range (null clears each slot back to the shared fallback). Per-bullet wins over shared.
+			</description>
+		</method>
+		<method name="all_bullets_split">
+			<return type="int" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Splits every live bullet in the range right now (cause [constant SPLIT_CAUSE_MANUAL]) and returns how many split. Needs a stage for this volley's generation; its triggers, [member BulletSplitStage2D.chance] and [member BulletSplitStage2D.max_splits_per_bullet] are ignored. The bullets leave like a clear (On Clear effects), or keep flying with [member BulletSplitStage2D.parent_survives]. The children spawn after the next factory sweep.
+			</description>
+		</method>
+		<method name="attach_time_based_function">
+			<return type="void" />
+			<param index="0" name="time" type="float" />
+			<param index="1" name="callable" type="Callable" />
+			<param index="2" name="repeat" type="bool" default="false" />
+			<param index="3" name="execute_only_if_volley_is_active" type="bool" default="true" />
+			<description>
+				Runs [param callable] after [param time] seconds of volley time (paused with the factory), repeating every [param time] seconds when [param repeat] is on (a repeating timer never fires more than once per tick, even after a hitch).
+				[param execute_only_if_volley_is_active] (default [code]true[/code]): the timer runs only while the volley is active. While the volley is parked it holds its remaining time and resumes on the wake, so a one-shot is never lost. With [code]false[/code] it keeps running and firing while the volley is parked, so it can wake the volley itself.
+				Timers are released when the volley returns to the pool. Attaching and detaching apply immediately, even from inside a timer callback. At most 64 timers per volley.
+			</description>
+		</method>
+		<method name="bullet_check_has_homing_targets" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Returns true if the specified bullet has any homing targets in its per-bullet deque.
+
+				If you want to check if the shared deque has any targets, use [method shared_homing_deque_check_has_homing_targets] instead.
+			</description>
+		</method>
+		<method name="bullet_clear_homing_targets">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Clears all homing targets from the specified bullet's per-bullet deque. Resets individual path; shared unaffected.
+
+				If you want to clear all bullet targets for a shared deque, use [method shared_homing_deque_clear_homing_targets] instead.
+			</description>
+		</method>
+		<method name="bullet_disable_attachment">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Disables the attachment of a specific bullet by calling its virtual function [method BulletAttachment2D.on_bullet_disable].
+			</description>
+		</method>
+		<method name="bullet_disable_orbiting">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Disables orbiting for the specified bullet. A bullet that does not orbit is left as it is.
+			</description>
+		</method>
+		<method name="bullet_enable_attachment">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Enables the attachment of a specific bullet, if it has one.
+			</description>
+		</method>
+		<method name="bullet_enable_orbiting">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="orbiting_radius" type="float" />
+			<param index="2" name="orbiting_direction" type="int" enum="BulletVolley2D.OrbitingDirection" default="2" />
+			<param index="3" name="orbiting_texture_rotation" type="int" enum="BulletVolley2D.OrbitingTextureRotation" default="0" />
+			<param index="4" name="orbiting_follow_mode" type="int" enum="BulletVolley2D.OrbitingFollowMode" default="0" />
+			<param index="5" name="orbiting_follow_deadzone" type="float" default="0.0" />
+			<param index="6" name="orbiting_lock_policy" type="int" enum="BulletVolley2D.OrbitingLockPolicy" default="0" />
+			<param index="7" name="orbiting_rigid_follow" type="bool" default="true" />
+			<description>
+				Enables orbiting for the specified bullet with the given parameters. A bullet that already orbits takes the new settings in place: the lock policy is applied first, so [constant StayLocked] keeps its lock while the other policies re-acquire the ring after a new radius or direction, and [constant OrbitRandom] keeps the direction the bullet rolled when it started orbiting.
+				Invalid direction or texture rotation values are rejected with an error and orbiting stays disabled. A frozen (disabled) bullet accepts the call: the configuration applies when the bullet is woken with [method enable_bullet] (only a pooled volley, the stale handle, refuses).
+				DontMove as direction means escort: the bullet holds a fixed slot on the ring and follows the target without circling. Tangential texture rotations (FaceOrbitingDirection, FaceOppositeOrbitingDirection) have no effect for escorts since there is no direction of travel.
+				The follow mode controls how the locked ring tracks a moving target (FollowTarget, FollowDeadzone with a pixel deadzone, or Anchored), the lock policy controls what drops the lock (RelockAlways, StayLocked, or RelockOnTargetChange), and rigid follow controls whether circling bullets translate 1:1 with the target like escorts (on) or chase the ring and trail behind fast targets (off).
+
+				Note that orbiting relies on having a homing target to orbit around. Frozen bullets accept targets too (they apply on the wake); the spawner retarget pass skips disabled slots automatically.
+
+				Example: [code]bullets.bullet_enable_orbiting(0, 90.0, 2); bullets.bullet_homing_push_back_global_position_target(0, boss.global_position)[/code], then read [method debug_get_orbiting_info].
+			</description>
+		</method>
+		<method name="bullet_free_attachment">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Frees the attachment of a specific bullet: the slot is cleared at once, the node is hidden and queue_free()d (deleted at the end of the frame), so this is safe to call from the attachment's own callbacks. Use this if you want to permanently remove an attachment from a bullet and free its resources, instead of just disabling it with [method bullet_disable_attachment].
+
+				Warning: Once you free an attachment, you can't reuse it anymore.
+			</description>
+		</method>
+		<method name="bullet_get_attachment">
+			<return type="BulletAttachment2D" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Gets the attachment of a specific bullet. Returns a [BulletAttachment2D], which can be null if the bullet doesn't have an attachment.
+			</description>
+		</method>
+		<method name="bullet_get_bounce_count" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				How many times the specified bullet has bounced in its current life. Invalid indexes read 0. Cleared on disable and on every pool reuse.
+			</description>
+		</method>
+		<method name="bullet_get_current_homing_target" qualifiers="const">
+			<return type="Variant" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Returns the current (front) homing target for the specified bullet's per-bullet deque as Variant (Node2D or Vector2; nullptr if invalid/empty).
+
+				If you want to get the current target from the shared deque, use [method shared_homing_deque_get_current_homing_target] instead.
+			</description>
+		</method>
+		<method name="bullet_get_curves_data" qualifiers="const">
+			<return type="BulletCurvesData2D" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Gets the curves data of a specific bullet. Returns a [BulletCurvesData2D], or null (with an error, since reading an empty slot is usually a mistake) when the bullet has no individual curves data: check [member shared_bullet_curves_data] for the shared one.
+				Curves data is a [BulletCurvesData2D] resource that can contain multiple curves used to control different aspects of the bullet's behavior over time, such as movement speed, rotation speed, direction adjustment, etc...
+				Note: If you want to set or get the curves data of multiple bullets at once, use [method all_bullets_set_curves_data] or [method all_bullets_get_curves_data].
+			</description>
+		</method>
+		<method name="bullet_get_custom_data" qualifiers="const">
+			<return type="Resource" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Gets the per-bullet custom data of a specific bullet, null when none is set. Strictly separate from [member shared_bullets_custom_data] - read that member for the shared value.
+			</description>
+		</method>
+		<method name="bullet_get_emitter_next_shot_sec" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Seconds of this volley's time ([method set_time_scale], its spawner's and the factory's time scale apply) until bullet [param bullet_index] fires its emitter template next: 0 when due this tick, -1 when it will not fire (no emitter, switched off, the bullet is out, or it fired [member BulletEmitterData2D.max_shots]). Use it to telegraph an emitter bullet (a flash or a growing ring before each shot).
+			</description>
+		</method>
+		<method name="bullet_get_fall_speed" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Integrated fall speed magnitude for the specified bullet. 0 when gravity never integrated there.
+			</description>
+		</method>
+		<method name="bullet_get_gravity" qualifiers="const">
+			<return type="Vector2" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Per-bullet gravity acceleration vector for the specified bullet. Invalid indexes read (0, 0).
+			</description>
+		</method>
+		<method name="bullet_get_homing_smoothing" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Returns the effective homing turn agility for the specified bullet: its per-bullet value when per-bullet mode is active, otherwise the shared [member homing_smoothing].
+			</description>
+		</method>
+		<method name="bullet_get_last_bounce_normal" qualifiers="const">
+			<return type="Vector2" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				The surface normal of the last wall bullet [param bullet_index] bounced off this life (pointing away from the wall), or [code]Vector2(0, 0)[/code] before its first bounce or while bouncing is off. Aim ricochet sparks or decals with it in a [signal BulletFactory2D.bounce_body_entered] handler.
+			</description>
+		</method>
+		<method name="bullet_get_orbiting_angle">
+			<return type="float" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Returns the locked ring angle in radians for the specified bullet (the slot it holds on the ring).
+			</description>
+		</method>
+		<method name="bullet_get_orbiting_center">
+			<return type="Vector2" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Returns the current ring center for the specified bullet: the locked center when locked, otherwise the live front-target position.
+			</description>
+		</method>
+		<method name="bullet_get_orbiting_direction">
+			<return type="int" enum="BulletVolley2D.OrbitingDirection" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Returns the orbiting direction for the specified bullet.
+			</description>
+		</method>
+		<method name="bullet_get_orbiting_follow_deadzone">
+			<return type="float" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Returns the follow deadzone in pixels for the specified bullet.
+			</description>
+		</method>
+		<method name="bullet_get_orbiting_follow_mode">
+			<return type="int" enum="BulletVolley2D.OrbitingFollowMode" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Returns how the locked ring follows a moving target for the specified bullet.
+			</description>
+		</method>
+		<method name="bullet_get_orbiting_lock_policy">
+			<return type="int" enum="BulletVolley2D.OrbitingLockPolicy" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Returns what drops the orbit lock for the specified bullet.
+			</description>
+		</method>
+		<method name="bullet_get_orbiting_radius">
+			<return type="float" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Returns the orbiting radius for the specified bullet.
+			</description>
+		</method>
+		<method name="bullet_get_orbiting_rigid_follow">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Returns whether the specified bullet uses rigid follow (locked bullets translate 1:1 with the target while circling).
+			</description>
+		</method>
+		<method name="bullet_get_orbiting_texture_rotation">
+			<return type="int" enum="BulletVolley2D.OrbitingTextureRotation" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Returns the orbiting texture rotation for the specified bullet.
+			</description>
+		</method>
+		<method name="bullet_get_rotation_speed" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Effective per-bullet rotation speed (seeded value, live-updated by the tick). 0 when inactive or out of range.
+			</description>
+		</method>
+		<method name="bullet_get_split_count" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				How many times bullet [param bullet_index] split this life (counted toward [member BulletSplitStage2D.max_splits_per_bullet] for a surviving parent). 0 for a bullet that never split.
+			</description>
+		</method>
+		<method name="bullet_get_wobble_amplitude" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Effective wobble amplitude of one bullet (seeded amplitude, 0 when inactive).
+			</description>
+		</method>
+		<method name="bullet_get_wobble_data" qualifiers="const">
+			<return type="BulletWobbleData2D" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Per-bullet wobble resource of one bullet (null when the slot runs on the shared fallback or is inactive).
+			</description>
+		</method>
+		<method name="bullet_get_wobble_face_movement_direction" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Whether the bullet's wobble visual follows the steered heading (seeded face flag, false when inactive).
+			</description>
+		</method>
+		<method name="bullet_get_wobble_face_rotation_speed" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Slew limit of the bullet's wobble texture follow in rad/s (seeded value, 0 when inactive).
+			</description>
+		</method>
+		<method name="bullet_homing_check_current_target_type" qualifiers="const">
+			<return type="int" enum="BulletVolley2D.HomingType" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Returns the type of the current (front) homing target for the specified bullet's per-bullet deque (NotHoming if empty).
+
+				If you want to check the type of the current target from the shared deque, use [method shared_homing_deque_check_current_target_type] instead.
+			</description>
+		</method>
+		<method name="bullet_homing_check_targets_amount" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Returns the number of homing targets in the specified bullet's per-bullet deque.
+
+				If you want to check the number of targets in the shared deque, use [method shared_homing_deque_check_homing_targets_amount] instead.
+			</description>
+		</method>
+		<method name="bullet_homing_pop_back_target">
+			<return type="Variant" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Pops and returns the back homing target from the specified bullet's per-bullet deque (Variant: Node2D or Vector2; nullptr if invalid/empty).
+
+				If you want to pop the back target from the shared deque, use [method shared_homing_deque_pop_back_target] instead.
+			</description>
+		</method>
+		<method name="bullet_homing_pop_front_target">
+			<return type="Variant" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Pops and returns the front (current) homing target from the specified bullet's per-bullet deque (Variant: Node2D or Vector2; nullptr if invalid/empty).
+
+				If you want to pop the front target from the shared deque, use [method shared_homing_deque_pop_front_target] instead.
+			</description>
+		</method>
+		<method name="bullet_homing_push_back_global_position_target">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="global_position" type="Vector2" />
+			<description>
+				Pushes a global position target to the back of the specified bullet's per-bullet deque. Returns true on success (valid index and finite target); a frozen bullet queues it for the wake and a pooled volley refuses. Per-bullet deque wins over the shared deque per bullet; a drained per-bullet deque falls back to shared. Example: [code]bullets.bullet_homing_push_back_global_position_target(0, boss.global_position)[/code].
+
+				If you want to push back a target to the shared deque, use [method shared_homing_deque_push_back_global_position_target] instead.
+			</description>
+		</method>
+		<method name="bullet_homing_push_back_homing_target">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="node2d_or_global_position" type="Variant" />
+			<description>
+				Pushes a Node2D or Vector2 target to the back of the specified bullet's per-bullet deque. Returns false with an error on invalid index or target type, pushing nothing.
+			</description>
+		</method>
+		<method name="bullet_homing_push_back_mouse_position_target">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Pushes the current mouse global position to the back of the specified bullet's per-bullet deque. Returns true on success; caches for perf.
+
+				If you want to push back a mouse position target to the shared deque, use [method shared_homing_deque_push_back_mouse_position_target] instead.
+			</description>
+		</method>
+		<method name="bullet_homing_push_back_node2d_target">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_homing_target" type="Variant" />
+			<description>
+				Pushes a Node2D target to the back of the specified bullet's per-bullet deque. Returns true on success (valid index and target); a frozen bullet queues it for the wake and a pooled volley refuses.
+
+				If you want to push back a target to the shared deque, use [method shared_homing_deque_push_back_node2d_target] instead.
+			</description>
+		</method>
+		<method name="bullet_homing_push_front_global_position_target">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="global_position" type="Vector2" />
+			<description>
+				Pushes a global position target to the front of the specified bullet's per-bullet deque. Returns true on success (valid index and finite target); a frozen bullet queues it for the wake and a pooled volley refuses.
+
+				If you want to push front a target to the shared deque, use [method shared_homing_deque_push_front_global_position_target] instead.
+			</description>
+		</method>
+		<method name="bullet_homing_push_front_homing_target">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="node2d_or_global_position" type="Variant" />
+			<description>
+				Pushes a Node2D or Vector2 target to the front of the specified bullet's per-bullet deque. Returns false with an error on invalid index or target type, pushing nothing.
+			</description>
+		</method>
+		<method name="bullet_homing_push_front_mouse_position_target">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Pushes the current mouse global position to the front of the specified bullet's per-bullet deque. Returns true on success.
+
+				If you want to push front a mouse position target to the shared deque, use [method shared_homing_deque_push_front_mouse_position_target] instead.
+			</description>
+		</method>
+		<method name="bullet_homing_push_front_node2d_target">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_homing_target" type="Variant" />
+			<description>
+				Pushes a Node2D target to the front of the specified bullet's per-bullet deque. Returns true on success (valid index and target); a frozen bullet queues it for the wake and a pooled volley refuses.
+
+				If you want to push front a target to the shared deque, use [method shared_homing_deque_push_front_node2d_target] instead.
+			</description>
+		</method>
+		<method name="bullet_is_orbiting_enabled">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Whether orbiting is currently enabled for the specified bullet.
+			</description>
+		</method>
+		<method name="bullet_is_orbiting_locked">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Returns whether the specified bullet is currently locked onto its orbit ring (as opposed to merely enabled but still flying to the ring).
+			</description>
+		</method>
+		<method name="bullet_replace_homing_targets_with_new_target">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="node2d_or_global_position" type="Variant" />
+			<description>
+				Replaces the specified bullet's per-bullet homing queue with a single new target (Node2D or Vector2) while preserving the orbit lock under StayLocked and RelockOnTargetChange (same front target keeps angle and center). Returns true when replaced; false when the slot is disabled or the target is invalid (nothing changed).
+			</description>
+		</method>
+		<method name="bullet_reset_graze">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Clears bullet [param bullet_index]'s graze state in every zone: it may graze every ring again and an open visit ends silently. [method bullet_reset_state] does this too.
+			</description>
+		</method>
+		<method name="bullet_reset_state">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Clears one bullet's runtime ledgers without touching its flight: hit count, bounce ledger, homing queue, orbiting (turned off), fall speed, wobble phase and movement-pattern progress. Use it to wake a frozen bullet fresh, or call [method disable_bullet] with [code]reset_state[/code].
+			</description>
+		</method>
+		<method name="bullet_set_attachment">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="attachment_scene" type="PackedScene" />
+			<param index="2" name="bullet_attachment_offset" type="Vector2" default="Vector2(0, 0)" />
+			<param index="3" name="stick_relative_to_bullet" type="bool" default="true" />
+			<description>
+				Spawns an attachment to a specific bullet. An attachment is a [BulletAttachment2D] that can contain a [Node2D] with particles, lights, etc... that will be attached to the bullet and follow it around. Pooling is keyed by the scene itself, so every loader of the same scene shares one pool bucket.
+			</description>
+		</method>
+		<method name="bullet_set_attachment_to_null">
+			<return type="BulletAttachment2D" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Removes the attachment of a specific bullet by setting it to null. Returns the removed [BulletAttachment2D] attachment, which can be useful if you want to reuse it as it is not freed, just detached from the bullet.
+
+				A cool trick you can do is, when a bullet collides or you want to disable it manually (with [method disable_bullet]) but keep its attachment active for a bit longer (for example, to let some particles or lights finish their effect), you can call this function to detach the attachment from the bullet and keep it on the scene.
+
+				Warning: You have to take care of the returned attachment yourself.
+			</description>
+		</method>
+		<method name="bullet_set_bounce_count">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="count" type="int" />
+			<description>
+				Sets how many bounces bullet [param bullet_index] has used this life (the count [member bounce_max_count] caps). Lower it to give a bullet more ricochets (a power-up, a mirror), raise it to end them early. [param count] must be &gt;= 0; bouncing must be on ([member bounce_mask] not 0). A refused call changes nothing; a pooled handle is refused.
+			</description>
+		</method>
+		<method name="bullet_set_curves_data">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="data" type="BulletCurvesData2D" />
+			<description>
+				Sets the curves data of a specific bullet. Curves data is a [BulletCurvesData2D] resource that can contain multiple curves used to control different aspects of the bullet's behavior over time, such as movement speed, rotation speed, direction adjustment, etc... Pass null to clear back to the shared fallback (see [method clear_per_bullet_curves_data]). Example: [code]bullets.bullet_set_curves_data(0, my_curves); print(bullets.debug_get_curves_info(0)["speed_src"])[/code] prints "per".
+
+				Note: If you want to set or get the curves data of multiple bullets at once, use [method all_bullets_set_curves_data] or [method all_bullets_get_curves_data].
+			</description>
+		</method>
+		<method name="bullet_set_custom_data">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_custom_data" type="Resource" />
+			<description>
+				Sets the custom data of a specific bullet. Pass null to clear it (reads as null afterwards, never as the shared value).
+			</description>
+		</method>
+		<method name="bullet_set_gravity">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="value" type="Vector2" />
+			<description>
+				Sets the gravity acceleration for one bullet and restarts its fall speed (new regime). The write claims presence like a seeded entry (even a deliberate zero), so a later shared [member gravity] write cannot silently undo it. Non-finite values are rejected. Example: [code]bullets.bullet_set_gravity(0, Vector2(0, 400)); print(bullets.debug_get_gravity_info(0)["vector"])[/code].
+			</description>
+		</method>
+		<method name="bullet_set_homing_smoothing">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="value" type="float" />
+			<description>
+				Sets the homing turn agility for the specified bullet. Enables per-bullet mode for the whole volley (see [method all_bullets_set_homing_smoothing]). Non-finite or negative values are rejected.
+			</description>
+		</method>
+		<method name="bullet_set_orbiting_center">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_center" type="Vector2" />
+			<description>
+				Re-pins the locked ring center for the specified bullet without unlocking. Rejected when orbiting is disabled or the bullet never locked.
+			</description>
+		</method>
+		<method name="bullet_set_orbiting_direction">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_direction" type="int" enum="BulletVolley2D.OrbitingDirection" />
+			<description>
+				Sets the orbiting direction for the specified bullet. Invalid values are rejected with an error and the direction stays unchanged. Passing OrbitRandom rolls OrbitLeft or OrbitRight (never DontMove).
+			</description>
+		</method>
+		<method name="bullet_set_orbiting_follow_deadzone">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_deadzone" type="float" />
+			<description>
+				Sets the follow deadzone in pixels for the specified bullet. Only meaningful with FollowDeadzone mode; non-finite or negative values are rejected.
+			</description>
+		</method>
+		<method name="bullet_set_orbiting_follow_mode">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_follow_mode" type="int" enum="BulletVolley2D.OrbitingFollowMode" />
+			<description>
+				Sets how the locked ring follows a moving target for the specified bullet: FollowTarget tracks 1:1, FollowDeadzone pins the center inside the deadzone, Anchored freezes the ring where it locked.
+			</description>
+		</method>
+		<method name="bullet_set_orbiting_lock_policy">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_lock_policy" type="int" enum="BulletVolley2D.OrbitingLockPolicy" />
+			<description>
+				Sets what drops the orbit lock for the specified bullet: RelockAlways re-acquires on every retarget, StayLocked never unlocks on retarget/empty, RelockOnTargetChange unlocks only when the front target changes identity.
+			</description>
+		</method>
+		<method name="bullet_set_orbiting_radius">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_radius" type="float" />
+			<description>
+				Sets the orbiting radius for the specified bullet. Writing the current value keeps the lock; a changed value re-locks.
+			</description>
+		</method>
+		<method name="bullet_set_orbiting_rigid_follow">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_rigid_follow" type="bool" />
+			<description>
+				Sets rigid follow for the specified bullet without dropping the lock. When on, locked bullets translate 1:1 with the target while circling, exactly like DontMove escorts. When off, locked bullets chase the ring clamped to speed times delta and trail behind fast targets.
+			</description>
+		</method>
+		<method name="bullet_set_orbiting_texture_rotation">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_texture_rotation" type="int" enum="BulletVolley2D.OrbitingTextureRotation" />
+			<description>
+				Sets the orbiting texture rotation for the specified bullet. Invalid values are rejected with an error and the rotation stays unchanged.
+			</description>
+		</method>
+		<method name="bullet_set_trail_enabled">
+			<return type="void" />
+			<param index="0" name="layer_index" type="int" />
+			<param index="1" name="bullet_index" type="int" />
+			<param index="2" name="trail_on" type="bool" />
+			<description>
+				Toggles one trail layer for one bullet. Takes effect immediately (no tick wait).
+			</description>
+		</method>
+		<method name="bullet_set_velocity">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_velocity" type="Vector2" />
+			<description>
+				Sets the exact velocity of the specified bullet (wind, knockback, split inheritance). See [method all_bullets_set_velocity] for details.
+			</description>
+		</method>
+		<method name="bullet_set_wobble_data">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="wobble_data" type="BulletWobbleData2D" />
+			<description>
+				Seeds wobble live for one bullet (null clears it back to the shared fallback, or inactive when unset). Invalid data errors and clears to the fallback. Example: [code]bullets.bullet_set_wobble_data(1, my_wobble); print(bullets.debug_get_wobble_info(1)["active"])[/code].
+			</description>
+		</method>
+		<method name="clear_all_bullets">
+			<return type="int" />
+			<description>
+				Clears every live bullet through [method clear_bullet] (On Clear effects fire; mass clears recycle the oldest effect slots so hundreds of bullets never spawn hundreds of live effects). Returns how many bullets were cleared. Allowed inside collision and lifetime handlers.
+			</description>
+		</method>
+		<method name="clear_bullet">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Manual clear with visuals: disables the bullet and fires On Clear effect layers at its death pose. Already-dead or invalid slots return false and stay silent (no double fire). Collision kills fire On Destroy and timeouts fire On Lifetime Over through their own paths, never On Clear.
+			</description>
+		</method>
+		<method name="clear_bullet_rotation_data">
+			<return type="void" />
+			<description>
+				Turns rotation off for the whole volley (same as seeding an empty array). Re-seed with spawn/enable or [method set_bullet_rotation_data] to spin again.
+			</description>
+		</method>
+		<method name="clear_bullets_in_circle">
+			<return type="int" />
+			<param index="0" name="center" type="Vector2" />
+			<param index="1" name="radius" type="float" />
+			<description>
+				Clears every live bullet of this volley whose centre is inside the circle (global space, edge inclusive), firing the same On Clear effects and sounds as [method clear_bullet]. Returns how many were cleared. Bad input pushes one error and clears nothing. For every volley at once use [method BulletFactory2D.clear_bullets_in_circle].
+			</description>
+		</method>
+		<method name="clear_bullets_in_rect">
+			<return type="int" />
+			<param index="0" name="rect" type="Rect2" />
+			<description>
+				Like [method clear_bullets_in_circle] for a rectangle (global space, all four edges inclusive). A negative size is accepted.
+			</description>
+		</method>
+		<method name="clear_per_bullet_curves_data">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Clears one bullet's per-bullet curves back to the shared fallback (or no curves when unset). Same as [method bullet_set_curves_data] with null, kept for symmetry with [method clear_per_bullet_homing_smoothing].
+			</description>
+		</method>
+		<method name="clear_per_bullet_homing_smoothing">
+			<return type="void" />
+			<description>
+				Clears per-bullet smoothing mode: the shared [member homing_smoothing] drives every bullet again. No-op when per-bullet mode was never enabled.
+			</description>
+		</method>
+		<method name="convert_to_pickups">
+			<return type="Array" />
+			<param index="0" name="pickup" type="BulletPickupData2D" />
+			<param index="1" name="target" type="Variant" />
+			<param index="2" name="bullet_indexes" type="PackedInt32Array" default="PackedInt32Array()" />
+			<description>
+				Turns this volley's live bullets into pickups described by [param pickup], all of them or only the ones in [param bullet_indexes] (an index out of range pushes one error and converts nothing; frozen bullets are skipped). Returns the new pickup volleys, see [method BulletFactory2D.convert_all_bullets_to_pickups] for the details, the [param target] forms and the rules. The converted bullets leave their volleys (silently, or with their On Clear effects when [member BulletPickupData2D.fire_clear_effects] is on) and reappear as pickups at the same pose, scaled by [member BulletPickupData2D.scale_multiplier]. Pickups are owned by the factory, follow [member BulletFactory2D.time_scale] and are never converted again. Collecting one emits [signal BulletFactory2D.pickup_collected]. [param target] is where the pickups are pulled: a [Node2D] (followed while it moves), a [Vector2] (a global position), a group name as a String or StringName (each pickup goes to the nearest usable member of that group at the moment of the call), or null (the mouse cursor). Anything else, an empty group, or a node outside the tree pushes one error and converts nothing.
+			</description>
+		</method>
+		<method name="debug_check_invariants" qualifiers="const">
+			<return type="String" />
+			<description>
+				Debug: an empty string when this volley is internally consistent, else the first broken invariant (per-bullet storage covers every bullet, the orbit and homing counters match their bullets, a pooled volley holds no pickup, graze, sound, material or custom data of its last life). [method BulletFactory2D.debug_assert_no_dangling] runs it for every volley.
+			</description>
+		</method>
+		<method name="debug_dedup_find_collision" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="probe_count" type="int" />
+			<description>
+				Brute-force key-collision search over probe_count deterministic distinct pairs. Returns collided and probes. Test-only: pins the 64-bit dedup key against birthday collisions.
+			</description>
+		</method>
+		<method name="debug_dedup_mark">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="target_instance_id" type="int" />
+			<description>
+				Marks one (bullet, target) pair as queued in the live dedup table. Test-only: call on an idle volley with no overlaps in flight.
+			</description>
+		</method>
+		<method name="debug_dedup_probe">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="target_instance_id" type="int" />
+			<description>
+				Whether one (bullet, target) pair is already queued in the live dedup table. Test-only: call on an idle volley with no overlaps in flight.
+			</description>
+		</method>
+		<method name="debug_dedup_reset">
+			<return type="void" />
+			<description>
+				Clears the live dedup table (same clear the drain runs, including the cold-table shrink). Test-only: call on an idle volley with no overlaps in flight.
+			</description>
+		</method>
+		<method name="debug_dedup_stats" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Dedup table introspection: used pairs, slot capacity, and the collision_dedup_by_object mode.
+			</description>
+		</method>
+		<method name="debug_get_active_set_stats" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				The volley's own per-bullet sparse set, the one every per-bullet loop walks: active (live bullets), capacity (the index space it covers), amount_bullets, active_indexes (the indexes in the order the loops walk them) and consistent (the dense/sparse bijection validator; false means the structure corrupted itself). Use it to prove the set and the live counter stay in step; a pooled handle reads active 0 with an empty index list.
+			</description>
+		</method>
+		<method name="debug_get_attachment_info" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Attachment slot introspection: has_attachment, pooling_id, owner_match. owner_match verifies the attachment's owner ids point back at this volley + index (stale ownership after reuse fails here). No range variant exists; loop bullet indices instead.
+			</description>
+		</method>
+		<method name="debug_get_bounce_frame" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Debug/test readout of one bullet's bounce mirror frame: [code]{valid, active, x_axis, y_axis}[/code]. The axes are the identity until the bullet bounces; a bounce reflects them, and split children inherit the frame (the inherited drift and the direction curves ride through it).
+			</description>
+		</method>
+		<method name="debug_get_bounce_info" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Bounce introspection for one bullet: counts, config echo (mask, strength, mode, max), whether bouncing is armed, pending smooth-visual state and cooldown. Never mutates. Out-of-range indexes report valid = false.
+			</description>
+		</method>
+		<method name="debug_get_bullet_flock_info" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				One bullet's flocking at a glance, for debugging a swarm: [code]flocking[/code] (bool), [code]flock[/code] (the [BulletFlock2D] it flies by), [code]scope[/code] (-1 when not flocking), [code]steering[/code] and [code]neighbors[/code] (from the last pass), [code]blend[/code] (how far the [member BulletFlock2D.blend_in_sec] fade has come, 0 to 1), [code]radius[/code] (its size for [member BulletFlock2D.count_bullet_size], 0 when off), [code]heading[/code] (its flight heading), [code]facing[/code] (the sprite's forward angle in radians, texture rotation stripped) and [code]max_turn_deg[/code]. An invalid index pushes an error and returns an empty Dictionary.
+			</description>
+		</method>
+		<method name="debug_get_bullet_flock_neighbors" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				How many flockmates the last flock pass read for this bullet (at most [member BulletFlock2D.max_neighbors]). 0 when not flocking or not gathered.
+			</description>
+		</method>
+		<method name="debug_get_bullet_flock_steering" qualifiers="const">
+			<return type="Vector2" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				The steering vector (per second) the last flock pass gave this bullet: its direction is the wished heading, its length how hard the bullet turns. Zero when not flocking, not gathered (frozen, or beyond the grid at absurd coordinates) or after the volley's next life.
+			</description>
+		</method>
+		<method name="debug_get_bullet_info" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Full per-bullet steering snapshot: {index, valid, active, direction, velocity, speed, gravity, fall_speed, wobble_active, wobble_amplitude, has_homing_targets, homing_targets_amount, homing_smoothing, orbiting_enabled, orbiting_locked, pattern, shared_pattern_active, rotation_speed}. Never mutates; invalid index returns valid=false with zeroed fields.
+			</description>
+		</method>
+		<method name="debug_get_bullet_shape_transform" qualifiers="const">
+			<return type="Transform2D" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				The transform the physics server holds for this bullet's collision shape: its hitbox as it is tested now (identity for an invalid index or a volley without an area). Scale, rotation and growth (scale-in) included.
+			</description>
+		</method>
+		<method name="debug_get_clocks" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Debug/test helper: a read-only snapshot of every clock the volley advances (curve clock, lifetime, homing interval, sprite animation, fade, custom timers, bounce cooldowns).
+			</description>
+		</method>
+		<method name="debug_get_collision_queue" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Debug/test readout of the collision records the physics flush queued and the next tick has not drained yet: [code]{size, rows}[/code]. Each row holds [code]bullet[/code], [code]target_id[/code], [code]type[/code] (0 = area, 1 = body), [code]epoch[/code] (the bullet's collision epoch when it was queued), [code]target_velocity_valid[/code] and [code]target_position_valid[/code]. Usually empty mid-tick; read it between physics frames.
+			</description>
+		</method>
+		<method name="debug_get_curves_info" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Per-channel curves winner for one bullet: {valid, x_src, y_src, rot_src, speed_src, gravity_src, has_per_bullet_resource, has_shared_fallback}, where each *_src is "per", "shared" or "none". Example: with shared x + per-bullet y, x_src is "shared" and y_src is "per". Never mutates; invalid index returns valid=false.
+			</description>
+		</method>
+		<method name="debug_get_effect_layers_info" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Baked trail-layer state: data layer count, and per bake the layer index, frame/shard counts, applied z_index/z_as_relative/modulate/visibility_layer/light_mask, visible shards, tracked bullets, and live trail rows (bullet, shard, tint).
+			</description>
+		</method>
+		<method name="debug_get_gravity_info" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Gravity introspection: vector, fall_speed, window_active, curve_scale. Never mutates.
+			</description>
+		</method>
+		<method name="debug_get_graze_info" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Graze introspection: armed, zone_slots, state_bytes, active_this_tick (some zone had a live target), pending_events (queued for the next dispatch), dispatched_events, bullet_radius (added when a zone counts bullet size), generation, target_group (the group of a factory volley), spawner_targets (true while its spawner's settings find the targets), targets (how many it tested last tick).
+			</description>
+		</method>
+		<method name="debug_get_graze_visit" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="zone_index" type="int" />
+			<description>
+				Debug/test readout of one bullet x zone graze visit: [code]{valid, inside, rings, deepest, visit_fired, anchor_slot, has_visit}[/code]. [code]anchor_slot[/code] is the stable slot of the target the visit belongs to (meaningful while [code]has_visit[/code]); an exit clears the visit bits but leaves the stale anchor.
+			</description>
+		</method>
+		<method name="debug_get_homing_queue_info" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="bullet_index" type="int" default="-1" />
+			<description>
+				Debug/test readout of a homing queue's ring internals: [code]{valid, queue, bullet_index, size, capacity, empty, head, front_type, front_position}[/code]. Pass a bullet index for its own queue or -1 for the shared deque. [code]capacity[/code] is 0 until the first push (the ring allocates nothing while empty) and doubles as it fills; [code]head[/code] moves with front pops.
+			</description>
+		</method>
+		<method name="debug_get_life_state" qualifiers="const">
+			<return type="String" />
+			<description>
+				Debug/test helper: [code]"active"[/code], [code]"parked"[/code] or [code]"pooled"[/code].
+			</description>
+		</method>
+		<method name="debug_get_orbiting_info" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Orbiting introspection for one bullet: {valid, enabled, locked, center, angle, radius, direction, texture_rotation, follow_mode, deadzone, lock_policy, rigid_follow, deque_src}, where deque_src is "locked" once the ring locks, else "per" when the bullet has its own deque, "shared" when it falls back to the shared deque, or "none". Per-bullet deque wins over shared, same as the steering tick. Example: [code]var info = bullets.debug_get_orbiting_info(0); print(info["deque_src"])[/code]. Never mutates; invalid index returns valid=false.
+			</description>
+		</method>
+		<method name="debug_get_pattern_info" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Movement-pattern state for one bullet: {valid, src, face, repeat, distance, length, finished, has_shared_fallback}, where src is "per", "shared" or "none". Finished shared parks at length; finished per-bullet clears back to src "none". Never mutates; invalid index returns valid=false.
+			</description>
+		</method>
+		<method name="debug_get_paused_overlaps" qualifiers="const">
+			<return type="Array" />
+			<description>
+				Debug/test readout of the overlaps a paused factory parked: one row per logical overlap with [code]bullet[/code], [code]target_id[/code], [code]type[/code] (0 = area, 1 = body), [code]epoch[/code] and [code]pairs[/code] (how many shape pairs of that target currently overlap). The replay empties it on resume.
+			</description>
+		</method>
+		<method name="debug_get_previous_origin" qualifiers="const">
+			<return type="Vector2" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Previous-tick origin used by physics interpolation. Lets tests prove the render path stays continuous across teleports and bounces (rotation may snap while position keeps lerping).
+			</description>
+		</method>
+		<method name="debug_get_shape_state" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Collision shape state: valid, type, circle_radius, rect_size, capsule_radius, capsule_height, rid_count. Asserts set_collision_shape_runtime same-type vs type-change paths.
+			</description>
+		</method>
+		<method name="debug_get_timer_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Attached timer count (0 = no per-tick timer cost). Asserts the 64-timer cap and detach-during-fire behavior.
+			</description>
+		</method>
+		<method name="debug_get_trail_transform" qualifiers="const">
+			<return type="Transform2D" />
+			<param index="0" name="layer_index" type="int" />
+			<param index="1" name="bullet_index" type="int" />
+			<description>
+				Last written local trail instance transform for one bullet (zero Transform2D when it has no visible trail instance on that layer).
+			</description>
+		</method>
+		<method name="debug_get_volley_info" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Stability introspection: amount_bullets, active_bullets, generation, owner_spawner_id, is_active, is_pooled, pool_amount, pool_shape, auto_pool_volley, auto_pool_attachments.
+			</description>
+		</method>
+		<method name="debug_get_wobble_info" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Wobble introspection for tests/support: {active, amplitude, frequency_hz, mode, waveform, phase, damping_per_sec, delay_sec, duration_sec, face_movement_direction, face_rotation_speed, has_per_bullet_resource, has_shared_fallback}. Example: [code]var w = bullets.debug_get_wobble_info(0); print(w["amplitude"])[/code]. Never mutates.
+			</description>
+		</method>
+		<method name="debug_run_interpolation_pass">
+			<return type="void" />
+			<param index="0" name="fraction" type="float" default="-1.0" />
+			<description>
+				Runs the render interpolation pass on demand (same code the factory _process drives) at [param fraction] between the last two physics poses (below 0: the engine's fraction, which is 0 headless): lets tests check mid-frame poses and prove trail shards follow the lerped bullet pose. No-op unless [method BulletFactory2D.is_physics_interpolation_active].
+			</description>
+		</method>
+		<method name="detach_all_time_based_functions">
+			<return type="void" />
+			<description>
+				Detaches all time based functions that were previously attached.
+			</description>
+		</method>
+		<method name="detach_from_spawner">
+			<return type="bool" />
+			<description>
+				Makes this volley factory-owned, like [constant BulletSpawner2D.ORPHANED_VOLLEYS_HAND_TO_FACTORY] for one volley: its signals reach the factory, its clock drops the spawner's [member BulletSpawner2D.time_scale], and the spawner no longer tracks, lists or retargets it. What the spawner armed (graze, sound, flock, split, emitter) stays. Returns [code]false[/code] (no change) for a factory volley; refused on a pooled volley. Splits and emitter shots this volley queued and the factory has not spawned yet (carried over by [member BulletFactory2D.split_max_children_per_sweep] or [member BulletFactory2D.emitter_max_shots_per_sweep]) become the factory's too. [method BulletSpawner2D.adopt_live_volley] hands it to a spawner again.
+			</description>
+		</method>
+		<method name="detach_time_based_function">
+			<return type="void" />
+			<param index="0" name="callable" type="Callable" />
+			<description>
+				Detaches a specific time based callable. This will work as long as the callable you are trying to detach
+				was previously saved in a variable or defined as a normal Godot function.
+			</description>
+		</method>
+		<method name="disable_bullet">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="release_attachment" type="bool" default="true" />
+			<param index="2" name="reset_state" type="bool" default="false" />
+			<description>
+				Disables (freezes) one bullet: it stops moving, colliding and drawing, but keeps its state (ballistics, hit count, bounce ledger, homing queue, orbit, wobble phase, fall speed, custom data), so [method enable_bullet] resumes it exactly. Silent: no effect layer fires (use [method clear_bullet] for a visible removal).
+				[param release_attachment]: [code]true[/code] (default) releases the attachment to the pool; [code]false[/code] suspends it in its slot (on_bullet_disable) and the wake resumes it.
+				[param reset_state]: [code]true[/code] also clears the ledgers ([method bullet_reset_state]).
+				When the last bullet goes, the volley returns to the pool if [member is_auto_pooling_enabled] is on, otherwise it parks (frozen and still yours).
+			</description>
+		</method>
+		<method name="emitter_clear">
+			<return type="void" />
+			<description>
+				Stops this volley's bullets from firing (see [method emitter_set]).
+			</description>
+		</method>
+		<method name="emitter_get_data" qualifiers="const">
+			<return type="BulletEmitterData2D" />
+			<description>
+				Returns the timing this volley emits with, or [code]null[/code] while it does not emit.
+			</description>
+		</method>
+		<method name="emitter_set">
+			<return type="bool" />
+			<param index="0" name="emitter" type="BulletEmitterData2D" />
+			<param index="1" name="template_spawner" type="Variant" />
+			<description>
+				Makes every flying bullet of this volley fire [param template_spawner]'s pattern, timed by [param emitter] (factory volleys, or an override of a spawner volley until its next life). The clocks start now: each bullet's first shot comes after the start delay plus its stagger. Returns [code]false[/code] (nothing changed) for a null [param emitter], a [param template_spawner] that is not a [PatternSpawner2D], or a pooled volley.
+			</description>
+		</method>
+		<method name="enable_bullet">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="collision_amount" type="int" default="-1" />
+			<param index="2" name="enable_attachment" type="bool" default="true" />
+			<description>
+				Wakes a disabled (frozen) bullet: it resumes exactly where it stopped, with its ballistics, homing, orbit, custom data and suspended attachment. [param collision_amount]: -1 (default) keeps the bullet's hit count, any other value sets it. Waking a parked volley resumes the whole volley (owner and volley features included); a volley that expired gets a fresh lifetime and curve clock.
+				A volley that already went back to the pool (its last bullet died with [member is_auto_pooling_enabled] on) cannot be woken: the call is refused with an error, because the handle is stale. Spawn a new volley instead, or turn auto pooling off before the last bullet dies to keep the volley parked.
+			</description>
+		</method>
+		<method name="enable_volley">
+			<return type="bool" />
+			<param index="0" name="data" type="BulletVolleyData2D" />
+			<param index="1" name="inherited_velocity_offset" type="Vector2" default="Vector2(0, 0)" />
+			<param index="2" name="spawner_id" type="int" default="0" />
+			<description>
+				Manual-pooling reseed: reactivates a fully-disabled volley with fresh data (same amount_bullets required; a different collision shape type is refused inside the physics step: spawn through [BulletFactory2D] instead, which pops a matching pool bucket, or call it from an idle frame). Refuses on active/queued/wrong-type/null/NaN-offset input without touching state. This is the cross-owner reuse path for manual poolers; same-owner revive uses enable_bullet/wake_bullet.
+			</description>
+		</method>
+		<method name="flock_get" qualifiers="const">
+			<return type="BulletFlock2D" />
+			<description>
+				The flock this volley flies in, or null (not armed, or its spawner switched flocking off).
+			</description>
+		</method>
+		<method name="flock_get_scope" qualifiers="const">
+			<return type="int" />
+			<description>
+				The armed scope ([enum BulletFlock2D.Scope]), or -1 when not flocking.
+			</description>
+		</method>
+		<method name="flock_join">
+			<return type="bool" />
+			<param index="0" name="flock" type="BulletFlock2D" />
+			<param index="1" name="scope" type="int" enum="BulletFlock2D.Scope" default="1" />
+			<description>
+				Makes this volley fly as a boids flock by [param flock]'s rules. [param scope] decides who it flies with: Shared (the default: every volley that joined the same flock with Shared, and spawners set to Shared), Per Spawner (its owner spawner's group; for a factory volley the factory's own volleys of this flock) or Per Volley (alone). Replaces any membership until the volley's next life (a spawner's Flocking settings no longer reach it). A null [param flock] joins the factory's default flock ([method BulletFactory2D.get_default_flock]). Returns false and changes nothing for a bad scope, a pooled handle or a volley no factory spawned. Steering starts on the next physics tick.
+			</description>
+		</method>
+		<method name="flock_leave">
+			<return type="void" />
+			<description>
+				Stops flocking (the bullets keep their current headings). Harmless when not flocking; refused on a pooled handle.
+			</description>
+		</method>
+		<method name="get_active_bullet_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				How many bullets of this volley are alive now (0 once it is pooled). Cheaper than counting [method get_all_bullets_status]: use it for "wave cleared" logic.
+			</description>
+		</method>
+		<method name="get_active_bullet_indexes" qualifiers="const">
+			<return type="PackedInt32Array" />
+			<description>
+				The indexes of the bullets alive now, ascending (empty once pooled). Loop over these instead of every index when you act on the live bullets only.
+			</description>
+		</method>
+		<method name="get_all_bullets_status">
+			<return type="bool[]" />
+			<description>
+				Get the status of all bullets inside the volley - whether they are enabled (active and visible on screen) or disabled (inactive and invisible)
+			</description>
+		</method>
+		<method name="get_amount_active_attachments" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns how many bullets of this multimesh currently have an attachment assigned. Useful for debugging attachment pooling on a [BulletFactory2D] controllable handle.
+			</description>
+		</method>
+		<method name="get_amount_bullets" qualifiers="const">
+			<return type="int" />
+			<description>
+				Get the amount of bullets inside the volley
+			</description>
+		</method>
+		<method name="get_bullet_collision_count" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Get how many times a specific bullet has collided so far. See [method set_bullet_collision_count] for writing it.
+			</description>
+		</method>
+		<method name="get_bullet_color" qualifiers="const">
+			<return type="Color" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Returns the bullet's own color (multiplied with the art, [member CanvasItem.self_modulate] and [member modulate_ramp] when drawn). A volley spawned without per-bullet colors reads white for every bullet.
+			</description>
+		</method>
+		<method name="get_bullet_direction" qualifiers="const">
+			<return type="Vector2" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Get the direction of a specific bullet. Returns a [Vector2] direction.
+			</description>
+		</method>
+		<method name="get_bullet_emitter_shots" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Returns how many shots bullet [param bullet_index] fired this life (chance misses included).
+			</description>
+		</method>
+		<method name="get_bullet_grazed_rings" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="zone_index" type="int" />
+			<description>
+				Bitmask of the rings of zone [param zone_index] that bullet [param bullet_index] already grazed (bit k = ring k). With [constant GrazeZone2D.REGRAZE_ONCE] the bits stay for the bullet's life.
+			</description>
+		</method>
+		<method name="get_bullet_indexes_in_circle" qualifiers="const">
+			<return type="PackedInt32Array" />
+			<param index="0" name="center" type="Vector2" />
+			<param index="1" name="radius" type="float" />
+			<description>
+				Indexes of the live bullets whose centre is inside the circle (global space, edge inclusive). Frozen and pooled bullets are never listed. Bullet size is not counted. Bad input pushes one error and returns an empty array.
+			</description>
+		</method>
+		<method name="get_bullet_indexes_in_rect" qualifiers="const">
+			<return type="PackedInt32Array" />
+			<param index="0" name="rect" type="Rect2" />
+			<description>
+				Like [method get_bullet_indexes_in_circle] for a rectangle. A negative size is accepted.
+			</description>
+		</method>
+		<method name="get_bullet_life_time_left" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Returns how many seconds bullet [param bullet_index] has left. A bullet with its own lifetime ([member BulletVolleyData2D.all_bullet_life_times], the spawner's [member BulletSpawner2D.bullet_life_time_scale_min], or [method set_bullet_life_time_left]) reads its own time; any other bullet reads the volley timer ([method get_life_time_left]: 0 while the lifetime is infinite).
+			</description>
+		</method>
+		<method name="get_bullet_movement_pattern_curve" qualifiers="const">
+			<return type="Curve2D" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Get the movement pattern curve of a specific bullet.
+			</description>
+		</method>
+		<method name="get_bullet_rotation_data" qualifiers="const">
+			<return type="BulletRotationData2D" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Live rotation triple of a specific bullet (rotation/max/accel). Read, tweak, and write back with [method set_bullet_rotation_data]. Out-of-range reads return a zeroed resource.
+			</description>
+		</method>
+		<method name="get_bullet_scale" qualifiers="const">
+			<return type="Vector2" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				The bullet's scale: the scale of its transform's basis ([method Transform2D.get_scale], so a mirrored bullet reads a negative y).
+			</description>
+		</method>
+		<method name="get_bullet_speed" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				The bullet's speed along its direction in px/s (negative flies backwards). The inherited drift and the gravity fall speed are not part of it; [method get_bullet_velocity] gives the composed total.
+			</description>
+		</method>
+		<method name="get_bullet_speed_data" qualifiers="const">
+			<return type="BulletSpeedData2D" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Get the speed data of a specific bullet. Returns a [BulletSpeedData2D] resource.
+			</description>
+		</method>
+		<method name="get_bullet_texture_rotation_degrees" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Get the texture rotation in degrees of a specific bullet. Returns a float representing the rotation in degrees.
+			</description>
+		</method>
+		<method name="get_bullet_texture_rotation_radians" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Get the texture rotation in radians of a specific bullet, in the same space [method set_bullet_texture_rotation_radians] writes: the volley-wide spawn-data [code]texture_rotation_radians[/code] offset is excluded, so [code]set(get())[/code] is a no-op. Wrapped to [-PI, PI] when an offset is set.
+			</description>
+		</method>
+		<method name="get_bullet_transform" qualifiers="const">
+			<return type="Transform2D" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Get the transform of a specific bullet in global space (the same space as [method set_bullet_transform]). Returns a [Transform2D] containing the bullet's position, rotation and scale.
+			</description>
+		</method>
+		<method name="get_bullet_velocity" qualifiers="const">
+			<return type="Vector2" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Logical velocity of a specific bullet (direction x speed + inherited offset + integrated gravity fall speed when gravity is active). Excludes per-tick pattern/orbit displacement, which steers the movement delta after this value is computed. Use this for gameplay logic such as splitting bullets or speed checks.
+			</description>
+		</method>
+		<method name="get_collision_layer" qualifiers="const">
+			<return type="int" />
+			<description>
+				Get the collision layer of the multimesh.
+			</description>
+		</method>
+		<method name="get_collision_mask" qualifiers="const">
+			<return type="int" />
+			<description>
+				Get the collision mask of the multimesh.
+			</description>
+		</method>
+		<method name="get_collision_shape" qualifiers="const">
+			<return type="Shape2D" />
+			<description>
+				The collision shape currently cached for this multimesh.
+			</description>
+		</method>
+		<method name="get_fade_base_modulate" qualifiers="const">
+			<return type="Color" />
+			<description>
+				Base tint the fade tick multiplies. Snapshotted from spawn data on every spawn/enable; change it here at runtime (not through the CanvasItem setter, which the next fade tick would overwrite while any fade is configured).
+			</description>
+		</method>
+		<method name="get_graze_zones" qualifiers="const">
+			<return type="Array" />
+			<description>
+				The zones armed on this volley, with null in empty slots (the index is the zone index used by the readouts).
+			</description>
+		</method>
+		<method name="get_is_wobble_enabled" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Whether any wobble entry is currently enabled on this volley (shared or per-bullet). Set wobble data through [member BulletVolleyData2D.shared_bullet_wobble_data] or [member BulletVolleyData2D.all_bullet_wobble_data] before spawning, or live via [method bullet_set_wobble_data] / [method set_shared_bullet_wobble_data].
+			</description>
+		</method>
+		<method name="get_life_age" qualifiers="const">
+			<return type="float" />
+			<description>
+				Seconds of this volley's time since its current life began (its spawn or the reuse that woke it from the pool), scaled like its bullets (0 for a pooled handle). Volley-wide clocks (lifetime, [member BulletSplitStage2D.split_after_sec], emitter schedules) run on it.
+			</description>
+		</method>
+		<method name="get_life_id" qualifiers="const">
+			<return type="int" />
+			<description>
+				The id of the volley's current life: it changes every time the volley is spawned or reused from the pool. Store it with a handle and compare later to know whether the volley still belongs to the same spawn.
+			</description>
+		</method>
+		<method name="get_life_time_left" qualifiers="const">
+			<return type="float" />
+			<description>
+				Seconds left until the volley's bullets expire (0 once expired, and always 0 for an infinite lifetime).
+			</description>
+		</method>
+		<method name="get_monitorable" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Check if the multimesh is monitorable.
+			</description>
+		</method>
+		<method name="get_owner_spawner" qualifiers="const">
+			<return type="BulletSpawner2D" />
+			<description>
+				The [BulletSpawner2D] that fired this volley (or adopted it with [method BulletSpawner2D.adopt_live_volley]) while that spawner is alive, else null: volleys the factory spawned directly, orphans (a freed or queued spawner, or one that handed them to the factory), and pooled volleys. Handy in factory-level signal handlers to tell who fired a bullet.
+			</description>
+		</method>
+		<method name="get_pickup_data" qualifiers="const">
+			<return type="BulletPickupData2D" />
+			<description>
+				The [BulletPickupData2D] this pickup volley was converted with (its value, magnet and collection settings), or null for a bullet volley. See [method is_pickup_volley].
+			</description>
+		</method>
+		<method name="get_scale_in_factor" qualifiers="const">
+			<return type="float" />
+			<description>
+				The growth the scale-in window shows now: [member BulletVolleyData2D.scale_in_from] at spawn up to 1.0 at the end of the window (1.0 without a window). The drawn size and the hitbox are the full-grown size times this.
+			</description>
+		</method>
+		<method name="get_scale_in_from" qualifiers="const">
+			<return type="float" />
+			<description>
+				The scale-in start size this life took from its spawn data ([member BulletVolleyData2D.scale_in_from]).
+			</description>
+		</method>
+		<method name="get_scale_in_sec" qualifiers="const">
+			<return type="float" />
+			<description>
+				The scale-in window this life took from its spawn data ([member BulletVolleyData2D.scale_in_sec]; 0 = no window).
+			</description>
+		</method>
+		<method name="get_sprite_animation" qualifiers="const">
+			<return type="StringName" />
+			<description>
+				Currently playing SpriteFrames animation (one per multimesh batch).
+			</description>
+		</method>
+		<method name="get_sprite_frame" qualifiers="const">
+			<return type="int" />
+			<description>
+				Current frame index within the playing animation.
+			</description>
+		</method>
+		<method name="get_sprite_frame_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Amount of baked frames in the playing animation.
+			</description>
+		</method>
+		<method name="get_sprite_frames" qualifiers="const">
+			<return type="SpriteFrames" />
+			<description>
+				Cached SpriteFrames source of the playing animation. The bake is a snapshot: later edits to the resource need a replay via [method play_sprite_animation] or [method play_sprite_animation_name]. Playing on a pooled (inactive) instance applies immediately but is discarded by the next pool-reuse bake.
+			</description>
+		</method>
+		<method name="get_time_scale" qualifiers="const">
+			<return type="float" />
+			<description>
+				This volley's own clock factor (see [method set_time_scale]).
+			</description>
+		</method>
+		<method name="graze_clear">
+			<return type="void" />
+			<description>
+				Disarms graze on this volley: zones released, per-bullet state and queued events dropped. Refused on a pooled handle.
+			</description>
+		</method>
+		<method name="graze_set_zones">
+			<return type="bool" />
+			<param index="0" name="zones" type="Array" />
+			<param index="1" name="target_group" type="Variant" />
+			<description>
+				Arms this volley with up to [constant MAX_GRAZE_ZONES] [GrazeZone2D] zones (null entries are skipped but keep their index), all ringing the live [Node2D] members of [param target_group] (a group name, or a [BulletTargets2D] for any other source: its detector is shared, so its edits reach these bullets in flight; anything else is refused with one error) (no cap), and resets every bullet's graze state. Use it for volleys spawned straight from [BulletFactory2D]; spawner volleys are armed by their spawner ([member BulletSpawner2D.graze_zones] and [member BulletSpawner2D.graze_target_source]), and re-arming one with this method replaces its spawner's targeting with the group. Returns false and changes nothing for more than 4 entries, a non-zone entry or an empty [param target_group]; refused on a pooled handle.
+			</description>
+		</method>
+		<method name="has_bullet_movement_pattern" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Check if a specific bullet has a movement pattern assigned to it, either from a [Path2D] or a [Curve2D].
+				Returns true if the bullet has a movement pattern, false if it doesn't.
+				Note: A bullet can have its movement pattern removed by using [method remove_bullet_movement_pattern] or [method all_bullets_remove_movement_pattern].
+			</description>
+		</method>
+		<method name="has_shared_bullet_curves_data" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Whether shared bullet curves are currently set.
+			</description>
+		</method>
+		<method name="has_shared_bullet_rotation_data" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Whether a shared rotation is currently set.
+			</description>
+		</method>
+		<method name="has_shared_bullet_speed_data" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Whether a shared speed is currently set.
+			</description>
+		</method>
+		<method name="has_shared_bullet_wobble_data" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Whether a shared wobble fallback is currently set.
+			</description>
+		</method>
+		<method name="has_shared_movement_pattern" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Whether a shared movement pattern curve is currently set.
+			</description>
+		</method>
+		<method name="has_trail_effects" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Whether any trail layer is currently baked on this volley.
+			</description>
+		</method>
+		<method name="homing_follow">
+			<return type="bool" />
+			<param index="0" name="targets" type="Variant" />
+			<param index="1" name="retarget_interval" type="float" default="0.0" />
+			<param index="2" name="mode" type="int" enum="BulletVolley2D.HomingFollowMode" default="0" />
+			<description>
+				Homes this volley on the targets of a [BulletTargets2D], without a spawner: every [param retarget_interval] seconds of the volley's clock ([code]0[/code] = every tick) it picks by [param mode] ([constant HOMING_FOLLOW_SHARED_NEAREST]: the shared queue holds the target nearest the live bullets' center; [constant HOMING_FOLLOW_EACH_NEAREST]: every live bullet's own queue holds the target nearest it, O(bullets x targets) per pick, so give large volleys an interval). A queue is replaced only when its front changes (a kept target keeps its orbit lock); no target found clears the queue; frozen bullets keep theirs. The mouse source chases the live cursor. The steering (smoothing, reach, auto pop, orbiting) is the volley's own. [code]null[/code] stops following and leaves the queues as they are. While it follows, its spawner's implicit updates leave it alone (retargets, [method BulletSpawner2D.apply_to_live_volleys] with [constant BulletSpawner2D.LIVE_HOMING], the homing armed for a wake); its explicit orders [method BulletSpawner2D.home_live_volleys_to] and [method BulletSpawner2D.clear_live_volleys_homing] end the follow, and [method BulletSpawner2D.aim_live_volleys_at] turns the headings as always (the next pick steers again). Dropped with the life. Returns [code]false[/code] with one error (nothing changed) for a target that is not a [BulletTargets2D] or [code]null[/code], a non-finite or negative interval or an unknown mode; refused on a pooled volley.
+			</description>
+		</method>
+		<method name="is_bullet_inside_graze" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="zone_index" type="int" />
+			<description>
+				Whether bullet [param bullet_index] was inside zone [param zone_index]'s outermost ring at the end of its last evaluated tick.
+			</description>
+		</method>
+		<method name="is_bullet_status_enabled">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Check the status of a specific bullet - whether it is enabled (active and visible on screen) or disabled (inactive and invisible)
+			</description>
+		</method>
+		<method name="is_emitter_armed" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] while this volley's bullets emit (a spawner's Emitter Bullets group or [method emitter_set]).
+			</description>
+		</method>
+		<method name="is_graze_armed" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Whether at least one graze zone is armed on this volley.
+			</description>
+		</method>
+		<method name="is_homing_following" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Whether [method homing_follow] steers this volley's homing queues.
+			</description>
+		</method>
+		<method name="is_parked" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Whether every bullet is disabled but the volley was kept (auto pooling off): frozen and still yours, wake it with [method enable_bullet].
+			</description>
+		</method>
+		<method name="is_pickup_volley" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Whether this volley was made by a pickup conversion and is still in that life. A pooled volley that is reused for ordinary bullets is not one any more.
+			</description>
+		</method>
+		<method name="is_pooled" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Whether the volley is back in the factory's pool (its last bullet died with auto pooling on). A pooled handle is stale: it cannot be woken, and the next spawn may reuse it for anyone.
+			</description>
+		</method>
+		<method name="is_rotation_data_active" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Whether rotation data is currently driving the volley (any seeded rotation array, shared or per-bullet).
+			</description>
+		</method>
+		<method name="is_sound_armed" qualifiers="const">
+			<return type="bool" />
+			<description>
+				True when at least one enabled entry is armed (the trigger mask is set).
+			</description>
+		</method>
+		<method name="is_sprite_animation_finished" qualifiers="const">
+			<return type="bool" />
+			<description>
+				True after a non-looping animation reached its last frame (emits sprite_animation_finished once, deferred).
+			</description>
+		</method>
+		<method name="is_sprite_animation_playing" qualifiers="const">
+			<return type="bool" />
+			<description>
+				True when active, unpaused, unfinished, with more than one baked frame.
+			</description>
+		</method>
+		<method name="is_using_bullet_colors" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] when this volley draws per-bullet colors (its spawn data had [member BulletVolleyData2D.use_bullet_colors] on or a [member BulletVolleyData2D.bullet_colors] entry). The format is part of the pool key, so it stays the same for the volley's whole life.
+			</description>
+		</method>
+		<method name="is_volley_active" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] while this volley has a live life: spawned (or woken) and holding at least one bullet. False once it is parked ([method is_parked]) or pooled ([method is_pooled]): check it before acting on a handle you kept.
+			</description>
+		</method>
+		<method name="play_effect_animation">
+			<return type="bool" />
+			<param index="0" name="layer_index" type="int" />
+			<param index="1" name="animation" type="StringName" />
+			<description>
+				Switches one trail layer to another baked animation (shard nodes rebuild; per-bullet phase and toggles survive). One-shot layers switch through their layer resource plus [method set_effect_layers]. A missing animation falls back to the first animation with frames (one error, like the bullets' animations). Returns [code]false[/code] when no trail layer has [param layer_index] or its frames cannot be baked.
+			</description>
+		</method>
+		<method name="play_sprite_animation">
+			<return type="bool" />
+			<param index="0" name="sprite_frames" type="SpriteFrames" />
+			<param index="1" name="animation" type="StringName" default="&amp;&quot;default&quot;" />
+			<description>
+				Switches this multimesh to a SpriteFrames animation (bakes frames, per-frame seconds from fps-relative durations, loop flag; AtlasTexture frames draw as their region). Same rules as [member BulletVolleyData2D.animation]: empty or "default" auto-resolves silently to "default" or the first animation with frames; explicit wrong names fall back with one error. Returns false on null/empty/missing with previous animation untouched. Note: pooled reuse re-bakes from spawn data and disconnects these handlers, so reconnect after reuse if needed.
+			</description>
+		</method>
+		<method name="play_sprite_animation_name">
+			<return type="bool" />
+			<param index="0" name="animation" type="StringName" />
+			<description>
+				Switches animation reusing the cached SpriteFrames source. Same resolve rules (empty or missing "default" auto-resolves to the first animation). Errors only when no source cached yet.
+			</description>
+		</method>
+		<method name="remove_bullet_movement_pattern">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Removes the movement pattern from a specific bullet, making it lose any [Path2D] or [Curve2D] drawn pattern it had and move solely based on its direction and speed data.
+				Note: If you want to remove the movement pattern from multiple bullets at once, use [method all_bullets_remove_movement_pattern].
+				Note: A bullet can have a movement pattern assigned by using [method set_bullet_movement_pattern_from_curve] or [method set_bullet_movement_pattern_from_path].
+			</description>
+		</method>
+		<method name="remove_shared_bullet_curves_data">
+			<return type="void" />
+			<description>
+				Removes the shared bullet curves (same as setting null). Per-bullet curves, if any, take over.
+			</description>
+		</method>
+		<method name="remove_shared_bullet_rotation_data">
+			<return type="void" />
+			<description>
+				Removes the shared rotation (same as setting null). Per-bullet rotation data, if any, takes over.
+			</description>
+		</method>
+		<method name="remove_shared_bullet_speed_data">
+			<return type="void" />
+			<description>
+				Removes the shared speed (same as setting null). Per-bullet speed data, if any, takes over.
+			</description>
+		</method>
+		<method name="remove_shared_bullet_wobble_data">
+			<return type="void" />
+			<description>
+				Clears the shared wobble fallback; slots without a live per-bullet resource go inactive.
+			</description>
+		</method>
+		<method name="remove_shared_movement_pattern">
+			<return type="void" />
+			<description>
+				Removes the shared movement pattern (same as setting a null curve). Per-bullet patterns, if any, take over.
+			</description>
+		</method>
+		<method name="reset_pooling_flags_to_default">
+			<return type="void" />
+			<description>
+				Resets both pooling flags ([member is_auto_pooling_enabled] and [member is_attachments_auto_pooling_enabled]) to true. Use after taking over a pooled instance whose previous owner customized them.
+			</description>
+		</method>
+		<method name="restart_sprite_animation">
+			<return type="bool" />
+			<description>
+				Restarts the baked animation at frame 0 (unpauses, clears finished). Errors when nothing baked.
+			</description>
+		</method>
+		<method name="resume_sprite_animation">
+			<return type="void" />
+			<description>
+				Unfreezes frame advancement.
+			</description>
+		</method>
+		<method name="set_bounce_mask_from_array">
+			<return type="void" />
+			<param index="0" name="array_of_masks" type="int[]" />
+			<description>
+				Rebuilds [member bounce_mask] live from layer numbers instead of raw bits, through the same path as [method set_bounce_mask] (ledger re-armed, or fully disarmed when the result is 0). Example: [code]set_bounce_mask_from_array([4])[/code] bounces off layer-4 targets.
+			</description>
+		</method>
+		<method name="set_bullet_collision_count">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="value" type="int" />
+			<description>
+				Set how many times a specific bullet has collided so far. Negative values become 0, values at or above [member bullet_max_collision_count] become max - 1 (exactly one hit remaining, when the max is above 0). Same clamp as [method enable_bullet]'s wake top-up. See [method get_bullet_collision_count] for reading it.
+			</description>
+		</method>
+		<method name="set_bullet_color">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_color" type="Color" />
+			<description>
+				Tints one bullet. The color shows at once, even on a paused factory, and stays until the volley's life ends (a parked wake keeps it). Refused with an error on a volley spawned without per-bullet colors or for a non-finite color.
+			</description>
+		</method>
+		<method name="set_bullet_direction">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_direction" type="Vector2" />
+			<description>
+				Set the direction of a specific bullet to a new direction. The direction gets normalized automatically.
+			</description>
+		</method>
+		<method name="set_bullet_direction_towards_node2d">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="target_node" type="Variant" />
+			<description>
+				Set the direction of a specific bullet towards a target [Node2D]. The direction gets normalized automatically.
+			</description>
+		</method>
+		<method name="set_bullet_direction_towards_position">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="target_position" type="Vector2" />
+			<description>
+				Set the direction of a specific bullet towards a target global position. The direction gets normalized automatically.
+			</description>
+		</method>
+		<method name="set_bullet_life_time_left">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="seconds" type="float" />
+			<description>
+				Gives bullet [param bullet_index] [param seconds] to live (finite, &gt; 0). From then on it ignores the volley timer and expires on its own, even in an infinite volley. A bullet woken after its own lifetime ran out starts it again; a frozen bullet keeps its time. Inside a [signal BulletFactory2D.life_time_over] handler this keeps a listed bullet alive.
+			</description>
+		</method>
+		<method name="set_bullet_movement_pattern_from_curve">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="curve_pattern" type="Curve2D" />
+			<param index="2" name="face_movement_direction" type="bool" default="false" />
+			<param index="3" name="repeat_pattern" type="bool" default="true" />
+			<description>
+				Set a [Curve2D] drawn movement pattern to a specific bullet. The bullet will follow the shape of the curve as it moves. Per-bullet patterns always win over the shared fallback; null clears back to shared (or no pattern). Example: [code]bullets.set_bullet_movement_pattern_from_curve(0, my_curve, true); print(bullets.debug_get_pattern_info(0)["src"])[/code] prints "per".
+
+				If [code]face_movement_direction[/code] is set to true, the bullet will also rotate to face the direction it is moving along the curve.
+
+				If [code]repeat_pattern[/code] is set to true, once the bullet reaches the end of the curve pattern it will start again from the beginning, creating a loop. If false, once the bullet reaches the end of the curve pattern it will stop following it and continue moving in a straight line based on its current direction and speed.
+				Note: If you want to set a movement pattern from a curve to multiple bullets at once, use [method all_bullets_set_movement_pattern_from_curve].
+				Note: A bullet can have its movement pattern removed by using [method remove_bullet_movement_pattern] or [method all_bullets_remove_movement_pattern].
+				Note: A bullet can only have one movement pattern at a time, so if you set a new movement pattern to a bullet that already has one, it will replace the previous one.
+			</description>
+		</method>
+		<method name="set_bullet_movement_pattern_from_path">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="path_holding_pattern" type="Variant" />
+			<param index="2" name="face_movement_direction" type="bool" default="false" />
+			<param index="3" name="repeat_pattern" type="bool" default="true" />
+			<description>
+				Set a [Path2D] drawn movement pattern to a specific bullet. The bullet will follow the shape of the path as it moves.
+
+				If [code]face_movement_direction[/code] is set to true, the bullet will also rotate to face the direction it is moving along the path.
+
+				If [code]repeat_pattern[/code] is set to true, once the bullet reaches the end of the path pattern it will start again from the beginning, creating a loop. If false, once the bullet reaches the end of the path pattern it will stop following it and continue moving in a straight line based on its current direction and speed.
+				Note: If you want to set a movement pattern from a path to multiple bullets at once, use [method all_bullets_set_movement_pattern_from_path].
+				Note: A bullet can have its movement pattern removed by using [method remove_bullet_movement_pattern] or [method all_bullets_remove_movement_pattern].
+				Note: A bullet can only have one movement pattern at a time, so if you set a new movement pattern to a bullet that already has one, it will replace the previous one.
+				Note: The [Path2D] used for setting a movement pattern doesn't need to be in the scene tree, since only its curve is used for the bullets movement.
+				Warning: If you are using a [Path2D] that is in the scene tree and you modify its curve after setting it as a movement pattern for a bullet, it may cause unexpected behavior in the bullet's movement. This is because the bullet's movement pattern is based on the curve data of the [Path2D], and modifying it while it's being used can lead to inconsistencies. It's recommended to use a [Path2D] that is not in the scene tree or to avoid modifying its curve after assigning it as a movement pattern to bullets.
+			</description>
+		</method>
+		<method name="set_bullet_rotation_data">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_bullet_rotation_data" type="BulletRotationData2D" />
+			<description>
+				Live per-bullet rotation write (null and non-finite values rejected). Mirrors [method set_bullet_speed_data].
+			</description>
+		</method>
+		<method name="set_bullet_scale">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_scale" type="Vector2" />
+			<description>
+				Sets the bullet's scale while keeping its position, rotation and direction. The bullet is shown at once with its hitbox, trails and attachment (like [method set_bullet_transform]); the hitbox scales with it in both [member BulletVolleyData2D.rotate_only_textures] modes, like the spawn transform's scale. Graze rings and flock spacing use the new size. A non-finite or zero component is refused with an error and the old scale is kept.
+			</description>
+		</method>
+		<method name="set_bullet_speed">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_speed" type="float" />
+			<description>
+				Sets the bullet's speed along its direction in px/s (negative flies backwards). Its direction, acceleration and inherited drift are kept and the next tick flies the new speed; a capped [member BulletSpeedData2D.max_speed] below the new speed rises to it, while 0 stays unlimited. Refused with a warning while a movement speed curve (shared or the bullet's own) drives the speed, and with an error for a non-finite speed; the old speed is kept.
+			</description>
+		</method>
+		<method name="set_bullet_speed_data">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_bullet_speed_data" type="BulletSpeedData2D" />
+			<description>
+				Set the speed data of a specific bullet (null and non-finite values rejected; a winning movement-speed curve blocks the write until cleared). Example: [code]var s = BulletSpeedData2D.new(); s.speed = 200.0; bullets.set_bullet_speed_data(0, s)[/code].
+			</description>
+		</method>
+		<method name="set_bullet_texture_rotation_degrees">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_rotation_degrees" type="float" />
+			<description>
+				Set the texture rotation in degrees of a specific bullet.
+			</description>
+		</method>
+		<method name="set_bullet_texture_rotation_radians">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_rotation_radians" type="float" />
+			<description>
+				Set the texture rotation in radians of a specific bullet. Composes with the volley-wide texture offset, so direction math that strips the offset stays exact. Stick-relative attachments follow immediately.
+			</description>
+		</method>
+		<method name="set_bullet_texture_rotation_towards_node2d">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="target_node" type="Variant" />
+			<description>
+				Set the texture rotation of a specific bullet towards a target [Node2D].
+				The rotation will be set so that the bullet's texture faces towards the target node. Composes with the volley-wide texture offset (physics shape stays logical). Stick-relative attachments follow immediately.
+			</description>
+		</method>
+		<method name="set_bullet_texture_rotation_towards_position">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="target_position" type="Vector2" />
+			<description>
+				Set the texture rotation of a specific bullet towards a target global position.
+				The rotation will be set so that the bullet's texture faces towards the target position. Composes with the volley-wide texture offset (physics shape stays logical). Stick-relative attachments follow immediately.
+			</description>
+		</method>
+		<method name="set_bullet_transform">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_transform" type="Transform2D" />
+			<param index="2" name="set_direction_based_on_transform" type="bool" default="false" />
+			<description>
+				Set the transform of a specific bullet, in global space (matching [method get_bullet_transform]). Zero-scale and non-finite transforms are rejected. With set_direction_based_on_transform, the logical direction is derived from the transform with the volley-wide texture offset stripped (same convention as the tick), unless a direction curve owns the direction.
+			</description>
+		</method>
+		<method name="set_collision_layer">
+			<return type="void" />
+			<param index="0" name="new_collision_layer" type="int" />
+			<description>
+				Sets the collision layer of the multimesh.
+			</description>
+		</method>
+		<method name="set_collision_layer_from_array">
+			<return type="void" />
+			<param index="0" name="array_of_layers" type="int[]" />
+			<description>
+				Sets the collision layer of the multimesh by providing an array of integers, where each integer represents a layer to be added to the collision layer.
+			</description>
+		</method>
+		<method name="set_collision_mask">
+			<return type="void" />
+			<param index="0" name="new_collision_mask" type="int" />
+			<description>
+				Sets the collision mask of the multimesh.
+			</description>
+		</method>
+		<method name="set_collision_mask_from_array">
+			<return type="void" />
+			<param index="0" name="array_of_masks" type="int[]" />
+			<description>
+				Sets the collision mask of the multimesh by providing an array of integers, where each integer represents a mask to be added to the collision mask.
+			</description>
+		</method>
+		<method name="set_collision_shape_runtime">
+			<return type="void" />
+			<param index="0" name="new_shape" type="Shape2D" />
+			<description>
+				Swaps the collision shape live, on an active or pooled volley. Size-only changes apply to every bullet right away through the physics server. A different effective type additionally rebuilds the physics shapes and moves pooled instances into the matching pool bucket. The visual QuadMesh is texture-driven and stays untouched. The debugger picks up the new type and size on the next physics tick.
+
+				Note: cannot run while bullets are being processed or inside a physics frame (same contract as the factory structural methods): use [method set_collision_shape_runtime_deferred] from handlers.
+			</description>
+		</method>
+		<method name="set_collision_shape_runtime_deferred">
+			<return type="void" />
+			<param index="0" name="new_shape" type="Shape2D" />
+			<description>
+				Deferred twin of [method set_collision_shape_runtime]: queued on the factory's idle structural queue, so it is safe to call from collision and lifetime handlers (where a shape change is rejected).
+			</description>
+		</method>
+		<method name="set_fade_base_modulate">
+			<return type="void" />
+			<param index="0" name="value" type="Color" />
+			<description>
+				Retints the fade base at runtime and re-arms the fade tick so the next frame writes even when the value matches the stale snapshot.
+			</description>
+		</method>
+		<method name="set_life_time_left">
+			<return type="void" />
+			<param index="0" name="seconds" type="float" />
+			<description>
+				Sets the seconds left until the volley's bullets expire, e.g. from a [signal BulletFactory2D.life_time_over] handler to give them more time (which vetoes that expiry). Must be finite and above 0; refused on an infinite-lifetime volley.
+			</description>
+		</method>
+		<method name="set_monitorable">
+			<return type="void" />
+			<param index="0" name="value" type="bool" />
+			<description>
+				Sets whether the multimesh is monitorable or not.
+			</description>
+		</method>
+		<method name="set_sprite_frame">
+			<return type="bool" />
+			<param index="0" name="frame" type="int" />
+			<description>
+				Seeks the sprite animation to [param frame] like [member AnimatedSprite2D.frame]: the frame shows at once for its full duration and the animation plays on from there. A stopped animation stays stopped on the chosen frame; a finished one plays again and emits [signal sprite_animation_finished] again when it ends. Out of range, or no animation baked, is refused with an error and returns false.
+			</description>
+		</method>
+		<method name="set_time_scale">
+			<return type="void" />
+			<param index="0" name="time_scale" type="float" />
+			<description>
+				Sets this volley's own clock factor (1 = normal, 0 = frozen alone): it multiplies [member BulletFactory2D.time_scale] and the owner spawner's [member BulletSpawner2D.time_scale], so its ticks, lifetime, custom timers, attachments and followed sounds run on it. Finite and &gt;= 0, else one error and the old value is kept; refused on a pooled volley. Every new life starts at 1.
+			</description>
+		</method>
+		<method name="shared_homing_deque_check_current_target_type" qualifiers="const">
+			<return type="int" enum="BulletVolley2D.HomingType" />
+			<description>
+				Returns the type of the current (front) homing target in the shared deque (NotHoming if empty).
+
+				If you want to check the type of the current target from a specific bullet's per-bullet deque, use [method bullet_homing_check_current_target_type] instead.
+			</description>
+		</method>
+		<method name="shared_homing_deque_check_has_homing_targets" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns true if the shared deque has any homing targets.
+
+				If you want to check if a specific bullet's per-bullet deque has any targets, use [method bullet_check_has_homing_targets] instead.
+			</description>
+		</method>
+		<method name="shared_homing_deque_check_homing_targets_amount" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the number of homing targets in the shared deque.
+
+				If you want to check the number of targets in a specific bullet's per-bullet deque, use [method bullet_homing_check_targets_amount] instead.
+			</description>
+		</method>
+		<method name="shared_homing_deque_clear_homing_targets">
+			<return type="void" />
+			<description>
+				Clears all targets from the shared deque, decrementing mouse counter if applicable. Resets swarm path.
+
+				If you want to clear all homing targets from specific bullets' per-bullet deques, use [method all_bullets_clear_homing_targets] or [method bullet_clear_homing_targets] instead.
+			</description>
+		</method>
+		<method name="shared_homing_deque_get_current_homing_target" qualifiers="const">
+			<return type="Variant" />
+			<description>
+				Returns the current (front) homing target from the shared deque as Variant (Node2D or Vector2; nullptr if invalid/empty).
+
+				If you want to get the current target from a specific bullet's per-bullet deque, use [method bullet_get_current_homing_target] instead.
+			</description>
+		</method>
+		<method name="shared_homing_deque_pop_back_target">
+			<return type="Variant" />
+			<description>
+				Pops and returns the back homing target from the shared deque (Variant: Node2D or Vector2; nullptr if invalid/empty).
+
+				If you want to pop the back target from a specific bullet's per-bullet deque, use [method bullet_homing_pop_back_target] instead.
+			</description>
+		</method>
+		<method name="shared_homing_deque_pop_front_target">
+			<return type="Variant" />
+			<description>
+				Pops and returns the front (current) homing target from the shared deque (Variant: Node2D target or Vector2; nullptr if invalid/empty).
+
+				If you want to pop the front target from a specific bullet's per-bullet deque, use [method bullet_homing_pop_front_target] instead.
+			</description>
+		</method>
+		<method name="shared_homing_deque_push_back_global_position_target">
+			<return type="void" />
+			<param index="0" name="global_position" type="Vector2" />
+			<description>
+				Pushes a global position target to the back of the shared deque.
+
+				If you want to push back a target to a specific bullet's per-bullet deque, use [method bullet_homing_push_back_global_position_target] instead.
+			</description>
+		</method>
+		<method name="shared_homing_deque_push_back_homing_targets_array">
+			<return type="void" />
+			<param index="0" name="node2ds_or_global_positions_array" type="Array" />
+			<description>
+				Pushes an array of homing targets (mix of Node2D and Vector2) to the back of the shared deque.
+
+				If you want to push back targets to a specific bullet's per-bullet deque, use [method all_bullets_push_back_homing_targets_array] instead.
+			</description>
+		</method>
+		<method name="shared_homing_deque_push_back_mouse_position_target">
+			<return type="void" />
+			<description>
+				Pushes the current mouse global position to the back of the shared deque.
+
+				If you want to push back a mouse position target to a specific bullet's per-bullet deque, use [method bullet_homing_push_back_mouse_position_target] instead.
+			</description>
+		</method>
+		<method name="shared_homing_deque_push_back_node2d_target">
+			<return type="void" />
+			<param index="0" name="new_homing_target" type="Variant" />
+			<description>
+				Pushes a Node2D target to the back of the shared deque.
+
+				If you want to push back a target to a specific bullet's per-bullet deque, use [method bullet_homing_push_back_node2d_target] instead.
+			</description>
+		</method>
+		<method name="shared_homing_deque_push_front_global_position_target">
+			<return type="void" />
+			<param index="0" name="global_position" type="Vector2" />
+			<description>
+				Pushes a global position target to the front of the shared deque.
+
+				Warning: Pushing to the front changes the current target being followed immediately.
+
+				If you want to push front a target to a specific bullet's per-bullet deque, use [method bullet_homing_push_front_global_position_target] instead.
+			</description>
+		</method>
+		<method name="shared_homing_deque_push_front_homing_targets_array">
+			<return type="void" />
+			<param index="0" name="node2ds_or_global_positions_array" type="Array" />
+			<description>
+				Pushes an array of homing targets to the front of the shared deque.
+
+				Warning: Pushing to the front changes the current target being followed immediately.
+
+				If you want to push front targets to a specific bullet's per-bullet deque, use [method all_bullets_push_front_homing_targets_array] instead.
+			</description>
+		</method>
+		<method name="shared_homing_deque_push_front_mouse_position_target">
+			<return type="void" />
+			<description>
+				Pushes the current mouse global position to the front of the shared deque.
+
+				Warning: Pushing to the front changes the current target being followed immediately.
+
+				If you want to push front a mouse position target to a specific bullet's per-bullet deque, use [method bullet_homing_push_front_mouse_position_target] instead.
+			</description>
+		</method>
+		<method name="shared_homing_deque_push_front_node2d_target">
+			<return type="void" />
+			<param index="0" name="new_homing_target" type="Variant" />
+			<description>
+				Pushes a Node2D target to the front of the shared deque.
+
+				Warning: Pushing to the front changes the current target being followed immediately.
+
+				If you want to push front a target to a specific bullet's per-bullet deque, use [method bullet_homing_push_front_node2d_target] instead.
+			</description>
+		</method>
+		<method name="shared_homing_deque_replace_homing_targets_with_new_target">
+			<return type="void" />
+			<param index="0" name="node2d_or_global_position" type="Variant" />
+			<description>
+				Clears then pushes a single homing target to the back of the shared deque.
+
+				If you want to clear then push a single target to a specific bullet's per-bullet deque, use [method all_bullets_replace_homing_targets_with_new_target] instead.
+			</description>
+		</method>
+		<method name="shared_homing_deque_replace_homing_targets_with_new_target_array">
+			<return type="void" />
+			<param index="0" name="node2ds_or_global_positions_array" type="Array" />
+			<description>
+				Clears then pushes an array of homing targets to the back of the shared deque.
+
+				If you want to clear then push an array of targets to a specific bullet's per-bullet deque, use [method all_bullets_replace_homing_targets_with_new_target_array] instead.
+			</description>
+		</method>
+		<method name="sound_get_effects" qualifiers="const">
+			<return type="Array" />
+			<description>
+				The armed sound entries, nulls in place.
+			</description>
+		</method>
+		<method name="sound_get_listener_group" qualifiers="const">
+			<return type="StringName" />
+			<description>
+				The listener group this factory volley was armed with (empty means Godot's listener).
+			</description>
+		</method>
+		<method name="sound_set_effects">
+			<return type="bool" />
+			<param index="0" name="effects" type="Array" />
+			<param index="1" name="listener_group" type="Variant" default="null" />
+			<description>
+				Arms a factory volley with sound entries (empty [param listener_group] means Godot's listener, else the nearest member of that group or the nearest target of a [BulletTargets2D]; anything else is refused with one error). On Shot and On Telegraph entries never fire on a factory volley: they are spawner-only. Refused on a pooled handle. Edits to an entry's [member BulletSoundData2D.trigger] or [member BulletSoundData2D.enabled] reach volleys in flight: enabling a disabled entry starts its plays, disabling one stops them.
+			</description>
+		</method>
+		<method name="split_bullet">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Splits one live bullet right now (see [method all_bullets_split]). Returns [code]true[/code] when it split; a volley without a chain (or without a stage for its generation) keeps the bullet and returns [code]false[/code].
+			</description>
+		</method>
+		<method name="split_clear">
+			<return type="void" />
+			<description>
+				Stops this volley from splitting (until its next life). A spawner volley gets its spawner's settings again on its next shot.
+			</description>
+		</method>
+		<method name="split_get_data" qualifiers="const">
+			<return type="BulletSplitData2D" />
+			<description>
+				The chain this volley splits by, or [code]null[/code] when it does not split (never armed, cleared, or its spawner's splitting is off).
+			</description>
+		</method>
+		<method name="split_get_depth" qualifiers="const">
+			<return type="int" />
+			<description>
+				This volley's generation: 0 for fired volleys, 1 for their children, and so on. Generation [code]d[/code] splits by [member BulletSplitData2D.stages][code][d][/code].
+			</description>
+		</method>
+		<method name="split_set_data">
+			<return type="bool" />
+			<param index="0" name="split" type="BulletSplitData2D" />
+			<param index="1" name="child_spawn_data" type="BulletVolleyData2D" default="null" />
+			<description>
+				Arms this volley to split by [param split] (for factory volleys, or to override a spawner volley until its next life). Children spawn from [param child_spawn_data]; [code]null[/code] keeps the data this volley was armed with (a spawner volley: its spawner's data). The chain starts at generation 0 (its first stage), even on a volley of children. Refused (with an error, nothing changed) for a null chain, a pickup volley, or a volley without any spawn data to copy.
+			</description>
+		</method>
+		<method name="stop_sprite_animation">
+			<return type="void" />
+			<description>
+				Freezes frame advancement (frozen multimeshes cost one branch per tick).
+			</description>
+		</method>
+		<method name="teleport_bullet">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_global_pos" type="Vector2" />
+			<description>
+				Teleports the specified bullet to a new global position, without travel: nothing is hit or grazed on the way, its trail layers, attachment and interpolation history move with it at once. A bullet locked on an orbit keeps circling from its new angle; its radius is the orbit's setting, so a jump off the ring is pulled back onto the ring on the next tick.
+			</description>
+		</method>
+		<method name="teleport_shift_all_bullets">
+			<return type="void" />
+			<param index="0" name="shift_value" type="Vector2" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Shifts the position of all bullets in the specified range by the given offset.
+			</description>
+		</method>
+		<method name="teleport_shift_bullet">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="shift_value" type="Vector2" />
+			<description>
+				Shifts the position of the specified bullet by the given offset.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="adjust_direction_based_on_rotation" type="bool" setter="set_adjust_direction_based_on_rotation" getter="get_adjust_direction_based_on_rotation" default="false">
+			Whether each bullet's direction is adjusted based on rotation data (the bullet moves where it faces). Mirrors the spawn data flag; pool reuse re-applies the data value. Needs [member BulletVolleyData2D.rotate_only_textures] off: while it is on (the default), rotation only turns the sprite and never steers.
+		</member>
+		<member name="bounce_charge_amplify" type="bool" setter="set_bounce_charge_amplify" getter="get_bounce_charge_amplify" default="true">
+			Whether an oncoming target amplifies the rebound through relative reflection, set live. True (default) enables the extra kick; false reflects absolutely. Outcome guarantee: the committed reflection always separates along the contact normal. Target velocity is sampled when the overlap is queued (scripts changing it before the drain cannot corrupt the bounce), and any stale or degenerate relative frame falls back to the absolute reflection, so target motion can only add energy, never send the bullet through the target.
+		</member>
+		<member name="bounce_cooldown_sec" type="float" setter="set_bounce_cooldown_sec" getter="get_bounce_cooldown_sec" default="0.05">
+			Quiet period in seconds after a bounce, set live (finite in [0, 1]). Swallows further bounce records whatever they hit, so keep it small and use [member bounce_debounce_sec] for repeat suppression. Example: bullet clips two walls 0.03 s apart with cooldown 0.05: the first touch bounces, the second is swallowed.
+		</member>
+		<member name="bounce_debounce_sec" type="float" setter="set_bounce_debounce_sec" getter="get_bounce_debounce_sec" default="0.15">
+			Same-target debounce window in seconds, set live (finite, 0 or more, no upper cap). Inside the window a re-hit against the just-bounced object never re-bounces; other targets bounce freely (unlike [member bounce_cooldown_sec], which swallows every target). 0 disables it. Example: bullet slides along one wall with debounce 0.15: it bounces once, ignores that wall for 0.15 s, but still bounces off a second wall touched in between.
+		</member>
+		<member name="bounce_hit_consumed" type="bool" setter="set_bounce_hit_consumed" getter="get_bounce_hit_consumed" default="false">
+			Whether a bounce also counts as a normal hit, set live. False (default) means free bounces. A consumed bounce emits BOTH the bounce signal and the matching area/body signal.
+		</member>
+		<member name="bounce_mask" type="int" setter="set_bounce_mask" getter="get_bounce_mask" default="0">
+			Bitmask of target collision layers that trigger a bounce, set live. An unsigned 32-bit value like [member BulletVolleyData2D.bounce_mask] (layer 32 is 2147483648). Takes precedence over the normal collision path. 0 (default) disables bouncing. Spawn-time equivalent lives on [member BulletVolleyData2D.bounce_mask] (reseeded on every pool reuse).
+		</member>
+		<member name="bounce_max_count" type="int" setter="set_bounce_max_count" getter="get_bounce_max_count" default="0">
+			How many times a single bullet may bounce before bounces stop for it, set live. 0 (default) = unlimited. Read per-bullet progress with [method bullet_get_bounce_count].
+		</member>
+		<member name="bounce_mode" type="int" setter="set_bounce_mode" getter="get_bounce_mode" enum="BulletVolleyData2D.BounceMode" default="0">
+			Which surface normal to reflect across, set live: 0 Simple Radial, 1 Precise Shape (rectangle, circle, capsule, segment, world boundary; falls back to radial for convex polygons or without a usable target shape).
+		</member>
+		<member name="bounce_push_assist" type="bool" setter="set_bounce_push_assist" getter="get_bounce_push_assist" default="true">
+			Whether a same-direction target feeds its velocity into the bounce, set live. True (default) surges pushed bullets forward instead of reversing them; false reflects absolutely. Same outcome guarantee as [member bounce_charge_amplify]: separation along the contact normal always holds.
+		</member>
+		<member name="bounce_randomness_deg" type="float" setter="set_bounce_randomness_deg" getter="get_bounce_randomness_deg" default="0.0">
+			Random scatter in degrees around the reflected heading per bounce, set live (finite in [0, 180]).
+		</member>
+		<member name="bounce_rotate_texture" type="bool" setter="set_bounce_rotate_texture" getter="get_bounce_rotate_texture" default="true">
+			Whether a bounce re-aims the bullet visual at the reflected heading, set live.
+		</member>
+		<member name="bounce_rotation_smooth" type="float" setter="set_bounce_rotation_smooth" getter="get_bounce_rotation_smooth" default="0.0">
+			Max visual turn rate in radians/sec toward the reflected heading, set live. 0 snaps instantly; above 0 only the sprite slews. Ignored while [member adjust_direction_based_on_rotation] is on.
+		</member>
+		<member name="bounce_strength" type="float" setter="set_bounce_strength" getter="get_bounce_strength" default="1.0">
+			Speed multiplier applied on every bounce, set live (finite, 0 or more, no upper cap). 1.0 is perfectly elastic, 0 dead-stops. The boost sticks: the bounce raises the bullet's cached max speed to the new speed and a per-bullet multiplier persists across speed-curve overwrites. Moving targets contribute their velocity when [member bounce_push_assist] (same-direction) or [member bounce_charge_amplify] (oncoming) is on; repeat hits against the same target while separating never re-bounce.
+		</member>
+		<member name="bounce_tilemap_layers" type="bool" setter="set_bounce_tilemap_layers" getter="get_bounce_tilemap_layers" default="false">
+			Live TileMapLayer opt-in: toggling rebuilds nothing, the next drain reads it. Same head-on reflection contract as the spawn-data flag.
+		</member>
+		<member name="bullet_homing_auto_pop_after_target_reached" type="bool" setter="set_bullet_homing_auto_pop_after_target_reached" getter="get_bullet_homing_auto_pop_after_target_reached" default="false">
+			Whether the current homing target should be automatically popped from the deque once it gets reached by a bullet (per-bullet deques only).
+
+			Adjust the distance for considering a target reached with [member homing_distance_before_reached].
+
+			The signal [signal bullet_homing_target_reached] is emitted when a target is reached.
+
+			If you want this behavior for the shared deque, use [member shared_homing_deque_auto_pop_after_target_reached] instead.
+		</member>
+		<member name="bullet_max_collision_count" type="int" setter="set_bullet_max_collision_count" getter="get_bullet_max_collision_count" default="1">
+			How many times a bullet can collide before it gets disabled. If you set to 0, then the bullet will NEVER get disabled due to collisions.
+		</member>
+		<member name="bullets_current_collision_count" type="int[]" setter="set_bullets_current_collision_count" getter="get_bullets_current_collision_count" default="[]">
+			An array of integers representing the current collision count for each bullet. The index of each integer in the array corresponds to the bullet index it is meant to represent.
+
+			For example, if you have 3 bullets and their current collision counts are 1, 2 and 3 respectively, then this array would be [1, 2, 3].
+
+			You can use this property to keep track of how many times each bullet has collided, and you can also set it to update the collision counts as needed.
+		</member>
+		<member name="collision_dedup_by_object" type="bool" setter="set_collision_dedup_by_object" getter="get_collision_dedup_by_object" default="true">
+			When on (default), a bullet reports each target object at most once per drain window, even when the physics server reports several shape pairs for one overlap (multi-shape bodies and areas). Off restores legacy shape-level delivery: every shape record counts, signals and bounces separately. Seeded from [member BulletVolleyData2D.collision_dedup_by_object] on every spawn.
+		</member>
+		<member name="curves_elapsed_time" type="float" setter="set_curves_elapsed_time" getter="get_curves_elapsed_time" default="0.0">
+			The elapsed time used for the bullets' curves. This is the time that gets passed to the curves assigned to the bullets, you can manipulate it freely.
+		</member>
+		<member name="effect_layers" type="EffectLayerData2D[]" setter="set_effect_layers" getter="get_effect_layers" default="[]">
+			Stackable sprite-effect layers (trails, spawn flashes, hit sparks, destroy explosions, bounce sparks, lifetime fizzles, manual-clear puffs). Each entry renders through its own per-frame shards: one extra draw call per animation frame while anything is visible, zero when idle. Empty (default) disables the whole feature. Assign custom SpriteFrames per layer. Cost scales with art (frames), bullets, and active one-shots, not with layer count alone.
+		</member>
+		<member name="emit_collision_signals" type="bool" setter="set_emit_collision_signals" getter="get_emit_collision_signals" default="true">
+			Runtime twin of [member BulletVolleyData2D.emit_collision_signals] (reset from the spawn data on every new life).
+		</member>
+		<member name="fade_in_sec" type="float" setter="set_fade_in_sec" getter="get_fade_in_sec" default="0.0">
+			Fade-in seconds after spawn (0 disables). The volley starts at transparent base tint and reaches full tint at fade_in_sec. Works with infinite lifetimes. While any fade is configured the tick owns self_modulate: retint through [method set_fade_base_modulate], not the CanvasItem setter.
+		</member>
+		<member name="fade_out_sec" type="float" setter="set_fade_out_sec" getter="get_fade_out_sec" default="0.0">
+			Fade-out seconds before expiry (0 disables). Needs a finite lifetime: infinite volleys ignore it.
+		</member>
+		<member name="gravity" type="Vector2" setter="set_gravity" getter="get_gravity" default="Vector2(0, 0)">
+			Shared gravity acceleration in px/s^2, filling only genuine per-bullet gaps (2D sideview arcs, tower-defense shells). (0, 0) disables — top-down default. Writing it starts a new regime only for the slots it changes: user-authored per-bullet entries (spawn-data vectors, even deliberate zeros, or [method bullet_set_gravity] writes) are kept with their fall speed intact, while gap slots take the shared value and restart theirs. A slot that took the shared value stays a gap, so the next write still reaches it. Prefer [method bullet_set_gravity] for single slots.
+		</member>
+		<member name="gravity_delay_sec" type="float" setter="set_gravity_delay_sec" getter="get_gravity_delay_sec" default="0.0">
+			Seconds of straight flight before gravity starts integrating. 0 falls immediately.
+		</member>
+		<member name="gravity_duration_sec" type="float" setter="set_gravity_duration_sec" getter="get_gravity_duration_sec" default="0.0">
+			Seconds of falling before gravity stops integrating (volley glides on with frozen fall speed). 0 = infinite.
+		</member>
+		<member name="homing_delay_sec" type="float" setter="set_homing_delay_sec" getter="get_homing_delay_sec" default="0.0">
+			Seconds of straight flight before steering starts (classic aimed-then-homing). 0 steers immediately.
+		</member>
+		<member name="homing_distance_before_reached" type="float" setter="set_homing_distance_before_reached" getter="get_homing_distance_before_reached" default="5.0">
+			Adjust if you want your bullets to consider a homing target reached if they are within a certain distance away from it.
+
+			The [signal bullet_homing_target_reached] signal is emitted when a target is reached.
+		</member>
+		<member name="homing_duration_sec" type="float" setter="set_homing_duration_sec" getter="get_homing_duration_sec" default="0.0">
+			Seconds of steering before bullets fly straight (lets fast players escape). 0 is infinite.
+		</member>
+		<member name="homing_lose_range_px" type="float" setter="set_homing_lose_range_px" getter="get_homing_lose_range_px" default="0.0">
+			Steering pauses while the bullet is farther than this from its target. 0 is unlimited.
+		</member>
+		<member name="homing_reach_counts_bullet_size" type="bool" setter="set_homing_reach_counts_bullet_size" getter="get_homing_reach_counts_bullet_size" default="false">
+			When on, the homing reach test adds the bullet's own size: [code]homing_distance_before_reached[/code] is measured from the bullet's EDGE (its collision shape's bounding radius (circle radius, half the shorter rectangle side, half the capsule height; the rule graze and the collision-ring preview use) times its own scale) instead of its center, so a big or randomly scaled bullet reaches (and auto-pops, and fires the reached signal) when it visibly touches its target. Off (the default) keeps the center-to-center distance. Seeded from [member BulletVolleyData2D.homing_reach_counts_bullet_size] (or the spawner's setting); changeable on a live volley.
+		</member>
+		<member name="homing_smoothing" type="float" setter="set_homing_smoothing" getter="get_homing_smoothing" default="0.0">
+			Adjust this value for natural smooth turning. Test with values [code]0.00-20.00[/code] or even bigger. Latch note: the first per-bullet write ([method bullet_set_homing_smoothing]) snapshots every sibling at the current shared value, so later shared writes only affect never-latched volleys — call [method clear_per_bullet_homing_smoothing] to hand control back to shared. The spawner equivalent fans [code]homing_smoothing_start + homing_smoothing_step * i[/code] per slot.
+		</member>
+		<member name="homing_take_control_of_texture_rotation" type="bool" setter="set_homing_take_control_of_texture_rotation" getter="get_homing_take_control_of_texture_rotation" default="false">
+			If you set to true then the texture of the bullets will start facing the direction in which it is moving while homing towards a target. Leave it off and homing targets will not steer bullets at all (unless a movement pattern or rotation data does), and you get one warning about it.
+		</member>
+		<member name="homing_update_interval" type="float" setter="set_homing_update_interval" getter="get_homing_update_interval" default="0.0">
+			How often it should cache the position of the targets so that they can be re-used instead of fetching them every frame. Increase if you want to boost performance.
+		</member>
+		<member name="inherited_velocity_offset" type="Vector2" setter="set_inherited_velocity_offset" getter="get_inherited_velocity_offset" default="Vector2(0, 0)">
+			Velocity added to every bullet for its whole life, e.g. the emitter's momentum ([member BulletSpawner2D.inherit_movement_velocity]). Homing bullets aim through it: they cancel its part across the line of sight to the target, as long as their own speed is larger than that part. A bouncing bullet mirrors its own share at every bounce, so its whole world motion reflects off the wall while its own speed stays unchanged (a fast ship's bullets bounce back instead of drifting into the wall); [method get_bullet_velocity] includes the mirrored share.
+		</member>
+		<member name="is_attachments_auto_pooling_enabled" type="bool" setter="set_is_attachments_auto_pooling_enabled" getter="get_is_attachments_auto_pooling_enabled" default="true">
+			Whether the attachments auto pooling is enabled or not.
+
+			When enabled, the attachments will automatically get pushed to the object pool when the bullets get disabled.
+			When disabled, the attachments will automatically get freed from the scene tree upon collision.
+		</member>
+		<member name="is_auto_pooling_enabled" type="bool" setter="set_is_auto_pooling_enabled" getter="get_is_auto_pooling_enabled" default="true">
+			Whether the volley returns to the factory's pool when its last bullet is disabled (default on). Pooling releases everything the volley held for its owner: attachments, homing targets, orbit state, timers, pending hits, its own signal connections and user resources; the handle is then stale ([method is_pooled]).
+			With it off, the volley parks instead ([method is_parked]): frozen and still yours, so [method enable_bullet] can wake it later with all its state. Turning it on for a parked volley pools it right away.
+			Note: both pooling flags are per-instance state, not spawn data; [method reset_pooling_flags_to_default] restores them.
+		</member>
+		<member name="is_life_time_infinite" type="bool" setter="set_is_life_time_infinite" getter="get_is_life_time_infinite" default="false">
+			If you set to true, then the lifetime will be ignored and bullets will never be destroyed.
+
+			Warning: If you don't implement "collision walls" or anything else to intercept/collide with the bullets, then they will truly live forever in your memory and you will experience lag.
+		</member>
+		<member name="linear_drag" type="float" setter="set_linear_drag" getter="get_linear_drag" default="0.0">
+			Linear drag trimming speed each tick. 0 disables.
+		</member>
+		<member name="modulate_ramp" type="Gradient" setter="set_modulate_ramp" getter="get_modulate_ramp">
+			Live tint-over-life gradient, sampled by lifetime fraction and multiplied with the fade base and fades. Reseeded from spawn data on every spawn/enable. Null disables it.
+		</member>
+		<member name="override_frame_color" type="bool" setter="set_override_frame_color" getter="get_override_frame_color" default="false">
+			Live bullet whiten override: toggling re-bakes the animation frames whitened (alpha preserved) or restores the art, in place: the animation keeps its frame, remaining time, paused and finished state (a finished one-shot never finishes again). Reseeded from spawn data on every spawn/enable.
+		</member>
+		<member name="shared_bullet_curves_data" type="BulletCurvesData2D" setter="set_shared_bullet_curves_data" getter="get_shared_bullet_curves_data">
+			A shared [BulletCurvesData2D] resource that can be assigned to all bullets in the volley. This is useful for saving memory if you have a lot of bullets that share the same curves data, since you can assign the same resource to all of them instead of creating a new one for each bullet. Values are copied at set time: editing the resource in place afterwards changes nothing until you set it again. Direction channels never park the direction at zero: an Override result near zero keeps the incoming direction.
+		</member>
+		<member name="shared_bullet_rotation_data" type="BulletRotationData2D" setter="set_shared_bullet_rotation_data" getter="get_shared_bullet_rotation_data">
+			Fallback spin for bullets whose own rotation entry is missing or invalid, set live. Only fully-zero triples (the invalid-entry gap marker) are filled; bullets with any non-zero value keep it. Live writes fill once at call time (order matters: per-zero then shared fills, shared then per-zero stays zero). All-zero shared is a silent no-op; non-finite shared aborts the whole fallback with an error. Clearing it (null) keeps the current ballistics. Configure the spawn-time equivalent (plus its [code]tile_*[/code] checkbox) on [BulletVolleyData2D]. Negative spin is legal and clamps symmetrically to [-max, max].
+		</member>
+		<member name="shared_bullet_speed_data" type="BulletSpeedData2D" setter="set_shared_bullet_speed_data" getter="get_shared_bullet_speed_data">
+			Fallback speed for bullets whose own speed entry is missing or invalid, set live. Only fully-zero triples (the invalid-entry gap marker) are filled; bullets with any non-zero value keep it. Live writes fill once at call time (order matters: per-zero then shared fills, shared then per-zero stays zero). All-zero shared is a silent no-op; non-finite shared aborts the whole fallback with an error. Clearing it (null) keeps the current ballistics. Configure the spawn-time equivalent (plus its [code]tile_*[/code] checkbox) on [BulletVolleyData2D]. Note: shared movement-speed curves still outrank it per tick. Negative speed flies backwards, clamped to [-max, max].
+		</member>
+		<member name="shared_bullet_wobble_data" type="BulletWobbleData2D" setter="set_shared_bullet_wobble_data" getter="get_shared_bullet_wobble_data">
+			Fallback wobble for bullets without a live per-bullet wobble resource, set live. Setting it re-seeds only those slots; clearing it (null) deactivates exactly those slots. Spawn-time equivalent (plus its [code]tile_all_bullet_wobble_data[/code] checkbox) lives on [member BulletVolleyData2D.shared_bullet_wobble_data]. Example: [code]bullets.set_shared_bullet_wobble_data(wobble)[/code] adds sway to every plain bullet while custom per-bullet seeds keep theirs.
+		</member>
+		<member name="shared_bullets_custom_data" type="Resource" setter="set_shared_bullets_custom_data" getter="get_shared_bullets_custom_data">
+			You can edit the custom bullets data that the volley was spawned with. Use this to set damage data or anything else you want to store in a resource for your bullets to use.
+		</member>
+		<member name="shared_homing_deque_auto_pop_after_target_reached" type="bool" setter="set_shared_homing_deque_auto_pop_after_target_reached" getter="get_shared_homing_deque_auto_pop_after_target_reached" default="false">
+			Whether the current homing target should be automatically popped from the deque once it gets reached by a bullet (shared deque only).
+
+			Adjust the distance for considering a target reached with [member homing_distance_before_reached].
+
+			The signal [signal bullet_homing_target_reached] is emitted when a target is reached.
+
+			If you want this behavior for the per-bullet deques, use [member bullet_homing_auto_pop_after_target_reached] instead.
+		</member>
+		<member name="shared_movement_pattern_curve" type="Curve2D" setter="set_shared_movement_pattern_curve" getter="get_shared_movement_pattern_curve">
+			Fallback pattern for bullets without their own per-bullet pattern, set live. Bullets with a valid per-bullet pattern always use it. Null (default) means no fallback. A locked orbit still owns the displacement while locked. Spawn-time flags plus the [code]tile_all_bullet_movement_pattern_paths / _face... / _repeats[/code] checkboxes live on [BulletVolleyData2D].
+		</member>
+		<member name="shared_movement_pattern_face_movement_direction" type="bool" setter="set_shared_movement_pattern_face_movement_direction" getter="get_shared_movement_pattern_face_movement_direction" default="false">
+			Whether the shared movement pattern rotates bullets to face their direction of travel.
+		</member>
+		<member name="shared_movement_pattern_repeat" type="bool" setter="set_shared_movement_pattern_repeat" getter="get_shared_movement_pattern_repeat" default="true">
+			Whether the shared movement pattern repeats instead of stopping at the end of the curve.
+		</member>
+	</members>
+	<signals>
+		<signal name="bullet_homing_target_reached">
+			<param index="0" name="volley" type="BulletVolley2D" />
+			<param index="1" name="bullet_index" type="int" />
+			<param index="2" name="target" type="Node2D" />
+			<param index="3" name="target_global_position" type="Vector2" />
+			<description>
+				Emitted live, inside the physics tick, when a bullet comes within [member homing_distance_before_reached] of its homing target. [param target] is null for position and mouse targets; [param target_global_position] is always valid. With auto pop on, the reached target is popped after the handler, unless the handler already changed the front of the deque (a target it pushed survives).
+				Connections made directly on the volley are dropped when it returns to the pool: connect to [signal BulletSpawner2D.volley_bullet_homing_target_reached] for spawner volleys.
+			</description>
+		</signal>
+		<signal name="sprite_animation_finished">
+			<param index="0" name="volley" type="BulletVolley2D" />
+			<description>
+				Emitted live, once, when a non-looping SpriteFrames animation reaches its last frame. Re-armed by every play or restart.
+			</description>
+		</signal>
+	</signals>
+	<constants>
+		<constant name="GlobalPositionTarget" value="1" enum="HomingType">
+			Homing target type, the target is a fixed Vector2 global position.
+		</constant>
+		<constant name="Node2DTarget" value="2" enum="HomingType">
+			Homing target type, the target is a Node2D and the bullet tracks its live global position. Freed targets get trimmed automatically.
+		</constant>
+		<constant name="MousePositionTarget" value="3" enum="HomingType">
+			Homing target type, the target is the mouse cursor position, refreshed on the homing update interval.
+		</constant>
+		<constant name="NotHoming" value="0" enum="HomingType">
+			Homing target type, no valid target. An empty homing deque reports this.
+		</constant>
+		<constant name="DontMove" value="0" enum="OrbitingDirection">
+			Orbiting direction, the bullet locks onto a fixed slot on the orbit ring and follows the target without circling (escort). Pre-lock flight (homing approach, push-out from inside the ring) behaves like the circling modes.
+		</constant>
+		<constant name="OrbitLeft" value="1" enum="OrbitingDirection">
+			Orbiting direction, the bullet circles the target counter-clockwise on screen (Godot uses a y-down coordinate space).
+		</constant>
+		<constant name="OrbitRight" value="2" enum="OrbitingDirection">
+			Orbiting direction, the bullet circles the target clockwise on screen (Godot uses a y-down coordinate space).
+		</constant>
+		<constant name="OrbitRandom" value="3" enum="OrbitingDirection">
+			Orbiting direction, each bullet rolls OrbitLeft or OrbitRight when orbiting is enabled (never DontMove). The rolled value is stored per bullet, so getters report the concrete direction and retarget passes never re-roll mid-flight. Passing it to [method bullet_set_orbiting_direction] or [method all_bullets_set_orbiting_direction] re-rolls instead.
+		</constant>
+		<constant name="FaceTarget" value="0" enum="OrbitingTextureRotation">
+			Orbiting texture rotation, the bullet texture keeps facing the target it orbits.
+		</constant>
+		<constant name="FaceOppositeTarget" value="1" enum="OrbitingTextureRotation">
+			Orbiting texture rotation, the bullet texture faces away from the target it orbits.
+		</constant>
+		<constant name="FaceOrbitingDirection" value="2" enum="OrbitingTextureRotation">
+			Orbiting texture rotation, the bullet texture faces along its direction of travel around the ring.
+		</constant>
+		<constant name="FaceOppositeOrbitingDirection" value="3" enum="OrbitingTextureRotation">
+			Orbiting texture rotation, the bullet texture faces against its direction of travel around the ring.
+		</constant>
+		<constant name="FollowTarget" value="0" enum="OrbitingFollowMode">
+			Orbiting follow mode, the locked ring tracks the target 1:1. A moving Node2D drags the whole ring with it.
+		</constant>
+		<constant name="FollowDeadzone" value="1" enum="OrbitingFollowMode">
+			Orbiting follow mode, the ring center stays pinned until the target walks farther than the follow deadzone from the lock point, then re-pins. Absorbs target jitter without breaking the ring.
+		</constant>
+		<constant name="Anchored" value="2" enum="OrbitingFollowMode">
+			Orbiting follow mode, the ring freezes where it locked and ignores target motion entirely. The target can leave the ring.
+		</constant>
+		<constant name="RelockAlways" value="0" enum="OrbitingLockPolicy">
+			Orbiting lock policy, every retarget or queue replace drops the lock and the bullet re-acquires the radius.
+		</constant>
+		<constant name="HOMING_FOLLOW_SHARED_NEAREST" value="0" enum="HomingFollowMode">
+			[method homing_follow]: the shared queue holds the target nearest the live bullets' center.
+		</constant>
+		<constant name="HOMING_FOLLOW_EACH_NEAREST" value="1" enum="HomingFollowMode">
+			[method homing_follow]: every live bullet's own queue holds the target nearest that bullet.
+		</constant>
+		<constant name="StayLocked" value="1" enum="OrbitingLockPolicy">
+			Orbiting lock policy, once locked the bullet stays locked: retargets and empty-queue gaps never unlock, only an explicit disable, clear, or a freed target does. Use for bodyguard rings on moving Node2Ds.
+		</constant>
+		<constant name="RelockOnTargetChange" value="2" enum="OrbitingLockPolicy">
+			Orbiting lock policy, the lock drops only when the front target is a different target than the one the bullet locked onto. The same moving Node2D never breaks the ring, but switching enemies re-acquires it.
+		</constant>
+		<constant name="SPLIT_CAUSE_HIT" value="0">
+			Split by a killing hit (decided after the hit handler: a heal vetoes it).
+		</constant>
+		<constant name="SPLIT_CAUSE_LIFETIME_OVER" value="1">
+			Split when the lifetime ran out (an extension from the [code]life_time_over[/code] handler vetoes it).
+		</constant>
+		<constant name="SPLIT_CAUSE_TIMER" value="2">
+			Split by the stage's [member BulletSplitStage2D.split_after_sec] timer.
+		</constant>
+		<constant name="SPLIT_CAUSE_DESPAWN" value="3">
+			Split when leaving the factory's despawn bounds.
+		</constant>
+		<constant name="SPLIT_CAUSE_CLEAR" value="4">
+			Split by a clear ([method clear_bullet], [method clear_all_bullets], the area and factory clears).
+		</constant>
+		<constant name="SPLIT_CAUSE_MANUAL" value="5">
+			Split by [method split_bullet] or [method all_bullets_split].
+		</constant>
+		<constant name="SPLIT_CAUSE_BOUNCE" value="6">
+			Split by a bounce ([member BulletSplitStage2D.split_on_bounce]).
+		</constant>
+		<constant name="SPLIT_CAUSE_NON_LETHAL_HIT" value="7">
+			Split by a hit the bullet survived ([member BulletSplitStage2D.split_on_non_lethal_hit]).
+		</constant>
+		<constant name="SPLIT_CAUSE_HOMING_REACHED" value="8">
+			Split on reaching the homing target ([member BulletSplitStage2D.split_on_homing_reached]).
+		</constant>
+		<constant name="SPLIT_CAUSE_GRAZE" value="9">
+			Split by a graze ([member BulletSplitStage2D.split_on_graze]).
+		</constant>
+		<constant name="MAX_GRAZE_ZONES" value="4">
+			Graze zones per volley (and per spawner).
+		</constant>
+	</constants>
+</class>

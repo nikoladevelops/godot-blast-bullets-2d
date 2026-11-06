@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="EffectLayerData2D" inherits="Resource" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		One stackable sprite-effect layer for a bullet volley: a trail that follows bullets, or a one-shot visual (spawn flash, hit sparks, destroy explosion, bounce sparks).
+	</brief_description>
+	<description>
+		Put layers in [member BulletVolleyData2D.effect_layers] — as many as you want. Each layer renders through its own per-frame shards (one extra draw call per animation frame while anything is visible, zero when idle), so layers never fight each other and every instance can show a different animation frame. Every frame of the animation bakes (one shard node each): the animation's length decides the cost.
+		The animation follows the same rules as bullets ([member BulletVolleyData2D.animation]): name resolution, speed (a trail at speed 0 shows its first frame; a one-shot plays one pass of its animation, so speed 0 leaves it no playable time and it is refused with one error), durations, and [AtlasTexture] frames drawn as their region.
+		Upload [member sprite_frames] per layer (a layer with null frames is inert). Use [BulletAttachment2D] scenes instead when you need particles or scripted nodes; use layers for plain sprites.
+		One texture per layer is shared by all its instances (the performance bargain), so per-bullet different textures are not supported — vary instances with [member random_start_frame], [member randomize_rotation], [member random_scale_min]/[member random_scale_max] and [member trigger_chance] instead. Tint with [member self_modulate], or over life with [member color_ramp].
+		Bakes are snapshots: editing a layer's frames mid-life does not refresh live volleys or factory bakes — call [method BulletVolley2D.set_effect_layers] (or [method BulletVolley2D.play_effect_animation] for trails) to apply edits.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="whiten_image_copy" qualifiers="static">
+			<return type="Image" />
+			<param index="0" name="src" type="Image" />
+			<description>
+				Pure pixel step of [member override_frame_color]: returns a copy with white RGB and identical alpha, at any size (a compressed image is decompressed first). Null or empty input returns null with one error.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="animation" type="StringName" setter="set_animation" getter="get_animation" default="&amp;&quot;default&quot;">
+			Which animation to play. Empty or "default" auto-resolves silently: "default" when it has frames, else the first animation with frames. An explicit name that is missing or has no frames falls back to the first animation with frames with one error (like bullets). Switch a live trail layer with [method BulletVolley2D.play_effect_animation].
+		</member>
+		<member name="color_ramp" type="Gradient" setter="set_color_ramp" getter="get_color_ramp">
+			Tint-over-life ramp, sampled per instance by animation age (one-shots) or loop phase (trails), exactly like particle color ramps. Multiplies with [member self_modulate]. Null (default) keeps every instance solid. Example: white-to-transparent red ramp on a destroy layer fades each explosion out individually.
+		</member>
+		<member name="enabled" type="bool" setter="set_enabled" getter="get_enabled" default="true">
+			Master switch: toggle a layer without removing it from the array.
+		</member>
+		<member name="fade_in_sec" type="float" setter="set_fade_in_sec" getter="get_fade_in_sec" default="0.0">
+			Opacity ramp-up after the slot fires (0 disables). Multiplies with [member self_modulate] and [member color_ramp]. One-shot slots key it off slot age; trails key it off volley age and remaining lifetime. A fade longer than the life dims the whole life proportionally.
+		</member>
+		<member name="fade_out_sec" type="float" setter="set_fade_out_sec" getter="get_fade_out_sec" default="0.0">
+			Opacity ramp-down before the slot ends (0 disables). Same multiplication and keying as [member fade_in_sec]. Infinite volley lifetimes skip trail fade-out (volley fade-out is skipped there too).
+		</member>
+		<member name="light_mask" type="int" setter="set_light_mask" getter="get_light_mask" default="1">
+			Light mask bitmask for this layer's shards (same numbering as the bullet light_mask). Lets effects opt out of 2D lights.
+		</member>
+		<member name="material" type="Material" setter="set_material" getter="get_material">
+			Per-layer material override. Null renders with default blending.
+		</member>
+		<member name="max_instances" type="int" setter="set_max_instances" getter="get_max_instances" default="0">
+			One-shot slot ring size (0 to 4096; larger values are refused): the oldest slot is recycled past this. Bounds worst-case memory per layer. 0 (default) means auto: max(32, 2x the spawning volley's bullet count, at most 4096), so one effect per bullet plus margin with zero config (the manual hatch without a volley falls back to 64). Trail layers ignore it (one slot per bullet by construction).
+		</member>
+		<member name="offset" type="Vector2" setter="set_offset" getter="get_offset" default="Vector2(0, 0)">
+			Trail follow offset from the bullet origin, rotated with the bullet. One-shots add it (rotated by the event orientation) to the event pose.
+		</member>
+		<member name="override_frame_color" type="bool" setter="set_override_frame_color" getter="get_override_frame_color" default="false">
+			Exact-color mode: the bake replaces every frame's RGB with white (alpha preserved), so [member self_modulate] and [member color_ramp] produce the exact dialed color instead of multiplying the source art. Frames are read as they draw (an AtlasTexture's region in its margin box, VRAM-compressed sheets decompressed); unreadable frames fall back to the original art with one warning. Costs roughly double texture memory for the layer while on. Toggling rebakes (manual-hatch outputs refresh through the layer version).
+		</member>
+		<member name="random_scale_max" type="float" setter="set_random_scale_max" getter="get_random_scale_max" default="1.0">
+			Upper end of the random uniform scale range per fired one-shot slot. Must be finite and 0 or more. Setting it below [member random_scale_min] pulls the minimum down to it.
+		</member>
+		<member name="random_scale_min" type="float" setter="set_random_scale_min" getter="get_random_scale_min" default="1.0">
+			Lower end of the random uniform scale range per fired one-shot slot. (1, 1) disables the randomization. Must be finite and 0 or more. Setting it above [member random_scale_max] pulls the maximum up to it.
+		</member>
+		<member name="random_start_frame" type="bool" setter="set_random_start_frame" getter="get_random_start_frame" default="false">
+			Desync: one-shot slots start at a random animation age, trail bullets at a random loop phase. Same-frame kills then read as a volley, not a slideshow copy. Off by default so timing stays exact unless asked.
+		</member>
+		<member name="randomize_rotation" type="bool" setter="set_randomize_rotation" getter="get_randomize_rotation" default="false">
+			Spin each fired one-shot slot randomly (full 360). Ideal for spark bursts.
+		</member>
+		<member name="rotation_degrees" type="float" setter="set_rotation_degrees" getter="get_rotation_degrees" default="0.0">
+			Static visual rotation in degrees, applied on top of the bullet or event orientation (a 90-degree streak flies sideways to its bullet). Positive spins clockwise. Example: rotation_degrees 90 on a trail turns a forward streak into a sideways ribbon.
+		</member>
+		<member name="scale" type="Vector2" setter="set_scale" getter="get_scale" default="Vector2(1, 1)">
+			Uniform visual scale of the layer (multiplies the frame size).
+		</member>
+		<member name="self_modulate" type="Color" setter="set_self_modulate" getter="get_self_modulate" default="Color(1, 1, 1, 1)">
+			Layer-wide tint, exactly like CanvasItem self_modulate (multiplies every instance of this layer). White renders the art untouched.
+		</member>
+		<member name="spin_degrees_per_sec" type="float" setter="set_spin_degrees_per_sec" getter="get_spin_degrees_per_sec" default="0.0">
+			Continuous spin in degrees per second (pinwheels, rotating sparks, shimmering trails). 0 (default) disables it. Signed: negative spins counter-clockwise. Derived from the running clock, so pooled reuse never desyncs it. Example: spin_degrees_per_sec 180 turns a trail glow one half-turn per second.
+		</member>
+		<member name="sprite_frames" type="SpriteFrames" setter="set_sprite_frames" getter="get_sprite_frames">
+			Frames to play (required: null frames leave the layer inert with a single bake-time error, never a crash). Plain textures or [AtlasTexture] regions of a sprite sheet (each drawn exactly as a [Sprite2D] would show it).
+		</member>
+		<member name="trigger" type="int" setter="set_trigger" getter="get_trigger" enum="EffectLayerData2D.EffectTrigger" default="0">
+			What this layer does: 0 Trail Follow (sticks to its bullet every tick, and follows physics interpolation exactly like the bullet), 1 On Spawn (muzzle flash at every bullet's spawn pose), 2 On Hit (sparks on counted hits), 3 On Destroy (explosion on collision-kill only, never on lifetime expiry or manual disable), 4 On Bounce (sparks on ricochet; a consumed bounce fires this once, not the hit spark), 5 On Lifetime Over (fizzle at expiry, on both the silent and the signalled expiry path), 6 On Clear (dismissal puff fired by clear_bullet()/clear_all_bullets() and BulletFactory2D.clear_active_bullets() only; kills, timeouts, free_active_bullets and reset never fire it, teardown stays silent), 7 On Despawn (a bullet that leaves through the factory's despawn bounds, see [member BulletFactory2D.despawn_bounds_enabled]; nothing else fires it), 8 On Split (fired at a bullet's pose when it splits into children, whatever made it split; see [member BulletSplitStage2D.fire_death_effects]), 9 On Any Hit (every counted collision hit, killing or survived, bodies and areas: beside On Destroy on a killing blow and beside On Hit on a survived one; hits a bounce fully swallows never count, and a consumed bounce's survived hit fires the bounce spark only, like On Hit).
+		</member>
+		<member name="trigger_chance" type="float" setter="set_trigger_chance" getter="get_trigger_chance" default="1.0">
+			Fire probability per event. Stack three explosion layers at 0.5 and every kill looks different. 0 never fires, 1 always fires.
+		</member>
+		<member name="visibility_layer" type="int" setter="set_visibility_layer" getter="get_visibility_layer" default="1">
+			Visibility layer bitmask for this layer's shards (same numbering as the bullet visibility_layer). Lets effects render on chosen canvases.
+		</member>
+		<member name="z_as_relative" type="bool" setter="set_z_as_relative" getter="get_z_as_relative" default="true">
+			Whether [member z_index] is relative. Trail shards are children of the volley, so relative offsets track the volley z forever. One-shot shards live under the factory, where the offset behaves like an absolute z.
+		</member>
+		<member name="z_index" type="int" setter="set_z_index" getter="get_z_index" default="1">
+			Draw order of this layer's shards. Default +1 renders above the bullets; use -1 for glows and shadows beneath them.
+		</member>
+	</members>
+	<constants>
+		<constant name="EFFECT_TRAIL_FOLLOW" value="0" enum="EffectTrigger">
+			Trail layer: follows its bullet every tick, dies with it.
+		</constant>
+		<constant name="EFFECT_ON_SPAWN" value="1" enum="EffectTrigger">
+			One-shot fired at every bullet's spawn pose on spawn and pool-pop (never on pre-population or single-bullet wakes).
+		</constant>
+		<constant name="EFFECT_ON_HIT" value="2" enum="EffectTrigger">
+			One-shot fired on counted hits (never on free bounces, never twice on a consumed bounce).
+		</constant>
+		<constant name="EFFECT_ON_DESTROY" value="3" enum="EffectTrigger">
+			One-shot fired on collision-kill only (never on lifetime expiry or manual disable, and never together with the hit spark).
+		</constant>
+		<constant name="EFFECT_ON_BOUNCE" value="4" enum="EffectTrigger">
+			One-shot fired on every ricochet.
+		</constant>
+		<constant name="EFFECT_ON_LIFETIME_OVER" value="5" enum="EffectTrigger">
+			One-shot fired at each bullet's death pose on lifetime expiry (both the silent and the signalled path), even as the volley pools underneath it.
+		</constant>
+		<constant name="EFFECT_ON_CLEAR" value="6" enum="EffectTrigger">
+			One-shot fired by manual clears only ([method BulletVolley2D.clear_all_bullets], [method BulletFactory2D.clear_active_bullets] and the single-bullet clear). Collision kills fire On Destroy, timeouts fire On Lifetime Over and teardown (reset/free) stays silent, so a clear layer never doubles another trigger.
+		</constant>
+		<constant name="EFFECT_ON_DESPAWN" value="7" enum="EffectTrigger">
+			One-shot fired at a bullet culled by the factory's despawn bounds ([member BulletFactory2D.despawn_bounds_enabled]), at its last pose. Bullets with [member BulletVolleyData2D.ignore_despawn_bounds] are never culled, so they never fire it.
+		</constant>
+		<constant name="EFFECT_ON_SPLIT" value="8" enum="EffectTrigger">
+			Fired at a bullet's pose when it splits into children ([BulletSplitStage2D]), whatever made it split. The parent's own death trigger (On Destroy, On Lifetime Over, ...) fires too unless [member BulletSplitStage2D.fire_death_effects] is off.
+		</constant>
+		<constant name="EFFECT_ON_ANY_HIT" value="9" enum="EffectTrigger">
+			Fired on every collision hit that counts: beside On Destroy on a killing blow and beside On Hit on a survived one, at the bullet's impact pose (bodies and areas). Hits a bounce fully swallows never count; a consumed bounce's survived hit keeps firing the bounce spark only, like On Hit.
+		</constant>
+	</constants>
+</class>

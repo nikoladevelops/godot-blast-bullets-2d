@@ -1,0 +1,475 @@
+class_name BlastTest
+extends GutTest
+## Base class for every BlastBullets2D GUT test file.
+##
+## Per test (before_each/after_each):
+##   - a fresh BulletFactory2D is added under the test (`factory`), ready after
+##     two idle frames;
+##   - afterwards the factory must report no dangling entries, is reset at
+##     idle (structural calls are refused inside physics frames), and the test
+##     must leave zero new orphan nodes.
+## GUT runs in strict mode: any push_error / engine error the test did not
+## declare with expect_error()/expect_errors_containing() fails the test, and
+## after_each fails a test that leaves a push_warning unclaimed
+## (expect_warning_sequence).
+##
+## Waiting rules (important):
+##   - physics(n) resumes INSIDE a physics frame: structural factory calls
+##     (reset/free_*/populate_*) are refused there. Call idle() first.
+##   - idle(n) resumes on an idle frame (safe for structural calls).
+
+const H := preload("res://tests/common/blast_test_helpers.gd")
+
+var factory: BulletFactory2D
+## Set false in a test (before it ends) to skip the automatic factory checks,
+## e.g. when the test frees the factory itself.
+var check_factory_after := true
+
+
+## Every suite runs with the spawner pattern-cache verifier ON: each shot or
+## preview served from the bake cache is regenerated and compared, and a
+## mismatch push_errors (strict mode fails the test). So every spawner test
+## doubles as a cache-parity test.
+func before_all() -> void:
+	BulletSpawner2D.debug_set_pattern_cache_verify(true)
+
+
+func after_all() -> void:
+	BulletSpawner2D.debug_set_pattern_cache_verify(false)
+	# Headless audio mixes in real time while tests run faster: Godot frees a
+	# stopped AudioStreamPlayback on its own mix cycles, not on stop(). One
+	# drain per file that played sound (H.make_sound_stream marks it) keeps
+	# the exit leak gate green without slowing the other files.
+	if H.audio_used:
+		H.audio_used = false
+		OS.delay_msec(500)
+
+
+func before_each() -> void:
+	check_factory_after = true
+	# The per-call bullet limit is process-wide: every test starts from the default.
+	BulletPatterns2D.set_max_bullets_per_pattern(20000)
+	factory = BulletFactory2D.new()
+	add_child_autofree(factory)
+	await idle()
+
+
+func after_each() -> void:
+	await idle()
+	if check_factory_after and is_instance_valid(factory) and factory.is_inside_tree():
+		var state: Dictionary = factory.debug_assert_no_dangling()
+		assert_true(state.get("ok", false), "factory has no dangling entries: %s" % state.get("error", ""))
+		factory.reset()
+		await idle()
+	assert_no_new_orphans("test left orphan nodes behind")
+	# Warnings are API like errors (one documented text each): a test claims
+	# every warning it causes, also those of bullets still flying at its end.
+	# GUT closes the test's error list before after_each: read every list
+	# (this test's, and the one after_each's own frames land in), marking
+	# what is reported so each warning is reported once.
+	var unclaimed: Array[String] = []
+	var lists: Dictionary = gut.error_tracker.errors.items
+	for key in lists:
+		for err in lists[key]:
+			if not err.handled and err.is_push_warning():
+				err.handled = true
+				unclaimed.append(str(err.code))
+	assert_eq(unclaimed.size(), 0, "unclaimed warnings (pin them with expect_warning_sequence): %s" % str(unclaimed))
+
+
+## Resume on an idle (process) frame: safe for structural factory calls.
+## Awaits the SceneTree signal directly: GUT's wait_process_frames(n) resumes
+## after n+1 frames, which would skew every frame-counted assertion.
+func idle(frames: int = 2) -> void:
+	for i in frames:
+		await get_tree().process_frame
+
+
+## Resume inside a physics frame after exactly `frames` ticks (bullets moved,
+## physics callbacks queued and drained). Same n+1 caveat as idle() for GUT's
+## wait_physics_frames.
+func physics(frames: int = 1) -> void:
+	for i in frames:
+		await get_tree().physics_frame
+
+
+## Declares one expected error (push_error from GDScript or C++, case
+## insensitive substring). Fails if it did not happen.
+func expect_error(text: String, msg := "") -> void:
+	assert_push_error(text, msg if msg != "" else "expected error: " + text)
+
+
+## Marks EVERY unhandled error/warning containing `text` as handled and
+## asserts EXACTLY `count` were seen (pass at_least=true only for genuinely
+## nondeterministic counts, e.g. physics-frame-dependent storms - and say why
+## in a comment). For loops that error once per element.
+func expect_errors_containing(text: String, count := 1, msg := "", at_least := false) -> int:
+	var seen := 0
+	for err in get_errors():
+		if not err.handled and err.contains_text(text):
+			err.handled = true
+			seen += 1
+	var ok: bool = seen >= count if at_least else seen == count
+	var want := (">= %d" % count) if at_least else str(count)
+	assert_true(ok, (msg + ": " if msg != "" else "") + "expected %s error(s) containing '%s' (got %d)" % [want, text, seen])
+	return seen
+
+
+## The PRECISE form: the unhandled errors recorded since the last expect_*
+## call must be exactly `texts.size()` errors, in order, each containing the
+## matching entry (case-insensitive substring). Extra, missing or reordered
+## errors fail with the actual list printed. Prefer this over the counting
+## helpers: it pins wording AND multiplicity right where the call happens.
+func expect_error_sequence(texts: Array, msg := "") -> void:
+	var seen: Array[String] = []
+	var errs: Array = []
+	for err in get_errors():
+		if not err.handled and (err.is_push_error() or err.is_engine_error()):
+			err.handled = true
+			errs.append(err)
+			seen.append(str(err.code))
+	var ok: bool = errs.size() == texts.size()
+	if ok:
+		for i in texts.size():
+			if not errs[i].contains_text(str(texts[i])):
+				ok = false
+				break
+	assert_true(ok, "%sexpected errors %s, got %s" % [(msg + ": ") if msg != "" else "", str(texts), str(seen)])
+
+
+## Same contract as expect_error_sequence, for push_warning: exactly
+## `texts.size()` NEW warnings, in order, each containing its entry.
+func expect_warning_sequence(texts: Array, msg := "") -> void:
+	var seen: Array[String] = []
+	var warns: Array = []
+	for err in get_errors():
+		if not err.handled and err.is_push_warning():
+			err.handled = true
+			warns.append(err)
+			seen.append(str(err.code))
+	var ok: bool = warns.size() == texts.size()
+	if ok:
+		for i in texts.size():
+			if not warns[i].contains_text(str(texts[i])):
+				ok = false
+				break
+	assert_true(ok, "%sexpected warnings %s, got %s" % [(msg + ": ") if msg != "" else "", str(texts), str(seen)])
+
+
+## Asserts that NO unhandled error was recorded since the last expect_* call
+## (a mid-test checkpoint: strict mode only checks at the very end).
+func expect_no_errors(msg := "") -> void:
+	expect_error_sequence([], msg if msg != "" else "no errors expected here")
+
+
+## The precise "explain, never fail" pin: EXACTLY one unhandled message
+## containing `text` (and, when given, `also`) since the last expect_* call,
+## and it must be a push_warning - a push_error or engine error carrying the
+## same text (or a second copy of it) fails. For the messages that describe an
+## event nobody handles: they must never abort a game.
+func expect_warning(text: String, msg := "", also := "") -> void:
+	var seen := 0
+	var kinds: Array[String] = []
+	var full: Array[String] = []
+	for err in get_errors():
+		if not err.handled and err.contains_text(text) and (also == "" or err.contains_text(also)):
+			err.handled = true
+			seen += 1
+			kinds.append("warning" if err.is_push_warning() else "error")
+			full.append(str(err.code))
+	var where := msg if msg != "" else "expected warning"
+	assert_eq(seen, 1, "%s: exactly one message containing '%s' (got %d: %s)" % [where, text, seen, str(full)])
+	if seen == 1:
+		assert_eq(kinds, ["warning"] as Array[String], "%s: it is a push_warning, never a push_error" % where)
+
+
+## Asserts that at least `min_count` NEW (unhandled) errors were recorded since
+## the last expect_* call, then marks them handled. For hostile-input calls
+## whose contract is "fail loud" when the exact wording is not the point.
+func expect_any_error(msg := "", min_count := 1) -> int:
+	var seen := 0
+	for err in get_errors():
+		if not err.handled and (err.is_push_error() or err.is_engine_error()):
+			err.handled = true
+			seen += 1
+	assert_true(seen >= min_count, msg if msg != "" else "expected the call to fail loud (>= %d error(s), got %d)" % [min_count, seen])
+	return seen
+
+
+## Marks every recorded error as handled without asserting. Only for fuzz /
+## crash-proof tests whose contract is "never crash, never NaN", where the
+## exact error set is not the point. Returns how many were swallowed.
+func swallow_errors() -> int:
+	var n := 0
+	for err in get_errors():
+		if not err.handled:
+			err.handled = true
+			n += 1
+	return n
+
+
+## A wall-clock budget in ms, scaled by BLAST_TIME_BUDGET_SCALE (default 1):
+## sanitizer runs (tools/run_sanitizer_tests.py) execute several times slower
+## and widen budgets that guard against minutes-long searches.
+func time_budget_ms(ms: float) -> float:
+	var scale := OS.get_environment("BLAST_TIME_BUDGET_SCALE")
+	return ms * (float(scale) if scale.is_valid_float() and float(scale) >= 1.0 else 1.0)
+
+
+## Builds a factory-owned volley (shared test data builders).
+func quick_volley(n: int = 4, speed: float = 200.0, lifetime: float = 5.0) -> BulletVolley2D:
+	return factory.spawn_volley(H.make_volley_data(n, speed, lifetime))
+
+
+## Spawner wired to `factory`, idle by default: shooting and homing are
+## switched off BEFORE it enters the tree (a default spawner would otherwise
+## auto-fire on its first frame). Freed automatically after the test.
+func make_spawner(data: BulletVolleyData2D = null, source: int = BulletSpawner2D.PATTERN_FROM_HELPER_RING, amount: int = 4) -> BulletSpawner2D:
+	var s := BulletSpawner2D.new()
+	s.set_shooting_enabled(false)
+	s.set_homing_enabled(false)
+	s.set_spawn_data(data if data != null else H.make_volley_data(amount))
+	s.pattern_source = source as PatternSpawner2D.PatternSource
+	s.helper_bullets_amount = amount
+	add(s)
+	s.set_bullet_factory(factory)
+	return s
+
+
+## Like make_spawner, with the pattern preview live at runtime.
+func make_preview_spawner(source: int = BulletSpawner2D.PATTERN_FROM_HELPER_RING, amount: int = 4) -> BulletSpawner2D:
+	var s := make_spawner(H.make_volley_data(1, 0.0, 60.0), source, amount)
+	s.show_pattern_preview = true
+	s.show_preview_during_runtime = true
+	return s
+
+
+## Whether `prop` is shown in the inspector (PROPERTY_USAGE_EDITOR).
+func is_editor_visible(obj: Object, prop: StringName) -> bool:
+	for p in obj.get_property_list():
+		if StringName(p.get("name", "")) == prop:
+			return (int(p.get("usage", 0)) & PROPERTY_USAGE_EDITOR) != 0
+	return false
+
+
+## Static obstacle on `layer_bits` (collision_layer value), rect `size`.
+## Adds `node` inside a SubViewport with its own World2D: a spawner there
+## finds no factory (an empty bullet_factory_path fires into the factory of
+## the spawner's world, and the test factory lives in the main one).
+func add_in_own_world(node: Node) -> Node:
+	var viewport := SubViewport.new()
+	viewport.world_2d = World2D.new()
+	add(viewport)
+	viewport.add_child(node)
+	return node
+
+
+## Moves `node` (already in the tree) into its own world: see add_in_own_world.
+func move_to_own_world(node: Node) -> Node:
+	node.get_parent().remove_child(node)
+	return add_in_own_world(node)
+
+
+func make_wall(pos: Vector2, size: Vector2 = Vector2(20, 400), layer_bits: int = 4, mask_bits: int = 2) -> StaticBody2D:
+	var wall := StaticBody2D.new()
+	wall.position = pos
+	wall.collision_layer = layer_bits
+	wall.collision_mask = mask_bits
+	var col := CollisionShape2D.new()
+	var box := RectangleShape2D.new()
+	box.size = size
+	col.shape = box
+	wall.add_child(col)
+	add(wall)
+	return wall
+
+
+## Monitoring Area2D on `layer_bits`, rect `size`.
+func make_area(pos: Vector2, size: Vector2 = Vector2(20, 400), layer_bits: int = 4) -> Area2D:
+	var area := Area2D.new()
+	area.position = pos
+	area.collision_layer = layer_bits
+	area.monitoring = true
+	area.monitorable = true
+	var col := CollisionShape2D.new()
+	var box := RectangleShape2D.new()
+	box.size = size
+	col.shape = box
+	area.add_child(col)
+	add(area)
+	return area
+
+
+## PackedScene wrapping one AttachmentProbe2D (counts every attachment
+## callback: spawn/enable/disable/in_pool).
+func make_probe_scene() -> PackedScene:
+	var probe = load("res://tests/scenes/attachment_probe.gd").new()
+	var ps := PackedScene.new()
+	assert_eq(ps.pack(probe), OK, "probe scene packs")
+	probe.free()
+	return ps
+
+
+## Adds a node under the test, freed automatically after it.
+func add(node: Node) -> Node:
+	return add_child_autofree(node)
+
+
+## Node2D graze target at global `pos`, member of `group` (freed after the test).
+func make_graze_target(pos: Vector2, group: StringName = &"graze_targets") -> Node2D:
+	var n := Node2D.new()
+	n.position = pos
+	add(n)
+	n.add_to_group(group)
+	return n
+
+
+## Factory-owned volley, one bullet per transform moving +X at `speed`
+## (speed cap lifted), circle r4 hitbox unless `shape` is given, 60 s life.
+func graze_volley(transforms: Array, speed: float, shape: Shape2D = null) -> BulletVolley2D:
+	var d := H.make_volley_data(transforms.size(), speed, 60.0)
+	d.transforms = transforms
+	for sp in d.all_bullet_speed_data:
+		(sp as BulletSpeedData2D).max_speed = 100000.0
+	d.collision_shape = shape if shape != null else H.make_circle_shape(4.0)
+	return factory.spawn_volley(d)
+
+
+## Moves the mouse so factory.get_global_mouse_position() reads `pos`
+## (headless: through mouse motion events). The window's stretch transform
+## is measured from two samples, never assumed.
+func mouse_to(pos: Vector2) -> void:
+	_mouse_event(Vector2.ZERO)
+	var origin := factory.get_global_mouse_position()
+	_mouse_event(Vector2(100, 100))
+	var per_pixel := (factory.get_global_mouse_position() - origin) / 100.0
+	_mouse_event((pos - origin) / per_pixel)
+	assert_almost_eq(factory.get_global_mouse_position(), pos, Vector2(0.01, 0.01), "the mouse sits at %s" % pos)
+
+
+func _mouse_event(screen_pos: Vector2) -> void:
+	var ev := InputEventMouseMotion.new()
+	ev.position = screen_pos
+	ev.global_position = screen_pos
+	Input.parse_input_event(ev)
+	Input.flush_buffered_events()
+
+
+## n factory ticks of `delta` (factory.debug_advance_time), each asserted.
+## Connects an empty handler to the hit, graze and expiry signals of
+## `emitter` (a factory or spawner), like a game handling them: the plugin
+## warns about such events nobody handles. For tests whose subject is not the
+## handler (bounces, graze rings, effect triggers).
+func handle_events(emitter: Object) -> void:
+	for info in emitter.get_signal_list():
+		if info.name in HANDLED_EVENTS:
+			var handler := _ignore_event.unbind(info.args.size())
+			if not emitter.is_connected(info.name, handler):
+				emitter.connect(info.name, handler)
+
+
+const HANDLED_EVENTS := [&"area_entered", &"body_entered", &"bullet_grazed", &"life_time_over"]
+
+
+func _ignore_event() -> void:
+	pass
+
+
+func step_factory(n: int = 1, delta: float = 1.0 / 60.0) -> void:
+	for i in n:
+		assert_true(factory.debug_advance_time(delta), "factory tick %d advanced" % i)
+
+
+## Every bullet's position (disabled bullets included), in index order.
+func origins(v: BulletVolley2D) -> Array:
+	var out: Array = []
+	for i in v.get_amount_bullets():
+		out.append(v.get_bullet_transform(i).origin)
+	return out
+
+
+## The smallest distance between any two of `points` (INF for fewer than 2).
+## Problems in what the plugin hands the GPU: every float of every
+## MultiMesh buffer under `root` (bullet volleys, effect and trail shards, the
+## debugger), every laser body vertex and every look pose must be finite, and
+## every instance origin inside +-`bound` px. A non-finite or absurd vertex is
+## what a GPU driver may hang on; finite bullet math guarantees none reaches it.
+func render_data_problems(root: Node, bound := 1.0e30) -> Array:
+	var out: Array = []
+	var stack: Array = [root]
+	while not stack.is_empty():
+		var n: Node = stack.pop_back()
+		stack.append_array(n.get_children(true))
+		var mmi := n as MultiMeshInstance2D
+		if mmi != null and mmi.multimesh != null:
+			var mm := mmi.multimesh
+			var buf: PackedFloat32Array = mm.buffer
+			var stride := 8 + (4 if mm.use_colors else 0) + (4 if mm.use_custom_data else 0)
+			for k in buf.size():
+				if is_nan(buf[k]) or is_inf(buf[k]):
+					out.append("%s %s: buffer float %d is %s" % [n.get_class(), n.name, k, buf[k]])
+					break
+			for i in range(0, buf.size() - 7, stride):
+				if absf(buf[i + 3]) > bound or absf(buf[i + 7]) > bound:
+					out.append("%s %s: instance %d at (%s, %s) past %s px" % [n.get_class(), n.name, int(i / float(stride)), buf[i + 3], buf[i + 7], bound])
+					break
+		var laser := n as LaserVolley2D
+		if laser != null and laser.is_laser_active():
+			for p in (laser.debug_get_body_mesh(1.0)["points"] as PackedVector2Array):
+				if not p.is_finite() or absf(p.x) > bound or absf(p.y) > bound:
+					out.append("LaserVolley2D %s: body vertex %s" % [n.name, p])
+					break
+			for m in laser.debug_get_look_draws(1.0):
+				if not (m["transform"] as Transform2D).is_finite():
+					out.append("LaserVolley2D %s: %s look pose %s" % [n.name, m["slot"], m["transform"]])
+					break
+	return out
+
+
+func min_pair_distance(points: Array) -> float:
+	var best := INF
+	for a in points.size():
+		for b in range(a + 1, points.size()):
+			best = minf(best, (points[a] as Vector2).distance_to(points[b]))
+	return best
+
+
+## Enabled bullets with a non-finite pose or heading, or (check_unit) a
+## heading that is not unit length, as "index: origin heading" lines.
+func broken_bullets(v: BulletVolley2D, check_unit := true) -> Array:
+	var bad: Array = []
+	for i in v.get_amount_bullets():
+		if not v.is_bullet_status_enabled(i):
+			continue
+		var d: Vector2 = v.get_bullet_direction(i)
+		if not v.get_bullet_transform(i).is_finite() or not d.is_finite() or (check_unit and absf(d.length() - 1.0) > 1e-4):
+			bad.append("%d: %s %s" % [i, v.get_bullet_transform(i).origin, d])
+	return bad
+
+
+## Node2D sound listener at global `pos`, member of `group` (freed after the test).
+func make_listener(pos: Vector2, group: StringName = &"listeners") -> Node2D:
+	var n := Node2D.new()
+	n.position = pos
+	add(n)
+	n.add_to_group(group)
+	return n
+
+
+## Busy entries of factory.debug_get_sound_voices() (one dict per voice).
+func busy_voices() -> Array:
+	var out: Array = []
+	for e in factory.debug_get_sound_voices():
+		if (e as Dictionary).get("busy", false):
+			out.append(e)
+	return out
+
+
+## Current AudioListener2D at `pos` (freed after the test), so Godot's own
+## falloff and panning measure from an exact known point.
+func godot_listener_at(pos: Vector2) -> AudioListener2D:
+	var l := AudioListener2D.new()
+	l.position = pos
+	add(l)
+	l.make_current()
+	return l

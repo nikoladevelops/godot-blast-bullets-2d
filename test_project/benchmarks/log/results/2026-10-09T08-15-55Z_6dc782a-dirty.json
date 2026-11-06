@@ -1,0 +1,159 @@
+{
+  "timestamp": "2026-10-09T08-15-55Z",
+  "commit": "6dc782a",
+  "dirty": true,
+  "repeat": 5,
+  "machine": {
+    "cpu": "AMD Ryzen 7 8840HS w/ Radeon 780M Graphics",
+    "cores": 16,
+    "os": "Linux-7.2.9-2-cachyos-x86_64-with-glibc2.44",
+    "python": "3.14.7"
+  },
+  "scenarios": {
+    "collision_storm": {
+      "active_bullets_mean": 1400.0,
+      "collision_records": 60000,
+      "description": "200-bullet volley/frame dying on walls (collision drain + pool churn)",
+      "engine_ms": {
+        "max": 2.267,
+        "mean": 0.750046666666667,
+        "p50": 0.637,
+        "p95": 1.185,
+        "p99": 1.26
+      },
+      "expired_bullets": 0,
+      "extra": {
+        "records_per_frame": 200.0
+      },
+      "factory_tick_ms": {
+        "max": 0.377,
+        "mean": 0.1908,
+        "p50": 0.154,
+        "p95": 0.312,
+        "p99": 0.329
+      },
+      "frame_ms": {
+        "max": 2.365,
+        "mean": 0.832126666666667,
+        "p50": 0.708,
+        "p95": 1.3,
+        "p99": 1.421
+      },
+      "measure_frames": 300,
+      "memory_static_growth_mb": 0.0390663146972656,
+      "memory_static_peak_mb": 30.9992322921753,
+      "nodes_end": 23.0,
+      "objects_end": 2383.0,
+      "objects_growth": 0,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 352,
+      "pool_misses": 8,
+      "spawned_bullets": 60000,
+      "step_ms": {
+        "max": 0.265,
+        "mean": 0.0884566666666667,
+        "p50": 0.078,
+        "p95": 0.146,
+        "p99": 0.185
+      },
+      "warmup_frames": 60
+    },
+    "hit_handlers_2k": {
+      "active_bullets_mean": 1870.47333333333,
+      "collision_records": 32857,
+      "description": "100-bullet volley/frame into walls, a GDScript hit handler per bullet (live emit + kill decision)",
+      "engine_ms": {
+        "max": 2.611,
+        "mean": 1.38556,
+        "p50": 1.313,
+        "p95": 2.023,
+        "p99": 2.306
+      },
+      "expired_bullets": 652,
+      "extra": {
+        "handler_calls": 38157,
+        "healed": 4769
+      },
+      "factory_tick_ms": {
+        "max": 1.159,
+        "mean": 0.443273333333333,
+        "p50": 0.412,
+        "p95": 0.727,
+        "p99": 0.882
+      },
+      "frame_ms": {
+        "max": 2.742,
+        "mean": 1.55979,
+        "p50": 1.495,
+        "p95": 2.195,
+        "p99": 2.434
+      },
+      "measure_frames": 300,
+      "memory_static_growth_mb": 3.96591949462891,
+      "memory_static_peak_mb": 36.2268438339233,
+      "nodes_end": 181.0,
+      "objects_end": 2458.0,
+      "objects_growth": 318,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 194,
+      "pool_misses": 166,
+      "spawned_bullets": 30000,
+      "step_ms": {
+        "max": 0.599,
+        "mean": 0.17423,
+        "p50": 0.115,
+        "p95": 0.451,
+        "p99": 0.502
+      },
+      "warmup_frames": 60
+    },
+    "spawner_warm_shot_5k": {
+      "active_bullets_mean": 90000.0,
+      "collision_records": 0,
+      "description": "5000-bullet heart spawner, shoot_once every frame, warm pool",
+      "engine_ms": {
+        "max": 22.391,
+        "mean": 16.5111,
+        "p50": 16.589,
+        "p95": 20.266,
+        "p99": 21.306
+      },
+      "expired_bullets": 1000000,
+      "extra": {},
+      "factory_tick_ms": {
+        "max": 5.67,
+        "mean": 4.4702,
+        "p50": 4.524,
+        "p95": 5.229,
+        "p99": 5.511
+      },
+      "frame_ms": {
+        "max": 24.422,
+        "mean": 18.45602,
+        "p50": 18.515,
+        "p95": 22.394,
+        "p99": 23.269
+      },
+      "measure_frames": 200,
+      "memory_static_growth_mb": 1.04824066162109,
+      "memory_static_peak_mb": 159.005164146423,
+      "nodes_end": 27.0,
+      "objects_end": 1594.0,
+      "objects_growth": 0,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 221,
+      "pool_misses": 19,
+      "spawned_bullets": 1000000,
+      "step_ms": {
+        "max": 2.604,
+        "mean": 1.94492,
+        "p50": 1.92,
+        "p95": 2.28,
+        "p99": 2.452
+      },
+      "warmup_frames": 40
+    }
+  },
+  "godot": "4.7.2-stable (arch_linux)",
+  "debug_build": true
+}

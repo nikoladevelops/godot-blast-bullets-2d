@@ -1,0 +1,150 @@
+#pragma once
+
+#include "bullet_volley/bullet_volley2d.hpp"
+#include "godot_cpp/core/object.hpp"
+#include "godot_cpp/variant/packed_int64_array.hpp"
+#include "godot_cpp/variant/utility_functions.hpp"
+
+#include <unordered_set>
+
+namespace BlastBullets2D {
+using namespace godot;
+
+// Owns one spawner's tracked-volley id list. Prune-before-touch is built
+// into every reader, so the list shape itself enforces the rule.
+//
+// The list only ever holds plain instance ids — no ownership, no node
+// pointers — so a freed, pooled, or re-homed volley can never be touched
+// through it: every reader prunes first, and every resolved volley is
+// re-validated (type + owner_spawner_id + is_active) before use. That pair
+// is what makes adopt_live_volley handovers and pool reuse safe even though
+// the previous owner's list still holds the id until its next prune.
+//
+// No cap: every live homing volley of the spawner stays tracked (dead,
+// pooled and re-owned ones are pruned), so retargeting reaches all of them;
+// a retarget pass costs what the game keeps flying. Header-only: all
+// operations are O(tracked).
+class VolleyTracker2D {
+public:
+	bool track(BulletVolley2D *volley, uint64_t owner_spawner_id) {
+		if (volley == nullptr) {
+			return false;
+		}
+		// Fail loud instead of silently no-op-ing: pushing an id the prune
+		// below immediately drops (foreign owner) used to vanish without a
+		// diagnostic. Every current caller stamps ownership first.
+		if (volley->owner_spawner_id != owner_spawner_id) {
+			UtilityFunctions::push_error("VolleyTracker2D::track: volley is not owned by this spawner (owner_spawner_id mismatch). Stamp ownership before tracking.");
+			return false;
+		}
+		const int64_t id = (int64_t)volley->get_instance_id();
+		if (member_ids.find(id) == member_ids.end()) {
+			live_ids.push_back(id);
+			member_ids.insert(id);
+		}
+		prune(owner_spawner_id);
+		return member_ids.find(id) != member_ids.end();
+	}
+
+	void clear() {
+		live_ids.clear();
+		member_ids.clear();
+	}
+
+	// Forgets one volley (its homing was cleared: it is no longer armed).
+	void untrack(int64_t id) {
+		if (member_ids.erase(id) == 0) {
+			return;
+		}
+		for (int i = 0; i < live_ids.size(); ++i) {
+			if (live_ids[i] == id) {
+				live_ids.remove_at(i);
+				break;
+			}
+		}
+	}
+
+	// Drops freed instances (teardown), volleys re-owned by another spawner
+	// (owner tag changed, e.g. adopt_live_volley), pooled and dying ones.
+	// A PARKED volley stays: a wake resumes its homing queue (freeze
+	// contract), and retargeting must reach it again then. Passes still touch
+	// only active volleys (resolve_live): frozen bullets take no targets.
+	void prune(uint64_t owner_spawner_id) const {
+		// Fast path: the common steady state (nothing died) allocates and
+		// copies nothing. Only a real death pays for compaction, in place.
+		bool any_dead = false;
+		for (int i = 0; i < live_ids.size(); ++i) {
+			if (resolve_tracked(live_ids[i], owner_spawner_id) == nullptr) {
+				any_dead = true;
+				break;
+			}
+		}
+		if (!any_dead) {
+			return;
+		}
+		int write = 0;
+		for (int i = 0; i < live_ids.size(); ++i) {
+			if (resolve_tracked(live_ids[i], owner_spawner_id) != nullptr) {
+				live_ids[write++] = live_ids[i];
+			} else {
+				member_ids.erase(live_ids[i]);
+			}
+		}
+		live_ids.resize(write);
+	}
+
+	int count(uint64_t owner_spawner_id) const {
+		prune(owner_spawner_id);
+		return live_ids.size();
+	}
+
+	bool is_empty(uint64_t owner_spawner_id) const {
+		prune(owner_spawner_id);
+		return live_ids.is_empty();
+	}
+
+	// Whether a volley id is tracked (prune first when it must be live).
+	bool contains(int64_t id) const {
+		return member_ids.count(id) != 0;
+	}
+
+	// Pruned id snapshot for index-based passes (e.g. newest-only retarget).
+	// Resolve each id with resolve_live() before touching the volley.
+	PackedInt64Array snapshot(uint64_t owner_spawner_id) const {
+		prune(owner_spawner_id);
+		return live_ids;
+	}
+
+	// Resolves one tracked id to a live volley owned by the given spawner.
+	// Null for freed instances, foreign-owned volleys, inactive volleys, and
+	// volleys queued for deletion (dying at flush: handing them out for
+	// direct engine calls would let scripts drive a corpse for a frame).
+	// Every touch of a tracked volley must go through here (or prune + an
+	// equivalent check): never dereference a stored id blindly.
+	static BulletVolley2D *resolve_live(int64_t id, uint64_t owner_spawner_id) {
+		BulletVolley2D *volley = resolve_tracked(id, owner_spawner_id);
+		return volley != nullptr && volley->is_active ? volley : nullptr;
+	}
+
+	// The tracked volley, live or parked (never freed, pooled, dying or
+	// another owner's).
+	static BulletVolley2D *resolve_tracked(int64_t id, uint64_t owner_spawner_id) {
+		Object *obj = ObjectDB::get_instance(ObjectID((uint64_t)id));
+		BulletVolley2D *volley = Object::cast_to<BulletVolley2D>(obj);
+		if (volley == nullptr || volley->owner_spawner_id != owner_spawner_id || volley->is_pooled() || volley->is_queued_for_deletion()) {
+			return nullptr;
+		}
+		return volley;
+	}
+
+private:
+	// Mutable: even const readers (counts, volley lists) prune dead entries,
+	// so queries never report corpses.
+	mutable PackedInt64Array live_ids;
+	// O(1) membership for track(): live_ids.has() was a linear scan per shot.
+	// Always mirrors live_ids (insert on track, erase on prune/evict/clear).
+	mutable std::unordered_set<int64_t> member_ids;
+	// One-shot latch for the cap-eviction warning above; re-armed by clear().
+};
+
+} //namespace BlastBullets2D

@@ -1,3 +1,4 @@
+import sys
 import os
 from pathlib import Path
 
@@ -39,6 +40,25 @@ def setup_build_environment(env, opts) -> None:
         print("No selected build profile\n")
 
     opts.Update(env)
+    _hide_static_libstdcpp_symbols(env)
+
+
+def _hide_static_libstdcpp_symbols(env) -> None:
+    """Linux GCC: never export the statically linked libstdc++.
+
+    godot-cpp links libstdc++ into the library (use_static_cpp). Exported, its
+    GNU unique symbols (`std::string::_Rep::_S_empty_rep_storage`, shown by
+    readelf as `<OS specific>: 10`) win the lookup under the OFFICIAL Godot
+    binary (it bundles libstdc++ without exporting it): glibc then marks the
+    library NODELETE, dlclose keeps it, and every exit reports Orphan
+    StringName leaks. A distro Godot linked to the shared libstdc++ hides it.
+    """
+    from SCons.Script import ARGUMENTS
+
+    platform = ARGUMENTS.get("platform", ARGUMENTS.get("p", ""))
+    use_llvm = str(ARGUMENTS.get("use_llvm", "no")).lower() in ("yes", "true", "1")
+    if sys.platform.startswith("linux") and platform in ("", "linux") and not use_llvm:
+        env.Append(LINKFLAGS=["-Wl,--exclude-libs,ALL"])
 
 
 def get_library_filename(env, libname: str, precision: str) -> str:

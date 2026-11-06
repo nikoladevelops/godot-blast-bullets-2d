@@ -1,0 +1,182 @@
+extends BlastTest
+## Orbiting: rings, modes, lock policies, mixed with homing. Enable without a
+## target arms safely, per-bullet + all_bullets + linear shells, setters,
+## rigid follow, disable clears, freed-target lock policies, spawner arming.
+
+var target: Node2D
+
+
+func before_each() -> void:
+	await super()
+	target = add(Node2D.new())
+	target.position = Vector2(400, 0)
+	await idle(1)
+
+
+func _homing_volley(n: int, target_node: Node2D) -> BulletVolley2D:
+	var v: BulletVolley2D = factory.spawn_volley(H.make_volley_data(n, 250.0, 30.0))
+	v.set_homing_smoothing(6.0)
+	v.set_homing_take_control_of_texture_rotation(true)
+	if n == 1:
+		v.bullet_homing_push_back_node2d_target(0, target_node)
+	else:
+		v.all_bullets_push_back_homing_target(target_node)
+	return v
+
+
+func _wait_locked(v: BulletVolley2D, frames := 60) -> void:
+	for i in frames:
+		await physics()
+		if v.bullet_is_orbiting_locked(0):
+			return
+
+
+func test_targetless_arm_then_setters() -> void:
+	var lone: BulletVolley2D = quick_volley(1, 200.0)
+	lone.bullet_enable_orbiting(0, 64.0, BulletVolley2D.OrbitRight, BulletVolley2D.FaceTarget)
+	assert_true(lone.bullet_is_orbiting_enabled(0), "orbit arms even targetless")
+	await physics(10)
+	assert_true(lone.get_bullet_transform(0).is_finite(), "targetless orbit never NaNs")
+	assert_false(lone.bullet_is_orbiting_locked(0), "targetless orbit never locks")
+	lone.bullet_homing_push_back_node2d_target(0, target)
+	await physics(20)
+	assert_true(lone.bullet_is_orbiting_enabled(0), "orbit stays armed once the target arrives")
+	lone.bullet_set_orbiting_radius(0, 96.0)
+	assert_almost_eq(lone.bullet_get_orbiting_radius(0), 96.0, 0.01, "radius set")
+	lone.bullet_set_orbiting_radius(0, -5.0)
+	expect_error("Orbiting radius must be >= 0.01")
+	assert_almost_eq(lone.bullet_get_orbiting_radius(0), 0.01, 0.001, "negative radius clamped to 0.01")
+	lone.bullet_set_orbiting_direction(0, BulletVolley2D.OrbitLeft)
+	lone.bullet_set_orbiting_texture_rotation(0, BulletVolley2D.FaceTarget)
+	lone.bullet_set_orbiting_follow_mode(0, BulletVolley2D.FollowTarget)
+	lone.bullet_set_orbiting_follow_deadzone(0, 8.0)
+	lone.bullet_set_orbiting_lock_policy(0, BulletVolley2D.StayLocked)
+	lone.bullet_set_orbiting_rigid_follow(0, true)
+	assert_eq(lone.bullet_get_orbiting_follow_deadzone(0), 8.0, "deadzone stored")
+
+
+func test_linear_shells_follow_and_disable() -> void:
+	var v: BulletVolley2D = factory.spawn_volley(H.make_volley_data(3, 250.0))
+	v.set_homing_smoothing(6.0)
+	v.set_homing_take_control_of_texture_rotation(true)
+	v.all_bullets_push_back_homing_target(target)
+	v.all_bullets_enable_orbiting_linear(48.0, 16.0, BulletVolley2D.OrbitRight, BulletVolley2D.FaceTarget)
+	assert_true(v.bullet_is_orbiting_enabled(0) and v.bullet_is_orbiting_enabled(2), "linear shells arm all")
+	assert_almost_eq(v.bullet_get_orbiting_radius(0), 48.0, 0.5, "shell 0 radius")
+	assert_almost_eq(v.bullet_get_orbiting_radius(2), 80.0, 0.5, "shell 2 radius stepped")
+	await physics(30)
+	assert_true(v.bullet_is_orbiting_locked(0) or v.bullet_is_orbiting_enabled(0), "ring alive after 30 ticks")
+	assert_lt(v.bullet_get_orbiting_center(0).distance_to(target.global_position), 120.0, "orbit center near target")
+	target.position = Vector2(500, 100)
+	await physics(15)
+	assert_lt(v.bullet_get_orbiting_center(0).distance_to(Vector2(500, 100)), 160.0, "ring followed target")
+	v.all_bullets_disable_orbiting()
+	assert_false(v.bullet_is_orbiting_enabled(0), "disable clears all")
+	v.bullet_disable_orbiting(1)
+
+
+func test_relock_always_on_freed_target() -> void:
+	var dying: Node2D = add(Node2D.new())
+	dying.position = Vector2(300, 0)
+	await idle(1)
+	var w := _homing_volley(2, dying)
+	w.all_bullets_enable_orbiting(64.0, BulletVolley2D.OrbitRight, BulletVolley2D.FaceTarget)
+	await _wait_locked(w)
+	assert_true(w.bullet_is_orbiting_locked(0), "ring locks before target death")
+	dying.queue_free()
+	await idle(1)
+	await physics(5)
+	assert_true(w.get_bullet_transform(0).is_finite() and w.get_bullet_velocity(0).is_finite(), "finite after target freed")
+	assert_false(w.bullet_is_orbiting_locked(0), "RelockAlways unlocks on empty queue")
+	assert_true(w.bullet_is_orbiting_enabled(0), "RelockAlways stays armed for the next target")
+
+
+func test_stay_locked_rides_out_the_gap() -> void:
+	var anchor: Node2D = add(Node2D.new())
+	anchor.position = Vector2(300, 50)
+	await idle(1)
+	var s := _homing_volley(1, anchor)
+	s.bullet_enable_orbiting(0, 64.0, BulletVolley2D.OrbitRight, BulletVolley2D.FaceTarget, BulletVolley2D.FollowTarget, 8.0, BulletVolley2D.StayLocked, true)
+	await _wait_locked(s)
+	assert_true(s.bullet_is_orbiting_locked(0), "StayLocked ring locks before target death")
+	var held_center: Vector2 = s.bullet_get_orbiting_center(0)
+	anchor.queue_free()
+	await idle(1)
+	await physics(5)
+	assert_true(s.get_bullet_transform(0).is_finite(), "finite after target freed")
+	assert_true(s.bullet_is_orbiting_locked(0), "StayLocked holds lock across the gap")
+	assert_lt(s.bullet_get_orbiting_center(0).distance_to(held_center), 8.0, "center rides out the gap")
+
+
+func test_spawner_orbit_without_homing_is_a_setup_warning() -> void:
+	const WARNING := "orbiting_enabled needs homing_enabled"
+	var sp := make_spawner(H.make_volley_data(2, 200.0, 5.0))
+	sp.set_orbiting_enabled(false)
+	assert_false(Array(sp.get_setup_warnings()).any(func(w): return WARNING in w), "no warning with both switches off")
+	sp.set_orbiting_enabled(true)
+	assert_true(Array(sp.get_setup_warnings()).any(func(w): return WARNING in w), "orbiting alone warns (it locks onto homing targets)")
+	sp.set_homing_enabled(true)
+	assert_false(Array(sp.get_setup_warnings()).any(func(w): return WARNING in w), "homing plus orbiting is configured")
+
+
+func test_enabling_again_updates_the_ring_and_disabling_twice_is_quiet() -> void:
+	var v := _homing_volley(3, target)
+	v.bullet_enable_orbiting(0, 70.0, BulletVolley2D.OrbitRight)
+	await _wait_locked(v, 240) # 400 px at 250 px/s
+	assert_true(v.bullet_is_orbiting_locked(0), "locked on its ring")
+	v.bullet_enable_orbiting(0, 120.0, BulletVolley2D.OrbitLeft, BulletVolley2D.FaceTarget, BulletVolley2D.FollowDeadzone, 9.0, BulletVolley2D.StayLocked, false)
+	expect_warning_sequence([], "enabling an orbiting bullet updates it")
+	assert_almost_eq(v.bullet_get_orbiting_radius(0), 120.0, 0.001, "the new radius")
+	assert_eq(v.bullet_get_orbiting_direction(0), BulletVolley2D.OrbitLeft, "the new direction")
+	assert_eq(v.bullet_get_orbiting_follow_mode(0), BulletVolley2D.FollowDeadzone, "the new follow mode")
+	assert_almost_eq(v.bullet_get_orbiting_follow_deadzone(0), 9.0, 0.001, "the new deadzone")
+	assert_eq(v.bullet_get_orbiting_lock_policy(0), BulletVolley2D.StayLocked, "the new lock policy")
+	assert_false(v.bullet_get_orbiting_rigid_follow(0), "the new rigid follow")
+	assert_true(v.bullet_is_orbiting_locked(0), "the ring keeps its lock")
+	v.bullet_enable_orbiting(0, 120.0, BulletVolley2D.OrbitRandom)
+	assert_eq(v.bullet_get_orbiting_direction(0), BulletVolley2D.OrbitLeft, "a random direction never re-rolls a ring in flight")
+	v.all_bullets_enable_orbiting(90.0)
+	expect_warning_sequence([], "a range enable over orbiting and plain bullets")
+	assert_eq(Array(v.all_bullets_get_orbiting_radius()), [90.0, 90.0, 90.0], "every bullet on the new radius")
+	v.bullet_disable_orbiting(1)
+	v.bullet_disable_orbiting(1)
+	v.all_bullets_disable_orbiting()
+	expect_warning_sequence([], "disabling a bullet that does not orbit does nothing, quietly")
+	assert_false(v.bullet_is_orbiting_enabled(0) or v.bullet_is_orbiting_enabled(1) or v.bullet_is_orbiting_enabled(2), "all off")
+	assert_eq(v.debug_check_invariants(), "", "the orbit counter matches the bullets")
+
+
+func test_the_documented_minimum_radius_is_accepted_silently() -> void:
+	# 0.01 is the documented minimum (>= 0.01), also what a spawner passes for
+	# orbiting_radius = 0.01: as a float it is 0.0099999998, which the check
+	# compared to the double 0.01 and "clamped" (to the same value) with an error.
+	var v := quick_volley(1, 100.0, 60.0)
+	v.bullet_enable_orbiting(0, 0.01)
+	expect_no_errors("enable at the minimum")
+	v.bullet_set_orbiting_radius(0, 0.01)
+	expect_no_errors("set at the minimum")
+	v.bullet_set_orbiting_radius(0, 0.0078125) # exact in float: below the minimum
+	expect_error_sequence(["Orbiting radius must be >= 0.01, got 0.0078125. Clamping to 0.01."])
+
+
+## A queue rebuild that keeps the SAME front target keeps the locked center
+## (doc: "same front target keeps angle and center"; Anchored "freezes the
+## ring where it locked"): only a new front identity re-pins it. A same-target
+## replace must not drag an Anchored ring onto the target's new position.
+func test_a_same_target_replace_keeps_the_anchored_ring_center() -> void:
+	var v: BulletVolley2D = factory.spawn_volley(H.make_volley_data(1, 250.0, 30.0))
+	v.set_homing_smoothing(0.0) # snap onto the ring
+	v.set_homing_take_control_of_texture_rotation(true)
+	v.bullet_homing_push_back_node2d_target(0, target)
+	v.bullet_enable_orbiting(0, 50.0, BulletVolley2D.OrbitRight, BulletVolley2D.FaceTarget, BulletVolley2D.Anchored, 0.0, BulletVolley2D.RelockOnTargetChange, true)
+	await _wait_locked(v, 300)
+	assert_true(v.bullet_is_orbiting_locked(0), "the ring locked")
+	var center: Vector2 = v.bullet_get_orbiting_center(0)
+	assert_almost_eq(center, Vector2(400, 0), Vector2(1, 1), "the anchored center is where it locked")
+	target.position = Vector2(700, 0)
+	await physics(1)
+	v.bullet_replace_homing_targets_with_new_target(0, target) # the SAME node
+	assert_almost_eq(v.bullet_get_orbiting_center(0), center, Vector2(0.01, 0.01), "a same-target replace keeps the anchored center")
+	await physics(20)
+	assert_almost_eq(v.bullet_get_orbiting_center(0), center, Vector2(0.01, 0.01), "and it stays frozen where it locked")
+	assert_almost_eq(v.get_bullet_transform(0).origin.distance_to(center), 50.0, 3.0, "the bullet still circles the old center")

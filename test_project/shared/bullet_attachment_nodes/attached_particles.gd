@@ -3,9 +3,14 @@ extends BulletAttachment2D
 @onready var CPUParticles = $CPUParticles2D
 
 func _ready() -> void:
-	BENCHMARK_GLOBALS.UI.bullets_selected_z_index_changed.connect(func(new_z_index):
-		z_index = new_z_index
-	)
+	BENCHMARK_GLOBALS.UI.bullets_selected_z_index_changed.connect(_on_bullets_selected_z_index_changed)
+
+func _exit_tree() -> void:
+	if is_instance_valid(BENCHMARK_GLOBALS.UI):
+		BENCHMARK_GLOBALS.UI.bullets_selected_z_index_changed.disconnect(_on_bullets_selected_z_index_changed)
+
+func _on_bullets_selected_z_index_changed(new_z_index: int) -> void:
+	z_index = new_z_index
 	
 func on_bullet_spawn() -> void:
 	pass

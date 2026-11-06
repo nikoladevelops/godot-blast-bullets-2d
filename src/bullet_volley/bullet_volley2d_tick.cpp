@@ -1,0 +1,1788 @@
+// The per-frame motion loop (move_bullets) and every helper it calls per bullet.
+// Hot path: keep helpers here or in bullet_volley2d_internal.hpp (inline) so no
+// per-bullet call crosses a translation unit. BulletFactory2D calls move_bullets
+// once per active volley per physics frame.
+
+#include "bullet_volley/bullet_volley2d_internal.hpp"
+#include "core/emit_on2d.hpp"
+
+#include <cmath>
+
+using namespace godot;
+
+namespace BlastBullets2D {
+
+bool BulletVolley2D::tick_may_continue(uint64_t self_id) const {
+	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+		return false;
+	}
+	if (is_queued_for_deletion() || !factory_alive()) {
+		return false;
+	}
+	return bullet_factory == nullptr || !bullet_factory->is_bullet_processing_paused();
+}
+
+void BulletVolley2D::tick(double delta) {
+	if (!Math::is_finite(delta) || delta < 0.0) {
+		return;
+	}
+	const uint64_t self_id = get_instance_id();
+	// Bounce bookkeeping runs only while armed; plain volleys skip it. The
+	// tick id advances BEFORE the drain: the one-bounce-per-bullet-per-tick
+	// guard compares against it, and a fresh ledger holds 0 (a volley whose
+	// first tick is a drain must not read as "already bounced this tick").
+	if (bounce_enabled()) {
+		++bounce_tick_counter;
+		bounce_last_delta = delta;
+	}
+	// 1. Hits first: the records were queued by the physics server for the
+	// pose it just tested (the current cached pose), so handlers, bounce
+	// normals and hit effects all see the impact pose, and a killed bullet
+	// never integrates one more step.
+	drain_collisions();
+	if (!tick_may_continue(self_id) || !is_active) {
+		return;
+	}
+	// 1b. Graze: this tick's targets and rings (no user code).
+	if (graze_zone_slots > 0) {
+		prepare_graze_tick();
+	}
+	if (pickup_data.is_valid() && !pickup_magnet_started) {
+		maybe_begin_pickup_magnet();
+	}
+	// 1b'. homing_follow: this tick's targets, before anyone steers (no user code).
+	if (follow_detector != nullptr) {
+		homing_follow_pick(delta);
+	}
+	// 1c. Scale-in window: every bullet grows by this tick's step before it
+	// moves (the placement below carries the new size to shape and buffer).
+	if (scale_in_active) {
+		step_scale_in(delta);
+	}
+	// 2. Integration (no user code runs inside; homing reaches and grazes
+	// are queued).
+	move_bullets(delta);
+	// 2b. Flight sounds: one offer per live bullet at its current pose, only
+	// when armed (one mask bit, otherwise zero per-bullet cost).
+	sound_refresh_mask();
+	if (sound_trigger_mask & (1u << BulletSoundData2D::SOUND_ON_FLIGHT)) {
+		sound_fire_flight();
+	}
+	// 3. Homing reached events (live) + auto-pops.
+	if (!homing_reached_events.empty() || shared_pop_requested) {
+		if (!dispatch_homing_events() || !tick_may_continue(self_id) || !is_active) {
+			return;
+		}
+	}
+	// 3b. Graze events (live). A pause from a handler lets the batch finish
+	// (the motion already happened); events an early return above left
+	// queued are dispatched first on the next tick.
+	if (!graze_events.empty()) {
+		if (!dispatch_graze_events() || !tick_may_continue(self_id) || !is_active) {
+			return;
+		}
+	}
+	// 4. Sprite animation (may emit sprite_animation_finished, live).
+	advance_sprite_animation(delta);
+	if (anim_finished_event_pending) {
+		anim_finished_event_pending = false;
+		note_user_code();
+		++self_emit_depth;
+		emit_on2d(this, CachedStringNames2D::get().sprite_animation_finished, this);
+		if (ObjectDB::get_instance(ObjectID(self_id)) == this) {
+			--self_emit_depth;
+		}
+		if (!tick_may_continue(self_id) || !is_active) {
+			return;
+		}
+	}
+	// 4b. Factory despawn bounds (silent; user callbacks of released
+	// attachments may run, so re-check liveness).
+	if (bullet_factory != nullptr && bullet_factory->get_despawn_bounds_enabled() && !ignore_despawn_bounds && active_bullets_counter > 0) {
+		cull_outside_bounds(bullet_factory->get_despawn_bounds_rect());
+		if (!tick_may_continue(self_id) || !is_active) {
+			return;
+		}
+	}
+	// 5. Lifetime (may emit life_time_over, live).
+	reduce_lifetime(delta);
+	// 6. Split timer (one test per armed volley; records splits, then the
+	// batch disable may run attachment callbacks). Liveness FIRST: the
+	// life_time_over handler above may have freed this volley, and reading
+	// any member before the check would read freed memory.
+	if (!tick_may_continue(self_id)) {
+		return;
+	}
+	if (split_config != nullptr && is_active) {
+		split_check_timer();
+		// Its batch disable runs attachment callbacks that may free this
+		// volley: liveness before reading another member.
+		if (!tick_may_continue(self_id)) {
+			return;
+		}
+	}
+	// 7. Emitter bullets: records the shots that are due (no user code).
+	if (emitter_config != nullptr && is_active) {
+		emitter_tick();
+	}
+}
+
+// Values move_bullets computes once per tick, before the bullet loop.
+struct BulletVolley2D::MoveTick2D {
+	double delta = 0.0;
+	bool homing_interval_reached = false;
+	bool shared_homing = false; // the shared deque holds targets this tick
+	bool per_bullet_homing = false; // some bullet holds its own targets
+	bool orbiting = false; // some bullet orbits
+	bool bounce = false; // bouncing is armed
+	// Per-bullet mirror frames (BounceFrame2D), null until a bullet bounced.
+	const BulletVolley2D::BounceFrame2D *bounce_frames = nullptr;
+	// Every always-sized per-bullet array covers [0, core_limit).
+	int core_limit = 0;
+	// Shared curve channels, sampled once (the same for every bullet).
+	const BulletCurvesData2D *shared_curves = nullptr;
+	bool shared_x = false;
+	bool shared_y = false;
+	bool shared_rotation = false;
+	bool shared_speed = false;
+	real_t shared_x_offset = 0.0;
+	real_t shared_y_offset = 0.0;
+	real_t shared_x_strength = 0.0;
+	real_t shared_y_strength = 0.0;
+	DirectionCurveMode shared_x_mode = DirectionCurveMode::Additive;
+	DirectionCurveMode shared_y_mode = DirectionCurveMode::Additive;
+	real_t shared_speed_value = 0.0;
+	real_t shared_rotation_value = 0.0;
+	// Shared movement pattern (0 length = none or degenerate).
+	bool shared_pattern = false;
+	real_t shared_pattern_len = 0.0;
+	bool gravity_window = false;
+	// Locked orbits before this tick moved anything (orbiting only), so the
+	// pattern gate and the orbit section agree even when a deque empties.
+	const std::vector<uint8_t> *orbit_locked = nullptr;
+	// Texture-rotation strip for the physics shape (sin/cos hoisted).
+	bool strip_texture_rotation = false;
+	real_t strip_cos = 1.0;
+	real_t strip_sin = 0.0;
+	bool has_shape_offset = false;
+	// Graze: some zone has a live target this tick (prepare_graze_tick).
+	bool graze = false;
+	int graze_zone_slots = 0;
+	const GrazeTickZone2D *graze_zones = nullptr;
+	const GrazeTickTargets2D *graze_targets = nullptr;
+	// Flocking: this volley's slice of the factory's pass (null = no turn).
+	const Vector2 *flock_steer = nullptr;
+	const float *flock_crowd = nullptr; // 0..1 per bullet: separation's priority over homing
+	real_t flock_max_turn = 0.0; // this tick, radians (0 = unlimited)
+	real_t flock_blend = 1.0; // the blend-in fade of this tick (0..1)
+	real_t *flock_rate = nullptr; // per bullet turn rate (turn inertia), null = instant
+	real_t flock_rate_keep = 0.0; // share of the old rate kept this tick: e^(-dt / smoothing)
+	// After a turn the bullet's rotation is aligned with the new heading
+	// when face_heading asks for it (and no rotation data owns the sprite),
+	// or when the rotation owns the heading (adjust_direction_based_on_
+	// rotation): the next stages would otherwise undo the turn.
+	bool flock_face = false;
+	bool flock_basis_owns_heading = false;
+	// Homing re-derives the heading from the rotation (no shared pattern,
+	// no rotation data): a homing bullet's rotation must follow too.
+	bool flock_homing_basis = false;
+};
+
+// One bullet's scratch while the stages run. Created once per tick and
+// re-pointed per bullet (begin): only the fields every bullet must start
+// from are reset, the rest is always written before it is read.
+struct BulletVolley2D::BulletStep2D {
+	int i = 0;
+	Transform2D *transf = nullptr; // &all_cached_instance_transforms[i]
+	Vector2 *direction = nullptr; // &all_cached_direction[i]
+	bool direction_updated = false; // re-derive the cached velocity
+	// The deque this bullet homed by this tick (its own, else the shared
+	// one) and that deque's front target: the orbit center and the reached
+	// test use them. Null when it did not home.
+	HomingTargetDeque *steering_deque = nullptr;
+	Vector2 target_pos;
+	Vector2 bullet_pos;
+	const BulletCurvesData2D *curves = nullptr; // per-bullet curves, null when none
+	Vector2 velocity_delta; // this tick's displacement
+	Vector2 pre_homing; // the heading before step_homing (flocking volleys only)
+
+	void begin(int index, Transform2D &instance_transf, Vector2 &heading) {
+		i = index;
+		transf = &instance_transf;
+		direction = &heading;
+		direction_updated = false;
+		steering_deque = nullptr;
+		curves = nullptr;
+	}
+};
+
+static _ALWAYS_INLINE_ Vector2 clamp_step(Vector2 step, real_t max_step) {
+	if (step.length_squared() > max_step * max_step) {
+		step = step.normalized() * max_step;
+	}
+	return step;
+}
+
+// Long-session guard: the orbit angle only feeds rotated() (periodic), so
+// wrap it once float precision could degrade. The threshold keeps every
+// sane-session read bit-identical.
+static _ALWAYS_INLINE_ void wrap_orbit_angle(real_t &angle) {
+	if (angle > 1000000.0 || angle < -1000000.0) {
+		angle = Math::fposmod(angle, (real_t)Math::TAU);
+	}
+}
+
+// Advances the orbit angle, holding the last finite value when the step
+// overflows (an INF angle would make every later pose NaN).
+static _ALWAYS_INLINE_ void advance_orbit_angle(real_t &angle, real_t step) {
+	const real_t next = angle + step;
+	if (std::isfinite(next)) {
+		angle = next;
+	}
+	wrap_orbit_angle(angle);
+}
+
+void BulletVolley2D::move_bullets(double delta) {
+	if (amount_bullets <= 0 || physics_server == nullptr || !area.is_valid()) {
+		return;
+	}
+	if (!Math::is_finite(delta) || delta < 0.0) {
+		return;
+	}
+	const bool is_using_physics_interpolation = bullet_factory != nullptr && bullet_factory->use_physics_interpolation;
+	if (is_using_physics_interpolation) {
+		update_all_previous_transforms_for_interpolation();
+	}
+
+	// Everything the loop reads but never changes, computed once.
+	const MoveTick2D t = [&]() {
+		MoveTick2D t;
+		t.delta = delta;
+		if (bounce_frames_active && (int)all_bounce_frame.size() >= amount_bullets) {
+			t.bounce_frames = all_bounce_frame.data();
+		}
+		// Unified precedence: a bullet's own deque wins; the shared deque is the
+		// broadcast fallback for bullets whose own deque is empty.
+		t.shared_homing = !shared_homing_deque.empty();
+		t.per_bullet_homing = active_homing_count > 0;
+		if (t.shared_homing || t.per_bullet_homing) {
+			t.homing_interval_reached = update_homing_timer(delta);
+			// The mouse is read once per interval, not once per push:
+			// get_global_mouse_position() walks to the viewport each call.
+			if (t.homing_interval_reached && HomingTargetDeque::mouse_homing_targets_amount > 0) {
+				cached_mouse_global_position = get_global_mouse_position();
+			}
+		}
+		if (t.shared_homing) {
+			// Drop freed targets off the shared front once for every bullet.
+			auto targets_amount = shared_homing_deque.get_homing_targets_amount();
+			int trimmed = shared_homing_deque.bullet_homing_trim_front_invalid_targets(cached_mouse_global_position, targets_amount);
+			if (trimmed > 0) {
+				// Front changed: route the orbit lock per policy (a new front
+				// target never inherits a stale center) and give every bullet
+				// a clean reached slate for the new target.
+				orbit_route_shared_front_change();
+			}
+			t.shared_homing = (targets_amount - trimmed) > 0;
+			if (t.shared_homing && t.homing_interval_reached) {
+				shared_homing_deque.refresh_cached_front_target_global_position(cached_mouse_global_position);
+			}
+		}
+		// While the shared deque holds targets, per-bullet caches go stale
+		// (their branch never runs). Refresh them on the interval too, so a
+		// shared drain hands over live positions instead of push-time ones.
+		if (t.shared_homing && t.homing_interval_reached && active_homing_count > 0) {
+			for (size_t qi = 0; qi < all_bullet_homing_targets.size() && qi < all_homing_count.size(); ++qi) {
+				if (all_homing_count[qi] > 0 && !all_bullet_homing_targets[qi].empty()) {
+					all_bullet_homing_targets[qi].refresh_cached_front_target_global_position(cached_mouse_global_position);
+				}
+			}
+		}
+
+		t.orbiting = active_orbiting_count > 0;
+		t.bounce = bounce_enabled();
+
+		if (shared_bullet_curves_data.is_valid()) {
+			const BulletCurvesData2D *c = shared_bullet_curves_data.ptr();
+			t.shared_curves = c;
+			t.shared_x = c->x_direction_curve.is_valid();
+			t.shared_y = c->y_direction_curve.is_valid();
+			t.shared_rotation = c->rotation_speed_curve.is_valid();
+			t.shared_speed = c->movement_speed_curve.is_valid();
+			if (t.shared_x) {
+				t.shared_x_offset = get_bullet_curves_x_direction_offset(c);
+				t.shared_x_strength = c->x_direction_curve_strength;
+				t.shared_x_mode = c->x_direction_curve_mode;
+			}
+			if (t.shared_y) {
+				t.shared_y_offset = get_bullet_curves_y_direction_offset(c);
+				t.shared_y_strength = c->y_direction_curve_strength;
+				t.shared_y_mode = c->y_direction_curve_mode;
+			}
+			if (t.shared_speed) {
+				t.shared_speed_value = get_bullet_curves_movement_speed(c);
+			}
+			if (t.shared_rotation) {
+				t.shared_rotation_value = get_bullet_curves_rotation_speed(c);
+			}
+		}
+
+		t.shared_pattern = shared_movement_pattern_curve.is_valid();
+		if (t.shared_pattern) {
+			t.shared_pattern_len = shared_movement_pattern_curve->get_baked_length();
+			// NaN baked length (corrupt Curve2D points) would flow into the
+			// per-bullet advance as known_len; normalize to 0 so the pattern
+			// gate stays shut (advance also guards).
+			if (!Math::is_finite(t.shared_pattern_len)) {
+				t.shared_pattern_len = 0.0;
+			}
+		}
+
+		// Combined with gravity_active, a volley with no pull skips the gravity
+		// block for every bullet.
+		t.gravity_window = gravity_window_open();
+
+		// Locked-orbit snapshot (member scratch: no per-tick allocation).
+		if (t.orbiting) {
+			std::vector<uint8_t> &snapshot = orbit_locked_scratch;
+			if ((int)snapshot.size() != amount_bullets) {
+				snapshot.assign(amount_bullets, 0);
+			} else {
+				std::fill(snapshot.begin(), snapshot.end(), (uint8_t)0);
+			}
+			for (int li : all_bullets_enabled_set.get_active_indexes()) {
+				if (li >= 0 && li < amount_bullets && li < (int)all_orbiting_status.size() && li < (int)all_orbiting_data.size()) {
+					if (all_orbiting_status[li] && all_orbiting_data[li].is_locked_orbiting) {
+						snapshot[li] = 1;
+					}
+				}
+			}
+			t.orbit_locked = &snapshot;
+		}
+
+		// Warn when homing cannot visibly do anything: no texture steering, no
+		// movement pattern, no rotation data and no orbit (usually a forgotten
+		// homing_take_control_of_texture_rotation). Once per spawn data, like
+		// every configuration warning: once per volley repeated it every shot.
+		if (!homing_inert_warning_issued && (t.shared_homing || t.per_bullet_homing) && !homing_take_control_of_texture_rotation && !is_rotation_data_active && active_orbiting_count == 0) {
+			bool any_pattern = shared_movement_pattern_curve.is_valid();
+			for (int pi : all_bullets_enabled_set.get_active_indexes()) {
+				if (any_pattern) {
+					break;
+				}
+				any_pattern = check_exists_bullet_movement_pattern_data(pi);
+			}
+			if (!any_pattern && WarnOnce2D::first(warn_data_id, 29u, 0, 0)) {
+				UtilityFunctions::push_warning("BulletVolley2D has homing targets but homing_take_control_of_texture_rotation is false (and no movement pattern/rotation data), so homing will not steer bullets. Set it to true.");
+			}
+			homing_inert_warning_issued = !any_pattern;
+		}
+
+		// BulletCurvesData2D is a mutable shared Resource: a user can gain a
+		// rotation curve AFTER the volley spawned, when nothing sized the
+		// rotation trio. Enforce the invariant once per tick so the rotation
+		// stage can never index out of bounds (resize keeps existing speeds).
+		if ((int)all_rotation_speed.size() != amount_bullets || (int)all_max_rotation_speed.size() != amount_bullets || (int)all_rotation_acceleration.size() != amount_bullets) {
+			visit_rotation_trio([&](std::vector<real_t> &v) { v.resize(amount_bullets, 0.0); });
+		}
+		// Same invariant for the shared-deque reached states.
+		if ((int)all_shared_homing_reached.size() != amount_bullets) {
+			all_shared_homing_reached.resize(amount_bullets);
+		}
+
+		// The always-sized arrays are checked once here instead of per bullet.
+		t.core_limit = amount_bullets;
+		for (size_t size : { all_cached_instance_transforms.size(), all_cached_direction.size(), all_cached_velocity.size(), all_cached_speed.size(), all_cached_max_speed.size(), all_cached_acceleration.size(), all_cached_instance_origin.size(), all_cached_shape_transforms.size() }) {
+			t.core_limit = MIN(t.core_limit, (int)size);
+		}
+
+		t.strip_texture_rotation = cache_texture_rotation_radians != 0.0;
+		t.strip_cos = t.strip_texture_rotation ? (real_t)Math::cos(-cache_texture_rotation_radians) : (real_t)1.0;
+		t.strip_sin = t.strip_texture_rotation ? (real_t)Math::sin(-cache_texture_rotation_radians) : (real_t)0.0;
+		t.has_shape_offset = cache_collision_shape_offset != Vector2(0, 0);
+		t.graze = graze_tick_active && graze_zone_slots > 0 && graze_state.size() == (size_t)amount_bullets * (size_t)graze_zone_slots;
+		t.graze_zone_slots = graze_zone_slots;
+		t.graze_zones = graze_tick_zones;
+		t.graze_targets = &graze_tick_targets;
+		if (flock_config != nullptr && flock_config->enabled && flock_config->flock.is_valid() && flock_view_current()) {
+			t.flock_steer = bullet_factory->get_flock_solver().steer_data() + flock_view.base;
+			t.flock_crowd = bullet_factory->get_flock_solver().crowding_data() + flock_view.base;
+			t.flock_max_turn = flock_view.max_turn_rad * (real_t)delta;
+			if (flock_view.turn_smoothing_sec > 0.0 && delta > 0.0) {
+				if ((int)flock_turn_rate.size() != amount_bullets) {
+					flock_turn_rate.assign((size_t)MAX(amount_bullets, 0), (real_t)0.0);
+				}
+				t.flock_rate = flock_turn_rate.data();
+				t.flock_rate_keep = (real_t)Math::exp(-delta / (double)flock_view.turn_smoothing_sec);
+			}
+			if (flock_view.blend_in_sec > 0.0) {
+				// Smoothstep of the volley's age at the end of this tick (the
+				// clock restarts with every spawn and pool reuse).
+				const real_t x = CLAMP((real_t)((curves_elapsed_time + delta) / (double)flock_view.blend_in_sec), (real_t)0.0, (real_t)1.0);
+				t.flock_blend = x * x * ((real_t)3.0 - (real_t)2.0 * x);
+			}
+			t.flock_face = flock_view.face_heading && !is_rotation_data_active;
+			t.flock_basis_owns_heading = adjust_direction_based_on_rotation && !rotate_only_textures;
+			t.flock_homing_basis = !t.shared_pattern && !is_rotation_data_active;
+		}
+		return t;
+	}();
+
+	BulletStep2D b;
+	{ // One node inverse for the whole loop (trail writes convert per bullet).
+		// The trail writes run shard visibility handlers (user code) that may
+		// disable/enable bullets: walk a stable snapshot, skip bullets disabled
+		// meanwhile, and stop when a handler asked to free this volley (the
+		// emit guard refuses the free and finishes it with queue_free).
+		const uint64_t loop_self_id = get_instance_id();
+		NodeInverseScope tick_inverse_scope(this);
+		std::vector<int> &active = tick_active_scratch;
+		active.assign(all_bullets_enabled_set.get_active_indexes().begin(), all_bullets_enabled_set.get_active_indexes().end());
+		for (int i : active) {
+			if (i < 0 || i >= amount_bullets || !all_bullets_enabled_set.contains(i)) {
+				continue;
+			}
+			// Bounce cooldown ticks down so the bullet can escape the overlap
+			// it just bounced out of (a body+area pair on one target would
+			// otherwise double-flip it in place).
+			if (t.bounce && i < (int)all_bounce_cooldown.size() && all_bounce_cooldown[i] > 0.0) {
+				all_bounce_cooldown[i] -= (real_t)delta;
+				if (all_bounce_cooldown[i] < 0.0) {
+					all_bounce_cooldown[i] = 0.0;
+				}
+			}
+			if (i >= t.core_limit) {
+				continue;
+			}
+			b.begin(i, all_cached_instance_transforms[i], all_cached_direction[i]);
+			// Steering first (homing, curves, wobble, rotation), then the
+			// displacement (pattern, wind, gravity, orbit), then the write
+			// (transform, shape, attachment, trail, reached signal), then
+			// next tick's speed.
+			if (t.flock_steer != nullptr) {
+				b.pre_homing = all_cached_direction[i];
+			}
+			step_homing(t, b);
+			step_flock(t, b);
+			if (i < (int)all_bullet_curves_data.size() && all_bullet_curves_data[i].is_valid()) {
+				b.curves = all_bullet_curves_data[i].ptr(); // borrowed: valid until the vector is reassigned
+			}
+			step_direction_curves(t, b);
+			step_wobble(t, b);
+			step_rotation(t, b);
+			if (b.direction_updated) {
+				refresh_cached_velocity(i);
+			}
+			// Wind-free base: the inherited offset rides along AFTER pattern
+			// steering (advance_movement_pattern measures |velocity_delta|,
+			// so the offset would stretch the pattern step instead of adding
+			// world-space drift).
+			b.velocity_delta = (*b.direction * all_cached_speed[i]) * (real_t)delta;
+			step_pattern_and_forces(t, b);
+			step_orbit(t, b);
+			const bool placed_user_code = step_place(t, b);
+			if (placed_user_code && (!survived_user_code(loop_self_id) || is_queued_for_deletion())) {
+				return; // a shard/reach handler asked for a free refused by the guard
+			}
+			if (t.graze) {
+				step_graze(t, i, all_cached_instance_origin[i], b.velocity_delta);
+			}
+			step_speed(t, b);
+		}
+	} // tick_inverse_scope
+	if (!is_using_physics_interpolation) {
+		batch_flush_instance_transforms();
+	}
+}
+
+// 1. HOMING. The bullet's own deque wins; the shared deque is the fallback
+// (also when its own deque drains this tick). Freed targets are trimmed off
+// the own front first, keeping the counters honest. The reached test runs
+// in step_place, after every steering stage moved the bullet.
+_ALWAYS_INLINE_ void BulletVolley2D::step_homing(const MoveTick2D &t, BulletStep2D &b) {
+	if (!t.per_bullet_homing && !t.shared_homing) {
+		return;
+	}
+	const int i = b.i;
+	HomingTargetDeque *deque = nullptr;
+	if (i < (int)all_homing_count.size() && i < (int)all_bullet_homing_targets.size() && all_homing_count[i] > 0 && !all_bullet_homing_targets[i].empty()) {
+		int &count = all_homing_count[i];
+		HomingTargetDeque &own = all_bullet_homing_targets[i];
+		const int trimmed_count = own.bullet_homing_trim_front_invalid_targets(cached_mouse_global_position, count);
+		count -= trimmed_count;
+		active_homing_count -= trimmed_count;
+		if (count < 0) {
+			count = 0;
+		}
+		if (active_homing_count < 0) {
+			active_homing_count = 0;
+		}
+		homing_resync_count(i);
+		// Trimming exposed a new front target: like a pop, orbit rings re-lock.
+		if (trimmed_count > 0) {
+			orbit_keep_lock_across_replace_for_bullet(i, own);
+		}
+		if (count > 0 && !own.empty()) {
+			// Moving targets refresh on the interval.
+			if (t.homing_interval_reached) {
+				own.refresh_cached_front_target_global_position(cached_mouse_global_position);
+			}
+			deque = &own;
+		}
+	}
+	if (deque == nullptr && t.shared_homing) {
+		deque = &shared_homing_deque;
+	}
+	if (deque == nullptr) {
+		return;
+	}
+	update_homing(*deque, i, t.delta, b.bullet_pos, b.target_pos);
+	b.direction_updated = true;
+	b.steering_deque = deque;
+}
+
+// 1b. FLOCKING. The factory's pass left one steering vector V per bullet,
+// measured where every flockmate stood before this sweep moved anyone. A
+// bullet flies at its own speed, so V acts like a sideways force on a car:
+// the heading turns at |V| sin(angle to V) radians per second (the part of
+// V pointing straight back cannot turn it: a flockmate dead ahead never
+// flips a bullet around), never past V's direction, capped by the flock's
+// turn rate and faded in over the flock's blend-in. Only the direction
+// turns: the speed stays the speed data's. After homing (the flock bends
+// the homing heading), before the curves (Override wins).
+_ALWAYS_INLINE_ void BulletVolley2D::step_flock(const MoveTick2D &t, BulletStep2D &b) {
+	if (t.flock_steer == nullptr) {
+		return;
+	}
+	const int i = b.i;
+	const Vector2 v = t.flock_steer[i];
+	const real_t steer_sq = v.x * v.x + v.y * v.y;
+	const real_t crowd = (b.steering_deque != nullptr) ? (real_t)t.flock_crowd[i] * t.flock_blend : (real_t)0.0;
+	if (!(steer_sq > (real_t)1e-12) && !(crowd > (real_t)0.0)) {
+		return;
+	}
+	// A locked orbit owns the bullet (the gate of the pattern stage).
+	if (t.orbit_locked != nullptr && i < (int)t.orbit_locked->size() && (*t.orbit_locked)[i] && b.steering_deque != nullptr && !b.steering_deque->empty()) {
+		return;
+	}
+	Vector2 &dir = *b.direction;
+	real_t heading_sq = dir.x * dir.x + dir.y * dir.y;
+	if (!(heading_sq > (real_t)1e-8) || !Math::is_finite(heading_sq)) {
+		return;
+	}
+	// Separation outranks homing: a crowded bullet (touching or overlapping
+	// a flockmate: crowd 1) gives back that share of this tick's homing turn,
+	// so it keeps its distance instead of piling onto the shared target; with
+	// room again (crowd 0) homing steers it fully.
+	bool yielded = false;
+	if (crowd > (real_t)0.0) {
+		const Vector2 pre = b.pre_homing;
+		const real_t turned = Math::atan2(pre.x * dir.y - pre.y * dir.x, pre.x * dir.x + pre.y * dir.y);
+		if (Math::is_finite(turned) && Math::abs(turned) > (real_t)1e-6) {
+			const real_t back = -turned * MIN(crowd, (real_t)1.0);
+			const real_t bc = Math::cos(back);
+			const real_t bs = Math::sin(back);
+			const real_t nx = dir.x * bc - dir.y * bs;
+			const real_t ny = dir.x * bs + dir.y * bc;
+			const real_t inv = (real_t)1.0 / Math::sqrt(nx * nx + ny * ny);
+			dir = Vector2(nx * inv, ny * inv);
+			heading_sq = (real_t)1.0;
+			yielded = true;
+		}
+	}
+	if (!(steer_sq > (real_t)1e-12) && !yielded) {
+		if (t.flock_rate != nullptr) {
+			t.flock_rate[i] = 0.0;
+		}
+		return;
+	}
+	// The flight heading: a negative speed flies against the direction
+	// (rotating either by the same angle is the same turn).
+	const real_t sign = all_cached_speed[i] < 0.0 ? (real_t)-1.0 : (real_t)1.0;
+	const real_t inv_heading = (real_t)1.0 / Math::sqrt(heading_sq);
+	const real_t fx = dir.x * sign * inv_heading;
+	const real_t fy = dir.y * sign * inv_heading;
+	// cross = |V| sin(phi): the sideways part of V (radians per second).
+	const real_t cross = fx * v.y - fy * v.x;
+	const real_t dt = (real_t)t.delta * t.flock_blend;
+	real_t theta = cross * dt;
+	// |V| dt <= 1 can never turn past V (|sin phi| <= |phi|); beyond that the
+	// turn stops at V's direction.
+	if (steer_sq * dt * dt > (real_t)1.0) {
+		const real_t phi = Math::atan2(cross, fx * v.x + fy * v.y);
+		if (Math::abs(theta) > Math::abs(phi)) {
+			theta = phi;
+		}
+	}
+	if (t.flock_rate != nullptr) {
+		// Turn inertia: the rate eases toward the rules' rate (a crowd whose
+		// push flips side every tick never makes the bullet vibrate).
+		const real_t wanted = theta / (real_t)t.delta;
+		real_t &rate = t.flock_rate[i];
+		rate = wanted + (rate - wanted) * t.flock_rate_keep;
+		theta = rate * (real_t)t.delta;
+	}
+	if (t.flock_max_turn > 0.0) {
+		theta = CLAMP(theta, -t.flock_max_turn, t.flock_max_turn);
+		if (t.flock_rate != nullptr) {
+			t.flock_rate[i] = theta / (real_t)t.delta; // no wind-up past the cap
+		}
+	}
+	// A calm flock (or a zero-delta tick) changes nothing, bit for bit.
+	const bool turns = Math::abs(theta) >= (real_t)1e-6;
+	if (!turns && !yielded) {
+		return;
+	}
+	if (turns) {
+		const real_t c = Math::cos(theta);
+		const real_t s = Math::sin(theta);
+		const real_t nx = dir.x * c - dir.y * s;
+		const real_t ny = dir.x * s + dir.y * c;
+		const real_t inv = (real_t)1.0 / Math::sqrt(nx * nx + ny * ny);
+		dir = Vector2(nx * inv, ny * inv);
+	}
+	if (t.flock_face || t.flock_basis_owns_heading || (b.steering_deque != nullptr && t.flock_homing_basis && !check_exists_bullet_movement_pattern_data(i))) {
+		// Align the rotation with the new heading ABSOLUTELY (not by theta):
+		// a heading something else snapped this tick (homing toward a
+		// target, a curve) would otherwise leave the sprite drifting. The
+		// forward axis strips the texture rotation, like the heading does.
+		Vector2 &x_axis = b.transf->columns[0];
+		Vector2 &y_axis = b.transf->columns[1];
+		const real_t fx = x_axis.x * t.strip_cos - x_axis.y * t.strip_sin;
+		const real_t fy = x_axis.x * t.strip_sin + x_axis.y * t.strip_cos;
+		const real_t f2 = fx * fx + fy * fy;
+		if (f2 > (real_t)1e-8) {
+			// The rotation taking the forward axis onto the heading, made
+			// exactly unit (a rounding error repeated every tick would
+			// otherwise slowly scale the bullet).
+			// In double: one rounding per stored component, so thousands of
+			// small turns never drift the bullet's scale.
+			double rc = (double)fx * dir.x + (double)fy * dir.y;
+			double rs = (double)fx * dir.y - (double)fy * dir.x;
+			const double r_inv = 1.0 / std::sqrt(rc * rc + rs * rs);
+			rc *= r_inv;
+			rs *= r_inv;
+			x_axis = Vector2((real_t)(x_axis.x * rc - x_axis.y * rs), (real_t)(x_axis.x * rs + x_axis.y * rc));
+			y_axis = Vector2((real_t)(y_axis.x * rc - y_axis.y * rs), (real_t)(y_axis.x * rs + y_axis.y * rc));
+		}
+	}
+	b.direction_updated = true;
+}
+
+// 2. DIRECTION CURVES. Per channel, the bullet's own curve wins over the
+// shared one (sampled once per tick); the texture follows the first
+// channel that steered.
+_ALWAYS_INLINE_ void BulletVolley2D::step_direction_curves(const MoveTick2D &t, BulletStep2D &b) {
+	const bool own_x = b.curves != nullptr && b.curves->x_direction_curve.is_valid();
+	const bool own_y = b.curves != nullptr && b.curves->y_direction_curve.is_valid();
+	// A bounced bullet flies its curve mirrored off the wall: the curve
+	// works in the bullet's mirror frame (out of line: the slow path).
+	const bool framed = t.bounce_frames != nullptr && (own_x || own_y || t.shared_x || t.shared_y);
+	if (framed) {
+		*b.direction = bounce_frame_unapply(b.i, *b.direction);
+	}
+	const BulletCurvesData2D *texture_source = nullptr;
+	if (own_x) {
+		apply_x_direction_curve(*b.direction, b.curves);
+		texture_source = b.curves;
+	} else if (t.shared_x) {
+		apply_direction_axis2d(*b.direction, 0, t.shared_x_mode, t.shared_x_offset, t.shared_x_strength);
+		texture_source = t.shared_curves;
+	}
+	if (own_y) {
+		apply_y_direction_curve(*b.direction, b.curves);
+		if (texture_source == nullptr) {
+			texture_source = b.curves;
+		}
+	} else if (t.shared_y) {
+		apply_direction_axis2d(*b.direction, 1, t.shared_y_mode, t.shared_y_offset, t.shared_y_strength);
+		// First-wins, like the own_y branch above: a shared y-curve must not
+		// steal the facing source from the bullet's own (or shared) x-curve.
+		if (texture_source == nullptr) {
+			texture_source = t.shared_curves;
+		}
+	}
+	if (framed) {
+		*b.direction = bounce_frame_apply(b.i, *b.direction);
+	}
+	if (texture_source != nullptr) {
+		apply_direction_curve_texture_rotation_if_needed(*b.direction, *b.transf, t.delta, texture_source);
+		b.direction_updated = true;
+	}
+}
+
+// 2b. WOBBLE (waveform flight modulation). Lateral displaces the heading
+// perpendicular to flight (snakes, weaves, curtains); angular oscillates
+// the heading itself (corkscrews, petals). Runs on the analytic offset DELTA
+// between frames (not the absolute offset) so pausing/teleporting never
+// jumps the bullet. With face_movement_direction the visual slews toward the
+// steered heading (skipped while rotation data owns the visual; snaps when
+// face_rotation_speed <= 0).
+_ALWAYS_INLINE_ void BulletVolley2D::step_wobble(const MoveTick2D &t, BulletStep2D &b) {
+	const int i = b.i;
+	if (!is_wobble_feature_enabled || i >= (int)all_bullet_wobble.size() || !all_bullet_wobble[i].active) {
+		return;
+	}
+	const double delta = t.delta;
+	WobbleSeed &w = all_bullet_wobble[i];
+	const real_t now = (real_t)curves_elapsed_time;
+	const bool in_window = now >= w.delay_sec && (w.duration_sec <= 0.0 || now < w.delay_sec + w.duration_sec);
+	if (!in_window) {
+		// Leaving (or not yet in) the window: the next entry starts from the
+		// analytic baseline.
+		w.has_last = false;
+		return;
+	}
+	if (!(w.frequency_hz >= 0.0 && w.amplitude >= 0.0)) {
+		return;
+	}
+	const bool phased = w.distance_phased && i < (int)wobble_distance_traveled.size();
+	const real_t phase_base = phased ? wobble_distance_traveled[i] * 0.02 : now;
+	const real_t damp = (w.damping_per_sec > 0.0 && now > w.delay_sec) ? (real_t)Math::exp(-(double)(w.damping_per_sec * (now - w.delay_sec))) : 1.0;
+	const real_t now_off = w.amplitude * damp * evaluate_wobble_waveform(w.waveform, Math::TAU * w.frequency_hz * phase_base + w.phase);
+	const real_t prev_t = now - (real_t)delta;
+	const bool prev_in = prev_t >= w.delay_sec && (w.duration_sec <= 0.0 || prev_t < w.delay_sec + w.duration_sec);
+	real_t prev_off = 0.0;
+	if (w.has_last && Math::abs((curves_elapsed_time - delta) - w.last_time) < 1e-6) {
+		// Clock continuous: exactly the offset applied last tick.
+		prev_off = w.last_offset;
+	} else if (prev_in && delta > 0.0) {
+		const real_t prev_base = phased ? (wobble_distance_traveled[i] - (*b.direction * all_cached_speed[i]).length() * (real_t)delta) * 0.02 : prev_t;
+		const real_t prev_damp = (w.damping_per_sec > 0.0 && prev_t > w.delay_sec) ? (real_t)Math::exp(-(double)(w.damping_per_sec * (prev_t - w.delay_sec))) : 1.0;
+		prev_off = w.amplitude * prev_damp * evaluate_wobble_waveform(w.waveform, Math::TAU * w.frequency_hz * prev_base + w.phase);
+	}
+	const real_t frame_delta = now_off - prev_off;
+	w.has_last = Math::is_finite(now_off);
+	if (w.has_last) {
+		w.last_offset = now_off;
+		w.last_time = curves_elapsed_time;
+	}
+	if (!Math::is_finite(frame_delta) || Math::abs(frame_delta) <= 0.00001) {
+		return;
+	}
+	Vector2 &dir = *b.direction;
+	if (w.mode == 1) {
+		dir = dir.rotated(Math::deg_to_rad(frame_delta));
+		dir = dir.length_squared() < 0.00000001 ? Vector2(1, 0) : safe_normalized2d(dir);
+	} else if (dir.length_squared() > 0.00000001) {
+		const Vector2 perp = Vector2(-dir.y, dir.x).normalized();
+		const Vector2 steered = dir + perp * (frame_delta * 0.01);
+		// A pathological frame_delta (~100x amplitude) could cancel the
+		// heading; hold the old heading instead of snapping to angle 0.
+		if (steered.length_squared() > 0.00000001) {
+			dir = safe_normalized2d(steered);
+		}
+	}
+	b.direction_updated = true;
+	if (w.face_movement_direction && !is_rotation_data_active && delta > 0.0) {
+		// The basis carries the texture rotation (the art's forward offset).
+		const real_t target = dir.angle() + cache_texture_rotation_radians;
+		const real_t current = b.transf->get_rotation();
+		const real_t diff = Math::fposmod(target - current + static_cast<real_t>(Math::PI), static_cast<real_t>(Math::TAU)) - static_cast<real_t>(Math::PI);
+		if (Math::is_finite(diff) && Math::abs(diff) > 0.00001) {
+			if (w.face_rotation_speed <= 0.0) {
+				rotate_transform_locally(*b.transf, diff);
+			} else {
+				const real_t step = Math::abs(w.face_rotation_speed) * (real_t)delta;
+				rotate_transform_locally(*b.transf, Math::clamp(diff, -step, step));
+			}
+		}
+	}
+}
+
+// 3-4. ROTATION. Own rotation curve > shared curve > rotation data. With
+// adjust_direction_based_on_rotation the heading follows the instance
+// rotation (texture rotation stripped; visual-only spin never steers). A
+// pending bounce ricochet slews the sprite (visual only) toward the
+// reflected heading.
+_ALWAYS_INLINE_ void BulletVolley2D::step_rotation(const MoveTick2D &t, BulletStep2D &b) {
+	const int i = b.i;
+	const double delta = t.delta;
+	if (b.curves != nullptr && b.curves->rotation_speed_curve.is_valid()) {
+		bullet_accelerate_rotation_speed_using_curve(i, delta, b.curves);
+		update_rotation_using_curve(i, delta);
+	} else if (t.shared_rotation) {
+		all_rotation_speed[i] = t.shared_rotation_value;
+		update_rotation_using_curve(i, delta);
+	} else if (is_rotation_data_active) {
+		bullet_accelerate_rotation_speed(i, delta);
+		update_rotation(i, delta);
+	}
+	if (adjust_direction_based_on_rotation && !rotate_only_textures) {
+		// Degenerate basis (zero scale) keeps the last good direction.
+		const Vector2 stripped_basis = b.transf->columns[0].rotated(-cache_texture_rotation_radians);
+		if (stripped_basis.length_squared() > 0.00000001) {
+			*b.direction = stripped_basis.normalized();
+		}
+		b.direction_updated = true;
+	}
+	// Bounce visual pursuit: ballistics reflected instantly in the drain;
+	// skipped while adjust_direction_based_on_rotation owns ballistics.
+	if (t.bounce && bounce_rotate_texture && bounce_rotation_smooth > 0.0 && !adjust_direction_based_on_rotation && i < (int)bounce_visual_pending.size() && bounce_visual_pending[i] && i < (int)bounce_visual_target.size()) {
+		const Vector2 want = bounce_visual_target[i];
+		if (want.length_squared() > 0.00000001 && Math::is_finite((double)bounce_rotation_smooth) && delta > 0.0) {
+			rotate_to_target(i, want, bounce_rotation_smooth * (real_t)delta, false);
+			const Vector2 fwd = (*b.transf)[0].rotated(-cache_texture_rotation_radians);
+			if (fwd.length_squared() > 0.00000001 && fwd.normalized().dot(want.normalized()) > 0.9999) {
+				bounce_visual_pending[i] = 0;
+			}
+		} else {
+			bounce_visual_pending[i] = 0;
+		}
+	}
+}
+
+// 6. MOVEMENT PATTERN, WIND, GRAVITY. The own pattern wins over the shared
+// one; a locked orbit owns the displacement (the pattern and its distance
+// ledger are skipped, so a non-repeating pattern cannot finish invisibly).
+// World-space wind is added after the pattern shaped the step; gravity
+// integrates the fall speed (semi-implicit) inside its time window.
+_ALWAYS_INLINE_ void BulletVolley2D::step_pattern_and_forces(const MoveTick2D &t, BulletStep2D &b) {
+	const int i = b.i;
+	const double delta = t.delta;
+	const bool orbit_locked = t.orbit_locked != nullptr && i < (int)t.orbit_locked->size() && (*t.orbit_locked)[i] && b.steering_deque != nullptr && !b.steering_deque->empty();
+	if (!orbit_locked) {
+		if (check_exists_bullet_movement_pattern_data(i)) {
+			BulletMovementPatternData2D &pattern = all_movement_pattern_data[i];
+			if (pattern.path_curve.is_null() || !advance_movement_pattern(pattern.path_curve, pattern.face_movement_direction, pattern.repeat_pattern, pattern.distance_traveled, b.velocity_delta, *b.direction, *b.transf)) {
+				pattern = BulletMovementPatternData2D();
+			}
+		} else if (t.shared_pattern && t.shared_pattern_len >= 0.001 && i < (int)shared_movement_pattern_distances.size() && (shared_movement_pattern_repeat || shared_movement_pattern_distances[i] < t.shared_pattern_len)) {
+			if (!advance_movement_pattern(shared_movement_pattern_curve, shared_movement_pattern_face_movement_direction, shared_movement_pattern_repeat, shared_movement_pattern_distances[i], b.velocity_delta, *b.direction, *b.transf, t.shared_pattern_len)) {
+				// Park the ledger at the end (degenerate curve or completed
+				// run) so finished bullets skip without an extra flag.
+				shared_movement_pattern_distances[i] = t.shared_pattern_len;
+			}
+		}
+	}
+	if (t.bounce_frames == nullptr) {
+		b.velocity_delta += inherited_velocity_offset * (real_t)delta;
+	} else {
+		b.velocity_delta += bounce_frame_drift(i) * (real_t)delta; // slow path: a bounced volley
+	}
+	if (gravity_active && t.gravity_window && i < (int)all_gravity.size() && i < (int)all_gravity_velocity.size()) {
+		const Vector2 base_g = all_gravity[i];
+		if (base_g.length_squared() > 0.0) {
+			const Vector2 g = base_g * gravity_strength_scale_for_bullet(t.shared_curves, b.curves);
+			if (g.is_finite()) {
+				Vector2 &gv = all_gravity_velocity[i];
+				// The fall speed holds its last finite value (an overflow
+				// would make the pose INF, then NaN).
+				const Vector2 next_gv = gv + g * (real_t)delta;
+				if (std::isfinite(next_gv.x) && std::isfinite(next_gv.y)) {
+					gv = next_gv;
+				}
+				b.velocity_delta += gv * (real_t)delta;
+			}
+		}
+	}
+	if (is_wobble_feature_enabled && i < (int)wobble_distance_traveled.size()) {
+		wobble_distance_traveled[i] += b.velocity_delta.length();
+	}
+}
+
+// 7. ORBIT (around the steering deque's front target). A deque that ran dry
+// unlocks the orbit under RelockAlways / RelockOnTargetChange; StayLocked
+// rides out the gap and re-pins silently when a target returns.
+_ALWAYS_INLINE_ void BulletVolley2D::step_orbit(const MoveTick2D &t, BulletStep2D &b) {
+	const int i = b.i;
+	if (!t.orbiting || i >= (int)all_orbiting_data.size() || i >= (int)all_orbiting_status.size()) {
+		return;
+	}
+	OrbitingData &o = all_orbiting_data[i];
+	const bool has_target = b.steering_deque != nullptr && !b.steering_deque->empty();
+	if (!has_target) {
+		if (o.lock_policy != StayLocked) {
+			o.is_locked_orbiting = false;
+		}
+		return;
+	}
+	if (!all_orbiting_status[i]) {
+		return;
+	}
+	const double delta = t.delta;
+	// RelockOnTargetChange watches identity, not distance: a new front
+	// target unlocks so the bullet re-acquires the ring around it; the same
+	// target moving keeps the lock.
+	if (o.is_locked_orbiting && o.lock_policy == RelockOnTargetChange && orbit_should_unlock_for_front_change(o, *b.steering_deque)) {
+		o.is_locked_orbiting = false;
+	}
+	// A non-finite front cache (a target freed between trim and tick) holds
+	// the bullet still this tick instead of poisoning ballistics.
+	if (!b.target_pos.is_finite()) {
+		b.velocity_delta = Vector2(0, 0);
+		return;
+	}
+	const Vector2 &origin = all_cached_instance_origin[i];
+	// Ring center: FollowTarget tracks the target, FollowDeadzone pins until
+	// it leaves the deadzone, Anchored freezes at the lock point. Unlocked
+	// bullets fly toward the live target to reach the ring.
+	const Vector2 center = o.is_locked_orbiting ? orbit_effective_center(o, b.target_pos) : b.target_pos;
+	const Vector2 to_center = origin - center;
+	const real_t current_dist = to_center.length();
+	const bool already_locked = o.is_locked_orbiting;
+	const real_t speed = all_cached_speed[i];
+	// Zero-delta ticks and zero-speed bullets hold still: any snap would be
+	// a teleport, not motion.
+	const bool can_move = delta > 0.0 && speed > 0.0;
+	auto ring_slot = [&]() { return center + Vector2(o.radius, 0).rotated(o.angle); };
+	bool on_ring = false; // moving along the ring this tick (drives the facing)
+	if (already_locked && o.direction == DontMove) {
+		// Escort: a fixed ring slot (angle set at lock time) that translates
+		// with the target; rigid follow holds it regardless of speed.
+		if (o.rigid_follow || can_move) {
+			const Vector2 snap = ring_slot() - origin;
+			b.velocity_delta = o.rigid_follow ? snap : clamp_step(snap, speed * (real_t)delta);
+		} else {
+			b.velocity_delta = Vector2(0, 0);
+		}
+		on_ring = true;
+	} else if (already_locked) {
+		const real_t dir_multiplier = (o.direction == OrbitRight) ? 1.0 : (o.direction == OrbitLeft ? -1.0 : 0.0);
+		if (dir_multiplier != 0.0) {
+			// Tiny radii would divide into inf/NaN.
+			const real_t safe_radius = o.radius < 0.01 ? (real_t)0.01 : o.radius;
+			// Rigid follow moves the ring slot with the target, then
+			// advances the angle (circling never lags a moving target);
+			// without it the angle advances but the step is clamped to
+			// speed * delta (cheap drift look).
+			if (o.rigid_follow) {
+				advance_orbit_angle(o.angle, delta > 0.0 ? (speed / safe_radius) * dir_multiplier * (real_t)delta : (real_t)0.0);
+				b.velocity_delta = ring_slot() - origin;
+			} else if (can_move) {
+				const real_t angular_speed = (speed / safe_radius) * dir_multiplier;
+				advance_orbit_angle(o.angle, angular_speed * delta);
+				b.velocity_delta = clamp_step(ring_slot() - origin, speed * (real_t)delta);
+			} else {
+				b.velocity_delta = Vector2(0, 0);
+			}
+		} else {
+			b.velocity_delta = ring_slot() - origin;
+		}
+		on_ring = true;
+	} else if (delta > 0.0 && Math::abs(current_dist - o.radius) < Math::max((real_t)(speed * delta), (real_t)2.0)) {
+		// Reached the ring this tick (epsilon so slow / high-FPS bullets
+		// still lock): lock and snap toward the slot. DontMove escorts lock
+		// here too; zero-delta ticks never lock.
+		o.angle = to_center.angle();
+		orbit_stamp_lock(o, center, *b.steering_deque);
+		// The lock tick spends the whole step: onto the ring, then along it
+		// (the radial gap and the arc are the two legs of the step). Only
+		// the gap was moved before, so a relock right on the ring
+		// (RelockAlways after every retarget pass) stood still a tick.
+		const real_t step = speed * (real_t)delta;
+		const real_t gap = Math::abs(current_dist - o.radius);
+		const real_t dir_multiplier = (o.direction == OrbitRight) ? 1.0 : (o.direction == OrbitLeft ? -1.0 : 0.0);
+		if (dir_multiplier != 0.0 && can_move && step > gap) {
+			const real_t safe_radius = o.radius < 0.01 ? (real_t)0.01 : o.radius;
+			advance_orbit_angle(o.angle, (Math::sqrt(step * step - gap * gap) / safe_radius) * dir_multiplier);
+		}
+		b.velocity_delta = clamp_step(ring_slot() - origin, step);
+		on_ring = true;
+	} else if (current_dist < o.radius) {
+		// Spawned inside the ring: push outward (not orbiting yet).
+		const Vector2 outward_dir = (current_dist > 0.1f) ? (to_center / current_dist) : Vector2(1, 0);
+		const real_t next_dist = current_dist + (speed * (real_t)delta);
+		b.velocity_delta = (center + (outward_dir * next_dist)) - origin;
+	}
+	// Facing while on the ring (orbiting owns its texture rotation, no
+	// homing flag needed). DontMove escorts only face the target: they have
+	// no direction of travel. A bullet exactly on the center keeps its yaw.
+	if (!on_ring || (o.direction == DontMove && (o.texture_rotation == FaceOrbitingDirection || o.texture_rotation == FaceOppositeOrbitingDirection))) {
+		return;
+	}
+	if ((origin - center).length_squared() < 0.000001) {
+		return;
+	}
+	const Vector2 radial = (origin - center).normalized();
+	Vector2 look_dir;
+	switch (o.texture_rotation) {
+		case FaceTarget:
+			look_dir = -radial;
+			break;
+		case FaceOppositeTarget:
+			look_dir = radial;
+			break;
+		case FaceOrbitingDirection:
+			look_dir = (o.direction == OrbitRight) ? Vector2(-radial.y, radial.x) : Vector2(radial.y, -radial.x);
+			break;
+		case FaceOppositeOrbitingDirection:
+			look_dir = (o.direction == OrbitRight) ? Vector2(radial.y, -radial.x) : Vector2(-radial.y, radial.x);
+			break;
+		default:
+			break;
+	}
+	if (look_dir != Vector2()) {
+		rotate_to_target_preserve_interpolation(i, look_dir, false);
+	}
+}
+
+// 8. WRITE. Move the instance, derive the physics shape (logical rotation:
+// the texture-only rotation stripped, frozen while rotate_only_textures),
+// offset it, push it to the physics server, carry the attachment and the
+// trail, then test the homing reach at the post-move position.
+_ALWAYS_INLINE_ bool BulletVolley2D::step_place(const MoveTick2D &t, BulletStep2D &b) {
+	const int i = b.i;
+	Vector2 &origin = all_cached_instance_origin[i];
+	const Vector2 pre_move_origin = origin;
+	// Safety net: a step that overflows float32 keeps the bullet where it is
+	// (a non-finite origin would poison the instance, the shape and the
+	// physics server for good).
+	const Vector2 moved = origin + b.velocity_delta;
+	if (std::isfinite(moved.x) && std::isfinite(moved.y)) {
+		origin = moved;
+	} else {
+		b.velocity_delta = Vector2(0, 0);
+	}
+	b.transf->set_origin(origin);
+
+	Transform2D &shape = all_cached_shape_transforms[i];
+	if (!rotate_only_textures) {
+		shape = *b.transf;
+		if (t.strip_texture_rotation) {
+			// Same as rotated_local(-texture_rotation): basis * R.
+			const Vector2 c0 = shape.columns[0];
+			const Vector2 c1 = shape.columns[1];
+			shape.columns[0] = c0 * t.strip_cos + c1 * t.strip_sin;
+			shape.columns[1] = c1 * t.strip_cos - c0 * t.strip_sin;
+		}
+	}
+	Vector2 rotated_offset = Vector2(0, 0);
+	if (t.has_shape_offset) {
+		// Rotate by the shape's facing (column 0) without atan2 + sin/cos.
+		const Vector2 facing = shape.columns[0];
+		const real_t facing_len = facing.length();
+		if (facing_len > (real_t)0.0) {
+			const Vector2 f = facing / facing_len;
+			rotated_offset = Vector2(f.x * cache_collision_shape_offset.x - f.y * cache_collision_shape_offset.y, f.y * cache_collision_shape_offset.x + f.x * cache_collision_shape_offset.y);
+		} else {
+			rotated_offset = cache_collision_shape_offset;
+		}
+	}
+	shape.set_origin(origin + rotated_offset);
+
+	physics_server->area_set_shape_transform(area, i, shape);
+	move_bullet_attachment(b.velocity_delta, i);
+	const bool trail_user_code = write_trail_instances(i); // shard set_visible handlers are user code
+
+	// 7b. REACHED: the whole move of this tick (pre-move origin -> origin) is
+	// tested, so a fast bullet cannot fly through the threshold circle; the
+	// reach belongs to the deque the bullet steered by.
+	if (b.steering_deque != nullptr && !b.steering_deque->empty() && b.target_pos.is_finite()) {
+		// Records the reach only (dispatch_homing_events emits after the
+		// loop): no user code here, so no per-bullet liveness check either.
+		try_to_emit_bullet_homing_target_reached_signal(*b.steering_deque, b.steering_deque == &shared_homing_deque, i, pre_move_origin, b.target_pos, b.velocity_delta);
+	}
+	return trail_user_code;
+}
+
+// 8b. GRAZE. The bullet's motion this tick is the segment p1 - v -> p1;
+// its closest approach to the volley's graze targets (swept, so a fast
+// bullet cannot skip a thin ring; every zone rings the same targets, so it
+// is measured once) decides which rings of each zone it touched, and its
+// end point whether it is still inside a zone's outermost ring. Inline here
+// is only the distance test every bullet pays; a bullet inside or touching
+// a zone continues in graze_visit (out of line: keeps the loop small).
+_ALWAYS_INLINE_ void BulletVolley2D::step_graze(const MoveTick2D &t, int bullet_index, const Vector2 &p1, const Vector2 &v) {
+	// Plain component math on purpose: godot-cpp's Vector2::dot() is not
+	// inline (a call per use), which tripled this stage's cost.
+	const real_t vx = v.x;
+	const real_t vy = v.y;
+	const real_t vv = vx * vx + vy * vy;
+	// Distances are compared scaled by |v|^2 (no division per bullet); a
+	// bullet that did not move compares them as they are.
+	const real_t scale = vv > (real_t)0.0 ? vv : (real_t)1.0;
+	const GrazeTickTargets2D &tg = *t.graze_targets;
+	real_t swept_scaled = (real_t)Math::INF;
+	int swept_target = 0;
+	if (tg.inline_count > 0) {
+		for (int k = 0; k < tg.inline_count; ++k) {
+			// q0 = start - center: the start pose relative to the target.
+			const real_t q0x = p1.x - tg.inline_centers[k].x - vx;
+			const real_t q0y = p1.y - tg.inline_centers[k].y - vy;
+			// Closest approach over the segment q0 -> q0 + v, branch-free:
+			// the projection of -q0 on v clamped to [0, |v|^2] picks the
+			// start, an interior point or the end; times |v|^2 that
+			// distance is |q0|^2 |v|^2 - c (2 a - c).
+			const real_t along = -(q0x * vx + q0y * vy);
+			const real_t along_c = MIN(MAX(along, (real_t)0.0), vv);
+			const real_t d2_scaled = (q0x * q0x + q0y * q0y) * scale - along_c * ((real_t)2.0 * along - along_c);
+			if (d2_scaled < swept_scaled) {
+				swept_scaled = d2_scaled;
+				swept_target = k;
+			}
+		}
+	} else {
+		// Centers sorted by x: only the slab of targets within reach of the
+		// motion's x range can touch a ring (same test, same ties; unsorted
+		// centers come with an infinite reach: all of them).
+		const real_t start_x = p1.x - vx;
+		const real_t lo = MIN(start_x, p1.x) - tg.slab_reach;
+		const real_t hi = MAX(start_x, p1.x) + tg.slab_reach;
+		int first = 0;
+		int last = tg.count;
+		while (first < last) {
+			const int mid = (first + last) >> 1;
+			if (tg.centers[mid].x < lo) {
+				first = mid + 1;
+			} else {
+				last = mid;
+			}
+		}
+		uint32_t best_order = UINT32_MAX;
+		for (int k = first; k < tg.count && tg.centers[k].x <= hi; ++k) {
+			const real_t q0x = p1.x - tg.centers[k].x - vx;
+			const real_t q0y = p1.y - tg.centers[k].y - vy;
+			const real_t along = -(q0x * vx + q0y * vy);
+			const real_t along_c = MIN(MAX(along, (real_t)0.0), vv);
+			const real_t d2_scaled = (q0x * q0x + q0y * q0y) * scale - along_c * ((real_t)2.0 * along - along_c);
+			if (d2_scaled < swept_scaled || (d2_scaled == swept_scaled && tg.order[k] < best_order)) {
+				swept_scaled = d2_scaled;
+				swept_target = k;
+				best_order = tg.order[k];
+			}
+		}
+	}
+	const uint16_t *row = graze_state.data() + (size_t)bullet_index * (size_t)t.graze_zone_slots;
+	for (int z = 0; z < t.graze_zone_slots; ++z) {
+		const GrazeTickZone2D &zone = t.graze_zones[z];
+		// Far bullets (nearly all of them) leave here, writing nothing. A
+		// non-finite pose compares false and leaves here too.
+		if (!zone.active || ((row[z] & GRAZE_INSIDE) == 0 && !(swept_scaled <= zone.ring_r2[0] * scale))) {
+			continue;
+		}
+		graze_visit(z, bullet_index, p1, swept_scaled / scale, swept_target);
+	}
+}
+
+// The rest of step_graze for a bullet inside or touching zone z: rings,
+// visit bookkeeping, events. A visit belongs to one target (its anchor
+// slot): the target of its latest new graze.
+_NO_INLINE_ void BulletVolley2D::graze_visit(int z, int bullet_index, const Vector2 &p1, real_t swept_d2, int swept_target) {
+	if (!Math::is_finite(p1.x) || !Math::is_finite(p1.y)) {
+		return;
+	}
+	const GrazeTickTargets2D &tg = graze_tick_targets;
+	const GrazeTickZone2D &zone = graze_tick_zones[z];
+	const size_t at = (size_t)bullet_index * (size_t)graze_zone_slots + (size_t)z;
+	// The bullet's own size (count_bullet_size): its largest basis scale,
+	// at most the volley's largest (the fast reject in step_graze used that
+	// one; every write that grows a bullet raises it, so it is an upper bound).
+	real_t ring_r2[GrazeZone2D::MAX_RINGS];
+	if (zone.sized && bullet_index < (int)all_cached_instance_transforms.size()) {
+		const Transform2D &pose = all_cached_instance_transforms[bullet_index];
+		const real_t sx = pose.columns[0].x * pose.columns[0].x + pose.columns[0].y * pose.columns[0].y;
+		const real_t sy = pose.columns[1].x * pose.columns[1].x + pose.columns[1].y * pose.columns[1].y;
+		real_t own = Math::sqrt(MAX(sx, sy));
+		own = (Math::is_finite(own) && own > (real_t)0.0) ? MIN(own, graze_bullet_scale) : graze_bullet_scale;
+		const real_t inflate = graze_tick_shape_radius * own;
+		for (int s = 0; s < zone.ring_count; ++s) {
+			const real_t r = zone.ring_raw[s] + inflate;
+			ring_r2[s] = r * r;
+		}
+	} else {
+		for (int s = 0; s < zone.ring_count; ++s) {
+			ring_r2[s] = zone.ring_r2[s];
+		}
+	}
+	// The nearest target to the end point among those that can be inside
+	// the zone (the x slab of the zone's reach when sorted); none = INF.
+	real_t end = (real_t)Math::INF;
+	int end_target = -1;
+	int first = 0;
+	int last = tg.count;
+	if (tg.sorted) {
+		const real_t lo = p1.x - zone.reach;
+		while (first < last) {
+			const int mid = (first + last) >> 1;
+			if (tg.centers[mid].x < lo) {
+				first = mid + 1;
+			} else {
+				last = mid;
+			}
+		}
+		last = tg.count;
+	}
+	const real_t hi = tg.sorted ? p1.x + zone.reach : (real_t)Math::INF;
+	for (int k = first; k < last && tg.centers[k].x <= hi; ++k) {
+		const real_t dx = p1.x - tg.centers[k].x;
+		const real_t dy = p1.y - tg.centers[k].y;
+		const real_t end_d2 = dx * dx + dy * dy;
+		// Ties go to the first in tree order (many targets are sorted by x).
+		if (end_d2 < end || (tg.order != nullptr && end_target >= 0 && end_d2 == end && tg.order[k] < tg.order[end_target])) {
+			end = end_d2;
+			end_target = k;
+		}
+	}
+	// The swept minimum never exceeds the end point (rounding aside).
+	const real_t swept = MIN(swept_d2, end);
+	uint16_t st = graze_state[at];
+	uint32_t anchor = graze_anchor[at];
+	bool was_inside = (st & GRAZE_INSIDE) != 0;
+	if (was_inside && tg.anchor_changed(anchor)) {
+		if (end <= ring_r2[0] && end_target >= 0) {
+			// Still inside another target: the visit moves on to it.
+			anchor = tg.slots[end_target];
+		} else {
+			// Its target is gone: the visit ends silently.
+			st &= (uint16_t)~(GRAZE_INSIDE | GRAZE_DEEPEST_MASK | GRAZE_VISIT_FIRED);
+			if (zone.regraze_after_exit) {
+				st &= (uint16_t)~GRAZE_RINGS_MASK;
+			}
+			was_inside = false;
+		}
+	}
+	// Not inside (or the visit just ended silently) and nothing touched.
+	if (!(swept <= ring_r2[0]) && !was_inside) {
+		graze_state[at] = st;
+		graze_anchor[at] = anchor;
+		return;
+	}
+	// Rings are sorted largest first: the touched ones are a prefix.
+	int touched = 0;
+	while (touched < zone.ring_count && swept <= ring_r2[touched]) {
+		++touched;
+	}
+	if (touched > 0) {
+		const int deepest_slot = touched - 1;
+		if (!was_inside) {
+			// A new visit starts, anchored to the target it touched.
+			st &= (uint16_t)~(GRAZE_DEEPEST_MASK | GRAZE_VISIT_FIRED);
+			st |= (uint16_t)(zone.ring_index[deepest_slot] << GRAZE_DEEPEST_SHIFT);
+			anchor = tg.slots[swept_target];
+		} else {
+			// A ring dropped mid-visit (ring_count lowered) never wins.
+			const int current = (st & GRAZE_DEEPEST_MASK) >> GRAZE_DEEPEST_SHIFT;
+			const int current_slot = current < zone.ring_count ? (int)zone.ring_slot[current] : -1;
+			if (deepest_slot > current_slot) {
+				st = (uint16_t)((st & ~GRAZE_DEEPEST_MASK) | (zone.ring_index[deepest_slot] << GRAZE_DEEPEST_SHIFT));
+			}
+		}
+		for (int s = 0; s < touched; ++s) {
+			const uint16_t bit = (uint16_t)(1u << zone.ring_index[s]);
+			if ((st & bit) != 0) {
+				continue;
+			}
+			st = (uint16_t)(st | bit | GRAZE_VISIT_FIRED);
+			anchor = tg.slots[swept_target];
+			GrazeEvent2D ev;
+			ev.bullet_index = bullet_index;
+			ev.epoch = collision_epoch_for_bullet(bullet_index);
+			ev.target_id = tg.slot_ids[anchor];
+			ev.generation = graze_generation;
+			ev.zone = (uint8_t)z;
+			ev.ring = zone.ring_index[s];
+			graze_events.push_back(ev);
+		}
+	}
+	if (end <= ring_r2[0]) {
+		st |= GRAZE_INSIDE;
+	} else if (was_inside || touched > 0) {
+		// The visit ends with the bullet alive and outside: the exit
+		// names the target the visit belongs to.
+		if ((st & GRAZE_VISIT_FIRED) != 0) {
+			GrazeEvent2D ev;
+			ev.bullet_index = bullet_index;
+			ev.epoch = collision_epoch_for_bullet(bullet_index);
+			ev.target_id = anchor < tg.slot_count ? tg.slot_ids[anchor] : 0;
+			ev.generation = graze_generation;
+			ev.zone = (uint8_t)z;
+			ev.ring = (uint8_t)((st & GRAZE_DEEPEST_MASK) >> GRAZE_DEEPEST_SHIFT);
+			ev.exit = true;
+			graze_events.push_back(ev);
+		}
+		st &= (uint16_t)~(GRAZE_INSIDE | GRAZE_DEEPEST_MASK | GRAZE_VISIT_FIRED);
+		if (zone.regraze_after_exit) {
+			st &= (uint16_t)~GRAZE_RINGS_MASK;
+		}
+	}
+	graze_state[at] = st;
+	graze_anchor[at] = anchor;
+}
+
+// 9. SPEED for the next tick. Own speed curve > shared curve > plain
+// acceleration. Curves rewrite the speed every tick, so the cumulative
+// bounce boost is re-applied on curve-driven ticks; linear drag then decays
+// the total. Disabled bullets freeze at their disable-time speed (a wake
+// resumes where that bullet left off).
+_ALWAYS_INLINE_ void BulletVolley2D::step_speed(const MoveTick2D &t, BulletStep2D &b) {
+	const int i = b.i;
+	const double delta = t.delta;
+	const bool curve_drives_speed = (b.curves != nullptr && b.curves->movement_speed_curve.is_valid()) || t.shared_speed;
+	if (b.curves != nullptr && b.curves->movement_speed_curve.is_valid()) {
+		bullet_accelerate_speed_using_curve(i, delta, b.curves);
+	} else if (t.shared_speed) {
+		all_cached_speed[i] = t.shared_speed_value;
+		refresh_cached_velocity(i);
+	} else {
+		bullet_accelerate_speed(i, delta);
+	}
+	if (curve_drives_speed && bounce_speed_scaled && i < (int)all_bounce_speed_multiplier.size()) {
+		const real_t bmult = all_bounce_speed_multiplier[i];
+		if (Math::is_finite((double)bmult) && bmult != (real_t)1.0) {
+			all_cached_speed[i] *= bmult;
+			refresh_cached_velocity(i);
+		}
+	}
+	if (linear_drag > 0.0 && Math::is_finite(linear_drag)) {
+		const real_t keep = Math::max((real_t)0.0, (real_t)1.0 - linear_drag * (real_t)delta);
+		all_cached_speed[i] *= keep;
+		refresh_cached_velocity(i);
+	}
+}
+
+// ---- Per-bullet helpers called from move_bullets (inline, this file only) ----
+
+_ALWAYS_INLINE_ void BulletVolley2D::batch_flush_instance_transforms() {
+	if (!multi.is_valid() || amount_bullets != multi->get_instance_count()) {
+		return;
+	}
+	const int stride = buffer_stride;
+	if ((int)all_cached_instance_transforms.size() != amount_bullets || (int)batch_buffer.size() != amount_bullets * stride) {
+		return;
+	}
+	float *w = batch_buffer.ptrw();
+	// Same degenerate-global guard as interpolate_bullet_visuals: never
+	// write a non-finite inverse into the buffer. A node at the identity
+	// needs no conversion at all, and a product that overflows float32 (a
+	// far pose met by a small inverse) falls back to the raw finite pose.
+	const Transform2D node_global = get_global_transform();
+	if (!is_transform_invertible_safe(node_global)) {
+		return;
+	}
+	const bool node_is_identity = node_global.columns[0] == Vector2(1, 0) && node_global.columns[1] == Vector2(0, 1) && node_global.columns[2] == Vector2(0, 0);
+	const Transform2D multimesh_inv = node_is_identity ? Transform2D() : node_global.affine_inverse();
+	for (int i = 0; i < amount_bullets; ++i) {
+		Transform2D t = zero_transform;
+		if (all_bullets_enabled_set.contains(i)) {
+			const Transform2D &cached = all_cached_instance_transforms[i];
+			if (node_is_identity) {
+				t = cached;
+			} else {
+				const Transform2D local = multimesh_inv * cached;
+				t = converted_pose_safe2d(local) ? local : cached;
+			}
+		}
+		write_multimesh_transform2d(w + i * stride, t);
+	}
+
+	multi->set_buffer(batch_buffer);
+}
+
+_ALWAYS_INLINE_ void BulletVolley2D::apply_direction_curve_texture_rotation_if_needed(Vector2 &curr_bullet_direction, Transform2D &curr_bullet_transf, double delta, const BulletCurvesData2D *curves_data) const {
+	bool should_apply = curves_data->rotate_towards_adjusted_direction && !is_rotation_data_active;
+
+	if (!should_apply) {
+		return;
+	}
+
+	// The basis carries the texture rotation (the art's forward offset).
+	real_t target = curr_bullet_direction.angle() + cache_texture_rotation_radians;
+	real_t current = curr_bullet_transf.get_rotation();
+
+	real_t diff = Math::fposmod(target - current + static_cast<real_t>(Math::PI), static_cast<real_t>(Math::TAU)) - static_cast<real_t>(Math::PI);
+	// Math::abs: a negative rotation speed would make Math::clamp's min > max,
+	// collapsing the clamp to a single bound (full-rate rotation, wrong direction).
+	real_t step = Math::abs(curves_data->direction_curve_rotation_speed) * (real_t)delta;
+
+	rotate_transform_locally(curr_bullet_transf, Math::clamp(diff, -step, step));
+}
+
+_ALWAYS_INLINE_ void BulletVolley2D::bullet_accelerate_speed(int bullet_index, double delta) {
+	real_t &curr_bullet_speed = all_cached_speed[bullet_index];
+	real_t curr_max_bullet_speed = all_cached_max_speed[bullet_index];
+
+	real_t acceleration = all_cached_acceleration[bullet_index] * delta;
+	real_t new_speed = curr_bullet_speed + acceleration;
+	// max_speed <= 0 means unlimited (matches max_collision_count = 0 and
+	// the resource default of 0): a default-constructed BulletSpeedData2D
+	// must fly at constant speed, not freeze after one tick.
+	if (curr_max_bullet_speed > 0.0) {
+		new_speed = Math::clamp(new_speed, -curr_max_bullet_speed, curr_max_bullet_speed);
+	}
+	// Unlimited acceleration holds the last finite speed.
+	if (std::isfinite(new_speed)) {
+		curr_bullet_speed = new_speed;
+	}
+
+	refresh_cached_velocity(bullet_index);
+}
+
+_ALWAYS_INLINE_ void BulletVolley2D::bullet_accelerate_speed_using_curve(int bullet_index, double delta, const BulletCurvesData2D *curves_data) {
+	real_t &curr_bullet_speed = all_cached_speed[bullet_index];
+	curr_bullet_speed = get_bullet_curves_movement_speed(curves_data);
+
+	refresh_cached_velocity(bullet_index);
+}
+
+_ALWAYS_INLINE_ void BulletVolley2D::bullet_accelerate_rotation_speed(int bullet_index, double delta) {
+	real_t &curr_bullet_rotation_speed = all_rotation_speed[bullet_index];
+	real_t curr_max_rotation_speed = all_max_rotation_speed[bullet_index];
+
+	// max <= 0 means unlimited (same convention as linear speed).
+	// Otherwise clamp symmetrically to [-max, max]: once the speed is
+	// already outside the band (e.g. seeded by a curve), acceleration in
+	// either direction recovers toward the band instead of freezing.
+	real_t acceleration = all_rotation_acceleration[bullet_index] * delta;
+	real_t new_speed = curr_bullet_rotation_speed + acceleration;
+	if (curr_max_rotation_speed > 0.0) {
+		new_speed = Math::clamp(new_speed, -curr_max_rotation_speed, curr_max_rotation_speed);
+	}
+	if (std::isfinite(new_speed)) {
+		curr_bullet_rotation_speed = new_speed;
+	}
+}
+
+_ALWAYS_INLINE_ void BulletVolley2D::bullet_accelerate_rotation_speed_using_curve(int bullet_index, double delta, const BulletCurvesData2D *curves_data) {
+	real_t &curr_bullet_rotation_speed = all_rotation_speed[bullet_index];
+
+	curr_bullet_rotation_speed = get_bullet_curves_rotation_speed(curves_data);
+}
+
+_ALWAYS_INLINE_ void BulletVolley2D::move_bullet_attachment(const Vector2 &translate_by, int bullet_index) {
+	if (bullet_index < 0 || bullet_index >= amount_bullets) {
+		return;
+	}
+	if (bullet_index >= (int)attachments.size() || bullet_index >= (int)attachment_stick_relative_to_bullet.size() || bullet_index >= (int)attachment_transforms.size() || bullet_index >= (int)all_cached_instance_transforms.size()) {
+		return;
+	}
+	auto &curr_attachment = attachments[bullet_index];
+
+	if (!curr_attachment) {
+		return;
+	}
+
+	Transform2D new_attachment_transf;
+	if (attachment_stick_relative_to_bullet[bullet_index]) {
+		const Transform2D &bullet_global_transf = all_cached_instance_transforms[bullet_index];
+		new_attachment_transf = calculate_attachment_global_transf(bullet_index, bullet_global_transf);
+	} else {
+		new_attachment_transf = attachment_transforms[bullet_index];
+		new_attachment_transf = new_attachment_transf.translated(translate_by);
+	}
+
+	// Store the new transform as the current one
+	attachment_transforms[bullet_index] = new_attachment_transf;
+
+	// Apply immediately only if not using interpolation (or the factory is
+	// gone: its interpolation pass will never run again).
+	if (bullet_factory == nullptr || !factory_alive() || !bullet_factory->use_physics_interpolation) {
+		curr_attachment->set_global_transform(new_attachment_transf);
+	}
+}
+
+_ALWAYS_INLINE_ bool BulletVolley2D::advance_movement_pattern(const Ref<Curve2D> &curve, bool face_movement_direction, bool repeat_pattern, real_t &distance_traveled, Vector2 &velocity_delta, Vector2 &curr_bullet_direction, Transform2D &curr_bullet_transf, real_t known_len) {
+	const real_t len = (known_len >= 0.001) ? known_len : curve->get_baked_length();
+	// NaN baked length (corrupt Curve2D points) fails the < comparison, so
+	// check finiteness explicitly: without it fmod/sample_baked propagate
+	// NaN into velocity/origin and brick the volley permanently.
+	if (!Math::is_finite(len) || len < 0.001) {
+		return false;
+	}
+	const real_t prev_dist = distance_traveled;
+	const real_t advance_dist = velocity_delta.length();
+	// A step whose length overflows float range (finite components near
+	// 1e19 square past FLT_MAX) holds the pattern where it is, like every
+	// other integrated value: an INF distance would feed fmod NaN into
+	// sample_baked on every later tick.
+	if (!std::isfinite(advance_dist) || !std::isfinite(prev_dist + advance_dist)) {
+		return true;
+	}
+	distance_traveled += advance_dist;
+	// Non-repeating patterns stop exactly at the end: clamp into the
+	// final tile instead of wrapping once past it and snapping back.
+	const real_t clamped_dist = (!repeat_pattern && distance_traveled >= len) ? len : distance_traveled;
+	const real_t s1 = Math::fmod(prev_dist, len);
+	const real_t s2 = Math::fmod(clamped_dist, len);
+	// Lap counts stay in double (truncated like the old int cast): past
+	// 2^63 laps (a tiny tile at an extreme speed) the int64 cast overflowed
+	// and the lap term turned the bullet back.
+	const double l1 = std::trunc((double)(prev_dist / len));
+	const double l2 = std::trunc((double)(clamped_dist / len));
+	// p2 - p1 = (l2 - l1) * disp + sample(s2) - sample(s1): the curve
+	// start cancels, and the lap displacement only matters on the tick a
+	// lap boundary is crossed. Two sample_baked calls per bullet per tick
+	// instead of four.
+	Vector2 local_delta = curve->sample_baked(s2) - curve->sample_baked(s1);
+	if (l2 != l1) {
+		const Vector2 disp = curve->sample_baked(len * 0.9999) - curve->sample_baked(0.0);
+		local_delta += (real_t)(l2 - l1) * disp;
+	}
+	// Reuse advance_dist (== |velocity_delta|, unchanged since entry) instead
+	// of a second length() sqrt per bullet per tick.
+	if (advance_dist > 0.0001 && local_delta.length_squared() > 0.00000001) {
+		Vector2 pattern_direction = local_delta.rotated(curr_bullet_direction.angle()).normalized();
+		velocity_delta = pattern_direction * advance_dist;
+	}
+	if (face_movement_direction && velocity_delta.length_squared() > 0.0001) {
+		const Vector2 tangent = velocity_delta.normalized();
+		// Preserve scale like set_bullet_texture_rotation_towards_position does.
+		const Vector2 pattern_scale = curr_bullet_transf.get_scale();
+		// The basis carries the texture rotation (the art's forward offset).
+		curr_bullet_transf.set_rotation_and_scale(tangent.angle() + cache_texture_rotation_radians, pattern_scale);
+	}
+	if (!repeat_pattern && distance_traveled >= len) {
+		if (face_movement_direction) {
+			const Vector2 logical_dir = curr_bullet_direction.normalized();
+			const Vector2 pattern_scale = curr_bullet_transf.get_scale();
+			curr_bullet_transf.set_rotation_and_scale(logical_dir.angle() + cache_texture_rotation_radians, pattern_scale);
+		}
+		return false;
+	}
+	return true;
+}
+
+_ALWAYS_INLINE_ void BulletVolley2D::orbit_stamp_lock(OrbitingData &orbiting_data, const Vector2 &center, const HomingTargetDeque &deque) {
+	orbiting_data.is_locked_orbiting = true;
+	orbiting_data.locked_center = center;
+	orbiting_data.locked_target_type = deque.get_current_target_type();
+	orbiting_data.locked_target_identity = orbit_target_identity(deque);
+}
+
+// The heading a homing bullet must fly so that its GROUND velocity (own
+// heading x speed + drift) points along diff: the drift component across the
+// line of sight is cancelled, the rest of the speed closes in (the crab angle
+// of a missile in a crosswind). A bullet too slow to cancel the drift leans
+// fully against it. No drift, or no own speed: diff itself.
+static _ALWAYS_INLINE_ Vector2 homing_aim_through_drift(const Vector2 &diff, const Vector2 &drift, real_t speed) {
+	if (!(speed > 0.0) || (drift.x == 0.0 && drift.y == 0.0)) {
+		return diff;
+	}
+	const real_t dist = diff.length();
+	if (!(dist > 0.0)) {
+		return diff;
+	}
+	const Vector2 los = diff / dist;
+	const Vector2 own_across = (los * drift.dot(los) - drift) / speed;
+	const real_t across_sq = own_across.length_squared();
+	if (!Math::is_finite(across_sq)) {
+		return diff;
+	}
+	if (across_sq >= 1.0) {
+		return own_across;
+	}
+	return los * Math::sqrt(1.0 - across_sq) + own_across;
+}
+
+_ALWAYS_INLINE_ void BulletVolley2D::update_homing(HomingTargetDeque &homing_deque, int bullet_index, double delta, Vector2 &bullet_pos, Vector2 &target_pos) {
+	if (bullet_index < 0 || bullet_index >= (int)all_cached_instance_origin.size() || bullet_index >= (int)all_cached_direction.size() || bullet_index >= (int)all_cached_instance_transforms.size()) {
+		return;
+	}
+	// The steering deque's front is this bullet's homing (and orbit) target
+	// on EVERY tick: the orbit section and the reached test read target_pos
+	// right after this call, so a zero-delta tick must not leave it holding
+	// the previous bullet's target.
+	target_pos = homing_deque.get_cached_front_target_global_position();
+	if (!Math::is_finite(delta) || delta <= 0.0) {
+		return;
+	}
+	if (!target_pos.is_finite()) {
+		return;
+	}
+
+	bullet_pos = all_cached_instance_origin[bullet_index];
+	Vector2 diff = target_pos - bullet_pos;
+
+	real_t dist_sq = diff.length_squared();
+	if (dist_sq <= 0.0) {
+		return;
+	}
+
+	// Homing gating: delay (straight flight first), duration (escape
+	// window), lose-range (pause while too far). All cheap float
+	// compares; curves_elapsed_time is the volley clock.
+	if (homing_delay_sec > 0.0 && curves_elapsed_time < homing_delay_sec) {
+		return;
+	}
+	if (homing_duration_sec > 0.0 && curves_elapsed_time >= homing_delay_sec + homing_duration_sec) {
+		return;
+	}
+	if (homing_lose_range_px > 0.0 && dist_sq > homing_lose_range_px * homing_lose_range_px) {
+		return;
+	}
+
+	// Steering gains. A zero heading (unseeded ballistics) holds: any
+	// steering below would normalize it into an angle-0 snap.
+	real_t max_turn = homing_smoothing * delta;
+	if (use_per_bullet_homing_smoothing && bullet_index >= 0 && bullet_index < (int)all_bullet_homing_smoothing.size()) {
+		max_turn = all_bullet_homing_smoothing[bullet_index] * delta;
+	}
+	if (max_turn < 0.0) {
+		max_turn = 0.0;
+	}
+
+	Vector2 &current_direction = all_cached_direction[bullet_index];
+	if (current_direction.length_squared() < 0.00000001) {
+		return;
+	}
+
+	auto &curr_transf = all_cached_instance_transforms[bullet_index];
+	// Aim through the inherited drift (the spawner's momentum rides on the
+	// bullet for its whole life): steering the own heading straight at the
+	// target let the drift carry the bullet past it.
+	const real_t own_speed = bullet_index < (int)all_cached_speed.size() ? all_cached_speed[bullet_index] : (real_t)0.0;
+	const Vector2 aim = homing_aim_through_drift(diff, bullet_drift(bullet_index), own_speed);
+	// If rotation is controlled via movement pattern (per-bullet or shared)
+	// or rotation data, just set direction directly toward target
+	if (check_exists_bullet_movement_pattern_data(bullet_index) || shared_movement_pattern_curve.is_valid() || is_rotation_data_active) {
+		current_direction = safe_normalized2d(aim);
+	} else if (!homing_take_control_of_texture_rotation) {
+		// This homing steers through the facing, which it may not touch: it
+		// steers nothing, and must not reset a heading something else set
+		// (a bounce, a flock turn, wobble, a direction setter).
+		return;
+	} else { // Otherwise use smoothing to rotate toward target
+		// The heading may have left the facing (a bounce without texture
+		// rotation or with a smooth visual, a flock turn without face_heading,
+		// angular wobble, a direction setter): turn the facing onto it first,
+		// so homing steers on from the heading instead of undoing it. Aligned
+		// bullets (the usual case) skip this.
+		const Vector2 facing = curr_transf[0].rotated(-cache_texture_rotation_radians);
+		const real_t facing_len_sq = facing.x * facing.x + facing.y * facing.y;
+		if (facing_len_sq > (real_t)0.00000001) {
+			const real_t inv_len = (real_t)1.0 / Math::sqrt(facing_len_sq);
+			const real_t cross = (facing.x * current_direction.y - facing.y * current_direction.x) * inv_len;
+			const real_t dot = (facing.x * current_direction.x + facing.y * current_direction.y) * inv_len;
+			if (dot < (real_t)0.0 || Math::abs(cross) > (real_t)0.0001) {
+				rotate_to_target(bullet_index, current_direction, (real_t)Math::TAU); // full turn, interpolation kept
+			}
+		}
+		// Rotate toward target with smoothing
+		rotate_to_target(bullet_index, aim, max_turn);
+
+		// Logical direction strips the texture rotation used for rendering
+		// (rotate_to_target aims the visual forward; movement must not
+		// inherit that offset or bullets head off-target every tick).
+		current_direction = curr_transf[0].rotated(-cache_texture_rotation_radians).normalized();
+	}
+}
+
+_ALWAYS_INLINE_ void BulletVolley2D::rotate_to_target_preserve_interpolation(int bullet_index, const Vector2 &diff, bool require_homing_flag) {
+	if (bullet_index < 0 || bullet_index >= (int)all_cached_instance_transforms.size() || bullet_index >= (int)all_previous_instance_transf.size()) {
+		return;
+	}
+	const Transform2D prev = all_cached_instance_transforms[bullet_index];
+	rotate_to_target(bullet_index, diff, 0.0, require_homing_flag);
+	all_previous_instance_transf[bullet_index] = prev;
+}
+
+_ALWAYS_INLINE_ void BulletVolley2D::update_rotation(int bullet_index, double delta) {
+	real_t cache_rotation_speed = all_rotation_speed[bullet_index];
+	real_t rot_delta = cache_rotation_speed * (real_t)delta;
+
+	// Skip standing still - rotating by 0 would just add float noise
+	if (cache_rotation_speed != 0.0f) {
+		// max <= 0 means unlimited (same convention as linear speed):
+		// without the gate, max == 0 makes abs(speed) >= 0 always true
+		// and the stop flag freezes default-constructed rotation data.
+		const real_t max_speed = (bullet_index >= 0 && bullet_index < (int)all_max_rotation_speed.size()) ? all_max_rotation_speed[bullet_index] : 0.0;
+		const bool max_reached = max_speed > 0.0 && Math::abs(cache_rotation_speed) >= max_speed;
+
+		if (!(max_reached && stop_rotation_when_max_reached)) {
+			rotate_transform_locally(all_cached_instance_transforms[bullet_index], rot_delta);
+		}
+	}
+}
+
+_ALWAYS_INLINE_ void BulletVolley2D::update_rotation_using_curve(int bullet_index, double delta) {
+	real_t cache_rotation_speed = all_rotation_speed[bullet_index];
+	real_t rot_delta = cache_rotation_speed * (real_t)delta;
+
+	rotate_transform_locally(all_cached_instance_transforms[bullet_index], rot_delta);
+}
+
+_ALWAYS_INLINE_ void BulletVolley2D::try_to_emit_bullet_homing_target_reached_signal(HomingTargetDeque &homing_deque, bool is_using_shared_homing_deque, int bullet_index, const Vector2 &bullet_pos, const Vector2 &target_pos, const Vector2 &post_velocity_delta) {
+	if (homing_deque.empty()) {
+		return;
+	}
+	// Reached check against this tick's whole move: the closest point of the
+	// segment from the pre-move to the predicted post-move position. At high
+	// speed a bullet can fly through the threshold circle within one tick and
+	// end beyond it; testing only the end point missed that (a fast pickup
+	// with a small collect radius never got collected). Component math (the
+	// Vector2 helpers are PLT calls); an overflowing segment falls back to the
+	// end point.
+	const real_t seg_x = post_velocity_delta.x;
+	const real_t seg_y = post_velocity_delta.y;
+	const real_t seg_sq = seg_x * seg_x + seg_y * seg_y;
+	real_t t = 1.0f;
+	if (seg_sq > 0.0f && Math::is_finite(seg_sq)) {
+		t = ((target_pos.x - bullet_pos.x) * seg_x + (target_pos.y - bullet_pos.y) * seg_y) / seg_sq;
+		t = t < 0.0f ? 0.0f : (t > 1.0f ? 1.0f : t);
+	}
+	const real_t closest_dx = bullet_pos.x + seg_x * t - target_pos.x;
+	const real_t closest_dy = bullet_pos.y + seg_y * t - target_pos.y;
+	real_t post_dist_sq = closest_dx * closest_dx + closest_dy * closest_dy;
+	real_t threshold = homing_distance_before_reached;
+	if (homing_reach_counts_bullet_size && bullet_index >= 0 && bullet_index < (int)all_cached_instance_transforms.size()) {
+		// Its edge reaches: the shape's bounding radius times its own scale.
+		const Transform2D &pose = all_cached_instance_transforms[bullet_index];
+		const real_t sx = pose.columns[0].x * pose.columns[0].x + pose.columns[0].y * pose.columns[0].y;
+		const real_t sy = pose.columns[1].x * pose.columns[1].x + pose.columns[1].y * pose.columns[1].y;
+		const real_t size = graze_shape_bound_radius2d(cached_effective_shape_type, cached_circle_radius, cached_rect_size, cached_capsule_height) * Math::sqrt(MAX(sx, sy));
+		if (Math::is_finite(size) && size > (real_t)0.0) {
+			threshold += size;
+		}
+	}
+	real_t threshold_sq = threshold * threshold;
+	if (post_dist_sq <= threshold_sq) { // Fully squared for perf
+
+		HomingTarget &target = homing_deque.front();
+
+		// Decide whether THIS bullet may fire:
+		// - shared deque: per-bullet state keyed on the current front target
+		// - per-bullet deque: the target's own flag (each bullet owns its targets)
+		bool fire_for_this_bullet = false;
+		if (is_using_shared_homing_deque) {
+			if (bullet_index >= 0 && bullet_index < (int)all_shared_homing_reached.size()) {
+				SharedHomingReachedState &state = all_shared_homing_reached[bullet_index];
+				// Compare a stable identity, not the element address: a back-push
+				// that grows the ring deque reallocates it and moves the address.
+				// A node front compares by its id alone (no per-bullet engine
+				// call: the tick trimmed a freed front before the move).
+				const uint64_t front_identity = target.type == Node2DTarget ? target.node2d_target_data.cached_valid_instance_id : orbit_target_identity(homing_deque);
+				fire_for_this_bullet = (state.front_identity != front_identity) || !state.fired;
+				state.front_identity = front_identity;
+				state.fired = true;
+			}
+		} else {
+			fire_for_this_bullet = !target.has_bullet_reached_target;
+			target.has_bullet_reached_target = true;
+		}
+
+		// Ensure that the signal is emitted only ONCE per bullet per target.
+		// No user code may run inside the move loop: record the event and
+		// let dispatch_homing_events() emit it right after the loop.
+		if (fire_for_this_bullet) {
+			HomingReachedEvent ev;
+			ev.bullet_index = bullet_index;
+			ev.epoch = collision_epoch_for_bullet(bullet_index);
+			ev.target_position = target_pos;
+			// A freed Node2D target still emits, with a null target.
+			if (target.type == Node2DTarget && homing_deque.is_homing_target_valid(target.node2d_target_data.target, target.node2d_target_data.cached_valid_instance_id)) {
+				ev.target_instance_id = target.node2d_target_data.cached_valid_instance_id;
+			}
+			ev.front_identity = orbit_target_identity(homing_deque);
+			if (is_using_shared_homing_deque) {
+				if (shared_homing_deque_auto_pop_after_target_reached && !shared_pop_requested) {
+					shared_pop_requested = true;
+					shared_pop_identity = ev.front_identity;
+				}
+			} else {
+				ev.auto_pop = bullet_homing_auto_pop_after_target_reached;
+			}
+			homing_reached_events.push_back(ev);
+		}
+	}
+}
+
+_ALWAYS_INLINE_ bool BulletVolley2D::update_homing_timer(double delta) {
+	homing_update_timer -= delta;
+	if (homing_update_timer <= 0.0) {
+		homing_update_timer = homing_update_interval;
+		return true;
+	}
+	return false;
+}
+
+} // namespace BlastBullets2D

@@ -1,0 +1,230 @@
+extends BlastTest
+## Reject-and-keep contract for every spawn-data resource, discovered from
+## ClassDB so new properties are covered automatically (the spawner has its
+## own suite, spawner/test_spawner_setter_contract.gd). For each class's own
+## stored properties:
+##   - FLOAT: NaN, +INF and -INF;
+##   - VECTOR2 / COLOR: a NaN component;
+##   - INT with an enum hint: ids just outside the hint;
+##   - a range hint (min,max without or_greater / or_less): just outside it;
+## must each push exactly ONE error, worded "<Class>: <property> ...,
+## keeping the old value.", and leave the value unchanged.
+
+const CLASSES := ["BulletVolleyData2D", "BulletSpeedData2D", "BulletRotationData2D", "BulletCurvesData2D", "BulletWobbleData2D", "EffectLayerData2D", "GrazeZone2D", "BulletPickupData2D", "BulletFlock2D", "BulletSoundData2D", "LaserSoundData2D", "LaserSpriteLook2D", "LaserEffectData2D", "BulletSplitStage2D", "BulletSplitData2D", "BulletEmitterData2D", "LaserData2D"]
+const KEEP_TEXT := "keeping the old value."
+
+## Properties whose range hint is an editor slider only (any value is valid).
+const RANGE_IS_A_SLIDER := {
+}
+
+
+func _own_props(cls: String) -> Array:
+	var out: Array = []
+	for p in ClassDB.class_get_property_list(cls, true):
+		var usage := int(p.get("usage", 0))
+		if (usage & PROPERTY_USAGE_STORAGE) == 0:
+			continue
+		if (usage & (PROPERTY_USAGE_GROUP | PROPERTY_USAGE_SUBGROUP | PROPERTY_USAGE_CATEGORY)) != 0:
+			continue
+		out.append(p)
+	return out
+
+
+func _bad_values(p: Dictionary) -> Array:
+	var node_name := str(p["name"])
+	var hint := int(p.get("hint", 0))
+	var hs := str(p.get("hint_string", ""))
+	var out: Array = []
+	match int(p["type"]):
+		TYPE_FLOAT:
+			# +-1e39: finite as a double, INF as a float (real_t math, engine floats)
+			out.append_array([NAN, INF, -INF, 1e39, -1e39])
+		TYPE_VECTOR2:
+			out.append(Vector2(NAN, 0.0))
+		TYPE_COLOR:
+			out.append(Color(NAN, 0.0, 0.0, 1.0))
+	if int(p["type"]) == TYPE_INT and hint == PROPERTY_HINT_ENUM and hs != "":
+		var ids: Array = []
+		var next := 0
+		for opt in hs.split(","):
+			var parts := opt.split(":")
+			var id := int(parts[1]) if parts.size() > 1 else next
+			ids.append(id)
+			next = id + 1
+		out.append(int(ids.max()) + 1)
+		out.append(int(ids.min()) - 1)
+	if hint == PROPERTY_HINT_RANGE and not RANGE_IS_A_SLIDER.has(node_name) and (int(p["type"]) == TYPE_FLOAT or int(p["type"]) == TYPE_INT):
+		var parts := hs.split(",")
+		if parts.size() >= 2:
+			var lo := float(parts[0])
+			var hi := float(parts[1])
+			var span := maxf(absf(hi - lo), 1.0)
+			var step := 1.0 if int(p["type"]) == TYPE_INT else span * 0.25
+			if not hs.contains("or_less"):
+				if int(p["type"]) == TYPE_FLOAT:
+					out.append(lo - step)
+				else:
+					out.append(int(lo) - 1)
+			if not hs.contains("or_greater"):
+				if int(p["type"]) == TYPE_FLOAT:
+					out.append(hi + step)
+				else:
+					out.append(int(hi) + 1)
+	return out
+
+
+func _same(a: Variant, b: Variant) -> bool:
+	if typeof(a) == TYPE_FLOAT and typeof(b) == TYPE_FLOAT:
+		return a == b or (is_nan(a) and is_nan(b))
+	return a == b
+
+
+func test_every_data_setter_rejects_bad_values_loudly_and_keeps_the_old_one() -> void:
+	var problems: Array = []
+	var probed := 0
+	for cls in CLASSES:
+		var obj: Object = ClassDB.instantiate(cls)
+		for p in _own_props(cls):
+			var node_name := str(p["name"])
+			for bad in _bad_values(p):
+				var before: Variant = obj.get(node_name)
+				expect_no_errors("clean before %s.%s" % [cls, node_name])
+				obj.set(node_name, bad)
+				var after: Variant = obj.get(node_name)
+				probed += 1
+				var texts: Array = []
+				for err in get_errors():
+					if not err.handled:
+						err.handled = true
+						texts.append(str(err.code))
+				var label := "%s.%s = %s" % [cls, node_name, bad]
+				if texts.size() != 1:
+					problems.append("%s: expected one error, got %s" % [label, texts])
+				elif not (texts[0] as String).begins_with("%s: %s " % [cls, node_name]) or not (texts[0] as String).ends_with(KEEP_TEXT):
+					problems.append("%s: wording %s" % [label, texts[0]])
+				if not _same(before, after):
+					problems.append("%s: value changed %s -> %s" % [label, before, after])
+	assert_gt(probed, 100, "the sweep reached the data classes (%d probes)" % probed)
+	assert_eq("\n".join(problems), "", "every data setter rejects loudly with the standard wording and keeps the old value")
+
+
+## A different valid value for `p`, or null when none is known (objects,
+## arrays, dictionaries: their own suites cover them).
+func _other_value(p: Dictionary, current: Variant) -> Variant:
+	var hint := int(p.get("hint", 0))
+	var hs := str(p.get("hint_string", ""))
+	match int(p["type"]):
+		TYPE_BOOL:
+			return not current
+		TYPE_INT:
+			if hint == PROPERTY_HINT_ENUM and hs != "":
+				var next := 0
+				for opt in hs.split(","):
+					var parts := opt.split(":")
+					var id := int(parts[1]) if parts.size() > 1 else next
+					next = id + 1
+					if id != int(current):
+						return id
+				return null
+			if hint == PROPERTY_HINT_RANGE:
+				var parts := hs.split(",")
+				if parts.size() >= 2 and int(current) + 1 > int(parts[1]):
+					return int(current) - 1
+			return int(current) + 1
+		TYPE_FLOAT:
+			return float(current) + 0.25
+		TYPE_VECTOR2:
+			return Vector2(current) + Vector2(0.25, 0.25)
+		TYPE_COLOR:
+			return Color(0.5, 0.25, 0.75, 1.0) if Color(current) != Color(0.5, 0.25, 0.75, 1.0) else Color(1, 1, 1, 1)
+	return null
+
+
+var _changed_count := 0
+
+
+func _on_changed() -> void:
+	_changed_count += 1
+
+
+## Every accepted edit of a data resource emits `changed` exactly once (the
+## spawner, the volleys in flight and the editor listen to it); a rejected or
+## same-value edit is skipped by this sweep.
+func test_every_accepted_data_edit_emits_changed_once() -> void:
+	var problems: Array = []
+	var probed := 0
+	for cls in CLASSES:
+		var obj: Resource = ClassDB.instantiate(cls)
+		obj.changed.connect(_on_changed)
+		for p in _own_props(cls):
+			var node_name := str(p["name"])
+			var before: Variant = obj.get(node_name)
+			var value: Variant = _other_value(p, before)
+			if value == null:
+				continue
+			_changed_count = 0
+			obj.set(node_name, value)
+			var rejected := false
+			for err in get_errors():
+				if not err.handled:
+					err.handled = true
+					rejected = true
+			if rejected or _same(obj.get(node_name), before):
+				continue
+			probed += 1
+			if _changed_count != 1:
+				problems.append("%s.%s = %s: changed emitted %d times" % [cls, node_name, value, _changed_count])
+	assert_gt(probed, 100, "the sweep reached the data classes (%d edits)" % probed)
+	assert_eq("\n".join(problems), "", "every accepted edit emits changed once")
+
+
+## Writing a property's current value is not an edit: no `changed` (a spawner
+## would otherwise re-duplicate its spawn data on the next shot, ~85 us).
+## Covers every stored property of every data class, read back from ClassDB.
+## Array and Dictionary values are references a script may have edited in
+## place before handing the same object back: those still count as a change.
+func test_writing_the_current_value_emits_nothing() -> void:
+	var problems: Array = []
+	var probed := 0
+	for cls in CLASSES:
+		var obj: Resource = ClassDB.instantiate(cls)
+		obj.changed.connect(_on_changed)
+		for p in _own_props(cls):
+			var node_name := str(p["name"])
+			var type := int(p["type"])
+			if type == TYPE_ARRAY or type == TYPE_DICTIONARY:
+				continue
+			var value: Variant = _other_value(p, obj.get(node_name))
+			if value != null:
+				obj.set(node_name, value) # a non-default current value where one is valid
+				for err in get_errors():
+					err.handled = true
+			_changed_count = 0
+			obj.set(node_name, obj.get(node_name))
+			probed += 1
+			if _changed_count != 0:
+				problems.append("%s.%s: a same-value write emitted changed %d times" % [cls, node_name, _changed_count])
+	assert_gt(probed, 200, "the sweep reached the data classes (%d writes)" % probed)
+	assert_eq("\n".join(problems), "", "same-value writes emit nothing")
+
+
+func test_an_array_written_back_after_an_in_place_edit_still_counts() -> void:
+	var data := H.make_volley_data(2)
+	watch_signals(data)
+	var transforms: Array = data.transforms
+	transforms.append(Transform2D(0.0, Vector2(99, 0)))
+	data.transforms = transforms # the same Array, edited in place
+	assert_signal_emit_count(data, "changed", 1, "the spawner hears about the new transform")
+
+
+## generate_random_data is bounded by the same developer limit as every other
+## "how many" entry: an absurd count must not resize a TypedArray to billions
+## of Variants (and memnew that many resources).
+func test_random_data_generators_reject_counts_above_the_limit() -> void:
+	var limit := BulletPatterns2D.get_max_bullets_per_pattern()
+	assert_true(BulletSpeedData2D.generate_random_data(limit + 1, 1.0, 2.0, 1.0, 2.0, 0.0, 1.0).is_empty(), "speed generator")
+	expect_error_sequence(["BulletSpeedData2D.generate_random_data: amount_to_generate must be <= %d." % limit])
+	assert_true(BulletRotationData2D.generate_random_data(limit + 1, 1.0, 2.0, 1.0, 2.0, 0.0, 1.0).is_empty(), "rotation generator")
+	expect_error_sequence(["BulletRotationData2D.generate_random_data: amount_to_generate must be <= %d." % limit])
+	assert_true(BulletWobbleData2D.generate_random_data(limit + 1, 10.0, 40.0, 1.0, 4.0).is_empty(), "wobble generator")
+	expect_error_sequence(["BulletWobbleData2D.generate_random_data: amount_to_generate must be <= %d." % limit])

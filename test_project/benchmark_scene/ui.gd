@@ -4,109 +4,103 @@ extends CanvasLayer
 # The default health that the player begins with
 @export var default_player_health:float
 # The player health bar
-@onready var player_health_bar:HealthBarComponent = $AlwaysVisibleView/HealthBar
+@onready var player_health_bar:HealthBarComponent = $Sidebar/List/AlwaysVisibleView/HealthRow/HealthBar
 
 ## Bullet Settings Related
 # Displays all object pool related settings
-@onready var object_pool_settings_view:Control = $ObjectPoolSettingsView
+@onready var object_pool_settings_view:Control = $Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView
 # Displays all bullet related settings
-@onready var bullet_settings_view:Control = $BulletSettingsView
+@onready var bullet_settings_view:Control = $Sidebar/List/Scroll/ViewStack/BulletSettingsView
 # Displays more settings for the bullets
-@onready var more_settings_view:Control = $MoreSettingsView
+@onready var more_settings_view:Control = $Sidebar/List/Scroll/ViewStack/MoreSettingsView
 # Displays settings only related to godot area2ds'
 @onready var godot_area2d_bullets_view:Control = $GodotArea2DBulletsView
 
-@onready var bullet_settings_btn:Button = $AlwaysVisibleView/SettingsUIManagerVBoxContainer/BulletSettingsBtn
-@onready var object_pool_settings_btn:Button = $AlwaysVisibleView/SettingsUIManagerVBoxContainer/ObjectPoolSettingsBtn
-@onready var more_settings_btn:Button = $AlwaysVisibleView/SettingsUIManagerVBoxContainer/MoreSettingsBtn
+@onready var bullet_settings_btn:Button = $Sidebar/List/ViewTabs/BulletSettingsBtn
+@onready var object_pool_settings_btn:Button = $Sidebar/List/ViewTabs/ObjectPoolSettingsBtn
+@onready var more_settings_btn:Button = $Sidebar/List/ViewTabs/MoreSettingsBtn
 
 # Saves the last view the user switched to
-@onready var last_visible_ui_setting_view:Control = $BulletSettingsView
+@onready var last_visible_ui_setting_view:Control = $Sidebar/List/Scroll/ViewStack/BulletSettingsView
 ##
 
 # The label that displays the current fps
-@onready var current_fps_label:Label = $TopRightContainer/CurrentFPS
+@onready var current_fps_label:Label = $StatsPanel/TopRightContainer/CurrentFPS
 # The label that displays the lowest recorded fps
-@onready var low_fps_label:Label = $TopRightContainer/LowFPS
+@onready var low_fps_label:Label = $StatsPanel/TopRightContainer/LowFPS
 # The button responsible for toggling whether the tracking of the fps is enabled
-@onready var track_fps_btn:Button = $TopRightContainer/TrackFPSBtn
+@onready var track_fps_btn:Button = $StatsPanel/TopRightContainer/TrackFPSBtn
 # If you check this checkbox then the monitorable property will be set to true, and all static bodies will now be detected by the bullets
-@onready var enable_monitorable_checkbox:CheckBox = $BulletSettingsView/VBoxContainer3/EnableMonitorableCheckBox
+@onready var enable_monitorable_checkbox:CheckBox = $Sidebar/List/Scroll/ViewStack/BulletSettingsView/EnableMonitorableCheckBox
 # If you check this checkbox then the debugger will be enabled and you will be able to see the movement of the collision shapes of the bullets
-@onready var enable_debugger_checkbox:CheckBox = $BulletSettingsView/VBoxContainer/VBoxContainer/EnableDebuggerCheckBox
+@onready var enable_debugger_checkbox:CheckBox = $Sidebar/List/Scroll/ViewStack/BulletSettingsView/EnableDebuggerCheckBox
 # Whether the rotation of the bullets should be stopped when the max rotation has been reached
-@onready var stop_rotation_when_max_reached_checkbox:CheckBox = $BulletSettingsView/VBoxContainer/VBoxContainer/StopRotationWhenMaxReachedCheckBox
+@onready var stop_rotation_when_max_reached_checkbox:CheckBox = $Sidebar/List/Scroll/ViewStack/BulletSettingsView/StopRotationWhenMaxReachedCheckBox
 
 ## Color Picker
-# Responsible for picking a color for the block bullets debugger
-@onready var block_debugger_color_picker:ColorPicker = $BlockDebuggerColorPicker
-# Responsible for picking a color for the directional bullets debugger
-@onready var directional_debugger_color_picker:ColorPicker = $DirectionalDebuggerColorPicker
-# Responsible for showing/hiding the block debugger color picker
-@onready var show_block_debugger_color_picker_btn:Button = $BulletSettingsView/VBoxContainer/BlockDebuggerVBoxContainer2/ShowBlockDebuggerColorPickerBtn
-# Responsible for showing/hiding the directional debugger color picker
-@onready var show_directional_debugger_color_picker_btn:Button = $BulletSettingsView/VBoxContainer/DirectionalDebuggerVBoxContainer/ShowDirectionalDebuggerColorPickerBtn
+# Responsible for picking a color for the collision-shape debugger
+@onready var debugger_color_picker:ColorPicker = $DebuggerColorPicker
+# Responsible for showing/hiding the debugger color picker
+@onready var show_debugger_color_picker_btn:Button = $Sidebar/List/Scroll/ViewStack/BulletSettingsView/DebuggerVBoxContainerFrame/DebuggerVBoxContainer/Options/ShowDebuggerColorPickerBtn
 # Responsible for closing the currently shown color picker
 @onready var close_color_picker_btn:Button = $CloseCurrentColorPickerBtn
 var last_selected_color_picker:ColorPicker = null
 ##
 
 # If you check this checkbox then the bullets will always keep their texture rotation, no matter the direction they travel in
-@onready var is_texture_rotation_permanent_checkbox:CheckBox = $BulletSettingsView/VBoxContainer3/IsTextureRotationPermanentCheckBox
+@onready var is_texture_rotation_permanent_checkbox:CheckBox = $Sidebar/List/Scroll/ViewStack/BulletSettingsView/IsTextureRotationPermanentCheckBox
 # The view that holds all buttons responsible for setting the amount of bullets the player spawns when shooting
-@onready var select_amount_bullets_view:SelectBtnView = $AlwaysVisibleView/SelectAmountBulletsBtnView
+@onready var select_amount_bullets_view:SelectBtnView = $Helpers/SelectAmountBulletsBtnView
 # The view that holds all buttons responsible for setting the amount of multimeshes to be freed / object pool settings related
-@onready var select_amount_multi_meshes_view:SelectBtnView = $ObjectPoolSettingsView/SelectAmountMultiMeshesBtnView
+@onready var select_amount_multi_meshes_view:SelectBtnView = $Helpers/SelectAmountMultiMeshesBtnView
 # Whether the physics shapes get rotated when rotation data is provided
-@onready var rotate_physics_shapes_checkbox:CheckBox = $BulletSettingsView/VBoxContainer/VBoxContainer/RotatePhysicsShapesCheckBox
+@onready var rotate_physics_shapes_checkbox:CheckBox = $Sidebar/List/Scroll/ViewStack/BulletSettingsView/RotatePhysicsShapesCheckBox
 # Will adjust the direction of the bullets based on their rotation data if they have any
-@onready var adjust_direction_based_on_rotation_checkbox:CheckBox = $BulletSettingsView/VBoxContainer/VBoxContainer/AdjustDirectionBasedOnRotationCheckBox
+@onready var adjust_direction_based_on_rotation_checkbox:CheckBox = $Sidebar/List/Scroll/ViewStack/BulletSettingsView/AdjustDirectionBasedOnRotationCheckBox
 
 ## Bullet On Bullet Collision
-@onready var dont_collide_btn:Button = $BulletSettingsView/BulletCollisionVboxContainer/DontCollideBtn
-@onready var destroy_player_bullets_btn:Button = $BulletSettingsView/BulletCollisionVboxContainer/DestroyPlayerBulletsBtn
-@onready var destroy_enemy_bullets_btn:Button = $BulletSettingsView/BulletCollisionVboxContainer/DestroyEnemyBulletsBtn
-@onready var destroy_both_btn:Button = $BulletSettingsView/BulletCollisionVboxContainer/DestroyBothBtn
+@onready var dont_collide_btn:Button = $Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletCollisionVboxContainerFrame/BulletCollisionVboxContainer/Options/DontCollideBtn
+@onready var destroy_player_bullets_btn:Button = $Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletCollisionVboxContainerFrame/BulletCollisionVboxContainer/Options/DestroyPlayerBulletsBtn
+@onready var destroy_enemy_bullets_btn:Button = $Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletCollisionVboxContainerFrame/BulletCollisionVboxContainer/Options/DestroyEnemyBulletsBtn
+@onready var destroy_both_btn:Button = $Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletCollisionVboxContainerFrame/BulletCollisionVboxContainer/Options/DestroyBothBtn
 ##
 
 ## Bullet Type
 # Button responsible for switching the type of bullets that are being spawned
-@onready var directional_bullets_btn:Button = $AlwaysVisibleView/BulletTypeContainer/DirectionalBtn
+@onready var volley_btn:Button = $Sidebar/List/AlwaysVisibleView/BulletTypeContainerFrame/BulletTypeContainer/Options/VolleyBtn
 # Button responsible for switching the type of bullets that are being spawned
-@onready var block_bullets_btn:Button = $AlwaysVisibleView/BulletTypeContainer/BlockBulletsBtn
-# Button responsible for switching the type of bullets that are being spawned
-@onready var godot_area2d_bullets_btn:Button = $AlwaysVisibleView/BulletTypeContainer/GodotArea2DBulletsBtn
+@onready var godot_area2d_bullets_btn:Button = $Sidebar/List/AlwaysVisibleView/BulletTypeContainerFrame/BulletTypeContainer/Options/GodotArea2DBulletsBtn
 ##
 
 # Switch buttons
-@onready var switch_bullet_texture_btn:SwitchButton = $BulletSettingsView/VBoxContainer5/SwitchBulletTextureBtn
-@onready var switch_attachment_scene_btn:SwitchButton = $BulletSettingsView/VBoxContainer5/SwitchAttachmentBtn
-@onready var generate_speed_btn:SwitchButton = $BulletSettingsView/VBoxContainer4/GenerateSpeedBtn
-@onready var generate_rotation_btn:SwitchButton = $BulletSettingsView/VBoxContainer4/GenerateRotationBtn
-@onready var switch_material_btn:SwitchButton = $BulletSettingsView/VBoxContainer5/SwitchMaterialBtn
+@onready var switch_bullet_texture_btn:SwitchButton = $Sidebar/List/Scroll/ViewStack/BulletSettingsView/VBoxContainer5Frame/VBoxContainer5/Options/SwitchBulletTextureBtn
+@onready var switch_attachment_scene_btn:SwitchButton = $Sidebar/List/Scroll/ViewStack/BulletSettingsView/VBoxContainer5Frame/VBoxContainer5/Options/SwitchAttachmentBtn
+@onready var generate_speed_btn:SwitchButton = $Sidebar/List/Scroll/ViewStack/BulletSettingsView/VBoxContainer5Frame/VBoxContainer5/Options/GenerateSpeedBtn
+@onready var generate_rotation_btn:SwitchButton = $Sidebar/List/Scroll/ViewStack/BulletSettingsView/VBoxContainer5Frame/VBoxContainer5/Options/GenerateRotationBtn
+@onready var switch_material_btn:SwitchButton = $Sidebar/List/Scroll/ViewStack/BulletSettingsView/VBoxContainer5Frame/VBoxContainer5/Options/SwitchMaterialBtn
 
 # Note when refactoring this button has dependencies in other scripts
-@onready var disable_or_enable_factory_btn:SwitchButton = $BulletSettingsView/VBoxContainer2/DisableOrEnableFactoryBtn
+@onready var disable_or_enable_factory_btn:SwitchButton = $Sidebar/List/Scroll/ViewStack/BulletSettingsView/VBoxContainer5Frame/VBoxContainer5/Options/DisableOrEnableFactoryBtn
 #
 
 # Attachment pooling related
-@onready var switch_bullet_attachment_id_btn:SwitchButton = $ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer/SwitchBulletAttachmentIdBtn
-@onready var select_amount_attachments_btn_view:SelectBtnView =$ObjectPoolSettingsView/AttachmentPoolRelated/SelectAmountAttachmentsBtnView
+@onready var switch_bullet_attachment_id_btn:SwitchButton = $Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/VBoxContainerFrame/VBoxContainer/Options/SwitchBulletAttachmentIdBtn
+@onready var select_amount_attachments_btn_view:SelectBtnView =$Helpers/SelectAmountAttachmentsBtnView
 #
 
 # Change UI Settings View
-@onready var change_settings_ui_select_btn_view:SelectBtnView = $AlwaysVisibleView/ChangeSettingsUISelectBtnView
+@onready var change_settings_ui_select_btn_view:SelectBtnView = $Helpers/ChangeSettingsUISelectBtnView
 #
 
 ## More Settings
 # Responsible for setting physics interpolation ON/OFF (both the engine setting and the BulletFactory2D setting)
-@onready var physics_interpolation_check_box:CheckBox = $MoreSettingsView/VBoxContainer3/HBoxContainer/PhysicsInterpolationCheckBox
+@onready var physics_interpolation_check_box:CheckBox = $Sidebar/List/Scroll/ViewStack/MoreSettingsView/PhysicsInterpolationCheckBox
 # Responsible for setting VSync ON/OFF
-@onready var enable_v_sync_check_box:CheckBox = $MoreSettingsView/VBoxContainer3/HBoxContainer/VSyncCheckBox
+@onready var enable_v_sync_check_box:CheckBox = $Sidebar/List/Scroll/ViewStack/MoreSettingsView/VSyncCheckBox
 # Responsible for setting whether the grid should rotate with the marker
-@onready var rotate_grid_with_marker_check_box:CheckBox = $MoreSettingsView/VBoxContainer2/RotateGridWithMarkerCheckBox
+@onready var rotate_grid_with_marker_check_box:CheckBox = $Sidebar/List/Scroll/ViewStack/MoreSettingsView/RotateGridWithMarkerCheckBox
 # Responsible for setting random local rotation when spawning bullets
-@onready var random_local_rotation_check_box:CheckBox = $MoreSettingsView/VBoxContainer2/RandomLocalRotationCheckBox
+@onready var random_local_rotation_check_box:CheckBox = $Sidebar/List/Scroll/ViewStack/MoreSettingsView/RandomLocalRotationCheckBox
 ##
 
 # Emitted when the selected z-index changes
@@ -192,12 +186,10 @@ func set_color_picker_visible(chosen_color_picker:ColorPicker, should_be_visible
 		return
 	
 	# Reset visibility
-	directional_debugger_color_picker.visible = false
-	block_debugger_color_picker.visible = false
+	debugger_color_picker.visible = false
 	
 	# Disable/enable show buttons based on whether the chosen color picker should be visible or not
-	show_directional_debugger_color_picker_btn.disabled = should_be_visible
-	show_block_debugger_color_picker_btn.disabled = should_be_visible
+	show_debugger_color_picker_btn.disabled = should_be_visible
 	
 	# Change visibility of the chosen one
 	chosen_color_picker.visible = should_be_visible
@@ -206,36 +198,20 @@ func set_color_picker_visible(chosen_color_picker:ColorPicker, should_be_visible
 	close_color_picker_btn.visible = should_be_visible
 	
 	
-func _on_show_directional_debugger_color_picker_btn_pressed() -> void:
-	set_color_picker_visible(directional_debugger_color_picker, true)
-	last_selected_color_picker = directional_debugger_color_picker
+func _on_show_debugger_color_picker_btn_pressed() -> void:
+	set_color_picker_visible(debugger_color_picker, true)
+	last_selected_color_picker = debugger_color_picker
 
-func _on_show_block_debugger_color_picker_btn_pressed() -> void:
-	set_color_picker_visible(block_debugger_color_picker, true)
-	last_selected_color_picker = block_debugger_color_picker
-
-func change_directional_debugger_btn_color(color:Color)->void:
-	var stylebox:StyleBoxFlat = show_directional_debugger_color_picker_btn.get_theme_stylebox("normal")
+func change_debugger_btn_color(color:Color)->void:
+	var stylebox:StyleBoxFlat = show_debugger_color_picker_btn.get_theme_stylebox("normal")
 	stylebox.bg_color = color
 	
-	show_directional_debugger_color_picker_btn.add_theme_stylebox_override("disabled", stylebox)
+	show_debugger_color_picker_btn.add_theme_stylebox_override("disabled", stylebox)
 	
 
-func change_block_debugger_btn_color(color:Color)->void:
-	var stylebox:StyleBoxFlat = show_block_debugger_color_picker_btn.get_theme_stylebox("normal")
-	stylebox.bg_color = color
-	
-	show_block_debugger_color_picker_btn.add_theme_stylebox_override("disabled", stylebox)
-	
-
-
-func _on_block_debugger_color_picker_color_changed(color: Color) -> void:
-	change_block_debugger_btn_color(color)
-	BENCHMARK_GLOBALS.FACTORY.block_bullets_debugger_color = color
-
-func _on_directional_debugger_color_picker_color_changed(color: Color) -> void:
-	change_directional_debugger_btn_color(color)
-	BENCHMARK_GLOBALS.FACTORY.directional_bullets_debugger_color = color
+func _on_debugger_color_picker_color_changed(color: Color) -> void:
+	change_debugger_btn_color(color)
+	BENCHMARK_GLOBALS.FACTORY.debugger_color = color
 
 func _on_enable_monitorable_check_box_pressed() -> void:
 	BENCHMARK_GLOBALS.PLAYER_DATA_NODE.set_monitorable_enabled(enable_monitorable_checkbox.button_pressed)
@@ -256,34 +232,39 @@ func _on_select_fire_timer_btn_view_new_btn_selected(new_selected_btn: Button) -
 
 ## Freeing object pool logic
 
-func _on_free_multi_mesh_directional_pool_btn_pressed() -> void:
-	var amount_bullets:int = select_amount_bullets_view.get_selected_btn.text.to_int()
-	
-	BENCHMARK_GLOBALS.FACTORY.free_bullets_pool(BulletFactory2D.DIRECTIONAL_BULLETS, amount_bullets)
+static func _effective_shape_type(shape: Shape2D) -> int:
+	if shape is RectangleShape2D:
+		return PhysicsServer2D.SHAPE_RECTANGLE
+	if shape is CapsuleShape2D:
+		return PhysicsServer2D.SHAPE_CAPSULE
+	return PhysicsServer2D.SHAPE_CIRCLE
 
-func _on_free_multi_mesh_block_bullets_pool_btn_pressed() -> void:
+func _on_free_volley_pool_btn_pressed() -> void:
 	var amount_bullets:int = select_amount_bullets_view.get_selected_btn.text.to_int()
-	
-	BENCHMARK_GLOBALS.FACTORY.free_bullets_pool(BulletFactory2D.BLOCK_BULLETS, amount_bullets)
+	var shape_type:int = _effective_shape_type(BENCHMARK_GLOBALS.PLAYER_DATA_NODE.volley_data.collision_shape)
+
+	BENCHMARK_GLOBALS.FACTORY.free_bullets_pool(VolleyPoolKey2D.make(amount_bullets, shape_type))
 
 func _on_free_all_bullet_pools_btn_pressed() -> void:
-	BENCHMARK_GLOBALS.FACTORY.free_bullets_pool(BulletFactory2D.DIRECTIONAL_BULLETS)
-	BENCHMARK_GLOBALS.FACTORY.free_bullets_pool(BulletFactory2D.BLOCK_BULLETS)
+	BENCHMARK_GLOBALS.FACTORY.free_bullets_pool()
 
 ##
 
 ## Populate object pool logic
 
-func _on_populate_multi_mesh_directional_pool_btn_pressed() -> void:
+func _on_populate_volley_pool_btn_pressed() -> void:
 	var amount_multi_meshes:int = select_amount_multi_meshes_view.get_selected_btn.text.to_int()
-	
-	BENCHMARK_GLOBALS.FACTORY.populate_bullets_pool(BENCHMARK_GLOBALS.PLAYER_DATA_NODE.directional_bullets_data, amount_multi_meshes)
-	
+	# Warm the bucket the player's next shot uses (the selected bullet amount),
+	# not the size of the last shot the data happened to carry.
+	var player_data:PlayerData = BENCHMARK_GLOBALS.PLAYER_DATA_NODE
+	var data:BulletVolleyData2D = player_data.volley_data.duplicate()
+	var transforms:Array[Transform2D] = []
+	transforms.resize(player_data.bullets_amount)
+	transforms.fill(Transform2D())
+	data.transforms = transforms
+	var pool_key:VolleyPoolKey2D = VolleyPoolKey2D.make(player_data.bullets_amount, _effective_shape_type(data.collision_shape))
 
-func _on_populate_multi_mesh_block_pool_btn_pressed() -> void:
-	var amount_multi_meshes:int = select_amount_multi_meshes_view.get_selected_btn.text.to_int()
-	
-	BENCHMARK_GLOBALS.FACTORY.populate_bullets_pool(BENCHMARK_GLOBALS.PLAYER_DATA_NODE.block_bullets_data,amount_multi_meshes)
+	BENCHMARK_GLOBALS.FACTORY.populate_bullets_pool(pool_key, data, amount_multi_meshes)
 	
 
 func _on_select_bullet_damage_view_new_btn_selected(new_selected_btn: Button) -> void:
@@ -329,12 +310,8 @@ func _on_select_bullet_collision_view_new_btn_selected(new_selected_btn: Button)
 
 func _on_select_bullet_type_view_new_btn_selected(new_selected_btn: Button) -> void:
 	match new_selected_btn:
-		directional_bullets_btn:
-			BENCHMARK_GLOBALS.BULLET_TYPE_TO_SPAWN = BENCHMARK_GLOBALS.BulletType.MultiMeshDirectional
-			
-			set_blast_bullets2d_ui_settings_visible(last_visible_ui_setting_view)
-		block_bullets_btn:
-			BENCHMARK_GLOBALS.BULLET_TYPE_TO_SPAWN = BENCHMARK_GLOBALS.BulletType.MultiMeshBlock
+		volley_btn:
+			BENCHMARK_GLOBALS.BULLET_TYPE_TO_SPAWN = BENCHMARK_GLOBALS.BulletType.BulletVolley
 			
 			set_blast_bullets2d_ui_settings_visible(last_visible_ui_setting_view)
 		godot_area2d_bullets_btn:
@@ -425,17 +402,17 @@ func _on_free_active_bullets_btn_pressed() -> void:
 		child.queue_free()
 
 func _on_free_specific_attachment_pool_btn_pressed() -> void:
-	var attachment_id:int = switch_bullet_attachment_id_btn.current_selected_option_index+1 # because id 1 is the first attachment and id 2 is the second attachment but ordering of the options starts from 0 so all indexes are behind with -1
-	BENCHMARK_GLOBALS.FACTORY.free_attachments_pool(attachment_id)
+	var attachment_index:int = switch_bullet_attachment_id_btn.current_selected_option_index+1 # because index 1 is the first attachment and index 2 is the second attachment but ordering of the options starts from 0 so all indexes are behind with -1
+	BENCHMARK_GLOBALS.FACTORY.free_attachments_pool_for_scene(BENCHMARK_GLOBALS.ATTACHMENT_SCENES[attachment_index])
 
 func _on_free_all_attachment_pools_btn_pressed() -> void:
-	BENCHMARK_GLOBALS.FACTORY.free_attachments_pool(-1)
+	BENCHMARK_GLOBALS.FACTORY.free_attachments_pool()
 
 func _on_populate_attachments_pool_btn_pressed() -> void:
-	var attachment_id:int = switch_bullet_attachment_id_btn.current_selected_option_index+1 # because id 1 is the first attachment and id 2 is the second attachment but ordering of the options starts from 0 so all indexes are behind with -1
+	var attachment_index:int = switch_bullet_attachment_id_btn.current_selected_option_index+1 # because index 1 is the first attachment and index 2 is the second attachment but ordering of the options starts from 0 so all indexes are behind with -1
 	var amount_attachments_to_pool:int = select_amount_attachments_btn_view.get_selected_btn.text.to_int()
-	
-	BENCHMARK_GLOBALS.FACTORY.populate_attachments_pool(BENCHMARK_GLOBALS.ATTACHMENT_SCENES[attachment_id], attachment_id, amount_attachments_to_pool)
+
+	BENCHMARK_GLOBALS.FACTORY.populate_attachments_pool(BENCHMARK_GLOBALS.ATTACHMENT_SCENES[attachment_index], amount_attachments_to_pool)
 	
 
 func _on_rotate_physics_shapes_check_box_pressed() -> void:
@@ -496,11 +473,11 @@ func _on_physics_interpolation_check_box_pressed() -> void:
 	if physics_interpolation_check_box.button_pressed:
 		get_tree().physics_interpolation = true # This is the engine's own implementation
 		Engine.physics_jitter_fix = 0
-		BENCHMARK_GLOBALS.FACTORY.set_use_physics_interpolation_runtime(true) # This is for the bullets
+		BENCHMARK_GLOBALS.FACTORY.physics_interpolation = BulletFactory2D.INTERPOLATION_ON # This is for the bullets
 	else:
 		get_tree().physics_interpolation = false
 		Engine.physics_jitter_fix = 0.5
-		BENCHMARK_GLOBALS.FACTORY.set_use_physics_interpolation_runtime(false)
+		BENCHMARK_GLOBALS.FACTORY.physics_interpolation = BulletFactory2D.INTERPOLATION_OFF
 
 
 func _on_v_sync_check_box_pressed() -> void:
@@ -516,14 +493,14 @@ func _on_select_rows_per_column_btn_view_new_btn_selected(new_selected_btn: Butt
 
 
 func _on_select_grid_alignment_btn_view_new_btn_selected(new_selected_btn: Button) -> void:
-	var new_alignment:BulletFactory2D.Alignment
+	var new_alignment:BulletPatterns2D.Alignment
 	match new_selected_btn.text:
 		"CenterLeft":
-			new_alignment = BulletFactory2D.Alignment.CENTER_LEFT
+			new_alignment = BulletPatterns2D.Alignment.CENTER_LEFT
 		"Topleft":
-			new_alignment = BulletFactory2D.Alignment.TOP_LEFT
+			new_alignment = BulletPatterns2D.Alignment.TOP_LEFT
 		"BottomLeft":
-			new_alignment = BulletFactory2D.Alignment.BOTTOM_LEFT
+			new_alignment = BulletPatterns2D.Alignment.BOTTOM_LEFT
 			
 	BENCHMARK_GLOBALS.PLAYER_DATA_NODE.set_grid_alignment(new_alignment)
 

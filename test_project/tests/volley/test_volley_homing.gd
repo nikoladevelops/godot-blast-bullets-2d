@@ -1,0 +1,221 @@
+extends BlastTest
+## Homing deques (per-bullet + shared): push/check/clear, target types, real
+## steering convergence, a freed target never crashes, the reached signal
+## fires near the target, gating setters reject bad values, per-bullet
+## smoothing fan.
+
+var target: Node2D
+var _reached: Array = []
+
+
+func _on_reached(_volley, idx: int, _target: Object, _pos: Vector2) -> void:
+	_reached.append(idx)
+
+
+func before_each() -> void:
+	await super()
+	_reached.clear()
+	target = add(Node2D.new())
+	target.position = Vector2(500, 0)
+
+
+func test_deque_push_check_clear() -> void:
+	var v: BulletVolley2D = quick_volley(2, 250.0)
+	v.bullet_homing_push_back_node2d_target(0, target)
+	assert_true(v.bullet_check_has_homing_targets(0), "per-bullet has targets")
+	assert_eq(v.bullet_homing_check_targets_amount(0), 1)
+	assert_false(v.bullet_check_has_homing_targets(1), "sibling empty")
+	v.all_bullets_push_back_homing_target(target)
+	assert_eq(v.bullet_homing_check_targets_amount(1), 1, "all_bullets push fans out")
+	v.shared_homing_deque_push_back_node2d_target(target)
+	assert_true(v.shared_homing_deque_check_has_homing_targets(), "shared deque has targets")
+	assert_eq(v.shared_homing_deque_check_homing_targets_amount(), 1, "shared amount counts pushes")
+	v.bullet_clear_homing_targets(0)
+	assert_false(v.bullet_check_has_homing_targets(0), "per-bullet clear")
+	v.shared_homing_deque_clear_homing_targets()
+	assert_false(v.shared_homing_deque_check_has_homing_targets(), "shared clear")
+
+
+## The ring internals behind the deques: nothing is allocated before the
+## first push (capacity 0), the ring doubles 4 -> 8, pops move the head, and
+## shared and per-bullet queues report independently.
+func test_the_homing_queue_readout_reports_the_ring_internals() -> void:
+	var v: BulletVolley2D = quick_volley(2, 250.0)
+	var empty: Dictionary = v.debug_get_homing_queue_info(0)
+	assert_true(bool(empty.get("valid", false)), "per-bullet queue valid")
+	assert_eq(int(empty.get("size", -1)), 0, "no targets yet")
+	assert_eq(int(empty.get("capacity", -1)), 0, "the ring allocates nothing while empty")
+	assert_true(bool(empty.get("empty", false)), "empty")
+	for i in 5:
+		v.bullet_homing_push_back_global_position_target(0, Vector2(100 + i, 0))
+	var grown: Dictionary = v.debug_get_homing_queue_info(0)
+	assert_eq(int(grown.get("size", 0)), 5, "five targets")
+	assert_eq(int(grown.get("capacity", 0)), 8, "the ring grew 0 -> 4 -> 8")
+	assert_eq(int(grown.get("head", -1)), 0, "head at the first push slot")
+	assert_eq(grown.get("front_position"), Vector2(100, 0), "the cached front position")
+	v.bullet_homing_pop_front_target(0)
+	var popped: Dictionary = v.debug_get_homing_queue_info(0)
+	assert_eq(int(popped.get("size", 0)), 4, "one popped")
+	assert_eq(int(popped.get("head", -1)), 1, "the head moved past the popped slot")
+	assert_eq(popped.get("front_position"), Vector2(101, 0), "the new front")
+	var shared: Dictionary = v.debug_get_homing_queue_info(-1)
+	assert_eq(String(shared.get("queue", "")), "shared", "the shared queue")
+	assert_eq(int(shared.get("size", -1)), 0, "the shared deque stays independent")
+	assert_false(bool(v.debug_get_homing_queue_info(9).get("valid", true)), "OOB invalid")
+
+
+func test_target_types() -> void:
+	var v: BulletVolley2D = quick_volley(2, 250.0)
+	v.bullet_homing_push_back_global_position_target(0, Vector2(400, 100))
+	assert_true(v.bullet_check_has_homing_targets(0), "global position target accepted")
+	v.bullet_homing_push_back_mouse_position_target(1)
+	assert_true(v.bullet_check_has_homing_targets(1), "mouse target accepted")
+	assert_eq(v.bullet_homing_check_current_target_type(1), 3, "mouse target type")
+	v.all_bullets_clear_homing_targets()
+
+
+func test_steering_converges() -> void:
+	var v: BulletVolley2D = quick_volley(2, 250.0)
+	v.set_homing_smoothing(5.0)
+	v.set_homing_take_control_of_texture_rotation(true)
+	v.all_bullets_push_back_homing_target(target)
+	var to_target := func() -> float:
+		return absf(v.get_bullet_direction(0).angle_to((target.global_position - v.get_bullet_transform(0).origin).normalized()))
+	var before: float = to_target.call()
+	await physics(20)
+	assert_lte(to_target.call(), before + 0.05, "direction converged toward the target")
+
+
+func test_freed_target_survives() -> void:
+	var doomed: Node2D = add(Node2D.new())
+	doomed.position = Vector2(300, 300)
+	var w: BulletVolley2D = quick_volley(1, 200.0)
+	w.set_homing_smoothing(5.0)
+	w.set_homing_take_control_of_texture_rotation(true)
+	w.bullet_homing_push_back_node2d_target(0, doomed)
+	doomed.queue_free()
+	await physics(10)
+	assert_true(w.get_bullet_transform(0).is_finite(), "volley alive after the target was freed")
+	assert_false(w.bullet_check_has_homing_targets(0), "freed target trimmed from the queue")
+
+
+func test_reached_signal_and_gating() -> void:
+	var s: BulletVolley2D = quick_volley(1, 400.0)
+	s.set_homing_smoothing(8.0)
+	s.set_homing_take_control_of_texture_rotation(true)
+	s.set_homing_distance_before_reached(30.0)
+	s.bullet_homing_target_reached.connect(_on_reached)
+	s.bullet_homing_push_back_node2d_target(0, target)
+	for i in 120:
+		await physics()
+		if _reached.size() >= 1:
+			break
+	assert_eq(_reached, [0], "reached signal emitted once for bullet 0")
+	s.set_homing_delay_sec(-1.0)
+	expect_error_sequence(["BulletVolley2D.set_homing_delay_sec: value must be finite and >= 0, keeping the old value."])
+	assert_eq(s.get_homing_delay_sec(), 0.0, "negative delay rejected")
+
+
+func test_per_bullet_smoothing_fan() -> void:
+	var f: BulletVolley2D = quick_volley(3, 200.0)
+	f.bullet_set_homing_smoothing(0, 2.0)
+	f.bullet_set_homing_smoothing(1, 4.0)
+	f.bullet_set_homing_smoothing(2, 6.0)
+	assert_almost_eq(f.bullet_get_homing_smoothing(2), 6.0, 0.01, "per-bullet smoothing stored")
+	f.all_bullets_set_homing_smoothing(3.0)
+	assert_almost_eq(f.bullet_get_homing_smoothing(0), 3.0, 0.01, "all_bullets smoothing fans out")
+
+
+func test_homing_reach_can_count_the_bullets_own_size() -> void:
+	# A 4x bullet (circle r4: radius 16) resting 15 px from its target, a
+	# 5 px reach: off, it never reaches; on, its edge reaches (15 <= 5 + 16);
+	# a 1x bullet (radius 4) does not (15 > 5 + 4).
+	var got := {}
+	var made: Array = []
+	for counts in [false, true]:
+		var d := H.make_volley_data(2, 0.0, 60.0)
+		d.transforms = [Transform2D(0.0, Vector2(4, 4), 0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 300))]
+		d.collision_shape = H.make_circle_shape(4.0)
+		d.homing_distance_before_reached = 5.0
+		d.homing_reach_counts_bullet_size = counts
+		var v: BulletVolley2D = factory.spawn_volley(d)
+		var id := v.get_instance_id()
+		v.bullet_homing_target_reached.connect(func(_v, i: int, _t, _p) -> void: got[id * 10 + i] = true)
+		assert_eq(v.homing_reach_counts_bullet_size, counts, "seeded from the data")
+		v.bullet_homing_push_back_global_position_target(0, Vector2(15, 0))
+		v.bullet_homing_push_back_global_position_target(1, Vector2(15, 300))
+		made.append(v)
+	step_factory(2)
+	assert_false(got.has(made[0].get_instance_id() * 10), "off: the center must come within 5 px")
+	assert_true(got.has(made[1].get_instance_id() * 10), "on: the 4x bullet's edge reaches")
+	assert_false(got.has(made[1].get_instance_id() * 10 + 1), "on: a 1x bullet still needs 5 + 4 px")
+
+
+const INERT_HOMING_WARNING := "BulletVolley2D has homing targets but homing_take_control_of_texture_rotation is false (and no movement pattern/rotation data), so homing will not steer bullets. Set it to true."
+
+
+func test_inert_homing_warns_once_per_spawn_data() -> void:
+	var data := H.make_volley_data(2, 100.0, 30.0)
+	data.homing_take_control_of_texture_rotation = false
+	for i in 3: # a spawner firing the same data: one line, not one per volley
+		var v: BulletVolley2D = factory.spawn_volley(data)
+		v.all_bullets_push_back_homing_target(target)
+	await physics(2)
+	expect_warning_sequence([INERT_HOMING_WARNING])
+	var pooled: BulletVolley2D = factory.spawn_volley(data)
+	pooled.all_bullets_push_back_homing_target(target)
+	await physics(2)
+	expect_warning_sequence([], "the same data again: silent")
+	var other_data := H.make_volley_data(2, 100.0, 30.0)
+	other_data.homing_take_control_of_texture_rotation = false
+	var other: BulletVolley2D = factory.spawn_volley(other_data)
+	other.all_bullets_push_back_homing_target(target)
+	await physics(2)
+	expect_warning_sequence([INERT_HOMING_WARNING], "another data resource warns once too")
+	var steering_data := H.make_volley_data(2, 100.0, 30.0)
+	steering_data.homing_take_control_of_texture_rotation = false
+	var steering: BulletVolley2D = factory.spawn_volley(steering_data)
+	steering.set_homing_take_control_of_texture_rotation(true)
+	steering.all_bullets_push_back_homing_target(target)
+	await physics(2)
+	expect_warning_sequence([], "steering homing never warns")
+	for v in factory.get_active_volleys(false):
+		v.all_bullets_clear_homing_targets()
+
+
+## A back-push that grows the shared deque must not re-fire the reached signal
+## for the same front target: the old code compared the element's address, and
+## a reallocation moves it.
+func test_a_shared_deque_growth_does_not_duplicate_the_reached_signal() -> void:
+	var v: BulletVolley2D = factory.spawn_volley(H.make_volley_data(1, 0.0, 60.0))
+	v.set_homing_distance_before_reached(10.0)
+	v.set_shared_homing_deque_auto_pop_after_target_reached(false)
+	var reached: Array = []
+	v.bullet_homing_target_reached.connect(func(_v, i: int, _t, _p) -> void: reached.append(i))
+	v.shared_homing_deque_push_back_global_position_target(Vector2(5, 0)) # the front, in reach
+	for k in 3:
+		v.shared_homing_deque_push_back_global_position_target(Vector2(500 + 100 * k, 0))
+	step_factory(1)
+	assert_eq(reached, [0], "fired once for the front target")
+	v.shared_homing_deque_push_back_global_position_target(Vector2(2000, 0)) # 5th: grows 4 -> 8
+	step_factory(1)
+	assert_eq(reached, [0], "a back-push growth does not re-fire the signal")
+
+
+## A shorter homing_update_interval applies at once: the pending wait never
+## outlasts it, so 0 refreshes the target position from the next tick (it once
+## waited out the previous 60 s interval, steering at a stale spot).
+func test_a_shorter_update_interval_applies_at_once() -> void:
+	var target_node := Node2D.new()
+	target_node.position = Vector2(300, 0)
+	add(target_node)
+	var v: BulletVolley2D = factory.spawn_volley(H.make_volley_data(1, 0.0, 30.0))
+	v.set_homing_smoothing(0.0) # snap: the direction is the direction to the cached target spot
+	v.set_homing_update_interval(60.0)
+	v.bullet_homing_push_back_node2d_target(0, target_node)
+	await physics(2)
+	assert_almost_eq(v.get_bullet_direction(0), Vector2(1, 0), Vector2(0.001, 0.001), "aimed at the first spot")
+	v.set_homing_update_interval(0.0)
+	target_node.position = Vector2(-300, 0)
+	await physics(3)
+	assert_almost_eq(v.get_bullet_direction(0), Vector2(-1, 0), Vector2(0.001, 0.001), "0 refreshes every tick: aimed at the new spot")

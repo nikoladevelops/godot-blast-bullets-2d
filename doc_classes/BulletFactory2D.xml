@@ -4,9 +4,10 @@
 		The heart of the BlastBullets2D plugin. Use this node to spawn bullets.
 	</brief_description>
 	<description>
-		The factory does all the work in spawning bullets and configuring other plugin related options.
-		Keep a reference of your [b]BulletFactory2D[/b] node throughout the lifetime of your game and call the functions you need.
-
+		Owns every bullet and laser of a level: pooling, movement, physics, drawing, sounds and signals. Add [b]one[/b] [BulletFactory2D] to each level scene, anywhere in it (bullets live in world coordinates, so the factory's own position does not matter), and put [BulletSpawner2D] / [LaserSpawner2D] nodes wherever things shoot: a spawner with an empty [member BulletSpawner2D.bullet_factory_path] fires into the first factory of its [World2D] by itself. Player and enemy bullets share the factory; collision layers and masks tell them apart.
+		Add a second factory only for a second world (a [SubViewport] with its own [World2D]); two factories in one world work too, but then name the factory on every spawner.
+		[b]Signals:[/b] connect the hit signals ([signal area_entered], [signal body_entered], [signal laser_hit], ...) here once to handle every bullet of the level: a spawner that has its own handler for a signal keeps those hits instead (never both). Inside a handler the bullet is still alive. Structural calls ([method reset], [code]free_*[/code], [code]populate_*[/code]) are refused inside physics handlers: use their [code]_deferred[/code] twins.
+		[b]From code:[/b] [method spawn_volley] and [method spawn_laser] fire one-off volleys and lasers; [method clear_active_bullets], [method clear_bullets_in_circle] and [method convert_all_bullets_to_pickups] are bombs; [member time_scale] is bullet time.
 		For tutorials and usage examples:
 		[url=https://www.youtube.com/@realnikich]YouTube Channel[/url]
 		[url=https://github.com/nikoladevelops/godot-blast-bullets-2d]Official Repository Of BlastBullets2D[/url]
@@ -19,17 +20,197 @@
 	<tutorials>
 	</tutorials>
 	<methods>
+		<method name="clear_active_bullets">
+			<return type="int" />
+			<param index="0" name="key" type="VolleyPoolKey2D" default="null" />
+			<description>
+				Clears every live bullet with dismissal visuals (and announces each volley that lost bullets with [signal bullets_cleared], positions included, after the factory is no longer busy): runs each active volley's [method BulletVolley2D.clear_all_bullets], so On Clear effect layers fire, and emptied volleys go back to the pool. Returns how many bullets were cleared. Pass [code]null[/code] (default) for every bucket, or a [VolleyPoolKey2D] for one exact bucket. Allowed inside collision and lifetime handlers. Unlike [method free_active_bullets] (silent deletion) and [method reset] (silent teardown), this is the wave-clear path that reads on screen.
+			</description>
+		</method>
+		<method name="clear_active_bullets_deferred">
+			<return type="void" />
+			<param index="0" name="key" type="VolleyPoolKey2D" default="null" />
+			<description>
+				Deferred [method clear_active_bullets]: safe from any callback.
+			</description>
+		</method>
+		<method name="clear_active_lasers">
+			<return type="int" />
+			<param index="0" name="fade" type="bool" default="true" />
+			<description>
+				Ends every firing laser, fading ([param fade]) or at once. Safe from handlers. Returns how many it ended.
+			</description>
+		</method>
+		<method name="clear_bullets_in_circle">
+			<return type="int" />
+			<param index="0" name="center" type="Vector2" />
+			<param index="1" name="radius" type="float" />
+			<param index="2" name="can_hit_mask" type="int" default="0" />
+			<description>
+				Clears every live bullet of every active volley whose centre is inside the circle (global space, edge inclusive), with the same On Clear effects and sounds as [method clear_active_bullets]. Then emits [signal bullets_cleared] once per volley that lost bullets. Allowed from physics handlers (a bomb on a hit); refused while a sweep is running. Returns how many bullets were cleared. [param center] must be finite and [param radius] a finite number 0 or more, else one error is pushed and nothing is cleared.
+				[param can_hit_mask] filters by what the bullets can hit: only volleys whose [member BulletVolleyData2D.collision_mask] shares a bit with it count (0, the default, takes every bullet). Pass the player's collision layer to take only what can hurt the player (a bomb) and leave the player's own shots.
+			</description>
+		</method>
+		<method name="clear_bullets_in_rect">
+			<return type="int" />
+			<param index="0" name="rect" type="Rect2" />
+			<param index="1" name="can_hit_mask" type="int" default="0" />
+			<description>
+				Like [method clear_bullets_in_circle] for a rectangle (global space, all four edges inclusive). A negative size is accepted and means the same rectangle. [param rect] must be finite.
+				[param can_hit_mask] filters by what the bullets can hit: only volleys whose [member BulletVolleyData2D.collision_mask] shares a bit with it count (0, the default, takes every bullet). Pass the player's collision layer to take only what can hurt the player (a bomb) and leave the player's own shots.
+			</description>
+		</method>
+		<method name="clear_sprite_effects">
+			<return type="void" />
+			<description>
+				Stops every active sprite visual. Volley bakes keep their configs (triggers keep working); the manual hatch bakes are dropped entirely.
+			</description>
+		</method>
+		<method name="convert_all_bullets_to_pickups">
+			<return type="Array" />
+			<param index="0" name="pickup" type="BulletPickupData2D" />
+			<param index="1" name="target" type="Variant" />
+			<param index="2" name="can_hit_mask" type="int" default="0" />
+			<description>
+				Turns every live bullet of every active volley on screen, whoever fired it, into pickups (coins, gems, score items) described by [param pickup]. Returns the new pickup volleys, usually one: a call that converts more bullets than [method BulletPatterns2D.get_max_bullets_per_pattern] is split into volleys of at most that size. Converting nothing returns an empty array without an error. Allowed from physics handlers (a bomb, a boss dying); refused while a sweep is running, use [method convert_all_bullets_to_pickups_deferred] there. A conversion started from inside a conversion (for example from the attachment callbacks of the new pickups) is refused with an error instead of converting the same bullets twice. The converted bullets leave their volleys (silently, or with their On Clear effects when [member BulletPickupData2D.fire_clear_effects] is on) and reappear as pickups at the same pose, scaled by [member BulletPickupData2D.scale_multiplier]. Pickups are owned by the factory, follow [member BulletFactory2D.time_scale] and are never converted again. Collecting one emits [signal BulletFactory2D.pickup_collected]. [param target] is where the pickups are pulled: a [Node2D] (followed while it moves), a [Vector2] (a global position), a group name as a String or StringName (each pickup goes to the nearest usable member of that group at the moment of the call), or null (the mouse cursor). Anything else, an empty group, or a node outside the tree pushes one error and converts nothing.
+				[param can_hit_mask] filters by what the bullets can hit: only volleys whose [member BulletVolleyData2D.collision_mask] shares a bit with it count (0, the default, takes every bullet). Pass the player's collision layer to take only what can hurt the player (a bomb) and leave the player's own shots.
+			</description>
+		</method>
+		<method name="convert_all_bullets_to_pickups_deferred">
+			<return type="void" />
+			<param index="0" name="pickup" type="BulletPickupData2D" />
+			<param index="1" name="target" type="Variant" />
+			<param index="2" name="can_hit_mask" type="int" default="0" />
+			<description>
+				Queues [method convert_all_bullets_to_pickups] for the next idle frame, in call order with the other deferred structural calls. Safe from anywhere, including callbacks that run inside a sweep. The result of the queued call is not returned.
+				[param can_hit_mask] filters by what the bullets can hit: only volleys whose [member BulletVolleyData2D.collision_mask] shares a bit with it count (0, the default, takes every bullet). Pass the player's collision layer to take only what can hurt the player (a bomb) and leave the player's own shots.
+			</description>
+		</method>
+		<method name="convert_bullets_in_circle_to_pickups">
+			<return type="Array" />
+			<param index="0" name="center" type="Vector2" />
+			<param index="1" name="radius" type="float" />
+			<param index="2" name="pickup" type="BulletPickupData2D" />
+			<param index="3" name="target" type="Variant" />
+			<param index="4" name="can_hit_mask" type="int" default="0" />
+			<description>
+				Like [method convert_all_bullets_to_pickups], but only the bullets whose centre is inside the circle (global space, edge inclusive). [param center] must be finite and [param radius] a finite number 0 or more, otherwise one error is pushed and nothing is converted.
+				[param can_hit_mask] filters by what the bullets can hit: only volleys whose [member BulletVolleyData2D.collision_mask] shares a bit with it count (0, the default, takes every bullet). Pass the player's collision layer to take only what can hurt the player (a bomb) and leave the player's own shots.
+			</description>
+		</method>
+		<method name="convert_bullets_in_rect_to_pickups">
+			<return type="Array" />
+			<param index="0" name="rect" type="Rect2" />
+			<param index="1" name="pickup" type="BulletPickupData2D" />
+			<param index="2" name="target" type="Variant" />
+			<param index="3" name="can_hit_mask" type="int" default="0" />
+			<description>
+				Like [method convert_all_bullets_to_pickups], but only the bullets whose centre is inside the rectangle (global space, edges inclusive, a negative size is the same rectangle). [param rect] must be finite.
+				[param can_hit_mask] filters by what the bullets can hit: only volleys whose [member BulletVolleyData2D.collision_mask] shares a bit with it count (0, the default, takes every bullet). Pass the player's collision layer to take only what can hurt the player (a bomb) and leave the player's own shots.
+			</description>
+		</method>
+		<method name="count_bullets_in_circle" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="center" type="Vector2" />
+			<param index="1" name="radius" type="float" />
+			<param index="2" name="can_hit_mask" type="int" default="0" />
+			<description>
+				How many live bullets, across every active volley, have their centre inside the circle (edge inclusive). Bullet size is not counted. Use it for danger meters and proximity checks. Bad input pushes one error and returns 0.
+				[param can_hit_mask] filters by what the bullets can hit: only volleys whose [member BulletVolleyData2D.collision_mask] shares a bit with it count (0, the default, takes every bullet). Pass the player's collision layer to take only what can hurt the player (a bomb) and leave the player's own shots.
+			</description>
+		</method>
+		<method name="count_bullets_in_rect" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="rect" type="Rect2" />
+			<param index="1" name="can_hit_mask" type="int" default="0" />
+			<description>
+				Like [method count_bullets_in_circle] for a rectangle. A negative size is accepted. Bad input pushes one error and returns 0.
+				[param can_hit_mask] filters by what the bullets can hit: only volleys whose [member BulletVolleyData2D.collision_mask] shares a bit with it count (0, the default, takes every bullet). Pass the player's collision layer to take only what can hurt the player (a bomb) and leave the player's own shots.
+			</description>
+		</method>
+		<method name="debug_advance_time">
+			<return type="bool" />
+			<param index="0" name="delta" type="float" />
+			<description>
+				Debug/test helper: runs one factory physics step with an explicit [param delta] (hitch and zero-delta audits; the engine loop always steps at the physics rate). Returns [code]false[/code] and advances nothing while the factory is paused. A non-finite or negative delta, a call from inside a running tick, and a factory that is not in the tree or is being freed are refused with an error.
+			</description>
+		</method>
+		<method name="debug_assert_no_dangling">
+			<return type="Dictionary" />
+			<description>
+				Structural consistency check: {ok, error, volleys_total}. Verifies vec/pool/sparse-set agreement (no nulls, sparse ids match indexes, active ids live). Never mutates. For crash-suite invariants after every destructive section.
+			</description>
+		</method>
+		<method name="debug_check_interpolation_status">
+			<return type="Dictionary" />
+			<description>
+				Interpolation agreement check: factory_enabled, project_enabled_2d (Godot's live [member SceneTree.physics_interpolation], which starts from ProjectSettings physics/common/physics_interpolation and may be changed at runtime), mismatch, hint. Enable both the factory flag and Godot's interpolation for smooth high-refresh bullets.
+			</description>
+		</method>
+		<method name="debug_clear_bullet_event_log">
+			<return type="void" />
+			<description>
+				Test helper: empties the bullet event log ([method debug_get_bullet_event_log]) and keeps it enabled.
+			</description>
+		</method>
+		<method name="debug_clear_effect_log">
+			<return type="void" />
+			<description>
+				Debug/test helper: empties the effect log (recording stays on).
+			</description>
+		</method>
+		<method name="debug_clear_sound_log">
+			<return type="void" />
+			<description>
+				Debug/test helper: empties the sound log (recording stays on).
+			</description>
+		</method>
+		<method name="debug_clear_sound_offer_log">
+			<return type="void" />
+			<description>
+				Test helper: empties the sound offer log ([method debug_get_sound_offer_log]) and keeps it enabled.
+			</description>
+		</method>
+		<method name="debug_expected_pool_key" qualifiers="static">
+			<return type="VolleyPoolKey2D" />
+			<param index="0" name="spawn_data" type="BulletVolleyData2D" />
+			<description>
+				Derives the exact pool bucket a spawn would use without spawning. Returns null on empty data.
+			</description>
+		</method>
+		<method name="debug_explain_sound">
+			<return type="Dictionary" />
+			<param index="0" name="sound" type="Resource" />
+			<param index="1" name="global_position" type="Vector2" />
+			<param index="2" name="listener_group" type="StringName" default="&amp;&quot;&quot;" />
+			<param index="3" name="volley_amount" type="int" default="1" />
+			<description>
+				Diagnosis for one entry (a [BulletSoundData2D] or a [LaserSoundData2D]) at one pose: which gate would drop the play, with the measured numbers. Returns {audible, blocked_by (none/paused/disabled/streamless/chance_zero/amount_gate/distance/camera_view), distance, effective_max_distance, zoom, camera (pinned/viewport/none), in_camera_view, interval_open, trigger_chance, chance (always/never/rolling), listener, occluded, volume_base (deterministic mix without the random rolls), volley_amount}. Read-only except reusing the resolve paths (a bad camera_path fires its one warning); never queues candidates. When a sound stays silent, ask here first.
+			</description>
+		</method>
+		<method name="debug_free_like_release" qualifiers="static">
+			<return type="void" />
+			<param index="0" name="object" type="Variant" />
+			<description>
+				Test helper: deletes [param object] the way an exported release game frees it. Godot refuses [method Object.free] on an object that is emitting a signal only in debug builds; this skips that check, so tests can prove the plugin survives a handler that frees its emitter in a release build (the plugin then defers the free to the end of the emit).
+			</description>
+		</method>
 		<method name="debug_get_active_attachments_amount">
 			<return type="int" />
 			<description>
 				Get the amount of active [BulletAttachment2D] nodes.
 			</description>
 		</method>
-		<method name="debug_get_active_bullets_amount">
+		<method name="debug_get_active_volleys_amount">
 			<return type="int" />
-			<param index="0" name="bullet_type" type="int" enum="BulletFactory2D.BulletType" />
 			<description>
-				Get the amount of active bullet multimeshes of a specific type.
+				Returns how many volleys are active (flying, not pooled and not queued for deletion). Counts volleys, not bullets: see [method get_active_bullet_count] for bullets.
+			</description>
+		</method>
+		<method name="debug_get_attachment_scene_memory_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				How many attachment scenes the pool remembers as validated (their debug labels in [method debug_get_attachments_pool_info]). Scenes loaded from a file stay remembered; in-memory scenes (made with [method PackedScene.pack]) are forgotten once they no longer exist, so packing a fresh scene per shot never grows this without bound.
 			</description>
 		</method>
 		<method name="debug_get_attachments_pool_amount">
@@ -41,21 +222,148 @@
 		<method name="debug_get_attachments_pool_info">
 			<return type="Dictionary" />
 			<description>
-				Get the whole information about the attachment object pool. Returns a [Dictionary] containing [b]attachment_id as the KEY[/b] and [b]amount of attachments with that attachment_id as the VALUE[/b].
+				Get the whole information about the attachment object pool. Returns a [Dictionary] containing the scene path (or [code]"&lt;in-memory&gt;"[/code] for unsaved scenes) as the KEY and the amount of pooled attachments from that scene as the VALUE.
+			</description>
+		</method>
+		<method name="debug_get_bullet_event_log" qualifiers="const">
+			<return type="Array" />
+			<description>
+				Test helper: every bullet state change of every volley since logging was enabled ([method debug_set_bullet_event_log_enabled]), oldest first, as [code]{kind, cause, volley, life, bullet, epoch, frame}[/code]. [code]kind[/code] is [code]"life"[/code] (a new active life enabled every bullet; [code]bullet[/code] holds the bullet count), [code]"wake"[/code] ([method BulletVolley2D.enable_bullet]) or [code]"disable"[/code], with [code]cause[/code] [code]"hit"[/code], [code]"lifetime"[/code], [code]"despawn"[/code], [code]"clear"[/code], [code]"split"[/code], [code]"split_manual"[/code] ([method BulletVolley2D.all_bullets_split]: leaves like a clear), [code]"pickup"[/code] (converted), [code]"collect"[/code] (a pickup collected) or [code]"manual"[/code] (a script's [method BulletVolley2D.disable_bullet]). [code]volley[/code] is the instance id, [code]life[/code] [method BulletVolley2D.get_life_id], [code]epoch[/code] the bullet's wake counter, [code]frame[/code] the physics frame. Read it once per frame: past 65536 entries the oldest are dropped ([method debug_get_bullet_event_log_dropped]).
+			</description>
+		</method>
+		<method name="debug_get_bullet_event_log_dropped" qualifiers="const">
+			<return type="int" />
+			<description>
+				Test helper: how many entries the bullet event log dropped since it was enabled (it keeps the newest 65536).
 			</description>
 		</method>
 		<method name="debug_get_bullets_pool_amount">
 			<return type="int" />
-			<param index="0" name="bullet_type" type="int" enum="BulletFactory2D.BulletType" />
 			<description>
-				Get the amount of bullet multimeshes of a specific type currently in the object pool.
+				Returns how many disabled volleys currently wait in the object pool, across every bucket.
 			</description>
 		</method>
 		<method name="debug_get_bullets_pool_info">
 			<return type="Dictionary" />
-			<param index="0" name="bullet_type" type="int" enum="BulletFactory2D.BulletType" />
 			<description>
-				Get the whole information about the bullet multimeshes object pool of a specific type. Returns a [Dictionary] containing [b]amount bullets in the multimesh as the KEY[/b] and the [b]amount of multimeshes that contain exactly that amount as the VALUE[/b].
+				Describes the volley object pool. Returns a [Dictionary] containing [VolleyPoolKey2D] as the KEY (one per exact amount_bullets + shape bucket) and the amount of pooled multimeshes in that bucket as the VALUE.
+			</description>
+		</method>
+		<method name="debug_get_despawn_bounds_preview" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Test helper: the preview layer's state as a Dictionary (active, exists, visible, rect, color, draws).
+			</description>
+		</method>
+		<method name="debug_get_effect_log" qualifiers="const">
+			<return type="Array" />
+			<description>
+				Debug/test helper: the effects recorded since [method debug_set_effect_log_enabled] was turned on, oldest first, one Dictionary per effect: [code]trigger[/code] (EffectLayerData2D trigger), [code]volley[/code] (instance id), [code]life[/code] ([method BulletVolley2D.get_life_id]), [code]bullet[/code] (index), [code]position[/code] and [code]frame[/code] (physics frame). A laser's effects ([member LaserData2D.effects]) log their [enum LaserEffectData2D.LaserEffectTrigger] with [code]volley[/code] 0, [code]bullet[/code] -1 and the extra keys [code]laser[/code] (instance id) and [code]beam[/code].
+			</description>
+		</method>
+		<method name="debug_get_effect_state" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				One-shot manager state: effect clock, bake count, total active slots, manual-bake actives and bake count, container validity, and per-bake volley/layer/active/slots/z/visibility/light/shards_busy/live_slots rows ([code]bakes[/code] for the volleys' bakes, [code]manual[/code] for [method spawn_layer_effect]'s). A live slot row carries its shard, tint and rotation plus the shards those two were written to ([code]tint_shard[/code], [code]rotation_shard[/code]).
+			</description>
+		</method>
+		<method name="debug_get_emitter_stats" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Returns the emitter-bullet queue counters: [code]pending[/code], [code]fired_last[/code] and [code]carried_over_last[/code] (the last sweep), [code]fired_total[/code], [code]recorded_total[/code], [code]dropped_total[/code].
+			</description>
+		</method>
+		<method name="debug_get_factory_state">
+			<return type="Dictionary" />
+			<description>
+				Lifecycle snapshot: is_ready, is_busy, is_iterating, is_tearing_down, processing, volleys_total, volleys_pooled, attachments_pooled.
+			</description>
+		</method>
+		<method name="debug_get_flock_stats" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				The last flock pass: [code]flocks[/code] (distinct flocks), [code]members[/code] (bullets of every flocking volley), [code]grid_members[/code] (live, finite bullets in the grid), [code]neighbor_checks[/code] (flockmates distance-tested), [code]capped_members[/code] (bullets that stopped at [member BulletFlock2D.max_neighbors]), [code]queried_members[/code] (bullets whose steering was recomputed, see [member BulletFlock2D.update_interval]), [code]pass_usec[/code], plus [code]armed_volleys[/code] (volleys holding a flock). The pass runs once per physics tick before any volley moves, and is skipped (zero cost) while no volley flocks.
+			</description>
+		</method>
+		<method name="debug_get_frame_cache_stats" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				The frame cache's counters (textures this factory baked from SpriteFrames frames: [AtlasTexture] regions and [member BulletVolleyData2D.override_frame_color] copies): [code]entries[/code], [code]builds[/code], [code]hits[/code], [code]sheet_reads[/code] (GPU readbacks) and [code]unreadable[/code]. For tests and profiling: a warm shot builds nothing and reads nothing.
+			</description>
+		</method>
+		<method name="debug_get_graze_stats" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Graze counters: refreshes (group scans by the factory's target lists, at most one per group per physics step), events_total (graze events dispatched by every volley), cached_groups (zone groups with a target list), live_detectors (graze target finders alive: the factory's plus one per spawner with its own settings, kept while its bullets fly).
+			</description>
+		</method>
+		<method name="debug_get_graze_targets">
+			<return type="Array" />
+			<param index="0" name="group" type="StringName" />
+			<description>
+				The graze targets of [param group] exactly as the next volley tick of this physics step tests them: an Array of {id, position} (every live [Node2D] member in tree order, in this factory's World2D; no cap).
+			</description>
+		</method>
+		<method name="debug_get_laser_debug_boxes" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Test helper: what the laser overlay of the collision debugger draws: [code]{visible, draws, color, z_index, boxes}[/code], each box [code]{laser, beam, transform, extents}[/code] (instance id, beam index, the box's pose and half extents), exactly the boxes the lasers' contact queries tested in the last tick.
+			</description>
+		</method>
+		<method name="debug_get_laser_pool_amount" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns how many finished lasers wait in the pool.
+			</description>
+		</method>
+		<method name="debug_get_live_volley_ids">
+			<return type="PackedInt64Array" />
+			<param index="0" name="owner_spawner_id" type="int" />
+			<description>
+				Instance ids of active volleys owned by a spawner. For teardown tests.
+			</description>
+		</method>
+		<method name="debug_get_pool_bucket">
+			<return type="VolleyPoolKey2D" />
+			<param index="0" name="volley" type="Variant" />
+			<description>
+				Live pool bucket (amount + shape) of one volley, for per-bucket free/reset assertions in multi-spawner tests. Returns null on null input.
+			</description>
+		</method>
+		<method name="debug_get_pool_hit_stats" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Pool reuse counters (64-bit): hits, misses. A spawn from inside a volley's own collision handler never reuses that volley (it is mid-tick), so it is served by another pooled instance or a fresh allocation and still succeeds. A 0% hit rate with a pre-populated pool means the spawn key never matches (e.g. helper_skip_indices shrank transforms after populate); compare [method debug_expected_pool_key] against [method debug_get_bullets_pool_info] keys with [method VolleyPoolKey2D.equals] (keys are Resources: [code]==[/code] compares identity).
+			</description>
+		</method>
+		<method name="debug_get_sound_log" qualifiers="const">
+			<return type="Array" />
+			<description>
+				Test helper: every sound the mixer played while recording was on, as {sound, position, frame} dicts (oldest dropped past 4096 entries).
+			</description>
+		</method>
+		<method name="debug_get_sound_offer_log" qualifiers="const">
+			<return type="Array" />
+			<description>
+				Test helper: every sound offer since logging was enabled ([method debug_set_sound_offer_log_enabled]), recorded BEFORE audibility, chance and voice limits decide what plays, as [code]{trigger, sound_class, position, volley, life, bullet, frame}[/code] ([code]trigger[/code] is the entry's own trigger id: [member BulletSoundData2D.trigger] or [member LaserSoundData2D.trigger], told apart by [code]sound_class[/code]; [code]position[/code] is where the event happened; spawner triggers and [method play_sound] have [code]volley[/code] 0 and [code]bullet[/code] -1; a laser's offers have [code]volley[/code] 0, [code]bullet[/code] -1 and add [code]laser[/code] (its instance id) and [code]beam[/code] (-1 for laser-wide events)). Keeps the newest 65536 entries. What actually played is [method debug_get_sound_log].
+			</description>
+		</method>
+		<method name="debug_get_sound_stats" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Sound mixer counters: {voices_total, voices_busy, channels, pending, plays_total, dropped_total}. Sample twice and subtract for per-frame rates.
+			</description>
+		</method>
+		<method name="debug_get_sound_voices" qualifiers="const">
+			<return type="Array" />
+			<description>
+				One dict per voice pool slot: {index, busy, fading, sound, priority, position, volume_db, pitch_scale, bus, stream, max_distance, attenuation, panning_strength, area_mask, paused}. Feed it to your own Node2D _draw loop for a live voice overlay (circle per busy voice at position, radius by volume_db).
+			</description>
+		</method>
+		<method name="debug_get_split_stats" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Splitting counters: [code]pending[/code] (splits waiting for the next flush), [code]flushed_last[/code] / [code]children_last[/code] / [code]carried_over_last[/code] (the last flush: parents handled, children spawned, splits that waited because of [member split_max_children_per_sweep]), [code]flushed_total[/code], [code]children_total[/code], [code]dropped_total[/code] (splits refused by [member split_max_pending]) and [code]templates[/code] (cached spawn data copies without per-bullet arrays).
 			</description>
 		</method>
 		<method name="debug_get_total_attachments_amount">
@@ -66,38 +374,270 @@
 		</method>
 		<method name="debug_get_total_bullets_amount">
 			<return type="int" />
-			<param index="0" name="bullet_type" type="int" enum="BulletFactory2D.BulletType" />
 			<description>
-				Get the total amount of bullet multimeshes of a specific type in the scene tree.
+				Returns how many volleys the factory tracks (active and pooled).
+			</description>
+		</method>
+		<method name="debug_read_frame">
+			<return type="Texture2D" />
+			<param index="0" name="texture" type="Texture2D" />
+			<param index="1" name="whiten" type="bool" default="false" />
+			<description>
+				What a mesh draw shows for [param texture], through this factory's frame cache: the texture itself, or for an [AtlasTexture] a texture of exactly what it draws (its region inside its margin box); with [param whiten], the [member BulletVolleyData2D.override_frame_color] copy. Returns null when the pixels cannot be read (a region outside its atlas, non-finite values, an undecodable format). For tests.
+			</description>
+		</method>
+		<method name="debug_reset_pool_stats">
+			<return type="void" />
+			<description>
+				Resets the pool hit/miss counters from [method debug_get_pool_hit_stats].
+			</description>
+		</method>
+		<method name="debug_seed_cosmetic_rng">
+			<return type="void" />
+			<param index="0" name="seed" type="int" />
+			<description>
+				Test helper: reseeds the plugin's cosmetic generator, which draws sound mix rolls (volume, pitch, pan, stream picks, chance) and effect layer starts, scales and rotations. Godot's [method @GlobalScope.seed] does not reach these rolls, so gameplay randomness stays the same whatever the audio does.
+			</description>
+		</method>
+		<method name="debug_set_bullet_event_log_enabled">
+			<return type="void" />
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Test helper: turns the bullet event log ([method debug_get_bullet_event_log]) on or off. Turning it off clears it. Off by default; while off, a bullet state change costs one check.
+			</description>
+		</method>
+		<method name="debug_set_effect_log_enabled">
+			<return type="void" />
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Debug/test helper: when enabled, every one-shot effect the factory fires is recorded for [method debug_get_effect_log]. Off by default; turning it off clears the log. The log keeps the newest 4096 entries.
+			</description>
+		</method>
+		<method name="debug_set_graze_slab_min_targets">
+			<return type="int" />
+			<param index="0" name="value" type="int" />
+			<description>
+				Test/profiling hook: zones with more live targets than [param value] (default 8) test each bullet only against the targets near its motion in x instead of every target (same results, far cheaper with many targets). 0 = always, a huge value = never. Process-wide. Returns the previous value; a value outside 0..64 pushes an error and changes nothing.
+			</description>
+		</method>
+		<method name="debug_set_sound_log_enabled">
+			<return type="void" />
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Test helper: records every played sound while on (cleared when switched off). One bool check per play.
+			</description>
+		</method>
+		<method name="debug_set_sound_offer_log_enabled">
+			<return type="void" />
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Test helper: turns the sound offer log ([method debug_get_sound_offer_log]) on or off. Turning it off clears it. Off by default; while off, an offer costs one check.
+			</description>
+		</method>
+		<method name="debug_stop_sound_voices">
+			<return type="void" />
+			<description>
+				Debug/test helper: stops every voice at once (channels kept).
+			</description>
+		</method>
+		<method name="debug_validate_spawn_data" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="spawn_data" type="BulletVolleyData2D" />
+			<description>
+				Non-mutating validation: {ok, error, warning}. Never spawns, never touches the pool. The warning fires for invisible bullets (no sprite_frames/mesh/texture_size); art must face Vector2.RIGHT (cannot be auto-detected).
+			</description>
+		</method>
+		<method name="end_lasers_in_circle">
+			<return type="int" />
+			<param index="0" name="center" type="Vector2" />
+			<param index="1" name="radius" type="float" />
+			<param index="2" name="fade" type="bool" default="true" />
+			<param index="3" name="can_hit_mask" type="int" default="0" />
+			<description>
+				Ends every laser whose live body touches the circle: the distance from [param center] to a beam's polyline is at most [param radius] plus half the beam's current width (edges included; a charging laser's warning line counts, spent bolt or curvy beams never). With [param fade] the lasers fade out, else they end on the next tick. Runs no user code, so a signal handler may call it (a bomb). Refuses a non-finite center or a negative radius with the same error as [method clear_bullets_in_circle]. Returns how many lasers it ended (or that were already fading).
+				[param can_hit_mask] filters by what the lasers can hit: only lasers whose [member LaserData2D.collision_mask] shares a bit with it count (0, the default, takes every laser).
+			</description>
+		</method>
+		<method name="end_lasers_in_rect">
+			<return type="int" />
+			<param index="0" name="rect" type="Rect2" />
+			<param index="1" name="fade" type="bool" default="true" />
+			<param index="2" name="can_hit_mask" type="int" default="0" />
+			<description>
+				Ends every laser whose live body touches [param rect] (edges included, a negative size is normalized, half the beam's width counted), fading with [param fade]. Same rules as [method end_lasers_in_circle]. Returns how many lasers it ended.
+				[param can_hit_mask] filters by what the lasers can hit: only lasers whose [member LaserData2D.collision_mask] shares a bit with it count (0, the default, takes every laser).
+			</description>
+		</method>
+		<method name="ensure_factory_initialized">
+			<return type="bool" />
+			<description>
+				Starts the factory now if it has not started yet (a spawn from a script [code]_ready()[/code] can come before the factory's own start) and returns whether it is ready. A script may define its own [code]_ready()[/code], [code]_physics_process()[/code] and [code]_process()[/code]: the factory runs its work from notifications, so both run. Called automatically by every spawn and populate call.
 			</description>
 		</method>
 		<method name="free_active_bullets">
 			<return type="void" />
-			<param index="0" name="amount_bullets" type="int" default="0" />
+			<param index="0" name="key" type="VolleyPoolKey2D" default="null" />
 			<description>
-				Frees all active bullets that are currently in the scene tree. You also have the option of freeing only the instances that each have a particular [code]amount_bullets_per_instance[/code] if you provide a value that is bigger than 0. Example: if you want to free all those multimeshes in the scene tree that each have 200 bullets each ([code]amount_bullets_per_instance=200[/code]).
+				Frees active bullets in the scene tree. Pass [code]null[/code] (default) to free all, or a [VolleyPoolKey2D] to free only that exact amount_bullets + shape bucket. Refused during the physics step (for example inside collision handlers); call it deferred then.
+				Warning (shared factories): this frees live volleys from EVERY spawner using this factory (or bucket), not just yours.
+			</description>
+		</method>
+		<method name="free_active_bullets_deferred">
+			<return type="void" />
+			<param index="0" name="key" type="VolleyPoolKey2D" default="null" />
+			<description>
+				Deferred [method free_active_bullets]: safe from any callback. Use this instead of free() on volleys inside handlers (free() mid-sweep corrupts iteration; queue_free() via [method free_volley_deferred] is the single-volley equivalent).
 			</description>
 		</method>
 		<method name="free_attachments_pool">
 			<return type="void" />
-			<param index="0" name="attachment_id" type="int" default="-1" />
 			<description>
-				By default completely frees the [BulletAttachment2D] object pools. You also have the option of freeing only the attachments with a particular [code]attachment_id[/code] if you provide a value that is not a negative number. Example: if you want to free all those attachments in the object pool that each have an [code]attachment_id=5[/code].
+				Completely frees the [BulletAttachment2D] object pool. To free only the attachments that came from one scene, use [method free_attachments_pool_for_scene].
+			</description>
+		</method>
+		<method name="free_attachments_pool_deferred">
+			<return type="void" />
+			<description>
+				Deferred [method free_attachments_pool]: safe from any callback.
+			</description>
+		</method>
+		<method name="free_attachments_pool_for_scene">
+			<return type="void" />
+			<param index="0" name="attachment_scene" type="PackedScene" />
+			<description>
+				Frees only the pooled [BulletAttachment2D] attachments that came from the given scene.
+			</description>
+		</method>
+		<method name="free_attachments_pool_for_scene_deferred">
+			<return type="void" />
+			<param index="0" name="attachment_scene" type="PackedScene" />
+			<description>
+				Deferred [method free_attachments_pool_for_scene]: safe from any callback.
 			</description>
 		</method>
 		<method name="free_bullets_pool">
 			<return type="void" />
-			<param index="0" name="bullet_type" type="int" enum="BulletFactory2D.BulletType" />
-			<param index="1" name="amount_bullets_per_instance" type="int" default="0" />
+			<param index="0" name="key" type="VolleyPoolKey2D" default="null" />
 			<description>
-				By default completely frees an object pool of a particular bullet type. You also have the option of freeing only the instances that each have a particular [code]amount_bullets_per_instance[/code] if you provide a value that is bigger than 0. Example: if you want to free all those multimeshes in the object pool that each have 200 bullets each ([code]amount_bullets_per_instance=200[/code]).
+				Frees pooled (disabled) volleys; parked volleys (auto pooling off: frozen, still yours, wakeable) are kept, [method free_active_bullets] frees them. Pass [code]null[/code] (default) to free the whole pool, or a [VolleyPoolKey2D] to free only that exact amount_bullets + shape bucket. Example: [code]VolleyPoolKey2D.make(200, PhysicsServer2D.SHAPE_CIRCLE)[/code]. Refused during the physics step; call it deferred then.
+			</description>
+		</method>
+		<method name="free_bullets_pool_deferred">
+			<return type="void" />
+			<param index="0" name="key" type="VolleyPoolKey2D" default="null" />
+			<description>
+				Deferred [method free_bullets_pool]: safe from any callback.
 			</description>
 		</method>
 		<method name="free_disabled_bullets">
 			<return type="void" />
-			<param index="0" name="amount_bullets" type="int" default="0" />
+			<param index="0" name="key" type="VolleyPoolKey2D" default="null" />
 			<description>
-				Frees all disabled bullets that are currently in the scene tree. You also have the option of freeing only the instances that each have a particular [code]amount_bullets_per_instance[/code] if you provide a value that is bigger than 0. Example: if you want to free all those multimeshes in the scene tree that each have 200 bullets each ([code]amount_bullets_per_instance=200[/code]).
+				Frees disabled (pooled) bullets; parked volleys (auto pooling off: frozen, still yours, wakeable) are kept, [method free_active_bullets] frees them. Pass [code]null[/code] (default) to free all, or a [VolleyPoolKey2D] to free only that exact amount_bullets + shape bucket. Refused during the physics step; call it deferred then.
+			</description>
+		</method>
+		<method name="free_disabled_bullets_deferred">
+			<return type="void" />
+			<param index="0" name="key" type="VolleyPoolKey2D" default="null" />
+			<description>
+				Deferred [method free_disabled_bullets]: safe from any callback.
+			</description>
+		</method>
+		<method name="free_lasers_pool">
+			<return type="int" />
+			<param index="0" name="beam_count" type="int" default="-1" />
+			<description>
+				Frees the pooled (finished) lasers: every bucket with -1, or only those of [param beam_count] beams. Lasers that still fire are never touched. Idle frames only (inside a physics frame it is refused: use [method free_lasers_pool_deferred]). Returns how many lasers it freed.
+			</description>
+		</method>
+		<method name="free_lasers_pool_deferred">
+			<return type="void" />
+			<param index="0" name="beam_count" type="int" default="-1" />
+			<description>
+				Queues [method free_lasers_pool] for the next idle frame: safe from anywhere, signal handlers included.
+			</description>
+		</method>
+		<method name="free_volley_deferred">
+			<return type="void" />
+			<param index="0" name="volley" type="Variant" />
+			<description>
+				Safe single-volley free from any callback: uses queue_free(), never free()/force_delete(). Use this inside area_entered and other handlers instead of freeing the volley directly. Only bullet volleys ([BulletVolley2D]) are accepted; any other node is rejected with an error and left alone.
+			</description>
+		</method>
+		<method name="get_active_bullet_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Live bullets across every active volley, summed from each volley's live counter: O(active volleys), no per-bullet scan. Counts bullets, unlike [method debug_get_active_volleys_amount], which counts volleys.
+			</description>
+		</method>
+		<method name="get_active_effect_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Total live one-shot effect slots across all bakes (plus the manual hatch).
+			</description>
+		</method>
+		<method name="get_active_laser_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns how many lasers fire now.
+			</description>
+		</method>
+		<method name="get_active_lasers" qualifiers="const">
+			<return type="Array" />
+			<description>
+				Returns every firing [LaserVolley2D].
+			</description>
+		</method>
+		<method name="get_active_volleys" qualifiers="const">
+			<return type="BulletVolley2D[]" />
+			<param index="0" name="include_parked" type="bool" default="false" />
+			<description>
+				Every active volley (bullets in flight; not pooled or queued for deletion), in the order the factory ticks them; parked volleys (auto pooling off, every bullet out, still wakeable) too with [param include_parked]. A fresh array per call. [method get_volleys_owned_by] lists one spawner's.
+			</description>
+		</method>
+		<method name="get_bullet_positions_in_circle" qualifiers="const">
+			<return type="PackedVector2Array" />
+			<param index="0" name="center" type="Vector2" />
+			<param index="1" name="radius" type="float" />
+			<param index="2" name="can_hit_mask" type="int" default="0" />
+			<description>
+				The positions of the live bullets within [param radius] of [param center] (edge included), in the order [method get_bullets_in_circle] lists them, as one [PackedVector2Array]: no Dictionary per volley, cheap enough to call every frame (dodge AI, aim assist, a danger meter). [param can_hit_mask] filters by what the bullets can hit: only volleys whose [member BulletVolleyData2D.collision_mask] shares a bit with it count (0, the default, takes every bullet).
+				[codeblock]
+				for p in factory.get_bullet_positions_in_circle(player.global_position, 120.0, PLAYER_LAYER):
+				    push += (player.global_position - p).normalized()
+				[/codeblock]
+			</description>
+		</method>
+		<method name="get_bullets_in_circle" qualifiers="const">
+			<return type="Dictionary[]" />
+			<param index="0" name="center" type="Vector2" />
+			<param index="1" name="radius" type="float" />
+			<param index="2" name="can_hit_mask" type="int" default="0" />
+			<description>
+				The live bullets within [param radius] of [param center] (edge included, like [method clear_bullets_in_circle]): one Dictionary per volley that has any, in factory order, with [code]"volley"[/code] (the [BulletVolley2D]), [code]"bullet_indexes"[/code] ([PackedInt32Array]) and [code]"positions"[/code] ([PackedVector2Array], parallel to the indexes). Frozen bullets and volleys queued for deletion are left out. Read-only and safe anywhere (handlers included); O(live bullets). A non-finite center or a negative radius fails loud and returns an empty array.
+				[param can_hit_mask] filters by what the bullets can hit: only volleys whose [member BulletVolleyData2D.collision_mask] shares a bit with it count (0, the default, takes every bullet). Pass the player's collision layer to take only what can hurt the player (a bomb) and leave the player's own shots.
+			</description>
+		</method>
+		<method name="get_bullets_in_rect" qualifiers="const">
+			<return type="Dictionary[]" />
+			<param index="0" name="rect" type="Rect2" />
+			<param index="1" name="can_hit_mask" type="int" default="0" />
+			<description>
+				Same as [method get_bullets_in_circle] for a rectangle (all four edges included; a negative size is normalized). A non-finite rect fails loud and returns an empty array.
+				[param can_hit_mask] filters by what the bullets can hit: only volleys whose [member BulletVolleyData2D.collision_mask] shares a bit with it count (0, the default, takes every bullet). Pass the player's collision layer to take only what can hurt the player (a bomb) and leave the player's own shots.
+			</description>
+		</method>
+		<method name="get_default_flock">
+			<return type="BulletFlock2D" />
+			<description>
+				The flock an empty flock slot stands for: a spawner with [member BulletSpawner2D.flock_enabled] on and no [member BulletSpawner2D.flock], and [method BulletVolley2D.flock_join] with null. One per factory, made on first use with the default rules ([constant BulletFlock2D.PRESET_SWARM]). Edit it to tune every such flock of this factory at once, e.g. [code]$BulletFactory2D.get_default_flock().separation = 15.0[/code].
+			</description>
+		</method>
+		<method name="get_frame_stats" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Cheap, always-on profiling snapshot. Keys: [code]physics_ticks[/code], [code]physics_tick_usec[/code] (last tick), [code]peak_physics_tick_usec[/code], [code]render_usec[/code] (last interpolation pass, 0 when interpolation is off), [code]flock_usec[/code] (last flock pass, 0 while nothing flocks), [code]volleys_ticked[/code] and [code]bullets_ticked[/code] (last tick), [code]collision_records_total[/code], [code]expired_bullets_total[/code], [code]spawned_bullets_total[/code], [code]pool_hits[/code], [code]pool_misses[/code], [code]active_bullets[/code], [code]active_volleys[/code], [code]pooled_volleys[/code], [code]parked_volleys[/code] (frozen with auto pooling off: still owned, wakeable), [code]active_effects[/code], [code]active_attachments[/code].
+				[code]physics_ticks[/code] and the [code]*_total[/code] counters are cumulative since start (or the last [method reset_frame_stats]): sample twice and subtract for per-frame rates. The same numbers are graphed live in the editor's Debugger &gt; Monitors tab, see [member register_performance_monitors].
 			</description>
 		</method>
 		<method name="get_is_factory_busy" qualifiers="const">
@@ -106,185 +646,500 @@
 				Sometimes the [b]BulletFactory2D[/b] might be busy doing some important work. This property provides an easy way to check if that's true.
 			</description>
 		</method>
+		<method name="get_is_tearing_down" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns true once the factory started destroying itself. While true, teardown paths stop touching child nodes and most factory operations report an error instead of running.
+			</description>
+		</method>
+		<method name="get_lasers_in_circle" qualifiers="const">
+			<return type="LaserVolley2D[]" />
+			<param index="0" name="center" type="Vector2" />
+			<param index="1" name="radius" type="float" />
+			<param index="2" name="can_hit_mask" type="int" default="0" />
+			<description>
+				Returns every firing laser whose body (half its current width included) touches the circle, in list order; [param can_hit_mask] keeps only the lasers whose [member LaserData2D.collision_mask] shares a bit with it (0 = all). The read-only twin of [method end_lasers_in_circle]: it ends nothing, so a bomb can decide per laser (score, shield) before ending them.
+			</description>
+		</method>
+		<method name="get_lasers_in_rect" qualifiers="const">
+			<return type="LaserVolley2D[]" />
+			<param index="0" name="rect" type="Rect2" />
+			<param index="1" name="can_hit_mask" type="int" default="0" />
+			<description>
+				Returns every firing laser whose body (half its current width included) touches the rect (a negative size is normalized, edges count). Same filter as [method get_lasers_in_circle]; the read-only twin of [method end_lasers_in_rect].
+			</description>
+		</method>
+		<method name="get_lasers_owned_by" qualifiers="const">
+			<return type="LaserVolley2D[]" />
+			<param index="0" name="spawner" type="Variant" />
+			<description>
+				The firing lasers [param spawner] fired (a [LaserSpawner2D], read by id), or with [code]null[/code] the ones this factory fired itself ([method spawn_laser], orphans handed to the factory), in factory order. A freed or wrong object lists nothing with one error.
+			</description>
+		</method>
+		<method name="get_nearest_bullet" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="position" type="Vector2" />
+			<param index="1" name="max_distance" type="float" />
+			<param index="2" name="can_hit_mask" type="int" default="0" />
+			<description>
+				The live bullet closest to [param position] within [param max_distance] (edge included) as [code]{"volley": BulletVolley2D, "index": int, "position": Vector2}[/code], or an empty Dictionary when none is in range. On a tie the first found wins (volley order, then bullet index). [param can_hit_mask] filters by what the bullets can hit: only volleys whose [member BulletVolleyData2D.collision_mask] shares a bit with it count (0, the default, takes every bullet). [param position] must be finite and [param max_distance] a finite number &gt;= 0.
+			</description>
+		</method>
+		<method name="get_pending_emit_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns how many emitter-bullet shots wait for the next flush.
+			</description>
+		</method>
+		<method name="get_pending_split_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				How many recorded splits wait to be spawned. Splits recorded inside a sweep spawn right after it; splits recorded outside one (a clear from [code]_process[/code], a manual split) spawn on the next sweep.
+			</description>
+		</method>
 		<method name="get_physics_space" qualifiers="const">
 			<return type="RID" />
 			<description>
 				Get the physics world space in which the bullets interact.
 			</description>
 		</method>
-		<method name="helper_generate_transforms_grid" qualifiers="static">
-			<return type="Transform2D[]" />
-			<param index="0" name="transforms_amount" type="int" />
-			<param index="1" name="marker_transform" type="Transform2D" />
-			<param index="2" name="rows_per_column" type="int" default="10" />
-			<param index="3" name="alignment" type="int" enum="BulletFactory2D.Alignment" default="3" />
-			<param index="4" name="column_offset" type="float" default="150.0" />
-			<param index="5" name="row_offset" type="float" default="150.0" />
-			<param index="6" name="rotate_grid_with_marker" type="bool" default="true" />
-			<param index="7" name="random_local_rotation" type="bool" default="false" />
+		<method name="get_volleys_owned_by" qualifiers="const">
+			<return type="BulletVolley2D[]" />
+			<param index="0" name="spawner" type="Variant" />
+			<param index="1" name="include_parked" type="bool" default="false" />
 			<description>
-				Generates a grid of transforms that are positioned relative to the [code]marker_transform[/code].
+				The live volleys [param spawner] fired (a [BulletSpawner2D], read by id), or with [code]null[/code] the ones this factory fired itself ([method spawn_volley], pickups, splits of factory volleys, orphans handed to the factory), in factory order. Parked volleys (auto pooling off, every bullet out) only with [param include_parked]; pooled ones never. A freed or wrong object lists nothing with one error.
+			</description>
+		</method>
+		<method name="is_physics_interpolation_active" qualifiers="const">
+			<return type="bool" />
+			<description>
+				True while bullets are drawn between their last two physics poses this frame: [member physics_interpolation] resolved (On, Off, or the scene tree's [member SceneTree.physics_interpolation] for Follow Project).
+			</description>
+		</method>
+		<method name="play_sound">
+			<return type="bool" />
+			<param index="0" name="sound" type="Resource" />
+			<param index="1" name="global_position" type="Vector2" />
+			<param index="2" name="listener_group" type="StringName" default="&amp;&quot;&quot;" />
+			<description>
+				Manual sound hatch: plays [param sound] (a [BulletSoundData2D] or a [LaserSoundData2D]; anything else is refused with one error) at [param global_position] at the end of the next sweep (Godot listener, or the nearest member of [param listener_group]). Returns false when refused (null, disabled, outside the tree, paused, editor): offers made during a sweep play at the end of that sweep.
 			</description>
 		</method>
 		<method name="populate_attachments_pool">
 			<return type="void" />
 			<param index="0" name="attachment_scene" type="PackedScene" />
-			<param index="1" name="attachment_id" type="int" />
-			<param index="2" name="amount_attachments" type="int" />
+			<param index="1" name="amount_attachments" type="int" />
 			<description>
-				Populates the attachments object pool. Ensure that the [code]attachment_scene[/code] contains an actual [BulletAttachment2D] scene where you attach other nodes - particles or anything else you could think of.
+				Populates the attachments object pool. Ensure that the [code]attachment_scene[/code] contains an actual [BulletAttachment2D] scene where you attach other nodes - particles or anything else you could think of. Pooling is keyed by the scene itself, so every loader of the same scene shares one pool bucket.
+			</description>
+		</method>
+		<method name="populate_attachments_pool_deferred">
+			<return type="void" />
+			<param index="0" name="attachment_scene" type="PackedScene" />
+			<param index="1" name="amount_attachments" type="int" />
+			<description>
+				Deferred twin of [method populate_attachments_pool]: queued on the factory's idle structural queue, so it is safe to call from collision and lifetime handlers (where structural calls are rejected).
 			</description>
 		</method>
 		<method name="populate_bullets_pool">
 			<return type="void" />
-			<param index="0" name="multimesh_data" type="MultiMeshBulletsData2D" />
-			<param index="1" name="amount_instances" type="int" />
+			<param index="0" name="key" type="VolleyPoolKey2D" />
+			<param index="1" name="spawn_data" type="BulletVolleyData2D" />
+			<param index="2" name="instance_count" type="int" />
 			<description>
-				Populates a specific [code]bullet_type[/code] object pool. The [code]amount_instances[/code] is the amount of multimeshes, while the [code]amount_bullets_per_instance[/code] determines how many bullets each multimesh instance has.
+				Pre-creates [code]instance_count[/code] disabled volleys in one exact bucket. [code]key.amount_bullets[/code] is bullets per volley (must equal [code]spawn_data[/code] transforms size); [code]instance_count[/code] is how many volleys to create. The [code]key[/code] is required and must match the bucket derived from [code]spawn_data[/code] (amount_bullets + effective collision shape); mismatch aborts with an error and creates nothing. A key with [member VolleyPoolKey2D.use_bullet_colors] on creates colored volleys even for plain data (what a spawner's [member BulletSpawner2D.bullet_color_mode] fires); data that draws per-bullet colors needs such a key. Example: [code]populate_bullets_pool(VolleyPoolKey2D.make(5, PhysicsServer2D.SHAPE_CIRCLE), data, 2)[/code] creates 2 volleys of 5 bullets each. Like [method spawn_volley], a volley of more than [method BulletPatterns2D.get_max_bullets_per_pattern] bullets is refused.
+			</description>
+		</method>
+		<method name="populate_bullets_pool_deferred">
+			<return type="void" />
+			<param index="0" name="key" type="VolleyPoolKey2D" />
+			<param index="1" name="spawn_data" type="BulletVolleyData2D" />
+			<param index="2" name="instance_count" type="int" />
+			<description>
+				Deferred [method populate_bullets_pool]: safe from any callback. Null key, null data and instance_count &lt;= 0 are rejected immediately without queuing.
+			</description>
+		</method>
+		<method name="populate_lasers_pool">
+			<return type="int" />
+			<param index="0" name="beam_count" type="int" />
+			<param index="1" name="amount" type="int" />
+			<description>
+				Pre-warms [param amount] pooled lasers of [param beam_count] beams, so the first shots of that size allocate nothing (the pool is keyed by beam count: a [LaserSpawner2D] fires one beam per pattern slot). [param beam_count] must be between 1 and [method BulletPatterns2D.get_max_bullets_per_pattern], [param amount] above 0. Idle frames only: use [method populate_lasers_pool_deferred] from a physics frame or a handler. Returns how many lasers it created.
+			</description>
+		</method>
+		<method name="populate_lasers_pool_deferred">
+			<return type="void" />
+			<param index="0" name="beam_count" type="int" />
+			<param index="1" name="amount" type="int" />
+			<description>
+				Queues [method populate_lasers_pool] for the next idle frame (arguments checked now): safe from anywhere.
+			</description>
+		</method>
+		<method name="populate_pickup_pool">
+			<return type="void" />
+			<param index="0" name="pickup" type="BulletPickupData2D" />
+			<param index="1" name="bullet_count" type="int" />
+			<param index="2" name="instance_count" type="int" />
+			<description>
+				Pre-builds [param instance_count] pooled volleys for pickup conversions of [param bullet_count] bullets, like [method populate_bullets_pool] but taking the whole [BulletPickupData2D] (look, attachment, effect layers, collision). The volley pool is keyed by bullet count, so a game that converts waves of a known size can do this while loading and avoid the first-conversion hitch. Idle frames only (use [method populate_pickup_pool_deferred] from a callback); [param bullet_count] must be between 1 and [method BulletPatterns2D.get_max_bullets_per_pattern].
+			</description>
+		</method>
+		<method name="populate_pickup_pool_deferred">
+			<return type="void" />
+			<param index="0" name="pickup" type="BulletPickupData2D" />
+			<param index="1" name="bullet_count" type="int" />
+			<param index="2" name="instance_count" type="int" />
+			<description>
+				Queues [method populate_pickup_pool] for the next idle frame. Safe from anywhere.
+			</description>
+		</method>
+		<method name="reactivate_volley">
+			<return type="void" />
+			<param index="0" name="volley" type="Variant" />
+			<description>
+				Puts a pooled volley back into the set of volleys the factory moves every tick, after one of its bullets was woken with [method BulletVolley2D.enable_bullet] outside of a normal spawn. Does nothing when the volley is already active, when the factory is busy, or when the factory is tearing down. You normally never call this yourself: [method BulletVolley2D.enable_bullet] already does it.
 			</description>
 		</method>
 		<method name="reset">
 			<return type="void" />
-			<param index="0" name="amount_bullets" type="int" default="0" />
+			<param index="0" name="key" type="VolleyPoolKey2D" default="null" />
 			<description>
-				Resets the factory - free everything (object pools, spawned bullets, spawned attachments - all get deleted from memory).
+				Resets the factory. Pass [code]null[/code] (default) for a full reset (all bullets, pools, the full attachment pool, and the frame textures baked from SpriteFrames, so art repainted in place re-bakes). Pass a [VolleyPoolKey2D] to reset only that exact amount_bullets+shape bucket; unrelated pooled attachments are preserved. Refused during the physics step; call it deferred then.
+				Warning (shared factories): this kills live volleys from EVERY spawner using this factory (or every spawner sharing the bucket, when keyed) - not just yours. Spawner trackers prune the dead ids on next read.
 				Emits the [signal reset_finished] signal when complete.
+			</description>
+		</method>
+		<method name="reset_deferred">
+			<return type="void" />
+			<param index="0" name="key" type="VolleyPoolKey2D" default="null" />
+			<description>
+				Deferred [method reset]: safe from collision, lifetime, timer and spawner-signal handlers. Validates cheaply now, runs the real op after the physics step.
+			</description>
+		</method>
+		<method name="reset_frame_stats">
+			<return type="void" />
+			<description>
+				Resets the peak tick time, [code]physics_ticks[/code] and the cumulative [code]*_total[/code] counters of [method get_frame_stats]. Pool hit/miss counters are separate: see [method debug_reset_pool_stats].
 			</description>
 		</method>
 		<method name="set_physics_space">
 			<return type="void" />
 			<param index="0" name="new_physics_space" type="RID" />
 			<description>
-				Sets the world physics space that the bullets interact in.
+				Sets the world physics space that the bullets interact in. Set it before spawning: it applies to subsequently spawned bullets, already spawned areas stay in their space. Invalid RIDs are rejected with an error.
 			</description>
 		</method>
-		<method name="set_use_physics_interpolation_runtime">
-			<return type="void" />
-			<param index="0" name="enable" type="bool" />
+		<method name="spawn_laser">
+			<return type="LaserVolley2D" />
+			<param index="0" name="data" type="LaserData2D" />
+			<param index="1" name="transforms" type="Transform2D[]" />
+			<param index="2" name="anchor" type="Variant" default="null" />
 			<description>
-				Controls whether physics interpolation is enabled or not for all bullets controlled by the [b]BulletFactory2D[/b]. This method is supposed to be called during runtime, while the [method set_use_physics_interpolation_editor] method is supposed to be called in the editor.
+				Fires one [LaserVolley2D]: a beam per transform in [param transforms] (its origin is the muzzle, its x axis the direction). With [param anchor], the muzzles follow that node while [member LaserData2D.follow_spawner] is on (an anchor outside the tree is ridden once it enters, from where the beams are then; a freed node is refused). Factory lasers signal on this factory. Returns [code]null[/code] (with an error) for null data, no transforms, a transform that is not finite and invertible, or more beams than [method BulletPatterns2D.get_max_bullets_per_pattern].
 			</description>
 		</method>
-		<method name="spawn_block_bullets">
-			<return type="void" />
-			<param index="0" name="spawn_data" type="BlockBulletsData2D" />
+		<method name="spawn_layer_effect">
+			<return type="int" />
+			<param index="0" name="layer" type="EffectLayerData2D" />
+			<param index="1" name="at" type="Transform2D" />
 			<description>
-				Spawns [BlockBullets2D] - bullets that act as a block that travels in a single direction with the same speed.
-				If there is already a multimesh available in the object pool (that matches the amount of transforms provided) then it gets re-used with the new data.
-				These bullets can NOT be controlled individually, but they are more efficient performance wise.
+				Manual one-shot hatch: plays any layer once at a global pose (the position and rotation of [param at]; its scale is ignored: the size comes from the layer's [member EffectLayerData2D.scale] and random scale range, so a bigger blast is a copy of the layer with a larger scale), owned by the factory (survives volleys). Distinct layers coexist without a cap; a layer's bake is released once its effects have played out and nothing else holds the layer. Returns the slot index, or -1 when the layer is inert.
 			</description>
 		</method>
-		<method name="spawn_controllable_directional_bullets">
-			<return type="DirectionalBullets2D" />
-			<param index="0" name="spawn_data" type="DirectionalBulletsData2D" />
+		<method name="spawn_volley">
+			<return type="BulletVolley2D" />
+			<param index="0" name="spawn_data" type="BulletVolleyData2D" />
 			<param index="1" name="inherited_velocity_offset" type="Vector2" default="Vector2(0, 0)" />
+			<param index="2" name="spawner_id" type="int" default="0" />
 			<description>
-				Spawns DirectionalBullets2D that are meant to be controlled and edited.
-				If there is a multimesh available in the object pool then it gets re-used with the new data.
-				Use if you want homing bullets or to edit properties during runtime.
-
-				Warning: Since object pooling is enabled by default, if you save these bullets to an array you might
-				accidentally push the exact same multimesh (you end up with 2 references or more to the same exact object),
-				that's why it's smart to disable auto pooling if you are storing them in arrays or other data structures - that way you can even implement your own pooling system.
+				Spawns one volley: one bullet per entry of [member BulletVolleyData2D.transforms], each flying along its transform's rotation. A pooled volley of the same bucket (bullet count + collision shape) is reused when one exists. Returns the live [BulletVolley2D], or [code]null[/code] when the request was refused (the error says why). Ignore the return value for fire-and-forget bullets; keep it to steer the volley at runtime (homing, curves, attachments, teleporting, timers...). [param inherited_velocity_offset] is added to every bullet's velocity (recoil, moving shooters). Leave [param spawner_id] at 0: [BulletSpawner2D] uses it to own the volley's signals. A volley holds at most [method BulletPatterns2D.get_max_bullets_per_pattern] bullets (default 20000): one volley is one physics area, and Godot's broadphase can abort the game on tens of thousands of clustered shapes; more is refused with an error naming the setting.
+				Example: [code]var volley := factory.spawn_volley(data)[/code]
+				Warning: with auto pooling on (the default) an expired volley returns to the pool and a later spawn may hand out the same object again. If you store volleys in your own arrays, set [member BulletVolley2D.is_auto_pooling_enabled] to false on them.
 			</description>
 		</method>
-		<method name="spawn_directional_bullets">
+		<method name="stop_sounds">
 			<return type="void" />
-			<param index="0" name="spawn_data" type="DirectionalBulletsData2D" />
-			<param index="1" name="inherited_velocity_offset" type="Vector2" default="Vector2(0, 0)" />
 			<description>
-				Spawns [DirectionalBullets2D] - bullets that have individual directions determined by the rotation of their transforms.
-				If there is already a multimesh available in the object pool (that matches the amount of transforms provided) then it gets re-used with the new data.
-				To control these bullets individually, use the [method spawn_controllable_directional_bullets] function instead.
+				Stops every voice at once (channels kept). reset() also forgets the channels.
 			</description>
 		</method>
 		<method name="teleport_shift_all_bullets">
 			<return type="void" />
 			<param index="0" name="shift_amount" type="Vector2" />
 			<description>
-				Shifts all bullets in the scene by a certain amount (only bullets spawned by this particular [b]BulletFactory2D[/b]).
+				Shifts all bullets in the scene by a certain amount (only bullets spawned by this particular [b]BulletFactory2D[/b]). Every [BulletVolley2D] volley is moved, with shape, attachment and interpolation state synced per bullet.
+				Warning (shared factories): this moves EVERY spawner's live volleys at once - there is no per-spawner or per-bucket variant.
 			</description>
 		</method>
 	</methods>
 	<members>
-		<member name="block_bullets_debugger_color" type="Color" setter="set_block_bullets_debugger_color" getter="get_block_bullets_debugger_color" default="Color(0, 0, 2, 0.8)">
-			The color for the collision shapes of all [BlockBullets2D].
+		<member name="debugger_color" type="Color" setter="set_debugger_color" getter="get_debugger_color" default="Color(0, 0, 1, 0.8)">
+			The color of the debug collision shapes drawn for every volley while [member is_debugger_enabled] is on. Can be set before the factory enters the tree (it applies on ready).
 		</member>
-		<member name="directional_bullets_debugger_color" type="Color" setter="set_directional_bullets_debugger_color" getter="get_directional_bullets_debugger_color" default="Color(0, 0, 2, 0.8)">
-			The color for the collision shapes of all [DirectionalBullets2D].
+		<member name="debugger_draw_inactive" type="bool" setter="set_debugger_draw_inactive" getter="get_debugger_draw_inactive" default="true">
+			When false, pooled/frozen volleys are hidden in the debugger instead of drawn frozen. Default true preserves always-draw behavior.
+		</member>
+		<member name="debugger_max_providers" type="int" setter="set_debugger_max_providers" getter="get_debugger_max_providers" default="0">
+			Max debugger providers drawn per tick (0 = unlimited). Beyond the cap extra volleys are hidden, oldest first. Lower this on 10k-bullet demos where the always-draw debugger costs frames.
+		</member>
+		<member name="debugger_z_index" type="int" setter="set_debugger_z_index" getter="get_debugger_z_index" default="999">
+			The z index of the collision debugger's shapes (default 999: over the bullets). Edits reach the drawn shapes at once. Between -4096 and 4096.
+		</member>
+		<member name="despawn_bounds_color" type="Color" setter="set_despawn_bounds_color" getter="get_despawn_bounds_color" default="Color(1, 0, 0, 0.25)">
+			Color of the despawn bounds preview: the fill uses it as is (translucent red by default), the outline is the same color made more opaque. Every component must be finite.
+		</member>
+		<member name="despawn_bounds_enabled" type="bool" setter="set_despawn_bounds_enabled" getter="get_despawn_bounds_enabled" default="false">
+			When on, every live bullet that is outside [member despawn_bounds_rect] and not heading back in is disabled each tick. Keeps off-screen bullets from living until their lifetime ends. A bullet that is outside and flying inwards is left alone. A culled bullet fires the On Despawn effect layers ([constant EffectLayerData2D.EFFECT_ON_DESPAWN]) and sounds ([constant BulletSoundData2D.SOUND_ON_DESPAWN]) it has and is announced by [signal bullets_despawned]; with none of those configured it is silent. A [BulletSpawner2D] whose muzzle is outside the rectangle does not shoot (see [member BulletSpawner2D.shoot_outside_despawn_bounds]). Off by default.
+		</member>
+		<member name="despawn_bounds_preview" type="bool" setter="set_despawn_bounds_preview" getter="get_despawn_bounds_preview" default="true">
+			Draws [member despawn_bounds_rect] while [member despawn_bounds_enabled] is on, so you can see the play field in the editor. At runtime it also needs [member despawn_bounds_preview_during_runtime]. Only a visual aid: culling does not depend on it.
+		</member>
+		<member name="despawn_bounds_preview_during_runtime" type="bool" setter="set_despawn_bounds_preview_during_runtime" getter="get_despawn_bounds_preview_during_runtime" default="false">
+			Also draws the despawn bounds preview while the game runs (debugging aid). Off by default. Needs [member despawn_bounds_enabled] and [member despawn_bounds_preview].
+		</member>
+		<member name="despawn_bounds_preview_z_index" type="int" setter="set_despawn_bounds_preview_z_index" getter="get_despawn_bounds_preview_z_index" default="4000">
+			The z index of the despawn-bounds preview rectangle (default 4000: over most of the game). Lower it when the preview hides UI or a foreground layer. Between -4096 and 4096.
+		</member>
+		<member name="despawn_bounds_rect" type="Rect2" setter="set_despawn_bounds_rect" getter="get_despawn_bounds_rect" default="Rect2(0, 0, 1152, 648)">
+			The play field for [member despawn_bounds_enabled], in global space. "Not heading back in" means that along every axis where the bullet is outside, its velocity does not point towards the rectangle. Defaults to Godot's default viewport. Must be finite; a negative size is normalized.
+		</member>
+		<member name="emitter_max_pending" type="int" setter="set_emitter_max_pending" getter="get_emitter_max_pending" default="100000">
+			Emitter-bullet shots that may wait at most (0 = no cap; default 100000). Past it a new shot is dropped (counted in [method debug_get_emitter_stats], one warning per overflow). Bounds runaway chains of emitters.
+		</member>
+		<member name="emitter_max_shots_per_sweep" type="int" setter="set_emitter_max_shots_per_sweep" getter="get_emitter_max_shots_per_sweep" default="0">
+			Emitter-bullet shots fired per physics step at most (0 = no cap, the default). The rest wait for the next step in order and are never dropped, so a wall of emitters spreads its shots over a few frames instead of one heavy frame.
 		</member>
 		<member name="is_debugger_enabled" type="bool" setter="set_is_debugger_enabled" getter="get_is_debugger_enabled" default="false">
-			Whether the debugger of the collision shapes is enabled or not.
+			Whether the collision debugger is on: it draws every bullet's collision shape and, for lasers, every box their contact queries test this tick (one per segment of every unspent beam while it hits) in [member debugger_color] at [member debugger_z_index].
 		</member>
 		<member name="is_factory_processing_bullets" type="bool" setter="set_is_factory_processing_bullets" getter="get_is_factory_processing_bullets" default="true">
-			Use this if you want to pause processing of bullets - being able to stop bullets in place. Always use this instead of [code]set_process[/code]/[code]set_physics_process[/code].
+			Use this if you want to pause processing of bullets - being able to stop bullets in place. Always use this instead of [code]set_process[/code]/[code]set_physics_process[/code]. While paused nothing is drained. Overlaps that START during the pause are parked per volley (no cap: one record per bullet, target and kind, deduplicated, cancelled when the overlap ends before resume) and replayed exactly once on resume. Overlaps counted before the pause are never re-reported, and nothing piles up into a resume hitch.
+			Warning (shared factories): pausing stops EVERY spawner's bullets at once - there is no per-spawner pause.
 		</member>
-		<member name="use_physics_interpolation" type="bool" setter="set_use_physics_interpolation_editor" getter="get_use_physics_interpolation" default="false">
-			Determines whether physics interpolation is enabled or not. The setter is for the editor only.
-
-			Instead always use [method set_use_physics_interpolation_runtime] if you are doing changes during runtime.
+		<member name="physics_interpolation" type="int" setter="set_physics_interpolation" getter="get_physics_interpolation" enum="BulletFactory2D.PhysicsInterpolation" default="2">
+			How bullets are drawn between physics ticks. [constant INTERPOLATION_FOLLOW_PROJECT] (the default) follows [member SceneTree.physics_interpolation], so enabling Godot's physics interpolation in Project Settings (or toggling it from a script at runtime) smooths bullets, their attachments and trails with no second switch; the factory checks it every physics frame. [constant INTERPOLATION_ON] and [constant INTERPOLATION_OFF] decide regardless of the project. Turning it on mid-game seeds every bullet's previous pose (no lerp from an old spot). See [method debug_check_interpolation_status].
+		</member>
+		<member name="register_performance_monitors" type="bool" setter="set_register_performance_monitors" getter="get_register_performance_monitors" default="true">
+			When on (default), the factory registers custom monitors on ready, graphed while the game runs in the editor's Debugger &gt; Monitors tab: BlastBullets2D/Active Bullets, Active Volleys, Pooled Volleys, Parked Volleys, Physics Tick (ms), Peak Physics Tick (ms), Interpolation (ms), Active Effects and Active Attachments. Use them to spot which frames are heavy and what causes it. One factory owns the monitor ids at a time (the first to become ready; others skip silently, and a freed owner's ids are reclaimed). Runtime only, never in the editor; removed when the factory leaves the tree.
+		</member>
+		<member name="sound_max_voices" type="int" setter="set_sound_max_voices" getter="get_sound_max_voices" default="32">
+			Voice pool size for the whole factory: one AudioStreamPlayer2D per simultaneous sound. Voices are created on demand; past this a new event steals the oldest voice of equal or lower priority, never a more important one. The pool only grows to its high-water mark: lowering the cap later never frees existing voices, but no more than the new cap play at once (the idle ones past it wait until the cap grows).
+		</member>
+		<member name="split_max_children_per_sweep" type="int" setter="set_split_max_children_per_sweep" getter="get_split_max_children_per_sweep" default="1024">
+			The most children one sweep spawns (default 1024, 0 = no cap). Splits over the cap wait for the next sweep in order and are never dropped; a first split larger than the cap still spawns. Every child volley costs about 8 µs to activate (its MultiMesh, physics area and draw order, mostly inside Godot), so the default spreads a mass split (a 500-bullet ring bursting into 2000 children) over a few frames instead of one ~15 ms frame; the last children then appear a frame or two later at their death pose. Raise it, or set 0, when every child must appear in the frame its parent died.
+		</member>
+		<member name="split_max_pending" type="int" setter="set_split_max_pending" getter="get_split_max_pending" default="100000">
+			The most splits waiting to spawn (0 = no cap). Past it a new split is dropped: the bullet dies, or survives, as if it had not split, the drop is counted in [code]dropped_total[/code] of [method debug_get_split_stats], and one warning reports each overflow. It bounds runaway chains (a stage that splits every generation into many children grows exponentially) and backlogs carried over by [member split_max_children_per_sweep]. Must be 0 or more.
+		</member>
+		<member name="time_scale" type="float" setter="set_time_scale" getter="get_time_scale" default="1.0">
+			Speed of the bullet world. Every volley tick, one-shot effect and bullet timer advances by delta times this value: 1 is real time, 0.25 is slow motion, 0 freezes bullets while the factory keeps processing (collisions already in flight still resolve). Spawners that use this factory run on it too (their cadence, bursts, telegraph, spin and movement, multiplied by their own [member BulletSpawner2D.time_scale]), and so do the bullets they fired. The rescan interval of graze targets and sound fades and intervals stay in real time. Must be finite and 0 or more; any such value is accepted, but one volley tick never covers more than 10 s of bullet time (a huge scale slows down there instead of turning bullets into INF). This is not [member Engine.time_scale].
 		</member>
 	</members>
 	<signals>
 		<signal name="area_entered">
 			<param index="0" name="hit_target_area" type="Object" />
-			<param index="1" name="multimesh_bullets_instance" type="MultiMeshBullets2D" />
+			<param index="1" name="volley" type="BulletVolley2D" />
 			<param index="2" name="bullet_index" type="int" />
-			<param index="3" name="bullets_custom_data" type="Resource" />
-			<param index="4" name="bullet_global_transform" type="Transform2D" />
 			<description>
-				Emitted when a bullet enters a physics area.
+				Emitted live, inside the physics tick, when a bullet enters an [Area2D]: for factory-owned volleys, and for a live spawner's volleys while nothing is connected to the spawner's own [signal BulletSpawner2D.area_entered] (a spawner with its own handler keeps its hits: never both, so nothing is handled twice). One handler here therefore receives every hit nobody handles on a spawner, e.g. of a spawner on each enemy. The bullet is still alive in the handler, with every runtime property readable: [method BulletVolley2D.bullet_get_custom_data], [method BulletVolley2D.get_bullet_transform] (the impact pose), [method BulletVolley2D.get_bullet_velocity], [method BulletVolley2D.get_bullet_collision_count] (this hit is already counted) and the attachment.
+
+				After the handler returns, the plugin decides: if the hit count is still at [member BulletVolley2D.bullet_max_collision_count] the bullet dies (On Destroy effects at the impact pose), otherwise it lives on (On Hit). A handler may veto the kill by lowering the count, disable the bullet itself (no extra effects), free its target (later hits on it are skipped) or pause the factory (the remaining hits wait for the resume). Structural calls ([method reset], [code]free_*[/code], [code]populate_*[/code]) are rejected here: use their [code]*_deferred[/code] twins. Per-bullet edits and spawning apply immediately.
 			</description>
 		</signal>
 		<signal name="body_entered">
 			<param index="0" name="hit_target_body" type="Object" />
-			<param index="1" name="multimesh_bullets_instance" type="MultiMeshBullets2D" />
+			<param index="1" name="volley" type="BulletVolley2D" />
 			<param index="2" name="bullet_index" type="int" />
-			<param index="3" name="bullets_custom_data" type="Resource" />
-			<param index="4" name="bullet_global_transform" type="Transform2D" />
 			<description>
-				Emited when a bullet enters a physics body.
+				Emitted live, inside the physics tick, when a bullet hits a physics body; same contract as [signal area_entered].
 
-				Note: Static bodies can be detected by the bullets, but only if you set the [MultiMeshBulletsData2D]'s [member MultiMeshBulletsData2D.monitorable] property to [code]true[/code] when spawning bullets - this is at the cost of performance of course, so it's better to stick with [Area2D] or other types of bodies for enemies/buildings etc and leave the [member MultiMeshBulletsData2D.monitorable] property to be false.
+				Note: Static bodies are only detected when [member BulletVolleyData2D.monitorable] is [code]true[/code] (it costs performance, so prefer areas or other body types for enemies and buildings).
+			</description>
+		</signal>
+		<signal name="bounce_area_entered">
+			<param index="0" name="hit_target_area" type="Object" />
+			<param index="1" name="volley" type="BulletVolley2D" />
+			<param index="2" name="bullet_index" type="int" />
+			<description>
+				Emitted live when a bullet bounces off an area (the area's layer matches the bounce mask). The reflection is already applied: the handler reads the new velocity and [method BulletVolley2D.bullet_get_bounce_count]. Same handler contract as [signal area_entered]. A bounce that also consumes the hit ([member BulletVolleyData2D.bounce_hit_consumed]) emits this signal first, then [signal area_entered] (unless the handler disabled the bullet).
+			</description>
+		</signal>
+		<signal name="bounce_body_entered">
+			<param index="0" name="hit_target_body" type="Object" />
+			<param index="1" name="volley" type="BulletVolley2D" />
+			<param index="2" name="bullet_index" type="int" />
+			<description>
+				Emitted live when a bullet bounces off a body; same contract as [signal bounce_area_entered].
+			</description>
+		</signal>
+		<signal name="bullet_graze_exited">
+			<param index="0" name="target" type="Node2D" />
+			<param index="1" name="volley" type="BulletVolley2D" />
+			<param index="2" name="bullet_index" type="int" />
+			<param index="3" name="zone" type="GrazeZone2D" />
+			<param index="4" name="deepest_ring_index" type="int" />
+			<description>
+				Emitted live when a bullet that grazed a zone leaves it alive (outside the outermost ring of every target of the zone). [param deepest_ring_index] is the smallest-radius ring touched during that visit and [param target] the target the visit belonged to (null for a point target: [constant BulletSpawner2D.GRAZE_SOURCE_MOUSE], [constant BulletSpawner2D.GRAZE_SOURCE_GLOBAL_POSITIONS]). A bullet killed, cleared, expired or frozen inside never exits. Every exit reaches the factory (right after the owner spawner's own signal).
+			</description>
+		</signal>
+		<signal name="bullet_grazed">
+			<param index="0" name="target" type="Node2D" />
+			<param index="1" name="volley" type="BulletVolley2D" />
+			<param index="2" name="bullet_index" type="int" />
+			<param index="3" name="zone" type="GrazeZone2D" />
+			<param index="4" name="ring_index" type="int" />
+			<description>
+				Emitted live, inside the physics tick right after the bullets moved, when a bullet comes within ring [param ring_index] of [param zone] around [param target] (see [GrazeZone2D]). [param target] is null when the target is a point (a spawner's Mouse or Global Positions source). The bullet is alive in the handler: transforms, velocity and custom data are readable and writable through [param volley]. Several rings entered in one tick fire from the largest radius to the smallest. Every graze in the game reaches the factory whoever owns the volley (the owner [BulletSpawner2D] emits first while it lives), including bullets of spawners already freed: connect here once to count graze for score. Structural calls need their [code]_deferred[/code] twins inside the handler.
+			</description>
+		</signal>
+		<signal name="bullet_split">
+			<param index="0" name="position" type="Vector2" />
+			<param index="1" name="cause" type="int" />
+			<param index="2" name="children" type="BulletVolley2D" />
+			<param index="3" name="depth" type="int" />
+			<description>
+				A bullet of a factory volley split: [param children] is the new volley (exactly [member BulletSplitStage2D.count] bullets, already moving and armed), spawned at [param position] where the parent died. [param cause] is one of the [code]BulletVolley2D.SPLIT_CAUSE_*[/code] constants and [param depth] the children's generation (1 = children of fired bullets). Emitted once per parent right after its children spawned, after the sweep in which it died. Spawner volleys report on their spawner instead ([signal BulletSpawner2D.bullet_split]), or here while nothing is connected there.
+			</description>
+		</signal>
+		<signal name="bullets_cleared">
+			<param index="0" name="positions" type="PackedVector2Array" />
+			<param index="1" name="volley" type="BulletVolley2D" />
+			<param index="2" name="bullet_indexes" type="int[]" />
+			<description>
+				Emitted after [method clear_bullets_in_circle] or [method clear_bullets_in_rect], once per volley that lost bullets, after the factory is no longer busy so handlers may spawn (turn cleared bullets into score items). [param positions] holds the global position of each cleared bullet, parallel to [param bullet_indexes]. The volley may already be back in the pool when this fires, so read the positions, not the volley. Also emitted by [method clear_active_bullets], once per volley that lost bullets.
+			</description>
+		</signal>
+		<signal name="bullets_converted">
+			<param index="0" name="count" type="int" />
+			<param index="1" name="volleys" type="BulletVolley2D[]" />
+			<description>
+				Emitted after a conversion call that converted something: [param count] bullets became pickups, in the new [param volleys] (the same array the call returns). The factory is not busy any more, so a handler may spawn or convert again.
+			</description>
+		</signal>
+		<signal name="bullets_despawned">
+			<param index="0" name="positions" type="PackedVector2Array" />
+			<param index="1" name="volley" type="BulletVolley2D" />
+			<param index="2" name="bullet_indexes" type="int[]" />
+			<description>
+				Emitted once per volley and tick for the bullets that just left through the despawn bounds (see [member despawn_bounds_enabled]), after their On Despawn effects and sounds. [param positions] holds the pose each bullet left from, parallel to [param bullet_indexes]. It runs live inside the sweep: spawn from it (an item where a bullet fell off the screen), but do not free the volley. Nothing is captured while no handler is connected.
+			</description>
+		</signal>
+		<signal name="laser_despawned">
+			<param index="0" name="laser" type="LaserVolley2D" />
+			<param index="1" name="beam_index" type="int" />
+			<param index="2" name="position" type="Vector2" />
+			<description>
+				Emitted inside the tick when a bolt or curvy head of [param laser] leaves the factory's despawn bounds ([member BulletFactory2D.despawn_bounds_enabled]): beam [param beam_index] is spent where it left ([param position], its head), right after its On Despawn sound and effect; the laser finishes once every beam is spent. Its contacts end afterwards. Not emitted for [member LaserData2D.ignore_despawn_bounds] lasers. Factory lasers signal here; a spawner's lasers signal on their [LaserSpawner2D].
+			</description>
+		</signal>
+		<signal name="laser_finished">
+			<param index="0" name="laser" type="LaserVolley2D" />
+			<description>
+				A laser finished (its fade ended, [method LaserVolley2D.end_laser] without fade, or every bolt / curvy beam was spent). It is pooled right after this signal.
+			</description>
+		</signal>
+		<signal name="laser_graze_exited">
+			<param index="0" name="target" type="Object" />
+			<param index="1" name="laser" type="LaserVolley2D" />
+			<param index="2" name="beam_index" type="int" />
+			<param index="3" name="zone" type="GrazeZone2D" />
+			<param index="4" name="deepest_ring_index" type="int" />
+			<description>
+				Beam [param beam_index] of [param laser] left the zone [param zone] of [param target] after grazing it ([param deepest_ring_index] = the innermost ring it touched; [param target] is [code]null[/code] for a point target). Every laser graze exit lands here, after the owner spawner's.
+			</description>
+		</signal>
+		<signal name="laser_grazed">
+			<param index="0" name="target" type="Object" />
+			<param index="1" name="laser" type="LaserVolley2D" />
+			<param index="2" name="beam_index" type="int" />
+			<param index="3" name="zone" type="GrazeZone2D" />
+			<param index="4" name="ring_index" type="int" />
+			<description>
+				Beam [param beam_index] of [param laser] grazed ring [param ring_index] of [param zone] around [param target] ([code]null[/code] for a point target). Every laser graze lands here, after the owner spawner's.
+			</description>
+		</signal>
+		<signal name="laser_hit">
+			<param index="0" name="target" type="Object" />
+			<param index="1" name="laser" type="LaserVolley2D" />
+			<param index="2" name="beam_index" type="int" />
+			<param index="3" name="position" type="Vector2" />
+			<description>
+				Beam [param beam_index] of [param laser] hit [param target] at [param position] (the target projected onto the beam): when the contact starts, then every [member LaserData2D.hit_interval_sec].
+			</description>
+		</signal>
+		<signal name="laser_phase_changed">
+			<param index="0" name="laser" type="LaserVolley2D" />
+			<param index="1" name="phase" type="int" />
+			<description>
+				[param laser] entered [param phase] (see [enum LaserVolley2D.LaserPhase]).
+			</description>
+		</signal>
+		<signal name="laser_pierce_ended">
+			<param index="0" name="target" type="Object" />
+			<param index="1" name="laser" type="LaserVolley2D" />
+			<param index="2" name="beam_index" type="int" />
+			<description>
+				Beam [param beam_index] of [param laser] stopped touching [param target] (it left, the beam moved away or was cut, the laser stopped hitting). A freed target ends silently.
+			</description>
+		</signal>
+		<signal name="laser_pierce_started">
+			<param index="0" name="target" type="Object" />
+			<param index="1" name="laser" type="LaserVolley2D" />
+			<param index="2" name="beam_index" type="int" />
+			<param index="3" name="position" type="Vector2" />
+			<description>
+				Beam [param beam_index] of [param laser] started touching [param target] at [param position]. Always followed by its first [signal laser_hit].
+			</description>
+		</signal>
+		<signal name="laser_wall_hit">
+			<param index="0" name="laser" type="LaserVolley2D" />
+			<param index="1" name="beam_index" type="int" />
+			<param index="2" name="position" type="Vector2" />
+			<param index="3" name="normal" type="Vector2" />
+			<description>
+				Beam [param beam_index] of [param laser] got blocked by a wall at [param position] with [param normal] (once per block; a bolt or curvy head that meets a wall it cannot reflect off is spent after it).
 			</description>
 		</signal>
 		<signal name="life_time_over">
-			<param index="0" name="multimesh_bullets_instance" type="MultiMeshBullets2D" />
+			<param index="0" name="volley" type="BulletVolley2D" />
 			<param index="1" name="bullet_indexes" type="int[]" />
-			<param index="2" name="bullets_custom_data" type="Resource" />
-			<param index="3" name="bullets_global_transforms" type="Transform2D[]" />
 			<description>
-				Emitted when a bullet multimesh's lifetime is over, but only if the [MultiMeshBulletsData2D]'s [member MultiMeshBulletsData2D.is_life_time_over_signal_enabled] is set to [code]true[/code].
+				Emitted live, inside the physics tick, when bullets of a volley reach the end of their lifetime, only if [member BulletVolleyData2D.is_life_time_over_signal_enabled] is on. [param bullet_indexes] lists the expiring bullets, still alive in the handler (custom data, transforms and attachments readable). After the handler, every listed bullet still alive dies with its On Lifetime Over effects, unless the handler extended its life ([method BulletVolley2D.set_life_time_left]) or made the volley infinite. Spawning from the handler is fine; structural calls need their [code]*_deferred[/code] twins.
+			</description>
+		</signal>
+		<signal name="pickup_collected">
+			<param index="0" name="target" type="Node2D" />
+			<param index="1" name="position" type="Vector2" />
+			<param index="2" name="volley" type="BulletVolley2D" />
+			<param index="3" name="bullet_index" type="int" />
+			<param index="4" name="value" type="Variant" />
+			<description>
+				A pickup reached its target (within [member BulletPickupData2D.collect_radius]). [param target] is the node that was followed (null for a point or the mouse), [param position] where the pickup is, [param volley] its pickup volley, [param bullet_index] its slot and [param value] the [member BulletPickupData2D.value] payload. The bullet is still alive in the handler (custom data and transform are readable) and leaves right after it. Emitted on the factory only, exactly once per pickup.
 			</description>
 		</signal>
 		<signal name="reset_finished">
 			<description>
-				Emitted when the [method reset] method finishes.
+				Emitted once after an accepted [method reset] (full or scoped) or [method reset_deferred] has completed and the factory is processing again, so a handler can spawn the next wave right away. A rejected reset emits nothing.
+			</description>
+		</signal>
+		<signal name="volley_spawned">
+			<param index="0" name="volley" type="BulletVolley2D" />
+			<param index="1" name="spawner" type="PatternSpawner2D" />
+			<description>
+				Emitted once per volley life, whatever started it: [method spawn_volley], a spawner's shot, a split's children or a pickup conversion. It arrives at the start of the next factory step, before the volley's first move and after its spawner armed it (homing, graze, sound, flocking, splitting, emitters), so a handler can tag, track or edit it: [code]volley.set_meta("team", 1)[/code], a network id, a debug overlay. [param spawner] is the [BulletSpawner2D] that fired it, or [code]null[/code] for a factory volley (and for a spawner freed since). A life that ended before the step (cleared, pooled, reused) is never announced. Spawns are only recorded while something is connected to this signal. A handler may spawn (announced at the next step), pause the factory (the rest waits for the resume) or free anything.
 			</description>
 		</signal>
 	</signals>
 	<constants>
-		<constant name="DIRECTIONAL_BULLETS" value="0" enum="BulletType">
+		<constant name="INTERPOLATION_OFF" value="0" enum="PhysicsInterpolation">
+			Bullets are drawn at their physics poses.
 		</constant>
-		<constant name="BLOCK_BULLETS" value="1" enum="BulletType">
+		<constant name="INTERPOLATION_ON" value="1" enum="PhysicsInterpolation">
+			Bullets are always drawn between their last two physics poses (pair it with the project setting so the rest of the scene is interpolated too).
 		</constant>
-		<constant name="TOP_LEFT" value="0" enum="Alignment">
-		</constant>
-		<constant name="TOP_CENTER" value="1" enum="Alignment">
-		</constant>
-		<constant name="TOP_RIGHT" value="2" enum="Alignment">
-		</constant>
-		<constant name="CENTER_LEFT" value="3" enum="Alignment">
-		</constant>
-		<constant name="CENTER" value="4" enum="Alignment">
-		</constant>
-		<constant name="CENTER_RIGHT" value="5" enum="Alignment">
-		</constant>
-		<constant name="BOTTOM_LEFT" value="6" enum="Alignment">
-		</constant>
-		<constant name="BOTTOM_CENTER" value="7" enum="Alignment">
-		</constant>
-		<constant name="BOTTOM_RIGHT" value="8" enum="Alignment">
+		<constant name="INTERPOLATION_FOLLOW_PROJECT" value="2" enum="PhysicsInterpolation">
+			Follow [member SceneTree.physics_interpolation] (the project setting, or a script toggling it at runtime).
 		</constant>
 	</constants>
 </class>

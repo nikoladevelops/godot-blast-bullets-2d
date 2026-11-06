@@ -1,0 +1,482 @@
+extends BlastTest
+## Reject-and-keep contract for EVERY spawner property, discovered from
+## get_property_list() so new properties are covered automatically:
+##   - FLOAT: NaN and +Inf are rejected with exactly one error that says the
+##     old value is kept, and the value is unchanged;
+##   - VECTOR2: a NaN vector is rejected the same way;
+##   - PACKED_VECTOR2_ARRAY: a list with a NaN or Inf entry is rejected the
+##     same way;
+##   - INT with an enum hint: an id outside the hint is rejected the same way.
+## Properties that legitimately accept any value are listed with a reason.
+
+## Every rejection message says this (exact wording pinned below).
+const KEEP_TEXT := "keeping the old value"
+
+## FLOAT/VECTOR2 properties with no finiteness rule, and why.
+const ANY_VALUE_OK := {
+}
+
+
+## A spawner of `kind` ("bullet" / "laser"), shooting off, in the tree.
+func _make(kind: String) -> PatternSpawner2D:
+	if kind == "bullet":
+		return make_spawner()
+	var sp := LaserSpawner2D.new()
+	sp.set_shooting_enabled(false)
+	sp.laser_data = H.make_laser()
+	sp.pattern_source = LaserSpawner2D.PATTERN_FROM_HELPER_RING
+	sp.helper_bullets_amount = 4
+	add(sp)
+	sp.set_bullet_factory(factory)
+	return sp
+
+
+## Properties the spawner's class and its plugin bases declare (inherited
+## Node2D ones are the engine's business), as seen on a live instance (usage
+## flags applied).
+func _editor_props(obj: Object) -> Array:
+	var own := {}
+	var cls := StringName(obj.get_class())
+	while cls != &"" and ClassDB.class_get_api_type(cls) == ClassDB.API_EXTENSION:
+		for p in ClassDB.class_get_property_list(cls, true):
+			own[str(p.name)] = true
+		cls = ClassDB.get_parent_class(cls)
+	var out: Array = []
+	for p in obj.get_property_list():
+		if not own.has(str(p.name)):
+			continue
+		var usage := int(p.get("usage", 0))
+		if (usage & PROPERTY_USAGE_STORAGE) == 0 and (usage & PROPERTY_USAGE_EDITOR) == 0:
+			continue
+		if (usage & (PROPERTY_USAGE_GROUP | PROPERTY_USAGE_SUBGROUP | PROPERTY_USAGE_CATEGORY)) != 0:
+			continue
+		out.append(p)
+	return out
+
+
+## Sets `value` and returns a problem string, or "" when the property
+## rejected it loudly (one KEEP_TEXT error) and kept the old value.
+func _probe(sp: PatternSpawner2D, prop: String, value: Variant) -> String:
+	var before: Variant = sp.get(prop)
+	expect_no_errors("clean before probing " + prop)
+	sp.set(prop, value)
+	var after: Variant = sp.get(prop)
+	var seen := 0
+	var wrong := ""
+	for err in get_errors():
+		if err.handled:
+			continue
+		err.handled = true
+		if err.contains_text(KEEP_TEXT):
+			seen += 1
+		else:
+			wrong = str(err.code)
+	if seen != 1 or wrong != "":
+		return "%s = %s: expected one '%s' error, got %d (other: %s)" % [prop, str(value), KEEP_TEXT, seen, wrong]
+	if typeof(before) != typeof(after) or not (before == after or (typeof(before) == TYPE_FLOAT and is_nan(before) and is_nan(after))):
+		return "%s = %s: value changed from %s to %s" % [prop, str(value), str(before), str(after)]
+	return ""
+
+
+func _assert_none(bad: Array, what: String) -> void:
+	assert_true(bad.is_empty(), "%s - %d problem(s):\n  %s" % [what, bad.size(), "\n  ".join(bad)])
+
+
+func test_float_properties_reject_nan_and_inf(kind: String = use_parameters(["bullet", "laser"])) -> void:
+	var sp := _make(kind)
+	var bad: Array = []
+	var probed := 0
+	for p in _editor_props(sp):
+		var prop := str(p.name)
+		if int(p.type) != TYPE_FLOAT or ANY_VALUE_OK.has(prop):
+			continue
+		probed += 1
+		for v in [NAN, INF]:
+			var problem := _probe(sp, prop, v)
+			if problem != "":
+				bad.append(problem)
+	assert_gt(probed, 100, "the sweep really covers the float surface")
+	_assert_none(bad, "float setters reject NaN/Inf and keep the old value")
+
+
+func test_vector_properties_reject_nan(kind: String = use_parameters(["bullet", "laser"])) -> void:
+	var sp := _make(kind)
+	var bad: Array = []
+	var probed := 0
+	for p in _editor_props(sp):
+		var prop := str(p.name)
+		if int(p.type) != TYPE_VECTOR2 or ANY_VALUE_OK.has(prop):
+			continue
+		probed += 1
+		var problem := _probe(sp, prop, Vector2(NAN, 1.0))
+		if problem != "":
+			bad.append(problem)
+	assert_gt(probed, 8, "the sweep really covers the vector surface")
+	_assert_none(bad, "vector setters reject NaN and keep the old value")
+
+
+func test_point_list_properties_reject_non_finite_entries(kind: String = use_parameters(["bullet", "laser"])) -> void:
+	var sp := _make(kind)
+	var bad: Array = []
+	var probed := 0
+	for p in _editor_props(sp):
+		var prop := str(p.name)
+		if int(p.type) != TYPE_PACKED_VECTOR2_ARRAY or ANY_VALUE_OK.has(prop):
+			continue
+		probed += 1
+		sp.set(prop, PackedVector2Array([Vector2(1, 2)])) # an old value worth keeping
+		for v in [PackedVector2Array([Vector2(3, 4), Vector2(NAN, 0)]), PackedVector2Array([Vector2(0, INF)])]:
+			var problem := _probe(sp, prop, v)
+			if problem != "":
+				bad.append(problem)
+	assert_gte(probed, 1, "the sweep covers every point list (graze_global_positions)")
+	_assert_none(bad, "point lists reject non-finite entries and keep the old value")
+
+
+func test_color_properties_reject_nan(kind: String = use_parameters(["bullet", "laser"])) -> void:
+	var sp := _make(kind)
+	var bad: Array = []
+	var probed := 0
+	for p in _editor_props(sp):
+		if int(p.type) != TYPE_COLOR:
+			continue
+		probed += 1
+		var problem := _probe(sp, str(p.name), Color(NAN, 0.5, 0.5, 1.0))
+		if problem != "":
+			bad.append(problem)
+	assert_gt(probed, 4, "the sweep really covers the colour surface")
+	_assert_none(bad, "colour setters reject NaN and keep the old value")
+
+
+func test_enum_properties_reject_unknown_ids(kind: String = use_parameters(["bullet", "laser"])) -> void:
+	var sp := _make(kind)
+	var bad: Array = []
+	var probed := 0
+	for p in _editor_props(sp):
+		var prop := str(p.name)
+		if int(p.type) != TYPE_INT or int(p.hint) != PROPERTY_HINT_ENUM:
+			continue
+		var ids: Array = []
+		var next := 0
+		for entry in str(p.hint_string).split(","):
+			var parts := entry.split(":")
+			var id := int(parts[1]) if parts.size() > 1 else next
+			ids.append(id)
+			next = id + 1
+		probed += 1
+		for v in [ids.max() + 1, ids.min() - 1]:
+			var problem := _probe(sp, prop, v)
+			if problem != "":
+				bad.append(problem)
+	assert_gt(probed, 20, "the sweep really covers the enum surface")
+	_assert_none(bad, "enum setters reject ids outside their hint and keep the old value")
+
+
+# --- Specific rules --------------------------------------------------------
+
+func test_caps_match_the_generators() -> void:
+	var sp := make_spawner()
+	for case in [
+		["helper_ellipse_gap_count", 20001, "helper_ellipse_gap_count must be between 0 and 20000"],
+		["helper_star_points", 20001, "helper_star_points must be between 2 and 20000"],
+		["helper_polygon_vertices", 20001, "helper_polygon_vertices must be between 3 and 20000"],
+		["helper_waterfall_columns", 80001, "helper_waterfall_columns must be between 1 and 80000"],
+		["helper_waterfall_rows", 80001, "helper_waterfall_rows must be between 1 and 80000"],
+		["helper_lattice_columns", 80001, "helper_lattice_columns must be between 1 and 80000"],
+		["helper_lattice_rows", 80001, "helper_lattice_rows must be between 1 and 80000"],
+		["burst_count", 0, "burst_count must be >= 1"],
+		["helper_line_spacing", 0.0, "helper_line_spacing must be finite and > 0"],
+		["helper_line_spacing", -5.0, "helper_line_spacing must be finite and > 0"],
+		["helper_ring_y_scale", 0.0, "helper_ring_y_scale must be finite and > 0"],
+		["helper_ring_y_scale", -1.0, "helper_ring_y_scale must be finite and > 0"],
+	]:
+		var before: Variant = sp.get(case[0])
+		sp.set(case[0], case[1])
+		expect_error_sequence([case[2]], "%s = %s" % [case[0], str(case[1])])
+		assert_eq(sp.get(case[0]), before, "%s kept its old value" % case[0])
+
+
+## No hidden burst cap: a chain fires one shot per interval (and at most
+## max_shots_per_frame in a frame), so any length the developer picks is fine.
+func test_long_bursts_are_accepted() -> void:
+	var sp := make_spawner()
+	sp.burst_count = 5000
+	expect_no_errors("a 5000-shot burst is accepted")
+	assert_eq(sp.burst_count, 5000, "kept")
+
+
+func test_grid_product_over_the_cap_warns_once_and_fires_nothing() -> void:
+	var sp := make_spawner(null, BulletSpawner2D.PATTERN_FROM_HELPER_LATTICE, 10)
+	sp.helper_lattice_columns = 1000
+	sp.helper_lattice_rows = 1000 # 1000000 > 80000 slots
+	assert_eq(sp.collect_spawn_transforms().size(), 0, "no slots")
+	assert_eq(sp.collect_spawn_transforms().size(), 0, "still none")
+	expect_warning_sequence(["BulletSpawner2D: helper_lattice_columns * helper_lattice_rows exceeds 80000 slots; lower them."], "warned once, not per collect")
+
+
+func test_corridor_width_and_gap_load_in_any_order() -> void:
+	# Width is stored (and loaded) before the gap: a narrow corridor used to
+	# be rejected at load because the default gap (96) was still in place.
+	var src := BulletSpawner2D.new()
+	src.set_shooting_enabled(false)
+	src.helper_corridor_gap_width = 20.0
+	src.helper_corridor_width = 60.0
+	var scene := PackedScene.new()
+	assert_eq(scene.pack(src), OK, "packs")
+	src.free()
+	var loaded: BulletSpawner2D = scene.instantiate()
+	assert_eq(loaded.helper_corridor_width, 60.0, "narrow width survives loading")
+	assert_eq(loaded.helper_corridor_gap_width, 20.0, "gap survives loading")
+	loaded.free()
+
+
+func test_corridor_gap_wider_than_wall_is_clamped_with_one_warning() -> void:
+	var sp := make_spawner(null, BulletSpawner2D.PATTERN_FROM_HELPER_CORRIDOR, 10)
+	sp.helper_corridor_width = 100.0
+	sp.helper_corridor_gap_width = 150.0 # accepted alone: load order must not matter
+	var pts: Array = sp.collect_spawn_transforms()
+	sp.collect_spawn_transforms()
+	assert_eq(pts.size(), 10, "every bullet still fires")
+	for t in pts:
+		var x: float = (t as Transform2D).origin.x
+		assert_true(absf(x) >= 25.0 - 0.01 and absf(x) <= 50.0 + 0.01, "door clamped to half the width (x=%.2f)" % x)
+	expect_warning_sequence(["BulletSpawner2D: helper_corridor_gap_width must be smaller than helper_corridor_width; using half the width for the door."], "warned once")
+
+
+func test_node_paths_reject_wrong_types_in_tree() -> void:
+	var sp := make_spawner()
+	var plain := Node.new()
+	add(plain)
+	var node2d := Node2D.new()
+	add(node2d)
+	var path_to_plain := sp.get_path_to(plain)
+	var path_to_2d := sp.get_path_to(node2d)
+	var old_factory: NodePath = sp.bullet_factory_path
+	sp.bullet_factory_path = path_to_2d
+	expect_error_sequence(["bullet_factory_path must point to a BulletFactory2D"])
+	assert_eq(sp.bullet_factory_path, old_factory, "factory path kept")
+	sp.transforms_generator = path_to_plain
+	expect_error_sequence(["transforms_generator must point to a Node2D"])
+	sp.helper_aimed_target = path_to_plain
+	expect_error_sequence(["helper_aimed_target must point to a Node2D"])
+	sp.helper_path2d_path = path_to_2d
+	expect_error_sequence(["helper_path2d_path must point to a Path2D"])
+	sp.movement_path = path_to_2d
+	expect_error_sequence(["movement_path must point to a Path2D"])
+	sp.transforms_generator = NodePath("DoesNotExistYet")
+	expect_no_errors("an unresolved path is accepted (the node may come later)")
+	assert_eq(sp.transforms_generator, NodePath("DoesNotExistYet"), "pending path stored")
+
+
+func test_shorter_interval_applies_to_the_running_wait() -> void:
+	var sp := make_spawner()
+	sp.set_shoot_interval_sec(10.0)
+	watch_signals(sp)
+	sp.set_shooting_enabled(true) # first shot is due at once, then a 10 s wait
+	for i in 5:
+		await idle(1)
+		if get_signal_emit_count(sp, "volley_fired") > 0:
+			break
+	assert_eq(get_signal_emit_count(sp, "volley_fired"), 1, "first shot")
+	sp.set_shoot_interval_sec(0.05) # the running 10 s wait shrinks to 0.05 s
+	for i in 20:
+		await idle(1)
+		if get_signal_emit_count(sp, "volley_fired") > 1:
+			break
+	assert_eq(get_signal_emit_count(sp, "volley_fired"), 2, "second shot on the new, shorter interval")
+	sp.set_shooting_enabled(false)
+
+
+func test_out_of_range_skip_index_warns_once_and_never_from_the_preview() -> void:
+	var sp := make_preview_spawner(BulletSpawner2D.PATTERN_FROM_HELPER_RING, 6)
+	sp.helper_skip_indices = PackedInt32Array([99])
+	await idle(6) # several preview rebuilds
+	expect_warning_sequence([], "the preview stays quiet")
+	assert_true(sp.shoot_once(), "shot 1")
+	assert_true(sp.shoot_once(), "shot 2")
+	expect_warning_sequence(["BulletSpawner2D: helper_skip_indices holds an index outside 0..5; it is ignored."], "one warning for two shots")
+
+
+## A strict range hint (min,max without or_greater / or_less) is a promise:
+## a value just outside it is rejected the same way. Pure editor sliders
+## (any value is valid) are listed in RANGE_IS_A_SLIDER with a reason.
+const RANGE_IS_A_SLIDER := {
+}
+
+
+func test_range_hints_are_enforced(kind: String = use_parameters(["bullet", "laser"])) -> void:
+	var sp := _make(kind)
+	var bad: Array = []
+	var probed := 0
+	for p in _editor_props(sp):
+		var prop := str(p.name)
+		var t := int(p.type)
+		if int(p.get("hint", 0)) != PROPERTY_HINT_RANGE or RANGE_IS_A_SLIDER.has(prop) or (t != TYPE_FLOAT and t != TYPE_INT):
+			continue
+		var hs := str(p.get("hint_string", ""))
+		var parts := hs.split(",")
+		if parts.size() < 2:
+			continue
+		var lo := float(parts[0])
+		var hi := float(parts[1])
+		var step := 1.0 if t == TYPE_INT else maxf(absf(hi - lo), 1.0) * 0.25
+		var outside: Array = []
+		if not hs.contains("or_less"):
+			if t == TYPE_INT:
+				outside.append(int(lo) - 1)
+			else:
+				outside.append(lo - step)
+		if not hs.contains("or_greater"):
+			if t == TYPE_INT:
+				outside.append(int(hi) + 1)
+			else:
+				outside.append(hi + step)
+		for v in outside:
+			probed += 1
+			var problem := _probe(sp, prop, v)
+			if problem != "":
+				bad.append(problem)
+	assert_gt(probed, 10, "the sweep reached the ranged properties (%d probes)" % probed)
+	_assert_none(bad, "values outside a strict range hint are rejected and the old value kept")
+
+
+## A finite double above what real_t holds (1e39 > FLT_MAX in a float build)
+## would turn into INF in the pattern, homing or orbit math. Every float
+## property either refuses it loudly (and keeps the old value) or takes it
+## and still fires a clean volley: no error at the shot, every bullet finite.
+func test_float_properties_never_overflow_real_t(kind: String = use_parameters(["bullet", "laser"])) -> void:
+	var target: Node2D = add(Node2D.new())
+	target.position = Vector2(300, 0)
+	var bad: Array = []
+	for p in _editor_props(_make(kind)):
+		if int(p.type) != TYPE_FLOAT:
+			continue
+		var prop := str(p.name)
+		var sp: PatternSpawner2D
+		if kind == "bullet":
+			var bs := make_spawner(H.make_volley_data(4, 50.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
+			bs.set_homing_enabled(true)
+			bs.set_homing_target_source(BulletSpawner2D.HOMING_SOURCE_NODE_PATH)
+			bs.set_homing_target_path(bs.get_path_to(target))
+			bs.orbiting_enabled = true
+			sp = bs
+		else:
+			var ls := _make("laser") as LaserSpawner2D
+			ls.laser_data.aim = LaserData2D.LASER_AIM_LOCK_ON
+			ls.laser_target_source = LaserSpawner2D.LASER_TARGET_NODE_PATH
+			ls.laser_target_path = ls.get_path_to(target)
+			sp = ls
+		var before: Variant = sp.get(prop)
+		sp.set(prop, 1e39)
+		var refused := 0
+		for err in get_errors():
+			if not err.handled:
+				err.handled = true
+				if err.contains_text(KEEP_TEXT):
+					refused += 1
+				else:
+					bad.append("%s = 1e39: unexpected error %s" % [prop, err.code])
+		if refused > 0:
+			if sp.get(prop) != before:
+				bad.append("%s = 1e39: refused but changed" % prop)
+			sp.queue_free()
+			continue
+		if not sp.shoot_once():
+			bad.append("%s = 1e39: accepted, then the shot failed" % prop)
+		if sp is BulletSpawner2D:
+			for v in (sp as BulletSpawner2D).get_live_volleys():
+				for i in v.get_amount_bullets():
+					if not v.get_bullet_transform(i).origin.is_finite():
+						bad.append("%s = 1e39: accepted, bullet %d not finite" % [prop, i])
+						break
+		else:
+			factory.debug_advance_time(1.0 / 60.0)
+			for l in (sp as LaserSpawner2D).get_live_lasers():
+				for i in l.get_beam_count():
+					if not (l.get_beam_start(i).is_finite() and l.get_beam_end(i).is_finite()):
+						bad.append("%s = 1e39: accepted, beam %d not finite" % [prop, i])
+						break
+		for err in get_errors():
+			if not err.handled:
+				err.handled = true
+				bad.append("%s = 1e39: accepted, then the shot reported %s" % [prop, err.code])
+		sp.queue_free()
+	_assert_none(bad, "float properties stay within real_t")
+
+
+## GDScript ints are 64-bit: a pattern knob never wraps one into range
+## (2^32 + 3 is not 3). The table-driven knobs, BulletPatterns2D.generate and
+## spawn_pattern_list entries refuse a value outside 32 bits and keep the old
+## one.
+func test_pattern_ints_never_wrap_from_64_bits() -> void:
+	const WIDE := 4294967299 # 2^32 + 3
+	var sp := make_spawner()
+	var bad: Array = []
+	for p in _editor_props(sp):
+		var prop := str(p.name)
+		if int(p.type) != TYPE_INT or not prop.begins_with("helper_") or prop.begins_with("helper_path2d_"):
+			continue
+		var problem := _probe(sp, prop, WIDE)
+		if problem != "":
+			bad.append(problem)
+	_assert_none(bad, "table knobs refuse 64-bit ints")
+	BulletPatterns2D.generate(BulletSpawner2D.PATTERN_FROM_HELPER_GRID, 4, Transform2D(), {"helper_grid_alignment": WIDE})
+	expect_error_sequence(["BulletPatterns2D.generate: helper_grid_alignment must be between -2147483648 and 2147483647, keeping the old value."])
+	BulletPatterns2D.generate(BulletSpawner2D.PATTERN_FROM_HELPER_PATH2D, 4, Transform2D(), {"helper_path2d_space": WIDE, "path_points": PackedVector2Array([Vector2.ZERO, Vector2(10, 0)])})
+	expect_error_sequence(["BulletPatterns2D.generate: helper_path2d_space must be an int in [0, 1], keeping the old value."])
+	var before_source := sp.pattern_source
+	var before_amount := sp.helper_bullets_amount
+	sp.spawn_pattern_list([{"helper_bullets_amount": WIDE + 1}], true)
+	expect_errors_containing("helper_bullets_amount must be between -2147483648 and 2147483647", 1)
+	sp.spawn_pattern_list([{"pattern_source": WIDE}], true)
+	expect_error_sequence(["BulletSpawner2D::spawn_pattern_list: entry 'pattern_source' out of range, keeping current."])
+	sp.spawn_pattern_list([{"preset": WIDE}], true)
+	expect_errors_containing("preset out of range", 1)
+	assert_eq([sp.pattern_source, sp.helper_bullets_amount], [before_source, before_amount], "nothing applied")
+
+
+## Setting shoot_interval_sec (even to its own value) never cuts a wait the
+## settings may roll (shoot_interval_max_sec, reload jitter) or the initial
+## delay; a shorter interval still shortens the running wait (above).
+func test_the_interval_setter_keeps_rolled_waits_and_the_initial_delay() -> void:
+	var sp := make_spawner()
+	sp.shoot_interval_sec = 0.1
+	sp.shoot_interval_max_sec = 10.0
+	sp.reload_jitter_seed = 3
+	watch_signals(sp)
+	sp.set_shooting_enabled(true)
+	for i in 5:
+		await idle(1)
+		if get_signal_emit_count(sp, "volley_fired") > 0:
+			break
+	var left := sp.get_shoot_time_left()
+	assert_gt(left, 0.2, "a rolled wait above the minimum")
+	sp.shoot_interval_sec = 0.1
+	assert_almost_eq(sp.get_shoot_time_left(), left, 0.000001, "the same interval keeps the rolled wait")
+	sp.shoot_interval_sec = 0.05
+	assert_almost_eq(sp.get_shoot_time_left(), left, 0.000001, "a wait the new range can still roll is kept")
+	sp.shoot_interval_max_sec = 0.0
+	sp.shoot_interval_sec = 0.05
+	assert_almost_eq(sp.get_shoot_time_left(), 0.05, 0.000001, "a wait the settings can no longer roll shrinks")
+	var late := make_spawner()
+	late.shoot_initial_delay_sec = 5.0
+	late.shoot_interval_sec = 1.0
+	late.reset_shooting()
+	late.set_shooting_enabled(true)
+	late.shoot_interval_sec = 0.5
+	assert_almost_eq(late.get_shoot_time_left(), 5.0, 0.000001, "the initial delay is not an interval")
+
+
+## set_helper_path2d_node refuses a node that is not a Path2D (the error and
+## the kept value of the helper_path2d_path setter); null clears it.
+func test_helper_path2d_node_refuses_a_non_path2d() -> void:
+	var sp := make_spawner()
+	var good := Path2D.new()
+	add(good)
+	sp.set_helper_path2d_node(good)
+	var plain: Node2D = add(Node2D.new())
+	sp.set_helper_path2d_node(plain)
+	expect_error_sequence(["BulletSpawner2D: helper_path2d_path must point to a Path2D, keeping the old value."])
+	assert_eq(sp.get_helper_path2d_node(), good, "kept")
+	sp.set_helper_path2d_node(null)
+	assert_null(sp.get_helper_path2d_node(), "null clears it")

@@ -1,9 +1,10 @@
 [gd_scene format=3 uid="uid://cjrcvxa7bnus"]
 
 [ext_resource type="Script" uid="uid://dpcvrqqwn57li" path="res://shared/enemies/enemy_turret/enemy_turret.gd" id="1_3gihl"]
-[ext_resource type="Texture2D" uid="uid://dwewxrfjic31m" path="res://shared/art/enemy_turret/enemy_turret_holder.png" id="1_me7l0"]
-[ext_resource type="Texture2D" uid="uid://ckhv0nqgp6e53" path="res://shared/art/enemy_turret/enemy_turret.png" id="2_wqeu6"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_turret/turret_base.png" id="1_me7l0"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_turret/turret_gun.png" id="2_wqeu6"]
 [ext_resource type="PackedScene" uid="uid://d17ruamw4uuqo" path="res://shared/components/health_bar_component/health_bar_component.tscn" id="4_1br1k"]
+[ext_resource type="SpriteFrames" uid="uid://dm6fv2ulo5qm6" path="res://shared/enemies/enemy_bullet_sprite_frames.tres" id="5_6vbbr"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_hvh1d"]
 radius = 399.212
@@ -21,17 +22,15 @@ monitoring = false
 script = ExtResource("1_3gihl")
 
 [node name="TurretBase" type="Sprite2D" parent="." unique_id=72497411]
-scale = Vector2(6, 6)
+scale = Vector2(0.75, 0.75)
 texture = ExtResource("1_me7l0")
 
 [node name="TurretGun" type="Sprite2D" parent="." unique_id=1116340627]
-rotation = -1.5708
-scale = Vector2(6, 6)
+scale = Vector2(0.75, 0.75)
 texture = ExtResource("2_wqeu6")
 
 [node name="BulletMarker" type="Marker2D" parent="TurretGun" unique_id=2092693056]
-position = Vector2(-1.33514e-05, 13.5)
-rotation = 1.5708
+position = Vector2(109, 0)
 
 [node name="DetectArea2D" type="Area2D" parent="." unique_id=237426411]
 visible = false
@@ -60,6 +59,10 @@ collision_mask = 0
 [node name="CollisionShape2D" type="CollisionShape2D" parent="StaticBody2D" unique_id=2071477083]
 position = Vector2(0, -3)
 shape = SubResource("CircleShape2D_mpoao")
+
+[node name="BulletAnimatedSprite" type="AnimatedSprite2D" parent="." unique_id=470460003]
+visible = false
+sprite_frames = ExtResource("5_6vbbr")
 
 [connection signal="body_entered" from="DetectArea2D" to="." method="_on_detect_area_2d_body_entered"]
 [connection signal="body_exited" from="DetectArea2D" to="." method="_on_detect_area_2d_body_exited"]

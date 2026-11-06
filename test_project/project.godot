@@ -20,13 +20,21 @@ config/icon="res://icon.svg"
 window/size/mode=2
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
-window/vsync/vsync_mode=0
 
 [editor]
 
 movie_writer/movie_file="C:/Users/Admin/Desktop/2025/yt/test.avi"
 movie_writer/disable_vsync=true
 movie_writer/mjpeg_quality=1.0
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/gut/plugin.cfg")
+
+[global_group]
+
+player=""
+enemy=""
 
 [input]
 
@@ -84,5 +92,6 @@ pointing/emulate_touch_from_mouse=true
 
 [rendering]
 
-textures/canvas_textures/default_texture_filter=0
+textures/canvas_textures/default_texture_filter=3
 textures/vram_compression/import_etc2_astc=true
+viewport/hdr_2d=true

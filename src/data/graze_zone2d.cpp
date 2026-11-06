@@ -1,0 +1,166 @@
+#include "data/graze_zone2d.hpp"
+
+#include "core/assign_if_changed2d.hpp"
+#include <godot_cpp/core/class_db.hpp>
+#include <godot_cpp/variant/utility_functions.hpp>
+
+using namespace godot;
+namespace BlastBullets2D {
+
+bool GrazeZone2D::get_enabled() const { return enabled; }
+void GrazeZone2D::set_enabled(bool value) {
+	if (enabled == value) {
+		return;
+	}
+	if (!assign_if_changed2d(enabled, value)) {
+		return;
+	}
+	emit_changed();
+}
+
+int GrazeZone2D::get_ring_count() const { return ring_count; }
+void GrazeZone2D::set_ring_count(int value) {
+	if (value < 1 || value > MAX_RINGS) {
+		UtilityFunctions::push_error("GrazeZone2D: ring_count must be between 1 and 4, keeping the old value.");
+		return;
+	}
+	if (ring_count == value) {
+		return;
+	}
+	ring_count = value;
+	notify_property_list_changed();
+	emit_changed();
+}
+
+void GrazeZone2D::store_ring_radius(int index, real_t value, const char *property_name) {
+	if (!Math::is_finite(value) || value <= 0.0) {
+		UtilityFunctions::push_error(String("GrazeZone2D: ") + property_name + " must be finite and > 0, keeping the old value.");
+		return;
+	}
+	if (ring_radii[index] == value) {
+		return;
+	}
+	if (!assign_if_changed2d(ring_radii[index], value)) {
+		return;
+	}
+	emit_changed();
+}
+
+real_t GrazeZone2D::get_ring_radius(int index) const {
+	if (index < 0 || index >= MAX_RINGS) {
+		UtilityFunctions::push_error("GrazeZone2D.get_ring_radius: index " + String::num_int64(index) + " is out of range 0..3.");
+		return 0.0;
+	}
+	return ring_radii[index];
+}
+
+void GrazeZone2D::set_ring_radius(int index, real_t value) {
+	if (index < 0 || index >= MAX_RINGS) {
+		UtilityFunctions::push_error("GrazeZone2D.set_ring_radius: index " + String::num_int64(index) + " is out of range 0..3, nothing changed.");
+		return;
+	}
+	static const char *const names[MAX_RINGS] = { "ring_1_radius", "ring_2_radius", "ring_3_radius", "ring_4_radius" };
+	store_ring_radius(index, value, names[index]);
+}
+
+PackedFloat32Array GrazeZone2D::get_active_ring_radii() const {
+	PackedFloat32Array out;
+	out.resize(ring_count);
+	for (int i = 0; i < ring_count; ++i) {
+		out.set(i, ring_radii[i]);
+	}
+	return out;
+}
+
+bool GrazeZone2D::get_count_bullet_size() const { return count_bullet_size; }
+void GrazeZone2D::set_count_bullet_size(bool value) {
+	if (count_bullet_size == value) {
+		return;
+	}
+	if (!assign_if_changed2d(count_bullet_size, value)) {
+		return;
+	}
+	emit_changed();
+}
+
+GrazeZone2D::Regraze GrazeZone2D::get_regraze() const { return regraze; }
+void GrazeZone2D::set_regraze(Regraze value) {
+	if (value < REGRAZE_ONCE || value > REGRAZE_AFTER_EXIT) {
+		UtilityFunctions::push_error("GrazeZone2D: regraze must be 0 (Once) or 1 (After Exit), keeping the old value.");
+		return;
+	}
+	if (regraze == value) {
+		return;
+	}
+	if (!assign_if_changed2d(regraze, value)) {
+		return;
+	}
+	emit_changed();
+}
+
+Color GrazeZone2D::get_preview_color() const { return preview_color; }
+void GrazeZone2D::set_preview_color(const Color &value) {
+	if (!Math::is_finite(value.r) || !Math::is_finite(value.g) || !Math::is_finite(value.b) || !Math::is_finite(value.a)) {
+		UtilityFunctions::push_error("GrazeZone2D: preview_color must be finite, keeping the old value.");
+		return;
+	}
+	if (preview_color == value) {
+		return;
+	}
+	if (!assign_if_changed2d(preview_color, value)) {
+		return;
+	}
+	emit_changed();
+}
+
+void GrazeZone2D::_validate_property(PropertyInfo &p_property) const {
+	const String name = p_property.name;
+	if (!name.begins_with("ring_") || !name.ends_with("_radius")) {
+		return;
+	}
+	const int number = name.substr(5, name.length() - 12).to_int();
+	if (number > ring_count) {
+		p_property.usage &= ~PROPERTY_USAGE_EDITOR;
+	}
+}
+
+void GrazeZone2D::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("get_enabled"), &GrazeZone2D::get_enabled);
+	ClassDB::bind_method(D_METHOD("set_enabled", "value"), &GrazeZone2D::set_enabled);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "enabled"), "set_enabled", "get_enabled");
+
+	ClassDB::bind_method(D_METHOD("get_ring_count"), &GrazeZone2D::get_ring_count);
+	ClassDB::bind_method(D_METHOD("set_ring_count", "value"), &GrazeZone2D::set_ring_count);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "ring_count", PROPERTY_HINT_RANGE, "1,4,1"), "set_ring_count", "get_ring_count");
+
+#define GRAZE_BIND_RING(N)                                                                                  \
+	ClassDB::bind_method(D_METHOD("get_ring_" #N "_radius"), &GrazeZone2D::get_ring_##N##_radius);          \
+	ClassDB::bind_method(D_METHOD("set_ring_" #N "_radius", "value"), &GrazeZone2D::set_ring_##N##_radius); \
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "ring_" #N "_radius", PROPERTY_HINT_RANGE, "0.5,512,0.5,or_greater,suffix:px"), "set_ring_" #N "_radius", "get_ring_" #N "_radius");
+	GRAZE_BIND_RING(1)
+	GRAZE_BIND_RING(2)
+	GRAZE_BIND_RING(3)
+	GRAZE_BIND_RING(4)
+#undef GRAZE_BIND_RING
+
+	ClassDB::bind_method(D_METHOD("get_count_bullet_size"), &GrazeZone2D::get_count_bullet_size);
+	ClassDB::bind_method(D_METHOD("set_count_bullet_size", "value"), &GrazeZone2D::set_count_bullet_size);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "count_bullet_size"), "set_count_bullet_size", "get_count_bullet_size");
+
+	ClassDB::bind_method(D_METHOD("get_regraze"), &GrazeZone2D::get_regraze);
+	ClassDB::bind_method(D_METHOD("set_regraze", "value"), &GrazeZone2D::set_regraze);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "regraze", PROPERTY_HINT_ENUM, "Once:0,After Exit:1"), "set_regraze", "get_regraze");
+
+	ClassDB::bind_method(D_METHOD("get_preview_color"), &GrazeZone2D::get_preview_color);
+	ClassDB::bind_method(D_METHOD("set_preview_color", "value"), &GrazeZone2D::set_preview_color);
+	ADD_PROPERTY(PropertyInfo(Variant::COLOR, "preview_color"), "set_preview_color", "get_preview_color");
+
+	ClassDB::bind_method(D_METHOD("get_ring_radius", "index"), &GrazeZone2D::get_ring_radius);
+	ClassDB::bind_method(D_METHOD("set_ring_radius", "index", "value"), &GrazeZone2D::set_ring_radius);
+	ClassDB::bind_method(D_METHOD("get_active_ring_radii"), &GrazeZone2D::get_active_ring_radii);
+
+	BIND_CONSTANT(MAX_RINGS);
+	BIND_ENUM_CONSTANT(REGRAZE_ONCE);
+	BIND_ENUM_CONSTANT(REGRAZE_AFTER_EXIT);
+}
+} //namespace BlastBullets2D

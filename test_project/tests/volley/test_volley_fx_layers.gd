@@ -1,0 +1,1920 @@
+extends BlastTest
+## Volley sprite-effect layers suite: REAL physics (no mocks).
+## Covers: custom-frame validation, ON_SPAWN flash fires + expires, trail
+## follows + dies on disable + resumes on wake, hit sparks on counted hits,
+## destroy explosion on collision-kill only (never on timeout), trigger
+## chance gate, opt-in desync across shards, per-bullet trail toggles,
+## play_effect_animation switch, pool-reuse reseed, ring caps (explicit +
+## auto), 24-frame bake cap, applied z/tint/texture/visibility/light,
+## bounce sparks, spawner integration, manual hatch +
+## clear, interpolation agreement, ramp tints, volley self_modulate,
+## rotation offsets + spin (trail + one-shot), On Clear manual visuals,
+## volley fade in/out + tint-over-life ramp, inspector trigger hint,
+## layer fades (one-shot envelope + trail volley-age envelope),
+## whiten override (exact-color frames, alpha preserved, fallback),
+## bullet whiten override (exact tint, toggle, reuse).
+
+
+
+func _fx_data(from: Vector2, speed: float, layers: Array, bounce: bool = true) -> BulletVolleyData2D:
+	var d := BulletVolleyData2D.new()
+	d.sprite_frames = H.make_sprite_frames()
+	d.transforms = [Transform2D(0.0, from)]
+	var sp := BulletSpeedData2D.new()
+	sp.speed = speed
+	sp.max_speed = 3000.0
+	sp.acceleration = 0.0
+	d.all_bullet_speed_data = [sp]
+	d.max_life_time = 8.0
+	d.texture_size = Vector2(16, 16)
+	d.monitorable = true
+	d.set_collision_layer_from_array([2])
+	d.set_collision_mask_from_array([4])
+	if bounce:
+		d.set_bounce_mask_from_array([4])
+	d.effect_layers = layers
+	return d
+
+func _make_wall(pos: Vector2) -> StaticBody2D:
+	var wall_body := StaticBody2D.new()
+	wall_body.position = pos
+	wall_body.collision_layer = 8
+	wall_body.collision_mask = 2
+	var col := CollisionShape2D.new()
+	var box := RectangleShape2D.new()
+	box.size = Vector2(20, 400)
+	col.shape = box
+	wall_body.add_child(col)
+	add(wall_body)
+	return wall_body
+
+func _settle(fx_factory: BulletFactory2D) -> void:
+	await idle(1)
+	await idle(1)
+	fx_factory.free_active_bullets()
+	fx_factory.clear_sprite_effects()
+	await physics()
+
+func _make_frames(count: int, anims: Array = ["default"], col: Color = Color(1, 1, 1, 1)) -> SpriteFrames:
+	var sf := SpriteFrames.new()
+	for a in anims:
+		if not sf.has_animation(a):
+			sf.add_animation(a)
+		sf.set_animation_speed(a, 10.0)
+		sf.set_animation_loop(a, false)
+		for i in count:
+			var img := Image.create_empty(8, 8, false, Image.FORMAT_RGBA8)
+			img.fill(col)
+			sf.add_frame(a, ImageTexture.create_from_image(img))
+	return sf
+
+func _make_layer(trigger: int, count: int = 4, anims: Array = ["default"]) -> EffectLayerData2D:
+	var l := EffectLayerData2D.new()
+	l.trigger = trigger as EffectLayerData2D.EffectTrigger
+	l.sprite_frames = _make_frames(count, anims)
+	return l
+
+func _fx_live_tint(fx_factory: BulletFactory2D, layer: int) -> Color:
+	var st: Dictionary = fx_factory.debug_get_effect_state()
+	var bakes: Array = st.get("bakes", [])
+	for b in bakes:
+		if int(b.get("layer", -1)) != layer:
+			continue
+		var live: Array = b.get("live_slots", [])
+		if live.is_empty():
+			continue
+		return live[0].get("tint", Color(-1, -1, -1, -1))
+	return Color(-1, -1, -1, -1)
+
+func _fx_trail_tint(v: BulletVolley2D) -> Color:
+	var info: Dictionary = v.debug_get_effect_layers_info()
+	var bakes: Array = info.get("trail_bakes", [])
+	if bakes.is_empty():
+		return Color(-1, -1, -1, -1)
+	var live: Array = bakes[0].get("live_trails", [])
+	if live.is_empty():
+		return Color(-1, -1, -1, -1)
+	return live[0].get("tint", Color(-1, -1, -1, -1))
+
+var wall
+
+
+func _preamble() -> void:
+	wall = _make_wall(Vector2(200, 0))
+	# The wall hits are handled (unhandled hits warn): this suite pins the effects.
+	factory.area_entered.connect(_on_hit)
+	factory.body_entered.connect(_on_hit)
+	await physics()
+
+
+func _on_hit(_target: Object, _volley: BulletVolley2D, _bullet_index: int) -> void:
+	pass
+
+
+func test_validation_inert_layers_stay_silent_rejects_hold() -> void:
+	await _preamble()
+	# FX T1 validation: inert layers stay silent, rejects hold
+	var dead := EffectLayerData2D.new()
+	assert_true(dead.random_start_frame == false, "desync off by default")
+	assert_true(dead.max_instances == 0, "auto cap by default")
+	assert_true(factory.spawn_layer_effect(dead, Transform2D.IDENTITY) == -1, "null-frames layer inert, no crash")
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	dead.trigger = (10 as EffectLayerData2D.EffectTrigger) # 9 is the appended On Any Hit
+	assert_true(dead.trigger == 0, "bad trigger rejected")
+	dead.set_trigger_chance(2.0)
+	assert_true(dead.trigger_chance == 1.0, "chance > 1 rejected")
+	dead.set_trigger_chance(NAN)
+	assert_true(dead.trigger_chance == 1.0, "NaN chance rejected")
+	dead.set_max_instances(-1)
+	assert_true(dead.max_instances == 0, "negative cap rejected")
+	dead.set_max_instances(0)
+	assert_true(dead.max_instances == 0, "auto cap (0) accepted")
+	dead.set_random_scale_min(NAN)
+	assert_true(dead.random_scale_min == 1.0, "NaN scale min rejected")
+	dead.set_rotation_degrees(NAN)
+	assert_true(dead.rotation_degrees == 0.0, "NaN rotation rejected")
+	dead.set_spin_degrees_per_sec(NAN)
+	assert_true(dead.spin_degrees_per_sec == 0.0, "NaN spin rejected")
+	var off := _make_layer(3, 4)
+	off.enabled = false
+	assert_true(factory.spawn_layer_effect(off, Transform2D.IDENTITY) == -1, "disabled layer never fires")
+	assert_true(factory.spawn_layer_effect(null, Transform2D.IDENTITY) == -1, "null layer rejected")
+	expect_errors_containing("sprite_frames is null", 1, "null frames fail loud")
+	expect_errors_containing("trigger must be", 1, "bad trigger fails loud")
+	expect_errors_containing("trigger_chance must be finite", 2, "bad chance fails loud")
+	expect_errors_containing("max_instances must be", 1, "negative instances fail loud")
+	expect_errors_containing("random_scale_min must be finite", 1, "NaN scale min fails loud")
+	expect_errors_containing("rotation_degrees must be finite", 1, "NaN rotation fails loud")
+	expect_errors_containing("spin_degrees_per_sec must be finite", 1, "NaN spin fails loud")
+	expect_errors_containing("layer is null or disabled", 2, "dead layers fail loud")
+
+
+func test_spawn_flash_fires_once_expires() -> void:
+	await _preamble()
+	# FX T2 spawn flash fires once + expires
+	await _settle(factory)
+	var _v2: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 300.0, [_make_layer(1, 4), _make_layer(2, 4), _make_layer(3, 4)]))
+	await physics()
+	assert_true(factory.get_active_effect_count() == 1, "only the flash fires at spawn (hit/destroy silent)")
+	for i in 30:
+		await physics()
+	assert_true(factory.get_active_effect_count() == 0, "flash expired on schedule (0.4s)")
+
+
+func test_trail_follows_dies_on_disable_resumes_on_wake() -> void:
+	await _preamble()
+	# FX T3 trail follows + dies on disable + resumes on wake
+	await _settle(factory)
+	var v3: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 200.0, [_make_layer(0, 1)]))
+	assert_true(v3.has_trail_effects(), "trail baked")
+	for i in 5:
+		await physics()
+	var bt: Vector2 = v3.get_bullet_transform(0).origin
+	var tt: Vector2 = v3.debug_get_trail_transform(0, 0).origin
+	assert_true(tt.distance_to(bt) < 0.01, "trail sits on the bullet")
+	v3.set_is_auto_pooling_enabled(false) # park on drain so the same life can wake
+	v3.disable_bullet(0)
+	assert_true(v3.debug_get_trail_transform(0, 0) == Transform2D(), "disable zeroes the trail")
+	v3.enable_bullet(0)
+	await physics()
+	await physics()
+	assert_true(v3.debug_get_trail_transform(0, 0).origin.distance_to(v3.get_bullet_transform(0).origin) < 0.01, "wake resumes the trail")
+
+
+func test_destroy_explosion_on_kill_only_chance_gate() -> void:
+	await _preamble()
+	# FX T4 destroy explosion on kill only, chance gate
+	await _settle(factory)
+	var d4 := _fx_data(Vector2.ZERO, 300.0, [_make_layer(3, 8)], false)
+	d4.set_bullet_max_collision_count(1)
+	var v4: BulletVolley2D = factory.spawn_volley(d4)
+	for i in 120:
+		await physics()
+		if not v4.is_bullet_status_enabled(0):
+			break
+	assert_true(not v4.is_bullet_status_enabled(0), "wall killed the bullet")
+	for i in 3:
+		await physics()
+	assert_true(factory.get_active_effect_count() >= 1, "kill detonated")
+	for i in 60:
+		await physics()
+	assert_true(factory.get_active_effect_count() == 0, "explosion expired (0.8s)")
+	await _settle(factory)
+	var shy := _make_layer(3, 4)
+	shy.trigger_chance = 0.0
+	var d4b := _fx_data(Vector2.ZERO, 300.0, [shy], false)
+	d4b.set_bullet_max_collision_count(1)
+	var v4b: BulletVolley2D = factory.spawn_volley(d4b)
+	for i in 120:
+		await physics()
+		if not v4b.is_bullet_status_enabled(0):
+			break
+	for i in 3:
+		await physics()
+	assert_true(factory.get_active_effect_count() == 0, "chance 0 never fires")
+	await _settle(factory)
+	var d4c := _fx_data(Vector2.ZERO, 0.0, [_make_layer(3, 4)], false)
+	d4c.max_life_time = 0.2
+	var _v4c: BulletVolley2D = factory.spawn_volley(d4c)
+	for i in 60:
+		await physics()
+	assert_true(factory.get_active_effect_count() == 0, "timeout never detonates")
+
+
+func test_hit_sparks_on_counted_non_killing_hits() -> void:
+	await _preamble()
+	# FX T5 hit sparks on counted non-killing hits
+	await _settle(factory)
+	var d5 := _fx_data(Vector2.ZERO, 300.0, [_make_layer(2, 6), _make_layer(3, 6)], false)
+	d5.set_bullet_max_collision_count(0)
+	var v5: BulletVolley2D = factory.spawn_volley(d5)
+	for i in 120:
+		await physics()
+		if v5.get_bullet_collision_count(0) >= 1:
+			break
+	assert_true(v5.get_bullet_collision_count(0) >= 1, "through-shot counted (max 0)")
+	assert_true(factory.get_active_effect_count() == 1, "only the spark fires on a non-killing hit")
+
+
+func test_opt_in_desync_same_tick_kills_span_shards() -> void:
+	await _preamble()
+	# FX T6 opt-in desync: same-tick kills span shards
+	await _settle(factory)
+	factory.debug_seed_cosmetic_rng(12345)
+	var dd := BulletVolleyData2D.new()
+	dd.sprite_frames = H.make_sprite_frames()
+	var arr: Array = []
+	for i in 6:
+		arr.append(Transform2D(0.0, Vector2.ZERO))
+	dd.transforms = arr
+	var speeds: Array = []
+	for i in 6:
+		var sp6 := BulletSpeedData2D.new()
+		sp6.speed = 300.0
+		sp6.max_speed = 3000.0
+		speeds.append(sp6)
+	dd.all_bullet_speed_data = speeds
+	dd.max_life_time = 8.0
+	dd.texture_size = Vector2(16, 16)
+	dd.monitorable = true
+	dd.set_collision_layer_from_array([2])
+	dd.set_collision_mask_from_array([4])
+	var big := _make_layer(3, 8)
+	big.random_start_frame = true
+	var c := CircleShape2D.new()
+	c.radius = 6.0
+	dd.collision_shape = c
+	dd.effect_layers = [big]
+	dd.set_bullet_max_collision_count(1)
+	var _v6: BulletVolley2D = factory.spawn_volley(dd)
+	for i in 120:
+		await physics()
+		if factory.debug_get_effect_state().get("active_total", 0) >= 1:
+			break
+	await physics()
+	var busy := 0
+	for bake in factory.debug_get_effect_state().get("bakes", []):
+		busy = maxi(busy, int(bake.get("shards_busy", 0)))
+	assert_true(busy >= 2, "six same-tick kills desync across shards (busy %d)" % busy)
+	await _settle(factory)
+	var dd6b := _fx_data(Vector2.ZERO, 300.0, [_make_layer(3, 8)], false)
+	dd6b.set_bullet_max_collision_count(1)
+	var v6b: BulletVolley2D = factory.spawn_volley(dd6b)
+	for i in 120:
+		await physics()
+		if not v6b.is_bullet_status_enabled(0):
+			break
+	await physics()
+	var busy6b := 0
+	for bake in factory.debug_get_effect_state().get("bakes", []):
+		busy6b = maxi(busy6b, int(bake.get("shards_busy", 0)))
+	assert_true(busy6b <= 1, "default sync parks one kill on one shard")
+
+
+func test_per_bullet_toggles_animation_switch() -> void:
+	await _preamble()
+	# FX T7 per-bullet toggles + animation switch
+	await _settle(factory)
+	var dd7 := _fx_data(Vector2.ZERO, 200.0, [_make_layer(0, 1)])
+	dd7.transforms = [Transform2D(0.0, Vector2.ZERO), Transform2D(0.0, Vector2(0, 40))]
+	var s7a := BulletSpeedData2D.new()
+	s7a.speed = 200.0
+	s7a.max_speed = 3000.0
+	dd7.all_bullet_speed_data = [s7a, s7a]
+	var v7: BulletVolley2D = factory.spawn_volley(dd7)
+	for i in 5:
+		await physics()
+	v7.bullet_set_trail_enabled(0, 0, false)
+	assert_true(v7.debug_get_trail_transform(0, 0) == Transform2D(), "bullet 0 trail off")
+	assert_true(v7.debug_get_trail_transform(0, 1).origin.distance_to(v7.get_bullet_transform(1).origin) < 0.01, "bullet 1 trail on")
+	v7.all_bullets_set_trail_enabled(0, false)
+	assert_true(v7.debug_get_trail_transform(0, 1) == Transform2D(), "range toggle hides all")
+	v7.all_bullets_set_trail_enabled(0, true)
+	await physics()
+	assert_true(v7.debug_get_trail_transform(0, 1).origin.distance_to(v7.get_bullet_transform(1).origin) < 0.01, "range toggle restores")
+	var custom := EffectLayerData2D.new()
+	custom.trigger = EffectLayerData2D.EFFECT_TRAIL_FOLLOW
+	custom.sprite_frames = _make_frames(1, ["a", "b"])
+	var v7b: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 200.0, [custom]))
+	assert_true(v7b.has_trail_effects(), "custom frames bake as trail")
+	assert_true(v7b.play_effect_animation(0, "b"), "animation switch accepted")
+	expect_no_errors("a known animation switches silently")
+	# A wrong name falls back to the first animation with frames, like the
+	# bullets do (one error; the empty "default" never counts).
+	assert_true(v7b.play_effect_animation(0, "nope"), "unknown animation falls back")
+	expect_error_sequence(["EffectLayerData2D: missing animation 'nope', falling back to 'a'."])
+	assert_true(not v7b.play_effect_animation(9, "b"), "unknown layer rejected")
+
+
+func test_pool_reuse_reseeds_caps_hold_explicit_auto() -> void:
+	await _preamble()
+	# FX T8 pool reuse reseeds + caps hold (explicit + auto)
+	await _settle(factory)
+	var d8 := _fx_data(Vector2.ZERO, 200.0, [_make_layer(1, 4), _make_layer(0, 1)])
+	d8.max_life_time = 0.3
+	var v8: BulletVolley2D = factory.spawn_volley(d8)
+	await physics()
+	assert_true(factory.get_active_effect_count() >= 1, "first life flashes")
+	for i in 60:
+		await physics()
+		if not v8.is_bullet_status_enabled(0):
+			break
+	assert_true(not v8.is_bullet_status_enabled(0), "expiry pooled the volley")
+	var v8b: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 200.0, [_make_layer(1, 4)]))
+	await physics()
+	assert_true(factory.get_active_effect_count() >= 1, "pooled reuse flashes again")
+	assert_true(not v8b.has_trail_effects(), "reseed without trail drops it")
+	await _settle(factory)
+	var capped := _make_layer(3, 4)
+	capped.max_instances = 2
+	for i in 5:
+		factory.spawn_layer_effect(capped, Transform2D(0.0, Vector2(i * 10, 0)))
+	assert_true(factory.get_active_effect_count() <= 2, "explicit ring cap holds at 2")
+	factory.clear_sprite_effects()
+	var auto_small := _make_layer(1, 2)
+	var _v8c: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 200.0, [auto_small]))
+	var auto_slots := -1
+	for bake in factory.debug_get_effect_state().get("bakes", []):
+		auto_slots = int(bake.get("slots", -1))
+	assert_true(auto_slots == 32, "auto cap floors at 32 for a 1-bullet volley (got %d)" % auto_slots)
+	await _settle(factory)
+	var wide := EffectLayerData2D.new()
+	wide.trigger = EffectLayerData2D.EFFECT_TRAIL_FOLLOW
+	wide.sprite_frames = _make_frames(30)
+	var v8d: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 200.0, [wide]))
+	var baked_frames := -1
+	for bake in v8d.debug_get_effect_layers_info().get("trail_bakes", []):
+		baked_frames = int(bake.get("frames", -1))
+	assert_eq(baked_frames, 30, "no frame cap: a 30-frame trail bakes every frame")
+
+
+func test_styling_z_tint_texture_visibility_light_bounce() -> void:
+	await _preamble()
+	# FX T9 styling: z, tint, texture, visibility, light + bounce
+	await _settle(factory)
+	var high := _make_layer(0, 1)
+	high.z_index = 5
+	high.self_modulate = Color(1, 0.25, 0.1)
+	high.visibility_layer = 4
+	high.light_mask = 8
+	var v9: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 200.0, [high]))
+	var got_z := -99
+	var got_rel := false
+	var got_mod := Color(0, 0, 0, 0)
+	var got_tex := false
+	var got_vis := -1
+	var got_light := -1
+	for bake in v9.debug_get_effect_layers_info().get("trail_bakes", []):
+		got_z = int(bake.get("z_index", -99))
+		got_rel = bool(bake.get("z_as_relative", false))
+		got_mod = bake.get("modulate", Color(0, 0, 0, 0))
+		got_tex = bool(bake.get("shard_texture_valid", false))
+		got_vis = int(bake.get("visibility_layer", -1))
+		got_light = int(bake.get("light_mask", -1))
+	assert_true(got_z == 5 and got_rel, "shard carries layer z (+5, relative)")
+	assert_true(got_mod.is_equal_approx(Color(1, 0.25, 0.1)), "shard carries layer tint")
+	assert_true(got_tex, "shard carries the baked texture")
+	assert_true(got_vis == 4 and got_light == 8, "shard carries visibility + light masks")
+	await _settle(factory)
+	var bspark := _make_layer(4, 6)
+	var db := _fx_data(Vector2.ZERO, 300.0, [bspark, _make_layer(3, 6)])
+	db.bounce_strength = 1.0
+	var vb: BulletVolley2D = factory.spawn_volley(db)
+	for i in 120:
+		await physics()
+		if vb.bullet_get_bounce_count(0) >= 1:
+			break
+	assert_true(vb.bullet_get_bounce_count(0) >= 1, "wall bounced")
+	assert_true(factory.get_active_effect_count() == 1, "only the bounce sparks (destroy silent)")
+
+
+func test_spawner_integration_manual_hatch() -> void:
+	await _preamble()
+	# FX T10 spawner integration + manual hatch
+	await _settle(factory)
+	var spawner := BulletSpawner2D.new()
+	spawner.bullet_factory_path = factory.get_path()
+	spawner.shooting_enabled = false
+	spawner.pattern_source = BulletSpawner2D.PATTERN_FROM_SELF
+	spawner.position = Vector2.ZERO
+	add(spawner)
+	await idle(1)
+	spawner.spawn_data = _fx_data(Vector2.ZERO, 200.0, [_make_layer(1, 4), _make_layer(0, 1)], false)
+	assert_true(spawner.shoot_once(), "spawner volley fired")
+	await physics()
+	await physics()
+	assert_true(factory.get_active_effect_count() >= 1, "spawner volley flashed")
+	spawner.queue_free()
+	await idle(1)
+	var ring := _make_layer(3, 4)
+	assert_true(factory.spawn_layer_effect(ring, Transform2D(0.0, Vector2(300, 0))) >= 0, "manual hatch fires")
+	assert_true(factory.get_active_effect_count() >= 1, "manual effect live")
+	factory.clear_sprite_effects()
+	assert_true(factory.get_active_effect_count() == 0, "manual clear stops all")
+
+
+func test_interpolation_agreement() -> void:
+	await _preamble()
+	# FX T11 interpolation agreement
+	await _settle(factory)
+	factory.physics_interpolation = BulletFactory2D.INTERPOLATION_ON
+	var v11: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 0.0, [_make_layer(0, 1)], false))
+	v11.set_bullet_transform(0, Transform2D(0.0, Vector2(100, 0)))
+	v11.debug_run_interpolation_pass()
+	assert_true(v11.debug_get_trail_transform(0, 0).origin.distance_to(Vector2(100, 0)) < 0.01, "interp pass writes trail with zero physics ticks")
+	v11.set_bullet_transform(0, Transform2D(0.0, Vector2(200, 0)))
+	v11.debug_run_interpolation_pass()
+	assert_true(v11.debug_get_trail_transform(0, 0).origin.distance_to(Vector2(200, 0)) < 0.01, "interp pass tracks teleports")
+	assert_true(v11.debug_get_trail_transform(0, 0).is_finite(), "interp trail finite")
+	factory.physics_interpolation = BulletFactory2D.INTERPOLATION_OFF
+	var v11b: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2(50, 0), 0.0, [_make_layer(0, 1)], false))
+	v11b.set_bullet_transform(0, Transform2D(0.0, Vector2(100, 0)))
+	assert_true(v11b.debug_get_trail_transform(0, 0).origin.distance_to(Vector2(100, 0)) < 0.01, "the setter moves the trail with the bullet")
+	v11b.debug_run_interpolation_pass()
+	# The pass uploads the whole buffer (from a history interpolation never
+	# kept here); gated off, the buffer keeps the spawn upload at (50, 0)
+	# (the headless renderer keeps whole-buffer uploads only).
+	var buf: PackedFloat32Array = v11b.multimesh.buffer
+	assert_eq(Vector2(buf[3], buf[7]), Vector2(50, 0), "interp pass gated off when disabled")
+
+
+func test_ramp_tints_over_life() -> void:
+	await _preamble()
+	# FX T12 ramp tints over life
+	await _settle(factory)
+	var ramp := Gradient.new()
+	ramp.set_color(0, Color(1, 1, 1, 1))
+	ramp.set_color(1, Color(1, 0, 0, 1))
+	var hot := _make_layer(3, 10)
+	hot.color_ramp = ramp
+	var d12 := _fx_data(Vector2.ZERO, 300.0, [hot], false)
+	d12.set_bullet_max_collision_count(1)
+	var v12: BulletVolley2D = factory.spawn_volley(d12)
+	for i in 120:
+		await physics()
+		if not v12.is_bullet_status_enabled(0):
+			break
+	var birth_tint := Color(-1, -1, -1, -1)
+	for bake in factory.debug_get_effect_state().get("bakes", []):
+		for row in bake.get("live_slots", []):
+			birth_tint = row.get("tint", birth_tint)
+	assert_true(birth_tint.r > 0.9 and birth_tint.g > 0.9 and birth_tint.b > 0.9, "ramp starts near-white (got %s)" % str(birth_tint))
+	for i in 30:
+		await physics()
+	var mid_tint := Color(-1, -1, -1, -1)
+	for bake in factory.debug_get_effect_state().get("bakes", []):
+		for row in bake.get("live_slots", []):
+			mid_tint = row.get("tint", mid_tint)
+	assert_true(mid_tint.r > 0.9 and mid_tint.g < 0.75 and mid_tint.b < 0.75, "ramp reddens mid-life (got %s)" % str(mid_tint))
+	await _settle(factory)
+	var cool := _make_layer(0, 10)
+	cool.color_ramp = ramp
+	var v12b: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 0.0, [cool], false))
+	for i in 35:
+		await physics()
+	var trail_tint := Color(-1, -1, -1, -1)
+	for bake in v12b.debug_get_effect_layers_info().get("trail_bakes", []):
+		for row in bake.get("live_trails", []):
+			trail_tint = row.get("tint", trail_tint)
+	assert_true(trail_tint.r > 0.9 and trail_tint.g < 0.9, "trail loop-phase tint applies (got %s)" % str(trail_tint))
+
+
+func test_volley_self_modulate_applies_reseeds_clean() -> void:
+	await _preamble()
+	# FX T13 volley self_modulate applies + reseeds clean
+	await _settle(factory)
+	var d13 := _fx_data(Vector2.ZERO, 200.0, [], false)
+	d13.self_modulate = Color(1, 0.2, 0.2)
+	d13.max_life_time = 0.3
+	var v13: BulletVolley2D = factory.spawn_volley(d13)
+	assert_true(v13.debug_get_volley_info().get("self_modulate", Color(0, 0, 0, 0)).is_equal_approx(Color(1, 0.2, 0.2)), "volley tint applied from data")
+	for i in 60:
+		await physics()
+		if not v13.is_bullet_status_enabled(0):
+			break
+	assert_true(not v13.is_bullet_status_enabled(0), "tinted volley expired into the pool")
+	var d13b := _fx_data(Vector2.ZERO, 200.0, [], false)
+	var v13b: BulletVolley2D = factory.spawn_volley(d13b)
+	assert_true(v13b.debug_get_volley_info().get("self_modulate", Color(0, 0, 0, 0)).is_equal_approx(Color(1, 1, 1, 1)), "pool reuse resets tint to white")
+
+
+func test_rotation_offsets_spin() -> void:
+	await _preamble()
+	# FX T14 rotation offsets + spin
+	await _settle(factory)
+	var turned := _make_layer(0, 1)
+	turned.rotation_degrees = 90.0
+	var v14c: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 200.0, [turned], false))
+	for i in 3:
+		await physics()
+	assert_true(absf(absf(wrapf(v14c.debug_get_trail_transform(0, 0).get_rotation(), -PI, PI)) - PI / 2.0) < 0.08, "90-degree offset rotates the trail")
+	await _settle(factory)
+	var spinner := _make_layer(0, 1)
+	spinner.spin_degrees_per_sec = 180.0
+	var v14d: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 0.0, [spinner], false))
+	for i in 30:
+		await physics()
+	var spin_rot: float = absf(wrapf(v14d.debug_get_trail_transform(0, 0).get_rotation(), -PI, PI))
+	assert_true(absf(spin_rot - PI / 2.0) < 0.2, "180dps trail spun a quarter turn in 0.5s (got %.2f)" % spin_rot)
+	await _settle(factory)
+	var boom_spin := _make_layer(3, 4)
+	boom_spin.spin_degrees_per_sec = 360.0
+	var d14e := _fx_data(Vector2.ZERO, 300.0, [boom_spin], false)
+	d14e.set_bullet_max_collision_count(1)
+	var v14e: BulletVolley2D = factory.spawn_volley(d14e)
+	for i in 120:
+		await physics()
+		if not v14e.is_bullet_status_enabled(0):
+			break
+	for i in 15:
+		await physics()
+	var spin_angle := 999.0
+	for bake in factory.debug_get_effect_state().get("bakes", []):
+		for row in bake.get("live_slots", []):
+			spin_angle = float(row.get("rotation", 999.0))
+	assert_true(spin_angle < 900.0 and absf(wrapf(spin_angle, -PI, PI)) > 0.3, "spinning one-shot rotates over life (got %.2f)" % spin_angle)
+
+
+func test_lifetime_over_trigger_fires_on_both_expiry_paths() -> void:
+	handle_events(factory) # the hits / grazes / expiries are handled; this test pins something else
+	await _preamble()
+	# FX T15 lifetime-over trigger fires on both expiry paths
+	await _settle(factory)
+	var d15 := _fx_data(Vector2.ZERO, 0.0, [_make_layer(5, 4)], false)
+	d15.max_life_time = 0.3
+	var v15: BulletVolley2D = factory.spawn_volley(d15)
+	for i in 60:
+		await physics()
+		if not v15.is_bullet_status_enabled(0):
+			break
+	assert_true(not v15.is_bullet_status_enabled(0), "silent expiry pooled the bullet")
+	for i in 3:
+		await physics()
+	assert_true(factory.get_active_effect_count() >= 1, "expiry fizzle fired (silent path)")
+	for i in 40:
+		await physics()
+	assert_true(factory.get_active_effect_count() == 0, "fizzle expired on schedule")
+	await _settle(factory)
+	var d15b := _fx_data(Vector2.ZERO, 0.0, [_make_layer(5, 4)], false)
+	d15b.max_life_time = 0.3
+	d15b.is_life_time_over_signal_enabled = true
+	var v15b: BulletVolley2D = factory.spawn_volley(d15b)
+	for i in 60:
+		await physics()
+		if not v15b.is_bullet_status_enabled(0):
+			break
+	assert_true(not v15b.is_bullet_status_enabled(0), "signalled expiry pooled the bullet")
+	for i in 3:
+		await physics()
+	assert_true(factory.get_active_effect_count() >= 1, "expiry fizzle fired (signal path)")
+
+
+func test_trail_visibility_retires_unknown_layers_null_entries() -> void:
+	await _preamble()
+	# FX T16 trail visibility retires + unknown layers + null entries
+	await _settle(factory)
+	var dd16 := _fx_data(Vector2.ZERO, 200.0, [_make_layer(0, 1)], false)
+	dd16.transforms = [Transform2D(0.0, Vector2.ZERO), Transform2D(0.0, Vector2(0, 40))]
+	var s16a := BulletSpeedData2D.new()
+	s16a.speed = 200.0
+	s16a.max_speed = 3000.0
+	dd16.all_bullet_speed_data = [s16a, s16a]
+	var v16: BulletVolley2D = factory.spawn_volley(dd16)
+	for i in 5:
+		await physics()
+	var vis16 := -1
+	for bake in v16.debug_get_effect_layers_info().get("trail_bakes", []):
+		vis16 = int(bake.get("shards_visible", -1))
+	assert_true(vis16 >= 1, "live trails mark shards visible")
+	v16.all_bullets_set_trail_enabled(0, false)
+	var vis16b := -1
+	for bake in v16.debug_get_effect_layers_info().get("trail_bakes", []):
+		vis16b = int(bake.get("shards_visible", -1))
+	assert_true(vis16b == 0, "fully hidden trail retires its shards (draw calls back to zero)")
+	v16.bullet_set_trail_enabled(9, 0, true)
+	await physics()
+	assert_true(v16.debug_get_trail_transform(0, 0) == Transform2D(), "unknown layer errors without side effects")
+	v16.bullet_set_trail_enabled(0, 0, true)
+	await physics()
+	assert_true(v16.debug_get_trail_transform(0, 0).origin.distance_to(v16.get_bullet_transform(0).origin) < 0.01, "valid toggle still works after the bad one")
+	await _settle(factory)
+	var nulllayer := _make_layer(0, 1)
+	var d16b := _fx_data(Vector2.ZERO, 200.0, [null, nulllayer], false)
+	var v16b: BulletVolley2D = factory.spawn_volley(d16b)
+	for i in 5:
+		await physics()
+	assert_true(v16b.has_trail_effects(), "null layer entry tolerated, rest bakes")
+	assert_true(v16b.debug_get_trail_transform(1, 0).origin.distance_to(v16b.get_bullet_transform(0).origin) < 0.01, "trail follows despite the null sibling")
+	expect_errors_containing("no baked trail layer 9", 1, "unknown trail layer fails loud")
+
+
+func test_lifetime_fizzle_live_rebake_bounce_knob_sparks() -> void:
+	await _preamble()
+	# FX T17 lifetime fizzle + live rebake + bounce-knob sparks
+	await _settle(factory)
+	var d17 := H.make_volley_data(1, 0.0, 0.3)
+	d17.effect_layers = [_make_layer(5, 4)]
+	factory.spawn_volley(d17)
+	var fired17 := false
+	for i in 60:
+		await physics()
+		if factory.get_active_effect_count() >= 1:
+			fired17 = true
+			break
+	assert_true(fired17, "expiry fizzles")
+	for i in 40:
+		await physics()
+	assert_true(factory.get_active_effect_count() == 0, "fizzle expires")
+	await _settle(factory)
+	var v17: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 200.0, [], false))
+	assert_true(not v17.has_trail_effects(), "no layers, no trails")
+	v17.set_effect_layers([_make_layer(0, 1)])
+	assert_true(v17.has_trail_effects(), "live set bakes trails with zero spawns")
+	for i in 5:
+		await physics()
+	assert_true(v17.debug_get_trail_transform(0, 0).origin.distance_to(v17.get_bullet_transform(0).origin) < 0.01, "live-set trail follows")
+	await _settle(factory)
+	var bs17 := _make_layer(4, 6)
+	var db17 := _fx_data(Vector2.ZERO, 300.0, [bs17])
+	db17.bounce_strength = 1.0
+	db17.bounce_push_assist = false
+	db17.bounce_charge_amplify = false
+	var v17b: BulletVolley2D = factory.spawn_volley(db17)
+	for i in 120:
+		await physics()
+		if v17b.bullet_get_bounce_count(0) >= 1:
+			break
+	assert_true(factory.get_active_effect_count() >= 1, "bounce sparks with knobs off (orthogonal)")
+
+
+func test_hostile_zero_frames_ring_caps_shared_refs_teardown() -> void:
+	await _preamble()
+	# FX T18 hostile: zero frames, ring caps, shared refs, teardown
+	await _settle(factory)
+	# T18a: zero-frame animation is inert, manual hatch refuses it.
+	var zeroframes := SpriteFrames.new()
+	var dead18 := EffectLayerData2D.new()
+	dead18.trigger = EffectLayerData2D.EFFECT_ON_SPAWN
+	dead18.sprite_frames = zeroframes
+	var _v18: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 300.0, [dead18], false))
+	await physics()
+	assert_true(factory.get_active_effect_count() == 0, "zero-frame volley layer stays silent")
+	assert_true(factory.spawn_layer_effect(dead18, Transform2D.IDENTITY) == -1, "zero-frame manual hatch refused")
+	# T18b: max_instances = 1 recycles the oldest slot (3 kills, 1 live).
+	await _settle(factory)
+	var cap18 := _make_layer(3, 6)
+	cap18.max_instances = 1
+	var d18b := _fx_data(Vector2.ZERO, 300.0, [cap18], false)
+	d18b.set_bullet_max_collision_count(1)
+	var _v18b: BulletVolley2D = factory.spawn_volley(d18b)
+	for i in 200:
+		await physics()
+		if factory.get_active_effect_count() >= 1:
+			break
+	assert_true(factory.get_active_effect_count() <= 1, "ring cap 1 holds under repeat kills")
+	await _settle(factory)
+	# T18c: one shared layer Ref across two volleys fires independently.
+	var shared18 := _make_layer(1, 4)
+	var _v18c1: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 300.0, [shared18], false))
+	var _v18c2: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 300.0, [shared18], false))
+	await physics()
+	await physics()
+	assert_true(factory.get_active_effect_count() == 2, "shared Ref fires once per volley")
+	await _settle(factory)
+	# T18d: queue_free volley with live one-shots drains without crashing.
+	var live18 := _make_layer(1, 4)
+	var v18d: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 300.0, [live18], false))
+	await physics()
+	assert_true(factory.get_active_effect_count() >= 1, "one-shot live before queue_free")
+	v18d.queue_free()
+	await idle(1)
+	await idle(1)
+	for i in 40:
+		await physics()
+	assert_true(factory.get_active_effect_count() == 0, "freed volley effects drain on expiry")
+	assert_true(factory.debug_assert_no_dangling().get("ok", false) == true, "no dangling after volley freed with live effects")
+	# T18e: factory.reset() with live effects zeroes everything.
+	await _settle(factory)
+	var _live18e: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 300.0, [_make_layer(1, 4)], false))
+	await physics()
+	assert_true(factory.get_active_effect_count() >= 1, "one-shot live before reset")
+	# Structural calls reject inside the physics step: awaiting
+	# physics_frame resumes mid-step, so park on idle first (same reason
+	# _settle uses process_frame before factory mutations).
+	await idle(1)
+	factory.reset()
+	assert_true(factory.get_active_effect_count() == 0, "reset zeroes live effects")
+	# T18f: play_effect_animation rejects one-shot layers and unknown indexes.
+	await _settle(factory)
+	var v18f: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 200.0, [_make_layer(2, 4)], false))
+	await physics()
+	assert_true(v18f.play_effect_animation(0, &"default") == false, "play_effect_animation refuses one-shot layer")
+	assert_true(v18f.play_effect_animation(9, &"default") == false, "play_effect_animation refuses unknown layer")
+	assert_true(not v18f.has_trail_effects(), "one-shot volley still has no trails")
+	# T18g: set_effect_layers([]) mid-life retires trails silently.
+	await _settle(factory)
+	var v18g: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 200.0, [_make_layer(0, 1)], false))
+	for i in 5:
+		await physics()
+	assert_true(v18g.has_trail_effects(), "trail baked before clear")
+	v18g.set_effect_layers([])
+	assert_true(not v18g.has_trail_effects(), "empty set clears trails")
+	assert_true(v18g.debug_get_trail_transform(0, 0) == Transform2D(), "cleared trail reads identity")
+	for i in 5:
+		await physics()
+	assert_true(v18g.get_bullet_transform(0).is_finite(), "volley finite after mid-life clear")
+	# T18h: chance gates, huge spin, manual-hatch eviction cap.
+	await _settle(factory)
+	var never18 := _make_layer(1, 4)
+	never18.trigger_chance = 0.0
+	var _v18h: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 300.0, [never18], false))
+	await physics()
+	await physics()
+	assert_true(factory.get_active_effect_count() == 0, "trigger_chance 0 never fires")
+	await _settle(factory)
+	var always18 := _make_layer(1, 4)
+	always18.trigger_chance = 1.0
+	var _v18h2: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 300.0, [always18], false))
+	await physics()
+	assert_true(factory.get_active_effect_count() >= 1, "trigger_chance 1 always fires")
+	await _settle(factory)
+	var spin18 := _make_layer(1, 4)
+	# INF is rejected by the setter (stays 0), so exercise the fire-path
+	# finite-gate with a huge-but-finite spin instead: it must still fire
+	# statically and never crash the ager.
+	spin18.spin_degrees_per_sec = 1e30
+	var _v18h3: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 300.0, [spin18], false))
+	await physics()
+	assert_true(factory.get_active_effect_count() >= 1, "huge spin still fires statically")
+	for i in 10:
+		await physics()
+	assert_true(factory.get_active_effect_count() <= 2, "huge spin never crashes the ager")
+	await _settle(factory)
+	# No cap on distinct manual layers: twelve play side by side, and an idle
+	# bake is released once its layer is dropped.
+	var held_layers: Array = []
+	for i in 12:
+		var ml := _make_layer(1, 2, ["default", "alt%d" % i])
+		if not ml.sprite_frames.has_animation("alt%d" % i):
+			ml.sprite_frames.add_animation("alt%d" % i)
+		held_layers.append(ml)
+		factory.spawn_layer_effect(ml, Transform2D.IDENTITY)
+	assert_eq(factory.debug_get_effect_state().get("manual_bakes", -1), 12, "every distinct layer keeps its bake")
+	assert_eq(factory.debug_get_effect_state().get("manual_active", -1), 12, "and its live visual")
+	var dropped: WeakRef = weakref(held_layers[0])
+	held_layers.clear()
+	for i in 240: # the effects play out on their own (no clear)
+		await physics()
+		if int(factory.debug_get_effect_state().get("manual_bakes", -1)) == 0:
+			break
+	assert_eq(factory.debug_get_effect_state().get("manual_bakes", -1), 0, "idle bakes of dropped layers are released")
+	assert_null(dropped.get_ref(), "the factory keeps no dropped layer alive")
+	# T18i: collision kills never fizzle; infinite life never fizzles.
+	await _settle(factory)
+	var kill18 := _fx_data(Vector2.ZERO, 300.0, [_make_layer(5, 4)], false)
+	kill18.set_bullet_max_collision_count(1)
+	var v18i: BulletVolley2D = factory.spawn_volley(kill18)
+	for i in 120:
+		await physics()
+		if not v18i.is_bullet_status_enabled(0):
+			break
+	assert_true(not v18i.is_bullet_status_enabled(0), "kill volley died on the wall")
+	for i in 3:
+		await physics()
+	assert_true(factory.get_active_effect_count() == 0, "collision kill fires no lifetime fizzle")
+	await _settle(factory)
+	var inf18 := _fx_data(Vector2.ZERO, 100.0, [_make_layer(5, 4)], false)
+	inf18.is_life_time_infinite = true
+	var _v18i2: BulletVolley2D = factory.spawn_volley(inf18)
+	for i in 30:
+		await physics()
+	assert_true(factory.get_active_effect_count() == 0, "infinite life never fizzles")
+	expect_errors_containing("has no animation with frames", 2, "frameless layers fail loud")
+
+
+func test_stacked_trails_offset_live_one_shot_swap_pause_freeze() -> void:
+	await _preamble()
+	# FX T19 stacked trails, offset, live one-shot swap, pause freeze
+	await _settle(factory)
+	var t19a := _make_layer(0, 1)
+	var t19b := _make_layer(0, 1)
+	t19b.offset = Vector2(24, 0)
+	var v19: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 200.0, [t19a, t19b], false))
+	for i in 5:
+		await physics()
+	assert_true(v19.debug_get_trail_transform(0, 0).origin.distance_to(v19.get_bullet_transform(0).origin) < 0.01, "first trail sits on the bullet")
+	assert_true(absf(v19.debug_get_trail_transform(1, 0).origin.distance_to(v19.get_bullet_transform(0).origin) - 24.0) < 0.5, "offset trail rides 24px ahead")
+	await _settle(factory)
+	var swap_hit := _make_layer(2, 4)
+	var swap_boom := _make_layer(3, 4)
+	var v19b: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 200.0, [swap_hit], false))
+	v19b.set_effect_layers([swap_boom])
+	assert_true(not v19b.has_trail_effects(), "live swap keeps trail state accurate")
+	await _settle(factory)
+	var stream := _make_layer(0, 1)
+	var v19c: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 200.0, [stream], false))
+	for i in 3:
+		await physics()
+	var pre_pause: Vector2 = v19c.debug_get_trail_transform(0, 0).origin
+	factory.set_is_factory_processing_bullets(false)
+	for i in 10:
+		await physics()
+	assert_true(v19c.debug_get_trail_transform(0, 0).origin.distance_to(pre_pause) < 0.01, "paused factory freezes trails")
+	assert_true(factory.get_active_effect_count() == 0, "no stray one-shots while paused")
+	factory.set_is_factory_processing_bullets(true)
+	for i in 3:
+		await physics()
+	assert_true(v19c.debug_get_trail_transform(0, 0).origin.distance_to(v19c.get_bullet_transform(0).origin) < 0.01, "unpaused trails resume")
+
+
+func test_hostile_configs_never_crash() -> void:
+	await _preamble()
+	# FX T20 hostile configs never crash
+	await _settle(factory)
+	var zeroanim := EffectLayerData2D.new()
+	zeroanim.trigger = EffectLayerData2D.EFFECT_ON_SPAWN
+	var empty_sf := SpriteFrames.new()
+	zeroanim.sprite_frames = empty_sf
+	assert_true(factory.spawn_layer_effect(zeroanim, Transform2D.IDENTITY) == -1, "zero-frame animation inert, no crash")
+	var wronganim := EffectLayerData2D.new()
+	wronganim.trigger = EffectLayerData2D.EFFECT_ON_SPAWN
+	wronganim.sprite_frames = _make_frames(2)
+	wronganim.animation = &"nope"
+	assert_true(factory.spawn_layer_effect(wronganim, Transform2D.IDENTITY) >= 0, "a wrong animation name falls back to the first animation with frames")
+	expect_error_sequence(["EffectLayerData2D: sprite_frames has no animation with frames.", "EffectLayerData2D: missing animation 'nope', falling back to 'default'."])
+	factory.clear_sprite_effects()
+	var dup_a := _make_layer(0, 1)
+	var v20: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 200.0, [dup_a, dup_a], false))
+	for i in 5:
+		await physics()
+	assert_true(v20.debug_get_trail_transform(0, 0).origin.distance_to(v20.get_bullet_transform(0).origin) < 0.01, "duplicate layer refs both follow")
+	assert_true(factory.get_active_effect_count() == 0, "no stray one-shots from trail-only volley")
+
+
+func test_interp_teleports_scale_paused_manual_hatch() -> void:
+	await _preamble()
+	# FX T21 interp teleports, scale, paused manual hatch
+	await _settle(factory)
+	factory.physics_interpolation = BulletFactory2D.INTERPOLATION_ON
+	var big21 := _make_layer(0, 1)
+	big21.scale = Vector2(2, 2)
+	var v21: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 0.0, [big21], false))
+	v21.set_bullet_transform(0, Transform2D(0.0, Vector2(100, 0)))
+	v21.debug_run_interpolation_pass()
+	assert_true(v21.debug_get_trail_transform(0, 0).origin.distance_to(Vector2(100, 0)) < 0.01, "interp trail glued after teleport")
+	assert_true(v21.debug_get_trail_transform(0, 0).get_scale().distance_to(Vector2(2, 2)) < 0.01, "trail carries layer scale")
+	factory.physics_interpolation = BulletFactory2D.INTERPOLATION_OFF
+	await _settle(factory)
+	var held := _make_layer(3, 4)
+	factory.set_is_factory_processing_bullets(false)
+	var slot21: int = factory.spawn_layer_effect(held, Transform2D(0.0, Vector2(50, 0)))
+	assert_true(slot21 >= 0, "manual hatch fires while paused")
+	for i in 10:
+		await physics()
+	assert_true(factory.get_active_effect_count() >= 1, "paused one-shot held, not expired")
+	factory.set_is_factory_processing_bullets(true)
+	for i in 40:
+		await physics()
+	assert_true(factory.get_active_effect_count() == 0, "resumed one-shot expires on schedule")
+
+
+func test_manual_hatch_rebakes_on_layer_edits() -> void:
+	await _preamble()
+	# FX T22 manual hatch rebakes on layer edits
+	await _settle(factory)
+	var vedit := _make_layer(3, 2)
+	assert_true(factory.spawn_layer_effect(vedit, Transform2D(0.0, Vector2(60, 0))) >= 0, "manual hatch fires")
+	assert_true(int(factory.debug_get_effect_state().get("manual_frames", -1)) == 2, "manual bake holds 2 frames")
+	vedit.sprite_frames = _make_frames(5)
+	assert_true(factory.spawn_layer_effect(vedit, Transform2D(0.0, Vector2(70, 0))) >= 0, "manual hatch fires after edit")
+	assert_true(int(factory.debug_get_effect_state().get("manual_frames", -1)) == 5, "manual rebake picks up 5 frames")
+	for i in 60:
+		await physics()
+	assert_true(factory.get_active_effect_count() == 0, "edited manual effects expire")
+
+
+func test_on_clear_fires_on_manual_clear_only() -> void:
+	await _preamble()
+	# FX T23 On Clear fires on manual clear only
+	await _settle(factory)
+	var clear_ok := EffectLayerData2D.new()
+	clear_ok.trigger = EffectLayerData2D.EFFECT_ON_CLEAR
+	assert_true(clear_ok.trigger == 6, "trigger 6 (On Clear) accepted")
+	var d23 := _fx_data(Vector2.ZERO, 0.0, [_make_layer(6, 4)], false)
+	d23.transforms = [Transform2D(0.0, Vector2.ZERO), Transform2D(0.0, Vector2(32, 0))]
+	d23.tile_all_bullet_speed_data = true # both bullets at the one speed entry
+	var v23: BulletVolley2D = factory.spawn_volley(d23)
+	assert_true(v23.clear_bullet(0), "clear_bullet live slot returns true")
+	for i in 3:
+		await physics()
+	assert_true(factory.get_active_effect_count() >= 1, "manual clear fires On Clear")
+	var count_after: int = factory.get_active_effect_count()
+	assert_true(not v23.clear_bullet(0), "double clear stays silent")
+	assert_true(factory.get_active_effect_count() == count_after, "no second visual for dead slot")
+	assert_true(not v23.clear_bullet(99), "clear invalid index refused")
+	assert_true(v23.clear_all_bullets() == 1, "clear_all drains the last live bullet")
+	for i in 60:
+		await physics()
+	assert_true(factory.get_active_effect_count() == 0, "clear visuals expire")
+	await _settle(factory)
+	var d23k := _fx_data(Vector2.ZERO, 300.0, [_make_layer(6, 4)], false)
+	d23k.set_bullet_max_collision_count(1)
+	var v23k: BulletVolley2D = factory.spawn_volley(d23k)
+	for i in 120:
+		await physics()
+		if not v23k.is_bullet_status_enabled(0):
+			break
+	assert_true(not v23k.is_bullet_status_enabled(0), "wall killed the clear-layer bullet")
+	for i in 3:
+		await physics()
+	assert_true(factory.get_active_effect_count() == 0, "kill does not fire On Clear (Destroy owns it)")
+	await _settle(factory)
+	var d23e := _fx_data(Vector2.ZERO, 0.0, [_make_layer(6, 4)], false)
+	d23e.max_life_time = 0.2
+	var v23e: BulletVolley2D = factory.spawn_volley(d23e)
+	for i in 60:
+		await physics()
+	assert_true(factory.get_active_effect_count() == 0, "timeout does not fire On Clear (Lifetime Over owns it)")
+	assert_true(not v23e.is_bullet_status_enabled(0), "expiry volley drained")
+	expect_errors_containing("Invalid bullet index in clear_bullet", 1, "stale clear fails loud")
+
+
+## A Gradient can hold a NaN point (a script writes one, or a tool writes a
+## Gradient resource): every sampled ramp color is checked before it is
+## written, so a NaN never reaches the volley's modulate, a trail's instance
+## color or a one-shot's tint. The ramp's own base color stands instead.
+func test_a_nan_ramp_point_never_writes_a_nan_tint() -> void:
+	await _preamble()
+	await _settle(factory)
+	var nan_ramp := Gradient.new()
+	nan_ramp.set_color(0, Color(NAN, 0, 0, 1))
+	nan_ramp.set_color(1, Color(0, 1, 0, 1))
+	var vol: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 0.0, []))
+	vol.set_modulate_ramp(nan_ramp)
+	for i in 4:
+		await physics()
+	var vol_tint: Color = vol.get_self_modulate()
+	assert_true(_color_finite(vol_tint), "volley self_modulate stays finite (got %s)" % str(vol_tint))
+	await _settle(factory)
+	# The trail path (an EffectLayerData2D.color_ramp sampled per bullet).
+	var trail := _make_layer(EffectLayerData2D.EFFECT_TRAIL_FOLLOW, 1)
+	trail.color_ramp = nan_ramp
+	var vt: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 0.0, [trail], false))
+	for i in 4:
+		await physics()
+	var trail_tint: Color = _fx_trail_tint(vt)
+	assert_true(_color_finite(trail_tint), "trail tint stays finite (got %s)" % str(trail_tint))
+	assert_eq(vt.debug_get_effect_layers_info().get("trail_bakes", []).size(), 1, "the trail baked")
+	await _settle(factory)
+	# The one-shot path (fx_refresh_slot_color samples the layer's ramp).
+	var spark := _make_layer(EffectLayerData2D.EFFECT_ON_SPAWN, 2)
+	spark.color_ramp = nan_ramp
+	var _vs: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 0.0, [spark], false))
+	for i in 3:
+		await physics()
+	var fx_tint: Color = _fx_live_tint(factory, 0)
+	assert_true(_color_finite(fx_tint), "one-shot tint stays finite (got %s)" % str(fx_tint))
+
+
+func _color_finite(c: Color) -> bool:
+	return is_finite(c.r) and is_finite(c.g) and is_finite(c.b) and is_finite(c.a)
+
+
+func test_volley_fades_in_out_ramp_infinite_reuse() -> void:
+	await _preamble()
+	# FX T24 volley fades: in, out, ramp, infinite, reuse
+	await _settle(factory)
+	var d24 := _fx_data(Vector2.ZERO, 0.0, [], false)
+	d24.fade_in_sec = 0.5
+	d24.max_life_time = 8.0
+	var v24: BulletVolley2D = factory.spawn_volley(d24)
+	for i in 2:
+		await physics()
+	assert_true(v24.self_modulate.a < 1.0, "fade-in starts transparent")
+	assert_true(v24.self_modulate.a > 0.0, "fade-in already ramping")
+	for i in 60:
+		await physics()
+	assert_true(absf(v24.self_modulate.a - 1.0) < 0.05, "fade-in reaches full tint")
+	await _settle(factory)
+	var d24o := _fx_data(Vector2.ZERO, 0.0, [], false)
+	d24o.fade_out_sec = 0.5
+	d24o.max_life_time = 1.0
+	var v24o: BulletVolley2D = factory.spawn_volley(d24o)
+	for i in 45:
+		await physics()
+	assert_true(v24o.self_modulate.a < 0.9, "fade-out dims before expiry")
+	assert_true(v24o.is_bullet_status_enabled(0), "volley alive mid fade-out")
+	for i in 60:
+		await physics()
+	assert_true(not v24o.is_bullet_status_enabled(0), "fade-out volley still expires")
+	await _settle(factory)
+	var d24i := _fx_data(Vector2.ZERO, 0.0, [], false)
+	d24i.is_life_time_infinite = true
+	d24i.fade_in_sec = 0.3
+	d24i.fade_out_sec = 5.0
+	var v24i: BulletVolley2D = factory.spawn_volley(d24i)
+	for i in 120:
+		await physics()
+	assert_true(absf(v24i.self_modulate.a - 1.0) < 0.05, "infinite volley ignores fade-out, holds full tint")
+	await _settle(factory)
+	var vol_ramp := Gradient.new()
+	vol_ramp.set_color(0, Color(1, 1, 1, 1))
+	vol_ramp.set_color(1, Color(1, 1, 1, 0))
+	var d24r := _fx_data(Vector2.ZERO, 0.0, [], false)
+	d24r.max_life_time = 2.0
+	d24r.modulate_ramp = vol_ramp
+	var v24r: BulletVolley2D = factory.spawn_volley(d24r)
+	for i in 60:
+		await physics()
+	assert_true(absf(v24r.self_modulate.a - 0.5) < 0.15, "ramp samples lifetime fraction")
+	await _settle(factory)
+	var d24n := _fx_data(Vector2.ZERO, 0.0, [], false)
+	d24n.fade_in_sec = NAN
+	assert_true(d24n.fade_in_sec == 0.0, "NaN fade-in rejected")
+	d24n.fade_out_sec = -1.0
+	assert_true(d24n.fade_out_sec == 0.0, "negative fade-out rejected")
+	d24n.fade_in_sec = 0.5
+	d24n.max_life_time = 8.0
+	var _v24a: BulletVolley2D = factory.spawn_volley(d24n)
+	for i in 70:
+		await physics()
+	var v24b: BulletVolley2D = factory.spawn_volley(d24n)
+	for i in 2:
+		await physics()
+	assert_true(v24b.self_modulate.a < 1.0, "second life restarts transparent (no tint leak)")
+	expect_errors_containing("fade_in_sec must be finite", 1, "NaN fade-in fails loud")
+	expect_errors_containing("fade_out_sec must be finite", 1, "NaN fade-out fails loud")
+
+
+## fade_base_modulate is the base the fade/ramp multiplies. With no fade and
+## no ramp the tick early-returns, so the setter applies it at once (the
+## documented path); with a ramp the next tick multiplies the new base.
+func test_fade_base_modulate_applies_immediately_without_fade() -> void:
+	var v: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 0.0, [], false))
+	var want := Color(0.5, 0.25, 0.125, 1.0)
+	v.set_fade_base_modulate(want)
+	assert_eq(v.get_fade_base_modulate(), want, "round trip")
+	assert_eq(v.self_modulate, want, "no fade/ramp: applied now")
+	await _settle(factory)
+	var ramp := Gradient.new()
+	ramp.set_color(0, Color(1, 1, 1, 1))
+	ramp.set_color(1, Color(1, 1, 1, 1))
+	var d := _fx_data(Vector2.ZERO, 0.0, [], false)
+	d.modulate_ramp = ramp
+	var r: BulletVolley2D = factory.spawn_volley(d)
+	var green := Color(0.0, 1.0, 0.0, 1.0)
+	r.set_fade_base_modulate(green)
+	await physics()
+	assert_true(r.self_modulate.g > 0.9 and r.self_modulate.r < 0.1, "the ramp multiplies the new base")
+
+
+func test_on_clear_visible_in_the_inspector_dropdown() -> void:
+	await _preamble()
+	# FX T25 On Clear visible in the inspector dropdown
+	await _settle(factory)
+	var hint_found := false
+	var order: Dictionary = {}
+	for p in EffectLayerData2D.new().get_property_list():
+		var pname: String = p.get("name", "")
+		if pname == "trigger":
+			hint_found = String(p.get("hint_string", "")).contains("On Clear")
+		if pname in ["self_modulate", "color_ramp", "fade_in_sec", "fade_out_sec", "override_frame_color"]:
+			order[pname] = order.size()
+	assert_true(hint_found, "trigger hint lists On Clear")
+	assert_true(order.get("color_ramp", 99) == order.get("self_modulate", -1) + 1, "color_ramp sits with self_modulate")
+	assert_true(order.get("fade_in_sec", 99) == order.get("color_ramp", -1) + 1, "fade_in sits with colors")
+	assert_true(order.get("fade_out_sec", 99) == order.get("fade_in_sec", -1) + 1, "fade_out sits with colors")
+	assert_true(order.get("override_frame_color", 99) == order.get("fade_out_sec", -1) + 1, "override sits with colors")
+	var dorder: Dictionary = {}
+	for p in BulletVolleyData2D.new().get_property_list():
+		var pname2: String = p.get("name", "")
+		if pname2 in ["self_modulate", "override_frame_color"]:
+			dorder[pname2] = dorder.size()
+	assert_true(dorder.get("override_frame_color", 99) == dorder.get("self_modulate", -1) + 1, "bullet override sits with self_modulate")
+
+
+func test_layer_fades_envelope_on_one_shots_trails_ignore() -> void:
+	await _preamble()
+	# FX T26 layer fades: envelope on one-shots, trails ignore
+	await _settle(factory)
+	var d26a := _fx_data(Vector2.ZERO, 0.0, [], false)
+	var lin := _make_layer(1, 4)
+	lin.fade_in_sec = 0.2
+	d26a.effect_layers = [lin]
+	var _v26a: BulletVolley2D = factory.spawn_volley(d26a)
+	for i in 2:
+		await physics()
+	var tint_in: Color = _fx_live_tint(factory, 0)
+	assert_true(tint_in.a < 1.0 and tint_in.a > 0.0, "fade-in slot starts transparent")
+	for i in 30:
+		await physics()
+	assert_true(factory.get_active_effect_count() == 0, "fade-in slot still expires on schedule")
+	await _settle(factory)
+	var d26b := _fx_data(Vector2.ZERO, 0.0, [], false)
+	var lout := _make_layer(1, 4)
+	lout.fade_out_sec = 0.2
+	d26b.effect_layers = [lout]
+	var _v26b: BulletVolley2D = factory.spawn_volley(d26b)
+	for i in 2:
+		await physics()
+	assert_true(_fx_live_tint(factory, 0).a > 0.95, "fade-out slot starts solid")
+	for i in 13:
+		await physics()
+	assert_true(_fx_live_tint(factory, 0).a < 0.95, "fade-out dims before the end")
+	for i in 30:
+		await physics()
+	assert_true(factory.get_active_effect_count() == 0, "fade-out slot still expires")
+	await _settle(factory)
+	var d26c := _fx_data(Vector2.ZERO, 0.0, [], false)
+	var llong := _make_layer(1, 4)
+	llong.fade_out_sec = 5.0
+	d26c.effect_layers = [llong]
+	var _v26c: BulletVolley2D = factory.spawn_volley(d26c)
+	for i in 15:
+		await physics()
+	assert_true(_fx_live_tint(factory, 0).a < 0.5, "oversized fade-out dims proportionally, never sticks at full")
+	for i in 30:
+		await physics()
+	assert_true(factory.get_active_effect_count() == 0, "oversized fade-out still expires")
+	await _settle(factory)
+	var d26t := _fx_data(Vector2.ZERO, 0.0, [], false)
+	d26t.max_life_time = 8.0
+	var ltrail := _make_layer(0, 1)
+	ltrail.fade_in_sec = 0.5
+	d26t.effect_layers = [ltrail]
+	var v26t: BulletVolley2D = factory.spawn_volley(d26t)
+	for i in 2:
+		await physics()
+	assert_true(_fx_trail_tint(v26t).a < 1.0, "trail fade-in starts transparent")
+	for i in 40:
+		await physics()
+	assert_true(absf(_fx_trail_tint(v26t).a - 1.0) < 0.05, "trail fade-in reaches solid")
+	assert_true(v26t.is_bullet_status_enabled(0), "faded trail volley alive")
+	await _settle(factory)
+	var d26to := _fx_data(Vector2.ZERO, 0.0, [], false)
+	d26to.max_life_time = 1.0
+	var ltrout := _make_layer(0, 1)
+	ltrout.fade_out_sec = 0.5
+	d26to.effect_layers = [ltrout]
+	var v26to: BulletVolley2D = factory.spawn_volley(d26to)
+	for i in 45:
+		await physics()
+	assert_true(_fx_trail_tint(v26to).a < 0.9, "trail fade-out dims with the volley")
+	assert_true(v26to.is_bullet_status_enabled(0), "trail volley alive mid fade-out")
+	await _settle(factory)
+	var d26n := _make_layer(1, 4)
+	d26n.fade_in_sec = NAN
+	assert_true(d26n.fade_in_sec == 0.0, "NaN layer fade-in rejected")
+	d26n.fade_out_sec = -2.0
+	assert_true(d26n.fade_out_sec == 0.0, "negative layer fade-out rejected")
+	expect_errors_containing("fade_in_sec must be finite", 1, "NaN layer fade-in fails loud")
+	expect_errors_containing("fade_out_sec must be finite", 1, "negative layer fade-out fails loud")
+
+
+func test_whiten_override_pixels_rebake_fallback() -> void:
+	await _preamble()
+	# FX T27 whiten override: pixels, rebake, fallback
+	var red := Image.create_empty(4, 4, false, Image.FORMAT_RGBA8)
+	red.fill(Color(1, 0, 0, 1))
+	red.set_pixel(1, 1, Color(1, 0, 0, 0.5))
+	var white: Image = EffectLayerData2D.whiten_image_copy(red)
+	assert_true(white != null and white.get_pixel(0, 0) == Color(1, 1, 1, 1), "red bakes to white")
+	assert_true(white != null and absf(white.get_pixel(1, 1).a - 0.5) < 0.01 and white.get_pixel(1, 1).r > 0.9, "alpha preserved under white")
+	assert_true(EffectLayerData2D.whiten_image_copy(Image.new()) == null, "empty image refused")
+	# No size cap (one byte loop, cached per frame by the factory).
+	var wide: Image = EffectLayerData2D.whiten_image_copy(Image.create_empty(600, 8, false, Image.FORMAT_RGBA8))
+	assert_true(wide != null and wide.get_size() == Vector2i(600, 8) and wide.get_pixel(599, 7) == Color(1, 1, 1, 0), "a 600 px image whitens")
+	# A compressed image is decompressed first.
+	var packed := Image.create_empty(8, 8, false, Image.FORMAT_RGBA8)
+	packed.fill(Color(1, 0, 0, 1))
+	packed.compress(Image.COMPRESS_S3TC)
+	var unpacked: Image = EffectLayerData2D.whiten_image_copy(packed)
+	assert_true(unpacked != null and unpacked.get_pixel(3, 3).is_equal_approx(Color(1, 1, 1, 1)), "a compressed image whitens")
+	await _settle(factory)
+	var d27 := _fx_data(Vector2.ZERO, 0.0, [], false)
+	var lwhite := _make_layer(1, 4)
+	d27.effect_layers = [lwhite]
+	var _v27: BulletVolley2D = factory.spawn_volley(d27)
+	for i in 3:
+		await physics()
+	assert_true(factory.get_active_effect_count() >= 1, "plain layer fires before override")
+	lwhite.override_frame_color = true
+	var _v27b: BulletVolley2D = factory.spawn_volley(d27)
+	for i in 3:
+		await physics()
+	assert_true(factory.get_active_effect_count() >= 1, "whitened layer fires after rebake")
+	for i in 60:
+		await physics()
+	assert_true(factory.get_active_effect_count() == 0, "whitened slots expire")
+	await _settle(factory)
+	var sf_bad := SpriteFrames.new()
+	if not sf_bad.has_animation("default"):
+		sf_bad.add_animation("default")
+	sf_bad.set_animation_speed("default", 10.0)
+	sf_bad.set_animation_loop("default", false)
+	sf_bad.add_frame("default", AtlasTexture.new())
+	var lfb := EffectLayerData2D.new()
+	lfb.trigger = EffectLayerData2D.EFFECT_ON_SPAWN
+	lfb.sprite_frames = sf_bad
+	lfb.override_frame_color = true
+	var d27b := _fx_data(Vector2.ZERO, 0.0, [lfb], false)
+	var _v27c: BulletVolley2D = factory.spawn_volley(d27b)
+	for i in 3:
+		await physics()
+	assert_true(factory.get_active_effect_count() >= 1, "unreadable frame falls back, still fires")
+	expect_warning_sequence(["EffectLayerData2D: override_frame_color could not read a frame of 'default', keeping the original art for unreadable frames."], "the unreadable frame is named once")
+	for i in 30:
+		await physics()
+	expect_errors_containing("source image is null or empty", 2, "empty whiten image fails loud")
+
+
+func test_bullet_whiten_override_exact_tint_toggle_reuse() -> void:
+	await _preamble()
+	# FX T28 bullet whiten override: exact tint, toggle, reuse
+	await _settle(factory)
+	var d28 := _fx_data(Vector2.ZERO, 0.0, [], false)
+	d28.sprite_frames = _make_frames(2, ["default"], Color(1, 0, 0, 1))
+	d28.self_modulate = Color(0, 0, 1, 1)
+	d28.override_frame_color = true
+	var v28: BulletVolley2D = factory.spawn_volley(d28)
+	assert_true(v28.get_texture().get_image().get_pixel(0, 0).r > 0.9, "red bullet art bakes white")
+	assert_true(v28.get_texture().get_image().get_pixel(0, 0).g > 0.9, "white keeps all channels")
+	assert_true(v28.is_bullet_status_enabled(0), "whitened volley alive")
+	await _settle(factory)
+	var d28b := _fx_data(Vector2.ZERO, 0.0, [], false)
+	d28b.sprite_frames = _make_frames(2, ["default"], Color(1, 0, 0, 1))
+	var v28b: BulletVolley2D = factory.spawn_volley(d28b)
+	assert_true(v28b.get_texture().get_image().get_pixel(0, 0).r > 0.9, "plain art starts red")
+	v28b.set_override_frame_color(true)
+	assert_true(v28b.get_texture().get_image().get_pixel(0, 0).r > 0.9 and v28b.get_texture().get_image().get_pixel(0, 0).g > 0.9, "live toggle whitens")
+	v28b.set_override_frame_color(false)
+	assert_true(v28b.get_texture().get_image().get_pixel(0, 0).g < 0.1, "live toggle restores art")
+	await _settle(factory)
+	var v28c: BulletVolley2D = factory.spawn_volley(d28)
+	assert_true(v28c.get_texture().get_image().get_pixel(0, 0).g > 0.9, "pooled reuse honors override")
+	var v28d: BulletVolley2D = factory.spawn_volley(d28b)
+	assert_true(v28d.get_texture().get_image().get_pixel(0, 0).g < 0.1, "reuse without override restores art")
+
+	await idle(1)
+
+
+func test_toggling_override_frame_color_keeps_the_animation_where_it_is() -> void:
+	# A cosmetic switch: the shown frame, its remaining time, the paused and
+	# finished states stay; a finished one-shot never finishes again.
+	var d := _fx_data(Vector2.ZERO, 0.0, [], false)
+	d.sprite_frames = _make_frames(4, ["default"], Color(1, 0, 0, 1)) # 10 fps, one-shot
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	watch_signals(v)
+	for i in 5:
+		factory.debug_advance_time(0.05) # 0.25 s: frame 2, 0.05 s left
+	assert_eq(v.get_sprite_frame(), 2, "frame 2")
+	v.set_override_frame_color(true)
+	assert_eq(v.get_sprite_frame(), 2, "the toggle keeps the frame")
+	assert_true(v.get_texture().get_image().get_pixel(0, 0).g > 0.9, "frame 2, whitened")
+	factory.debug_advance_time(0.05)
+	assert_eq(v.get_sprite_frame(), 3, "the frame's remaining time is kept")
+	for i in 4:
+		factory.debug_advance_time(0.05)
+	assert_signal_emit_count(v, "sprite_animation_finished", 1, "finished once")
+	v.set_override_frame_color(false)
+	for i in 4:
+		factory.debug_advance_time(0.05)
+	assert_eq([v.get_sprite_frame(), v.is_sprite_animation_finished()], [3, true], "still finished on the last frame")
+	assert_signal_emit_count(v, "sprite_animation_finished", 1, "never finishes twice")
+	assert_true(v.get_texture().get_image().get_pixel(0, 0).g < 0.1, "the original art again")
+	v.stop_sprite_animation()
+	v.set_sprite_frame(1)
+	v.set_override_frame_color(true)
+	assert_eq([v.get_sprite_frame(), v.is_sprite_animation_playing()], [1, false], "a stopped animation stays stopped")
+
+
+## An AtlasTexture frame on a 4x4 base: red, pixel (1, 1) half transparent.
+func _atlas_frames(region: Rect2) -> SpriteFrames:
+	var img := Image.create_empty(4, 4, false, Image.FORMAT_RGBA8)
+	img.fill(Color(1, 0, 0, 1))
+	img.set_pixel(1, 1, Color(1, 0, 0, 0.5))
+	var atlas := AtlasTexture.new()
+	atlas.atlas = ImageTexture.create_from_image(img)
+	atlas.region = region
+	var sf := SpriteFrames.new()
+	sf.add_frame("default", atlas)
+	return sf
+
+
+func test_whiten_reads_an_atlas_region_only_inside_its_atlas() -> void:
+	# override_frame_color reads AtlasTexture frames through their region.
+	# A genuinely unreadable region (non-finite, a negative size, or a box past
+	# MAX_SIDE) keeps the original art with the documented texts, never a
+	# silent blank frame. An out-of-sheet region is READABLE (Godot clips it):
+	# it must be baked, not fall back to the original whole sheet.
+	var bad := [Rect2(NAN, 0, 4, 4), Rect2(0, 0, INF, 4), Rect2(0, 0, 1e12, 4), Rect2(0, 0, -4, 4)]
+	var problems: Array = []
+	for r in bad:
+		var d := _fx_data(Vector2.ZERO, 0.0, [], false)
+		d.sprite_frames = _atlas_frames(r)
+		d.override_frame_color = true
+		var v: BulletVolley2D = factory.spawn_volley(d)
+		if not (v.get_texture() is AtlasTexture):
+			problems.append("bullet %s: %s instead of the original art" % [r, v.get_texture()])
+		expect_error_sequence(["EffectLayerData2D.whiten_image_copy: source image is null or empty."])
+		expect_warning_sequence(["BulletVolley2D: override_frame_color could not read a frame of 'default', keeping the original art for unreadable frames."])
+		var layer := EffectLayerData2D.new()
+		layer.sprite_frames = _atlas_frames(r)
+		layer.override_frame_color = true
+		if factory.spawn_layer_effect(layer, Transform2D.IDENTITY) < 0:
+			problems.append("layer %s: not spawned" % r)
+		expect_error_sequence(["EffectLayerData2D.whiten_image_copy: source image is null or empty."])
+		expect_warning_sequence(["EffectLayerData2D: override_frame_color could not read a frame of 'default', keeping the original art for unreadable frames."])
+		await _settle(factory)
+	assert_eq("\n".join(problems), "", "every bad region keeps the original art")
+	# Out-of-sheet regions are READABLE: Godot clips them, so the whiten path
+	# must bake the clipped pixels instead of keeping the whole-sheet original.
+	for r in [Rect2(2, 2, 4, 4), Rect2(-1, 0, 4, 4), Rect2(2147483520, 0, 4, 4)]:
+		var clipped := _fx_data(Vector2.ZERO, 0.0, [], false)
+		clipped.sprite_frames = _atlas_frames(r)
+		clipped.override_frame_color = true
+		var cv: BulletVolley2D = factory.spawn_volley(clipped)
+		assert_true(cv.get_texture() is ImageTexture, "region %s: a baked (clipped) frame" % r)
+		assert_eq(cv.get_texture().get_size(), _atlas_frames(r).get_frame_texture("default", 0).get_size(), "region %s: Godot's size" % r)
+		await _settle(factory)
+	expect_no_errors("clipping is not an error")
+	# A region inside the atlas reads exactly its pixels.
+	var dg := _fx_data(Vector2.ZERO, 0.0, [], false)
+	dg.sprite_frames = _atlas_frames(Rect2(1, 1, 2, 3))
+	dg.override_frame_color = true
+	var img: Image = factory.spawn_volley(dg).get_texture().get_image()
+	assert_eq([img.get_width(), img.get_height()], [2, 3], "the region's size")
+	assert_almost_eq(img.get_pixel(0, 0).a, 0.5, 0.01, "pixel (1, 1) of the atlas, whitened")
+	assert_eq(img.get_pixel(1, 2), Color(1, 1, 1, 1), "an opaque pixel, whitened")
+	expect_no_errors("a readable region bakes silently")
+
+
+func test_every_frame_of_a_long_animation_bakes() -> void:
+	# No frame cap: a 30-frame layer bakes all 30 frames (one shard node each),
+	# as a trail and as a one-shot, with nothing truncated or warned.
+	var layer := _make_layer(1, 30)
+	assert_true(factory.spawn_layer_effect(layer, Transform2D.IDENTITY) >= 0, "fires")
+	assert_eq(factory.debug_get_effect_state()["manual_frames"], 30, "every frame baked")
+	var trail := _make_layer(0, 30)
+	var v: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 0.0, [trail], false))
+	var shards := v.get_children().filter(func(c): return c is MultiMeshInstance2D)
+	assert_eq(shards.size(), 30, "one trail shard per frame")
+	expect_no_errors("no error")
+	expect_warning_sequence([], "no truncation warning")
+
+
+func test_scale_range_is_order_independent_and_survives_a_round_trip() -> void:
+	# The scene loader assigns random_scale_min before random_scale_max: a
+	# saved 1.5..2.0 range used to load min as 1.0 (rejected against max 1.0).
+	var l := EffectLayerData2D.new()
+	l.random_scale_min = 1.5
+	l.random_scale_max = 2.0
+	assert_eq([l.random_scale_min, l.random_scale_max], [1.5, 2.0], "min then max keeps both")
+	var r := EffectLayerData2D.new()
+	r.random_scale_max = 2.0
+	r.random_scale_min = 1.5
+	assert_eq([r.random_scale_min, r.random_scale_max], [1.5, 2.0], "max then min keeps both")
+	l.random_scale_min = 3.0
+	assert_eq([l.random_scale_min, l.random_scale_max], [3.0, 3.0], "min above max pulls max up")
+	l.random_scale_max = 0.5
+	assert_eq([l.random_scale_min, l.random_scale_max], [0.5, 0.5], "max below min pulls min down")
+	l.random_scale_min = -1.0
+	expect_error_sequence(["EffectLayerData2D: random_scale_min must be finite and >= 0, keeping the old value."])
+	l.random_scale_max = INF
+	expect_error_sequence(["EffectLayerData2D: random_scale_max must be finite and >= 0, keeping the old value."])
+	assert_eq([l.random_scale_min, l.random_scale_max], [0.5, 0.5], "rejected values keep the old pair")
+
+
+## A one-shot that changes frames keeps its spin and its tint on the frame it
+## shows: both are written to the shard of the current frame, never to the
+## one it left (that left the new frame unspun and with a stale tint).
+func test_a_frame_change_keeps_the_spin_and_tint_on_the_shown_frame() -> void:
+	await _preamble()
+	await _settle(factory)
+	var layer := _make_layer(3, 4) # 4 frames at 10 fps
+	layer.spin_degrees_per_sec = 90.0
+	var ramp := Gradient.new()
+	ramp.set_color(0, Color(1, 0, 0, 1))
+	ramp.set_color(1, Color(0, 0, 1, 1))
+	layer.color_ramp = ramp
+	assert_true(factory.spawn_layer_effect(layer, Transform2D(0.0, Vector2(40, 0))) >= 0, "fires")
+	var problems: Array = []
+	var shards_seen := {}
+	for i in 30:
+		await physics()
+		for b in factory.debug_get_effect_state().get("manual", []):
+			for row in b.get("live_slots", []):
+				shards_seen[int(row["shard"])] = true
+				if int(row["tint_shard"]) != int(row["shard"]) or int(row["rotation_shard"]) != int(row["shard"]):
+					problems.append([i, row["shard"], row["tint_shard"], row["rotation_shard"]])
+	assert_gt(shards_seen.size(), 1, "it changed frames")
+	assert_eq(problems, [], "tint and spin always on the shown frame's shard")
+
+
+## A layer whose ramp was removed fires plain white: the instance never keeps
+## the tint an earlier effect left in it.
+func test_an_effect_without_a_ramp_never_keeps_an_old_tint() -> void:
+	await _preamble()
+	await _settle(factory)
+	var layer := _make_layer(3, 1)
+	layer.max_instances = 1 # one slot: the next effect reuses it
+	var ramp := Gradient.new()
+	ramp.set_color(0, Color(0, 1, 0, 0.2))
+	ramp.set_color(1, Color(0, 1, 0, 0.2))
+	layer.color_ramp = ramp
+	assert_true(factory.spawn_layer_effect(layer, Transform2D(0.0, Vector2(40, 0))) >= 0, "fires tinted")
+	await physics(2)
+	assert_almost_eq(_manual_tint().a, 0.2, 0.01, "tinted by the ramp")
+	layer.color_ramp = null
+	assert_true(factory.spawn_layer_effect(layer, Transform2D(0.0, Vector2(80, 0))) >= 0, "fires plain")
+	assert_eq(_manual_tint(), Color(1, 1, 1, 1), "plain white, not the old tint")
+
+
+## The manual hatch (spawn_layer_effect) rebuilds its shards when the layer's
+## look changed since: material, tint, draw order and ring size.
+func test_manual_hatch_rebuilds_on_look_edits() -> void:
+	await _preamble()
+	await _settle(factory)
+	var layer := _make_layer(3, 2)
+	assert_true(factory.spawn_layer_effect(layer, Transform2D(0.0, Vector2(60, 0))) >= 0, "fires")
+	var container: Node = null
+	for c in factory.get_children(true):
+		if c.name == "SpriteEffectsContainer":
+			container = c
+	assert_not_null(container, "the effects container")
+	layer.self_modulate = Color(1, 0, 0, 1)
+	layer.z_index = 9
+	var mat := CanvasItemMaterial.new()
+	layer.material = mat
+	layer.max_instances = 7
+	assert_true(factory.spawn_layer_effect(layer, Transform2D(0.0, Vector2(60, 0))) >= 0, "fires again")
+	await idle(1)
+	var looks: Array = []
+	for c in container.get_children():
+		if c is MultiMeshInstance2D and is_instance_valid(c) and not c.is_queued_for_deletion():
+			looks.append([c.modulate, c.z_index, c.material == mat, (c as MultiMeshInstance2D).multimesh.instance_count])
+	assert_gt(looks.size(), 0, "shards exist")
+	for l in looks:
+		assert_eq(l, [Color(1, 0, 0, 1), 9, true, 7], "every shard carries the new look")
+
+
+## The tint of the manual hatch's first live slot (Color(-1...) when none).
+func _manual_tint() -> Color:
+	for b in factory.debug_get_effect_state().get("manual", []):
+		var live: Array = b.get("live_slots", [])
+		if not live.is_empty():
+			return live[0].get("tint", Color(-1, -1, -1, -1))
+	return Color(-1, -1, -1, -1)
+
+
+## A full reset drops the frame textures so art repainted in place re-bakes:
+## an effect layer's own bake follows it (it is built again from the sheet).
+func test_a_full_reset_re_bakes_effect_layer_art() -> void:
+	await _preamble()
+	await _settle(factory)
+	var layer := _make_layer(3, 1)
+	layer.override_frame_color = true # a whitened copy: built from the pixels
+	assert_true(factory.spawn_layer_effect(layer, Transform2D(0.0, Vector2(40, 0))) >= 0, "fires")
+	var builds_before := int(factory.debug_get_frame_cache_stats()["builds"])
+	assert_true(factory.spawn_layer_effect(layer, Transform2D(0.0, Vector2(40, 0))) >= 0, "fires again")
+	assert_eq(int(factory.debug_get_frame_cache_stats()["builds"]), builds_before, "a second effect reuses the bake")
+	await idle(1) # reset is idle-only
+	factory.reset()
+	assert_true(factory.spawn_layer_effect(layer, Transform2D(0.0, Vector2(40, 0))) >= 0, "fires after the reset")
+	assert_gt(int(factory.debug_get_frame_cache_stats()["builds"]), builds_before, "the layer re-baked from the cleared cache (its whitened frame built again)")
+
+
+func _visible_effect_shards() -> int:
+	var n := 0
+	for c in factory.get_children(true):
+		if c.name == "SpriteEffectsContainer" and not c.is_queued_for_deletion():
+			for s in c.get_children():
+				if s is MultiMeshInstance2D and s.visible:
+					n += 1
+	return n
+
+
+## A script freed the effects container (and every one-shot shard in it): a
+## pooled volley reused afterwards draws its one-shots again (its bakes are
+## rebuilt, never fired into the freed shards).
+func test_a_reused_volley_draws_its_one_shots_after_the_container_was_freed() -> void:
+	await _preamble()
+	await _settle(factory)
+	var d := H.make_volley_data(2, 0.0, 5.0)
+	d.effect_layers = [H.make_effect_layer(EffectLayerData2D.EFFECT_ON_CLEAR, 2)]
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	v.clear_all_bullets()
+	assert_gt(_visible_effect_shards(), 0, "the clear effect draws")
+	await idle(2)
+	for c in factory.get_children(true):
+		if c.name == "SpriteEffectsContainer":
+			c.free()
+	await idle(1)
+	var again: BulletVolley2D = factory.spawn_volley(d)
+	assert_eq(again, v, "the pooled volley is reused")
+	again.clear_all_bullets()
+	assert_gt(_visible_effect_shards(), 0, "its clear effect draws again")
+
+
+## spawn_layer_effect on a layer whose animation never ends (a held Trail
+## Follow layer, speed 0) has nothing to play once: refused with one error,
+## before any shard is built or another manual bake is dropped.
+func test_spawn_layer_effect_refuses_an_animation_without_playable_time() -> void:
+	await _preamble()
+	await _settle(factory)
+	var held := _make_layer(EffectLayerData2D.EFFECT_TRAIL_FOLLOW, 2)
+	held.sprite_frames.set_animation_speed(&"default", 0.0)
+	var manual_before := int(factory.debug_get_effect_state()["manual_bakes"])
+	assert_eq(factory.spawn_layer_effect(held, Transform2D(0.0, Vector2(40, 0))), -1, "refused")
+	expect_error_sequence(["BulletFactory2D.spawn_layer_effect: the layer's animation has no playable time (speed 0 holds its frame), nothing spawned."])
+	assert_eq(int(factory.debug_get_effect_state()["manual_bakes"]), manual_before, "no bake built or dropped")
+
+
+## A pooled volley reused for data with NO effect layers starts clean: the
+## previous life's trail and one-shot routing are dropped, never replayed.
+## The pool keeps its internal cache while the volley waits (the previous
+## life's in-flight one-shots must finish), but nothing plays from it.
+func test_pooled_reuse_without_layers_starts_clean() -> void:
+	await _preamble()
+	await _settle(factory)
+	var with_layers := _fx_data(Vector2.ZERO, 0.0, [_make_layer(0, 1), _make_layer(2, 4)], false)
+	with_layers.max_life_time = 0.2
+	var v: BulletVolley2D = factory.spawn_volley(with_layers)
+	assert_true(v.has_trail_effects(), "the first life baked its trail")
+	for i in 60:
+		await physics()
+		if not v.is_bullet_status_enabled(0):
+			break
+	assert_true(v.is_pooled(), "the first life drained into the pool")
+	var pooled_info: Dictionary = v.debug_get_effect_layers_info()
+	assert_eq(int(pooled_info.get("data_layer_count", -1)), 2, "the pooled cache still names the old layers")
+	assert_eq(int(pooled_info.get("trail_bake_count", -1)), 1, "the pooled cache still holds the old trail bake")
+	assert_eq(factory.get_active_effect_count(), 0, "pooling plays nothing")
+	var plain := _fx_data(Vector2.ZERO, 0.0, [], false)
+	plain.max_life_time = 0.2
+	factory.debug_reset_pool_stats()
+	factory.debug_set_effect_log_enabled(true)
+	factory.debug_clear_effect_log()
+	var again: BulletVolley2D = factory.spawn_volley(plain)
+	assert_eq(again, v, "the pooled volley is reused")
+	assert_eq(int(factory.debug_get_pool_hit_stats().get("hits", 0)), 1, "the second spawn came from the pool")
+	var info: Dictionary = again.debug_get_effect_layers_info()
+	assert_false(again.has_trail_effects(), "no trail for the new life")
+	assert_eq(int(info.get("data_layer_count", -1)), 0, "no effect layer named for the new life")
+	assert_eq(int(info.get("trail_bake_count", -1)), 0, "no trail bake for the new life")
+	for bake in factory.debug_get_effect_state().get("bakes", []):
+		assert_ne(int(bake.get("volley", 0)), int(again.get_instance_id()), "no one-shot bake routed to the reused volley")
+	await idle(1) # let the cleared trail shard nodes finish queue_free
+	var strays := 0
+	for child in again.get_children():
+		if child is MultiMeshInstance2D:
+			strays += 1
+	assert_eq(strays, 0, "the old trail shard nodes are gone, not drawn")
+	for i in 60:
+		await physics()
+		if not again.is_bullet_status_enabled(0):
+			break
+	assert_true(again.is_pooled(), "the second life drained too")
+	assert_eq(factory.get_active_effect_count(), 0, "the new life played no effect")
+	assert_eq(factory.debug_get_effect_log().size(), 0, "no trigger row fired for the new life")
+
+
+## A pooled volley reused with DIFFERENT layers uses only the new ones: the
+## old trigger never fires on the new life, and the new layers work.
+func test_pooled_reuse_with_different_layers_uses_only_the_new_ones() -> void:
+	await _preamble()
+	await _settle(factory)
+	var first := _fx_data(Vector2.ZERO, 0.0, [_make_layer(1, 4)], false) # On Spawn
+	first.max_life_time = 0.2
+	var v: BulletVolley2D = factory.spawn_volley(first)
+	assert_eq(factory.get_active_effect_count(), 1, "the old On Spawn layer flashed")
+	for i in 60:
+		await physics()
+		if not v.is_bullet_status_enabled(0):
+			break
+	assert_true(v.is_pooled(), "the first life pooled")
+	var new_trail := _make_layer(0, 1)
+	var new_hit := _make_layer(2, 4)
+	var second := _fx_data(Vector2.ZERO, 300.0, [new_trail, new_hit], false)
+	second.max_life_time = 2.0
+	second.set_bullet_max_collision_count(0) # the wall hit is survived, so On Hit owns it
+	factory.clear_sprite_effects()
+	factory.debug_reset_pool_stats()
+	factory.debug_set_effect_log_enabled(true)
+	factory.debug_clear_effect_log()
+	var again: BulletVolley2D = factory.spawn_volley(second)
+	assert_eq(again, v, "the pooled volley is reused")
+	assert_eq(int(factory.debug_get_pool_hit_stats().get("hits", 0)), 1, "the second spawn came from the pool")
+	assert_true(again.has_trail_effects(), "the NEW trail baked")
+	var info: Dictionary = again.debug_get_effect_layers_info()
+	assert_eq(int(info.get("data_layer_count", -1)), 2, "only the new layers are named")
+	var bakes: Array = info.get("trail_bakes", [])
+	assert_eq(bakes.size(), 1, "one new trail bake")
+	assert_eq(int(bakes[0].get("frames", -1)), 1, "the bake is the new 1-frame trail, not the old 4-frame layer")
+	assert_eq(factory.get_active_effect_count(), 0, "the old On Spawn layer did not fire on the new life")
+	assert_eq(factory.debug_get_effect_log().size(), 0, "no effect row at the new spawn")
+	for i in 60:
+		await physics()
+		if again.get_bullet_collision_count(0) >= 1:
+			break
+	assert_gte(again.get_bullet_collision_count(0), 1, "the new life hit the wall")
+	assert_eq(factory.get_active_effect_count(), 1, "the new On Hit layer fired once")
+	var hit_rows := 0
+	var spawn_rows := 0
+	for e in factory.debug_get_effect_log():
+		if int(e.get("trigger", -1)) == 2:
+			hit_rows += 1
+		if int(e.get("trigger", -1)) == 1:
+			spawn_rows += 1
+	assert_eq(hit_rows, 1, "exactly one new On Hit")
+	assert_eq(spawn_rows, 0, "the old On Spawn never fired on the new life")
+
+
+## One-shot shards are children of the factory's effects container, so a
+## visibility_changed handler may free the volley that fired them (only the
+## emitter itself and its ancestors are the engine's own boundary). The fire
+## path must survive it: the volley's emit guard refuses the free and finishes
+## it with queue_free(), nothing of the bake is used after user code, and the
+## books stay balanced.
+func test_a_visibility_changed_handler_that_frees_the_volley_is_survived() -> void:
+	var layer := _make_layer(EffectLayerData2D.EFFECT_ON_CLEAR, 1)
+	var v: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 0.0, [layer]))
+	await idle(1)
+	var shard: MultiMeshInstance2D = null
+	for c in factory.get_node("SpriteEffectsContainer").get_children():
+		if c is MultiMeshInstance2D:
+			shard = c
+			break
+	assert_not_null(shard, "the one-shot shard exists")
+	var freed := [false]
+	shard.visibility_changed.connect(func() -> void:
+		if not freed[0] and is_instance_valid(v):
+			freed[0] = true
+			v.free())
+	v.clear_all_bullets()
+	assert_true(freed[0], "the handler ran from the fire's set_visible")
+	assert_true(is_instance_valid(v), "a refused free keeps the volley alive until frame end")
+	assert_true(v.is_queued_for_deletion(), "the refused free finishes with queue_free")
+	await idle(2)
+	assert_false(is_instance_valid(v), "the volley is gone")
+	var books: Dictionary = factory.debug_assert_no_dangling()
+	assert_true(books["ok"], str(books["error"]))
+	expect_no_errors()
+
+
+## age_fx_effects holds no FXOneShotBake& across user code: a shard's
+## visibility_changed handler may register another manual effect, which
+## reallocates fx_manual_bakes. Aging must resume on the moved vector (both
+## bakes stay intact, both effects play), never on freed memory.
+## tools/run_sanitizer_tests.py runs this under AddressSanitizer.
+func test_registering_a_manual_effect_from_a_shard_visibility_handler_is_survived() -> void:
+	var layer := _make_layer(EffectLayerData2D.EFFECT_ON_CLEAR, 2) # a frame change at 0.1 s
+	var other := _make_layer(EffectLayerData2D.EFFECT_ON_CLEAR, 1)
+	assert_gte(factory.spawn_layer_effect(layer, Transform2D(0.0, Vector2.ZERO)), 0, "the manual effect fired")
+	await idle(1)
+	var shard: MultiMeshInstance2D = null
+	for c in factory.get_node("SpriteEffectsContainer").get_children():
+		if c is MultiMeshInstance2D:
+			shard = c
+			break
+	assert_not_null(shard, "the manual shard exists")
+	var registered := [false]
+	shard.visibility_changed.connect(func() -> void:
+		if not registered[0]:
+			registered[0] = true
+			factory.spawn_layer_effect(other, Transform2D(0.0, Vector2(40, 0))))
+	for i in 20:
+		await physics(1)
+		if registered[0]:
+			break
+	assert_true(registered[0], "the handler ran from the aging pass's set_visible")
+	assert_eq(int(factory.debug_get_effect_state().get("manual_bakes", 0)), 2, "both manual bakes exist")
+	assert_eq(factory.get_active_effect_count(), 2, "both manual effects are alive")
+	var books: Dictionary = factory.debug_assert_no_dangling()
+	assert_true(books["ok"], str(books["error"]))
+	expect_no_errors()
+
+
+## set_effect_layers registers one factory one-shot bake per layer; each shard
+## is add_child'ed, which runs SceneTree.node_added handlers (user code). A
+## handler that frees the volley there must not leave the registration loop
+## touching it for the next layer: the volley's emit guard refuses the free
+## and finishes it with queue_free(), and every bake it registered is
+## unregistered when it dies. tools/run_sanitizer_tests.py runs this under
+## AddressSanitizer.
+func test_a_node_added_handler_that_frees_the_volley_during_set_effect_layers_is_survived() -> void:
+	var l1 := _make_layer(EffectLayerData2D.EFFECT_ON_CLEAR, 1)
+	var l2 := _make_layer(EffectLayerData2D.EFFECT_ON_HIT, 1)
+	var v: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 0.0, []))
+	await idle(1)
+	assert_eq(int(v.debug_get_effect_layers_info().get("data_layer_count", -1)), 0, "no layers to begin with")
+	var freed := [false]
+	var tree := factory.get_tree()
+	var on_added := func(node: Node) -> void:
+		if not freed[0] and is_instance_valid(v) and node is MultiMeshInstance2D:
+			freed[0] = true
+			v.free()
+	tree.node_added.connect(on_added)
+	v.set_effect_layers([l1, l2])
+	tree.node_added.disconnect(on_added)
+	assert_true(freed[0], "the handler ran while the bakes registered")
+	assert_true(is_instance_valid(v), "a refused free keeps the volley alive until frame end")
+	assert_true(v.is_queued_for_deletion(), "the refused free finishes with queue_free")
+	await idle(2)
+	assert_false(is_instance_valid(v), "the volley is gone")
+	assert_eq(int(factory.debug_get_effect_state().get("bake_count", -1)), 0, "its bakes died with it")
+	var books: Dictionary = factory.debug_assert_no_dangling()
+	assert_true(books["ok"], str(books["error"]))
+	expect_no_errors()
+
+
+## An effect layer's LAST reference can drop inside set_effect_layers
+## (fx_reseed_from_data): its NOTIFICATION_PREDELETE is user code that may
+## free the volley, so the setter must stop before reading `this` again
+## (ASan: heap-use-after-free otherwise).
+func test_an_effect_layer_predelede_freeing_the_volley_mid_setter_is_survived() -> void:
+	var v := quick_volley(2)
+	# A real trail layer (frames + the default Trail Follow trigger): the
+	# volley's trail bake holds it too, so its last Ref drops inside the
+	# rebuild of the trail bakes while the setter runs.
+	var probe := FreeVolleyOnPredeleteEffectLayer2D.new()
+	probe.sprite_frames = _make_frames(4)
+	v.set_effect_layers([probe])
+	probe = null
+	FreeVolleyOnPredeleteEffectLayer2D.fired = 0
+	FreeVolleyOnPredeleteEffectLayer2D.victim = v
+	check_factory_after = false
+	v.set_effect_layers([])
+	assert_gt(FreeVolleyOnPredeleteEffectLayer2D.fired, 0, "the last Ref dropped inside the setter")
+	assert_false(is_instance_valid(v), "the PREDELETE handler freed the volley")
+	await idle(1)
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "nothing dangles")
+	assert_not_null(quick_volley(2), "the factory still spawns")
+
+
+## The one-shot sibling: an ON_SPAWN layer is held by the FACTORY's register
+## bake, so its last Ref drops where the setter unregisters the volley's old
+## bakes (fx_unregister_volley). That drop is user code too: the setter must
+## re-check the volley before it registers the new bakes.
+func test_a_oneshot_effect_layer_predelede_freeing_the_volley_mid_setter_is_survived() -> void:
+	var v := quick_volley(2)
+	var probe := FreeVolleyOnPredeleteEffectLayer2D.new()
+	probe.trigger = EffectLayerData2D.EFFECT_ON_SPAWN
+	probe.sprite_frames = _make_frames(4)
+	v.set_effect_layers([probe])
+	probe = null
+	FreeVolleyOnPredeleteEffectLayer2D.fired = 0
+	FreeVolleyOnPredeleteEffectLayer2D.victim = v
+	check_factory_after = false
+	v.set_effect_layers([])
+	assert_gt(FreeVolleyOnPredeleteEffectLayer2D.fired, 0, "the last Ref dropped inside the setter")
+	assert_false(is_instance_valid(v), "the PREDELETE handler freed the volley")
+	await idle(1)
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "nothing dangles")
+	assert_not_null(quick_volley(2), "the factory still spawns")
+
+
+## A disabled layer bakes nothing, so the volley's layer list alone holds it:
+## its last Ref drops inside the list store itself. godot-cpp's Array
+## assignment destroys the old value BEFORE it constructs the new one, so that
+## store must not run the layer's PREDELETE while it still writes the member
+## (ASan: heap-use-after-free; the store leaked an orphan StringName before).
+func test_a_disabled_layer_predelede_freeing_the_volley_mid_setter_is_survived() -> void:
+	var v := quick_volley(2)
+	var probe := FreeVolleyOnPredeleteEffectLayer2D.new()
+	probe.enabled = false
+	v.set_effect_layers([probe])
+	probe = null
+	FreeVolleyOnPredeleteEffectLayer2D.fired = 0
+	FreeVolleyOnPredeleteEffectLayer2D.victim = v
+	check_factory_after = false
+	v.set_effect_layers([])
+	assert_gt(FreeVolleyOnPredeleteEffectLayer2D.fired, 0, "the last Ref dropped inside the setter")
+	assert_false(is_instance_valid(v), "the PREDELETE handler freed the volley")
+	await idle(1)
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "nothing dangles")
+	assert_not_null(quick_volley(2), "the factory still spawns")
+
+
+## A shard visibility handler that replaces the effect layers mid-tick runs a
+## nested trail rebuild. The tick must abandon its stale bake element (the
+## epoch) and keep running on a live volley; pre-fix this is a use-after-free.
+## NOTE: freeing the volley (an ancestor) from a child shard's signal is
+## Godot's own boundary (the engine destroys the children before the plugin's
+## PREDELETE refusal can cancel), so this pins the guardable hazard instead.
+func test_a_trail_handler_replacing_the_layers_mid_tick_is_survived() -> void:
+	var layer := _make_layer(EffectLayerData2D.EFFECT_TRAIL_FOLLOW, 4)
+	var v: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 30.0, [layer]))
+	await idle(1) # the first tick already showed frame 0's shard
+	var done := []
+	for c in v.get_children():
+		if c is MultiMeshInstance2D:
+			(c as MultiMeshInstance2D).visibility_changed.connect(func() -> void:
+				if done.is_empty():
+					done.append(true)
+					v.set_effect_layers([layer]))
+	step_factory(12) # a frame transition hides frame 0's shard inside the tick
+	assert_eq(done, [true], "the handler replaced the layers from an in-tick shard hide")
+	assert_true(is_instance_valid(v), "the volley survived the nested rebuild")
+	assert_eq(int(v.debug_get_effect_layers_info().get("trail_bake_count", -1)), 1, "one trail bake after the rebuild")
+	expect_no_errors()
+	step_factory(4)
+	assert_true(is_instance_valid(v), "and keeps ticking")
+	expect_no_errors()
+
+
+## A shard handler disabling a later bullet mid-tick must not corrupt the
+## iteration: the tick walks a snapshot and skips bullets disabled meanwhile.
+func test_a_trail_handler_disabling_another_bullet_mid_tick_is_safe() -> void:
+	var d := H.make_volley_data(3, 30.0, 8.0)
+	d.effect_layers = [_make_layer(EffectLayerData2D.EFFECT_TRAIL_FOLLOW, 4)]
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	await idle(1)
+	var done := []
+	for c in v.get_children():
+		if c is MultiMeshInstance2D:
+			(c as MultiMeshInstance2D).visibility_changed.connect(func() -> void:
+				if done.is_empty():
+					done.append(true)
+					v.disable_bullet(2))
+	step_factory(12)
+	assert_eq(done, [true], "the handler ran and disabled a bullet mid-tick")
+	assert_false(v.is_bullet_status_enabled(2), "bullet 2 disabled")
+	assert_eq(int(v.debug_get_volley_info().get("active_bullets", -1)), 2, "two bullets stay live")
+	expect_no_errors()
+
+
+## The soft-reset fast path (same layers, same bake version) hides the trail
+## shards. A shard's visibility_changed handler may rebake the layers (a
+## nested set_effect_layers swaps fx_trail_bakes): the outer loop must abandon
+## its bake then, never write through a reference into the destroyed vector.
+## tools/run_sanitizer_tests.py runs this under AddressSanitizer (it used to
+## be a heap-use-after-free).
+func test_a_trail_visibility_handler_that_rebakes_the_layers_is_survived() -> void:
+	var layer := _make_layer(EffectLayerData2D.EFFECT_TRAIL_FOLLOW, 1)
+	var v: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 0.0, [layer]))
+	step_factory(2) # a tick writes the trail, making its shard visible
+	var shard: MultiMeshInstance2D = null
+	for c in v.get_children():
+		if c is MultiMeshInstance2D:
+			shard = c
+			break
+	assert_not_null(shard, "the trail shard exists")
+	assert_true(shard.visible, "the tick showed the trail shard")
+	var rebound := [false]
+	shard.visibility_changed.connect(func() -> void:
+		if not rebound[0] and not shard.visible and is_instance_valid(v):
+			rebound[0] = true
+			v.set_effect_layers([]))
+	# The same list and the same bake versions take the soft-reset fast path,
+	# which hides every shard (`set_visible(false)` = the handler above).
+	v.set_effect_layers(v.get_effect_layers())
+	assert_true(rebound[0], "the handler ran from the soft reset")
+	assert_eq(v.get_effect_layers().size(), 0, "the nested rebake wins")
+	assert_false(v.has_trail_effects(), "the nested clear dropped the trail")
+	var books: Dictionary = factory.debug_assert_no_dangling()
+	assert_true(books["ok"], str(books["error"]))
+	await idle(1)
+	expect_no_errors()
+
+
+## play_effect_animation rebuilds its shard nodes; a node_added handler that
+## replaces the effect layers there must not leave the switch writing into a
+## stale bake (the epoch abandons the superseded switch).
+func test_play_effect_animation_survives_a_handler_replacing_the_layers() -> void:
+	var layer := _make_layer(EffectLayerData2D.EFFECT_TRAIL_FOLLOW, 4)
+	var v: BulletVolley2D = factory.spawn_volley(_fx_data(Vector2.ZERO, 30.0, [layer]))
+	await idle(1)
+	var fired := []
+	var tree := get_tree()
+	var on_added := func(n: Node) -> void:
+		if fired.is_empty() and n is MultiMeshInstance2D and is_instance_valid(v) and v.is_ancestor_of(n):
+			fired.append(true)
+			v.set_effect_layers([layer])
+	tree.node_added.connect(on_added)
+	var switched := v.play_effect_animation(0, "default")
+	tree.node_added.disconnect(on_added)
+	assert_eq(fired, [true], "the handler replaced the layers while the animation switched")
+	assert_true(is_instance_valid(v), "the volley survived the nested rebuild")
+	assert_false(switched, "the superseded switch reports false")
+	expect_no_errors()

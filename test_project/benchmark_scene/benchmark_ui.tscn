@@ -1,36 +1,234 @@
 [gd_scene format=3 uid="uid://cud5bunpvk1hb"]
 
-[ext_resource type="Script" uid="uid://cj7yt22hrpu8v" path="res://benchmark_scene/ui.gd" id="1_lkveq"]
-[ext_resource type="Theme" uid="uid://cqmgct2nhqx0e" path="res://shared/ui/btn_disabled_theme.tres" id="2_e8asd"]
-[ext_resource type="PackedScene" uid="uid://cxelp27ipxssv" path="res://shared/ui/select_btn_view.tscn" id="3_cgqfs"]
-[ext_resource type="Theme" uid="uid://12g5de2h44s0" path="res://shared/ui/btn_generation_theme.tres" id="3_vd08o"]
-[ext_resource type="Script" uid="uid://bl6k64f6vtqup" path="res://benchmark_scene/additional_debug_data_container.gd" id="5_1mjrc"]
-[ext_resource type="PackedScene" uid="uid://d17ruamw4uuqo" path="res://shared/components/health_bar_component/health_bar_component.tscn" id="5_avyxe"]
-[ext_resource type="PackedScene" uid="uid://bmmgv82lf5hy2" path="res://shared/ui/custom_label.tscn" id="5_i53y2"]
-[ext_resource type="Script" uid="uid://b7wucn8wglgth" path="res://shared/ui/switch_button.gd" id="7_gbr8l"]
-[ext_resource type="Script" uid="uid://cs67whos5iyl6" path="res://shared/ui/select_btn_view.gd" id="8_44pmw"]
-[ext_resource type="Theme" uid="uid://dwqt78wi7igiw" path="res://shared/ui/chosen_bullet_setting_theme.tres" id="10_520nk"]
-[ext_resource type="Theme" uid="uid://cy4gbtdvhi65p" path="res://shared/ui/not_chosen_bullet_setting_theme.tres" id="11_ptpx1"]
+[ext_resource type="Script" path="res://benchmark_scene/ui.gd" id="1_lkveq"]
+[ext_resource type="FontFile" path="res://shared/ui/fonts/Exo2.ttf" id="2_4nhgn"]
+[ext_resource type="Theme" path="res://shared/ui/btn_disabled_theme.tres" id="2_e8asd"]
+[ext_resource type="PackedScene" path="res://shared/ui/select_btn_view.tscn" id="3_cgqfs"]
+[ext_resource type="Theme" path="res://shared/ui/btn_generation_theme.tres" id="3_vd08o"]
+[ext_resource type="PackedScene" path="res://shared/components/health_bar_component/health_bar_component.tscn" id="5_avyxe"]
+[ext_resource type="PackedScene" path="res://shared/ui/custom_label.tscn" id="5_i53y2"]
+[ext_resource type="Script" path="res://shared/ui/switch_button.gd" id="7_gbr8l"]
+[ext_resource type="Script" path="res://shared/ui/select_btn_view.gd" id="8_44pmw"]
+[ext_resource type="Script" path="res://shared/components/health_bar_component/health_bar_component.gd" id="8_krh4v"]
+[ext_resource type="Theme" path="res://shared/ui/chosen_bullet_setting_theme.tres" id="10_520nk"]
+[ext_resource type="Theme" path="res://shared/ui/not_chosen_bullet_setting_theme.tres" id="11_ptpx1"]
+[ext_resource type="Script" path="res://shared/ui/custom_label.gd" id="12_0rlg4"]
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ptpx1"]
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_x0gbu"]
+content_margin_left = 8.0
+content_margin_top = 3.0
+content_margin_right = 8.0
+content_margin_bottom = 3.0
+bg_color = Color(0.09411765, 0.1254902, 0.2, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.16862746, 0.20784314, 0.32156864, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
 
-[sub_resource type="Theme" id="Theme_ptpx1"]
-Button/styles/disabled = SubResource("StyleBoxFlat_ptpx1")
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_56t5u"]
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_vfxln"]
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_80trj"]
+content_margin_left = 8.0
+content_margin_top = 3.0
+content_margin_right = 8.0
+content_margin_bottom = 3.0
+bg_color = Color(0.11372549, 0.15686275, 0.2509804, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.30980393, 0.9529412, 1, 0.65)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
 
-[sub_resource type="Theme" id="Theme_vfxln"]
-Button/styles/disabled = SubResource("StyleBoxFlat_vfxln")
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_xfdvk"]
+content_margin_left = 8.0
+content_margin_top = 3.0
+content_margin_right = 8.0
+content_margin_bottom = 3.0
+bg_color = Color(0.05882353, 0.2, 0.2509804, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.30980393, 0.9529412, 1, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_rds0a"]
+content_margin_left = 2.0
+content_margin_top = 1.0
+content_margin_right = 2.0
+content_margin_bottom = 1.0
+bg_color = Color(0, 0, 0, 0)
+border_color = Color(0, 0, 0, 0)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_70ysa"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_r4gif"]
+content_margin_left = 2.0
+content_margin_top = 1.0
+content_margin_right = 2.0
+content_margin_bottom = 1.0
+bg_color = Color(0, 0, 0, 0)
+border_color = Color(0, 0, 0, 0)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_yl2fy"]
+content_margin_left = 2.0
+content_margin_top = 1.0
+content_margin_right = 2.0
+content_margin_bottom = 1.0
+bg_color = Color(0, 0, 0, 0)
+border_color = Color(0, 0, 0, 0)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_tsvl1"]
+content_margin_left = 2.0
+content_margin_top = 1.0
+content_margin_right = 2.0
+content_margin_bottom = 1.0
+bg_color = Color(0, 0, 0, 0)
+border_color = Color(0, 0, 0, 0)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ajhq0"]
+content_margin_left = 2.0
+content_margin_top = 1.0
+content_margin_right = 2.0
+content_margin_bottom = 1.0
+bg_color = Color(0, 0, 0, 0)
+border_color = Color(0, 0, 0, 0)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxLine" id="StyleBoxLine_3dl43"]
+color = Color(0.16862746, 0.20784314, 0.32156864, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_nqbab"]
+content_margin_left = 12.0
+content_margin_top = 10.0
+content_margin_right = 12.0
+content_margin_bottom = 10.0
+bg_color = Color(0.043, 0.059, 0.102, 0.9)
+border_width_right = 1
+border_color = Color(0.30980393, 0.9529412, 1, 0.45)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_tqwas"]
+content_margin_left = 8.0
+content_margin_top = 5.0
+content_margin_right = 8.0
+content_margin_bottom = 7.0
+bg_color = Color(1, 1, 1, 0.025)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.13333334, 0.16470589, 0.2509804, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_0iwgl"]
+content_margin_left = 10.0
+content_margin_top = 6.0
+content_margin_right = 10.0
+content_margin_bottom = 6.0
+bg_color = Color(0.043, 0.059, 0.102, 0.85)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.30980393, 0.9529412, 1, 0.45)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="Theme" id="Theme_g8e4a"]
+default_font = ExtResource("2_4nhgn")
+default_font_size = 11
+Button/colors/font_color = Color(0.78431374, 0.83137256, 0.9254902, 1)
+Button/colors/font_focus_color = Color(1, 1, 1, 1)
+Button/colors/font_hover_color = Color(1, 1, 1, 1)
+Button/colors/font_hover_pressed_color = Color(1, 1, 1, 1)
+Button/colors/font_pressed_color = Color(1, 1, 1, 1)
+Button/styles/disabled = SubResource("StyleBoxFlat_x0gbu")
+Button/styles/focus = SubResource("StyleBoxEmpty_56t5u")
+Button/styles/hover = SubResource("StyleBoxFlat_80trj")
+Button/styles/hover_pressed = SubResource("StyleBoxFlat_xfdvk")
+Button/styles/normal = SubResource("StyleBoxFlat_x0gbu")
+Button/styles/pressed = SubResource("StyleBoxFlat_xfdvk")
+CheckBox/colors/font_color = Color(0.78431374, 0.83137256, 0.9254902, 1)
+CheckBox/colors/font_hover_color = Color(1, 1, 1, 1)
+CheckBox/colors/font_hover_pressed_color = Color(1, 1, 1, 1)
+CheckBox/colors/font_pressed_color = Color(1, 1, 1, 1)
+CheckBox/styles/disabled = SubResource("StyleBoxFlat_rds0a")
+CheckBox/styles/focus = SubResource("StyleBoxEmpty_70ysa")
+CheckBox/styles/hover = SubResource("StyleBoxFlat_r4gif")
+CheckBox/styles/hover_pressed = SubResource("StyleBoxFlat_yl2fy")
+CheckBox/styles/normal = SubResource("StyleBoxFlat_tsvl1")
+CheckBox/styles/pressed = SubResource("StyleBoxFlat_ajhq0")
+HBoxContainer/constants/separation = 6
+HFlowContainer/constants/h_separation = 4
+HFlowContainer/constants/v_separation = 4
+HSeparator/constants/separation = 8
+HSeparator/styles/separator = SubResource("StyleBoxLine_3dl43")
+Label/colors/font_color = Color(0.78431374, 0.83137256, 0.9254902, 1)
+PanelContainer/styles/panel = SubResource("StyleBoxFlat_nqbab")
+SectionHeader/base_type = &"Label"
+SectionHeader/colors/font_color = Color(0.30980393, 0.9529412, 1, 1)
+SectionHeader/font_sizes/font_size = 9
+SectionPanel/base_type = &"PanelContainer"
+SectionPanel/styles/panel = SubResource("StyleBoxFlat_tqwas")
+StatsPanel/base_type = &"PanelContainer"
+StatsPanel/styles/panel = SubResource("StyleBoxFlat_0iwgl")
+SubtitleLabel/base_type = &"Label"
+SubtitleLabel/colors/font_color = Color(0.54901963, 0.60784316, 0.72156864, 1)
+SubtitleLabel/font_sizes/font_size = 9
+TitleLabel/base_type = &"Label"
+TitleLabel/colors/font_color = Color(1, 1, 1, 1)
+TitleLabel/font_sizes/font_size = 17
+VBoxContainer/constants/separation = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ujani"]
+bg_color = Color(0, 0.301961, 0, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_1ettl"]
+bg_color = Color(0.337578, 0.703146, 0, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_5up31"]
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_e0ht7"]
 
 [node name="UI" type="CanvasLayer" unique_id=1629046844]
 script = ExtResource("1_lkveq")
 default_player_health = 100.0
 
-[node name="BlockDebuggerColorPicker" type="ColorPicker" parent="." unique_id=1467060132]
+[node name="DebuggerColorPicker" type="ColorPicker" parent="." unique_id=1438354296]
 visible = false
 z_index = 5
 anchors_preset = 8
@@ -47,26 +245,7 @@ grow_vertical = 2
 scale = Vector2(0.7, 0.7)
 size_flags_horizontal = 4
 mouse_filter = 0
-theme = SubResource("Theme_ptpx1")
-
-[node name="DirectionalDebuggerColorPicker" type="ColorPicker" parent="." unique_id=1438354296]
-visible = false
-z_index = 5
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -95.0
-offset_top = -187.0
-offset_right = 203.0
-offset_bottom = 389.0
-grow_horizontal = 2
-grow_vertical = 2
-scale = Vector2(0.7, 0.7)
-size_flags_horizontal = 4
-mouse_filter = 0
-theme = SubResource("Theme_vfxln")
+theme = SubResource("Theme_g8e4a")
 
 [node name="CloseCurrentColorPickerBtn" type="Button" parent="." unique_id=1891504070]
 visible = false
@@ -83,1334 +262,8 @@ offset_bottom = 19.0
 grow_horizontal = 2
 grow_vertical = 2
 focus_mode = 0
+theme = SubResource("Theme_g8e4a")
 text = "Close Color Picker"
-
-[node name="TopRightContainer" type="VBoxContainer" parent="." unique_id=1529341854]
-custom_minimum_size = Vector2(200, 0)
-anchors_preset = 1
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -200.0
-offset_bottom = 147.0
-grow_horizontal = 0
-
-[node name="CurrentFPS" type="Label" parent="TopRightContainer" unique_id=1443015256]
-layout_mode = 2
-text = "FPS::"
-
-[node name="LowFPS" type="Label" parent="TopRightContainer" unique_id=670312590]
-layout_mode = 2
-text = "Low:"
-
-[node name="TrackFPSBtn" type="Button" parent="TopRightContainer" unique_id=1412509999]
-layout_mode = 2
-focus_mode = 0
-theme = ExtResource("2_e8asd")
-text = "Not Tracking FPS"
-
-[node name="ObjectPoolSettingsView" type="Control" parent="." unique_id=530912329]
-visible = false
-layout_mode = 3
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-
-[node name="FreeBulletPoolVBoxContainer" type="VBoxContainer" parent="ObjectPoolSettingsView" unique_id=2100869197]
-layout_mode = 1
-anchors_preset = 3
-anchor_left = 1.0
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -273.0
-offset_top = -199.0
-grow_horizontal = 0
-grow_vertical = 0
-size_flags_vertical = 8
-
-[node name="Label" type="Label" parent="ObjectPoolSettingsView/FreeBulletPoolVBoxContainer" unique_id=2007634529]
-layout_mode = 2
-text = "Free specific bullets object pool
-that has N amount bullets"
-horizontal_alignment = 1
-
-[node name="FreeMultiMeshDirectionalPoolBtn" type="Button" parent="ObjectPoolSettingsView/FreeBulletPoolVBoxContainer" unique_id=638277059]
-custom_minimum_size = Vector2(200, 46)
-layout_mode = 2
-size_flags_vertical = 8
-focus_mode = 0
-theme = ExtResource("3_vd08o")
-text = "Free Directional Bullets Pool
-(only those with N amount bullets)"
-autowrap_mode = 2
-
-[node name="FreeMultiMeshBlockBulletsPoolBtn" type="Button" parent="ObjectPoolSettingsView/FreeBulletPoolVBoxContainer" unique_id=280404643]
-custom_minimum_size = Vector2(200, 46)
-layout_mode = 2
-size_flags_vertical = 8
-focus_mode = 0
-theme = ExtResource("3_vd08o")
-text = "Free Block Bullets Pool
-(only those with N amount bullets)"
-autowrap_mode = 2
-
-[node name="FreeAllBulletPoolsBtn" type="Button" parent="ObjectPoolSettingsView/FreeBulletPoolVBoxContainer" unique_id=1844945031]
-custom_minimum_size = Vector2(151, 46)
-layout_mode = 2
-size_flags_vertical = 8
-focus_mode = 0
-theme = ExtResource("3_vd08o")
-text = "Free All Bullet Pools
-(no matter N amount bullets)
-"
-autowrap_mode = 2
-
-[node name="PopulateBulletPoolVBoxContainer" type="VBoxContainer" parent="ObjectPoolSettingsView" unique_id=2089181824]
-layout_mode = 1
-anchors_preset = 3
-anchor_left = 1.0
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -203.0
-offset_top = -411.0
-offset_right = -3.0
-offset_bottom = -213.0
-grow_horizontal = 0
-grow_vertical = 0
-size_flags_vertical = 8
-
-[node name="Label" type="Label" parent="ObjectPoolSettingsView/PopulateBulletPoolVBoxContainer" unique_id=689906736]
-layout_mode = 2
-text = "Populate X amount
-MultiMeshInstances
-with N amount bullets"
-horizontal_alignment = 1
-
-[node name="PopulateMultiMeshDirectionalPoolBtn" type="Button" parent="ObjectPoolSettingsView/PopulateBulletPoolVBoxContainer" unique_id=1063897349]
-custom_minimum_size = Vector2(200, 69)
-layout_mode = 2
-size_flags_vertical = 8
-focus_mode = 0
-theme = ExtResource("3_vd08o")
-text = "Populate Directional Bullets Pool
-( X amount MultiMeshes with N amount bullets)"
-autowrap_mode = 2
-
-[node name="PopulateMultiMeshBlockPoolBtn" type="Button" parent="ObjectPoolSettingsView/PopulateBulletPoolVBoxContainer" unique_id=1403601704]
-custom_minimum_size = Vector2(200, 46)
-layout_mode = 2
-size_flags_vertical = 8
-focus_mode = 0
-theme = ExtResource("3_vd08o")
-text = "Populate Block
-Bullets Pool
-( X amount MultiMeshes with N amount bullets)"
-autowrap_mode = 2
-
-[node name="AmountMultiMeshInstancesVboxContainer" type="VBoxContainer" parent="ObjectPoolSettingsView" unique_id=522313607]
-layout_mode = 1
-anchors_preset = 2
-anchor_top = 1.0
-anchor_bottom = 1.0
-offset_left = 368.0
-offset_top = -63.0
-offset_right = 713.0
-offset_bottom = -5.0
-grow_vertical = 0
-alignment = 1
-
-[node name="Label" type="Label" parent="ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainer" unique_id=1483116611]
-layout_mode = 2
-text = "Amount MultiMeshInstances (X)"
-horizontal_alignment = 1
-
-[node name="HBoxContainer" type="HBoxContainer" parent="ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainer" unique_id=2058705799]
-layout_mode = 2
-alignment = 1
-
-[node name="1" type="Button" parent="ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainer/HBoxContainer" unique_id=837580298]
-custom_minimum_size = Vector2(32, 0)
-layout_mode = 2
-focus_mode = 0
-text = "1"
-
-[node name="5" type="Button" parent="ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainer/HBoxContainer" unique_id=823130215]
-custom_minimum_size = Vector2(32, 0)
-layout_mode = 2
-focus_mode = 0
-text = "5"
-
-[node name="15" type="Button" parent="ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainer/HBoxContainer" unique_id=1711292588]
-custom_minimum_size = Vector2(32, 0)
-layout_mode = 2
-focus_mode = 0
-text = "15"
-
-[node name="30" type="Button" parent="ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainer/HBoxContainer" unique_id=408272927]
-custom_minimum_size = Vector2(32, 0)
-layout_mode = 2
-focus_mode = 0
-text = "30"
-
-[node name="60" type="Button" parent="ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainer/HBoxContainer" unique_id=1163103048]
-custom_minimum_size = Vector2(32, 0)
-layout_mode = 2
-focus_mode = 0
-text = "60"
-
-[node name="100" type="Button" parent="ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainer/HBoxContainer" unique_id=390375897]
-custom_minimum_size = Vector2(32, 0)
-layout_mode = 2
-focus_mode = 0
-text = "100"
-
-[node name="200" type="Button" parent="ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainer/HBoxContainer" unique_id=493441306]
-custom_minimum_size = Vector2(32, 0)
-layout_mode = 2
-focus_mode = 0
-text = "200"
-
-[node name="500" type="Button" parent="ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainer/HBoxContainer" unique_id=1236154870]
-custom_minimum_size = Vector2(32, 0)
-layout_mode = 2
-focus_mode = 0
-text = "500"
-
-[node name="1000" type="Button" parent="ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainer/HBoxContainer" unique_id=1880108391]
-custom_minimum_size = Vector2(32, 0)
-layout_mode = 2
-focus_mode = 0
-text = "1000
-"
-
-[node name="SelectAmountMultiMeshesBtnView" parent="ObjectPoolSettingsView" unique_id=1197564796 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
-visible = false
-layout_mode = 0
-offset_top = 0.0
-offset_bottom = 0.0
-all_btns = [NodePath("../AmountMultiMeshInstancesVboxContainer/HBoxContainer/1"), NodePath("../AmountMultiMeshInstancesVboxContainer/HBoxContainer/5"), NodePath("../AmountMultiMeshInstancesVboxContainer/HBoxContainer/15"), NodePath("../AmountMultiMeshInstancesVboxContainer/HBoxContainer/30"), NodePath("../AmountMultiMeshInstancesVboxContainer/HBoxContainer/60"), NodePath("../AmountMultiMeshInstancesVboxContainer/HBoxContainer/100"), NodePath("../AmountMultiMeshInstancesVboxContainer/HBoxContainer/200"), NodePath("../AmountMultiMeshInstancesVboxContainer/HBoxContainer/500"), NodePath("../AmountMultiMeshInstancesVboxContainer/HBoxContainer/1000")]
-
-[node name="AdditionalDebugDataContainer" type="VBoxContainer" parent="ObjectPoolSettingsView" unique_id=1929526133]
-layout_mode = 1
-offset_right = 245.0
-offset_bottom = 239.0
-script = ExtResource("5_1mjrc")
-
-[node name="ActiveDirectionalMultiMeshesCustomLabel" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer" unique_id=2066304836 instance=ExtResource("5_i53y2")]
-layout_mode = 2
-default_text = "Active Directional MultiMeshes:"
-
-[node name="ActiveBlockMultiMeshesCustomLabel" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer" unique_id=2065926148 instance=ExtResource("5_i53y2")]
-layout_mode = 2
-default_text = "Active Block MultiMeshes:"
-
-[node name="ActiveBulletAttachmentsCustomLabel" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer" unique_id=76869897 instance=ExtResource("5_i53y2")]
-layout_mode = 2
-default_text = "Active Bullet Attachments:"
-
-[node name="Control" type="Control" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer" unique_id=483451645]
-custom_minimum_size = Vector2(0, 20)
-layout_mode = 2
-mouse_filter = 2
-
-[node name="PooledDirectionalMultiMeshesCustomLabel" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer" unique_id=140627347 instance=ExtResource("5_i53y2")]
-layout_mode = 2
-default_text = "Pooled Directional MultiMeshes:"
-
-[node name="PooledBlockMultiMeshesCustomLabel" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer" unique_id=366365038 instance=ExtResource("5_i53y2")]
-layout_mode = 2
-default_text = "Pooled Block MultiMeshes:"
-
-[node name="PooledBulletAttachmentsCustomLabel" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer" unique_id=1280452547 instance=ExtResource("5_i53y2")]
-layout_mode = 2
-default_text = "Pooled Bullet Attachments:"
-
-[node name="Control2" type="Control" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer" unique_id=1901907745]
-custom_minimum_size = Vector2(0, 20)
-layout_mode = 2
-mouse_filter = 2
-
-[node name="DirectionalPoolInfoCustomLabel" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer" unique_id=1413990276 instance=ExtResource("5_i53y2")]
-layout_mode = 2
-default_text = "Directional Pool Info:"
-
-[node name="BlockPoolInfoCustomLabel" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer" unique_id=584881102 instance=ExtResource("5_i53y2")]
-layout_mode = 2
-default_text = "Block Pool Info:"
-
-[node name="AttachmentsPoolInfoCustomLabel" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer" unique_id=1298054100 instance=ExtResource("5_i53y2")]
-layout_mode = 2
-default_text = "Attachments Pool Info:"
-
-[node name="UpdateDebugDataTimer" type="Timer" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer" unique_id=1430951984]
-wait_time = 0.5
-autostart = true
-
-[node name="AttachmentPoolRelated" type="HBoxContainer" parent="ObjectPoolSettingsView" unique_id=1355191524]
-layout_mode = 1
-offset_left = 303.0
-offset_right = 929.0
-offset_bottom = 193.0
-
-[node name="VBoxContainer" type="VBoxContainer" parent="ObjectPoolSettingsView/AttachmentPoolRelated" unique_id=1422652040]
-layout_mode = 2
-
-[node name="Label2" type="Label" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer" unique_id=1572306012]
-layout_mode = 2
-text = "Selected Attachment Id"
-horizontal_alignment = 1
-
-[node name="SwitchBulletAttachmentIdBtn" type="Button" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer" unique_id=344996161]
-layout_mode = 2
-focus_mode = 0
-theme = ExtResource("3_vd08o")
-text = "Attachment Id: IdGoesHere"
-script = ExtResource("7_gbr8l")
-text_options = Array[String](["Attachment Id: 1", "Attachment Id: 2", "Attachment Id: 3"])
-metadata/_custom_type_script = "uid://b7wucn8wglgth"
-
-[node name="Label" type="Label" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer" unique_id=1099595940]
-layout_mode = 2
-text = "Amount Attachments (Y)"
-horizontal_alignment = 1
-
-[node name="HBoxContainer" type="HBoxContainer" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer" unique_id=182087049]
-layout_mode = 2
-size_flags_horizontal = 4
-
-[node name="1" type="Button" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer/HBoxContainer" unique_id=745806805]
-custom_minimum_size = Vector2(32, 0)
-layout_mode = 2
-focus_mode = 0
-text = "1"
-
-[node name="5" type="Button" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer/HBoxContainer" unique_id=1484594319]
-custom_minimum_size = Vector2(32, 0)
-layout_mode = 2
-focus_mode = 0
-text = "5"
-
-[node name="15" type="Button" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer/HBoxContainer" unique_id=313905688]
-custom_minimum_size = Vector2(32, 0)
-layout_mode = 2
-focus_mode = 0
-text = "15"
-
-[node name="30" type="Button" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer/HBoxContainer" unique_id=1905783399]
-custom_minimum_size = Vector2(32, 0)
-layout_mode = 2
-focus_mode = 0
-text = "30"
-
-[node name="60" type="Button" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer/HBoxContainer" unique_id=620498061]
-custom_minimum_size = Vector2(32, 0)
-layout_mode = 2
-focus_mode = 0
-text = "60"
-
-[node name="100" type="Button" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer/HBoxContainer" unique_id=609357206]
-custom_minimum_size = Vector2(32, 0)
-layout_mode = 2
-focus_mode = 0
-text = "100"
-
-[node name="PopulateAttachmentsPoolBtn" type="Button" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer" unique_id=1935235510]
-layout_mode = 2
-size_flags_vertical = 8
-focus_mode = 0
-theme = ExtResource("3_vd08o")
-text = "Populate Attachment Pool
-(with Y amount )"
-autowrap_mode = 2
-
-[node name="VBoxContainer2" type="HBoxContainer" parent="ObjectPoolSettingsView/AttachmentPoolRelated" unique_id=1583426820]
-layout_mode = 2
-size_flags_vertical = 0
-
-[node name="FreeSpecificAttachmentPoolBtn" type="Button" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer2" unique_id=57845736]
-custom_minimum_size = Vector2(200, 69)
-layout_mode = 2
-size_flags_vertical = 8
-focus_mode = 0
-theme = ExtResource("3_vd08o")
-text = "Free Specific 
-Attachment Pool
-(based on selected attachment_id)"
-autowrap_mode = 2
-
-[node name="FreeAllAttachmentPoolsBtn" type="Button" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer2" unique_id=983967240]
-custom_minimum_size = Vector2(200, 69)
-layout_mode = 2
-size_flags_vertical = 8
-focus_mode = 0
-theme = ExtResource("3_vd08o")
-text = "Free All 
-Attachment Pools
-(no matter the attachment_id)"
-autowrap_mode = 2
-
-[node name="SelectAmountAttachmentsBtnView" type="Control" parent="ObjectPoolSettingsView/AttachmentPoolRelated" unique_id=10346908 node_paths=PackedStringArray("all_btns")]
-visible = false
-layout_mode = 2
-script = ExtResource("8_44pmw")
-all_btns = [NodePath("../VBoxContainer/HBoxContainer/1"), NodePath("../VBoxContainer/HBoxContainer/5"), NodePath("../VBoxContainer/HBoxContainer/15"), NodePath("../VBoxContainer/HBoxContainer/30"), NodePath("../VBoxContainer/HBoxContainer/60"), NodePath("../VBoxContainer/HBoxContainer/100")]
-metadata/_custom_type_script = "uid://cs67whos5iyl6"
-
-[node name="BulletSettingsView" type="Control" parent="." unique_id=303884450]
-layout_mode = 3
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-layout_direction = 1
-mouse_filter = 2
-
-[node name="ZIndexContainer" type="VBoxContainer" parent="BulletSettingsView" unique_id=706732977]
-custom_minimum_size = Vector2(57, 198)
-layout_mode = 1
-anchors_preset = 2
-anchor_top = 1.0
-anchor_bottom = 1.0
-offset_left = 360.0
-offset_top = -164.0
-offset_right = 417.0
-offset_bottom = 34.0
-grow_vertical = 0
-
-[node name="Label" type="Label" parent="BulletSettingsView/ZIndexContainer" unique_id=1780170504]
-layout_mode = 2
-text = "Z Index"
-
-[node name="Z_INDEX_0" type="Button" parent="BulletSettingsView/ZIndexContainer" unique_id=1945293167]
-layout_mode = 2
-focus_mode = 0
-text = "0"
-
-[node name="Z_INDEX_1" type="Button" parent="BulletSettingsView/ZIndexContainer" unique_id=854587553]
-layout_mode = 2
-focus_mode = 0
-text = "1"
-
-[node name="Z_INDEX_2" type="Button" parent="BulletSettingsView/ZIndexContainer" unique_id=951603942]
-layout_mode = 2
-focus_mode = 0
-text = "2"
-
-[node name="Z_INDEX_3" type="Button" parent="BulletSettingsView/ZIndexContainer" unique_id=336561921]
-layout_mode = 2
-focus_mode = 0
-text = "3"
-
-[node name="Z_INDEX_MINUS_5" type="Button" parent="BulletSettingsView/ZIndexContainer" unique_id=18286663]
-layout_mode = 2
-focus_mode = 0
-text = "-5"
-
-[node name="VBoxContainer" type="HBoxContainer" parent="BulletSettingsView" unique_id=283871008]
-layout_mode = 1
-offset_left = 401.0
-offset_right = 842.0
-offset_bottom = 117.0
-theme_override_constants/separation = 12
-
-[node name="DirectionalDebuggerVBoxContainer" type="VBoxContainer" parent="BulletSettingsView/VBoxContainer" unique_id=1023093027]
-layout_mode = 2
-
-[node name="ShowDirectionalDebuggerColorPickerBtn" type="Button" parent="BulletSettingsView/VBoxContainer/DirectionalDebuggerVBoxContainer" unique_id=1938260879]
-custom_minimum_size = Vector2(64, 64)
-layout_mode = 2
-size_flags_horizontal = 4
-size_flags_vertical = 4
-focus_mode = 0
-theme_override_styles/normal = SubResource("StyleBoxFlat_5up31")
-
-[node name="Label" type="Label" parent="BulletSettingsView/VBoxContainer/DirectionalDebuggerVBoxContainer" unique_id=551605980]
-layout_mode = 2
-text = "DirectionalBullets
-Debugger"
-horizontal_alignment = 1
-
-[node name="BlockDebuggerVBoxContainer2" type="VBoxContainer" parent="BulletSettingsView/VBoxContainer" unique_id=184103996]
-layout_mode = 2
-
-[node name="ShowBlockDebuggerColorPickerBtn" type="Button" parent="BulletSettingsView/VBoxContainer/BlockDebuggerVBoxContainer2" unique_id=1931114056]
-custom_minimum_size = Vector2(64, 64)
-layout_mode = 2
-size_flags_horizontal = 4
-size_flags_vertical = 4
-focus_mode = 0
-theme_override_styles/normal = SubResource("StyleBoxFlat_e0ht7")
-
-[node name="Label" type="Label" parent="BulletSettingsView/VBoxContainer/BlockDebuggerVBoxContainer2" unique_id=336272836]
-layout_mode = 2
-text = "BlockBullets
-Debugger"
-horizontal_alignment = 1
-
-[node name="VBoxContainer" type="VBoxContainer" parent="BulletSettingsView/VBoxContainer" unique_id=1762485]
-layout_mode = 2
-
-[node name="EnableDebuggerCheckBox" type="CheckBox" parent="BulletSettingsView/VBoxContainer/VBoxContainer" unique_id=1066462979]
-layout_mode = 2
-focus_mode = 0
-text = "Enable Debugger"
-
-[node name="RotatePhysicsShapesCheckBox" type="CheckBox" parent="BulletSettingsView/VBoxContainer/VBoxContainer" unique_id=1598475774]
-layout_mode = 2
-focus_mode = 0
-text = "Rotate Physics Shapes"
-
-[node name="AdjustDirectionBasedOnRotationCheckBox" type="CheckBox" parent="BulletSettingsView/VBoxContainer/VBoxContainer" unique_id=1134841387]
-layout_mode = 2
-focus_mode = 0
-text = "Adjust Direction Based On Rotation"
-
-[node name="StopRotationWhenMaxReachedCheckBox" type="CheckBox" parent="BulletSettingsView/VBoxContainer/VBoxContainer" unique_id=1799614189]
-layout_mode = 2
-focus_mode = 0
-text = "Stop Rotation When Max Reached"
-
-[node name="VBoxContainer5" type="VBoxContainer" parent="BulletSettingsView" unique_id=508925416]
-layout_mode = 1
-anchors_preset = 3
-anchor_left = 1.0
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -698.0
-offset_top = -108.0
-offset_right = -547.0
-offset_bottom = -12.0
-grow_horizontal = 0
-grow_vertical = 0
-
-[node name="SwitchMaterialBtn" type="Button" parent="BulletSettingsView/VBoxContainer5" unique_id=2094810834]
-custom_minimum_size = Vector2(151, 46)
-layout_mode = 2
-size_flags_vertical = 8
-focus_mode = 0
-theme = ExtResource("3_vd08o")
-text = "Switch Material Button
-"
-autowrap_mode = 2
-script = ExtResource("7_gbr8l")
-text_options = Array[String](["No Material", "CanvasItem Material", "Colorful Fragment Shader", "Glitch Fragment Shader", "Scale Vertex Shader"])
-metadata/_custom_type_script = "uid://b7wucn8wglgth"
-
-[node name="SwitchBulletTextureBtn" type="Button" parent="BulletSettingsView/VBoxContainer5" unique_id=2136685656]
-custom_minimum_size = Vector2(151, 46)
-layout_mode = 2
-size_flags_vertical = 8
-focus_mode = 0
-theme = ExtResource("3_vd08o")
-text = "Switch Bullet Texture
-"
-autowrap_mode = 2
-script = ExtResource("7_gbr8l")
-text_options = Array[String](["Animated Rocket Texture", "Single Godot Texture"])
-metadata/_custom_type_script = "uid://b7wucn8wglgth"
-
-[node name="SwitchAttachmentBtn" type="Button" parent="BulletSettingsView/VBoxContainer5" unique_id=1061980349]
-custom_minimum_size = Vector2(151, 46)
-layout_mode = 2
-size_flags_vertical = 8
-focus_mode = 0
-theme = ExtResource("3_vd08o")
-text = "Switch Attachment Scene
-"
-autowrap_mode = 2
-script = ExtResource("7_gbr8l")
-text_options = Array[String](["No Bullet Attachment", "CPU Particles", "GPU Particles", "Light Sprite Attachment"])
-metadata/_custom_type_script = "uid://b7wucn8wglgth"
-
-[node name="VBoxContainer4" type="VBoxContainer" parent="BulletSettingsView" unique_id=790087604]
-layout_mode = 1
-anchors_preset = 3
-anchor_left = 1.0
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -542.0
-offset_top = -108.0
-offset_right = -391.0
-offset_bottom = -12.0
-grow_horizontal = 0
-grow_vertical = 0
-size_flags_vertical = 8
-
-[node name="GenerateSpeedBtn" type="Button" parent="BulletSettingsView/VBoxContainer4" unique_id=112417892]
-custom_minimum_size = Vector2(151, 46)
-layout_mode = 2
-size_flags_vertical = 8
-focus_mode = 0
-theme = ExtResource("3_vd08o")
-text = "Generate Random Speed Data"
-autowrap_mode = 2
-script = ExtResource("7_gbr8l")
-text_options = Array[String](["Random Speed Data 1", "Random Speed Data 2", "Random Speed Data 3"])
-metadata/_custom_type_script = "uid://b7wucn8wglgth"
-
-[node name="GenerateRotationBtn" type="Button" parent="BulletSettingsView/VBoxContainer4" unique_id=257220646]
-custom_minimum_size = Vector2(151, 46)
-layout_mode = 2
-focus_mode = 0
-theme = ExtResource("3_vd08o")
-text = "Generate Random Rotation Data"
-autowrap_mode = 2
-script = ExtResource("7_gbr8l")
-text_options = Array[String](["Disabled Rotation", "Random Rotation Data 1", "Random Rotation Data 2", "Random Rotation Data 3"])
-metadata/_custom_type_script = "uid://b7wucn8wglgth"
-
-[node name="VBoxContainer2" type="VBoxContainer" parent="BulletSettingsView" unique_id=1932469294]
-layout_mode = 1
-anchors_preset = 3
-anchor_left = 1.0
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -386.0
-offset_top = -108.0
-offset_right = -235.0
-offset_bottom = -12.0
-grow_horizontal = 0
-grow_vertical = 0
-
-[node name="DisableOrEnableFactoryBtn" type="Button" parent="BulletSettingsView/VBoxContainer2" unique_id=1804688607]
-custom_minimum_size = Vector2(151, 46)
-layout_mode = 2
-size_flags_vertical = 8
-focus_mode = 0
-theme = ExtResource("3_vd08o")
-text = "Disable/Enable BulletFactory2D"
-autowrap_mode = 2
-script = ExtResource("7_gbr8l")
-text_options = Array[String](["Disable BulletFactory2D", "Enable BulletFactory2D"])
-metadata/_custom_type_script = "uid://b7wucn8wglgth"
-
-[node name="ResetFactoryBtn" type="Button" parent="BulletSettingsView/VBoxContainer2" unique_id=762492034]
-custom_minimum_size = Vector2(151, 46)
-layout_mode = 2
-size_flags_vertical = 8
-focus_mode = 0
-theme = ExtResource("3_vd08o")
-text = "Reset BulletFactory2D"
-autowrap_mode = 2
-
-[node name="FreeActiveBulletsBtn" type="Button" parent="BulletSettingsView/VBoxContainer2" unique_id=1656736060]
-custom_minimum_size = Vector2(151, 46)
-layout_mode = 2
-size_flags_vertical = 8
-focus_mode = 0
-theme = ExtResource("3_vd08o")
-text = "Free Active Bullets"
-autowrap_mode = 2
-
-[node name="VBoxContainer3" type="VBoxContainer" parent="BulletSettingsView" unique_id=1210507654]
-layout_mode = 1
-anchors_preset = 3
-anchor_left = 1.0
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -203.0
-offset_top = -102.0
-offset_right = -23.0
-offset_bottom = -13.0
-grow_horizontal = 0
-grow_vertical = 0
-size_flags_vertical = 8
-
-[node name="EnableMonitorableCheckBox" type="CheckBox" parent="BulletSettingsView/VBoxContainer3" unique_id=1834602878]
-layout_mode = 2
-focus_mode = 0
-text = "Enable Monitorable"
-
-[node name="IsTextureRotationPermanentCheckBox" type="CheckBox" parent="BulletSettingsView/VBoxContainer3" unique_id=272833530]
-layout_mode = 2
-focus_mode = 0
-text = "Is Texture Rotation
- Permanent"
-
-[node name="BulletCollisionVboxContainer" type="VBoxContainer" parent="BulletSettingsView" unique_id=543388122]
-layout_mode = 1
-anchors_preset = 1
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -192.0
-offset_top = 158.0
-offset_bottom = 321.0
-grow_horizontal = 0
-
-[node name="Label" type="Label" parent="BulletSettingsView/BulletCollisionVboxContainer" unique_id=1861678758]
-layout_mode = 2
-text = "Bullet On Bullet Collision"
-horizontal_alignment = 1
-
-[node name="DontCollideBtn" type="Button" parent="BulletSettingsView/BulletCollisionVboxContainer" unique_id=771719724]
-layout_mode = 2
-focus_mode = 0
-text = "Don't Collide"
-
-[node name="DestroyPlayerBulletsBtn" type="Button" parent="BulletSettingsView/BulletCollisionVboxContainer" unique_id=1035080220]
-layout_mode = 2
-focus_mode = 0
-text = "Destroy Player Bullets"
-
-[node name="DestroyEnemyBulletsBtn" type="Button" parent="BulletSettingsView/BulletCollisionVboxContainer" unique_id=1620246841]
-layout_mode = 2
-focus_mode = 0
-text = "Destroy Enemy Bullets"
-
-[node name="DestroyBothBtn" type="Button" parent="BulletSettingsView/BulletCollisionVboxContainer" unique_id=1119014358]
-layout_mode = 2
-focus_mode = 0
-text = "DestroyBoth"
-
-[node name="BulletDamageVboxContainer" type="VBoxContainer" parent="BulletSettingsView" unique_id=1704295089]
-layout_mode = 1
-anchors_preset = 3
-anchor_left = 1.0
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -117.0
-offset_top = -327.0
-offset_right = -3.0
-offset_bottom = -164.0
-grow_horizontal = 0
-grow_vertical = 0
-
-[node name="Label" type="Label" parent="BulletSettingsView/BulletDamageVboxContainer" unique_id=801719748]
-layout_mode = 2
-text = "Bullet Damage"
-horizontal_alignment = 1
-
-[node name="5" type="Button" parent="BulletSettingsView/BulletDamageVboxContainer" unique_id=1507856729]
-layout_mode = 2
-focus_mode = 0
-text = "5"
-
-[node name="10" type="Button" parent="BulletSettingsView/BulletDamageVboxContainer" unique_id=255044003]
-layout_mode = 2
-focus_mode = 0
-text = "10"
-
-[node name="30" type="Button" parent="BulletSettingsView/BulletDamageVboxContainer" unique_id=442112585]
-layout_mode = 2
-focus_mode = 0
-text = "30"
-
-[node name="60" type="Button" parent="BulletSettingsView/BulletDamageVboxContainer" unique_id=1114470908]
-layout_mode = 2
-focus_mode = 0
-text = "60"
-
-[node name="CollisionShapeSizeContainer" type="HBoxContainer" parent="BulletSettingsView" unique_id=209275176]
-layout_mode = 0
-offset_right = 40.0
-offset_bottom = 40.0
-
-[node name="Label" type="Label" parent="BulletSettingsView/CollisionShapeSizeContainer" unique_id=1039151015]
-layout_mode = 2
-text = "Collision Shape Size"
-
-[node name="32" type="Button" parent="BulletSettingsView/CollisionShapeSizeContainer" unique_id=135409155]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "32;32"
-
-[node name="64" type="Button" parent="BulletSettingsView/CollisionShapeSizeContainer" unique_id=749316215]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "64;64"
-
-[node name="128" type="Button" parent="BulletSettingsView/CollisionShapeSizeContainer" unique_id=1688329983]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "128;128"
-
-[node name="256" type="Button" parent="BulletSettingsView/CollisionShapeSizeContainer" unique_id=455070586]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "256;256"
-
-[node name="CollisionShapeOffsetContainer" type="HBoxContainer" parent="BulletSettingsView" unique_id=1685571403]
-layout_mode = 0
-offset_top = 45.0
-offset_right = 236.0
-offset_bottom = 85.0
-
-[node name="Label" type="Label" parent="BulletSettingsView/CollisionShapeOffsetContainer" unique_id=1301700086]
-layout_mode = 2
-text = "Collision Shape Offset"
-
-[node name="0" type="Button" parent="BulletSettingsView/CollisionShapeOffsetContainer" unique_id=1847483007]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "0;0"
-
-[node name="25_0" type="Button" parent="BulletSettingsView/CollisionShapeOffsetContainer" unique_id=1978325915]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "25;0"
-
-[node name="0_25" type="Button" parent="BulletSettingsView/CollisionShapeOffsetContainer" unique_id=2069455574]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "0;25"
-
-[node name="25_25" type="Button" parent="BulletSettingsView/CollisionShapeOffsetContainer" unique_id=2122907489]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "25;25"
-
-[node name="AttachmentOffsetContainer" type="HBoxContainer" parent="BulletSettingsView" unique_id=670868505]
-layout_mode = 0
-offset_top = 93.0
-offset_right = 275.0
-offset_bottom = 133.0
-
-[node name="Label" type="Label" parent="BulletSettingsView/AttachmentOffsetContainer" unique_id=1403240395]
-layout_mode = 2
-text = "Bullet Attachment Offset"
-
-[node name="-60_0" type="Button" parent="BulletSettingsView/AttachmentOffsetContainer" unique_id=52275078]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "-60;0"
-
-[node name="0_0" type="Button" parent="BulletSettingsView/AttachmentOffsetContainer" unique_id=1964163826]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "0;0"
-
-[node name="0_-60" type="Button" parent="BulletSettingsView/AttachmentOffsetContainer" unique_id=1071120729]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "0;-60"
-
-[node name="-60_-60" type="Button" parent="BulletSettingsView/AttachmentOffsetContainer" unique_id=1594569521]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "-60;-60"
-
-[node name="TextureRotationContainer" type="HBoxContainer" parent="BulletSettingsView" unique_id=617828251]
-layout_mode = 0
-offset_left = 3.0
-offset_top = 141.0
-offset_right = 239.0
-offset_bottom = 181.0
-
-[node name="Label" type="Label" parent="BulletSettingsView/TextureRotationContainer" unique_id=75946076]
-layout_mode = 2
-text = "Texture Rotation"
-
-[node name="0" type="Button" parent="BulletSettingsView/TextureRotationContainer" unique_id=1086933484]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "0"
-
-[node name="90" type="Button" parent="BulletSettingsView/TextureRotationContainer" unique_id=1871218888]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "90"
-
-[node name="180" type="Button" parent="BulletSettingsView/TextureRotationContainer" unique_id=2137135139]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "180"
-
-[node name="-90" type="Button" parent="BulletSettingsView/TextureRotationContainer" unique_id=217286140]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "-90"
-
-[node name="BulletLifeTimeContainer" type="HBoxContainer" parent="BulletSettingsView" unique_id=1176680]
-layout_mode = 0
-offset_left = 3.0
-offset_top = 188.0
-offset_right = 213.0
-offset_bottom = 219.0
-
-[node name="Label" type="Label" parent="BulletSettingsView/BulletLifeTimeContainer" unique_id=361889608]
-layout_mode = 2
-text = "Bullet Lifetime"
-
-[node name="2" type="Button" parent="BulletSettingsView/BulletLifeTimeContainer" unique_id=1085620900]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "2"
-
-[node name="0_5" type="Button" parent="BulletSettingsView/BulletLifeTimeContainer" unique_id=930160423]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "0.5"
-
-[node name="0_2" type="Button" parent="BulletSettingsView/BulletLifeTimeContainer" unique_id=1904295372]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "0.2"
-
-[node name="5" type="Button" parent="BulletSettingsView/BulletLifeTimeContainer" unique_id=1184569483]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "5"
-
-[node name="Infinite" type="Button" parent="BulletSettingsView/BulletLifeTimeContainer" unique_id=935127781]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "Infinite"
-
-[node name="TextureSizeContainer" type="HBoxContainer" parent="BulletSettingsView" unique_id=827009208]
-layout_mode = 0
-offset_left = 3.0
-offset_top = 236.0
-offset_right = 292.0
-offset_bottom = 276.0
-
-[node name="Label" type="Label" parent="BulletSettingsView/TextureSizeContainer" unique_id=2141815516]
-layout_mode = 2
-text = "Texture Size"
-
-[node name="140_140" type="Button" parent="BulletSettingsView/TextureSizeContainer" unique_id=404931495]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "140;140"
-
-[node name="200_200" type="Button" parent="BulletSettingsView/TextureSizeContainer" unique_id=110453033]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "200;200"
-
-[node name="320_320" type="Button" parent="BulletSettingsView/TextureSizeContainer" unique_id=1129031785]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "320;320"
-
-[node name="64_64" type="Button" parent="BulletSettingsView/TextureSizeContainer" unique_id=1861235187]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "64;64"
-
-[node name="SelectViewsContainer" type="Control" parent="BulletSettingsView" unique_id=874927359]
-visible = false
-anchors_preset = 0
-offset_right = 40.0
-offset_bottom = 40.0
-
-[node name="SelectCollisionShapeSizeView" parent="BulletSettingsView/SelectViewsContainer" unique_id=1056262356 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
-layout_mode = 0
-offset_top = 0.0
-offset_bottom = 0.0
-all_btns = [NodePath("../../CollisionShapeSizeContainer/32"), NodePath("../../CollisionShapeSizeContainer/64"), NodePath("../../CollisionShapeSizeContainer/128"), NodePath("../../CollisionShapeSizeContainer/256")]
-
-[node name="SelectBulletDamageView" parent="BulletSettingsView/SelectViewsContainer" unique_id=348725187 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
-layout_mode = 0
-offset_top = 0.0
-offset_bottom = 0.0
-all_btns = [NodePath("../../BulletDamageVboxContainer/5"), NodePath("../../BulletDamageVboxContainer/10"), NodePath("../../BulletDamageVboxContainer/30"), NodePath("../../BulletDamageVboxContainer/60")]
-
-[node name="SelectBulletCollisionView" parent="BulletSettingsView/SelectViewsContainer" unique_id=1888876757 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
-layout_mode = 0
-offset_top = 0.0
-offset_bottom = 0.0
-all_btns = [NodePath("../../BulletCollisionVboxContainer/DontCollideBtn"), NodePath("../../BulletCollisionVboxContainer/DestroyPlayerBulletsBtn"), NodePath("../../BulletCollisionVboxContainer/DestroyEnemyBulletsBtn"), NodePath("../../BulletCollisionVboxContainer/DestroyBothBtn")]
-
-[node name="SelectCollisionShapeOffsetView" parent="BulletSettingsView/SelectViewsContainer" unique_id=1955790454 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
-layout_mode = 0
-offset_top = 0.0
-offset_bottom = 0.0
-all_btns = [NodePath("../../CollisionShapeOffsetContainer/0"), NodePath("../../CollisionShapeOffsetContainer/25_0"), NodePath("../../CollisionShapeOffsetContainer/0_25"), NodePath("../../CollisionShapeOffsetContainer/25_25")]
-
-[node name="SelectBulletAttachmentOffsetView" parent="BulletSettingsView/SelectViewsContainer" unique_id=1177416728 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
-layout_mode = 0
-offset_top = 0.0
-offset_bottom = 0.0
-all_btns = [NodePath("../../AttachmentOffsetContainer/-60_0"), NodePath("../../AttachmentOffsetContainer/0_-60"), NodePath("../../AttachmentOffsetContainer/0_0"), NodePath("../../AttachmentOffsetContainer/-60_-60")]
-
-[node name="SelectTextureRotationView" parent="BulletSettingsView/SelectViewsContainer" unique_id=430997943 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
-layout_mode = 0
-offset_top = 0.0
-offset_bottom = 0.0
-all_btns = [NodePath("../../TextureRotationContainer/0"), NodePath("../../TextureRotationContainer/90"), NodePath("../../TextureRotationContainer/180"), NodePath("../../TextureRotationContainer/-90")]
-
-[node name="SelectBulletLifetimeView" parent="BulletSettingsView/SelectViewsContainer" unique_id=408327826 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
-layout_mode = 0
-offset_top = 0.0
-offset_bottom = 0.0
-all_btns = [NodePath("../../BulletLifeTimeContainer/2"), NodePath("../../BulletLifeTimeContainer/0_5"), NodePath("../../BulletLifeTimeContainer/0_2"), NodePath("../../BulletLifeTimeContainer/5"), NodePath("../../BulletLifeTimeContainer/Infinite")]
-
-[node name="SelectTextureSizeBtnView" parent="BulletSettingsView/SelectViewsContainer" unique_id=898752228 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
-layout_mode = 0
-offset_top = 0.0
-offset_bottom = 0.0
-all_btns = [NodePath("../../TextureSizeContainer/140_140"), NodePath("../../TextureSizeContainer/200_200"), NodePath("../../TextureSizeContainer/320_320"), NodePath("../../TextureSizeContainer/64_64")]
-
-[node name="SelectZIndexBtnView" parent="BulletSettingsView/SelectViewsContainer" unique_id=153009147 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
-layout_mode = 0
-offset_top = 0.0
-offset_bottom = 0.0
-all_btns = [NodePath("../../ZIndexContainer/Z_INDEX_0"), NodePath("../../ZIndexContainer/Z_INDEX_1"), NodePath("../../ZIndexContainer/Z_INDEX_2"), NodePath("../../ZIndexContainer/Z_INDEX_3"), NodePath("../../ZIndexContainer/Z_INDEX_MINUS_5")]
-
-[node name="MoreSettingsView" type="Control" parent="." unique_id=1865970130]
-visible = false
-layout_mode = 3
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-
-[node name="VBoxContainer3" type="VBoxContainer" parent="MoreSettingsView" unique_id=583709514]
-layout_mode = 0
-offset_right = 40.0
-offset_bottom = 40.0
-
-[node name="HBoxContainer" type="HBoxContainer" parent="MoreSettingsView/VBoxContainer3" unique_id=369412085]
-layout_mode = 2
-
-[node name="PhysicsTickVBoxContainer" type="HBoxContainer" parent="MoreSettingsView/VBoxContainer3/HBoxContainer" unique_id=2018298643]
-layout_mode = 2
-
-[node name="Label" type="Label" parent="MoreSettingsView/VBoxContainer3/HBoxContainer/PhysicsTickVBoxContainer" unique_id=1181584825]
-layout_mode = 2
-text = "Physics Ticks per Second"
-
-[node name="60" type="Button" parent="MoreSettingsView/VBoxContainer3/HBoxContainer/PhysicsTickVBoxContainer" unique_id=1097448829]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "60"
-
-[node name="40" type="Button" parent="MoreSettingsView/VBoxContainer3/HBoxContainer/PhysicsTickVBoxContainer" unique_id=300731582]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "40"
-
-[node name="25" type="Button" parent="MoreSettingsView/VBoxContainer3/HBoxContainer/PhysicsTickVBoxContainer" unique_id=291382639]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "25"
-
-[node name="15" type="Button" parent="MoreSettingsView/VBoxContainer3/HBoxContainer/PhysicsTickVBoxContainer" unique_id=155851599]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "15"
-
-[node name="120" type="Button" parent="MoreSettingsView/VBoxContainer3/HBoxContainer/PhysicsTickVBoxContainer" unique_id=877945415]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "120"
-
-[node name="PhysicsInterpolationCheckBox" type="CheckBox" parent="MoreSettingsView/VBoxContainer3/HBoxContainer" unique_id=1074037543]
-layout_mode = 2
-focus_mode = 0
-text = "Enable Physics Interpolation"
-
-[node name="VSyncCheckBox" type="CheckBox" parent="MoreSettingsView/VBoxContainer3/HBoxContainer" unique_id=836784967]
-layout_mode = 2
-focus_mode = 0
-text = "Enable VSync"
-
-[node name="HBoxContainer2" type="HBoxContainer" parent="MoreSettingsView/VBoxContainer3" unique_id=1572207736]
-layout_mode = 2
-
-[node name="LimitFPSContainer" type="HBoxContainer" parent="MoreSettingsView/VBoxContainer3/HBoxContainer2" unique_id=648470335]
-layout_mode = 2
-
-[node name="Label" type="Label" parent="MoreSettingsView/VBoxContainer3/HBoxContainer2/LimitFPSContainer" unique_id=437058524]
-layout_mode = 2
-text = "Limit FPS"
-
-[node name="NoLimit" type="Button" parent="MoreSettingsView/VBoxContainer3/HBoxContainer2/LimitFPSContainer" unique_id=1198446117]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "No Limit"
-
-[node name="60" type="Button" parent="MoreSettingsView/VBoxContainer3/HBoxContainer2/LimitFPSContainer" unique_id=232866730]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "60"
-
-[node name="40" type="Button" parent="MoreSettingsView/VBoxContainer3/HBoxContainer2/LimitFPSContainer" unique_id=1254070452]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "40"
-
-[node name="25" type="Button" parent="MoreSettingsView/VBoxContainer3/HBoxContainer2/LimitFPSContainer" unique_id=1759766490]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "25"
-
-[node name="15" type="Button" parent="MoreSettingsView/VBoxContainer3/HBoxContainer2/LimitFPSContainer" unique_id=1998877422]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "15"
-
-[node name="120" type="Button" parent="MoreSettingsView/VBoxContainer3/HBoxContainer2/LimitFPSContainer" unique_id=643448492]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "120"
-
-[node name="SelectLimitFPSBtnView" parent="MoreSettingsView" unique_id=1989831996 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
-visible = false
-layout_mode = 0
-offset_top = 162.0
-offset_bottom = 162.0
-all_btns = [NodePath("../VBoxContainer3/HBoxContainer2/LimitFPSContainer/NoLimit"), NodePath("../VBoxContainer3/HBoxContainer2/LimitFPSContainer/60"), NodePath("../VBoxContainer3/HBoxContainer2/LimitFPSContainer/40"), NodePath("../VBoxContainer3/HBoxContainer2/LimitFPSContainer/25"), NodePath("../VBoxContainer3/HBoxContainer2/LimitFPSContainer/15"), NodePath("../VBoxContainer3/HBoxContainer2/LimitFPSContainer/120")]
-
-[node name="SelectPhysicsTicksBtnView" parent="MoreSettingsView" unique_id=767601189 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
-visible = false
-layout_mode = 0
-offset_top = 0.0
-offset_bottom = 0.0
-all_btns = [NodePath("../VBoxContainer3/HBoxContainer/PhysicsTickVBoxContainer/60"), NodePath("../VBoxContainer3/HBoxContainer/PhysicsTickVBoxContainer/40"), NodePath("../VBoxContainer3/HBoxContainer/PhysicsTickVBoxContainer/25"), NodePath("../VBoxContainer3/HBoxContainer/PhysicsTickVBoxContainer/15"), NodePath("../VBoxContainer3/HBoxContainer/PhysicsTickVBoxContainer/120")]
-
-[node name="VBoxContainer" type="VBoxContainer" parent="MoreSettingsView" unique_id=79864768]
-layout_mode = 1
-anchors_preset = 3
-anchor_left = 1.0
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -617.0
-offset_top = -199.0
-offset_right = -261.0
-grow_horizontal = 0
-grow_vertical = 0
-
-[node name="Label" type="Label" parent="MoreSettingsView/VBoxContainer" unique_id=1996653568]
-layout_mode = 2
-text = "Bullet Grid Options"
-horizontal_alignment = 1
-
-[node name="RowsPerColumnHBoxContainer" type="HBoxContainer" parent="MoreSettingsView/VBoxContainer" unique_id=1421883674]
-layout_mode = 2
-
-[node name="Label" type="Label" parent="MoreSettingsView/VBoxContainer/RowsPerColumnHBoxContainer" unique_id=470407446]
-layout_mode = 2
-text = "Rows per Column"
-
-[node name="10rows" type="Button" parent="MoreSettingsView/VBoxContainer/RowsPerColumnHBoxContainer" unique_id=535632180]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "10"
-
-[node name="15rows" type="Button" parent="MoreSettingsView/VBoxContainer/RowsPerColumnHBoxContainer" unique_id=1845201296]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "15"
-
-[node name="25rows" type="Button" parent="MoreSettingsView/VBoxContainer/RowsPerColumnHBoxContainer" unique_id=1111059806]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "25"
-
-[node name="5rows" type="Button" parent="MoreSettingsView/VBoxContainer/RowsPerColumnHBoxContainer" unique_id=1361066331]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "5"
-
-[node name="50rows" type="Button" parent="MoreSettingsView/VBoxContainer/RowsPerColumnHBoxContainer" unique_id=593290242]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "50"
-
-[node name="AlignmentOptionsHBoxContainer" type="HBoxContainer" parent="MoreSettingsView/VBoxContainer" unique_id=704654792]
-layout_mode = 2
-
-[node name="Label" type="Label" parent="MoreSettingsView/VBoxContainer/AlignmentOptionsHBoxContainer" unique_id=1712774085]
-layout_mode = 2
-text = "Alignment"
-
-[node name="CenterLeftAlignmentBtn" type="Button" parent="MoreSettingsView/VBoxContainer/AlignmentOptionsHBoxContainer" unique_id=1071162410]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "CenterLeft"
-
-[node name="TopLeftAlignmentBtn" type="Button" parent="MoreSettingsView/VBoxContainer/AlignmentOptionsHBoxContainer" unique_id=1425566529]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "TopLeft"
-
-[node name="BottomLeftAlignmentBtn" type="Button" parent="MoreSettingsView/VBoxContainer/AlignmentOptionsHBoxContainer" unique_id=335166153]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "BottomLeft"
-
-[node name="ColumnOffsetHBoxContainer" type="HBoxContainer" parent="MoreSettingsView/VBoxContainer" unique_id=2000622312]
-layout_mode = 2
-
-[node name="Label" type="Label" parent="MoreSettingsView/VBoxContainer/ColumnOffsetHBoxContainer" unique_id=1588624560]
-layout_mode = 2
-text = "Column Offset"
-
-[node name="150col-offset" type="Button" parent="MoreSettingsView/VBoxContainer/ColumnOffsetHBoxContainer" unique_id=1500925520]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "150"
-
-[node name="250col-offset" type="Button" parent="MoreSettingsView/VBoxContainer/ColumnOffsetHBoxContainer" unique_id=1486607687]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "250"
-
-[node name="350col-offset" type="Button" parent="MoreSettingsView/VBoxContainer/ColumnOffsetHBoxContainer" unique_id=1195972491]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "350"
-
-[node name="500col-offset" type="Button" parent="MoreSettingsView/VBoxContainer/ColumnOffsetHBoxContainer" unique_id=216984037]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "500"
-
-[node name="50col-offset" type="Button" parent="MoreSettingsView/VBoxContainer/ColumnOffsetHBoxContainer" unique_id=202695736]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "50"
-
-[node name="RowOffsetHBoxContainer2" type="HBoxContainer" parent="MoreSettingsView/VBoxContainer" unique_id=1509743462]
-layout_mode = 2
-
-[node name="Label" type="Label" parent="MoreSettingsView/VBoxContainer/RowOffsetHBoxContainer2" unique_id=1285622642]
-layout_mode = 2
-text = "Row Offset"
-
-[node name="150row-offset" type="Button" parent="MoreSettingsView/VBoxContainer/RowOffsetHBoxContainer2" unique_id=956736149]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "150"
-
-[node name="250row-offset" type="Button" parent="MoreSettingsView/VBoxContainer/RowOffsetHBoxContainer2" unique_id=552037406]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "250"
-
-[node name="350row-offset" type="Button" parent="MoreSettingsView/VBoxContainer/RowOffsetHBoxContainer2" unique_id=654501532]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "350"
-
-[node name="500row-offset" type="Button" parent="MoreSettingsView/VBoxContainer/RowOffsetHBoxContainer2" unique_id=1674279143]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "500"
-
-[node name="50row-offset" type="Button" parent="MoreSettingsView/VBoxContainer/RowOffsetHBoxContainer2" unique_id=27365981]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "50"
-
-[node name="VBoxContainer2" type="VBoxContainer" parent="MoreSettingsView" unique_id=1486294317]
-layout_mode = 1
-anchors_preset = 3
-anchor_left = 1.0
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -247.0
-offset_top = -40.0
-grow_horizontal = 0
-grow_vertical = 0
-
-[node name="RotateGridWithMarkerCheckBox" type="CheckBox" parent="MoreSettingsView/VBoxContainer2" unique_id=1493819152]
-layout_mode = 2
-focus_mode = 0
-button_pressed = true
-text = "Rotate Grid With Marker"
-
-[node name="RandomLocalRotationCheckBox" type="CheckBox" parent="MoreSettingsView/VBoxContainer2" unique_id=1113531706]
-layout_mode = 2
-focus_mode = 0
-text = "Random Local Rotation"
-
-[node name="SelectRowsPerColumnBtnView" parent="MoreSettingsView" unique_id=1065716988 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
-visible = false
-layout_mode = 0
-offset_top = 0.0
-offset_bottom = 0.0
-all_btns = [NodePath("../VBoxContainer/RowsPerColumnHBoxContainer/10rows"), NodePath("../VBoxContainer/RowsPerColumnHBoxContainer/15rows"), NodePath("../VBoxContainer/RowsPerColumnHBoxContainer/25rows"), NodePath("../VBoxContainer/RowsPerColumnHBoxContainer/5rows"), NodePath("../VBoxContainer/RowsPerColumnHBoxContainer/50rows")]
-
-[node name="SelectGridAlignmentBtnView" parent="MoreSettingsView" unique_id=545075841 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
-visible = false
-layout_mode = 0
-offset_top = 0.0
-offset_bottom = 0.0
-all_btns = [NodePath("../VBoxContainer/AlignmentOptionsHBoxContainer/CenterLeftAlignmentBtn"), NodePath("../VBoxContainer/AlignmentOptionsHBoxContainer/TopLeftAlignmentBtn"), NodePath("../VBoxContainer/AlignmentOptionsHBoxContainer/BottomLeftAlignmentBtn")]
-
-[node name="SelectColumnOffsetBtnView" parent="MoreSettingsView" unique_id=1339069376 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
-visible = false
-layout_mode = 0
-offset_top = 0.0
-offset_bottom = 0.0
-all_btns = [NodePath("../VBoxContainer/ColumnOffsetHBoxContainer/150col-offset"), NodePath("../VBoxContainer/ColumnOffsetHBoxContainer/250col-offset"), NodePath("../VBoxContainer/ColumnOffsetHBoxContainer/350col-offset"), NodePath("../VBoxContainer/ColumnOffsetHBoxContainer/500col-offset"), NodePath("../VBoxContainer/ColumnOffsetHBoxContainer/50col-offset")]
-
-[node name="SelectRowOffsetBtnView" parent="MoreSettingsView" unique_id=434215871 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
-visible = false
-layout_mode = 0
-offset_top = 0.0
-offset_bottom = 0.0
-all_btns = [NodePath("../VBoxContainer/RowOffsetHBoxContainer2/150row-offset"), NodePath("../VBoxContainer/RowOffsetHBoxContainer2/250row-offset"), NodePath("../VBoxContainer/RowOffsetHBoxContainer2/350row-offset"), NodePath("../VBoxContainer/RowOffsetHBoxContainer2/500row-offset"), NodePath("../VBoxContainer/RowOffsetHBoxContainer2/50row-offset")]
 
 [node name="GodotArea2DBulletsView" type="Control" parent="." unique_id=1936559472]
 visible = false
@@ -1421,6 +274,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
+theme = SubResource("Theme_g8e4a")
 
 [node name="Label" type="Label" parent="GodotArea2DBulletsView" unique_id=285743372]
 layout_mode = 1
@@ -1433,49 +287,20 @@ offset_bottom = 23.0
 grow_horizontal = 2
 text = "Godot Area2D bullets do NOT support BlastBullets2D plugin features"
 
-[node name="AlwaysVisibleView" type="Control" parent="." unique_id=487175531]
+[node name="Helpers" type="Control" parent="." unique_id=840976331]
 layout_mode = 3
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
+anchors_preset = 0
 mouse_filter = 2
 
-[node name="HealthBar" parent="AlwaysVisibleView" unique_id=752409122 instance=ExtResource("5_avyxe")]
-custom_minimum_size = Vector2(200, 30)
-layout_mode = 1
-anchors_preset = 2
-anchor_top = 1.0
-anchor_bottom = 1.0
-offset_left = 20.0
-offset_top = -146.0
-offset_right = 220.0
-offset_bottom = -116.0
-grow_vertical = 0
-
-[node name="FillUpPlayerHealthBtn" type="Button" parent="AlwaysVisibleView" unique_id=863780386]
-layout_mode = 1
-anchors_preset = 2
-anchor_top = 1.0
-anchor_bottom = 1.0
-offset_left = 228.0
-offset_top = -146.0
-offset_right = 271.0
-offset_bottom = -115.0
-grow_vertical = 0
-focus_mode = 0
-text = "Heal"
-
-[node name="SelectFireTimerBtnView" parent="AlwaysVisibleView" unique_id=1145824 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+[node name="SelectFireTimerBtnView" type="Control" parent="Helpers" unique_id=1145824 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
 visible = false
-layout_mode = 0
-offset_top = 0.0
-offset_bottom = 0.0
-all_btns = [NodePath("../FireTimerVboxContainer/HBoxContainer/0_05"), NodePath("../FireTimerVboxContainer/HBoxContainer/0_10"), NodePath("../FireTimerVboxContainer/HBoxContainer/0_15"), NodePath("../FireTimerVboxContainer/HBoxContainer/0_20"), NodePath("../FireTimerVboxContainer/HBoxContainer/0_50"), NodePath("../FireTimerVboxContainer/HBoxContainer/1_00"), NodePath("../FireTimerVboxContainer/HBoxContainer/2_00"), NodePath("../FireTimerVboxContainer/HBoxContainer/0_02")]
+anchors_preset = 0
+offset_right = 220.0
+script = ExtResource("8_44pmw")
+all_btns = [NodePath("../../Sidebar/List/AlwaysVisibleView/FireTimerVboxContainerFrame/FireTimerVboxContainer/Options/0_05"), NodePath("../../Sidebar/List/AlwaysVisibleView/FireTimerVboxContainerFrame/FireTimerVboxContainer/Options/0_10"), NodePath("../../Sidebar/List/AlwaysVisibleView/FireTimerVboxContainerFrame/FireTimerVboxContainer/Options/0_15"), NodePath("../../Sidebar/List/AlwaysVisibleView/FireTimerVboxContainerFrame/FireTimerVboxContainer/Options/0_20"), NodePath("../../Sidebar/List/AlwaysVisibleView/FireTimerVboxContainerFrame/FireTimerVboxContainer/Options/0_50"), NodePath("../../Sidebar/List/AlwaysVisibleView/FireTimerVboxContainerFrame/FireTimerVboxContainer/Options/1_00"), NodePath("../../Sidebar/List/AlwaysVisibleView/FireTimerVboxContainerFrame/FireTimerVboxContainer/Options/2_00"), NodePath("../../Sidebar/List/AlwaysVisibleView/FireTimerVboxContainerFrame/FireTimerVboxContainer/Options/0_02")]
 selected_btn_index = 7
 
-[node name="SelectAmountBulletsBtnView" parent="AlwaysVisibleView" unique_id=494730021 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+[node name="SelectAmountBulletsBtnView" type="Control" parent="Helpers" unique_id=494730021 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
 visible = false
 layout_mode = 1
 anchors_preset = 3
@@ -1489,282 +314,1566 @@ offset_right = -687.0
 offset_bottom = -426.0
 grow_horizontal = 0
 grow_vertical = 0
-all_btns = [NodePath("../AmountBulletsVboxContainer/HBoxContainer/1"), NodePath("../AmountBulletsVboxContainer/HBoxContainer/500"), NodePath("../AmountBulletsVboxContainer/HBoxContainer/5"), NodePath("../AmountBulletsVboxContainer/HBoxContainer/60"), NodePath("../AmountBulletsVboxContainer/HBoxContainer/100"), NodePath("../AmountBulletsVboxContainer/HBoxContainer/200"), NodePath("../AmountBulletsVboxContainer/HBoxContainer/1000"), NodePath("../AmountBulletsVboxContainer/HBoxContainer/30"), NodePath("../AmountBulletsVboxContainer/HBoxContainer/15")]
+script = ExtResource("8_44pmw")
+all_btns = [NodePath("../../Sidebar/List/AlwaysVisibleView/AmountBulletsVboxContainerFrame/AmountBulletsVboxContainer/Options/1"), NodePath("../../Sidebar/List/AlwaysVisibleView/AmountBulletsVboxContainerFrame/AmountBulletsVboxContainer/Options/500"), NodePath("../../Sidebar/List/AlwaysVisibleView/AmountBulletsVboxContainerFrame/AmountBulletsVboxContainer/Options/5"), NodePath("../../Sidebar/List/AlwaysVisibleView/AmountBulletsVboxContainerFrame/AmountBulletsVboxContainer/Options/60"), NodePath("../../Sidebar/List/AlwaysVisibleView/AmountBulletsVboxContainerFrame/AmountBulletsVboxContainer/Options/100"), NodePath("../../Sidebar/List/AlwaysVisibleView/AmountBulletsVboxContainerFrame/AmountBulletsVboxContainer/Options/200"), NodePath("../../Sidebar/List/AlwaysVisibleView/AmountBulletsVboxContainerFrame/AmountBulletsVboxContainer/Options/1000"), NodePath("../../Sidebar/List/AlwaysVisibleView/AmountBulletsVboxContainerFrame/AmountBulletsVboxContainer/Options/30"), NodePath("../../Sidebar/List/AlwaysVisibleView/AmountBulletsVboxContainerFrame/AmountBulletsVboxContainer/Options/15")]
 
-[node name="FireTimerVboxContainer" type="VBoxContainer" parent="AlwaysVisibleView" unique_id=1003812881]
-layout_mode = 1
-anchors_preset = 2
-anchor_top = 1.0
+[node name="SelectBulletTypeView" type="Control" parent="Helpers" unique_id=1506756560 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+visible = false
+anchors_preset = 0
+offset_left = 42.0
+offset_top = 528.0
+offset_right = 262.0
+offset_bottom = 528.0
+script = ExtResource("8_44pmw")
+all_btns = [NodePath("../../Sidebar/List/AlwaysVisibleView/BulletTypeContainerFrame/BulletTypeContainer/Options/VolleyBtn"), NodePath("../../Sidebar/List/AlwaysVisibleView/BulletTypeContainerFrame/BulletTypeContainer/Options/GodotArea2DBulletsBtn")]
+
+[node name="ChangeSettingsUISelectBtnView" type="Control" parent="Helpers" unique_id=1247672632 node_paths=PackedStringArray("all_btns")]
+anchors_preset = 0
+offset_right = 40.0
+offset_bottom = 40.0
+script = ExtResource("8_44pmw")
+all_btns = [NodePath("../../Sidebar/List/ViewTabs/BulletSettingsBtn"), NodePath("../../Sidebar/List/ViewTabs/ObjectPoolSettingsBtn"), NodePath("../../Sidebar/List/ViewTabs/MoreSettingsBtn")]
+selected_btn_theme = ExtResource("10_520nk")
+disabled_btn_theme = ExtResource("11_ptpx1")
+metadata/_custom_type_script = "uid://cs67whos5iyl6"
+
+[node name="SelectCollisionShapeSizeView" type="Control" parent="Helpers" unique_id=1056262356 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+anchors_preset = 0
+offset_right = 220.0
+script = ExtResource("8_44pmw")
+all_btns = [NodePath("../../Sidebar/List/Scroll/ViewStack/BulletSettingsView/CollisionShapeSizeContainerFrame/CollisionShapeSizeContainer/Options/32"), NodePath("../../Sidebar/List/Scroll/ViewStack/BulletSettingsView/CollisionShapeSizeContainerFrame/CollisionShapeSizeContainer/Options/64"), NodePath("../../Sidebar/List/Scroll/ViewStack/BulletSettingsView/CollisionShapeSizeContainerFrame/CollisionShapeSizeContainer/Options/128"), NodePath("../../Sidebar/List/Scroll/ViewStack/BulletSettingsView/CollisionShapeSizeContainerFrame/CollisionShapeSizeContainer/Options/256")]
+
+[node name="SelectBulletDamageView" type="Control" parent="Helpers" unique_id=348725187 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+anchors_preset = 0
+offset_right = 220.0
+script = ExtResource("8_44pmw")
+all_btns = [NodePath("../../Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletDamageVboxContainerFrame/BulletDamageVboxContainer/Options/5"), NodePath("../../Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletDamageVboxContainerFrame/BulletDamageVboxContainer/Options/10"), NodePath("../../Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletDamageVboxContainerFrame/BulletDamageVboxContainer/Options/30"), NodePath("../../Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletDamageVboxContainerFrame/BulletDamageVboxContainer/Options/60")]
+
+[node name="SelectBulletCollisionView" type="Control" parent="Helpers" unique_id=1888876757 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+anchors_preset = 0
+offset_right = 220.0
+script = ExtResource("8_44pmw")
+all_btns = [NodePath("../../Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletCollisionVboxContainerFrame/BulletCollisionVboxContainer/Options/DontCollideBtn"), NodePath("../../Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletCollisionVboxContainerFrame/BulletCollisionVboxContainer/Options/DestroyPlayerBulletsBtn"), NodePath("../../Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletCollisionVboxContainerFrame/BulletCollisionVboxContainer/Options/DestroyEnemyBulletsBtn"), NodePath("../../Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletCollisionVboxContainerFrame/BulletCollisionVboxContainer/Options/DestroyBothBtn")]
+
+[node name="SelectCollisionShapeOffsetView" type="Control" parent="Helpers" unique_id=1955790454 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+anchors_preset = 0
+offset_right = 220.0
+script = ExtResource("8_44pmw")
+all_btns = [NodePath("../../Sidebar/List/Scroll/ViewStack/BulletSettingsView/CollisionShapeOffsetContainerFrame/CollisionShapeOffsetContainer/Options/0"), NodePath("../../Sidebar/List/Scroll/ViewStack/BulletSettingsView/CollisionShapeOffsetContainerFrame/CollisionShapeOffsetContainer/Options/25_0"), NodePath("../../Sidebar/List/Scroll/ViewStack/BulletSettingsView/CollisionShapeOffsetContainerFrame/CollisionShapeOffsetContainer/Options/0_25"), NodePath("../../Sidebar/List/Scroll/ViewStack/BulletSettingsView/CollisionShapeOffsetContainerFrame/CollisionShapeOffsetContainer/Options/25_25")]
+
+[node name="SelectBulletAttachmentOffsetView" type="Control" parent="Helpers" unique_id=1177416728 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+anchors_preset = 0
+offset_right = 220.0
+script = ExtResource("8_44pmw")
+all_btns = [NodePath("../../Sidebar/List/Scroll/ViewStack/BulletSettingsView/AttachmentOffsetContainerFrame/AttachmentOffsetContainer/Options/-60_0"), NodePath("../../Sidebar/List/Scroll/ViewStack/BulletSettingsView/AttachmentOffsetContainerFrame/AttachmentOffsetContainer/Options/0_-60"), NodePath("../../Sidebar/List/Scroll/ViewStack/BulletSettingsView/AttachmentOffsetContainerFrame/AttachmentOffsetContainer/Options/0_0"), NodePath("../../Sidebar/List/Scroll/ViewStack/BulletSettingsView/AttachmentOffsetContainerFrame/AttachmentOffsetContainer/Options/-60_-60")]
+
+[node name="SelectTextureRotationView" type="Control" parent="Helpers" unique_id=430997943 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+anchors_preset = 0
+offset_right = 220.0
+script = ExtResource("8_44pmw")
+all_btns = [NodePath("../../Sidebar/List/Scroll/ViewStack/BulletSettingsView/TextureRotationContainerFrame/TextureRotationContainer/Options/0"), NodePath("../../Sidebar/List/Scroll/ViewStack/BulletSettingsView/TextureRotationContainerFrame/TextureRotationContainer/Options/90"), NodePath("../../Sidebar/List/Scroll/ViewStack/BulletSettingsView/TextureRotationContainerFrame/TextureRotationContainer/Options/180"), NodePath("../../Sidebar/List/Scroll/ViewStack/BulletSettingsView/TextureRotationContainerFrame/TextureRotationContainer/Options/-90")]
+
+[node name="SelectBulletLifetimeView" type="Control" parent="Helpers" unique_id=408327826 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+anchors_preset = 0
+offset_right = 220.0
+script = ExtResource("8_44pmw")
+all_btns = [NodePath("../../Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletLifeTimeContainerFrame/BulletLifeTimeContainer/Options/2"), NodePath("../../Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletLifeTimeContainerFrame/BulletLifeTimeContainer/Options/0_5"), NodePath("../../Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletLifeTimeContainerFrame/BulletLifeTimeContainer/Options/0_2"), NodePath("../../Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletLifeTimeContainerFrame/BulletLifeTimeContainer/Options/5"), NodePath("../../Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletLifeTimeContainerFrame/BulletLifeTimeContainer/Options/Infinite")]
+
+[node name="SelectTextureSizeBtnView" type="Control" parent="Helpers" unique_id=898752228 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+anchors_preset = 0
+offset_right = 220.0
+script = ExtResource("8_44pmw")
+all_btns = [NodePath("../../Sidebar/List/Scroll/ViewStack/BulletSettingsView/TextureSizeContainerFrame/TextureSizeContainer/Options/140_140"), NodePath("../../Sidebar/List/Scroll/ViewStack/BulletSettingsView/TextureSizeContainerFrame/TextureSizeContainer/Options/200_200"), NodePath("../../Sidebar/List/Scroll/ViewStack/BulletSettingsView/TextureSizeContainerFrame/TextureSizeContainer/Options/320_320"), NodePath("../../Sidebar/List/Scroll/ViewStack/BulletSettingsView/TextureSizeContainerFrame/TextureSizeContainer/Options/64_64")]
+
+[node name="SelectZIndexBtnView" type="Control" parent="Helpers" unique_id=153009147 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+anchors_preset = 0
+offset_right = 220.0
+script = ExtResource("8_44pmw")
+all_btns = [NodePath("../../Sidebar/List/Scroll/ViewStack/BulletSettingsView/ZIndexContainerFrame/ZIndexContainer/Options/Z_INDEX_0"), NodePath("../../Sidebar/List/Scroll/ViewStack/BulletSettingsView/ZIndexContainerFrame/ZIndexContainer/Options/Z_INDEX_1"), NodePath("../../Sidebar/List/Scroll/ViewStack/BulletSettingsView/ZIndexContainerFrame/ZIndexContainer/Options/Z_INDEX_2"), NodePath("../../Sidebar/List/Scroll/ViewStack/BulletSettingsView/ZIndexContainerFrame/ZIndexContainer/Options/Z_INDEX_3"), NodePath("../../Sidebar/List/Scroll/ViewStack/BulletSettingsView/ZIndexContainerFrame/ZIndexContainer/Options/Z_INDEX_MINUS_5")]
+
+[node name="SelectAmountMultiMeshesBtnView" type="Control" parent="Helpers" unique_id=1197564796 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+visible = false
+anchors_preset = 0
+offset_right = 220.0
+script = ExtResource("8_44pmw")
+all_btns = [NodePath("../../Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainerFrame/AmountMultiMeshInstancesVboxContainer/Options/1"), NodePath("../../Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainerFrame/AmountMultiMeshInstancesVboxContainer/Options/5"), NodePath("../../Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainerFrame/AmountMultiMeshInstancesVboxContainer/Options/15"), NodePath("../../Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainerFrame/AmountMultiMeshInstancesVboxContainer/Options/30"), NodePath("../../Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainerFrame/AmountMultiMeshInstancesVboxContainer/Options/60"), NodePath("../../Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainerFrame/AmountMultiMeshInstancesVboxContainer/Options/100"), NodePath("../../Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainerFrame/AmountMultiMeshInstancesVboxContainer/Options/200"), NodePath("../../Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainerFrame/AmountMultiMeshInstancesVboxContainer/Options/500"), NodePath("../../Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainerFrame/AmountMultiMeshInstancesVboxContainer/Options/1000")]
+
+[node name="UpdateDebugDataTimer" type="Timer" parent="Helpers" unique_id=1430951984]
+wait_time = 0.5
+autostart = true
+
+[node name="SelectAmountAttachmentsBtnView" type="Control" parent="Helpers" unique_id=10346908 node_paths=PackedStringArray("all_btns")]
+visible = false
+anchors_preset = 0
+script = ExtResource("8_44pmw")
+all_btns = [NodePath("../../Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/VBoxContainer2Frame/VBoxContainer2/Options/1"), NodePath("../../Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/VBoxContainer2Frame/VBoxContainer2/Options/5"), NodePath("../../Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/VBoxContainer2Frame/VBoxContainer2/Options/15"), NodePath("../../Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/VBoxContainer2Frame/VBoxContainer2/Options/30"), NodePath("../../Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/VBoxContainer2Frame/VBoxContainer2/Options/60"), NodePath("../../Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/VBoxContainer2Frame/VBoxContainer2/Options/100")]
+metadata/_custom_type_script = "uid://cs67whos5iyl6"
+
+[node name="SelectLimitFPSBtnView" type="Control" parent="Helpers" unique_id=1989831996 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+visible = false
+anchors_preset = 0
+offset_top = 162.0
+offset_right = 220.0
+offset_bottom = 162.0
+script = ExtResource("8_44pmw")
+all_btns = [NodePath("../../Sidebar/List/Scroll/ViewStack/MoreSettingsView/LimitFPSContainerFrame/LimitFPSContainer/Options/NoLimit"), NodePath("../../Sidebar/List/Scroll/ViewStack/MoreSettingsView/LimitFPSContainerFrame/LimitFPSContainer/Options/60"), NodePath("../../Sidebar/List/Scroll/ViewStack/MoreSettingsView/LimitFPSContainerFrame/LimitFPSContainer/Options/40"), NodePath("../../Sidebar/List/Scroll/ViewStack/MoreSettingsView/LimitFPSContainerFrame/LimitFPSContainer/Options/25"), NodePath("../../Sidebar/List/Scroll/ViewStack/MoreSettingsView/LimitFPSContainerFrame/LimitFPSContainer/Options/15"), NodePath("../../Sidebar/List/Scroll/ViewStack/MoreSettingsView/LimitFPSContainerFrame/LimitFPSContainer/Options/120")]
+
+[node name="SelectPhysicsTicksBtnView" type="Control" parent="Helpers" unique_id=767601189 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+visible = false
+anchors_preset = 0
+offset_right = 220.0
+script = ExtResource("8_44pmw")
+all_btns = [NodePath("../../Sidebar/List/Scroll/ViewStack/MoreSettingsView/PhysicsTickVBoxContainerFrame/PhysicsTickVBoxContainer/Options/60"), NodePath("../../Sidebar/List/Scroll/ViewStack/MoreSettingsView/PhysicsTickVBoxContainerFrame/PhysicsTickVBoxContainer/Options/40"), NodePath("../../Sidebar/List/Scroll/ViewStack/MoreSettingsView/PhysicsTickVBoxContainerFrame/PhysicsTickVBoxContainer/Options/25"), NodePath("../../Sidebar/List/Scroll/ViewStack/MoreSettingsView/PhysicsTickVBoxContainerFrame/PhysicsTickVBoxContainer/Options/15"), NodePath("../../Sidebar/List/Scroll/ViewStack/MoreSettingsView/PhysicsTickVBoxContainerFrame/PhysicsTickVBoxContainer/Options/120")]
+
+[node name="SelectRowsPerColumnBtnView" type="Control" parent="Helpers" unique_id=1065716988 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+visible = false
+anchors_preset = 0
+offset_right = 220.0
+script = ExtResource("8_44pmw")
+all_btns = [NodePath("../../Sidebar/List/Scroll/ViewStack/MoreSettingsView/RowsPerColumnHBoxContainerFrame/RowsPerColumnHBoxContainer/Options/10rows"), NodePath("../../Sidebar/List/Scroll/ViewStack/MoreSettingsView/RowsPerColumnHBoxContainerFrame/RowsPerColumnHBoxContainer/Options/15rows"), NodePath("../../Sidebar/List/Scroll/ViewStack/MoreSettingsView/RowsPerColumnHBoxContainerFrame/RowsPerColumnHBoxContainer/Options/25rows"), NodePath("../../Sidebar/List/Scroll/ViewStack/MoreSettingsView/RowsPerColumnHBoxContainerFrame/RowsPerColumnHBoxContainer/Options/5rows"), NodePath("../../Sidebar/List/Scroll/ViewStack/MoreSettingsView/RowsPerColumnHBoxContainerFrame/RowsPerColumnHBoxContainer/Options/50rows")]
+
+[node name="SelectGridAlignmentBtnView" type="Control" parent="Helpers" unique_id=545075841 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+visible = false
+anchors_preset = 0
+offset_right = 220.0
+script = ExtResource("8_44pmw")
+all_btns = [NodePath("../../Sidebar/List/Scroll/ViewStack/MoreSettingsView/AlignmentOptionsHBoxContainerFrame/AlignmentOptionsHBoxContainer/Options/CenterLeftAlignmentBtn"), NodePath("../../Sidebar/List/Scroll/ViewStack/MoreSettingsView/AlignmentOptionsHBoxContainerFrame/AlignmentOptionsHBoxContainer/Options/TopLeftAlignmentBtn"), NodePath("../../Sidebar/List/Scroll/ViewStack/MoreSettingsView/AlignmentOptionsHBoxContainerFrame/AlignmentOptionsHBoxContainer/Options/BottomLeftAlignmentBtn")]
+
+[node name="SelectColumnOffsetBtnView" type="Control" parent="Helpers" unique_id=1339069376 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+visible = false
+anchors_preset = 0
+offset_right = 220.0
+script = ExtResource("8_44pmw")
+all_btns = [NodePath("../../Sidebar/List/Scroll/ViewStack/MoreSettingsView/ColumnOffsetHBoxContainerFrame/ColumnOffsetHBoxContainer/Options/150col-offset"), NodePath("../../Sidebar/List/Scroll/ViewStack/MoreSettingsView/ColumnOffsetHBoxContainerFrame/ColumnOffsetHBoxContainer/Options/250col-offset"), NodePath("../../Sidebar/List/Scroll/ViewStack/MoreSettingsView/ColumnOffsetHBoxContainerFrame/ColumnOffsetHBoxContainer/Options/350col-offset"), NodePath("../../Sidebar/List/Scroll/ViewStack/MoreSettingsView/ColumnOffsetHBoxContainerFrame/ColumnOffsetHBoxContainer/Options/500col-offset"), NodePath("../../Sidebar/List/Scroll/ViewStack/MoreSettingsView/ColumnOffsetHBoxContainerFrame/ColumnOffsetHBoxContainer/Options/50col-offset")]
+
+[node name="SelectRowOffsetBtnView" type="Control" parent="Helpers" unique_id=434215871 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+visible = false
+anchors_preset = 0
+offset_right = 220.0
+script = ExtResource("8_44pmw")
+all_btns = [NodePath("../../Sidebar/List/Scroll/ViewStack/MoreSettingsView/RowOffsetHBoxContainer2Frame/RowOffsetHBoxContainer2/Options/150row-offset"), NodePath("../../Sidebar/List/Scroll/ViewStack/MoreSettingsView/RowOffsetHBoxContainer2Frame/RowOffsetHBoxContainer2/Options/250row-offset"), NodePath("../../Sidebar/List/Scroll/ViewStack/MoreSettingsView/RowOffsetHBoxContainer2Frame/RowOffsetHBoxContainer2/Options/350row-offset"), NodePath("../../Sidebar/List/Scroll/ViewStack/MoreSettingsView/RowOffsetHBoxContainer2Frame/RowOffsetHBoxContainer2/Options/500row-offset"), NodePath("../../Sidebar/List/Scroll/ViewStack/MoreSettingsView/RowOffsetHBoxContainer2Frame/RowOffsetHBoxContainer2/Options/50row-offset")]
+
+[node name="Sidebar" type="PanelContainer" parent="." unique_id=1365466996]
+anchors_preset = 9
 anchor_bottom = 1.0
-offset_left = 6.0
-offset_top = -118.0
-offset_right = 354.0
-offset_bottom = -60.0
-grow_vertical = 0
-alignment = 1
+offset_right = 300.0
+theme = SubResource("Theme_g8e4a")
 
-[node name="Label" type="Label" parent="AlwaysVisibleView/FireTimerVboxContainer" unique_id=686880145]
+[node name="List" type="VBoxContainer" parent="Sidebar" unique_id=721510139]
 layout_mode = 2
+
+[node name="Title" type="Label" parent="Sidebar/List" unique_id=1905675723]
+layout_mode = 2
+theme_type_variation = &"TitleLabel"
+text = "BlastBullets2D Test Lab"
+
+[node name="Subtitle" type="Label" parent="Sidebar/List" unique_id=514190524]
+layout_mode = 2
+theme_type_variation = &"SubtitleLabel"
+text = "Every plugin feature, live. Mouse wheel zooms."
+
+[node name="AlwaysVisibleView" type="VBoxContainer" parent="Sidebar/List" unique_id=1371675191]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="HealthRow" type="HBoxContainer" parent="Sidebar/List/AlwaysVisibleView" unique_id=1626664924]
+layout_mode = 2
+
+[node name="HealthBar" type="ProgressBar" parent="Sidebar/List/AlwaysVisibleView/HealthRow" unique_id=752409122 instance=ExtResource("5_avyxe")]
+custom_minimum_size = Vector2(0, 30)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/background = SubResource("StyleBoxFlat_ujani")
+theme_override_styles/fill = SubResource("StyleBoxFlat_1ettl")
+value = 100.0
+show_percentage = false
+script = ExtResource("8_krh4v")
+metadata/_edit_use_anchors_ = true
+
+[node name="FillUpPlayerHealthBtn" type="Button" parent="Sidebar/List/AlwaysVisibleView/HealthRow" unique_id=863780386]
+layout_mode = 2
+focus_mode = 0
+text = "Heal"
+
+[node name="FireTimerVboxContainerFrame" type="PanelContainer" parent="Sidebar/List/AlwaysVisibleView" unique_id=646850631]
+layout_mode = 2
+theme_type_variation = &"SectionPanel"
+
+[node name="FireTimerVboxContainer" type="VBoxContainer" parent="Sidebar/List/AlwaysVisibleView/FireTimerVboxContainerFrame" unique_id=1074219189]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Sidebar/List/AlwaysVisibleView/FireTimerVboxContainerFrame/FireTimerVboxContainer" unique_id=686880145]
+layout_mode = 2
+theme_type_variation = &"SectionHeader"
 text = "Fire Timer Cooldown Time"
-horizontal_alignment = 1
+uppercase = true
 
-[node name="HBoxContainer" type="HBoxContainer" parent="AlwaysVisibleView/FireTimerVboxContainer" unique_id=731859443]
+[node name="Options" type="HFlowContainer" parent="Sidebar/List/AlwaysVisibleView/FireTimerVboxContainerFrame/FireTimerVboxContainer" unique_id=1053782490]
 layout_mode = 2
-alignment = 1
 
-[node name="0_02" type="Button" parent="AlwaysVisibleView/FireTimerVboxContainer/HBoxContainer" unique_id=218436635]
-custom_minimum_size = Vector2(32, 0)
+[node name="0_02" type="Button" parent="Sidebar/List/AlwaysVisibleView/FireTimerVboxContainerFrame/FireTimerVboxContainer/Options" unique_id=218436635]
+custom_minimum_size = Vector2(0, 22)
 layout_mode = 2
 focus_mode = 0
 text = "0.02
 "
 
-[node name="0_05" type="Button" parent="AlwaysVisibleView/FireTimerVboxContainer/HBoxContainer" unique_id=857658006]
-custom_minimum_size = Vector2(32, 0)
+[node name="0_05" type="Button" parent="Sidebar/List/AlwaysVisibleView/FireTimerVboxContainerFrame/FireTimerVboxContainer/Options" unique_id=857658006]
+custom_minimum_size = Vector2(0, 22)
 layout_mode = 2
 focus_mode = 0
 text = "0.05
 "
 
-[node name="0_10" type="Button" parent="AlwaysVisibleView/FireTimerVboxContainer/HBoxContainer" unique_id=1182396653]
-custom_minimum_size = Vector2(32, 0)
+[node name="0_10" type="Button" parent="Sidebar/List/AlwaysVisibleView/FireTimerVboxContainerFrame/FireTimerVboxContainer/Options" unique_id=1182396653]
+custom_minimum_size = Vector2(0, 22)
 layout_mode = 2
 focus_mode = 0
 text = "0.10
 "
 
-[node name="0_15" type="Button" parent="AlwaysVisibleView/FireTimerVboxContainer/HBoxContainer" unique_id=1790597914]
-custom_minimum_size = Vector2(32, 0)
+[node name="0_15" type="Button" parent="Sidebar/List/AlwaysVisibleView/FireTimerVboxContainerFrame/FireTimerVboxContainer/Options" unique_id=1790597914]
+custom_minimum_size = Vector2(0, 22)
 layout_mode = 2
 focus_mode = 0
 text = "0.15
 "
 
-[node name="0_20" type="Button" parent="AlwaysVisibleView/FireTimerVboxContainer/HBoxContainer" unique_id=808886927]
-custom_minimum_size = Vector2(32, 0)
+[node name="0_20" type="Button" parent="Sidebar/List/AlwaysVisibleView/FireTimerVboxContainerFrame/FireTimerVboxContainer/Options" unique_id=808886927]
+custom_minimum_size = Vector2(0, 22)
 layout_mode = 2
 focus_mode = 0
 text = "0.20
 "
 
-[node name="0_50" type="Button" parent="AlwaysVisibleView/FireTimerVboxContainer/HBoxContainer" unique_id=283874654]
-custom_minimum_size = Vector2(32, 0)
+[node name="0_50" type="Button" parent="Sidebar/List/AlwaysVisibleView/FireTimerVboxContainerFrame/FireTimerVboxContainer/Options" unique_id=283874654]
+custom_minimum_size = Vector2(0, 22)
 layout_mode = 2
 focus_mode = 0
 text = "0.50
 "
 
-[node name="1_00" type="Button" parent="AlwaysVisibleView/FireTimerVboxContainer/HBoxContainer" unique_id=629579215]
-custom_minimum_size = Vector2(32, 0)
+[node name="1_00" type="Button" parent="Sidebar/List/AlwaysVisibleView/FireTimerVboxContainerFrame/FireTimerVboxContainer/Options" unique_id=629579215]
+custom_minimum_size = Vector2(0, 22)
 layout_mode = 2
 focus_mode = 0
 text = "1.00
 "
 
-[node name="2_00" type="Button" parent="AlwaysVisibleView/FireTimerVboxContainer/HBoxContainer" unique_id=1372654012]
-custom_minimum_size = Vector2(32, 0)
+[node name="2_00" type="Button" parent="Sidebar/List/AlwaysVisibleView/FireTimerVboxContainerFrame/FireTimerVboxContainer/Options" unique_id=1372654012]
+custom_minimum_size = Vector2(0, 22)
 layout_mode = 2
 focus_mode = 0
 text = "2.00
 "
 
-[node name="AmountBulletsVboxContainer" type="VBoxContainer" parent="AlwaysVisibleView" unique_id=766586298]
-layout_mode = 1
-anchors_preset = 2
-anchor_top = 1.0
-anchor_bottom = 1.0
-offset_left = 9.0
-offset_top = -63.0
-offset_right = 354.0
-offset_bottom = -5.0
-grow_vertical = 0
-alignment = 1
-
-[node name="Label" type="Label" parent="AlwaysVisibleView/AmountBulletsVboxContainer" unique_id=875686895]
+[node name="AmountBulletsVboxContainerFrame" type="PanelContainer" parent="Sidebar/List/AlwaysVisibleView" unique_id=1983921500]
 layout_mode = 2
+theme_type_variation = &"SectionPanel"
+
+[node name="AmountBulletsVboxContainer" type="VBoxContainer" parent="Sidebar/List/AlwaysVisibleView/AmountBulletsVboxContainerFrame" unique_id=47052293]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Sidebar/List/AlwaysVisibleView/AmountBulletsVboxContainerFrame/AmountBulletsVboxContainer" unique_id=875686895]
+layout_mode = 2
+theme_type_variation = &"SectionHeader"
 text = "Amount Bullets (N)"
-horizontal_alignment = 1
+uppercase = true
 
-[node name="HBoxContainer" type="HBoxContainer" parent="AlwaysVisibleView/AmountBulletsVboxContainer" unique_id=1751236239]
+[node name="Options" type="HFlowContainer" parent="Sidebar/List/AlwaysVisibleView/AmountBulletsVboxContainerFrame/AmountBulletsVboxContainer" unique_id=1687076865]
 layout_mode = 2
-alignment = 1
 
-[node name="1" type="Button" parent="AlwaysVisibleView/AmountBulletsVboxContainer/HBoxContainer" unique_id=1276734169]
-custom_minimum_size = Vector2(32, 0)
+[node name="1" type="Button" parent="Sidebar/List/AlwaysVisibleView/AmountBulletsVboxContainerFrame/AmountBulletsVboxContainer/Options" unique_id=1276734169]
+custom_minimum_size = Vector2(0, 22)
 layout_mode = 2
 focus_mode = 0
 text = "1"
 
-[node name="5" type="Button" parent="AlwaysVisibleView/AmountBulletsVboxContainer/HBoxContainer" unique_id=1953955848]
-custom_minimum_size = Vector2(32, 0)
+[node name="5" type="Button" parent="Sidebar/List/AlwaysVisibleView/AmountBulletsVboxContainerFrame/AmountBulletsVboxContainer/Options" unique_id=1953955848]
+custom_minimum_size = Vector2(0, 22)
 layout_mode = 2
 focus_mode = 0
 text = "5"
 
-[node name="15" type="Button" parent="AlwaysVisibleView/AmountBulletsVboxContainer/HBoxContainer" unique_id=1003270981]
-custom_minimum_size = Vector2(32, 0)
+[node name="15" type="Button" parent="Sidebar/List/AlwaysVisibleView/AmountBulletsVboxContainerFrame/AmountBulletsVboxContainer/Options" unique_id=1003270981]
+custom_minimum_size = Vector2(0, 22)
 layout_mode = 2
 focus_mode = 0
 text = "15"
 
-[node name="30" type="Button" parent="AlwaysVisibleView/AmountBulletsVboxContainer/HBoxContainer" unique_id=1082211149]
-custom_minimum_size = Vector2(32, 0)
+[node name="30" type="Button" parent="Sidebar/List/AlwaysVisibleView/AmountBulletsVboxContainerFrame/AmountBulletsVboxContainer/Options" unique_id=1082211149]
+custom_minimum_size = Vector2(0, 22)
 layout_mode = 2
 focus_mode = 0
 text = "30"
 
-[node name="60" type="Button" parent="AlwaysVisibleView/AmountBulletsVboxContainer/HBoxContainer" unique_id=1700508201]
-custom_minimum_size = Vector2(32, 0)
+[node name="60" type="Button" parent="Sidebar/List/AlwaysVisibleView/AmountBulletsVboxContainerFrame/AmountBulletsVboxContainer/Options" unique_id=1700508201]
+custom_minimum_size = Vector2(0, 22)
 layout_mode = 2
 focus_mode = 0
 text = "60"
 
-[node name="100" type="Button" parent="AlwaysVisibleView/AmountBulletsVboxContainer/HBoxContainer" unique_id=366840439]
-custom_minimum_size = Vector2(32, 0)
+[node name="100" type="Button" parent="Sidebar/List/AlwaysVisibleView/AmountBulletsVboxContainerFrame/AmountBulletsVboxContainer/Options" unique_id=366840439]
+custom_minimum_size = Vector2(0, 22)
 layout_mode = 2
 focus_mode = 0
 text = "100"
 
-[node name="200" type="Button" parent="AlwaysVisibleView/AmountBulletsVboxContainer/HBoxContainer" unique_id=228770929]
-custom_minimum_size = Vector2(32, 0)
+[node name="200" type="Button" parent="Sidebar/List/AlwaysVisibleView/AmountBulletsVboxContainerFrame/AmountBulletsVboxContainer/Options" unique_id=228770929]
+custom_minimum_size = Vector2(0, 22)
 layout_mode = 2
 focus_mode = 0
 text = "200"
 
-[node name="500" type="Button" parent="AlwaysVisibleView/AmountBulletsVboxContainer/HBoxContainer" unique_id=214124075]
-custom_minimum_size = Vector2(32, 0)
+[node name="500" type="Button" parent="Sidebar/List/AlwaysVisibleView/AmountBulletsVboxContainerFrame/AmountBulletsVboxContainer/Options" unique_id=214124075]
+custom_minimum_size = Vector2(0, 22)
 layout_mode = 2
 focus_mode = 0
 text = "500"
 
-[node name="1000" type="Button" parent="AlwaysVisibleView/AmountBulletsVboxContainer/HBoxContainer" unique_id=896703732]
-custom_minimum_size = Vector2(32, 0)
+[node name="1000" type="Button" parent="Sidebar/List/AlwaysVisibleView/AmountBulletsVboxContainerFrame/AmountBulletsVboxContainer/Options" unique_id=896703732]
+custom_minimum_size = Vector2(0, 22)
 layout_mode = 2
 focus_mode = 0
 text = "1000
 "
 
-[node name="BulletTypeContainer" type="VBoxContainer" parent="AlwaysVisibleView" unique_id=351312914]
-layout_mode = 1
-offset_left = 18.0
-offset_top = 283.0
-offset_right = 246.0
-offset_bottom = 411.0
-size_flags_vertical = 8
-
-[node name="Label" type="Label" parent="AlwaysVisibleView/BulletTypeContainer" unique_id=75842918]
+[node name="BulletTypeContainerFrame" type="PanelContainer" parent="Sidebar/List/AlwaysVisibleView" unique_id=2137812474]
 layout_mode = 2
+theme_type_variation = &"SectionPanel"
+
+[node name="BulletTypeContainer" type="VBoxContainer" parent="Sidebar/List/AlwaysVisibleView/BulletTypeContainerFrame" unique_id=1861014178]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Sidebar/List/AlwaysVisibleView/BulletTypeContainerFrame/BulletTypeContainer" unique_id=75842918]
+layout_mode = 2
+theme_type_variation = &"SectionHeader"
 text = "Bullet Type"
-horizontal_alignment = 1
+uppercase = true
 
-[node name="DirectionalBtn" type="Button" parent="AlwaysVisibleView/BulletTypeContainer" unique_id=242276313]
-custom_minimum_size = Vector2(155, 0)
+[node name="Options" type="HFlowContainer" parent="Sidebar/List/AlwaysVisibleView/BulletTypeContainerFrame/BulletTypeContainer" unique_id=2088997276]
+layout_mode = 2
+
+[node name="VolleyBtn" type="Button" parent="Sidebar/List/AlwaysVisibleView/BulletTypeContainerFrame/BulletTypeContainer/Options" unique_id=242276313]
+custom_minimum_size = Vector2(0, 22)
 layout_mode = 2
 focus_mode = 0
-text = "DirectionalBullets
-"
+text = "BulletVolley2D"
 
-[node name="BlockBulletsBtn" type="Button" parent="AlwaysVisibleView/BulletTypeContainer" unique_id=1934151629]
-custom_minimum_size = Vector2(155, 0)
-layout_mode = 2
-focus_mode = 0
-text = "BlockBullets"
-
-[node name="GodotArea2DBulletsBtn" type="Button" parent="AlwaysVisibleView/BulletTypeContainer" unique_id=1174109171]
-custom_minimum_size = Vector2(155, 0)
+[node name="GodotArea2DBulletsBtn" type="Button" parent="Sidebar/List/AlwaysVisibleView/BulletTypeContainerFrame/BulletTypeContainer/Options" unique_id=1174109171]
+custom_minimum_size = Vector2(0, 22)
 layout_mode = 2
 focus_mode = 0
 text = "Godot Area2D Bullets"
 
-[node name="SelectBulletTypeView" parent="AlwaysVisibleView" unique_id=1506756560 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
-visible = false
-layout_mode = 0
-offset_left = 42.0
-offset_top = 528.0
-offset_right = 262.0
-offset_bottom = 528.0
-all_btns = [NodePath("../BulletTypeContainer/DirectionalBtn"), NodePath("../BulletTypeContainer/BlockBulletsBtn"), NodePath("../BulletTypeContainer/GodotArea2DBulletsBtn")]
-
-[node name="SettingsUIManagerVBoxContainer" type="VBoxContainer" parent="AlwaysVisibleView" unique_id=391469247]
-layout_mode = 1
-anchors_preset = 2
-anchor_top = 1.0
-anchor_bottom = 1.0
-offset_left = 19.0
-offset_top = -231.0
-offset_right = 228.0
-offset_bottom = -130.0
-grow_vertical = 0
-
-[node name="BulletSettingsBtn" type="Button" parent="AlwaysVisibleView/SettingsUIManagerVBoxContainer" unique_id=935299468]
+[node name="Separator" type="HSeparator" parent="Sidebar/List" unique_id=1870249791]
 layout_mode = 2
+
+[node name="ViewTabs" type="HBoxContainer" parent="Sidebar/List" unique_id=1975521190]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="BulletSettingsBtn" type="Button" parent="Sidebar/List/ViewTabs" unique_id=935299468]
+layout_mode = 2
+size_flags_horizontal = 3
 focus_mode = 0
 text = "Bullet Settings"
 
-[node name="ObjectPoolSettingsBtn" type="Button" parent="AlwaysVisibleView/SettingsUIManagerVBoxContainer" unique_id=688513397]
+[node name="ObjectPoolSettingsBtn" type="Button" parent="Sidebar/List/ViewTabs" unique_id=688513397]
 layout_mode = 2
+size_flags_horizontal = 3
 focus_mode = 0
 text = "Object Pool Settings"
 
-[node name="MoreSettingsBtn" type="Button" parent="AlwaysVisibleView/SettingsUIManagerVBoxContainer" unique_id=1532633965]
+[node name="MoreSettingsBtn" type="Button" parent="Sidebar/List/ViewTabs" unique_id=1532633965]
 layout_mode = 2
+size_flags_horizontal = 3
 focus_mode = 0
 text = "More Settings"
 
-[node name="ChangeSettingsUISelectBtnView" type="Control" parent="AlwaysVisibleView" unique_id=1247672632 node_paths=PackedStringArray("all_btns")]
-anchors_preset = 0
-offset_right = 40.0
-offset_bottom = 40.0
-script = ExtResource("8_44pmw")
-all_btns = [NodePath("../SettingsUIManagerVBoxContainer/BulletSettingsBtn"), NodePath("../SettingsUIManagerVBoxContainer/ObjectPoolSettingsBtn"), NodePath("../SettingsUIManagerVBoxContainer/MoreSettingsBtn")]
-selected_btn_theme = ExtResource("10_520nk")
-disabled_btn_theme = ExtResource("11_ptpx1")
-metadata/_custom_type_script = "uid://cs67whos5iyl6"
+[node name="Scroll" type="ScrollContainer" parent="Sidebar/List" unique_id=91499243]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
 
-[connection signal="color_changed" from="BlockDebuggerColorPicker" to="." method="_on_block_debugger_color_picker_color_changed"]
-[connection signal="color_changed" from="DirectionalDebuggerColorPicker" to="." method="_on_directional_debugger_color_picker_color_changed"]
+[node name="ViewStack" type="VBoxContainer" parent="Sidebar/List/Scroll" unique_id=1890227216]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="BulletSettingsView" type="VBoxContainer" parent="Sidebar/List/Scroll/ViewStack" unique_id=135248769]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ZIndexContainerFrame" type="PanelContainer" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView" unique_id=1443200386]
+layout_mode = 2
+theme_type_variation = &"SectionPanel"
+
+[node name="ZIndexContainer" type="VBoxContainer" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/ZIndexContainerFrame" unique_id=439883230]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/ZIndexContainerFrame/ZIndexContainer" unique_id=1780170504]
+layout_mode = 2
+theme_type_variation = &"SectionHeader"
+text = "Z Index"
+uppercase = true
+
+[node name="Options" type="HFlowContainer" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/ZIndexContainerFrame/ZIndexContainer" unique_id=1268449390]
+layout_mode = 2
+
+[node name="Z_INDEX_0" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/ZIndexContainerFrame/ZIndexContainer/Options" unique_id=1945293167]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "0"
+
+[node name="Z_INDEX_1" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/ZIndexContainerFrame/ZIndexContainer/Options" unique_id=854587553]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "1"
+
+[node name="Z_INDEX_2" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/ZIndexContainerFrame/ZIndexContainer/Options" unique_id=951603942]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "2"
+
+[node name="Z_INDEX_3" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/ZIndexContainerFrame/ZIndexContainer/Options" unique_id=336561921]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "3"
+
+[node name="Z_INDEX_MINUS_5" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/ZIndexContainerFrame/ZIndexContainer/Options" unique_id=18286663]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "-5"
+
+[node name="DebuggerVBoxContainerFrame" type="PanelContainer" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView" unique_id=2056067579]
+layout_mode = 2
+theme_type_variation = &"SectionPanel"
+
+[node name="DebuggerVBoxContainer" type="VBoxContainer" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/DebuggerVBoxContainerFrame" unique_id=190037903]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/DebuggerVBoxContainerFrame/DebuggerVBoxContainer" unique_id=551605980]
+layout_mode = 2
+theme_type_variation = &"SectionHeader"
+text = "Collision
+Debugger"
+uppercase = true
+
+[node name="Options" type="HFlowContainer" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/DebuggerVBoxContainerFrame/DebuggerVBoxContainer" unique_id=944577739]
+layout_mode = 2
+
+[node name="ShowDebuggerColorPickerBtn" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/DebuggerVBoxContainerFrame/DebuggerVBoxContainer/Options" unique_id=1938260879]
+custom_minimum_size = Vector2(56, 20)
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
+focus_mode = 0
+theme_override_styles/normal = SubResource("StyleBoxFlat_5up31")
+
+[node name="EnableDebuggerCheckBox" type="CheckBox" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView" unique_id=1066462979]
+layout_mode = 2
+focus_mode = 0
+text = "Enable Debugger"
+
+[node name="RotatePhysicsShapesCheckBox" type="CheckBox" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView" unique_id=1598475774]
+layout_mode = 2
+focus_mode = 0
+text = "Rotate Physics Shapes"
+
+[node name="AdjustDirectionBasedOnRotationCheckBox" type="CheckBox" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView" unique_id=1134841387]
+layout_mode = 2
+focus_mode = 0
+text = "Adjust Direction Based On Rotation"
+
+[node name="StopRotationWhenMaxReachedCheckBox" type="CheckBox" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView" unique_id=1799614189]
+layout_mode = 2
+focus_mode = 0
+text = "Stop Rotation When Max Reached"
+
+[node name="VBoxContainer5Frame" type="PanelContainer" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView" unique_id=252562384]
+layout_mode = 2
+theme_type_variation = &"SectionPanel"
+
+[node name="VBoxContainer5" type="VBoxContainer" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/VBoxContainer5Frame" unique_id=467349942]
+layout_mode = 2
+
+[node name="Options" type="HFlowContainer" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/VBoxContainer5Frame/VBoxContainer5" unique_id=966334383]
+layout_mode = 2
+
+[node name="SwitchMaterialBtn" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/VBoxContainer5Frame/VBoxContainer5/Options" unique_id=2094810834]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+size_flags_vertical = 8
+focus_mode = 0
+theme = ExtResource("3_vd08o")
+text = "Switch Material Button
+"
+script = ExtResource("7_gbr8l")
+text_options = Array[String](["No Material", "CanvasItem Material", "Colorful Fragment Shader", "Glitch Fragment Shader", "Scale Vertex Shader"])
+metadata/_custom_type_script = "uid://b7wucn8wglgth"
+
+[node name="SwitchBulletTextureBtn" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/VBoxContainer5Frame/VBoxContainer5/Options" unique_id=2136685656]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+size_flags_vertical = 8
+focus_mode = 0
+theme = ExtResource("3_vd08o")
+text = "Switch Bullet Texture
+"
+script = ExtResource("7_gbr8l")
+text_options = Array[String](["Animated Rocket Texture", "Single Godot Texture"])
+metadata/_custom_type_script = "uid://b7wucn8wglgth"
+
+[node name="SwitchAttachmentBtn" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/VBoxContainer5Frame/VBoxContainer5/Options" unique_id=1061980349]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+size_flags_vertical = 8
+focus_mode = 0
+theme = ExtResource("3_vd08o")
+text = "Switch Attachment Scene
+"
+script = ExtResource("7_gbr8l")
+text_options = Array[String](["No Bullet Attachment", "CPU Particles", "GPU Particles", "Light Sprite Attachment"])
+metadata/_custom_type_script = "uid://b7wucn8wglgth"
+
+[node name="GenerateSpeedBtn" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/VBoxContainer5Frame/VBoxContainer5/Options" unique_id=112417892]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+size_flags_vertical = 8
+focus_mode = 0
+theme = ExtResource("3_vd08o")
+text = "Generate Random Speed Data"
+script = ExtResource("7_gbr8l")
+text_options = Array[String](["Random Speed Data 1", "Random Speed Data 2", "Random Speed Data 3"])
+metadata/_custom_type_script = "uid://b7wucn8wglgth"
+
+[node name="GenerateRotationBtn" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/VBoxContainer5Frame/VBoxContainer5/Options" unique_id=257220646]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+theme = ExtResource("3_vd08o")
+text = "Generate Random Rotation Data"
+script = ExtResource("7_gbr8l")
+text_options = Array[String](["Disabled Rotation", "Random Rotation Data 1", "Random Rotation Data 2", "Random Rotation Data 3"])
+metadata/_custom_type_script = "uid://b7wucn8wglgth"
+
+[node name="DisableOrEnableFactoryBtn" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/VBoxContainer5Frame/VBoxContainer5/Options" unique_id=1804688607]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+size_flags_vertical = 8
+focus_mode = 0
+theme = ExtResource("3_vd08o")
+text = "Disable/Enable BulletFactory2D"
+script = ExtResource("7_gbr8l")
+text_options = Array[String](["Disable BulletFactory2D", "Enable BulletFactory2D"])
+metadata/_custom_type_script = "uid://b7wucn8wglgth"
+
+[node name="ResetFactoryBtn" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/VBoxContainer5Frame/VBoxContainer5/Options" unique_id=762492034]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+size_flags_vertical = 8
+focus_mode = 0
+theme = ExtResource("3_vd08o")
+text = "Reset BulletFactory2D"
+
+[node name="FreeActiveBulletsBtn" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/VBoxContainer5Frame/VBoxContainer5/Options" unique_id=1656736060]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+size_flags_vertical = 8
+focus_mode = 0
+theme = ExtResource("3_vd08o")
+text = "Free Active Bullets"
+
+[node name="EnableMonitorableCheckBox" type="CheckBox" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView" unique_id=1834602878]
+layout_mode = 2
+focus_mode = 0
+text = "Enable Monitorable"
+
+[node name="IsTextureRotationPermanentCheckBox" type="CheckBox" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView" unique_id=272833530]
+layout_mode = 2
+focus_mode = 0
+text = "Is Texture Rotation
+ Permanent"
+
+[node name="BulletCollisionVboxContainerFrame" type="PanelContainer" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView" unique_id=1915141798]
+layout_mode = 2
+theme_type_variation = &"SectionPanel"
+
+[node name="BulletCollisionVboxContainer" type="VBoxContainer" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletCollisionVboxContainerFrame" unique_id=488372236]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletCollisionVboxContainerFrame/BulletCollisionVboxContainer" unique_id=1861678758]
+layout_mode = 2
+theme_type_variation = &"SectionHeader"
+text = "Bullet On Bullet Collision"
+uppercase = true
+
+[node name="Options" type="HFlowContainer" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletCollisionVboxContainerFrame/BulletCollisionVboxContainer" unique_id=650447465]
+layout_mode = 2
+
+[node name="DontCollideBtn" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletCollisionVboxContainerFrame/BulletCollisionVboxContainer/Options" unique_id=771719724]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "Don't Collide"
+
+[node name="DestroyPlayerBulletsBtn" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletCollisionVboxContainerFrame/BulletCollisionVboxContainer/Options" unique_id=1035080220]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "Destroy Player Bullets"
+
+[node name="DestroyEnemyBulletsBtn" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletCollisionVboxContainerFrame/BulletCollisionVboxContainer/Options" unique_id=1620246841]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "Destroy Enemy Bullets"
+
+[node name="DestroyBothBtn" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletCollisionVboxContainerFrame/BulletCollisionVboxContainer/Options" unique_id=1119014358]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "DestroyBoth"
+
+[node name="BulletDamageVboxContainerFrame" type="PanelContainer" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView" unique_id=2004744869]
+layout_mode = 2
+theme_type_variation = &"SectionPanel"
+
+[node name="BulletDamageVboxContainer" type="VBoxContainer" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletDamageVboxContainerFrame" unique_id=183883141]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletDamageVboxContainerFrame/BulletDamageVboxContainer" unique_id=801719748]
+layout_mode = 2
+theme_type_variation = &"SectionHeader"
+text = "Bullet Damage"
+uppercase = true
+
+[node name="Options" type="HFlowContainer" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletDamageVboxContainerFrame/BulletDamageVboxContainer" unique_id=1766115485]
+layout_mode = 2
+
+[node name="5" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletDamageVboxContainerFrame/BulletDamageVboxContainer/Options" unique_id=1507856729]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "5"
+
+[node name="10" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletDamageVboxContainerFrame/BulletDamageVboxContainer/Options" unique_id=255044003]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "10"
+
+[node name="30" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletDamageVboxContainerFrame/BulletDamageVboxContainer/Options" unique_id=442112585]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "30"
+
+[node name="60" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletDamageVboxContainerFrame/BulletDamageVboxContainer/Options" unique_id=1114470908]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "60"
+
+[node name="CollisionShapeSizeContainerFrame" type="PanelContainer" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView" unique_id=1826756995]
+layout_mode = 2
+theme_type_variation = &"SectionPanel"
+
+[node name="CollisionShapeSizeContainer" type="VBoxContainer" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/CollisionShapeSizeContainerFrame" unique_id=504527519]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/CollisionShapeSizeContainerFrame/CollisionShapeSizeContainer" unique_id=1039151015]
+layout_mode = 2
+theme_type_variation = &"SectionHeader"
+text = "Collision Shape Size"
+uppercase = true
+
+[node name="Options" type="HFlowContainer" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/CollisionShapeSizeContainerFrame/CollisionShapeSizeContainer" unique_id=40490760]
+layout_mode = 2
+
+[node name="32" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/CollisionShapeSizeContainerFrame/CollisionShapeSizeContainer/Options" unique_id=135409155]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "32;32"
+
+[node name="64" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/CollisionShapeSizeContainerFrame/CollisionShapeSizeContainer/Options" unique_id=749316215]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "64;64"
+
+[node name="128" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/CollisionShapeSizeContainerFrame/CollisionShapeSizeContainer/Options" unique_id=1688329983]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "128;128"
+
+[node name="256" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/CollisionShapeSizeContainerFrame/CollisionShapeSizeContainer/Options" unique_id=455070586]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "256;256"
+
+[node name="CollisionShapeOffsetContainerFrame" type="PanelContainer" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView" unique_id=1015048923]
+layout_mode = 2
+theme_type_variation = &"SectionPanel"
+
+[node name="CollisionShapeOffsetContainer" type="VBoxContainer" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/CollisionShapeOffsetContainerFrame" unique_id=2009779182]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/CollisionShapeOffsetContainerFrame/CollisionShapeOffsetContainer" unique_id=1301700086]
+layout_mode = 2
+theme_type_variation = &"SectionHeader"
+text = "Collision Shape Offset"
+uppercase = true
+
+[node name="Options" type="HFlowContainer" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/CollisionShapeOffsetContainerFrame/CollisionShapeOffsetContainer" unique_id=143765105]
+layout_mode = 2
+
+[node name="0" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/CollisionShapeOffsetContainerFrame/CollisionShapeOffsetContainer/Options" unique_id=1847483007]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "0;0"
+
+[node name="25_0" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/CollisionShapeOffsetContainerFrame/CollisionShapeOffsetContainer/Options" unique_id=1978325915]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "25;0"
+
+[node name="0_25" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/CollisionShapeOffsetContainerFrame/CollisionShapeOffsetContainer/Options" unique_id=2069455574]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "0;25"
+
+[node name="25_25" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/CollisionShapeOffsetContainerFrame/CollisionShapeOffsetContainer/Options" unique_id=2122907489]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "25;25"
+
+[node name="AttachmentOffsetContainerFrame" type="PanelContainer" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView" unique_id=1516517847]
+layout_mode = 2
+theme_type_variation = &"SectionPanel"
+
+[node name="AttachmentOffsetContainer" type="VBoxContainer" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/AttachmentOffsetContainerFrame" unique_id=611185037]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/AttachmentOffsetContainerFrame/AttachmentOffsetContainer" unique_id=1403240395]
+layout_mode = 2
+theme_type_variation = &"SectionHeader"
+text = "Bullet Attachment Offset"
+uppercase = true
+
+[node name="Options" type="HFlowContainer" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/AttachmentOffsetContainerFrame/AttachmentOffsetContainer" unique_id=1659166696]
+layout_mode = 2
+
+[node name="-60_0" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/AttachmentOffsetContainerFrame/AttachmentOffsetContainer/Options" unique_id=52275078]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "-60;0"
+
+[node name="0_0" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/AttachmentOffsetContainerFrame/AttachmentOffsetContainer/Options" unique_id=1964163826]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "0;0"
+
+[node name="0_-60" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/AttachmentOffsetContainerFrame/AttachmentOffsetContainer/Options" unique_id=1071120729]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "0;-60"
+
+[node name="-60_-60" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/AttachmentOffsetContainerFrame/AttachmentOffsetContainer/Options" unique_id=1594569521]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "-60;-60"
+
+[node name="TextureRotationContainerFrame" type="PanelContainer" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView" unique_id=1801489063]
+layout_mode = 2
+theme_type_variation = &"SectionPanel"
+
+[node name="TextureRotationContainer" type="VBoxContainer" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/TextureRotationContainerFrame" unique_id=1465662196]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/TextureRotationContainerFrame/TextureRotationContainer" unique_id=75946076]
+layout_mode = 2
+theme_type_variation = &"SectionHeader"
+text = "Texture Rotation"
+uppercase = true
+
+[node name="Options" type="HFlowContainer" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/TextureRotationContainerFrame/TextureRotationContainer" unique_id=489429441]
+layout_mode = 2
+
+[node name="0" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/TextureRotationContainerFrame/TextureRotationContainer/Options" unique_id=1086933484]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "0"
+
+[node name="90" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/TextureRotationContainerFrame/TextureRotationContainer/Options" unique_id=1871218888]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "90"
+
+[node name="180" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/TextureRotationContainerFrame/TextureRotationContainer/Options" unique_id=2137135139]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "180"
+
+[node name="-90" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/TextureRotationContainerFrame/TextureRotationContainer/Options" unique_id=217286140]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "-90"
+
+[node name="BulletLifeTimeContainerFrame" type="PanelContainer" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView" unique_id=493191104]
+layout_mode = 2
+theme_type_variation = &"SectionPanel"
+
+[node name="BulletLifeTimeContainer" type="VBoxContainer" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletLifeTimeContainerFrame" unique_id=703180270]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletLifeTimeContainerFrame/BulletLifeTimeContainer" unique_id=361889608]
+layout_mode = 2
+theme_type_variation = &"SectionHeader"
+text = "Bullet Lifetime"
+uppercase = true
+
+[node name="Options" type="HFlowContainer" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletLifeTimeContainerFrame/BulletLifeTimeContainer" unique_id=1055991279]
+layout_mode = 2
+
+[node name="2" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletLifeTimeContainerFrame/BulletLifeTimeContainer/Options" unique_id=1085620900]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "2"
+
+[node name="0_5" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletLifeTimeContainerFrame/BulletLifeTimeContainer/Options" unique_id=930160423]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "0.5"
+
+[node name="0_2" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletLifeTimeContainerFrame/BulletLifeTimeContainer/Options" unique_id=1904295372]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "0.2"
+
+[node name="5" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletLifeTimeContainerFrame/BulletLifeTimeContainer/Options" unique_id=1184569483]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "5"
+
+[node name="Infinite" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/BulletLifeTimeContainerFrame/BulletLifeTimeContainer/Options" unique_id=935127781]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "Infinite"
+
+[node name="TextureSizeContainerFrame" type="PanelContainer" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView" unique_id=1235975137]
+layout_mode = 2
+theme_type_variation = &"SectionPanel"
+
+[node name="TextureSizeContainer" type="VBoxContainer" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/TextureSizeContainerFrame" unique_id=1101735255]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/TextureSizeContainerFrame/TextureSizeContainer" unique_id=2141815516]
+layout_mode = 2
+theme_type_variation = &"SectionHeader"
+text = "Texture Size"
+uppercase = true
+
+[node name="Options" type="HFlowContainer" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/TextureSizeContainerFrame/TextureSizeContainer" unique_id=351222776]
+layout_mode = 2
+
+[node name="140_140" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/TextureSizeContainerFrame/TextureSizeContainer/Options" unique_id=404931495]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "140;140"
+
+[node name="200_200" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/TextureSizeContainerFrame/TextureSizeContainer/Options" unique_id=110453033]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "200;200"
+
+[node name="320_320" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/TextureSizeContainerFrame/TextureSizeContainer/Options" unique_id=1129031785]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "320;320"
+
+[node name="64_64" type="Button" parent="Sidebar/List/Scroll/ViewStack/BulletSettingsView/TextureSizeContainerFrame/TextureSizeContainer/Options" unique_id=1861235187]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "64;64"
+
+[node name="ObjectPoolSettingsView" type="VBoxContainer" parent="Sidebar/List/Scroll/ViewStack" unique_id=80068117]
+visible = false
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="FreeBulletPoolVBoxContainerFrame" type="PanelContainer" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView" unique_id=2072505259]
+layout_mode = 2
+theme_type_variation = &"SectionPanel"
+
+[node name="FreeBulletPoolVBoxContainer" type="VBoxContainer" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/FreeBulletPoolVBoxContainerFrame" unique_id=752654196]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/FreeBulletPoolVBoxContainerFrame/FreeBulletPoolVBoxContainer" unique_id=2007634529]
+layout_mode = 2
+theme_type_variation = &"SectionHeader"
+text = "Free specific bullets object pool
+that has N amount bullets"
+uppercase = true
+
+[node name="Options" type="HFlowContainer" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/FreeBulletPoolVBoxContainerFrame/FreeBulletPoolVBoxContainer" unique_id=81890630]
+layout_mode = 2
+
+[node name="FreeVolleyPoolBtn" type="Button" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/FreeBulletPoolVBoxContainerFrame/FreeBulletPoolVBoxContainer/Options" unique_id=638277059]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+size_flags_vertical = 8
+focus_mode = 0
+theme = ExtResource("3_vd08o")
+text = "Free Volley Pool
+(only those with N amount bullets)"
+
+[node name="FreeAllBulletPoolsBtn" type="Button" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/FreeBulletPoolVBoxContainerFrame/FreeBulletPoolVBoxContainer/Options" unique_id=1844945031]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+size_flags_vertical = 8
+focus_mode = 0
+theme = ExtResource("3_vd08o")
+text = "Free All Bullet Pools
+(no matter N amount bullets)
+"
+
+[node name="PopulateBulletPoolVBoxContainerFrame" type="PanelContainer" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView" unique_id=1356851675]
+layout_mode = 2
+theme_type_variation = &"SectionPanel"
+
+[node name="PopulateBulletPoolVBoxContainer" type="VBoxContainer" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/PopulateBulletPoolVBoxContainerFrame" unique_id=825118055]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/PopulateBulletPoolVBoxContainerFrame/PopulateBulletPoolVBoxContainer" unique_id=689906736]
+layout_mode = 2
+theme_type_variation = &"SectionHeader"
+text = "Populate X amount
+MultiMeshInstances
+with N amount bullets"
+uppercase = true
+
+[node name="Options" type="HFlowContainer" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/PopulateBulletPoolVBoxContainerFrame/PopulateBulletPoolVBoxContainer" unique_id=1002149083]
+layout_mode = 2
+
+[node name="PopulateVolleyPoolBtn" type="Button" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/PopulateBulletPoolVBoxContainerFrame/PopulateBulletPoolVBoxContainer/Options" unique_id=1063897349]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+size_flags_vertical = 8
+focus_mode = 0
+theme = ExtResource("3_vd08o")
+text = "Populate Volley Pool
+( X amount MultiMeshes with N amount bullets)"
+
+[node name="AmountMultiMeshInstancesVboxContainerFrame" type="PanelContainer" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView" unique_id=230345138]
+layout_mode = 2
+theme_type_variation = &"SectionPanel"
+
+[node name="AmountMultiMeshInstancesVboxContainer" type="VBoxContainer" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainerFrame" unique_id=913196375]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainerFrame/AmountMultiMeshInstancesVboxContainer" unique_id=1483116611]
+layout_mode = 2
+theme_type_variation = &"SectionHeader"
+text = "Amount MultiMeshInstances (X)"
+uppercase = true
+
+[node name="Options" type="HFlowContainer" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainerFrame/AmountMultiMeshInstancesVboxContainer" unique_id=195885828]
+layout_mode = 2
+
+[node name="1" type="Button" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainerFrame/AmountMultiMeshInstancesVboxContainer/Options" unique_id=837580298]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "1"
+
+[node name="5" type="Button" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainerFrame/AmountMultiMeshInstancesVboxContainer/Options" unique_id=823130215]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "5"
+
+[node name="15" type="Button" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainerFrame/AmountMultiMeshInstancesVboxContainer/Options" unique_id=1711292588]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "15"
+
+[node name="30" type="Button" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainerFrame/AmountMultiMeshInstancesVboxContainer/Options" unique_id=408272927]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "30"
+
+[node name="60" type="Button" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainerFrame/AmountMultiMeshInstancesVboxContainer/Options" unique_id=1163103048]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "60"
+
+[node name="100" type="Button" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainerFrame/AmountMultiMeshInstancesVboxContainer/Options" unique_id=390375897]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "100"
+
+[node name="200" type="Button" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainerFrame/AmountMultiMeshInstancesVboxContainer/Options" unique_id=493441306]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "200"
+
+[node name="500" type="Button" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainerFrame/AmountMultiMeshInstancesVboxContainer/Options" unique_id=1236154870]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "500"
+
+[node name="1000" type="Button" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainerFrame/AmountMultiMeshInstancesVboxContainer/Options" unique_id=1880108391]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "1000
+"
+
+[node name="ActiveVolleysCustomLabel" type="HBoxContainer" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView" unique_id=2066304836 instance=ExtResource("5_i53y2")]
+layout_mode = 2
+script = ExtResource("12_0rlg4")
+default_text = "Active Volleys:"
+
+[node name="ActiveBulletAttachmentsCustomLabel" type="HBoxContainer" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView" unique_id=76869897 instance=ExtResource("5_i53y2")]
+layout_mode = 2
+script = ExtResource("12_0rlg4")
+default_text = "Active Bullet Attachments:"
+
+[node name="PooledVolleysCustomLabel" type="HBoxContainer" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView" unique_id=140627347 instance=ExtResource("5_i53y2")]
+layout_mode = 2
+script = ExtResource("12_0rlg4")
+default_text = "Pooled Volleys:"
+
+[node name="PooledBulletAttachmentsCustomLabel" type="HBoxContainer" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView" unique_id=1280452547 instance=ExtResource("5_i53y2")]
+layout_mode = 2
+script = ExtResource("12_0rlg4")
+default_text = "Pooled Bullet Attachments:"
+
+[node name="VolleyPoolInfoCustomLabel" type="HBoxContainer" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView" unique_id=1413990276 instance=ExtResource("5_i53y2")]
+layout_mode = 2
+script = ExtResource("12_0rlg4")
+default_text = "Volley Pool Info:"
+
+[node name="AttachmentsPoolInfoCustomLabel" type="HBoxContainer" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView" unique_id=1298054100 instance=ExtResource("5_i53y2")]
+layout_mode = 2
+script = ExtResource("12_0rlg4")
+default_text = "Attachments Pool Info:"
+
+[node name="VBoxContainerFrame" type="PanelContainer" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView" unique_id=1471873711]
+layout_mode = 2
+theme_type_variation = &"SectionPanel"
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/VBoxContainerFrame" unique_id=347465257]
+layout_mode = 2
+
+[node name="Label2" type="Label" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/VBoxContainerFrame/VBoxContainer" unique_id=1572306012]
+layout_mode = 2
+theme_type_variation = &"SectionHeader"
+text = "Selected Attachment Id"
+uppercase = true
+
+[node name="Options" type="HFlowContainer" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/VBoxContainerFrame/VBoxContainer" unique_id=1432494162]
+layout_mode = 2
+
+[node name="SwitchBulletAttachmentIdBtn" type="Button" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/VBoxContainerFrame/VBoxContainer/Options" unique_id=344996161]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+theme = ExtResource("3_vd08o")
+text = "Attachment Id: IdGoesHere"
+script = ExtResource("7_gbr8l")
+text_options = Array[String](["Attachment Id: 1", "Attachment Id: 2", "Attachment Id: 3"])
+metadata/_custom_type_script = "uid://b7wucn8wglgth"
+
+[node name="VBoxContainer2Frame" type="PanelContainer" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView" unique_id=1405128352]
+layout_mode = 2
+theme_type_variation = &"SectionPanel"
+
+[node name="VBoxContainer2" type="VBoxContainer" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/VBoxContainer2Frame" unique_id=1098698872]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/VBoxContainer2Frame/VBoxContainer2" unique_id=1099595940]
+layout_mode = 2
+theme_type_variation = &"SectionHeader"
+text = "Amount Attachments (Y)"
+uppercase = true
+
+[node name="Options" type="HFlowContainer" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/VBoxContainer2Frame/VBoxContainer2" unique_id=187964600]
+layout_mode = 2
+
+[node name="1" type="Button" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/VBoxContainer2Frame/VBoxContainer2/Options" unique_id=745806805]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "1"
+
+[node name="5" type="Button" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/VBoxContainer2Frame/VBoxContainer2/Options" unique_id=1484594319]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "5"
+
+[node name="15" type="Button" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/VBoxContainer2Frame/VBoxContainer2/Options" unique_id=313905688]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "15"
+
+[node name="30" type="Button" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/VBoxContainer2Frame/VBoxContainer2/Options" unique_id=1905783399]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "30"
+
+[node name="60" type="Button" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/VBoxContainer2Frame/VBoxContainer2/Options" unique_id=620498061]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "60"
+
+[node name="100" type="Button" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/VBoxContainer2Frame/VBoxContainer2/Options" unique_id=609357206]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "100"
+
+[node name="PopulateAttachmentsPoolBtn" type="Button" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/VBoxContainer2Frame/VBoxContainer2/Options" unique_id=1935235510]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+size_flags_vertical = 8
+focus_mode = 0
+theme = ExtResource("3_vd08o")
+text = "Populate Attachment Pool
+(with Y amount )"
+
+[node name="FreeSpecificAttachmentPoolBtn" type="Button" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/VBoxContainer2Frame/VBoxContainer2/Options" unique_id=57845736]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+size_flags_vertical = 8
+focus_mode = 0
+theme = ExtResource("3_vd08o")
+text = "Free Specific 
+Attachment Pool
+(based on selected attachment_id)"
+
+[node name="FreeAllAttachmentPoolsBtn" type="Button" parent="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/VBoxContainer2Frame/VBoxContainer2/Options" unique_id=983967240]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+size_flags_vertical = 8
+focus_mode = 0
+theme = ExtResource("3_vd08o")
+text = "Free All 
+Attachment Pools
+(no matter the attachment_id)"
+
+[node name="MoreSettingsView" type="VBoxContainer" parent="Sidebar/List/Scroll/ViewStack" unique_id=1875090932]
+visible = false
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="PhysicsTickVBoxContainerFrame" type="PanelContainer" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView" unique_id=1837797891]
+layout_mode = 2
+theme_type_variation = &"SectionPanel"
+
+[node name="PhysicsTickVBoxContainer" type="VBoxContainer" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/PhysicsTickVBoxContainerFrame" unique_id=232004518]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/PhysicsTickVBoxContainerFrame/PhysicsTickVBoxContainer" unique_id=1181584825]
+layout_mode = 2
+theme_type_variation = &"SectionHeader"
+text = "Physics Ticks per Second"
+uppercase = true
+
+[node name="Options" type="HFlowContainer" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/PhysicsTickVBoxContainerFrame/PhysicsTickVBoxContainer" unique_id=416587163]
+layout_mode = 2
+
+[node name="60" type="Button" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/PhysicsTickVBoxContainerFrame/PhysicsTickVBoxContainer/Options" unique_id=1097448829]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "60"
+
+[node name="40" type="Button" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/PhysicsTickVBoxContainerFrame/PhysicsTickVBoxContainer/Options" unique_id=300731582]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "40"
+
+[node name="25" type="Button" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/PhysicsTickVBoxContainerFrame/PhysicsTickVBoxContainer/Options" unique_id=291382639]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "25"
+
+[node name="15" type="Button" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/PhysicsTickVBoxContainerFrame/PhysicsTickVBoxContainer/Options" unique_id=155851599]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "15"
+
+[node name="120" type="Button" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/PhysicsTickVBoxContainerFrame/PhysicsTickVBoxContainer/Options" unique_id=877945415]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "120"
+
+[node name="PhysicsInterpolationCheckBox" type="CheckBox" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView" unique_id=1074037543]
+layout_mode = 2
+focus_mode = 0
+text = "Enable Physics Interpolation"
+
+[node name="VSyncCheckBox" type="CheckBox" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView" unique_id=836784967]
+layout_mode = 2
+focus_mode = 0
+text = "Enable VSync"
+
+[node name="LimitFPSContainerFrame" type="PanelContainer" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView" unique_id=1820593152]
+layout_mode = 2
+theme_type_variation = &"SectionPanel"
+
+[node name="LimitFPSContainer" type="VBoxContainer" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/LimitFPSContainerFrame" unique_id=1896232778]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/LimitFPSContainerFrame/LimitFPSContainer" unique_id=437058524]
+layout_mode = 2
+theme_type_variation = &"SectionHeader"
+text = "Limit FPS"
+uppercase = true
+
+[node name="Options" type="HFlowContainer" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/LimitFPSContainerFrame/LimitFPSContainer" unique_id=127787467]
+layout_mode = 2
+
+[node name="NoLimit" type="Button" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/LimitFPSContainerFrame/LimitFPSContainer/Options" unique_id=1198446117]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "No Limit"
+
+[node name="60" type="Button" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/LimitFPSContainerFrame/LimitFPSContainer/Options" unique_id=232866730]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "60"
+
+[node name="40" type="Button" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/LimitFPSContainerFrame/LimitFPSContainer/Options" unique_id=1254070452]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "40"
+
+[node name="25" type="Button" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/LimitFPSContainerFrame/LimitFPSContainer/Options" unique_id=1759766490]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "25"
+
+[node name="15" type="Button" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/LimitFPSContainerFrame/LimitFPSContainer/Options" unique_id=1998877422]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "15"
+
+[node name="120" type="Button" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/LimitFPSContainerFrame/LimitFPSContainer/Options" unique_id=643448492]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "120"
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView" unique_id=1425753591]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/VBoxContainer" unique_id=1996653568]
+layout_mode = 2
+theme_type_variation = &"SectionHeader"
+text = "Bullet Grid Options"
+uppercase = true
+
+[node name="RowsPerColumnHBoxContainerFrame" type="PanelContainer" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView" unique_id=1582507083]
+layout_mode = 2
+theme_type_variation = &"SectionPanel"
+
+[node name="RowsPerColumnHBoxContainer" type="VBoxContainer" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/RowsPerColumnHBoxContainerFrame" unique_id=661124797]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/RowsPerColumnHBoxContainerFrame/RowsPerColumnHBoxContainer" unique_id=470407446]
+layout_mode = 2
+theme_type_variation = &"SectionHeader"
+text = "Rows per Column"
+uppercase = true
+
+[node name="Options" type="HFlowContainer" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/RowsPerColumnHBoxContainerFrame/RowsPerColumnHBoxContainer" unique_id=1501502207]
+layout_mode = 2
+
+[node name="10rows" type="Button" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/RowsPerColumnHBoxContainerFrame/RowsPerColumnHBoxContainer/Options" unique_id=535632180]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "10"
+
+[node name="15rows" type="Button" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/RowsPerColumnHBoxContainerFrame/RowsPerColumnHBoxContainer/Options" unique_id=1845201296]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "15"
+
+[node name="25rows" type="Button" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/RowsPerColumnHBoxContainerFrame/RowsPerColumnHBoxContainer/Options" unique_id=1111059806]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "25"
+
+[node name="5rows" type="Button" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/RowsPerColumnHBoxContainerFrame/RowsPerColumnHBoxContainer/Options" unique_id=1361066331]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "5"
+
+[node name="50rows" type="Button" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/RowsPerColumnHBoxContainerFrame/RowsPerColumnHBoxContainer/Options" unique_id=593290242]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "50"
+
+[node name="AlignmentOptionsHBoxContainerFrame" type="PanelContainer" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView" unique_id=550916905]
+layout_mode = 2
+theme_type_variation = &"SectionPanel"
+
+[node name="AlignmentOptionsHBoxContainer" type="VBoxContainer" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/AlignmentOptionsHBoxContainerFrame" unique_id=128689814]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/AlignmentOptionsHBoxContainerFrame/AlignmentOptionsHBoxContainer" unique_id=1712774085]
+layout_mode = 2
+theme_type_variation = &"SectionHeader"
+text = "Alignment"
+uppercase = true
+
+[node name="Options" type="HFlowContainer" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/AlignmentOptionsHBoxContainerFrame/AlignmentOptionsHBoxContainer" unique_id=459171071]
+layout_mode = 2
+
+[node name="CenterLeftAlignmentBtn" type="Button" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/AlignmentOptionsHBoxContainerFrame/AlignmentOptionsHBoxContainer/Options" unique_id=1071162410]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "CenterLeft"
+
+[node name="TopLeftAlignmentBtn" type="Button" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/AlignmentOptionsHBoxContainerFrame/AlignmentOptionsHBoxContainer/Options" unique_id=1425566529]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "TopLeft"
+
+[node name="BottomLeftAlignmentBtn" type="Button" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/AlignmentOptionsHBoxContainerFrame/AlignmentOptionsHBoxContainer/Options" unique_id=335166153]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "BottomLeft"
+
+[node name="ColumnOffsetHBoxContainerFrame" type="PanelContainer" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView" unique_id=958125965]
+layout_mode = 2
+theme_type_variation = &"SectionPanel"
+
+[node name="ColumnOffsetHBoxContainer" type="VBoxContainer" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/ColumnOffsetHBoxContainerFrame" unique_id=1707986779]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/ColumnOffsetHBoxContainerFrame/ColumnOffsetHBoxContainer" unique_id=1588624560]
+layout_mode = 2
+theme_type_variation = &"SectionHeader"
+text = "Column Offset"
+uppercase = true
+
+[node name="Options" type="HFlowContainer" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/ColumnOffsetHBoxContainerFrame/ColumnOffsetHBoxContainer" unique_id=1328172602]
+layout_mode = 2
+
+[node name="150col-offset" type="Button" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/ColumnOffsetHBoxContainerFrame/ColumnOffsetHBoxContainer/Options" unique_id=1500925520]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "150"
+
+[node name="250col-offset" type="Button" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/ColumnOffsetHBoxContainerFrame/ColumnOffsetHBoxContainer/Options" unique_id=1486607687]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "250"
+
+[node name="350col-offset" type="Button" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/ColumnOffsetHBoxContainerFrame/ColumnOffsetHBoxContainer/Options" unique_id=1195972491]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "350"
+
+[node name="500col-offset" type="Button" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/ColumnOffsetHBoxContainerFrame/ColumnOffsetHBoxContainer/Options" unique_id=216984037]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "500"
+
+[node name="50col-offset" type="Button" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/ColumnOffsetHBoxContainerFrame/ColumnOffsetHBoxContainer/Options" unique_id=202695736]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "50"
+
+[node name="RowOffsetHBoxContainer2Frame" type="PanelContainer" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView" unique_id=1484124515]
+layout_mode = 2
+theme_type_variation = &"SectionPanel"
+
+[node name="RowOffsetHBoxContainer2" type="VBoxContainer" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/RowOffsetHBoxContainer2Frame" unique_id=382208645]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/RowOffsetHBoxContainer2Frame/RowOffsetHBoxContainer2" unique_id=1285622642]
+layout_mode = 2
+theme_type_variation = &"SectionHeader"
+text = "Row Offset"
+uppercase = true
+
+[node name="Options" type="HFlowContainer" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/RowOffsetHBoxContainer2Frame/RowOffsetHBoxContainer2" unique_id=35415012]
+layout_mode = 2
+
+[node name="150row-offset" type="Button" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/RowOffsetHBoxContainer2Frame/RowOffsetHBoxContainer2/Options" unique_id=956736149]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "150"
+
+[node name="250row-offset" type="Button" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/RowOffsetHBoxContainer2Frame/RowOffsetHBoxContainer2/Options" unique_id=552037406]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "250"
+
+[node name="350row-offset" type="Button" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/RowOffsetHBoxContainer2Frame/RowOffsetHBoxContainer2/Options" unique_id=654501532]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "350"
+
+[node name="500row-offset" type="Button" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/RowOffsetHBoxContainer2Frame/RowOffsetHBoxContainer2/Options" unique_id=1674279143]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "500"
+
+[node name="50row-offset" type="Button" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView/RowOffsetHBoxContainer2Frame/RowOffsetHBoxContainer2/Options" unique_id=27365981]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+focus_mode = 0
+text = "50"
+
+[node name="RotateGridWithMarkerCheckBox" type="CheckBox" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView" unique_id=1493819152]
+layout_mode = 2
+focus_mode = 0
+button_pressed = true
+text = "Rotate Grid With Marker"
+
+[node name="RandomLocalRotationCheckBox" type="CheckBox" parent="Sidebar/List/Scroll/ViewStack/MoreSettingsView" unique_id=1113531706]
+layout_mode = 2
+focus_mode = 0
+text = "Random Local Rotation"
+
+[node name="StatsPanel" type="PanelContainer" parent="." unique_id=34793678]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -190.0
+offset_top = 8.0
+offset_right = -8.0
+grow_horizontal = 0
+theme = SubResource("Theme_g8e4a")
+theme_type_variation = &"StatsPanel"
+
+[node name="TopRightContainer" type="VBoxContainer" parent="StatsPanel" unique_id=1529341854]
+layout_mode = 2
+
+[node name="CurrentFPS" type="Label" parent="StatsPanel/TopRightContainer" unique_id=1443015256]
+layout_mode = 2
+text = "FPS::"
+
+[node name="LowFPS" type="Label" parent="StatsPanel/TopRightContainer" unique_id=670312590]
+layout_mode = 2
+text = "Low:"
+
+[node name="TrackFPSBtn" type="Button" parent="StatsPanel/TopRightContainer" unique_id=1412509999]
+layout_mode = 2
+focus_mode = 0
+theme = ExtResource("2_e8asd")
+text = "Not Tracking FPS"
+
+[connection signal="color_changed" from="DebuggerColorPicker" to="." method="_on_debugger_color_picker_color_changed"]
 [connection signal="pressed" from="CloseCurrentColorPickerBtn" to="." method="_on_close_current_color_picker_btn_pressed"]
-[connection signal="pressed" from="TopRightContainer/TrackFPSBtn" to="." method="_on_track_fps_button_pressed"]
-[connection signal="pressed" from="ObjectPoolSettingsView/FreeBulletPoolVBoxContainer/FreeMultiMeshDirectionalPoolBtn" to="." method="_on_free_multi_mesh_directional_pool_btn_pressed"]
-[connection signal="pressed" from="ObjectPoolSettingsView/FreeBulletPoolVBoxContainer/FreeMultiMeshBlockBulletsPoolBtn" to="." method="_on_free_multi_mesh_block_bullets_pool_btn_pressed"]
-[connection signal="pressed" from="ObjectPoolSettingsView/FreeBulletPoolVBoxContainer/FreeAllBulletPoolsBtn" to="." method="_on_free_all_bullet_pools_btn_pressed"]
-[connection signal="pressed" from="ObjectPoolSettingsView/PopulateBulletPoolVBoxContainer/PopulateMultiMeshDirectionalPoolBtn" to="." method="_on_populate_multi_mesh_directional_pool_btn_pressed"]
-[connection signal="pressed" from="ObjectPoolSettingsView/PopulateBulletPoolVBoxContainer/PopulateMultiMeshBlockPoolBtn" to="." method="_on_populate_multi_mesh_block_pool_btn_pressed"]
-[connection signal="timeout" from="ObjectPoolSettingsView/AdditionalDebugDataContainer/UpdateDebugDataTimer" to="ObjectPoolSettingsView/AdditionalDebugDataContainer" method="_on_update_debug_data_timer_timeout"]
-[connection signal="pressed" from="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer/PopulateAttachmentsPoolBtn" to="." method="_on_populate_attachments_pool_btn_pressed"]
-[connection signal="pressed" from="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer2/FreeSpecificAttachmentPoolBtn" to="." method="_on_free_specific_attachment_pool_btn_pressed"]
-[connection signal="pressed" from="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer2/FreeAllAttachmentPoolsBtn" to="." method="_on_free_all_attachment_pools_btn_pressed"]
-[connection signal="pressed" from="BulletSettingsView/VBoxContainer/DirectionalDebuggerVBoxContainer/ShowDirectionalDebuggerColorPickerBtn" to="." method="_on_show_directional_debugger_color_picker_btn_pressed"]
-[connection signal="pressed" from="BulletSettingsView/VBoxContainer/BlockDebuggerVBoxContainer2/ShowBlockDebuggerColorPickerBtn" to="." method="_on_show_block_debugger_color_picker_btn_pressed"]
-[connection signal="pressed" from="BulletSettingsView/VBoxContainer/VBoxContainer/EnableDebuggerCheckBox" to="." method="_on_enable_debugger_check_box_pressed"]
-[connection signal="pressed" from="BulletSettingsView/VBoxContainer/VBoxContainer/RotatePhysicsShapesCheckBox" to="." method="_on_rotate_physics_shapes_check_box_pressed"]
-[connection signal="pressed" from="BulletSettingsView/VBoxContainer/VBoxContainer/AdjustDirectionBasedOnRotationCheckBox" to="." method="_on_adjust_direction_based_on_rotation_check_box_pressed"]
-[connection signal="pressed" from="BulletSettingsView/VBoxContainer/VBoxContainer/StopRotationWhenMaxReachedCheckBox" to="." method="_on_stop_rotation_when_max_reached_check_box_pressed"]
-[connection signal="pressed" from="BulletSettingsView/VBoxContainer2/ResetFactoryBtn" to="." method="_on_reset_factory_btn_pressed"]
-[connection signal="pressed" from="BulletSettingsView/VBoxContainer2/FreeActiveBulletsBtn" to="." method="_on_free_active_bullets_btn_pressed"]
-[connection signal="pressed" from="BulletSettingsView/VBoxContainer3/EnableMonitorableCheckBox" to="." method="_on_enable_monitorable_check_box_pressed"]
-[connection signal="pressed" from="BulletSettingsView/VBoxContainer3/IsTextureRotationPermanentCheckBox" to="." method="_on_is_texture_rotation_permanent_check_box_pressed"]
-[connection signal="new_btn_selected" from="BulletSettingsView/SelectViewsContainer/SelectCollisionShapeSizeView" to="." method="_on_select_collision_shape_size_view_new_btn_selected"]
-[connection signal="new_btn_selected" from="BulletSettingsView/SelectViewsContainer/SelectBulletDamageView" to="." method="_on_select_bullet_damage_view_new_btn_selected"]
-[connection signal="new_btn_selected" from="BulletSettingsView/SelectViewsContainer/SelectBulletCollisionView" to="." method="_on_select_bullet_collision_view_new_btn_selected"]
-[connection signal="new_btn_selected" from="BulletSettingsView/SelectViewsContainer/SelectCollisionShapeOffsetView" to="." method="_on_select_collision_shape_offset_view_new_btn_selected"]
-[connection signal="new_btn_selected" from="BulletSettingsView/SelectViewsContainer/SelectBulletAttachmentOffsetView" to="." method="_on_select_bullet_attachment_offset_view_new_btn_selected"]
-[connection signal="new_btn_selected" from="BulletSettingsView/SelectViewsContainer/SelectTextureRotationView" to="." method="_on_select_texture_rotation_view_new_btn_selected"]
-[connection signal="new_btn_selected" from="BulletSettingsView/SelectViewsContainer/SelectBulletLifetimeView" to="." method="_on_select_bullet_lifetime_view_new_btn_selected"]
-[connection signal="new_btn_selected" from="BulletSettingsView/SelectViewsContainer/SelectTextureSizeBtnView" to="." method="_on_select_texture_size_btn_view_new_btn_selected"]
-[connection signal="new_btn_selected" from="BulletSettingsView/SelectViewsContainer/SelectZIndexBtnView" to="." method="_on_select_z_index_btn_view_new_btn_selected"]
-[connection signal="pressed" from="MoreSettingsView/VBoxContainer3/HBoxContainer/PhysicsInterpolationCheckBox" to="." method="_on_physics_interpolation_check_box_pressed"]
-[connection signal="pressed" from="MoreSettingsView/VBoxContainer3/HBoxContainer/VSyncCheckBox" to="." method="_on_v_sync_check_box_pressed"]
-[connection signal="new_btn_selected" from="MoreSettingsView/SelectLimitFPSBtnView" to="." method="_on_select_limit_fps_btn_view_new_btn_selected"]
-[connection signal="new_btn_selected" from="MoreSettingsView/SelectPhysicsTicksBtnView" to="." method="_on_select_physics_ticks_btn_view_new_btn_selected"]
-[connection signal="pressed" from="MoreSettingsView/VBoxContainer2/RotateGridWithMarkerCheckBox" to="." method="_on_rotate_grid_with_marker_check_box_pressed"]
-[connection signal="pressed" from="MoreSettingsView/VBoxContainer2/RandomLocalRotationCheckBox" to="." method="_on_random_local_rotation_check_box_pressed"]
-[connection signal="new_btn_selected" from="MoreSettingsView/SelectRowsPerColumnBtnView" to="." method="_on_select_rows_per_column_btn_view_new_btn_selected"]
-[connection signal="new_btn_selected" from="MoreSettingsView/SelectGridAlignmentBtnView" to="." method="_on_select_grid_alignment_btn_view_new_btn_selected"]
-[connection signal="new_btn_selected" from="MoreSettingsView/SelectColumnOffsetBtnView" to="." method="_on_select_column_offset_btn_view_new_btn_selected"]
-[connection signal="new_btn_selected" from="MoreSettingsView/SelectRowOffsetBtnView" to="." method="_on_select_row_offset_btn_view_new_btn_selected"]
-[connection signal="pressed" from="AlwaysVisibleView/FillUpPlayerHealthBtn" to="." method="_on_fill_up_player_health_btn_pressed"]
-[connection signal="new_btn_selected" from="AlwaysVisibleView/SelectFireTimerBtnView" to="." method="_on_select_fire_timer_btn_view_new_btn_selected"]
-[connection signal="new_btn_selected" from="AlwaysVisibleView/SelectAmountBulletsBtnView" to="." method="_on_select_amount_bullets_btn_view_new_btn_selected"]
-[connection signal="new_btn_selected" from="AlwaysVisibleView/SelectBulletTypeView" to="." method="_on_select_bullet_type_view_new_btn_selected"]
-[connection signal="new_btn_selected" from="AlwaysVisibleView/ChangeSettingsUISelectBtnView" to="." method="_on_change_settings_ui_select_btn_view_new_btn_selected"]
+[connection signal="new_btn_selected" from="Helpers/SelectFireTimerBtnView" to="." method="_on_select_fire_timer_btn_view_new_btn_selected"]
+[connection signal="new_btn_selected" from="Helpers/SelectAmountBulletsBtnView" to="." method="_on_select_amount_bullets_btn_view_new_btn_selected"]
+[connection signal="new_btn_selected" from="Helpers/SelectBulletTypeView" to="." method="_on_select_bullet_type_view_new_btn_selected"]
+[connection signal="new_btn_selected" from="Helpers/ChangeSettingsUISelectBtnView" to="." method="_on_change_settings_ui_select_btn_view_new_btn_selected"]
+[connection signal="new_btn_selected" from="Helpers/SelectCollisionShapeSizeView" to="." method="_on_select_collision_shape_size_view_new_btn_selected"]
+[connection signal="new_btn_selected" from="Helpers/SelectBulletDamageView" to="." method="_on_select_bullet_damage_view_new_btn_selected"]
+[connection signal="new_btn_selected" from="Helpers/SelectBulletCollisionView" to="." method="_on_select_bullet_collision_view_new_btn_selected"]
+[connection signal="new_btn_selected" from="Helpers/SelectCollisionShapeOffsetView" to="." method="_on_select_collision_shape_offset_view_new_btn_selected"]
+[connection signal="new_btn_selected" from="Helpers/SelectBulletAttachmentOffsetView" to="." method="_on_select_bullet_attachment_offset_view_new_btn_selected"]
+[connection signal="new_btn_selected" from="Helpers/SelectTextureRotationView" to="." method="_on_select_texture_rotation_view_new_btn_selected"]
+[connection signal="new_btn_selected" from="Helpers/SelectBulletLifetimeView" to="." method="_on_select_bullet_lifetime_view_new_btn_selected"]
+[connection signal="new_btn_selected" from="Helpers/SelectTextureSizeBtnView" to="." method="_on_select_texture_size_btn_view_new_btn_selected"]
+[connection signal="new_btn_selected" from="Helpers/SelectZIndexBtnView" to="." method="_on_select_z_index_btn_view_new_btn_selected"]
+[connection signal="new_btn_selected" from="Helpers/SelectLimitFPSBtnView" to="." method="_on_select_limit_fps_btn_view_new_btn_selected"]
+[connection signal="new_btn_selected" from="Helpers/SelectPhysicsTicksBtnView" to="." method="_on_select_physics_ticks_btn_view_new_btn_selected"]
+[connection signal="new_btn_selected" from="Helpers/SelectRowsPerColumnBtnView" to="." method="_on_select_rows_per_column_btn_view_new_btn_selected"]
+[connection signal="new_btn_selected" from="Helpers/SelectGridAlignmentBtnView" to="." method="_on_select_grid_alignment_btn_view_new_btn_selected"]
+[connection signal="new_btn_selected" from="Helpers/SelectColumnOffsetBtnView" to="." method="_on_select_column_offset_btn_view_new_btn_selected"]
+[connection signal="new_btn_selected" from="Helpers/SelectRowOffsetBtnView" to="." method="_on_select_row_offset_btn_view_new_btn_selected"]
+[connection signal="pressed" from="Sidebar/List/AlwaysVisibleView/HealthRow/FillUpPlayerHealthBtn" to="." method="_on_fill_up_player_health_btn_pressed"]
+[connection signal="pressed" from="Sidebar/List/Scroll/ViewStack/BulletSettingsView/DebuggerVBoxContainerFrame/DebuggerVBoxContainer/Options/ShowDebuggerColorPickerBtn" to="." method="_on_show_debugger_color_picker_btn_pressed"]
+[connection signal="pressed" from="Sidebar/List/Scroll/ViewStack/BulletSettingsView/EnableDebuggerCheckBox" to="." method="_on_enable_debugger_check_box_pressed"]
+[connection signal="pressed" from="Sidebar/List/Scroll/ViewStack/BulletSettingsView/RotatePhysicsShapesCheckBox" to="." method="_on_rotate_physics_shapes_check_box_pressed"]
+[connection signal="pressed" from="Sidebar/List/Scroll/ViewStack/BulletSettingsView/AdjustDirectionBasedOnRotationCheckBox" to="." method="_on_adjust_direction_based_on_rotation_check_box_pressed"]
+[connection signal="pressed" from="Sidebar/List/Scroll/ViewStack/BulletSettingsView/StopRotationWhenMaxReachedCheckBox" to="." method="_on_stop_rotation_when_max_reached_check_box_pressed"]
+[connection signal="pressed" from="Sidebar/List/Scroll/ViewStack/BulletSettingsView/VBoxContainer5Frame/VBoxContainer5/Options/ResetFactoryBtn" to="." method="_on_reset_factory_btn_pressed"]
+[connection signal="pressed" from="Sidebar/List/Scroll/ViewStack/BulletSettingsView/VBoxContainer5Frame/VBoxContainer5/Options/FreeActiveBulletsBtn" to="." method="_on_free_active_bullets_btn_pressed"]
+[connection signal="pressed" from="Sidebar/List/Scroll/ViewStack/BulletSettingsView/EnableMonitorableCheckBox" to="." method="_on_enable_monitorable_check_box_pressed"]
+[connection signal="pressed" from="Sidebar/List/Scroll/ViewStack/BulletSettingsView/IsTextureRotationPermanentCheckBox" to="." method="_on_is_texture_rotation_permanent_check_box_pressed"]
+[connection signal="pressed" from="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/FreeBulletPoolVBoxContainerFrame/FreeBulletPoolVBoxContainer/Options/FreeVolleyPoolBtn" to="." method="_on_free_volley_pool_btn_pressed"]
+[connection signal="pressed" from="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/FreeBulletPoolVBoxContainerFrame/FreeBulletPoolVBoxContainer/Options/FreeAllBulletPoolsBtn" to="." method="_on_free_all_bullet_pools_btn_pressed"]
+[connection signal="pressed" from="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/PopulateBulletPoolVBoxContainerFrame/PopulateBulletPoolVBoxContainer/Options/PopulateVolleyPoolBtn" to="." method="_on_populate_volley_pool_btn_pressed"]
+[connection signal="pressed" from="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/VBoxContainer2Frame/VBoxContainer2/Options/PopulateAttachmentsPoolBtn" to="." method="_on_populate_attachments_pool_btn_pressed"]
+[connection signal="pressed" from="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/VBoxContainer2Frame/VBoxContainer2/Options/FreeSpecificAttachmentPoolBtn" to="." method="_on_free_specific_attachment_pool_btn_pressed"]
+[connection signal="pressed" from="Sidebar/List/Scroll/ViewStack/ObjectPoolSettingsView/VBoxContainer2Frame/VBoxContainer2/Options/FreeAllAttachmentPoolsBtn" to="." method="_on_free_all_attachment_pools_btn_pressed"]
+[connection signal="pressed" from="Sidebar/List/Scroll/ViewStack/MoreSettingsView/PhysicsInterpolationCheckBox" to="." method="_on_physics_interpolation_check_box_pressed"]
+[connection signal="pressed" from="Sidebar/List/Scroll/ViewStack/MoreSettingsView/VSyncCheckBox" to="." method="_on_v_sync_check_box_pressed"]
+[connection signal="pressed" from="Sidebar/List/Scroll/ViewStack/MoreSettingsView/RotateGridWithMarkerCheckBox" to="." method="_on_rotate_grid_with_marker_check_box_pressed"]
+[connection signal="pressed" from="Sidebar/List/Scroll/ViewStack/MoreSettingsView/RandomLocalRotationCheckBox" to="." method="_on_random_local_rotation_check_box_pressed"]
+[connection signal="pressed" from="StatsPanel/TopRightContainer/TrackFPSBtn" to="." method="_on_track_fps_button_pressed"]

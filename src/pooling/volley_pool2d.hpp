@@ -1,0 +1,57 @@
+#pragma once
+
+#include <godot_cpp/classes/node.hpp>
+#include <godot_cpp/classes/ref.hpp>
+#include <godot_cpp/core/class_db.hpp>
+#include <queue>
+#include <unordered_map>
+#include <vector>
+
+#include <map>
+
+#include <godot_cpp/classes/physics_server2d.hpp>
+
+#include "pooling/volley_pool_key2d.hpp"
+
+namespace BlastBullets2D {
+using namespace godot;
+
+class BulletVolley2D;
+
+class VolleyPool {
+public:
+	// Caller must always provide the full PoolKey (amount + shape). No int-only overloads.
+	void push(BulletVolley2D *multimesh, const PoolKey &key);
+
+	// Exact bucket lookup. Returns nullptr when empty/missing.
+	BulletVolley2D *pop(const PoolKey &key);
+
+	// Used to clear all bullet pointers that were saved inside the object pool. Note that this only clears the pointers and doesn't free the actual bullet multimesh objects.
+	void clear();
+
+	// Frees memory by deleting every single BulletVolley2D object that is stored in the pool and resets it to be empty
+	void free_all_bullets();
+
+	// Frees memory by deleting BulletVolley2D objects with an exact PoolKey match
+	void free_specific_bullets(const PoolKey &key);
+
+	// Gets the total amount of multimeshes currently present in the object pool
+	int get_total_amount_pooled();
+
+	// True info: per exact key (amount + shape), no aggregation that hides shape split
+	std::map<PoolKey, int, std::less<PoolKey>> get_pool_info();
+
+	bool try_remove_instance(BulletVolley2D *target, const PoolKey &key);
+	// Removes target from whichever bucket holds it (a cold scan of every bucket):
+	// the delete paths' fallback when its live key no longer names its bucket.
+	bool try_remove_anywhere(BulletVolley2D *target);
+
+	// Every (bucket key, instance) pair currently pooled. Cold path: the
+	// factory's debug_assert_no_dangling invariant check only.
+	std::vector<std::pair<PoolKey, BulletVolley2D *>> debug_entries() const;
+
+private:
+	// The key is amount + shape type enum. Example: key {5, SHAPE_CIRCLE} holds all disabled multis with 5 bullets and circle shapes.
+	std::unordered_map<PoolKey, std::vector<BulletVolley2D *>, PoolKeyHash> pool;
+};
+} //namespace BlastBullets2D

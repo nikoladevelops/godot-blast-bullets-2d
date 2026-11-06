@@ -1,0 +1,168 @@
+[gd_scene format=3]
+[ext_resource type="Script" path="res://examples/common/example_turret.gd" id="turret_script"]
+[ext_resource type="PackedScene" path="res://examples/common/world_environment.tscn" id="world_env"]
+[ext_resource type="PackedScene" path="res://shared/background/space_background.tscn" id="bg_space"]
+[ext_resource type="PackedScene" path="res://shared/live_inspector/live_inspector.tscn" id="live_inspector"]
+
+[ext_resource type="Script" path="res://examples/01_ring_turret.gd" id="1_6j8m6"]
+[ext_resource type="Script" path="res://examples/common/example_player.gd" id="2_51ea7"]
+[ext_resource type="Theme" path="res://shared/ui/test_lab_theme.tres" id="8_od5f0"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_turret/turret_base.png" id="9_uwc60"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_turret/turret_gun.png" id="10_l8cfc"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/moving_01.png" id="art_moving_01"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/moving_02.png" id="art_moving_02"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/moving_03.png" id="art_moving_03"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/moving_04.png" id="art_moving_04"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/moving_05.png" id="art_moving_05"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/moving_06.png" id="art_moving_06"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/moving_07.png" id="art_moving_07"]
+[ext_resource type="Texture2D" path="res://shared/art/player_ship/moving_08.png" id="art_moving_08"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/plasma_rocket_01.png" id="art_plasma_rocket_01"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/plasma_rocket_02.png" id="art_plasma_rocket_02"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/plasma_rocket_03.png" id="art_plasma_rocket_03"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/plasma_rocket_04.png" id="art_plasma_rocket_04"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/plasma_rocket_05.png" id="art_plasma_rocket_05"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/plasma_rocket_06.png" id="art_plasma_rocket_06"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/plasma_rocket_07.png" id="art_plasma_rocket_07"]
+[ext_resource type="Texture2D" path="res://shared/art/enemy_bullets/plasma_rocket_08.png" id="art_plasma_rocket_08"]
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_cupln"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("art_moving_01")
+}, {
+"duration": 1.0,
+"texture": ExtResource("art_moving_02")
+}, {
+"duration": 1.0,
+"texture": ExtResource("art_moving_03")
+}, {
+"duration": 1.0,
+"texture": ExtResource("art_moving_04")
+}, {
+"duration": 1.0,
+"texture": ExtResource("art_moving_05")
+}, {
+"duration": 1.0,
+"texture": ExtResource("art_moving_06")
+}, {
+"duration": 1.0,
+"texture": ExtResource("art_moving_07")
+}, {
+"duration": 1.0,
+"texture": ExtResource("art_moving_08")
+}],
+"loop": 1,
+"name": &"default",
+"speed": 14.0
+}]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_h44b7"]
+radius = 8.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_6oqrm"]
+radius = 6.0
+
+[sub_resource type="BulletSpeedData2D" id="BulletSpeedData2D_b2unc"]
+speed = 180.0
+max_speed = 180.0
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_kawt4"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("art_plasma_rocket_01")
+}, {
+"duration": 1.0,
+"texture": ExtResource("art_plasma_rocket_02")
+}, {
+"duration": 1.0,
+"texture": ExtResource("art_plasma_rocket_03")
+}, {
+"duration": 1.0,
+"texture": ExtResource("art_plasma_rocket_04")
+}, {
+"duration": 1.0,
+"texture": ExtResource("art_plasma_rocket_05")
+}, {
+"duration": 1.0,
+"texture": ExtResource("art_plasma_rocket_06")
+}, {
+"duration": 1.0,
+"texture": ExtResource("art_plasma_rocket_07")
+}, {
+"duration": 1.0,
+"texture": ExtResource("art_plasma_rocket_08")
+}],
+"loop": 1,
+"name": &"default",
+"speed": 16.0
+}]
+
+[sub_resource type="BulletVolleyData2D" id="BulletVolleyData2D_aoqhu"]
+sprite_frames = SubResource("SpriteFrames_kawt4")
+texture_size = Vector2(36, 36)
+max_life_time = 5.0
+shared_bullet_speed_data = SubResource("BulletSpeedData2D_b2unc")
+collision_mask = 2
+collision_shape = SubResource("CircleShape2D_6oqrm")
+
+[node name="RingTurret" type="Node2D" unique_id=1178078963]
+script = ExtResource("1_6j8m6")
+
+[node name="SpaceBackground" parent="." instance=ExtResource("bg_space")]
+
+[node name="BulletFactory2D" type="BulletFactory2D" parent="." unique_id=1709861121]
+
+[node name="Player" type="Area2D" parent="." unique_id=499765590 groups=["player"]]
+position = Vector2(576, 540)
+collision_layer = 2
+collision_mask = 0
+script = ExtResource("2_51ea7")
+
+[node name="Ship" type="AnimatedSprite2D" parent="Player" unique_id=697971275]
+scale = Vector2(0.1875, 0.1875)
+sprite_frames = SubResource("SpriteFrames_cupln")
+autoplay = "default"
+
+[node name="Hitbox" type="CollisionShape2D" parent="Player" unique_id=1753167832]
+shape = SubResource("CircleShape2D_h44b7")
+
+[node name="Tip" type="Label" parent="." unique_id=1407096407]
+offset_left = 16.0
+offset_top = 548.0
+offset_right = 330.0
+offset_bottom = 636.0
+theme = ExtResource("8_od5f0")
+theme_override_font_sizes/font_size = 15
+text = "Turret/Spawner: pattern Ring (16 bullets), Spin 50 deg/s."
+
+autowrap_mode = 3
+vertical_alignment = 2
+[node name="Turret" type="Node2D" parent="." unique_id=1784550933]
+script = ExtResource("turret_script")
+position = Vector2(576, 150)
+
+[node name="EnemyTurretHolder" type="Sprite2D" parent="Turret" unique_id=843884496]
+rotation = 3.1415927
+scale = Vector2(0.25, 0.25)
+texture = ExtResource("9_uwc60")
+
+[node name="EnemyTurret" type="Sprite2D" parent="Turret" unique_id=1729767669]
+rotation = 3.1415927
+scale = Vector2(0.25, 0.25)
+texture = ExtResource("10_l8cfc")
+
+[node name="Spawner" type="BulletSpawner2D" parent="Turret" unique_id=788157410]
+spawn_data = SubResource("BulletVolleyData2D_aoqhu")
+pattern_source = 3
+helper_bullets_amount = 16
+helper_ring_radius = 24.0
+shoot_interval_sec = 0.35
+spin_enabled = true
+spin_speed_deg_per_sec = 50.0
+
+[node name="WorldEnvironment" parent="." instance=ExtResource("world_env")]
+
+[node name="LiveInspector" parent="." instance=ExtResource("live_inspector")]

@@ -1,0 +1,588 @@
+extends BlastTest
+## BulletSpawner2D movement along a Path2D: timing (duration / speed),
+## easing parity with Tween, ONCE / LOOP / PING_PONG with leg counts,
+## reverse direction, ATTACH vs RELATIVE_TO_START, rotate-with-path,
+## start ratio / delay / endpoint pause, progress Curve, playback API,
+## signals (exact counts), shooting while moving (pattern + preview follow,
+## inherited velocity), hostile inputs and re-entrant frees.
+## Time: the runner uses --fixed-fps 60, so one idle frame = 1/60 s exactly.
+
+const FPS := 60.0
+
+var path: Path2D
+
+
+## Straight path from `a` to `b` (Path2D at the origin).
+func _line_path(a: Vector2, b: Vector2) -> Path2D:
+	var p := Path2D.new()
+	var c := Curve2D.new()
+	c.add_point(a)
+	c.add_point(b)
+	p.curve = c
+	add(p)
+	return p
+
+
+func _mover(p: Path2D, configure: Callable = func(_s): pass) -> BulletSpawner2D:
+	var sp := make_spawner(H.make_volley_data(4, 200.0, 2.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 8)
+	sp.movement_transition = Tween.TRANS_LINEAR # linear unless a test says otherwise
+	sp.movement_ease = Tween.EASE_IN
+	sp.movement_duration_sec = 1.0
+	sp.set_movement_path_node(p)
+	configure.call(sp)
+	sp.movement_enabled = true # autostart: plays now (already in the tree)
+	return sp
+
+
+func before_each() -> void:
+	await super()
+	path = _line_path(Vector2(0, 0), Vector2(300, 0))
+
+
+func test_once_linear_duration_and_signals() -> void:
+	var sp := _mover(path, func(s): watch_signals(s))
+	assert_true(sp.is_movement_playing(), "autostart plays")
+	assert_almost_eq(sp.global_position, Vector2(0, 0), Vector2(0.5, 0.5), "starts at the path start")
+	await idle(30) # 0.5 s of a 1 s leg
+	assert_almost_eq(sp.global_position.x, 150.0, 6.0, "linear: half the path at half time")
+	assert_almost_eq(sp.get_movement_velocity().x, 300.0, 15.0, "velocity = path length / duration")
+	await idle(40)
+	assert_almost_eq(sp.global_position, Vector2(300, 0), Vector2(0.5, 0.5), "ends exactly at the path end")
+	assert_false(sp.is_movement_playing(), "ONCE stops")
+	assert_signal_emit_count(sp, "movement_started", 1)
+	assert_signal_emit_count(sp, "movement_endpoint_reached", 1)
+	assert_signal_emitted_with_parameters(sp, "movement_endpoint_reached", [true])
+	assert_signal_emit_count(sp, "movement_finished", 1)
+	assert_signal_emit_count(sp, "movement_loop_completed", 0)
+	assert_eq(sp.get_movement_velocity(), Vector2.ZERO, "velocity zero when stopped")
+
+
+func test_eased_progress_matches_tween() -> void:
+	var sp := _mover(path, func(s):
+		s.movement_transition = Tween.TRANS_CUBIC
+		s.movement_ease = Tween.EASE_IN_OUT)
+	await idle(15) # t = 0.25
+	var want: float = Tween.interpolate_value(0.0, 300.0, 15.0 / FPS, 1.0, Tween.TRANS_CUBIC, Tween.EASE_IN_OUT)
+	assert_almost_eq(sp.global_position.x, want, 1.0, "cubic in-out position equals a Tween's")
+
+
+func test_speed_timing() -> void:
+	var sp := _mover(path, func(s):
+		s.movement_timing = BulletSpawner2D.MOVEMENT_TIMING_SPEED
+		s.movement_speed = 150.0) # 300 px / 150 = 2 s
+	await idle(60)
+	assert_almost_eq(sp.global_position.x, 150.0, 6.0, "speed timing: 150 px after 1 s")
+	await idle(70)
+	assert_false(sp.is_movement_playing(), "done after 2 s")
+
+
+func test_loop_counts_legs() -> void:
+	var sp := _mover(path, func(s):
+		watch_signals(s)
+		s.movement_loop_mode = BulletSpawner2D.MOVEMENT_LOOP_LOOP
+		s.movement_loops = 3)
+	await idle(30)
+	assert_almost_eq(sp.global_position.x, 150.0, 6.0, "first leg mid")
+	await idle(45) # 1.25 s: second leg, a quarter in (jumped back to start)
+	assert_almost_eq(sp.global_position.x, 75.0, 8.0, "LOOP restarts from the beginning")
+	await idle(130)
+	assert_false(sp.is_movement_playing(), "3 legs then finished")
+	assert_eq(sp.get_movement_leg(), 3, "3 legs completed")
+	assert_signal_emit_count(sp, "movement_loop_completed", 2, "loop_completed between legs only")
+	assert_eq(get_signal_parameters(sp, "movement_loop_completed", 0), [0])
+	assert_eq(get_signal_parameters(sp, "movement_loop_completed", 1), [1])
+	assert_signal_emit_count(sp, "movement_finished", 1)
+
+
+func test_ping_pong_turns_around() -> void:
+	var sp := _mover(path, func(s):
+		watch_signals(s)
+		s.movement_loop_mode = BulletSpawner2D.MOVEMENT_LOOP_PING_PONG)
+	await idle(90) # 1.5 s: halfway back
+	assert_almost_eq(sp.global_position.x, 150.0, 6.0, "halfway back")
+	assert_lt(sp.get_movement_velocity().x, 0.0, "moving backwards")
+	await idle(60) # 2.5 s: halfway out again
+	assert_gt(sp.get_movement_velocity().x, 0.0, "forwards again")
+	assert_true(sp.is_movement_playing(), "infinite ping-pong keeps playing")
+	assert_eq(get_signal_parameters(sp, "movement_endpoint_reached", 0), [true], "first endpoint = end")
+	assert_eq(get_signal_parameters(sp, "movement_endpoint_reached", 1), [false], "second endpoint = start")
+
+
+func test_reverse_direction_starts_at_end() -> void:
+	var sp := _mover(path, func(s): s.movement_direction = BulletSpawner2D.MOVEMENT_DIRECTION_REVERSE)
+	assert_almost_eq(sp.global_position, Vector2(300, 0), Vector2(0.5, 0.5), "reverse starts at the path end")
+	await idle(30)
+	assert_almost_eq(sp.global_position.x, 150.0, 6.0, "and travels to the start")
+
+
+func test_relative_to_start_replays_the_shape() -> void:
+	var sp := make_spawner()
+	sp.global_position = Vector2(1000, 500)
+	sp.movement_transition = Tween.TRANS_LINEAR
+	sp.movement_ease = Tween.EASE_IN
+	sp.movement_duration_sec = 1.0
+	sp.movement_space = BulletSpawner2D.MOVEMENT_SPACE_RELATIVE_TO_START
+	sp.set_movement_path_node(path)
+	sp.movement_enabled = true
+	await idle(30)
+	assert_almost_eq(sp.global_position, Vector2(1150, 500), Vector2(6, 0.5), "path shape replayed from the spawner's start")
+
+
+func test_rotate_with_path_faces_travel() -> void:
+	var down := _line_path(Vector2(0, 0), Vector2(0, 300))
+	var sp := _mover(down, func(s):
+		s.movement_rotate_with_path = true
+		s.movement_rotation_offset_deg = 10.0
+		s.movement_loop_mode = BulletSpawner2D.MOVEMENT_LOOP_PING_PONG)
+	await idle(20)
+	assert_almost_eq(angle_difference(sp.global_rotation, PI / 2.0 + deg_to_rad(10.0)), 0.0, 0.01, "faces +Y (+offset) going out")
+	await idle(60)
+	assert_almost_eq(angle_difference(sp.global_rotation, -PI / 2.0 + deg_to_rad(10.0)), 0.0, 0.01, "turns around coming back")
+
+
+func test_start_ratio_delay_and_endpoint_pause() -> void:
+	var sp := _mover(path, func(s):
+		s.movement_start_ratio = 0.5
+		s.movement_start_delay_sec = 0.5
+		s.movement_endpoint_pause_sec = 0.5
+		s.movement_loop_mode = BulletSpawner2D.MOVEMENT_LOOP_PING_PONG)
+	assert_almost_eq(sp.global_position.x, 150.0, 1.0, "start ratio: begins halfway")
+	await idle(25)
+	assert_almost_eq(sp.global_position.x, 150.0, 1.0, "start delay: still waiting")
+	# Timeline: delay ends at frame 30, the remaining half leg ends at 60,
+	# the endpoint pause holds until 90. Sample at 70.
+	await idle(45)
+	assert_almost_eq(sp.global_position.x, 300.0, 1.0, "endpoint pause holds the end")
+	await idle(30)
+	assert_lt(sp.global_position.x, 300.0, "after the pause it heads back")
+
+
+func test_progress_curve_overrides_easing() -> void:
+	var c := Curve.new()
+	c.add_point(Vector2(0, 0))
+	c.add_point(Vector2(0.5, 1.0)) # reach the end at half time, then stay
+	c.add_point(Vector2(1, 1))
+	var sp := _mover(path, func(s): s.movement_progress_curve = c)
+	await idle(31)
+	assert_almost_eq(sp.global_position.x, 300.0, 15.0, "curve drives progress, not the transition")
+	assert_false(is_editor_visible(sp, &"movement_transition"), "transition hidden while a curve is set")
+
+
+func test_playback_api() -> void:
+	var sp := _mover(path)
+	await idle(15)
+	sp.movement_pause()
+	var held := sp.global_position
+	await idle(20)
+	assert_eq(sp.global_position, held, "pause holds")
+	sp.movement_play()
+	await idle(5)
+	assert_gt(sp.global_position.x, held.x, "play resumes from where it paused")
+	sp.movement_seek(0.8)
+	assert_almost_eq(sp.global_position.x, 240.0, 1.0, "seek jumps to 80%")
+	sp.movement_reverse()
+	await idle(6)
+	assert_lt(sp.global_position.x, 240.0, "reverse keeps the spot and turns back")
+	sp.movement_stop()
+	assert_almost_eq(sp.global_position.x, 0.0, 0.5, "stop(reset) snaps to the start")
+	assert_false(sp.is_movement_playing())
+	sp.movement_seek(1.5)
+	expect_error_sequence(["movement_seek: ratio must be in [0, 1]"])
+
+
+func test_setters_reject_and_keep() -> void:
+	var sp := make_spawner()
+	var cases := [
+		["movement_space", 5, "movement_space must be 0 (Attach) or 1 (Relative To Start)"],
+		["movement_loop_mode", -1, "movement_loop_mode must be 0 (Once), 1 (Loop) or 2 (Ping Pong)"],
+		["movement_direction", 2, "movement_direction must be 0 (Forward) or 1 (Reverse)"],
+		["movement_loops", -1, "movement_loops must be >= 0"],
+		["movement_timing", 9, "movement_timing must be 0 (Duration) or 1 (Speed)"],
+		["movement_duration_sec", 0.0, "movement_duration_sec must be finite and > 0"],
+		["movement_duration_sec", NAN, "movement_duration_sec must be finite and > 0"],
+		["movement_speed", -5.0, "movement_speed must be finite and > 0"],
+		["movement_transition", 12, "movement_transition must be a Tween.TransitionType"],
+		["movement_ease", 4, "movement_ease must be a Tween.EaseType"],
+		["movement_start_ratio", 1.5, "movement_start_ratio must be in [0, 1]"],
+		["movement_start_delay_sec", -1.0, "movement_start_delay_sec must be finite and >= 0"],
+		["movement_endpoint_pause_sec", INF, "movement_endpoint_pause_sec must be finite and >= 0"],
+		["movement_rotation_offset_deg", NAN, "movement_rotation_offset_deg must be finite"],
+		["movement_velocity_inherit_factor", INF, "movement_velocity_inherit_factor must be finite"],
+	]
+	for case in cases:
+		var before: Variant = sp.get(case[0])
+		sp.set(case[0], case[1])
+		expect_error_sequence([case[2]], "%s = %s" % [case[0], case[1]])
+		assert_true(sp.get(case[0]) == before or (typeof(before) == TYPE_FLOAT and is_nan(before) and is_nan(sp.get(case[0]))), "%s kept its old value" % case[0])
+
+
+func test_unusable_paths_never_crash() -> void:
+	# No path, an empty curve, and a path freed mid-movement: the spawner
+	# stays put, warns ONCE, never errors or NaNs.
+	var sp := make_spawner()
+	sp.global_position = Vector2(50, 60)
+	sp.movement_enabled = true
+	await idle(5)
+	assert_eq(sp.global_position, Vector2(50, 60), "no path: stays where it is")
+	expect_warning_sequence([UNUSABLE_PATH_WARNING], "no path: warned once, not per frame")
+	var empty := Path2D.new()
+	empty.curve = Curve2D.new()
+	add(empty)
+	sp.set_movement_path_node(empty)
+	sp.movement_play()
+	await idle(5)
+	assert_eq(sp.global_position, Vector2(50, 60), "empty curve: stays")
+	expect_warning_sequence([UNUSABLE_PATH_WARNING], "a new unusable path warns again, once")
+	sp.set_movement_path_node(path)
+	sp.movement_stop()
+	sp.movement_play()
+	await idle(10)
+	path.free()
+	await idle(10)
+	assert_true(sp.global_position.is_finite(), "path freed mid-movement: finite pose")
+	expect_warning_sequence([UNUSABLE_PATH_WARNING], "the freed path: once")
+
+
+const UNUSABLE_PATH_WARNING := "BulletSpawner2D: movement_path is not a Path2D with a non-empty curve in the tree; the spawner stays where it is."
+
+
+func test_a_path_assigned_right_after_entering_the_tree_never_warns() -> void:
+	# Code builds a mover like a scene would: movement on, into the tree, then
+	# the path (a NodePath needs the tree). Only a frame that should travel
+	# without a usable path warns.
+	var sp := BulletSpawner2D.new()
+	sp.set_shooting_enabled(false)
+	sp.movement_enabled = true
+	sp.movement_duration_sec = 1.0
+	sp.movement_transition = Tween.TRANS_LINEAR
+	add(sp)
+	sp.movement_path = sp.get_path_to(path)
+	expect_warning_sequence([], "nothing travelled yet")
+	await idle(3)
+	expect_warning_sequence([], "the path was there in time")
+	assert_ne(sp.global_position, Vector2.ZERO, "it travels")
+	var lost := BulletSpawner2D.new()
+	lost.set_shooting_enabled(false)
+	lost.movement_enabled = true
+	add(lost)
+	await idle(3)
+	expect_warning_sequence([UNUSABLE_PATH_WARNING], "a frame that should travel without a path warns once")
+
+
+func test_handlers_that_free_things() -> void:
+	# (free() of the emitter itself is refused by Godot: an emitting object is
+	# locked. queue_free() is the sanctioned way and must be clean.)
+	var sp := _mover(path)
+	sp.movement_endpoint_reached.connect(func(_at_end): sp.queue_free())
+	await idle(80)
+	assert_false(is_instance_valid(sp), "spawner queue_freed inside its own signal, no crash")
+	# Freeing the PATH from a handler: the next frames see a freed node.
+	var p2 := _line_path(Vector2(0, 0), Vector2(100, 0))
+	var sp2 := _mover(p2, func(s): s.movement_loop_mode = BulletSpawner2D.MOVEMENT_LOOP_PING_PONG)
+	sp2.movement_endpoint_reached.connect(func(_at_end): if is_instance_valid(p2): p2.free())
+	await idle(90)
+	assert_true(sp2.global_position.is_finite(), "path freed from a handler: still finite")
+	expect_warning_sequence([UNUSABLE_PATH_WARNING], "warned once")
+
+
+func test_shooting_while_moving_follows_and_inherits() -> void:
+	var sp := _mover(path, func(s):
+		s.inherit_movement_velocity = true
+		s.movement_velocity_inherit_factor = 0.5)
+	watch_signals(sp)
+	await idle(20)
+	assert_true(sp.shoot_once(), "fires while moving")
+	var v: BulletVolley2D = get_signal_parameters(sp, "volley_fired", 0)[0]
+	assert_almost_eq(v.get_inherited_velocity_offset(), sp.get_movement_velocity() * 0.5, Vector2(1, 1), "volley inherits half the spawner velocity")
+	var expected: Array = sp.collect_spawn_transforms()
+	assert_almost_eq(v.get_bullet_transform(0).origin, (expected[0] as Transform2D).origin, Vector2(0.5, 0.5), "pattern centered on the moving spawner")
+
+
+func test_moving_spawner_hits_the_bake_and_never_rebuilds_preview() -> void:
+	var sp := _mover(path, func(s):
+		s.show_pattern_preview = true
+		s.show_preview_during_runtime = true
+		s.helper_bullets_amount = 400)
+	await idle(4)
+	var r0: int = sp.debug_get_preview_stats()["rebuilds"]
+	var hits0: int = sp.debug_get_pattern_cache_info()["hits"]
+	for i in 20:
+		await idle(1)
+		sp.shoot_once()
+	assert_eq(int(sp.debug_get_preview_stats()["rebuilds"]), r0, "moving spawner: zero preview rebuilds")
+	assert_gte(int(sp.debug_get_pattern_cache_info()["hits"]) - hits0, 19, "moving shots served from the bake (verifier on)")
+
+
+func test_process_sleeps_when_movement_ends() -> void:
+	var sp := _mover(path)
+	assert_true(sp.is_processing(), "movement keeps _process awake")
+	await idle(70)
+	assert_false(sp.is_movement_playing())
+	assert_false(sp.is_processing(), "nothing left to do: _process sleeps")
+
+
+## A movement handler owns the movement: stop / seek called from
+## movement_endpoint_reached is what the spawner does next (the leg code that
+## ran after the emit used to emit movement_loop_completed(-1) after a stop
+## and snap a seek back to the leg start).
+func test_handlers_that_stop_or_seek_win() -> void:
+	var sp := _mover(path, func(s): s.movement_loop_mode = BulletSpawner2D.MOVEMENT_LOOP_LOOP)
+	watch_signals(sp)
+	sp.movement_endpoint_reached.connect(func(_at_end): sp.movement_stop(), CONNECT_ONE_SHOT)
+	await idle(70)
+	assert_false(sp.is_movement_playing(), "stopped by the handler")
+	assert_signal_emit_count(sp, "movement_loop_completed", 0, "no loop after the handler stopped it")
+	assert_almost_eq(sp.global_position, Vector2(0, 0), Vector2(0.5, 0.5), "stop(reset) left it at the start")
+	var sp2 := _mover(path, func(s): s.movement_loop_mode = BulletSpawner2D.MOVEMENT_LOOP_LOOP)
+	watch_signals(sp2)
+	var seen: Array = []
+	sp2.movement_endpoint_reached.connect(func(_at_end):
+		sp2.movement_seek(0.5)
+		seen.append(sp2.global_position.x), CONNECT_ONE_SHOT)
+	for k in 70:
+		await idle(1)
+		if not seen.is_empty():
+			break
+	assert_eq(seen.size(), 1, "the endpoint was reached")
+	assert_almost_eq(sp2.global_position.x, 150.0, 1.0, "the seek stands after the handler")
+	await idle(1)
+	assert_between(sp2.global_position.x, 150.0, 160.0, "and the run continues from there")
+	assert_true(sp2.is_movement_playing(), "still playing")
+	assert_signal_emit_count(sp2, "movement_loop_completed", 0, "the seek replaced the loop restart")
+
+
+## Re-entering the tree somewhere else is a jump, not motion: the first frame
+## after it reports no velocity (shots would inherit thousands of px/s).
+func test_reentering_the_tree_reports_no_jump_velocity() -> void:
+	var sp := _mover(path)
+	await idle(10)
+	var elsewhere := Node2D.new()
+	elsewhere.position = Vector2(5000, 5000)
+	add(elsewhere)
+	sp.reparent(elsewhere, false) # local position kept: the global one jumps by 5000
+	await idle(1)
+	assert_lt(sp.get_movement_velocity().length(), 1000.0, "no jump velocity on re-entry (%s)" % sp.get_movement_velocity())
+	await idle(2)
+	assert_almost_eq(sp.get_movement_velocity().x, 300.0, 15.0, "then the path speed again")
+	sp.movement_pause()
+	var progress := sp.get_movement_progress()
+	sp.reparent(self, false)
+	await idle(1)
+	sp.movement_play()
+	assert_almost_eq(sp.get_movement_progress(), progress, 0.001, "a paused run resumes where it was after a reparent")
+
+
+func test_a_position_written_by_hand_is_never_inherited_as_velocity() -> void:
+	# The path re-applies its pose on the next frame; the jump between the
+	# hand-written spot and that pose is not motion a shot may inherit.
+	var sp := _mover(path, func(s):
+		s.inherit_movement_velocity = true)
+	await idle(10)
+	sp.global_position = Vector2(2000, 900)
+	await idle(1)
+	assert_lt(sp.get_movement_velocity().length(), 1000.0, "no jump velocity (%s)" % sp.get_movement_velocity())
+	watch_signals(sp)
+	assert_true(sp.shoot_once(), "fires")
+	var v: BulletVolley2D = get_signal_parameters(sp, "volley_fired", 0)[0]
+	assert_lt(v.get_inherited_velocity_offset().length(), 1000.0, "the shot inherits no jump (%s)" % v.get_inherited_velocity_offset())
+	await idle(2)
+	assert_almost_eq(sp.get_movement_velocity().x, 300.0, 15.0, "then the path speed again")
+
+
+func test_teleport_moves_an_idle_spawner_without_rebuilding_its_preview() -> void:
+	var sp := make_preview_spawner(BulletSpawner2D.PATTERN_FROM_HELPER_RING, 6)
+	await idle(6)
+	var rebuilds: int = sp.debug_get_preview_stats()["rebuilds"]
+	sp.teleport(Vector2(640, -120))
+	assert_eq(sp.global_position, Vector2(640, -120), "moved")
+	await idle(6)
+	assert_eq(int(sp.debug_get_preview_stats()["rebuilds"]), rebuilds, "the preview follows as a node move (0 rebuilds)")
+	var pts: Array = sp.collect_spawn_transforms()
+	assert_almost_eq(((pts[0] as Transform2D).origin - Vector2(640, -120)).length(), sp.helper_ring_radius, 0.5, "and the pattern is centered there")
+
+
+func test_teleport_keeps_the_path_shape(space: int = use_parameters([BulletSpawner2D.MOVEMENT_SPACE_ATTACH, BulletSpawner2D.MOVEMENT_SPACE_RELATIVE_TO_START])) -> void:
+	var sp := _mover(path, func(s):
+		s.movement_space = space
+		s.inherit_movement_velocity = true)
+	await idle(15) # a quarter of the way: x = 75
+	var before: Vector2 = sp.global_position
+	sp.teleport(before + Vector2(500, 200))
+	assert_eq(sp.global_position, before + Vector2(500, 200), "space %d: moved at once" % space)
+	await idle(15) # another quarter: x + 75 along the path, shifted by the jump
+	assert_almost_eq(sp.global_position, before + Vector2(500 + 75, 200), Vector2(6, 0.5), "space %d: the path goes on from the new spot" % space)
+	assert_almost_eq(sp.get_movement_velocity().x, 300.0, 15.0, "space %d: the path speed, no jump" % space)
+	watch_signals(sp)
+	assert_true(sp.shoot_once(), "fires")
+	var v: BulletVolley2D = get_signal_parameters(sp, "volley_fired", 0)[0]
+	assert_almost_eq(v.get_inherited_velocity_offset().x, 300.0, 15.0, "space %d: the shot inherits the path velocity" % space)
+	sp.movement_stop(true)
+	await idle(1)
+	if space == BulletSpawner2D.MOVEMENT_SPACE_ATTACH:
+		assert_almost_eq(sp.global_position, Vector2.ZERO, Vector2(0.5, 0.5), "Attach: a stop back to the start returns to the path itself")
+
+
+func test_teleport_carries_this_spawners_bullets_on_request(carry: bool = use_parameters([true, false])) -> void:
+	var sp := make_spawner(H.make_volley_data(3, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 3)
+	var other := make_spawner(H.make_volley_data(3, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 3)
+	watch_signals(sp)
+	watch_signals(other)
+	assert_true(sp.shoot_once() and other.shoot_once(), "both fire")
+	var mine: BulletVolley2D = get_signal_parameters(sp, "volley_fired", 0)[0]
+	var theirs: BulletVolley2D = get_signal_parameters(other, "volley_fired", 0)[0]
+	var mine_at: Vector2 = mine.get_bullet_transform(0).origin
+	var theirs_at: Vector2 = theirs.get_bullet_transform(0).origin
+	sp.teleport(Vector2(300, 100), carry)
+	var want: Vector2 = mine_at + (Vector2(300, 100) if carry else Vector2.ZERO)
+	assert_almost_eq(mine.get_bullet_transform(0).origin, want, Vector2(0.01, 0.01), "carry %s: its bullets" % carry)
+	assert_eq(theirs.get_bullet_transform(0).origin, theirs_at, "another spawner's bullets never move")
+
+
+func test_teleport_refuses_a_bad_position_or_a_spawner_outside_the_tree() -> void:
+	var sp := make_spawner(H.make_volley_data(2), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 2)
+	sp.global_position = Vector2(10, 20)
+	sp.teleport(Vector2(NAN, 0))
+	expect_error_sequence(["BulletSpawner2D::teleport: global_position must be finite, the spawner stays where it is."])
+	assert_eq(sp.global_position, Vector2(10, 20), "kept")
+	var loose := BulletSpawner2D.new()
+	loose.teleport(Vector2(1, 1))
+	expect_error_sequence(["BulletSpawner2D::teleport: the spawner is outside the scene tree, it stays where it is."])
+	loose.free()
+
+
+## The reported velocity is the motion of the last step on every frame, also
+## on the frame that completes a leg (it used to divide only the bit after
+## the endpoint by the whole frame: about zero on an exact landing) and on a
+## Loop's wrap back to the start (a jump, but the motion goes on).
+func test_velocity_stays_exact_through_the_endpoints(mode: int = use_parameters([BulletSpawner2D.MOVEMENT_LOOP_PING_PONG, BulletSpawner2D.MOVEMENT_LOOP_LOOP])) -> void:
+	var sp := _mover(path, func(s): s.movement_loop_mode = mode)
+	var off: Array = []
+	for i in 150:
+		await idle(1)
+		var vx := absf(sp.get_movement_velocity().x)
+		if absf(vx - 300.0) > 1.0:
+			off.append([i, vx])
+	assert_eq(off, [], "300 px/s on every frame, the endpoint frames too")
+
+
+## A new movement_path (by path or node) or movement_space mid-play is a jump,
+## never travel: no shot inherits a jump-sized kick from it.
+func test_switching_the_path_or_space_mid_play_is_not_travel(kind: String = use_parameters(["path", "node", "space"])) -> void:
+	var sp := _mover(path, func(s): s.position = Vector2(500, 0))
+	await idle(10)
+	var far := _line_path(Vector2(5000, 0), Vector2(5300, 0))
+	match kind:
+		"path":
+			sp.movement_path = sp.get_path_to(far)
+		"node":
+			sp.set_movement_path_node(far)
+		"space":
+			sp.movement_space = BulletSpawner2D.MOVEMENT_SPACE_RELATIVE_TO_START
+	var peak := 0.0
+	for i in 4:
+		await idle(1)
+		peak = maxf(peak, sp.get_movement_velocity().length())
+	assert_lt(peak, 400.0, "no jump-sized velocity (the leg runs at 300 px/s)")
+	assert_true(sp.is_movement_playing(), "it keeps playing")
+
+
+## Movement switched on while the spawner is out of the tree after its first
+## _ready (a pooled enemy, a reparent) starts with autostart once it is back.
+func test_movement_enabled_while_detached_autostarts_on_reentry() -> void:
+	var sp := make_spawner(H.make_volley_data(4, 200.0, 2.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 8)
+	sp.movement_transition = Tween.TRANS_LINEAR
+	sp.movement_ease = Tween.EASE_IN
+	sp.movement_duration_sec = 1.0
+	sp.set_movement_path_node(path)
+	await idle(1)
+	var parent := sp.get_parent()
+	parent.remove_child(sp)
+	sp.movement_enabled = true
+	parent.add_child(sp)
+	assert_true(sp.is_movement_playing(), "autostart plays on the way back in")
+	await idle(10)
+	assert_gt(sp.global_position.x, 10.0, "and it moves")
+
+
+## movement_play while movement_enabled is off moves nothing: one warning, the
+## spawner stays where it is and reports no start (it would never advance).
+func test_movement_play_while_disabled_is_refused_with_a_warning() -> void:
+	var sp := make_spawner(H.make_volley_data(4, 200.0, 2.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 8)
+	sp.set_movement_path_node(_line_path(Vector2(100, 100), Vector2(400, 100)))
+	sp.global_position = Vector2(-50, -50)
+	watch_signals(sp)
+	sp.movement_play()
+	expect_warning_sequence(["BulletSpawner2D::movement_play: movement_enabled is off, nothing moves (turn it on to play the path)."])
+	assert_false(sp.is_movement_playing(), "not playing")
+	assert_eq(sp.global_position, Vector2(-50, -50), "never snapped onto the path")
+	assert_signal_emit_count(sp, "movement_started", 0, "no start reported")
+	sp.movement_enabled = true
+	assert_true(sp.is_movement_playing(), "turned on: it plays (autostart)")
+
+
+## Re-assigning the same (unusable) movement path is not a new configuration:
+## the once-per-path warning must not re-arm.
+func test_reassigning_the_same_unusable_path_does_not_rewarn() -> void:
+	var empty := Path2D.new()
+	empty.curve = Curve2D.new() # no points: unusable
+	add(empty)
+	var sp := make_spawner(H.make_volley_data(1, 0.0, 5.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
+	sp.set_movement_path_node(empty)
+	sp.movement_enabled = true # autostart: plays now, warns once
+	await idle(3)
+	expect_warning_sequence(["BulletSpawner2D: movement_path is not a Path2D with a non-empty curve in the tree; the spawner stays where it is."], "warned once")
+	sp.set_movement_path(sp.get_movement_path()) # the very same path again
+	sp.movement_seek(0.5) # re-applies the pose (no new warning expected)
+	await idle(3)
+	expect_warning_sequence([], "a same-value path write does not re-arm the warning")
+
+
+## Clearing the Path2D node by code clears the stored path too, also while
+## that path resolves to nothing (the node it named is gone).
+func test_clearing_the_path_node_clears_an_unresolved_path() -> void:
+	var sp := make_spawner(H.make_volley_data(1, 0.0, 5.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
+	sp.movement_path = NodePath("NoSuchPath")
+	assert_null(sp.get_movement_path_node(), "the path resolves to nothing")
+	sp.set_movement_path_node(null)
+	assert_eq(sp.movement_path, NodePath(), "the stale path is cleared")
+	expect_warning_sequence([])
+
+
+## The 0.5 s hitch clamp covers the SCALED delta too. time_scale is unbounded
+## on purpose, so one frame could otherwise run the whole 64-leg movement
+## catch-up with a month-long scaled delta (every completed leg emits
+## movement_endpoint_reached + movement_loop_completed).
+func test_a_huge_time_scale_cannot_fast_forward_the_movement() -> void:
+	var sp := _mover(path, func(s):
+		s.movement_loop_mode = BulletSpawner2D.MOVEMENT_LOOP_LOOP
+		s.time_scale = 1.0e9)
+	watch_signals(sp)
+	await idle(1) # 1e9 x 1/60 s without the clamp: the whole 64-leg catch-up in this one frame
+	var one_frame: int = get_signal_emit_count(sp, "movement_endpoint_reached") + get_signal_emit_count(sp, "movement_loop_completed")
+	assert_lte(one_frame, 64, "one frame never runs more leg transitions than the 64-leg catch-up bound (was %d)" % one_frame)
+	await idle(4)
+	var total: int = get_signal_emit_count(sp, "movement_endpoint_reached") + get_signal_emit_count(sp, "movement_loop_completed")
+	assert_lte(total, 64, "5 frames of 0.5 s-scaled movement stay far below it (%d)" % total)
+
+
+## A LOOP wrap and a seek are pose jumps, not travel: the node must restart
+## its engine interpolation history (teleport does), or a windowed run draws
+## the spawner sliding across the path. PING_PONG turns around continuously
+## and must never reset. debug_get_movement_state counts the resets.
+func test_loop_wrap_and_seek_restart_interpolation_but_ping_pong_does_not() -> void:
+	var sp := _mover(path, func(s):
+		s.movement_loop_mode = BulletSpawner2D.MOVEMENT_LOOP_LOOP
+		s.movement_loops = 2)
+	await idle(70) # past the 1 s wrap
+	var looped := int(sp.debug_get_movement_state().get("interpolation_resets", -1))
+	assert_gte(looped, 1, "the LOOP wrap restarted interpolation")
+	sp.movement_seek(0.25)
+	assert_eq(int(sp.debug_get_movement_state().get("interpolation_resets", -1)), looped + 1, "a seek restarts it too")
+	sp.teleport(sp.global_position, false)
+	assert_eq(int(sp.debug_get_movement_state().get("interpolation_resets", -1)), looped + 2, "teleport restarts it (baseline)")
+	var pp := _mover(_line_path(Vector2(0, 0), Vector2(100, 0)), func(s):
+		s.movement_loop_mode = BulletSpawner2D.MOVEMENT_LOOP_PING_PONG
+		s.movement_loops = 2)
+	await idle(75) # past the 1 s turn-around
+	assert_gte(pp.get_movement_leg(), 1, "the ping-pong turned around")
+	assert_eq(int(pp.debug_get_movement_state().get("interpolation_resets", -1)), 0, "PING_PONG never resets (continuous)")

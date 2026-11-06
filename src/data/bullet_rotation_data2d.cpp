@@ -1,0 +1,127 @@
+#include "data/bullet_rotation_data2d.hpp"
+
+#include "core/assign_if_changed2d.hpp"
+#include "patterns/pattern_inputs2d.hpp"
+#include <godot_cpp/classes/random_number_generator.hpp>
+#include <godot_cpp/variant/dictionary.hpp>
+#include <godot_cpp/variant/utility_functions.hpp>
+
+using namespace godot;
+
+namespace BlastBullets2D {
+
+TypedArray<BulletRotationData2D> BulletRotationData2D::generate_random_data(
+		int amount_to_generate,
+		real_t rotation_speed_MIN,
+		real_t rotation_speed_MAX,
+		real_t max_rotation_speed_MIN,
+		real_t max_rotation_speed_MAX,
+		real_t rotation_acceleration_MIN,
+		real_t rotation_acceleration_MAX) {
+	Ref<RandomNumberGenerator> rand_gen = memnew(RandomNumberGenerator);
+	rand_gen->randomize();
+
+	TypedArray<BulletRotationData2D> data;
+	if (amount_to_generate <= 0) {
+		UtilityFunctions::push_error("BulletRotationData2D.generate_random_data: amount_to_generate must be > 0.");
+		return data;
+	}
+	if (amount_to_generate > pattern_max_bullets()) {
+		UtilityFunctions::push_error("BulletRotationData2D.generate_random_data: amount_to_generate must be <= " + String::num_int64(pattern_max_bullets()) + ".");
+		return data;
+	}
+	if (!(rotation_speed_MIN <= rotation_speed_MAX) || !(max_rotation_speed_MIN <= max_rotation_speed_MAX) || !(rotation_acceleration_MIN <= rotation_acceleration_MAX)) {
+		UtilityFunctions::push_error("BulletRotationData2D.generate_random_data: every MIN must be <= its MAX.");
+		return data;
+	}
+	if (!Math::is_finite(rotation_speed_MIN) || !Math::is_finite(rotation_speed_MAX) || !Math::is_finite(max_rotation_speed_MIN) || !Math::is_finite(max_rotation_speed_MAX) || !Math::is_finite(rotation_acceleration_MIN) || !Math::is_finite(rotation_acceleration_MAX)) {
+		UtilityFunctions::push_error("BulletRotationData2D.generate_random_data: MIN/MAX bounds must be finite.");
+		return data;
+	}
+	if (max_rotation_speed_MIN < 0.0) {
+		UtilityFunctions::push_error("BulletRotationData2D.generate_random_data: max_rotation_speed bounds must be >= 0.");
+		return data;
+	}
+	data.resize(amount_to_generate);
+
+	for (int i = 0; i < amount_to_generate; ++i) {
+		Ref<BulletRotationData2D> bullet_data = memnew(BulletRotationData2D);
+		bullet_data->rotation_speed = rand_gen->randf_range(rotation_speed_MIN, rotation_speed_MAX);
+		bullet_data->max_rotation_speed = rand_gen->randf_range(max_rotation_speed_MIN, max_rotation_speed_MAX);
+		bullet_data->rotation_acceleration = rand_gen->randf_range(rotation_acceleration_MIN, rotation_acceleration_MAX);
+
+		data[i] = bullet_data;
+	}
+
+	return data;
+};
+
+real_t BulletRotationData2D::get_rotation_speed() {
+	return rotation_speed;
+}
+void BulletRotationData2D::set_rotation_speed(real_t new_rotation_speed) {
+	if (!Math::is_finite(new_rotation_speed)) {
+		UtilityFunctions::push_error("BulletRotationData2D: rotation_speed must be finite (NaN/Inf would poison bullet rotation), keeping the old value.");
+		return;
+	}
+	if (!assign_if_changed2d(rotation_speed, new_rotation_speed)) {
+		return;
+	}
+	emit_changed();
+}
+
+real_t BulletRotationData2D::get_max_rotation_speed() {
+	return max_rotation_speed;
+}
+void BulletRotationData2D::set_max_rotation_speed(real_t new_max_rotation_speed) {
+	if (!Math::is_finite(new_max_rotation_speed) || new_max_rotation_speed < 0.0) {
+		UtilityFunctions::push_error("BulletRotationData2D: max_rotation_speed must be finite and >= 0, keeping the old value.");
+		return;
+	}
+	if (!assign_if_changed2d(max_rotation_speed, new_max_rotation_speed)) {
+		return;
+	}
+	emit_changed();
+}
+
+real_t BulletRotationData2D::get_rotation_acceleration() {
+	return rotation_acceleration;
+}
+void BulletRotationData2D::set_rotation_acceleration(real_t new_rotation_acceleration) {
+	if (!Math::is_finite(new_rotation_acceleration)) {
+		UtilityFunctions::push_error("BulletRotationData2D: rotation_acceleration must be finite, keeping the old value.");
+		return;
+	}
+	if (!assign_if_changed2d(rotation_acceleration, new_rotation_acceleration)) {
+		return;
+	}
+	emit_changed();
+}
+
+void BulletRotationData2D::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("set_rotation_speed", "new_rotation_speed"), &BulletRotationData2D::set_rotation_speed);
+	ClassDB::bind_method(D_METHOD("get_rotation_speed"), &BulletRotationData2D::get_rotation_speed);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "rotation_speed"), "set_rotation_speed", "get_rotation_speed");
+
+	ClassDB::bind_method(D_METHOD("set_max_rotation_speed", "new_max_rotation_speed"), &BulletRotationData2D::set_max_rotation_speed);
+	ClassDB::bind_method(D_METHOD("get_max_rotation_speed"), &BulletRotationData2D::get_max_rotation_speed);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "max_rotation_speed"), "set_max_rotation_speed", "get_max_rotation_speed");
+
+	ClassDB::bind_method(D_METHOD("set_rotation_acceleration", "new_rotation_acceleration"), &BulletRotationData2D::set_rotation_acceleration);
+	ClassDB::bind_method(D_METHOD("get_rotation_acceleration"), &BulletRotationData2D::get_rotation_acceleration);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "rotation_acceleration"), "set_rotation_acceleration", "get_rotation_acceleration");
+
+	ClassDB::bind_static_method(
+			"BulletRotationData2D",
+			D_METHOD(
+					"generate_random_data",
+					"amount_to_generate",
+					"rotation_speed_MIN",
+					"rotation_speed_MAX",
+					"max_rotation_speed_MIN",
+					"max_rotation_speed_MAX",
+					"rotation_acceleration_MIN",
+					"rotation_acceleration_MAX"),
+			&BulletRotationData2D::generate_random_data);
+}
+} //namespace BlastBullets2D

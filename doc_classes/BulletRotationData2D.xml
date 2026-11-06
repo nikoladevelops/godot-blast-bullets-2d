@@ -4,6 +4,7 @@
 		Contains bullet rotation related data.
 	</brief_description>
 	<description>
+		One bullet's spin: how fast the texture turns, how fast it is allowed to get, and how quickly it accelerates. Put one entry per bullet in [member BulletVolleyData2D.all_bullet_rotation_data] — entry [code]i[/code] rotates bullet [code]i[/code] only. Use [method generate_random_data] to roll a batch with ranges. A null entry or NaN/Inf values read as zero spin for that bullet only.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -18,19 +19,19 @@
 			<param index="5" name="rotation_acceleration_MIN" type="float" />
 			<param index="6" name="rotation_acceleration_MAX" type="float" />
 			<description>
-				Generates random rotation data.
+				Generates random rotation data: amount_to_generate entries with each value rolled inside its MIN/MAX range. Requires amount_to_generate above 0 and every MIN at or below its MAX, otherwise returns empty.
 			</description>
 		</method>
 	</methods>
 	<members>
 		<member name="max_rotation_speed" type="float" setter="set_max_rotation_speed" getter="get_max_rotation_speed" default="0.0">
-			The maximum rotation speed that the bullets can have.
+			Top rotation speed in radians per second for [member rotation_acceleration]: the rotation speed is clamped to the range from -max to max. 0 (the default) means no top speed. Must be finite and 0 or more.
 		</member>
 		<member name="rotation_acceleration" type="float" setter="set_rotation_acceleration" getter="get_rotation_acceleration" default="0.0">
-			The amount by which the rotation speeds up every frame until reaching max_rotation_speed.
+			Change of the rotation speed in radians per second per second. It stops at [member max_rotation_speed]; with 0 there it has no limit and holds its last finite value instead of overflowing.
 		</member>
 		<member name="rotation_speed" type="float" setter="set_rotation_speed" getter="get_rotation_speed" default="0.0">
-			The actual current rotation speed.
+			Starting rotation speed in radians per second (positive turns clockwise on screen).
 		</member>
 	</members>
 </class>

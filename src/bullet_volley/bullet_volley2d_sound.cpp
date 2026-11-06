@@ -1,0 +1,217 @@
+// Volley sound state: arming (sound_set_effects for factory volleys,
+// sound_arm_from_spawner for spawner volleys) and pool-time release. The
+// trigger sites (collision, bounce, lifetime, graze, homing, spawner shots)
+// offer through sound_fire in bullet_volley2d_sound.cpp's second half.
+
+#include "bullet_volley/bullet_volley2d_internal.hpp"
+#include "core/live_object2d.hpp"
+#include "targets/bullet_targets2d.hpp"
+
+using namespace godot;
+
+namespace BlastBullets2D {
+
+static bool sound_collect_entries(const Array &effects, std::vector<Ref<BulletSoundData2D>> &r_entries, uint32_t &r_mask, const char *caller) {
+	r_entries.clear();
+	r_mask = 0;
+	for (int i = 0; i < effects.size(); ++i) {
+		const Variant &entry = effects[i];
+		if (entry.get_type() == Variant::NIL) {
+			r_entries.push_back(Ref<BulletSoundData2D>());
+			continue;
+		}
+		BulletSoundData2D *sound = live_object2d<BulletSoundData2D>(entry);
+		if (sound == nullptr) {
+			UtilityFunctions::push_error(String(caller) + ": entry " + String::num_int64(i) + " is not a BulletSoundData2D, nothing changed.");
+			return false;
+		}
+		r_entries.push_back(Ref<BulletSoundData2D>(sound));
+		const int trigger = sound->get_trigger();
+		if (sound->get_enabled() && trigger >= 0 && trigger < 32) {
+			r_mask |= (1u << trigger);
+		}
+	}
+	return true;
+}
+
+bool BulletVolley2D::sound_set_effects(const Array &effects, const Variant &listener_group) {
+	if (reject_pooled_handle("sound_set_effects")) {
+		return false;
+	}
+	std::vector<Ref<BulletSoundData2D>> entries;
+	uint32_t mask = 0;
+	if (!sound_collect_entries(effects, entries, mask, "sound_set_effects")) {
+		return false;
+	}
+	// A group name (empty: Godot's listener) or a BulletTargets2D.
+	StringName group;
+	std::shared_ptr<GrazeDetector2D> detector;
+	if (!read_targets_argument2d(listener_group, "sound_set_effects", "listener_group", group, detector)) {
+		return false;
+	}
+	sound_release();
+	sound_effects = entries;
+	sound_trigger_mask = mask;
+	sound_mask_epoch = BulletSoundData2D::mask_epoch;
+	sound_listener_group = group;
+	sound_detector = detector;
+	++split_arming_serial;
+	return true;
+}
+
+bool BulletVolley2D::sound_arm_from_spawner(const Array &effects, const std::shared_ptr<GrazeDetector2D> &detector, float volume_offset_db) {
+	if (detector == nullptr) {
+		return false;
+	}
+	std::vector<Ref<BulletSoundData2D>> entries;
+	uint32_t mask = 0;
+	if (!sound_collect_entries(effects, entries, mask, "sound_arm_from_spawner")) {
+		return false;
+	}
+	sound_release();
+	sound_effects = entries;
+	sound_trigger_mask = mask;
+	sound_mask_epoch = BulletSoundData2D::mask_epoch;
+	// Shared: listener edits and refresh_sound_listeners() reach it in flight.
+	sound_detector = detector;
+	sound_volume_offset_db = volume_offset_db;
+	++split_arming_serial;
+	return true;
+}
+
+bool BulletVolley2D::sound_armed_with(const Array &effects, const std::shared_ptr<GrazeDetector2D> &detector, float volume_offset_db) const {
+	if (sound_detector != detector || !sound_listener_group.is_empty() || sound_volume_offset_db != volume_offset_db || (int64_t)sound_effects.size() != effects.size()) {
+		return false;
+	}
+	for (int i = 0; i < effects.size(); ++i) {
+		const Variant &entry = effects[i];
+		const Object *sound = live_object2d(entry);
+		if ((const Object *)sound_effects[i].ptr() != sound) {
+			return false;
+		}
+	}
+	return true;
+}
+
+Array BulletVolley2D::sound_get_effects() const {
+	Array out;
+	for (const Ref<BulletSoundData2D> &entry : sound_effects) {
+		// A plain null for an empty slot (not a null object).
+		out.push_back(entry.is_valid() ? Variant(entry) : Variant());
+	}
+	return out;
+}
+
+StringName BulletVolley2D::sound_get_listener_group() const {
+	return sound_listener_group;
+}
+
+void BulletVolley2D::sound_refresh_mask() const {
+	if (sound_mask_epoch == BulletSoundData2D::mask_epoch) {
+		return;
+	}
+	sound_mask_epoch = BulletSoundData2D::mask_epoch;
+	uint32_t mask = 0;
+	for (const Ref<BulletSoundData2D> &entry : sound_effects) {
+		if (entry.is_valid() && entry->get_enabled()) {
+			const int trigger = entry->get_trigger();
+			if (trigger >= 0 && trigger < 32) {
+				mask |= (1u << trigger);
+			}
+		}
+	}
+	sound_trigger_mask = mask;
+}
+
+void BulletVolley2D::sound_release() {
+	// A sound entry's script PREDELETE may free this volley while the vector
+	// drops it: guard the free (queued) so the release stays on a live object.
+	guarded_user_call2d(this, emit_guard, [&]() {
+		++split_arming_serial;
+		sound_effects.clear();
+		sound_trigger_mask = 0;
+		sound_detector.reset();
+		sound_listener_group = StringName();
+		sound_volume_offset_db = 0.0f;
+	});
+}
+
+void BulletVolley2D::sound_fire(int trigger, int bullet_index, const Vector2 &event_pos, int ring, int zone) {
+	sound_refresh_mask();
+	if (trigger < 0 || trigger >= 32 || !(sound_trigger_mask & (1u << trigger))) {
+		return;
+	}
+	if (bullet_factory == nullptr || !factory_alive() || sound_effects.empty()) {
+		return;
+	}
+	if (bullet_index < 0 || bullet_index >= amount_bullets || !event_pos.is_finite()) {
+		return;
+	}
+	SoundListenerSpec2D spec;
+	if (sound_detector != nullptr) {
+		spec.kind = SoundListenerSpec2D::DETECTOR;
+		spec.detector = sound_detector;
+	} else if (!sound_listener_group.is_empty()) {
+		spec.kind = SoundListenerSpec2D::NODE_GROUP;
+		spec.group = sound_listener_group;
+	}
+	for (const Ref<BulletSoundData2D> &entry : sound_effects) {
+		if (entry.is_null() || !entry->enabled || entry->get_trigger() != trigger) {
+			continue;
+		}
+		// Ring and zone filters belong to the graze triggers only: every
+		// other trigger ignores them (they stay stored when the trigger
+		// changes, hidden in the inspector).
+		const bool graze_trigger = trigger == BulletSoundData2D::SOUND_ON_GRAZE || trigger == BulletSoundData2D::SOUND_ON_GRAZE_EXIT;
+		if (graze_trigger && entry->get_ring_index() >= 0 && entry->get_ring_index() != ring) {
+			continue;
+		}
+		if (graze_trigger && entry->get_zone_index() >= 0 && entry->get_zone_index() != zone) {
+			continue;
+		}
+		bullet_factory->sound_offer(entry.ptr(), event_pos, sound_volume_offset_db, spec, amount_bullets, get_instance_id(), get_life_id(), bullet_index);
+	}
+}
+
+void BulletVolley2D::sound_fire_flight() {
+	if (!(sound_trigger_mask & (1u << BulletSoundData2D::SOUND_ON_FLIGHT))) {
+		return;
+	}
+	if (bullet_factory == nullptr || !factory_alive() || sound_effects.empty()) {
+		return;
+	}
+	SoundListenerSpec2D spec;
+	if (sound_detector != nullptr) {
+		spec.kind = SoundListenerSpec2D::DETECTOR;
+		spec.detector = sound_detector;
+	} else if (!sound_listener_group.is_empty()) {
+		spec.kind = SoundListenerSpec2D::NODE_GROUP;
+		spec.group = sound_listener_group;
+	}
+	// The On Flight entries, once per tick (not per bullet x entry).
+	flight_entries_scratch.clear();
+	for (const Ref<BulletSoundData2D> &entry : sound_effects) {
+		if (entry.is_valid() && entry->enabled && entry->get_trigger() == BulletSoundData2D::SOUND_ON_FLIGHT) {
+			flight_entries_scratch.push_back(&entry);
+		}
+	}
+	if (flight_entries_scratch.empty()) {
+		return;
+	}
+	const uint64_t self_id = get_instance_id();
+	const int life_id = get_life_id();
+	for (int i : all_bullets_enabled_set.get_active_indexes()) {
+		if (i < 0 || i >= amount_bullets) {
+			continue;
+		}
+		const Vector2 at = all_cached_instance_origin[i];
+		if (!at.is_finite()) {
+			continue;
+		}
+		for (const Ref<BulletSoundData2D> *entry : flight_entries_scratch) {
+			bullet_factory->sound_offer(entry->ptr(), at, sound_volume_offset_db, spec, amount_bullets, self_id, life_id, i);
+		}
+	}
+}
+
+} // namespace BlastBullets2D

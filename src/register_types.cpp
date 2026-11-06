@@ -1,30 +1,50 @@
+#include "core/warn_once2d.hpp"
 #include <gdextension_interface.h>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/core/defs.hpp>
 #include <godot_cpp/godot.hpp>
 
 // Shared
-#include "shared/bullet_attachment2d.hpp"
-#include "shared/bullet_curves_data2d.hpp"
-#include "shared/bullet_rotation_data2d.hpp"
-#include "shared/bullet_speed_data2d.hpp"
+#include "attachments/bullet_attachment2d.hpp"
+#include "bullet_spawner/laser_spawner2d.hpp"
+#include "core/cached_string_names2d.hpp"
+#include "data/bullet_curves_data2d.hpp"
+#include "data/bullet_emitter_data2d.hpp"
+#include "data/bullet_flock2d.hpp"
+#include "data/bullet_pickup_data2d.hpp"
+#include "data/bullet_rotation_data2d.hpp"
+#include "data/bullet_sound_data2d.hpp"
+#include "data/bullet_speed_data2d.hpp"
+#include "data/bullet_split_data2d.hpp"
+#include "data/bullet_split_stage2d.hpp"
+#include "data/bullet_wobble_data2d.hpp"
+#include "data/effect_layer_data2d.hpp"
+#include "data/graze_zone2d.hpp"
+#include "data/laser_data2d.hpp"
+#include "data/laser_effect_data2d.hpp"
+#include "data/laser_sound_data2d.hpp"
+#include "data/laser_sprite_look2d.hpp"
+#include "laser/laser_volley2d.hpp"
+#include "pooling/volley_pool_key2d.hpp"
+#include "targets/bullet_targets2d.hpp"
 
 // Factory
 #include "factory/bullet_factory2d.hpp"
 
 // Debugger
-#include "debugger/multimesh_bullets_debugger2d.hpp"
+#include "debugger/bullet_volley_debugger2d.hpp"
+#include "debugger/graze_preview_layer2d.hpp"
+#include "debugger/laser_debug_layer2d.hpp"
 
 // Spawn data classes
-#include "spawn-data/block_bullets_data2d.hpp"
-#include "spawn-data/directional_bullets_data2d.hpp"
-#include "spawn-data/multimesh_bullets_data2d.hpp"
-
+#include "data/bullet_volley_data2d.hpp"
 
 // Bullets classes
-#include "bullets/block_bullets2d.hpp"
-#include "bullets/directional_bullets2d.hpp"
-#include "bullets/multimesh_bullets2d.hpp"
+#include "bullet_volley/bullet_volley2d.hpp"
+
+// Bullet Spawner
+#include "bullet_spawner/bullet_spawner2d.hpp"
+#include "patterns/bullet_patterns2d.hpp"
 
 using namespace godot;
 using namespace BlastBullets2D;
@@ -34,33 +54,79 @@ void initialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
 		return;
 	}
 
+	// REGISTRATION POLICY - read before changing anything here.
+	//
+	// Every class below stays GDREGISTER_CLASS on purpose, even the purely
+	// runtime-created ones. Per the official docs, GDREGISTER_RUNTIME_CLASS means
+	// "only available at runtime (but not in the editor)": the editor then
+	// creates mere placeholders instead of real instances (no properties, failed
+	// casts, broken scene restore for any .tscn containing such nodes).
+	//
+	// Editor behavior is therefore NEVER controlled through registration. Code
+	// that must not run in the editor (shoot timers, physics setup, processing)
+	// is guarded with Engine::is_editor_hint() at the call site - see
+	// BulletFactory2D::native_ready() and PatternSpawner2D::native_ready()/native_process().
+	// Do not "fix" editor log spam by switching macros; fix (or add) the guard.
+
 	// Shared
 	GDREGISTER_CLASS(BulletRotationData2D)
+	GDREGISTER_CLASS(EffectLayerData2D)
 	GDREGISTER_CLASS(BulletSpeedData2D)
 	GDREGISTER_CLASS(BulletCurvesData2D)
-	GDREGISTER_RUNTIME_CLASS(BulletAttachment2D)
+	GDREGISTER_CLASS(BulletWobbleData2D)
+	GDREGISTER_CLASS(GrazeZone2D)
+	GDREGISTER_CLASS(BulletFlock2D)
+	GDREGISTER_CLASS(BulletSplitStage2D)
+	GDREGISTER_CLASS(BulletSplitData2D)
+	GDREGISTER_CLASS(BulletEmitterData2D)
+	GDREGISTER_CLASS(BulletTargets2D)
+	GDREGISTER_CLASS(LaserSpriteLook2D)
+	GDREGISTER_CLASS(LaserEffectData2D)
+	GDREGISTER_CLASS(LaserData2D)
+	GDREGISTER_CLASS(LaserVolley2D)
+	GDREGISTER_CLASS(BulletSoundData2D)
+	GDREGISTER_CLASS(LaserSoundData2D)
+	GDREGISTER_CLASS(BulletPickupData2D)
+	GDREGISTER_CLASS(VolleyPoolKey2D)
+	GDREGISTER_CLASS(BulletAttachment2D)
 
 	// Factory
-	GDREGISTER_RUNTIME_CLASS(BulletFactory2D)
+	// Static-only pattern library: abstract (BulletPatterns2D.new() is refused),
+	// its static methods and enums are what GDScript uses.
+	GDREGISTER_ABSTRACT_CLASS(BulletPatterns2D)
+	GDREGISTER_CLASS(BulletFactory2D)
 
 	// Debugger
-	GDREGISTER_RUNTIME_CLASS(MultiMeshBulletsDebugger2D)
+	GDREGISTER_CLASS(BulletVolleyDebugger2D)
 
 	// Spawn data classes
-	GDREGISTER_CLASS(MultiMeshBulletsData2D)
-	GDREGISTER_CLASS(DirectionalBulletsData2D)
-	GDREGISTER_CLASS(BlockBulletsData2D)
+	GDREGISTER_CLASS(BulletVolleyData2D)
 
 	// Bullets classes
-	GDREGISTER_RUNTIME_CLASS(MultiMeshBullets2D)
-	GDREGISTER_RUNTIME_CLASS(DirectionalBullets2D)
-	GDREGISTER_RUNTIME_CLASS(BlockBullets2D)
+	// GDREGISTER_CLASS (not RUNTIME): runtime classes are not creatable in the editor,
+	// which would break restoring any scene that contains these nodes.
+	GDREGISTER_CLASS(BulletVolley2D)
+
+	// Bullet Spawner
+	GDREGISTER_ABSTRACT_CLASS(PatternSpawner2D)
+	GDREGISTER_CLASS(BulletSpawner2D)
+	GDREGISTER_CLASS(LaserSpawner2D)
+	GDREGISTER_CLASS(PatternPreviewLayer2D)
+	GDREGISTER_CLASS(GrazePreviewLayer2D)
+	GDREGISTER_CLASS(DespawnBoundsPreviewLayer2D)
+	GDREGISTER_CLASS(LaserDebugLayer2D)
+
+	CachedStringNames2D::create();
+	WarnOnce2D::create();
+	BulletPatterns2D::register_project_settings();
 }
 
 void uninitialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
 		return;
 	}
+	CachedStringNames2D::destroy();
+	WarnOnce2D::destroy();
 }
 
 extern "C" {

@@ -1,15 +1,68 @@
-[gd_resource type="Theme" format=3 uid="uid://12g5de2h44s0"]
+[gd_resource type="Theme" format=3]
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ueu2y"]
-bg_color = Color(0.482012, 0.343024, 0.178261, 1)
+[ext_resource type="FontFile" path="res://shared/ui/fonts/Exo2.ttf" id="1_e4bcm"]
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_mov8b"]
-bg_color = Color(0.427453, 0.300244, 0.154564, 1)
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_5o3ud"]
+content_margin_left = 8.0
+content_margin_top = 3.0
+content_margin_right = 8.0
+content_margin_bottom = 3.0
+bg_color = Color(0.10980392, 0.101960786, 0.2, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.7058824, 0.54901963, 1, 0.55)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_f3evs"]
-bg_color = Color(0.427451, 0.301961, 0.152941, 1)
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_767gp"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_wt67k"]
+content_margin_left = 8.0
+content_margin_top = 3.0
+content_margin_right = 8.0
+content_margin_bottom = 3.0
+bg_color = Color(0.14901961, 0.12941177, 0.2901961, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.7058824, 0.54901963, 1, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_71wmt"]
+content_margin_left = 8.0
+content_margin_top = 3.0
+content_margin_right = 8.0
+content_margin_bottom = 3.0
+bg_color = Color(0.18039216, 0.14509805, 0.3764706, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.7058824, 0.54901963, 1, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
 
 [resource]
-Button/styles/hover = SubResource("StyleBoxFlat_ueu2y")
-Button/styles/normal = SubResource("StyleBoxFlat_mov8b")
-Button/styles/pressed = SubResource("StyleBoxFlat_f3evs")
+default_font = ExtResource("1_e4bcm")
+default_font_size = 11
+Button/colors/font_color = Color(0.8666667, 0.8235294, 1, 1)
+Button/colors/font_focus_color = Color(1, 1, 1, 1)
+Button/colors/font_hover_color = Color(1, 1, 1, 1)
+Button/colors/font_hover_pressed_color = Color(1, 1, 1, 1)
+Button/colors/font_pressed_color = Color(1, 1, 1, 1)
+Button/styles/disabled = SubResource("StyleBoxFlat_5o3ud")
+Button/styles/focus = SubResource("StyleBoxEmpty_767gp")
+Button/styles/hover = SubResource("StyleBoxFlat_wt67k")
+Button/styles/hover_pressed = SubResource("StyleBoxFlat_71wmt")
+Button/styles/normal = SubResource("StyleBoxFlat_5o3ud")
+Button/styles/pressed = SubResource("StyleBoxFlat_71wmt")

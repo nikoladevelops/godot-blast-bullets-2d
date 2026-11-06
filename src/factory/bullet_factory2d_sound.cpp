@@ -1,0 +1,137 @@
+// Factory-owned sound triggers: user hatch (play_sound), voice pool cap,
+// debug readouts. Volley and spawner trigger sites offer through sound_offer;
+// the mixer plays the sweep's winners at the end of _physics_process.
+
+#include "core/cosmetic_rng2d.hpp"
+#include "factory/bullet_factory2d_internal.hpp"
+
+using namespace godot;
+
+namespace BlastBullets2D {
+
+bool BulletFactory2D::sound_offer(const SoundMix2D *sound, const Vector2 &event_pos, float volume_offset_db, const SoundListenerSpec2D &listener, int volley_amount, uint64_t follow_volley_id, int follow_life_id, int follow_bullet, int follow_kind) {
+	if (is_tearing_down) {
+		return false;
+	}
+	if (debug_sound_offer_log_enabled && sound != nullptr) {
+		if (debug_sound_offer_log.size() >= 65536) {
+			debug_sound_offer_log.remove_at(0);
+		}
+		Dictionary e;
+		e["trigger"] = sound->sound_trigger();
+		e["sound_class"] = sound->sound_class();
+		e["position"] = event_pos;
+		const bool laser = follow_kind != SOUND_FOLLOW_BULLET;
+		e["volley"] = laser ? (int64_t)0 : (int64_t)follow_volley_id;
+		e["life"] = follow_life_id;
+		e["bullet"] = laser ? -1 : follow_bullet;
+		if (laser) {
+			e["laser"] = (int64_t)follow_volley_id;
+			e["beam"] = follow_bullet;
+		}
+		e["frame"] = (int64_t)Engine::get_singleton()->get_physics_frames();
+		debug_sound_offer_log.push_back(e);
+	}
+	return sound_mixer.offer(*this, sound, event_pos, volume_offset_db, listener, volley_amount, follow_volley_id, follow_life_id, follow_bullet, follow_kind);
+}
+
+const SoundMix2D *BulletFactory2D::script_sound_mix(const Ref<Resource> &sound, const char *function_name) {
+	if (sound.is_null()) {
+		UtilityFunctions::push_error(String("BulletFactory2D.") + function_name + ": sound is null, nothing plays.");
+		return nullptr;
+	}
+	const SoundMix2D *mix = sound_mix_of2d(sound.ptr());
+	if (mix == nullptr) {
+		UtilityFunctions::push_error(String("BulletFactory2D.") + function_name + ": sound must be a BulletSoundData2D or a LaserSoundData2D, nothing plays.");
+	}
+	return mix;
+}
+
+bool BulletFactory2D::play_sound(const Ref<Resource> &resource, const Vector2 &global_position, const StringName &listener_group) {
+	const SoundMix2D *sound = script_sound_mix(resource, "play_sound");
+	if (sound == nullptr) {
+		return false;
+	}
+	if (!sound->enabled) {
+		return false;
+	}
+	if (!is_inside_tree() || is_tearing_down) {
+		UtilityFunctions::push_error("BulletFactory2D.play_sound: the factory is outside the tree, the sound plays nothing.");
+		return false;
+	}
+	if (!global_position.is_finite()) {
+		UtilityFunctions::push_error("BulletFactory2D.play_sound: global_position must be finite (NaN/Inf is rejected).");
+		return false;
+	}
+	if (!is_factory_processing_bullets) {
+		return false;
+	}
+	SoundListenerSpec2D spec;
+	if (!listener_group.is_empty()) {
+		spec.kind = SoundListenerSpec2D::NODE_GROUP;
+		spec.group = listener_group;
+	}
+	return sound_offer(sound, global_position, 0.0f, spec);
+}
+
+void BulletFactory2D::stop_sounds() {
+	sound_mixer.stop_all();
+}
+
+int BulletFactory2D::get_sound_max_voices() const {
+	return sound_mixer.max_voices_total;
+}
+
+void BulletFactory2D::set_sound_max_voices(int value) {
+	if (value < 1 || value > 256) {
+		UtilityFunctions::push_error("BulletFactory2D: sound_max_voices must be between 1 and 256, keeping the old value.");
+		return;
+	}
+	sound_mixer.max_voices_total = value;
+	sound_mixer.enforce_voice_cap(*this);
+}
+
+void BulletFactory2D::debug_seed_cosmetic_rng(int64_t seed) {
+	CosmeticRng2D::seed((uint64_t)seed);
+}
+
+void BulletFactory2D::debug_set_sound_log_enabled(bool enabled) {
+	sound_mixer.set_log_enabled(enabled);
+}
+
+void BulletFactory2D::debug_set_sound_offer_log_enabled(bool enabled) {
+	debug_sound_offer_log_enabled = enabled;
+	if (!enabled) {
+		debug_sound_offer_log.clear();
+	}
+}
+
+Array BulletFactory2D::debug_get_sound_log() const {
+	return sound_mixer.get_log();
+}
+
+void BulletFactory2D::debug_clear_sound_log() {
+	sound_mixer.clear_log();
+}
+
+Array BulletFactory2D::debug_get_sound_voices() const {
+	return sound_mixer.debug_voices();
+}
+
+Dictionary BulletFactory2D::debug_explain_sound(const Ref<Resource> &resource, const Vector2 &global_position, const StringName &listener_group, int volley_amount) {
+	const SoundMix2D *sound = script_sound_mix(resource, "debug_explain_sound");
+	if (sound == nullptr) {
+		return Dictionary();
+	}
+	return sound_mixer.explain_sound(*this, sound, global_position, listener_group, volley_amount);
+}
+
+Dictionary BulletFactory2D::debug_get_sound_stats() const {
+	return sound_mixer.debug_stats();
+}
+
+void BulletFactory2D::debug_stop_sound_voices() {
+	sound_mixer.stop_all();
+}
+
+} // namespace BlastBullets2D

@@ -47,28 +47,28 @@ def print_instructions_and_prompt(project_folder: str, plugin_name: str) -> bool
             print("Invalid input. Please enter 'y' to proceed or 'q' to quit.")
 
 
-def clean_destination_directory(project_icons_dest: Path, godot_imported_dir: Path):
+def clean_destination_directory(project_icons_dest: Path, godot_imported_dir: Path, new_icon_names: set[str]):
     """
     Completely wipes the destination icons directory (including old .import files)
-    and removes matching imported cache files in .godot/imported/.
+    and removes the imported cache of the plugin's icons (old and new) in .godot/imported/.
+    Only the plugin's own icon files are touched: the game's other SVGs keep their imports.
     """
+    icon_names = set(new_icon_names)
     if project_icons_dest.exists():
+        icon_names.update(p.name for p in project_icons_dest.glob("*.svg"))
         print("Cleaning old icons and stale .import files...")
         shutil.rmtree(project_icons_dest)
 
     # Re-create fresh destination directory
     project_icons_dest.mkdir(parents=True, exist_ok=True)
 
-    # Clean .godot/imported cache for icon files to prevent stale import loops
+    # Godot names an imported file "<source file name>-<md5 of its path>.<ext>".
     if godot_imported_dir.exists():
-        for imported_file in godot_imported_dir.glob("*.md5"):
-            if "icons" in imported_file.name or "svg" in imported_file.name:
+        for imported_file in godot_imported_dir.iterdir():
+            source_name = imported_file.name.rsplit("-", 1)[0]
+            if source_name in icon_names:
                 try:
                     imported_file.unlink(missing_ok=True)
-                    stex_file = imported_file.with_suffix(".stex")
-                    ctex_file = imported_file.with_suffix(".ctex")
-                    stex_file.unlink(missing_ok=True)
-                    ctex_file.unlink(missing_ok=True)
                 except OSError:
                     pass
 
@@ -109,7 +109,7 @@ def update_gdextension_icons():
         return
 
     # Wipe destination icons folder & import cache
-    clean_destination_directory(project_icons_dest, godot_imported_dir)
+    clean_destination_directory(project_icons_dest, godot_imported_dir, {f.name for f in svg_files})
 
     # Copy fresh SVGs and build mapping dictionary
     icon_mappings = {}

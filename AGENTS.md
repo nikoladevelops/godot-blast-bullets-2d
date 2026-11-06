@@ -1,0 +1,2191 @@
+# AGENTS.md — BlastBullets2D: how to work on this codebase
+
+Godot 4 GDExtension (C++ via godot-cpp) + headless GUT test suites. Stability
+and performance come first; every behavior change is proven by an executed
+test, every refactor by an unchanged behavior snapshot. Every fact below was
+verified by running it; if one turns out wrong, fix this file in the same
+change.
+
+**If you read nothing else, read §0, §1 and §2 (with §2.1).** Use the table
+of contents for the rest: the sections are written to be looked up, not read
+once.
+
+§0 and §2.1 are mechanical on purpose. They do not depend on how hard you
+think or on your reasoning budget: every step produces a command output you
+can paste. If you cannot show the output, the step did not happen, and the
+work is not done. A fix campaign by a model once shipped 24 "red-first,
+proven" commits: one was wrong about Godot, two broke working behavior, two
+were half done and three changed a contract nobody approved (§2.1 lists them).
+Each would have been caught by a rule below. "My effort setting was too low"
+is not an explanation; skipping a step is.
+
+| § | Topic | § | Topic |
+|---|---|---|---|
+| 0 | Golden rules | 10 | Pattern module (BulletPatterns2D, spawner patterns) |
+| 1 | Commands | 11 | Volley (BulletVolley2D) architecture |
+| 2 | The work loop (do it like this); 2.1 the fix protocol | 12 | Factory, spawner, signals, pooling |
+| 3 | Decision table | 13 | Pattern bake cache |
+| 4 | Playbooks | 14 | Contracts and pitfalls catalog |
+| 5 | Commits | 15 | Benchmarks and performance lessons |
+| 6 | Never edit | 16 | Inspector groups and serialization |
+| 7 | Test harness | 17 | Documentation generation |
+| 8 | Writing tests | 18 | tools/ catalog |
+| 9 | Searching and reading | 19 | Final report template |
+|  |  | 20 | Graze (zones, tick stage, routing, preview) |
+|  |  | 21 | Sound (mixer, triggers, listeners, RNG) |
+|  |  | 22 | World controls (time scale, despawn bounds, randomization, pickups) |
+|  |  | 23 | Flocking (BulletFlock2D, flock pass, step_flock, spawner group) |
+|  |  | 24 | Splitting (BulletSplitData2D, capture, flush, spawner group) |
+|  |  | 25 | Feature mixing (MixLedger, FeatureMix catalog, cover suites) |
+|  |  | 26 | Spawner architecture (PatternSpawner2D, BulletSpawner2D, LaserSpawner2D) |
+|  |  | 27 | Lasers (LaserData2D, LaserVolley2D, factory lasers, LaserSpawner2D) |
+|  |  | 28 | Emitter bullets (BulletEmitterData2D, emit queue, flush) |
+|  |  | 29 | Runtime control, colors, per-bullet lifetimes, scale-in, interpolation |
+|  |  | 30 | Sprite animations (src/sprite/: SpriteFrames rules, frame reader, frame cache) |
+
+## 0. Golden rules
+
+1. **Never guess.** Read the code (`rg -n`), probe the engine, run the test.
+   Cite `file:line` for every claim you make.
+2. **Failing test first.** A bug fix starts with a test that fails for the
+   right reason; a fix you never saw red is not proven.
+3. **Never weaken a test** to make it pass. Fix the code, or ask the user
+   (with engine-code references) when the contract itself is in question.
+4. **A refactor changes nothing observable.** Prove it with
+   `tools/api_snapshot.py diff` (IDENTICAL) before you commit.
+5. **Hot paths are sacred** (§15): no per-bullet allocation, no per-bullet
+   engine boundary crossing, benchmark before AND after.
+6. **Build only with `tools/compile_debug_build.py`**; check its exit code
+   before you test (a failed build leaves the old library).
+7. **Small steps:** one concern per change, build + test + snapshot after
+   each, commit each green step (§5).
+8. **Error and warning texts are public API.** Keep them byte-identical
+   unless the change is the point (then pin the new text in a test).
+9. **Ask the user** before changing a contract (public behavior, wording,
+   defaults); fix plain bugs without asking but list them in the report.
+10. **Finish green:** full suite + `--self-test` + format check +
+    `check_portability.py` + snapshot diff + benchmark gate (+ `run_editor_smoke.py` when editor/preview code
+    changed, + `run_sanitizer_tests.py` when casts, enums, integer math,
+    lifetimes or user-callback paths changed, + `run_release_tests.py` before a release
+    or after inlining / LTO-sensitive changes), then report with Big-O and a ratings table (§19).
+    CI (`.github/workflows/tests.yml`) runs lint, format, portability, the self-test,
+    the suites on the debug AND release library and the editor smoke on every push;
+    sanitizers and fuzz soaks weekly.
+11. **Your own red test proves your intent, not the contract.** Red-then-green
+    shows the code does what YOU decided. Before you decide, name where the
+    expected behavior comes from: Godot's own output (`tools/probe.py`), an
+    existing test, `doc_classes/`, or §14. "Godot does X" without probe output
+    is a guess, even when you are sure (§2.1, case 1).
+12. **A fix covers every sibling or it is not done.** List every branch,
+    caller, setter and copy that has the same shape (`rg`), fix all of them,
+    and say which you checked. Prefer one ClassDB-driven test that walks them
+    all over one hand-picked example (§2.1, cases 4 and 5).
+13. **An existing test or doc that disagrees with your fix is a contract
+    question: stop and ask.** Never "fix" a pinned behavior without the user
+    (§0.9); never route around a pin by only changing the code it does not
+    reach (§2.1, case 7).
+14. **Unfinished is a valid result; claiming it done is not.** Report what is
+    open; report a refutation only with the probe or test output that refutes
+    it.
+
+## 1. Commands
+
+```sh
+GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py   # build (exit 1 = failed; never raw scons, never edit SConstruct)
+python3 tools/run_tests.py                                       # 256 files / 2710 tests, ~35 s, leak-checked
+python3 tools/run_release_tests.py [--no-build] [run_tests args]  # the suites against the RELEASE (LTO) library a game ships (~2 min build)
+python3 tools/run_tests.py --suite <substring> --full            # one area, every failure message unclipped
+python3 tools/run_tests.py --self-test                           # proves the harness still catches failures/leaks
+python3 tools/probe.py -c 'probe("x", AtlasTexture.new().get_size())'  # ask the engine / the built plugin (§2.2); hangs still show progress
+python3 tools/run_editor_smoke.py                                # headless EDITOR run of tests/editor_smoke/ (editor-only paths)
+python3 tools/run_sanitizer_tests.py [--sanitizer address|undefined] [--suite <x>]  # suites under ASan + UBSan (~12 min both; Linux/GCC)
+python3 tools/api_snapshot.py save <label>                       # behavior snapshot (~10 s, §7.4)
+python3 tools/api_snapshot.py diff <label_a> <label_b>           # must print IDENTICAL for a refactor
+python3 tools/format_code.py [--check] [files or dirs]           # clang-format (repo .clang-format)
+python3 tools/check_portability.py                               # what only MSVC / Clang reject (pedantic, narrowing, std includes, non-ASCII literals)
+python3 tools/run_benchmarks.py [--scenario <name>] [--gate]     # performance (§15)
+GODOTPP_NONINTERACTIVE=1 python3 tools/generate_xml_docs.py      # regenerate doc_classes (§17)
+```
+
+## 2. The work loop (this is how the expert works)
+
+Follow these steps in order for EVERY change. Expected output is shown so you
+know what "done" looks like.
+
+1. **Understand before touching.** Find the code: `rg -n "name" src/`.
+   Read the whole function and its callers (`Read` with offset/limit for big
+   files: never assume what a function does from its name). Find the tests
+   that pin it: `rg -n "name" test_project/tests`. Note the error texts.
+2. **Probe what you are unsure about** (engine behavior, current output):
+   `python3 tools/probe.py snippet.gd` (or `-c '<code>'`, or `-` for stdin).
+   The snippet is the body of a BlastTest test (`factory`, `add()`,
+   `await idle()`, `H` work); `probe(label, value)` prints one line, written
+   to disk at once (a hang still shows how far it got: `--timeout 60`), and
+   the errors and warnings it caused are printed after. The tool deletes its
+   files. Probe Godot's OWN answer when you claim engine behavior: e.g.
+   `AtlasTexture.get_image()` for what an atlas draws, never our reader.
+3. **Take a snapshot** when you will change C++: build, then
+   `python3 tools/api_snapshot.py save before`.
+4. **Bug fix: write the test first.** Add it to the suite of that area (or a
+   new suite: §8.4), run it, and confirm it FAILS for the reason you
+   expect (the assert message, not a script error).
+5. **Change the code** in the smallest steps you can. After each step:
+   ```sh
+   GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py   # must print "Compilation finished successfully"
+   python3 tools/run_tests.py --suite <area>                        # "ALL n TEST FILES PASSED (... no leaks)"
+   python3 tools/api_snapshot.py save after && python3 tools/api_snapshot.py diff before after
+   ```
+   A pure refactor must print `IDENTICAL`. A bug fix shows ONLY the entries
+   you meant to change: read each one; anything else is a regression.
+6. **Format** what you touched: `python3 tools/format_code.py src/<dir>`.
+7. **Hot path touched?** Benchmark before and after (§15) on the same
+   machine and build; differences under ~5% p50 are noise.
+8. **Full verification:** `python3 tools/run_tests.py`,
+   `python3 tools/run_tests.py --self-test`, `python3 tools/format_code.py --check`.
+9. **Public API or docs changed?** Update `doc_classes/` (§17) and list new
+   suites in `test_project/tests/README.md` (the lint fails otherwise).
+10. **Commit** the green step (§5), then continue with the next step.
+
+Habits that matter:
+- Before changing any message text, `rg` the tests for SEVERAL fragments
+  of it (prefix and suffix): `expect_errors_containing` pins substrings, so
+  searching one part misses the pin. Run the FULL suite before every commit,
+  not only the area suite (a reworded curves error once passed its area
+  suite and broke `volley/test_volley_api_coverage.gd`).
+- Scripted multi-file edits: assert every `old` text occurs exactly as many
+  times as you expect BEFORE writing (`str.replace("", x)` inserts x between
+  every character: an empty match once exploded `pattern_generate2d.cpp`). Re-read the diff (`git diff --stat`, `git diff`) after.
+- Mechanical rewrites (regex over many functions) are fine when the
+  compiler and the snapshot check them; fix the few compile errors by hand.
+- When a benchmark regresses, diagnose before reverting: the cause is often
+  a per-bullet store/allocation or a mutable context the compiler must
+  reload (§15.3).
+- Keep the user's hand-edited files out of your commits
+  (`test_project/benchmark_scene/benchmark.tscn`).
+
+### 2.1 The fix protocol (mandatory evidence for every fix)
+
+Before you commit a fix, write down these six answers, each with the command
+output that supports it. They go into the final report (§19), one row per fix.
+A fix missing any of them is not done.
+
+| # | Question | How you answer it (evidence) |
+|---|---|---|
+| E1 | **Where does the expected behavior come from?** | Godot's own output (`tools/probe.py`: the engine API, not our code), an existing test (`file:line`), `doc_classes/` text, or a §14 row. "It is obviously right" is not a source. |
+| E2 | **Is it reachable through the public API?** | A probe or test that triggers it from GDScript (no `debug_*` hook that real code cannot call). Not reachable: report it as latent, do not "fix" it. |
+| E3 | **Who else has the same shape?** | The `rg` you ran for siblings (other branches of the same `if`, the other selection modes, the twin setter on the other spawner, the laser twin of a bullet path) and the list it gave. Fix all of them or name the open ones. |
+| E4 | **What pins the old behavior?** | `rg` of the tests for the function, property and several fragments of every message you touch. A pin that disagrees with your fix = STOP, ask (§0.13). |
+| E5 | **Who writes and reads every value you now trust or cache?** | For a "this never changes" premise: every bound property can be set from a script at any time (`rg "set_<name>"` + ClassDB). For a stored snapshot: when does it go stale? |
+| E6 | **What did the guard or early return change for every input class?** | A table of null, unresolved path, empty, same value, out of tree, freed, pooled, huge/NaN: what each did before and after. |
+
+Then the usual gates: red test for the right reason (§2.4), mutation check
+(§8.3), snapshot diff (§2.5), full suite, and for a hot path the benchmark.
+
+**The cases this protocol comes from** (one campaign, October 2026; each
+was committed as "red-first, proven"):
+
+| # | What shipped | What broke | The rule that catches it |
+|---|---|---|---|
+| 1 | "A zero AtlasTexture region axis ignores the origin" (assumed) | Wrong: Godot keeps `region.position` (probed with `AtlasTexture.get_image()`); the reader baked pixels Godot never draws | E1: probe the engine, test against the engine's own output |
+| 2 | An early return `if (node == get_movement_path_node()) return;` | `set_movement_path_node(null)` stopped clearing a path that resolved to nothing (both sides null) | E6: the null / unresolved row |
+| 3 | "A Global Position never changes, so the retarget loop can sleep" | A script moving `laser_target_position` never reached lasers in flight | E5: every bound property is writable at runtime |
+| 4 | The orbit-off stop on an empty pool, fixed in the shared-target branch | Random / Round Robin / Distribute took another branch and still skipped it | E3: every branch of the same function; a parametrized test over every mode |
+| 5 | "Same-value writes keep the error latch" in 13 setters | ~40 other setters still re-armed: the behavior became inconsistent | E3 + a ClassDB sweep (`test_every_same_value_write_keeps_the_auto_fire_latch`) |
+| 6 | The graze-exit sound placed at a position stored when the visit started | Stale: the target had moved; the exit belongs where it is now | E5: a stored snapshot goes stale |
+| 7 | The same-value latch change itself | An existing test (`test_auto_fire_reports_a_misconfiguration_once`) pinned the opposite ("configuration touched: re-armed"); it passed only because its setter was not changed | E4: a pin that disagrees is a question for the user |
+| 8 | A fix that compared targets through `orbit_target_identity` | Added an engine call per bullet per tick inside reach (hot path) | §0.5: read what a helper does before calling it per bullet |
+| 9 | A mechanism replaced by a parameter | The old member stayed behind, unused | After replacing something: `rg` the old name, zero uses |
+
+**Bug-hunt and audit campaigns.** Every claim in a report has a probe or
+test output behind it: "found N bugs" counts only reproduced ones, "refuted"
+only with the output that refutes it. Static review misses whole classes
+that a brute-force probe finds in minutes: sweep extremes (every int and
+float knob of every source at 1e9, 1e6, 1000, 0.001, with and without
+Fill Inside, timed with `Time.get_ticks_msec()` through `tools/probe.py`).
+That sweep found a pattern that froze for over 10 minutes (§10.4.7) that no
+reviewer had seen.
+
+## 3. Decision table
+
+| Situation | Do this | Never do this |
+|---|---|---|
+| A test fails after your change | Read the FULL failure (`--full`); reproduce with `--suite <file>`; fix the code | Edit the assertion to match new behavior without asking (§0.3) |
+| Unexpected `push_error` fails a test | Find the emitter: `rg -n "<text>" src/`; decide whether the call (test input) or the code is wrong | `swallow_errors()` (lint rejects it outside the fuzz allowlist) |
+| `CRASH` / missing JUnit report | Stale or broken `.so`: rebuild, rerun; read the log for `SCRIPT ERROR` / `class_db.cpp` | Assume it passed |
+| Runner says "src/ changed after the last successful build" | The last build FAILED (or never ran): fix the compile error, rebuild | `--allow-stale` |
+| `LEAK` verdict | Something survives the test: `add()`/autofree nodes, free RIDs, disconnect | `--no-leaks` and call it green |
+| Snapshot diff shows entries you did not intend | It is a behavior change: find which step caused it (re-snapshot per step) | Commit and hope |
+| Snapshot diff is IDENTICAL but a test failed | Tests are stricter in places (signals, timing): the test wins | Ignore the test |
+| New property invisible in the inspector | ADD_PROPERTY before its bind, wrong subgroup prefix, or `_validate_property` gate (§16) | Hide the visibility test failure |
+| Need to know if your test is real | Mutation-check it (§8.3): break the code, watch it fail, restore | Trust a test you never saw fail |
+| Perf change | Benchmark before AND after on the same build (§15) | Claim a speedup from one run |
+| Unsure about engine behavior | Probe it (§2.2) | Guess from memory of Godot docs |
+| A pattern draws fewer bullets or stacks two | Extend `spawner/test_spawner_pattern_counts.gd`, then fix the generator (§10) | "It looks fine" |
+| Adding a pattern knob | Field in `PatternKnobs2D` + one `PATTERN_KNOB` row (§10.3) | Hand-written accessor, declaration and bind |
+| Adding a generator argument | One row in `pattern_signatures2d.inc` + the Params struct field (§10.2) | Editing the header, the wrapper and the bind by hand |
+| A handler needs reset / free_* / populate_* / a shape change | Call the `*_deferred` twin (§12.3) | `call_deferred` from physics (still inside the physics frame) |
+| "Homing bullets sometimes miss" | Check inherited momentum vs speed (`inherit_movement_velocity`), turn rate (`homing_smoothing`) vs hitbox | Assume a pattern bug |
+| A warning must be pinned | `expect_warning_sequence([...])` | `expect_error_sequence` (it ignores warnings) |
+| Your fix makes an existing test fail, or contradicts one that still passes | Read what the test says it pins; ask the user (§0.13, §2.1 E4) | Edit the test, or change only the setters the test does not reach |
+| You believe a value "never changes" | `rg` its setter: a bound property is script-writable at any time (§2.1 E5) | Remove the refresh / wake / re-read that keeps it live |
+| You add an early return or a guard | Fill the E6 table (null, unresolved, empty, same, out of tree, freed, pooled) | Test only the case you wrote it for |
+| A claim about what Godot does | `tools/probe.py` with Godot's own API (e.g. `AtlasTexture.get_image()`) | Reason from memory, or test against the plugin's own reader |
+| You fixed one branch, mode or setter | `rg` the siblings; a parametrized or ClassDB-driven test over all of them | Ship the one you saw |
+| Hunting freezes / DoS | Time every knob at extremes through `tools/probe.py` (§2.1) | Trust a `>= 1` check to bound a loop |
+
+## 4. Playbooks
+
+### 4.1 Fix a bug
+1. Reproduce: smallest script or test that shows it (`tools/probe.py`),
+   through the public API (§2.1 E2).
+2. Find the cause in code; cite `file:line`. Look for siblings: the same
+   mistake is often copied (e.g. velocity composed without the fall speed
+   appeared in 8 setters) (§2.1 E3).
+3. Answer E1, E4, E5 and E6 of §2.1 BEFORE writing the fix. If E1 has no
+   source or E4 finds a pin that disagrees: ask the user.
+4. Red test in the area's suite (assert the documented behavior, exact
+   texts). Run: it fails for the right reason. When the expected behavior
+   is Godot's, the test compares against Godot's own API, not a literal you
+   derived.
+5. Minimal fix; rebuild; the test passes; the full suite passes.
+6. Snapshot diff: only the intended entries changed.
+7. Commit: `Fix <thing>` + one line of why. Record the E1-E6 row for §19.
+
+### 4.2 Pure refactor (behavior must not change)
+1. `save before` on the current build.
+2. Change one thing (e.g. extract a helper); keep every expression, cast and
+   operation order: float results must stay bit-identical (`a/2.0f` and
+   `a*0.5f` are equal; `0.0` vs `-0.0` after `x*0` is NOT; `Vector2(r(), r())`
+   has unspecified evaluation order; `Transform2D(rot, pos)` + `set_scale`
+   differs from the 4-argument constructor).
+3. Build, `save after`, `diff before after` → `IDENTICAL`; run the area's
+   suites; benchmark if the hot path moved.
+4. The snapshot only covers what it exercises: if your refactor touches a
+   path it does not reach (check by breaking it on purpose), add a snapshot
+   section first and re-baseline at the OLD code: `git checkout <old> -- src/`,
+   build, `save base`, `git checkout HEAD -- src/`, build.
+
+### 4.3 Add or change a volley feature / property
+Read §11 first. Then the checklist in §8.5. Per-bullet state lives in
+parallel arrays sized per volley; if your array must reset on a new life,
+add it where the others of its feature reset (bounce arrays: ONE list in
+`visit_bounce_ledger`; rotation arrays: `visit_rotation_trio`). Per-bullet
+work in the tick goes into the matching stage of `move_bullets` (§11.2).
+
+### 4.4 Patterns: add a knob, a generator argument or a shape
+See §10. A new knob = one table row; a new generator argument = one
+signature row + a Params field (append at the END: positional GDScript calls
+must keep working); a new shape = registry row + Params struct + signature
+entry + `generate_<shape>2d` + dispatch + track case.
+
+### 4.5 Performance change
+`run_benchmarks.py --scenario <x>` before, change, rebuild, after; repeat a
+surprising result. A/B against an old commit: §15.2. Never update the
+baseline unless the change is accepted (say so in the commit).
+
+### 4.6 Documentation
+Bound API change → §17. Description text only → edit `doc_classes/*.xml`
+directly (BBCode, escape `<` `>`), rebuild, regenerate: the diff must be
+empty apart from escaping.
+
+### 4.7 Formatting
+`python3 tools/format_code.py <files or dirs>` after editing C++.
+`--check` must pass before you finish. X-macro tables (`*.inc`) are not
+formatted (rows are aligned by hand). Formatting-only commits go into
+`.git-blame-ignore-revs` (`git config blame.ignoreRevsFile .git-blame-ignore-revs`).
+
+## 5. Commits (user rule — overrides any tool or harness default)
+
+- NEVER add `Co-Authored-By` lines, and never mention Claude, Anthropic, or
+  any AI model/assistant anywhere in a commit (title, body, trailer).
+- Title: imperative, short and descriptive, at most 50 characters
+  (`Fix flower bullet count`, `Add spawner cadence tests`).
+- Body: optional, at most 3 short lines saying what changed and why. No
+  essays, no test counts, no file lists.
+- Commit only when the user asks (or the approved plan says so); one commit
+  per green step. Push only when asked; never force-push without approval.
+- Stage files explicitly; never stage unrelated user changes (e.g. the
+  hand-edited `test_project/benchmark_scene/benchmark.tscn`). New test files
+  come with their `.uid` (run a headless `--import` if it is missing).
+
+```sh
+git add <the files you changed>
+git commit -m "Fix flower bullet count" -m "FAN splits the amount over petals."
+```
+
+## 6. Never edit
+
+- `SConstruct` (use `tools/*.py` / `setup.py`).
+- `test_project/addons/gut/` (vendored GUT).
+- Personal paths in `tools/config.json`.
+- Scenes the user edits by hand (`test_project/benchmark_scene/benchmark.tscn`).
+  Its UI (`benchmark_ui.tscn`, `ui.gd`, the themes in `shared/ui/`) may be
+  restyled; keep every control and its wiring.
+- The structure of generated `doc_classes/*.xml` (description text only; §17).
+
+## 7. Test harness
+
+### 7.1 Running tests (only supported path)
+
+```sh
+python3 tools/run_tests.py                  # every suite, leak-checked
+python3 tools/run_tests.py --suite volley    # substring/glob filter (repeatable)
+python3 tools/run_tests.py --changed-only    # files plausibly affected by uncommitted changes
+python3 tools/run_tests.py --fail-fast       # stop scheduling after the first red file
+python3 tools/run_tests.py --list            # discover without running
+python3 tools/run_tests.py --self-test       # canaries must report FAIL + LEAK + strict mismatch
+python3 tools/run_tests.py --no-leaks        # faster, NOT green (skips the leak gate)
+python3 tools/run_tests.py --report          # + test_project/test_results/summary.json (slowest first)
+python3 tools/run_tests.py --full            # every failure message unclipped (all failing parameters)
+python3 tools/run_tests.py --realtime        # real-time pacing (default: simulated time)
+python3 tools/lint_tests.py                  # static test lint (run first by the runner; exit 3 = failed)
+```
+
+- Time is SIMULATED (`--fixed-fps 60`): every frame advances exactly 1/60 s
+  as fast as the CPU allows. Frame-counted tests behave like real time.
+- A file is green only when ALL hold: exit 0, GUT JUnit with 0 failures
+  (missing report = CRASH, never PASS), no leaks in the `--verbose` exit
+  report, no `SCRIPT ERROR`, no `godot-cpp/src/core/class_db.cpp` error.
+- Stale-build guard: every SUCCESSFUL build writes
+  `test_project/addons/blastbullets2d/bin/.build_stamp`; tests and snapshots
+  refuse to run while any `src/` file is newer than it. A failed build keeps
+  the refusal (before the stamp, objects compiled before the error made a
+  failed build look fresh and tests ran against the previous library).
+- Never run test files with `--script`; the runner does the class-cache
+  refresh, per-file processes, JUnit and leak verdicts.
+- Lint rules (`tools/lint_tests.py`): R1 no `extends SceneTree`; R2 every
+  suite `extends BlastTest`; R3 no GUT `wait_*_frames`; R4 `swallow_errors()`
+  only in `volley/test_volley_crash_proof.gd`; R5 `at_least=true` expects
+  need a `# lint: at-least <reason>` comment; R6 every suite listed in
+  `test_project/tests/README.md`; R7 no stray `print(` (only `print("BENCH`).
+
+### 7.2 Leak detection
+
+- The runner fails files matching `ObjectDB instances leaked`,
+  `Leaked instance:`, `RID ... leaked`, `resources still in use`,
+  `Orphan StringName`.
+- `BlastTest.after_each` asserts `debug_assert_no_dangling()` and zero new
+  orphans after EVERY test: a leak fails at the test, not at exit. The
+  dangling check also runs `BulletVolley2D.debug_check_invariants()` on every
+  tracked volley (per-bullet storage covers the bullets, orbit/homing
+  counters match their arrays, a pooled volley holds no pickup, graze,
+  sound, material or custom data) and rejects duplicate pool entries and
+  incomplete queued splits. A new per-volley invariant goes there.
+- Deliberate leakers/failers live in `test_project/tests_meta/` and run only
+  via `--self-test` (they must be reported, never green).
+- `integration/test_steady_state_memory.gd` pins the live Object count over
+  repeated warm shots (retention leaks the exit report never sees).
+
+### 7.3 Harness facts
+
+- From an idle point `await idle(k)` runs exactly k factory ticks;
+  `await physics(n)` resumes INSIDE frame n before the factory ticked
+  (n-1 ticks). `factory.debug_advance_time(delta)` runs one tick with any
+  delta (zero included) from an idle point; with `--fixed-fps`,
+  `Engine.time_scale` does not change the delta.
+- The runner prints only the first failing assert per test and GUT clips
+  array diffs: join problems into one string to see them all.
+- A `Packed*Array` read from an Array is a copy (write it back).
+- `push_warning` lands in `get_errors()` (`err.is_push_warning()`); pin it
+  with `expect_warning_sequence`. `BlastTest.after_each` fails a test that
+  leaves a plugin warning unclaimed, also one printed by bullets still flying
+  while `after_each` steps the frames (GUT closes the test's error list before
+  `after_each`, so the gate reads `gut.error_tracker`). Unclaimed warnings
+  once hid two spurious ones a user saw (a factory fallback warning at
+  `add_child`, a size warning despite the tile checkbox). `expect_no_errors()`
+  ignores warnings: pin silence with `expect_warning_sequence([])`. A GDScript
+  `push_warning` is not classified as a warning by GUT (the self-test canary
+  uses a plugin warning).
+- `obj.set("misspelled", v)` silently does nothing: assert `k in obj` and
+  read the value back when a test sets properties by name.
+- NEVER `free()` nodes you `watch_signals()` on: freeing several watched
+  nodes hangs GUT at the end of the test (plain Node2Ds too; the runner's
+  per-file timeout then reports a CRASH). Let autofree take them.
+- The mouse is drivable headless: `mouse_to(pos)` (BlastTest) feeds motion
+  events so `factory.get_global_mouse_position()` reads `pos` (the window's
+  stretch transform is measured, never assumed; a Camera2D is honored).
+
+### 7.4 The behavior snapshot (`tools/api_snapshot.py`)
+
+Runs `test_project/snapshot/api_snapshot.tscn` headless and stores what the
+plugin does as short hashes plus the exact error/warning texts each call
+produced (JSON in `test_project/test_results/snapshots/`, gitignored).
+Sections:
+- `surface`: ClassDB surface of every plugin class (methods, argument names
+  and types, default values with their Variant type, properties with
+  hints/usage in order, signals, enum constants).
+- `patterns`: every static BulletPatterns2D method over defaults, amounts
+  (-1, 0, 1, 2, 7, 24, 10001), markers, one-argument perturbations and seeded
+  combinations.
+- `generate`: `BulletPatterns2D.generate` for every shape and every knob.
+- `layouts`: 48 multi-ring + 8 fill-inside seeded outline combinations per
+  outline shape.
+- `spawner`: every pattern source x every inspector-visible knob (spawn
+  transforms + preview dots/track/rings) and every preset.
+- `setters`: hostile setter probes (NaN, INF, negatives, huge) for spawner,
+  volley and data resources.
+- `traces`: deterministic volley flights (`debug_advance_time`) for every
+  motion feature.
+- `volley_api`: every bound BulletVolley2D method x 3 argument sets on a
+  plain and a featured volley: return value, errors, full per-bullet state
+  before and after a tick.
+- `sound`: seeded sound flights (`debug_seed_cosmetic_rng`, `debug_advance_time`):
+  rolled mix, followed hum, capped flight, three-level ducking, clear/expiry
+  triggers; plays and busy voices named by entry index, never instance ids.
+- `flock`: seeded flock flights (each rule alone, defaults, cap, turn cap,
+  face_heading off, wide separation, a parting stack, Shared vs Per Volley,
+  a homing swarm): poses, headings, steering vectors and neighbor counts.
+- `lasers`: deterministic laser flights at 1/16 s ticks (every type x aim,
+  walls, reflections, extension, sweeps, pierce limits, hit intervals,
+  graze) among fixed targets: per-tick geometry and every laser signal; plus
+  one LaserSpawner2D shot per pattern source (every `*_seed` knob set).
+
+Unseeded randomness is detected (each call runs twice) and recorded by size
+only. `save` refuses a stale build. `diff a b` exits 1 on any difference and
+prints the first entries per section (`--limit N`).
+
+## 8. Writing tests
+
+### 8.1 Doctrine (`test_project/tests/common/blast_test.gd`)
+
+- Builders: `quick_volley()`, `make_spawner()` (shooting + homing OFF
+  before it enters the tree), `make_preview_spawner()`, graze:
+  `make_graze_target(pos, group)`, `graze_volley(transforms, speed)`,
+  `step_factory(n, delta)`, `H.make_graze_zone(radii, group)`,
+  `H.record_graze(emitter)` + `H.graze_kinds(log)`, `mouse_to(pos)`,
+  `handle_events(emitter)` (empty handlers on its hit / graze / expiry
+  signals, for tests whose subject is not the handler: unhandled events warn), `H`
+  (`blast_test_helpers.gd`: `make_volley_data`, `make_still_data`,
+  `make_speed`, `make_rotation`, `make_effect_layer`, `make_flat_curve`,
+  ...), `make_wall/make_area/make_probe_scene/add` (autofreed).
+- Frames: `await idle(n)` (idle frame: structural factory calls allowed) vs
+  `await physics(n)` (INSIDE the physics step: structural calls rejected;
+  call `idle()` first). NEVER GUT's `wait_*_frames` (resumes after n+1
+  frames, skews every count).
+- Pin errors RIGHT AFTER the hostile call: `expect_error_sequence(["exact
+  text", ...])` (exact count + order + wording; preferred),
+  `expect_error(text)`, `expect_errors_containing(text, N)` (EXACTLY N),
+  `expect_no_errors()` (mid-test checkpoint), `expect_warning_sequence`
+  (same contract for warnings). End-of-test lumps hide bugs.
+- `Array(...)`-wrap engine arrays before `assert_eq` against literals.
+- Headless rendering: the dummy RenderingServer stores multimesh buffers but
+  `get_instance_transform_2d()` returns identity — decode `multimesh.buffer`
+  (`volley/test_volley_render_buffers.gd`).
+
+### 8.2 Checklist for a good test
+
+- Name: `test_<behavior>_<expectation>`.
+- One behavior per test; shared builders over local setup; no magic numbers
+  without a comment (frame budgets, tolerances, layer values).
+- Determinism: no wall-clock sleeps; frame counts with margins (early-break
+  loops `for i in N: await physics(); if cond: break`); `seed()` any
+  randomness you assert on.
+- Each `push_error`/`push_warning` gets an expect with the EXACT text.
+- New API surface: `has_method` bind check + happy path + reject-and-keep +
+  OOB + pool-reuse neutrality (spawn → pool → respawn, no state leaks).
+- Prefer GENERIC tests that walk `get_property_list()` / `get_method_list()`
+  / `ClassDB.class_get_method_list()` so future additions are covered
+  automatically (range contract sweep, bake invalidation sweep, subgroup
+  lock, visibility sweep, every-generator wording sweep).
+- Invariants beat examples: "the next tick moves the bullet by exactly
+  (reported velocity + g dt) dt" catches every composition bug at once.
+
+### 8.3 Mutation check (prove a test is real)
+
+Copy the source file to a scratch location, break the fix on purpose (old
+wording back, `if (false && ...)`), rebuild, run the suite: it must FAIL on
+exactly the tests you expect. Restore the copy, rebuild, run again (green).
+
+### 8.4 New suite template (copy, rename, list in `tests/README.md`)
+
+```gdscript
+extends BlastTest
+## <One paragraph: the contract this file pins.>
+
+
+func test_<behavior>_<expectation>() -> void:
+	var sp := make_spawner(H.make_volley_data(4, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
+	watch_signals(sp)
+	sp.helper_ring_radius = 80.0
+	var pts: Array = sp.collect_spawn_transforms()
+	assert_eq(pts.size(), 4, "exact count")
+	sp.helper_ring_radius = NAN
+	expect_error_sequence(["helper_ring_radius must be finite"]) # exact text, right after the call
+	assert_true(sp.shoot_once(), "fires")
+	for i in 30: # early-break wait, never a fixed long wait
+		await idle(1)
+		if get_signal_emit_count(sp, "volley_fired") > 0:
+			break
+	assert_signal_emit_count(sp, "volley_fired", 1, "exactly once")
+```
+
+### 8.5 New-feature checklist (do all of these)
+
+1. Bind check (`has_method`) + happy-path test.
+2. Setter reject-and-keep: NaN/Inf/OOB/negative/inverted, old value kept,
+   exact error text pinned.
+3. Inspector: right group/subgroup (§16), per-mode visibility, gating
+   setters call `notify_property_list_changed()`, hint strings byte-exact,
+   serialized enums locked.
+4. Pattern geometry? The setter calls `on_pattern_changed()` (§13).
+5. Pool-reuse neutrality + no-dangling (automatic via `after_each`, but add
+   explicit state assertions).
+6. Signals: emission counts incl. negative cases; liveness check after
+   every emit (§12.4).
+7. `doc_classes/<Class>.xml` (§17), `tests/README.md` entry (lint R6).
+8. Hot path touched? Benchmark before/after (§15).
+
+### 8.6 GUT reference
+
+(See also §8.8 for merging suites.)
+
+- Discovery: `.gutconfig.json` points at `res://tests/`; files named
+  `test_*.gd`, extending `BlastTest`. Each file runs in its OWN Godot process.
+- Lifecycle: `before_all` / `before_each` / `after_each` / `after_all`.
+  `BlastTest.before_all` turns the spawner cache verifier ON (§13);
+  `before_each` builds a fresh `factory`; override with `await super()` first.
+- Asserts: `assert_eq/ne`, `assert_almost_eq/ne`, `assert_gt/gte/lt/lte`,
+  `assert_true/false`, `assert_between`, `assert_has`, `assert_has_method`,
+  `assert_null/not_null`, `assert_freed/not_freed`, `assert_no_new_orphans`,
+  `assert_string_contains`, `assert_connected`, `assert_has_signal`,
+  `assert_is/typeof`, `assert_eq_deep`. Prefer the typed assert matching the
+  comparison (failure output shows got/expected).
+- Signals: `watch_signals(obj)`, `assert_signal_emit_count(obj, name, n)`,
+  `assert_signal_emitted_with_parameters`, `get_signal_emit_count`,
+  `get_signal_parameters`. Use COUNTS for exactly-once contracts.
+- Parameters: `func test_x(i: int = use_parameters([...]))` runs once per
+  value with full before/after_each isolation; this GUT version reports them
+  under one `<parameterized>` case.
+- Doubles (`double`/`spy`/`stub`): available, unused so far.
+- Strict errors: any `push_error`/engine error not claimed by an `expect_*`
+  fails the test; `BlastTest.after_each` adds the same for plugin warnings.
+
+### 8.7 Integration tests, scenes and feature mixing
+
+- Harness pattern: `make_spawner(data, source, n)` + `make_wall(pos)` /
+  `make_area` on known layers + `watch_signals` on factory/spawner/volley.
+  `make_wall` defaults to layer value 4 (matches `H.make_*_data` masks); the
+  bounce suite uses its own convention (bounce wall 8, plain 16).
+- A spawner added to the tree auto-fires: use `make_spawner()` or
+  `set_shooting_enabled(false)` BEFORE `add()`.
+- Scene tests: author a `.tscn` under `test_project/tests/scenes/` and
+  `load().instantiate()` it (`integration/test_scene_moving_turret.gd`); this
+  also locks serialization (property names + enum ids survive load).
+- Physics tests need REAL frames: spawn → `await physics(k)` with
+  early-break; assert counts, signals AND finiteness.
+- Re-entrancy: `integration/test_reentrant_frees.gd` frees things inside
+  every signal handler.
+- Chaos: `integration/test_chaos_fuzz.gd` runs a seeded battlefield (up to 8
+  spawners sharing flock/graze/sound/split Resources, real physics, frees,
+  reparents, resets, pickups, live edits, handlers acting inside the sweep)
+  and demands zero errors, balanced books, finite bullets and a clean
+  MixLedger (§25) after every step. A failure names its seed: rerun it alone with `CHAOS_SEEDS=<seed>,`,
+  bisect with `CHAOS_SKIP=<op ids>` / `CHAOS_SKIP_HANDLERS=1`, soak with
+  `CHAOS_SEEDS=200`. New operations go into `_operate` (idle point) or
+  `_handler` (inside the sweep: only what is legal there). In DEBUG builds
+  Godot refuses `free()` on an object that is emitting, so a plain handler
+  `queue_free()`s the emitter; the run also takes the RELEASE path through
+  `BulletFactory2D.debug_free_like_release` (§12.4, emit guard).
+- Feature crosses: combine 2–4 systems; assert each system's signature, full
+  finiteness and pool-reuse neutrality. Pairwise beats exhaustive.
+- Preview tests: `make_preview_spawner`, `await idle(6)` for rebuilds,
+  `debug_check_layer_coincidence(tol)`, `debug_get_preview_stats()`
+  (spin/move keep `rebuilds`/`*_draws` flat).
+- Spawner-owned vs factory-owned routing: connect BOTH signal sets and
+  assert the silent side stayed silent.
+
+### 8.8 Merging suites and shared helpers
+
+- One contract, one suite: before adding a file, find the suite that pins
+  the contract (`tests/README.md`) and add the test there. A suite is split
+  only by lifecycle needs (a `before_each` the other tests must not get).
+- Shared test helpers live in `common/blast_test.gd` (`step_factory`,
+  `origins`, `min_pair_distance`, `broken_bullets`, the builders) and
+  `common/blast_test_helpers.gd` (`H.*` data builders); a private copy of
+  one is a merge to do.
+- To merge suites: `python3 tools/test_inventory.py save before.json`,
+  merge (lifecycle overrides must not clash; a helper with the same name
+  but another body gets a descriptive name), move the README entries,
+  `save after.json`, `diff before.json after.json` (no MISSING, no FEWER
+  ASSERTS), full suite green. The October 2026 merge took 210 files to 191
+  with every test and assert kept.
+
+## 9. Searching and reading
+
+```sh
+rg --files test_project/tests -g 'test_*.gd'      # suite inventory (-g globs the BASENAME)
+rg -n "push_error|emit_signal" src/bullet_volley/   # fail-loud sites (pin exact text in tests)
+rg -n "^func test_" test_project/tests/volley/test_volley_bounce.gd
+rg -n 'BulletSpawner2D::shoot_once' src/           # where a method lives (files are split, §11/§12)
+rg -n "PATTERN_ARGS_ring" src/patterns/            # a generator's signature row
+```
+
+- Big files: read the region you need (`Read` with offset/limit); never edit
+  a file you have not read.
+- Includes are root-relative (`"data/..."`). New `.cpp` files under `src/`
+  are picked up automatically (recursive glob).
+
+## 10. Pattern module (`src/patterns/`, class `BulletPatterns2D`)
+
+### 10.1 File map
+
+| File | Holds |
+|---|---|
+| `patterns_shapes.cpp` | direct-placement generators: grid, fan, spiral, line, aimed, rain, scatter, star polygon, multi/counter spiral (one `arm_spirals2d` core + `spiral_facing2d`), cross, wave, waterfall, lattice, corridor |
+| `patterns_curves.cpp` | loop generators: ring, flower, ellipse, star, heart, rose, lissajous, circle (`dense_curve_loop2d` = dense sweep → even resample → fill outline) |
+| `patterns_polygons.cpp` | rectangle, polygon, triangle, trapezoid, diamond; corner builders, `build_symmetric_polygon_loop`, `layout_polygon_corners2d`, `stack_at_marker2d` |
+| `patterns_edges.cpp`, `patterns_polyline.cpp` | edge from points / image edges; polyline (and the spawner Path2D layout) |
+| `pattern_layout2d.cpp` | the outline layout engine `layout_outline_slots` (On Outline / Layers / Fill Inside), resamplers, generator head checks (`pattern_check_amount`, `pattern_check_marker`, `pattern_check_corner_layout`, `danmaku_validate_head`), layer helpers |
+| `pattern_preview_tracks2d.cpp` | `helper_sample_outline_*`: the curve each pattern's bullets sit on |
+| `pattern_signatures2d.inc` | ONE row per argument of every `helper_generate_transforms_*` (§10.2) |
+| `bullet_patterns2d_bindings.cpp` | the generated wrappers + every bind (one line each) |
+| `bullet_patterns2d.hpp`, `pattern_params2d.hpp` | class + enums; the `<Shape>Params2D` structs (defaults = GDScript defaults) |
+| `pattern_knobs2d.hpp`, `pattern_knob_table2d.inc`, `pattern_knob_checks2d.hpp` | spawner knobs, the knob table (§10.3), its value checks + shared array validators |
+| `pattern_dispatch2d.cpp`, `pattern_track_dispatch2d.cpp` | per source: knobs → Params → `generate_<shape>2d`; knobs → preview track |
+| `pattern_gating2d.cpp`, `pattern_presets2d.cpp`, `pattern_registry2d.cpp` | inspector gating, presets, ONE registry table (ids, names, prefixes, capabilities; `get_shapes()`) |
+| `pattern_generate2d.cpp` | `BulletPatterns2D.generate(shape, amount, marker, params)` (writes knobs by name through the same table and checks) |
+| `pattern_bake_cache2d.*`, `pattern_pose2d.*` | the spawner bake cache (§13) |
+| `pattern_debug2d.cpp` | outline debug inspectors used by tests |
+| `patterns_internal.hpp`, `pattern_curves2d.hpp` | shared declarations and formulas used by a generator AND its track |
+
+The module never touches the scene tree: the spawner resolves children /
+aimed target / Path2D curve into `PatternInputs2D`
+(`bullet_spawner2d_patterns.cpp`, `generate_raw_pattern`).
+
+### 10.2 Generators and the signature table
+
+Every generator is a native core `generate_<shape>2d(amount, marker, const
+<Shape>Params2D &p)` returning `PatternSlots2D` (std::vector, no Variant per
+bullet). Inside, inputs read as `p.<field>`; the function names itself once
+and rejects input in a fixed order (`patterns_shapes.cpp`, grid):
+```cpp
+const char *caller = "helper_generate_transforms_grid";
+PATTERN_REQUIRE(pattern_check_amount(caller, transforms_amount));       // "<caller>: transforms_amount must be between 0 and 20000." (the limit: §10.4)
+PATTERN_REJECT_IF(!Math::is_finite(p.jitter) || p.jitter < 0.0, "jitter must be a finite number >= 0."); // pushes "<caller>: <tail>", returns {}
+PATTERN_REQUIRE(pattern_check_marker(caller, marker_transform, false)); // finite marker (true = also invertible)
+```
+Shortcuts: `danmaku_validate_head(caller, amount, marker)` = amount + finite
+invertible marker; `pattern_check_corner_layout(caller, p.corner,
+p.outline.layer_layout)` = the six polygon corner checks in pinned order.
+Check ORDER is part of the contract (only the first failing check reports).
+
+`pattern_signatures2d.inc` describes the GDScript wrapper of each generator:
+```
+#define PATTERN_ARGS_heart(REQ, OPT) \
+	OPT(real_t, size, 150.0, size) \
+	OPT(real_t, base_rotation, 0.0, base_rotation) \
+	OPT(bool, face_outward, true, face_outward) \
+	OPT(real_t, facing_offset_degrees, 0.0, facing_offset_degrees) \
+	PATTERN_OUTLINE_HEAD(REQ, OPT) \
+	OPT(int, layer_layout, 1, outline.layer_layout)
+PATTERN_GENERATOR(heart, HeartParams2D)
+```
+`REQ(type, name, field)` / `OPT(type, name, default_literal, field)`; field
+is the Params path (`outline.`/`corner.` for the shared layout structs).
+The table expands into the header declarations (with C++ defaults), the
+wrapper bodies and the binds (D_METHOD names + DEFVALs). Rules: exact C++
+types (enum types feed the doc's `enum=`, real_t vs double is visible);
+defaults are LITERALS (never `Params{}.x`: real_t is float, so 0.3 would
+become 0.30000001 in the bound default); new arguments go at the END of an
+entry (positional calls); the Params struct default must match the row.
+
+### 10.3 Spawner knobs (`pattern_knob_table2d.inc`)
+
+ONE row per spawner "Patterns" property in inspector (and `.tscn`)
+order, expanded into the spawner getters/setters (validation via
+`pattern_knob_checks2d.hpp`, message "BulletSpawner2D: <knob> <text>,
+keeping the old value."), their declarations and binds, and the by-name
+writer of `generate()`. New knob = field in `PatternKnobs2D` + one
+`PATTERN_KNOB` row. `PATTERN_PROPERTY` rows (node paths, arrays, enum-typed
+Path2D knobs, spawner settings) keep hand-written accessors in
+`bullet_spawner2d_pattern_properties.cpp`. The dispatch copies knobs into
+Params; the shared layouts come from `outline_layout()` / `corner_layout()`.
+
+New shape = registry row (next free id) + knobs + table rows + Params
+struct + signature entry + `generate_<shape>2d` + a dispatch and a track
+case; gating follows its prefix.
+
+### 10.4 Invariants every generator keeps
+
+Pinned by `spawner/test_spawner_pattern_counts.gd`,
+`test_spawner_pattern_bake.gd`, `test_spawner_preview_coincidence.gd`,
+`test_spawner_preview_track_coincidence.gd`, `patterns/test_patterns_gating.gd`,
+`factory/test_factory_helper_edges.gd`:
+1. Exactly `helper_bullets_amount` transforms (On Outline, Layers, Fill
+   Inside; gaps redistribute, overflow shrinks spacing).
+2. No two bullets closer than 0.5 px. Closed curves sweep exactly once
+   (watch retraces: odd roses, shared-factor Lissajous, multi-revolution
+   spirographs); self-crossing curves use `resample_loop_even_distinct`.
+3. Pure function of its inputs (the bake cache relies on it; random
+   patterns take a seed; seed 0 = a fresh seed from the clock, so tests and
+   snapshots always set one).
+4. The preview track draws the curve the bullets sit on, for EVERY source
+   (dots within 1.5 px x pattern_scale). Formulas both sides need live in
+   `patterns_internal.hpp` / `pattern_curves2d.hpp`.
+5. Every bad input fails loud once with exact wording; amount errors read
+   "<fn>: transforms_amount must be between 0 and 20000." for every shape
+   generator (polyline keeps its pinned "must be in 0..20000."). The number
+   is the developer-set limit `BulletPatterns2D.max_bullets_per_pattern`
+   (project setting `blastbullets2d/patterns/max_bullets_per_pattern`,
+   default 20000; `pattern_max_bullets()` in `pattern_inputs2d.hpp`, never a
+   constant). The same limit bounds every volley (`validate_spawn_data_fields`:
+   `spawn_volley`, the spawner's span path, `populate_bullets_pool`). Why 20000: a volley is ONE physics area with a shape per
+   bullet and Godot's broadphase BVH hitches for seconds on thousands of
+   clustered shapes and aborts the game past ~35k (measured on 4.7.2; spread
+   out, 100k works). Several volleys stacked on one thin curve abort it too
+   (three 20000-bullet rings of 150 px, 0.05 px apart, joining in one frame;
+   ten 10000-bullet rings; a 96k spread-out stress runs fine): an engine limit
+   no per-volley cap can prevent, documented on `set_max_bullets_per_pattern`.
+   Tests reset the limit in `BlastTest.before_each`.
+6. Fill Inside never searches forever: `fill_spacing_that_fits` answers an
+   impossible `fill_margin` at once (`fill_margin_unreachable`), floors the
+   refinement at `helper_outline_fill_min_spacing` (default 0.5, also at 1/1000
+   of the shape so a scan stays ~1M cells) and tests cells through a segment
+   grid. Taking it away brings back 20-100 s freezes (the editor preview runs it).
+7. No knob makes a loop run longer than the bullets need: a count knob that
+   sizes a loop (petals, points, vertices, gaps, grid cells) is bounded by
+   `pattern_max_bullets()` (a `>= 1` check alone let 2e9 FAN petals freeze for
+   6 s). Helpers over point clouds stay O(n log n): `outline_build_boundary`
+   once sorted by insertion with `atan2` in the inner loop, and a Fill Inside
+   flower of 20000 petals (17 silhouette points each) ran past the 10-minute test timeout.
+   Pinned by `factory/test_factory_helper_edges.gd`; the extreme-knob sweep
+   in §2.1 is how to check a new generator.
+
+Not merged on purpose: the six arc-length resamplers (precision and
+threshold differences change bits).
+
+## 11. Volley (`src/bullet_volley/`, class `BulletVolley2D`)
+
+One volley = one spawn call = N bullets in one MultiMesh + one physics area.
+Per-bullet state is struct-of-arrays (`all_cached_*`, `all_bounce_*`, ...).
+
+### 11.1 File map
+
+```
+bullet_volley2d.hpp            the class: fields grouped per feature + declarations
+bullet_volley2d_internal.hpp   inline helpers shared by several volley TUs
+bullet_volley2d.cpp            lifecycle: spawn, enable_volley (pool reuse), begin/release life, enable/disable/clear bullet
+bullet_volley2d_tick.cpp       tick() + move_bullets (THE per-bullet loop) and its stages (hot path)
+bullet_volley2d_render.cpp     physics interpolation pass
+bullet_volley2d_setup.cpp      MultiMesh/buffer setup (one set_buffer per spawn)
+bullet_volley2d_collision.cpp  area + ONE shared shape, intake, dedup, paused-overlap park/replay, drain
+bullet_volley2d_{bounce,homing,orbit,motion,curves,wobble,gravity,lifetime,timers,attachments,
+                 effects,animation,teleport,area,pickups,debug,bindings}.cpp   one feature each
+                                 (area: circle/rect queries + clears, cull_outside_bounds)
+bullet_volley2d_graze.cpp      graze arming, per-tick zone snapshot (prepare_graze_tick), live dispatch (§20)
+bullet_volley2d_flock.cpp      flock arming (flock_set_config = THE choke point), join/leave/get, readouts (§23)
+bullet_volley2d_colors.cpp     per-bullet colors: the 12-float MultiMesh format, seeding, get/set color API (§29)
+bullet_volley2d_emitter.cpp    emitter arming (emitter_arm = THE choke point), the timer pass, emitter_set (§28)
+bullet_volley2d_readouts.cpp   script readouts (live count/indexes, life age, split/bounce/emitter per bullet, scale-in, pickup data)
+homing_target_deque.hpp        per-bullet/shared target queue (RingDeque2D: allocates nothing while empty)
+```
+
+### 11.2 The tick (`bullet_volley2d_tick.cpp`)
+
+`tick()`: drain collisions (impact pose) → `prepare_graze_tick` (armed
+volleys) → `move_bullets` → homing reached events → graze events →
+animation finished → lifetime. `move_bullets` computes a
+`const MoveTick2D t` once (hoisted flags, shared curve samples, pattern
+length, lock snapshot, `core_limit` = the size every always-sized array
+covers) and reuses ONE `BulletStep2D b` scratch for all bullets
+(`b.begin(i, ...)` resets only what each bullet must start from). Per
+bullet, in order:
+`step_homing` (own deque wins, shared is the fallback) → `step_flock`
+(turn toward the factory pass's steering vector; §23) →
+`step_direction_curves` → `step_wobble` → `step_rotation` (+ adjust
+direction, bounce visual) → velocity refresh → `step_pattern_and_forces`
+(pattern, wind, gravity) → `step_orbit` → `step_place` (transform, shape,
+attachment, trail, reached test) → `step_graze` (only while a zone has a
+live target; §20) → `step_speed` (next tick's speed).
+All stages are `_ALWAYS_INLINE_` in this TU: keep per-bullet code in ONE
+translation unit; a `_ALWAYS_INLINE_` helper called from another file links
+but fails at extension LOAD time (CRASH) — move its definition to
+`bullet_volley2d_internal.hpp`.
+
+### 11.3 Shared helpers (use them; do not re-implement)
+
+| Helper | Use |
+|---|---|
+| `for_range` / `collect_range<Arr>` | every `all_bullets_*` method: one range validation, then per bullet |
+| `validate_bullet_index(i, fn)` | per-bullet entry check (loud); guarantees `0 <= i < amount_bullets` |
+| `reject_pooled_handle(fn)` | a pooled volley is a stale handle: refuse writes (frozen bullets accept them) |
+| `refresh_cached_velocity(i)` | the documented composition: direction x speed + inherited + fall speed |
+| `present_bullet_transform(i, delta)` | push a changed cached transform to shape, MultiMesh, attachment, interpolation |
+| `teleport_bullet_to(i, origin, delta)` | the shared teleport body |
+| `visit_bounce_ledger(f)` / `visit_rotation_trio(f)` | the ONE list of those per-bullet arrays |
+| `homing_drop_own_targets(i)` / `homing_resync_count(i)` | per-bullet homing counter bookkeeping |
+| `bullet_homing_push` / `shared_homing_push` | counted pushes (a rejected push is never counted) |
+| `orbit_keep_lock_across_replace_for_bullet` | single routing point for a front change |
+| `direction_curve_owns_direction(i)` | direction setters refuse (one warning) while a direction curve steers |
+| `sample_volley_curve(curve, use_unit, fallback)` | a curve at the volley clock |
+| `apply_direction_axis2d` | one direction-curve channel (x or y) |
+| `write_multimesh_transform2d` | the 8-float MultiMesh layout |
+| `area_ready_or_error(fn)` | area accessors on a never-spawned volley |
+
+### 11.4 Life states and pooling
+
+ACTIVE → last bullet out → POOLED (auto pooling on: `release_life` drops
+attachments, homing, orbit, timers, records, the volley's own connections,
+owner, user Resources, groups, metadata; the handle is stale and
+`enable_bullet` refuses it) or PARKED (auto pooling off: frozen, still owned,
+wakeable). `begin_life` is the single new-life path (one generation bump =
+`get_life_id`). `disable_bullet` FREEZES (state kept; `reset_state` /
+`bullet_reset_state` clear ledgers); active-only timers hold while parked.
+
+### 11.5 Per-bullet data model
+
+Entry `i` drives bullet `i`; per-bullet (valid) > shared (valid) > default;
+explicit all-zero = intent; tile checkboxes wrap short arrays. Curves:
+clear FREEZES the last sample (pinned).
+
+## 12. Factory, spawner, signals, pooling
+
+### 12.1 Map
+
+```
+src/
+  register_types.cpp                      class registration
+  factory/bullet_factory2d.cpp            lifecycle, containers/debugger, interpolation, tick/render sweeps
+  factory/bullet_factory2d_spawn.cpp      request validation, spawn_volley(+_span), pool pre-population
+  factory/bullet_factory2d_structural.cpp reset/free_*/clear_*, *_deferred queue, bookkeeping
+  factory/bullet_factory2d_effects.cpp    factory-owned one-shot effects
+  factory/bullet_factory2d_world.cpp      time_scale, despawn bounds (+ preview layer), area clears/counts + bullets_cleared
+  factory/bullet_factory2d_pickups.cpp    bullets -> pickups conversion engine (§22.3)
+  factory/bullet_factory2d_stats.cpp      frame stats, monitors, debugger knobs, debug_*
+  factory/bullet_factory2d_graze.cpp      graze debug readouts (the factory's detector lives in it)
+  factory/graze_detector2d.cpp            GrazeDetector2D: graze target lists (stable slots, scans on the update interval, x-sorted slab order)
+  factory/bullet_factory2d_flock.cpp      the per-sweep flock pass over the volley snapshot + debug_get_flock_stats (§23)
+  factory/flock_solver2d.cpp              FlockSolver2D: gather, exact spatial hash grid, one steering vector per bullet; FlockConfig2D, FlockView2D
+  factory/bullet_factory2d_lasers.cpp     spawn_laser(+_span), the laser list and pool, tick_lasers, redraws, clears (§27)
+  factory/bullet_factory2d_emitter.cpp    the emitter-bullet queue and flush_emits (§28); factory/emit_queue2d.hpp its plain data
+  factory/bullet_factory2d_bindings.cpp   _bind_methods
+  bullet_spawner/pattern_spawner2d.hpp    PatternSpawner2D (abstract base: WHERE/WHEN to fire) + PatternPreviewLayer2D; the hooks a spawner type implements (shot_preflight/shot_prepare/fire_shot, process_owned, restart_owned_clocks, ...)
+  bullet_spawner/pattern_spawner2d.cpp    wiring, cadence, spin, bursts/telegraph, pattern lists, the shoot_once skeleton, lifecycle
+  bullet_spawner/pattern_spawner2d_pattern_properties.cpp  hand-written pattern accessors + presets
+  bullet_spawner/pattern_spawner2d_patterns.cpp   scene inputs -> generate_raw, bake cache use
+  bullet_spawner/pattern_spawner2d_preview.cpp    preview snapshot/rebuild, pose, debug_* geometry
+  bullet_spawner/pattern_spawner2d_preview_layer.cpp  PatternPreviewLayer2D (draw_multimesh)
+  bullet_spawner/pattern_spawner2d_movement.cpp   Path2D movement, teleport
+  bullet_spawner/pattern_spawner2d_randomization.cpp  placement rolls (scale/rotation/position), timing ranges
+  bullet_spawner/pattern_spawner2d_graze.cpp      Graze group: target sources + detector, refresh/resolve_graze_targets, ring preview (GrazePreviewLayer2D)
+  bullet_spawner/pattern_spawner2d_sound.cpp      Sound group: entries + listener sources, On Shot / On Telegraph
+  bullet_spawner/pattern_spawner2d_bindings.cpp   the base's _bind_methods + _validate_property
+  bullet_spawner/bullet_spawner2d.hpp     BulletSpawner2D: what a shot fires as bullets
+  bullet_spawner/bullet_spawner2d.cpp     shot hooks (spawn data, fire_shot), graze/sound arming + live re-arm, speed roll, lifecycle hooks
+  bullet_spawner/bullet_spawner2d_homing.cpp     homing/orbiting, target resolution, live steering, orphan policy, live-volley API
+  bullet_spawner/bullet_spawner2d_flock.cpp      Flocking group: flock_enabled/flock/flock_scope, the shared FlockConfig2D, arming at shot
+  bullet_spawner/bullet_spawner2d_split.cpp      Splitting group
+  bullet_spawner/bullet_spawner2d_bindings.cpp   the bullet groups' _bind_methods + _validate_property
+  bullet_spawner/bullet_spawner2d_colors.cpp     Bullet Colors group (colors handed to spawn_volley_span next to the transforms)
+  bullet_spawner/bullet_spawner2d_emitter.cpp    Emitter Bullets group (the shared EmitterConfig2D, cycle refusal)
+  bullet_spawner/bullet_spawner2d_live.cpp       apply_to_live_volleys(LiveVolleyGroup flags), home/aim/speed of live volleys
+  bullet_spawner/laser_spawner2d.*               LaserSpawner2D: Lasers + Laser Targeting groups, laser arming, orphan policy (§27)
+  laser/       LaserVolley2D (laser_volley2d.cpp lifecycle + API, _tick.cpp phases/geometry/walls/contacts/graze/sound, _render.cpp draw + interpolation)
+  data/        inspector Resources: BulletVolleyData2D, BulletSpeed/Rotation/Curves/Wobble/EffectLayerData2D, GrazeZone2D, BulletFlock2D,
+               BulletSoundData2D, BulletPickupData2D, BulletSplitStage2D, BulletSplitData2D (every accepted edit emits `changed` once:
+               `data/test_data_setter_contract.gd` sweeps it)
+  pooling/     VolleyPool (parked volleys per key), VolleyPoolKey2D
+  attachments/ BulletAttachment2D + its object pool
+  debugger/    BulletVolleyDebugger2D (collision-shape overlay)
+  sprite/      sprite_anim2d (THE SpriteFrames rules: resolver, timing, bake loop, SpriteAnim2D, frame_draw_size2d),
+               frame_image2d (pixels as Godot draws a frame), frame_texture_cache2d (the factory's frame textures) (§30)
+  core/        header-only: warn_once2d, cached_string_names2d, easing2d (Tween port), dynamic_sparse_set, live_object2d (script Variant -> live Object by id),
+               collision_shape_helper2d, reentrancy_guard2d, transform_math2d, graze_targets2d (graze target lists' helpers, point target ids),
+               node_scan2d (THE target filter of homing and graze, their node-name / children scans, PREVIEW_META_KEY)
+```
+
+### 12.2 Flows
+
+- Spawn: `BulletFactory2D.spawn_volley` → `spawn_volley_internal` → pool pop
+  by `VolleyPoolKey2D` (bullet count + shape) or fresh alloc →
+  `enable_volley` (validates EVERYTHING before mutating; a refused enable
+  changes nothing) → `set_up_bullet_instances` (one `set_buffer`). The
+  spawner uses the span path (`spawn_volley_span`, no Variant boxing).
+- Factory sweep: the snapshot is (instance id, pointer) pairs, never slots
+  (a handler `free()` swap-removes `all_volleys`); `volley_free_epoch` skips
+  the ObjectDB lookup unless something was freed; `sweep_tick_stamp` /
+  `sweep_timer_stamp` give one tick and one timer pass per volley per step.
+- Spawner loop: `_process` runs iff `needs_process()`. Order: movement →
+  spin → preview → shooting/bursts. `shooting_*` signals track auto-fire
+  transitions only; auto-fire errors are latched (one report per
+  misconfiguration until a config setter CHANGES a value: a write of the
+  value already held is a no-op and keeps the latch, an Array write always
+  counts; ClassDB-swept by `test_spawner_config_ux`
+  `test_every_same_value_write_keeps_the_auto_fire_latch`).
+- Preview: geometry snapshotted UNSPUN in holder space; spin/move are the
+  layer NODE transform, so spinning/moving costs 0 rebuilds / 0 redraws.
+  Holders are found by OWNER (meta `_blast_preview_owner` = spawner id),
+  never by name: spawners sharing a generator each keep their own holder,
+  and the cached holder/layers are read through id-checked `live_*`
+  accessors (a script clearing the generator's children frees them).
+- Movement: the spawner travels a Path2D at runtime (`advance_movement`,
+  bounded 64-leg catch-up; `Easing2D::ease` parity-tested vs Tween).
+
+### 12.3 Structural calls and threading
+
+- Everything runs on the main thread (physics callbacks included); no locks.
+  Do not add threads.
+- Structural ops (`reset/free_*/populate_*`, shape changes) are idle-frame
+  only: inside a physics frame they are REJECTED loudly. Their `*_deferred`
+  twins queue through `queue_structural_call` and are safe from anywhere.
+  The queue holds plain C++ calls (`std::function`), never method-name
+  Callables: `Object::callp` locks the factory for the call, so a `free()`
+  of it from a callback inside a deferred reset was refused ("locked
+  object"). The flush checks `watch_life()` after every call.
+  `free_active_bullets()` DESTROYS; clear/expiry return drained volleys to
+  the pool (or park them with auto pooling off).
+
+### 12.4 Signals (live, in-tick) and liveness
+
+- Every bullet signal fires synchronously inside `BulletVolley2D::tick`:
+  `area_entered` / `body_entered` / `bounce_*` (drain, impact pose),
+  `bullet_homing_target_reached` (after the move),
+  `sprite_animation_finished`, `life_time_over` (lifetime pass). The bullet
+  is ALIVE in the handler (custom data, transforms, velocity, counts,
+  attachment readable).
+- The plugin decides afterwards from the post-handler state: a hit kills
+  only if the count is still at max (a heal vetoes it); expiry kills only
+  bullets whose life was not extended; a homing auto-pop pops only if the
+  front is still the reached target; a handler that disabled the bullet
+  gets no extra effects; freed targets are skipped; a pause stops the sweep.
+- Handlers may spawn and edit bullets freely; structural calls need the
+  `*_deferred` twins. Remaining `call_deferred` uses: `shoot_once_deferred`,
+  the structural queue itself, the debugger restore, preview rebuilds (a
+  call deferred from physics still runs inside the physics frame: pinned in
+  `integration/test_engine_facts.gd`).
+- Routing: a spawner volley emits on its spawner, a factory volley on the
+  factory, never both. A signal the live owner spawner has NOTHING connected
+  to falls through to the factory (`core/signal_route2d.hpp`,
+  `route_owned_signal2d`: hits, bounces, `life_time_over`, `bullet_split`,
+  every laser signal), so one global factory handler sees the hits of every
+  NPC spawner; the unhandled-event warnings then check both ("(on it or on
+  BulletFactory2D)"). A new routed emit uses the helper. The ONE exception is graze (§20): `bullet_grazed` /
+  `bullet_graze_exited` bubble to the owner spawner (while alive) and then
+  ALWAYS to the factory (graze changes nothing and must outlive enemies). A freed spawner takes its connections along
+  (`orphaned_volleys` decides what its bullets do).
+- C++ liveness: never carry a raw `Object*` across user code or
+  `call_deferred` (godot-cpp converts Variant args before your id check
+  runs). Capture `get_instance_id()` before the emit and compare
+  `ObjectDB::get_instance(id) == expected_ptr` after (`tick_may_continue`,
+  `revalidate_configured_volley`, the movement `alive()` lambda). Stop
+  touching `this` when it fails.
+- Attachment callbacks (`on_bullet_spawn/enable/disable`, `on_spawn_in_pool`)
+  and timer callbacks are plain calls, not signals: Godot locks neither the
+  factory nor the volley, so user code may `free()` either in the middle of
+  any operation (a spawn, a tick, a clear, a reset, a teardown). After user
+  code: a volley tests `survived_user_code(self_id)` (itself AND its
+  `factory_life`); a factory operation holds `watch_life()` and stops on
+  `died()` (the bool outlives the factory; `this` does not); a loop over
+  volleys snapshots (pointer, id) pairs BEFORE user code
+  (`snapshot_volley_entries`) and validates each through ObjectDB, never
+  reading `get_instance_id()` from a pointer that may be freed; an RAII
+  scope re-checks its owner in the destructor (`ReentrancyGuard`,
+  `FactoryOperationGuard`). A second `free()` from inside a PREDELETE is
+  refused with `cancel_free()` (`predelete_state`); Godot keeps ONE "free
+  ok" flag per object, so the refusal also cancels the running deletion,
+  which then finishes with `queue_free()`. The factory deletes its children
+  inside its own PREDELETE handler: Node's teardown (after the handler) would
+  run their callbacks where a second free is no longer refused. A volley
+  emitting its OWN signal (`self_emit_depth`: sprite_animation_finished,
+  bullet_homing_target_reached) whose handler frees the factory is detached
+  and queue_freed by the teardown, never deleted under Godot's emit. Pinned by
+  `integration/test_callback_free_matrix`, `test_signal_free_matrix` (run them under
+  `tools/run_sanitizer_tests.py --sanitizer address` after touching any of
+  this: a write into freed memory passes every assert).
+- Emit guard (`core/emit_guard2d.hpp`, `core/emit_on2d.hpp`): Godot refuses
+  `free()` on an emitting object ONLY in debug builds (`Object::callp`'s lock
+  check is `DEBUG_ENABLED`); an exported release game deletes it in the middle
+  of the plugin's code. EVERY plugin emit goes through `emit_on2d(emitter,
+  ...)` (never a bare `emit_signal`): spawner, factory, volley and laser keep
+  an `EmitGuardState2D`, PREDELETE refuses a free while one is emitting
+  (`cancel_free()`) and the outermost emit then `queue_free()`s it. The
+  laser's own guard covers the `set_visible` calls of `begin_life` /
+  `release_life` / `enter_pool_unfired` (its only self-emitted signal is
+  Godot's `visibility_changed`); `spawn_laser_span` and `laser_finished_now`
+  re-check the factory life after them, exactly like the volley twin (a
+  handler freeing the factory there used to abort the engine). Tests take
+  the release path with `BulletFactory2D.debug_free_like_release(object)`
+  (C++ `memdelete`, no lock check): `integration/test_release_free_matrix`
+  frees the emitter from EVERY signal of the three classes (ClassDB-driven);
+  the laser's own `visibility_changed` is covered by
+  `laser/test_laser_pool_and_lifecycle`.
+  The same guard covers user code the plugin runs OUTSIDE a signal where the
+  caller must outlive it (`guarded_user_call2d`: the aimed target's
+  `get_velocity`, a hit target's `_get` read inside the physics flush).
+- User code outside signals and callbacks is still user code: `Object::get`
+  runs a script `_get` or property getter (the bounce reads the hit target's
+  `collision_layer` / velocity), `call("get_velocity")` runs a script method
+  (aimed prediction, read ONCE per collect), `PackedScene::instantiate()`
+  runs `_init` (attachments), `set_visible` runs `visibility_changed`
+  handlers. Every such site re-checks by id afterwards: the volley
+  (`survived_user_code`), the target (looked up again), the bullet's life
+  (`volley_generation` + bullet epoch: a clear inside may have pooled the
+  volley), and a raw factory pointer (re-resolved). Pinned by
+  `integration/test_target_script_free_matrix` and the hostile scripts in
+  the chaos fuzz.
+- A handler may also stop, replace or restart what emitted (movement
+  playback, pattern lists): the emitting code re-checks an epoch/serial
+  (`movement.epoch`, `cadence.pattern_list_serial`) after the emit and leaves the
+  rest to the handler.
+- Pinned by `volley/test_volley_hit_contract`, `test_volley_lifetime_contract`,
+  `test_volley_signal_timing`, `test_volley_bounce_signals`,
+  `test_volley_homing_mixed_deques`, `spawner/test_spawner_orphan_policy`.
+
+### 12.5 Collision pipeline
+
+Area callbacks (ADDED) → object-level dedup window (O(1) hash;
+`collision_dedup_by_object = false` for shape-level) → records with
+queue-time epochs/velocity/pose → per-tick drain → counting → signals →
+bounce. Paused factory: ADDED events are PARKED per volley (no cap:
+`PausedOverlaps2D` dedupes through a hash index; the old 4096 cap lost
+hits of big volleys resting on a target), cancelled by REMOVED, and
+replayed once on resume.
+
+## 13. Pattern bake cache (spawner)
+
+- `resolve_raw_pattern` generates raw transforms (pre spin/scale/skip) once
+  per `pattern_version` and re-poses them per shot (one 2x3 multiply per
+  bullet). The motion class is MEASURED with probe markers: RIGID,
+  TRANSLATION (same basis only, e.g. world-direction rain), NONE. Sources
+  with `reads_external_state` (CHILDREN/AIMED/CORRIDOR/CUSTOM/PATH2D) and
+  unseeded random always regenerate.
+- Every geometry setter calls `on_pattern_changed()` (version bump +
+  preview rebuild). Presets write members raw, then call it once.
+- Proof: tests run with `debug_set_pattern_cache_verify(true)` (every cached
+  result regenerated and compared; mismatch = error = red test);
+  `test_spawner_pattern_bake` perturbs EVERY pattern property, and every
+  shape knob under its OWN shape. `pattern_cache_mode = Off` exists for
+  debugging.
+- A bake is reused only where float32 can re-pose it inside the verifier's
+  tolerance (`repose_is_exact_enough`: about four epsilons of the largest
+  coordinate involved vs `1e-3 + 1e-5 * |marker|`): a bake taken at a huge,
+  finite position (the chaos fuzz's hostile moves, 8e35 px) re-posed near the
+  origin cancelled the offset to 0. Such a shot regenerates and re-anchors;
+  ordinary coordinates keep hitting (`test_a_bake_far_away_is_never_reposed_near_the_origin`).
+
+## 14. Contracts and pitfalls catalog (pinned by tests — do not "fix" back)
+
+- Pool time drops everything a life brought: `release_life` unrefs the
+  material and its instance shader parameter values too, and a
+  pre-populated volley runs the real `release_life` (it kept the populate
+  data's resources alive before).
+- Ranges: `all_bullets_*(start, end)`: (0, -1) = whole volley, end -1 =
+  through the last bullet; out-of-range/inverted ranges push `Invalid index
+  range in <fn> ...` once and apply NOTHING (`volley/test_volley_range_contract.gd`).
+- `spawn_pattern_list` entries: unknown keys fail loud with a did-you-mean;
+  valid keys still apply.
+- Pause/resume replays overlaps that began during the pause, exactly once.
+- Same-owner full-drain wake keeps linear ballistics; foreign wakes are
+  neutralized.
+- `spawn_position_offset_space`: Global (default) vs Local; the preview
+  draws it where bullets spawn.
+
+| Behavior | Suite |
+|---|---|
+| Every helper draws exactly `helper_bullets_amount` bullets at distinct spots; flower FAN splits the amount over petals | `test_spawner_pattern_counts` |
+| Every shape generator reports amount and NaN-marker errors in one wording | `test_factory_helper_edges` |
+| Presets are clean (pattern knobs + spin reset; Transform subgroup and node wiring kept) | `test_spawner_presets` |
+| Pattern-list entries are temporary overrides (only what an entry changed goes back: a shot handler's edits of other knobs stick); `pattern_list_finished` in both modes | `test_spawner_pattern_lists` |
+| Auto bursts clamp to `volleys_remaining`, cancel when auto-fire turns off | `test_spawner_burst_telegraph` |
+| Controls before the tree survive `_ready`; `shooting_*` signals are auto-fire only | `test_spawner_cadence` |
+| Every failed shot emits `volley_skipped(reason)` | `test_spawner_cadence` |
+| Reparenting keeps assigned nodes, tracked volleys, chains and lists | `test_spawner_tree_reentry` |
+| Setters reject NaN/Inf/out-of-range with "keeping the old value"; no setter depends on another field | `test_spawner_setter_contract` |
+| Fire arc follows spin; the volley chases the targets the arc approved | `test_spawner_homing_propagation` |
+| ONE target filter for every node source of homing and graze: Node2D, in the tree, alive, finite, in the bullets' world, never a factory or its nodes, never a preview layer; scans never find the spawner's subtree, Node Group / Node Path may name its children, homing Node Path may name the spawner itself, graze never | `test_spawner_target_filter` |
+| Every graze / homing source honors one contract (finds its node, newcomers, interval, filter, edits in flight, orphans, preview, tree order, settings kept, scene round trip; homing: selection, range, retarget, live mouse) | `test_spawner_graze_sources`, `test_spawner_homing_sources` |
+| Mouse and Global Positions graze: points with a null signal target, visits follow the point's index, read every tick (no filter, no interval), no cap | `test_spawner_graze_point_sources` |
+| Every bound method names every argument (no `_unnamed_argN`) | `integration/test_accessor_contract` |
+| Homing queues have no cap (300 targets queue, shared and per bullet); freed targets trimmed; retarget skips dead/pooled/foreign volleys | `test_spawner_homing_queues` |
+| No hidden caps: every live homing volley stays tracked and retargets; `homing_max_targets` has no upper bound; no default homing/graze group or name (empty settings are named in warnings) | `test_spawner_homing_tracking`, `test_spawner_homing_selection`, `test_spawner_homing_sources` |
+| A bullet steering by its own targets owns its reach even while the shared deque has targets | `test_volley_homing_mixed_deques` |
+| Every orbiting bullet circles its own front target; a zero-delta tick moves nothing | `test_volley_orbit_own_center` |
+| `get_bullet_velocity` = direction x speed + inherited + fall speed, in the tick AND right after every setter; `bullet_set_velocity` sets the exact total | `test_volley_velocity_composition` |
+| Direction setters under a direction curve refuse with one direction-worded warning | `test_volley_core` |
+| Public surface: one `spawn_volley`, no `BulletType`, shared signal names/payloads, exact stats keys | `test_factory_api_surface` |
+| A pooled volley reused for plain data matches a cold volley field by field | `pooling/test_pool_reuse_neutrality` |
+| A one-bullet volley behaves like bullet 0 of any volley | `test_volley_single_bullet` |
+| Every spawn-data and volley property sits in a group; names and titles unique | `test_volley_data_inspector` |
+| Hits/bounces/lifetime/homing fire live; the kill is decided after the handler | `test_volley_hit_contract`, `test_volley_lifetime_contract`, `test_volley_signal_timing`, `test_volley_bounce_signals` |
+| A consumed bounce's hit path reports the pose the physics server tested (never the bounce's escape nudge); hit and bounce counters saturate at INT32_MAX with max 0 | `test_volley_hit_contract`, `test_volley_bounce` |
+| Movement LOOP wraps, seeks and teleports restart engine interpolation; PING_PONG turns continuously | `test_spawner_movement` |
+| A paused factory's transform setters move the attachment node at once (its interpolation pass never runs) | `test_mix_teleport` |
+| Preview tracks refuse the lattice/waterfall products the dispatch refuses and never sweep arms x amount | `test_spawner_preview_track_coincidence` |
+| A volley's own visibility_changed handlers are guarded on drain/enable/wake (a release-path free is refused, finished with queue_free); freeing the volley from a CHILD's signal is Godot's own boundary | `test_volley_freeze_contract` (the child case is documented, never tested) |
+| The move loop walks a snapshot of the live set, skips bullets disabled by a trail handler, and re-checks liveness after a shard visibility toggle | `test_volley_fx_layers` |
+| Effect-layer rebuilds carry an epoch: a nested set_effect_layers/play_effect_animation abandons the outer loop instead of touching a stale bake | `test_volley_fx_layers` |
+| `free_bullets_pool` clears the buckets before deleting (tree_exiting/resource callbacks may spawn); release_life re-checks after every resource/connection drop | `test_factory_pooling`, `test_volley_freeze_contract` |
+| Every GDScript "how many instances" entry is bounded by max_bullets_per_pattern (populate bullets/attachments/lasers/pickups, generate_random_data, the limit setter's 1e6 ceiling); play_sound rejects a non-finite position | `test_factory_input_limits`, `test_data_setter_contract`, `test_patterns_bullet_limit` |
+| VolleyPoolKey2D takes shape_type as an int64 and range-checks before storing (engine enums are unfixed: cast-before-check is UB) | `test_pool_key_validity` |
+| The per-bullet and tick sparse sets are validated (dense/sparse bijection) by debug_check_invariants / debug_assert_no_dangling after every test; `debug_get_active_set_stats().consistent` exposes the same check | all suites, `test_volley_readouts` |
+| A script chain inheriting `_process`/`_physics_process` from a base GDScript keeps them: the engine's script method list includes inherited script methods | `test_spawner_tree` |
+| A GDScript `_draw`/`_get_configuration_warnings` on a spawner replaces the native virtual (the plugin gizmo draw and editor warnings): plugin work stays in `_notification`, but these two virtuals remain a documented limitation | documented, not tested |
+| Freeing a volley (or any ancestor) from a CHILD's signal is Godot's own boundary: the engine destroys the parent's children before the plugin's PREDELETE refusal can cancel | documented, never tested (§14 above) |
+| disable_bullet freezes; opt-in reset; parked vs pooled; pooled wake refused | `test_volley_freeze_contract` |
+| Every clock restarts per life, holds while parked/paused, finite under hitches | `test_volley_clock_audit` |
+| Custom data per bullet and shared, readable in every callback, never leaks through the pool | `test_volley_custom_data_contract` |
+| orphaned_volleys policies; unhandled hits warn once | `test_spawner_orphan_policy` |
+| Every setter round-trips or rejects loudly and keeps the old value | `integration/test_accessor_contract` |
+| Homing aims through inherited spawner momentum | `test_volley_homing_drift` |
+| reset_finished fires after the reset; handlers can respawn | `test_factory_lifecycle` |
+| Graze: one graze per ring per bullet life (Once), outer ring first, swept test, inclusive effective radius (bullet size counted) | `test_volley_graze_core` |
+| Graze visits: one exit per visit that grazed, naming its target; killed/frozen bullets never exit; a vanished target ends or moves its visits silently | `test_volley_graze_exit` |
+| Graze handlers are live; events of disabled/woken bullets, freed targets, replaced zones are dropped; a pause finishes the batch | `test_volley_graze_handlers` |
+| Spawner volleys are armed before any shot signal; graze bubbles spawner -> factory; orphans keep grazing on the factory | `test_spawner_graze`, `test_spawner_graze_orphans` |
+| The ring preview draws exactly the runtime targets; never saved, never a marker or homing candidate | `test_spawner_graze_preview`, `run_editor_smoke.py` |
+| No graze target cap (300+ targets, a member joining after the shot counts next tick); a target keeps its slot while others come and go | `test_volley_graze_targets` |
+| Graze target sources (node group, path, name, children: the spawner decides who grazes, zones only how), filter, update interval, refresh; edits reach flying bullets; orphans keep the settings; homing's refresh is `retarget_live_volleys()` | `test_spawner_graze_sources` |
+| Past 8 targets the slab finds exactly what testing every target finds (same events, same ties) | `test_volley_graze_slab` |
+| Area clears: edge-inclusive circle/rect, negative rects normalized, `bullets_cleared` after the busy latch (handlers can spawn); despawn bounds spare bullets heading back in and are silent; `time_scale` scales volley ticks, effects and timers (not spawners) | `factory/test_factory_world` |
+| A sound entry's `trigger`/`enabled` edits reach volleys in flight (`BulletSoundData2D::mask_epoch`, recomputed lazily) | `sound/test_sound_flight` |
+| A fading sound voice is never restarted or stolen again; a pool of fading tails never starves new plays | `sound/test_sound_mixer_unit` |
+| A followed bullet keeps one hum voice per sound entry | `sound/test_sound_flight` |
+| Cosmetic sound and effect rolls never consume Godot's global RNG (seeded gameplay is unchanged) | `sound/test_sound_rng_isolation` |
+| Teleports and transform setters move trail layers with the bullet at once (also on a paused factory) and restart the interpolation history | `integration/test_mix_teleport` |
+| The tick that locks an orbit (a first lock, or RelockAlways re-acquiring the ring after every retarget pass) moves a full step: onto the ring, then along it | `spawner/test_spawner_homing_orbit` |
+| Every way a bullet leaves fires exactly its own sound and effect trigger once (a manual split leaves like a clear) | `integration/test_mix_trigger_ledger` |
+| keep_homing children of the parent's data home like the parent (its target AND its steering: texture control, smoothing, reach, auto pop, delay/duration/lose range) when no live owner spawner aims them; authored child_data is used exactly | `spawner/test_spawner_split` |
+| `BulletSpawner2D.teleport` jumps without a velocity kick (a position written by hand is never inherited either), a playing path keeps its shape from the new spot, `carry_live_bullets` shifts the owned volleys | `spawner/test_spawner_movement` |
+| `shoot_once_with` is one counted shot with pattern-list entry overrides, restored afterwards (only what it changed), never a list report | `spawner/test_spawner_pattern_lists` |
+| A speed or velocity write raises only a capped `max_speed`: 0 stays unlimited | `volley/test_volley_velocity_composition` |
+| `set_bullet_scale` keeps pose and direction and rescales the hitbox in both `rotate_only_textures` modes | `volley/test_volley_core` |
+| A bubbled graze event revalidates its target after the owner spawner's handler: the factory never receives a Variant built from a freed target (bullet and laser dispatch), and a live target array is read by id (`live_object2d`), never through godot-cpp's Variant object operator | `laser/test_laser_spawner`, `volley/test_volley_graze_handlers` |
+| `apply_to_live_volleys(groups)` applies homing / graze / sound / flock / split / emitter to flying volleys; a volley armed alike is untouched (spent rings stay spent). The live legs walk (pointer, id) snapshots and re-check the spawner after every resource PREDELETE; `LaserSpawner2D.apply_to_live_lasers` does the same for lasers (a zone that frees the spawner mid-leg stops it) | `spawner/test_spawner_graze`, `sound/test_sound_spawner_contract`, the flock suites, `spawner/test_spawner_emitters`, `laser/test_laser_spawner` |
+| Per-bullet colors: 12-float MultiMesh format only while used, part of the pool key; colors survive every upload, the interpolation pass and a parked wake; split children wear their parent's color | `volley/test_volley_colors`, `spawner/test_spawner_colors` |
+| Per-bullet lifetimes: an own lifetime ignores the volley timer (also in an infinite volley), a handler extending it keeps the bullet, a wake after expiry restarts it | `volley/test_volley_lifetime` |
+| Scale-in grows bullets (hitbox and graze rings too) to full size exactly; graze's size bound grows with any bullet scaled after arming | `volley/test_volley_scale_in`, `volley/test_volley_graze_core` |
+| Emitter bullets: one shot per bullet per tick (no catch-up burst), fired after the sweep through the template (auto-fire error latch), caps carry over / drop with one warning, a chain back to the spawner refused once | `spawner/test_spawner_emitters` |
+| Lasers: phases announced once each inside the tick, contacts end only after they started, pierce_limit cuts beams and spends bolts, a wall stops (once per block) or reflects, interpolation keeps a sweeping beam on its muzzle | the `laser/` suites |
+| A factory queued for deletion (a free refused under its emit guard) stops its sweep: no spawn outside the tree, `debug_advance_time` refuses it | `integration/test_release_free_matrix` |
+| A pooled or never-fired laser refuses every write once; the pool strips custom data, metadata, groups and node settings | `laser/test_laser_pooled_handle` |
+| Inside every laser signal a handler may end, re-arm, retarget, edit the shared data, spawn, teleport, re-apply or queue structural calls: no error, balanced books | `laser/test_laser_handler_matrix` |
+| Every pattern source fires one beam per slot, on its slot | `laser/test_laser_patterns` |
+| A bullet spawner and a laser spawner give the same where/when timeline for the same settings | `spawner/test_spawner_base_parity` |
+| Warm laser, emitter and colored shots retain no object (headless audio frees stopped playbacks in real time: drain before counting) | `integration/test_steady_state_memory` |
+| A following laser reads its anchor once per tick: a lost anchor (freed, queued) leaves EVERY beam where it is, an anchor out of the tree holds the beams and they ride it again without a slide; the spawn offset rides on top of the spun frame (never turned by the spin) | `laser/test_laser_spawner` |
+| Laser retargets use each laser's own aim; None leaves the beams without a target; targets come from the factory's world | `laser/test_laser_spawner`, `spawner/test_spawner_target_filter` |
+| A parked homing volley stays on the retarget list (woken, it is retargeted); `LIVE_HOMING` clears parked chases and arms a parked volley when it wakes; a cleared volley leaves the list | `spawner/test_spawner_live_volleys` |
+| A Variant a script hands in is read by id (`core/live_object2d.hpp`), never through its pointer: a freed node is refused like any non-target | `spawner/test_spawner_live_volleys`, `laser/test_laser_spawner` |
+| Orphan policies apply in every factory the spawner fired into; Clear / Remove freed inside a busy factory operation run right after it (structural queue) | `spawner/test_spawner_orphan_policy` |
+| A telegraph refused at the bounds retries a burst interval later (warning first); get_velocity user code that cancels the wave, burst or telegraph wins; telegraph_sec 0 with a max still warns; auto chains end at a cap or budget set mid-chain | `spawner/test_spawner_burst_telegraph`, `factory/test_factory_despawn_triggers` |
+| Movement velocity is measured over the time each step took (endpoint frames, Loop wraps); a new path or space is a jump | `spawner/test_spawner_movement` |
+| Every system that plays SpriteFrames (bullets, `play_sprite_animation`, pickups, trails, one-shots, `spawn_layer_effect`, the laser body and its five LaserSpriteLook2D slots) picks, times and draws a frame by the same rules; an AtlasTexture frame draws its region (margin box, zero region = whole atlas, nested, compressed), never its sheet | `integration/test_sprite_frames_contract` |
+| An AtlasTexture rect is TRUNCATED per component like Godot (`Rect2 -> Rect2i`): a fractional region/margin bakes the size `get_size()` draws (never a round()ed box), a region axis under 1 px is the atlas's whole axis, and a region past the sheet is CLIPPED to it (fully outside reads transparent) - never "unreadable", which fell back to drawing the WHOLE sheet across the quad | `integration/test_sprite_frames_contract` |
+| The trail soft reset (`fx_soft_reset_trail_layers`) runs a shard's `visibility_changed` handlers: every hide goes through `guarded_user_call2d` and the loop abandons its bake on `fx_trail_epoch` / death / queued (a nested `set_effect_layers` destroys the vector; ASan caught the write) | `volley/test_volley_fx_layers` |
+| `override_frame_color` toggled live keeps the animation's frame, time, paused and finished state | `volley/test_volley_fx_layers` |
+| A rejected range applies NOTHING, also through a nested all_bullets_* call (callers return on `!ensure_indexes_match_amount_bullets_range`: the emptied (0, -1) reads as the whole volley); every range method names its args `bullet_index_start` / `bullet_index_end_inclusive` | `volley/test_volley_range_contract` (state-checked sweep) |
+| Gravity setters and state resets report the velocity without the dropped fall speed at once | `volley/test_volley_velocity_composition` |
+| A laser queued for deletion is never pooled, popped, listed, counted or ticked; an ended laser (fading included) no longer counts for max_live_lasers or appears in get_live_lasers, while teleport carry and orphan policies still reach a fading beam | `laser/test_laser_pool_and_lifecycle`, `laser/test_laser_spawner` |
+| set_anchor keeps a running sweep; an anchor outside the tree (spawn_laser, set_anchor) is ridden once it enters, without a jump; a teleport moves a beam only when its own anchor jumped | `laser/test_laser_aim_and_motion`, `laser/test_laser_spawner` |
+| end_laser from a live handler announces every phase it entered before laser_finished | `laser/test_laser_beam_phases` |
+| A spent beam and a target that left the graze list end a laser graze visit silently (like bullets) | `laser/test_laser_graze` |
+| LaserData2D look edits (frames: `looks_serial`, body material, z_index, body mode repeat; every LaserSpriteLook2D edit, passed on by the data) reach lasers in flight | `laser/test_laser_render_interpolation`, `laser/test_laser_looks` |
+| Scenes saved with the old per-look laser properties (`*_frames`, `effects_scale`, `material`) load into the looks (`LaserData2D::_set`) and never save them again | `laser/test_laser_looks` |
+| No bound method takes a typed (non-Resource) object: object arguments are Variants read by id (`live_argument2d`), a freed or wrong object is refused with one error | `integration/test_accessor_contract` |
+| One-shot frame changes write tint and spin to the shown frame's shard; a fresh instance without ramp or fade is white; the manual hatch rebuilds on look edits; a full reset re-bakes effect-layer art (`FrameTextureCache2D::clear_epoch`) | `volley/test_volley_fx_layers` |
+| A one-frame non-looping animation finishes after its frame's time (AnimatedSprite2D); a zero region axis is the whole atlas WITHOUT the margin's size | `volley/test_volley_signal_timing`, `integration/test_sprite_frames_contract` |
+| A burst chain taken over at its last shot still reports burst_finished; an auto warning never fires past a cap reached during it; the capping shot reports shooting_finished even when its handler hands out a budget; one runtime step per frame across a process_callback switch | `spawner/test_spawner_burst_telegraph`, `spawner/test_spawner_cadence` |
+| A new volley's area joins the physics space only after layer, mask, monitorable and every shape are posed (`set_up_area` configures, `attach_area_to_space` at the end of `set_up_bullet_instances`): joined first under the default layer/mask 1, 40 cold 64-bullet volleys cost a 3 s stall in the next step; Godot refuses `area_set_monitorable` inside the query flush only for areas IN a space, and its BVH never re-pairs a resting area that turns monitorable after joining | `integration/test_cold_spawn_stall` |
+| Monitor callbacks of a volley whose factory is gone do nothing (`factory_alive()` first; a queue-freed volley's area still fires inside the same frame) | `integration/test_signal_free_matrix` |
+| Circle and Ellipse turn with their aim once (`helper_ellipse_rotate_with_marker`, on by default): a turned marker moves every bullet around it AND turns it by the same angle, like ring/star/polygons; both bake as RIGID. Heart, rose, flower and Lissajous stay world-fixed by design | `spawner/test_spawner_preview_rotation`, `spawner/test_spawner_pattern_bake` |
+| Pattern-list and `shoot_once_with` overrides snapshot natively (`PatternStateSnapshot2D`: the knob struct + the hand-written properties) and restore only what changed; a knob setter given its current value bumps no pattern version | `spawner/test_spawner_pattern_lists` |
+| Every data-resource setter skips a same-value write (`core/assign_if_changed2d.hpp`: no `changed`); an Array or Dictionary write always counts (in-place edits) | `data/test_data_setter_contract` (same-value sweep) |
+| One frame repays at most `max_shots_per_frame` (default 8, >= 1) late shots, bursts and list entries, then resyncs | `spawner/test_spawner_cadence` |
+| `spawn_volley` / `enable_volley` refuse a `spawner_id` that is not 0 or a live BulletSpawner2D (nothing spawned); `get_active_bullet_count` skips pooled and queued volleys; the volley counter is `debug_get_active_volleys_amount` | `factory/test_factory_api_surface` |
+| A same-value config write keeps the auto-fire latch (no re-report every frame from a script writing its config); a real change or an Array write re-arms it | `spawner/test_spawner_config_ux` (ClassDB sweep over both spawner types) |
+| The smoothing fan's off path clears only per-bullet smoothing the fan wrote (`homing_smoothing_fanned`); a script's per-bullet values survive retarget passes | `spawner/test_spawner_homing_propagation` |
+| An empty homing pool still stops live orbits when orbiting is off, in every selection mode | `spawner/test_spawner_homing_orbit` |
+| `keep_tracking_when_active` off: the beam holds its line (also when the target is gone, anchored or not) through ACTIVE **and FADING**; Lock On also holds the length it locked at (ends where the warning line ended) | `laser/test_laser_aim_and_motion` |
+| A laser Global Position target is re-picked on the retarget interval (a script may move it) | `laser/test_laser_spawner` |
+| A laser graze exit plays where its target is at the exit | `laser/test_laser_graze` |
+| A zero AtlasTexture region axis keeps its origin (Godot's `_get_region_rect` only fills the size); an out-of-sheet region is clipped like `get_image()` (fully outside = transparent), not rejected | `integration/test_sprite_frames_contract` |
+| Every public `helper_sample_outline_*` count (`transforms_amount`, `vertices`, `points`) and `helper_cross_arm_count` is bounded by the live `pattern_max_bullets()`: the samplers used to sweep 1e9 points (`points * 2` overflowed) while the generator refused the same value | `patterns/test_patterns_bullet_limit` |
+| One-shot sprite effects age on `capped_volley_delta` like bullets, lasers and timers: a raw `delta * time_scale` tick at 1e300 left `fx_clock` where adding 1/60 is a no-op, freezing every later effect on frame 0 | `factory/test_factory_world` |
+| Pool time drops the modulate ramp and the instance shader parameter dictionary/CanvasItem overrides (even after a script cleared the material); `debug_check_invariants` rejects a pooled volley holding either | `pooling/test_pool_reuse_neutrality` |
+| Live resource replacement drops old Refs whose script PREDELETE may free the owner: `graze_release` / `sound_release` / the laser's `graze_arm`/`graze_clear`/`sound_arm` run the drop under the emit guard (a free is refused+queued), and `split_arm` moves the old config/spawn-data into locals that drop after the last write. Never a write through freed memory | `volley/test_volley_crash_proof`, `laser/test_laser_pool_and_lifecycle` |
+| Every preview takes its z order from a property (`preview_z_index` / `preview_z_as_relative` on spawners, `despawn_bounds_preview_z_index`, `debugger_z_index`; defaults 4000 / 999) | `integration/test_preview_z_order` |
+| Every drawn part of a laser interpolates (body points, width, muzzle, tip, pierce and wall frames each on their own segment angle and clock); a head spent at a wall still plays its impact; laser preview arrows draw at the beam's width | `laser/test_laser_render_interpolation` |
+
+- A warning or error that describes the DATA (a per-bullet array size, a
+  broken SpriteFrames, homing that cannot steer) goes through `WarnOnce2D`
+  (once per resource): printed per spawn it repeats every shot. Only a SHORT,
+  untiled per-bullet array warns (`size < bullets && !tile`); a tiled or
+  longer array covers every bullet and is silent. A warning about wiring that
+  code may still complete (an empty factory path, a movement path) waits for
+  the first use (a shot, a frame that travels), never `add_child`.
+- Edge cases to test everywhere: NaN/Inf scalars and vectors; null array
+  entries; empty arrays; short vs oversized arrays; OOB indices (-1/99);
+  inverted ranges; zero amounts/sizes/speeds; singular transforms; freed
+  factory/generator/target/path mid-flight; pool reuse across lives;
+  pause/resume with overlaps in flight; the pattern limit (limit ok, limit+1 rejected);
+  finite-but-overflowing values (1e30 velocity: its square is INF in float32);
+  maxed timers (64); huge target/queue counts; same-frame expiry+respawn; deferred calls from
+  collision handlers; zero-delta ticks; mixed shared + per-bullet features.
+- Every compiler, not just GCC (the release builds include MSVC; GCC
+  accepts extensions MSVC refuses, and libstdc++ includes more than MSVC's
+  STL): never `, ##__VA_ARGS__` with an empty argument list (a bind macro
+  takes its hint and hint string explicitly: `PROPERTY_HINT_NONE, ""`),
+  include the standard header of every `std::` name you use, never narrow
+  inside braces, and build non-ASCII text with `String::utf8(...)`
+  (godot-cpp's `String(const char *)` reads Latin-1: "px/s²" showed as
+  "px/sÂ²"). `tools/check_portability.py` checks all of it on Linux.
+- Never bind a typed Node/Object pointer parameter: godot-cpp converts the
+  argument through the object's raw pointer before the plugin runs, so a
+  freed node a script still holds is read after free (it crashed in
+  `Object::get_gdtype`; ASan cannot see it, the read is in engine code).
+  Bind a `const Variant &` and resolve it with `live_argument2d<T>`.
+- Godot facts that bit us: GDExtension virtuals
+  (`_get_configuration_warnings`) are not script-callable (expose a public
+  twin); a game's script `_ready` / `_process` / `_physics_process` REPLACES
+  the extension's virtual of the same name and GDScript refuses
+  `super._ready()` on an extension class, so the nodes a game scripts
+  (factory, spawners) never override those virtuals: their work runs from
+  `_notification` (READY / PROCESS / PHYSICS_PROCESS) gated by their own
+  switches (`core/native_callbacks2d.hpp`), and processing stays on while the
+  script needs it (pinned by `test_factory_lifecycle`, `test_spawner_tree`); NEVER open the real test_project in an editor with a scene argument
+  (headless or not): the editor saves `open_scenes`/`current_scene` in
+  `.godot/editor/editor_layout.cfg` and the developer's next launch reopens
+  that scene, so a @tool script in it runs in their editor (an editor-smoke
+  probe once quit the developer's editor 3 s after every launch); Godot imports `.csv` files inside the project as translations (keep
+  logs under a `.gdignore` folder); a warning printed per spawn retains
+  objects (use `WarnOnce2D`); `--quit-after` guards headless scripts;
+  NEVER `std::make_shared` in src/ (use `std::shared_ptr<T>(new T(...))`):
+  its type tag `_Sp_make_shared_tag::_S_ti()::__tag` is a GNU unique
+  symbol, glibc then marks the library NODELETE, `dlclose` keeps it, its
+  statics outlive Godot's StringName table and EVERY test file reports ~86
+  `Orphan StringName` leaks (diagnose with `LD_DEBUG=all ... | grep NODELETE`)). The statically linked libstdc++ (godot-cpp `use_static_cpp`) carries one too (`std::string::_Rep::_S_empty_rep_storage`, readelf binding `<OS specific>: 10`): exported, it pins the library under the OFFICIAL Godot binary (libstdc++ bundled, not exported) while a distro Godot hides it. Linux GCC builds link with `-Wl,--exclude-libs,ALL` (`tools/scons_build_helpers.py`), CI fails on any unique symbol in `readelf --dyn-syms`, and leak work is proven with the official binary (`GODOT_BIN=<official> python3 tools/run_tests.py`).
+- Memory errors and undefined behavior the suites cannot see (a write into
+  freed memory passes every assert; x86 hides most UB, ARM and the optimizer
+  do not): `tools/run_sanitizer_tests.py` finds them with file:line and a
+  stack. Rules it taught us:
+  - An RAII scope that writes into an object must re-check the owner after
+    user code ran inside it (`ReentrancyGuard(depth, this)`,
+    `FactoryBusyScope2D`): a callback may `free()` the owner, and the
+    destructor otherwise writes freed memory (heap-use-after-free).
+  - Every script-bound enum is `enum X : int` and uses
+    `BLAST_VARIANT_ENUM_CAST` (`core/variant_enum_cast2d.hpp`, a
+    compile-time assert): GDScript may pass any int, and an out-of-range
+    value in an enum without a fixed type is UB before a setter rejects it.
+  - Clamp a float in floating point BEFORE an int cast
+    (`(int)Math::clamp(x / 8.0, 32.0, 256.0)`, never `clamp((int)(x / 8.0),
+    ...)`): an out-of-range cast is UB (x86 yields INT_MIN, so a huge track
+    fell to its minimum density, a far homing position collapsed onto one
+    identity, and 1e17 px/s movement-pattern laps turned bullets back).
+    Never let `x + w` of two casted ints overflow a bounds check.
+  - Read GDScript ints from an Array/TypedArray as `int64_t`: an int32
+    cast wraps 2^32 + 1 onto 1 (a valid layer, a valid hit count). Bound
+    `int` parameters wrap the same way before the setter runs: the pattern
+    knob table binds int knobs as `int64_t` and refuses what an int cannot
+    hold (`PatternKnobCheck2D::FITS`); hand-written int setters still wrap
+    like Godot's own int properties.
+  - A finite double above FLT_MAX is INF as `real_t`/`float`: setters that
+    feed real_t math check `is_finite_real2d`, values handed to the engine as
+    floats (sound) `is_finite_float2d` (`core/transform_math2d.hpp`).
+- Every plugin MultiMesh (volley, debugger, effect and trail shards) carries
+  the fixed custom AABB `never_culled_aabb2d()` (`core/transform_math2d.hpp`):
+  a 2D canvas item culls by bounds the renderer does NOT recompute when
+  instances move, so without it bullets that flew away from where the bounds
+  were taken vanish (the collision debugger once drew no split children).
+  The headless dummy renderer never culls: prove a culling fix in a real
+  windowed run (a throwaway `zz_*` scene, deleted after).
+- Bullet math never turns INF/NaN from finite input: `safe_normalized2d`
+  normalizes vectors whose square overflows (`normalized()` returns (0, 0)
+  there and the bullet stalls); integrated values (speed, rotation speed,
+  fall speed, orbit angle) hold their last finite value; `step_place` keeps
+  a bullet whose step overflows where it is; angles wrap through
+  `wrap_angle_pi2d` (a `while (a > PI) a -= TAU` loop never ends at 1e30).
+  Pinned by `volley/test_volley_core` (huge directions, extreme motion).
+- Feature mixing (pinned by `integration/test_feature_mix_*`: bounce, homing,
+  flock, orbit, graze, pickups crossed with every heading/force source).
+  The heading and the sprite facing are separate: only homing WITH
+  `homing_take_control_of_texture_rotation` steers through the facing, and
+  it first re-aligns the facing to the heading when something else moved
+  the heading (bounce, flock, wobble, setters); without the control it
+  never touches the heading. A bounce reflects the own heading and composes
+  the same reflection into the bullet's `BounceFrame2D` (own storage, not the
+  bounce ledger; reset per life and per bullet reset): the bullet's share of
+  the inherited drift (`bullet_drift(i)`, used by EVERY velocity composition)
+  and its direction curves go through that frame, and split children inherit
+  it (`SplitRequest2D::framed`). The frame paths are out of line
+  (`bounce_frame_*`): inlined they cost split_storm ~15%. Flat walls need
+  `bounce_mode` Precise (radial is for round targets). Shot handlers own
+  what they change: `cadence.burst_serial` (chains) and `cadence.serial`
+  (reset_shooting / fire_n_volleys) are re-checked after every shot emit.
+- A pooled volley is a stale handle: every mutator refuses it
+  (`reject_pooled_handle`); `volley/test_volley_pooled_handle_writes` calls
+  EVERY bound method on a pooled handle (ClassDB-driven) and demands that the
+  next life starts exactly like the one before.
+- Never convert a script-given Variant to `Object *` through godot-cpp's
+  operator (it reads the object's instance binding: a freed node passed from
+  GDScript is a use-after-free, and a raw-Variant target Array carried across
+  user code is the same bug): `live_object2d<T>(variant)` reads the id and
+  resolves it through ObjectDB.
+- Plugin-created nodes (containers, debugger and its multimesh nodes, sound
+  voices, effect and trail shards, preview holders) are ordinary children a
+  script can `free()`. Cache them as `OwnedNode2D<T>` (`core/owned_node2d.hpp`)
+  and read them through `get()`; NEVER validate a pointer with
+  `ObjectDB::get_instance(ObjectID(p->get_instance_id())) == p` (that reads
+  freed memory). Cold paths heal (`heal_owned_children`, the voice and effects
+  containers); hot paths test `.ptr` for existence and write through the
+  cached `Ref<MultiMesh>`, touching the node only on rare calls.
+  `integration/test_owned_children_free.gd` frees each one.
+- A spawner freed from user code inside its own shot (an attachment
+  callback of the new volley) is refused in PREDELETE and queue_freed when the
+  shot ends (`refused_free_during_shot`), like the factory and volleys.
+- A node freed inside its OWN `add_child` (a `child_entered_tree` handler
+  freeing the node being added or the emitting parent) crashes inside Godot
+  itself; the plugin cannot guard that, so tests never do it. Same boundary:
+  freeing (the release way) the emitter of a GODOT signal or its ancestor
+  inside that emit (an attachment's own `visibility_changed`), user code in
+  notifications the user opts into (`NOTIFICATION_LOCAL_TRANSFORM_CHANGED`),
+  and scripted engine resources (a GDScript `AudioStream` or `Texture2D`).
+  Also freeing a SIBLING while the parent is busy removing a child (a
+  `tree_exiting` handler freeing another child of the same parent): Godot
+  refuses the removal (`data.blocked > 0`) and keeps a dangling child even
+  for plain Node2Ds (probed, November 2026). The plugin's own loops still
+  check every entry by id (`free_all_lasers`, `remove_and_delete2d`), so it
+  never adds a use-after-free of its own.
+- A 2D `NOTIFICATION_TRANSFORM_CHANGED` is DEFERRED (probed: 0 calls inside
+  `set_global_transform`, 1 a frame later): attachment transform writes in
+  the tick run no user code.
+- Every `area_entered` / `body_entered` callback of EVERY node (a game's
+  hurtbox too) runs inside Godot's physics query flush, where the server
+  refuses `area_set_shape_disabled` and `area_set_monitorable`. Volleys write
+  both through `write_shape_disabled` / `write_monitorable`
+  (`core/physics_flush2d.hpp`): inside the flush they mark the volley and
+  the factory applies the whole state right after it (next sweep start, or a
+  deferred call while paused), before the physics step. Flush detection: in
+  a physics frame whose SceneTree `physics_frame` has not fired yet (each
+  factory records it); the factory sweep never defers (`sweep_depth`). A
+  bullet taken out inside the flush keeps its shape until it ends, so the
+  monitor callbacks drop records of disabled bullets. Pinned by
+  `integration/test_physics_flush_contract`.
+
+## 15. Benchmarks and performance lessons
+
+### 15.1 Running
+
+```sh
+python3 tools/run_benchmarks.py                     # 40 headless scenarios x5 (median)
+python3 tools/run_benchmarks.py --scenario spawner_ # substring filter (repeatable)
+python3 tools/run_benchmarks.py --gate              # exit 1 on regression vs log/baseline.json
+python3 tools/run_benchmarks.py --update-baseline   # ONLY for an accepted change; say so in the commit
+```
+
+- Read `test_project/benchmarks/log/LATEST.md`. Regression = p50 > +10% AND
+  > +0.05 ms, or p95 > +20% AND > +0.3 ms (p99/max reported, not gated; a
+  scenario that spikes on purpose sets `gate_p95 = false` and gates p50 only:
+  split_storm's p95 swings 1.5-2.4 ms between runs of one build).
+  `log/history.csv` = trend, `log/results/*.json` = raw runs. Compare only
+  same machine + same build type. Differences under ~5% p50 are noise.
+- Columns: frame = step (the scenario's plugin calls) + engine (physics +
+  factory tick + render); tick = factory physics tick only.
+- In-engine: `BulletFactory2D.get_frame_stats()`, the `BlastBullets2D/*`
+  monitors (`register_performance_monitors`), the editor profilers.
+
+### 15.2 A/B
+
+On your build run the scenarios, `git stash push -u -- src/`, rebuild, run
+again, `git stash pop`, rebuild. Against an OLD commit:
+`git worktree add --detach <dir> <commit>`, copy `godot-cpp/` (with `bin/`)
+into it and point that worktree's `tools/config.json` `godotProjectFolder`
+at ITS `test_project` (left as is, the old build installs over the main
+project's `.so`). For quick numeric comparisons load two
+`log/results/*.json` files and compare `scenarios[name].factory_tick_ms.p50`.
+
+### 15.3 Lessons (measured on Ryzen 7 8840HS, debug build)
+
+- 10k bullets in flight ≈ 0.26 ms factory tick (`volley_10k_flight`).
+- The target scene (`multi_spawner_pooled_8x`: 8 auto-firing spawners with
+  spin, homing, split and graze into one warm pool, ~10k live bullets):
+  tick p50 ≈ 0.43 ms, frame p50 ≈ 0.87 ms / p99 ≈ 2 ms, `objects_growth` 0
+  in steady state (every pool miss happens in the warmup).
+- Tick code rules: no per-bullet engine-boundary crossings (hoist sin/cos,
+  inverses, StringNames via `CachedStringNames2D`), O(1) amortized per
+  bullet, no per-bullet allocation (reuse scratch, `reserve()`), batched
+  buffer uploads.
+- Per-bullet stores are expensive at 10k: a per-bullet scratch struct that
+  zero-initialized three Vector2 made `trails_fx_2k` +13% and
+  `volley_10k_flight` +7%. Create scratch once per tick, reset only what each
+  bullet needs; make the per-tick context a `const` object (a mutable one
+  is reloaded after every external call). The staged loop then measured
+  level or faster than the monolithic one (tick p50: `trails_fx_2k` −1%,
+  `volley_10k_flight` −6%).
+- A liveness check (`survived_user_code` + `is_queued_for_deletion`) per bullet
+  is two engine lookups: run it only after user code REALLY ran. The homing
+  reach is only recorded inside the loop; checking after every homing bullet
+  cost `pickup_convert_5k` +25% tick.
+- Write-only per-bullet arrays cost a store per bullet per tick: delete
+  them (the shape-origin cache was one).
+- `std::deque` allocates on construction: two mallocs per bullet per cold
+  spawn even with homing unused; `RingDeque2D` allocates nothing while empty.
+- Duplicate seeding: a blank pre-seed that ran the full per-bullet speed
+  setup before the real one cost ~5% of a cold spawn.
+- Cold spawn was O(N²) (8k: 1.5 s) when every per-bullet `shape_set_data`
+  re-updated all shapes; one shared shape per volley made it O(N) (8k: ~10 ms).
+- Inlining `move_bullets` into the factory loop cost 20–25% on
+  `trails_fx_2k`: it stays a separate call in its own TU.
+  Same for the factory sweep itself: `native_physics_process` inlined into
+  `_notification` cost `emitter_storm` / `spawner_warm_shot_5k` ~14% (the
+  native callbacks are `_NO_INLINE_`).
+- A `Ref<>` returned by value per bullet costs a reference()/unreference()
+  pair (trail and effect shards hand out raw `MultiMesh *`).
+- Pattern layout: the pattern refactor (one `marker.affine_inverse()` per
+  call instead of per point, shared layout lambdas) cut
+  `spawner_warm_shot_5k` p50 ~23% and `spawner_aimed_regen_2k` ~13%.
+- Spawner preview spin/move: 0 rebuilds, p99 ~50 ms → 3–5 ms.
+- Live signals: `lifetime_signal_10k` adds ~0.25 ms per 10k-bullet expiry
+  wave over `mass_expiry_10k` with an empty handler.
+- godot-cpp `Vector2::dot()`, `length_squared()` and `is_finite()` are NOT
+  inline (a PLT call each): the graze stage tripled its cost through three
+  `.dot()` calls per bullet. Hot paths use component math (`a.x * b.x + ...`).
+  Check with `objdump -dr -C src/bullet_volley/bullet_volley2d_tick.os`.
+- Graze armed: `graze_10k_flight` ≈ +10% tick over `volley_10k_flight`
+  (fast path inline in the loop, slow path `_NO_INLINE_`); a separate
+  post-move pass measured slower. Graze off costs nothing (hoisted flag).
+- Many graze targets: testing every target is ~1.6 ns per bullet-target pair
+  (`graze_64_targets`, 10k bullets x 64 targets: 1.32 ms tick). Past 8 live
+  targets the list keeps a test view sorted by x (once per sweep, shared by
+  every volley) and each bullet binary-searches the slab within reach of
+  its motion: ~0.36 ms. Reading few targets through a pointer cost
+  `graze_10k_flight` +3% (one more load and branch per bullet): up to 8
+  unsorted targets are copied inline into `GrazeTickTargets2D`. Volleys
+  read larger lists IN PLACE (no per-volley copy, no per-volley liveness
+  pass: the user-code epoch re-validates the shared list instead), and the
+  swept distance is measured once per bullet for every zone.
+- Flocking (§23): the pass costs ~2-5 ns per flockmate looked at plus
+  ~75 ns per turned bullet (atan2, exp, sincos): `flock_2k_swarm` 1.25 ms,
+  `flock_10k_flight` (dense, capped) 4.1 ms, `flock_5k_stacked` 2.0 ms tick
+  (debug build, this machine running ~1.6x slower than the baseline). The
+  candidate loop is bound by unpredictable range tests, not math: a
+  branch-free scalar version and a 4-wide SIMD version (GCC vector
+  extensions) were measured slower in loose swarms (cells hold ~1 bullet,
+  runs too short) and only 25% faster in dense ones, so the loop stays
+  branchy and scalar. What paid: dense per-flock cell arrays instead of hash
+  probes, one routine with plain-local sums (accumulators as struct members
+  were stored and reloaded around every candidate), and a bit-trick inverse
+  sqrt (no div/sqrt latency, the same bits on every CPU). Copying ring
+  flockmates into per-cell lists cost more than scanning them in place.
+  `count_bullet_size` (edge gaps, on by default) costs ~8-14% of the pass
+  with the same neighbors (one add and multiply per range test, one more
+  float per flockmate). The sideways separation (bearing, capped push,
+  lookahead) roughly doubles the work per separating pair: dense capped
+  swarms tick +36% (`flock_10k_flight` 3.1 -> 4.2 ms), `flock_5k_stacked`
+  +44%, a loose 2k swarm +6%. The loop is throughput-bound there: the
+  lookahead is a per-bullet predicted position stored at gather (a pair's
+  offset ahead is one subtraction; per-pair velocity math cost ~1.5 ns per
+  check), the push has no branch (max with 0), and the side is summed as a
+  scalar along the bullet's own perpendicular.
+  Prototype in a standalone harness (the solver compiles against a tiny
+  Godot shim) before touching the plugin: a full build per experiment is
+  slow, and perf/valgrind are not installed here.
+- Override shots (`spawner_override_shots`): a ClassDB walk + ~460 Variant reads per
+  shot took 940 us; the native snapshot 25 us (one knob changed: 65 us). Cold volleys
+  from a physics callback (`cold_volleys_in_physics`): 3083 ms -> 2.4 ms next tick once
+  areas join the space fully posed. Laser looks on child canvas items
+  (`laser_looks_256`): 0.268 -> 0.249 ms frame (one transform + rect per frame instead
+  of a set / draw / reset triple).
+- Lasers: one `draw_polygon` per body segment (the engine triangulates each)
+  made `curvy_lasers_256` (256 tracking snakes of ~36 segments) cost 4.7 ms
+  per frame; one triangle array per laser: 0.65 ms. One `intersect_shape`
+  per segment was 1.77 ms of tick; testing groups of 8 segments with one box
+  first (exact: the box holds every segment's rectangle): 0.29 ms.
+  `laser_beams_256` (sweeping beams, walls, graze, 24 pierce targets):
+  0.34 ms tick. Prove a draw change in a real window (a throwaway
+  `--script` probe outside the project that saves a screenshot, counting
+  PHYSICS frames: a window renders far faster than 60 fps).
+  Laser graze measured every target's exact polyline distance per beam
+  per tick (`curvy_graze_300`: 256 snakes of ~36 segments, 300 targets,
+  10.4 ms tick); the beam's box grown by the largest enabled ring first
+  culls targets no zone can reach (exact, list order kept): 0.6 ms.
+- Many tiny volleys: `emitter_storm` (256 emitters, ~1500 live 8-bullet
+  child volleys) ticks ~1.7 ms, about 1 us per volley per tick on top of the
+  per-bullet cost; a few big volleys (`volley_10k_flight`) are far cheaper
+  per bullet. `colors_10k_flight` (stride 12) ticks like `volley_10k_flight`.
+
+## 16. Inspector groups and serialization locks
+
+- Each spawner lays out its own inspector (locked by
+  `spawner/test_spawner_inspector_layout.gd`): PatternSpawner2D binds the
+  shared accessors but registers NO property; every concrete class calls
+  `bind_spawner_group(cls, group, skip, sound_entry_class)` per shared group
+  (`spawner_property_binder2d.hpp`) in its own order. BulletSpawner2D: Setup,
+  Bullets, Patterns, Shooting, Time, Spin, Randomization, Bullet Colors,
+  Homing, Orbiting, Flocking, Splitting, Emitter Bullets, Graze, Sound,
+  Preview, Movement, Performance. LaserSpawner2D: Setup, Lasers, Patterns,
+  Shooting, Time, Spin, Randomization, Laser Targeting, Graze, Sound,
+  Preview, Movement, Performance (it leaves out the collision ring and the
+  bullet scale knobs). A shared property carries the same group, type and
+  hint on both (sound_effects excepted: each names its own sound class). Docs
+  describe members on the concrete classes (`[member BulletSpawner2D.x]`,
+  never `PatternSpawner2D.x`). Spawn data (`BulletVolleyData2D`): Bullets, Appearance,
+  Movement Speed, Bullet Rotation, Wobble, Gravity, Bounce and Ricochet,
+  Movement Pattern Paths, Homing, Collision, Attachments, Sprite Effects,
+  Rendering and Material. No duplicate titles, no ungrouped property
+  (`volley/test_volley_data_inspector.gd`).
+- Patterns: `pattern_source` + `helper_bullets_amount`, then a
+  `Transform` subgroup, one `ADD_SUBGROUP("Ring", "helper_ring_")` per shape
+  (prefix stripped in the inspector), `Outline Layers` last. The inspector
+  EJECTS a property whose name lacks the subgroup prefix
+  (`test_every_prefixed_subgroup_member_carries_the_prefix`). Mind
+  overlapping prefixes (`helper_star_polygon_` vs `helper_star_`).
+- ADD_PROPERTY BEFORE its bind_method is SILENTLY dropped by ClassDB (the
+  runner flags the `class_db.cpp` error). Moving a property = moving its
+  bind + ADD_PROPERTY paragraph (pattern knobs: move the table row).
+- A setter whose field `_validate_property` reads MUST call
+  `notify_property_list_changed()`.
+- Gating: helper_* per pattern mode; homing/orbiting/movement/preview knobs
+  hide while their switch is off; spin speed only in Continuous;
+  amplitude/frequency only in Oscillate; burst_*/telegraph_sec only when on.
+- Enum ids are serialized: renumbering silently repoints saved scenes.
+  `pattern_source` ids and pool-key shape ids (`Circle:3,Rectangle:4,Capsule:5`)
+  are locked. Saved property ORDER follows the bind order (an inspector
+  reorg reorders `.tscn` lines: harmless, expected in diffs).
+
+## 17. Documentation generation
+
+- Order: close the editor → build → `GODOTPP_NONINTERACTIVE=1 python3
+  tools/generate_xml_docs.py` → review `git diff doc_classes/` → fill every
+  empty `<description>` → build (docs compile into the binary) → regenerate:
+  the diff must be empty apart from escaping (`>` becomes `&gt;`).
+- The doctool KEEPS descriptions of existing members, ADDS new members with
+  empty text, DROPS removed ones and re-sorts alphabetically. Write `<`/`>`
+  as `&lt;`/`&gt;`.
+- A regeneration with zero diff proves the bound API matches the docs (use
+  it after big refactors).
+- BBCode: `[Class]`, `[method C.m]`, `[member C.p]`, `[signal C.s]`,
+  `[param x]`, `[constant C]`, `[enum C.E]`, `[code]`, `[codeblock]`, `[b]`, `[i]`.
+
+## 18. tools/ catalog
+
+- `setup.py`: interactive menu (Godot paths/versions, project folder,
+  rename, icons, docs, builds, profiles, LTO, export zip, tutorials).
+- Build: `compile_debug_build.py` / `compile_release_build.py` (both write
+  the build stamp on success) / `clean_build.py` / `select_build_profile.py`
+  / `edit_build_profile.py` / `change_lto_mode.py` / `toggle_editor_target.py`
+  / `toggle_debug_symbols.py` / `toggle_reloadable.py`.
+- Verification: `run_tests.py`, `run_release_tests.py` (builds template_release, swaps it in for the
+  installed debug library, runs the suites, always restores it; restores compile_commands.json),
+  `lint_tests.py`, `api_snapshot.py` (§7.4),
+  `probe.py` (a GDScript snippet as a BlastTest body against the built
+  plugin; `probe(label, value)` lines stream to
+  `test_project/test_results/probe_output.txt`, the errors it caused are
+  listed, the probe suite is always deleted; §2.2),
+  `check_portability.py` (GCC -Wpedantic -Wnarrowing syntax pass over every
+  src TU, std:: names without their own header include, non-ASCII literals
+  outside String::utf8: the Windows-only failures, caught on Linux),
+  `test_inventory.py` (save/diff every test name with its assert count:
+  proves a suite merge or helper move lost nothing; §8.8),
+  `format_code.py`, `run_benchmarks.py`, `run_editor_smoke.py` (headless
+  editor + @tool probes in `test_project/tests/editor_smoke/`, run on a
+  throwaway COPY of the project; probes act only with `--blast-editor-smoke`),
+  `run_sanitizer_tests.py` (ASan / UBSan objects from compile_commands.json
+  under `test_project/test_results/sanitizers/`, swapped in for the installed
+  library and always restored; ASan is preloaded with a shim that drops
+  Godot's RTLD_DEEPBIND; leak gate off: a sanitizer runtime makes every file
+  report Orphan StringNames; wall-clock budgets scale through
+  `BLAST_TIME_BUDGET_SCALE` / `BlastTest.time_budget_ms`).
+- Extra projects: `sync_project_folders.py` copies the built addon into every
+  `extraProjectFolders` entry of `config.json` after each successful build
+  (missing or non-Godot folders are skipped with one line); `manage_extra_folders.py`
+  (setup.py menu) edits the list.
+- Config: `select_godot_path.py`, `select_godot_project.py`,
+  `change_godot_target_version.py`, `update_godot_cpp.py`,
+  `config_manager.py` + `config.json` (machine state), `paths.py`.
+- Plugin: `renaming.py`, `update_icons.py` (copies `icons/*.svg`, named exactly like the class,
+  into the addon and writes the `[icons]` block of the .gdextension; it clears only those icons'
+  import cache: re-import the project afterwards), `export_plugin.py`,
+  `generate_xml_docs.py`, `gdextension_file_helper.py`, `apple_helpers.py`,
+  `git_helpers.py`, `scons_helpers.py` + `scons_build_helpers.py`,
+  `tutorials.py`.
+
+## 19. Final report template
+
+End every task with:
+1. What changed (per area), with the commits.
+2. Bugs found and fixed, each with the test that pins it, as one row per
+   fix: `commit | E1 source | E2 reproduction | E3 siblings checked |
+   E4 pins checked | E5/E6 notes` (§2.1). A refuted claim gets the output that
+   refutes it.
+3. Verification: suite (`ALL n TEST FILES PASSED`), `--self-test`, format
+   check, snapshot diff (IDENTICAL or the listed intended deltas), benchmark
+   gate + the notable deltas.
+4. Big-O of the touched paths (per tick, per spawn, per call).
+5. A ratings table (stability, performance, code clarity, test coverage,
+   docs) with one line of justification each.
+6. Open questions for the user (contract changes you did NOT make).
+
+## 20. Graze (`GrazeZone2D`, volley stage, spawner group)
+
+A bullet grazes ring k of a zone when its motion during one tick (segment
+start -> end, swept: fast bullets never skip a ring) comes within ring k's
+effective radius (`ring_<k+1>_radius` + bullet bounding radius when
+`count_bullet_size`) of a zone target. Detection is math in the tick, never
+physics (no layer/mask setup, deterministic under `debug_advance_time`).
+
+### 20.1 Pieces
+
+WHO grazes is decided in ONE place, never in the zone: the spawner's Graze
+group (`graze_target_source` + knobs) for spawner volleys, the group passed
+to `graze_set_zones(zones, target_group)` for factory volleys. A zone only
+says HOW (rings, regraze, bullet size, preview color). Every zone of a volley
+rings the same targets.
+
+| Piece | Where | Notes |
+|---|---|---|
+| Zone config | `data/graze_zone2d.*` | 1..4 rings (fixed `ring_N_radius`: inspector-safe), `regraze` (Once 0 / After Exit 1, serialized), `count_bullet_size`, `preview_color`; every accepted change emits `changed`. No targeting or runtime preview property (the spawner's `graze_preview_during_runtime` is the only runtime ring preview) |
+| Target filter | `core/node_scan2d.hpp`, `core/graze_targets2d.hpp` | `target_node_usable2d` (THE filter, homing too): `target_node_present2d` (Node2D in tree, not queued, finite, same World2D: the per-tick check between scans) + never a preview layer + never inside a factory (`node_in_bullet_factory2d`: one `is_ancestor_of` per `BulletFactory2D::factories_in_tree`, no ancestor walk); `collect_graze_targets2d`: group members (+ filter group), tree order, no cap; shared by every source AND the previews. Point targets (Mouse, Global Positions): id = `GRAZE_POINT_TARGET_BIT` (bit 63, never set for a Node) + index; never looked up in ObjectDB |
+| Target lists | `factory/graze_detector2d.*` | `GrazeDetector2D`: the factory owns one (a list per group, every tick) for factory volleys; each spawner owns one (`std::shared_ptr`, shared with every volley it armed) and hands out the factory's list while it is Node Group + no filter + interval 0. `GrazeTargetList2D`: growable, stable slots (`slot_of` hash, free-slot reuse, per-slot change serials), one list per (factory, group) (a `BulletTargets2D` read by the bullets of two factories never rescans at their switches; idle lists of a factory go after 600 of its sweeps, a gone factory's at the next new list), membership rescanned per `update_interval` (factory `graze_clock`), positions once per sweep, re-validated within a sweep when the factory's user-code epoch moved, x-sorted test view past 8 targets |
+| Arming + dispatch | `bullet_volley/bullet_volley2d_graze.cpp` | `graze_set_zones(zones, group)` (factory volleys; empty group refused), `graze_arm_from_spawner` (C++), `graze_target_list()`, `prepare_graze_tick` (reads the list in place; copies only <= 8 targets inline or a view without its owner spawner), `dispatch_graze_events` |
+| Per-bullet stage | `bullet_volley2d_tick.cpp` | `step_graze`: the swept distance to the targets once per bullet (inline loop, or a binary-searched x slab), then each active zone's outer radius; `graze_visit` (`_NO_INLINE_` slow path) per zone |
+| Spawner | `bullet_spawner/pattern_spawner2d_graze.cpp` (sources), `bullet_spawner2d.cpp` (arming) | Graze group: `graze_target_source` (Node Group / Node Path / Node Name / Node Children / Mouse / Global Positions, serialized 0..5) + `graze_node_group`, `graze_global_positions` and the other knobs (homing's name matching via `core/node_scan2d.hpp`), `graze_update_interval`, `refresh_graze_targets`, `resolve_graze_targets()`, arming in `shoot_once` before `pre_shoot` (with sound, flock, split; a `pre_shoot` handler's own arming sticks), ring preview (`GrazePreviewLayer2D`: top-level, internal, owner-less, tagged) |
+
+### 20.2 Contract (pinned by the `*graze*` suites)
+
+- Signals `bullet_grazed(target, volley, bullet_index, zone, ring_index)` and
+  `bullet_graze_exited(target, volley, bullet_index, zone, deepest_ring_index)`,
+  same payload on spawner and factory, live after the move (tick order §11.2).
+  Bubbling: owner spawner first (while alive), then the factory ALWAYS.
+- Rings touched in one tick fire largest radius first (equal radii by index).
+  Once: each ring once per bullet life (per zone, shared by its targets).
+  After Exit: leaving the zone re-arms its rings.
+- A visit = inside the outermost ring of any zone target. It belongs to one
+  target (anchor slot = target of its latest new graze). Exit fires once per
+  visit that grazed, naming that target. Killed/cleared/expired/frozen
+  bullets never exit; a wake starts a fresh visit; a vanished anchor moves
+  the visit to another target the bullet is still inside, else ends it
+  silently; a zone losing every target ends its visits silently. A target
+  keeps its slot while others come and go; a new list (source switch, new
+  group) re-anchors every open visit the same way.
+- Targets: Node Group (default; `graze_node_group`, EMPTY by default: the
+  developer names it), Node Path, Node Name, Node Children, all filtered by
+  `graze_filter_group` and THE target filter, NO cap, tree order (ties),
+  never the spawner, never a factory or its nodes; the scans never find
+  anything under the spawner, Node Group / Node Path may name its
+  children. Membership rescans every `graze_update_interval`
+  (0 = every tick: a joining target counts next tick); between scans
+  positions stay live and a freed/queued target drops at once.
+- Point sources: Mouse (the factory's `get_global_mouse_position()`, at
+  runtime only: the editor draws nothing) and Global Positions (every
+  entry, finite by the setter). Read every sweep (no filter group, no
+  interval), signals carry a null `target`, a visit follows its point's
+  index, `resolve_graze_targets()` returns the points as Vector2.
+  `refresh_graze_targets()` rescans now. Spawner settings are shared with
+  its volleys (edits reach bullets in flight; orphans keep them and the
+  nodes the paths last resolved); `release_life` drops them.
+- Inside a sweep, a target freed or queued by ANY live handler of an
+  earlier volley is never tested by a later one (its Once ring is never
+  spent): `BulletFactory2D::note_user_code()` bumps the user-code epoch
+  right before every live emit / timer callback in the tick and the lists
+  re-validate when it moved. A NEW emit or callback site in the tick MUST
+  call `note_user_code()` (`test_volley_graze_handlers` pins two sites).
+- Dispatch drops events whose bullet epoch moved, whose zones generation
+  changed, or whose node target is freed/queued (points never die); stops when the volley is freed
+  or queued; a pause lets the batch finish; an early tick return keeps the
+  queue for the next tick; `release_life` clears it.
+- The owner spawner never grazes its own bullets. Volleys hold zone Refs and
+  read them every tick (live edits reach bullets in flight); `release_life`
+  unrefs them (weakref-tested).
+
+### 20.3 State and limits
+
+`graze_state`: one `uint16_t` per bullet per zone slot (`uint16_t`, not
+`uint8_t`: char stores alias everything and would force reloads in the
+loop). Bits 0-3 rings grazed, 4 inside, 5-6 deepest ring of the visit,
+7 visit fired; `graze_anchor` (`uint32_t`, same indexing) is the visit's
+target slot. Targets: no cap. Structural limits: 4 zones per volley, 4
+rings per zone (`BulletVolley2D::MAX_GRAZE_ZONES`,
+`GrazeZone2D::MAX_RINGS`). Per-bullet cost grows with the LIVE
+targets only; past `GrazeTargetList2D::slab_min_targets` (8) a bullet tests
+only the x-slab around its motion (`debug_set_graze_slab_min_targets`
+forces either path; `test_volley_graze_slab` proves them equal).
+
+### 20.4 Adding a zone option
+
+A zone option is about HOW a graze is measured (who grazes belongs to the
+spawner's Graze group: §20.5). Field + validated setter (emit_changed,
+"GrazeZone2D: <prop> ..., keeping the old value.") + bind in
+`graze_zone2d.cpp`; read it in
+`prepare_graze_tick` into `GrazeTickZone2D` (never read the Resource per
+bullet); cover it in `test_volley_graze_core` (mutation-checked); the data
+setter sweep picks the setter up automatically; regenerate docs (§17).
+
+### 20.5 Adding a graze target source
+
+Append the id to `GrazeDetector2D::Source` AND `BulletSpawner2D::GrazeTargetSource`
+(serialized: never renumber) + the hint string; knobs = member + validated
+setter that ends in `apply_graze_detector_config()` (+ `notify_property_list_changed()`
+when it gates), a `Config` field filled in `graze_detector_config()`, gating
+in `_validate_property`, an empty-setting line in `_get_configuration_warnings`;
+the scan is one `case` in `GrazeDetector2D::scan` (nodes go through
+`graze_add_target2d` = THE target filter, never the spawner; a point source
+emits `GRAZE_POINT_TARGET_BIT | index` ids and belongs in
+`GrazeDetector2D::uses_points()`); add the source to the matrices:
+`test_spawner_target_filter` (node sources), `test_spawner_graze_sources`
+(the per-source contract) or `test_spawner_graze_point_sources`, then docs
+(§17).
+
+## 21. Sound (`SoundMix2D`, `BulletSoundData2D`, `LaserSoundData2D`, mixer, spawner Sound group)
+
+### 21.1 Pieces
+
+| Piece | Where | Notes |
+|---|---|---|
+| Mix part | `data/sound_mix2d.*`, `sound_mix_{declarations,accessors,binds}2d.inc` | `SoundMix2D`: HOW a sound plays (streams + stream mode, mix, spatial, audibility, limits, fades, ducking, priority, `follow`), a plain C++ base every sound resource inherits next to `Resource`; the `.inc` files generate its declarations, validated accessors (texts name `SOUND_DATA_NAME`) and binds in each class (hooks `SOUND_MIX_TRIGGER_BINDS()` / `SOUND_MIX_LIMIT_BINDS()` keep the inspector order). The mixer reads only `SoundMix2D` (`sound_resource()`, `sound_trigger()`, `sound_mix_of2d(obj)`) |
+| Entry resources | `data/bullet_sound_data2d.*`, `data/laser_sound_data2d.*` | WHEN it plays: `BulletSoundData2D` (13 SOUND_ON_* ids, ring/zone filters, volley-amount gate, `follow_bullet`); `LaserSoundData2D` (14 LASER_SOUND_ON_* ids: Shot 0, Telegraph 1, Charge 2, Fire 3, Active 4, Hit 5, Pierce Start 6, Pierce End 7, Wall Hit 8, Graze 9, Graze Exit 10, Finish 11, Ended Early 12, Despawn 13; ring/zone filters, `follow_beam`, `follow_point` Tip/Muzzle; the mix enums bound on it too). Both serialized: never renumber |
+| Laser arming | `laser/laser_volley2d.cpp`, `_tick.cpp` | `sound_set_effects` / `sound_arm` take `LaserSoundData2D` only; `sound_fire(trigger, pos, beam, ring, zone)` at every event site (before the event's signal); On Active once per live beam per hitting tick at `sound_beam_point`; `charge_sounded` / `ended_early` reset in `begin_life`; a followed voice rides `beam_point` while `beam_sounds` (SoundFollowKind2D LASER_TIP / LASER_MUZZLE) |
+| Volley arming | `bullet_volley/bullet_volley2d_sound.cpp` | `sound_set_effects` (factory volleys), `sound_arm_from_spawner` (spawner volleys); trigger sites call `sound_fire`, On Flight calls `sound_fire_flight` from the tick |
+| Factory hatch | `factory/bullet_factory2d_sound.cpp` | `sound_offer` (volleys and spawner), `play_sound` (manual), debug readouts |
+| Mixer | `factory/sound_mixer2d.*` | Channels per resource (shared by every spawner using it), bounded per-sweep candidates (nearest wins), voice pool (one AudioStreamPlayer2D per voice, polyphony 1), `flush` at the end of the factory sweep |
+| Spawner | `bullet_spawner/pattern_spawner2d_sound.cpp` (entries, listeners), `bullet_spawner2d.cpp` / `laser_spawner2d.cpp` (arming) | Sound group: `sound_effects`, `sound_volume_db`, listener source (`TargetSource2D`, THE target filter), On Shot / On Telegraph. Each spawner type names its entry class through hooks (`sound_entry_class`, `sound_entry_of`, `spawner_sound_trigger(SpawnerSoundEvent2D)`, `shot_noun` for the warnings) and `bind_spawner_group(..., sound_entry_class)` types the array hint: a spawner refuses the other class |
+| Cosmetic RNG | `core/cosmetic_rng2d.hpp` | PCG32 for mix and effect-layer rolls only; gameplay keeps Godot's global RNG |
+
+### 21.2 Contract
+
+- Zero cost until armed: a trigger site tests one mask bit; an unarmed volley makes no offers.
+- Audibility (distance, camera view) is judged at offer AND again at `flush` against the listener as it stands then, so a listener moved by a handler mid-sweep silences that sweep. The per-sweep offer cache is only an optimization of the offer-time check.
+- Offers never play inside the sweep: `flush` plays the winners after every volley, effect and timer of the sweep (at most one tick of latency).
+- A channel's `min_interval_sec` and `max_voices` are shared by every spawner and volley using the resource. Nearest wins each sweep.
+- Fading voices hold their pool slot but never count toward `max_voices` and are never restarted. A full pool steals the oldest fading voice first, then starts the oldest live voice's fade (that one play waits one sweep).
+- `pitch_scale` / `pitch_min` / `pitch_max` stop at 1000: Godot's audio mixer never finishes a looping stream at ~1e8x speed (plain AudioStreamPlayer2D nodes too), a typo like 1e9 froze the game for tens of seconds (pinned in `test_sound_data_contract`).
+- `follow_bullet`: one live voice per bullet and entry; the voice rides the bullet and fades when the bullet ends. `follow_beam` (lasers): one voice per beam and entry, riding its tip or muzzle; it fades when the beam is spent or the laser ends.
+- Every laser event offers its trigger once (`sound/test_sound_laser.gd` compares offers with the signals); On Finish and On Ended Early exclude each other; the offer log names the class (`sound_class`) and the event `position`, and the MixLedger counts laser offers as `laser_offer:<id>`.
+- Cosmetic rolls (volume, pitch, pan, chance, stream picks, effect starts) draw from `CosmeticRng2D`. Tests reseed it with `BulletFactory2D.debug_seed_cosmetic_rng`.
+
+### 21.3 Cost and open work
+
+- Per tick, On Flight offers once per live bullet. A followed bullet also scans the voices of its entry (O(voices)) per offer. Measured with `sound_flight_10k` (10k bullets, followed hum): tick p50 2.03 ms before the per-sweep offer cache, 1.26 ms after (plain 10k flight is about 0.28 ms). `sound_hit_storm` (On Hit on every wall hit) is unchanged at about 0.15 ms tick.
+- Ducking ranks the busy voices once per sweep (one sort, O(V log V)); equal priorities never dip each other. Duck timing: a duck applies on the sweep after its voices start.
+- Offers still do per-bullet work (channel lookup, candidate copy, follow dedup over the entry's voices). The per-sweep cache removed the engine calls; the rest is the next target if the flight cost matters.
+
+### 21.4 Tests
+
+`test_project/tests/sound/` (17 suites, `test_sound_laser` for the laser triggers, `test_sound_rng_isolation` among them; `test_sound_reentrancy` pins user code inside the sweep). Mixer rules live in `test_sound_mixer_unit`, flight and hum rules in `test_sound_flight`, spatial and camera in `test_sound_spatial_limits` and `test_sound_camera`.
+
+## 22. World controls (time scale, despawn bounds, randomization, pickups)
+
+### 22.1 Time scale
+
+- One bullet-world clock: `BulletFactory2D.time_scale` (default 1, 0 = frozen, still processing).
+  A volley ticks on `delta * factory.volley_time_factor(volley)` = factory scale x its owner
+  spawner's `time_scale` (only while that spawner lives and `time_scale_affects_volleys` is on;
+  orphans, factory-spawned and pooled volleys use the factory scale alone). Custom timers use the
+  same factor. One-shot effects (`age_fx_effects`) use the factory scale only.
+- A spawner's own clock (`BulletSpawner2D::get_process_time_scale`) = hitch-clamped delta (0.5 s)
+  x spawner scale x factory scale, clamped to 0.5 s again after the scale; every countdown, spin
+  and the Path2D movement run on it. Scale 0 freezes everything and resumes with the exact
+  remaining time; large scales stay bounded by that second clamp (one frame never runs a
+  month-long scaled step) plus the existing caps (8 shot pulls per frame, 64 movement legs).
+- Real time on purpose: `graze_clock` (target rescans), sound fades/intervals/`min_interval_sec`.
+  Opt-in: `BulletSoundData2D.pitch_follows_time_scale` (pitch x scale, paused below 0.01; a pause
+  is re-asserted every sweep because Godot drops one requested before the playback registers).
+- Attachments: `BulletAttachment2D` multiplies `speed_scale` of descendant particles, animated
+  sprites and animation players (originals in node meta, restored exactly at 1.0) and calls
+  `on_time_scale_changed`; the factory pushes the volley's factor once per change
+  (`apply_attachment_time_scale`), released attachments go back to 1.0.
+- Physics interpolation needs nothing: prev/cur are copied once per tick, so any scale is smooth
+  (`volley/test_volley_time_scale_interpolation`).
+
+### 22.2 Randomization (spawner, applied at shot time)
+
+- Group "Randomization": scale (Off/Uniform/Per Axis), rotation and position jitter, speed
+  multiplier, `bullet_random_seed`. Randomized by the same rules but shown in their own groups:
+  `spin_random_start_phase` (Spin) and the timing ranges `shoot_interval_max_sec` /
+  `burst_interval_max_sec` / `telegraph_max_sec` (Shooting).
+- Rules: min/max pairs are never validated against each other (normalized at use: scene loading
+  sets min before max); every knob off draws nothing from the global RNG; seeded rolls are a pure
+  SplitMix64 hash of (seed, shots fired, channel, bullet index) so channels never share numbers;
+  unseeded rolls use Godot's global RNG; the pattern, preview, bake cache and
+  `collect_spawn_transforms()` never see the rolls (they run in `shoot_once` after the collect).
+  The speed multiplier is applied once after the spawn (`BulletVolley2D::apply_speed_factors`);
+  nothing changed in the tick.
+- Roll order per bullet (`ShotRandomizer2D::apply`): turn, then scale along the bullet's own
+  (turned) axes, then jitter. Scaling first and turning inside the scaled frame skewed the basis
+  (the volley then silently recomposed it). `BulletPatterns2D.randomize_transforms(transforms,
+  settings, seed, shot_index)` is the same roller for scripts (the spawner's setting names and rules;
+  seeded = exactly the spawner's shot `shot_index`).
+
+### 22.3 Pickups
+
+- `BulletPickupData2D` (look, burst, magnet, collection, optional collision) is converted into
+  one `BulletVolleyData2D` (cached, dropped on `changed`). Entry points all end in
+  `BulletFactory2D::convert_to_pickups_impl`: validate (pickup, busy latch, target) -> snapshot the
+  sources (read-only) -> spawn one pickup volley per `pattern_max_bullets()` chunk -> only then
+  disable the sources under the busy latch (a refused spawn never costs a bullet) -> signal.
+- A pickup volley carries `pickup_data` and `pickup_time_scale_owner_id` (both cleared in
+  `release_life`, so a pooled volley is plain again). `motion_mode`: Burst And Magnet (initial
+  velocity + `linear_drag`; at `magnet_delay_sec` the tick hook `maybe_begin_pickup_magnet` ends the
+  drag and sets acceleration/max speed), Keep Bullet Motion (each pickup keeps the source's speed,
+  top speed, acceleration: `PickupSeed`), Custom (the developer's `speed_data`/`curves_data`; only
+  the heading comes from the source). Steering is the normal homing after `magnet_delay_sec`
+  (`homing_take_control_of_texture_rotation` must be on or nothing turns). Collection = the homing
+  reach event routed to `collect_pickup_bullet`, or a touch with `collect_on_collision` (hook in
+  `handle_bullet_collision`, before bounce/counters): signal, then `collect_callback`, then
+  sound/effect, then the bullet leaves. Pickup volleys use `bullet_max_collision_count = 0`: a
+  touch never kills one. Poses that overflow float32 fall back to the source pose
+  (`pose_is_usable`). Pickups are owned by the factory and never converted again.
+- The homing reach test is SWEPT: `try_to_emit_bullet_homing_target_reached_signal` gets the
+  pre-move origin and the move, and tests the closest point of the segment (a fast bullet or
+  pickup cannot fly through the threshold circle in one tick).
+- Despawn bounds: a culled bullet fires `EFFECT_ON_DESPAWN` / `SOUND_ON_DESPAWN` and the factory
+  signal `bullets_despawned` (positions captured only while connected); `BulletVolleyData2D.
+  ignore_despawn_bounds` and `BulletPickupData2D.obey_despawn_bounds` opt out; a spawner whose
+  muzzle (global position + spawn offset) is outside does not shoot or telegraph
+  (`volley_skipped` "outside_despawn_bounds", opt-out `shoot_outside_despawn_bounds`).
+  `clear_active_bullets` announces each volley through `bullets_cleared` like the area clears.
+  Pre-warm pickup pools with `populate_pickup_pool(pickup, bullet_count, n)` (pool keys use the
+  bullet count, which the pickup data alone does not have).
+- Despawn bounds preview: `DespawnBoundsPreviewLayer2D` (internal, owner-less, tagged, top-level),
+  created lazily outside `_ready` (the factory skips `_ready` in the editor); editor always,
+  runtime only with `despawn_bounds_preview_during_runtime`.
+- Tests: `factory/test_factory_pickups*` (looks, motion, targets, hardening, stability fuzz),
+  `factory/test_factory_despawn_triggers`, `data/test_pickup_data_resource`,
+  `spawner/test_spawner_time_scale`, `spawner/test_spawner_randomization`,
+  `volley/test_volley_attachment_time_scale`, `sound/test_sound_time_scale`,
+  `factory/test_factory_despawn_preview` (+ the `despawn_preview` editor smoke probe).
+
+## 23. Flocking (`BulletFlock2D`, flock pass, spawner group)
+
+Boids: every tick each flocking bullet steers by
+`V = alignment * A + cohesion * C + separation * S` (radians per second),
+measured where every flockmate stood BEFORE the sweep moved anyone (A = mean
+flight heading of the flockmates within `neighbor_range`, C = mean offset to
+them / `neighbor_range`, S = the summed pushes of the flockmates in
+`separation_range` scaled to sqrt(strongest push x mean push), each pair
+measured `separation_lookahead_sec` ahead along its own flight, push =
+1 - gap / range capped at 2). A bullet keeps its speed, so V is a sideways
+force: the heading turns at cross(heading, V) per second (never past V,
+eased by `turn_smoothing_sec` turn inertia, capped by
+`max_turn_rate_degrees`, faded in over the volley's first `blend_in_sec`).
+Separation outranks homing: the pass also writes each bullet's crowding
+(its strongest single push, 0..1) and `step_flock` gives back that share of
+the tick's homing turn (`BulletStep2D::pre_homing`) before turning; a bullet with a heading is pushed
+perpendicular to it, away from the side each flockmate is on (by the
+bearing: full past 30 deg off the heading line, proportional inside; a
+flockmate exactly on the line or stacked takes the bullet's golden-ratio fan
+side). Measured with `tests/common/motion_probe.gd`: the old
+target-heading turn (`1 - e^(-|V| dt)` of the angle) flipped crowded
+bullets 180 deg per tick; the MEAN push alone was too weak to hold any gap
+against homing (a homing swarm piled up as if there were no flock); the
+strongest push alone made whole stacks turn in lockstep; strong pushes
+without turn inertia chattered left-right at the cap.
+
+### 23.1 Pieces
+
+| Piece | Where | Notes |
+|---|---|---|
+| Rules | `data/bullet_flock2d.*` | weights (per second), ranges (edge gaps while `count_bullet_size`, the default: radius = half the quad's mean side x the bullet's scale; the grid cell then grows by the flock's largest bullet pair, decided in `solve()` after every volley is gathered), turn cap, `face_heading`, `max_neighbors` (0 = all), `update_interval` (s, 0 = every tick), `view_angle_degrees` (360 = all around), enum `Scope` (Per Spawner 0 / Shared 1 / Per Volley 2, serialized); every accepted change emits `changed` |
+| Who flies together | `FlockConfig2D` (`factory/flock_solver2d.hpp`) | {flock, scope, enabled, captured owner id, serial}; the spawner owns one `std::shared_ptr` shared with every volley it armed (edits reach bullets in flight, orphans keep it); `flock_join` gives a volley its own |
+| Arming | `bullet_volley/bullet_volley2d_flock.cpp` | `flock_set_config` is THE choke point (keeps `BulletFactory2D::flock_armed_volleys` exact): spawner arming, join, leave, `release_life`, PREDELETE (`force_delete` skips `release_life`) |
+| Pass | `factory/bullet_factory2d_flock.cpp`, `factory/flock_solver2d.*` | in `tick_volleys` right after `snapshot_active_volleys`, skipped while nothing is armed or `time_scale` is 0; flock key = (resource id, scope kind, owner id / 0 / volley id); slots `base..base+amount` per volley, zeroed per pass; cell = max(range)/2, 5x5 block, own cell first then the 8- and 16-rings, starts rotating per bullet; per-flock ordinals make each flock bit-identical to flying alone |
+| Turn | `step_flock` in `bullet_volley2d_tick.cpp` | after `step_homing`, before the curves; the volley reads its slice through `FlockView2D` {base, sweep, life, serial} (never a pointer) and only when all match; skipped for locked orbits and zero headings; after a turn the basis is ALIGNED to the new heading (absolute, unit rotation: a relative turn drifted when homing snapped the heading) when `face_heading` (unless rotation data spins the sprite) or when the rotation owns the heading (`adjust_direction_based_on_rotation`, or homing in transform mode: `update_homing` re-derives the heading from the basis) |
+| Interval | `FlockSteerCache2D` in `BulletVolley2D::flock_cache` | `update_interval > 0`: each bullet recomputes when the factory's flock clock (bullet time) crosses its golden-ratio phase; between refreshes its slot is filled from the cache; written back after the solve; dropped with every membership change and every rules edit (`BulletFlock2D::rules_serial`, bumped with `changed`); an invalid entry (new, reused, woken) computes at once |
+| Spawner | `bullet_spawner/bullet_spawner2d_flock.cpp` | Flocking group after Orbiting: `flock_enabled`, `flock`, `flock_scope` (hidden while off); an empty `flock` = `BulletFactory2D.get_default_flock()` (`effective_flock()`, also `flock_join(null)`); armed in `shoot_once` next to graze/sound, before `pre_shoot` (the first signal); `apply_to_live_volleys(LIVE_FLOCK)` arms owned volleys fired while off (or taken over by a script); setup warning for snapping homing |
+| Presets | `data/bullet_flock2d.cpp` (`FLOCK_PRESETS`) | `Preset` enum (Custom 0, Swarm 1 = the defaults, Fly Together 2, Keep Distance 3, Tight Group 4); `apply_preset` / `get_matching_preset` back the editor-only `preset` property (never saved, so the setter walks skip it), `create_preset` is static; a preset writes the steering knobs only |
+| Readouts | `bullet_volley2d_flock.cpp`, `bullet_spawner2d_explain.cpp` | `debug_get_bullet_flock_info(i)` (steering, neighbors, blend, radius via `flock_bullet_radius2d`, heading, facing); `BulletSpawner2D.debug_explain_features()` (one sentence per steering group + the setup warnings) |
+
+### 23.2 Contract (pinned by the `*flock*` suites)
+
+- Separate flocks never see each other; zero weights, out-of-range
+  flockmates and a calm aligned flock are bit-identical to no flock.
+- Frozen bullets and bullets beyond 2^30 cells are not flockmates; a
+  negative speed flies along -direction (its flight heading counts).
+- A handler mid-sweep that frees, leaves, joins, toggles or edits never
+  steers with stale data (serial/life mismatch = no turn this tick);
+  resource edits apply from the next pass.
+- Spawner: turning flocking off stops it for bullets in flight (on resumes
+  them); bullets fired while it was off never flock; `adopt_live_volley`
+  leaves flocking alone.
+- `debug_assert_no_dangling` fails when the armed count disagrees with the
+  volleys holding a config, or a pooled volley still flocks.
+- Field of view: flockmates outside the cone around the FLIGHT heading are
+  ignored by every rule and the cap; stacked ones are always seen; a bullet
+  without a heading sees all around. The cone test runs only below 360.
+- A factory frees every tracked volley at teardown when a script moved one
+  out of its subtree (its teardown would otherwise call into freed memory).
+
+- Defaults (separation 10, alignment 1, cohesion 1.5, neighbor_range 150,
+  separation_range 24, edge gaps, lookahead 0.2 s, turn cap 270 deg/s,
+  turn inertia 0.1 s, blend-in 0.3 s, 32 neighbors); a homing swarm of 16 px
+  bullets keeps 89% of them apart around one target point
+  (`test_a_homing_swarm_keeps_its_distance`) were picked with MotionProbe sweeps (16 and
+  128 px, random scale 1-2, 3-shot bursts, homing, wobble): no 180 deg
+  flips, about 1-2.5 turn-side flips per bullet per second in crowds (a
+  homing crowd at its target buzzes at about 5), sprites on the heading,
+  clear gaps wherever the geometry allows. Fewer neighbors (16, 12) measured
+  noisier (the sampled set changes per tick). Pinned by
+  `volley/test_volley_flock_motion.gd`. The rule tests use
+  `H.make_flock(...)` (count_bullet_size, blend-in, lookahead and the turn
+  cap OFF) to pin the formulas alone.
+- Bullet size per bullet everywhere: the flock radius (`flock_bullet_radius2d`), graze rings (`graze_visit` narrows the volley's largest radius, measured at arming, to the bullet's own scale; the fast reject keeps the largest) and the opt-in homing reach (`homing_reach_counts_bullet_size`: shape bound x own scale). Pinned through the real spawner path by `integration/test_feature_mix_matrix.gd`.
+- Texture rotation is cosmetic for every feature that faces or steers by
+  the basis (the basis carries heading + offset): pinned by
+  `volley/test_volley_texture_rotation_paths.gd` (homing once turned by
+  MINUS the offset and flew off course).
+
+### 23.3 Adding a rule
+
+A field + validated setter on `BulletFlock2D` (standard wording, emit
+`changed`); read it ONCE per flock in `FlockSolver2D::group_for` into
+`Group`; add its term in `solve()` (inside the candidate test if it needs
+pairs, keeping the sums plain locals); a mutation-checked test in
+`volley/test_volley_flock_rules.gd`; the snapshot `flock` section; docs (§17).
+
+## 24. Splitting (`BulletSplitData2D`, capture, flush, spawner group)
+
+A dying bullet bursts into `count` children: ONE new volley of exactly
+`count` bullets per parent (one pool key, perfect reuse). `stages[d]`
+(`BulletSplitStage2D`) splits generation d; the chain ends at the last stage
+(or `max_depth` with `repeat_last_stage`).
+
+| Piece | Where | Notes |
+|---|---|---|
+| Resources | `data/bullet_split_stage2d.*`, `data/bullet_split_data2d.*` | triggers (deaths: killing hit, lifetime, despawn, clear; non-lethal: bounce, survived hit, homing reached, graze; plus the `split_after_sec` timer; despawn, clear and the non-lethal ones off by default), `parent_survives` + `max_splits_per_bullet` (per-life `split_counts`; deaths always take the parent), count/chance/seed, direction (Fan 0 / Ring 1 / Random In Spread 2), speed (Multiply Parent 0 / Fixed 1 / From Spawn Data 2; Ramp/Random), offset, scale, `child_data`, keep flags, `fire_death_effects`; enum ids serialized; `EFFECT_ON_SPLIT` 8 / `SOUND_ON_SPLIT` 12 appended |
+| Shared types | `factory/split_queue2d.hpp` | `SplitConfig2D` (chain + switch, shared like `FlockConfig2D`), `SplitArming2D` (graze/sound/flock snapshot, one per arming change of a life), `SplitRequest2D` (POD: never a volley pointer), `SplitCause2D` (signal ids, serialized), seeded rolls = SplitMix64 of (seed, generation, parent index, child, channel) |
+| Capture | `bullet_volley/bullet_volley2d_split.cpp` | `split_capture` runs no user code and is called BEFORE every disable (the last disable pools the volley): lethal hit (after the handler), `disable_bullets_bulk(..., split_cause)` (lifetime, despawn, clears, timer, manual), `clear_bullet`; the non-lethal triggers go through `split_on_event` AFTER their handler (bounce and survived hit in `handle_bullet_collision`, homing reached and graze in their dispatchers) and re-check liveness after it (the parent's disable runs attachment callbacks). `split_arm` is THE choke point (`release_life` disarms). Pickup conversion, reset and free pass no cause |
+| Flush | `factory/bullet_factory2d_split.cpp` | `_physics_process` after the timers, before the sound flush; works on a swapped-out batch (splits recorded meanwhile wait: one generation per sweep, never an endless chain); `split_drop_epoch` cancels the rest when a handler resets; `split_max_children_per_sweep` carries over in order; `split_max_pending` (default 100000, 0 = no cap) bounds the queue: `split_has_room()` in `split_capture` drops a new split past it (one warning per overflow, `dropped_total`); children of the parent's data spawn from `split_child_template` (per-bullet arrays removed, cached per source until `changed`) and get the parent bullet's own spin/gravity/curves/wobble; `child_data` is used exactly |
+| Spawner | `bullet_spawner/bullet_spawner2d_split.cpp` | Splitting group after Flocking; armed in `shoot_once` next to flock, before `pre_shoot` (the first signal), with the shot's spawn data; `split_configure_child_homing` re-aims children like a fresh shot |
+
+Contract (the `*split*` suites, `integration/test_*_free_matrix`): exact
+count at the death pose in the same sweep, first move next sweep; heal /
+lifetime extension vetoes; routing like hits (spawner, factory, silent
+orphan); pooled volleys never keep a chain (`debug_assert_no_dangling`);
+reset/free drop queued splits; a handler freeing anything mid-flush is
+survived. ASan found two use-after-frees while this was built (a member read
+after the `life_time_over` handler; a drop after free_active's callbacks):
+read nothing of `this` after user code before the liveness check.
+
+## 25. Feature mixing (`MixLedger`, `FeatureMix`, cover suites)
+
+Every feature crossed with every other one through the real spawner path,
+checked by an oracle instead of hand-picked expectations.
+
+| Piece | Where | Notes |
+|---|---|---|
+| Debug logs | `factory/bullet_factory2d_effects.cpp`, `_sound.cpp` | `debug_set_bullet_event_log_enabled` (every life start, wake and disable with its cause: hit, lifetime, despawn, clear, split, split_manual, pickup, collect, manual), `debug_set_sound_offer_log_enabled` (every `sound_offer` BEFORE audibility and limits), the effect log (now with `life`). One bool check each while off. A new disable path passes its cause to `disable_bullet_core` / `disable_bullets_bulk` |
+| Oracle | `tests/common/mix_ledger.gd` | Bullet life intervals from the event log; rules: one death per life, every offer / effect names a live bullet of its life (closed that frame at the latest), death triggers match the death cause, signals see live bullets (it connects FIRST: attach before any test handler), `bullets_cleared` / `bullets_despawned` name bullets that left that way in the life they name. `per_frame_limits` off where `debug_advance_time` ticks inside a physics frame |
+| Catalog | `tests/common/feature_mix.gd` | 49 features (`FEATURES`), each = setup in `_configure`, timeline actions in `_act` (teleports 9-27, freeze 12/22, clear 24, pickups 36, orphan 50, park wake 100), proof in `_evidence` (`emitter`: the bullets fire a template whose bullets fire short lasers through a LaserSpawner2D). A run checks the ledger, books, finiteness and what is drawn every frame, then winds down (every bullet out, every volley pooled / parked / freed, every laser finished and pooled, no emitter shot queued); `run_twice` repeats it on the warm pool (no new volleys, the same deaths) |
+| Suites | `integration/test_feature_mix_solo.gd`, `test_feature_mix_cover_{a,b,c}.gd`, `test_mix_{teleport,interpolation,animation,speed_curves,trigger_ledger}.gd` | Solo: each feature alone + evidence. Cover: a seeded greedy covering array (every pair, 8 features a mix) + the kitchen sink, sliced over 3 files. The `test_mix_*` suites pin the exact contracts of the named crosses |
+
+Knobs: `MIX_SEEDS=<n>` soaks n cover seeds (~10 s per seed per file),
+`MIX_ONLY=<seed>:<index>` reruns one mix, `MIX_SKIP=<f,g>` bisects. To find
+where two runs part ways set `record_trace = true` on both and diff the
+traces (a divergence is usually something keyed by instance id, e.g. the
+default retarget stagger: mixes fix `homing_retarget_phase`).
+
+Add a feature: a `FEATURES` entry (+ `NEEDS`), its setup, actions and
+evidence; run the solo suite (the evidence must hold alone), then the cover
+with `MIX_SEEDS=30`. A legit documented warning goes into `WARNING_OK` with
+its reason.
+
+Facts learned building it (each pinned):
+- The headless renderer keeps whole-buffer uploads only: per-instance
+  writes (teleports, wakes, a spawner's muzzle shift) are invisible to
+  `multimesh.buffer` until the next upload. Compare drawn poses only after a
+  volley ticked (its flush) or after the interpolation pass.
+- A tick moves at the speed it sampled from the curves at its start; the
+  curve clock advances after the move (`test_mix_speed_curves`).
+- A Godot `Curve.add_point` without tangents eases in and out: use
+  `TANGENT_LINEAR` points where a test computes speeds.
+- Static bodies are hit only with `monitorable` on (documented).
+- A manual split leaves like a clear (On Clear), a split by a non-lethal
+  trigger silently (the children replace the parent).
+
+
+## 26. Spawner architecture (PatternSpawner2D, BulletSpawner2D, LaserSpawner2D)
+
+`PatternSpawner2D` (abstract, `bullet_spawner/pattern_spawner2d*`) owns WHERE
+and WHEN to fire: pattern sources and preview, the Transform subgroup,
+cadence (auto fire, budgets, bursts, telegraph, pattern lists,
+`shoot_once_with`, `shoot_from`), spin, Path2D movement and `teleport`, time
+scale, `process_callback`, placement randomization, countdowns, and the Graze
+and Sound target settings. A derived spawner decides WHAT a shot fires through
+the hooks (`shot_preflight`, `shot_prepare`, `fire_shot`, `needs_process_owned`
+/ `process_owned`, `on_predelete_owned`, `on_teleported_owned` (every teleport:
+riding lasers snap, carry shifts the rest), `append_*_warnings`, `payload_key`,
+`preview_beam_length`, ...). `fire_shot` counts the shot (`volleys_fired`) and
+emits the class's own fired signal; the skeleton then plays On Shot and
+handles budgets and caps.
+
+The base is assembled from parts (plain C++ members, each with its settings,
+runtime state and pure logic; the host keeps the node, the tree and every
+emit, and re-checks the parts' serials after user code):
+
+| Part | Member | Holds |
+|---|---|---|
+| `ShotCadence2D` (`shot_cadence2d.*`) | `cadence` | WHEN: auto fire, interval ranges + reload jitter (its own RNG), budgets, `max_shots_per_frame`, bursts, telegraph, the pattern-list sequencer, `volleys_fired` (`count_shot()`, `next_shot_number()`) and the serials |
+| `SpawnerSpin2D` (`spawner_spin2d.hpp`) | `spin` | the Spin group, the angle and the oscillation clock (`advance`, `reset`, `start_at_phase`) |
+| `SpawnerMovement2D` (`spawner_movement2d.hpp`) | `movement` | the Movement group, the playback state, `epoch`, leg timing and easing |
+| `SpawnerPreview2D` (`spawner_preview2d.hpp`) | `preview` | the preview look, the watched sources, the preview nodes (ids next to pointers) and the rebuild bookkeeping |
+| `ShotRandomizer2D` (`patterns/shot_randomizer2d.hpp`) | `placement` | the placement rolls (also `BulletPatterns2D.randomize_transforms`) |
+| `TargetSource2D` (`targets/target_source2d.*`) | graze / sound sources | WHO a feature finds, one detector shared with the volleys |
+
+Bound accessors stay on the spawner (their error texts name `get_class()`)
+and forward to the part; a part's enums carry the serialized ids, pinned by
+a `static_assert` against the bound enum. A derived spawner fires through the
+part's API (`cadence.count_shot()`), never its counters.
+
+- Base errors name `get_class()` (BulletSpawner2D texts stay byte-identical).
+- Register a derived class AFTER `PatternSpawner2D` in `register_types.cpp`
+  (an extension class with a not-yet-registered parent makes every class
+  after it fail to bind).
+- `emit_on2d(Object*)` casts to `PatternSpawner2D` (the emit guard lives on
+  the base), so every spawner type emits through its guard.
+- A virtual declared in the base and never defined links fine and crashes
+  at extension LOAD: after every build `nm -D -u -C <library> | grep -i
+  blastbullets2d::` must print nothing.
+
+## 27. Lasers (`LaserData2D`, `LaserVolley2D`, factory lasers, `LaserSpawner2D`)
+
+A laser is its own system (its data, runtime, signals and spawner), sharing
+only what bullets share too (factory sweep, pause, time scale, graze target
+lists, the sound mixer, the target filter, the emit guard).
+
+| Piece | Where | Notes |
+|---|---|---|
+| Data | `data/laser_data2d.*` | type (Beam / Bolt / Curvy), size, phases (charge, grow, active (0 = until ended), fade), aim (Pattern / Track / Lock On), follow, sweep (+ arc), speed and wave, walls (`wall_mask`, `reflections`), hits (`collision_mask`, bodies / areas, `pierce_limit`, `hit_interval_sec`, `max_hits_per_beam`), looks (modulate, color ramp, body frames stretch / tile + scroll, `body_width_scale` (drawn only), `body_material`; five `LaserSpriteLook2D` slots `charge_look` / `muzzle_look` / `tip_look` / `pierce_look` / `wall_impact_look` (`data/laser_sprite_look2d.*`: frames + animation name, speed_scale, offset / rotation / scale turned with the beam while `align_to_beam`, modulate, z_index / z_as_relative, material, visible); a look's `changed` is passed on (connected once while any slot holds it); old saved names migrate in `_set`), presets (editor-only `preset`); gating per type / aim / walls / body mode |
+| Runtime | `laser/laser_volley2d*.cpp` | one node per shot, a `Beam` per slot; `begin_life` / `release_life` (pooled by beam count); the tick: phases (zero-length phases pass in one tick, one `laser_phase_changed` per phase, `end_laser` announced at the next tick start) -> geometry (anchor frame = `PatternSpawner2D::get_shot_frame()` while following, aim, sweep, extension, a wall ray per segment) -> contacts (a rectangle `intersect_shape` per segment; a polyline tests groups of 8 segments with one box (their points' bounds + the half width) first and queries a group's segments only when that box touches something, walls (bodies on `wall_mask`) never targets, nearest first, `pierce_limit` cuts a beam / spends a bolt) -> graze -> wall reports -> finish. Bolts and curvy lasers share a head + trail model (the body is the newest `length` px of the head's path, tail to head); a head that cannot reflect off a wall, used up its pierce limit or left the despawn bounds is spent; all spent = finished |
+| Signals | factory + `LaserSpawner2D` | `laser_phase_changed`, `laser_pierce_started` (always followed by its first `laser_hit`), `laser_hit` (repeats every `hit_interval_sec`, no burst after a hitch), `laser_pierce_ended` (only after a start; a freed target ends silently), `laser_wall_hit` (once per block), `laser_finished` (then pooled), `laser_grazed` / `laser_graze_exited` (owner spawner first, then the factory always), `laser_despawned` (a bolt or curvy head left the despawn bounds; not with `ignore_despawn_bounds`, which also lets the spawner fire from outside). A spawner laser signals on its spawner, a factory laser on the factory, never both |
+| Draw | `laser_volley2d_render.cpp` | every body of a laser is ONE triangle array (`canvas_item_add_triangle_array`: a strip of left/right pairs per beam, mitered up to 90 degree turns, split at sharper ones, 8 color-ramp pieces over the length; `debug_get_body_mesh(fraction)` reports it), the point looks on their own clocks, each slot on its own RenderingServer canvas item (child of the laser's item, z / material per look, all five created together the first time a life has a look, freed in PREDELETE, cleared at every `_draw`) through `collect_look_marks` (shared by `_draw` and `debug_get_look_draws`); interpolation lerps muzzle / angle / length for a straight beam (a sweep stays on its muzzle), point by point for a polyline; `debug_get_draw_state(fraction)` reports exactly what `_draw` uses |
+| Events | `laser_volley2d_tick.cpp` (`fire_event`), `data/laser_effect_data2d.*`, `factory/bullet_factory2d_effects.cpp` (`fx_play_laser_effect`) | every laser event site calls `fire_event(event, pos, beam, ring, zone)` BEFORE the event's signal (no user code inside): the sounds (`sound_fire`) and the data's `effects` (`LaserEffectData2D`: trigger = the laser sound ids 2..13, at Event / Muzzle / Tip, `align_to_beam`). Laser-wide events (charge, fire, finish, ended early) play effects once per beam; effects go through the manual one-shot bakes (no cap: idle bakes of dropped layers are pruned in `age_fx_effects`), a layer that cannot play is latched per bake version (`fx_failed_laser_layers`, cleared on a full reset); the effect log rows carry `laser` / `beam` and the MixLedger counts them as `laser_effect:<id>` |
+| Debugger | `debugger/laser_debug_layer2d.*`, `factory/bullet_factory2d_world.cpp` | while `is_debugger_enabled`, `refresh_laser_debug_layer` (after `tick_lasers`, no user code) collects `append_debug_boxes` of every listed laser into an internal, owner-less, top-level layer (`~BlastBulletsLaserDebug`, id-checked, healed from the tree); the boxes come from `laser_query_box2d` / `laser_query_half_width2d` (`laser/laser_geometry2d.hpp`), THE helpers of the contact query, so the overlay is what is tested; `debug_get_laser_debug_boxes` reads it |
+| Factory | `factory/bullet_factory2d_lasers.cpp`, `_world.cpp` | `spawn_laser` (script) / `spawn_laser_span` (C++), `tick_lasers` after the volley timers (each laser with its own time factor), `redraw_lasers` in the interpolation pass, `clear_active_lasers`, `end_lasers_in_circle` / `_rect` (bombs: the body, half its width included, touches the area; no user code, legal in handlers), `populate_lasers_pool` / `free_lasers_pool` (+ `_deferred`; idle only), `reset()` frees lasers, teardown detaches them; `debug_check_lasers` in `debug_assert_no_dangling` |
+| Handles | `laser_volley2d.cpp` | a pooled (or never fired) laser refuses EVERY write with one stale-handle error (`reject_stale_handle`, ClassDB-swept by `laser/test_laser_pooled_handle.gd`); the pool strips what a script added (`core/node_baseline2d.hpp`, shared with volleys: groups, metadata, node settings) and `custom_data`; graze dispatch stops when a handler re-arms or clears the zones (`graze_generation`); a vanished graze target hands its visit to another one inside; `set_beam_angle` restarts the draw history; bullet volleys are never laser targets (their areas carry no instance) |
+| Spawner | `bullet_spawner/laser_spawner2d.*` | Lasers (`laser_data`, `orphaned_lasers` Fade Out / Keep Firing / Hand To Factory / Remove, `max_live_lasers`), Laser Targeting (None / Node Group (nearest per beam) / Node Path / Mouse (every frame) / Global Position / Node Name / Node Children (the homing and graze scans, THE target filter), filter group, retarget interval); arms graze and sound at the shot, `apply_to_live_lasers(LIVE_GRAZE / LIVE_SOUND / LIVE_HOMING)` re-applies them to lasers in flight (armed alike = untouched); a teleport moves riding beams (and, with carry, the others); `shot_inherited_velocity()` (shared with bullets) hands the spawner's motion to bolt and curvy heads (`Beam::drift`, bounced at reflections), beams ignore it; a `shoot_from` shot never follows the template; the preview draws each slot as its beam (arrows at `LaserData2D.length`, redrawn on every `changed`: `debug_get_preview_arrows`, editor probe `laser_preview_smoke.tscn`) |
+
+Engine facts behind it (pinned in `integration/test_engine_facts.gd` and the
+laser suites): `intersect_ray` / `intersect_shape` work inside the factory
+tick; a body added to the tree is found by queries after one physics step
+(tests `await idle(2)` after building targets); exact binary ticks (1/16 s)
+make phase and interval tests land on their ticks (six 1/60 s steps sum to
+0.0999...).
+
+## 28. Emitter bullets (`BulletEmitterData2D`, emit queue, flush)
+
+A flying bullet fires a template spawner's whole pattern (any
+`PatternSpawner2D`: bullets or lasers) on its own schedule.
+
+- `EmitterConfig2D` (`factory/emit_queue2d.hpp`): {data, template id, enabled},
+  owned by the spawner and shared with its volleys (edits, a new template and
+  the switch reach bullets in flight; orphans keep it); `emitter_set` gives a
+  factory volley its own. `emitter_arm` is THE choke point (`release_life`
+  disarms).
+- The volley pass (`emitter_tick`, after the split timer): an O(1) gate on
+  the earliest due time (and `BulletEmitterData2D::rules_epoch`, so a raised
+  `max_shots` re-opens it); per live bullet at most one shot per tick, the
+  schedule moves on after a hitch (no burst); a parked volley's clock holds;
+  a wake re-enters the gate (`emitter_on_wake`). A shot is an `EmitRequest2D`
+  (plain data: template id, pose with the aim, spin, velocity).
+- `flush_emits` (after `flush_splits`): templates by id (freed ones skipped),
+  `emit_shot_from` = `shoot_from` with the auto-fire error latch (a broken
+  template reports once), `emitter_max_shots_per_sweep` carries over in
+  order, `emitter_max_pending` drops with one warning; reset / free / teardown
+  / orphan Clear-Remove drop queued shots.
+- A spawner's template chain is walked (no depth cap, a visited set) before
+  arming: a way back to the spawner is refused with one error.
+
+## 29. Runtime control, colors, per-bullet lifetimes, scale-in, interpolation
+
+- Code API without a spawner (`integration/test_code_api_parity.gd`): `BulletTargets2D`
+  (`targets/bullet_targets2d.*`: from_group / from_node / from_children / from_name /
+  from_positions / from_mouse, one spawner-less `GrazeDetector2D` shared by everything it arms;
+  node and children sources name their nodes through `set_fixed_nodes`) goes wherever a target
+  group went (`read_targets_argument2d`: graze_set_zones, sound_set_effects on volleys and lasers)
+  and into `LaserVolley2D.track` (nearest target per beam per interval; the spawner's retargets skip
+  a tracking laser). Volley and laser `time_scale`, `all_bullets_scale_speed` /
+  `all_bullets_scale_life_time`, `detach_from_spawner`, `LaserSpawner2D.adopt_live_laser`, the
+  factory listings by owner, `BulletPatterns2D.randomize_transforms` and
+  `BulletVolley2D.homing_follow` (shared or per-bullet nearest target on the volley's clock, a queue
+  replaced only when its front changes; the spawner's implicit updates (retargets, LIVE_HOMING, the wake arming) skip it, its explicit `home_live_volleys_to` / `clear_live_volleys_homing` end it) complete it.
+- `BulletSpawner2D.apply_to_live_volleys(LiveVolleyGroup flags)` re-applies
+  homing / graze / sound / flock / split / emitter to what it already fired;
+  `home_live_volleys_to`, `aim_live_volleys_at`, `set/scale_live_volleys_speed`.
+  `LaserSpawner2D.apply_to_live_lasers` re-applies graze / sound / homing to its
+  flying lasers through a (laser, id) snapshot with a spawner re-check after
+  every resource PREDELETE.
+- Per-bullet colors: `BulletVolleyData2D.use_bullet_colors` / `bullet_colors`
+  (+ tile) switch the MultiMesh to 12 floats per instance (colors live in the
+  batch buffer after the transform; transform passes write only their 8
+  floats; the drained zero-fill keeps the colors). The format is part of the
+  pool key (`VolleyPoolKey2D.use_bullet_colors`, `populate_bullets_pool` with
+  a colors key pre-warms colored volleys). The spawner's Bullet Colors group
+  hands one color per bullet to `spawn_volley_span` next to the transforms
+  (spawn data untouched).
+- Per-bullet lifetimes: `all_bullet_life_times` (+ tile), `set_bullet_life_time_left`,
+  the spawner's `bullet_life_time_scale_min/max`. Deadlines run on a per-life
+  `life_age` clock; one compare per tick until one is due.
+- Scale-in: `scale_in_sec` / `scale_in_from`: spawned shrunk in
+  `set_up_bullet_instances`, `step_scale_in` before `move_bullets` multiplies
+  every basis by the growth (the own shape basis with `rotate_only_textures`).
+  Graze's size bound (`graze_bullet_scale`) grows with it and with every
+  setter that grows a bullet (`note_bullet_basis_grew`). Inside the window
+  `set_bullet_scale` / `set_bullet_transform` set the FULL-GROWN size (drawn
+  at the growth so far; readers report the drawn size), and split children
+  and pickups are born full size (`full_grown2d`).
+- Interpolation: `BulletFactory2D.physics_interpolation` Off / On / Follow
+  Project (default); lasers redraw every frame while it is active.
+- Shot timing (`BulletFactory2D::first_tick_lead`): a TIMED shot (spawner
+  cadence: auto fire, burst steps, list entries, the telegraphed shot;
+  emitter shots) knows how late it is (`set_shot_overshoot` from the timer,
+  `EmitRequest2D::overshoot_sec`, emitter shots also posed back along the
+  bullet's velocity) and what it fired gets `first_tick_lead` added to its
+  FIRST tick: in a physics frame before the sweep `overshoot - step`, after
+  it `overshoot`, in an idle frame `overshoot - fraction * step`. Streams
+  sit exactly speed x interval apart at any interval (they were 10/10/15 px
+  at 0.04 s, 300 px/s). Manual and script spawns get no lead (deterministic
+  for code that steps the factory). Measure stream spacing at an idle point
+  after every volley's first tick (`spawner/test_spawner_cadence.gd`
+  `_stream_gaps`): mid-frame, the newest volley has not had its first tick.
+- `process_callback` Auto (the default): Physics while the factory
+  interpolates, Idle otherwise, switched live from the running callback.
+- Spawner factory fallback: an empty `bullet_factory_path` (nothing assigned)
+  fires into the first factory in the tree that shares the spawner's
+  World2D (one warning when several do); the cache resets on every
+  ENTER_TREE (a reparent may change the world). Tests that need a spawner
+  without a factory put it in its own world (`BlastTest.add_in_own_world` /
+  `move_to_own_world`).
+- `orphaned_volleys` defaults to Hand To Factory: a dying NPC's bullets keep
+  hitting (their hits reach the factory's signals; a live NPC spawner without
+  handlers falls through to them too, §12.4).
+- GDScript facts that bit the tests: a lambda captures locals by value
+  (collect through an Array); a preview rebuild can run user code (the aimed
+  target's `get_velocity`): re-check every node after it.
+
+## 30. Sprite animations (`src/sprite/`)
+
+Every system that plays a [SpriteFrames] goes through this module: bullet
+volleys (spawn and `play_sprite_animation`), pickups (they spawn a volley),
+effect layers (trails, one-shots, `spawn_layer_effect`), the laser body and
+the five `LaserSpriteLook2D` slots (each names its animation). A new consumer uses it too; never read `get_frame_texture` and hand
+the texture to a draw yourself.
+
+| Piece | Where | Notes |
+|---|---|---|
+| Name rule | `resolve_sprite_animation2d` | pure: NULL_FRAMES / NO_ANIMATIONS / NO_FRAMES_ANYWHERE / RESOLVED / FELL_BACK. Empty or "default" = "default" when it has frames, else the first animation with frames (silent: the empty "default" of a fresh SpriteFrames never hides frames); a missing or empty explicit name falls back to the first animation with frames (the caller errors). Callers print their own class-prefixed texts (`BulletVolley2D:`, `EffectLayerData2D:`, `LaserData2D.<property>:`; pickups warn) |
+| Timing rule | `sprite_anim_fps2d`, `sprite_frame_sec2d` | speed 0 = held (frame 0, never finishes; a one-shot effect has no playable time and is refused), NaN/INF/negative = 1 fps + one error; a non-finite duration = 0 s + one error (SpriteFrames stores NaN and INF as given) |
+| Bake loop | `bake_sprite_animation2d` | THE frame loop: timing, null frames (refuse), every frame through `FrameTextureCache2D` (DRAWABLE, or WHITENED for `override_frame_color`); a `SpriteAnimBakeReport2D` carries what went wrong for the caller's texts. One `FrameImageReader2D` per bake |
+| `SpriteAnim2D` | `sprite_anim2d.hpp` | frames, secs, ends (prefix sums), total, loop, held; `frame_at_looped` / `frame_for_local` (O(log F), the trail tick inlines them), `frame_at` / `texture_at` (lasers: loop or hold the last frame) |
+| Size rule | `frame_draw_size2d` | `Texture2D::get_size()` (region + margin; zero region = the atlas) for the bullet quad, effect shards, pickups, laser point frames |
+| Reader | `frame_image2d.*` | `FrameImageReader2D::read`: RGBA8 pixels as Godot draws the frame: rounded region (zero size = whole atlas per axis) at `margin.position` inside a `region + margin` box (cut at the box), nested atlases (depth 16), compressed images decompressed, mipmaps regenerated when the sheet had them; null when unreadable (non-finite / outside / overflowing region, non-finite or empty or > 16384 px box, undecodable format). A sheet is decoded once per reader (per bake) |
+| Cache | `frame_texture_cache2d.*` | owned by `BulletFactory2D` (`frame_cache`; volleys reach it through `frame_cache()`, effect layers through their caller, lasers through `factory`). DRAWABLE: a plain texture is itself (no entry, identity kept); an AtlasTexture is baked into an ImageTexture of what it draws, because a mesh draw (MultiMesh, triangle array) hands the engine `get_rid()` and an AtlasTexture's RID is its whole atlas drawn with 0..1 UVs. WHITENED: `whiten_image_copy` of the drawn pixels. Keyed by source instance id, validated by `frame_signature2d` (atlas ids, regions, margins, base size: an edited region rebuilds), null entry = unreadable, wholesale clear past 4096 per kind, full `reset()` clears. Readouts: `debug_get_frame_cache_stats()`, `debug_read_frame(texture, whiten)` |
+
+Contract (pinned by `integration/test_sprite_frames_contract.gd`, one table
+of consumers; whiten cases in `volley/test_volley_fx_layers.gd`):
+- A consumer row covers every rule at once: add a new system as a row of
+  `CONSUMERS` (+ `PREFIXES`, `_build`, `_drawn`).
+- An unreadable atlas frame draws the original texture with one warning per
+  SpriteFrames and frame (`WarnOnce2D`, code 27: the data, not the spawn).
+  Lasers bake per shot and latch every report per SpriteFrames and property
+  (code 26).
+- Bakes run at spawn / play / pool reuse; the tick never touches SpriteFrames.
+  Per spawn: one resolve, one cast + one signature (atlas frames) + one hash
+  lookup per frame. A miss costs one GPU readback per sheet per bake (and per
+  region an O(region) blit): `populate_bullets_pool` takes it before the first
+  shot.
+- A texture repainted in place (same size) keeps its cached copy until a full
+  `reset()`; a region, margin, atlas or size edit rebuilds on the next bake.
+- Effect layers cache their bake on the layer (`bake_cache`, keyed by
+  animation; setters invalidate, `set_trigger` too: a held trail draws, a held
+  one-shot cannot). Edits inside the SpriteFrames itself are not seen by a
+  cached layer bake (call `set_effect_layers` / reassign the frames).
+

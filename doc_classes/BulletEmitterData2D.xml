@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="BulletEmitterData2D" inherits="Resource" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		When and how flying bullets fire a template spawner's pattern (emitter bullets).
+	</brief_description>
+	<description>
+		Emitter bullets fire while they fly: every bullet of a volley fires the whole pattern of a template spawner (any [PatternSpawner2D], normally with its own shooting off) on its own schedule. The template decides [i]what[/i] is fired (pattern, spawn data, homing, sound, graze, splits, even its own emitters); this resource decides [i]when[/i] (interval, start delay, a stagger per bullet index, a shot limit, a chance) and [i]which way[/i] (the bullet's flight heading, the world, or the template's rotation, plus a spin that grows with every shot for spirals).
+		Use it from [member BulletSpawner2D.emitter] (with [member BulletSpawner2D.emitter_enabled] and [member BulletSpawner2D.emitter_spawner_path]) or on a factory volley with [method BulletVolley2D.emitter_set]. Volleys read the resource every tick, so edits reach bullets already in flight. Shots are recorded during the factory sweep and fired right after it; [member BulletFactory2D.emitter_max_shots_per_sweep] and [member BulletFactory2D.emitter_max_pending] bound how many fire per frame and wait. Every accepted change emits [signal Resource.changed].
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="aim" type="int" setter="set_aim" getter="get_aim" enum="BulletEmitterData2D.EmitterAim" default="0">
+			Which way the fired pattern faces (see [enum EmitterAim]). Edits reach bullets in flight.
+		</member>
+		<member name="chance" type="float" setter="set_chance" getter="get_chance" default="1.0">
+			The chance (0 to 1) that a due shot fires. A missed shot still counts toward [member max_shots] and keeps the schedule. Rolled with [member seed].
+		</member>
+		<member name="inherit_bullet_velocity" type="bool" setter="set_inherit_bullet_velocity" getter="get_inherit_bullet_velocity" default="false">
+			When [code]true[/code], every shot inherits the emitting bullet's velocity (a still template bullet then flies along with the emitter bullet).
+		</member>
+		<member name="interval_sec" type="float" setter="set_interval_sec" getter="get_interval_sec" default="0.5">
+			Seconds between two shots of one bullet, on the volley's clock (time scales apply). A bullet fires at most once per tick: after a hitch or a freeze the schedule moves on instead of firing a burst of missed shots. Must be finite and &gt; 0.
+		</member>
+		<member name="max_shots" type="int" setter="set_max_shots" getter="get_max_shots" default="0">
+			How many shots each bullet fires per life at most. 0 (default) = no limit.
+		</member>
+		<member name="seed" type="int" setter="set_seed" getter="get_seed" default="0">
+			Seeds the [member chance] rolls (with the shot number and the bullet index, so successive shots differ). 0 uses Godot's global random generator.
+		</member>
+		<member name="spin_per_shot_degrees" type="float" setter="set_spin_per_shot_degrees" getter="get_spin_per_shot_degrees" default="0.0">
+			Turns each shot further than the last: shot [code]k[/code] of a bullet is turned by [code]k * spin_per_shot_degrees[/code] (a spiral from every bullet). Must be finite.
+		</member>
+		<member name="stagger_sec" type="float" setter="set_stagger_sec" getter="get_stagger_sec" default="0.0">
+			Delays bullet [code]i[/code]'s first shot by [code]i * stagger_sec[/code] on top of [member start_delay_sec], so the bullets of a ring fire one after another. Must be finite and &gt;= 0.
+		</member>
+		<member name="start_delay_sec" type="float" setter="set_start_delay_sec" getter="get_start_delay_sec" default="0.0">
+			Seconds after the volley is armed (usually its spawn) before a bullet's first shot. 0 (default) fires on the first tick. Must be finite and &gt;= 0.
+		</member>
+	</members>
+	<constants>
+		<constant name="EMITTER_AIM_HEADING" value="0" enum="EmitterAim">
+			The pattern is turned to the bullet's flight heading (its velocity, or its direction while still).
+		</constant>
+		<constant name="EMITTER_AIM_WORLD" value="1" enum="EmitterAim">
+			The pattern is not turned: the bullet is a moving muzzle.
+		</constant>
+		<constant name="EMITTER_AIM_TEMPLATE" value="2" enum="EmitterAim">
+			The pattern is turned like the template spawner node (read when the shot fires).
+		</constant>
+	</constants>
+</class>

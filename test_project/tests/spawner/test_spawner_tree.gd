@@ -1,0 +1,340 @@
+extends BlastTest
+## Integration fuzz for BulletSpawner2D + BulletFactory2D in a live tree:
+## error paths, preview/cap/custom/line collection, homing resolution,
+## live shooting, and factory smoke. Survival + documented behavior.
+## Adapted from the SceneTree original: shared member factory, spawners via
+## add()/make_spawner (autofreed), frames via idle(), rejections fail loud.
+func _finite_volley(v: Array) -> bool:
+	for t in v:
+		var transform_value: Transform2D = t
+		if not transform_value.is_finite():
+			return false
+	return true
+
+func _make_data() -> BulletVolleyData2D:
+	var data := BulletVolleyData2D.new()
+	data.transforms = [Transform2D.IDENTITY, Transform2D(0.0, Vector2(50, 0))]
+	var sp := BulletSpeedData2D.new()
+	sp.speed = 200.0
+	sp.max_speed = 3000.0
+	sp.acceleration = 1500.0
+	data.all_bullet_speed_data = [sp]
+	data.tile_all_bullet_speed_data = true # every bullet of any pattern
+	data.max_life_time = 5.0
+	data.sprite_frames = H.make_sprite_frames()
+	data.set_collision_layer_from_array([2])
+	data.set_collision_mask_from_array([3])
+	return data
+
+
+func test_error_paths() -> void:
+	var bare := BulletSpawner2D.new()
+	add_in_own_world(bare) # no factory in its world to fall back on
+	bare.set_shooting_enabled(false)
+	# No factory, no data: loud failure, no state change, no crash.
+	assert_true(bare.shoot_once() == false, "shoot without factory fails")
+	expect_errors_containing("no BulletFactory2D assigned", 1, "missing factory fails loud")
+	assert_true(bare.get_volleys_fired() == 0, "failed shot not counted")
+	bare.set_bullet_factory(factory)
+	assert_true(bare.shoot_once() == false, "shoot without spawn_data fails")
+	expect_errors_containing("no spawn_data assigned", 1, "missing data fails loud")
+	assert_true(bare.spawn_pattern_list([], false, 0.25) == 0, "empty pattern list rejected")
+	expect_errors_containing("entries is empty", 1, "empty list fails loud")
+	var src0: int = bare.get_pattern_source()
+	var amt0: int = bare.get_helper_bullets_amount()
+	var fired_bad: int = bare.spawn_pattern_list(
+		[42, "x", {"pattern_source": 999}, {"helper_bullets_amount": "x"}, {"spawn_data": null}],
+		true, 0.25)
+	assert_true(fired_bad == 0, "malformed simultaneous list fires nothing")
+	expect_errors_containing("must be a Dictionary", 2, "non-dict entries fail loud")
+	expect_errors_containing("out of range", 1, "bad pattern_source entry fails loud")
+	expect_errors_containing("must be an int", 1, "bad amount entry fails loud")
+	expect_errors_containing("must be a BulletVolleyData2D", 1, "null data entry fails loud")
+	expect_errors_containing("no spawn_data assigned", 3, "entry shots fail loud without data")
+	assert_true(bare.get_pattern_source() == src0, "pattern_source restored after bad list")
+	assert_true(bare.get_helper_bullets_amount() == amt0, "bullets_amount restored after bad list")
+	assert_true(bare.get_spawn_data() == null or not bare.get_spawn_data().is_valid(), "spawn_data untouched by bad list")
+	var seq: int = bare.spawn_pattern_list([{"helper_bullets_amount": 3}], false, 0.01)
+	assert_true(seq == 1 and bare.is_pattern_list_active(), "sequential list queues")
+	bare.stop_pattern_list()
+	assert_true(not bare.is_pattern_list_active(), "stop_pattern_list disarms")
+	bare.pattern_source = 33 as PatternSpawner2D.PatternSource
+	expect_errors_containing("invalid pattern_source", 1, "source 33 fails loud")
+	assert_true(bare.get_pattern_source() == src0, "pattern_source 33 rejected")
+	bare.pattern_source = (-1) as PatternSpawner2D.PatternSource
+	expect_errors_containing("invalid pattern_source", 1, "source -1 fails loud")
+	assert_true(bare.get_pattern_source() == src0, "pattern_source -1 rejected")
+
+func test_preview_cap_custom_line() -> void:
+	var spawner := make_spawner(_make_data(), BulletSpawner2D.PATTERN_FROM_SELF, 5)
+	spawner.show_preview_during_runtime = true
+	spawner.show_pattern_preview = true
+	spawner.helper_bullets_amount = 5
+	# (Every source's count/empty-input contract: test_spawner_patterns and
+	# test_spawner_pattern_counts.)
+	# Limit boundary under a lowered limit (keeps the 10k-bullet preview cheap;
+	# the default is pinned in patterns/test_patterns_bullet_limit.gd).
+	BulletPatterns2D.set_max_bullets_per_pattern(10000)
+	spawner.helper_bullets_amount = 10000
+	assert_true(spawner.get_helper_bullets_amount() == 10000, "amount cap accepts 10000")
+	spawner.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_RING
+	assert_true(spawner.collect_spawn_transforms().size() == 10000, "cap volley collects 10000")
+	spawner.helper_bullets_amount = 10001
+	expect_errors_containing("must be <= 10000", 1, "amount cap fails loud")
+	assert_true(spawner.get_helper_bullets_amount() == 10000, "amount 10001 rejected")
+	spawner.helper_bullets_amount = 5
+	# Custom compose + order ops (spawner at origin identity).
+	spawner.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_CUSTOM
+	spawner.set_helper_custom_transforms([Transform2D(0.0, Vector2(10, 0)), Transform2D(0.0, Vector2(0, 20)), Transform2D(0.0, Vector2(-5, -5))])
+	var cust: Array = spawner.collect_spawn_transforms()
+	assert_eq(cust.size(), 3, "custom collects all")
+	assert_almost_eq((cust[0] as Transform2D).origin, Vector2(10, 0), Vector2(0.01, 0.01), "custom composes marker")
+	# (Reverse / slot-offset order ops: test_spawner_patterns.)
+	# Regression (COW aliasing): rebuilds and mode switches must never wipe
+	# placed transforms — the snapshot keeps a private copy now.
+	assert_true(spawner.get_helper_custom_transforms().size() == 3, "custom array survives rebuilds")
+	spawner.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_LINE
+	spawner.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_CUSTOM
+	assert_true(spawner.get_helper_custom_transforms().size() == 3, "custom array survives mode switch")
+	assert_true(spawner.collect_spawn_transforms().size() == 3, "custom still collects after switch")
+	# Line row + order ops: center-anchored row, reverse flips it.
+	spawner.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_LINE
+	spawner.helper_bullets_amount = 5
+	spawner.set_helper_line_direction(Vector2(1, 0))
+	spawner.set_helper_line_spacing(10.0)
+	var line_plain: Array = spawner.collect_spawn_transforms()
+	var line_x: Array = []
+	for t in line_plain:
+		line_x.append((t as Transform2D).origin.x)
+	var line_ok := line_x.size() == 5
+	var line_want := [-20.0, -10.0, 0.0, 10.0, 20.0]
+	for i in line_x.size():
+		if i >= 5 or not (line_x[i] is float and absf(line_x[i] - line_want[i]) < 0.01):
+			line_ok = false
+	assert_true(line_ok, "line centers row")
+	spawner.set_helper_line_reverse(true)
+	var line_rev: Array = spawner.collect_spawn_transforms()
+	var rev_x: Array = []
+	for t in line_rev:
+		rev_x.append((t as Transform2D).origin.x)
+	var rev_ok := rev_x.size() == 5
+	var rev_want := [20.0, 10.0, 0.0, -10.0, -20.0]
+	for i in rev_x.size():
+		if i >= 5 or not (rev_x[i] is float and absf(rev_x[i] - rev_want[i]) < 0.01):
+			rev_ok = false
+	assert_true(rev_ok, "line reverse flips row")
+	spawner.set_helper_line_reverse(false)
+
+func test_homing_resolve() -> void:
+	var spawner := make_spawner(_make_data(), BulletSpawner2D.PATTERN_FROM_SELF, 5)
+	spawner.set_homing_enabled(true)
+	spawner.set_homing_max_targets(5)
+	spawner.set_homing_target_source(BulletSpawner2D.HOMING_SOURCE_NODE_GROUP)
+	spawner.set_homing_node_group("no_such_group_xyz")
+	assert_true(spawner.resolve_homing_targets(true).is_empty(), "empty group resolves empty")
+	var d1 := Node2D.new()
+	d1.name = "DummyA"
+	d1.position = Vector2(100, 0)
+	d1.add_to_group("test_targets")
+	add(d1)
+	var d2 := Node2D.new()
+	d2.name = "DummyB"
+	d2.position = Vector2(200, 0)
+	d2.add_to_group("test_targets")
+	add(d2)
+	spawner.set_homing_node_group("test_targets")
+	spawner.set_homing_max_targets(2)
+	assert_eq(spawner.resolve_homing_targets(true, false), [d1, d2], "group source resolves both, nearest first (per-mode semantics: test_spawner_homing_selection)")
+	spawner.set_homing_target_source(BulletSpawner2D.HOMING_SOURCE_MOUSE)
+	assert_true(spawner.resolve_homing_targets(true).is_empty(), "mouse resolves empty array")
+	spawner.set_homing_target_source(BulletSpawner2D.HOMING_SOURCE_GLOBAL_POSITION)
+	spawner.set_homing_global_position(Vector2(50, 50))
+	var gp: Array = spawner.resolve_homing_targets(true)
+	assert_true(gp.size() == 1 and (gp[0] as Vector2) == Vector2(50, 50), "global position resolves")
+	spawner.set_homing_global_position(Vector2(NAN, NAN))
+	expect_errors_containing("must be finite", 1, "NAN global fails loud")
+	assert_true(spawner.get_homing_global_position() == Vector2(50, 50), "NAN global keeps old value")
+	assert_true(spawner.resolve_homing_targets(true).size() == 1, "kept global still resolves")
+	spawner.set_homing_target_source(BulletSpawner2D.HOMING_SOURCE_NODE_PATH)
+	spawner.set_homing_target_path(NodePath("nope"))
+	assert_true(spawner.resolve_homing_targets(true).is_empty(), "dead path resolves empty")
+	spawner.set_homing_target_path(d1.get_path())
+	assert_true(spawner.resolve_homing_targets(true).size() == 1, "live path resolves")
+	spawner.set_homing_target_source(BulletSpawner2D.HOMING_SOURCE_NODE_NAME)
+	spawner.set_homing_node_name("")
+	assert_true(spawner.resolve_homing_targets(true).is_empty(), "empty name resolves empty")
+	spawner.set_homing_node_name("Dummy")
+	spawner.set_homing_node_name_match_mode(PatternSpawner2D.HOMING_NAME_MATCH_CONTAINS)
+	assert_true(spawner.resolve_homing_targets(true).size() == 2, "contains name resolves both")
+	spawner.set_homing_target_source(BulletSpawner2D.HOMING_SOURCE_NODE_CHILDREN)
+	spawner.set_homing_children_parent_path(NodePath("."))
+	# Regression: the runtime preview holder is a Node2D child of the
+	# spawner and must never resolve as a homing target.
+	assert_true(spawner.resolve_homing_targets(true).is_empty(), "childless parent resolves empty")
+	assert_true(spawner.retarget_live_volleys() == 0, "retarget with no volleys is 0")
+	spawner.set_homing_enabled(false)
+
+func test_live_shoot() -> void:
+	var spawner := make_spawner(_make_data(), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 5)
+	spawner.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_RING
+	# Homing on so the volley is tracked (plain volleys stay untracked by
+	# design: only homing volleys need retargeting).
+	var t1 := Node2D.new()
+	t1.position = Vector2(100, 0)
+	t1.add_to_group("test_targets")
+	add(t1)
+	var t2 := Node2D.new()
+	t2.position = Vector2(200, 0)
+	t2.add_to_group("test_targets")
+	add(t2)
+	spawner.set_homing_enabled(true)
+	spawner.set_homing_target_source(BulletSpawner2D.HOMING_SOURCE_NODE_GROUP)
+	spawner.set_homing_node_group("test_targets")
+	assert_true(spawner.shoot_once(), "homing shot fires")
+	assert_eq(spawner.get_volleys_fired(), 1, "fired volley counted")
+	assert_eq(spawner.get_live_volley_count(), 1, "fired volley tracked")
+	assert_eq(spawner.get_active_live_bullet_count(), spawner.helper_bullets_amount, "live bullets census")
+	spawner.forget_tracked_volleys()
+	assert_eq(spawner.get_tracked_volley_count(), 0, "forget empties the retarget list")
+	assert_eq(spawner.get_live_volley_count(), 1, "the census still sees the live volley")
+	factory.free_active_bullets()
+	assert_eq(spawner.get_active_live_bullet_count(), 0, "free_active drains census")
+
+func test_factory_smoke() -> void:
+	factory.reset()
+	factory.free_active_bullets()
+	factory.free_disabled_bullets()
+	factory.free_bullets_pool()
+	assert_true(factory.debug_get_total_bullets_amount() == 0, "empty factory totals 0")
+	assert_true(factory.debug_get_active_volleys_amount() == 0, "empty factory actives 0")
+	assert_true(factory.debug_get_bullets_pool_amount() == 0, "empty factory pool 0")
+	factory.populate_bullets_pool(null, null, 0)
+	factory.populate_bullets_pool(null, _make_data(), 3)
+	expect_errors_containing("explicit VolleyPoolKey2D", 2, "null-key populate fails loud")
+	assert_true(factory.debug_get_bullets_pool_amount() == 0, "null-key populate creates nothing")
+
+
+func _scripted(base: String) -> GDScript:
+	# GDScript refuses super._ready() on an extension class (the virtual is not
+	# a script method), so a script override never reaches the native one.
+	var s := GDScript.new()
+	s.source_code = "extends %s\nvar readied := false\nvar processed := 0\nvar physics := 0\nfunc _ready() -> void:\n\treaded_mark()\nfunc readed_mark() -> void:\n\treadied = true\nfunc _process(_d: float) -> void:\n\tprocessed += 1\nfunc _physics_process(_d: float) -> void:\n\tphysics += 1\n" % base
+	assert_eq(s.reload(), OK, "the script compiles")
+	return s
+
+
+## A script that overrides _ready / _process / _physics_process (connecting
+## signals, its own logic) never costs the spawner its own start and loop:
+## the initial delay, the movement autostart, shooting_started and the shot
+## timer all run next to the script's callbacks.
+func test_a_script_with_its_own_callbacks_keeps_the_native_ones() -> void:
+	var path := Path2D.new()
+	path.curve = Curve2D.new()
+	path.curve.add_point(Vector2.ZERO)
+	path.curve.add_point(Vector2(200, 0))
+	add(path)
+	var sp := BulletSpawner2D.new()
+	sp.set_script(_scripted("BulletSpawner2D"))
+	sp.spawn_data = H.make_volley_data(1, 50.0, 2.0)
+	sp.shoot_interval_sec = 0.1
+	sp.shoot_initial_delay_sec = 0.5
+	sp.movement_enabled = true
+	var started := [0]
+	var fired := [0]
+	sp.shooting_started.connect(func() -> void: started[0] += 1)
+	sp.volley_fired.connect(func(_v, _n) -> void: fired[0] += 1)
+	add(sp)
+	sp.movement_path = sp.get_path_to(path)
+	sp.set_bullet_factory(factory)
+	assert_true(sp.readied, "the script's _ready ran")
+	assert_eq(started[0], 1, "shooting_started once")
+	assert_true(sp.is_movement_playing(), "the movement autostarted")
+	for i in 20: # 1/3 s, inside the initial delay
+		await physics(1)
+	assert_eq(fired[0], 0, "the initial delay holds the first shot")
+	for i in 30:
+		await physics(1)
+	assert_gt(fired[0], 0, "then it fires")
+	assert_gt(sp.processed + sp.physics, 0, "the script's own callbacks ran too")
+
+
+## An NPC scene's spawner needs no wiring: an empty bullet_factory_path fires
+## into the factory of the spawner's world; a path or set_bullet_factory()
+## wins; several factories pick the first one in the tree with one warning; a
+## freed factory is never used (the next one in the world takes over).
+func test_an_unwired_spawner_fires_into_its_worlds_factory() -> void:
+	var npc := Node2D.new()
+	var sp := BulletSpawner2D.new()
+	sp.name = "NpcGun"
+	sp.set_shooting_enabled(false)
+	sp.spawn_data = H.make_volley_data(1, 0.0, 30.0)
+	npc.add_child(sp)
+	add(npc)
+	assert_eq(sp.get_bullet_factory(), factory, "the world's factory")
+	assert_eq(Array(sp.get_setup_warnings()).filter(func(w): return "BulletFactory2D" in w), [], "nothing to fix")
+	assert_true(sp.shoot_once(), "fires without wiring")
+	assert_eq(factory.get_volleys_owned_by(sp).size(), 1, "into that factory, owned by the spawner")
+	var other := BulletFactory2D.new()
+	other.name = "Other"
+	add(other)
+	await idle(1)
+	sp.set_bullet_factory(other)
+	assert_eq(sp.get_bullet_factory(), other, "set_bullet_factory wins")
+	sp.set_bullet_factory(null)
+	assert_eq(sp.get_bullet_factory(), factory, "back to the world's factory: the first in the tree")
+	var fresh := BulletSpawner2D.new()
+	fresh.name = "Fresh"
+	fresh.set_shooting_enabled(false)
+	fresh.spawn_data = H.make_volley_data(1, 0.0, 30.0)
+	add(fresh)
+	assert_eq(fresh.get_bullet_factory(), factory, "two factories: the first one")
+	expect_warning_sequence([], "a lookup never warns (code may assign a factory right after adding the spawner)")
+	assert_true(fresh.shoot_once(), "fires into the fallback")
+	expect_warning_sequence(["BulletSpawner2D 'Fresh': bullet_factory_path is empty and 2 BulletFactory2D share its world; it fires into '%s' (the first one in the tree). Set bullet_factory_path to choose another." % factory.name])
+	assert_true(fresh.shoot_once(), "fires again")
+	expect_warning_sequence([], "warned once")
+	var wired := BulletSpawner2D.new()
+	wired.set_shooting_enabled(false)
+	wired.spawn_data = H.make_volley_data(1, 0.0, 30.0)
+	add(wired)
+	wired.set_bullet_factory(other)
+	assert_true(wired.shoot_once(), "an assigned factory")
+	expect_warning_sequence([], "assigned right after entering the tree: no warning")
+	var lonely := BulletSpawner2D.new()
+	lonely.set_shooting_enabled(false)
+	add_in_own_world(lonely)
+	assert_null(lonely.get_bullet_factory(), "another world has no factory")
+	other.queue_free()
+	await idle(1)
+	assert_eq(sp.get_bullet_factory(), factory, "a gone factory is never used")
+
+
+## The world's factory is found again after a move: a spawner reparented into
+## another world never keeps firing into the old world's factory.
+func test_a_moved_spawner_finds_its_new_worlds_factory() -> void:
+	var sp := make_spawner()
+	sp.set_bullet_factory(null)
+	assert_eq(sp.get_bullet_factory(), factory, "the main world's factory")
+	move_to_own_world(sp)
+	assert_null(sp.get_bullet_factory(), "its new world has none")
+	sp.get_parent().remove_child(sp)
+	add(sp)
+	assert_eq(sp.get_bullet_factory(), factory, "back in the main world")
+
+
+## A game often subclasses its own base spawner script. The plugin must see
+## `_process`/`_physics_process` inherited from a base GDScript too, or its
+## set_process(false) silently stops the game's own logic while the plugin
+## keeps ticking.
+func test_a_script_chain_inheriting_process_keeps_it_running() -> void:
+	var sp := BulletSpawner2D.new()
+	sp.set_script(load("res://tests/scenes/child_spawner_process.gd"))
+	sp.spawn_data = H.make_volley_data(1, 50.0, 2.0)
+	sp.set_shooting_enabled(false)
+	sp.spin_enabled = true # keeps the plugin loop alive
+	sp.spin_speed_deg_per_sec = 90.0
+	add(sp)
+	await idle(20)
+	assert_gt(int(sp.processed), 0, "the inherited _process still runs")
+	assert_gt(sp.debug_get_run_frame_count(), 0, "and the plugin still ticks")
+	expect_no_errors()

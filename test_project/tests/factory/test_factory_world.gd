@@ -1,0 +1,674 @@
+extends BlastTest
+## The bullet world controls of the factory: area queries and clears (volley
+## and factory level, `bullets_cleared`), despawn bounds, and time_scale (the
+## factory's, times each volley's and laser's own).
+
+var cleared_log: Array = []
+
+
+func _on_bullets_cleared(positions: PackedVector2Array, volley: BulletVolley2D, indexes: Array) -> void:
+	cleared_log.append({ "positions": positions, "volley": volley, "indexes": indexes })
+
+
+func before_each() -> void:
+	await super()
+	cleared_log.clear()
+
+
+## A still volley with one bullet per position (speed 0, long life).
+func _volley_at(points: Array, speed: float = 0.0) -> BulletVolley2D:
+	var data := H.make_volley_data(points.size(), speed, 60.0)
+	var arr: Array = []
+	for p in points:
+		arr.append(Transform2D(0.0, p))
+	data.transforms = arr
+	return factory.spawn_volley(data)
+
+
+func _alive(v: BulletVolley2D) -> Array:
+	var out: Array = []
+	for i in v.get_amount_bullets():
+		if v.is_bullet_status_enabled(i):
+			out.append(i)
+	return out
+
+
+# --- area queries ------------------------------------------------------------
+
+func test_bound_surface() -> void:
+	for m in ["get_bullet_indexes_in_circle", "get_bullet_indexes_in_rect", "clear_bullets_in_circle", "clear_bullets_in_rect"]:
+		assert_true(ClassDB.class_has_method("BulletVolley2D", m), "volley has " + m)
+	for m in ["clear_bullets_in_circle", "clear_bullets_in_rect", "count_bullets_in_circle", "count_bullets_in_rect", "get_time_scale", "set_time_scale", "get_despawn_bounds_enabled", "set_despawn_bounds_enabled", "get_despawn_bounds_rect", "set_despawn_bounds_rect"]:
+		assert_true(factory.has_method(m), "factory has " + m)
+	assert_true(factory.has_signal("bullets_cleared"), "bullets_cleared signal")
+	for p in ["time_scale", "despawn_bounds_enabled", "despawn_bounds_rect"]:
+		assert_true(p in factory, "factory property " + p)
+
+
+func test_circle_query_is_exact_and_edge_inclusive() -> void:
+	var v := _volley_at([Vector2(0, 0), Vector2(10, 0), Vector2(0, 10.5), Vector2(30, 40), Vector2(100, 100)])
+	assert_eq(Array(v.get_bullet_indexes_in_circle(Vector2.ZERO, 10.0)), [0, 1], "r=10: origin and the bullet exactly on the edge")
+	assert_eq(Array(v.get_bullet_indexes_in_circle(Vector2.ZERO, 50.0)), [0, 1, 2, 3], "r=50 includes the 3-4-5 point on the edge")
+	assert_eq(Array(v.get_bullet_indexes_in_circle(Vector2.ZERO, 0.0)), [0], "radius 0 finds only a bullet exactly there")
+	assert_eq(Array(v.get_bullet_indexes_in_circle(Vector2(500, 500), 5.0)), [], "far away finds nothing")
+
+
+func test_rect_query_is_edge_inclusive_and_accepts_negative_sizes() -> void:
+	var v := _volley_at([Vector2(0, 0), Vector2(10, 10), Vector2(10.5, 5), Vector2(-5, 5)])
+	assert_eq(Array(v.get_bullet_indexes_in_rect(Rect2(0, 0, 10, 10))), [0, 1], "all four edges inclusive")
+	assert_eq(Array(v.get_bullet_indexes_in_rect(Rect2(10, 10, -10, -10))), [0, 1], "a negative size is the same rect")
+
+
+func test_queries_skip_cleared_bullets() -> void:
+	var v := _volley_at([Vector2(0, 0), Vector2(1, 0), Vector2(2, 0)])
+	v.disable_bullet(1)
+	assert_eq(Array(v.get_bullet_indexes_in_circle(Vector2.ZERO, 5.0)), [0, 2], "a frozen bullet is not listed")
+
+
+func test_hostile_query_input_fails_loud_and_returns_empty() -> void:
+	var v := _volley_at([Vector2(0, 0)])
+	assert_eq(Array(v.get_bullet_indexes_in_circle(Vector2(NAN, 0), 5.0)), [], "NaN center")
+	expect_error_sequence(["get_bullet_indexes_in_circle: center must be finite and radius a finite number >= 0."])
+	assert_eq(Array(v.get_bullet_indexes_in_circle(Vector2.ZERO, -1.0)), [], "negative radius")
+	expect_error_sequence(["get_bullet_indexes_in_circle: center must be finite and radius a finite number >= 0."])
+	assert_eq(Array(v.get_bullet_indexes_in_circle(Vector2.ZERO, INF)), [], "infinite radius")
+	expect_error_sequence(["get_bullet_indexes_in_circle: center must be finite and radius a finite number >= 0."])
+	assert_eq(Array(v.get_bullet_indexes_in_rect(Rect2(0, 0, NAN, 1))), [], "NaN rect")
+	expect_error_sequence(["get_bullet_indexes_in_rect: rect must be finite."])
+	assert_eq(v.clear_bullets_in_circle(Vector2.ZERO, -1.0), 0, "clear with a bad circle clears nothing")
+	expect_error_sequence(["clear_bullets_in_circle: center must be finite and radius a finite number >= 0."])
+	assert_eq(v.clear_bullets_in_rect(Rect2(INF, 0, 1, 1)), 0, "clear with a bad rect clears nothing")
+	expect_error_sequence(["clear_bullets_in_rect: rect must be finite."])
+	assert_eq(_alive(v), [0], "the bullet survived every refused call")
+
+
+func test_factory_queries_list_what_the_counts_count() -> void:
+	for m in ["get_bullets_in_circle", "get_bullets_in_rect", "get_active_volleys"]:
+		assert_true(factory.has_method(m), "factory has " + m)
+	var a := _volley_at([Vector2(0, 0), Vector2(100, 0), Vector2(20, 0)])
+	var b := _volley_at([Vector2(5, 5), Vector2(200, 0), Vector2(6, 6)])
+	var c := _volley_at([Vector2(1, 1)])
+	b.disable_bullet(2) # a frozen bullet is not listed
+	var parked := _volley_at([Vector2(2, 2)])
+	parked.set_is_auto_pooling_enabled(false)
+	parked.disable_bullet(0)
+	var pooled := _volley_at([Vector2(3, 3)])
+	pooled.clear_all_bullets()
+	await idle(1)
+	assert_true(parked.is_parked() and pooled.is_pooled(), "one parked, one pooled")
+	assert_eq(factory.get_active_volleys(), [a, b, c], "the active volleys in factory order")
+	assert_eq(factory.get_active_volleys(true), [a, b, c, parked], "include_parked adds the parked one, never the pooled one")
+	var circle: Array = factory.get_bullets_in_circle(Vector2.ZERO, 20.0)
+	assert_eq(circle.size(), 3, "one entry per volley with bullets inside")
+	assert_eq(circle[0]["volley"], a, "factory order")
+	assert_eq(Array(circle[0]["bullet_indexes"]), [0, 2], "a: the edge counts")
+	assert_eq(Array(circle[0]["positions"]), [Vector2(0, 0), Vector2(20, 0)], "a: parallel positions")
+	assert_eq(Array(circle[1]["bullet_indexes"]), [0], "b: the frozen one is left out")
+	assert_eq(circle[2]["volley"], c, "c")
+	var listed := 0
+	for e in circle:
+		listed += e["bullet_indexes"].size()
+	assert_eq(listed, factory.count_bullets_in_circle(Vector2.ZERO, 20.0), "the query lists what the count counts")
+	var rect: Array = factory.get_bullets_in_rect(Rect2(10, 10, -20, -20))
+	assert_eq(rect.size(), 3, "a negative rect is normalized")
+	assert_eq(Array(rect[1]["positions"]), [Vector2(5, 5)], "b in the rect")
+	c.queue_free()
+	assert_eq(factory.get_active_volleys(), [a, b], "a volley queued for deletion is left out")
+	assert_eq(factory.get_bullets_in_circle(Vector2.ZERO, 20.0).size(), 2, "by the query too")
+	assert_eq(factory.get_bullets_in_circle(Vector2(NAN, 0), 1.0), [], "a bad circle")
+	expect_error_sequence(["get_bullets_in_circle: center must be finite and radius a finite number >= 0."])
+	assert_eq(factory.get_bullets_in_rect(Rect2(0, 0, INF, 1)), [], "a bad rect")
+	expect_error_sequence(["get_bullets_in_rect: rect must be finite."])
+
+
+# --- area clears -------------------------------------------------------------
+
+func test_volley_clear_in_circle_and_rect() -> void:
+	var v := _volley_at([Vector2(0, 0), Vector2(5, 0), Vector2(50, 0), Vector2(60, 0)])
+	assert_eq(v.clear_bullets_in_circle(Vector2.ZERO, 10.0), 2, "two bullets in the circle")
+	assert_eq(_alive(v), [2, 3], "only the far ones live")
+	assert_eq(v.clear_bullets_in_rect(Rect2(40, -5, 30, 10)), 2, "the rest in the rect")
+	assert_eq(v.clear_bullets_in_circle(Vector2.ZERO, 1000.0), 0, "nothing left to clear")
+
+
+func test_factory_clear_spans_volleys_and_reports_positions() -> void:
+	var a := _volley_at([Vector2(0, 0), Vector2(100, 0)])
+	var b := _volley_at([Vector2(5, 5), Vector2(200, 0), Vector2(6, 6)])
+	factory.bullets_cleared.connect(_on_bullets_cleared)
+	assert_eq(factory.count_bullets_in_circle(Vector2.ZERO, 20.0), 3, "count sees three")
+	assert_eq(factory.count_bullets_in_rect(Rect2(-10, -10, 30, 30)), 3, "rect count agrees")
+	assert_eq(factory.clear_bullets_in_circle(Vector2.ZERO, 20.0), 3, "three cleared across two volleys")
+	assert_eq(cleared_log.size(), 2, "one bullets_cleared per volley")
+	var by_volley := {}
+	for e in cleared_log:
+		by_volley[e["volley"]] = e
+	assert_eq(Array(by_volley[a]["indexes"]), [0], "volley a: index 0")
+	assert_eq(Array(by_volley[a]["positions"]), [Vector2(0, 0)], "volley a: position")
+	assert_eq(Array(by_volley[b]["indexes"]), [0, 2], "volley b: indexes")
+	assert_eq(Array(by_volley[b]["positions"]), [Vector2(5, 5), Vector2(6, 6)], "volley b: positions parallel to indexes")
+	assert_eq(factory.count_bullets_in_circle(Vector2.ZERO, 20.0), 0, "nothing left inside")
+	assert_eq(factory.get_active_bullet_count(), 2, "the two outside bullets live on")
+
+
+func test_bullets_cleared_handler_can_spawn_pickups() -> void:
+	# The signal fires after the busy latch is released: a handler turning
+	# cleared bullets into score items must be able to spawn.
+	_volley_at([Vector2(0, 0), Vector2(1, 0)])
+	var spawned: Array = []
+	factory.bullets_cleared.connect(func(positions: PackedVector2Array, _v: BulletVolley2D, _i: Array) -> void:
+		for p in positions:
+			spawned.append(_volley_at([p])))
+	assert_eq(factory.clear_bullets_in_rect(Rect2(-5, -5, 10, 10)), 2, "both cleared")
+	assert_eq(spawned.size(), 2, "one pickup spawned per cleared bullet")
+	for s in spawned:
+		assert_not_null(s, "the spawn inside the handler succeeded")
+	assert_eq(factory.get_active_bullet_count(), 2, "only the pickups live")
+
+
+func test_factory_area_calls_refuse_bad_input() -> void:
+	_volley_at([Vector2(0, 0)])
+	assert_eq(factory.clear_bullets_in_circle(Vector2(NAN, 0), 1.0), 0, "bad center")
+	expect_error_sequence(["clear_bullets_in_circle: center must be finite and radius a finite number >= 0."])
+	assert_eq(factory.clear_bullets_in_rect(Rect2(0, 0, 1, NAN)), 0, "bad rect")
+	expect_error_sequence(["clear_bullets_in_rect: rect must be finite."])
+	assert_eq(factory.count_bullets_in_circle(Vector2.ZERO, -2.0), 0, "bad count radius")
+	expect_error_sequence(["count_bullets_in_circle: center must be finite and radius a finite number >= 0."])
+	assert_eq(factory.count_bullets_in_rect(Rect2(NAN, 0, 1, 1)), 0, "bad count rect")
+	expect_error_sequence(["count_bullets_in_rect: rect must be finite."])
+	assert_eq(factory.get_active_bullet_count(), 1, "nothing was cleared")
+
+
+# --- despawn bounds ----------------------------------------------------------
+
+func test_despawn_bounds_cull_outbound_and_spare_inbound_bullets() -> void:
+	factory.despawn_bounds_rect = Rect2(0, 0, 100, 100)
+	factory.despawn_bounds_enabled = true
+	var v := _volley_at([Vector2(50, 50), Vector2(150, 50), Vector2(-50, 50), Vector2(50, -40), Vector2(-50, 150)])
+	v.bullet_set_velocity(0, Vector2(0, 0)) # inside, still
+	v.bullet_set_velocity(1, Vector2(100, 0)) # outside right, flying away
+	v.bullet_set_velocity(2, Vector2(100, 0)) # outside left, flying in
+	v.bullet_set_velocity(3, Vector2(0, 100)) # outside above, flying in
+	v.bullet_set_velocity(4, Vector2(100, 0)) # outside left AND below: in on x, away on y
+	watch_signals(factory)
+	await idle(1)
+	assert_true(factory.debug_advance_time(0.1), "one tick")
+	assert_eq(_alive(v), [0, 2, 3], "away-flying (1) and not-fully-returning (4) are gone; inbound (2, 3) and inside (0) live")
+	assert_signal_not_emitted(factory, "life_time_over", "a despawn is silent")
+
+
+func test_despawn_bounds_cull_a_bullet_that_flies_out() -> void:
+	factory.despawn_bounds_rect = Rect2(0, 0, 100, 100)
+	factory.despawn_bounds_enabled = true
+	var v := _volley_at([Vector2(90, 50)])
+	v.bullet_set_velocity(0, Vector2(200, 0))
+	await idle(1)
+	factory.debug_advance_time(0.01) # x = 92: still inside
+	assert_eq(_alive(v), [0], "inside the rect it lives")
+	for i in 5:
+		factory.debug_advance_time(0.1)
+	assert_eq(_alive(v), [], "past the edge, moving away: gone")
+	assert_eq(factory.get_active_bullet_count(), 0, "the volley drained")
+
+
+func test_despawn_bounds_off_by_default_and_togglable() -> void:
+	assert_false(factory.despawn_bounds_enabled, "off by default")
+	assert_eq(factory.despawn_bounds_rect, Rect2(0, 0, 1152, 648), "the default rect is Godot's default viewport")
+	var v := _volley_at([Vector2(5000, 5000)])
+	v.bullet_set_velocity(0, Vector2(100, 100))
+	await idle(1)
+	factory.debug_advance_time(0.1)
+	assert_eq(_alive(v), [0], "disabled: far outside bullets live")
+	factory.despawn_bounds_enabled = true
+	factory.debug_advance_time(0.1)
+	assert_eq(_alive(v), [], "enabled: it is culled on the next tick")
+
+
+func test_despawn_bounds_setters_validate() -> void:
+	factory.despawn_bounds_rect = Rect2(NAN, 0, 10, 10)
+	expect_error_sequence(["BulletFactory2D: despawn_bounds_rect must be finite, keeping the old value."])
+	assert_eq(factory.despawn_bounds_rect, Rect2(0, 0, 1152, 648), "old rect kept")
+	factory.despawn_bounds_rect = Rect2(100, 100, -100, -100)
+	assert_eq(factory.despawn_bounds_rect, Rect2(0, 0, 100, 100), "a negative size is normalized")
+
+
+# --- time scale --------------------------------------------------------------
+
+func test_time_scale_scales_motion_and_lifetime() -> void:
+	var v := _volley_at([Vector2.ZERO], 0.0)
+	v.bullet_set_velocity(0, Vector2(100, 0))
+	await idle(1) # one real-time tick has already run
+	var x0: float = v.get_bullet_transform(0).origin.x
+	var life0: float = v.get_life_time_left()
+	factory.time_scale = 0.5
+	factory.debug_advance_time(1.0)
+	assert_almost_eq(v.get_bullet_transform(0).origin.x - x0, 50.0, 0.01, "half speed: 50 px in a 1 s tick")
+	assert_almost_eq(life0 - v.get_life_time_left(), 0.5, 0.01, "lifetime runs at the same scale")
+	factory.time_scale = 0.0
+	factory.debug_advance_time(1.0)
+	assert_almost_eq(v.get_bullet_transform(0).origin.x - x0, 50.0, 0.01, "scale 0 freezes the bullet")
+	factory.time_scale = 2.0
+	factory.debug_advance_time(1.0)
+	assert_almost_eq(v.get_bullet_transform(0).origin.x - x0, 250.0, 0.01, "double speed: +200 px")
+
+
+## A volley's and a laser's own time_scale multiply the factory's: each runs
+## on its own clock (0 freezes it alone), every life starts at 1, and bad
+## values or stale handles are refused with one error.
+func test_each_volley_and_laser_has_its_own_time_scale() -> void:
+	var slow := _volley_at([Vector2.ZERO], 0.0)
+	var normal := _volley_at([Vector2(0, 50)], 0.0)
+	for v in [slow, normal]:
+		v.bullet_set_velocity(0, Vector2(100, 0))
+	await idle(1)
+	assert_eq(slow.get_time_scale(), 1.0, "every life starts at 1")
+	var x0: float = slow.get_bullet_transform(0).origin.x
+	var n0: float = normal.get_bullet_transform(0).origin.x
+	var life0: float = slow.get_life_time_left()
+	slow.set_time_scale(0.25)
+	factory.time_scale = 2.0
+	factory.debug_advance_time(1.0)
+	assert_almost_eq(slow.get_bullet_transform(0).origin.x - x0, 50.0, 0.01, "0.25 x the factory's 2: 50 px in a 1 s tick")
+	assert_almost_eq(life0 - slow.get_life_time_left(), 0.5, 0.01, "its lifetime runs on the same clock")
+	assert_almost_eq(normal.get_bullet_transform(0).origin.x - n0, 200.0, 0.01, "the other volley keeps the factory's 2")
+	slow.set_time_scale(0.0)
+	factory.debug_advance_time(1.0)
+	assert_almost_eq(slow.get_bullet_transform(0).origin.x - x0, 50.0, 0.01, "0 freezes this volley alone")
+	slow.set_time_scale(-1.0)
+	slow.set_time_scale(NAN)
+	expect_error_sequence([
+		"set_time_scale: time_scale must be finite and >= 0 (0 freezes this volley), keeping the old value.",
+		"set_time_scale: time_scale must be finite and >= 0 (0 freezes this volley), keeping the old value.",
+	])
+	assert_eq(slow.get_time_scale(), 0.0, "old value kept")
+	factory.time_scale = 1.0
+	slow.clear_all_bullets()
+	await idle(1)
+	assert_true(slow.is_pooled(), "pooled")
+	slow.set_time_scale(3.0)
+	expect_error_sequence(["set_time_scale: this volley is in the pool (its last bullet died), so this handle is stale. Spawn a new volley instead."])
+	var reused := _volley_at([Vector2.ZERO], 0.0)
+	assert_same(reused, slow, "reused")
+	assert_eq(reused.get_time_scale(), 1.0, "a new life starts at 1")
+	# Lasers: a bolt at half speed, a frozen beam keeps its phase.
+	var bolt_data := H.make_laser(0.0, 0.0, 0.0, 0.0, 20.0)
+	bolt_data.type = LaserData2D.LASER_BOLT
+	bolt_data.speed = 800.0
+	var bolt := factory.spawn_laser(bolt_data, [Transform2D.IDENTITY] as Array[Transform2D])
+	bolt.set_time_scale(0.5)
+	factory.debug_advance_time(0.0625)
+	var head: Vector2 = bolt.get_beam_end(0)
+	factory.debug_advance_time(0.0625)
+	assert_almost_eq(bolt.get_beam_end(0) - head, Vector2(25, 0), Vector2(0.001, 0.001), "a bolt at 0.5: 25 px a 1/16 s tick")
+	var beam := factory.spawn_laser(H.make_laser(0.0, 0.0, 0.125, 0.0), [Transform2D.IDENTITY] as Array[Transform2D])
+	beam.set_time_scale(0.0)
+	for i in 6:
+		factory.debug_advance_time(0.0625)
+	assert_false(beam.is_pooled(), "a frozen laser never runs its active time out")
+	beam.set_time_scale(INF)
+	expect_error_sequence(["set_time_scale: time_scale must be finite and >= 0 (0 freezes this laser), keeping the old value."])
+	beam.set_time_scale(1.0)
+	for i in 4:
+		factory.debug_advance_time(0.0625)
+	assert_true(beam.is_pooled(), "back at 1 it finishes")
+	beam.set_time_scale(2.0)
+	expect_error_sequence(["set_time_scale: this laser finished (it waits in the pool), so this handle is stale. Fire a new laser instead."])
+	var again := factory.spawn_laser(H.make_laser(0.0, 0.0, 0.125, 0.0), [Transform2D.IDENTITY] as Array[Transform2D])
+	assert_same(again, beam, "the laser is reused")
+	assert_eq(again.get_time_scale(), 1.0, "a new laser life starts at 1")
+
+
+## Any finite time_scale is accepted, but one volley tick never covers more
+## than 10 s of bullet time: 1e300 would turn every pose into INF (and hand
+## INF shapes to the physics server). The lifetime runs on the same clamped
+## clock. Scales whose ticks stay below the cap are untouched (above: x2).
+func test_a_huge_time_scale_keeps_bullets_finite() -> void:
+	var v := _volley_at([Vector2.ZERO], 0.0)
+	v.bullet_set_velocity(0, Vector2(100, 0))
+	await idle(1)
+	var x0: float = v.get_bullet_transform(0).origin.x
+	factory.time_scale = 1e300
+	factory.debug_advance_time(1.0 / 60.0)
+	var p: Vector2 = v.get_bullet_transform(0).origin
+	assert_true(p.is_finite(), "the bullet stays finite")
+	assert_almost_eq(p.x - x0, 1000.0, 0.01, "one tick covers at most 10 s of bullet time (100 px/s)")
+	expect_no_errors("no engine error from a huge scale")
+
+
+## One-shot sprite effects age on the same capped bullet-world clock. They
+## used to get the raw delta * time_scale: one 1e300 tick moved fx_clock to
+## 1e298, where adding 1/60 is a no-op in a double, and every effect fired
+## afterwards froze on frame 0 forever.
+func test_a_huge_time_scale_does_not_freeze_later_effects() -> void:
+	var clock_before: float = float(factory.debug_get_effect_state()["clock"])
+	factory.time_scale = 1e300
+	factory.debug_advance_time(1.0 / 60.0)
+	var clock_after: float = float(factory.debug_get_effect_state()["clock"])
+	assert_lte(clock_after - clock_before, 10.0001, "the effect clock covers at most one capped bullet tick")
+	factory.time_scale = 1.0
+	var layer := H.make_effect_layer(EffectLayerData2D.EFFECT_ON_HIT, 2) # 2 frames at 10 fps = 0.2 s
+	assert_gte(factory.spawn_layer_effect(layer, Transform2D()), 0, "the effect fires")
+	assert_eq(factory.get_active_effect_count(), 1, "one live slot")
+	factory.debug_advance_time(1.0)
+	assert_eq(factory.get_active_effect_count(), 0, "the effect ages out after the huge-scale tick")
+	expect_no_errors()
+
+
+func test_time_scale_default_and_validation() -> void:
+	assert_eq(factory.time_scale, 1.0, "default is real time")
+	factory.time_scale = -1.0
+	expect_error_sequence(["BulletFactory2D: time_scale must be a finite number >= 0, keeping the old value."])
+	factory.time_scale = NAN
+	expect_error_sequence(["BulletFactory2D: time_scale must be a finite number >= 0, keeping the old value."])
+	factory.time_scale = INF
+	expect_error_sequence(["BulletFactory2D: time_scale must be a finite number >= 0, keeping the old value."])
+	assert_eq(factory.time_scale, 1.0, "rejected values keep the old scale")
+	factory.time_scale = 0.25
+	assert_eq(factory.time_scale, 0.25, "valid value accepted")
+
+
+# --- clear_active_bullets also announces itself -------------------------------------------------
+
+func test_clear_active_bullets_emits_bullets_cleared_per_volley() -> void:
+	var a := _volley_at([Vector2(0, 0), Vector2(10, 0)])
+	var b := _volley_at([Vector2(50, 50)])
+	factory.bullets_cleared.connect(_on_bullets_cleared)
+	assert_eq(factory.clear_active_bullets(), 3, "three bullets cleared")
+	assert_eq(cleared_log.size(), 2, "one signal per volley that lost bullets")
+	var by_volley := {}
+	for e in cleared_log:
+		by_volley[e["volley"]] = e
+	assert_eq(Array(by_volley[a]["positions"]), [Vector2(0, 0), Vector2(10, 0)], "positions of volley a")
+	assert_eq(Array(by_volley[a]["indexes"]), [0, 1], "indexes of volley a")
+	assert_eq(Array(by_volley[b]["positions"]), [Vector2(50, 50)], "positions of volley b")
+
+
+func test_clear_active_bullets_with_a_key_announces_only_that_bucket() -> void:
+	_volley_at([Vector2(0, 0)])
+	_volley_at([Vector2(1, 0), Vector2(2, 0)])
+	factory.bullets_cleared.connect(_on_bullets_cleared)
+	var key: VolleyPoolKey2D = BulletFactory2D.debug_expected_pool_key(H.make_volley_data(2, 0.0, 60.0))
+	assert_eq(factory.clear_active_bullets(key), 2, "only the two-bullet volley")
+	assert_eq(cleared_log.size(), 1, "one signal")
+	assert_eq(cleared_log[0]["positions"].size(), 2, "for that volley")
+
+
+func test_nothing_to_clear_announces_nothing() -> void:
+	factory.bullets_cleared.connect(_on_bullets_cleared)
+	assert_eq(factory.clear_active_bullets(), 0, "empty factory")
+	assert_eq(cleared_log.size(), 0, "no signal")
+
+
+func test_a_cleared_handler_of_clear_active_bullets_may_spawn_pickups() -> void:
+	_volley_at([Vector2(0, 0), Vector2(5, 5)])
+	var made := []
+	factory.bullets_cleared.connect(func(positions, _v, _i):
+		for p in positions:
+			made.append(_volley_at([p])))
+	factory.clear_active_bullets()
+	assert_eq(made.size(), 2, "the busy latch is down when the signal fires")
+	assert_eq(factory.get_active_bullet_count(), 2, "only the spawned replacements live")
+
+
+## A volley queued for deletion is gone for every area query alike: the
+## counts agree with get_bullets_in_circle / rect and the clears.
+func test_area_counts_skip_volleys_queued_for_deletion() -> void:
+	var d := H.make_still_data(2)
+	d.transforms = [Transform2D(0.0, Vector2(10, 10)), Transform2D(0.0, Vector2(20, 10))]
+	var keep: BulletVolley2D = factory.spawn_volley(d)
+	var gone: BulletVolley2D = factory.spawn_volley(d)
+	gone.queue_free()
+	assert_eq(factory.get_bullets_in_circle(Vector2(15, 10), 50.0).size(), 1, "one volley listed")
+	assert_eq(factory.count_bullets_in_circle(Vector2(15, 10), 50.0), 2, "its two bullets counted (circle)")
+	assert_eq(factory.count_bullets_in_rect(Rect2(0, 0, 40, 40)), 2, "its two bullets counted (rect)")
+	assert_not_null(keep, "kept")
+
+
+## Who fired what: get_volleys_owned_by / get_lasers_owned_by list one
+## spawner's live volleys or lasers (null: what the factory fired itself), in
+## factory order; a freed or wrong object lists nothing with one error.
+func test_listings_by_owner() -> void:
+	var sp := make_spawner(H.make_volley_data(2, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 2)
+	var own: Array = []
+	sp.volley_fired.connect(func(v: BulletVolley2D, _n) -> void: own.append(v))
+	assert_true(sp.shoot_once(), "fires")
+	assert_true(sp.shoot_once(), "fires again")
+	var mine := _volley_at([Vector2.ZERO])
+	assert_eq(factory.get_volleys_owned_by(sp), own, "the spawner's two volleys")
+	assert_eq(factory.get_volleys_owned_by(null), [mine], "null: the factory's own")
+	own[0].set_is_auto_pooling_enabled(false)
+	own[0].clear_all_bullets()
+	await idle(1)
+	assert_true(own[0].is_parked(), "parked")
+	assert_eq(factory.get_volleys_owned_by(sp), [own[1]], "a parked volley only with include_parked")
+	assert_eq(factory.get_volleys_owned_by(sp, true), own, "with include_parked")
+	var ls := LaserSpawner2D.new()
+	ls.set_shooting_enabled(false)
+	ls.laser_data = H.make_laser(0.0, 0.0, 0.0, 0.0)
+	ls.pattern_source = LaserSpawner2D.PATTERN_FROM_HELPER_CUSTOM
+	ls.helper_custom_transforms = [Transform2D.IDENTITY]
+	add(ls)
+	ls.set_bullet_factory(factory)
+	assert_true(ls.shoot_once(), "laser fires")
+	var free_laser := factory.spawn_laser(H.make_laser(0.0, 0.0, 0.0, 0.0), [Transform2D.IDENTITY] as Array[Transform2D])
+	assert_eq(factory.get_lasers_owned_by(ls), ls.get_live_lasers(), "the laser spawner's laser")
+	assert_eq(factory.get_lasers_owned_by(null), [free_laser], "null: the factory's own laser")
+	assert_eq(factory.get_volleys_owned_by(ls), [], "a laser spawner owns no volley")
+	var gone := Node2D.new()
+	gone.free()
+	assert_eq(factory.get_volleys_owned_by(gone), [], "a freed object lists nothing")
+	assert_eq(factory.get_lasers_owned_by(factory), [], "a non-spawner lists nothing")
+	expect_error_sequence([
+		"get_volleys_owned_by: spawner must be a PatternSpawner2D or null (a freed object is neither), listing nothing.",
+		"get_lasers_owned_by: spawner must be a PatternSpawner2D or null (a freed object is neither), listing nothing.",
+	])
+
+
+
+## A pause taken by a handler inside the sweep freezes the rest of it (a
+## hit-stop freezes the frame): no custom timer, laser tick, effect aging,
+## split or emitter shot runs after it. What was queued waits and happens
+## exactly once after the resume.
+func test_a_pause_from_a_handler_freezes_the_rest_of_the_sweep() -> void:
+	const DT := 1.0 / 60.0
+	var counts := {"timer": 0, "splits": 0, "emits": 0}
+	var tpl := BulletSpawner2D.new()
+	tpl.set_shooting_enabled(false)
+	tpl.set_spawn_data(H.make_volley_data(1, 0.0, 30.0))
+	tpl.helper_bullets_amount = 1
+	add(tpl)
+	tpl.set_bullet_factory(factory)
+	tpl.volley_fired.connect(func(_a = null, _b = null, _c = null) -> void: counts.emits += 1)
+	var timing := BulletEmitterData2D.new()
+	timing.interval_sec = DT # one shot every tick
+	var emitter_volley: BulletVolley2D = factory.spawn_volley(H.make_volley_data(1, 0.0, 30.0)) # ticked before the pauser
+	assert_true(emitter_volley.emitter_set(timing, tpl), "emitter armed")
+	var split_data := H.make_volley_data(1, 0.0, 30.0)
+	var to_split: BulletVolley2D = factory.spawn_volley(split_data)
+	var stage := BulletSplitStage2D.new()
+	stage.count = 2
+	var chain := BulletSplitData2D.new()
+	chain.stages = [stage]
+	assert_true(to_split.split_set_data(chain, split_data), "split armed")
+	factory.bullet_split.connect(func(_a = null, _b = null, _c = null, _d = null, _e = null) -> void: counts.splits += 1)
+	var pauser_data := H.make_volley_data(1, 0.0, 0.1)
+	pauser_data.is_life_time_over_signal_enabled = true
+	var pauser: BulletVolley2D = factory.spawn_volley(pauser_data)
+	factory.life_time_over.connect(func(v: BulletVolley2D, _idx = null) -> void:
+		if v == pauser:
+			to_split.all_bullets_split() # queued inside the sweep
+			factory.set_is_factory_processing_bullets(false))
+	var timer_volley: BulletVolley2D = factory.spawn_volley(H.make_volley_data(1, 0.0, 30.0))
+	timer_volley.attach_time_based_function(DT * 0.5, func() -> void: counts.timer += 1, true)
+	var laser: LaserVolley2D = factory.spawn_laser(H.make_laser(0.0, 0.0, 5.0, 0.0), [Transform2D()])
+	var paused_at := -1
+	var before := {}
+	for i in 30:
+		before = counts.duplicate()
+		before["laser"] = laser.get_active_time_left()
+		factory.debug_advance_time(DT)
+		if not factory.is_factory_processing_bullets:
+			paused_at = i
+			break
+	assert_gt(paused_at, 0, "the handler paused the factory after a few sweeps")
+	assert_gt(before.timer, 0, "the timer ran before the pause")
+	assert_gt(before.emits, 0, "the emitter fired before the pause")
+	var problems: Array = []
+	if counts.timer != before.timer:
+		problems.append("a timer ran after the pause")
+	if laser.get_active_time_left() != before.laser:
+		problems.append("the laser ticked after the pause")
+	if counts.splits != 0:
+		problems.append("the split flushed during the pause")
+	if counts.emits != before.emits:
+		problems.append("an emitter shot fired during the pause")
+	assert_eq(", ".join(problems), "", "nothing after the pause ran in that sweep")
+	assert_eq(factory.get_pending_split_count(), 1, "the split waits")
+	factory.set_is_factory_processing_bullets(true)
+	factory.debug_advance_time(DT)
+	assert_eq(counts.splits, 1, "the queued split happens exactly once after the resume")
+	assert_gt(counts.emits, before.emits, "the carried emitter shot fires after the resume")
+	handle_events(factory)
+
+
+# --- can_hit_mask: what the bullets can hit ---------------------------------
+
+## The factory area calls take a trailing can_hit_mask: only bullets (and lasers)
+## whose collision_mask shares a bit with it count; 0 = all. A bomb clears
+## "everything that can hurt the player" without touching the player's shots.
+const AREA_CALLS := ["get_bullets_in_circle", "get_bullets_in_rect", "get_bullet_positions_in_circle", "get_nearest_bullet", "count_bullets_in_circle", "count_bullets_in_rect",
+	"clear_bullets_in_circle", "clear_bullets_in_rect", "convert_all_bullets_to_pickups",
+	"convert_all_bullets_to_pickups_deferred", "convert_bullets_in_circle_to_pickups",
+	"convert_bullets_in_rect_to_pickups", "end_lasers_in_circle", "end_lasers_in_rect"]
+
+
+func _masked_volley(points: Array, mask: int) -> BulletVolley2D:
+	var data := H.make_volley_data(points.size(), 0.0, 60.0)
+	var arr: Array = []
+	for p in points:
+		arr.append(Transform2D(0.0, p))
+	data.transforms = arr
+	data.collision_mask = mask
+	return factory.spawn_volley(data)
+
+
+func test_every_area_call_ends_in_can_hit_mask_defaulting_to_all() -> void:
+	for m in ClassDB.class_get_method_list("BulletFactory2D", true):
+		if m["name"] in AREA_CALLS:
+			var args: Array = m["args"]
+			assert_eq(args[-1]["name"], "can_hit_mask", m["name"] + ": the filter is the last argument")
+			assert_eq(args[-1]["type"], TYPE_INT, m["name"] + ": an int mask")
+			assert_eq(m["default_args"][-1], 0, m["name"] + ": 0 (every bullet) by default")
+
+
+func test_area_calls_count_only_bullets_that_can_hit_the_mask() -> void:
+	var at_player := _masked_volley([Vector2(0, 0), Vector2(5, 0)], 2)
+	var at_enemies := _masked_volley([Vector2(3, 0)], 4 | 8)
+	var both := _masked_volley([Vector2(6, 0)], 2 | 4)
+	var box := Rect2(-10, -10, 30, 30)
+	assert_eq([factory.count_bullets_in_circle(Vector2.ZERO, 20.0, 2), factory.count_bullets_in_circle(Vector2.ZERO, 20.0, 4),
+		factory.count_bullets_in_circle(Vector2.ZERO, 20.0, 8), factory.count_bullets_in_circle(Vector2.ZERO, 20.0)], [3, 2, 1, 4], "circle counts per mask")
+	assert_eq([factory.count_bullets_in_rect(box, 2), factory.count_bullets_in_rect(box, 16), factory.count_bullets_in_rect(box)], [3, 0, 4], "rect counts per mask")
+	var found: Array = []
+	for e in factory.get_bullets_in_circle(Vector2.ZERO, 20.0, 4):
+		found.append(e["volley"])
+	assert_eq(found, [at_enemies, both], "circle listing keeps the volleys that can hit 4")
+	found.clear()
+	for e in factory.get_bullets_in_rect(box, 2):
+		found.append(e["volley"])
+	assert_eq(found, [at_player, both], "rect listing keeps the volleys that can hit 2")
+	assert_eq(factory.clear_bullets_in_circle(Vector2.ZERO, 20.0, 2), 3, "the bomb clears what can hit the player")
+	assert_eq([_alive(at_player), _alive(at_enemies), _alive(both)], [[], [0], []], "the player's shots survive")
+	assert_eq(factory.clear_bullets_in_rect(box, 2), 0, "nothing left that can hit 2")
+	assert_eq(factory.clear_bullets_in_rect(box, 8), 1, "then the rest")
+
+
+func test_pickup_conversions_take_only_bullets_that_can_hit_the_mask() -> void:
+	var target := Node2D.new()
+	target.position = Vector2(500, 500)
+	add(target)
+	var at_player := _masked_volley([Vector2(0, 0), Vector2(5, 0)], 2)
+	var at_enemies := _masked_volley([Vector2(3, 0), Vector2(4, 0)], 4)
+	assert_eq(factory.convert_bullets_in_circle_to_pickups(Vector2.ZERO, 20.0, PickupTestHelpers.coin(), target, 4).size(), 1, "one pickup volley, from the enemy-bound bullets")
+	assert_eq([_alive(at_player), _alive(at_enemies)], [[0, 1], []], "circle: the other volley untouched")
+	var again := _masked_volley([Vector2(7, 0)], 4)
+	assert_eq(factory.convert_bullets_in_rect_to_pickups(Rect2(-10, -10, 30, 30), PickupTestHelpers.coin(), target, 2).size(), 1, "rect: the player-bound ones")
+	assert_eq([_alive(at_player), _alive(again)], [[], [0]], "rect: only mask 2 converted")
+	assert_eq(factory.convert_all_bullets_to_pickups(PickupTestHelpers.coin(), target, 8).size(), 0, "nothing can hit 8")
+	assert_eq(factory.convert_all_bullets_to_pickups(PickupTestHelpers.coin(), target, 4).size(), 1, "all: the one left that can hit 4")
+	assert_eq(_alive(again), [], "converted")
+	var last := _masked_volley([Vector2(9, 0)], 2)
+	var spare := _masked_volley([Vector2(9, 0)], 4)
+	factory.convert_all_bullets_to_pickups_deferred(PickupTestHelpers.coin(), target, 2)
+	await idle(2)
+	assert_eq([_alive(last), _alive(spare)], [[], [0]], "deferred: the mask travels with the call")
+
+
+func test_a_can_hit_mask_outside_32_bits_is_refused_and_changes_nothing() -> void:
+	var v := _masked_volley([Vector2(0, 0)], 2)
+	var target := Node2D.new()
+	add(target)
+	for bad in [-1, 1 << 32]:
+		assert_eq(factory.count_bullets_in_circle(Vector2.ZERO, 5.0, bad), 0, "count refused")
+		expect_error_sequence(["count_bullets_in_circle: can_hit_mask must be between 0 and 4294967295 (0 matches everything)."])
+		assert_eq(factory.clear_bullets_in_rect(Rect2(-5, -5, 10, 10), bad), 0, "clear refused")
+		expect_error_sequence(["clear_bullets_in_rect: can_hit_mask must be between 0 and 4294967295 (0 matches everything)."])
+		assert_eq(factory.get_bullets_in_circle(Vector2.ZERO, 5.0, bad).size(), 0, "listing refused")
+		expect_error_sequence(["get_bullets_in_circle: can_hit_mask must be between 0 and 4294967295 (0 matches everything)."])
+		assert_eq(factory.convert_all_bullets_to_pickups(PickupTestHelpers.coin(), target, bad).size(), 0, "conversion refused")
+		expect_error_sequence(["BulletFactory2D.convert_all_bullets_to_pickups: can_hit_mask must be between 0 and 4294967295 (0 matches everything), nothing converted."])
+		assert_eq(factory.end_lasers_in_circle(Vector2.ZERO, 5.0, true, bad), 0, "laser end refused")
+		expect_error_sequence(["end_lasers_in_circle: can_hit_mask must be between 0 and 4294967295 (0 matches everything)."])
+	assert_eq(_alive(v), [0], "nothing happened")
+
+
+# --- fast queries: positions and the nearest bullet --------------------------
+
+func test_positions_in_circle_match_the_listing_without_dictionaries() -> void:
+	var a := _masked_volley([Vector2(0, 0), Vector2(50, 0), Vector2(3, 4)], 2)
+	var b := _masked_volley([Vector2(-6, 0), Vector2(8, 0)], 4)
+	b.disable_bullet(1)
+	var listed := PackedVector2Array()
+	for e in factory.get_bullets_in_circle(Vector2.ZERO, 10.0):
+		listed.append_array(e["positions"])
+	var fast: PackedVector2Array = factory.get_bullet_positions_in_circle(Vector2.ZERO, 10.0)
+	assert_eq(fast, listed, "the same positions, in volley then index order")
+	assert_eq(fast, PackedVector2Array([Vector2(0, 0), Vector2(3, 4), Vector2(-6, 0)]), "cleared and far bullets left out")
+	assert_eq(factory.get_bullet_positions_in_circle(Vector2.ZERO, 10.0, 4), PackedVector2Array([Vector2(-6, 0)]), "filtered by what they can hit")
+	assert_eq(factory.get_bullet_positions_in_circle(Vector2.ZERO, 10.0, 8).size(), 0, "nothing can hit 8")
+	assert_eq(a.get_amount_bullets(), 3, "a query changes nothing")
+
+
+func test_nearest_bullet_is_the_closest_that_can_hit_the_mask() -> void:
+	var a := _masked_volley([Vector2(30, 0), Vector2(10, 0)], 2)
+	var b := _masked_volley([Vector2(-8, 0), Vector2(5, 5)], 4)
+	var n: Dictionary = factory.get_nearest_bullet(Vector2.ZERO, 100.0)
+	assert_eq([n["volley"], n["index"], n["position"]], [b, 1, Vector2(5, 5)], "the closest of every volley (7.07 px)")
+	n = factory.get_nearest_bullet(Vector2.ZERO, 100.0, 2)
+	assert_eq([n["volley"], n["index"]], [a, 1], "the closest that can hit 2")
+	assert_true(factory.get_nearest_bullet(Vector2.ZERO, 7.0).is_empty(), "nothing within 7 px: an empty Dictionary")
+	assert_eq(factory.get_nearest_bullet(Vector2(10, 0), 0.0)["index"], 1, "distance 0 finds a bullet exactly there")
+	b.disable_bullet(1)
+	assert_eq(factory.get_nearest_bullet(Vector2.ZERO, 100.0)["position"], Vector2(-8, 0), "a cleared bullet is not a candidate")
+
+
+func test_nearest_bullet_ties_go_to_the_first_volley_and_index() -> void:
+	var a := _masked_volley([Vector2(5, 0), Vector2(-5, 0)], 2)
+	_masked_volley([Vector2(0, 5)], 2)
+	var n: Dictionary = factory.get_nearest_bullet(Vector2.ZERO, 10.0)
+	assert_eq([n["volley"], n["index"]], [a, 0], "equal distances: the first found wins")
+
+
+func test_fast_queries_refuse_bad_input() -> void:
+	_masked_volley([Vector2(0, 0)], 2)
+	assert_eq(factory.get_bullet_positions_in_circle(Vector2(INF, 0), 5.0).size(), 0, "bad center")
+	expect_error_sequence(["get_bullet_positions_in_circle: center must be finite and radius a finite number >= 0."])
+	assert_eq(factory.get_bullet_positions_in_circle(Vector2.ZERO, 5.0, -3).size(), 0, "bad mask")
+	expect_error_sequence(["get_bullet_positions_in_circle: can_hit_mask must be between 0 and 4294967295 (0 matches everything)."])
+	assert_true(factory.get_nearest_bullet(Vector2(0, NAN), 5.0).is_empty(), "bad position")
+	expect_error_sequence(["get_nearest_bullet: position must be finite and max_distance a finite number >= 0."])
+	assert_true(factory.get_nearest_bullet(Vector2.ZERO, -1.0).is_empty(), "negative distance")
+	expect_error_sequence(["get_nearest_bullet: position must be finite and max_distance a finite number >= 0."])
+	assert_true(factory.get_nearest_bullet(Vector2.ZERO, 5.0, 1 << 33).is_empty(), "bad mask")
+	expect_error_sequence(["get_nearest_bullet: can_hit_mask must be between 0 and 4294967295 (0 matches everything)."])
+	for m in ["get_bullet_positions_in_circle", "get_nearest_bullet"]:
+		assert_true(factory.has_method(m), "bound: " + m)

@@ -1,0 +1,10 @@
+[gd_resource type="EffectLayerData2D" format=3]
+
+[ext_resource type="SpriteFrames" path="res://shared/effects/explosion_frames.tres" id="1_gkohh"]
+
+[resource]
+trigger = 3
+sprite_frames = ExtResource("1_gkohh")
+randomize_rotation = true
+random_scale_min = 0.85
+random_scale_max = 1.15

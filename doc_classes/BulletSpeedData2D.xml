@@ -4,6 +4,8 @@
 		Contains bullet speed related data.
 	</brief_description>
 	<description>
+		One bullet's movement: current speed, cap, and acceleration. Put one entry per bullet in [BulletVolleyData2D.all_bullet_speed_data] — entry [code]i[/code] drives bullet [code]i[/code] only. Use [method generate_random_data] to roll a batch with ranges.
+		Negative [member speed] is legal and flies backwards along the heading (velocity = direction × speed); the tick clamps symmetrically to [-max_speed, max_speed] when max_speed is above 0, so reverse flight survives. Example: speed -250 with max_speed 1000 → the bullet retreats at 250 px/s. NaN/Inf values are rejected — that bullet reads 0/0/0 and its siblings are untouched.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -18,19 +20,19 @@
 			<param index="5" name="acceleration_MIN" type="float" />
 			<param index="6" name="acceleration_MAX" type="float" />
 			<description>
-				Generates random speed data.
+				Generates random speed data: amount_to_generate entries with each value rolled inside its MIN/MAX range. Requires amount_to_generate above 0 and every MIN at or below its MAX, otherwise returns empty.
 			</description>
 		</method>
 	</methods>
 	<members>
 		<member name="acceleration" type="float" setter="set_acceleration" getter="get_acceleration" default="0.0">
-			The amount by which the speed increases every frame until reaching max_speed.
+			Change of the speed in px/s per second (negative slows down, and keeps going into negative speeds, which fly backwards). The speed stops growing at [member max_speed] in either direction; with [member max_speed] 0 it has no limit and holds its last finite value instead of overflowing.
 		</member>
 		<member name="max_speed" type="float" setter="set_max_speed" getter="get_max_speed" default="0.0">
-			The max possible speed that the bullets can have.
+			Top speed in px/s for [member acceleration]: the speed is clamped to the range from -max_speed to max_speed. 0 (the default) means no top speed.
 		</member>
 		<member name="speed" type="float" setter="set_speed" getter="get_speed" default="0.0">
-			The current speed that the bullets have.
+			Starting speed in px/s along the bullet's direction.
 		</member>
 	</members>
 </class>

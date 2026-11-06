@@ -1,0 +1,62 @@
+{
+  "timestamp": "2026-10-27T05-55-13Z",
+  "commit": "9d0c2c0",
+  "dirty": true,
+  "repeat": 5,
+  "machine": {
+    "cpu": "AMD Ryzen 7 8840HS w/ Radeon 780M Graphics",
+    "cores": 16,
+    "os": "Linux-7.3.0-5-cachyos-x86_64-with-glibc2.44",
+    "python": "3.14.8"
+  },
+  "scenarios": {
+    "cold_volleys_in_physics": {
+      "active_bullets_mean": 1735.33333333333,
+      "collision_records": 0,
+      "description": "40 cold monitorable volleys per wave spawned inside _physics_process",
+      "engine_ms": {
+        "max": 4.095,
+        "mean": 0.99566,
+        "p50": 1.238,
+        "p95": 1.851,
+        "p99": 3.468
+      },
+      "expired_bullets": 27400,
+      "extra": {},
+      "factory_tick_ms": {
+        "max": 0.423,
+        "mean": 0.0660866666666667,
+        "p50": 0.085,
+        "p95": 0.111,
+        "p99": 0.375
+      },
+      "frame_ms": {
+        "max": 4.096,
+        "mean": 0.996036666666667,
+        "p50": 1.239,
+        "p95": 1.852,
+        "p99": 3.47
+      },
+      "measure_frames": 300,
+      "memory_static_growth_mb": 0.00759124755859375,
+      "memory_static_peak_mb": 48.8579568862915,
+      "nodes_end": 408.0,
+      "objects_end": 3139.0,
+      "objects_growth": -27800,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 0,
+      "pool_misses": 400,
+      "spawned_bullets": 27400,
+      "step_ms": {
+        "max": 0.004,
+        "mean": 0.000393333333333333,
+        "p50": 0.0,
+        "p95": 0.001,
+        "p99": 0.002
+      },
+      "warmup_frames": 0
+    }
+  },
+  "godot": "4.7.2-stable (arch_linux)",
+  "debug_build": true
+}

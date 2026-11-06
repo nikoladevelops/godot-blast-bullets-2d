@@ -12,6 +12,7 @@ SUBMENUS = {
             ("Select Godot Engine Executable Path", "select_godot_path.py"),
             ("Update godot_cpp Submodule To Latest", "update_godot_cpp.py"),
             ("Select Godot Project Folder", "select_godot_project.py"),
+            ("Manage Extra Project Folders (builds are copied there too)", "manage_extra_folders.py"),
         ],
     },
     "2": {
@@ -81,6 +82,8 @@ def display_dashboard_header():
     print(f"- Active Godot Path: {godot_path or 'NONE'} ({active_version})")
     print(f"- Saved Godot Paths Count: {len(saved_paths)}")
     print(f"- Godot Project Folder: {project_folder or 'NONE'}")
+    extra = config.getExtraProjectFolders()
+    print(f"- Extra Project Folders: {', '.join(extra) if extra else 'NONE'}")
     print(f"- Selected Build Profile: {build_profile or 'NONE'}")
     print(f"- Extension API Path: {extension_api_path or 'NONE'}")
     print(f"- LTO Mode: {lto_mode}")
@@ -190,7 +193,24 @@ def main():
             input("Press Enter to continue...")
 
 
+# Non-interactive commands (CI, scripts): the same tool scripts the menu runs.
+CLI_COMMANDS = {
+    "build-debug": "compile_debug_build.py",
+    "build-release": "compile_release_build.py",
+}
+
+
+def run_cli(args) -> int:
+    command = args[0]
+    if command not in CLI_COMMANDS:
+        print(f"Unknown command '{command}'. Commands: {', '.join(CLI_COMMANDS)} (no command = the menu).")
+        return 2
+    return run_tool_script(CLI_COMMANDS[command])
+
+
 if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        sys.exit(run_cli(sys.argv[1:]))
     try:
         main()
     except KeyboardInterrupt:

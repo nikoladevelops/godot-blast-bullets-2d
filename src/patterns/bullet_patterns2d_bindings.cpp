@@ -1,0 +1,282 @@
+// Godot bindings of the static pattern helpers (helper_generate_transforms_*,
+// helper_sample_outline_*, outline debug inspectors) and the pattern enums,
+// plus the helper_generate_transforms_* wrappers themselves. The wrappers and
+// their binds are expanded from patterns/pattern_signatures2d.inc.
+
+#include "godot_cpp/classes/project_settings.hpp"
+#include "patterns/pattern_knob_checks2d.hpp"
+#include "patterns/patterns_internal.hpp"
+
+using namespace godot;
+
+namespace BlastBullets2D {
+
+// helper_generate_transforms_<shape>: copy the arguments into the core's
+// params struct, run the native core, box the result for GDScript.
+#define PATTERN_PARAM_REQ(TYPE, NAME, FIELD) , TYPE NAME
+#define PATTERN_PARAM_OPT(TYPE, NAME, DEFAULT, FIELD) , TYPE NAME
+#define PATTERN_ASSIGN_REQ(TYPE, NAME, FIELD) params.FIELD = NAME;
+#define PATTERN_ASSIGN_OPT(TYPE, NAME, DEFAULT, FIELD) params.FIELD = NAME;
+#define PATTERN_GENERATOR(SHAPE, PARAMS)                                                                                                                                                           \
+	TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_##SHAPE(int transforms_amount, Transform2D marker_transform PATTERN_ARGS_##SHAPE(PATTERN_PARAM_REQ, PATTERN_PARAM_OPT)) { \
+		PARAMS params;                                                                                                                                                                             \
+		PATTERN_ARGS_##SHAPE(PATTERN_ASSIGN_REQ, PATTERN_ASSIGN_OPT) return pattern_slots_to_array(generate_##SHAPE##2d(transforms_amount, marker_transform, params));                             \
+	}
+#include "patterns/pattern_signatures2d.inc"
+#undef PATTERN_GENERATOR
+#undef PATTERN_PARAM_REQ
+#undef PATTERN_PARAM_OPT
+#undef PATTERN_ASSIGN_REQ
+#undef PATTERN_ASSIGN_OPT
+
+void BulletPatterns2D::set_max_bullets_per_pattern(int p_limit) {
+	if (p_limit < 1) {
+		pattern_knob_reject2d("max_bullets_per_pattern", "must be >= 1", "BulletPatterns2D");
+		return;
+	}
+	// Hard ceiling: the limit is the only bound every generator and every
+	// spawn path trusts, so a typo must not remove the bound itself.
+	if (p_limit > 1000000) {
+		pattern_knob_reject2d("max_bullets_per_pattern", "must be <= 1000000", "BulletPatterns2D");
+		return;
+	}
+	if (p_limit != g_pattern_max_bullets) {
+		g_pattern_max_bullets = p_limit;
+		++g_pattern_limit_generation;
+	}
+}
+
+int BulletPatterns2D::get_max_bullets_per_pattern() {
+	return g_pattern_max_bullets;
+}
+
+void BulletPatterns2D::register_project_settings() {
+	ProjectSettings *settings = ProjectSettings::get_singleton();
+	if (settings == nullptr) {
+		return;
+	}
+	const String name = "blastbullets2d/patterns/max_bullets_per_pattern";
+	if (!settings->has_setting(name)) {
+		settings->set_setting(name, kPatternDefaultMaxBullets);
+	}
+	settings->set_initial_value(name, kPatternDefaultMaxBullets);
+	Dictionary info;
+	info["name"] = name;
+	info["type"] = Variant::INT;
+	info["hint"] = PROPERTY_HINT_RANGE;
+	info["hint_string"] = "1,1000000,1,or_greater";
+	settings->add_property_info(info);
+	const Variant value = settings->get_setting(name, kPatternDefaultMaxBullets);
+	if (value.get_type() == Variant::INT) {
+		set_max_bullets_per_pattern((int)value);
+	}
+}
+
+void BulletPatterns2D::_bind_methods() {
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("set_max_bullets_per_pattern", "limit"), &BulletPatterns2D::set_max_bullets_per_pattern);
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("get_max_bullets_per_pattern"), &BulletPatterns2D::get_max_bullets_per_pattern);
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("get_shapes"), &BulletPatterns2D::get_shapes);
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("generate", "shape", "amount", "marker_transform", "params"), &BulletPatterns2D::generate, DEFVAL(Dictionary()));
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("randomize_transforms", "transforms", "settings", "seed", "shot_index"), &BulletPatterns2D::randomize_transforms, DEFVAL(0), DEFVAL(0));
+	// Every helper_generate_transforms_<shape>, with its defaults.
+#define PATTERN_NAME_REQ(TYPE, NAME, FIELD) , #NAME
+#define PATTERN_NAME_OPT(TYPE, NAME, DEFAULT, FIELD) , #NAME
+#define PATTERN_DEFVAL_REQ(TYPE, NAME, FIELD)
+#define PATTERN_DEFVAL_OPT(TYPE, NAME, DEFAULT, FIELD) , DEFVAL(DEFAULT)
+#define PATTERN_GENERATOR(SHAPE, PARAMS) \
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_generate_transforms_" #SHAPE, "transforms_amount", "marker_transform" PATTERN_ARGS_##SHAPE(PATTERN_NAME_REQ, PATTERN_NAME_OPT)), &BulletPatterns2D::helper_generate_transforms_##SHAPE PATTERN_ARGS_##SHAPE(PATTERN_DEFVAL_REQ, PATTERN_DEFVAL_OPT));
+#include "patterns/pattern_signatures2d.inc"
+#undef PATTERN_GENERATOR
+#undef PATTERN_NAME_REQ
+#undef PATTERN_NAME_OPT
+#undef PATTERN_DEFVAL_REQ
+#undef PATTERN_DEFVAL_OPT
+	BIND_ENUM_CONSTANT(POLYLINE_DISTRIBUTION_FIXED_SPACING);
+	BIND_ENUM_CONSTANT(POLYLINE_DISTRIBUTION_EVEN);
+	BIND_ENUM_CONSTANT(POLYLINE_OVERFLOW_CLAMP);
+	BIND_ENUM_CONSTANT(POLYLINE_OVERFLOW_WRAP);
+	BIND_ENUM_CONSTANT(POLYLINE_OVERFLOW_SHRINK_TO_FIT);
+	BIND_ENUM_CONSTANT(POLYLINE_ANCHOR_START);
+	BIND_ENUM_CONSTANT(POLYLINE_ANCHOR_CENTER);
+	BIND_ENUM_CONSTANT(POLYLINE_ANCHOR_END);
+	BIND_ENUM_CONSTANT(POLYLINE_FACING_ALONG_PATH);
+	BIND_ENUM_CONSTANT(POLYLINE_FACING_NORMAL_P90);
+	BIND_ENUM_CONSTANT(POLYLINE_FACING_NORMAL_M90);
+
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_apply_skip_indices", "transforms", "skip_indices"), &BulletPatterns2D::helper_apply_skip_indices);
+
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_layer_scale_factor", "layer_index", "scale_step", "side", "scale_curve", "custom_scales"), &BulletPatterns2D::helper_layer_scale_factor, DEFVAL(0.2), DEFVAL(0), DEFVAL(0), DEFVAL(PackedFloat32Array()));
+
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_bullet_layer_index", "bullet_index", "slot_count", "layer_count", "layer_fill", "layer_start_offset"), &BulletPatterns2D::helper_bullet_layer_index, DEFVAL(0), DEFVAL(0), DEFVAL(1), DEFVAL(0), DEFVAL(0));
+
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_rose", "petals", "radius", "lobe_sharpness", "base_rotation"), &BulletPatterns2D::helper_sample_outline_rose, DEFVAL(6), DEFVAL(150.0), DEFVAL(1.0), DEFVAL(0.0));
+
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_flower", "flower_type", "petals", "radius", "petal_spread", "petal_sharpness", "inner_radius_scale", "spiro_roller", "spiro_pen", "super_lobes", "super_fullness", "base_rotation", "transforms_amount"), &BulletPatterns2D::helper_sample_outline_flower, DEFVAL(0), DEFVAL(6), DEFVAL(150.0), DEFVAL(0.5), DEFVAL(1.0), DEFVAL(0.0), DEFVAL(45.0), DEFVAL(80.0), DEFVAL(6.0), DEFVAL(1.0), DEFVAL(0.0), DEFVAL(-1));
+
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_lissajous", "size_x", "size_y", "freq_x", "freq_y", "phase", "rotation"), &BulletPatterns2D::helper_sample_outline_lissajous, DEFVAL(200.0), DEFVAL(120.0), DEFVAL(3.0), DEFVAL(2.0), DEFVAL(0.0), DEFVAL(0.0));
+
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_circle", "radius"), &BulletPatterns2D::helper_sample_outline_circle, DEFVAL(150.0));
+
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_rectangle", "size"), &BulletPatterns2D::helper_sample_outline_rectangle, DEFVAL(Vector2(300.0, 200.0)));
+
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_triangle", "triangle_type", "size_a", "size_b", "rotation"), &BulletPatterns2D::helper_sample_outline_triangle, DEFVAL(0), DEFVAL(150.0), DEFVAL(150.0), DEFVAL(0.0));
+
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_trapezoid", "base_top", "base_bottom", "height", "rotation"), &BulletPatterns2D::helper_sample_outline_trapezoid, DEFVAL(200.0), DEFVAL(300.0), DEFVAL(200.0), DEFVAL(0.0));
+
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_diamond", "diagonal_x", "diagonal_y", "rotation"), &BulletPatterns2D::helper_sample_outline_diamond, DEFVAL(200.0), DEFVAL(300.0), DEFVAL(0.0));
+
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_polygon", "vertices", "radius", "base_rotation"), &BulletPatterns2D::helper_sample_outline_polygon, DEFVAL(6), DEFVAL(150.0), DEFVAL(0.0));
+
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_ellipse", "radius_x", "radius_y", "ellipse_rotation", "start_angle", "arc", "mode"), &BulletPatterns2D::helper_sample_outline_ellipse, DEFVAL(150.0), DEFVAL(100.0), DEFVAL(0.0), DEFVAL(0.0), DEFVAL(Math::TAU), DEFVAL(0));
+
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_ring", "radius", "arc", "y_scale", "start_angle_abs"), &BulletPatterns2D::helper_sample_outline_ring, DEFVAL(150.0), DEFVAL(Math::TAU), DEFVAL(1.0), DEFVAL(0.0));
+
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_star", "points", "outer_radius", "inner_radius", "base_rotation"), &BulletPatterns2D::helper_sample_outline_star, DEFVAL(5), DEFVAL(150.0), DEFVAL(65.0), DEFVAL(0.0));
+
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_grid", "transforms_amount", "rows_per_column", "alignment", "column_offset", "row_offset", "base_rotation_abs", "rotate_with_marker"), &BulletPatterns2D::helper_sample_outline_grid, DEFVAL(0), DEFVAL(10), DEFVAL(3), DEFVAL(150.0), DEFVAL(150.0), DEFVAL(0.0), DEFVAL(true));
+
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_lattice", "transforms_amount", "columns", "rows", "spacing_x", "spacing_y", "stagger_rows"), &BulletPatterns2D::helper_sample_outline_lattice, DEFVAL(0), DEFVAL(4), DEFVAL(4), DEFVAL(64.0), DEFVAL(64.0), DEFVAL(true));
+
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_waterfall", "transforms_amount", "columns", "column_spacing", "rows", "row_spacing", "stagger", "rain_direction"), &BulletPatterns2D::helper_sample_outline_waterfall, DEFVAL(0), DEFVAL(4), DEFVAL(64.0), DEFVAL(4), DEFVAL(64.0), DEFVAL(0.0), DEFVAL(Vector2(0, 1)));
+
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_rain", "transforms_amount", "band_width", "rain_direction", "drop_spacing"), &BulletPatterns2D::helper_sample_outline_rain, DEFVAL(0), DEFVAL(600.0), DEFVAL(Vector2(0, 1)), DEFVAL(48.0));
+
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_wave", "width", "amplitude", "waves", "direction"), &BulletPatterns2D::helper_sample_outline_wave, DEFVAL(300.0), DEFVAL(50.0), DEFVAL(2.0), DEFVAL(Vector2(1, 0)));
+
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_heart", "size", "base_rotation"), &BulletPatterns2D::helper_sample_outline_heart, DEFVAL(100.0), DEFVAL(0.0));
+
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_spiral", "transforms_amount", "start_radius", "radius_step", "angle_step", "base_rotation_abs"), &BulletPatterns2D::helper_sample_outline_spiral, DEFVAL(0), DEFVAL(50.0), DEFVAL(15.0), DEFVAL(0.6), DEFVAL(0.0));
+
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_multispiral", "transforms_amount", "arms", "start_radius", "radius_step", "angle_step", "base_rotation_abs", "arm_index_stride"), &BulletPatterns2D::helper_sample_outline_multispiral, DEFVAL(0), DEFVAL(3), DEFVAL(50.0), DEFVAL(15.0), DEFVAL(0.6), DEFVAL(0.0), DEFVAL(1));
+
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_sample_outline_counter_spiral", "transforms_amount", "arms", "start_radius", "radius_step", "angle_step", "base_rotation_abs", "arm_index_stride", "mirror_alternate_arms"), &BulletPatterns2D::helper_sample_outline_counter_spiral, DEFVAL(0), DEFVAL(4), DEFVAL(50.0), DEFVAL(15.0), DEFVAL(0.6), DEFVAL(0.0), DEFVAL(1), DEFVAL(true));
+
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_apply_side_spread", "transforms", "side_mode", "spread", "spread_exponent", "seed"), &BulletPatterns2D::helper_apply_side_spread, DEFVAL(0), DEFVAL(0.0), DEFVAL(2.0), DEFVAL(0));
+
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_compute_edge_normals", "edge_points", "closed", "flip"), &BulletPatterns2D::helper_compute_edge_normals, DEFVAL(false), DEFVAL(false));
+
+	// Outline debug inspectors: mathematical conformance framework for every
+	// closed shape (dot positions, gaps, corner ownership, facing deviations,
+	// settings echo). Pure math, no scene tree needed.
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("debug_describe_outline", "shape", "count", "params"), &BulletPatterns2D::debug_describe_outline, DEFVAL(Dictionary()));
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("debug_volley_gaps", "volley"), &BulletPatterns2D::debug_volley_gaps);
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("debug_verify_volley", "volley", "shape", "marker", "count", "params", "tolerance_px", "tolerance_rad"), &BulletPatterns2D::debug_verify_volley, DEFVAL(Dictionary()), DEFVAL(1.0), DEFVAL(0.02));
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("debug_outline_quotas", "shape", "count", "params"), &BulletPatterns2D::debug_outline_quotas, DEFVAL(Dictionary()));
+
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_extract_edge_from_image", "image", "threshold", "step", "quiet"), &BulletPatterns2D::helper_extract_edge_from_image, DEFVAL(0.5), DEFVAL(4), DEFVAL(false));
+
+	// Need this in order to expose the enum constants to Godot Engine
+	BIND_ENUM_CONSTANT(SPIRAL_FACING_TANGENT);
+	BIND_ENUM_CONSTANT(SPIRAL_FACING_RADIAL_OUTWARD);
+	BIND_ENUM_CONSTANT(SPIRAL_FACING_TOWARD_CENTER);
+	BIND_ENUM_CONSTANT(SPIRAL_FACING_KEEP_MARKER);
+	BIND_ENUM_CONSTANT(SCATTER_FACING_OUTWARD);
+	BIND_ENUM_CONSTANT(SCATTER_FACING_RANDOM);
+	BIND_ENUM_CONSTANT(SCATTER_FACING_INWARD);
+	BIND_ENUM_CONSTANT(LINE_ANCHOR_START);
+	BIND_ENUM_CONSTANT(LINE_ANCHOR_CENTER);
+	BIND_ENUM_CONSTANT(LINE_ANCHOR_END);
+	BIND_ENUM_CONSTANT(ELLIPSE_FULL);
+	BIND_ENUM_CONSTANT(ELLIPSE_ARC);
+	BIND_ENUM_CONSTANT(ELLIPSE_WALL);
+	BIND_ENUM_CONSTANT(PATTERN_PRESET_CUSTOM);
+	BIND_ENUM_CONSTANT(PATTERN_PRESET_RADIAL_DENSE);
+	BIND_ENUM_CONSTANT(PATTERN_PRESET_RADIAL_SPARSE);
+	BIND_ENUM_CONSTANT(PATTERN_PRESET_SPIRAL_3ARM);
+	BIND_ENUM_CONSTANT(PATTERN_PRESET_AIMED_FAN_NARROW);
+	BIND_ENUM_CONSTANT(PATTERN_PRESET_AIMED_FAN_WIDE);
+	BIND_ENUM_CONSTANT(PATTERN_PRESET_RING_SLOW);
+	BIND_ENUM_CONSTANT(PATTERN_PRESET_WALL_GAPS);
+	BIND_ENUM_CONSTANT(PATTERN_PRESET_RAIN);
+	BIND_ENUM_CONSTANT(PATTERN_PRESET_FLOWER_6);
+	BIND_ENUM_CONSTANT(PATTERN_PRESET_SCATTER_BURST);
+	BIND_ENUM_CONSTANT(PATTERN_PRESET_CROSS_BURST);
+	BIND_ENUM_CONSTANT(PATTERN_PRESET_STAR_SHELL);
+	BIND_ENUM_CONSTANT(PATTERN_PRESET_HEART_BLOOM);
+	BIND_ENUM_CONSTANT(PATTERN_PRESET_SNAKE_WAVE);
+	BIND_ENUM_CONSTANT(PATTERN_PRESET_WATERFALL_CURTAIN);
+	BIND_ENUM_CONSTANT(PATTERN_PRESET_PETAL_STORM);
+	BIND_ENUM_CONSTANT(PATTERN_PRESET_TWIN_SPIRAL_COUNTER);
+	BIND_ENUM_CONSTANT(PATTERN_PRESET_AIMED_TRAP);
+	BIND_ENUM_CONSTANT(PATTERN_PRESET_BLOSSOM_FINALE);
+	BIND_ENUM_CONSTANT(PATTERN_PRESET_TERRAIN_CREST);
+	BIND_ENUM_CONSTANT(EDGE_SPREAD_ALONG_NORMAL);
+	BIND_ENUM_CONSTANT(EDGE_SPREAD_BEHIND_NORMAL);
+	BIND_ENUM_CONSTANT(EDGE_SPREAD_BOTH);
+	BIND_ENUM_CONSTANT(SIDE_ON_PATH);
+	BIND_ENUM_CONSTANT(SIDE_OUTSIDE);
+	BIND_ENUM_CONSTANT(SIDE_INSIDE);
+	BIND_ENUM_CONSTANT(SIDE_BOTH);
+	BIND_ENUM_CONSTANT(TRIANGLE_EQUILATERAL);
+	BIND_ENUM_CONSTANT(TRIANGLE_ISOSCELES);
+	BIND_ENUM_CONSTANT(TRIANGLE_RIGHT);
+	BIND_ENUM_CONSTANT(FLOWER_FAN);
+	BIND_ENUM_CONSTANT(FLOWER_RHODONEA);
+	BIND_ENUM_CONSTANT(FLOWER_PHYLLOTAXIS);
+	BIND_ENUM_CONSTANT(FLOWER_SPIROGRAPH);
+	BIND_ENUM_CONSTANT(FLOWER_SUPERFORMULA);
+	BIND_ENUM_CONSTANT(OUTLINE_ON_OUTLINE);
+	BIND_ENUM_CONSTANT(OUTLINE_LAYERS);
+	BIND_ENUM_CONSTANT(OUTLINE_FILL_INSIDE);
+	BIND_ENUM_CONSTANT(OUTLINE_DISTRIBUTION_LEGACY);
+	BIND_ENUM_CONSTANT(OUTLINE_DISTRIBUTION_SYMMETRIC);
+	BIND_ENUM_CONSTANT(OUTLINE_LAYER_LAYOUT_SHARED_LOOP);
+	BIND_ENUM_CONSTANT(OUTLINE_LAYER_LAYOUT_EVEN_PER_LAYER);
+	BIND_ENUM_CONSTANT(OUTLINE_CORNER_PRIORITY_HORIZONTAL);
+	BIND_ENUM_CONSTANT(OUTLINE_CORNER_PRIORITY_VERTICAL);
+	BIND_ENUM_CONSTANT(OUTLINE_CORNER_PRIORITY_BALANCED);
+	BIND_ENUM_CONSTANT(OUTLINE_CORNER_MODE_PIN_CORNERS);
+	BIND_ENUM_CONSTANT(OUTLINE_CORNER_MODE_EVEN_ARC);
+	BIND_ENUM_CONSTANT(OUTLINE_CORNER_FACING_SIDE);
+	BIND_ENUM_CONSTANT(OUTLINE_CORNER_FACING_MITER);
+	BIND_ENUM_CONSTANT(OUTLINE_CORNER_FACING_SMOOTH);
+	BIND_ENUM_CONSTANT(DEBUG_SHAPE_CIRCLE);
+	BIND_ENUM_CONSTANT(DEBUG_SHAPE_RING);
+	BIND_ENUM_CONSTANT(DEBUG_SHAPE_ELLIPSE);
+	BIND_ENUM_CONSTANT(DEBUG_SHAPE_RECTANGLE);
+	BIND_ENUM_CONSTANT(DEBUG_SHAPE_SQUARE);
+	BIND_ENUM_CONSTANT(DEBUG_SHAPE_POLYGON);
+	BIND_ENUM_CONSTANT(DEBUG_SHAPE_TRIANGLE);
+	BIND_ENUM_CONSTANT(DEBUG_SHAPE_TRAPEZOID);
+	BIND_ENUM_CONSTANT(DEBUG_SHAPE_DIAMOND);
+	BIND_ENUM_CONSTANT(DEBUG_SHAPE_STAR);
+	BIND_ENUM_CONSTANT(DEBUG_SHAPE_HEART);
+	BIND_ENUM_CONSTANT(DEBUG_SHAPE_FLOWER);
+	BIND_ENUM_CONSTANT(DEBUG_SHAPE_ROSE);
+	BIND_ENUM_CONSTANT(DEBUG_SHAPE_LISSAJOUS);
+	BIND_ENUM_CONSTANT(OUTLINE_LAYER_OUTWARD);
+	BIND_ENUM_CONSTANT(OUTLINE_LAYER_INWARD);
+	BIND_ENUM_CONSTANT(OUTLINE_LAYER_BOTH);
+	BIND_ENUM_CONSTANT(OUTLINE_LAYER_INTERLEAVED);
+	BIND_ENUM_CONSTANT(OUTLINE_LAYER_SEQUENTIAL);
+	BIND_ENUM_CONSTANT(OUTLINE_LAYER_OUTER_FIRST);
+	BIND_ENUM_CONSTANT(OUTLINE_LAYER_PINGPONG);
+	BIND_ENUM_CONSTANT(OUTLINE_LAYER_CURVE_LINEAR);
+	BIND_ENUM_CONSTANT(OUTLINE_LAYER_CURVE_EXPONENTIAL);
+	BIND_ENUM_CONSTANT(OUTLINE_FACING_NORMAL);
+	BIND_ENUM_CONSTANT(OUTLINE_FACING_ALONG_P90);
+	BIND_ENUM_CONSTANT(OUTLINE_FACING_ALONG_M90);
+
+	//
+
+	// For the grid alignment enum
+	BIND_ENUM_CONSTANT(LINE_FACING_ALONG);
+	BIND_ENUM_CONSTANT(LINE_FACING_PLUS_90);
+	BIND_ENUM_CONSTANT(LINE_FACING_MINUS_90);
+	BIND_ENUM_CONSTANT(CUSTOM_FACING_AS_STORED);
+	BIND_ENUM_CONSTANT(CUSTOM_FACING_OUTWARD);
+	BIND_ENUM_CONSTANT(CUSTOM_FACING_INWARD);
+	BIND_ENUM_CONSTANT(CUSTOM_FACING_PLUS_90);
+	BIND_ENUM_CONSTANT(CUSTOM_FACING_MINUS_90);
+	BIND_ENUM_CONSTANT(TOP_LEFT);
+	BIND_ENUM_CONSTANT(TOP_CENTER);
+	BIND_ENUM_CONSTANT(TOP_RIGHT);
+	BIND_ENUM_CONSTANT(CENTER_LEFT);
+	BIND_ENUM_CONSTANT(CENTER);
+	BIND_ENUM_CONSTANT(CENTER_RIGHT);
+	BIND_ENUM_CONSTANT(BOTTOM_LEFT);
+	BIND_ENUM_CONSTANT(BOTTOM_CENTER);
+	BIND_ENUM_CONSTANT(BOTTOM_RIGHT);
+}
+
+} // namespace BlastBullets2D

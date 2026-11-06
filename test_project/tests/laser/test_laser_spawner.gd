@@ -1,0 +1,1129 @@
+extends BlastTest
+## LaserSpawner2D: PatternSpawner2D's patterns and cadence, firing one
+## LaserVolley2D per shot (a beam per slot) instead of bullets. Its groups
+## (Lasers, Laser Targeting) come first; a shot needs laser_data and respects
+## max_live_lasers; the muzzles ride the spawner (moves, spin, teleports); the
+## laser signals fire on the spawner, never the factory (grazes bubble on);
+## Track / Lock On beams aim at the Laser Targeting group's targets (nearest
+## per beam, filter group, path, the mouse every frame, a position, re-picked
+## on an interval); orphaned_lasers decides what its lasers do when it is
+## freed; pattern lists swap laser_data; emitter bullets can fire lasers.
+
+const DT := 0.0625
+const SCENE_PATH := "user://laser_spawner_round_trip.tscn"
+
+
+## A script zone whose PREDELETE frees a node while a live-laser leg drops it.
+class HostileZone extends GrazeZone2D:
+	var target: Node
+
+	func _notification(what: int) -> void:
+		if what == NOTIFICATION_PREDELETE and is_instance_valid(target):
+			target.free()
+
+
+func _laser(active := 0.0) -> LaserData2D:
+	return H.make_laser(0.0, 0.0, active, 0.0, 200.0)
+
+
+func _spawner(data: LaserData2D = null, amount := 4) -> LaserSpawner2D:
+	var sp := LaserSpawner2D.new()
+	sp.set_shooting_enabled(false)
+	sp.laser_data = data if data != null else _laser()
+	sp.pattern_source = LaserSpawner2D.PATTERN_FROM_HELPER_RING
+	sp.helper_bullets_amount = amount
+	sp.helper_ring_radius = 20.0
+	add(sp)
+	sp.set_bullet_factory(factory)
+	return sp
+
+
+func _fire(sp: LaserSpawner2D) -> LaserVolley2D:
+	var got: Array = []
+	sp.laser_fired.connect(func(l: LaserVolley2D, _n: int) -> void: got.append(l), CONNECT_ONE_SHOT)
+	assert_true(sp.shoot_once(), "fires")
+	return got[0] if got.size() > 0 else null
+
+
+func test_its_groups_come_first_and_gate_the_targeting() -> void:
+	var sp := _spawner()
+	assert_true(sp is PatternSpawner2D, "a PatternSpawner2D")
+	var groups: Array = []
+	for p in sp.get_property_list():
+		if int(p["usage"]) & PROPERTY_USAGE_GROUP:
+			groups.append(str(p["name"]))
+	assert_eq(groups.slice(0, 3), ["Setup", "Lasers", "Patterns"], "Setup, what it fires, then where (test_spawner_inspector_layout pins the rest)")
+	assert_false("Homing" in groups, "no bullet groups")
+	var shown := func() -> Array:
+		var out: Array = []
+		for n in [&"laser_target_group", &"laser_target_filter_group", &"laser_target_path", &"laser_target_position", &"laser_retarget_interval_sec"]:
+			out.append(is_editor_visible(sp, n))
+		return out
+	assert_eq(shown.call(), [false, false, false, false, false], "None: nothing")
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_NODE_GROUP
+	assert_eq(shown.call(), [true, true, false, false, true], "Node Group")
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_NODE_PATH
+	assert_eq(shown.call(), [false, true, true, false, true], "Node Path")
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_GLOBAL_POSITION
+	assert_eq(shown.call(), [false, false, false, true, false], "Global Position (a point never needs re-picking)")
+
+
+func test_a_shot_fires_one_laser_with_a_beam_per_slot() -> void:
+	var sp := _spawner(_laser(), 4)
+	sp.position = Vector2(100, 100)
+	var l := _fire(sp)
+	assert_eq(l.get_beam_count(), 4, "a beam per ring slot")
+	assert_eq(l.get_owner_spawner(), sp, "owned by the spawner")
+	for i in 4:
+		assert_almost_eq(l.get_beam_start(i).distance_to(Vector2(100, 100)), 20.0, 0.01, "beam %d on the ring" % i)
+		assert_almost_eq(angle_difference((l.get_beam_start(i) - Vector2(100, 100)).angle(), l.get_beam_angle(i)), 0.0, 0.001, "pointing outward")
+	assert_eq(sp.get_live_lasers(), [l], "the live readout")
+
+
+func test_refusals_no_data_and_the_live_cap() -> void:
+	var sp := _spawner()
+	sp.laser_data = null
+	watch_signals(sp)
+	assert_false(sp.shoot_once(), "no data: no shot")
+	expect_error_sequence(["LaserSpawner2D::shoot_once: no laser_data assigned."])
+	assert_signal_emitted_with_parameters(sp, "volley_skipped", [&"no_laser_data"])
+	sp.laser_data = _laser()
+	sp.max_live_lasers = 1
+	assert_true(sp.shoot_once(), "the first fires")
+	assert_false(sp.shoot_once(), "the cap holds the second")
+	assert_signal_emitted_with_parameters(sp, "volley_skipped", [&"over_budget"])
+	sp.max_live_lasers = -1
+	expect_error_sequence(["LaserSpawner2D: max_live_lasers must be >= 0 (0 = no limit), keeping the old value."])
+
+
+func test_auto_fire_keeps_its_cadence() -> void:
+	var sp := _spawner(H.make_laser(0.0, 0.0, 0.05, 0.0, 100.0), 1)
+	sp.shoot_interval_sec = 0.25
+	var fired: Array = []
+	sp.laser_fired.connect(func(_l, n: int) -> void: fired.append(n))
+	sp.set_shooting_enabled(true)
+	await idle(62) # about a second
+	assert_between(fired.size(), 4, 6, "every 0.25 s")
+
+
+func test_the_muzzles_ride_the_spawner() -> void:
+	var sp := _spawner(_laser(), 2)
+	var l := _fire(sp)
+	sp.position = Vector2(50, 0)
+	sp.set_spin_angle_deg(90.0)
+	step_factory(1, DT)
+	assert_almost_eq(l.get_beam_start(0).distance_to(Vector2(50, 20)), 0.0, 0.01, "moved and spun: slot 0 (+X) turned to +Y")
+	assert_almost_eq(rad_to_deg(l.get_beam_angle(0)), 90.0, 0.01, "and pointing down")
+	sp.teleport(Vector2(300, 300))
+	step_factory(1, DT)
+	assert_almost_eq(l.get_beam_start(0).distance_to(Vector2(300, 320)), 0.0, 0.01, "a teleport takes the muzzles along")
+
+
+func test_signals_fire_on_the_spawner_never_the_factory() -> void:
+	make_area(Vector2(100, 0), Vector2(20, 60))
+	await idle(2)
+	var sp := _spawner(H.make_laser(0.0, 0.0, 0.125, 0.0, 200.0), 1)
+	var spawner_log: Array = []
+	var factory_log: Array = []
+	for s in ["laser_phase_changed", "laser_pierce_started", "laser_hit", "laser_pierce_ended", "laser_finished"]:
+		var sig: String = s
+		var n := 0
+		for d in sp.get_signal_list():
+			if str(d.name) == sig:
+				n = (d.args as Array).size()
+		sp.connect(sig, (func() -> void: spawner_log.append(sig)).unbind(n))
+		factory.connect(sig, (func() -> void: factory_log.append(sig)).unbind(n))
+	_fire(sp)
+	step_factory(4, DT)
+	assert_eq(spawner_log, ["laser_phase_changed", "laser_phase_changed", "laser_pierce_started", "laser_hit", "laser_phase_changed", "laser_phase_changed", "laser_pierce_ended", "laser_finished"], "every signal on the spawner")
+	assert_eq(factory_log, [], "the factory stays silent")
+
+
+func test_targeting_aims_track_and_lock_on_beams() -> void:
+	var near := Node2D.new()
+	near.position = Vector2(0, 100)
+	near.add_to_group(&"laser_foes")
+	add(near)
+	var far := Node2D.new()
+	far.position = Vector2(0, -300)
+	far.add_to_group(&"laser_foes")
+	add(far)
+	var d := _laser()
+	d.aim = LaserData2D.LASER_AIM_LOCK_ON
+	var sp := _spawner(d, 1)
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_NODE_GROUP
+	sp.laser_target_group = &"laser_foes"
+	assert_eq(sp.resolve_laser_targets(), [near, far], "every member (THE target filter)")
+	var l := _fire(sp)
+	step_factory(1, DT)
+	assert_almost_eq(l.get_beam_end(0).distance_to(Vector2(0, 100)), 0.0, 0.01, "locked onto the nearest member")
+	far.add_to_group(&"vip")
+	sp.laser_target_filter_group = &"vip"
+	assert_eq(sp.retarget_live_lasers(), 1, "one laser retargeted")
+	step_factory(1, DT)
+	assert_almost_eq(l.get_beam_angle(0), (far.position - l.get_beam_start(0)).angle(), 0.0001, "the filter group leaves only the far one")
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_GLOBAL_POSITION
+	sp.laser_target_position = Vector2(-50, 0)
+	sp.retarget_live_lasers()
+	step_factory(1, DT)
+	assert_almost_eq(l.get_beam_end(0).distance_to(Vector2(-50, 0)), 0.0, 0.01, "a position")
+	sp.laser_target_position = Vector2(INF, 0)
+	expect_error_sequence(["LaserSpawner2D: laser_target_position must be finite, keeping the old value."])
+
+
+func test_the_retarget_interval_and_the_mouse_follow_their_targets() -> void:
+	var foe := Node2D.new()
+	foe.position = Vector2(100, 0)
+	foe.add_to_group(&"laser_foes")
+	add(foe)
+	var d := _laser()
+	d.aim = LaserData2D.LASER_AIM_LOCK_ON
+	var sp := _spawner(d, 1)
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_NODE_GROUP
+	sp.laser_target_group = &"laser_foes"
+	sp.laser_retarget_interval_sec = 0.1
+	var l := _fire(sp)
+	var other := Node2D.new()
+	other.position = Vector2(0, 30)
+	other.add_to_group(&"laser_foes")
+	add(other)
+	await idle(10) # past the interval: the nearer newcomer is picked
+	assert_almost_eq(l.get_beam_end(0).distance_to(Vector2(0, 30)), 0.0, 0.5, "re-picked on the interval")
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_MOUSE
+	mouse_to(Vector2(0, -120))
+	await idle(2)
+	assert_almost_eq(l.get_beam_end(0).distance_to(Vector2(0, -120)), 0.0, 0.5, "the mouse, every frame")
+
+
+func test_orphan_policies(policy: int = use_parameters([0, 1, 2, 3])) -> void:
+	var sp := _spawner(H.make_laser(0.0, 0.0, 0.0, 0.25), 1)
+	sp.orphaned_lasers = (policy as LaserSpawner2D.OrphanedLasers)
+	var l := _fire(sp)
+	var heard: Array = []
+	factory.laser_phase_changed.connect(func(_l, p: int) -> void: heard.append(p))
+	sp.free()
+	step_factory(1, DT)
+	match policy:
+		LaserSpawner2D.ORPHANED_LASERS_FADE_OUT:
+			assert_eq(l.get_phase(), LaserVolley2D.PHASE_FADING, "fades out")
+		LaserSpawner2D.ORPHANED_LASERS_KEEP_FIRING:
+			assert_eq(l.get_phase(), LaserVolley2D.PHASE_ACTIVE, "keeps firing")
+			assert_eq(heard, [], "silently")
+		LaserSpawner2D.ORPHANED_LASERS_HAND_TO_FACTORY:
+			assert_eq(l.get_phase(), LaserVolley2D.PHASE_ACTIVE, "keeps firing")
+			assert_eq(heard, [LaserVolley2D.PHASE_GROWING, LaserVolley2D.PHASE_ACTIVE], "signalling on the factory (its first tick ran after the free)")
+		LaserSpawner2D.ORPHANED_LASERS_REMOVE:
+			assert_true(l.is_pooled(), "gone at once")
+
+
+func test_grazes_bubble_from_the_spawner_to_the_factory() -> void:
+	var t := Node2D.new()
+	t.position = Vector2(100, 40) # 40 px beside a +X beam
+	t.add_to_group(&"laser_grazers")
+	add(t)
+	var sp := _spawner(_laser(), 1)
+	sp.graze_enabled = true
+	sp.graze_zones = [H.make_graze_zone([50.0, 30.0])]
+	sp.graze_node_group = &"laser_grazers"
+	var order: Array = []
+	sp.laser_grazed.connect(func(_t, _l, _b, _z, ring: int) -> void: order.append("spawner:%d" % ring))
+	factory.laser_grazed.connect(func(_t, _l, _b, _z, ring: int) -> void: order.append("factory:%d" % ring))
+	var l := _fire(sp)
+	step_factory(2, DT)
+	assert_eq(order, ["spawner:0", "factory:0"], "the 50 px ring once (the 30 px ring is out of reach), spawner first")
+	assert_true(l.is_graze_armed(), "armed at the shot")
+
+
+func test_sound_entries_offer_on_hits() -> void:
+	make_area(Vector2(100, 0), Vector2(20, 60))
+	await idle(2)
+	factory.debug_set_sound_offer_log_enabled(true)
+	var sp := _spawner(_laser(), 1)
+	sp.sound_enabled = true
+	sp.sound_effects = [H.make_laser_sound(LaserSoundData2D.LASER_SOUND_ON_HIT)]
+	_fire(sp)
+	step_factory(1, DT)
+	var offers: Array = factory.debug_get_sound_offer_log()
+	assert_eq(offers.size(), 1, "one offer for the pierce")
+	assert_eq(offers[0]["trigger"], LaserSoundData2D.LASER_SOUND_ON_HIT, "On Hit")
+
+
+func test_pattern_lists_swap_the_laser_data() -> void:
+	var sp := _spawner(_laser(), 1)
+	var long := _laser()
+	long.length = 500.0
+	var fired: Array = []
+	sp.laser_fired.connect(func(l: LaserVolley2D, _n: int) -> void: fired.append(l.get_laser_data()))
+	assert_true(sp.shoot_once_with({"laser_data": long}), "an override shot")
+	assert_eq(fired, [long], "fired with the entry's data")
+	assert_ne(sp.laser_data, long, "restored afterwards")
+	sp.shoot_once_with({"laser_dat": long})
+	expect_error_sequence(["LaserSpawner2D::shoot_once_with: unknown entry key 'laser_dat' (did you mean 'laser_data'?); valid keys: preset, pattern_source, helper_bullets_amount, laser_data. Ignoring it."])
+
+
+func test_setup_warnings_and_explain() -> void:
+	var sp := _spawner()
+	sp.laser_data = null
+	assert_true("laser_data is empty: the spawner fires nothing. Assign a LaserData2D." in sp.get_setup_warnings(), "no data")
+	var d := _laser()
+	d.aim = LaserData2D.LASER_AIM_TRACK
+	sp.laser_data = d
+	assert_true("laser_data aims with Track or Lock On but laser_target_source is None: the beams keep their pattern direction." in sp.get_setup_warnings(), "no source")
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_NODE_GROUP
+	assert_true("laser_target_source is Node Group but laser_target_group is empty: the lasers have no target." in sp.get_setup_warnings(), "no group")
+	var lines: PackedStringArray = sp.debug_explain_features()
+	assert_true("Lasers: every shot fires a beam per pattern slot, 200 px long, active until ended." in lines, str(lines))
+	assert_true("Laser Targeting: each beam turns toward the nearest member of the target group." in lines, str(lines))
+
+
+func test_a_saved_scene_keeps_its_settings() -> void:
+	var sp := _spawner()
+	sp.orphaned_lasers = LaserSpawner2D.ORPHANED_LASERS_REMOVE
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_NODE_PATH
+	sp.laser_retarget_interval_sec = 0.5
+	sp.max_live_lasers = 3
+	var holder := Node2D.new()
+	add(holder)
+	sp.reparent(holder)
+	sp.owner = holder
+	var scene := PackedScene.new()
+	assert_eq(scene.pack(holder), OK, "packed")
+	assert_eq(ResourceSaver.save(scene, SCENE_PATH), OK, "saved")
+	var loaded := ResourceLoader.load(SCENE_PATH, "", ResourceLoader.CACHE_MODE_IGNORE) as PackedScene
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(SCENE_PATH))
+	var copy := loaded.instantiate()
+	var back := copy.get_child(0) as LaserSpawner2D
+	assert_not_null(back, "the spawner came back")
+	assert_eq([back.orphaned_lasers, back.laser_target_source, back.laser_retarget_interval_sec, back.max_live_lasers], [LaserSpawner2D.ORPHANED_LASERS_REMOVE, LaserSpawner2D.LASER_TARGET_NODE_PATH, 0.5, 3], "settings")
+	assert_eq(back.laser_data.length, 200.0, "its laser data")
+	copy.free()
+
+
+func test_emitter_bullets_fire_lasers() -> void:
+	var tpl := _spawner(H.make_laser(0.0, 0.0, 0.05, 0.0, 50.0), 1)
+	var lasers: Array = []
+	tpl.laser_fired.connect(func(l: LaserVolley2D, _n: int) -> void: lasers.append(l))
+	var bullets := make_spawner(H.make_volley_data(1, 160.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 1)
+	var timing := BulletEmitterData2D.new()
+	timing.interval_sec = 0.25
+	bullets.emitter_enabled = true
+	bullets.emitter = timing
+	bullets.emitter_spawner_path = bullets.get_path_to(tpl)
+	var fired: Array = [] # a lambda captures locals by value: collect through an Array
+	bullets.volley_fired.connect(func(vol: BulletVolley2D, _n: int) -> void: fired.append(vol), CONNECT_ONE_SHOT)
+	bullets.shoot_once()
+	var v: BulletVolley2D = fired[0]
+	# The first shot is due at once (no start delay): it fires from where the
+	# bullet was then (shot timing), its spawn point, though the tick that
+	# records it ends later.
+	var born: Vector2 = v.get_bullet_transform(0).origin
+	step_factory(1, DT)
+	assert_eq(lasers.size(), 1, "the flying bullet fired the laser spawner's pattern")
+	assert_almost_eq(lasers[0].get_beam_start(0).distance_to(born), 20.0, 0.5, "around the bullet where its shot was due, not the template")
+	assert_null(lasers[0].get_anchor(), "an emitter shot never follows the template")
+
+
+func test_the_preview_draws_each_slot_as_its_beam() -> void:
+	var d := _laser() # 200 px
+	var sp := _spawner(d, 4)
+	sp.show_pattern_preview = true
+	sp.show_preview_during_runtime = true
+	await idle(6) # the deferred preview rebuild
+	var arrows: Dictionary = sp.debug_get_preview_arrows()
+	assert_eq((arrows["tails"] as PackedVector2Array).size(), 4, "one beam per slot")
+	assert_almost_eq(float(arrows["beam_length"]), 200.0, 0.001, "the beam band runs the laser's length")
+	assert_almost_eq(float(arrows["beam_width"]), d.width, 0.001, "at the laser's width")
+	var offset := sp.preview_dot_radius + sp.preview_arrow_gap
+	assert_almost_eq(float(arrows["length"]), 200.0 - offset, 0.001, "the arrow ends where the beam ends (it starts outside the dot)")
+	var l := _fire(sp)
+	step_factory(1, DT)
+	var dots := sp.debug_get_preview_dot_points()
+	var dirs: PackedVector2Array = arrows["dirs"]
+	var off: Array = []
+	for i in 4:
+		if not dots[i].is_equal_approx(l.get_beam_start(i)) or not is_equal_approx(angle_difference(dirs[i].angle(), l.get_beam_angle(i)), 0.0):
+			off.append(i)
+	assert_eq(off, [], "every preview beam starts and points where its beam fires")
+	d.length = 350.0
+	await idle(6)
+	assert_almost_eq(float(sp.debug_get_preview_arrows()["beam_length"]), 350.0, 0.001, "a length edit redraws")
+	d.width = 37.0
+	await idle(6)
+	assert_almost_eq(float(sp.debug_get_preview_arrows()["beam_width"]), 37.0, 0.001, "a width edit redraws at the new width")
+	sp.scale = Vector2(2, 2)
+	await idle(6)
+	assert_almost_eq(float(sp.debug_get_preview_arrows()["beam_width"]), 18.5, 0.001, "drawn in the spawner's space: world px divided by its scale")
+	sp.scale = Vector2.ONE
+	sp.laser_data = LaserData2D.create_preset(LaserData2D.PRESET_WALL_BEAM)
+	await idle(6)
+	assert_almost_eq(float(sp.debug_get_preview_arrows()["beam_length"]), 1200.0, 0.001, "a new laser_data redraws")
+	sp.laser_data = null
+	await idle(6)
+	assert_almost_eq(float(sp.debug_get_preview_arrows()["length"]), sp.preview_arrow_length, 0.001, "no laser: the plain facing arrows")
+	assert_eq(float(sp.debug_get_preview_arrows()["beam_width"]), 0.0, "and no beam band")
+	var bullets := make_preview_spawner(BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
+	await idle(6)
+	assert_almost_eq(float(bullets.debug_get_preview_arrows()["length"]), bullets.preview_arrow_length, 0.001, "bullet spawners keep preview_arrow_length")
+	assert_eq(float(bullets.debug_get_preview_arrows()["beam_width"]), 0.0, "bullet spawners draw no beam band")
+
+
+func test_a_teleport_snaps_following_beams_without_a_slide() -> void:
+	var sp := _spawner(_laser(), 1)
+	var l := _fire(sp)
+	step_factory(2, DT)
+	var start := l.get_beam_start(0)
+	sp.teleport(Vector2(500, 300))
+	var jump := Vector2(500, 300)
+	var now: PackedVector2Array = l.debug_get_draw_state(0.5)[0]["points"]
+	assert_true(now[0].is_equal_approx(start + jump), "drawn at the new spot at once (mid-frame too)")
+	step_factory(1, DT)
+	var mid: PackedVector2Array = l.debug_get_draw_state(0.5)[0]["points"]
+	assert_true(mid[0].is_equal_approx(start + jump), "the next tick never lerps across the jump")
+
+
+func test_teleport_carry_moves_lasers_that_do_not_follow() -> void:
+	var d := _laser()
+	d.follow_spawner = false
+	var sp := _spawner(d, 1)
+	var l := _fire(sp)
+	step_factory(1, DT)
+	var start := l.get_beam_start(0)
+	sp.teleport(Vector2(100, 0))
+	step_factory(1, DT)
+	assert_eq(l.get_beam_start(0), start, "without carry a laser that does not follow stays")
+	sp.teleport(Vector2(100, 50), true)
+	assert_true(l.get_beam_start(0).is_equal_approx(start + Vector2(0, 50)), "carried at once")
+	step_factory(1, DT)
+	assert_true(l.get_beam_start(0).is_equal_approx(start + Vector2(0, 50)), "and it stays carried")
+	var mid: PackedVector2Array = l.debug_get_draw_state(0.5)[0]["points"]
+	assert_true(mid[0].is_equal_approx(start + Vector2(0, 50)), "no slide")
+
+
+func test_teleport_carry_moves_flying_bolts() -> void:
+	var d := _laser()
+	d.type = LaserData2D.LASER_BOLT
+	d.speed = 320.0 # 20 px per tick
+	var sp := _spawner(d, 1)
+	var l := _fire(sp)
+	step_factory(3, DT)
+	var head := l.get_beam_end(0)
+	sp.teleport(Vector2(0, 200))
+	assert_eq(l.get_beam_end(0), head, "a flying bolt does not follow a teleport")
+	sp.teleport(Vector2(0, 260), true)
+	assert_true(l.get_beam_end(0).is_equal_approx(head + Vector2(0, 60)), "carry moves it")
+	step_factory(1, DT)
+	assert_true(l.get_beam_end(0).is_equal_approx(head + Vector2(20, 60)), "and it flies on from there")
+
+
+func test_apply_to_live_lasers_arms_disarms_and_retargets() -> void:
+	var t := Node2D.new()
+	t.position = Vector2(100, 40)
+	t.add_to_group(&"laser_grazers")
+	add(t)
+	var d := _laser()
+	var sp := _spawner(d, 2)
+	var l := _fire(sp)
+	assert_false(l.is_graze_armed(), "fired unarmed")
+	sp.graze_zones = [H.make_graze_zone([50.0])]
+	sp.graze_node_group = &"laser_grazers"
+	sp.graze_enabled = true
+	assert_false(l.is_graze_armed(), "spawner settings alone never reach a laser in flight")
+	assert_eq(sp.apply_to_live_lasers(LaserSpawner2D.LIVE_GRAZE), 1, "armed now")
+	assert_true(l.is_graze_armed(), "armed")
+	assert_eq(sp.apply_to_live_lasers(LaserSpawner2D.LIVE_GRAZE), 0, "armed alike: untouched")
+	var grazes: Array = []
+	sp.laser_grazed.connect(func(_t, _l, b: int, _z, _r) -> void: grazes.append(b))
+	step_factory(1, DT)
+	assert_eq(grazes, [0], "and it grazes")
+	sp.sound_enabled = true
+	sp.sound_effects = [H.make_laser_sound(LaserSoundData2D.LASER_SOUND_ON_HIT)]
+	assert_eq(sp.apply_to_live_lasers(LaserSpawner2D.LIVE_SOUND), 1, "sound armed")
+	assert_true(l.is_sound_armed(), "sound armed")
+	sp.graze_enabled = false
+	assert_eq(sp.apply_to_live_lasers(), 1, "LIVE_ALL: graze disarmed, sound already alike")
+	assert_eq([l.is_graze_armed(), l.is_sound_armed()], [false, true], "only graze changed")
+	d.aim = LaserData2D.LASER_AIM_LOCK_ON
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_GLOBAL_POSITION
+	sp.laser_target_position = Vector2(0, 300)
+	assert_eq(sp.apply_to_live_lasers(LaserSpawner2D.LIVE_HOMING), 1, "retargeted")
+	step_factory(1, DT)
+	var off := angle_difference((Vector2(0, 300) - l.get_beam_start(0)).angle(), l.get_beam_angle(0))
+	assert_almost_eq(off, 0.0, 0.0001, "the lock-on beam aims at the new target")
+	l.end_laser(false)
+	step_factory(1, DT)
+	assert_eq(sp.apply_to_live_lasers(), 0, "no live laser: nothing to apply")
+
+
+func _named(n: String, pos: Vector2, parent: Node = null) -> Node2D:
+	var node := Node2D.new()
+	node.name = n
+	node.position = pos
+	if parent != null:
+		parent.add_child(node)
+	else:
+		add(node)
+	return node
+
+
+## Two beams (+X from (20, 0), -X from (-20, 0)), Lock On, 1000 px.
+func _lock_on_spawner() -> LaserSpawner2D:
+	var d := _laser()
+	d.length = 1000.0
+	d.aim = LaserData2D.LASER_AIM_LOCK_ON
+	return _spawner(d, 2)
+
+
+func test_the_node_name_source_aims_each_beam_at_the_nearest_named_node() -> void:
+	var a := _named("EnemyA", Vector2(300, 0))
+	var b := _named("EnemyB", Vector2(0, 300))
+	_named("Other", Vector2(25, 0))
+	var sp := _lock_on_spawner()
+	_named("EnemyMarker", Vector2(-20, 5), sp) # under the spawner: never a target
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_NODE_NAME
+	sp.laser_target_node_name = "enemy" # Contains, case-insensitive (the defaults)
+	assert_eq(sp.resolve_laser_targets(), [a, b], "the named nodes, in tree order")
+	var l := _fire(sp)
+	step_factory(1, DT)
+	assert_true(l.get_beam_end(0).distance_to(a.position) < 0.01 and l.get_beam_end(1).distance_to(b.position) < 0.01, "each beam ends on its nearest: %s" % [[l.get_beam_end(0), l.get_beam_end(1)]])
+	sp.laser_target_name_case_sensitive = true
+	assert_eq(sp.resolve_laser_targets(), [], "case-sensitive: \"enemy\" matches nothing")
+	sp.laser_target_name_match_mode = PatternSpawner2D.HOMING_NAME_MATCH_EXACT
+	sp.laser_target_name_case_sensitive = false
+	sp.laser_target_node_name = "enemya"
+	assert_eq(sp.resolve_laser_targets(), [a], "Exact")
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	sp.laser_target_name_match_mode = (9 as PatternSpawner2D.HomingNodeNameMatch)
+	expect_error_sequence(["LaserSpawner2D: invalid laser_target_name_match_mode, keeping the old value."])
+	assert_eq(sp.laser_target_name_match_mode, PatternSpawner2D.HOMING_NAME_MATCH_EXACT, "kept")
+
+
+func test_the_node_children_source_aims_at_the_nearest_child() -> void:
+	var squad := _named("Squad", Vector2(0, 0))
+	var a := _named("A", Vector2(300, 0), squad)
+	var b := _named("B", Vector2(0, 300), squad)
+	var deep := _named("Deep", Vector2(0, 30), a) # a grandchild: (300, 30)
+	var sp := _lock_on_spawner()
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_NODE_CHILDREN
+	sp.laser_target_children_parent_path = sp.get_path_to(squad)
+	assert_eq(sp.resolve_laser_targets(), [a, b], "the direct children")
+	sp.laser_target_children_recursive = true
+	assert_eq(sp.resolve_laser_targets(), [a, deep, b], "recursive: depth-first, tree order")
+	var l := _fire(sp)
+	step_factory(1, DT)
+	assert_true(l.get_beam_end(0).distance_to(a.position) < 0.01, "the nearest child")
+	sp.laser_target_children_parent_path = NodePath(".")
+	assert_eq(sp.resolve_laser_targets(), [], "the spawner itself as the parent: nothing")
+	deep.add_to_group(&"laser_squad")
+	sp.laser_target_children_parent_path = sp.get_path_to(squad)
+	sp.laser_target_filter_group = &"laser_squad"
+	assert_eq(sp.resolve_laser_targets(), [deep], "the filter group applies")
+
+
+func test_the_new_sources_gate_their_knobs_and_warn_when_empty() -> void:
+	var sp := _lock_on_spawner()
+	var shown := func() -> Array:
+		var out: Array = []
+		for n in [&"laser_target_node_name", &"laser_target_name_match_mode", &"laser_target_name_case_sensitive", &"laser_target_children_parent_path", &"laser_target_children_recursive", &"laser_target_filter_group", &"laser_retarget_interval_sec"]:
+			out.append(is_editor_visible(sp, n))
+		return out
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_NODE_NAME
+	assert_eq(shown.call(), [true, true, true, false, false, true, true], "Node Name")
+	assert_true("laser_target_source is Node Name but laser_target_node_name is empty: the lasers have no target." in sp.get_setup_warnings(), "empty name")
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_NODE_CHILDREN
+	assert_eq(shown.call(), [false, false, false, true, true, true, true], "Node Children")
+	assert_true("laser_target_source is Node Children but laser_target_children_parent_path is empty: the lasers have no target." in sp.get_setup_warnings(), "empty parent")
+	assert_eq([LaserSpawner2D.LASER_TARGET_NODE_NAME, LaserSpawner2D.LASER_TARGET_NODE_CHILDREN], [5, 6], "serialized ids appended")
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the API must reject it
+	sp.laser_target_source = (7 as LaserSpawner2D.LaserTargetSource)
+	expect_error_sequence(["LaserSpawner2D: laser_target_source must be 0 (None), 1 (Node Group), 2 (Node Path), 3 (Mouse), 4 (Global Position), 5 (Node Name) or 6 (Node Children), keeping the old value."])
+
+
+## Every beam stays where it fired when the spawner it rode is gone: a lost
+## anchor converts EVERY beam to its world pose, never only the first (the
+## others used to fall back to their spawner-local slot, near the origin).
+func test_every_beam_keeps_its_pose_when_the_spawner_is_freed(policy: int = use_parameters([0, 1, 2])) -> void:
+	var sp := _spawner(H.make_laser(0.0, 0.0, 0.0, 0.5, 200.0), 4)
+	sp.position = Vector2(300, 300)
+	sp.orphaned_lasers = (policy as LaserSpawner2D.OrphanedLasers)
+	var l := _fire(sp)
+	step_factory(1, DT)
+	var before: Array = []
+	for i in 4:
+		before.append(l.get_beam_start(i))
+	sp.free()
+	step_factory(2, DT)
+	var moved: Array = []
+	for i in 4:
+		if l.get_beam_start(i).distance_to(before[i]) > 0.01:
+			moved.append([i, before[i], l.get_beam_start(i)])
+	assert_eq(moved, [], "policy %d: every beam stays on its muzzle" % policy)
+
+
+## A live target source wakes an idle spawner (auto fire off, nothing else
+## processing): Mouse beams follow the cursor every frame whether the source
+## or the Track / Lock On data comes last.
+func test_a_live_target_source_wakes_an_idle_spawner() -> void:
+	var d := _laser()
+	d.aim = LaserData2D.LASER_AIM_LOCK_ON
+	var sp := _spawner(d, 1)
+	var l := _fire(sp)
+	expect_warning_sequence(["LaserSpawner2D: laser_data aims with Track or Lock On but laser_target_source is None: the beams keep their pattern direction."], "no source yet: named at the shot")
+	await idle(2)
+	assert_false(sp.is_processing(), "an idle spawner sleeps")
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_MOUSE
+	assert_true(sp.is_processing(), "the mouse source wakes the loop")
+	mouse_to(Vector2(0, -120))
+	await idle(2)
+	assert_almost_eq(l.get_beam_end(0).distance_to(Vector2(0, -120)), 0.0, 0.5, "the beam follows the cursor")
+	var d2 := _laser()
+	var sp2 := _spawner(d2, 1)
+	sp2.laser_target_source = LaserSpawner2D.LASER_TARGET_MOUSE
+	await idle(2)
+	assert_false(sp2.is_processing(), "pattern aim: nothing to retarget, asleep")
+	d2.aim = LaserData2D.LASER_AIM_TRACK
+	assert_true(sp2.is_processing(), "the data turning to Track wakes it")
+	d2.aim = LaserData2D.LASER_AIM_PATTERN
+	await idle(2)
+	assert_false(sp2.is_processing(), "back to pattern: asleep again")
+	sp2.laser_data = d
+	assert_true(sp2.is_processing(), "a Lock On laser_data wakes it")
+
+
+## None leaves the beams no target: retarget_live_lasers and
+## apply_to_live_lasers(LIVE_HOMING) clear them like a source that finds
+## nothing (Lock On falls back to the pattern direction). A laser keeps the
+## aim of the data it was fired with: swapping the spawner's laser_data to a
+## pattern-aim one never stops it from being retargeted.
+func test_none_and_a_pattern_data_swap_reach_live_lasers() -> void:
+	var d := _laser()
+	d.aim = LaserData2D.LASER_AIM_LOCK_ON
+	var sp := _spawner(d, 1) # slot 0 at (20, 0) pointing +X
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_GLOBAL_POSITION
+	sp.laser_target_position = Vector2(0, 300)
+	var l := _fire(sp)
+	step_factory(1, DT)
+	var aim_at := func(p: Vector2) -> float:
+		return absf(angle_difference((p - l.get_beam_start(0)).angle(), l.get_beam_angle(0)))
+	assert_almost_eq(aim_at.call(Vector2(0, 300)), 0.0, 0.0001, "locked on the position")
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_NONE
+	assert_eq(sp.retarget_live_lasers(), 1, "None: the beams lose their target")
+	step_factory(1, DT)
+	assert_almost_eq(l.get_beam_angle(0), 0.0, 0.0001, "back to the pattern direction")
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_GLOBAL_POSITION
+	assert_eq(sp.apply_to_live_lasers(LaserSpawner2D.LIVE_HOMING), 1, "retargeted")
+	step_factory(1, DT)
+	assert_almost_eq(aim_at.call(Vector2(0, 300)), 0.0, 0.0001, "locked on again")
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_NONE
+	assert_eq(sp.apply_to_live_lasers(LaserSpawner2D.LIVE_HOMING), 1, "LIVE_HOMING with None clears too")
+	step_factory(1, DT)
+	assert_almost_eq(l.get_beam_angle(0), 0.0, 0.0001, "pattern direction")
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_GLOBAL_POSITION
+	sp.laser_data = _laser() # the next shots aim along the pattern
+	sp.laser_target_position = Vector2(0, -300)
+	assert_eq(sp.retarget_live_lasers(), 1, "the Lock On laser in flight still retargets")
+	step_factory(1, DT)
+	assert_almost_eq(aim_at.call(Vector2(0, -300)), 0.0, 0.0001, "locked on the new position")
+
+
+## laser_target_path refuses a node that is not a Node2D (like homing and
+## graze) and keeps the old value; a path that does not resolve yet is fine.
+func test_laser_target_path_refuses_a_non_node2d() -> void:
+	var sp := _spawner()
+	var plain: Node = add(Node.new())
+	var ok_target: Node2D = add(Node2D.new())
+	sp.laser_target_path = sp.get_path_to(ok_target)
+	sp.laser_target_path = sp.get_path_to(plain)
+	expect_error_sequence(["LaserSpawner2D: laser_target_path must point to a Node2D, keeping the old value."])
+	assert_eq(sp.laser_target_path, sp.get_path_to(ok_target), "kept")
+	sp.laser_target_path = NodePath("NotThereYet")
+	expect_no_errors("an unresolved path is accepted (the node may come later)")
+
+
+## Targets are found in the factory's world, where the beams fire (like
+## homing): a laser spawner inside a SubViewport whose factory is in the main
+## world aims at main-world nodes, never at its own viewport's.
+func test_targets_come_from_the_factory_world() -> void:
+	var viewport := SubViewport.new()
+	add(viewport)
+	var sp := LaserSpawner2D.new()
+	sp.set_shooting_enabled(false)
+	sp.laser_data = _laser()
+	viewport.add_child(sp)
+	sp.set_bullet_factory(factory)
+	var main_foe: Node2D = add(Node2D.new())
+	main_foe.add_to_group(&"world_foes")
+	var viewport_foe := Node2D.new()
+	viewport_foe.add_to_group(&"world_foes")
+	viewport.add_child(viewport_foe)
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_NODE_GROUP
+	sp.laser_target_group = &"world_foes"
+	assert_eq(sp.resolve_laser_targets(), [main_foe], "the factory's world only")
+
+
+## Picking the nearest target never overflows into "no target": a lone
+## target farther than a float square can hold is still every beam's target.
+func test_a_far_target_is_still_picked() -> void:
+	var d := _laser()
+	d.aim = LaserData2D.LASER_AIM_LOCK_ON
+	var sp := _spawner(d, 1) # slot 0 at (20, 0) pointing +X
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_GLOBAL_POSITION
+	sp.laser_target_position = Vector2(0, 1e20)
+	var l := _fire(sp)
+	step_factory(1, DT)
+	assert_almost_eq(l.get_beam_angle(0), PI / 2.0, 0.001, "locked on the far target (down)")
+
+
+## A spawner outside the tree for a few ticks (a reparent across frames)
+## never ends its lasers' follow: they hold their pose while it is out and
+## ride it again, without a slide, once it is back.
+func test_following_beams_hold_while_the_spawner_is_out_of_the_tree() -> void:
+	var sp := _spawner(_laser(), 2)
+	var l := _fire(sp)
+	step_factory(1, DT)
+	var held := [l.get_beam_start(0), l.get_beam_start(1)]
+	var parent := sp.get_parent()
+	parent.remove_child(sp)
+	step_factory(3, DT)
+	assert_eq([l.get_beam_start(0), l.get_beam_start(1)], held, "held while out of the tree")
+	var holder: Node2D = add(Node2D.new())
+	holder.position = Vector2(100, 0)
+	holder.add_child(sp)
+	step_factory(1, DT)
+	assert_true(l.get_beam_start(0).is_equal_approx(held[0] + Vector2(100, 0)) and l.get_beam_start(1).is_equal_approx(held[1] + Vector2(100, 0)), "every beam rides the spawner again: %s" % [[l.get_beam_start(0), l.get_beam_start(1)]])
+	var mid: PackedVector2Array = l.debug_get_draw_state(0.5)[0]["points"]
+	assert_true(mid[0].is_equal_approx(held[0] + Vector2(100, 0)), "no slide across the jump")
+
+
+## A following laser's muzzle offset stays what the shot made it: Global a
+## world vector, Local in the generator's frame; the spin never turns it
+## (bullets and the preview add it after the spin).
+func test_the_muzzle_offset_never_turns_with_the_spin(space: int = use_parameters([0, 1])) -> void:
+	var sp := _spawner(_laser(), 1) # slot 0 at (20, 0) pointing +X
+	sp.spawn_position_offset = Vector2(0, 50)
+	sp.spawn_position_offset_space = (space as LaserSpawner2D.SpawnOffsetSpace)
+	var l := _fire(sp)
+	step_factory(1, DT)
+	assert_true(l.get_beam_start(0).is_equal_approx(Vector2(20, 50)), "fired at the slot plus the offset: %s" % l.get_beam_start(0))
+	sp.set_spin_angle_deg(90.0)
+	step_factory(1, DT)
+	assert_true(l.get_beam_start(0).is_equal_approx(Vector2(0, 70)), "the slot turned with the spin, the offset did not: %s" % l.get_beam_start(0))
+	sp.set_spin_angle_deg(0.0)
+	sp.rotation = PI / 2.0
+	step_factory(1, DT)
+	var want := Vector2(0, 70) if space == 0 else Vector2(-50, 20)
+	assert_true(l.get_beam_start(0).is_equal_approx(want), "a turned spawner turns a Local offset only: %s" % l.get_beam_start(0))
+
+
+## orphaned_lasers reaches every factory the spawner fired into, not only the
+## one it points at when it is freed.
+func test_orphaned_lasers_reach_every_factory_it_fired_into() -> void:
+	var sp := _spawner(_laser(), 1)
+	sp.orphaned_lasers = LaserSpawner2D.ORPHANED_LASERS_REMOVE
+	var in_first := _fire(sp)
+	var second := BulletFactory2D.new()
+	add(second)
+	await idle(1)
+	sp.set_bullet_factory(second)
+	var in_second := _fire(sp)
+	sp.free()
+	await idle(3) # both factories tick: an ended laser is pooled on its next tick
+	assert_eq([in_first.is_pooled(), in_second.is_pooled()], [true, true], "both lasers ended")
+
+
+## A freed node handed to set_beam_target / set_targets is refused like any
+## other non-target (it used to be read through its dangling pointer).
+func test_a_freed_node_is_no_beam_target() -> void:
+	var l := _fire(_spawner(_laser(), 2))
+	var gone := Node2D.new()
+	add_child(gone)
+	gone.free()
+	l.set_beam_target(0, gone)
+	expect_error_sequence(["set_beam_target: target must be a Node2D, a Vector2 or null, the beam has no target now."])
+	l.set_targets([gone])
+	expect_error_sequence(["set_targets: every entry must be a Node2D, a finite Vector2 or null, nothing changed."]) # once, not once per beam
+
+
+## Mouse and interval retargeting keep following every live Track / Lock On
+## laser, also after the spawner's laser_data turned to a pattern aim (the
+## lasers in flight keep the aim they were fired with); the loop sleeps once
+## no live laser aims.
+func test_live_aiming_lasers_keep_following_after_a_pattern_data_swap() -> void:
+	var d := _laser()
+	d.aim = LaserData2D.LASER_AIM_LOCK_ON
+	var sp := _spawner(d, 1)
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_MOUSE
+	var l := _fire(sp)
+	sp.laser_data = _laser() # the next shots aim along the pattern
+	assert_true(sp.is_processing(), "awake while a live laser aims")
+	mouse_to(Vector2(0, -120))
+	await idle(3)
+	assert_almost_eq(l.get_beam_end(0).distance_to(Vector2(0, -120)), 0.0, 0.5, "still following the cursor")
+	l.end_laser(false)
+	await idle(3)
+	assert_false(sp.is_processing(), "asleep once no live laser aims")
+
+
+## The explain line names how each source is read: the mouse every frame,
+## a position as it is set, node sources re-picked on the interval (the
+## interval only shows for them, and only they use it).
+func test_explain_names_how_each_target_source_is_read() -> void:
+	var d := _laser()
+	d.aim = LaserData2D.LASER_AIM_TRACK
+	var sp := _spawner(d, 1)
+	sp.laser_retarget_interval_sec = 0.5
+	var line := func() -> String:
+		for l in sp.debug_explain_features():
+			if l.begins_with("Laser Targeting"):
+				return l
+		return ""
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_NODE_GROUP
+	assert_eq(line.call(), "Laser Targeting: each beam turns toward the nearest member of the target group, re-picked every 0.5 s.", "node source")
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_MOUSE
+	assert_eq(line.call(), "Laser Targeting: each beam turns toward the mouse, read every frame.", "the mouse")
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_GLOBAL_POSITION
+	assert_eq(line.call(), "Laser Targeting: each beam turns toward laser_target_position.", "a position")
+
+
+## A beam re-anchored to another node (set_anchor) rides that node: its
+## spawner's teleport never moves it, with carry or without. A beam anchored
+## to a child of the spawner jumps with it (the child jumped too).
+func test_a_teleport_moves_beams_by_their_own_anchor() -> void:
+	var sp := _spawner(_laser(), 1)
+	var l := _fire(sp)
+	var other := Node2D.new()
+	other.position = Vector2(-200, 50)
+	add(other)
+	l.set_anchor(other)
+	step_factory(1, DT)
+	var start := l.get_beam_start(0)
+	for carry in [false, true]:
+		sp.teleport(sp.global_position + Vector2(500, 300), carry)
+		assert_true(l.get_beam_start(0).is_equal_approx(start), "stays on its own anchor at once (carry %s)" % carry)
+		var drawn: PackedVector2Array = l.debug_get_draw_state(0.5)[0]["points"]
+		assert_true(drawn[0].is_equal_approx(start), "drawn there too (carry %s)" % carry)
+		step_factory(1, DT)
+		assert_true(l.get_beam_start(0).is_equal_approx(start), "and after a tick (carry %s)" % carry)
+	var child := Node2D.new()
+	child.position = Vector2(30, 0)
+	sp.add_child(child)
+	l.set_anchor(child)
+	step_factory(1, DT)
+	var on_child := l.get_beam_start(0)
+	sp.teleport(sp.global_position + Vector2(40, 0))
+	assert_true(l.get_beam_start(0).is_equal_approx(on_child + Vector2(40, 0)), "a child anchor jumped with the spawner")
+	step_factory(1, DT)
+	assert_true(l.get_beam_start(0).is_equal_approx(on_child + Vector2(40, 0)), "and stays on it")
+
+
+## Re-applying the same laser_retarget_interval_sec (a script that writes its
+## config every frame) never restarts the countdown: the lasers still retarget.
+func test_reapplying_the_retarget_interval_keeps_the_countdown() -> void:
+	var foe := Node2D.new()
+	foe.position = Vector2(100, 0)
+	foe.add_to_group(&"laser_foes")
+	add(foe)
+	var d := _laser()
+	d.aim = LaserData2D.LASER_AIM_LOCK_ON
+	var sp := _spawner(d, 1)
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_NODE_GROUP
+	sp.laser_target_group = &"laser_foes"
+	sp.laser_retarget_interval_sec = 0.1
+	var l := _fire(sp)
+	var other := Node2D.new()
+	other.position = Vector2(0, 30)
+	other.add_to_group(&"laser_foes")
+	add(other)
+	for i in 12: # 0.2 s: two intervals
+		sp.laser_retarget_interval_sec = 0.1
+		await idle(1)
+	assert_almost_eq(l.get_beam_end(0).distance_to(Vector2(0, 30)), 0.0, 0.5, "re-picked on the interval")
+
+
+## max_live_lasers counts the lasers that still fire: one ended at once (it
+## finishes on the next tick) never holds the next shot back.
+func test_an_ended_laser_never_counts_against_max_live_lasers() -> void:
+	var sp := _spawner(_laser(), 1)
+	sp.max_live_lasers = 1
+	watch_signals(sp)
+	assert_true(sp.shoot_once(), "the first fires")
+	assert_eq(sp.end_live_lasers(false), 1, "ended at once")
+	assert_eq(sp.get_live_laser_count(), 0, "it fires no more")
+	assert_eq(sp.get_live_lasers(), [], "nor is it listed")
+	assert_true(sp.shoot_once(), "the next shot fires")
+	assert_signal_emit_count(sp, "volley_skipped", 0, "nothing skipped")
+	step_factory(2, DT)
+	assert_eq(sp.get_live_laser_count(), 1, "one fires")
+
+
+## A fading laser is an ENDED laser: it can no longer hit, so it must not
+## hold max_live_lasers, be listed by get_live_lasers or counted. It used to
+## block the next shot with a silent over_budget skip for its whole fade.
+func test_a_fading_laser_no_longer_counts_as_live() -> void:
+	var sp := _spawner(H.make_laser(0.0, 0.0, 10.0, 2.0, 200.0), 1)
+	sp.max_live_lasers = 1
+	watch_signals(sp)
+	var l := _fire(sp)
+	assert_eq(sp.end_live_lasers(true), 1, "fade out")
+	assert_eq(l.get_phase(), LaserVolley2D.PHASE_FADING, "fading")
+	assert_eq(sp.get_live_lasers(), [], "a fading laser is not live")
+	assert_eq(sp.get_live_laser_count(), 0, "nor counted")
+	assert_true(sp.shoot_once(), "the next shot is not blocked by the fade")
+	assert_signal_emit_count(sp, "volley_skipped", 0, "nothing skipped")
+	step_factory(1, DT)
+	assert_true(is_instance_valid(l), "the fading laser still draws")
+	expect_no_errors()
+
+
+## A spawner's graze handler may free the target: the factory copy of the
+## event must be dropped, never built from a freed target Variant.
+func test_a_spawner_graze_handler_freeing_the_target_drops_the_factory_copy() -> void:
+	var target := Node2D.new()
+	target.name = "graze_victim"
+	target.position = Vector2(50, 0)
+	add(target)
+	target.add_to_group(&"laser_foes")
+	var sp := _spawner(_laser(10.0), 1)
+	sp.graze_enabled = true
+	sp.graze_zones = [H.make_graze_zone([80.0])]
+	sp.graze_node_group = &"laser_foes"
+	var freed := [false]
+	var factory_saw: Array = []
+	sp.laser_grazed.connect(func(t: Object, _l, _b, _z, _r) -> void:
+		if not freed[0] and is_instance_valid(t):
+			freed[0] = true
+			t.free())
+	factory.laser_grazed.connect(func(t: Object, _l, _b, _z, _r) -> void: factory_saw.append(t))
+	var l := _fire(sp)
+	assert_not_null(l, "fired")
+	for i in 5:
+		if freed[0]:
+			break
+		step_factory(1, DT)
+	assert_true(freed[0], "the spawner handler ran and freed the target")
+	assert_eq(factory_saw, [], "the factory never receives the freed target")
+	expect_no_errors()
+
+
+## apply_to_live_lasers arms the laser's resources: an old zone's PREDELETE
+## that frees the spawner mid-leg must stop the walk (snapshot + id checks),
+## never continue into the next laser through a freed spawner.
+func test_apply_to_live_lasers_survives_a_zone_predelete_that_frees_the_spawner() -> void:
+	var sp := _spawner(_laser(10.0), 1)
+	sp.graze_enabled = true
+	sp.graze_zones = [H.make_graze_zone([30.0])]
+	sp.graze_node_group = &"laser_foes"
+	var a := _fire(sp)
+	var b := _fire(sp)
+	assert_not_null(a, "first laser")
+	assert_not_null(b, "second laser")
+	var z := HostileZone.new()
+	z.ring_count = 1
+	z.set_ring_radius(0, 20.0)
+	z.target = sp
+	assert_true(a.graze_set_zones([z], &"laser_foes"), "the first laser holds the hostile zone")
+	z = null # the laser holds the zone's last Ref
+	sp.apply_to_live_lasers(PatternSpawner2D.LIVE_GRAZE)
+	await idle(1)
+	assert_true(is_instance_valid(factory), "the factory survives")
+	assert_false(is_instance_valid(sp), "the zone PREDELETE freed the spawner cleanly")
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "books balanced")
+	expect_no_errors()
+
+
+## laser_target_source without a Track / Lock On aim (and the reverse) used to
+## warn only in the editor's scene tree: a game hears it once at the first
+## shot of each mismatched configuration, and the explain text names it.
+func test_an_aim_and_target_source_mismatch_warns_once_at_the_shot() -> void:
+	var sp := _spawner(_laser(0.5), 2)
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_MOUSE
+	assert_true(sp.shoot_once(), "fires")
+	expect_warning_sequence(["LaserSpawner2D: laser_target_source is set but laser_data aims along the pattern: set its aim to Track or Lock On to use the targets."])
+	assert_true(sp.shoot_once(), "fires again")
+	expect_warning_sequence([])
+	var explain := "\n".join(sp.debug_explain_features())
+	assert_string_contains(explain, "laser_target_source is ignored until laser_data's aim is Track or Lock On")
+	assert_string_contains(explain, "Warning: laser_target_source is set but laser_data aims along the pattern")
+	sp.laser_data.aim = LaserData2D.LASER_AIM_TRACK
+	assert_true(sp.shoot_once(), "a matching setup fires silently")
+	expect_warning_sequence([])
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_NONE
+	assert_true(sp.shoot_once(), "fires")
+	expect_warning_sequence(["LaserSpawner2D: laser_data aims with Track or Lock On but laser_target_source is None: the beams keep their pattern direction."])
+	sp.laser_data.aim = LaserData2D.LASER_AIM_PATTERN
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_MOUSE
+	assert_true(sp.shoot_once(), "fires")
+	expect_warning_sequence(["LaserSpawner2D: laser_target_source is set but laser_data aims along the pattern: set its aim to Track or Lock On to use the targets."])
+	factory.clear_active_lasers(false)
+
+
+## shoot_once from inside a shot's own signal is refused naming the signals
+## THIS spawner type emits during a shot (it listed the bullet signals).
+func test_a_nested_shot_names_the_laser_signals() -> void:
+	var sp := _spawner(_laser(0.5), 1)
+	sp.laser_fired.connect(func(_l, _n) -> void: sp.shoot_once(), CONNECT_ONE_SHOT)
+	assert_true(sp.shoot_once(), "the outer shot fires")
+	expect_error_sequence(["LaserSpawner2D::shoot_once: re-entrant call from inside a spawner signal handler is not allowed (laser_fired, volley_skipped). Use call_deferred(\"shoot_once\") instead."])
+	factory.clear_active_lasers(false)
+
+
+## A laser changes hands: detach_from_spawner makes it the factory's
+## (signals, time scale, max_live_lasers, listings); adopt_live_laser hands a
+## firing laser to a spawner. get_owner_spawner names the live owner only.
+func test_lasers_change_hands_by_detach_and_adopt() -> void:
+	var sp := _spawner(_laser(), 1)
+	var l := _fire(sp)
+	assert_same(l.get_owner_spawner(), sp, "owned at first")
+	var hits_on_spawner: Array = []
+	sp.laser_phase_changed.connect(func(_l, p: int) -> void: hits_on_spawner.append(p))
+	var on_factory: Array = []
+	factory.laser_phase_changed.connect(func(_l, p: int) -> void: on_factory.append(p))
+	assert_true(l.detach_from_spawner(), "detached")
+	assert_null(l.get_owner_spawner(), "factory-owned now")
+	assert_eq(sp.get_live_lasers(), [], "the spawner no longer counts it")
+	assert_eq(factory.get_lasers_owned_by(null), [l], "the factory lists it")
+	assert_false(l.detach_from_spawner(), "a factory laser: no change")
+	l.end_laser(true)
+	step_factory(1, DT)
+	assert_eq([hits_on_spawner.size() == 0, on_factory.size() > 0], [true, true], "its signals reach the factory only")
+	var free_laser := factory.spawn_laser(_laser(), [Transform2D.IDENTITY] as Array[Transform2D])
+	assert_true(sp.adopt_live_laser(free_laser), "adopted")
+	assert_same(free_laser.get_owner_spawner(), sp, "the spawner owns it")
+	assert_eq(sp.get_live_lasers(), [free_laser], "and counts it")
+	assert_false(sp.adopt_live_laser(null), "null")
+	assert_false(sp.adopt_live_laser(factory), "not a laser")
+	free_laser.end_laser(false)
+	step_factory(2, DT)
+	assert_true(free_laser.is_pooled(), "pooled")
+	assert_false(sp.adopt_live_laser(free_laser), "a pooled laser")
+	assert_null(free_laser.get_owner_spawner(), "a pooled laser has no owner")
+	expect_error_sequence([
+		"LaserSpawner2D::adopt_live_laser: instance is null.",
+		"adopt_live_laser: laser must be a LaserVolley2D or null (a freed object is neither), nothing changed.",
+		"LaserSpawner2D::adopt_live_laser: instance is not firing (finished, pooled or never fired).",
+	])
+
+
+## A Global Position with a retarget interval is re-picked on it: a script
+## that moves the point reaches the lasers in flight at the next interval.
+func test_a_moved_global_position_reaches_live_lasers_on_the_interval() -> void:
+	var d := _laser()
+	d.aim = LaserData2D.LASER_AIM_LOCK_ON
+	var sp := _spawner(d, 1)
+	sp.laser_target_source = LaserSpawner2D.LASER_TARGET_GLOBAL_POSITION
+	sp.laser_target_position = Vector2(0, 300)
+	sp.laser_retarget_interval_sec = 0.1
+	var l := _fire(sp)
+	assert_true(sp.is_processing(), "the interval keeps the loop awake")
+	sp.laser_target_position = Vector2(0, -300)
+	var aim_at := func(p: Vector2) -> float:
+		return absf(angle_difference((p - l.get_beam_start(0)).angle(), l.get_beam_angle(0)))
+	for i in 30: # the interval is 6 frames: early break
+		await idle(1)
+		if aim_at.call(Vector2(0, -300)) < 0.0001:
+			break
+	assert_almost_eq(aim_at.call(Vector2(0, -300)), 0.0, 0.0001, "the moved point was picked up")
+
+
+## set_live_lasers_target aims every live Track / Lock On laser (never a
+## Pattern one or one that tracks its own targets); clear_live_lasers_targets
+## leaves them none; a bad target changes nothing.
+func test_set_live_lasers_target_aims_the_live_lasers() -> void:
+	var d := _laser()
+	d.aim = LaserData2D.LASER_AIM_LOCK_ON
+	var sp := _spawner(d, 1)
+	var l := _fire(sp)
+	expect_warning_sequence(["LaserSpawner2D: laser_data aims with Track or Lock On but laser_target_source is None: the beams keep their pattern direction."])
+	var plain := _spawner(_laser(), 1)
+	var straight := _fire(plain)
+	var node := Node2D.new()
+	node.position = Vector2(0, 120)
+	add(node)
+	assert_eq(sp.set_live_lasers_target(node), 1, "one Lock On laser aimed")
+	assert_eq(plain.set_live_lasers_target(node), 0, "a Pattern laser keeps its aim")
+	assert_same(l.get_beam_target(0), node, "the beam's target")
+	assert_null(straight.get_beam_target(0), "untouched")
+	step_factory(1, DT)
+	assert_almost_eq(l.get_beam_end(0).distance_to(Vector2(0, 120)), 0.0, 0.01, "locked onto it")
+	assert_eq(sp.set_live_lasers_target(Vector2(-80, 0)), 1, "a point")
+	assert_eq(l.get_beam_target(0), Vector2(-80, 0), "the point")
+	assert_eq(sp.set_live_lasers_target(Vector2(NAN, 0)), 0, "refused")
+	assert_eq(sp.set_live_lasers_target("nope"), 0, "refused")
+	var gone := Node2D.new()
+	add(gone)
+	gone.free()
+	assert_eq(sp.set_live_lasers_target(gone), 0, "a freed node is refused")
+	expect_error_sequence([
+		"LaserSpawner2D::set_live_lasers_target: a Vector2 target must be finite, nothing changed.",
+		"LaserSpawner2D::set_live_lasers_target: target must be a live Node2D or a Vector2, nothing changed.",
+		"LaserSpawner2D::set_live_lasers_target: target must be a live Node2D or a Vector2, nothing changed.",
+	])
+	assert_eq(l.get_beam_target(0), Vector2(-80, 0), "the refused calls kept the target")
+	l.track(BulletTargets2D.from_positions([Vector2(0, -50)]))
+	assert_eq(sp.set_live_lasers_target(node), 0, "a tracking laser picks its own targets")
+	l.track(null)
+	assert_eq(sp.clear_live_lasers_targets(), 1, "cleared")
+	assert_null(l.get_beam_target(0), "no target")
+
+
+## A spawner's lasers in every factory are its own: one it adopted from
+## another factory is listed, counted, held to max_live_lasers and ended
+## like the lasers it fired (the listings once read only its current factory).
+func test_lasers_in_another_factory_are_listed_capped_and_ended() -> void:
+	var second := BulletFactory2D.new()
+	add(second)
+	await idle(1)
+	var sp := _spawner(_laser(), 1)
+	var l := second.spawn_laser(_laser(), [Transform2D.IDENTITY] as Array[Transform2D])
+	assert_true(sp.adopt_live_laser(l), "adopted from the second factory")
+	assert_eq([sp.get_live_lasers(), sp.get_live_laser_count()], [[l], 1], "listed and counted")
+	sp.max_live_lasers = 1
+	watch_signals(sp)
+	assert_false(sp.shoot_once(), "the cap counts it")
+	assert_signal_emit_count(sp, "volley_skipped", 1, "refused once at the cap")
+	assert_eq(sp.end_live_lasers(false), 1, "ended like its own")
+
+
+## A laser data resource's LAST reference can drop inside `set_laser_data`:
+## its NOTIFICATION_PREDELETE is user code that may free the spawner, so the
+## setter must stop before reading `this` again (ASan: heap-use-after-free).
+func test_a_laser_data_predelede_freeing_the_spawner_mid_setter_is_survived() -> void:
+	var sp := _spawner()
+	var probe := FreeSpawnerOnPredeleteLaserData2D.new()
+	sp.laser_data = probe
+	probe = null
+	FreeSpawnerOnPredeleteLaserData2D.fired = 0
+	FreeSpawnerOnPredeleteLaserData2D.victim = sp
+	check_factory_after = false
+	sp.laser_data = null
+	assert_gt(FreeSpawnerOnPredeleteLaserData2D.fired, 0, "the last Ref dropped inside the setter")
+	assert_false(is_instance_valid(sp), "the PREDELETE handler freed the spawner")
+	await idle(1)
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "nothing dangles")
+	assert_not_null(quick_volley(2), "the factory still spawns")
+
+
+## Asking the spawner to explain its features changes nothing: two collects of
+## the same seeded pattern stay identical with the explain call between them,
+## and the explain lines themselves are stable between calls (the explain
+## path must not touch the bake, the seed stream or any knob).
+func test_identically_seeded_collects_stay_identical_across_explain() -> void:
+	var sp := _spawner(_laser(), 24)
+	sp.pattern_source = LaserSpawner2D.PATTERN_FROM_HELPER_SCATTER
+	sp.helper_scatter_seed = 4242
+	sp.helper_scatter_burst_radius = 120.0
+	var first: Array = sp.collect_spawn_transforms()
+	assert_eq(first.size(), 24, "the seeded scatter draws every slot")
+	var lines: PackedStringArray = sp.debug_explain_features()
+	var second: Array = sp.collect_spawn_transforms()
+	assert_eq(second.size(), first.size(), "same slot count")
+	var divergent := 0
+	for i in first.size():
+		var a := first[i] as Transform2D
+		var b := second[i] as Transform2D
+		if a.origin.distance_to(b.origin) > 0.0001 or absf(angle_difference(a.get_rotation(), b.get_rotation())) > 0.0001:
+			divergent += 1
+	assert_eq(divergent, 0, "an identical seed collects identical transforms with explain in between")
+	assert_eq(sp.debug_explain_features(), lines, "the explain lines are stable between calls")
+	var info: Dictionary = sp.debug_get_pattern_cache_info()
+	assert_gte(int(info["hits"]), 1, "the second collect was served from the bake")
+	expect_no_errors()

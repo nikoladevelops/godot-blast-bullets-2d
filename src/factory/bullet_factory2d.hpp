@@ -1,93 +1,352 @@
 #pragma once
 
+#include "core/live_object2d.hpp"
+#include "core/native_callbacks2d.hpp"
+
+#include "core/variant_enum_cast2d.hpp"
+
+#include <functional>
+#include <memory>
+#include <unordered_map>
+
 #include <algorithm>
 
+#include <godot_cpp/classes/engine.hpp>
+#include <godot_cpp/classes/image.hpp>
+#include <godot_cpp/classes/multi_mesh.hpp>
+#include <godot_cpp/classes/multi_mesh_instance2d.hpp>
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/node2d.hpp>
 #include <godot_cpp/classes/packed_scene.hpp>
+#include <godot_cpp/classes/quad_mesh.hpp>
 #include <utility>
 
-#include "../shared/bullet_attachment_object_pool2d.hpp"
-#include "../shared/multimesh_object_pool2d.hpp"
+#include "attachments/bullet_attachment_object_pool2d.hpp"
+#include "core/collision_shape_helper2d.hpp"
+#include "core/dynamic_sparse_set.hpp"
+#include "core/emit_guard2d.hpp"
+#include "core/graze_targets2d.hpp"
+#include "core/owned_node2d.hpp"
+#include "data/bullet_pickup_data2d.hpp"
+#include "data/bullet_volley_data2d.hpp"
+#include "data/effect_layer_data2d.hpp"
+#include "data/laser_data2d.hpp"
+#include "debugger/despawn_bounds_preview_layer2d.hpp"
+#include "debugger/laser_debug_layer2d.hpp"
+#include "factory/emit_queue2d.hpp"
+#include "factory/flock_solver2d.hpp"
+#include "factory/graze_detector2d.hpp"
+#include "factory/sound_mixer2d.hpp"
+#include "factory/split_queue2d.hpp"
+#include "godot_cpp/core/math.hpp"
+#include "godot_cpp/variant/dictionary.hpp"
+#include "godot_cpp/variant/packed_float32_array.hpp"
+#include "godot_cpp/variant/packed_vector2_array.hpp"
+#include "godot_cpp/variant/utility_functions.hpp"
 #include "godot_cpp/variant/vector2.hpp"
-#include "shared/dynamic_sparse_set.hpp"
-#include "spawn-data/multimesh_bullets_data2d.hpp"
+#include "pooling/volley_pool2d.hpp"
+#include "sprite/frame_texture_cache2d.hpp"
 
 namespace BlastBullets2D {
 using namespace godot;
 
 // Using forward declaration to avoid circular dependencies
-class BlockBulletsData2D;
-class DirectionalBulletsData2D;
-class MultiMeshBulletsDebugger2D;
-class DirectionalBullets2D;
-class BlockBullets2D;
+class BulletVolleyData2D;
+class BulletVolleyDebugger2D;
+class BulletVolley2D;
+class LaserVolley2D;
+
+// Validates spawn data before any pool pop or memnew happens, so a bad resource can
+// never leave a half-set-up multimesh behind. Returns false with an error when invalid.
+// Shared by the factory spawn entries (via validate_spawn_request) and the pool
+// pre-population path.
+bool validate_spawn_data(const Ref<BulletVolleyData2D> &spawn_data, const char *caller_name);
+// Split pieces (native span path): data fields for a volley of bullet_count,
+// a raw transform span, and the invisible-bullets heads-up.
+bool validate_spawn_data_fields(const Ref<BulletVolleyData2D> &spawn_data, int bullet_count, const char *caller_name);
+bool validate_spawn_transform_span(const Transform2D *transforms, int count, const char *caller_name);
+void warn_if_spawn_invisible(const Ref<BulletVolleyData2D> &spawn_data, const char *caller_name);
 
 // Creates bullets with different behavior
 class BulletFactory2D : public Node2D {
 	GDCLASS(BulletFactory2D, Node2D)
 
-public:
-	// The available multimesh bullet types that the factory can handle with ease (if you plan on adding more custom types, you would have to add extra code where you see BulletType being checked to ensure consistent behavior)
-	enum BulletType {
-		DIRECTIONAL_BULLETS,
-		BLOCK_BULLETS
-	};
+	// FactoryOperationGuard (shared/factory_operation_guard2d.hpp) drives the
+	// busy/processing/debugger state machine for structural ops. It needs the
+	// private setters, so it is a friend instead of going through Godot binds.
+	friend class FactoryOperationGuard;
 
-	// Enum class for grid alignment
-	enum Alignment {
-		TOP_LEFT,
-		TOP_CENTER,
-		TOP_RIGHT,
-		CENTER_LEFT,
-		CENTER,
-		CENTER_RIGHT,
-		BOTTOM_LEFT,
-		BOTTOM_CENTER,
-		BOTTOM_RIGHT
-	};
+public:
+	// Refuses a release-build free() while this node emits (core/emit_guard2d.hpp).
+	EmitGuardState2D emit_guard;
 
 	// Whether the factory is currently busy doing something important and it can't handle any other requests
 	bool get_is_factory_busy() const;
 
-	// Ensures the correct initial state
-	virtual void _ready() override;
+	// Internal re-entrancy guard for BulletVolley2D teardown: a multimesh's disable
+	// sweep fires user script callbacks, and a handler calling reset()/free_*/populate
+	// there could force_delete the multimesh mid-sweep (use-after-free). While the
+	// internal busy flag is held, those operations reject with the standard busy error.
+	void _set_internal_operation_busy(bool value) { is_factory_busy = value; }
 
-	// Moves all bullets / handles bullet behavior
-	virtual void _physics_process(double delta) override;
+	// The engine callbacks run from _notification (READY, PHYSICS_PROCESS,
+	// PROCESS), never as virtual overrides: a game's script may define its
+	// own _ready / _physics_process / _process and both run
+	// (core/native_callbacks2d.hpp).
 
-	virtual void _process(double delta) override;
+	// Spawns one volley (one bullet per spawn_data.transforms entry), reusing a
+	// pooled volley of the same bucket when one exists. Returns the live
+	// volley (null when the request was refused, with the error already
+	// reported). Ignore the return for fire-and-forget bullets.
+	// spawner_id pre-stamps signal ownership before activation (configure-then-attach):
+	// BulletSpawner2D passes its instance id; direct factory users leave 0 (factory-owned).
+	BulletVolley2D *spawn_volley(const Ref<BulletVolleyData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset = Vector2(0, 0), uint64_t spawner_id = 0);
+	// Script-given owner ids: 0 or a live BulletSpawner2D (one error, else).
+	static bool validate_owner_spawner_id(uint64_t spawner_id, const char *function_name);
 
-	// Spawns DirectionalBullets2D when given a resource containing all needed data
-	void spawn_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset = Vector2(0, 0));
+	// C++-only fast path (BulletSpawner2D): transforms come from a native
+	// buffer (no TypedArray, no Variant per bullet). Same validation as the
+	// script path: every transform finite and invertible, data fields sane.
+	// colors (count entries, finite): per-bullet colors for this volley only
+	// (a colored volley even when the data has none; the spawner's Bullet
+	// Colors group, split children wearing their parent's color).
+	BulletVolley2D *spawn_volley_span(const Ref<BulletVolleyData2D> &spawn_data, const Transform2D *transforms, int count, const Vector2 &new_inherited_velocity_offset = Vector2(0, 0), uint64_t spawner_id = 0, const Color *colors = nullptr);
 
-	// Spawns BlockBullets2D when given a resource containing all needed data
-	void spawn_block_bullets(const Ref<BlockBulletsData2D> &spawn_data);
+	// ---- Lasers (bullet_factory2d_lasers.cpp) ----
+	// One LaserVolley2D per call: a beam per transform (its origin is the
+	// muzzle, its x axis the direction), following `anchor` while
+	// LaserData2D.follow_spawner is on. Factory-owned: its signals fire here.
+	LaserVolley2D *spawn_laser(const Ref<LaserData2D> &data, const TypedArray<Transform2D> &transforms, Node2D *anchor = nullptr);
+	// Script entries of the methods taking an object (bound): the Variant is
+	// read by id, a freed or wrong object is refused (core/live_object2d.hpp).
+	LaserVolley2D *spawn_laser_script(const Ref<LaserData2D> &data, const TypedArray<Transform2D> &transforms, const Variant &anchor);
+	void free_volley_deferred_script(const Variant &volley);
+	static void debug_free_like_release_script(const Variant &object);
+	Ref<VolleyPoolKey2D> debug_get_pool_bucket_script(const Variant &volley);
+	// C++ path (LaserSpawner2D): native transforms, the owner spawner, the
+	// anchor and its frame at fire time. Validated like spawn_laser.
+	// anchor_offset: a world shift already in `transforms` that a following
+	// laser keeps apart from its anchor-local slots (the spawn offset).
+	LaserVolley2D *spawn_laser_span(const Ref<LaserData2D> &data, const Transform2D *transforms, int count, uint64_t owner_id, uint64_t anchor_id, const Transform2D &anchor_frame, const char *caller, const Vector2 &anchor_offset = Vector2(), bool anchor_frame_pending = false, const Vector2 &inherited_velocity = Vector2());
+	Array get_active_lasers() const;
+	int get_active_laser_count() const;
+	// Ends every firing laser (fading, or at once). Safe from handlers.
+	// Returns how many it ended.
+	int clear_active_lasers(bool fade = true);
+	// Ends every laser whose live body touches the area (edges included,
+	// negative rects normalized). No user code: safe inside handlers.
+	int end_lasers_in_circle(const Vector2 &center, real_t radius, bool fade = true, int64_t can_hit_mask = 0);
+	// Read-only twins of end_lasers_in_*: the listed lasers whose body touches the area.
+	TypedArray<LaserVolley2D> get_lasers_in_circle(const Vector2 &center, real_t radius, int64_t can_hit_mask = 0) const;
+	TypedArray<LaserVolley2D> get_lasers_in_rect(const Rect2 &rect, int64_t can_hit_mask = 0) const;
+	int end_lasers_in_rect(const Rect2 &rect, bool fade = true, int64_t can_hit_mask = 0);
+	int end_lasers_in_area(const char *function_name, bool circle, const Vector2 &center, real_t radius, const Rect2 &rect, bool fade, int64_t can_hit_mask);
+	// Pre-warms `amount` pooled lasers of `beam_count` beams (no first-shot
+	// allocation); frees pooled lasers (every bucket, or one beam count).
+	// Idle only: their _deferred twins queue from anywhere.
+	int populate_lasers_pool(int beam_count, int amount);
+	void populate_lasers_pool_deferred(int beam_count, int amount);
+	int free_lasers_pool(int beam_count = -1);
+	void free_lasers_pool_deferred(int beam_count = -1);
+	int debug_get_laser_pool_amount() const;
+	// The lasers `owner_id` fired (never finished/pooled/queued). firing_only
+	// (the default) also skips a fading laser: it can no longer hit, so it
+	// does not count against max_live_lasers or appear as a live laser.
+	// Pass false for ownership work that must still reach a fading beam
+	// (teleport carry, orphan policies).
+	void collect_lasers_owned_by(uint64_t owner_id, std::vector<LaserVolley2D *> &r_out, bool firing_only = true) const;
+	// A laser the factory lists, counts and ticks: active, not queued for deletion.
+	static bool laser_listed(const LaserVolley2D *laser);
+	// Factory time scale x the owner spawner's fired time factor.
+	double laser_time_factor(const LaserVolley2D &laser) const;
+	// LaserVolley2D hooks: a freed laser leaves the lists; a finished one pools.
+	void laser_forget(LaserVolley2D *laser);
+	void laser_finished_now(LaserVolley2D *laser);
 
-	// Spawns DirectionalBullets2D when given a resource containing all needed data. These bullets should be controlled by the user
-	DirectionalBullets2D *spawn_controllable_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset = Vector2(0, 0));
+	// Resets the factory. Null key frees everything (all bullets, pools, and the full
+	// attachment pool). Exact key frees only that bucket; unrelated pooled attachments
+	// are preserved (only attachments owned by the freed multis are released).
+	void reset(const Ref<VolleyPoolKey2D> &key = Ref<VolleyPoolKey2D>());
 
-	// Resets the factory - frees everything (object pools, spawned bullets, spawned attachments - all get deleted from memory)
-	void reset(int amount_bullets = 0);
+	// Frees all active bullets (null key = all buckets, else exact PoolKey match)
+	void free_active_bullets(const Ref<VolleyPoolKey2D> &key = Ref<VolleyPoolKey2D>());
 
-	// Frees all active bullets
-	void free_active_bullets(int amount_bullets = 0);
+	// Clears all live bullets with dismissal visuals (null key = all buckets,
+	// else exact PoolKey match). Unlike free_active_bullets() (silent
+	// deletion) this runs each volley's clear_all_bullets(), so EFFECT_ON_CLEAR
+	// layers fire and the emptied volleys park in the pool instead of being
+	// freed. Returns how many bullets were cleared. reset()/free_* stay
+	// silent teardown and never fire effect layers.
+	int clear_active_bullets(const Ref<VolleyPoolKey2D> &key = Ref<VolleyPoolKey2D>());
 
-	void free_disabled_bullets(int amount_bullets = 0);
+	// ---- Bullet world: time scale, despawn bounds, area clears/counts
+	// (bullet_factory2d_world.cpp) ----
+	// Speed of the bullet world: every volley tick, effect and bullet timer
+	// advances by delta * time_scale (1 = real time, 0 = frozen but still
+	// processing). Spawners using this factory run on it too, times their own
+	// time_scale (BulletSpawner2D::get_process_time_scale).
+	double get_time_scale() const { return time_scale; }
+	// time_scale x the owner spawner scale (while it lives and opted in): the
+	// clock one volley (and its attachments, hum voices) runs on. Non-finite -> 0.
+	double volley_time_factor(const BulletVolley2D &volley) const;
+	// Most bullet time one volley tick covers: any finite time_scale is
+	// accepted, but 1e300 x delta would turn every pose into INF. Above the
+	// cap bullet time slows down instead of exploding.
+	static constexpr double MAX_VOLLEY_TICK_DELTA = 10.0;
+	// delta x volley_time_factor, capped at MAX_VOLLEY_TICK_DELTA.
+	// Shot timing of a TIMED shot (a spawner's cadence, an emitter): the extra
+	// real seconds (+ or -) the first tick of what it spawned gets, so its
+	// bullets move exactly from when the shot was due (`overshoot_sec` ago).
+	// This frame's sweep ticks a spawn made before it in a physics frame (that
+	// tick ends now); a spawn after it, or in an idle frame, waits for the
+	// next sweep, which ends one step after the last one (the interpolation
+	// fraction says how much of that step already passed). Streams then sit
+	// exactly speed x interval apart however shots and ticks interleave.
+	// Manual and script spawns keep their full first tick (deterministic for
+	// code that steps the factory itself).
+	double first_tick_lead(double overshoot_sec) const;
+	static double capped_volley_delta(double delta, double time_factor) {
+		const double scaled = delta * time_factor;
+		return scaled < MAX_VOLLEY_TICK_DELTA ? scaled : MAX_VOLLEY_TICK_DELTA;
+	}
+	void set_time_scale(double value);
+	// Bullets outside the rect (global space) and not heading back in are
+	// silently disabled each tick while enabled.
+	bool get_despawn_bounds_enabled() const { return despawn_bounds_enabled; }
+	void set_despawn_bounds_enabled(bool value);
+	Rect2 get_despawn_bounds_rect() const { return despawn_bounds_rect; }
+	void set_despawn_bounds_rect(const Rect2 &value);
+	// Preview of the rectangle (a translucent layer, always in the editor,
+	// at runtime only with the during_runtime flag). Needs the bounds on.
+	Color get_despawn_bounds_color() const { return despawn_bounds_color; }
+	void set_despawn_bounds_color(const Color &value);
+	bool get_despawn_bounds_preview() const { return despawn_bounds_preview; }
+	void set_despawn_bounds_preview(bool value);
+	bool get_despawn_bounds_preview_during_runtime() const { return despawn_bounds_preview_during_runtime; }
+	void set_despawn_bounds_preview_during_runtime(bool value);
+	// Where the despawn-bounds preview and the collision debugger draw among
+	// the game's canvas items.
+	int get_despawn_bounds_preview_z_index() const { return despawn_bounds_preview_z_index; }
+	void set_despawn_bounds_preview_z_index(int value);
+	int get_debugger_z_index() const { return debugger_z_index; }
+	// What the laser overlay draws: {visible, draws, color, z_index, boxes:
+	// [{laser, beam, transform, extents}]}.
+	Dictionary debug_get_laser_debug_boxes() const;
+	void set_debugger_z_index(int value);
+	bool despawn_bounds_preview_active() const;
+	void refresh_despawn_bounds_preview();
+	Dictionary debug_get_despawn_bounds_preview() const;
+	// Clears every live bullet of every active volley inside the area (On
+	// Clear effects and sounds like clear_active_bullets), then emits
+	// bullets_cleared once per volley. Allowed from physics handlers (not
+	// structural). Returns how many bullets were cleared.
+	int clear_bullets_in_circle(const Vector2 &center, real_t radius, int64_t can_hit_mask = 0);
+	int clear_bullets_in_rect(const Rect2 &rect, int64_t can_hit_mask = 0);
+	int count_bullets_in_circle(const Vector2 &center, real_t radius, int64_t can_hit_mask = 0) const;
+	// The live bullets inside the area (edge-inclusive like the clears, rect
+	// normalized), one Dictionary per volley that has any: {"volley",
+	// "bullet_indexes" (PackedInt32Array), "positions" (PackedVector2Array)},
+	// in factory order. Volleys queued for deletion are skipped. Read-only:
+	// safe anywhere, O(live bullets) per call.
+	TypedArray<Dictionary> get_bullets_in_circle(const Vector2 &center, real_t radius, int64_t can_hit_mask = 0) const;
+	TypedArray<Dictionary> get_bullets_in_rect(const Rect2 &rect, int64_t can_hit_mask = 0) const;
+	PackedVector2Array get_bullet_positions_in_circle(const Vector2 &center, real_t radius, int64_t can_hit_mask = 0) const;
+	Dictionary get_nearest_bullet(const Vector2 &position, real_t max_distance, int64_t can_hit_mask = 0) const;
+	// Every ACTIVE volley (not pooled or queued for deletion; parked ones
+	// only with include_parked), in factory order (the sweep's order).
+	TypedArray<BulletVolley2D> get_active_volleys(bool include_parked = false) const;
+
+	// ---- Pickups (bullet_factory2d_pickups.cpp) ----
+	// Turns live bullets into one pickup volley per call (split by the pattern
+	// limit): they leave their volleys, burst out, are pulled to `target` (a
+	// Node2D, a Vector2, a group name = nearest member per bullet, or null =
+	// the mouse) and are collected on arrival (signal pickup_collected). Not
+	// structural: allowed from physics handlers, refused while a sweep runs
+	// (use the deferred twin there). Bad input converts nothing.
+	Array convert_all_bullets_to_pickups(const Ref<BulletPickupData2D> &pickup, const Variant &target, int64_t can_hit_mask = 0);
+	Array convert_bullets_in_circle_to_pickups(const Vector2 &center, real_t radius, const Ref<BulletPickupData2D> &pickup, const Variant &target, int64_t can_hit_mask = 0);
+	Array convert_bullets_in_rect_to_pickups(const Rect2 &rect, const Ref<BulletPickupData2D> &pickup, const Variant &target, int64_t can_hit_mask = 0);
+	void convert_all_bullets_to_pickups_deferred(const Ref<BulletPickupData2D> &pickup, const Variant &target, int64_t can_hit_mask = 0);
+	// Pre-warms the pool for pickup volleys of `bullet_count` bullets
+	// (instance_count volleys, like populate_bullets_pool). The pool is keyed
+	// by bullet count, so a game that converts waves of a known size can
+	// build them at load time. Structural (idle frames only).
+	void populate_pickup_pool(const Ref<BulletPickupData2D> &pickup, int bullet_count, int instance_count);
+	void populate_pickup_pool_deferred(const Ref<BulletPickupData2D> &pickup, int bullet_count, int instance_count);
+	struct PickupSelection {
+		enum Kind { ALL,
+			OWNER,
+			CIRCLE,
+			RECT,
+			VOLLEY };
+		Kind kind = ALL;
+		uint64_t owner_spawner_id = 0;
+		Vector2 center;
+		real_t radius = 0.0;
+		Rect2 rect;
+		BulletVolley2D *volley = nullptr; // VOLLEY: used immediately, never kept
+		const PackedInt32Array *indexes = nullptr; // VOLLEY: empty = every live bullet
+		int64_t can_hit_mask = 0; // ALL / CIRCLE / RECT: only volleys whose collision_mask shares a bit (0 = all)
+	};
+	Array convert_to_pickups_impl(const char *function_name, const Ref<BulletPickupData2D> &pickup, const Variant &target, const PickupSelection &selection);
+	int count_bullets_in_rect(const Rect2 &rect, int64_t can_hit_mask = 0) const;
+	// can_hit_mask of the area calls: 0 = everything, else what a collision_mask
+	// must share a bit with (bullets and lasers alike). Checked once per call.
+	static bool can_hit_mask_valid(const String &function_name, int64_t can_hit_mask, const char *tail = ".");
+	static bool can_hit(int64_t can_hit_mask, int64_t collision_mask) { return can_hit_mask == 0 || (collision_mask & can_hit_mask) != 0; }
+
+	void free_disabled_bullets(const Ref<VolleyPoolKey2D> &key = Ref<VolleyPoolKey2D>());
 
 	// OBJECT POOLING RELATED
 
-	// Populates the object pool of a bullet type
-	void populate_bullets_pool(const Ref<MultiMeshBulletsData2D> &multimesh_data, int amount_instances);
+	// Pre-creates disabled volleys for one exact pool bucket.
+	// The key is required and must match the bucket derived from spawn_data
+	// (key.amount_bullets must equal spawn_data.transforms.size(), plus effective shape).
+	// instance_count = how many volleys to pre-create in that bucket. Mismatch aborts.
+	void populate_bullets_pool(const Ref<VolleyPoolKey2D> &key, const Ref<BulletVolleyData2D> &spawn_data, int instance_count);
 
-	// By default completely frees an object pool of a particular bullet type. You also have the option of freeing only the instances that each have a particular amount_bullets_per_instance if you provide a value that is bigger than 0
-	void free_bullets_pool(BulletType bullet_type, int amount_bullets_per_instance = 0);
+	// Frees pooled (disabled) volleys. Null key frees every bucket, an exact key only that bucket.
+	void free_bullets_pool(const Ref<VolleyPoolKey2D> &key = Ref<VolleyPoolKey2D>());
 
-	// Populates the bullet attachments pool. The packed scene has to contain a BulletAttachment2D
-	void populate_attachments_pool(const Ref<PackedScene> attachment_scene, int attachment_id, int amount_instances);
+	// Populates the bullet attachments pool. The packed scene has to contain a BulletAttachment2D.
+	// Pooling is keyed by the scene itself (see BulletAttachmentObjectPool2D::make_pooling_key_for_scene),
+	// so every loader of the same scene shares one bucket - no ids needed.
+	void populate_attachments_pool(const Ref<PackedScene> attachment_scene, int amount_instances);
 
-	// By default completely frees the bullet attachments pool. You also have the option of freeing only the attachments with a particular attachment_id if you provide a value that is not a negative number
-	void free_attachments_pool(int attachment_id = -1);
+	// Frees the whole bullet attachments pool.
+	void free_attachments_pool();
+
+	// Frees only the pooled attachments that came from the given scene.
+	void free_attachments_pool_for_scene(const Ref<PackedScene> &attachment_scene);
+
+	// ---- Deferred structural wrappers (safe from any callback) ----
+	// Structural ops reject inside physics frames / sweeps (see
+	// reject_when_iterating). These validate cheaply now and run the real op
+	// deferred, so collision / lifetime / timer / spawner-signal handlers can
+	// call them without call_deferred boilerplate. No-ops with an error when
+	// the factory is tearing down.
+	void reset_deferred(const Ref<VolleyPoolKey2D> &key = Ref<VolleyPoolKey2D>());
+	void free_active_bullets_deferred(const Ref<VolleyPoolKey2D> &key = Ref<VolleyPoolKey2D>());
+	void clear_active_bullets_deferred(const Ref<VolleyPoolKey2D> &key = Ref<VolleyPoolKey2D>());
+	void free_disabled_bullets_deferred(const Ref<VolleyPoolKey2D> &key = Ref<VolleyPoolKey2D>());
+	void free_bullets_pool_deferred(const Ref<VolleyPoolKey2D> &key = Ref<VolleyPoolKey2D>());
+	void populate_bullets_pool_deferred(const Ref<VolleyPoolKey2D> &key, const Ref<BulletVolleyData2D> &spawn_data, int instance_count);
+	void free_attachments_pool_deferred();
+	void populate_attachments_pool_deferred(const Ref<PackedScene> &attachment_scene, int amount_instances);
+	void free_attachments_pool_for_scene_deferred(const Ref<PackedScene> &attachment_scene);
+	// Safe single-volley free from any callback. Never calls free()/force_delete
+	// synchronously; uses queue_free() which is always safe mid-sweep.
+	// Use this instead of free() on a volley inside signal handlers.
+	void free_volley_deferred(Node *volley);
+
+	// Runs queued *_deferred structural calls on the next idle frame (see
+	// queue_structural_call in the .cpp). Bound for the not-in-tree fallback.
+	void _flush_structural_calls();
+
+	// Starts the factory now when it is used before its READY notification
+	// (a spawn from a script _ready, which runs first). Called lazily from
+	// every spawn/populate entry via validate_spawn_request(). Returns is_ready.
+	bool ensure_factory_initialized();
 
 	//
 
@@ -96,15 +355,281 @@ public:
 	// Holds all disabled BulletAttachment2D
 	BulletAttachmentObjectPool2D bullet_attachments_pool;
 
-	// Contains all BulletAttachment2D in the scene tree
-	Node *bullet_attachments_container = nullptr;
+	// Contains all BulletAttachment2D in the scene tree. Like every helper
+	// child below, an ordinary node a script may free: read through get()
+	// (heal_owned_children() recreates it).
+	OwnedNode2D<Node> bullet_attachments_container;
+
+	//
+
+	// SPRITE EFFECT (ONE-SHOT) MANAGER
+	//
+	// Fire-and-forget visuals (spawn flashes, hit sparks, destroy/bounce
+	// effects) render here so they outlive their volley: a destroy
+	// explosion keeps playing after its bullet (and volley) is pooled.
+	// One bake per (volley, layer) with per-frame shard nodes (children of
+	// the container below); slots form a ring per bake, oldest recycled.
+	// Trail layers never register here (they follow bullets on the volley
+	// itself). Bakes die on volley teardown, data reseed, manual clear, or
+	// factory reset - never on pool push, so in-flight effects survive it.
+	struct FXOneShotSlot {
+		bool active = false;
+		Transform2D fixed;
+		double birth = 0.0;
+		// Sweep the slot fired in: the sweep's delta covers time BEFORE the
+		// birth, so the birth sweep must not age the newborn (it already shows
+		// frame zero). Fires on the tick path (before this sweep's aging ran)
+		// additionally rebase birth forward by the sweep's delta at the next
+		// aging: without it the clock still advances under the newborn and the
+		// effect dies one sweep early. Fires after this sweep's aging (timers,
+		// idle code) need no rebase: the next delta is fully post-birth.
+		uint64_t birth_sweep = 0;
+		bool birth_needs_rebase = false;
+		double duration = 0.0;
+		double start_age = 0.0;
+		int last_shard = -1;
+		// Last written instance tint (multimesh color readback is as
+		// unreliable headless as transform readback: debug reads this).
+		Color tint = Color(1, 1, 1, 1);
+		// Last written rotation in radians (base pose plus spin at the
+		// slot's age): debug mirror for spin verification.
+		float last_angle = 0.0f;
+		// The shards those two writes went to (debug: they must be the one
+		// the slot shows, last_shard).
+		int tint_shard = -1;
+		int angle_shard = -1;
+	};
+	struct FXOneShotBake {
+		uint64_t volley_id = 0;
+		int layer_index = -1;
+		Ref<EffectLayerData2D> layer;
+		// Layer content generation at bake time; a mismatch means the user
+		// edited the layer since (manual hatch path re-bakes on it).
+		uint64_t layer_version = 0;
+		// The baked animation (frames, seconds, end boundaries, total).
+		SpriteAnim2D anim;
+		// Ordinary children a script may free: read through get().
+		std::vector<OwnedNode2D<MultiMeshInstance2D>> shards;
+		// Parallel to shards: each shard's MultiMesh, cached so the per-slot
+		// writes every frame skip a get_multimesh() engine call and the
+		// Ref reference()/unreference() pair that comes with it.
+		std::vector<Ref<MultiMesh>> shard_multimeshes;
+		std::vector<FXOneShotSlot> slots;
+		int ring_cursor = 0;
+		int active_count = 0;
+
+		// A shard node a script freed (cold paths only: one ObjectDB lookup each).
+		bool any_shard_lost() const {
+			for (const OwnedNode2D<MultiMeshInstance2D> &shard : shards) {
+				if (shard.lost()) {
+					return true;
+				}
+			}
+			return false;
+		}
+		// Appends a shard and caches its MultiMesh.
+		void add_shard(MultiMeshInstance2D *shard) {
+			shards.push_back(shard);
+			shard_multimeshes.push_back(shard != nullptr ? shard->get_multimesh() : Ref<MultiMesh>());
+		}
+		// Raw pointer on purpose (no Ref churn on the per-slot path); the shard
+		// node owns its MultiMesh, so the pointer stays valid.
+		_ALWAYS_INLINE_ MultiMesh *shard_multimesh(int shard_index) const {
+			if (shard_index >= 0 && shard_index < (int)shard_multimeshes.size() && shard_multimeshes[shard_index].is_valid()) {
+				return shard_multimeshes[shard_index].ptr();
+			}
+			MultiMeshInstance2D *node = shards[shard_index].get();
+			if (node == nullptr) {
+				return nullptr;
+			}
+			const Ref<MultiMesh> owned_by_node = node->get_multimesh();
+			return owned_by_node.ptr();
+		}
+	};
+
+	std::vector<FXOneShotBake> fx_bakes;
+	// Manual-hatch bakes (spawn_layer_effect): owned by the factory itself,
+	// keyed separately so volley teardown never touches them. One bake per
+	// distinct layer (capped, oldest dropped) so mixed manual effects
+	// coexist instead of rebaking each other away.
+	std::vector<FXOneShotBake> fx_manual_bakes;
+	// spawn_layer_effect's body; `caller` names the hatch in its errors.
+	int fx_spawn_manual(const Ref<EffectLayerData2D> &layer, const Transform2D &at, const char *caller, bool *r_unplayable = nullptr);
+	// Laser effect layers that could not play, by instance id: the bake
+	// version that failed (fx_play_laser_effect tries again after an edit).
+	std::unordered_map<uint64_t, uint64_t> fx_failed_laser_layers;
+	double fx_clock = 0.0;
+	// Sweep of the last age_fx_effects run, and the delta it advanced with:
+	// newborn slots fired before this sweep's aging rebase their birth by it.
+	uint64_t fx_aged_sweep = 0;
+	double fx_last_delta = 0.0;
+	// Reusable per-tick scratch for the shard-occupancy pass in age_fx_bake:
+	// allocating it fresh per bake per tick was heap churn on every physics
+	// frame. Sized per use via assign (no preservation needed).
+	std::vector<int> fx_occupancy_scratch;
+	// Visibility writes collected while the bake loops hold FXOneShotBake&:
+	// set_visible runs a shard's visibility_changed handlers (user code), and
+	// a handler may register another bake (the vectors reallocate), clear the
+	// manual bakes or free shards. No bake may be held across one, so the
+	// loops queue plain ids here and the outermost caller applies them once
+	// its bake references are gone (fx_apply_queued_visibility).
+	struct FXVisibilityWrite2D {
+		uint64_t id = 0;
+		MultiMeshInstance2D *node = nullptr;
+		bool visible = false;
+	};
+	std::vector<FXVisibilityWrite2D> fx_visibility_writes;
+	void fx_queue_visibility(MultiMeshInstance2D *node, bool visible);
+	void fx_apply_queued_visibility();
+
+	// Structural calls queued by the *_deferred wrappers, flushed together on
+	// the next SceneTree process_frame (idle, outside the physics step).
+	// Plain C++ calls, never method-name Callables: Object::callp locks the
+	// target for the call, so a free() of this factory from user code inside
+	// a deferred reset would be refused (unlike the same reset called
+	// directly); the flush checks liveness after each call instead.
+	std::vector<std::function<void()>> pending_structural_calls;
+	bool structural_flush_connected = false;
+	void queue_structural_call(std::function<void()> call);
+
+	// Textures made from SpriteFrames frames (sprite/frame_texture_cache2d.hpp),
+	// shared by this factory's volleys, effect layers and lasers. A full
+	// reset() clears it so edited art re-bakes.
+	FrameTextureCache2D frame_cache;
+
+	// Contains all one-shot effect shard nodes in the scene tree.
+	OwnedNode2D<Node2D> sprite_effects_container;
+
+	// Shared shard helpers (volleys reuse these for trail shards): per-frame
+	// node owning one baked texture, sized from that texture. with_colors
+	// enables the per-instance color array (ramp sampling needs it);
+	// instances start white so untinted layers render untouched.
+	static Vector2 fx_quad_size_for_texture(const Ref<Texture2D> &tex);
+	static MultiMeshInstance2D *fx_create_shard(Node *parent, const Ref<Texture2D> &tex, const Vector2 &quad_size, const Ref<Material> &mat, const Color &col, int z, bool z_rel, int vis, int light, int instance_count, bool with_colors);
+
+	void fx_ensure_effects_container();
+	// Frees one bake's shard nodes (zeroed first so this frame never renders
+	// stale) and drops the record.
+	void fx_erase_bake(FXOneShotBake &bake);
+	// Erases every bake of one volley, optionally a single layer index
+	// (-1 erases all of the volley's layers).
+	void fx_unregister_volley_bake(uint64_t volley_id, int layer_index);
+	// Registers (or re-registers) one one-shot layer bake for a volley.
+	// amount_bullets sizes the ring when the layer leaves max_instances on
+	// auto (0). False when the layer is inert (disabled, trail trigger,
+	// null, frames missing, zero playable time): warn-once happens inside.
+	bool fx_register_volley_bake(uint64_t volley_id, int layer_index, const Ref<EffectLayerData2D> &layer, int amount_bullets);
+	// Every one-shot bake of `volley_id` still has its shard nodes (a script
+	// may free them, or the whole effects container). Cold: a reuse check.
+	bool fx_volley_bakes_intact(uint64_t volley_id) const;
+	// Erases every bake of one volley (teardown, data reseed). In-flight
+	// visuals of that volley stop; other volleys are untouched.
+	void fx_unregister_volley(uint64_t volley_id);
+	// Erases every bake (factory reset/teardown).
+	void fx_unregister_all_bakes();
+	// Fires one slot of a registered bake at a global pose. Silent no-op
+	// when the bake is missing (volley reseeded without effects).
+	void fx_fire(uint64_t volley_id, int layer_index, const Transform2D &at);
+	// Ages every active slot (called from _physics_process, so pausing the
+	// factory freezes effects exactly like bullets).
+	void age_fx_effects(double delta);
+	// Single-bake aging shared by the volley bakes and the manual bake.
+	void age_fx_bake(FXOneShotBake &bake);
+	// Shared fire path for volley triggers and the manual hatch.
+	int fx_fire_into_bake(FXOneShotBake &bake, const Transform2D &at);
+	int get_active_effect_count() const;
+	// Manual one-shot hatch: plays any layer once at a pose, owned by the
+	// factory (survives volleys). Returns the slot index, or -1 when inert.
+	int spawn_layer_effect(const Ref<EffectLayerData2D> &layer, const Transform2D &at);
+	// The laser effect hatch (LaserVolley2D::fire_event): plays `layer` once
+	// at `at` through the same manual bakes, silently skipping a missing,
+	// disabled or trail layer; a layer that cannot play reports once per edit
+	// (its bake version), never once per event. False when nothing played.
+	bool fx_play_laser_effect(const Ref<EffectLayerData2D> &layer, const Transform2D &at);
+	// Laser effects are queued while a laser ticks (spawning a shard adds a
+	// node: SceneTree.node_added and the parent's child_entered_tree run user
+	// code) and played right after that laser's tick, so a laser's event code
+	// never runs user code between resolving a target and emitting it.
+	struct PendingLaserEffect2D {
+		Ref<EffectLayerData2D> layer;
+		Transform2D at;
+		int event = 0;
+		uint64_t laser_id = 0;
+		int life_id = 0;
+		int beam = 0;
+	};
+	std::vector<PendingLaserEffect2D> pending_laser_effects;
+	void queue_laser_effect(const Ref<EffectLayerData2D> &layer, const Transform2D &at, int event, uint64_t laser_id, int life_id, int beam) {
+		pending_laser_effects.push_back({ layer, at, event, laser_id, life_id, beam });
+	}
+	// Plays the queued laser effects (user code inside). False: this factory
+	// was freed by it.
+	bool flush_laser_effects();
+	// The laser effect log rows ({trigger, laser, life, beam, position,
+	// frame}, volley 0 and bullet -1) share the effect log.
+	void debug_log_laser_effect(int trigger, uint64_t laser_id, int life_id, int beam_index, const Vector2 &position);
+	// Stops every active visual (volley bakes keep their configs, the manual
+	// bake is dropped entirely).
+	void clear_sprite_effects();
+	Dictionary debug_get_effect_state() const;
+	// The frame cache's counters: {entries, builds, hits, sheet_reads, unreadable}.
+	Dictionary debug_get_frame_cache_stats() const { return frame_cache.debug_stats(); }
+	// What a mesh draw shows for `texture` (whiten: its whitened copy), through
+	// the frame cache. Null when its pixels cannot be read.
+	Ref<Texture2D> debug_read_frame(const Ref<Texture2D> &texture, bool whiten);
+	// Trigger log for tests: every volley one-shot trigger that actually
+	// fired (layer matched) is recorded as {trigger, volley, life, bullet,
+	// position, frame} while enabled. Off by default: one bool check per
+	// fire. Bounded (oldest dropped past 4096 entries).
+	bool debug_effect_log_enabled = false;
+	Array debug_effect_log;
+	void debug_set_effect_log_enabled(bool enabled);
+	Array debug_get_effect_log() const { return debug_effect_log.duplicate(); }
+	void debug_clear_effect_log() { debug_effect_log.clear(); }
+	void debug_log_effect(int trigger, uint64_t volley_id, int life_id, int bullet_index, const Vector2 &position);
+	// Bullet event log for tests (the feature-mix ledger): every bullet state
+	// change of every volley while enabled, as {kind, cause, volley, life,
+	// bullet, epoch, frame}. kind "life": a new active life enabled every
+	// bullet (bullet = amount, cause and epoch unused); "wake": enable_bullet;
+	// "disable": cause hit, lifetime, despawn, clear, split, split_manual (a
+	// manual split, leaving like a clear), pickup, collect or manual (a
+	// script's disable_bullet). Off by default: one bool check
+	// per state change. Bounded: past 65536 entries the oldest are dropped
+	// and counted (debug_get_bullet_event_log_dropped).
+	bool debug_bullet_event_log_enabled = false;
+	Array debug_bullet_event_log;
+	int64_t debug_bullet_event_log_dropped = 0;
+	void debug_set_bullet_event_log_enabled(bool enabled);
+	Array debug_get_bullet_event_log() const { return debug_bullet_event_log.duplicate(); }
+	void debug_clear_bullet_event_log() { debug_bullet_event_log.clear(); }
+	int64_t debug_get_bullet_event_log_dropped() const { return debug_bullet_event_log_dropped; }
+	void debug_log_bullet_event(const char *kind, const char *cause, uint64_t volley_id, int life_id, int bullet_index, uint64_t epoch);
 
 	//
 
 	// PHYSICS INTERPOLATION
-
-	// Toggle physics interpolation on/off
+	//
+	// Bullets are drawn between their last two physics poses each rendered
+	// frame (smooth on high-refresh displays). SERIALIZED ids: never renumber.
+	enum PhysicsInterpolation : int {
+		INTERPOLATION_OFF = 0,
+		INTERPOLATION_ON = 1,
+		// Follows SceneTree.physics_interpolation (the project setting, or a
+		// script toggling it at runtime): checked every physics frame.
+		INTERPOLATION_FOLLOW_PROJECT = 2
+	};
+	PhysicsInterpolation physics_interpolation = INTERPOLATION_FOLLOW_PROJECT;
+	// The effective state the volleys read (hot paths): physics_interpolation
+	// resolved by resolve_physics_interpolation().
 	bool use_physics_interpolation = false;
+	PhysicsInterpolation get_physics_interpolation() const { return physics_interpolation; }
+	void set_physics_interpolation(PhysicsInterpolation value);
+	bool is_physics_interpolation_active() const { return use_physics_interpolation; }
+	// Applies the mode now when allowed (ready, not busy, not tearing down;
+	// otherwise the next physics frame does), seeding the previous poses when
+	// it turns on and waking or sleeping the render pass.
+	void resolve_physics_interpolation();
+	bool godot_interpolation_enabled() const;
 
 	//
 
@@ -117,36 +642,418 @@ public:
 
 	void teleport_shift_all_bullets(const Vector2 &shift_amount);
 
+	// True once NOTIFICATION_PREDELETE started. Teardown paths use this to avoid
+	// touching half-destroyed state (e.g. re-pooling attachments into a dying pool).
+	bool get_is_tearing_down() const { return is_tearing_down; }
+	// See alive_flag: copy it before user code runs, test it after.
+	std::shared_ptr<bool> life_token() const { return alive_flag; }
+	// Watches this factory across user code: died() turns true once user code
+	// freed it after the watch began. A watch begun during teardown never
+	// trips (the teardown frame owns the factory until it returns).
+	struct LifeWatch {
+		std::shared_ptr<bool> life;
+		bool started_alive = false;
+		explicit LifeWatch(const std::shared_ptr<bool> &p_life) :
+				life(p_life), started_alive(*p_life) {}
+		bool died() const { return started_alive && !*life; }
+	};
+	LifeWatch watch_life() const { return LifeWatch(alive_flag); }
+	// A volley and its instance id read while it was alive (see the sweep
+	// snapshot below): validated through ObjectDB after user code ran.
+	struct VolleyIterationEntry {
+		uint64_t id = 0;
+		BulletVolley2D *volley = nullptr;
+	};
+
+	// Volleys whose shape / monitorable writes landed inside the physics
+	// server's query flush (core/physics_flush2d.hpp): applied at the start
+	// of the next sweep, or by a deferred call (a paused factory does not
+	// sweep). Both run after the flush and before the physics step.
+	void queue_physics_sync(BulletVolley2D *volley);
+	void flush_physics_sync();
+	void on_scene_physics_frame();
+	std::vector<VolleyIterationEntry> physics_sync_queue;
+	bool physics_sync_call_queued = false;
+
+	// Debugger provider budget passthrough (applies to both debuggers).
+	// max_providers 0 = unlimited (default, preserves always-draw behavior).
+	int get_debugger_max_providers() const;
+	void set_debugger_max_providers(int v);
+	bool get_debugger_draw_inactive() const;
+	void set_debugger_draw_inactive(bool v);
+
 	//
 
 	// ADDITIONAL METHODS FOR DEBUGGING PURPOSES
 
-	int debug_get_total_bullets_amount(BulletType bullet_type);
-	int debug_get_active_bullets_amount(BulletType bullet_type);
-	int debug_get_bullets_pool_amount(BulletType bullet_type);
+	// Volley counts (not bullets): every tracked volley, the active ones,
+	// and the pooled ones. Pool info maps each VolleyPoolKey2D bucket to
+	// its pooled count.
+	int debug_get_total_bullets_amount();
+	int debug_get_active_volleys_amount();
+	int debug_get_bullets_pool_amount();
 
-	Dictionary debug_get_bullets_pool_info(BulletType bullet_type);
+	Dictionary debug_get_bullets_pool_info();
 
 	int debug_get_total_attachments_amount();
 	int debug_get_active_attachments_amount();
 	int debug_get_attachments_pool_amount();
 
 	Dictionary debug_get_attachments_pool_info();
+	// Scenes the attachment pool remembers as validated (dead in-memory
+	// scenes are forgotten).
+	int debug_get_attachment_scene_memory_count() const { return bullet_attachments_pool.get_scene_memory_count(); }
+
+	// ---- Stability / observability debug API (bound, const where possible) ----
+	// Snapshot of factory lifecycle state. Keys: is_ready, is_busy,
+	// is_iterating, is_tearing_down, processing, volleys_total,
+	// volleys_pooled, attachments_pooled.
+	Dictionary debug_get_factory_state();
+	// Pool hit/miss counters for spawn reuse (pop hit vs allocate-new miss).
+	// Keys: hits, misses.
+	// Misses are normal on first spawn / key change; a 0% hit rate with a
+	// pre-populated pool means the spawn key never matches (e.g. skip indices
+	// shrank transforms after populate). Use debug_expected_pool_key() to compare.
+	Dictionary debug_get_pool_hit_stats() const;
+	void debug_reset_pool_stats();
+
+	// ---- Profiling (cheap, always on) ----
+	// Last completed physics tick + cumulative counters. Keys:
+	//   physics_ticks, physics_tick_usec (last), peak_physics_tick_usec,
+	//   render_usec (last interpolation pass, 0 when interpolation is off),
+	//   volleys_ticked / bullets_ticked (last tick), collision_records_total,
+	//   expired_bullets_total, spawned_bullets_total, pool_hits, pool_misses,
+	//   active_bullets, active_volleys, pooled_volleys, parked_volleys, active_effects,
+	//   active_attachments.
+	// Counters are cumulative: sample twice and subtract for per-frame rates.
+	Dictionary get_frame_stats() const;
+	// Resets the peak tick time and every cumulative counter (not the pool).
+	void reset_frame_stats();
+	// Live bullets across every active volley (O(active volleys)).
+	int get_active_bullet_count() const;
+	// Registers BlastBullets2D/* custom monitors (editor Debugger -> Monitors)
+	// on ready. One factory owns the monitors at a time (the first to enter
+	// the tree); others skip silently. Runtime only, never in the editor.
+	void set_register_performance_monitors(bool value);
+	bool get_register_performance_monitors() const;
+	// Non-mutating validation of spawn data. Returns {ok, error}. Never spawns,
+	// never touches the pool. Use from crash-fuzz tests before spawn_*().
+	static Dictionary debug_validate_spawn_data(const Ref<BulletVolleyData2D> &spawn_data);
+	// Test seam: frees a Node the way an exported RELEASE game does. Godot
+	// refuses free() on an object that is emitting a signal only in debug
+	// builds (the lock check of Object::callp is DEBUG_ENABLED); this deletes
+	// through the C++ path that skips it. Nodes only (a RefCounted would be
+	// freed under its references).
+	static void debug_free_like_release(Object *object);
+	// Interpolation status. Keys: factory_enabled, project_enabled_2d,
+	// project_enabled_3d, mismatch (bool), hint. Mismatch = bullets look
+	// steppy despite the factory flag, or vice versa.
+	Dictionary debug_check_interpolation_status();
+	// Live volley ids owned by a spawner (for teardown tests). Empty when none.
+	PackedInt64Array debug_get_live_volley_ids(uint64_t owner_spawner_id);
+	// Derives the exact pool bucket a spawn would use without spawning.
+	// Returns null (with an error) when spawn_data has no transforms.
+	// Compare with debug_get_bullets_pool_info() keys to diagnose 0% pool hits.
+	static Ref<VolleyPoolKey2D> debug_expected_pool_key(const Ref<BulletVolleyData2D> &spawn_data);
+	// Structural consistency check for tests: verifies vec/pool/sparse-set
+	// agreement (no nulls, sparse ids match indexes, active ids in range,
+	// pooled instances inactive). Returns {ok, error}. Never mutates.
+	Dictionary debug_assert_no_dangling();
+	// Runs one factory physics step with an explicit delta (hitch / zero
+	// delta audits; the engine loop always steps at the fixed rate). Same
+	// guards as the engine tick: false and nothing advances while the
+	// factory is paused; refused (error) from inside a tick or for a
+	// non-finite or negative delta.
+	bool debug_advance_time(double delta);
+	// Live pool bucket of one volley (for per-bucket free/reset assertions in
+	// multi-spawner tests). Returns null with an error for null/outside nodes.
+	Ref<VolleyPoolKey2D> debug_get_pool_bucket(BulletVolley2D *volley);
+
+	// Live-bullet census attributed by spawner ownership. Sums
+	// active_bullets_counter over every ACTIVE volley whose
+	// owner_spawner_id matches.
+	// Used by BulletSpawner2D's max_live_bullets fuse so the budget sees ALL
+	// of a spawner's live bullets — not just the homing-tracked subset.
+	// O(volleys); call sparingly (per-shot gates, not per-bullet ticks).
+	int count_active_bullets_owned_by(uint64_t owner_spawner_id) const;
+	// Every ACTIVE volley owned by a spawner, in factory order (census, not
+	// the spawner's capped retarget list). O(volleys).
+	Array get_active_volleys_owned_by(uint64_t owner_spawner_id) const;
+	// Script listings. A volley is listed while it flies (not pooled, not
+	// queued for deletion), a parked one (auto pooling off, every bullet out)
+	// too with include_parked. `spawner` is a PatternSpawner2D (read by id) or
+	// null for what the factory itself fired; a freed or wrong object lists
+	// nothing with one error.
+	TypedArray<BulletVolley2D> get_volleys_owned_by(const Variant &spawner, bool include_parked = false) const;
+	TypedArray<LaserVolley2D> get_lasers_owned_by(const Variant &spawner) const;
+	// The owner id `spawner` names (0 = the factory); false after an error.
+	static bool listing_owner_id(const Variant &spawner, const char *fn, uint64_t &r_id);
+	static bool volley_listed(const BulletVolley2D *volley, bool include_parked);
+	int count_active_volleys_owned_by(uint64_t owner_spawner_id) const;
+	// Every tracked volley (live or parked) a spawner owns.
+	void collect_volleys_owned_by(uint64_t owner_spawner_id, std::vector<BulletVolley2D *> &r_volleys) const;
+	// Clears every live bullet of one owner (fire_clear_effects: On Clear at
+	// each pose), PARKED volleys of that owner go back to the pool. Not
+	// structural: safe from handlers. Returns the bullets cleared.
+	// split_cause: SPLIT_CAUSE_CLEAR lets the cleared bullets split (a
+	// spawner clearing its own bullets); -1 never splits (orphan cleanup).
+	int clear_bullets_owned_by(uint64_t owner_spawner_id, bool fire_clear_effects, int split_cause = SPLIT_CAUSE_CLEAR);
+	// A spawner was freed: apply its orphaned_volleys policy to every volley
+	// it owns (active and parked). keep_flying records the spawner path for
+	// the orphan warnings; hand_to_factory makes them factory-owned.
+	void apply_orphan_policy(uint64_t owner_spawner_id, int policy, const String &spawner_path);
+
+	// ---- Graze targets (bullet_factory2d_graze.cpp, graze_detector2d.*) ----
+	// The factory's graze detector: one target list per zone group, rescanned
+	// at most once per physics step and only for the groups an armed volley
+	// asks for (ids + positions: user code runs between the volleys of a
+	// sweep, so volleys re-resolve every id). Factory volleys use it, and so
+	// do spawners left at the default graze target settings (their volleys
+	// share these lists). A spawner's death does not matter.
+	GrazeDetector2D &get_graze_default_detector() { return graze_default_detector; }
+	// Graze target lists only update while the factory runs (ready, in the
+	// tree, not tearing down).
+	bool graze_lists_usable() const { return is_ready && !is_tearing_down && is_inside_tree(); }
+	// Factory time for graze rescans: the sum of every physics step's delta.
+	double get_graze_clock() const { return graze_clock; }
+	// Bumped right before the plugin hands control to user code inside a
+	// sweep (every live signal / timer callback): graze target lists
+	// re-validate when it moved, so a target an earlier handler freed is
+	// never tested by a later volley of the same sweep. Every new emit or
+	// callback site inside the tick MUST call note_user_code().
+	uint64_t get_user_code_epoch() const { return user_code_epoch; }
+	void note_user_code() { ++user_code_epoch; }
+	void clear_graze_cache();
+	// [{id, position}] exactly as the next volley tick of this sweep would
+	// test them (refreshes a stale entry first).
+	Array debug_get_graze_targets(const StringName &group);
+	// {refreshes, events_total, cached_groups, live_detectors}.
+	Dictionary debug_get_graze_stats() const;
+	// Zones with more live targets than this test each bullet against the
+	// targets near it in x only (default 8; 0 = always, a huge value =
+	// never).
+	// Process-wide, for tests and profiling. Returns the previous value.
+	int debug_set_graze_slab_min_targets(int value);
+	// Bumped by volleys per emitted graze event (never per bullet).
+	uint64_t stats_graze_events_total = 0;
+
+	// ---- Flocking (flock_solver2d.*, bullet_factory2d_flock.cpp) ----
+	// The flock pass runs once per sweep, before any volley ticks, while at
+	// least one volley holds a flock config (one integer test otherwise).
+	const FlockSolver2D &get_flock_solver() const { return flock_solver; }
+	// BulletVolley2D::flock_set_config is the ONLY caller (arm +1, disarm -1).
+	void flock_note_armed(int delta) { flock_armed_volleys += delta; }
+	int get_flock_armed_volleys() const { return flock_armed_volleys; }
+	// The flock an empty flock slot stands for (a spawner's Flocking group
+	// with no BulletFlock2D, BulletVolley2D.flock_join(null)): one per
+	// factory, made on first use with the default rules. Editing it tunes
+	// every such flock of this factory.
+	Ref<BulletFlock2D> get_default_flock();
+	// {flocks, members, grid_members, neighbor_checks, capped_members, queried_members,
+	// pass_usec} of the last pass, plus armed_volleys.
+	Dictionary debug_get_flock_stats() const;
+
+	// ---- Splitting (split_queue2d.hpp, bullet_factory2d_split.cpp) ----
+	// Volleys record the splits of dying bullets here (C++ only, no user
+	// code); flush_splits spawns them once per sweep, after the timers and
+	// before the sound flush. Requests recorded outside a sweep spawn on the
+	// next one; reset/free_active_bullets/teardown drop them.
+	void split_enqueue(SplitRequest2D &&request);
+	// Children spawned per sweep at most (0 = no cap, the default). Splits
+	// over the cap wait for the next sweep in order, never dropped; one
+	// split larger than the cap still spawns when it comes first.
+	int get_split_max_children_per_sweep() const { return split_max_children_per_sweep; }
+	void set_split_max_children_per_sweep(int value);
+	// Splits waiting at most (0 = no cap; default 100000): past it a new
+	// split is dropped (the bullet dies or survives as if it never split),
+	// counted in debug_get_split_stats().dropped_total, one warning per
+	// overflow. Bounds exponential chains and carried-over backlogs.
+	int get_split_max_pending() const { return split_max_pending; }
+	void set_split_max_pending(int value);
+	// False (and the drop counted) when the queue is full.
+	bool split_has_room();
+	// The waiting splits and emitter shots of one volley life now belong to
+	// new_owner_id (0 = the factory): its owner changed while they waited.
+	void reown_pending_requests(uint64_t volley_id, int life, uint64_t new_owner_id);
+	int get_pending_split_count() const { return (int)pending_splits.size(); }
+	// Every split ever recorded (monotonic: a manual split counts its own).
+	uint64_t get_split_recorded_total() const { return split_recorded_total; }
+	// {pending, flushed_last, children_last, carried_over_last, flushed_total, children_total, dropped_total, templates}.
+	Dictionary debug_get_split_stats() const;
+
+	// ---- Emitter bullets (emit_queue2d.hpp, bullet_factory2d_emitter.cpp) ----
+	// Volleys record the shots of their emitter bullets here (C++ only, no
+	// user code); flush_emits fires them through their template spawners once
+	// per sweep, right after the splits. Reset/free_active_bullets/teardown
+	// drop them.
+	void emit_enqueue(EmitRequest2D &&request);
+	// Shots fired per sweep at most (0 = no cap, the default): the rest wait
+	// for the next sweep in order, never dropped.
+	int get_emitter_max_shots_per_sweep() const { return emitter_max_shots_per_sweep; }
+	void set_emitter_max_shots_per_sweep(int value);
+	// Shots waiting at most (0 = no cap; default 100000): past it a new shot
+	// is dropped, counted in debug_get_emitter_stats().dropped_total, one
+	// warning per overflow. Bounds runaway chains (emitters of emitters).
+	int get_emitter_max_pending() const { return emitter_max_pending; }
+	void set_emitter_max_pending(int value);
+	// False (and the drop counted) when the queue is full.
+	bool emit_has_room();
+	int get_pending_emit_count() const { return (int)pending_emits.size(); }
+	// {pending, fired_last, carried_over_last, fired_total, recorded_total, dropped_total}.
+	Dictionary debug_get_emitter_stats() const;
+
+	// ---- Sound triggers (sound_mixer2d.*) ----
+	// Fire-and-forget audio: trigger sites offer (volley, spawner, user) and
+	// the mixer plays the sweep's winners at the end of _physics_process.
+	// Channels are shared per sound resource across the whole factory.
+	// Volley/spawner entry point (C++ only: the listener spec has no Variant
+	// form): false = dropped (paused, editor, disabled, streamless, chance).
+	// volley_amount carries the firing volley's size for the amount gates
+	// (manual hatches count as one).
+	// A laser offer names its laser and beam with follow_kind LASER_TIP /
+	// LASER_MUZZLE (the point a following voice rides).
+	bool sound_offer(const SoundMix2D *sound, const Vector2 &event_pos, float volume_offset_db, const SoundListenerSpec2D &listener, int volley_amount = 1, uint64_t follow_volley_id = 0, int follow_life_id = -1, int follow_bullet = -1, int follow_kind = SOUND_FOLLOW_BULLET);
+	// User hatch: plays `sound` (a BulletSoundData2D or a LaserSoundData2D)
+	// at the end of the next sweep (Godot listener, or the nearest member of
+	// `listener_group`). False = refused (null, not a sound, disabled,
+	// outside the tree, paused, editor).
+	bool play_sound(const Ref<Resource> &sound, const Vector2 &global_position, const StringName &listener_group = StringName());
+	// Stops every voice (channels kept). reset() also forgets the channels.
+	void stop_sounds();
+	int get_sound_max_voices() const;
+	void set_sound_max_voices(int value);
+	void debug_set_sound_log_enabled(bool enabled);
+	// Offer log for tests (the feature-mix ledger): every sound_offer while
+	// enabled, BEFORE audibility, limits and chance, as {trigger, volley,
+	// life, bullet, frame} (spawner and manual offers: volley 0, bullet -1;
+	// laser offers: volley 0, bullet -1, plus laser (its id) and beam).
+	// Off by default: one bool check per offer. Bounded like the bullet
+	// event log (oldest dropped past 65536 entries).
+	bool debug_sound_offer_log_enabled = false;
+	Array debug_sound_offer_log;
+	void debug_set_sound_offer_log_enabled(bool enabled);
+	Array debug_get_sound_offer_log() const { return debug_sound_offer_log.duplicate(); }
+	void debug_clear_sound_offer_log() { debug_sound_offer_log.clear(); }
+	// Test helper: reseeds the plugin's cosmetic generator (sound mix, effect
+	// layer starts). Godot's global seed() does not reach these rolls.
+	void debug_seed_cosmetic_rng(int64_t seed);
+	Array debug_get_sound_log() const;
+	void debug_clear_sound_log();
+	Array debug_get_sound_voices() const;
+	Dictionary debug_get_sound_stats() const;
+	Dictionary debug_explain_sound(const Ref<Resource> &sound, const Vector2 &global_position, const StringName &listener_group, int volley_amount);
+	// The sound mix of a script-given sound resource, or null after one
+	// error naming `function_name`.
+	static const SoundMix2D *script_sound_mix(const Ref<Resource> &sound, const char *function_name);
+	void debug_stop_sound_voices();
 
 	//
 
-	DynamicSparseSet directional_bullets_set;
-	DynamicSparseSet block_bullets_set;
+	void handle_manual_volley_deletion(BulletVolley2D &bullet_multi);
 
-	void handle_manual_user_deletion_of_multimesh_bullets(MultiMeshBullets2D &bullet_multi);
+	// Re-registers a pooled multimesh that was woken via enable_bullet() outside spawn,
+	// so the factory processes it again. No-op when already active or tearing down.
+	void track_volley_active(BulletVolley2D &bullet_multi);
+
+	// Removes a volley that just went inactive (last bullet disabled) from the
+	// set of volleys the tick walks. Identity-checked: a stale sparse id never
+	// deactivates another volley. The volley stays tracked (and poolable).
+	void track_volley_inactive(BulletVolley2D &bullet_multi);
+
+	// GDScript entry for the same: enable_bullet() wake from script can't pass a
+	// C++ reference, so this validates the node first. Unbound C++ path stays.
+	void reactivate_volley_for_script(const Variant &volley);
+
+	void _notification(int p_what);
+	// Every BulletFactory2D inside a SceneTree (ENTER_TREE / EXIT_TREE). The
+	// target sources' "never a factory or anything inside one" rule
+	// (node_in_bullet_factory2d) asks these instead of walking each
+	// candidate's ancestors.
+	static std::vector<BulletFactory2D *> factories_in_tree;
+
+	// True while bullet state must not be structurally mutated: the factory is
+	// actively iterating flight vectors (physics sweep, disable sweeps holding
+	// the busy flag). Same-shape pool reuse (no RID alloc/free) is safe from
+	// ordinary physics callbacks, so this is intentionally NARROWER than
+	// is_in_physics_frame(): callers that only need "am I inside any physics
+	// frame" check the engine directly. Single source of truth for spawn-safe
+	// paths (enable_volley fast path), usable from multimesh-level
+	// mutators. Not bound.
+	bool is_bullets_iterating() const {
+		return is_iterating_bullets;
+	}
+
+	// True while structural RID work (area_clear_shapes / free_rid / re-bucket)
+	// is unsafe: either the factory is iterating, or any physics frame is
+	// running (server flush locks apply). Structural paths (reset/free_* /
+	// populate_*, shape-type changes) reject on this; the spawn fast path
+	// does not. Not bound.
+	bool is_structural_mutation_unsafe() const {
+		if (is_iterating_bullets) {
+			return true;
+		}
+		const Engine *engine = Engine::get_singleton();
+		return engine != nullptr && engine->is_in_physics_frame();
+	}
+
+	// Public read of the pause flag for multimesh-level guards: physics
+	// callbacks keep firing while paused (drain stopped), so producers must
+	// drop instead of queue. Not bound.
+	bool is_bullet_processing_paused() const {
+		return !is_factory_processing_bullets;
+	}
 
 protected:
 	// Responsible for exposing C++ methods/properties to Godot Engine
 	static void _bind_methods();
 
 private:
-	// Whether the factory was spawned correctly and the ready function finished. Used in order to avoid bugs related to editor executing getters/setters that should only be executed during runtime / gameplay. If a getter/setter is executed when in editor then those values get cached in different variables and finally get applied in _ready()
+	// Set when the factory enters the scene tree. Editor runs of getters/setters only
+	// fill the cached values below; the real ones apply in _ready() once nodes exist.
+	double time_scale = 1.0;
+	bool pickup_conversion_running = false;
+	bool despawn_bounds_enabled = false;
+	// Godot's default viewport, so enabling without editing is sensible.
+	Rect2 despawn_bounds_rect = Rect2(0, 0, 1152, 648);
+	Color despawn_bounds_color = Color(1, 0, 0, 0.25f);
+	bool despawn_bounds_preview = true;
+	bool despawn_bounds_preview_during_runtime = false;
+	int despawn_bounds_preview_z_index = 4000;
+	int debugger_z_index = 999;
+	// Id-checked (a raw pointer outlives a freed child).
+	DespawnBoundsPreviewLayer2D *despawn_preview_layer = nullptr;
+	uint64_t despawn_preview_layer_id = 0;
+	DespawnBoundsPreviewLayer2D *resolve_despawn_preview_layer(bool create);
+	// The collision debugger's laser overlay (id-checked like the preview).
+	LaserDebugLayer2D *laser_debug_layer = nullptr;
+	uint64_t laser_debug_layer_id = 0;
+	LaserDebugLayer2D *resolve_laser_debug_layer(bool create);
+	// After the laser tick: the boxes every active laser queried, while the
+	// debugger is enabled (hidden and emptied otherwise). No user code.
+	void refresh_laser_debug_layer();
+	int clear_bullets_in_area(const char *function_name, bool circle, const Vector2 &center, real_t radius, const Rect2 &rect, int64_t can_hit_mask);
 	bool is_ready = false;
+
+	// Set in NOTIFICATION_PREDELETE (parent notified before children are destroyed).
+	// Teardown paths must not touch child pointers (debuggers/containers may be gone).
+	bool is_tearing_down = false;
+
+	// Cleared in NOTIFICATION_PREDELETE. User code (attachment callbacks,
+	// timers) may free() this factory in the middle of one of its own
+	// operations: an operation that runs user code holds a COPY of this
+	// pointer (life_token()) and stops touching the factory once it reads
+	// false. The bool outlives the factory; `this` does not.
+	std::shared_ptr<bool> alive_flag = std::shared_ptr<bool>(new bool(true));
+	// NOTIFICATION_PREDELETE progress: user code inside the teardown (an
+	// attachment callback of a dying volley) that frees this factory again is
+	// refused with cancel_free() instead of deleting it twice.
+	enum PredeleteState : uint8_t {
+		PREDELETE_NONE,
+		PREDELETE_RUNNING,
+		PREDELETE_DONE,
+	};
+	PredeleteState predelete_state = PREDELETE_NONE;
+	bool refused_nested_free = false;
 
 	// Whether the factory is currently busy doing stuff and no other functions should be executed during this time
 	bool is_factory_busy = false;
@@ -154,417 +1061,371 @@ private:
 	// Whether bullets are currently paused and should NOT move. Always use this instead of set_processing/ set_physics_processing.
 	bool is_factory_processing_bullets = true;
 
+	// True while _physics_process iterates bullet vectors. Shrinking operations
+	// (free_*, reset) must not run then; they error out and suggest call_deferred.
+	// Spawning only appends, so it stays allowed.
+	bool is_iterating_bullets = false;
+
+	// Reusable per-frame iteration buffers (dense-index + the pointer that
+	// occupied that index when the snapshot was taken). Avoid 2-4 heap
+	// allocations every physics/render frame; only used on the main thread.
+	// The pointer half is load-bearing: see tick_volleys.
+
+	// One dense slot captured at the start of a frame's iteration: the index
+	// plus whatever object occupied it THEN. The index alone is not enough:
+	// a user calling free() from a collision handler triggers a swap-remove
+	// that moves the last live volley into the freed index, and that index is
+	// already in the snapshot - so the swapped-in volley would be simulated a
+	// second time this frame (double-advancing its age, lifetime and curve
+	// clock). Re-verifying the pointer makes that impossible.
+	// Entries are resolved by instance id, never by slot: a free() from a
+	// handler swap-removes the list, moving the last volley into the freed
+	// slot (possibly one the sweep already passed), so a slot-based sweep
+	// SKIPPED that volley for the frame. The id finds it wherever it moved;
+	// the per-volley sweep stamps keep it to one tick (VolleyIterationEntry).
+	std::vector<VolleyIterationEntry> iteration_scratch;
+	// (pointer, id) of every tracked volley, ids read NOW: a loop that runs
+	// user code (which may free any volley, or this factory) validates each
+	// entry through ObjectDB before touching it, never by reading the id
+	// from a pointer that may be freed.
+	std::vector<VolleyIterationEntry> snapshot_volley_entries() const;
+	std::vector<VolleyIterationEntry> timer_iteration_scratch;
+	GrazeDetector2D graze_default_detector{ 0 };
+	SoundMixer2D sound_mixer;
+	FlockSolver2D flock_solver;
+	int flock_armed_volleys = 0;
+	Ref<BulletFlock2D> default_flock; // get_default_flock (made on first use)
+	// Splitting: the recorded splits (swapped out by each flush, so splits
+	// recorded during a flush wait for the next sweep) and reused scratch.
+	std::vector<SplitRequest2D> pending_splits;
+	std::vector<SplitRequest2D> split_flush_scratch;
+	std::vector<Transform2D> split_pose_scratch;
+	std::vector<Color> split_color_scratch; // the parent's color per child (a colored parent)
+	std::vector<Vector2> split_direction_scratch;
+	std::vector<real_t> split_speed_scratch;
+	int split_max_children_per_sweep = 1024; // a mass split spreads over a few sweeps (~8 us per child volley)
+	int split_max_pending = 100000;
+	uint64_t split_dropped_total = 0;
+	bool split_full_warned = false; // one warning per overflow
+	uint64_t split_recorded_total = 0;
+	bool split_flush_running = false;
+	// The request the running flush is spawning (split_flush_scratch index).
+	size_t split_flush_next = 0;
+	// Bumped by every drop: a running flush stops spawning its batch.
+	uint64_t split_drop_epoch = 0;
+	int split_stats_flushed_last = 0;
+	int split_stats_children_last = 0;
+	int split_stats_carried_last = 0;
+	uint64_t split_stats_flushed_total = 0;
+	uint64_t split_stats_children_total = 0;
+	// The spawn data children use: `source` itself when it has no per-bullet
+	// arrays (the common case), else a copy without them (entry i of the
+	// parent's arrays means nothing to child i; children receive their
+	// parent's own values instead). Cached per source until it changes.
+	std::unordered_map<uint64_t, Ref<BulletVolleyData2D>> split_templates;
+	Ref<BulletVolleyData2D> split_child_template(const Ref<BulletVolleyData2D> &source);
+	void split_source_changed(uint64_t source_id);
+	// Spawns every pending split (bullet_factory2d_split.cpp). False when
+	// user code inside freed this factory.
+	bool flush_splits(const bool &alive);
+	// Drops every pending split (reset, free_active_bullets, teardown).
+	void drop_pending_splits();
+	// Scoped reset/free: drops the splits whose PARENTS were in this pool
+	// key's bucket (the rest of a running flush keeps spawning).
+	void drop_pending_splits_for_key(const PoolKey &key);
+	// A freed spawner's queued splits (pending, and the rest of a running
+	// flush) follow its orphaned_volleys policy: Hand To Factory re-owns
+	// them, Clear / Remove drop them, Keep Flying keeps them.
+	void orphan_pending_splits(uint64_t owner_spawner_id, int policy);
+	void drop_pending_splits_for(const PoolKey *key) {
+		if (key == nullptr) {
+			drop_pending_splits();
+		} else {
+			drop_pending_splits_for_key(*key);
+		}
+	}
+	// Emitter shots (same shape as the split queue above).
+	std::vector<EmitRequest2D> pending_emits;
+	std::vector<EmitRequest2D> emit_flush_scratch;
+	int emitter_max_shots_per_sweep = 0;
+	int emitter_max_pending = 100000;
+	bool emit_full_warned = false;
+	bool emit_flush_running = false;
+	size_t emit_flush_next = 0;
+	uint64_t emit_drop_epoch = 0;
+	uint64_t emit_recorded_total = 0;
+	uint64_t emit_dropped_total = 0;
+	uint64_t emit_fired_total = 0;
+	int emit_stats_fired_last = 0;
+	int emit_stats_carried_last = 0;
+	// Fires every pending shot (bullet_factory2d_emitter.cpp). False when
+	// user code inside freed this factory.
+	bool flush_emits(const bool &alive);
+	void drop_pending_emits();
+	void drop_pending_emits_for(const PoolKey *key);
+	// A freed spawner's queued shots follow its orphaned_volleys policy
+	// (Clear / Remove drop them; the others keep firing).
+	void orphan_pending_emits(uint64_t owner_spawner_id, int policy);
+	uint64_t stats_last_flock_usec = 0;
+	// Bullet time of the flock passes (BulletFlock2D.update_interval).
+	double flock_clock = 0.0;
+	// The flock pass over this sweep's snapshot (bullet_factory2d_flock.cpp).
+	void run_flock_pass(double delta);
+	double graze_clock = 0.0;
+	uint64_t user_code_epoch = 0;
+	// _process runs for the interpolation pass (processing + interpolation)
+	// only: the ONE place that decides.
+	void update_process_state();
+	// Advanced once per factory physics step (tick + timers + effects).
+	uint64_t sweep_counter = 0;
+	// The engine physics frame of the last sweep (first_tick_lead: was this
+	// frame swept already?).
+	uint64_t sweep_physics_frame = UINT64_MAX;
+	// Bumped whenever a volley is destroyed (manual free, tracking removal).
+	// A sweep whose epoch is unchanged knows every snapshot pointer is still
+	// live, so the common path pays no ObjectDB lookup at all.
+	uint64_t volley_free_epoch = 0;
+
+public:
+	uint64_t get_sweep_counter() const { return sweep_counter; }
+
+private:
+	// Pool reuse counters. Incremented only on spawn pop/allocate
+	// paths (never in the per-bullet tick), so zero hot-path cost.
+	// Mutable so const debug getters can report without breaking constness.
+	mutable uint64_t pool_hits = 0;
+	mutable uint64_t pool_misses = 0;
+
+	// FRAME STATS (get_frame_stats / custom Performance monitors). Written once
+	// per tick or once per event (spawn, drained collision record, expiry),
+	// never per bullet, so the cost is two get_ticks_usec() calls per physics
+	// tick plus a few integer adds. Public so volleys can bump the event
+	// counters without a call.
+public:
+	uint64_t stats_collision_records_total = 0;
+	uint64_t stats_expired_bullets_total = 0;
+	uint64_t stats_spawned_bullets_total = 0;
+
+private:
+	uint64_t stats_physics_ticks = 0;
+	uint64_t stats_last_physics_tick_usec = 0;
+	uint64_t stats_peak_physics_tick_usec = 0;
+	uint64_t stats_last_render_usec = 0;
+	int stats_tick_volleys = 0;
+	int stats_tick_bullets = 0;
+	int stats_last_tick_volleys = 0;
+	int stats_last_tick_bullets = 0;
+	// Editor Debugger -> Monitors integration (one factory owns the global
+	// monitor ids at a time; see register_monitors()).
+	bool register_performance_monitors = true;
+	bool owns_performance_monitors = false;
+	static uint64_t performance_monitors_owner_id;
+	// After this owner unregistered on tree exit / free: the first other
+	// factory in the tree that wants the monitors registers them.
+	void hand_monitors_to_another_factory();
+	void register_monitors();
+	void unregister_monitors();
+	Variant _monitor_active_bullets();
+	Variant _monitor_active_volleys();
+	Variant _monitor_pooled_volleys();
+	Variant _monitor_parked_volleys();
+	Variant _monitor_physics_tick_ms();
+	Variant _monitor_peak_physics_tick_ms();
+	Variant _monitor_render_ms();
+	Variant _monitor_active_effects();
+	Variant _monitor_active_attachments();
+	// Once-only _ready-missing warning (lazy init when _ready ran without super).
+	// The plugin's processing switches (the gate of its callbacks).
+	NativeCallbacks2D callbacks;
+	// Builds the containers, the debuggers and the monitors (once).
+	void native_ready();
+	// Moves all bullets / handles bullet behavior. Never inlined into
+	// _notification (measured: a sweep inlined there ran ~14% slower).
+	_NO_INLINE_ void native_physics_process(double delta);
+	// The interpolation pass.
+	_NO_INLINE_ void native_process(double delta);
+
+	// Errors (once per call) when a structural operation runs while mutation
+	// is unsafe: mid-iteration, or inside any physics frame (server flush
+	// locks apply to RIDs the operation would free). E.g. reset()/free_*()/
+	// populate_*() called from inside a collision or lifetime handler
+	// (area_entered, body_entered,
+	// life_time_over, ...) or from a native flush callback.
+	// Use the *_deferred() wrappers: they run on the next idle frame (a plain
+	// call_deferred() from a physics callback still flushes inside physics).
+	// Game logic (spawning same-shape volleys, homing, teleporting,
+	// attachments, custom data) is always safe to touch directly.
+	// Returns true when the caller must abort.
+	bool reject_when_iterating(const char *caller_name) const {
+		if (is_structural_mutation_unsafe()) {
+			UtilityFunctions::push_error(String("BulletFactory2D::") + caller_name + " cannot run inside a physics frame or while bullets are being processed (e.g. inside area_entered/body_entered/life_time_over handlers). Use " + caller_name + "_deferred() instead: it runs on the next idle frame (a plain call_deferred() still runs inside the physics frame).");
+			return true;
+		}
+		return false;
+	}
+
 	bool get_is_factory_processing_bullets() const;
 	void set_is_factory_processing_bullets(bool is_processing_enabled);
 
-	void reset_factory_state(int amount_bullets = 0);
+	void reset_factory_state(const PoolKey *key = nullptr);
 
-	// BULLETS RELATED
+	// Single validation pipeline for every spawn entry point. Runs all
+	// gates BEFORE any pool pop or memnew, so a rejected request can never
+	// leave a half-set-up multimesh behind. Returns false (with an error
+	// already reported) when the caller must abort. override_count >= 0 marks
+	// a native span caller whose transforms were validated already.
+	bool validate_spawn_request(const char *caller_name, const Ref<BulletVolleyData2D> &spawn_data, const Vector2 &inherited_velocity_offset, int override_count = -1);
 
-	// DIRECTIONAL BULLETS RELATED
-
-	// Keeps track of all directional bullets that were spawned
-	std::vector<DirectionalBullets2D *> all_directional_bullets;
-
-	// Contains all DirectionalBullets2D in the scene tree
-	Node *directional_bullets_container = nullptr;
-
-	// Holds all disabled DirectionalBullets2D
-	MultiMeshObjectPool directional_bullets_pool;
-
+	// VOLLEYS (every spawned BulletVolley2D, active or pooled)
 	//
+	// Ownership rule: all_volleys is the source of truth. volley_pool holds a
+	// subset (disabled volleys only), volley_set holds the indexes of the
+	// ACTIVE volleys (the ones the tick walks). Every volley stores its own
+	// index in all_volleys as sparse_set_id; the helpers below keep the three
+	// in sync.
 
-	// BLOCK BULLETS RELATED
+	std::vector<BulletVolley2D *> all_volleys;
 
-	std::vector<BlockBullets2D *> all_block_bullets;
+	// Indexes (into all_volleys) of the active volleys.
+	DynamicSparseSet volley_set;
 
-	// Contains all BlockBullets2D in the scene tree
-	Node *block_bullets_container = nullptr;
+	// Disabled volleys waiting for reuse, bucketed by PoolKey (amount + shape).
+	VolleyPool volley_pool;
 
-	// Holds all disabled BlockBullets2D
-	MultiMeshObjectPool block_bullets_pool;
-
-	//
-
-	//
+	// Parent node of every volley in the scene tree.
+	OwnedNode2D<Node> volley_container;
+	// Lasers: every tracked laser (firing and pooled), the pool by beam
+	// count, the sweep snapshot, and a bump per freed laser.
+	OwnedNode2D<Node> laser_container;
+	std::vector<LaserVolley2D *> all_lasers;
+	std::unordered_map<int, std::vector<LaserVolley2D *>> laser_pool;
+	std::vector<std::pair<LaserVolley2D *, uint64_t>> laser_iteration_scratch;
+	uint64_t laser_free_epoch = 0;
+	void add_laser_container();
+	bool tick_lasers(double delta, const bool &alive);
+	// The sweep goes on after user code: this factory still exists AND was
+	// not queued for deletion (a free refused under its emit guard queues it
+	// and Godot already took it out of the tree: nothing may spawn anymore).
+	bool sweep_may_continue(const bool &alive) const { return alive && !is_queued_for_deletion(); }
+	// A handler paused the factory (a hit-stop): nothing after it runs in this
+	// sweep. What it queued (splits, emitter shots) waits for the resume.
+	bool sweep_paused() const { return !is_factory_processing_bullets; }
+	// volley_spawned: every spawn path (script, spawner shot, split child,
+	// pickup) only RECORDS the started life (no user code inside a spawn);
+	// the next sweep announces them before any volley moves, fully armed.
+	// Recorded only while something is connected.
+	struct SpawnAnnouncement2D {
+		uint64_t volley_id = 0;
+		uint64_t spawner_id = 0;
+		int life_id = 0;
+	};
+	std::vector<SpawnAnnouncement2D> pending_spawn_announcements;
+	void note_volley_spawned(const BulletVolley2D *volley, uint64_t spawner_id);
+	// False when a handler freed/queued this factory or paused it.
+	bool announce_spawned_volleys(const bool &alive);
+	void redraw_lasers();
+	void free_all_lasers();
+	void detach_lasers_for_teardown();
+	String debug_check_lasers() const;
 
 	// DEBUGGER RELATED
 
-	// Determines whether both debuggers should be enabled
+	// Whether the collision-shape debugger draws.
 	bool is_debugger_enabled_cached_before_ready = false;
 	bool get_is_debugger_enabled() const;
 	void set_is_debugger_enabled(bool new_is_enabled);
 
-	//
+	// Draws the collision shapes of every volley when enabled.
+	OwnedNode2D<BulletVolleyDebugger2D> volley_debugger;
+	// Pushes the cached debugger settings (always current) to a debugger.
+	void apply_debugger_settings(BulletVolleyDebugger2D &debugger) const;
 
-	// DIRECTIONAL BULLETS DEBUGGER RELATED
+public:
+	// Recreates the helper children (volley and attachment containers, the
+	// debugger) a script freed; the debugger follows a new volley container.
+	// No-op before ready and during teardown. Cheap when nothing is lost
+	// (three ObjectDB lookups).
+	void heal_owned_children();
 
-	// Debugs the collision shapes of all DirectionalBullets2D when enabled
-	MultiMeshBulletsDebugger2D *directional_bullets_debugger = nullptr;
+private:
+	// The color of the debug collision shapes.
+	Color debugger_color_cached_before_ready = Color(0, 0, 1, 0.8);
+	Color get_debugger_color() const;
+	void set_debugger_color(const Color &new_color);
 
-	// The color for the collision shapes of all DirectionalBullets2D
-	Color directional_bullets_debugger_color_cached_before_ready = Color(0, 0, 2, 0.8);
-	Color get_directional_bullets_debugger_color() const;
-	void set_directional_bullets_debugger_color(const Color &new_color);
-
-	//
-
-	// BLOCK BULLETS DEBUGGER RELATED
-
-	// Debugs the collision shapes of all BlockBullets2D when enabled
-	MultiMeshBulletsDebugger2D *block_bullets_debugger = nullptr;
-
-	// The color for the collision shapes of all BlockBullets2D
-	Color block_bullets_debugger_color_cached_before_ready = Color(0, 0, 2, 0.8);
-	Color get_block_bullets_debugger_color() const;
-	void set_block_bullets_debugger_color(const Color &new_color);
-
-	//
-
-	// PHYSICS INTERPOLATION RELATED
-
-	// Cache the setting before the factory is ready in the scene tree. / Whenever you see something similar, just know I am doing this to avoid bugs with the editor - keeps state consistent
-	bool use_physics_interpolation_cached_before_ready = false;
-
-	bool get_use_physics_interpolation() const;
-	void set_use_physics_interpolation_runtime(bool new_use_physics_interpolation);
-	void set_use_physics_interpolation_editor(bool new_use_physics_interpolation);
-
-	//
+	// Budget caches before ready (same pattern as debugger enabled flag).
+	int debugger_max_providers_cached_before_ready = 0;
+	bool debugger_draw_inactive_cached_before_ready = true;
 
 	// FACTORY CHILDREN
 
-	// Adds containers as children of the factory, meant to hold bullets
+	// Adds the container that holds every volley as a child of the factory
 	void add_bullet_containers();
 
 	// Adds a single container as a child of the factory, where bullet attachments are always spawned
 	void add_bullet_attachment_container();
 
-	// Adds the debuggers as children of the factory
+	// Adds the collision-shape debugger as a child of the factory
 	void add_debuggers();
 
-	//
-
-	// TEMPLATES
-
-	// Populates a bullets pool with disabled bullet instances. It's mandatory that the TBullet type inherits from MultiMeshBullets2D
-	template <typename TBullet>
-	void populate_bullets_pool_helper(const Ref<MultiMeshBulletsData2D> &spawn_data, std::vector<TBullet *> &bullets_vec, MultiMeshObjectPool &bullets_object_pool, Node *bullets_container, int amount_instances, int amount_bullets_per_instance, const Vector2 &new_inherited_velocity_offset = Vector2(0, 0)) {
-		bullets_vec.reserve(bullets_vec.size() + amount_instances);
-		for (int i = 0; i < amount_instances; ++i) {
-			TBullet *bullets = memnew(TBullet);
-
-			// Generate new id according to how many ids there are in the sparse set
-			int sparse_set_id = bullets_vec.size();
-
-			bullets->spawn(*spawn_data.ptr(), &bullets_object_pool, this, bullets_container, new_inherited_velocity_offset, sparse_set_id, true);
-			bullets_vec.emplace_back(bullets);
-		}
-	}
-	// Shrinks a vector and keeps capacity.
-	// We don't memdelete here
-	template <typename TBullet, typename Predicate>
-	void shrink_vector(std::vector<TBullet *> &bullets_vec, Predicate func) {
-		auto new_end = std::remove_if(bullets_vec.begin(), bullets_vec.end(), func);
-		bullets_vec.erase(new_end, bullets_vec.end());
-	}
-
-	template <typename TBullet>
-	void free_bullets_pool_helper(std::vector<TBullet *> &bullets_vec, DynamicSparseSet &sparse_set, MultiMeshObjectPool &bullets_pool, int amount_bullets_per_instance) {
-		// The criteria for what we are removing from the vector
-		auto removal_predicate = [amount_bullets_per_instance](const TBullet *multi) {
-			return multi != nullptr && !multi->is_active && (amount_bullets_per_instance <= 0 || multi->get_amount_bullets() == amount_bullets_per_instance);
-			// We look only for disabled bullets (those that are in the pool)
-			// If amount_bullets_per_instance is negative, we remove ALL disabled bullets
-			// Otherwise we only remove disabled bullets that have a specific amount of bullets
-		};
-
-		// We erase from the vector so we don't have any dangling pointers
-		shrink_vector(bullets_vec, removal_predicate);
-
-		// Resize to the new vector size and clear stale mapping data
-		sparse_set.resize((int)bullets_vec.size());
-		sparse_set.clear();
-
-		// Now since we've shrunk the vector, we need to re-assign sparse set ids to the remaining multimeshes (or we will get crashes)
-		for (int i = 0; i < (int)bullets_vec.size(); ++i) {
-			bullets_vec[i]->sparse_set_id = i;
-
-			// If the multi was marked as active, it belongs in the dense list, so active it
-			if (bullets_vec[i]->is_active) {
-				sparse_set.activate_data(i);
-			}
-		}
-
-		// Tell the pool to actually memdelete the objects
-		if (amount_bullets_per_instance > 0) {
-			bullets_pool.free_specific_bullets(amount_bullets_per_instance);
-		} else {
-			bullets_pool.free_all_bullets();
-		}
-	}
-
-	// Frees all multimeshes of a TBullet type and clears dangling pointers. If amount_bullets is 0 it clears ALL multimeshes, otherwise clears all multimeshes but only those with specific N amount bullets
-	template <typename TBullet>
-	void free_all_bullets_helper(std::vector<TBullet *> &bullets_vec, DynamicSparseSet &sparse_set, MultiMeshObjectPool &bullets_pool, int amount_bullets = 0) {
-		if (amount_bullets <= 0) {
-			for (TBullet *bullet_multi : bullets_vec) {
-				if (bullet_multi == nullptr) {
-					continue;
-				}
-
-				bullet_multi->force_delete();
-			}
-
-			bullets_pool.clear();
-			bullets_vec.clear();
-			sparse_set.clear();
-		} else {
-			std::vector<TBullet *> surviving_bullets;
-			surviving_bullets.reserve(bullets_vec.size());
-
-			// Wipe the sparse set because we are re-indexing everything
-			sparse_set.clear();
-
-			for (TBullet *bullet_multi : bullets_vec) {
-				if (bullet_multi == nullptr) {
-					continue;
-				}
-
-				if (bullet_multi->get_amount_bullets() == amount_bullets) {
-					// If it's active, it's NOT in the pool, so we must delete it here.
-					if (bullet_multi->is_active) {
-						bullet_multi->force_delete();
-					}
-					// If it's NOT active, it IS in the pool.
-					// We leave it alone so free_specific_bullets can handle it later.
-				} else {
-					// Since we clear specific bullets we need to keep our vector of multimeshes correct as well as the dynamic sparse set,
-					// which means new sparse set ids ( we are generating a vector that holds only VALID instances, the others are freed so the mappings will be off otherwise)
-
-					// We give it a NEW ID based on its position in the NEW vector.
-					int new_id = static_cast<int>(surviving_bullets.size());
-					bullet_multi->sparse_set_id = new_id; // Ofc we update it in the multimesh too
-
-					surviving_bullets.push_back(bullet_multi);
-
-					// In case the multimesh was marked as active, it belongs in the dense list, so active it
-					if (bullet_multi->is_active) {
-						sparse_set.activate_data(new_id);
-					}
-				}
-			}
-
-			// FREES the actual multimesh instances, and the pool remains valid
-			bullets_pool.free_specific_bullets(amount_bullets);
-
-			// Swap the vectors. Memory for the old vector is freed.
-			bullets_vec.swap(surviving_bullets);
-		}
-	}
-
-	// Frees all ACTIVE bullets of a TBullet type and clears dangling pointers
-	template <typename TBullet>
-	void free_only_active_bullets_helper(std::vector<TBullet *> &bullets_vec, DynamicSparseSet &sparse_set, int amount_bullets = 0) {
-		std::vector<TBullet *> new_bullets_vec;
-		new_bullets_vec.reserve(bullets_vec.size());
-
-		sparse_set.clear();
-
-		int sparse_set_id = 0;
-
-		if (amount_bullets <= 0) {
-			for (TBullet *bullet_multi : bullets_vec) {
-				if (bullet_multi == nullptr) {
-					continue;
-				}
-
-				if (bullet_multi->is_active) {
-					bullet_multi->force_delete();
-				} else {
-					new_bullets_vec.push_back(bullet_multi);
-					bullet_multi->sparse_set_id = sparse_set_id;
-
-					++sparse_set_id;
-				}
-			}
-		} else {
-			for (TBullet *bullet_multi : bullets_vec) {
-				if (bullet_multi == nullptr) {
-					continue;
-				}
-
-				if (bullet_multi->is_active && bullet_multi->get_amount_bullets() == amount_bullets) {
-					bullet_multi->force_delete();
-				} else {
-					new_bullets_vec.push_back(bullet_multi);
-					bullet_multi->sparse_set_id = sparse_set_id;
-
-					if (bullet_multi->is_active) {
-						sparse_set.activate_data(sparse_set_id);
-					}
-
-					++sparse_set_id;
-				}
-			}
-		}
-
-		bullets_vec.swap(new_bullets_vec);
-	}
-
-	// Frees all DISABLED bullets of a TBullet type and clears dangling pointers
-	template <typename TBullet>
-	void free_only_disabled_bullets_helper(std::vector<TBullet *> &bullets_vec, DynamicSparseSet &sparse_set, MultiMeshObjectPool &bullets_pool, int amount_bullets = 0) {
-		if (amount_bullets <= 0) {
-			std::vector<TBullet *> surviving_bullets;
-			surviving_bullets.reserve(bullets_vec.size());
-
-			sparse_set.clear();
-
-			for (TBullet *bullet_multi : bullets_vec) {
-				if (bullet_multi == nullptr) {
-					continue;
-				}
-
-				if (!bullet_multi->is_active) {
-					bullet_multi->force_delete();
-				} else {
-					int new_id = static_cast<int>(surviving_bullets.size());
-					bullet_multi->sparse_set_id = new_id;
-
-					surviving_bullets.push_back(bullet_multi);
-					sparse_set.activate_data(new_id);
-				}
-			}
-
-			bullets_pool.clear();
-			bullets_vec.swap(surviving_bullets);
-
-		} else {
-			std::vector<TBullet *> surviving_bullets;
-			surviving_bullets.reserve(bullets_vec.size());
-
-			sparse_set.clear();
-
-			for (TBullet *bullet_multi : bullets_vec) {
-				if (bullet_multi == nullptr) {
-					continue;
-				}
-
-				if (bullet_multi->get_amount_bullets() == amount_bullets && !bullet_multi->is_active) {
-					// free_specific_bullets will handle freeing these bullets
-				} else {
-					int new_id = static_cast<int>(surviving_bullets.size());
-					bullet_multi->sparse_set_id = new_id;
-
-					surviving_bullets.push_back(bullet_multi);
-
-					if (bullet_multi->is_active) {
-						sparse_set.activate_data(new_id);
-					}
-				}
-			}
-
-			bullets_pool.free_specific_bullets(amount_bullets);
-
-			bullets_vec.swap(surviving_bullets);
-		}
-	}
-
-	template <typename T>
-	void remove_multimesh_instance_from_vec_and_sparse_set(std::vector<T *> &vec, DynamicSparseSet &sparse_set, T *target) {
-		int id_to_remove = target->sparse_set_id;
-		int last_idx = static_cast<int>(vec.size()) - 1;
-
-		// If it's not the last one we swap
-		if (id_to_remove < last_idx) {
-			T *last_bullet = vec[last_idx];
-
-			// Move the last bullet into the hole
-			vec[id_to_remove] = last_bullet;
-
-			// Update the moved bullet's internal tracking ID
-			last_bullet->sparse_set_id = id_to_remove;
-
-			// If the moved bullet was active then sync the sparse set bitmask
-			if (last_bullet->is_active) {
-				sparse_set.activate_data(id_to_remove);
-			}
-		}
-
-		// Remove the last slot
-		vec.pop_back();
-
-		// Ensure the sparse set knows this index is now dead
-		sparse_set.disable_data(last_idx);
-	}
-
-	// Spawns bullets by either creating a brand new TBullet or retrieving one from the object pool
-	template <typename TBullet, typename TBulletSpawnData>
-	TBullet *spawn_bullets_helper(std::vector<TBullet *> &bullets_vec, DynamicSparseSet &sparse_set, MultiMeshObjectPool &bullets_pool, Node *bullets_container, const Ref<TBulletSpawnData> &spawn_data, const Vector2 &new_inherited_velocity_offset = Vector2(0, 0)) {
-		int key = spawn_data->transforms.size();
-
-		// Try to get a TBullet from the pool first
-		TBullet *bullets = static_cast<TBullet *>(bullets_pool.pop(key));
-		if (bullets != nullptr) {
-			bullets->enable_multimesh(*spawn_data.ptr(), new_inherited_velocity_offset);
-			sparse_set.activate_data(bullets->sparse_set_id);
-			return bullets;
-		}
-
-		// Generate new id according to how many ids there are in the sparse set
-		int sparse_set_id = bullets_vec.size();
-
-		// If there was no TBullet in the pool, create a brand new one and spawn it
-		bullets = memnew(TBullet);
-		bullets->spawn(*spawn_data.ptr(), &bullets_pool, this, bullets_container, new_inherited_velocity_offset, sparse_set_id, false);
-		bullets_vec.emplace_back(bullets);
-
-		sparse_set.activate_data(sparse_set_id);
-
-		return bullets;
-	}
-
-	// Handles movement and other behaviors of the bullets.
-	template <typename TBullet>
-	void handle_bullet_behavior(const std::vector<TBullet *> &bullets_vec, const DynamicSparseSet &bullets_set, double delta) {
-		const auto &all_active_multis = bullets_set.get_active_indexes();
-
-		for (auto index : all_active_multis) {
-			auto &multi = bullets_vec[index];
-
-			multi->move_bullets(delta);
-			multi->change_texture_periodically(delta);
-			multi->reduce_lifetime(delta);
-		}
-	}
-
-	// Handles rendering with physics interpolation
-	template <typename TBullet>
-	void handle_bullet_rendering_interpolation(std::vector<TBullet *> &bullets_vec, const DynamicSparseSet &bullets_set) {
-		const auto &all_active_multis = bullets_set.get_active_indexes();
-
-		for (auto index : all_active_multis) {
-			auto &multi = bullets_vec[index];
-			multi->interpolate_bullet_visuals();
-		}
-	}
-
-	// Exposed helper methods
-
-	// Generates a grid of 2D transforms positioned relative to marker_transform
-	static TypedArray<Transform2D> helper_generate_transforms_grid(
-			int transforms_amount,
-			Transform2D marker_transform,
-			int rows_per_column = 10,
-			Alignment alignment = Alignment::CENTER_LEFT,
-			real_t column_offset = 150.0,
-			real_t row_offset = 150.0,
-			bool rotate_grid_with_marker = true,
-			bool random_local_rotation = false);
+	// VOLLEY BOOKKEEPING (bodies in bullet_factory2d.cpp)
+
+	// Pre-creates instance_count disabled volleys in the exact `key` bucket.
+	// Callers validate key against spawn_data before invoking.
+	void populate_pool_bucket(const PoolKey &key, const Ref<BulletVolleyData2D> &spawn_data, int instance_count);
+
+	// Unlinks one volley from the pool (no-op when absent: pooling off or
+	// never pooled) and frees it exactly once. force_delete() sets
+	// marked_for_internal_deletion so _notification never re-enters
+	// handle_manual_user_deletion while is_factory_busy.
+	void unlink_and_delete_volley(BulletVolley2D *volley);
+
+	// Re-indexes survivors after a removal: sparse ids must equal vec indexes
+	// or the factory drives the wrong volley (crash). Actives rejoin the
+	// dense list. Never shrinks volley_set (it auto-grows; shrinking only
+	// causes realloc churn and fragile ids).
+	void reindex_volleys();
+
+	// Frees disabled volleys (null key = every bucket) and drops the pool's
+	// leftovers. Backs free_bullets_pool().
+	void free_pooled_volleys(const PoolKey *key);
+
+	// Frees every volley (null key) or every volley of one bucket, active or
+	// not, and clears dangling pointers. Backs reset().
+	void free_all_volleys(const PoolKey *key = nullptr);
+
+	// Frees ACTIVE volleys only (null key = every bucket). The pool is
+	// untouched: active volleys are never pooled. Backs free_active_bullets().
+	void free_active_volleys(const PoolKey *key = nullptr);
+
+	// Frees DISABLED volleys only (null key = every bucket). Backs
+	// free_disabled_bullets().
+	void free_disabled_volleys(const PoolKey *key = nullptr);
+
+	// Swap-removes one volley from all_volleys + volley_set. No pool touch:
+	// callers must call volley_pool.try_remove_instance() FIRST with the
+	// exact PoolKey, or the pool keeps a dangling pointer.
+	void remove_volley_from_tracking(BulletVolley2D *target);
+
+	// Spawns one volley: pool pop (same PoolKey) or a brand new instance.
+	// spawner_id is stamped inside spawn()/enable_volley() BEFORE any
+	// physics/tree activation (configure-then-attach): 0 = factory-owned.
+	// transforms_ptr/transforms_count: native span path (no Variant boxing).
+	// colors_ptr: transforms_count colors (span path only; see spawn_volley_span).
+	BulletVolley2D *spawn_volley_internal(const Ref<BulletVolleyData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset, uint64_t spawner_id = 0, const Transform2D *transforms_ptr = nullptr, int transforms_count = -1, const Color *colors_ptr = nullptr);
+
+	// Copies the active volley indexes AND their occupants into
+	// iteration_scratch, so the sweeps below survive re-entrant frees.
+	void snapshot_active_volleys();
+
+	// Physics tick of every active volley: movement, animation, lifetime.
+	// False when user code inside the sweep freed this factory (`alive` is
+	// a copy of life_token(): `this` must not be touched any more).
+	bool tick_volleys(double delta, const bool &alive);
+
+	// Render-frame interpolation pass of every active volley.
+	void interpolate_volleys();
 };
 } //namespace BlastBullets2D
 
-// Need this in order to expose the enum to Godot Engine
-VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::BulletType);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::Alignment);
+BLAST_VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::PhysicsInterpolation);

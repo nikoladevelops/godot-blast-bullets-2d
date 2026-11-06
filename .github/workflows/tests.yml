@@ -1,0 +1,151 @@
+name: Tests
+
+# Every push and pull request: lint, format, portability, the full suite with
+# its leak gate, the harness self-test and the editor smoke run on the debug
+# library, and the full suite again on the release (LTO) library an exported
+# game ships. Weekly (or on demand): the sanitizer runs and the fuzz soaks.
+
+on:
+  push:
+    branches: [main, v4]
+  pull_request:
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+    inputs:
+      deep:
+        description: "Also run the sanitizer and fuzz soak jobs"
+        type: boolean
+        default: false
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GODOT_VERSION: "4.7.2"
+  GODOTPP_NONINTERACTIVE: "1"
+  CLANG_FORMAT_VERSION: "23.1.3"
+
+jobs:
+  static:
+    name: Lint and format
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install "clang-format==${CLANG_FORMAT_VERSION}"
+      - name: Test lint
+        run: python3 tools/lint_tests.py
+      - name: Format check
+        run: python3 tools/format_code.py --check
+
+  suites:
+    name: Suites (${{ matrix.build }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        build: [debug, release]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install scons
+      - name: Restore the SCons cache
+        uses: actions/cache@v4
+        with:
+          path: .scons-cache
+          key: scons-${{ matrix.build }}-${{ hashFiles('godot-cpp/**/*.hpp', 'src/**') }}
+          restore-keys: scons-${{ matrix.build }}-
+      - name: Install Godot ${{ env.GODOT_VERSION }}
+        run: bash .github/scripts/install_godot.sh
+      - name: Build the debug library
+        env:
+          SCONS_CACHE: ${{ github.workspace }}/.scons-cache
+        run: python3 setup.py build-debug
+      - name: Build the release library
+        if: matrix.build == 'release'
+        env:
+          SCONS_CACHE: ${{ github.workspace }}/.scons-cache
+        run: |
+          cp compile_commands.json compile_commands.debug.json
+          python3 setup.py build-release
+          mv compile_commands.debug.json compile_commands.json
+      - name: Install the plugin into the test project
+        run: bash .github/scripts/install_plugin.sh
+      - name: "No GNU unique symbols (they pin the library: Orphan StringName leaks)"
+        run: |
+          bad=0
+          for lib in test_project/addons/blastbullets2d/bin/linux/*.so; do
+            syms=$(readelf -W --dyn-syms "$lib" | grep -E " UNIQUE |<OS specific>: 10" | awk '{print $NF}' | c++filt)
+            if [ -n "$syms" ]; then echo "::error::$lib has GNU unique symbols:"; echo "$syms"; bad=1; fi
+          done
+          exit $bad
+      - name: Portability (MSVC / Clang only failures)
+        if: matrix.build == 'debug'
+        run: python3 tools/check_portability.py
+      - name: Harness self-test
+        if: matrix.build == 'debug'
+        run: python3 tools/run_tests.py --self-test
+      - name: Full suite (debug library)
+        if: matrix.build == 'debug'
+        run: python3 tools/run_tests.py --report
+      - name: Full suite (release library)
+        if: matrix.build == 'release'
+        run: python3 tools/run_release_tests.py --no-build --report
+      - name: Editor smoke
+        if: matrix.build == 'debug'
+        run: python3 tools/run_editor_smoke.py
+      - name: Upload the results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.build }}
+          path: |
+            test_project/test_results/summary.json
+            test_project/test_results/**/*.xml
+          if-no-files-found: ignore
+
+  deep:
+    name: Deep (${{ matrix.run }})
+    if: github.event_name == 'schedule' || inputs.deep
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        run: [address, undefined, soak]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install scons
+      - name: Install Godot ${{ env.GODOT_VERSION }}
+        run: bash .github/scripts/install_godot.sh
+      - name: Build the debug library
+        run: python3 setup.py build-debug
+      - name: Install the plugin into the test project
+        run: bash .github/scripts/install_plugin.sh
+      - name: Sanitizer run
+        if: matrix.run != 'soak'
+        run: python3 tools/run_sanitizer_tests.py --sanitizer ${{ matrix.run }}
+      - name: Chaos fuzz soak (200 seeds)
+        if: matrix.run == 'soak'
+        env:
+          CHAOS_SEEDS: "200"
+        run: python3 tools/run_tests.py --suite test_chaos_fuzz --timeout 7200
+      - name: Feature mix soak (30 seeds)
+        if: matrix.run == 'soak'
+        env:
+          MIX_SEEDS: "30"
+        run: python3 tools/run_tests.py --suite test_feature_mix_cover --timeout 7200

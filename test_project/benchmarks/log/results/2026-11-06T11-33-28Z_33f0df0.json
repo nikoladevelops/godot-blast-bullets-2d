@@ -1,0 +1,63 @@
+{
+  "timestamp": "2026-11-06T11-33-28Z",
+  "commit": "33f0df0",
+  "dirty": false,
+  "repeat": 5,
+  "machine": {
+    "cpu": "AMD Ryzen 7 8840HS w/ Radeon 780M Graphics",
+    "cores": 16,
+    "os": "Linux-7.3.1-1-cachyos-x86_64-with-glibc2.44",
+    "python": "3.14.9"
+  },
+  "scenarios": {
+    "spawner_warm_shot_5k": {
+      "active_bullets_mean": 90000.0,
+      "collision_records": 0,
+      "description": "5000-bullet heart spawner, shoot_once every frame, warm pool",
+      "engine_ms": {
+        "max": 20.392,
+        "mean": 13.25388,
+        "p50": 12.9,
+        "p95": 17.383,
+        "p99": 19.344
+      },
+      "expired_bullets": 1000000,
+      "extra": {},
+      "factory_tick_ms": {
+        "max": 5.533,
+        "mean": 3.8222,
+        "p50": 3.68,
+        "p95": 4.64,
+        "p99": 5.295
+      },
+      "frame_ms": {
+        "max": 21.73,
+        "mean": 14.22205,
+        "p50": 13.863,
+        "p95": 18.348,
+        "p99": 20.497
+      },
+      "gate_p95": true,
+      "measure_frames": 200,
+      "memory_static_growth_mb": 33.5161323547363,
+      "memory_static_peak_mb": 161.735708236694,
+      "nodes_end": 27.0,
+      "objects_end": 1608.0,
+      "objects_growth": 0,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 221,
+      "pool_misses": 19,
+      "spawned_bullets": 1000000,
+      "step_ms": {
+        "max": 1.378,
+        "mean": 0.98505,
+        "p50": 0.928,
+        "p95": 1.223,
+        "p99": 1.336
+      },
+      "warmup_frames": 40
+    }
+  },
+  "godot": "4.7.2-stable (arch_linux)",
+  "debug_build": true
+}

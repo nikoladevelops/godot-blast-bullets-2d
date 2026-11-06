@@ -1,0 +1,66 @@
+{
+  "timestamp": "2026-10-02T17-04-56Z",
+  "commit": "f610273",
+  "dirty": true,
+  "repeat": 3,
+  "machine": {
+    "cpu": "AMD Ryzen 7 8840HS w/ Radeon 780M Graphics",
+    "cores": 16,
+    "os": "Linux-7.2.8-2-cachyos-x86_64-with-glibc2.44",
+    "python": "3.14.7"
+  },
+  "scenarios": {
+    "spawner_path_move_1500": {
+      "active_bullets_mean": 17780.0,
+      "collision_records": 0,
+      "description": "1500-bullet star spawner moving along a Path2D, preview on, firing 8/s",
+      "engine_ms": {
+        "max": 3.866,
+        "mean": 1.03014333333333,
+        "p50": 0.867,
+        "p95": 1.919,
+        "p99": 3.501
+      },
+      "expired_bullets": 54000,
+      "extra": {
+        "pattern_cache_hits": 47,
+        "pattern_cache_misses": 2,
+        "preview_rebuilds": 1
+      },
+      "factory_tick_ms": {
+        "max": 1.083,
+        "mean": 0.527023333333333,
+        "p50": 0.492,
+        "p95": 0.794,
+        "p99": 0.849
+      },
+      "frame_ms": {
+        "max": 3.867,
+        "mean": 1.03042666666667,
+        "p50": 0.867,
+        "p95": 1.92,
+        "p99": 3.501
+      },
+      "measure_frames": 300,
+      "memory_static_growth_mb": 3.54119110107422,
+      "memory_static_peak_mb": 37.5777053833008,
+      "nodes_end": 27.0,
+      "objects_end": 1587.0,
+      "objects_growth": 15,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 35,
+      "pool_misses": 13,
+      "spawned_bullets": 60000,
+      "step_ms": {
+        "max": 0.004,
+        "mean": 0.000266666666666667,
+        "p50": 0.0,
+        "p95": 0.001,
+        "p99": 0.001
+      },
+      "warmup_frames": 60
+    }
+  },
+  "godot": "4.7.2-stable (arch_linux)",
+  "debug_build": true
+}

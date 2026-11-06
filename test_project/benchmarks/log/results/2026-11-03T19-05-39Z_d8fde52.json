@@ -1,0 +1,63 @@
+{
+  "timestamp": "2026-11-03T19-05-39Z",
+  "commit": "d8fde52",
+  "dirty": false,
+  "repeat": 5,
+  "machine": {
+    "cpu": "AMD Ryzen 7 8840HS w/ Radeon 780M Graphics",
+    "cores": 16,
+    "os": "Linux-7.3.1-1-cachyos-x86_64-with-glibc2.44",
+    "python": "3.14.9"
+  },
+  "scenarios": {
+    "split_storm": {
+      "active_bullets_mean": 1675.0,
+      "collision_records": 0,
+      "description": "500 parents -> 2000 children -> 4000 grandchildren (two-stage split)",
+      "engine_ms": {
+        "max": 21.162,
+        "mean": 0.678572222222222,
+        "p50": 0.221,
+        "p95": 1.786,
+        "p99": 8.314
+      },
+      "expired_bullets": 19500,
+      "extra": {},
+      "factory_tick_ms": {
+        "max": 19.35,
+        "mean": 0.571205555555556,
+        "p50": 0.159,
+        "p95": 1.482,
+        "p99": 7.436
+      },
+      "frame_ms": {
+        "max": 21.162,
+        "mean": 0.680977777777778,
+        "p50": 0.222,
+        "p95": 1.789,
+        "p99": 8.315
+      },
+      "gate_p95": false,
+      "measure_frames": 360,
+      "memory_static_growth_mb": 0.136325836181641,
+      "memory_static_peak_mb": 63.1200590133667,
+      "nodes_end": 2509.0,
+      "objects_end": 9063.0,
+      "objects_growth": 0,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 7508,
+      "pool_misses": 2502,
+      "spawned_bullets": 19500,
+      "step_ms": {
+        "max": 0.26,
+        "mean": 0.00240555555555556,
+        "p50": 0.001,
+        "p95": 0.002,
+        "p99": 0.007
+      },
+      "warmup_frames": 130
+    }
+  },
+  "godot": "4.7.2-stable (arch_linux)",
+  "debug_build": true
+}

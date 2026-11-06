@@ -1,0 +1,178 @@
+class_name BlastBenchmark
+extends Node2D
+## Base class for headless benchmark scenarios (tools/run_benchmarks.py).
+##
+## Lifecycle (driven by bench_main.gd):
+##   1. a fresh BulletFactory2D is added as `factory`;
+##   2. `await setup()` builds the scenario (spawners, targets, walls...);
+##   3. `warmup_frames` frames run (pools fill, caches warm), then the
+##      factory's cumulative stats are reset;
+##   4. `measure_frames` frames run; per frame we time (pure CPU: with
+##      --fixed-fps the loop never sleeps):
+##        step_ms   = the scenario's step() (its spawn/clear calls),
+##        engine_ms = the rest of the frame (physics server step, factory
+##                    tick, collision drain, rendering),
+##        frame_ms  = step_ms + engine_ms,
+##      plus the factory's own physics tick and memory/object counts;
+##   5. results() returns percentiles + `extra` (scenario-specific numbers).
+## `step(frame)` runs once per frame. Build every spawn-data resource in
+## setup() and only CALL the plugin in step(): GDScript array building inside
+## step() would be billed to the plugin.
+
+const H := preload("res://tests/common/blast_test_helpers.gd")
+
+var factory: BulletFactory2D
+var warmup_frames := 60
+var measure_frames := 300
+## False for a scenario that spikes on purpose every few frames (a wave every
+## N frames): its p95 lands on or next to a spike run by run, so only its p50
+## is gated (p95, p99 and max are still reported).
+var gate_p95 := true
+## Scenario-specific metrics (numbers only), merged into the result JSON.
+var extra := {}
+var rng := RandomNumberGenerator.new()
+
+var _frame_us: Array[float] = []
+var _step_us: Array[float] = []
+var _engine_us: Array[float] = []
+var _tick_us: Array[float] = []
+var _bullets: Array[float] = []
+var _mem_peak := 0.0
+var _mem_start := 0.0
+var _objects_start := 0
+
+
+## Override: build the scenario. May await frames.
+func setup() -> void:
+	pass
+
+
+## Override: per-frame scenario work (spawn, move targets...). `frame` counts
+## from 0 across warmup + measurement.
+func step(_frame: int) -> void:
+	pass
+
+
+## One-line human description (printed in LATEST.md).
+func describe() -> String:
+	return ""
+
+
+func run() -> Dictionary:
+	rng.seed = 1234567
+	factory = BulletFactory2D.new()
+	factory.name = "BenchFactory"
+	add_child(factory)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	@warning_ignore("redundant_await")
+	await setup()
+	for i in warmup_frames:
+		step(i)
+		await get_tree().process_frame
+	factory.reset_frame_stats()
+	_mem_start = Performance.get_monitor(Performance.MEMORY_STATIC)
+	_objects_start = int(Performance.get_monitor(Performance.OBJECT_COUNT))
+	for i in measure_frames:
+		var t0 := Time.get_ticks_usec()
+		step(warmup_frames + i)
+		var t1 := Time.get_ticks_usec()
+		await get_tree().process_frame
+		var t2 := Time.get_ticks_usec()
+		_step_us.append(float(t1 - t0))
+		_engine_us.append(float(t2 - t1))
+		_frame_us.append(float(t2 - t0))
+		var s: Dictionary = factory.get_frame_stats()
+		_tick_us.append(float(s["physics_tick_usec"]))
+		_bullets.append(float(s["active_bullets"]))
+		_mem_peak = maxf(_mem_peak, Performance.get_monitor(Performance.MEMORY_STATIC))
+	return results()
+
+
+static func _stats_ms(samples: Array[float]) -> Dictionary:
+	if samples.is_empty():
+		return {"p50": 0.0, "p95": 0.0, "p99": 0.0, "max": 0.0, "mean": 0.0}
+	var sorted := samples.duplicate()
+	sorted.sort()
+	var n := sorted.size()
+	var total := 0.0
+	for v in sorted:
+		total += v
+	var pick := func(q: float) -> float:
+		return sorted[clampi(int(ceil(q * n)) - 1, 0, n - 1)] / 1000.0
+	return {"p50": pick.call(0.50), "p95": pick.call(0.95), "p99": pick.call(0.99),
+		"max": sorted[n - 1] / 1000.0, "mean": total / n / 1000.0}
+
+
+func results() -> Dictionary:
+	var stats: Dictionary = factory.get_frame_stats()
+	var mean_bullets := 0.0
+	for b in _bullets:
+		mean_bullets += b
+	mean_bullets /= maxf(1.0, _bullets.size())
+	return {
+		"description": describe(),
+		"warmup_frames": warmup_frames,
+		"measure_frames": measure_frames,
+		"gate_p95": gate_p95,
+		"frame_ms": _stats_ms(_frame_us),
+		"factory_tick_ms": _stats_ms(_tick_us),
+		"step_ms": _stats_ms(_step_us),
+		"engine_ms": _stats_ms(_engine_us),
+		"memory_static_peak_mb": _mem_peak / 1048576.0,
+		"memory_static_growth_mb": (_mem_peak - _mem_start) / 1048576.0,
+		"objects_end": Performance.get_monitor(Performance.OBJECT_COUNT),
+		# Live Objects created and NOT freed during the measured window. A
+		# warm steady state should be ~0; steady growth = retention leak.
+		"objects_growth": int(Performance.get_monitor(Performance.OBJECT_COUNT)) - _objects_start,
+		"nodes_end": Performance.get_monitor(Performance.OBJECT_NODE_COUNT),
+		"active_bullets_mean": mean_bullets,
+		"spawned_bullets": stats["spawned_bullets_total"],
+		"expired_bullets": stats["expired_bullets_total"],
+		"collision_records": stats["collision_records_total"],
+		"pool_hits": stats["pool_hits"],
+		"pool_misses": stats["pool_misses"],
+		"extra": extra,
+	}
+
+
+# ---------------- shared scenario builders ----------------
+
+## Volley data: n bullets on a ring of radius r around `center`, flying
+## outward at `speed`. Collision layer 2, mask 3 (walls/areas use value 4).
+## The test helper's data as every baseline measured it: its per-bullet
+## speed array untiled (a spawner firing more bullets than `n` leaves the
+## rest at the default speed) and homing without texture control. The test
+## helper changed both for the warning-free suites; a benchmark keeps its
+## workload so its numbers stay comparable.
+func bench_data(n: int = 4, speed: float = 200.0, lifetime: float = 5.0) -> BulletVolleyData2D:
+	var d := H.make_volley_data(n, speed, lifetime)
+	d.tile_all_bullet_speed_data = false
+	d.homing_take_control_of_texture_rotation = false
+	return d
+
+
+func ring_data(n: int, center: Vector2, r: float, speed: float, lifetime: float) -> BulletVolleyData2D:
+	var d := bench_data(n, speed, lifetime)
+	var arr: Array = []
+	for i in n:
+		var a := TAU * float(i) / float(n)
+		arr.append(Transform2D(a, center + Vector2(cos(a), sin(a)) * r))
+	d.transforms = arr
+	d.set_collision_mask_from_array([3])
+	d.collision_shape = H.make_circle_shape(4.0)
+	return d
+
+
+func make_static_box(pos: Vector2, size: Vector2, layer_value: int = 4) -> StaticBody2D:
+	var body := StaticBody2D.new()
+	body.position = pos
+	body.collision_layer = layer_value
+	body.collision_mask = 2
+	var cs := CollisionShape2D.new()
+	var box := RectangleShape2D.new()
+	box.size = size
+	cs.shape = box
+	body.add_child(cs)
+	add_child(body)
+	return body

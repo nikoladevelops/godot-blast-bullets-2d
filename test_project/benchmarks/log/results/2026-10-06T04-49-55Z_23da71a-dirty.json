@@ -1,0 +1,154 @@
+{
+  "timestamp": "2026-10-06T04-49-55Z",
+  "commit": "23da71a",
+  "dirty": true,
+  "repeat": 5,
+  "machine": {
+    "cpu": "AMD Ryzen 7 8840HS w/ Radeon 780M Graphics",
+    "cores": 16,
+    "os": "Linux-7.2.9-1-cachyos-x86_64-with-glibc2.44",
+    "python": "3.14.7"
+  },
+  "scenarios": {
+    "mass_expiry_10k": {
+      "active_bullets_mean": 7375.0,
+      "collision_records": 0,
+      "description": "10k bullets expiring on the same frame (3 waves)",
+      "engine_ms": {
+        "max": 2.447,
+        "mean": 0.493120833333333,
+        "p50": 0.569,
+        "p95": 0.755,
+        "p99": 1.983
+      },
+      "expired_bullets": 30000,
+      "extra": {},
+      "factory_tick_ms": {
+        "max": 1.535,
+        "mean": 0.205383333333333,
+        "p50": 0.254,
+        "p95": 0.268,
+        "p99": 0.762
+      },
+      "frame_ms": {
+        "max": 5.237,
+        "mean": 0.528645833333333,
+        "p50": 0.57,
+        "p95": 0.755,
+        "p99": 4.66
+      },
+      "measure_frames": 240,
+      "memory_static_growth_mb": 1.86118698120117,
+      "memory_static_peak_mb": 38.7826204299927,
+      "nodes_end": 17.0,
+      "objects_end": 11604.0,
+      "objects_growth": 0,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 30,
+      "pool_misses": 0,
+      "spawned_bullets": 30000,
+      "step_ms": {
+        "max": 2.976,
+        "mean": 0.0360958333333333,
+        "p50": 0.0,
+        "p95": 0.001,
+        "p99": 2.73
+      },
+      "warmup_frames": 10
+    },
+    "trails_fx_2k": {
+      "active_bullets_mean": 1966.66666666667,
+      "collision_records": 0,
+      "description": "2k bullets with trail + spawn-flash layers, refired every 60 frames",
+      "engine_ms": {
+        "max": 2.014,
+        "mean": 0.381136666666667,
+        "p50": 0.343,
+        "p95": 0.589,
+        "p99": 0.615
+      },
+      "expired_bullets": 10000,
+      "extra": {},
+      "factory_tick_ms": {
+        "max": 1.947,
+        "mean": 0.30942,
+        "p50": 0.277,
+        "p95": 0.514,
+        "p99": 0.535
+      },
+      "frame_ms": {
+        "max": 3.738,
+        "mean": 0.432943333333333,
+        "p50": 0.344,
+        "p95": 0.596,
+        "p99": 3.532
+      },
+      "measure_frames": 300,
+      "memory_static_growth_mb": 0.0407447814941406,
+      "memory_static_peak_mb": 30.946141242981,
+      "nodes_end": 44.0,
+      "objects_end": 3733.0,
+      "objects_growth": 0,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 20,
+      "pool_misses": 4,
+      "spawned_bullets": 10000,
+      "step_ms": {
+        "max": 3.129,
+        "mean": 0.05117,
+        "p50": 0.0,
+        "p95": 0.001,
+        "p99": 2.943
+      },
+      "warmup_frames": 60
+    },
+    "volley_10k_flight": {
+      "active_bullets_mean": 10000.0,
+      "collision_records": 0,
+      "description": "10k bullets in flight, no overlaps",
+      "engine_ms": {
+        "max": 2.251,
+        "mean": 0.559716666666667,
+        "p50": 0.551,
+        "p95": 0.577,
+        "p99": 0.61
+      },
+      "expired_bullets": 0,
+      "extra": {},
+      "factory_tick_ms": {
+        "max": 0.9,
+        "mean": 0.26254,
+        "p50": 0.261,
+        "p95": 0.271,
+        "p99": 0.284
+      },
+      "frame_ms": {
+        "max": 2.251,
+        "mean": 0.559976666666667,
+        "p50": 0.552,
+        "p95": 0.577,
+        "p99": 0.61
+      },
+      "measure_frames": 300,
+      "memory_static_growth_mb": 0.0396690368652344,
+      "memory_static_peak_mb": 32.7598247528076,
+      "nodes_end": 17.0,
+      "objects_end": 1594.0,
+      "objects_growth": 0,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 0,
+      "pool_misses": 10,
+      "spawned_bullets": 0,
+      "step_ms": {
+        "max": 0.001,
+        "mean": 0.000213333333333333,
+        "p50": 0.0,
+        "p95": 0.001,
+        "p99": 0.001
+      },
+      "warmup_frames": 60
+    }
+  },
+  "godot": "4.7.2-stable (arch_linux)",
+  "debug_build": true
+}

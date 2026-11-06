@@ -9,6 +9,18 @@ from paths import PROJECT_ROOT, TOOLS_DIR
 BuildTarget = Literal["template_debug", "template_release"]
 
 
+def is_noninteractive() -> bool:
+    """True when GODOTPP_NONINTERACTIVE=1 (CI, scripts, AI agents): prompts are
+    skipped, the screen is not cleared, and failures exit with a non-zero code."""
+    return os.environ.get("GODOTPP_NONINTERACTIVE", "") not in ("", "0", "false", "no")
+
+
+def pause(message: str = "\nPress Enter to continue...") -> None:
+    """input() that is a no-op in non-interactive mode."""
+    if not is_noninteractive():
+        input(message)
+
+
 def run_tool_script(script_filename):
     """Run a script from the tools folder and handle errors/output."""
     script_path = TOOLS_DIR / script_filename
@@ -16,12 +28,28 @@ def run_tool_script(script_filename):
 
     if result.returncode != 0:
         print(result.stderr or "An error occurred.")
-        input("Press Enter to continue...")
+        pause("Press Enter to continue...")
+    return result.returncode
 
 def clear_screen() -> None:
     """Clear the terminal screen cross-platform using subprocess."""
+    if is_noninteractive():
+        return
     cmd = "cls" if os.name == "nt" else "clear"
     subprocess.run([cmd], check=False)
+
+# Written only after a SUCCESSFUL build. tools/run_tests.py and
+# tools/api_snapshot.py refuse to run while any source is newer than it, so a
+# failed build can never be tested against the previous library (the objects
+# that did compile before the error would otherwise look up to date).
+BUILD_STAMP = os.path.join(str(PROJECT_ROOT), "test_project", "addons", "blastbullets2d", "bin", ".build_stamp")
+
+
+def write_build_stamp(target: str) -> None:
+    os.makedirs(os.path.dirname(BUILD_STAMP), exist_ok=True)
+    with open(BUILD_STAMP, "w", encoding="utf-8") as handle:
+        handle.write(target + "\n")
+
 
 def run_scons_build(target: BuildTarget) -> None:
     """
@@ -40,7 +68,7 @@ def run_scons_build(target: BuildTarget) -> None:
 
     if not godot_version:
         print("Error: No Godot version set in config.json.")
-        input("\nPress Enter to continue...")
+        pause()
         sys.exit(1)
 
     scons_args = [
@@ -63,11 +91,16 @@ def run_scons_build(target: BuildTarget) -> None:
 
     print(f"Executing: {' '.join(scons_args)}\n" + "-" * 50 + "\n")
 
+    succeeded = False
     try:
         process = subprocess.Popen(
             scons_args,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            # Merged into stdout and streamed live: a separate stderr pipe
+            # that is only drained after exit deadlocks as soon as scons
+            # writes more than one pipe buffer of errors (a large compile
+            # error then looked like a silent hang).
+            stderr=subprocess.STDOUT,
             text=True,
             cwd=str(PROJECT_ROOT)
         )
@@ -92,22 +125,30 @@ def run_scons_build(target: BuildTarget) -> None:
             stderr_lines.append(remaining_err)
 
         if process.returncode == 0:
+            succeeded = True
+            write_build_stamp(target)
             print("\n" + "=" * 50)
             print(f"Compilation finished successfully ({mode_label} Build).")
             print(f"Target API: Godot {godot_version} | LTO: {lto_mode} | Debug Symbols: {debug_symbols}")
             print(f"A {mode_label.lower()} build was added to the bin/ folder.")
             print("The compile_commands.json file was also updated for IDE IntelliSense support.")
+            # Keep every extra project (a game, a demo) on this build too.
+            from sync_project_folders import sync_extra_project_folders
+            sync_extra_project_folders()
         else:
             print("\n" + "=" * 50)
             print(f"Compilation FAILED ({mode_label} Build):")
-            print("".join(stderr_lines).strip() or "Unknown error occurred.")
+            errors = [line for line in stdout_lines if "error" in line.lower()]
+            print("".join(errors).strip() or "".join(stdout_lines[-40:]).strip() or "Unknown error occurred.")
 
     except FileNotFoundError:
         print("Error: 'scons' command not found. Make sure SCons is installed and available in your PATH.")
     except (subprocess.SubprocessError, OSError) as e:
         print(f"An unexpected execution error occurred: {e}")
 
-    input("\nPress Enter to continue...")
+    pause()
+    if not succeeded and is_noninteractive():
+        sys.exit(1)
 
 def run_scons_clean() -> None:
     """
@@ -126,7 +167,11 @@ def run_scons_clean() -> None:
         process = subprocess.Popen(
             scons_args,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            # Merged into stdout and streamed live: a separate stderr pipe
+            # that is only drained after exit deadlocks as soon as scons
+            # writes more than one pipe buffer of errors (a large compile
+            # error then looked like a silent hang).
+            stderr=subprocess.STDOUT,
             text=True,
             cwd=str(PROJECT_ROOT)
         )
@@ -157,7 +202,7 @@ def run_scons_clean() -> None:
         else:
             print("\n" + "=" * 50)
             print("SCons clean FAILED:")
-            print("".join(stderr_lines).strip() or "Unknown error occurred.")
+            print("".join(stdout_lines[-40:]).strip() or "Unknown error occurred.")
 
     except FileNotFoundError:
         print("Error: 'scons' command not found. Make sure SCons is installed and available in your PATH.")

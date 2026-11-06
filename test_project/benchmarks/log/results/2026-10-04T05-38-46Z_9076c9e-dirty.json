@@ -1,0 +1,156 @@
+{
+  "timestamp": "2026-10-04T05-38-46Z",
+  "commit": "9076c9e",
+  "dirty": true,
+  "repeat": 5,
+  "machine": {
+    "cpu": "AMD Ryzen 7 8840HS w/ Radeon 780M Graphics",
+    "cores": 16,
+    "os": "Linux-7.2.8-2-cachyos-x86_64-with-glibc2.44",
+    "python": "3.14.7"
+  },
+  "scenarios": {
+    "collision_storm": {
+      "active_bullets_mean": 1400.0,
+      "collision_records": 60000,
+      "description": "200-bullet volley/frame dying on walls (collision drain + pool churn)",
+      "engine_ms": {
+        "max": 2.38,
+        "mean": 0.777726666666667,
+        "p50": 0.617,
+        "p95": 1.152,
+        "p99": 2.158
+      },
+      "expired_bullets": 0,
+      "extra": {
+        "records_per_frame": 200.0
+      },
+      "factory_tick_ms": {
+        "max": 1.356,
+        "mean": 0.20205,
+        "p50": 0.144,
+        "p95": 0.302,
+        "p99": 0.316
+      },
+      "frame_ms": {
+        "max": 2.517,
+        "mean": 0.87039,
+        "p50": 0.694,
+        "p95": 1.292,
+        "p99": 2.236
+      },
+      "measure_frames": 300,
+      "memory_static_growth_mb": 0.0390663146972656,
+      "memory_static_peak_mb": 30.4120197296143,
+      "nodes_end": 23.0,
+      "objects_end": 2379.0,
+      "objects_growth": 0,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 352,
+      "pool_misses": 8,
+      "spawned_bullets": 60000,
+      "step_ms": {
+        "max": 0.325,
+        "mean": 0.0926633333333333,
+        "p50": 0.067,
+        "p95": 0.145,
+        "p99": 0.154
+      },
+      "warmup_frames": 60
+    },
+    "mass_expiry_10k": {
+      "active_bullets_mean": 7375.0,
+      "collision_records": 0,
+      "description": "10k bullets expiring on the same frame (3 waves)",
+      "engine_ms": {
+        "max": 2.561,
+        "mean": 0.503054166666667,
+        "p50": 0.594,
+        "p95": 0.778,
+        "p99": 1.894
+      },
+      "expired_bullets": 30000,
+      "extra": {},
+      "factory_tick_ms": {
+        "max": 1.307,
+        "mean": 0.218441666666667,
+        "p50": 0.274,
+        "p95": 0.284,
+        "p99": 0.787
+      },
+      "frame_ms": {
+        "max": 6.54,
+        "mean": 0.5415625,
+        "p50": 0.594,
+        "p95": 0.779,
+        "p99": 4.746
+      },
+      "measure_frames": 240,
+      "memory_static_growth_mb": 1.86118698120117,
+      "memory_static_peak_mb": 38.6859798431396,
+      "nodes_end": 17.0,
+      "objects_end": 11603.0,
+      "objects_growth": 0,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 30,
+      "pool_misses": 0,
+      "spawned_bullets": 30000,
+      "step_ms": {
+        "max": 2.963,
+        "mean": 0.0366583333333333,
+        "p50": 0.0,
+        "p95": 0.001,
+        "p99": 2.782
+      },
+      "warmup_frames": 10
+    },
+    "pool_churn": {
+      "active_bullets_mean": 9000.0,
+      "collision_records": 0,
+      "description": "one 300-bullet volley per frame, 0.5 s life (warm-pool spawn + expiry)",
+      "engine_ms": {
+        "max": 2.448,
+        "mean": 0.72151,
+        "p50": 0.704,
+        "p95": 0.758,
+        "p99": 0.823
+      },
+      "expired_bullets": 90000,
+      "extra": {},
+      "factory_tick_ms": {
+        "max": 1.235,
+        "mean": 0.283063333333333,
+        "p50": 0.276,
+        "p95": 0.29,
+        "p99": 0.318
+      },
+      "frame_ms": {
+        "max": 2.557,
+        "mean": 0.812916666666667,
+        "p50": 0.793,
+        "p95": 0.85,
+        "p99": 0.925
+      },
+      "measure_frames": 300,
+      "memory_static_growth_mb": 0.0395088195800781,
+      "memory_static_peak_mb": 33.7607898712158,
+      "nodes_end": 38.0,
+      "objects_end": 4056.0,
+      "objects_growth": 0,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 329,
+      "pool_misses": 31,
+      "spawned_bullets": 90000,
+      "step_ms": {
+        "max": 0.123,
+        "mean": 0.0904633333333333,
+        "p50": 0.087,
+        "p95": 0.101,
+        "p99": 0.113
+      },
+      "warmup_frames": 60
+    }
+  },
+  "godot": "4.7.2-stable (arch_linux)",
+  "debug_build": true
+}

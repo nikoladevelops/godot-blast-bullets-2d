@@ -1,0 +1,26 @@
+[gd_resource type="SpriteFrames" format=3]
+
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_beam_01.png" id="1_hu4yw"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_beam_02.png" id="2_nmaib"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_beam_03.png" id="3_cwau0"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_beam_04.png" id="4_kvclk"]
+
+[resource]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("1_hu4yw")
+}, {
+"duration": 1.0,
+"texture": ExtResource("2_nmaib")
+}, {
+"duration": 1.0,
+"texture": ExtResource("3_cwau0")
+}, {
+"duration": 1.0,
+"texture": ExtResource("4_kvclk")
+}],
+"loop": 1,
+"name": &"default",
+"speed": 12.0
+}]

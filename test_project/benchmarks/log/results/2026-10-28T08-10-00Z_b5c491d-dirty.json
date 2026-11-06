@@ -1,0 +1,160 @@
+{
+  "timestamp": "2026-10-28T08-10-00Z",
+  "commit": "b5c491d",
+  "dirty": true,
+  "repeat": 5,
+  "machine": {
+    "cpu": "AMD Ryzen 7 8840HS w/ Radeon 780M Graphics",
+    "cores": 16,
+    "os": "Linux-7.3.0-5-cachyos-x86_64-with-glibc2.44",
+    "python": "3.14.8"
+  },
+  "scenarios": {
+    "graze_10k_flight": {
+      "active_bullets_mean": 10000.0,
+      "collision_records": 0,
+      "description": "10k bullets in flight, graze armed (3 rings, 1 moving target)",
+      "engine_ms": {
+        "max": 2.323,
+        "mean": 0.629523333333333,
+        "p50": 0.62,
+        "p95": 0.643,
+        "p99": 0.685
+      },
+      "expired_bullets": 0,
+      "extra": {
+        "grazes": 500
+      },
+      "factory_tick_ms": {
+        "max": 1.351,
+        "mean": 0.331296666666667,
+        "p50": 0.323,
+        "p95": 0.337,
+        "p99": 0.362
+      },
+      "frame_ms": {
+        "max": 2.324,
+        "mean": 0.630213333333333,
+        "p50": 0.621,
+        "p95": 0.643,
+        "p99": 0.686
+      },
+      "measure_frames": 300,
+      "memory_static_growth_mb": 0.0391998291015625,
+      "memory_static_peak_mb": 36.2261304855347,
+      "nodes_end": 18.0,
+      "objects_end": 1614.0,
+      "objects_growth": 0,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 0,
+      "pool_misses": 10,
+      "spawned_bullets": 0,
+      "step_ms": {
+        "max": 0.005,
+        "mean": 0.00069,
+        "p50": 0.001,
+        "p95": 0.001,
+        "p99": 0.001
+      },
+      "warmup_frames": 60
+    },
+    "graze_64_targets": {
+      "active_bullets_mean": 10000.0,
+      "collision_records": 0,
+      "description": "10k bullets in flight, graze armed (3 rings, 64 moving targets)",
+      "engine_ms": {
+        "max": 2.395,
+        "mean": 0.692473333333333,
+        "p50": 0.681,
+        "p95": 0.718,
+        "p99": 0.757
+      },
+      "expired_bullets": 0,
+      "extra": {
+        "grazes": 7178
+      },
+      "factory_tick_ms": {
+        "max": 2.043,
+        "mean": 0.391823333333333,
+        "p50": 0.384,
+        "p95": 0.415,
+        "p99": 0.432
+      },
+      "frame_ms": {
+        "max": 2.407,
+        "mean": 0.70518,
+        "p50": 0.692,
+        "p95": 0.731,
+        "p99": 0.777
+      },
+      "measure_frames": 300,
+      "memory_static_growth_mb": 0.0391998291015625,
+      "memory_static_peak_mb": 36.3356695175171,
+      "nodes_end": 81.0,
+      "objects_end": 1677.0,
+      "objects_growth": 0,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 0,
+      "pool_misses": 10,
+      "spawned_bullets": 0,
+      "step_ms": {
+        "max": 0.032,
+        "mean": 0.0121666666666667,
+        "p50": 0.012,
+        "p95": 0.013,
+        "p99": 0.017
+      },
+      "warmup_frames": 60
+    },
+    "graze_storm": {
+      "active_bullets_mean": 7866.66666666667,
+      "collision_records": 0,
+      "description": "graze storm: 2k-bullet rings spawned on the player every 0.25 s",
+      "engine_ms": {
+        "max": 17.417,
+        "mean": 1.76949333333333,
+        "p50": 1.01,
+        "p95": 4.76,
+        "p99": 9.089
+      },
+      "expired_bullets": 40000,
+      "extra": {
+        "events": 142000
+      },
+      "factory_tick_ms": {
+        "max": 2.709,
+        "mean": 0.412113333333333,
+        "p50": 0.276,
+        "p95": 1.445,
+        "p99": 1.485
+      },
+      "frame_ms": {
+        "max": 17.418,
+        "mean": 1.80312,
+        "p50": 1.01,
+        "p95": 4.876,
+        "p99": 9.09
+      },
+      "measure_frames": 300,
+      "memory_static_growth_mb": 0.0392379760742188,
+      "memory_static_peak_mb": 42.0351114273071,
+      "nodes_end": 12.0,
+      "objects_end": 3561.0,
+      "objects_growth": 0,
+      "physics_ticks_per_second": 60,
+      "pool_hits": 20,
+      "pool_misses": 4,
+      "spawned_bullets": 40000,
+      "step_ms": {
+        "max": 1.175,
+        "mean": 0.0375366666666667,
+        "p50": 0.0,
+        "p95": 0.452,
+        "p99": 0.566
+      },
+      "warmup_frames": 60
+    }
+  },
+  "godot": "4.7.2-stable (arch_linux)",
+  "debug_build": true
+}

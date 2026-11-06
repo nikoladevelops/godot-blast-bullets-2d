@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://331neay58a3r"]
 
 [ext_resource type="Script" uid="uid://cbte70d3pv4s6" path="res://shared/bullet_attachment_nodes/light_attachment.gd" id="1_cqoog"]
-[ext_resource type="Texture2D" uid="uid://b36wg4ut31vkd" path="res://shared/art/light/light_texture.png" id="2_qbtnj"]
+[ext_resource type="Texture2D" path="res://shared/art/light/light.png" id="2_qbtnj"]
 
 [sub_resource type="CanvasItemMaterial" id="CanvasItemMaterial_qbtnj"]
 blend_mode = 1
@@ -12,5 +12,5 @@ script = ExtResource("1_cqoog")
 
 [node name="LightTexture" type="Sprite2D" parent="." unique_id=1625330662]
 material = SubResource("CanvasItemMaterial_qbtnj")
-scale = Vector2(10, 10)
+scale = Vector2(1.25, 1.25)
 texture = ExtResource("2_qbtnj")

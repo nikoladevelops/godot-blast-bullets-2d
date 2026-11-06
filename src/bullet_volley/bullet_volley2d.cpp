@@ -1,0 +1,1283 @@
+// Lifecycle of a volley: creation (spawn), pool reuse (enable_volley), per-bullet
+// enable/disable/clear, the clean-disabled reset and teardown. Start here to follow
+// a volley's life; the per-frame motion lives in bullet_volley2d_tick.cpp.
+
+#include "bullet_spawner/bullet_spawner2d.hpp"
+#include "bullet_volley/bullet_volley2d_internal.hpp"
+#include "core/node_baseline2d.hpp"
+#include "core/physics_flush2d.hpp"
+
+using namespace godot;
+
+namespace BlastBullets2D {
+
+bool BulletVolley2D::enable_volley_for_script(const Ref<BulletVolleyData2D> &data, const Vector2 &new_inherited_velocity_offset, uint64_t spawner_id) {
+	if (data.is_null()) {
+		UtilityFunctions::push_error("enable_volley: spawn data is null.");
+		return false;
+	}
+	if (!BulletFactory2D::validate_owner_spawner_id(spawner_id, "enable_volley")) {
+		return false;
+	}
+	return enable_volley(*data.ptr(), new_inherited_velocity_offset, spawner_id);
+}
+
+void BulletVolley2D::force_delete() {
+	marked_for_internal_deletion = true;
+	Node *parent = get_parent();
+	if (parent) {
+		parent->remove_child(this);
+	}
+	memdelete(this); // Immediate deletion after removal from tree
+}
+
+TypedArray<bool> BulletVolley2D::get_all_bullets_status() {
+	TypedArray<bool> status_array;
+	status_array.resize(amount_bullets);
+
+	for (int i = 0; i < amount_bullets; i++) {
+		bool status = all_bullets_enabled_set.contains(i);
+		status_array[i] = status;
+	}
+
+	return status_array;
+}
+
+bool BulletVolley2D::is_bullet_status_enabled(int bullet_index) {
+	if (!validate_bullet_index(bullet_index, "is_bullet_status_enabled")) {
+		return false;
+	}
+
+	return all_bullets_enabled_set.contains(bullet_index);
+}
+
+void BulletVolley2D::reset_pooling_flags_to_default() {
+	is_auto_pooling_enabled = true;
+	is_attachments_auto_pooling_enabled = true;
+}
+
+_ALWAYS_INLINE_ void BulletVolley2D::apply_shared_bullet_attachment_from_data(const BulletVolleyData2D &data) {
+	if (data.shared_bullet_attachment.is_null()) {
+		return;
+	}
+	// A broken scene describes the DATA: it reports once per resource (WarnOnce2D,
+	// re-armed when the scene is packed again), never once per shot, and spawns
+	// the bullets without attachments.
+	StringName root_type;
+	const AttachmentSceneCheck2D scene_check = check_attachment_scene2d(data.shared_bullet_attachment, &root_type);
+	if (scene_check != AttachmentSceneCheck2D::OK) {
+		const Ref<SceneState> state = data.shared_bullet_attachment->get_state();
+		const int64_t node_count = state.is_valid() ? state->get_node_count() : 0;
+		if (WarnOnce2D::first(data.shared_bullet_attachment->get_instance_id(), 34u, (int64_t)scene_check, node_count * 1000003 + String(root_type).hash())) {
+			if (scene_check == AttachmentSceneCheck2D::EMPTY) {
+				UtilityFunctions::push_error("BulletVolleyData2D: shared_bullet_attachment is an empty PackedScene (nothing to instantiate), the bullets spawn without attachments.");
+			} else {
+				UtilityFunctions::push_error("BulletVolleyData2D: shared_bullet_attachment is not a BulletAttachment2D scene (its root is a " + String(root_type) + "), the bullets spawn without attachments.");
+			}
+		}
+		return;
+	}
+	for (int i = 0; i < amount_bullets; ++i) {
+		// A callback of an earlier bullet may have drained this volley (it is
+		// pooled or parked now: attaching would leak into the pool) or
+		// disabled later bullets (a disabled bullet carries no attachment).
+		if (!is_active) {
+			break;
+		}
+		if (!all_bullets_enabled_set.contains(i)) {
+			continue;
+		}
+		if (!attach_bullet_attachment_internal(i, data.shared_bullet_attachment, data.shared_bullet_attachment_offset, data.shared_bullet_attachment_stick_relative_to_bullet)) {
+			break;
+		}
+	}
+}
+
+// ---- Life states --------------------------------------------------------
+// ACTIVE : is_active (at least one live bullet, ticked by the factory).
+// PARKED : the last bullet went out with is_auto_pooling_enabled OFF. Nothing
+//          was reset: the volley is frozen, still owned, and enable_bullet()
+//          resumes it exactly where it stopped.
+// POOLED : the last bullet went out with is_auto_pooling_enabled ON.
+//          release_life() dropped every external reference; only a new life
+//          (spawn / enable_volley -> begin_life) revives it, and waking a
+//          pooled volley with enable_bullet() is refused (stale handle).
+
+bool BulletVolley2D::is_pooled() const {
+	return is_pooled_in_pool;
+}
+
+bool BulletVolley2D::detach_from_spawner() {
+	if (reject_pooled_handle("detach_from_spawner")) {
+		return false;
+	}
+	if (owner_spawner_id == 0) {
+		return false;
+	}
+	owner_spawner_id = 0;
+	orphaned_spawner_path = String();
+	reown_queued_requests();
+	return true;
+}
+
+void BulletVolley2D::reown_queued_requests() {
+	if (bullet_factory != nullptr && factory_alive()) {
+		bullet_factory->reown_pending_requests(get_instance_id(), volley_generation, owner_spawner_id);
+	}
+}
+
+BulletSpawner2D *BulletVolley2D::get_owner_spawner() const {
+	if (owner_spawner_id == 0 || is_pooled_in_pool) {
+		return nullptr;
+	}
+	BulletSpawner2D *spawner = Object::cast_to<BulletSpawner2D>(ObjectDB::get_instance(ObjectID(owner_spawner_id)));
+	if (spawner == nullptr || spawner->is_queued_for_deletion()) {
+		return nullptr;
+	}
+	return spawner;
+}
+
+bool BulletVolley2D::is_parked() const {
+	return !is_active && !is_pooled_in_pool && multi.is_valid() && amount_bullets > 0 && !is_queued_for_deletion();
+}
+
+String BulletVolley2D::debug_get_life_state() const {
+	if (is_queued_for_deletion()) {
+		return "dying";
+	}
+	if (is_active) {
+		return "active";
+	}
+	if (is_pooled_in_pool) {
+		return "pooled";
+	}
+	if (multi.is_valid() && amount_bullets > 0) {
+		return "parked";
+	}
+	return "fresh";
+}
+
+void BulletVolley2D::set_is_auto_pooling_enabled(bool value) {
+	is_auto_pooling_enabled = value;
+	// A parked volley pools as soon as its owner lets it go.
+	if (value && is_parked() && !is_being_ticked && bullets_pool != nullptr) {
+		const uint64_t self_id = get_instance_id();
+		release_life();
+		if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+			return;
+		}
+		if (!is_active && !is_queued_for_deletion() && is_auto_pooling_enabled && !is_pooled_in_pool) {
+			bullets_pool->push(this, get_pool_key());
+		}
+	}
+}
+
+// Holds the factory busy flag across a sweep that runs user callbacks
+// (attachment on_bullet_disable): reset()/free_*/spawns from inside reject
+// with the standard busy error, and wakes are refused, until the sweep ends.
+// The factory is re-resolved by id on exit (a callback could free it).
+struct FactoryBusyScope2D {
+	BulletFactory2D *factory = nullptr;
+	uint64_t factory_id = 0;
+	bool saved = false;
+	explicit FactoryBusyScope2D(BulletFactory2D *p_factory) :
+			factory(p_factory) {
+		if (factory != nullptr) {
+			factory_id = factory->get_instance_id();
+			saved = factory->get_is_factory_busy();
+			factory->_set_internal_operation_busy(true);
+		}
+	}
+	~FactoryBusyScope2D() {
+		if (factory != nullptr && ObjectDB::get_instance(ObjectID(factory_id)) == factory) {
+			factory->_set_internal_operation_busy(saved);
+		}
+	}
+	FactoryBusyScope2D(const FactoryBusyScope2D &) = delete;
+	FactoryBusyScope2D &operator=(const FactoryBusyScope2D &) = delete;
+};
+
+void BulletVolley2D::on_volley_drained() {
+	// disable_bullet() just took out the last live bullet.
+	active_bullets_counter = 0;
+	is_active = false;
+	on_volley_deactivated();
+	// Every shape was disabled bullet by bullet on the way here; hiding the
+	// node is all that is left for the frozen (parked) state. set_visible
+	// runs the volley's own visibility_changed handlers (synchronous user
+	// code): the emit guard refuses a free (finished with queue_free) and the
+	// checks below stop the drain when a handler changed its outcome.
+	const uint64_t self_id = get_instance_id();
+	guarded_user_call2d(this, emit_guard, [&]() { set_visible(false); });
+	if (!survived_user_code(self_id) || is_queued_for_deletion()) {
+		return;
+	}
+	if (is_active || active_bullets_counter > 0) {
+		return; // a handler woke a bullet: the drain is no longer due
+	}
+	if (!is_auto_pooling_enabled || bullets_pool == nullptr) {
+		return; // PARKED: frozen, still owned, enable_bullet() resumes it
+	}
+	release_life();
+	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+		return; // a release callback freed this volley
+	}
+	// A release callback may have queued the volley for deletion or turned
+	// pooling off (then it stays parked, released).
+	if (is_active || active_bullets_counter > 0 || is_queued_for_deletion() || !is_auto_pooling_enabled || is_pooled_in_pool) {
+		return;
+	}
+	bullets_pool->push(this, get_pool_key());
+}
+
+void BulletVolley2D::release_life() {
+	// Pool time: drop everything that reaches OUTSIDE the volley (nodes,
+	// callables, connections, user resources, the owner), so a pooled
+	// instance retains nothing and fires nothing. Plain values (ballistics,
+	// ledgers, seeds) are NOT reset here: begin_life() reseeds every one of
+	// them once, from the next owner's data.
+	// A dead factory (freed from an attachment callback) must never be touched:
+	// the scope only holds it to toggle the busy flag.
+	FactoryBusyScope2D busy(factory_alive() ? bullet_factory : nullptr);
+	const uint64_t self_id = get_instance_id();
+	for (int i = 0; i < (int)attachments.size(); ++i) {
+		if (attachments[i] != nullptr) {
+			bullet_disable_attachment(i); // user callback (on_bullet_disable)
+			if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+				return;
+			}
+		}
+	}
+	// Everything below drops external Refs and Callables whose PREDELETE is
+	// user code that may free this volley. Under the emit guard a free is
+	// refused (finished with queue_free at the guard's end), so the remaining
+	// drops always touch a live object; the caller re-checks afterwards.
+	guarded_user_call2d(this, emit_guard, [&]() {
+		reset_attachment_state_for_reuse();
+		clear_homing_state_for_teardown();
+		detach_all_time_based_functions();
+		all_collided_bullets.clear();
+		clear_collision_dedup_keys();
+		paused_overlaps.clear();
+		homing_reached_events.clear();
+		shared_pop_requested = false;
+		pickup_data.unref(); // a pooled volley is a plain one again
+		cached_collision_shape.unref(); // the pool key keeps only its type and size (cached scalars): never the user's Shape2D
+		if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+			return; // a dropped Ref's PREDELETE freed this volley
+		}
+		pickup_magnet_started = false;
+		pickup_time_scale_owner_id = 0;
+		anim_finished_event_pending = false;
+		graze_release(); // user resources (zones) and queued events
+		sound_release(); // user resources (sounds) and the listener ref
+		graze_detector.reset(); // the arming spawner's target settings
+		follow_detector.reset(); // homing_follow's targets
+		flock_set_config(nullptr); // the flock (and the factory's armed count)
+		split_arm(nullptr, Ref<BulletVolleyData2D>(), 0); // the chain and the spawn data copy
+		split_counts.clear(); // what this life spent (split_arm keeps it across re-arming)
+		split_timer_fired_chain = 0;
+		emitter_arm(nullptr); // the timing resource and the template
+		if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+			return; // a dropped config Ref's PREDELETE freed this volley
+		}
+		// Volley-level listeners belong to the life that connected them.
+		disconnect_sprite_animation_connections();
+		for (const Dictionary &connection : get_signal_connection_list(CachedStringNames2D::get().bullet_homing_target_reached)) {
+			const Callable callable = connection["callable"];
+			disconnect(CachedStringNames2D::get().bullet_homing_target_reached, callable);
+		}
+		if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+			return; // a dropped Callable's PREDELETE freed this volley
+		}
+		owner_spawner_id = 0;
+		homing_wake_owner_id = 0;
+		orphaned_spawner_path = String();
+		// User resources: a pooled volley must not keep them alive.
+		shared_bullets_custom_data.unref();
+		for (Ref<Resource> &r : all_bullets_custom_data) {
+			r.unref();
+		}
+		shared_bullet_curves_data.unref();
+		for (Ref<BulletCurvesData2D> &r : all_bullet_curves_data) {
+			r.unref();
+		}
+		for (BulletMovementPatternData2D &p : all_movement_pattern_data) {
+			p = BulletMovementPatternData2D();
+		}
+		shared_movement_pattern_curve.unref();
+		shared_bullet_speed_data.unref();
+		shared_bullet_rotation_data.unref();
+		shared_bullet_wobble_data.unref();
+		for (Ref<BulletWobbleData2D> &r : all_bullet_wobble_data) {
+			r.unref();
+		}
+		anim_source.unref();
+		anim.clear();
+		fade_modulate_ramp.unref(); // the life's Gradient (a pooled volley retains nothing)
+		anim_name = StringName("default"); // a frameless next life reads like a cold volley
+		set_texture(Ref<Texture2D>());
+		if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+			return; // the frames resource's PREDELETE freed this volley
+		}
+		// The material (and its instance parameter values, which may hold
+		// textures) belongs to the spawn data: the next life sets its own.
+		// Clear the CanvasItem overrides even when a script already dropped
+		// the material: they still reference the values on their own.
+		clear_applied_instance_shader_overrides();
+		if (get_material().is_valid()) {
+			set_material(Ref<Material>());
+		}
+		instance_shader_parameters.clear();
+		if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+			return; // the material's PREDELETE freed this volley
+		}
+		// Node-level decorations a previous owner may have added: the next owner
+		// starts from a neutral node (core/node_baseline2d.hpp).
+		strip_user_decorations2d(this);
+		restore_node_baseline2d(this); // a script _get runs here
+		if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+			return; // the script _get freed this volley
+		}
+		life_released = true;
+	});
+}
+
+void BulletVolley2D::begin_life(const BulletVolleyData2D &data, uint64_t new_owner_spawner_id, const Vector2 &new_inherited_velocity_offset) {
+	// The single new-life path (spawn and enable_volley both end here). A
+	// volley that was never released (fresh, or parked and re-enabled)
+	// releases first, so nothing of the previous life survives.
+	if (!life_released) {
+		const uint64_t self_id = get_instance_id();
+		release_life();
+		if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+			return;
+		}
+	}
+	// A life begun mid-sweep (cold spawn or pool reuse from a handler) starts
+	// on the NEXT factory step, never inside the one already running.
+	if (bullet_factory != nullptr && factory_alive()) {
+		sweep_tick_stamp = bullet_factory->get_sweep_counter();
+		first_tick_lead = 0.0; // a timed spawner shot sets its own right after
+		sweep_timer_stamp = sweep_tick_stamp;
+	}
+	// One generation (life id) per life: stale handles compare against it.
+	++volley_generation;
+	// Ownership first: a spawner volley is never observable as factory-owned.
+	owner_spawner_id = new_owner_spawner_id;
+	orphaned_spawner_path = String();
+	inherited_velocity_offset = new_inherited_velocity_offset;
+	own_time_scale = 1.0;
+	reset_bounce_frames();
+	// Runtime-only knobs spawn data never seeds start from their defaults.
+	reset_pooling_flags_to_default();
+	set_collision_dedup_by_object(data.collision_dedup_by_object);
+	// Scale-in: set before the instances are set up (they spawn shrunk).
+	scale_in_sec = data.scale_in_sec;
+	scale_in_from = data.scale_in_from;
+	scale_in_active = Math::is_finite(scale_in_sec) && scale_in_sec > 0.0 && scale_in_from > 0.0 && scale_in_from < 1.0;
+	scale_in_applied = scale_in_active ? scale_in_from : 1.0;
+	scale_in_elapsed = 0.0;
+	curves_elapsed_time = 0.0;
+	split_timer_fired_chain = 0;
+	split_counts.clear();
+	// Pickup state belongs to one life (release_life drops it too; this
+	// covers a life that was never released, e.g. a pre-populated volley).
+	pickup_data.unref();
+	pickup_magnet_started = false;
+	pickup_time_scale_owner_id = 0;
+	anim_frame_index = 0;
+	anim_paused = false;
+	anim_finished = false;
+	anim_finished_event_pending = false;
+
+	set_up_life_time_timer(data.max_life_time, data.max_life_time);
+	reset_bullet_life_times();
+	seed_bullet_life_times(data);
+	set_up_multimesh(amount_bullets, data.mesh, resolve_quad_size(data.sprite_frames, data.animation, data.texture_size), data.wants_bullet_colors() || spawn_colors_ptr != nullptr);
+	set_up_bullet_instances(data);
+	reset_attachment_state_for_reuse();
+	set_rotation_data(data.all_bullet_rotation_data, data.rotate_only_textures, data.tile_all_bullet_rotation_data);
+	all_previous_instance_transf.resize(amount_bullets);
+	all_previous_attachment_transf.resize(amount_bullets);
+	update_all_previous_transforms_for_interpolation();
+	finalize_set_up(
+			data.shared_bullets_custom_data,
+			data.material,
+			data.z_index,
+			data.light_mask,
+			data.visibility_layer,
+			data.self_modulate,
+			data.instance_shader_parameters);
+	// Single-error policy: rebuild_sprite_animation already reported the
+	// cause. Appearance snapshot first: the rebuild whitens frames when the
+	// data asks for it, and the fade half starts transparent when fading in.
+	snapshot_appearance_from_data(data);
+	if (data.sprite_frames.is_valid()) {
+		rebuild_sprite_animation(data.sprite_frames, data.animation);
+	} else {
+		// Frames are optional (a mesh or a material draws): the volley draws
+		// untextured, silently (the spawn validation warns when nothing draws).
+		anim_source.unref();
+		anim.clear();
+		set_texture(Ref<Texture2D>());
+	}
+	seed_motion_features(data);
+	life_released = false;
+}
+
+void BulletVolley2D::_notification(int p_what) {
+	switch (p_what) {
+		case NOTIFICATION_PREDELETE: {
+			if (emit_guard.depth > 0 && predelete_state == PREDELETE_NONE) {
+				// Freed from a handler of one of its own signals (a release
+				// build: debug builds refuse first). The emit queues it.
+				cancel_free();
+				emit_guard.refused_free = true;
+				break;
+			}
+			if (predelete_state == PREDELETE_RUNNING) {
+				// A free() of this volley from user code inside its own
+				// teardown (an attachment callback freed it, or freed the
+				// factory, which deletes its children): a second deletion
+				// would free this memory under the running one.
+				cancel_free();
+				refused_nested_free = true;
+				break;
+			}
+			if (predelete_state == PREDELETE_DONE) {
+				break; // the deferred deletion below: everything is torn down
+			}
+			predelete_state = PREDELETE_RUNNING;
+			predelete_teardown();
+			predelete_state = PREDELETE_DONE;
+			if (refused_nested_free) {
+				// Godot keeps ONE "free ok" flag per object: the refused free
+				// cancelled this deletion too. Finish it at the end of the frame.
+				queue_free();
+			}
+		} break;
+	}
+}
+
+void BulletVolley2D::predelete_teardown() {
+	// The destructor also runs for editor-time instances, which have no runtime state.
+	if (Engine::get_singleton()->is_editor_hint()) {
+		return;
+	}
+
+	if (!marked_for_internal_deletion && bullet_factory && factory_alive()) {
+		bullet_factory->handle_manual_volley_deletion(*this);
+	}
+	// Every exit path (force_delete skips release_life): the
+	// factory's armed count stays exact. The factory is still alive
+	// here (it frees its volleys inside its own PREDELETE).
+	flock_set_config(nullptr);
+
+	clear_homing_state_for_teardown();
+
+	// Sprite effect teardown first: factory one-shot bakes keyed by
+	// this volley die here (in-flight visuals stop), trail shard
+	// children are freed with the node below. Safe during factory
+	// teardown too (its vectors were already cleared, unregister
+	// no-ops, and our own children are still alive).
+	if (bullet_factory != nullptr && factory_alive()) {
+		bullet_factory->fx_unregister_volley(get_instance_id());
+	}
+	fx_clear_trail_layers();
+
+	if (physics_server && area.is_valid()) {
+		// Disable every shape of the area (enabled or not).
+		// Bounds-checked: never let a desynced attachments vector take down PREDELETE.
+		// When the factory itself is tearing down, only run the script callback and
+		// drop the slot: re-pooling into (or queue_freeing from) a dying factory is
+		// pointless, the engine destroys the whole subtree anyway.
+		bool factory_is_dying = bullet_factory == nullptr || !factory_alive() || bullet_factory->get_is_tearing_down();
+		// Inside the physics flush the server refuses the writes; the area is
+		// freed below anyway (allowed there), so skip them.
+		const bool flushing = PhysicsFlush2D::flushing();
+		for (int i = 0; i < amount_bullets && i < area_shape_count; ++i) {
+			if (!flushing) {
+				physics_server->area_set_shape_disabled(area, i, true);
+			}
+
+			if (i >= 0 && i < (int)attachments.size() && attachments[i] != nullptr) {
+				// A callback of an earlier slot may have freed the
+				// factory: never touch it (or its pool) after that.
+				factory_is_dying = factory_is_dying || !factory_alive();
+				if (factory_is_dying) {
+					// Null the slot BEFORE the callback (same ordering as
+					// bullet_disable_attachment): re-entrant API calls from the
+					// script must see an empty slot.
+					BulletAttachment2D *detaching = attachments[i];
+					attachments[i] = nullptr;
+					// Every ownership change bumps the slot epoch, including
+					// this teardown path, so the "bumped on every change"
+					// invariant holds without exceptions.
+					bump_attachment_epoch(i);
+					// Owner tracking cleared like bullet_disable_attachment:
+					// attachments outlive this multimesh (siblings in the
+					// container), and a stale owner id would make their
+					// PREDELETE resolve a dead multimesh.
+					detaching->owner_volley_id = 0;
+					detaching->owner_bullet_index = -1;
+					detaching->call_on_bullet_disable();
+				} else {
+					bullet_disable_attachment(i);
+				}
+			}
+		}
+
+		physics_server->area_set_area_monitor_callback(area, Variant());
+		physics_server->area_set_monitor_callback(area, Variant());
+
+		// Detach the shapes from the area BEFORE freeing the RID (freeing a
+		// still-attached shape RID warns/leaks on the physics server).
+		release_volley_shape();
+
+		if (area.is_valid()) {
+			physics_server->free_rid(area);
+		}
+		area = RID();
+		area_space = RID();
+		pending_area_space = RID();
+	}
+}
+
+// Used to spawn brand new bullets.
+void BulletVolley2D::spawn(const BulletVolleyData2D &data, VolleyPool *pool, BulletFactory2D *factory, Node *bullets_container, const Vector2 &new_inherited_velocity_offset, int new_sparse_set_id, bool spawn_in_pool, uint64_t spawner_id) {
+	this->set_physics_interpolation_mode(Node::PHYSICS_INTERPOLATION_MODE_OFF); // We have custom physics interpolation logic, so disable the Godot one that comes from Godot 4.5
+
+	sparse_set_id = new_sparse_set_id;
+	bullets_pool = pool;
+	bullet_factory = factory;
+	factory_life = factory != nullptr ? factory->life_token() : std::shared_ptr<bool>();
+	physics_server = PhysicsServer2D::get_singleton();
+
+	warn_data_id = data.get_instance_id();
+	amount_bullets = spawn_transform_count(data); // important, because some set_up methods use this
+	cache_collision_shape_typed(data.collision_shape);
+
+	// Allocation (once per instance; pool reuse keeps all of it).
+	all_bullets_enabled_set.resize(amount_bullets);
+	bullet_collision_epochs.assign(amount_bullets, 0);
+	generate_multimesh(); // the format and batch buffer come with begin_life (set_up_multimesh)
+	area = physics_server->area_create();
+	generate_physics_shapes_for_area(amount_bullets);
+	// A fresh instance has nothing to release.
+	life_released = true;
+
+	begin_life(data, spawn_in_pool ? 0 : spawner_id, new_inherited_velocity_offset);
+
+	set_process(false);
+	set_physics_process(false);
+	if (spawn_in_pool) {
+		// Pre-population: a released, inactive instance waiting in the pool
+		// (enable_volley seeds it from the real data when popped).
+		set_visible(false);
+		is_active = false;
+		active_bullets_counter = 0;
+		set_all_physics_shapes_enabled_for_area(false);
+		bullets_container->add_child(this);
+		// Released for real: the populate data seeded this life, and a
+		// pooled volley keeps none of its resources (custom data, curves,
+		// texture, material...). No attachment was applied, so no user
+		// code runs here.
+		release_life();
+		if (is_queued_for_deletion()) {
+			return; // a release callback asked to free it (refused, queued)
+		}
+		bullets_pool->push(this, get_pool_key());
+		return;
+	}
+	all_bullets_enabled_set.activate_all_data();
+	is_active = true;
+	if (factory != nullptr && factory->debug_bullet_event_log_enabled) {
+		factory->debug_log_bullet_event("life", "", get_instance_id(), get_life_id(), amount_bullets, 0);
+	}
+	bullets_container->add_child(this);
+	// Effect layers first (trail shards rebuilt, factory one-shot bakes
+	// registered, spawn flashes at every bullet): an attachment callback
+	// below that clears bullets fires THIS life's effects.
+	fx_reseed_from_data(data.effect_layers, true);
+	// Shared spawn-data attachments (user code: on_bullet_spawn). The caller
+	// checks is_active afterwards: a callback may drain this volley.
+	apply_shared_bullet_attachment_from_data(data);
+}
+
+// Activates the multimesh
+bool BulletVolley2D::enable_volley(const BulletVolleyData2D &data, const Vector2 &new_inherited_velocity_offset, uint64_t spawner_id) {
+	// A busy factory (a callback inside a clear, reset or pool release)
+	// cannot take the volley into its tick set: refuse before touching
+	// anything, like spawn_volley does, instead of enabling a volley that
+	// never moves.
+	if (bullet_factory != nullptr && factory_alive() && bullet_factory->get_is_factory_busy()) {
+		UtilityFunctions::push_error("enable_volley: BulletFactory2D is currently busy. Ignoring the request.");
+		return false;
+	}
+	warn_data_id = data.get_instance_id();
+	// The pool sorts volleys by bullet count, so a wrong-size array here would read past the end - bail before touching anything.
+	if (spawn_transform_count(data) != amount_bullets) {
+		spawn_transforms_ptr = nullptr;
+		UtilityFunctions::push_error("enable_volley: transforms size (" + String::num_int64(spawn_transform_count(data)) + ") must match amount_bullets (" + String::num_int64(amount_bullets) + ").");
+		return false;
+	}
+
+	// Same-shape reuse only rewrites transforms and reseeds vectors (no RID
+	// alloc/free), so it is safe from physics callbacks (shooting from
+	// _physics_process, spawning from hit handlers). A shape-TYPE change
+	// recreates RIDs and must wait for a safe point.
+	const PhysicsServer2D::ShapeType incoming_effective = CollisionShapeHelper2D::get_effective_type(data.collision_shape, false);
+	const bool shape_type_changes = (incoming_effective != cached_effective_shape_type);
+	// Only THIS volley's own tick is off limits (its drain/lifetime pass is
+	// still walking its vectors). Other pooled volleys reuse fine mid-sweep.
+	if (is_being_ticked) {
+		UtilityFunctions::push_error("enable_volley cannot run on a volley while its own tick is running (e.g. from its collision handler or attachment callback). Spawn a new volley instead.");
+		return false;
+	}
+	if (shape_type_changes && bullet_factory != nullptr && factory_alive() && bullet_factory->is_structural_mutation_unsafe()) {
+		UtilityFunctions::push_error("enable_volley with a different collision shape type cannot run inside a physics frame (server flush locks apply to the shape RIDs it must recreate). Spawn through BulletFactory2D (a shape change pops a matching pool bucket) or call enable_volley from an idle frame.");
+		return false;
+	}
+	// Re-enabling a live volley would wipe its attachments, timers, curves and
+	// patterns mid-flight.
+	if (is_active) {
+		UtilityFunctions::push_error("enable_volley: instance is already active. Disable it first or spawn a new volley instead.");
+		return false;
+	}
+	if (is_queued_for_deletion()) {
+		UtilityFunctions::push_error("enable_volley: multimesh is queued for deletion.");
+		return false;
+	}
+	// Never-spawned instances hold no bullet storage (spawn() allocates it).
+	if (multi.is_null() || !multi.is_valid()) {
+		UtilityFunctions::push_error("enable_volley: multimesh was never spawned through BulletFactory2D (no bullet storage). Spawn it first.");
+		return false;
+	}
+	// The factory spawn paths validate finiteness; a direct call must too.
+	if (!new_inherited_velocity_offset.is_finite()) {
+		UtilityFunctions::push_error("enable_volley: inherited velocity offset must be finite, keeping the old value.");
+		return false;
+	}
+	// A direct enable on a pooled instance takes it out of its bucket (the
+	// factory pop already did when it got here through spawn_volley).
+	if (is_pooled_in_pool && bullets_pool != nullptr) {
+		bullets_pool->try_remove_instance(this, get_pool_key());
+	}
+
+	// Reused RIDs keep their original type: a shape-type change recreates
+	// them exactly like set_collision_shape_runtime() does.
+	cache_collision_shape_typed(data.collision_shape);
+	if (shape_type_changes && physics_server != nullptr && area.is_valid()) {
+		release_volley_shape();
+		generate_physics_shapes_for_area(amount_bullets);
+	}
+
+	const uint64_t self_id = get_instance_id();
+	begin_life(data, spawner_id, new_inherited_velocity_offset);
+	if (ObjectDB::get_instance(ObjectID(self_id)) != this || is_queued_for_deletion()) {
+		return false;
+	}
+
+	set_all_physics_shapes_enabled_for_area(true);
+	// Active BEFORE the attachment callbacks, like a cold spawn: an
+	// on_bullet_spawn / on_bullet_enable handler sees enabled bullets and a
+	// disable_bullet from it sticks.
+	// set_visible runs the volley's visibility_changed handlers (user code):
+	// the guard refuses a free and finishes it with queue_free.
+	guarded_user_call2d(this, emit_guard, [&]() { set_visible(true); });
+	if (!survived_user_code(self_id) || is_queued_for_deletion()) {
+		return false;
+	}
+	all_bullets_enabled_set.activate_all_data();
+	is_active = true;
+	if (bullet_factory != nullptr && factory_alive() && bullet_factory->debug_bullet_event_log_enabled) {
+		bullet_factory->debug_log_bullet_event("life", "", get_instance_id(), get_life_id(), amount_bullets, 0);
+	}
+	move_to_front(); // Pooled instances render behind newer ones without this; moving to front emulates fresh spawn order.
+	// Previous life's bakes die here, trail shards rebuild, spawn flashes
+	// fire: BEFORE the attachment callbacks, so a clear from one of them
+	// fires this life's effects, never the previous life's.
+	fx_reseed_from_data(data.effect_layers, true);
+	// Shared spawn-data attachments (slots were blanked by begin_life).
+	apply_shared_bullet_attachment_from_data(data);
+	if (!survived_user_code(self_id)) {
+		return false; // an attachment callback freed this volley or the factory
+	}
+	if (!is_active) {
+		// A callback drained this volley: it is back in the pool (or
+		// parked). The enable itself succeeded; the caller checks is_active.
+		return true;
+	}
+	// Join the factory tick (the spawn path does this too; the sparse set
+	// dedups). Without it a direct enable_volley() call left an active
+	// volley that never moved.
+	if (bullet_factory != nullptr && factory_alive()) {
+		bullet_factory->track_volley_active(*this);
+	}
+	return true;
+}
+
+void BulletVolley2D::enable_bullet(int bullet_index, int collision_amount, bool should_enable_attachment) {
+	const uint64_t self_id = get_instance_id();
+	const bool was_active = is_active;
+	enable_bullet_core(bullet_index, collision_amount, should_enable_attachment);
+	// A parked volley armed for homing while frozen: its owner spawner arms it
+	// now, like a fresh shot (user code: its homing signals). After the
+	// re-entrancy guard, so its handlers may wake or freeze bullets.
+	if (!was_active && ObjectDB::get_instance(ObjectID(self_id)) == this && is_active && homing_wake_owner_id != 0) {
+		const uint64_t owner = homing_wake_owner_id;
+		homing_wake_owner_id = 0;
+		BulletSpawner2D *spawner = owner == owner_spawner_id ? Object::cast_to<BulletSpawner2D>(ObjectDB::get_instance(ObjectID(owner))) : nullptr;
+		if (spawner != nullptr && !spawner->is_queued_for_deletion()) {
+			spawner->arm_homing_after_wake(this);
+		}
+	}
+}
+
+void BulletVolley2D::enable_bullet_core(int bullet_index, int collision_amount, bool should_enable_attachment) {
+	// Wake = RESUME (freeze contract): the bullet continues exactly where
+	// disable_bullet() froze it (ballistics, hit count, bounce ledger, homing
+	// queue, orbit, wobble, gravity, pattern progress, custom data). Waking
+	// the LAST disabled bullet of a parked volley resumes the whole volley,
+	// owner and timers included; an expired parked volley gets a fresh
+	// lifetime (both clocks restart together). A POOLED volley is refused:
+	// it was released, so this handle is stale.
+	if (!validate_bullet_index(bullet_index, "enable_bullet")) {
+		return;
+	}
+	if (is_queued_for_deletion()) {
+		UtilityFunctions::push_error("enable_bullet: multimesh is queued for deletion.");
+		return;
+	}
+	if (is_pooled_in_pool) {
+		UtilityFunctions::push_error("enable_bullet: this volley went back to the pool when its last bullet died (is_auto_pooling_enabled was on), so this handle is stale. Spawn a new volley, or set is_auto_pooling_enabled = false before the last bullet dies to keep (park) the volley.");
+		return;
+	}
+	if (bullet_index >= (int)all_cached_instance_transforms.size() || bullet_index >= (int)bullets_current_collision_count.size()) {
+		return;
+	}
+	if (multi.is_null() || !multi.is_valid()) {
+		return;
+	}
+	if (physics_server == nullptr || !area.is_valid()) {
+		return;
+	}
+	if (all_bullets_enabled_set.contains(bullet_index)) {
+		return;
+	}
+	// A wake from inside a sweep (on_bullet_disable handler during a pool
+	// release or a clear) would resurrect a volley that is being torn down.
+	if (bullet_factory != nullptr && factory_alive() && bullet_factory->get_is_factory_busy()) {
+		UtilityFunctions::push_error("enable_bullet: cannot wake a bullet while the factory is busy (e.g. inside an on_bullet_disable handler during a sweep). Wake it after the sweep (e.g. from the next frame).");
+		return;
+	}
+	// The attachment callback below runs user code that may re-enter
+	// enable_bullet()/disable_bullet(): claim the slot (set + counter) first
+	// and reject nested calls, so the counter never drifts vs the sparse set.
+	if (_bullet_enable_depth > 0) {
+		UtilityFunctions::push_error("enable_bullet: re-entrant call from inside on_bullet_enable is not allowed. Use call_deferred to change bullet state from that callback.");
+		return;
+	}
+	ReentrancyGuard bullet_enable_guard(_bullet_enable_depth, this);
+	const uint64_t self_id = get_instance_id();
+
+	const bool waking_volley = !is_active;
+	all_bullets_enabled_set.activate_data(bullet_index);
+	++active_bullets_counter;
+	if (active_bullets_counter > amount_bullets) {
+		active_bullets_counter = amount_bullets;
+	}
+	// A wake is a new slot life: records queued before the disable must not
+	// fire now (same-overlap double count).
+	bump_collision_epoch_for_bullet(bullet_index);
+	if (bullet_factory != nullptr && factory_alive() && bullet_factory->debug_bullet_event_log_enabled) {
+		bullet_factory->debug_log_bullet_event("wake", "", get_instance_id(), get_life_id(), bullet_index, collision_epoch_for_bullet(bullet_index));
+	}
+	// The freeze ended any graze visit: a fresh one starts (no exit fires
+	// for a visit that ended frozen).
+	graze_end_visits_of_bullet(bullet_index);
+	// Read before own_life_on_wake grants the new lifetime.
+	const bool fresh_life = wake_is_fresh_life(bullet_index);
+	own_life_on_wake(bullet_index);
+	emitter_on_wake(bullet_index, fresh_life);
+	// A woken bullet splits again (max_splits_per_bullet counts one life).
+	if (bullet_index < (int)split_counts.size()) {
+		split_counts[bullet_index] = 0;
+	}
+
+	multi->set_instance_transform_2d(bullet_index, to_local_for_multimesh(all_cached_instance_transforms[bullet_index])); // Start rendering the instance
+	write_trail_instances(bullet_index); // Wake resumes the trail with the bullet (a shard handler is user code)
+	if (!survived_user_code(self_id) || is_queued_for_deletion()) {
+		return;
+	}
+	write_shape_disabled(bullet_index, false);
+	// Woken bullets must not lerp from a stale pre-disable position.
+	update_bullet_previous_transform_for_interpolation(bullet_index);
+
+	// collision_amount -1 (default) keeps the frozen hit count. 0+ sets how
+	// many hits the bullet has already taken, clamped like
+	// set_bullet_collision_count (at/above max leaves exactly one hit).
+	if (collision_amount >= 0) {
+		int &count = bullets_current_collision_count[bullet_index];
+		if (bullet_max_collision_count > 0 && collision_amount >= bullet_max_collision_count) {
+			count = bullet_max_collision_count - 1;
+		} else {
+			count = collision_amount;
+		}
+	}
+
+	if (waking_volley) {
+		// Expired parked volley: a fresh lifetime, both clocks restart
+		// together (unit curves sample elapsed / max_life_time). A manual
+		// drain keeps its remaining time and clock.
+		if (!is_life_time_infinite && current_life_time <= 0.0) {
+			current_life_time = max_life_time;
+			curves_elapsed_time = 0.0;
+			split_timer_fired_chain = 0; // the split timer runs on that clock
+		}
+		is_active = true;
+		// set_visible runs the volley's visibility_changed handlers (user
+		// code): the guard refuses a free and finishes it with queue_free.
+		guarded_user_call2d(this, emit_guard, [&]() { set_visible(true); });
+		if (!survived_user_code(self_id) || is_queued_for_deletion()) {
+			return;
+		}
+		if (bullet_factory != nullptr && factory_alive()) {
+			bullet_factory->track_volley_active(*this);
+		}
+		// Disabled bullets are not rendered, but their prev cache is stale:
+		// sync all so a later wake never lerps from a pre-disable pose.
+		update_all_previous_transforms_for_interpolation();
+	}
+
+	if (should_enable_attachment) {
+		note_user_code(); // on_bullet_enable runs user code inside the sweep
+		bullet_enable_attachment(bullet_index); // resumes a suspended attachment (on_bullet_enable)
+	}
+}
+
+void BulletVolley2D::disable_bullet(int bullet_index, bool release_attachment, bool reset_state) {
+	disable_bullet_core(bullet_index, release_attachment, reset_state, "manual");
+}
+
+void BulletVolley2D::disable_bullet_core(int bullet_index, bool release_attachment, bool reset_state, const char *cause) {
+	// Disable = FREEZE: the bullet stops rendering, colliding and moving, and
+	// keeps every runtime value for enable_bullet() to resume. reset_state
+	// clears its runtime ledgers (see bullet_reset_state). The attachment is
+	// either returned to the attachment pool (default) or suspended in its
+	// slot (on_bullet_disable now, on_bullet_enable on wake).
+	if (!validate_bullet_index(bullet_index, "disable_bullet")) {
+		return;
+	}
+	// Teardown-adjacent path (PREDELETE frees the area): never null-deref.
+	if (multi.is_null() || !multi.is_valid()) {
+		return;
+	}
+	if (physics_server == nullptr || !area.is_valid()) {
+		return;
+	}
+	// Same re-entrancy latch as enable_bullet(): the attachment callback
+	// below runs user code that may call enable_bullet()/disable_bullet().
+	if (_bullet_enable_depth > 0) {
+		UtilityFunctions::push_error("disable_bullet: re-entrant call from inside on_bullet_enable/on_bullet_disable is not allowed. Use call_deferred to change bullet state from that callback.");
+		return;
+	}
+	if (!all_bullets_enabled_set.contains(bullet_index)) {
+		// Already frozen: a reset request still applies to its ledgers.
+		if (reset_state) {
+			bullet_reset_state(bullet_index);
+		}
+		return;
+	}
+	ReentrancyGuard bullet_disable_guard(_bullet_enable_depth, this);
+
+	all_bullets_enabled_set.disable_data(bullet_index);
+	--active_bullets_counter;
+	if (active_bullets_counter < 0) {
+		active_bullets_counter = 0;
+	}
+	if (bullet_factory != nullptr && factory_alive() && bullet_factory->debug_bullet_event_log_enabled) {
+		bullet_factory->debug_log_bullet_event("disable", cause, get_instance_id(), get_life_id(), bullet_index, collision_epoch_for_bullet(bullet_index));
+	}
+	// Records queued before this disable must not fire after a re-enable.
+	bump_collision_epoch_for_bullet(bullet_index);
+	if (reset_state) {
+		reset_bullet_runtime_state(bullet_index);
+	}
+
+	multi->set_instance_transform_2d(bullet_index, zero_transform); // Stops rendering the instance
+	hide_trail_instances(bullet_index); // Trail dies with its bullet, same frame
+	write_shape_disabled(bullet_index, true);
+
+	const uint64_t self_id = get_instance_id();
+	// on_bullet_disable / on_time_scale_changed run user code inside the
+	// sweep (graze target lists re-validate when the epoch moved, §20.2).
+	note_user_code();
+	if (release_attachment) {
+		bullet_disable_attachment(bullet_index);
+	} else {
+		suspend_bullet_attachment(bullet_index);
+	}
+	// The attachment callback ran user code: stop if it freed this volley.
+	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+		return;
+	}
+	if (active_bullets_counter <= 0 && is_active) {
+		on_volley_drained();
+	}
+}
+
+int BulletVolley2D::disable_bullets_bulk(const std::vector<int> &indexes, int fx_trigger, const std::vector<uint64_t> *expected_epochs, int split_cause, bool only_split, const char *cause) {
+	// Same per-bullet contract as disable_bullet(i, true) (freeze, epoch
+	// bump, trail hidden, shape off, attachment released), but the render
+	// side is batched: the per-instance zero writes are collected into ONE
+	// buffer upload when the batch drains the volley (expiry / clear of a
+	// whole volley: N render-server calls -> 1). fx_trigger >= 0 fires that
+	// one-shot layer at each disabled bullet's pose. expected_epochs (same
+	// length as indexes) skips bullets a handler took over in between.
+	// split_cause >= 0 records each bullet's split (pose and state intact)
+	// before its disable; a stage with fire_death_effects off silences that
+	// bullet's death effects. only_split keeps every bullet whose split was
+	// not recorded (the split IS the reason it leaves: timer, manual).
+	if (multi.is_null() || !multi.is_valid() || physics_server == nullptr || !area.is_valid()) {
+		return 0;
+	}
+	if (_bullet_enable_depth > 0) {
+		UtilityFunctions::push_error("disable_bullet: re-entrant call from inside on_bullet_enable/on_bullet_disable is not allowed. Use call_deferred to change bullet state from that callback.");
+		return 0;
+	}
+	const uint64_t self_id = get_instance_id();
+	int disabled_count = 0;
+	// Tests' bullet event log: one check per batch, not per bullet (a
+	// callback inside cannot free the factory without this batch stopping).
+	const bool log_events = bullet_factory != nullptr && factory_alive() && bullet_factory->debug_bullet_event_log_enabled;
+	// Inside the physics flush the shapes sync right after it (one check
+	// for the batch, not one per bullet).
+	const bool defer_shapes = PhysicsFlush2D::flushing();
+	if (defer_shapes) {
+		request_physics_sync();
+	}
+	{
+		ReentrancyGuard bullet_disable_guard(_bullet_enable_depth, this);
+		for (size_t k = 0; k < indexes.size(); ++k) {
+			const int i = indexes[k];
+			if (i < 0 || i >= amount_bullets || !all_bullets_enabled_set.contains(i)) {
+				continue;
+			}
+			if (expected_epochs != nullptr && k < expected_epochs->size() && (*expected_epochs)[k] != collision_epoch_for_bullet(i)) {
+				continue;
+			}
+			int split = 0;
+			if (split_cause >= 0 && split_config != nullptr && i < (int)all_cached_instance_transforms.size()) {
+				split = split_capture(i, split_cause, all_cached_instance_transforms[i]);
+			}
+			if (only_split && !(split & SPLIT_RECORDED)) {
+				continue;
+			}
+			const bool fx_have_pose = !(split & SPLIT_SILENCE_DEATH) && fx_trigger >= 0 && i < (int)all_cached_instance_transforms.size();
+			const Transform2D fx_pose = fx_have_pose ? all_cached_instance_transforms[i] : Transform2D();
+			if (fx_have_pose) {
+				// The matching sound trigger, BEFORE the disable below (a
+				// clear of the last bullet releases the life synchronously;
+				// the drain check runs after this loop, but the pose and
+				// the entries are read while both are intact).
+				const int sound_trigger = fx_trigger == EFFECT_ON_CLEAR ? BulletSoundData2D::SOUND_ON_CLEAR : (fx_trigger == EFFECT_ON_LIFETIME_OVER ? BulletSoundData2D::SOUND_ON_LIFETIME_OVER : (fx_trigger == EFFECT_ON_DESPAWN ? BulletSoundData2D::SOUND_ON_DESPAWN : -1));
+				if (sound_trigger >= 0) {
+					sound_fire(sound_trigger, i, fx_pose.get_origin());
+				}
+			}
+			all_bullets_enabled_set.disable_data(i);
+			--active_bullets_counter;
+			if (active_bullets_counter < 0) {
+				active_bullets_counter = 0;
+			}
+			if (log_events && factory_alive()) {
+				bullet_factory->debug_log_bullet_event("disable", cause, get_instance_id(), get_life_id(), i, collision_epoch_for_bullet(i));
+			}
+			bump_collision_epoch_for_bullet(i);
+			++disabled_count;
+			hide_trail_instances(i);
+			if (!defer_shapes) {
+				physics_server->area_set_shape_disabled(area, i, true);
+			}
+			if (i < (int)attachments.size() && attachments[i] != nullptr) {
+				bullet_disable_attachment(i); // user callback (on_bullet_disable)
+				if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+					return disabled_count; // freed by the callback: touch nothing more
+				}
+			}
+			if (fx_have_pose) {
+				fx_fire_oneshot(fx_trigger, i, fx_pose);
+			}
+		}
+	}
+	if (disabled_count == 0) {
+		return 0;
+	}
+	// Render: zero every dead instance. A drained volley uploads one zero
+	// buffer; a partial batch writes only the bullets it disabled.
+	if (active_bullets_counter <= 0 && (int)batch_buffer.size() == amount_bullets * buffer_stride && multi->get_instance_count() == amount_bullets) {
+		if (colors_enabled) {
+			// Zero only the transforms: a parked volley woken later keeps its colors.
+			float *w = batch_buffer.ptrw();
+			for (int i = 0; i < amount_bullets; ++i) {
+				std::fill(w + i * 12, w + i * 12 + 8, 0.0f);
+			}
+		} else {
+			batch_buffer.fill(0.0f);
+		}
+		multi->set_buffer(batch_buffer);
+	} else {
+		for (int i : indexes) {
+			if (i >= 0 && i < amount_bullets && !all_bullets_enabled_set.contains(i)) {
+				multi->set_instance_transform_2d(i, zero_transform);
+			}
+		}
+	}
+	if (active_bullets_counter <= 0 && is_active) {
+		on_volley_drained();
+	}
+	return disabled_count;
+}
+
+void BulletVolley2D::bullet_reset_state(int bullet_index) {
+	if (!validate_bullet_index(bullet_index, "bullet_reset_state")) {
+		return;
+	}
+	reset_bullet_runtime_state(bullet_index);
+}
+
+void BulletVolley2D::all_bullets_reset_state(int bullet_index_start, int bullet_index_end_inclusive) {
+	for_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_reset_state", [&](int i) { reset_bullet_runtime_state(i); });
+}
+
+void BulletVolley2D::reset_bullet_runtime_state(int bullet_index) {
+	if (bullet_index < 0 || bullet_index >= amount_bullets) {
+		return;
+	}
+	// Runtime LEDGERS only (what the bullet accumulated while flying).
+	// Kinematics (pose, direction, speed, rotation), per-bullet configuration
+	// (curves, wobble/gravity seeds, custom data) and the attachment stay.
+	if (bullet_index < (int)bullets_current_collision_count.size()) {
+		bullets_current_collision_count[bullet_index] = 0;
+	}
+	for (int z = 0; z < graze_zone_slots; ++z) {
+		const size_t at = (size_t)bullet_index * graze_zone_slots + z;
+		if (at < graze_state.size()) {
+			graze_state[at] = 0;
+		}
+	}
+	visit_bounce_ledger([&](auto &v, auto empty) {
+		if (bullet_index < (int)v.size()) {
+			v[bullet_index] = empty;
+		}
+	});
+	if (bullet_index < (int)all_bounce_frame.size()) {
+		all_bounce_frame[bullet_index] = BounceFrame2D();
+	}
+	if (bullet_index < (int)all_gravity_velocity.size()) {
+		all_gravity_velocity[bullet_index] = Vector2(0, 0);
+	}
+	if (bullet_index < (int)all_bullet_wobble.size()) {
+		all_bullet_wobble[bullet_index].has_last = false;
+	}
+	if (bullet_index < (int)wobble_distance_traveled.size()) {
+		wobble_distance_traveled[bullet_index] = 0.0;
+	}
+	if (bullet_index < (int)all_movement_pattern_data.size()) {
+		all_movement_pattern_data[bullet_index].distance_traveled = 0.0;
+	}
+	if (bullet_index < (int)shared_movement_pattern_distances.size()) {
+		shared_movement_pattern_distances[bullet_index] = 0.0;
+	}
+	if (bullet_index < (int)all_bullet_homing_targets.size() && bullet_index < (int)all_homing_count.size()) {
+		homing_drop_own_targets(bullet_index);
+	}
+	if (bullet_index < (int)all_shared_homing_reached.size()) {
+		all_shared_homing_reached[bullet_index] = SharedHomingReachedState();
+	}
+	if (bullet_index < (int)all_orbiting_status.size() && all_orbiting_status[bullet_index]) {
+		all_orbiting_status[bullet_index] = 0;
+		--active_orbiting_count;
+		if (active_orbiting_count < 0) {
+			active_orbiting_count = 0;
+		}
+	}
+	if (bullet_index < (int)all_orbiting_data.size()) {
+		all_orbiting_data[bullet_index] = OrbitingData();
+	}
+	if (bullet_index < (int)split_counts.size()) {
+		split_counts[bullet_index] = 0;
+	}
+	// The fall speed and the bounce frame (drift) are gone: report it at once.
+	refresh_velocity_if_cached(bullet_index);
+}
+
+bool BulletVolley2D::clear_bullet(int bullet_index) {
+	if (!validate_bullet_index(bullet_index, "clear_bullet")) {
+		return false;
+	}
+	// Already-dead slots stay silent: without this a double clear would
+	// fire a second visual for a bullet that is already gone.
+	if (!all_bullets_enabled_set.contains(bullet_index)) {
+		return false;
+	}
+	// Refused by the re-entrancy latch (called from an attachment callback):
+	// disable_bullet reports it, and nothing is recorded for a bullet that
+	// does not die (no split, no On Clear sound or flash).
+	if (_bullet_enable_depth > 0) {
+		disable_bullet_core(bullet_index, true, false, "clear");
+		return false;
+	}
+	// Pose captured before the disable below (disable never moves the
+	// bullet, but the last-bullet disable releases the life and pools the
+	// instance; the DESTROY path fires the same way).
+	Transform2D fx_clear_transf;
+	const bool fx_have_pose = bullet_index >= 0 && bullet_index < (int)all_cached_instance_transforms.size();
+	int split = 0;
+	if (fx_have_pose) {
+		fx_clear_transf = all_cached_instance_transforms[bullet_index];
+		if (split_config != nullptr) {
+			split = split_capture(bullet_index, SPLIT_CAUSE_CLEAR, fx_clear_transf);
+		}
+		if (!(split & SPLIT_SILENCE_DEATH)) {
+			sound_fire(BulletSoundData2D::SOUND_ON_CLEAR, bullet_index, fx_clear_transf.get_origin());
+		}
+	}
+	const uint64_t self_id = get_instance_id();
+	disable_bullet_core(bullet_index, true, false, "clear");
+	// The attachment callback inside ran user code: it may have freed this
+	// volley or the factory.
+	if (!survived_user_code(self_id)) {
+		return true;
+	}
+	if (fx_have_pose && !(split & SPLIT_SILENCE_DEATH)) {
+		fx_fire_oneshot(EFFECT_ON_CLEAR, bullet_index, fx_clear_transf);
+	}
+	return true;
+}
+
+int BulletVolley2D::clear_all_bullets() {
+	// Snapshot first: the batch mutates the live set. One On Clear per
+	// cleared bullet; a drained volley pays one render upload.
+	// A local copy, never a member: an attachment callback may re-enter
+	// clear_all_bullets() (rejected by the latch inside, but it must not
+	// rewrite the list this batch is walking).
+	const std::vector<int> live = all_bullets_enabled_set.get_active_indexes();
+	return disable_bullets_bulk(live, EFFECT_ON_CLEAR, nullptr, SPLIT_CAUSE_CLEAR, false, "clear");
+}
+
+BulletVolley2D::~BulletVolley2D() {
+	for (auto &queue : all_bullet_homing_targets) {
+		queue.clear_homing_targets(cached_mouse_global_position);
+	}
+	shared_homing_deque.clear_homing_targets(cached_mouse_global_position);
+}
+
+void BulletVolley2D::seed_motion_features(const BulletVolleyData2D &data) {
+	const BulletVolleyData2D *volley_data = &data;
+	// Reset every motion feature to its blank state first (the apply_* calls
+	// below then seed from the data); the speed/direction/velocity arrays are
+	// sized and fully written by set_up_movement_data below.
+	adjust_direction_based_on_rotation = false;
+	homing_update_timer = 0.0;
+	all_bullet_wobble.assign(amount_bullets, WobbleSeed());
+	all_bullet_wobble_data.assign(amount_bullets, Ref<BulletWobbleData2D>());
+	wobble_distance_traveled.assign(amount_bullets, 0.0);
+	is_wobble_feature_enabled = false;
+	shared_bullet_wobble_data.unref();
+	gravity = Vector2(0, 0);
+	all_gravity.assign(amount_bullets, Vector2(0, 0));
+	all_gravity_velocity.assign(amount_bullets, Vector2(0, 0));
+	has_per_bullet_gravity.assign(amount_bullets, 0);
+	gravity_delay_sec = 0.0;
+	gravity_duration_sec = 0.0;
+	linear_drag = 0.0;
+	homing_delay_sec = 0.0;
+	homing_duration_sec = 0.0;
+	homing_lose_range_px = 0.0;
+	all_bullet_homing_targets.resize(amount_bullets);
+	all_homing_count.assign(amount_bullets, 0);
+	all_bullet_homing_smoothing.assign(amount_bullets, 0.0);
+	homing_smoothing_script_owned.assign(amount_bullets, 0);
+	use_per_bullet_homing_smoothing = false;
+	homing_smoothing_fanned = false;
+	all_orbiting_data.resize(amount_bullets);
+	all_orbiting_status.assign(amount_bullets, 0);
+	all_shared_homing_reached.resize(amount_bullets);
+	homing_inert_warning_issued = false;
+	// Like enable: a fresh volley starts with zeroed homing/orbit counters and no cached mouse position.
+	active_homing_count = 0;
+	active_orbiting_count = 0;
+	cached_mouse_global_position = Vector2(0, 0);
+	homing_reached_events.clear();
+	shared_pop_requested = false;
+	shared_movement_pattern_curve.unref();
+	shared_movement_pattern_face_movement_direction = false;
+	shared_movement_pattern_repeat = true;
+	shared_movement_pattern_distances.assign(amount_bullets, 0.0);
+	all_bullet_curves_data.assign(amount_bullets, Ref<BulletCurvesData2D>());
+	all_movement_pattern_data.assign(amount_bullets, BulletMovementPatternData2D());
+	shared_bullet_curves_data.unref();
+	// Rotation presence is (re)derived by set_rotation_data, which begin_life
+	// runs before this seed; resetting it here would erase authored entries.
+
+	set_up_movement_data(volley_data->all_bullet_speed_data, volley_data->tile_all_bullet_speed_data);
+
+	adjust_direction_based_on_rotation = volley_data->adjust_direction_based_on_rotation;
+
+	// Unified precedence: per-bullet wins over shared. Seed per-bullet
+	// first, then fill only the gaps left by invalid entries (null or
+	// non-finite) from shared. Shared is the fallback default, never an
+	// override. Members mirror the data so runtime getters stay truthful.
+	shared_bullet_speed_data = volley_data->shared_bullet_speed_data;
+	if (shared_bullet_speed_data.is_valid()) {
+		apply_shared_speed_fallback(shared_bullet_speed_data);
+	}
+	shared_bullet_rotation_data = volley_data->shared_bullet_rotation_data;
+	if (shared_bullet_rotation_data.is_valid()) {
+		apply_shared_rotation_fallback(shared_bullet_rotation_data, data.rotate_only_textures);
+	}
+
+	// Per-bullet spawn-data curves/patterns first, then the shared features
+	// below (separate storages, so the tick resolves precedence live).
+	apply_per_bullet_curves_from_data(*volley_data);
+	apply_per_bullet_movement_patterns_from_data(*volley_data);
+
+	// Shared spawn-data features. Curves always applied (a null data unrefs
+	// any stale member via populate_shared); the pattern resolver clears its
+	// own slot on empty/unresolvable paths. Per-bullet runtime state set after
+	// spawn still overrides afterwards.
+	populate_shared_curves_related_data(volley_data->shared_bullet_curves_data);
+	apply_shared_movement_pattern_from_data(*volley_data);
+	apply_wobble_from_data(*volley_data);
+	apply_gravity_from_data(*volley_data);
+
+	// Homing steering seeds from the same spawn data (direct factory users
+	// keep it on fresh spawns too, matching the enable path).
+	homing_smoothing = (real_t)volley_data->homing_smoothing;
+	homing_update_interval = (real_t)volley_data->homing_update_interval;
+	homing_update_timer = 0.0;
+	homing_take_control_of_texture_rotation = volley_data->homing_take_control_of_texture_rotation;
+	homing_distance_before_reached = (real_t)volley_data->homing_distance_before_reached;
+	homing_reach_counts_bullet_size = volley_data->homing_reach_counts_bullet_size;
+	bullet_homing_auto_pop_after_target_reached = volley_data->bullet_homing_auto_pop_after_target_reached;
+	shared_homing_deque_auto_pop_after_target_reached = volley_data->shared_homing_deque_auto_pop_after_target_reached;
+	linear_drag = (real_t)volley_data->linear_drag;
+	homing_delay_sec = (real_t)volley_data->homing_delay_sec;
+	homing_duration_sec = (real_t)volley_data->homing_duration_sec;
+	homing_lose_range_px = (real_t)volley_data->homing_lose_range_px;
+	apply_bounce_from_data(*volley_data, data.collision_mask);
+}
+
+void BulletVolley2D::on_volley_deactivated() {
+	// Dying life: reached events collected this tick die with it.
+	homing_reached_events.clear();
+	shared_pop_requested = false;
+	if (bullet_factory != nullptr && factory_alive()) {
+		bullet_factory->track_volley_inactive(*this);
+	}
+}
+
+} // namespace BlastBullets2D

@@ -1,0 +1,401 @@
+extends BlastTest
+## Pattern bake cache: raw transforms are generated once per geometry change
+## and re-posed per shot when the generator moves rigidly (or translates, for
+## world-direction patterns). Classification is MEASURED (probe markers), the
+## verifier (on for every suite via BlastTest.before_all) regenerates every
+## cached result, and these tests prove: cached == uncached for every source
+## under random generator motion, hits really happen, every inspector
+## property invalidates, OFF disables, mirror bursts get their own bake.
+
+const SOURCES_NEEDING_INPUT := [
+	BulletSpawner2D.PATTERN_FROM_HELPER_AIMED,
+	BulletSpawner2D.PATTERN_FROM_HELPER_CUSTOM,
+	BulletSpawner2D.PATTERN_FROM_HELPER_PATH2D,
+]
+
+var sp: BulletSpawner2D
+var gen: Node2D
+var rng := RandomNumberGenerator.new()
+
+
+func before_each() -> void:
+	await super()
+	rng.seed = 424242
+	gen = add(Node2D.new())
+	gen.position = Vector2(300, 200)
+	sp = make_spawner(H.make_volley_data(4), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 24)
+	sp.set_transforms_generator(gen)
+
+
+func _assert_same(a: Array, b: Array, label: String) -> void:
+	assert_eq(a.size(), b.size(), label + ": size")
+	for i in mini(a.size(), b.size()):
+		var x: Transform2D = a[i]
+		var y: Transform2D = b[i]
+		if x.origin.distance_to(y.origin) > 0.01 or x.x.distance_to(y.x) > 0.001 or x.y.distance_to(y.y) > 0.001:
+			assert_true(false, "%s: slot %d cached %s vs uncached %s" % [label, i, x, y])
+			return
+
+
+func _random_pose() -> void:
+	gen.position = Vector2(rng.randf_range(-500, 500), rng.randf_range(-500, 500))
+	gen.rotation = rng.randf_range(-PI, PI)
+
+
+## Seeds every helper RNG so random layouts are reproducible: an unseeded
+## generator re-rolls per call, so two collects can never be compared.
+func _seed_all() -> void:
+	for p in sp.get_property_list():
+		var node_name := str(p["name"])
+		if node_name.begins_with("helper_") and node_name.ends_with("_seed"):
+			sp.set(node_name, 1234)
+
+
+func _configure_input(src: int) -> void:
+	if src == BulletSpawner2D.PATTERN_FROM_HELPER_AIMED or src == BulletSpawner2D.PATTERN_FROM_HELPER_CORRIDOR:
+		var tgt: Node2D = add(Node2D.new())
+		tgt.position = Vector2(900, -300)
+		sp.set_helper_aimed_target(tgt)
+	elif src == BulletSpawner2D.PATTERN_FROM_HELPER_CUSTOM:
+		sp.set_helper_custom_transforms([Transform2D(0.3, Vector2(10, 0)), Transform2D(-0.2, Vector2(0, 25)), Transform2D(1.0, Vector2(-15, -5))])
+	elif src == BulletSpawner2D.PATTERN_FROM_HELPER_PATH2D:
+		var path := Path2D.new()
+		var curve := Curve2D.new()
+		for p in [Vector2(0, 0), Vector2(100, 40), Vector2(200, -20), Vector2(320, 30)]:
+			curve.add_point(p)
+		path.curve = curve
+		add(path)
+		sp.set_helper_path2d_node(path)
+	elif src == BulletSpawner2D.PATTERN_FROM_CHILDREN:
+		for i in 3:
+			var m := Node2D.new()
+			m.position = Vector2(20 * i, -10 * i)
+			m.rotation = 0.3 * i
+			gen.add_child(m)
+
+
+func test_every_source_cached_equals_uncached_under_motion(src: int = use_parameters(range(BulletSpawner2D.PATTERN_FROM_LAST))) -> void:
+	sp.pattern_source = (src as BulletSpawner2D.PatternSource)
+	_seed_all()
+	_configure_input(src)
+	for step in 6:
+		_random_pose()
+		var cached: Array = sp.collect_spawn_transforms()
+		var fresh: Array = sp.debug_collect_spawn_transforms_uncached()
+		_assert_same(cached, fresh, "source %d pose %d" % [src, step])
+	assert_true(H.finite_volley(sp.collect_spawn_transforms()), "source %d finite" % src)
+
+
+func test_rigid_ring_hits_cache_while_moving() -> void:
+	sp.collect_spawn_transforms()
+	var info: Dictionary = sp.debug_get_pattern_cache_info()
+	assert_eq(int(info["shot_class"]), 2, "default ring is classified RIGID (2)")
+	var hits0: int = info["hits"]
+	var bakes0: int = info["bakes"]
+	for i in 10:
+		_random_pose()
+		sp.collect_spawn_transforms()
+	info = sp.debug_get_pattern_cache_info()
+	assert_eq(int(info["hits"]) - hits0, 10, "every rigid move is served from the bake")
+	assert_eq(int(info["bakes"]), bakes0, "no re-bake while only the generator moves")
+
+
+## A bake is reused only where float32 can re-pose it within the cache's own
+## match tolerance: one taken at a huge (finite) position never serves a shot
+## near the origin (re-posing it cancelled the offset to 0: a verifier
+## mismatch and bullets at the wrong spot); it re-anchors there instead, and
+## nearby moves keep hitting.
+func test_a_bake_far_away_is_never_reposed_near_the_origin() -> void:
+	gen.position = Vector2(42.0, 8.3e35)
+	sp.collect_spawn_transforms()
+	gen.position = Vector2(300, 569)
+	var cached: Array = sp.collect_spawn_transforms()
+	expect_no_errors("no cache mismatch")
+	_assert_same(cached, sp.debug_collect_spawn_transforms_uncached(), "after the far bake")
+	var info: Dictionary = sp.debug_get_pattern_cache_info()
+	var hits0: int = info["hits"]
+	gen.position = Vector2(310, 580)
+	sp.collect_spawn_transforms()
+	assert_eq(int(sp.debug_get_pattern_cache_info()["hits"]) - hits0, 1, "re-anchored near the origin: nearby moves hit again")
+	gen.position = Vector2(1e9, -3e9) # float32 spacing is 64-256 px out there: the verifier's relative tolerance judges it
+	sp.collect_spawn_transforms()
+	expect_no_errors("a far shot from a near bake: still no mismatch")
+
+
+func test_scaled_generator_rebakes_then_hits() -> void:
+	sp.collect_spawn_transforms()
+	gen.scale = Vector2(2, 2)
+	sp.collect_spawn_transforms()
+	var bakes1: int = sp.debug_get_pattern_cache_info()["bakes"]
+	var hits1: int = sp.debug_get_pattern_cache_info()["hits"]
+	gen.rotation = 1.0
+	gen.position += Vector2(50, 0)
+	sp.collect_spawn_transforms()
+	var info: Dictionary = sp.debug_get_pattern_cache_info()
+	assert_eq(int(info["hits"]), hits1 + 1, "rigid move of the scaled generator hits")
+	assert_eq(int(info["bakes"]), bakes1, "no extra bake")
+
+
+func test_translation_class_world_direction_rain() -> void:
+	sp.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_RAIN
+	sp.helper_rain_seed = 7
+	sp.collect_spawn_transforms()
+	var cls: int = sp.debug_get_pattern_cache_info()["shot_class"]
+	assert_true(cls >= 1, "seeded rain is cacheable (class %d)" % cls)
+	var hits0: int = sp.debug_get_pattern_cache_info()["hits"]
+	gen.position += Vector2(123, -45)
+	sp.collect_spawn_transforms()
+	assert_eq(int(sp.debug_get_pattern_cache_info()["hits"]), hits0 + 1, "translation is served from the bake")
+
+
+func test_unseeded_scatter_never_cached_for_shots() -> void:
+	sp.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_SCATTER
+	sp.helper_scatter_seed = 0
+	var a: Array = sp.collect_spawn_transforms()
+	var b: Array = sp.collect_spawn_transforms()
+	assert_eq(int(sp.debug_get_pattern_cache_info()["shot_class"]), 0, "unseeded randomness is class NONE")
+	var differs := false
+	for i in mini(a.size(), b.size()):
+		if (a[i] as Transform2D).origin.distance_to((b[i] as Transform2D).origin) > 0.01:
+			differs = true
+	assert_true(differs, "unseeded scatter still re-rolls every shot")
+
+
+func test_external_sources_are_never_cached(src: int = use_parameters([BulletSpawner2D.PATTERN_FROM_CHILDREN, BulletSpawner2D.PATTERN_FROM_HELPER_AIMED, BulletSpawner2D.PATTERN_FROM_HELPER_CORRIDOR, BulletSpawner2D.PATTERN_FROM_HELPER_CUSTOM, BulletSpawner2D.PATTERN_FROM_HELPER_PATH2D])) -> void:
+	sp.pattern_source = (src as BulletSpawner2D.PatternSource)
+	_configure_input(src)
+	sp.collect_spawn_transforms()
+	sp.collect_spawn_transforms()
+	var info: Dictionary = sp.debug_get_pattern_cache_info()
+	assert_eq(int(info["shot_class"]), 0, "source %d reads other nodes: class NONE" % src)
+	assert_eq(int(info["hits"]), 0, "source %d never served from cache" % src)
+
+
+func test_cache_off_never_hits() -> void:
+	sp.pattern_cache_mode = BulletSpawner2D.PATTERN_CACHE_OFF
+	for i in 5:
+		_random_pose()
+		sp.collect_spawn_transforms()
+	assert_eq(int(sp.debug_get_pattern_cache_info()["hits"]), 0, "OFF regenerates every time")
+	@warning_ignore("int_as_enum_without_match") # deliberate invalid value: the setter must reject it
+	sp.pattern_cache_mode = (7 as BulletSpawner2D.PatternCacheMode)
+	expect_error_sequence(["pattern_cache_mode must be 0 (Auto) or 1 (Off)"])
+	assert_eq(sp.pattern_cache_mode, BulletSpawner2D.PATTERN_CACHE_OFF, "invalid mode rejected, old value kept")
+
+
+func test_burst_mirror_bakes_separately() -> void:
+	sp.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_SPIRAL
+	sp.helper_bullets_amount = 12
+	sp.burst_alternate_mirror = true
+	for i in 6:
+		_random_pose()
+		var cached: Array = sp.collect_spawn_transforms()
+		_assert_same(cached, sp.debug_collect_spawn_transforms_uncached(), "spiral (mirror state %d)" % i)
+
+
+## Value that differs from `v` for a property, guided by its hint.
+func _perturb(p: Dictionary, v: Variant) -> Variant:
+	match typeof(v):
+		TYPE_BOOL:
+			return not v
+		TYPE_INT:
+			if int(p.get("hint", 0)) == PROPERTY_HINT_ENUM:
+				var opts: PackedStringArray = str(p.get("hint_string", "")).split(",")
+				return (int(v) + 1) % maxi(1, opts.size())
+			return int(v) + 1
+		TYPE_FLOAT:
+			return float(v) * 1.25 + 3.0
+		TYPE_VECTOR2:
+			return (v as Vector2) * 1.25 + Vector2(3, 2)
+	return null
+
+
+func test_every_pattern_property_invalidates_the_bake() -> void:
+	# Generic sweep: bake, change ONE property, collect again. A setter that
+	# forgot mark_pattern_dirty() would serve the stale bake and the verifier
+	# push_errors "pattern cache mismatch" (strict mode fails the test).
+	var swept := 0
+	_seed_all()
+	for src in [BulletSpawner2D.PATTERN_FROM_HELPER_RING, BulletSpawner2D.PATTERN_FROM_HELPER_RECTANGLE, BulletSpawner2D.PATTERN_FROM_HELPER_SPIRAL, BulletSpawner2D.PATTERN_FROM_HELPER_FLOWER, BulletSpawner2D.PATTERN_FROM_HELPER_GRID]:
+		sp.pattern_source = src
+		for p in sp.get_property_list():
+			var node_name := str(p["name"])
+			if not (node_name.begins_with("helper_") or node_name in ["pattern_scale", "transforms_scale"]):
+				continue
+			if node_name == "helper_bullets_amount" or node_name.ends_with("_path") or node_name.ends_with("_target") or node_name.ends_with("_seed") or node_name == "helper_custom_transforms" or node_name == "helper_skip_indices":
+				continue
+			var old: Variant = sp.get(node_name)
+			var nv: Variant = _perturb(p, old)
+			if nv == null:
+				continue
+			sp.collect_spawn_transforms() # bake at the old value
+			_random_pose()
+			sp.collect_spawn_transforms()
+			sp.set(node_name, nv)
+			swallow_rejections_for(node_name)
+			_random_pose()
+			var cached: Array = sp.collect_spawn_transforms()
+			swallow_rejections_for(node_name)
+			_assert_same(cached, sp.debug_collect_spawn_transforms_uncached(), "after changing %s (source %d)" % [node_name, src])
+			swallow_rejections_for(node_name)
+			sp.set(node_name, old)
+			swallow_rejections_for(node_name)
+			swept += 1
+	assert_gt(swept, 100, "sweep covered the pattern inspector (%d properties)" % swept)
+
+
+## A perturbed value may be legitimately rejected by its setter or make the
+## generator refuse (e.g. a negative count): that is fine for THIS test (the
+## contract here is cache coherence, pinned by the verifier's error text,
+## which is never swallowed).
+func swallow_rejections_for(_prop: String) -> void:
+	for err in get_errors():
+		if not err.handled and not err.contains_text("pattern cache mismatch"):
+			err.handled = true
+
+
+func test_skip_indices_and_scales_apply_after_the_bake() -> void:
+	var plain: Array = sp.collect_spawn_transforms()
+	sp.helper_skip_indices = PackedInt32Array([0, 5])
+	sp.pattern_scale = 1.5
+	sp.transforms_scale = 2.0
+	_random_pose()
+	_assert_same(sp.collect_spawn_transforms(), sp.debug_collect_spawn_transforms_uncached(), "skip + scales on a cached pattern")
+	assert_eq(sp.collect_spawn_transforms().size(), plain.size() - 2, "skip carves exactly two slots")
+
+
+func _differs(a: Array, b: Array) -> bool:
+	if a.size() != b.size():
+		return true
+	for i in a.size():
+		var x: Transform2D = a[i]
+		var y: Transform2D = b[i]
+		if x.origin.distance_to(y.origin) > 0.01 or x.x.distance_to(y.x) > 0.001:
+			return true
+	return false
+
+
+## The longest registered knob prefix owning a property (-1: shared knob).
+func _owner(prop: String, shapes: Array) -> int:
+	var best := -1
+	var best_len := 0
+	for s in shapes:
+		var pre: String = s["knob_prefix"]
+		if pre != "" and pre.length() > best_len and prop.begins_with(pre):
+			best = int(s["id"])
+			best_len = pre.length()
+	return best
+
+
+func test_every_shape_knob_invalidates_the_bake_under_its_own_shape() -> void:
+	# Ownership-driven sweep: each cacheable shape's knobs are perturbed while
+	# THAT shape is the source (the generic sweep above runs every knob under
+	# five fixed sources, where most knobs cannot move a single bullet). A
+	# perturbation that moves the bullets proves the knob participates; the
+	# verifier then proves the bake noticed.
+	var shapes: Array = BulletPatterns2D.get_shapes()
+	_seed_all()
+	var by_owner := {}
+	for p in sp.get_property_list():
+		var node_name := str(p["name"])
+		if not node_name.begins_with("helper_") or node_name.begins_with("helper_outline_") or node_name.ends_with("_seed") or node_name.ends_with("_path") or node_name.ends_with("_target"):
+			continue
+		var owner_id := _owner(node_name, shapes)
+		if owner_id >= 0:
+			if not by_owner.has(owner_id):
+				by_owner[owner_id] = []
+			by_owner[owner_id].append(p)
+	var swept := 0
+	var moved := 0
+	var inert: Array = []
+	for s in shapes:
+		if bool(s["reads_external_state"]) or not by_owner.has(int(s["id"])):
+			continue
+		sp.pattern_source = (int(s["id"]) as BulletSpawner2D.PatternSource)
+		for p in by_owner[int(s["id"])]:
+			var knob_name := str(p["name"])
+			var old: Variant = sp.get(knob_name)
+			var nv: Variant = _perturb(p, old)
+			if nv == null:
+				continue
+			_random_pose()
+			var before: Array = sp.debug_collect_spawn_transforms_uncached()
+			sp.collect_spawn_transforms() # bake at the old value
+			sp.set(knob_name, nv)
+			swallow_rejections_for(knob_name)
+			var cached: Array = sp.collect_spawn_transforms()
+			swallow_rejections_for(knob_name)
+			var fresh: Array = sp.debug_collect_spawn_transforms_uncached()
+			swallow_rejections_for(knob_name)
+			_assert_same(cached, fresh, "after changing %s under %s" % [knob_name, s["name"]])
+			if _differs(before, fresh):
+				moved += 1
+			elif sp.get(knob_name) == nv:
+				inert.append(knob_name)
+			sp.set(knob_name, old)
+			swallow_rejections_for(knob_name)
+			swept += 1
+	assert_gt(swept, 150, "every cacheable shape's knobs swept (%d)" % swept)
+	assert_gt(moved, int(swept * 85.0 / 100.0), "most perturbations really move bullets (%d of %d); inert: %s" % [moved, swept, inert])
+
+
+## The random-layout sources (one `*_seed` knob each) and the exact key set of
+## debug_get_pattern_cache_info for a bullet spawner (it adds the spawn-data
+## duplicate cache to the pattern cache's six).
+const RANDOM_SOURCES := [
+	[BulletSpawner2D.PATTERN_FROM_HELPER_GRID, "helper_grid_seed"],
+	[BulletSpawner2D.PATTERN_FROM_HELPER_RING, "helper_ring_seed"],
+	[BulletSpawner2D.PATTERN_FROM_HELPER_FAN, "helper_fan_seed"],
+	[BulletSpawner2D.PATTERN_FROM_HELPER_RAIN, "helper_rain_seed"],
+	[BulletSpawner2D.PATTERN_FROM_HELPER_SCATTER, "helper_scatter_seed"],
+	[BulletSpawner2D.PATTERN_FROM_HELPER_WATERFALL, "helper_waterfall_seed"],
+]
+const CACHE_INFO_KEYS := ["hits", "misses", "bakes", "version", "shot_class", "preview_class", "template_valid", "spawn_id_match"]
+
+
+## Every seeded random source reports the exact cache-info key set, finite
+## non-negative counters that never decrease, no re-bake while its knobs stay
+## unchanged, and exactly one more bake when the seed changes: a seeded
+## random layout is fully cacheable (class RIGID or TRANSLATION).
+func test_random_source_cache_info_is_exact_and_monotonic(i: int = use_parameters(range(RANDOM_SOURCES.size()))) -> void:
+	var src: int = RANDOM_SOURCES[i][0]
+	var knob: String = RANDOM_SOURCES[i][1]
+	sp.pattern_source = src as BulletSpawner2D.PatternSource
+	assert_true(knob in sp, "the seed knob exists: %s" % knob)
+	sp.set(knob, 7)
+	assert_eq(int(sp.get(knob)), 7, "the seed is set")
+	var base: Dictionary = sp.debug_get_pattern_cache_info()
+	assert_eq(base.keys(), CACHE_INFO_KEYS, "the exact key set")
+	assert_eq([int(base["hits"]), int(base["misses"]), int(base["bakes"])], [0, 0, 0], "a fresh spawner has no cache history")
+	var hits := 0
+	var bakes := -1
+	for k in 3:
+		sp.collect_spawn_transforms()
+		var info: Dictionary = sp.debug_get_pattern_cache_info()
+		assert_eq(info.keys(), CACHE_INFO_KEYS, "key set")
+		assert_between(int(info["shot_class"]), 1, 2, "the seeded shot bake is classified RIGID or TRANSLATION")
+		assert_between(int(info["preview_class"]), -1, 2, "the preview channel is unclassified (-1) or a real class")
+		for key in ["hits", "misses", "bakes", "version"]:
+			assert_gte(int(info[key]), 0, "%s is a finite non-negative counter" % key)
+		assert_gte(int(info["hits"]), hits, "hits never decrease")
+		if bakes >= 0:
+			assert_eq(int(info["bakes"]), bakes, "unchanged knobs: no re-bake after the first collect")
+		bakes = int(info["bakes"])
+		hits = int(info["hits"])
+	assert_eq([hits, bakes], [2, 1], "the first collect baked, the next two hit")
+	sp.set(knob, 8)
+	sp.collect_spawn_transforms()
+	var changed: Dictionary = sp.debug_get_pattern_cache_info()
+	assert_eq([int(changed["hits"]), int(changed["misses"]), int(changed["bakes"])], [2, 2, 2], "the seed change re-baked exactly once")
+	assert_gt(int(changed["version"]), int(base["version"]), "and bumped the pattern version")
+	expect_no_errors()
+
+
+## The cache verifier toggle reads back (the harness turns it on for every
+## test; restoring it keeps sibling tests intact).
+func test_the_cache_verify_toggle_reads_back() -> void:
+	var before := PatternSpawner2D.debug_get_pattern_cache_verify()
+	PatternSpawner2D.debug_set_pattern_cache_verify(not before)
+	assert_eq(PatternSpawner2D.debug_get_pattern_cache_verify(), not before, "toggled")
+	PatternSpawner2D.debug_set_pattern_cache_verify(before)
+	assert_eq(PatternSpawner2D.debug_get_pattern_cache_verify(), before, "restored")

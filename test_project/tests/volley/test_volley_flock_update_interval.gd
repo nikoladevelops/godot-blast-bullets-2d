@@ -1,0 +1,201 @@
+extends BlastTest
+## BulletFlock2D.update_interval (the opt-in cost knob): 0 recomputes every
+## bullet's steering every tick (the default, unchanged behavior); a positive
+## interval recomputes each bullet once per interval, staggered across the
+## flock so the work spreads evenly over the ticks, while every bullet keeps
+## turning toward its last steering in between and still counts as a
+## flockmate. A bullet with no steering yet (new volley, pool reuse, woken
+## from a freeze) computes at once. The work drops by the interval's factor.
+
+const DT := 1.0 / 60.0
+
+
+func _stack(count: int) -> Array:
+	var transforms: Array = []
+	for k in count:
+		transforms.append(Transform2D(0.0, Vector2(100, 100)))
+	return transforms
+
+
+func _volley(transforms: Array, flock: BulletFlock2D, speed := 0.0) -> BulletVolley2D:
+	var v: BulletVolley2D = factory.spawn_volley(H.make_flight_data(transforms, speed, 1000.0))
+	v.flock_join(flock)
+	return v
+
+
+func test_the_default_recomputes_every_bullet_every_tick() -> void:
+	var f := BulletFlock2D.new()
+	assert_eq(f.update_interval, 0.0, "every tick by default")
+	_volley(_stack(20), f)
+	for k in 5:
+		step_factory(1)
+		var stats: Dictionary = factory.debug_get_flock_stats()
+		assert_eq(stats["queried_members"], 20, "tick %d: every bullet recomputed" % k)
+
+
+func test_an_interval_spreads_the_work_evenly() -> void:
+	var f := BulletFlock2D.new()
+	f.update_interval = 3.0 * DT
+	_volley(_stack(60), f)
+	step_factory(1) # first tick: nobody has steering yet, everyone computes
+	assert_eq(factory.debug_get_flock_stats()["queried_members"], 60, "the first tick computes everyone")
+	var total := 0
+	var per_tick: Array = []
+	for k in 30:
+		step_factory(1)
+		var q: int = factory.debug_get_flock_stats()["queried_members"]
+		per_tick.append(q)
+		total += q
+	assert_almost_eq(float(total), 600.0, 30.0, "30 ticks at one refresh per 3 ticks: ~10 per bullet (%d)" % total)
+	assert_lt(per_tick.max() - per_tick.min(), 12, "spread evenly over the ticks: %s" % [per_tick])
+
+
+func test_the_work_drops_by_the_interval_factor() -> void:
+	var f := BulletFlock2D.new()
+	f.update_interval = 4.0 * DT
+	_volley(_stack(100), f)
+	step_factory(1)
+	var checks := 0
+	for k in 40:
+		step_factory(1)
+		checks += int(factory.debug_get_flock_stats()["neighbor_checks"])
+	# Stacked: each recomputed bullet costs exactly the cap (32) checks.
+	assert_almost_eq(float(checks), 40.0 * 100.0 * 32.0 / 4.0, 40.0 * 100.0 * 32.0 / 4.0 * 0.1, "a quarter of the every-tick work (%d checks)" % checks)
+
+
+func test_a_bullet_keeps_its_steering_between_refreshes() -> void:
+	var f := H.make_flock(0.0, 0.0, 1.0)
+	f.update_interval = 5.0 * DT
+	var v := _volley([Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 40))], f, 100.0)
+	step_factory(1)
+	var changes := 0
+	var last: Vector2 = v.debug_get_bullet_flock_steering(0)
+	var turned := 0
+	for k in 30:
+		var before: Vector2 = v.get_bullet_direction(0)
+		step_factory(1)
+		var s: Vector2 = v.debug_get_bullet_flock_steering(0)
+		if s != last:
+			changes += 1
+			last = s
+		if v.get_bullet_direction(0) != before:
+			turned += 1
+	assert_between(changes, 5, 7, "30 ticks at one refresh per 5: ~6 updates (%d)" % changes)
+	assert_eq(turned, 30, "it turns every tick toward its last steering")
+
+
+func test_the_flock_still_flocks_with_an_interval() -> void:
+	var f := H.make_flock(0.0, 0.0, 1.0)
+	f.update_interval = 0.1
+	var v := _volley([Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 30))], f, 100.0)
+	step_factory(30)
+	assert_lt(v.get_bullet_transform(0).origin.distance_to(v.get_bullet_transform(1).origin), 25.0, "cohesion still closes the gap")
+
+
+func test_bullets_without_steering_compute_at_once() -> void:
+	var f := H.make_flock(0.0, 0.0, 1.0)
+	f.update_interval = 100.0 # one refresh per 100 s: only the forced ones happen
+	var a := _volley([Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 30))], f, 100.0)
+	step_factory(1)
+	assert_ne(a.debug_get_bullet_flock_steering(0), Vector2(), "a new volley steers on its first tick")
+	var b := _volley([Transform2D(0.0, Vector2(500, 0)), Transform2D(0.0, Vector2(500, 30))], f, 100.0)
+	step_factory(1)
+	assert_ne(b.debug_get_bullet_flock_steering(0), Vector2(), "a volley joining later too")
+	a.set_is_auto_pooling_enabled(false)
+	a.disable_bullet(1)
+	step_factory(3)
+	a.teleport_shift_all_bullets(Vector2(0, 0))
+	a.enable_bullet(1)
+	step_factory(1)
+	assert_ne(a.debug_get_bullet_flock_steering(1), Vector2(), "a woken bullet computes at once")
+	assert_eq(a.debug_get_bullet_flock_neighbors(1), 1, "with its current flockmate")
+
+
+func test_pool_reuse_never_reads_an_old_life_steering() -> void:
+	var f := H.make_flock(0.0, 0.0, 1.0)
+	f.update_interval = 100.0
+	var old := _volley([Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 30))], f, 100.0)
+	step_factory(2)
+	assert_ne(old.debug_get_bullet_flock_steering(0), Vector2(), "the old life steered")
+	old.disable_bullet(0)
+	old.disable_bullet(1)
+	var reused: BulletVolley2D = factory.spawn_volley(H.make_flight_data([Transform2D(0.0, Vector2(400, 0)), Transform2D(0.0, Vector2(400, 300))], 100.0, 1000.0))
+	assert_eq(reused, old, "the pool handed it back")
+	reused.flock_join(f)
+	step_factory(1)
+	assert_eq(reused.debug_get_bullet_flock_steering(0), Vector2(), "300 px apart: no steering, never the old life's")
+	assert_eq(reused.debug_get_bullet_flock_neighbors(0), 0, "no flockmate in range")
+
+
+func test_update_interval_rejects_bad_values() -> void:
+	var f := BulletFlock2D.new()
+	f.update_interval = -0.1
+	f.update_interval = NAN
+	f.update_interval = INF
+	expect_error_sequence([
+		"BulletFlock2D: update_interval must be finite and >= 0, keeping the old value.",
+		"BulletFlock2D: update_interval must be finite and >= 0, keeping the old value.",
+		"BulletFlock2D: update_interval must be finite and >= 0, keeping the old value.",
+	])
+	assert_eq(f.update_interval, 0.0, "kept")
+
+
+func test_a_cache_from_an_older_setup_is_never_reused() -> void:
+	# Interval on, then off while the bullets move apart, then on again: the
+	# steering must be measured anew, never the one cached before the gap.
+	var f := H.make_flock(0.0, 0.0, 1.0)
+	f.update_interval = 100.0
+	var v := _volley([Transform2D(0.0, Vector2(0, 0)), Transform2D(0.0, Vector2(0, 30))], f, 100.0)
+	step_factory(1)
+	assert_ne(v.debug_get_bullet_flock_steering(0), Vector2(), "pulled together")
+	f.update_interval = 0.0
+	v.teleport_shift_all_bullets(Vector2(0, 0))
+	v.bullet_set_velocity(1, Vector2(0, 2000))
+	step_factory(10) # bullet 1 flies far away; every tick recomputes, no cache
+	assert_eq(v.debug_get_bullet_flock_neighbors(0), 0, "out of range now")
+	f.update_interval = 100.0
+	step_factory(1)
+	assert_eq(v.debug_get_bullet_flock_steering(0), Vector2(), "the old cached pull is never reused")
+
+
+func test_a_new_scope_measures_anew() -> void:
+	# A spawner switching scope in flight regroups its bullets: a cached
+	# steering from the old group must not survive the switch.
+	var f := H.make_flock(0.0, 0.0, 1.0, 400.0, 0.0)
+	f.update_interval = 100.0
+	var sp := make_spawner(H.make_volley_data(4, 0.0, 1000.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
+	sp.helper_ring_radius = 30.0
+	sp.flock_enabled = true
+	sp.flock = f
+	sp.flock_scope = BulletFlock2D.SCOPE_SHARED
+	var got: Array = []
+	sp.volley_fired.connect(func(v: BulletVolley2D, _n: int) -> void: got.append(v))
+	sp.shoot_once()
+	sp.global_position = Vector2(200, 0)
+	sp.shoot_once()
+	step_factory(1)
+	assert_eq(got[0].debug_get_bullet_flock_neighbors(0), 7, "Shared: both shots flock together")
+	sp.flock_scope = BulletFlock2D.SCOPE_PER_VOLLEY
+	step_factory(1)
+	assert_eq(got[0].debug_get_bullet_flock_neighbors(0), 3, "Per Volley: measured anew right away, not after 100 s")
+
+
+func test_a_rules_edit_reaches_every_bullet_on_the_next_tick() -> void:
+	# Edits apply on the next tick even between refreshes: the cached
+	# steering was computed by the old rules (found by the chaos soak: a
+	# lowered max_neighbors still read 25 flockmates for a whole interval).
+	var f := H.make_flock(1.0, 1.0, 1.0, 400.0, 40.0)
+	f.update_interval = 0.5
+	var v := _volley(_stack(40), f)
+	step_factory(2)
+	assert_eq(v.debug_get_bullet_flock_neighbors(7), 32, "the default cap of 32")
+	f.max_neighbors = 3
+	step_factory(1)
+	var over: Array = []
+	for i in 40:
+		if v.debug_get_bullet_flock_neighbors(i) > 3:
+			over.append(i)
+	assert_eq(over, [], "every bullet reads at most the new cap at once")
+	assert_eq(factory.debug_get_flock_stats()["queried_members"], 40, "the edit made every bullet compute anew")
+	step_factory(1)
+	assert_lt(factory.debug_get_flock_stats()["queried_members"], 40, "then the interval spreads the work again")
