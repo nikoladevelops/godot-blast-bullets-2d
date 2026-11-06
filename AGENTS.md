@@ -1411,6 +1411,10 @@ project's `.so`). For quick numeric comparisons load two
   is reloaded after every external call). The staged loop then measured
   level or faster than the monolithic one (tick p50: `trails_fx_2k` −1%,
   `volley_10k_flight` −6%).
+- A liveness check (`survived_user_code` + `is_queued_for_deletion`) per bullet
+  is two engine lookups: run it only after user code REALLY ran. The homing
+  reach is only recorded inside the loop; checking after every homing bullet
+  cost `pickup_convert_5k` +25% tick.
 - Write-only per-bullet arrays cost a store per bullet per tick: delete
   them (the shape-origin cache was one).
 - `std::deque` allocates on construction: two mallocs per bullet per cold
