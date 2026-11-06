@@ -285,19 +285,45 @@ spawner.bounce_body_entered.connect(func(wall, volley: BulletVolley2D, i: int) -
 <details>
 <summary><b>Sound effects</b> (Sound)</summary>
 
-Each `BulletSoundData2D` entry says WHEN it plays (`trigger`: On Hit, On Bounce, On Graze, On Flight, On Split...) and HOW (streams, volume, pitch, spatial range, voice limits). The factory mixes every play: the nearest wins when too many fire at once.
+A `BulletSoundData2D` says WHEN it plays (`trigger`) and HOW. Give a spawner a list of them (`sound_effects`), arm a volley you spawned yourself (`volley.sound_set_effects(...)`), or play one anywhere (`factory.play_sound(...)`). Every play goes through the factory's mixer: limits, stealing and ducking are shared by everyone using the same resource, and when too many events fire at once the nearest win.
 
 ```gdscript
+# Hits: five variations, never the same one twice in a row, a little pitch and volume variety.
 var hit := BulletSoundData2D.new()
-hit.trigger = BulletSoundData2D.SOUND_ON_HIT
-hit.streams = [preload("res://sfx/hit.wav")]
+hit.trigger = BulletSoundData2D.SOUND_ON_HIT     # also On Shot, Bounce, Graze, Flight, Split, Lifetime Over, Despawn...
+hit.streams = [preload("res://sfx/hit_1.wav"), preload("res://sfx/hit_2.wav"), preload("res://sfx/hit_3.wav")]
+hit.stream_mode = BulletSoundData2D.STREAM_RANDOM   # or WEIGHTED (stream_weights), SEQUENCE, SHUFFLE
+hit.random_pitch_min = 0.9                          # each play: pitch x a roll in 0.9..1.1
+hit.random_pitch_max = 1.1
+hit.random_volume_min_db = -3.0                     # each play: volume + a roll in -3..0 dB
+hit.max_voices = 6                                  # at most 6 at once across the whole game...
+hit.min_interval_sec = 0.04                         # ...and one new play per 40 ms (a 300-bullet hit storm stays one sound)
+hit.when_limit_reached = BulletSoundData2D.SOUND_LIMIT_REPLACE_OLDEST   # or SOUND_LIMIT_SKIP_NEW
+hit.bus = &"SFX"
 
-spawner.sound_effects = [hit]                 # a spawner's bullets (On Shot and On Telegraph work here too)
-var volley := factory.spawn_volley(data)
-volley.sound_set_effects([hit])               # a volley spawned from code
-factory.play_sound(hit, global_position)      # a one-off play, anywhere
+# A hum that rides each bullet and fades out when the bullet ends.
+var hum := BulletSoundData2D.new()
+hum.trigger = BulletSoundData2D.SOUND_ON_FLIGHT
+hum.streams = [preload("res://sfx/hum_loop.ogg")]
+hum.follow_bullet = true
+hum.fade_out_sec = 0.2
+hum.max_distance = 600.0          # silent (no voice taken) past 600 px from the listener
+
+# The boss's big shot ducks everything quieter while it plays.
+var boom := BulletSoundData2D.new()
+boom.trigger = BulletSoundData2D.SOUND_ON_SHOT
+boom.streams = [preload("res://sfx/boom.wav")]
+boom.priority = 10
+boom.duck_amount_db = 8.0   # dip lower-priority voices by 8 dB
+
+spawner.sound_effects = [hit, hum, boom]
+volley.sound_set_effects([hit, hum])              # a volley from factory.spawn_volley (Shot/Telegraph are spawner-only)
+factory.play_sound(hit, global_position)          # a one-off play, anywhere
+
+hit.streams = [preload("res://sfx/ice_hit.wav")]  # switch sounds any time: edits reach bullets already flying
+hum.enabled = false                               # mute one entry
 ```
-Edits to an entry (`enabled`, `trigger`, volume...) reach bullets already in flight.
+More: `trigger_chance`, graze filters (`ring_index`, `zone_index`), `positional` off for UI-style stings, `audibility_mode` (distance, camera view or both), `pitch_follows_time_scale` for slow motion, `amount_gain_db` to make big volleys louder. Lasers use `LaserSoundData2D` the same way (`LASER_SOUND_ON_CHARGE`, `_FIRE`, `_ACTIVE`, `_HIT`, ...) on a `LaserSpawner2D` or `laser.sound_set_effects(...)`. Every property has in-editor help.
 </details>
 
 <details>

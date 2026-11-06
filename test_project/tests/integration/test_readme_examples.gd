@@ -297,17 +297,48 @@ func test_the_laser_from_code_example_runs_as_written() -> void:
 
 
 func test_the_sound_recipe_runs_as_written() -> void:
+	AudioServer.add_bus()
+	AudioServer.set_bus_name(AudioServer.bus_count - 1, "SFX") # the recipe's bus, as a project would have it
 	factory.debug_set_sound_offer_log_enabled(true)
 	var hit := BulletSoundData2D.new()
 	hit.trigger = BulletSoundData2D.SOUND_ON_HIT
-	hit.streams = [H.make_sound_stream()] # marks the file for the headless audio drain
+	hit.streams = [H.make_sound_stream(), H.make_sound_stream(), H.make_sound_stream()] # marks the file for the headless audio drain
+	hit.stream_mode = BulletSoundData2D.STREAM_RANDOM
+	hit.random_pitch_min = 0.9
+	hit.random_pitch_max = 1.1
+	hit.random_volume_min_db = -3.0
+	hit.max_voices = 6
+	hit.min_interval_sec = 0.04
+	hit.when_limit_reached = BulletSoundData2D.SOUND_LIMIT_REPLACE_OLDEST
+	hit.bus = &"SFX"
+	var hum := BulletSoundData2D.new()
+	hum.trigger = BulletSoundData2D.SOUND_ON_FLIGHT
+	hum.streams = [H.make_sound_stream()]
+	hum.follow_bullet = true
+	hum.fade_out_sec = 0.2
+	hum.max_distance = 600.0
+	var boom := BulletSoundData2D.new()
+	boom.trigger = BulletSoundData2D.SOUND_ON_SHOT
+	boom.streams = [H.make_sound_stream()]
+	boom.priority = 10
+	boom.duck_amount_db = 8.0
+	assert_eq([hit.random_pitch_min, hit.random_pitch_max, hit.max_voices, hit.bus, hum.follow_bullet, boom.duck_amount_db],
+			[0.9, 1.1, 6, &"SFX", true, 8.0], "every setting sticks")
 	var sp := make_spawner(H.make_volley_data(4), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
-	sp.sound_effects = [hit]
-	assert_eq(sp.sound_effects.size(), 1, "the spawner takes the entry")
+	sp.sound_effects = [hit, hum, boom]
+	assert_eq(sp.sound_effects.size(), 3, "the spawner takes the entries")
 	var volley := factory.spawn_volley(H.make_volley_data(4))
-	volley.sound_set_effects([hit])
+	volley.sound_set_effects([hit, hum])
 	assert_true(volley.is_sound_armed(), "a factory volley is armed")
 	factory.play_sound(hit, Vector2(10, 10))
-	step_factory(1, DT)
-	assert_gt(factory.debug_get_sound_offer_log().size(), 0, "the one-off play was offered")
+	step_factory(2, DT)
+	var log: Array = factory.debug_get_sound_offer_log()
+	assert_gt(log.size(), 1, "the one-off play and the flying hum were offered")
+	hit.streams = [H.make_sound_stream()]
+	hum.enabled = false
+	var before := factory.debug_get_sound_offer_log().size()
+	step_factory(2, DT)
+	assert_eq(factory.debug_get_sound_offer_log().size(), before, "a disabled hum stops offering in flight")
 	expect_no_errors()
+	expect_warning_sequence([])
+	AudioServer.remove_bus(AudioServer.get_bus_index("SFX"))
