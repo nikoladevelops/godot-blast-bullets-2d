@@ -193,7 +193,24 @@ def main():
             input("Press Enter to continue...")
 
 
+# Non-interactive commands (CI, scripts): the same tool scripts the menu runs.
+CLI_COMMANDS = {
+    "build-debug": "compile_debug_build.py",
+    "build-release": "compile_release_build.py",
+}
+
+
+def run_cli(args) -> int:
+    command = args[0]
+    if command not in CLI_COMMANDS:
+        print(f"Unknown command '{command}'. Commands: {', '.join(CLI_COMMANDS)} (no command = the menu).")
+        return 2
+    return run_tool_script(CLI_COMMANDS[command])
+
+
 if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        sys.exit(run_cli(sys.argv[1:]))
     try:
         main()
     except KeyboardInterrupt:

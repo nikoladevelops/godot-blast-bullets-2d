@@ -29,6 +29,7 @@ def run_tool_script(script_filename):
     if result.returncode != 0:
         print(result.stderr or "An error occurred.")
         pause("Press Enter to continue...")
+    return result.returncode
 
 def clear_screen() -> None:
     """Clear the terminal screen cross-platform using subprocess."""
