@@ -601,3 +601,33 @@ func test_lowered_max_voices_caps_new_plays() -> void:
 		factory.play_sound(s, Vector2(i, 0))
 	await physics(2)
 	assert_eq(busy_voices().size(), 10, "the idle voices serve again once the cap grows")
+
+
+func test_each_play_runs_on_its_entry_bus_and_a_reused_voice_switches() -> void:
+	# One voice in the pool: the same AudioStreamPlayer2D serves both entries.
+	AudioServer.add_bus()
+	AudioServer.set_bus_name(AudioServer.get_bus_count() - 1, "SfxTest")
+	godot_listener_at(Vector2.ZERO)
+	factory.set_sound_max_voices(1)
+	var sfx := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+	sfx.bus = &"SfxTest"
+	var plain := H.make_sound(BulletSoundData2D.SOUND_ON_SHOT)
+	assert_true(factory.play_sound(sfx, Vector2(10, 0)), "SFX play accepted")
+	await physics(2)
+	assert_eq(String((busy_voices()[0] as Dictionary)["bus"]), "SfxTest", "plays on the entry's bus")
+	factory.stop_sounds()
+	assert_true(factory.play_sound(plain, Vector2(10, 0)), "Master play accepted")
+	await physics(2)
+	assert_eq(busy_voices().size(), 1, "the one voice is reused")
+	assert_eq(String((busy_voices()[0] as Dictionary)["bus"]), "Master", "a reused voice switches back to Master")
+	factory.stop_sounds()
+	AudioServer.remove_bus(AudioServer.get_bus_index("SfxTest"))
+	sfx.bus = &"SfxTest" # the bus is gone now: Master, one warning per name
+	assert_true(factory.play_sound(sfx, Vector2(10, 0)), "still plays")
+	await physics(2)
+	expect_warning_sequence(["BulletSoundData2D: bus \"SfxTest\" does not exist, playing on Master."])
+	assert_eq(String((busy_voices()[0] as Dictionary)["bus"]), "Master", "a removed bus falls back to Master")
+	factory.stop_sounds()
+	assert_true(factory.play_sound(sfx, Vector2(10, 0)), "plays again")
+	await physics(2)
+	expect_warning_sequence([]) # warned once per name, not per play

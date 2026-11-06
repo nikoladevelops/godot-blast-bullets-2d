@@ -323,6 +323,8 @@ factory.play_sound(hit, global_position)          # a one-off play, anywhere
 hit.streams = [preload("res://sfx/ice_hit.wav")]  # switch sounds any time: edits reach bullets already flying
 hum.enabled = false                               # mute one entry
 ```
+**Audio buses:** each entry plays on its own `bus` (create it in Godot's Audio panel; an unknown name plays on Master with one warning), so a settings menu's SFX slider is just `AudioServer.set_bus_volume_db(AudioServer.get_bus_index("SFX"), db)`. `occlusion_bus` reroutes plays blocked by walls (`occlusion_mask`) to a muffled bus, and `area_mask` honors the bus override of `Area2D` reverb zones (a cave that echoes).
+
 More: `trigger_chance`, graze filters (`ring_index`, `zone_index`), `positional` off for UI-style stings, `audibility_mode` (distance, camera view or both), `pitch_follows_time_scale` for slow motion, `amount_gain_db` to make big volleys louder. Lasers use `LaserSoundData2D` the same way (`LASER_SOUND_ON_CHARGE`, `_FIRE`, `_ACTIVE`, `_HIT`, ...) on a `LaserSpawner2D` or `laser.sound_set_effects(...)`. Every property has in-editor help.
 </details>
 
