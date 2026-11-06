@@ -40,24 +40,25 @@ def setup_build_environment(env, opts) -> None:
         print("No selected build profile\n")
 
     opts.Update(env)
-    _disable_gnu_unique_symbols(env)
+    _hide_static_libstdcpp_symbols(env)
 
 
-def _disable_gnu_unique_symbols(env) -> None:
-    """GCC on Linux: never emit STB_GNU_UNIQUE symbols.
+def _hide_static_libstdcpp_symbols(env) -> None:
+    """Linux GCC: never export the statically linked libstdc++.
 
-    One unique symbol (older libstdc++ emits them for function-local statics
-    in inline templates) makes glibc mark the library NODELETE: dlclose keeps
-    it, its statics outlive Godot's StringName table and every run reports
-    Orphan StringName leaks (CI's GCC 13 did; GCC 16 emitted none). Clang
-    toolchains (macOS, iOS, Android NDK, Emscripten) never emit them.
+    godot-cpp links libstdc++ into the library (use_static_cpp). Exported, its
+    GNU unique symbols (`std::string::_Rep::_S_empty_rep_storage`, shown by
+    readelf as `<OS specific>: 10`) win the lookup under the OFFICIAL Godot
+    binary (it bundles libstdc++ without exporting it): glibc then marks the
+    library NODELETE, dlclose keeps it, and every exit reports Orphan
+    StringName leaks. A distro Godot linked to the shared libstdc++ hides it.
     """
     from SCons.Script import ARGUMENTS
 
     platform = ARGUMENTS.get("platform", ARGUMENTS.get("p", ""))
     use_llvm = str(ARGUMENTS.get("use_llvm", "no")).lower() in ("yes", "true", "1")
     if sys.platform.startswith("linux") and platform in ("", "linux") and not use_llvm:
-        env.Append(CCFLAGS=["-fno-gnu-unique"])
+        env.Append(LINKFLAGS=["-Wl,--exclude-libs,ALL"])
 
 
 def get_library_filename(env, libname: str, precision: str) -> str:

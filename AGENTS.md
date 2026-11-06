@@ -1253,7 +1253,7 @@ replayed once on resume.
   its type tag `_Sp_make_shared_tag::_S_ti()::__tag` is a GNU unique
   symbol, glibc then marks the library NODELETE, `dlclose` keeps it, its
   statics outlive Godot's StringName table and EVERY test file reports ~86
-  `Orphan StringName` leaks (diagnose with `LD_DEBUG=all ... | grep NODELETE`)). Older GCCs emit such symbols from libstdc++ itself (CI's GCC 13 did, GCC 16 does not): Linux GCC builds pass `-fno-gnu-unique` (`tools/scons_build_helpers.py`) and CI fails on any `UNIQUE` symbol in `readelf -Ws`.
+  `Orphan StringName` leaks (diagnose with `LD_DEBUG=all ... | grep NODELETE`)). The statically linked libstdc++ (godot-cpp `use_static_cpp`) carries one too (`std::string::_Rep::_S_empty_rep_storage`, readelf binding `<OS specific>: 10`): exported, it pins the library under the OFFICIAL Godot binary (libstdc++ bundled, not exported) while a distro Godot hides it. Linux GCC builds link with `-Wl,--exclude-libs,ALL` (`tools/scons_build_helpers.py`), CI fails on any unique symbol in `readelf --dyn-syms`, and leak work is proven with the official binary (`GODOT_BIN=<official> python3 tools/run_tests.py`).
 - Memory errors and undefined behavior the suites cannot see (a write into
   freed memory passes every assert; x86 hides most UB, ARM and the optimizer
   do not): `tools/run_sanitizer_tests.py` finds them with file:line and a

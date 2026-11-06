@@ -69,14 +69,14 @@ jobs:
       - name: Build the debug library
         env:
           SCONS_CACHE: ${{ github.workspace }}/.scons-cache
-        run: python3 tools/compile_debug_build.py
+        run: python3 setup.py build-debug
       - name: Build the release library
         if: matrix.build == 'release'
         env:
           SCONS_CACHE: ${{ github.workspace }}/.scons-cache
         run: |
           cp compile_commands.json compile_commands.debug.json
-          python3 tools/compile_release_build.py
+          python3 setup.py build-release
           mv compile_commands.debug.json compile_commands.json
       - name: Install the plugin into the test project
         run: bash .github/scripts/install_plugin.sh
@@ -84,7 +84,7 @@ jobs:
         run: |
           bad=0
           for lib in test_project/addons/blastbullets2d/bin/linux/*.so; do
-            syms=$(readelf -Ws "$lib" | awk '$5=="UNIQUE"{print $8}' | c++filt)
+            syms=$(readelf -W --dyn-syms "$lib" | grep -E " UNIQUE |<OS specific>: 10" | awk '{print $NF}' | c++filt)
             if [ -n "$syms" ]; then echo "::error::$lib has GNU unique symbols:"; echo "$syms"; bad=1; fi
           done
           exit $bad
@@ -133,7 +133,7 @@ jobs:
       - name: Install Godot ${{ env.GODOT_VERSION }}
         run: bash .github/scripts/install_godot.sh
       - name: Build the debug library
-        run: python3 tools/compile_debug_build.py
+        run: python3 setup.py build-debug
       - name: Install the plugin into the test project
         run: bash .github/scripts/install_plugin.sh
       - name: Sanitizer run
