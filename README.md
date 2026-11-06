@@ -341,6 +341,14 @@ data.transforms = BulletPatterns2D.helper_generate_transforms_ring(24, Transform
 var volley := factory.spawn_volley(data)
 volley.all_bullets_set_speed(300.0, 0, -1)   # steer it afterwards (0, -1 = every bullet): speed, homing, colors, teleport...
 ```
+Lasers work the same way, without a `LaserSpawner2D`:
+
+```gdscript
+var beam := LaserData2D.create_preset(LaserData2D.PRESET_CHARGED_SWEEP)
+var laser := factory.spawn_laser(beam, [Transform2D(0.0, global_position)], self)   # one beam per transform; follows this node
+factory.laser_hit.connect(func(target, _laser, _beam_index, _position) -> void: print("burned ", target))
+laser.end_laser()   # or let its phases run out
+```
 Every pattern of the spawner is a static `BulletPatterns2D.helper_generate_transforms_*` function, and `BulletVolley2D` has runtime control for every feature (see its in-editor docs). Factory-spawned bullets report their hits on the factory's signals.
 
 ## Performance

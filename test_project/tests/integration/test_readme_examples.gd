@@ -274,3 +274,23 @@ func test_the_resize_and_bounce_recipes_run_as_written() -> void:
 	assert_eq([data.bounce_mask, data.collision_mask, data.bounce_max_count], [1, 3, 3], "the bounce settings stick")
 	assert_true(volley.has_method("bullet_get_last_bounce_normal"), "the normal readout exists")
 	expect_no_errors()
+
+
+func test_the_laser_from_code_example_runs_as_written() -> void:
+	var owner_node := Node2D.new()
+	add(owner_node)
+	var beam := LaserData2D.create_preset(LaserData2D.PRESET_CHARGED_SWEEP)
+	var laser := factory.spawn_laser(beam, [Transform2D(0.0, owner_node.global_position)], owner_node)
+	assert_not_null(laser, "fired")
+	assert_eq(laser.get_beam_count(), 1, "one beam per transform")
+	var hits := [0]
+	factory.laser_hit.connect(func(_target, _laser, _beam_index, _position) -> void: hits[0] += 1)
+	step_factory(2, DT)
+	assert_true(laser.is_laser_active(), "running")
+	laser.end_laser()
+	for i in 200:
+		step_factory(1, DT)
+		if not laser.is_laser_active():
+			break
+	assert_false(laser.is_laser_active(), "ended")
+	expect_no_errors()
