@@ -1,0 +1,142 @@
+[gd_resource type="LaserData2D" format=3]
+
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_beam_01.png" id="1_6e7md"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_beam_02.png" id="2_a2v81"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_beam_03.png" id="3_jhu1u"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_beam_04.png" id="4_urwcw"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_orb_01.png" id="5_yck6c"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_orb_02.png" id="6_w21w3"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_orb_03.png" id="7_1xtsh"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_orb_04.png" id="8_cvxxb"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_orb_05.png" id="9_84bsp"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_orb_06.png" id="10_1foeh"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_orb_07.png" id="11_iis5n"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/laser_orb_08.png" id="12_cepux"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/hit_spark_01.png" id="13_sfgb2"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/hit_spark_02.png" id="14_u8xxk"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/hit_spark_03.png" id="15_uym8n"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/hit_spark_04.png" id="16_y13cl"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/hit_spark_05.png" id="17_qkg1j"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/hit_spark_06.png" id="18_v61nn"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/hit_spark_07.png" id="19_fgp8y"]
+[ext_resource type="Texture2D" path="res://shared/art/effects/hit_spark_08.png" id="20_2b2rq"]
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_dva6a"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("1_6e7md")
+}, {
+"duration": 1.0,
+"texture": ExtResource("2_a2v81")
+}, {
+"duration": 1.0,
+"texture": ExtResource("3_jhu1u")
+}, {
+"duration": 1.0,
+"texture": ExtResource("4_urwcw")
+}],
+"loop": 1,
+"name": &"default",
+"speed": 12.0
+}]
+
+[sub_resource type="Gradient" id="Gradient_7susu"]
+colors = PackedColorArray(0, 0, 0, 1, 0.4400404, 0.00013495862, 0.44005203, 1)
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_wvwjm"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("5_yck6c")
+}, {
+"duration": 1.0,
+"texture": ExtResource("6_w21w3")
+}, {
+"duration": 1.0,
+"texture": ExtResource("7_1xtsh")
+}, {
+"duration": 1.0,
+"texture": ExtResource("8_cvxxb")
+}, {
+"duration": 1.0,
+"texture": ExtResource("9_84bsp")
+}, {
+"duration": 1.0,
+"texture": ExtResource("10_1foeh")
+}, {
+"duration": 1.0,
+"texture": ExtResource("11_iis5n")
+}, {
+"duration": 1.0,
+"texture": ExtResource("12_cepux")
+}],
+"loop": 1,
+"name": &"default",
+"speed": 14.0
+}]
+
+[sub_resource type="LaserSpriteLook2D" id="LaserSpriteLook2D_ocj32"]
+frames = SubResource("SpriteFrames_wvwjm")
+scale = Vector2(1.3, 1.3)
+
+[sub_resource type="LaserSpriteLook2D" id="LaserSpriteLook2D_qm5g5"]
+frames = SubResource("SpriteFrames_wvwjm")
+scale = Vector2(1.3, 1.3)
+show_when = 1
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_0gn1e"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("13_sfgb2")
+}, {
+"duration": 1.0,
+"texture": ExtResource("14_u8xxk")
+}, {
+"duration": 1.0,
+"texture": ExtResource("15_uym8n")
+}, {
+"duration": 1.0,
+"texture": ExtResource("16_y13cl")
+}, {
+"duration": 1.0,
+"texture": ExtResource("17_qkg1j")
+}, {
+"duration": 1.0,
+"texture": ExtResource("18_v61nn")
+}, {
+"duration": 1.0,
+"texture": ExtResource("19_fgp8y")
+}, {
+"duration": 1.0,
+"texture": ExtResource("20_2b2rq")
+}],
+"loop": 0,
+"name": &"default",
+"speed": 20.0
+}]
+
+[sub_resource type="LaserSpriteLook2D" id="LaserSpriteLook2D_pjaw6"]
+frames = SubResource("SpriteFrames_0gn1e")
+scale = Vector2(1.6, 1.6)
+
+[resource]
+length = 780.0
+width = 97.0
+extend_speed = 4717.0
+grow_sec = 0.05
+active_sec = 0.5
+fade_sec = 0.15
+aim = 2
+wall_mask = 1
+reflections = 5
+hit_interval_sec = 0.1
+color_ramp = SubResource("Gradient_7susu")
+body_frames = SubResource("SpriteFrames_dva6a")
+body_mode = 1
+body_scroll_speed = 1459.0
+body_end_fade = 60.0
+muzzle_look = SubResource("LaserSpriteLook2D_ocj32")
+tip_look = SubResource("LaserSpriteLook2D_qm5g5")
+wall_impact_look = SubResource("LaserSpriteLook2D_pjaw6")

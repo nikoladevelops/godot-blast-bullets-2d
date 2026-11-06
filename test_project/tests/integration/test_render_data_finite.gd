@@ -13,14 +13,10 @@ extends BlastTest
 const SANE := 1.0e6
 
 
+## The test lab's reflecting Lock On laser, saved as a fixture: a test never
+## reads the hand-edited benchmark scene (it may differ from the committed one).
 func _benchmark_laser() -> LaserData2D:
-	var state := (load("res://benchmark_scene/benchmark.tscn") as PackedScene).get_state()
-	for i in state.get_node_count():
-		if state.get_node_name(i) == "LaserSpawner2D":
-			for p in state.get_node_property_count(i):
-				if state.get_node_property_name(i, p) == "laser_data":
-					return state.get_node_property_value(i, p)
-	return null
+	return load("res://tests/scenes/test_lab_laser.tres") as LaserData2D
 
 
 func test_the_demo_setups_hand_the_gpu_sane_data() -> void:
